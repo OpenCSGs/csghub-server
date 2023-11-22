@@ -11,6 +11,8 @@ import (
 var WireSet = wire.NewSet(
 	ProvideRedisConfig,
 	ProvideCache,
+	ProvideModelCache,
+	ProvideDatasetCache,
 )
 
 func ProvideRedisConfig(config *config.Config) RedisConfig {
@@ -24,4 +26,12 @@ func ProvideRedisConfig(config *config.Config) RedisConfig {
 
 func ProvideCache(ctx context.Context, cfg RedisConfig) (*Cache, error) {
 	return NewCache(ctx, cfg)
+}
+
+func ProvideModelCache(cache *Cache) ModelCache {
+	return NewModelCache(cache)
+}
+
+func ProvideDatasetCache(cache *Cache) DatasetCache {
+	return NewDatasetCache(cache)
 }
