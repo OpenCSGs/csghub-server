@@ -9,11 +9,14 @@ package main
 import (
 	"context"
 	"git-devops.opencsg.com/product/community/starhub-server/cmd/starhub-server/cmd/common"
+	"git-devops.opencsg.com/product/community/starhub-server/pkg/api/controller/dataset"
+	model2 "git-devops.opencsg.com/product/community/starhub-server/pkg/api/controller/model"
 	"git-devops.opencsg.com/product/community/starhub-server/pkg/apiserver"
-	"git-devops.opencsg.com/product/community/starhub-server/pkg/cache"
 	"git-devops.opencsg.com/product/community/starhub-server/pkg/httpbase"
 	"git-devops.opencsg.com/product/community/starhub-server/pkg/model"
-	"git-devops.opencsg.com/product/community/starhub-server/pkg/serverhost"
+	"git-devops.opencsg.com/product/community/starhub-server/pkg/router"
+	"git-devops.opencsg.com/product/community/starhub-server/pkg/store/cache"
+	"git-devops.opencsg.com/product/community/starhub-server/pkg/store/database"
 )
 
 // Injectors from wire.go:
@@ -23,26 +26,26 @@ func initAPIServer(ctx context.Context) (*httpbase.GracefulServer, error) {
 	if err != nil {
 		return nil, err
 	}
-	redisConfig := cache.ProvideRedisConfig(config)
-	cacheCache, err := cache.ProvideCache(ctx, redisConfig)
-	if err != nil {
-		return nil, err
-	}
+	logger := apiserver.ProvideServerLogger()
 	dbConfig := model.ProvideDBConfig(config)
 	db, err := model.ProvideDatabse(ctx, dbConfig)
 	if err != nil {
 		return nil, err
 	}
-	logger := apiserver.ProvideServerLogger()
-	opt := serverhost.ProvideOpt(config)
-	serverHost, err := serverhost.ProvideServerHost(opt)
+	modelStore := database.ProvideModelStore(db)
+	redisConfig := cache.ProvideRedisConfig(config)
+	cacheCache, err := cache.ProvideCache(ctx, redisConfig)
 	if err != nil {
 		return nil, err
 	}
-	serverOpt := apiserver.ProvideServerOpt(config, cacheCache, db, logger, serverHost)
-	gracefulServer, err := apiserver.ProvideGracefulServer(serverOpt)
-	if err != nil {
-		return nil, err
-	}
+	modelCache := cache.ProvideModelCache(cacheCache)
+	controller := model2.ProvideController(modelStore, modelCache)
+	datasetStore := database.ProvideDatasetStore(db)
+	datasetCache := cache.ProvideDatasetCache(cacheCache)
+	datasetController := dataset.ProvideController(datasetStore, datasetCache)
+	apiHandler := router.ProvideAPIHandler(config, controller, datasetController)
+	gitHandler := router.ProvideGitHandler(config, controller, datasetController)
+	routerRouter := router.ProvideRouter(apiHandler, gitHandler)
+	gracefulServer := apiserver.ProvideGracefulServer(config, logger, routerRouter)
 	return gracefulServer, nil
 }
