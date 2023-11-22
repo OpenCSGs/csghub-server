@@ -1,0 +1,13 @@
+stages:
+  - build
+
+variables:  # 替换为您的容器注册表URL
+  IMAGE_NAME: "starhub-server"     # 替换为您的Docker镜像名称
+  IMAGE_TAG: "latest"
+
+build:
+  stage: build
+  script:
+    - docker build -t $CI_REGISTRY_HOST/$IMAGE_NAME:$IMAGE_TAG .
+    - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_USER $CI_REGISTRY_HOST
+    - docker push $CI_REGISTRY_HOST/$IMAGE_NAME:$IMAGE_TAG
