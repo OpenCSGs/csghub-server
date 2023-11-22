@@ -1,0 +1,27 @@
+//go:build wireinject
+// +build wireinject
+
+package main
+
+import (
+	"context"
+
+	"git-devops.opencsg.com/product/community/starhub-server/cmd/starhub-server/cmd/common"
+	"git-devops.opencsg.com/product/community/starhub-server/pkg/apiserver"
+	"git-devops.opencsg.com/product/community/starhub-server/pkg/cache"
+	"git-devops.opencsg.com/product/community/starhub-server/pkg/httpbase"
+	"git-devops.opencsg.com/product/community/starhub-server/pkg/model"
+	"git-devops.opencsg.com/product/community/starhub-server/pkg/serverhost"
+	"github.com/google/wire"
+)
+
+func initAPIServer(ctx context.Context) (*httpbase.GracefulServer, error) {
+	wire.Build(
+		common.ProvideConfig,
+		apiserver.WireSet,
+		cache.WireSet,
+		model.WireSet,
+		serverhost.WireSet,
+	)
+	return &httpbase.GracefulServer{}, nil
+}
