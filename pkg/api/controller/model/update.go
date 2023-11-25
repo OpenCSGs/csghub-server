@@ -6,10 +6,5 @@ import (
 )
 
 func (c *Controller) Update(ctx *gin.Context) (*types.Model, error) {
-	return &types.Model{
-		UserID:    "test123",
-		Namespace: "namespace",
-		Name:      "name",
-		Public:    true,
-	}, nil
+	return nil, nil
 }

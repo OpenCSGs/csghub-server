@@ -8,12 +8,17 @@ import (
 var WireSet = wire.NewSet(
 	ProvideDatasetStore,
 	ProvideModelStore,
+	ProvideUserStore,
 )
 
-func ProvideDatasetStore(db *model.DB) DatasetStore {
+func ProvideDatasetStore(db *model.DB) *DatasetStore {
 	return NewDatasetStore(db)
 }
 
-func ProvideModelStore(db *model.DB) ModelStore {
+func ProvideModelStore(db *model.DB) *ModelStore {
 	return NewModelStore(db)
+}
+
+func ProvideUserStore(db *model.DB) *UserStore {
+	return NewUserStore(db)
 }

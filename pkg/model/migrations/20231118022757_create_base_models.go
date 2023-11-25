@@ -7,6 +7,7 @@ import (
 )
 
 var baseModelTables = []any{
+	User{},
 	Repository{},
 	LfsFile{},
 	PublicKey{},
@@ -20,13 +21,37 @@ func init() {
 	})
 }
 
+type User struct {
+	ID         int          `bun:",pk,autoincrement" json:"id"`
+	GitID      int          `bun:",notnull" json:"git_id"`
+	Name       string       `bun:",notnull" json:"name"`
+	Username   string       `bun:",notnull,unique" json:"username"`
+	Email      string       `bun:",notnull,unique" json:"email"`
+	Password   string       `bun:",notnull" json:"password"`
+	PublicKeys []*PublicKey `bun:"rel:has-many,join:id=user_id"`
+	times
+}
+
+type RepositoryType string
+
+const (
+	Model   RepositoryType = "model"
+	Dataset RepositoryType = "dataset"
+)
+
 type Repository struct {
-	ID        int        `bun:",pk,autoincrement" json:"id"`
-	UserID    string     `bun:",notnull" json:"user_id"`
-	Path      string     `bun:",notnull" json:"path"`
-	Name      string     `bun:",notnull" json:"name"`
-	OwnerName string     `bun:",notnull" json:"owner_name"`
-	LfsFiles  []*LfsFile `bun:"rel:has-many,join:id=repository_id"`
+	ID             int        `bun:",pk,autoincrement" json:"id"`
+	UserID         string     `bun:",notnull" json:"user_id"`
+	Path           string     `bun:",notnull" json:"path"`
+	Name           string     `bun:",notnull" json:"name"`
+	Description    string     `bun:",notnull" json:"description"`
+	Private        bool       `bun:",notnull" json:"private"`
+	Labels         string     `bun:",notnull" json:"labels"`
+	License        string     `bun:",notnull" json:"license"`
+	Readme         string     `bun:"," json:"readme"`
+	DefaultBranch  string     `bun:"," json:"default_branch"`
+	LfsFiles       []*LfsFile `bun:"rel:has-many,join:id=repository_id"`
+	RepositoryType string     `bun:",notnull" json:"repository_type"`
 	times
 }
 
@@ -42,5 +67,6 @@ type PublicKey struct {
 	ID     int    `bun:",pk,autoincrement" json:"id"`
 	UserID string `bun:",notnull" json:"user_id"`
 	Value  string `bun:",notnull" json:"value"`
+	User   User   `bun:"rel:belongs-to,join:user_id=id"`
 	times
 }

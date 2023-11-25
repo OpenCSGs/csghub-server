@@ -6,8 +6,8 @@ type DatasetStore struct {
 	db *model.DB
 }
 
-func NewDatasetStore(db *model.DB) DatasetStore {
-	return DatasetStore{
+func NewDatasetStore(db *model.DB) *DatasetStore {
+	return &DatasetStore{
 		db: db,
 	}
 }

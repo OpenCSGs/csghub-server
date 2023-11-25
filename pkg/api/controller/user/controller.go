@@ -1,4 +1,4 @@
-package dataset
+package user
 
 import (
 	"git-devops.opencsg.com/product/community/starhub-server/pkg/gitserver"
@@ -7,19 +7,19 @@ import (
 )
 
 type Controller struct {
-	datasetStore *database.DatasetStore
-	datasetCache *cache.DatasetCache
-	gitServer    gitserver.GitServer
+	userStore *database.UserStore
+	userCache *cache.UserCache
+	gitServer gitserver.GitServer
 }
 
 func NewController(
-	datasetStore *database.DatasetStore,
-	datasetCache *cache.DatasetCache,
+	userStore *database.UserStore,
+	userCache *cache.UserCache,
 	gitServer gitserver.GitServer,
 ) *Controller {
 	return &Controller{
-		datasetStore: datasetStore,
-		datasetCache: datasetCache,
-		gitServer:    gitServer,
+		userStore: userStore,
+		userCache: userCache,
+		gitServer: gitServer,
 	}
 }

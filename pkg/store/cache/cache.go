@@ -2,6 +2,7 @@ package cache
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/redis/go-redis/v9"
 )
@@ -19,30 +20,30 @@ type Cache struct {
 }
 
 func NewCache(ctx context.Context, cfg RedisConfig) (cache *Cache, err error) {
-	// 	const releaseLockScript = `
-	// local value = redis.call("GET", KEYS[1])
-	// if not value then
-	// 	return -1 -- not locked
-	// end
-	// if value == ARGV[1] then
-	// 	return redis.call("DEL",KEYS[1]) -- lock is successfully released
-	// else
-	// 	return 0 -- lock does not belongs to us
-	// end`
-	// 	cache = &Cache{
-	// 		core: redis.NewClient(&redis.Options{
-	// 			Addr:     cfg.Addr,
-	// 			Username: cfg.Username,
-	// 			Password: cfg.Password,
-	// 			DB:       cfg.DB,
-	// 		}),
-	// 		releaseLockScript: redis.NewScript(releaseLockScript),
-	// 	}
-	// 	err = cache.core.Ping(ctx).Err()
-	// 	if err != nil {
-	// 		err = fmt.Errorf("pinging Redis: %w", err)
-	// 		return
-	// 	}
+	const releaseLockScript = `
+local value = redis.call("GET", KEYS[1])
+if not value then
+	return -1 -- not locked
+end
+if value == ARGV[1] then
+	return redis.call("DEL",KEYS[1]) -- lock is successfully released
+else
+	return 0 -- lock does not belongs to us
+end`
+	cache = &Cache{
+		core: redis.NewClient(&redis.Options{
+			Addr:     cfg.Addr,
+			Username: cfg.Username,
+			Password: cfg.Password,
+			DB:       cfg.DB,
+		}),
+		releaseLockScript: redis.NewScript(releaseLockScript),
+	}
+	err = cache.core.Ping(ctx).Err()
+	if err != nil {
+		err = fmt.Errorf("pinging Redis: %w", err)
+		return
+	}
 	return
 }
 

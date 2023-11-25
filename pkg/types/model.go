@@ -1,11 +1,8 @@
 package types
 
-type Model struct {
-	UserID    string `json:"user_id"`
-	Namespace string `json:"namespace"`
-	Name      string `json:"name"`
-	Public    bool   `json:"public"`
-}
+import "git-devops.opencsg.com/product/community/starhub-server/pkg/store/database"
+
+type Model database.Repository
 
 type ModelDetail struct {
 	Path          string `json:"path"`
@@ -34,4 +31,26 @@ type ModelBranch struct {
 
 type ModelBranchCommit struct {
 	ID string `json:"id"`
+}
+
+type CreateModelReq struct {
+	Username      string `json:"username"`
+	Name          string `json:"name"`
+	Description   string `json:"description"`
+	Private       bool   `json:"private"`
+	Labels        string `json:"labels"`
+	License       string `json:"license"`
+	Readme        string `json:"readme"`
+	DefaultBranch string `json:"default_branch"`
+}
+
+type UpdateModelReq struct {
+	Username      string `json:"username"`
+	Name          string `json:"name"`
+	Description   string `json:"description"`
+	Private       bool   `json:"private"`
+	Labels        string `json:"labels"`
+	License       string `json:"license"`
+	Readme        string `json:"readme"`
+	DefaultBranch string `json:"default_branch"`
 }

@@ -6,10 +6,5 @@ import (
 )
 
 func (c *Controller) Create(ctx *gin.Context) (*types.Dataset, error) {
-	return &types.Dataset{
-		UserID:    "test123",
-		Namespace: "namespace",
-		Name:      "name",
-		Public:    true,
-	}, nil
+	return nil, nil
 }

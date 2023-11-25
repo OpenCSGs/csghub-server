@@ -6,8 +6,10 @@ import (
 	"git-devops.opencsg.com/product/community/starhub-server/config"
 	"git-devops.opencsg.com/product/community/starhub-server/pkg/api/controller/dataset"
 	"git-devops.opencsg.com/product/community/starhub-server/pkg/api/controller/model"
+	"git-devops.opencsg.com/product/community/starhub-server/pkg/api/controller/user"
 	datasetHandler "git-devops.opencsg.com/product/community/starhub-server/pkg/api/handler/dataset"
 	modelHandler "git-devops.opencsg.com/product/community/starhub-server/pkg/api/handler/model"
+	userHandler "git-devops.opencsg.com/product/community/starhub-server/pkg/api/handler/user"
 	"github.com/gin-gonic/gin"
 )
 
@@ -19,6 +21,7 @@ func NewAPIHandler(
 	config *config.Config,
 	modelCtrl *model.Controller,
 	datasetCtrl *dataset.Controller,
+	userCtrl *user.Controller,
 ) APIHandler {
 	_ = config
 	r := gin.New()
@@ -41,5 +44,7 @@ func NewAPIHandler(
 	apiGroup.GET("/datasets/:namespace/:name/commits", datasetHandler.HandleCommits(datasetCtrl))
 	apiGroup.GET("/models/:namespace/:name/raw/*file_path", modelHandler.HandleFileRaw(modelCtrl))
 	apiGroup.GET("/datasets/:namespace/:name/raw/*file_path", datasetHandler.HandleFileRaw(datasetCtrl))
+	apiGroup.POST("/users", userHandler.HandleCreate(userCtrl))
+	apiGroup.PUT("/users/", userHandler.HandleUpdate(userCtrl))
 	return r
 }

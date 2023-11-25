@@ -1,4 +1,4 @@
-package model
+package user
 
 import (
 	"git-devops.opencsg.com/product/community/starhub-server/pkg/store/database"
@@ -6,18 +6,16 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func (c *Controller) Create(ctx *gin.Context) (model *types.Model, err error) {
-	var req types.CreateModelReq
+func (c *Controller) Create(ctx *gin.Context) (*database.User, error) {
+	var req types.CreateUserRequest
 	if err := ctx.ShouldBindJSON(&req); err != nil {
 		return nil, err
 	}
 
-	model, err = c.gitServer.CreateModelRepo(&req)
+	respUser, err := c.gitServer.CreateUser(&req)
 	if err == nil {
-		err = c.modelStore.CreateRepo(ctx, database.Repository(*model))
-		if err != nil {
-			return
-		}
+		c.userStore.CreateUser(ctx, respUser)
 	}
-	return
+
+	return respUser, err
 }
