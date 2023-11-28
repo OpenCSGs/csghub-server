@@ -9,6 +9,7 @@ import (
 
 func HandleTree(modelCtrl *model.Controller) func(*gin.Context) {
 	return func(c *gin.Context) {
+		// TODO: Add parameter validation
 		tree, err := modelCtrl.Tree(c)
 		if err != nil {
 			c.JSON(http.StatusOK, gin.H{

@@ -10,6 +10,7 @@ import (
 
 func HandleCreate(modelCtrl *model.Controller) func(*gin.Context) {
 	return func(c *gin.Context) {
+		// TODO: Add parameter validation
 		model, err := modelCtrl.Create(c)
 		if err != nil {
 			c.JSON(http.StatusOK, gin.H{

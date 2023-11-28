@@ -1,0 +1,69 @@
+version: "3.8"
+
+services:
+  redis:
+    image: "redis:latest"
+    ports:
+      - "6379:6379"
+    networks:
+      - my_network
+
+  postgres:
+    image: "postgres-mutiple-db"
+    environment:
+      POSTGRES_USER: "postgres"
+      POSTGRES_PASSWORD: "postgres"
+      POSTGRES_MULTIPLE_DATABASES: "starhub_server,gitea"
+    ports:
+      - "5432:5432"
+    networks:
+      - my_network
+
+  gitea:
+    image: "bitnami/gitea:latest"
+    environment:
+      - GITEA_ADMIN_USER=root
+      - GITEA_ADMIN_PASSWORD=password123
+      - GITEA_ADMIN_EMAIL=root@opencsg.com
+      - GITEA_DATABASE_TYPE=postgres
+      - GITEA_DATABASE_HOST=postgres
+      - GITEA_DATABASE_PORT_NUMBER=5432
+      - GITEA_DATABASE_NAME=gitea
+      - GITEA_DATABASE_USERNAME=postgres
+      - GITEA_DATABASE_PASSWORD=postgres
+      - GITEA_DATABASE_SSL_MODE=disable
+      - GITEA_APP_NAME=gitea
+      - GITEA_SMTP_ENABLED=false
+    ports:
+      - "3000:3000"
+      - "22:22"
+    volumes:
+      - ./gitea:/data
+    networks:
+      - my_network
+
+  starhub_server:
+    image: "starhub-server"
+    depends_on:
+      - postgres
+      - redis
+      - gitea
+    environment:
+      STARHUB_DATABASE_DSN: postgresql://postgres:postgres@postgres:5432/starhub_server?sslmode=disable
+      STARHUB_DATABASE_TIMEZONE: Asia/Shanghai
+      STARHUB_SERVER_REDIS_ENDPOINT: redis:6379
+      STARHUB_SERVER_GITSERVER_HOST: http://gitea:3000
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: starhub_server
+      GITEA_USERNAME: root
+      GITEA_PASSWORD: password123
+      GIN_MODE: release
+    ports:
+      - "8080:8080"
+    networks:
+      - my_network
+
+networks:
+  my_network:
+    driver: bridge

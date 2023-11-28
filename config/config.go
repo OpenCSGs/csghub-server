@@ -31,6 +31,6 @@ type Config struct {
 	GitServer struct {
 		Type      string `envconfig:"STARHUB_SERVER_GITSERVER_TYPE"    default:"gitea"`
 		Host      string `envconfig:"STARHUB_SERVER_GITSERVER_HOST"       default:"http://localhost:3000"`
-		SecretKey string `envconfig:"STARHUB_SERVER_GITSERVER_SECRET_KEY" default:"3c54c7e9391c564e5756127bf82a3455e832e730"`
+		SecretKey string `envconfig:"STARHUB_SERVER_GITSERVER_SECRET_KEY"`
 	}
 }

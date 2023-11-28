@@ -10,6 +10,7 @@ import (
 
 func HandleUpdate(userCtrl *user.Controller) func(*gin.Context) {
 	return func(c *gin.Context) {
+		// TODO: Add parameter validation
 		user, err := userCtrl.Update(c)
 		if err != nil {
 			c.JSON(http.StatusOK, gin.H{

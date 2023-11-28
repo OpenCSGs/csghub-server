@@ -9,6 +9,7 @@ import (
 
 func HandleCommits(modelCtrl *model.Controller) func(*gin.Context) {
 	return func(c *gin.Context) {
+		// TODO: Add parameter validation
 		commits, err := modelCtrl.Commits(c)
 		if err != nil {
 			c.JSON(http.StatusOK, gin.H{

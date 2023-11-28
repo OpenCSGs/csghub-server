@@ -9,6 +9,7 @@ import (
 
 func HandleTags(modelCtrl *model.Controller) func(*gin.Context) {
 	return func(c *gin.Context) {
+		// TODO: Add parameter validation
 		tags, err := modelCtrl.Tags(c)
 		if err != nil {
 			c.JSON(http.StatusOK, gin.H{
