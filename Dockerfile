@@ -7,7 +7,7 @@ RUN CGO_ENABLED=0 GOOS=linux go build -tags netgo -a -v -o starhub ./cmd/starhub
 FROM alpine:latest as prod
 WORKDIR /starhub-bin
 ENV GIN_MODE=release
-COPY starhub /starhub-bin/
+COPY /starhub/starhub /starhub-bin/
 RUN apk add --no-cache --upgrade bash curl jq
 COPY scripts/init.sh /starhub-bin/scripts/
 RUN chmod +x /starhub-bin/scripts/init.sh
