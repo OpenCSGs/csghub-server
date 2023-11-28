@@ -9,6 +9,7 @@ import (
 
 func HandleDetail(modelCtrl *model.Controller) func(*gin.Context) {
 	return func(c *gin.Context) {
+		// TODO: Add parameter validation
 		modelDetail, err := modelCtrl.Detail(c)
 		if err != nil {
 			c.JSON(http.StatusOK, gin.H{

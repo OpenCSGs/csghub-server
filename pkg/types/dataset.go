@@ -1,11 +1,8 @@
 package types
 
-type Dataset struct {
-	UserID    string `json:"user_id"`
-	Namespace string `json:"namespace"`
-	Name      string `json:"name"`
-	Public    bool   `json:"public"`
-}
+import "git-devops.opencsg.com/product/community/starhub-server/pkg/store/database"
+
+type Dataset database.Repository
 
 type DatasetDetail struct {
 	Path          string `json:"path"`

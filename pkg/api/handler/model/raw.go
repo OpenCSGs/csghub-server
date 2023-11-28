@@ -9,6 +9,7 @@ import (
 
 func HandleFileRaw(modelCtrl *model.Controller) func(*gin.Context) {
 	return func(c *gin.Context) {
+		// TODO: Add parameter validation
 		content, err := modelCtrl.FileRaw(c)
 		if err != nil {
 			c.JSON(http.StatusOK, gin.H{

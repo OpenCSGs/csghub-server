@@ -11,7 +11,9 @@ import (
 	"git-devops.opencsg.com/product/community/starhub-server/cmd/starhub-server/cmd/common"
 	"git-devops.opencsg.com/product/community/starhub-server/pkg/api/controller/dataset"
 	model2 "git-devops.opencsg.com/product/community/starhub-server/pkg/api/controller/model"
+	"git-devops.opencsg.com/product/community/starhub-server/pkg/api/controller/user"
 	"git-devops.opencsg.com/product/community/starhub-server/pkg/apiserver"
+	"git-devops.opencsg.com/product/community/starhub-server/pkg/gitserver"
 	"git-devops.opencsg.com/product/community/starhub-server/pkg/httpbase"
 	"git-devops.opencsg.com/product/community/starhub-server/pkg/model"
 	"git-devops.opencsg.com/product/community/starhub-server/pkg/router"
@@ -39,11 +41,18 @@ func initAPIServer(ctx context.Context) (*httpbase.GracefulServer, error) {
 		return nil, err
 	}
 	modelCache := cache.ProvideModelCache(cacheCache)
-	controller := model2.ProvideController(modelStore, modelCache)
+	gitServer, err := gitserver.ProvideGitServer(config)
+	if err != nil {
+		return nil, err
+	}
+	controller := model2.ProvideController(modelStore, modelCache, gitServer)
 	datasetStore := database.ProvideDatasetStore(db)
 	datasetCache := cache.ProvideDatasetCache(cacheCache)
-	datasetController := dataset.ProvideController(datasetStore, datasetCache)
-	apiHandler := router.ProvideAPIHandler(config, controller, datasetController)
+	datasetController := dataset.ProvideController(datasetStore, datasetCache, gitServer)
+	userStore := database.ProvideUserStore(db)
+	userCache := cache.ProvideUserCache(cacheCache)
+	userController := user.ProvideController(userStore, userCache, gitServer)
+	apiHandler := router.ProvideAPIHandler(config, controller, datasetController, userController)
 	gitHandler := router.ProvideGitHandler(config, controller, datasetController)
 	routerRouter := router.ProvideRouter(apiHandler, gitHandler)
 	gracefulServer := apiserver.ProvideGracefulServer(config, logger, routerRouter)

@@ -9,6 +9,7 @@ import (
 
 func HandleBranches(modelCtrl *model.Controller) func(*gin.Context) {
 	return func(c *gin.Context) {
+		// TODO: Add parameter validations
 		branches, err := modelCtrl.Branches(c)
 		if err != nil {
 			c.JSON(http.StatusOK, gin.H{

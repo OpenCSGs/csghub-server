@@ -1,18 +1,25 @@
 package dataset
 
 import (
+	"git-devops.opencsg.com/product/community/starhub-server/pkg/gitserver"
 	"git-devops.opencsg.com/product/community/starhub-server/pkg/store/cache"
 	"git-devops.opencsg.com/product/community/starhub-server/pkg/store/database"
 )
 
 type Controller struct {
-	datasetStore database.DatasetStore
-	datasetCache cache.DatasetCache
+	datasetStore *database.DatasetStore
+	datasetCache *cache.DatasetCache
+	gitServer    gitserver.GitServer
 }
 
-func NewController(datasetStore database.DatasetStore, datasetCache cache.DatasetCache) *Controller {
+func NewController(
+	datasetStore *database.DatasetStore,
+	datasetCache *cache.DatasetCache,
+	gitServer gitserver.GitServer,
+) *Controller {
 	return &Controller{
 		datasetStore: datasetStore,
 		datasetCache: datasetCache,
+		gitServer:    gitServer,
 	}
 }
