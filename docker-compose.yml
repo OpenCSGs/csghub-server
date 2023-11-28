@@ -27,7 +27,7 @@ services:
       - GITEA_ADMIN_EMAIL=root@opencsg.com
       - GITEA_DATABASE_TYPE=postgres
       - GITEA_DATABASE_HOST=postgres
-      - GITEA_DATABASE_PORT_NUMBER=5433
+      - GITEA_DATABASE_PORT_NUMBER=5432
       - GITEA_DATABASE_NAME=gitea
       - GITEA_DATABASE_USERNAME=postgres
       - GITEA_DATABASE_PASSWORD=postgres
@@ -49,10 +49,10 @@ services:
       - redis
       - gitea
     environment:
-      STARHUB_DATABASE_DSN: postgresql://postgres:postgres@postgres:5433/starhub_server?sslmode=disable
+      STARHUB_DATABASE_DSN: postgresql://postgres:postgres@postgres:5432/starhub_server?sslmode=disable
       STARHUB_DATABASE_TIMEZONE: Asia/Shanghai
       STARHUB_SERVER_REDIS_ENDPOINT: redis:6379
-      STARHUB_SERVER_GITSERVER_HOST: http://gitea:3001
+      STARHUB_SERVER_GITSERVER_HOST: http://gitea:3000
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
       POSTGRES_DB: starhub_server
