@@ -9,7 +9,7 @@ services:
       - my_network
 
   postgres:
-    image: "postgres-mutiple-db"
+    image: "gradescope/postgresql-multiple-databases"
     environment:
       POSTGRES_USER: "postgres"
       POSTGRES_PASSWORD: "postgres"
