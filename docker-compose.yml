@@ -35,7 +35,7 @@ services:
       - GITEA_APP_NAME=gitea
       - GITEA_SMTP_ENABLED=false
     ports:
-      - "3000:3000"
+      - "3001:3000"
       - "22:22"
     volumes:
       - ./gitea:/data
@@ -43,7 +43,7 @@ services:
       - my_network
 
   starhub_server:
-    image: "starhub-server"
+    image: "git-devops.opencsg.com:5050/product/community/starhub-server"
     depends_on:
       - postgres
       - redis
@@ -52,7 +52,7 @@ services:
       STARHUB_DATABASE_DSN: postgresql://postgres:postgres@postgres:5432/starhub_server?sslmode=disable
       STARHUB_DATABASE_TIMEZONE: Asia/Shanghai
       STARHUB_SERVER_REDIS_ENDPOINT: redis:6379
-      STARHUB_SERVER_GITSERVER_HOST: http://gitea:3000
+      STARHUB_SERVER_GITSERVER_HOST: http://gitea:3001
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
       POSTGRES_DB: starhub_server
