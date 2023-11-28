@@ -36,7 +36,7 @@ services:
       - GITEA_SMTP_ENABLED=false
     ports:
       - "3001:3000"
-      - "22:22"
+      # - "22:22"
     volumes:
       - ./gitea:/data
     networks:
