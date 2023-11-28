@@ -2,7 +2,6 @@ package gitea
 
 import (
 	"context"
-	"log"
 
 	"code.gitea.io/sdk/gitea"
 	"git-devops.opencsg.com/product/community/starhub-server/config"
@@ -22,8 +21,6 @@ const APIBaseUrl = "api/v1"
 
 func NewClient(config *config.Config) (client *Client, err error) {
 	ctx := context.Background()
-	log.Println("================================")
-	log.Print(config.GitServer.SecretKey)
 	giteaClient, err := gitea.NewClient(
 		config.GitServer.Host,
 		gitea.SetContext(ctx),
