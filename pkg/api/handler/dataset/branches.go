@@ -1,6 +1,7 @@
 package dataset
 
 import (
+	"fmt"
 	"net/http"
 
 	"git-devops.opencsg.com/product/community/starhub-server/pkg/api/controller/dataset"
@@ -13,14 +14,15 @@ func HandleBranches(datasetCtrl *dataset.Controller) func(*gin.Context) {
 		if err != nil {
 			c.JSON(http.StatusOK, gin.H{
 				"code":    401,
-				"message": "Get dataset branches failed.",
+				"message": fmt.Sprintf("Get dataset branches failed. %v", err),
 			})
 			return
 		}
 
 		respData := gin.H{
-			"code":     200,
-			"branches": branches,
+			"code":    200,
+			"data":    branches,
+			"message": "Get dataset branches successfully.",
 		}
 
 		c.JSON(http.StatusOK, respData)

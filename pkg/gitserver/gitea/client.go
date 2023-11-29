@@ -3,8 +3,8 @@ package gitea
 import (
 	"context"
 
-	"code.gitea.io/sdk/gitea"
 	"git-devops.opencsg.com/product/community/starhub-server/config"
+	"github.com/pulltheflower/gitea-go-sdk/gitea"
 )
 
 type Client struct {
@@ -16,8 +16,6 @@ type Response struct {
 	Message string `json:"message"`
 	Data    any    `json:"data"`
 }
-
-const APIBaseUrl = "api/v1"
 
 func NewClient(config *config.Config) (client *Client, err error) {
 	ctx := context.Background()

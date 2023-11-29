@@ -6,16 +6,16 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func (c *Controller) Branches(ctx *gin.Context) (branches []*types.ModelBranch, err error) {
-	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
-	if err != nil {
-		return
-	}
+func (c *Controller) Index(ctx *gin.Context) (models []*types.Model, total int, err error) {
 	per, page, err := common.GetPerAndPageFromContext(ctx)
 	if err != nil {
 		return
 	}
-	branches, err = c.gitServer.GetModelBranches(namespace, name, per, page)
+	models, err = c.modelStore.Index(ctx, per, page)
+	if err != nil {
+		return
+	}
+	total, err = c.modelStore.Count(ctx)
 	if err != nil {
 		return
 	}

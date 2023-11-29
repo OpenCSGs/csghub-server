@@ -56,6 +56,9 @@ cd cmd/starhub-server/ && go build
 ### Server
 
 ```shell
-# start server
+# start server with binary
 ./starhub-server start server
+
+# start all services (Gitea, PG, Redis) with docker compose
+docker compose up -d
 ```

@@ -4,9 +4,9 @@ import (
 	"crypto/rand"
 	"math/big"
 
-	"code.gitea.io/sdk/gitea"
 	"git-devops.opencsg.com/product/community/starhub-server/pkg/store/database"
 	"git-devops.opencsg.com/product/community/starhub-server/pkg/types"
+	"github.com/pulltheflower/gitea-go-sdk/gitea"
 )
 
 func (c *Client) CreateUser(u *types.CreateUserRequest) (user *database.User, err error) {

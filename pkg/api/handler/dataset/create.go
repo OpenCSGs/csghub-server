@@ -1,6 +1,7 @@
 package dataset
 
 import (
+	"fmt"
 	"net/http"
 
 	"git-devops.opencsg.com/product/community/starhub-server/pkg/api/controller/dataset"
@@ -13,7 +14,7 @@ func HandleCreate(datasetCtrl *dataset.Controller) func(*gin.Context) {
 		if err != nil {
 			c.JSON(http.StatusOK, gin.H{
 				"code":    401,
-				"message": "Created failed.",
+				"message": fmt.Sprintf("Created dataset repository failed. %v", err),
 			})
 			return
 		}
@@ -21,7 +22,7 @@ func HandleCreate(datasetCtrl *dataset.Controller) func(*gin.Context) {
 		respData := gin.H{
 			"code":    200,
 			"message": "Dataset repository created.",
-			"dataset": dataset,
+			"data":    dataset,
 		}
 
 		c.JSON(http.StatusOK, respData)
