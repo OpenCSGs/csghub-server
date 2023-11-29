@@ -1,35 +1,36 @@
 package model
 
 import (
+	"errors"
+
 	"git-devops.opencsg.com/product/community/starhub-server/pkg/types"
+	"git-devops.opencsg.com/product/community/starhub-server/pkg/utils/common"
 	"github.com/gin-gonic/gin"
 )
 
-func (c *Controller) Commits(ctx *gin.Context) ([]*types.Commit, error) {
-	return []*types.Commit{
-		{
-			ID:             "94991886af3e3820aa09fa353b29cf8557c93168",
-			CommitterName:  "vincent",
-			CommitterEmail: "vincent@gmail.com",
-			CommitterDate:  "2023-10-10 10:10:10",
-			CreatedAt:      "2023-10-10 10:10:10",
-			Title:          "Add some files",
-			Message:        "Add some files",
-			AuthorName:     "vincent",
-			AuthorEmail:    "vincent@gmail.com",
-			AuthoredDate:   "2023-10-10 10:10:10",
-		},
-		{
-			ID:             "94991886af3e3820aa09fa353b29cf8557c93168",
-			CommitterName:  "vincent",
-			CommitterEmail: "vincent@gmail.com",
-			CommitterDate:  "2023-10-10 10:10:10",
-			CreatedAt:      "2023-10-10 10:10:10",
-			Title:          "Add some files",
-			Message:        "Add some files",
-			AuthorName:     "vincent",
-			AuthorEmail:    "vincent@gmail.com",
-			AuthoredDate:   "2023-10-10 10:10:10",
-		},
-	}, nil
+func (c *Controller) Commits(ctx *gin.Context) (commits []*types.Commit, err error) {
+	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
+	if err != nil {
+		return
+	}
+	per, page, err := common.GetPerAndPageFromContext(ctx)
+	if err != nil {
+		return
+	}
+	ref := ctx.Query("ref")
+	if ref == "" {
+		repo, err := c.modelStore.FindyByRepoPath(ctx, namespace, name)
+		if err != nil {
+			return nil, err
+		}
+		if repo == nil {
+			return nil, errors.New("The repository with given path and name is not found")
+		}
+		ref = repo.DefaultBranch
+	}
+	commits, err = c.gitServer.GetModelCommits(namespace, name, ref, per, page)
+	if err != nil {
+		return
+	}
+	return
 }

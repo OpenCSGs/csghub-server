@@ -1,7 +1,6 @@
 package model
 
 import (
-	"git-devops.opencsg.com/product/community/starhub-server/pkg/store/database"
 	"git-devops.opencsg.com/product/community/starhub-server/pkg/types"
 	"github.com/gin-gonic/gin"
 )
@@ -14,7 +13,7 @@ func (c *Controller) Create(ctx *gin.Context) (model *types.Model, err error) {
 
 	model, err = c.gitServer.CreateModelRepo(&req)
 	if err == nil {
-		err = c.modelStore.CreateRepo(ctx, database.Repository(*model))
+		err = c.modelStore.CreateRepo(ctx, model)
 		if err != nil {
 			return
 		}

@@ -22,8 +22,8 @@ func HandleCreate(modelCtrl *model.Controller) func(*gin.Context) {
 
 		respData := gin.H{
 			"code":    200,
-			"message": "Dataset repository created.",
-			"model":   model,
+			"message": "Model repository created.",
+			"data":    model,
 		}
 
 		c.JSON(http.StatusOK, respData)

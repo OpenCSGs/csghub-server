@@ -2,7 +2,7 @@ package types
 
 import "git-devops.opencsg.com/product/community/starhub-server/pkg/store/database"
 
-type Model database.Repository
+type Model = database.Repository
 
 type ModelDetail struct {
 	Path          string `json:"path"`
@@ -11,6 +11,10 @@ type ModelDetail struct {
 	License       string `json:"license"`
 	DownloadCount int    `json:"download_count"`
 	LastUpdatedAt string `json:"last_updated_at"`
+	HTTPCloneURL  string `json:"http_clone_url"`
+	SSHCloneURL   string `json:"ssh_clone_url"`
+	Size          int    `json:"size"`
+	DefaultBranch string `json:"default_branch"`
 }
 
 type ModelTag struct {

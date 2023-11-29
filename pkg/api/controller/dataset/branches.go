@@ -2,24 +2,22 @@ package dataset
 
 import (
 	"git-devops.opencsg.com/product/community/starhub-server/pkg/types"
+	"git-devops.opencsg.com/product/community/starhub-server/pkg/utils/common"
 	"github.com/gin-gonic/gin"
 )
 
-func (c *Controller) Branches(ctx *gin.Context) ([]*types.DatasetBranch, error) {
-	return []*types.DatasetBranch{
-		{
-			Name:    "branch1",
-			Message: "Commit message",
-			Commit: types.DatasetBranchCommit{
-				ID: "94991886af3e3820aa09fa353b29cf8557c93168",
-			},
-		},
-		{
-			Name:    "branch2",
-			Message: "Commit message",
-			Commit: types.DatasetBranchCommit{
-				ID: "94991886af3e3820aa09fa353b29cf8557c93168",
-			},
-		},
-	}, nil
+func (c *Controller) Branches(ctx *gin.Context) (branches []*types.DatasetBranch, err error) {
+	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
+	if err != nil {
+		return
+	}
+	per, page, err := common.GetPerAndPageFromContext(ctx)
+	if err != nil {
+		return
+	}
+	branches, err = c.gitServer.GetDatasetBranches(namespace, name, per, page)
+	if err != nil {
+		return
+	}
+	return
 }

@@ -6,7 +6,6 @@ type Commit struct {
 	CommitterEmail string `json:"committer_email"`
 	CommitterDate  string `json:"committer_date"`
 	CreatedAt      string `json:"created_at"`
-	Title          string `json:"title"`
 	Message        string `json:"message"`
 	AuthorName     string `json:"author_name"`
 	AuthorEmail    string `json:"author_email"`

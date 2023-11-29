@@ -1,6 +1,7 @@
 package model
 
 import (
+	"fmt"
 	"net/http"
 
 	"git-devops.opencsg.com/product/community/starhub-server/pkg/api/controller/model"
@@ -14,15 +15,15 @@ func HandleUpdate(modelCtrl *model.Controller) func(*gin.Context) {
 		if err != nil {
 			c.JSON(http.StatusOK, gin.H{
 				"code":    "401",
-				"message": "Updated failed.",
+				"message": fmt.Sprintf("Updated failed. %v", err),
 			})
 			return
 		}
 
 		respData := gin.H{
 			"code":    200,
-			"message": "Dataset repository updated.",
-			"model":   model,
+			"message": "Model repository updated.",
+			"data":    model,
 		}
 
 		c.JSON(http.StatusOK, respData)

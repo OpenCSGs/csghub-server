@@ -1,6 +1,7 @@
 package model
 
 import (
+	"fmt"
 	"net/http"
 
 	"git-devops.opencsg.com/product/community/starhub-server/pkg/api/controller/model"
@@ -14,14 +15,15 @@ func HandleDetail(modelCtrl *model.Controller) func(*gin.Context) {
 		if err != nil {
 			c.JSON(http.StatusOK, gin.H{
 				"code":    401,
-				"message": "Request failed.",
+				"message": fmt.Sprintf("Get model detail failed: %v", err),
 			})
 			return
 		}
 
 		respData := gin.H{
-			"code":   200,
-			"detail": modelDetail,
+			"code":    200,
+			"data":    modelDetail,
+			"message": "Get model detail successfully.",
 		}
 
 		c.JSON(http.StatusOK, respData)

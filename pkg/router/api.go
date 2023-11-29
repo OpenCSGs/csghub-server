@@ -28,6 +28,8 @@ func NewAPIHandler(
 	apiGroup := r.Group("/api/v1")
 	apiGroup.POST("/models", modelHandler.HandleCreate(modelCtrl))
 	apiGroup.POST("/datasets", datasetHandler.HandleCreate(datasetCtrl))
+	apiGroup.GET("/models", modelHandler.HandleIndex(modelCtrl))
+	apiGroup.GET("/datasets", datasetHandler.HandleIndex(datasetCtrl))
 	apiGroup.PUT("/models/:namespace/:name", modelHandler.HandleUpdate(modelCtrl))
 	apiGroup.PUT("/datasets/:namespace/:name", datasetHandler.HandleUpdate(datasetCtrl))
 	apiGroup.GET("/models/:namespace/:name/detail", modelHandler.HandleDetail(modelCtrl))

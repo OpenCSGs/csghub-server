@@ -6,17 +6,16 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func (c *Controller) Tags(ctx *gin.Context) (tags []*types.DatasetTag, err error) {
-	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
-	if err != nil {
-		return
-	}
+func (c *Controller) Index(ctx *gin.Context) (datasets []*types.Dataset, total int, err error) {
 	per, page, err := common.GetPerAndPageFromContext(ctx)
 	if err != nil {
 		return
 	}
-
-	tags, err = c.gitServer.GetDatasetTags(namespace, name, per, page)
+	datasets, err = c.datasetStore.Index(ctx, per, page)
+	if err != nil {
+		return
+	}
+	total, err = c.datasetStore.Count(ctx)
 	if err != nil {
 		return
 	}

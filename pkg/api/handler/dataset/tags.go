@@ -1,6 +1,7 @@
 package dataset
 
 import (
+	"fmt"
 	"net/http"
 
 	"git-devops.opencsg.com/product/community/starhub-server/pkg/api/controller/dataset"
@@ -13,14 +14,15 @@ func HandleTags(datasetCtrl *dataset.Controller) func(*gin.Context) {
 		if err != nil {
 			c.JSON(http.StatusOK, gin.H{
 				"code":    401,
-				"message": "Get dataset tags failed.",
+				"message": fmt.Sprintf("Get dataset tags failed. %v", err),
 			})
 			return
 		}
 
 		respData := gin.H{
-			"code": 200,
-			"tags": tags,
+			"code":    200,
+			"data":    tags,
+			"message": "Get dataset tags successfully.",
 		}
 
 		c.JSON(http.StatusOK, respData)
