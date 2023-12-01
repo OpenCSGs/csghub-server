@@ -49,7 +49,20 @@ func (s *UserStore) UpdateByUsername(ctx context.Context, u *User) (err error) {
 	return
 }
 
-func (s *UserStore) CreateUser(ctx context.Context, user *User) (err error) {
+func (s *UserStore) Create(ctx context.Context, user *User) (err error) {
 	err = s.db.Operator.Core.NewInsert().Model(user).Scan(ctx)
+	return
+}
+
+func (s *UserStore) IsExist(ctx context.Context, username string) (exists bool, err error) {
+	var user User
+	exists, err = s.db.Operator.Core.
+		NewSelect().
+		Model(&user).
+		Where("username =?", username).
+		Exists(ctx)
+	if err != nil {
+		return
+	}
 	return
 }

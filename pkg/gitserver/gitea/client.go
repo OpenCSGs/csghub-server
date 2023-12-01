@@ -23,6 +23,7 @@ func NewClient(config *config.Config) (client *Client, err error) {
 		config.GitServer.Host,
 		gitea.SetContext(ctx),
 		gitea.SetToken(config.GitServer.SecretKey),
+		gitea.SetBasicAuth(config.GitServer.Username, config.GitServer.Password),
 	)
 
 	if err != nil {

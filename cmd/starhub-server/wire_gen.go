@@ -9,6 +9,7 @@ package main
 import (
 	"context"
 	"git-devops.opencsg.com/product/community/starhub-server/cmd/starhub-server/cmd/common"
+	"git-devops.opencsg.com/product/community/starhub-server/pkg/api/controller/accesstoken"
 	"git-devops.opencsg.com/product/community/starhub-server/pkg/api/controller/dataset"
 	model2 "git-devops.opencsg.com/product/community/starhub-server/pkg/api/controller/model"
 	"git-devops.opencsg.com/product/community/starhub-server/pkg/api/controller/user"
@@ -52,7 +53,10 @@ func initAPIServer(ctx context.Context) (*httpbase.GracefulServer, error) {
 	userStore := database.ProvideUserStore(db)
 	userCache := cache.ProvideUserCache(cacheCache)
 	userController := user.ProvideController(userStore, userCache, gitServer)
-	apiHandler := router.ProvideAPIHandler(config, controller, datasetController, userController)
+	accessTokenStore := database.ProvideAccessTokenStore(db)
+	accessTokenCache := cache.ProvideAccessTokenCache(cacheCache)
+	accesstokenController := accesstoken.ProvideController(userStore, userCache, accessTokenStore, accessTokenCache, gitServer)
+	apiHandler := router.ProvideAPIHandler(config, controller, datasetController, userController, accesstokenController)
 	gitHandler := router.ProvideGitHandler(config, controller, datasetController)
 	routerRouter := router.ProvideRouter(apiHandler, gitHandler)
 	gracefulServer := apiserver.ProvideGracefulServer(config, logger, routerRouter)

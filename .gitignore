@@ -1,3 +1,7 @@
 # Binaries
 /cmd/starhub-server/starhub-server
 /bin/.
+.vscode
+starhub
+/gitea/.
+/pgdata/.

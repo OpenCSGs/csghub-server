@@ -10,7 +10,7 @@ require (
 	github.com/google/wire v0.5.0
 	github.com/kelseyhightower/envconfig v1.4.0
 	github.com/nanmu42/limitio v1.0.0
-	github.com/pulltheflower/gitea-go-sdk/gitea v0.0.0-20231129032401-63716f3f17fc
+	github.com/pulltheflower/gitea-go-sdk/gitea v0.0.0-20231130084805-e36d7e1ee393
 	github.com/redis/go-redis/v9 v9.3.0
 	github.com/signalsciences/ac v1.2.0
 	github.com/spf13/cobra v1.8.0

@@ -117,3 +117,13 @@ func (c *Client) UpdateDatasetRepo(owner string, repoPath string, repo *types.Da
 
 	return repo, nil
 }
+
+func (c *Client) DeleteModelRepo(username, name string) error {
+	_, err := c.giteaClient.DeleteRepo(username, name)
+	return err
+}
+
+func (c *Client) DeleteDatasetRepo(username, name string) error {
+	_, err := c.giteaClient.DeleteRepo(username, name)
+	return err
+}

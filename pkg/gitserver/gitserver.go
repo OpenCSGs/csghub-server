@@ -12,8 +12,11 @@ import (
 type GitServer interface {
 	CreateUser(*types.CreateUserRequest) (*database.User, error)
 	UpdateUser(*types.UpdateUserRequest) (int, *database.User, error)
+	CreateUserToken(*types.CreateUserTokenRequest) (*database.AccessToken, error)
+	DeleteUserToken(*types.DeleteUserTokenRequest) error
 	CreateModelRepo(*types.CreateModelReq) (*types.Model, error)
 	UpdateModelRepo(string, string, *types.Model, *types.UpdateModelReq) (*types.Model, error)
+	DeleteModelRepo(string, string) error
 	GetModelBranches(string, string, int, int) ([]*types.ModelBranch, error)
 	GetModelCommits(string, string, string, int, int) ([]*types.Commit, error)
 	GetModelLastCommit(string, string, string) (*types.Commit, error)
@@ -24,6 +27,7 @@ type GitServer interface {
 
 	CreateDatasetRepo(*types.CreateDatasetReq) (*types.Dataset, error)
 	UpdateDatasetRepo(string, string, *types.Dataset, *types.UpdateDatasetReq) (*types.Dataset, error)
+	DeleteDatasetRepo(string, string) error
 	GetDatasetBranches(string, string, int, int) ([]*types.DatasetBranch, error)
 	GetDatasetCommits(string, string, string, int, int) ([]*types.Commit, error)
 	GetDatasetLastCommit(string, string, string) (*types.Commit, error)
