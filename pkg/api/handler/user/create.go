@@ -23,7 +23,7 @@ func HandleCreate(userCtrl *user.Controller) func(*gin.Context) {
 		respData := gin.H{
 			"code":    200,
 			"message": fmt.Sprintf("User #%d created", user.ID),
-			"user":    user,
+			"data":    user,
 		}
 
 		c.JSON(http.StatusOK, respData)

@@ -36,9 +36,11 @@ services:
       - GITEA_DATABASE_SSL_MODE=disable
       - GITEA_APP_NAME=gitea
       - GITEA_SMTP_ENABLED=false
+      - GITEA_LFS_ROOT_PATH=./gitea/lfs
+      - GITEA_LFS_START_SERVER=true
     ports:
       - "3001:3000"
-      # - "22:22"
+      - "22:22"
     volumes:
       - ./gitea:/data
     networks:
@@ -55,6 +57,8 @@ services:
       STARHUB_DATABASE_TIMEZONE: Asia/Shanghai
       STARHUB_SERVER_REDIS_ENDPOINT: redis:6379
       STARHUB_SERVER_GITSERVER_HOST: http://gitea:3000
+      STARHUB_SERVER_GITSERVER_USERNAME: root
+      STARHUB_SERVER_GITSERVER_PASSWORD: password123
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
       POSTGRES_DB: starhub_server

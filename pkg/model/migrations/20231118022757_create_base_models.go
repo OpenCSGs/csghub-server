@@ -10,7 +10,6 @@ var baseModelTables = []any{
 	User{},
 	Repository{},
 	LfsFile{},
-	PublicKey{},
 }
 
 func init() {
@@ -22,13 +21,13 @@ func init() {
 }
 
 type User struct {
-	ID         int          `bun:",pk,autoincrement" json:"id"`
-	GitID      int          `bun:",notnull" json:"git_id"`
-	Name       string       `bun:",notnull" json:"name"`
-	Username   string       `bun:",notnull,unique" json:"username"`
-	Email      string       `bun:",notnull,unique" json:"email"`
-	Password   string       `bun:",notnull" json:"password"`
-	PublicKeys []*PublicKey `bun:"rel:has-many,join:id=user_id"`
+	ID           int            `bun:",pk,autoincrement" json:"id"`
+	GitID        int            `bun:",notnull" json:"git_id"`
+	Name         string         `bun:",notnull" json:"name"`
+	Username     string         `bun:",notnull,unique" json:"username"`
+	Email        string         `bun:",notnull,unique" json:"email"`
+	Password     string         `bun:",notnull" json:"password"`
+	AccessTokens []*AccessToken `bun:"rel:has-many,join:id=user_id"`
 	times
 }
 
@@ -60,13 +59,5 @@ type LfsFile struct {
 	RepositoryID int        `bun:",notnull" json:"repository_id"`
 	Repository   Repository `bun:"rel:belongs-to,join:repository_id=id"`
 	OriginPath   string     `bun:",notnull" json:"orgin_path"`
-	times
-}
-
-type PublicKey struct {
-	ID     int    `bun:",pk,autoincrement" json:"id"`
-	UserID string `bun:",notnull" json:"user_id"`
-	Value  string `bun:",notnull" json:"value"`
-	User   User   `bun:"rel:belongs-to,join:user_id=id"`
 	times
 }

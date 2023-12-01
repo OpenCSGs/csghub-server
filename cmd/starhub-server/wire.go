@@ -7,6 +7,7 @@ import (
 	"context"
 
 	"git-devops.opencsg.com/product/community/starhub-server/cmd/starhub-server/cmd/common"
+	"git-devops.opencsg.com/product/community/starhub-server/pkg/api/controller/accesstoken"
 	"git-devops.opencsg.com/product/community/starhub-server/pkg/api/controller/dataset"
 	modelCtrl "git-devops.opencsg.com/product/community/starhub-server/pkg/api/controller/model"
 	"git-devops.opencsg.com/product/community/starhub-server/pkg/api/controller/user"
@@ -31,6 +32,7 @@ func initAPIServer(ctx context.Context) (*httpbase.GracefulServer, error) {
 		modelCtrl.ProvideController,
 		router.WireSet,
 		user.ProvideController,
+		accesstoken.ProvideController,
 		gitserver.ProvideGitServer,
 	)
 	return &httpbase.GracefulServer{}, nil

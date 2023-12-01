@@ -14,7 +14,7 @@ func (c *Controller) Create(ctx *gin.Context) (*database.User, error) {
 
 	respUser, err := c.gitServer.CreateUser(&req)
 	if err == nil {
-		c.userStore.CreateUser(ctx, respUser)
+		c.userStore.Create(ctx, respUser)
 	}
 
 	return respUser, err

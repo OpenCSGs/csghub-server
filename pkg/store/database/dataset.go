@@ -73,3 +73,13 @@ func (s *DatasetStore) FindyByRepoPath(ctx context.Context, owner string, repoPa
 
 	return &repos[0], nil
 }
+
+func (s *DatasetStore) DeleteRepo(ctx context.Context, username, name string) (err error) {
+	_, err = s.db.Operator.Core.
+		NewDelete().
+		Model(&Repository{}).
+		Where("path = ?", fmt.Sprintf("%v/%v", username, name)).
+		Where("repository_type = ?", DatasetRepo).
+		Exec(ctx)
+	return
+}

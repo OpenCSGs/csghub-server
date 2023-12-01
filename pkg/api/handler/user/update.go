@@ -23,7 +23,7 @@ func HandleUpdate(userCtrl *user.Controller) func(*gin.Context) {
 		respData := gin.H{
 			"code":    200,
 			"message": fmt.Sprintf("User #%d update", user.ID),
-			"user":    user,
+			"data":    user,
 		}
 
 		c.JSON(http.StatusOK, respData)
