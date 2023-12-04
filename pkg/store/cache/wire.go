@@ -15,6 +15,7 @@ var WireSet = wire.NewSet(
 	ProvideDatasetCache,
 	ProvideUserCache,
 	ProvideAccessTokenCache,
+	ProvideSSHKeyCache,
 )
 
 func ProvideRedisConfig(config *config.Config) RedisConfig {
@@ -44,4 +45,8 @@ func ProvideUserCache(cache *Cache) *UserCache {
 
 func ProvideAccessTokenCache(cache *Cache) *AccessTokenCache {
 	return NewAccessTokenCache(cache)
+}
+
+func ProvideSSHKeyCache(cache *Cache) *SSHKeyCache {
+	return NewSSHKeyCache(cache)
 }

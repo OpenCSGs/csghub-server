@@ -9,7 +9,9 @@ import (
 func ProvideController(
 	datasetStore *database.DatasetStore,
 	datasetCache *cache.DatasetCache,
+	userStore *database.UserStore,
+	userCache *cache.UserCache,
 	gitServer gitserver.GitServer,
 ) *Controller {
-	return NewController(datasetStore, datasetCache, gitServer)
+	return NewController(datasetStore, datasetCache, userStore, userCache, gitServer)
 }

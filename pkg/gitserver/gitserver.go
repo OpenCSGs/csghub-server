@@ -35,6 +35,10 @@ type GitServer interface {
 	GetDatasetFileRaw(string, string, string, string) (string, error)
 	GetDatasetTags(string, string, int, int) ([]*types.DatasetTag, error)
 	GetDatasetFileTree(string, string, string, string) ([]*types.File, error)
+
+	CreateSSHKey(*types.CreateSSHKeyRequest) (*database.SSHKey, error)
+	// ListSSHKeys(string, int, int) ([]*database.SSHKey, error)
+	DeleteSSHKey(int) error
 }
 
 func NewGitServer(config *config.Config) (GitServer, error) {

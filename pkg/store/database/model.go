@@ -18,7 +18,7 @@ func NewModelStore(db *model.DB) *ModelStore {
 	}
 }
 
-func (s *ModelStore) Index(ctx context.Context, per, page int) (models []*Repository, err error) {
+func (s *ModelStore) Index(ctx context.Context, per, page int) (models []Repository, err error) {
 	err = s.db.Operator.Core.
 		NewSelect().
 		Model(&models).
@@ -27,6 +27,44 @@ func (s *ModelStore) Index(ctx context.Context, per, page int) (models []*Reposi
 		Limit(per).
 		Offset((page - 1) * per).
 		Scan(ctx)
+	if err != nil {
+		return
+	}
+	return
+}
+
+func (s *ModelStore) PublicRepos(ctx context.Context, per, page int) (models []Repository, err error) {
+	err = s.db.Operator.Core.
+		NewSelect().
+		Model(&models).
+		Where("repository_type = ?", ModelRepo).
+		Where("private = ?", false).
+		Order("created_at DESC").
+		Limit(per).
+		Offset((page - 1) * per).
+		Scan(ctx)
+	if err != nil {
+		return
+	}
+	return
+}
+
+func (s *ModelStore) RepoByUsername(ctx context.Context, username string, per, page int, onlyPublic bool) (models []Repository, err error) {
+	query := s.db.Operator.Core.
+		NewSelect().
+		Model(&models).
+		Join("JOIN users AS u ON u.id = repository.user_id").
+		Where("u.username = ?", username).
+		Where("repository_type = ?", ModelRepo)
+
+	if onlyPublic {
+		query = query.Where("private = ?", false)
+	}
+	query = query.Order("created_at DESC").
+		Limit(per).
+		Offset((page - 1) * per)
+
+	err = query.Scan(ctx, &models)
 	if err != nil {
 		return
 	}
@@ -45,7 +83,21 @@ func (s *ModelStore) Count(ctx context.Context) (count int, err error) {
 	return
 }
 
-func (s *ModelStore) CreateRepo(ctx context.Context, repo *Repository) (err error) {
+func (s *ModelStore) PublicRepoCount(ctx context.Context) (count int, err error) {
+	count, err = s.db.Operator.Core.
+		NewSelect().
+		Model(&Repository{}).
+		Where("repository_type = ?", DatasetRepo).
+		Where("private = ?", false).
+		Count(ctx)
+	if err != nil {
+		return
+	}
+	return
+}
+
+func (s *ModelStore) CreateRepo(ctx context.Context, repo *Repository, userId int) (err error) {
+	repo.UserID = userId
 	err = s.db.Operator.Core.NewInsert().Model(repo).Scan(ctx)
 	return
 }

@@ -15,7 +15,7 @@ const (
 
 type Repository struct {
 	ID             int            `bun:",pk,autoincrement" json:"id"`
-	UserID         string         `bun:",notnull" json:"user_id"`
+	UserID         int            `bun:",notnull" json:"user_id"`
 	Path           string         `bun:",notnull" json:"path"`
 	Name           string         `bun:",notnull" json:"name"`
 	Description    string         `bun:",notnull" json:"description"`

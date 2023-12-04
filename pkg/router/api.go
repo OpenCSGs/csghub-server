@@ -7,10 +7,12 @@ import (
 	"git-devops.opencsg.com/product/community/starhub-server/pkg/api/controller/accesstoken"
 	"git-devops.opencsg.com/product/community/starhub-server/pkg/api/controller/dataset"
 	"git-devops.opencsg.com/product/community/starhub-server/pkg/api/controller/model"
+	"git-devops.opencsg.com/product/community/starhub-server/pkg/api/controller/sshkey"
 	"git-devops.opencsg.com/product/community/starhub-server/pkg/api/controller/user"
 	acHandler "git-devops.opencsg.com/product/community/starhub-server/pkg/api/handler/accesstoken"
 	datasetHandler "git-devops.opencsg.com/product/community/starhub-server/pkg/api/handler/dataset"
 	modelHandler "git-devops.opencsg.com/product/community/starhub-server/pkg/api/handler/model"
+	sshKeyHandler "git-devops.opencsg.com/product/community/starhub-server/pkg/api/handler/sshkey"
 	userHandler "git-devops.opencsg.com/product/community/starhub-server/pkg/api/handler/user"
 	"github.com/gin-gonic/gin"
 )
@@ -25,6 +27,7 @@ func NewAPIHandler(
 	datasetCtrl *dataset.Controller,
 	userCtrl *user.Controller,
 	acCtrl *accesstoken.Controller,
+	sshKeyCtrl *sshkey.Controller,
 ) APIHandler {
 	_ = config
 	r := gin.New()
@@ -60,5 +63,14 @@ func NewAPIHandler(
 	apiGroup.PUT("/users/", userHandler.HandleUpdate(userCtrl))
 	apiGroup.POST("/user/:username/tokens", acHandler.HandleCreate(acCtrl))
 	apiGroup.DELETE("/user/:username/tokens/:token_name", acHandler.HandleDelete(acCtrl))
+	apiGroup.GET("/user/:username/ssh_keys", sshKeyHandler.HandleIndex(sshKeyCtrl))
+	apiGroup.POST("/user/:username/ssh_keys", sshKeyHandler.HandleCreate(sshKeyCtrl))
+	apiGroup.DELETE("/user/:username/ssh_key/:id", sshKeyHandler.HandleDelete(sshKeyCtrl))
+
+	// User models
+	apiGroup.GET("/user/:username/models", userHandler.HandleModels(userCtrl))
+
+	// User datasets
+	apiGroup.GET("/user/:username/datasets", userHandler.HandleDatasets(userCtrl))
 	return r
 }
