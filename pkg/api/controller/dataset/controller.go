@@ -9,17 +9,23 @@ import (
 type Controller struct {
 	datasetStore *database.DatasetStore
 	datasetCache *cache.DatasetCache
+	userStore    *database.UserStore
+	userCache    *cache.UserCache
 	gitServer    gitserver.GitServer
 }
 
 func NewController(
 	datasetStore *database.DatasetStore,
 	datasetCache *cache.DatasetCache,
+	userStore *database.UserStore,
+	userCache *cache.UserCache,
 	gitServer gitserver.GitServer,
 ) *Controller {
 	return &Controller{
 		datasetStore: datasetStore,
 		datasetCache: datasetCache,
+		userStore:    userStore,
+		userCache:    userCache,
 		gitServer:    gitServer,
 	}
 }

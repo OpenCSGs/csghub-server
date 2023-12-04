@@ -10,6 +10,7 @@ var WireSet = wire.NewSet(
 	ProvideModelStore,
 	ProvideUserStore,
 	ProvideAccessTokenStore,
+	ProvideSSHKeyStore,
 )
 
 func ProvideDatasetStore(db *model.DB) *DatasetStore {
@@ -23,6 +24,11 @@ func ProvideModelStore(db *model.DB) *ModelStore {
 func ProvideUserStore(db *model.DB) *UserStore {
 	return NewUserStore(db)
 }
+
 func ProvideAccessTokenStore(db *model.DB) *AccessTokenStore {
 	return NewAccessTokenStore(db)
+}
+
+func ProvideSSHKeyStore(db *model.DB) *SSHKeyStore {
+	return NewSSHKeyStore(db)
 }

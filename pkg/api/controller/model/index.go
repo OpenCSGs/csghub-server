@@ -6,16 +6,16 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func (c *Controller) Index(ctx *gin.Context) (models []*types.Model, total int, err error) {
+func (c *Controller) Index(ctx *gin.Context) (models []types.Model, total int, err error) {
 	per, page, err := common.GetPerAndPageFromContext(ctx)
 	if err != nil {
 		return
 	}
-	models, err = c.modelStore.Index(ctx, per, page)
+	models, err = c.modelStore.PublicRepos(ctx, per, page)
 	if err != nil {
 		return
 	}
-	total, err = c.modelStore.Count(ctx)
+	total, err = c.modelStore.PublicRepoCount(ctx)
 	if err != nil {
 		return
 	}
