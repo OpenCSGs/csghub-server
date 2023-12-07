@@ -19,14 +19,14 @@ func (c *Controller) Tree(ctx *gin.Context) (tree []*types.File, err error) {
 	path := ctx.Query("path")
 	ref = ctx.Query("ref")
 	if ref == "" {
-		repo, err := c.modelStore.FindyByRepoPath(ctx, namespace, name)
+		model, err := c.modelStore.FindyByPath(ctx, namespace, name)
 		if err != nil {
 			return nil, err
 		}
-		if repo == nil {
+		if model == nil {
 			return nil, errors.New("The repository with given path and name is not found")
 		}
-		ref = repo.DefaultBranch
+		ref = model.Repository.DefaultBranch
 	}
 
 	tree, err = c.gitServer.GetModelFileTree(namespace, name, ref, path)

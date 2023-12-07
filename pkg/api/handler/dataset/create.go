@@ -14,14 +14,14 @@ func HandleCreate(datasetCtrl *dataset.Controller) func(*gin.Context) {
 		if err != nil {
 			c.JSON(http.StatusOK, gin.H{
 				"code":    401,
-				"message": fmt.Sprintf("Created dataset repository failed. %v", err),
+				"message": fmt.Sprintf("Created dataset failed. %v", err),
 			})
 			return
 		}
 
 		respData := gin.H{
 			"code":    200,
-			"message": "Dataset repository created.",
+			"message": "Dataset created.",
 			"data":    dataset,
 		}
 

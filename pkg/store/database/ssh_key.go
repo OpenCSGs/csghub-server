@@ -17,12 +17,12 @@ func NewSSHKeyStore(db *model.DB) *SSHKeyStore {
 }
 
 type SSHKey struct {
-	ID      int    `bun:",pk,autoincrement" json:"id"`
-	GID     int    `bun:",notnull" json:"gid"`
+	ID      int64  `bun:",pk,autoincrement" json:"id"`
+	GitID   int64  `bun:",notnull" json:"git_id"`
 	Name    string `bun:",notnull" json:"name"`
 	Content string `bun:",notnull" json:"content"`
-	UserID  int    `bun:",notnull" json:"user_id"`
-	User    User   `bun:"rel:belongs-to,join:user_id=id" json:"user"`
+	UserID  int64  `bun:",pk" json:"user_id"`
+	User    *User  `bun:"rel:belongs-to,join:user_id=id" json:"user"`
 	times
 }
 
@@ -40,9 +40,13 @@ func (s *SSHKeyStore) Index(ctx context.Context, username string, per, page int)
 	return
 }
 
-func (s *SSHKeyStore) Create(ctx context.Context, sshKey *SSHKey, user User) (err error) {
+func (s *SSHKeyStore) Create(ctx context.Context, sshKey *SSHKey, user User) (key *SSHKey, err error) {
 	sshKey.UserID = user.ID
-	err = s.db.Operator.Core.NewInsert().Model(sshKey).Scan(ctx)
+	err = s.db.Operator.Core.
+		NewInsert().
+		Model(sshKey).
+		Returning("*").
+		Scan(ctx)
 	return
 }
 

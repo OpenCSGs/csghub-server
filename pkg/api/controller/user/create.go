@@ -14,7 +14,10 @@ func (c *Controller) Create(ctx *gin.Context) (*database.User, error) {
 
 	respUser, err := c.gitServer.CreateUser(&req)
 	if err == nil {
-		c.userStore.Create(ctx, respUser)
+		namespace := &database.Namespace{
+			Path: respUser.Username,
+		}
+		c.userStore.Create(ctx, respUser, namespace)
 	}
 
 	return respUser, err

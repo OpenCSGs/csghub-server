@@ -9,7 +9,9 @@ import (
 	"git-devops.opencsg.com/product/community/starhub-server/cmd/starhub-server/cmd/common"
 	"git-devops.opencsg.com/product/community/starhub-server/pkg/api/controller/accesstoken"
 	"git-devops.opencsg.com/product/community/starhub-server/pkg/api/controller/dataset"
+	"git-devops.opencsg.com/product/community/starhub-server/pkg/api/controller/member"
 	modelCtrl "git-devops.opencsg.com/product/community/starhub-server/pkg/api/controller/model"
+	"git-devops.opencsg.com/product/community/starhub-server/pkg/api/controller/organization"
 	"git-devops.opencsg.com/product/community/starhub-server/pkg/api/controller/sshkey"
 	"git-devops.opencsg.com/product/community/starhub-server/pkg/api/controller/user"
 	"git-devops.opencsg.com/product/community/starhub-server/pkg/apiserver"
@@ -35,6 +37,8 @@ func initAPIServer(ctx context.Context) (*httpbase.GracefulServer, error) {
 		user.ProvideController,
 		accesstoken.ProvideController,
 		sshkey.ProvideController,
+		organization.ProvideController,
+		member.ProvideController,
 		gitserver.ProvideGitServer,
 	)
 	return &httpbase.GracefulServer{}, nil

@@ -17,11 +17,12 @@ func NewAccessTokenStore(db *model.DB) *AccessTokenStore {
 }
 
 type AccessToken struct {
-	ID     int    `bun:",pk,autoincrement" json:"id"`
+	ID     int64  `bun:",pk,autoincrement" json:"id"`
+	GitID  int64  `bun:",pk" json:"git_id"`
 	Name   string `bun:",notnull" json:"name"`
 	Token  string `bun:",notnull" json:"token"`
-	UserID int    `bun:",notnull" json:"user_id"`
-	User   User   `bun:"rel:belongs-to,join:user_id=id" json:"user"`
+	UserID int64  `bun:",pk" json:"user_id"`
+	User   *User  `bun:"rel:belongs-to,join:user_id=id" json:"user"`
 	times
 }
 
@@ -30,7 +31,7 @@ func (s *AccessTokenStore) Create(ctx context.Context, token *AccessToken) (err 
 	return
 }
 
-func (s *AccessTokenStore) FindByID(ctx context.Context, id int) (token *AccessToken, err error) {
+func (s *AccessTokenStore) FindByID(ctx context.Context, id int64) (token *AccessToken, err error) {
 	var tokens []AccessToken
 	err = s.db.Operator.Core.
 		NewSelect().

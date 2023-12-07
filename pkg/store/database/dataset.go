@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"git-devops.opencsg.com/product/community/starhub-server/pkg/model"
+	"github.com/uptrace/bun"
 )
 
 type DatasetStore struct {
@@ -13,9 +14,37 @@ type DatasetStore struct {
 }
 
 func NewDatasetStore(db *model.DB) *DatasetStore {
+	db.BunDB.RegisterModel((*DatasetTag)(nil))
 	return &DatasetStore{
 		db: db,
 	}
+}
+
+type Dataset struct {
+	ID            int64       `bun:",pk,autoincrement" json:"id"`
+	Name          string      `bun:",notnull" json:"name"`
+	UrlSlug       string      `bun:",notnull" json:"url_slug"`
+	Description   string      `bun:",nullzero" json:"description"`
+	Likes         int64       `bun:",notnull" json:"likes"`
+	Downloads     int64       `bun:",notnull" json:"downloads"`
+	Path          string      `bun:",notnull" json:"path"`
+	GitPath       string      `bun:",notnull" json:"git_path"`
+	RepositoryID  int64       `bun:",notnull" json:"repository_id"`
+	Repository    *Repository `bun:"rel:belongs-to,join:repository_id=id" json:"repository"`
+	LastUpdatedAt time.Time   `bun:",notnull" json:"last"`
+	Tags          []Tag       `bun:"m2m:dataset_tags,join:Dataset=Tag" json:"tags"`
+	Private       bool        `bun:",notnull" json:"private"`
+	UserID        int64       `bun:",notnull" json:"user_id"`
+	User          *User       `bun:"rel:belongs-to,join:user_id=id" json:"user"`
+	times
+}
+
+type DatasetTag struct {
+	ID        int64    `bun:",pk,autoincrement" json:"id"`
+	DatasetID int64    `bun:",pk" json:"dataset_id"`
+	TagID     int64    `bun:",pk" json:"tag_id"`
+	Dataset   *Dataset `bun:"rel:belongs-to,join:dataset_id=id"`
+	Tag       *Tag     `bun:"rel:belongs-to,join:tag_id=id"`
 }
 
 func (s *DatasetStore) Index(ctx context.Context, per, page int) (datasets []*Repository, err error) {
@@ -33,11 +62,10 @@ func (s *DatasetStore) Index(ctx context.Context, per, page int) (datasets []*Re
 	return
 }
 
-func (s *DatasetStore) PublicRepos(ctx context.Context, per, page int) (datasets []Repository, err error) {
+func (s *DatasetStore) Public(ctx context.Context, per, page int) (datasets []Dataset, err error) {
 	err = s.db.Operator.Core.
 		NewSelect().
 		Model(&datasets).
-		Where("repository_type = ?", ModelRepo).
 		Where("private = ?", false).
 		Order("created_at DESC").
 		Limit(per).
@@ -49,13 +77,12 @@ func (s *DatasetStore) PublicRepos(ctx context.Context, per, page int) (datasets
 	return
 }
 
-func (s *DatasetStore) RepoByUsername(ctx context.Context, username string, per, page int, onlyPublic bool) (datasets []Repository, err error) {
+func (s *DatasetStore) ByUsername(ctx context.Context, username string, per, page int, onlyPublic bool) (datasets []Dataset, err error) {
 	query := s.db.Operator.Core.
 		NewSelect().
 		Model(&datasets).
-		Join("JOIN users AS u ON u.id = repository.user_id").
-		Where("u.username = ?", username).
-		Where("repository_type = ?", DatasetRepo)
+		Join("JOIN users AS u ON u.id = dataset.user_id").
+		Where("u.username = ?", username)
 
 	if onlyPublic {
 		query = query.Where("private = ?", false)
@@ -83,7 +110,7 @@ func (s *DatasetStore) Count(ctx context.Context) (count int, err error) {
 	return
 }
 
-func (s *DatasetStore) PublicRepoCount(ctx context.Context) (count int, err error) {
+func (s *DatasetStore) PublicCount(ctx context.Context) (count int, err error) {
 	count, err = s.db.Operator.Core.
 		NewSelect().
 		Model(&Repository{}).
@@ -96,42 +123,67 @@ func (s *DatasetStore) PublicRepoCount(ctx context.Context) (count int, err erro
 	return
 }
 
-func (s *DatasetStore) CreateRepo(ctx context.Context, repo *Repository, userId int) (err error) {
+func (s *DatasetStore) Create(ctx context.Context, dataset *Dataset, repo *Repository, userId int64) (err error) {
 	repo.UserID = userId
-	err = s.db.Operator.Core.NewInsert().Model(repo).Scan(ctx)
+	dataset.UserID = userId
+	err = s.db.Operator.Core.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
+		if err = assertAffectedOneRow(tx.NewInsert().Model(repo).Exec(ctx)); err != nil {
+			return err
+		}
+		dataset.RepositoryID = repo.ID
+		if err = assertAffectedOneRow(tx.NewInsert().Model(dataset).Exec(ctx)); err != nil {
+			return err
+		}
+		return nil
+	})
 	return
 }
 
-func (s *DatasetStore) UpdateRepo(ctx context.Context, repo *Repository) (err error) {
+func (s *DatasetStore) Update(ctx context.Context, dataset *Dataset, repo *Repository) (err error) {
 	repo.UpdatedAt = time.Now()
-	err = assertAffectedOneRow(s.db.Operator.Core.NewUpdate().Model(repo).WherePK().Exec(ctx))
+	dataset.UpdatedAt = time.Now()
+	err = s.db.Operator.Core.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
+		if err = assertAffectedOneRow(tx.NewUpdate().Model(dataset).WherePK().Exec(ctx)); err != nil {
+			return err
+		}
+		if err = assertAffectedOneRow(tx.NewUpdate().Model(repo).WherePK().Exec(ctx)); err != nil {
+			return err
+		}
+		return nil
+	})
 	return
 }
 
-func (s *DatasetStore) FindyByRepoPath(ctx context.Context, owner string, repoPath string) (model *Repository, err error) {
-	var repos []Repository
+func (s *DatasetStore) FindyByPath(ctx context.Context, namespace string, repoPath string) (dataset *Dataset, err error) {
+	resDataset := new(Dataset)
 	err = s.db.Operator.Core.
 		NewSelect().
-		Model(&repos).
-		Where("path =?", fmt.Sprintf("%s/%s", owner, repoPath)).
-		Where("name =?", repoPath).
+		Model(resDataset).
+		Relation("Repository").
+		Where("dataset.path =?", fmt.Sprintf("%s/%s", namespace, repoPath)).
+		Where("dataset.name =?", repoPath).
 		Scan(ctx)
-	if err != nil {
-		return
-	}
-	if len(repos) == 0 {
-		return
-	}
-
-	return &repos[0], nil
+	return resDataset, err
 }
 
-func (s *DatasetStore) DeleteRepo(ctx context.Context, username, name string) (err error) {
-	_, err = s.db.Operator.Core.
-		NewDelete().
-		Model(&Repository{}).
-		Where("path = ?", fmt.Sprintf("%v/%v", username, name)).
-		Where("repository_type = ?", DatasetRepo).
-		Exec(ctx)
+func (s *DatasetStore) Delete(ctx context.Context, namespace, name string) (err error) {
+	err = s.db.Operator.Core.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
+		if err = assertAffectedOneRow(
+			tx.NewDelete().
+				Model(&Repository{}).
+				Where("path = ?", fmt.Sprintf("%v/%v", namespace, name)).
+				Where("repository_type = ?", DatasetRepo).
+				Exec(ctx)); err != nil {
+			return err
+		}
+		if err = assertAffectedOneRow(
+			tx.NewDelete().
+				Model(&Dataset{}).
+				Where("path = ?", fmt.Sprintf("%v/%v", namespace, name)).
+				Exec(ctx)); err != nil {
+			return err
+		}
+		return nil
+	})
 	return
 }

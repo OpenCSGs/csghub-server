@@ -10,9 +10,9 @@ func (c *Controller) Delete(ctx *gin.Context) (err error) {
 	if err != nil {
 		return err
 	}
-	err = c.gitServer.DeleteModelRepo(username, name)
+	err = c.gitServer.DeleteDatasetRepo(username, name)
 	if err == nil {
-		err = c.datasetStore.DeleteRepo(ctx, username, name)
+		err = c.datasetStore.Delete(ctx, username, name)
 		if err != nil {
 			return
 		}

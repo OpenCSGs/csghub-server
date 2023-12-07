@@ -2,10 +2,12 @@ package gitea
 
 import (
 	"git-devops.opencsg.com/product/community/starhub-server/pkg/types"
+	"git-devops.opencsg.com/product/community/starhub-server/pkg/utils/common"
 	"github.com/pulltheflower/gitea-go-sdk/gitea"
 )
 
 func (c *Client) GetDatasetTags(namespace, name string, per, page int) (tags []*types.DatasetTag, err error) {
+	namespace = common.WithPrefix(namespace, DatasetOrgPrefix)
 	giteaTags, _, err := c.giteaClient.ListRepoTags(
 		namespace,
 		name,
@@ -33,6 +35,7 @@ func (c *Client) GetDatasetTags(namespace, name string, per, page int) (tags []*
 }
 
 func (c *Client) GetModelTags(namespace, name string, per, page int) (tags []*types.ModelTag, err error) {
+	namespace = common.WithPrefix(namespace, ModelOrgPrefix)
 	giteaTags, _, err := c.giteaClient.ListRepoTags(
 		namespace,
 		name,

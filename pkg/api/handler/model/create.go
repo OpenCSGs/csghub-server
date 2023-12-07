@@ -15,14 +15,14 @@ func HandleCreate(modelCtrl *model.Controller) func(*gin.Context) {
 		if err != nil {
 			c.JSON(http.StatusOK, gin.H{
 				"code":    "401",
-				"message": fmt.Sprintf("Created failed. %v", err),
+				"message": fmt.Sprintf("Created model failed. %v", err),
 			})
 			return
 		}
 
 		respData := gin.H{
 			"code":    200,
-			"message": "Model repository created.",
+			"message": "Model created.",
 			"data":    model,
 		}
 

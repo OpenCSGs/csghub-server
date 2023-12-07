@@ -6,12 +6,16 @@ import (
 	"git-devops.opencsg.com/product/community/starhub-server/config"
 	"git-devops.opencsg.com/product/community/starhub-server/pkg/api/controller/accesstoken"
 	"git-devops.opencsg.com/product/community/starhub-server/pkg/api/controller/dataset"
+	"git-devops.opencsg.com/product/community/starhub-server/pkg/api/controller/member"
 	"git-devops.opencsg.com/product/community/starhub-server/pkg/api/controller/model"
+	"git-devops.opencsg.com/product/community/starhub-server/pkg/api/controller/organization"
 	"git-devops.opencsg.com/product/community/starhub-server/pkg/api/controller/sshkey"
 	"git-devops.opencsg.com/product/community/starhub-server/pkg/api/controller/user"
 	acHandler "git-devops.opencsg.com/product/community/starhub-server/pkg/api/handler/accesstoken"
 	datasetHandler "git-devops.opencsg.com/product/community/starhub-server/pkg/api/handler/dataset"
+	memberHandler "git-devops.opencsg.com/product/community/starhub-server/pkg/api/handler/member"
 	modelHandler "git-devops.opencsg.com/product/community/starhub-server/pkg/api/handler/model"
+	orgHandler "git-devops.opencsg.com/product/community/starhub-server/pkg/api/handler/organization"
 	sshKeyHandler "git-devops.opencsg.com/product/community/starhub-server/pkg/api/handler/sshkey"
 	userHandler "git-devops.opencsg.com/product/community/starhub-server/pkg/api/handler/user"
 	"github.com/gin-gonic/gin"
@@ -28,6 +32,8 @@ func NewAPIHandler(
 	userCtrl *user.Controller,
 	acCtrl *accesstoken.Controller,
 	sshKeyCtrl *sshkey.Controller,
+	orgCtrl *organization.Controller,
+	memberCtrl *member.Controller,
 ) APIHandler {
 	_ = config
 	r := gin.New()
@@ -72,5 +78,18 @@ func NewAPIHandler(
 
 	// User datasets
 	apiGroup.GET("/user/:username/datasets", userHandler.HandleDatasets(userCtrl))
+
+	//Organization
+	apiGroup.GET("/organizations", orgHandler.HandleIndex(orgCtrl))
+	apiGroup.POST("/organizations", orgHandler.HandleCreate(orgCtrl))
+	apiGroup.PUT("/organizations/:name", orgHandler.HandleUpdate(orgCtrl))
+	apiGroup.DELETE("/organizations/:name", orgHandler.HandleDelete(orgCtrl))
+
+	//Member
+	apiGroup.GET("/organizations/:name/members", memberHandler.HandleIndex(memberCtrl))
+	apiGroup.POST("/organizations/:name/members", memberHandler.HandleCreate(memberCtrl))
+	apiGroup.PUT("/organizations/:name/members/:username", memberHandler.HandleUpdate(memberCtrl))
+	apiGroup.DELETE("/organizations/:name/members/:username", memberHandler.HandleDelete(memberCtrl))
+
 	return r
 }

@@ -2,10 +2,12 @@ package gitea
 
 import (
 	"git-devops.opencsg.com/product/community/starhub-server/pkg/types"
+	"git-devops.opencsg.com/product/community/starhub-server/pkg/utils/common"
 	"github.com/pulltheflower/gitea-go-sdk/gitea"
 )
 
 func (c *Client) GetModelBranches(namespace, name string, per, page int) (branches []*types.ModelBranch, err error) {
+	namespace = common.WithPrefix(namespace, ModelOrgPrefix)
 	giteaBranches, _, err := c.giteaClient.ListRepoBranches(
 		namespace,
 		name,
@@ -29,6 +31,7 @@ func (c *Client) GetModelBranches(namespace, name string, per, page int) (branch
 }
 
 func (c *Client) GetDatasetBranches(namespace, name string, per, page int) (branches []*types.DatasetBranch, err error) {
+	namespace = common.WithPrefix(namespace, DatasetOrgPrefix)
 	giteaBranches, _, err := c.giteaClient.ListRepoBranches(
 		namespace,
 		name,

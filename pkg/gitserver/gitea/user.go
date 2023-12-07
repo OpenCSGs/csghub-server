@@ -6,6 +6,7 @@ import (
 
 	"git-devops.opencsg.com/product/community/starhub-server/pkg/store/database"
 	"git-devops.opencsg.com/product/community/starhub-server/pkg/types"
+	"git-devops.opencsg.com/product/community/starhub-server/pkg/utils/common"
 	"github.com/pulltheflower/gitea-go-sdk/gitea"
 )
 
@@ -30,9 +31,15 @@ func (c *Client) CreateUser(u *types.CreateUserRequest) (user *database.User, er
 		return
 	}
 
+	err = c.createOrgsForUser(giteaUser)
+
+	if err != nil {
+		return
+	}
+
 	user = &database.User{
 		Email:    giteaUser.Email,
-		GitID:    int(giteaUser.ID),
+		GitID:    giteaUser.ID,
 		Username: giteaUser.UserName,
 		Name:     giteaUser.FullName,
 		Password: password,
@@ -73,4 +80,28 @@ func generateRandomPassword(length int) (string, error) {
 	}
 
 	return string(password), nil
+}
+
+// Create three orgs for user
+func (c *Client) createOrgsForUser(user *gitea.User) (err error) {
+	orgNames := []string{
+		common.WithPrefix(user.UserName, ModelOrgPrefix),
+		common.WithPrefix(user.UserName, DatasetOrgPrefix),
+		common.WithPrefix(user.UserName, SpaceOrgPrefix),
+	}
+
+	for _, orgName := range orgNames {
+		_, _, err = c.giteaClient.AdminCreateOrg(
+			user.UserName,
+			gitea.CreateOrgOption{
+				Name:     orgName,
+				FullName: orgName,
+			},
+		)
+		if err != nil {
+			return
+		}
+	}
+
+	return
 }

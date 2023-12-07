@@ -19,14 +19,14 @@ func (c *Controller) Commits(ctx *gin.Context) (commits []*types.Commit, err err
 	}
 	ref := ctx.Query("ref")
 	if ref == "" {
-		repo, err := c.datasetStore.FindyByRepoPath(ctx, namespace, name)
+		dataset, err := c.datasetStore.FindyByPath(ctx, namespace, name)
 		if err != nil {
 			return nil, err
 		}
-		if repo == nil {
+		if dataset == nil {
 			return nil, errors.New("The repository with given path and name is not found")
 		}
-		ref = repo.DefaultBranch
+		ref = dataset.Repository.DefaultBranch
 	}
 	commits, err = c.gitServer.GetDatasetCommits(namespace, name, ref, per, page)
 	if err != nil {

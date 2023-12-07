@@ -39,7 +39,9 @@ type DatasetBranchCommit struct {
 
 type CreateDatasetReq struct {
 	Username      string `json:"username"`
+	Namespace     string `json:"namespace"`
 	Name          string `json:"name"`
+	Path          string `json:"path"`
 	Description   string `json:"description"`
 	Private       bool   `json:"private"`
 	Labels        string `json:"labels"`

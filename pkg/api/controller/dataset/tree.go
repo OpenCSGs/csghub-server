@@ -19,16 +19,16 @@ func (c *Controller) Tree(ctx *gin.Context) (tree []*types.File, err error) {
 	path := ctx.Query("path")
 	ref = ctx.Query("ref")
 	if ref == "" {
-		repo, err := c.datasetStore.FindyByRepoPath(ctx, namespace, name)
+		dataset, err := c.datasetStore.FindyByPath(ctx, namespace, name)
 		if err != nil {
 			return nil, err
 		}
-		if repo == nil {
+		if dataset == nil {
 			return nil, errors.New("The repository with given path and name is not found")
 		}
-		ref = repo.DefaultBranch
+		ref = dataset.Repository.DefaultBranch
 	}
 
-	tree, err = c.gitServer.GetModelFileTree(namespace, name, ref, path)
+	tree, err = c.gitServer.GetDatasetFileTree(namespace, name, ref, path)
 	return
 }

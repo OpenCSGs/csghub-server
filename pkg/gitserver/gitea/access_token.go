@@ -20,7 +20,7 @@ func (c *Client) CreateUserToken(req *types.CreateUserTokenRequest) (token *data
 	}
 
 	token = &database.AccessToken{
-		ID:    int(giteaToken.ID),
+		GitID: giteaToken.ID,
 		Name:  req.Name,
 		Token: giteaToken.Token,
 	}

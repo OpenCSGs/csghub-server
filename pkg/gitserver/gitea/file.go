@@ -6,12 +6,14 @@ import (
 	"sync"
 
 	"git-devops.opencsg.com/product/community/starhub-server/pkg/types"
+	"git-devops.opencsg.com/product/community/starhub-server/pkg/utils/common"
 	"github.com/pulltheflower/gitea-go-sdk/gitea"
 )
 
 const LFSPrefix = "version https://git-lfs.github.com/spec/v1"
 
 func (c *Client) GetModelFileTree(namespace, name, ref, path string) (tree []*types.File, err error) {
+	namespace = common.WithPrefix(namespace, ModelOrgPrefix)
 	giteaEntries, _, err := c.giteaClient.ListContents(namespace, name, ref, path)
 	if err != nil {
 		return
@@ -36,6 +38,7 @@ func (c *Client) GetModelFileTree(namespace, name, ref, path string) (tree []*ty
 }
 
 func (c *Client) GetDatasetFileTree(namespace, name, ref, path string) (tree []*types.File, err error) {
+	namespace = common.WithPrefix(namespace, DatasetOrgPrefix)
 	giteaEntries, _, err := c.giteaClient.ListContents(namespace, name, ref, path)
 	if err != nil {
 		return
@@ -60,6 +63,7 @@ func (c *Client) GetDatasetFileTree(namespace, name, ref, path string) (tree []*
 }
 
 func (c *Client) GetDatasetFileRaw(namespace, name, ref, path string) (data string, err error) {
+	namespace = common.WithPrefix(namespace, DatasetOrgPrefix)
 	giteaFileData, _, err := c.giteaClient.GetFile(namespace, name, ref, path)
 	if err != nil {
 		return
@@ -69,6 +73,7 @@ func (c *Client) GetDatasetFileRaw(namespace, name, ref, path string) (data stri
 }
 
 func (c *Client) GetModelFileRaw(namespace, name, ref, path string) (data string, err error) {
+	namespace = common.WithPrefix(namespace, ModelOrgPrefix)
 	giteaFileData, _, err := c.giteaClient.GetFile(namespace, name, ref, path)
 	if err != nil {
 		return

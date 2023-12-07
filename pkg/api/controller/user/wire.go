@@ -13,7 +13,10 @@ func ProvideController(
 	modelCache *cache.ModelCache,
 	datasetStore *database.DatasetStore,
 	datasetCache *cache.DatasetCache,
+	namespaceStore *database.NamespaceStore,
+	namespaceCache *cache.NamespaceCache,
 	gitServer gitserver.GitServer,
 ) *Controller {
-	return NewController(userStore, userCache, modelStore, modelCache, datasetStore, datasetCache, gitServer)
+	return NewController(userStore, userCache, modelStore, modelCache, datasetStore, datasetCache,
+		namespaceStore, namespaceCache, gitServer)
 }

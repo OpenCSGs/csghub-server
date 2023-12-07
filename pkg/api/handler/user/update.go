@@ -15,14 +15,14 @@ func HandleUpdate(userCtrl *user.Controller) func(*gin.Context) {
 		if err != nil {
 			c.JSON(http.StatusOK, gin.H{
 				"code":    "401",
-				"message": fmt.Sprintf("Update failed: %v", err.Error()),
+				"message": fmt.Sprintf("Update user failed: %v", err.Error()),
 			})
 			return
 		}
 
 		respData := gin.H{
 			"code":    200,
-			"message": fmt.Sprintf("User #%d update", user.ID),
+			"message": fmt.Sprintf("User #%d updated", user.ID),
 			"data":    user,
 		}
 

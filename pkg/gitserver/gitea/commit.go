@@ -2,10 +2,12 @@ package gitea
 
 import (
 	"git-devops.opencsg.com/product/community/starhub-server/pkg/types"
+	"git-devops.opencsg.com/product/community/starhub-server/pkg/utils/common"
 	"github.com/pulltheflower/gitea-go-sdk/gitea"
 )
 
 func (c *Client) GetModelCommits(namespace, name, ref string, per, page int) (commits []*types.Commit, err error) {
+	namespace = common.WithPrefix(namespace, ModelOrgPrefix)
 	giteaCommits, _, err := c.giteaClient.ListRepoCommits(
 		namespace,
 		name,
@@ -44,6 +46,7 @@ func (c *Client) GetModelCommits(namespace, name, ref string, per, page int) (co
 }
 
 func (c *Client) GetModelLastCommit(namespace, name, ref string) (commit *types.Commit, err error) {
+	namespace = common.WithPrefix(namespace, ModelOrgPrefix)
 	giteaCommit, _, err := c.giteaClient.GetSingleCommit(
 		namespace,
 		name,
@@ -73,6 +76,7 @@ func (c *Client) GetModelLastCommit(namespace, name, ref string) (commit *types.
 }
 
 func (c *Client) GetDatasetCommits(namespace, name, ref string, per, page int) (commits []*types.Commit, err error) {
+	namespace = common.WithPrefix(namespace, DatasetOrgPrefix)
 	giteaCommits, _, err := c.giteaClient.ListRepoCommits(
 		namespace,
 		name,
@@ -110,6 +114,7 @@ func (c *Client) GetDatasetCommits(namespace, name, ref string, per, page int) (
 }
 
 func (c *Client) GetDatasetLastCommit(namespace, name, ref string) (commit *types.Commit, err error) {
+	namespace = common.WithPrefix(namespace, DatasetOrgPrefix)
 	giteaCommit, _, err := c.giteaClient.GetSingleCommit(
 		namespace,
 		name,
