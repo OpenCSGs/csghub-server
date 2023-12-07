@@ -38,7 +38,7 @@ type DB struct {
 	Operator
 
 	// the underlying *bun.DB
-	bunDB *bun.DB
+	BunDB *bun.DB
 }
 
 // Operator is where database access/write methods implemented
@@ -97,7 +97,7 @@ func NewDB(ctx context.Context, config DBConfig) (db *DB, err error) {
 
 	db = &DB{
 		Operator: Operator{Core: bunDB},
-		bunDB:    bunDB,
+		BunDB:    bunDB,
 	}
 
 	return
@@ -107,7 +107,7 @@ func NewDB(ctx context.Context, config DBConfig) (db *DB, err error) {
 // If the function returns an error, the transaction is rolled back.
 // Otherwise, the transaction is committed.
 func (db *DB) RunInTx(ctx context.Context, fn func(tx Operator) error) error {
-	return db.bunDB.RunInTx(ctx, &sql.TxOptions{}, func(ctx context.Context, tx bun.Tx) error {
+	return db.BunDB.RunInTx(ctx, &sql.TxOptions{}, func(ctx context.Context, tx bun.Tx) error {
 		op := Operator{Core: tx}
 		return fn(op)
 	})
@@ -118,10 +118,10 @@ func (db *DB) RunInTx(ctx context.Context, fn func(tx Operator) error) error {
 // It is rare to Close a DB,
 // as the DB handle is meant to be long-lived and shared between many goroutines.
 func (db *DB) Close() error {
-	return db.bunDB.Close()
+	return db.BunDB.Close()
 }
 
 // NewMigrator factory of database migrator
 func NewMigrator(db *DB) *migrate.Migrator {
-	return migrate.NewMigrator(db.bunDB, migrations.Migrations) // nolint: staticcheck
+	return migrate.NewMigrator(db.BunDB, migrations.Migrations) // nolint: staticcheck
 }

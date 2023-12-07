@@ -15,14 +15,14 @@ func (c *Controller) LastCommit(ctx *gin.Context) (commit *types.Commit, err err
 	}
 	ref := ctx.Query("ref")
 	if ref == "" {
-		repo, err := c.modelStore.FindyByRepoPath(ctx, namespace, name)
+		model, err := c.modelStore.FindyByPath(ctx, namespace, name)
 		if err != nil {
 			return nil, err
 		}
-		if repo == nil {
+		if model == nil {
 			return nil, errors.New("The repository with given path and name is not found")
 		}
-		ref = repo.DefaultBranch
+		ref = model.Repository.DefaultBranch
 	}
 	commit, err = c.gitServer.GetModelLastCommit(namespace, name, ref)
 	if err != nil {

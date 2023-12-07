@@ -20,7 +20,7 @@ func (c *Client) CreateSSHKey(req *types.CreateSSHKeyRequest) (token *database.S
 	}
 
 	token = &database.SSHKey{
-		GID:     int(giteaSSHKey.ID),
+		GitID:   giteaSSHKey.ID,
 		Name:    req.Name,
 		Content: giteaSSHKey.Key,
 	}

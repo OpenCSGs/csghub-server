@@ -3,12 +3,13 @@ package dataset
 import (
 	"errors"
 
+	"git-devops.opencsg.com/product/community/starhub-server/pkg/store/database"
 	"git-devops.opencsg.com/product/community/starhub-server/pkg/types"
 	"git-devops.opencsg.com/product/community/starhub-server/pkg/utils/common"
 	"github.com/gin-gonic/gin"
 )
 
-func (c *Controller) Update(ctx *gin.Context) (dataset *types.Dataset, err error) {
+func (c *Controller) Update(ctx *gin.Context) (dataset *database.Dataset, err error) {
 	var req types.UpdateDatasetReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {
 		return nil, err
@@ -18,18 +19,25 @@ func (c *Controller) Update(ctx *gin.Context) (dataset *types.Dataset, err error
 	if err != nil {
 		return
 	}
-	repo, err := c.datasetStore.FindyByRepoPath(ctx, namespace, name)
+
+	_, err = c.namespaceStore.FindByPath(ctx, namespace)
+	if err != nil {
+		return nil, errors.New("Namespace does not exist")
+	}
+
+	_, err = c.userStore.FindByUsername(ctx, req.Username)
+	if err != nil {
+		return nil, errors.New("User does not exist")
+	}
+
+	dataset, err = c.datasetStore.FindyByPath(ctx, namespace, name)
 	if err != nil {
 		return
 	}
 
-	if repo == nil {
-		return nil, errors.New("The repository with given path and name is not found")
-	}
-
-	dataset, err = c.gitServer.UpdateDatasetRepo(namespace, name, repo, &req)
+	err = c.gitServer.UpdateDatasetRepo(namespace, name, dataset, dataset.Repository, &req)
 	if err == nil {
-		err = c.datasetStore.UpdateRepo(ctx, dataset)
+		err = c.datasetStore.Update(ctx, dataset, dataset.Repository)
 		if err != nil {
 			return
 		}

@@ -1,14 +1,23 @@
 package gitea
 
 import (
+	"fmt"
+
 	"git-devops.opencsg.com/product/community/starhub-server/pkg/store/database"
 	"git-devops.opencsg.com/product/community/starhub-server/pkg/types"
+	"git-devops.opencsg.com/product/community/starhub-server/pkg/utils/common"
 	"github.com/pulltheflower/gitea-go-sdk/gitea"
 )
 
-func (c *Client) CreateModelRepo(req *types.CreateModelReq) (model *types.Model, err error) {
-	repo, _, err := c.giteaClient.AdminCreateRepo(
-		req.Username,
+const (
+	ModelOrgPrefix   = "models_"
+	DatasetOrgPrefix = "datasets_"
+	SpaceOrgPrefix   = "spaces_"
+)
+
+func (c *Client) CreateModelRepo(req *types.CreateModelReq) (model *database.Model, repo *database.Repository, err error) {
+	giteaRepo, _, err := c.giteaClient.CreateOrgRepo(
+		common.WithPrefix(req.Namespace, ModelOrgPrefix),
 		gitea.CreateRepoOption{
 			Name:          req.Name,
 			Description:   req.Description,
@@ -23,23 +32,39 @@ func (c *Client) CreateModelRepo(req *types.CreateModelReq) (model *types.Model,
 		return
 	}
 
-	model = &types.Model{
-		Path:           repo.FullName,
-		Name:           repo.Name,
-		Description:    repo.Description,
-		Private:        repo.Private,
+	model = &database.Model{
+		UrlSlug:     giteaRepo.Name,
+		Path:        fmt.Sprintf("%s/%s", req.Namespace, req.Name),
+		GitPath:     giteaRepo.FullName,
+		Name:        giteaRepo.Name,
+		Description: giteaRepo.Description,
+		Private:     giteaRepo.Private,
+	}
+
+	repo = &database.Repository{
+		Path:           fmt.Sprintf("%s/%s", req.Namespace, req.Name),
+		GitPath:        giteaRepo.FullName,
+		Name:           giteaRepo.Name,
+		Description:    giteaRepo.Description,
+		Private:        giteaRepo.Private,
 		Labels:         req.Labels,
 		License:        req.License,
-		DefaultBranch:  repo.DefaultBranch,
+		DefaultBranch:  giteaRepo.DefaultBranch,
 		RepositoryType: database.ModelRepo,
 	}
 
 	return
 }
 
-func (c *Client) UpdateModelRepo(owner string, repoPath string, repo *types.Model, req *types.UpdateModelReq) (*types.Model, error) {
+func (c *Client) UpdateModelRepo(
+	namespace string,
+	repoPath string,
+	model *database.Model,
+	repo *database.Repository,
+	req *types.UpdateModelReq,
+) (err error) {
 	giteaRepo, _, err := c.giteaClient.EditRepo(
-		owner,
+		common.WithPrefix(namespace, ModelOrgPrefix),
 		repoPath,
 		gitea.EditRepoOption{
 			Name:          gitea.OptionalString(req.Name),
@@ -50,21 +75,30 @@ func (c *Client) UpdateModelRepo(owner string, repoPath string, repo *types.Mode
 	)
 
 	if err != nil {
-		return nil, err
+		return
 	}
+	path := fmt.Sprintf("%s/%s", namespace, giteaRepo.Name)
 
 	repo.Name = giteaRepo.Name
-	repo.Path = giteaRepo.FullName
+	repo.Path = path
+	repo.GitPath = giteaRepo.FullName
 	repo.Description = giteaRepo.Description
 	repo.Private = giteaRepo.Private
 	repo.DefaultBranch = giteaRepo.DefaultBranch
 
-	return repo, nil
+	model.Name = giteaRepo.Name
+	model.GitPath = giteaRepo.FullName
+	model.UrlSlug = giteaRepo.Name
+	model.Path = path
+	model.Description = giteaRepo.Description
+	model.Private = giteaRepo.Private
+
+	return
 }
 
-func (c *Client) CreateDatasetRepo(req *types.CreateDatasetReq) (dataset *types.Dataset, err error) {
-	repo, _, err := c.giteaClient.AdminCreateRepo(
-		req.Username,
+func (c *Client) CreateDatasetRepo(req *types.CreateDatasetReq) (dataset *database.Dataset, repo *database.Repository, err error) {
+	giteaRepo, _, err := c.giteaClient.CreateOrgRepo(
+		common.WithPrefix(req.Namespace, DatasetOrgPrefix),
 		gitea.CreateRepoOption{
 			Name:          req.Name,
 			Description:   req.Description,
@@ -79,23 +113,39 @@ func (c *Client) CreateDatasetRepo(req *types.CreateDatasetReq) (dataset *types.
 		return
 	}
 
-	dataset = &types.Dataset{
-		Path:           repo.FullName,
-		Name:           repo.Name,
-		Description:    repo.Description,
-		Private:        repo.Private,
+	dataset = &database.Dataset{
+		UrlSlug:     giteaRepo.Name,
+		Path:        fmt.Sprintf("%s/%s", req.Namespace, req.Name),
+		GitPath:     giteaRepo.FullName,
+		Name:        giteaRepo.Name,
+		Description: giteaRepo.Description,
+		Private:     giteaRepo.Private,
+	}
+
+	repo = &database.Repository{
+		Path:           fmt.Sprintf("%s/%s", req.Namespace, req.Name),
+		GitPath:        giteaRepo.FullName,
+		Name:           giteaRepo.Name,
+		Description:    giteaRepo.Description,
+		Private:        giteaRepo.Private,
 		Labels:         req.Labels,
 		License:        req.License,
-		DefaultBranch:  repo.DefaultBranch,
+		DefaultBranch:  giteaRepo.DefaultBranch,
 		RepositoryType: database.DatasetRepo,
 	}
 
 	return
 }
 
-func (c *Client) UpdateDatasetRepo(owner string, repoPath string, repo *types.Dataset, req *types.UpdateDatasetReq) (*types.Dataset, error) {
+func (c *Client) UpdateDatasetRepo(
+	namespace string,
+	repoPath string,
+	dataset *database.Dataset,
+	repo *database.Repository,
+	req *types.UpdateDatasetReq,
+) (err error) {
 	giteaRepo, _, err := c.giteaClient.EditRepo(
-		owner,
+		common.WithPrefix(namespace, DatasetOrgPrefix),
 		repoPath,
 		gitea.EditRepoOption{
 			Name:          gitea.OptionalString(req.Name),
@@ -106,24 +156,36 @@ func (c *Client) UpdateDatasetRepo(owner string, repoPath string, repo *types.Da
 	)
 
 	if err != nil {
-		return nil, err
+		return
 	}
 
+	path := fmt.Sprintf("%s/%s", namespace, giteaRepo.Name)
+
 	repo.Name = giteaRepo.Name
-	repo.Path = giteaRepo.FullName
+	repo.Path = path
+	repo.GitPath = giteaRepo.FullName
 	repo.Description = giteaRepo.Description
 	repo.Private = giteaRepo.Private
 	repo.DefaultBranch = giteaRepo.DefaultBranch
 
-	return repo, nil
+	dataset.Name = giteaRepo.Name
+	dataset.GitPath = giteaRepo.FullName
+	dataset.UrlSlug = giteaRepo.Name
+	dataset.Path = path
+	dataset.Description = giteaRepo.Description
+	dataset.Private = giteaRepo.Private
+
+	return
 }
 
-func (c *Client) DeleteModelRepo(username, name string) error {
-	_, err := c.giteaClient.DeleteRepo(username, name)
+func (c *Client) DeleteModelRepo(namespace, name string) error {
+	giteaNamespace := common.WithPrefix(namespace, ModelOrgPrefix)
+	_, err := c.giteaClient.DeleteRepo(giteaNamespace, name)
 	return err
 }
 
-func (c *Client) DeleteDatasetRepo(username, name string) error {
-	_, err := c.giteaClient.DeleteRepo(username, name)
+func (c *Client) DeleteDatasetRepo(namespace, name string) error {
+	giteaNamespace := common.WithPrefix(namespace, DatasetOrgPrefix)
+	_, err := c.giteaClient.DeleteRepo(giteaNamespace, name)
 	return err
 }

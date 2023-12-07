@@ -19,14 +19,14 @@ func (c *Controller) Commits(ctx *gin.Context) (commits []*types.Commit, err err
 	}
 	ref := ctx.Query("ref")
 	if ref == "" {
-		repo, err := c.modelStore.FindyByRepoPath(ctx, namespace, name)
+		model, err := c.modelStore.FindyByPath(ctx, namespace, name)
 		if err != nil {
 			return nil, err
 		}
-		if repo == nil {
+		if model == nil {
 			return nil, errors.New("The repository with given path and name is not found")
 		}
-		ref = repo.DefaultBranch
+		ref = model.Repository.DefaultBranch
 	}
 	commits, err = c.gitServer.GetModelCommits(namespace, name, ref, per, page)
 	if err != nil {

@@ -15,10 +15,11 @@ func init() {
 }
 
 type AccessToken struct {
-	ID     int    `bun:",pk,autoincrement" json:"id"`
+	ID     int64  `bun:",pk,autoincrement" json:"id"`
+	GitID  int64  `bun:",pk" json:"git_id"`
 	Name   string `bun:",notnull" json:"name"`
 	Token  string `bun:",notnull" json:"token"`
-	UserID int    `bun:",notnull" json:"user_id"`
-	User   User   `bun:"rel:belongs-to,join:user_id=id" json:"user"`
+	UserID int64  `bun:",pk" json:"user_id"`
+	User   *User  `bun:"rel:belongs-to,join:user_id=id" json:"user"`
 	times
 }

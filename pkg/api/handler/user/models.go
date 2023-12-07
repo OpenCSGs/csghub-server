@@ -15,14 +15,14 @@ func HandleModels(userCtrl *user.Controller) func(*gin.Context) {
 		if err != nil {
 			c.JSON(http.StatusOK, gin.H{
 				"code":    "401",
-				"message": fmt.Sprintf("Update failed: %v", err.Error()),
+				"message": fmt.Sprintf("Get user models failed: %v", err.Error()),
 			})
 			return
 		}
 
 		respData := gin.H{
 			"code":    200,
-			"message": "Get models successfully",
+			"message": "Get user models successfully",
 			"data":    models,
 		}
 

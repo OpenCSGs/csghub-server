@@ -11,6 +11,7 @@ func (c *Controller) Detail(ctx *gin.Context) (detail *types.ModelDetail, err er
 	if err != nil {
 		return
 	}
+
 	detail, err = c.gitServer.GetModelDetail(namespace, name)
 	if err != nil {
 		return

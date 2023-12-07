@@ -3,5 +3,6 @@
 /bin/.
 .vscode
 starhub
-/gitea/.
-/pgdata/.
+/gitea
+/pgdata
+/minio_data

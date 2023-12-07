@@ -14,8 +14,9 @@ type GitServer interface {
 	UpdateUser(*types.UpdateUserRequest) (int, *database.User, error)
 	CreateUserToken(*types.CreateUserTokenRequest) (*database.AccessToken, error)
 	DeleteUserToken(*types.DeleteUserTokenRequest) error
-	CreateModelRepo(*types.CreateModelReq) (*types.Model, error)
-	UpdateModelRepo(string, string, *types.Model, *types.UpdateModelReq) (*types.Model, error)
+
+	CreateModelRepo(*types.CreateModelReq) (*database.Model, *database.Repository, error)
+	UpdateModelRepo(string, string, *database.Model, *database.Repository, *types.UpdateModelReq) error
 	DeleteModelRepo(string, string) error
 	GetModelBranches(string, string, int, int) ([]*types.ModelBranch, error)
 	GetModelCommits(string, string, string, int, int) ([]*types.Commit, error)
@@ -25,8 +26,8 @@ type GitServer interface {
 	GetModelTags(string, string, int, int) ([]*types.ModelTag, error)
 	GetModelFileTree(string, string, string, string) ([]*types.File, error)
 
-	CreateDatasetRepo(*types.CreateDatasetReq) (*types.Dataset, error)
-	UpdateDatasetRepo(string, string, *types.Dataset, *types.UpdateDatasetReq) (*types.Dataset, error)
+	CreateDatasetRepo(*types.CreateDatasetReq) (*database.Dataset, *database.Repository, error)
+	UpdateDatasetRepo(string, string, *database.Dataset, *database.Repository, *types.UpdateDatasetReq) error
 	DeleteDatasetRepo(string, string) error
 	GetDatasetBranches(string, string, int, int) ([]*types.DatasetBranch, error)
 	GetDatasetCommits(string, string, string, int, int) ([]*types.Commit, error)
@@ -39,6 +40,10 @@ type GitServer interface {
 	CreateSSHKey(*types.CreateSSHKeyRequest) (*database.SSHKey, error)
 	// ListSSHKeys(string, int, int) ([]*database.SSHKey, error)
 	DeleteSSHKey(int) error
+
+	CreateOrganization(*types.CreateOrgReq) (*database.Organization, error)
+	DeleteOrganization(string) error
+	UpdateOrganization(string, *types.EditOrgReq, *database.Organization) (*database.Organization, error)
 }
 
 func NewGitServer(config *config.Config) (GitServer, error) {

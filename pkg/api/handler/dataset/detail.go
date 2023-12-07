@@ -14,7 +14,7 @@ func HandleDetail(datasetCtrl *dataset.Controller) func(*gin.Context) {
 		if err != nil {
 			c.JSON(http.StatusOK, gin.H{
 				"code":    401,
-				"message": fmt.Sprintf("Get repository detail failed: %v", err),
+				"message": fmt.Sprintf("Get dataset detail failed: %v", err),
 			})
 			return
 		}
@@ -22,7 +22,7 @@ func HandleDetail(datasetCtrl *dataset.Controller) func(*gin.Context) {
 		respData := gin.H{
 			"code":    200,
 			"data":    datasetDetail,
-			"message": "Get repository detail successfully.",
+			"message": "Get dataset detail successfully.",
 		}
 
 		c.JSON(http.StatusOK, respData)

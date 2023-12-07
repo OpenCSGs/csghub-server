@@ -14,14 +14,14 @@ func HandleDelete(modelCtrl *model.Controller) func(*gin.Context) {
 		if err != nil {
 			c.JSON(http.StatusOK, gin.H{
 				"code":    401,
-				"message": fmt.Sprintf("Delete model repository failed. %v", err),
+				"message": fmt.Sprintf("Delete model failed. %v", err),
 			})
 			return
 		}
 
 		respData := gin.H{
 			"code":    200,
-			"message": "Model repository deleted.",
+			"message": "Model deleted.",
 		}
 
 		c.JSON(http.StatusOK, respData)

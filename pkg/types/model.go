@@ -1,9 +1,5 @@
 package types
 
-import "git-devops.opencsg.com/product/community/starhub-server/pkg/store/database"
-
-type Model = database.Repository
-
 type ModelDetail struct {
 	Path          string `json:"path"`
 	Name          string `json:"name"`
@@ -39,7 +35,9 @@ type ModelBranchCommit struct {
 
 type CreateModelReq struct {
 	Username      string `json:"username"`
+	Namespace     string `json:"namespace"`
 	Name          string `json:"name"`
+	Path          string `json:"path"`
 	Description   string `json:"description"`
 	Private       bool   `json:"private"`
 	Labels        string `json:"labels"`

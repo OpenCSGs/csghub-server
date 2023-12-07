@@ -15,15 +15,15 @@ func (c *Controller) FileRaw(ctx *gin.Context) (raw string, err error) {
 	path := ctx.Param("file_path")
 	ref := ctx.Query("ref")
 	if ref == "" {
-		repo, err := c.modelStore.FindyByRepoPath(ctx, namespace, name)
+		model, err := c.modelStore.FindyByPath(ctx, namespace, name)
 		if err != nil {
 			return "", err
 		}
-		if repo == nil {
+		if model == nil {
 			err = errors.New("The repository with given path and name is not found")
 			return "", err
 		}
-		ref = repo.DefaultBranch
+		ref = model.Repository.DefaultBranch
 	}
 	raw, err = c.gitServer.GetModelFileRaw(namespace, name, ref, path)
 	if err != nil {

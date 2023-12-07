@@ -11,7 +11,9 @@ import (
 	"git-devops.opencsg.com/product/community/starhub-server/cmd/starhub-server/cmd/common"
 	"git-devops.opencsg.com/product/community/starhub-server/pkg/api/controller/accesstoken"
 	"git-devops.opencsg.com/product/community/starhub-server/pkg/api/controller/dataset"
+	"git-devops.opencsg.com/product/community/starhub-server/pkg/api/controller/member"
 	model2 "git-devops.opencsg.com/product/community/starhub-server/pkg/api/controller/model"
+	"git-devops.opencsg.com/product/community/starhub-server/pkg/api/controller/organization"
 	"git-devops.opencsg.com/product/community/starhub-server/pkg/api/controller/sshkey"
 	"git-devops.opencsg.com/product/community/starhub-server/pkg/api/controller/user"
 	"git-devops.opencsg.com/product/community/starhub-server/pkg/apiserver"
@@ -45,22 +47,32 @@ func initAPIServer(ctx context.Context) (*httpbase.GracefulServer, error) {
 	modelCache := cache.ProvideModelCache(cacheCache)
 	userStore := database.ProvideUserStore(db)
 	userCache := cache.ProvideUserCache(cacheCache)
+	orgStore := database.ProvideOrgStore(db)
+	orgCache := cache.ProvideOrgCache(cacheCache)
+	namespaceStore := database.ProvideNamespaceStore(db)
+	namespaceCache := cache.ProvideNamespaceCache(cacheCache)
+	repoStore := database.ProvideRepoStore(db)
+	repoCache := cache.ProvideRepoCache(cacheCache)
 	gitServer, err := gitserver.ProvideGitServer(config)
 	if err != nil {
 		return nil, err
 	}
-	controller := model2.ProvideController(modelStore, modelCache, userStore, userCache, gitServer)
+	controller := model2.ProvideController(modelStore, modelCache, userStore, userCache, orgStore, orgCache, namespaceStore, namespaceCache, repoStore, repoCache, gitServer)
 	datasetStore := database.ProvideDatasetStore(db)
 	datasetCache := cache.ProvideDatasetCache(cacheCache)
-	datasetController := dataset.ProvideController(datasetStore, datasetCache, userStore, userCache, gitServer)
-	userController := user.ProvideController(userStore, userCache, modelStore, modelCache, datasetStore, datasetCache, gitServer)
+	datasetController := dataset.ProvideController(datasetStore, datasetCache, userStore, userCache, orgStore, orgCache, namespaceStore, namespaceCache, repoStore, repoCache, gitServer)
+	userController := user.ProvideController(userStore, userCache, modelStore, modelCache, datasetStore, datasetCache, namespaceStore, namespaceCache, gitServer)
 	accessTokenStore := database.ProvideAccessTokenStore(db)
 	accessTokenCache := cache.ProvideAccessTokenCache(cacheCache)
 	accesstokenController := accesstoken.ProvideController(userStore, userCache, accessTokenStore, accessTokenCache, gitServer)
 	sshKeyStore := database.ProvideSSHKeyStore(db)
 	sshKeyCache := cache.ProvideSSHKeyCache(cacheCache)
 	sshkeyController := sshkey.ProvideController(sshKeyStore, sshKeyCache, userStore, gitServer)
-	apiHandler := router.ProvideAPIHandler(config, controller, datasetController, userController, accesstokenController, sshkeyController)
+	memberStore := database.ProvideMemberStore(db)
+	memberCache := cache.ProvideMemberCache(cacheCache)
+	organizationController := organization.ProvideController(memberStore, memberCache, orgStore, orgCache, userStore, userCache, namespaceStore, namespaceCache, gitServer)
+	memberController := member.ProvideController(memberStore, memberCache, orgStore, orgCache, gitServer)
+	apiHandler := router.ProvideAPIHandler(config, controller, datasetController, userController, accesstokenController, sshkeyController, organizationController, memberController)
 	gitHandler := router.ProvideGitHandler(config, controller, datasetController)
 	routerRouter := router.ProvideRouter(apiHandler, gitHandler)
 	gracefulServer := apiserver.ProvideGracefulServer(config, logger, routerRouter)
