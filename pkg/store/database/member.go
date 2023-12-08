@@ -1,6 +1,6 @@
 package database
 
-import "git-devops.opencsg.com/product/community/starhub-server/pkg/model"
+import "opencsg.com/starhub-server/pkg/model"
 
 type MemberStore struct {
 	db *model.DB

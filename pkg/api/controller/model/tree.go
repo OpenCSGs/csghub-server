@@ -3,9 +3,9 @@ package model
 import (
 	"errors"
 
-	"git-devops.opencsg.com/product/community/starhub-server/pkg/types"
-	"git-devops.opencsg.com/product/community/starhub-server/pkg/utils/common"
 	"github.com/gin-gonic/gin"
+	"opencsg.com/starhub-server/pkg/types"
+	"opencsg.com/starhub-server/pkg/utils/common"
 )
 
 func (c *Controller) Tree(ctx *gin.Context) (tree []*types.File, err error) {

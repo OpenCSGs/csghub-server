@@ -3,27 +3,21 @@ package httpbase
 import (
 	"errors"
 	"fmt"
-	"io"
 	"net/http"
 	"runtime/debug"
 	"strconv"
 	"time"
 
-	"git-devops.opencsg.com/product/community/starhub-server/pkg/log"
-	"git-devops.opencsg.com/product/community/starhub-server/pkg/utils"
 	"github.com/getsentry/sentry-go"
 	"github.com/gin-gonic/gin"
 	validation "github.com/go-ozzo/ozzo-validation"
-	"github.com/nanmu42/limitio"
-	"github.com/signalsciences/ac/acascii"
-	"github.com/valyala/bytebufferpool"
 	"go.uber.org/zap"
+	"opencsg.com/starhub-server/pkg/log"
+	"opencsg.com/starhub-server/pkg/utils"
 )
 
 const (
-	ctxSkipLoggingKey   = "skipLogging"
-	ctxRequestAuditKey  = "requestAudit"
-	ctxResponseAuditKey = "responseAudit"
+	ctxSkipLoggingKey = "skipLogging"
 )
 
 // SkipLogging marks when we don't want logging
@@ -35,11 +29,6 @@ func SkipLogging(c *gin.Context) {
 // It acts as easy building blocks for HTTP services.
 type Middleware struct {
 	Logger log.Logger
-	// see Middleware PayloadAuditLog
-	AuditResponse bool
-	// used for logging and Sentry report.
-	// An empty UserIdentity must be returned if it's impossible to identify the user.
-	UserIdentifier func(c *gin.Context) UserIdentity
 }
 
 // UserIdentity contains fields that can identify a user.
@@ -51,20 +40,6 @@ type UserIdentity struct {
 
 func (i UserIdentity) IsEmpty() bool {
 	return i == UserIdentity{}
-}
-
-// HelloHandler says hello world,
-// also stands for health check.
-// @Summary says hello world
-// @Success 200 {string} string "hello world"
-// @Router /api/hello [get]
-func (m *Middleware) HelloHandler(c *gin.Context) {
-	SkipLogging(c)
-	if c.Request.Method == http.MethodHead {
-		c.Status(http.StatusNoContent)
-		return
-	}
-	OK(c, "hello world!")
 }
 
 // NotFoundHandler 404 not found handler
@@ -109,9 +84,6 @@ func (m *Middleware) Recovery(c *gin.Context) {
 			clientIP = c.ClientIP()
 			logger   = m.Logger
 		)
-		if m.UserIdentifier != nil {
-			user = m.UserIdentifier(c)
-		}
 		if !user.IsEmpty() {
 			logger = logger.With(zap.Int("userId", user.ID))
 		}
@@ -234,18 +206,8 @@ func (m *Middleware) RequestLog(c *gin.Context) {
 		clientIP = c.ClientIP()
 	)
 
-	if m.UserIdentifier != nil {
-		user = m.UserIdentifier(c)
-	}
 	if !user.IsEmpty() {
 		logger = logger.With(zap.Int("userId", user.ID))
-	}
-
-	if reqBody, ok := c.Get(ctxRequestAuditKey); ok {
-		logger = logger.With(log.Stringp("requestBody", reqBody.(*string)))
-	}
-	if respBody, ok := c.Get(ctxResponseAuditKey); ok {
-		logger = logger.With(log.Stringp("responseBody", respBody.(*string)))
 	}
 
 	logger.For(c.Request.Context()).
@@ -299,144 +261,6 @@ func (m *Middleware) RequestLog(c *gin.Context) {
 		Message: c.Errors[0].Error(),
 	}
 	hub.CaptureEvent(event)
-}
-
-// CORSMiddleware allows CORS request
-func CORSMiddleware(c *gin.Context) {
-	header := c.Writer.Header()
-	header.Set("Access-Control-Allow-Origin", "*")
-	header.Set("Access-Control-Max-Age", "43200")
-	header.Set("Access-Control-Allow-Methods", "POST")
-	header.Set("Access-Control-Allow-Headers", "Content-Type, Token")
-
-	if c.Request.Method == http.MethodOptions {
-		c.AbortWithStatus(http.StatusNoContent)
-		return
-	}
-
-	c.Next()
-}
-
-// LimitRequestBody limits the request size
-func (m *Middleware) LimitRequestBody(maxRequestBodyBytes int) func(c *gin.Context) {
-	return func(c *gin.Context) {
-		if c.Request.ContentLength > int64(maxRequestBodyBytes) {
-			_ = c.Error(fmt.Errorf("oversized payload by content length, got %d bytes, limit %d bytes", c.Request.ContentLength, maxRequestBodyBytes))
-
-			c.Abort()
-			return
-		}
-
-		c.Request.Body = limitio.NewReadCloser(c.Request.Body, maxRequestBodyBytes, false)
-
-		c.Next()
-	}
-}
-
-// PayloadAuditLog audits text request and response then logs them.
-// This middleware replies on RequestLog to output,
-// use it inside RequestLog so that RequestLog can see this one's product.
-//
-// Note:
-//
-// If there's a gzip middleware, use it outside this one so this one can see response before compressing.
-func (m *Middleware) PayloadAuditLog() func(c *gin.Context) {
-	const (
-		RequestBodyMaxLength  = 512
-		ResponseBodyMaxLength = 512
-	)
-
-	textPayloadMIME := []string{
-		"application/json", "text/xml", "application/xml", "text/html",
-		"text/richtext", "text/plain", "text/css", "text/x-script",
-		"text/x-component", "text/x-markdown", "application/javascript",
-	}
-	MIMEChecker := acascii.MustCompileString(textPayloadMIME)
-
-	return func(c *gin.Context) {
-		if c.Request.Method == http.MethodHead ||
-			c.Request.Method == http.MethodOptions {
-			return
-		}
-
-		reqBuf := bytebufferpool.Get()
-		defer bytebufferpool.Put(reqBuf)
-		limitedReqBuf := limitio.NewWriter(reqBuf, RequestBodyMaxLength, true)
-
-		c.Request.Body = &readCloser{
-			Reader: io.TeeReader(c.Request.Body, limitedReqBuf),
-			Closer: c.Request.Body,
-		}
-
-		var respBuf *bytebufferpool.ByteBuffer
-		if m.AuditResponse {
-			respBuf = bytebufferpool.Get()
-			defer bytebufferpool.Put(respBuf)
-			limitedRespBuf := limitio.NewWriter(respBuf, ResponseBodyMaxLength, true)
-
-			c.Writer = &logWriter{
-				ResponseWriter: c.Writer,
-				SavedBody:      limitedRespBuf,
-			}
-		}
-
-		c.Next()
-
-		// sometimes we just don't want log
-		if c.GetBool(ctxSkipLoggingKey) {
-			return
-		}
-
-		var (
-			reqBody  string
-			respBody string
-		)
-
-		if reqBuf.Len() > 0 {
-			reqContentType := c.Request.Header.Get("Content-Type")
-			if reqContentType == "" {
-				reqContentType = http.DetectContentType(reqBuf.Bytes())
-			}
-			if reqContentType != "" && MIMEChecker.MatchString(reqContentType) {
-				reqBody = reqBuf.String()
-			} else {
-				reqBody = "unsupported content type: " + reqContentType
-			}
-			c.Set(ctxRequestAuditKey, &reqBody)
-		}
-
-		//goland:noinspection ALL
-		if m.AuditResponse && respBuf.Len() > 0 {
-			if respContentType := c.Writer.Header().Get("Content-Type"); respContentType != "" && MIMEChecker.MatchString(respContentType) {
-				//goland:noinspection ALL
-				respBody = respBuf.String()
-			} else {
-				respBody = "unsupported content type: " + respContentType
-			}
-
-			c.Set(ctxResponseAuditKey, &respBody)
-		}
-	}
-}
-
-type readCloser struct {
-	io.Reader
-	io.Closer
-}
-
-type logWriter struct {
-	gin.ResponseWriter
-	SavedBody io.Writer
-}
-
-func (w *logWriter) Write(b []byte) (int, error) {
-	_, _ = w.SavedBody.Write(b)
-	return w.ResponseWriter.Write(b)
-}
-
-func (w *logWriter) WriteString(s string) (int, error) {
-	_, _ = w.SavedBody.Write([]byte(s))
-	return w.ResponseWriter.WriteString(s)
 }
 
 // OK responds the client with standard JSON.

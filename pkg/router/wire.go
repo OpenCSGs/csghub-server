@@ -1,15 +1,15 @@
 package router
 
 import (
-	"git-devops.opencsg.com/product/community/starhub-server/config"
-	"git-devops.opencsg.com/product/community/starhub-server/pkg/api/controller/accesstoken"
-	"git-devops.opencsg.com/product/community/starhub-server/pkg/api/controller/dataset"
-	"git-devops.opencsg.com/product/community/starhub-server/pkg/api/controller/member"
-	"git-devops.opencsg.com/product/community/starhub-server/pkg/api/controller/model"
-	"git-devops.opencsg.com/product/community/starhub-server/pkg/api/controller/organization"
-	"git-devops.opencsg.com/product/community/starhub-server/pkg/api/controller/sshkey"
-	"git-devops.opencsg.com/product/community/starhub-server/pkg/api/controller/user"
 	"github.com/google/wire"
+	"opencsg.com/starhub-server/config"
+	"opencsg.com/starhub-server/pkg/api/controller/accesstoken"
+	"opencsg.com/starhub-server/pkg/api/controller/dataset"
+	"opencsg.com/starhub-server/pkg/api/controller/member"
+	"opencsg.com/starhub-server/pkg/api/controller/model"
+	"opencsg.com/starhub-server/pkg/api/controller/organization"
+	"opencsg.com/starhub-server/pkg/api/controller/sshkey"
+	"opencsg.com/starhub-server/pkg/api/controller/user"
 )
 
 // WireSet provides a wire set for this package.

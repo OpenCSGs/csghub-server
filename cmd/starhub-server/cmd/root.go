@@ -3,11 +3,11 @@ package cmd
 import (
 	"fmt"
 
-	"git-devops.opencsg.com/product/community/starhub-server/cmd/starhub-server/cmd/migration"
-	"git-devops.opencsg.com/product/community/starhub-server/cmd/starhub-server/cmd/start"
-	"git-devops.opencsg.com/product/community/starhub-server/pkg/log"
-	"git-devops.opencsg.com/product/community/starhub-server/version"
 	"github.com/spf13/cobra"
+	"opencsg.com/starhub-server/cmd/starhub-server/cmd/migration"
+	"opencsg.com/starhub-server/cmd/starhub-server/cmd/start"
+	"opencsg.com/starhub-server/pkg/log"
+	"opencsg.com/starhub-server/version"
 )
 
 var (

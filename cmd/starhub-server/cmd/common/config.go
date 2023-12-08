@@ -1,8 +1,8 @@
 package common
 
 import (
-	"git-devops.opencsg.com/product/community/starhub-server/config"
 	"github.com/kelseyhightower/envconfig"
+	"opencsg.com/starhub-server/config"
 )
 
 func LoadConfig() (cfg *config.Config, err error) {

@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"net/http"
 
-	"git-devops.opencsg.com/product/community/starhub-server/pkg/api/controller/user"
 	"github.com/gin-gonic/gin"
+	"opencsg.com/starhub-server/pkg/api/controller/user"
 )
 
 func HandleModels(userCtrl *user.Controller) func(*gin.Context) {

@@ -5,9 +5,9 @@ import (
 	"strings"
 	"sync"
 
-	"git-devops.opencsg.com/product/community/starhub-server/pkg/types"
-	"git-devops.opencsg.com/product/community/starhub-server/pkg/utils/common"
 	"github.com/pulltheflower/gitea-go-sdk/gitea"
+	"opencsg.com/starhub-server/pkg/types"
+	"opencsg.com/starhub-server/pkg/utils/common"
 )
 
 const LFSPrefix = "version https://git-lfs.github.com/spec/v1"

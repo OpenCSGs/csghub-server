@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"net/http"
 
-	"git-devops.opencsg.com/product/community/starhub-server/pkg/api/controller/organization"
 	"github.com/gin-gonic/gin"
+	"opencsg.com/starhub-server/pkg/api/controller/organization"
 )
 
 func HandleIndex(orgCtrl *organization.Controller) func(*gin.Context) {

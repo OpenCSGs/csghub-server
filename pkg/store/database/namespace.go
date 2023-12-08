@@ -3,7 +3,7 @@ package database
 import (
 	"context"
 
-	"git-devops.opencsg.com/product/community/starhub-server/pkg/model"
+	"opencsg.com/starhub-server/pkg/model"
 )
 
 type NamespaceStore struct {

@@ -1,10 +1,10 @@
 package apiserver
 
 import (
-	"git-devops.opencsg.com/product/community/starhub-server/config"
-	"git-devops.opencsg.com/product/community/starhub-server/pkg/httpbase"
-	"git-devops.opencsg.com/product/community/starhub-server/pkg/log"
-	"git-devops.opencsg.com/product/community/starhub-server/pkg/router"
+	"opencsg.com/starhub-server/config"
+	"opencsg.com/starhub-server/pkg/httpbase"
+	"opencsg.com/starhub-server/pkg/log"
+	"opencsg.com/starhub-server/pkg/router"
 )
 
 // type ServerOpt struct {

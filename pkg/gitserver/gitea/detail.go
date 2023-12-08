@@ -1,8 +1,8 @@
 package gitea
 
 import (
-	"git-devops.opencsg.com/product/community/starhub-server/pkg/types"
-	"git-devops.opencsg.com/product/community/starhub-server/pkg/utils/common"
+	"opencsg.com/starhub-server/pkg/types"
+	"opencsg.com/starhub-server/pkg/utils/common"
 )
 
 func (c *Client) GetModelDetail(namespace, name string) (model *types.ModelDetail, err error) {

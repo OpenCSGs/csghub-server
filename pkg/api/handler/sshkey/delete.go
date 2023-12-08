@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"net/http"
 
-	"git-devops.opencsg.com/product/community/starhub-server/pkg/api/controller/sshkey"
 	"github.com/gin-gonic/gin"
+	"opencsg.com/starhub-server/pkg/api/controller/sshkey"
 )
 
 func HandleDelete(sshKeyCtrl *sshkey.Controller) func(*gin.Context) {

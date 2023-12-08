@@ -1,8 +1,8 @@
 package organization
 
 import (
-	"git-devops.opencsg.com/product/community/starhub-server/pkg/store/database"
 	"github.com/gin-gonic/gin"
+	"opencsg.com/starhub-server/pkg/store/database"
 )
 
 func (c *Controller) Index(ctx *gin.Context) (orgs []database.Organization, err error) {

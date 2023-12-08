@@ -3,9 +3,9 @@ package user
 import (
 	"net/http"
 
-	"git-devops.opencsg.com/product/community/starhub-server/pkg/store/database"
-	"git-devops.opencsg.com/product/community/starhub-server/pkg/types"
 	"github.com/gin-gonic/gin"
+	"opencsg.com/starhub-server/pkg/store/database"
+	"opencsg.com/starhub-server/pkg/types"
 )
 
 func (c *Controller) Update(ctx *gin.Context) (*database.User, error) {

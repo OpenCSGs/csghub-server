@@ -3,10 +3,10 @@ package gitserver
 import (
 	"errors"
 
-	"git-devops.opencsg.com/product/community/starhub-server/config"
-	"git-devops.opencsg.com/product/community/starhub-server/pkg/gitserver/gitea"
-	"git-devops.opencsg.com/product/community/starhub-server/pkg/store/database"
-	"git-devops.opencsg.com/product/community/starhub-server/pkg/types"
+	"opencsg.com/starhub-server/config"
+	"opencsg.com/starhub-server/pkg/gitserver/gitea"
+	"opencsg.com/starhub-server/pkg/store/database"
+	"opencsg.com/starhub-server/pkg/types"
 )
 
 type GitServer interface {

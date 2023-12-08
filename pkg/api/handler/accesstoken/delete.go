@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"net/http"
 
-	"git-devops.opencsg.com/product/community/starhub-server/pkg/api/controller/accesstoken"
 	"github.com/gin-gonic/gin"
+	"opencsg.com/starhub-server/pkg/api/controller/accesstoken"
 )
 
 func HandleDelete(acCtrl *accesstoken.Controller) func(*gin.Context) {

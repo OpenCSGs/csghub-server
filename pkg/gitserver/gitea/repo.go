@@ -3,10 +3,10 @@ package gitea
 import (
 	"fmt"
 
-	"git-devops.opencsg.com/product/community/starhub-server/pkg/store/database"
-	"git-devops.opencsg.com/product/community/starhub-server/pkg/types"
-	"git-devops.opencsg.com/product/community/starhub-server/pkg/utils/common"
 	"github.com/pulltheflower/gitea-go-sdk/gitea"
+	"opencsg.com/starhub-server/pkg/store/database"
+	"opencsg.com/starhub-server/pkg/types"
+	"opencsg.com/starhub-server/pkg/utils/common"
 )
 
 const (

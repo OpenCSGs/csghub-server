@@ -1,9 +1,9 @@
 package model
 
 import (
-	"git-devops.opencsg.com/product/community/starhub-server/pkg/gitserver"
-	"git-devops.opencsg.com/product/community/starhub-server/pkg/store/cache"
-	"git-devops.opencsg.com/product/community/starhub-server/pkg/store/database"
+	"opencsg.com/starhub-server/pkg/gitserver"
+	"opencsg.com/starhub-server/pkg/store/cache"
+	"opencsg.com/starhub-server/pkg/store/database"
 )
 
 func ProvideController(

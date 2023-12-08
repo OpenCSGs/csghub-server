@@ -8,10 +8,10 @@ import (
 	"syscall"
 	"time"
 
-	"git-devops.opencsg.com/product/community/starhub-server/cmd/starhub-server/cmd/common"
-	"git-devops.opencsg.com/product/community/starhub-server/pkg/log"
-	"git-devops.opencsg.com/product/community/starhub-server/pkg/model"
 	"github.com/spf13/cobra"
+	"opencsg.com/starhub-server/cmd/starhub-server/cmd/common"
+	"opencsg.com/starhub-server/pkg/log"
+	"opencsg.com/starhub-server/pkg/model"
 )
 
 var Cmd = &cobra.Command{

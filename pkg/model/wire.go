@@ -3,8 +3,8 @@ package model
 import (
 	"context"
 
-	"git-devops.opencsg.com/product/community/starhub-server/config"
 	"github.com/google/wire"
+	"opencsg.com/starhub-server/config"
 )
 
 // WireSet provides a wire set for this package.

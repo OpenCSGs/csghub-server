@@ -1,8 +1,8 @@
 package database
 
 import (
-	"git-devops.opencsg.com/product/community/starhub-server/pkg/model"
 	"github.com/google/wire"
+	"opencsg.com/starhub-server/pkg/model"
 )
 
 var WireSet = wire.NewSet(
