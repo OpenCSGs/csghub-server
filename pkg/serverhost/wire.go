@@ -1,8 +1,8 @@
 package serverhost
 
 import (
-	"git-devops.opencsg.com/product/community/starhub-server/config"
 	"github.com/google/wire"
+	"opencsg.com/starhub-server/config"
 )
 
 var WireSet = wire.NewSet(

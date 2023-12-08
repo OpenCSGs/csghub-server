@@ -6,13 +6,13 @@ import (
 	"fmt"
 	"strings"
 
-	"git-devops.opencsg.com/product/community/starhub-server/pkg/model/migrations"
 	"github.com/uptrace/bun/dialect/pgdialect"
 	"github.com/uptrace/bun/dialect/sqlitedialect"
 	"github.com/uptrace/bun/driver/pgdriver"
 	"github.com/uptrace/bun/driver/sqliteshim"
 	"github.com/uptrace/bun/extra/bundebug"
 	"github.com/uptrace/bun/migrate"
+	"opencsg.com/starhub-server/pkg/model/migrations"
 
 	"github.com/uptrace/bun"
 )

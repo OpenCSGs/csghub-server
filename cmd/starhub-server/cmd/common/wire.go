@@ -1,6 +1,6 @@
 package common
 
-import "git-devops.opencsg.com/product/community/starhub-server/config"
+import "opencsg.com/starhub-server/config"
 
 func ProvideConfig() (*config.Config, error) {
 	return LoadConfig()

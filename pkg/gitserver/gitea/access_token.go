@@ -1,9 +1,9 @@
 package gitea
 
 import (
-	"git-devops.opencsg.com/product/community/starhub-server/pkg/store/database"
-	"git-devops.opencsg.com/product/community/starhub-server/pkg/types"
 	"github.com/pulltheflower/gitea-go-sdk/gitea"
+	"opencsg.com/starhub-server/pkg/store/database"
+	"opencsg.com/starhub-server/pkg/types"
 )
 
 func (c *Client) CreateUserToken(req *types.CreateUserTokenRequest) (token *database.AccessToken, err error) {

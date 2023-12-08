@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"time"
 
-	"git-devops.opencsg.com/product/community/starhub-server/pkg/httpbase"
 	"github.com/spf13/cobra"
+	"opencsg.com/starhub-server/pkg/httpbase"
 )
 
 var (

@@ -3,9 +3,9 @@ package organization
 import (
 	"errors"
 
-	"git-devops.opencsg.com/product/community/starhub-server/pkg/store/database"
-	"git-devops.opencsg.com/product/community/starhub-server/pkg/types"
 	"github.com/gin-gonic/gin"
+	"opencsg.com/starhub-server/pkg/store/database"
+	"opencsg.com/starhub-server/pkg/types"
 )
 
 func (c *Controller) Create(ctx *gin.Context) (org *database.Organization, err error) {

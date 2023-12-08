@@ -4,8 +4,8 @@ import (
 	"context"
 	"time"
 
-	"git-devops.opencsg.com/product/community/starhub-server/pkg/model"
 	"github.com/uptrace/bun"
+	"opencsg.com/starhub-server/pkg/model"
 )
 
 type UserStore struct {

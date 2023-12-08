@@ -3,10 +3,10 @@ package router
 import (
 	"net/http"
 
-	"git-devops.opencsg.com/product/community/starhub-server/config"
-	"git-devops.opencsg.com/product/community/starhub-server/pkg/api/controller/dataset"
-	"git-devops.opencsg.com/product/community/starhub-server/pkg/api/controller/model"
 	"github.com/gin-gonic/gin"
+	"opencsg.com/starhub-server/config"
+	"opencsg.com/starhub-server/pkg/api/controller/dataset"
+	"opencsg.com/starhub-server/pkg/api/controller/model"
 )
 
 type GitHandler interface {

@@ -1,9 +1,9 @@
 package model
 
 import (
-	"git-devops.opencsg.com/product/community/starhub-server/pkg/types"
-	"git-devops.opencsg.com/product/community/starhub-server/pkg/utils/common"
 	"github.com/gin-gonic/gin"
+	"opencsg.com/starhub-server/pkg/types"
+	"opencsg.com/starhub-server/pkg/utils/common"
 )
 
 func (c *Controller) Branches(ctx *gin.Context) (branches []*types.ModelBranch, err error) {

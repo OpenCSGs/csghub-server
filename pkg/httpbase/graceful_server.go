@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"net/http"
 
-	"git-devops.opencsg.com/product/community/starhub-server/pkg/log"
+	"opencsg.com/starhub-server/pkg/log"
 )
 
 // GracefulServer implements an HTTP server with graceful shutdown.

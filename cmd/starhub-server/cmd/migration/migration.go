@@ -5,11 +5,11 @@ import (
 	"os"
 	"strings"
 
-	"git-devops.opencsg.com/product/community/starhub-server/cmd/starhub-server/cmd/common"
-	"git-devops.opencsg.com/product/community/starhub-server/pkg/model"
-	"git-devops.opencsg.com/product/community/starhub-server/pkg/utils/console"
 	"github.com/spf13/cobra"
 	"github.com/uptrace/bun/migrate"
+	"opencsg.com/starhub-server/cmd/starhub-server/cmd/common"
+	"opencsg.com/starhub-server/pkg/model"
+	"opencsg.com/starhub-server/pkg/utils/console"
 )
 
 // verboseMode whether to show SQL detail

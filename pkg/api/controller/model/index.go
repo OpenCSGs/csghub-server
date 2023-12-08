@@ -1,9 +1,9 @@
 package model
 
 import (
-	"git-devops.opencsg.com/product/community/starhub-server/pkg/store/database"
-	"git-devops.opencsg.com/product/community/starhub-server/pkg/utils/common"
 	"github.com/gin-gonic/gin"
+	"opencsg.com/starhub-server/pkg/store/database"
+	"opencsg.com/starhub-server/pkg/utils/common"
 )
 
 func (c *Controller) Index(ctx *gin.Context) (models []database.Model, total int, err error) {

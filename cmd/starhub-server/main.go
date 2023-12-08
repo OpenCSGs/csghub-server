@@ -4,10 +4,10 @@ import (
 	"context"
 	"os"
 
-	"git-devops.opencsg.com/product/community/starhub-server/cmd/starhub-server/cmd"
-	"git-devops.opencsg.com/product/community/starhub-server/cmd/starhub-server/cmd/start"
-	"git-devops.opencsg.com/product/community/starhub-server/pkg/log"
-	"git-devops.opencsg.com/product/community/starhub-server/pkg/log/trace"
+	"opencsg.com/starhub-server/cmd/starhub-server/cmd"
+	"opencsg.com/starhub-server/cmd/starhub-server/cmd/start"
+	"opencsg.com/starhub-server/pkg/log"
+	"opencsg.com/starhub-server/pkg/log/trace"
 )
 
 func main() {

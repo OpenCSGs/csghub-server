@@ -3,8 +3,8 @@ package gitea
 import (
 	"context"
 
-	"git-devops.opencsg.com/product/community/starhub-server/config"
 	"github.com/pulltheflower/gitea-go-sdk/gitea"
+	"opencsg.com/starhub-server/config"
 )
 
 type Client struct {

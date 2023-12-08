@@ -3,8 +3,8 @@ package database
 import (
 	"context"
 
-	"git-devops.opencsg.com/product/community/starhub-server/pkg/model"
 	"github.com/uptrace/bun"
+	"opencsg.com/starhub-server/pkg/model"
 )
 
 type OrgStore struct {

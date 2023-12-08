@@ -3,8 +3,8 @@ package accesstoken
 import (
 	"errors"
 
-	"git-devops.opencsg.com/product/community/starhub-server/pkg/types"
 	"github.com/gin-gonic/gin"
+	"opencsg.com/starhub-server/pkg/types"
 )
 
 func (c *Controller) Delete(ctx *gin.Context) (err error) {

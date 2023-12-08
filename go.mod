@@ -1,6 +1,6 @@
-module git-devops.opencsg.com/product/community/starhub-server
+module opencsg.com/starhub-server
 
-go 1.21.2
+go 1.21
 
 require (
 	github.com/charmbracelet/lipgloss v0.9.1
@@ -9,10 +9,8 @@ require (
 	github.com/go-ozzo/ozzo-validation v3.6.0+incompatible
 	github.com/google/wire v0.5.0
 	github.com/kelseyhightower/envconfig v1.4.0
-	github.com/nanmu42/limitio v1.0.0
 	github.com/pulltheflower/gitea-go-sdk/gitea v0.0.0-20231130084805-e36d7e1ee393
 	github.com/redis/go-redis/v9 v9.3.0
-	github.com/signalsciences/ac v1.2.0
 	github.com/spf13/cobra v1.8.0
 	github.com/stretchr/testify v1.8.4
 	github.com/uptrace/bun v1.1.16
@@ -21,7 +19,6 @@ require (
 	github.com/uptrace/bun/driver/pgdriver v1.1.16
 	github.com/uptrace/bun/driver/sqliteshim v1.1.16
 	github.com/uptrace/bun/extra/bundebug v1.1.16
-	github.com/valyala/bytebufferpool v1.0.0
 	go.opentelemetry.io/otel v1.21.0
 	go.opentelemetry.io/otel/exporters/jaeger v1.17.0
 	go.opentelemetry.io/otel/sdk v1.21.0

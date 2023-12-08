@@ -1,8 +1,8 @@
 package model
 
 import (
-	"git-devops.opencsg.com/product/community/starhub-server/pkg/utils/common"
 	"github.com/gin-gonic/gin"
+	"opencsg.com/starhub-server/pkg/utils/common"
 )
 
 func (c *Controller) Delete(ctx *gin.Context) (err error) {

@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"git-devops.opencsg.com/product/community/starhub-server/pkg/model"
+	"opencsg.com/starhub-server/pkg/model"
 )
 
 type RepositoryType string
