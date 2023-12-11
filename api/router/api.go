@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/gin-gonic/gin"
+	"opencsg.com/starhub-server/api/handler"
 	acHandler "opencsg.com/starhub-server/api/handler/accesstoken"
 	datasetHandler "opencsg.com/starhub-server/api/handler/dataset"
 	memberHandler "opencsg.com/starhub-server/api/handler/member"
@@ -111,6 +112,16 @@ func NewRouter(config *config.Config) (*gin.Engine, error) {
 	apiGroup.POST("/organizations/:name/members", memberHandler.HandleCreate(memberCtrl))
 	apiGroup.PUT("/organizations/:name/members/:username", memberHandler.HandleUpdate(memberCtrl))
 	apiGroup.DELETE("/organizations/:name/members/:username", memberHandler.HandleDelete(memberCtrl))
+
+	//Tag
+	tagCtrl, err := handler.NewTagHandler(config)
+	if err != nil {
+		return nil, fmt.Errorf("error creating tag controller:%w", err)
+	}
+	apiGroup.GET("/tags", tagCtrl.AllTags)
+	// apiGroup.POST("/tag", tagCtrl.NewTag)
+	// apiGroup.PUT("/tag", tagCtrl.UpdateTag)
+	// apiGroup.DELETE("/tag", tagCtrl.DeleteTag)
 
 	return r, nil
 }

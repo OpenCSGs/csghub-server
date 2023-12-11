@@ -4,7 +4,9 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"log"
 	"strings"
+	"time"
 
 	"github.com/uptrace/bun/dialect/pgdialect"
 	"github.com/uptrace/bun/dialect/sqlitedialect"
@@ -18,6 +20,9 @@ import (
 )
 
 type DatabaseDialect string
+
+// default database connection shared between different stores
+var defaultDB *DB
 
 const (
 	DialectPostgres DatabaseDialect = "pg"
@@ -45,6 +50,16 @@ type DB struct {
 // so that we don't have to write the same method on both DB and Transaction.
 type Operator struct {
 	Core bun.IDB
+}
+
+func InitDB(config DBConfig) {
+	bg, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	var err error
+	defaultDB, err = NewDB(bg, config)
+	if err != nil {
+		log.Fatal("failed to initialize database", err.Error())
+	}
 }
 
 // NewDB initializes a DB via config

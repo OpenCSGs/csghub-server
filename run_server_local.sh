@@ -13,6 +13,9 @@ export GITEA_USERNAME="root"
 export GITEA_PASSWORD="password123"
 #export GIN_MODE="release"
 
-go build -o ./bin/starhub-server ./cmd/starhub-server
+go build -v -o ./bin/starhub-server ./cmd/starhub-server
+
+./bin/starhub-server migration init
+./bin/starhub-server migration migrate
 
 ./bin/starhub-server start server
