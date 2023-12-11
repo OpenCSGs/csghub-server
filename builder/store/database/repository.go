@@ -17,7 +17,6 @@ type RepoStore struct {
 }
 
 func NewRepoStore(db *DB) *RepoStore {
-	db.BunDB.RegisterModel((*RepositoryTag)(nil))
 	return &RepoStore{
 		db: db,
 	}

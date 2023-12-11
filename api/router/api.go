@@ -41,6 +41,8 @@ func NewRouter(config *config.Config) (*gin.Engine, error) {
 	apiGroup.GET("/models/:namespace/:name/tree", modelHandler.HandleTree(modelCtrl))
 	apiGroup.GET("/models/:namespace/:name/commits", modelHandler.HandleCommits(modelCtrl))
 	apiGroup.GET("/models/:namespace/:name/raw/*file_path", modelHandler.HandleFileRaw(modelCtrl))
+	apiGroup.POST("/models/:namespace/:name/raw/*file_path", modelHandler.HandleFileCreate(modelCtrl))
+	apiGroup.PUT("/models/:namespace/:name/raw/*file_path", modelHandler.HandleFileUpdate(modelCtrl))
 
 	// Dataset routes
 	datasetCtrl, err := dataset.New(config)
@@ -58,6 +60,8 @@ func NewRouter(config *config.Config) (*gin.Engine, error) {
 	apiGroup.GET("/datasets/:namespace/:name/tree", datasetHandler.HandleTree(datasetCtrl))
 	apiGroup.GET("/datasets/:namespace/:name/commits", datasetHandler.HandleCommits(datasetCtrl))
 	apiGroup.GET("/datasets/:namespace/:name/raw/*file_path", datasetHandler.HandleFileRaw(datasetCtrl))
+	apiGroup.POST("/datasets/:namespace/:name/raw/*file_path", datasetHandler.HandleFileCreate(datasetCtrl))
+	apiGroup.PUT("/datasets/:namespace/:name/raw/*file_path", datasetHandler.HandleFileUpdate(datasetCtrl))
 
 	// User routes
 	userCtrl, err := user.New(config)

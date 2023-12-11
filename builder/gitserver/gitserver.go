@@ -25,6 +25,8 @@ type GitServer interface {
 	GetModelFileRaw(string, string, string, string) (string, error)
 	GetModelTags(string, string, int, int) ([]*types.ModelTag, error)
 	GetModelFileTree(string, string, string, string) ([]*types.File, error)
+	CreateModelFile(string, string, string, *types.CreateFileReq) (err error)
+	UpdateModelFile(string, string, string, *types.UpdateFileReq) (err error)
 
 	CreateDatasetRepo(*types.CreateDatasetReq) (*database.Dataset, *database.Repository, error)
 	UpdateDatasetRepo(string, string, *database.Dataset, *database.Repository, *types.UpdateDatasetReq) error
@@ -36,6 +38,8 @@ type GitServer interface {
 	GetDatasetFileRaw(string, string, string, string) (string, error)
 	GetDatasetTags(string, string, int, int) ([]*types.DatasetTag, error)
 	GetDatasetFileTree(string, string, string, string) ([]*types.File, error)
+	CreateDatasetFile(string, string, string, *types.CreateFileReq) (err error)
+	UpdateDatasetFile(string, string, string, *types.UpdateFileReq) (err error)
 
 	CreateSSHKey(*types.CreateSSHKeyRequest) (*database.SSHKey, error)
 	// ListSSHKeys(string, int, int) ([]*database.SSHKey, error)

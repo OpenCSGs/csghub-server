@@ -12,3 +12,23 @@ type File struct {
 	DownloadURL string `json:"download_url"`
 	Content     string `json:"content"`
 }
+
+type CreateFileReq struct {
+	Username  string `json:"username"`
+	Email     string `json:"email"`
+	Message   string `json:"message"`
+	Branch    string `json:"branch"`
+	Content   string `json:"content"`
+	NewBranch string `json:"new_branch"`
+}
+
+type UpdateFileReq struct {
+	Username   string `json:"username"`
+	Email      string `json:"email"`
+	Message    string `json:"message"`
+	Branch     string `json:"branch"`
+	Content    string `json:"content"`
+	NewBranch  string `json:"new_branch"`
+	OriginPath string `json:"origin_path"`
+	SHA        string `json:"sha"`
+}
