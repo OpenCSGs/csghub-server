@@ -6,7 +6,7 @@ import (
 	"github.com/spf13/cobra"
 	"opencsg.com/starhub-server/cmd/starhub-server/cmd/migration"
 	"opencsg.com/starhub-server/cmd/starhub-server/cmd/start"
-	"opencsg.com/starhub-server/pkg/log"
+	"opencsg.com/starhub-server/common/log"
 	"opencsg.com/starhub-server/version"
 )
 

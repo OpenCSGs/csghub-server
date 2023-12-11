@@ -5,9 +5,8 @@ import (
 	"os"
 
 	"opencsg.com/starhub-server/cmd/starhub-server/cmd"
-	"opencsg.com/starhub-server/cmd/starhub-server/cmd/start"
-	"opencsg.com/starhub-server/pkg/log"
-	"opencsg.com/starhub-server/pkg/log/trace"
+	"opencsg.com/starhub-server/common/log"
+	"opencsg.com/starhub-server/common/log/trace"
 )
 
 func main() {
@@ -16,7 +15,6 @@ func main() {
 
 	defer log.Sync()
 
-	start.Initializer = initAPIServer
 	command := cmd.RootCmd
 	if err := command.ExecuteContext(context.Background()); err != nil {
 		os.Exit(1)

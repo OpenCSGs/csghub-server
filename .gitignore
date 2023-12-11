@@ -1,8 +1,8 @@
 # Binaries
 /cmd/starhub-server/starhub-server
-/bin/.
+bin
 .vscode
-starhub
+/starhub
 /gitea
 /pgdata
-/minio_data
+minio_data

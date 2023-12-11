@@ -7,9 +7,9 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/uptrace/bun/migrate"
-	"opencsg.com/starhub-server/cmd/starhub-server/cmd/common"
-	"opencsg.com/starhub-server/pkg/model"
-	"opencsg.com/starhub-server/pkg/utils/console"
+	"opencsg.com/starhub-server/builder/store/database"
+	"opencsg.com/starhub-server/common/config"
+	"opencsg.com/starhub-server/common/utils/console"
 )
 
 // verboseMode whether to show SQL detail
@@ -36,7 +36,7 @@ func init() {
 
 var (
 	migrator *migrate.Migrator
-	db       *model.DB
+	db       *database.DB
 )
 
 var Cmd = &cobra.Command{
@@ -52,22 +52,22 @@ var Cmd = &cobra.Command{
 			}
 		}
 
-		config, err := common.LoadConfig()
+		config, err := config.LoadConfig()
 		if err != nil {
 			return
 		}
 
-		dbConfig := model.DBConfig{
-			Dialect: model.DatabaseDialect(config.Database.Driver),
+		dbConfig := database.DBConfig{
+			Dialect: database.DatabaseDialect(config.Database.Driver),
 			DSN:     config.Database.DSN,
 		}
 
-		db, err = model.NewDB(cmd.Context(), dbConfig)
+		db, err = database.NewDB(cmd.Context(), dbConfig)
 		if err != nil {
 			err = fmt.Errorf("initializing DB connection: %w", err)
 			return
 		}
-		migrator = model.NewMigrator(db)
+		migrator = database.NewMigrator(db)
 
 		return
 	},

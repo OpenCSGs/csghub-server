@@ -1,12 +1,10 @@
 package start
 
 import (
-	"context"
-	"fmt"
-	"time"
-
 	"github.com/spf13/cobra"
-	"opencsg.com/starhub-server/pkg/httpbase"
+	"opencsg.com/starhub-server/api/httpbase"
+	"opencsg.com/starhub-server/api/router"
+	"opencsg.com/starhub-server/common/config"
 )
 
 var (
@@ -15,8 +13,6 @@ var (
 	enableSwagger      bool
 	enableUI           bool
 )
-
-var Initializer func(ctx context.Context) (*httpbase.GracefulServer, error)
 
 func init() {
 	serverCmd.Flags().BoolVar(&enableSwagger, "swagger", false, "Start swagger help docs")
@@ -31,27 +27,23 @@ var serverCmd = &cobra.Command{
 	Short:   "Start the API server",
 	Example: serverExample(),
 	RunE: func(cmd *cobra.Command, args []string) (err error) {
-		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-		defer cancel()
-
-		server, err := Initializer(ctx)
+		cfg, err := config.LoadConfig()
 		if err != nil {
-			return
+			return err
 		}
-
-		err = server.ListenAndServe()
+		r, err := router.NewRouter(cfg)
 		if err != nil {
-			err = fmt.Errorf("starting API server: %w", err)
-			return
+			return err
 		}
+		server := httpbase.NewGracefulServer(
+			httpbase.GraceServerOpt{
+				Port: cfg.APIServer.Port,
+			},
+			r,
+		)
+		server.Run()
 
-		go waitExitSignal(func() {
-			exitCtx, cancelExitCtx := context.WithTimeout(ctx, 10*time.Second)
-			defer cancelExitCtx()
-			// server.Shutdown already logs
-			_ = server.Shutdown(exitCtx)
-		})
-		return
+		return nil
 	},
 }
 
