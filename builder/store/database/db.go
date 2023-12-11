@@ -100,6 +100,8 @@ func NewDB(ctx context.Context, config DBConfig) (db *DB, err error) {
 		BunDB:    bunDB,
 	}
 
+	db.BunDB.RegisterModel((*RepositoryTag)(nil))
+
 	return
 }
 

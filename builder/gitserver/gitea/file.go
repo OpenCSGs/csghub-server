@@ -4,6 +4,7 @@ import (
 	"encoding/base64"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/pulltheflower/gitea-go-sdk/gitea"
 	"opencsg.com/starhub-server/common/types"
@@ -136,4 +137,108 @@ func (c *Client) getFileFromEntry(namespace, name, ref string, entry *gitea.Cont
 		}
 	}
 	ch <- file
+}
+
+func (c *Client) CreateModelFile(namespace, name, path string, req *types.CreateFileReq) (err error) {
+	namespace = common.WithPrefix(namespace, ModelOrgPrefix)
+	_, _, err = c.giteaClient.CreateFile(namespace, name, path, gitea.CreateFileOptions{
+		FileOptions: gitea.FileOptions{
+			Message:       req.Message,
+			BranchName:    req.Branch,
+			NewBranchName: req.NewBranch,
+			Author: gitea.Identity{
+				Name:  req.Username,
+				Email: req.Email,
+			},
+			Committer: gitea.Identity{
+				Name:  req.Username,
+				Email: req.Email,
+			},
+			Dates: gitea.CommitDateOptions{
+				Author:    time.Now(),
+				Committer: time.Now(),
+			},
+		},
+		Content: req.Content,
+	})
+	return
+}
+
+func (c *Client) UpdateModelFile(namespace, name, path string, req *types.UpdateFileReq) (err error) {
+	namespace = common.WithPrefix(namespace, ModelOrgPrefix)
+	_, _, err = c.giteaClient.UpdateFile(namespace, name, path, gitea.UpdateFileOptions{
+		FileOptions: gitea.FileOptions{
+			Message:       req.Message,
+			BranchName:    req.Branch,
+			NewBranchName: req.NewBranch,
+			Author: gitea.Identity{
+				Name:  req.Username,
+				Email: req.Email,
+			},
+			Committer: gitea.Identity{
+				Name:  req.Username,
+				Email: req.Email,
+			},
+			Dates: gitea.CommitDateOptions{
+				Author:    time.Now(),
+				Committer: time.Now(),
+			},
+		},
+		SHA:      req.SHA,
+		Content:  req.Content,
+		FromPath: req.OriginPath,
+	})
+	return
+}
+
+func (c *Client) CreateDatasetFile(namespace, name, path string, req *types.CreateFileReq) (err error) {
+	namespace = common.WithPrefix(namespace, DatasetOrgPrefix)
+	_, _, err = c.giteaClient.CreateFile(namespace, name, path, gitea.CreateFileOptions{
+		FileOptions: gitea.FileOptions{
+			Message:       req.Message,
+			BranchName:    req.Branch,
+			NewBranchName: req.NewBranch,
+			Author: gitea.Identity{
+				Name:  req.Username,
+				Email: req.Email,
+			},
+			Committer: gitea.Identity{
+				Name:  req.Username,
+				Email: req.Email,
+			},
+			Dates: gitea.CommitDateOptions{
+				Author:    time.Now(),
+				Committer: time.Now(),
+			},
+		},
+		Content: req.Content,
+	})
+	return
+}
+
+func (c *Client) UpdateDatasetFile(namespace, name, path string, req *types.UpdateFileReq) (err error) {
+	namespace = common.WithPrefix(namespace, DatasetOrgPrefix)
+	_, _, err = c.giteaClient.UpdateFile(namespace, name, path, gitea.UpdateFileOptions{
+		FileOptions: gitea.FileOptions{
+			Message:       req.Message,
+			BranchName:    req.Branch,
+			NewBranchName: req.NewBranch,
+			Author: gitea.Identity{
+				Name:  req.Username,
+				Email: req.Email,
+			},
+			Committer: gitea.Identity{
+				Name:  req.Username,
+				Email: req.Email,
+			},
+			Dates: gitea.CommitDateOptions{
+				Author:    time.Now(),
+				Committer: time.Now(),
+			},
+		},
+		SHA:      req.SHA,
+		Content:  req.Content,
+		FromPath: req.OriginPath,
+	})
+	return
 }
