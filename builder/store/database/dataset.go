@@ -13,7 +13,6 @@ type DatasetStore struct {
 }
 
 func NewDatasetStore(db *DB) *DatasetStore {
-	db.BunDB.RegisterModel((*DatasetTag)(nil))
 	return &DatasetStore{
 		db: db,
 	}
@@ -31,19 +30,10 @@ type Dataset struct {
 	RepositoryID  int64       `bun:",notnull" json:"repository_id"`
 	Repository    *Repository `bun:"rel:belongs-to,join:repository_id=id" json:"repository"`
 	LastUpdatedAt time.Time   `bun:",notnull" json:"last"`
-	Tags          []Tag       `bun:"m2m:dataset_tags,join:Dataset=Tag" json:"tags"`
 	Private       bool        `bun:",notnull" json:"private"`
 	UserID        int64       `bun:",notnull" json:"user_id"`
 	User          *User       `bun:"rel:belongs-to,join:user_id=id" json:"user"`
 	times
-}
-
-type DatasetTag struct {
-	ID        int64    `bun:",pk,autoincrement" json:"id"`
-	DatasetID int64    `bun:",pk" json:"dataset_id"`
-	TagID     int64    `bun:",pk" json:"tag_id"`
-	Dataset   *Dataset `bun:"rel:belongs-to,join:dataset_id=id"`
-	Tag       *Tag     `bun:"rel:belongs-to,join:tag_id=id"`
 }
 
 func (s *DatasetStore) Index(ctx context.Context, per, page int) (datasets []*Repository, err error) {
