@@ -13,7 +13,6 @@ type ModelStore struct {
 }
 
 func NewModelStore(db *DB) *ModelStore {
-	db.BunDB.RegisterModel((*ModelTag)(nil))
 	return &ModelStore{
 		db: db,
 	}
@@ -30,20 +29,11 @@ type Model struct {
 	GitPath       string      `bun:",notnull" json:"git_path"`
 	RepositoryID  int64       `bun:",notnull" json:"repository_id"`
 	Repository    *Repository `bun:"rel:belongs-to,join:repository_id=id" json:"repository"`
-	LastUpdatedAt time.Time   `bun:",notnull" json:"last_updated_at"`
-	Tags          []Tag       `bun:"m2m:model_tags,join:Model=Tag" json:"tags"`
+	LastUpdatedAt time.Time   `bun:",notnull" json:"last"`
 	Private       bool        `bun:",notnull" json:"private"`
 	UserID        int64       `bun:",notnull" json:"user_id"`
 	User          *User       `bun:"rel:belongs-to,join:user_id=id" json:"user"`
 	times
-}
-
-type ModelTag struct {
-	ID      int64  `bun:",pk,autoincrement" json:"id"`
-	ModelID int64  `bun:",pk" json:"model_id"`
-	TagID   int64  `bun:",pk" json:"tag_id"`
-	Model   *Model `bun:"rel:belongs-to,join:model_id=id"`
-	Tag     *Tag   `bun:"rel:belongs-to,join:tag_id=id"`
 }
 
 func (s *ModelStore) Index(ctx context.Context, per, page int) (models []Model, err error) {
