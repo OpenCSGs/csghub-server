@@ -3,15 +3,11 @@ package start
 import (
 	"context"
 	"fmt"
-	"os"
-	"os/signal"
-	"syscall"
 	"time"
 
 	"github.com/spf13/cobra"
-	"opencsg.com/starhub-server/cmd/starhub-server/cmd/common"
-	"opencsg.com/starhub-server/pkg/log"
-	"opencsg.com/starhub-server/pkg/model"
+	"opencsg.com/starhub-server/builder/store/database"
+	"opencsg.com/starhub-server/common/config"
 )
 
 var Cmd = &cobra.Command{
@@ -22,22 +18,22 @@ var Cmd = &cobra.Command{
 		ctx, cancel := context.WithTimeout(cmd.Context(), 10*time.Second)
 		defer cancel()
 
-		config, err := common.LoadConfig()
+		config, err := config.LoadConfig()
 		if err != nil {
 			return
 		}
 
-		dbConfig := model.DBConfig{
-			Dialect: model.DatabaseDialect(config.Database.Driver),
+		dbConfig := database.DBConfig{
+			Dialect: database.DatabaseDialect(config.Database.Driver),
 			DSN:     config.Database.DSN,
 		}
 
-		db, err := model.NewDB(cmd.Context(), dbConfig)
+		db, err := database.NewDB(cmd.Context(), dbConfig)
 		if err != nil {
 			err = fmt.Errorf("initializing DB connection: %w", err)
 			return
 		}
-		migrator := model.NewMigrator(db)
+		migrator := database.NewMigrator(db)
 
 		status, err := migrator.MigrationsWithStatus(ctx)
 		if err != nil {
@@ -56,13 +52,4 @@ var Cmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		return cmd.Help()
 	},
-}
-
-func waitExitSignal(callback func()) {
-	sigs := make(chan os.Signal, 1)
-	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
-	sig := <-sigs
-	log.Info("received signal, start to shutdown...", log.Any("signal", sig))
-
-	callback()
 }
