@@ -10,11 +10,18 @@ func NewTagStore(db *DB) *TagStore {
 	}
 }
 
+type TagScope string
+
+const (
+	ModelTagScope    TagScope = "model"
+	DatabaseTagScope TagScope = "database"
+)
+
 type Tag struct {
-	ID       int64  `bun:",pk,autoincrement" json:"id"`
-	ParentID int64  `bun:",pk" json:"parent_id"`
-	Name     string `bun:",notnull" json:"name"`
-	Category string `bun:",notnull" json:"category"`
-	Group    string `bun:",notnull" json:"group"`
+	ID       int64    `bun:",pk,autoincrement" json:"id"`
+	Name     string   `bun:",notnull" json:"name"`
+	Category string   `bun:",notnull" json:"category"`
+	Group    string   `bun:",notnull" json:"group"`
+	Scope    TagScope `bun:",notnull" json:"scope"`
 	times
 }
