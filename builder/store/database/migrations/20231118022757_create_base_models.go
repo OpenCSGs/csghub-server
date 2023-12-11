@@ -127,7 +127,7 @@ type Tag struct {
 	ID       int64  `bun:",pk,autoincrement" json:"id"`
 	ParentID int64  `bun:",pk" json:"parent_id"`
 	Name     string `bun:",notnull" json:"name"`
-	TagType  string `bun:",notnull" json:"tag_type"`
+	Category string `bun:",notnull" json:"category"`
 	Group    string `bun:",notnull" json:"group"`
 	times
 }
