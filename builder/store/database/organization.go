@@ -10,9 +10,9 @@ type OrgStore struct {
 	db *DB
 }
 
-func NewOrgStore(db *DB) *OrgStore {
+func NewOrgStore() *OrgStore {
 	return &OrgStore{
-		db: db,
+		db: defaultDB,
 	}
 }
 

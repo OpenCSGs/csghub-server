@@ -61,8 +61,13 @@ func NewRouter(config *config.Config) (*gin.Engine, error) {
 	apiGroup.GET("/datasets/:namespace/:name/tree", datasetHandler.HandleTree(datasetCtrl))
 	apiGroup.GET("/datasets/:namespace/:name/commits", datasetHandler.HandleCommits(datasetCtrl))
 	apiGroup.GET("/datasets/:namespace/:name/raw/*file_path", datasetHandler.HandleFileRaw(datasetCtrl))
-	apiGroup.POST("/datasets/:namespace/:name/raw/*file_path", datasetHandler.HandleFileCreate(datasetCtrl))
 	apiGroup.PUT("/datasets/:namespace/:name/raw/*file_path", datasetHandler.HandleFileUpdate(datasetCtrl))
+
+	dsHandler, err := handler.NewDatasetHandler(config)
+	if err != nil {
+		return nil, fmt.Errorf("error creating dataset handler:%w", err)
+	}
+	apiGroup.POST("/datasets/:namespace/:name/raw/*file_path", dsHandler.CreateFile)
 
 	// User routes
 	userCtrl, err := user.New(config)

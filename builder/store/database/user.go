@@ -11,9 +11,9 @@ type UserStore struct {
 	db *DB
 }
 
-func NewUserStore(db *DB) *UserStore {
+func NewUserStore() *UserStore {
 	return &UserStore{
-		db: db,
+		db: defaultDB,
 	}
 }
 

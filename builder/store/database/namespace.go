@@ -8,10 +8,8 @@ type NamespaceStore struct {
 	db *DB
 }
 
-func NewNamespaceStore(db *DB) *NamespaceStore {
-	return &NamespaceStore{
-		db: db,
-	}
+func NewNamespaceStore() *NamespaceStore {
+	return &NamespaceStore{db: defaultDB}
 }
 
 type NamespaceType string

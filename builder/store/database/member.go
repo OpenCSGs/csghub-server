@@ -4,9 +4,9 @@ type MemberStore struct {
 	db *DB
 }
 
-func NewMemberStore(db *DB) *MemberStore {
+func NewMemberStore() *MemberStore {
 	return &MemberStore{
-		db: db,
+		db: defaultDB,
 	}
 }
 
