@@ -4,6 +4,7 @@ import (
 	"github.com/spf13/cobra"
 	"opencsg.com/starhub-server/api/httpbase"
 	"opencsg.com/starhub-server/api/router"
+	"opencsg.com/starhub-server/builder/store/database"
 	"opencsg.com/starhub-server/common/config"
 )
 
@@ -31,6 +32,12 @@ var serverCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
+
+		dbConfig := database.DBConfig{
+			Dialect: database.DatabaseDialect(cfg.Database.Driver),
+			DSN:     cfg.Database.DSN,
+		}
+		database.InitDB(dbConfig)
 		r, err := router.NewRouter(cfg)
 		if err != nil {
 			return err
