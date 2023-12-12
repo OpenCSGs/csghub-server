@@ -1,0 +1,25 @@
+categories:
+- name: Tasks
+  scope: model
+- name: Libraries
+  scope: model
+- name: Datasets
+  scope: model
+- name: Languages
+  scope: model
+- name: Licenses
+  scope: model
+- name: Other
+  scope: model
+- name: Tasks
+  scope: dataset
+- name: Sizes
+  scope: dataset
+- name: Sub-tasks
+  scope: dataset
+- name: Languages
+  scope: dataset
+- name: Licenses
+  scope: dataset
+- name: Other
+  scope: dataset
