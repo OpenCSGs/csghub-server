@@ -191,9 +191,9 @@ func (c *Client) UpdateModelFile(namespace, name, path string, req *types.Update
 	return
 }
 
-func (c *Client) CreateDatasetFile(namespace, name, path string, req *types.CreateFileReq) (err error) {
-	namespace = common.WithPrefix(namespace, DatasetOrgPrefix)
-	_, _, err = c.giteaClient.CreateFile(namespace, name, path, gitea.CreateFileOptions{
+func (c *Client) CreateDatasetFile(req *types.CreateFileReq) (err error) {
+	namespace := common.WithPrefix(req.NameSpace, DatasetOrgPrefix)
+	_, _, err = c.giteaClient.CreateFile(namespace, req.Name, req.FilePath, gitea.CreateFileOptions{
 		FileOptions: gitea.FileOptions{
 			Message:       req.Message,
 			BranchName:    req.Branch,

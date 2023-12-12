@@ -20,6 +20,10 @@ type CreateFileReq struct {
 	Branch    string `json:"branch"`
 	Content   string `json:"content"`
 	NewBranch string `json:"new_branch"`
+
+	NameSpace string `json:"-"`
+	Name      string `json:"-"`
+	FilePath  string `json:"-"`
 }
 
 type UpdateFileReq struct {

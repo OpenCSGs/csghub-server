@@ -12,9 +12,9 @@ type ModelStore struct {
 	db *DB
 }
 
-func NewModelStore(db *DB) *ModelStore {
+func NewModelStore() *ModelStore {
 	return &ModelStore{
-		db: db,
+		db: defaultDB,
 	}
 }
 

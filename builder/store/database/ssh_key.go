@@ -8,9 +8,9 @@ type SSHKeyStore struct {
 	db *DB
 }
 
-func NewSSHKeyStore(db *DB) *SSHKeyStore {
+func NewSSHKeyStore() *SSHKeyStore {
 	return &SSHKeyStore{
-		db: db,
+		db: defaultDB,
 	}
 }
 

@@ -8,9 +8,9 @@ type AccessTokenStore struct {
 	db *DB
 }
 
-func NewAccessTokenStore(db *DB) *AccessTokenStore {
+func NewAccessTokenStore() *AccessTokenStore {
 	return &AccessTokenStore{
-		db: db,
+		db: defaultDB,
 	}
 }
 

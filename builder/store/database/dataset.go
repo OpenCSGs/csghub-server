@@ -12,10 +12,8 @@ type DatasetStore struct {
 	db *DB
 }
 
-func NewDatasetStore(db *DB) *DatasetStore {
-	return &DatasetStore{
-		db: db,
-	}
+func NewDatasetStore() *DatasetStore {
+	return &DatasetStore{db: defaultDB}
 }
 
 type Dataset struct {

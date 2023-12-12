@@ -3,13 +3,12 @@ package httpbase
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
 	"time"
-
-	"opencsg.com/starhub-server/common/log"
 )
 
 // GracefulServer implements an HTTP server with graceful shutdown.
@@ -47,22 +46,22 @@ func (s *GracefulServer) Run() {
 			//notify server to stop
 			q <- syscall.SIGTERM
 
-			log.Error("listen: %s\n", log.ErrField(err))
+			slog.Error("listen failed", slog.Any("error", err))
 		}
 	}()
 
 	// Listen for the interrupt signal.
 	<-q
 
-	log.Info("shutting down gracefully, press Ctrl+C again to force")
+	slog.Info("shutting down gracefully, press Ctrl+C again to force")
 
 	// The context is used to inform the server it has 5 seconds to finish
 	// the request it is currently handling
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	if err := s.server.Shutdown(ctx); err != nil {
-		log.Error("Server forced to shutdown: ", log.ErrField(err))
+		slog.Error("Server faild to shutdown", slog.Any("error", err))
 	}
 
-	log.Info("Server stopped")
+	slog.Info("Server stopped")
 }
