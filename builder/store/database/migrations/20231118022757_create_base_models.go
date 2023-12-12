@@ -130,12 +130,14 @@ type RepositoryTag struct {
 	Tag          *Tag        `bun:"rel:belongs-to,join:tag_id=id"`
 }
 
+type TagStatus int8
+
 type Tag struct {
 	ID       int64    `bun:",pk,autoincrement" json:"id"`
-	Name     string   `bun:",notnull" json:"name"`
-	Category string   `bun:",notnull" json:"category"`
-	Group    string   `bun:",notnull" json:"group"`
-	Scope    TagScope `bun:",notnull" json:"scope"`
+	Name     string   `bun:",notnull" json:"name" yaml:"name"`
+	Category string   `bun:",notnull" json:"category" yaml:"category"`
+	Group    string   `bun:",notnull" json:"group" yaml:"group"`
+	Scope    TagScope `bun:",notnull" json:"scope" yaml:"scope"`
 	times
 }
 
