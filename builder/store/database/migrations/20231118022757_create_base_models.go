@@ -13,6 +13,7 @@ var baseModelTables = []any{
 	Repository{},
 	Namespace{},
 	Tag{},
+	TagCategory{},
 	Model{},
 	Dataset{},
 	LfsFile{},
@@ -43,8 +44,8 @@ const (
 type TagScope string
 
 const (
-	ModelTagScope    TagScope = "model"
-	DatabaseTagScope TagScope = "database"
+	ModelTagScope   TagScope = "model"
+	DatasetTagScope TagScope = "dataset"
 )
 
 type User struct {
@@ -130,8 +131,6 @@ type RepositoryTag struct {
 	Tag          *Tag        `bun:"rel:belongs-to,join:tag_id=id"`
 }
 
-type TagStatus int8
-
 type Tag struct {
 	ID       int64    `bun:",pk,autoincrement" json:"id"`
 	Name     string   `bun:",notnull" json:"name" yaml:"name"`
@@ -139,6 +138,12 @@ type Tag struct {
 	Group    string   `bun:",notnull" json:"group" yaml:"group"`
 	Scope    TagScope `bun:",notnull" json:"scope" yaml:"scope"`
 	times
+}
+
+type TagCategory struct {
+	ID    int64    `bun:",pk,autoincrement" json:"id"`
+	Name  string   `bun:",notnull" json:"name" yaml:"name"`
+	Scope TagScope `bun:",notnull" json:"scope" yaml:"scope"`
 }
 
 type LfsFile struct {

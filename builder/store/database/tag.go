@@ -22,8 +22,6 @@ const (
 	DatabaseTagScope TagScope = "database"
 )
 
-type TagStatus int8
-
 type Tag struct {
 	ID       int64    `bun:",pk,autoincrement" json:"id"`
 	Name     string   `bun:",notnull" json:"name" yaml:"name"`
@@ -31,6 +29,12 @@ type Tag struct {
 	Group    string   `bun:",notnull" json:"group" yaml:"group"`
 	Scope    TagScope `bun:",notnull" json:"scope" yaml:"scope"`
 	times
+}
+
+type TagCategory struct {
+	ID    int64    `bun:",pk,autoincrement" json:"id"`
+	Name  string   `bun:",notnull" json:"name" yaml:"name"`
+	Scope TagScope `bun:",notnull" json:"scope" yaml:"scope"`
 }
 
 func (ts *TagStore) AllTags(ctx context.Context) ([]Tag, error) {
