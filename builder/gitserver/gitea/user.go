@@ -2,6 +2,8 @@ package gitea
 
 import (
 	"crypto/rand"
+	"crypto/sha1"
+	"encoding/hex"
 	"math/big"
 
 	"github.com/pulltheflower/gitea-go-sdk/gitea"
@@ -37,6 +39,7 @@ func (c *Client) CreateUser(u *types.CreateUserRequest) (user *database.User, er
 		return
 	}
 
+	password = calculateSHA1(password)
 	user = &database.User{
 		Email:    giteaUser.Email,
 		GitID:    giteaUser.ID,
@@ -104,4 +107,13 @@ func (c *Client) createOrgsForUser(user *gitea.User) (err error) {
 	}
 
 	return
+}
+
+func calculateSHA1(input string) string {
+	hasher := sha1.New()
+	hasher.Write([]byte(input))
+	hashInBytes := hasher.Sum(nil)
+	hashString := hex.EncodeToString(hashInBytes)
+
+	return hashString
 }
