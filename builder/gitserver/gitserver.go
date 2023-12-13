@@ -25,7 +25,7 @@ type GitServer interface {
 	GetModelFileRaw(string, string, string, string) (string, error)
 	GetModelTags(string, string, int, int) ([]*types.ModelTag, error)
 	GetModelFileTree(string, string, string, string) ([]*types.File, error)
-	CreateModelFile(string, string, string, *types.CreateFileReq) (err error)
+	CreateModelFile(*types.CreateFileReq) (err error)
 	UpdateModelFile(string, string, string, *types.UpdateFileReq) (err error)
 
 	CreateDatasetRepo(*types.CreateDatasetReq) (*database.Dataset, *database.Repository, error)

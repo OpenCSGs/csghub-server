@@ -270,7 +270,6 @@ func (m *Middleware) RequestLog(c *gin.Context) {
 // * ok(c, nil)
 func OK(c *gin.Context, data interface{}) {
 	c.PureJSON(http.StatusOK, R{
-		Code: 0,
 		Msg:  "OK",
 		Data: data,
 	})

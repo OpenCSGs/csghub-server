@@ -50,7 +50,7 @@ func NewRouter(config *config.Config) (*gin.Engine, error) {
 	if err != nil {
 		return nil, fmt.Errorf("error creating dataset controller:%w", err)
 	}
-	apiGroup.POST("/datasets", datasetHandler.HandleCreate(datasetCtrl))
+	//apiGroup.POST("/datasets", datasetHandler.HandleCreate(datasetCtrl))
 	apiGroup.GET("/datasets", datasetHandler.HandleIndex(datasetCtrl))
 	apiGroup.PUT("/datasets/:namespace/:name", datasetHandler.HandleUpdate(datasetCtrl))
 	apiGroup.DELETE("/datasets/:namespace/:name", datasetHandler.HandleDelete(datasetCtrl))
@@ -68,6 +68,7 @@ func NewRouter(config *config.Config) (*gin.Engine, error) {
 		return nil, fmt.Errorf("error creating dataset handler:%w", err)
 	}
 	apiGroup.POST("/datasets/:namespace/:name/raw/*file_path", dsHandler.CreateFile)
+	apiGroup.POST("/datasets", dsHandler.Create)
 
 	// User routes
 	userCtrl, err := user.New(config)

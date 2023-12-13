@@ -18,6 +18,9 @@ func (c *Controller) FileCreate(ctx *gin.Context) (err error) {
 		return err
 	}
 	filePath := ctx.Param("file_path")
+	req.NameSpace = namespace
+	req.Name = name
+	req.FilePath = filePath
 
 	_, err = c.namespaceStore.FindByPath(ctx, namespace)
 	if err != nil {
@@ -28,7 +31,7 @@ func (c *Controller) FileCreate(ctx *gin.Context) (err error) {
 	if err != nil {
 		return errors.New("User does not exist")
 	}
-	err = c.gitServer.CreateModelFile(namespace, name, filePath, req)
+	err = c.gitServer.CreateModelFile(req)
 	if err != nil {
 		return
 	}

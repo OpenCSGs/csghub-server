@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+	"opencsg.com/starhub-server/api/httpbase"
 	"opencsg.com/starhub-server/common/config"
 	"opencsg.com/starhub-server/common/types"
 	"opencsg.com/starhub-server/common/utils/common"
@@ -51,4 +52,20 @@ func (h *DatasetHandler) CreateFile(ctx *gin.Context) {
 	}
 	slog.Info("Create file succeed", slog.String("file_path", filePath))
 	ctx.JSON(http.StatusOK, nil)
+}
+
+func (h *DatasetHandler) Create(ctx *gin.Context) {
+	var req *types.CreateDatasetReq
+	if err := ctx.ShouldBindJSON(&req); err != nil {
+		return
+	}
+
+	dataset, err := h.c.Create(ctx, req)
+	if err != nil {
+		slog.Error("Failed to create dataset", slog.Any("error", err))
+		ctx.JSON(http.StatusInternalServerError, gin.H{"message": err.Error()})
+		return
+	}
+	slog.Info("Create dataset succeed", slog.String("dataset", dataset.Name))
+	httpbase.OK(ctx, dataset)
 }
