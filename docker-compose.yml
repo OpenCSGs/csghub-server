@@ -43,6 +43,7 @@ services:
       - GITEA_LFS_START_SERVER=true
       - GITEA_LFS_ROOT_PATH=/bitnami/gitea/data/lfs
       - GITEA_LFS_STORAGE_TYPE=local
+      - GITEA_SERVICE_DEFAULT_ALLOW_CREATE_ORGANIZATION=true
     ports:
       - "3001:3000"
       - "2222:2222"

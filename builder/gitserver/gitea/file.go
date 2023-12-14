@@ -139,9 +139,9 @@ func (c *Client) getFileFromEntry(namespace, name, ref string, entry *gitea.Cont
 	ch <- file
 }
 
-func (c *Client) CreateModelFile(namespace, name, path string, req *types.CreateFileReq) (err error) {
-	namespace = common.WithPrefix(namespace, ModelOrgPrefix)
-	_, _, err = c.giteaClient.CreateFile(namespace, name, path, gitea.CreateFileOptions{
+func (c *Client) CreateModelFile(req *types.CreateFileReq) (err error) {
+	namespace := common.WithPrefix(req.NameSpace, ModelOrgPrefix)
+	_, _, err = c.giteaClient.CreateFile(namespace, req.Name, req.FilePath, gitea.CreateFileOptions{
 		FileOptions: gitea.FileOptions{
 			Message:       req.Message,
 			BranchName:    req.Branch,
