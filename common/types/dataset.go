@@ -51,7 +51,9 @@ type CreateDatasetReq struct {
 }
 
 type UpdateDatasetReq struct {
+	Namespace     string `json:"namespace"`
 	Username      string `json:"username"`
+	OriginName    string `json:"origin_name"`
 	Name          string `json:"name"`
 	Description   string `json:"description"`
 	Private       bool   `json:"private"`

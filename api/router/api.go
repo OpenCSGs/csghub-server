@@ -5,13 +5,9 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"opencsg.com/starhub-server/api/handler"
-	datasetHandler "opencsg.com/starhub-server/api/handler/dataset"
 	memberHandler "opencsg.com/starhub-server/api/handler/member"
-	modelHandler "opencsg.com/starhub-server/api/handler/model"
 	"opencsg.com/starhub-server/common/config"
-	"opencsg.com/starhub-server/component/dataset"
 	"opencsg.com/starhub-server/component/member"
-	"opencsg.com/starhub-server/component/model"
 )
 
 func NewRouter(config *config.Config) (*gin.Engine, error) {
@@ -19,48 +15,42 @@ func NewRouter(config *config.Config) (*gin.Engine, error) {
 	apiGroup := r.Group("/api/v1")
 	//TODO:use middleware to handle common response
 	// Models routes
-	modelCtrl, err := model.New(config)
+	modelHandler, err := handler.NewModelHandler(config)
 	if err != nil {
 		return nil, fmt.Errorf("error creating model controller:%w", err)
 	}
-	apiGroup.POST("/models", modelHandler.HandleCreate(modelCtrl))
-	apiGroup.GET("/models", modelHandler.HandleIndex(modelCtrl))
-	apiGroup.PUT("/models/:namespace/:name", modelHandler.HandleUpdate(modelCtrl))
-	apiGroup.DELETE("/models/:namespace/:name", modelHandler.HandleDelete(modelCtrl))
-	apiGroup.GET("/models/:namespace/:name/detail", modelHandler.HandleDetail(modelCtrl))
-	apiGroup.GET("/models/:namespace/:name/branches", modelHandler.HandleBranches(modelCtrl))
-	apiGroup.GET("/models/:namespace/:name/tags", modelHandler.HandleTags(modelCtrl))
-	apiGroup.GET("/models/:namespace/:name/last_commit", modelHandler.HandleLastCommit(modelCtrl))
-	apiGroup.GET("/models/:namespace/:name/tree", modelHandler.HandleTree(modelCtrl))
-	apiGroup.GET("/models/:namespace/:name/commits", modelHandler.HandleCommits(modelCtrl))
-	apiGroup.GET("/models/:namespace/:name/raw/*file_path", modelHandler.HandleFileRaw(modelCtrl))
-	apiGroup.POST("/models/:namespace/:name/raw/*file_path", modelHandler.HandleFileCreate(modelCtrl))
-	apiGroup.PUT("/models/:namespace/:name/raw/*file_path", modelHandler.HandleFileUpdate(modelCtrl))
+	apiGroup.POST("/models", modelHandler.Create)
+	apiGroup.GET("/models", modelHandler.Index)
+	apiGroup.PUT("/models/:namespace/:name", modelHandler.Update)
+	apiGroup.DELETE("/models/:namespace/:name", modelHandler.Delete)
+	apiGroup.GET("/models/:namespace/:name/detail", modelHandler.Detail)
+	apiGroup.GET("/models/:namespace/:name/branches", modelHandler.Branches)
+	apiGroup.GET("/models/:namespace/:name/tags", modelHandler.Tags)
+	apiGroup.GET("/models/:namespace/:name/last_commit", modelHandler.LastCommit)
+	apiGroup.GET("/models/:namespace/:name/tree", modelHandler.Tree)
+	apiGroup.GET("/models/:namespace/:name/commits", modelHandler.Commits)
+	apiGroup.GET("/models/:namespace/:name/raw/*file_path", modelHandler.FileRaw)
+	apiGroup.POST("/models/:namespace/:name/raw/*file_path", modelHandler.CreateFile)
+	apiGroup.PUT("/models/:namespace/:name/raw/*file_path", modelHandler.UpdateFile)
 
 	// Dataset routes
-	datasetCtrl, err := dataset.New(config)
-	if err != nil {
-		return nil, fmt.Errorf("error creating dataset controller:%w", err)
-	}
-	//apiGroup.POST("/datasets", datasetHandler.HandleCreate(datasetCtrl))
-	apiGroup.GET("/datasets", datasetHandler.HandleIndex(datasetCtrl))
-	apiGroup.PUT("/datasets/:namespace/:name", datasetHandler.HandleUpdate(datasetCtrl))
-	apiGroup.DELETE("/datasets/:namespace/:name", datasetHandler.HandleDelete(datasetCtrl))
-	apiGroup.GET("/datasets/:namespace/:name/detail", datasetHandler.HandleDetail(datasetCtrl))
-	apiGroup.GET("/datasets/:namespace/:name/branches", datasetHandler.HandleBranches(datasetCtrl))
-	apiGroup.GET("/datasets/:namespace/:name/tags", datasetHandler.HandleTags(datasetCtrl))
-	apiGroup.GET("/datasets/:namespace/:name/last_commit", datasetHandler.HandleLastCommit(datasetCtrl))
-	apiGroup.GET("/datasets/:namespace/:name/tree", datasetHandler.HandleTree(datasetCtrl))
-	apiGroup.GET("/datasets/:namespace/:name/commits", datasetHandler.HandleCommits(datasetCtrl))
-	apiGroup.GET("/datasets/:namespace/:name/raw/*file_path", datasetHandler.HandleFileRaw(datasetCtrl))
-	apiGroup.PUT("/datasets/:namespace/:name/raw/*file_path", datasetHandler.HandleFileUpdate(datasetCtrl))
-
 	dsHandler, err := handler.NewDatasetHandler(config)
 	if err != nil {
 		return nil, fmt.Errorf("error creating dataset handler:%w", err)
 	}
 	apiGroup.POST("/datasets/:namespace/:name/raw/*file_path", dsHandler.CreateFile)
 	apiGroup.POST("/datasets", dsHandler.Create)
+	apiGroup.GET("/datasets", dsHandler.Index)
+	apiGroup.PUT("/datasets/:namespace/:name", dsHandler.Update)
+	apiGroup.DELETE("/datasets/:namespace/:name", dsHandler.Delete)
+	apiGroup.GET("/datasets/:namespace/:name/detail", dsHandler.Detail)
+	apiGroup.GET("/datasets/:namespace/:name/branches", dsHandler.Branches)
+	apiGroup.GET("/datasets/:namespace/:name/tags", dsHandler.Tags)
+	apiGroup.GET("/datasets/:namespace/:name/last_commit", dsHandler.LastCommit)
+	apiGroup.GET("/datasets/:namespace/:name/tree", dsHandler.Tree)
+	apiGroup.GET("/datasets/:namespace/:name/commits", dsHandler.Commits)
+	apiGroup.GET("/datasets/:namespace/:name/raw/*file_path", dsHandler.FileRaw)
+	apiGroup.PUT("/datasets/:namespace/:name/raw/*file_path", dsHandler.UpdateFile)
 
 	// User routes
 	userCtrl, err := handler.NewUserHandler(config)

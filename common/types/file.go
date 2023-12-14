@@ -44,4 +44,35 @@ type UpdateFileReq struct {
 	NewBranch  string `json:"new_branch"`
 	OriginPath string `json:"origin_path"`
 	SHA        string `json:"sha"`
+
+	NameSpace string `json:"-"`
+	Name      string `json:"-"`
+	FilePath  string `json:"-"`
+}
+
+type GetCommitsReq struct {
+	Namespace string `json:"namespace"`
+	Name      string `json:"name"`
+	Per       int    `json:"per"`
+	Page      int    `json:"page"`
+	Ref       string `json:"ref"`
+}
+
+type GetFileReq struct {
+	Namespace string `json:"namespace"`
+	Name      string `json:"name"`
+	Path      string `json:"path"`
+	Ref       string `json:"ref"`
+}
+
+type GetBranchesReq struct {
+	Namespace string `json:"namespace"`
+	Name      string `json:"name"`
+	Page      int    `json:"page"`
+	Per       int    `json:"per"`
+}
+
+type GetTagsReq struct {
+	Namespace string `json:"namespace"`
+	Name      string `json:"name"`
 }

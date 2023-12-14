@@ -285,3 +285,181 @@ license: ` + license + `
 ---
 	`
 }
+
+func (c *DatasetComponent) Index(ctx context.Context, per, page int) ([]database.Dataset, int, error) {
+	datasets, err := c.ds.Public(ctx, per, page)
+	if err != nil {
+		newError := fmt.Errorf("failed to get public datasets,error:%w", err)
+		slog.Error(newError.Error())
+		return nil, 0, newError
+	}
+	total, err := c.ds.PublicCount(ctx)
+	if err != nil {
+		newError := fmt.Errorf("failed to get public dataset count,error:%w", err)
+		slog.Error(newError.Error())
+		return nil, 0, newError
+	}
+	return datasets, total, nil
+}
+
+func (c *DatasetComponent) Update(ctx context.Context, req *types.UpdateDatasetReq) (*database.Dataset, error) {
+	_, err := c.ns.FindByPath(ctx, req.Namespace)
+	if err != nil {
+		return nil, fmt.Errorf("failed to find namespace, error: %w", err)
+	}
+
+	_, err = c.us.FindByUsername(ctx, req.Username)
+	if err != nil {
+		return nil, fmt.Errorf("failed to find user, error: %w", err)
+	}
+
+	dataset, err := c.ds.FindyByPath(ctx, req.Namespace, req.OriginName)
+	if err != nil {
+		return nil, fmt.Errorf("failed to find dataset, error: %w", err)
+	}
+
+	err = c.gs.UpdateDatasetRepo(req.Namespace, req.OriginName, dataset, dataset.Repository, req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to update git dataset repository, error: %w", err)
+	}
+
+	err = c.ds.Update(ctx, dataset, dataset.Repository)
+	if err != nil {
+		return nil, fmt.Errorf("failed to update database dataset, error: %w", err)
+	}
+
+	return dataset, nil
+}
+
+func (c *DatasetComponent) Delete(ctx context.Context, namespace, name string) error {
+	_, err := c.ds.FindyByPath(ctx, namespace, name)
+	if err != nil {
+		return fmt.Errorf("failed to find dataset, error: %w", err)
+	}
+	err = c.gs.DeleteDatasetRepo(namespace, name)
+	if err != nil {
+		return fmt.Errorf("failed to delete git dataset repository, error: %w", err)
+	}
+
+	err = c.ds.Delete(ctx, namespace, name)
+	if err != nil {
+		return fmt.Errorf("failed to delete database dataset, error: %w", err)
+	}
+	return nil
+}
+
+func (c *DatasetComponent) Detail(ctx context.Context, namespace, name string) (*types.DatasetDetail, error) {
+	_, err := c.ds.FindyByPath(ctx, namespace, name)
+	if err != nil {
+		return nil, fmt.Errorf("failed to find dataset, error: %w", err)
+	}
+	detail, err := c.gs.GetDatasetDetail(namespace, name)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get git dataset detail, error: %w", err)
+	}
+
+	return detail, nil
+}
+
+func (c *DatasetComponent) UpdateFile(ctx context.Context, req *types.UpdateFileReq) error {
+	_, err := c.ns.FindByPath(ctx, req.NameSpace)
+	if err != nil {
+		return fmt.Errorf("failed to find namespace, error: %w", err)
+	}
+
+	_, err = c.us.FindByUsername(ctx, req.Username)
+	if err != nil {
+		return fmt.Errorf("failed to find username, error: %w", err)
+	}
+	err = c.gs.UpdateDatasetFile(req.NameSpace, req.Name, req.FilePath, req)
+	if err != nil {
+		return fmt.Errorf("failed to create dataset file, error: %w", err)
+	}
+
+	return nil
+}
+
+func (c *DatasetComponent) Commits(ctx context.Context, req *types.GetCommitsReq) ([]*types.Commit, error) {
+	dataset, err := c.ds.FindyByPath(ctx, req.Namespace, req.Name)
+	if err != nil {
+		return nil, fmt.Errorf("failed to find dataset, error: %w", err)
+	}
+	if req.Ref == "" {
+		req.Ref = dataset.Repository.DefaultBranch
+	}
+	commits, err := c.gs.GetDatasetCommits(req.Namespace, req.Name, req.Ref, req.Per, req.Page)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get git dataset repository commits, error: %w", err)
+	}
+	return commits, nil
+}
+
+func (c *DatasetComponent) LastCommit(ctx context.Context, req *types.GetCommitsReq) (*types.Commit, error) {
+	dataset, err := c.ds.FindyByPath(ctx, req.Namespace, req.Name)
+	if err != nil {
+		return nil, fmt.Errorf("failed to find dataset, error: %w", err)
+	}
+
+	if req.Ref == "" {
+		req.Ref = dataset.Repository.DefaultBranch
+	}
+	commit, err := c.gs.GetDatasetLastCommit(req.Namespace, req.Name, req.Ref)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get git dataset repository last commit, error: %w", err)
+	}
+	return commit, nil
+}
+
+func (c *DatasetComponent) FileRaw(ctx context.Context, req *types.GetFileReq) (string, error) {
+	dataset, err := c.ds.FindyByPath(ctx, req.Namespace, req.Name)
+	if err != nil {
+		return "", fmt.Errorf("failed to find dataset, error: %w", err)
+	}
+	if req.Ref == "" {
+		req.Ref = dataset.Repository.DefaultBranch
+	}
+	raw, err := c.gs.GetDatasetFileRaw(req.Namespace, req.Name, req.Ref, req.Path)
+	if err != nil {
+		return "", fmt.Errorf("failed to get git dataset repository file raw, error: %w", err)
+	}
+	return raw, nil
+}
+
+func (c *DatasetComponent) Branches(ctx context.Context, req *types.GetBranchesReq) ([]*types.DatasetBranch, error) {
+	_, err := c.ds.FindyByPath(ctx, req.Namespace, req.Name)
+	if err != nil {
+		return nil, fmt.Errorf("failed to find dataset, error: %w", err)
+	}
+	bs, err := c.gs.GetDatasetBranches(req.Namespace, req.Name, req.Per, req.Page)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get git dataset repository branches, error: %w", err)
+	}
+	return bs, nil
+}
+
+func (c *DatasetComponent) Tags(ctx context.Context, req *types.GetTagsReq) ([]database.Tag, error) {
+	_, err := c.ds.FindyByPath(ctx, req.Namespace, req.Name)
+	if err != nil {
+		return nil, fmt.Errorf("failed to find dataset, error: %w", err)
+	}
+	tags, err := c.ds.Tags(ctx, req.Namespace, req.Name)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get dataset tags, error: %w", err)
+	}
+	return tags, nil
+}
+
+func (c *DatasetComponent) Tree(ctx context.Context, req *types.GetFileReq) ([]*types.File, error) {
+	dataset, err := c.ds.FindyByPath(ctx, req.Namespace, req.Name)
+	if err != nil {
+		return nil, fmt.Errorf("failed to find dataset, error: %w", err)
+	}
+	if req.Ref == "" {
+		req.Ref = dataset.Repository.DefaultBranch
+	}
+	tree, err := c.gs.GetDatasetFileTree(req.Namespace, req.Name, req.Ref, req.Path)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get git dataset repository file tree, error: %w", err)
+	}
+	return tree, nil
+}

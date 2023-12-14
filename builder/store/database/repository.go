@@ -24,7 +24,7 @@ func NewRepoStore(db *DB) *RepoStore {
 
 type Repository struct {
 	ID             int64          `bun:",pk,autoincrement" json:"id"`
-	UserID         int64          `bun:",pk" json:"user_id"`
+	UserID         int64          `bun:",notnull" json:"user_id"`
 	Path           string         `bun:",notnull" json:"path"`
 	GitPath        string         `bun:",notnull" json:"git_path"`
 	Name           string         `bun:",notnull" json:"name"`
