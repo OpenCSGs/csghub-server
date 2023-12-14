@@ -51,8 +51,8 @@ func (c *Client) CreateUser(u *types.CreateUserRequest) (user *database.User, er
 	return
 }
 
-func (c *Client) UpdateUser(u *types.UpdateUserRequest) (int, *database.User, error) {
-	resp, err := c.giteaClient.AdminEditUser(
+func (c *Client) UpdateUser(u *types.UpdateUserRequest) (*database.User, error) {
+	_, err := c.giteaClient.AdminEditUser(
 		u.Username,
 		gitea.EditUserOption{
 			LoginName: u.Username,
@@ -65,7 +65,7 @@ func (c *Client) UpdateUser(u *types.UpdateUserRequest) (int, *database.User, er
 		Name:     u.Name,
 		Email:    u.Email,
 	}
-	return resp.StatusCode, user, err
+	return user, err
 }
 
 // Random password generator

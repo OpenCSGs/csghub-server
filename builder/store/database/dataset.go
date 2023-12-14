@@ -64,7 +64,7 @@ func (s *DatasetStore) Public(ctx context.Context, per, page int) (datasets []Da
 	return
 }
 
-func (s *DatasetStore) ByUsername(ctx context.Context, username string, per, page int, onlyPublic bool) (datasets []Dataset, err error) {
+func (s *DatasetStore) ByUsername(ctx context.Context, username string, per, page int, onlyPublic bool) (datasets []Dataset, total int, err error) {
 	query := s.db.Operator.Core.
 		NewSelect().
 		Model(&datasets).
@@ -79,6 +79,10 @@ func (s *DatasetStore) ByUsername(ctx context.Context, username string, per, pag
 		Offset((page - 1) * per)
 
 	err = query.Scan(ctx, &datasets)
+	if err != nil {
+		return
+	}
+	total, err = query.Count(ctx)
 	if err != nil {
 		return
 	}

@@ -8,12 +8,10 @@ import (
 	datasetHandler "opencsg.com/starhub-server/api/handler/dataset"
 	memberHandler "opencsg.com/starhub-server/api/handler/member"
 	modelHandler "opencsg.com/starhub-server/api/handler/model"
-	userHandler "opencsg.com/starhub-server/api/handler/user"
 	"opencsg.com/starhub-server/common/config"
 	"opencsg.com/starhub-server/component/dataset"
 	"opencsg.com/starhub-server/component/member"
 	"opencsg.com/starhub-server/component/model"
-	"opencsg.com/starhub-server/component/user"
 )
 
 func NewRouter(config *config.Config) (*gin.Engine, error) {
@@ -65,12 +63,16 @@ func NewRouter(config *config.Config) (*gin.Engine, error) {
 	apiGroup.POST("/datasets", dsHandler.Create)
 
 	// User routes
-	userCtrl, err := user.New(config)
+	userCtrl, err := handler.NewUserHandler(config)
 	if err != nil {
 		return nil, fmt.Errorf("error creating user controller:%w", err)
 	}
-	apiGroup.POST("/users", userHandler.HandleCreate(userCtrl))
-	apiGroup.PUT("/users/", userHandler.HandleUpdate(userCtrl))
+	apiGroup.POST("/users", userCtrl.Create)
+	apiGroup.PUT("/users/", userCtrl.Update)
+	// User models
+	apiGroup.GET("/user/:username/models", userCtrl.Models)
+	// User datasets
+	apiGroup.GET("/user/:username/datasets", userCtrl.Datasets)
 
 	acHandler, err := handler.NewAccessTokenHandler(config)
 	if err != nil {
@@ -86,12 +88,6 @@ func NewRouter(config *config.Config) (*gin.Engine, error) {
 	apiGroup.GET("/user/:username/ssh_keys", sshKeyHandler.Index)
 	apiGroup.POST("/user/:username/ssh_keys", sshKeyHandler.Create)
 	apiGroup.DELETE("/user/:username/ssh_key/:id", sshKeyHandler.Delete)
-
-	// User models
-	apiGroup.GET("/user/:username/models", userHandler.HandleModels(userCtrl))
-
-	// User datasets
-	apiGroup.GET("/user/:username/datasets", userHandler.HandleDatasets(userCtrl))
 
 	//Organization
 	orgHandler, err := handler.NewOrganizationHandler(config)
