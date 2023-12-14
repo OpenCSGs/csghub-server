@@ -26,6 +26,15 @@ type CreateFileReq struct {
 	FilePath  string `json:"-"`
 }
 
+type CreateFileResp struct {
+	Tags []CreateFileResp_Tag `json:"tags"`
+}
+
+type CreateFileResp_Tag struct {
+	Name     string `json:"name"`
+	Category string `json:"category"`
+}
+
 type UpdateFileReq struct {
 	Username   string `json:"username"`
 	Email      string `json:"email"`

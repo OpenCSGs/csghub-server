@@ -174,3 +174,33 @@ func (s *DatasetStore) Delete(ctx context.Context, namespace, name string) (err 
 	})
 	return
 }
+
+// SetTags will delete existing tags and create new ones
+func (s *DatasetStore) SetTags(ctx context.Context, namespace, name string, tags []*Tag) (repoTags []*RepositoryTag, err error) {
+	repo := new(Repository)
+	err = s.db.Operator.Core.NewSelect().Model(repo).
+		Where("path =?", fmt.Sprintf("%v/%v", namespace, name)).
+		Scan(ctx)
+	if err != nil {
+		return repoTags, fmt.Errorf("failed to find repository, path:%v/%v,error:%w", namespace, name, err)
+	}
+	err = s.db.Operator.Core.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
+		//remove all tags of the repository and then add new tags
+		tx.NewDelete().
+			Model(&RepositoryTag{}).
+			Where("repository_id =?", repo.ID).
+			Exec(ctx)
+		for _, tag := range tags {
+			repoTag := &RepositoryTag{RepositoryID: repo.ID, TagID: tag.ID, Repository: repo, Tag: tag}
+			repoTags = append(repoTags, repoTag)
+		}
+		//batch insert
+		_, err := tx.NewInsert().Model(&repoTags).Exec(ctx)
+		if err != nil {
+			return fmt.Errorf("failed to batch insert repository tags, path:%v/%v,error:%w", namespace, name, err)
+		}
+		return nil
+	})
+
+	return repoTags, err
+}

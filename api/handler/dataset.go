@@ -27,7 +27,10 @@ type DatasetHandler struct {
 }
 
 func (h *DatasetHandler) CreateFile(ctx *gin.Context) {
-	var req *types.CreateFileReq
+	var (
+		req  *types.CreateFileReq
+		resp *types.CreateFileResp
+	)
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
 	if err != nil {
 		slog.Error("Failed to get namespace from context", "error", err)
@@ -44,14 +47,14 @@ func (h *DatasetHandler) CreateFile(ctx *gin.Context) {
 	req.Name = name
 	req.FilePath = filePath
 
-	err = h.c.CreateFile(ctx, req)
+	resp, err = h.c.CreateFile(ctx, req)
 	if err != nil {
 		slog.Error("Failed to create file", slog.Any("error", err), slog.String("file_path", filePath))
 		ctx.JSON(http.StatusInternalServerError, gin.H{"message": err.Error()})
 		return
 	}
 	slog.Info("Create file succeed", slog.String("file_path", filePath))
-	ctx.JSON(http.StatusOK, nil)
+	ctx.JSON(http.StatusOK, gin.H{"data": resp})
 }
 
 func (h *DatasetHandler) Create(ctx *gin.Context) {
