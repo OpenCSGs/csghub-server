@@ -24,7 +24,7 @@ type SSHKey struct {
 	times
 }
 
-func (s *SSHKeyStore) Index(ctx context.Context, username string, per, page int) (sshKeys []*SSHKey, err error) {
+func (s *SSHKeyStore) Index(ctx context.Context, username string, per, page int) (sshKeys []SSHKey, err error) {
 	err = s.db.Operator.Core.
 		NewSelect().
 		Model(&sshKeys).
@@ -38,14 +38,14 @@ func (s *SSHKeyStore) Index(ctx context.Context, username string, per, page int)
 	return
 }
 
-func (s *SSHKeyStore) Create(ctx context.Context, sshKey *SSHKey, user User) (key *SSHKey, err error) {
+func (s *SSHKeyStore) Create(ctx context.Context, sshKey *SSHKey, user User) (*SSHKey, error) {
 	sshKey.UserID = user.ID
-	err = s.db.Operator.Core.
+	err := s.db.Operator.Core.
 		NewInsert().
 		Model(sshKey).
 		Returning("*").
 		Scan(ctx)
-	return
+	return sshKey, err
 }
 
 func (s *SSHKeyStore) FindByID(ctx context.Context, id int) (sshKey *SSHKey, err error) {
@@ -60,12 +60,12 @@ func (s *SSHKeyStore) FindByID(ctx context.Context, id int) (sshKey *SSHKey, err
 	return
 }
 
-func (s *SSHKeyStore) Delete(ctx context.Context, gid int) (err error) {
+func (s *SSHKeyStore) Delete(ctx context.Context, gid int64) (err error) {
 	var sshKey SSHKey
 	_, err = s.db.Operator.Core.
 		NewDelete().
 		Model(&sshKey).
-		Where("gid = ?", gid).
+		Where("git_id = ?", gid).
 		Exec(ctx)
 	return
 }

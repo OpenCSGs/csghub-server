@@ -5,20 +5,14 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"opencsg.com/starhub-server/api/handler"
-	acHandler "opencsg.com/starhub-server/api/handler/accesstoken"
 	datasetHandler "opencsg.com/starhub-server/api/handler/dataset"
 	memberHandler "opencsg.com/starhub-server/api/handler/member"
 	modelHandler "opencsg.com/starhub-server/api/handler/model"
-	orgHandler "opencsg.com/starhub-server/api/handler/organization"
-	sshKeyHandler "opencsg.com/starhub-server/api/handler/sshkey"
 	userHandler "opencsg.com/starhub-server/api/handler/user"
 	"opencsg.com/starhub-server/common/config"
-	"opencsg.com/starhub-server/component/accesstoken"
 	"opencsg.com/starhub-server/component/dataset"
 	"opencsg.com/starhub-server/component/member"
 	"opencsg.com/starhub-server/component/model"
-	"opencsg.com/starhub-server/component/organization"
-	"opencsg.com/starhub-server/component/sshkey"
 	"opencsg.com/starhub-server/component/user"
 )
 
@@ -78,20 +72,20 @@ func NewRouter(config *config.Config) (*gin.Engine, error) {
 	apiGroup.POST("/users", userHandler.HandleCreate(userCtrl))
 	apiGroup.PUT("/users/", userHandler.HandleUpdate(userCtrl))
 
-	acCtrl, err := accesstoken.New(config)
+	acHandler, err := handler.NewAccessTokenHandler(config)
 	if err != nil {
 		return nil, fmt.Errorf("error creating user controller:%w", err)
 	}
-	apiGroup.POST("/user/:username/tokens", acHandler.HandleCreate(acCtrl))
-	apiGroup.DELETE("/user/:username/tokens/:token_name", acHandler.HandleDelete(acCtrl))
+	apiGroup.POST("/user/:username/tokens", acHandler.Create)
+	apiGroup.DELETE("/user/:username/tokens/:token_name", acHandler.Delete)
 
-	sshKeyCtrl, err := sshkey.New(config)
+	sshKeyHandler, err := handler.NewSSHKeyHandler(config)
 	if err != nil {
 		return nil, fmt.Errorf("error creating user controller:%w", err)
 	}
-	apiGroup.GET("/user/:username/ssh_keys", sshKeyHandler.HandleIndex(sshKeyCtrl))
-	apiGroup.POST("/user/:username/ssh_keys", sshKeyHandler.HandleCreate(sshKeyCtrl))
-	apiGroup.DELETE("/user/:username/ssh_key/:id", sshKeyHandler.HandleDelete(sshKeyCtrl))
+	apiGroup.GET("/user/:username/ssh_keys", sshKeyHandler.Index)
+	apiGroup.POST("/user/:username/ssh_keys", sshKeyHandler.Create)
+	apiGroup.DELETE("/user/:username/ssh_key/:id", sshKeyHandler.Delete)
 
 	// User models
 	apiGroup.GET("/user/:username/models", userHandler.HandleModels(userCtrl))
@@ -100,14 +94,14 @@ func NewRouter(config *config.Config) (*gin.Engine, error) {
 	apiGroup.GET("/user/:username/datasets", userHandler.HandleDatasets(userCtrl))
 
 	//Organization
-	orgCtrl, err := organization.New(config)
+	orgHandler, err := handler.NewOrganizationHandler(config)
 	if err != nil {
 		return nil, fmt.Errorf("error creating user controller:%w", err)
 	}
-	apiGroup.GET("/organizations", orgHandler.HandleIndex(orgCtrl))
-	apiGroup.POST("/organizations", orgHandler.HandleCreate(orgCtrl))
-	apiGroup.PUT("/organizations/:name", orgHandler.HandleUpdate(orgCtrl))
-	apiGroup.DELETE("/organizations/:name", orgHandler.HandleDelete(orgCtrl))
+	apiGroup.GET("/organizations", orgHandler.Index)
+	apiGroup.POST("/organizations", orgHandler.Create)
+	apiGroup.PUT("/organizations/:name", orgHandler.Update)
+	apiGroup.DELETE("/organizations/:name", orgHandler.Delete)
 
 	//Member
 	memberCtrl, err := member.New(config)
