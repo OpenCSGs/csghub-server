@@ -6,6 +6,9 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"path/filepath"
+	"slices"
+	"strings"
 
 	"opencsg.com/starhub-server/builder/gitserver"
 	"opencsg.com/starhub-server/builder/store/database"
@@ -78,9 +81,10 @@ const (
 
 func NewDatasetComponent(config *config.Config) (*DatasetComponent, error) {
 	c := &DatasetComponent{}
+	c.ds = database.NewDatasetStore()
 	c.ns = database.NewNamespaceStore()
 	c.us = database.NewUserStore()
-	c.ds = database.NewDatasetStore()
+	c.ts = database.NewTagStore()
 	var err error
 	c.gs, err = gitserver.NewGitServer(config)
 	if err != nil {
@@ -92,51 +96,126 @@ func NewDatasetComponent(config *config.Config) (*DatasetComponent, error) {
 }
 
 type DatasetComponent struct {
-	// ds *database.DatasetStore
+	ds *database.DatasetStore
 	ns *database.NamespaceStore
 	us *database.UserStore
+	ts *database.TagStore
 	gs gitserver.GitServer
-	ds *database.DatasetStore
 }
 
-func (c *DatasetComponent) CreateFile(ctx context.Context, req *types.CreateFileReq) error {
+func (c *DatasetComponent) CreateFile(ctx context.Context, req *types.CreateFileReq) (*types.CreateFileResp, error) {
+	slog.Debug("creating file get request", slog.String("namespace", req.NameSpace), slog.String("filepath", req.FilePath))
 	var err error
 	_, err = c.ns.FindByPath(ctx, req.NameSpace)
 	if err != nil {
-		return errors.New("namespace does not exist")
+		return nil, errors.New("namespace does not exist")
 	}
 
 	_, err = c.us.FindByUsername(ctx, req.Username)
 	if err != nil {
-		return errors.New("user does not exist")
+		return nil, errors.New("user does not exist")
 	}
 	//TODO:check sensitive content of file
 
-	categoryTagMap := make(map[string][]string)
-	if req.Name == "README.md" {
-		categoryTagMap, err = tagparser.MetaTags(req.Content)
+	fileCategoryTagMap := make(map[string][]string)
+	fileName := filepath.Base(req.FilePath)
+	if fileName == "README.md" {
+		slog.Debug("file is readme", slog.String("content", req.Content))
+		fileCategoryTagMap, err = tagparser.MetaTags(req.Content)
 		if err != nil {
-			return fmt.Errorf("failed to parse metadata, error: %w", err)
+			return nil, fmt.Errorf("failed to parse metadata, error: %w", err)
 		}
 	}
-	libTag := tagparser.LibraryTag(req.Name)
+	libTag := tagparser.LibraryTag(fileName)
 	if libTag != "" {
-		categoryTagMap["Library"] = append(categoryTagMap["Library"], libTag)
+		fileCategoryTagMap["Library"] = append(fileCategoryTagMap["Library"], libTag)
 	}
-	slog.Debug("File tags parsed", slog.Any("tags", categoryTagMap))
-	// for category, tagNames := range categoryTagMap {
-	// 	for _, tagName := range tagNames {
-	// 		tags = append(tags, database.Tag{Name: tagName, Category: category})
-	// 	}
-	// }
-	//TODO:compare with system predefined categories and tags
+	slog.Debug("File tags parsed", slog.Any("tags", fileCategoryTagMap))
+
+	//compare with system predefined categories and tags
+	var predefinedTags []*database.Tag
+	//TODO:load from cache
+	predefinedTags, err = c.ts.AllDatasetTags(ctx)
+	if err != nil {
+		slog.Error("Failed to get predefined tags", slog.Any("error", err))
+		return nil, fmt.Errorf("failed to get predefined tags, error: %w", err)
+	}
+	var tags []*database.Tag
+	tags, err = c.prepareTags(ctx, predefinedTags, fileCategoryTagMap)
+	if err != nil {
+		slog.Error("Failed to process tags", slog.Any("error", err))
+		return nil, fmt.Errorf("failed to process tags, error: %w", err)
+	}
+	var repoTags []*database.RepositoryTag
+	repoTags, err = c.ds.SetTags(ctx, req.NameSpace, req.Name, tags)
+	if err != nil {
+		slog.Error("failed to set dataset's tags", slog.String("namespace", req.NameSpace),
+			slog.String("name", req.Name), slog.Any("error", err))
+		return nil, fmt.Errorf("failed to set dataset's tags, cause: %w", err)
+	}
 
 	err = c.gs.CreateDatasetFile(req)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	return err
+	respTags := make([]types.CreateFileResp_Tag, 0, len(repoTags))
+	for _, tag := range repoTags {
+		respTags = append(respTags, types.CreateFileResp_Tag{Name: tag.Tag.Name, Category: tag.Tag.Category})
+	}
+	resp := &types.CreateFileResp{
+		Tags: respTags,
+	}
+
+	return resp, err
+}
+
+func (c *DatasetComponent) prepareTags(ctx context.Context, predefinedTags []*database.Tag, categoryTagMap map[string][]string) ([]*database.Tag, error) {
+	var tagsNeed []*database.Tag
+	if len(categoryTagMap) == 0 {
+		slog.Debug("No category tags to compare with predefined tags")
+		return tagsNeed, nil
+	}
+
+	var tagsToCreate []*database.Tag
+	for category, tagNames := range categoryTagMap {
+		for _, tagName := range tagNames {
+			//is predefined tag, or "Other" tag created before
+			if !slices.ContainsFunc(predefinedTags, func(t *database.Tag) bool {
+				match := strings.EqualFold(t.Name, tagName) && (strings.EqualFold(t.Category, category) ||
+					strings.EqualFold(t.Category, "Other"))
+
+				if match {
+					tagsNeed = append(tagsNeed, t)
+				}
+				return match
+			}) {
+				//all unkown tags belongs to category "Other" and will be created later
+				category = "Other"
+				tagsToCreate = append(tagsToCreate, &database.Tag{
+					Category: category,
+					Name:     tagName,
+					Scope:    database.DatasetTagScope,
+				})
+			}
+		}
+	}
+	//remove duplicated tag info, make sure the same tag will be created once
+	tagsToCreate = slices.CompactFunc(tagsToCreate, func(t1, t2 *database.Tag) bool {
+		return t1.Name == t2.Name && t1.Category == t2.Category
+	})
+
+	if len(tagsToCreate) == 0 {
+		return tagsNeed, nil
+	}
+
+	err := c.ts.SaveTags(ctx, tagsToCreate)
+	if err != nil {
+		return nil, err
+	}
+
+	return append(tagsNeed, tagsToCreate...), nil
+
 }
 
 func (c *DatasetComponent) Create(ctx context.Context, req *types.CreateDatasetReq) (dataset *database.Dataset, err error) {

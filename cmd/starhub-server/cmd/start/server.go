@@ -1,6 +1,9 @@
 package start
 
 import (
+	"log/slog"
+	"os"
+
 	"github.com/spf13/cobra"
 	"opencsg.com/starhub-server/api/httpbase"
 	"opencsg.com/starhub-server/api/router"
@@ -32,6 +35,9 @@ var serverCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
+		//TODO:init logger by config
+		logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{AddSource: true, Level: slog.LevelDebug}))
+		slog.SetDefault(logger)
 
 		dbConfig := database.DBConfig{
 			Dialect: database.DatabaseDialect(cfg.Database.Driver),
