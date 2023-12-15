@@ -41,6 +41,17 @@ func (s *UserStore) FindByID(ctx context.Context, id int) (user User, err error)
 	return
 }
 
+func (s *UserStore) Update(ctx context.Context, user *User) (err error) {
+	user.UpdatedAt = time.Now()
+	err = assertAffectedOneRow(s.db.Operator.Core.NewUpdate().
+		Model(user).
+		WherePK().
+		Exec(ctx),
+	)
+
+	return
+}
+
 func (s *UserStore) UpdateByUsername(ctx context.Context, u *User) (err error) {
 	u.UpdatedAt = time.Now()
 	err = assertAffectedOneRow(s.db.Operator.Core.NewUpdate().

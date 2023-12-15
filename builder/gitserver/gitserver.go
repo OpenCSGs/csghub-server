@@ -11,7 +11,7 @@ import (
 
 type GitServer interface {
 	CreateUser(*types.CreateUserRequest) (*database.User, error)
-	UpdateUser(*types.UpdateUserRequest) (*database.User, error)
+	UpdateUser(*types.UpdateUserRequest, *database.User) (*database.User, error)
 	CreateUserToken(*types.CreateUserTokenRequest) (*database.AccessToken, error)
 	DeleteUserToken(*types.DeleteUserTokenRequest) error
 

@@ -34,6 +34,7 @@ func (h *UserHandler) Create(ctx *gin.Context) {
 		return
 	}
 
+	slog.Debug("Creating user", slog.Any("req", req))
 	user, err := h.c.Create(ctx, req)
 	if err != nil {
 		slog.Error("Failed to create user", slog.Any("error", err))
@@ -60,7 +61,7 @@ func (h *UserHandler) Update(ctx *gin.Context) {
 		return
 	}
 
-	slog.Info("Create user succeed", slog.String("user", user.Username))
+	slog.Info("Update user succeed", slog.String("user", user.Username))
 	httpbase.OK(ctx, user)
 }
 

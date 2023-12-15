@@ -66,25 +66,28 @@ func (c *UserComponent) Create(ctx context.Context, req *types.CreateUserRequest
 }
 
 func (c *UserComponent) Update(ctx context.Context, req *types.UpdateUserRequest) (*database.User, error) {
-	userExists, err := c.us.IsExist(ctx, req.Username)
+	user, err := c.us.FindByUsername(ctx, req.Username)
 	if err != nil {
 		newError := fmt.Errorf("failed to check for the presence of the user,error:%w", err)
 		slog.Error(newError.Error())
 		return nil, newError
 	}
 
-	if !userExists {
-		return nil, errors.New("user does not exists")
-	}
-
-	user, err := c.gs.UpdateUser(req)
+	respUser, err := c.gs.UpdateUser(req, &user)
 	if err != nil {
-		newError := fmt.Errorf("failed to update user,error:%w", err)
+		newError := fmt.Errorf("failed to update git user,error:%w", err)
 		slog.Error(newError.Error())
 		return nil, newError
 	}
 
-	return user, nil
+	err = c.us.Update(ctx, respUser)
+	if err != nil {
+		newError := fmt.Errorf("failed to update database user,error:%w", err)
+		slog.Error(newError.Error())
+		return nil, newError
+	}
+
+	return respUser, nil
 }
 
 func (c *UserComponent) Datasets(ctx context.Context, req *types.UserDatasetsReq) ([]database.Dataset, int, error) {

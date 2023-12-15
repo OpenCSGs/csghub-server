@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+	"opencsg.com/starhub-server/api/httpbase"
 	"opencsg.com/starhub-server/common/config"
 	"opencsg.com/starhub-server/common/types"
 	"opencsg.com/starhub-server/common/utils/common"
