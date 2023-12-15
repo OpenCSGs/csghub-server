@@ -3,6 +3,7 @@ package database
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"time"
 
 	"github.com/uptrace/bun"
@@ -207,4 +208,19 @@ func (s *DatasetStore) SetTags(ctx context.Context, namespace, name string, tags
 	})
 
 	return repoTags, err
+}
+
+func (s *DatasetStore) Tags(ctx context.Context, namespace, name string) (tags []Tag, err error) {
+	query := s.db.Operator.Core.NewSelect().
+		ColumnExpr("tags.*").
+		Model(&Dataset{}).
+		Join("JOIN repositories ON dataset.repository_id = repositories.id").
+		Join("JOIN repository_tags ON repositories.id = repository_tags.repository_id").
+		Join("JOIN tags ON repository_tags.tag_id = tags.id").
+		Where("repositories.repository_type = ?", DatasetRepo).
+		Where("dataset.path = ?", fmt.Sprintf("%v/%v", namespace, name))
+
+	slog.Debug(query.String())
+	err = query.Scan(ctx, &tags)
+	return
 }

@@ -5,8 +5,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"opencsg.com/starhub-server/common/config"
-	"opencsg.com/starhub-server/component/dataset"
-	"opencsg.com/starhub-server/component/model"
+	"opencsg.com/starhub-server/component"
 )
 
 type GitHandler interface {
@@ -15,8 +14,8 @@ type GitHandler interface {
 
 func NewGitHandler(
 	config *config.Config,
-	modelCtrl *model.Controller,
-	datasetCtrl *dataset.Controller,
+	modelCtrl *component.ModelComponent,
+	datasetCtrl *component.DatasetComponent,
 ) GitHandler {
 	_ = datasetCtrl
 	_ = modelCtrl

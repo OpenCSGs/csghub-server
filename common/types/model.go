@@ -47,6 +47,8 @@ type CreateModelReq struct {
 }
 
 type UpdateModelReq struct {
+	Namespace     string `json:"namespace"`
+	OriginName    string `json:"origin_name"`
 	Username      string `json:"username"`
 	Name          string `json:"name"`
 	Description   string `json:"description"`

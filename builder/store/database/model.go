@@ -3,6 +3,7 @@ package database
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"time"
 
 	"github.com/uptrace/bun"
@@ -29,7 +30,7 @@ type Model struct {
 	GitPath       string      `bun:",notnull" json:"git_path"`
 	RepositoryID  int64       `bun:",notnull" json:"repository_id"`
 	Repository    *Repository `bun:"rel:belongs-to,join:repository_id=id" json:"repository"`
-	LastUpdatedAt time.Time   `bun:",notnull" json:"last"`
+	LastUpdatedAt time.Time   `bun:",notnull" json:"last_updated_at"`
 	Private       bool        `bun:",notnull" json:"private"`
 	UserID        int64       `bun:",notnull" json:"user_id"`
 	User          *User       `bun:"rel:belongs-to,join:user_id=id" json:"user"`
@@ -161,12 +162,12 @@ func (s *ModelStore) FindyByPath(ctx context.Context, namespace string, repoPath
 	return resModel, err
 }
 
-func (s *ModelStore) Delete(ctx context.Context, username, name string) (err error) {
+func (s *ModelStore) Delete(ctx context.Context, namespace, name string) (err error) {
 	err = s.db.Operator.Core.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
 		if err = assertAffectedOneRow(
 			tx.NewDelete().
 				Model(&Repository{}).
-				Where("path = ?", fmt.Sprintf("%v/%v", username, name)).
+				Where("path = ?", fmt.Sprintf("%v/%v", namespace, name)).
 				Where("repository_type = ?", ModelRepo).
 				Exec(ctx)); err != nil {
 			return err
@@ -174,11 +175,26 @@ func (s *ModelStore) Delete(ctx context.Context, username, name string) (err err
 		if err = assertAffectedOneRow(
 			tx.NewDelete().
 				Model(&Model{}).
-				Where("path = ?", fmt.Sprintf("%v/%v", username, name)).
+				Where("path = ?", fmt.Sprintf("%v/%v", namespace, name)).
 				Exec(ctx)); err != nil {
 			return err
 		}
 		return nil
 	})
+	return
+}
+
+func (s *ModelStore) Tags(ctx context.Context, namespace, name string) (tags []Tag, err error) {
+	query := s.db.Operator.Core.NewSelect().
+		ColumnExpr("tags.*").
+		Model(&Model{}).
+		Join("JOIN repositories ON model.repository_id = repositories.id").
+		Join("JOIN repository_tags ON repositories.id = repository_tags.repository_id").
+		Join("JOIN tags ON repository_tags.tag_id = tags.id").
+		Where("repositories.repository_type = ?", ModelRepo).
+		Where("model.path = ?", fmt.Sprintf("%v/%v", namespace, name))
+
+	slog.Info(query.String())
+	err = query.Scan(ctx, &tags)
 	return
 }

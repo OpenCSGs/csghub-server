@@ -5,79 +5,28 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+	"opencsg.com/starhub-server/api/httpbase"
 	"opencsg.com/starhub-server/common/config"
 	"opencsg.com/starhub-server/common/types"
 	"opencsg.com/starhub-server/common/utils/common"
 	"opencsg.com/starhub-server/component"
 )
 
-func NewDatasetHandler(config *config.Config) (*DatasetHandler, error) {
-	tc, err := component.NewDatasetComponent(config)
+func NewModelHandler(config *config.Config) (*ModelHandler, error) {
+	uc, err := component.NewModelComponent(config)
 	if err != nil {
 		return nil, err
 	}
-	return &DatasetHandler{
-		c: tc,
+	return &ModelHandler{
+		c: uc,
 	}, nil
 }
 
-type DatasetHandler struct {
-	c *component.DatasetComponent
+type ModelHandler struct {
+	c *component.ModelComponent
 }
 
-func (h *DatasetHandler) CreateFile(ctx *gin.Context) {
-	var (
-		req  *types.CreateFileReq
-		resp *types.CreateFileResp
-	)
-	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
-	if err != nil {
-		slog.Error("Failed to get namespace from context", "error", err)
-		ctx.JSON(http.StatusBadRequest, gin.H{"message": err.Error()})
-		return
-	}
-	if err = ctx.ShouldBindJSON(&req); err != nil {
-		slog.Error("Bad request format", "error", err)
-		ctx.JSON(http.StatusBadRequest, gin.H{"message": err.Error()})
-		return
-	}
-	filePath := ctx.Param("file_path")
-	req.NameSpace = namespace
-	req.Name = name
-	req.FilePath = filePath
-
-	resp, err = h.c.CreateFile(ctx, req)
-	if err != nil {
-		slog.Error("Failed to create file", slog.Any("error", err), slog.String("file_path", filePath))
-		ctx.JSON(http.StatusInternalServerError, gin.H{"message": err.Error()})
-		return
-	}
-	slog.Info("Create file succeed", slog.String("file_path", filePath))
-	httpbase.OK(ctx, resp)
-}
-
-func (h *DatasetHandler) Create(ctx *gin.Context) {
-	var req *types.CreateDatasetReq
-	if err := ctx.ShouldBindJSON(&req); err != nil {
-		slog.Error("Bad request format", "error", err)
-		ctx.JSON(http.StatusBadRequest, gin.H{"message": err.Error()})
-		return
-	}
-
-	dataset, err := h.c.Create(ctx, req)
-	if err != nil {
-		slog.Error("Failed to create dataset", slog.Any("error", err))
-		ctx.JSON(http.StatusInternalServerError, gin.H{"message": err.Error()})
-		return
-	}
-	slog.Info("Create dataset succeed", slog.String("dataset", dataset.Name))
-	respData := gin.H{
-		"data": dataset,
-	}
-	ctx.JSON(http.StatusOK, respData)
-}
-
-func (h *DatasetHandler) Index(ctx *gin.Context) {
+func (h *ModelHandler) Index(ctx *gin.Context) {
 	per, page, err := common.GetPerAndPageFromContext(ctx)
 	if err != nil {
 		slog.Error("Bad request format", "error", err)
@@ -85,22 +34,40 @@ func (h *DatasetHandler) Index(ctx *gin.Context) {
 		return
 	}
 
-	datasets, total, err := h.c.Index(ctx, per, page)
+	models, total, err := h.c.Index(ctx, per, page)
 	if err != nil {
 		slog.Error("Failed to create user", slog.Any("error", err))
 		ctx.JSON(http.StatusInternalServerError, gin.H{"message": err.Error()})
 		return
 	}
-	slog.Info("Create public datasets succeed", slog.Int("count", total))
+	slog.Info("Create public models succeed", slog.Int("count", total))
 	respData := gin.H{
-		"data":  datasets,
+		"data":  models,
 		"total": total,
 	}
 	ctx.JSON(http.StatusOK, respData)
 }
 
-func (h *DatasetHandler) Update(ctx *gin.Context) {
-	var req *types.UpdateDatasetReq
+func (h *ModelHandler) Create(ctx *gin.Context) {
+	var req *types.CreateModelReq
+	if err := ctx.ShouldBindJSON(&req); err != nil {
+		slog.Error("Bad request format", "error", err)
+		ctx.JSON(http.StatusBadRequest, gin.H{"message": err.Error()})
+		return
+	}
+
+	model, err := h.c.Create(ctx, req)
+	if err != nil {
+		slog.Error("Failed to create model", slog.Any("error", err))
+		ctx.JSON(http.StatusInternalServerError, gin.H{"message": err.Error()})
+		return
+	}
+	slog.Info("Create model succeed", slog.String("model", model.Name))
+	httpbase.OK(ctx, model)
+}
+
+func (h *ModelHandler) Update(ctx *gin.Context) {
+	var req *types.UpdateModelReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {
 		slog.Error("Bad request format", "error", err)
 		ctx.JSON(http.StatusBadRequest, gin.H{"message": err.Error()})
@@ -116,18 +83,18 @@ func (h *DatasetHandler) Update(ctx *gin.Context) {
 	req.Namespace = namespace
 	req.OriginName = name
 
-	dataset, err := h.c.Update(ctx, req)
+	model, err := h.c.Update(ctx, req)
 	if err != nil {
-		slog.Error("Failed to update dataset", slog.Any("error", err))
+		slog.Error("Failed to update model", slog.Any("error", err))
 		ctx.JSON(http.StatusInternalServerError, gin.H{"message": err.Error()})
 		return
 	}
 
-	slog.Info("Update dataset succeed", slog.String("dataset", dataset.Name))
-	httpbase.OK(ctx, dataset)
+	slog.Info("Update model succeed", slog.String("model", model.Name))
+	httpbase.OK(ctx, model)
 }
 
-func (h *DatasetHandler) Delete(ctx *gin.Context) {
+func (h *ModelHandler) Delete(ctx *gin.Context) {
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
 	if err != nil {
 		slog.Error("Bad request format", "error", err)
@@ -136,15 +103,15 @@ func (h *DatasetHandler) Delete(ctx *gin.Context) {
 	}
 	err = h.c.Delete(ctx, namespace, name)
 	if err != nil {
-		slog.Error("Failed to delete dataset", slog.Any("error", err))
+		slog.Error("Failed to delete model", slog.Any("error", err))
 		ctx.JSON(http.StatusInternalServerError, gin.H{"message": err.Error()})
 		return
 	}
-	slog.Info("Delete dataset succeed", slog.String("dataset", name))
+	slog.Info("Delete model succeed", slog.String("model", name))
 	httpbase.OK(ctx, nil)
 }
 
-func (h *DatasetHandler) Detail(ctx *gin.Context) {
+func (h *ModelHandler) Detail(ctx *gin.Context) {
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
 	if err != nil {
 		slog.Error("Bad request format", "error", err)
@@ -153,15 +120,44 @@ func (h *DatasetHandler) Detail(ctx *gin.Context) {
 	}
 	detail, err := h.c.Detail(ctx, namespace, name)
 	if err != nil {
-		slog.Error("Failed to get dataset detail", slog.Any("error", err))
+		slog.Error("Failed to get model detail", slog.Any("error", err))
 		ctx.JSON(http.StatusInternalServerError, gin.H{"message": err.Error()})
 		return
 	}
-	slog.Info("Get dataset detail succeed", slog.String("dataset", name))
+
+	slog.Info("Get model detail succeed", slog.String("model", name))
 	httpbase.OK(ctx, detail)
 }
 
-func (h *DatasetHandler) UpdateFile(ctx *gin.Context) {
+func (h *ModelHandler) CreateFile(ctx *gin.Context) {
+	var req *types.CreateFileReq
+	if err := ctx.ShouldBindJSON(&req); err != nil {
+		slog.Error("Bad request format", "error", err)
+		ctx.JSON(http.StatusBadRequest, gin.H{"message": err.Error()})
+		return
+	}
+
+	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
+	if err != nil {
+		slog.Error("Bad request format", "error", err)
+		ctx.JSON(http.StatusBadRequest, gin.H{"message": err.Error()})
+		return
+	}
+	req.NameSpace = namespace
+	req.Name = name
+	req.FilePath = ctx.Param("file_path")
+
+	err = h.c.CreateFile(ctx, req)
+	if err != nil {
+		slog.Error("Failed to create model file", slog.Any("error", err))
+		ctx.JSON(http.StatusInternalServerError, gin.H{"message": err.Error()})
+		return
+	}
+	slog.Info("Create model file succeed", slog.String("model", name))
+	httpbase.OK(ctx, nil)
+}
+
+func (h *ModelHandler) UpdateFile(ctx *gin.Context) {
 	var req *types.UpdateFileReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {
 		slog.Error("Bad request format", "error", err)
@@ -182,15 +178,15 @@ func (h *DatasetHandler) UpdateFile(ctx *gin.Context) {
 
 	err = h.c.UpdateFile(ctx, req)
 	if err != nil {
-		slog.Error("Failed to update dataset file", slog.Any("error", err))
+		slog.Error("Failed to update model file", slog.Any("error", err))
 		ctx.JSON(http.StatusInternalServerError, gin.H{"message": err.Error()})
 		return
 	}
-	slog.Info("Update dataset file succeed", slog.String("dataset", name))
+	slog.Info("Update model file succeed", slog.String("model", name))
 	httpbase.OK(ctx, nil)
 }
 
-func (h *DatasetHandler) Commits(ctx *gin.Context) {
+func (h *ModelHandler) Commits(ctx *gin.Context) {
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
 	if err != nil {
 		slog.Error("Bad request format", "error", err)
@@ -213,16 +209,16 @@ func (h *DatasetHandler) Commits(ctx *gin.Context) {
 	}
 	commits, err := h.c.Commits(ctx, req)
 	if err != nil {
-		slog.Error("Failed to get dataset commits", slog.Any("error", err))
+		slog.Error("Failed to get model commits", slog.Any("error", err))
 		ctx.JSON(http.StatusInternalServerError, gin.H{"message": err.Error()})
 		return
 	}
 
-	slog.Info("Get dataset commits succeed", slog.String("dataset", name), slog.String("ref", req.Ref))
+	slog.Info("Get model commits succeed", slog.String("model", name), slog.String("ref", req.Ref))
 	httpbase.OK(ctx, commits)
 }
 
-func (h *DatasetHandler) LastCommit(ctx *gin.Context) {
+func (h *ModelHandler) LastCommit(ctx *gin.Context) {
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
 	if err != nil {
 		slog.Error("Bad request format", "error", err)
@@ -237,16 +233,16 @@ func (h *DatasetHandler) LastCommit(ctx *gin.Context) {
 	}
 	commit, err := h.c.LastCommit(ctx, req)
 	if err != nil {
-		slog.Error("Failed to get dataset last commit", slog.Any("error", err))
+		slog.Error("Failed to get model last commit", slog.Any("error", err))
 		ctx.JSON(http.StatusInternalServerError, gin.H{"message": err.Error()})
 		return
 	}
 
-	slog.Info("Get dataset last commit succeed", slog.String("dataset", name), slog.String("ref", req.Ref))
+	slog.Info("Get model last commit succeed", slog.String("model", name), slog.String("ref", req.Ref))
 	httpbase.OK(ctx, commit)
 }
 
-func (h *DatasetHandler) FileRaw(ctx *gin.Context) {
+func (h *ModelHandler) FileRaw(ctx *gin.Context) {
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
 	if err != nil {
 		slog.Error("Bad request format", "error", err)
@@ -261,16 +257,16 @@ func (h *DatasetHandler) FileRaw(ctx *gin.Context) {
 	}
 	raw, err := h.c.FileRaw(ctx, req)
 	if err != nil {
-		slog.Error("Failed to get dataset file raw", slog.Any("error", err))
+		slog.Error("Failed to get model file raw", slog.Any("error", err))
 		ctx.JSON(http.StatusInternalServerError, gin.H{"message": err.Error()})
 		return
 	}
 
-	slog.Info("Get dataset file raw succeed", slog.String("dataset", name), slog.String("path", req.Path), slog.String("ref", req.Ref))
+	slog.Info("Get model file raw succeed", slog.String("model", name), slog.String("path", req.Path), slog.String("ref", req.Ref))
 	httpbase.OK(ctx, raw)
 }
 
-func (h *DatasetHandler) Branches(ctx *gin.Context) {
+func (h *ModelHandler) Branches(ctx *gin.Context) {
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
 	if err != nil {
 		slog.Error("Bad request format", "error", err)
@@ -291,16 +287,16 @@ func (h *DatasetHandler) Branches(ctx *gin.Context) {
 	}
 	branches, err := h.c.Branches(ctx, req)
 	if err != nil {
-		slog.Error("Failed to get dataset branches", slog.Any("error", err))
+		slog.Error("Failed to get model branches", slog.Any("error", err))
 		ctx.JSON(http.StatusInternalServerError, gin.H{"message": err.Error()})
 		return
 	}
 
-	slog.Info("Get dataset branches succeed", slog.String("dataset", name))
+	slog.Info("Get model branches succeed", slog.String("model", name))
 	httpbase.OK(ctx, branches)
 }
 
-func (h *DatasetHandler) Tags(ctx *gin.Context) {
+func (h *ModelHandler) Tags(ctx *gin.Context) {
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
 	if err != nil {
 		slog.Error("Bad request format", "error", err)
@@ -313,16 +309,16 @@ func (h *DatasetHandler) Tags(ctx *gin.Context) {
 	}
 	tags, err := h.c.Tags(ctx, req)
 	if err != nil {
-		slog.Error("Failed to get dataset tags", slog.Any("error", err))
+		slog.Error("Failed to get model tags", slog.Any("error", err))
 		ctx.JSON(http.StatusInternalServerError, gin.H{"message": err.Error()})
 		return
 	}
 
-	slog.Info("Get dataset tags succeed", slog.String("dataset", name))
+	slog.Info("Get model tags succeed", slog.String("model", name))
 	httpbase.OK(ctx, tags)
 }
 
-func (h *DatasetHandler) Tree(ctx *gin.Context) {
+func (h *ModelHandler) Tree(ctx *gin.Context) {
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
 	if err != nil {
 		slog.Error("Bad request format", "error", err)
@@ -337,11 +333,11 @@ func (h *DatasetHandler) Tree(ctx *gin.Context) {
 	}
 	tree, err := h.c.Tree(ctx, req)
 	if err != nil {
-		slog.Error("Failed to get dataset file tree", slog.Any("error", err))
+		slog.Error("Failed to get model file tree", slog.Any("error", err))
 		ctx.JSON(http.StatusInternalServerError, gin.H{"message": err.Error()})
 		return
 	}
 
-	slog.Info("Get dataset file tree succeed", slog.String("dataset", name), slog.String("path", req.Path), slog.String("ref", req.Ref))
+	slog.Info("Get model file tree succeed", slog.String("model", name), slog.String("path", req.Path), slog.String("ref", req.Ref))
 	httpbase.OK(ctx, tree)
 }
