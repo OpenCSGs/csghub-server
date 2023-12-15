@@ -58,11 +58,11 @@ func (c *Client) DeleteOrganization(name string) (err error) {
 	return
 }
 
-func (c *Client) UpdateOrganization(name string, req *types.EditOrgReq, originOrg *database.Organization) (org *database.Organization, err error) {
+func (c *Client) UpdateOrganization(req *types.EditOrgReq, originOrg *database.Organization) (org *database.Organization, err error) {
 	orgNames := []string{
-		common.WithPrefix(name, ModelOrgPrefix),
-		common.WithPrefix(name, DatasetOrgPrefix),
-		common.WithPrefix(name, SpaceOrgPrefix),
+		common.WithPrefix(req.Path, ModelOrgPrefix),
+		common.WithPrefix(req.Path, DatasetOrgPrefix),
+		common.WithPrefix(req.Path, SpaceOrgPrefix),
 	}
 
 	for _, orgName := range orgNames {

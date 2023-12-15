@@ -61,6 +61,7 @@ func (s *OrgStore) Update(ctx context.Context, org *Organization) (err error) {
 	err = assertAffectedOneRow(s.db.Operator.Core.
 		NewUpdate().
 		Model(org).
+		WherePK().
 		Exec(ctx))
 	return
 }
@@ -86,7 +87,7 @@ func (s *OrgStore) Delete(ctx context.Context, path string) (err error) {
 	return
 }
 
-func (s *OrgStore) FindByName(ctx context.Context, path string) (org Organization, err error) {
+func (s *OrgStore) FindByPath(ctx context.Context, path string) (org Organization, err error) {
 	org.Name = path
 	err = s.db.Operator.Core.
 		NewSelect().

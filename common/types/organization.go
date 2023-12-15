@@ -13,4 +13,5 @@ type CreateOrgReq struct {
 type EditOrgReq struct {
 	FullName    string `json:"full_name"`
 	Description string `json:"description"`
+	Path        string `json:"path"`
 }
