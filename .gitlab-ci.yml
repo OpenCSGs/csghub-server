@@ -3,6 +3,7 @@ default:
 
 stages:
   - build
+  - deploy
 
 services:
   - docker:dind
@@ -13,6 +14,16 @@ variables:
 
 build:
   stage: build
+  image: golang:1.21.0
+  script:
+    - go env -w GO111MODULE=on
+    - go env -w GOPROXY=https://goproxy.cn,direct
+    - go build -o starhub ./cmd/starhub-server
+  except:
+   - main
+
+build-docker-image:
+  stage: deploy
   script:
     - docker build -t $CI_REGISTRY_IMAGE:$IMAGE_TAG .
     - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
