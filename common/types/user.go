@@ -24,4 +24,16 @@ type CreateUserTokenRequest struct {
 	Name     string `json:"name"`
 }
 
+type UserDatasetsReq struct {
+	Owner       string `json:"owner"`
+	CurrentUser string `json:"current_user"`
+	PageOpts
+}
+
+type UserModelsReq = UserDatasetsReq
 type DeleteUserTokenRequest = CreateUserTokenRequest
+
+type PageOpts struct {
+	Page     int `json:"page"`
+	PageSize int `json:"page_size"`
+}

@@ -65,7 +65,7 @@ func (s *ModelStore) Public(ctx context.Context, per, page int) (models []Model,
 	return
 }
 
-func (s *ModelStore) ByUsername(ctx context.Context, username string, per, page int, onlyPublic bool) (models []Model, err error) {
+func (s *ModelStore) ByUsername(ctx context.Context, username string, per, page int, onlyPublic bool) (models []Model, total int, err error) {
 	query := s.db.Operator.Core.
 		NewSelect().
 		Model(&models).
@@ -80,6 +80,11 @@ func (s *ModelStore) ByUsername(ctx context.Context, username string, per, page 
 		Offset((page - 1) * per)
 
 	err = query.Scan(ctx, &models)
+
+	if err != nil {
+		return
+	}
+	total, err = query.Count(ctx)
 	if err != nil {
 		return
 	}
