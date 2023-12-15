@@ -51,7 +51,7 @@ func (c *Client) CreateUser(u *types.CreateUserRequest) (user *database.User, er
 	return
 }
 
-func (c *Client) UpdateUser(u *types.UpdateUserRequest) (*database.User, error) {
+func (c *Client) UpdateUser(u *types.UpdateUserRequest, user *database.User) (*database.User, error) {
 	_, err := c.giteaClient.AdminEditUser(
 		u.Username,
 		gitea.EditUserOption{
@@ -60,11 +60,9 @@ func (c *Client) UpdateUser(u *types.UpdateUserRequest) (*database.User, error) 
 			Email:     gitea.OptionalString(u.Email),
 		},
 	)
-	user := &database.User{
-		Username: u.Username,
-		Name:     u.Name,
-		Email:    u.Email,
-	}
+
+	user.Name = u.Name
+	user.Email = u.Email
 	return user, err
 }
 
