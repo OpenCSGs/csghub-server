@@ -6,12 +6,15 @@ import (
 	"github.com/gin-gonic/gin"
 	"opencsg.com/starhub-server/api/handler"
 	memberHandler "opencsg.com/starhub-server/api/handler/member"
+	"opencsg.com/starhub-server/api/middleware"
 	"opencsg.com/starhub-server/common/config"
 	"opencsg.com/starhub-server/component/member"
 )
 
 func NewRouter(config *config.Config) (*gin.Engine, error) {
 	r := gin.New()
+	r.Use(middleware.Authenticator(config))
+	r.Use(gin.Recovery())
 	apiGroup := r.Group("/api/v1")
 	//TODO:use middleware to handle common response
 	// Models routes

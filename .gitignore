@@ -6,3 +6,4 @@ bin
 /gitea
 /pgdata
 minio_data
+.envrc
