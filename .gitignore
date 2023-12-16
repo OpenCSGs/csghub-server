@@ -2,6 +2,7 @@
 /cmd/starhub-server/starhub-server
 bin
 .vscode
+.DS_Store
 /starhub
 /gitea
 /pgdata

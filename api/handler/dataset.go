@@ -34,12 +34,12 @@ func (h *DatasetHandler) CreateFile(ctx *gin.Context) {
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
 	if err != nil {
 		slog.Error("Failed to get namespace from context", "error", err)
-		ctx.JSON(http.StatusBadRequest, gin.H{"message": err.Error()})
+		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
 	if err = ctx.ShouldBindJSON(&req); err != nil {
 		slog.Error("Bad request format", "error", err)
-		ctx.JSON(http.StatusBadRequest, gin.H{"message": err.Error()})
+		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
 	filePath := ctx.Param("file_path")
@@ -54,6 +54,39 @@ func (h *DatasetHandler) CreateFile(ctx *gin.Context) {
 		return
 	}
 	slog.Info("Create file succeed", slog.String("file_path", filePath))
+	httpbase.OK(ctx, resp)
+}
+
+func (h *DatasetHandler) UpdateFile(ctx *gin.Context) {
+	var (
+		req  *types.UpdateFileReq
+		resp *types.UpdateFileResp
+	)
+	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
+	if err != nil {
+		slog.Error("Failed to get namespace from context", "error", err)
+		httpbase.BadRequest(ctx, err.Error())
+		return
+	}
+	if err = ctx.ShouldBindJSON(&req); err != nil {
+		slog.Error("Bad request format", "error", err)
+		httpbase.BadRequest(ctx, err.Error())
+		return
+	}
+	filePath := ctx.Param("file_path")
+	req.NameSpace = namespace
+	req.Name = name
+	req.FilePath = filePath
+
+	resp, err = h.c.UpdateFile(ctx, req)
+	if err != nil {
+		slog.Error("Failed to update file", slog.Any("error", err), slog.String("file_path", filePath),
+			slog.String("origin_path", req.OriginPath))
+		ctx.JSON(http.StatusInternalServerError, gin.H{"message": err.Error()})
+		return
+	}
+	slog.Info("Update file succeed", slog.String("file_path", filePath),
+		slog.String("origin_path", req.OriginPath))
 	httpbase.OK(ctx, resp)
 }
 
@@ -160,35 +193,6 @@ func (h *DatasetHandler) Detail(ctx *gin.Context) {
 	}
 	slog.Info("Get dataset detail succeed", slog.String("dataset", name))
 	httpbase.OK(ctx, detail)
-}
-
-func (h *DatasetHandler) UpdateFile(ctx *gin.Context) {
-	var req *types.UpdateFileReq
-	if err := ctx.ShouldBindJSON(&req); err != nil {
-		slog.Error("Bad request format", "error", err)
-		ctx.JSON(http.StatusBadRequest, gin.H{"message": err.Error()})
-		return
-	}
-
-	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
-	if err != nil {
-		slog.Error("Bad request format", "error", err)
-		ctx.JSON(http.StatusBadRequest, gin.H{"message": err.Error()})
-		return
-	}
-
-	req.NameSpace = namespace
-	req.Name = name
-	req.FilePath = ctx.Param("file_path")
-
-	err = h.c.UpdateFile(ctx, req)
-	if err != nil {
-		slog.Error("Failed to update dataset file", slog.Any("error", err))
-		ctx.JSON(http.StatusInternalServerError, gin.H{"message": err.Error()})
-		return
-	}
-	slog.Info("Update dataset file succeed", slog.String("dataset", name))
-	httpbase.OK(ctx, nil)
 }
 
 func (h *DatasetHandler) Commits(ctx *gin.Context) {

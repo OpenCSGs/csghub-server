@@ -2,6 +2,7 @@ package database
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"time"
@@ -180,29 +181,62 @@ func (s *DatasetStore) Delete(ctx context.Context, namespace, name string) (err 
 	return
 }
 
-// SetTags will delete existing tags and create new ones
-func (s *DatasetStore) SetTags(ctx context.Context, namespace, name string, tags []*Tag) (repoTags []*RepositoryTag, err error) {
+func (s *DatasetStore) SetLibraryTag(ctx context.Context, namespace, name string, newTag, oldTag *Tag) (err error) {
 	repo := new(Repository)
 	err = s.db.Operator.Core.NewSelect().Model(repo).
 		Where("path =?", fmt.Sprintf("%v/%v", namespace, name)).
 		Scan(ctx)
 	if err != nil {
-		return repoTags, fmt.Errorf("failed to find repository, path:%v/%v,error:%w", namespace, name, err)
+		return fmt.Errorf("failed to find repository, path:%v/%v,error:%w", namespace, name, err)
 	}
 	err = s.db.Operator.Core.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
-		//remove all tags of the repository and then add new tags
+		//TODO:implement tag counting logic
+		//decrease count of old tag
+		//increase count of new tag
+		if err != nil {
+			return fmt.Errorf("failed to update repository library tags, path:%v/%v,error:%w", namespace, name, err)
+		}
+		return nil
+	})
+
+	return err
+}
+
+// SetMetaTags will delete existing tags and create new ones
+func (s *DatasetStore) SetMetaTags(ctx context.Context, namespace, name string, tags []*Tag, libCategory TagCategory) (repoTags []*RepositoryTag, err error) {
+	repo := new(Repository)
+	err = s.db.Operator.Core.NewSelect().Model(repo).
+		Relation("Tags").
+		Where("path =?", fmt.Sprintf("%v/%v", namespace, name)).
+		Scan(ctx)
+	if err != nil {
+		return repoTags, fmt.Errorf("failed to find repository, path:%v/%v,error:%w", namespace, name, err)
+	}
+
+	var metaTagIds []int64
+	for _, tag := range repo.Tags {
+		if tag.Category != "Library" {
+			metaTagIds = append(metaTagIds, tag.ID)
+		}
+	}
+	//select all repo tags which are not Library tags
+	err = s.db.Operator.Core.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
+		//remove all tags of the repository not belongs to category "Library", and then add new tags
 		tx.NewDelete().
 			Model(&RepositoryTag{}).
-			Where("repository_id =?", repo.ID).
+			Where("repository_id =? and tag_id in (?)", repo.ID, bun.In(metaTagIds)).
 			Exec(ctx)
 		for _, tag := range tags {
+			if tag.Category == "Library" {
+				return errors.New("found Library tag when set meta tag, tag name:" + tag.Name)
+			}
 			repoTag := &RepositoryTag{RepositoryID: repo.ID, TagID: tag.ID, Repository: repo, Tag: tag}
 			repoTags = append(repoTags, repoTag)
 		}
 		//batch insert
 		_, err := tx.NewInsert().Model(&repoTags).Exec(ctx)
 		if err != nil {
-			return fmt.Errorf("failed to batch insert repository tags, path:%v/%v,error:%w", namespace, name, err)
+			return fmt.Errorf("failed to batch insert repository meta tags, path:%v/%v,error:%w", namespace, name, err)
 		}
 		return nil
 	})
