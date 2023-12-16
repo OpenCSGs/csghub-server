@@ -41,7 +41,6 @@ func NewRouter(config *config.Config) (*gin.Engine, error) {
 	if err != nil {
 		return nil, fmt.Errorf("error creating dataset handler:%w", err)
 	}
-	apiGroup.POST("/datasets/:namespace/:name/raw/*file_path", dsHandler.CreateFile)
 	apiGroup.POST("/datasets", dsHandler.Create)
 	apiGroup.GET("/datasets", dsHandler.Index)
 	apiGroup.PUT("/datasets/:namespace/:name", dsHandler.Update)
@@ -52,6 +51,7 @@ func NewRouter(config *config.Config) (*gin.Engine, error) {
 	apiGroup.GET("/datasets/:namespace/:name/last_commit", dsHandler.LastCommit)
 	apiGroup.GET("/datasets/:namespace/:name/tree", dsHandler.Tree)
 	apiGroup.GET("/datasets/:namespace/:name/commits", dsHandler.Commits)
+	apiGroup.POST("/datasets/:namespace/:name/raw/*file_path", dsHandler.CreateFile)
 	apiGroup.GET("/datasets/:namespace/:name/raw/*file_path", dsHandler.FileRaw)
 	apiGroup.PUT("/datasets/:namespace/:name/raw/*file_path", dsHandler.UpdateFile)
 

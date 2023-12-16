@@ -39,7 +39,7 @@ type GitServer interface {
 	GetDatasetTags(string, string, int, int) ([]*types.DatasetTag, error)
 	GetDatasetFileTree(string, string, string, string) ([]*types.File, error)
 	CreateDatasetFile(*types.CreateFileReq) (err error)
-	UpdateDatasetFile(string, string, string, *types.UpdateFileReq) (err error)
+	UpdateDatasetFile(*types.UpdateFileReq) (err error)
 
 	CreateSSHKey(*types.CreateSSHKeyRequest) (*database.SSHKey, error)
 	// ListSSHKeys(string, int, int) ([]*database.SSHKey, error)

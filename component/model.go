@@ -56,12 +56,12 @@ func (c *ModelComponent) Index(ctx context.Context, per, page int) ([]database.M
 func (c *ModelComponent) Create(ctx context.Context, req *types.CreateModelReq) (*database.Model, error) {
 	_, err := c.ns.FindByPath(ctx, req.Namespace)
 	if err != nil {
-		return nil, errors.New("Namespace does not exist")
+		return nil, errors.New("namespace does not exist")
 	}
 
 	user, err := c.us.FindByUsername(ctx, req.Username)
 	if err != nil {
-		return nil, errors.New("User does not exist")
+		return nil, errors.New("user does not exist")
 	}
 
 	model, repo, err := c.gs.CreateModelRepo(req)

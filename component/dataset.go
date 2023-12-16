@@ -108,60 +108,42 @@ func (c *DatasetComponent) CreateFile(ctx context.Context, req *types.CreateFile
 	var err error
 	_, err = c.ns.FindByPath(ctx, req.NameSpace)
 	if err != nil {
-		return nil, errors.New("namespace does not exist")
+		return nil, fmt.Errorf("fail to check namespace, cause: %w", err)
 	}
 
 	_, err = c.us.FindByUsername(ctx, req.Username)
 	if err != nil {
-		return nil, errors.New("user does not exist")
+		return nil, fmt.Errorf("fail to check user, cause: %w", err)
 	}
 	//TODO:check sensitive content of file
-
-	fileCategoryTagMap := make(map[string][]string)
 	fileName := filepath.Base(req.FilePath)
 	if fileName == "README.md" {
 		slog.Debug("file is readme", slog.String("content", req.Content))
-		fileCategoryTagMap, err = tagparser.MetaTags(req.Content)
-		if err != nil {
-			return nil, fmt.Errorf("failed to parse metadata, error: %w", err)
-		}
+		return c.createReadmeFile(ctx, req)
+	} else {
+		return c.createLibraryFile(ctx, req)
 	}
-	libTag := tagparser.LibraryTag(fileName)
-	if libTag != "" {
-		fileCategoryTagMap["Library"] = append(fileCategoryTagMap["Library"], libTag)
-	}
-	slog.Debug("File tags parsed", slog.Any("tags", fileCategoryTagMap))
+}
 
-	//compare with system predefined categories and tags
-	var predefinedTags []*database.Tag
-	//TODO:load from cache
-	predefinedTags, err = c.ts.AllDatasetTags(ctx)
-	if err != nil {
-		slog.Error("Failed to get predefined tags", slog.Any("error", err))
-		return nil, fmt.Errorf("failed to get predefined tags, error: %w", err)
-	}
-	var tags []*database.Tag
-	tags, err = c.prepareTags(ctx, predefinedTags, fileCategoryTagMap)
-	if err != nil {
-		slog.Error("Failed to process tags", slog.Any("error", err))
-		return nil, fmt.Errorf("failed to process tags, error: %w", err)
-	}
+func (c *DatasetComponent) createReadmeFile(ctx context.Context, req *types.CreateFileReq) (*types.CreateFileResp, error) {
+	var err error
 	var repoTags []*database.RepositoryTag
-	repoTags, err = c.ds.SetTags(ctx, req.NameSpace, req.Name, tags)
+	repoTags, err = c.updateMetaTags(ctx, req.NameSpace, req.Name, req.Content)
 	if err != nil {
-		slog.Error("failed to set dataset's tags", slog.String("namespace", req.NameSpace),
-			slog.String("name", req.Name), slog.Any("error", err))
-		return nil, fmt.Errorf("failed to set dataset's tags, cause: %w", err)
+		return nil, fmt.Errorf("failed to update meta tags, cause: %w", err)
 	}
 
 	err = c.gs.CreateDatasetFile(req)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to create dataset file, cause: %w", err)
 	}
 
 	respTags := make([]types.CreateFileResp_Tag, 0, len(repoTags))
 	for _, tag := range repoTags {
-		respTags = append(respTags, types.CreateFileResp_Tag{Name: tag.Tag.Name, Category: tag.Tag.Category})
+		respTags = append(respTags, types.CreateFileResp_Tag{
+			Name: tag.Tag.Name, Category: tag.Tag.Category,
+			Scope: string(tag.Tag.Scope), Group: tag.Tag.Group,
+		})
 	}
 	resp := &types.CreateFileResp{
 		Tags: respTags,
@@ -170,13 +152,202 @@ func (c *DatasetComponent) CreateFile(ctx context.Context, req *types.CreateFile
 	return resp, err
 }
 
-func (c *DatasetComponent) prepareTags(ctx context.Context, predefinedTags []*database.Tag, categoryTagMap map[string][]string) ([]*database.Tag, error) {
+func (c *DatasetComponent) createLibraryFile(ctx context.Context, req *types.CreateFileReq) (*types.CreateFileResp, error) {
+	var err error
+	resp := &types.CreateFileResp{}
+
+	newLibTagName := tagparser.LibraryTag(req.FilePath)
+	//TODO:load from cache
+	allTags, err := c.ts.AllDatasetTags(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get all tags, error: %w", err)
+	}
+	var newLibTag *database.Tag
+	for _, t := range allTags {
+		if t.Name == newLibTagName {
+			newLibTag = t
+			break
+		}
+	}
+	err = c.ds.SetLibraryTag(ctx, req.NameSpace, req.Name, nil, newLibTag)
+	if err != nil {
+		slog.Error("failed to set dataset's tags", slog.String("namespace", req.NameSpace),
+			slog.String("name", req.Name), slog.Any("error", err))
+		return nil, fmt.Errorf("failed to set dataset's tags, cause: %w", err)
+	}
+	//TODO:reload all tags of dataset ?
+	respTags := make([]types.CreateFileResp_Tag, 0)
+	respTags = append(respTags, types.CreateFileResp_Tag{
+		Name: newLibTag.Name, Category: newLibTag.Category,
+		Scope: string(newLibTag.Scope), Group: newLibTag.Group,
+	})
+	resp.Tags = respTags
+
+	err = c.gs.CreateDatasetFile(req)
+	if err != nil {
+		return nil, err
+	}
+
+	return resp, err
+}
+func (c *DatasetComponent) UpdateFile(ctx context.Context, req *types.UpdateFileReq) (*types.UpdateFileResp, error) {
+	slog.Debug("update file get request", slog.String("namespace", req.NameSpace), slog.String("filePath", req.FilePath),
+		slog.String("origin_path", req.OriginPath))
+
+	var err error
+	_, err = c.ns.FindByPath(ctx, req.NameSpace)
+	if err != nil {
+		return nil, fmt.Errorf("fail to check namespace, cause: %w", err)
+	}
+
+	_, err = c.us.FindByUsername(ctx, req.Username)
+	if err != nil {
+		return nil, fmt.Errorf("fail to check user, cause: %w", err)
+	}
+	//TODO:check sensitive content of file
+
+	fileName := filepath.Base(req.FilePath)
+	if fileName == "README.md" {
+		slog.Debug("file is readme", slog.String("content", req.Content))
+		return c.updateReadmeFile(ctx, req)
+	} else {
+		slog.Debug("file is not readme", slog.String("filePath", req.FilePath), slog.String("originPath", req.OriginPath))
+		return c.updateLibraryFile(ctx, req)
+	}
+}
+
+func (c *DatasetComponent) updateLibraryFile(ctx context.Context, req *types.UpdateFileReq) (*types.UpdateFileResp, error) {
+	var err error
+	resp := &types.UpdateFileResp{}
+
+	isFileRenamed := req.FilePath != req.OriginPath
+	//need to handle tag change only if file renamed
+	if isFileRenamed {
+		oldLibTagName := tagparser.LibraryTag(req.OriginPath)
+		newLibTagName := tagparser.LibraryTag(req.FilePath)
+		if newLibTagName != oldLibTagName {
+			//TODO:load from cache
+			allTags, err := c.ts.AllDatasetTags(ctx)
+			if err != nil {
+				return nil, fmt.Errorf("failed to get all tags, error: %w", err)
+			}
+			var oldLibTag, newLibTag *database.Tag
+			for _, t := range allTags {
+				if t.Name == oldLibTagName {
+					oldLibTag = t
+				} else if t.Name == newLibTagName {
+					newLibTag = t
+				}
+			}
+			err = c.ds.SetLibraryTag(ctx, req.NameSpace, req.Name, oldLibTag, newLibTag)
+			if err != nil {
+				slog.Error("failed to set dataset's tags", slog.String("namespace", req.NameSpace),
+					slog.String("name", req.Name), slog.Any("error", err))
+				return nil, fmt.Errorf("failed to set dataset's tags, cause: %w", err)
+			}
+			//TODO:reload all tags of dataset ?
+			respTags := make([]types.CreateFileResp_Tag, 0)
+			respTags = append(respTags, types.CreateFileResp_Tag{
+				Name: newLibTag.Name, Category: newLibTag.Category,
+				Scope: string(newLibTag.Scope), Group: newLibTag.Group,
+			})
+			resp.Tags = respTags
+		}
+	}
+
+	err = c.gs.UpdateDatasetFile(req)
+	if err != nil {
+		return nil, err
+	}
+
+	return resp, err
+}
+
+func (c *DatasetComponent) updateMetaTags(ctx context.Context, namespace, name, content string) ([]*database.RepositoryTag, error) {
+	fileCategoryTagMap, err := tagparser.MetaTags(content)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse metadata, cause: %w", err)
+	}
+	slog.Debug("File tags parsed", slog.Any("tags", fileCategoryTagMap))
+
+	var predefinedTags []*database.Tag
+	//TODO:load from cache
+	predefinedTags, err = c.ts.AllDatasetTags(ctx)
+	if err != nil {
+		slog.Error("Failed to get predefined tags", slog.Any("error", err))
+		return nil, fmt.Errorf("failed to get predefined tags, cause: %w", err)
+	}
+
+	var metaTags []*database.Tag
+	metaTags, err = c.prepareMetaTags(ctx, predefinedTags, fileCategoryTagMap)
+	if err != nil {
+		slog.Error("Failed to process tags", slog.Any("error", err))
+		return nil, fmt.Errorf("failed to process tags, cause: %w", err)
+	}
+	categories, err := c.ts.AllDatasetCategories(ctx)
+	if err != nil {
+		slog.Error("Failed to get categories", slog.Any("error", err))
+		return nil, fmt.Errorf("failed to get categories, cause: %w", err)
+	}
+	var libCategory database.TagCategory
+	for _, c := range categories {
+		if c.Name == "library" {
+			libCategory = c
+			break
+		}
+	}
+	var repoTags []*database.RepositoryTag
+	repoTags, err = c.ds.SetMetaTags(ctx, namespace, name, metaTags, libCategory)
+	if err != nil {
+		slog.Error("failed to set dataset's tags", slog.String("namespace", namespace),
+			slog.String("name", name), slog.Any("error", err))
+		return nil, fmt.Errorf("failed to set dataset's tags, cause: %w", err)
+	}
+
+	return repoTags, nil
+}
+
+func (c *DatasetComponent) updateReadmeFile(ctx context.Context, req *types.UpdateFileReq) (*types.UpdateFileResp, error) {
+	slog.Debug("file is readme", slog.String("content", req.Content))
+	var err error
+	var repoTags []*database.RepositoryTag
+	repoTags, err = c.updateMetaTags(ctx, req.NameSpace, req.Name, req.Content)
+	if err != nil {
+		return nil, fmt.Errorf("failed to update meta tags, cause: %w", err)
+	}
+	err = c.gs.UpdateDatasetFile(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to update dataset file, cause: %w", err)
+	}
+
+	//TODO:reload all tags of dataset ?
+	respTags := make([]types.CreateFileResp_Tag, 0, len(repoTags))
+	for _, tag := range repoTags {
+		respTags = append(respTags, types.CreateFileResp_Tag{
+			Name: tag.Tag.Name, Category: tag.Tag.Category,
+			Scope: string(tag.Tag.Scope), Group: tag.Tag.Group,
+		})
+	}
+	resp := &types.UpdateFileResp{
+		Tags: respTags,
+	}
+
+	return resp, err
+}
+
+func (c *DatasetComponent) prepareMetaTags(ctx context.Context, predefinedTags []*database.Tag, categoryTagMap map[string][]string) ([]*database.Tag, error) {
+	var err error
 	var tagsNeed []*database.Tag
 	if len(categoryTagMap) == 0 {
 		slog.Debug("No category tags to compare with predefined tags")
 		return tagsNeed, nil
 	}
 
+	/*Rules for meta tags here:
+	- if any tag is found in the predefined tags, accept it
+	- if any tag is not found in the predefined tags but of category "Tasks", add it to "Other" category
+	- if any tag is not found in the predefined tags and not of category "Tasks", ignore it
+	*/
 	var tagsToCreate []*database.Tag
 	for category, tagNames := range categoryTagMap {
 		for _, tagName := range tagNames {
@@ -190,7 +361,10 @@ func (c *DatasetComponent) prepareTags(ctx context.Context, predefinedTags []*da
 				}
 				return match
 			}) {
-				//all unkown tags belongs to category "Other" and will be created later
+				//all unkown tags of category "Tasks" belongs to category "Other" and will be created later
+				if strings.EqualFold(category, "Tasks") {
+					continue
+				}
 				category = "Other"
 				tagsToCreate = append(tagsToCreate, &database.Tag{
 					Category: category,
@@ -209,7 +383,7 @@ func (c *DatasetComponent) prepareTags(ctx context.Context, predefinedTags []*da
 		return tagsNeed, nil
 	}
 
-	err := c.ts.SaveTags(ctx, tagsToCreate)
+	err = c.ts.SaveTags(ctx, tagsToCreate)
 	if err != nil {
 		return nil, err
 	}
@@ -221,12 +395,12 @@ func (c *DatasetComponent) prepareTags(ctx context.Context, predefinedTags []*da
 func (c *DatasetComponent) Create(ctx context.Context, req *types.CreateDatasetReq) (dataset *database.Dataset, err error) {
 	_, err = c.ns.FindByPath(ctx, req.Namespace)
 	if err != nil {
-		return nil, errors.New("Namespace does not exist")
+		return nil, errors.New("namespace does not exist")
 	}
 
 	user, err := c.us.FindByUsername(ctx, req.Username)
 	if err != nil {
-		return nil, errors.New("User does not exist")
+		return nil, errors.New("user does not exist")
 	}
 
 	dataset, repo, err := c.gs.CreateDatasetRepo(req)
@@ -359,24 +533,6 @@ func (c *DatasetComponent) Detail(ctx context.Context, namespace, name string) (
 	}
 
 	return detail, nil
-}
-
-func (c *DatasetComponent) UpdateFile(ctx context.Context, req *types.UpdateFileReq) error {
-	_, err := c.ns.FindByPath(ctx, req.NameSpace)
-	if err != nil {
-		return fmt.Errorf("failed to find namespace, error: %w", err)
-	}
-
-	_, err = c.us.FindByUsername(ctx, req.Username)
-	if err != nil {
-		return fmt.Errorf("failed to find username, error: %w", err)
-	}
-	err = c.gs.UpdateDatasetFile(req.NameSpace, req.Name, req.FilePath, req)
-	if err != nil {
-		return fmt.Errorf("failed to create dataset file, error: %w", err)
-	}
-
-	return nil
 }
 
 func (c *DatasetComponent) Commits(ctx context.Context, req *types.GetCommitsReq) ([]*types.Commit, error) {

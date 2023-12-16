@@ -33,6 +33,8 @@ type CreateFileResp struct {
 type CreateFileResp_Tag struct {
 	Name     string `json:"name"`
 	Category string `json:"category"`
+	Scope    string `json:"scope"`
+	Group    string `json:"group"`
 }
 
 type UpdateFileReq struct {
@@ -47,7 +49,8 @@ type UpdateFileReq struct {
 
 	NameSpace string `json:"-"`
 	Name      string `json:"-"`
-	FilePath  string `json:"-"`
+	//new file path, it will be different from OriginPath if file renamed
+	FilePath string `json:"-"`
 }
 
 type GetCommitsReq struct {
@@ -76,3 +79,6 @@ type GetTagsReq struct {
 	Namespace string `json:"namespace"`
 	Name      string `json:"name"`
 }
+
+// currently update and create fiel share the same response
+type UpdateFileResp CreateFileResp

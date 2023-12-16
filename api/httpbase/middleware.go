@@ -275,9 +275,15 @@ func OK(c *gin.Context, data interface{}) {
 	})
 }
 
+func BadRequest(c *gin.Context, errMsg string) {
+	c.PureJSON(http.StatusBadRequest, R{
+		Msg: errMsg,
+	})
+}
+
 // R is the response envelope
 type R struct {
-	Code int    `json:"code"`
+	Code int    `json:"code,omitempty"`
 	Msg  string `json:"msg"`
-	Data any    `json:"data"`
+	Data any    `json:"data,omitempty"`
 }
