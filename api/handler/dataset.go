@@ -333,7 +333,7 @@ func (h *DatasetHandler) Tree(ctx *gin.Context) {
 	req := &types.GetFileReq{
 		Namespace: namespace,
 		Name:      name,
-		Path:      ctx.Param("file_path"),
+		Path:      ctx.Query("path"),
 		Ref:       ctx.Query("ref"),
 	}
 	tree, err := h.c.Tree(ctx, req)
