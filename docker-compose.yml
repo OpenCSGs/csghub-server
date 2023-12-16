@@ -65,6 +65,7 @@ services:
       STARHUB_SERVER_GITSERVER_HOST: http://gitea:3000
       STARHUB_SERVER_GITSERVER_USERNAME: root
       STARHUB_SERVER_GITSERVER_PASSWORD: password123
+      STARHUB_SERVER_GITSERVER_WEBHOOK_URL: http://localhost:8080/api/v1/callback/git
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
       POSTGRES_DB: starhub_server
