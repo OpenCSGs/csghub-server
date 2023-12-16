@@ -1,6 +1,7 @@
 package start
 
 import (
+	"fmt"
 	"log/slog"
 	"os"
 
@@ -34,6 +35,10 @@ var serverCmd = &cobra.Command{
 		cfg, err := config.LoadConfig()
 		if err != nil {
 			return err
+		}
+		// Check APIToken length
+		if len(cfg.APIToken) < 128 {
+			return fmt.Errorf("API token length is less than 128, please check")
 		}
 		//TODO:init logger by config
 		logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{AddSource: true, Level: slog.LevelDebug}))
