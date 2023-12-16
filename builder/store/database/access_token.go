@@ -16,10 +16,10 @@ func NewAccessTokenStore() *AccessTokenStore {
 
 type AccessToken struct {
 	ID     int64  `bun:",pk,autoincrement" json:"id"`
-	GitID  int64  `bun:",pk" json:"git_id"`
+	GitID  int64  `bun:",notnull" json:"git_id"`
 	Name   string `bun:",notnull" json:"name"`
 	Token  string `bun:",notnull" json:"token"`
-	UserID int64  `bun:",pk" json:"user_id"`
+	UserID int64  `bun:",notnull" json:"user_id"`
 	User   *User  `bun:"rel:belongs-to,join:user_id=id" json:"user"`
 	times
 }

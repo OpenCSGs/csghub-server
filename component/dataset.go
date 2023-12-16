@@ -404,11 +404,13 @@ func (c *DatasetComponent) Create(ctx context.Context, req *types.CreateDatasetR
 	}
 
 	dataset, repo, err := c.gs.CreateDatasetRepo(req)
-	if err == nil {
-		err = c.ds.Create(ctx, dataset, repo, user.ID)
-		if err != nil {
-			return
-		}
+	if err != nil {
+		return nil, fmt.Errorf("failed to create git dataset repository, cause: %w", err)
+	}
+
+	dataset, err = c.ds.Create(ctx, dataset, repo, user.ID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create database dataset, cause: %w", err)
 	}
 
 	err = c.gs.CreateDatasetFile(createGitattributesReq(req, user))

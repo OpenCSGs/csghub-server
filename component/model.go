@@ -69,7 +69,7 @@ func (c *ModelComponent) Create(ctx context.Context, req *types.CreateModelReq) 
 		return nil, fmt.Errorf("failed to create git model repository, error: %w", err)
 	}
 
-	err = c.ms.Create(ctx, model, repo, user.ID)
+	model, err = c.ms.Create(ctx, model, repo, user.ID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create database model, error: %w", err)
 	}
