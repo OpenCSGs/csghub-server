@@ -37,13 +37,15 @@ type Repository struct {
 	LfsFiles       []LfsFile      `bun:"rel:has-many,join:id=repository_id"`
 	Tags           []Tag          `bun:"m2m:repository_tags,join:Repository=Tag" json:"tags"`
 	RepositoryType RepositoryType `bun:",notnull" json:"repository_type"`
+	HTTPCloneURL   string         `bun:",nullzero" json:"http_clone_url"`
+	SSHCloneURL    string         `bun:",nullzero" json:"ssh_clone_url"`
 	times
 }
 
 type RepositoryTag struct {
 	ID           int64       `bun:",pk,autoincrement" json:"id"`
-	RepositoryID int64       `bun:",pk" json:"repository_id"`
-	TagID        int64       `bun:",pk" json:"tag_id"`
+	RepositoryID int64       `bun:",notnull" json:"repository_id"`
+	TagID        int64       `bun:",notnull" json:"tag_id"`
 	Repository   *Repository `bun:"rel:belongs-to,join:repository_id=id"`
 	Tag          *Tag        `bun:"rel:belongs-to,join:tag_id=id"`
 }

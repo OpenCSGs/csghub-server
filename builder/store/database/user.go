@@ -19,7 +19,7 @@ func NewUserStore() *UserStore {
 
 type User struct {
 	ID           int64         `bun:",pk,autoincrement" json:"id"`
-	GitID        int64         `bun:",pk" json:"git_id"`
+	GitID        int64         `bun:",notnull" json:"git_id"`
 	Name         string        `bun:",notnull" json:"name"`
 	Username     string        `bun:",notnull,unique" json:"username"`
 	Email        string        `bun:",notnull,unique" json:"email"`

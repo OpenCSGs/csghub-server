@@ -22,7 +22,7 @@ const (
 type Namespace struct {
 	ID            int64         `bun:",pk,autoincrement" json:"id"`
 	Path          string        `bun:",notnull" json:"path"`
-	UserID        int64         `bun:",pk" json:"user_id"`
+	UserID        int64         `bun:",notnull" json:"user_id"`
 	User          User          `bun:"rel:belongs-to,join:user_id=id" json:"user"`
 	NamespaceType NamespaceType `bun:",notnull" json:"namespace_type"`
 	times

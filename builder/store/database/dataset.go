@@ -116,7 +116,8 @@ func (s *DatasetStore) PublicCount(ctx context.Context) (count int, err error) {
 	return
 }
 
-func (s *DatasetStore) Create(ctx context.Context, dataset *Dataset, repo *Repository, userId int64) (err error) {
+func (s *DatasetStore) Create(ctx context.Context, dataset *Dataset, repo *Repository, userId int64) (newDataset *Dataset, err error) {
+	resDataset := new(Dataset)
 	repo.UserID = userId
 	dataset.UserID = userId
 	err = s.db.Operator.Core.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
@@ -129,7 +130,18 @@ func (s *DatasetStore) Create(ctx context.Context, dataset *Dataset, repo *Repos
 		}
 		return nil
 	})
-	return
+	err = s.db.Operator.Core.NewSelect().
+		Model(resDataset).
+		Where("dataset.id=?", dataset.ID).
+		Relation("Repository").
+		Scan(ctx)
+	err = s.db.Operator.Core.NewSelect().
+		Model(resDataset.Repository).
+		WherePK().
+		Relation("Tags").
+		Scan(ctx)
+
+	return resDataset, nil
 }
 
 func (s *DatasetStore) Update(ctx context.Context, dataset *Dataset, repo *Repository) (err error) {

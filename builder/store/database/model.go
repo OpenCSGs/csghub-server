@@ -117,7 +117,8 @@ func (s *ModelStore) PublicCount(ctx context.Context) (count int, err error) {
 	return
 }
 
-func (s *ModelStore) Create(ctx context.Context, model *Model, repo *Repository, userId int64) (err error) {
+func (s *ModelStore) Create(ctx context.Context, model *Model, repo *Repository, userId int64) (newModel *Model, err error) {
+	resModel := new(Model)
 	model.UserID = userId
 	repo.UserID = userId
 	err = s.db.Operator.Core.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
@@ -130,8 +131,18 @@ func (s *ModelStore) Create(ctx context.Context, model *Model, repo *Repository,
 		}
 		return nil
 	})
+	err = s.db.Operator.Core.NewSelect().
+		Model(resModel).
+		Where("model.id=?", model.ID).
+		Relation("Repository").
+		Scan(ctx)
+	err = s.db.Operator.Core.NewSelect().
+		Model(resModel.Repository).
+		WherePK().
+		Relation("Tags").
+		Scan(ctx)
 
-	return
+	return resModel, nil
 }
 
 func (s *ModelStore) Update(ctx context.Context, model *Model, repo *Repository) (err error) {

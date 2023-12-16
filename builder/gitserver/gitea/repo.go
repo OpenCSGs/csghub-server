@@ -51,6 +51,8 @@ func (c *Client) CreateModelRepo(req *types.CreateModelReq) (model *database.Mod
 		License:        req.License,
 		DefaultBranch:  giteaRepo.DefaultBranch,
 		RepositoryType: database.ModelRepo,
+		SSHCloneURL:    giteaRepo.SSHURL,
+		HTTPCloneURL:   common.PortalCloneUrl(giteaRepo.CloneURL, ModelOrgPrefix),
 	}
 
 	return
@@ -132,6 +134,8 @@ func (c *Client) CreateDatasetRepo(req *types.CreateDatasetReq) (dataset *databa
 		License:        req.License,
 		DefaultBranch:  giteaRepo.DefaultBranch,
 		RepositoryType: database.DatasetRepo,
+		SSHCloneURL:    giteaRepo.SSHURL,
+		HTTPCloneURL:   common.PortalCloneUrl(giteaRepo.CloneURL, ModelOrgPrefix),
 	}
 
 	return

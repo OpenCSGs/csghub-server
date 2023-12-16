@@ -24,7 +24,7 @@ type Organization struct {
 	Description string     `json:"description"`
 	UserID      int64      `bun:",notnull" json:"user_id"`
 	User        *User      `bun:"rel:belongs-to,join:user_id=id" json:"user"`
-	NamespaceID int64      `bun:",pk" json:"namespace_id"`
+	NamespaceID int64      `bun:",notnull" json:"namespace_id"`
 	Namespace   *Namespace `bun:"rel:has-one,join:namespace_id=id" json:"namespace"`
 	times
 }

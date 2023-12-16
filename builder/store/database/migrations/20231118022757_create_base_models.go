@@ -50,7 +50,7 @@ const (
 
 type User struct {
 	ID           int64         `bun:",pk,autoincrement" json:"id"`
-	GitID        int64         `bun:",pk" json:"git_id"`
+	GitID        int64         `bun:",notnull" json:"git_id"`
 	Name         string        `bun:",notnull" json:"name"`
 	Username     string        `bun:",notnull,unique" json:"username"`
 	Email        string        `bun:",notnull,unique" json:"email"`
@@ -63,7 +63,7 @@ type User struct {
 type Namespace struct {
 	ID            int64         `bun:",pk,autoincrement" json:"id"`
 	Path          string        `bun:",notnull" json:"path"`
-	UserID        int64         `bun:",pk" json:"user_id"`
+	UserID        int64         `bun:",notnull" json:"user_id"`
 	User          User          `bun:"rel:belongs-to,join:user_id=id" json:"user"`
 	NamespaceType NamespaceType `bun:",notnull" json:"namespace_type"`
 	times
@@ -71,7 +71,7 @@ type Namespace struct {
 
 type Repository struct {
 	ID             int64          `bun:",pk,autoincrement" json:"id"`
-	UserID         int64          `bun:",pk" json:"user_id"`
+	UserID         int64          `bun:",notnull" json:"user_id"`
 	Path           string         `bun:",notnull" json:"path"`
 	GitPath        string         `bun:",notnull" json:"git_path"`
 	Name           string         `bun:",notnull" json:"name"`
@@ -84,6 +84,8 @@ type Repository struct {
 	LfsFiles       []LfsFile      `bun:"rel:has-many,join:id=repository_id"`
 	Tags           []Tag          `bun:"m2m:repository_tags,join:Repository=Tag" json:"tags"`
 	RepositoryType RepositoryType `bun:",notnull" json:"repository_type"`
+	HTTPCloneURL   string         `bun:",nullzero" json:"http_clone_url"`
+	SSHCloneURL    string         `bun:",nullzero" json:"ssh_clone_url"`
 	times
 }
 
@@ -125,8 +127,8 @@ type Dataset struct {
 
 type RepositoryTag struct {
 	ID           int64       `bun:",pk,autoincrement" json:"id"`
-	RepositoryID int64       `bun:",pk" json:"repository_id"`
-	TagID        int64       `bun:",pk" json:"tag_id"`
+	RepositoryID int64       `bun:",notnull" json:"repository_id"`
+	TagID        int64       `bun:",notnull" json:"tag_id"`
 	Repository   *Repository `bun:"rel:belongs-to,join:repository_id=id"`
 	Tag          *Tag        `bun:"rel:belongs-to,join:tag_id=id"`
 }
@@ -148,7 +150,7 @@ type TagCategory struct {
 
 type LfsFile struct {
 	ID           int64       `bun:",pk,autoincrement" json:"id"`
-	RepositoryID int64       `bun:",pk" json:"repository_id"`
+	RepositoryID int64       `bun:",notnull" json:"repository_id"`
 	Repository   *Repository `bun:"rel:belongs-to,join:repository_id=id"`
 	OriginPath   string      `bun:",notnull" json:"orgin_path"`
 	times
