@@ -37,7 +37,7 @@ type Model struct {
 	times
 }
 
-func (s *ModelStore) Index(ctx context.Context, per, page int) (models []Model, err error) {
+func (s *ModelStore) Index(ctx context.Context, per, page int) (models []Model, count int, err error) {
 	err = s.db.Operator.Core.
 		NewSelect().
 		Model(&models).
@@ -51,15 +51,36 @@ func (s *ModelStore) Index(ctx context.Context, per, page int) (models []Model, 
 	return
 }
 
-func (s *ModelStore) Public(ctx context.Context, per, page int) (models []Model, err error) {
-	err = s.db.Operator.Core.
+func (s *ModelStore) Public(ctx context.Context, search, sort, tag string, per, page int) (models []Model, count int, err error) {
+	query := s.db.Operator.Core.
 		NewSelect().
 		Model(&models).
-		Where("private = ?", false).
-		Order("created_at DESC").
-		Limit(per).
-		Offset((page - 1) * per).
-		Scan(ctx)
+		Where("model.private = ?", false)
+	if search != "" {
+		query = query.Where(
+			"model.path like ? or model.description like ? or model.name like ?",
+			fmt.Sprintf("%%%s%%", search),
+			fmt.Sprintf("%%%s%%", search),
+			fmt.Sprintf("%%%s%%", search),
+		)
+	}
+	if tag != "" {
+		query = query.
+			Join("JOIN repositories ON model.repository_id = repositories.id").
+			Join("JOIN repository_tags ON repositories.id = repository_tags.repository_id").
+			Join("JOIN tags ON repository_tags.tag_id = tags.id").
+			Where("tags.name = ?", tag)
+	}
+	count, err = query.Count(ctx)
+	if err != nil {
+		return
+	}
+
+	query = query.Order(sortBy[sort])
+	query = query.Limit(per).
+		Offset((page - 1) * per)
+
+	err = query.Scan(ctx)
 	if err != nil {
 		return
 	}
