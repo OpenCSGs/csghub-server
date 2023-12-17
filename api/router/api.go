@@ -61,7 +61,7 @@ func NewRouter(config *config.Config) (*gin.Engine, error) {
 		return nil, fmt.Errorf("error creating user controller:%w", err)
 	}
 	apiGroup.POST("/users", userCtrl.Create)
-	apiGroup.PUT("/users/", userCtrl.Update)
+	apiGroup.PUT("/users/:username", userCtrl.Update)
 	// User models
 	apiGroup.GET("/user/:username/models", userCtrl.Models)
 	// User datasets
