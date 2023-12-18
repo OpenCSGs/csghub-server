@@ -191,6 +191,11 @@ func (s *ModelStore) FindyByPath(ctx context.Context, namespace string, repoPath
 		Where("model.name =?", repoPath).
 		Limit(1).
 		Scan(ctx)
+	err = s.db.Operator.Core.NewSelect().
+		Model(resModel.Repository).
+		WherePK().
+		Relation("Tags").
+		Scan(ctx)
 	return resModel, err
 }
 

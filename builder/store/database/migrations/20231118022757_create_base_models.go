@@ -81,7 +81,7 @@ type Repository struct {
 	License        string         `bun:",nullzero" json:"license"`
 	Readme         string         `bun:",nullzero" json:"readme"`
 	DefaultBranch  string         `bun:",notnull" json:"default_branch"`
-	LfsFiles       []LfsFile      `bun:"rel:has-many,join:id=repository_id"`
+	LfsFiles       []LfsFile      `bun:"rel:has-many,join:id=repository_id" json:"-"`
 	Tags           []Tag          `bun:"m2m:repository_tags,join:Repository=Tag" json:"tags"`
 	RepositoryType RepositoryType `bun:",notnull" json:"repository_type"`
 	HTTPCloneURL   string         `bun:",nullzero" json:"http_clone_url"`

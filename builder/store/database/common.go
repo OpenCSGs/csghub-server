@@ -7,8 +7,8 @@ import (
 )
 
 type times struct {
-	CreatedAt time.Time `bun:",nullzero,notnull,skipupdate,default:current_timestamp" json:"createdAt"`
-	UpdatedAt time.Time `bun:",nullzero,default:current_timestamp" json:"updatedAt"`
+	CreatedAt time.Time `bun:",nullzero,notnull,skipupdate,default:current_timestamp" json:"created_at"`
+	UpdatedAt time.Time `bun:",nullzero,default:current_timestamp" json:"updated_at"`
 }
 
 func assertAffectedOneRow(result sql.Result, err error) error {

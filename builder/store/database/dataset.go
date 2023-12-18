@@ -195,6 +195,11 @@ func (s *DatasetStore) FindyByPath(ctx context.Context, namespace string, repoPa
 		Where("dataset.path =?", fmt.Sprintf("%s/%s", namespace, repoPath)).
 		Where("dataset.name =?", repoPath).
 		Scan(ctx)
+	err = s.db.Operator.Core.NewSelect().
+		Model(resDataset.Repository).
+		WherePK().
+		Relation("Tags").
+		Scan(ctx)
 	return resDataset, err
 }
 

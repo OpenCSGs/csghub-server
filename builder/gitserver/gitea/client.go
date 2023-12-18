@@ -9,6 +9,7 @@ import (
 
 type Client struct {
 	giteaClient *gitea.Client
+	config      *config.Config
 }
 
 type Response struct {
@@ -30,5 +31,5 @@ func NewClient(config *config.Config) (client *Client, err error) {
 		return nil, err
 	}
 
-	return &Client{giteaClient: giteaClient}, nil
+	return &Client{giteaClient: giteaClient, config: config}, nil
 }
