@@ -2,6 +2,7 @@ package gitserver
 
 import (
 	"errors"
+	"io"
 
 	"opencsg.com/starhub-server/builder/gitserver/gitea"
 	"opencsg.com/starhub-server/builder/store/database"
@@ -22,7 +23,8 @@ type GitServer interface {
 	GetModelCommits(string, string, string, int, int) ([]*types.Commit, error)
 	GetModelLastCommit(string, string, string) (*types.Commit, error)
 	GetModelDetail(namespace, name string) (*types.ModelDetail, error)
-	GetModelFileRaw(string, string, string, string) (string, error)
+	GetModelFileRaw(namespace, repoName, ref, filePath string) (string, error)
+	GetModelLfsFileRaw(namespace, repoName, ref, filePath string) (io.ReadCloser, error)
 	GetModelTags(string, string, int, int) ([]*types.ModelTag, error)
 	GetModelFileTree(string, string, string, string) ([]*types.File, error)
 	CreateModelFile(*types.CreateFileReq) (err error)
@@ -35,7 +37,8 @@ type GitServer interface {
 	GetDatasetCommits(string, string, string, int, int) ([]*types.Commit, error)
 	GetDatasetLastCommit(string, string, string) (*types.Commit, error)
 	GetDatasetDetail(namespace, name string) (*types.DatasetDetail, error)
-	GetDatasetFileRaw(string, string, string, string) (string, error)
+	GetDatasetFileRaw(namespace, repoName, ref, filePath string) (string, error)
+	GetDatasetLfsFileRaw(namespace, repoName, ref, filePath string) (io.ReadCloser, error)
 	GetDatasetTags(string, string, int, int) ([]*types.DatasetTag, error)
 	GetDatasetFileTree(string, string, string, string) ([]*types.File, error)
 	CreateDatasetFile(*types.CreateFileReq) (err error)

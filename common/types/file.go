@@ -27,14 +27,6 @@ type CreateFileReq struct {
 }
 
 type CreateFileResp struct {
-	Tags []CreateFileResp_Tag `json:"tags"`
-}
-
-type CreateFileResp_Tag struct {
-	Name     string `json:"name"`
-	Category string `json:"category"`
-	Scope    string `json:"scope"`
-	Group    string `json:"group"`
 }
 
 type UpdateFileReq struct {

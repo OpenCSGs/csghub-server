@@ -5,6 +5,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"opencsg.com/starhub-server/api/handler"
+	"opencsg.com/starhub-server/api/handler/callback"
 	memberHandler "opencsg.com/starhub-server/api/handler/member"
 	"opencsg.com/starhub-server/api/middleware"
 	"opencsg.com/starhub-server/common/config"
@@ -112,5 +113,11 @@ func NewRouter(config *config.Config) (*gin.Engine, error) {
 	// apiGroup.PUT("/tag", tagCtrl.UpdateTag)
 	// apiGroup.DELETE("/tag", tagCtrl.DeleteTag)
 
+	//callback
+	callbackCtrl, err := callback.NewGitCallbackHandler(config)
+	if err != nil {
+		return nil, fmt.Errorf("error creating callback controller:%w", err)
+	}
+	apiGroup.POST("/callback/git", callbackCtrl.Handle)
 	return r, nil
 }
