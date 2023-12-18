@@ -55,12 +55,16 @@ func (c *SSHKeyComponent) Index(ctx context.Context, username string, per, page 
 	return sks, nil
 }
 
-func (c *SSHKeyComponent) Delete(ctx context.Context, gid int64) error {
-	err := c.gs.DeleteSSHKey(int(gid))
+func (c *SSHKeyComponent) Delete(ctx context.Context, username, name string) error {
+	sshKey, err := c.ss.FindByUsernameAndName(ctx, username, name)
+	if err != nil {
+		return fmt.Errorf("failed to get database SSH keys,error:%w", err)
+	}
+	err = c.gs.DeleteSSHKey(int(sshKey.GitID))
 	if err != nil {
 		return fmt.Errorf("failed to delete git SSH keys,error:%w", err)
 	}
-	err = c.ss.Delete(ctx, gid)
+	err = c.ss.Delete(ctx, sshKey.GitID)
 	if err != nil {
 		return fmt.Errorf("failed to delete database SSH keys,error:%w", err)
 	}

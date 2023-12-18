@@ -1,9 +1,9 @@
 package handler
 
 import (
+	"fmt"
 	"log/slog"
 	"net/http"
-	"strconv"
 
 	"github.com/gin-gonic/gin"
 	"opencsg.com/starhub-server/api/httpbase"
@@ -66,14 +66,15 @@ func (h *SSHKeyHandler) Index(ctx *gin.Context) {
 }
 
 func (h *SSHKeyHandler) Delete(ctx *gin.Context) {
-	id := ctx.Param("id")
-	gid, err := strconv.Atoi(id)
-	if err != nil {
+	name := ctx.Param("name")
+	username := ctx.Param("username")
+	if name == "" || username == "" {
+		err := fmt.Errorf("Invalid username or key name in url")
 		slog.Error("Bad request format", "error", err)
 		ctx.JSON(http.StatusBadRequest, gin.H{"message": err.Error()})
 		return
 	}
-	err = h.c.Delete(ctx, int64(gid))
+	err := h.c.Delete(ctx, username, name)
 	if err != nil {
 		slog.Error("Failed to delete SSH key", slog.Any("error", err))
 		ctx.JSON(http.StatusInternalServerError, gin.H{"message": err.Error()})

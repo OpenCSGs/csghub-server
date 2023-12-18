@@ -81,3 +81,15 @@ func (s *SSHKeyStore) IsExist(ctx context.Context, username, keyName string) (ex
 		Exists(ctx)
 	return
 }
+
+func (s *SSHKeyStore) FindByUsernameAndName(ctx context.Context, username, keyName string) (sshKey SSHKey, err error) {
+	sshKey.Name = keyName
+	err = s.db.Operator.Core.
+		NewSelect().
+		Model(&sshKey).
+		Join("JOIN users AS u ON u.id = ssh_key.user_id").
+		Where("u.username = ?", username).
+		Where("ssh_key.name = ?", keyName).
+		Scan(ctx)
+	return sshKey, err
+}
