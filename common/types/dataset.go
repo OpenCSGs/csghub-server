@@ -9,6 +9,7 @@ type DatasetDetail struct {
 	Name          string `json:"name"`
 	Introduction  string `json:"introduction"`
 	License       string `json:"license"`
+	Private       bool   `json:"private"`
 	DownloadCount int    `json:"download_count"`
 	LastUpdatedAt string `json:"last_updated_at"`
 	HTTPCloneURL  string `json:"http_clone_url"`

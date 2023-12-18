@@ -168,6 +168,21 @@ func (c *ModelComponent) Detail(ctx context.Context, namespace, name string) (*t
 	return detail, nil
 }
 
+func (c *ModelComponent) Show(ctx context.Context, namespace, name, current_user string) (*database.Model, error) {
+	model, err := c.ms.FindyByPath(ctx, namespace, name)
+	if err != nil {
+		return nil, fmt.Errorf("failed to find model, error: %w", err)
+	}
+
+	if model.Private {
+		if model.User.Username != current_user {
+			return nil, fmt.Errorf("failed to find model, error: %w", errors.New("the private model is not accessible to the current user"))
+		}
+	}
+
+	return model, nil
+}
+
 func (c *ModelComponent) CreateFile(ctx context.Context, req *types.CreateFileReq) error {
 	_, err := c.ns.FindByPath(ctx, req.NameSpace)
 	if err != nil {

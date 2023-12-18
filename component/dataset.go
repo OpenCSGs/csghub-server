@@ -371,6 +371,21 @@ func (c *DatasetComponent) Detail(ctx context.Context, namespace, name string) (
 	return detail, nil
 }
 
+func (c *DatasetComponent) Show(ctx context.Context, namespace, name, current_user string) (*database.Dataset, error) {
+	dataset, err := c.ds.FindyByPath(ctx, namespace, name)
+	if err != nil {
+		return nil, fmt.Errorf("failed to find dataset, error: %w", err)
+	}
+
+	if dataset.Private {
+		if dataset.User.Username != current_user {
+			return nil, fmt.Errorf("failed to find dataset, error: %w", errors.New("the private dataset is not accessible to the current user"))
+		}
+	}
+
+	return dataset, nil
+}
+
 func (c *DatasetComponent) Commits(ctx context.Context, req *types.GetCommitsReq) ([]*types.Commit, error) {
 	dataset, err := c.ds.FindyByPath(ctx, req.Namespace, req.Name)
 	if err != nil {

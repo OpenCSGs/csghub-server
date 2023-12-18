@@ -206,6 +206,25 @@ func (h *DatasetHandler) Detail(ctx *gin.Context) {
 	httpbase.OK(ctx, detail)
 }
 
+func (h *DatasetHandler) Show(ctx *gin.Context) {
+	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
+	if err != nil {
+		slog.Error("Bad request format", "error", err)
+		ctx.JSON(http.StatusBadRequest, gin.H{"message": err.Error()})
+		return
+	}
+	currentUser := ctx.Query("current_user")
+	detail, err := h.c.Show(ctx, namespace, name, currentUser)
+	if err != nil {
+		slog.Error("Failed to get dataset detail", slog.Any("error", err))
+		ctx.JSON(http.StatusInternalServerError, gin.H{"message": err.Error()})
+		return
+	}
+
+	slog.Info("Get dataset detail succeed", slog.String("dataset", name))
+	httpbase.OK(ctx, detail)
+}
+
 func (h *DatasetHandler) Commits(ctx *gin.Context) {
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
 	if err != nil {

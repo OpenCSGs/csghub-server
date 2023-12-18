@@ -93,8 +93,8 @@ func dropTables(ctx context.Context, db *bun.DB, tables ...any) (err error) {
 // Sadly, bun.BeforeAppendModelHook does not actually work,
 // see https://github.com/uptrace/bun/discussions/621
 type times struct {
-	CreatedAt time.Time `bun:",nullzero,notnull,skipupdate,default:current_timestamp" json:"createdAt"`
-	UpdatedAt time.Time `bun:",nullzero" json:"updatedAt"`
+	CreatedAt time.Time `bun:",nullzero,notnull,skipupdate,default:current_timestamp" json:"created_at"`
+	UpdatedAt time.Time `bun:",nullzero" json:"updated_at"`
 }
 
 // OwnerType is the owner a user or organization?
