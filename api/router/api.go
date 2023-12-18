@@ -80,7 +80,7 @@ func NewRouter(config *config.Config) (*gin.Engine, error) {
 	}
 	apiGroup.GET("/user/:username/ssh_keys", sshKeyHandler.Index)
 	apiGroup.POST("/user/:username/ssh_keys", sshKeyHandler.Create)
-	apiGroup.DELETE("/user/:username/ssh_key/:id", sshKeyHandler.Delete)
+	apiGroup.DELETE("/user/:username/ssh_key/:name", sshKeyHandler.Delete)
 
 	//Organization
 	orgHandler, err := handler.NewOrganizationHandler(config)
