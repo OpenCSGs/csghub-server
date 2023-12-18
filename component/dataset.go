@@ -462,16 +462,10 @@ license: ` + license + `
 	`
 }
 
-func (c *DatasetComponent) Index(ctx context.Context, per, page int) ([]database.Dataset, int, error) {
-	datasets, err := c.ds.Public(ctx, per, page)
+func (c *DatasetComponent) Index(ctx context.Context, search, sort, tag string, per, page int) ([]database.Dataset, int, error) {
+	datasets, total, err := c.ds.Public(ctx, search, sort, tag, per, page)
 	if err != nil {
 		newError := fmt.Errorf("failed to get public datasets,error:%w", err)
-		slog.Error(newError.Error())
-		return nil, 0, newError
-	}
-	total, err := c.ds.PublicCount(ctx)
-	if err != nil {
-		newError := fmt.Errorf("failed to get public dataset count,error:%w", err)
 		slog.Error(newError.Error())
 		return nil, 0, newError
 	}

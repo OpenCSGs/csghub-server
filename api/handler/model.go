@@ -1,8 +1,10 @@
 package handler
 
 import (
+	"fmt"
 	"log/slog"
 	"net/http"
+	"slices"
 
 	"github.com/gin-gonic/gin"
 	"opencsg.com/starhub-server/api/httpbase"
@@ -33,8 +35,14 @@ func (h *ModelHandler) Index(ctx *gin.Context) {
 		ctx.JSON(http.StatusBadRequest, gin.H{"message": err.Error()})
 		return
 	}
-
-	models, total, err := h.c.Index(ctx, per, page)
+	search, sort, tag := getFilterFromContext(ctx)
+	if !slices.Contains[[]string](Sorts, sort) {
+		msg := fmt.Sprintf("sort parameter must be one of %v", Sorts)
+		slog.Error("Bad request format,", slog.String("error", msg))
+		ctx.JSON(http.StatusBadRequest, gin.H{"message": msg})
+		return
+	}
+	models, total, err := h.c.Index(ctx, search, sort, tag, per, page)
 	if err != nil {
 		slog.Error("Failed to create user", slog.Any("error", err))
 		ctx.JSON(http.StatusInternalServerError, gin.H{"message": err.Error()})

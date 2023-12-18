@@ -10,6 +10,13 @@ import (
 	"github.com/uptrace/bun"
 )
 
+var sortBy = map[string]string{
+	"trending":        "downloads DESC",
+	"recently_update": "updated_at DESC",
+	"most_download":   "downloads DESC",
+	"most_favorite":   "likes DESC",
+}
+
 type DatasetStore struct {
 	db *DB
 }
@@ -51,15 +58,36 @@ func (s *DatasetStore) Index(ctx context.Context, per, page int) (datasets []*Re
 	return
 }
 
-func (s *DatasetStore) Public(ctx context.Context, per, page int) (datasets []Dataset, err error) {
-	err = s.db.Operator.Core.
+func (s *DatasetStore) Public(ctx context.Context, search, sort, tag string, per, page int) (datasets []Dataset, count int, err error) {
+	query := s.db.Operator.Core.
 		NewSelect().
 		Model(&datasets).
-		Where("private = ?", false).
-		Order("created_at DESC").
-		Limit(per).
-		Offset((page - 1) * per).
-		Scan(ctx)
+		Where("dataset.private = ?", false)
+	if search != "" {
+		query = query.Where(
+			"dataset.path like ? or dataset.description like ? or dataset.name like ?",
+			fmt.Sprintf("%%%s%%", search),
+			fmt.Sprintf("%%%s%%", search),
+			fmt.Sprintf("%%%s%%", search),
+		)
+	}
+	if tag != "" {
+		query = query.
+			Join("JOIN repositories ON dataset.repository_id = repositories.id").
+			Join("JOIN repository_tags ON repositories.id = repository_tags.repository_id").
+			Join("JOIN tags ON repository_tags.tag_id = tags.id").
+			Where("tags.name = ?", tag)
+	}
+	count, err = query.Count(ctx)
+	if err != nil {
+		return
+	}
+
+	query = query.Order(sortBy[sort])
+	query = query.Limit(per).
+		Offset((page - 1) * per)
+
+	err = query.Scan(ctx)
 	if err != nil {
 		return
 	}

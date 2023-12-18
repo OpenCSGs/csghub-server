@@ -37,16 +37,10 @@ type ModelComponent struct {
 	gs gitserver.GitServer
 }
 
-func (c *ModelComponent) Index(ctx context.Context, per, page int) ([]database.Model, int, error) {
-	models, err := c.ms.Public(ctx, per, page)
+func (c *ModelComponent) Index(ctx context.Context, search, sort, tag string, per, page int) ([]database.Model, int, error) {
+	models, total, err := c.ms.Public(ctx, search, sort, tag, per, page)
 	if err != nil {
 		newError := fmt.Errorf("failed to get public models,error:%w", err)
-		slog.Error(newError.Error())
-		return nil, 0, newError
-	}
-	total, err := c.ms.PublicCount(ctx)
-	if err != nil {
-		newError := fmt.Errorf("failed to get public model count,error:%w", err)
 		slog.Error(newError.Error())
 		return nil, 0, newError
 	}

@@ -1,8 +1,10 @@
 package handler
 
 import (
+	"fmt"
 	"log/slog"
 	"net/http"
+	"slices"
 
 	"github.com/gin-gonic/gin"
 	"opencsg.com/starhub-server/api/httpbase"
@@ -11,6 +13,8 @@ import (
 	"opencsg.com/starhub-server/common/utils/common"
 	"opencsg.com/starhub-server/component"
 )
+
+var Sorts = []string{"trending", "recently_update", "most_download", "most_favorite"}
 
 func NewDatasetHandler(config *config.Config) (*DatasetHandler, error) {
 	tc, err := component.NewDatasetComponent(config)
@@ -118,8 +122,15 @@ func (h *DatasetHandler) Index(ctx *gin.Context) {
 		ctx.JSON(http.StatusBadRequest, gin.H{"message": err.Error()})
 		return
 	}
+	search, sort, tag := getFilterFromContext(ctx)
+	if !slices.Contains[[]string](Sorts, sort) {
+		msg := fmt.Sprintf("sort parameter must be one of %v", Sorts)
+		slog.Error("Bad request format,", slog.String("error", msg))
+		ctx.JSON(http.StatusBadRequest, gin.H{"message": msg})
+		return
+	}
 
-	datasets, total, err := h.c.Index(ctx, per, page)
+	datasets, total, err := h.c.Index(ctx, search, sort, tag, per, page)
 	if err != nil {
 		slog.Error("Failed to create user", slog.Any("error", err))
 		ctx.JSON(http.StatusInternalServerError, gin.H{"message": err.Error()})
@@ -349,4 +360,14 @@ func (h *DatasetHandler) Tree(ctx *gin.Context) {
 
 	slog.Info("Get dataset file tree succeed", slog.String("dataset", name), slog.String("path", req.Path), slog.String("ref", req.Ref))
 	httpbase.OK(ctx, tree)
+}
+
+func getFilterFromContext(ctx *gin.Context) (searchKey, sort, tag string) {
+	searchKey = ctx.Query("search")
+	sort = ctx.Query("sort")
+	tag = ctx.Query("tag")
+	if sort == "" {
+		sort = "recently_update"
+	}
+	return
 }
