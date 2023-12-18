@@ -134,7 +134,8 @@ func (c *DatasetComponent) createReadmeFile(ctx context.Context, req *types.Crea
 		err  error
 		resp types.CreateFileResp
 	)
-	_, err = c.tc.UpdateMetaTags(ctx, database.DatasetTagScope, req.NameSpace, req.Name, req.Content)
+	contentDecoded, _ := base64.RawStdEncoding.DecodeString(req.Content)
+	_, err = c.tc.UpdateMetaTags(ctx, database.DatasetTagScope, req.NameSpace, req.Name, string(contentDecoded))
 	if err != nil {
 		return nil, fmt.Errorf("failed to update meta tags, cause: %w", err)
 	}
@@ -220,7 +221,8 @@ func (c *DatasetComponent) updateReadmeFile(ctx context.Context, req *types.Upda
 	var err error
 	resp := new(types.UpdateFileResp)
 
-	_, err = c.tc.UpdateMetaTags(ctx, database.DatasetTagScope, req.NameSpace, req.Name, req.Content)
+	contentDecoded, _ := base64.RawStdEncoding.DecodeString(req.Content)
+	_, err = c.tc.UpdateMetaTags(ctx, database.DatasetTagScope, req.NameSpace, req.Name, string(contentDecoded))
 	if err != nil {
 		return nil, fmt.Errorf("failed to update meta tags, cause: %w", err)
 	}
