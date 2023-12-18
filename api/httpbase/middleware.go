@@ -275,9 +275,25 @@ func OK(c *gin.Context, data interface{}) {
 	})
 }
 
+// BadRequest responds with a JSON-formatted error message.
+//
+// Example:
+//
+//	BadRequest(c, "Invalid request parameters")
 func BadRequest(c *gin.Context, errMsg string) {
 	c.PureJSON(http.StatusBadRequest, R{
 		Msg: errMsg,
+	})
+}
+
+// ServerError responds with a JSON-formatted error message.
+//
+// Example:
+//
+//	ServerError(c, errors.New("internal server error"))
+func ServerError(c *gin.Context, err error) {
+	c.PureJSON(http.StatusInternalServerError, R{
+		Msg: err.Error(),
 	})
 }
 

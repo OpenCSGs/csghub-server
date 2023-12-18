@@ -2,6 +2,7 @@ package gitea
 
 import (
 	"encoding/base64"
+	"io"
 	"strings"
 	"sync"
 	"time"
@@ -63,14 +64,19 @@ func (c *Client) GetDatasetFileTree(namespace, name, ref, path string) (tree []*
 	return
 }
 
-func (c *Client) GetDatasetFileRaw(namespace, name, ref, path string) (data string, err error) {
+func (c *Client) GetDatasetFileRaw(namespace, name, ref, path string) (string, error) {
 	namespace = common.WithPrefix(namespace, DatasetOrgPrefix)
 	giteaFileData, _, err := c.giteaClient.GetFile(namespace, name, ref, path)
 	if err != nil {
-		return
+		return "", err
 	}
-	data = string(giteaFileData)
-	return
+	return string(giteaFileData), nil
+}
+
+func (c *Client) GetDatasetLfsFileRaw(namespace, repoName, ref, filePath string) (io.ReadCloser, error) {
+	namespace = common.WithPrefix(namespace, DatasetOrgPrefix)
+	r, _, err := c.giteaClient.GetFileReader(namespace, repoName, ref, filePath, true)
+	return r, err
 }
 
 func (c *Client) GetModelFileRaw(namespace, name, ref, path string) (data string, err error) {
@@ -81,6 +87,12 @@ func (c *Client) GetModelFileRaw(namespace, name, ref, path string) (data string
 	}
 	data = string(giteaFileData)
 	return
+}
+
+func (c *Client) GetModelLfsFileRaw(namespace, repoName, ref, filePath string) (io.ReadCloser, error) {
+	namespace = common.WithPrefix(namespace, ModelOrgPrefix)
+	r, _, err := c.giteaClient.GetFileReader(namespace, repoName, ref, filePath, true)
+	return r, err
 }
 
 func (c *Client) getFileFromEntry(namespace, name, ref string, entry *gitea.ContentsResponse, ch chan<- *types.File, wg *sync.WaitGroup) {

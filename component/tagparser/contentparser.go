@@ -12,7 +12,7 @@ import (
 func MetaTags(readme string) (map[string][]string, error) {
 	meta := metaText(readme)
 	if len(meta) == 0 {
-		return nil, errors.New("no meta data found")
+		return map[string][]string{}, nil
 	}
 
 	categoryMap := make(map[string]any)
