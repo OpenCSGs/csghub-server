@@ -121,5 +121,9 @@ func NewRouter(config *config.Config) (*gin.Engine, error) {
 		return nil, fmt.Errorf("error creating callback controller:%w", err)
 	}
 	apiGroup.POST("/callback/git", callbackCtrl.Handle)
+	//Sensive check
+	sensitiveCtrl := handler.NewSensitiveHandler(config)
+	apiGroup.POST("/sensitive/text", sensitiveCtrl.Text)
+
 	return r, nil
 }

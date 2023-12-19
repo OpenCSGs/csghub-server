@@ -1,0 +1,48 @@
+package handler
+
+import (
+	"log/slog"
+
+	"github.com/gin-gonic/gin"
+	"opencsg.com/starhub-server/api/httpbase"
+	"opencsg.com/starhub-server/common/config"
+	"opencsg.com/starhub-server/component"
+)
+
+type SensitiveHandler struct {
+	c *component.SensitiveComponent
+}
+
+func NewSensitiveHandler(cfg *config.Config) *SensitiveHandler {
+	return &SensitiveHandler{
+		c: component.NewSensitiveComponent(cfg),
+	}
+}
+
+func (h *SensitiveHandler) Text(ctx *gin.Context) {
+	type req struct {
+		Scenario string `json:"scenario"`
+		Text     string `json:"text"`
+	}
+	var (
+		r   req
+		err error
+	)
+	if err = ctx.ShouldBindJSON(&r); err != nil {
+		slog.Error("Bad request format", slog.String("err", err.Error()))
+		httpbase.BadRequest(ctx, err.Error())
+		return
+	}
+	ok, err := h.c.CheckText(ctx, r.Scenario, r.Text)
+	if err != nil {
+		httpbase.ServerError(ctx, err)
+		return
+	}
+
+	if ok {
+		httpbase.OK(ctx, nil)
+	} else {
+		httpbase.BadRequest(ctx, "sensitive content detected")
+	}
+
+}
