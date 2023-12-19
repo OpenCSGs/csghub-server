@@ -48,6 +48,12 @@ type RepositoryTag struct {
 	TagID        int64       `bun:",notnull" json:"tag_id"`
 	Repository   *Repository `bun:"rel:belongs-to,join:repository_id=id"`
 	Tag          *Tag        `bun:"rel:belongs-to,join:tag_id=id"`
+	/*
+		for meta tags parsed from README.md file, count is alway 1
+
+		for Library tags, count means how many a kind of library file (e.g. *.ONNX file) exists in the repository
+	*/
+	Count int32 `bun:",default:1" json:"count"`
 }
 
 func (s *RepoStore) CreateRepo(ctx context.Context, repo Repository) (err error) {

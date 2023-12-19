@@ -15,6 +15,9 @@ export GITEA_USERNAME="root"
 export GITEA_PASSWORD="password123"
 #export GIN_MODE="release"
 
+#allow Bun to log sql queries
+export DB_DEBUG=2
+
 #maker sure you have defined these 3 environment variables
 # export STARHUB_SERVER_ALIYUN_ACCESS_KEY_ID="[YOUR_ACCESS_KEY_ID]"
 # export STARHUB_SERVER_ALIYUN_ACCESS_KEY_SECRET="[YOUR_ACCESS_KEY_SECRET]"
@@ -23,6 +26,8 @@ export GITEA_PASSWORD="password123"
 go build -v -o ./bin/starhub-server ./cmd/starhub-server
 
 ./bin/starhub-server migration init
-./bin/starhub-server migration migrate
+#uncomment this command if db schema changed
+# ./bin/starhub-server migration create_sql add_col_count_to_repository_tags
+./bin/starhub-server migration migrate 
 
-./bin/starhub-server start server
+# ./bin/starhub-server start server
