@@ -43,6 +43,12 @@ type Config struct {
 	Frontend struct {
 		URL string `envconfig:"STARHUB_SERVER_FRONTEND_URL" default:"https://portal-stg.opencsg.com"`
 	}
+
+	Aliyun struct {
+		AccessKeyID     string `envconfig:"STARHUB_SERVER_ALIYUN_ACCESS_KEY_ID"`
+		AccessKeySecret string `envconfig:"STARHUB_SERVER_ALIYUN_ACCESS_KEY_SECRET"`
+		Region          string `envconfig:"STARHUB_SERVER_ALIYUN_REGION"`
+	}
 }
 
 func LoadConfig() (cfg *Config, err error) {
