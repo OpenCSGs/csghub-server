@@ -2,6 +2,7 @@ package database
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -151,6 +152,7 @@ func (ts *TagStore) UpsertTags(ctx context.Context, tagScope TagScope, categoryT
 func (ts *TagStore) SetMetaTags(ctx context.Context, namespace, name string, tags []*Tag) (repoTags []*RepositoryTag, err error) {
 	repo := new(Repository)
 	err = ts.db.Operator.Core.NewSelect().Model(repo).
+		Column("id").
 		Relation("Tags").
 		Where("path =?", fmt.Sprintf("%v/%v", namespace, name)).
 		Scan(ctx)
@@ -179,7 +181,7 @@ func (ts *TagStore) SetMetaTags(ctx context.Context, namespace, name string, tag
 			if tag.Category == "Libraries" {
 				return errors.New("found Library tag when set meta tag, tag name:" + tag.Name)
 			}
-			repoTag := &RepositoryTag{RepositoryID: repo.ID, TagID: tag.ID, Repository: repo, Tag: tag}
+			repoTag := &RepositoryTag{RepositoryID: repo.ID, TagID: tag.ID, Repository: repo, Tag: tag, Count: 1}
 			repoTags = append(repoTags, repoTag)
 		}
 		//batch insert
@@ -196,20 +198,48 @@ func (ts *TagStore) SetMetaTags(ctx context.Context, namespace, name string, tag
 func (ts *TagStore) SetLibraryTag(ctx context.Context, namespace, name string, newTag, oldTag *Tag) (err error) {
 	repo := new(Repository)
 	err = ts.db.Operator.Core.NewSelect().Model(repo).
+		Column("id").
 		Where("path =?", fmt.Sprintf("%v/%v", namespace, name)).
 		Scan(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to find repository, path:%v/%v,error:%w", namespace, name, err)
 	}
 	err = ts.db.Operator.Core.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
-		//TODO:implement tag counting logic
+		var err error
 		//decrease count of old tag
-		//increase count of new tag
-		if err != nil {
-			return fmt.Errorf("failed to update repository library tags, path:%v/%v,error:%w", namespace, name, err)
+		if oldTag != nil {
+			oldRepoTag := RepositoryTag{RepositoryID: repo.ID, TagID: oldTag.ID}
+			_, err = tx.NewUpdate().Model(&oldRepoTag).
+				Set("count = count-1").
+				Where("repository_id = ? and tag_id = ? and count > 0", repo.ID, oldTag.ID).
+				Exec(ctx)
+			if err != nil {
+				return err
+			}
 		}
-		return nil
+		//increase count of new tag
+		if newTag != nil {
+			newRepoTag := RepositoryTag{RepositoryID: repo.ID, TagID: newTag.ID}
+			err = tx.NewSelect().Model(&newRepoTag).
+				Where("repository_id = ? and tag_id = ?", repo.ID, newTag.ID).
+				Scan(ctx)
+			if err != sql.ErrNoRows {
+				return err
+			}
+			if newRepoTag.ID == 0 {
+				newRepoTag.Count = 1
+				_, err = tx.NewInsert().Model(&newRepoTag).Exec(ctx)
+			} else {
+				_, err = tx.NewUpdate().Model(&newRepoTag).Where("id = ?", newRepoTag.ID).Set("count = count+1").Exec(ctx)
+			}
+		}
+		return err
 	})
+	if err != nil {
+		slog.Error("Failed to update repository library tags", slog.String("namespace", namespace),
+			slog.String("name", name), slog.Any("oldTag", oldTag), slog.Any("newTag", newTag), slog.Any("error", err))
+		return fmt.Errorf("failed to update repository library tags, path:%v/%v,error:%w", namespace, name, err)
+	}
 
 	return err
 }

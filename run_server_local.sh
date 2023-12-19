@@ -15,6 +15,9 @@ export GITEA_USERNAME="root"
 export GITEA_PASSWORD="password123"
 #export GIN_MODE="release"
 
+#allow Bun to log sql queries
+export DB_DEBUG=2
+
 #maker sure you have defined these 3 environment variables
 # export STARHUB_SERVER_ALIYUN_ACCESS_KEY_ID="[YOUR_ACCESS_KEY_ID]"
 # export STARHUB_SERVER_ALIYUN_ACCESS_KEY_SECRET="[YOUR_ACCESS_KEY_SECRET]"
