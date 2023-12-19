@@ -136,7 +136,7 @@ func (h *DatasetHandler) Index(ctx *gin.Context) {
 		ctx.JSON(http.StatusInternalServerError, gin.H{"message": err.Error()})
 		return
 	}
-	slog.Info("Create public datasets succeed", slog.Int("count", total))
+	slog.Info("Get public datasets succeed", slog.Int("count", total))
 	respData := gin.H{
 		"data":  datasets,
 		"total": total,
@@ -216,12 +216,12 @@ func (h *DatasetHandler) Show(ctx *gin.Context) {
 	currentUser := ctx.Query("current_user")
 	detail, err := h.c.Show(ctx, namespace, name, currentUser)
 	if err != nil {
-		slog.Error("Failed to get dataset detail", slog.Any("error", err))
+		slog.Error("Failed to get dataset", slog.Any("error", err))
 		ctx.JSON(http.StatusInternalServerError, gin.H{"message": err.Error()})
 		return
 	}
 
-	slog.Info("Get dataset detail succeed", slog.String("dataset", name))
+	slog.Info("Get dataset succeed", slog.String("dataset", name))
 	httpbase.OK(ctx, detail)
 }
 
