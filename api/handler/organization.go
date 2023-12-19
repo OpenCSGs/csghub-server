@@ -84,6 +84,6 @@ func (h *OrganizationHandler) Update(ctx *gin.Context) {
 		return
 	}
 
-	slog.Info("Delete organizations succeed", slog.String("org_name", org.Name))
+	slog.Info("Update organizations succeed", slog.String("org_name", org.Name))
 	httpbase.OK(ctx, org)
 }

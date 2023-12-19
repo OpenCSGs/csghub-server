@@ -61,7 +61,7 @@ func (h *SSHKeyHandler) Index(ctx *gin.Context) {
 		return
 	}
 
-	slog.Info("Create SSH keys succeed")
+	slog.Info("Get User SSH keys succeed")
 	httpbase.OK(ctx, sks)
 }
 

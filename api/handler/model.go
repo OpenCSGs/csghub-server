@@ -48,7 +48,7 @@ func (h *ModelHandler) Index(ctx *gin.Context) {
 		ctx.JSON(http.StatusInternalServerError, gin.H{"message": err.Error()})
 		return
 	}
-	slog.Info("Create public models succeed", slog.Int("count", total))
+	slog.Info("Get public models succeed", slog.Int("count", total))
 	respData := gin.H{
 		"data":  models,
 		"total": total,
@@ -152,7 +152,7 @@ func (h *ModelHandler) Show(ctx *gin.Context) {
 		return
 	}
 
-	slog.Info("Get model detail succeed", slog.String("model", name))
+	slog.Info("Get model succeed", slog.String("model", name))
 	httpbase.OK(ctx, detail)
 }
 
