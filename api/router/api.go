@@ -124,6 +124,7 @@ func NewRouter(config *config.Config) (*gin.Engine, error) {
 	//Sensive check
 	sensitiveCtrl := handler.NewSensitiveHandler(config)
 	apiGroup.POST("/sensitive/text", sensitiveCtrl.Text)
+	apiGroup.POST("/sensitive/image", sensitiveCtrl.Image)
 
 	return r, nil
 }

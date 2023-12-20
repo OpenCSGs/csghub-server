@@ -28,3 +28,14 @@ func (c SensitiveComponent) CheckText(ctx context.Context, scenario, text string
 	}
 	return c.checker.PassTextCheck(ctx, s, text)
 }
+
+func (c SensitiveComponent) CheckImage(ctx context.Context, scenario, ossBucketName, ossObjectName string) (bool, error) {
+	var (
+		s  sensitive.Scenario
+		ok bool
+	)
+	if s, ok = s.FromString(scenario); !ok {
+		return false, fmt.Errorf("invalid scenario: %s", scenario)
+	}
+	return c.checker.PassImageCheck(ctx, s, ossBucketName, ossObjectName)
+}

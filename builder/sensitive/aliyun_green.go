@@ -62,12 +62,13 @@ func (c *AliyunGreenChecker) PassTextCheck(ctx context.Context, scenario Scenari
 	}
 	resp, err := c.TextModeration(textModerationRequest)
 	if err != nil {
+		slog.Error("fail to call aliyun TextModeration", slog.String("content", text), slog.Any("error", err))
 		return false, err
 	}
 	slog.Debug("aliyun TextModeration return", slog.String("resp", resp.GoString()))
 
 	if *resp.StatusCode != http.StatusOK || *resp.Body.Code != 200 {
-		slog.Error("fail to call aliyun TextModeration", slog.String("content", text),
+		slog.Error("aliyun TextModeration return code not 200", slog.String("content", text),
 			slog.String("resp", resp.GoString()))
 		return false, errors.New(*resp.Body.Message)
 	}
@@ -80,4 +81,57 @@ func (c *AliyunGreenChecker) PassTextCheck(ctx context.Context, scenario Scenari
 	}
 
 	return true, nil
+}
+
+func (c *AliyunGreenChecker) PassImageCheck(ctx context.Context, scenario Scenario, ossBucketName, ossObjectName string) (bool, error) {
+	serviceParameters, _ := json.Marshal(
+		map[string]interface{}{
+			"ossRegionId": tea.StringValue(c.RegionId),
+			//for example: my-image-bucket
+			"ossBucketName": ossBucketName,
+			//for example: image/001.jpg
+			"ossObjectName": ossObjectName,
+		},
+	)
+	imageModerationRequest := &green20220302.ImageModerationRequest{
+		Service:           tea.String(string(scenario)),
+		ServiceParameters: tea.String(string(serviceParameters)),
+	}
+	resp, err := c.ImageModeration(imageModerationRequest)
+	if err != nil {
+		slog.Error("fail to call aliyun ImageModeration", slog.String("ossBucketName", ossBucketName),
+			slog.String("ossObjectName", ossObjectName), slog.Any("error", err))
+		return false, err
+	}
+	slog.Debug("aliyun ImageModeration return", slog.String("resp", resp.GoString()))
+
+	if *resp.StatusCode != http.StatusOK || *resp.Body.Code != 200 {
+		slog.Error("aliyun ImageModeration return code not 200", slog.String("ossBucketName", ossBucketName),
+			slog.String("ossObjectName", ossObjectName),
+			slog.String("resp", resp.GoString()))
+		return false, errors.New(tea.StringValue(resp.Body.Msg))
+	}
+
+	result := resp.Body.Data.Result
+	//pass check
+	if len(result) == 0 && tea.StringValue(result[0].Label) == "nonLabel" {
+		return true, nil
+	}
+
+	labelMap := make(map[string]float32)
+	for _, r := range result {
+		label, confidence := tea.StringValue(r.Label), tea.Float32Value(r.Confidence)
+		if confidence > 80 {
+			labelMap[label] = confidence
+		}
+	}
+	//pass check
+	if len(labelMap) == 0 {
+		return true, nil
+	}
+
+	slog.Info("sensitive image detected", slog.String("scenario", string(scenario)), slog.String("ossBucketName", ossBucketName),
+		slog.String("ossObjectName", ossObjectName), slog.Any("labels", labelMap))
+	//TODO:return the labels if need in future
+	return false, nil
 }
