@@ -3,6 +3,8 @@ package gitea
 import (
 	"encoding/base64"
 	"io"
+	"regexp"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -13,6 +15,8 @@ import (
 )
 
 const LFSPrefix = "version https://git-lfs.github.com/spec/v1"
+
+var fileSizeReg = regexp.MustCompile(`size (\d+)`)
 
 func (c *Client) GetModelFileTree(namespace, name, ref, path string) (tree []*types.File, err error) {
 	namespace = common.WithPrefix(namespace, ModelOrgPrefix)
@@ -144,6 +148,14 @@ func (c *Client) getFileFromEntry(namespace, name, ref string, entry *gitea.Cont
 			return
 		}
 		if strings.HasPrefix(string(fc), LFSPrefix) {
+			match := fileSizeReg.FindStringSubmatch(string(fc))
+			if match != nil {
+				size, err := strconv.ParseInt(match[1], 10, 64)
+				if err != nil {
+					return
+				}
+				file.Size = int(size)
+			}
 			file.Lfs = true
 			file.DownloadURL = strings.Replace(*entry.DownloadURL, "/raw/", "/media/", 1)
 		}
