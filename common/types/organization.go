@@ -15,3 +15,11 @@ type EditOrgReq struct {
 	Description string `json:"description"`
 	Path        string `json:"path"`
 }
+
+type OrgDatasetsReq struct {
+	Namespace   string `json:"namespace"`
+	CurrentUser string `json:"current_user"`
+	PageOpts
+}
+
+type OrgModelsReq = OrgDatasetsReq

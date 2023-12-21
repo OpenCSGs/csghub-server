@@ -98,7 +98,7 @@ func (c *ModelComponent) Index(ctx context.Context, username, search, sort strin
 }
 
 func (c *ModelComponent) Create(ctx context.Context, req *types.CreateModelReq) (*database.Model, error) {
-	_, err := c.ns.FindByPath(ctx, req.Namespace)
+	namespace, err := c.ns.FindByPath(ctx, req.Namespace)
 	if err != nil {
 		return nil, errors.New("namespace does not exist")
 	}
@@ -106,6 +106,16 @@ func (c *ModelComponent) Create(ctx context.Context, req *types.CreateModelReq) 
 	user, err := c.us.FindByUsername(ctx, req.Username)
 	if err != nil {
 		return nil, errors.New("user does not exist")
+	}
+
+	if namespace.NamespaceType == database.OrgNamespace {
+		if namespace.UserID != user.ID {
+			return nil, errors.New("users do not have permission to create models in this organization")
+		}
+	} else {
+		if namespace.Path != user.Username {
+			return nil, errors.New("users do not have permission to create models in this namespace")
+		}
 	}
 
 	model, repo, err := c.gs.CreateModelRepo(req)
