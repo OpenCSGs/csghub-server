@@ -8,6 +8,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"opencsg.com/starhub-server/api/httpbase"
+	"opencsg.com/starhub-server/builder/store/database"
 	"opencsg.com/starhub-server/common/config"
 	"opencsg.com/starhub-server/common/types"
 	"opencsg.com/starhub-server/common/utils/common"
@@ -116,13 +117,16 @@ func (h *DatasetHandler) Create(ctx *gin.Context) {
 }
 
 func (h *DatasetHandler) Index(ctx *gin.Context) {
+	var tagReqs []database.TagReq
+	tagReqs = parseTagReqs(ctx)
+	username := ctx.Query("current_user")
 	per, page, err := common.GetPerAndPageFromContext(ctx)
 	if err != nil {
 		slog.Error("Bad request format", "error", err)
 		ctx.JSON(http.StatusBadRequest, gin.H{"message": err.Error()})
 		return
 	}
-	search, sort, tag := getFilterFromContext(ctx)
+	search, sort := getFilterFromContext(ctx)
 	if !slices.Contains[[]string](Sorts, sort) {
 		msg := fmt.Sprintf("sort parameter must be one of %v", Sorts)
 		slog.Error("Bad request format,", slog.String("error", msg))
@@ -130,9 +134,9 @@ func (h *DatasetHandler) Index(ctx *gin.Context) {
 		return
 	}
 
-	datasets, total, err := h.c.Index(ctx, search, sort, tag, per, page)
+	datasets, total, err := h.c.Index(ctx, username, search, sort, tagReqs, per, page)
 	if err != nil {
-		slog.Error("Failed to create user", slog.Any("error", err))
+		slog.Error("Failed to get datasets", slog.Any("error", err))
 		ctx.JSON(http.StatusInternalServerError, gin.H{"message": err.Error()})
 		return
 	}
@@ -381,10 +385,9 @@ func (h *DatasetHandler) Tree(ctx *gin.Context) {
 	httpbase.OK(ctx, tree)
 }
 
-func getFilterFromContext(ctx *gin.Context) (searchKey, sort, tag string) {
+func getFilterFromContext(ctx *gin.Context) (searchKey, sort string) {
 	searchKey = ctx.Query("search")
 	sort = ctx.Query("sort")
-	tag = ctx.Query("tag")
 	if sort == "" {
 		sort = "recently_update"
 	}

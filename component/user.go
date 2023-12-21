@@ -17,6 +17,7 @@ func NewUserComponent(config *config.Config) (*UserComponent, error) {
 	c.ms = database.NewModelStore()
 	c.us = database.NewUserStore()
 	c.ds = database.NewDatasetStore()
+	c.ns = database.NewNamespaceStore()
 	var err error
 	c.gs, err = gitserver.NewGitServer(config)
 	if err != nil {
@@ -31,10 +32,22 @@ type UserComponent struct {
 	us *database.UserStore
 	ms *database.ModelStore
 	ds *database.DatasetStore
+	ns *database.NamespaceStore
 	gs gitserver.GitServer
 }
 
 func (c *UserComponent) Create(ctx context.Context, req *types.CreateUserRequest) (*database.User, error) {
+	nsExists, err := c.ns.Exists(ctx, req.Username)
+	if err != nil {
+		newError := fmt.Errorf("failed to check for the presence of the namespace,error:%w", err)
+		slog.Error(newError.Error())
+		return nil, newError
+	}
+
+	if nsExists {
+		return nil, errors.New("namespace already exists")
+	}
+
 	userExists, err := c.us.IsExist(ctx, req.Username)
 	if err != nil {
 		newError := fmt.Errorf("failed to check for the presence of the user,error:%w", err)
@@ -102,15 +115,17 @@ func (c *UserComponent) Datasets(ctx context.Context, req *types.UserDatasetsReq
 		return nil, 0, errors.New("user not exists")
 	}
 
-	cuserExists, err := c.us.IsExist(ctx, req.CurrentUser)
-	if err != nil {
-		newError := fmt.Errorf("failed to check for the presence of current user,error:%w", err)
-		slog.Error(newError.Error())
-		return nil, 0, newError
-	}
+	if req.CurrentUser != "" {
+		cuserExists, err := c.us.IsExist(ctx, req.CurrentUser)
+		if err != nil {
+			newError := fmt.Errorf("failed to check for the presence of current user,error:%w", err)
+			slog.Error(newError.Error())
+			return nil, 0, newError
+		}
 
-	if !cuserExists {
-		return nil, 0, errors.New("current user not exists")
+		if !cuserExists {
+			return nil, 0, errors.New("current user not exists")
+		}
 	}
 
 	onlyPublic := req.Owner != req.CurrentUser
@@ -136,19 +151,21 @@ func (c *UserComponent) Models(ctx context.Context, req *types.UserModelsReq) ([
 		return nil, 0, errors.New("user not exists")
 	}
 
-	cuserExists, err := c.us.IsExist(ctx, req.CurrentUser)
-	if err != nil {
-		newError := fmt.Errorf("failed to check for the presence of current user,error:%w", err)
-		slog.Error(newError.Error())
-		return nil, 0, newError
+	if req.CurrentUser != "" {
+		cuserExists, err := c.us.IsExist(ctx, req.CurrentUser)
+		if err != nil {
+			newError := fmt.Errorf("failed to check for the presence of current user,error:%w", err)
+			slog.Error(newError.Error())
+			return nil, 0, newError
+		}
+
+		if !cuserExists {
+			return nil, 0, errors.New("current user not exists")
+		}
 	}
 
-	if !cuserExists {
-		return nil, 0, errors.New("current user not exists")
-	}
-
-	op := req.Owner != req.CurrentUser
-	ms, total, err := c.ms.ByUsername(ctx, req.Owner, req.PageSize, req.Page, op)
+	onlyPublic := req.Owner != req.CurrentUser
+	ms, total, err := c.ms.ByUsername(ctx, req.Owner, req.PageSize, req.Page, onlyPublic)
 	if err != nil {
 		newError := fmt.Errorf("failed to get user datasets,error:%w", err)
 		slog.Error(newError.Error())

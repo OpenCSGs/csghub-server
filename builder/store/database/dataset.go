@@ -57,6 +57,48 @@ func (s *DatasetStore) Index(ctx context.Context, per, page int) (datasets []*Re
 	return
 }
 
+func (s *DatasetStore) PublicToUser(ctx context.Context, user *User, search, sort string, tags []TagReq, per, page int) (datasets []Dataset, count int, err error) {
+	query := s.db.Operator.Core.
+		NewSelect().
+		Model(&datasets).
+		Relation("Repository.Tags")
+
+	if user != nil {
+		query = query.Where("dataset.private = ? or dataset.user_id = ?", false, user.ID)
+	} else {
+		query = query.Where("dataset.private = ?", false)
+	}
+
+	if search != "" {
+		query = query.Where(
+			"dataset.path like ? or dataset.description like ? or dataset.name like ?",
+			fmt.Sprintf("%%%s%%", search),
+			fmt.Sprintf("%%%s%%", search),
+			fmt.Sprintf("%%%s%%", search),
+		)
+	}
+	// TODO：Optimize SQL
+	if len(tags) > 0 {
+		for _, tag := range tags {
+			query = query.Where("dataset.repository_id IN (SELECT repository_id FROM repository_tags JOIN tags ON repository_tags.tag_id = tags.id WHERE tags.category = ? AND tags.name = ?)", tag.Category, tag.Name)
+		}
+	}
+	count, err = query.Count(ctx)
+	if err != nil {
+		return
+	}
+
+	query = query.Order(sortBy[sort])
+	query = query.Limit(per).
+		Offset((page - 1) * per)
+
+	err = query.Scan(ctx)
+	if err != nil {
+		return
+	}
+	return
+}
+
 func (s *DatasetStore) Public(ctx context.Context, search, sort, tag string, per, page int) (datasets []Dataset, count int, err error) {
 	query := s.db.Operator.Core.
 		NewSelect().
@@ -192,6 +234,7 @@ func (s *DatasetStore) FindyByPath(ctx context.Context, namespace string, repoPa
 		NewSelect().
 		Model(resDataset).
 		Relation("Repository").
+		Relation("User").
 		Where("dataset.path =?", fmt.Sprintf("%s/%s", namespace, repoPath)).
 		Where("dataset.name =?", repoPath).
 		Scan(ctx)

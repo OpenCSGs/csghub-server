@@ -87,6 +87,49 @@ func (s *ModelStore) Public(ctx context.Context, search, sort, tag string, per, 
 	return
 }
 
+func (s *ModelStore) PublicToUser(ctx context.Context, user *User, search, sort string, tags []TagReq, per, page int) (models []Model, count int, err error) {
+	query := s.db.Operator.Core.
+		NewSelect().
+		Model(&models).
+		Relation("Repository.Tags")
+
+	if user != nil {
+		query = query.Where("model.private = ? or model.user_id = ?", false, user.ID)
+	} else {
+		query = query.Where("model.private = ?", false)
+	}
+
+	if search != "" {
+		query = query.Where(
+			"model.path like ? or model.description like ? or model.name like ?",
+			fmt.Sprintf("%%%s%%", search),
+			fmt.Sprintf("%%%s%%", search),
+			fmt.Sprintf("%%%s%%", search),
+		)
+	}
+	// TODO：Optimize SQL
+	if len(tags) > 0 {
+		for _, tag := range tags {
+			query = query.Where("model.repository_id IN (SELECT repository_id FROM repository_tags JOIN tags ON repository_tags.tag_id = tags.id WHERE tags.category = ? AND tags.name = ?)", tag.Category, tag.Name)
+		}
+	}
+
+	count, err = query.Count(ctx)
+	if err != nil {
+		return
+	}
+
+	query = query.Order(sortBy[sort])
+	query = query.Limit(per).
+		Offset((page - 1) * per)
+
+	err = query.Scan(ctx)
+	if err != nil {
+		return
+	}
+	return
+}
+
 func (s *ModelStore) ByUsername(ctx context.Context, username string, per, page int, onlyPublic bool) (models []Model, total int, err error) {
 	query := s.db.Operator.Core.
 		NewSelect().
@@ -187,6 +230,7 @@ func (s *ModelStore) FindyByPath(ctx context.Context, namespace string, repoPath
 		NewSelect().
 		Model(resModel).
 		Relation("Repository").
+		Relation("User").
 		Where("model.path =?", fmt.Sprintf("%s/%s", namespace, repoPath)).
 		Where("model.name =?", repoPath).
 		Limit(1).

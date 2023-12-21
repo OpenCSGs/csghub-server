@@ -75,8 +75,20 @@ type ModelComponent struct {
 	gs gitserver.GitServer
 }
 
-func (c *ModelComponent) Index(ctx context.Context, search, sort, tag string, per, page int) ([]database.Model, int, error) {
-	models, total, err := c.ms.Public(ctx, search, sort, tag, per, page)
+func (c *ModelComponent) Index(ctx context.Context, username, search, sort string, ragReqs []database.TagReq, per, page int) ([]database.Model, int, error) {
+	var user database.User
+	var err error
+	if username == "" {
+		slog.Info("get models without current username")
+	} else {
+		user, err = c.us.FindByUsername(ctx, username)
+		if err != nil {
+			newError := fmt.Errorf("failed to get current user,error:%w", err)
+			slog.Error(newError.Error())
+			return nil, 0, newError
+		}
+	}
+	models, total, err := c.ms.PublicToUser(ctx, &user, search, sort, ragReqs, per, page)
 	if err != nil {
 		newError := fmt.Errorf("failed to get public models,error:%w", err)
 		slog.Error(newError.Error())
