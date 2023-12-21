@@ -77,6 +77,7 @@ func (s *DatasetStore) PublicToUser(ctx context.Context, user *User, search, sor
 			fmt.Sprintf("%%%s%%", search),
 		)
 	}
+	// TODO：Optimize SQL
 	if len(tags) > 0 {
 		for _, tag := range tags {
 			query = query.Where("dataset.repository_id IN (SELECT repository_id FROM repository_tags JOIN tags ON repository_tags.tag_id = tags.id WHERE tags.category = ? AND tags.name = ?)", tag.Category, tag.Name)

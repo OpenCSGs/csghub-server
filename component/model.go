@@ -76,9 +76,17 @@ type ModelComponent struct {
 }
 
 func (c *ModelComponent) Index(ctx context.Context, username, search, sort string, ragReqs []database.TagReq, per, page int) ([]database.Model, int, error) {
-	user, err := c.us.FindByUsername(ctx, username)
-	if err != nil {
+	var user database.User
+	var err error
+	if username == "" {
 		slog.Info("get models without current username")
+	} else {
+		user, err = c.us.FindByUsername(ctx, username)
+		if err != nil {
+			newError := fmt.Errorf("failed to get current user,error:%w", err)
+			slog.Error(newError.Error())
+			return nil, 0, newError
+		}
 	}
 	models, total, err := c.ms.PublicToUser(ctx, &user, search, sort, ragReqs, per, page)
 	if err != nil {
