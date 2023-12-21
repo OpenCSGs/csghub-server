@@ -156,6 +156,32 @@ func (s *ModelStore) ByUsername(ctx context.Context, username string, per, page 
 	return
 }
 
+func (s *ModelStore) ByOrgPath(ctx context.Context, namespace string, per, page int, onlyPublic bool) (models []Model, total int, err error) {
+	query := s.db.Operator.Core.
+		NewSelect().
+		Model(&models).
+		Relation("Repository.Tags").
+		Where("model.path like ?", fmt.Sprintf("%s/%%", namespace))
+
+	if onlyPublic {
+		query = query.Where("model.private = ?", false)
+	}
+	query = query.Order("model.created_at DESC").
+		Limit(per).
+		Offset((page - 1) * per)
+
+	err = query.Scan(ctx, &models)
+
+	if err != nil {
+		return
+	}
+	total, err = query.Count(ctx)
+	if err != nil {
+		return
+	}
+	return
+}
+
 func (s *ModelStore) Count(ctx context.Context) (count int, err error) {
 	count, err = s.db.Operator.Core.
 		NewSelect().

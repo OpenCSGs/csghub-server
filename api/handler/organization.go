@@ -8,6 +8,7 @@ import (
 	"opencsg.com/starhub-server/api/httpbase"
 	"opencsg.com/starhub-server/common/config"
 	"opencsg.com/starhub-server/common/types"
+	"opencsg.com/starhub-server/common/utils/common"
 	"opencsg.com/starhub-server/component"
 )
 
@@ -86,4 +87,64 @@ func (h *OrganizationHandler) Update(ctx *gin.Context) {
 
 	slog.Info("Update organizations succeed", slog.String("org_name", org.Name))
 	httpbase.OK(ctx, org)
+}
+
+func (h *OrganizationHandler) Models(ctx *gin.Context) {
+	var req types.OrgModelsReq
+	req.Namespace = ctx.Param("namespace")
+	req.CurrentUser = ctx.Query("current_user")
+
+	per, page, err := common.GetPerAndPageFromContext(ctx)
+	if err != nil {
+		slog.Error("Bad request format", "error", err)
+		ctx.JSON(http.StatusBadRequest, gin.H{"message": err.Error()})
+		return
+	}
+	req.Page = page
+	req.PageSize = per
+	models, total, err := h.c.Models(ctx, &req)
+	if err != nil {
+		slog.Error("Failed to gat org models", slog.Any("error", err))
+		httpbase.ServerError(ctx, err)
+		return
+	}
+
+	slog.Info("Get org models succeed", slog.String("org", req.Namespace))
+
+	respData := gin.H{
+		"message": "OK",
+		"data":    models,
+		"total":   total,
+	}
+	ctx.JSON(http.StatusOK, respData)
+}
+
+func (h *OrganizationHandler) Datasets(ctx *gin.Context) {
+	var req types.OrgDatasetsReq
+	req.Namespace = ctx.Param("namespace")
+	req.CurrentUser = ctx.Query("current_user")
+
+	per, page, err := common.GetPerAndPageFromContext(ctx)
+	if err != nil {
+		slog.Error("Bad request format", "error", err)
+		ctx.JSON(http.StatusBadRequest, gin.H{"message": err.Error()})
+		return
+	}
+	req.Page = page
+	req.PageSize = per
+	datasets, total, err := h.c.Datasets(ctx, &req)
+	if err != nil {
+		slog.Error("Failed to gat org datasets", slog.Any("error", err))
+		httpbase.ServerError(ctx, err)
+		return
+	}
+
+	slog.Info("Get org datasets succeed", slog.String("org", req.Namespace))
+
+	respData := gin.H{
+		"message": "OK",
+		"data":    datasets,
+		"total":   total,
+	}
+	ctx.JSON(http.StatusOK, respData)
 }

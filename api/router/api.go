@@ -59,16 +59,16 @@ func NewRouter(config *config.Config) (*gin.Engine, error) {
 	apiGroup.PUT("/datasets/:namespace/:name/raw/*file_path", dsHandler.UpdateFile)
 
 	// User routes
-	userCtrl, err := handler.NewUserHandler(config)
+	userHandler, err := handler.NewUserHandler(config)
 	if err != nil {
 		return nil, fmt.Errorf("error creating user controller:%w", err)
 	}
-	apiGroup.POST("/users", userCtrl.Create)
-	apiGroup.PUT("/users/:username", userCtrl.Update)
+	apiGroup.POST("/users", userHandler.Create)
+	apiGroup.PUT("/users/:username", userHandler.Update)
 	// User models
-	apiGroup.GET("/user/:username/models", userCtrl.Models)
+	apiGroup.GET("/user/:username/models", userHandler.Models)
 	// User datasets
-	apiGroup.GET("/user/:username/datasets", userCtrl.Datasets)
+	apiGroup.GET("/user/:username/datasets", userHandler.Datasets)
 
 	acHandler, err := handler.NewAccessTokenHandler(config)
 	if err != nil {
@@ -94,6 +94,10 @@ func NewRouter(config *config.Config) (*gin.Engine, error) {
 	apiGroup.POST("/organizations", orgHandler.Create)
 	apiGroup.PUT("/organizations/:name", orgHandler.Update)
 	apiGroup.DELETE("/organizations/:name", orgHandler.Delete)
+	// Organization models
+	apiGroup.GET("/organization/:namespace/models", orgHandler.Models)
+	// Organization datasets
+	apiGroup.GET("/organization/:namespace/datasets", orgHandler.Datasets)
 
 	//Member
 	memberCtrl, err := member.New(config)

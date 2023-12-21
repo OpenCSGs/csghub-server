@@ -235,7 +235,7 @@ func (c *DatasetComponent) updateReadmeFile(ctx context.Context, req *types.Upda
 }
 
 func (c *DatasetComponent) Create(ctx context.Context, req *types.CreateDatasetReq) (dataset *database.Dataset, err error) {
-	_, err = c.ns.FindByPath(ctx, req.Namespace)
+	namespace, err := c.ns.FindByPath(ctx, req.Namespace)
 	if err != nil {
 		return nil, errors.New("namespace does not exist")
 	}
@@ -243,6 +243,16 @@ func (c *DatasetComponent) Create(ctx context.Context, req *types.CreateDatasetR
 	user, err := c.us.FindByUsername(ctx, req.Username)
 	if err != nil {
 		return nil, errors.New("user does not exist")
+	}
+
+	if namespace.NamespaceType == database.OrgNamespace {
+		if namespace.UserID != user.ID {
+			return nil, errors.New("users do not have permission to create models in this organization")
+		}
+	} else {
+		if namespace.Path != user.Username {
+			return nil, errors.New("users do not have permission to create models in this namespace")
+		}
 	}
 
 	dataset, repo, err := c.gs.CreateDatasetRepo(req)

@@ -160,6 +160,31 @@ func (s *DatasetStore) ByUsername(ctx context.Context, username string, per, pag
 	return
 }
 
+func (s *DatasetStore) ByOrgPath(ctx context.Context, namespace string, per, page int, onlyPublic bool) (datasets []Dataset, total int, err error) {
+	query := s.db.Operator.Core.
+		NewSelect().
+		Model(&datasets).
+		Relation("Repository.Tags").
+		Where("dataset.path like ?", fmt.Sprintf("%s/%%", namespace))
+
+	if onlyPublic {
+		query = query.Where("dataset.private = ?", false)
+	}
+	query = query.Order("dataset.created_at DESC").
+		Limit(per).
+		Offset((page - 1) * per)
+
+	err = query.Scan(ctx, &datasets)
+	if err != nil {
+		return
+	}
+	total, err = query.Count(ctx)
+	if err != nil {
+		return
+	}
+	return
+}
+
 func (s *DatasetStore) Count(ctx context.Context) (count int, err error) {
 	count, err = s.db.Operator.Core.
 		NewSelect().

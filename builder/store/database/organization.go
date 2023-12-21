@@ -96,3 +96,16 @@ func (s *OrgStore) FindByPath(ctx context.Context, path string) (org Organizatio
 		Scan(ctx)
 	return
 }
+
+func (s *OrgStore) Exists(ctx context.Context, path string) (exists bool, err error) {
+	var org Organization
+	exists, err = s.db.Operator.Core.
+		NewSelect().
+		Model(&org).
+		Where("path =?", path).
+		Exists(ctx)
+	if err != nil {
+		return
+	}
+	return
+}
