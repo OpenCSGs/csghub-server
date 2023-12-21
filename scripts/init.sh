@@ -50,20 +50,32 @@ TOKEN_RESPONSE=$(curl -s -X POST \
 # Extract access token from the response
 STARHUB_SERVER_GITSERVER_SECRET_KEY=$(echo "$TOKEN_RESPONSE" | jq -r '.sha1')
 
-# Create a webhook to send push events
-curl -X POST \
-     -H "Content-Type: application/json" \
-     -d '{
-       "type": "gitea",
-       "config": {
-         "url": "'"$STARHUB_SERVER_GITSERVER_WEBHOOK_URL"'",
-         "content_type": "json",
-         "insecure_ssl": "true"
-       },
-       "events": ["push"],
-       "active": true
-     }' \
-     "$STARHUB_SERVER_GITSERVER_HOST/api/v1/admin/hooks?access_token=$STARHUB_SERVER_GITSERVER_SECRET_KEY"
+# Get the system hook list
+webhooks=$(curl -s -X GET --url "$STARHUB_SERVER_GITSERVER_HOST/api/v1/admin/hooks" --header "Authorization: Basic $AUTH_HEADER")
+
+# Get the first hook type
+first_hook_type=$(echo "$webhooks" | jq -r '.[0].type')
+
+if [ -n "$first_hook_type" ] && [ "$first_hook_type" != "null" ]; then
+    echo "System hook exists"
+else
+    # Create a webhook to send push events
+    curl -X POST \
+        -H "Content-Type: application/json" \
+        -d '{
+        "type": "gitea",
+        "authorization_header": "Bearer '"$STARHUB_SERVER_API_TOKEN"'",
+        "config": {
+            "is_system_webhook": "true",
+            "url": "'"$STARHUB_SERVER_GITSERVER_WEBHOOK_URL"'",
+            "content_type": "json",
+            "insecure_ssl": "true"
+        },
+        "events": ["push"],
+        "active": true
+        }' \
+        "$STARHUB_SERVER_GITSERVER_HOST/api/v1/admin/hooks?access_token=$STARHUB_SERVER_GITSERVER_SECRET_KEY"
+fi
 
 # Add the access token to the environment
 echo "export STARHUB_SERVER_GITSERVER_SECRET_KEY=$STARHUB_SERVER_GITSERVER_SECRET_KEY" >> /etc/profile
