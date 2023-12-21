@@ -8,6 +8,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"opencsg.com/starhub-server/api/httpbase"
+	"opencsg.com/starhub-server/builder/store/database"
 	"opencsg.com/starhub-server/common/config"
 	"opencsg.com/starhub-server/common/types"
 	"opencsg.com/starhub-server/common/utils/common"
@@ -29,22 +30,25 @@ type ModelHandler struct {
 }
 
 func (h *ModelHandler) Index(ctx *gin.Context) {
+	var tagReqs []database.TagReq
+	tagReqs = parseTagReqs(ctx)
+	username := ctx.Query("current_user")
 	per, page, err := common.GetPerAndPageFromContext(ctx)
 	if err != nil {
 		slog.Error("Bad request format", "error", err)
 		ctx.JSON(http.StatusBadRequest, gin.H{"message": err.Error()})
 		return
 	}
-	search, sort, tag := getFilterFromContext(ctx)
+	search, sort := getFilterFromContext(ctx)
 	if !slices.Contains[[]string](Sorts, sort) {
 		msg := fmt.Sprintf("sort parameter must be one of %v", Sorts)
 		slog.Error("Bad request format,", slog.String("error", msg))
 		ctx.JSON(http.StatusBadRequest, gin.H{"message": msg})
 		return
 	}
-	models, total, err := h.c.Index(ctx, search, sort, tag, per, page)
+	models, total, err := h.c.Index(ctx, username, search, sort, tagReqs, per, page)
 	if err != nil {
-		slog.Error("Failed to create user", slog.Any("error", err))
+		slog.Error("Failed to get models", slog.Any("error", err))
 		ctx.JSON(http.StatusInternalServerError, gin.H{"message": err.Error()})
 		return
 	}
@@ -367,4 +371,32 @@ func (h *ModelHandler) Tree(ctx *gin.Context) {
 
 	slog.Info("Get model file tree succeed", slog.String("model", name), slog.String("path", req.Path), slog.String("ref", req.Ref))
 	httpbase.OK(ctx, tree)
+}
+
+func parseTagReqs(ctx *gin.Context) (tags []database.TagReq) {
+	licenseTag := ctx.Query("license_tag")
+	taskTag := ctx.Query("task_tag")
+	frameworkTag := ctx.Query("framework_tag")
+	if licenseTag != "" {
+		tags = append(tags, database.TagReq{
+			Name:     licenseTag,
+			Category: "License",
+		})
+	}
+
+	if taskTag != "" {
+		tags = append(tags, database.TagReq{
+			Name:     taskTag,
+			Category: "Tasks",
+		})
+	}
+
+	if frameworkTag != "" {
+		tags = append(tags, database.TagReq{
+			Name:     frameworkTag,
+			Category: "Framework",
+		})
+	}
+
+	return
 }

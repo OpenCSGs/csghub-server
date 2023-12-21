@@ -2,6 +2,7 @@ package component
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 
@@ -41,7 +42,7 @@ func (c *OrganizationComponent) Create(ctx context.Context, req *types.CreateOrg
 
 	es, err := c.ns.Exists(ctx, req.Name)
 	if es {
-		return nil, fmt.Errorf("the name already exists, error: %w", err)
+		return nil, errors.New("the name already exists")
 	}
 
 	req.User = user

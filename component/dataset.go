@@ -304,8 +304,12 @@ license: ` + license + `
 	`
 }
 
-func (c *DatasetComponent) Index(ctx context.Context, search, sort, tag string, per, page int) ([]database.Dataset, int, error) {
-	datasets, total, err := c.ds.Public(ctx, search, sort, tag, per, page)
+func (c *DatasetComponent) Index(ctx context.Context, username, search, sort string, tags []database.TagReq, per, page int) ([]database.Dataset, int, error) {
+	user, err := c.us.FindByUsername(ctx, username)
+	if err != nil {
+		slog.Info("get models without current username")
+	}
+	datasets, total, err := c.ds.PublicToUser(ctx, &user, search, sort, tags, per, page)
 	if err != nil {
 		newError := fmt.Errorf("failed to get public datasets,error:%w", err)
 		slog.Error(newError.Error())
