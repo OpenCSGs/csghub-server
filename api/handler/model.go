@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"net/http"
 	"slices"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"opencsg.com/starhub-server/api/httpbase"
@@ -379,22 +380,22 @@ func parseTagReqs(ctx *gin.Context) (tags []database.TagReq) {
 	frameworkTag := ctx.Query("framework_tag")
 	if licenseTag != "" {
 		tags = append(tags, database.TagReq{
-			Name:     licenseTag,
-			Category: "License",
+			Name:     strings.ToLower(licenseTag),
+			Category: "license",
 		})
 	}
 
 	if taskTag != "" {
 		tags = append(tags, database.TagReq{
-			Name:     taskTag,
-			Category: "Tasks",
+			Name:     strings.ToLower(taskTag),
+			Category: "task",
 		})
 	}
 
 	if frameworkTag != "" {
 		tags = append(tags, database.TagReq{
-			Name:     frameworkTag,
-			Category: "Framework",
+			Name:     strings.ToLower(frameworkTag),
+			Category: "framework",
 		})
 	}
 

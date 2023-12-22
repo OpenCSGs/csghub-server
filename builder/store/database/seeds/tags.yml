@@ -1,281 +1,621 @@
 tags:
-- category: Tasks
+- category: task
   group: computer_vision
   name: image-classification
   scope: model
-- category: Tasks
+  built_in: true
+- category: task
   group: computer_vision
   name: image-segmentation
   scope: model
-- category: Tasks
+  built_in: true
+- category: task
   group: computer_vision
   name: ocr
   scope: model
-- category: Tasks
+  built_in: true
+- category: task
   group: computer_vision
   name: skin-retouching
   scope: model
-- category: Tasks
+  built_in: true
+- category: task
   group: computer_vision
   name: image-to-image
   scope: model
-- category: Tasks
+  built_in: true
+- category: task
   group: computer_vision
   name: video-detection
   scope: model
-- category: Tasks
+  built_in: true
+- category: task
   group: computer_vision
   name: video-segmentation
   scope: model
-- category: Tasks
+  built_in: true
+- category: task
   group: computer_vision
   name: video-generation
   scope: model
-- category: Tasks
+  built_in: true
+- category: task
   group: computer_vision
   name: video-captioning
   scope: model
-- category: Tasks
+  built_in: true
+- category: task
   group: computer_vision
   name: face-detection
   scope: model
-- category: Tasks
+  built_in: true
+- category: task
   group: computer_vision
   name: face-recognition
   scope: model
-- category: Tasks
+  built_in: true
+- category: task
   group: computer_vision
   name: face-image-generation
   scope: model
-- category: Tasks
+  built_in: true
+- category: task
   group: computer_vision
   name: image-object-detection
   scope: model
-- category: Tasks
+  built_in: true
+- category: task
   group: computer_vision
   name: image-super-resolution
   scope: model
-- category: Tasks
+  built_in: true
+- category: task
   group: computer_vision
   name: action-detection
   scope: model
-- category: Tasks
+  built_in: true
+- category: task
   group: computer_vision
   name: semantic-segmentation
   scope: model
-- category: Tasks
+  built_in: true
+- category: task
   group: natural_language_processing
   name: word-segmentation
   scope: model
-- category: Tasks
+  built_in: true
+- category: task
   group: natural_language_processing
   name: named-entity-recognition
   scope: model
-- category: Tasks
+  built_in: true
+- category: task
   group: natural_language_processing
   name: part-of-speech
   scope: model
-- category: Tasks
+  built_in: true
+- category: task
   group: natural_language_processing
   name: document-segmentation
   scope: model
-- category: Tasks
+  built_in: true
+- category: task
   group: natural_language_processing
   name: text-classification
   scope: model
-- category: Tasks
+  built_in: true
+- category: task
   group: natural_language_processing
   name: sentiment-classification
   scope: model
-- category: Tasks
+  built_in: true
+- category: task
   group: natural_language_processing
   name: nli
   scope: model
-- category: Tasks
+  built_in: true
+- category: task
   group: natural_language_processing
   name: conversational
   scope: model
-- category: Tasks
+  built_in: true
+- category: task
   group: natural_language_processing
   name: translation
   scope: model
-- category: Tasks
+  built_in: true
+- category: task
   group: natural_language_processing
   name: text-generation
   scope: model
-- category: Tasks
+  built_in: true
+- category: task
   group: natural_language_processing
   name: text-summarization
   scope: model
-- category: Tasks
+  built_in: true
+- category: task
   group: natural_language_processing
   name: feature-extraction
   scope: model
-- category: Tasks
+  built_in: true
+- category: task
   group: natural_language_processing
   name: relation-extraction
   scope: model
-- category: Tasks
+  built_in: true
+- category: task
   group: audio_processing
   name: auto-speech-recognition
   scope: model
-- category: Tasks
+  built_in: true
+- category: task
   group: audio_processing
   name: text-to-speech
   scope: model
-- category: Tasks
+  built_in: true
+- category: task
   group: audio_processing
   name: audio-classification
   scope: model
-- category: Tasks
+  built_in: true
+- category: task
   group: multimodal
   name: text-to-image-synthesis
   scope: model
-- category: Tasks
+  built_in: true
+- category: task
   group: multimodal
   name: visual-question-answering
   scope: model
-- category: Tasks
+  built_in: true
+- category: task
   group: multimodal
   name: image-text-retrieval
   scope: model
+  built_in: true
 - name: text-classification
-  category: Tasks
+  category: task
   group: text_processing
   scope: dataset
+  built_in: true
 - name: relation-extraction
-  category: Tasks
+  category: task
   group: text_processing
   scope: dataset
+  built_in: true
 - name: zero-shot
-  category: Tasks
+  category: task
   group: text_processing
   scope: dataset
+  built_in: true
 - name: translation
-  category: Tasks
+  category: task
   group: text_processing
   scope: dataset
+  built_in: true
 - name: token-classification
-  category: Tasks
+  category: task
   group: text_processing
   scope: dataset
+  built_in: true
 - name: conversational
-  category: Tasks
+  category: task
   group: text_processing
   scope: dataset
+  built_in: true
 - name: text-generation
-  category: Tasks
+  category: task
   group: text_processing
   scope: dataset
+  built_in: true
 - name: table-question-answering
-  category: Tasks
+  category: task
   group: text_processing
   scope: dataset
+  built_in: true
 - name: sentence-similarity
-  category: Tasks
+  category: task
   group: text_processing
   scope: dataset
+  built_in: true
 - name: fill-mask
-  category: Tasks
+  category: task
   group: text_processing
   scope: dataset
+  built_in: true
 - name: summarization
-  category: Tasks
+  category: task
   group: text_processing
   scope: dataset
+  built_in: true
 - name: question-answering
-  category: Tasks
+  category: task
   group: text_processing
   scope: dataset
+  built_in: true
 - name: image-to-text
-  category: Tasks
+  category: task
   group: graphics
   scope: dataset
+  built_in: true
 - name: image-classification
-  category: Tasks
+  category: task
   group: graphics
   scope: dataset
+  built_in: true
 - name: object-detection
-  category: Tasks
+  category: task
   group: graphics
   scope: dataset
+  built_in: true
 - name: image-segmentation
-  category: Tasks
+  category: task
   group: graphics
   scope: dataset
+  built_in: true
 - name: image-editing
-  category: Tasks
+  category: task
   group: graphics
   scope: dataset
+  built_in: true
 - name: image-generation
-  category: Tasks
+  category: task
   group: graphics
   scope: dataset
+  built_in: true
 - name: auto-speech-recognition
-  category: Tasks
+  category: task
   group: audio
   scope: dataset
+  built_in: true
 - name: text-to-speech
-  category: Tasks
+  category: task
   group: audio
   scope: dataset
+  built_in: true
 - name: speech-signal-process
-  category: Tasks
+  category: task
   group: audio
   scope: dataset
+  built_in: true
 - name: keyword-spotting
-  category: Tasks
+  category: task
   group: audio
   scope: dataset
+  built_in: true
 - name: audio-classification
-  category: Tasks
+  category: task
   group: audio
   scope: dataset
+  built_in: true
 - name: voice-activity-detection
-  category: Tasks
+  category: task
   group: audio
   scope: dataset
+  built_in: true
 - name: object-tracking
-  category: Tasks
+  category: task
   group: video
   scope: dataset
+  built_in: true
 - name: autonomous-driving
-  category: Tasks
+  category: task
   group: video
   scope: dataset
+  built_in: true
 - name: video-generation
-  category: Tasks
+  category: task
   group: video
   scope: dataset
+  built_in: true
 - name: video-super-resolution
-  category: Tasks
+  category: task
   group: video
   scope: dataset
+  built_in: true
 - name: video-segmentation
-  category: Tasks
+  category: task
   group: video
   scope: dataset
+  built_in: true
 - name: image-captioning
-  category: Tasks
+  category: task
   group: multimodal
   scope: dataset
+  built_in: true
 - name: visual-grounding
-  category: Tasks
+  category: task
   group: multimodal
   scope: dataset
+  built_in: true
 - name: text-to-image-synthesis
-  category: Tasks
+  category: task
   group: multimodal
   scope: dataset
+  built_in: true
 - name: feature-extraction
-  category: Tasks
+  category: task
   group: multimodal
   scope: dataset
+  built_in: true
 - name: biomedicine
-  category: Tasks
+  category: task
   group: scientific_computing
   scope: dataset
+  built_in: true
 - name: protein-structure
-  category: Tasks
+  category: task
   group: scientific_computing
   scope: dataset
+  built_in: true
+- name: apache-2.0
+  category: license
+  group: ''
+  scope: model
+  built_in: true
+- name: mit
+  category: license
+  group: ''
+  scope: model
+  built_in: true
+- name: lgpl
+  category: license
+  group: ''
+  scope: model
+  built_in: true
+- name: lgpl-2.1
+  category: license
+  group: ''
+  scope: model
+  built_in: true
+- name: lgpl-3.0
+  category: license
+  group: ''
+  scope: model
+  built_in: true
+- name: gpl
+  category: license
+  group: ''
+  scope: model
+  built_in: true
+- name: gpl-2.0
+  category: license
+  group: ''
+  scope: model
+  built_in: true
+- name: gpl-3.0
+  category: license
+  group: ''
+  scope: model
+  built_in: true
+- name: afl-3.0
+  category: license
+  group: ''
+  scope: model
+  built_in: true
+- name: ecl-2.0
+  category: license
+  group: ''
+  scope: model
+  built_in: true
+- name: cc-by-4.0
+  category: license
+  group: ''
+  scope: model
+  built_in: true
+- name: cc-by-nc-nd-3.0
+  category: license
+  group: ''
+  scope: model
+  built_in: true
+- name: cc-by-nc-nd-4.0
+  category: license
+  group: ''
+  scope: model
+  built_in: true
+- name: creativeml-openrail-m
+  category: license
+  group: ''
+  scope: model
+  built_in: true
+- name: agpl-3.0
+  category: license
+  group: ''
+  scope: model
+  built_in: true
+- name: cc-by-nc-4.0
+  category: license
+  group: ''
+  scope: model
+  built_in: true
+- name: cc-by-nc-sa-2.0
+  category: license
+  group: ''
+  scope: model
+  built_in: true
+- name: cc-by-nc-sa-3.0
+  category: license
+  group: ''
+  scope: model
+  built_in: true
+- name: cc-by-nc-sa-4.0
+  category: license
+  group: ''
+  scope: model
+  built_in: true
+- name: apache-2.0
+  category: license
+  group: ''
+  scope: dataset
+  built_in: true
+- name: mit
+  category: license
+  group: ''
+  scope: dataset
+  built_in: true
+- name: lgpl
+  category: license
+  group: ''
+  scope: dataset
+  built_in: true
+- name: lgpl-2.1
+  category: license
+  group: ''
+  scope: dataset
+  built_in: true
+- name: lgpl-3.0
+  category: license
+  group: ''
+  scope: dataset
+  built_in: true
+- name: gpl
+  category: license
+  group: ''
+  scope: dataset
+  built_in: true
+- name: gpl-2.0
+  category: license
+  group: ''
+  scope: dataset
+  built_in: true
+- name: gpl-3.0
+  category: license
+  group: ''
+  scope: dataset
+  built_in: true
+- name: afl-3.0
+  category: license
+  group: ''
+  scope: dataset
+  built_in: true
+- name: ecl-2.0
+  category: license
+  group: ''
+  scope: dataset
+  built_in: true
+- name: cc-by-4.0
+  category: license
+  group: ''
+  scope: dataset
+  built_in: true
+- name: cc-by-nc-nd-3.0
+  category: license
+  group: ''
+  scope: dataset
+  built_in: true
+- name: cc-by-nc-nd-4.0
+  category: license
+  group: ''
+  scope: dataset
+  built_in: true
+- name: creativeml-openrail-m
+  category: license
+  group: ''
+  scope: dataset
+  built_in: true
+- name: agpl-3.0
+  category: license
+  group: ''
+  scope: dataset
+  built_in: true
+- name: cc-by-nc-4.0
+  category: license
+  group: ''
+  scope: dataset
+  built_in: true
+- name: cc-by-nc-sa-2.0
+  category: license
+  group: ''
+  scope: dataset
+  built_in: true
+- name: cc-by-nc-sa-3.0
+  category: license
+  group: ''
+  scope: dataset
+  built_in: true
+- name: cc-by-nc-sa-4.0
+  category: license
+  group: ''
+  scope: dataset
+  built_in: true
+- name: pytorch
+  category: framework
+  group: ""
+  scope: model
+  built_in: true
+- name: tensorflow
+  category: framework
+  group: ""
+  scope: model
+  built_in: true
+- name: safetensors
+  category: framework
+  group: ""
+  scope: model
+  built_in: true
+- name: jax
+  category: framework
+  group: ""
+  scope: model
+  built_in: true
+- name: onnx
+  category: framework
+  group: ""
+  scope: model
+  built_in: true
+- name: paddlepaddle
+  category: framework
+  group: ""
+  scope: model
+  built_in: true
+- name: joblib
+  category: framework
+  group: ""
+  scope: model
+  built_in: true
+- name: gguf
+  category: framework
+  group: ""
+  scope: model
+  built_in: true
+- name: pytorch
+  category: framework
+  group: ""
+  scope: dataset
+  built_in: true
+- name: tensorflow
+  category: framework
+  group: ""
+  scope: dataset
+  built_in: true
+- name: safetensors
+  category: framework
+  group: ""
+  scope: dataset
+  built_in: true
+- name: jax
+  category: framework
+  group: ""
+  scope: dataset
+  built_in: true
+- name: onnx
+  category: framework
+  group: ""
+  scope: dataset
+  built_in: true
+- name: paddlepaddle
+  category: framework
+  group: ""
+  scope: dataset
+  built_in: true
+- name: joblib
+  category: framework
+  group: ""
+  scope: dataset
+  built_in: true
+- name: gguf
+  category: framework
+  group: ""
+  scope: dataset
+  built_in: true

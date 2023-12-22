@@ -1,25 +1,13 @@
 categories:
-- name: Tasks
+- name: task
   scope: model
-- name: Libraries
+- name: license
   scope: model
-- name: Datasets
+- name: framework
   scope: model
-- name: Languages
-  scope: model
-- name: Licenses
-  scope: model
-- name: Other
-  scope: model
-- name: Tasks
+- name: task
   scope: dataset
-- name: Sizes
+- name: license
   scope: dataset
-- name: Sub-tasks
-  scope: dataset
-- name: Languages
-  scope: dataset
-- name: Licenses
-  scope: dataset
-- name: Other
+- name: size
   scope: dataset
