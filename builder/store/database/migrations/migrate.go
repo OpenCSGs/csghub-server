@@ -94,7 +94,7 @@ func dropTables(ctx context.Context, db *bun.DB, tables ...any) (err error) {
 // see https://github.com/uptrace/bun/discussions/621
 type times struct {
 	CreatedAt time.Time `bun:",nullzero,notnull,skipupdate,default:current_timestamp" json:"created_at"`
-	UpdatedAt time.Time `bun:",nullzero" json:"updated_at"`
+	UpdatedAt time.Time `bun:",nullzero,notnull,default:current_timestamp" json:"updated_at"`
 }
 
 // OwnerType is the owner a user or organization?

@@ -41,6 +41,7 @@ type Tag struct {
 	Category string   `bun:",notnull" json:"category" yaml:"category"`
 	Group    string   `bun:",notnull" json:"group" yaml:"group"`
 	Scope    TagScope `bun:",notnull" json:"scope" yaml:"scope"`
+	BuiltIn  bool     `bun:",notnull" json:"built_in" yaml:"built_in"`
 	times
 }
 
