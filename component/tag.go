@@ -4,8 +4,6 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
-	"slices"
-	"strings"
 
 	"opencsg.com/starhub-server/builder/store/database"
 	"opencsg.com/starhub-server/common/config"
@@ -33,30 +31,28 @@ func (c *TagComponent) ClearMetaTags(ctx context.Context, namespace, name string
 }
 
 func (c *TagComponent) UpdateMetaTags(ctx context.Context, tagScope database.TagScope, namespace, name, content string) ([]*database.RepositoryTag, error) {
-	fileCategoryTagMap, err := tagparser.MetaTags(content)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse metadata, cause: %w", err)
-	}
-	slog.Debug("File tags parsed", slog.Any("tags", fileCategoryTagMap))
 
-	var predefinedTags []*database.Tag
+	var tp tagparser.TagProcessor
 	//TODO:load from cache
 	if tagScope == database.DatasetTagScope {
-		predefinedTags, err = c.ts.AllDatasetTags(ctx)
+		tp = tagparser.NewDatasetTagProcessor(c.ts)
 	} else {
-		predefinedTags, err = c.ts.AllModelTags(ctx)
+		tp = tagparser.NewModelTagProcessor(c.ts)
 	}
-	if err != nil {
-		slog.Error("Failed to get predefined tags", slog.Any("error", err))
-		return nil, fmt.Errorf("failed to get predefined tags, cause: %w", err)
-	}
-
-	var metaTags []*database.Tag
-	metaTags, err = c.prepareMetaTags(ctx, predefinedTags, fileCategoryTagMap)
+	tagsMatched, tagToCreate, err := tp.ProcessReadme(ctx, content)
 	if err != nil {
 		slog.Error("Failed to process tags", slog.Any("error", err))
 		return nil, fmt.Errorf("failed to process tags, cause: %w", err)
 	}
+	slog.Debug("tagsToCreate", slog.Any("tags", tagToCreate))
+	slog.Debug("tagsMatched", slog.Any("tags", tagsMatched))
+
+	err = c.ts.SaveTags(ctx, tagToCreate)
+	if err != nil {
+		slog.Error("Failed to save tags", slog.Any("error", err))
+		return nil, fmt.Errorf("failed to save tags, cause: %w", err)
+	}
+	metaTags := append(tagsMatched, tagToCreate...)
 	var repoTags []*database.RepositoryTag
 	repoTags, err = c.ts.SetMetaTags(ctx, namespace, name, metaTags)
 	if err != nil {
@@ -66,63 +62,6 @@ func (c *TagComponent) UpdateMetaTags(ctx context.Context, tagScope database.Tag
 	}
 
 	return repoTags, nil
-}
-
-func (c *TagComponent) prepareMetaTags(ctx context.Context, predefinedTags []*database.Tag, categoryTagMap map[string][]string) ([]*database.Tag, error) {
-	var err error
-	var tagsNeed []*database.Tag
-	if len(categoryTagMap) == 0 {
-		slog.Debug("No category tags to compare with predefined tags")
-		return tagsNeed, nil
-	}
-
-	/*Rules for meta tags here:
-	- if any tag is found in the predefined tags, accept it
-	- if any tag is not found in the predefined tags but of category "Tasks", add it to "Other" category
-	- if any tag is not found in the predefined tags and not of category "Tasks", ignore it
-	*/
-	var tagsToCreate []*database.Tag
-	for category, tagNames := range categoryTagMap {
-		for _, tagName := range tagNames {
-			//is predefined tag, or "Other" tag created before
-			if !slices.ContainsFunc(predefinedTags, func(t *database.Tag) bool {
-				match := strings.EqualFold(t.Name, tagName) && (strings.EqualFold(t.Category, category) ||
-					strings.EqualFold(t.Category, "Other"))
-
-				if match {
-					tagsNeed = append(tagsNeed, t)
-				}
-				return match
-			}) {
-				//all unkown tags of category "Tasks" belongs to category "Other" and will be created later
-				if strings.EqualFold(category, "Tasks") {
-					continue
-				}
-				category = "Other"
-				tagsToCreate = append(tagsToCreate, &database.Tag{
-					Category: category,
-					Name:     tagName,
-					Scope:    database.DatasetTagScope,
-				})
-			}
-		}
-	}
-	//remove duplicated tag info, make sure the same tag will be created once
-	tagsToCreate = slices.CompactFunc(tagsToCreate, func(t1, t2 *database.Tag) bool {
-		return t1.Name == t2.Name && t1.Category == t2.Category
-	})
-
-	if len(tagsToCreate) == 0 {
-		return tagsNeed, nil
-	}
-
-	err = c.ts.SaveTags(ctx, tagsToCreate)
-	if err != nil {
-		return nil, err
-	}
-
-	return append(tagsNeed, tagsToCreate...), nil
-
 }
 
 func (c *TagComponent) UpdateLibraryTags(ctx context.Context, tagScope database.TagScope, namespace, name, oldFilePath, newFilePath string) error {

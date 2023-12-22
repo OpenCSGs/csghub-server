@@ -116,6 +116,9 @@ func (ts *TagStore) CreateTag(ctx context.Context, category, name, group string,
 }
 
 func (ts *TagStore) SaveTags(ctx context.Context, tags []*Tag) error {
+	if len(tags) == 0 {
+		return nil
+	}
 	_, err := ts.db.Operator.Core.NewInsert().Model(&tags).Exec(ctx)
 	if err != nil {
 		slog.Error("Failed to save tags", slog.Any("tags", tags), slog.Any("error", err))
@@ -168,7 +171,7 @@ func (ts *TagStore) SetMetaTags(ctx context.Context, namespace, name string, tag
 
 	var metaTagIds []int64
 	for _, tag := range repo.Tags {
-		if tag.Category != "Libraries" {
+		if tag.Category != "framework" {
 			metaTagIds = append(metaTagIds, tag.ID)
 		}
 	}
@@ -184,8 +187,8 @@ func (ts *TagStore) SetMetaTags(ctx context.Context, namespace, name string, tag
 			return nil
 		}
 		for _, tag := range tags {
-			if tag.Category == "Libraries" {
-				return errors.New("found Library tag when set meta tag, tag name:" + tag.Name)
+			if tag.Category == "framework" {
+				return errors.New("found framework tag when set meta tag, tag name:" + tag.Name)
 			}
 			repoTag := &RepositoryTag{RepositoryID: repo.ID, TagID: tag.ID, Repository: repo, Tag: tag, Count: 1}
 			repoTags = append(repoTags, repoTag)

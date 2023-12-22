@@ -3,6 +3,7 @@ package tagparser
 import (
 	"errors"
 	"log/slog"
+	"slices"
 	"strings"
 
 	"gopkg.in/yaml.v3"
@@ -15,29 +16,41 @@ func MetaTags(readme string) (map[string][]string, error) {
 		return map[string][]string{}, nil
 	}
 
-	categoryMap := make(map[string]any)
+	categoryContents := make(map[string]any)
 	//parse yaml string
-	err := yaml.Unmarshal([]byte(meta), categoryMap)
+	err := yaml.Unmarshal([]byte(meta), categoryContents)
 	if err != nil {
 		slog.Error("error unmarshall meta for tags", slog.Any("error", err), slog.String("meta", meta))
 		return nil, err
 	}
-	tagMap := make(map[string][]string)
-	for category, tagStr := range categoryMap {
-		slog.Debug("tag category map content", slog.String("category", category), slog.Any("tagStr", tagStr))
-		if tagName, match := tagStr.(string); match {
-			tagMap[category] = append(tagMap[category], strings.TrimSpace(tagName))
-		} else if tagNames, match := tagStr.([]interface{}); match {
+	categoryTags := make(map[string][]string)
+	for category, content := range categoryContents {
+		category = formatCategoryName(category)
+		slog.Debug("tag category map content", slog.String("category", category), slog.Any("content", content))
+		//TODO: define different content parser
+		if tagName, match := content.(string); match {
+			categoryTags[category] = append(categoryTags[category], strings.TrimSpace(tagName))
+		} else if tagNames, match := content.([]interface{}); match {
 			for _, tagName := range tagNames {
-				tagMap[category] = append(tagMap[category], strings.TrimSpace(tagName.(string)))
+				categoryTags[category] = append(categoryTags[category], strings.TrimSpace(tagName.(string)))
 			}
 		} else {
-			slog.Error("Unknown meta format", slog.Any("tagStr", tagStr))
+			slog.Error("Unknown meta format", slog.Any("content", content))
 			return nil, errors.New("unknown meta format")
 		}
 	}
 
-	return tagMap, nil
+	return uniqueTags(categoryTags), nil
+}
+
+func uniqueTags(categoryTags map[string][]string) map[string][]string {
+	uniqueTags := make(map[string][]string)
+	for c, ts := range categoryTags {
+		//must sort before slice compact
+		slices.Sort(ts)
+		uniqueTags[c] = slices.Compact(ts)
+	}
+	return uniqueTags
 }
 
 func metaText(readme string) string {

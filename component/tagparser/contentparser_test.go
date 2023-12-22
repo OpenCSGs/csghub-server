@@ -1,6 +1,7 @@
 package tagparser
 
 import (
+	"slices"
 	"testing"
 )
 
@@ -11,6 +12,7 @@ task_categories:
 language:
 - zh
 tags:
+- text-generation
 - 'llm '
 - casual-lm
 - language-modeling
@@ -36,6 +38,7 @@ task_categories:
 language:
 - zh
 tags:
+- text-generation
 - 'llm '
 - casual-lm
 - language-modeling
@@ -58,20 +61,19 @@ func TestMetaTags(t *testing.T) {
 		t.Error(err)
 		t.FailNow()
 	}
-	if len(metaTags) != 5 {
-		t.Errorf("expected 5 tags, got %d", len(metaTags))
+	if len(metaTags) != 4 {
+		t.Errorf("expected 4 tags, got %d", len(metaTags))
 		t.Fail()
 	}
-	if len(metaTags["task_categories"]) != 1 || metaTags["task_categories"][0] != "text-generation" {
-		t.Error("wrong task_categories")
+	if len(metaTags["task"]) != 4 || !slices.Equal(metaTags["task"], []string{"text-generation", "llm", "casual-lm", "language-modeling"}) {
+		t.Error("wrong task_categories", len(metaTags["task"]), metaTags["task"])
 		t.Fail()
 	}
 	if len(metaTags["language"]) != 1 || metaTags["language"][0] != "zh" {
 		t.Error("wrong language")
 		t.Fail()
 	}
-	if len(metaTags["tags"]) != 3 || metaTags["tags"][0] != "llm" ||
-		metaTags["tags"][1] != "casual-lm" || metaTags["tags"][2] != "language-modeling" {
+	if len(metaTags["tags"]) != 0 {
 		t.Errorf("wrong tags, got:%v", metaTags["tags"])
 		t.Fail()
 	}
@@ -79,7 +81,7 @@ func TestMetaTags(t *testing.T) {
 		t.Error("wrong pretty_name")
 		t.Fail()
 	}
-	if len(metaTags["size_categories"]) != 1 || metaTags["size_categories"][0] != "100B<n<1T" {
+	if len(metaTags["size"]) != 1 || metaTags["size"][0] != "100B<n<1T" {
 		t.Error("wrong size_categories")
 		t.Fail()
 	}

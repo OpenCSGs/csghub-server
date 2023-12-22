@@ -25,9 +25,9 @@ export DB_DEBUG=2
 
 go build -v -o ./bin/starhub-server ./cmd/starhub-server
 
-./bin/starhub-server migration init
+# ./bin/starhub-server migration init
 #uncomment this command if db schema changed
 # ./bin/starhub-server migration create_sql add_col_count_to_repository_tags
-./bin/starhub-server migration migrate 
+# ./bin/starhub-server migration migrate 
 
-# ./bin/starhub-server start server
+./bin/starhub-server start server
