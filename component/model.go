@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"io"
 	"log/slog"
 
 	"opencsg.com/starhub-server/builder/gitserver"
@@ -322,6 +323,21 @@ func (c *ModelComponent) FileRaw(ctx context.Context, req *types.GetFileReq) (st
 		return "", fmt.Errorf("failed to get git model repository file raw, error: %w", err)
 	}
 	return raw, nil
+}
+
+func (c *ModelComponent) DownloadFile(ctx context.Context, req *types.GetFileReq) (io.ReadCloser, error) {
+	model, err := c.ms.FindyByPath(ctx, req.Namespace, req.Name)
+	if err != nil {
+		return nil, fmt.Errorf("failed to find model, error: %w", err)
+	}
+	if req.Ref == "" {
+		req.Ref = model.Repository.DefaultBranch
+	}
+	reader, err := c.gs.GetModelFileReader(req.Namespace, req.Name, req.Ref, req.Path, req.Lfs)
+	if err != nil {
+		return nil, fmt.Errorf("failed to download git model repository file, error: %w", err)
+	}
+	return reader, nil
 }
 
 func (c *ModelComponent) Branches(ctx context.Context, req *types.GetBranchesReq) ([]*types.ModelBranch, error) {

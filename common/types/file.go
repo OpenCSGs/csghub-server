@@ -58,6 +58,7 @@ type GetFileReq struct {
 	Name      string `json:"name"`
 	Path      string `json:"path"`
 	Ref       string `json:"ref"`
+	Lfs       bool   `json:"lfs"`
 }
 
 type GetBranchesReq struct {

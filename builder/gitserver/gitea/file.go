@@ -77,6 +77,15 @@ func (c *Client) GetDatasetFileRaw(namespace, name, ref, path string) (string, e
 	return string(giteaFileData), nil
 }
 
+func (c *Client) GetDatasetFileReader(namespace, name, ref, path string, lfs bool) (io.ReadCloser, error) {
+	namespace = common.WithPrefix(namespace, DatasetOrgPrefix)
+	giteaFileReader, _, err := c.giteaClient.GetFileReader(namespace, name, ref, path, lfs)
+	if err != nil {
+		return nil, err
+	}
+	return giteaFileReader, nil
+}
+
 func (c *Client) GetDatasetLfsFileRaw(namespace, repoName, ref, filePath string) (io.ReadCloser, error) {
 	namespace = common.WithPrefix(namespace, DatasetOrgPrefix)
 	r, _, err := c.giteaClient.GetFileReader(namespace, repoName, ref, filePath, true)
@@ -90,6 +99,15 @@ func (c *Client) GetModelFileRaw(namespace, name, ref, path string) (data string
 		return
 	}
 	data = string(giteaFileData)
+	return
+}
+
+func (c *Client) GetModelFileReader(namespace, name, ref, path string, lfs bool) (giteaFileReader io.ReadCloser, err error) {
+	namespace = common.WithPrefix(namespace, ModelOrgPrefix)
+	giteaFileReader, _, err = c.giteaClient.GetFileReader(namespace, name, ref, path, lfs)
+	if err != nil {
+		return
+	}
 	return
 }
 
