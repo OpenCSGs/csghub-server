@@ -3,351 +3,421 @@ tags:
   group: computer_vision
   name: image-classification
   scope: model
+  show_name: 单标签图像分类
   built_in: true
 - category: task
   group: computer_vision
   name: image-segmentation
   scope: model
+  show_name: 通用图像分割
   built_in: true
 - category: task
   group: computer_vision
   name: ocr
   scope: model
+  show_name: 通用字符文字识别
   built_in: true
 - category: task
   group: computer_vision
   name: skin-retouching
   scope: model
+  show_name: 人像美肤
   built_in: true
 - category: task
   group: computer_vision
   name: image-to-image
   scope: model
+  show_name: 图生图
   built_in: true
 - category: task
   group: computer_vision
   name: video-detection
   scope: model
+  show_name: 视频检测
   built_in: true
 - category: task
   group: computer_vision
   name: video-segmentation
   scope: model
+  show_name: 视频分割
   built_in: true
 - category: task
   group: computer_vision
   name: video-generation
   scope: model
+  show_name: 视频生成
   built_in: true
 - category: task
   group: computer_vision
   name: video-captioning
   scope: model
+  show_name: 视频到文本生成
   built_in: true
 - category: task
   group: computer_vision
   name: face-detection
   scope: model
+  show_name: 人脸检测
   built_in: true
 - category: task
   group: computer_vision
   name: face-recognition
   scope: model
+  show_name: 人脸识别
   built_in: true
 - category: task
   group: computer_vision
   name: face-image-generation
   scope: model
+  show_name: 人脸生成
   built_in: true
 - category: task
   group: computer_vision
   name: image-object-detection
   scope: model
+  show_name: 通用目标检测
   built_in: true
 - category: task
   group: computer_vision
   name: image-super-resolution
   scope: model
+  show_name: 图像超分辨
   built_in: true
 - category: task
   group: computer_vision
   name: action-detection
   scope: model
+  show_name: 行为检测
   built_in: true
 - category: task
   group: computer_vision
   name: semantic-segmentation
   scope: model
+  show_name: 语义分割
   built_in: true
 - category: task
   group: natural_language_processing
   name: word-segmentation
   scope: model
+  show_name: 分词
   built_in: true
 - category: task
   group: natural_language_processing
   name: named-entity-recognition
   scope: model
+  show_name: 命名实体识别
   built_in: true
 - category: task
   group: natural_language_processing
   name: part-of-speech
   scope: model
+  show_name: 词性标注
   built_in: true
 - category: task
   group: natural_language_processing
   name: document-segmentation
   scope: model
+  show_name: 文本分割
   built_in: true
 - category: task
   group: natural_language_processing
   name: text-classification
   scope: model
+  show_name: 文本分类
   built_in: true
 - category: task
   group: natural_language_processing
   name: sentiment-classification
   scope: model
+  show_name: 情感分类
   built_in: true
 - category: task
   group: natural_language_processing
   name: nli
   scope: model
+  show_name: 自然语言推理
   built_in: true
 - category: task
   group: natural_language_processing
   name: conversational
   scope: model
+  show_name: 对话
   built_in: true
 - category: task
   group: natural_language_processing
   name: translation
   scope: model
+  show_name: 翻译
   built_in: true
 - category: task
   group: natural_language_processing
   name: text-generation
   scope: model
+  show_name: 文本生成
   built_in: true
 - category: task
   group: natural_language_processing
   name: text-summarization
   scope: model
+  show_name: 文本摘要
   built_in: true
 - category: task
   group: natural_language_processing
   name: feature-extraction
   scope: model
+  show_name: 特征抽取
   built_in: true
 - category: task
   group: natural_language_processing
   name: relation-extraction
   scope: model
+  show_name: 关系抽取
   built_in: true
 - category: task
   group: audio_processing
   name: auto-speech-recognition
   scope: model
+  show_name: 语音识别
   built_in: true
 - category: task
   group: audio_processing
   name: text-to-speech
   scope: model
+  show_name: 语音合成
   built_in: true
 - category: task
   group: audio_processing
   name: audio-classification
   scope: model
+  show_name: 音频分类
   built_in: true
 - category: task
   group: multimodal
   name: text-to-image-synthesis
   scope: model
+  show_name: 文本生成图片
   built_in: true
 - category: task
   group: multimodal
   name: visual-question-answering
   scope: model
+  show_name: 视觉问答
   built_in: true
 - category: task
   group: multimodal
   name: image-text-retrieval
   scope: model
+  show_name: 图文检索
   built_in: true
 - name: text-classification
   category: task
   group: text_processing
   scope: dataset
+  show_name: 文本分类
   built_in: true
 - name: relation-extraction
   category: task
   group: text_processing
   scope: dataset
+  show_name: 关系抽取
   built_in: true
 - name: zero-shot
   category: task
   group: text_processing
   scope: dataset
+  show_name: 零样本学习
   built_in: true
 - name: translation
   category: task
   group: text_processing
   scope: dataset
+  show_name: 机器翻译
   built_in: true
 - name: token-classification
   category: task
   group: text_processing
   scope: dataset
+  show_name: 词分类
   built_in: true
 - name: conversational
   category: task
   group: text_processing
   scope: dataset
+  show_name: 智能对话
   built_in: true
 - name: text-generation
   category: task
   group: text_processing
   scope: dataset
+  show_name: 文本生成
   built_in: true
 - name: table-question-answering
   category: task
   group: text_processing
   scope: dataset
+  show_name: 表格问答
   built_in: true
 - name: sentence-similarity
   category: task
   group: text_processing
   scope: dataset
+  show_name: 句子相似度
   built_in: true
 - name: fill-mask
   category: task
   group: text_processing
   scope: dataset
+  show_name: 完形填空
   built_in: true
 - name: summarization
   category: task
   group: text_processing
   scope: dataset
+  show_name: 摘要总结
   built_in: true
 - name: question-answering
   category: task
   group: text_processing
   scope: dataset
+  show_name: 问答
   built_in: true
 - name: image-to-text
   category: task
   group: graphics
   scope: dataset
+  show_name: 文字识别
   built_in: true
 - name: image-classification
   category: task
   group: graphics
   scope: dataset
+  show_name: 图像分类
   built_in: true
 - name: object-detection
   category: task
   group: graphics
   scope: dataset
+  show_name: 通用检测
   built_in: true
 - name: image-segmentation
   category: task
   group: graphics
   scope: dataset
+  show_name: 图像分割
   built_in: true
 - name: image-editing
   category: task
   group: graphics
   scope: dataset
+  show_name: 图像编辑
   built_in: true
 - name: image-generation
   category: task
   group: graphics
   scope: dataset
+  show_name: 图像生成
   built_in: true
 - name: auto-speech-recognition
   category: task
   group: audio
   scope: dataset
+  show_name: 语音识别
   built_in: true
 - name: text-to-speech
   category: task
   group: audio
   scope: dataset
+  show_name: 语音合成
   built_in: true
 - name: speech-signal-process
   category: task
   group: audio
   scope: dataset
+  show_name: 语音信号处理
   built_in: true
 - name: keyword-spotting
   category: task
   group: audio
   scope: dataset
+  show_name: 语音唤醒
   built_in: true
 - name: audio-classification
   category: task
   group: audio
   scope: dataset
+  show_name: 音频分类
   built_in: true
 - name: voice-activity-detection
   category: task
   group: audio
   scope: dataset
+  show_name: 语音端点检测
   built_in: true
 - name: object-tracking
   category: task
   group: video
   scope: dataset
+  show_name: 目标追踪
   built_in: true
 - name: autonomous-driving
   category: task
   group: video
   scope: dataset
+  show_name: 自动驾驶
   built_in: true
 - name: video-generation
   category: task
   group: video
   scope: dataset
+  show_name: 视频生成
   built_in: true
 - name: video-super-resolution
   category: task
   group: video
   scope: dataset
+  show_name: 视频超分辨率
   built_in: true
 - name: video-segmentation
   category: task
   group: video
   scope: dataset
+  show_name: 视频分割
   built_in: true
 - name: image-captioning
   category: task
   group: multimodal
   scope: dataset
+  show_name: 图像描述
   built_in: true
 - name: visual-grounding
   category: task
   group: multimodal
   scope: dataset
+  show_name: 视觉定位
   built_in: true
 - name: text-to-image-synthesis
   category: task
   group: multimodal
   scope: dataset
+  show_name: 文本生成图片
   built_in: true
 - name: feature-extraction
   category: task
   group: multimodal
   scope: dataset
+  show_name: 特征抽取
   built_in: true
 - name: biomedicine
   category: task
   group: scientific_computing
   scope: dataset
+  show_name: 生物医学
   built_in: true
 - name: protein-structure
   category: task
   group: scientific_computing
   scope: dataset
+  show_name: 蛋白质结构生成
   built_in: true
 - name: apache-2.0
   category: license

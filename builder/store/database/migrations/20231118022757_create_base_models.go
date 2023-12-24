@@ -140,6 +140,7 @@ type Tag struct {
 	Group    string   `bun:",notnull" json:"group" yaml:"group"`
 	Scope    TagScope `bun:",notnull" json:"scope" yaml:"scope"`
 	BuiltIn  bool     `bun:",notnull" json:"built_in" yaml:"built_in"`
+	ShowName string   `bun:"" json:"show_name" yaml:"show_name"`
 	times
 }
 
