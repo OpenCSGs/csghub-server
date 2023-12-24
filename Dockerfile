@@ -9,7 +9,8 @@ FROM alpine:latest as prod
 WORKDIR /starhub-bin
 ENV GIN_MODE=release
 COPY --from=0 /starhub/starhub .
-RUN apk add --no-cache --upgrade bash curl jq
+RUN apk update && \
+    apk add --no-cache --upgrade bash curl jq
 COPY scripts/init.sh /starhub-bin/scripts/
 COPY builder/store/database/seeds/. /starhub-bin/builder/store/database/seeds/
 RUN chmod +x /starhub-bin/scripts/init.sh
