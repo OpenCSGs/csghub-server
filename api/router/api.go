@@ -59,6 +59,9 @@ func NewRouter(config *config.Config) (*gin.Engine, error) {
 	apiGroup.GET("/datasets/:namespace/:name/raw/*file_path", dsHandler.FileRaw)
 	apiGroup.GET("/datasets/:namespace/:name/download/*file_path", dsHandler.DownloadFile)
 	apiGroup.PUT("/datasets/:namespace/:name/raw/*file_path", dsHandler.UpdateFile)
+	//Dataset viewer
+	dsViewerHandler, err := handler.NewDatasetViewerHandler(config)
+	apiGroup.GET("/datasets/:namespace/:name/viewer/*file_path", dsViewerHandler.View)
 
 	// User routes
 	userHandler, err := handler.NewUserHandler(config)

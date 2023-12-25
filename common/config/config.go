@@ -48,6 +48,7 @@ type Config struct {
 		AccessKeyID     string `envconfig:"STARHUB_SERVER_ALIYUN_ACCESS_KEY_ID"`
 		AccessKeySecret string `envconfig:"STARHUB_SERVER_ALIYUN_ACCESS_KEY_SECRET"`
 		Region          string `envconfig:"STARHUB_SERVER_ALIYUN_REGION"`
+		Endpoint        string `envconfig:"STARHUB_SERVER_ALIYUN_ENDPOINT" default:"oss-cn-beijing.aliyuncs.com"`
 	}
 }
 
