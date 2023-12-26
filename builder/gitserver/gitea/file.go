@@ -156,7 +156,7 @@ func (c *Client) getFileFromEntry(namespace, name, ref string, entry *gitea.Cont
 		AuthorEmail:    commit.RepoCommit.Author.Email,
 		AuthoredDate:   commit.RepoCommit.Author.Date,
 	}
-	if file.Type == "file" {
+	if file.Type == "file" && file.Size < 1024 {
 		fileContent, _, err := c.giteaClient.GetContents(namespace, name, ref, file.Path)
 		if err != nil {
 			return
