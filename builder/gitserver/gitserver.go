@@ -43,6 +43,7 @@ type GitServer interface {
 	GetDatasetLfsFileRaw(namespace, repoName, ref, filePath string) (io.ReadCloser, error)
 	GetDatasetTags(string, string, int, int) ([]*types.DatasetTag, error)
 	GetDatasetFileTree(string, string, string, string) ([]*types.File, error)
+	GetDatasetFileContents(namespace, repo, ref, path string) (*types.File, error)
 	CreateDatasetFile(*types.CreateFileReq) (err error)
 	UpdateDatasetFile(*types.UpdateFileReq) (err error)
 

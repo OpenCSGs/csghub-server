@@ -3,6 +3,7 @@ package gitea
 import (
 	"encoding/base64"
 	"io"
+	"log/slog"
 	"regexp"
 	"strconv"
 	"strings"
@@ -179,6 +180,70 @@ func (c *Client) getFileFromEntry(namespace, name, ref string, entry *gitea.Cont
 		}
 	}
 	ch <- file
+}
+
+func (c *Client) GetDatasetFileContents(namespace, repo, ref, path string) (*types.File, error) {
+	owner := common.WithPrefix(namespace, DatasetOrgPrefix)
+	return c.getFileContents(owner, repo, ref, path)
+}
+
+func (c *Client) GetModelFileContents(namespace, repo, ref, path string) (*types.File, error) {
+	owner := common.WithPrefix(namespace, ModelOrgPrefix)
+	return c.getFileContents(owner, repo, ref, path)
+}
+
+func (c *Client) getFileContents(owner, repo, ref, path string) (*types.File, error) {
+	/* Example file content from gitea
+		{
+	  "name": "model-00001-of-00002.safetensors",
+	  "path": "model-00001-of-00002.safetensors",
+	  "sha": "5824b5e840050f193d3d9091a6b5dbb3c33fb0f3",
+	  "last_commit_sha": "d682aedec5182964a9c17e9dd9d5f437847a8c43",
+	  "type": "file",
+	  "size": 135,
+	  "encoding": "base64",
+	  "content": "dmVyc2lvbiBodHRwczovL2dpdC1sZnMuZ2l0aHViLmNvbS9zcGVjL3YxCm9pZCBzaGEyNTY6ODYwMmQ0ZDNiMTRmNTg2NTIwZDFmNzY1MDkxZDlmM2E0ZmViMWM1Nzg2NDQ4YzYwMGQwMThkYjcyMTZmNzIzNQpzaXplIDQ5ODI0Njc4NjQK",
+	  "target": null,
+	  "url": "http://portal-stg.opencsg.com:3001/api/v1/repos/models_wayne/phi-2/contents/model-00001-of-00002.safetensors?ref=main",
+	  "html_url": "http://portal-stg.opencsg.com:3001/models_wayne/phi-2/src/branch/main/model-00001-of-00002.safetensors",
+	  "git_url": "http://portal-stg.opencsg.com:3001/api/v1/repos/models_wayne/phi-2/git/blobs/5824b5e840050f193d3d9091a6b5dbb3c33fb0f3",
+	  "download_url": "http://portal-stg.opencsg.com:3001/models_wayne/phi-2/raw/branch/main/model-00001-of-00002.safetensors",
+	  "submodule_git_url": null,
+	  "_links": {
+	    "self": "http://portal-stg.opencsg.com:3001/api/v1/repos/models_wayne/phi-2/contents/model-00001-of-00002.safetensors?ref=main",
+	    "git": "http://portal-stg.opencsg.com:3001/api/v1/repos/models_wayne/phi-2/git/blobs/5824b5e840050f193d3d9091a6b5dbb3c33fb0f3",
+	    "html": "http://portal-stg.opencsg.com:3001/models_wayne/phi-2/src/branch/main/model-00001-of-00002.safetensors"
+	  }
+	}
+	*/
+	fileContent, _, err := c.giteaClient.GetContents(owner, repo, ref, path)
+	if err != nil {
+		slog.Error("Failed to get contents from gitea", slog.Any("error", err), slog.String("owner", owner), slog.String("repo", repo),
+			slog.String("ref", ref), slog.String("path", path))
+		return nil, err
+	}
+	f := &types.File{
+		Name:        fileContent.Name,
+		Type:        fileContent.Type,
+		Size:        int(fileContent.Size),
+		SHA:         fileContent.SHA,
+		Path:        fileContent.Path,
+		DownloadURL: *fileContent.DownloadURL,
+		Content:     *fileContent.Content,
+	}
+
+	//base64 decode
+	contentDecoded, _ := base64.RawStdEncoding.DecodeString(f.Content)
+	lfsPointer, err := ReadPointerFromBuffer(contentDecoded)
+	//not a lfs pointer, return file content directly
+	if err != nil || !lfsPointer.IsValid() {
+		slog.Info("Failed to parse lsf pointer", slog.Any("error", err), slog.Bool("isValidPointer", lfsPointer.IsValid()))
+		return f, nil
+	}
+
+	f.DownloadURL = strings.Replace(f.DownloadURL, "/raw/", "/media/", 1)
+	f.LfsRelativePath = lfsPointer.RelativePath()
+	return f, nil
 }
 
 func (c *Client) CreateModelFile(req *types.CreateFileReq) (err error) {

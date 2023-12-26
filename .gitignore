@@ -8,3 +8,4 @@ bin
 /pgdata
 minio_data
 .envrc
+docker-compose-leida.yml

@@ -11,6 +11,8 @@ type File struct {
 	SHA         string `json:"sha"`
 	DownloadURL string `json:"download_url"`
 	Content     string `json:"content"`
+
+	LfsRelativePath string `json:"lfs_relative_path"`
 }
 
 type CreateFileReq struct {
