@@ -21,7 +21,7 @@ test:
     - go env -w GOPROXY=https://goproxy.cn,direct
     - go build -o starhub ./cmd/starhub-server
   except:
-   - main
+    - main
 
 build_image:commit:
   image: docker:24.0.6
@@ -45,7 +45,7 @@ build_image:tag:
   image: docker:24.0.6
   stage: build
   services:
-   - docker:24.0.6-dind
+    - docker:24.0.6-dind
   only:
     refs:
       - tags
