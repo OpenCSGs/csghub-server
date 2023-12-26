@@ -134,17 +134,17 @@ func (s *ModelStore) ByUsername(ctx context.Context, username string, per, page 
 	query := s.db.Operator.Core.
 		NewSelect().
 		Model(&models).
-		Join("JOIN users AS u ON u.id = model.user_id").
-		Where("u.username = ?", username)
+		Relation("Repository.Tags").
+		Where("model.path like ?", fmt.Sprintf("%s/%%", username))
 
 	if onlyPublic {
-		query = query.Where("private = ?", false)
+		query = query.Where("model.private = ?", false)
 	}
-	query = query.Order("created_at DESC").
+	query = query.Order("model.created_at DESC").
 		Limit(per).
 		Offset((page - 1) * per)
 
-	err = query.Scan(ctx, &models)
+	err = query.Scan(ctx)
 
 	if err != nil {
 		return

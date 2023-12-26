@@ -167,7 +167,7 @@ func (c *UserComponent) Models(ctx context.Context, req *types.UserModelsReq) ([
 	onlyPublic := req.Owner != req.CurrentUser
 	ms, total, err := c.ms.ByUsername(ctx, req.Owner, req.PageSize, req.Page, onlyPublic)
 	if err != nil {
-		newError := fmt.Errorf("failed to get user datasets,error:%w", err)
+		newError := fmt.Errorf("failed to get user models,error:%w", err)
 		slog.Error(newError.Error())
 		return nil, 0, newError
 	}
