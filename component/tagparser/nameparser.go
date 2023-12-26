@@ -11,21 +11,21 @@ func LibraryTag(filePath string) string {
 	filename := filepath.Base(filePath)
 	switch {
 	case filename == "pytorch_model.bin":
-		return "PyTorch"
+		return "pytorch"
 	case filename == "tf_model.h5":
-		return "TensorFlow"
+		return "tensorflow"
 	case filename == "model.safetensors":
-		return "Safetensors"
+		return "safetensors"
 	case filename == "flax_model.msgpack":
-		return "JAX"
+		return "jax"
 	case strings.HasSuffix(filename, "onnx"):
-		return "ONNX"
+		return "onnx"
 	case strings.HasSuffix(filename, "pdparams"):
-		return "PaddlePaddle"
+		return "paddlepaddle"
 	case strings.HasSuffix(filename, "joblib"):
-		return "Joblib"
+		return "joblib"
 	case strings.HasSuffix(filename, "gguf"):
-		return "GGUF"
+		return "gguf"
 	default:
 		return ""
 	}
