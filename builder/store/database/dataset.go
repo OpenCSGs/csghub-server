@@ -139,17 +139,17 @@ func (s *DatasetStore) ByUsername(ctx context.Context, username string, per, pag
 	query := s.db.Operator.Core.
 		NewSelect().
 		Model(&datasets).
-		Join("JOIN users AS u ON u.id = dataset.user_id").
-		Where("u.username = ?", username)
+		Relation("Repository.Tags").
+		Where("dataset.path like ?", fmt.Sprintf("%s/%%", username))
 
 	if onlyPublic {
-		query = query.Where("private = ?", false)
+		query = query.Where("dataset.private = ?", false)
 	}
-	query = query.Order("created_at DESC").
+	query = query.Order("dataset.created_at DESC").
 		Limit(per).
 		Offset((page - 1) * per)
 
-	err = query.Scan(ctx, &datasets)
+	err = query.Scan(ctx)
 	if err != nil {
 		return
 	}
