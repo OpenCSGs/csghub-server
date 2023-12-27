@@ -230,7 +230,7 @@ func (c *GitCallbackComponent) setPrivate(ctx context.Context, repoType, namespa
 	var dataset *database.Dataset
 	var model *database.Model
 	if repoType == DatasetRepoType {
-		dataset, err = c.ds.FindyByPath(ctx, namespace, repoName)
+		dataset, err = c.ds.FindByPath(ctx, namespace, repoName)
 		err = c.gs.UpdateDatasetRepo(namespace, repoName, dataset, dataset.Repository, &types.UpdateDatasetReq{
 			Name:          dataset.Name,
 			Description:   dataset.Description,
@@ -245,7 +245,7 @@ func (c *GitCallbackComponent) setPrivate(ctx context.Context, repoType, namespa
 			return fmt.Errorf("failed to update database dataset to private, error: %w", err)
 		}
 	} else {
-		model, err = c.ms.FindyByPath(ctx, namespace, repoName)
+		model, err = c.ms.FindByPath(ctx, namespace, repoName)
 		err = c.gs.UpdateModelRepo(namespace, repoName, model, model.Repository, &types.UpdateModelReq{
 			Name:          model.Name,
 			Description:   model.Description,

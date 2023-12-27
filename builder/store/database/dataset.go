@@ -318,7 +318,7 @@ func (s *DatasetStore) UpdateDownloads(ctx context.Context, dataset *Dataset) er
 	return nil
 }
 
-func (s *DatasetStore) FindyByPath(ctx context.Context, namespace string, repoPath string) (dataset *Dataset, err error) {
+func (s *DatasetStore) FindByPath(ctx context.Context, namespace string, repoPath string) (dataset *Dataset, err error) {
 	resDataset := new(Dataset)
 	err = s.db.Operator.Core.
 		NewSelect().

@@ -62,7 +62,7 @@ func (s *RepoStore) CreateRepo(ctx context.Context, repo Repository) (err error)
 	return
 }
 
-func (s *RepoStore) FindyByPath(ctx context.Context, owner string, repoPath string) (repo *Repository, err error) {
+func (s *RepoStore) FindByPath(ctx context.Context, owner string, repoPath string) (repo *Repository, err error) {
 	err = s.db.Operator.Core.
 		NewSelect().
 		Model(&repo).

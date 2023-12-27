@@ -315,7 +315,7 @@ func (s *ModelStore) UpdateDownloads(ctx context.Context, model *Model) error {
 	return nil
 }
 
-func (s *ModelStore) FindyByPath(ctx context.Context, namespace string, repoPath string) (*Model, error) {
+func (s *ModelStore) FindByPath(ctx context.Context, namespace string, repoPath string) (*Model, error) {
 	resModel := new(Model)
 	err := s.db.Operator.Core.
 		NewSelect().
