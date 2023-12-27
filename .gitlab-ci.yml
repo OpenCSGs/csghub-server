@@ -6,8 +6,6 @@ stages:
   - build
   - deploy
 
-services:
-  - docker:dind
 
 variables:
   IMAGE_NAME: "starhub-server"
