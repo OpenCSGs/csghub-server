@@ -56,7 +56,7 @@ build_image:tag:
 
 
 # trigger starhub-deploy project 
-trigger_deploy_stg:
+.trigger_deploy_stg:
   stage: deploy
   needs: ['build_image:commit']
   image: docker.m.daocloud.io/alpine:3.14
