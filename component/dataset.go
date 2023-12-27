@@ -348,7 +348,7 @@ func (c *DatasetComponent) Update(ctx context.Context, req *types.UpdateDatasetR
 		return nil, fmt.Errorf("failed to find user, error: %w", err)
 	}
 
-	dataset, err := c.ds.FindyByPath(ctx, req.Namespace, req.OriginName)
+	dataset, err := c.ds.FindByPath(ctx, req.Namespace, req.OriginName)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find dataset, error: %w", err)
 	}
@@ -367,7 +367,7 @@ func (c *DatasetComponent) Update(ctx context.Context, req *types.UpdateDatasetR
 }
 
 func (c *DatasetComponent) Delete(ctx context.Context, namespace, name string) error {
-	_, err := c.ds.FindyByPath(ctx, namespace, name)
+	_, err := c.ds.FindByPath(ctx, namespace, name)
 	if err != nil {
 		return fmt.Errorf("failed to find dataset, error: %w", err)
 	}
@@ -384,7 +384,7 @@ func (c *DatasetComponent) Delete(ctx context.Context, namespace, name string) e
 }
 
 func (c *DatasetComponent) Detail(ctx context.Context, namespace, name string) (*types.DatasetDetail, error) {
-	_, err := c.ds.FindyByPath(ctx, namespace, name)
+	_, err := c.ds.FindByPath(ctx, namespace, name)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find dataset, error: %w", err)
 	}
@@ -397,7 +397,7 @@ func (c *DatasetComponent) Detail(ctx context.Context, namespace, name string) (
 }
 
 func (c *DatasetComponent) Show(ctx context.Context, namespace, name, current_user string) (*database.Dataset, error) {
-	dataset, err := c.ds.FindyByPath(ctx, namespace, name)
+	dataset, err := c.ds.FindByPath(ctx, namespace, name)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find dataset, error: %w", err)
 	}
@@ -412,7 +412,7 @@ func (c *DatasetComponent) Show(ctx context.Context, namespace, name, current_us
 }
 
 func (c *DatasetComponent) Commits(ctx context.Context, req *types.GetCommitsReq) ([]*types.Commit, error) {
-	dataset, err := c.ds.FindyByPath(ctx, req.Namespace, req.Name)
+	dataset, err := c.ds.FindByPath(ctx, req.Namespace, req.Name)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find dataset, error: %w", err)
 	}
@@ -427,7 +427,7 @@ func (c *DatasetComponent) Commits(ctx context.Context, req *types.GetCommitsReq
 }
 
 func (c *DatasetComponent) LastCommit(ctx context.Context, req *types.GetCommitsReq) (*types.Commit, error) {
-	dataset, err := c.ds.FindyByPath(ctx, req.Namespace, req.Name)
+	dataset, err := c.ds.FindByPath(ctx, req.Namespace, req.Name)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find dataset, error: %w", err)
 	}
@@ -443,7 +443,7 @@ func (c *DatasetComponent) LastCommit(ctx context.Context, req *types.GetCommits
 }
 
 func (c *DatasetComponent) FileRaw(ctx context.Context, req *types.GetFileReq) (string, error) {
-	dataset, err := c.ds.FindyByPath(ctx, req.Namespace, req.Name)
+	dataset, err := c.ds.FindByPath(ctx, req.Namespace, req.Name)
 	if err != nil {
 		return "", fmt.Errorf("failed to find dataset, error: %w", err)
 	}
@@ -458,7 +458,7 @@ func (c *DatasetComponent) FileRaw(ctx context.Context, req *types.GetFileReq) (
 }
 
 func (c *DatasetComponent) DownloadFile(ctx context.Context, req *types.GetFileReq) (io.ReadCloser, error) {
-	dataset, err := c.ds.FindyByPath(ctx, req.Namespace, req.Name)
+	dataset, err := c.ds.FindByPath(ctx, req.Namespace, req.Name)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find dataset, error: %w", err)
 	}
@@ -473,7 +473,7 @@ func (c *DatasetComponent) DownloadFile(ctx context.Context, req *types.GetFileR
 }
 
 func (c *DatasetComponent) Branches(ctx context.Context, req *types.GetBranchesReq) ([]*types.DatasetBranch, error) {
-	_, err := c.ds.FindyByPath(ctx, req.Namespace, req.Name)
+	_, err := c.ds.FindByPath(ctx, req.Namespace, req.Name)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find dataset, error: %w", err)
 	}
@@ -485,7 +485,7 @@ func (c *DatasetComponent) Branches(ctx context.Context, req *types.GetBranchesR
 }
 
 func (c *DatasetComponent) Tags(ctx context.Context, req *types.GetTagsReq) ([]database.Tag, error) {
-	_, err := c.ds.FindyByPath(ctx, req.Namespace, req.Name)
+	_, err := c.ds.FindByPath(ctx, req.Namespace, req.Name)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find dataset, error: %w", err)
 	}
@@ -497,7 +497,7 @@ func (c *DatasetComponent) Tags(ctx context.Context, req *types.GetTagsReq) ([]d
 }
 
 func (c *DatasetComponent) Tree(ctx context.Context, req *types.GetFileReq) ([]*types.File, error) {
-	dataset, err := c.ds.FindyByPath(ctx, req.Namespace, req.Name)
+	dataset, err := c.ds.FindByPath(ctx, req.Namespace, req.Name)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find dataset, error: %w", err)
 	}
@@ -512,7 +512,7 @@ func (c *DatasetComponent) Tree(ctx context.Context, req *types.GetFileReq) ([]*
 }
 
 func (c *DatasetComponent) UpdateDownloads(ctx context.Context, req *types.UpdateDownloadsReq) error {
-	dataset, err := c.ds.FindyByPath(ctx, req.Namespace, req.Name)
+	dataset, err := c.ds.FindByPath(ctx, req.Namespace, req.Name)
 	if err != nil {
 		return fmt.Errorf("failed to find dataset, error: %w", err)
 	}

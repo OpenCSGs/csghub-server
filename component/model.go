@@ -181,7 +181,7 @@ func (c *ModelComponent) Update(ctx context.Context, req *types.UpdateModelReq) 
 		return nil, fmt.Errorf("failed to find user, error: %w", err)
 	}
 
-	model, err := c.ms.FindyByPath(ctx, req.Namespace, req.OriginName)
+	model, err := c.ms.FindByPath(ctx, req.Namespace, req.OriginName)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find model, error: %w", err)
 	}
@@ -200,7 +200,7 @@ func (c *ModelComponent) Update(ctx context.Context, req *types.UpdateModelReq) 
 }
 
 func (c *ModelComponent) Delete(ctx context.Context, namespace, name string) error {
-	_, err := c.ms.FindyByPath(ctx, namespace, name)
+	_, err := c.ms.FindByPath(ctx, namespace, name)
 	if err != nil {
 		return fmt.Errorf("failed to find model, error: %w", err)
 	}
@@ -217,7 +217,7 @@ func (c *ModelComponent) Delete(ctx context.Context, namespace, name string) err
 }
 
 func (c *ModelComponent) Detail(ctx context.Context, namespace, name string) (*types.ModelDetail, error) {
-	_, err := c.ms.FindyByPath(ctx, namespace, name)
+	_, err := c.ms.FindByPath(ctx, namespace, name)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find model, error: %w", err)
 	}
@@ -230,7 +230,7 @@ func (c *ModelComponent) Detail(ctx context.Context, namespace, name string) (*t
 }
 
 func (c *ModelComponent) Show(ctx context.Context, namespace, name, current_user string) (*database.Model, error) {
-	model, err := c.ms.FindyByPath(ctx, namespace, name)
+	model, err := c.ms.FindByPath(ctx, namespace, name)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find model, error: %w", err)
 	}
@@ -281,7 +281,7 @@ func (c *ModelComponent) UpdateFile(ctx context.Context, req *types.UpdateFileRe
 }
 
 func (c *ModelComponent) Commits(ctx context.Context, req *types.GetCommitsReq) ([]*types.Commit, error) {
-	model, err := c.ms.FindyByPath(ctx, req.Namespace, req.Name)
+	model, err := c.ms.FindByPath(ctx, req.Namespace, req.Name)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find model, error: %w", err)
 	}
@@ -296,7 +296,7 @@ func (c *ModelComponent) Commits(ctx context.Context, req *types.GetCommitsReq) 
 }
 
 func (c *ModelComponent) LastCommit(ctx context.Context, req *types.GetCommitsReq) (*types.Commit, error) {
-	model, err := c.ms.FindyByPath(ctx, req.Namespace, req.Name)
+	model, err := c.ms.FindByPath(ctx, req.Namespace, req.Name)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find model, error: %w", err)
 	}
@@ -311,7 +311,7 @@ func (c *ModelComponent) LastCommit(ctx context.Context, req *types.GetCommitsRe
 }
 
 func (c *ModelComponent) FileRaw(ctx context.Context, req *types.GetFileReq) (string, error) {
-	model, err := c.ms.FindyByPath(ctx, req.Namespace, req.Name)
+	model, err := c.ms.FindByPath(ctx, req.Namespace, req.Name)
 	if err != nil {
 		return "", fmt.Errorf("failed to find model, error: %w", err)
 	}
@@ -326,7 +326,7 @@ func (c *ModelComponent) FileRaw(ctx context.Context, req *types.GetFileReq) (st
 }
 
 func (c *ModelComponent) DownloadFile(ctx context.Context, req *types.GetFileReq) (io.ReadCloser, error) {
-	model, err := c.ms.FindyByPath(ctx, req.Namespace, req.Name)
+	model, err := c.ms.FindByPath(ctx, req.Namespace, req.Name)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find model, error: %w", err)
 	}
@@ -341,7 +341,7 @@ func (c *ModelComponent) DownloadFile(ctx context.Context, req *types.GetFileReq
 }
 
 func (c *ModelComponent) Branches(ctx context.Context, req *types.GetBranchesReq) ([]*types.ModelBranch, error) {
-	_, err := c.ms.FindyByPath(ctx, req.Namespace, req.Name)
+	_, err := c.ms.FindByPath(ctx, req.Namespace, req.Name)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find dataset, error: %w", err)
 	}
@@ -353,7 +353,7 @@ func (c *ModelComponent) Branches(ctx context.Context, req *types.GetBranchesReq
 }
 
 func (c *ModelComponent) Tags(ctx context.Context, req *types.GetTagsReq) ([]database.Tag, error) {
-	_, err := c.ms.FindyByPath(ctx, req.Namespace, req.Name)
+	_, err := c.ms.FindByPath(ctx, req.Namespace, req.Name)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find dataset, error: %w", err)
 	}
@@ -365,7 +365,7 @@ func (c *ModelComponent) Tags(ctx context.Context, req *types.GetTagsReq) ([]dat
 }
 
 func (c *ModelComponent) Tree(ctx context.Context, req *types.GetFileReq) ([]*types.File, error) {
-	model, err := c.ms.FindyByPath(ctx, req.Namespace, req.Name)
+	model, err := c.ms.FindByPath(ctx, req.Namespace, req.Name)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find model, error: %w", err)
 	}
@@ -380,7 +380,7 @@ func (c *ModelComponent) Tree(ctx context.Context, req *types.GetFileReq) ([]*ty
 }
 
 func (c *ModelComponent) UpdateDownloads(ctx context.Context, req *types.UpdateDownloadsReq) error {
-	model, err := c.ms.FindyByPath(ctx, req.Namespace, req.Name)
+	model, err := c.ms.FindByPath(ctx, req.Namespace, req.Name)
 	if err != nil {
 		return fmt.Errorf("failed to find model, error: %w", err)
 	}

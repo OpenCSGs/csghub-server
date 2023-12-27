@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/spf13/cobra"
+	"opencsg.com/starhub-server/cmd/starhub-server/cmd/logscan"
 	"opencsg.com/starhub-server/cmd/starhub-server/cmd/migration"
 	"opencsg.com/starhub-server/cmd/starhub-server/cmd/start"
 	"opencsg.com/starhub-server/common/log"
@@ -50,5 +51,6 @@ func init() {
 	RootCmd.AddCommand(
 		migration.Cmd,
 		start.Cmd,
+		logscan.Cmd,
 	)
 }
