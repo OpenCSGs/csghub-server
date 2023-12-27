@@ -12,7 +12,7 @@ check_gitea() {
 
 # Wait for the database to be ready
 echo "Waiting for the database to be ready..."
-until nc -z postgres 5432; do
+until telnet postgres 5432 </dev/null 2>&1 | grep -q "Connected"; do
     sleep 1
 done
 echo "Database is ready!"
