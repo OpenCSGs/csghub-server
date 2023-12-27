@@ -1,6 +1,6 @@
 FROM golang:1.21.0
 
-RUN  apt-get update && apt-get install -y telnet
+RUN  apt-get update && apt-get install -y telnet jq
 
 ENV GOPROXY=https://goproxy.cn,direct
 RUN mkdir -p /hub
