@@ -23,22 +23,23 @@ func NewRepoStore(db *DB) *RepoStore {
 }
 
 type Repository struct {
-	ID             int64          `bun:",pk,autoincrement" json:"id"`
-	UserID         int64          `bun:",notnull" json:"user_id"`
-	Path           string         `bun:",notnull" json:"path"`
-	GitPath        string         `bun:",notnull" json:"git_path"`
-	Name           string         `bun:",notnull" json:"name"`
-	Description    string         `bun:",nullzero" json:"description"`
-	Private        bool           `bun:",notnull" json:"private"`
-	Labels         string         `bun:",nullzero" json:"labels"`
-	License        string         `bun:",nullzero" json:"license"`
-	Readme         string         `bun:",nullzero" json:"readme"`
-	DefaultBranch  string         `bun:",notnull" json:"default_branch"`
-	LfsFiles       []LfsFile      `bun:"rel:has-many,join:id=repository_id" json:"-"`
-	Tags           []Tag          `bun:"m2m:repository_tags,join:Repository=Tag" json:"tags"`
-	RepositoryType RepositoryType `bun:",notnull" json:"repository_type"`
-	HTTPCloneURL   string         `bun:",nullzero" json:"http_clone_url"`
-	SSHCloneURL    string         `bun:",nullzero" json:"ssh_clone_url"`
+	ID             int64                `bun:",pk,autoincrement" json:"id"`
+	UserID         int64                `bun:",notnull" json:"user_id"`
+	Path           string               `bun:",notnull" json:"path"`
+	GitPath        string               `bun:",notnull" json:"git_path"`
+	Name           string               `bun:",notnull" json:"name"`
+	Description    string               `bun:",nullzero" json:"description"`
+	Private        bool                 `bun:",notnull" json:"private"`
+	Labels         string               `bun:",nullzero" json:"labels"`
+	License        string               `bun:",nullzero" json:"license"`
+	Readme         string               `bun:",nullzero" json:"readme"`
+	DefaultBranch  string               `bun:",notnull" json:"default_branch"`
+	LfsFiles       []LfsFile            `bun:"rel:has-many,join:id=repository_id" json:"-"`
+	Downloads      []RepositoryDownload `bun:"rel:has-many,join:id=repository_id" json:"downloads"`
+	Tags           []Tag                `bun:"m2m:repository_tags,join:Repository=Tag" json:"tags"`
+	RepositoryType RepositoryType       `bun:",notnull" json:"repository_type"`
+	HTTPCloneURL   string               `bun:",nullzero" json:"http_clone_url"`
+	SSHCloneURL    string               `bun:",nullzero" json:"ssh_clone_url"`
 	times
 }
 

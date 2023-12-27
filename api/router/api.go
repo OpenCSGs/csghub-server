@@ -38,6 +38,7 @@ func NewRouter(config *config.Config) (*gin.Engine, error) {
 	apiGroup.GET("/models/:namespace/:name/download/*file_path", modelHandler.DownloadFile)
 	apiGroup.POST("/models/:namespace/:name/raw/*file_path", modelHandler.CreateFile)
 	apiGroup.PUT("/models/:namespace/:name/raw/*file_path", modelHandler.UpdateFile)
+	apiGroup.POST("/models/:namespace/:name/update_downloads", modelHandler.UpdateDownloads)
 
 	// Dataset routes
 	dsHandler, err := handler.NewDatasetHandler(config)
@@ -59,7 +60,9 @@ func NewRouter(config *config.Config) (*gin.Engine, error) {
 	apiGroup.GET("/datasets/:namespace/:name/raw/*file_path", dsHandler.FileRaw)
 	apiGroup.GET("/datasets/:namespace/:name/download/*file_path", dsHandler.DownloadFile)
 	apiGroup.PUT("/datasets/:namespace/:name/raw/*file_path", dsHandler.UpdateFile)
-	//Dataset viewer
+	apiGroup.POST("/datasets/:namespace/:name/update_downloads", dsHandler.UpdateDownloads)
+
+	// Dataset viewer
 	dsViewerHandler, err := handler.NewDatasetViewerHandler(config)
 	apiGroup.GET("/datasets/:namespace/:name/viewer/*file_path", dsViewerHandler.View)
 

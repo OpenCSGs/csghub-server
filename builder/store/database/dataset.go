@@ -2,6 +2,8 @@ package database
 
 import (
 	"context"
+	"database/sql"
+	"errors"
 	"fmt"
 	"log/slog"
 	"time"
@@ -251,6 +253,69 @@ func (s *DatasetStore) Update(ctx context.Context, dataset *Dataset, repo *Repos
 		return nil
 	})
 	return
+}
+
+func (s *DatasetStore) UpdateRepoDownloads(ctx context.Context, dataset *Dataset, date time.Time, downloads int64) (err error) {
+	rd := new(RepositoryDownload)
+	err = s.db.Operator.Core.NewSelect().
+		Model(rd).
+		Where("date = ? AND repository_id = ?", date.Format("2006-01-02"), dataset.RepositoryID).
+		Scan(ctx)
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
+		return
+	}
+
+	if errors.Is(err, sql.ErrNoRows) {
+		rd.Count = downloads
+		rd.Date = date
+		rd.RepositoryID = dataset.RepositoryID
+		err = s.db.Operator.Core.NewInsert().
+			Model(rd).
+			Scan(ctx)
+		if err != nil {
+			return
+		}
+	} else {
+		rd.Count = downloads
+		rd.UpdatedAt = time.Now()
+		query := s.db.Operator.Core.NewUpdate().
+			Model(rd).
+			WherePK()
+		slog.Debug(query.String())
+
+		_, err = query.Exec(ctx)
+		if err != nil {
+			return
+		}
+	}
+	err = s.UpdateDownloads(ctx, dataset)
+	if err != nil {
+		return
+	}
+
+	return
+}
+
+func (s *DatasetStore) UpdateDownloads(ctx context.Context, dataset *Dataset) error {
+	var downloadCount int64
+	err := s.db.Operator.Core.NewSelect().
+		ColumnExpr("SUM(count)").
+		Model(&RepositoryDownload{}).
+		Where("repository_id=?", dataset.RepositoryID).
+		Scan(ctx, &downloadCount)
+	if err != nil {
+		return err
+	}
+	dataset.Downloads = downloadCount
+	_, err = s.db.Operator.Core.NewUpdate().
+		Model(dataset).
+		WherePK().
+		Exec(ctx)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func (s *DatasetStore) FindyByPath(ctx context.Context, namespace string, repoPath string) (dataset *Dataset, err error) {
