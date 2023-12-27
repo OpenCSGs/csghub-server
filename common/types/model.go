@@ -1,5 +1,7 @@
 package types
 
+import "time"
+
 type ModelDetail struct {
 	Path          string `json:"path"`
 	Name          string `json:"name"`
@@ -58,4 +60,12 @@ type UpdateModelReq struct {
 	License       string `json:"license"`
 	Readme        string `json:"readme"`
 	DefaultBranch string `json:"default_branch"`
+}
+
+type UpdateDownloadsReq struct {
+	Namespace     string `json:"namespace"`
+	Name          string `json:"name"`
+	ReqDate       string `json:"date"`
+	Date          time.Time
+	DownloadCount int64 `json:"download_count"`
 }

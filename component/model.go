@@ -378,3 +378,16 @@ func (c *ModelComponent) Tree(ctx context.Context, req *types.GetFileReq) ([]*ty
 	}
 	return tree, nil
 }
+
+func (c *ModelComponent) UpdateDownloads(ctx context.Context, req *types.UpdateDownloadsReq) error {
+	model, err := c.ms.FindyByPath(ctx, req.Namespace, req.Name)
+	if err != nil {
+		return fmt.Errorf("failed to find model, error: %w", err)
+	}
+
+	err = c.ms.UpdateRepoDownloads(ctx, model, req.Date, req.DownloadCount)
+	if err != nil {
+		return fmt.Errorf("failed to update model download count, error: %w", err)
+	}
+	return err
+}

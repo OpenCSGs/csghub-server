@@ -9,6 +9,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"opencsg.com/starhub-server/api/httpbase"
@@ -416,6 +417,41 @@ func (h *ModelHandler) Tree(ctx *gin.Context) {
 
 	slog.Info("Get model file tree succeed", slog.String("model", name), slog.String("path", req.Path), slog.String("ref", req.Ref))
 	httpbase.OK(ctx, tree)
+}
+
+func (h *ModelHandler) UpdateDownloads(ctx *gin.Context) {
+	var req *types.UpdateDownloadsReq
+	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
+	if err != nil {
+		slog.Error("Bad request format", "error", err)
+		httpbase.BadRequest(ctx, err.Error())
+		return
+	}
+
+	if err := ctx.ShouldBindJSON(&req); err != nil {
+		slog.Error("Bad request format", "error", err)
+		httpbase.BadRequest(ctx, err.Error())
+		return
+	}
+
+	req.Namespace = namespace
+	req.Name = name
+	date, err := time.Parse("2006-01-02", req.ReqDate)
+	if err != nil {
+		slog.Error("Bad request format", "error", err)
+		httpbase.BadRequest(ctx, err.Error())
+		return
+	}
+	req.Date = date
+
+	err = h.c.UpdateDownloads(ctx, req)
+	if err != nil {
+		slog.Error("Failed to update model download count", slog.Any("error", err), slog.String("namespace", namespace), slog.String("name", name), slog.Time("date", date), slog.Int64("download_count", req.DownloadCount))
+		ctx.JSON(http.StatusInternalServerError, gin.H{"message": err.Error()})
+		return
+	}
+	slog.Info("Update model download count succeed", slog.String("namespace", namespace), slog.String("name", name), slog.Int64("download_count", req.DownloadCount))
+	httpbase.OK(ctx, nil)
 }
 
 func parseTagReqs(ctx *gin.Context) (tags []database.TagReq) {

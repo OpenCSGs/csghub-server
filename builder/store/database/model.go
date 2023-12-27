@@ -2,6 +2,8 @@ package database
 
 import (
 	"context"
+	"database/sql"
+	"errors"
 	"fmt"
 	"log/slog"
 	"time"
@@ -248,6 +250,69 @@ func (s *ModelStore) Update(ctx context.Context, model *Model, repo *Repository)
 		return nil
 	})
 	return
+}
+
+func (s *ModelStore) UpdateRepoDownloads(ctx context.Context, model *Model, date time.Time, downloads int64) (err error) {
+	rd := new(RepositoryDownload)
+	err = s.db.Operator.Core.NewSelect().
+		Model(rd).
+		Where("date = ? AND repository_id = ?", date.Format("2006-01-02"), model.RepositoryID).
+		Scan(ctx)
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
+		return
+	}
+
+	if errors.Is(err, sql.ErrNoRows) {
+		rd.Count = downloads
+		rd.Date = date
+		rd.RepositoryID = model.RepositoryID
+		err = s.db.Operator.Core.NewInsert().
+			Model(rd).
+			Scan(ctx)
+		if err != nil {
+			return
+		}
+	} else {
+		rd.Count = downloads
+		rd.UpdatedAt = time.Now()
+		query := s.db.Operator.Core.NewUpdate().
+			Model(rd).
+			WherePK()
+		slog.Debug(query.String())
+
+		_, err = query.Exec(ctx)
+		if err != nil {
+			return
+		}
+	}
+	err = s.UpdateDownloads(ctx, model)
+	if err != nil {
+		return
+	}
+
+	return
+}
+
+func (s *ModelStore) UpdateDownloads(ctx context.Context, model *Model) error {
+	var downloadCount int64
+	err := s.db.Operator.Core.NewSelect().
+		ColumnExpr("SUM(count)").
+		Model(&RepositoryDownload{}).
+		Where("repository_id=?", model.RepositoryID).
+		Scan(ctx, &downloadCount)
+	if err != nil {
+		return err
+	}
+	model.Downloads = downloadCount
+	_, err = s.db.Operator.Core.NewUpdate().
+		Model(model).
+		WherePK().
+		Exec(ctx)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func (s *ModelStore) FindyByPath(ctx context.Context, namespace string, repoPath string) (*Model, error) {

@@ -510,3 +510,16 @@ func (c *DatasetComponent) Tree(ctx context.Context, req *types.GetFileReq) ([]*
 	}
 	return tree, nil
 }
+
+func (c *DatasetComponent) UpdateDownloads(ctx context.Context, req *types.UpdateDownloadsReq) error {
+	dataset, err := c.ds.FindyByPath(ctx, req.Namespace, req.Name)
+	if err != nil {
+		return fmt.Errorf("failed to find dataset, error: %w", err)
+	}
+
+	err = c.ds.UpdateRepoDownloads(ctx, dataset, req.Date, req.DownloadCount)
+	if err != nil {
+		return fmt.Errorf("failed to update dataset download count, error: %w", err)
+	}
+	return err
+}
