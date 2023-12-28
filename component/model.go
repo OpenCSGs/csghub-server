@@ -353,7 +353,7 @@ func (c *ModelComponent) DownloadFile(ctx context.Context, req *types.GetFileReq
 	}
 	if req.Lfs {
 		objectKey := "lfs/" + req.Path
-		url, err = c.ossBucket.SignURL(objectKey, oss.HTTPGet, 600)
+		url, err = c.ossBucket.SignURL(objectKey, oss.HTTPGet, ossFileExpireSeconds)
 		if err != nil {
 			return nil, url, err
 		}
