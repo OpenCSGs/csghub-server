@@ -81,6 +81,11 @@ fi
 echo "export STARHUB_SERVER_GITSERVER_SECRET_KEY=$STARHUB_SERVER_GITSERVER_SECRET_KEY" >> /etc/profile
 source /etc/profile
 
+echo "Creating cron job..."
+echo "0 23 * * * STARHUB_DATABASE_DSN=$STARHUB_DATABASE_DSN /starhub-bin/starhub logscan gitea --path /starhub-bin/logs/gitea.log >> /starhub-bin/cron.log 2>&1" | crontab -
+service cron reload
+echo "Done."
+
 echo "Database setup..."
 
 echo "Migration init"
