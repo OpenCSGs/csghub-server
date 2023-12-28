@@ -4,10 +4,7 @@ import (
 	"encoding/base64"
 	"io"
 	"log/slog"
-	"regexp"
-	"strconv"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/pulltheflower/gitea-go-sdk/gitea"
@@ -17,56 +14,47 @@ import (
 
 const LFSPrefix = "version https://git-lfs.github.com/spec/v1"
 
-var fileSizeReg = regexp.MustCompile(`size (\d+)`)
-
 func (c *Client) GetModelFileTree(namespace, name, ref, path string) (tree []*types.File, err error) {
 	namespace = common.WithPrefix(namespace, ModelOrgPrefix)
-	giteaEntries, _, err := c.giteaClient.ListContents(namespace, name, ref, path)
-	if err != nil {
-		return
-	}
-	fileChan := make(chan *types.File, len(giteaEntries))
-	var wg sync.WaitGroup
-	for _, entry := range giteaEntries {
-		wg.Add(1)
-		c.getFileFromEntry(namespace, name, ref, entry, fileChan, &wg)
-	}
-
-	go func() {
-		wg.Wait()
-		close(fileChan)
-	}()
-
-	for file := range fileChan {
-		tree = append(tree, file)
-	}
-
-	return
+	return c.getRepoDir(namespace, name, ref, path)
 }
 
 func (c *Client) GetDatasetFileTree(namespace, name, ref, path string) (tree []*types.File, err error) {
 	namespace = common.WithPrefix(namespace, DatasetOrgPrefix)
-	giteaEntries, _, err := c.giteaClient.ListContents(namespace, name, ref, path)
+	return c.getRepoDir(namespace, name, ref, path)
+}
+
+func (c *Client) getRepoDir(namespace, name, ref, path string) (files []*types.File, err error) {
+	giteaEntries, _, err := c.giteaClient.GetDir(namespace, name, ref, path)
 	if err != nil {
 		return
 	}
-	fileChan := make(chan *types.File, len(giteaEntries))
-	var wg sync.WaitGroup
 	for _, entry := range giteaEntries {
-		wg.Add(1)
-		c.getFileFromEntry(namespace, name, ref, entry, fileChan, &wg)
+		f := &types.File{
+			Name:            entry.Name,
+			Path:            strings.TrimPrefix(entry.Path, "/"),
+			Type:            entry.Type,
+			Lfs:             entry.IsLfs,
+			LfsRelativePath: entry.LfsRelativePath,
+			Size:            int(entry.Size),
+			Commit: types.Commit{
+				Message: entry.CommitMsg, ID: entry.SHA, CommitterDate: entry.CommitterDate.String()},
+			Mode:        entry.Mode,
+			SHA:         entry.SHA,
+			URL:         entry.URL,
+			DownloadURL: entry.DownloadURL,
+		}
+		if entry.Type == "tree" {
+			f.Type = "dir"
+		} else {
+			f.Type = "file"
+		}
+
+		files = append(files, f)
+
 	}
 
-	go func() {
-		wg.Wait()
-		close(fileChan)
-	}()
-
-	for file := range fileChan {
-		tree = append(tree, file)
-	}
-
-	return
+	return files, nil
 }
 
 func (c *Client) GetDatasetFileRaw(namespace, name, ref, path string) (string, error) {
@@ -116,70 +104,6 @@ func (c *Client) GetModelLfsFileRaw(namespace, repoName, ref, filePath string) (
 	namespace = common.WithPrefix(namespace, ModelOrgPrefix)
 	r, _, err := c.giteaClient.GetFileReader(namespace, repoName, ref, filePath, true)
 	return r, err
-}
-
-func (c *Client) getFileFromEntry(namespace, name, ref string, entry *gitea.ContentsResponse, ch chan<- *types.File, wg *sync.WaitGroup) {
-	defer wg.Done()
-	file := &types.File{
-		Name: entry.Name,
-		Type: entry.Type,
-		Lfs:  false,
-		Size: int(entry.Size),
-		SHA:  entry.SHA,
-		Path: entry.Path,
-	}
-	if entry.DownloadURL != nil {
-		file.DownloadURL = *entry.DownloadURL
-	}
-
-	commit, _, err := c.giteaClient.GetSingleCommit(
-		namespace,
-		name,
-		entry.LastCommitSHA,
-		gitea.SpeedUpOtions{
-			DisableStat:         true,
-			DisableVerification: true,
-			DisableFiles:        true,
-		},
-	)
-	if err != nil {
-		return
-	}
-
-	file.Commit = types.Commit{
-		ID:             commit.SHA,
-		CommitterName:  commit.RepoCommit.Committer.Name,
-		CommitterEmail: commit.RepoCommit.Committer.Email,
-		CommitterDate:  commit.RepoCommit.Committer.Date,
-		CreatedAt:      commit.CommitMeta.Created.String(),
-		Message:        commit.RepoCommit.Message,
-		AuthorName:     commit.RepoCommit.Author.Name,
-		AuthorEmail:    commit.RepoCommit.Author.Email,
-		AuthoredDate:   commit.RepoCommit.Author.Date,
-	}
-	if file.Type == "file" && file.Size < 1024 {
-		fileContent, _, err := c.giteaClient.GetContents(namespace, name, ref, file.Path)
-		if err != nil {
-			return
-		}
-		fc, err := base64.StdEncoding.DecodeString(*fileContent.Content)
-		if err != nil {
-			return
-		}
-		if strings.HasPrefix(string(fc), LFSPrefix) {
-			match := fileSizeReg.FindStringSubmatch(string(fc))
-			if match != nil {
-				size, err := strconv.ParseInt(match[1], 10, 64)
-				if err != nil {
-					return
-				}
-				file.Size = int(size)
-			}
-			file.Lfs = true
-			file.DownloadURL = strings.Replace(*entry.DownloadURL, "/raw/", "/media/", 1)
-		}
-	}
-	ch <- file
 }
 
 func (c *Client) GetDatasetFileContents(namespace, repo, ref, path string) (*types.File, error) {
