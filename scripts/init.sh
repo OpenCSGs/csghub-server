@@ -11,11 +11,11 @@ check_gitea() {
 }
 
 # Wait for the database to be ready
-echo "Waiting for the database to be ready..."
-until telnet postgres 5432 </dev/null 2>&1 | grep -q "Connected"; do
-    sleep 1
-done
-echo "Database is ready!"
+# echo "Waiting for the database to be ready..."
+# until telnet postgres 5432 </dev/null 2>&1 | grep -q "Connected"; do
+#     sleep 1
+# done
+# echo "Database is ready!"
 
 # Wait for the Gitea service to be ready
 echo "Waiting for Gitea service to be ready..."
@@ -74,6 +74,7 @@ fi
 echo "Creating cron job..."
 echo "0 23 * * * STARHUB_DATABASE_DSN=$STARHUB_DATABASE_DSN /starhub-bin/starhub logscan gitea --path /starhub-bin/logs/gitea.log >> /starhub-bin/cron.log 2>&1" | crontab -
 service cron reload
+service cron restart
 echo "Done."
 
 echo "Database setup..."
