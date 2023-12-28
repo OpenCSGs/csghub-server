@@ -9,6 +9,7 @@ import (
 	"log/slog"
 	"path/filepath"
 
+	"github.com/aliyun/aliyun-oss-go-sdk/oss"
 	"opencsg.com/starhub-server/builder/gitserver"
 	"opencsg.com/starhub-server/builder/store/database"
 	"opencsg.com/starhub-server/common/config"
@@ -96,16 +97,29 @@ func NewDatasetComponent(config *config.Config) (*DatasetComponent, error) {
 		slog.Error(newError.Error())
 		return nil, newError
 	}
+	client, err := oss.New(config.S3.Endpoint, config.S3.AccessKeyID, config.S3.AccessKeySecret)
+	if err != nil {
+		newError := fmt.Errorf("fail to init oss client for dataset,error:%w", err)
+		slog.Error(newError.Error())
+		return nil, newError
+	}
+	c.ossBucket, err = client.Bucket(config.S3.Bucket)
+	if err != nil {
+		newError := fmt.Errorf("fail to init oss bucket for dataset,error:%w", err)
+		slog.Error(newError.Error())
+		return nil, newError
+	}
 	return c, nil
 }
 
 type DatasetComponent struct {
-	ds *database.DatasetStore
-	ns *database.NamespaceStore
-	us *database.UserStore
-	ts *database.TagStore
-	gs gitserver.GitServer
-	tc *TagComponent
+	ds        *database.DatasetStore
+	ns        *database.NamespaceStore
+	us        *database.UserStore
+	ts        *database.TagStore
+	gs        gitserver.GitServer
+	tc        *TagComponent
+	ossBucket *oss.Bucket
 }
 
 func (c *DatasetComponent) CreateFile(ctx context.Context, req *types.CreateFileReq) (*types.CreateFileResp, error) {
@@ -457,19 +471,32 @@ func (c *DatasetComponent) FileRaw(ctx context.Context, req *types.GetFileReq) (
 	return raw, nil
 }
 
-func (c *DatasetComponent) DownloadFile(ctx context.Context, req *types.GetFileReq) (io.ReadCloser, error) {
+func (c *DatasetComponent) DownloadFile(ctx context.Context, req *types.GetFileReq) (io.ReadCloser, string, error) {
+	var (
+		reader io.ReadCloser
+		url    string
+	)
 	dataset, err := c.ds.FindByPath(ctx, req.Namespace, req.Name)
 	if err != nil {
-		return nil, fmt.Errorf("failed to find dataset, error: %w", err)
+		return nil, "", fmt.Errorf("failed to find dataset, error: %w", err)
 	}
 	if req.Ref == "" {
 		req.Ref = dataset.Repository.DefaultBranch
 	}
-	reader, err := c.gs.GetDatasetFileReader(req.Namespace, req.Name, req.Ref, req.Path, req.Lfs)
-	if err != nil {
-		return nil, fmt.Errorf("failed to download git dataset repository file, error: %w", err)
+	if req.Lfs {
+		objectKey := "lfs" + req.Path
+		url, err = c.ossBucket.SignURL(objectKey, oss.HTTPGet, 600)
+		if err != nil {
+			return nil, url, err
+		}
+		return reader, url, nil
+	} else {
+		reader, err = c.gs.GetDatasetFileReader(req.Namespace, req.Name, req.Ref, req.Path)
+		if err != nil {
+			return nil, "", fmt.Errorf("failed to download git dataset repository file, error: %w", err)
+		}
+		return reader, url, nil
 	}
-	return reader, nil
 }
 
 func (c *DatasetComponent) Branches(ctx context.Context, req *types.GetBranchesReq) ([]*types.DatasetBranch, error) {
