@@ -75,7 +75,8 @@ saved_model/**/* filter=lfs diff=lfs merge=lfs -text
 `
 
 const (
-	initCommitMessage = "initial commit"
+	initCommitMessage    = "initial commit"
+	ossFileExpireSeconds = 259200
 )
 
 func NewDatasetComponent(config *config.Config) (*DatasetComponent, error) {
@@ -485,7 +486,7 @@ func (c *DatasetComponent) DownloadFile(ctx context.Context, req *types.GetFileR
 	}
 	if req.Lfs {
 		objectKey := "lfs/" + req.Path
-		url, err = c.ossBucket.SignURL(objectKey, oss.HTTPGet, 600)
+		url, err = c.ossBucket.SignURL(objectKey, oss.HTTPGet, ossFileExpireSeconds)
 		if err != nil {
 			return nil, url, err
 		}
