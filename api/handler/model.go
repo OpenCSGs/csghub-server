@@ -324,22 +324,26 @@ func (h *ModelHandler) DownloadFile(ctx *gin.Context) {
 			return
 		}
 	}
-	reader, err := h.c.DownloadFile(ctx, req)
+	reader, url, err := h.c.DownloadFile(ctx, req)
 	if err != nil {
 		slog.Error("Failed to download model file", slog.Any("error", err))
 		ctx.JSON(http.StatusInternalServerError, gin.H{"message": err.Error()})
 		return
 	}
 
-	slog.Info("Download model file succeed", slog.String("model", name), slog.String("path", req.Path), slog.String("ref", req.Ref))
-	fileName := path.Base(req.Path)
-	ctx.Header("Content-Type", "application/octet-stream")
-	ctx.Header("Content-Disposition", `attachment; filename="`+fileName+`"`)
-	_, err = io.Copy(ctx.Writer, reader)
-	if err != nil {
-		slog.Error("Failed to download model file", slog.Any("error", err))
-		ctx.JSON(http.StatusInternalServerError, gin.H{"message": err.Error()})
-		return
+	if req.Lfs {
+		httpbase.OK(ctx, url)
+	} else {
+		slog.Info("Download model file succeed", slog.String("model", name), slog.String("path", req.Path), slog.String("ref", req.Ref))
+		fileName := path.Base(req.Path)
+		ctx.Header("Content-Type", "application/octet-stream")
+		ctx.Header("Content-Disposition", `attachment; filename="`+fileName+`"`)
+		_, err = io.Copy(ctx.Writer, reader)
+		if err != nil {
+			slog.Error("Failed to download model file", slog.Any("error", err))
+			ctx.JSON(http.StatusInternalServerError, gin.H{"message": err.Error()})
+			return
+		}
 	}
 }
 

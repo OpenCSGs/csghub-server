@@ -25,23 +25,16 @@ done
 echo "Gitea service is ready!"
 echo "Running initialization commands..."
 
-# Get the tokens list of $GITEA_USERNAME
-tokens=$(curl -s -X GET --url "$STARHUB_SERVER_GITSERVER_HOST/api/v1/users/$GITEA_USERNAME/tokens" --header "Authorization: Basic $AUTH_HEADER")
 
-# Get the first token of tokens
-first_token_name=$(echo "$tokens" | jq -r '.[0].name')
-
-# Delete if the access token named `access_token` already exist
-if [ -n "$first_token_name" ] && [ "$first_token_name" != "null" ]; then
-    echo "Access token already exist, Delete it..."
-    curl -s -X DELETE --url "$STARHUB_SERVER_GITSERVER_HOST/api/v1/users/$GITEA_USERNAME/tokens/$first_token_name" --header "Authorization: Basic $AUTH_HEADER"
-fi
+# Delete if the access token named `webhook_access_token` already exist
+echo "Access token already exist, Delete it..."
+curl -s -X DELETE --url "$STARHUB_SERVER_GITSERVER_HOST/api/v1/users/$GITEA_USERNAME/tokens/webhook_access_token" --header "Authorization: Basic $AUTH_HEADER"
 
 echo "Creating access token..."
 # Create a new access token for $GITEA_USERNAME
 TOKEN_RESPONSE=$(curl -s -X POST \
     --url $STARHUB_SERVER_GITSERVER_HOST/api/v1/users/$GITEA_USERNAME/tokens \
-    --data-urlencode "name=access_token" \
+    --data-urlencode "name=webhook_access_token" \
     --data-urlencode "scopes=read:user,write:user,write:admin,read:admin" \
     --header "accept: application/json" \
     --header "Content-Type: application/x-www-form-urlencoded" \
@@ -77,10 +70,7 @@ else
         "$STARHUB_SERVER_GITSERVER_HOST/api/v1/admin/hooks?access_token=$STARHUB_SERVER_GITSERVER_SECRET_KEY"
 fi
 
-# Add the access token to the environment
-echo "export STARHUB_SERVER_GITSERVER_SECRET_KEY=$STARHUB_SERVER_GITSERVER_SECRET_KEY" >> /etc/profile
-source /etc/profile
-
+# Create cron job
 echo "Creating cron job..."
 echo "0 23 * * * STARHUB_DATABASE_DSN=$STARHUB_DATABASE_DSN /starhub-bin/starhub logscan gitea --path /starhub-bin/logs/gitea.log >> /starhub-bin/cron.log 2>&1" | crontab -
 service cron reload
