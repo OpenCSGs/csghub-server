@@ -484,7 +484,7 @@ func (c *DatasetComponent) DownloadFile(ctx context.Context, req *types.GetFileR
 		req.Ref = dataset.Repository.DefaultBranch
 	}
 	if req.Lfs {
-		objectKey := "lfs" + req.Path
+		objectKey := "lfs/" + req.Path
 		url, err = c.ossBucket.SignURL(objectKey, oss.HTTPGet, 600)
 		if err != nil {
 			return nil, url, err
