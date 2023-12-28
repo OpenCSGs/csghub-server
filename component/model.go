@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"path/filepath"
 
 	"github.com/aliyun/aliyun-oss-go-sdk/oss"
 	"opencsg.com/starhub-server/builder/gitserver"
@@ -66,6 +67,12 @@ func NewModelComponent(config *config.Config) (*ModelComponent, error) {
 		slog.Error(newError.Error())
 		return nil, newError
 	}
+	c.tc, err = NewTagComponent(config)
+	if err != nil {
+		newError := fmt.Errorf("fail to create tag component,error:%w", err)
+		slog.Error(newError.Error())
+		return nil, newError
+	}
 	client, err := oss.New(config.S3.Endpoint, config.S3.AccessKeyID, config.S3.AccessKeySecret)
 	if err != nil {
 		newError := fmt.Errorf("fail to init oss client for dataset,error:%w", err)
@@ -87,6 +94,7 @@ type ModelComponent struct {
 	os        *database.OrgStore
 	ns        *database.NamespaceStore
 	gs        gitserver.GitServer
+	tc        *TagComponent
 	ossBucket *oss.Bucket
 }
 
@@ -258,40 +266,131 @@ func (c *ModelComponent) Show(ctx context.Context, namespace, name, current_user
 	return model, nil
 }
 
-func (c *ModelComponent) CreateFile(ctx context.Context, req *types.CreateFileReq) error {
+func (c *ModelComponent) CreateFile(ctx context.Context, req *types.CreateFileReq) (*types.CreateFileResp, error) {
 	_, err := c.ns.FindByPath(ctx, req.NameSpace)
 	if err != nil {
-		return fmt.Errorf("failed to find namespace, error: %w", err)
+		return nil, fmt.Errorf("failed to find namespace, error: %w", err)
 	}
 
 	_, err = c.us.FindByUsername(ctx, req.Username)
 	if err != nil {
-		return fmt.Errorf("failed to find username, error: %w", err)
-	}
-	err = c.gs.CreateModelFile(req)
-	if err != nil {
-		return fmt.Errorf("failed to create model file, error: %w", err)
+		return nil, fmt.Errorf("failed to find username, error: %w", err)
 	}
 
-	return nil
+	//TODO:check sensitive content of file
+	fileName := filepath.Base(req.FilePath)
+	if fileName == "README.md" {
+		slog.Debug("file is readme", slog.String("content", req.Content))
+		return c.createReadmeFile(ctx, req)
+	} else {
+		return c.createLibraryFile(ctx, req)
+	}
 }
 
-func (c *ModelComponent) UpdateFile(ctx context.Context, req *types.UpdateFileReq) error {
+func (c *ModelComponent) createReadmeFile(ctx context.Context, req *types.CreateFileReq) (*types.CreateFileResp, error) {
+	var (
+		err  error
+		resp types.CreateFileResp
+	)
+	contentDecoded, _ := base64.RawStdEncoding.DecodeString(req.Content)
+	_, err = c.tc.UpdateMetaTags(ctx, database.ModelTagScope, req.NameSpace, req.Name, string(contentDecoded))
+	if err != nil {
+		return nil, fmt.Errorf("failed to update meta tags, cause: %w", err)
+	}
+
+	err = c.gs.CreateDatasetFile(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create model file, cause: %w", err)
+	}
+
+	return &resp, err
+}
+
+func (c *ModelComponent) createLibraryFile(ctx context.Context, req *types.CreateFileReq) (*types.CreateFileResp, error) {
+	var (
+		err  error
+		resp types.CreateFileResp
+	)
+
+	err = c.tc.UpdateLibraryTags(ctx, database.ModelTagScope, req.NameSpace, req.Name, "", req.FilePath)
+	if err != nil {
+		slog.Error("failed to set model's tags", slog.String("namespace", req.NameSpace),
+			slog.String("name", req.Name), slog.Any("error", err))
+		return nil, fmt.Errorf("failed to set model's tags, cause: %w", err)
+	}
+	err = c.gs.CreateDatasetFile(req)
+	if err != nil {
+		return nil, err
+	}
+
+	return &resp, err
+}
+
+func (c *ModelComponent) UpdateFile(ctx context.Context, req *types.UpdateFileReq) (*types.UpdateFileResp, error) {
 	_, err := c.ns.FindByPath(ctx, req.NameSpace)
 	if err != nil {
-		return fmt.Errorf("failed to find namespace, error: %w", err)
+		return nil, fmt.Errorf("failed to find namespace, error: %w", err)
 	}
 
 	_, err = c.us.FindByUsername(ctx, req.Username)
 	if err != nil {
-		return fmt.Errorf("failed to find username, error: %w", err)
+		return nil, fmt.Errorf("failed to find username, error: %w", err)
 	}
 	err = c.gs.UpdateModelFile(req.NameSpace, req.Name, req.FilePath, req)
 	if err != nil {
-		return fmt.Errorf("failed to create model file, error: %w", err)
+		return nil, fmt.Errorf("failed to create model file, error: %w", err)
+	}
+	//TODO:check sensitive content of file
+
+	fileName := filepath.Base(req.FilePath)
+	if fileName == "README.md" {
+		slog.Debug("file is readme", slog.String("content", req.Content))
+		return c.updateReadmeFile(ctx, req)
+	} else {
+		slog.Debug("file is not readme", slog.String("filePath", req.FilePath), slog.String("originPath", req.OriginPath))
+		return c.updateLibraryFile(ctx, req)
+	}
+}
+
+func (c *ModelComponent) updateLibraryFile(ctx context.Context, req *types.UpdateFileReq) (*types.UpdateFileResp, error) {
+	var err error
+	resp := &types.UpdateFileResp{}
+
+	isFileRenamed := req.FilePath != req.OriginPath
+	//need to handle tag change only if file renamed
+	if isFileRenamed {
+		c.tc.UpdateLibraryTags(ctx, database.ModelTagScope, req.NameSpace, req.Name, req.OriginPath, req.FilePath)
+		if err != nil {
+			slog.Error("failed to set model's tags", slog.String("namespace", req.NameSpace),
+				slog.String("name", req.Name), slog.Any("error", err))
+			return nil, fmt.Errorf("failed to set model's tags, cause: %w", err)
+		}
 	}
 
-	return nil
+	err = c.gs.UpdateDatasetFile(req)
+	if err != nil {
+		return nil, err
+	}
+
+	return resp, err
+}
+
+func (c *ModelComponent) updateReadmeFile(ctx context.Context, req *types.UpdateFileReq) (*types.UpdateFileResp, error) {
+	slog.Debug("file is readme", slog.String("content", req.Content))
+	var err error
+	resp := new(types.UpdateFileResp)
+
+	contentDecoded, _ := base64.RawStdEncoding.DecodeString(req.Content)
+	_, err = c.tc.UpdateMetaTags(ctx, database.ModelTagScope, req.NameSpace, req.Name, string(contentDecoded))
+	if err != nil {
+		return nil, fmt.Errorf("failed to update meta tags, cause: %w", err)
+	}
+	err = c.gs.UpdateDatasetFile(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to update model file, cause: %w", err)
+	}
+
+	return resp, err
 }
 
 func (c *ModelComponent) Commits(ctx context.Context, req *types.GetCommitsReq) ([]*types.Commit, error) {

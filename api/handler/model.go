@@ -183,14 +183,14 @@ func (h *ModelHandler) CreateFile(ctx *gin.Context) {
 	req.Name = name
 	req.FilePath = ctx.Param("file_path")
 
-	err = h.c.CreateFile(ctx, req)
+	resp, err := h.c.CreateFile(ctx, req)
 	if err != nil {
 		slog.Error("Failed to create model file", slog.Any("error", err))
 		ctx.JSON(http.StatusInternalServerError, gin.H{"message": err.Error()})
 		return
 	}
 	slog.Info("Create model file succeed", slog.String("model", name))
-	httpbase.OK(ctx, nil)
+	httpbase.OK(ctx, resp)
 }
 
 func (h *ModelHandler) UpdateFile(ctx *gin.Context) {
@@ -212,14 +212,14 @@ func (h *ModelHandler) UpdateFile(ctx *gin.Context) {
 	req.Name = name
 	req.FilePath = ctx.Param("file_path")
 
-	err = h.c.UpdateFile(ctx, req)
+	resp, err := h.c.UpdateFile(ctx, req)
 	if err != nil {
 		slog.Error("Failed to update model file", slog.Any("error", err))
 		ctx.JSON(http.StatusInternalServerError, gin.H{"message": err.Error()})
 		return
 	}
 	slog.Info("Update model file succeed", slog.String("model", name))
-	httpbase.OK(ctx, nil)
+	httpbase.OK(ctx, resp)
 }
 
 func (h *ModelHandler) Commits(ctx *gin.Context) {
