@@ -25,9 +25,9 @@ var _ SensitiveChecker = (*AliyunGreenChecker)(nil)
 
 // NewAliyunGreenChecker creates a new AliyunGreenChecker
 func NewAliyunGreenChecker(config *config.Config) *AliyunGreenChecker {
-	accessKeyID := config.Aliyun.AccessKeyID
-	accessKeySecret := config.Aliyun.AccessKeySecret
-	region := config.Aliyun.Region
+	accessKeyID := config.S3.AccessKeyID
+	accessKeySecret := config.S3.AccessKeySecret
+	region := config.S3.Region
 	slog.Debug("Aliyun client init", slog.String("accessKeyID", accessKeyID),
 		slog.String("accessKeySecret", accessKeySecret),
 		slog.String("region", region))

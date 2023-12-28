@@ -11,12 +11,13 @@ import (
 )
 
 type Reader interface {
-	RowCount(bucketName, objName string) (count int, err error)
-	TopN(bucketName, objName string, count int) (columns []string, rows [][]interface{}, err error)
+	RowCount(objName string) (count int, err error)
+	TopN(objName string, count int) (columns []string, rows [][]interface{}, err error)
 }
 
 type duckdbReader struct {
-	db *sql.DB
+	db     *sql.DB
+	bucket string
 }
 
 // NewS3Reader create a new reader to read from s3 compatible object storage service
@@ -29,7 +30,7 @@ func NewS3Reader(cfg *config.Config) (Reader, error) {
 	SET s3_url_style = 'vhost';
 	SET s3_access_key_id = '%s';
 	SET s3_secret_access_key = '%s';
-	`, cfg.Aliyun.Region, cfg.Aliyun.Endpoint, cfg.Aliyun.AccessKeyID, cfg.Aliyun.AccessKeySecret)
+	`, cfg.S3.Region, cfg.S3.Endpoint, cfg.S3.AccessKeyID, cfg.S3.AccessKeySecret)
 	db, err := sql.Open("duckdb", "")
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to duckdb, cause:%w", err)
@@ -40,12 +41,12 @@ func NewS3Reader(cfg *config.Config) (Reader, error) {
 		return nil, fmt.Errorf("failed to setup s3 for duckdb, cause:%w", err)
 	}
 
-	return &duckdbReader{db: db}, nil
+	return &duckdbReader{db: db, bucket: cfg.S3.Bucket}, nil
 }
 
 // RowCount returns the total number of rows in a parquet file in S3 bucket.
-func (r *duckdbReader) RowCount(bucketName, objName string) (int, error) {
-	selectCount := fmt.Sprintf("select count(*) from read_parquet('s3://%s/%s');", bucketName, objName)
+func (r *duckdbReader) RowCount(objName string) (int, error) {
+	selectCount := fmt.Sprintf("select count(*) from read_parquet('s3://%s/%s');", r.bucket, objName)
 	fmt.Println(selectCount)
 	row := r.db.QueryRow(selectCount)
 	if row.Err() != nil {
@@ -57,8 +58,8 @@ func (r *duckdbReader) RowCount(bucketName, objName string) (int, error) {
 }
 
 // TopN returns the top N rows of a parquet file in S3 bucket.
-func (r *duckdbReader) TopN(bucketName, objName string, count int) ([]string, [][]interface{}, error) {
-	topN := fmt.Sprintf("select * from read_parquet('s3://%s/%s') limit %d;", bucketName, objName, count)
+func (r *duckdbReader) TopN(objName string, count int) ([]string, [][]interface{}, error) {
+	topN := fmt.Sprintf("select * from read_parquet('s3://%s/%s') limit %d;", r.bucket, objName, count)
 	slog.Debug("query topN", slog.String("query", topN))
 	rows, err := r.db.Query(topN)
 	if err != nil {

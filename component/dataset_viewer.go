@@ -10,8 +10,6 @@ import (
 	"opencsg.com/starhub-server/common/config"
 )
 
-const ossLfsBucketName = "opencsg-test"
-
 type ViewParquetFileReq struct {
 	Namespace string `json:"namespace"`
 	RepoName  string `json:"name"`
@@ -44,7 +42,6 @@ func NewDatasetViewerComponent(cfg *config.Config) (*DatasetViewerComponent, err
 }
 
 func (c *DatasetViewerComponent) ViewParquetFile(ctx context.Context, req *ViewParquetFileReq) (*ViewParquetFileResp, error) {
-	bucketName := ossLfsBucketName
 	objName, err := c.getParquetObject(req)
 	if err != nil {
 		slog.Error("Failed to view parquet file", slog.Any("error", err))
@@ -56,7 +53,7 @@ func (c *DatasetViewerComponent) ViewParquetFile(ctx context.Context, req *ViewP
 	} else if rowCount > 100 {
 		rowCount = 100
 	}
-	columns, rows, err := c.preader.TopN(bucketName, objName, rowCount)
+	columns, rows, err := c.preader.TopN(objName, rowCount)
 	if err != nil {
 		slog.Error("Failed to view parquet file", slog.Any("error", err))
 		return nil, err
