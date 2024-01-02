@@ -1,7 +1,6 @@
 package tagparser
 
 import (
-	"errors"
 	"log/slog"
 	"slices"
 	"strings"
@@ -31,12 +30,18 @@ func MetaTags(readme string) (map[string][]string, error) {
 		if tagName, match := content.(string); match {
 			categoryTags[category] = append(categoryTags[category], strings.TrimSpace(tagName))
 		} else if tagNames, match := content.([]interface{}); match {
-			for _, tagName := range tagNames {
-				categoryTags[category] = append(categoryTags[category], strings.TrimSpace(tagName.(string)))
+			for _, tagNameValue := range tagNames {
+				if tagName, isString := tagNameValue.(string); isString {
+					categoryTags[category] = append(categoryTags[category], strings.TrimSpace(tagName))
+				} else {
+					//ignore
+					slog.Warn("ignore unknown tag format", slog.Any("tagNameValue", tagNameValue))
+				}
 			}
 		} else {
 			slog.Error("Unknown meta format", slog.Any("content", content))
-			return nil, errors.New("unknown meta format")
+			//alow continue parsing
+			// return nil, errors.New("unknown meta format")
 		}
 	}
 

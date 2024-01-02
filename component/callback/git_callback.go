@@ -131,10 +131,13 @@ func (c *GitCallbackComponent) addFiles(ctx context.Context, repoType, namespace
 		if fileName == ReadmeFileName {
 			content, ok, err := c.checkFileContent(ctx, repoType, namespace, repoName, ref, fileName)
 			if err != nil {
+				slog.Error("callback check file failed", slog.String("file", fileName), slog.String("error", err.Error()))
 				return err
 			}
 			if !ok {
-				return fmt.Errorf("sensitie contest detected. Set %s %s/%s to private", repoType, namespace, repoName)
+				err := fmt.Errorf("sensitie contest detected. Set %s %s/%s to private", repoType, namespace, repoName)
+				slog.Error(err.Error())
+				return err
 			}
 			err = c.updateMetaTags(ctx, repoType, namespace, repoName, ref, content)
 			if err != nil {
