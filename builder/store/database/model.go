@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"strings"
 	"time"
 
 	"github.com/uptrace/bun"
@@ -59,8 +60,9 @@ func (s *ModelStore) Public(ctx context.Context, search, sort, tag string, per, 
 		Model(&models).
 		Where("model.private = ?", false)
 	if search != "" {
+		search = strings.ToLower(search)
 		query = query.Where(
-			"model.path like ? or model.description like ? or model.name like ?",
+			"LOWER(model.path) like ? or LOWER(model.description) like ? or LOWER(model.name) like ?",
 			fmt.Sprintf("%%%s%%", search),
 			fmt.Sprintf("%%%s%%", search),
 			fmt.Sprintf("%%%s%%", search),
@@ -102,8 +104,9 @@ func (s *ModelStore) PublicToUser(ctx context.Context, user *User, search, sort 
 	}
 
 	if search != "" {
+		search = strings.ToLower(search)
 		query = query.Where(
-			"model.path like ? or model.description like ? or model.name like ?",
+			"LOWER(model.path) like ? or LOWER(model.description) like ? or LOWER(model.name) like ?",
 			fmt.Sprintf("%%%s%%", search),
 			fmt.Sprintf("%%%s%%", search),
 			fmt.Sprintf("%%%s%%", search),
