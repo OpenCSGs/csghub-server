@@ -14,6 +14,7 @@ import (
 	"github.com/alibabacloud-go/tea/tea"
 	"github.com/aliyun/alibaba-cloud-sdk-go/services/green"
 	"opencsg.com/starhub-server/common/config"
+	"opencsg.com/starhub-server/common/utils/common"
 )
 
 /*
@@ -27,6 +28,9 @@ type AliyunGreenChecker struct {
 }
 
 var _ SensitiveChecker = (*AliyunGreenChecker)(nil)
+
+const smallTextSize = 500
+const largeTextSize = 9000
 
 // NewAliyunGreenChecker creates a new AliyunGreenChecker
 func NewAliyunGreenChecker(config *config.Config) *AliyunGreenChecker {
@@ -60,10 +64,10 @@ func NewAliyunGreenChecker(config *config.Config) *AliyunGreenChecker {
 	}
 }
 
-// passLargeTextCheck splits large text into smaller 10000 bytes chunks and check them in batch
+// passLargeTextCheck splits large text into smaller `largeTextSize` bytes chunks and check them in batch
 func (c *AliyunGreenChecker) passLargeTextCheck(ctx context.Context, text string) (bool, error) {
-	if len(text) > 100*10000 {
-		return false, errors.New("text length can't be greater than 100*10000")
+	if len(text) > 100*largeTextSize {
+		return false, fmt.Errorf("text length can't be greater than 100*%d", largeTextSize)
 	}
 	//指定检测对象，JSON数组中的每个元素是一个检测任务结构体。最多支持100个元素，即每次提交100条内容进行检测。如果您的业务需要更大的并发量，请联系客户经理申请并发扩容
 	tasks := c.splitTasks(text)
@@ -91,20 +95,25 @@ func (c *AliyunGreenChecker) passLargeTextCheck(ctx context.Context, text string
 	for _, data := range resp.Data {
 		for _, result := range data.Results {
 			if result.Label == "ad" || result.Label == "flood" {
-				slog.Info("allow ad and flood in text")
+				slog.Info("allow ad and flood in text", slog.String("taskId", data.TaskId))
 				continue
 			}
 
 			if result.Suggestion == "block" {
+				slog.Info("block content", slog.String("content", common.TruncString(data.Content, 128)), slog.String("taskId", data.TaskId))
+
 				return false, nil
 			}
 		}
 	}
+
+	slog.Info("large text check pass", slog.String("text", common.TruncString(text, 128)), slog.Int("size", len(text)))
 	return true, nil
 }
 
 func (c *AliyunGreenChecker) PassTextCheck(ctx context.Context, scenario Scenario, text string) (bool, error) {
-	if len(text) > 600 {
+	if len(text) > smallTextSize {
+		slog.Info("switch to large text check", slog.String("scenario", string(scenario)), slog.Int("size", len(text)))
 		return c.passLargeTextCheck(ctx, text)
 	}
 	tasks := c.splitTasks(text)
@@ -141,9 +150,9 @@ func (c *AliyunGreenChecker) PassTextCheck(ctx context.Context, scenario Scenari
 func (*AliyunGreenChecker) splitTasks(text string) []map[string]string {
 	var tasks []map[string]string
 	var i int
-	for i+1000 < len(text) {
-		tasks = append(tasks, map[string]string{"content": text[i : i+1000]})
-		i += 1000
+	for i+largeTextSize < len(text) {
+		tasks = append(tasks, map[string]string{"content": text[i : i+largeTextSize]})
+		i += largeTextSize
 	}
 	if i <= len(text) {
 		tasks = append(tasks, map[string]string{"content": text[i:]})
