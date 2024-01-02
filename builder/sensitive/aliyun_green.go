@@ -50,37 +50,48 @@ func NewAliyunGreenChecker(config *config.Config) *AliyunGreenChecker {
 }
 
 func (c *AliyunGreenChecker) PassTextCheck(ctx context.Context, scenario Scenario, text string) (bool, error) {
-	serviceParameters, _ := json.Marshal(
-		map[string]interface{}{
-			"content": text,
-		},
-	)
+	tasks := c.splitTasks(text)
+	for _, task := range tasks {
+		serviceParameters, _ := json.Marshal(task)
+		slog.Debug("task", slog.String("task", string(serviceParameters)))
+		textModerationRequest := &green20220302.TextModerationRequest{
+			Service:           tea.String(string(scenario)),
+			ServiceParameters: tea.String(string(serviceParameters)),
+		}
+		resp, err := c.TextModeration(textModerationRequest)
+		if err != nil {
+			slog.Error("fail to call aliyun TextModeration", slog.String("content", text), slog.Any("error", err))
+			return false, err
+		}
 
-	textModerationRequest := &green20220302.TextModerationRequest{
-		Service:           tea.String(string(scenario)),
-		ServiceParameters: tea.String(string(serviceParameters)),
-	}
-	resp, err := c.TextModeration(textModerationRequest)
-	if err != nil {
-		slog.Error("fail to call aliyun TextModeration", slog.String("content", text), slog.Any("error", err))
-		return false, err
-	}
-	slog.Debug("aliyun TextModeration return", slog.String("resp", resp.GoString()))
+		if *resp.StatusCode != http.StatusOK || *resp.Body.Code != 200 {
+			slog.Error("aliyun TextModeration return code not 200", slog.String("content", text),
+				slog.String("resp", resp.GoString()))
+			return false, errors.New(*resp.Body.Message)
+		}
 
-	if *resp.StatusCode != http.StatusOK || *resp.Body.Code != 200 {
-		slog.Error("aliyun TextModeration return code not 200", slog.String("content", text),
-			slog.String("resp", resp.GoString()))
-		return false, errors.New(*resp.Body.Message)
-	}
-
-	if len(*resp.Body.Data.Labels) > 0 {
-		slog.Info("sensitive content detected", slog.String("content", text),
-			slog.String("labels", *resp.Body.Data.Labels),
-			slog.String("reason", *resp.Body.Data.Reason))
-		return false, nil
+		if len(*resp.Body.Data.Labels) > 0 {
+			slog.Info("sensitive content detected", slog.String("content", text),
+				slog.String("labels", *resp.Body.Data.Labels),
+				slog.String("reason", *resp.Body.Data.Reason))
+			return false, nil
+		}
 	}
 
 	return true, nil
+}
+
+func (*AliyunGreenChecker) splitTasks(text string) []map[string]string {
+	var tasks []map[string]string
+	var i int
+	for i+1000 < len(text) {
+		tasks = append(tasks, map[string]string{"content": text[i : i+1000]})
+		i += 1000
+	}
+	if i <= len(text) {
+		tasks = append(tasks, map[string]string{"content": text[i:]})
+	}
+	return tasks
 }
 
 func (c *AliyunGreenChecker) PassImageCheck(ctx context.Context, scenario Scenario, ossBucketName, ossObjectName string) (bool, error) {
