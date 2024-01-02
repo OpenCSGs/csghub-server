@@ -10,7 +10,7 @@ type DatasetDetail struct {
 	Introduction  string `json:"introduction"`
 	License       string `json:"license"`
 	Private       bool   `json:"private"`
-	DownloadCount int    `json:"download_count"`
+	Downloads     int    `json:"downloads"`
 	LastUpdatedAt string `json:"last_updated_at"`
 	HTTPCloneURL  string `json:"http_clone_url"`
 	SSHCloneURL   string `json:"ssh_clone_url"`

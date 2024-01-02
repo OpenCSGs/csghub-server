@@ -399,7 +399,7 @@ func (c *DatasetComponent) Delete(ctx context.Context, namespace, name string) e
 }
 
 func (c *DatasetComponent) Detail(ctx context.Context, namespace, name string) (*types.DatasetDetail, error) {
-	_, err := c.ds.FindByPath(ctx, namespace, name)
+	d, err := c.ds.FindByPath(ctx, namespace, name)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find dataset, error: %w", err)
 	}
@@ -407,6 +407,7 @@ func (c *DatasetComponent) Detail(ctx context.Context, namespace, name string) (
 	if err != nil {
 		return nil, fmt.Errorf("failed to get git dataset detail, error: %w", err)
 	}
+	detail.Downloads = int(d.Downloads)
 
 	return detail, nil
 }
