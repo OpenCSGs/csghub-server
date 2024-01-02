@@ -88,9 +88,7 @@ func (c *AliyunGreenChecker) passLargeTextCheck(ctx context.Context, text string
 	if err != nil {
 		return false, fmt.Errorf("error unmarshalling scan response: %w", err)
 	}
-	fmt.Println((len(resp.Data)))
 	for _, data := range resp.Data {
-		fmt.Println(data.Results)
 		for _, result := range data.Results {
 			if result.Label == "ad" || result.Label == "flood" {
 				slog.Info("allow ad and flood in text")
