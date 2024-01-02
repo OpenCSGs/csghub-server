@@ -239,7 +239,7 @@ func (c *ModelComponent) Delete(ctx context.Context, namespace, name string) err
 }
 
 func (c *ModelComponent) Detail(ctx context.Context, namespace, name string) (*types.ModelDetail, error) {
-	_, err := c.ms.FindByPath(ctx, namespace, name)
+	m, err := c.ms.FindByPath(ctx, namespace, name)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find model, error: %w", err)
 	}
@@ -247,6 +247,7 @@ func (c *ModelComponent) Detail(ctx context.Context, namespace, name string) (*t
 	if err != nil {
 		return nil, fmt.Errorf("failed to get git model detail, error: %w", err)
 	}
+	detail.Downloads = int(m.Downloads)
 
 	return detail, nil
 }
