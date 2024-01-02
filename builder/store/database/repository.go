@@ -16,9 +16,9 @@ type RepoStore struct {
 	db *DB
 }
 
-func NewRepoStore(db *DB) *RepoStore {
+func NewRepoStore() *RepoStore {
 	return &RepoStore{
-		db: db,
+		db: defaultDB,
 	}
 }
 
@@ -82,4 +82,13 @@ func (s *RepoStore) FindById(ctx context.Context, id int64) (*Repository, error)
 		Where("id =?", id).
 		Scan(ctx)
 	return resRepo, err
+}
+
+func (s *RepoStore) All(ctx context.Context) ([]*Repository, error) {
+	repos := make([]*Repository, 0)
+	err := s.db.Operator.Core.
+		NewSelect().
+		Model(&repos).
+		Scan(ctx)
+	return repos, err
 }

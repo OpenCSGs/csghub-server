@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/spf13/cobra"
+	tag "opencsg.com/starhub-server/cmd/starhub-server/cmd/callback"
 	"opencsg.com/starhub-server/cmd/starhub-server/cmd/logscan"
 	"opencsg.com/starhub-server/cmd/starhub-server/cmd/migration"
 	"opencsg.com/starhub-server/cmd/starhub-server/cmd/start"
@@ -52,5 +53,6 @@ func init() {
 		migration.Cmd,
 		start.Cmd,
 		logscan.Cmd,
+		tag.Cmd,
 	)
 }
