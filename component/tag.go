@@ -89,7 +89,7 @@ func (c *TagComponent) UpdateLibraryTags(ctx context.Context, tagScope database.
 			oldLibTag = t
 		}
 	}
-	err = c.ts.SetLibraryTag(ctx, namespace, name, oldLibTag, newLibTag)
+	err = c.ts.SetLibraryTag(ctx, namespace, name, newLibTag, oldLibTag)
 	if err != nil {
 		slog.Error("failed to set dataset's tags", slog.String("namespace", namespace),
 			slog.String("name", name), slog.Any("error", err))
