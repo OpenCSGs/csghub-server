@@ -315,6 +315,7 @@ func (h *ModelHandler) DownloadFile(ctx *gin.Context) {
 		Path:      ctx.Param("file_path"),
 		Ref:       ctx.Query("ref"),
 		Lfs:       false,
+		SaveAs:    ctx.Query("save_as"),
 	}
 	if ctx.Query("lfs") != "" {
 		req.Lfs, err = strconv.ParseBool(ctx.Query("lfs"))

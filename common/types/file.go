@@ -64,6 +64,7 @@ type GetFileReq struct {
 	Path      string `json:"path"`
 	Ref       string `json:"ref"`
 	Lfs       bool   `json:"lfs"`
+	SaveAs    string `json:"save_as"`
 }
 
 type GetBranchesReq struct {
