@@ -206,6 +206,7 @@ func (ts *TagStore) SetMetaTags(ctx context.Context, namespace, name string, tag
 }
 
 func (ts *TagStore) SetLibraryTag(ctx context.Context, namespace, name string, newTag, oldTag *Tag) (err error) {
+	slog.Debug("set library tag", slog.Any("newTag", newTag), slog.Any("oldTag", oldTag))
 	repo := new(Repository)
 	err = ts.db.Operator.Core.NewSelect().Model(repo).
 		Column("id").
