@@ -62,16 +62,16 @@ func (s *RepoStore) CreateRepo(ctx context.Context, repo Repository) (err error)
 	return
 }
 
-func (s *RepoStore) FindByPath(ctx context.Context, owner string, repoPath string) (repo *Repository, err error) {
+func (s *RepoStore) Find(ctx context.Context, owner, repoType, repoName string) (*Repository, error) {
+	var err error
+	repo := &Repository{}
 	err = s.db.Operator.Core.
 		NewSelect().
-		Model(&repo).
-		Relation("Repository").
-		Where("path =?", fmt.Sprintf("%s/%s", owner, repoPath)).
-		Where("name =?", repoPath).
+		Model(repo).
+		Where("git_path =?", fmt.Sprintf("%s_%s/%s", repoType, owner, repoName)).
 		Limit(1).
 		Scan(ctx)
-	return
+	return repo, err
 }
 
 func (s *RepoStore) FindById(ctx context.Context, id int64) (*Repository, error) {

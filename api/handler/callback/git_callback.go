@@ -17,10 +17,11 @@ type GitCallbackHandler struct {
 
 func NewGitCallbackHandler(config *config.Config) (*GitCallbackHandler, error) {
 	cbc, err := component.NewGitCallback(config)
-
 	if err != nil {
 		return nil, err
 	}
+	cbc.SetRepoVisibility(true)
+
 	return &GitCallbackHandler{cbc}, nil
 }
 

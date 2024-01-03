@@ -2,8 +2,10 @@ package callback
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
+	"path"
 	"strings"
 
 	"opencsg.com/starhub-server/builder/gitserver"
@@ -27,6 +29,8 @@ type GitCallbackComponent struct {
 	checker sensitive.SensitiveChecker
 	ms      *database.ModelStore
 	ds      *database.DatasetStore
+	//set visibility if file content is sensitive
+	setRepoVisibility bool
 }
 
 // new CallbackComponent
@@ -51,6 +55,11 @@ func NewGitCallback(config *config.Config) (*GitCallbackComponent, error) {
 	}, nil
 }
 
+// SetRepoVisibility sets a flag whether change repo's visibility if file content is sensitive
+func (c *GitCallbackComponent) SetRepoVisibility(yes bool) {
+	c.setRepoVisibility = yes
+}
+
 func (c *GitCallbackComponent) HandlePush(ctx context.Context, req *types.GiteaCallbackPushReq) error {
 	commits := req.Commits
 	ref := req.Ref
@@ -58,12 +67,13 @@ func (c *GitCallbackComponent) HandlePush(ctx context.Context, req *types.GiteaC
 	splits := strings.Split(req.Repository.FullName, "/")
 	fullNamespace, repoName := splits[0], splits[1]
 	repoType, namespace, _ := strings.Cut(fullNamespace, "_")
+	var err error
 	for _, commit := range commits {
-		c.modifyFiles(ctx, repoType, namespace, repoName, ref, commit.Modified)
-		c.removeFiles(ctx, repoType, namespace, repoName, ref, commit.Removed)
-		c.addFiles(ctx, repoType, namespace, repoName, ref, commit.Added)
+		err = errors.Join(err, c.modifyFiles(ctx, repoType, namespace, repoName, ref, commit.Modified))
+		err = errors.Join(err, c.removeFiles(ctx, repoType, namespace, repoName, ref, commit.Removed))
+		err = errors.Join(err, c.addFiles(ctx, repoType, namespace, repoName, ref, commit.Added))
 	}
-	return nil
+	return err
 }
 
 // modifyFiles method handles modified files, skip if not modify README.md
@@ -75,14 +85,25 @@ func (c *GitCallbackComponent) modifyFiles(ctx context.Context, repoType, namesp
 			continue
 		}
 
-		content, ok, err := c.checkFileContent(ctx, repoType, namespace, repoName, ref, fileName)
+		content, err := c.getFileRaw(repoType, namespace, repoName, ref, fileName)
 		if err != nil {
 			return err
 		}
-		if !ok {
-			return fmt.Errorf("sensitie contest detected. Set %s %s/%s to private", repoType, namespace, repoName)
+		if c.setRepoVisibility {
+			go func(content string) {
+				ok, err := c.checkFileContent(ctx, repoType, namespace, repoName, ref, content)
+				if err != nil {
+					slog.Error("callback check file failed", slog.String("repo", path.Join(namespace, repoName)), slog.String("file", fileName),
+						slog.String("error", err.Error()))
+					return
+				}
+				if !ok {
+					err := fmt.Errorf("sensitie context detected. Set %s %s/%s to private", repoType, namespace, repoName)
+					slog.Error(err.Error())
+					return
+				}
+			}(content)
 		}
-
 		//should be only one README.md
 		return c.updateMetaTags(ctx, repoType, namespace, repoName, ref, content)
 	}
@@ -100,10 +121,10 @@ func (c *GitCallbackComponent) removeFiles(ctx context.Context, repoType, namesp
 			const content string = ""
 			err := c.tc.ClearMetaTags(ctx, namespace, repoName)
 			if err != nil {
-				slog.Error("failed to clear meta tags", slog.String("namespace", namespace),
-					slog.String("content", content), slog.String("repo", repoName), slog.String("ref", ref),
+				slog.Error("failed to clear meta tags", slog.String("content", content),
+					slog.String("repo", path.Join(namespace, repoName)), slog.String("ref", ref),
 					slog.Any("error", err))
-				return fmt.Errorf("failed to update met tags,cause: %w", err)
+				return fmt.Errorf("failed to clear met tags,cause: %w", err)
 			}
 		} else {
 			var tagScope database.TagScope
@@ -129,15 +150,23 @@ func (c *GitCallbackComponent) addFiles(ctx context.Context, repoType, namespace
 		slog.Debug("add file", slog.String("file", fileName))
 		//only care about readme file under root directory
 		if fileName == ReadmeFileName {
-			content, ok, err := c.checkFileContent(ctx, repoType, namespace, repoName, ref, fileName)
+			content, err := c.getFileRaw(repoType, namespace, repoName, ref, fileName)
 			if err != nil {
-				slog.Error("callback check file failed", slog.String("file", fileName), slog.String("error", err.Error()))
 				return err
 			}
-			if !ok {
-				err := fmt.Errorf("sensitie contest detected. Set %s %s/%s to private", repoType, namespace, repoName)
-				slog.Error(err.Error())
-				return err
+			if c.setRepoVisibility {
+				go func(content string) {
+					ok, err := c.checkFileContent(ctx, repoType, namespace, repoName, ref, content)
+					if err != nil {
+						slog.Error("callback check file failed", slog.String("file", fileName), slog.String("error", err.Error()))
+						return
+					}
+					if !ok {
+						err := fmt.Errorf("sensitie contest detected. Set %s %s/%s to private", repoType, namespace, repoName)
+						slog.Error(err.Error())
+						return
+					}
+				}(content)
 			}
 			err = c.updateMetaTags(ctx, repoType, namespace, repoName, ref, content)
 			if err != nil {
@@ -179,6 +208,7 @@ func (c *GitCallbackComponent) updateMetaTags(ctx context.Context, repoType, nam
 			slog.Any("error", err))
 		return fmt.Errorf("failed to update met tags,cause: %w", err)
 	}
+	slog.Info("update meta tags success", slog.String("repo", path.Join(namespace, repoName)), slog.String("type", repoType))
 	return nil
 }
 
@@ -204,24 +234,21 @@ func (c *GitCallbackComponent) getFileRaw(repoType, namespace, repoName, ref, fi
 	return content, nil
 }
 
-func (c *GitCallbackComponent) checkFileContent(ctx context.Context, repoType, namespace, repoName, ref, fileName string) (string, bool, error) {
-	content, err := c.getFileRaw(repoType, namespace, repoName, ref, fileName)
-	if err != nil {
-		return "", false, err
-	}
+func (c *GitCallbackComponent) checkFileContent(ctx context.Context, repoType, namespace, repoName, ref, content string) (bool, error) {
 
 	ok, err := c.checkText(ctx, content)
 	if err != nil {
-		return "", ok, err
+		return ok, err
 	}
 
 	if !ok {
+		slog.Info("sensitive content detected, set repo to private", slog.String("repo", path.Join(namespace, repoName)))
 		err := c.setPrivate(ctx, repoType, namespace, repoName)
 		if err != nil {
-			return "", ok, err
+			return ok, err
 		}
 	}
-	return content, ok, nil
+	return ok, nil
 }
 
 func (c *GitCallbackComponent) checkText(ctx context.Context, content string) (bool, error) {
