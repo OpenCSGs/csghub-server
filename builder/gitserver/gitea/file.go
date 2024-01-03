@@ -71,14 +71,14 @@ func (c *Client) GetDatasetFileRaw(namespace, name, ref, path string) (string, e
 }
 
 func (c *Client) GetDatasetFileReader(namespace, name, ref, path string) (io.ReadCloser, error) {
-	file, err := c.GetDatasetFileContents(namespace, name, ref, path)
+	namespace = common.WithPrefix(namespace, DatasetOrgPrefix)
+	entries, _, err := c.giteaClient.GetDir(namespace, name, ref, path)
 	if err != nil {
 		return nil, err
 	}
-	if file.Size > NonLFSFileSizeLimit {
+	if entries[0].Size > NonLFSFileSizeLimit {
 		return nil, errors.New("file is larger than 10MB")
 	}
-	namespace = common.WithPrefix(namespace, DatasetOrgPrefix)
 	giteaFileReader, _, err := c.giteaClient.GetFileReader(namespace, name, ref, path)
 	if err != nil {
 		return nil, err
@@ -103,14 +103,14 @@ func (c *Client) GetModelFileRaw(namespace, name, ref, path string) (data string
 }
 
 func (c *Client) GetModelFileReader(namespace, name, ref, path string) (giteaFileReader io.ReadCloser, err error) {
-	file, err := c.GetModelFileContents(namespace, name, ref, path)
+	namespace = common.WithPrefix(namespace, ModelOrgPrefix)
+	entries, _, err := c.giteaClient.GetDir(namespace, name, ref, path)
 	if err != nil {
 		return
 	}
-	if file.Size > NonLFSFileSizeLimit {
+	if entries[0].Size > NonLFSFileSizeLimit {
 		return nil, errors.New("file is larger than 10MB")
 	}
-	namespace = common.WithPrefix(namespace, ModelOrgPrefix)
 	giteaFileReader, _, err = c.giteaClient.GetFileReader(namespace, name, ref, path)
 	if err != nil {
 		return
