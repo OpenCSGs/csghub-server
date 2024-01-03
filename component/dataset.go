@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"path"
 	"path/filepath"
 
 	"github.com/aliyun/aliyun-oss-go-sdk/oss"
@@ -486,12 +487,16 @@ func (c *DatasetComponent) DownloadFile(ctx context.Context, req *types.GetFileR
 		req.Ref = dataset.Repository.DefaultBranch
 	}
 	if req.Lfs {
-		objectKey := "lfs/" + req.Path
+		objectKey := path.Join("lfs", req.Path)
+		if req.SaveAs != "" {
+			opt := oss.ContentDisposition(fmt.Sprintf(`attachment; filename="%s"`, req.SaveAs))
+			c.ossBucket.SetObjectMeta(objectKey, opt)
+		}
 		url, err = c.ossBucket.SignURL(objectKey, oss.HTTPGet, ossFileExpireSeconds)
 		if err != nil {
 			return nil, url, err
 		}
-		return reader, url, nil
+		return nil, url, nil
 	} else {
 		reader, err = c.gs.GetDatasetFileReader(req.Namespace, req.Name, req.Ref, req.Path)
 		if err != nil {

@@ -2,6 +2,7 @@ package gitea
 
 import (
 	"encoding/base64"
+	"errors"
 	"io"
 	"log/slog"
 	"strings"
@@ -12,7 +13,10 @@ import (
 	"opencsg.com/starhub-server/common/utils/common"
 )
 
-const LFSPrefix = "version https://git-lfs.github.com/spec/v1"
+const (
+	LFSPrefix           = "version https://git-lfs.github.com/spec/v1"
+	NonLFSFileSizeLimit = 10485760
+)
 
 func (c *Client) GetModelFileTree(namespace, name, ref, path string) (tree []*types.File, err error) {
 	namespace = common.WithPrefix(namespace, ModelOrgPrefix)
@@ -68,6 +72,13 @@ func (c *Client) GetDatasetFileRaw(namespace, name, ref, path string) (string, e
 
 func (c *Client) GetDatasetFileReader(namespace, name, ref, path string) (io.ReadCloser, error) {
 	namespace = common.WithPrefix(namespace, DatasetOrgPrefix)
+	entries, _, err := c.giteaClient.GetDir(namespace, name, ref, path)
+	if err != nil {
+		return nil, err
+	}
+	if entries[0].Size > NonLFSFileSizeLimit {
+		return nil, errors.New("file is larger than 10MB")
+	}
 	giteaFileReader, _, err := c.giteaClient.GetFileReader(namespace, name, ref, path)
 	if err != nil {
 		return nil, err
@@ -93,6 +104,13 @@ func (c *Client) GetModelFileRaw(namespace, name, ref, path string) (data string
 
 func (c *Client) GetModelFileReader(namespace, name, ref, path string) (giteaFileReader io.ReadCloser, err error) {
 	namespace = common.WithPrefix(namespace, ModelOrgPrefix)
+	entries, _, err := c.giteaClient.GetDir(namespace, name, ref, path)
+	if err != nil {
+		return
+	}
+	if entries[0].Size > NonLFSFileSizeLimit {
+		return nil, errors.New("file is larger than 10MB")
+	}
 	giteaFileReader, _, err = c.giteaClient.GetFileReader(namespace, name, ref, path)
 	if err != nil {
 		return
