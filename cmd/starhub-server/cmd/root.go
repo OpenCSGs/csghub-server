@@ -4,10 +4,10 @@ import (
 	"fmt"
 
 	"github.com/spf13/cobra"
-	tag "opencsg.com/starhub-server/cmd/starhub-server/cmd/callback"
 	"opencsg.com/starhub-server/cmd/starhub-server/cmd/logscan"
 	"opencsg.com/starhub-server/cmd/starhub-server/cmd/migration"
 	"opencsg.com/starhub-server/cmd/starhub-server/cmd/start"
+	"opencsg.com/starhub-server/cmd/starhub-server/cmd/trigger"
 	"opencsg.com/starhub-server/common/log"
 	"opencsg.com/starhub-server/version"
 )
@@ -53,6 +53,6 @@ func init() {
 		migration.Cmd,
 		start.Cmd,
 		logscan.Cmd,
-		tag.Cmd,
+		trigger.Cmd,
 	)
 }
