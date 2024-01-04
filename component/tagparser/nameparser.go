@@ -9,24 +9,39 @@ import (
 // see: https://git-devops.opencsg.com/product/community/open-portal/-/issues/47
 func LibraryTag(filePath string) string {
 	filename := filepath.Base(filePath)
+	filename = strings.ToLower(filename)
 	switch {
-	case filename == "pytorch_model.bin":
+	case isPytorch(filename):
 		return "pytorch"
-	case filename == "tf_model.h5":
+	case isTensorflow(filename):
 		return "tensorflow"
-	case filename == "model.safetensors":
+	case isSafetensors(filename):
 		return "safetensors"
-	case filename == "flax_model.msgpack":
+	case isJAX(filename):
 		return "jax"
-	case strings.HasSuffix(filename, "onnx"):
+	case strings.HasSuffix(filename, ".onnx"):
 		return "onnx"
-	case strings.HasSuffix(filename, "pdparams"):
+	case strings.HasSuffix(filename, ".pdparams"):
 		return "paddlepaddle"
-	case strings.HasSuffix(filename, "joblib"):
+	case strings.HasSuffix(filename, ".joblib"):
 		return "joblib"
-	case strings.HasSuffix(filename, "gguf"):
+	case strings.HasSuffix(filename, ".gguf"):
 		return "gguf"
 	default:
 		return ""
 	}
+}
+
+func isPytorch(filename string) bool {
+	return strings.HasPrefix(filename, "pytorch_model") && strings.HasSuffix(filename, ".bin")
+}
+
+func isTensorflow(filename string) bool {
+	return strings.HasPrefix(filename, "tf_model") && strings.HasSuffix(filename, ".h5")
+}
+func isSafetensors(filename string) bool {
+	return strings.HasPrefix(filename, "model") && strings.HasSuffix(filename, ".safetensors")
+}
+func isJAX(filename string) bool {
+	return strings.HasPrefix(filename, "flax_model") && strings.HasSuffix(filename, ".msgpack")
 }
