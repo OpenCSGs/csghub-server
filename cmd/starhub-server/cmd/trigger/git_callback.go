@@ -106,20 +106,21 @@ var gitCallbackCmd = &cobra.Command{
 			namespace, repoName := splits[0], splits[1]
 			req := &types.GiteaCallbackPushReq{}
 			var err error
-			var fileNames []string
+			//file paths relative to repository root
+			var filePaths []string
 			if repo.RepositoryType == "dataset" {
-				fileNames, err = getFileNames(namespace, repoName, "", gs.GetDatasetFileTree)
+				filePaths, err = getFilePaths(namespace, repoName, "", gs.GetDatasetFileTree)
 			} else {
-				fileNames, err = getFileNames(namespace, repoName, "", gs.GetModelFileTree)
+				filePaths, err = getFilePaths(namespace, repoName, "", gs.GetModelFileTree)
 			}
 			if err != nil {
 				slog.Error("failed to get file names", slog.String("repo", repo.Path), slog.Any("error", err))
 				continue
 			}
-			slog.Info("file names from git server ", "fileNames", fileNames)
+			slog.Info("file names from git server ", "fileNames", filePaths)
 			req.Repository.FullName = repo.GitPath
 			req.Commits = append(req.Commits, types.GiteaCallbackPushReq_Commit{})
-			req.Commits[0].Added = append(req.Commits[0].Added, fileNames...)
+			req.Commits[0].Added = append(req.Commits[0].Added, filePaths...)
 			err = callbackComponent.HandlePush(context.Background(), req)
 			slog.Info("trigger complete", slog.String("repo", repo.Path), slog.String("type", string(repo.RepositoryType)), slog.Any("error", err))
 		}
@@ -127,23 +128,23 @@ var gitCallbackCmd = &cobra.Command{
 	},
 }
 
-func getFileNames(namespace, repoName, folder string, gsTree func(namespce, repoName, ref, path string) ([]*types.File, error)) ([]string, error) {
-	var fileNames []string
+func getFilePaths(namespace, repoName, folder string, gsTree func(namespce, repoName, ref, path string) ([]*types.File, error)) ([]string, error) {
+	var filePaths []string
 	gitFiles, err := gsTree(namespace, repoName, "", folder)
 	if err != nil {
 		slog.Error("Failed to get dataset file contents", slog.String("path", folder), slog.Any("error", err))
-		return fileNames, err
+		return filePaths, err
 	}
 	for _, file := range gitFiles {
 		if file.Type == "dir" {
-			subFileNames, err := getFileNames(namespace, repoName, file.Name, gsTree)
+			subFileNames, err := getFilePaths(namespace, repoName, file.Path, gsTree)
 			if err != nil {
-				return fileNames, err
+				return filePaths, err
 			}
-			fileNames = append(fileNames, subFileNames...)
+			filePaths = append(filePaths, subFileNames...)
 		} else {
-			fileNames = append(fileNames, file.Path)
+			filePaths = append(filePaths, file.Path)
 		}
 	}
-	return fileNames, nil
+	return filePaths, nil
 }
