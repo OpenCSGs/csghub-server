@@ -7,10 +7,12 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"net/url"
 	"path"
 	"path/filepath"
 
-	"github.com/aliyun/aliyun-oss-go-sdk/oss"
+	"github.com/minio/minio-go/v7"
+	"github.com/minio/minio-go/v7/pkg/credentials"
 	"opencsg.com/starhub-server/builder/gitserver"
 	"opencsg.com/starhub-server/builder/store/database"
 	"opencsg.com/starhub-server/common/config"
@@ -74,18 +76,18 @@ func NewModelComponent(config *config.Config) (*ModelComponent, error) {
 		slog.Error(newError.Error())
 		return nil, newError
 	}
-	client, err := oss.New(config.S3.Endpoint, config.S3.AccessKeyID, config.S3.AccessKeySecret)
+	c.s3Client, err = minio.New(config.S3.Endpoint, &minio.Options{
+		Creds:        credentials.NewStaticV4(config.S3.AccessKeyID, config.S3.AccessKeySecret, ""),
+		Secure:       true,
+		BucketLookup: minio.BucketLookupAuto,
+		Region:       config.S3.Region,
+	})
 	if err != nil {
-		newError := fmt.Errorf("fail to init oss client for dataset,error:%w", err)
+		newError := fmt.Errorf("fail to init s3 client for dataset,error:%w", err)
 		slog.Error(newError.Error())
 		return nil, newError
 	}
-	c.ossBucket, err = client.Bucket(config.S3.Bucket)
-	if err != nil {
-		newError := fmt.Errorf("fail to init oss bucket for dataset,error:%w", err)
-		slog.Error(newError.Error())
-		return nil, newError
-	}
+	c.lfsBucket = config.S3.Bucket
 	return c, nil
 }
 
@@ -96,7 +98,8 @@ type ModelComponent struct {
 	ns        *database.NamespaceStore
 	gs        gitserver.GitServer
 	tc        *TagComponent
-	ossBucket *oss.Bucket
+	s3Client  *minio.Client
+	lfsBucket string
 }
 
 func (c *ModelComponent) Index(ctx context.Context, username, search, sort string, ragReqs []database.TagReq, per, page int) ([]database.Model, int, error) {
@@ -442,8 +445,8 @@ func (c *ModelComponent) FileRaw(ctx context.Context, req *types.GetFileReq) (st
 
 func (c *ModelComponent) DownloadFile(ctx context.Context, req *types.GetFileReq) (io.ReadCloser, string, error) {
 	var (
-		reader io.ReadCloser
-		url    string
+		reader      io.ReadCloser
+		downloadUrl string
 	)
 	model, err := c.ms.FindByPath(ctx, req.Namespace, req.Name)
 	if err != nil {
@@ -454,21 +457,22 @@ func (c *ModelComponent) DownloadFile(ctx context.Context, req *types.GetFileReq
 	}
 	if req.Lfs {
 		objectKey := path.Join("lfs", req.Path)
+		reqParams := make(url.Values)
 		if req.SaveAs != "" {
-			opt := oss.ContentDisposition(fmt.Sprintf(`attachment; filename="%s"`, req.SaveAs))
-			c.ossBucket.SetObjectMeta(objectKey, opt)
+			// allow rename when download through content-disposition header
+			reqParams.Set("response-content-disposition", fmt.Sprintf("attachment;filename=%s", req.SaveAs))
 		}
-		url, err = c.ossBucket.SignURL(objectKey, oss.HTTPGet, ossFileExpireSeconds)
+		signedUrl, err := c.s3Client.PresignedGetObject(ctx, c.lfsBucket, objectKey, ossFileExpireSeconds, reqParams)
 		if err != nil {
-			return nil, url, err
+			return nil, downloadUrl, err
 		}
-		return nil, url, nil
+		return nil, signedUrl.String(), nil
 	} else {
 		reader, err = c.gs.GetModelFileReader(req.Namespace, req.Name, req.Ref, req.Path)
 		if err != nil {
 			return nil, "", fmt.Errorf("failed to download git dataset repository file, error: %w", err)
 		}
-		return reader, url, nil
+		return reader, downloadUrl, nil
 	}
 }
 
