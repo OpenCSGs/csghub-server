@@ -8,6 +8,9 @@ import (
 // LibraryTag parse file name or extension to match defined tag name
 // see: https://git-devops.opencsg.com/product/community/open-portal/-/issues/47
 func LibraryTag(filePath string) string {
+	if len(filePath) == 0 {
+		return ""
+	}
 	filename := filepath.Base(filePath)
 	filename = strings.ToLower(filename)
 	switch {

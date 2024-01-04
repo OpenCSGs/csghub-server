@@ -82,6 +82,9 @@ func (c *TagComponent) UpdateLibraryTags(ctx context.Context, tagScope database.
 	}
 	var oldLibTag, newLibTag *database.Tag
 	for _, t := range allTags {
+		if t.Category != "framework" {
+			continue
+		}
 		if t.Name == newLibTagName {
 			newLibTag = t
 		}
