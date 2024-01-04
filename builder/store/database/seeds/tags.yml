@@ -193,7 +193,7 @@ tags:
   built_in: true
 - category: task
   group: multimodal
-  name: text-to-image-synthesis
+  name: text-to-image
   scope: model
   show_name: 文本生成图片
   built_in: true
