@@ -235,7 +235,7 @@ func (ts *TagStore) SetLibraryTag(ctx context.Context, namespace, name string, n
 				Where("repository_id = ? and tag_id = ?", repo.ID, newTag.ID).
 				Scan(ctx)
 
-			if err != nil && err != sql.ErrNoRows {
+			if err != nil && !errors.Is(err, sql.ErrNoRows) {
 				return err
 			}
 			if newRepoTag.ID == 0 {
