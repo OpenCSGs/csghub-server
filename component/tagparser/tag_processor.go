@@ -63,6 +63,7 @@ func (p *tagProcessor) ProcessReadme(ctx context.Context, content string) (tagsM
 }
 
 func (p *tagProcessor) ProcessFramework(ctx context.Context, fileName string) (*database.Tag, error) {
+	//TODO:move framework tag processing from component package to here
 	return nil, nil
 }
 
