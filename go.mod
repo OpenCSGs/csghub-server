@@ -8,9 +8,7 @@ require (
 	github.com/alibabacloud-go/tea v1.2.1
 	github.com/aliyun/alibaba-cloud-sdk-go v1.62.648
 	github.com/charmbracelet/lipgloss v0.9.1
-	github.com/getsentry/sentry-go v0.25.0
 	github.com/gin-gonic/gin v1.9.1
-	github.com/go-ozzo/ozzo-validation v3.6.0+incompatible
 	github.com/kelseyhightower/envconfig v1.4.0
 	github.com/marcboeker/go-duckdb v1.5.6
 	github.com/minio/minio-go/v7 v7.0.66
@@ -43,7 +41,6 @@ require (
 	github.com/alibabacloud-go/tea-utils/v2 v2.0.4 // indirect
 	github.com/alibabacloud-go/tea-xml v1.1.3 // indirect
 	github.com/aliyun/credentials-go v1.3.2 // indirect
-	github.com/asaskevich/govalidator v0.0.0-20230301143203-a9d515a09cc2 // indirect
 	github.com/aymanbagabas/go-osc52/v2 v2.0.1 // indirect
 	github.com/bytedance/sonic v1.9.1 // indirect
 	github.com/cespare/xxhash/v2 v2.2.0 // indirect
