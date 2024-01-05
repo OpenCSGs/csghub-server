@@ -4,7 +4,9 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"slices"
 
+	"opencsg.com/starhub-server/builder/sensitive"
 	"opencsg.com/starhub-server/builder/store/database"
 	"opencsg.com/starhub-server/common/config"
 	"opencsg.com/starhub-server/component/tagparser"
@@ -13,11 +15,13 @@ import (
 func NewTagComponent(config *config.Config) (*TagComponent, error) {
 	tc := &TagComponent{}
 	tc.ts = database.NewTagStore()
+	tc.sensitiveChecker = sensitive.NewAliyunGreenChecker(config)
 	return tc, nil
 }
 
 type TagComponent struct {
-	ts *database.TagStore
+	ts               *database.TagStore
+	sensitiveChecker sensitive.SensitiveChecker
 }
 
 func (tc *TagComponent) AllTags(ctx context.Context) ([]database.Tag, error) {
@@ -44,8 +48,15 @@ func (c *TagComponent) UpdateMetaTags(ctx context.Context, tagScope database.Tag
 		slog.Error("Failed to process tags", slog.Any("error", err))
 		return nil, fmt.Errorf("failed to process tags, cause: %w", err)
 	}
-	slog.Debug("tagsToCreate", slog.Any("tags", tagToCreate))
-	slog.Debug("tagsMatched", slog.Any("tags", tagsMatched))
+
+	if c.sensitiveChecker != nil {
+		//TODO:do tag name sensitive checking in batch
+		//remove sensitive tags by checking tag name of tag to create
+		tagToCreate = slices.DeleteFunc(tagToCreate, func(t *database.Tag) bool {
+			pass, _ := c.sensitiveChecker.PassTextCheck(ctx, sensitive.ScenarioNicknameDetection, t.Name)
+			return !pass
+		})
+	}
 
 	err = c.ts.SaveTags(ctx, tagToCreate)
 	if err != nil {
