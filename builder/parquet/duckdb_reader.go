@@ -22,9 +22,6 @@ type duckdbReader struct {
 
 // NewS3Reader create a new reader to read from s3 compatible object storage service
 func NewS3Reader(cfg *config.Config) (Reader, error) {
-	if !cfg.S3.Enable {
-		return nil, fmt.Errorf("S3 storage is not enabled. Please config STARHUB_SERVER_S3_* to enable S3 storage.")
-	}
 	s3SetupSql := fmt.Sprintf(`
 	INSTALL httpfs;
 	LOAD httpfs;

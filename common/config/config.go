@@ -21,7 +21,6 @@ type Config struct {
 	}
 
 	Redis struct {
-		Enable             bool   `envconfig:"STARHUB_SERVER_REDIS_ENABLE" default:"false"`
 		Endpoint           string `envconfig:"STARHUB_SERVER_REDIS_ENDPOINT"              default:"localhost:6379"`
 		MaxRetries         int    `envconfig:"STARHUB_SERVER_REDIS_MAX_RETRIES"           default:"3"`
 		MinIdleConnections int    `envconfig:"STARHUB_SERVER_REDIS_MIN_IDLE_CONNECTIONS"  default:"0"`
@@ -46,7 +45,6 @@ type Config struct {
 	}
 
 	S3 struct {
-		Enable          bool   `envconfig:"STARHUB_SERVER_S3_ENABLE" default:"true"`
 		AccessKeyID     string `envconfig:"STARHUB_SERVER_S3_ACCESS_KEY_ID"`
 		AccessKeySecret string `envconfig:"STARHUB_SERVER_S3_ACCESS_KEY_SECRET"`
 		Region          string `envconfig:"STARHUB_SERVER_S3_REGION"`
