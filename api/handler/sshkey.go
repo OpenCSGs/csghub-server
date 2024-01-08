@@ -69,7 +69,7 @@ func (h *SSHKeyHandler) Delete(ctx *gin.Context) {
 	name := ctx.Param("name")
 	username := ctx.Param("username")
 	if name == "" || username == "" {
-		err := fmt.Errorf("Invalid username or key name in url")
+		err := fmt.Errorf("invalid username or key name in url")
 		slog.Error("Bad request format", "error", err)
 		ctx.JSON(http.StatusBadRequest, gin.H{"message": err.Error()})
 		return

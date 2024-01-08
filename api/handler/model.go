@@ -35,8 +35,7 @@ type ModelHandler struct {
 }
 
 func (h *ModelHandler) Index(ctx *gin.Context) {
-	var tagReqs []database.TagReq
-	tagReqs = parseTagReqs(ctx)
+	tagReqs := parseTagReqs(ctx)
 	username := ctx.Query("current_user")
 	per, page, err := common.GetPerAndPageFromContext(ctx)
 	if err != nil {

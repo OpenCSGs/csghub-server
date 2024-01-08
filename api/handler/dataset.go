@@ -12,7 +12,6 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"opencsg.com/starhub-server/api/httpbase"
-	"opencsg.com/starhub-server/builder/store/database"
 	"opencsg.com/starhub-server/common/config"
 	"opencsg.com/starhub-server/common/types"
 	"opencsg.com/starhub-server/common/utils/common"
@@ -121,8 +120,7 @@ func (h *DatasetHandler) Create(ctx *gin.Context) {
 }
 
 func (h *DatasetHandler) Index(ctx *gin.Context) {
-	var tagReqs []database.TagReq
-	tagReqs = parseTagReqs(ctx)
+	tagReqs := parseTagReqs(ctx)
 	username := ctx.Query("current_user")
 	per, page, err := common.GetPerAndPageFromContext(ctx)
 	if err != nil {
