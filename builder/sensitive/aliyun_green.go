@@ -35,7 +35,7 @@ const largeTextSize = 9000
 // NewAliyunGreenChecker creates a new AliyunGreenChecker
 func NewAliyunGreenChecker(config *config.Config) *AliyunGreenChecker {
 	if !config.SensitiveCheck.Enable {
-		log.Println("AliyunGreenChecker requires SensitiveCheck configuration. Please add SensitiveCheck configuration if you want enable AliyunGreenChecker.")
+		slog.Info("AliyunGreenChecker requires SensitiveCheck configuration. Please add SensitiveCheck configuration if you want enable AliyunGreenChecker.")
 		return nil
 	}
 	accessKeyID := config.SensitiveCheck.AccessKeyID
