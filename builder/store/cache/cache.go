@@ -8,6 +8,7 @@ import (
 )
 
 type RedisConfig struct {
+	Enable   bool   `comment:"Enable redis or not"`
 	Addr     string `comment:"Redis address, e.g. localhost:6379"`
 	Username string `comment:"optional, Redis username"`
 	Password string `comment:"optional, Redis password"`
@@ -20,6 +21,10 @@ type Cache struct {
 }
 
 func NewCache(ctx context.Context, cfg RedisConfig) (cache *Cache, err error) {
+	if !cfg.Enable {
+		return
+	}
+
 	const releaseLockScript = `
 local value = redis.call("GET", KEYS[1])
 if not value then

@@ -12,9 +12,9 @@ import (
 	"path/filepath"
 
 	"github.com/minio/minio-go/v7"
-	"github.com/minio/minio-go/v7/pkg/credentials"
 	"opencsg.com/starhub-server/builder/gitserver"
 	"opencsg.com/starhub-server/builder/store/database"
+	"opencsg.com/starhub-server/builder/store/s3"
 	"opencsg.com/starhub-server/common/config"
 	"opencsg.com/starhub-server/common/types"
 )
@@ -101,12 +101,7 @@ func NewDatasetComponent(config *config.Config) (*DatasetComponent, error) {
 		slog.Error(newError.Error())
 		return nil, newError
 	}
-	c.s3Client, err = minio.New(config.S3.Endpoint, &minio.Options{
-		Creds:        credentials.NewStaticV4(config.S3.AccessKeyID, config.S3.AccessKeySecret, ""),
-		Secure:       true,
-		BucketLookup: minio.BucketLookupAuto,
-		Region:       config.S3.Region,
-	})
+	c.s3Client, err = s3.NewMinio(config)
 	if err != nil {
 		newError := fmt.Errorf("fail to init s3 client for dataset,error:%w", err)
 		slog.Error(newError.Error())

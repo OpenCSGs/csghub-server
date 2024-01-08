@@ -89,7 +89,7 @@ func (c *GitCallbackComponent) modifyFiles(ctx context.Context, repoType, namesp
 		if err != nil {
 			return err
 		}
-		if c.setRepoVisibility {
+		if c.setRepoVisibility && c.checker != nil {
 			go func(content string) {
 				ok, err := c.checkFileContent(ctx, repoType, namespace, repoName, ref, content)
 				if err != nil {
