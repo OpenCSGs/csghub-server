@@ -47,6 +47,9 @@ func (c *OrganizationComponent) Create(ctx context.Context, req *types.CreateOrg
 	}
 
 	es, err := c.ns.Exists(ctx, req.Name)
+	if err != nil {
+		return nil, err
+	}
 	if es {
 		return nil, errors.New("the name already exists")
 	}

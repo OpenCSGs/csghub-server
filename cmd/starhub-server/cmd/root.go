@@ -2,18 +2,17 @@ package cmd
 
 import (
 	"fmt"
+	"log/slog"
+	"os"
 
 	"github.com/spf13/cobra"
 	"opencsg.com/starhub-server/cmd/starhub-server/cmd/logscan"
 	"opencsg.com/starhub-server/cmd/starhub-server/cmd/migration"
 	"opencsg.com/starhub-server/cmd/starhub-server/cmd/start"
 	"opencsg.com/starhub-server/cmd/starhub-server/cmd/trigger"
-	"opencsg.com/starhub-server/common/log"
-	"opencsg.com/starhub-server/version"
 )
 
 var (
-	cfgFile   string
 	logLevel  string
 	logFormat string
 )
@@ -32,21 +31,12 @@ func init() {
 		}
 	}()
 
-	RootCmd.PersistentFlags().StringVarP(&logLevel, "log-level", "l", "info", "log level (debug, info, warn, error, fatal)")
-	RootCmd.PersistentFlags().StringVar(&logFormat, "log-format", "console", "json, console")
+	RootCmd.PersistentFlags().StringVarP(&logLevel, "log-level", "l", "info", "set log level to debug, info, warn, error or fatal (case-insensitive). default is INFO")
+	RootCmd.PersistentFlags().StringVarP(&logFormat, "log-format", "f", "json", "set log format to json or text. default is json")
 	RootCmd.DisableAutoGenTag = true
 
 	cobra.OnInitialize(func() {
-		logFields := log.WithFields(log.String("git-revision", version.GitRevision),
-			log.String("version", version.StarhubAPIVersion))
-
-		var lv log.Level
-		lv, err = log.ParseLevel(logLevel)
-		if err != nil {
-			err = fmt.Errorf("parsing log level: %w", err)
-			return
-		}
-		log.Init("starhub-server", lv, logFields, log.WithEncoding(logFormat))
+		setupLog(logLevel, logFormat)
 	})
 
 	RootCmd.AddCommand(
@@ -55,4 +45,27 @@ func init() {
 		logscan.Cmd,
 		trigger.Cmd,
 	)
+}
+
+func setupLog(lvl, format string) {
+	var logLevel = slog.LevelInfo.Level()
+	var logger *slog.Logger
+	if len(lvl) > 0 {
+		err := logLevel.UnmarshalText([]byte(lvl))
+		//logLevel not change if unmarshall failed
+		if err != nil {
+			fmt.Println("input invalid log level, use default log level INFO")
+		}
+	}
+	opt := &slog.HandlerOptions{AddSource: true, Level: logLevel}
+	var handler slog.Handler
+	switch format {
+	case "json":
+		handler = slog.NewJSONHandler(os.Stdout, opt)
+	default:
+		handler = slog.NewTextHandler(os.Stdout, opt)
+	}
+	fmt.Printf("init logger, level: %s, format: %s\n", logLevel.String(), format)
+	logger = slog.New(handler)
+	slog.SetDefault(logger)
 }

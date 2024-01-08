@@ -2,8 +2,6 @@ package start
 
 import (
 	"fmt"
-	"log/slog"
-	"os"
 
 	"github.com/spf13/cobra"
 	"opencsg.com/starhub-server/api/httpbase"
@@ -40,10 +38,6 @@ var serverCmd = &cobra.Command{
 		if len(cfg.APIToken) < 128 {
 			return fmt.Errorf("API token length is less than 128, please check")
 		}
-		//TODO:init logger by config
-		logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{AddSource: true, Level: slog.LevelDebug}))
-		slog.SetDefault(logger)
-
 		dbConfig := database.DBConfig{
 			Dialect: database.DatabaseDialect(cfg.Database.Driver),
 			DSN:     cfg.Database.DSN,
