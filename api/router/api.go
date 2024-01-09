@@ -132,9 +132,10 @@ func NewRouter(config *config.Config) (*gin.Engine, error) {
 	}
 	apiGroup.POST("/callback/git", callbackCtrl.Handle)
 	//Sensive check
-	sensitiveCtrl := handler.NewSensitiveHandler(config)
-	apiGroup.POST("/sensitive/text", sensitiveCtrl.Text)
-	apiGroup.POST("/sensitive/image", sensitiveCtrl.Image)
-
+	if config.SensitiveCheck.Enable {
+		sensitiveCtrl := handler.NewSensitiveHandler(config)
+		apiGroup.POST("/sensitive/text", sensitiveCtrl.Text)
+		apiGroup.POST("/sensitive/image", sensitiveCtrl.Image)
+	}
 	return r, nil
 }

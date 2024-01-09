@@ -34,9 +34,13 @@ const largeTextSize = 9000
 
 // NewAliyunGreenChecker creates a new AliyunGreenChecker
 func NewAliyunGreenChecker(config *config.Config) *AliyunGreenChecker {
-	accessKeyID := config.S3.AccessKeyID
-	accessKeySecret := config.S3.AccessKeySecret
-	region := config.S3.Region
+	if !config.SensitiveCheck.Enable {
+		slog.Info("AliyunGreenChecker requires SensitiveCheck configuration. Please add SensitiveCheck configuration if you want enable AliyunGreenChecker.")
+		return nil
+	}
+	accessKeyID := config.SensitiveCheck.AccessKeyID
+	accessKeySecret := config.SensitiveCheck.AccessKeySecret
+	region := config.SensitiveCheck.Region
 	slog.Debug("Aliyun client init", slog.String("accessKeyID", accessKeyID),
 		slog.String("accessKeySecret", accessKeySecret),
 		slog.String("region", region))
