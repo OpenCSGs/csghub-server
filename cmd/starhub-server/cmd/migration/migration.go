@@ -2,6 +2,7 @@ package migration
 
 import (
 	"fmt"
+	"log/slog"
 	"os"
 	"strings"
 
@@ -9,7 +10,6 @@ import (
 	"github.com/uptrace/bun/migrate"
 	"opencsg.com/starhub-server/builder/store/database"
 	"opencsg.com/starhub-server/common/config"
-	"opencsg.com/starhub-server/common/utils/console"
 )
 
 // verboseMode whether to show SQL detail
@@ -97,18 +97,11 @@ var migrateCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		// if mockSession {
-		// 	err = db.InsertMockUserAndSession(cmd.Context())
-		// 	if err != nil {
-		// 		err = fmt.Errorf("inserting mock user and session: %w", err)
-		// 		return err
-		// 	}
-		// }
 		if group.IsZero() {
-			console.RenderSuccess("there are no new migrations to run (database is up to date)").Println()
+			slog.Info("there are no new migrations to run (database is up to date)")
 			return nil
 		}
-		console.RenderSuccess(fmt.Sprintf("migrated to %s\n", group))
+		slog.Info(fmt.Sprintf("migrated to %s", group))
 		return nil
 	},
 }
@@ -122,10 +115,10 @@ var rollbackCmd = &cobra.Command{
 			return err
 		}
 		if group.IsZero() {
-			console.RenderSuccess("there are no groups to roll back").Println()
+			slog.Info("there are no groups to roll back")
 			return nil
 		}
-		console.RenderSuccess(fmt.Sprintf("rolled back %s\n", group))
+		slog.Info(fmt.Sprintf("rolled back %s", group))
 		return nil
 	},
 }
@@ -155,7 +148,7 @@ var createGoCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		fmt.Printf("created migration %s (%s)\n", mf.Name, mf.Path)
+		slog.Info("created migration %s (%s)", mf.Name, mf.Path)
 		return nil
 	},
 }
@@ -171,7 +164,7 @@ var createSQLCmd = &cobra.Command{
 		}
 
 		for _, mf := range files {
-			fmt.Printf("created migration %s (%s)\n", mf.Name, mf.Path)
+			slog.Info("created migration %s (%s)", mf.Name, mf.Path)
 		}
 
 		return nil
@@ -186,9 +179,9 @@ var statusCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		fmt.Printf("migrations: %s\n", ms)
-		fmt.Printf("unapplied migrations: %s\n", ms.Unapplied())
-		fmt.Printf("last migration group: %s\n", ms.LastGroup())
+		slog.Info(fmt.Sprintf("migrations: %s", ms))
+		slog.Info(fmt.Sprintf("unapplied migrations: %s", ms.Unapplied()))
+		slog.Info(fmt.Sprintf("last migration group: %s", ms.LastGroup()))
 		return nil
 	},
 }
@@ -202,10 +195,10 @@ var markAppliedCmd = &cobra.Command{
 			return err
 		}
 		if group.IsZero() {
-			fmt.Printf("there are no new migrations to mark as applied\n")
+			slog.Info("there are no new migrations to mark as applied")
 			return nil
 		}
-		fmt.Printf("marked as applied %s\n", group)
+		slog.Info(fmt.Sprintf("marked as applied %s", group))
 		return nil
 	},
 }

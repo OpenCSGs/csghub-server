@@ -6,10 +6,8 @@ import (
 	"github.com/gin-gonic/gin"
 	"opencsg.com/starhub-server/api/handler"
 	"opencsg.com/starhub-server/api/handler/callback"
-	memberHandler "opencsg.com/starhub-server/api/handler/member"
 	"opencsg.com/starhub-server/api/middleware"
 	"opencsg.com/starhub-server/common/config"
-	"opencsg.com/starhub-server/component/member"
 )
 
 func NewRouter(config *config.Config) (*gin.Engine, error) {
@@ -108,14 +106,14 @@ func NewRouter(config *config.Config) (*gin.Engine, error) {
 	apiGroup.GET("/organization/:namespace/datasets", orgHandler.Datasets)
 
 	//Member
-	memberCtrl, err := member.New(config)
+	memberCtrl, err := handler.NewMemberHandler(config)
 	if err != nil {
 		return nil, fmt.Errorf("error creating user controller:%w", err)
 	}
-	apiGroup.GET("/organizations/:name/members", memberHandler.HandleIndex(memberCtrl))
-	apiGroup.POST("/organizations/:name/members", memberHandler.HandleCreate(memberCtrl))
-	apiGroup.PUT("/organizations/:name/members/:username", memberHandler.HandleUpdate(memberCtrl))
-	apiGroup.DELETE("/organizations/:name/members/:username", memberHandler.HandleDelete(memberCtrl))
+	apiGroup.GET("/organizations/:name/members", memberCtrl.Index)
+	apiGroup.POST("/organizations/:name/members", memberCtrl.Create)
+	apiGroup.PUT("/organizations/:name/members/:username", memberCtrl.Update)
+	apiGroup.DELETE("/organizations/:name/members/:username", memberCtrl.Delete)
 
 	//Tag
 	tagCtrl, err := handler.NewTagHandler(config)
