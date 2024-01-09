@@ -22,10 +22,10 @@ Migration 文件的名字有两个部分，时间戳和迁移名（也就是这�
 
 ```bash
 # 编译项目
-go build -o starhub  ./cmd/starhub-server
+go build -o bin/starhub  ./cmd/starhub-server
 
 # 初始化迁移
-./starhub migration init
+./bin/starhub migration init
 ```
 指定初始化迁移命令后，数据库中会创建两个表用来管理数据库迁移的版本，这个两个表是 `bun_migrations` 和 `bun_migration_locks`。
 
@@ -34,7 +34,7 @@ go build -o starhub  ./cmd/starhub-server
 在初始化数据库迁移之后，我们需要执行数据库迁移来初始化数据库。
 
 ```bash
-./starhub migration migrate
+./bin/starhub migration migrate
 ```
 
 ## 创建数据库迁移
@@ -43,13 +43,13 @@ go build -o starhub  ./cmd/starhub-server
 
 ```bash
 # 创建 .sql 格式的迁移文件
-./starhub migration create_sql <迁移名称>
+./bin/starhub migration create_sql <迁移名称>
 
 # 创建 .go 格式的迁移文件
-./starhub migration create_go <迁移名称>
+./bin/starhub migration create_go <迁移名称>
 ```
 
-例如我们需要创建一个名字为 create_users 的迁移文件来创建一个 users 表，我们可以执行 `./starhub migration create_go create_users` 来创建一个迁移文件。这个命令会在 `builder/store/migrations` 目录中新建一个格式例如 `20240103065315_create_users.go` 的文件。
+例如我们需要创建一个名字为 create_users 的迁移文件来创建一个 users 表，我们可以执行 `./bin/starhub migration create_go create_users` 来创建一个迁移文件。这个命令会在 `builder/store/migrations` 目录中新建一个格式例如 `20240103065315_create_users.go` 的文件。
 
 然后我们可以在这个文件中添加如下内容：
 
@@ -77,11 +77,11 @@ type User struct {
 }
 ```
 
-然后执行 `./starhub migration migrate` ，就会创建一个 users 表。这个表会有四个列，分别是 `id` `username` `created_at` `updated_at` 。
+然后执行 `./bin/starhub migration migrate` ，就会创建一个 users 表。这个表会有四个列，分别是 `id` `username` `created_at` `updated_at` 。
 
-这个时候我们可能需要对用户的 `username` 字段加上唯一索引，我们可以创建一个 `.sql` 格式的迁移文件来做这个事情。使用命令 `./starhub migration create_sql add_index_for_users` 命令来创建一个名为 `add_index_for_users` 的迁移文件，这个命令会生成两个文件，一个名字格式为 `20240104063114_add_index_for_users.up.sql` ；另一个名字格式为 `20240104063114_add_index_for_users.down.sql` 。它们的不同在于 `.sql` 前的 `up` 和 `down`
+这个时候我们可能需要对用户的 `username` 字段加上唯一索引，我们可以创建一个 `.sql` 格式的迁移文件来做这个事情。使用命令 `./bin/starhub migration create_sql add_index_for_users` 命令来创建一个名为 `add_index_for_users` 的迁移文件，这个命令会生成两个文件，一个名字格式为 `20240104063114_add_index_for_users.up.sql` ；另一个名字格式为 `20240104063114_add_index_for_users.down.sql` 。它们的不同在于 `.sql` 前的 `up` 和 `down`
 
-，其中包含 `up` 关键字的代表是在执行数据库迁移时所执行的文件，也就是执行 `./starhub migration migrate` 时执行的迁移文件；包含 `down` 关键字的则是在执行数据库迁移回滚的时候所执行的文件，也就是执行 `./starhub migration rollback` 时执行的迁移文件。 我们在`20240104063114_add_index_for_users.up.sql`这个文件中添加如下内容：
+，其中包含 `up` 关键字的代表是在执行数据库迁移时所执行的文件，也就是执行 `./bin/starhub migration migrate` 时执行的迁移文件；包含 `down` 关键字的则是在执行数据库迁移回滚的时候所执行的文件，也就是执行 `./bin/starhub migration rollback` 时执行的迁移文件。 我们在`20240104063114_add_index_for_users.up.sql`这个文件中添加如下内容：
 
 ```sql
 
@@ -94,7 +94,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_users_username ON users(username);
 CREATE INDEX IF EXISTS idx_users_username;
 ```
 
-这样在执行 `./starhub migration migrate` 时会创建一个名为 `idx_users_username` 的索引，在执行 `./starhub migration rollback` 时会将名为 `idx_users_username` 的索引删掉。
+这样在执行 `./bin/starhub migration migrate` 时会创建一个名为 `idx_users_username` 的索引，在执行 `./bin/starhub migration rollback` 时会将名为 `idx_users_username` 的索引删掉。
 
 *注意：如果需要在 `.sql` 文件中书写多条 SQL 语句时，需要使用 `-bun:split` 将多条 SQL 语句隔开。例如：*
 
