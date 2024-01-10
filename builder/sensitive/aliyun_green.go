@@ -8,6 +8,7 @@ import (
 	"log"
 	"log/slog"
 	"net/http"
+	"strings"
 
 	openapi "github.com/alibabacloud-go/darabonba-openapi/v2/client"
 	green20220302 "github.com/alibabacloud-go/green-20220302/client"
@@ -99,12 +100,13 @@ func (c *AliyunGreenChecker) passLargeTextCheck(ctx context.Context, text string
 	for _, data := range resp.Data {
 		for _, result := range data.Results {
 			if result.Label == "ad" || result.Label == "flood" {
-				slog.Info("allow ad and flood in text", slog.String("taskId", data.TaskId))
+				slog.Info("allow ad and flood in text", slog.String("taskId", data.TaskId), slog.String("aliyun_request_id", resp.RequestID))
 				continue
 			}
 
 			if result.Suggestion == "block" {
-				slog.Info("block content", slog.String("content", common.TruncString(data.Content, 128)), slog.String("taskId", data.TaskId))
+				slog.Info("block content", slog.String("content", common.TruncString(data.Content, 128)), slog.String("taskId", data.TaskId),
+					slog.String("aliyun_request_id", resp.RequestID))
 
 				return false, nil
 			}
@@ -120,32 +122,38 @@ func (c *AliyunGreenChecker) PassTextCheck(ctx context.Context, scenario Scenari
 		slog.Info("switch to large text check", slog.String("scenario", string(scenario)), slog.Int("size", len(text)))
 		return c.passLargeTextCheck(ctx, text)
 	}
-	tasks := c.splitTasks(text)
-	for _, task := range tasks {
-		serviceParameters, _ := json.Marshal(task)
-		slog.Debug("task", slog.String("task", string(serviceParameters)))
-		textModerationRequest := &green20220302.TextModerationRequest{
-			Service:           tea.String(string(scenario)),
-			ServiceParameters: tea.String(string(serviceParameters)),
-		}
-		resp, err := c.cip.TextModeration(textModerationRequest)
-		if err != nil {
-			slog.Error("fail to call aliyun TextModeration", slog.String("content", text), slog.Any("error", err))
-			return false, err
+	task := map[string]string{"content": text}
+	serviceParameters, _ := json.Marshal(task)
+	textModerationRequest := &green20220302.TextModerationRequest{
+		Service:           tea.String(string(scenario)),
+		ServiceParameters: tea.String(string(serviceParameters)),
+	}
+	resp, err := c.cip.TextModeration(textModerationRequest)
+	if err != nil {
+		slog.Error("fail to call aliyun TextModeration", slog.String("content", text), slog.Any("error", err))
+		return false, err
+	}
+
+	if *resp.StatusCode != http.StatusOK || *resp.Body.Code != 200 {
+		slog.Error("aliyun TextModeration return code not 200", slog.String("content", text),
+			slog.String("resp", resp.GoString()))
+		return false, errors.New(*resp.Body.Message)
+	}
+
+	if len(*resp.Body.Data.Labels) == 0 {
+		return true, nil
+	}
+
+	labelStr := *resp.Body.Data.Labels
+	labels := strings.Split(labelStr, ",")
+	for _, label := range labels {
+		if label == "ad" || label == "flood" {
+			continue
 		}
 
-		if *resp.StatusCode != http.StatusOK || *resp.Body.Code != 200 {
-			slog.Error("aliyun TextModeration return code not 200", slog.String("content", text),
-				slog.String("resp", resp.GoString()))
-			return false, errors.New(*resp.Body.Message)
-		}
-
-		if len(*resp.Body.Data.Labels) > 0 {
-			slog.Info("sensitive content detected", slog.String("content", text),
-				slog.String("labels", *resp.Body.Data.Labels),
-				slog.String("reason", *resp.Body.Data.Reason))
-			return false, nil
-		}
+		slog.Info("sensitive content detected", slog.String("content", text),
+			slog.String("label", label), slog.String("aliyun_request_id", *resp.Body.RequestId))
+		return false, nil
 	}
 
 	return true, nil
@@ -212,7 +220,7 @@ func (c *AliyunGreenChecker) PassImageCheck(ctx context.Context, scenario Scenar
 	}
 
 	slog.Info("sensitive image detected", slog.String("scenario", string(scenario)), slog.String("ossBucketName", ossBucketName),
-		slog.String("ossObjectName", ossObjectName), slog.Any("labels", labelMap))
+		slog.String("ossObjectName", ossObjectName), slog.Any("labels", labelMap), slog.String("aliyun_request_id", *resp.Body.RequestId))
 	//TODO:return the labels if need in future
 	return false, nil
 }

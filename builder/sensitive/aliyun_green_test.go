@@ -36,6 +36,7 @@ func Test_passLargeTextCheck(t *testing.T) {
 		t.Log("Failed to load config:", err)
 		t.FailNow()
 	}
+	cfg.SensitiveCheck.Enable = true
 	c := NewAliyunGreenChecker(cfg)
 	buf, err := os.ReadFile(txtFileName)
 	if err != nil {
@@ -60,6 +61,25 @@ func Test_passLargeTextCheck(t *testing.T) {
 
 	if !success {
 		t.Log("success", success)
+		t.FailNow()
+	}
+}
+
+func Test_PassTextCheck(t *testing.T) {
+	cfg, err := config.LoadConfig()
+	if err != nil {
+		t.Log("Failed to load config:", err)
+		t.FailNow()
+	}
+	cfg.SensitiveCheck.Enable = true
+	c := NewAliyunGreenChecker(cfg)
+	content := "http://github.com/repo"
+	pass, err := c.PassTextCheck(context.Background(), ScenarioCommentDetection, content)
+	if err != nil {
+		t.Fail()
+	}
+	if !pass {
+		t.Log("fail")
 		t.FailNow()
 	}
 }
