@@ -6,7 +6,7 @@ import (
 	"encoding/hex"
 	"math/big"
 
-	"github.com/pulltheflower/gitea-go-sdk/gitea"
+	"github.com/OpenCSGs/gitea-go-sdk/gitea"
 	"opencsg.com/starhub-server/builder/store/database"
 	"opencsg.com/starhub-server/common/types"
 	"opencsg.com/starhub-server/common/utils/common"

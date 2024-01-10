@@ -3,6 +3,7 @@ module opencsg.com/starhub-server
 go 1.21
 
 require (
+	github.com/OpenCSGs/gitea-go-sdk/gitea v0.0.0-20240110070248-7098d11df207
 	github.com/alibabacloud-go/darabonba-openapi/v2 v2.0.5
 	github.com/alibabacloud-go/green-20220302 v1.2.0
 	github.com/alibabacloud-go/tea v1.2.1
@@ -12,7 +13,6 @@ require (
 	github.com/marcboeker/go-duckdb v1.5.6
 	github.com/minio/minio-go/v7 v7.0.66
 	github.com/minio/sha256-simd v1.0.1
-	github.com/pulltheflower/gitea-go-sdk/gitea v0.0.0-20231228063935-0a5792804e93
 	github.com/redis/go-redis/v9 v9.3.0
 	github.com/spf13/cobra v1.8.0
 	github.com/uptrace/bun v1.1.16
