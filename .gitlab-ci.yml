@@ -6,10 +6,14 @@ stages:
   - build
   - deploy
 
-
 variables:
   IMAGE_NAME: "starhub-server"
   IMAGE_TAG: "latest"
+  SAST_IMAGE_SUFFIX: '-fips'
+
+include:
+  - template: Security/Dependency-Scanning.gitlab-ci.yml
+  - template: Jobs/Secret-Detection.gitlab-ci.yml
 
 test:
   stage: test
