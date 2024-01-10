@@ -514,6 +514,16 @@ tags:
   group: ''
   scope: model
   built_in: true
+- name: cc
+  category: license
+  group: ''
+  scope: model
+  built_in: true
+- name: cc0-1.0
+  category: license
+  group: ''
+  scope: model
+  built_in: true
 - name: apache-2.0
   category: license
   group: ''
@@ -605,6 +615,16 @@ tags:
   scope: dataset
   built_in: true
 - name: cc-by-nc-sa-4.0
+  category: license
+  group: ''
+  scope: dataset
+  built_in: true
+- name: cc
+  category: license
+  group: ''
+  scope: dataset
+  built_in: true
+- name: cc0-1.0
   category: license
   group: ''
   scope: dataset
