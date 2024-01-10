@@ -1,64 +1,54 @@
-# Starhub API
+# Starhub Server
 
 This is an API project that provides services to `portal`.
 
 ## Build
 
 ```shell
-cd cmd/starhub-server/ && go build
+go build -o starhub  ./cmd/starhub-server
 ```
 
-## Usage
+## Migration
 
-### Database migration
+Migration 相关文档在 [这里](docs/zh-CN/migration.md)
 
-```shell
-# init migration tables
-./starhub-server migration init
+## 项目配置
 
-# create sql migration files
-./starhub-server migration create_go <filename>
-
-# create go migration files
-./starhub-server migration create_sql <filename>
-
-# execute migration
-./starhub-server migration migrate
-
-# rollback the last migration group
-./starhub-server migration rollback
-```
-
-### Configurations
-
-| Environment Variable Name | Default Value | Detail |
+| 环境变量名 | 默认值 | 描述 |
 | --- | --- | --- |
-| STARHUB_SERVER_INSTANCE_ID | none | Primary instance ID |
-| STARHUB_SERVER_ENABLE_SWAGGER | false | Whether to open the Swagger API documentation page |
-| STARHUB_SERVER_SERVER_PORT | 8080 | The port of starhub-server server |
-| STARHUB_SERVER_SERVER_EXTERNAL_HOST | localhost | The external host of starhub-server server |
-| STARHUB_SERVER_SERVER_DOCS_HOST | `http://localhost:6636` | The host of documentation page |
-| STARHUB_DATABASE_DRIVER | pg | Database driver name |
-| STARHUB_DATABASE_DSN | postgresql://postgres:postgres@localhost:5432/STARHUB_SERVER?sslmode=disable | Database DSN |
-| STARHUB_DATABASE_TIMEZONE | Asia/Shanghai | The timezone used by the database |
-| STARHUB_SERVER_REDIS_ENDPOINT | localhost:6379 | Redis endpoint |
-| STARHUB_SERVER_REDIS_MAX_RETRIES | 3 | Max retry count of Redis |
-| STARHUB_SERVER_REDIS_MIN_IDLE_CONNECTIONS | 0 | Minimum number of free connections held in the connection pool |
-| STARHUB_SERVER_REDIS_USER | none | The username of Redis server |
-| STARHUB_SERVER_REDIS_PASSWORD | none | The password of Redis server |
-| STARHUB_SERVER_REDIS_USE_SENTINEL | false | Used to enable or disable the Sentinel function |
-| STARHUB_SERVER_REDIS_SENTINEL_MASTER | none | The name of master Redis node |
-| STARHUB_SERVER_REDIS_SENTINEL_ENDPOINT | none | The endpoint of master Redis node |
-| STARHUB_SERVER_GITSERVER_TYPE | gitea | The type of Git server [`gitea` or `local`] |
-| STARHUB_SERVER_GITSERVER_HOST | none | The host of Git server |
-| STARHUB_SERVER_GITSERVER_SECRET_KEY | none | The secret key of Git server |
+| STARHUB_SERVER_INSTANCE_ID | none | 一个唯一的实例 ID，用于部署多个实例时做标识 |
+| STARHUB_SERVER_ENABLE_SWAGGER | false | 是否开启 Swagger 文档服务 |
+| STARHUB_SERVER_API_TOKEN | f3a7b9c1d6e5f8e2a1b5d4f9e6a2b8d7c3a4e2b1d9f6e7a8d2c5a7b4c1e3f5b8a1d4f9b7d6e2f8a5d3b1e7f9c6a8b2d1e4f7d5b6e9f2a4b3c8e1d7f995hd82hf | 用于和前端做身份校验的 API token |
+| STARHUB_SERVER_SERVER_PORT | 8080 | Starhub Sever 启动后监听的端口 |
+| STARHUB_SERVER_SERVER_EXTERNAL_HOST | localhost | Starhub Server 启动后的 Host |
+| STARHUB_SERVER_SERVER_DOCS_HOST | `http://localhost:6636` | Swagger 启动后的 Host|
+| STARHUB_DATABASE_DRIVER | pg | 数据库的类别 |
+| STARHUB_DATABASE_DSN | postgresql://postgres:postgres@localhost:5432/STARHUB_SERVER?sslmode=disable | 数据库的 DSN |
+| STARHUB_DATABASE_TIMEZONE | Asia/Shanghai | 数据库的时区 |
+| STARHUB_SERVER_GITSERVER_URL | http://localhost:3000 | Git server 的地址 |
+| STARHUB_SERVER_GITSERVER_TYPE | gitea | Git server 的类别，目前只支持 gitea |
+| STARHUB_SERVER_GITSERVER_HOST | http://localhost:3000 | Git server 的 Host |
+| STARHUB_SERVER_GITSERVER_SECRET_KEY | 619c849c49e03754454ccd4cda79a209ce0b30b3 | Git server 管理员用户的 access token |
+| STARHUB_SERVER_GITSERVER_USERNAME | root | Git server 管理员用户的账号 |
+| STARHUB_SERVER_GITSERVER_PASSWORD | password123 | Git server 管理员用户的密码 |
+| STARHUB_SERVER_FRONTEND_URL | https://portal-stg.opencsg.com | Starhub 前端项目启动后的 URL |
+| STARHUB_SERVER_S3_ACCESS_KEY_ID | none | S3 存储的 Access key ID |
+| STARHUB_SERVER_S3_ACCESS_KEY_SECRET | none | S3 存储的 Access key Secret |
+| STARHUB_SERVER_S3_REGION | none | S3 存储的 region |
+| STARHUB_SERVER_S3_ENDPOINT | none | S3 存储的地址 |
+| STARHUB_SERVER_S3_BUCKET | none | S3 存储的 bucket |
+| STARHUB_SERVER_SENSITIVE_CHECK_ENABLE | false | 是否开启文本审核(目前只支持阿里云内容审核服务)|
+| STARHUB_SERVER_SENSITIVE_CHECK_ACCESS_KEY_ID | none | 阿里云内容审核的 Access key ID |
+| STARHUB_SERVER_SENSITIVE_CHECK_ACCESS_KEY_SECRET | none | 阿里云内容审核的 Access key secret |
+| STARHUB_SERVER_SENSITIVE_CHECK_REGION | none | 阿里云内容审核的 region |
+| STARHUB_SERVER_SENSITIVE_CHECK_ENDPOINT | none | 阿里云内容审核的服务地址 |
 
-### Server
+## 启动 API 服务
 
 ```shell
 # start server with binary
-./starhub-server start server
+./starhub start server
 
-# start all services (Gitea, PG, Redis) with docker compose
+# start all services (Gitea, PG, MinIO) with docker compose
 docker compose up -d
 ```
