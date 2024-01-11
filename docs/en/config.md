@@ -1,16 +1,3 @@
-# CSGhub Server
-
-This is an API project that provides services to `portal`.
-
-## Build
-
-```shell
-go build -o bin/starhub ./cmd/starhub-server
-```
-## Migration
-
-Migration-related documentation can be found [here](docs/en/migration.md).
-
 ## Project Configuration
 
 | Environment Variable | Default Value | Description |
@@ -41,13 +28,3 @@ Migration-related documentation can be found [here](docs/en/migration.md).
 | STARHUB_SERVER_SENSITIVE_CHECK_ACCESS_KEY_SECRET | none | Alibaba Cloud content review Access key secret |
 | STARHUB_SERVER_SENSITIVE_CHECK_REGION | none | Alibaba Cloud content review region |
 | STARHUB_SERVER_SENSITIVE_CHECK_ENDPOINT | none | Alibaba Cloud content review service address |
-
-## Start API Server
-
-```shell
-# start server with binary
-./bin/starhub start server
-
-# start all services (Gitea, PG, MinIO) with docker compose
-docker compose up -d
-```
