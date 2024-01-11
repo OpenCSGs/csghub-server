@@ -10,6 +10,7 @@ import (
 	"net/url"
 	"path"
 	"path/filepath"
+	"time"
 
 	"github.com/minio/minio-go/v7"
 	"opencsg.com/starhub-server/builder/gitserver"
@@ -79,7 +80,7 @@ saved_model/**/* filter=lfs diff=lfs merge=lfs -text
 
 const (
 	initCommitMessage    = "initial commit"
-	ossFileExpireSeconds = 259200
+	ossFileExpireSeconds = 259200 * time.Second
 )
 
 func NewDatasetComponent(config *config.Config) (*DatasetComponent, error) {
