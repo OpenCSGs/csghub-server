@@ -1,54 +1,57 @@
-# CSGhub Server
+`csghub-server` is a part of the open source and reliable large model assets management platform - `OpenCSG Hub`. It focus on management of models and datasets through REST API。
 
-This is an API project that provides services to `portal`.
+## Key Features：
+- Creation and Management of users and orgnizations
+- Auto-tagging of model and dataset labels
+- Search for users, organizations, models, and data
+- Online preview of dataset files, like `.parquet` file
+- Content moderation for both text and image 
+- Download of individual files, including LFS files
+- Tracking of model and dataset activity data, such as downloads and likes volume
 
-## Build
+## Demo
+To help you better understand the features and usage of `csghub-server`, we have recorded a series of demonstration videos. These videos will quickly introduce you to the main features and operating steps of the project.
 
-```shell
-go build -o bin/starhub  ./cmd/starhub-server
+- Web GUI features demo: Demo Video
+- Git operations demo: Demo Video
+
+Please visit the [OpenCSG website](https://portal.opencsg.com/) to experience the powerful management features. The "Developer" module is for LLM model and dataset.
+
+## Quick Start
+> System resource requirements: 4c CPU/8GB memory
+
+Please install Docker yourself. This project has been tested in Ubuntu22 environment.
+
+You can quickly deploy the localized `csghub-server` service through docker-compose:
+```
+docker-compose up -d -f https://github.com/opencsginc/starhub/blob/main/docker/docker-compose.yaml
 ```
 
-## Migration
+## Technical Architecture
+<div align=center>
+  <img src="docs/csghub_server-arch.png" alt="csghub-server architecture">
+</div>
 
-Migration 相关文档在 [这里](docs/zh-CN/migration.md)
+### Extensible and customizable
 
-## 项目配置
+- Supports different git servers, such as Gitea, GitLab, etc.
+- Supports flexible configuration of the LFS storage system, and you can choose to use local or any third-party cloud storage service that is compatible with the S3 protocol.
+- Enable content moderation on demand, and choose any third-party content moderation service.
 
-| 环境变量名 | 默认值 | 描述 |
-| --- | --- | --- |
-| STARHUB_SERVER_INSTANCE_ID | none | 一个唯一的实例 ID，用于部署多个实例时做标识 |
-| STARHUB_SERVER_ENABLE_SWAGGER | false | 是否开启 Swagger 文档服务 |
-| STARHUB_SERVER_API_TOKEN | none | 用于和前端做身份校验的 API token, 长度需要为 128 个字符 |
-| STARHUB_SERVER_SERVER_PORT | 8080 | CSGhub Sever 启动后监听的端口 |
-| STARHUB_SERVER_SERVER_EXTERNAL_HOST | localhost | CSGhub Server 启动后的 Host |
-| STARHUB_SERVER_SERVER_DOCS_HOST | `http://localhost:6636` | Swagger 启动后的 Host|
-| STARHUB_DATABASE_DRIVER | pg | 数据库的类别 |
-| STARHUB_DATABASE_DSN | postgresql://postgres:postgres@localhost:5432/STARHUB_SERVER?sslmode=disable | 数据库的 DSN |
-| STARHUB_DATABASE_TIMEZONE | Asia/Shanghai | 数据库的时区 |
-| STARHUB_SERVER_GITSERVER_URL | http://localhost:3000 | Git server 的地址 |
-| STARHUB_SERVER_GITSERVER_TYPE | gitea | Git server 的类别，目前只支持 gitea |
-| STARHUB_SERVER_GITSERVER_HOST | http://localhost:3000 | Git server 的 Host |
-| STARHUB_SERVER_GITSERVER_SECRET_KEY | 619c849c49e03754454ccd4cda79a209ce0b30b3 | Git server 管理员用户的 access token |
-| STARHUB_SERVER_GITSERVER_USERNAME | root | Git server 管理员用户的账号 |
-| STARHUB_SERVER_GITSERVER_PASSWORD | password123 | Git server 管理员用户的密码 |
-| STARHUB_SERVER_FRONTEND_URL | https://portal-stg.opencsg.com | CSGhub 前端项目启动后的 URL |
-| STARHUB_SERVER_S3_ACCESS_KEY_ID | none | S3 存储的 Access key ID |
-| STARHUB_SERVER_S3_ACCESS_KEY_SECRET | none | S3 存储的 Access key Secret |
-| STARHUB_SERVER_S3_REGION | none | S3 存储的 region |
-| STARHUB_SERVER_S3_ENDPOINT | none | S3 存储的地址 |
-| STARHUB_SERVER_S3_BUCKET | none | S3 存储的 bucket |
-| STARHUB_SERVER_SENSITIVE_CHECK_ENABLE | false | 是否开启文本审核(目前只支持阿里云内容审核服务)|
-| STARHUB_SERVER_SENSITIVE_CHECK_ACCESS_KEY_ID | none | 阿里云内容审核的 Access key ID |
-| STARHUB_SERVER_SENSITIVE_CHECK_ACCESS_KEY_SECRET | none | 阿里云内容审核的 Access key secret |
-| STARHUB_SERVER_SENSITIVE_CHECK_REGION | none | 阿里云内容审核的 region |
-| STARHUB_SERVER_SENSITIVE_CHECK_ENDPOINT | none | 阿里云内容审核的服务地址 |
+## Roadmap
+- [ ] Support more Git Servers: Currently supports Gitea, and plans to support mainstream Git repositories in the future.
+- [x] Git LFS: Git LFS supports large files, and supports Git command operations and online download through the Web UI. 
+- [x] DataSet online viewer: Data set preview, supports the Top20/TopN loading preview of LFS format data sets. 
+- [x] Model/Dataset AutoTag: Supports custom metadata and automatic extraction of model/dataset tags. 
+- [x] S3 Protocol Support: Supports S3 (MinIO) storage protocol, providing higher reliability and storage cost-effectiveness.
+- [ ] Model format convert: Conversion of mainstream model formats.
+- [ ] Model oneclick deploy: Supports integration with OpenCSG llm-inference, one-click to start model inference.
 
-## 启动 API 服务
+## License
+We use the Apache 2.0 license, the content of which is detailed in the `LICENSE` file.
 
-```shell
-# start server with binary
-./bin/starhub start server
+## Acknowledgments
+This project is based on open source projects such as Gin, DuckDB, minio, and Gitea. We would like to express our sincere gratitude to them for their open source contributions!
 
-# start all services (Gitea, PG, MinIO) with docker compose
-docker compose up -d
-```
+## Contact us
+If you have any questions during use, you can raise an issue on GitHub.

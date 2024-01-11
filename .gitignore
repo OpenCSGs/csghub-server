@@ -9,3 +9,4 @@ bin
 minio_data
 .envrc
 docker-compose-leida.yml
+run_server_local.sh
