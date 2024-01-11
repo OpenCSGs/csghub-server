@@ -9,7 +9,6 @@ import (
 	"strings"
 
 	"opencsg.com/starhub-server/builder/gitserver"
-	"opencsg.com/starhub-server/builder/sensitive"
 	"opencsg.com/starhub-server/builder/store/database"
 	"opencsg.com/starhub-server/common/config"
 	"opencsg.com/starhub-server/common/types"
@@ -26,7 +25,7 @@ type GitCallbackComponent struct {
 	config  *config.Config
 	gs      gitserver.GitServer
 	tc      *component.TagComponent
-	checker sensitive.SensitiveChecker
+	checker component.SensitiveChecker
 	ms      *database.ModelStore
 	ds      *database.DatasetStore
 	//set visibility if file content is sensitive
@@ -45,13 +44,14 @@ func NewGitCallback(config *config.Config) (*GitCallbackComponent, error) {
 	}
 	ms := database.NewModelStore()
 	ds := database.NewDatasetStore()
+	checker := component.NewSensitiveComponent(config)
 	return &GitCallbackComponent{
 		config:  config,
 		gs:      gs,
 		tc:      tc,
 		ms:      ms,
 		ds:      ds,
-		checker: sensitive.NewAliyunGreenChecker(config),
+		checker: checker,
 	}, nil
 }
 
@@ -89,7 +89,7 @@ func (c *GitCallbackComponent) modifyFiles(ctx context.Context, repoType, namesp
 		if err != nil {
 			return err
 		}
-		if c.setRepoVisibility && c.checker != nil {
+		if c.setRepoVisibility {
 			go func(content string) {
 				ok, err := c.checkFileContent(ctx, repoType, namespace, repoName, ref, content)
 				if err != nil {
@@ -235,7 +235,6 @@ func (c *GitCallbackComponent) getFileRaw(repoType, namespace, repoName, ref, fi
 }
 
 func (c *GitCallbackComponent) checkFileContent(ctx context.Context, repoType, namespace, repoName, ref, content string) (bool, error) {
-
 	ok, err := c.checkText(ctx, content)
 	if err != nil {
 		return ok, err
@@ -252,7 +251,7 @@ func (c *GitCallbackComponent) checkFileContent(ctx context.Context, repoType, n
 }
 
 func (c *GitCallbackComponent) checkText(ctx context.Context, content string) (bool, error) {
-	return c.checker.PassTextCheck(ctx, "comment_detection", content)
+	return c.checker.CheckText(ctx, "comment_detection", content)
 }
 
 func (c *GitCallbackComponent) setPrivate(ctx context.Context, repoType, namespace, repoName string) error {
@@ -276,6 +275,9 @@ func (c *GitCallbackComponent) setPrivate(ctx context.Context, repoType, namespa
 		}
 	} else {
 		model, err = c.ms.FindByPath(ctx, namespace, repoName)
+		if err != nil {
+			return fmt.Errorf("failed to find model by path, error: %w", err)
+		}
 		err = c.gs.UpdateModelRepo(namespace, repoName, model, model.Repository, &types.UpdateModelReq{
 			Name:          model.Name,
 			Description:   model.Description,

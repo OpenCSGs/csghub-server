@@ -15,13 +15,13 @@ import (
 func NewTagComponent(config *config.Config) (*TagComponent, error) {
 	tc := &TagComponent{}
 	tc.ts = database.NewTagStore()
-	tc.sensitiveChecker = sensitive.NewAliyunGreenChecker(config)
+	tc.sensitiveChecker = NewSensitiveComponent(config)
 	return tc, nil
 }
 
 type TagComponent struct {
 	ts               *database.TagStore
-	sensitiveChecker sensitive.SensitiveChecker
+	sensitiveChecker SensitiveChecker
 }
 
 func (tc *TagComponent) AllTags(ctx context.Context) ([]database.Tag, error) {
@@ -53,7 +53,7 @@ func (c *TagComponent) UpdateMetaTags(ctx context.Context, tagScope database.Tag
 		//TODO:do tag name sensitive checking in batch
 		//remove sensitive tags by checking tag name of tag to create
 		tagToCreate = slices.DeleteFunc(tagToCreate, func(t *database.Tag) bool {
-			pass, _ := c.sensitiveChecker.PassTextCheck(ctx, sensitive.ScenarioNicknameDetection, t.Name)
+			pass, _ := c.sensitiveChecker.CheckText(ctx, string(sensitive.ScenarioNicknameDetection), t.Name)
 			return !pass
 		})
 	}

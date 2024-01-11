@@ -44,7 +44,7 @@ func (h *GitCallbackHandler) handlePush(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"message": err.Error()})
 		return
 	}
-	err := h.cbc.HandlePush(c.Request.Context(), &req)
+	err := h.cbc.HandlePush(c, &req)
 	if err != nil {
 		slog.Error("failed to handle git push callback", slog.Any("error", err))
 		httpbase.ServerError(c, err)
