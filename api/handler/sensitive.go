@@ -10,13 +10,10 @@ import (
 )
 
 type SensitiveHandler struct {
-	c *component.SensitiveComponent
+	c component.SensitiveChecker
 }
 
 func NewSensitiveHandler(cfg *config.Config) *SensitiveHandler {
-	if !cfg.SensitiveCheck.Enable {
-		return nil
-	}
 	return &SensitiveHandler{
 		c: component.NewSensitiveComponent(cfg),
 	}
