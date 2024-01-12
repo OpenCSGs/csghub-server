@@ -1,10 +1,6 @@
-<<<<<<< Updated upstream
 *[English](README.md) ∙ [简体中文](README_zh-hans.md)*
 
-csghub-server是开源、可信的大模型资产管理平台OpenCSG Hub的服务端部分开源项目，提供基于REST API的模型和数据集管理功能。
-=======
 `CSGHub Server`是开源、可信的大模型资产管理平台`CSGHub`的服务端部分开源项目，提供基于REST API的模型和数据集管理功能。
->>>>>>> Stashed changes
 
 ## 主要功能：
 - 用户和组织的创建和管理 

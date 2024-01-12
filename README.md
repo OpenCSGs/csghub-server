@@ -1,10 +1,6 @@
-<<<<<<< Updated upstream
 *[English](README.md) ∙ [简体中文](README_zh-hans.md)*
 
-`csghub-server` is a part of the open source and reliable large model assets management platform - `OpenCSG Hub`. It focus on management of models and datasets through REST API。
-=======
 `CSGHub Server` is a part of the open source and reliable large model assets management platform - `CSGHub`. It focus on management of models and datasets through REST API。
->>>>>>> Stashed changes
 
 ## Key Features：
 - Creation and Management of users and orgnizations
