@@ -1,4 +1,4 @@
-*[English](README.md) ∙ [简体中文](README_zh-hans.md)*
+*[English](README_en.md) ∙ [简体中文](README.md)*
 
 `CSGHub Server`是开源、可信的大模型资产管理平台`CSGHub`的服务端部分开源项目，提供基于REST API的模型和数据集管理功能。
 

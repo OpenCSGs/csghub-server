@@ -1,4 +1,4 @@
-*[English](README.md) ∙ [简体中文](README_zh-hans.md)*
+*[English](README_en.md) ∙ [简体中文](README.md)*
 
 `CSGHub Server` is a part of the open source and reliable large model assets management platform - `CSGHub`. It focus on management of models and datasets through REST API。
 
