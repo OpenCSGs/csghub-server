@@ -22,7 +22,7 @@ Migration 文件的名字有两个部分，时间戳和迁移名（也就是这�
 
 ```bash
 # 编译项目
-go build -o bin/starhub  ./cmd/starhub-server
+go build -o bin/starhub  ./cmd/csghub-server
 
 # 初始化迁移
 ./bin/starhub migration init

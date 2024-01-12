@@ -10,18 +10,7 @@ import (
 	"opencsg.com/csghub-server/common/config"
 )
 
-var (
-	serverEnableTunnel bool
-	enableOpenBrowser  bool
-	enableSwagger      bool
-	enableUI           bool
-)
-
 func init() {
-	serverCmd.Flags().BoolVar(&enableSwagger, "swagger", false, "Start swagger help docs")
-	serverCmd.Flags().BoolVar(&enableUI, "ui", false, "enable frontend ui")
-	serverCmd.Flags().BoolVar(&serverEnableTunnel, "tunnel", false, "automatic connection to UltraFox dev tunnel, and modifies the externalhost configuration")
-	serverCmd.Flags().BoolVar(&enableOpenBrowser, "open-browser", false, "auto open swagger and ui in browser")
 	Cmd.AddCommand(serverCmd)
 }
 
@@ -62,6 +51,6 @@ var serverCmd = &cobra.Command{
 func serverExample() string {
 	return `
 # for development
-starhub-server start server
+csghub-server start server
 `
 }

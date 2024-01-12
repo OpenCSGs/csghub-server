@@ -15,7 +15,7 @@ services:
       - my_network
 
   gitea:
-    image: "git-devops.opencsg.com:5050/product/community/starhub-server/gitea-bitnami"
+    image: "git-devops.opencsg.com:5050/product/community/csghub-server/gitea-bitnami"
     depends_on:
       - postgres
     environment:
@@ -56,7 +56,7 @@ services:
       - my_network
 
   starhub_server:
-    image: "git-devops.opencsg.com:5050/product/community/starhub-server"
+    image: "git-devops.opencsg.com:5050/product/community/csghub-server"
     depends_on:
       - postgres
       - gitea
