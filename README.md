@@ -1,6 +1,10 @@
+<<<<<<< Updated upstream
 *[English](README.md) ∙ [简体中文](README_zh-hans.md)*
 
 `csghub-server` is a part of the open source and reliable large model assets management platform - `OpenCSG Hub`. It focus on management of models and datasets through REST API。
+=======
+`CSGHub Server` is a part of the open source and reliable large model assets management platform - `CSGHub`. It focus on management of models and datasets through REST API。
+>>>>>>> Stashed changes
 
 ## Key Features：
 - Creation and Management of users and orgnizations
@@ -12,7 +16,7 @@
 - Tracking of model and dataset activity data, such as downloads and likes volume
 
 ## Demo
-To help you better understand the features and usage of `csghub-server`, we have recorded a series of demonstration videos. These videos will quickly introduce you to the main features and operating steps of the project.
+To help you better understand the features and usage of `CSGHub Server`, we have recorded a series of demonstration videos. These videos will quickly introduce you to the main features and operating steps of the project.
 
 - Web GUI features demo: Demo Video
 - Git operations demo: Demo Video
@@ -24,14 +28,14 @@ Please visit the [OpenCSG website](https://portal.opencsg.com/) to experience th
 
 Please install Docker yourself. This project has been tested in Ubuntu22 environment.
 
-You can quickly deploy the localized `csghub-server` service through docker-compose:
+You can quickly deploy the localized `CSGHub Server` service through docker-compose:
 ```
 docker-compose up -d -f https://github.com/opencsginc/starhub/blob/main/docker/docker-compose.yaml
 ```
 
 ## Technical Architecture
 <div align=center>
-  <img src="docs/csghub_server-arch.png" alt="csghub-server architecture">
+  <img src="docs/csghub_server-arch.png" alt="csghub-server architecture" width="800px">
 </div>
 
 ### Extensible and customizable
