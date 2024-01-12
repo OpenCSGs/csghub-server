@@ -7,9 +7,9 @@ import (
 	"math/big"
 
 	"github.com/OpenCSGs/gitea-go-sdk/gitea"
-	"opencsg.com/starhub-server/builder/store/database"
-	"opencsg.com/starhub-server/common/types"
-	"opencsg.com/starhub-server/common/utils/common"
+	"opencsg.com/csghub-server/builder/store/database"
+	"opencsg.com/csghub-server/common/types"
+	"opencsg.com/csghub-server/common/utils/common"
 )
 
 func (c *Client) CreateUser(u *types.CreateUserRequest) (user *database.User, err error) {

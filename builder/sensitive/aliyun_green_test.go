@@ -8,7 +8,7 @@ import (
 	"os"
 	"testing"
 
-	"opencsg.com/starhub-server/common/config"
+	"opencsg.com/csghub-server/common/config"
 )
 
 func Test_splitTasks(t *testing.T) {

@@ -4,10 +4,10 @@ import (
 	"errors"
 	"io"
 
-	"opencsg.com/starhub-server/builder/gitserver/gitea"
-	"opencsg.com/starhub-server/builder/store/database"
-	"opencsg.com/starhub-server/common/config"
-	"opencsg.com/starhub-server/common/types"
+	"opencsg.com/csghub-server/builder/gitserver/gitea"
+	"opencsg.com/csghub-server/builder/store/database"
+	"opencsg.com/csghub-server/common/config"
+	"opencsg.com/csghub-server/common/types"
 )
 
 type GitServer interface {

@@ -5,8 +5,8 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
-	"opencsg.com/starhub-server/common/config"
-	"opencsg.com/starhub-server/component"
+	"opencsg.com/csghub-server/common/config"
+	"opencsg.com/csghub-server/component"
 )
 
 func NewTagHandler(config *config.Config) (*TagsHandler, error) {

@@ -2,9 +2,9 @@ package handler
 
 import (
 	"github.com/gin-gonic/gin"
-	"opencsg.com/starhub-server/api/httpbase"
-	"opencsg.com/starhub-server/common/config"
-	"opencsg.com/starhub-server/component"
+	"opencsg.com/csghub-server/api/httpbase"
+	"opencsg.com/csghub-server/common/config"
+	"opencsg.com/csghub-server/component"
 )
 
 type MemberHandler struct {

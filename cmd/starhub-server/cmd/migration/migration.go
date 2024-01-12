@@ -8,8 +8,8 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/uptrace/bun/migrate"
-	"opencsg.com/starhub-server/builder/store/database"
-	"opencsg.com/starhub-server/common/config"
+	"opencsg.com/csghub-server/builder/store/database"
+	"opencsg.com/csghub-server/common/config"
 )
 
 // verboseMode whether to show SQL detail

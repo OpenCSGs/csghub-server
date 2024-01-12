@@ -4,10 +4,10 @@ import (
 	"fmt"
 
 	"github.com/gin-gonic/gin"
-	"opencsg.com/starhub-server/api/handler"
-	"opencsg.com/starhub-server/api/handler/callback"
-	"opencsg.com/starhub-server/api/middleware"
-	"opencsg.com/starhub-server/common/config"
+	"opencsg.com/csghub-server/api/handler"
+	"opencsg.com/csghub-server/api/handler/callback"
+	"opencsg.com/csghub-server/api/middleware"
+	"opencsg.com/csghub-server/common/config"
 )
 
 func NewRouter(config *config.Config) (*gin.Engine, error) {

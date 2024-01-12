@@ -14,7 +14,7 @@ import (
 	"github.com/uptrace/bun/driver/sqliteshim"
 	"github.com/uptrace/bun/extra/bundebug"
 	"github.com/uptrace/bun/migrate"
-	"opencsg.com/starhub-server/builder/store/database/migrations"
+	"opencsg.com/csghub-server/builder/store/database/migrations"
 
 	"github.com/uptrace/bun"
 )

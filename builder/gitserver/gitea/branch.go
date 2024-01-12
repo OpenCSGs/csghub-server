@@ -2,8 +2,8 @@ package gitea
 
 import (
 	"github.com/OpenCSGs/gitea-go-sdk/gitea"
-	"opencsg.com/starhub-server/common/types"
-	"opencsg.com/starhub-server/common/utils/common"
+	"opencsg.com/csghub-server/common/types"
+	"opencsg.com/csghub-server/common/utils/common"
 )
 
 func (c *Client) GetModelBranches(namespace, name string, per, page int) (branches []*types.ModelBranch, err error) {

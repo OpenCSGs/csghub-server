@@ -6,10 +6,10 @@ import (
 	"log/slog"
 	"slices"
 
-	"opencsg.com/starhub-server/builder/sensitive"
-	"opencsg.com/starhub-server/builder/store/database"
-	"opencsg.com/starhub-server/common/config"
-	"opencsg.com/starhub-server/component/tagparser"
+	"opencsg.com/csghub-server/builder/sensitive"
+	"opencsg.com/csghub-server/builder/store/database"
+	"opencsg.com/csghub-server/common/config"
+	"opencsg.com/csghub-server/component/tagparser"
 )
 
 func NewTagComponent(config *config.Config) (*TagComponent, error) {
