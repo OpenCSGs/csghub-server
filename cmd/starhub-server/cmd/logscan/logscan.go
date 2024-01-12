@@ -9,8 +9,8 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
-	"opencsg.com/starhub-server/builder/store/database"
-	"opencsg.com/starhub-server/common/config"
+	"opencsg.com/csghub-server/builder/store/database"
+	"opencsg.com/csghub-server/common/config"
 )
 
 var logPath string

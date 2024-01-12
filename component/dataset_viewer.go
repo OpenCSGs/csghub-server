@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"log/slog"
 
-	"opencsg.com/starhub-server/builder/gitserver"
-	"opencsg.com/starhub-server/builder/parquet"
-	"opencsg.com/starhub-server/common/config"
+	"opencsg.com/csghub-server/builder/gitserver"
+	"opencsg.com/csghub-server/builder/parquet"
+	"opencsg.com/csghub-server/common/config"
 )
 
 type ViewParquetFileReq struct {

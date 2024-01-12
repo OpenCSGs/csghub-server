@@ -8,10 +8,10 @@ import (
 	"fmt"
 	"log/slog"
 
-	"opencsg.com/starhub-server/builder/gitserver"
-	"opencsg.com/starhub-server/builder/store/database"
-	"opencsg.com/starhub-server/common/config"
-	"opencsg.com/starhub-server/common/types"
+	"opencsg.com/csghub-server/builder/gitserver"
+	"opencsg.com/csghub-server/builder/store/database"
+	"opencsg.com/csghub-server/common/config"
+	"opencsg.com/csghub-server/common/types"
 )
 
 func NewOrganizationComponent(config *config.Config) (*OrganizationComponent, error) {

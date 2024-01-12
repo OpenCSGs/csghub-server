@@ -1,6 +1,6 @@
 package types
 
-import "opencsg.com/starhub-server/builder/store/database"
+import "opencsg.com/csghub-server/builder/store/database"
 
 type CreateOrgReq struct {
 	Name        string        `json:"name"`

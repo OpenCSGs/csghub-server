@@ -13,11 +13,11 @@ import (
 	"time"
 
 	"github.com/minio/minio-go/v7"
-	"opencsg.com/starhub-server/builder/gitserver"
-	"opencsg.com/starhub-server/builder/store/database"
-	"opencsg.com/starhub-server/builder/store/s3"
-	"opencsg.com/starhub-server/common/config"
-	"opencsg.com/starhub-server/common/types"
+	"opencsg.com/csghub-server/builder/gitserver"
+	"opencsg.com/csghub-server/builder/store/database"
+	"opencsg.com/csghub-server/builder/store/s3"
+	"opencsg.com/csghub-server/common/config"
+	"opencsg.com/csghub-server/common/types"
 )
 
 const datasetGitattributesContent = `*.7z filter=lfs diff=lfs merge=lfs -text

@@ -4,7 +4,7 @@ import (
 	"context"
 	"os"
 
-	"opencsg.com/starhub-server/cmd/starhub-server/cmd"
+	"opencsg.com/csghub-server/cmd/starhub-server/cmd"
 )
 
 func main() {

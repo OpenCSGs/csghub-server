@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"opencsg.com/starhub-server/common/config"
+	"opencsg.com/csghub-server/common/config"
 )
 
 func WithPrefix(name string, prefix string) string {

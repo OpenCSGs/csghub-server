@@ -1,4 +1,4 @@
-module opencsg.com/starhub-server
+module opencsg.com/csghub-server
 
 go 1.21
 

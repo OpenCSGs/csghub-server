@@ -12,8 +12,8 @@ import (
 	"net/http"
 
 	"github.com/OpenCSGs/gitea-go-sdk/gitea"
-	"opencsg.com/starhub-server/builder/store/database"
-	"opencsg.com/starhub-server/common/config"
+	"opencsg.com/csghub-server/builder/store/database"
+	"opencsg.com/csghub-server/common/config"
 )
 
 type Client struct {

@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 
-	"opencsg.com/starhub-server/builder/sensitive"
-	"opencsg.com/starhub-server/common/config"
+	"opencsg.com/csghub-server/builder/sensitive"
+	"opencsg.com/csghub-server/common/config"
 )
 
 type SensitiveChecker interface {

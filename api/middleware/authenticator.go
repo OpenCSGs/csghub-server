@@ -5,7 +5,7 @@ import (
 	"strings"
 
 	"github.com/gin-gonic/gin"
-	"opencsg.com/starhub-server/common/config"
+	"opencsg.com/csghub-server/common/config"
 )
 
 func Authenticator(config *config.Config) gin.HandlerFunc {
