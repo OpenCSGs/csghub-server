@@ -1,3 +1,5 @@
+*[English](README.md) ∙ [简体中文](README_zh-hans.md)*
+
 csghub-server是开源、可信的大模型资产管理平台OpenCSG Hub的服务端部分开源项目，提供基于REST API的模型和数据集管理功能。
 
 ## 主要功能：
@@ -47,6 +49,9 @@ docker-compose up -d -f https://github.com/opencsginc/starhub/blob/main/docker/d
 
 ## License
 我们使用Apache 2.0协议，协议内容详见`LICENSE`文件。
+
+## 参与贡献
+如果你想参与贡献，可以先克隆项目，然后根据 [配置文档](docs/zh-CN/config.md) 来在本地启动项目，根据 [数据库迁移文档](docs/zh-CN/migration.md) 来添加功能。我们非常期待你的贡献！
 
 ## 致谢
 本项目基于Gin, DuckDB, minio, gitea等开源项目，在此深深感谢他们的开源贡献！
