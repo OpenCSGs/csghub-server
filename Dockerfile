@@ -2,7 +2,7 @@ FROM golang:1.21.0 as builder
 ENV GOPROXY=https://goproxy.cn,direct
 WORKDIR /starhub
 COPY . .
-RUN  CGO_ENABLED=1 GOOS=linux go build -tags netgo -a  -installsuffix cgo -ldflags '-extldflags "-static"'  -v -o starhub ./cmd/starhub-server
+RUN  CGO_ENABLED=1 GOOS=linux go build -tags netgo -a  -installsuffix cgo -ldflags '-extldflags "-static"'  -v -o starhub ./cmd/csghub-server
 
 
 FROM alpine:latest as prod

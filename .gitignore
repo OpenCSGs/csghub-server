@@ -1,5 +1,5 @@
 # Binaries
-/cmd/starhub-server/starhub-server
+/cmd/csghub-server/csghub-server
 bin
 .vscode
 .DS_Store

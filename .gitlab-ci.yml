@@ -7,7 +7,7 @@ stages:
   - deploy
 
 variables:
-  IMAGE_NAME: "starhub-server"
+  IMAGE_NAME: "csghub-server"
   IMAGE_TAG: "latest"
   SAST_IMAGE_SUFFIX: '-fips'
 
@@ -21,7 +21,7 @@ test:
   script:
     - go env -w GO111MODULE=on
     - go env -w GOPROXY=https://goproxy.cn,direct
-    - go build -o starhub ./cmd/starhub-server
+    - go build -o starhub ./cmd/csghub-server
   except:
     - main
 

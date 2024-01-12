@@ -15,12 +15,8 @@ import (
 // verboseMode whether to show SQL detail
 var verboseMode bool
 
-// mockSession whether to insert mock user and session
-var mockSession bool
-
 func init() {
 	Cmd.Flags().BoolVar(&verboseMode, "verbose", false, "whether to show SQL detail")
-	migrateCmd.Flags().BoolVar(&mockSession, "dev-mock-session", false, "mock a user and its login session")
 	Cmd.AddCommand(
 		initCmd,
 		migrateCmd,

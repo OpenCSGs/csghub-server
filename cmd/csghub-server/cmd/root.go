@@ -6,10 +6,10 @@ import (
 	"os"
 
 	"github.com/spf13/cobra"
-	"opencsg.com/csghub-server/cmd/starhub-server/cmd/logscan"
-	"opencsg.com/csghub-server/cmd/starhub-server/cmd/migration"
-	"opencsg.com/csghub-server/cmd/starhub-server/cmd/start"
-	"opencsg.com/csghub-server/cmd/starhub-server/cmd/trigger"
+	"opencsg.com/csghub-server/cmd/csghub-server/cmd/logscan"
+	"opencsg.com/csghub-server/cmd/csghub-server/cmd/migration"
+	"opencsg.com/csghub-server/cmd/csghub-server/cmd/start"
+	"opencsg.com/csghub-server/cmd/csghub-server/cmd/trigger"
 )
 
 var (
@@ -18,7 +18,7 @@ var (
 )
 
 var RootCmd = &cobra.Command{
-	Use:          "starhub-server",
+	Use:          "csghub-server",
 	Short:        "Back-end API server for starhub.",
 	SilenceUsage: true,
 }

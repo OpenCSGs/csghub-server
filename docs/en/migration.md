@@ -22,7 +22,7 @@ After creating the database, execute the command to manually initialize migratio
 
 ```bash
 # Compile the project
-go build -o bin/starhub ./cmd/starhub-server
+go build -o bin/starhub ./cmd/csghub-server
 
 # Initialize migrations
 ./bin/starhub migration init
