@@ -1,0 +1,102 @@
+version: "3.8"
+
+services:
+  postgres:
+    image: "gradescope/postgresql-multiple-databases"
+    environment:
+      POSTGRES_USER: "postgres"
+      POSTGRES_PASSWORD: "postgres"
+      POSTGRES_MULTIPLE_DATABASES: "starhub_server,gitea"
+    ports:
+      - "5433:5432"
+    volumes:
+      - ./pgdata:/var/lib/postgresql/data
+    networks:
+      - my_network
+
+  minio:
+    image: "bitnami/minio"
+    environment:
+      MINIO_ROOT_USER: "minio-root-user-User-123"
+      MINIO_ROOT_PASSWORD: "minio-root-password-User-123"
+      MINIO_SCHEME: "http"
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - ./minio_data:/bitnami/minio/data
+    networks:
+      - my_network
+
+  gitea:
+    image: "opencsg/csghub-git"
+    depends_on:
+      - postgres
+    environment:
+      - GITEA_DAEMON_USER=git
+      - GITEA_ROOT_URL=$GITEA_ROOT_URL
+      - GITEA_SSH_DOMAIN=$GITEA_SSH_DOMAIN
+      - GITEA_HTTP_PORT=3001
+      - GITEA_ADMIN_USER=root
+      - GITEA_ADMIN_PASSWORD=password123
+      - GITEA_ADMIN_EMAIL=root@opencsg.com
+      - GITEA_DATABASE_TYPE=postgres
+      - GITEA_DATABASE_HOST=postgres
+      - GITEA_DATABASE_PORT_NUMBER=5432
+      - GITEA_DATABASE_NAME=gitea
+      - GITEA_DATABASE_USERNAME=postgres
+      - GITEA_DATABASE_PASSWORD=postgres
+      - GITEA_DATABASE_SSL_MODE=disable
+      - GITEA_APP_NAME=gitea
+      - GITEA_SMTP_ENABLED=false
+      - BITNAMI_DEBUG=true
+      - GITEA_LFS_START_SERVER=true
+      - GITEA_LFS_ROOT_PATH=/bitnami/gitea/data/lfs
+      - GITEA_LFS_STORAGE_TYPE=minio
+      - GITEA_LFS_MINIO_ACCESS_KEY_ID=minio-root-user-User-123
+      - GITEA_LFS_MINIO_SECRET_ACCESS_KEY=minio-root-password-User-123
+      - GITEA_LFS_MINIO_ENDPOINT=minio:9000
+      - GITEA_LFS_MINIO_BUCKET=opencsg-server-lfs
+      - GITEA_LFS_MINIO_LOCATION=beijing
+      - GITEA_LFS_MINIO_USE_SSL=false
+      - GITEA_LFS_SERVE_DIRECT=true
+      - GITEA_SERVICE_DEFAULT_ALLOW_CREATE_ORGANIZATION=true
+    ports:
+      - "3001:3001"
+      - "2222:2222"
+    volumes:
+      - ./gitea:/bitnami/gitea
+    networks:
+      - my_network
+
+  starhub_server:
+    image: "opencsg/csghub-server"
+    depends_on:
+      - postgres
+      - gitea
+    environment:
+      STARHUB_DATABASE_DSN: postgresql://postgres:postgres@postgres:5432/starhub_server?sslmode=disable
+      STARHUB_DATABASE_TIMEZONE: Asia/Shanghai
+      STARHUB_SERVER_GITSERVER_HOST: http://gitea:3001
+      STARHUB_SERVER_GITSERVER_USERNAME: root
+      STARHUB_SERVER_GITSERVER_PASSWORD: password123
+      STARHUB_SERVER_GITSERVER_WEBHOOK_URL: http://localhost:8080/api/v1/callback/git
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: starhub_server
+      GITEA_USERNAME: root
+      GITEA_PASSWORD: password123
+      GIN_MODE: release
+      STARHUB_SERVER_API_TOKEN: $STARHUB_SERVER_API_TOKEN
+      STARHUB_SERVER_S3_ACCESS_KEY_ID: $STARHUB_SERVER_S3_ACCESS_KEY_ID
+      STARHUB_SERVER_S3_ACCESS_KEY_SECRET: $STARHUB_SERVER_S3_ACCESS_KEY_SECRET
+      STARHUB_SERVER_S3_REGION: $STARHUB_SERVER_S3_REGION
+      STARHUB_SERVER_S3_BUCKET: $STARHUB_SERVER_S3_BUCKET
+    ports:
+      - "8080:8080"
+    networks:
+      - my_network
+
+networks:
+  my_network:
+    driver: bridge

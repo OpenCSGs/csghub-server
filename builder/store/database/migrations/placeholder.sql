@@ -1,0 +1,1 @@
+-- This SQL file is a placeholder for Go's embed package and serves no other purpose.

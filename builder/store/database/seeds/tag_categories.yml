@@ -1,0 +1,13 @@
+categories:
+- name: task
+  scope: model
+- name: license
+  scope: model
+- name: framework
+  scope: model
+- name: task
+  scope: dataset
+- name: license
+  scope: dataset
+- name: size
+  scope: dataset

@@ -1,0 +1,12 @@
+# Binaries
+/cmd/csghub-server/csghub-server
+bin
+.vscode
+.DS_Store
+/starhub
+/gitea
+/pgdata
+minio_data
+.envrc
+docker-compose-leida.yml
+run_server_local.sh
