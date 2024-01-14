@@ -1,4 +1,4 @@
-## Project Configuration
+# Project Configuration
 
 | Environment Variable | Default Value | Description |
 | --- | --- | --- |
