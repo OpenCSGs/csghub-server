@@ -13,7 +13,6 @@
 
 ## Demo
 To help you better understand the features and usage of `CSGHub Server`, we have recorded a series of demonstration videos. These videos will quickly introduce you to the main features and operating steps of the project.
-
 - Web GUI features demo: Demo Video
 - Git operations demo: Demo Video
 
