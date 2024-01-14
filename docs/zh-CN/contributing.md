@@ -37,6 +37,6 @@ CSGHub Server是开源大模型资产管理平台 CSGHub 的服务端部分的�
 
 ## 本地开发
 
-你可以使用 docker-compose 来拉起 CSGHub Server 项目，拉起后会单独启动 CSGHub Server 项目，这是一个后端项目，作用是为 [CSGHub](https://github.com/OpenCSGs/CSGHub) 提供后端 API 支持。你也可以根据 [配置文档](docs/zh-CN/config.md) 和 [数据库迁移文档](docs/zh-CN/migration.md) 来配置并在本地编译启动。
+你可以使用 docker-compose 来拉起 CSGHub Server 项目，拉起后会单独启动 CSGHub Server 项目，这是一个后端项目，作用是为 [CSGHub](https://github.com/OpenCSGs/CSGHub) 提供后端 API 支持。你也可以根据 [配置文档](config.md) 和 [数据库迁移文档](migration.md) 来配置并在本地编译启动。
 
 感谢您对 CSGHub Server 项目的贡献！我们期待您的参与和建议。

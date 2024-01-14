@@ -53,7 +53,7 @@ docker-compose up -d -f https://github.com/opencsginc/starhub/blob/main/docker/d
 We use the Apache 2.0 license, the content of which is detailed in the `LICENSE` file.
 
 ## Contributing
-If you wish to contribute, please follow the [Contribution Guidelines](docs/en-US/contributing.md). We are very excited about your contributions!
+If you wish to contribute, please follow the [Contribution Guidelines](docs/en/contributing.md). We are very excited about your contributions!
 
 ## Acknowledgments
 This project is based on open source projects such as Gin, DuckDB, minio, and Gitea. We would like to express our sincere gratitude to them for their open source contributions!
