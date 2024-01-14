@@ -14,8 +14,8 @@ CSGHub Server是开源、可信的大模型资产管理平台[CSGHub](https://gi
 
 ## 功能演示
 为了帮助您更直观地了解 CSGHub 的功能和使用方法，我们录制了演示视频。您可以通过观看视频，快速了解本项目的主要特性和操作流程。
-- CSGHub功能演示：
-<video width="549" height="360" src="https://github-production-user-asset-6210df.s3.amazonaws.com/3232817/296553219-6a3825a0-9c83-4f83-9521-ec82c07cc101.mp4"></video>
+- CSGHub功能演示如下，你也可以通过外部视频网站查看 [YouTube](https://www.youtube.com/watch?v=SFDISpqowXs) 或 [Bilibili](https://www.bilibili.com/video/BV12T4y187bv/)
+<video width="658" height="432" src="https://github-production-user-asset-6210df.s3.amazonaws.com/3232817/296556812-205d07f2-de9d-4a7f-b3f5-83514a71453e.mp4"></video>
 
 更完整的功能请移步[OpenCSG官网](https://portal.opencsg.com/)，体验“开发者”模块的强大管理功能。
 
