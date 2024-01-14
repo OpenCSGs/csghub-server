@@ -24,8 +24,11 @@
 请准备自行安装docker程序，本项目已在 Ubuntu22 环境下中完成测试。
 
 您可以通过docker-compose快速部署本地化的csghub-server服务：
-```
-docker-compose up -d -f https://github.com/opencsginc/starhub/blob/main/docker/docker-compose.yaml
+```shell
+# API token 长度至少为128个字符，发往 csghub-server 的 http 请求需要将 API token 作为 Bearer token 来做身份验证
+export STARHUB_SERVER_API_TOKEN=<API token>
+curl -L https://raw.githubusercontent.com/OpenCSGs/csghub-server/main/docker-compose.yml -o docker-compose.yml
+docker compose -f docker-compose.yml up -d
 ```
 
 ## 技术架构
