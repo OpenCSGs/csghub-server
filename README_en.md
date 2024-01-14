@@ -25,8 +25,11 @@ Please visit the [OpenCSG website](https://portal.opencsg.com/) to experience th
 Please install Docker yourself. This project has been tested in Ubuntu22 environment.
 
 You can quickly deploy the localized `CSGHub Server` service through docker-compose:
-```
-docker-compose up -d -f https://github.com/opencsginc/starhub/blob/main/docker/docker-compose.yaml
+```shell
+# The API token should be at least 128 characters long, and HTTP requests to csghub-server require the API token to be sent as a Bearer token for authentication.
+export STARHUB_SERVER_API_TOKEN=<API token>
+curl -L https://raw.githubusercontent.com/OpenCSGs/csghub-server/main/docker-compose.yml -o docker-compose.yml
+docker-compose -f docker-compose.yml up -d
 ```
 
 ## Technical Architecture
