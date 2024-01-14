@@ -36,6 +36,6 @@ When reporting issues or making suggestions, follow these guidelines:
 We use tags to categorize and classify issues and pull requests. For detailed tag descriptions, please refer to [this page](https://github.com/OpenCSGs/csghub-server/labels).
 
 ## Local Development
-You can use `docker-compose` to launch the CSGHub Server project. After launching, it will start the CSGHub Server project, which is a backend project providing API support for [CSGHub](https://github.com/OpenCSGs/CSGHub). You can also configure and compile locally based on the [configuration documentation](docs/en/config.md) and [database migration documentation](docs/en/migration.md).
+You can use `docker-compose` to launch the CSGHub Server project. After launching, it will start the CSGHub Server project, which is a backend project providing API support for [CSGHub](https://github.com/OpenCSGs/CSGHub). You can also configure and compile locally based on the [configuration documentation](config.md) and [database migration documentation](migration.md).
 
 Thank you for contributing to the CSGHub Server project! We look forward to your participation and suggestions.
