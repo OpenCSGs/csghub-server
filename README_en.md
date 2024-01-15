@@ -16,7 +16,7 @@ In order to help users to quickly understand the features and usage of CSGHub, w
 - CSGHub Demo video is as blew，you can also check it at [YouTube](https://www.youtube.com/watch?v=SFDISpqowXs) or [Bilibili](https://www.bilibili.com/video/BV12T4y187bv/)
 <video width="658" height="432" src="https://github-production-user-asset-6210df.s3.amazonaws.com/3232817/296556812-205d07f2-de9d-4a7f-b3f5-83514a71453e.mp4"></video>
 
-Please visit the [OpenCSG website](https://portal.opencsg.com/models) to experience the powerful management features. The "Developer" module is for LLM model and dataset.
+Please visit the [OpenCSG website](https://portal.opencsg.com/models) to experience the powerful management features. 
 
 ## Quick Start
 > System resource requirements: 4c CPU/8GB memory
