@@ -17,7 +17,7 @@ CSGHub Server是开源、可信的大模型资产管理平台[CSGHub](https://gi
 - CSGHub功能演示如下，你也可以通过外部视频网站查看 [YouTube](https://www.youtube.com/watch?v=SFDISpqowXs) 或 [Bilibili](https://www.bilibili.com/video/BV1wk4y1X7G7/)
 <video width="658" height="432" src="https://github-production-user-asset-6210df.s3.amazonaws.com/3232817/296556812-205d07f2-de9d-4a7f-b3f5-83514a71453e.mp4"></video>
 
-更完整的功能请移步[OpenCSG官网](https://portal.opencsg.com/)，体验“开发者”模块的强大管理功能。
+更完整的功能请移步[OpenCSG官网](https://portal.opencsg.com/models)，体验"模型"和"数据集"的强大管理功能。
 
 ## 快速使用
 系统资源需求: 4c CPU/8GB内存
