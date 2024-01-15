@@ -395,7 +395,7 @@ tags:
   scope: dataset
   show_name: 视觉定位
   built_in: true
-- name: text-to-image-synthesis
+- name: text-to-image
   category: task
   group: multimodal
   scope: dataset
