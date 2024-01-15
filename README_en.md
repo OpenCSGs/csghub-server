@@ -27,6 +27,7 @@ You can quickly deploy the localized `CSGHub Server` service through docker-comp
 ```shell
 # The API token should be at least 128 characters long, and HTTP requests to csghub-server require the API token to be sent as a Bearer token for authentication.
 export STARHUB_SERVER_API_TOKEN=<API token>
+mkdir -m 777 gitea minio_data
 curl -L https://raw.githubusercontent.com/OpenCSGs/csghub-server/main/docker-compose.yml -o docker-compose.yml
 docker-compose -f docker-compose.yml up -d
 ```

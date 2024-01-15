@@ -27,6 +27,7 @@ CSGHub Server是开源、可信的大模型资产管理平台[CSGHub](https://gi
 ```shell
 # API token 长度至少为128个字符，发往 csghub-server 的 http 请求需要将 API token 作为 Bearer token 来做身份验证
 export STARHUB_SERVER_API_TOKEN=<API token>
+mkdir -m 777 gitea minio_data
 curl -L https://raw.githubusercontent.com/OpenCSGs/csghub-server/main/docker-compose.yml -o docker-compose.yml
 docker compose -f docker-compose.yml up -d
 ```
