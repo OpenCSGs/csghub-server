@@ -1,6 +1,5 @@
 package types
 
-// swagger:model
 type CreateUserRequest struct {
 	ID       string `json:"id"`
 	Name     string `json:"name"`

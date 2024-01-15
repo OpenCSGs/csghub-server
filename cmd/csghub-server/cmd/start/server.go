@@ -29,10 +29,10 @@ var serverCmd = &cobra.Command{
 		}
 
 		if enableSwagger {
-			//	@securityDefinitions.apikey	JWT
-			//	@in							header
-			//	@name						Authorization
-			//	@description				Description for what is this security definition being used
+			//	@securityDefinitions.apikey ApiKey
+			//	@in                         header
+			//	@name                       Authorization
+			//	@description                Bearer token
 			docs.SwaggerInfo.Title = "CSGHub Server API"
 			docs.SwaggerInfo.Description = "CSGHub Server API."
 			docs.SwaggerInfo.Version = "1.0"

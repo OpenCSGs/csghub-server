@@ -28,7 +28,7 @@ type SSHKeyHandler struct {
 }
 
 // CreateUserSSHKey godoc
-// @Security     JWT
+// @Security     ApiKey
 // @Summary      Create a new SSH key for the given user
 // @Description  create a new SSH key for the given user
 // @Tags         SSH Key
@@ -58,7 +58,7 @@ func (h *SSHKeyHandler) Create(ctx *gin.Context) {
 }
 
 // GetUserSSHKeys godoc
-// @Security     JWT
+// @Security     ApiKey
 // @Summary      Get all SSH keys for the given user
 // @Description  get all SSH keys for the given user
 // @Tags         SSH Key
@@ -87,7 +87,7 @@ func (h *SSHKeyHandler) Index(ctx *gin.Context) {
 }
 
 // DeleteUserSSHKey godoc
-// @Security     JWT
+// @Security     ApiKey
 // @Summary      Delete specific SSH key for the given user
 // @Description  delete specific SSH key for the given user
 // @Tags         SSH Key

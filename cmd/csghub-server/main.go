@@ -5,7 +5,6 @@ import (
 	"os"
 
 	"opencsg.com/csghub-server/cmd/csghub-server/cmd"
-	_ "opencsg.com/csghub-server/docs"
 )
 
 func main() {

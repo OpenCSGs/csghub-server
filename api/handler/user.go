@@ -27,7 +27,7 @@ type UserHandler struct {
 }
 
 // CreateUser godoc
-// @Security     JWT
+// @Security     ApiKey
 // @Summary      Create a new user
 // @Description  create a new user
 // @Tags         User
@@ -57,7 +57,7 @@ func (h *UserHandler) Create(ctx *gin.Context) {
 }
 
 // UpdateUser godoc
-// @Security     JWT
+// @Security     ApiKey
 // @Summary      Update user
 // @Description  update user
 // @Tags         User
@@ -87,7 +87,7 @@ func (h *UserHandler) Update(ctx *gin.Context) {
 }
 
 // GetUserDatasets godoc
-// @Security     JWT
+// @Security     ApiKey
 // @Summary      Get user datasets
 // @Description  get user datasets
 // @Tags         User
@@ -126,7 +126,7 @@ func (h *UserHandler) Datasets(ctx *gin.Context) {
 }
 
 // GetUserModels godoc
-// @Security     JWT
+// @Security     ApiKey
 // @Summary      Get user models
 // @Description  get user models
 // @Tags         User

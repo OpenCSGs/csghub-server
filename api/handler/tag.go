@@ -24,7 +24,7 @@ type TagsHandler struct {
 }
 
 // GetAllTags godoc
-// @Security     JWT
+// @Security     ApiKey
 // @Summary      Get all tags
 // @Description  get all tags
 // @Tags         Tag
