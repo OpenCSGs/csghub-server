@@ -8,9 +8,13 @@ import (
 	"opencsg.com/csghub-server/api/router"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/config"
+	"opencsg.com/csghub-server/docs"
 )
 
+var enableSwagger bool
+
 func init() {
+	serverCmd.Flags().BoolVar(&enableSwagger, "swagger", false, "Start swagger help docs")
 	Cmd.AddCommand(serverCmd)
 }
 
@@ -23,6 +27,20 @@ var serverCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
+
+		if enableSwagger {
+			//	@securityDefinitions.apikey	JWT
+			//	@in							header
+			//	@name						Authorization
+			//	@description				Description for what is this security definition being used
+			docs.SwaggerInfo.Title = "CSGHub Server API"
+			docs.SwaggerInfo.Description = "CSGHub Server API."
+			docs.SwaggerInfo.Version = "1.0"
+			docs.SwaggerInfo.Host = "localhost:8080"
+			docs.SwaggerInfo.BasePath = "/api/v1"
+			docs.SwaggerInfo.Schemes = []string{"http", "https"}
+		}
+
 		// Check APIToken length
 		if len(cfg.APIToken) < 128 {
 			return fmt.Errorf("API token length is less than 128, please check")
@@ -32,7 +50,7 @@ var serverCmd = &cobra.Command{
 			DSN:     cfg.Database.DSN,
 		}
 		database.InitDB(dbConfig)
-		r, err := router.NewRouter(cfg)
+		r, err := router.NewRouter(cfg, enableSwagger)
 		if err != nil {
 			return err
 		}

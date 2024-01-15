@@ -1,0 +1,557 @@
+definitions:
+  database.AccessToken:
+    properties:
+      created_at:
+        type: string
+      git_id:
+        type: integer
+      id:
+        type: integer
+      name:
+        type: string
+      token:
+        type: string
+      updated_at:
+        type: string
+      user:
+        $ref: '#/definitions/database.User'
+      user_id:
+        type: integer
+    type: object
+  database.Dataset:
+    properties:
+      created_at:
+        type: string
+      description:
+        type: string
+      downloads:
+        type: integer
+      git_path:
+        type: string
+      id:
+        type: integer
+      last:
+        type: string
+      likes:
+        type: integer
+      name:
+        type: string
+      path:
+        type: string
+      private:
+        type: boolean
+      repository:
+        $ref: '#/definitions/database.Repository'
+      repository_id:
+        type: integer
+      updated_at:
+        type: string
+      url_slug:
+        type: string
+      user:
+        $ref: '#/definitions/database.User'
+      user_id:
+        type: integer
+    type: object
+  database.Model:
+    properties:
+      created_at:
+        type: string
+      description:
+        type: string
+      downloads:
+        type: integer
+      git_path:
+        type: string
+      id:
+        type: integer
+      last_updated_at:
+        type: string
+      likes:
+        type: integer
+      name:
+        type: string
+      path:
+        type: string
+      private:
+        type: boolean
+      repository:
+        $ref: '#/definitions/database.Repository'
+      repository_id:
+        type: integer
+      updated_at:
+        type: string
+      url_slug:
+        type: string
+      user:
+        $ref: '#/definitions/database.User'
+      user_id:
+        type: integer
+    type: object
+  database.Namespace:
+    properties:
+      created_at:
+        type: string
+      id:
+        type: integer
+      namespace_type:
+        $ref: '#/definitions/database.NamespaceType'
+      path:
+        type: string
+      updated_at:
+        type: string
+      user:
+        $ref: '#/definitions/database.User'
+      user_id:
+        type: integer
+    type: object
+  database.NamespaceType:
+    enum:
+    - user
+    - organization
+    type: string
+    x-enum-varnames:
+    - UserNamespace
+    - OrgNamespace
+  database.Repository:
+    properties:
+      created_at:
+        type: string
+      default_branch:
+        type: string
+      description:
+        type: string
+      downloads:
+        items:
+          $ref: '#/definitions/database.RepositoryDownload'
+        type: array
+      git_path:
+        type: string
+      http_clone_url:
+        type: string
+      id:
+        type: integer
+      labels:
+        type: string
+      license:
+        type: string
+      name:
+        type: string
+      path:
+        type: string
+      private:
+        type: boolean
+      readme:
+        type: string
+      repository_type:
+        $ref: '#/definitions/database.RepositoryType'
+      ssh_clone_url:
+        type: string
+      tags:
+        items:
+          $ref: '#/definitions/database.Tag'
+        type: array
+      updated_at:
+        type: string
+      user_id:
+        type: integer
+    type: object
+  database.RepositoryDownload:
+    properties:
+      created_at:
+        type: string
+      date:
+        type: string
+      id:
+        type: integer
+      repository:
+        $ref: '#/definitions/database.Repository'
+      repository_id:
+        type: integer
+      updated_at:
+        type: string
+      user_id:
+        type: integer
+    type: object
+  database.RepositoryType:
+    enum:
+    - model
+    - dataset
+    type: string
+    x-enum-varnames:
+    - ModelRepo
+    - DatasetRepo
+  database.SSHKey:
+    properties:
+      content:
+        type: string
+      created_at:
+        type: string
+      git_id:
+        type: integer
+      id:
+        type: integer
+      name:
+        type: string
+      updated_at:
+        type: string
+      user:
+        $ref: '#/definitions/database.User'
+      user_id:
+        type: integer
+    type: object
+  database.Tag:
+    properties:
+      built_in:
+        type: boolean
+      category:
+        type: string
+      created_at:
+        type: string
+      group:
+        type: string
+      id:
+        type: integer
+      name:
+        type: string
+      scope:
+        $ref: '#/definitions/database.TagScope'
+      show_name:
+        type: string
+      updated_at:
+        type: string
+    type: object
+  database.TagScope:
+    enum:
+    - model
+    - dataset
+    type: string
+    x-enum-varnames:
+    - ModelTagScope
+    - DatasetTagScope
+  database.User:
+    properties:
+      accessTokens:
+        items:
+          $ref: '#/definitions/database.AccessToken'
+        type: array
+      created_at:
+        type: string
+      email:
+        type: string
+      git_id:
+        type: integer
+      id:
+        type: integer
+      name:
+        type: string
+      namespace:
+        items:
+          $ref: '#/definitions/database.Namespace'
+        type: array
+      updated_at:
+        type: string
+      username:
+        type: string
+    type: object
+  types.CreateSSHKeyRequest:
+    properties:
+      content:
+        type: string
+      name:
+        type: string
+      username:
+        type: string
+    type: object
+  types.CreateUserRequest:
+    properties:
+      email:
+        type: string
+      id:
+        type: string
+      name:
+        type: string
+      username:
+        type: string
+    type: object
+  types.Response:
+    properties:
+      data: {}
+      message:
+        type: string
+    type: object
+  types.ResponseWithTotal:
+    properties:
+      data: {}
+      message:
+        type: string
+      total:
+        type: integer
+    type: object
+  types.UpdateUserRequest:
+    properties:
+      email:
+        type: string
+      id:
+        type: string
+      name:
+        type: string
+      username:
+        type: string
+    type: object
+info:
+  contact: {}
+paths:
+  /tags:
+    get:
+      consumes:
+      - application/json
+      description: get all tags
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: tags
+          schema:
+            allOf:
+            - $ref: '#/definitions/types.ResponseWithTotal'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/database.Tag'
+                  type: array
+                total:
+                  type: integer
+              type: object
+      security:
+      - JWT: []
+      summary: Get all tags
+      tags:
+      - Tag
+  /user/{username}/datasets:
+    get:
+      consumes:
+      - application/json
+      description: get user datasets
+      parameters:
+      - description: username
+        in: path
+        name: username
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/types.ResponseWithTotal'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/database.Dataset'
+                  type: array
+                total:
+                  type: integer
+              type: object
+      security:
+      - JWT: []
+      summary: Get user datasets
+      tags:
+      - User
+  /user/{username}/models:
+    get:
+      consumes:
+      - application/json
+      description: get user models
+      parameters:
+      - description: username
+        in: path
+        name: username
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/types.ResponseWithTotal'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/database.Model'
+                  type: array
+                total:
+                  type: integer
+              type: object
+      security:
+      - JWT: []
+      summary: Get user models
+      tags:
+      - User
+  /user/{username}/ssh_key/{name}:
+    delete:
+      consumes:
+      - application/json
+      description: delete specific SSH key for the given user
+      parameters:
+      - description: username
+        in: path
+        name: username
+        required: true
+        type: string
+      - description: key name
+        in: path
+        name: name
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/types.Response'
+      security:
+      - JWT: []
+      summary: Delete specific SSH key for the given user
+      tags:
+      - SSH Key
+  /user/{username}/ssh_keys:
+    get:
+      consumes:
+      - application/json
+      description: get all SSH keys for the given user
+      parameters:
+      - description: username
+        in: path
+        name: username
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/types.ResponseWithTotal'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/database.SSHKey'
+                  type: array
+                total:
+                  type: integer
+              type: object
+      security:
+      - JWT: []
+      summary: Get all SSH keys for the given user
+      tags:
+      - SSH Key
+    post:
+      consumes:
+      - application/json
+      description: create a new SSH key for the given user
+      parameters:
+      - description: username
+        in: path
+        name: username
+        required: true
+        type: string
+      - description: body
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/types.CreateSSHKeyRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/types.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/database.SSHKey'
+              type: object
+      security:
+      - JWT: []
+      summary: Create a new SSH key for the given user
+      tags:
+      - SSH Key
+  /users:
+    post:
+      consumes:
+      - application/json
+      description: create a new user
+      parameters:
+      - description: body
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/types.CreateUserRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/types.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/database.User'
+              type: object
+      security:
+      - JWT: []
+      summary: Create a new user
+      tags:
+      - User
+  /users/{username}:
+    put:
+      consumes:
+      - application/json
+      description: update user
+      parameters:
+      - description: username
+        in: path
+        name: username
+        required: true
+        type: string
+      - description: body
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/types.UpdateUserRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/types.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/database.User'
+              type: object
+      security:
+      - JWT: []
+      summary: Update user
+      tags:
+      - User
+securityDefinitions:
+  JWT:
+    description: Description for what is this security definition being used
+    in: header
+    name: Authorization
+    type: apiKey
+swagger: "2.0"

@@ -27,6 +27,17 @@ type SSHKeyHandler struct {
 	c *component.SSHKeyComponent
 }
 
+// CreateUserSSHKey godoc
+// @Security     JWT
+// @Summary      Create a new SSH key for the given user
+// @Description  create a new SSH key for the given user
+// @Tags         SSH Key
+// @Accept       json
+// @Produce      json
+// @Param        username path string true "username"
+// @param        body body types.CreateSSHKeyRequest true "body"
+// @Success      200  {object}  types.Response{data=database.SSHKey} "OK"
+// @Router       /user/{username}/ssh_keys [post]
 func (h *SSHKeyHandler) Create(ctx *gin.Context) {
 	var req types.CreateSSHKeyRequest
 	if err := ctx.ShouldBindJSON(&req); err != nil {
@@ -46,6 +57,16 @@ func (h *SSHKeyHandler) Create(ctx *gin.Context) {
 	httpbase.OK(ctx, sk)
 }
 
+// GetUserSSHKeys godoc
+// @Security     JWT
+// @Summary      Get all SSH keys for the given user
+// @Description  get all SSH keys for the given user
+// @Tags         SSH Key
+// @Accept       json
+// @Produce      json
+// @Param        username path string true "username"
+// @Success      200  {object}  types.ResponseWithTotal{data=[]database.SSHKey,total=int} "OK"
+// @Router       /user/{username}/ssh_keys [get]
 func (h *SSHKeyHandler) Index(ctx *gin.Context) {
 	username := ctx.Param("username")
 	per, page, err := common.GetPerAndPageFromContext(ctx)
@@ -65,6 +86,17 @@ func (h *SSHKeyHandler) Index(ctx *gin.Context) {
 	httpbase.OK(ctx, sks)
 }
 
+// DeleteUserSSHKey godoc
+// @Security     JWT
+// @Summary      Delete specific SSH key for the given user
+// @Description  delete specific SSH key for the given user
+// @Tags         SSH Key
+// @Accept       json
+// @Produce      json
+// @Param        username path string true "username"
+// @Param        name path string true "key name"
+// @Success      200  {object}  types.Response{} "OK"
+// @Router       /user/{username}/ssh_key/{name} [delete]
 func (h *SSHKeyHandler) Delete(ctx *gin.Context) {
 	name := ctx.Param("name")
 	username := ctx.Param("username")
