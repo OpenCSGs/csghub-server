@@ -51,7 +51,7 @@ type GitServer interface {
 	// ListSSHKeys(string, int, int) ([]*database.SSHKey, error)
 	DeleteSSHKey(int) error
 
-	CreateOrganization(*types.CreateOrgReq) (*database.Organization, error)
+	CreateOrganization(*types.CreateOrgReq, database.User) (*database.Organization, error)
 	DeleteOrganization(string) error
 	UpdateOrganization(*types.EditOrgReq, *database.Organization) (*database.Organization, error)
 	// CreateOrgMember(string, *types.CreateMemberReq) (*database.Member, error)

@@ -7,7 +7,7 @@ import (
 	"opencsg.com/csghub-server/common/utils/common"
 )
 
-func (c *Client) CreateOrganization(req *types.CreateOrgReq) (org *database.Organization, err error) {
+func (c *Client) CreateOrganization(req *types.CreateOrgReq, user database.User) (org *database.Organization, err error) {
 	orgNames := []string{
 		common.WithPrefix(req.Name, ModelOrgPrefix),
 		common.WithPrefix(req.Name, DatasetOrgPrefix),
@@ -16,7 +16,7 @@ func (c *Client) CreateOrganization(req *types.CreateOrgReq) (org *database.Orga
 
 	for _, orgName := range orgNames {
 		_, _, err := c.giteaClient.AdminCreateOrg(
-			req.User.Username,
+			user.Username,
 			gitea.CreateOrgOption{
 				Name:        orgName,
 				Description: req.Description,
@@ -34,8 +34,8 @@ func (c *Client) CreateOrganization(req *types.CreateOrgReq) (org *database.Orga
 		Path:        req.Name,
 		Name:        req.FullName,
 		Description: req.Description,
-		User:        &req.User,
-		UserID:      req.User.ID,
+		User:        &user,
+		UserID:      user.ID,
 	}
 
 	return

@@ -54,8 +54,7 @@ func (c *OrganizationComponent) Create(ctx context.Context, req *types.CreateOrg
 		return nil, errors.New("the name already exists")
 	}
 
-	req.User = user
-	org, err := c.gs.CreateOrganization(req)
+	org, err := c.gs.CreateOrganization(req, user)
 	if err != nil {
 		return nil, fmt.Errorf("failed create git organization, error: %w", err)
 	}

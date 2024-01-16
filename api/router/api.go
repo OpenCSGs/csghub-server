@@ -4,14 +4,21 @@ import (
 	"fmt"
 
 	"github.com/gin-gonic/gin"
+	swaggerFiles "github.com/swaggo/files"
+	ginSwagger "github.com/swaggo/gin-swagger"
 	"opencsg.com/csghub-server/api/handler"
 	"opencsg.com/csghub-server/api/handler/callback"
 	"opencsg.com/csghub-server/api/middleware"
 	"opencsg.com/csghub-server/common/config"
 )
 
-func NewRouter(config *config.Config) (*gin.Engine, error) {
+func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 	r := gin.New()
+
+	if enableSwagger {
+		r.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
+	}
+
 	r.Use(middleware.Authenticator(config))
 	r.Use(gin.Recovery())
 	apiGroup := r.Group("/api/v1")
