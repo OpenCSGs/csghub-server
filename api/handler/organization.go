@@ -26,6 +26,18 @@ type OrganizationHandler struct {
 	c *component.OrganizationComponent
 }
 
+// CreateOrganization godoc
+// @Security     ApiKey
+// @Summary      Create a new organization
+// @Description  create a new organization
+// @Tags         Organization
+// @Accept       json
+// @Produce      json
+// @param        body body types.CreateOrgReq true "body"
+// @Success      200  {object}  types.Response{data=database.Organization} "OK"
+// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
+// @Router       /organizations [post]
 func (h *OrganizationHandler) Create(ctx *gin.Context) {
 	var req types.CreateOrgReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {
@@ -44,6 +56,16 @@ func (h *OrganizationHandler) Create(ctx *gin.Context) {
 	httpbase.OK(ctx, org)
 }
 
+// GetOrganizations godoc
+// @Security     ApiKey
+// @Summary      Get organizations
+// @Description  get organizations
+// @Tags         Organization
+// @Accept       json
+// @Produce      json
+// @Success      200  {object}  types.ResponseWithTotal{data=[]database.Organization,total=int} "OK"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
+// @Router       /organizations [get]
 func (h *OrganizationHandler) Index(ctx *gin.Context) {
 	username := ctx.Query("username")
 	orgs, err := h.c.Index(ctx, username)
@@ -57,6 +79,17 @@ func (h *OrganizationHandler) Index(ctx *gin.Context) {
 	httpbase.OK(ctx, orgs)
 }
 
+// DeleteOrganization godoc
+// @Security     ApiKey
+// @Summary      Delete organization
+// @Description  delete organization
+// @Tags         Organization
+// @Accept       json
+// @Produce      json
+// @Param        name path string true "name"
+// @Success      200  {object}  types.Response{} "OK"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
+// @Router       /organizations/{name} [delete]
 func (h *OrganizationHandler) Delete(ctx *gin.Context) {
 	name := ctx.Param("name")
 	err := h.c.Delete(ctx, name)
@@ -70,6 +103,19 @@ func (h *OrganizationHandler) Delete(ctx *gin.Context) {
 	httpbase.OK(ctx, nil)
 }
 
+// UpdateOrganization godoc
+// @Security     ApiKey
+// @Summary      Update organization
+// @Description  update organization
+// @Tags         Organization
+// @Accept       json
+// @Produce      json
+// @Param        name path string true "name"
+// @Param        body body types.EditOrgReq true "body"
+// @Success      200  {object}  types.Response{data=database.Organization} "OK"
+// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
+// @Router       /organizations/{name} [put]
 func (h *OrganizationHandler) Update(ctx *gin.Context) {
 	var req types.EditOrgReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {
@@ -89,6 +135,18 @@ func (h *OrganizationHandler) Update(ctx *gin.Context) {
 	httpbase.OK(ctx, org)
 }
 
+// GetOrganizationModels godoc
+// @Security     ApiKey
+// @Summary      Get organization models
+// @Description  get organization models
+// @Tags         Organization
+// @Accept       json
+// @Produce      json
+// @Param        namespace path string true "namespace"
+// @Success      200  {object}  types.ResponseWithTotal{data=[]database.Model,total=int} "OK"
+// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
+// @Router       /organization/{namespace}/models [get]
 func (h *OrganizationHandler) Models(ctx *gin.Context) {
 	var req types.OrgModelsReq
 	req.Namespace = ctx.Param("namespace")
@@ -119,6 +177,18 @@ func (h *OrganizationHandler) Models(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, respData)
 }
 
+// GetOrganizationDatasets godoc
+// @Security     ApiKey
+// @Summary      Get organization datasets
+// @Description  get organization datasets
+// @Tags         Organization
+// @Accept       json
+// @Produce      json
+// @Param        namespace path string true "namespace"
+// @Success      200  {object}  types.ResponseWithTotal{data=[]database.Dataset,total=int} "OK"
+// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
+// @Router       /organization/{namespace}/datasets [get]
 func (h *OrganizationHandler) Datasets(ctx *gin.Context) {
 	var req types.OrgDatasetsReq
 	req.Namespace = ctx.Param("namespace")
