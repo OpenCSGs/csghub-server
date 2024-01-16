@@ -31,6 +31,7 @@ type TagsHandler struct {
 // @Accept       json
 // @Produce      json
 // @Success      200  {object}  types.ResponseWithTotal{data=[]database.Tag,total=int} "tags"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
 // @Router       /tags [get]
 func (t *TagsHandler) AllTags(ctx *gin.Context) {
 	//TODO:validate inputs

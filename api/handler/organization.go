@@ -35,6 +35,8 @@ type OrganizationHandler struct {
 // @Produce      json
 // @param        body body types.CreateOrgReq true "body"
 // @Success      200  {object}  types.Response{data=database.Organization} "OK"
+// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
 // @Router       /organizations [post]
 func (h *OrganizationHandler) Create(ctx *gin.Context) {
 	var req types.CreateOrgReq
@@ -62,6 +64,7 @@ func (h *OrganizationHandler) Create(ctx *gin.Context) {
 // @Accept       json
 // @Produce      json
 // @Success      200  {object}  types.ResponseWithTotal{data=[]database.Organization,total=int} "OK"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
 // @Router       /organizations [get]
 func (h *OrganizationHandler) Index(ctx *gin.Context) {
 	username := ctx.Query("username")
@@ -85,6 +88,7 @@ func (h *OrganizationHandler) Index(ctx *gin.Context) {
 // @Produce      json
 // @Param        name path string true "name"
 // @Success      200  {object}  types.Response{} "OK"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
 // @Router       /organizations/{name} [delete]
 func (h *OrganizationHandler) Delete(ctx *gin.Context) {
 	name := ctx.Param("name")
@@ -109,6 +113,8 @@ func (h *OrganizationHandler) Delete(ctx *gin.Context) {
 // @Param        name path string true "name"
 // @Param        body body types.EditOrgReq true "body"
 // @Success      200  {object}  types.Response{data=database.Organization} "OK"
+// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
 // @Router       /organizations/{name} [put]
 func (h *OrganizationHandler) Update(ctx *gin.Context) {
 	var req types.EditOrgReq
@@ -138,6 +144,8 @@ func (h *OrganizationHandler) Update(ctx *gin.Context) {
 // @Produce      json
 // @Param        namespace path string true "namespace"
 // @Success      200  {object}  types.ResponseWithTotal{data=[]database.Model,total=int} "OK"
+// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
 // @Router       /organization/{namespace}/models [get]
 func (h *OrganizationHandler) Models(ctx *gin.Context) {
 	var req types.OrgModelsReq
@@ -178,6 +186,8 @@ func (h *OrganizationHandler) Models(ctx *gin.Context) {
 // @Produce      json
 // @Param        namespace path string true "namespace"
 // @Success      200  {object}  types.ResponseWithTotal{data=[]database.Dataset,total=int} "OK"
+// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
 // @Router       /organization/{namespace}/datasets [get]
 func (h *OrganizationHandler) Datasets(ctx *gin.Context) {
 	var req types.OrgDatasetsReq

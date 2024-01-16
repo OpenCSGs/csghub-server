@@ -10,3 +10,7 @@ type ResponseWithTotal struct {
 	Data    any    `json:"data"`
 	Total   int    `json:"total"`
 }
+
+type APIInternalServerError struct{}
+
+type APIBadRequest struct{}

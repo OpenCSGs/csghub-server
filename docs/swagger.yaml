@@ -279,6 +279,10 @@ definitions:
       username:
         type: string
     type: object
+  types.APIBadRequest:
+    type: object
+  types.APIInternalServerError:
+    type: object
   types.CreateModelReq:
     properties:
       default_branch:
@@ -630,6 +634,14 @@ paths:
                 total:
                   type: integer
               type: object
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
       security:
       - ApiKey: []
       summary: Get organization datasets
@@ -662,6 +674,14 @@ paths:
                 total:
                   type: integer
               type: object
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
       security:
       - ApiKey: []
       summary: Get organization models
@@ -688,6 +708,10 @@ paths:
                 total:
                   type: integer
               type: object
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
       security:
       - ApiKey: []
       summary: Get organizations
@@ -716,6 +740,14 @@ paths:
                 data:
                   $ref: '#/definitions/database.Organization'
               type: object
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
       security:
       - ApiKey: []
       summary: Create a new organization
@@ -739,6 +771,10 @@ paths:
           description: OK
           schema:
             $ref: '#/definitions/types.Response'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
       security:
       - ApiKey: []
       summary: Delete organization
@@ -772,6 +808,14 @@ paths:
                 data:
                   $ref: '#/definitions/database.Organization'
               type: object
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
       security:
       - ApiKey: []
       summary: Update organization
@@ -798,6 +842,10 @@ paths:
                 total:
                   type: integer
               type: object
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
       security:
       - ApiKey: []
       summary: Get all tags
@@ -830,6 +878,14 @@ paths:
                 total:
                   type: integer
               type: object
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
       security:
       - ApiKey: []
       summary: Get user datasets
@@ -862,6 +918,14 @@ paths:
                 total:
                   type: integer
               type: object
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
       security:
       - ApiKey: []
       summary: Get user models
@@ -890,6 +954,14 @@ paths:
           description: OK
           schema:
             $ref: '#/definitions/types.Response'
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
       security:
       - ApiKey: []
       summary: Delete specific SSH key for the given user
@@ -922,6 +994,14 @@ paths:
                 total:
                   type: integer
               type: object
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
       security:
       - ApiKey: []
       summary: Get all SSH keys for the given user
@@ -955,6 +1035,14 @@ paths:
                 data:
                   $ref: '#/definitions/database.SSHKey'
               type: object
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
       security:
       - ApiKey: []
       summary: Create a new SSH key for the given user
@@ -984,6 +1072,14 @@ paths:
                 data:
                   $ref: '#/definitions/database.User'
               type: object
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
       security:
       - ApiKey: []
       summary: Create a new user
@@ -1018,6 +1114,14 @@ paths:
                 data:
                   $ref: '#/definitions/database.User'
               type: object
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
       security:
       - ApiKey: []
       summary: Update user

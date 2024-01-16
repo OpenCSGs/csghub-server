@@ -37,6 +37,8 @@ type SSHKeyHandler struct {
 // @Param        username path string true "username"
 // @param        body body types.CreateSSHKeyRequest true "body"
 // @Success      200  {object}  types.Response{data=database.SSHKey} "OK"
+// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
 // @Router       /user/{username}/ssh_keys [post]
 func (h *SSHKeyHandler) Create(ctx *gin.Context) {
 	var req types.CreateSSHKeyRequest
@@ -66,6 +68,8 @@ func (h *SSHKeyHandler) Create(ctx *gin.Context) {
 // @Produce      json
 // @Param        username path string true "username"
 // @Success      200  {object}  types.ResponseWithTotal{data=[]database.SSHKey,total=int} "OK"
+// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
 // @Router       /user/{username}/ssh_keys [get]
 func (h *SSHKeyHandler) Index(ctx *gin.Context) {
 	username := ctx.Param("username")
@@ -96,6 +100,8 @@ func (h *SSHKeyHandler) Index(ctx *gin.Context) {
 // @Param        username path string true "username"
 // @Param        name path string true "key name"
 // @Success      200  {object}  types.Response{} "OK"
+// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
 // @Router       /user/{username}/ssh_key/{name} [delete]
 func (h *SSHKeyHandler) Delete(ctx *gin.Context) {
 	name := ctx.Param("name")

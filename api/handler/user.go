@@ -35,6 +35,8 @@ type UserHandler struct {
 // @Produce      json
 // @Param        body   body  types.CreateUserRequest true "body"
 // @Success      200  {object}  types.Response{data=database.User} "OK"
+// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
 // @Router       /users [post]
 func (h *UserHandler) Create(ctx *gin.Context) {
 	var req *types.CreateUserRequest
@@ -66,6 +68,8 @@ func (h *UserHandler) Create(ctx *gin.Context) {
 // @Param        username path string true "username"
 // @Param        body   body  types.UpdateUserRequest true "body"
 // @Success      200  {object}  types.Response{data=database.User} "OK"
+// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
 // @Router       /users/{username} [put]
 func (h *UserHandler) Update(ctx *gin.Context) {
 	var req *types.UpdateUserRequest
@@ -95,6 +99,8 @@ func (h *UserHandler) Update(ctx *gin.Context) {
 // @Produce      json
 // @Param        username path string true "username"
 // @Success      200  {object}  types.ResponseWithTotal{data=[]database.Dataset,total=int} "OK"
+// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
 // @Router       /user/{username}/datasets [get]
 func (h *UserHandler) Datasets(ctx *gin.Context) {
 	var req types.UserDatasetsReq
@@ -134,6 +140,8 @@ func (h *UserHandler) Datasets(ctx *gin.Context) {
 // @Produce      json
 // @Param        username path string true "username"
 // @Success      200  {object}  types.ResponseWithTotal{data=[]database.Model,total=int} "OK"
+// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
 // @Router       /user/{username}/models [get]
 func (h *UserHandler) Models(ctx *gin.Context) {
 	var req types.UserDatasetsReq
