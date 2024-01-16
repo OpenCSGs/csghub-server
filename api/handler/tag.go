@@ -23,6 +23,16 @@ type TagsHandler struct {
 	tc *component.TagComponent
 }
 
+// GetAllTags godoc
+// @Security     ApiKey
+// @Summary      Get all tags
+// @Description  get all tags
+// @Tags         Tag
+// @Accept       json
+// @Produce      json
+// @Success      200  {object}  types.ResponseWithTotal{data=[]database.Tag,total=int} "tags"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
+// @Router       /tags [get]
 func (t *TagsHandler) AllTags(ctx *gin.Context) {
 	//TODO:validate inputs
 

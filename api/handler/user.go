@@ -26,6 +26,18 @@ type UserHandler struct {
 	c *component.UserComponent
 }
 
+// CreateUser godoc
+// @Security     ApiKey
+// @Summary      Create a new user
+// @Description  create a new user
+// @Tags         User
+// @Accept       json
+// @Produce      json
+// @Param        body   body  types.CreateUserRequest true "body"
+// @Success      200  {object}  types.Response{data=database.User} "OK"
+// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
+// @Router       /users [post]
 func (h *UserHandler) Create(ctx *gin.Context) {
 	var req *types.CreateUserRequest
 	if err := ctx.ShouldBindJSON(&req); err != nil {
@@ -46,6 +58,19 @@ func (h *UserHandler) Create(ctx *gin.Context) {
 	httpbase.OK(ctx, user)
 }
 
+// UpdateUser godoc
+// @Security     ApiKey
+// @Summary      Update user
+// @Description  update user
+// @Tags         User
+// @Accept       json
+// @Produce      json
+// @Param        username path string true "username"
+// @Param        body   body  types.UpdateUserRequest true "body"
+// @Success      200  {object}  types.Response{data=database.User} "OK"
+// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
+// @Router       /users/{username} [put]
 func (h *UserHandler) Update(ctx *gin.Context) {
 	var req *types.UpdateUserRequest
 	if err := ctx.ShouldBindJSON(&req); err != nil {
@@ -65,6 +90,18 @@ func (h *UserHandler) Update(ctx *gin.Context) {
 	httpbase.OK(ctx, user)
 }
 
+// GetUserDatasets godoc
+// @Security     ApiKey
+// @Summary      Get user datasets
+// @Description  get user datasets
+// @Tags         User
+// @Accept       json
+// @Produce      json
+// @Param        username path string true "username"
+// @Success      200  {object}  types.ResponseWithTotal{data=[]database.Dataset,total=int} "OK"
+// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
+// @Router       /user/{username}/datasets [get]
 func (h *UserHandler) Datasets(ctx *gin.Context) {
 	var req types.UserDatasetsReq
 	per, page, err := common.GetPerAndPageFromContext(ctx)
@@ -94,6 +131,18 @@ func (h *UserHandler) Datasets(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, respData)
 }
 
+// GetUserModels godoc
+// @Security     ApiKey
+// @Summary      Get user models
+// @Description  get user models
+// @Tags         User
+// @Accept       json
+// @Produce      json
+// @Param        username path string true "username"
+// @Success      200  {object}  types.ResponseWithTotal{data=[]database.Model,total=int} "OK"
+// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
+// @Router       /user/{username}/models [get]
 func (h *UserHandler) Models(ctx *gin.Context) {
 	var req types.UserDatasetsReq
 	per, page, err := common.GetPerAndPageFromContext(ctx)
