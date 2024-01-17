@@ -29,7 +29,7 @@ type GitServer interface {
 	GetModelTags(string, string, int, int) ([]*types.ModelTag, error)
 	GetModelFileTree(string, string, string, string) ([]*types.File, error)
 	CreateModelFile(*types.CreateFileReq) (err error)
-	UpdateModelFile(string, string, string, *types.UpdateFileReq) (err error)
+	UpdateModelFile(*types.UpdateFileReq) (err error)
 
 	CreateDatasetRepo(*types.CreateDatasetReq) (*database.Dataset, *database.Repository, error)
 	UpdateDatasetRepo(string, string, *database.Dataset, *database.Repository, *types.UpdateDatasetReq) error

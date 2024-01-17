@@ -3,7 +3,7 @@ module opencsg.com/csghub-server
 go 1.21
 
 require (
-	github.com/OpenCSGs/gitea-go-sdk/gitea v0.0.0-20240110070248-7098d11df207
+	github.com/OpenCSGs/gitea-go-sdk/gitea v0.0.0-20240117080153-8d03f7abd3db
 	github.com/alibabacloud-go/darabonba-openapi/v2 v2.0.5
 	github.com/alibabacloud-go/green-20220302 v1.2.0
 	github.com/alibabacloud-go/tea v1.2.1

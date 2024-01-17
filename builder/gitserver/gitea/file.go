@@ -43,10 +43,11 @@ func (c *Client) getRepoDir(namespace, name, ref, path string) (files []*types.F
 			Size:            int(entry.Size),
 			Commit: types.Commit{
 				Message: entry.CommitMsg, ID: entry.SHA, CommitterDate: entry.CommitterDate.String()},
-			Mode:        entry.Mode,
-			SHA:         entry.SHA,
-			URL:         entry.URL,
-			DownloadURL: entry.DownloadURL,
+			Mode:          entry.Mode,
+			SHA:           entry.SHA,
+			URL:           entry.URL,
+			DownloadURL:   entry.DownloadURL,
+			LastCommitSHA: entry.LastCommitSHA,
 		}
 		if entry.Type == "tree" {
 			f.Type = "dir"
@@ -213,9 +214,9 @@ func (c *Client) CreateModelFile(req *types.CreateFileReq) (err error) {
 	return
 }
 
-func (c *Client) UpdateModelFile(namespace, name, path string, req *types.UpdateFileReq) (err error) {
-	namespace = common.WithPrefix(namespace, ModelOrgPrefix)
-	_, _, err = c.giteaClient.UpdateFile(namespace, name, path, gitea.UpdateFileOptions{
+func (c *Client) UpdateModelFile(req *types.UpdateFileReq) (err error) {
+	namespace := common.WithPrefix(req.NameSpace, ModelOrgPrefix)
+	_, _, err = c.giteaClient.UpdateFile(namespace, req.Name, req.FilePath, gitea.UpdateFileOptions{
 		FileOptions: gitea.FileOptions{
 			Message:       req.Message,
 			BranchName:    req.Branch,

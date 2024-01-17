@@ -78,7 +78,7 @@ func NewModelComponent(config *config.Config) (*ModelComponent, error) {
 	}
 	c.s3Client, err = s3.NewMinio(config)
 	if err != nil {
-		newError := fmt.Errorf("fail to init s3 client for dataset,error:%w", err)
+		newError := fmt.Errorf("fail to init s3 client for model,error:%w", err)
 		slog.Error(newError.Error())
 		return nil, newError
 	}
@@ -298,7 +298,7 @@ func (c *ModelComponent) createReadmeFile(ctx context.Context, req *types.Create
 		return nil, fmt.Errorf("failed to update meta tags, cause: %w", err)
 	}
 
-	err = c.gs.CreateDatasetFile(req)
+	err = c.gs.CreateModelFile(req)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create model file, cause: %w", err)
 	}
@@ -318,7 +318,7 @@ func (c *ModelComponent) createLibraryFile(ctx context.Context, req *types.Creat
 			slog.String("name", req.Name), slog.Any("error", err))
 		return nil, fmt.Errorf("failed to set model's tags, cause: %w", err)
 	}
-	err = c.gs.CreateDatasetFile(req)
+	err = c.gs.CreateModelFile(req)
 	if err != nil {
 		return nil, err
 	}
@@ -336,7 +336,7 @@ func (c *ModelComponent) UpdateFile(ctx context.Context, req *types.UpdateFileRe
 	if err != nil {
 		return nil, fmt.Errorf("failed to find username, error: %w", err)
 	}
-	err = c.gs.UpdateModelFile(req.NameSpace, req.Name, req.FilePath, req)
+	err = c.gs.UpdateModelFile(req)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create model file, error: %w", err)
 	}
@@ -367,11 +367,6 @@ func (c *ModelComponent) updateLibraryFile(ctx context.Context, req *types.Updat
 		}
 	}
 
-	err = c.gs.UpdateDatasetFile(req)
-	if err != nil {
-		return nil, err
-	}
-
 	return resp, err
 }
 
@@ -384,10 +379,6 @@ func (c *ModelComponent) updateReadmeFile(ctx context.Context, req *types.Update
 	_, err = c.tc.UpdateMetaTags(ctx, database.ModelTagScope, req.NameSpace, req.Name, string(contentDecoded))
 	if err != nil {
 		return nil, fmt.Errorf("failed to update meta tags, cause: %w", err)
-	}
-	err = c.gs.UpdateDatasetFile(req)
-	if err != nil {
-		return nil, fmt.Errorf("failed to update model file, cause: %w", err)
 	}
 
 	return resp, err
@@ -465,7 +456,7 @@ func (c *ModelComponent) DownloadFile(ctx context.Context, req *types.GetFileReq
 	} else {
 		reader, err = c.gs.GetModelFileReader(req.Namespace, req.Name, req.Ref, req.Path)
 		if err != nil {
-			return nil, "", fmt.Errorf("failed to download git dataset repository file, error: %w", err)
+			return nil, "", fmt.Errorf("failed to download git model repository file, error: %w", err)
 		}
 		return reader, downloadUrl, nil
 	}
@@ -474,7 +465,7 @@ func (c *ModelComponent) DownloadFile(ctx context.Context, req *types.GetFileReq
 func (c *ModelComponent) Branches(ctx context.Context, req *types.GetBranchesReq) ([]*types.ModelBranch, error) {
 	_, err := c.ms.FindByPath(ctx, req.Namespace, req.Name)
 	if err != nil {
-		return nil, fmt.Errorf("failed to find dataset, error: %w", err)
+		return nil, fmt.Errorf("failed to find model, error: %w", err)
 	}
 	bs, err := c.gs.GetModelBranches(req.Namespace, req.Name, req.Per, req.Page)
 	if err != nil {
@@ -486,7 +477,7 @@ func (c *ModelComponent) Branches(ctx context.Context, req *types.GetBranchesReq
 func (c *ModelComponent) Tags(ctx context.Context, req *types.GetTagsReq) ([]database.Tag, error) {
 	_, err := c.ms.FindByPath(ctx, req.Namespace, req.Name)
 	if err != nil {
-		return nil, fmt.Errorf("failed to find dataset, error: %w", err)
+		return nil, fmt.Errorf("failed to find model, error: %w", err)
 	}
 	tags, err := c.ms.Tags(ctx, req.Namespace, req.Name)
 	if err != nil {
