@@ -34,6 +34,21 @@ type DatasetHandler struct {
 	c *component.DatasetComponent
 }
 
+// CreateDatasetFile godoc
+// @Security     ApiKey
+// @Summary      Create dataset file
+// @Description  create dataset file
+// @Tags         Dataset
+// @Accept       json
+// @Produce      json
+// @Param        namespace path string true "namespace"
+// @Param        name path string true "name"
+// @Param        file_path path string true "file_path"
+// @Param        body body types.CreateFileReq true "body"
+// @Success      200  {object}  types.Response{data=types.CreateFileResp} "OK"
+// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
+// @Router       /datasets/{namespace}/{name}/raw/{file_path} [post]
 func (h *DatasetHandler) CreateFile(ctx *gin.Context) {
 	var (
 		req  *types.CreateFileReq
@@ -65,6 +80,21 @@ func (h *DatasetHandler) CreateFile(ctx *gin.Context) {
 	httpbase.OK(ctx, resp)
 }
 
+// UpdateDatasetFile godoc
+// @Security     ApiKey
+// @Summary      Update dataset file
+// @Description  update dataset file
+// @Tags         Dataset
+// @Accept       json
+// @Produce      json
+// @Param        namespace path string true "namespace"
+// @Param        name path string true "name"
+// @Param        file_path path string true "file_path"
+// @Param        body body types.UpdateFileReq true "body"
+// @Success      200  {object}  types.Response{data=types.UpdateFileResp} "OK"
+// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
+// @Router       /datasets/{namespace}/{name}/raw/{file_path} [put]
 func (h *DatasetHandler) UpdateFile(ctx *gin.Context) {
 	var (
 		req  *types.UpdateFileReq
@@ -98,6 +128,18 @@ func (h *DatasetHandler) UpdateFile(ctx *gin.Context) {
 	httpbase.OK(ctx, resp)
 }
 
+// CreateDataset   godoc
+// @Security     ApiKey
+// @Summary      Create a new dataset
+// @Description  create a new dataset
+// @Tags         Dataset
+// @Accept       json
+// @Produce      json
+// @Param        body body types.CreateDatasetReq true "body"
+// @Success      200  {object}  types.Response{data=database.Dataset} "OK"
+// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
+// @Router       /datasets [post]
 func (h *DatasetHandler) Create(ctx *gin.Context) {
 	var req *types.CreateDatasetReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {
@@ -119,6 +161,20 @@ func (h *DatasetHandler) Create(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, respData)
 }
 
+// GetVisiableDatasets godoc
+// @Security     ApiKey
+// @Summary      Get Visiable datasets for current user
+// @Description  get visiable datasets for current user
+// @Tags         Dataset
+// @Accept       json
+// @Produce      json
+// @Param        per query int false "per" default(20)
+// @Param        page query int false "per page" default(1)
+// @Param        current_user query string true "current user"
+// @Success      200  {object}  types.ResponseWithTotal{data=[]database.Dataset,total=int} "OK"
+// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
+// @Router       /datasets [get]
 func (h *DatasetHandler) Index(ctx *gin.Context) {
 	tagReqs := parseTagReqs(ctx)
 	username := ctx.Query("current_user")
@@ -150,6 +206,20 @@ func (h *DatasetHandler) Index(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, respData)
 }
 
+// UpdateDataset   godoc
+// @Security     ApiKey
+// @Summary      Update a exists dataset
+// @Description  update a exists dataset
+// @Tags         Dataset
+// @Accept       json
+// @Produce      json
+// @Param        namespace path string true "namespace"
+// @Param        name path string true "name"
+// @Param        body body types.UpdateDatasetReq true "body"
+// @Success      200  {object}  types.Response{data=database.Dataset} "OK"
+// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
+// @Router       /datasets/{namespace}/{name} [put]
 func (h *DatasetHandler) Update(ctx *gin.Context) {
 	var req *types.UpdateDatasetReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {
@@ -178,6 +248,19 @@ func (h *DatasetHandler) Update(ctx *gin.Context) {
 	httpbase.OK(ctx, dataset)
 }
 
+// DeleteDataset   godoc
+// @Security     ApiKey
+// @Summary      Delete a exists dataset
+// @Description  delete a exists dataset
+// @Tags         Dataset
+// @Accept       json
+// @Produce      json
+// @Param        namespace path string true "namespace"
+// @Param        name path string true "name"
+// @Success      200  {object}  types.Response{} "OK"
+// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
+// @Router       /datasets/{namespace}/{name} [delete]
 func (h *DatasetHandler) Delete(ctx *gin.Context) {
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
 	if err != nil {
@@ -195,6 +278,19 @@ func (h *DatasetHandler) Delete(ctx *gin.Context) {
 	httpbase.OK(ctx, nil)
 }
 
+// GetDatasetDetail godoc
+// @Security     ApiKey
+// @Summary      Get dataset detail
+// @Description  get dataset detail
+// @Tags         Dataset
+// @Accept       json
+// @Produce      json
+// @Param        namespace path string true "namespace"
+// @Param        name path string true "name"
+// @Success      200  {object}  types.Response{data=types.DatasetDetail} "OK"
+// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
+// @Router       /datasets/{namespace}/{name}/detail [get]
 func (h *DatasetHandler) Detail(ctx *gin.Context) {
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
 	if err != nil {
@@ -212,6 +308,20 @@ func (h *DatasetHandler) Detail(ctx *gin.Context) {
 	httpbase.OK(ctx, detail)
 }
 
+// GetDataset      godoc
+// @Security     ApiKey
+// @Summary      Get dataset detail
+// @Description  get dataset detail
+// @Tags         Dataset
+// @Accept       json
+// @Produce      json
+// @Param        namespace path string true "namespace"
+// @Param        name path string true "name"
+// @Param        current_user query string true "current_user"
+// @Success      200  {object}  types.Response{data=database.Dataset} "OK"
+// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
+// @Router       /datasets/{namespace}/{name} [get]
 func (h *DatasetHandler) Show(ctx *gin.Context) {
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
 	if err != nil {
@@ -231,6 +341,20 @@ func (h *DatasetHandler) Show(ctx *gin.Context) {
 	httpbase.OK(ctx, detail)
 }
 
+// GetDatasetCommits godoc
+// @Security     ApiKey
+// @Summary      Get dataset commits
+// @Description  get dataset commits
+// @Tags         Dataset
+// @Accept       json
+// @Produce      json
+// @Param        namespace path string true "namespace"
+// @Param        name path string true "name"
+// @Param        ref query string false "ref"
+// @Success      200  {object}  types.Response{data=[]types.Commit} "OK"
+// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
+// @Router       /datasets/{namespace}/{name}/commits [get]
 func (h *DatasetHandler) Commits(ctx *gin.Context) {
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
 	if err != nil {
@@ -263,6 +387,20 @@ func (h *DatasetHandler) Commits(ctx *gin.Context) {
 	httpbase.OK(ctx, commits)
 }
 
+// GetDatasetLastCommit godoc
+// @Security     ApiKey
+// @Summary      Get dataset last commit
+// @Description  get dataset last commit
+// @Tags         Dataset
+// @Accept       json
+// @Produce      json
+// @Param        namespace path string true "namespace"
+// @Param        name path string true "name"
+// @Param        ref query string false "ref"
+// @Success      200  {object}  types.Response{data=types.Commit} "OK"
+// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
+// @Router       /datasets/{namespace}/{name}/last_commit [get]
 func (h *DatasetHandler) LastCommit(ctx *gin.Context) {
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
 	if err != nil {
@@ -287,6 +425,21 @@ func (h *DatasetHandler) LastCommit(ctx *gin.Context) {
 	httpbase.OK(ctx, commit)
 }
 
+// GetDatasetFileRaw godoc
+// @Security     ApiKey
+// @Summary      Get dataset file raw
+// @Description  get dataset file raw
+// @Tags         Dataset
+// @Accept       json
+// @Produce      json
+// @Param        namespace path string true "namespace"
+// @Param        name path string true "name"
+// @Param        file_path path string true "file_path"
+// @Param        ref query string false "ref"
+// @Success      200  {object}  types.Response{data=types.Commit} "OK"
+// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
+// @Router       /datasets/{namespace}/{name}/raw/{file_path} [get]
 func (h *DatasetHandler) FileRaw(ctx *gin.Context) {
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
 	if err != nil {
@@ -311,6 +464,24 @@ func (h *DatasetHandler) FileRaw(ctx *gin.Context) {
 	httpbase.OK(ctx, raw)
 }
 
+// DownloadDatasetFile godoc
+// @Security     ApiKey
+// @Summary      Download dataset file
+// @Description  download dataset file
+// @Tags         Dataset
+// @Accept       json
+// @Produce      json
+// @Produce      octet-stream
+// @Param        namespace path string true "namespace"
+// @Param        name path string true "name"
+// @Param        file_path path string true "file_path"
+// @Param        lfs query bool false "lfs"
+// @Param        ref query string false "ref"
+// @Param        save_as query string false "name of download file"
+// @Success      200  {object}  types.Response{data=string} "OK"
+// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
+// @Router       /datasets/{namespace}/{name}/download/{file_path} [get]
 func (h *DatasetHandler) DownloadFile(ctx *gin.Context) {
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
 	if err != nil {
@@ -356,6 +527,21 @@ func (h *DatasetHandler) DownloadFile(ctx *gin.Context) {
 	}
 }
 
+// GetDatasetBranches godoc
+// @Security     ApiKey
+// @Summary      Get dataset branches
+// @Description  get dataset branches
+// @Tags         Dataset
+// @Accept       json
+// @Produce      json
+// @Param        namespace path string true "namespace"
+// @Param        name path string true "name"
+// @param        per query int false "per" default(20)
+// @Param        page query int false "page" default(1)
+// @Success      200  {object}  types.Response{data=[]types.DatasetBranch} "OK"
+// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
+// @Router       /datasets/{namespace}/{name}/branches [get]
 func (h *DatasetHandler) Branches(ctx *gin.Context) {
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
 	if err != nil {
@@ -386,6 +572,19 @@ func (h *DatasetHandler) Branches(ctx *gin.Context) {
 	httpbase.OK(ctx, branches)
 }
 
+// GetDatasetTags godoc
+// @Security     ApiKey
+// @Summary      Get dataset tags
+// @Description  get dataset tags
+// @Tags         Dataset
+// @Accept       json
+// @Produce      json
+// @Param        namespace path string true "namespace"
+// @Param        name path string true "name"
+// @Success      200  {object}  types.Response{data=[]types.DatasetBranch} "OK"
+// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
+// @Router       /datasets/{namespace}/{name}/tags [get]
 func (h *DatasetHandler) Tags(ctx *gin.Context) {
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
 	if err != nil {
@@ -408,6 +607,20 @@ func (h *DatasetHandler) Tags(ctx *gin.Context) {
 	httpbase.OK(ctx, tags)
 }
 
+// GetDatasetFileTree godoc
+// @Security     ApiKey
+// @Summary      Get dataset file tree
+// @Description  get dataset file tree
+// @Tags         Dataset
+// @Accept       json
+// @Produce      json
+// @Param        namespace path string true "namespace"
+// @Param        name path string true "name"
+// @Param        ref query string false "ref"
+// @Success      200  {object}  types.Response{data=[]types.File} "OK"
+// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
+// @Router       /datasets/{namespace}/{name}/tree [get]
 func (h *DatasetHandler) Tree(ctx *gin.Context) {
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
 	if err != nil {
@@ -432,6 +645,20 @@ func (h *DatasetHandler) Tree(ctx *gin.Context) {
 	httpbase.OK(ctx, tree)
 }
 
+// UpdateDatasetDownloads godoc
+// @Security     ApiKey
+// @Summary      Update dataset downloads
+// @Description  update dataset downloads
+// @Tags         Dataset
+// @Accept       json
+// @Produce      json
+// @Param        namespace path string true "namespace"
+// @Param        name path string true "name"
+// @Param        body body types.UpdateDownloadsReq true "body"
+// @Success      200  {object}  types.Response{data=[]types.File} "OK"
+// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
+// @Router       /datasets/{namespace}/{name}/update_downloads [post]
 func (h *DatasetHandler) UpdateDownloads(ctx *gin.Context) {
 	var req *types.UpdateDownloadsReq
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
