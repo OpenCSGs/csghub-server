@@ -66,6 +66,7 @@ func (h *DatasetHandler) CreateFile(ctx *gin.Context) {
 		return
 	}
 	filePath := ctx.Param("file_path")
+	filePath = convertFilePathFromRoute(filePath)
 	req.NameSpace = namespace
 	req.Name = name
 	req.FilePath = filePath
@@ -112,6 +113,7 @@ func (h *DatasetHandler) UpdateFile(ctx *gin.Context) {
 		return
 	}
 	filePath := ctx.Param("file_path")
+	filePath = convertFilePathFromRoute(filePath)
 	req.NameSpace = namespace
 	req.Name = name
 	req.FilePath = filePath
@@ -447,10 +449,12 @@ func (h *DatasetHandler) FileRaw(ctx *gin.Context) {
 		ctx.JSON(http.StatusBadRequest, gin.H{"message": err.Error()})
 		return
 	}
+	filePath := ctx.Param("file_path")
+	filePath = convertFilePathFromRoute(filePath)
 	req := &types.GetFileReq{
 		Namespace: namespace,
 		Name:      name,
-		Path:      ctx.Param("file_path"),
+		Path:      filePath,
 		Ref:       ctx.Query("ref"),
 	}
 	raw, err := h.c.FileRaw(ctx, req)
@@ -489,10 +493,12 @@ func (h *DatasetHandler) DownloadFile(ctx *gin.Context) {
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
+	filePath := ctx.Param("file_path")
+	filePath = convertFilePathFromRoute(filePath)
 	req := &types.GetFileReq{
 		Namespace: namespace,
 		Name:      name,
-		Path:      ctx.Param("file_path"),
+		Path:      filePath,
 		Ref:       ctx.Query("ref"),
 		Lfs:       false,
 		SaveAs:    ctx.Query("save_as"),
