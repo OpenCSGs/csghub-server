@@ -573,10 +573,10 @@ func (h *ModelHandler) Branches(ctx *gin.Context) {
 	httpbase.OK(ctx, branches)
 }
 
-// GetModelBranches godoc
+// GetModelTags godoc
 // @Security     ApiKey
-// @Summary      Get model branches
-// @Description  get model branches
+// @Summary      Get model tags
+// @Description  get model tags
 // @Tags         Model
 // @Accept       json
 // @Produce      json
@@ -585,7 +585,7 @@ func (h *ModelHandler) Branches(ctx *gin.Context) {
 // @Success      200  {object}  types.Response{data=[]types.ModelBranch} "OK"
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
-// @Router       /models/{namespace}/{name}/branches [get]
+// @Router       /models/{namespace}/{name}/tags [get]
 func (h *ModelHandler) Tags(ctx *gin.Context) {
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
 	if err != nil {
