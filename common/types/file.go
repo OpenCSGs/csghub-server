@@ -16,6 +16,7 @@ type File struct {
 	Content     string `json:"content"`
 	//relative path in lfs storage
 	LfsRelativePath string `json:"lfs_relative_path"`
+	LastCommitSHA   string `json:"last_commit_sha"`
 }
 
 type CreateFileReq struct {
