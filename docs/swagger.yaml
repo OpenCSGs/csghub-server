@@ -304,6 +304,29 @@ definitions:
       message:
         type: string
     type: object
+  types.CreateDatasetReq:
+    properties:
+      default_branch:
+        type: string
+      description:
+        type: string
+      labels:
+        type: string
+      license:
+        type: string
+      name:
+        type: string
+      namespace:
+        type: string
+      path:
+        type: string
+      private:
+        type: boolean
+      readme:
+        type: string
+      username:
+        type: string
+    type: object
   types.CreateFileReq:
     properties:
       branch:
@@ -375,6 +398,45 @@ definitions:
       username:
         type: string
     type: object
+  types.DatasetBranch:
+    properties:
+      commit:
+        $ref: '#/definitions/types.DatasetBranchCommit'
+      message:
+        type: string
+      name:
+        type: string
+    type: object
+  types.DatasetBranchCommit:
+    properties:
+      id:
+        type: string
+    type: object
+  types.DatasetDetail:
+    properties:
+      default_branch:
+        type: string
+      downloads:
+        type: integer
+      http_clone_url:
+        type: string
+      introduction:
+        type: string
+      last_updated_at:
+        type: string
+      license:
+        type: string
+      name:
+        type: string
+      path:
+        type: string
+      private:
+        type: boolean
+      size:
+        type: integer
+      ssh_clone_url:
+        type: string
+    type: object
   types.EditOrgReq:
     properties:
       description:
@@ -392,6 +454,8 @@ definitions:
         type: string
       download_url:
         description: URL to download the file, same with URL, except for lfs file
+        type: string
+      last_commit_sha:
         type: string
       lfs:
         type: boolean
@@ -467,6 +531,29 @@ definitions:
       total:
         type: integer
     type: object
+  types.UpdateDatasetReq:
+    properties:
+      default_branch:
+        type: string
+      description:
+        type: string
+      labels:
+        type: string
+      license:
+        type: string
+      name:
+        type: string
+      namespace:
+        type: string
+      origin_name:
+        type: string
+      private:
+        type: boolean
+      readme:
+        type: string
+      username:
+        type: string
+    type: object
   types.UpdateDownloadsReq:
     properties:
       date:
@@ -536,6 +623,755 @@ definitions:
 info:
   contact: {}
 paths:
+  /datasets:
+    get:
+      consumes:
+      - application/json
+      description: get visiable datasets for current user
+      parameters:
+      - default: 20
+        description: per
+        in: query
+        name: per
+        type: integer
+      - default: 1
+        description: per page
+        in: query
+        name: page
+        type: integer
+      - description: current user
+        in: query
+        name: current_user
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/types.ResponseWithTotal'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/database.Dataset'
+                  type: array
+                total:
+                  type: integer
+              type: object
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Get Visiable datasets for current user
+      tags:
+      - Dataset
+    post:
+      consumes:
+      - application/json
+      description: create a new dataset
+      parameters:
+      - description: body
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/types.CreateDatasetReq'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/types.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/database.Dataset'
+              type: object
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Create a new dataset
+      tags:
+      - Dataset
+  /datasets/{namespace}/{name}:
+    delete:
+      consumes:
+      - application/json
+      description: delete a exists dataset
+      parameters:
+      - description: namespace
+        in: path
+        name: namespace
+        required: true
+        type: string
+      - description: name
+        in: path
+        name: name
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/types.Response'
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Delete a exists dataset
+      tags:
+      - Dataset
+    get:
+      consumes:
+      - application/json
+      description: get dataset detail
+      parameters:
+      - description: namespace
+        in: path
+        name: namespace
+        required: true
+        type: string
+      - description: name
+        in: path
+        name: name
+        required: true
+        type: string
+      - description: current_user
+        in: query
+        name: current_user
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/types.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/database.Dataset'
+              type: object
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Get dataset detail
+      tags:
+      - Dataset
+    put:
+      consumes:
+      - application/json
+      description: update a exists dataset
+      parameters:
+      - description: namespace
+        in: path
+        name: namespace
+        required: true
+        type: string
+      - description: name
+        in: path
+        name: name
+        required: true
+        type: string
+      - description: body
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/types.UpdateDatasetReq'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/types.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/database.Dataset'
+              type: object
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Update a exists dataset
+      tags:
+      - Dataset
+  /datasets/{namespace}/{name}/branches:
+    get:
+      consumes:
+      - application/json
+      description: get dataset branches
+      parameters:
+      - description: namespace
+        in: path
+        name: namespace
+        required: true
+        type: string
+      - description: name
+        in: path
+        name: name
+        required: true
+        type: string
+      - default: 20
+        description: per
+        in: query
+        name: per
+        type: integer
+      - default: 1
+        description: page
+        in: query
+        name: page
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/types.Response'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/types.DatasetBranch'
+                  type: array
+              type: object
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Get dataset branches
+      tags:
+      - Dataset
+  /datasets/{namespace}/{name}/commits:
+    get:
+      consumes:
+      - application/json
+      description: get dataset commits
+      parameters:
+      - description: namespace
+        in: path
+        name: namespace
+        required: true
+        type: string
+      - description: name
+        in: path
+        name: name
+        required: true
+        type: string
+      - description: ref
+        in: query
+        name: ref
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/types.Response'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/types.Commit'
+                  type: array
+              type: object
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Get dataset commits
+      tags:
+      - Dataset
+  /datasets/{namespace}/{name}/detail:
+    get:
+      consumes:
+      - application/json
+      description: get dataset detail
+      parameters:
+      - description: namespace
+        in: path
+        name: namespace
+        required: true
+        type: string
+      - description: name
+        in: path
+        name: name
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/types.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/types.DatasetDetail'
+              type: object
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Get dataset detail
+      tags:
+      - Dataset
+  /datasets/{namespace}/{name}/download/{file_path}:
+    get:
+      consumes:
+      - application/json
+      description: download dataset file
+      parameters:
+      - description: namespace
+        in: path
+        name: namespace
+        required: true
+        type: string
+      - description: name
+        in: path
+        name: name
+        required: true
+        type: string
+      - description: file_path
+        in: path
+        name: file_path
+        required: true
+        type: string
+      - description: lfs
+        in: query
+        name: lfs
+        type: boolean
+      - description: ref
+        in: query
+        name: ref
+        type: string
+      - description: name of download file
+        in: query
+        name: save_as
+        type: string
+      produces:
+      - application/json
+      - application/octet-stream
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/types.Response'
+            - properties:
+                data:
+                  type: string
+              type: object
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Download dataset file
+      tags:
+      - Dataset
+  /datasets/{namespace}/{name}/last_commit:
+    get:
+      consumes:
+      - application/json
+      description: get dataset last commit
+      parameters:
+      - description: namespace
+        in: path
+        name: namespace
+        required: true
+        type: string
+      - description: name
+        in: path
+        name: name
+        required: true
+        type: string
+      - description: ref
+        in: query
+        name: ref
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/types.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/types.Commit'
+              type: object
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Get dataset last commit
+      tags:
+      - Dataset
+  /datasets/{namespace}/{name}/raw/{file_path}:
+    get:
+      consumes:
+      - application/json
+      description: get dataset file raw
+      parameters:
+      - description: namespace
+        in: path
+        name: namespace
+        required: true
+        type: string
+      - description: name
+        in: path
+        name: name
+        required: true
+        type: string
+      - description: file_path
+        in: path
+        name: file_path
+        required: true
+        type: string
+      - description: ref
+        in: query
+        name: ref
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/types.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/types.Commit'
+              type: object
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Get dataset file raw
+      tags:
+      - Dataset
+    post:
+      consumes:
+      - application/json
+      description: create dataset file
+      parameters:
+      - description: namespace
+        in: path
+        name: namespace
+        required: true
+        type: string
+      - description: name
+        in: path
+        name: name
+        required: true
+        type: string
+      - description: file_path
+        in: path
+        name: file_path
+        required: true
+        type: string
+      - description: body
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/types.CreateFileReq'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/types.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/types.CreateFileResp'
+              type: object
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Create dataset file
+      tags:
+      - Dataset
+    put:
+      consumes:
+      - application/json
+      description: update dataset file
+      parameters:
+      - description: namespace
+        in: path
+        name: namespace
+        required: true
+        type: string
+      - description: name
+        in: path
+        name: name
+        required: true
+        type: string
+      - description: file_path
+        in: path
+        name: file_path
+        required: true
+        type: string
+      - description: body
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/types.UpdateFileReq'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/types.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/types.UpdateFileResp'
+              type: object
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Update dataset file
+      tags:
+      - Dataset
+  /datasets/{namespace}/{name}/tags:
+    get:
+      consumes:
+      - application/json
+      description: get dataset tags
+      parameters:
+      - description: namespace
+        in: path
+        name: namespace
+        required: true
+        type: string
+      - description: name
+        in: path
+        name: name
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/types.Response'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/types.DatasetBranch'
+                  type: array
+              type: object
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Get dataset tags
+      tags:
+      - Dataset
+  /datasets/{namespace}/{name}/tree:
+    get:
+      consumes:
+      - application/json
+      description: get dataset file tree
+      parameters:
+      - description: namespace
+        in: path
+        name: namespace
+        required: true
+        type: string
+      - description: name
+        in: path
+        name: name
+        required: true
+        type: string
+      - description: ref
+        in: query
+        name: ref
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/types.Response'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/types.File'
+                  type: array
+              type: object
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Get dataset file tree
+      tags:
+      - Dataset
+  /datasets/{namespace}/{name}/update_downloads:
+    post:
+      consumes:
+      - application/json
+      description: update dataset downloads
+      parameters:
+      - description: namespace
+        in: path
+        name: namespace
+        required: true
+        type: string
+      - description: name
+        in: path
+        name: name
+        required: true
+        type: string
+      - description: body
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/types.UpdateDownloadsReq'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/types.Response'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/types.File'
+                  type: array
+              type: object
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Update dataset downloads
+      tags:
+      - Dataset
   /models:
     get:
       consumes:
@@ -765,6 +1601,16 @@ paths:
         name: name
         required: true
         type: string
+      - default: 20
+        description: per
+        in: query
+        name: per
+        type: integer
+      - default: 1
+        description: page
+        in: query
+        name: page
+        type: integer
       produces:
       - application/json
       responses:
@@ -1134,6 +1980,49 @@ paths:
       security:
       - ApiKey: []
       summary: Update model file
+      tags:
+      - Model
+  /models/{namespace}/{name}/tags:
+    get:
+      consumes:
+      - application/json
+      description: get model tags
+      parameters:
+      - description: namespace
+        in: path
+        name: namespace
+        required: true
+        type: string
+      - description: name
+        in: path
+        name: name
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/types.Response'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/types.ModelBranch'
+                  type: array
+              type: object
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Get model tags
       tags:
       - Model
   /models/{namespace}/{name}/tree:
