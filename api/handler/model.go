@@ -724,5 +724,5 @@ func parseTagReqs(ctx *gin.Context) (tags []database.TagReq) {
 }
 
 func convertFilePathFromRoute(path string) string {
-	return path[1:]
+	return strings.TrimLeft(path, "/")
 }
