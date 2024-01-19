@@ -1,12 +1,9 @@
 package gitserver
 
 import (
-	"errors"
 	"io"
 
-	"opencsg.com/csghub-server/builder/gitserver/gitea"
 	"opencsg.com/csghub-server/builder/store/database"
-	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/types"
 )
 
@@ -54,15 +51,4 @@ type GitServer interface {
 	CreateOrganization(*types.CreateOrgReq, database.User) (*database.Organization, error)
 	DeleteOrganization(string) error
 	UpdateOrganization(*types.EditOrgReq, *database.Organization) (*database.Organization, error)
-	// CreateOrgMember(string, *types.CreateMemberReq) (*database.Member, error)
-	// DeleteOrgMember(string, *types.DeleteMemberReq) error
-}
-
-func NewGitServer(config *config.Config) (GitServer, error) {
-	if config.GitServer.Type == "gitea" {
-		gitServer, err := gitea.NewClient(config)
-		return gitServer, err
-	}
-
-	return nil, errors.New("Undefined git server type.")
 }

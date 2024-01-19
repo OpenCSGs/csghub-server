@@ -42,13 +42,27 @@ func (h *MemberHandler) Update(ctx *gin.Context) {
 }
 
 func (h *MemberHandler) Create(ctx *gin.Context) {
-	member, err := h.c.Create(ctx)
+	type addMemberRequest struct {
+		Org string `json:"org"`
+		//name of user will be added to the org as a member
+		User string `json:"user"`
+		Role string `json:"role"`
+		//name of the operator
+		Op string `json:"op"`
+	}
+
+	req := new(addMemberRequest)
+	if err := ctx.ShouldBindJSON(req); err != nil {
+		httpbase.BadRequest(ctx, err.Error())
+		return
+	}
+	err := h.c.Create(ctx, req.Org, req.User, req.Op, req.Role)
 	if err != nil {
 		httpbase.ServerError(ctx, err)
 		return
 	}
 
-	httpbase.OK(ctx, member)
+	httpbase.OK(ctx, nil)
 }
 
 func (h *MemberHandler) Delete(ctx *gin.Context) {

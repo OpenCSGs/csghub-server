@@ -8,7 +8,8 @@ import (
 	"path"
 	"strings"
 
-	"opencsg.com/csghub-server/builder/gitserver"
+	"opencsg.com/csghub-server/builder/git"
+	"opencsg.com/csghub-server/builder/git/gitserver"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/types"
@@ -34,7 +35,7 @@ type GitCallbackComponent struct {
 
 // new CallbackComponent
 func NewGitCallback(config *config.Config) (*GitCallbackComponent, error) {
-	gs, err := gitserver.NewGitServer(config)
+	gs, err := git.NewGitServer(config)
 	if err != nil {
 		return nil, err
 	}

@@ -8,7 +8,8 @@ import (
 	"fmt"
 	"log/slog"
 
-	"opencsg.com/csghub-server/builder/gitserver"
+	"opencsg.com/csghub-server/builder/git"
+	"opencsg.com/csghub-server/builder/git/gitserver"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/types"
@@ -22,7 +23,7 @@ func NewOrganizationComponent(config *config.Config) (*OrganizationComponent, er
 	c.ds = database.NewDatasetStore()
 	c.ms = database.NewModelStore()
 	var err error
-	c.gs, err = gitserver.NewGitServer(config)
+	c.gs, err = git.NewGitServer(config)
 	if err != nil {
 		newError := fmt.Errorf("fail to create git server,error:%w", err)
 		slog.Error(newError.Error())
