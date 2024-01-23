@@ -98,7 +98,7 @@ func (h *MemberHandler) Create(ctx *gin.Context) {
 // @Success      200  {object}  types.Response{} "OK"
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
-// @Router       /organizations/{name}/members/:username [delete]
+// @Router       /organizations/{name}/members/{username} [delete]
 func (h *MemberHandler) Delete(ctx *gin.Context) {
 	type removeMemberRequest struct {
 		Role string `json:"role"`
