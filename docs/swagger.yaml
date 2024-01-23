@@ -398,6 +398,13 @@ definitions:
       username:
         type: string
     type: object
+  types.CreateUserTokenRequest:
+    properties:
+      name:
+        type: string
+      username:
+        type: string
+    type: object
   types.DatasetBranch:
     properties:
       commit:
@@ -435,6 +442,13 @@ definitions:
       size:
         type: integer
       ssh_clone_url:
+        type: string
+    type: object
+  types.DeleteUserTokenRequest:
+    properties:
+      name:
+        type: string
+      username:
         type: string
     type: object
   types.EditOrgReq:
@@ -1370,6 +1384,47 @@ paths:
       security:
       - ApiKey: []
       summary: Update dataset downloads
+      tags:
+      - Dataset
+  /datasets/{namespace}/{name}/viewer/{file_path}:
+    get:
+      consumes:
+      - application/json
+      description: get the demo data of the dataset
+      parameters:
+      - description: namespace
+        in: path
+        name: namespace
+        required: true
+        type: string
+      - description: file_path
+        in: path
+        name: file_path
+        required: true
+        type: string
+      - description: count
+        in: query
+        name: count
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/types.Response'
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Get the demo data of the dataset
       tags:
       - Dataset
   /models:
@@ -2562,6 +2617,90 @@ paths:
       summary: Create a new SSH key for the given user
       tags:
       - SSH Key
+  /user/{username}/tokens:
+    post:
+      consumes:
+      - application/json
+      description: create access token for a user
+      parameters:
+      - description: username
+        in: path
+        name: username
+        required: true
+        type: string
+      - description: body
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/types.CreateUserTokenRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/types.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/database.AccessToken'
+              type: object
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Create access token for a user
+      tags:
+      - Access token
+  /user/{username}/tokens/{token_name}:
+    delete:
+      consumes:
+      - application/json
+      description: delete access token for a user
+      parameters:
+      - description: username
+        in: path
+        name: username
+        required: true
+        type: string
+      - description: token_name
+        in: path
+        name: token_name
+        required: true
+        type: string
+      - description: body
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/types.DeleteUserTokenRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/types.Response'
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Delete access token for a user
+      tags:
+      - Access token
   /users:
     post:
       consumes:

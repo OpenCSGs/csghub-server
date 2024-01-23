@@ -25,6 +25,19 @@ type AccessTokenHandler struct {
 	c *component.AccessTokenComponent
 }
 
+// CreateAccessToken godoc
+// @Security     ApiKey
+// @Summary      Create access token for a user
+// @Description  create access token for a user
+// @Tags         Access token
+// @Accept       json
+// @Produce      json
+// @Param        username path string true "username"
+// @Param        body body types.CreateUserTokenRequest true "body"
+// @Success      200  {object}  types.Response{data=database.AccessToken} "OK"
+// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
+// @Router       /user/{username}/tokens [post]
 func (h *AccessTokenHandler) Create(ctx *gin.Context) {
 	var req types.CreateUserTokenRequest
 	if err := ctx.ShouldBindJSON(&req); err != nil {
@@ -47,6 +60,20 @@ func (h *AccessTokenHandler) Create(ctx *gin.Context) {
 	httpbase.OK(ctx, token)
 }
 
+// DeleteAccessToken godoc
+// @Security     ApiKey
+// @Summary      Delete access token for a user
+// @Description  delete access token for a user
+// @Tags         Access token
+// @Accept       json
+// @Produce      json
+// @Param        username path string true "username"
+// @Param        token_name path string true "token_name"
+// @Param        body body types.DeleteUserTokenRequest true "body"
+// @Success      200  {object}  types.Response{} "OK"
+// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
+// @Router       /user/{username}/tokens/{token_name} [delete]
 func (h *AccessTokenHandler) Delete(ctx *gin.Context) {
 	var req types.DeleteUserTokenRequest
 	req.Username = ctx.Param("username")
