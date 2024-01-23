@@ -8,12 +8,7 @@ import (
 )
 
 func (c *Client) CreateOrganization(req *types.CreateOrgReq, user database.User) (org *database.Organization, err error) {
-	orgNames := []string{
-		common.WithPrefix(req.Name, ModelOrgPrefix),
-		common.WithPrefix(req.Name, DatasetOrgPrefix),
-		common.WithPrefix(req.Name, SpaceOrgPrefix),
-	}
-
+	orgNames := c.getTargetOrgs(req.Name)
 	for _, orgName := range orgNames {
 		_, _, err := c.giteaClient.AdminCreateOrg(
 			user.Username,
@@ -42,12 +37,7 @@ func (c *Client) CreateOrganization(req *types.CreateOrgReq, user database.User)
 }
 
 func (c *Client) DeleteOrganization(name string) (err error) {
-	orgNames := []string{
-		common.WithPrefix(name, ModelOrgPrefix),
-		common.WithPrefix(name, DatasetOrgPrefix),
-		common.WithPrefix(name, SpaceOrgPrefix),
-	}
-
+	orgNames := c.getTargetOrgs(name)
 	for _, orgName := range orgNames {
 		_, err = c.giteaClient.DeleteOrg(orgName)
 		if err != nil {
@@ -59,11 +49,7 @@ func (c *Client) DeleteOrganization(name string) (err error) {
 }
 
 func (c *Client) UpdateOrganization(req *types.EditOrgReq, originOrg *database.Organization) (org *database.Organization, err error) {
-	orgNames := []string{
-		common.WithPrefix(req.Path, ModelOrgPrefix),
-		common.WithPrefix(req.Path, DatasetOrgPrefix),
-		common.WithPrefix(req.Path, SpaceOrgPrefix),
-	}
+	orgNames := c.getTargetOrgs(req.Name)
 
 	for _, orgName := range orgNames {
 		_, err = c.giteaClient.EditOrg(
@@ -82,4 +68,13 @@ func (c *Client) UpdateOrganization(req *types.EditOrgReq, originOrg *database.O
 	originOrg.Description = req.Description
 
 	return originOrg, nil
+}
+
+func (c *Client) getTargetOrgs(org string) []string {
+	orgs := [3]string{
+		common.WithPrefix(org, DatasetOrgPrefix),
+		common.WithPrefix(org, ModelOrgPrefix),
+		common.WithPrefix(org, SpaceOrgPrefix),
+	}
+	return orgs[:]
 }

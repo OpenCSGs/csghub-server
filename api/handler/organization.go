@@ -123,7 +123,7 @@ func (h *OrganizationHandler) Update(ctx *gin.Context) {
 		ctx.JSON(http.StatusBadRequest, gin.H{"message": err.Error()})
 		return
 	}
-	req.Path = ctx.Param("name")
+	req.Name = ctx.Param("name")
 	org, err := h.c.Update(ctx, &req)
 	if err != nil {
 		slog.Error("Failed to update organizations", slog.Any("error", err))
