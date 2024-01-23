@@ -2870,6 +2870,129 @@ const docTemplate = `{
                 }
             }
         },
+        "/organizations/{name}/members": {
+            "post": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "description": "user will be added to org with a role",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Members"
+                ],
+                "summary": "Create new membership between org and user",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "org name",
+                        "name": "name",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "body",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handler.Create.addMemberRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/types.Response"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            }
+        },
+        "/organizations/{name}/members/:username": {
+            "delete": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "description": "user's role will be remove from org",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Members"
+                ],
+                "summary": "Remove membership between org and user",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "org name",
+                        "name": "name",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "user name",
+                        "name": "username",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "body",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handler.Delete.removeMemberRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/types.Response"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            }
+        },
         "/tags": {
             "get": {
                 "security": [
@@ -3939,6 +4062,34 @@ const docTemplate = `{
                 }
             }
         },
+        "handler.Create.addMemberRequest": {
+            "type": "object",
+            "properties": {
+                "op_user": {
+                    "description": "name of the operator",
+                    "type": "string"
+                },
+                "role": {
+                    "type": "string"
+                },
+                "user": {
+                    "description": "name of user will be added to the org as a member",
+                    "type": "string"
+                }
+            }
+        },
+        "handler.Delete.removeMemberRequest": {
+            "type": "object",
+            "properties": {
+                "op_user": {
+                    "description": "name of the operator",
+                    "type": "string"
+                },
+                "role": {
+                    "type": "string"
+                }
+            }
+        },
         "types.APIBadRequest": {
             "type": "object"
         },
@@ -4080,6 +4231,7 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "full_name": {
+                    "description": "Display name",
                     "type": "string"
                 },
                 "name": {
@@ -4210,6 +4362,7 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "full_name": {
+                    "description": "Display name",
                     "type": "string"
                 },
                 "path": {
@@ -4480,14 +4633,6 @@ const docTemplate = `{
                     "type": "string"
                 }
             }
-        }
-    },
-    "securityDefinitions": {
-        "ApiKey": {
-            "description": "Bearer token",
-            "type": "apiKey",
-            "name": "Authorization",
-            "in": "header"
         }
     }
 }`

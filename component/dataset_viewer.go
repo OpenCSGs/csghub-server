@@ -5,7 +5,8 @@ import (
 	"fmt"
 	"log/slog"
 
-	"opencsg.com/csghub-server/builder/gitserver"
+	"opencsg.com/csghub-server/builder/git"
+	"opencsg.com/csghub-server/builder/git/gitserver"
 	"opencsg.com/csghub-server/builder/parquet"
 	"opencsg.com/csghub-server/common/config"
 )
@@ -27,7 +28,7 @@ type DatasetViewerComponent struct {
 }
 
 func NewDatasetViewerComponent(cfg *config.Config) (*DatasetViewerComponent, error) {
-	gs, err := gitserver.NewGitServer(cfg)
+	gs, err := git.NewGitServer(cfg)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create git server,cause:%w", err)
 	}
