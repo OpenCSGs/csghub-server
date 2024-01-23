@@ -7,7 +7,8 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
-	"opencsg.com/csghub-server/builder/gitserver"
+	"opencsg.com/csghub-server/builder/git"
+	"opencsg.com/csghub-server/builder/git/gitserver"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/types"
@@ -51,7 +52,7 @@ var Cmd = &cobra.Command{
 			return
 		}
 		rs = database.NewRepoStore()
-		gs, err = gitserver.NewGitServer(config)
+		gs, err = git.NewGitServer(config)
 		if err != nil {
 			return
 		}

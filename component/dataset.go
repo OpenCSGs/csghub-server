@@ -13,7 +13,8 @@ import (
 	"time"
 
 	"github.com/minio/minio-go/v7"
-	"opencsg.com/csghub-server/builder/gitserver"
+	"opencsg.com/csghub-server/builder/git"
+	"opencsg.com/csghub-server/builder/git/gitserver"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/builder/store/s3"
 	"opencsg.com/csghub-server/common/config"
@@ -90,7 +91,7 @@ func NewDatasetComponent(config *config.Config) (*DatasetComponent, error) {
 	c.us = database.NewUserStore()
 	c.ts = database.NewTagStore()
 	var err error
-	c.gs, err = gitserver.NewGitServer(config)
+	c.gs, err = git.NewGitServer(config)
 	if err != nil {
 		newError := fmt.Errorf("fail to create git server,error:%w", err)
 		slog.Error(newError.Error())

@@ -21,6 +21,7 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 
 	r.Use(middleware.Authenticator(config))
 	r.Use(gin.Recovery())
+	r.Use(middleware.Log())
 	apiGroup := r.Group("/api/v1")
 	//TODO:use middleware to handle common response
 	// Models routes

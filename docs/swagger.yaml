@@ -279,6 +279,25 @@ definitions:
       username:
         type: string
     type: object
+  handler.Create.addMemberRequest:
+    properties:
+      op_user:
+        description: name of the operator
+        type: string
+      role:
+        type: string
+      user:
+        description: name of user will be added to the org as a member
+        type: string
+    type: object
+  handler.Delete.removeMemberRequest:
+    properties:
+      op_user:
+        description: name of the operator
+        type: string
+      role:
+        type: string
+    type: object
   types.APIBadRequest:
     type: object
   types.APIInternalServerError:
@@ -372,6 +391,7 @@ definitions:
       description:
         type: string
       full_name:
+        description: Display name
         type: string
       name:
         type: string
@@ -456,6 +476,7 @@ definitions:
       description:
         type: string
       full_name:
+        description: Display name
         type: string
       path:
         type: string
@@ -2390,6 +2411,85 @@ paths:
       summary: Update organization
       tags:
       - Organization
+  /organizations/{name}/members:
+    post:
+      consumes:
+      - application/json
+      description: user will be added to org with a role
+      parameters:
+      - description: org name
+        in: path
+        name: name
+        required: true
+        type: string
+      - description: body
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/handler.Create.addMemberRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/types.Response'
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Create new membership between org and user
+      tags:
+      - Members
+  /organizations/{name}/members/:username:
+    delete:
+      consumes:
+      - application/json
+      description: user's role will be remove from org
+      parameters:
+      - description: org name
+        in: path
+        name: name
+        required: true
+        type: string
+      - description: user name
+        in: path
+        name: username
+        required: true
+        type: string
+      - description: body
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/handler.Delete.removeMemberRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/types.Response'
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Remove membership between org and user
+      tags:
+      - Members
   /tags:
     get:
       consumes:
@@ -2780,10 +2880,4 @@ paths:
       summary: Update user
       tags:
       - User
-securityDefinitions:
-  ApiKey:
-    description: Bearer token
-    in: header
-    name: Authorization
-    type: apiKey
 swagger: "2.0"

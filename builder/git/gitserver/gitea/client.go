@@ -12,9 +12,12 @@ import (
 	"net/http"
 
 	"github.com/OpenCSGs/gitea-go-sdk/gitea"
+	"opencsg.com/csghub-server/builder/git/gitserver"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/config"
 )
+
+var _ gitserver.GitServer = (*Client)(nil)
 
 type Client struct {
 	giteaClient *gitea.Client
@@ -93,13 +96,8 @@ func generateAccessTokenFromGitea(config *config.Config) (string, error) {
 	giteaUrl := fmt.Sprintf("%s/api/v1/users/%s/tokens", config.GitServer.URL, username)
 	authHeader := encodeCredentials(username, password)
 	data := map[string]any{
-		"name": "access_token",
-		"scopes": []string{
-			"write:user",
-			"write:admin",
-			"write:organization",
-			"write:repository",
-		},
+		"name":   "access_token",
+		"scopes": []string{"read:user", "write:user", "write:admin", "read:admin"},
 	}
 	jsonData, err := json.Marshal(data)
 	if err != nil {
