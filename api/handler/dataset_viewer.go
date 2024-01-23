@@ -26,6 +26,21 @@ func NewDatasetViewerHandler(cfg *config.Config) (*DatasetViewerHandler, error) 
 	}, nil
 }
 
+// GetDatasetDemoData godoc
+// @Security     ApiKey
+// @Summary      Get the demo data of the dataset
+// @Description  get the demo data of the dataset
+// @Tags         Dataset
+// @Accept       json
+// @Produce      json
+// @Param        namespace path string true "namespace"
+// @Parsm        name path string true "name"
+// @Param        file_path path string true "file_path"
+// @Param        count query int true "count"
+// @Success      200  {object}  types.Response{} "OK"
+// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
+// @Router       /datasets/{namespace}/{name}/viewer/{file_path} [get]
 func (h *DatasetViewerHandler) View(ctx *gin.Context) {
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
 	if err != nil {
