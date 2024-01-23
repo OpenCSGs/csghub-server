@@ -38,9 +38,15 @@ func (s *MemberStore) Add(ctx context.Context, orgID, userID int64, role string)
 		UserID:         userID,
 		Role:           role,
 	}
-	result, err := s.db.Core.NewInsert().Model(&member).Exec(ctx)
+	result, err := s.db.Core.NewInsert().Model(member).Exec(ctx)
 	if err != nil {
 		return err
 	}
 	return assertAffectedOneRow(result, err)
+}
+
+func (s *MemberStore) Delete(ctx context.Context, orgID, userID int64, role string) error {
+	var member Member
+	_, err := s.db.Core.NewDelete().Model(&member).Where("organization_id=? and user_id=? and role=?", orgID, userID, role).Exec(ctx)
+	return err
 }

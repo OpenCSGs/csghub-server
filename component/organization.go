@@ -29,6 +29,12 @@ func NewOrganizationComponent(config *config.Config) (*OrganizationComponent, er
 		slog.Error(newError.Error())
 		return nil, newError
 	}
+	c.msc, err = NewMemberComponent(config)
+	if err != nil {
+		newError := fmt.Errorf("fail to create membership component,error:%w", err)
+		slog.Error(newError.Error())
+		return nil, newError
+	}
 	return c, nil
 }
 
@@ -39,6 +45,8 @@ type OrganizationComponent struct {
 	ds *database.DatasetStore
 	ms *database.ModelStore
 	gs gitserver.GitServer
+
+	msc *MemberComponent
 }
 
 func (c *OrganizationComponent) Create(ctx context.Context, req *types.CreateOrgReq) (*database.Organization, error) {
@@ -67,7 +75,14 @@ func (c *OrganizationComponent) Create(ctx context.Context, req *types.CreateOrg
 	if err != nil {
 		return nil, fmt.Errorf("failed create database organization, error: %w", err)
 	}
-	return org, nil
+	//need to create roles for a new org before adding members
+	err = c.msc.InitRoles(ctx, org)
+	if err != nil {
+		return nil, fmt.Errorf("failed init roles for organization, error: %w", err)
+	}
+	//org creator defaults to be admin role
+	err = c.msc.SetAdmin(ctx, org, &user)
+	return org, err
 }
 
 func (c *OrganizationComponent) Index(ctx context.Context, username string) ([]database.Organization, error) {
@@ -91,7 +106,7 @@ func (c *OrganizationComponent) Delete(ctx context.Context, name string) error {
 }
 
 func (c *OrganizationComponent) Update(ctx context.Context, req *types.EditOrgReq) (*database.Organization, error) {
-	org, err := c.os.FindByPath(ctx, req.Path)
+	org, err := c.os.FindByPath(ctx, req.Name)
 	if err != nil {
 		return nil, fmt.Errorf("organization does not exists, error: %w", err)
 	}

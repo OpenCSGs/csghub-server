@@ -16,6 +16,12 @@ import (
 	"opencsg.com/csghub-server/common/config"
 )
 
+const (
+	ModelOrgPrefix   = "models_"
+	DatasetOrgPrefix = "datasets_"
+	SpaceOrgPrefix   = "spaces_"
+)
+
 type Client struct {
 	giteaClient *gitea.Client
 	config      *config.Config
