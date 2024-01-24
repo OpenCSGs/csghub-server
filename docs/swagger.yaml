@@ -130,6 +130,7 @@ definitions:
       namespace_id:
         type: integer
       path:
+        description: unique name of the organization
         type: string
       updated_at:
         type: string
@@ -326,26 +327,31 @@ definitions:
   types.CreateDatasetReq:
     properties:
       default_branch:
+        example: main
         type: string
       description:
         type: string
       labels:
+        example: ""
         type: string
       license:
+        example: MIT
         type: string
       name:
+        example: dataset_name
         type: string
       namespace:
+        example: user_or_org_name
         type: string
       nickname:
-        type: string
-      path:
+        example: data set display name
         type: string
       private:
         type: boolean
       readme:
         type: string
       username:
+        example: creator_user_name
         type: string
     type: object
   types.CreateFileReq:
@@ -368,38 +374,48 @@ definitions:
   types.CreateModelReq:
     properties:
       default_branch:
+        example: main
         type: string
       description:
         type: string
       labels:
+        example: ""
         type: string
       license:
+        example: MIT
         type: string
       name:
+        example: model_name_1
         type: string
       namespace:
+        example: user_or_org_name
         type: string
       nickname:
-        type: string
-      path:
+        example: model display name
         type: string
       private:
         type: boolean
       readme:
         type: string
       username:
+        example: creator_user_name
         type: string
     type: object
   types.CreateOrgReq:
     properties:
       description:
+        example: org description
         type: string
       full_name:
         description: Display name
+        example: org display name
         type: string
       name:
+        description: Org unique identifier
+        example: org_name_1
         type: string
       username:
+        example: user_name_1
         type: string
     type: object
   types.CreateSSHKeyRequest:
@@ -415,11 +431,11 @@ definitions:
     properties:
       email:
         type: string
-      id:
-        type: string
       name:
+        description: Display name of the user
         type: string
       username:
+        description: the login name
         type: string
     type: object
   types.CreateUserTokenRequest:
@@ -480,11 +496,17 @@ definitions:
   types.EditOrgReq:
     properties:
       description:
+        example: org description
         type: string
       full_name:
         description: Display name
+        example: org display name
         type: string
       path:
+        description: |-
+          TODO:rename json field name to 'name", need to negotiate with Portal engineer
+          Org unique identifier
+        example: org_name_1
         type: string
     type: object
   types.File:
@@ -658,11 +680,11 @@ definitions:
     properties:
       email:
         type: string
-      id:
-        type: string
       name:
+        description: Display name of the user
         type: string
       username:
+        description: the login name
         type: string
     type: object
 info:
@@ -2213,11 +2235,24 @@ paths:
       - application/json
       description: get organization datasets
       parameters:
-      - description: namespace
+      - description: org name
         in: path
         name: namespace
         required: true
         type: string
+      - description: current user name
+        in: query
+        name: current_user
+        required: true
+        type: string
+      - description: page size
+        in: query
+        name: per
+        type: integer
+      - description: current page number
+        in: query
+        name: page
+        type: integer
       produces:
       - application/json
       responses:
@@ -2253,11 +2288,24 @@ paths:
       - application/json
       description: get organization models
       parameters:
-      - description: namespace
+      - description: org name
         in: path
         name: namespace
         required: true
         type: string
+      - description: current user name
+        in: query
+        name: current_user
+        required: true
+        type: string
+      - description: page size
+        in: query
+        name: per
+        type: integer
+      - description: current page number
+        in: query
+        name: page
+        type: integer
       produces:
       - application/json
       responses:

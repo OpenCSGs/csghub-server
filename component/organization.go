@@ -2,7 +2,6 @@ package component
 
 import (
 	"context"
-	"database/sql"
 
 	"errors"
 	"fmt"
@@ -68,7 +67,7 @@ func (c *OrganizationComponent) Create(ctx context.Context, req *types.CreateOrg
 		return nil, fmt.Errorf("failed create git organization, error: %w", err)
 	}
 	namespace := &database.Namespace{
-		Path:   org.Path,
+		Path:   org.Name,
 		UserID: user.ID,
 	}
 	err = c.os.Create(ctx, org, namespace)
@@ -122,30 +121,14 @@ func (c *OrganizationComponent) Update(ctx context.Context, req *types.EditOrgRe
 }
 
 func (c *OrganizationComponent) Models(ctx context.Context, req *types.OrgModelsReq) ([]database.Model, int, error) {
-	var currentUser database.User
-	org, err := c.os.FindByPath(ctx, req.Namespace)
+	r, err := c.msc.GetMemberRole(ctx, req.Namespace, req.CurrentUser)
+	//log error, and treat user as unkown role in org
 	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return nil, 0, errors.New("organization not exists")
-		}
-		newError := fmt.Errorf("failed to check for the presence of the organization,error:%w", err)
-		slog.Error(newError.Error())
-		return nil, 0, newError
+		slog.Error("faild to get member role",
+			slog.String("org", req.Namespace), slog.String("user", req.CurrentUser),
+			slog.String("error", err.Error()))
 	}
-
-	if req.CurrentUser != "" {
-		currentUser, err = c.us.FindByUsername(ctx, req.CurrentUser)
-		if err != nil {
-			if errors.Is(err, sql.ErrNoRows) {
-				return nil, 0, errors.New("current user not exists")
-			}
-			newError := fmt.Errorf("failed to check for the presence of current user,error:%w", err)
-			slog.Error(newError.Error())
-			return nil, 0, newError
-		}
-	}
-
-	onlyPublic := !ifBelongsTo(currentUser, org)
+	onlyPublic := !r.CanRead()
 	ms, total, err := c.ms.ByOrgPath(ctx, req.Namespace, req.PageSize, req.Page, onlyPublic)
 	if err != nil {
 		newError := fmt.Errorf("failed to get user datasets,error:%w", err)
@@ -157,30 +140,14 @@ func (c *OrganizationComponent) Models(ctx context.Context, req *types.OrgModels
 }
 
 func (c *OrganizationComponent) Datasets(ctx context.Context, req *types.OrgDatasetsReq) ([]database.Dataset, int, error) {
-	var currentUser database.User
-	org, err := c.os.FindByPath(ctx, req.Namespace)
+	r, err := c.msc.GetMemberRole(ctx, req.Namespace, req.CurrentUser)
+	//log error, and treat user as unkown role in org
 	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return nil, 0, errors.New("organization not exists")
-		}
-		newError := fmt.Errorf("failed to check for the presence of the organization,error:%w", err)
-		slog.Error(newError.Error())
-		return nil, 0, newError
+		slog.Error("faild to get member role",
+			slog.String("org", req.Namespace), slog.String("user", req.CurrentUser),
+			slog.String("error", err.Error()))
 	}
-
-	if req.CurrentUser != "" {
-		currentUser, err = c.us.FindByUsername(ctx, req.CurrentUser)
-		if err != nil {
-			if errors.Is(err, sql.ErrNoRows) {
-				return nil, 0, errors.New("current user not exists")
-			}
-			newError := fmt.Errorf("failed to check for the presence of current user,error:%w", err)
-			slog.Error(newError.Error())
-			return nil, 0, newError
-		}
-	}
-
-	onlyPublic := !ifBelongsTo(currentUser, org)
+	onlyPublic := !r.CanRead()
 	datasets, total, err := c.ds.ByOrgPath(ctx, req.Namespace, req.PageSize, req.Page, onlyPublic)
 	if err != nil {
 		newError := fmt.Errorf("failed to get user datasets,error:%w", err)
@@ -189,8 +156,4 @@ func (c *OrganizationComponent) Datasets(ctx context.Context, req *types.OrgData
 	}
 
 	return datasets, total, nil
-}
-
-func ifBelongsTo(user database.User, org database.Organization) bool {
-	return user.ID == org.UserID
 }
