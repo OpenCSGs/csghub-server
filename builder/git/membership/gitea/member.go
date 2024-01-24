@@ -29,7 +29,7 @@ func (c *Client) addRoles(ctx context.Context, org string, roles []membership.Ro
 		opt := c.getTeamOptByRole(role)
 		_, resp, err := c.giteaClient.CreateTeam(org, opt)
 		if err != nil {
-			slog.Error("gitea create team failed", slog.Any("body", resp.Body),
+			slog.Error("gitea create team failed", slog.String("org", org), slog.Any("body", resp.Body),
 				slog.Int("code", resp.StatusCode), slog.String("error", err.Error()))
 			errs = errors.Join(errs, err)
 		}

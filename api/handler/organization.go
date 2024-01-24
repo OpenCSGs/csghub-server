@@ -52,7 +52,7 @@ func (h *OrganizationHandler) Create(ctx *gin.Context) {
 		return
 	}
 
-	slog.Info("Create organization succeed", slog.String("org_path", org.Path))
+	slog.Info("Create organization succeed", slog.String("org_path", org.Name))
 	httpbase.OK(ctx, org)
 }
 
@@ -131,7 +131,7 @@ func (h *OrganizationHandler) Update(ctx *gin.Context) {
 		return
 	}
 
-	slog.Info("Update organizations succeed", slog.String("org_name", org.Name))
+	slog.Info("Update organizations succeed", slog.String("org_name", org.FullName))
 	httpbase.OK(ctx, org)
 }
 

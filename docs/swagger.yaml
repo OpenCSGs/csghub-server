@@ -130,6 +130,7 @@ definitions:
       namespace_id:
         type: integer
       path:
+        description: unique name of the organization
         type: string
       updated_at:
         type: string
@@ -396,8 +397,11 @@ definitions:
         type: string
       full_name:
         description: Display name
+        example: org display name
         type: string
       name:
+        description: Org unique identifier
+        example: org_name_1
         type: string
       username:
         type: string
@@ -483,8 +487,13 @@ definitions:
         type: string
       full_name:
         description: Display name
+        example: org display name
         type: string
       path:
+        description: |-
+          TODO:rename json field name to 'name"
+          Org unique identifier
+        example: org_name_1
         type: string
     type: object
   types.File:

@@ -67,7 +67,7 @@ func (c *OrganizationComponent) Create(ctx context.Context, req *types.CreateOrg
 		return nil, fmt.Errorf("failed create git organization, error: %w", err)
 	}
 	namespace := &database.Namespace{
-		Path:   org.Path,
+		Path:   org.Name,
 		UserID: user.ID,
 	}
 	err = c.os.Create(ctx, org, namespace)

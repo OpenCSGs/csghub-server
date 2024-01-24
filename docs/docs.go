@@ -3875,6 +3875,7 @@ const docTemplate = `{
                     "type": "integer"
                 },
                 "path": {
+                    "description": "unique name of the organization",
                     "type": "string"
                 },
                 "updated_at": {
@@ -4276,10 +4277,13 @@ const docTemplate = `{
                 },
                 "full_name": {
                     "description": "Display name",
-                    "type": "string"
+                    "type": "string",
+                    "example": "org display name"
                 },
                 "name": {
-                    "type": "string"
+                    "description": "Org unique identifier",
+                    "type": "string",
+                    "example": "org_name_1"
                 },
                 "username": {
                     "type": "string"
@@ -4409,10 +4413,13 @@ const docTemplate = `{
                 },
                 "full_name": {
                     "description": "Display name",
-                    "type": "string"
+                    "type": "string",
+                    "example": "org display name"
                 },
                 "path": {
-                    "type": "string"
+                    "description": "TODO:rename json field name to 'name\"\nOrg unique identifier",
+                    "type": "string",
+                    "example": "org_name_1"
                 }
             }
         },
