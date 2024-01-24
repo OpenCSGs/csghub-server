@@ -52,7 +52,7 @@ func (h *OrganizationHandler) Create(ctx *gin.Context) {
 		return
 	}
 
-	slog.Info("Create organization succeed", slog.String("org_path", org.Path))
+	slog.Info("Create organization succeed", slog.String("org_path", org.Name))
 	httpbase.OK(ctx, org)
 }
 
@@ -131,7 +131,7 @@ func (h *OrganizationHandler) Update(ctx *gin.Context) {
 		return
 	}
 
-	slog.Info("Update organizations succeed", slog.String("org_name", org.Name))
+	slog.Info("Update organizations succeed", slog.String("org_name", org.FullName))
 	httpbase.OK(ctx, org)
 }
 
@@ -142,7 +142,10 @@ func (h *OrganizationHandler) Update(ctx *gin.Context) {
 // @Tags         Organization
 // @Accept       json
 // @Produce      json
-// @Param        namespace path string true "namespace"
+// @Param        namespace path string true "org name"
+// @Param        current_user query string true "current user name"
+// @Param        per query int false "page size"
+// @Param        page query int false "current page number"
 // @Success      200  {object}  types.ResponseWithTotal{data=[]database.Model,total=int} "OK"
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
@@ -184,7 +187,10 @@ func (h *OrganizationHandler) Models(ctx *gin.Context) {
 // @Tags         Organization
 // @Accept       json
 // @Produce      json
-// @Param        namespace path string true "namespace"
+// @Param        namespace path string true "org name"
+// @Param        current_user query string true "current user name"
+// @Param        per query int false "page size"
+// @Param        page query int false "current page number"
 // @Success      200  {object}  types.ResponseWithTotal{data=[]database.Dataset,total=int} "OK"
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"

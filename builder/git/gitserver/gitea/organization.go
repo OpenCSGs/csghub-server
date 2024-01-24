@@ -1,6 +1,8 @@
 package gitea
 
 import (
+	"log/slog"
+
 	"github.com/OpenCSGs/gitea-go-sdk/gitea"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/types"
@@ -20,14 +22,15 @@ func (c *Client) CreateOrganization(req *types.CreateOrgReq, user database.User)
 		)
 
 		if err != nil {
+			slog.Error("failed to create organization", slog.String("orgName", orgName))
 			return nil, err
 		}
 
 	}
 
 	org = &database.Organization{
-		Path:        req.Name,
-		Name:        req.FullName,
+		Name:        req.Name,
+		FullName:    req.FullName,
 		Description: req.Description,
 		User:        &user,
 		UserID:      user.ID,
@@ -64,7 +67,7 @@ func (c *Client) UpdateOrganization(req *types.EditOrgReq, originOrg *database.O
 		}
 	}
 
-	originOrg.Name = req.FullName
+	originOrg.FullName = req.FullName
 	originOrg.Description = req.Description
 
 	return originOrg, nil

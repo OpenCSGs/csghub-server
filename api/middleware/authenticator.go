@@ -1,6 +1,7 @@
 package middleware
 
 import (
+	"log/slog"
 	"net/http"
 	"strings"
 
@@ -16,8 +17,8 @@ func Authenticator(config *config.Config) gin.HandlerFunc {
 		authHeader := c.Request.Header.Get("Authorization")
 
 		// Check Authorization Header formt
-		if authHeader == "" || !strings.HasPrefix(authHeader, "Bearer ") {
-			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+		if authHeader == "" {
+			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "missing Authorization header"})
 			return
 		}
 
@@ -25,7 +26,8 @@ func Authenticator(config *config.Config) gin.HandlerFunc {
 		token := strings.TrimPrefix(authHeader, "Bearer ")
 
 		if token != authToken {
-			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+			slog.Debug("Authenticator token is invalid", slog.String("token_get", token), slog.String("token_expected", authToken))
+			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "api token mismatch, it must be in format 'Bearer xxx'"})
 			return
 		}
 

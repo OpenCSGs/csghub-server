@@ -17,9 +17,10 @@ func NewOrgStore() *OrgStore {
 }
 
 type Organization struct {
-	ID          int64      `bun:",pk,autoincrement" json:"id"`
-	Name        string     `bun:",notnull" json:"name"`
-	Path        string     `bun:",notnull" json:"path"`
+	ID       int64  `bun:",pk,autoincrement" json:"id"`
+	FullName string `bun:",column:name,notnull" json:"name"`
+	//unique name of the organization
+	Name        string     `bun:",column:path,notnull" json:"path"`
 	GitPath     string     `bun:",notnull" json:"git_path"`
 	Description string     `json:"description"`
 	UserID      int64      `bun:",notnull" json:"user_id"`
@@ -88,7 +89,7 @@ func (s *OrgStore) Delete(ctx context.Context, path string) (err error) {
 }
 
 func (s *OrgStore) FindByPath(ctx context.Context, path string) (org Organization, err error) {
-	org.Name = path
+	org.FullName = path
 	err = s.db.Operator.Core.
 		NewSelect().
 		Model(&org).

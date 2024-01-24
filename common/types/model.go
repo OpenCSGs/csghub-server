@@ -37,17 +37,16 @@ type ModelBranchCommit struct {
 }
 
 type CreateModelReq struct {
-	Username      string `json:"username"`
-	Namespace     string `json:"namespace"`
-	Name          string `json:"name"`
-	Nickname      string `json:"nickname"`
-	Path          string `json:"path"`
+	Username      string `json:"username" example:"creator_user_name"`
+	Namespace     string `json:"namespace" example:"user_or_org_name"`
+	Name          string `json:"name" example:"model_name_1"`
+	Nickname      string `json:"nickname" example:"model display name"`
 	Description   string `json:"description"`
 	Private       bool   `json:"private"`
-	Labels        string `json:"labels"`
-	License       string `json:"license"`
+	Labels        string `json:"labels" example:""`
+	License       string `json:"license" example:"MIT"`
 	Readme        string `json:"readme"`
-	DefaultBranch string `json:"default_branch"`
+	DefaultBranch string `json:"default_branch" example:"main"`
 }
 
 type UpdateModelReq struct {
