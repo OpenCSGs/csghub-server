@@ -122,8 +122,11 @@ func (c *OrganizationComponent) Update(ctx context.Context, req *types.EditOrgRe
 
 func (c *OrganizationComponent) Models(ctx context.Context, req *types.OrgModelsReq) ([]database.Model, int, error) {
 	r, err := c.msc.GetMemberRole(ctx, req.Namespace, req.CurrentUser)
+	//log error, and treat user as unkown role in org
 	if err != nil {
-		return nil, 0, fmt.Errorf("faild to get member role,error:%w", err)
+		slog.Error("faild to get member role",
+			slog.String("org", req.Namespace), slog.String("user", req.CurrentUser),
+			slog.String("error", err.Error()))
 	}
 	onlyPublic := !r.CanRead()
 	ms, total, err := c.ms.ByOrgPath(ctx, req.Namespace, req.PageSize, req.Page, onlyPublic)
@@ -138,8 +141,11 @@ func (c *OrganizationComponent) Models(ctx context.Context, req *types.OrgModels
 
 func (c *OrganizationComponent) Datasets(ctx context.Context, req *types.OrgDatasetsReq) ([]database.Dataset, int, error) {
 	r, err := c.msc.GetMemberRole(ctx, req.Namespace, req.CurrentUser)
+	//log error, and treat user as unkown role in org
 	if err != nil {
-		return nil, 0, fmt.Errorf("faild to get member role,error:%w", err)
+		slog.Error("faild to get member role",
+			slog.String("org", req.Namespace), slog.String("user", req.CurrentUser),
+			slog.String("error", err.Error()))
 	}
 	onlyPublic := !r.CanRead()
 	datasets, total, err := c.ds.ByOrgPath(ctx, req.Namespace, req.PageSize, req.Page, onlyPublic)
