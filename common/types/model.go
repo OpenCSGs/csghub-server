@@ -40,6 +40,7 @@ type CreateModelReq struct {
 	Username      string `json:"username"`
 	Namespace     string `json:"namespace"`
 	Name          string `json:"name"`
+	Nickname      string `json:"nickname"`
 	Path          string `json:"path"`
 	Description   string `json:"description"`
 	Private       bool   `json:"private"`
@@ -54,6 +55,7 @@ type UpdateModelReq struct {
 	OriginName    string `json:"origin_name"`
 	Username      string `json:"username"`
 	Name          string `json:"name"`
+	Nickname      string `json:"nickname"`
 	Description   string `json:"description"`
 	Private       bool   `json:"private"`
 	Labels        string `json:"labels"`

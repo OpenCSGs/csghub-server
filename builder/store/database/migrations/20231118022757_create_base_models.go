@@ -93,7 +93,7 @@ type Repository struct {
 type Model struct {
 	ID            int64       `bun:",pk,autoincrement" json:"id"`
 	Name          string      `bun:",notnull" json:"name"`
-	UrlSlug       string      `bun:",notnull" json:"url_slug"`
+	UrlSlug       string      `bun:",notnull" json:"nickname"`
 	Description   string      `bun:",nullzero" json:"description"`
 	Likes         int64       `bun:",notnull" json:"likes"`
 	Downloads     int64       `bun:",notnull" json:"downloads"`
@@ -111,7 +111,7 @@ type Model struct {
 type Dataset struct {
 	ID            int64       `bun:",pk,autoincrement" json:"id"`
 	Name          string      `bun:",notnull" json:"name"`
-	UrlSlug       string      `bun:",notnull" json:"url_slug"`
+	UrlSlug       string      `bun:",notnull" json:"nickname"`
 	Description   string      `bun:",nullzero" json:"description"`
 	Likes         int64       `bun:",notnull" json:"likes"`
 	Downloads     int64       `bun:",notnull" json:"downloads"`
