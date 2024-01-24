@@ -7,6 +7,7 @@ type Dataset = database.Repository
 type DatasetDetail struct {
 	Path          string `json:"path"`
 	Name          string `json:"name"`
+	Nickname      string `json:"nickname"`
 	Introduction  string `json:"introduction"`
 	License       string `json:"license"`
 	Private       bool   `json:"private"`
@@ -42,6 +43,7 @@ type CreateDatasetReq struct {
 	Username      string `json:"username"`
 	Namespace     string `json:"namespace"`
 	Name          string `json:"name"`
+	Nickname      string `json:"nickname"`
 	Path          string `json:"path"`
 	Description   string `json:"description"`
 	Private       bool   `json:"private"`
@@ -56,6 +58,7 @@ type UpdateDatasetReq struct {
 	Username      string `json:"username"`
 	OriginName    string `json:"origin_name"`
 	Name          string `json:"name"`
+	Nickname      string `json:"nickname"`
 	Description   string `json:"description"`
 	Private       bool   `json:"private"`
 	Labels        string `json:"labels"`

@@ -2874,7 +2874,7 @@
                     "application/json"
                 ],
                 "tags": [
-                    "Members"
+                    "Member"
                 ],
                 "summary": "Create new membership between org and user",
                 "parameters": [
@@ -2917,7 +2917,7 @@
                 }
             }
         },
-        "/organizations/{name}/members/:username": {
+        "/organizations/{name}/members/{username}": {
             "delete": {
                 "security": [
                     {
@@ -2932,7 +2932,7 @@
                     "application/json"
                 ],
                 "tags": [
-                    "Members"
+                    "Member"
                 ],
                 "summary": "Remove membership between org and user",
                 "parameters": [
@@ -3685,6 +3685,9 @@
                 "name": {
                     "type": "string"
                 },
+                "nickname": {
+                    "type": "string"
+                },
                 "path": {
                     "type": "string"
                 },
@@ -3698,9 +3701,6 @@
                     "type": "integer"
                 },
                 "updated_at": {
-                    "type": "string"
-                },
-                "url_slug": {
                     "type": "string"
                 },
                 "user": {
@@ -3738,6 +3738,9 @@
                 "name": {
                     "type": "string"
                 },
+                "nickname": {
+                    "type": "string"
+                },
                 "path": {
                     "type": "string"
                 },
@@ -3751,9 +3754,6 @@
                     "type": "integer"
                 },
                 "updated_at": {
-                    "type": "string"
-                },
-                "url_slug": {
                     "type": "string"
                 },
                 "user": {
@@ -4138,6 +4138,9 @@
                 "namespace": {
                     "type": "string"
                 },
+                "nickname": {
+                    "type": "string"
+                },
                 "path": {
                     "type": "string"
                 },
@@ -4197,6 +4200,9 @@
                     "type": "string"
                 },
                 "namespace": {
+                    "type": "string"
+                },
+                "nickname": {
                     "type": "string"
                 },
                 "path": {
@@ -4317,6 +4323,9 @@
                     "type": "string"
                 },
                 "name": {
+                    "type": "string"
+                },
+                "nickname": {
                     "type": "string"
                 },
                 "path": {
@@ -4508,6 +4517,9 @@
                 "namespace": {
                     "type": "string"
                 },
+                "nickname": {
+                    "type": "string"
+                },
                 "origin_name": {
                     "type": "string"
                 },
@@ -4592,6 +4604,9 @@
                 "namespace": {
                     "type": "string"
                 },
+                "nickname": {
+                    "type": "string"
+                },
                 "origin_name": {
                     "type": "string"
                 },
@@ -4622,6 +4637,14 @@
                     "type": "string"
                 }
             }
+        }
+    },
+    "securityDefinitions": {
+        "ApiKey": {
+            "description": "Bearer token",
+            "type": "apiKey",
+            "name": "Authorization",
+            "in": "header"
         }
     }
 }
