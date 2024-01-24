@@ -4171,28 +4171,31 @@ const docTemplate = `{
             "type": "object",
             "properties": {
                 "default_branch": {
-                    "type": "string"
+                    "type": "string",
+                    "example": "main"
                 },
                 "description": {
                     "type": "string"
                 },
                 "labels": {
-                    "type": "string"
+                    "type": "string",
+                    "example": ""
                 },
                 "license": {
-                    "type": "string"
+                    "type": "string",
+                    "example": "MIT"
                 },
                 "name": {
-                    "type": "string"
+                    "type": "string",
+                    "example": "dataset_name"
                 },
                 "namespace": {
-                    "type": "string"
+                    "type": "string",
+                    "example": "user_or_org_name"
                 },
                 "nickname": {
-                    "type": "string"
-                },
-                "path": {
-                    "type": "string"
+                    "type": "string",
+                    "example": "data set display name"
                 },
                 "private": {
                     "type": "boolean"
@@ -4201,7 +4204,8 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "username": {
-                    "type": "string"
+                    "type": "string",
+                    "example": "creator_user_name"
                 }
             }
         },
@@ -4235,28 +4239,31 @@ const docTemplate = `{
             "type": "object",
             "properties": {
                 "default_branch": {
-                    "type": "string"
+                    "type": "string",
+                    "example": "main"
                 },
                 "description": {
                     "type": "string"
                 },
                 "labels": {
-                    "type": "string"
+                    "type": "string",
+                    "example": ""
                 },
                 "license": {
-                    "type": "string"
+                    "type": "string",
+                    "example": "MIT"
                 },
                 "name": {
-                    "type": "string"
+                    "type": "string",
+                    "example": "model_name_1"
                 },
                 "namespace": {
-                    "type": "string"
+                    "type": "string",
+                    "example": "user_or_org_name"
                 },
                 "nickname": {
-                    "type": "string"
-                },
-                "path": {
-                    "type": "string"
+                    "type": "string",
+                    "example": "model display name"
                 },
                 "private": {
                     "type": "boolean"
@@ -4265,7 +4272,8 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "username": {
-                    "type": "string"
+                    "type": "string",
+                    "example": "creator_user_name"
                 }
             }
         },
@@ -4273,7 +4281,8 @@ const docTemplate = `{
             "type": "object",
             "properties": {
                 "description": {
-                    "type": "string"
+                    "type": "string",
+                    "example": "org description"
                 },
                 "full_name": {
                     "description": "Display name",
@@ -4286,7 +4295,8 @@ const docTemplate = `{
                     "example": "org_name_1"
                 },
                 "username": {
-                    "type": "string"
+                    "type": "string",
+                    "example": "user_name_1"
                 }
             }
         },
@@ -4409,7 +4419,8 @@ const docTemplate = `{
             "type": "object",
             "properties": {
                 "description": {
-                    "type": "string"
+                    "type": "string",
+                    "example": "org description"
                 },
                 "full_name": {
                     "description": "Display name",
@@ -4417,7 +4428,7 @@ const docTemplate = `{
                     "example": "org display name"
                 },
                 "path": {
-                    "description": "TODO:rename json field name to 'name\"\nOrg unique identifier",
+                    "description": "TODO:rename json field name to 'name\", need to negotiate with Portal engineer\nOrg unique identifier",
                     "type": "string",
                     "example": "org_name_1"
                 }
