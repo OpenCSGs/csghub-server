@@ -1,15 +1,17 @@
 package types
 
 type CreateUserRequest struct {
-	ID       string `json:"id"`
-	Name     string `json:"name"`
+	//Display name of the user
+	Name string `json:"name"`
+	//the login name
 	Username string `json:"username"`
 	Email    string `json:"email"`
 }
 
 type UpdateUserRequest struct {
-	ID       string `json:"id"`
-	Name     string `json:"name"`
+	//Display name of the user
+	Name string `json:"name"`
+	//the login name
 	Username string `json:"username"`
 	Email    string `json:"email"`
 }

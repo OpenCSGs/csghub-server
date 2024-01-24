@@ -60,6 +60,43 @@ func (c *MemberComponent) SetAdmin(ctx context.Context, org *database.Organizati
 	return c.gitMemberShip.AddMember(ctx, org.Name, user.Username, membership.RoleAdmin)
 }
 
+func (c *MemberComponent) ChangeMemberRole(ctx context.Context, orgName, userName, operatorName, oldRole, newRole string) error {
+	err := c.Delete(ctx, orgName, userName, operatorName, oldRole)
+	if err != nil {
+		return fmt.Errorf("failed to delete old role,error:%w", err)
+	}
+	err = c.AddMember(ctx, orgName, userName, operatorName, newRole)
+	if err != nil {
+		return fmt.Errorf("failed to create new role,error:%w", err)
+	}
+
+	return nil
+}
+
+func (c *MemberComponent) GetMemberRole(ctx context.Context, orgName, userName string) (membership.Role, error) {
+	var (
+		org  database.Organization
+		user database.User
+		err  error
+	)
+	org, err = c.orgStore.FindByPath(ctx, orgName)
+	if err != nil {
+		return membership.RoleUnkown, fmt.Errorf("failed to find org,caused by:%w", err)
+	}
+	user, err = c.userStore.FindByUsername(ctx, userName)
+	if err != nil {
+		return membership.RoleUnkown, fmt.Errorf("failed to find user,caused by:%w", err)
+	}
+	m, err := c.memberStore.Find(ctx, org.ID, user.ID)
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
+		return membership.RoleUnkown, fmt.Errorf("failed to check memberhsip existance,caused by:%w", err)
+	}
+	if m == nil {
+		return membership.RoleUnkown, nil
+	}
+	return c.toGitRole(m.Role), nil
+}
+
 func (c *MemberComponent) AddMember(ctx context.Context, orgName, userName, operatorName string, role string) error {
 	var (
 		org  database.Organization
@@ -159,7 +196,9 @@ func (c *MemberComponent) toGitRole(role string) membership.Role {
 		return membership.RoleAdmin
 	case "write":
 		return membership.RoleWrite
-	default:
+	case "read":
 		return membership.RoleRead
+	default:
+		return membership.RoleUnkown
 	}
 }
