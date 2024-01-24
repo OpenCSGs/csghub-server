@@ -16,6 +16,7 @@ const (
 )
 
 func (c *Client) CreateModelRepo(req *types.CreateModelReq) (model *database.Model, repo *database.Repository, err error) {
+	var urlSlug string
 	giteaRepo, _, err := c.giteaClient.CreateOrgRepo(
 		common.WithPrefix(req.Namespace, ModelOrgPrefix),
 		gitea.CreateRepoOption{
@@ -31,9 +32,14 @@ func (c *Client) CreateModelRepo(req *types.CreateModelReq) (model *database.Mod
 	if err != nil {
 		return
 	}
+	if req.Nickname != "" {
+		urlSlug = req.Nickname
+	} else {
+		urlSlug = giteaRepo.Name
+	}
 
 	model = &database.Model{
-		UrlSlug:     giteaRepo.Name,
+		UrlSlug:     urlSlug,
 		Path:        fmt.Sprintf("%s/%s", req.Namespace, req.Name),
 		GitPath:     giteaRepo.FullName,
 		Name:        giteaRepo.Name,
@@ -90,7 +96,13 @@ func (c *Client) UpdateModelRepo(
 
 	model.Name = giteaRepo.Name
 	model.GitPath = giteaRepo.FullName
-	model.UrlSlug = giteaRepo.Name
+
+	if req.Nickname != "" {
+		model.UrlSlug = req.Nickname
+	} else {
+		model.UrlSlug = giteaRepo.Name
+	}
+
 	model.Path = path
 	model.Description = giteaRepo.Description
 	model.Private = giteaRepo.Private
@@ -99,6 +111,7 @@ func (c *Client) UpdateModelRepo(
 }
 
 func (c *Client) CreateDatasetRepo(req *types.CreateDatasetReq) (dataset *database.Dataset, repo *database.Repository, err error) {
+	var urlSlug string
 	giteaRepo, _, err := c.giteaClient.CreateOrgRepo(
 		common.WithPrefix(req.Namespace, DatasetOrgPrefix),
 		gitea.CreateRepoOption{
@@ -115,8 +128,14 @@ func (c *Client) CreateDatasetRepo(req *types.CreateDatasetReq) (dataset *databa
 		return
 	}
 
+	if req.Nickname != "" {
+		urlSlug = req.Nickname
+	} else {
+		urlSlug = giteaRepo.Name
+	}
+
 	dataset = &database.Dataset{
-		UrlSlug:     giteaRepo.Name,
+		UrlSlug:     urlSlug,
 		Path:        fmt.Sprintf("%s/%s", req.Namespace, req.Name),
 		GitPath:     giteaRepo.FullName,
 		Name:        giteaRepo.Name,
@@ -174,7 +193,13 @@ func (c *Client) UpdateDatasetRepo(
 
 	dataset.Name = giteaRepo.Name
 	dataset.GitPath = giteaRepo.FullName
-	dataset.UrlSlug = giteaRepo.Name
+
+	if req.Nickname != "" {
+		dataset.UrlSlug = req.Nickname
+	} else {
+		dataset.UrlSlug = giteaRepo.Name
+	}
+
 	dataset.Path = path
 	dataset.Description = giteaRepo.Description
 	dataset.Private = giteaRepo.Private
