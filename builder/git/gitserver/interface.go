@@ -1,12 +1,9 @@
 package gitserver
 
 import (
-	"errors"
 	"io"
 
-	"opencsg.com/csghub-server/builder/gitserver/gitea"
 	"opencsg.com/csghub-server/builder/store/database"
-	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/types"
 )
 
@@ -29,7 +26,7 @@ type GitServer interface {
 	GetModelTags(string, string, int, int) ([]*types.ModelTag, error)
 	GetModelFileTree(string, string, string, string) ([]*types.File, error)
 	CreateModelFile(*types.CreateFileReq) (err error)
-	UpdateModelFile(string, string, string, *types.UpdateFileReq) (err error)
+	UpdateModelFile(*types.UpdateFileReq) (err error)
 
 	CreateDatasetRepo(*types.CreateDatasetReq) (*database.Dataset, *database.Repository, error)
 	UpdateDatasetRepo(string, string, *database.Dataset, *database.Repository, *types.UpdateDatasetReq) error
@@ -51,18 +48,7 @@ type GitServer interface {
 	// ListSSHKeys(string, int, int) ([]*database.SSHKey, error)
 	DeleteSSHKey(int) error
 
-	CreateOrganization(*types.CreateOrgReq) (*database.Organization, error)
+	CreateOrganization(req *types.CreateOrgReq, orgOwner database.User) (*database.Organization, error)
 	DeleteOrganization(string) error
 	UpdateOrganization(*types.EditOrgReq, *database.Organization) (*database.Organization, error)
-	// CreateOrgMember(string, *types.CreateMemberReq) (*database.Member, error)
-	// DeleteOrgMember(string, *types.DeleteMemberReq) error
-}
-
-func NewGitServer(config *config.Config) (GitServer, error) {
-	if config.GitServer.Type == "gitea" {
-		gitServer, err := gitea.NewClient(config)
-		return gitServer, err
-	}
-
-	return nil, errors.New("Undefined git server type.")
 }

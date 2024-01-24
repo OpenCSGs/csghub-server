@@ -13,7 +13,8 @@ import (
 	"time"
 
 	"github.com/minio/minio-go/v7"
-	"opencsg.com/csghub-server/builder/gitserver"
+	"opencsg.com/csghub-server/builder/git"
+	"opencsg.com/csghub-server/builder/git/gitserver"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/builder/store/s3"
 	"opencsg.com/csghub-server/common/config"
@@ -90,7 +91,7 @@ func NewDatasetComponent(config *config.Config) (*DatasetComponent, error) {
 	c.us = database.NewUserStore()
 	c.ts = database.NewTagStore()
 	var err error
-	c.gs, err = gitserver.NewGitServer(config)
+	c.gs, err = git.NewGitServer(config)
 	if err != nil {
 		newError := fmt.Errorf("fail to create git server,error:%w", err)
 		slog.Error(newError.Error())
@@ -197,6 +198,11 @@ func (c *DatasetComponent) UpdateFile(ctx context.Context, req *types.UpdateFile
 	if err != nil {
 		return nil, fmt.Errorf("fail to check user, cause: %w", err)
 	}
+
+	err = c.gs.UpdateDatasetFile(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to update dataset file, cause: %w", err)
+	}
 	//TODO:check sensitive content of file
 
 	fileName := filepath.Base(req.FilePath)
@@ -224,11 +230,6 @@ func (c *DatasetComponent) updateLibraryFile(ctx context.Context, req *types.Upd
 		}
 	}
 
-	err = c.gs.UpdateDatasetFile(req)
-	if err != nil {
-		return nil, err
-	}
-
 	return resp, err
 }
 
@@ -241,10 +242,6 @@ func (c *DatasetComponent) updateReadmeFile(ctx context.Context, req *types.Upda
 	_, err = c.tc.UpdateMetaTags(ctx, database.DatasetTagScope, req.NameSpace, req.Name, string(contentDecoded))
 	if err != nil {
 		return nil, fmt.Errorf("failed to update meta tags, cause: %w", err)
-	}
-	err = c.gs.UpdateDatasetFile(req)
-	if err != nil {
-		return nil, fmt.Errorf("failed to update dataset file, cause: %w", err)
 	}
 
 	return resp, err
@@ -263,11 +260,11 @@ func (c *DatasetComponent) Create(ctx context.Context, req *types.CreateDatasetR
 
 	if namespace.NamespaceType == database.OrgNamespace {
 		if namespace.UserID != user.ID {
-			return nil, errors.New("users do not have permission to create models in this organization")
+			return nil, errors.New("users do not have permission to create datasets in this organization")
 		}
 	} else {
 		if namespace.Path != user.Username {
-			return nil, errors.New("users do not have permission to create models in this namespace")
+			return nil, errors.New("users do not have permission to create datasets in this namespace")
 		}
 	}
 

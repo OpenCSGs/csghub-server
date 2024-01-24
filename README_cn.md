@@ -1,6 +1,6 @@
 *[English](README_en.md) ∙ [简体中文](README_cn.md)*
 
-`CSGHub Server` is a part of the open source and reliable large model assets management platform - [CSGHub](https://github.com/OpenCSGs/CSGHub/). It focuses on management of models、datasets and other LLM assets through REST API。
+`CSGHub Server` is a part of the open source and reliable large model assets management platform - `CSGHub`. It focus on management of models and datasets through REST API。
 
 ## Key Features：
 - Creation and Management of users and orgnizations
@@ -12,11 +12,11 @@
 - Tracking of model and dataset activity data, such as downloads and likes volume
 
 ## Demo
-In order to help users to quickly understand the features and usage of CSGHub, we have recorded a demo video. You can watch this video to get a quick understanding of the main features and operation procedures of this program.
-- CSGHub Demo video is as blew，you can also check it at [YouTube](https://www.youtube.com/watch?v=SFDISpqowXs) or [Bilibili](https://www.bilibili.com/video/BV12T4y187bv/)
-<video width="658" height="432" src="https://github-production-user-asset-6210df.s3.amazonaws.com/3232817/296556812-205d07f2-de9d-4a7f-b3f5-83514a71453e.mp4"></video>
+To help you better understand the features and usage of `CSGHub Server`, we have recorded a series of demonstration videos. These videos will quickly introduce you to the main features and operating steps of the project.
+- Web GUI features demo: Demo Video
+- Git operations demo: Demo Video
 
-Please visit the [OpenCSG website](https://portal.opencsg.com/models) to experience the powerful management features. 
+Please visit the [OpenCSG website](https://portal.opencsg.com/) to experience the powerful management features. The "Developer" module is for LLM model and dataset.
 
 ## Quick Start
 > System resource requirements: 4c CPU/8GB memory
@@ -24,12 +24,8 @@ Please visit the [OpenCSG website](https://portal.opencsg.com/models) to experie
 Please install Docker yourself. This project has been tested in Ubuntu22 environment.
 
 You can quickly deploy the localized `CSGHub Server` service through docker-compose:
-```shell
-# The API token should be at least 128 characters long, and HTTP requests to csghub-server require the API token to be sent as a Bearer token for authentication.
-export STARHUB_SERVER_API_TOKEN=<API token>
-mkdir -m 777 gitea minio_data
-curl -L https://raw.githubusercontent.com/OpenCSGs/csghub-server/main/docker-compose.yml -o docker-compose.yml
-docker-compose -f docker-compose.yml up -d
+```
+docker-compose up -d -f https://github.com/opencsginc/starhub/blob/main/docker/docker-compose.yaml
 ```
 
 ## Technical Architecture
@@ -56,7 +52,7 @@ docker-compose -f docker-compose.yml up -d
 We use the Apache 2.0 license, the content of which is detailed in the `LICENSE` file.
 
 ## Contributing
-If you wish to contribute, please follow the [Contribution Guidelines](docs/en/contributing.md). We are very excited about your contributions!
+If you'd like to contribute, start by cloning the project. Then follow the [configuration documentation](docs/en/config.md) to set up the project locally, and refer to the [database migration documentation](docs/en/migration.md) for adding new features. We highly appreciate your contributions!
 
 ## Acknowledgments
 This project is based on open source projects such as Gin, DuckDB, minio, and Gitea. We would like to express our sincere gratitude to them for their open source contributions!

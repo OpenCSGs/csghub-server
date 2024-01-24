@@ -1,5 +1,7 @@
 package database
 
+import "context"
+
 type MemberStore struct {
 	db *DB
 }
@@ -10,6 +12,7 @@ func NewMemberStore() *MemberStore {
 	}
 }
 
+// Member is the relationship between a user and an organization.
 type Member struct {
 	ID             int64         `bun:",pk,autoincrement" json:"id"`
 	OrganizationID int64         `bun:",pk" json:"organization_id"`
@@ -18,4 +21,32 @@ type Member struct {
 	User           *User         `bun:"rel:belongs-to,join:user_id=id" json:"user"`
 	Role           string        `bun:",notnull" json:"role"`
 	times
+}
+
+func (s *MemberStore) Find(ctx context.Context, orgID, userID int64) (*Member, error) {
+	var member Member
+	err := s.db.Core.NewSelect().Model(&member).Where("organization_id = ? AND user_id = ?", orgID, userID).Scan(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return &member, nil
+}
+
+func (s *MemberStore) Add(ctx context.Context, orgID, userID int64, role string) error {
+	member := &Member{
+		OrganizationID: orgID,
+		UserID:         userID,
+		Role:           role,
+	}
+	result, err := s.db.Core.NewInsert().Model(member).Exec(ctx)
+	if err != nil {
+		return err
+	}
+	return assertAffectedOneRow(result, err)
+}
+
+func (s *MemberStore) Delete(ctx context.Context, orgID, userID int64, role string) error {
+	var member Member
+	_, err := s.db.Core.NewDelete().Model(&member).Where("organization_id=? and user_id=? and role=?", orgID, userID, role).Exec(ctx)
+	return err
 }

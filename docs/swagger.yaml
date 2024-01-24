@@ -1,0 +1,2883 @@
+definitions:
+  database.AccessToken:
+    properties:
+      created_at:
+        type: string
+      git_id:
+        type: integer
+      id:
+        type: integer
+      name:
+        type: string
+      token:
+        type: string
+      updated_at:
+        type: string
+      user:
+        $ref: '#/definitions/database.User'
+      user_id:
+        type: integer
+    type: object
+  database.Dataset:
+    properties:
+      created_at:
+        type: string
+      description:
+        type: string
+      downloads:
+        type: integer
+      git_path:
+        type: string
+      id:
+        type: integer
+      last:
+        type: string
+      likes:
+        type: integer
+      name:
+        type: string
+      path:
+        type: string
+      private:
+        type: boolean
+      repository:
+        $ref: '#/definitions/database.Repository'
+      repository_id:
+        type: integer
+      updated_at:
+        type: string
+      url_slug:
+        type: string
+      user:
+        $ref: '#/definitions/database.User'
+      user_id:
+        type: integer
+    type: object
+  database.Model:
+    properties:
+      created_at:
+        type: string
+      description:
+        type: string
+      downloads:
+        type: integer
+      git_path:
+        type: string
+      id:
+        type: integer
+      last_updated_at:
+        type: string
+      likes:
+        type: integer
+      name:
+        type: string
+      path:
+        type: string
+      private:
+        type: boolean
+      repository:
+        $ref: '#/definitions/database.Repository'
+      repository_id:
+        type: integer
+      updated_at:
+        type: string
+      url_slug:
+        type: string
+      user:
+        $ref: '#/definitions/database.User'
+      user_id:
+        type: integer
+    type: object
+  database.Namespace:
+    properties:
+      created_at:
+        type: string
+      id:
+        type: integer
+      namespace_type:
+        $ref: '#/definitions/database.NamespaceType'
+      path:
+        type: string
+      updated_at:
+        type: string
+      user:
+        $ref: '#/definitions/database.User'
+      user_id:
+        type: integer
+    type: object
+  database.NamespaceType:
+    enum:
+    - user
+    - organization
+    type: string
+    x-enum-varnames:
+    - UserNamespace
+    - OrgNamespace
+  database.Organization:
+    properties:
+      created_at:
+        type: string
+      description:
+        type: string
+      git_path:
+        type: string
+      id:
+        type: integer
+      name:
+        type: string
+      namespace:
+        $ref: '#/definitions/database.Namespace'
+      namespace_id:
+        type: integer
+      path:
+        type: string
+      updated_at:
+        type: string
+      user:
+        $ref: '#/definitions/database.User'
+      user_id:
+        type: integer
+    type: object
+  database.Repository:
+    properties:
+      created_at:
+        type: string
+      default_branch:
+        type: string
+      description:
+        type: string
+      downloads:
+        items:
+          $ref: '#/definitions/database.RepositoryDownload'
+        type: array
+      git_path:
+        type: string
+      http_clone_url:
+        type: string
+      id:
+        type: integer
+      labels:
+        type: string
+      license:
+        type: string
+      name:
+        type: string
+      path:
+        type: string
+      private:
+        type: boolean
+      readme:
+        type: string
+      repository_type:
+        $ref: '#/definitions/database.RepositoryType'
+      ssh_clone_url:
+        type: string
+      tags:
+        items:
+          $ref: '#/definitions/database.Tag'
+        type: array
+      updated_at:
+        type: string
+      user_id:
+        type: integer
+    type: object
+  database.RepositoryDownload:
+    properties:
+      created_at:
+        type: string
+      date:
+        type: string
+      id:
+        type: integer
+      repository:
+        $ref: '#/definitions/database.Repository'
+      repository_id:
+        type: integer
+      updated_at:
+        type: string
+      user_id:
+        type: integer
+    type: object
+  database.RepositoryType:
+    enum:
+    - model
+    - dataset
+    type: string
+    x-enum-varnames:
+    - ModelRepo
+    - DatasetRepo
+  database.SSHKey:
+    properties:
+      content:
+        type: string
+      created_at:
+        type: string
+      git_id:
+        type: integer
+      id:
+        type: integer
+      name:
+        type: string
+      updated_at:
+        type: string
+      user:
+        $ref: '#/definitions/database.User'
+      user_id:
+        type: integer
+    type: object
+  database.Tag:
+    properties:
+      built_in:
+        type: boolean
+      category:
+        type: string
+      created_at:
+        type: string
+      group:
+        type: string
+      id:
+        type: integer
+      name:
+        type: string
+      scope:
+        $ref: '#/definitions/database.TagScope'
+      show_name:
+        type: string
+      updated_at:
+        type: string
+    type: object
+  database.TagScope:
+    enum:
+    - model
+    - dataset
+    type: string
+    x-enum-varnames:
+    - ModelTagScope
+    - DatasetTagScope
+  database.User:
+    properties:
+      accessTokens:
+        items:
+          $ref: '#/definitions/database.AccessToken'
+        type: array
+      created_at:
+        type: string
+      email:
+        type: string
+      git_id:
+        type: integer
+      id:
+        type: integer
+      name:
+        type: string
+      namespace:
+        items:
+          $ref: '#/definitions/database.Namespace'
+        type: array
+      updated_at:
+        type: string
+      username:
+        type: string
+    type: object
+  handler.Create.addMemberRequest:
+    properties:
+      op_user:
+        description: name of the operator
+        type: string
+      role:
+        type: string
+      user:
+        description: name of user will be added to the org as a member
+        type: string
+    type: object
+  handler.Delete.removeMemberRequest:
+    properties:
+      op_user:
+        description: name of the operator
+        type: string
+      role:
+        type: string
+    type: object
+  types.APIBadRequest:
+    type: object
+  types.APIInternalServerError:
+    type: object
+  types.Commit:
+    properties:
+      author_email:
+        type: string
+      author_name:
+        type: string
+      authored_date:
+        type: string
+      committer_date:
+        type: string
+      committer_email:
+        type: string
+      committer_name:
+        type: string
+      created_at:
+        type: string
+      id:
+        type: string
+      message:
+        type: string
+    type: object
+  types.CreateDatasetReq:
+    properties:
+      default_branch:
+        type: string
+      description:
+        type: string
+      labels:
+        type: string
+      license:
+        type: string
+      name:
+        type: string
+      namespace:
+        type: string
+      path:
+        type: string
+      private:
+        type: boolean
+      readme:
+        type: string
+      username:
+        type: string
+    type: object
+  types.CreateFileReq:
+    properties:
+      branch:
+        type: string
+      content:
+        type: string
+      email:
+        type: string
+      message:
+        type: string
+      new_branch:
+        type: string
+      username:
+        type: string
+    type: object
+  types.CreateFileResp:
+    type: object
+  types.CreateModelReq:
+    properties:
+      default_branch:
+        type: string
+      description:
+        type: string
+      labels:
+        type: string
+      license:
+        type: string
+      name:
+        type: string
+      namespace:
+        type: string
+      path:
+        type: string
+      private:
+        type: boolean
+      readme:
+        type: string
+      username:
+        type: string
+    type: object
+  types.CreateOrgReq:
+    properties:
+      description:
+        type: string
+      full_name:
+        description: Display name
+        type: string
+      name:
+        type: string
+      username:
+        type: string
+    type: object
+  types.CreateSSHKeyRequest:
+    properties:
+      content:
+        type: string
+      name:
+        type: string
+      username:
+        type: string
+    type: object
+  types.CreateUserRequest:
+    properties:
+      email:
+        type: string
+      id:
+        type: string
+      name:
+        type: string
+      username:
+        type: string
+    type: object
+  types.CreateUserTokenRequest:
+    properties:
+      name:
+        type: string
+      username:
+        type: string
+    type: object
+  types.DatasetBranch:
+    properties:
+      commit:
+        $ref: '#/definitions/types.DatasetBranchCommit'
+      message:
+        type: string
+      name:
+        type: string
+    type: object
+  types.DatasetBranchCommit:
+    properties:
+      id:
+        type: string
+    type: object
+  types.DatasetDetail:
+    properties:
+      default_branch:
+        type: string
+      downloads:
+        type: integer
+      http_clone_url:
+        type: string
+      introduction:
+        type: string
+      last_updated_at:
+        type: string
+      license:
+        type: string
+      name:
+        type: string
+      path:
+        type: string
+      private:
+        type: boolean
+      size:
+        type: integer
+      ssh_clone_url:
+        type: string
+    type: object
+  types.DeleteUserTokenRequest:
+    properties:
+      name:
+        type: string
+      username:
+        type: string
+    type: object
+  types.EditOrgReq:
+    properties:
+      description:
+        type: string
+      full_name:
+        description: Display name
+        type: string
+      path:
+        type: string
+    type: object
+  types.File:
+    properties:
+      commit:
+        $ref: '#/definitions/types.Commit'
+      content:
+        type: string
+      download_url:
+        description: URL to download the file, same with URL, except for lfs file
+        type: string
+      last_commit_sha:
+        type: string
+      lfs:
+        type: boolean
+      lfs_relative_path:
+        description: relative path in lfs storage
+        type: string
+      mode:
+        type: string
+      name:
+        type: string
+      path:
+        type: string
+      sha:
+        type: string
+      size:
+        type: integer
+      type:
+        type: string
+      url:
+        description: URL to browse the file
+        type: string
+    type: object
+  types.ModelBranch:
+    properties:
+      commit:
+        $ref: '#/definitions/types.ModelBranchCommit'
+      message:
+        type: string
+      name:
+        type: string
+    type: object
+  types.ModelBranchCommit:
+    properties:
+      id:
+        type: string
+    type: object
+  types.ModelDetail:
+    properties:
+      default_branch:
+        type: string
+      downloads:
+        type: integer
+      http_clone_url:
+        type: string
+      introduction:
+        type: string
+      last_updated_at:
+        type: string
+      license:
+        type: string
+      name:
+        type: string
+      path:
+        type: string
+      private:
+        type: boolean
+      size:
+        type: integer
+      ssh_clone_url:
+        type: string
+    type: object
+  types.Response:
+    properties:
+      data: {}
+      message:
+        type: string
+    type: object
+  types.ResponseWithTotal:
+    properties:
+      data: {}
+      message:
+        type: string
+      total:
+        type: integer
+    type: object
+  types.UpdateDatasetReq:
+    properties:
+      default_branch:
+        type: string
+      description:
+        type: string
+      labels:
+        type: string
+      license:
+        type: string
+      name:
+        type: string
+      namespace:
+        type: string
+      origin_name:
+        type: string
+      private:
+        type: boolean
+      readme:
+        type: string
+      username:
+        type: string
+    type: object
+  types.UpdateDownloadsReq:
+    properties:
+      date:
+        type: string
+      download_count:
+        type: integer
+      name:
+        type: string
+      namespace:
+        type: string
+    type: object
+  types.UpdateFileReq:
+    properties:
+      branch:
+        type: string
+      content:
+        type: string
+      email:
+        type: string
+      message:
+        type: string
+      new_branch:
+        type: string
+      origin_path:
+        type: string
+      sha:
+        type: string
+      username:
+        type: string
+    type: object
+  types.UpdateFileResp:
+    type: object
+  types.UpdateModelReq:
+    properties:
+      default_branch:
+        type: string
+      description:
+        type: string
+      labels:
+        type: string
+      license:
+        type: string
+      name:
+        type: string
+      namespace:
+        type: string
+      origin_name:
+        type: string
+      private:
+        type: boolean
+      readme:
+        type: string
+      username:
+        type: string
+    type: object
+  types.UpdateUserRequest:
+    properties:
+      email:
+        type: string
+      id:
+        type: string
+      name:
+        type: string
+      username:
+        type: string
+    type: object
+info:
+  contact: {}
+paths:
+  /datasets:
+    get:
+      consumes:
+      - application/json
+      description: get visiable datasets for current user
+      parameters:
+      - default: 20
+        description: per
+        in: query
+        name: per
+        type: integer
+      - default: 1
+        description: per page
+        in: query
+        name: page
+        type: integer
+      - description: current user
+        in: query
+        name: current_user
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/types.ResponseWithTotal'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/database.Dataset'
+                  type: array
+                total:
+                  type: integer
+              type: object
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Get Visiable datasets for current user
+      tags:
+      - Dataset
+    post:
+      consumes:
+      - application/json
+      description: create a new dataset
+      parameters:
+      - description: body
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/types.CreateDatasetReq'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/types.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/database.Dataset'
+              type: object
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Create a new dataset
+      tags:
+      - Dataset
+  /datasets/{namespace}/{name}:
+    delete:
+      consumes:
+      - application/json
+      description: delete a exists dataset
+      parameters:
+      - description: namespace
+        in: path
+        name: namespace
+        required: true
+        type: string
+      - description: name
+        in: path
+        name: name
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/types.Response'
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Delete a exists dataset
+      tags:
+      - Dataset
+    get:
+      consumes:
+      - application/json
+      description: get dataset detail
+      parameters:
+      - description: namespace
+        in: path
+        name: namespace
+        required: true
+        type: string
+      - description: name
+        in: path
+        name: name
+        required: true
+        type: string
+      - description: current_user
+        in: query
+        name: current_user
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/types.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/database.Dataset'
+              type: object
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Get dataset detail
+      tags:
+      - Dataset
+    put:
+      consumes:
+      - application/json
+      description: update a exists dataset
+      parameters:
+      - description: namespace
+        in: path
+        name: namespace
+        required: true
+        type: string
+      - description: name
+        in: path
+        name: name
+        required: true
+        type: string
+      - description: body
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/types.UpdateDatasetReq'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/types.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/database.Dataset'
+              type: object
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Update a exists dataset
+      tags:
+      - Dataset
+  /datasets/{namespace}/{name}/branches:
+    get:
+      consumes:
+      - application/json
+      description: get dataset branches
+      parameters:
+      - description: namespace
+        in: path
+        name: namespace
+        required: true
+        type: string
+      - description: name
+        in: path
+        name: name
+        required: true
+        type: string
+      - default: 20
+        description: per
+        in: query
+        name: per
+        type: integer
+      - default: 1
+        description: page
+        in: query
+        name: page
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/types.Response'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/types.DatasetBranch'
+                  type: array
+              type: object
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Get dataset branches
+      tags:
+      - Dataset
+  /datasets/{namespace}/{name}/commits:
+    get:
+      consumes:
+      - application/json
+      description: get dataset commits
+      parameters:
+      - description: namespace
+        in: path
+        name: namespace
+        required: true
+        type: string
+      - description: name
+        in: path
+        name: name
+        required: true
+        type: string
+      - description: ref
+        in: query
+        name: ref
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/types.Response'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/types.Commit'
+                  type: array
+              type: object
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Get dataset commits
+      tags:
+      - Dataset
+  /datasets/{namespace}/{name}/detail:
+    get:
+      consumes:
+      - application/json
+      description: get dataset detail
+      parameters:
+      - description: namespace
+        in: path
+        name: namespace
+        required: true
+        type: string
+      - description: name
+        in: path
+        name: name
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/types.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/types.DatasetDetail'
+              type: object
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Get dataset detail
+      tags:
+      - Dataset
+  /datasets/{namespace}/{name}/download/{file_path}:
+    get:
+      consumes:
+      - application/json
+      description: download dataset file
+      parameters:
+      - description: namespace
+        in: path
+        name: namespace
+        required: true
+        type: string
+      - description: name
+        in: path
+        name: name
+        required: true
+        type: string
+      - description: file_path
+        in: path
+        name: file_path
+        required: true
+        type: string
+      - description: lfs
+        in: query
+        name: lfs
+        type: boolean
+      - description: ref
+        in: query
+        name: ref
+        type: string
+      - description: name of download file
+        in: query
+        name: save_as
+        type: string
+      produces:
+      - application/json
+      - application/octet-stream
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/types.Response'
+            - properties:
+                data:
+                  type: string
+              type: object
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Download dataset file
+      tags:
+      - Dataset
+  /datasets/{namespace}/{name}/last_commit:
+    get:
+      consumes:
+      - application/json
+      description: get dataset last commit
+      parameters:
+      - description: namespace
+        in: path
+        name: namespace
+        required: true
+        type: string
+      - description: name
+        in: path
+        name: name
+        required: true
+        type: string
+      - description: ref
+        in: query
+        name: ref
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/types.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/types.Commit'
+              type: object
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Get dataset last commit
+      tags:
+      - Dataset
+  /datasets/{namespace}/{name}/raw/{file_path}:
+    get:
+      consumes:
+      - application/json
+      description: get dataset file raw
+      parameters:
+      - description: namespace
+        in: path
+        name: namespace
+        required: true
+        type: string
+      - description: name
+        in: path
+        name: name
+        required: true
+        type: string
+      - description: file_path
+        in: path
+        name: file_path
+        required: true
+        type: string
+      - description: ref
+        in: query
+        name: ref
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/types.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/types.Commit'
+              type: object
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Get dataset file raw
+      tags:
+      - Dataset
+    post:
+      consumes:
+      - application/json
+      description: create dataset file
+      parameters:
+      - description: namespace
+        in: path
+        name: namespace
+        required: true
+        type: string
+      - description: name
+        in: path
+        name: name
+        required: true
+        type: string
+      - description: file_path
+        in: path
+        name: file_path
+        required: true
+        type: string
+      - description: body
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/types.CreateFileReq'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/types.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/types.CreateFileResp'
+              type: object
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Create dataset file
+      tags:
+      - Dataset
+    put:
+      consumes:
+      - application/json
+      description: update dataset file
+      parameters:
+      - description: namespace
+        in: path
+        name: namespace
+        required: true
+        type: string
+      - description: name
+        in: path
+        name: name
+        required: true
+        type: string
+      - description: file_path
+        in: path
+        name: file_path
+        required: true
+        type: string
+      - description: body
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/types.UpdateFileReq'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/types.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/types.UpdateFileResp'
+              type: object
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Update dataset file
+      tags:
+      - Dataset
+  /datasets/{namespace}/{name}/tags:
+    get:
+      consumes:
+      - application/json
+      description: get dataset tags
+      parameters:
+      - description: namespace
+        in: path
+        name: namespace
+        required: true
+        type: string
+      - description: name
+        in: path
+        name: name
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/types.Response'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/types.DatasetBranch'
+                  type: array
+              type: object
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Get dataset tags
+      tags:
+      - Dataset
+  /datasets/{namespace}/{name}/tree:
+    get:
+      consumes:
+      - application/json
+      description: get dataset file tree
+      parameters:
+      - description: namespace
+        in: path
+        name: namespace
+        required: true
+        type: string
+      - description: name
+        in: path
+        name: name
+        required: true
+        type: string
+      - description: ref
+        in: query
+        name: ref
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/types.Response'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/types.File'
+                  type: array
+              type: object
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Get dataset file tree
+      tags:
+      - Dataset
+  /datasets/{namespace}/{name}/update_downloads:
+    post:
+      consumes:
+      - application/json
+      description: update dataset downloads
+      parameters:
+      - description: namespace
+        in: path
+        name: namespace
+        required: true
+        type: string
+      - description: name
+        in: path
+        name: name
+        required: true
+        type: string
+      - description: body
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/types.UpdateDownloadsReq'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/types.Response'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/types.File'
+                  type: array
+              type: object
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Update dataset downloads
+      tags:
+      - Dataset
+  /datasets/{namespace}/{name}/viewer/{file_path}:
+    get:
+      consumes:
+      - application/json
+      description: get the demo data of the dataset
+      parameters:
+      - description: namespace
+        in: path
+        name: namespace
+        required: true
+        type: string
+      - description: file_path
+        in: path
+        name: file_path
+        required: true
+        type: string
+      - description: count
+        in: query
+        name: count
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/types.Response'
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Get the demo data of the dataset
+      tags:
+      - Dataset
+  /models:
+    get:
+      consumes:
+      - application/json
+      description: get visiable models for current user
+      parameters:
+      - default: 20
+        description: per
+        in: query
+        name: per
+        type: integer
+      - default: 1
+        description: per page
+        in: query
+        name: page
+        type: integer
+      - description: current user
+        in: query
+        name: current_user
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/types.ResponseWithTotal'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/database.Model'
+                  type: array
+                total:
+                  type: integer
+              type: object
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Get Visiable models for current user
+      tags:
+      - Model
+    post:
+      consumes:
+      - application/json
+      description: create a new model
+      parameters:
+      - description: body
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/types.CreateModelReq'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/types.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/database.Model'
+              type: object
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Create a new model
+      tags:
+      - Model
+  /models/{namespace}/{name}:
+    delete:
+      consumes:
+      - application/json
+      description: delete a exists model
+      parameters:
+      - description: namespace
+        in: path
+        name: namespace
+        required: true
+        type: string
+      - description: name
+        in: path
+        name: name
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/types.Response'
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Delete a exists model
+      tags:
+      - Model
+    get:
+      consumes:
+      - application/json
+      description: get model detail
+      parameters:
+      - description: namespace
+        in: path
+        name: namespace
+        required: true
+        type: string
+      - description: name
+        in: path
+        name: name
+        required: true
+        type: string
+      - description: current_user
+        in: query
+        name: current_user
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/types.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/database.Model'
+              type: object
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Get model detail
+      tags:
+      - Model
+    put:
+      consumes:
+      - application/json
+      description: update a exists model
+      parameters:
+      - description: namespace
+        in: path
+        name: namespace
+        required: true
+        type: string
+      - description: name
+        in: path
+        name: name
+        required: true
+        type: string
+      - description: body
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/types.UpdateModelReq'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/types.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/database.Model'
+              type: object
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Update a exists model
+      tags:
+      - Model
+  /models/{namespace}/{name}/branches:
+    get:
+      consumes:
+      - application/json
+      description: get model branches
+      parameters:
+      - description: namespace
+        in: path
+        name: namespace
+        required: true
+        type: string
+      - description: name
+        in: path
+        name: name
+        required: true
+        type: string
+      - default: 20
+        description: per
+        in: query
+        name: per
+        type: integer
+      - default: 1
+        description: page
+        in: query
+        name: page
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/types.Response'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/types.ModelBranch'
+                  type: array
+              type: object
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Get model branches
+      tags:
+      - Model
+  /models/{namespace}/{name}/commits:
+    get:
+      consumes:
+      - application/json
+      description: get model commits
+      parameters:
+      - description: namespace
+        in: path
+        name: namespace
+        required: true
+        type: string
+      - description: name
+        in: path
+        name: name
+        required: true
+        type: string
+      - description: ref
+        in: query
+        name: ref
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/types.Response'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/types.Commit'
+                  type: array
+              type: object
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Get model commits
+      tags:
+      - Model
+  /models/{namespace}/{name}/detail:
+    get:
+      consumes:
+      - application/json
+      description: get model detail
+      parameters:
+      - description: namespace
+        in: path
+        name: namespace
+        required: true
+        type: string
+      - description: name
+        in: path
+        name: name
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/types.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/types.ModelDetail'
+              type: object
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Get model detail
+      tags:
+      - Model
+  /models/{namespace}/{name}/download/{file_path}:
+    get:
+      consumes:
+      - application/json
+      description: download model file
+      parameters:
+      - description: namespace
+        in: path
+        name: namespace
+        required: true
+        type: string
+      - description: name
+        in: path
+        name: name
+        required: true
+        type: string
+      - description: file_path
+        in: path
+        name: file_path
+        required: true
+        type: string
+      - description: lfs
+        in: query
+        name: lfs
+        type: boolean
+      - description: ref
+        in: query
+        name: ref
+        type: string
+      - description: name of download file
+        in: query
+        name: save_as
+        type: string
+      produces:
+      - application/json
+      - application/octet-stream
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/types.Response'
+            - properties:
+                data:
+                  type: string
+              type: object
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Download model file
+      tags:
+      - Model
+  /models/{namespace}/{name}/last_commit:
+    get:
+      consumes:
+      - application/json
+      description: get model last commit
+      parameters:
+      - description: namespace
+        in: path
+        name: namespace
+        required: true
+        type: string
+      - description: name
+        in: path
+        name: name
+        required: true
+        type: string
+      - description: ref
+        in: query
+        name: ref
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/types.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/types.Commit'
+              type: object
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Get model last commit
+      tags:
+      - Model
+  /models/{namespace}/{name}/raw/{file_path}:
+    get:
+      consumes:
+      - application/json
+      description: get model file raw
+      parameters:
+      - description: namespace
+        in: path
+        name: namespace
+        required: true
+        type: string
+      - description: name
+        in: path
+        name: name
+        required: true
+        type: string
+      - description: file_path
+        in: path
+        name: file_path
+        required: true
+        type: string
+      - description: ref
+        in: query
+        name: ref
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/types.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/types.Commit'
+              type: object
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Get model file raw
+      tags:
+      - Model
+    post:
+      consumes:
+      - application/json
+      description: create model file
+      parameters:
+      - description: namespace
+        in: path
+        name: namespace
+        required: true
+        type: string
+      - description: name
+        in: path
+        name: name
+        required: true
+        type: string
+      - description: file_path
+        in: path
+        name: file_path
+        required: true
+        type: string
+      - description: body
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/types.CreateFileReq'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/types.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/types.CreateFileResp'
+              type: object
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Create model file
+      tags:
+      - Model
+    put:
+      consumes:
+      - application/json
+      description: update model file
+      parameters:
+      - description: namespace
+        in: path
+        name: namespace
+        required: true
+        type: string
+      - description: name
+        in: path
+        name: name
+        required: true
+        type: string
+      - description: file_path
+        in: path
+        name: file_path
+        required: true
+        type: string
+      - description: body
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/types.UpdateFileReq'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/types.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/types.UpdateFileResp'
+              type: object
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Update model file
+      tags:
+      - Model
+  /models/{namespace}/{name}/tags:
+    get:
+      consumes:
+      - application/json
+      description: get model tags
+      parameters:
+      - description: namespace
+        in: path
+        name: namespace
+        required: true
+        type: string
+      - description: name
+        in: path
+        name: name
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/types.Response'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/types.ModelBranch'
+                  type: array
+              type: object
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Get model tags
+      tags:
+      - Model
+  /models/{namespace}/{name}/tree:
+    get:
+      consumes:
+      - application/json
+      description: get model file tree
+      parameters:
+      - description: namespace
+        in: path
+        name: namespace
+        required: true
+        type: string
+      - description: name
+        in: path
+        name: name
+        required: true
+        type: string
+      - description: ref
+        in: query
+        name: ref
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/types.Response'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/types.File'
+                  type: array
+              type: object
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Get model file tree
+      tags:
+      - Model
+  /models/{namespace}/{name}/update_downloads:
+    post:
+      consumes:
+      - application/json
+      description: update model downloads
+      parameters:
+      - description: namespace
+        in: path
+        name: namespace
+        required: true
+        type: string
+      - description: name
+        in: path
+        name: name
+        required: true
+        type: string
+      - description: body
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/types.UpdateDownloadsReq'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/types.Response'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/types.File'
+                  type: array
+              type: object
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Update model downloads
+      tags:
+      - Model
+  /organization/{namespace}/datasets:
+    get:
+      consumes:
+      - application/json
+      description: get organization datasets
+      parameters:
+      - description: namespace
+        in: path
+        name: namespace
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/types.ResponseWithTotal'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/database.Dataset'
+                  type: array
+                total:
+                  type: integer
+              type: object
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Get organization datasets
+      tags:
+      - Organization
+  /organization/{namespace}/models:
+    get:
+      consumes:
+      - application/json
+      description: get organization models
+      parameters:
+      - description: namespace
+        in: path
+        name: namespace
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/types.ResponseWithTotal'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/database.Model'
+                  type: array
+                total:
+                  type: integer
+              type: object
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Get organization models
+      tags:
+      - Organization
+  /organizations:
+    get:
+      consumes:
+      - application/json
+      description: get organizations
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/types.ResponseWithTotal'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/database.Organization'
+                  type: array
+                total:
+                  type: integer
+              type: object
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Get organizations
+      tags:
+      - Organization
+    post:
+      consumes:
+      - application/json
+      description: create a new organization
+      parameters:
+      - description: body
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/types.CreateOrgReq'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/types.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/database.Organization'
+              type: object
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Create a new organization
+      tags:
+      - Organization
+  /organizations/{name}:
+    delete:
+      consumes:
+      - application/json
+      description: delete organization
+      parameters:
+      - description: name
+        in: path
+        name: name
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/types.Response'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Delete organization
+      tags:
+      - Organization
+    put:
+      consumes:
+      - application/json
+      description: update organization
+      parameters:
+      - description: name
+        in: path
+        name: name
+        required: true
+        type: string
+      - description: body
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/types.EditOrgReq'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/types.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/database.Organization'
+              type: object
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Update organization
+      tags:
+      - Organization
+  /organizations/{name}/members:
+    post:
+      consumes:
+      - application/json
+      description: user will be added to org with a role
+      parameters:
+      - description: org name
+        in: path
+        name: name
+        required: true
+        type: string
+      - description: body
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/handler.Create.addMemberRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/types.Response'
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Create new membership between org and user
+      tags:
+      - Members
+  /organizations/{name}/members/:username:
+    delete:
+      consumes:
+      - application/json
+      description: user's role will be remove from org
+      parameters:
+      - description: org name
+        in: path
+        name: name
+        required: true
+        type: string
+      - description: user name
+        in: path
+        name: username
+        required: true
+        type: string
+      - description: body
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/handler.Delete.removeMemberRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/types.Response'
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Remove membership between org and user
+      tags:
+      - Members
+  /tags:
+    get:
+      consumes:
+      - application/json
+      description: get all tags
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: tags
+          schema:
+            allOf:
+            - $ref: '#/definitions/types.ResponseWithTotal'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/database.Tag'
+                  type: array
+                total:
+                  type: integer
+              type: object
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Get all tags
+      tags:
+      - Tag
+  /user/{username}/datasets:
+    get:
+      consumes:
+      - application/json
+      description: get user datasets
+      parameters:
+      - description: username
+        in: path
+        name: username
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/types.ResponseWithTotal'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/database.Dataset'
+                  type: array
+                total:
+                  type: integer
+              type: object
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Get user datasets
+      tags:
+      - User
+  /user/{username}/models:
+    get:
+      consumes:
+      - application/json
+      description: get user models
+      parameters:
+      - description: username
+        in: path
+        name: username
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/types.ResponseWithTotal'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/database.Model'
+                  type: array
+                total:
+                  type: integer
+              type: object
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Get user models
+      tags:
+      - User
+  /user/{username}/ssh_key/{name}:
+    delete:
+      consumes:
+      - application/json
+      description: delete specific SSH key for the given user
+      parameters:
+      - description: username
+        in: path
+        name: username
+        required: true
+        type: string
+      - description: key name
+        in: path
+        name: name
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/types.Response'
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Delete specific SSH key for the given user
+      tags:
+      - SSH Key
+  /user/{username}/ssh_keys:
+    get:
+      consumes:
+      - application/json
+      description: get all SSH keys for the given user
+      parameters:
+      - description: username
+        in: path
+        name: username
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/types.ResponseWithTotal'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/database.SSHKey'
+                  type: array
+                total:
+                  type: integer
+              type: object
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Get all SSH keys for the given user
+      tags:
+      - SSH Key
+    post:
+      consumes:
+      - application/json
+      description: create a new SSH key for the given user
+      parameters:
+      - description: username
+        in: path
+        name: username
+        required: true
+        type: string
+      - description: body
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/types.CreateSSHKeyRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/types.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/database.SSHKey'
+              type: object
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Create a new SSH key for the given user
+      tags:
+      - SSH Key
+  /user/{username}/tokens:
+    post:
+      consumes:
+      - application/json
+      description: create access token for a user
+      parameters:
+      - description: username
+        in: path
+        name: username
+        required: true
+        type: string
+      - description: body
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/types.CreateUserTokenRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/types.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/database.AccessToken'
+              type: object
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Create access token for a user
+      tags:
+      - Access token
+  /user/{username}/tokens/{token_name}:
+    delete:
+      consumes:
+      - application/json
+      description: delete access token for a user
+      parameters:
+      - description: username
+        in: path
+        name: username
+        required: true
+        type: string
+      - description: token_name
+        in: path
+        name: token_name
+        required: true
+        type: string
+      - description: body
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/types.DeleteUserTokenRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/types.Response'
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Delete access token for a user
+      tags:
+      - Access token
+  /users:
+    post:
+      consumes:
+      - application/json
+      description: create a new user
+      parameters:
+      - description: body
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/types.CreateUserRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/types.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/database.User'
+              type: object
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Create a new user
+      tags:
+      - User
+  /users/{username}:
+    put:
+      consumes:
+      - application/json
+      description: update user
+      parameters:
+      - description: username
+        in: path
+        name: username
+        required: true
+        type: string
+      - description: body
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/types.UpdateUserRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/types.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/database.User'
+              type: object
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Update user
+      tags:
+      - User
+swagger: "2.0"

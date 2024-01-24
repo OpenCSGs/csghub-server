@@ -34,6 +34,20 @@ type ModelHandler struct {
 	c *component.ModelComponent
 }
 
+// GetVisiableModels godoc
+// @Security     ApiKey
+// @Summary      Get Visiable models for current user
+// @Description  get visiable models for current user
+// @Tags         Model
+// @Accept       json
+// @Produce      json
+// @Param        per query int false "per" default(20)
+// @Param        page query int false "per page" default(1)
+// @Param        current_user query string true "current user"
+// @Success      200  {object}  types.ResponseWithTotal{data=[]database.Model,total=int} "OK"
+// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
+// @Router       /models [get]
 func (h *ModelHandler) Index(ctx *gin.Context) {
 	tagReqs := parseTagReqs(ctx)
 	username := ctx.Query("current_user")
@@ -64,6 +78,18 @@ func (h *ModelHandler) Index(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, respData)
 }
 
+// CreateModel   godoc
+// @Security     ApiKey
+// @Summary      Create a new model
+// @Description  create a new model
+// @Tags         Model
+// @Accept       json
+// @Produce      json
+// @Param        body body types.CreateModelReq true "body"
+// @Success      200  {object}  types.Response{data=database.Model} "OK"
+// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
+// @Router       /models [post]
 func (h *ModelHandler) Create(ctx *gin.Context) {
 	var req *types.CreateModelReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {
@@ -82,6 +108,20 @@ func (h *ModelHandler) Create(ctx *gin.Context) {
 	httpbase.OK(ctx, model)
 }
 
+// UpdateModel   godoc
+// @Security     ApiKey
+// @Summary      Update a exists model
+// @Description  update a exists model
+// @Tags         Model
+// @Accept       json
+// @Produce      json
+// @Param        namespace path string true "namespace"
+// @Param        name path string true "name"
+// @Param        body body types.UpdateModelReq true "body"
+// @Success      200  {object}  types.Response{data=database.Model} "OK"
+// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
+// @Router       /models/{namespace}/{name} [put]
 func (h *ModelHandler) Update(ctx *gin.Context) {
 	var req *types.UpdateModelReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {
@@ -110,6 +150,19 @@ func (h *ModelHandler) Update(ctx *gin.Context) {
 	httpbase.OK(ctx, model)
 }
 
+// DeleteModel   godoc
+// @Security     ApiKey
+// @Summary      Delete a exists model
+// @Description  delete a exists model
+// @Tags         Model
+// @Accept       json
+// @Produce      json
+// @Param        namespace path string true "namespace"
+// @Param        name path string true "name"
+// @Success      200  {object}  types.Response{} "OK"
+// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
+// @Router       /models/{namespace}/{name} [delete]
 func (h *ModelHandler) Delete(ctx *gin.Context) {
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
 	if err != nil {
@@ -127,6 +180,19 @@ func (h *ModelHandler) Delete(ctx *gin.Context) {
 	httpbase.OK(ctx, nil)
 }
 
+// GetModelDetail godoc
+// @Security     ApiKey
+// @Summary      Get model detail
+// @Description  get model detail
+// @Tags         Model
+// @Accept       json
+// @Produce      json
+// @Param        namespace path string true "namespace"
+// @Param        name path string true "name"
+// @Success      200  {object}  types.Response{data=types.ModelDetail} "OK"
+// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
+// @Router       /models/{namespace}/{name}/detail [get]
 func (h *ModelHandler) Detail(ctx *gin.Context) {
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
 	if err != nil {
@@ -145,6 +211,20 @@ func (h *ModelHandler) Detail(ctx *gin.Context) {
 	httpbase.OK(ctx, detail)
 }
 
+// GetModel      godoc
+// @Security     ApiKey
+// @Summary      Get model detail
+// @Description  get model detail
+// @Tags         Model
+// @Accept       json
+// @Produce      json
+// @Param        namespace path string true "namespace"
+// @Param        name path string true "name"
+// @Param        current_user query string true "current_user"
+// @Success      200  {object}  types.Response{data=database.Model} "OK"
+// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
+// @Router       /models/{namespace}/{name} [get]
 func (h *ModelHandler) Show(ctx *gin.Context) {
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
 	if err != nil {
@@ -164,6 +244,21 @@ func (h *ModelHandler) Show(ctx *gin.Context) {
 	httpbase.OK(ctx, detail)
 }
 
+// CreateModelFile godoc
+// @Security     ApiKey
+// @Summary      Create model file
+// @Description  create model file
+// @Tags         Model
+// @Accept       json
+// @Produce      json
+// @Param        namespace path string true "namespace"
+// @Param        name path string true "name"
+// @Param        file_path path string true "file_path"
+// @Param        body body types.CreateFileReq true "body"
+// @Success      200  {object}  types.Response{data=types.CreateFileResp} "OK"
+// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
+// @Router       /models/{namespace}/{name}/raw/{file_path} [post]
 func (h *ModelHandler) CreateFile(ctx *gin.Context) {
 	var req *types.CreateFileReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {
@@ -178,10 +273,14 @@ func (h *ModelHandler) CreateFile(ctx *gin.Context) {
 		ctx.JSON(http.StatusBadRequest, gin.H{"message": err.Error()})
 		return
 	}
+	filePath := ctx.Param("file_path")
+	filePath = convertFilePathFromRoute(filePath)
 	req.NameSpace = namespace
 	req.Name = name
-	req.FilePath = ctx.Param("file_path")
+	req.FilePath = filePath
 
+	slog.Error("File path: ", slog.Any("file_path", ctx.Param("file_path")))
+	slog.Error("File path: ", slog.Any("file_path", req.FilePath))
 	resp, err := h.c.CreateFile(ctx, req)
 	if err != nil {
 		slog.Error("Failed to create model file", slog.Any("error", err))
@@ -192,6 +291,21 @@ func (h *ModelHandler) CreateFile(ctx *gin.Context) {
 	httpbase.OK(ctx, resp)
 }
 
+// UpdateModelFile godoc
+// @Security     ApiKey
+// @Summary      Update model file
+// @Description  update model file
+// @Tags         Model
+// @Accept       json
+// @Produce      json
+// @Param        namespace path string true "namespace"
+// @Param        name path string true "name"
+// @Param        file_path path string true "file_path"
+// @Param        body body types.UpdateFileReq true "body"
+// @Success      200  {object}  types.Response{data=types.UpdateFileResp} "OK"
+// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
+// @Router       /models/{namespace}/{name}/raw/{file_path} [put]
 func (h *ModelHandler) UpdateFile(ctx *gin.Context) {
 	var req *types.UpdateFileReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {
@@ -207,9 +321,11 @@ func (h *ModelHandler) UpdateFile(ctx *gin.Context) {
 		return
 	}
 
+	filePath := ctx.Param("file_path")
+	filePath = convertFilePathFromRoute(filePath)
 	req.NameSpace = namespace
 	req.Name = name
-	req.FilePath = ctx.Param("file_path")
+	req.FilePath = filePath
 
 	resp, err := h.c.UpdateFile(ctx, req)
 	if err != nil {
@@ -221,6 +337,20 @@ func (h *ModelHandler) UpdateFile(ctx *gin.Context) {
 	httpbase.OK(ctx, resp)
 }
 
+// GetModelCommits godoc
+// @Security     ApiKey
+// @Summary      Get model commits
+// @Description  get model commits
+// @Tags         Model
+// @Accept       json
+// @Produce      json
+// @Param        namespace path string true "namespace"
+// @Param        name path string true "name"
+// @Param        ref query string false "ref"
+// @Success      200  {object}  types.Response{data=[]types.Commit} "OK"
+// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
+// @Router       /models/{namespace}/{name}/commits [get]
 func (h *ModelHandler) Commits(ctx *gin.Context) {
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
 	if err != nil {
@@ -253,6 +383,20 @@ func (h *ModelHandler) Commits(ctx *gin.Context) {
 	httpbase.OK(ctx, commits)
 }
 
+// GetModelLastCommit godoc
+// @Security     ApiKey
+// @Summary      Get model last commit
+// @Description  get model last commit
+// @Tags         Model
+// @Accept       json
+// @Produce      json
+// @Param        namespace path string true "namespace"
+// @Param        name path string true "name"
+// @Param        ref query string false "ref"
+// @Success      200  {object}  types.Response{data=types.Commit} "OK"
+// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
+// @Router       /models/{namespace}/{name}/last_commit [get]
 func (h *ModelHandler) LastCommit(ctx *gin.Context) {
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
 	if err != nil {
@@ -277,6 +421,21 @@ func (h *ModelHandler) LastCommit(ctx *gin.Context) {
 	httpbase.OK(ctx, commit)
 }
 
+// GetModelFileRaw godoc
+// @Security     ApiKey
+// @Summary      Get model file raw
+// @Description  get model file raw
+// @Tags         Model
+// @Accept       json
+// @Produce      json
+// @Param        namespace path string true "namespace"
+// @Param        name path string true "name"
+// @Param        file_path path string true "file_path"
+// @Param        ref query string false "ref"
+// @Success      200  {object}  types.Response{data=types.Commit} "OK"
+// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
+// @Router       /models/{namespace}/{name}/raw/{file_path} [get]
 func (h *ModelHandler) FileRaw(ctx *gin.Context) {
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
 	if err != nil {
@@ -284,10 +443,12 @@ func (h *ModelHandler) FileRaw(ctx *gin.Context) {
 		ctx.JSON(http.StatusBadRequest, gin.H{"message": err.Error()})
 		return
 	}
+	filePath := ctx.Param("file_path")
+	filePath = convertFilePathFromRoute(filePath)
 	req := &types.GetFileReq{
 		Namespace: namespace,
 		Name:      name,
-		Path:      ctx.Param("file_path"),
+		Path:      filePath,
 		Ref:       ctx.Query("ref"),
 	}
 	raw, err := h.c.FileRaw(ctx, req)
@@ -301,6 +462,24 @@ func (h *ModelHandler) FileRaw(ctx *gin.Context) {
 	httpbase.OK(ctx, raw)
 }
 
+// DownloadModelFile godoc
+// @Security     ApiKey
+// @Summary      Download model file
+// @Description  download model file
+// @Tags         Model
+// @Accept       json
+// @Produce      json
+// @Produce      octet-stream
+// @Param        namespace path string true "namespace"
+// @Param        name path string true "name"
+// @Param        file_path path string true "file_path"
+// @Param        lfs query bool false "lfs"
+// @Param        ref query string false "ref"
+// @Param        save_as query string false "name of download file"
+// @Success      200  {object}  types.Response{data=string} "OK"
+// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
+// @Router       /models/{namespace}/{name}/download/{file_path} [get]
 func (h *ModelHandler) DownloadFile(ctx *gin.Context) {
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
 	if err != nil {
@@ -308,10 +487,12 @@ func (h *ModelHandler) DownloadFile(ctx *gin.Context) {
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
+	filePath := ctx.Param("file_path")
+	filePath = convertFilePathFromRoute(filePath)
 	req := &types.GetFileReq{
 		Namespace: namespace,
 		Name:      name,
-		Path:      ctx.Param("file_path"),
+		Path:      filePath,
 		Ref:       ctx.Query("ref"),
 		Lfs:       false,
 		SaveAs:    ctx.Query("save_as"),
@@ -347,6 +528,21 @@ func (h *ModelHandler) DownloadFile(ctx *gin.Context) {
 	}
 }
 
+// GetModelBranches godoc
+// @Security     ApiKey
+// @Summary      Get model branches
+// @Description  get model branches
+// @Tags         Model
+// @Accept       json
+// @Produce      json
+// @Param        namespace path string true "namespace"
+// @Param        name path string true "name"
+// @param        per query int false "per" default(20)
+// @Param        page query int false "page" default(1)
+// @Success      200  {object}  types.Response{data=[]types.ModelBranch} "OK"
+// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
+// @Router       /models/{namespace}/{name}/branches [get]
 func (h *ModelHandler) Branches(ctx *gin.Context) {
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
 	if err != nil {
@@ -377,6 +573,19 @@ func (h *ModelHandler) Branches(ctx *gin.Context) {
 	httpbase.OK(ctx, branches)
 }
 
+// GetModelTags godoc
+// @Security     ApiKey
+// @Summary      Get model tags
+// @Description  get model tags
+// @Tags         Model
+// @Accept       json
+// @Produce      json
+// @Param        namespace path string true "namespace"
+// @Param        name path string true "name"
+// @Success      200  {object}  types.Response{data=[]types.ModelBranch} "OK"
+// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
+// @Router       /models/{namespace}/{name}/tags [get]
 func (h *ModelHandler) Tags(ctx *gin.Context) {
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
 	if err != nil {
@@ -399,6 +608,20 @@ func (h *ModelHandler) Tags(ctx *gin.Context) {
 	httpbase.OK(ctx, tags)
 }
 
+// GetModelFileTree godoc
+// @Security     ApiKey
+// @Summary      Get model file tree
+// @Description  get model file tree
+// @Tags         Model
+// @Accept       json
+// @Produce      json
+// @Param        namespace path string true "namespace"
+// @Param        name path string true "name"
+// @Param        ref query string false "ref"
+// @Success      200  {object}  types.Response{data=[]types.File} "OK"
+// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
+// @Router       /models/{namespace}/{name}/tree [get]
 func (h *ModelHandler) Tree(ctx *gin.Context) {
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
 	if err != nil {
@@ -423,6 +646,20 @@ func (h *ModelHandler) Tree(ctx *gin.Context) {
 	httpbase.OK(ctx, tree)
 }
 
+// UpdateModelDownloads godoc
+// @Security     ApiKey
+// @Summary      Update model downloads
+// @Description  update model downloads
+// @Tags         Model
+// @Accept       json
+// @Produce      json
+// @Param        namespace path string true "namespace"
+// @Param        name path string true "name"
+// @Param        body body types.UpdateDownloadsReq true "body"
+// @Success      200  {object}  types.Response{data=[]types.File} "OK"
+// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
+// @Router       /models/{namespace}/{name}/update_downloads [post]
 func (h *ModelHandler) UpdateDownloads(ctx *gin.Context) {
 	var req *types.UpdateDownloadsReq
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
@@ -484,4 +721,8 @@ func parseTagReqs(ctx *gin.Context) (tags []database.TagReq) {
 	}
 
 	return
+}
+
+func convertFilePathFromRoute(path string) string {
+	return strings.TrimLeft(path, "/")
 }

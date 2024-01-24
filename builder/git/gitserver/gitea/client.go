@@ -12,9 +12,12 @@ import (
 	"net/http"
 
 	"github.com/OpenCSGs/gitea-go-sdk/gitea"
+	"opencsg.com/csghub-server/builder/git/gitserver"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/config"
 )
+
+var _ gitserver.GitServer = (*Client)(nil)
 
 type Client struct {
 	giteaClient *gitea.Client
