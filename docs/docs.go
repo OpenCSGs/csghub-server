@@ -2885,7 +2885,7 @@ const docTemplate = `{
                     "application/json"
                 ],
                 "tags": [
-                    "Members"
+                    "Member"
                 ],
                 "summary": "Create new membership between org and user",
                 "parameters": [
@@ -2928,7 +2928,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/organizations/{name}/members/:username": {
+        "/organizations/{name}/members/{username}": {
             "delete": {
                 "security": [
                     {
@@ -2943,7 +2943,7 @@ const docTemplate = `{
                     "application/json"
                 ],
                 "tags": [
-                    "Members"
+                    "Member"
                 ],
                 "summary": "Remove membership between org and user",
                 "parameters": [
@@ -3696,6 +3696,9 @@ const docTemplate = `{
                 "name": {
                     "type": "string"
                 },
+                "nickname": {
+                    "type": "string"
+                },
                 "path": {
                     "type": "string"
                 },
@@ -3709,9 +3712,6 @@ const docTemplate = `{
                     "type": "integer"
                 },
                 "updated_at": {
-                    "type": "string"
-                },
-                "url_slug": {
                     "type": "string"
                 },
                 "user": {
@@ -3749,6 +3749,9 @@ const docTemplate = `{
                 "name": {
                     "type": "string"
                 },
+                "nickname": {
+                    "type": "string"
+                },
                 "path": {
                     "type": "string"
                 },
@@ -3762,9 +3765,6 @@ const docTemplate = `{
                     "type": "integer"
                 },
                 "updated_at": {
-                    "type": "string"
-                },
-                "url_slug": {
                     "type": "string"
                 },
                 "user": {
@@ -4149,6 +4149,9 @@ const docTemplate = `{
                 "namespace": {
                     "type": "string"
                 },
+                "nickname": {
+                    "type": "string"
+                },
                 "path": {
                     "type": "string"
                 },
@@ -4208,6 +4211,9 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "namespace": {
+                    "type": "string"
+                },
+                "nickname": {
                     "type": "string"
                 },
                 "path": {
@@ -4328,6 +4334,9 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "name": {
+                    "type": "string"
+                },
+                "nickname": {
                     "type": "string"
                 },
                 "path": {
@@ -4519,6 +4528,9 @@ const docTemplate = `{
                 "namespace": {
                     "type": "string"
                 },
+                "nickname": {
+                    "type": "string"
+                },
                 "origin_name": {
                     "type": "string"
                 },
@@ -4603,6 +4615,9 @@ const docTemplate = `{
                 "namespace": {
                     "type": "string"
                 },
+                "nickname": {
+                    "type": "string"
+                },
                 "origin_name": {
                     "type": "string"
                 },
@@ -4633,6 +4648,14 @@ const docTemplate = `{
                     "type": "string"
                 }
             }
+        }
+    },
+    "securityDefinitions": {
+        "ApiKey": {
+            "description": "Bearer token",
+            "type": "apiKey",
+            "name": "Authorization",
+            "in": "header"
         }
     }
 }`

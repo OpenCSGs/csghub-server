@@ -28,6 +28,8 @@ var serverCmd = &cobra.Command{
 			return err
 		}
 
+		enableSwagger = enableSwagger || cfg.EnableSwagger
+
 		if enableSwagger {
 			//	@securityDefinitions.apikey ApiKey
 			//	@in                         header
