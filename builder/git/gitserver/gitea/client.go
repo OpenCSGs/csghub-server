@@ -96,8 +96,13 @@ func generateAccessTokenFromGitea(config *config.Config) (string, error) {
 	giteaUrl := fmt.Sprintf("%s/api/v1/users/%s/tokens", config.GitServer.URL, username)
 	authHeader := encodeCredentials(username, password)
 	data := map[string]any{
-		"name":   "access_token",
-		"scopes": []string{"read:user", "write:user", "write:admin", "read:admin"},
+		"name": "access_token",
+		"scopes": []string{
+			"write:user",
+			"write:admin",
+			"write:organization",
+			"write:repository",
+		},
 	}
 	jsonData, err := json.Marshal(data)
 	if err != nil {
