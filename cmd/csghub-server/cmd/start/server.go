@@ -38,7 +38,7 @@ var serverCmd = &cobra.Command{
 			docs.SwaggerInfo.Title = "CSGHub Server API"
 			docs.SwaggerInfo.Description = "CSGHub Server API."
 			docs.SwaggerInfo.Version = "1.0"
-			docs.SwaggerInfo.Host = "localhost:8080"
+			docs.SwaggerInfo.Host = cfg.APIServer.ExternalHost
 			docs.SwaggerInfo.BasePath = "/api/v1"
 			docs.SwaggerInfo.Schemes = []string{"http", "https"}
 		}
