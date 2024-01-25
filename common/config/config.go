@@ -9,7 +9,7 @@ type Config struct {
 
 	APIServer struct {
 		Port         int    `envconfig:"STARHUB_SERVER_SERVER_PORT" default:"8080"`
-		ExternalHost string `envconfig:"STARHUB_SERVER_SERVER_EXTERNAL_HOST" default:"http://localhost"`
+		ExternalHost string `envconfig:"STARHUB_SERVER_SERVER_EXTERNAL_HOST" default:"localhost:8080"`
 	}
 
 	DocsHost string `envconfig:"STARHUB_SERVER_SERVER_DOCS_HOST" default:"http://localhost:6636"`
