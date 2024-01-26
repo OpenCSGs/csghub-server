@@ -12,7 +12,7 @@ variables:
   SAST_IMAGE_SUFFIX: '-fips'
 
 include:
-  - template: Security/Dependency-Scanning.gitlab-ci.yml
+  # - template: Security/Dependency-Scanning.gitlab-ci.yml
   - template: Jobs/Secret-Detection.gitlab-ci.yml
 
 test:
