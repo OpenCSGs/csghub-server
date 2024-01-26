@@ -20,6 +20,7 @@ const (
 	ModelOrgPrefix   = "models_"
 	DatasetOrgPrefix = "datasets_"
 	SpaceOrgPrefix   = "spaces_"
+	CodeOrgPrefix    = "codes_"
 )
 
 type Client struct {
@@ -51,7 +52,6 @@ func NewClient(config *config.Config) (client *Client, err error) {
 		gitea.SetToken(token.Token),
 		gitea.SetBasicAuth(config.GitServer.Username, config.GitServer.Password),
 	)
-
 	if err != nil {
 		return nil, err
 	}

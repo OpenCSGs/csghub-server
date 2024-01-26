@@ -55,6 +55,7 @@ func (c *Client) getTeamOptByRole(role membership.Role) gitea.CreateTeamOption {
 	}
 	return opt
 }
+
 func (c *Client) AddMember(ctx context.Context, org, member string, role membership.Role) error {
 	var err error
 	for _, to := range c.getTargetOrgs(org) {
@@ -66,18 +67,18 @@ func (c *Client) AddMember(ctx context.Context, org, member string, role members
 }
 
 func (c *Client) addMember(ctx context.Context, org, member string, role membership.Role) error {
-	//teams are created automatically when create repo
+	// teams are created automatically when create repo
 	t, err := c.findTeam(org, role)
 	if err != nil {
 		slog.ErrorContext(ctx, "fail to get team from gitea", slog.Any("err", err))
 		return err
 	}
 	_, resp, err := c.giteaClient.GetTeamMember(t.ID, member)
-	//silently success if user is already a member
+	// silently success if user is already a member
 	if resp.StatusCode == http.StatusOK {
 		return nil
 	}
-	//if not a member
+	// if not a member
 	if resp.StatusCode == http.StatusNotFound {
 		_, err = c.giteaClient.AddTeamMember(t.ID, member)
 		if err != nil {
@@ -85,7 +86,7 @@ func (c *Client) addMember(ctx context.Context, org, member string, role members
 		}
 		return err
 	}
-	//unkown server error happend
+	// unkown server error happend
 	slog.ErrorContext(ctx, "fail to get team member from gitea", slog.Any("err", err))
 	return err
 }
@@ -109,7 +110,7 @@ func (c *Client) removeMember(ctx context.Context, org, member string, role memb
 		return err
 	}
 
-	//silently success if user is not a member
+	// silently success if user is not a member
 	if u == nil {
 		return nil
 	}
@@ -122,10 +123,11 @@ func (c *Client) IsRole(ctx context.Context, org, member string, role membership
 }
 
 func (c *Client) getTargetOrgs(org string) []string {
-	orgs := [3]string{
+	orgs := [4]string{
 		common.WithPrefix(org, DatasetOrgPrefix),
 		common.WithPrefix(org, ModelOrgPrefix),
 		common.WithPrefix(org, SpaceOrgPrefix),
+		common.WithPrefix(org, CodeOrgPrefix),
 	}
 	return orgs[:]
 }

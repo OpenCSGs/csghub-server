@@ -19,7 +19,7 @@ func NewOrgStore() *OrgStore {
 type Organization struct {
 	ID       int64  `bun:",pk,autoincrement" json:"id"`
 	FullName string `bun:",column:name,notnull" json:"name"`
-	//unique name of the organization
+	// unique name of the organization
 	Name        string     `bun:",column:path,notnull" json:"path"`
 	GitPath     string     `bun:",notnull" json:"git_path"`
 	Description string     `json:"description"`
@@ -47,7 +47,8 @@ func (s *OrgStore) Create(ctx context.Context, org *Organization, namepace *Name
 func (s *OrgStore) Index(ctx context.Context, username string) (orgs []Organization, err error) {
 	query := s.db.Operator.Core.
 		NewSelect().
-		Model(&orgs)
+		Model(&orgs).
+		Relation("User")
 	if username != "" {
 		query = query.
 			Join("JOIN users AS u ON u.id = organization.user_id").
