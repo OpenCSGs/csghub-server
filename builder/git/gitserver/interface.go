@@ -51,4 +51,6 @@ type GitServer interface {
 	CreateOrganization(req *types.CreateOrgReq, orgOwner database.User) (*database.Organization, error)
 	DeleteOrganization(string) error
 	UpdateOrganization(*types.EditOrgReq, *database.Organization) (*database.Organization, error)
+
+	FixOrganization(req *types.CreateOrgReq, orgOwner database.User) error
 }

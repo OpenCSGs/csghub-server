@@ -13,6 +13,7 @@ const (
 	ModelOrgPrefix   = "models_"
 	DatasetOrgPrefix = "datasets_"
 	SpaceOrgPrefix   = "spaces_"
+	CodeOrgPrefix    = "codes_"
 )
 
 func (c *Client) CreateModelRepo(req *types.CreateModelReq) (model *database.Model, repo *database.Repository, err error) {
@@ -81,7 +82,6 @@ func (c *Client) UpdateModelRepo(
 			DefaultBranch: gitea.OptionalString(req.DefaultBranch),
 		},
 	)
-
 	if err != nil {
 		return
 	}
@@ -177,7 +177,6 @@ func (c *Client) UpdateDatasetRepo(
 			DefaultBranch: gitea.OptionalString(req.DefaultBranch),
 		},
 	)
-
 	if err != nil {
 		return
 	}
