@@ -1,6 +1,7 @@
 package gitea
 
 import (
+	"errors"
 	"log/slog"
 
 	"github.com/OpenCSGs/gitea-go-sdk/gitea"
@@ -8,6 +9,32 @@ import (
 	"opencsg.com/csghub-server/common/types"
 	"opencsg.com/csghub-server/common/utils/common"
 )
+
+// FixOrganization recreate organization data, ignore data duplication error
+// !should only be used for online data fixing
+func (c *Client) FixOrganization(req *types.CreateOrgReq, user database.User) error {
+	var errs error
+	orgNames := c.getTargetOrgs(req.Name)
+	for _, orgName := range orgNames {
+		_, _, err := c.giteaClient.AdminCreateOrg(
+			user.Username,
+			gitea.CreateOrgOption{
+				Name:        orgName,
+				Description: req.Description,
+				FullName:    req.FullName,
+			},
+		)
+		if err != nil {
+			errs = errors.Join(err)
+			slog.Error("fix gitea organization failed", slog.String("orgName", orgName), slog.String("user", user.Username),
+				slog.String("error", err.Error()))
+		} else {
+			slog.Info("fix gitea organization success", slog.String("orgName", req.Name), slog.String("user", user.Username))
+		}
+	}
+
+	return errs
+}
 
 func (c *Client) CreateOrganization(req *types.CreateOrgReq, user database.User) (org *database.Organization, err error) {
 	orgNames := c.getTargetOrgs(req.Name)
@@ -20,12 +47,10 @@ func (c *Client) CreateOrganization(req *types.CreateOrgReq, user database.User)
 				FullName:    req.FullName,
 			},
 		)
-
 		if err != nil {
-			slog.Error("failed to create organization", slog.String("orgName", orgName))
+			slog.Error("create gitea organization failed", slog.String("orgName", orgName), slog.String("userName", user.Username))
 			return nil, err
 		}
-
 	}
 
 	org = &database.Organization{
@@ -74,10 +99,11 @@ func (c *Client) UpdateOrganization(req *types.EditOrgReq, originOrg *database.O
 }
 
 func (c *Client) getTargetOrgs(org string) []string {
-	orgs := [3]string{
+	orgs := [4]string{
 		common.WithPrefix(org, DatasetOrgPrefix),
 		common.WithPrefix(org, ModelOrgPrefix),
 		common.WithPrefix(org, SpaceOrgPrefix),
+		common.WithPrefix(org, CodeOrgPrefix),
 	}
 	return orgs[:]
 }

@@ -50,3 +50,9 @@ func (s *MemberStore) Delete(ctx context.Context, orgID, userID int64, role stri
 	_, err := s.db.Core.NewDelete().Model(&member).Where("organization_id=? and user_id=? and role=?", orgID, userID, role).Exec(ctx)
 	return err
 }
+
+func (s *MemberStore) UserMembers(ctx context.Context, userID int64) ([]Member, error) {
+	var members []Member
+	err := s.db.Core.NewSelect().Model((*Member)(nil)).Where("user_id=?", userID).Scan(ctx, &members)
+	return members, err
+}
