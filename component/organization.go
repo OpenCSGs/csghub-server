@@ -2,7 +2,6 @@ package component
 
 import (
 	"context"
-
 	"errors"
 	"fmt"
 	"log/slog"
@@ -48,6 +47,27 @@ type OrganizationComponent struct {
 	msc *MemberComponent
 }
 
+func (c *OrganizationComponent) FixOrgData(ctx context.Context, org *database.Organization) (*database.Organization, error) {
+	user := org.User
+	req := new(types.CreateOrgReq)
+	req.Name = org.Name
+	req.FullName = org.FullName
+	req.Username = org.User.Username
+	req.Description = org.Description
+	err := c.gs.FixOrganization(req, *user)
+	if err != nil {
+		slog.Error("fix git org data has error", slog.Any("error", err))
+	}
+	// need to create roles for a new org before adding members
+	err = c.msc.InitRoles(ctx, org)
+	if err != nil {
+		slog.Error("fix organization role has error", slog.String("error", err.Error()))
+	}
+	// org creator defaults to be admin role
+	err = c.msc.SetAdmin(ctx, org, user)
+	return org, err
+}
+
 func (c *OrganizationComponent) Create(ctx context.Context, req *types.CreateOrgReq) (*database.Organization, error) {
 	user, err := c.us.FindByUsername(ctx, req.Username)
 	if err != nil {
@@ -74,12 +94,12 @@ func (c *OrganizationComponent) Create(ctx context.Context, req *types.CreateOrg
 	if err != nil {
 		return nil, fmt.Errorf("failed create database organization, error: %w", err)
 	}
-	//need to create roles for a new org before adding members
+	// need to create roles for a new org before adding members
 	err = c.msc.InitRoles(ctx, org)
 	if err != nil {
 		return nil, fmt.Errorf("failed init roles for organization, error: %w", err)
 	}
-	//org creator defaults to be admin role
+	// org creator defaults to be admin role
 	err = c.msc.SetAdmin(ctx, org, &user)
 	return org, err
 }
@@ -122,7 +142,7 @@ func (c *OrganizationComponent) Update(ctx context.Context, req *types.EditOrgRe
 
 func (c *OrganizationComponent) Models(ctx context.Context, req *types.OrgModelsReq) ([]database.Model, int, error) {
 	r, err := c.msc.GetMemberRole(ctx, req.Namespace, req.CurrentUser)
-	//log error, and treat user as unkown role in org
+	// log error, and treat user as unkown role in org
 	if err != nil {
 		slog.Error("faild to get member role",
 			slog.String("org", req.Namespace), slog.String("user", req.CurrentUser),
@@ -141,7 +161,7 @@ func (c *OrganizationComponent) Models(ctx context.Context, req *types.OrgModels
 
 func (c *OrganizationComponent) Datasets(ctx context.Context, req *types.OrgDatasetsReq) ([]database.Dataset, int, error) {
 	r, err := c.msc.GetMemberRole(ctx, req.Namespace, req.CurrentUser)
-	//log error, and treat user as unkown role in org
+	// log error, and treat user as unkown role in org
 	if err != nil {
 		slog.Error("faild to get member role",
 			slog.String("org", req.Namespace), slog.String("user", req.CurrentUser),

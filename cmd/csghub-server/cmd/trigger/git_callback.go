@@ -29,6 +29,7 @@ func init() {
 		"paths of repositories to trigger callback, path in format '[repo_type]/[owner]/[repo_name]', for example 'datasets/leida/stg-test-dataset,models/leida/stg-test-model'")
 	Cmd.AddCommand(
 		gitCallbackCmd,
+		fixOrgDataCmd,
 	)
 }
 
@@ -107,7 +108,7 @@ var gitCallbackCmd = &cobra.Command{
 			namespace, repoName := splits[0], splits[1]
 			req := &types.GiteaCallbackPushReq{}
 			var err error
-			//file paths relative to repository root
+			// file paths relative to repository root
 			var filePaths []string
 			if repo.RepositoryType == "dataset" {
 				filePaths, err = getFilePaths(namespace, repoName, "", gs.GetDatasetFileTree)
