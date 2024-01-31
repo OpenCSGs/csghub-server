@@ -64,9 +64,9 @@ type UpdateModelReq struct {
 }
 
 type UpdateDownloadsReq struct {
-	Namespace     string `json:"namespace"`
-	Name          string `json:"name"`
-	ReqDate       string `json:"date"`
-	Date          time.Time
-	DownloadCount int64 `json:"download_count"`
+	Namespace  string `json:"namespace"`
+	Name       string `json:"name"`
+	ReqDate    string `json:"date"`
+	Date       time.Time
+	CloneCount int64 `json:"download_count"`
 }
