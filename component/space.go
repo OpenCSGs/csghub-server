@@ -71,7 +71,7 @@ func (c *SpaceComponent) Create(ctx context.Context, req types.CreateSpaceReq) (
 		Private:   req.Private,
 		RepoType:  types.SpaceRepo,
 	}
-	gitRepo, err := c.git.CreateRepository(ctx, gitRepoReq)
+	gitRepo, err := c.git.CreateRepo(ctx, gitRepoReq)
 	if err != nil {
 		slog.Error("fail to create space in git ", slog.Any("req", req), slog.String("error", err.Error()))
 		return nil, fmt.Errorf("fail to create space in git, error: %w", err)
