@@ -23,7 +23,7 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 	r.Use(gin.Recovery())
 	r.Use(middleware.Log())
 	apiGroup := r.Group("/api/v1")
-	//TODO:use middleware to handle common response
+	// TODO:use middleware to handle common response
 	// Models routes
 	modelHandler, err := handler.NewModelHandler(config)
 	if err != nil {
@@ -72,6 +72,28 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 	dsViewerHandler, err := handler.NewDatasetViewerHandler(config)
 	apiGroup.GET("/datasets/:namespace/:name/viewer/*file_path", dsViewerHandler.View)
 
+	spaceHandler, err := handler.NewSpaceHandler(config)
+	spaces := apiGroup.Group("/spaces")
+	{
+		// list all spaces
+		spaces.GET("/", spaceHandler.Index)
+		// show a user or org's space
+		spaces.GET("/:namespace/:name", spaceHandler.Get)
+		spaces.POST("/:namespace/:name", spaceHandler.Create)
+		spaces.PUT("/:namespace/:name", spaceHandler.Update)
+		spaces.DELETE("/:namespace/:name", spaceHandler.Delete)
+		// invoke model prediction
+		spaces.POST("/:namespace/:name/predict", spaceHandler.Predict)
+		// depoly and start running the space
+		spaces.POST("/:namespace/:name/run", nil)
+		// stop running space
+		spaces.POST("/:namespace/:name/stop", nil)
+		// pull space running status
+		spaces.POST("/:namespace/:name/status", nil)
+		// call space webhook api
+		spaces.POST("/:namespace/:name/webhook", nil)
+	}
+
 	// User routes
 	userHandler, err := handler.NewUserHandler(config)
 	if err != nil {
@@ -99,7 +121,7 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 	apiGroup.POST("/user/:username/ssh_keys", sshKeyHandler.Create)
 	apiGroup.DELETE("/user/:username/ssh_key/:name", sshKeyHandler.Delete)
 
-	//Organization
+	// Organization
 	orgHandler, err := handler.NewOrganizationHandler(config)
 	if err != nil {
 		return nil, fmt.Errorf("error creating user controller:%w", err)
@@ -113,7 +135,7 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 	// Organization datasets
 	apiGroup.GET("/organization/:namespace/datasets", orgHandler.Datasets)
 
-	//Member
+	// Member
 	memberCtrl, err := handler.NewMemberHandler(config)
 	if err != nil {
 		return nil, fmt.Errorf("error creating user controller:%w", err)
@@ -123,7 +145,7 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 	apiGroup.PUT("/organizations/:name/members/:username", memberCtrl.Update)
 	apiGroup.DELETE("/organizations/:name/members/:username", memberCtrl.Delete)
 
-	//Tag
+	// Tag
 	tagCtrl, err := handler.NewTagHandler(config)
 	if err != nil {
 		return nil, fmt.Errorf("error creating tag controller:%w", err)
@@ -133,13 +155,13 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 	// apiGroup.PUT("/tag", tagCtrl.UpdateTag)
 	// apiGroup.DELETE("/tag", tagCtrl.DeleteTag)
 
-	//callback
+	// callback
 	callbackCtrl, err := callback.NewGitCallbackHandler(config)
 	if err != nil {
 		return nil, fmt.Errorf("error creating callback controller:%w", err)
 	}
 	apiGroup.POST("/callback/git", callbackCtrl.Handle)
-	//Sensive check
+	// Sensive check
 	if config.SensitiveCheck.Enable {
 		sensitiveCtrl := handler.NewSensitiveHandler(config)
 		apiGroup.POST("/sensitive/text", sensitiveCtrl.Text)

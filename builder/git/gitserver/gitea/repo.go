@@ -1,9 +1,12 @@
 package gitea
 
 import (
+	"context"
+	"errors"
 	"fmt"
 
 	"github.com/OpenCSGs/gitea-go-sdk/gitea"
+	"opencsg.com/csghub-server/builder/git/gitserver"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/types"
 	"opencsg.com/csghub-server/common/utils/common"
@@ -15,6 +18,10 @@ const (
 	SpaceOrgPrefix   = "spaces_"
 	CodeOrgPrefix    = "codes_"
 )
+
+func (c *Client) CreateRepository(ctx context.Context, req gitserver.CreateRepoReq) (*gitserver.CreateRepoResp, error) {
+	return nil, errors.New("not implemented")
+}
 
 func (c *Client) CreateModelRepo(req *types.CreateModelReq) (model *database.Model, repo *database.Repository, err error) {
 	var urlSlug string
@@ -57,7 +64,7 @@ func (c *Client) CreateModelRepo(req *types.CreateModelReq) (model *database.Mod
 		Labels:         req.Labels,
 		License:        req.License,
 		DefaultBranch:  giteaRepo.DefaultBranch,
-		RepositoryType: database.ModelRepo,
+		RepositoryType: types.ModelRepo,
 		SSHCloneURL:    giteaRepo.SSHURL,
 		HTTPCloneURL:   common.PortalCloneUrl(giteaRepo.CloneURL, ModelOrgPrefix, c.config),
 	}
@@ -152,7 +159,7 @@ func (c *Client) CreateDatasetRepo(req *types.CreateDatasetReq) (dataset *databa
 		Labels:         req.Labels,
 		License:        req.License,
 		DefaultBranch:  giteaRepo.DefaultBranch,
-		RepositoryType: database.DatasetRepo,
+		RepositoryType: types.DatasetRepo,
 		SSHCloneURL:    giteaRepo.SSHURL,
 		HTTPCloneURL:   common.PortalCloneUrl(giteaRepo.CloneURL, DatasetOrgPrefix, c.config),
 	}

@@ -3,13 +3,9 @@ package database
 import (
 	"context"
 	"fmt"
-)
 
-type RepositoryType string
-
-const (
-	ModelRepo   RepositoryType = "model"
-	DatasetRepo RepositoryType = "dataset"
+	"github.com/uptrace/bun"
+	"opencsg.com/csghub-server/common/types"
 )
 
 type RepoStore struct {
@@ -37,7 +33,7 @@ type Repository struct {
 	LfsFiles       []LfsFile            `bun:"rel:has-many,join:id=repository_id" json:"-"`
 	Downloads      []RepositoryDownload `bun:"rel:has-many,join:id=repository_id" json:"downloads"`
 	Tags           []Tag                `bun:"m2m:repository_tags,join:Repository=Tag" json:"tags"`
-	RepositoryType RepositoryType       `bun:",notnull" json:"repository_type"`
+	RepositoryType types.RepositoryType `bun:",notnull" json:"repository_type"`
 	HTTPCloneURL   string               `bun:",nullzero" json:"http_clone_url"`
 	SSHCloneURL    string               `bun:",nullzero" json:"ssh_clone_url"`
 	times
@@ -57,9 +53,18 @@ type RepositoryTag struct {
 	Count int32 `bun:",default:1" json:"count"`
 }
 
-func (s *RepoStore) CreateRepo(ctx context.Context, repo Repository) (err error) {
-	err = s.db.Operator.Core.NewInsert().Model(repo).Scan(ctx)
-	return
+func (s *RepoStore) CreateRepoTx(ctx context.Context, tx bun.Tx, input Repository) (*Repository, error) {
+	res, err := tx.NewInsert().Model(&input).Exec(ctx)
+	if err := assertAffectedOneRow(res, err); err != nil {
+		return nil, fmt.Errorf("create repository in tx failed,error:%w", err)
+	}
+
+	input.ID, _ = res.LastInsertId()
+	return &input, nil
+}
+
+func (s *RepoStore) CreateRepo(ctx context.Context, repo Repository) error {
+	return s.db.Operator.Core.NewInsert().Model(repo).Scan(ctx)
 }
 
 func (s *RepoStore) Find(ctx context.Context, owner, repoType, repoName string) (*Repository, error) {
