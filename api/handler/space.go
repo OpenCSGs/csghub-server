@@ -38,7 +38,7 @@ func (h *SpaceHandler) Get(ctx *gin.Context) {
 // @Tags         Space
 // @Accept       json
 // @Produce      json
-// @Param        body body handler.Create.createSpaceReq true "body"
+// @Param        body body types.CreateSpaceReq true "body"
 // @Success      200  {object}  types.Response{data=database.Space} "OK"
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
@@ -64,8 +64,8 @@ func (h *SpaceHandler) Create(ctx *gin.Context) {
 func (h *SpaceHandler) Update(ctx *gin.Context) {
 	type updateSpaceReq struct {
 		Username string `json:"username" example:"creator_user_name"`
-		Private  bool   `json:"private"`
 		License  string `json:"license" example:"MIT"`
+		Private  bool   `json:"private"`
 	}
 }
 

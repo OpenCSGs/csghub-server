@@ -332,6 +332,9 @@ func (s *DatasetStore) FindByPath(ctx context.Context, namespace string, repoPat
 		Where("dataset.path =?", fmt.Sprintf("%s/%s", namespace, repoPath)).
 		Where("dataset.name =?", repoPath).
 		Scan(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to find dataset: %w", err)
+	}
 	err = s.db.Operator.Core.NewSelect().
 		Model(resDataset.Repository).
 		WherePK().

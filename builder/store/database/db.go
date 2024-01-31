@@ -123,10 +123,10 @@ func NewDB(ctx context.Context, config DBConfig) (db *DB, err error) {
 // RunInTx runs the function in a transaction.
 // If the function returns an error, the transaction is rolled back.
 // Otherwise, the transaction is committed.
-func (db *DB) RunInTx(ctx context.Context, fn func(tx Operator) error) error {
+func (db *DB) RunInTx(ctx context.Context, fn func(ctx context.Context, tx Operator) error) error {
 	return db.BunDB.RunInTx(ctx, &sql.TxOptions{}, func(ctx context.Context, tx bun.Tx) error {
 		op := Operator{Core: tx}
-		return fn(op)
+		return fn(ctx, op)
 	})
 }
 

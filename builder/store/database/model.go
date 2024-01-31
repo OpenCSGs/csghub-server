@@ -330,6 +330,9 @@ func (s *ModelStore) FindByPath(ctx context.Context, namespace string, repoPath 
 		Where("model.name =?", repoPath).
 		Limit(1).
 		Scan(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to find model,error: %w", err)
+	}
 	err = s.db.Operator.Core.NewSelect().
 		Model(resModel.Repository).
 		WherePK().

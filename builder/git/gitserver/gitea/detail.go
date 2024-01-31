@@ -18,7 +18,7 @@ func (c *Client) GetModelDetail(namespace, name string) (model *types.ModelDetai
 		License:       "",
 		Private:       giteaRepo.Private,
 		Downloads:     0,
-		LastUpdatedAt: giteaRepo.Updated.Format("2006-01-02 15:04:05"),
+		LastUpdatedAt: giteaRepo.Updated.Format("006-01-02 15:04:05"),
 		HTTPCloneURL:  PortalCloneUrl(giteaRepo.CloneURL, types.ModelRepo, c.config.GitServer.URL, c.config.Frontend.URL),
 		SSHCloneURL:   giteaRepo.SSHURL,
 		Size:          giteaRepo.Size,
