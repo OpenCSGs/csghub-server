@@ -132,7 +132,7 @@ var initCmd = &cobra.Command{
 							continue
 						}
 						pDate, _ := time.Parse("2006/01/02", date)
-						err = ds.UpdateRepoDownloads(cmd.Context(), dataset, pDate, count)
+						err = ds.UpdateRepoCloneDownloads(cmd.Context(), dataset, pDate, count)
 						if err != nil {
 							fmt.Printf("Error updating dataset: %s, Date: %s, Count: %d error: %v\n", path, date, count, err)
 						}
@@ -145,7 +145,7 @@ var initCmd = &cobra.Command{
 							continue
 						}
 						pDate, _ := time.Parse("2006/01/02", date)
-						err = ms.UpdateRepoDownloads(cmd.Context(), model, pDate, count)
+						err = ms.UpdateRepoCloneDownloads(cmd.Context(), model, pDate, count)
 						if err != nil {
 							fmt.Printf("Error updating model: %s, Date: %s, Count: %d error: %v\n", path, date, count, err)
 						}

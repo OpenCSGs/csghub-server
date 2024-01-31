@@ -10,6 +10,7 @@ import (
 	"net/url"
 	"path"
 	"path/filepath"
+	"time"
 
 	"github.com/minio/minio-go/v7"
 	"opencsg.com/csghub-server/builder/git"
@@ -439,6 +440,10 @@ func (c *ModelComponent) DownloadFile(ctx context.Context, req *types.GetFileReq
 	if err != nil {
 		return nil, "", fmt.Errorf("failed to find model, error: %w", err)
 	}
+	err = c.ms.UpdateRepoFileDownloads(ctx, model, time.Now(), 1)
+	if err != nil {
+		return nil, "", fmt.Errorf("failed to update model file download count, error: %w", err)
+	}
 	if req.Ref == "" {
 		req.Ref = model.Repository.DefaultBranch
 	}
@@ -508,7 +513,7 @@ func (c *ModelComponent) UpdateDownloads(ctx context.Context, req *types.UpdateD
 		return fmt.Errorf("failed to find model, error: %w", err)
 	}
 
-	err = c.ms.UpdateRepoDownloads(ctx, model, req.Date, req.DownloadCount)
+	err = c.ms.UpdateRepoCloneDownloads(ctx, model, req.Date, req.CloneCount)
 	if err != nil {
 		return fmt.Errorf("failed to update model download count, error: %w", err)
 	}
