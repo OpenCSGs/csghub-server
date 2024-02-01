@@ -255,7 +255,7 @@ func (s *ModelStore) Update(ctx context.Context, model *Model, repo *Repository)
 	return
 }
 
-func (s *ModelStore) UpdateRepoFileDownloads(ctx context.Context, model *Model, date time.Time, downloadCount int64) (err error) {
+func (s *ModelStore) UpdateRepoFileDownloads(ctx context.Context, model *Model, date time.Time, clickDownloadCount int64) (err error) {
 	rd := new(RepositoryDownload)
 	err = s.db.Operator.Core.NewSelect().
 		Model(rd).
@@ -266,7 +266,7 @@ func (s *ModelStore) UpdateRepoFileDownloads(ctx context.Context, model *Model, 
 	}
 
 	if errors.Is(err, sql.ErrNoRows) {
-		rd.DownloadCount = downloadCount
+		rd.ClickDownloadCount = clickDownloadCount
 		rd.Date = date
 		rd.RepositoryID = model.RepositoryID
 		err = s.db.Operator.Core.NewInsert().
@@ -276,7 +276,7 @@ func (s *ModelStore) UpdateRepoFileDownloads(ctx context.Context, model *Model, 
 			return
 		}
 	} else {
-		rd.DownloadCount = rd.DownloadCount + downloadCount
+		rd.ClickDownloadCount = rd.ClickDownloadCount + clickDownloadCount
 		rd.UpdatedAt = time.Now()
 		query := s.db.Operator.Core.NewUpdate().
 			Model(rd).
@@ -340,7 +340,7 @@ func (s *ModelStore) UpdateRepoCloneDownloads(ctx context.Context, model *Model,
 func (s *ModelStore) UpdateDownloads(ctx context.Context, model *Model) error {
 	var downloadCount int64
 	err := s.db.Operator.Core.NewSelect().
-		ColumnExpr("(SUM(clone_count)+SUM(download_count)) AS total_count").
+		ColumnExpr("(SUM(clone_count)+SUM(click_download_count)) AS total_count").
 		Model(&RepositoryDownload{}).
 		Where("repository_id=?", model.RepositoryID).
 		Scan(ctx, &downloadCount)
