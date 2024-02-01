@@ -258,7 +258,7 @@ func (s *DatasetStore) Update(ctx context.Context, dataset *Dataset, repo *Repos
 	return
 }
 
-func (s *DatasetStore) UpdateRepoFileDownloads(ctx context.Context, dataset *Dataset, date time.Time, downloadCount int64) (err error) {
+func (s *DatasetStore) UpdateRepoFileDownloads(ctx context.Context, dataset *Dataset, date time.Time, clickDownloadCount int64) (err error) {
 	rd := new(RepositoryDownload)
 	err = s.db.Operator.Core.NewSelect().
 		Model(rd).
@@ -269,7 +269,7 @@ func (s *DatasetStore) UpdateRepoFileDownloads(ctx context.Context, dataset *Dat
 	}
 
 	if errors.Is(err, sql.ErrNoRows) {
-		rd.DownloadCount = downloadCount
+		rd.ClickDownloadCount = clickDownloadCount
 		rd.Date = date
 		rd.RepositoryID = dataset.RepositoryID
 		err = s.db.Operator.Core.NewInsert().
@@ -279,7 +279,7 @@ func (s *DatasetStore) UpdateRepoFileDownloads(ctx context.Context, dataset *Dat
 			return
 		}
 	} else {
-		rd.DownloadCount = rd.DownloadCount + downloadCount
+		rd.ClickDownloadCount = rd.ClickDownloadCount + clickDownloadCount
 		rd.UpdatedAt = time.Now()
 		query := s.db.Operator.Core.NewUpdate().
 			Model(rd).
@@ -343,7 +343,7 @@ func (s *DatasetStore) UpdateRepoCloneDownloads(ctx context.Context, dataset *Da
 func (s *DatasetStore) UpdateDownloads(ctx context.Context, dataset *Dataset) error {
 	var downloadCount int64
 	err := s.db.Operator.Core.NewSelect().
-		ColumnExpr("(SUM(clone_count)+SUM(download_count)) AS total_count").
+		ColumnExpr("(SUM(clone_count)+SUM(click_download_count)) AS total_count").
 		Model(&RepositoryDownload{}).
 		Where("repository_id=?", dataset.RepositoryID).
 		Scan(ctx, &downloadCount)

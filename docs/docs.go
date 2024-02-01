@@ -3957,6 +3957,9 @@ const docTemplate = `{
         "database.RepositoryDownload": {
             "type": "object",
             "properties": {
+                "click_download_count": {
+                    "type": "integer"
+                },
                 "created_at": {
                     "type": "string"
                 },
