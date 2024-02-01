@@ -63,13 +63,15 @@ func (c *SpaceComponent) Create(ctx context.Context, req types.CreateSpaceReq) (
 	}
 
 	gitRepoReq := gitserver.CreateRepoReq{
-		Username:  req.Creator,
-		Namespace: req.Namespace,
-		Name:      req.Name,
-		License:   req.License,
-		Readme:    "",
-		Private:   req.Private,
-		RepoType:  types.SpaceRepo,
+		Username:      req.Creator,
+		Namespace:     req.Namespace,
+		Name:          req.Name,
+		Nickname:      req.Name,
+		License:       req.License,
+		DefaultBranch: "main",
+		Readme:        "Please introduce your space.",
+		Private:       req.Private,
+		RepoType:      types.SpaceRepo,
 	}
 	gitRepo, err := c.git.CreateRepo(ctx, gitRepoReq)
 	if err != nil {
@@ -84,6 +86,7 @@ func (c *SpaceComponent) Create(ctx context.Context, req types.CreateSpaceReq) (
 		Name:           req.Name,
 		Private:        req.Private,
 		License:        req.License,
+		DefaultBranch:  "main",
 		RepositoryType: types.SpaceRepo,
 		HTTPCloneURL:   gitRepo.HttpCloneURL,
 		SSHCloneURL:    gitRepo.SshCloneURL,

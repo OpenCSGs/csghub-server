@@ -38,18 +38,19 @@ func (c *Client) CreateRepo(ctx context.Context, req gitserver.CreateRepoReq) (*
 	}
 
 	resp := &gitserver.CreateRepoResp{
-		Username:     req.Username,
-		Namespace:    req.Namespace,
-		Name:         req.Name,
-		Nickname:     req.Nickname,
-		Description:  req.Description,
-		Labels:       req.Labels,
-		License:      req.License,
-		RepoType:     req.RepoType,
-		GitPath:      giteaRepo.FullName,
-		SshCloneURL:  giteaRepo.SSHURL,
-		HttpCloneURL: PortalCloneUrl(giteaRepo.CloneURL, req.RepoType, c.config.GitServer.URL, c.config.Frontend.URL),
-		Private:      req.Private,
+		Username:      req.Username,
+		Namespace:     req.Namespace,
+		Name:          req.Name,
+		Nickname:      req.Nickname,
+		Description:   req.Description,
+		Labels:        req.Labels,
+		License:       req.License,
+		DefaultBranch: req.DefaultBranch,
+		RepoType:      req.RepoType,
+		GitPath:       giteaRepo.FullName,
+		SshCloneURL:   giteaRepo.SSHURL,
+		HttpCloneURL:  portalCloneUrl(giteaRepo.CloneURL, req.RepoType, c.config.GitServer.URL, c.config.Frontend.URL),
+		Private:       req.Private,
 	}
 
 	return resp, nil
@@ -98,7 +99,7 @@ func (c *Client) CreateModelRepo(req *types.CreateModelReq) (model *database.Mod
 		DefaultBranch:  giteaRepo.DefaultBranch,
 		RepositoryType: types.ModelRepo,
 		SSHCloneURL:    giteaRepo.SSHURL,
-		HTTPCloneURL:   PortalCloneUrl(giteaRepo.CloneURL, types.ModelRepo, c.config.GitServer.URL, c.config.Frontend.URL),
+		HTTPCloneURL:   portalCloneUrl(giteaRepo.CloneURL, types.ModelRepo, c.config.GitServer.URL, c.config.Frontend.URL),
 	}
 
 	return
@@ -193,7 +194,7 @@ func (c *Client) CreateDatasetRepo(req *types.CreateDatasetReq) (dataset *databa
 		DefaultBranch:  giteaRepo.DefaultBranch,
 		RepositoryType: types.DatasetRepo,
 		SSHCloneURL:    giteaRepo.SSHURL,
-		HTTPCloneURL:   PortalCloneUrl(giteaRepo.CloneURL, types.DatasetRepo, c.config.GitServer.URL, c.config.Frontend.URL),
+		HTTPCloneURL:   portalCloneUrl(giteaRepo.CloneURL, types.DatasetRepo, c.config.GitServer.URL, c.config.Frontend.URL),
 	}
 
 	return

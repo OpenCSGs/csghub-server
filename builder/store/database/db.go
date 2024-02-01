@@ -13,8 +13,6 @@ import (
 	"github.com/uptrace/bun/driver/pgdriver"
 	"github.com/uptrace/bun/driver/sqliteshim"
 	"github.com/uptrace/bun/extra/bundebug"
-	"github.com/uptrace/bun/migrate"
-	"opencsg.com/csghub-server/builder/store/database/migrations"
 
 	"github.com/uptrace/bun"
 )
@@ -136,9 +134,4 @@ func (db *DB) RunInTx(ctx context.Context, fn func(ctx context.Context, tx Opera
 // as the DB handle is meant to be long-lived and shared between many goroutines.
 func (db *DB) Close() error {
 	return db.BunDB.Close()
-}
-
-// NewMigrator factory of database migrator
-func NewMigrator(db *DB) *migrate.Migrator {
-	return migrate.NewMigrator(db.BunDB, migrations.Migrations) // nolint: staticcheck
 }

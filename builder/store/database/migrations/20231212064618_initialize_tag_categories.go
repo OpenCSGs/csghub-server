@@ -9,10 +9,11 @@ import (
 
 	"github.com/uptrace/bun"
 	"gopkg.in/yaml.v2"
+	"opencsg.com/csghub-server/builder/store/database"
 )
 
 type Categories struct {
-	Categories []TagCategory
+	Categories []database.TagCategory
 }
 
 func init() {
@@ -40,7 +41,6 @@ func init() {
 
 			tcs := tagCategory.Categories
 			_, err = db.NewInsert().Model(&tcs).Exec(ctx)
-
 			if err != nil {
 				fmt.Println("Error inserting data:", err)
 				return
@@ -48,7 +48,7 @@ func init() {
 			fmt.Println("Insert data successfully")
 			return
 		})
-	}, func(ctx context.Context, db *bun.DB) error {
+	}, func(context.Context, *bun.DB) error {
 		fmt.Print(" [down migration] ")
 		return nil
 	})

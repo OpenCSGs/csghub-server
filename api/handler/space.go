@@ -25,6 +25,17 @@ type SpaceHandler struct {
 	c *component.SpaceComponent
 }
 
+// GetAllSpaces   godoc
+// @Security     ApiKey
+// @Summary      Get all spaces
+// @Description  get all spaces
+// @Tags         Space
+// @Accept       json
+// @Produce      json
+// @Success      200  {object}  types.Response{data=database.Space} "OK"
+// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
+// @Router       /spaces [get]
 func (h *SpaceHandler) Index(ctx *gin.Context) {
 }
 

@@ -70,16 +70,22 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 
 	// Dataset viewer
 	dsViewerHandler, err := handler.NewDatasetViewerHandler(config)
+	if err != nil {
+		return nil, fmt.Errorf("error creating dataset viewer handler:%w", err)
+	}
 	apiGroup.GET("/datasets/:namespace/:name/viewer/*file_path", dsViewerHandler.View)
 
 	spaceHandler, err := handler.NewSpaceHandler(config)
+	if err != nil {
+		return nil, fmt.Errorf("error creating space handler:%w", err)
+	}
 	spaces := apiGroup.Group("/spaces")
 	{
 		// list all spaces
 		spaces.GET("/", spaceHandler.Index)
+		spaces.POST("/", spaceHandler.Create)
 		// show a user or org's space
 		spaces.GET("/:namespace/:name", spaceHandler.Get)
-		spaces.POST("/:namespace/:name", spaceHandler.Create)
 		spaces.PUT("/:namespace/:name", spaceHandler.Update)
 		spaces.DELETE("/:namespace/:name", spaceHandler.Delete)
 		// invoke model prediction

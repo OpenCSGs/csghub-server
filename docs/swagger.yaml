@@ -158,6 +158,7 @@ definitions:
       id:
         type: integer
       labels:
+        description: Depreated
         type: string
       license:
         type: string
@@ -168,9 +169,10 @@ definitions:
       private:
         type: boolean
       readme:
+        description: Depreated
         type: string
       repository_type:
-        $ref: '#/definitions/database.RepositoryType'
+        $ref: '#/definitions/types.RepositoryType'
       ssh_clone_url:
         type: string
       tags:
@@ -199,14 +201,6 @@ definitions:
       user_id:
         type: integer
     type: object
-  database.RepositoryType:
-    enum:
-    - model
-    - dataset
-    type: string
-    x-enum-varnames:
-    - ModelRepo
-    - DatasetRepo
   database.SSHKey:
     properties:
       content:
@@ -218,6 +212,42 @@ definitions:
       id:
         type: integer
       name:
+        type: string
+      updated_at:
+        type: string
+      user:
+        $ref: '#/definitions/database.User'
+      user_id:
+        type: integer
+    type: object
+  database.Space:
+    properties:
+      created_at:
+        type: string
+      downloads:
+        type: integer
+      git_path:
+        type: string
+      id:
+        type: integer
+      last_updated_at:
+        type: string
+      likes:
+        type: integer
+      name:
+        type: string
+      nickname:
+        type: string
+      path:
+        type: string
+      private:
+        type: boolean
+      repository:
+        $ref: '#/definitions/database.Repository'
+      repository_id:
+        type: integer
+      sdk:
+        description: gradio, streamlit, docker etc
         type: string
       updated_at:
         type: string
@@ -427,6 +457,26 @@ definitions:
       username:
         type: string
     type: object
+  types.CreateSpaceReq:
+    properties:
+      license:
+        example: MIT
+        type: string
+      name:
+        example: space_name_1
+        type: string
+      namespace:
+        example: user_or_org_name
+        type: string
+      private:
+        type: boolean
+      sdk:
+        example: gradio
+        type: string
+      username:
+        example: creator_user_name
+        type: string
+    type: object
   types.CreateUserRequest:
     properties:
       email:
@@ -580,6 +630,18 @@ definitions:
       ssh_clone_url:
         type: string
     type: object
+  types.RepositoryType:
+    enum:
+    - model
+    - dataset
+    - space
+    - code
+    type: string
+    x-enum-varnames:
+    - ModelRepo
+    - DatasetRepo
+    - SpaceRepo
+    - CodeRepo
   types.Response:
     properties:
       data: {}
@@ -2548,6 +2610,72 @@ paths:
       summary: Remove membership between org and user
       tags:
       - Member
+  /spaces:
+    get:
+      consumes:
+      - application/json
+      description: get all spaces
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/types.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/database.Space'
+              type: object
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Get all spaces
+      tags:
+      - Space
+    post:
+      consumes:
+      - application/json
+      description: create a new space
+      parameters:
+      - description: body
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/types.CreateSpaceReq'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/types.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/database.Space'
+              type: object
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Create a new space
+      tags:
+      - Space
   /tags:
     get:
       consumes:

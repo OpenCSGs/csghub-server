@@ -7,7 +7,7 @@ import (
 	"opencsg.com/csghub-server/common/types"
 )
 
-func PortalCloneUrl(url string, repoType types.RepositoryType, gitDomain, portalDomain string) string {
+func portalCloneUrl(url string, repoType types.RepositoryType, gitDomain, portalDomain string) string {
 	prefix := repoPrefixByType(repoType)
 	url = strings.Replace(url, prefix, fmt.Sprintf("%s/", prefix[:len(prefix)-1]), 1)
 	url = strings.Replace(url, gitDomain, portalDomain, 1)

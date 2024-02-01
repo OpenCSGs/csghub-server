@@ -19,15 +19,17 @@ func NewRepoStore() *RepoStore {
 }
 
 type Repository struct {
-	ID             int64                `bun:",pk,autoincrement" json:"id"`
-	UserID         int64                `bun:",notnull" json:"user_id"`
-	Path           string               `bun:",notnull" json:"path"`
-	GitPath        string               `bun:",notnull" json:"git_path"`
-	Name           string               `bun:",notnull" json:"name"`
-	Description    string               `bun:",nullzero" json:"description"`
-	Private        bool                 `bun:",notnull" json:"private"`
-	Labels         string               `bun:",nullzero" json:"labels"`
-	License        string               `bun:",nullzero" json:"license"`
+	ID          int64  `bun:",pk,autoincrement" json:"id"`
+	UserID      int64  `bun:",notnull" json:"user_id"`
+	Path        string `bun:",notnull" json:"path"`
+	GitPath     string `bun:",notnull" json:"git_path"`
+	Name        string `bun:",notnull" json:"name"`
+	Description string `bun:",nullzero" json:"description"`
+	Private     bool   `bun:",notnull" json:"private"`
+	// Depreated
+	Labels  string `bun:",nullzero" json:"labels"`
+	License string `bun:",nullzero" json:"license"`
+	// Depreated
 	Readme         string               `bun:",nullzero" json:"readme"`
 	DefaultBranch  string               `bun:",notnull" json:"default_branch"`
 	LfsFiles       []LfsFile            `bun:"rel:has-many,join:id=repository_id" json:"-"`
@@ -59,12 +61,7 @@ func (s *RepoStore) CreateRepoTx(ctx context.Context, tx bun.Tx, input Repositor
 		return nil, fmt.Errorf("create repository in tx failed,error:%w", err)
 	}
 
-	input.ID, _ = res.LastInsertId()
 	return &input, nil
-}
-
-func (s *RepoStore) CreateRepo(ctx context.Context, repo Repository) error {
-	return s.db.Operator.Core.NewInsert().Model(repo).Scan(ctx)
 }
 
 func (s *RepoStore) Find(ctx context.Context, owner, repoType, repoName string) (*Repository, error) {
