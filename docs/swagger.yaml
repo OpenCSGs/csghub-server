@@ -220,42 +220,6 @@ definitions:
       user_id:
         type: integer
     type: object
-  database.Space:
-    properties:
-      created_at:
-        type: string
-      downloads:
-        type: integer
-      git_path:
-        type: string
-      id:
-        type: integer
-      last_updated_at:
-        type: string
-      likes:
-        type: integer
-      name:
-        type: string
-      nickname:
-        type: string
-      path:
-        type: string
-      private:
-        type: boolean
-      repository:
-        $ref: '#/definitions/database.Repository'
-      repository_id:
-        type: integer
-      sdk:
-        description: gradio, streamlit, docker etc
-        type: string
-      updated_at:
-        type: string
-      user:
-        $ref: '#/definitions/database.User'
-      user_id:
-        type: integer
-    type: object
   database.Tag:
     properties:
       built_in:
@@ -655,6 +619,40 @@ definitions:
         type: string
       total:
         type: integer
+    type: object
+  types.Space:
+    properties:
+      cover_img:
+        type: string
+      created_at:
+        type: string
+      endpoint:
+        description: the serving endpoint url
+        example: https://localhost/spaces/myname/myspace
+        type: string
+      license:
+        example: MIT
+        type: string
+      like_count:
+        type: integer
+      name:
+        example: space_name_1
+        type: string
+      namespace:
+        example: user_or_org_name
+        type: string
+      private:
+        type: boolean
+      running_status:
+        description: deploying, running, failed
+        type: string
+      sdk:
+        description: like gradio,steamlit etc
+        example: gradio
+        type: string
+      username:
+        example: creator_user_name
+        type: string
     type: object
   types.UpdateDatasetReq:
     properties:
@@ -1561,7 +1559,14 @@ paths:
       - description: current user
         in: query
         name: current_user
-        required: true
+        type: string
+      - description: search text
+        in: query
+        name: search
+        type: string
+      - description: sort by
+        in: query
+        name: sort
         type: string
       produces:
       - application/json
@@ -2614,7 +2619,31 @@ paths:
     get:
       consumes:
       - application/json
-      description: get all spaces
+      description: get spaces visible to current user
+      parameters:
+      - default: 20
+        description: per
+        in: query
+        name: per
+        type: integer
+      - default: 1
+        description: per page
+        in: query
+        name: page
+        type: integer
+      - description: current user
+        in: query
+        name: current_user
+        required: true
+        type: string
+      - description: search text
+        in: query
+        name: search
+        type: string
+      - description: sort by
+        in: query
+        name: sort
+        type: string
       produces:
       - application/json
       responses:
@@ -2622,10 +2651,14 @@ paths:
           description: OK
           schema:
             allOf:
-            - $ref: '#/definitions/types.Response'
+            - $ref: '#/definitions/types.ResponseWithTotal'
             - properties:
                 data:
-                  $ref: '#/definitions/database.Space'
+                  items:
+                    $ref: '#/definitions/types.Space'
+                  type: array
+                total:
+                  type: integer
               type: object
         "400":
           description: Bad request
@@ -2637,7 +2670,7 @@ paths:
             $ref: '#/definitions/types.APIInternalServerError'
       security:
       - ApiKey: []
-      summary: Get all spaces
+      summary: Get spaces visible to current user
       tags:
       - Space
     post:
@@ -2661,7 +2694,7 @@ paths:
             - $ref: '#/definitions/types.Response'
             - properties:
                 data:
-                  $ref: '#/definitions/database.Space'
+                  $ref: '#/definitions/types.Space'
               type: object
         "400":
           description: Bad request

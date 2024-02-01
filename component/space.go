@@ -135,8 +135,8 @@ func (c *SpaceComponent) Create(ctx context.Context, req types.CreateSpaceReq) (
 	space := &types.Space{
 		Creator:   req.Creator,
 		Namespace: req.Namespace,
-		Name:      req.Name,
 		License:   req.License,
+		Name:      req.Name,
 		Sdk:       req.Sdk,
 		// TODO: get running status and endpoint from inference service
 		Endpoint:      "",
@@ -144,4 +144,47 @@ func (c *SpaceComponent) Create(ctx context.Context, req types.CreateSpaceReq) (
 		Private:       req.Private,
 	}
 	return space, nil
+}
+
+func (c *SpaceComponent) Index(ctx context.Context, username, search, sort string, per, page int) ([]types.Space, int, error) {
+	var (
+		spaces []types.Space
+		user   database.User
+		err    error
+	)
+	if username == "" {
+		slog.Info("get spaces without current username", slog.String("search", search))
+	} else {
+		user, err = c.user.FindByUsername(ctx, username)
+		if err != nil {
+			slog.Error("fail to get public spaces", slog.String("user", username), slog.String("search", search),
+				slog.String("error", err.Error()))
+			newError := fmt.Errorf("failed to get current user,error:%w", err)
+			return nil, 0, newError
+		}
+	}
+	spaceData, total, err := c.space.PublicToUser(ctx, user.ID, search, sort, per, page)
+	if err != nil {
+		slog.Error("fail to get public spaces", slog.String("user", username), slog.String("search", search),
+			slog.String("error", err.Error()))
+		newError := fmt.Errorf("failed to get public spaces,error:%w", err)
+		return nil, 0, newError
+	}
+
+	for _, data := range spaceData {
+		spaces = append(spaces, types.Space{
+			Creator:   data.User.Username,
+			Namespace: data.User.Username,
+			Name:      data.Name,
+			Sdk:       data.Sdk,
+			// TODO: get running status and endpoint from inference service
+			Endpoint:      "",
+			RunningStatus: "",
+			Private:       data.Private,
+			Likes:         data.Likes,
+			CreatedAt:     data.CreatedAt,
+			CoverImg:      "",
+		})
+	}
+	return spaces, total, nil
 }

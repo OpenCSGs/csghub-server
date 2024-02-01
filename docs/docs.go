@@ -1332,8 +1332,19 @@ const docTemplate = `{
                         "type": "string",
                         "description": "current user",
                         "name": "current_user",
-                        "in": "query",
-                        "required": true
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "search text",
+                        "name": "search",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "sort by",
+                        "name": "sort",
+                        "in": "query"
                     }
                 ],
                 "responses": {
@@ -3038,7 +3049,7 @@ const docTemplate = `{
                         "ApiKey": []
                     }
                 ],
-                "description": "get all spaces",
+                "description": "get spaces visible to current user",
                 "consumes": [
                     "application/json"
                 ],
@@ -3048,20 +3059,61 @@ const docTemplate = `{
                 "tags": [
                     "Space"
                 ],
-                "summary": "Get all spaces",
+                "summary": "Get spaces visible to current user",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "default": 20,
+                        "description": "per",
+                        "name": "per",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "default": 1,
+                        "description": "per page",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "current user",
+                        "name": "current_user",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "search text",
+                        "name": "search",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "sort by",
+                        "name": "sort",
+                        "in": "query"
+                    }
+                ],
                 "responses": {
                     "200": {
                         "description": "OK",
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/types.Response"
+                                    "$ref": "#/definitions/types.ResponseWithTotal"
                                 },
                                 {
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/database.Space"
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/definitions/types.Space"
+                                            }
+                                        },
+                                        "total": {
+                                            "type": "integer"
                                         }
                                     }
                                 }
@@ -3122,7 +3174,7 @@ const docTemplate = `{
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/database.Space"
+                                            "$ref": "#/definitions/types.Space"
                                         }
                                     }
                                 }
@@ -4124,60 +4176,6 @@ const docTemplate = `{
                 }
             }
         },
-        "database.Space": {
-            "type": "object",
-            "properties": {
-                "created_at": {
-                    "type": "string"
-                },
-                "downloads": {
-                    "type": "integer"
-                },
-                "git_path": {
-                    "type": "string"
-                },
-                "id": {
-                    "type": "integer"
-                },
-                "last_updated_at": {
-                    "type": "string"
-                },
-                "likes": {
-                    "type": "integer"
-                },
-                "name": {
-                    "type": "string"
-                },
-                "nickname": {
-                    "type": "string"
-                },
-                "path": {
-                    "type": "string"
-                },
-                "private": {
-                    "type": "boolean"
-                },
-                "repository": {
-                    "$ref": "#/definitions/database.Repository"
-                },
-                "repository_id": {
-                    "type": "integer"
-                },
-                "sdk": {
-                    "description": "gradio, streamlit, docker etc",
-                    "type": "string"
-                },
-                "updated_at": {
-                    "type": "string"
-                },
-                "user": {
-                    "$ref": "#/definitions/database.User"
-                },
-                "user_id": {
-                    "type": "integer"
-                }
-            }
-        },
         "database.Tag": {
             "type": "object",
             "properties": {
@@ -4760,6 +4758,53 @@ const docTemplate = `{
                 },
                 "total": {
                     "type": "integer"
+                }
+            }
+        },
+        "types.Space": {
+            "type": "object",
+            "properties": {
+                "cover_img": {
+                    "type": "string"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "endpoint": {
+                    "description": "the serving endpoint url",
+                    "type": "string",
+                    "example": "https://localhost/spaces/myname/myspace"
+                },
+                "license": {
+                    "type": "string",
+                    "example": "MIT"
+                },
+                "like_count": {
+                    "type": "integer"
+                },
+                "name": {
+                    "type": "string",
+                    "example": "space_name_1"
+                },
+                "namespace": {
+                    "type": "string",
+                    "example": "user_or_org_name"
+                },
+                "private": {
+                    "type": "boolean"
+                },
+                "running_status": {
+                    "description": "deploying, running, failed",
+                    "type": "string"
+                },
+                "sdk": {
+                    "description": "like gradio,steamlit etc",
+                    "type": "string",
+                    "example": "gradio"
+                },
+                "username": {
+                    "type": "string",
+                    "example": "creator_user_name"
                 }
             }
         },

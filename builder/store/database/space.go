@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"strings"
 	"time"
 
 	"github.com/uptrace/bun"
@@ -62,4 +63,46 @@ func (s *SpaceStore) Create(ctx context.Context, input Space) (*Space, error) {
 
 	input.ID, _ = res.LastInsertId()
 	return &input, nil
+}
+
+func (s *SpaceStore) PublicToUser(ctx context.Context, userID int64, search, sort string, per, page int) ([]Space, int, error) {
+	var (
+		spaces []Space
+		count  int
+		err    error
+	)
+	query := s.db.Operator.Core.
+		NewSelect().
+		Model(&spaces).
+		Relation("User")
+
+	if userID > 0 {
+		query = query.Where("space.private = ? or space.user_id = ?", false, userID)
+	} else {
+		query = query.Where("space.private = ?", false)
+	}
+
+	if search != "" {
+		search = strings.ToLower(search)
+		query = query.Where(
+			"LOWER(space.path) like ? or LOWER(space.name) like ?",
+			fmt.Sprintf("%%%s%%", search),
+			fmt.Sprintf("%%%s%%", search),
+		)
+	}
+
+	count, err = query.Count(ctx)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	query = query.Order(sortBy[sort])
+	query = query.Limit(per).
+		Offset((page - 1) * per)
+
+	err = query.Scan(ctx)
+	if err != nil {
+		return nil, 0, err
+	}
+	return spaces, count, nil
 }
