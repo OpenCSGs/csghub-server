@@ -16,6 +16,7 @@ import (
 	"github.com/minio/minio-go/v7"
 	"opencsg.com/csghub-server/builder/git"
 	"opencsg.com/csghub-server/builder/git/gitserver"
+	"opencsg.com/csghub-server/builder/inference"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/builder/store/s3"
 	"opencsg.com/csghub-server/common/config"
@@ -87,6 +88,7 @@ func NewModelComponent(config *config.Config) (*ModelComponent, error) {
 		return nil, newError
 	}
 	c.lfsBucket = config.S3.Bucket
+	c.infer = inference.NewClient(config)
 	return c, nil
 }
 
@@ -99,6 +101,7 @@ type ModelComponent struct {
 	tc        *TagComponent
 	s3Client  *minio.Client
 	lfsBucket string
+	infer     inference.Client
 }
 
 func (c *ModelComponent) Index(ctx context.Context, username, search, sort string, ragReqs []database.TagReq, per, page int) ([]database.Model, int, error) {
@@ -610,7 +613,6 @@ func getFilePaths(namespace, repoName, folder string, gsTree func(namespce, repo
 
 func (c *ModelComponent) IsLfs(ctx context.Context, req *types.GetFileReq) (bool, error) {
 	content, err := c.gs.GetModelFileRaw(req.Namespace, req.Name, req.Ref, req.Path)
-
 	if err != nil {
 		slog.Error("failed to get model file raw", slog.String("namespace", req.Namespace), slog.String("name", req.Name), slog.String("path", req.Path))
 		return false, err
@@ -620,10 +622,6 @@ func (c *ModelComponent) IsLfs(ctx context.Context, req *types.GetFileReq) (bool
 }
 
 func (c *ModelComponent) HeadDownloadFile(ctx context.Context, req *types.GetFileReq) (*types.File, error) {
-	model, err := c.ms.FindByPath(ctx, req.Namespace, req.Name)
-	if err != nil {
-		return nil, fmt.Errorf("failed to find model, error: %w", err)
-	}
 	if req.Ref == "" {
 		req.Ref = model.Repository.DefaultBranch
 	}
@@ -635,9 +633,7 @@ func (c *ModelComponent) HeadDownloadFile(ctx context.Context, req *types.GetFil
 }
 
 func (c *ModelComponent) SDKDownloadFile(ctx context.Context, req *types.GetFileReq) (io.ReadCloser, string, error) {
-	var (
-		downloadUrl string
-	)
+	var downloadUrl string
 	dataset, err := c.ms.FindByPath(ctx, req.Namespace, req.Name)
 	if err != nil {
 		return nil, "", fmt.Errorf("failed to find model, error: %w", err)
@@ -669,4 +665,13 @@ func (c *ModelComponent) SDKDownloadFile(ctx context.Context, req *types.GetFile
 		}
 		return reader, downloadUrl, nil
 	}
+}
+
+func (c *ModelComponent) Predict(ctx context.Context, req *types.ModelPredictReq) (*types.ModelPredictResp, error) {
+	model, err := c.ms.FindByPath(ctx, req.Namespace, req.Name)
+	if err != nil {
+		return nil, fmt.Errorf("failed to find model, error: %w", err)
+	}
+	c.infer.Predict(model.Path, req.Input)
+	return nil, nil
 }

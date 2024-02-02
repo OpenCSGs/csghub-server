@@ -56,33 +56,40 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 	apiGroup.POST("/list/datasets_by_path", listHandler.ListDatasetsByPath)
 
 	// Models routes
+	modelHandler, err := handler.NewModelHandler(config)
+	if err != nil {
+		return nil, fmt.Errorf("error creating model controller:%w", err)
+	}
+	modelsGroup := apiGroup.Group("/models")
+	{
+		modelsGroup.POST("/", modelHandler.Create)
+		modelsGroup.GET("/", modelHandler.Index)
+		modelsGroup.PUT(":namespace/:name", modelHandler.Update)
+		modelsGroup.DELETE(":namespace/:name", modelHandler.Delete)
+		modelsGroup.GET(":namespace/:name", modelHandler.Show)
+		modelsGroup.GET(":namespace/:name/detail", modelHandler.Detail)
+		modelsGroup.GET(":namespace/:name/branches", modelHandler.Branches)
+		modelsGroup.GET(":namespace/:name/tags", modelHandler.Tags)
+		modelsGroup.GET(":namespace/:name/last_commit", modelHandler.LastCommit)
+		modelsGroup.GET(":namespace/:name/tree", modelHandler.Tree)
+		modelsGroup.GET(":namespace/:name/commits", modelHandler.Commits)
+		modelsGroup.GET(":namespace/:name/raw/*file_path", modelHandler.FileRaw)
+		// The DownloadFile method differs from the SDKDownload interface in a few ways
 
-	apiGroup.POST("/models", modelHandler.Create)
-	apiGroup.GET("/models", modelHandler.Index)
-	apiGroup.PUT("/models/:namespace/:name", modelHandler.Update)
-	apiGroup.DELETE("/models/:namespace/:name", modelHandler.Delete)
-	apiGroup.GET("/models/:namespace/:name", modelHandler.Show)
-	apiGroup.GET("/models/:namespace/:name/detail", modelHandler.Detail)
-	apiGroup.GET("/models/:namespace/:name/branches", modelHandler.Branches)
-	apiGroup.GET("/models/:namespace/:name/tags", modelHandler.Tags)
-	apiGroup.GET("/models/:namespace/:name/last_commit", modelHandler.LastCommit)
-	apiGroup.GET("/models/:namespace/:name/tree", modelHandler.Tree)
-	apiGroup.GET("/models/:namespace/:name/commits", modelHandler.Commits)
-	apiGroup.GET("/models/:namespace/:name/raw/*file_path", modelHandler.FileRaw)
-	// The DownloadFile method differs from the SDKDownload interface in a few ways
-
-	// 1.When passing the file_path parameter to the SDKDownload method,
-	// it only needs to pass the path of the file itself,
-	// whether it is an lfs file or a non-lfs file.
-	// The DownloadFile has a different file_path format for lfs files and non-lfs files,
-	// and an lfs parameter needs to be added.
-	// 2. DownloadFile returns an object store url for lfs files, while SDKDownload redirects directly.
-	apiGroup.GET("/models/:namespace/:name/download/*file_path", modelHandler.DownloadFile)
-	apiGroup.GET("/models/:namespace/:name/resolve/:branch/*file_path", modelHandler.SDKDownload)
-	apiGroup.POST("/models/:namespace/:name/raw/*file_path", modelHandler.CreateFile)
-	apiGroup.PUT("/models/:namespace/:name/raw/*file_path", modelHandler.UpdateFile)
-	apiGroup.POST("/models/:namespace/:name/update_downloads", modelHandler.UpdateDownloads)
-	apiGroup.POST("/models/:namespace/:name/upload_file", modelHandler.UploadFile)
+		// 1.When passing the file_path parameter to the SDKDownload method,
+		// it only needs to pass the path of the file itself,
+		// whether it is an lfs file or a non-lfs file.
+		// The DownloadFile has a different file_path format for lfs files and non-lfs files,
+		// and an lfs parameter needs to be added.
+		// 2. DownloadFile returns an object store url for lfs files, while SDKDownload redirects directly.
+		modelsGroup.GET(":namespace/:name/download/*file_path", modelHandler.DownloadFile)
+		modelsGroup.POST(":namespace/:name/raw/*file_path", modelHandler.CreateFile)
+		modelsGroup.PUT(":namespace/:name/raw/*file_path", modelHandler.UpdateFile)
+		modelsGroup.POST(":namespace/:name/update_downloads", modelHandler.UpdateDownloads)
+		modelsGroup.POST(":namespace/:name/upload_file", modelHandler.UploadFile)
+		// invoke model endpoint to do pediction
+		modelsGroup.POST(":namespace/:name/predict", modelHandler.Predict)
+	}
 
 	// Dataset routes
 

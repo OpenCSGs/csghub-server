@@ -70,3 +70,15 @@ type UpdateDownloadsReq struct {
 	Date       time.Time
 	CloneCount int64 `json:"download_count"`
 }
+
+type ModelPredictReq struct {
+	Namespace   string `json:"-"`
+	Name        string `json:"-"`
+	Input       string `json:"input"`
+	CurrentUser string `json:"current_user"`
+}
+
+type ModelPredictResp struct {
+	Content string `json:"content"`
+	// TODO:add metrics like tokens, latency etc
+}

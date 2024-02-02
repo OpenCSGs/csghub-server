@@ -700,6 +700,48 @@ func (h *ModelHandler) UpdateDownloads(ctx *gin.Context) {
 	httpbase.OK(ctx, nil)
 }
 
+// Predict godoc
+// @Security     ApiKey
+// @Summary      Invoke model prediction
+// @Description  invoke model prediction
+// @Tags         Model
+// @Accept       json
+// @Produce      json
+// @Param        namespace path string true "namespace"
+// @Param        name path string true "name"
+// @Param        body {object} types.ModelPredictReq true "input for model prediction"
+// @Success      200  {object}  string "OK"
+// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
+// @Router       /models/{namespace}/{name}/predict [post]
+func (h *ModelHandler) Predict(ctx *gin.Context) {
+	var req types.ModelPredictReq
+	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
+	if err != nil {
+		slog.Error("Bad request format", "error", err)
+		httpbase.BadRequest(ctx, err.Error())
+		return
+	}
+
+	if err := ctx.ShouldBindJSON(&req); err != nil {
+		slog.Error("Bad request format", "error", err)
+		httpbase.BadRequest(ctx, err.Error())
+		return
+	}
+
+	req.Name = name
+	req.Namespace = namespace
+
+	resp, err := h.c.Predict(ctx, &req)
+	if err != nil {
+		slog.Error("fail to call predict", slog.String("error", err.Error()))
+		httpbase.ServerError(ctx, err)
+		return
+	}
+
+	httpbase.OK(ctx, resp)
+}
+
 func parseTagReqs(ctx *gin.Context) (tags []database.TagReq) {
 	licenseTag := ctx.Query("license_tag")
 	taskTag := ctx.Query("task_tag")
