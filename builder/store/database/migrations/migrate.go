@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/uptrace/bun"
+	"opencsg.com/csghub-server/builder/store/database"
 
 	"github.com/uptrace/bun/migrate"
 )
@@ -23,11 +24,14 @@ var Migrations = migrate.NewMigrations()
 
 func init() {
 	if err := Migrations.Discover(migrationDir); err != nil {
-		if err != nil {
-			err = fmt.Errorf("discovering database migrations: %w", err)
-			panic(err)
-		}
+		err = fmt.Errorf("discovering database migrations: %w", err)
+		panic(err)
 	}
+}
+
+// NewMigrator factory of database migrator
+func NewMigrator(db *database.DB) *migrate.Migrator {
+	return migrate.NewMigrator(db.BunDB, Migrations) // nolint: staticcheck
 }
 
 func createTables(ctx context.Context, db *bun.DB, tables ...any) (err error) {
@@ -42,7 +46,7 @@ func createTables(ctx context.Context, db *bun.DB, tables ...any) (err error) {
 				return
 			}
 
-			_, err = db.NewCreateTable().
+			_, err = tx.NewCreateTable().
 				Model(reflect.New(tableType).Interface()).
 				Exec(ctx)
 			if err != nil {
@@ -69,7 +73,7 @@ func dropTables(ctx context.Context, db *bun.DB, tables ...any) (err error) {
 				return
 			}
 
-			_, err = db.NewDropTable().
+			_, err = tx.NewDropTable().
 				Model(reflect.New(tableType).Interface()).
 				IfExists().
 				Cascade().

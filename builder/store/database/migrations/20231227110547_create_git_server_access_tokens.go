@@ -4,18 +4,13 @@ import (
 	"context"
 
 	"github.com/uptrace/bun"
+	"opencsg.com/csghub-server/builder/store/database"
 )
 
 func init() {
 	Migrations.MustRegister(func(ctx context.Context, db *bun.DB) error {
-		return createTables(ctx, db, GitServerAccessToken{})
+		return createTables(ctx, db, database.GitServerAccessToken{})
 	}, func(ctx context.Context, db *bun.DB) error {
-		return dropTables(ctx, db, GitServerAccessToken{})
+		return dropTables(ctx, db, database.GitServerAccessToken{})
 	})
-}
-
-type GitServerAccessToken struct {
-	ID    int64  `bun:",pk,autoincrement" json:"id"`
-	Token string `bun:",notnull" json:"token"`
-	times
 }

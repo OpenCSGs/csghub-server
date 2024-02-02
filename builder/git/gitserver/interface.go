@@ -1,6 +1,7 @@
 package gitserver
 
 import (
+	"context"
 	"io"
 
 	"opencsg.com/csghub-server/builder/store/database"
@@ -12,6 +13,8 @@ type GitServer interface {
 	UpdateUser(*types.UpdateUserRequest, *database.User) (*database.User, error)
 	CreateUserToken(*types.CreateUserTokenRequest) (*database.AccessToken, error)
 	DeleteUserToken(*types.DeleteUserTokenRequest) error
+
+	CreateRepo(ctx context.Context, req CreateRepoReq) (*CreateRepoResp, error)
 
 	CreateModelRepo(*types.CreateModelReq) (*database.Model, *database.Repository, error)
 	UpdateModelRepo(string, string, *database.Model, *database.Repository, *types.UpdateModelReq) error

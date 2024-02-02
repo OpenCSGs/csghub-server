@@ -49,11 +49,9 @@ func (h *AccessTokenHandler) Create(ctx *gin.Context) {
 	req.Username = ctx.Param("username")
 	token, err := h.c.Create(ctx, &req)
 	if err != nil {
-		if err != nil {
-			slog.Error("Failed to create user access token", slog.Any("error", err))
-			ctx.JSON(http.StatusInternalServerError, gin.H{"message": err.Error()})
-			return
-		}
+		slog.Error("Failed to create user access token", slog.Any("error", err))
+		ctx.JSON(http.StatusInternalServerError, gin.H{"message": err.Error()})
+		return
 	}
 
 	slog.Info("Create user access token succeed")
@@ -80,11 +78,9 @@ func (h *AccessTokenHandler) Delete(ctx *gin.Context) {
 	req.Name = ctx.Param("token_name")
 	err := h.c.Delete(ctx, &req)
 	if err != nil {
-		if err != nil {
-			slog.Error("Failed to delete user access token", slog.Any("error", err))
-			ctx.JSON(http.StatusInternalServerError, gin.H{"message": err.Error()})
-			return
-		}
+		slog.Error("Failed to delete user access token", slog.Any("error", err))
+		ctx.JSON(http.StatusInternalServerError, gin.H{"message": err.Error()})
+		return
 	}
 
 	slog.Info("Delete user access token succeed")

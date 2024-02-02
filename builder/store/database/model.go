@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/uptrace/bun"
+	"opencsg.com/csghub-server/common/types"
 )
 
 type ModelStore struct {
@@ -191,7 +192,7 @@ func (s *ModelStore) Count(ctx context.Context) (count int, err error) {
 	count, err = s.db.Operator.Core.
 		NewSelect().
 		Model(&Repository{}).
-		Where("repository_type = ?", ModelRepo).
+		Where("repository_type = ?", types.ModelRepo).
 		Count(ctx)
 	if err != nil {
 		return
@@ -203,7 +204,7 @@ func (s *ModelStore) PublicCount(ctx context.Context) (count int, err error) {
 	count, err = s.db.Operator.Core.
 		NewSelect().
 		Model(&Repository{}).
-		Where("repository_type = ?", DatasetRepo).
+		Where("repository_type = ?", types.DatasetRepo).
 		Where("private = ?", false).
 		Count(ctx)
 	if err != nil {
@@ -370,6 +371,9 @@ func (s *ModelStore) FindByPath(ctx context.Context, namespace string, repoPath 
 		Where("model.name =?", repoPath).
 		Limit(1).
 		Scan(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to find model,error: %w", err)
+	}
 	err = s.db.Operator.Core.NewSelect().
 		Model(resModel.Repository).
 		WherePK().
@@ -384,7 +388,7 @@ func (s *ModelStore) Delete(ctx context.Context, namespace, name string) (err er
 			tx.NewDelete().
 				Model(&Repository{}).
 				Where("path = ?", fmt.Sprintf("%v/%v", namespace, name)).
-				Where("repository_type = ?", ModelRepo).
+				Where("repository_type = ?", types.ModelRepo).
 				Exec(ctx)); err != nil {
 			return err
 		}
@@ -407,7 +411,7 @@ func (s *ModelStore) Tags(ctx context.Context, namespace, name string) (tags []T
 		Join("JOIN repositories ON model.repository_id = repositories.id").
 		Join("JOIN repository_tags ON repositories.id = repository_tags.repository_id").
 		Join("JOIN tags ON repository_tags.tag_id = tags.id").
-		Where("repositories.repository_type = ?", ModelRepo).
+		Where("repositories.repository_type = ?", types.ModelRepo).
 		Where("model.path = ?", fmt.Sprintf("%v/%v", namespace, name))
 
 	slog.Info(query.String())

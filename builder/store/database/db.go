@@ -13,8 +13,6 @@ import (
 	"github.com/uptrace/bun/driver/pgdriver"
 	"github.com/uptrace/bun/driver/sqliteshim"
 	"github.com/uptrace/bun/extra/bundebug"
-	"github.com/uptrace/bun/migrate"
-	"opencsg.com/csghub-server/builder/store/database/migrations"
 
 	"github.com/uptrace/bun"
 )
@@ -123,10 +121,10 @@ func NewDB(ctx context.Context, config DBConfig) (db *DB, err error) {
 // RunInTx runs the function in a transaction.
 // If the function returns an error, the transaction is rolled back.
 // Otherwise, the transaction is committed.
-func (db *DB) RunInTx(ctx context.Context, fn func(tx Operator) error) error {
+func (db *DB) RunInTx(ctx context.Context, fn func(ctx context.Context, tx Operator) error) error {
 	return db.BunDB.RunInTx(ctx, &sql.TxOptions{}, func(ctx context.Context, tx bun.Tx) error {
 		op := Operator{Core: tx}
-		return fn(op)
+		return fn(ctx, op)
 	})
 }
 
@@ -136,9 +134,4 @@ func (db *DB) RunInTx(ctx context.Context, fn func(tx Operator) error) error {
 // as the DB handle is meant to be long-lived and shared between many goroutines.
 func (db *DB) Close() error {
 	return db.BunDB.Close()
-}
-
-// NewMigrator factory of database migrator
-func NewMigrator(db *DB) *migrate.Migrator {
-	return migrate.NewMigrator(db.BunDB, migrations.Migrations) // nolint: staticcheck
 }

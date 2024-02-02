@@ -1,9 +1,5 @@
 package types
 
-import "opencsg.com/csghub-server/builder/store/database"
-
-type Dataset = database.Repository
-
 type DatasetDetail struct {
 	Path          string `json:"path"`
 	Name          string `json:"name"`

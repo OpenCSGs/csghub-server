@@ -54,7 +54,7 @@ var serverCmd = &cobra.Command{
 		database.InitDB(dbConfig)
 		r, err := router.NewRouter(cfg, enableSwagger)
 		if err != nil {
-			return err
+			return fmt.Errorf("failed to init router: %w", err)
 		}
 		server := httpbase.NewGracefulServer(
 			httpbase.GraceServerOpt{
