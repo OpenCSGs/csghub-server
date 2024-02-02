@@ -279,7 +279,7 @@ func (c *ModelComponent) CreateFile(ctx context.Context, req *types.CreateFileRe
 		return nil, fmt.Errorf("failed to find username, error: %w", err)
 	}
 
-	//TODO:check sensitive content of file
+	// TODO:check sensitive content of file
 	fileName := filepath.Base(req.FilePath)
 	if fileName == "README.md" {
 		slog.Debug("file is readme", slog.String("content", req.Content))
@@ -342,7 +342,7 @@ func (c *ModelComponent) UpdateFile(ctx context.Context, req *types.UpdateFileRe
 	if err != nil {
 		return nil, fmt.Errorf("failed to create model file, error: %w", err)
 	}
-	//TODO:check sensitive content of file
+	// TODO:check sensitive content of file
 
 	fileName := filepath.Base(req.FilePath)
 	if fileName == "README.md" {
@@ -359,9 +359,9 @@ func (c *ModelComponent) updateLibraryFile(ctx context.Context, req *types.Updat
 	resp := &types.UpdateFileResp{}
 
 	isFileRenamed := req.FilePath != req.OriginPath
-	//need to handle tag change only if file renamed
+	// need to handle tag change only if file renamed
 	if isFileRenamed {
-		c.tc.UpdateLibraryTags(ctx, database.ModelTagScope, req.NameSpace, req.Name, req.OriginPath, req.FilePath)
+		err = c.tc.UpdateLibraryTags(ctx, database.ModelTagScope, req.NameSpace, req.Name, req.OriginPath, req.FilePath)
 		if err != nil {
 			slog.Error("failed to set model's tags", slog.String("namespace", req.NameSpace),
 				slog.String("name", req.Name), slog.Any("error", err))
