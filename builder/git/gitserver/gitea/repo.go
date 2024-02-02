@@ -1,9 +1,12 @@
 package gitea
 
 import (
+	"context"
 	"fmt"
+	"log/slog"
 
 	"github.com/OpenCSGs/gitea-go-sdk/gitea"
+	"opencsg.com/csghub-server/builder/git/gitserver"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/types"
 	"opencsg.com/csghub-server/common/utils/common"
@@ -15,6 +18,43 @@ const (
 	SpaceOrgPrefix   = "spaces_"
 	CodeOrgPrefix    = "codes_"
 )
+
+func (c *Client) CreateRepo(ctx context.Context, req gitserver.CreateRepoReq) (*gitserver.CreateRepoResp, error) {
+	giteaRepo, _, err := c.giteaClient.CreateOrgRepo(
+		common.WithPrefix(req.Namespace, repoPrefixByType(req.RepoType)),
+		gitea.CreateRepoOption{
+			Name:          req.Name,
+			Description:   req.Description,
+			Private:       req.Private,
+			IssueLabels:   req.Labels,
+			License:       req.License,
+			Readme:        req.Readme,
+			DefaultBranch: req.DefaultBranch,
+		},
+	)
+	if err != nil {
+		slog.Error("fail to call gitea to create repository", slog.Any("req", req), slog.String("error", err.Error()))
+		return nil, err
+	}
+
+	resp := &gitserver.CreateRepoResp{
+		Username:      req.Username,
+		Namespace:     req.Namespace,
+		Name:          req.Name,
+		Nickname:      req.Nickname,
+		Description:   req.Description,
+		Labels:        req.Labels,
+		License:       req.License,
+		DefaultBranch: req.DefaultBranch,
+		RepoType:      req.RepoType,
+		GitPath:       giteaRepo.FullName,
+		SshCloneURL:   giteaRepo.SSHURL,
+		HttpCloneURL:  portalCloneUrl(giteaRepo.CloneURL, req.RepoType, c.config.GitServer.URL, c.config.Frontend.URL),
+		Private:       req.Private,
+	}
+
+	return resp, nil
+}
 
 func (c *Client) CreateModelRepo(req *types.CreateModelReq) (model *database.Model, repo *database.Repository, err error) {
 	var urlSlug string
@@ -57,9 +97,9 @@ func (c *Client) CreateModelRepo(req *types.CreateModelReq) (model *database.Mod
 		Labels:         req.Labels,
 		License:        req.License,
 		DefaultBranch:  giteaRepo.DefaultBranch,
-		RepositoryType: database.ModelRepo,
+		RepositoryType: types.ModelRepo,
 		SSHCloneURL:    giteaRepo.SSHURL,
-		HTTPCloneURL:   common.PortalCloneUrl(giteaRepo.CloneURL, ModelOrgPrefix, c.config),
+		HTTPCloneURL:   portalCloneUrl(giteaRepo.CloneURL, types.ModelRepo, c.config.GitServer.URL, c.config.Frontend.URL),
 	}
 
 	return
@@ -152,9 +192,9 @@ func (c *Client) CreateDatasetRepo(req *types.CreateDatasetReq) (dataset *databa
 		Labels:         req.Labels,
 		License:        req.License,
 		DefaultBranch:  giteaRepo.DefaultBranch,
-		RepositoryType: database.DatasetRepo,
+		RepositoryType: types.DatasetRepo,
 		SSHCloneURL:    giteaRepo.SSHURL,
-		HTTPCloneURL:   common.PortalCloneUrl(giteaRepo.CloneURL, DatasetOrgPrefix, c.config),
+		HTTPCloneURL:   portalCloneUrl(giteaRepo.CloneURL, types.DatasetRepo, c.config.GitServer.URL, c.config.Frontend.URL),
 	}
 
 	return

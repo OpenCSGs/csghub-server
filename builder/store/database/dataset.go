@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/uptrace/bun"
+	"opencsg.com/csghub-server/common/types"
 )
 
 var sortBy = map[string]string{
@@ -49,7 +50,7 @@ func (s *DatasetStore) Index(ctx context.Context, per, page int) (datasets []*Re
 	err = s.db.Operator.Core.
 		NewSelect().
 		Model(&datasets).
-		Where("repository_type = ?", DatasetRepo).
+		Where("repository_type = ?", types.DatasetRepo).
 		Order("created_at DESC").
 		Limit(per).
 		Offset((page - 1) * per).
@@ -194,7 +195,7 @@ func (s *DatasetStore) Count(ctx context.Context) (count int, err error) {
 	count, err = s.db.Operator.Core.
 		NewSelect().
 		Model(&Repository{}).
-		Where("repository_type = ?", DatasetRepo).
+		Where("repository_type = ?", types.DatasetRepo).
 		Count(ctx)
 	if err != nil {
 		return
@@ -206,7 +207,7 @@ func (s *DatasetStore) PublicCount(ctx context.Context) (count int, err error) {
 	count, err = s.db.Operator.Core.
 		NewSelect().
 		Model(&Repository{}).
-		Where("repository_type = ?", DatasetRepo).
+		Where("repository_type = ?", types.DatasetRepo).
 		Where("private = ?", false).
 		Count(ctx)
 	if err != nil {
@@ -372,6 +373,9 @@ func (s *DatasetStore) FindByPath(ctx context.Context, namespace string, repoPat
 		Where("dataset.path =?", fmt.Sprintf("%s/%s", namespace, repoPath)).
 		Where("dataset.name =?", repoPath).
 		Scan(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to find dataset: %w", err)
+	}
 	err = s.db.Operator.Core.NewSelect().
 		Model(resDataset.Repository).
 		WherePK().
@@ -386,7 +390,7 @@ func (s *DatasetStore) Delete(ctx context.Context, namespace, name string) (err 
 			tx.NewDelete().
 				Model(&Repository{}).
 				Where("path = ?", fmt.Sprintf("%v/%v", namespace, name)).
-				Where("repository_type = ?", DatasetRepo).
+				Where("repository_type = ?", types.DatasetRepo).
 				Exec(ctx)); err != nil {
 			return err
 		}
@@ -409,7 +413,7 @@ func (s *DatasetStore) Tags(ctx context.Context, namespace, name string) (tags [
 		Join("JOIN repositories ON dataset.repository_id = repositories.id").
 		Join("JOIN repository_tags ON repositories.id = repository_tags.repository_id").
 		Join("JOIN tags ON repository_tags.tag_id = tags.id").
-		Where("repositories.repository_type = ?", DatasetRepo).
+		Where("repositories.repository_type = ?", types.DatasetRepo).
 		Where("dataset.path = ?", fmt.Sprintf("%v/%v", namespace, name))
 
 	slog.Debug(query.String())
