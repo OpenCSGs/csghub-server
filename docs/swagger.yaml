@@ -2636,7 +2636,6 @@ paths:
       - description: current user
         in: query
         name: current_user
-        required: true
         type: string
       - description: search text
         in: query
