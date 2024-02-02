@@ -1,21 +1,21 @@
 package inference
 
-import "opencsg.com/csghub-server/common/config"
-
-type Client interface {
-	Predict(string) (string, error)
+type ModelID struct {
+	Owner, Name, Version string
 }
 
-var _ Client = (*llmInferClient)(nil)
+var _ App = (*llmInferApp)(nil)
 
-type llmInferClient struct{}
+type llmInferApp struct {
+	modelID ModelID
+}
 
-func NewClient(cfg *config.Config) (Client, error) {
-	c := &llmInferClient{}
+func Model(id ModelID) (App, error) {
+	c := &llmInferApp{}
 	return c, nil
 }
 
-func (c *llmInferClient) Predict(input string) (string, error) {
+func (c *llmInferApp) Predict(input string) (string, error) {
 	// TODO:implement this method
 	return "test result", nil
 }
