@@ -20,16 +20,16 @@ type File struct {
 }
 
 type CreateFileReq struct {
-	Username  string `json:"username"`
-	Email     string `json:"email"`
-	Message   string `json:"message"`
-	Branch    string `json:"branch"`
+	Username  string `json:"username" form:"username"`
+	Email     string `json:"email" form:"email"`
+	Message   string `json:"message" form:"message"`
+	Branch    string `json:"branch" form:"branch"`
 	Content   string `json:"content"`
 	NewBranch string `json:"new_branch"`
 
 	NameSpace string `json:"-"`
 	Name      string `json:"-"`
-	FilePath  string `json:"-"`
+	FilePath  string `json:"-" form:"file_path"`
 }
 
 type CreateFileResp struct {
