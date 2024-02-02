@@ -9,6 +9,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/uptrace/bun/migrate"
 	"opencsg.com/csghub-server/builder/store/database"
+	"opencsg.com/csghub-server/builder/store/database/migrations"
 	"opencsg.com/csghub-server/common/config"
 )
 
@@ -63,7 +64,7 @@ var Cmd = &cobra.Command{
 			err = fmt.Errorf("initializing DB connection: %w", err)
 			return
 		}
-		migrator = database.NewMigrator(db)
+		migrator = migrations.NewMigrator(db)
 
 		return
 	},

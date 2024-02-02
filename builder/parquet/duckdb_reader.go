@@ -40,6 +40,7 @@ func NewS3Reader(cfg *config.Config) (Reader, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to setup s3 for duckdb, cause:%w", err)
 	}
+	slog.Info("setup duckdb succeeded")
 
 	return &duckdbReader{db: db, bucket: cfg.S3.Bucket}, nil
 }

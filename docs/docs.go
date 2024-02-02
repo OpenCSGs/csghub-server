@@ -1332,8 +1332,19 @@ const docTemplate = `{
                         "type": "string",
                         "description": "current user",
                         "name": "current_user",
-                        "in": "query",
-                        "required": true
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "search text",
+                        "name": "search",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "sort by",
+                        "name": "sort",
+                        "in": "query"
                     }
                 ],
                 "responses": {
@@ -3031,6 +3042,160 @@ const docTemplate = `{
                 }
             }
         },
+        "/spaces": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "description": "get spaces visible to current user",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Space"
+                ],
+                "summary": "Get spaces visible to current user",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "default": 20,
+                        "description": "per",
+                        "name": "per",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "default": 1,
+                        "description": "per page",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "current user",
+                        "name": "current_user",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "search text",
+                        "name": "search",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "sort by",
+                        "name": "sort",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/types.ResponseWithTotal"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/definitions/types.Space"
+                                            }
+                                        },
+                                        "total": {
+                                            "type": "integer"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "description": "create a new space",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Space"
+                ],
+                "summary": "Create a new space",
+                "parameters": [
+                    {
+                        "description": "body",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/types.CreateSpaceReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/types.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/types.Space"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            }
+        },
         "/tags": {
             "get": {
                 "security": [
@@ -3917,6 +4082,7 @@ const docTemplate = `{
                     "type": "integer"
                 },
                 "labels": {
+                    "description": "Depreated",
                     "type": "string"
                 },
                 "license": {
@@ -3932,10 +4098,11 @@ const docTemplate = `{
                     "type": "boolean"
                 },
                 "readme": {
+                    "description": "Depreated",
                     "type": "string"
                 },
                 "repository_type": {
-                    "$ref": "#/definitions/database.RepositoryType"
+                    "$ref": "#/definitions/types.RepositoryType"
                 },
                 "ssh_clone_url": {
                     "type": "string"
@@ -3957,6 +4124,9 @@ const docTemplate = `{
         "database.RepositoryDownload": {
             "type": "object",
             "properties": {
+                "click_download_count": {
+                    "type": "integer"
+                },
                 "created_at": {
                     "type": "string"
                 },
@@ -3979,17 +4149,6 @@ const docTemplate = `{
                     "type": "integer"
                 }
             }
-        },
-        "database.RepositoryType": {
-            "type": "string",
-            "enum": [
-                "model",
-                "dataset"
-            ],
-            "x-enum-varnames": [
-                "ModelRepo",
-                "DatasetRepo"
-            ]
         },
         "database.SSHKey": {
             "type": "object",
@@ -4314,6 +4473,34 @@ const docTemplate = `{
                 }
             }
         },
+        "types.CreateSpaceReq": {
+            "type": "object",
+            "properties": {
+                "license": {
+                    "type": "string",
+                    "example": "MIT"
+                },
+                "name": {
+                    "type": "string",
+                    "example": "space_name_1"
+                },
+                "namespace": {
+                    "type": "string",
+                    "example": "user_or_org_name"
+                },
+                "private": {
+                    "type": "boolean"
+                },
+                "sdk": {
+                    "type": "string",
+                    "example": "gradio"
+                },
+                "username": {
+                    "type": "string",
+                    "example": "creator_user_name"
+                }
+            }
+        },
         "types.CreateUserRequest": {
             "type": "object",
             "properties": {
@@ -4541,6 +4728,21 @@ const docTemplate = `{
                 }
             }
         },
+        "types.RepositoryType": {
+            "type": "string",
+            "enum": [
+                "model",
+                "dataset",
+                "space",
+                "code"
+            ],
+            "x-enum-varnames": [
+                "ModelRepo",
+                "DatasetRepo",
+                "SpaceRepo",
+                "CodeRepo"
+            ]
+        },
         "types.Response": {
             "type": "object",
             "properties": {
@@ -4559,6 +4761,53 @@ const docTemplate = `{
                 },
                 "total": {
                     "type": "integer"
+                }
+            }
+        },
+        "types.Space": {
+            "type": "object",
+            "properties": {
+                "cover_img": {
+                    "type": "string"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "endpoint": {
+                    "description": "the serving endpoint url",
+                    "type": "string",
+                    "example": "https://localhost/spaces/myname/myspace"
+                },
+                "license": {
+                    "type": "string",
+                    "example": "MIT"
+                },
+                "like_count": {
+                    "type": "integer"
+                },
+                "name": {
+                    "type": "string",
+                    "example": "space_name_1"
+                },
+                "namespace": {
+                    "type": "string",
+                    "example": "user_or_org_name"
+                },
+                "private": {
+                    "type": "boolean"
+                },
+                "running_status": {
+                    "description": "deploying, running, failed",
+                    "type": "string"
+                },
+                "sdk": {
+                    "description": "like gradio,steamlit etc",
+                    "type": "string",
+                    "example": "gradio"
+                },
+                "username": {
+                    "type": "string",
+                    "example": "creator_user_name"
                 }
             }
         },

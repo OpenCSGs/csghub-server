@@ -479,6 +479,10 @@ func (c *DatasetComponent) DownloadFile(ctx context.Context, req *types.GetFileR
 	if err != nil {
 		return nil, "", fmt.Errorf("failed to find dataset, error: %w", err)
 	}
+	err = c.ds.UpdateRepoFileDownloads(ctx, dataset, time.Now(), 1)
+	if err != nil {
+		return nil, "", fmt.Errorf("failed to update dataset file download count, error: %w", err)
+	}
 	if req.Ref == "" {
 		req.Ref = dataset.Repository.DefaultBranch
 	}
@@ -549,7 +553,7 @@ func (c *DatasetComponent) UpdateDownloads(ctx context.Context, req *types.Updat
 		return fmt.Errorf("failed to find dataset, error: %w", err)
 	}
 
-	err = c.ds.UpdateRepoDownloads(ctx, dataset, req.Date, req.DownloadCount)
+	err = c.ds.UpdateRepoCloneDownloads(ctx, dataset, req.Date, req.CloneCount)
 	if err != nil {
 		return fmt.Errorf("failed to update dataset download count, error: %w", err)
 	}

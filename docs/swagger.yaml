@@ -158,6 +158,7 @@ definitions:
       id:
         type: integer
       labels:
+        description: Depreated
         type: string
       license:
         type: string
@@ -168,9 +169,10 @@ definitions:
       private:
         type: boolean
       readme:
+        description: Depreated
         type: string
       repository_type:
-        $ref: '#/definitions/database.RepositoryType'
+        $ref: '#/definitions/types.RepositoryType'
       ssh_clone_url:
         type: string
       tags:
@@ -184,6 +186,8 @@ definitions:
     type: object
   database.RepositoryDownload:
     properties:
+      click_download_count:
+        type: integer
       created_at:
         type: string
       date:
@@ -199,14 +203,6 @@ definitions:
       user_id:
         type: integer
     type: object
-  database.RepositoryType:
-    enum:
-    - model
-    - dataset
-    type: string
-    x-enum-varnames:
-    - ModelRepo
-    - DatasetRepo
   database.SSHKey:
     properties:
       content:
@@ -427,6 +423,26 @@ definitions:
       username:
         type: string
     type: object
+  types.CreateSpaceReq:
+    properties:
+      license:
+        example: MIT
+        type: string
+      name:
+        example: space_name_1
+        type: string
+      namespace:
+        example: user_or_org_name
+        type: string
+      private:
+        type: boolean
+      sdk:
+        example: gradio
+        type: string
+      username:
+        example: creator_user_name
+        type: string
+    type: object
   types.CreateUserRequest:
     properties:
       email:
@@ -580,6 +596,18 @@ definitions:
       ssh_clone_url:
         type: string
     type: object
+  types.RepositoryType:
+    enum:
+    - model
+    - dataset
+    - space
+    - code
+    type: string
+    x-enum-varnames:
+    - ModelRepo
+    - DatasetRepo
+    - SpaceRepo
+    - CodeRepo
   types.Response:
     properties:
       data: {}
@@ -593,6 +621,40 @@ definitions:
         type: string
       total:
         type: integer
+    type: object
+  types.Space:
+    properties:
+      cover_img:
+        type: string
+      created_at:
+        type: string
+      endpoint:
+        description: the serving endpoint url
+        example: https://localhost/spaces/myname/myspace
+        type: string
+      license:
+        example: MIT
+        type: string
+      like_count:
+        type: integer
+      name:
+        example: space_name_1
+        type: string
+      namespace:
+        example: user_or_org_name
+        type: string
+      private:
+        type: boolean
+      running_status:
+        description: deploying, running, failed
+        type: string
+      sdk:
+        description: like gradio,steamlit etc
+        example: gradio
+        type: string
+      username:
+        example: creator_user_name
+        type: string
     type: object
   types.UpdateDatasetReq:
     properties:
@@ -1499,7 +1561,14 @@ paths:
       - description: current user
         in: query
         name: current_user
-        required: true
+        type: string
+      - description: search text
+        in: query
+        name: search
+        type: string
+      - description: sort by
+        in: query
+        name: sort
         type: string
       produces:
       - application/json
@@ -2548,6 +2617,100 @@ paths:
       summary: Remove membership between org and user
       tags:
       - Member
+  /spaces:
+    get:
+      consumes:
+      - application/json
+      description: get spaces visible to current user
+      parameters:
+      - default: 20
+        description: per
+        in: query
+        name: per
+        type: integer
+      - default: 1
+        description: per page
+        in: query
+        name: page
+        type: integer
+      - description: current user
+        in: query
+        name: current_user
+        required: true
+        type: string
+      - description: search text
+        in: query
+        name: search
+        type: string
+      - description: sort by
+        in: query
+        name: sort
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/types.ResponseWithTotal'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/types.Space'
+                  type: array
+                total:
+                  type: integer
+              type: object
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Get spaces visible to current user
+      tags:
+      - Space
+    post:
+      consumes:
+      - application/json
+      description: create a new space
+      parameters:
+      - description: body
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/types.CreateSpaceReq'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/types.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/types.Space'
+              type: object
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Create a new space
+      tags:
+      - Space
   /tags:
     get:
       consumes:

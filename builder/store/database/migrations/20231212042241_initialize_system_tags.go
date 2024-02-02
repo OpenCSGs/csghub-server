@@ -9,10 +9,11 @@ import (
 
 	"github.com/uptrace/bun"
 	"gopkg.in/yaml.v2"
+	"opencsg.com/csghub-server/builder/store/database"
 )
 
 type Tags struct {
-	Tags []Tag
+	Tags []database.Tag
 }
 
 func init() {
@@ -40,7 +41,6 @@ func init() {
 
 			ts := tags.Tags
 			_, err = db.NewInsert().Model(&ts).Exec(ctx)
-
 			if err != nil {
 				fmt.Println("Error inserting data:", err)
 				return

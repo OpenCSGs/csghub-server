@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/uptrace/bun"
+	"opencsg.com/csghub-server/common/types"
 )
 
 var sortBy = map[string]string{
@@ -49,7 +50,7 @@ func (s *DatasetStore) Index(ctx context.Context, per, page int) (datasets []*Re
 	err = s.db.Operator.Core.
 		NewSelect().
 		Model(&datasets).
-		Where("repository_type = ?", DatasetRepo).
+		Where("repository_type = ?", types.DatasetRepo).
 		Order("created_at DESC").
 		Limit(per).
 		Offset((page - 1) * per).
@@ -194,7 +195,7 @@ func (s *DatasetStore) Count(ctx context.Context) (count int, err error) {
 	count, err = s.db.Operator.Core.
 		NewSelect().
 		Model(&Repository{}).
-		Where("repository_type = ?", DatasetRepo).
+		Where("repository_type = ?", types.DatasetRepo).
 		Count(ctx)
 	if err != nil {
 		return
@@ -206,7 +207,7 @@ func (s *DatasetStore) PublicCount(ctx context.Context) (count int, err error) {
 	count, err = s.db.Operator.Core.
 		NewSelect().
 		Model(&Repository{}).
-		Where("repository_type = ?", DatasetRepo).
+		Where("repository_type = ?", types.DatasetRepo).
 		Where("private = ?", false).
 		Count(ctx)
 	if err != nil {
@@ -258,7 +259,7 @@ func (s *DatasetStore) Update(ctx context.Context, dataset *Dataset, repo *Repos
 	return
 }
 
-func (s *DatasetStore) UpdateRepoDownloads(ctx context.Context, dataset *Dataset, date time.Time, downloads int64) (err error) {
+func (s *DatasetStore) UpdateRepoFileDownloads(ctx context.Context, dataset *Dataset, date time.Time, clickDownloadCount int64) (err error) {
 	rd := new(RepositoryDownload)
 	err = s.db.Operator.Core.NewSelect().
 		Model(rd).
@@ -269,7 +270,7 @@ func (s *DatasetStore) UpdateRepoDownloads(ctx context.Context, dataset *Dataset
 	}
 
 	if errors.Is(err, sql.ErrNoRows) {
-		rd.Count = downloads
+		rd.ClickDownloadCount = clickDownloadCount
 		rd.Date = date
 		rd.RepositoryID = dataset.RepositoryID
 		err = s.db.Operator.Core.NewInsert().
@@ -279,7 +280,48 @@ func (s *DatasetStore) UpdateRepoDownloads(ctx context.Context, dataset *Dataset
 			return
 		}
 	} else {
-		rd.Count = downloads
+		rd.ClickDownloadCount = rd.ClickDownloadCount + clickDownloadCount
+		rd.UpdatedAt = time.Now()
+		query := s.db.Operator.Core.NewUpdate().
+			Model(rd).
+			WherePK()
+		slog.Debug(query.String())
+
+		_, err = query.Exec(ctx)
+		if err != nil {
+			return
+		}
+	}
+	err = s.UpdateDownloads(ctx, dataset)
+	if err != nil {
+		return
+	}
+
+	return
+}
+
+func (s *DatasetStore) UpdateRepoCloneDownloads(ctx context.Context, dataset *Dataset, date time.Time, cloneCount int64) (err error) {
+	rd := new(RepositoryDownload)
+	err = s.db.Operator.Core.NewSelect().
+		Model(rd).
+		Where("date = ? AND repository_id = ?", date.Format("2006-01-02"), dataset.RepositoryID).
+		Scan(ctx)
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
+		return
+	}
+
+	if errors.Is(err, sql.ErrNoRows) {
+		rd.CloneCount = cloneCount
+		rd.Date = date
+		rd.RepositoryID = dataset.RepositoryID
+		err = s.db.Operator.Core.NewInsert().
+			Model(rd).
+			Scan(ctx)
+		if err != nil {
+			return
+		}
+	} else {
+		rd.CloneCount = cloneCount
 		rd.UpdatedAt = time.Now()
 		query := s.db.Operator.Core.NewUpdate().
 			Model(rd).
@@ -302,7 +344,7 @@ func (s *DatasetStore) UpdateRepoDownloads(ctx context.Context, dataset *Dataset
 func (s *DatasetStore) UpdateDownloads(ctx context.Context, dataset *Dataset) error {
 	var downloadCount int64
 	err := s.db.Operator.Core.NewSelect().
-		ColumnExpr("SUM(count)").
+		ColumnExpr("(SUM(clone_count)+SUM(click_download_count)) AS total_count").
 		Model(&RepositoryDownload{}).
 		Where("repository_id=?", dataset.RepositoryID).
 		Scan(ctx, &downloadCount)
@@ -331,6 +373,9 @@ func (s *DatasetStore) FindByPath(ctx context.Context, namespace string, repoPat
 		Where("dataset.path =?", fmt.Sprintf("%s/%s", namespace, repoPath)).
 		Where("dataset.name =?", repoPath).
 		Scan(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to find dataset: %w", err)
+	}
 	err = s.db.Operator.Core.NewSelect().
 		Model(resDataset.Repository).
 		WherePK().
@@ -345,7 +390,7 @@ func (s *DatasetStore) Delete(ctx context.Context, namespace, name string) (err 
 			tx.NewDelete().
 				Model(&Repository{}).
 				Where("path = ?", fmt.Sprintf("%v/%v", namespace, name)).
-				Where("repository_type = ?", DatasetRepo).
+				Where("repository_type = ?", types.DatasetRepo).
 				Exec(ctx)); err != nil {
 			return err
 		}
@@ -368,7 +413,7 @@ func (s *DatasetStore) Tags(ctx context.Context, namespace, name string) (tags [
 		Join("JOIN repositories ON dataset.repository_id = repositories.id").
 		Join("JOIN repository_tags ON repositories.id = repository_tags.repository_id").
 		Join("JOIN tags ON repository_tags.tag_id = tags.id").
-		Where("repositories.repository_type = ?", DatasetRepo).
+		Where("repositories.repository_type = ?", types.DatasetRepo).
 		Where("dataset.path = ?", fmt.Sprintf("%v/%v", namespace, name))
 
 	slog.Debug(query.String())

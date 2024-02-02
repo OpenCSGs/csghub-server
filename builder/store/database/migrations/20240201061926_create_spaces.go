@@ -9,8 +9,8 @@ import (
 
 func init() {
 	Migrations.MustRegister(func(ctx context.Context, db *bun.DB) error {
-		return createTables(ctx, db, database.SSHKey{})
+		return createTables(ctx, db, database.Space{})
 	}, func(ctx context.Context, db *bun.DB) error {
-		return dropTables(ctx, db, database.SSHKey{})
+		return dropTables(ctx, db, database.Space{})
 	})
 }

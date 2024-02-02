@@ -692,11 +692,11 @@ func (h *DatasetHandler) UpdateDownloads(ctx *gin.Context) {
 
 	err = h.c.UpdateDownloads(ctx, req)
 	if err != nil {
-		slog.Error("Failed to update dataset download count", slog.Any("error", err), slog.String("namespace", namespace), slog.String("name", name), slog.Time("date", date), slog.Int64("download_count", req.DownloadCount))
+		slog.Error("Failed to update dataset download count", slog.Any("error", err), slog.String("namespace", namespace), slog.String("name", name), slog.Time("date", date), slog.Int64("clone_count", req.CloneCount))
 		ctx.JSON(http.StatusInternalServerError, gin.H{"message": err.Error()})
 		return
 	}
-	slog.Info("Update dataset download count succeed", slog.String("namespace", namespace), slog.String("name", name), slog.Int64("download_count", req.DownloadCount))
+	slog.Info("Update dataset download count succeed", slog.String("namespace", namespace), slog.String("name", name), slog.Int64("clone_count", req.CloneCount))
 	httpbase.OK(ctx, nil)
 }
 

@@ -43,7 +43,9 @@ type ModelHandler struct {
 // @Produce      json
 // @Param        per query int false "per" default(20)
 // @Param        page query int false "per page" default(1)
-// @Param        current_user query string true "current user"
+// @Param        current_user query string false "current user"
+// @Param        search query string false "search text"
+// @Param        sort query string false "sort by"
 // @Success      200  {object}  types.ResponseWithTotal{data=[]database.Model,total=int} "OK"
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
@@ -687,11 +689,11 @@ func (h *ModelHandler) UpdateDownloads(ctx *gin.Context) {
 
 	err = h.c.UpdateDownloads(ctx, req)
 	if err != nil {
-		slog.Error("Failed to update model download count", slog.Any("error", err), slog.String("namespace", namespace), slog.String("name", name), slog.Time("date", date), slog.Int64("download_count", req.DownloadCount))
+		slog.Error("Failed to update model download count", slog.Any("error", err), slog.String("namespace", namespace), slog.String("name", name), slog.Time("date", date), slog.Int64("clone_count", req.CloneCount))
 		ctx.JSON(http.StatusInternalServerError, gin.H{"message": err.Error()})
 		return
 	}
-	slog.Info("Update model download count succeed", slog.String("namespace", namespace), slog.String("name", name), slog.Int64("download_count", req.DownloadCount))
+	slog.Info("Update model download count succeed", slog.String("namespace", namespace), slog.String("name", name), slog.Int64("clone_count", req.CloneCount))
 	httpbase.OK(ctx, nil)
 }
 

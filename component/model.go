@@ -10,6 +10,7 @@ import (
 	"net/url"
 	"path"
 	"path/filepath"
+	"time"
 
 	"github.com/minio/minio-go/v7"
 	"opencsg.com/csghub-server/builder/git"
@@ -278,7 +279,7 @@ func (c *ModelComponent) CreateFile(ctx context.Context, req *types.CreateFileRe
 		return nil, fmt.Errorf("failed to find username, error: %w", err)
 	}
 
-	//TODO:check sensitive content of file
+	// TODO:check sensitive content of file
 	fileName := filepath.Base(req.FilePath)
 	if fileName == "README.md" {
 		slog.Debug("file is readme", slog.String("content", req.Content))
@@ -341,7 +342,7 @@ func (c *ModelComponent) UpdateFile(ctx context.Context, req *types.UpdateFileRe
 	if err != nil {
 		return nil, fmt.Errorf("failed to create model file, error: %w", err)
 	}
-	//TODO:check sensitive content of file
+	// TODO:check sensitive content of file
 
 	fileName := filepath.Base(req.FilePath)
 	if fileName == "README.md" {
@@ -358,9 +359,9 @@ func (c *ModelComponent) updateLibraryFile(ctx context.Context, req *types.Updat
 	resp := &types.UpdateFileResp{}
 
 	isFileRenamed := req.FilePath != req.OriginPath
-	//need to handle tag change only if file renamed
+	// need to handle tag change only if file renamed
 	if isFileRenamed {
-		c.tc.UpdateLibraryTags(ctx, database.ModelTagScope, req.NameSpace, req.Name, req.OriginPath, req.FilePath)
+		err = c.tc.UpdateLibraryTags(ctx, database.ModelTagScope, req.NameSpace, req.Name, req.OriginPath, req.FilePath)
 		if err != nil {
 			slog.Error("failed to set model's tags", slog.String("namespace", req.NameSpace),
 				slog.String("name", req.Name), slog.Any("error", err))
@@ -439,6 +440,10 @@ func (c *ModelComponent) DownloadFile(ctx context.Context, req *types.GetFileReq
 	if err != nil {
 		return nil, "", fmt.Errorf("failed to find model, error: %w", err)
 	}
+	err = c.ms.UpdateRepoFileDownloads(ctx, model, time.Now(), 1)
+	if err != nil {
+		return nil, "", fmt.Errorf("failed to update model file download count, error: %w", err)
+	}
 	if req.Ref == "" {
 		req.Ref = model.Repository.DefaultBranch
 	}
@@ -508,7 +513,7 @@ func (c *ModelComponent) UpdateDownloads(ctx context.Context, req *types.UpdateD
 		return fmt.Errorf("failed to find model, error: %w", err)
 	}
 
-	err = c.ms.UpdateRepoDownloads(ctx, model, req.Date, req.DownloadCount)
+	err = c.ms.UpdateRepoCloneDownloads(ctx, model, req.Date, req.CloneCount)
 	if err != nil {
 		return fmt.Errorf("failed to update model download count, error: %w", err)
 	}
