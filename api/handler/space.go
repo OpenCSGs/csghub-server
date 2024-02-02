@@ -15,12 +15,12 @@ import (
 )
 
 func NewSpaceHandler(config *config.Config) (*SpaceHandler, error) {
-	tc, err := component.NewSpaceComponent(config)
+	sc, err := component.NewSpaceComponent(config)
 	if err != nil {
 		return nil, err
 	}
 	return &SpaceHandler{
-		c: tc,
+		c: sc,
 	}, nil
 }
 
