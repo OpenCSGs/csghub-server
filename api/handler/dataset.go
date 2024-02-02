@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"encoding/base64"
 	"fmt"
 	"io"
 	"log/slog"
@@ -707,4 +708,80 @@ func getFilterFromContext(ctx *gin.Context) (searchKey, sort string) {
 		sort = "recently_update"
 	}
 	return
+}
+
+// UploadDatasetFile godoc
+// @Security     ApiKey
+// @Summary      Create dataset file
+// @Description  create dataset file
+// @Tags         Dataset
+// @Accept       json
+// @Produce      json
+// @Param        namespace path string true "namespace"
+// @Param        name path string true "name"
+// @Param        file_path formData string true "file_path"
+// @Param        file formData file true "file"
+// @Param        email formData string true "email"
+// @Param        message formData string true "message"
+// @Param        branch formData string false "branch"
+// @Param        username formData string true "username"
+// @Success      200  {object}  types.Response{data=types.CreateFileResp} "OK"
+// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
+// @Router       /datasets/{namespace}/{name}/upload_file [post]
+func (h *DatasetHandler) UploadFile(ctx *gin.Context) {
+	var (
+		req  *types.CreateFileReq
+		resp *types.CreateFileResp
+	)
+
+	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
+	if err != nil {
+		slog.Error("Failed to get namespace from context", "error", err)
+		httpbase.BadRequest(ctx, err.Error())
+		return
+	}
+	if err = ctx.ShouldBind(&req); err != nil {
+		slog.Error("Bad request format", "error", err)
+		httpbase.BadRequest(ctx, err.Error())
+		return
+	}
+
+	file, err := ctx.FormFile("file")
+	if err != nil {
+		slog.Error("Bad request format", "error", err)
+		httpbase.BadRequest(ctx, err.Error())
+		return
+	}
+
+	openedFile, err := file.Open()
+	if err != nil {
+		slog.Error("Error opening uploaded file", "error", err)
+		httpbase.BadRequest(ctx, err.Error())
+		return
+	}
+	defer openedFile.Close()
+
+	fileBytes, err := io.ReadAll(openedFile)
+	if err != nil {
+		slog.Error("Error reading uploaded file", "error", err)
+		httpbase.BadRequest(ctx, err.Error())
+		return
+	}
+	encodedString := base64.StdEncoding.EncodeToString(fileBytes)
+
+	filePath := ctx.PostForm("file_path")
+	req.NameSpace = namespace
+	req.Name = name
+	req.FilePath = filePath
+	req.Content = encodedString
+
+	resp, err = h.c.CreateFile(ctx, req)
+	if err != nil {
+		slog.Error("Failed to create dataset file", slog.Any("error", err), slog.String("file_path", filePath))
+		ctx.JSON(http.StatusInternalServerError, gin.H{"message": err.Error()})
+		return
+	}
+	slog.Info("Create file succeed", slog.String("file_path", filePath))
+	httpbase.OK(ctx, resp)
 }

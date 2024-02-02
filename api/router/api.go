@@ -45,6 +45,7 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 	apiGroup.POST("/models/:namespace/:name/raw/*file_path", modelHandler.CreateFile)
 	apiGroup.PUT("/models/:namespace/:name/raw/*file_path", modelHandler.UpdateFile)
 	apiGroup.POST("/models/:namespace/:name/update_downloads", modelHandler.UpdateDownloads)
+	apiGroup.POST("/models/:namespace/:name/upload_file", modelHandler.UploadFile)
 
 	// Dataset routes
 	dsHandler, err := handler.NewDatasetHandler(config)
@@ -67,6 +68,7 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 	apiGroup.GET("/datasets/:namespace/:name/download/*file_path", dsHandler.DownloadFile)
 	apiGroup.PUT("/datasets/:namespace/:name/raw/*file_path", dsHandler.UpdateFile)
 	apiGroup.POST("/datasets/:namespace/:name/update_downloads", dsHandler.UpdateDownloads)
+	apiGroup.POST("/datasets/:namespace/:name/upload_file", dsHandler.UploadFile)
 
 	// Dataset viewer
 	dsViewerHandler, err := handler.NewDatasetViewerHandler(config)
