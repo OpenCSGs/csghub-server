@@ -3079,8 +3079,7 @@ const docTemplate = `{
                         "type": "string",
                         "description": "current user",
                         "name": "current_user",
-                        "in": "query",
-                        "required": true
+                        "in": "query"
                     },
                     {
                         "type": "string",

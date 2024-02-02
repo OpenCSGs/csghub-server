@@ -69,11 +69,11 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 	apiGroup.POST("/datasets/:namespace/:name/update_downloads", dsHandler.UpdateDownloads)
 
 	// Dataset viewer
-	dsViewerHandler, err := handler.NewDatasetViewerHandler(config)
-	if err != nil {
-		return nil, fmt.Errorf("error creating dataset viewer handler:%w", err)
-	}
-	apiGroup.GET("/datasets/:namespace/:name/viewer/*file_path", dsViewerHandler.View)
+	// dsViewerHandler, err := handler.NewDatasetViewerHandler(config)
+	// if err != nil {
+	// 	return nil, fmt.Errorf("error creating dataset viewer handler:%w", err)
+	// }
+	// apiGroup.GET("/datasets/:namespace/:name/viewer/*file_path", dsViewerHandler.View)
 
 	spaceHandler, err := handler.NewSpaceHandler(config)
 	if err != nil {
