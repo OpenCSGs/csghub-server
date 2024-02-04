@@ -10,6 +10,7 @@ import (
 	"net/url"
 	"path"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/minio/minio-go/v7"
@@ -518,4 +519,32 @@ func (c *ModelComponent) UpdateDownloads(ctx context.Context, req *types.UpdateD
 		return fmt.Errorf("failed to update model download count, error: %w", err)
 	}
 	return err
+}
+
+func (c *ModelComponent) UploadFile(ctx context.Context, req *types.CreateFileReq) error {
+	tree, err := c.gs.GetModelFileTree(req.NameSpace, req.Name, req.Branch, req.FilePath)
+	if err != nil && strings.Contains(err.Error(), "object does not exist") {
+		_, err = c.CreateFile(ctx, req)
+		if err != nil {
+			return err
+		}
+		return nil
+	}
+	var updateFileReq types.UpdateFileReq
+
+	updateFileReq.Username = req.Username
+	updateFileReq.Email = req.Email
+	updateFileReq.Message = req.Message
+	updateFileReq.Branch = req.Branch
+	updateFileReq.Content = req.Content
+	updateFileReq.NameSpace = req.NameSpace
+	updateFileReq.Name = req.Name
+	updateFileReq.FilePath = req.FilePath
+	updateFileReq.SHA = tree[0].SHA
+
+	_, err = c.UpdateFile(ctx, &updateFileReq)
+	if err != nil {
+		return err
+	}
+	return nil
 }

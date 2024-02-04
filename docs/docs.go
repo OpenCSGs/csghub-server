@@ -1239,7 +1239,7 @@ const docTemplate = `{
                         "ApiKey": []
                     }
                 ],
-                "description": "create dataset file",
+                "description": "upload dataset file to create or update a file in dataset repository",
                 "consumes": [
                     "application/json"
                 ],
@@ -2639,7 +2639,7 @@ const docTemplate = `{
                         "ApiKey": []
                     }
                 ],
-                "description": "upload model file",
+                "description": "upload model file to create or update a file in model repository",
                 "consumes": [
                     "application/json"
                 ],
@@ -3297,8 +3297,7 @@ const docTemplate = `{
                         "type": "string",
                         "description": "current user",
                         "name": "current_user",
-                        "in": "query",
-                        "required": true
+                        "in": "query"
                     },
                     {
                         "type": "string",

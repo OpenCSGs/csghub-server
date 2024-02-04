@@ -1505,7 +1505,7 @@ paths:
     post:
       consumes:
       - application/json
-      description: create dataset file
+      description: upload dataset file to create or update a file in dataset repository
       parameters:
       - description: namespace
         in: path
@@ -2372,7 +2372,7 @@ paths:
     post:
       consumes:
       - application/json
-      description: upload model file
+      description: upload model file to create or update a file in model repository
       parameters:
       - description: namespace
         in: path
@@ -2776,7 +2776,6 @@ paths:
       - description: current user
         in: query
         name: current_user
-        required: true
         type: string
       - description: search text
         in: query

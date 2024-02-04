@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"bytes"
 	"encoding/base64"
 	"fmt"
 	"io"
@@ -733,7 +734,7 @@ func convertFilePathFromRoute(path string) string {
 // UploadModelFile godoc
 // @Security     ApiKey
 // @Summary      Upload model file
-// @Description  upload model file
+// @Description  upload model file to create or update a file in model repository
 // @Tags         Model
 // @Accept       json
 // @Produce      json
@@ -750,10 +751,7 @@ func convertFilePathFromRoute(path string) string {
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
 // @Router       /models/{namespace}/{name}/upload_file [post]
 func (h *ModelHandler) UploadFile(ctx *gin.Context) {
-	var (
-		req  *types.CreateFileReq
-		resp *types.CreateFileResp
-	)
+	var req *types.CreateFileReq
 
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
 	if err != nil {
@@ -782,26 +780,24 @@ func (h *ModelHandler) UploadFile(ctx *gin.Context) {
 	}
 	defer openedFile.Close()
 
-	fileBytes, err := io.ReadAll(openedFile)
-	if err != nil {
-		slog.Error("Error reading uploaded file", "error", err)
-		httpbase.BadRequest(ctx, err.Error())
-		return
-	}
-	encodedString := base64.StdEncoding.EncodeToString(fileBytes)
+	var buf bytes.Buffer
+	w := base64.NewEncoder(base64.StdEncoding, &buf)
+	io.Copy(w, openedFile)
+
+	defer w.Close()
 
 	filePath := ctx.PostForm("file_path")
 	req.NameSpace = namespace
 	req.Name = name
 	req.FilePath = filePath
-	req.Content = encodedString
+	req.Content = buf.String()
 
-	resp, err = h.c.CreateFile(ctx, req)
+	err = h.c.UploadFile(ctx, req)
 	if err != nil {
 		slog.Error("Failed to create model file", slog.Any("error", err), slog.String("file_path", filePath))
 		ctx.JSON(http.StatusInternalServerError, gin.H{"message": err.Error()})
 		return
 	}
 	slog.Info("Create file succeed", slog.String("file_path", filePath))
-	httpbase.OK(ctx, resp)
+	httpbase.OK(ctx, nil)
 }
