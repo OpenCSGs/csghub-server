@@ -1,6 +1,8 @@
 package handler
 
 import (
+	"bytes"
+	"encoding/base64"
 	"fmt"
 	"io"
 	"log/slog"
@@ -727,4 +729,79 @@ func parseTagReqs(ctx *gin.Context) (tags []database.TagReq) {
 
 func convertFilePathFromRoute(path string) string {
 	return strings.TrimLeft(path, "/")
+}
+
+// UploadModelFile godoc
+// @Security     ApiKey
+// @Summary      Upload model file
+// @Description  upload model file to create or update a file in model repository
+// @Tags         Model
+// @Accept       json
+// @Produce      json
+// @Param        namespace path string true "namespace"
+// @Param        name path string true "name"
+// @Param        file_path formData string true "file_path"
+// @Param        file formData file true "file"
+// @Param        email formData string true "email"
+// @Param        message formData string true "message"
+// @Param        branch formData string false "branch"
+// @Param        username formData string true "username"
+// @Success      200  {object}  types.Response{data=types.CreateFileResp} "OK"
+// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
+// @Router       /models/{namespace}/{name}/upload_file [post]
+func (h *ModelHandler) UploadFile(ctx *gin.Context) {
+	var req *types.CreateFileReq
+
+	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
+	if err != nil {
+		slog.Error("Failed to get namespace from context", "error", err)
+		httpbase.BadRequest(ctx, err.Error())
+		return
+	}
+	if err = ctx.ShouldBind(&req); err != nil {
+		slog.Error("Bad request format", "error", err)
+		httpbase.BadRequest(ctx, err.Error())
+		return
+	}
+
+	file, err := ctx.FormFile("file")
+	if err != nil {
+		slog.Error("Bad request format", "error", err)
+		httpbase.BadRequest(ctx, err.Error())
+		return
+	}
+
+	openedFile, err := file.Open()
+	if err != nil {
+		slog.Error("Error opening uploaded file", "error", err)
+		httpbase.BadRequest(ctx, err.Error())
+		return
+	}
+	defer openedFile.Close()
+
+	var buf bytes.Buffer
+	w := base64.NewEncoder(base64.StdEncoding, &buf)
+	_, err = io.Copy(w, openedFile)
+	w.Close()
+	if err != nil {
+		slog.Info("Error encodeing uploaded file", "error", err)
+		httpbase.BadRequest(ctx, err.Error())
+		return
+	}
+
+	filePath := ctx.PostForm("file_path")
+	req.NameSpace = namespace
+	req.Name = name
+	req.FilePath = filePath
+	req.Content = buf.String()
+
+	err = h.c.UploadFile(ctx, req)
+	if err != nil {
+		slog.Error("Failed to create model file", slog.Any("error", err), slog.String("file_path", filePath))
+		ctx.JSON(http.StatusInternalServerError, gin.H{"message": err.Error()})
+		return
+	}
+	slog.Info("Create file succeed", slog.String("file_path", filePath))
+	httpbase.OK(ctx, nil)
 }

@@ -559,3 +559,47 @@ func (c *DatasetComponent) UpdateDownloads(ctx context.Context, req *types.Updat
 	}
 	return err
 }
+
+func (c *DatasetComponent) UploadFile(ctx context.Context, req *types.CreateFileReq) error {
+	parentPath := filepath.Dir(req.FilePath)
+	if parentPath == "." {
+		parentPath = "/"
+	}
+	tree, err := c.gs.GetDatasetFileTree(req.NameSpace, req.Name, req.Branch, parentPath)
+	if err != nil {
+		slog.Error("Error getting dataset file tree: %w", err, slog.String("dataset", fmt.Sprintf("%s/%s", req.NameSpace, req.Name)), slog.String("file_path", req.FilePath))
+		return err
+	}
+	file, exists := fileIsExist(tree, req.FilePath)
+	if !exists {
+		_, err = c.CreateFile(ctx, req)
+		if err != nil {
+			return err
+		}
+		return nil
+	}
+	var updateFileReq types.UpdateFileReq
+
+	updateFileReq.Username = req.Username
+	updateFileReq.Email = req.Email
+	updateFileReq.Message = req.Message
+	updateFileReq.Branch = req.Branch
+	updateFileReq.Content = req.Content
+	updateFileReq.NameSpace = req.NameSpace
+	updateFileReq.Name = req.Name
+	updateFileReq.FilePath = req.FilePath
+	updateFileReq.SHA = file.SHA
+
+	_, err = c.UpdateFile(ctx, &updateFileReq)
+
+	return err
+}
+
+func fileIsExist(tree []*types.File, path string) (*types.File, bool) {
+	for _, f := range tree {
+		if f.Path == path {
+			return f, true
+		}
+	}
+	return nil, false
+}

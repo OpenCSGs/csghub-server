@@ -1501,6 +1501,76 @@ paths:
       summary: Update dataset downloads
       tags:
       - Dataset
+  /datasets/{namespace}/{name}/upload_file:
+    post:
+      consumes:
+      - application/json
+      description: upload dataset file to create or update a file in dataset repository
+      parameters:
+      - description: namespace
+        in: path
+        name: namespace
+        required: true
+        type: string
+      - description: name
+        in: path
+        name: name
+        required: true
+        type: string
+      - description: file_path
+        in: formData
+        name: file_path
+        required: true
+        type: string
+      - description: file
+        in: formData
+        name: file
+        required: true
+        type: file
+      - description: email
+        in: formData
+        name: email
+        required: true
+        type: string
+      - description: message
+        in: formData
+        name: message
+        required: true
+        type: string
+      - description: branch
+        in: formData
+        name: branch
+        type: string
+      - description: username
+        in: formData
+        name: username
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/types.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/types.CreateFileResp'
+              type: object
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Create dataset file
+      tags:
+      - Dataset
   /datasets/{namespace}/{name}/viewer/{file_path}:
     get:
       consumes:
@@ -2296,6 +2366,76 @@ paths:
       security:
       - ApiKey: []
       summary: Update model downloads
+      tags:
+      - Model
+  /models/{namespace}/{name}/upload_file:
+    post:
+      consumes:
+      - application/json
+      description: upload model file to create or update a file in model repository
+      parameters:
+      - description: namespace
+        in: path
+        name: namespace
+        required: true
+        type: string
+      - description: name
+        in: path
+        name: name
+        required: true
+        type: string
+      - description: file_path
+        in: formData
+        name: file_path
+        required: true
+        type: string
+      - description: file
+        in: formData
+        name: file
+        required: true
+        type: file
+      - description: email
+        in: formData
+        name: email
+        required: true
+        type: string
+      - description: message
+        in: formData
+        name: message
+        required: true
+        type: string
+      - description: branch
+        in: formData
+        name: branch
+        type: string
+      - description: username
+        in: formData
+        name: username
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/types.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/types.CreateFileResp'
+              type: object
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Upload model file
       tags:
       - Model
   /organization/{namespace}/datasets:
