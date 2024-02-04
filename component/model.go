@@ -551,8 +551,6 @@ func (c *ModelComponent) UploadFile(ctx context.Context, req *types.CreateFileRe
 	updateFileReq.SHA = file.SHA
 
 	_, err = c.UpdateFile(ctx, &updateFileReq)
-	if err != nil {
-		return err
-	}
-	return nil
+
+	return err
 }
