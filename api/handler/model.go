@@ -709,7 +709,7 @@ func (h *ModelHandler) UpdateDownloads(ctx *gin.Context) {
 // @Produce      json
 // @Param        namespace path string true "namespace"
 // @Param        name path string true "name"
-// @Param        body {object} types.ModelPredictReq true "input for model prediction"
+// @Param        body body types.ModelPredictReq true "input for model prediction"
 // @Success      200  {object}  string "OK"
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"

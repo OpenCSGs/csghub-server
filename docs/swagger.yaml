@@ -624,6 +624,13 @@ definitions:
       private:
         type: boolean
       updated_at:
+  types.ModelPredictReq:
+    properties:
+      current_user:
+        type: string
+      input:
+        type: string
+      version:
         type: string
     type: object
   types.RepositoryType:
@@ -2183,6 +2190,48 @@ paths:
       security:
       - ApiKey: []
       summary: Get model last commit
+      tags:
+      - Model
+  /models/{namespace}/{name}/predict:
+    post:
+      consumes:
+      - application/json
+      description: invoke model prediction
+      parameters:
+      - description: namespace
+        in: path
+        name: namespace
+        required: true
+        type: string
+      - description: name
+        in: path
+        name: name
+        required: true
+        type: string
+      - description: input for model prediction
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/types.ModelPredictReq'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            type: string
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Invoke model prediction
       tags:
       - Model
   /models/{namespace}/{name}/raw/{file_path}:

@@ -75,6 +75,7 @@ type ModelPredictReq struct {
 	Namespace   string `json:"-"`
 	Name        string `json:"-"`
 	Input       string `json:"input"`
+	Version     string `json:"version"`
 	CurrentUser string `json:"current_user"`
 }
 

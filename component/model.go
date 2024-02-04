@@ -88,7 +88,6 @@ func NewModelComponent(config *config.Config) (*ModelComponent, error) {
 		return nil, newError
 	}
 	c.lfsBucket = config.S3.Bucket
-	c.infer = inference.NewClient(config)
 	return c, nil
 }
 
@@ -101,7 +100,6 @@ type ModelComponent struct {
 	tc        *TagComponent
 	s3Client  *minio.Client
 	lfsBucket string
-	infer     inference.Client
 }
 
 func (c *ModelComponent) Index(ctx context.Context, username, search, sort string, ragReqs []database.TagReq, per, page int) ([]database.Model, int, error) {
@@ -672,6 +670,23 @@ func (c *ModelComponent) Predict(ctx context.Context, req *types.ModelPredictReq
 	if err != nil {
 		return nil, fmt.Errorf("failed to find model, error: %w", err)
 	}
-	c.infer.Predict(model.Path, req.Input)
-	return nil, nil
+
+	mid := inference.ModelID{
+		Owner:   model.User.Username,
+		Name:    model.Name,
+		Version: req.Version,
+	}
+	app, err := inference.Model(mid)
+	if err != nil {
+		return nil, fmt.Errorf("fail to init infer model,error:%w", err)
+	}
+	result, err := app.Predict(req.Input)
+	if err != nil {
+		return nil, fmt.Errorf("fail to call predict api,error:%w", err)
+	}
+
+	resp := &types.ModelPredictResp{
+		Content: result,
+	}
+	return resp, nil
 }
