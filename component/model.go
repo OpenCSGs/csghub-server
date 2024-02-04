@@ -10,7 +10,6 @@ import (
 	"net/url"
 	"path"
 	"path/filepath"
-	"strings"
 	"time"
 
 	"github.com/minio/minio-go/v7"
@@ -522,8 +521,17 @@ func (c *ModelComponent) UpdateDownloads(ctx context.Context, req *types.UpdateD
 }
 
 func (c *ModelComponent) UploadFile(ctx context.Context, req *types.CreateFileReq) error {
-	tree, err := c.gs.GetModelFileTree(req.NameSpace, req.Name, req.Branch, req.FilePath)
-	if err != nil && strings.Contains(err.Error(), "object does not exist") {
+	parentPath := filepath.Dir(req.FilePath)
+	if parentPath == "." {
+		parentPath = "/"
+	}
+	tree, err := c.gs.GetModelFileTree(req.NameSpace, req.Name, req.Branch, parentPath)
+	if err != nil {
+		slog.Error("Error getting mode file tree: %w", err, slog.String("model", fmt.Sprintf("%s/%s", req.NameSpace, req.Name)), slog.String("file_path", req.FilePath))
+		return err
+	}
+	file, exists := fileIsExist(tree, req.FilePath)
+	if !exists {
 		_, err = c.CreateFile(ctx, req)
 		if err != nil {
 			return err
@@ -540,7 +548,7 @@ func (c *ModelComponent) UploadFile(ctx context.Context, req *types.CreateFileRe
 	updateFileReq.NameSpace = req.NameSpace
 	updateFileReq.Name = req.Name
 	updateFileReq.FilePath = req.FilePath
-	updateFileReq.SHA = tree[0].SHA
+	updateFileReq.SHA = file.SHA
 
 	_, err = c.UpdateFile(ctx, &updateFileReq)
 	if err != nil {
