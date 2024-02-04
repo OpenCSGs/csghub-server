@@ -782,9 +782,13 @@ func (h *ModelHandler) UploadFile(ctx *gin.Context) {
 
 	var buf bytes.Buffer
 	w := base64.NewEncoder(base64.StdEncoding, &buf)
-	io.Copy(w, openedFile)
-
-	defer w.Close()
+	_, err = io.Copy(w, openedFile)
+	w.Close()
+	if err != nil {
+		slog.Info("Error encodeing uploaded file", "error", err)
+		httpbase.BadRequest(ctx, err.Error())
+		return
+	}
 
 	filePath := ctx.PostForm("file_path")
 	req.NameSpace = namespace
