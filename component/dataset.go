@@ -591,10 +591,8 @@ func (c *DatasetComponent) UploadFile(ctx context.Context, req *types.CreateFile
 	updateFileReq.SHA = file.SHA
 
 	_, err = c.UpdateFile(ctx, &updateFileReq)
-	if err != nil {
-		return err
-	}
-	return nil
+
+	return err
 }
 
 func fileIsExist(tree []*types.File, path string) (*types.File, bool) {
