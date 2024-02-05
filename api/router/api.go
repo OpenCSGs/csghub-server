@@ -24,6 +24,15 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 	r.Use(middleware.Log())
 	apiGroup := r.Group("/api/v1")
 	// TODO:use middleware to handle common response
+
+	// List trending models and datasets routes
+	listHandler, err := handler.NewListHandler(config)
+	if err != nil {
+		return nil, fmt.Errorf("error creatring list handler: %v", err)
+	}
+	apiGroup.POST("/list/models_by_path", listHandler.ListModelsByPath)
+	apiGroup.POST("/list/datasets_by_path", listHandler.ListDatasetsByPath)
+
 	// Models routes
 	modelHandler, err := handler.NewModelHandler(config)
 	if err != nil {

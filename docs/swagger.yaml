@@ -502,6 +502,17 @@ definitions:
       ssh_clone_url:
         type: string
     type: object
+  types.DatasetResp:
+    properties:
+      downloads:
+        type: integer
+      path:
+        type: string
+      private:
+        type: boolean
+      updated_at:
+        type: string
+    type: object
   types.DeleteUserTokenRequest:
     properties:
       name:
@@ -557,6 +568,13 @@ definitions:
         description: URL to browse the file
         type: string
     type: object
+  types.ListByPathReq:
+    properties:
+      paths:
+        items:
+          type: string
+        type: array
+    type: object
   types.ModelBranch:
     properties:
       commit:
@@ -594,6 +612,17 @@ definitions:
       size:
         type: integer
       ssh_clone_url:
+        type: string
+    type: object
+  types.ModelResp:
+    properties:
+      downloads:
+        type: integer
+      path:
+        type: string
+      private:
+        type: boolean
+      updated_at:
         type: string
     type: object
   types.RepositoryType:
@@ -1612,6 +1641,84 @@ paths:
       summary: Get the demo data of the dataset
       tags:
       - Dataset
+  /list/datasets_by_path:
+    post:
+      consumes:
+      - application/json
+      description: list datasets by paths
+      parameters:
+      - description: body
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/types.ListByPathReq'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/types.Response'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/types.DatasetResp'
+                  type: array
+              type: object
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: List datasets by paths
+      tags:
+      - List
+  /list/models_by_path:
+    post:
+      consumes:
+      - application/json
+      description: list models by paths
+      parameters:
+      - description: body
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/types.ListByPathReq'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/types.Response'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/types.ModelResp'
+                  type: array
+              type: object
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: List models by paths
+      tags:
+      - List
   /models:
     get:
       consumes:
