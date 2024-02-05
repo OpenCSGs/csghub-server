@@ -1404,6 +1404,138 @@ const docTemplate = `{
                 }
             }
         },
+        "/list/datasets_by_path": {
+            "post": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "description": "list datasets by paths",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "List"
+                ],
+                "summary": "List datasets by paths",
+                "parameters": [
+                    {
+                        "description": "body",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/types.ListByPathReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/types.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/definitions/types.DatasetResp"
+                                            }
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            }
+        },
+        "/list/models_by_path": {
+            "post": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "description": "list models by paths",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "List"
+                ],
+                "summary": "List models by paths",
+                "parameters": [
+                    {
+                        "description": "body",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/types.ListByPathReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/types.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/definitions/types.ModelResp"
+                                            }
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            }
+        },
         "/models": {
             "get": {
                 "security": [
@@ -4808,6 +4940,23 @@ const docTemplate = `{
                 }
             }
         },
+        "types.DatasetResp": {
+            "type": "object",
+            "properties": {
+                "downloads": {
+                    "type": "integer"
+                },
+                "path": {
+                    "type": "string"
+                },
+                "private": {
+                    "type": "boolean"
+                },
+                "updated_at": {
+                    "type": "string"
+                }
+            }
+        },
         "types.DeleteUserTokenRequest": {
             "type": "object",
             "properties": {
@@ -4885,6 +5034,17 @@ const docTemplate = `{
                 }
             }
         },
+        "types.ListByPathReq": {
+            "type": "object",
+            "properties": {
+                "paths": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                }
+            }
+        },
         "types.ModelBranch": {
             "type": "object",
             "properties": {
@@ -4941,6 +5101,23 @@ const docTemplate = `{
                     "type": "integer"
                 },
                 "ssh_clone_url": {
+                    "type": "string"
+                }
+            }
+        },
+        "types.ModelResp": {
+            "type": "object",
+            "properties": {
+                "downloads": {
+                    "type": "integer"
+                },
+                "path": {
+                    "type": "string"
+                },
+                "private": {
+                    "type": "boolean"
+                },
+                "updated_at": {
                     "type": "string"
                 }
             }
