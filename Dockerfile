@@ -5,7 +5,7 @@ COPY . .
 RUN  CGO_ENABLED=1 GOOS=linux go build -tags netgo -a  -installsuffix cgo -ldflags '-extldflags "-static"'  -v -o starhub ./cmd/csghub-server
 
 
-FROM alpine:latest as prod
+FROM frolvlad/alpine-glibc:glibc-2.34 as prod
 WORKDIR /starhub-bin
 ENV GIN_MODE=release
 COPY --from=0 /starhub/starhub .
