@@ -88,6 +88,8 @@ func NewModelComponent(config *config.Config) (*ModelComponent, error) {
 		return nil, newError
 	}
 	c.lfsBucket = config.S3.Bucket
+
+	c.infer = inference.NewInferClient(config.Inference.ServerAddr)
 	return c, nil
 }
 
@@ -97,6 +99,7 @@ type ModelComponent struct {
 	os        *database.OrgStore
 	ns        *database.NamespaceStore
 	gs        gitserver.GitServer
+	infer     inference.App
 	tc        *TagComponent
 	s3Client  *minio.Client
 	lfsBucket string
@@ -676,17 +679,16 @@ func (c *ModelComponent) Predict(ctx context.Context, req *types.ModelPredictReq
 		Name:    model.Name,
 		Version: req.Version,
 	}
-	app, err := inference.Model(mid)
-	if err != nil {
-		return nil, fmt.Errorf("fail to init infer model,error:%w", err)
+	inferReq := &inference.PredictRequest{
+		Prompt: req.Input,
 	}
-	result, err := app.Predict(req.Input)
+	inferResp, err := c.infer.Predict(mid, inferReq)
 	if err != nil {
-		return nil, fmt.Errorf("fail to call predict api,error:%w", err)
+		slog.Error("failed to predict", slog.Any("req", *inferReq), slog.Any("model", mid), slog.String("error", err.Error()))
+		return nil, err
 	}
-
 	resp := &types.ModelPredictResp{
-		Content: result,
+		Content: inferResp.GeneratedText,
 	}
 	return resp, nil
 }
