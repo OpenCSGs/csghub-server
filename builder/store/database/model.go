@@ -418,3 +418,16 @@ func (s *ModelStore) Tags(ctx context.Context, namespace, name string) (tags []T
 	err = query.Scan(ctx, &tags)
 	return
 }
+
+func (s *ModelStore) ListByPath(ctx context.Context, paths []string) ([]Model, error) {
+	var models []Model
+	err := s.db.Operator.Core.
+		NewSelect().
+		Model(&Model{}).
+		Where("path IN (?)", bun.In(paths)).
+		Scan(ctx, &models)
+	if err != nil {
+		return nil, fmt.Errorf("failed to find models by path,error: %w", err)
+	}
+	return models, nil
+}

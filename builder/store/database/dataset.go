@@ -420,3 +420,16 @@ func (s *DatasetStore) Tags(ctx context.Context, namespace, name string) (tags [
 	err = query.Scan(ctx, &tags)
 	return
 }
+
+func (s *DatasetStore) ListByPath(ctx context.Context, paths []string) ([]Dataset, error) {
+	var datasets []Dataset
+	err := s.db.Operator.Core.
+		NewSelect().
+		Model(&Dataset{}).
+		Where("path IN (?)", bun.In(paths)).
+		Scan(ctx, &datasets)
+	if err != nil {
+		return nil, fmt.Errorf("failed to find models by path,error: %w", err)
+	}
+	return datasets, nil
+}
