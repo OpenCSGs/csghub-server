@@ -56,6 +56,13 @@ func (c *llmInferClient) Predict(id ModelID, req *PredictRequest) (*PredictRespo
 	if err != nil {
 		return nil, fmt.Errorf("failed to get model info,error:%w", err)
 	}
+
+	{
+		// for test only, as inference service is not ready
+		if id.Owner == "test_user_name" && id.Name == "test_model_name" {
+			return &PredictResponse{GeneratedText: "this is a test predict result."}, nil
+		}
+	}
 	return c.CallPredict(s.Endpoint, req)
 }
 
@@ -75,7 +82,7 @@ func (c *llmInferClient) ServingList() (map[uint64]ModelInfo, error) {
 	}
 	tmp[testModelID.Hash()] = ModelInfo{
 		HashID:   testModelID.Hash(),
-		Endpoint: "htttp://localhost:8080/test_user_name/test_model_name",
+		Endpoint: "http://localhost:8080/test_user_name/test_model_name",
 		Status:   "running",
 	}
 
