@@ -87,19 +87,27 @@ func (h *OrganizationHandler) Index(ctx *gin.Context) {
 // @Accept       json
 // @Produce      json
 // @Param        name path string true "name"
+// @Param        body body types.DeleteOrgReq true "body"
 // @Success      200  {object}  types.Response{} "OK"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
 // @Router       /organizations/{name} [delete]
 func (h *OrganizationHandler) Delete(ctx *gin.Context) {
-	name := ctx.Param("name")
-	err := h.c.Delete(ctx, name)
+	var req types.DeleteOrgReq
+	if err := ctx.ShouldBindJSON(&req); err != nil {
+		slog.Error("Bad request format", "error", err)
+		httpbase.BadRequest(ctx, err.Error())
+		return
+	}
+
+	req.Name = ctx.Param("name")
+	err := h.c.Delete(ctx, &req)
 	if err != nil {
 		slog.Error("Failed to delete organizations", slog.Any("error", err))
 		ctx.JSON(http.StatusInternalServerError, gin.H{"message": err.Error()})
 		return
 	}
 
-	slog.Info("Delete organizations succeed", slog.String("org_name", name))
+	slog.Info("Delete organizations succeed", slog.String("org_name", req.Name))
 	httpbase.OK(ctx, nil)
 }
 

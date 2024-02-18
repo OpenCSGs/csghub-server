@@ -513,6 +513,11 @@ definitions:
       updated_at:
         type: string
     type: object
+  types.DeleteOrgReq:
+    properties:
+      current_user:
+        type: string
+    type: object
   types.DeleteUserTokenRequest:
     properties:
       name:
@@ -522,18 +527,14 @@ definitions:
     type: object
   types.EditOrgReq:
     properties:
+      current_user:
+        type: string
       description:
         example: org description
         type: string
       full_name:
         description: Display name
         example: org display name
-        type: string
-      path:
-        description: |-
-          TODO:rename json field name to 'name", need to negotiate with Portal engineer
-          Org unique identifier
-        example: org_name_1
         type: string
     type: object
   types.File:
@@ -2728,6 +2729,12 @@ paths:
         name: name
         required: true
         type: string
+      - description: body
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/types.DeleteOrgReq'
       produces:
       - application/json
       responses:
