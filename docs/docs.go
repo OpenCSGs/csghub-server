@@ -3251,6 +3251,15 @@ const docTemplate = `{
                         "name": "name",
                         "in": "path",
                         "required": true
+                    },
+                    {
+                        "description": "body",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/types.DeleteOrgReq"
+                        }
                     }
                 ],
                 "responses": {
@@ -4957,6 +4966,14 @@ const docTemplate = `{
                 }
             }
         },
+        "types.DeleteOrgReq": {
+            "type": "object",
+            "properties": {
+                "current_user": {
+                    "type": "string"
+                }
+            }
+        },
         "types.DeleteUserTokenRequest": {
             "type": "object",
             "properties": {
@@ -4971,6 +4988,9 @@ const docTemplate = `{
         "types.EditOrgReq": {
             "type": "object",
             "properties": {
+                "current_user": {
+                    "type": "string"
+                },
                 "description": {
                     "type": "string",
                     "example": "org description"
@@ -4979,11 +4999,6 @@ const docTemplate = `{
                     "description": "Display name",
                     "type": "string",
                     "example": "org display name"
-                },
-                "path": {
-                    "description": "TODO:rename json field name to 'name\", need to negotiate with Portal engineer\nOrg unique identifier",
-                    "type": "string",
-                    "example": "org_name_1"
                 }
             }
         },
