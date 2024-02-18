@@ -112,12 +112,21 @@ func (c *OrganizationComponent) Index(ctx context.Context, username string) ([]d
 	return orgs, nil
 }
 
-func (c *OrganizationComponent) Delete(ctx context.Context, name string) error {
-	err := c.gs.DeleteOrganization(name)
+func (c *OrganizationComponent) Delete(ctx context.Context, req *types.DeleteOrgReq) error {
+	r, err := c.msc.GetMemberRole(ctx, req.Name, req.CurrentUser)
+	if err != nil {
+		slog.Error("faild to get member role",
+			slog.String("org", req.Name), slog.String("user", req.CurrentUser),
+			slog.String("error", err.Error()))
+	}
+	if !r.CanAdmin() {
+		return fmt.Errorf("current user does not have permission to edit the organization, current user: %s", req.CurrentUser)
+	}
+	err = c.gs.DeleteOrganization(req.Name)
 	if err != nil {
 		return fmt.Errorf("failed to delete git organizations, error: %w", err)
 	}
-	err = c.os.Delete(ctx, name)
+	err = c.os.Delete(ctx, req.Name)
 	if err != nil {
 		return fmt.Errorf("failed to delete database organizations, error: %w", err)
 	}
@@ -125,6 +134,15 @@ func (c *OrganizationComponent) Delete(ctx context.Context, name string) error {
 }
 
 func (c *OrganizationComponent) Update(ctx context.Context, req *types.EditOrgReq) (*database.Organization, error) {
+	r, err := c.msc.GetMemberRole(ctx, req.Name, req.CurrentUser)
+	if err != nil {
+		slog.Error("faild to get member role",
+			slog.String("org", req.Name), slog.String("user", req.CurrentUser),
+			slog.String("error", err.Error()))
+	}
+	if !r.CanAdmin() {
+		return nil, fmt.Errorf("current user does not have permission to edit the organization, current user: %s", req.CurrentUser)
+	}
 	org, err := c.os.FindByPath(ctx, req.Name)
 	if err != nil {
 		return nil, fmt.Errorf("organization does not exists, error: %w", err)
