@@ -87,6 +87,7 @@ func (c *llmInferClient) ServingList() (map[uint64]ModelInfo, error) {
 	}
 
 	c.modelServices = tmp
+	c.lastUpdate = time.Now()
 	return c.modelServices, nil
 }
 
@@ -100,7 +101,7 @@ func (c *llmInferClient) GetModelService(id ModelID) (ModelInfo, error) {
 		return s, nil
 	}
 
-	return ModelInfo{}, errors.New("model info not found")
+	return ModelInfo{}, errors.New("model service not found by id")
 }
 
 func (c *llmInferClient) CallPredict(url string, req *PredictRequest) (*PredictResponse, error) {

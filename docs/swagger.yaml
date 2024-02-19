@@ -615,6 +615,15 @@ definitions:
       ssh_clone_url:
         type: string
     type: object
+  types.ModelPredictReq:
+    properties:
+      current_user:
+        type: string
+      input:
+        type: string
+      version:
+        type: string
+    type: object
   types.ModelResp:
     properties:
       downloads:
@@ -624,13 +633,6 @@ definitions:
       private:
         type: boolean
       updated_at:
-  types.ModelPredictReq:
-    properties:
-      current_user:
-        type: string
-      input:
-        type: string
-      version:
         type: string
     type: object
   types.RepositoryType:

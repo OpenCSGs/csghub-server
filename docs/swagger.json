@@ -5174,6 +5174,20 @@
                 }
             }
         },
+        "types.ModelPredictReq": {
+            "type": "object",
+            "properties": {
+                "current_user": {
+                    "type": "string"
+                },
+                "input": {
+                    "type": "string"
+                },
+                "version": {
+                    "type": "string"
+                }
+            }
+        },
         "types.ModelResp": {
             "type": "object",
             "properties": {
@@ -5187,16 +5201,6 @@
                     "type": "boolean"
                 },
                 "updated_at": {
-        "types.ModelPredictReq": {
-            "type": "object",
-            "properties": {
-                "current_user": {
-                    "type": "string"
-                },
-                "input": {
-                    "type": "string"
-                },
-                "version": {
                     "type": "string"
                 }
             }

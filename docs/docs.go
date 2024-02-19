@@ -5185,6 +5185,20 @@ const docTemplate = `{
                 }
             }
         },
+        "types.ModelPredictReq": {
+            "type": "object",
+            "properties": {
+                "current_user": {
+                    "type": "string"
+                },
+                "input": {
+                    "type": "string"
+                },
+                "version": {
+                    "type": "string"
+                }
+            }
+        },
         "types.ModelResp": {
             "type": "object",
             "properties": {
