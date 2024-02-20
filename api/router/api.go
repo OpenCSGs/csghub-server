@@ -172,6 +172,13 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 	// apiGroup.PUT("/tag", tagCtrl.UpdateTag)
 	// apiGroup.DELETE("/tag", tagCtrl.DeleteTag)
 
+	// JWT token
+	jwtCtrl, err := handler.NewJWTHandler(config)
+	if err != nil {
+		return nil, fmt.Errorf("error creating jwt token controller:%w", err)
+	}
+	apiGroup.POST("/jwt/token", jwtCtrl.Create)
+
 	// callback
 	callbackCtrl, err := callback.NewGitCallbackHandler(config)
 	if err != nil {
