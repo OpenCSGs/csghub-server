@@ -28,6 +28,7 @@ type GitServer interface {
 	GetModelLfsFileRaw(namespace, repoName, ref, filePath string) (io.ReadCloser, error)
 	GetModelTags(string, string, int, int) ([]*types.ModelTag, error)
 	GetModelFileTree(string, string, string, string) ([]*types.File, error)
+	GetModelFileContents(namespace, repo, ref, path string) (*types.File, error)
 	CreateModelFile(*types.CreateFileReq) (err error)
 	UpdateModelFile(*types.UpdateFileReq) (err error)
 

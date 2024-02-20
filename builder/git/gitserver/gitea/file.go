@@ -176,7 +176,7 @@ func (c *Client) getFileContents(owner, repo, ref, path string) (*types.File, er
 	}
 
 	//base64 decode
-	contentDecoded, _ := base64.RawStdEncoding.DecodeString(f.Content)
+	contentDecoded, _ := base64.StdEncoding.DecodeString(f.Content)
 	lfsPointer, err := ReadPointerFromBuffer(contentDecoded)
 	//not a lfs pointer, return file content directly
 	if err != nil || !lfsPointer.IsValid() {
@@ -186,6 +186,7 @@ func (c *Client) getFileContents(owner, repo, ref, path string) (*types.File, er
 
 	f.DownloadURL = strings.Replace(f.DownloadURL, "/raw/", "/media/", 1)
 	f.LfsRelativePath = lfsPointer.RelativePath()
+	f.Size = int(lfsPointer.Size)
 	return f, nil
 }
 
