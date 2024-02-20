@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"net/http"
 	"path"
+	"path/filepath"
 	"slices"
 	"strconv"
 	"time"
@@ -783,4 +784,103 @@ func (h *DatasetHandler) UploadFile(ctx *gin.Context) {
 	}
 	slog.Info("Create file succeed", slog.String("file_path", filePath))
 	httpbase.OK(ctx, nil)
+}
+
+func (h *DatasetHandler) SDKListFiles(ctx *gin.Context) {
+	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
+	if err != nil {
+		slog.Error("Bad request format", "error", err)
+		httpbase.BadRequest(ctx, err.Error())
+		return
+	}
+
+	files, err := h.c.SDKListFiles(ctx, namespace, name)
+	if err != nil {
+		slog.Error("Error listing dataset files", "error", err)
+		httpbase.ServerError(ctx, err)
+		return
+	}
+
+	ctx.JSON(http.StatusOK, files)
+}
+
+func (h *DatasetHandler) SDKDownload(ctx *gin.Context) {
+	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
+	if err != nil {
+		slog.Error("Bad request format", "error", err)
+		httpbase.BadRequest(ctx, err.Error())
+		return
+	}
+	filePath := ctx.Param("file_path")
+	filePath = convertFilePathFromRoute(filePath)
+	branch := ctx.Param("branch")
+	req := &types.GetFileReq{
+		Namespace: namespace,
+		Name:      name,
+		Path:      filePath,
+		Ref:       branch,
+		Lfs:       false,
+		SaveAs:    filepath.Base(filePath),
+	}
+	lfs, err := h.c.IsLfs(ctx, req)
+	if err != nil {
+		slog.Error("Filed to lfs information", "error", err)
+		httpbase.ServerError(ctx, err)
+		return
+	}
+	req.Lfs = lfs
+	reader, url, err := h.c.SDKDownloadFile(ctx, req)
+	if err != nil {
+		slog.Error("Failed to download dataset file", slog.Any("error", err))
+		httpbase.ServerError(ctx, err)
+		return
+	}
+
+	if req.Lfs {
+		ctx.Redirect(http.StatusMovedPermanently, url)
+	} else {
+		slog.Info("Download dataset file succeed", slog.String("dataset", name), slog.String("path", req.Path), slog.String("ref", req.Ref))
+		fileName := path.Base(req.Path)
+		ctx.Header("Content-Type", "application/octet-stream")
+		ctx.Header("Content-Disposition", `attachment; filename="`+fileName+`"`)
+		_, err = io.Copy(ctx.Writer, reader)
+		if err != nil {
+			slog.Error("Failed to download model file", slog.Any("error", err))
+			httpbase.ServerError(ctx, err)
+			return
+		}
+	}
+}
+
+func (h *DatasetHandler) HeadSDKDownload(ctx *gin.Context) {
+	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
+	if err != nil {
+		slog.Error("Bad request format", "error", err)
+		httpbase.BadRequest(ctx, err.Error())
+		return
+	}
+	filePath := ctx.Param("file_path")
+	filePath = convertFilePathFromRoute(filePath)
+	branch := ctx.Param("branch")
+	req := &types.GetFileReq{
+		Namespace: namespace,
+		Name:      name,
+		Path:      filePath,
+		Ref:       branch,
+		Lfs:       false,
+		SaveAs:    filepath.Base(filePath),
+	}
+
+	file, err := h.c.HeadDownloadFile(ctx, req)
+	if err != nil {
+		slog.Error("Failed to download dataset file", slog.Any("error", err))
+		httpbase.ServerError(ctx, err)
+		return
+	}
+
+	slog.Info("Head download dataset file succeed", slog.String("dataset", name), slog.String("path", req.Path), slog.String("ref", req.Ref))
+	ctx.Header("Content-Length", strconv.Itoa(file.Size))
+	ctx.Header("X-Repo-Commit", file.SHA)
+	ctx.Header("ETag", file.SHA)
+	ctx.Status(http.StatusOK)
 }

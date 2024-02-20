@@ -19,6 +19,28 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 		r.GET("/api/v1/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 	}
 
+	modelHandler, err := handler.NewModelHandler(config)
+	if err != nil {
+		return nil, fmt.Errorf("error creating model controller:%w", err)
+	}
+	dsHandler, err := handler.NewDatasetHandler(config)
+	if err != nil {
+		return nil, fmt.Errorf("error creating dataset handler:%w", err)
+	}
+
+	hfGroup := r.Group("/hf")
+	{
+		hfGroup.GET("/:namespace/:name/resolve/:branch/*file_path", modelHandler.SDKDownload)
+		hfGroup.HEAD("/:namespace/:name/resolve/:branch/*file_path", modelHandler.HeadSDKDownload)
+		hfGroup.GET("/datasets/:namespace/:name/resolve/:branch/*file_path", dsHandler.SDKDownload)
+		hfGroup.HEAD("/datasets/:namespace/:name/resolve/:branch/*file_path", dsHandler.HeadSDKDownload)
+		hfAPIGroup := hfGroup.Group("/api")
+		{
+			hfAPIGroup.GET("/models/:namespace/:name/revision/:branch", modelHandler.SDKListFiles)
+			hfAPIGroup.GET("/datasets/:namespace/:name/revision/:branch", dsHandler.SDKListFiles)
+		}
+	}
+
 	r.Use(middleware.Authenticator(config))
 	r.Use(gin.Recovery())
 	r.Use(middleware.Log())
@@ -34,10 +56,7 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 	apiGroup.POST("/list/datasets_by_path", listHandler.ListDatasetsByPath)
 
 	// Models routes
-	modelHandler, err := handler.NewModelHandler(config)
-	if err != nil {
-		return nil, fmt.Errorf("error creating model controller:%w", err)
-	}
+
 	apiGroup.POST("/models", modelHandler.Create)
 	apiGroup.GET("/models", modelHandler.Index)
 	apiGroup.PUT("/models/:namespace/:name", modelHandler.Update)
@@ -50,17 +69,23 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 	apiGroup.GET("/models/:namespace/:name/tree", modelHandler.Tree)
 	apiGroup.GET("/models/:namespace/:name/commits", modelHandler.Commits)
 	apiGroup.GET("/models/:namespace/:name/raw/*file_path", modelHandler.FileRaw)
+	// The DownloadFile method differs from the SDKDownload interface in a few ways
+
+	// 1.When passing the file_path parameter to the SDKDownload method,
+	// it only needs to pass the path of the file itself,
+	// whether it is an lfs file or a non-lfs file.
+	// The DownloadFile has a different file_path format for lfs files and non-lfs files,
+	// and an lfs parameter needs to be added.
+	// 2. DownloadFile returns an object store url for lfs files, while SDKDownload redirects directly.
 	apiGroup.GET("/models/:namespace/:name/download/*file_path", modelHandler.DownloadFile)
+	apiGroup.GET("/models/:namespace/:name/resolve/:branch/*file_path", modelHandler.SDKDownload)
 	apiGroup.POST("/models/:namespace/:name/raw/*file_path", modelHandler.CreateFile)
 	apiGroup.PUT("/models/:namespace/:name/raw/*file_path", modelHandler.UpdateFile)
 	apiGroup.POST("/models/:namespace/:name/update_downloads", modelHandler.UpdateDownloads)
 	apiGroup.POST("/models/:namespace/:name/upload_file", modelHandler.UploadFile)
 
 	// Dataset routes
-	dsHandler, err := handler.NewDatasetHandler(config)
-	if err != nil {
-		return nil, fmt.Errorf("error creating dataset handler:%w", err)
-	}
+
 	apiGroup.POST("/datasets", dsHandler.Create)
 	apiGroup.GET("/datasets", dsHandler.Index)
 	apiGroup.PUT("/datasets/:namespace/:name", dsHandler.Update)
@@ -75,6 +100,7 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 	apiGroup.POST("/datasets/:namespace/:name/raw/*file_path", dsHandler.CreateFile)
 	apiGroup.GET("/datasets/:namespace/:name/raw/*file_path", dsHandler.FileRaw)
 	apiGroup.GET("/datasets/:namespace/:name/download/*file_path", dsHandler.DownloadFile)
+	apiGroup.GET("/datasets/:namespace/:name/resolve/:branch/*file_path", dsHandler.SDKDownload)
 	apiGroup.PUT("/datasets/:namespace/:name/raw/*file_path", dsHandler.UpdateFile)
 	apiGroup.POST("/datasets/:namespace/:name/update_downloads", dsHandler.UpdateDownloads)
 	apiGroup.POST("/datasets/:namespace/:name/upload_file", dsHandler.UploadFile)
