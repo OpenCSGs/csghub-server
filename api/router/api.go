@@ -85,8 +85,8 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 		modelsGroup.GET("/:namespace/:name/download/*file_path", modelHandler.DownloadFile)
 		modelsGroup.POST("/:namespace/:name/raw/*file_path", modelHandler.CreateFile)
 		modelsGroup.PUT("/:namespace/:name/raw/*file_path", modelHandler.UpdateFile)
-		modelsGroup.POST(":namespace/:name/update_downloads", modelHandler.UpdateDownloads)
-		modelsGroup.POST(":namespace/:name/upload_file", modelHandler.UploadFile)
+		modelsGroup.POST("/:namespace/:name/update_downloads", modelHandler.UpdateDownloads)
+		modelsGroup.POST("/:namespace/:name/upload_file", modelHandler.UploadFile)
 		// invoke model endpoint to do pediction
 		modelsGroup.POST("/:namespace/:name/predict", modelHandler.Predict)
 	}
@@ -126,8 +126,8 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 	spaces := apiGroup.Group("/spaces")
 	{
 		// list all spaces
-		spaces.GET("/", spaceHandler.Index)
-		spaces.POST("/", spaceHandler.Create)
+		spaces.GET("", spaceHandler.Index)
+		spaces.POST("", spaceHandler.Create)
 		// show a user or org's space
 		spaces.GET("/:namespace/:name", spaceHandler.Get)
 		spaces.PUT("/:namespace/:name", spaceHandler.Update)
