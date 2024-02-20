@@ -825,14 +825,14 @@ func (h *DatasetHandler) SDKDownload(ctx *gin.Context) {
 	lfs, err := h.c.IsLfs(ctx, req)
 	if err != nil {
 		slog.Error("Filed to lfs information", "error", err)
-		ctx.JSON(http.StatusInternalServerError, gin.H{"message": err.Error()})
+		httpbase.ServerError(ctx, err)
 		return
 	}
 	req.Lfs = lfs
 	reader, url, err := h.c.SDKDownloadFile(ctx, req)
 	if err != nil {
 		slog.Error("Failed to download dataset file", slog.Any("error", err))
-		ctx.JSON(http.StatusInternalServerError, gin.H{"message": err.Error()})
+		httpbase.ServerError(ctx, err)
 		return
 	}
 
@@ -846,7 +846,7 @@ func (h *DatasetHandler) SDKDownload(ctx *gin.Context) {
 		_, err = io.Copy(ctx.Writer, reader)
 		if err != nil {
 			slog.Error("Failed to download model file", slog.Any("error", err))
-			ctx.JSON(http.StatusInternalServerError, gin.H{"message": err.Error()})
+			httpbase.ServerError(ctx, err)
 			return
 		}
 	}
@@ -874,7 +874,7 @@ func (h *DatasetHandler) HeadSDKDownload(ctx *gin.Context) {
 	file, err := h.c.HeadDownloadFile(ctx, req)
 	if err != nil {
 		slog.Error("Failed to download dataset file", slog.Any("error", err))
-		ctx.JSON(http.StatusInternalServerError, gin.H{"message": err.Error()})
+		httpbase.ServerError(ctx, err)
 		return
 	}
 
