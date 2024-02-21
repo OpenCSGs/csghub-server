@@ -82,3 +82,17 @@ type GetTagsReq struct {
 
 // currently update and create fiel share the same response
 type UpdateFileResp CreateFileResp
+
+type SDKFiles struct {
+	SHA       string    `json:"sha"`
+	Tags      []string  `json:"tags"`
+	Likes     int64     `json:"likes"`
+	Downloads int64     `json:"downloads"`
+	Private   bool      `json:"private"`
+	ID        string    `json:"id"`
+	Siblings  []SDKFile `json:"siblings"`
+}
+
+type SDKFile struct {
+	Filename string `json:"rfilename"`
+}

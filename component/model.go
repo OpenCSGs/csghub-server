@@ -10,11 +10,13 @@ import (
 	"net/url"
 	"path"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/minio/minio-go/v7"
 	"opencsg.com/csghub-server/builder/git"
 	"opencsg.com/csghub-server/builder/git/gitserver"
+	"opencsg.com/csghub-server/builder/inference"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/builder/store/s3"
 	"opencsg.com/csghub-server/common/config"
@@ -58,6 +60,7 @@ saved_model/**/* filter=lfs diff=lfs merge=lfs -text
 *tfevents* filter=lfs diff=lfs merge=lfs -text
 
 `
+const LFSPrefix = "version https://git-lfs.github.com/spec/v1"
 
 func NewModelComponent(config *config.Config) (*ModelComponent, error) {
 	c := &ModelComponent{}
@@ -85,6 +88,8 @@ func NewModelComponent(config *config.Config) (*ModelComponent, error) {
 		return nil, newError
 	}
 	c.lfsBucket = config.S3.Bucket
+
+	c.infer = inference.NewInferClient(config.Inference.ServerAddr)
 	return c, nil
 }
 
@@ -94,6 +99,7 @@ type ModelComponent struct {
 	os        *database.OrgStore
 	ns        *database.NamespaceStore
 	gs        gitserver.GitServer
+	infer     inference.App
 	tc        *TagComponent
 	s3Client  *minio.Client
 	lfsBucket string
@@ -553,4 +559,140 @@ func (c *ModelComponent) UploadFile(ctx context.Context, req *types.CreateFileRe
 	_, err = c.UpdateFile(ctx, &updateFileReq)
 
 	return err
+}
+
+func (c *ModelComponent) SDKListFiles(ctx context.Context, namespace, name string) (*types.SDKFiles, error) {
+	var sdkFiles []types.SDKFile
+	var tags []string
+	model, err := c.ms.FindByPath(ctx, namespace, name)
+	if err != nil {
+		return nil, fmt.Errorf("failed to find model, error: %w", err)
+	}
+	filePaths, err := getFilePaths(namespace, name, "", c.gs.GetModelFileTree)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get all model files, error: %w", err)
+	}
+
+	for _, tag := range model.Repository.Tags {
+		tags = append(tags, tag.Name)
+	}
+
+	for _, filePath := range filePaths {
+		sdkFiles = append(sdkFiles, types.SDKFile{Filename: filePath})
+	}
+	return &types.SDKFiles{
+		ID:        fmt.Sprintf("%s/%s", namespace, name),
+		Siblings:  sdkFiles,
+		Private:   model.Private,
+		Downloads: model.Downloads,
+		Likes:     model.Likes,
+		Tags:      tags,
+		SHA:       model.Repository.DefaultBranch,
+	}, nil
+}
+
+func getFilePaths(namespace, repoName, folder string, gsTree func(namespce, repoName, ref, path string) ([]*types.File, error)) ([]string, error) {
+	var filePaths []string
+	gitFiles, err := gsTree(namespace, repoName, "", folder)
+	if err != nil {
+		slog.Error("Failed to get repo file contents", slog.String("path", folder), slog.Any("error", err))
+		return filePaths, err
+	}
+	for _, file := range gitFiles {
+		if file.Type == "dir" {
+			subFileNames, err := getFilePaths(namespace, repoName, file.Path, gsTree)
+			if err != nil {
+				return filePaths, err
+			}
+			filePaths = append(filePaths, subFileNames...)
+		} else {
+			filePaths = append(filePaths, file.Path)
+		}
+	}
+	return filePaths, nil
+}
+
+func (c *ModelComponent) IsLfs(ctx context.Context, req *types.GetFileReq) (bool, error) {
+	content, err := c.gs.GetModelFileRaw(req.Namespace, req.Name, req.Ref, req.Path)
+	if err != nil {
+		slog.Error("failed to get model file raw", slog.String("namespace", req.Namespace), slog.String("name", req.Name), slog.String("path", req.Path))
+		return false, err
+	}
+
+	return strings.HasPrefix(content, LFSPrefix), nil
+}
+
+func (c *ModelComponent) HeadDownloadFile(ctx context.Context, req *types.GetFileReq) (*types.File, error) {
+	model, err := c.ms.FindByPath(ctx, req.Namespace, req.Name)
+	if err != nil {
+		return nil, fmt.Errorf("failed to find model, error: %w", err)
+	}
+	if req.Ref == "" {
+		req.Ref = model.Repository.DefaultBranch
+	}
+	file, err := c.gs.GetModelFileContents(req.Namespace, req.Name, req.Ref, req.Path)
+	if err != nil {
+		return nil, fmt.Errorf("failed to download git dataset repository file, error: %w", err)
+	}
+	return file, nil
+}
+
+func (c *ModelComponent) SDKDownloadFile(ctx context.Context, req *types.GetFileReq) (io.ReadCloser, string, error) {
+	var downloadUrl string
+	dataset, err := c.ms.FindByPath(ctx, req.Namespace, req.Name)
+	if err != nil {
+		return nil, "", fmt.Errorf("failed to find model, error: %w", err)
+	}
+	if req.Ref == "" {
+		req.Ref = dataset.Repository.DefaultBranch
+	}
+	if req.Lfs {
+		file, err := c.gs.GetModelFileContents(req.Namespace, req.Name, req.Ref, req.Path)
+		if err != nil {
+			return nil, "", err
+		}
+		objectKey := file.LfsRelativePath
+		objectKey = path.Join("lfs", objectKey)
+		reqParams := make(url.Values)
+		if req.SaveAs != "" {
+			// allow rename when download through content-disposition header
+			reqParams.Set("response-content-disposition", fmt.Sprintf("attachment;filename=%s", req.SaveAs))
+		}
+		signedUrl, err := c.s3Client.PresignedGetObject(ctx, c.lfsBucket, objectKey, ossFileExpireSeconds, reqParams)
+		if err != nil {
+			return nil, downloadUrl, err
+		}
+		return nil, signedUrl.String(), nil
+	} else {
+		reader, err := c.gs.GetModelFileReader(req.Namespace, req.Name, req.Ref, req.Path)
+		if err != nil {
+			return nil, "", fmt.Errorf("failed to download git model repository file, error: %w", err)
+		}
+		return reader, downloadUrl, nil
+	}
+}
+
+func (c *ModelComponent) Predict(ctx context.Context, req *types.ModelPredictReq) (*types.ModelPredictResp, error) {
+	model, err := c.ms.FindByPath(ctx, req.Namespace, req.Name)
+	if err != nil {
+		return nil, fmt.Errorf("failed to find model, error: %w", err)
+	}
+
+	mid := inference.ModelID{
+		Owner:   model.User.Username,
+		Name:    model.Name,
+		Version: req.Version,
+	}
+	inferReq := &inference.PredictRequest{
+		Prompt: req.Input,
+	}
+	inferResp, err := c.infer.Predict(mid, inferReq)
+	if err != nil {
+		slog.Error("failed to predict", slog.Any("req", *inferReq), slog.Any("model", mid), slog.String("error", err.Error()))
+		return nil, err
+	}
+	resp := &types.ModelPredictResp{
+		Content: inferResp.GeneratedText,
+	}
+	return resp, nil
 }

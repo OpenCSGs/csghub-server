@@ -14,14 +14,36 @@ import (
 
 func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 	r := gin.New()
+	r.Use(gin.Recovery())
+	r.Use(middleware.Log())
 
 	if enableSwagger {
 		r.GET("/api/v1/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 	}
 
+	modelHandler, err := handler.NewModelHandler(config)
+	if err != nil {
+		return nil, fmt.Errorf("error creating model controller:%w", err)
+	}
+	dsHandler, err := handler.NewDatasetHandler(config)
+	if err != nil {
+		return nil, fmt.Errorf("error creating dataset handler:%w", err)
+	}
+
+	hfGroup := r.Group("/hf")
+	{
+		hfGroup.GET("/:namespace/:name/resolve/:branch/*file_path", modelHandler.SDKDownload)
+		hfGroup.HEAD("/:namespace/:name/resolve/:branch/*file_path", modelHandler.HeadSDKDownload)
+		hfGroup.GET("/datasets/:namespace/:name/resolve/:branch/*file_path", dsHandler.SDKDownload)
+		hfGroup.HEAD("/datasets/:namespace/:name/resolve/:branch/*file_path", dsHandler.HeadSDKDownload)
+		hfAPIGroup := hfGroup.Group("/api")
+		{
+			hfAPIGroup.GET("/models/:namespace/:name/revision/:branch", modelHandler.SDKListFiles)
+			hfAPIGroup.GET("/datasets/:namespace/:name/revision/:branch", dsHandler.SDKListFiles)
+		}
+	}
+
 	r.Use(middleware.Authenticator(config))
-	r.Use(gin.Recovery())
-	r.Use(middleware.Log())
 	apiGroup := r.Group("/api/v1")
 	// TODO:use middleware to handle common response
 
@@ -34,33 +56,39 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 	apiGroup.POST("/list/datasets_by_path", listHandler.ListDatasetsByPath)
 
 	// Models routes
-	modelHandler, err := handler.NewModelHandler(config)
-	if err != nil {
-		return nil, fmt.Errorf("error creating model controller:%w", err)
+	modelsGroup := apiGroup.Group("/models")
+	{
+		modelsGroup.POST("", modelHandler.Create)
+		modelsGroup.GET("", modelHandler.Index)
+		modelsGroup.PUT("/:namespace/:name", modelHandler.Update)
+		modelsGroup.DELETE("/:namespace/:name", modelHandler.Delete)
+		modelsGroup.GET("/:namespace/:name", modelHandler.Show)
+		modelsGroup.GET("/:namespace/:name/detail", modelHandler.Detail)
+		modelsGroup.GET("/:namespace/:name/branches", modelHandler.Branches)
+		modelsGroup.GET("/:namespace/:name/tags", modelHandler.Tags)
+		modelsGroup.GET("/:namespace/:name/last_commit", modelHandler.LastCommit)
+		modelsGroup.GET("/:namespace/:name/tree", modelHandler.Tree)
+		modelsGroup.GET("/:namespace/:name/commits", modelHandler.Commits)
+		modelsGroup.GET("/:namespace/:name/raw/*file_path", modelHandler.FileRaw)
+		// The DownloadFile method differs from the SDKDownload interface in a few ways
+
+		// 1.When passing the file_path parameter to the SDKDownload method,
+		// it only needs to pass the path of the file itself,
+		// whether it is an lfs file or a non-lfs file.
+		// The DownloadFile has a different file_path format for lfs files and non-lfs files,
+		// and an lfs parameter needs to be added.
+		// 2. DownloadFile returns an object store url for lfs files, while SDKDownload redirects directly.
+		modelsGroup.GET("/:namespace/:name/download/*file_path", modelHandler.DownloadFile)
+		modelsGroup.POST("/:namespace/:name/raw/*file_path", modelHandler.CreateFile)
+		modelsGroup.PUT("/:namespace/:name/raw/*file_path", modelHandler.UpdateFile)
+		modelsGroup.POST("/:namespace/:name/update_downloads", modelHandler.UpdateDownloads)
+		modelsGroup.POST("/:namespace/:name/upload_file", modelHandler.UploadFile)
+		// invoke model endpoint to do pediction
+		modelsGroup.POST("/:namespace/:name/predict", modelHandler.Predict)
 	}
-	apiGroup.POST("/models", modelHandler.Create)
-	apiGroup.GET("/models", modelHandler.Index)
-	apiGroup.PUT("/models/:namespace/:name", modelHandler.Update)
-	apiGroup.DELETE("/models/:namespace/:name", modelHandler.Delete)
-	apiGroup.GET("/models/:namespace/:name", modelHandler.Show)
-	apiGroup.GET("/models/:namespace/:name/detail", modelHandler.Detail)
-	apiGroup.GET("/models/:namespace/:name/branches", modelHandler.Branches)
-	apiGroup.GET("/models/:namespace/:name/tags", modelHandler.Tags)
-	apiGroup.GET("/models/:namespace/:name/last_commit", modelHandler.LastCommit)
-	apiGroup.GET("/models/:namespace/:name/tree", modelHandler.Tree)
-	apiGroup.GET("/models/:namespace/:name/commits", modelHandler.Commits)
-	apiGroup.GET("/models/:namespace/:name/raw/*file_path", modelHandler.FileRaw)
-	apiGroup.GET("/models/:namespace/:name/download/*file_path", modelHandler.DownloadFile)
-	apiGroup.POST("/models/:namespace/:name/raw/*file_path", modelHandler.CreateFile)
-	apiGroup.PUT("/models/:namespace/:name/raw/*file_path", modelHandler.UpdateFile)
-	apiGroup.POST("/models/:namespace/:name/update_downloads", modelHandler.UpdateDownloads)
-	apiGroup.POST("/models/:namespace/:name/upload_file", modelHandler.UploadFile)
 
 	// Dataset routes
-	dsHandler, err := handler.NewDatasetHandler(config)
-	if err != nil {
-		return nil, fmt.Errorf("error creating dataset handler:%w", err)
-	}
+
 	apiGroup.POST("/datasets", dsHandler.Create)
 	apiGroup.GET("/datasets", dsHandler.Index)
 	apiGroup.PUT("/datasets/:namespace/:name", dsHandler.Update)
@@ -75,6 +103,7 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 	apiGroup.POST("/datasets/:namespace/:name/raw/*file_path", dsHandler.CreateFile)
 	apiGroup.GET("/datasets/:namespace/:name/raw/*file_path", dsHandler.FileRaw)
 	apiGroup.GET("/datasets/:namespace/:name/download/*file_path", dsHandler.DownloadFile)
+	apiGroup.GET("/datasets/:namespace/:name/resolve/:branch/*file_path", dsHandler.SDKDownload)
 	apiGroup.PUT("/datasets/:namespace/:name/raw/*file_path", dsHandler.UpdateFile)
 	apiGroup.POST("/datasets/:namespace/:name/update_downloads", dsHandler.UpdateDownloads)
 	apiGroup.POST("/datasets/:namespace/:name/upload_file", dsHandler.UploadFile)
@@ -93,8 +122,8 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 	spaces := apiGroup.Group("/spaces")
 	{
 		// list all spaces
-		spaces.GET("/", spaceHandler.Index)
-		spaces.POST("/", spaceHandler.Create)
+		spaces.GET("", spaceHandler.Index)
+		spaces.POST("", spaceHandler.Create)
 		// show a user or org's space
 		spaces.GET("/:namespace/:name", spaceHandler.Get)
 		spaces.PUT("/:namespace/:name", spaceHandler.Update)
@@ -171,6 +200,13 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 	// apiGroup.POST("/tag", tagCtrl.NewTag)
 	// apiGroup.PUT("/tag", tagCtrl.UpdateTag)
 	// apiGroup.DELETE("/tag", tagCtrl.DeleteTag)
+
+	// JWT token
+	jwtCtrl, err := handler.NewJWTHandler(config)
+	if err != nil {
+		return nil, fmt.Errorf("error creating jwt token controller:%w", err)
+	}
+	apiGroup.POST("/jwt/token", jwtCtrl.Create)
 
 	// callback
 	callbackCtrl, err := callback.NewGitCallbackHandler(config)

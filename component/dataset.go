@@ -10,6 +10,7 @@ import (
 	"net/url"
 	"path"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/minio/minio-go/v7"
@@ -602,4 +603,92 @@ func fileIsExist(tree []*types.File, path string) (*types.File, bool) {
 		}
 	}
 	return nil, false
+}
+
+func (c *DatasetComponent) SDKListFiles(ctx context.Context, namespace, name string) (*types.SDKFiles, error) {
+	var sdkFiles []types.SDKFile
+	dataset, err := c.ds.FindByPath(ctx, namespace, name)
+	if err != nil {
+		return nil, fmt.Errorf("failed to find dataset, error: %w", err)
+	}
+	filePaths, err := getFilePaths(namespace, name, "", c.gs.GetDatasetFileTree)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get all dataset files, error: %w", err)
+	}
+
+	for _, filePath := range filePaths {
+		sdkFiles = append(sdkFiles, types.SDKFile{Filename: filePath})
+	}
+	return &types.SDKFiles{
+		ID:        fmt.Sprintf("%s/%s", namespace, name),
+		Siblings:  sdkFiles,
+		Private:   dataset.Private,
+		Downloads: dataset.Downloads,
+		Likes:     dataset.Likes,
+		Tags:      []string{},
+		SHA:       dataset.Repository.DefaultBranch,
+	}, nil
+}
+
+func (c *DatasetComponent) IsLfs(ctx context.Context, req *types.GetFileReq) (bool, error) {
+	content, err := c.gs.GetDatasetFileRaw(req.Namespace, req.Name, req.Ref, req.Path)
+
+	if err != nil {
+		slog.Error("failed to get dataset file raw", slog.String("namespace", req.Namespace), slog.String("name", req.Name), slog.String("path", req.Path))
+		return false, err
+	}
+
+	return strings.HasPrefix(content, LFSPrefix), nil
+}
+
+func (c *DatasetComponent) HeadDownloadFile(ctx context.Context, req *types.GetFileReq) (*types.File, error) {
+	dataset, err := c.ds.FindByPath(ctx, req.Namespace, req.Name)
+	if err != nil {
+		return nil, fmt.Errorf("failed to find dataset, error: %w", err)
+	}
+	if req.Ref == "" {
+		req.Ref = dataset.Repository.DefaultBranch
+	}
+	file, err := c.gs.GetDatasetFileContents(req.Namespace, req.Name, req.Ref, req.Path)
+	if err != nil {
+		return nil, fmt.Errorf("failed to download git dataset repository file, error: %w", err)
+	}
+	return file, nil
+}
+
+func (c *DatasetComponent) SDKDownloadFile(ctx context.Context, req *types.GetFileReq) (io.ReadCloser, string, error) {
+	var (
+		downloadUrl string
+	)
+	dataset, err := c.ds.FindByPath(ctx, req.Namespace, req.Name)
+	if err != nil {
+		return nil, "", fmt.Errorf("failed to find dataset, error: %w", err)
+	}
+	if req.Ref == "" {
+		req.Ref = dataset.Repository.DefaultBranch
+	}
+	if req.Lfs {
+		file, err := c.gs.GetDatasetFileContents(req.Namespace, req.Name, req.Ref, req.Path)
+		if err != nil {
+			return nil, "", err
+		}
+		objectKey := file.LfsRelativePath
+		objectKey = path.Join("lfs", objectKey)
+		reqParams := make(url.Values)
+		if req.SaveAs != "" {
+			// allow rename when download through content-disposition header
+			reqParams.Set("response-content-disposition", fmt.Sprintf("attachment;filename=%s", req.SaveAs))
+		}
+		signedUrl, err := c.s3Client.PresignedGetObject(ctx, c.lfsBucket, objectKey, ossFileExpireSeconds, reqParams)
+		if err != nil {
+			return nil, downloadUrl, err
+		}
+		return nil, signedUrl.String(), nil
+	} else {
+		reader, err := c.gs.GetDatasetFileReader(req.Namespace, req.Name, req.Ref, req.Path)
+		if err != nil {
+			return nil, "", fmt.Errorf("failed to download git dataset repository file, error: %w", err)
+		}
+		return reader, downloadUrl, nil
+	}
 }

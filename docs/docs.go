@@ -2291,6 +2291,71 @@ const docTemplate = `{
                 }
             }
         },
+        "/models/{namespace}/{name}/predict": {
+            "post": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "description": "invoke model prediction",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Model"
+                ],
+                "summary": "Invoke model prediction",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "namespace",
+                        "name": "namespace",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "name",
+                        "name": "name",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "input for model prediction",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/types.ModelPredictReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            }
+        },
         "/models/{namespace}/{name}/raw/{file_path}": {
             "get": {
                 "security": [
@@ -5116,6 +5181,20 @@ const docTemplate = `{
                     "type": "integer"
                 },
                 "ssh_clone_url": {
+                    "type": "string"
+                }
+            }
+        },
+        "types.ModelPredictReq": {
+            "type": "object",
+            "properties": {
+                "current_user": {
+                    "type": "string"
+                },
+                "input": {
+                    "type": "string"
+                },
+                "version": {
                     "type": "string"
                 }
             }

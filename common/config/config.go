@@ -59,6 +59,14 @@ type Config struct {
 		Region          string `envconfig:"STARHUB_SERVER_SENSITIVE_CHECK_REGION"`
 		Endpoint        string `envconfig:"STARHUB_SERVER_SENSITIVE_CHECK_ENDPOINT" default:"oss-cn-beijing.aliyuncs.com"`
 	}
+
+	JWT struct {
+		SigningKey string `envconfig:"STARHUB_JWT_SIGNING_KEY" default:"signing-key"`
+	}
+
+	Inference struct {
+		ServerAddr string `envconfig:"STARHUB_SERVER_INFERENCE_SERVER_ADDR" default:"http://localhost:8256"`
+	}
 }
 
 func LoadConfig() (cfg *Config, err error) {

@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"net/http"
 	"path"
+	"path/filepath"
 	"slices"
 	"strconv"
 	"strings"
@@ -699,6 +700,48 @@ func (h *ModelHandler) UpdateDownloads(ctx *gin.Context) {
 	httpbase.OK(ctx, nil)
 }
 
+// Predict godoc
+// @Security     ApiKey
+// @Summary      Invoke model prediction
+// @Description  invoke model prediction
+// @Tags         Model
+// @Accept       json
+// @Produce      json
+// @Param        namespace path string true "namespace"
+// @Param        name path string true "name"
+// @Param        body body types.ModelPredictReq true "input for model prediction"
+// @Success      200  {object}  string "OK"
+// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
+// @Router       /models/{namespace}/{name}/predict [post]
+func (h *ModelHandler) Predict(ctx *gin.Context) {
+	var req types.ModelPredictReq
+	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
+	if err != nil {
+		slog.Error("Bad request format", "error", err)
+		httpbase.BadRequest(ctx, err.Error())
+		return
+	}
+
+	if err := ctx.ShouldBindJSON(&req); err != nil {
+		slog.Error("Bad request format", "error", err)
+		httpbase.BadRequest(ctx, err.Error())
+		return
+	}
+
+	req.Name = name
+	req.Namespace = namespace
+
+	resp, err := h.c.Predict(ctx, &req)
+	if err != nil {
+		slog.Error("fail to call predict", slog.String("error", err.Error()))
+		httpbase.ServerError(ctx, err)
+		return
+	}
+
+	httpbase.OK(ctx, resp)
+}
+
 func parseTagReqs(ctx *gin.Context) (tags []database.TagReq) {
 	licenseTag := ctx.Query("license_tag")
 	taskTag := ctx.Query("task_tag")
@@ -804,4 +847,103 @@ func (h *ModelHandler) UploadFile(ctx *gin.Context) {
 	}
 	slog.Info("Create file succeed", slog.String("file_path", filePath))
 	httpbase.OK(ctx, nil)
+}
+
+func (h *ModelHandler) SDKListFiles(ctx *gin.Context) {
+	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
+	if err != nil {
+		slog.Error("Bad request format", "error", err)
+		ctx.JSON(http.StatusBadRequest, gin.H{"message": err.Error()})
+		return
+	}
+
+	files, err := h.c.SDKListFiles(ctx, namespace, name)
+	if err != nil {
+		slog.Error("Error listing model files", "error", err)
+		httpbase.ServerError(ctx, err)
+		return
+	}
+
+	ctx.JSON(http.StatusOK, files)
+}
+
+func (h *ModelHandler) SDKDownload(ctx *gin.Context) {
+	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
+	if err != nil {
+		slog.Error("Bad request format", "error", err)
+		httpbase.BadRequest(ctx, err.Error())
+		return
+	}
+	filePath := ctx.Param("file_path")
+	filePath = convertFilePathFromRoute(filePath)
+	branch := ctx.Param("branch")
+	req := &types.GetFileReq{
+		Namespace: namespace,
+		Name:      name,
+		Path:      filePath,
+		Ref:       branch,
+		Lfs:       false,
+		SaveAs:    filepath.Base(filePath),
+	}
+	lfs, err := h.c.IsLfs(ctx, req)
+	if err != nil {
+		slog.Error("Filed to lfs information", "error", err)
+		httpbase.ServerError(ctx, err)
+		return
+	}
+	req.Lfs = lfs
+	reader, url, err := h.c.SDKDownloadFile(ctx, req)
+	if err != nil {
+		slog.Error("Failed to download model file", slog.Any("error", err))
+		httpbase.ServerError(ctx, err)
+		return
+	}
+
+	if req.Lfs {
+		ctx.Redirect(http.StatusMovedPermanently, url)
+	} else {
+		slog.Info("Download model file succeed", slog.String("model", name), slog.String("path", req.Path), slog.String("ref", req.Ref))
+		fileName := path.Base(req.Path)
+		ctx.Header("Content-Type", "application/octet-stream")
+		ctx.Header("Content-Disposition", `attachment; filename="`+fileName+`"`)
+		_, err = io.Copy(ctx.Writer, reader)
+		if err != nil {
+			slog.Error("Failed to download model file", slog.Any("error", err))
+			httpbase.ServerError(ctx, err)
+			return
+		}
+	}
+}
+
+func (h *ModelHandler) HeadSDKDownload(ctx *gin.Context) {
+	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
+	if err != nil {
+		slog.Error("Bad request format", "error", err)
+		httpbase.BadRequest(ctx, err.Error())
+		return
+	}
+	filePath := ctx.Param("file_path")
+	filePath = convertFilePathFromRoute(filePath)
+	branch := ctx.Param("branch")
+	req := &types.GetFileReq{
+		Namespace: namespace,
+		Name:      name,
+		Path:      filePath,
+		Ref:       branch,
+		Lfs:       false,
+		SaveAs:    filepath.Base(filePath),
+	}
+
+	file, err := h.c.HeadDownloadFile(ctx, req)
+	if err != nil {
+		slog.Error("Failed to download model file", slog.Any("error", err))
+		httpbase.ServerError(ctx, err)
+		return
+	}
+
+	slog.Info("Head download model file succeed", slog.String("model", name), slog.String("path", req.Path), slog.String("ref", req.Ref), slog.String("contentLength", strconv.Itoa(file.Size)))
+	ctx.Header("Content-Length", strconv.Itoa(file.Size))
+	ctx.Header("X-Repo-Commit", file.SHA)
+	ctx.Header("ETag", file.SHA)
+	ctx.Status(http.StatusOK)
 }
