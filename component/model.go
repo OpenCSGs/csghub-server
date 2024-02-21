@@ -623,6 +623,10 @@ func (c *ModelComponent) IsLfs(ctx context.Context, req *types.GetFileReq) (bool
 }
 
 func (c *ModelComponent) HeadDownloadFile(ctx context.Context, req *types.GetFileReq) (*types.File, error) {
+	model, err := c.ms.FindByPath(ctx, req.Namespace, req.Name)
+	if err != nil {
+		return nil, fmt.Errorf("failed to find model, error: %w", err)
+	}
 	if req.Ref == "" {
 		req.Ref = model.Repository.DefaultBranch
 	}

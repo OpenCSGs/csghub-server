@@ -14,6 +14,8 @@ import (
 
 func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 	r := gin.New()
+	r.Use(gin.Recovery())
+	r.Use(middleware.Log())
 
 	if enableSwagger {
 		r.GET("/api/v1/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
@@ -42,8 +44,6 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 	}
 
 	r.Use(middleware.Authenticator(config))
-	r.Use(gin.Recovery())
-	r.Use(middleware.Log())
 	apiGroup := r.Group("/api/v1")
 	// TODO:use middleware to handle common response
 
@@ -56,10 +56,6 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 	apiGroup.POST("/list/datasets_by_path", listHandler.ListDatasetsByPath)
 
 	// Models routes
-	modelHandler, err := handler.NewModelHandler(config)
-	if err != nil {
-		return nil, fmt.Errorf("error creating model controller:%w", err)
-	}
 	modelsGroup := apiGroup.Group("/models")
 	{
 		modelsGroup.POST("", modelHandler.Create)
