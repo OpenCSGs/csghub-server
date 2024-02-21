@@ -64,6 +64,10 @@ type Config struct {
 	JWT struct {
 		SigningKey string `envconfig:"STARHUB_JWT_SIGNING_KEY" default:"signing-key"`
 	}
+
+	Inference struct {
+		ServerAddr string `envconfig:"STARHUB_SERVER_INFERENCE_SERVER_ADDR" default:"http://localhost:8256"`
+	}
 }
 
 func LoadConfig() (cfg *Config, err error) {
