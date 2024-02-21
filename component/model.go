@@ -13,6 +13,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/gin-gonic/gin"
 	"github.com/minio/minio-go/v7"
 	"opencsg.com/csghub-server/builder/git"
 	"opencsg.com/csghub-server/builder/git/gitserver"
@@ -90,6 +91,13 @@ func NewModelComponent(config *config.Config) (*ModelComponent, error) {
 	c.lfsBucket = config.S3.Bucket
 
 	c.infer = inference.NewInferClient(config.Inference.ServerAddr)
+
+	c.msc, err = NewMemberComponent(config)
+	if err != nil {
+		newError := fmt.Errorf("fail to create membership component,error:%w", err)
+		slog.Error(newError.Error())
+		return nil, newError
+	}
 	return c, nil
 }
 
@@ -103,6 +111,8 @@ type ModelComponent struct {
 	tc        *TagComponent
 	s3Client  *minio.Client
 	lfsBucket string
+
+	msc *MemberComponent
 }
 
 func (c *ModelComponent) Index(ctx context.Context, username, search, sort string, ragReqs []database.TagReq, per, page int) ([]database.Model, int, error) {
@@ -561,13 +571,30 @@ func (c *ModelComponent) UploadFile(ctx context.Context, req *types.CreateFileRe
 	return err
 }
 
-func (c *ModelComponent) SDKListFiles(ctx context.Context, namespace, name string) (*types.SDKFiles, error) {
-	var sdkFiles []types.SDKFile
-	var tags []string
+func (c *ModelComponent) SDKListFiles(ctx *gin.Context, namespace, name string) (*types.SDKFiles, error) {
+	var (
+		sdkFiles    []types.SDKFile
+		tags        []string
+		currentUser any
+		exists      bool
+	)
 	model, err := c.ms.FindByPath(ctx, namespace, name)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find model, error: %w", err)
 	}
+	currentUser, exists = ctx.Get("currentUser")
+
+	// TODO: Use user access token to check permissions
+	if model.Private && exists {
+		canRead, err := c.checkCurrentUserPermission(ctx, currentUser, namespace)
+		if err != nil {
+			return nil, err
+		}
+		if !canRead {
+			return nil, fmt.Errorf("permission denied")
+		}
+	}
+
 	filePaths, err := getFilePaths(namespace, name, "", c.gs.GetModelFileTree)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get all model files, error: %w", err)
@@ -622,11 +649,24 @@ func (c *ModelComponent) IsLfs(ctx context.Context, req *types.GetFileReq) (bool
 	return strings.HasPrefix(content, LFSPrefix), nil
 }
 
-func (c *ModelComponent) HeadDownloadFile(ctx context.Context, req *types.GetFileReq) (*types.File, error) {
+func (c *ModelComponent) HeadDownloadFile(ctx *gin.Context, req *types.GetFileReq) (*types.File, error) {
 	model, err := c.ms.FindByPath(ctx, req.Namespace, req.Name)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find model, error: %w", err)
 	}
+	currentUser, exists := ctx.Get("currentUser")
+
+	// TODO: Use user access token to check permissions
+	if model.Private && exists {
+		canRead, err := c.checkCurrentUserPermission(ctx, currentUser, req.Namespace)
+		if err != nil {
+			return nil, err
+		}
+		if !canRead {
+			return nil, fmt.Errorf("permission denied")
+		}
+	}
+
 	if req.Ref == "" {
 		req.Ref = model.Repository.DefaultBranch
 	}
@@ -637,14 +677,26 @@ func (c *ModelComponent) HeadDownloadFile(ctx context.Context, req *types.GetFil
 	return file, nil
 }
 
-func (c *ModelComponent) SDKDownloadFile(ctx context.Context, req *types.GetFileReq) (io.ReadCloser, string, error) {
+func (c *ModelComponent) SDKDownloadFile(ctx *gin.Context, req *types.GetFileReq) (io.ReadCloser, string, error) {
 	var downloadUrl string
-	dataset, err := c.ms.FindByPath(ctx, req.Namespace, req.Name)
+	model, err := c.ms.FindByPath(ctx, req.Namespace, req.Name)
 	if err != nil {
 		return nil, "", fmt.Errorf("failed to find model, error: %w", err)
 	}
+	currentUser, exists := ctx.Get("currentUser")
+
+	// TODO: Use user access token to check permissions
+	if model.Private && exists {
+		canRead, err := c.checkCurrentUserPermission(ctx, currentUser, req.Namespace)
+		if err != nil {
+			return nil, "", err
+		}
+		if !canRead {
+			return nil, "", fmt.Errorf("permission denied")
+		}
+	}
 	if req.Ref == "" {
-		req.Ref = dataset.Repository.DefaultBranch
+		req.Ref = model.Repository.DefaultBranch
 	}
 	if req.Lfs {
 		file, err := c.gs.GetModelFileContents(req.Namespace, req.Name, req.Ref, req.Path)
@@ -695,4 +747,26 @@ func (c *ModelComponent) Predict(ctx context.Context, req *types.ModelPredictReq
 		Content: inferResp.GeneratedText,
 	}
 	return resp, nil
+}
+
+func (c *ModelComponent) checkCurrentUserPermission(ctx context.Context, currentUser any, namespace string) (bool, error) {
+	cu, ok := currentUser.(string)
+	if !ok {
+		return false, fmt.Errorf("error parsing current user from context")
+	}
+
+	ns, err := c.ns.FindByPath(ctx, namespace)
+	if err != nil {
+		return false, err
+	}
+
+	if ns.NamespaceType == "user" {
+		return cu == namespace, nil
+	} else {
+		r, err := c.msc.GetMemberRole(ctx, namespace, cu)
+		if err != nil {
+			return false, err
+		}
+		return r.CanRead(), nil
+	}
 }
