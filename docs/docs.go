@@ -5462,6 +5462,10 @@ const docTemplate = `{
                     "type": "string",
                     "example": "user_or_org_name"
                 },
+                "path": {
+                    "type": "string",
+                    "example": "user_or_org_name/space_name_1"
+                },
                 "private": {
                     "type": "boolean"
                 },

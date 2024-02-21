@@ -4,8 +4,6 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
-	"path"
-	"time"
 
 	"opencsg.com/csghub-server/builder/git"
 	"opencsg.com/csghub-server/builder/store/database"
@@ -36,20 +34,16 @@ type SpaceComponent struct {
 }
 
 func (c *SpaceComponent) Create(ctx context.Context, req types.CreateSpaceReq) (*types.Space, error) {
-	req.CreateRepoReq.RepoType = types.SpaceRepo
-	req.CreateRepoReq.Readme = "Please introduce your space!"
-	gitRepo, dbRepo, err := c.CreateRepo(ctx, req.CreateRepoReq)
+	req.RepoType = types.SpaceRepo
+	req.Readme = "Please introduce your space!"
+	_, dbRepo, err := c.CreateRepo(ctx, req.CreateRepoReq)
+	if err != nil {
+		return nil, err
+	}
 
 	dbSpace := database.Space{
-		Name:          req.Name,
-		UrlSlug:       gitRepo.Nickname,
-		Path:          path.Join(req.Namespace, req.Name),
-		GitPath:       gitRepo.GitPath,
-		RepositoryID:  dbRepo.ID,
-		LastUpdatedAt: time.Now(),
-		Private:       req.Private,
-		UserID:        dbRepo.UserID,
-		Sdk:           req.Sdk,
+		Repository: dbRepo,
+		Sdk:        req.Sdk,
 	}
 
 	_, err = c.space.Create(ctx, dbSpace)
@@ -99,17 +93,19 @@ func (c *SpaceComponent) Index(ctx context.Context, username, search, sort strin
 
 	for _, data := range spaceData {
 		spaces = append(spaces, types.Space{
-			Creator:   data.User.Username,
-			Namespace: data.User.Username,
-			Name:      data.Name,
-			Sdk:       data.Sdk,
-			// TODO: get running status and endpoint from inference service
-			Endpoint:      "",
-			RunningStatus: "",
-			Private:       data.Private,
-			Likes:         data.Likes,
-			CreatedAt:     data.CreatedAt,
-			CoverImg:      "",
+			// Creator:   data.Repository.Username,
+			// Namespace: data.Repository.,
+			Name:    data.Repository.Name,
+			Path:    data.Repository.Path,
+			Sdk:     data.Sdk,
+			License: data.Repository.License,
+			// // TODO: get running status and endpoint from inference service
+			// Endpoint:      "",
+			// RunningStatus: "",
+			Private: data.Repository.Private,
+			// Likes:         data.Repository.Likes,
+			CreatedAt: data.Repository.CreatedAt,
+			CoverImg:  "",
 		})
 	}
 	return spaces, total, nil

@@ -700,6 +700,9 @@ definitions:
       namespace:
         example: user_or_org_name
         type: string
+      path:
+        example: user_or_org_name/space_name_1
+        type: string
       private:
         type: boolean
       running_status:
