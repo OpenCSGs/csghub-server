@@ -425,18 +425,36 @@ definitions:
     type: object
   types.CreateSpaceReq:
     properties:
+      default_branch:
+        example: main
+        type: string
+      description:
+        type: string
+      labels:
+        example: ""
+        type: string
       license:
         example: MIT
         type: string
       name:
-        example: space_name_1
+        example: model_name_1
         type: string
       namespace:
         example: user_or_org_name
         type: string
+      nickname:
+        example: model display name
+        type: string
       private:
         type: boolean
+      readme:
+        type: string
       sdk:
+        description: |-
+          Creator   string `json:"username" example:"creator_user_name"`
+          Namespace string `json:"namespace" example:"user_or_org_name"`
+          Name      string `json:"name" example:"space_name_1"`
+          License   string `json:"license" example:"MIT"`
         example: gradio
         type: string
       username:

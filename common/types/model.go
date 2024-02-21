@@ -1,6 +1,8 @@
 package types
 
-import "time"
+import (
+	"time"
+)
 
 type ModelDetail struct {
 	Path          string `json:"path"`
@@ -82,4 +84,18 @@ type ModelPredictReq struct {
 type ModelPredictResp struct {
 	Content string `json:"content"`
 	// TODO:add metrics like tokens, latency etc
+}
+
+type CreateRepoReq struct {
+	Username      string         `json:"username" example:"creator_user_name"`
+	Namespace     string         `json:"namespace" example:"user_or_org_name"`
+	Name          string         `json:"name" example:"model_name_1"`
+	Nickname      string         `json:"nickname" example:"model display name"`
+	Description   string         `json:"description"`
+	Private       bool           `json:"private"`
+	Labels        string         `json:"labels" example:""`
+	License       string         `json:"license" example:"MIT"`
+	Readme        string         `json:"readme"`
+	DefaultBranch string         `json:"default_branch" example:"main"`
+	RepoType      RepositoryType `json:"-"`
 }

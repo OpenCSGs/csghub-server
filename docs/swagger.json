@@ -4888,22 +4888,41 @@
         "types.CreateSpaceReq": {
             "type": "object",
             "properties": {
+                "default_branch": {
+                    "type": "string",
+                    "example": "main"
+                },
+                "description": {
+                    "type": "string"
+                },
+                "labels": {
+                    "type": "string",
+                    "example": ""
+                },
                 "license": {
                     "type": "string",
                     "example": "MIT"
                 },
                 "name": {
                     "type": "string",
-                    "example": "space_name_1"
+                    "example": "model_name_1"
                 },
                 "namespace": {
                     "type": "string",
                     "example": "user_or_org_name"
                 },
+                "nickname": {
+                    "type": "string",
+                    "example": "model display name"
+                },
                 "private": {
                     "type": "boolean"
                 },
+                "readme": {
+                    "type": "string"
+                },
                 "sdk": {
+                    "description": "Creator   string `json:\"username\" example:\"creator_user_name\"`\nNamespace string `json:\"namespace\" example:\"user_or_org_name\"`\nName      string `json:\"name\" example:\"space_name_1\"`\nLicense   string `json:\"license\" example:\"MIT\"`",
                     "type": "string",
                     "example": "gradio"
                 },

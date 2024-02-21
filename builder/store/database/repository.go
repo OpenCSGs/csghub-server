@@ -64,6 +64,15 @@ func (s *RepoStore) CreateRepoTx(ctx context.Context, tx bun.Tx, input Repositor
 	return &input, nil
 }
 
+func (s *RepoStore) CreateRepo(ctx context.Context, input Repository) (*Repository, error) {
+	res, err := s.db.Core.NewInsert().Model(&input).Exec(ctx)
+	if err := assertAffectedOneRow(res, err); err != nil {
+		return nil, fmt.Errorf("create repository in tx failed,error:%w", err)
+	}
+
+	return &input, nil
+}
+
 func (s *RepoStore) Find(ctx context.Context, owner, repoType, repoName string) (*Repository, error) {
 	var err error
 	repo := &Repository{}
