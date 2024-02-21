@@ -2,6 +2,7 @@ package middleware
 
 import (
 	"errors"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"strings"
@@ -9,6 +10,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
 	"opencsg.com/csghub-server/common/config"
+	"opencsg.com/csghub-server/common/types"
 )
 
 func Authenticator(config *config.Config) gin.HandlerFunc {
@@ -40,6 +42,13 @@ func Authenticator(config *config.Config) gin.HandlerFunc {
 				c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "api token mismatch, it must be in format 'Bearer xxx'"})
 				return
 			}
+
+			err = setCurrentUser(c, config, token)
+			if err != nil {
+				slog.Debug("Error parsing claims from JWT token", slog.String("token_get", token))
+				c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "error parsing claims from JWT token"})
+				return
+			}
 		}
 
 		c.Next()
@@ -67,4 +76,21 @@ func checkJWTToken(config *config.Config, tokenString string) (bool, string, err
 	default:
 		return false, "Could not handle this token", nil
 	}
+}
+
+func setCurrentUser(ctx *gin.Context, config *config.Config, tokenString string) error {
+	token, err := jwt.ParseWithClaims(tokenString, &types.JWTClaims{}, func(token *jwt.Token) (interface{}, error) {
+		return []byte(config.JWT.SigningKey), nil
+	})
+
+	if err != nil {
+		return err
+	}
+
+	claims, ok := token.Claims.(*types.JWTClaims)
+	if ok {
+		ctx.Set("currentUser", claims.CurrentUser)
+		return nil
+	}
+	return fmt.Errorf("error parsing claims: %v", token)
 }
