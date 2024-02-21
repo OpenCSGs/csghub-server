@@ -3,12 +3,13 @@ package types
 import "time"
 
 type CreateSpaceReq struct {
-	Creator   string `json:"username" example:"creator_user_name"`
-	Namespace string `json:"namespace" example:"user_or_org_name"`
-	Name      string `json:"name" example:"space_name_1"`
-	License   string `json:"license" example:"MIT"`
-	Sdk       string `json:"sdk" example:"gradio"`
-	Private   bool   `json:"private"`
+	CreateRepoReq
+	// Creator   string `json:"username" example:"creator_user_name"`
+	// Namespace string `json:"namespace" example:"user_or_org_name"`
+	// Name      string `json:"name" example:"space_name_1"`
+	// License   string `json:"license" example:"MIT"`
+	Sdk string `json:"sdk" example:"gradio"`
+	// Private   bool   `json:"private"`
 }
 
 // Space is the domain object for spaces
