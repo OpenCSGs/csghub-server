@@ -13,6 +13,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/gin-gonic/gin"
 	"github.com/minio/minio-go/v7"
 	"opencsg.com/csghub-server/builder/git"
 	"opencsg.com/csghub-server/builder/git/gitserver"
@@ -111,6 +112,12 @@ func NewDatasetComponent(config *config.Config) (*DatasetComponent, error) {
 		return nil, newError
 	}
 	c.lfsBucket = config.S3.Bucket
+	c.msc, err = NewMemberComponent(config)
+	if err != nil {
+		newError := fmt.Errorf("fail to create membership component,error:%w", err)
+		slog.Error(newError.Error())
+		return nil, newError
+	}
 	return c, nil
 }
 
@@ -123,6 +130,7 @@ type DatasetComponent struct {
 	tc        *TagComponent
 	s3Client  *minio.Client
 	lfsBucket string
+	msc       *MemberComponent
 }
 
 func (c *DatasetComponent) CreateFile(ctx context.Context, req *types.CreateFileReq) (*types.CreateFileResp, error) {
@@ -605,12 +613,25 @@ func fileIsExist(tree []*types.File, path string) (*types.File, bool) {
 	return nil, false
 }
 
-func (c *DatasetComponent) SDKListFiles(ctx context.Context, namespace, name string) (*types.SDKFiles, error) {
+func (c *DatasetComponent) SDKListFiles(ctx *gin.Context, namespace, name string) (*types.SDKFiles, error) {
 	var sdkFiles []types.SDKFile
 	dataset, err := c.ds.FindByPath(ctx, namespace, name)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find dataset, error: %w", err)
 	}
+
+	currentUser, exists := ctx.Get("currentUser")
+	// TODO: Use user access token to check permissions
+	if dataset.Private && exists {
+		canRead, err := c.checkCurrentUserPermission(ctx, currentUser, namespace)
+		if err != nil {
+			return nil, err
+		}
+		if !canRead {
+			return nil, fmt.Errorf("permission denied")
+		}
+	}
+
 	filePaths, err := getFilePaths(namespace, name, "", c.gs.GetDatasetFileTree)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get all dataset files, error: %w", err)
@@ -641,10 +662,21 @@ func (c *DatasetComponent) IsLfs(ctx context.Context, req *types.GetFileReq) (bo
 	return strings.HasPrefix(content, LFSPrefix), nil
 }
 
-func (c *DatasetComponent) HeadDownloadFile(ctx context.Context, req *types.GetFileReq) (*types.File, error) {
+func (c *DatasetComponent) HeadDownloadFile(ctx *gin.Context, req *types.GetFileReq) (*types.File, error) {
 	dataset, err := c.ds.FindByPath(ctx, req.Namespace, req.Name)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find dataset, error: %w", err)
+	}
+	currentUser, exists := ctx.Get("currentUser")
+	// TODO: Use user access token to check permissions
+	if dataset.Private && exists {
+		canRead, err := c.checkCurrentUserPermission(ctx, currentUser, req.Namespace)
+		if err != nil {
+			return nil, err
+		}
+		if !canRead {
+			return nil, fmt.Errorf("permission denied")
+		}
 	}
 	if req.Ref == "" {
 		req.Ref = dataset.Repository.DefaultBranch
@@ -656,13 +688,24 @@ func (c *DatasetComponent) HeadDownloadFile(ctx context.Context, req *types.GetF
 	return file, nil
 }
 
-func (c *DatasetComponent) SDKDownloadFile(ctx context.Context, req *types.GetFileReq) (io.ReadCloser, string, error) {
+func (c *DatasetComponent) SDKDownloadFile(ctx *gin.Context, req *types.GetFileReq) (io.ReadCloser, string, error) {
 	var (
 		downloadUrl string
 	)
 	dataset, err := c.ds.FindByPath(ctx, req.Namespace, req.Name)
 	if err != nil {
 		return nil, "", fmt.Errorf("failed to find dataset, error: %w", err)
+	}
+	currentUser, exists := ctx.Get("currentUser")
+	// TODO: Use user access token to check permissions
+	if dataset.Private && exists {
+		canRead, err := c.checkCurrentUserPermission(ctx, currentUser, req.Namespace)
+		if err != nil {
+			return nil, "", err
+		}
+		if !canRead {
+			return nil, "", fmt.Errorf("permission denied")
+		}
 	}
 	if req.Ref == "" {
 		req.Ref = dataset.Repository.DefaultBranch
@@ -690,5 +733,27 @@ func (c *DatasetComponent) SDKDownloadFile(ctx context.Context, req *types.GetFi
 			return nil, "", fmt.Errorf("failed to download git dataset repository file, error: %w", err)
 		}
 		return reader, downloadUrl, nil
+	}
+}
+
+func (c *DatasetComponent) checkCurrentUserPermission(ctx context.Context, currentUser any, namespace string) (bool, error) {
+	cu, ok := currentUser.(string)
+	if !ok {
+		return false, fmt.Errorf("error parsing current user from context")
+	}
+
+	ns, err := c.ns.FindByPath(ctx, namespace)
+	if err != nil {
+		return false, err
+	}
+
+	if ns.NamespaceType == "user" {
+		return cu == namespace, nil
+	} else {
+		r, err := c.msc.GetMemberRole(ctx, namespace, cu)
+		if err != nil {
+			return false, err
+		}
+		return r.CanRead(), nil
 	}
 }

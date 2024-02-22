@@ -11,12 +11,6 @@ import (
 	"opencsg.com/csghub-server/common/types"
 )
 
-type JWTClaims struct {
-	CurrentUser   string   `json:"current_user"`
-	Organizations []string `json:"organizations"`
-	jwt.RegisteredClaims
-}
-
 func NewJWTHandler(config *config.Config) (*JWTHandler, error) {
 	return &JWTHandler{
 		SigningKey: []byte(config.JWT.SigningKey),
@@ -35,10 +29,10 @@ func (h *JWTHandler) Create(ctx *gin.Context) {
 		return
 	}
 
-	claims := JWTClaims{
-		req.CurrentUser,
-		req.Organizations,
-		jwt.RegisteredClaims{
+	claims := types.JWTClaims{
+		CurrentUser:   req.CurrentUser,
+		Organizations: req.Organizations,
+		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(time.Now().Add(1 * time.Hour)),
 			Issuer:    "OpenCSG",
 		},

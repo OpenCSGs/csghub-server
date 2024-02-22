@@ -21,6 +21,19 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 		r.GET("/api/v1/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 	}
 
+	r.Use(middleware.Authenticator(config))
+	apiGroup := r.Group("/api/v1")
+	// TODO:use middleware to handle common response
+
+	// List trending models and datasets routes
+	listHandler, err := handler.NewListHandler(config)
+	if err != nil {
+		return nil, fmt.Errorf("error creatring list handler: %v", err)
+	}
+	apiGroup.POST("/list/models_by_path", listHandler.ListModelsByPath)
+	apiGroup.POST("/list/datasets_by_path", listHandler.ListDatasetsByPath)
+
+	// Huggingface SDK routes
 	modelHandler, err := handler.NewModelHandler(config)
 	if err != nil {
 		return nil, fmt.Errorf("error creating model controller:%w", err)
@@ -42,19 +55,6 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 			hfAPIGroup.GET("/datasets/:namespace/:name/revision/:branch", dsHandler.SDKListFiles)
 		}
 	}
-
-	r.Use(middleware.Authenticator(config))
-	apiGroup := r.Group("/api/v1")
-	// TODO:use middleware to handle common response
-
-	// List trending models and datasets routes
-	listHandler, err := handler.NewListHandler(config)
-	if err != nil {
-		return nil, fmt.Errorf("error creatring list handler: %v", err)
-	}
-	apiGroup.POST("/list/models_by_path", listHandler.ListModelsByPath)
-	apiGroup.POST("/list/datasets_by_path", listHandler.ListDatasetsByPath)
-
 	// Models routes
 	modelsGroup := apiGroup.Group("/models")
 	{
