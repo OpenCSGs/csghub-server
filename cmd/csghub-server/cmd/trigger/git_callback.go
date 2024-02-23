@@ -111,9 +111,9 @@ var gitCallbackCmd = &cobra.Command{
 			// file paths relative to repository root
 			var filePaths []string
 			if repo.RepositoryType == "dataset" {
-				filePaths, err = getFilePaths(namespace, repoName, "", gs.GetDatasetFileTree)
+				filePaths, err = getFilePaths(namespace, repoName, "", types.DatasetRepo, gs.GetRepoFileTree)
 			} else {
-				filePaths, err = getFilePaths(namespace, repoName, "", gs.GetModelFileTree)
+				filePaths, err = getFilePaths(namespace, repoName, "", types.ModelRepo, gs.GetRepoFileTree)
 			}
 			if err != nil {
 				slog.Error("failed to get file names", slog.String("repo", repo.Path), slog.Any("error", err))
@@ -130,16 +130,23 @@ var gitCallbackCmd = &cobra.Command{
 	},
 }
 
-func getFilePaths(namespace, repoName, folder string, gsTree func(namespce, repoName, ref, path string) ([]*types.File, error)) ([]string, error) {
+func getFilePaths(namespace, repoName, folder string, repoType types.RepositoryType, gsTree func(ctx context.Context, req gitserver.GetRepoInfoByPathReq) ([]*types.File, error)) ([]string, error) {
 	var filePaths []string
-	gitFiles, err := gsTree(namespace, repoName, "", folder)
+	getRepoFileTree := gitserver.GetRepoInfoByPathReq{
+		Namespace: namespace,
+		Name:      repoName,
+		Ref:       "",
+		Path:      folder,
+		RepoType:  repoType,
+	}
+	gitFiles, err := gsTree(context.Background(), getRepoFileTree)
 	if err != nil {
 		slog.Error("Failed to get dataset file contents", slog.String("path", folder), slog.Any("error", err))
 		return filePaths, err
 	}
 	for _, file := range gitFiles {
 		if file.Type == "dir" {
-			subFileNames, err := getFilePaths(namespace, repoName, file.Path, gsTree)
+			subFileNames, err := getFilePaths(namespace, repoName, file.Path, repoType, gsTree)
 			if err != nil {
 				return filePaths, err
 			}

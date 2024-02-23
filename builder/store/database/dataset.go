@@ -39,7 +39,7 @@ type Dataset struct {
 	GitPath       string      `bun:",notnull" json:"git_path"`
 	RepositoryID  int64       `bun:",notnull" json:"repository_id"`
 	Repository    *Repository `bun:"rel:belongs-to,join:repository_id=id" json:"repository"`
-	LastUpdatedAt time.Time   `bun:",notnull" json:"last"`
+	LastUpdatedAt time.Time   `bun:",notnull" json:"last_updated_at"`
 	Private       bool        `bun:",notnull" json:"private"`
 	UserID        int64       `bun:",notnull" json:"user_id"`
 	User          *User       `bun:"rel:belongs-to,join:user_id=id" json:"user"`
@@ -216,46 +216,19 @@ func (s *DatasetStore) PublicCount(ctx context.Context) (count int, err error) {
 	return
 }
 
-func (s *DatasetStore) Create(ctx context.Context, dataset *Dataset, repo *Repository, userId int64) (newDataset *Dataset, err error) {
-	resDataset := new(Dataset)
-	repo.UserID = userId
-	dataset.UserID = userId
-	err = s.db.Operator.Core.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
-		if err = assertAffectedOneRow(tx.NewInsert().Model(repo).Exec(ctx)); err != nil {
-			return err
-		}
-		dataset.RepositoryID = repo.ID
-		if err = assertAffectedOneRow(tx.NewInsert().Model(dataset).Exec(ctx)); err != nil {
-			return err
-		}
-		return nil
-	})
-	err = s.db.Operator.Core.NewSelect().
-		Model(resDataset).
-		Where("dataset.id=?", dataset.ID).
-		Relation("Repository").
-		Scan(ctx)
-	err = s.db.Operator.Core.NewSelect().
-		Model(resDataset.Repository).
-		WherePK().
-		Relation("Tags").
-		Scan(ctx)
+func (s *DatasetStore) Create(ctx context.Context, input Dataset) (*Dataset, error) {
+	res, err := s.db.Core.NewInsert().Model(&input).Exec(ctx, &input)
+	if err := assertAffectedOneRow(res, err); err != nil {
+		slog.Error("create dataset in db failed", slog.String("error", err.Error()))
+		return nil, fmt.Errorf("create dataset in db failed,error:%w", err)
+	}
 
-	return resDataset, nil
+	return &input, nil
 }
 
-func (s *DatasetStore) Update(ctx context.Context, dataset *Dataset, repo *Repository) (err error) {
-	repo.UpdatedAt = time.Now()
-	dataset.UpdatedAt = time.Now()
-	err = s.db.Operator.Core.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
-		if err = assertAffectedOneRow(tx.NewUpdate().Model(dataset).WherePK().Exec(ctx)); err != nil {
-			return err
-		}
-		if err = assertAffectedOneRow(tx.NewUpdate().Model(repo).WherePK().Exec(ctx)); err != nil {
-			return err
-		}
-		return nil
-	})
+func (s *DatasetStore) Update(ctx context.Context, input Dataset) (err error) {
+	input.UpdatedAt = time.Now()
+	_, err = s.db.Core.NewUpdate().Model(&input).WherePK().Exec(ctx)
 	return
 }
 
@@ -371,7 +344,6 @@ func (s *DatasetStore) FindByPath(ctx context.Context, namespace string, repoPat
 		Relation("Repository").
 		Relation("User").
 		Where("dataset.path =?", fmt.Sprintf("%s/%s", namespace, repoPath)).
-		Where("dataset.name =?", repoPath).
 		Scan(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find dataset: %w", err)

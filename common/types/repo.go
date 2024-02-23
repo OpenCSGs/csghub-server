@@ -17,3 +17,9 @@ type RepoRequest struct {
 	Page      int    `json:"page"`
 	Per       int    `json:"per"`
 }
+
+type Branch struct {
+	Name    string            `json:"name"`
+	Message string            `json:"message"`
+	Commit  ModelBranchCommit `json:"commit"`
+}

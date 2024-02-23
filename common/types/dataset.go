@@ -21,6 +21,12 @@ type DatasetTag struct {
 	Commit  DatasetTagCommit `json:"commit"`
 }
 
+type Tag struct {
+	Name    string           `json:"name"`
+	Message string           `json:"message"`
+	Commit  DatasetTagCommit `json:"commit"`
+}
+
 type DatasetTagCommit struct {
 	ID string `json:"id"`
 }
@@ -36,28 +42,9 @@ type DatasetBranchCommit struct {
 }
 
 type CreateDatasetReq struct {
-	Username      string `json:"username" example:"creator_user_name"`
-	Namespace     string `json:"namespace" example:"user_or_org_name"`
-	Name          string `json:"name" example:"dataset_name"`
-	Nickname      string `json:"nickname" example:"data set display name"`
-	Description   string `json:"description"`
-	Private       bool   `json:"private"`
-	Labels        string `json:"labels" example:""`
-	License       string `json:"license" example:"MIT"`
-	Readme        string `json:"readme"`
-	DefaultBranch string `json:"default_branch" example:"main"`
+	CreateRepoReq
 }
 
 type UpdateDatasetReq struct {
-	Namespace     string `json:"namespace"`
-	Username      string `json:"username"`
-	OriginName    string `json:"origin_name"`
-	Name          string `json:"name"`
-	Nickname      string `json:"nickname"`
-	Description   string `json:"description"`
-	Private       bool   `json:"private"`
-	Labels        string `json:"labels"`
-	License       string `json:"license"`
-	Readme        string `json:"readme"`
-	DefaultBranch string `json:"default_branch"`
+	CreateRepoReq
 }

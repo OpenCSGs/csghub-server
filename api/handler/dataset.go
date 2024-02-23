@@ -73,6 +73,7 @@ func (h *DatasetHandler) CreateFile(ctx *gin.Context) {
 	req.NameSpace = namespace
 	req.Name = name
 	req.FilePath = filePath
+	req.RepoType = types.DatasetRepo
 
 	resp, err = h.c.CreateFile(ctx, req)
 	if err != nil {
@@ -120,6 +121,7 @@ func (h *DatasetHandler) UpdateFile(ctx *gin.Context) {
 	req.NameSpace = namespace
 	req.Name = name
 	req.FilePath = filePath
+	req.RepoType = types.DatasetRepo
 
 	resp, err = h.c.UpdateFile(ctx, req)
 	if err != nil {
@@ -240,7 +242,7 @@ func (h *DatasetHandler) Update(ctx *gin.Context) {
 		return
 	}
 	req.Namespace = namespace
-	req.OriginName = name
+	req.Name = name
 
 	dataset, err := h.c.Update(ctx, req)
 	if err != nil {
@@ -281,36 +283,6 @@ func (h *DatasetHandler) Delete(ctx *gin.Context) {
 	}
 	slog.Info("Delete dataset succeed", slog.String("dataset", name))
 	httpbase.OK(ctx, nil)
-}
-
-// GetDatasetDetail godoc
-// @Security     ApiKey
-// @Summary      Get dataset detail
-// @Description  get dataset detail
-// @Tags         Dataset
-// @Accept       json
-// @Produce      json
-// @Param        namespace path string true "namespace"
-// @Param        name path string true "name"
-// @Success      200  {object}  types.Response{data=types.DatasetDetail} "OK"
-// @Failure      400  {object}  types.APIBadRequest "Bad request"
-// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
-// @Router       /datasets/{namespace}/{name}/detail [get]
-func (h *DatasetHandler) Detail(ctx *gin.Context) {
-	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
-	if err != nil {
-		slog.Error("Bad request format", "error", err)
-		ctx.JSON(http.StatusBadRequest, gin.H{"message": err.Error()})
-		return
-	}
-	detail, err := h.c.Detail(ctx, namespace, name)
-	if err != nil {
-		slog.Error("Failed to get dataset detail", slog.Any("error", err))
-		ctx.JSON(http.StatusInternalServerError, gin.H{"message": err.Error()})
-		return
-	}
-	slog.Info("Get dataset detail succeed", slog.String("dataset", name))
-	httpbase.OK(ctx, detail)
 }
 
 // GetDataset      godoc

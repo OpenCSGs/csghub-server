@@ -213,47 +213,21 @@ func (s *ModelStore) PublicCount(ctx context.Context) (count int, err error) {
 	return
 }
 
-func (s *ModelStore) Create(ctx context.Context, model *Model, repo *Repository, userId int64) (newModel *Model, err error) {
-	resModel := new(Model)
-	model.UserID = userId
-	repo.UserID = userId
-	err = s.db.Operator.Core.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
-		if err = assertAffectedOneRow(tx.NewInsert().Model(repo).Exec(ctx)); err != nil {
-			return err
-		}
-		model.RepositoryID = repo.ID
-		if err = assertAffectedOneRow(tx.NewInsert().Model(model).Exec(ctx)); err != nil {
-			return err
-		}
-		return nil
-	})
-	err = s.db.Operator.Core.NewSelect().
-		Model(resModel).
-		Where("model.id=?", model.ID).
-		Relation("Repository").
-		Scan(ctx)
-	err = s.db.Operator.Core.NewSelect().
-		Model(resModel.Repository).
-		WherePK().
-		Relation("Tags").
-		Scan(ctx)
+func (s *ModelStore) Create(ctx context.Context, input Model) (*Model, error) {
+	res, err := s.db.Core.NewInsert().Model(&input).Exec(ctx, &input)
+	if err := assertAffectedOneRow(res, err); err != nil {
+		slog.Error("create model in db failed", slog.String("error", err.Error()))
+		return nil, fmt.Errorf("create model in db failed,error:%w", err)
+	}
 
-	return resModel, nil
+	return &input, nil
 }
 
-func (s *ModelStore) Update(ctx context.Context, model *Model, repo *Repository) (err error) {
-	repo.UpdatedAt = time.Now()
-	model.UpdatedAt = time.Now()
-	err = s.db.Operator.Core.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
-		if err = assertAffectedOneRow(tx.NewUpdate().Model(model).WherePK().Exec(ctx)); err != nil {
-			return err
-		}
-		if err = assertAffectedOneRow(tx.NewUpdate().Model(repo).WherePK().Exec(ctx)); err != nil {
-			return err
-		}
-		return nil
-	})
-	return
+func (s *ModelStore) Update(ctx context.Context, input Model) (*Model, error) {
+	input.UpdatedAt = time.Now()
+	_, err := s.db.Core.NewUpdate().Model(&input).WherePK().Exec(ctx)
+
+	return &input, err
 }
 
 func (s *ModelStore) UpdateRepoFileDownloads(ctx context.Context, model *Model, date time.Time, clickDownloadCount int64) (err error) {
@@ -368,7 +342,6 @@ func (s *ModelStore) FindByPath(ctx context.Context, namespace string, repoPath 
 		Relation("Repository").
 		Relation("User").
 		Where("model.path =?", fmt.Sprintf("%s/%s", namespace, repoPath)).
-		Where("model.name =?", repoPath).
 		Limit(1).
 		Scan(ctx)
 	if err != nil {

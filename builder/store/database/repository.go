@@ -65,12 +65,18 @@ func (s *RepoStore) CreateRepoTx(ctx context.Context, tx bun.Tx, input Repositor
 }
 
 func (s *RepoStore) CreateRepo(ctx context.Context, input Repository) (*Repository, error) {
-	res, err := s.db.Core.NewInsert().Model(&input).Exec(ctx)
+	res, err := s.db.Core.NewInsert().Model(&input).Exec(ctx, &input)
 	if err := assertAffectedOneRow(res, err); err != nil {
 		return nil, fmt.Errorf("create repository in tx failed,error:%w", err)
 	}
 
 	return &input, nil
+}
+
+func (s *RepoStore) UpdateRepo(ctx context.Context, input Repository) (*Repository, error) {
+	_, err := s.db.Core.NewUpdate().Model(&input).WherePK().Exec(ctx)
+
+	return &input, err
 }
 
 func (s *RepoStore) Find(ctx context.Context, owner, repoType, repoName string) (*Repository, error) {
@@ -79,7 +85,7 @@ func (s *RepoStore) Find(ctx context.Context, owner, repoType, repoName string) 
 	err = s.db.Operator.Core.
 		NewSelect().
 		Model(repo).
-		Where("git_path =?", fmt.Sprintf("%s_%s/%s", repoType, owner, repoName)).
+		Where("git_path =?", fmt.Sprintf("%ss_%s/%s", repoType, owner, repoName)).
 		Limit(1).
 		Scan(ctx)
 	return repo, err

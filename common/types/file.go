@@ -30,6 +30,7 @@ type CreateFileReq struct {
 	NameSpace string `json:"-"`
 	Name      string `json:"-"`
 	FilePath  string `json:"-" form:"file_path"`
+	RepoType  RepositoryType
 }
 
 type CreateFileResp struct {
@@ -49,6 +50,7 @@ type UpdateFileReq struct {
 	Name      string `json:"-"`
 	//new file path, it will be different from OriginPath if file renamed
 	FilePath string `json:"-"`
+	RepoType RepositoryType
 }
 
 type GetCommitsReq struct {
@@ -95,4 +97,16 @@ type SDKFiles struct {
 
 type SDKFile struct {
 	Filename string `json:"rfilename"`
+}
+
+type CreateFileParams struct {
+	Username  string `json:"username"`
+	Email     string `json:"email"`
+	Message   string `json:"message"`
+	Branch    string `json:"branch"`
+	Content   string `json:"content"`
+	NewBranch string `json:"new_branch"`
+	Namespace string `json:"namespace"`
+	Name      string `json:"name"`
+	FilePath  string `json:"file_path"`
 }
