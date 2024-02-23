@@ -32,13 +32,9 @@ type DatasetTagCommit struct {
 }
 
 type DatasetBranch struct {
-	Name    string              `json:"name"`
-	Message string              `json:"message"`
-	Commit  DatasetBranchCommit `json:"commit"`
-}
-
-type DatasetBranchCommit struct {
-	ID string `json:"id"`
+	Name    string           `json:"name"`
+	Message string           `json:"message"`
+	Commit  RepoBranchCommit `json:"commit"`
 }
 
 type CreateDatasetReq struct {

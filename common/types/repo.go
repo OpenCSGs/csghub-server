@@ -19,7 +19,7 @@ type RepoRequest struct {
 }
 
 type Branch struct {
-	Name    string            `json:"name"`
-	Message string            `json:"message"`
-	Commit  ModelBranchCommit `json:"commit"`
+	Name    string           `json:"name"`
+	Message string           `json:"message"`
+	Commit  RepoBranchCommit `json:"commit"`
 }

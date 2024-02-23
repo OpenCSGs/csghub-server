@@ -29,12 +29,12 @@ type ModelTagCommit struct {
 }
 
 type ModelBranch struct {
-	Name    string            `json:"name"`
-	Message string            `json:"message"`
-	Commit  ModelBranchCommit `json:"commit"`
+	Name    string           `json:"name"`
+	Message string           `json:"message"`
+	Commit  RepoBranchCommit `json:"commit"`
 }
 
-type ModelBranchCommit struct {
+type RepoBranchCommit struct {
 	ID string `json:"id"`
 }
 

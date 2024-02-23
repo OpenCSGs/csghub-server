@@ -218,25 +218,16 @@ func (c *GitCallbackComponent) getFileRaw(repoType, namespace, repoName, ref, fi
 		content string
 		err     error
 	)
-	if repoType == DatasetRepoType {
-		getFileRawReq := gitserver.GetRepoInfoByPathReq{
-			Namespace: namespace,
-			Name:      repoName,
-			Ref:       ref,
-			Path:      fileName,
-			RepoType:  types.DatasetRepo,
-		}
-		content, err = c.gs.GetRepoFileRaw(context.Background(), getFileRawReq)
-	} else {
-		getFileRawReq := gitserver.GetRepoInfoByPathReq{
-			Namespace: namespace,
-			Name:      repoName,
-			Ref:       ref,
-			Path:      fileName,
-			RepoType:  types.DatasetRepo,
-		}
-		content, err = c.gs.GetRepoFileRaw(context.Background(), getFileRawReq)
+	repoType = strings.TrimRight(repoType, "s")
+	getFileRawReq := gitserver.GetRepoInfoByPathReq{
+		Namespace: namespace,
+		Name:      repoName,
+		Ref:       ref,
+		Path:      fileName,
+		RepoType:  types.RepositoryType(repoType),
 	}
+	content, err = c.gs.GetRepoFileRaw(context.Background(), getFileRawReq)
+
 	if err != nil {
 		slog.Error("failed to get file content", slog.String("namespace", namespace),
 			slog.String("file", fileName), slog.String("repo", repoName), slog.String("ref", ref),

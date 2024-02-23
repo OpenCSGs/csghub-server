@@ -30,7 +30,7 @@ definitions:
         type: string
       id:
         type: integer
-      last:
+      last_updated_at:
         type: string
       likes:
         type: integer
@@ -334,13 +334,13 @@ definitions:
         example: MIT
         type: string
       name:
-        example: dataset_name
+        example: model_name_1
         type: string
       namespace:
         example: user_or_org_name
         type: string
       nickname:
-        example: data set display name
+        example: model display name
         type: string
       private:
         type: boolean
@@ -362,6 +362,8 @@ definitions:
         type: string
       new_branch:
         type: string
+      repoType:
+        $ref: '#/definitions/types.RepositoryType'
       username:
         type: string
     type: object
@@ -482,42 +484,10 @@ definitions:
   types.DatasetBranch:
     properties:
       commit:
-        $ref: '#/definitions/types.DatasetBranchCommit'
+        $ref: '#/definitions/types.RepoBranchCommit'
       message:
         type: string
       name:
-        type: string
-    type: object
-  types.DatasetBranchCommit:
-    properties:
-      id:
-        type: string
-    type: object
-  types.DatasetDetail:
-    properties:
-      default_branch:
-        type: string
-      downloads:
-        type: integer
-      http_clone_url:
-        type: string
-      introduction:
-        type: string
-      last_updated_at:
-        type: string
-      license:
-        type: string
-      name:
-        type: string
-      nickname:
-        type: string
-      path:
-        type: string
-      private:
-        type: boolean
-      size:
-        type: integer
-      ssh_clone_url:
         type: string
     type: object
   types.DatasetResp:
@@ -597,40 +567,10 @@ definitions:
   types.ModelBranch:
     properties:
       commit:
-        $ref: '#/definitions/types.ModelBranchCommit'
+        $ref: '#/definitions/types.RepoBranchCommit'
       message:
         type: string
       name:
-        type: string
-    type: object
-  types.ModelBranchCommit:
-    properties:
-      id:
-        type: string
-    type: object
-  types.ModelDetail:
-    properties:
-      default_branch:
-        type: string
-      downloads:
-        type: integer
-      http_clone_url:
-        type: string
-      introduction:
-        type: string
-      last_updated_at:
-        type: string
-      license:
-        type: string
-      name:
-        type: string
-      path:
-        type: string
-      private:
-        type: boolean
-      size:
-        type: integer
-      ssh_clone_url:
         type: string
     type: object
   types.ModelPredictReq:
@@ -651,6 +591,11 @@ definitions:
       private:
         type: boolean
       updated_at:
+        type: string
+    type: object
+  types.RepoBranchCommit:
+    properties:
+      id:
         type: string
     type: object
   types.RepositoryType:
@@ -719,26 +664,31 @@ definitions:
   types.UpdateDatasetReq:
     properties:
       default_branch:
+        example: main
         type: string
       description:
         type: string
       labels:
+        example: ""
         type: string
       license:
+        example: MIT
         type: string
       name:
+        example: model_name_1
         type: string
       namespace:
+        example: user_or_org_name
         type: string
       nickname:
-        type: string
-      origin_name:
+        example: model display name
         type: string
       private:
         type: boolean
       readme:
         type: string
       username:
+        example: creator_user_name
         type: string
     type: object
   types.UpdateDownloadsReq:
@@ -766,6 +716,8 @@ definitions:
         type: string
       origin_path:
         type: string
+      repoType:
+        $ref: '#/definitions/types.RepositoryType'
       sha:
         type: string
       username:
@@ -776,26 +728,31 @@ definitions:
   types.UpdateModelReq:
     properties:
       default_branch:
+        example: main
         type: string
       description:
         type: string
       labels:
+        example: ""
         type: string
       license:
+        example: MIT
         type: string
       name:
+        example: model_name_1
         type: string
       namespace:
+        example: user_or_org_name
         type: string
       nickname:
-        type: string
-      origin_name:
+        example: model display name
         type: string
       private:
         type: boolean
       readme:
         type: string
       username:
+        example: creator_user_name
         type: string
     type: object
   types.UpdateUserRequest:
@@ -1123,47 +1080,6 @@ paths:
       security:
       - ApiKey: []
       summary: Get dataset commits
-      tags:
-      - Dataset
-  /datasets/{namespace}/{name}/detail:
-    get:
-      consumes:
-      - application/json
-      description: get dataset detail
-      parameters:
-      - description: namespace
-        in: path
-        name: namespace
-        required: true
-        type: string
-      - description: name
-        in: path
-        name: name
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            allOf:
-            - $ref: '#/definitions/types.Response'
-            - properties:
-                data:
-                  $ref: '#/definitions/types.DatasetDetail'
-              type: object
-        "400":
-          description: Bad request
-          schema:
-            $ref: '#/definitions/types.APIBadRequest'
-        "500":
-          description: Internal server error
-          schema:
-            $ref: '#/definitions/types.APIInternalServerError'
-      security:
-      - ApiKey: []
-      summary: Get dataset detail
       tags:
       - Dataset
   /datasets/{namespace}/{name}/download/{file_path}:
@@ -2068,47 +1984,6 @@ paths:
       security:
       - ApiKey: []
       summary: Get model commits
-      tags:
-      - Model
-  /models/{namespace}/{name}/detail:
-    get:
-      consumes:
-      - application/json
-      description: get model detail
-      parameters:
-      - description: namespace
-        in: path
-        name: namespace
-        required: true
-        type: string
-      - description: name
-        in: path
-        name: name
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            allOf:
-            - $ref: '#/definitions/types.Response'
-            - properties:
-                data:
-                  $ref: '#/definitions/types.ModelDetail'
-              type: object
-        "400":
-          description: Bad request
-          schema:
-            $ref: '#/definitions/types.APIBadRequest'
-        "500":
-          description: Internal server error
-          schema:
-            $ref: '#/definitions/types.APIInternalServerError'
-      security:
-      - ApiKey: []
-      summary: Get model detail
       tags:
       - Model
   /models/{namespace}/{name}/download/{file_path}:

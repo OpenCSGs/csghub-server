@@ -523,74 +523,6 @@ const docTemplate = `{
                 }
             }
         },
-        "/datasets/{namespace}/{name}/detail": {
-            "get": {
-                "security": [
-                    {
-                        "ApiKey": []
-                    }
-                ],
-                "description": "get dataset detail",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Dataset"
-                ],
-                "summary": "Get dataset detail",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "namespace",
-                        "name": "namespace",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "name",
-                        "name": "name",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/types.Response"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "$ref": "#/definitions/types.DatasetDetail"
-                                        }
-                                    }
-                                }
-                            ]
-                        }
-                    },
-                    "400": {
-                        "description": "Bad request",
-                        "schema": {
-                            "$ref": "#/definitions/types.APIBadRequest"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal server error",
-                        "schema": {
-                            "$ref": "#/definitions/types.APIInternalServerError"
-                        }
-                    }
-                }
-            }
-        },
         "/datasets/{namespace}/{name}/download/{file_path}": {
             "get": {
                 "security": [
@@ -2034,74 +1966,6 @@ const docTemplate = `{
                                             "items": {
                                                 "$ref": "#/definitions/types.Commit"
                                             }
-                                        }
-                                    }
-                                }
-                            ]
-                        }
-                    },
-                    "400": {
-                        "description": "Bad request",
-                        "schema": {
-                            "$ref": "#/definitions/types.APIBadRequest"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal server error",
-                        "schema": {
-                            "$ref": "#/definitions/types.APIInternalServerError"
-                        }
-                    }
-                }
-            }
-        },
-        "/models/{namespace}/{name}/detail": {
-            "get": {
-                "security": [
-                    {
-                        "ApiKey": []
-                    }
-                ],
-                "description": "get model detail",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Model"
-                ],
-                "summary": "Get model detail",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "namespace",
-                        "name": "namespace",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "name",
-                        "name": "name",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/types.Response"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "$ref": "#/definitions/types.ModelDetail"
                                         }
                                     }
                                 }
@@ -4313,7 +4177,7 @@ const docTemplate = `{
                 "id": {
                     "type": "integer"
                 },
-                "last": {
+                "last_updated_at": {
                     "type": "string"
                 },
                 "likes": {
@@ -4769,7 +4633,7 @@ const docTemplate = `{
                 },
                 "name": {
                     "type": "string",
-                    "example": "dataset_name"
+                    "example": "model_name_1"
                 },
                 "namespace": {
                     "type": "string",
@@ -4777,7 +4641,7 @@ const docTemplate = `{
                 },
                 "nickname": {
                     "type": "string",
-                    "example": "data set display name"
+                    "example": "model display name"
                 },
                 "private": {
                     "type": "boolean"
@@ -4808,6 +4672,9 @@ const docTemplate = `{
                 },
                 "new_branch": {
                     "type": "string"
+                },
+                "repoType": {
+                    "$ref": "#/definitions/types.RepositoryType"
                 },
                 "username": {
                     "type": "string"
@@ -4974,61 +4841,12 @@ const docTemplate = `{
             "type": "object",
             "properties": {
                 "commit": {
-                    "$ref": "#/definitions/types.DatasetBranchCommit"
+                    "$ref": "#/definitions/types.RepoBranchCommit"
                 },
                 "message": {
                     "type": "string"
                 },
                 "name": {
-                    "type": "string"
-                }
-            }
-        },
-        "types.DatasetBranchCommit": {
-            "type": "object",
-            "properties": {
-                "id": {
-                    "type": "string"
-                }
-            }
-        },
-        "types.DatasetDetail": {
-            "type": "object",
-            "properties": {
-                "default_branch": {
-                    "type": "string"
-                },
-                "downloads": {
-                    "type": "integer"
-                },
-                "http_clone_url": {
-                    "type": "string"
-                },
-                "introduction": {
-                    "type": "string"
-                },
-                "last_updated_at": {
-                    "type": "string"
-                },
-                "license": {
-                    "type": "string"
-                },
-                "name": {
-                    "type": "string"
-                },
-                "nickname": {
-                    "type": "string"
-                },
-                "path": {
-                    "type": "string"
-                },
-                "private": {
-                    "type": "boolean"
-                },
-                "size": {
-                    "type": "integer"
-                },
-                "ssh_clone_url": {
                     "type": "string"
                 }
             }
@@ -5148,58 +4966,12 @@ const docTemplate = `{
             "type": "object",
             "properties": {
                 "commit": {
-                    "$ref": "#/definitions/types.ModelBranchCommit"
+                    "$ref": "#/definitions/types.RepoBranchCommit"
                 },
                 "message": {
                     "type": "string"
                 },
                 "name": {
-                    "type": "string"
-                }
-            }
-        },
-        "types.ModelBranchCommit": {
-            "type": "object",
-            "properties": {
-                "id": {
-                    "type": "string"
-                }
-            }
-        },
-        "types.ModelDetail": {
-            "type": "object",
-            "properties": {
-                "default_branch": {
-                    "type": "string"
-                },
-                "downloads": {
-                    "type": "integer"
-                },
-                "http_clone_url": {
-                    "type": "string"
-                },
-                "introduction": {
-                    "type": "string"
-                },
-                "last_updated_at": {
-                    "type": "string"
-                },
-                "license": {
-                    "type": "string"
-                },
-                "name": {
-                    "type": "string"
-                },
-                "path": {
-                    "type": "string"
-                },
-                "private": {
-                    "type": "boolean"
-                },
-                "size": {
-                    "type": "integer"
-                },
-                "ssh_clone_url": {
                     "type": "string"
                 }
             }
@@ -5231,6 +5003,14 @@ const docTemplate = `{
                     "type": "boolean"
                 },
                 "updated_at": {
+                    "type": "string"
+                }
+            }
+        },
+        "types.RepoBranchCommit": {
+            "type": "object",
+            "properties": {
+                "id": {
                     "type": "string"
                 }
             }
@@ -5326,28 +5106,31 @@ const docTemplate = `{
             "type": "object",
             "properties": {
                 "default_branch": {
-                    "type": "string"
+                    "type": "string",
+                    "example": "main"
                 },
                 "description": {
                     "type": "string"
                 },
                 "labels": {
-                    "type": "string"
+                    "type": "string",
+                    "example": ""
                 },
                 "license": {
-                    "type": "string"
+                    "type": "string",
+                    "example": "MIT"
                 },
                 "name": {
-                    "type": "string"
+                    "type": "string",
+                    "example": "model_name_1"
                 },
                 "namespace": {
-                    "type": "string"
+                    "type": "string",
+                    "example": "user_or_org_name"
                 },
                 "nickname": {
-                    "type": "string"
-                },
-                "origin_name": {
-                    "type": "string"
+                    "type": "string",
+                    "example": "model display name"
                 },
                 "private": {
                     "type": "boolean"
@@ -5356,7 +5139,8 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "username": {
-                    "type": "string"
+                    "type": "string",
+                    "example": "creator_user_name"
                 }
             }
         },
@@ -5398,6 +5182,9 @@ const docTemplate = `{
                 "origin_path": {
                     "type": "string"
                 },
+                "repoType": {
+                    "$ref": "#/definitions/types.RepositoryType"
+                },
                 "sha": {
                     "type": "string"
                 },
@@ -5413,28 +5200,31 @@ const docTemplate = `{
             "type": "object",
             "properties": {
                 "default_branch": {
-                    "type": "string"
+                    "type": "string",
+                    "example": "main"
                 },
                 "description": {
                     "type": "string"
                 },
                 "labels": {
-                    "type": "string"
+                    "type": "string",
+                    "example": ""
                 },
                 "license": {
-                    "type": "string"
+                    "type": "string",
+                    "example": "MIT"
                 },
                 "name": {
-                    "type": "string"
+                    "type": "string",
+                    "example": "model_name_1"
                 },
                 "namespace": {
-                    "type": "string"
+                    "type": "string",
+                    "example": "user_or_org_name"
                 },
                 "nickname": {
-                    "type": "string"
-                },
-                "origin_name": {
-                    "type": "string"
+                    "type": "string",
+                    "example": "model display name"
                 },
                 "private": {
                     "type": "boolean"
@@ -5443,7 +5233,8 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "username": {
-                    "type": "string"
+                    "type": "string",
+                    "example": "creator_user_name"
                 }
             }
         },

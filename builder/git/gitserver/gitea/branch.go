@@ -26,7 +26,7 @@ func (c *Client) GetRepoBranches(ctx context.Context, req gitserver.GetBranchesR
 		branches = append(branches, types.Branch{
 			Name:    giteaBranch.Name,
 			Message: giteaBranch.Commit.Message,
-			Commit: types.ModelBranchCommit{
+			Commit: types.RepoBranchCommit{
 				ID: giteaBranch.Commit.ID,
 			},
 		})
@@ -49,7 +49,7 @@ func (c *Client) GetModelBranches(namespace, name string, per, page int) (branch
 		branches = append(branches, &types.ModelBranch{
 			Name:    giteaBranch.Name,
 			Message: giteaBranch.Commit.Message,
-			Commit: types.ModelBranchCommit{
+			Commit: types.RepoBranchCommit{
 				ID: giteaBranch.Commit.ID,
 			},
 		})
@@ -73,7 +73,7 @@ func (c *Client) GetDatasetBranches(namespace, name string, per, page int) (bran
 		branches = append(branches, &types.DatasetBranch{
 			Name:    giteaBranch.Name,
 			Message: giteaBranch.Commit.Message,
-			Commit: types.DatasetBranchCommit{
+			Commit: types.RepoBranchCommit{
 				ID: giteaBranch.Commit.ID,
 			},
 		})
