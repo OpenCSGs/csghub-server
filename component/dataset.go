@@ -479,6 +479,21 @@ func (c *DatasetComponent) FileRaw(ctx context.Context, req *types.GetFileReq) (
 	return raw, nil
 }
 
+func (c *DatasetComponent) FileInfo(ctx context.Context, req *types.GetFileReq) (*types.File, error) {
+	dataset, err := c.ds.FindByPath(ctx, req.Namespace, req.Name)
+	if err != nil {
+		return nil, fmt.Errorf("failed to find dataset, error: %w", err)
+	}
+	if req.Ref == "" {
+		req.Ref = dataset.Repository.DefaultBranch
+	}
+	file, err := c.gs.GetDatasetFileContents(req.Namespace, req.Name, req.Ref, req.Path)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get git dataset repository file info, error: %w", err)
+	}
+	return file, nil
+}
+
 func (c *DatasetComponent) DownloadFile(ctx context.Context, req *types.GetFileReq) (io.ReadCloser, string, error) {
 	var (
 		reader      io.ReadCloser

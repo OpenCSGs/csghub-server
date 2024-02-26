@@ -1204,6 +1204,56 @@ paths:
       summary: Download dataset file
       tags:
       - Dataset
+  /datasets/{namespace}/{name}/info/{file_path}:
+    get:
+      consumes:
+      - application/json
+      description: get dataset file info
+      parameters:
+      - description: namespace
+        in: path
+        name: namespace
+        required: true
+        type: string
+      - description: name
+        in: path
+        name: name
+        required: true
+        type: string
+      - description: file_path
+        in: path
+        name: file_path
+        required: true
+        type: string
+      - description: ref
+        in: query
+        name: ref
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/types.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/types.Commit'
+              type: object
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Get dataset file info
+      tags:
+      - Dataset
   /datasets/{namespace}/{name}/last_commit:
     get:
       consumes:
@@ -2147,6 +2197,56 @@ paths:
       security:
       - ApiKey: []
       summary: Download model file
+      tags:
+      - Model
+  /models/{namespace}/{name}/info/{file_path}:
+    get:
+      consumes:
+      - application/json
+      description: get model file info
+      parameters:
+      - description: namespace
+        in: path
+        name: namespace
+        required: true
+        type: string
+      - description: name
+        in: path
+        name: name
+        required: true
+        type: string
+      - description: file_path
+        in: path
+        name: file_path
+        required: true
+        type: string
+      - description: ref
+        in: query
+        name: ref
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/types.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/types.Commit'
+              type: object
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Get model file info
       tags:
       - Model
   /models/{namespace}/{name}/last_commit:

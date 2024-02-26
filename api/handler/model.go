@@ -467,6 +467,47 @@ func (h *ModelHandler) FileRaw(ctx *gin.Context) {
 	httpbase.OK(ctx, raw)
 }
 
+// GetModelFileInfo godoc
+// @Security     ApiKey
+// @Summary      Get model file info
+// @Description  get model file info
+// @Tags         Model
+// @Accept       json
+// @Produce      json
+// @Param        namespace path string true "namespace"
+// @Param        name path string true "name"
+// @Param        file_path path string true "file_path"
+// @Param        ref query string false "ref"
+// @Success      200  {object}  types.Response{data=types.Commit} "OK"
+// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
+// @Router       /models/{namespace}/{name}/info/{file_path} [get]
+func (h *ModelHandler) FileInfo(ctx *gin.Context) {
+	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
+	if err != nil {
+		slog.Error("Bad request format", "error", err)
+		ctx.JSON(http.StatusBadRequest, gin.H{"message": err.Error()})
+		return
+	}
+	filePath := ctx.Param("file_path")
+	filePath = convertFilePathFromRoute(filePath)
+	req := &types.GetFileReq{
+		Namespace: namespace,
+		Name:      name,
+		Path:      filePath,
+		Ref:       ctx.Query("ref"),
+	}
+	file, err := h.c.FileInfo(ctx, req)
+	if err != nil {
+		slog.Error("Failed to get model file info", slog.Any("error", err))
+		ctx.JSON(http.StatusInternalServerError, gin.H{"message": err.Error()})
+		return
+	}
+
+	slog.Info("Get model file info succeed", slog.String("model", name), slog.String("path", req.Path), slog.String("ref", req.Ref))
+	httpbase.OK(ctx, file)
+}
+
 // DownloadModelFile godoc
 // @Security     ApiKey
 // @Summary      Download model file
