@@ -47,7 +47,7 @@ func (c *repoComponent) CreateRepo(ctx context.Context, req types.CreateRepoReq)
 		Name:          req.Name,
 		Nickname:      req.Name,
 		License:       req.License,
-		DefaultBranch: "main",
+		DefaultBranch: req.DefaultBranch,
 		// Readme:        "Please introduce your space.",
 		Readme:   req.Readme,
 		Private:  req.Private,
@@ -66,7 +66,7 @@ func (c *repoComponent) CreateRepo(ctx context.Context, req types.CreateRepoReq)
 		Name:           req.Name,
 		Private:        req.Private,
 		License:        req.License,
-		DefaultBranch:  "main",
+		DefaultBranch:  gitRepo.DefaultBranch,
 		RepositoryType: req.RepoType,
 		HTTPCloneURL:   gitRepo.HttpCloneURL,
 		SSHCloneURL:    gitRepo.SshCloneURL,
@@ -97,11 +97,11 @@ func (c *repoComponent) UpdateRepo(ctx context.Context, req types.CreateRepoReq)
 
 	if namespace.NamespaceType == database.OrgNamespace {
 		if namespace.UserID != user.ID {
-			return nil, errors.New("users do not have permission to create spaces in this organization")
+			return nil, errors.New("users do not have permission to update repo in this organization")
 		}
 	} else {
 		if namespace.Path != user.Username {
-			return nil, errors.New("users do not have permission to create spaces in this namespace")
+			return nil, errors.New("users do not have permission to update repo in this namespace")
 		}
 	}
 
@@ -120,7 +120,6 @@ func (c *repoComponent) UpdateRepo(ctx context.Context, req types.CreateRepoReq)
 		return nil, fmt.Errorf("fail to update repo in git, error: %w", err)
 	}
 
-	repo.Name = gitRepo.Nickname
 	repo.Description = gitRepo.Description
 	repo.Private = gitRepo.Private
 	repo.DefaultBranch = gitRepo.DefaultBranch
@@ -132,4 +131,50 @@ func (c *repoComponent) UpdateRepo(ctx context.Context, req types.CreateRepoReq)
 	}
 
 	return resRepo, nil
+}
+
+func (c *repoComponent) DeleteRepo(ctx context.Context, req types.DeleteRepoReq) (*database.Repository, error) {
+	repo, err := c.repo.Find(ctx, req.Namespace, string(req.RepoType), req.Name)
+	if err != nil {
+		return nil, errors.New("repository does not exist")
+	}
+
+	namespace, err := c.namespace.FindByPath(ctx, req.Namespace)
+	if err != nil {
+		return nil, errors.New("namespace does not exist")
+	}
+
+	user, err := c.user.FindByUsername(ctx, req.Username)
+	if err != nil {
+		return nil, errors.New("user does not exist")
+	}
+
+	if namespace.NamespaceType == database.OrgNamespace {
+		if namespace.UserID != user.ID {
+			return nil, errors.New("users do not have permission to delete repo in this organization")
+		}
+	} else {
+		if namespace.Path != user.Username {
+			return nil, errors.New("users do not have permission to delete repo in this namespace")
+		}
+	}
+
+	deleteRepoReq := gitserver.DeleteRepoReq{
+		Namespace: req.Namespace,
+		Name:      req.Name,
+		RepoType:  req.RepoType,
+	}
+	err = c.git.DeleteRepo(ctx, deleteRepoReq)
+	if err != nil {
+		slog.Error("fail to update repo in git ", slog.Any("req", req), slog.String("error", err.Error()))
+		return nil, fmt.Errorf("fail to delete repo in git, error: %w", err)
+	}
+
+	err = c.repo.DeleteRepo(ctx, *repo)
+	if err != nil {
+		slog.Error("fail to delete repo in git ", slog.Any("req", req), slog.String("error", err.Error()))
+		return nil, fmt.Errorf("fail to delete repo in database, error: %w", err)
+	}
+
+	return repo, nil
 }

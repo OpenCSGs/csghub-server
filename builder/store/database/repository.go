@@ -21,6 +21,7 @@ func NewRepoStore() *RepoStore {
 type Repository struct {
 	ID          int64  `bun:",pk,autoincrement" json:"id"`
 	UserID      int64  `bun:",notnull" json:"user_id"`
+	User        User   `bun:"rel:belongs-to,join:user_id=id" json:"user"`
 	Path        string `bun:",notnull" json:"path"`
 	GitPath     string `bun:",notnull" json:"git_path"`
 	Name        string `bun:",notnull" json:"name"`
@@ -77,6 +78,12 @@ func (s *RepoStore) UpdateRepo(ctx context.Context, input Repository) (*Reposito
 	_, err := s.db.Core.NewUpdate().Model(&input).WherePK().Exec(ctx)
 
 	return &input, err
+}
+
+func (s *RepoStore) DeleteRepo(ctx context.Context, input Repository) error {
+	_, err := s.db.Core.NewDelete().Model(&input).WherePK().Exec(ctx)
+
+	return err
 }
 
 func (s *RepoStore) Find(ctx context.Context, owner, repoType, repoName string) (*Repository, error) {

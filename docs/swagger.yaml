@@ -22,71 +22,43 @@ definitions:
     properties:
       created_at:
         type: string
-      description:
-        type: string
       downloads:
         type: integer
-      git_path:
-        type: string
       id:
         type: integer
       last_updated_at:
         type: string
       likes:
         type: integer
-      name:
-        type: string
       nickname:
         type: string
-      path:
-        type: string
-      private:
-        type: boolean
       repository:
         $ref: '#/definitions/database.Repository'
       repository_id:
         type: integer
       updated_at:
         type: string
-      user:
-        $ref: '#/definitions/database.User'
-      user_id:
-        type: integer
     type: object
   database.Model:
     properties:
       created_at:
         type: string
-      description:
-        type: string
       downloads:
         type: integer
-      git_path:
-        type: string
       id:
         type: integer
       last_updated_at:
         type: string
       likes:
         type: integer
-      name:
-        type: string
       nickname:
         type: string
-      path:
-        type: string
-      private:
-        type: boolean
       repository:
         $ref: '#/definitions/database.Repository'
       repository_id:
         type: integer
       updated_at:
         type: string
-      user:
-        $ref: '#/definitions/database.User'
-      user_id:
-        type: integer
     type: object
   database.Namespace:
     properties:
@@ -181,6 +153,8 @@ definitions:
         type: array
       updated_at:
         type: string
+      user:
+        $ref: '#/definitions/database.User'
       user_id:
         type: integer
     type: object
@@ -298,6 +272,15 @@ definitions:
   types.APIBadRequest:
     type: object
   types.APIInternalServerError:
+    type: object
+  types.Branch:
+    properties:
+      commit:
+        $ref: '#/definitions/types.RepoBranchCommit'
+      message:
+        type: string
+      name:
+        type: string
     type: object
   types.Commit:
     properties:
@@ -481,13 +464,31 @@ definitions:
       username:
         type: string
     type: object
-  types.DatasetBranch:
+  types.Dataset:
     properties:
-      commit:
-        $ref: '#/definitions/types.RepoBranchCommit'
-      message:
+      created_at:
         type: string
+      description:
+        type: string
+      downloads:
+        type: integer
+      id:
+        type: integer
+      likes:
+        type: integer
       name:
+        type: string
+      nickname:
+        type: string
+      path:
+        type: string
+      private:
+        type: boolean
+      repository_id:
+        type: integer
+      updated_at:
+        type: string
+      user:
         type: string
     type: object
   types.DatasetResp:
@@ -563,15 +564,6 @@ definitions:
         items:
           type: string
         type: array
-    type: object
-  types.ModelBranch:
-    properties:
-      commit:
-        $ref: '#/definitions/types.RepoBranchCommit'
-      message:
-        type: string
-      name:
-        type: string
     type: object
   types.ModelPredictReq:
     properties:
@@ -801,7 +793,7 @@ paths:
             - properties:
                 data:
                   items:
-                    $ref: '#/definitions/database.Dataset'
+                    $ref: '#/definitions/types.Dataset'
                   type: array
                 total:
                   type: integer
@@ -840,7 +832,7 @@ paths:
             - $ref: '#/definitions/types.Response'
             - properties:
                 data:
-                  $ref: '#/definitions/database.Dataset'
+                  $ref: '#/definitions/types.Dataset'
               type: object
         "400":
           description: Bad request
@@ -869,6 +861,11 @@ paths:
       - description: name
         in: path
         name: name
+        required: true
+        type: string
+      - description: current_user
+        in: query
+        name: current_user
         required: true
         type: string
       produces:
@@ -1019,7 +1016,7 @@ paths:
             - properties:
                 data:
                   items:
-                    $ref: '#/definitions/types.DatasetBranch'
+                    $ref: '#/definitions/types.Branch'
                   type: array
               type: object
         "400":
@@ -1365,7 +1362,7 @@ paths:
             - properties:
                 data:
                   items:
-                    $ref: '#/definitions/types.DatasetBranch'
+                    $ref: '#/definitions/types.Branch'
                   type: array
               type: object
         "400":
@@ -1775,6 +1772,11 @@ paths:
         name: name
         required: true
         type: string
+      - description: current_user
+        in: query
+        name: current_user
+        required: true
+        type: string
       produces:
       - application/json
       responses:
@@ -1923,7 +1925,7 @@ paths:
             - properties:
                 data:
                   items:
-                    $ref: '#/definitions/types.ModelBranch'
+                    $ref: '#/definitions/types.Branch'
                   type: array
               type: object
         "400":
@@ -2311,7 +2313,7 @@ paths:
             - properties:
                 data:
                   items:
-                    $ref: '#/definitions/types.ModelBranch'
+                    $ref: '#/definitions/types.Branch'
                   type: array
               type: object
         "400":

@@ -23,3 +23,9 @@ type Branch struct {
 	Message string           `json:"message"`
 	Commit  RepoBranchCommit `json:"commit"`
 }
+
+type Tag struct {
+	Name    string           `json:"name"`
+	Message string           `json:"message"`
+	Commit  DatasetTagCommit `json:"commit"`
+}

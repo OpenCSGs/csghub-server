@@ -25,19 +25,12 @@ func NewModelStore() *ModelStore {
 
 type Model struct {
 	ID            int64       `bun:",pk,autoincrement" json:"id"`
-	Name          string      `bun:",notnull" json:"name"`
 	UrlSlug       string      `bun:",notnull" json:"nickname"`
-	Description   string      `bun:",nullzero" json:"description"`
 	Likes         int64       `bun:",notnull" json:"likes"`
 	Downloads     int64       `bun:",notnull" json:"downloads"`
-	Path          string      `bun:",notnull" json:"path"`
-	GitPath       string      `bun:",notnull" json:"git_path"`
 	RepositoryID  int64       `bun:",notnull" json:"repository_id"`
 	Repository    *Repository `bun:"rel:belongs-to,join:repository_id=id" json:"repository"`
 	LastUpdatedAt time.Time   `bun:",notnull" json:"last_updated_at"`
-	Private       bool        `bun:",notnull" json:"private"`
-	UserID        int64       `bun:",notnull" json:"user_id"`
-	User          *User       `bun:"rel:belongs-to,join:user_id=id" json:"user"`
 	times
 }
 
@@ -99,15 +92,15 @@ func (s *ModelStore) PublicToUser(ctx context.Context, user *User, search, sort 
 		Relation("Repository.Tags")
 
 	if user != nil {
-		query = query.Where("model.private = ? or model.user_id = ?", false, user.ID)
+		query = query.Where("repository.private = ? or repository.user_id = ?", false, user.ID)
 	} else {
-		query = query.Where("model.private = ?", false)
+		query = query.Where("repository.private = ?", false)
 	}
 
 	if search != "" {
 		search = strings.ToLower(search)
 		query = query.Where(
-			"LOWER(model.path) like ? or LOWER(model.description) like ? or LOWER(model.name) like ?",
+			"LOWER(repository.path) like ? or LOWER(repository.description) like ? or LOWER(repository.name) like ?",
 			fmt.Sprintf("%%%s%%", search),
 			fmt.Sprintf("%%%s%%", search),
 			fmt.Sprintf("%%%s%%", search),
@@ -141,7 +134,8 @@ func (s *ModelStore) ByUsername(ctx context.Context, username string, per, page 
 		NewSelect().
 		Model(&models).
 		Relation("Repository.Tags").
-		Where("model.path like ?", fmt.Sprintf("%s/%%", username))
+		Relation("Repository.User").
+		Where("repository.path like ?", fmt.Sprintf("%s/%%", username))
 
 	if onlyPublic {
 		query = query.Where("model.private = ?", false)
@@ -167,10 +161,11 @@ func (s *ModelStore) ByOrgPath(ctx context.Context, namespace string, per, page 
 		NewSelect().
 		Model(&models).
 		Relation("Repository.Tags").
-		Where("model.path like ?", fmt.Sprintf("%s/%%", namespace))
+		Relation("Repository.User").
+		Where("repository.path like ?", fmt.Sprintf("%s/%%", namespace))
 
 	if onlyPublic {
-		query = query.Where("model.private = ?", false)
+		query = query.Where("repository.private = ?", false)
 	}
 	query = query.Order("model.created_at DESC").
 		Limit(per).
@@ -339,9 +334,8 @@ func (s *ModelStore) FindByPath(ctx context.Context, namespace string, repoPath 
 	err := s.db.Operator.Core.
 		NewSelect().
 		Model(resModel).
-		Relation("Repository").
-		Relation("User").
-		Where("model.path =?", fmt.Sprintf("%s/%s", namespace, repoPath)).
+		Relation("Repository.User").
+		Where("repository.path =?", fmt.Sprintf("%s/%s", namespace, repoPath)).
 		Limit(1).
 		Scan(ctx)
 	if err != nil {
@@ -355,26 +349,12 @@ func (s *ModelStore) FindByPath(ctx context.Context, namespace string, repoPath 
 	return resModel, err
 }
 
-func (s *ModelStore) Delete(ctx context.Context, namespace, name string) (err error) {
-	err = s.db.Operator.Core.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
-		if err = assertAffectedOneRow(
-			tx.NewDelete().
-				Model(&Repository{}).
-				Where("path = ?", fmt.Sprintf("%v/%v", namespace, name)).
-				Where("repository_type = ?", types.ModelRepo).
-				Exec(ctx)); err != nil {
-			return err
-		}
-		if err = assertAffectedOneRow(
-			tx.NewDelete().
-				Model(&Model{}).
-				Where("path = ?", fmt.Sprintf("%v/%v", namespace, name)).
-				Exec(ctx)); err != nil {
-			return err
-		}
-		return nil
-	})
-	return
+func (s *ModelStore) Delete(ctx context.Context, input Model) error {
+	res, err := s.db.Operator.Core.NewDelete().Model(&input).WherePK().Exec(ctx)
+	if err := assertAffectedOneRow(res, err); err != nil {
+		return fmt.Errorf("delete model in tx failed,error:%w", err)
+	}
+	return nil
 }
 
 func (s *ModelStore) Tags(ctx context.Context, namespace, name string) (tags []Tag, err error) {
@@ -385,7 +365,7 @@ func (s *ModelStore) Tags(ctx context.Context, namespace, name string) (tags []T
 		Join("JOIN repository_tags ON repositories.id = repository_tags.repository_id").
 		Join("JOIN tags ON repository_tags.tag_id = tags.id").
 		Where("repositories.repository_type = ?", types.ModelRepo).
-		Where("model.path = ?", fmt.Sprintf("%v/%v", namespace, name))
+		Where("reposiroties.path = ?", fmt.Sprintf("%v/%v", namespace, name))
 
 	slog.Info(query.String())
 	err = query.Scan(ctx, &tags)
@@ -397,7 +377,8 @@ func (s *ModelStore) ListByPath(ctx context.Context, paths []string) ([]Model, e
 	err := s.db.Operator.Core.
 		NewSelect().
 		Model(&Model{}).
-		Where("path IN (?)", bun.In(paths)).
+		Relation("Repository").
+		Where("repository.path IN (?)", bun.In(paths)).
 		Scan(ctx, &models)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find models by path,error: %w", err)

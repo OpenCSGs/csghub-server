@@ -70,7 +70,7 @@ const docTemplate = `{
                                         "data": {
                                             "type": "array",
                                             "items": {
-                                                "$ref": "#/definitions/database.Dataset"
+                                                "$ref": "#/definitions/types.Dataset"
                                             }
                                         },
                                         "total": {
@@ -135,7 +135,7 @@ const docTemplate = `{
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/database.Dataset"
+                                            "$ref": "#/definitions/types.Dataset"
                                         }
                                     }
                                 }
@@ -337,6 +337,13 @@ const docTemplate = `{
                         "name": "name",
                         "in": "path",
                         "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "current_user",
+                        "name": "current_user",
+                        "in": "query",
+                        "required": true
                     }
                 ],
                 "responses": {
@@ -423,7 +430,7 @@ const docTemplate = `{
                                         "data": {
                                             "type": "array",
                                             "items": {
-                                                "$ref": "#/definitions/types.DatasetBranch"
+                                                "$ref": "#/definitions/types.Branch"
                                             }
                                         }
                                     }
@@ -984,7 +991,7 @@ const docTemplate = `{
                                         "data": {
                                             "type": "array",
                                             "items": {
-                                                "$ref": "#/definitions/types.DatasetBranch"
+                                                "$ref": "#/definitions/types.Branch"
                                             }
                                         }
                                     }
@@ -1801,6 +1808,13 @@ const docTemplate = `{
                         "name": "name",
                         "in": "path",
                         "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "current_user",
+                        "name": "current_user",
+                        "in": "query",
+                        "required": true
                     }
                 ],
                 "responses": {
@@ -1887,7 +1901,7 @@ const docTemplate = `{
                                         "data": {
                                             "type": "array",
                                             "items": {
-                                                "$ref": "#/definitions/types.ModelBranch"
+                                                "$ref": "#/definitions/types.Branch"
                                             }
                                         }
                                     }
@@ -2513,7 +2527,7 @@ const docTemplate = `{
                                         "data": {
                                             "type": "array",
                                             "items": {
-                                                "$ref": "#/definitions/types.ModelBranch"
+                                                "$ref": "#/definitions/types.Branch"
                                             }
                                         }
                                     }
@@ -4165,14 +4179,8 @@ const docTemplate = `{
                 "created_at": {
                     "type": "string"
                 },
-                "description": {
-                    "type": "string"
-                },
                 "downloads": {
                     "type": "integer"
-                },
-                "git_path": {
-                    "type": "string"
                 },
                 "id": {
                     "type": "integer"
@@ -4183,17 +4191,8 @@ const docTemplate = `{
                 "likes": {
                     "type": "integer"
                 },
-                "name": {
-                    "type": "string"
-                },
                 "nickname": {
                     "type": "string"
-                },
-                "path": {
-                    "type": "string"
-                },
-                "private": {
-                    "type": "boolean"
                 },
                 "repository": {
                     "$ref": "#/definitions/database.Repository"
@@ -4203,12 +4202,6 @@ const docTemplate = `{
                 },
                 "updated_at": {
                     "type": "string"
-                },
-                "user": {
-                    "$ref": "#/definitions/database.User"
-                },
-                "user_id": {
-                    "type": "integer"
                 }
             }
         },
@@ -4218,14 +4211,8 @@ const docTemplate = `{
                 "created_at": {
                     "type": "string"
                 },
-                "description": {
-                    "type": "string"
-                },
                 "downloads": {
                     "type": "integer"
-                },
-                "git_path": {
-                    "type": "string"
                 },
                 "id": {
                     "type": "integer"
@@ -4236,17 +4223,8 @@ const docTemplate = `{
                 "likes": {
                     "type": "integer"
                 },
-                "name": {
-                    "type": "string"
-                },
                 "nickname": {
                     "type": "string"
-                },
-                "path": {
-                    "type": "string"
-                },
-                "private": {
-                    "type": "boolean"
                 },
                 "repository": {
                     "$ref": "#/definitions/database.Repository"
@@ -4256,12 +4234,6 @@ const docTemplate = `{
                 },
                 "updated_at": {
                     "type": "string"
-                },
-                "user": {
-                    "$ref": "#/definitions/database.User"
-                },
-                "user_id": {
-                    "type": "integer"
                 }
             }
         },
@@ -4402,6 +4374,9 @@ const docTemplate = `{
                 },
                 "updated_at": {
                     "type": "string"
+                },
+                "user": {
+                    "$ref": "#/definitions/database.User"
                 },
                 "user_id": {
                     "type": "integer"
@@ -4580,6 +4555,20 @@ const docTemplate = `{
         },
         "types.APIInternalServerError": {
             "type": "object"
+        },
+        "types.Branch": {
+            "type": "object",
+            "properties": {
+                "commit": {
+                    "$ref": "#/definitions/types.RepoBranchCommit"
+                },
+                "message": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                }
+            }
         },
         "types.Commit": {
             "type": "object",
@@ -4837,16 +4826,43 @@ const docTemplate = `{
                 }
             }
         },
-        "types.DatasetBranch": {
+        "types.Dataset": {
             "type": "object",
             "properties": {
-                "commit": {
-                    "$ref": "#/definitions/types.RepoBranchCommit"
-                },
-                "message": {
+                "created_at": {
                     "type": "string"
                 },
+                "description": {
+                    "type": "string"
+                },
+                "downloads": {
+                    "type": "integer"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "likes": {
+                    "type": "integer"
+                },
                 "name": {
+                    "type": "string"
+                },
+                "nickname": {
+                    "type": "string"
+                },
+                "path": {
+                    "type": "string"
+                },
+                "private": {
+                    "type": "boolean"
+                },
+                "repository_id": {
+                    "type": "integer"
+                },
+                "updated_at": {
+                    "type": "string"
+                },
+                "user": {
                     "type": "string"
                 }
             }
@@ -4959,20 +4975,6 @@ const docTemplate = `{
                     "items": {
                         "type": "string"
                     }
-                }
-            }
-        },
-        "types.ModelBranch": {
-            "type": "object",
-            "properties": {
-                "commit": {
-                    "$ref": "#/definitions/types.RepoBranchCommit"
-                },
-                "message": {
-                    "type": "string"
-                },
-                "name": {
-                    "type": "string"
                 }
             }
         },

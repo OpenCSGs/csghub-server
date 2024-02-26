@@ -33,7 +33,7 @@ func (c *Client) GetRepoBranches(ctx context.Context, req gitserver.GetBranchesR
 	}
 	return branches, err
 }
-func (c *Client) GetModelBranches(namespace, name string, per, page int) (branches []*types.ModelBranch, err error) {
+func (c *Client) GetModelBranches(namespace, name string, per, page int) (branches []*types.Branch, err error) {
 	namespace = common.WithPrefix(namespace, ModelOrgPrefix)
 	giteaBranches, _, err := c.giteaClient.ListRepoBranches(
 		namespace,
@@ -46,7 +46,7 @@ func (c *Client) GetModelBranches(namespace, name string, per, page int) (branch
 		},
 	)
 	for _, giteaBranch := range giteaBranches {
-		branches = append(branches, &types.ModelBranch{
+		branches = append(branches, &types.Branch{
 			Name:    giteaBranch.Name,
 			Message: giteaBranch.Commit.Message,
 			Commit: types.RepoBranchCommit{
@@ -57,7 +57,7 @@ func (c *Client) GetModelBranches(namespace, name string, per, page int) (branch
 	return
 }
 
-func (c *Client) GetDatasetBranches(namespace, name string, per, page int) (branches []*types.DatasetBranch, err error) {
+func (c *Client) GetDatasetBranches(namespace, name string, per, page int) (branches []*types.Branch, err error) {
 	namespace = common.WithPrefix(namespace, DatasetOrgPrefix)
 	giteaBranches, _, err := c.giteaClient.ListRepoBranches(
 		namespace,
@@ -70,7 +70,7 @@ func (c *Client) GetDatasetBranches(namespace, name string, per, page int) (bran
 		},
 	)
 	for _, giteaBranch := range giteaBranches {
-		branches = append(branches, &types.DatasetBranch{
+		branches = append(branches, &types.Branch{
 			Name:    giteaBranch.Name,
 			Message: giteaBranch.Commit.Message,
 			Commit: types.RepoBranchCommit{

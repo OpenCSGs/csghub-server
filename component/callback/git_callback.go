@@ -271,8 +271,8 @@ func (c *GitCallbackComponent) setPrivate(ctx context.Context, repoType, namespa
 			return fmt.Errorf("failed to find dataset, error: %w", err)
 		}
 		_, err = c.gs.UpdateRepo(ctx, gitserver.UpdateRepoReq{
-			Name:          dataset.Name,
-			Description:   dataset.Description,
+			Name:          dataset.Repository.Name,
+			Description:   dataset.Repository.Description,
 			Private:       true,
 			DefaultBranch: dataset.Repository.DefaultBranch,
 		})
@@ -289,8 +289,8 @@ func (c *GitCallbackComponent) setPrivate(ctx context.Context, repoType, namespa
 			return fmt.Errorf("failed to find model by path, error: %w", err)
 		}
 		_, err = c.gs.UpdateRepo(ctx, gitserver.UpdateRepoReq{
-			Name:          model.Name,
-			Description:   model.Description,
+			Name:          model.Repository.Name,
+			Description:   model.Repository.Description,
 			Private:       true,
 			DefaultBranch: model.Repository.DefaultBranch,
 		})

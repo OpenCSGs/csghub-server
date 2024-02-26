@@ -164,6 +164,7 @@ func (h *ModelHandler) Update(ctx *gin.Context) {
 // @Produce      json
 // @Param        namespace path string true "namespace"
 // @Param        name path string true "name"
+// @Param        current_user query string true "current_user"
 // @Success      200  {object}  types.Response{} "OK"
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
@@ -175,7 +176,8 @@ func (h *ModelHandler) Delete(ctx *gin.Context) {
 		ctx.JSON(http.StatusBadRequest, gin.H{"message": err.Error()})
 		return
 	}
-	err = h.c.Delete(ctx, namespace, name)
+	currentUser := ctx.Query("current_user")
+	err = h.c.Delete(ctx, namespace, name, currentUser)
 	if err != nil {
 		slog.Error("Failed to delete model", slog.Any("error", err))
 		ctx.JSON(http.StatusInternalServerError, gin.H{"message": err.Error()})
@@ -515,7 +517,7 @@ func (h *ModelHandler) DownloadFile(ctx *gin.Context) {
 // @Param        name path string true "name"
 // @param        per query int false "per" default(20)
 // @Param        page query int false "page" default(1)
-// @Success      200  {object}  types.Response{data=[]types.ModelBranch} "OK"
+// @Success      200  {object}  types.Response{data=[]types.Branch} "OK"
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
 // @Router       /models/{namespace}/{name}/branches [get]
@@ -558,7 +560,7 @@ func (h *ModelHandler) Branches(ctx *gin.Context) {
 // @Produce      json
 // @Param        namespace path string true "namespace"
 // @Param        name path string true "name"
-// @Success      200  {object}  types.Response{data=[]types.ModelBranch} "OK"
+// @Success      200  {object}  types.Response{data=[]types.Branch} "OK"
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
 // @Router       /models/{namespace}/{name}/tags [get]

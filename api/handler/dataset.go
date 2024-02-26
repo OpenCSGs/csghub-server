@@ -143,7 +143,7 @@ func (h *DatasetHandler) UpdateFile(ctx *gin.Context) {
 // @Accept       json
 // @Produce      json
 // @Param        body body types.CreateDatasetReq true "body"
-// @Success      200  {object}  types.Response{data=database.Dataset} "OK"
+// @Success      200  {object}  types.Response{data=types.Dataset} "OK"
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
 // @Router       /datasets [post]
@@ -178,7 +178,7 @@ func (h *DatasetHandler) Create(ctx *gin.Context) {
 // @Param        per query int false "per" default(20)
 // @Param        page query int false "per page" default(1)
 // @Param        current_user query string true "current user"
-// @Success      200  {object}  types.ResponseWithTotal{data=[]database.Dataset,total=int} "OK"
+// @Success      200  {object}  types.ResponseWithTotal{data=[]types.Dataset,total=int} "OK"
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
 // @Router       /datasets [get]
@@ -264,6 +264,7 @@ func (h *DatasetHandler) Update(ctx *gin.Context) {
 // @Produce      json
 // @Param        namespace path string true "namespace"
 // @Param        name path string true "name"
+// @Param        current_user query string true "current_user"
 // @Success      200  {object}  types.Response{} "OK"
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
@@ -275,7 +276,8 @@ func (h *DatasetHandler) Delete(ctx *gin.Context) {
 		ctx.JSON(http.StatusBadRequest, gin.H{"message": err.Error()})
 		return
 	}
-	err = h.c.Delete(ctx, namespace, name)
+	currentUser := ctx.Query("current_user")
+	err = h.c.Delete(ctx, namespace, name, currentUser)
 	if err != nil {
 		slog.Error("Failed to delete dataset", slog.Any("error", err))
 		ctx.JSON(http.StatusInternalServerError, gin.H{"message": err.Error()})
@@ -519,7 +521,7 @@ func (h *DatasetHandler) DownloadFile(ctx *gin.Context) {
 // @Param        name path string true "name"
 // @param        per query int false "per" default(20)
 // @Param        page query int false "page" default(1)
-// @Success      200  {object}  types.Response{data=[]types.DatasetBranch} "OK"
+// @Success      200  {object}  types.Response{data=[]types.Branch} "OK"
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
 // @Router       /datasets/{namespace}/{name}/branches [get]
@@ -562,7 +564,7 @@ func (h *DatasetHandler) Branches(ctx *gin.Context) {
 // @Produce      json
 // @Param        namespace path string true "namespace"
 // @Param        name path string true "name"
-// @Success      200  {object}  types.Response{data=[]types.DatasetBranch} "OK"
+// @Success      200  {object}  types.Response{data=[]types.Branch} "OK"
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
 // @Router       /datasets/{namespace}/{name}/tags [get]

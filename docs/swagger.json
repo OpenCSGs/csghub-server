@@ -59,7 +59,7 @@
                                         "data": {
                                             "type": "array",
                                             "items": {
-                                                "$ref": "#/definitions/database.Dataset"
+                                                "$ref": "#/definitions/types.Dataset"
                                             }
                                         },
                                         "total": {
@@ -124,7 +124,7 @@
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/database.Dataset"
+                                            "$ref": "#/definitions/types.Dataset"
                                         }
                                     }
                                 }
@@ -326,6 +326,13 @@
                         "name": "name",
                         "in": "path",
                         "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "current_user",
+                        "name": "current_user",
+                        "in": "query",
+                        "required": true
                     }
                 ],
                 "responses": {
@@ -412,7 +419,7 @@
                                         "data": {
                                             "type": "array",
                                             "items": {
-                                                "$ref": "#/definitions/types.DatasetBranch"
+                                                "$ref": "#/definitions/types.Branch"
                                             }
                                         }
                                     }
@@ -973,7 +980,7 @@
                                         "data": {
                                             "type": "array",
                                             "items": {
-                                                "$ref": "#/definitions/types.DatasetBranch"
+                                                "$ref": "#/definitions/types.Branch"
                                             }
                                         }
                                     }
@@ -1790,6 +1797,13 @@
                         "name": "name",
                         "in": "path",
                         "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "current_user",
+                        "name": "current_user",
+                        "in": "query",
+                        "required": true
                     }
                 ],
                 "responses": {
@@ -1876,7 +1890,7 @@
                                         "data": {
                                             "type": "array",
                                             "items": {
-                                                "$ref": "#/definitions/types.ModelBranch"
+                                                "$ref": "#/definitions/types.Branch"
                                             }
                                         }
                                     }
@@ -2502,7 +2516,7 @@
                                         "data": {
                                             "type": "array",
                                             "items": {
-                                                "$ref": "#/definitions/types.ModelBranch"
+                                                "$ref": "#/definitions/types.Branch"
                                             }
                                         }
                                     }
@@ -4154,14 +4168,8 @@
                 "created_at": {
                     "type": "string"
                 },
-                "description": {
-                    "type": "string"
-                },
                 "downloads": {
                     "type": "integer"
-                },
-                "git_path": {
-                    "type": "string"
                 },
                 "id": {
                     "type": "integer"
@@ -4172,17 +4180,8 @@
                 "likes": {
                     "type": "integer"
                 },
-                "name": {
-                    "type": "string"
-                },
                 "nickname": {
                     "type": "string"
-                },
-                "path": {
-                    "type": "string"
-                },
-                "private": {
-                    "type": "boolean"
                 },
                 "repository": {
                     "$ref": "#/definitions/database.Repository"
@@ -4192,12 +4191,6 @@
                 },
                 "updated_at": {
                     "type": "string"
-                },
-                "user": {
-                    "$ref": "#/definitions/database.User"
-                },
-                "user_id": {
-                    "type": "integer"
                 }
             }
         },
@@ -4207,14 +4200,8 @@
                 "created_at": {
                     "type": "string"
                 },
-                "description": {
-                    "type": "string"
-                },
                 "downloads": {
                     "type": "integer"
-                },
-                "git_path": {
-                    "type": "string"
                 },
                 "id": {
                     "type": "integer"
@@ -4225,17 +4212,8 @@
                 "likes": {
                     "type": "integer"
                 },
-                "name": {
-                    "type": "string"
-                },
                 "nickname": {
                     "type": "string"
-                },
-                "path": {
-                    "type": "string"
-                },
-                "private": {
-                    "type": "boolean"
                 },
                 "repository": {
                     "$ref": "#/definitions/database.Repository"
@@ -4245,12 +4223,6 @@
                 },
                 "updated_at": {
                     "type": "string"
-                },
-                "user": {
-                    "$ref": "#/definitions/database.User"
-                },
-                "user_id": {
-                    "type": "integer"
                 }
             }
         },
@@ -4391,6 +4363,9 @@
                 },
                 "updated_at": {
                     "type": "string"
+                },
+                "user": {
+                    "$ref": "#/definitions/database.User"
                 },
                 "user_id": {
                     "type": "integer"
@@ -4569,6 +4544,20 @@
         },
         "types.APIInternalServerError": {
             "type": "object"
+        },
+        "types.Branch": {
+            "type": "object",
+            "properties": {
+                "commit": {
+                    "$ref": "#/definitions/types.RepoBranchCommit"
+                },
+                "message": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                }
+            }
         },
         "types.Commit": {
             "type": "object",
@@ -4826,16 +4815,43 @@
                 }
             }
         },
-        "types.DatasetBranch": {
+        "types.Dataset": {
             "type": "object",
             "properties": {
-                "commit": {
-                    "$ref": "#/definitions/types.RepoBranchCommit"
-                },
-                "message": {
+                "created_at": {
                     "type": "string"
                 },
+                "description": {
+                    "type": "string"
+                },
+                "downloads": {
+                    "type": "integer"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "likes": {
+                    "type": "integer"
+                },
                 "name": {
+                    "type": "string"
+                },
+                "nickname": {
+                    "type": "string"
+                },
+                "path": {
+                    "type": "string"
+                },
+                "private": {
+                    "type": "boolean"
+                },
+                "repository_id": {
+                    "type": "integer"
+                },
+                "updated_at": {
+                    "type": "string"
+                },
+                "user": {
                     "type": "string"
                 }
             }
@@ -4948,20 +4964,6 @@
                     "items": {
                         "type": "string"
                     }
-                }
-            }
-        },
-        "types.ModelBranch": {
-            "type": "object",
-            "properties": {
-                "commit": {
-                    "$ref": "#/definitions/types.RepoBranchCommit"
-                },
-                "message": {
-                    "type": "string"
-                },
-                "name": {
-                    "type": "string"
                 }
             }
         },

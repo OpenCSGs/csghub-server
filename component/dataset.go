@@ -258,8 +258,8 @@ func (c *DatasetComponent) updateReadmeFile(ctx context.Context, req *types.Upda
 	return resp, err
 }
 
-func (c *DatasetComponent) Create(ctx context.Context, req *types.CreateDatasetReq) (dataset *database.Dataset, err error) {
-	var name string
+func (c *DatasetComponent) Create(ctx context.Context, req *types.CreateDatasetReq) (*types.Dataset, error) {
+	var nickname string
 	req.RepoType = types.DatasetRepo
 	req.Readme = generateReadmeData(req.License)
 	_, dbRepo, err := c.CreateRepo(ctx, req.CreateRepoReq)
@@ -267,31 +267,25 @@ func (c *DatasetComponent) Create(ctx context.Context, req *types.CreateDatasetR
 		return nil, err
 	}
 	if req.Nickname != "" {
-		name = req.Nickname
+		nickname = req.Nickname
 	} else {
-		name = req.Name
+		nickname = req.Name
 	}
 
 	dbDataset := database.Dataset{
 		Repository:   dbRepo,
-		Name:         name,
-		UrlSlug:      req.Name,
-		Description:  req.Description,
-		Path:         dbRepo.Path,
-		GitPath:      dbRepo.GitPath,
-		Private:      req.Private,
-		UserID:       dbRepo.UserID,
+		UrlSlug:      nickname,
 		RepositoryID: dbRepo.ID,
 	}
 
-	dataset, err = c.ds.Create(ctx, dbDataset)
+	dataset, err := c.ds.Create(ctx, dbDataset)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create database dataset, cause: %w", err)
 	}
 
-	user, err := c.user.FindByID(ctx, int(dataset.UserID))
+	user, err := c.user.FindByID(ctx, int(dbRepo.UserID))
 	if err != nil {
-		return nil, fmt.Errorf("failed to find database user, cause: %w", err)
+		return nil, fmt.Errorf("failed to find user by id, cause: %w", err)
 	}
 
 	// Create README.md file
@@ -326,7 +320,22 @@ func (c *DatasetComponent) Create(ctx context.Context, req *types.CreateDatasetR
 		return nil, fmt.Errorf("failed to create .gitattributes file, cause: %w", err)
 	}
 
-	return
+	resDataset := &types.Dataset{
+		ID:           dataset.ID,
+		Name:         dataset.Repository.Name,
+		Nickname:     dataset.UrlSlug,
+		Description:  dataset.Repository.Description,
+		Likes:        dataset.Likes,
+		Downloads:    dataset.Downloads,
+		Path:         dataset.Repository.Path,
+		RepositoryID: dataset.RepositoryID,
+		Private:      dataset.Repository.Private,
+		Username:     user.Username,
+		CreatedAt:    dataset.CreatedAt,
+		UpdatedAt:    dataset.UpdatedAt,
+	}
+
+	return resDataset, nil
 }
 
 func generateReadmeData(license string) string {
@@ -337,9 +346,12 @@ license: ` + license + `
 	`
 }
 
-func (c *DatasetComponent) Index(ctx context.Context, username, search, sort string, tags []database.TagReq, per, page int) ([]database.Dataset, int, error) {
-	var user database.User
-	var err error
+func (c *DatasetComponent) Index(ctx context.Context, username, search, sort string, tags []database.TagReq, per, page int) ([]types.Dataset, int, error) {
+	var (
+		user        database.User
+		err         error
+		resDatasets []types.Dataset
+	)
 	if username == "" {
 		slog.Info("get datasets without current username")
 	} else {
@@ -356,10 +368,27 @@ func (c *DatasetComponent) Index(ctx context.Context, username, search, sort str
 		slog.Error(newError.Error())
 		return nil, 0, newError
 	}
-	return datasets, total, nil
+
+	for _, data := range datasets {
+		resDatasets = append(resDatasets, types.Dataset{
+			ID:           data.ID,
+			Name:         data.Repository.Name,
+			Nickname:     data.UrlSlug,
+			Description:  data.Repository.Description,
+			Likes:        data.Likes,
+			Downloads:    data.Downloads,
+			Path:         data.Repository.Path,
+			RepositoryID: data.RepositoryID,
+			Private:      data.Repository.Private,
+			CreatedAt:    data.CreatedAt,
+			UpdatedAt:    data.UpdatedAt,
+		})
+	}
+
+	return resDatasets, total, nil
 }
 
-func (c *DatasetComponent) Update(ctx context.Context, req *types.UpdateDatasetReq) (*database.Dataset, error) {
+func (c *DatasetComponent) Update(ctx context.Context, req *types.UpdateDatasetReq) (*types.Dataset, error) {
 	req.RepoType = types.DatasetRepo
 	dbRepo, err := c.UpdateRepo(ctx, req.CreateRepoReq)
 	if err != nil {
@@ -371,35 +400,48 @@ func (c *DatasetComponent) Update(ctx context.Context, req *types.UpdateDatasetR
 		return nil, fmt.Errorf("failed to find dataset, error: %w", err)
 	}
 
-	dataset.Name = req.Nickname
-	dataset.Description = dbRepo.Description
-	dataset.Private = dbRepo.Private
+	dataset.UrlSlug = req.Nickname
 
 	err = c.ds.Update(ctx, *dataset)
 	if err != nil {
 		return nil, fmt.Errorf("failed to update database dataset, error: %w", err)
 	}
 
-	return dataset, nil
+	resDataset := &types.Dataset{
+		ID:           dataset.ID,
+		Name:         dbRepo.Name,
+		Nickname:     dataset.UrlSlug,
+		Description:  dbRepo.Description,
+		Likes:        dataset.Likes,
+		Downloads:    dataset.Downloads,
+		Path:         dbRepo.Path,
+		RepositoryID: dbRepo.ID,
+		Private:      dbRepo.Private,
+		CreatedAt:    dataset.CreatedAt,
+		UpdatedAt:    dataset.UpdatedAt,
+	}
+
+	return resDataset, nil
 }
 
-func (c *DatasetComponent) Delete(ctx context.Context, namespace, name string) error {
-	_, err := c.ds.FindByPath(ctx, namespace, name)
+func (c *DatasetComponent) Delete(ctx context.Context, namespace, name, currentUser string) error {
+	dataset, err := c.ds.FindByPath(ctx, namespace, name)
 	if err != nil {
 		return fmt.Errorf("failed to find dataset, error: %w", err)
 	}
 
-	deleteRepoReq := gitserver.DeleteRepoReq{
+	deleteDatabaseRepoReq := types.DeleteRepoReq{
+		Username:  currentUser,
 		Namespace: namespace,
 		Name:      name,
 		RepoType:  types.DatasetRepo,
 	}
-	err = c.git.DeleteRepo(ctx, deleteRepoReq)
+	_, err = c.DeleteRepo(ctx, deleteDatabaseRepoReq)
 	if err != nil {
-		return fmt.Errorf("failed to delete git dataset repository, error: %w", err)
+		return fmt.Errorf("failed to delete repo of dataset, error: %w", err)
 	}
 
-	err = c.ds.Delete(ctx, namespace, name)
+	err = c.ds.Delete(ctx, *dataset)
 	if err != nil {
 		return fmt.Errorf("failed to delete database dataset, error: %w", err)
 	}
@@ -412,8 +454,8 @@ func (c *DatasetComponent) Show(ctx context.Context, namespace, name, current_us
 		return nil, fmt.Errorf("failed to find dataset, error: %w", err)
 	}
 
-	if dataset.Private {
-		if dataset.User.Username != current_user {
+	if dataset.Repository.Private {
+		if dataset.Repository.User.Username != current_user {
 			return nil, fmt.Errorf("failed to find dataset, error: %w", errors.New("the private dataset is not accessible to the current user"))
 		}
 	}
@@ -659,7 +701,7 @@ func (c *DatasetComponent) SDKListFiles(ctx *gin.Context, namespace, name string
 
 	currentUser, exists := ctx.Get("currentUser")
 	// TODO: Use user access token to check permissions
-	if dataset.Private && exists {
+	if dataset.Repository.Private && exists {
 		canRead, err := c.checkCurrentUserPermission(ctx, currentUser, namespace)
 		if err != nil {
 			return nil, err
@@ -680,7 +722,7 @@ func (c *DatasetComponent) SDKListFiles(ctx *gin.Context, namespace, name string
 	return &types.SDKFiles{
 		ID:        fmt.Sprintf("%s/%s", namespace, name),
 		Siblings:  sdkFiles,
-		Private:   dataset.Private,
+		Private:   dataset.Repository.Private,
 		Downloads: dataset.Downloads,
 		Likes:     dataset.Likes,
 		Tags:      []string{},
@@ -713,7 +755,7 @@ func (c *DatasetComponent) HeadDownloadFile(ctx *gin.Context, req *types.GetFile
 	}
 	currentUser, exists := ctx.Get("currentUser")
 	// TODO: Use user access token to check permissions
-	if dataset.Private && exists {
+	if dataset.Repository.Private && exists {
 		canRead, err := c.checkCurrentUserPermission(ctx, currentUser, req.Namespace)
 		if err != nil {
 			return nil, err
@@ -749,7 +791,7 @@ func (c *DatasetComponent) SDKDownloadFile(ctx *gin.Context, req *types.GetFileR
 	}
 	currentUser, exists := ctx.Get("currentUser")
 	// TODO: Use user access token to check permissions
-	if dataset.Private && exists {
+	if dataset.Repository.Private && exists {
 		canRead, err := c.checkCurrentUserPermission(ctx, currentUser, req.Namespace)
 		if err != nil {
 			return nil, "", err

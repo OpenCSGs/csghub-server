@@ -30,19 +30,12 @@ func NewDatasetStore() *DatasetStore {
 
 type Dataset struct {
 	ID            int64       `bun:",pk,autoincrement" json:"id"`
-	Name          string      `bun:",notnull" json:"name"`
 	UrlSlug       string      `bun:",notnull" json:"nickname"`
-	Description   string      `bun:",nullzero" json:"description"`
 	Likes         int64       `bun:",notnull" json:"likes"`
 	Downloads     int64       `bun:",notnull" json:"downloads"`
-	Path          string      `bun:",notnull" json:"path"`
-	GitPath       string      `bun:",notnull" json:"git_path"`
 	RepositoryID  int64       `bun:",notnull" json:"repository_id"`
 	Repository    *Repository `bun:"rel:belongs-to,join:repository_id=id" json:"repository"`
 	LastUpdatedAt time.Time   `bun:",notnull" json:"last_updated_at"`
-	Private       bool        `bun:",notnull" json:"private"`
-	UserID        int64       `bun:",notnull" json:"user_id"`
-	User          *User       `bun:"rel:belongs-to,join:user_id=id" json:"user"`
 	times
 }
 
@@ -68,15 +61,15 @@ func (s *DatasetStore) PublicToUser(ctx context.Context, user *User, search, sor
 		Relation("Repository.Tags")
 
 	if user != nil {
-		query = query.Where("dataset.private = ? or dataset.user_id = ?", false, user.ID)
+		query = query.Where("repository.private = ? or repository.user_id = ?", false, user.ID)
 	} else {
-		query = query.Where("dataset.private = ?", false)
+		query = query.Where("repository.private = ?", false)
 	}
 
 	if search != "" {
 		search = strings.ToLower(search)
 		query = query.Where(
-			"LOWER(dataset.path) like ? or LOWER(dataset.description) like ? or LOWER(dataset.name) like ?",
+			"LOWER(repository.path) like ? or LOWER(repository.description) like ? or LOWER(dataset.url_slug) like ?",
 			fmt.Sprintf("%%%s%%", search),
 			fmt.Sprintf("%%%s%%", search),
 			fmt.Sprintf("%%%s%%", search),
@@ -146,10 +139,11 @@ func (s *DatasetStore) ByUsername(ctx context.Context, username string, per, pag
 		NewSelect().
 		Model(&datasets).
 		Relation("Repository.Tags").
-		Where("dataset.path like ?", fmt.Sprintf("%s/%%", username))
+		Relation("Repository.User").
+		Where("repository.path like ?", fmt.Sprintf("%s/%%", username))
 
 	if onlyPublic {
-		query = query.Where("dataset.private = ?", false)
+		query = query.Where("repository.private = ?", false)
 	}
 	query = query.Order("dataset.created_at DESC").
 		Limit(per).
@@ -171,10 +165,11 @@ func (s *DatasetStore) ByOrgPath(ctx context.Context, namespace string, per, pag
 		NewSelect().
 		Model(&datasets).
 		Relation("Repository.Tags").
-		Where("dataset.path like ?", fmt.Sprintf("%s/%%", namespace))
+		Relation("Repository.User").
+		Where("repository.path like ?", fmt.Sprintf("%s/%%", namespace))
 
 	if onlyPublic {
-		query = query.Where("dataset.private = ?", false)
+		query = query.Where("repository.private = ?", false)
 	}
 	query = query.Order("dataset.created_at DESC").
 		Limit(per).
@@ -341,9 +336,8 @@ func (s *DatasetStore) FindByPath(ctx context.Context, namespace string, repoPat
 	err = s.db.Operator.Core.
 		NewSelect().
 		Model(resDataset).
-		Relation("Repository").
-		Relation("User").
-		Where("dataset.path =?", fmt.Sprintf("%s/%s", namespace, repoPath)).
+		Relation("Repository.User").
+		Where("repository.path =?", fmt.Sprintf("%s/%s", namespace, repoPath)).
 		Scan(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find dataset: %w", err)
@@ -356,26 +350,12 @@ func (s *DatasetStore) FindByPath(ctx context.Context, namespace string, repoPat
 	return resDataset, err
 }
 
-func (s *DatasetStore) Delete(ctx context.Context, namespace, name string) (err error) {
-	err = s.db.Operator.Core.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
-		if err = assertAffectedOneRow(
-			tx.NewDelete().
-				Model(&Repository{}).
-				Where("path = ?", fmt.Sprintf("%v/%v", namespace, name)).
-				Where("repository_type = ?", types.DatasetRepo).
-				Exec(ctx)); err != nil {
-			return err
-		}
-		if err = assertAffectedOneRow(
-			tx.NewDelete().
-				Model(&Dataset{}).
-				Where("path = ?", fmt.Sprintf("%v/%v", namespace, name)).
-				Exec(ctx)); err != nil {
-			return err
-		}
-		return nil
-	})
-	return
+func (s *DatasetStore) Delete(ctx context.Context, input Dataset) error {
+	res, err := s.db.Operator.Core.NewDelete().Model(&input).WherePK().Exec(ctx)
+	if err := assertAffectedOneRow(res, err); err != nil {
+		return fmt.Errorf("delete dataset in tx failed,error:%w", err)
+	}
+	return nil
 }
 
 func (s *DatasetStore) Tags(ctx context.Context, namespace, name string) (tags []Tag, err error) {
@@ -398,6 +378,7 @@ func (s *DatasetStore) ListByPath(ctx context.Context, paths []string) ([]Datase
 	err := s.db.Operator.Core.
 		NewSelect().
 		Model(&Dataset{}).
+		Relation("Repository").
 		Where("path IN (?)", bun.In(paths)).
 		Scan(ctx, &datasets)
 	if err != nil {

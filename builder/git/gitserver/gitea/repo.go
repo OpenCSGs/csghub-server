@@ -58,7 +58,6 @@ func (c *Client) UpdateRepo(ctx context.Context, req gitserver.UpdateRepoReq) (*
 		common.WithPrefix(req.Namespace, repoPrefixByType(req.RepoType)),
 		req.Name,
 		gitea.EditRepoOption{
-			Name:          gitea.OptionalString(req.Nickname),
 			Description:   gitea.OptionalString(req.Description),
 			Private:       gitea.OptionalBool(req.Private),
 			DefaultBranch: gitea.OptionalString(req.DefaultBranch),
@@ -70,7 +69,7 @@ func (c *Client) UpdateRepo(ctx context.Context, req gitserver.UpdateRepoReq) (*
 	}
 
 	resp := &gitserver.CreateRepoResp{
-		Nickname:      giteaRepo.Name,
+		Nickname:      giteaRepo.FullName,
 		Description:   giteaRepo.Description,
 		DefaultBranch: giteaRepo.DefaultBranch,
 		RepoType:      req.RepoType,

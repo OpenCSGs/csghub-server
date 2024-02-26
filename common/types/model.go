@@ -4,36 +4,6 @@ import (
 	"time"
 )
 
-type ModelDetail struct {
-	Path          string `json:"path"`
-	Name          string `json:"name"`
-	Introduction  string `json:"introduction"`
-	License       string `json:"license"`
-	Private       bool   `json:"private"`
-	Downloads     int    `json:"downloads"`
-	LastUpdatedAt string `json:"last_updated_at"`
-	HTTPCloneURL  string `json:"http_clone_url"`
-	SSHCloneURL   string `json:"ssh_clone_url"`
-	Size          int    `json:"size"`
-	DefaultBranch string `json:"default_branch"`
-}
-
-type ModelTag struct {
-	Name    string         `json:"name"`
-	Message string         `json:"message"`
-	Commit  ModelTagCommit `json:"commit"`
-}
-
-type ModelTagCommit struct {
-	ID string `json:"id"`
-}
-
-type ModelBranch struct {
-	Name    string           `json:"name"`
-	Message string           `json:"message"`
-	Commit  RepoBranchCommit `json:"commit"`
-}
-
 type RepoBranchCommit struct {
 	ID string `json:"id"`
 }
@@ -79,4 +49,26 @@ type CreateRepoReq struct {
 	Readme        string         `json:"readme"`
 	DefaultBranch string         `json:"default_branch" example:"main"`
 	RepoType      RepositoryType `json:"-"`
+}
+
+type DeleteRepoReq struct {
+	Username  string         `json:"username" example:"creator_user_name"`
+	Namespace string         `json:"namespace" example:"user_or_org_name"`
+	Name      string         `json:"name" example:"model_name_1"`
+	RepoType  RepositoryType `json:"-"`
+}
+
+type Model struct {
+	ID           int64     `json:"id"`
+	Name         string    `json:"name"`
+	Nickname     string    `json:"nickname"`
+	Description  string    `json:"description"`
+	Likes        int64     `json:"likes"`
+	Downloads    int64     `json:"downloads"`
+	Path         string    `json:"path"`
+	RepositoryID int64     `json:"repository_id"`
+	Private      bool      `json:"private"`
+	Username     string    `json:"user"`
+	CreatedAt    time.Time `json:"created_at"`
+	UpdatedAt    time.Time `json:"updated_at"`
 }

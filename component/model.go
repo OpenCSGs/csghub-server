@@ -113,9 +113,12 @@ type ModelComponent struct {
 	msc *MemberComponent
 }
 
-func (c *ModelComponent) Index(ctx context.Context, username, search, sort string, ragReqs []database.TagReq, per, page int) ([]database.Model, int, error) {
-	var user database.User
-	var err error
+func (c *ModelComponent) Index(ctx context.Context, username, search, sort string, ragReqs []database.TagReq, per, page int) ([]types.Model, int, error) {
+	var (
+		user      database.User
+		err       error
+		resModels []types.Model
+	)
 	if username == "" {
 		slog.Info("get models without current username")
 	} else {
@@ -132,11 +135,26 @@ func (c *ModelComponent) Index(ctx context.Context, username, search, sort strin
 		slog.Error(newError.Error())
 		return nil, 0, newError
 	}
-	return models, total, nil
+	for _, data := range models {
+		resModels = append(resModels, types.Model{
+			ID:           data.ID,
+			Name:         data.Repository.Name,
+			Nickname:     data.UrlSlug,
+			Description:  data.Repository.Description,
+			Likes:        data.Likes,
+			Downloads:    data.Downloads,
+			Path:         data.Repository.Path,
+			RepositoryID: data.RepositoryID,
+			Private:      data.Repository.Private,
+			CreatedAt:    data.CreatedAt,
+			UpdatedAt:    data.UpdatedAt,
+		})
+	}
+	return resModels, total, nil
 }
 
-func (c *ModelComponent) Create(ctx context.Context, req *types.CreateModelReq) (*database.Model, error) {
-	var name string
+func (c *ModelComponent) Create(ctx context.Context, req *types.CreateModelReq) (*types.Model, error) {
+	var nickname string
 	req.RepoType = types.ModelRepo
 	req.Readme = generateReadmeData(req.License)
 	_, dbRepo, err := c.CreateRepo(ctx, req.CreateRepoReq)
@@ -144,20 +162,14 @@ func (c *ModelComponent) Create(ctx context.Context, req *types.CreateModelReq) 
 		return nil, err
 	}
 	if req.Nickname != "" {
-		name = req.Nickname
+		nickname = req.Nickname
 	} else {
-		name = req.Name
+		nickname = req.Name
 	}
 
 	dbModel := database.Model{
 		Repository:   dbRepo,
-		Name:         name,
-		UrlSlug:      req.Name,
-		Description:  req.Description,
-		Path:         dbRepo.Path,
-		GitPath:      dbRepo.GitPath,
-		Private:      req.Private,
-		UserID:       dbRepo.UserID,
+		UrlSlug:      nickname,
 		RepositoryID: dbRepo.ID,
 	}
 
@@ -166,7 +178,7 @@ func (c *ModelComponent) Create(ctx context.Context, req *types.CreateModelReq) 
 		return nil, fmt.Errorf("failed to create database model, cause: %w", err)
 	}
 
-	user, err := c.user.FindByID(ctx, int(model.UserID))
+	user, err := c.user.FindByID(ctx, int(dbRepo.UserID))
 	if err != nil {
 		return nil, fmt.Errorf("failed to find database user, cause: %w", err)
 	}
@@ -203,7 +215,21 @@ func (c *ModelComponent) Create(ctx context.Context, req *types.CreateModelReq) 
 		return nil, fmt.Errorf("failed to create .gitattributes file, cause: %w", err)
 	}
 
-	return model, nil
+	resModel := &types.Model{
+		ID:           model.ID,
+		Name:         model.Repository.Name,
+		Nickname:     model.UrlSlug,
+		Description:  model.Repository.Description,
+		Likes:        model.Likes,
+		Downloads:    model.Downloads,
+		Path:         model.Repository.Path,
+		RepositoryID: model.RepositoryID,
+		Private:      model.Repository.Private,
+		CreatedAt:    model.CreatedAt,
+		UpdatedAt:    model.UpdatedAt,
+	}
+
+	return resModel, nil
 }
 
 func buildCreateFileReq(p *types.CreateFileParams, repoType types.RepositoryType) *types.CreateFileReq {
@@ -221,7 +247,7 @@ func buildCreateFileReq(p *types.CreateFileParams, repoType types.RepositoryType
 	}
 }
 
-func (c *ModelComponent) Update(ctx context.Context, req *types.UpdateModelReq) (*database.Model, error) {
+func (c *ModelComponent) Update(ctx context.Context, req *types.UpdateModelReq) (*types.Model, error) {
 	req.RepoType = types.ModelRepo
 	dbRepo, err := c.UpdateRepo(ctx, req.CreateRepoReq)
 	if err != nil {
@@ -233,35 +259,47 @@ func (c *ModelComponent) Update(ctx context.Context, req *types.UpdateModelReq) 
 		return nil, fmt.Errorf("failed to find model, error: %w", err)
 	}
 
-	model.Name = req.Nickname
-	model.Description = dbRepo.Description
-	model.Private = dbRepo.Private
+	model.UrlSlug = req.Nickname
 
 	model, err = c.ms.Update(ctx, *model)
 	if err != nil {
 		return nil, fmt.Errorf("failed to update database model, error: %w", err)
 	}
+	resModel := &types.Model{
+		ID:           model.ID,
+		Name:         dbRepo.Name,
+		Nickname:     model.UrlSlug,
+		Description:  dbRepo.Description,
+		Likes:        model.Likes,
+		Downloads:    model.Downloads,
+		Path:         dbRepo.Path,
+		RepositoryID: dbRepo.ID,
+		Private:      dbRepo.Private,
+		CreatedAt:    model.CreatedAt,
+		UpdatedAt:    model.UpdatedAt,
+	}
 
-	return model, nil
+	return resModel, nil
 }
 
-func (c *ModelComponent) Delete(ctx context.Context, namespace, name string) error {
-	_, err := c.ms.FindByPath(ctx, namespace, name)
+func (c *ModelComponent) Delete(ctx context.Context, namespace, name, currentUser string) error {
+	model, err := c.ms.FindByPath(ctx, namespace, name)
 	if err != nil {
 		return fmt.Errorf("failed to find model, error: %w", err)
 	}
 
-	deleteRepoReq := gitserver.DeleteRepoReq{
+	deleteDatabaseRepoReq := types.DeleteRepoReq{
+		Username:  currentUser,
 		Namespace: namespace,
 		Name:      name,
 		RepoType:  types.ModelRepo,
 	}
-	err = c.git.DeleteRepo(ctx, deleteRepoReq)
+	_, err = c.DeleteRepo(ctx, deleteDatabaseRepoReq)
 	if err != nil {
-		return fmt.Errorf("failed to delete git model repository, error: %w", err)
+		return fmt.Errorf("failed to delete repo of model, error: %w", err)
 	}
 
-	err = c.ms.Delete(ctx, namespace, name)
+	err = c.ms.Delete(ctx, *model)
 	if err != nil {
 		return fmt.Errorf("failed to delete database model, error: %w", err)
 	}
@@ -274,8 +312,8 @@ func (c *ModelComponent) Show(ctx context.Context, namespace, name, current_user
 		return nil, fmt.Errorf("failed to find model, error: %w", err)
 	}
 
-	if model.Private {
-		if model.User.Username != current_user {
+	if model.Repository.Private {
+		if model.Repository.User.Username != current_user {
 			return nil, fmt.Errorf("failed to find model, error: %w", errors.New("the private model is not accessible to the current user"))
 		}
 	}
@@ -633,7 +671,7 @@ func (c *ModelComponent) SDKListFiles(ctx *gin.Context, namespace, name string) 
 	currentUser, exists = ctx.Get("currentUser")
 
 	// TODO: Use user access token to check permissions
-	if model.Private && exists {
+	if model.Repository.Private && exists {
 		canRead, err := c.checkCurrentUserPermission(ctx, currentUser, namespace)
 		if err != nil {
 			return nil, err
@@ -658,7 +696,7 @@ func (c *ModelComponent) SDKListFiles(ctx *gin.Context, namespace, name string) 
 	return &types.SDKFiles{
 		ID:        fmt.Sprintf("%s/%s", namespace, name),
 		Siblings:  sdkFiles,
-		Private:   model.Private,
+		Private:   model.Repository.Private,
 		Downloads: model.Downloads,
 		Likes:     model.Likes,
 		Tags:      tags,
@@ -720,7 +758,7 @@ func (c *ModelComponent) HeadDownloadFile(ctx *gin.Context, req *types.GetFileRe
 	currentUser, exists := ctx.Get("currentUser")
 
 	// TODO: Use user access token to check permissions
-	if model.Private && exists {
+	if model.Repository.Private && exists {
 		canRead, err := c.checkCurrentUserPermission(ctx, currentUser, req.Namespace)
 		if err != nil {
 			return nil, err
@@ -756,7 +794,7 @@ func (c *ModelComponent) SDKDownloadFile(ctx *gin.Context, req *types.GetFileReq
 	currentUser, exists := ctx.Get("currentUser")
 
 	// TODO: Use user access token to check permissions
-	if model.Private && exists {
+	if model.Repository.Private && exists {
 		canRead, err := c.checkCurrentUserPermission(ctx, currentUser, req.Namespace)
 		if err != nil {
 			return nil, "", err
@@ -815,8 +853,8 @@ func (c *ModelComponent) Predict(ctx context.Context, req *types.ModelPredictReq
 	}
 
 	mid := inference.ModelID{
-		Owner:   model.User.Username,
-		Name:    model.Name,
+		Owner:   model.Repository.User.Username,
+		Name:    model.Repository.Name,
 		Version: req.Version,
 	}
 	inferReq := &inference.PredictRequest{
