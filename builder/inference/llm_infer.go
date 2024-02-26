@@ -7,7 +7,10 @@ import (
 	"fmt"
 	"hash/fnv"
 	"io"
+	"log/slog"
 	"net/http"
+	"net/url"
+	"strings"
 	"time"
 )
 
@@ -36,23 +39,24 @@ type ModelInfo struct {
 }
 
 type llmInferClient struct {
-	lastUpdate    time.Time
-	hc            *http.Client
-	modelServices map[uint64]ModelInfo
-	serverAddr    string
+	lastUpdate time.Time
+	hc         *http.Client
+	modelInfos map[uint64]ModelInfo
+	serverAddr string
 }
 
 func NewInferClient(addr string) App {
 	hc := http.DefaultClient
-	hc.Timeout = 5 * time.Second
+	hc.Timeout = time.Minute
 	return &llmInferClient{
 		hc:         hc,
+		modelInfos: make(map[uint64]ModelInfo),
 		serverAddr: addr,
 	}
 }
 
 func (c *llmInferClient) Predict(id ModelID, req *PredictRequest) (*PredictResponse, error) {
-	s, err := c.GetModelService(id)
+	s, err := c.GetModelInfo(id)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get model info,error:%w", err)
 	}
@@ -66,33 +70,82 @@ func (c *llmInferClient) Predict(id ModelID, req *PredictRequest) (*PredictRespo
 	return c.CallPredict(s.Endpoint, req)
 }
 
-func (c *llmInferClient) ServingList() (map[uint64]ModelInfo, error) {
+// ListServing call inference service to ge all serving models
+func (c *llmInferClient) ListServing() (map[uint64]ModelInfo, error) {
+	defer func() {
+		// for test only
+		testModelID := ModelID{
+			Owner:   "test_user_name",
+			Name:    "test_model_name",
+			Version: "",
+		}
+		c.modelInfos[testModelID.Hash()] = ModelInfo{
+			HashID:   testModelID.Hash(),
+			Endpoint: "http://localhost:8080/test_user_name/test_model_name",
+			Status:   "running",
+		}
+	}()
+
 	// use local cache first
-	if time.Since(c.lastUpdate).Seconds() < 30 {
-		return c.modelServices, nil
+	if expire := time.Since(c.lastUpdate).Seconds(); expire < 30 {
+		slog.Info("use cached model infos", slog.Float64("expire", expire))
+		return c.modelInfos, nil
 	}
 
-	tmp := make(map[uint64]ModelInfo)
-	// TODO:call inference service to ge all serving models
-	// c.hc.Post()
-	testModelID := ModelID{
-		Owner:   "test_user_name",
-		Name:    "test_model_name",
-		Version: "",
+	api, _ := url.JoinPath(c.serverAddr, "/api/list_serving")
+	req, _ := http.NewRequest(http.MethodGet, api, nil)
+	req.Header.Set("user-name", "default")
+	resp, err := c.hc.Do(req)
+	if err != nil {
+		slog.Error("fail to call list serving api", slog.Any("err", err))
+		return c.modelInfos, fmt.Errorf("fail to call list serving api,%w", err)
 	}
-	tmp[testModelID.Hash()] = ModelInfo{
-		HashID:   testModelID.Hash(),
-		Endpoint: "http://localhost:8080/test_user_name/test_model_name",
-		Status:   "running",
+	llmInfos := make(map[string]LlmModelInfo)
+	err = json.NewDecoder(resp.Body).Decode(&llmInfos)
+	if err != nil {
+		slog.Error("fail to decode list serving response", slog.Any("err", err))
+		return c.modelInfos, fmt.Errorf("fail to decode list serving response,%w", err)
 	}
 
-	c.modelServices = tmp
-	c.lastUpdate = time.Now()
-	return c.modelServices, nil
+	slog.Debug("llmResp", slog.Any("map", llmInfos))
+	if len(llmInfos) > 0 {
+		c.updateModelInfos(llmInfos)
+	}
+	return c.modelInfos, nil
 }
 
-func (c *llmInferClient) GetModelService(id ModelID) (ModelInfo, error) {
-	list, err := c.ServingList()
+func (c *llmInferClient) updateModelInfos(llmInfos map[string]LlmModelInfo) {
+	tmp := make(map[uint64]ModelInfo)
+	for _, v := range llmInfos {
+		for modelName, endpoint := range v.URL {
+			// example: THUDM/chatglm3-6b
+			owner, name, _ := strings.Cut(modelName, "/")
+			mid := ModelID{
+				Owner:   owner,
+				Name:    name,
+				Version: "",
+			}
+			slog.Debug("get model info", slog.Any("mid", mid), slog.String("endpoint", endpoint))
+			// endpoint = strings.Replace(endpoint, "http://0.0.0.0:8000", c.serverAddr, 1)
+			parsedUrl, _ := url.Parse(endpoint)
+			endpoint, _ = url.JoinPath(c.serverAddr, parsedUrl.RequestURI())
+			slog.Debug("replace llm endpoint with new domain", slog.String("new_endpoint", endpoint))
+			mi := ModelInfo{
+				Endpoint: endpoint,
+				Status:   "running",
+				HashID:   mid.Hash(),
+			}
+			tmp[mi.HashID] = mi
+			// only one url
+			break
+		}
+	}
+	c.modelInfos = tmp
+	c.lastUpdate = time.Now()
+}
+
+func (c *llmInferClient) GetModelInfo(id ModelID) (ModelInfo, error) {
+	list, err := c.ListServing()
 	if err != nil {
 		return ModelInfo{}, err
 	}
@@ -101,7 +154,7 @@ func (c *llmInferClient) GetModelService(id ModelID) (ModelInfo, error) {
 		return s, nil
 	}
 
-	return ModelInfo{}, errors.New("model service not found by id")
+	return ModelInfo{}, errors.New("model info not found by id")
 }
 
 func (c *llmInferClient) CallPredict(url string, req *PredictRequest) (*PredictResponse, error) {

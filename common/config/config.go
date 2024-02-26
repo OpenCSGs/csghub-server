@@ -66,7 +66,7 @@ type Config struct {
 	}
 
 	Inference struct {
-		ServerAddr string `envconfig:"STARHUB_SERVER_INFERENCE_SERVER_ADDR" default:"http://localhost:8256"`
+		ServerAddr string `envconfig:"STARHUB_SERVER_INFERENCE_SERVER_ADDR" default:"http://localhost:8000"`
 	}
 }
 
