@@ -481,7 +481,7 @@ func (h *ModelHandler) FileRaw(ctx *gin.Context) {
 // @Success      200  {object}  types.Response{data=types.Commit} "OK"
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
-// @Router       /models/{namespace}/{name}/info/{file_path} [get]
+// @Router       /models/{namespace}/{name}/blob/{file_path} [get]
 func (h *ModelHandler) FileInfo(ctx *gin.Context) {
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
 	if err != nil {

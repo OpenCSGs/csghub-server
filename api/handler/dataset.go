@@ -485,7 +485,7 @@ func (h *DatasetHandler) FileRaw(ctx *gin.Context) {
 // @Success      200  {object}  types.Response{data=types.Commit} "OK"
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
-// @Router       /datasets/{namespace}/{name}/info/{file_path} [get]
+// @Router       /datasets/{namespace}/{name}/blob/{file_path} [get]
 func (h *DatasetHandler) FileInfo(ctx *gin.Context) {
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
 	if err != nil {
