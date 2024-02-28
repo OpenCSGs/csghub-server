@@ -154,7 +154,7 @@ func (h *OrganizationHandler) Update(ctx *gin.Context) {
 // @Param        current_user query string true "current user name"
 // @Param        per query int false "page size"
 // @Param        page query int false "current page number"
-// @Success      200  {object}  types.ResponseWithTotal{data=[]database.Model,total=int} "OK"
+// @Success      200  {object}  types.ResponseWithTotal{data=[]types.Model,total=int} "OK"
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
 // @Router       /organization/{namespace}/models [get]
@@ -199,7 +199,7 @@ func (h *OrganizationHandler) Models(ctx *gin.Context) {
 // @Param        current_user query string true "current user name"
 // @Param        per query int false "page size"
 // @Param        page query int false "current page number"
-// @Success      200  {object}  types.ResponseWithTotal{data=[]database.Dataset,total=int} "OK"
+// @Success      200  {object}  types.ResponseWithTotal{data=[]types.Dataset,total=int} "OK"
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
 // @Router       /organization/{namespace}/datasets [get]

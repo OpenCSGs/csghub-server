@@ -1,6 +1,7 @@
 package gitea
 
 import (
+	"context"
 	"encoding/base64"
 	"errors"
 	"io"
@@ -9,6 +10,7 @@ import (
 	"time"
 
 	"github.com/OpenCSGs/gitea-go-sdk/gitea"
+	"opencsg.com/csghub-server/builder/git/gitserver"
 	"opencsg.com/csghub-server/common/types"
 	"opencsg.com/csghub-server/common/utils/common"
 )
@@ -17,6 +19,11 @@ const (
 	LFSPrefix           = "version https://git-lfs.github.com/spec/v1"
 	NonLFSFileSizeLimit = 10485760
 )
+
+func (c *Client) GetRepoFileTree(ctx context.Context, req gitserver.GetRepoInfoByPathReq) ([]*types.File, error) {
+	namespace := common.WithPrefix(req.Namespace, repoPrefixByType(req.RepoType))
+	return c.getRepoDir(namespace, req.Name, req.Ref, req.Path)
+}
 
 func (c *Client) GetModelFileTree(namespace, name, ref, path string) (tree []*types.File, err error) {
 	namespace = common.WithPrefix(namespace, ModelOrgPrefix)
@@ -60,6 +67,94 @@ func (c *Client) getRepoDir(namespace, name, ref, path string) (files []*types.F
 	}
 
 	return files, nil
+}
+
+func (c *Client) GetRepoFileRaw(ctx context.Context, req gitserver.GetRepoInfoByPathReq) (string, error) {
+	namespace := common.WithPrefix(req.Namespace, repoPrefixByType(req.RepoType))
+	giteaFileData, _, err := c.giteaClient.GetFile(namespace, req.Name, req.Ref, req.Path)
+	if err != nil {
+		return "", err
+	}
+	return string(giteaFileData), nil
+}
+
+func (c *Client) GetRepoFileReader(ctx context.Context, req gitserver.GetRepoInfoByPathReq) (io.ReadCloser, error) {
+	namespace := common.WithPrefix(req.Namespace, repoPrefixByType(req.RepoType))
+	entries, _, err := c.giteaClient.GetDir(namespace, req.Name, req.Ref, req.Path)
+	if err != nil {
+		return nil, err
+	}
+	if entries[0].Size > NonLFSFileSizeLimit {
+		return nil, errors.New("file is larger than 10MB")
+	}
+	giteaFileReader, _, err := c.giteaClient.GetFileReader(namespace, req.Name, req.Ref, req.Path)
+	if err != nil {
+		return nil, err
+	}
+	return giteaFileReader, nil
+}
+
+func (c *Client) GetRepoLfsFileRaw(ctx context.Context, req gitserver.GetRepoInfoByPathReq) (io.ReadCloser, error) {
+	namespace := common.WithPrefix(req.Namespace, repoPrefixByType(req.RepoType))
+	r, _, err := c.giteaClient.GetFileReader(namespace, req.Name, req.Ref, req.Path, true)
+	return r, err
+}
+
+func (c *Client) GetRepoFileContents(ctx context.Context, req gitserver.GetRepoInfoByPathReq) (*types.File, error) {
+	namespace := common.WithPrefix(req.Namespace, repoPrefixByType(req.RepoType))
+	return c.getFileContents(namespace, req.Name, req.Ref, req.Path)
+}
+
+func (c *Client) CreateRepoFile(req *types.CreateFileReq) (err error) {
+	namespace := common.WithPrefix(req.NameSpace, repoPrefixByType(req.RepoType))
+	_, _, err = c.giteaClient.CreateFile(namespace, req.Name, req.FilePath, gitea.CreateFileOptions{
+		FileOptions: gitea.FileOptions{
+			Message:       req.Message,
+			BranchName:    req.Branch,
+			NewBranchName: req.NewBranch,
+			Author: gitea.Identity{
+				Name:  req.Username,
+				Email: req.Email,
+			},
+			Committer: gitea.Identity{
+				Name:  req.Username,
+				Email: req.Email,
+			},
+			Dates: gitea.CommitDateOptions{
+				Author:    time.Now(),
+				Committer: time.Now(),
+			},
+		},
+		Content: req.Content,
+	})
+	return
+}
+
+func (c *Client) UpdateRepoFile(req *types.UpdateFileReq) (err error) {
+	namespace := common.WithPrefix(req.NameSpace, repoPrefixByType(req.RepoType))
+	_, _, err = c.giteaClient.UpdateFile(namespace, req.Name, req.FilePath, gitea.UpdateFileOptions{
+		FileOptions: gitea.FileOptions{
+			Message:       req.Message,
+			BranchName:    req.Branch,
+			NewBranchName: req.NewBranch,
+			Author: gitea.Identity{
+				Name:  req.Username,
+				Email: req.Email,
+			},
+			Committer: gitea.Identity{
+				Name:  req.Username,
+				Email: req.Email,
+			},
+			Dates: gitea.CommitDateOptions{
+				Author:    time.Now(),
+				Committer: time.Now(),
+			},
+		},
+		SHA:      req.SHA,
+		Content:  req.Content,
+		FromPath: req.OriginPath,
+	})
+	return
 }
 
 func (c *Client) GetDatasetFileRaw(namespace, name, ref, path string) (string, error) {
