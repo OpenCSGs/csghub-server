@@ -39,3 +39,9 @@ type PageOpts struct {
 	Page     int `json:"page"`
 	PageSize int `json:"page_size"`
 }
+
+type User struct {
+	Username string `json:"username"`
+	Nickname string `json:"nickname"`
+	Email    string `json:"email"`
+}

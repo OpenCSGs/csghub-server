@@ -98,7 +98,7 @@ func (h *UserHandler) Update(ctx *gin.Context) {
 // @Accept       json
 // @Produce      json
 // @Param        username path string true "username"
-// @Success      200  {object}  types.ResponseWithTotal{data=[]database.Dataset,total=int} "OK"
+// @Success      200  {object}  types.ResponseWithTotal{data=[]types.Dataset,total=int} "OK"
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
 // @Router       /user/{username}/datasets [get]
@@ -139,7 +139,7 @@ func (h *UserHandler) Datasets(ctx *gin.Context) {
 // @Accept       json
 // @Produce      json
 // @Param        username path string true "username"
-// @Success      200  {object}  types.ResponseWithTotal{data=[]database.Model,total=int} "OK"
+// @Success      200  {object}  types.ResponseWithTotal{data=[]types.Model,total=int} "OK"
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
 // @Router       /user/{username}/models [get]

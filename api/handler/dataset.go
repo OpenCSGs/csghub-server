@@ -73,6 +73,7 @@ func (h *DatasetHandler) CreateFile(ctx *gin.Context) {
 	req.NameSpace = namespace
 	req.Name = name
 	req.FilePath = filePath
+	req.RepoType = types.DatasetRepo
 
 	resp, err = h.c.CreateFile(ctx, req)
 	if err != nil {
@@ -120,6 +121,7 @@ func (h *DatasetHandler) UpdateFile(ctx *gin.Context) {
 	req.NameSpace = namespace
 	req.Name = name
 	req.FilePath = filePath
+	req.RepoType = types.DatasetRepo
 
 	resp, err = h.c.UpdateFile(ctx, req)
 	if err != nil {
@@ -141,7 +143,7 @@ func (h *DatasetHandler) UpdateFile(ctx *gin.Context) {
 // @Accept       json
 // @Produce      json
 // @Param        body body types.CreateDatasetReq true "body"
-// @Success      200  {object}  types.Response{data=database.Dataset} "OK"
+// @Success      200  {object}  types.Response{data=types.Dataset} "OK"
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
 // @Router       /datasets [post]
@@ -176,7 +178,7 @@ func (h *DatasetHandler) Create(ctx *gin.Context) {
 // @Param        per query int false "per" default(20)
 // @Param        page query int false "per page" default(1)
 // @Param        current_user query string true "current user"
-// @Success      200  {object}  types.ResponseWithTotal{data=[]database.Dataset,total=int} "OK"
+// @Success      200  {object}  types.ResponseWithTotal{data=[]types.Dataset,total=int} "OK"
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
 // @Router       /datasets [get]
@@ -240,7 +242,7 @@ func (h *DatasetHandler) Update(ctx *gin.Context) {
 		return
 	}
 	req.Namespace = namespace
-	req.OriginName = name
+	req.Name = name
 
 	dataset, err := h.c.Update(ctx, req)
 	if err != nil {
@@ -262,6 +264,7 @@ func (h *DatasetHandler) Update(ctx *gin.Context) {
 // @Produce      json
 // @Param        namespace path string true "namespace"
 // @Param        name path string true "name"
+// @Param        current_user query string true "current_user"
 // @Success      200  {object}  types.Response{} "OK"
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
@@ -273,7 +276,8 @@ func (h *DatasetHandler) Delete(ctx *gin.Context) {
 		ctx.JSON(http.StatusBadRequest, gin.H{"message": err.Error()})
 		return
 	}
-	err = h.c.Delete(ctx, namespace, name)
+	currentUser := ctx.Query("current_user")
+	err = h.c.Delete(ctx, namespace, name, currentUser)
 	if err != nil {
 		slog.Error("Failed to delete dataset", slog.Any("error", err))
 		ctx.JSON(http.StatusInternalServerError, gin.H{"message": err.Error()})
@@ -281,36 +285,6 @@ func (h *DatasetHandler) Delete(ctx *gin.Context) {
 	}
 	slog.Info("Delete dataset succeed", slog.String("dataset", name))
 	httpbase.OK(ctx, nil)
-}
-
-// GetDatasetDetail godoc
-// @Security     ApiKey
-// @Summary      Get dataset detail
-// @Description  get dataset detail
-// @Tags         Dataset
-// @Accept       json
-// @Produce      json
-// @Param        namespace path string true "namespace"
-// @Param        name path string true "name"
-// @Success      200  {object}  types.Response{data=types.DatasetDetail} "OK"
-// @Failure      400  {object}  types.APIBadRequest "Bad request"
-// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
-// @Router       /datasets/{namespace}/{name}/detail [get]
-func (h *DatasetHandler) Detail(ctx *gin.Context) {
-	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
-	if err != nil {
-		slog.Error("Bad request format", "error", err)
-		ctx.JSON(http.StatusBadRequest, gin.H{"message": err.Error()})
-		return
-	}
-	detail, err := h.c.Detail(ctx, namespace, name)
-	if err != nil {
-		slog.Error("Failed to get dataset detail", slog.Any("error", err))
-		ctx.JSON(http.StatusInternalServerError, gin.H{"message": err.Error()})
-		return
-	}
-	slog.Info("Get dataset detail succeed", slog.String("dataset", name))
-	httpbase.OK(ctx, detail)
 }
 
 // GetDataset      godoc
@@ -323,7 +297,7 @@ func (h *DatasetHandler) Detail(ctx *gin.Context) {
 // @Param        namespace path string true "namespace"
 // @Param        name path string true "name"
 // @Param        current_user query string true "current_user"
-// @Success      200  {object}  types.Response{data=database.Dataset} "OK"
+// @Success      200  {object}  types.Response{data=types.Dataset} "OK"
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
 // @Router       /datasets/{namespace}/{name} [get]
@@ -380,6 +354,7 @@ func (h *DatasetHandler) Commits(ctx *gin.Context) {
 		Ref:       ref,
 		Per:       per,
 		Page:      page,
+		RepoType:  types.DatasetRepo,
 	}
 	commits, err := h.c.Commits(ctx, req)
 	if err != nil {
@@ -418,6 +393,7 @@ func (h *DatasetHandler) LastCommit(ctx *gin.Context) {
 		Namespace: namespace,
 		Name:      name,
 		Ref:       ref,
+		RepoType:  types.DatasetRepo,
 	}
 	commit, err := h.c.LastCommit(ctx, req)
 	if err != nil {
@@ -459,6 +435,7 @@ func (h *DatasetHandler) FileRaw(ctx *gin.Context) {
 		Name:      name,
 		Path:      filePath,
 		Ref:       ctx.Query("ref"),
+		RepoType:  types.DatasetRepo,
 	}
 	raw, err := h.c.FileRaw(ctx, req)
 	if err != nil {
@@ -505,6 +482,7 @@ func (h *DatasetHandler) DownloadFile(ctx *gin.Context) {
 		Ref:       ctx.Query("ref"),
 		Lfs:       false,
 		SaveAs:    ctx.Query("save_as"),
+		RepoType:  types.DatasetRepo,
 	}
 	if ctx.Query("lfs") != "" {
 		req.Lfs, err = strconv.ParseBool(ctx.Query("lfs"))
@@ -547,7 +525,7 @@ func (h *DatasetHandler) DownloadFile(ctx *gin.Context) {
 // @Param        name path string true "name"
 // @param        per query int false "per" default(20)
 // @Param        page query int false "page" default(1)
-// @Success      200  {object}  types.Response{data=[]types.DatasetBranch} "OK"
+// @Success      200  {object}  types.Response{data=[]types.Branch} "OK"
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
 // @Router       /datasets/{namespace}/{name}/branches [get]
@@ -569,6 +547,7 @@ func (h *DatasetHandler) Branches(ctx *gin.Context) {
 		Name:      name,
 		Per:       per,
 		Page:      page,
+		RepoType:  types.DatasetRepo,
 	}
 	branches, err := h.c.Branches(ctx, req)
 	if err != nil {
@@ -590,7 +569,7 @@ func (h *DatasetHandler) Branches(ctx *gin.Context) {
 // @Produce      json
 // @Param        namespace path string true "namespace"
 // @Param        name path string true "name"
-// @Success      200  {object}  types.Response{data=[]types.DatasetBranch} "OK"
+// @Success      200  {object}  types.Response{data=[]types.Branch} "OK"
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
 // @Router       /datasets/{namespace}/{name}/tags [get]
@@ -604,6 +583,7 @@ func (h *DatasetHandler) Tags(ctx *gin.Context) {
 	req := &types.GetTagsReq{
 		Namespace: namespace,
 		Name:      name,
+		RepoType:  types.DatasetRepo,
 	}
 	tags, err := h.c.Tags(ctx, req)
 	if err != nil {
@@ -642,6 +622,7 @@ func (h *DatasetHandler) Tree(ctx *gin.Context) {
 		Name:      name,
 		Path:      ctx.Query("path"),
 		Ref:       ctx.Query("ref"),
+		RepoType:  types.DatasetRepo,
 	}
 	tree, err := h.c.Tree(ctx, req)
 	if err != nil {
@@ -685,6 +666,7 @@ func (h *DatasetHandler) UpdateDownloads(ctx *gin.Context) {
 
 	req.Namespace = namespace
 	req.Name = name
+	req.RepoType = types.DatasetRepo
 	date, err := time.Parse("2006-01-02", req.ReqDate)
 	if err != nil {
 		slog.Error("Bad request format", "error", err)
@@ -775,6 +757,7 @@ func (h *DatasetHandler) UploadFile(ctx *gin.Context) {
 	req.Name = name
 	req.FilePath = filePath
 	req.Content = buf.String()
+	req.RepoType = types.DatasetRepo
 
 	err = h.c.UploadFile(ctx, req)
 	if err != nil {
@@ -794,7 +777,7 @@ func (h *DatasetHandler) SDKListFiles(ctx *gin.Context) {
 		return
 	}
 
-	files, err := h.c.SDKListFiles(ctx, namespace, name)
+	files, err := h.c.SDKListFiles(ctx, types.DatasetRepo, namespace, name)
 	if err != nil {
 		slog.Error("Error listing dataset files", "error", err)
 		httpbase.ServerError(ctx, err)
@@ -821,6 +804,7 @@ func (h *DatasetHandler) SDKDownload(ctx *gin.Context) {
 		Ref:       branch,
 		Lfs:       false,
 		SaveAs:    filepath.Base(filePath),
+		RepoType:  types.DatasetRepo,
 	}
 	lfs, err := h.c.IsLfs(ctx, req)
 	if err != nil {
@@ -869,6 +853,7 @@ func (h *DatasetHandler) HeadSDKDownload(ctx *gin.Context) {
 		Ref:       branch,
 		Lfs:       false,
 		SaveAs:    filepath.Base(filePath),
+		RepoType:  types.DatasetRepo,
 	}
 
 	file, err := h.c.HeadDownloadFile(ctx, req)
