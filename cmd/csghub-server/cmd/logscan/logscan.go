@@ -149,9 +149,16 @@ var initCmd = &cobra.Command{
 }
 
 func getRepoTypeByTypeName(repoType string) types.RepositoryType {
-	if repoType == "datasets" {
+	switch repoType {
+	case "datasets":
 		return types.DatasetRepo
-	} else {
+	case "models":
 		return types.ModelRepo
+	case "codes":
+		return types.CodeRepo
+	case "spaces":
+		return types.SpaceRepo
+	default:
+		return types.UnknownRepo
 	}
 }

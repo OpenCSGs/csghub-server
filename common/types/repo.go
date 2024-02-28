@@ -7,6 +7,7 @@ const (
 	DatasetRepo RepositoryType = "dataset"
 	SpaceRepo   RepositoryType = "space"
 	CodeRepo    RepositoryType = "code"
+	UnknownRepo RepositoryType = ""
 )
 
 type RepoRequest struct {
