@@ -455,6 +455,21 @@ func (c *ModelComponent) FileRaw(ctx context.Context, req *types.GetFileReq) (st
 	return raw, nil
 }
 
+func (c *ModelComponent) FileInfo(ctx context.Context, req *types.GetFileReq) (*types.File, error) {
+	model, err := c.ms.FindByPath(ctx, req.Namespace, req.Name)
+	if err != nil {
+		return nil, fmt.Errorf("failed to find model, error: %w", err)
+	}
+	if req.Ref == "" {
+		req.Ref = model.Repository.DefaultBranch
+	}
+	file, err := c.gs.GetModelFileContents(req.Namespace, req.Name, req.Ref, req.Path)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get git model repository file info, error: %w", err)
+	}
+	return file, nil
+}
+
 func (c *ModelComponent) DownloadFile(ctx context.Context, req *types.GetFileReq) (io.ReadCloser, string, error) {
 	var (
 		reader      io.ReadCloser

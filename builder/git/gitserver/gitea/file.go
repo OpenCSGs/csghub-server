@@ -127,12 +127,60 @@ func (c *Client) GetModelLfsFileRaw(namespace, repoName, ref, filePath string) (
 
 func (c *Client) GetDatasetFileContents(namespace, repo, ref, path string) (*types.File, error) {
 	owner := common.WithPrefix(namespace, DatasetOrgPrefix)
-	return c.getFileContents(owner, repo, ref, path)
+	file, err := c.getFileContents(owner, repo, ref, path)
+	if err != nil {
+		return nil, errors.New("failed to get dataset file contents")
+	}
+	commit, _, err := c.giteaClient.GetSingleCommit(owner, repo, file.LastCommitSHA, gitea.SpeedUpOtions{
+		DisableStat:         true,
+		DisableVerification: true,
+		DisableFiles:        true,
+	})
+	if err != nil {
+		return nil, errors.New("failed to get dataset file last commit")
+	}
+
+	file.Commit = types.Commit{
+		ID:             commit.SHA,
+		CommitterName:  commit.RepoCommit.Committer.Name,
+		CommitterEmail: commit.RepoCommit.Committer.Email,
+		CommitterDate:  commit.RepoCommit.Committer.Date,
+		CreatedAt:      commit.Created.Format("2024-02-26T15:05:35+08:00"),
+		Message:        commit.RepoCommit.Message,
+		AuthorName:     commit.RepoCommit.Author.Name,
+		AuthorEmail:    commit.RepoCommit.Author.Email,
+		AuthoredDate:   commit.RepoCommit.Author.Date,
+	}
+	return file, nil
 }
 
 func (c *Client) GetModelFileContents(namespace, repo, ref, path string) (*types.File, error) {
 	owner := common.WithPrefix(namespace, ModelOrgPrefix)
-	return c.getFileContents(owner, repo, ref, path)
+	file, err := c.getFileContents(owner, repo, ref, path)
+	if err != nil {
+		return nil, errors.New("failed to get model file contents")
+	}
+	commit, _, err := c.giteaClient.GetSingleCommit(owner, repo, file.LastCommitSHA, gitea.SpeedUpOtions{
+		DisableStat:         true,
+		DisableVerification: true,
+		DisableFiles:        true,
+	})
+	if err != nil {
+		return nil, errors.New("failed to get model file last commit")
+	}
+
+	file.Commit = types.Commit{
+		ID:             commit.SHA,
+		CommitterName:  commit.RepoCommit.Committer.Name,
+		CommitterEmail: commit.RepoCommit.Committer.Email,
+		CommitterDate:  commit.RepoCommit.Committer.Date,
+		CreatedAt:      commit.Created.Format("2024-02-26T15:05:35+08:00"),
+		Message:        commit.RepoCommit.Message,
+		AuthorName:     commit.RepoCommit.Author.Name,
+		AuthorEmail:    commit.RepoCommit.Author.Email,
+		AuthoredDate:   commit.RepoCommit.Author.Date,
+	}
+	return file, nil
 }
 
 func (c *Client) getFileContents(owner, repo, ref, path string) (*types.File, error) {
@@ -166,13 +214,14 @@ func (c *Client) getFileContents(owner, repo, ref, path string) (*types.File, er
 		return nil, err
 	}
 	f := &types.File{
-		Name:        fileContent.Name,
-		Type:        fileContent.Type,
-		Size:        int(fileContent.Size),
-		SHA:         fileContent.SHA,
-		Path:        fileContent.Path,
-		DownloadURL: *fileContent.DownloadURL,
-		Content:     *fileContent.Content,
+		Name:          fileContent.Name,
+		Type:          fileContent.Type,
+		Size:          int(fileContent.Size),
+		SHA:           fileContent.SHA,
+		Path:          fileContent.Path,
+		DownloadURL:   *fileContent.DownloadURL,
+		Content:       *fileContent.Content,
+		LastCommitSHA: fileContent.LastCommitSHA,
 	}
 
 	//base64 decode
