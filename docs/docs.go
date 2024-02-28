@@ -210,7 +210,7 @@ const docTemplate = `{
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/database.Dataset"
+                                            "$ref": "#/definitions/types.Dataset"
                                         }
                                     }
                                 }
@@ -1541,7 +1541,7 @@ const docTemplate = `{
                                         "data": {
                                             "type": "array",
                                             "items": {
-                                                "$ref": "#/definitions/database.Model"
+                                                "$ref": "#/definitions/types.Model"
                                             }
                                         },
                                         "total": {
@@ -1681,7 +1681,7 @@ const docTemplate = `{
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/database.Model"
+                                            "$ref": "#/definitions/types.Model"
                                         }
                                     }
                                 }
@@ -3590,7 +3590,7 @@ const docTemplate = `{
                                         "data": {
                                             "type": "array",
                                             "items": {
-                                                "$ref": "#/definitions/database.Dataset"
+                                                "$ref": "#/definitions/types.Dataset"
                                             }
                                         },
                                         "total": {
@@ -3657,7 +3657,7 @@ const docTemplate = `{
                                         "data": {
                                             "type": "array",
                                             "items": {
-                                                "$ref": "#/definitions/database.Model"
+                                                "$ref": "#/definitions/types.Model"
                                             }
                                         },
                                         "total": {
@@ -4179,19 +4179,10 @@ const docTemplate = `{
                 "created_at": {
                     "type": "string"
                 },
-                "downloads": {
-                    "type": "integer"
-                },
                 "id": {
                     "type": "integer"
                 },
                 "last_updated_at": {
-                    "type": "string"
-                },
-                "likes": {
-                    "type": "integer"
-                },
-                "nickname": {
                     "type": "string"
                 },
                 "repository": {
@@ -4211,19 +4202,10 @@ const docTemplate = `{
                 "created_at": {
                     "type": "string"
                 },
-                "downloads": {
-                    "type": "integer"
-                },
                 "id": {
                     "type": "integer"
                 },
                 "last_updated_at": {
-                    "type": "string"
-                },
-                "likes": {
-                    "type": "integer"
-                },
-                "nickname": {
                     "type": "string"
                 },
                 "repository": {
@@ -4325,6 +4307,9 @@ const docTemplate = `{
                 "description": {
                     "type": "string"
                 },
+                "download_count": {
+                    "type": "integer"
+                },
                 "downloads": {
                     "type": "array",
                     "items": {
@@ -4347,7 +4332,13 @@ const docTemplate = `{
                 "license": {
                     "type": "string"
                 },
+                "likes": {
+                    "type": "integer"
+                },
                 "name": {
+                    "type": "string"
+                },
+                "nickname": {
                     "type": "string"
                 },
                 "path": {
@@ -4859,11 +4850,17 @@ const docTemplate = `{
                 "repository_id": {
                     "type": "integer"
                 },
+                "tags": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/types.RepoTag"
+                    }
+                },
                 "updated_at": {
                     "type": "string"
                 },
                 "user": {
-                    "type": "string"
+                    "$ref": "#/definitions/types.User"
                 }
             }
         },
@@ -4978,6 +4975,53 @@ const docTemplate = `{
                 }
             }
         },
+        "types.Model": {
+            "type": "object",
+            "properties": {
+                "created_at": {
+                    "type": "string"
+                },
+                "description": {
+                    "type": "string"
+                },
+                "downloads": {
+                    "type": "integer"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "likes": {
+                    "type": "integer"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "nickname": {
+                    "type": "string"
+                },
+                "path": {
+                    "type": "string"
+                },
+                "private": {
+                    "type": "boolean"
+                },
+                "repository_id": {
+                    "type": "integer"
+                },
+                "tags": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/types.RepoTag"
+                    }
+                },
+                "updated_at": {
+                    "type": "string"
+                },
+                "user": {
+                    "$ref": "#/definitions/types.User"
+                }
+            }
+        },
         "types.ModelPredictReq": {
             "type": "object",
             "properties": {
@@ -5013,6 +5057,32 @@ const docTemplate = `{
             "type": "object",
             "properties": {
                 "id": {
+                    "type": "string"
+                }
+            }
+        },
+        "types.RepoTag": {
+            "type": "object",
+            "properties": {
+                "built_in": {
+                    "type": "boolean"
+                },
+                "category": {
+                    "type": "string"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "group": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "show_name": {
+                    "type": "string"
+                },
+                "updated_at": {
                     "type": "string"
                 }
             }
@@ -5160,6 +5230,9 @@ const docTemplate = `{
                 },
                 "namespace": {
                     "type": "string"
+                },
+                "repoType": {
+                    "$ref": "#/definitions/types.RepositoryType"
                 }
             }
         },
@@ -5252,6 +5325,20 @@ const docTemplate = `{
                 },
                 "username": {
                     "description": "the login name",
+                    "type": "string"
+                }
+            }
+        },
+        "types.User": {
+            "type": "object",
+            "properties": {
+                "email": {
+                    "type": "string"
+                },
+                "nickname": {
+                    "type": "string"
+                },
+                "username": {
                     "type": "string"
                 }
             }

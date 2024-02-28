@@ -2,15 +2,12 @@ package database
 
 import (
 	"context"
-	"database/sql"
-	"errors"
 	"fmt"
 	"log/slog"
 	"strings"
 	"time"
 
 	"github.com/uptrace/bun"
-	"opencsg.com/csghub-server/common/types"
 )
 
 var sortBy = map[string]string{
@@ -30,28 +27,10 @@ func NewDatasetStore() *DatasetStore {
 
 type Dataset struct {
 	ID            int64       `bun:",pk,autoincrement" json:"id"`
-	UrlSlug       string      `bun:",notnull" json:"nickname"`
-	Likes         int64       `bun:",notnull" json:"likes"`
-	Downloads     int64       `bun:",notnull" json:"downloads"`
 	RepositoryID  int64       `bun:",notnull" json:"repository_id"`
 	Repository    *Repository `bun:"rel:belongs-to,join:repository_id=id" json:"repository"`
 	LastUpdatedAt time.Time   `bun:",notnull" json:"last_updated_at"`
 	times
-}
-
-func (s *DatasetStore) Index(ctx context.Context, per, page int) (datasets []*Repository, err error) {
-	err = s.db.Operator.Core.
-		NewSelect().
-		Model(&datasets).
-		Where("repository_type = ?", types.DatasetRepo).
-		Order("created_at DESC").
-		Limit(per).
-		Offset((page - 1) * per).
-		Scan(ctx)
-	if err != nil {
-		return
-	}
-	return
 }
 
 func (s *DatasetStore) PublicToUser(ctx context.Context, user *User, search, sort string, tags []TagReq, per, page int) (datasets []Dataset, count int, err error) {
@@ -80,43 +59,6 @@ func (s *DatasetStore) PublicToUser(ctx context.Context, user *User, search, sor
 		for _, tag := range tags {
 			query = query.Where("dataset.repository_id IN (SELECT repository_id FROM repository_tags JOIN tags ON repository_tags.tag_id = tags.id WHERE tags.category = ? AND tags.name = ?)", tag.Category, tag.Name)
 		}
-	}
-	count, err = query.Count(ctx)
-	if err != nil {
-		return
-	}
-
-	query = query.Order(sortBy[sort])
-	query = query.Limit(per).
-		Offset((page - 1) * per)
-
-	err = query.Scan(ctx)
-	if err != nil {
-		return
-	}
-	return
-}
-
-func (s *DatasetStore) Public(ctx context.Context, search, sort, tag string, per, page int) (datasets []Dataset, count int, err error) {
-	query := s.db.Operator.Core.
-		NewSelect().
-		Model(&datasets).
-		Where("dataset.private = ?", false)
-	if search != "" {
-		search = strings.ToLower(search)
-		query = query.Where(
-			"LOWER(dataset.path) like ? or LOWER(dataset.description) like ? or LOWER(dataset.name) like ?",
-			fmt.Sprintf("%%%s%%", search),
-			fmt.Sprintf("%%%s%%", search),
-			fmt.Sprintf("%%%s%%", search),
-		)
-	}
-	if tag != "" {
-		query = query.
-			Join("JOIN repositories ON dataset.repository_id = repositories.id").
-			Join("JOIN repository_tags ON repositories.id = repository_tags.repository_id").
-			Join("JOIN tags ON repository_tags.tag_id = tags.id").
-			Where("tags.name = ?", tag)
 	}
 	count, err = query.Count(ctx)
 	if err != nil {
@@ -186,31 +128,6 @@ func (s *DatasetStore) ByOrgPath(ctx context.Context, namespace string, per, pag
 	return
 }
 
-func (s *DatasetStore) Count(ctx context.Context) (count int, err error) {
-	count, err = s.db.Operator.Core.
-		NewSelect().
-		Model(&Repository{}).
-		Where("repository_type = ?", types.DatasetRepo).
-		Count(ctx)
-	if err != nil {
-		return
-	}
-	return
-}
-
-func (s *DatasetStore) PublicCount(ctx context.Context) (count int, err error) {
-	count, err = s.db.Operator.Core.
-		NewSelect().
-		Model(&Repository{}).
-		Where("repository_type = ?", types.DatasetRepo).
-		Where("private = ?", false).
-		Count(ctx)
-	if err != nil {
-		return
-	}
-	return
-}
-
 func (s *DatasetStore) Create(ctx context.Context, input Dataset) (*Dataset, error) {
 	res, err := s.db.Core.NewInsert().Model(&input).Exec(ctx, &input)
 	if err := assertAffectedOneRow(res, err); err != nil {
@@ -225,110 +142,6 @@ func (s *DatasetStore) Update(ctx context.Context, input Dataset) (err error) {
 	input.UpdatedAt = time.Now()
 	_, err = s.db.Core.NewUpdate().Model(&input).WherePK().Exec(ctx)
 	return
-}
-
-func (s *DatasetStore) UpdateRepoFileDownloads(ctx context.Context, dataset *Dataset, date time.Time, clickDownloadCount int64) (err error) {
-	rd := new(RepositoryDownload)
-	err = s.db.Operator.Core.NewSelect().
-		Model(rd).
-		Where("date = ? AND repository_id = ?", date.Format("2006-01-02"), dataset.RepositoryID).
-		Scan(ctx)
-	if err != nil && !errors.Is(err, sql.ErrNoRows) {
-		return
-	}
-
-	if errors.Is(err, sql.ErrNoRows) {
-		rd.ClickDownloadCount = clickDownloadCount
-		rd.Date = date
-		rd.RepositoryID = dataset.RepositoryID
-		err = s.db.Operator.Core.NewInsert().
-			Model(rd).
-			Scan(ctx)
-		if err != nil {
-			return
-		}
-	} else {
-		rd.ClickDownloadCount = rd.ClickDownloadCount + clickDownloadCount
-		rd.UpdatedAt = time.Now()
-		query := s.db.Operator.Core.NewUpdate().
-			Model(rd).
-			WherePK()
-		slog.Debug(query.String())
-
-		_, err = query.Exec(ctx)
-		if err != nil {
-			return
-		}
-	}
-	err = s.UpdateDownloads(ctx, dataset)
-	if err != nil {
-		return
-	}
-
-	return
-}
-
-func (s *DatasetStore) UpdateRepoCloneDownloads(ctx context.Context, dataset *Dataset, date time.Time, cloneCount int64) (err error) {
-	rd := new(RepositoryDownload)
-	err = s.db.Operator.Core.NewSelect().
-		Model(rd).
-		Where("date = ? AND repository_id = ?", date.Format("2006-01-02"), dataset.RepositoryID).
-		Scan(ctx)
-	if err != nil && !errors.Is(err, sql.ErrNoRows) {
-		return
-	}
-
-	if errors.Is(err, sql.ErrNoRows) {
-		rd.CloneCount = cloneCount
-		rd.Date = date
-		rd.RepositoryID = dataset.RepositoryID
-		err = s.db.Operator.Core.NewInsert().
-			Model(rd).
-			Scan(ctx)
-		if err != nil {
-			return
-		}
-	} else {
-		rd.CloneCount = cloneCount
-		rd.UpdatedAt = time.Now()
-		query := s.db.Operator.Core.NewUpdate().
-			Model(rd).
-			WherePK()
-		slog.Debug(query.String())
-
-		_, err = query.Exec(ctx)
-		if err != nil {
-			return
-		}
-	}
-	err = s.UpdateDownloads(ctx, dataset)
-	if err != nil {
-		return
-	}
-
-	return
-}
-
-func (s *DatasetStore) UpdateDownloads(ctx context.Context, dataset *Dataset) error {
-	var downloadCount int64
-	err := s.db.Operator.Core.NewSelect().
-		ColumnExpr("(SUM(clone_count)+SUM(click_download_count)) AS total_count").
-		Model(&RepositoryDownload{}).
-		Where("repository_id=?", dataset.RepositoryID).
-		Scan(ctx, &downloadCount)
-	if err != nil {
-		return err
-	}
-	dataset.Downloads = downloadCount
-	_, err = s.db.Operator.Core.NewUpdate().
-		Model(dataset).
-		WherePK().
-		Exec(ctx)
-	if err != nil {
-		return err
-	}
-
-	return nil
 }
 
 func (s *DatasetStore) FindByPath(ctx context.Context, namespace string, repoPath string) (dataset *Dataset, err error) {
@@ -356,21 +169,6 @@ func (s *DatasetStore) Delete(ctx context.Context, input Dataset) error {
 		return fmt.Errorf("delete dataset in tx failed,error:%w", err)
 	}
 	return nil
-}
-
-func (s *DatasetStore) Tags(ctx context.Context, namespace, name string) (tags []Tag, err error) {
-	query := s.db.Operator.Core.NewSelect().
-		ColumnExpr("tags.*").
-		Model(&Dataset{}).
-		Join("JOIN repositories ON dataset.repository_id = repositories.id").
-		Join("JOIN repository_tags ON repositories.id = repository_tags.repository_id").
-		Join("JOIN tags ON repository_tags.tag_id = tags.id").
-		Where("repositories.repository_type = ?", types.DatasetRepo).
-		Where("dataset.path = ?", fmt.Sprintf("%v/%v", namespace, name))
-
-	slog.Debug(query.String())
-	err = query.Scan(ctx, &tags)
-	return
 }
 
 func (s *DatasetStore) ListByPath(ctx context.Context, paths []string) ([]Dataset, error) {

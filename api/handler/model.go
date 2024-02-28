@@ -49,7 +49,7 @@ type ModelHandler struct {
 // @Param        current_user query string false "current user"
 // @Param        search query string false "search text"
 // @Param        sort query string false "sort by"
-// @Success      200  {object}  types.ResponseWithTotal{data=[]database.Model,total=int} "OK"
+// @Success      200  {object}  types.ResponseWithTotal{data=[]types.Model,total=int} "OK"
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
 // @Router       /models [get]
@@ -197,7 +197,7 @@ func (h *ModelHandler) Delete(ctx *gin.Context) {
 // @Param        namespace path string true "namespace"
 // @Param        name path string true "name"
 // @Param        current_user query string true "current_user"
-// @Success      200  {object}  types.Response{data=database.Model} "OK"
+// @Success      200  {object}  types.Response{data=types.Model} "OK"
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
 // @Router       /models/{namespace}/{name} [get]
@@ -349,6 +349,7 @@ func (h *ModelHandler) Commits(ctx *gin.Context) {
 		Ref:       ref,
 		Per:       per,
 		Page:      page,
+		RepoType:  types.ModelRepo,
 	}
 	commits, err := h.c.Commits(ctx, req)
 	if err != nil {
@@ -387,6 +388,7 @@ func (h *ModelHandler) LastCommit(ctx *gin.Context) {
 		Namespace: namespace,
 		Name:      name,
 		Ref:       ref,
+		RepoType:  types.ModelRepo,
 	}
 	commit, err := h.c.LastCommit(ctx, req)
 	if err != nil {
@@ -428,6 +430,7 @@ func (h *ModelHandler) FileRaw(ctx *gin.Context) {
 		Name:      name,
 		Path:      filePath,
 		Ref:       ctx.Query("ref"),
+		RepoType:  types.ModelRepo,
 	}
 	raw, err := h.c.FileRaw(ctx, req)
 	if err != nil {
@@ -474,6 +477,7 @@ func (h *ModelHandler) DownloadFile(ctx *gin.Context) {
 		Ref:       ctx.Query("ref"),
 		Lfs:       false,
 		SaveAs:    ctx.Query("save_as"),
+		RepoType:  types.ModelRepo,
 	}
 	if ctx.Query("lfs") != "" {
 		req.Lfs, err = strconv.ParseBool(ctx.Query("lfs"))
@@ -539,6 +543,7 @@ func (h *ModelHandler) Branches(ctx *gin.Context) {
 		Name:      name,
 		Per:       per,
 		Page:      page,
+		RepoType:  types.ModelRepo,
 	}
 	branches, err := h.c.Branches(ctx, req)
 	if err != nil {
@@ -574,6 +579,7 @@ func (h *ModelHandler) Tags(ctx *gin.Context) {
 	req := &types.GetTagsReq{
 		Namespace: namespace,
 		Name:      name,
+		RepoType:  types.ModelRepo,
 	}
 	tags, err := h.c.Tags(ctx, req)
 	if err != nil {
@@ -612,6 +618,7 @@ func (h *ModelHandler) Tree(ctx *gin.Context) {
 		Name:      name,
 		Path:      ctx.Query("path"),
 		Ref:       ctx.Query("ref"),
+		RepoType:  types.ModelRepo,
 	}
 	tree, err := h.c.Tree(ctx, req)
 	if err != nil {
@@ -655,6 +662,7 @@ func (h *ModelHandler) UpdateDownloads(ctx *gin.Context) {
 
 	req.Namespace = namespace
 	req.Name = name
+	req.RepoType = types.ModelRepo
 	date, err := time.Parse("2006-01-02", req.ReqDate)
 	if err != nil {
 		slog.Error("Bad request format", "error", err)
@@ -811,6 +819,7 @@ func (h *ModelHandler) UploadFile(ctx *gin.Context) {
 	req.Name = name
 	req.FilePath = filePath
 	req.Content = buf.String()
+	req.RepoType = types.ModelRepo
 
 	err = h.c.UploadFile(ctx, req)
 	if err != nil {
@@ -830,7 +839,7 @@ func (h *ModelHandler) SDKListFiles(ctx *gin.Context) {
 		return
 	}
 
-	files, err := h.c.SDKListFiles(ctx, namespace, name)
+	files, err := h.c.SDKListFiles(ctx, types.ModelRepo, namespace, name)
 	if err != nil {
 		slog.Error("Error listing model files", "error", err)
 		httpbase.ServerError(ctx, err)
@@ -857,6 +866,7 @@ func (h *ModelHandler) SDKDownload(ctx *gin.Context) {
 		Ref:       branch,
 		Lfs:       false,
 		SaveAs:    filepath.Base(filePath),
+		RepoType:  types.ModelRepo,
 	}
 	lfs, err := h.c.IsLfs(ctx, req)
 	if err != nil {
@@ -905,6 +915,7 @@ func (h *ModelHandler) HeadSDKDownload(ctx *gin.Context) {
 		Ref:       branch,
 		Lfs:       false,
 		SaveAs:    filepath.Base(filePath),
+		RepoType:  types.ModelRepo,
 	}
 
 	file, err := h.c.HeadDownloadFile(ctx, req)

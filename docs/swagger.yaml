@@ -22,15 +22,9 @@ definitions:
     properties:
       created_at:
         type: string
-      downloads:
-        type: integer
       id:
         type: integer
       last_updated_at:
-        type: string
-      likes:
-        type: integer
-      nickname:
         type: string
       repository:
         $ref: '#/definitions/database.Repository'
@@ -43,15 +37,9 @@ definitions:
     properties:
       created_at:
         type: string
-      downloads:
-        type: integer
       id:
         type: integer
       last_updated_at:
-        type: string
-      likes:
-        type: integer
-      nickname:
         type: string
       repository:
         $ref: '#/definitions/database.Repository'
@@ -119,6 +107,8 @@ definitions:
         type: string
       description:
         type: string
+      download_count:
+        type: integer
       downloads:
         items:
           $ref: '#/definitions/database.RepositoryDownload'
@@ -134,7 +124,11 @@ definitions:
         type: string
       license:
         type: string
+      likes:
+        type: integer
       name:
+        type: string
+      nickname:
         type: string
       path:
         type: string
@@ -486,10 +480,14 @@ definitions:
         type: boolean
       repository_id:
         type: integer
+      tags:
+        items:
+          $ref: '#/definitions/types.RepoTag'
+        type: array
       updated_at:
         type: string
       user:
-        type: string
+        $ref: '#/definitions/types.User'
     type: object
   types.DatasetResp:
     properties:
@@ -565,6 +563,37 @@ definitions:
           type: string
         type: array
     type: object
+  types.Model:
+    properties:
+      created_at:
+        type: string
+      description:
+        type: string
+      downloads:
+        type: integer
+      id:
+        type: integer
+      likes:
+        type: integer
+      name:
+        type: string
+      nickname:
+        type: string
+      path:
+        type: string
+      private:
+        type: boolean
+      repository_id:
+        type: integer
+      tags:
+        items:
+          $ref: '#/definitions/types.RepoTag'
+        type: array
+      updated_at:
+        type: string
+      user:
+        $ref: '#/definitions/types.User'
+    type: object
   types.ModelPredictReq:
     properties:
       current_user:
@@ -588,6 +617,23 @@ definitions:
   types.RepoBranchCommit:
     properties:
       id:
+        type: string
+    type: object
+  types.RepoTag:
+    properties:
+      built_in:
+        type: boolean
+      category:
+        type: string
+      created_at:
+        type: string
+      group:
+        type: string
+      name:
+        type: string
+      show_name:
+        type: string
+      updated_at:
         type: string
     type: object
   types.RepositoryType:
@@ -693,6 +739,8 @@ definitions:
         type: string
       namespace:
         type: string
+      repoType:
+        $ref: '#/definitions/types.RepositoryType'
     type: object
   types.UpdateFileReq:
     properties:
@@ -756,6 +804,15 @@ definitions:
         type: string
       username:
         description: the login name
+        type: string
+    type: object
+  types.User:
+    properties:
+      email:
+        type: string
+      nickname:
+        type: string
+      username:
         type: string
     type: object
 info:
@@ -918,7 +975,7 @@ paths:
             - $ref: '#/definitions/types.Response'
             - properties:
                 data:
-                  $ref: '#/definitions/database.Dataset'
+                  $ref: '#/definitions/types.Dataset'
               type: object
         "400":
           description: Bad request
@@ -1702,7 +1759,7 @@ paths:
             - properties:
                 data:
                   items:
-                    $ref: '#/definitions/database.Model'
+                    $ref: '#/definitions/types.Model'
                   type: array
                 total:
                   type: integer
@@ -1827,7 +1884,7 @@ paths:
             - $ref: '#/definitions/types.Response'
             - properties:
                 data:
-                  $ref: '#/definitions/database.Model'
+                  $ref: '#/definitions/types.Model'
               type: object
         "400":
           description: Bad request
@@ -2965,7 +3022,7 @@ paths:
             - properties:
                 data:
                   items:
-                    $ref: '#/definitions/database.Dataset'
+                    $ref: '#/definitions/types.Dataset'
                   type: array
                 total:
                   type: integer
@@ -3005,7 +3062,7 @@ paths:
             - properties:
                 data:
                   items:
-                    $ref: '#/definitions/database.Model'
+                    $ref: '#/definitions/types.Model'
                   type: array
                 total:
                   type: integer

@@ -26,7 +26,8 @@ type Dataset struct {
 	Path         string    `json:"path"`
 	RepositoryID int64     `json:"repository_id"`
 	Private      bool      `json:"private"`
-	Username     string    `json:"user"`
+	User         User      `json:"user"`
+	Tags         []RepoTag `json:"tags"`
 	CreatedAt    time.Time `json:"created_at"`
 	UpdatedAt    time.Time `json:"updated_at"`
 }

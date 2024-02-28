@@ -32,7 +32,7 @@ func (c *ListComponent) ListModelsByPath(ctx context.Context, req *types.ListByP
 	for _, model := range models {
 		modelResp = append(modelResp, &types.ModelResp{
 			Path:      model.Repository.Path,
-			Downloads: model.Downloads,
+			Downloads: model.Repository.DownloadCount,
 			UpdatedAt: model.UpdatedAt,
 			Private:   model.Repository.Private,
 		})
@@ -52,7 +52,7 @@ func (c *ListComponent) ListDatasetsByPath(ctx context.Context, req *types.ListB
 	for _, dataset := range datasets {
 		datasetResp = append(datasetResp, &types.ModelResp{
 			Path:      dataset.Repository.Path,
-			Downloads: dataset.Downloads,
+			Downloads: dataset.Repository.DownloadCount,
 			UpdatedAt: dataset.UpdatedAt,
 			Private:   dataset.Repository.Private,
 		})

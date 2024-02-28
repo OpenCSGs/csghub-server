@@ -2,8 +2,6 @@ package database
 
 import (
 	"context"
-	"database/sql"
-	"errors"
 	"fmt"
 	"log/slog"
 	"strings"
@@ -25,64 +23,10 @@ func NewModelStore() *ModelStore {
 
 type Model struct {
 	ID            int64       `bun:",pk,autoincrement" json:"id"`
-	UrlSlug       string      `bun:",notnull" json:"nickname"`
-	Likes         int64       `bun:",notnull" json:"likes"`
-	Downloads     int64       `bun:",notnull" json:"downloads"`
 	RepositoryID  int64       `bun:",notnull" json:"repository_id"`
 	Repository    *Repository `bun:"rel:belongs-to,join:repository_id=id" json:"repository"`
 	LastUpdatedAt time.Time   `bun:",notnull" json:"last_updated_at"`
 	times
-}
-
-func (s *ModelStore) Index(ctx context.Context, per, page int) (models []Model, count int, err error) {
-	err = s.db.Operator.Core.
-		NewSelect().
-		Model(&models).
-		Order("created_at DESC").
-		Limit(per).
-		Offset((page - 1) * per).
-		Scan(ctx)
-	if err != nil {
-		return
-	}
-	return
-}
-
-func (s *ModelStore) Public(ctx context.Context, search, sort, tag string, per, page int) (models []Model, count int, err error) {
-	query := s.db.Operator.Core.
-		NewSelect().
-		Model(&models).
-		Where("model.private = ?", false)
-	if search != "" {
-		search = strings.ToLower(search)
-		query = query.Where(
-			"LOWER(model.path) like ? or LOWER(model.description) like ? or LOWER(model.name) like ?",
-			fmt.Sprintf("%%%s%%", search),
-			fmt.Sprintf("%%%s%%", search),
-			fmt.Sprintf("%%%s%%", search),
-		)
-	}
-	if tag != "" {
-		query = query.
-			Join("JOIN repositories ON model.repository_id = repositories.id").
-			Join("JOIN repository_tags ON repositories.id = repository_tags.repository_id").
-			Join("JOIN tags ON repository_tags.tag_id = tags.id").
-			Where("tags.name = ?", tag)
-	}
-	count, err = query.Count(ctx)
-	if err != nil {
-		return
-	}
-
-	query = query.Order(sortBy[sort])
-	query = query.Limit(per).
-		Offset((page - 1) * per)
-
-	err = query.Scan(ctx)
-	if err != nil {
-		return
-	}
-	return
 }
 
 func (s *ModelStore) PublicToUser(ctx context.Context, user *User, search, sort string, tags []TagReq, per, page int) (models []Model, count int, err error) {
@@ -138,7 +82,7 @@ func (s *ModelStore) ByUsername(ctx context.Context, username string, per, page 
 		Where("repository.path like ?", fmt.Sprintf("%s/%%", username))
 
 	if onlyPublic {
-		query = query.Where("model.private = ?", false)
+		query = query.Where("repository.private = ?", false)
 	}
 	query = query.Order("model.created_at DESC").
 		Limit(per).
@@ -225,110 +169,6 @@ func (s *ModelStore) Update(ctx context.Context, input Model) (*Model, error) {
 	return &input, err
 }
 
-func (s *ModelStore) UpdateRepoFileDownloads(ctx context.Context, model *Model, date time.Time, clickDownloadCount int64) (err error) {
-	rd := new(RepositoryDownload)
-	err = s.db.Operator.Core.NewSelect().
-		Model(rd).
-		Where("date = ? AND repository_id = ?", date.Format("2006-01-02"), model.RepositoryID).
-		Scan(ctx)
-	if err != nil && !errors.Is(err, sql.ErrNoRows) {
-		return
-	}
-
-	if errors.Is(err, sql.ErrNoRows) {
-		rd.ClickDownloadCount = clickDownloadCount
-		rd.Date = date
-		rd.RepositoryID = model.RepositoryID
-		err = s.db.Operator.Core.NewInsert().
-			Model(rd).
-			Scan(ctx)
-		if err != nil {
-			return
-		}
-	} else {
-		rd.ClickDownloadCount = rd.ClickDownloadCount + clickDownloadCount
-		rd.UpdatedAt = time.Now()
-		query := s.db.Operator.Core.NewUpdate().
-			Model(rd).
-			WherePK()
-		slog.Debug(query.String())
-
-		_, err = query.Exec(ctx)
-		if err != nil {
-			return
-		}
-	}
-	err = s.UpdateDownloads(ctx, model)
-	if err != nil {
-		return
-	}
-
-	return
-}
-
-func (s *ModelStore) UpdateRepoCloneDownloads(ctx context.Context, model *Model, date time.Time, cloneCount int64) (err error) {
-	rd := new(RepositoryDownload)
-	err = s.db.Operator.Core.NewSelect().
-		Model(rd).
-		Where("date = ? AND repository_id = ?", date.Format("2006-01-02"), model.RepositoryID).
-		Scan(ctx)
-	if err != nil && !errors.Is(err, sql.ErrNoRows) {
-		return
-	}
-
-	if errors.Is(err, sql.ErrNoRows) {
-		rd.CloneCount = cloneCount
-		rd.Date = date
-		rd.RepositoryID = model.RepositoryID
-		err = s.db.Operator.Core.NewInsert().
-			Model(rd).
-			Scan(ctx)
-		if err != nil {
-			return
-		}
-	} else {
-		rd.CloneCount = cloneCount
-		rd.UpdatedAt = time.Now()
-		query := s.db.Operator.Core.NewUpdate().
-			Model(rd).
-			WherePK()
-		slog.Debug(query.String())
-
-		_, err = query.Exec(ctx)
-		if err != nil {
-			return
-		}
-	}
-	err = s.UpdateDownloads(ctx, model)
-	if err != nil {
-		return
-	}
-
-	return
-}
-
-func (s *ModelStore) UpdateDownloads(ctx context.Context, model *Model) error {
-	var downloadCount int64
-	err := s.db.Operator.Core.NewSelect().
-		ColumnExpr("(SUM(clone_count)+SUM(click_download_count)) AS total_count").
-		Model(&RepositoryDownload{}).
-		Where("repository_id=?", model.RepositoryID).
-		Scan(ctx, &downloadCount)
-	if err != nil {
-		return err
-	}
-	model.Downloads = downloadCount
-	_, err = s.db.Operator.Core.NewUpdate().
-		Model(model).
-		WherePK().
-		Exec(ctx)
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
 func (s *ModelStore) FindByPath(ctx context.Context, namespace string, repoPath string) (*Model, error) {
 	resModel := new(Model)
 	err := s.db.Operator.Core.
@@ -355,21 +195,6 @@ func (s *ModelStore) Delete(ctx context.Context, input Model) error {
 		return fmt.Errorf("delete model in tx failed,error:%w", err)
 	}
 	return nil
-}
-
-func (s *ModelStore) Tags(ctx context.Context, namespace, name string) (tags []Tag, err error) {
-	query := s.db.Operator.Core.NewSelect().
-		ColumnExpr("tags.*").
-		Model(&Model{}).
-		Join("JOIN repositories ON model.repository_id = repositories.id").
-		Join("JOIN repository_tags ON repositories.id = repository_tags.repository_id").
-		Join("JOIN tags ON repository_tags.tag_id = tags.id").
-		Where("repositories.repository_type = ?", types.ModelRepo).
-		Where("reposiroties.path = ?", fmt.Sprintf("%v/%v", namespace, name))
-
-	slog.Info(query.String())
-	err = query.Scan(ctx, &tags)
-	return
 }
 
 func (s *ModelStore) ListByPath(ctx context.Context, paths []string) ([]Model, error) {

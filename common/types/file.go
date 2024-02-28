@@ -59,6 +59,7 @@ type GetCommitsReq struct {
 	Per       int    `json:"per"`
 	Page      int    `json:"page"`
 	Ref       string `json:"ref"`
+	RepoType  RepositoryType
 }
 
 type GetFileReq struct {
@@ -68,6 +69,7 @@ type GetFileReq struct {
 	Ref       string `json:"ref"`
 	Lfs       bool   `json:"lfs"`
 	SaveAs    string `json:"save_as"`
+	RepoType  RepositoryType
 }
 
 type GetBranchesReq struct {
@@ -75,11 +77,13 @@ type GetBranchesReq struct {
 	Name      string `json:"name"`
 	Page      int    `json:"page"`
 	Per       int    `json:"per"`
+	RepoType  RepositoryType
 }
 
 type GetTagsReq struct {
 	Namespace string `json:"namespace"`
 	Name      string `json:"name"`
+	RepoType  RepositoryType
 }
 
 // currently update and create fiel share the same response
