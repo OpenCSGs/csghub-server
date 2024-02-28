@@ -17,6 +17,7 @@ import (
 	"github.com/minio/minio-go/v7"
 	"opencsg.com/csghub-server/builder/git"
 	"opencsg.com/csghub-server/builder/git/gitserver"
+	"opencsg.com/csghub-server/builder/git/membership"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/builder/store/s3"
 	"opencsg.com/csghub-server/common/config"
@@ -268,7 +269,11 @@ func (c *DatasetComponent) Create(ctx context.Context, req *types.CreateDatasetR
 	}
 
 	if namespace.NamespaceType == database.OrgNamespace {
-		if namespace.UserID != user.ID {
+		canWrite, err := c.checkCurrentUserPermission(ctx, req.Username, req.Namespace, membership.RoleWrite)
+		if err != nil {
+			return nil, err
+		}
+		if !canWrite {
 			return nil, errors.New("users do not have permission to create datasets in this organization")
 		}
 	} else {
@@ -638,7 +643,7 @@ func (c *DatasetComponent) SDKListFiles(ctx *gin.Context, namespace, name string
 	currentUser, exists := ctx.Get("currentUser")
 	// TODO: Use user access token to check permissions
 	if dataset.Private && exists {
-		canRead, err := c.checkCurrentUserPermission(ctx, currentUser, namespace)
+		canRead, err := c.checkCurrentUserPermission(ctx, currentUser, namespace, membership.RoleRead)
 		if err != nil {
 			return nil, err
 		}
@@ -685,7 +690,7 @@ func (c *DatasetComponent) HeadDownloadFile(ctx *gin.Context, req *types.GetFile
 	currentUser, exists := ctx.Get("currentUser")
 	// TODO: Use user access token to check permissions
 	if dataset.Private && exists {
-		canRead, err := c.checkCurrentUserPermission(ctx, currentUser, req.Namespace)
+		canRead, err := c.checkCurrentUserPermission(ctx, currentUser, req.Namespace, membership.RoleRead)
 		if err != nil {
 			return nil, err
 		}
@@ -714,7 +719,7 @@ func (c *DatasetComponent) SDKDownloadFile(ctx *gin.Context, req *types.GetFileR
 	currentUser, exists := ctx.Get("currentUser")
 	// TODO: Use user access token to check permissions
 	if dataset.Private && exists {
-		canRead, err := c.checkCurrentUserPermission(ctx, currentUser, req.Namespace)
+		canRead, err := c.checkCurrentUserPermission(ctx, currentUser, req.Namespace, membership.RoleRead)
 		if err != nil {
 			return nil, "", err
 		}
@@ -751,7 +756,7 @@ func (c *DatasetComponent) SDKDownloadFile(ctx *gin.Context, req *types.GetFileR
 	}
 }
 
-func (c *DatasetComponent) checkCurrentUserPermission(ctx context.Context, currentUser any, namespace string) (bool, error) {
+func (c *DatasetComponent) checkCurrentUserPermission(ctx context.Context, currentUser any, namespace string, role membership.Role) (bool, error) {
 	cu, ok := currentUser.(string)
 	if !ok {
 		return false, fmt.Errorf("error parsing current user from context")
@@ -769,6 +774,15 @@ func (c *DatasetComponent) checkCurrentUserPermission(ctx context.Context, curre
 		if err != nil {
 			return false, err
 		}
-		return r.CanRead(), nil
+		switch role {
+		case membership.RoleAdmin:
+			return r.CanAdmin(), nil
+		case membership.RoleWrite:
+			return r.CanWrite(), nil
+		case membership.RoleRead:
+			return r.CanRead(), nil
+		default:
+			return false, fmt.Errorf("unknown role %s", role)
+		}
 	}
 }
