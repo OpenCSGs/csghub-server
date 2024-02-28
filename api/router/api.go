@@ -70,6 +70,7 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 		modelsGroup.GET("/:namespace/:name/tree", modelHandler.Tree)
 		modelsGroup.GET("/:namespace/:name/commits", modelHandler.Commits)
 		modelsGroup.GET("/:namespace/:name/raw/*file_path", modelHandler.FileRaw)
+		modelsGroup.GET("/:namespace/:name/blob/*file_path", modelHandler.FileInfo)
 		// The DownloadFile method differs from the SDKDownload interface in a few ways
 
 		// 1.When passing the file_path parameter to the SDKDownload method,
@@ -102,6 +103,7 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 	apiGroup.GET("/datasets/:namespace/:name/commits", dsHandler.Commits)
 	apiGroup.POST("/datasets/:namespace/:name/raw/*file_path", dsHandler.CreateFile)
 	apiGroup.GET("/datasets/:namespace/:name/raw/*file_path", dsHandler.FileRaw)
+	apiGroup.GET("/datasets/:namespace/:name/blob/*file_path", dsHandler.FileInfo)
 	apiGroup.GET("/datasets/:namespace/:name/download/*file_path", dsHandler.DownloadFile)
 	apiGroup.GET("/datasets/:namespace/:name/resolve/:branch/*file_path", dsHandler.SDKDownload)
 	apiGroup.PUT("/datasets/:namespace/:name/raw/*file_path", dsHandler.UpdateFile)
