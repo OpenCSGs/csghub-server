@@ -248,7 +248,11 @@ func (c *ModelComponent) Create(ctx context.Context, req *types.CreateModelReq) 
 		Downloads:    model.Repository.DownloadCount,
 		Path:         model.Repository.Path,
 		RepositoryID: model.RepositoryID,
-		Private:      model.Repository.Private,
+		Repository: types.Repository{
+			HTTPCloneURL: model.Repository.HTTPCloneURL,
+			SSHCloneURL:  model.Repository.SSHCloneURL,
+		},
+		Private: model.Repository.Private,
 		User: types.User{
 			Username: user.Username,
 			Nickname: user.Name,
@@ -360,16 +364,21 @@ func (c *ModelComponent) Show(ctx context.Context, namespace, name, current_user
 	}
 
 	resModel := &types.Model{
-		ID:           model.ID,
-		Name:         model.Repository.Name,
-		Nickname:     model.Repository.Nickname,
-		Description:  model.Repository.Description,
-		Likes:        model.Repository.Likes,
-		Downloads:    model.Repository.DownloadCount,
-		Path:         model.Repository.Path,
-		RepositoryID: model.Repository.ID,
-		Private:      model.Repository.Private,
-		Tags:         tags,
+		ID:            model.ID,
+		Name:          model.Repository.Name,
+		Nickname:      model.Repository.Nickname,
+		Description:   model.Repository.Description,
+		Likes:         model.Repository.Likes,
+		Downloads:     model.Repository.DownloadCount,
+		Path:          model.Repository.Path,
+		RepositoryID:  model.Repository.ID,
+		DefaultBranch: model.Repository.DefaultBranch,
+		Repository: types.Repository{
+			HTTPCloneURL: model.Repository.HTTPCloneURL,
+			SSHCloneURL:  model.Repository.SSHCloneURL,
+		},
+		Private: model.Repository.Private,
+		Tags:    tags,
 		User: types.User{
 			Username: model.Repository.User.Username,
 			Nickname: model.Repository.User.Name,
