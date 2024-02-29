@@ -104,7 +104,8 @@ func (c *UserComponent) Update(ctx context.Context, req *types.UpdateUserRequest
 	return respUser, nil
 }
 
-func (c *UserComponent) Datasets(ctx context.Context, req *types.UserDatasetsReq) ([]database.Dataset, int, error) {
+func (c *UserComponent) Datasets(ctx context.Context, req *types.UserDatasetsReq) ([]types.Dataset, int, error) {
+	var resDatasets []types.Dataset
 	userExists, err := c.us.IsExist(ctx, req.Owner)
 	if err != nil {
 		newError := fmt.Errorf("failed to check for the presence of the user,error:%w", err)
@@ -137,10 +138,27 @@ func (c *UserComponent) Datasets(ctx context.Context, req *types.UserDatasetsReq
 		return nil, 0, newError
 	}
 
-	return ds, total, nil
+	for _, data := range ds {
+		resDatasets = append(resDatasets, types.Dataset{
+			ID:           data.ID,
+			Name:         data.Repository.Name,
+			Nickname:     data.Repository.Nickname,
+			Description:  data.Repository.Description,
+			Likes:        data.Repository.Likes,
+			Downloads:    data.Repository.DownloadCount,
+			Path:         data.Repository.Path,
+			RepositoryID: data.RepositoryID,
+			Private:      data.Repository.Private,
+			CreatedAt:    data.CreatedAt,
+			UpdatedAt:    data.UpdatedAt,
+		})
+	}
+
+	return resDatasets, total, nil
 }
 
-func (c *UserComponent) Models(ctx context.Context, req *types.UserModelsReq) ([]database.Model, int, error) {
+func (c *UserComponent) Models(ctx context.Context, req *types.UserModelsReq) ([]types.Model, int, error) {
+	var resModels []types.Model
 	userExists, err := c.us.IsExist(ctx, req.Owner)
 	if err != nil {
 		newError := fmt.Errorf("failed to check for the presence of the user,error:%w", err)
@@ -173,5 +191,21 @@ func (c *UserComponent) Models(ctx context.Context, req *types.UserModelsReq) ([
 		return nil, 0, newError
 	}
 
-	return ms, total, nil
+	for _, data := range ms {
+		resModels = append(resModels, types.Model{
+			ID:           data.ID,
+			Name:         data.Repository.Name,
+			Nickname:     data.Repository.Nickname,
+			Description:  data.Repository.Description,
+			Likes:        data.Repository.Likes,
+			Downloads:    data.Repository.DownloadCount,
+			Path:         data.Repository.Path,
+			RepositoryID: data.RepositoryID,
+			Private:      data.Repository.Private,
+			CreatedAt:    data.CreatedAt,
+			UpdatedAt:    data.UpdatedAt,
+		})
+	}
+
+	return resModels, total, nil
 }

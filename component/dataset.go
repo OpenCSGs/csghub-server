@@ -2,21 +2,12 @@ package component
 
 import (
 	"context"
-	"encoding/base64"
 	"errors"
 	"fmt"
-	"io"
 	"log/slog"
-	"net/url"
-	"path"
-	"path/filepath"
-	"strings"
 	"time"
 
-	"github.com/gin-gonic/gin"
-	"github.com/minio/minio-go/v7"
 	"opencsg.com/csghub-server/builder/git"
-	"opencsg.com/csghub-server/builder/git/gitserver"
 	"opencsg.com/csghub-server/builder/git/membership"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/builder/store/s3"
@@ -83,18 +74,22 @@ saved_model/**/* filter=lfs diff=lfs merge=lfs -text
 `
 
 const (
-	initCommitMessage    = "initial commit"
-	ossFileExpireSeconds = 259200 * time.Second
+	initCommitMessage     = "initial commit"
+	ossFileExpireSeconds  = 259200 * time.Second
+	readmeFileName        = "README.md"
+	gitattributesFileName = ".gitattributes"
 )
 
 func NewDatasetComponent(config *config.Config) (*DatasetComponent, error) {
 	c := &DatasetComponent{}
 	c.ds = database.NewDatasetStore()
-	c.ns = database.NewNamespaceStore()
-	c.us = database.NewUserStore()
+	c.namespace = database.NewNamespaceStore()
+	c.user = database.NewUserStore()
+	c.org = database.NewOrgStore()
+	c.repo = database.NewRepoStore()
 	c.ts = database.NewTagStore()
 	var err error
-	c.gs, err = git.NewGitServer(config)
+	c.git, err = git.NewGitServer(config)
 	if err != nil {
 		newError := fmt.Errorf("fail to create git server,error:%w", err)
 		slog.Error(newError.Error())
@@ -123,147 +118,22 @@ func NewDatasetComponent(config *config.Config) (*DatasetComponent, error) {
 }
 
 type DatasetComponent struct {
-	ds        *database.DatasetStore
-	ns        *database.NamespaceStore
-	us        *database.UserStore
-	ts        *database.TagStore
-	gs        gitserver.GitServer
-	tc        *TagComponent
-	s3Client  *minio.Client
-	lfsBucket string
-	msc       *MemberComponent
+	repoComponent
+	ts *database.TagStore
 }
 
-func (c *DatasetComponent) CreateFile(ctx context.Context, req *types.CreateFileReq) (*types.CreateFileResp, error) {
-	slog.Debug("creating file get request", slog.String("namespace", req.NameSpace), slog.String("filepath", req.FilePath))
-	var err error
-	_, err = c.ns.FindByPath(ctx, req.NameSpace)
-	if err != nil {
-		return nil, fmt.Errorf("fail to check namespace, cause: %w", err)
-	}
-
-	_, err = c.us.FindByUsername(ctx, req.Username)
-	if err != nil {
-		return nil, fmt.Errorf("fail to check user, cause: %w", err)
-	}
-	//TODO:check sensitive content of file
-	fileName := filepath.Base(req.FilePath)
-	if fileName == "README.md" {
-		slog.Debug("file is readme", slog.String("content", req.Content))
-		return c.createReadmeFile(ctx, req)
-	} else {
-		return c.createLibraryFile(ctx, req)
-	}
-}
-
-func (c *DatasetComponent) createReadmeFile(ctx context.Context, req *types.CreateFileReq) (*types.CreateFileResp, error) {
+func (c *DatasetComponent) Create(ctx context.Context, req *types.CreateDatasetReq) (*types.Dataset, error) {
 	var (
-		err  error
-		resp types.CreateFileResp
-	)
-	contentDecoded, _ := base64.RawStdEncoding.DecodeString(req.Content)
-	_, err = c.tc.UpdateMetaTags(ctx, database.DatasetTagScope, req.NameSpace, req.Name, string(contentDecoded))
-	if err != nil {
-		return nil, fmt.Errorf("failed to update meta tags, cause: %w", err)
-	}
-
-	err = c.gs.CreateDatasetFile(req)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create dataset file, cause: %w", err)
-	}
-
-	return &resp, err
-}
-
-func (c *DatasetComponent) createLibraryFile(ctx context.Context, req *types.CreateFileReq) (*types.CreateFileResp, error) {
-	var (
-		err  error
-		resp types.CreateFileResp
+		nickname string
+		tags     []types.RepoTag
 	)
 
-	err = c.tc.UpdateLibraryTags(ctx, database.DatasetTagScope, req.NameSpace, req.Name, "", req.FilePath)
-	if err != nil {
-		slog.Error("failed to set dataset's tags", slog.String("namespace", req.NameSpace),
-			slog.String("name", req.Name), slog.Any("error", err))
-		return nil, fmt.Errorf("failed to set dataset's tags, cause: %w", err)
-	}
-	err = c.gs.CreateDatasetFile(req)
-	if err != nil {
-		return nil, err
-	}
-
-	return &resp, err
-}
-func (c *DatasetComponent) UpdateFile(ctx context.Context, req *types.UpdateFileReq) (*types.UpdateFileResp, error) {
-	slog.Debug("update file get request", slog.String("namespace", req.NameSpace), slog.String("filePath", req.FilePath),
-		slog.String("origin_path", req.OriginPath))
-
-	var err error
-	_, err = c.ns.FindByPath(ctx, req.NameSpace)
-	if err != nil {
-		return nil, fmt.Errorf("fail to check namespace, cause: %w", err)
-	}
-
-	_, err = c.us.FindByUsername(ctx, req.Username)
-	if err != nil {
-		return nil, fmt.Errorf("fail to check user, cause: %w", err)
-	}
-
-	err = c.gs.UpdateDatasetFile(req)
-	if err != nil {
-		return nil, fmt.Errorf("failed to update dataset file, cause: %w", err)
-	}
-	//TODO:check sensitive content of file
-
-	fileName := filepath.Base(req.FilePath)
-	if fileName == "README.md" {
-		slog.Debug("file is readme", slog.String("content", req.Content))
-		return c.updateReadmeFile(ctx, req)
-	} else {
-		slog.Debug("file is not readme", slog.String("filePath", req.FilePath), slog.String("originPath", req.OriginPath))
-		return c.updateLibraryFile(ctx, req)
-	}
-}
-
-func (c *DatasetComponent) updateLibraryFile(ctx context.Context, req *types.UpdateFileReq) (*types.UpdateFileResp, error) {
-	var err error
-	resp := &types.UpdateFileResp{}
-
-	isFileRenamed := req.FilePath != req.OriginPath
-	//need to handle tag change only if file renamed
-	if isFileRenamed {
-		c.tc.UpdateLibraryTags(ctx, database.DatasetTagScope, req.NameSpace, req.Name, req.OriginPath, req.FilePath)
-		if err != nil {
-			slog.Error("failed to set dataset's tags", slog.String("namespace", req.NameSpace),
-				slog.String("name", req.Name), slog.Any("error", err))
-			return nil, fmt.Errorf("failed to set dataset's tags, cause: %w", err)
-		}
-	}
-
-	return resp, err
-}
-
-func (c *DatasetComponent) updateReadmeFile(ctx context.Context, req *types.UpdateFileReq) (*types.UpdateFileResp, error) {
-	slog.Debug("file is readme", slog.String("content", req.Content))
-	var err error
-	resp := new(types.UpdateFileResp)
-
-	contentDecoded, _ := base64.RawStdEncoding.DecodeString(req.Content)
-	_, err = c.tc.UpdateMetaTags(ctx, database.DatasetTagScope, req.NameSpace, req.Name, string(contentDecoded))
-	if err != nil {
-		return nil, fmt.Errorf("failed to update meta tags, cause: %w", err)
-	}
-
-	return resp, err
-}
-
-func (c *DatasetComponent) Create(ctx context.Context, req *types.CreateDatasetReq) (dataset *database.Dataset, err error) {
-	namespace, err := c.ns.FindByPath(ctx, req.Namespace)
+	namespace, err := c.namespace.FindByPath(ctx, req.Namespace)
 	if err != nil {
 		return nil, errors.New("namespace does not exist")
 	}
 
-	user, err := c.us.FindByUsername(ctx, req.Username)
+	user, err := c.user.FindByUsername(ctx, req.Username)
 	if err != nil {
 		return nil, errors.New("user does not exist")
 	}
@@ -282,55 +152,95 @@ func (c *DatasetComponent) Create(ctx context.Context, req *types.CreateDatasetR
 		}
 	}
 
-	dataset, repo, err := c.gs.CreateDatasetRepo(req)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create git dataset repository, cause: %w", err)
+	if req.Nickname != "" {
+		nickname = req.Nickname
+	} else {
+		nickname = req.Name
 	}
 
-	dataset, err = c.ds.Create(ctx, dataset, repo, user.ID)
+	req.RepoType = types.DatasetRepo
+	req.Readme = generateReadmeData(req.License)
+	req.Nickname = nickname
+	_, dbRepo, err := c.CreateRepo(ctx, req.CreateRepoReq)
+	if err != nil {
+		return nil, err
+	}
+
+	dbDataset := database.Dataset{
+		Repository:   dbRepo,
+		RepositoryID: dbRepo.ID,
+	}
+
+	dataset, err := c.ds.Create(ctx, dbDataset)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create database dataset, cause: %w", err)
 	}
 
-	err = c.gs.CreateDatasetFile(createGitattributesReq(req, user))
-	if err != nil {
-		return nil, fmt.Errorf("failed to create .gitattributes file, cause: %w", err)
-	}
-
-	err = c.gs.CreateDatasetFile(createReadmeReq(req, user))
+	// Create README.md file
+	err = c.git.CreateRepoFile(buildCreateFileReq(&types.CreateFileParams{
+		Username:  user.Username,
+		Email:     user.Email,
+		Message:   initCommitMessage,
+		Branch:    req.DefaultBranch,
+		Content:   req.Readme,
+		NewBranch: req.DefaultBranch,
+		Namespace: req.Namespace,
+		Name:      req.Name,
+		FilePath:  readmeFileName,
+	}, types.DatasetRepo))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create README.md file, cause: %w", err)
 	}
 
-	return
-}
-
-func createGitattributesReq(r *types.CreateDatasetReq, user database.User) *types.CreateFileReq {
-	return &types.CreateFileReq{
+	// Create .gitattributes file
+	err = c.git.CreateRepoFile(buildCreateFileReq(&types.CreateFileParams{
 		Username:  user.Username,
 		Email:     user.Email,
 		Message:   initCommitMessage,
-		Branch:    r.DefaultBranch,
-		Content:   base64.StdEncoding.EncodeToString([]byte(datasetGitattributesContent)),
-		NewBranch: r.DefaultBranch,
-		NameSpace: r.Namespace,
-		Name:      r.Name,
-		FilePath:  ".gitattributes",
+		Branch:    req.DefaultBranch,
+		Content:   datasetGitattributesContent,
+		NewBranch: req.DefaultBranch,
+		Namespace: req.Namespace,
+		Name:      req.Name,
+		FilePath:  gitattributesFileName,
+	}, types.DatasetRepo))
+	if err != nil {
+		return nil, fmt.Errorf("failed to create .gitattributes file, cause: %w", err)
 	}
-}
 
-func createReadmeReq(r *types.CreateDatasetReq, user database.User) *types.CreateFileReq {
-	return &types.CreateFileReq{
-		Username:  user.Username,
-		Email:     user.Email,
-		Message:   initCommitMessage,
-		Branch:    r.DefaultBranch,
-		Content:   base64.StdEncoding.EncodeToString([]byte(generateReadmeData(r.License))),
-		NewBranch: r.DefaultBranch,
-		NameSpace: r.Namespace,
-		Name:      r.Name,
-		FilePath:  "README.md",
+	for _, tag := range dataset.Repository.Tags {
+		tags = append(tags, types.RepoTag{
+			Name:      tag.Name,
+			Category:  tag.Category,
+			Group:     tag.Group,
+			BuiltIn:   tag.BuiltIn,
+			ShowName:  tag.ShowName,
+			CreatedAt: tag.CreatedAt,
+			UpdatedAt: tag.UpdatedAt,
+		})
 	}
+
+	resDataset := &types.Dataset{
+		ID:           dataset.ID,
+		Name:         dataset.Repository.Name,
+		Nickname:     dataset.Repository.Nickname,
+		Description:  dataset.Repository.Description,
+		Likes:        dataset.Repository.Likes,
+		Downloads:    dataset.Repository.DownloadCount,
+		Path:         dataset.Repository.Path,
+		RepositoryID: dataset.RepositoryID,
+		Private:      dataset.Repository.Private,
+		User: types.User{
+			Username: user.Username,
+			Nickname: user.Name,
+			Email:    user.Email,
+		},
+		Tags:      tags,
+		CreatedAt: dataset.CreatedAt,
+		UpdatedAt: dataset.UpdatedAt,
+	}
+
+	return resDataset, nil
 }
 
 func generateReadmeData(license string) string {
@@ -341,13 +251,16 @@ license: ` + license + `
 	`
 }
 
-func (c *DatasetComponent) Index(ctx context.Context, username, search, sort string, tags []database.TagReq, per, page int) ([]database.Dataset, int, error) {
-	var user database.User
-	var err error
+func (c *DatasetComponent) Index(ctx context.Context, username, search, sort string, tags []database.TagReq, per, page int) ([]types.Dataset, int, error) {
+	var (
+		user        database.User
+		err         error
+		resDatasets []types.Dataset
+	)
 	if username == "" {
 		slog.Info("get datasets without current username")
 	} else {
-		user, err = c.us.FindByUsername(ctx, username)
+		user, err = c.user.FindByUsername(ctx, username)
 		if err != nil {
 			newError := fmt.Errorf("failed to get current user,error:%w", err)
 			slog.Error(newError.Error())
@@ -360,268 +273,130 @@ func (c *DatasetComponent) Index(ctx context.Context, username, search, sort str
 		slog.Error(newError.Error())
 		return nil, 0, newError
 	}
-	return datasets, total, nil
+
+	for _, data := range datasets {
+		resDatasets = append(resDatasets, types.Dataset{
+			ID:           data.ID,
+			Name:         data.Repository.Name,
+			Nickname:     data.Repository.Nickname,
+			Description:  data.Repository.Description,
+			Likes:        data.Repository.Likes,
+			Downloads:    data.Repository.DownloadCount,
+			Path:         data.Repository.Path,
+			RepositoryID: data.RepositoryID,
+			Private:      data.Repository.Private,
+			CreatedAt:    data.CreatedAt,
+			UpdatedAt:    data.UpdatedAt,
+		})
+	}
+
+	return resDatasets, total, nil
 }
 
-func (c *DatasetComponent) Update(ctx context.Context, req *types.UpdateDatasetReq) (*database.Dataset, error) {
-	_, err := c.ns.FindByPath(ctx, req.Namespace)
+func (c *DatasetComponent) Update(ctx context.Context, req *types.UpdateDatasetReq) (*types.Dataset, error) {
+	req.RepoType = types.DatasetRepo
+	dbRepo, err := c.UpdateRepo(ctx, req.CreateRepoReq)
 	if err != nil {
-		return nil, fmt.Errorf("failed to find namespace, error: %w", err)
+		return nil, err
 	}
 
-	_, err = c.us.FindByUsername(ctx, req.Username)
-	if err != nil {
-		return nil, fmt.Errorf("failed to find user, error: %w", err)
-	}
-
-	dataset, err := c.ds.FindByPath(ctx, req.Namespace, req.OriginName)
+	dataset, err := c.ds.FindByPath(ctx, req.Namespace, req.Name)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find dataset, error: %w", err)
 	}
 
-	err = c.gs.UpdateDatasetRepo(req.Namespace, req.OriginName, dataset, dataset.Repository, req)
-	if err != nil {
-		return nil, fmt.Errorf("failed to update git dataset repository, error: %w", err)
-	}
-
-	err = c.ds.Update(ctx, dataset, dataset.Repository)
+	err = c.ds.Update(ctx, *dataset)
 	if err != nil {
 		return nil, fmt.Errorf("failed to update database dataset, error: %w", err)
 	}
 
-	return dataset, nil
+	resDataset := &types.Dataset{
+		ID:           dataset.ID,
+		Name:         dbRepo.Name,
+		Nickname:     dbRepo.Nickname,
+		Description:  dbRepo.Description,
+		Likes:        dbRepo.Likes,
+		Downloads:    dbRepo.DownloadCount,
+		Path:         dbRepo.Path,
+		RepositoryID: dbRepo.ID,
+		Private:      dbRepo.Private,
+		CreatedAt:    dataset.CreatedAt,
+		UpdatedAt:    dataset.UpdatedAt,
+	}
+
+	return resDataset, nil
 }
 
-func (c *DatasetComponent) Delete(ctx context.Context, namespace, name string) error {
-	_, err := c.ds.FindByPath(ctx, namespace, name)
+func (c *DatasetComponent) Delete(ctx context.Context, namespace, name, currentUser string) error {
+	dataset, err := c.ds.FindByPath(ctx, namespace, name)
 	if err != nil {
 		return fmt.Errorf("failed to find dataset, error: %w", err)
 	}
-	err = c.gs.DeleteDatasetRepo(namespace, name)
+
+	deleteDatabaseRepoReq := types.DeleteRepoReq{
+		Username:  currentUser,
+		Namespace: namespace,
+		Name:      name,
+		RepoType:  types.DatasetRepo,
+	}
+	_, err = c.DeleteRepo(ctx, deleteDatabaseRepoReq)
 	if err != nil {
-		return fmt.Errorf("failed to delete git dataset repository, error: %w", err)
+		return fmt.Errorf("failed to delete repo of dataset, error: %w", err)
 	}
 
-	err = c.ds.Delete(ctx, namespace, name)
+	err = c.ds.Delete(ctx, *dataset)
 	if err != nil {
 		return fmt.Errorf("failed to delete database dataset, error: %w", err)
 	}
 	return nil
 }
 
-func (c *DatasetComponent) Detail(ctx context.Context, namespace, name string) (*types.DatasetDetail, error) {
-	d, err := c.ds.FindByPath(ctx, namespace, name)
-	if err != nil {
-		return nil, fmt.Errorf("failed to find dataset, error: %w", err)
-	}
-	detail, err := c.gs.GetDatasetDetail(namespace, name)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get git dataset detail, error: %w", err)
-	}
-	detail.Downloads = int(d.Downloads)
-
-	return detail, nil
-}
-
-func (c *DatasetComponent) Show(ctx context.Context, namespace, name, current_user string) (*database.Dataset, error) {
+func (c *DatasetComponent) Show(ctx context.Context, namespace, name, current_user string) (*types.Dataset, error) {
+	var tags []types.RepoTag
 	dataset, err := c.ds.FindByPath(ctx, namespace, name)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find dataset, error: %w", err)
 	}
 
-	if dataset.Private {
-		if dataset.User.Username != current_user {
+	if dataset.Repository.Private {
+		if dataset.Repository.User.Username != current_user {
 			return nil, fmt.Errorf("failed to find dataset, error: %w", errors.New("the private dataset is not accessible to the current user"))
 		}
 	}
 
-	return dataset, nil
-}
-
-func (c *DatasetComponent) Commits(ctx context.Context, req *types.GetCommitsReq) ([]*types.Commit, error) {
-	dataset, err := c.ds.FindByPath(ctx, req.Namespace, req.Name)
-	if err != nil {
-		return nil, fmt.Errorf("failed to find dataset, error: %w", err)
-	}
-	if req.Ref == "" {
-		req.Ref = dataset.Repository.DefaultBranch
-	}
-	commits, err := c.gs.GetDatasetCommits(req.Namespace, req.Name, req.Ref, req.Per, req.Page)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get git dataset repository commits, error: %w", err)
-	}
-	return commits, nil
-}
-
-func (c *DatasetComponent) LastCommit(ctx context.Context, req *types.GetCommitsReq) (*types.Commit, error) {
-	dataset, err := c.ds.FindByPath(ctx, req.Namespace, req.Name)
-	if err != nil {
-		return nil, fmt.Errorf("failed to find dataset, error: %w", err)
+	for _, tag := range dataset.Repository.Tags {
+		tags = append(tags, types.RepoTag{
+			Name:      tag.Name,
+			Category:  tag.Category,
+			Group:     tag.Group,
+			BuiltIn:   tag.BuiltIn,
+			ShowName:  tag.ShowName,
+			CreatedAt: tag.CreatedAt,
+			UpdatedAt: tag.UpdatedAt,
+		})
 	}
 
-	if req.Ref == "" {
-		req.Ref = dataset.Repository.DefaultBranch
-	}
-	commit, err := c.gs.GetDatasetLastCommit(req.Namespace, req.Name, req.Ref)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get git dataset repository last commit, error: %w", err)
-	}
-	return commit, nil
-}
-
-func (c *DatasetComponent) FileRaw(ctx context.Context, req *types.GetFileReq) (string, error) {
-	dataset, err := c.ds.FindByPath(ctx, req.Namespace, req.Name)
-	if err != nil {
-		return "", fmt.Errorf("failed to find dataset, error: %w", err)
-	}
-	if req.Ref == "" {
-		req.Ref = dataset.Repository.DefaultBranch
-	}
-	raw, err := c.gs.GetDatasetFileRaw(req.Namespace, req.Name, req.Ref, req.Path)
-	if err != nil {
-		return "", fmt.Errorf("failed to get git dataset repository file raw, error: %w", err)
-	}
-	return raw, nil
-}
-
-func (c *DatasetComponent) FileInfo(ctx context.Context, req *types.GetFileReq) (*types.File, error) {
-	dataset, err := c.ds.FindByPath(ctx, req.Namespace, req.Name)
-	if err != nil {
-		return nil, fmt.Errorf("failed to find dataset, error: %w", err)
-	}
-	if req.Ref == "" {
-		req.Ref = dataset.Repository.DefaultBranch
-	}
-	file, err := c.gs.GetDatasetFileContents(req.Namespace, req.Name, req.Ref, req.Path)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get git dataset repository file info, error: %w", err)
-	}
-	return file, nil
-}
-
-func (c *DatasetComponent) DownloadFile(ctx context.Context, req *types.GetFileReq) (io.ReadCloser, string, error) {
-	var (
-		reader      io.ReadCloser
-		downloadUrl string
-	)
-	dataset, err := c.ds.FindByPath(ctx, req.Namespace, req.Name)
-	if err != nil {
-		return nil, "", fmt.Errorf("failed to find dataset, error: %w", err)
-	}
-	err = c.ds.UpdateRepoFileDownloads(ctx, dataset, time.Now(), 1)
-	if err != nil {
-		return nil, "", fmt.Errorf("failed to update dataset file download count, error: %w", err)
-	}
-	if req.Ref == "" {
-		req.Ref = dataset.Repository.DefaultBranch
-	}
-	if req.Lfs {
-		objectKey := path.Join("lfs", req.Path)
-
-		reqParams := make(url.Values)
-		if req.SaveAs != "" {
-			// allow rename when download through content-disposition header
-			reqParams.Set("response-content-disposition", fmt.Sprintf("attachment;filename=%s", req.SaveAs))
-		}
-		signedUrl, err := c.s3Client.PresignedGetObject(ctx, c.lfsBucket, objectKey, ossFileExpireSeconds, reqParams)
-		if err != nil {
-			return nil, downloadUrl, err
-		}
-		return nil, signedUrl.String(), nil
-	} else {
-		reader, err = c.gs.GetDatasetFileReader(req.Namespace, req.Name, req.Ref, req.Path)
-		if err != nil {
-			return nil, "", fmt.Errorf("failed to download git dataset repository file, error: %w", err)
-		}
-		return reader, downloadUrl, nil
-	}
-}
-
-func (c *DatasetComponent) Branches(ctx context.Context, req *types.GetBranchesReq) ([]*types.DatasetBranch, error) {
-	_, err := c.ds.FindByPath(ctx, req.Namespace, req.Name)
-	if err != nil {
-		return nil, fmt.Errorf("failed to find dataset, error: %w", err)
-	}
-	bs, err := c.gs.GetDatasetBranches(req.Namespace, req.Name, req.Per, req.Page)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get git dataset repository branches, error: %w", err)
-	}
-	return bs, nil
-}
-
-func (c *DatasetComponent) Tags(ctx context.Context, req *types.GetTagsReq) ([]database.Tag, error) {
-	_, err := c.ds.FindByPath(ctx, req.Namespace, req.Name)
-	if err != nil {
-		return nil, fmt.Errorf("failed to find dataset, error: %w", err)
-	}
-	tags, err := c.ds.Tags(ctx, req.Namespace, req.Name)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get dataset tags, error: %w", err)
-	}
-	return tags, nil
-}
-
-func (c *DatasetComponent) Tree(ctx context.Context, req *types.GetFileReq) ([]*types.File, error) {
-	dataset, err := c.ds.FindByPath(ctx, req.Namespace, req.Name)
-	if err != nil {
-		return nil, fmt.Errorf("failed to find dataset, error: %w", err)
-	}
-	if req.Ref == "" {
-		req.Ref = dataset.Repository.DefaultBranch
-	}
-	tree, err := c.gs.GetDatasetFileTree(req.Namespace, req.Name, req.Ref, req.Path)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get git dataset repository file tree, error: %w", err)
-	}
-	return tree, nil
-}
-
-func (c *DatasetComponent) UpdateDownloads(ctx context.Context, req *types.UpdateDownloadsReq) error {
-	dataset, err := c.ds.FindByPath(ctx, req.Namespace, req.Name)
-	if err != nil {
-		return fmt.Errorf("failed to find dataset, error: %w", err)
+	resDataset := &types.Dataset{
+		ID:           dataset.ID,
+		Name:         dataset.Repository.Name,
+		Nickname:     dataset.Repository.Nickname,
+		Description:  dataset.Repository.Description,
+		Likes:        dataset.Repository.Likes,
+		Downloads:    dataset.Repository.DownloadCount,
+		Path:         dataset.Repository.Path,
+		RepositoryID: dataset.Repository.ID,
+		Tags:         tags,
+		User: types.User{
+			Username: dataset.Repository.User.Username,
+			Nickname: dataset.Repository.User.Name,
+			Email:    dataset.Repository.User.Email,
+		},
+		Private:   dataset.Repository.Private,
+		CreatedAt: dataset.CreatedAt,
+		UpdatedAt: dataset.UpdatedAt,
 	}
 
-	err = c.ds.UpdateRepoCloneDownloads(ctx, dataset, req.Date, req.CloneCount)
-	if err != nil {
-		return fmt.Errorf("failed to update dataset download count, error: %w", err)
-	}
-	return err
-}
-
-func (c *DatasetComponent) UploadFile(ctx context.Context, req *types.CreateFileReq) error {
-	parentPath := filepath.Dir(req.FilePath)
-	if parentPath == "." {
-		parentPath = "/"
-	}
-	tree, err := c.gs.GetDatasetFileTree(req.NameSpace, req.Name, req.Branch, parentPath)
-	if err != nil {
-		slog.Error("Error getting dataset file tree: %w", err, slog.String("dataset", fmt.Sprintf("%s/%s", req.NameSpace, req.Name)), slog.String("file_path", req.FilePath))
-		return err
-	}
-	file, exists := fileIsExist(tree, req.FilePath)
-	if !exists {
-		_, err = c.CreateFile(ctx, req)
-		if err != nil {
-			return err
-		}
-		return nil
-	}
-	var updateFileReq types.UpdateFileReq
-
-	updateFileReq.Username = req.Username
-	updateFileReq.Email = req.Email
-	updateFileReq.Message = req.Message
-	updateFileReq.Branch = req.Branch
-	updateFileReq.Content = req.Content
-	updateFileReq.NameSpace = req.NameSpace
-	updateFileReq.Name = req.Name
-	updateFileReq.FilePath = req.FilePath
-	updateFileReq.SHA = file.SHA
-
-	_, err = c.UpdateFile(ctx, &updateFileReq)
-
-	return err
+	return resDataset, nil
 }
 
 func fileIsExist(tree []*types.File, path string) (*types.File, bool) {
@@ -631,158 +406,4 @@ func fileIsExist(tree []*types.File, path string) (*types.File, bool) {
 		}
 	}
 	return nil, false
-}
-
-func (c *DatasetComponent) SDKListFiles(ctx *gin.Context, namespace, name string) (*types.SDKFiles, error) {
-	var sdkFiles []types.SDKFile
-	dataset, err := c.ds.FindByPath(ctx, namespace, name)
-	if err != nil {
-		return nil, fmt.Errorf("failed to find dataset, error: %w", err)
-	}
-
-	currentUser, exists := ctx.Get("currentUser")
-	// TODO: Use user access token to check permissions
-	if dataset.Private && exists {
-		canRead, err := c.checkCurrentUserPermission(ctx, currentUser, namespace, membership.RoleRead)
-		if err != nil {
-			return nil, err
-		}
-		if !canRead {
-			return nil, fmt.Errorf("permission denied")
-		}
-	}
-
-	filePaths, err := getFilePaths(namespace, name, "", c.gs.GetDatasetFileTree)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get all dataset files, error: %w", err)
-	}
-
-	for _, filePath := range filePaths {
-		sdkFiles = append(sdkFiles, types.SDKFile{Filename: filePath})
-	}
-	return &types.SDKFiles{
-		ID:        fmt.Sprintf("%s/%s", namespace, name),
-		Siblings:  sdkFiles,
-		Private:   dataset.Private,
-		Downloads: dataset.Downloads,
-		Likes:     dataset.Likes,
-		Tags:      []string{},
-		SHA:       dataset.Repository.DefaultBranch,
-	}, nil
-}
-
-func (c *DatasetComponent) IsLfs(ctx context.Context, req *types.GetFileReq) (bool, error) {
-	content, err := c.gs.GetDatasetFileRaw(req.Namespace, req.Name, req.Ref, req.Path)
-
-	if err != nil {
-		slog.Error("failed to get dataset file raw", slog.String("namespace", req.Namespace), slog.String("name", req.Name), slog.String("path", req.Path))
-		return false, err
-	}
-
-	return strings.HasPrefix(content, LFSPrefix), nil
-}
-
-func (c *DatasetComponent) HeadDownloadFile(ctx *gin.Context, req *types.GetFileReq) (*types.File, error) {
-	dataset, err := c.ds.FindByPath(ctx, req.Namespace, req.Name)
-	if err != nil {
-		return nil, fmt.Errorf("failed to find dataset, error: %w", err)
-	}
-	currentUser, exists := ctx.Get("currentUser")
-	// TODO: Use user access token to check permissions
-	if dataset.Private && exists {
-		canRead, err := c.checkCurrentUserPermission(ctx, currentUser, req.Namespace, membership.RoleRead)
-		if err != nil {
-			return nil, err
-		}
-		if !canRead {
-			return nil, fmt.Errorf("permission denied")
-		}
-	}
-	if req.Ref == "" {
-		req.Ref = dataset.Repository.DefaultBranch
-	}
-	file, err := c.gs.GetDatasetFileContents(req.Namespace, req.Name, req.Ref, req.Path)
-	if err != nil {
-		return nil, fmt.Errorf("failed to download git dataset repository file, error: %w", err)
-	}
-	return file, nil
-}
-
-func (c *DatasetComponent) SDKDownloadFile(ctx *gin.Context, req *types.GetFileReq) (io.ReadCloser, string, error) {
-	var (
-		downloadUrl string
-	)
-	dataset, err := c.ds.FindByPath(ctx, req.Namespace, req.Name)
-	if err != nil {
-		return nil, "", fmt.Errorf("failed to find dataset, error: %w", err)
-	}
-	currentUser, exists := ctx.Get("currentUser")
-	// TODO: Use user access token to check permissions
-	if dataset.Private && exists {
-		canRead, err := c.checkCurrentUserPermission(ctx, currentUser, req.Namespace, membership.RoleRead)
-		if err != nil {
-			return nil, "", err
-		}
-		if !canRead {
-			return nil, "", fmt.Errorf("permission denied")
-		}
-	}
-	if req.Ref == "" {
-		req.Ref = dataset.Repository.DefaultBranch
-	}
-	if req.Lfs {
-		file, err := c.gs.GetDatasetFileContents(req.Namespace, req.Name, req.Ref, req.Path)
-		if err != nil {
-			return nil, "", err
-		}
-		objectKey := file.LfsRelativePath
-		objectKey = path.Join("lfs", objectKey)
-		reqParams := make(url.Values)
-		if req.SaveAs != "" {
-			// allow rename when download through content-disposition header
-			reqParams.Set("response-content-disposition", fmt.Sprintf("attachment;filename=%s", req.SaveAs))
-		}
-		signedUrl, err := c.s3Client.PresignedGetObject(ctx, c.lfsBucket, objectKey, ossFileExpireSeconds, reqParams)
-		if err != nil {
-			return nil, downloadUrl, err
-		}
-		return nil, signedUrl.String(), nil
-	} else {
-		reader, err := c.gs.GetDatasetFileReader(req.Namespace, req.Name, req.Ref, req.Path)
-		if err != nil {
-			return nil, "", fmt.Errorf("failed to download git dataset repository file, error: %w", err)
-		}
-		return reader, downloadUrl, nil
-	}
-}
-
-func (c *DatasetComponent) checkCurrentUserPermission(ctx context.Context, currentUser any, namespace string, role membership.Role) (bool, error) {
-	cu, ok := currentUser.(string)
-	if !ok {
-		return false, fmt.Errorf("error parsing current user from context")
-	}
-
-	ns, err := c.ns.FindByPath(ctx, namespace)
-	if err != nil {
-		return false, err
-	}
-
-	if ns.NamespaceType == "user" {
-		return cu == namespace, nil
-	} else {
-		r, err := c.msc.GetMemberRole(ctx, namespace, cu)
-		if err != nil {
-			return false, err
-		}
-		switch role {
-		case membership.RoleAdmin:
-			return r.CanAdmin(), nil
-		case membership.RoleWrite:
-			return r.CanWrite(), nil
-		case membership.RoleRead:
-			return r.CanRead(), nil
-		default:
-			return false, fmt.Errorf("unknown role %s", role)
-		}
-	}
 }

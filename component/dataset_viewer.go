@@ -9,6 +9,7 @@ import (
 	"opencsg.com/csghub-server/builder/git/gitserver"
 	"opencsg.com/csghub-server/builder/parquet"
 	"opencsg.com/csghub-server/common/config"
+	"opencsg.com/csghub-server/common/types"
 )
 
 type ViewParquetFileReq struct {
@@ -67,7 +68,14 @@ func (c *DatasetViewerComponent) ViewParquetFile(ctx context.Context, req *ViewP
 }
 
 func (c *DatasetViewerComponent) getParquetObject(req *ViewParquetFileReq) (string, error) {
-	f, err := c.gs.GetDatasetFileContents(req.Namespace, req.RepoName, req.Branch, req.Path)
+	getFileContentReq := gitserver.GetRepoInfoByPathReq{
+		Namespace: req.Namespace,
+		Name:      req.RepoName,
+		Ref:       req.Branch,
+		Path:      req.Path,
+		RepoType:  types.DatasetRepo,
+	}
+	f, err := c.gs.GetRepoFileContents(context.Background(), getFileContentReq)
 	if err != nil {
 		return "", fmt.Errorf("failed to get file contents,cause:%v", err)
 	}
