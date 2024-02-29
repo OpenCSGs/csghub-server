@@ -75,4 +75,15 @@ type Model struct {
 	DefaultBranch string     `json:"default_branch"`
 	CreatedAt     time.Time  `json:"created_at"`
 	UpdatedAt     time.Time  `json:"updated_at"`
+	// widget UI style: generation,chat
+	WidgetType ModelWidgetType `json:"widget_type"`
+	// url to interact with the model
+	Endpoint string `json:"endpoint"`
 }
+
+type ModelWidgetType string
+
+const (
+	ModelWidgetTypeGeneration ModelWidgetType = "generation"
+	ModelWidgetTypeChat       ModelWidgetType = "chat"
+)

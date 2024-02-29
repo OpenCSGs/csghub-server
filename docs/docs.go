@@ -3038,7 +3038,7 @@ const docTemplate = `{
                                         "data": {
                                             "type": "array",
                                             "items": {
-                                                "$ref": "#/definitions/database.Dataset"
+                                                "$ref": "#/definitions/types.Dataset"
                                             }
                                         },
                                         "total": {
@@ -3124,7 +3124,7 @@ const docTemplate = `{
                                         "data": {
                                             "type": "array",
                                             "items": {
-                                                "$ref": "#/definitions/database.Model"
+                                                "$ref": "#/definitions/types.Model"
                                             }
                                         },
                                         "total": {
@@ -5149,6 +5149,10 @@ const docTemplate = `{
                 "downloads": {
                     "type": "integer"
                 },
+                "endpoint": {
+                    "description": "url to interact with the model",
+                    "type": "string"
+                },
                 "id": {
                     "type": "integer"
                 },
@@ -5181,6 +5185,14 @@ const docTemplate = `{
                 },
                 "user": {
                     "$ref": "#/definitions/types.User"
+                },
+                "widget_type": {
+                    "description": "widget UI style: generation,chat",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/types.ModelWidgetType"
+                        }
+                    ]
                 }
             }
         },
@@ -5214,6 +5226,17 @@ const docTemplate = `{
                     "type": "string"
                 }
             }
+        },
+        "types.ModelWidgetType": {
+            "type": "string",
+            "enum": [
+                "generation",
+                "chat"
+            ],
+            "x-enum-varnames": [
+                "ModelWidgetTypeGeneration",
+                "ModelWidgetTypeChat"
+            ]
         },
         "types.RepoBranchCommit": {
             "type": "object",
@@ -5255,13 +5278,15 @@ const docTemplate = `{
                 "model",
                 "dataset",
                 "space",
-                "code"
+                "code",
+                ""
             ],
             "x-enum-varnames": [
                 "ModelRepo",
                 "DatasetRepo",
                 "SpaceRepo",
-                "CodeRepo"
+                "CodeRepo",
+                "UnknownRepo"
             ]
         },
         "types.Response": {

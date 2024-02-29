@@ -3027,7 +3027,7 @@
                                         "data": {
                                             "type": "array",
                                             "items": {
-                                                "$ref": "#/definitions/database.Dataset"
+                                                "$ref": "#/definitions/types.Dataset"
                                             }
                                         },
                                         "total": {
@@ -3113,7 +3113,7 @@
                                         "data": {
                                             "type": "array",
                                             "items": {
-                                                "$ref": "#/definitions/database.Model"
+                                                "$ref": "#/definitions/types.Model"
                                             }
                                         },
                                         "total": {
@@ -5138,6 +5138,10 @@
                 "downloads": {
                     "type": "integer"
                 },
+                "endpoint": {
+                    "description": "url to interact with the model",
+                    "type": "string"
+                },
                 "id": {
                     "type": "integer"
                 },
@@ -5170,6 +5174,14 @@
                 },
                 "user": {
                     "$ref": "#/definitions/types.User"
+                },
+                "widget_type": {
+                    "description": "widget UI style: generation,chat",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/types.ModelWidgetType"
+                        }
+                    ]
                 }
             }
         },
@@ -5203,6 +5215,17 @@
                     "type": "string"
                 }
             }
+        },
+        "types.ModelWidgetType": {
+            "type": "string",
+            "enum": [
+                "generation",
+                "chat"
+            ],
+            "x-enum-varnames": [
+                "ModelWidgetTypeGeneration",
+                "ModelWidgetTypeChat"
+            ]
         },
         "types.RepoBranchCommit": {
             "type": "object",
@@ -5244,13 +5267,15 @@
                 "model",
                 "dataset",
                 "space",
-                "code"
+                "code",
+                ""
             ],
             "x-enum-varnames": [
                 "ModelRepo",
                 "DatasetRepo",
                 "SpaceRepo",
-                "CodeRepo"
+                "CodeRepo",
+                "UnknownRepo"
             ]
         },
         "types.Response": {

@@ -100,7 +100,7 @@ func NewModelComponent(config *config.Config) (*ModelComponent, error) {
 
 type ModelComponent struct {
 	repoComponent
-	infer inference.App
+	infer inference.Client
 }
 
 func (c *ModelComponent) Index(ctx context.Context, username, search, sort string, ragReqs []database.TagReq, per, page int) ([]types.Model, int, error) {
@@ -351,6 +351,15 @@ func (c *ModelComponent) Show(ctx context.Context, namespace, name, current_user
 		}
 	}
 
+	// get model running status
+	var mid inference.ModelID
+	mid.Owner = namespace
+	mid.Name = name
+	mi, err := c.infer.GetModelInfo(mid)
+	if err != nil {
+		slog.Error("failed to get model info", slog.Any("id", mid), slog.Any("error", err))
+	}
+
 	for _, tag := range model.Repository.Tags {
 		tags = append(tags, types.RepoTag{
 			Name:      tag.Name,
@@ -386,6 +395,9 @@ func (c *ModelComponent) Show(ctx context.Context, namespace, name, current_user
 		},
 		CreatedAt: model.CreatedAt,
 		UpdatedAt: model.UpdatedAt,
+		// TODO:default to ModelWidgetTypeGeneration, need to config later
+		WidgetType: types.ModelWidgetTypeGeneration,
+		Endpoint:   mi.Endpoint,
 	}
 
 	return resModel, nil

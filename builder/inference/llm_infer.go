@@ -28,7 +28,7 @@ func (m ModelID) Hash() uint64 {
 	return f.Sum64()
 }
 
-var _ App = (*llmInferClient)(nil)
+var _ Client = (*llmInferClient)(nil)
 
 type ModelInfo struct {
 	Endpoint string
@@ -45,7 +45,7 @@ type llmInferClient struct {
 	serverAddr string
 }
 
-func NewInferClient(addr string) App {
+func NewInferClient(addr string) Client {
 	hc := http.DefaultClient
 	hc.Timeout = time.Minute
 	return &llmInferClient{
