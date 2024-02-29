@@ -11,12 +11,12 @@ import (
 	"github.com/spf13/cobra"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/config"
+	"opencsg.com/csghub-server/common/types"
 )
 
 var logPath string
 var (
-	ms *database.ModelStore
-	ds *database.DatasetStore
+	repoStore *database.RepoStore
 )
 
 func init() {
@@ -45,8 +45,7 @@ var Cmd = &cobra.Command{
 			err = fmt.Errorf("initializing DB connection: %w", err)
 			return
 		}
-		ms = database.NewModelStore()
-		ds = database.NewDatasetStore()
+		repoStore = database.NewRepoStore()
 		return
 	},
 	Run: func(cmd *cobra.Command, args []string) {
@@ -121,35 +120,22 @@ var initCmd = &cobra.Command{
 		}
 
 		for date, typeMap := range projectCount {
-			for repoType, pathMap := range typeMap {
+			for repoTypeString, pathMap := range typeMap {
 				for path, count := range pathMap {
-					fmt.Printf("date: %s, type: %s, path: %s, count: %d\n", date, repoType, path, count)
-					if repoType == "datasets" {
-						spPath := strings.Split(path, "/")
-						dataset, err := ds.FindByPath(cmd.Context(), spPath[0], spPath[1])
-						if err != nil {
-							fmt.Printf("Error finding dataset: %s, Date: %s, Count: %d error: %v\n", path, date, count, err)
-							continue
-						}
-						pDate, _ := time.Parse("2006/01/02", date)
-						err = ds.UpdateRepoCloneDownloads(cmd.Context(), dataset, pDate, count)
-						if err != nil {
-							fmt.Printf("Error updating dataset: %s, Date: %s, Count: %d error: %v\n", path, date, count, err)
-						}
-						fmt.Printf("Update secceed dataset: %s, Date: %s, Count: %d error: %v\n", path, date, count, err)
-					} else {
-						spPath := strings.Split(path, "/")
-						model, err := ms.FindByPath(cmd.Context(), spPath[0], spPath[1])
-						if err != nil {
-							fmt.Printf("Error finding model: %s, Date: %s, Count: %d error: %v\n", path, date, count, err)
-							continue
-						}
-						pDate, _ := time.Parse("2006/01/02", date)
-						err = ms.UpdateRepoCloneDownloads(cmd.Context(), model, pDate, count)
-						if err != nil {
-							fmt.Printf("Error updating model: %s, Date: %s, Count: %d error: %v\n", path, date, count, err)
-						}
+					fmt.Printf("date: %s, type: %s, path: %s, count: %d\n", date, repoTypeString, path, count)
+					repoType := getRepoTypeByTypeName(repoTypeString)
+					spPath := strings.Split(path, "/")
+					repo, err := repoStore.FindByPath(cmd.Context(), repoType, spPath[0], spPath[1])
+					if err != nil {
+						fmt.Printf("Error finding %s: %s, Date: %s, Count: %d error: %v\n", repoType, path, date, count, err)
+						continue
 					}
+					pDate, _ := time.Parse("2006/01/02", date)
+					err = repoStore.UpdateRepoCloneDownloads(cmd.Context(), repo, pDate, count)
+					if err != nil {
+						fmt.Printf("Error updating %s: %s, Date: %s, Count: %d error: %v\n", repoType, path, date, count, err)
+					}
+					fmt.Printf("Update secceed %s: %s, Date: %s, Count: %d error: %v\n", repoType, path, date, count, err)
 				}
 			}
 		}
@@ -160,4 +146,19 @@ var initCmd = &cobra.Command{
 		}
 		return nil
 	},
+}
+
+func getRepoTypeByTypeName(repoType string) types.RepositoryType {
+	switch repoType {
+	case "datasets":
+		return types.DatasetRepo
+	case "models":
+		return types.ModelRepo
+	case "codes":
+		return types.CodeRepo
+	case "spaces":
+		return types.SpaceRepo
+	default:
+		return types.UnknownRepo
+	}
 }

@@ -158,7 +158,8 @@ func (c *OrganizationComponent) Update(ctx context.Context, req *types.EditOrgRe
 	return nOrg, err
 }
 
-func (c *OrganizationComponent) Models(ctx context.Context, req *types.OrgModelsReq) ([]database.Model, int, error) {
+func (c *OrganizationComponent) Models(ctx context.Context, req *types.OrgModelsReq) ([]types.Model, int, error) {
+	var resModels []types.Model
 	r, err := c.msc.GetMemberRole(ctx, req.Namespace, req.CurrentUser)
 	// log error, and treat user as unkown role in org
 	if err != nil {
@@ -174,10 +175,27 @@ func (c *OrganizationComponent) Models(ctx context.Context, req *types.OrgModels
 		return nil, 0, newError
 	}
 
-	return ms, total, nil
+	for _, data := range ms {
+		resModels = append(resModels, types.Model{
+			ID:           data.ID,
+			Name:         data.Repository.Name,
+			Nickname:     data.Repository.Nickname,
+			Description:  data.Repository.Description,
+			Likes:        data.Repository.Likes,
+			Downloads:    data.Repository.DownloadCount,
+			Path:         data.Repository.Path,
+			RepositoryID: data.RepositoryID,
+			Private:      data.Repository.Private,
+			CreatedAt:    data.CreatedAt,
+			UpdatedAt:    data.UpdatedAt,
+		})
+	}
+
+	return resModels, total, nil
 }
 
-func (c *OrganizationComponent) Datasets(ctx context.Context, req *types.OrgDatasetsReq) ([]database.Dataset, int, error) {
+func (c *OrganizationComponent) Datasets(ctx context.Context, req *types.OrgDatasetsReq) ([]types.Dataset, int, error) {
+	var resDatasets []types.Dataset
 	r, err := c.msc.GetMemberRole(ctx, req.Namespace, req.CurrentUser)
 	// log error, and treat user as unkown role in org
 	if err != nil {
@@ -193,5 +211,21 @@ func (c *OrganizationComponent) Datasets(ctx context.Context, req *types.OrgData
 		return nil, 0, newError
 	}
 
-	return datasets, total, nil
+	for _, data := range datasets {
+		resDatasets = append(resDatasets, types.Dataset{
+			ID:           data.ID,
+			Name:         data.Repository.Name,
+			Nickname:     data.Repository.Nickname,
+			Description:  data.Repository.Description,
+			Likes:        data.Repository.Likes,
+			Downloads:    data.Repository.DownloadCount,
+			Path:         data.Repository.Path,
+			RepositoryID: data.RepositoryID,
+			Private:      data.Repository.Private,
+			CreatedAt:    data.CreatedAt,
+			UpdatedAt:    data.UpdatedAt,
+		})
+	}
+
+	return resDatasets, total, nil
 }

@@ -1,36 +1,40 @@
 package gitea
 
 import (
+	"context"
+
 	"github.com/OpenCSGs/gitea-go-sdk/gitea"
+	"opencsg.com/csghub-server/builder/git/gitserver"
 	"opencsg.com/csghub-server/common/types"
 	"opencsg.com/csghub-server/common/utils/common"
 )
 
-func (c *Client) GetModelCommits(namespace, name, ref string, per, page int) (commits []*types.Commit, err error) {
-	namespace = common.WithPrefix(namespace, ModelOrgPrefix)
+func (c *Client) GetRepoCommits(ctx context.Context, req gitserver.GetRepoCommitsReq) ([]types.Commit, error) {
+	var commits []types.Commit
+	namespace := common.WithPrefix(req.Namespace, repoPrefixByType(req.RepoType))
 	giteaCommits, _, err := c.giteaClient.ListRepoCommits(
 		namespace,
-		name,
+		req.Name,
 		gitea.ListCommitOptions{
 			ListOptions: gitea.ListOptions{
-				PageSize: per,
-				Page:     page,
+				PageSize: req.Per,
+				Page:     req.Page,
 			},
 			SpeedUpOtions: gitea.SpeedUpOtions{
 				DisableStat:         true,
 				DisableVerification: true,
 				DisableFiles:        true,
 			},
-			SHA: ref,
+			SHA: req.Ref,
 		},
 	)
 
 	if err != nil {
-		return
+		return nil, err
 	}
 
 	for _, giteaCommit := range giteaCommits {
-		commits = append(commits, &types.Commit{
+		commits = append(commits, types.Commit{
 			ID:             giteaCommit.SHA,
 			CommitterName:  giteaCommit.RepoCommit.Committer.Name,
 			CommitterEmail: giteaCommit.RepoCommit.Committer.Email,
@@ -42,15 +46,16 @@ func (c *Client) GetModelCommits(namespace, name, ref string, per, page int) (co
 			AuthoredDate:   giteaCommit.RepoCommit.Author.Date,
 		})
 	}
-	return
+	return commits, nil
 }
 
-func (c *Client) GetModelLastCommit(namespace, name, ref string) (commit *types.Commit, err error) {
-	namespace = common.WithPrefix(namespace, ModelOrgPrefix)
+func (c *Client) GetRepoLastCommit(ctx context.Context, req gitserver.GetRepoLastCommitReq) (*types.Commit, error) {
+	var commit *types.Commit
+	namespace := common.WithPrefix(req.Namespace, repoPrefixByType(req.RepoType))
 	giteaCommit, _, err := c.giteaClient.GetSingleCommit(
 		namespace,
-		name,
-		ref,
+		req.Name,
+		req.Ref,
 		gitea.SpeedUpOtions{
 			DisableStat:         true,
 			DisableVerification: true,
@@ -58,7 +63,7 @@ func (c *Client) GetModelLastCommit(namespace, name, ref string) (commit *types.
 		},
 	)
 	if err != nil {
-		return
+		return nil, err
 	}
 
 	commit = &types.Commit{
@@ -72,73 +77,5 @@ func (c *Client) GetModelLastCommit(namespace, name, ref string) (commit *types.
 		AuthorEmail:    giteaCommit.RepoCommit.Author.Email,
 		AuthoredDate:   giteaCommit.RepoCommit.Author.Date,
 	}
-	return
-}
-
-func (c *Client) GetDatasetCommits(namespace, name, ref string, per, page int) (commits []*types.Commit, err error) {
-	namespace = common.WithPrefix(namespace, DatasetOrgPrefix)
-	giteaCommits, _, err := c.giteaClient.ListRepoCommits(
-		namespace,
-		name,
-		gitea.ListCommitOptions{
-			ListOptions: gitea.ListOptions{
-				PageSize: per,
-				Page:     page,
-			},
-			SpeedUpOtions: gitea.SpeedUpOtions{
-				DisableStat:         true,
-				DisableVerification: true,
-				DisableFiles:        true,
-			},
-			SHA: ref,
-		},
-	)
-	if err != nil {
-		return
-	}
-
-	for _, giteaCommit := range giteaCommits {
-		commits = append(commits, &types.Commit{
-			ID:             giteaCommit.SHA,
-			CommitterName:  giteaCommit.RepoCommit.Committer.Name,
-			CommitterEmail: giteaCommit.RepoCommit.Committer.Email,
-			CommitterDate:  giteaCommit.RepoCommit.Committer.Date,
-			CreatedAt:      giteaCommit.CommitMeta.Created.String(),
-			Message:        giteaCommit.RepoCommit.Message,
-			AuthorName:     giteaCommit.RepoCommit.Author.Name,
-			AuthorEmail:    giteaCommit.RepoCommit.Author.Email,
-			AuthoredDate:   giteaCommit.RepoCommit.Author.Date,
-		})
-	}
-	return
-}
-
-func (c *Client) GetDatasetLastCommit(namespace, name, ref string) (commit *types.Commit, err error) {
-	namespace = common.WithPrefix(namespace, DatasetOrgPrefix)
-	giteaCommit, _, err := c.giteaClient.GetSingleCommit(
-		namespace,
-		name,
-		ref,
-		gitea.SpeedUpOtions{
-			DisableStat:         true,
-			DisableVerification: true,
-			DisableFiles:        true,
-		},
-	)
-	if err != nil {
-		return
-	}
-
-	commit = &types.Commit{
-		ID:             giteaCommit.SHA,
-		CommitterName:  giteaCommit.RepoCommit.Committer.Name,
-		CommitterEmail: giteaCommit.RepoCommit.Committer.Email,
-		CommitterDate:  giteaCommit.RepoCommit.Committer.Date,
-		CreatedAt:      giteaCommit.CommitMeta.Created.String(),
-		Message:        giteaCommit.RepoCommit.Message,
-		AuthorName:     giteaCommit.RepoCommit.Author.Name,
-		AuthorEmail:    giteaCommit.RepoCommit.Author.Email,
-		AuthoredDate:   giteaCommit.RepoCommit.Author.Date,
-	}
-	return
+	return commit, nil
 }

@@ -218,11 +218,16 @@ func (c *GitCallbackComponent) getFileRaw(repoType, namespace, repoName, ref, fi
 		content string
 		err     error
 	)
-	if repoType == DatasetRepoType {
-		content, err = c.gs.GetDatasetFileRaw(namespace, repoName, ref, fileName)
-	} else {
-		content, err = c.gs.GetModelFileRaw(namespace, repoName, ref, fileName)
+	repoType = strings.TrimRight(repoType, "s")
+	getFileRawReq := gitserver.GetRepoInfoByPathReq{
+		Namespace: namespace,
+		Name:      repoName,
+		Ref:       ref,
+		Path:      fileName,
+		RepoType:  types.RepositoryType(repoType),
 	}
+	content, err = c.gs.GetRepoFileRaw(context.Background(), getFileRawReq)
+
 	if err != nil {
 		slog.Error("failed to get file content", slog.String("namespace", namespace),
 			slog.String("file", fileName), slog.String("repo", repoName), slog.String("ref", ref),
@@ -261,16 +266,20 @@ func (c *GitCallbackComponent) setPrivate(ctx context.Context, repoType, namespa
 	var model *database.Model
 	if repoType == DatasetRepoType {
 		dataset, err = c.ds.FindByPath(ctx, namespace, repoName)
-		err = c.gs.UpdateDatasetRepo(namespace, repoName, dataset, dataset.Repository, &types.UpdateDatasetReq{
-			Name:          dataset.Name,
-			Description:   dataset.Description,
+		if err != nil {
+			slog.Error("Failed to find dataset", slog.String("namespace", namespace), slog.String("name", repoName))
+			return fmt.Errorf("failed to find dataset, error: %w", err)
+		}
+		_, err = c.gs.UpdateRepo(ctx, gitserver.UpdateRepoReq{
+			Name:          dataset.Repository.Name,
+			Description:   dataset.Repository.Description,
 			Private:       true,
 			DefaultBranch: dataset.Repository.DefaultBranch,
 		})
 		if err != nil {
 			return fmt.Errorf("failed to update git server dataset to private, error: %w", err)
 		}
-		err = c.ds.Update(ctx, dataset, dataset.Repository)
+		err = c.ds.Update(ctx, *dataset)
 		if err != nil {
 			return fmt.Errorf("failed to update database dataset to private, error: %w", err)
 		}
@@ -279,16 +288,16 @@ func (c *GitCallbackComponent) setPrivate(ctx context.Context, repoType, namespa
 		if err != nil {
 			return fmt.Errorf("failed to find model by path, error: %w", err)
 		}
-		err = c.gs.UpdateModelRepo(namespace, repoName, model, model.Repository, &types.UpdateModelReq{
-			Name:          model.Name,
-			Description:   model.Description,
+		_, err = c.gs.UpdateRepo(ctx, gitserver.UpdateRepoReq{
+			Name:          model.Repository.Name,
+			Description:   model.Repository.Description,
 			Private:       true,
 			DefaultBranch: model.Repository.DefaultBranch,
 		})
 		if err != nil {
 			return fmt.Errorf("failed to update git server model to private, error: %w", err)
 		}
-		err = c.ms.Update(ctx, model, model.Repository)
+		_, err = c.ms.Update(ctx, *model)
 		if err != nil {
 			return fmt.Errorf("failed to update database model to private, error: %w", err)
 		}
