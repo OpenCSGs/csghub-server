@@ -16,6 +16,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/minio/minio-go/v7"
 	"opencsg.com/csghub-server/builder/git/gitserver"
+	"opencsg.com/csghub-server/builder/git/membership"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/types"
 )
@@ -46,12 +47,16 @@ func (c *repoComponent) CreateRepo(ctx context.Context, req types.CreateRepoReq)
 	}
 
 	if namespace.NamespaceType == database.OrgNamespace {
-		if namespace.UserID != user.ID {
-			return nil, nil, errors.New("users do not have permission to create spaces in this organization")
+		canWrite, err := c.checkCurrentUserPermission(ctx, req.Username, req.Namespace, membership.RoleWrite)
+		if err != nil {
+			return nil, nil, err
+		}
+		if !canWrite {
+			return nil, nil, fmt.Errorf("users do not have permission to create %s in this organization", req.RepoType)
 		}
 	} else {
 		if namespace.Path != user.Username {
-			return nil, nil, errors.New("users do not have permission to create spaces in this namespace")
+			return nil, nil, fmt.Errorf("users do not have permission to create %s in this namespace", req.RepoType)
 		}
 	}
 
@@ -537,7 +542,7 @@ func (c *repoComponent) SDKListFiles(ctx *gin.Context, repoType types.Repository
 	currentUser, exists := ctx.Get("currentUser")
 	// TODO: Use user access token to check permissions
 	if repo.Private && exists {
-		canRead, err := c.checkCurrentUserPermission(ctx, currentUser, namespace)
+		canRead, err := c.checkCurrentUserPermission(ctx, currentUser, namespace, membership.RoleRead)
 		if err != nil {
 			return nil, err
 		}
@@ -591,7 +596,7 @@ func (c *repoComponent) HeadDownloadFile(ctx *gin.Context, req *types.GetFileReq
 	currentUser, exists := ctx.Get("currentUser")
 	// TODO: Use user access token to check permissions
 	if repo.Private && exists {
-		canRead, err := c.checkCurrentUserPermission(ctx, currentUser, req.Namespace)
+		canRead, err := c.checkCurrentUserPermission(ctx, currentUser, req.Namespace, membership.RoleRead)
 		if err != nil {
 			return nil, err
 		}
@@ -627,7 +632,7 @@ func (c *repoComponent) SDKDownloadFile(ctx *gin.Context, req *types.GetFileReq)
 	currentUser, exists := ctx.Get("currentUser")
 	// TODO: Use user access token to check permissions
 	if repo.Private && exists {
-		canRead, err := c.checkCurrentUserPermission(ctx, currentUser, req.Namespace)
+		canRead, err := c.checkCurrentUserPermission(ctx, currentUser, req.Namespace, membership.RoleRead)
 		if err != nil {
 			return nil, "", err
 		}
@@ -722,7 +727,7 @@ func getTagScopeByRepoType(repoType types.RepositoryType) database.TagScope {
 	}
 }
 
-func (c *repoComponent) checkCurrentUserPermission(ctx context.Context, currentUser any, namespace string) (bool, error) {
+func (c *repoComponent) checkCurrentUserPermission(ctx context.Context, currentUser any, namespace string, role membership.Role) (bool, error) {
 	cu, ok := currentUser.(string)
 	if !ok {
 		return false, fmt.Errorf("error parsing current user from context")
@@ -740,6 +745,15 @@ func (c *repoComponent) checkCurrentUserPermission(ctx context.Context, currentU
 		if err != nil {
 			return false, err
 		}
-		return r.CanRead(), nil
+		switch role {
+		case membership.RoleAdmin:
+			return r.CanAdmin(), nil
+		case membership.RoleWrite:
+			return r.CanWrite(), nil
+		case membership.RoleRead:
+			return r.CanRead(), nil
+		default:
+			return false, fmt.Errorf("unknown role %s", role)
+		}
 	}
 }

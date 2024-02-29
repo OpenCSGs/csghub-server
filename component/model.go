@@ -9,6 +9,7 @@ import (
 
 	"opencsg.com/csghub-server/builder/git"
 	"opencsg.com/csghub-server/builder/git/gitserver"
+	"opencsg.com/csghub-server/builder/git/membership"
 	"opencsg.com/csghub-server/builder/inference"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/builder/store/s3"
@@ -147,6 +148,30 @@ func (c *ModelComponent) Create(ctx context.Context, req *types.CreateModelReq) 
 		nickname string
 		tags     []types.RepoTag
 	)
+	namespace, err := c.namespace.FindByPath(ctx, req.Namespace)
+	if err != nil {
+		return nil, errors.New("namespace does not exist")
+	}
+
+	user, err := c.user.FindByUsername(ctx, req.Username)
+	if err != nil {
+		return nil, errors.New("user does not exist")
+	}
+
+	if namespace.NamespaceType == database.OrgNamespace {
+		canWrite, err := c.checkCurrentUserPermission(ctx, req.Username, req.Namespace, membership.RoleWrite)
+		if err != nil {
+			return nil, err
+		}
+		if !canWrite {
+			return nil, errors.New("users do not have permission to create models in this organization")
+		}
+	} else {
+		if namespace.Path != user.Username {
+			return nil, errors.New("users do not have permission to create models in this namespace")
+		}
+	}
+
 	if req.Nickname != "" {
 		nickname = req.Nickname
 	} else {
@@ -168,11 +193,6 @@ func (c *ModelComponent) Create(ctx context.Context, req *types.CreateModelReq) 
 	model, err := c.ms.Create(ctx, dbModel)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create database model, cause: %w", err)
-	}
-
-	user, err := c.user.FindByID(ctx, int(dbRepo.UserID))
-	if err != nil {
-		return nil, fmt.Errorf("failed to find database user, cause: %w", err)
 	}
 
 	// Create README.md file

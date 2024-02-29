@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"opencsg.com/csghub-server/builder/git"
+	"opencsg.com/csghub-server/builder/git/membership"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/builder/store/s3"
 	"opencsg.com/csghub-server/common/config"
@@ -126,11 +127,37 @@ func (c *DatasetComponent) Create(ctx context.Context, req *types.CreateDatasetR
 		nickname string
 		tags     []types.RepoTag
 	)
+
+	namespace, err := c.namespace.FindByPath(ctx, req.Namespace)
+	if err != nil {
+		return nil, errors.New("namespace does not exist")
+	}
+
+	user, err := c.user.FindByUsername(ctx, req.Username)
+	if err != nil {
+		return nil, errors.New("user does not exist")
+	}
+
+	if namespace.NamespaceType == database.OrgNamespace {
+		canWrite, err := c.checkCurrentUserPermission(ctx, req.Username, req.Namespace, membership.RoleWrite)
+		if err != nil {
+			return nil, err
+		}
+		if !canWrite {
+			return nil, errors.New("users do not have permission to create datasets in this organization")
+		}
+	} else {
+		if namespace.Path != user.Username {
+			return nil, errors.New("users do not have permission to create datasets in this namespace")
+		}
+	}
+
 	if req.Nickname != "" {
 		nickname = req.Nickname
 	} else {
 		nickname = req.Name
 	}
+
 	req.RepoType = types.DatasetRepo
 	req.Readme = generateReadmeData(req.License)
 	req.Nickname = nickname
@@ -147,11 +174,6 @@ func (c *DatasetComponent) Create(ctx context.Context, req *types.CreateDatasetR
 	dataset, err := c.ds.Create(ctx, dbDataset)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create database dataset, cause: %w", err)
-	}
-
-	user, err := c.user.FindByID(ctx, int(dbRepo.UserID))
-	if err != nil {
-		return nil, fmt.Errorf("failed to find user by id, cause: %w", err)
 	}
 
 	// Create README.md file
