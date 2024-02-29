@@ -15,38 +15,18 @@ type GitServer interface {
 	DeleteUserToken(*types.DeleteUserTokenRequest) error
 
 	CreateRepo(ctx context.Context, req CreateRepoReq) (*CreateRepoResp, error)
-
-	CreateModelRepo(*types.CreateModelReq) (*database.Model, *database.Repository, error)
-	UpdateModelRepo(string, string, *database.Model, *database.Repository, *types.UpdateModelReq) error
-	DeleteModelRepo(string, string) error
-	GetModelBranches(string, string, int, int) ([]*types.ModelBranch, error)
-	GetModelCommits(string, string, string, int, int) ([]*types.Commit, error)
-	GetModelLastCommit(string, string, string) (*types.Commit, error)
-	GetModelDetail(namespace, name string) (*types.ModelDetail, error)
-	GetModelFileRaw(namespace, repoName, ref, filePath string) (string, error)
-	GetModelFileReader(namespace, repoName, ref, filePath string) (io.ReadCloser, error)
-	GetModelLfsFileRaw(namespace, repoName, ref, filePath string) (io.ReadCloser, error)
-	GetModelTags(string, string, int, int) ([]*types.ModelTag, error)
-	GetModelFileTree(string, string, string, string) ([]*types.File, error)
-	GetModelFileContents(namespace, repo, ref, path string) (*types.File, error)
-	CreateModelFile(*types.CreateFileReq) (err error)
-	UpdateModelFile(*types.UpdateFileReq) (err error)
-
-	CreateDatasetRepo(*types.CreateDatasetReq) (*database.Dataset, *database.Repository, error)
-	UpdateDatasetRepo(string, string, *database.Dataset, *database.Repository, *types.UpdateDatasetReq) error
-	DeleteDatasetRepo(string, string) error
-	GetDatasetBranches(string, string, int, int) ([]*types.DatasetBranch, error)
-	GetDatasetCommits(string, string, string, int, int) ([]*types.Commit, error)
-	GetDatasetLastCommit(string, string, string) (*types.Commit, error)
-	GetDatasetDetail(namespace, name string) (*types.DatasetDetail, error)
-	GetDatasetFileRaw(namespace, repoName, ref, filePath string) (string, error)
-	GetDatasetFileReader(namespace, repoName, ref, filePath string) (io.ReadCloser, error)
-	GetDatasetLfsFileRaw(namespace, repoName, ref, filePath string) (io.ReadCloser, error)
-	GetDatasetTags(string, string, int, int) ([]*types.DatasetTag, error)
-	GetDatasetFileTree(string, string, string, string) ([]*types.File, error)
-	GetDatasetFileContents(namespace, repo, ref, path string) (*types.File, error)
-	CreateDatasetFile(*types.CreateFileReq) (err error)
-	UpdateDatasetFile(*types.UpdateFileReq) (err error)
+	UpdateRepo(ctx context.Context, req UpdateRepoReq) (*CreateRepoResp, error)
+	DeleteRepo(ctx context.Context, req DeleteRepoReq) error
+	GetRepoBranches(ctx context.Context, req GetBranchesReq) ([]types.Branch, error)
+	GetRepoCommits(ctx context.Context, req GetRepoCommitsReq) ([]types.Commit, error)
+	GetRepoLastCommit(ctx context.Context, req GetRepoLastCommitReq) (*types.Commit, error)
+	GetRepoFileTree(ctx context.Context, req GetRepoInfoByPathReq) ([]*types.File, error)
+	GetRepoFileRaw(ctx context.Context, req GetRepoInfoByPathReq) (string, error)
+	GetRepoFileReader(ctx context.Context, req GetRepoInfoByPathReq) (io.ReadCloser, error)
+	GetRepoLfsFileRaw(ctx context.Context, req GetRepoInfoByPathReq) (io.ReadCloser, error)
+	GetRepoFileContents(ctx context.Context, req GetRepoInfoByPathReq) (*types.File, error)
+	CreateRepoFile(req *types.CreateFileReq) (err error)
+	UpdateRepoFile(req *types.UpdateFileReq) (err error)
 
 	CreateSSHKey(*types.CreateSSHKeyRequest) (*database.SSHKey, error)
 	// ListSSHKeys(string, int, int) ([]*database.SSHKey, error)

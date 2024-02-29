@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"log/slog"
 	"strings"
-	"time"
 
 	"github.com/uptrace/bun"
 )
@@ -18,25 +17,6 @@ func NewSpaceStore() *SpaceStore {
 	return &SpaceStore{
 		db: defaultDB,
 	}
-}
-
-type Space struct {
-	ID            int64       `bun:",pk,autoincrement" json:"id"`
-	Name          string      `bun:",notnull" json:"name"`
-	UrlSlug       string      `bun:",notnull" json:"nickname"`
-	Likes         int64       `bun:",notnull" json:"likes"`
-	Downloads     int64       `bun:",notnull" json:"downloads"`
-	Path          string      `bun:",notnull" json:"path"`
-	GitPath       string      `bun:",notnull" json:"git_path"`
-	RepositoryID  int64       `bun:",notnull" json:"repository_id"`
-	Repository    *Repository `bun:"rel:belongs-to,join:repository_id=id" json:"repository"`
-	LastUpdatedAt time.Time   `bun:",notnull" json:"last_updated_at"`
-	Private       bool        `bun:",notnull" json:"private"`
-	UserID        int64       `bun:",notnull" json:"user_id"`
-	User          *User       `bun:"rel:belongs-to,join:user_id=id" json:"user"`
-	// gradio, streamlit, docker etc
-	Sdk string `bun:",notnull" json:"sdk"`
-	times
 }
 
 func (s *SpaceStore) BeginTx(ctx context.Context) (bun.Tx, error) {
@@ -74,18 +54,19 @@ func (s *SpaceStore) PublicToUser(ctx context.Context, userID int64, search, sor
 	query := s.db.Operator.Core.
 		NewSelect().
 		Model(&spaces).
-		Relation("User")
+		Relation("Repository")
+		// Relation("User")
 
 	if userID > 0 {
-		query = query.Where("space.private = ? or space.user_id = ?", false, userID)
+		query = query.Where("repository.private = ? or repository.user_id = ?", false, userID)
 	} else {
-		query = query.Where("space.private = ?", false)
+		query = query.Where("repository.private = ?", false)
 	}
 
 	if search != "" {
 		search = strings.ToLower(search)
 		query = query.Where(
-			"LOWER(space.path) like ? or LOWER(space.name) like ?",
+			"LOWER(repository.path) like ? or LOWER(repository.name) like ?",
 			fmt.Sprintf("%%%s%%", search),
 			fmt.Sprintf("%%%s%%", search),
 		)

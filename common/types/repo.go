@@ -7,6 +7,7 @@ const (
 	DatasetRepo RepositoryType = "dataset"
 	SpaceRepo   RepositoryType = "space"
 	CodeRepo    RepositoryType = "code"
+	UnknownRepo RepositoryType = ""
 )
 
 type RepoRequest struct {
@@ -16,4 +17,21 @@ type RepoRequest struct {
 	Path      string `json:"path"`
 	Page      int    `json:"page"`
 	Per       int    `json:"per"`
+}
+
+type Branch struct {
+	Name    string           `json:"name"`
+	Message string           `json:"message"`
+	Commit  RepoBranchCommit `json:"commit"`
+}
+
+type Tag struct {
+	Name    string           `json:"name"`
+	Message string           `json:"message"`
+	Commit  DatasetTagCommit `json:"commit"`
+}
+
+type Repository struct {
+	HTTPCloneURL string `json:"http_clone_url"`
+	SSHCloneURL  string `json:"ssh_clone_url"`
 }
