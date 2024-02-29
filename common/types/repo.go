@@ -30,3 +30,8 @@ type Tag struct {
 	Message string           `json:"message"`
 	Commit  DatasetTagCommit `json:"commit"`
 }
+
+type Repository struct {
+	HTTPCloneURL string `json:"http_clone_url"`
+	SSHCloneURL  string `json:"ssh_clone_url"`
+}
