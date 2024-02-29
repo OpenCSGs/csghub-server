@@ -102,7 +102,31 @@ func (c *Client) GetRepoLfsFileRaw(ctx context.Context, req gitserver.GetRepoInf
 
 func (c *Client) GetRepoFileContents(ctx context.Context, req gitserver.GetRepoInfoByPathReq) (*types.File, error) {
 	namespace := common.WithPrefix(req.Namespace, repoPrefixByType(req.RepoType))
-	return c.getFileContents(namespace, req.Name, req.Ref, req.Path)
+	file, err := c.getFileContents(namespace, req.Name, req.Ref, req.Path)
+	if err != nil {
+		return nil, errors.New("failed to get dataset file contents")
+	}
+	commit, _, err := c.giteaClient.GetSingleCommit(namespace, req.Name, file.LastCommitSHA, gitea.SpeedUpOtions{
+		DisableStat:         true,
+		DisableVerification: true,
+		DisableFiles:        true,
+	})
+	if err != nil {
+		return nil, errors.New("failed to get dataset file last commit")
+	}
+
+	file.Commit = types.Commit{
+		ID:             commit.SHA,
+		CommitterName:  commit.RepoCommit.Committer.Name,
+		CommitterEmail: commit.RepoCommit.Committer.Email,
+		CommitterDate:  commit.RepoCommit.Committer.Date,
+		CreatedAt:      commit.Created.Format("2024-02-26T15:05:35+08:00"),
+		Message:        commit.RepoCommit.Message,
+		AuthorName:     commit.RepoCommit.Author.Name,
+		AuthorEmail:    commit.RepoCommit.Author.Email,
+		AuthoredDate:   commit.RepoCommit.Author.Date,
+	}
+	return file, nil
 }
 
 func (c *Client) CreateRepoFile(req *types.CreateFileReq) (err error) {
