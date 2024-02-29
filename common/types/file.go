@@ -30,6 +30,7 @@ type CreateFileReq struct {
 	NameSpace string `json:"-"`
 	Name      string `json:"-"`
 	FilePath  string `json:"-" form:"file_path"`
+	RepoType  RepositoryType
 }
 
 type CreateFileResp struct {
@@ -49,6 +50,7 @@ type UpdateFileReq struct {
 	Name      string `json:"-"`
 	//new file path, it will be different from OriginPath if file renamed
 	FilePath string `json:"-"`
+	RepoType RepositoryType
 }
 
 type GetCommitsReq struct {
@@ -57,6 +59,7 @@ type GetCommitsReq struct {
 	Per       int    `json:"per"`
 	Page      int    `json:"page"`
 	Ref       string `json:"ref"`
+	RepoType  RepositoryType
 }
 
 type GetFileReq struct {
@@ -66,6 +69,7 @@ type GetFileReq struct {
 	Ref       string `json:"ref"`
 	Lfs       bool   `json:"lfs"`
 	SaveAs    string `json:"save_as"`
+	RepoType  RepositoryType
 }
 
 type GetBranchesReq struct {
@@ -73,11 +77,13 @@ type GetBranchesReq struct {
 	Name      string `json:"name"`
 	Page      int    `json:"page"`
 	Per       int    `json:"per"`
+	RepoType  RepositoryType
 }
 
 type GetTagsReq struct {
 	Namespace string `json:"namespace"`
 	Name      string `json:"name"`
+	RepoType  RepositoryType
 }
 
 // currently update and create fiel share the same response
@@ -95,4 +101,16 @@ type SDKFiles struct {
 
 type SDKFile struct {
 	Filename string `json:"rfilename"`
+}
+
+type CreateFileParams struct {
+	Username  string `json:"username"`
+	Email     string `json:"email"`
+	Message   string `json:"message"`
+	Branch    string `json:"branch"`
+	Content   string `json:"content"`
+	NewBranch string `json:"new_branch"`
+	Namespace string `json:"namespace"`
+	Name      string `json:"name"`
+	FilePath  string `json:"file_path"`
 }
