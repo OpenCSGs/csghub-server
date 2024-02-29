@@ -117,7 +117,11 @@ func (c *repoComponent) UpdateRepo(ctx context.Context, req types.CreateRepoReq)
 	}
 
 	if namespace.NamespaceType == database.OrgNamespace {
-		if namespace.UserID != user.ID {
+		canWrite, err := c.checkCurrentUserPermission(ctx, req.Username, req.Namespace, membership.RoleWrite)
+		if err != nil {
+			return nil, err
+		}
+		if !canWrite {
 			return nil, errors.New("users do not have permission to update repo in this organization")
 		}
 	} else {
@@ -172,7 +176,11 @@ func (c *repoComponent) DeleteRepo(ctx context.Context, req types.DeleteRepoReq)
 	}
 
 	if namespace.NamespaceType == database.OrgNamespace {
-		if namespace.UserID != user.ID {
+		canWrite, err := c.checkCurrentUserPermission(ctx, req.Username, req.Namespace, membership.RoleAdmin)
+		if err != nil {
+			return nil, err
+		}
+		if !canWrite {
 			return nil, errors.New("users do not have permission to delete repo in this organization")
 		}
 	} else {

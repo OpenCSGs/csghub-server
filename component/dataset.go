@@ -229,7 +229,11 @@ func (c *DatasetComponent) Create(ctx context.Context, req *types.CreateDatasetR
 		Downloads:    dataset.Repository.DownloadCount,
 		Path:         dataset.Repository.Path,
 		RepositoryID: dataset.RepositoryID,
-		Private:      dataset.Repository.Private,
+		Repository: types.Repository{
+			HTTPCloneURL: dataset.Repository.HTTPCloneURL,
+			SSHCloneURL:  dataset.Repository.SSHCloneURL,
+		},
+		Private: dataset.Repository.Private,
 		User: types.User{
 			Username: user.Username,
 			Nickname: user.Name,
@@ -377,15 +381,20 @@ func (c *DatasetComponent) Show(ctx context.Context, namespace, name, current_us
 	}
 
 	resDataset := &types.Dataset{
-		ID:           dataset.ID,
-		Name:         dataset.Repository.Name,
-		Nickname:     dataset.Repository.Nickname,
-		Description:  dataset.Repository.Description,
-		Likes:        dataset.Repository.Likes,
-		Downloads:    dataset.Repository.DownloadCount,
-		Path:         dataset.Repository.Path,
-		RepositoryID: dataset.Repository.ID,
-		Tags:         tags,
+		ID:            dataset.ID,
+		Name:          dataset.Repository.Name,
+		Nickname:      dataset.Repository.Nickname,
+		Description:   dataset.Repository.Description,
+		Likes:         dataset.Repository.Likes,
+		Downloads:     dataset.Repository.DownloadCount,
+		Path:          dataset.Repository.Path,
+		RepositoryID:  dataset.Repository.ID,
+		DefaultBranch: dataset.Repository.DefaultBranch,
+		Repository: types.Repository{
+			HTTPCloneURL: dataset.Repository.HTTPCloneURL,
+			SSHCloneURL:  dataset.Repository.SSHCloneURL,
+		},
+		Tags: tags,
 		User: types.User{
 			Username: dataset.Repository.User.Username,
 			Nickname: dataset.Repository.User.Name,
