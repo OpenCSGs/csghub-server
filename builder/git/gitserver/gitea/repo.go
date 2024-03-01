@@ -42,7 +42,7 @@ func (c *Client) CreateRepo(ctx context.Context, req gitserver.CreateRepoReq) (*
 		Description:   req.Description,
 		Labels:        req.Labels,
 		License:       req.License,
-		DefaultBranch: req.DefaultBranch,
+		DefaultBranch: giteaRepo.DefaultBranch,
 		RepoType:      req.RepoType,
 		GitPath:       giteaRepo.FullName,
 		SshCloneURL:   giteaRepo.SSHURL,
