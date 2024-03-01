@@ -44,7 +44,7 @@ func (s *ModelStore) PublicToUser(ctx context.Context, user *User, search, sort 
 	if search != "" {
 		search = strings.ToLower(search)
 		query = query.Where(
-			"LOWER(repository.path) like ? or LOWER(repository.description) like ? or LOWER(repository.name) like ?",
+			"LOWER(repository.path) like ? or LOWER(repository.description) like ? or LOWER(repository.nickname) like ?",
 			fmt.Sprintf("%%%s%%", search),
 			fmt.Sprintf("%%%s%%", search),
 			fmt.Sprintf("%%%s%%", search),
@@ -62,7 +62,7 @@ func (s *ModelStore) PublicToUser(ctx context.Context, user *User, search, sort 
 		return
 	}
 
-	query = query.Order(sortBy[sort])
+	query = query.Order(fmt.Sprintf("repository.%s", sortBy[sort]))
 	query = query.Limit(per).
 		Offset((page - 1) * per)
 

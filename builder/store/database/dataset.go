@@ -11,9 +11,9 @@ import (
 )
 
 var sortBy = map[string]string{
-	"trending":        "downloads DESC",
+	"trending":        "download_count DESC",
 	"recently_update": "updated_at DESC",
-	"most_download":   "downloads DESC",
+	"most_download":   "download_count DESC",
 	"most_favorite":   "likes DESC",
 }
 
@@ -48,7 +48,7 @@ func (s *DatasetStore) PublicToUser(ctx context.Context, user *User, search, sor
 	if search != "" {
 		search = strings.ToLower(search)
 		query = query.Where(
-			"LOWER(repository.path) like ? or LOWER(repository.description) like ? or LOWER(dataset.url_slug) like ?",
+			"LOWER(repository.path) like ? or LOWER(repository.description) like ? or LOWER(repository.nickname) like ?",
 			fmt.Sprintf("%%%s%%", search),
 			fmt.Sprintf("%%%s%%", search),
 			fmt.Sprintf("%%%s%%", search),
@@ -65,7 +65,7 @@ func (s *DatasetStore) PublicToUser(ctx context.Context, user *User, search, sor
 		return
 	}
 
-	query = query.Order(sortBy[sort])
+	query = query.Order(fmt.Sprintf("repository.%s", sortBy[sort]))
 	query = query.Limit(per).
 		Offset((page - 1) * per)
 
