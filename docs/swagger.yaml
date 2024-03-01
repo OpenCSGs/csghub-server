@@ -462,6 +462,8 @@ definitions:
     properties:
       created_at:
         type: string
+      default_branch:
+        type: string
       description:
         type: string
       downloads:
@@ -478,6 +480,8 @@ definitions:
         type: string
       private:
         type: boolean
+      repository:
+        $ref: '#/definitions/types.Repository'
       repository_id:
         type: integer
       tags:
@@ -567,13 +571,12 @@ definitions:
     properties:
       created_at:
         type: string
+      default_branch:
+        type: string
       description:
         type: string
       downloads:
         type: integer
-      endpoint:
-        description: url to interact with the model
-        type: string
       id:
         type: integer
       likes:
@@ -586,8 +589,14 @@ definitions:
         type: string
       private:
         type: boolean
+      repository:
+        $ref: '#/definitions/types.Repository'
       repository_id:
         type: integer
+      status:
+        description: url to interact with the model
+        example: RUNNING
+        type: string
       tags:
         items:
           $ref: '#/definitions/types.RepoTag'
@@ -600,6 +609,7 @@ definitions:
         allOf:
         - $ref: '#/definitions/types.ModelWidgetType'
         description: 'widget UI style: generation,chat'
+        example: generation
     type: object
   types.ModelPredictReq:
     properties:
@@ -649,6 +659,13 @@ definitions:
       show_name:
         type: string
       updated_at:
+        type: string
+    type: object
+  types.Repository:
+    properties:
+      http_clone_url:
+        type: string
+      ssh_clone_url:
         type: string
     type: object
   types.RepositoryType:

@@ -4985,6 +4985,9 @@ const docTemplate = `{
                 "created_at": {
                     "type": "string"
                 },
+                "default_branch": {
+                    "type": "string"
+                },
                 "description": {
                     "type": "string"
                 },
@@ -5008,6 +5011,9 @@ const docTemplate = `{
                 },
                 "private": {
                     "type": "boolean"
+                },
+                "repository": {
+                    "$ref": "#/definitions/types.Repository"
                 },
                 "repository_id": {
                     "type": "integer"
@@ -5143,15 +5149,14 @@ const docTemplate = `{
                 "created_at": {
                     "type": "string"
                 },
+                "default_branch": {
+                    "type": "string"
+                },
                 "description": {
                     "type": "string"
                 },
                 "downloads": {
                     "type": "integer"
-                },
-                "endpoint": {
-                    "description": "url to interact with the model",
-                    "type": "string"
                 },
                 "id": {
                     "type": "integer"
@@ -5171,8 +5176,16 @@ const docTemplate = `{
                 "private": {
                     "type": "boolean"
                 },
+                "repository": {
+                    "$ref": "#/definitions/types.Repository"
+                },
                 "repository_id": {
                     "type": "integer"
+                },
+                "status": {
+                    "description": "url to interact with the model",
+                    "type": "string",
+                    "example": "RUNNING"
                 },
                 "tags": {
                     "type": "array",
@@ -5192,7 +5205,8 @@ const docTemplate = `{
                         {
                             "$ref": "#/definitions/types.ModelWidgetType"
                         }
-                    ]
+                    ],
+                    "example": "generation"
                 }
             }
         },
@@ -5268,6 +5282,17 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "updated_at": {
+                    "type": "string"
+                }
+            }
+        },
+        "types.Repository": {
+            "type": "object",
+            "properties": {
+                "http_clone_url": {
+                    "type": "string"
+                },
+                "ssh_clone_url": {
                     "type": "string"
                 }
             }

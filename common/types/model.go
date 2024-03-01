@@ -76,9 +76,9 @@ type Model struct {
 	CreatedAt     time.Time  `json:"created_at"`
 	UpdatedAt     time.Time  `json:"updated_at"`
 	// widget UI style: generation,chat
-	WidgetType ModelWidgetType `json:"widget_type"`
+	WidgetType ModelWidgetType `json:"widget_type" example:"generation"`
 	// url to interact with the model
-	Endpoint string `json:"endpoint"`
+	Status string `json:"status" example:"RUNNING"`
 }
 
 type ModelWidgetType string

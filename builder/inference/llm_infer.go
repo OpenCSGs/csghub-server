@@ -130,9 +130,16 @@ func (c *llmInferClient) updateModelInfos(llmInfos map[string]LlmModelInfo) {
 			parsedUrl, _ := url.Parse(endpoint)
 			endpoint, _ = url.JoinPath(c.serverAddr, parsedUrl.RequestURI())
 			slog.Debug("replace llm endpoint with new domain", slog.String("new_endpoint", endpoint))
+			var status string
+			if len(v.Status) > 0 {
+				for _, vs := range v.Status {
+					status = vs.ApplicationStatus
+					break
+				}
+			}
 			mi := ModelInfo{
 				Endpoint: endpoint,
-				Status:   "running",
+				Status:   status,
 				HashID:   mid.Hash(),
 			}
 			tmp[mi.HashID] = mi

@@ -397,7 +397,7 @@ func (c *ModelComponent) Show(ctx context.Context, namespace, name, current_user
 		UpdatedAt: model.UpdatedAt,
 		// TODO:default to ModelWidgetTypeGeneration, need to config later
 		WidgetType: types.ModelWidgetTypeGeneration,
-		Endpoint:   mi.Endpoint,
+		Status:     mi.Status,
 	}
 
 	return resModel, nil
