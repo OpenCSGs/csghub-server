@@ -462,6 +462,8 @@ definitions:
     properties:
       created_at:
         type: string
+      default_branch:
+        type: string
       description:
         type: string
       downloads:
@@ -478,6 +480,8 @@ definitions:
         type: string
       private:
         type: boolean
+      repository:
+        $ref: '#/definitions/types.Repository'
       repository_id:
         type: integer
       tags:
@@ -567,6 +571,8 @@ definitions:
     properties:
       created_at:
         type: string
+      default_branch:
+        type: string
       description:
         type: string
       downloads:
@@ -583,8 +589,14 @@ definitions:
         type: string
       private:
         type: boolean
+      repository:
+        $ref: '#/definitions/types.Repository'
       repository_id:
         type: integer
+      status:
+        description: url to interact with the model
+        example: RUNNING
+        type: string
       tags:
         items:
           $ref: '#/definitions/types.RepoTag'
@@ -593,6 +605,11 @@ definitions:
         type: string
       user:
         $ref: '#/definitions/types.User'
+      widget_type:
+        allOf:
+        - $ref: '#/definitions/types.ModelWidgetType'
+        description: 'widget UI style: generation,chat'
+        example: generation
     type: object
   types.ModelPredictReq:
     properties:
@@ -614,6 +631,14 @@ definitions:
       updated_at:
         type: string
     type: object
+  types.ModelWidgetType:
+    enum:
+    - generation
+    - chat
+    type: string
+    x-enum-varnames:
+    - ModelWidgetTypeGeneration
+    - ModelWidgetTypeChat
   types.RepoBranchCommit:
     properties:
       id:
@@ -636,18 +661,27 @@ definitions:
       updated_at:
         type: string
     type: object
+  types.Repository:
+    properties:
+      http_clone_url:
+        type: string
+      ssh_clone_url:
+        type: string
+    type: object
   types.RepositoryType:
     enum:
     - model
     - dataset
     - space
     - code
+    - ""
     type: string
     x-enum-varnames:
     - ModelRepo
     - DatasetRepo
     - SpaceRepo
     - CodeRepo
+    - UnknownRepo
   types.Response:
     properties:
       data: {}
@@ -2687,7 +2721,7 @@ paths:
             - properties:
                 data:
                   items:
-                    $ref: '#/definitions/database.Dataset'
+                    $ref: '#/definitions/types.Dataset'
                   type: array
                 total:
                   type: integer
@@ -2740,7 +2774,7 @@ paths:
             - properties:
                 data:
                   items:
-                    $ref: '#/definitions/database.Model'
+                    $ref: '#/definitions/types.Model'
                   type: array
                 total:
                   type: integer

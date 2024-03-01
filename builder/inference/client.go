@@ -1,7 +1,8 @@
 package inference
 
-type App interface {
+type Client interface {
 	Predict(id ModelID, req *PredictRequest) (*PredictResponse, error)
+	GetModelInfo(id ModelID) (ModelInfo, error)
 }
 
 type PredictRequest struct {
