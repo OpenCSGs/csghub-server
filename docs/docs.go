@@ -3038,7 +3038,7 @@ const docTemplate = `{
                                         "data": {
                                             "type": "array",
                                             "items": {
-                                                "$ref": "#/definitions/database.Dataset"
+                                                "$ref": "#/definitions/types.Dataset"
                                             }
                                         },
                                         "total": {
@@ -3124,7 +3124,7 @@ const docTemplate = `{
                                         "data": {
                                             "type": "array",
                                             "items": {
-                                                "$ref": "#/definitions/database.Model"
+                                                "$ref": "#/definitions/types.Model"
                                             }
                                         },
                                         "total": {
@@ -4985,6 +4985,9 @@ const docTemplate = `{
                 "created_at": {
                     "type": "string"
                 },
+                "default_branch": {
+                    "type": "string"
+                },
                 "description": {
                     "type": "string"
                 },
@@ -5008,6 +5011,9 @@ const docTemplate = `{
                 },
                 "private": {
                     "type": "boolean"
+                },
+                "repository": {
+                    "$ref": "#/definitions/types.Repository"
                 },
                 "repository_id": {
                     "type": "integer"
@@ -5143,6 +5149,9 @@ const docTemplate = `{
                 "created_at": {
                     "type": "string"
                 },
+                "default_branch": {
+                    "type": "string"
+                },
                 "description": {
                     "type": "string"
                 },
@@ -5167,8 +5176,16 @@ const docTemplate = `{
                 "private": {
                     "type": "boolean"
                 },
+                "repository": {
+                    "$ref": "#/definitions/types.Repository"
+                },
                 "repository_id": {
                     "type": "integer"
+                },
+                "status": {
+                    "description": "url to interact with the model",
+                    "type": "string",
+                    "example": "RUNNING"
                 },
                 "tags": {
                     "type": "array",
@@ -5181,6 +5198,15 @@ const docTemplate = `{
                 },
                 "user": {
                     "$ref": "#/definitions/types.User"
+                },
+                "widget_type": {
+                    "description": "widget UI style: generation,chat",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/types.ModelWidgetType"
+                        }
+                    ],
+                    "example": "generation"
                 }
             }
         },
@@ -5214,6 +5240,17 @@ const docTemplate = `{
                     "type": "string"
                 }
             }
+        },
+        "types.ModelWidgetType": {
+            "type": "string",
+            "enum": [
+                "generation",
+                "chat"
+            ],
+            "x-enum-varnames": [
+                "ModelWidgetTypeGeneration",
+                "ModelWidgetTypeChat"
+            ]
         },
         "types.RepoBranchCommit": {
             "type": "object",
@@ -5249,19 +5286,32 @@ const docTemplate = `{
                 }
             }
         },
+        "types.Repository": {
+            "type": "object",
+            "properties": {
+                "http_clone_url": {
+                    "type": "string"
+                },
+                "ssh_clone_url": {
+                    "type": "string"
+                }
+            }
+        },
         "types.RepositoryType": {
             "type": "string",
             "enum": [
                 "model",
                 "dataset",
                 "space",
-                "code"
+                "code",
+                ""
             ],
             "x-enum-varnames": [
                 "ModelRepo",
                 "DatasetRepo",
                 "SpaceRepo",
-                "CodeRepo"
+                "CodeRepo",
+                "UnknownRepo"
             ]
         },
         "types.Response": {
