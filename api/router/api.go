@@ -79,6 +79,7 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 		// and an lfs parameter needs to be added.
 		// 2. DownloadFile returns an object store url for lfs files, while SDKDownload redirects directly.
 		modelsGroup.GET("/:namespace/:name/download/*file_path", modelHandler.DownloadFile)
+		modelsGroup.GET("/:namespace/:name/resolve/*file_path", modelHandler.ResolveDownload)
 		modelsGroup.POST("/:namespace/:name/raw/*file_path", modelHandler.CreateFile)
 		modelsGroup.PUT("/:namespace/:name/raw/*file_path", modelHandler.UpdateFile)
 		modelsGroup.POST("/:namespace/:name/update_downloads", modelHandler.UpdateDownloads)
@@ -103,7 +104,7 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 	apiGroup.GET("/datasets/:namespace/:name/raw/*file_path", dsHandler.FileRaw)
 	apiGroup.GET("/datasets/:namespace/:name/blob/*file_path", dsHandler.FileInfo)
 	apiGroup.GET("/datasets/:namespace/:name/download/*file_path", dsHandler.DownloadFile)
-	apiGroup.GET("/datasets/:namespace/:name/resolve/:branch/*file_path", dsHandler.SDKDownload)
+	apiGroup.GET("/datasets/:namespace/:name/resolve/*file_path", dsHandler.ResolveDownload)
 	apiGroup.PUT("/datasets/:namespace/:name/raw/*file_path", dsHandler.UpdateFile)
 	apiGroup.POST("/datasets/:namespace/:name/update_downloads", dsHandler.UpdateDownloads)
 	apiGroup.POST("/datasets/:namespace/:name/upload_file", dsHandler.UploadFile)

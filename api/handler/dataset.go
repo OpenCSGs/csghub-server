@@ -830,6 +830,30 @@ func (h *DatasetHandler) SDKListFiles(ctx *gin.Context) {
 }
 
 func (h *DatasetHandler) SDKDownload(ctx *gin.Context) {
+	h.handleDownload(ctx, false)
+}
+
+// DownloadDatasetFile godoc
+// @Security     ApiKey
+// @Summary      Download dataset file
+// @Description  download dataset file
+// @Tags         Dataset
+// @Accept       json
+// @Produce      json
+// @Produce      octet-stream
+// @Param        namespace path string true "namespace"
+// @Param        name path string true "name"
+// @Param        file_path path string true "file_path"
+// @Param        ref query string false "ref"
+// @Success      200  {object}  types.Response{data=string} "OK"
+// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
+// @Router       /datasets/{namespace}/{name}/resolve/{file_path} [get]
+func (h *DatasetHandler) ResolveDownload(ctx *gin.Context) {
+	h.handleDownload(ctx, true)
+}
+
+func (h *DatasetHandler) HeadSDKDownload(ctx *gin.Context) {
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
 	if err != nil {
 		slog.Error("Bad request format", "error", err)
@@ -839,6 +863,45 @@ func (h *DatasetHandler) SDKDownload(ctx *gin.Context) {
 	filePath := ctx.Param("file_path")
 	filePath = convertFilePathFromRoute(filePath)
 	branch := ctx.Param("branch")
+	req := &types.GetFileReq{
+		Namespace: namespace,
+		Name:      name,
+		Path:      filePath,
+		Ref:       branch,
+		Lfs:       false,
+		SaveAs:    filepath.Base(filePath),
+		RepoType:  types.DatasetRepo,
+	}
+
+	file, err := h.c.HeadDownloadFile(ctx, req)
+	if err != nil {
+		slog.Error("Failed to download dataset file", slog.Any("error", err))
+		httpbase.ServerError(ctx, err)
+		return
+	}
+
+	slog.Info("Head download dataset file succeed", slog.String("dataset", name), slog.String("path", req.Path), slog.String("ref", req.Ref))
+	ctx.Header("Content-Length", strconv.Itoa(file.Size))
+	ctx.Header("X-Repo-Commit", file.SHA)
+	ctx.Header("ETag", file.SHA)
+	ctx.Status(http.StatusOK)
+}
+
+func (h *DatasetHandler) handleDownload(ctx *gin.Context, isResolve bool) {
+	var branch string
+	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
+	if err != nil {
+		slog.Error("Bad request format", "error", err)
+		httpbase.BadRequest(ctx, err.Error())
+		return
+	}
+	filePath := ctx.Param("file_path")
+	filePath = convertFilePathFromRoute(filePath)
+	if isResolve {
+		branch = ctx.Query("ref")
+	} else {
+		branch = ctx.Param("branch")
+	}
 	req := &types.GetFileReq{
 		Namespace: namespace,
 		Name:      name,
@@ -876,38 +939,4 @@ func (h *DatasetHandler) SDKDownload(ctx *gin.Context) {
 			return
 		}
 	}
-}
-
-func (h *DatasetHandler) HeadSDKDownload(ctx *gin.Context) {
-	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
-	if err != nil {
-		slog.Error("Bad request format", "error", err)
-		httpbase.BadRequest(ctx, err.Error())
-		return
-	}
-	filePath := ctx.Param("file_path")
-	filePath = convertFilePathFromRoute(filePath)
-	branch := ctx.Param("branch")
-	req := &types.GetFileReq{
-		Namespace: namespace,
-		Name:      name,
-		Path:      filePath,
-		Ref:       branch,
-		Lfs:       false,
-		SaveAs:    filepath.Base(filePath),
-		RepoType:  types.DatasetRepo,
-	}
-
-	file, err := h.c.HeadDownloadFile(ctx, req)
-	if err != nil {
-		slog.Error("Failed to download dataset file", slog.Any("error", err))
-		httpbase.ServerError(ctx, err)
-		return
-	}
-
-	slog.Info("Head download dataset file succeed", slog.String("dataset", name), slog.String("path", req.Path), slog.String("ref", req.Ref))
-	ctx.Header("Content-Length", strconv.Itoa(file.Size))
-	ctx.Header("X-Repo-Commit", file.SHA)
-	ctx.Header("ETag", file.SHA)
-	ctx.Status(http.StatusOK)
 }
