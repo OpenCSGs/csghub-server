@@ -891,16 +891,38 @@ func (h *ModelHandler) SDKListFiles(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, files)
 }
 
+// DownloadModelFile godoc
+// @Security     ApiKey
+// @Summary      Download model file
+// @Description  download model file
+// @Tags         Model
+// @Accept       json
+// @Produce      json
+// @Produce      octet-stream
+// @Param        namespace path string true "namespace"
+// @Param        name path string true "name"
+// @Param        file_path path string true "file_path"
+// @Param        ref query string true "ref"
+// @Success      200  {object}  types.Response{data=string} "OK"
+// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
+// @Router       /models/{namespace}/{name}/resolve/{file_path} [get]
 func (h *ModelHandler) SDKDownload(ctx *gin.Context) {
+	var branch string
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
 	if err != nil {
 		slog.Error("Bad request format", "error", err)
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
+
 	filePath := ctx.Param("file_path")
 	filePath = convertFilePathFromRoute(filePath)
-	branch := ctx.Param("branch")
+	if isResolveAPI(ctx) {
+		branch = ctx.Query("ref")
+	} else {
+		branch = ctx.Param("branch")
+	}
 	req := &types.GetFileReq{
 		Namespace: namespace,
 		Name:      name,
@@ -972,4 +994,8 @@ func (h *ModelHandler) HeadSDKDownload(ctx *gin.Context) {
 	ctx.Header("X-Repo-Commit", file.SHA)
 	ctx.Header("ETag", file.SHA)
 	ctx.Status(http.StatusOK)
+}
+
+func isResolveAPI(ctx *gin.Context) bool {
+	return strings.EqualFold(ctx.FullPath(), "/api/v1/models/:namespace/:name/resolve/*file_path")
 }

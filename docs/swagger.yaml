@@ -1476,6 +1476,58 @@ paths:
       summary: Update dataset file
       tags:
       - Dataset
+  /datasets/{namespace}/{name}/resolve/{file_path}:
+    get:
+      consumes:
+      - application/json
+      description: download dataset file
+      parameters:
+      - description: namespace
+        in: path
+        name: namespace
+        required: true
+        type: string
+      - description: name
+        in: path
+        name: name
+        required: true
+        type: string
+      - description: file_path
+        in: path
+        name: file_path
+        required: true
+        type: string
+      - description: ref
+        in: query
+        name: ref
+        required: true
+        type: string
+      produces:
+      - application/json
+      - application/octet-stream
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/types.Response'
+            - properties:
+                data:
+                  type: string
+              type: object
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Download dataset file
+      tags:
+      - Dataset
   /datasets/{namespace}/{name}/tags:
     get:
       consumes:
@@ -2475,6 +2527,58 @@ paths:
       security:
       - ApiKey: []
       summary: Update model file
+      tags:
+      - Model
+  /models/{namespace}/{name}/resolve/{file_path}:
+    get:
+      consumes:
+      - application/json
+      description: download model file
+      parameters:
+      - description: namespace
+        in: path
+        name: namespace
+        required: true
+        type: string
+      - description: name
+        in: path
+        name: name
+        required: true
+        type: string
+      - description: file_path
+        in: path
+        name: file_path
+        required: true
+        type: string
+      - description: ref
+        in: query
+        name: ref
+        required: true
+        type: string
+      produces:
+      - application/json
+      - application/octet-stream
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/types.Response'
+            - properties:
+                data:
+                  type: string
+              type: object
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Download model file
       tags:
       - Model
   /models/{namespace}/{name}/tags:
