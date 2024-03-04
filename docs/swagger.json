@@ -1058,8 +1058,7 @@
                         "type": "string",
                         "description": "ref",
                         "name": "ref",
-                        "in": "query",
-                        "required": true
+                        "in": "query"
                     }
                 ],
                 "responses": {
@@ -2758,8 +2757,7 @@
                         "type": "string",
                         "description": "ref",
                         "name": "ref",
-                        "in": "query",
-                        "required": true
+                        "in": "query"
                     }
                 ],
                 "responses": {

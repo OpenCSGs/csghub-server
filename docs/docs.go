@@ -1069,8 +1069,7 @@ const docTemplate = `{
                         "type": "string",
                         "description": "ref",
                         "name": "ref",
-                        "in": "query",
-                        "required": true
+                        "in": "query"
                     }
                 ],
                 "responses": {
@@ -2769,8 +2768,7 @@ const docTemplate = `{
                         "type": "string",
                         "description": "ref",
                         "name": "ref",
-                        "in": "query",
-                        "required": true
+                        "in": "query"
                     }
                 ],
                 "responses": {

@@ -1500,7 +1500,6 @@ paths:
       - description: ref
         in: query
         name: ref
-        required: true
         type: string
       produces:
       - application/json
@@ -2553,7 +2552,6 @@ paths:
       - description: ref
         in: query
         name: ref
-        required: true
         type: string
       produces:
       - application/json
