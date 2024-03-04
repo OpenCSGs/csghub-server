@@ -892,7 +892,7 @@ func (h *ModelHandler) SDKListFiles(ctx *gin.Context) {
 }
 
 func (h *ModelHandler) SDKDownload(ctx *gin.Context) {
-	h.handleDownload(ctx)
+	h.handleDownload(ctx, false)
 }
 
 // DownloadModelFile godoc
@@ -912,7 +912,7 @@ func (h *ModelHandler) SDKDownload(ctx *gin.Context) {
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
 // @Router       /models/{namespace}/{name}/resolve/{file_path} [get]
 func (h *ModelHandler) ResolveDownload(ctx *gin.Context) {
-	h.handleDownload(ctx)
+	h.handleDownload(ctx, true)
 }
 
 func (h *ModelHandler) HeadSDKDownload(ctx *gin.Context) {
@@ -949,7 +949,7 @@ func (h *ModelHandler) HeadSDKDownload(ctx *gin.Context) {
 	ctx.Status(http.StatusOK)
 }
 
-func (h *ModelHandler) handleDownload(ctx *gin.Context) {
+func (h *ModelHandler) handleDownload(ctx *gin.Context, isResolve bool) {
 	var branch string
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
 	if err != nil {
@@ -960,7 +960,7 @@ func (h *ModelHandler) handleDownload(ctx *gin.Context) {
 
 	filePath := ctx.Param("file_path")
 	filePath = convertFilePathFromRoute(filePath)
-	if isResolveAPI(ctx) {
+	if isResolve {
 		branch = ctx.Query("ref")
 	} else {
 		branch = ctx.Param("branch")
@@ -1002,8 +1002,4 @@ func (h *ModelHandler) handleDownload(ctx *gin.Context) {
 			return
 		}
 	}
-}
-
-func isResolveAPI(ctx *gin.Context) bool {
-	return strings.EqualFold(ctx.FullPath(), "/api/v1/models/:namespace/:name/resolve/*file_path")
 }

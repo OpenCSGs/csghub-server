@@ -830,7 +830,7 @@ func (h *DatasetHandler) SDKListFiles(ctx *gin.Context) {
 }
 
 func (h *DatasetHandler) SDKDownload(ctx *gin.Context) {
-	h.handleDownload(ctx)
+	h.handleDownload(ctx, false)
 }
 
 // DownloadDatasetFile godoc
@@ -850,7 +850,7 @@ func (h *DatasetHandler) SDKDownload(ctx *gin.Context) {
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
 // @Router       /datasets/{namespace}/{name}/resolve/{file_path} [get]
 func (h *DatasetHandler) ResolveDownload(ctx *gin.Context) {
-	h.handleDownload(ctx)
+	h.handleDownload(ctx, true)
 }
 
 func (h *DatasetHandler) HeadSDKDownload(ctx *gin.Context) {
@@ -887,7 +887,7 @@ func (h *DatasetHandler) HeadSDKDownload(ctx *gin.Context) {
 	ctx.Status(http.StatusOK)
 }
 
-func (h *DatasetHandler) handleDownload(ctx *gin.Context) {
+func (h *DatasetHandler) handleDownload(ctx *gin.Context, isResolve bool) {
 	var branch string
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
 	if err != nil {
@@ -897,7 +897,7 @@ func (h *DatasetHandler) handleDownload(ctx *gin.Context) {
 	}
 	filePath := ctx.Param("file_path")
 	filePath = convertFilePathFromRoute(filePath)
-	if isResolveAPI(ctx) {
+	if isResolve {
 		branch = ctx.Query("ref")
 	} else {
 		branch = ctx.Param("branch")
