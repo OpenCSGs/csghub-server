@@ -71,7 +71,7 @@ type Config struct {
 
 	Space struct {
 		// base url for space api running in k8s cluster
-		K8sEndpoint string `envconfig:"STARHUB_SERVER_SPACE_K8sEndpoint" default:"http://www.baidu.com"`
+		K8sEndpoint string `envconfig:"STARHUB_SERVER_SPACE_K8sEndpoint" default:"http://localhost:8080"`
 	}
 }
 
