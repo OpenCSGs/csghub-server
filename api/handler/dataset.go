@@ -178,6 +178,8 @@ func (h *DatasetHandler) Create(ctx *gin.Context) {
 // @Param        per query int false "per" default(20)
 // @Param        page query int false "per page" default(1)
 // @Param        current_user query string true "current user"
+// @Param        search query string false "search text"
+// @Param        sort query string false "sort by"
 // @Success      200  {object}  types.ResponseWithTotal{data=[]types.Dataset,total=int} "OK"
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
