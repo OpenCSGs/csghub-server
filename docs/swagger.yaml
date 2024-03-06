@@ -873,6 +873,14 @@ paths:
         name: current_user
         required: true
         type: string
+      - description: search text
+        in: query
+        name: search
+        type: string
+      - description: sort by
+        in: query
+        name: sort
+        type: string
       produces:
       - application/json
       responses:

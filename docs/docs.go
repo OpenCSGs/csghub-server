@@ -54,6 +54,18 @@ const docTemplate = `{
                         "name": "current_user",
                         "in": "query",
                         "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "search text",
+                        "name": "search",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "sort by",
+                        "name": "sort",
+                        "in": "query"
                     }
                 ],
                 "responses": {
