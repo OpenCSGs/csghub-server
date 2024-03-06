@@ -8,7 +8,9 @@ type CreateSpaceReq struct {
 	// Namespace string `json:"namespace" example:"user_or_org_name"`
 	// Name      string `json:"name" example:"space_name_1"`
 	// License   string `json:"license" example:"MIT"`
-	Sdk string `json:"sdk" example:"gradio"`
+	SdkID         int64  `json:"sdk_id" example:"1"`
+	ResourceID    int64  `json:"resource_id" example:"1"`
+	CoverImageUrl string `json:"cover_image_url"`
 	// Private   bool   `json:"private"`
 }
 
@@ -20,12 +22,13 @@ type Space struct {
 	Path      string `json:"path" example:"user_or_org_name/space_name_1"`
 	License   string `json:"license" example:"MIT"`
 	// like gradio,steamlit etc
-	Sdk string `json:"sdk" example:"gradio"`
+	Sdk           SpaceSdk      `json:"sdk"`
+	Resource      SpaceResource `json:"resource"`
+	CoverImageUrl string        `json:"cover_image_url"`
 	// the serving endpoint url
 	Endpoint string `json:"endpoint" example:"https://localhost/spaces/myname/myspace"`
 	// deploying, running, failed
 	RunningStatus string    `json:"running_status"`
-	CoverImg      string    `json:"cover_img"`
 	CreatedAt     time.Time `json:"created_at"`
 	Likes         int64     `json:"like_count"`
 	Private       bool      `json:"private"`

@@ -18,6 +18,21 @@ definitions:
       user_id:
         type: integer
     type: object
+  database.Code:
+    properties:
+      created_at:
+        type: string
+      id:
+        type: integer
+      last_updated_at:
+        type: string
+      repository:
+        $ref: '#/definitions/database.Repository'
+      repository_id:
+        type: integer
+      updated_at:
+        type: string
+    type: object
   database.Dataset:
     properties:
       created_at:
@@ -276,6 +291,41 @@ definitions:
       name:
         type: string
     type: object
+  types.Code:
+    properties:
+      created_at:
+        type: string
+      default_branch:
+        type: string
+      description:
+        type: string
+      downloads:
+        type: integer
+      id:
+        type: integer
+      likes:
+        type: integer
+      name:
+        type: string
+      nickname:
+        type: string
+      path:
+        type: string
+      private:
+        type: boolean
+      repository:
+        $ref: '#/definitions/types.Repository'
+      repository_id:
+        type: integer
+      tags:
+        items:
+          $ref: '#/definitions/types.RepoTag'
+        type: array
+      updated_at:
+        type: string
+      user:
+        $ref: '#/definitions/types.User'
+    type: object
   types.Commit:
     properties:
       author_email:
@@ -295,6 +345,36 @@ definitions:
       id:
         type: string
       message:
+        type: string
+    type: object
+  types.CreateCodeReq:
+    properties:
+      default_branch:
+        example: main
+        type: string
+      description:
+        type: string
+      labels:
+        example: ""
+        type: string
+      license:
+        example: MIT
+        type: string
+      name:
+        example: model_name_1
+        type: string
+      namespace:
+        example: user_or_org_name
+        type: string
+      nickname:
+        example: model display name
+        type: string
+      private:
+        type: boolean
+      readme:
+        type: string
+      username:
+        example: creator_user_name
         type: string
     type: object
   types.CreateDatasetReq:
@@ -404,6 +484,8 @@ definitions:
     type: object
   types.CreateSpaceReq:
     properties:
+      cover_image_url:
+        type: string
       default_branch:
         example: main
         type: string
@@ -428,17 +510,34 @@ definitions:
         type: boolean
       readme:
         type: string
-      sdk:
+      resource_id:
+        example: 1
+        type: integer
+      sdk_id:
         description: |-
           Creator   string `json:"username" example:"creator_user_name"`
           Namespace string `json:"namespace" example:"user_or_org_name"`
           Name      string `json:"name" example:"space_name_1"`
           License   string `json:"license" example:"MIT"`
-        example: gradio
-        type: string
+        example: 1
+        type: integer
       username:
         example: creator_user_name
         type: string
+    type: object
+  types.CreateSpaceResourceReq:
+    properties:
+      name:
+        type: string
+    required:
+    - name
+    type: object
+  types.CreateSpaceSdkReq:
+    properties:
+      name:
+        type: string
+    required:
+    - name
     type: object
   types.CreateUserRequest:
     properties:
@@ -698,7 +797,7 @@ definitions:
     type: object
   types.Space:
     properties:
-      cover_img:
+      cover_image_url:
         type: string
       created_at:
         type: string
@@ -722,12 +821,58 @@ definitions:
         type: string
       private:
         type: boolean
+      resource:
+        $ref: '#/definitions/types.SpaceResource'
       running_status:
         description: deploying, running, failed
         type: string
       sdk:
+        allOf:
+        - $ref: '#/definitions/types.SpaceSdk'
         description: like gradio,steamlit etc
-        example: gradio
+      username:
+        example: creator_user_name
+        type: string
+    type: object
+  types.SpaceResource:
+    properties:
+      id:
+        type: integer
+      name:
+        type: string
+    type: object
+  types.SpaceSdk:
+    properties:
+      id:
+        type: integer
+      name:
+        type: string
+    type: object
+  types.UpdateCodeReq:
+    properties:
+      default_branch:
+        example: main
+        type: string
+      description:
+        type: string
+      labels:
+        example: ""
+        type: string
+      license:
+        example: MIT
+        type: string
+      name:
+        example: model_name_1
+        type: string
+      namespace:
+        example: user_or_org_name
+        type: string
+      nickname:
+        example: model display name
+        type: string
+      private:
+        type: boolean
+      readme:
         type: string
       username:
         example: creator_user_name
@@ -829,6 +974,22 @@ definitions:
         example: creator_user_name
         type: string
     type: object
+  types.UpdateSpaceResourceReq:
+    properties:
+      name:
+        type: string
+    required:
+    - name
+    type: object
+  types.UpdateSpaceSdkReq:
+    properties:
+      id:
+        type: integer
+      name:
+        type: string
+    required:
+    - name
+    type: object
   types.UpdateUserRequest:
     properties:
       email:
@@ -852,6 +1013,890 @@ definitions:
 info:
   contact: {}
 paths:
+  /codes:
+    get:
+      consumes:
+      - application/json
+      description: get visiable codes for current user
+      parameters:
+      - default: 20
+        description: per
+        in: query
+        name: per
+        type: integer
+      - default: 1
+        description: per page
+        in: query
+        name: page
+        type: integer
+      - description: current user
+        in: query
+        name: current_user
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/types.ResponseWithTotal'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/types.Code'
+                  type: array
+                total:
+                  type: integer
+              type: object
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Get Visiable codes for current user
+      tags:
+      - Code
+    post:
+      consumes:
+      - application/json
+      description: create a new code
+      parameters:
+      - description: body
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/types.CreateCodeReq'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/types.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/types.Code'
+              type: object
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Create a new code
+      tags:
+      - Code
+  /codes/{namespace}/{name}:
+    delete:
+      consumes:
+      - application/json
+      description: delete a exists code
+      parameters:
+      - description: namespace
+        in: path
+        name: namespace
+        required: true
+        type: string
+      - description: name
+        in: path
+        name: name
+        required: true
+        type: string
+      - description: current_user
+        in: query
+        name: current_user
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/types.Response'
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Delete a exists code
+      tags:
+      - Code
+    get:
+      consumes:
+      - application/json
+      description: get code detail
+      parameters:
+      - description: namespace
+        in: path
+        name: namespace
+        required: true
+        type: string
+      - description: name
+        in: path
+        name: name
+        required: true
+        type: string
+      - description: current_user
+        in: query
+        name: current_user
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/types.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/types.Code'
+              type: object
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Get code detail
+      tags:
+      - Code
+    put:
+      consumes:
+      - application/json
+      description: update a exists code
+      parameters:
+      - description: namespace
+        in: path
+        name: namespace
+        required: true
+        type: string
+      - description: name
+        in: path
+        name: name
+        required: true
+        type: string
+      - description: body
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/types.UpdateCodeReq'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/types.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/database.Code'
+              type: object
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Update a exists code
+      tags:
+      - Code
+  /codes/{namespace}/{name}/blob/{file_path}:
+    get:
+      consumes:
+      - application/json
+      description: get code file info
+      parameters:
+      - description: namespace
+        in: path
+        name: namespace
+        required: true
+        type: string
+      - description: name
+        in: path
+        name: name
+        required: true
+        type: string
+      - description: file_path
+        in: path
+        name: file_path
+        required: true
+        type: string
+      - description: ref
+        in: query
+        name: ref
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/types.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/types.Commit'
+              type: object
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Get code file info
+      tags:
+      - Code
+  /codes/{namespace}/{name}/branches:
+    get:
+      consumes:
+      - application/json
+      description: get code branches
+      parameters:
+      - description: namespace
+        in: path
+        name: namespace
+        required: true
+        type: string
+      - description: name
+        in: path
+        name: name
+        required: true
+        type: string
+      - default: 20
+        description: per
+        in: query
+        name: per
+        type: integer
+      - default: 1
+        description: page
+        in: query
+        name: page
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/types.Response'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/types.Branch'
+                  type: array
+              type: object
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Get code branches
+      tags:
+      - Code
+  /codes/{namespace}/{name}/commits:
+    get:
+      consumes:
+      - application/json
+      description: get code commits
+      parameters:
+      - description: namespace
+        in: path
+        name: namespace
+        required: true
+        type: string
+      - description: name
+        in: path
+        name: name
+        required: true
+        type: string
+      - description: ref
+        in: query
+        name: ref
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/types.Response'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/types.Commit'
+                  type: array
+              type: object
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Get code commits
+      tags:
+      - Code
+  /codes/{namespace}/{name}/download/{file_path}:
+    get:
+      consumes:
+      - application/json
+      description: download code file
+      parameters:
+      - description: namespace
+        in: path
+        name: namespace
+        required: true
+        type: string
+      - description: name
+        in: path
+        name: name
+        required: true
+        type: string
+      - description: file_path
+        in: path
+        name: file_path
+        required: true
+        type: string
+      - description: lfs
+        in: query
+        name: lfs
+        type: boolean
+      - description: ref
+        in: query
+        name: ref
+        type: string
+      - description: name of download file
+        in: query
+        name: save_as
+        type: string
+      produces:
+      - application/json
+      - application/octet-stream
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/types.Response'
+            - properties:
+                data:
+                  type: string
+              type: object
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Download code file
+      tags:
+      - Code
+  /codes/{namespace}/{name}/last_commit:
+    get:
+      consumes:
+      - application/json
+      description: get code last commit
+      parameters:
+      - description: namespace
+        in: path
+        name: namespace
+        required: true
+        type: string
+      - description: name
+        in: path
+        name: name
+        required: true
+        type: string
+      - description: ref
+        in: query
+        name: ref
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/types.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/types.Commit'
+              type: object
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Get code last commit
+      tags:
+      - Code
+  /codes/{namespace}/{name}/raw/{file_path}:
+    get:
+      consumes:
+      - application/json
+      description: get code file raw
+      parameters:
+      - description: namespace
+        in: path
+        name: namespace
+        required: true
+        type: string
+      - description: name
+        in: path
+        name: name
+        required: true
+        type: string
+      - description: file_path
+        in: path
+        name: file_path
+        required: true
+        type: string
+      - description: ref
+        in: query
+        name: ref
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/types.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/types.Commit'
+              type: object
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Get code file raw
+      tags:
+      - Code
+    post:
+      consumes:
+      - application/json
+      description: create code file
+      parameters:
+      - description: namespace
+        in: path
+        name: namespace
+        required: true
+        type: string
+      - description: name
+        in: path
+        name: name
+        required: true
+        type: string
+      - description: file_path
+        in: path
+        name: file_path
+        required: true
+        type: string
+      - description: body
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/types.CreateFileReq'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/types.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/types.CreateFileResp'
+              type: object
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Create code file
+      tags:
+      - Code
+    put:
+      consumes:
+      - application/json
+      description: update code file
+      parameters:
+      - description: namespace
+        in: path
+        name: namespace
+        required: true
+        type: string
+      - description: name
+        in: path
+        name: name
+        required: true
+        type: string
+      - description: file_path
+        in: path
+        name: file_path
+        required: true
+        type: string
+      - description: body
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/types.UpdateFileReq'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/types.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/types.UpdateFileResp'
+              type: object
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Update code file
+      tags:
+      - Code
+  /codes/{namespace}/{name}/resolve/{file_path}:
+    get:
+      consumes:
+      - application/json
+      description: download code file
+      parameters:
+      - description: namespace
+        in: path
+        name: namespace
+        required: true
+        type: string
+      - description: name
+        in: path
+        name: name
+        required: true
+        type: string
+      - description: file_path
+        in: path
+        name: file_path
+        required: true
+        type: string
+      - description: ref
+        in: query
+        name: ref
+        type: string
+      produces:
+      - application/json
+      - application/octet-stream
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/types.Response'
+            - properties:
+                data:
+                  type: string
+              type: object
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Download code file
+      tags:
+      - Code
+  /codes/{namespace}/{name}/tags:
+    get:
+      consumes:
+      - application/json
+      description: get code tags
+      parameters:
+      - description: namespace
+        in: path
+        name: namespace
+        required: true
+        type: string
+      - description: name
+        in: path
+        name: name
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/types.Response'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/types.Branch'
+                  type: array
+              type: object
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Get code tags
+      tags:
+      - Code
+  /codes/{namespace}/{name}/tree:
+    get:
+      consumes:
+      - application/json
+      description: get code file tree
+      parameters:
+      - description: namespace
+        in: path
+        name: namespace
+        required: true
+        type: string
+      - description: name
+        in: path
+        name: name
+        required: true
+        type: string
+      - description: ref
+        in: query
+        name: ref
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/types.Response'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/types.File'
+                  type: array
+              type: object
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Get code file tree
+      tags:
+      - Code
+  /codes/{namespace}/{name}/update_downloads:
+    post:
+      consumes:
+      - application/json
+      description: update code downloads
+      parameters:
+      - description: namespace
+        in: path
+        name: namespace
+        required: true
+        type: string
+      - description: name
+        in: path
+        name: name
+        required: true
+        type: string
+      - description: body
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/types.UpdateDownloadsReq'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/types.Response'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/types.File'
+                  type: array
+              type: object
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Update code downloads
+      tags:
+      - Code
+  /codes/{namespace}/{name}/upload_file:
+    post:
+      consumes:
+      - application/json
+      description: upload code file to create or update a file in code repository
+      parameters:
+      - description: namespace
+        in: path
+        name: namespace
+        required: true
+        type: string
+      - description: name
+        in: path
+        name: name
+        required: true
+        type: string
+      - description: file_path
+        in: formData
+        name: file_path
+        required: true
+        type: string
+      - description: file
+        in: formData
+        name: file
+        required: true
+        type: file
+      - description: email
+        in: formData
+        name: email
+        required: true
+        type: string
+      - description: message
+        in: formData
+        name: message
+        required: true
+        type: string
+      - description: branch
+        in: formData
+        name: branch
+        type: string
+      - description: username
+        in: formData
+        name: username
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/types.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/types.CreateFileResp'
+              type: object
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Create code file
+      tags:
+      - Code
   /datasets:
     get:
       consumes:
@@ -3113,6 +4158,298 @@ paths:
       summary: Remove membership between org and user
       tags:
       - Member
+  /space_resources:
+    get:
+      consumes:
+      - application/json
+      description: get space resources
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/types.ResponseWithTotal'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/types.SpaceResource'
+                  type: array
+                total:
+                  type: integer
+              type: object
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Get space resources
+      tags:
+      - SpaceReource
+    post:
+      consumes:
+      - application/json
+      description: create space resource
+      parameters:
+      - description: body
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/types.CreateSpaceResourceReq'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/types.ResponseWithTotal'
+            - properties:
+                data:
+                  $ref: '#/definitions/types.SpaceResource'
+                total:
+                  type: integer
+              type: object
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Create space resource
+      tags:
+      - SpaceReource
+  /space_resources/{id}:
+    delete:
+      consumes:
+      - application/json
+      description: delete a exist space resource
+      parameters:
+      - description: id
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/types.Response'
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Delete a exist space resource
+      tags:
+      - SpaceReource
+    put:
+      consumes:
+      - application/json
+      description: update a exist space resource
+      parameters:
+      - description: id
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: body
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/types.UpdateSpaceResourceReq'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/types.ResponseWithTotal'
+            - properties:
+                data:
+                  $ref: '#/definitions/types.SpaceResource'
+                total:
+                  type: integer
+              type: object
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Update a exist space resource
+      tags:
+      - SpaceReource
+  /space_sdks:
+    get:
+      consumes:
+      - application/json
+      description: get space sdks
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/types.ResponseWithTotal'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/types.SpaceSdk'
+                  type: array
+                total:
+                  type: integer
+              type: object
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Get space sdks
+      tags:
+      - SpaceSdk
+    post:
+      consumes:
+      - application/json
+      description: create space sdk
+      parameters:
+      - description: body
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/types.CreateSpaceSdkReq'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/types.ResponseWithTotal'
+            - properties:
+                data:
+                  $ref: '#/definitions/types.SpaceSdk'
+                total:
+                  type: integer
+              type: object
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Create space sdk
+      tags:
+      - SpaceSdk
+  /space_sdks/{id}:
+    delete:
+      consumes:
+      - application/json
+      description: delete a exist space sdk
+      parameters:
+      - description: id
+        in: path
+        name: 写id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/types.Response'
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Delete a exist space sdk
+      tags:
+      - SpaceSdk
+    put:
+      consumes:
+      - application/json
+      description: update a exist space sdk
+      parameters:
+      - description: id
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: body
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/types.UpdateSpaceSdkReq'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/types.ResponseWithTotal'
+            - properties:
+                data:
+                  $ref: '#/definitions/types.SpaceSdk'
+                total:
+                  type: integer
+              type: object
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Update a exist space sdk
+      tags:
+      - SpaceSdk
   /spaces:
     get:
       consumes:
@@ -3206,6 +4543,47 @@ paths:
       summary: Create a new space
       tags:
       - Space
+  /spaces/{namespace}/{name}:
+    delete:
+      consumes:
+      - application/json
+      description: delete a exists space
+      parameters:
+      - description: namespace
+        in: path
+        name: namespace
+        required: true
+        type: string
+      - description: name
+        in: path
+        name: name
+        required: true
+        type: string
+      - description: current_user
+        in: query
+        name: current_user
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/types.Response'
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Delete a exists space
+      tags:
+      - Space
   /spaces/{namespace}/{name}/api/{api_name}:
     post:
       consumes:
@@ -3246,6 +4624,672 @@ paths:
       security:
       - JWT token: []
       summary: Call space api
+      tags:
+      - Space
+  /spaces/{namespace}/{name}/blob/{file_path}:
+    get:
+      consumes:
+      - application/json
+      description: get space file info
+      parameters:
+      - description: namespace
+        in: path
+        name: namespace
+        required: true
+        type: string
+      - description: name
+        in: path
+        name: name
+        required: true
+        type: string
+      - description: file_path
+        in: path
+        name: file_path
+        required: true
+        type: string
+      - description: ref
+        in: query
+        name: ref
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/types.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/types.Commit'
+              type: object
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Get space file info
+      tags:
+      - Space
+  /spaces/{namespace}/{name}/branches:
+    get:
+      consumes:
+      - application/json
+      description: get space branches
+      parameters:
+      - description: namespace
+        in: path
+        name: namespace
+        required: true
+        type: string
+      - description: name
+        in: path
+        name: name
+        required: true
+        type: string
+      - default: 20
+        description: per
+        in: query
+        name: per
+        type: integer
+      - default: 1
+        description: page
+        in: query
+        name: page
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/types.Response'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/types.Branch'
+                  type: array
+              type: object
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Get space branches
+      tags:
+      - Space
+  /spaces/{namespace}/{name}/commits:
+    get:
+      consumes:
+      - application/json
+      description: get space commits
+      parameters:
+      - description: namespace
+        in: path
+        name: namespace
+        required: true
+        type: string
+      - description: name
+        in: path
+        name: name
+        required: true
+        type: string
+      - description: ref
+        in: query
+        name: ref
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/types.Response'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/types.Commit'
+                  type: array
+              type: object
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Get space commits
+      tags:
+      - Space
+  /spaces/{namespace}/{name}/download/{file_path}:
+    get:
+      consumes:
+      - application/json
+      description: download space file
+      parameters:
+      - description: namespace
+        in: path
+        name: namespace
+        required: true
+        type: string
+      - description: name
+        in: path
+        name: name
+        required: true
+        type: string
+      - description: file_path
+        in: path
+        name: file_path
+        required: true
+        type: string
+      - description: lfs
+        in: query
+        name: lfs
+        type: boolean
+      - description: ref
+        in: query
+        name: ref
+        type: string
+      - description: name of download file
+        in: query
+        name: save_as
+        type: string
+      produces:
+      - application/json
+      - application/octet-stream
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/types.Response'
+            - properties:
+                data:
+                  type: string
+              type: object
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Download space file
+      tags:
+      - Space
+  /spaces/{namespace}/{name}/last_commit:
+    get:
+      consumes:
+      - application/json
+      description: get space last commit
+      parameters:
+      - description: namespace
+        in: path
+        name: namespace
+        required: true
+        type: string
+      - description: name
+        in: path
+        name: name
+        required: true
+        type: string
+      - description: ref
+        in: query
+        name: ref
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/types.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/types.Commit'
+              type: object
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Get space last commit
+      tags:
+      - Space
+  /spaces/{namespace}/{name}/raw/{file_path}:
+    get:
+      consumes:
+      - application/json
+      description: get space file raw
+      parameters:
+      - description: namespace
+        in: path
+        name: namespace
+        required: true
+        type: string
+      - description: name
+        in: path
+        name: name
+        required: true
+        type: string
+      - description: file_path
+        in: path
+        name: file_path
+        required: true
+        type: string
+      - description: ref
+        in: query
+        name: ref
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/types.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/types.Commit'
+              type: object
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Get space file raw
+      tags:
+      - Space
+    post:
+      consumes:
+      - application/json
+      description: create space file
+      parameters:
+      - description: namespace
+        in: path
+        name: namespace
+        required: true
+        type: string
+      - description: name
+        in: path
+        name: name
+        required: true
+        type: string
+      - description: file_path
+        in: path
+        name: file_path
+        required: true
+        type: string
+      - description: body
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/types.CreateFileReq'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/types.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/types.CreateFileResp'
+              type: object
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Create space file
+      tags:
+      - Space
+    put:
+      consumes:
+      - application/json
+      description: update code file
+      parameters:
+      - description: namespace
+        in: path
+        name: namespace
+        required: true
+        type: string
+      - description: name
+        in: path
+        name: name
+        required: true
+        type: string
+      - description: file_path
+        in: path
+        name: file_path
+        required: true
+        type: string
+      - description: body
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/types.UpdateFileReq'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/types.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/types.UpdateFileResp'
+              type: object
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Update code file
+      tags:
+      - Space
+  /spaces/{namespace}/{name}/resolve/{file_path}:
+    get:
+      consumes:
+      - application/json
+      description: download space file
+      parameters:
+      - description: namespace
+        in: path
+        name: namespace
+        required: true
+        type: string
+      - description: name
+        in: path
+        name: name
+        required: true
+        type: string
+      - description: file_path
+        in: path
+        name: file_path
+        required: true
+        type: string
+      - description: ref
+        in: query
+        name: ref
+        type: string
+      produces:
+      - application/json
+      - application/octet-stream
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/types.Response'
+            - properties:
+                data:
+                  type: string
+              type: object
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Download space file
+      tags:
+      - Space
+  /spaces/{namespace}/{name}/tags:
+    get:
+      consumes:
+      - application/json
+      description: get space tags
+      parameters:
+      - description: namespace
+        in: path
+        name: namespace
+        required: true
+        type: string
+      - description: name
+        in: path
+        name: name
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/types.Response'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/types.Branch'
+                  type: array
+              type: object
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Get space tags
+      tags:
+      - Space
+  /spaces/{namespace}/{name}/tree:
+    get:
+      consumes:
+      - application/json
+      description: get space file tree
+      parameters:
+      - description: namespace
+        in: path
+        name: namespace
+        required: true
+        type: string
+      - description: name
+        in: path
+        name: name
+        required: true
+        type: string
+      - description: ref
+        in: query
+        name: ref
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/types.Response'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/types.File'
+                  type: array
+              type: object
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Get space file tree
+      tags:
+      - Space
+  /spaces/{namespace}/{name}/update_downloads:
+    post:
+      consumes:
+      - application/json
+      description: update space downloads
+      parameters:
+      - description: namespace
+        in: path
+        name: namespace
+        required: true
+        type: string
+      - description: name
+        in: path
+        name: name
+        required: true
+        type: string
+      - description: body
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/types.UpdateDownloadsReq'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/types.Response'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/types.File'
+                  type: array
+              type: object
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Update space downloads
+      tags:
+      - Space
+  /spaces/{namespace}/{name}/upload_file:
+    post:
+      consumes:
+      - application/json
+      description: upload space file to create or update a file in space repository
+      parameters:
+      - description: namespace
+        in: path
+        name: namespace
+        required: true
+        type: string
+      - description: name
+        in: path
+        name: name
+        required: true
+        type: string
+      - description: file_path
+        in: formData
+        name: file_path
+        required: true
+        type: string
+      - description: file
+        in: formData
+        name: file
+        required: true
+        type: file
+      - description: email
+        in: formData
+        name: email
+        required: true
+        type: string
+      - description: message
+        in: formData
+        name: message
+        required: true
+        type: string
+      - description: branch
+        in: formData
+        name: branch
+        type: string
+      - description: username
+        in: formData
+        name: username
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/types.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/types.CreateFileResp'
+              type: object
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Create space file
       tags:
       - Space
   /tags:

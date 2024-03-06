@@ -29,6 +29,7 @@ type repoComponent struct {
 	repo      *database.RepoStore
 	ds        *database.DatasetStore
 	ms        *database.ModelStore
+	cs        *database.CodeStore
 	git       gitserver.GitServer
 	s3Client  *minio.Client
 	msc       *MemberComponent

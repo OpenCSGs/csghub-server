@@ -89,25 +89,56 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 	}
 
 	// Dataset routes
+	datasetsGroup := apiGroup.Group("/datasets")
 
-	apiGroup.POST("/datasets", dsHandler.Create)
-	apiGroup.GET("/datasets", dsHandler.Index)
-	apiGroup.PUT("/datasets/:namespace/:name", dsHandler.Update)
-	apiGroup.DELETE("/datasets/:namespace/:name", dsHandler.Delete)
-	apiGroup.GET("/datasets/:namespace/:name", dsHandler.Show)
-	apiGroup.GET("/datasets/:namespace/:name/branches", dsHandler.Branches)
-	apiGroup.GET("/datasets/:namespace/:name/tags", dsHandler.Tags)
-	apiGroup.GET("/datasets/:namespace/:name/last_commit", dsHandler.LastCommit)
-	apiGroup.GET("/datasets/:namespace/:name/tree", dsHandler.Tree)
-	apiGroup.GET("/datasets/:namespace/:name/commits", dsHandler.Commits)
-	apiGroup.POST("/datasets/:namespace/:name/raw/*file_path", dsHandler.CreateFile)
-	apiGroup.GET("/datasets/:namespace/:name/raw/*file_path", dsHandler.FileRaw)
-	apiGroup.GET("/datasets/:namespace/:name/blob/*file_path", dsHandler.FileInfo)
-	apiGroup.GET("/datasets/:namespace/:name/download/*file_path", dsHandler.DownloadFile)
-	apiGroup.GET("/datasets/:namespace/:name/resolve/*file_path", dsHandler.ResolveDownload)
-	apiGroup.PUT("/datasets/:namespace/:name/raw/*file_path", dsHandler.UpdateFile)
-	apiGroup.POST("/datasets/:namespace/:name/update_downloads", dsHandler.UpdateDownloads)
-	apiGroup.POST("/datasets/:namespace/:name/upload_file", dsHandler.UploadFile)
+	{
+		datasetsGroup.POST("", dsHandler.Create)
+		datasetsGroup.GET("", dsHandler.Index)
+		datasetsGroup.PUT("/:namespace/:name", dsHandler.Update)
+		datasetsGroup.DELETE("/:namespace/:name", dsHandler.Delete)
+		datasetsGroup.GET("/:namespace/:name", dsHandler.Show)
+		datasetsGroup.GET("/:namespace/:name/branches", dsHandler.Branches)
+		datasetsGroup.GET("/:namespace/:name/tags", dsHandler.Tags)
+		datasetsGroup.GET("/:namespace/:name/last_commit", dsHandler.LastCommit)
+		datasetsGroup.GET("/:namespace/:name/tree", dsHandler.Tree)
+		datasetsGroup.GET("/:namespace/:name/commits", dsHandler.Commits)
+		datasetsGroup.POST("/:namespace/:name/raw/*file_path", dsHandler.CreateFile)
+		datasetsGroup.GET("/:namespace/:name/raw/*file_path", dsHandler.FileRaw)
+		datasetsGroup.GET("/:namespace/:name/blob/*file_path", dsHandler.FileInfo)
+		datasetsGroup.GET("/:namespace/:name/download/*file_path", dsHandler.DownloadFile)
+		datasetsGroup.GET("/:namespace/:name/resolve/*file_path", dsHandler.ResolveDownload)
+		datasetsGroup.PUT("/:namespace/:name/raw/*file_path", dsHandler.UpdateFile)
+		datasetsGroup.POST("/:namespace/:name/update_downloads", dsHandler.UpdateDownloads)
+		datasetsGroup.POST("/:namespace/:name/upload_file", dsHandler.UploadFile)
+	}
+
+	// Code routes
+	codeHandler, err := handler.NewCodeHandler(config)
+	if err != nil {
+		return nil, fmt.Errorf("error creating code handler:%w", err)
+	}
+
+	codesGroup := apiGroup.Group("/codes")
+	{
+		codesGroup.POST("", codeHandler.Create)
+		codesGroup.GET("", codeHandler.Index)
+		codesGroup.PUT("/:namespace/:name", codeHandler.Update)
+		codesGroup.DELETE("/:namespace/:name", codeHandler.Delete)
+		codesGroup.GET("/:namespace/:name", codeHandler.Show)
+		codesGroup.GET("/:namespace/:name/branches", codeHandler.Branches)
+		codesGroup.GET("/:namespace/:name/tags", codeHandler.Tags)
+		codesGroup.GET("/:namespace/:name/last_commit", codeHandler.LastCommit)
+		codesGroup.GET("/:namespace/:name/tree", codeHandler.Tree)
+		codesGroup.GET("/:namespace/:name/commits", codeHandler.Commits)
+		codesGroup.POST("/:namespace/:name/raw/*file_path", codeHandler.CreateFile)
+		codesGroup.GET("/:namespace/:name/raw/*file_path", codeHandler.FileRaw)
+		codesGroup.GET("/:namespace/:name/blob/*file_path", codeHandler.FileInfo)
+		codesGroup.GET("/:namespace/:name/download/*file_path", codeHandler.DownloadFile)
+		codesGroup.GET("/:namespace/:name/resolve/*file_path", codeHandler.ResolveDownload)
+		codesGroup.PUT("/:namespace/:name/raw/*file_path", codeHandler.UpdateFile)
+		codesGroup.POST("/:namespace/:name/update_downloads", codeHandler.UpdateDownloads)
+		codesGroup.POST("/:namespace/:name/upload_file", codeHandler.UploadFile)
+	}
 
 	// Dataset viewer
 	dsViewerHandler, err := handler.NewDatasetViewerHandler(config)
@@ -139,6 +170,46 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 		spaces.POST("/:namespace/:name/status", nil)
 		// call space webhook api
 		spaces.POST("/:namespace/:name/webhook", nil)
+
+		spaces.GET("/:namespace/:name/branches", spaceHandler.Branches)
+		spaces.GET("/:namespace/:name/tags", spaceHandler.Tags)
+		spaces.GET("/:namespace/:name/last_commit", spaceHandler.LastCommit)
+		spaces.GET("/:namespace/:name/tree", spaceHandler.Tree)
+		spaces.GET("/:namespace/:name/commits", spaceHandler.Commits)
+		spaces.POST("/:namespace/:name/raw/*file_path", spaceHandler.CreateFile)
+		spaces.GET("/:namespace/:name/raw/*file_path", spaceHandler.FileRaw)
+		spaces.GET("/:namespace/:name/blob/*file_path", spaceHandler.FileInfo)
+		spaces.GET("/:namespace/:name/download/*file_path", spaceHandler.DownloadFile)
+		spaces.GET("/:namespace/:name/resolve/*file_path", spaceHandler.ResolveDownload)
+		spaces.PUT("/:namespace/:name/raw/*file_path", spaceHandler.UpdateFile)
+		spaces.POST("/:namespace/:name/update_downloads", spaceHandler.UpdateDownloads)
+		spaces.POST("/:namespace/:name/upload_file", spaceHandler.UploadFile)
+	}
+
+	spaceResourceHandler, err := handler.NewSpaceResourceHandler(config)
+	if err != nil {
+		return nil, fmt.Errorf("error creating space resource handler:%w", err)
+	}
+
+	spaceResource := apiGroup.Group("space_resources")
+	{
+		spaceResource.GET("", spaceResourceHandler.Index)
+		spaceResource.POST("", spaceResourceHandler.Create)
+		spaceResource.PUT("/:id", spaceResourceHandler.Update)
+		spaceResource.DELETE("/:id", spaceResourceHandler.Delete)
+	}
+
+	spaceSdkHandler, err := handler.NewSpaceSdkHandler(config)
+	if err != nil {
+		return nil, fmt.Errorf("error creating space sdk handler:%w", err)
+	}
+
+	spaceSdk := apiGroup.Group("space_sdks")
+	{
+		spaceSdk.GET("", spaceSdkHandler.Index)
+		spaceSdk.POST("", spaceSdkHandler.Create)
+		spaceSdk.PUT("/:id", spaceSdkHandler.Update)
+		spaceSdk.DELETE("/:id", spaceSdkHandler.Delete)
 	}
 
 	// User routes
