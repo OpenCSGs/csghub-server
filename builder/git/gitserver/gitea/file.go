@@ -53,7 +53,6 @@ func (c *Client) getRepoDir(namespace, name, ref, path string) (files []*types.F
 			Mode:          entry.Mode,
 			SHA:           entry.SHA,
 			URL:           entry.URL,
-			DownloadURL:   entry.DownloadURL,
 			LastCommitSHA: entry.LastCommitSHA,
 		}
 		if entry.Type == "tree" {
@@ -303,6 +302,7 @@ func (c *Client) GetModelFileContents(namespace, repo, ref, path string) (*types
 }
 
 func (c *Client) getFileContents(owner, repo, ref, path string) (*types.File, error) {
+	var content string
 	/* Example file content from gitea
 		{
 	  "name": "model-00001-of-00002.safetensors",
@@ -332,14 +332,17 @@ func (c *Client) getFileContents(owner, repo, ref, path string) (*types.File, er
 			slog.String("ref", ref), slog.String("path", path))
 		return nil, err
 	}
+	if fileContent.Content != nil {
+		content = *fileContent.Content
+	}
+
 	f := &types.File{
 		Name:          fileContent.Name,
 		Type:          fileContent.Type,
 		Size:          int(fileContent.Size),
 		SHA:           fileContent.SHA,
 		Path:          fileContent.Path,
-		DownloadURL:   *fileContent.DownloadURL,
-		Content:       *fileContent.Content,
+		Content:       content,
 		LastCommitSHA: fileContent.LastCommitSHA,
 	}
 
@@ -352,7 +355,6 @@ func (c *Client) getFileContents(owner, repo, ref, path string) (*types.File, er
 		return f, nil
 	}
 
-	f.DownloadURL = strings.Replace(f.DownloadURL, "/raw/", "/media/", 1)
 	f.LfsRelativePath = lfsPointer.RelativePath()
 	f.Size = int(lfsPointer.Size)
 	return f, nil

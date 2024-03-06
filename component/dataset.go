@@ -279,6 +279,18 @@ func (c *DatasetComponent) Index(ctx context.Context, username, search, sort str
 	}
 
 	for _, data := range datasets {
+		var tags []types.RepoTag
+		for _, tag := range data.Repository.Tags {
+			tags = append(tags, types.RepoTag{
+				Name:      tag.Name,
+				Category:  tag.Category,
+				Group:     tag.Group,
+				BuiltIn:   tag.BuiltIn,
+				ShowName:  tag.ShowName,
+				CreatedAt: tag.CreatedAt,
+				UpdatedAt: tag.UpdatedAt,
+			})
+		}
 		resDatasets = append(resDatasets, types.Dataset{
 			ID:           data.ID,
 			Name:         data.Repository.Name,
@@ -289,6 +301,7 @@ func (c *DatasetComponent) Index(ctx context.Context, username, search, sort str
 			Path:         data.Repository.Path,
 			RepositoryID: data.RepositoryID,
 			Private:      data.Repository.Private,
+			Tags:         tags,
 			CreatedAt:    data.CreatedAt,
 			UpdatedAt:    data.UpdatedAt,
 		})
