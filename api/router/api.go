@@ -129,8 +129,8 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 		spaces.GET("/:namespace/:name", spaceHandler.Get)
 		spaces.PUT("/:namespace/:name", spaceHandler.Update)
 		spaces.DELETE("/:namespace/:name", spaceHandler.Delete)
-		// invoke model prediction
-		spaces.POST("/:namespace/:name/predict", spaceHandler.Predict)
+		// proxy any request to space api
+		spaces.Any("/:namespace/:name/api/*api_name", spaceHandler.Proxy)
 		// depoly and start running the space
 		spaces.POST("/:namespace/:name/run", nil)
 		// stop running space

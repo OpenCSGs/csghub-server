@@ -6,6 +6,8 @@ import (
 	"log/slog"
 
 	"opencsg.com/csghub-server/builder/git"
+	"opencsg.com/csghub-server/builder/git/membership"
+	"opencsg.com/csghub-server/builder/proxy"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/types"
@@ -30,7 +32,8 @@ func NewSpaceComponent(config *config.Config) (*SpaceComponent, error) {
 
 type SpaceComponent struct {
 	repoComponent
-	space *database.SpaceStore
+	space  *database.SpaceStore
+	rproxy *proxy.ReverseProxy
 }
 
 func (c *SpaceComponent) Create(ctx context.Context, req types.CreateSpaceReq) (*types.Space, error) {
@@ -109,4 +112,15 @@ func (c *SpaceComponent) Index(ctx context.Context, username, search, sort strin
 		})
 	}
 	return spaces, total, nil
+}
+
+func (c *SpaceComponent) AllowCallApi(ctx context.Context, namespace, name, username string) (bool, error) {
+	repo, err := c.repo.FindByPath(ctx, types.SpaceRepo, namespace, name)
+	if err != nil {
+		return false, fmt.Errorf("failed to find repo, error: %w", err)
+	}
+	if !repo.Private {
+		return true, nil
+	}
+	return c.checkCurrentUserPermission(ctx, username, namespace, membership.RoleRead)
 }

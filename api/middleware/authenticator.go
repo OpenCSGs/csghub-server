@@ -59,7 +59,6 @@ func checkJWTToken(config *config.Config, tokenString string) (bool, string, err
 	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
 		return []byte(config.JWT.SigningKey), nil
 	})
-
 	if err != nil {
 		return false, "Invilid JWT token", err
 	}
@@ -82,7 +81,6 @@ func setCurrentUser(ctx *gin.Context, config *config.Config, tokenString string)
 	token, err := jwt.ParseWithClaims(tokenString, &types.JWTClaims{}, func(token *jwt.Token) (interface{}, error) {
 		return []byte(config.JWT.SigningKey), nil
 	})
-
 	if err != nil {
 		return err
 	}
@@ -90,6 +88,7 @@ func setCurrentUser(ctx *gin.Context, config *config.Config, tokenString string)
 	claims, ok := token.Claims.(*types.JWTClaims)
 	if ok {
 		ctx.Set("currentUser", claims.CurrentUser)
+		slog.Info("user jwt token validated", slog.Any("currentUser", claims.CurrentUser))
 		return nil
 	}
 	return fmt.Errorf("error parsing claims: %v", token)
