@@ -126,6 +126,18 @@ func (c *ModelComponent) Index(ctx context.Context, username, search, sort strin
 		return nil, 0, newError
 	}
 	for _, data := range models {
+		var tags []types.RepoTag
+		for _, tag := range data.Repository.Tags {
+			tags = append(tags, types.RepoTag{
+				Name:      tag.Name,
+				Category:  tag.Category,
+				Group:     tag.Group,
+				BuiltIn:   tag.BuiltIn,
+				ShowName:  tag.ShowName,
+				CreatedAt: tag.CreatedAt,
+				UpdatedAt: tag.UpdatedAt,
+			})
+		}
 		resModels = append(resModels, types.Model{
 			ID:           data.ID,
 			Name:         data.Repository.Name,
@@ -137,6 +149,7 @@ func (c *ModelComponent) Index(ctx context.Context, username, search, sort strin
 			RepositoryID: data.RepositoryID,
 			Private:      data.Repository.Private,
 			CreatedAt:    data.CreatedAt,
+			Tags:         tags,
 			UpdatedAt:    data.UpdatedAt,
 		})
 	}
