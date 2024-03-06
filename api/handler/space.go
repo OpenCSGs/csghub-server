@@ -21,10 +21,10 @@ func NewSpaceHandler(config *config.Config) (*SpaceHandler, error) {
 	if err != nil {
 		return nil, err
 	}
-	rp, err := proxy.NewReverseProxy(config.Space.K8sEndpoint)
+	rp, err := proxy.NewReverseProxy(config.Space.K8SEndpoint)
 	if err != nil {
 		// log error and continue
-		slog.Error("failed to create space reverse proxy", slog.String("K8sEndpoint", config.Space.K8sEndpoint),
+		slog.Error("failed to create space reverse proxy", slog.String("K8sEndpoint", config.Space.K8SEndpoint),
 			slog.Any("error", err))
 	}
 	return &SpaceHandler{
@@ -127,7 +127,7 @@ func (h *SpaceHandler) Update(ctx *gin.Context) {
 func (h *SpaceHandler) Delete(ctx *gin.Context) {
 }
 
-// CreateSpace   godoc
+// CallSpaceApi   godoc
 // @Security     JWT token
 // @Summary      Call space api
 // @Description  call space api
