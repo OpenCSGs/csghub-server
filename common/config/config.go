@@ -71,7 +71,7 @@ type Config struct {
 
 	Space struct {
 		// base url for space api running in k8s cluster
-		K8SEndpoint string `envconfig:"STARHUB_SERVER_SPACE_K8SEndpoint" default:"http://localhost:8080"`
+		K8SEndpoint string `envconfig:"STARHUB_SERVER_SPACE_K8SENDPOINT" default:"http://localhost:8080"`
 	}
 }
 
