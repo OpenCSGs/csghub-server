@@ -68,6 +68,11 @@ type Config struct {
 	Inference struct {
 		ServerAddr string `envconfig:"STARHUB_SERVER_INFERENCE_SERVER_ADDR" default:"http://localhost:8000"`
 	}
+
+	Space struct {
+		// base url for space api running in k8s cluster
+		K8SEndpoint string `envconfig:"STARHUB_SERVER_SPACE_K8SENDPOINT" default:"http://localhost:8080"`
+	}
 }
 
 func LoadConfig() (cfg *Config, err error) {
