@@ -303,6 +303,10 @@ func (c *Client) GetModelFileContents(namespace, repo, ref, path string) (*types
 }
 
 func (c *Client) getFileContents(owner, repo, ref, path string) (*types.File, error) {
+	var (
+		downloadUrl string
+		content     string
+	)
 	/* Example file content from gitea
 		{
 	  "name": "model-00001-of-00002.safetensors",
@@ -332,14 +336,21 @@ func (c *Client) getFileContents(owner, repo, ref, path string) (*types.File, er
 			slog.String("ref", ref), slog.String("path", path))
 		return nil, err
 	}
+	if fileContent.DownloadURL != nil {
+		downloadUrl = *fileContent.DownloadURL
+	}
+	if fileContent.Content != nil {
+		content = *fileContent.Content
+	}
+
 	f := &types.File{
 		Name:          fileContent.Name,
 		Type:          fileContent.Type,
 		Size:          int(fileContent.Size),
 		SHA:           fileContent.SHA,
 		Path:          fileContent.Path,
-		DownloadURL:   *fileContent.DownloadURL,
-		Content:       *fileContent.Content,
+		DownloadURL:   downloadUrl,
+		Content:       content,
 		LastCommitSHA: fileContent.LastCommitSHA,
 	}
 
