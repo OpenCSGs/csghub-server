@@ -44,6 +44,7 @@ func (c *SpaceSdkComponent) Update(ctx context.Context, req *types.UpdateSpaceSd
 		return nil, err
 	}
 	ss.Name = req.Name
+	ss.Version = req.Version
 
 	ss, err = c.sss.Update(ctx, *ss)
 	if err != nil {
@@ -62,7 +63,8 @@ func (c *SpaceSdkComponent) Update(ctx context.Context, req *types.UpdateSpaceSd
 
 func (c *SpaceSdkComponent) Create(ctx context.Context, req *types.CreateSpaceSdkReq) (*types.SpaceSdk, error) {
 	ss := database.SpaceSdk{
-		Name: req.Name,
+		Name:    req.Name,
+		Version: req.Version,
 	}
 	res, err := c.sss.Create(ctx, ss)
 	if err != nil {

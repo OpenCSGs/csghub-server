@@ -47,6 +47,10 @@ func (c *SpaceResourceComponent) Update(ctx context.Context, req *types.UpdateSp
 		return nil, err
 	}
 	sr.Name = req.Name
+	sr.Cpu = req.Cpu
+	sr.Gpu = req.Gpu
+	sr.Memory = req.Memory
+	sr.Disk = req.Disk
 
 	sr, err = c.srs.Update(ctx, *sr)
 	if err != nil {
@@ -68,7 +72,11 @@ func (c *SpaceResourceComponent) Update(ctx context.Context, req *types.UpdateSp
 
 func (c *SpaceResourceComponent) Create(ctx context.Context, req *types.CreateSpaceResourceReq) (*types.SpaceResource, error) {
 	sr := database.SpaceResource{
-		Name: req.Name,
+		Name:   req.Name,
+		Cpu:    req.Cpu,
+		Gpu:    req.Gpu,
+		Memory: req.Memory,
+		Disk:   req.Disk,
 	}
 	res, err := c.srs.Create(ctx, sr)
 	if err != nil {

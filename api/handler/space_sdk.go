@@ -60,13 +60,13 @@ func (h *SpaceSdkHandler) Index(ctx *gin.Context) {
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
 // @Router       /space_sdks [post]
 func (h *SpaceSdkHandler) Create(ctx *gin.Context) {
-	var req *types.CreateSpaceSdkReq
+	var req types.CreateSpaceSdkReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {
 		slog.Error("Bad request format", "error", err)
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
-	spaceSdk, err := h.c.Create(ctx, req)
+	spaceSdk, err := h.c.Create(ctx, &req)
 	if err != nil {
 		slog.Error("Failed to create space sdk", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
@@ -94,7 +94,7 @@ func (h *SpaceSdkHandler) Update(ctx *gin.Context) {
 		id  int64
 		err error
 	)
-	var req *types.UpdateSpaceSdkReq
+	var req types.UpdateSpaceSdkReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {
 		slog.Error("Bad request format", "error", err)
 		httpbase.BadRequest(ctx, err.Error())
@@ -108,7 +108,7 @@ func (h *SpaceSdkHandler) Update(ctx *gin.Context) {
 	}
 	req.ID = id
 
-	spaceSdk, err := h.c.Update(ctx, req)
+	spaceSdk, err := h.c.Update(ctx, &req)
 	if err != nil {
 		slog.Error("Failed to update space sdk", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)

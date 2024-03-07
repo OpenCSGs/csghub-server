@@ -60,13 +60,13 @@ func (h *SpaceResourceHandler) Index(ctx *gin.Context) {
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
 // @Router       /space_resources [post]
 func (h *SpaceResourceHandler) Create(ctx *gin.Context) {
-	var req *types.CreateSpaceResourceReq
+	var req types.CreateSpaceResourceReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {
 		slog.Error("Bad request format", "error", err)
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
-	spaceResource, err := h.c.Create(ctx, req)
+	spaceResource, err := h.c.Create(ctx, &req)
 	if err != nil {
 		slog.Error("Failed to create space resources", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
