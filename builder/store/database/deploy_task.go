@@ -3,12 +3,14 @@ package database
 import "context"
 
 type Deploy struct {
-	ID       int64  `bun:",pk,autoincrement" json:"id"`
-	Status   int    `bun:",notnull" json:"status"`
-	GitPath  string `bun:",notnull" json:"git_path"`
-	Env      string `bun:",nullzero" json:"env"`
-	Secret   string `bun:",nullzero" json:"secret"`
-	Template string `bun:",nonnull" json:"tmeplate"`
+	ID        int64  `bun:",pk,autoincrement" json:"id"`
+	Status    int    `bun:",notnull" json:"status"`
+	GitPath   string `bun:",notnull" json:"git_path"`
+	GitBranch string `bun:",notnull" json:"git_branch"`
+	Env       string `bun:",nullzero" json:"env"`
+	Secret    string `bun:",nullzero" json:"secret"`
+	Template  string `bun:",nonnull" json:"tmeplate"`
+	Hardware  string `bun:",nonnull" json:"hardware"`
 	times
 }
 
@@ -21,6 +23,11 @@ type DeployTask struct {
 	DeployID int64   `bun:",notnull" json:"deploy_id"`
 	Deploy   *Deploy `bun:"rel:belongs-to,join:deploy_id=id" json:"deploy"`
 	times
+}
+
+type MonitorTask struct {
+	DeployTaskID int64 `bun:",pk" json:"deploy_task_id"`
+	DeployID     int64 `bun:",notnull" json:"deploy_id"`
 }
 
 type DeployTaskStore struct {
@@ -63,8 +70,16 @@ func (s *DeployTaskStore) GetDeployTask(ctx context.Context, id int64) (*DeployT
 	return deployTask, err
 }
 
-func (s *DeployTaskStore) GetNextDeployTask(ctx context.Context, currentTaskId int64) (*DeployTask, error) {
+// GetNewTaskAfter return the new task after current task
+func (s *DeployTaskStore) GetNewTaskAfter(ctx context.Context, currentTaskId int64) (*DeployTask, error) {
 	deployTask := &DeployTask{}
-	err := s.db.Core.NewSelect().Model(deployTask).Where("id > ?", currentTaskId).Order("id ASC").Limit(1).Scan(ctx, deployTask)
+	err := s.db.Core.NewSelect().Model(deployTask).Where("id > ? and status = 0", currentTaskId).Order("id ASC").Limit(1).Scan(ctx, deployTask)
+	return deployTask, err
+}
+
+// GetNewTaskFirst returns the first task which has never scheduled, or status is 0
+func (s *DeployTaskStore) GetNewTaskFirst(ctx context.Context) (*DeployTask, error) {
+	deployTask := &DeployTask{}
+	err := s.db.Core.NewSelect().Model(deployTask).Where("status = ?", 0).Order("id asc").Limit(1).Scan(ctx, deployTask)
 	return deployTask, err
 }

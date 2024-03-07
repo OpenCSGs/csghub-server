@@ -61,16 +61,19 @@ type Scheduler interface {
 type FIFOScheduler struct {
 	timeout time.Duration
 	// number of parallel tasks
-	currency int
+	parallel int
+	last     *database.DeployTask
 
-	store *database.DeployTaskStore
+	monitor *Monitor
+	store   *database.DeployTaskStore
 }
 
 func NewFIFOScheduler() Scheduler {
 	s := &FIFOScheduler{}
 	// TODO:allow config
 	s.timeout = 30 * time.Minute
-	s.currency = 5
+	s.parallel = 5
+	s.monitor = NewMonitor()
 	s.store = database.NewDeployTaskStore()
 	go s.Run()
 
@@ -82,10 +85,16 @@ func (rs *FIFOScheduler) Run() error {
 	for t := range rs.tasks() {
 		go func(t Task) {
 			ctx, cancel := context.WithTimeout(context.Background(), rs.timeout)
+			defer cancel()
+
 			if err := t.Run(ctx); err != nil {
 				slog.Error("failed to run task", slog.Any("task", t))
+				return
 			}
-			cancel()
+
+			if err := rs.monitor.Watch(t); err != nil {
+				slog.Error("failed to monitor task", slog.Any("error", err))
+			}
 		}(t)
 	}
 
@@ -94,7 +103,7 @@ func (rs *FIFOScheduler) Run() error {
 
 func (rs *FIFOScheduler) tasks() <-chan Task {
 	// allow concurrent deployment tasks
-	tasks := make(chan Task, rs.currency)
+	tasks := make(chan Task, rs.parallel)
 	for {
 		t, err := rs.next()
 		if err != nil {
@@ -110,10 +119,29 @@ func (rs *FIFOScheduler) tasks() <-chan Task {
 // run next task
 func (rs *FIFOScheduler) next() (Task, error) {
 	var (
-		t   Task
-		err error
+		deployTask *database.DeployTask
+		t          Task
+		err        error
 	)
-	// TODO:load from persistent storage,e.g. db
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	if rs.last == nil {
+		// TODO: save last task into db
+		deployTask, err = rs.store.GetNewTaskFirst(ctx)
+	} else {
+		deployTask, err = rs.store.GetNewTaskAfter(ctx, rs.last.DeployID)
+	}
+	if err != nil {
+		return nil, err
+	}
+	rs.last = deployTask
+	// for build task
+	if deployTask.TaskType == 0 {
+		t = &buildTask{data: deployTask}
+	} else {
+		t = &runTask{data: deployTask}
+	}
+
 	return t, err
 }
 
@@ -128,7 +156,8 @@ var (
 
 // buildTask defines a docker image building task
 type buildTask struct {
-	DeployID int
+	// DeployID int
+	data *database.DeployTask
 }
 
 // Run call image builder service to build a docker image
@@ -136,8 +165,13 @@ func (t *buildTask) Run(ctx context.Context) error { return nil }
 
 // runTask defines a k8s image running task
 type runTask struct {
-	DeployID int
+	// DeployID int
+	data *database.DeployTask
 }
 
 // Run call k8s image runner service to run a docker image
 func (t *runTask) Run(ctx context.Context) error { return nil }
+
+type monitorTask struct {
+	data *database.DeployTask
+}
