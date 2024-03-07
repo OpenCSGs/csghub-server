@@ -3,7 +3,6 @@ package handler
 import (
 	"fmt"
 	"log/slog"
-	"net/http"
 
 	"github.com/gin-gonic/gin"
 	"opencsg.com/csghub-server/api/httpbase"
@@ -44,14 +43,14 @@ func (h *SSHKeyHandler) Create(ctx *gin.Context) {
 	var req types.CreateSSHKeyRequest
 	if err := ctx.ShouldBindJSON(&req); err != nil {
 		slog.Error("Bad request format", "error", err)
-		ctx.JSON(http.StatusBadRequest, gin.H{"message": err.Error()})
+		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
 	req.Username = ctx.Param("username")
 	sk, err := h.c.Create(ctx, &req)
 	if err != nil {
 		slog.Error("Failed to create SSH key", slog.Any("error", err))
-		ctx.JSON(http.StatusInternalServerError, gin.H{"message": err.Error()})
+		httpbase.ServerError(ctx, err)
 		return
 	}
 
@@ -76,13 +75,13 @@ func (h *SSHKeyHandler) Index(ctx *gin.Context) {
 	per, page, err := common.GetPerAndPageFromContext(ctx)
 	if err != nil {
 		slog.Error("Bad request format", "error", err)
-		ctx.JSON(http.StatusBadRequest, gin.H{"message": err.Error()})
+		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
 	sks, err := h.c.Index(ctx, username, per, page)
 	if err != nil {
 		slog.Error("Failed to create SSH key", slog.Any("error", err))
-		ctx.JSON(http.StatusInternalServerError, gin.H{"message": err.Error()})
+		httpbase.ServerError(ctx, err)
 		return
 	}
 
@@ -109,13 +108,13 @@ func (h *SSHKeyHandler) Delete(ctx *gin.Context) {
 	if name == "" || username == "" {
 		err := fmt.Errorf("invalid username or key name in url")
 		slog.Error("Bad request format", "error", err)
-		ctx.JSON(http.StatusBadRequest, gin.H{"message": err.Error()})
+		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
 	err := h.c.Delete(ctx, username, name)
 	if err != nil {
 		slog.Error("Failed to delete SSH key", slog.Any("error", err))
-		ctx.JSON(http.StatusInternalServerError, gin.H{"message": err.Error()})
+		httpbase.ServerError(ctx, err)
 		return
 	}
 

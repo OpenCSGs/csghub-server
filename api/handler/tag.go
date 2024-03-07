@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+	"opencsg.com/csghub-server/api/httpbase"
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/component"
 )
@@ -39,7 +40,7 @@ func (t *TagsHandler) AllTags(ctx *gin.Context) {
 	tags, err := t.tc.AllTags(ctx)
 	if err != nil {
 		slog.Error("Failed to load tags", "error", err)
-		ctx.JSON(http.StatusInternalServerError, gin.H{"message": err.Error()})
+		httpbase.ServerError(ctx, err)
 		return
 	}
 	respData := gin.H{

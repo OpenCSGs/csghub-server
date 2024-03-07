@@ -28,8 +28,9 @@ func (c *SpaceSdkComponent) Index(ctx context.Context) ([]types.SpaceSdk, error)
 	}
 	for _, r := range databaseSpaceSdks {
 		result = append(result, types.SpaceSdk{
-			ID:   r.ID,
-			Name: r.Name,
+			ID:      r.ID,
+			Name:    r.Name,
+			Version: r.Version,
 		})
 	}
 
@@ -51,8 +52,9 @@ func (c *SpaceSdkComponent) Update(ctx context.Context, req *types.UpdateSpaceSd
 	}
 
 	result := &types.SpaceSdk{
-		ID:   ss.ID,
-		Name: ss.Name,
+		ID:      ss.ID,
+		Name:    ss.Name,
+		Version: ss.Version,
 	}
 
 	return result, nil
@@ -69,8 +71,9 @@ func (c *SpaceSdkComponent) Create(ctx context.Context, req *types.CreateSpaceSd
 	}
 
 	result := &types.SpaceSdk{
-		ID:   res.ID,
-		Name: res.Name,
+		ID:      res.ID,
+		Name:    res.Name,
+		Version: res.Version,
 	}
 
 	return result, nil

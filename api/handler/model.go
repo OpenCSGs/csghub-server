@@ -1,18 +1,11 @@
 package handler
 
 import (
-	"bytes"
-	"encoding/base64"
 	"fmt"
-	"io"
 	"log/slog"
 	"net/http"
-	"path"
-	"path/filepath"
 	"slices"
-	"strconv"
 	"strings"
-	"time"
 
 	"github.com/gin-gonic/gin"
 	"opencsg.com/csghub-server/api/httpbase"
@@ -59,7 +52,7 @@ func (h *ModelHandler) Index(ctx *gin.Context) {
 	per, page, err := common.GetPerAndPageFromContext(ctx)
 	if err != nil {
 		slog.Error("Bad request format", "error", err)
-		ctx.JSON(http.StatusBadRequest, gin.H{"message": err.Error()})
+		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
 	search, sort := getFilterFromContext(ctx)
@@ -72,7 +65,7 @@ func (h *ModelHandler) Index(ctx *gin.Context) {
 	models, total, err := h.c.Index(ctx, username, search, sort, tagReqs, per, page)
 	if err != nil {
 		slog.Error("Failed to get models", slog.Any("error", err))
-		ctx.JSON(http.StatusInternalServerError, gin.H{"message": err.Error()})
+		httpbase.ServerError(ctx, err)
 		return
 	}
 	slog.Info("Get public models succeed", slog.Int("count", total))
@@ -99,14 +92,14 @@ func (h *ModelHandler) Create(ctx *gin.Context) {
 	var req *types.CreateModelReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {
 		slog.Error("Bad request format", "error", err)
-		ctx.JSON(http.StatusBadRequest, gin.H{"message": err.Error()})
+		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
 
 	model, err := h.c.Create(ctx, req)
 	if err != nil {
 		slog.Error("Failed to create model", slog.Any("error", err))
-		ctx.JSON(http.StatusInternalServerError, gin.H{"message": err.Error()})
+		httpbase.ServerError(ctx, err)
 		return
 	}
 	slog.Info("Create model succeed", slog.String("model", model.Name))
@@ -131,14 +124,14 @@ func (h *ModelHandler) Update(ctx *gin.Context) {
 	var req *types.UpdateModelReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {
 		slog.Error("Bad request format", "error", err)
-		ctx.JSON(http.StatusBadRequest, gin.H{"message": err.Error()})
+		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
 
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
 	if err != nil {
 		slog.Error("Bad request format", "error", err)
-		ctx.JSON(http.StatusBadRequest, gin.H{"message": err.Error()})
+		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
 	req.Namespace = namespace
@@ -147,7 +140,7 @@ func (h *ModelHandler) Update(ctx *gin.Context) {
 	model, err := h.c.Update(ctx, req)
 	if err != nil {
 		slog.Error("Failed to update model", slog.Any("error", err))
-		ctx.JSON(http.StatusInternalServerError, gin.H{"message": err.Error()})
+		httpbase.ServerError(ctx, err)
 		return
 	}
 
@@ -173,14 +166,14 @@ func (h *ModelHandler) Delete(ctx *gin.Context) {
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
 	if err != nil {
 		slog.Error("Bad request format", "error", err)
-		ctx.JSON(http.StatusBadRequest, gin.H{"message": err.Error()})
+		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
 	currentUser := ctx.Query("current_user")
 	err = h.c.Delete(ctx, namespace, name, currentUser)
 	if err != nil {
 		slog.Error("Failed to delete model", slog.Any("error", err))
-		ctx.JSON(http.StatusInternalServerError, gin.H{"message": err.Error()})
+		httpbase.ServerError(ctx, err)
 		return
 	}
 	slog.Info("Delete model succeed", slog.String("model", name))
@@ -212,7 +205,7 @@ func (h *ModelHandler) Show(ctx *gin.Context) {
 	detail, err := h.c.Show(ctx, namespace, name, currentUser)
 	if err != nil {
 		slog.Error("Failed to get model detail", slog.Any("error", err))
-		ctx.JSON(http.StatusInternalServerError, gin.H{"message": err.Error()})
+		httpbase.ServerError(ctx, err)
 		return
 	}
 
@@ -235,38 +228,6 @@ func (h *ModelHandler) Show(ctx *gin.Context) {
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
 // @Router       /models/{namespace}/{name}/raw/{file_path} [post]
-func (h *ModelHandler) CreateFile(ctx *gin.Context) {
-	var req *types.CreateFileReq
-	if err := ctx.ShouldBindJSON(&req); err != nil {
-		slog.Error("Bad request format", "error", err)
-		ctx.JSON(http.StatusBadRequest, gin.H{"message": err.Error()})
-		return
-	}
-
-	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
-	if err != nil {
-		slog.Error("Bad request format", "error", err)
-		ctx.JSON(http.StatusBadRequest, gin.H{"message": err.Error()})
-		return
-	}
-	filePath := ctx.Param("file_path")
-	filePath = convertFilePathFromRoute(filePath)
-	req.NameSpace = namespace
-	req.Name = name
-	req.FilePath = filePath
-	req.RepoType = types.ModelRepo
-
-	slog.Error("File path: ", slog.Any("file_path", ctx.Param("file_path")))
-	slog.Error("File path: ", slog.Any("file_path", req.FilePath))
-	resp, err := h.c.CreateFile(ctx, req)
-	if err != nil {
-		slog.Error("Failed to create model file", slog.Any("error", err))
-		ctx.JSON(http.StatusInternalServerError, gin.H{"message": err.Error()})
-		return
-	}
-	slog.Info("Create model file succeed", slog.String("model", name))
-	httpbase.OK(ctx, resp)
-}
 
 // UpdateModelFile godoc
 // @Security     ApiKey
@@ -283,37 +244,6 @@ func (h *ModelHandler) CreateFile(ctx *gin.Context) {
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
 // @Router       /models/{namespace}/{name}/raw/{file_path} [put]
-func (h *ModelHandler) UpdateFile(ctx *gin.Context) {
-	var req *types.UpdateFileReq
-	if err := ctx.ShouldBindJSON(&req); err != nil {
-		slog.Error("Bad request format", "error", err)
-		ctx.JSON(http.StatusBadRequest, gin.H{"message": err.Error()})
-		return
-	}
-
-	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
-	if err != nil {
-		slog.Error("Bad request format", "error", err)
-		ctx.JSON(http.StatusBadRequest, gin.H{"message": err.Error()})
-		return
-	}
-
-	filePath := ctx.Param("file_path")
-	filePath = convertFilePathFromRoute(filePath)
-	req.NameSpace = namespace
-	req.Name = name
-	req.FilePath = filePath
-	req.RepoType = types.ModelRepo
-
-	resp, err := h.c.UpdateFile(ctx, req)
-	if err != nil {
-		slog.Error("Failed to update model file", slog.Any("error", err))
-		ctx.JSON(http.StatusInternalServerError, gin.H{"message": err.Error()})
-		return
-	}
-	slog.Info("Update model file succeed", slog.String("model", name))
-	httpbase.OK(ctx, resp)
-}
 
 // GetModelCommits godoc
 // @Security     ApiKey
@@ -329,38 +259,6 @@ func (h *ModelHandler) UpdateFile(ctx *gin.Context) {
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
 // @Router       /models/{namespace}/{name}/commits [get]
-func (h *ModelHandler) Commits(ctx *gin.Context) {
-	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
-	if err != nil {
-		slog.Error("Bad request format", "error", err)
-		ctx.JSON(http.StatusBadRequest, gin.H{"message": err.Error()})
-		return
-	}
-	per, page, err := common.GetPerAndPageFromContext(ctx)
-	if err != nil {
-		slog.Error("Bad request format", "error", err)
-		ctx.JSON(http.StatusBadRequest, gin.H{"message": err.Error()})
-		return
-	}
-	ref := ctx.Query("ref")
-	req := &types.GetCommitsReq{
-		Namespace: namespace,
-		Name:      name,
-		Ref:       ref,
-		Per:       per,
-		Page:      page,
-		RepoType:  types.ModelRepo,
-	}
-	commits, err := h.c.Commits(ctx, req)
-	if err != nil {
-		slog.Error("Failed to get model commits", slog.Any("error", err))
-		ctx.JSON(http.StatusInternalServerError, gin.H{"message": err.Error()})
-		return
-	}
-
-	slog.Info("Get model commits succeed", slog.String("model", name), slog.String("ref", req.Ref))
-	httpbase.OK(ctx, commits)
-}
 
 // GetModelLastCommit godoc
 // @Security     ApiKey
@@ -376,30 +274,6 @@ func (h *ModelHandler) Commits(ctx *gin.Context) {
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
 // @Router       /models/{namespace}/{name}/last_commit [get]
-func (h *ModelHandler) LastCommit(ctx *gin.Context) {
-	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
-	if err != nil {
-		slog.Error("Bad request format", "error", err)
-		ctx.JSON(http.StatusBadRequest, gin.H{"message": err.Error()})
-		return
-	}
-	ref := ctx.Query("ref")
-	req := &types.GetCommitsReq{
-		Namespace: namespace,
-		Name:      name,
-		Ref:       ref,
-		RepoType:  types.ModelRepo,
-	}
-	commit, err := h.c.LastCommit(ctx, req)
-	if err != nil {
-		slog.Error("Failed to get model last commit", slog.Any("error", err))
-		ctx.JSON(http.StatusInternalServerError, gin.H{"message": err.Error()})
-		return
-	}
-
-	slog.Info("Get model last commit succeed", slog.String("model", name), slog.String("ref", req.Ref))
-	httpbase.OK(ctx, commit)
-}
 
 // GetModelFileRaw godoc
 // @Security     ApiKey
@@ -416,32 +290,6 @@ func (h *ModelHandler) LastCommit(ctx *gin.Context) {
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
 // @Router       /models/{namespace}/{name}/raw/{file_path} [get]
-func (h *ModelHandler) FileRaw(ctx *gin.Context) {
-	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
-	if err != nil {
-		slog.Error("Bad request format", "error", err)
-		ctx.JSON(http.StatusBadRequest, gin.H{"message": err.Error()})
-		return
-	}
-	filePath := ctx.Param("file_path")
-	filePath = convertFilePathFromRoute(filePath)
-	req := &types.GetFileReq{
-		Namespace: namespace,
-		Name:      name,
-		Path:      filePath,
-		Ref:       ctx.Query("ref"),
-		RepoType:  types.ModelRepo,
-	}
-	raw, err := h.c.FileRaw(ctx, req)
-	if err != nil {
-		slog.Error("Failed to get model file raw", slog.Any("error", err))
-		ctx.JSON(http.StatusInternalServerError, gin.H{"message": err.Error()})
-		return
-	}
-
-	slog.Info("Get model file raw succeed", slog.String("model", name), slog.String("path", req.Path), slog.String("ref", req.Ref))
-	httpbase.OK(ctx, raw)
-}
 
 // GetModelFileInfo godoc
 // @Security     ApiKey
@@ -458,32 +306,6 @@ func (h *ModelHandler) FileRaw(ctx *gin.Context) {
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
 // @Router       /models/{namespace}/{name}/blob/{file_path} [get]
-func (h *ModelHandler) FileInfo(ctx *gin.Context) {
-	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
-	if err != nil {
-		slog.Error("Bad request format", "error", err)
-		ctx.JSON(http.StatusBadRequest, gin.H{"message": err.Error()})
-		return
-	}
-	filePath := ctx.Param("file_path")
-	filePath = convertFilePathFromRoute(filePath)
-	req := &types.GetFileReq{
-		Namespace: namespace,
-		Name:      name,
-		Path:      filePath,
-		Ref:       ctx.Query("ref"),
-		RepoType:  types.ModelRepo,
-	}
-	file, err := h.c.FileInfo(ctx, req)
-	if err != nil {
-		slog.Error("Failed to get model file info", slog.Any("error", err))
-		ctx.JSON(http.StatusInternalServerError, gin.H{"message": err.Error()})
-		return
-	}
-
-	slog.Info("Get model file info succeed", slog.String("model", name), slog.String("path", req.Path), slog.String("ref", req.Ref))
-	httpbase.OK(ctx, file)
-}
 
 // DownloadModelFile godoc
 // @Security     ApiKey
@@ -503,54 +325,6 @@ func (h *ModelHandler) FileInfo(ctx *gin.Context) {
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
 // @Router       /models/{namespace}/{name}/download/{file_path} [get]
-func (h *ModelHandler) DownloadFile(ctx *gin.Context) {
-	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
-	if err != nil {
-		slog.Error("Bad request format", "error", err)
-		httpbase.BadRequest(ctx, err.Error())
-		return
-	}
-	filePath := ctx.Param("file_path")
-	filePath = convertFilePathFromRoute(filePath)
-	req := &types.GetFileReq{
-		Namespace: namespace,
-		Name:      name,
-		Path:      filePath,
-		Ref:       ctx.Query("ref"),
-		Lfs:       false,
-		SaveAs:    ctx.Query("save_as"),
-		RepoType:  types.ModelRepo,
-	}
-	if ctx.Query("lfs") != "" {
-		req.Lfs, err = strconv.ParseBool(ctx.Query("lfs"))
-		if err != nil {
-			slog.Error("Bad request format", "error", err)
-			httpbase.BadRequest(ctx, err.Error())
-			return
-		}
-	}
-	reader, url, err := h.c.DownloadFile(ctx, req)
-	if err != nil {
-		slog.Error("Failed to download model file", slog.Any("error", err))
-		ctx.JSON(http.StatusInternalServerError, gin.H{"message": err.Error()})
-		return
-	}
-
-	if req.Lfs {
-		httpbase.OK(ctx, url)
-	} else {
-		slog.Info("Download model file succeed", slog.String("model", name), slog.String("path", req.Path), slog.String("ref", req.Ref))
-		fileName := path.Base(req.Path)
-		ctx.Header("Content-Type", "application/octet-stream")
-		ctx.Header("Content-Disposition", `attachment; filename="`+fileName+`"`)
-		_, err = io.Copy(ctx.Writer, reader)
-		if err != nil {
-			slog.Error("Failed to download model file", slog.Any("error", err))
-			ctx.JSON(http.StatusInternalServerError, gin.H{"message": err.Error()})
-			return
-		}
-	}
-}
 
 // GetModelBranches godoc
 // @Security     ApiKey
@@ -567,36 +341,6 @@ func (h *ModelHandler) DownloadFile(ctx *gin.Context) {
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
 // @Router       /models/{namespace}/{name}/branches [get]
-func (h *ModelHandler) Branches(ctx *gin.Context) {
-	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
-	if err != nil {
-		slog.Error("Bad request format", "error", err)
-		ctx.JSON(http.StatusBadRequest, gin.H{"message": err.Error()})
-		return
-	}
-	per, page, err := common.GetPerAndPageFromContext(ctx)
-	if err != nil {
-		slog.Error("Bad request format", "error", err)
-		ctx.JSON(http.StatusBadRequest, gin.H{"message": err.Error()})
-		return
-	}
-	req := &types.GetBranchesReq{
-		Namespace: namespace,
-		Name:      name,
-		Per:       per,
-		Page:      page,
-		RepoType:  types.ModelRepo,
-	}
-	branches, err := h.c.Branches(ctx, req)
-	if err != nil {
-		slog.Error("Failed to get model branches", slog.Any("error", err))
-		ctx.JSON(http.StatusInternalServerError, gin.H{"message": err.Error()})
-		return
-	}
-
-	slog.Info("Get model branches succeed", slog.String("model", name))
-	httpbase.OK(ctx, branches)
-}
 
 // GetModelTags godoc
 // @Security     ApiKey
@@ -611,28 +355,6 @@ func (h *ModelHandler) Branches(ctx *gin.Context) {
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
 // @Router       /models/{namespace}/{name}/tags [get]
-func (h *ModelHandler) Tags(ctx *gin.Context) {
-	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
-	if err != nil {
-		slog.Error("Bad request format", "error", err)
-		ctx.JSON(http.StatusBadRequest, gin.H{"message": err.Error()})
-		return
-	}
-	req := &types.GetTagsReq{
-		Namespace: namespace,
-		Name:      name,
-		RepoType:  types.ModelRepo,
-	}
-	tags, err := h.c.Tags(ctx, req)
-	if err != nil {
-		slog.Error("Failed to get model tags", slog.Any("error", err))
-		ctx.JSON(http.StatusInternalServerError, gin.H{"message": err.Error()})
-		return
-	}
-
-	slog.Info("Get model tags succeed", slog.String("model", name))
-	httpbase.OK(ctx, tags)
-}
 
 // GetModelFileTree godoc
 // @Security     ApiKey
@@ -648,30 +370,6 @@ func (h *ModelHandler) Tags(ctx *gin.Context) {
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
 // @Router       /models/{namespace}/{name}/tree [get]
-func (h *ModelHandler) Tree(ctx *gin.Context) {
-	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
-	if err != nil {
-		slog.Error("Bad request format", "error", err)
-		ctx.JSON(http.StatusBadRequest, gin.H{"message": err.Error()})
-		return
-	}
-	req := &types.GetFileReq{
-		Namespace: namespace,
-		Name:      name,
-		Path:      ctx.Query("path"),
-		Ref:       ctx.Query("ref"),
-		RepoType:  types.ModelRepo,
-	}
-	tree, err := h.c.Tree(ctx, req)
-	if err != nil {
-		slog.Error("Failed to get model file tree", slog.Any("error", err))
-		ctx.JSON(http.StatusInternalServerError, gin.H{"message": err.Error()})
-		return
-	}
-
-	slog.Info("Get model file tree succeed", slog.String("model", name), slog.String("path", req.Path), slog.String("ref", req.Ref))
-	httpbase.OK(ctx, tree)
-}
 
 // UpdateModelDownloads godoc
 // @Security     ApiKey
@@ -687,41 +385,6 @@ func (h *ModelHandler) Tree(ctx *gin.Context) {
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
 // @Router       /models/{namespace}/{name}/update_downloads [post]
-func (h *ModelHandler) UpdateDownloads(ctx *gin.Context) {
-	var req *types.UpdateDownloadsReq
-	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
-	if err != nil {
-		slog.Error("Bad request format", "error", err)
-		httpbase.BadRequest(ctx, err.Error())
-		return
-	}
-
-	if err := ctx.ShouldBindJSON(&req); err != nil {
-		slog.Error("Bad request format", "error", err)
-		httpbase.BadRequest(ctx, err.Error())
-		return
-	}
-
-	req.Namespace = namespace
-	req.Name = name
-	req.RepoType = types.ModelRepo
-	date, err := time.Parse("2006-01-02", req.ReqDate)
-	if err != nil {
-		slog.Error("Bad request format", "error", err)
-		httpbase.BadRequest(ctx, err.Error())
-		return
-	}
-	req.Date = date
-
-	err = h.c.UpdateDownloads(ctx, req)
-	if err != nil {
-		slog.Error("Failed to update model download count", slog.Any("error", err), slog.String("namespace", namespace), slog.String("name", name), slog.Time("date", date), slog.Int64("clone_count", req.CloneCount))
-		ctx.JSON(http.StatusInternalServerError, gin.H{"message": err.Error()})
-		return
-	}
-	slog.Info("Update model download count succeed", slog.String("namespace", namespace), slog.String("name", name), slog.Int64("clone_count", req.CloneCount))
-	httpbase.OK(ctx, nil)
-}
 
 // Predict godoc
 // @Security     ApiKey
@@ -816,84 +479,6 @@ func convertFilePathFromRoute(path string) string {
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
 // @Router       /models/{namespace}/{name}/upload_file [post]
-func (h *ModelHandler) UploadFile(ctx *gin.Context) {
-	var req *types.CreateFileReq
-
-	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
-	if err != nil {
-		slog.Error("Failed to get namespace from context", "error", err)
-		httpbase.BadRequest(ctx, err.Error())
-		return
-	}
-	if err = ctx.ShouldBind(&req); err != nil {
-		slog.Error("Bad request format", "error", err)
-		httpbase.BadRequest(ctx, err.Error())
-		return
-	}
-
-	file, err := ctx.FormFile("file")
-	if err != nil {
-		slog.Error("Bad request format", "error", err)
-		httpbase.BadRequest(ctx, err.Error())
-		return
-	}
-
-	openedFile, err := file.Open()
-	if err != nil {
-		slog.Error("Error opening uploaded file", "error", err)
-		httpbase.BadRequest(ctx, err.Error())
-		return
-	}
-	defer openedFile.Close()
-
-	var buf bytes.Buffer
-	w := base64.NewEncoder(base64.StdEncoding, &buf)
-	_, err = io.Copy(w, openedFile)
-	w.Close()
-	if err != nil {
-		slog.Info("Error encodeing uploaded file", "error", err)
-		httpbase.BadRequest(ctx, err.Error())
-		return
-	}
-
-	filePath := ctx.PostForm("file_path")
-	req.NameSpace = namespace
-	req.Name = name
-	req.FilePath = filePath
-	req.Content = buf.String()
-	req.RepoType = types.ModelRepo
-
-	err = h.c.UploadFile(ctx, req)
-	if err != nil {
-		slog.Error("Failed to create model file", slog.Any("error", err), slog.String("file_path", filePath))
-		ctx.JSON(http.StatusInternalServerError, gin.H{"message": err.Error()})
-		return
-	}
-	slog.Info("Create file succeed", slog.String("file_path", filePath))
-	httpbase.OK(ctx, nil)
-}
-
-func (h *ModelHandler) SDKListFiles(ctx *gin.Context) {
-	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
-	if err != nil {
-		slog.Error("Bad request format", "error", err)
-		ctx.JSON(http.StatusBadRequest, gin.H{"message": err.Error()})
-		return
-	}
-
-	files, err := h.c.SDKListFiles(ctx, types.ModelRepo, namespace, name)
-	if err != nil {
-		slog.Error("Error listing model files", "error", err)
-		httpbase.ServerError(ctx, err)
-		return
-	}
-
-	ctx.JSON(http.StatusOK, files)
-}
-
-func (h *ModelHandler) SDKDownload(ctx *gin.Context) {
-	h.handleDownload(ctx, false)
-}
 
 // DownloadModelFile godoc
 // @Security     ApiKey
@@ -911,95 +496,3 @@ func (h *ModelHandler) SDKDownload(ctx *gin.Context) {
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
 // @Router       /models/{namespace}/{name}/resolve/{file_path} [get]
-func (h *ModelHandler) ResolveDownload(ctx *gin.Context) {
-	h.handleDownload(ctx, true)
-}
-
-func (h *ModelHandler) HeadSDKDownload(ctx *gin.Context) {
-	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
-	if err != nil {
-		slog.Error("Bad request format", "error", err)
-		httpbase.BadRequest(ctx, err.Error())
-		return
-	}
-	filePath := ctx.Param("file_path")
-	filePath = convertFilePathFromRoute(filePath)
-	branch := ctx.Param("branch")
-	req := &types.GetFileReq{
-		Namespace: namespace,
-		Name:      name,
-		Path:      filePath,
-		Ref:       branch,
-		Lfs:       false,
-		SaveAs:    filepath.Base(filePath),
-		RepoType:  types.ModelRepo,
-	}
-
-	file, err := h.c.HeadDownloadFile(ctx, req)
-	if err != nil {
-		slog.Error("Failed to download model file", slog.Any("error", err))
-		httpbase.ServerError(ctx, err)
-		return
-	}
-
-	slog.Info("Head download model file succeed", slog.String("model", name), slog.String("path", req.Path), slog.String("ref", req.Ref), slog.String("contentLength", strconv.Itoa(file.Size)))
-	ctx.Header("Content-Length", strconv.Itoa(file.Size))
-	ctx.Header("X-Repo-Commit", file.SHA)
-	ctx.Header("ETag", file.SHA)
-	ctx.Status(http.StatusOK)
-}
-
-func (h *ModelHandler) handleDownload(ctx *gin.Context, isResolve bool) {
-	var branch string
-	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
-	if err != nil {
-		slog.Error("Bad request format", "error", err)
-		httpbase.BadRequest(ctx, err.Error())
-		return
-	}
-
-	filePath := ctx.Param("file_path")
-	filePath = convertFilePathFromRoute(filePath)
-	if isResolve {
-		branch = ctx.Query("ref")
-	} else {
-		branch = ctx.Param("branch")
-	}
-	req := &types.GetFileReq{
-		Namespace: namespace,
-		Name:      name,
-		Path:      filePath,
-		Ref:       branch,
-		Lfs:       false,
-		SaveAs:    filepath.Base(filePath),
-		RepoType:  types.ModelRepo,
-	}
-	lfs, err := h.c.IsLfs(ctx, req)
-	if err != nil {
-		slog.Error("Filed to lfs information", "error", err)
-		httpbase.ServerError(ctx, err)
-		return
-	}
-	req.Lfs = lfs
-	reader, url, err := h.c.SDKDownloadFile(ctx, req)
-	if err != nil {
-		slog.Error("Failed to download model file", slog.Any("error", err))
-		httpbase.ServerError(ctx, err)
-		return
-	}
-
-	if req.Lfs {
-		ctx.Redirect(http.StatusMovedPermanently, url)
-	} else {
-		slog.Info("Download model file succeed", slog.String("model", name), slog.String("path", req.Path), slog.String("ref", req.Ref))
-		fileName := path.Base(req.Path)
-		ctx.Header("Content-Type", "application/octet-stream")
-		ctx.Header("Content-Disposition", `attachment; filename="`+fileName+`"`)
-		_, err = io.Copy(ctx.Writer, reader)
-		if err != nil {
-			slog.Error("Failed to download model file", slog.Any("error", err))
-			httpbase.ServerError(ctx, err)
-			return
-		}
-	}
-}

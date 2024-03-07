@@ -2,7 +2,6 @@ package handler
 
 import (
 	"log/slog"
-	"net/http"
 	"strconv"
 
 	"github.com/gin-gonic/gin"
@@ -41,7 +40,7 @@ func (h *SpaceResourceHandler) Index(ctx *gin.Context) {
 	spaceResources, err := h.c.Index(ctx)
 	if err != nil {
 		slog.Error("Failed to get space resources", slog.Any("error", err))
-		ctx.JSON(http.StatusInternalServerError, gin.H{"message": err.Error()})
+		httpbase.ServerError(ctx, err)
 		return
 	}
 	slog.Info("Get space resources successfully")
@@ -64,13 +63,13 @@ func (h *SpaceResourceHandler) Create(ctx *gin.Context) {
 	var req *types.CreateSpaceResourceReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {
 		slog.Error("Bad request format", "error", err)
-		ctx.JSON(http.StatusBadRequest, gin.H{"message": err.Error()})
+		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
 	spaceResource, err := h.c.Create(ctx, req)
 	if err != nil {
 		slog.Error("Failed to create space resources", slog.Any("error", err))
-		ctx.JSON(http.StatusInternalServerError, gin.H{"message": err.Error()})
+		httpbase.ServerError(ctx, err)
 		return
 	}
 	slog.Info("Create space resources successfully")
@@ -98,13 +97,13 @@ func (h *SpaceResourceHandler) Update(ctx *gin.Context) {
 	var req *types.UpdateSpaceResourceReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {
 		slog.Error("Bad request format", "error", err)
-		ctx.JSON(http.StatusBadRequest, gin.H{"message": err.Error()})
+		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
 	id, err = strconv.ParseInt(ctx.Param("id"), 10, 64)
 	if err != nil {
 		slog.Error("Bad request format", "error", err)
-		ctx.JSON(http.StatusBadRequest, gin.H{"message": err.Error()})
+		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
 	req.ID = id
@@ -112,7 +111,7 @@ func (h *SpaceResourceHandler) Update(ctx *gin.Context) {
 	spaceResource, err := h.c.Update(ctx, req)
 	if err != nil {
 		slog.Error("Failed to update space resource", slog.Any("error", err))
-		ctx.JSON(http.StatusInternalServerError, gin.H{"message": err.Error()})
+		httpbase.ServerError(ctx, err)
 		return
 	}
 	slog.Info("Update space resources successfully")
@@ -139,14 +138,14 @@ func (h *SpaceResourceHandler) Delete(ctx *gin.Context) {
 	id, err = strconv.ParseInt(ctx.Param("id"), 10, 64)
 	if err != nil {
 		slog.Error("Bad request format", "error", err)
-		ctx.JSON(http.StatusBadRequest, gin.H{"message": err.Error()})
+		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
 
 	err = h.c.Delete(ctx, id)
 	if err != nil {
 		slog.Error("Failed to delete space resource", slog.Any("error", err))
-		ctx.JSON(http.StatusInternalServerError, gin.H{"message": err.Error()})
+		httpbase.ServerError(ctx, err)
 		return
 	}
 	slog.Info("Delete space resource successfully")

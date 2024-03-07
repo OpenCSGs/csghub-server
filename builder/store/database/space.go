@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 	"strings"
+	"time"
 
 	"github.com/uptrace/bun"
 )
@@ -43,6 +44,12 @@ func (s *SpaceStore) Create(ctx context.Context, input Space) (*Space, error) {
 
 	input.ID, _ = res.LastInsertId()
 	return &input, nil
+}
+
+func (s *SpaceStore) Update(ctx context.Context, input Space) (err error) {
+	input.UpdatedAt = time.Now()
+	_, err = s.db.Core.NewUpdate().Model(&input).WherePK().Exec(ctx)
+	return
 }
 
 func (s *SpaceStore) PublicToUser(ctx context.Context, userID int64, search, sort string, per, page int) ([]Space, int, error) {

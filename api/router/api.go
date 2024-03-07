@@ -10,6 +10,7 @@ import (
 	"opencsg.com/csghub-server/api/handler/callback"
 	"opencsg.com/csghub-server/api/middleware"
 	"opencsg.com/csghub-server/common/config"
+	"opencsg.com/csghub-server/common/types"
 )
 
 func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
@@ -43,16 +44,21 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 		return nil, fmt.Errorf("error creating dataset handler:%w", err)
 	}
 
+	repoCommonHandler, err := handler.NewRepoHandler(config)
+	if err != nil {
+		return nil, fmt.Errorf("error creating repo common handler: %w", err)
+	}
+
 	hfGroup := r.Group("/hf")
 	{
-		hfGroup.GET("/:namespace/:name/resolve/:branch/*file_path", modelHandler.SDKDownload)
-		hfGroup.HEAD("/:namespace/:name/resolve/:branch/*file_path", modelHandler.HeadSDKDownload)
-		hfGroup.GET("/datasets/:namespace/:name/resolve/:branch/*file_path", dsHandler.SDKDownload)
-		hfGroup.HEAD("/datasets/:namespace/:name/resolve/:branch/*file_path", dsHandler.HeadSDKDownload)
+		hfGroup.GET("/:namespace/:name/resolve/:branch/*file_path", middleware.RepoType(types.ModelRepo), repoCommonHandler.SDKDownload)
+		hfGroup.HEAD("/:namespace/:name/resolve/:branch/*file_path", middleware.RepoType(types.ModelRepo), repoCommonHandler.HeadSDKDownload)
+		hfGroup.GET("/datasets/:namespace/:name/resolve/:branch/*file_path", middleware.RepoType(types.DatasetRepo), repoCommonHandler.SDKDownload)
+		hfGroup.HEAD("/datasets/:namespace/:name/resolve/:branch/*file_path", middleware.RepoType(types.DatasetRepo), repoCommonHandler.HeadSDKDownload)
 		hfAPIGroup := hfGroup.Group("/api")
 		{
-			hfAPIGroup.GET("/models/:namespace/:name/revision/:branch", modelHandler.SDKListFiles)
-			hfAPIGroup.GET("/datasets/:namespace/:name/revision/:branch", dsHandler.SDKListFiles)
+			hfAPIGroup.GET("/models/:namespace/:name/revision/:branch", middleware.RepoType(types.ModelRepo), repoCommonHandler.SDKListFiles)
+			hfAPIGroup.GET("/datasets/:namespace/:name/revision/:branch", middleware.RepoType(types.DatasetRepo), repoCommonHandler.SDKListFiles)
 		}
 	}
 	// Models routes
@@ -63,13 +69,13 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 		modelsGroup.PUT("/:namespace/:name", modelHandler.Update)
 		modelsGroup.DELETE("/:namespace/:name", modelHandler.Delete)
 		modelsGroup.GET("/:namespace/:name", modelHandler.Show)
-		modelsGroup.GET("/:namespace/:name/branches", modelHandler.Branches)
-		modelsGroup.GET("/:namespace/:name/tags", modelHandler.Tags)
-		modelsGroup.GET("/:namespace/:name/last_commit", modelHandler.LastCommit)
-		modelsGroup.GET("/:namespace/:name/tree", modelHandler.Tree)
-		modelsGroup.GET("/:namespace/:name/commits", modelHandler.Commits)
-		modelsGroup.GET("/:namespace/:name/raw/*file_path", modelHandler.FileRaw)
-		modelsGroup.GET("/:namespace/:name/blob/*file_path", modelHandler.FileInfo)
+		modelsGroup.GET("/:namespace/:name/branches", middleware.RepoType(types.ModelRepo), repoCommonHandler.Branches)
+		modelsGroup.GET("/:namespace/:name/tags", middleware.RepoType(types.ModelRepo), repoCommonHandler.Tags)
+		modelsGroup.GET("/:namespace/:name/last_commit", middleware.RepoType(types.ModelRepo), repoCommonHandler.LastCommit)
+		modelsGroup.GET("/:namespace/:name/tree", middleware.RepoType(types.ModelRepo), repoCommonHandler.Tree)
+		modelsGroup.GET("/:namespace/:name/commits", middleware.RepoType(types.ModelRepo), repoCommonHandler.Commits)
+		modelsGroup.GET("/:namespace/:name/raw/*file_path", middleware.RepoType(types.ModelRepo), repoCommonHandler.FileRaw)
+		modelsGroup.GET("/:namespace/:name/blob/*file_path", middleware.RepoType(types.ModelRepo), repoCommonHandler.FileInfo)
 		// The DownloadFile method differs from the SDKDownload interface in a few ways
 
 		// 1.When passing the file_path parameter to the SDKDownload method,
@@ -78,12 +84,12 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 		// The DownloadFile has a different file_path format for lfs files and non-lfs files,
 		// and an lfs parameter needs to be added.
 		// 2. DownloadFile returns an object store url for lfs files, while SDKDownload redirects directly.
-		modelsGroup.GET("/:namespace/:name/download/*file_path", modelHandler.DownloadFile)
-		modelsGroup.GET("/:namespace/:name/resolve/*file_path", modelHandler.ResolveDownload)
-		modelsGroup.POST("/:namespace/:name/raw/*file_path", modelHandler.CreateFile)
-		modelsGroup.PUT("/:namespace/:name/raw/*file_path", modelHandler.UpdateFile)
-		modelsGroup.POST("/:namespace/:name/update_downloads", modelHandler.UpdateDownloads)
-		modelsGroup.POST("/:namespace/:name/upload_file", modelHandler.UploadFile)
+		modelsGroup.GET("/:namespace/:name/download/*file_path", middleware.RepoType(types.ModelRepo), repoCommonHandler.DownloadFile)
+		modelsGroup.GET("/:namespace/:name/resolve/*file_path", middleware.RepoType(types.ModelRepo), repoCommonHandler.ResolveDownload)
+		modelsGroup.POST("/:namespace/:name/raw/*file_path", middleware.RepoType(types.ModelRepo), repoCommonHandler.CreateFile)
+		modelsGroup.PUT("/:namespace/:name/raw/*file_path", middleware.RepoType(types.ModelRepo), repoCommonHandler.UpdateFile)
+		modelsGroup.POST("/:namespace/:name/update_downloads", middleware.RepoType(types.ModelRepo), repoCommonHandler.UpdateDownloads)
+		modelsGroup.POST("/:namespace/:name/upload_file", middleware.RepoType(types.ModelRepo), repoCommonHandler.UploadFile)
 		// invoke model endpoint to do pediction
 		modelsGroup.POST("/:namespace/:name/predict", modelHandler.Predict)
 	}
@@ -97,19 +103,19 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 		datasetsGroup.PUT("/:namespace/:name", dsHandler.Update)
 		datasetsGroup.DELETE("/:namespace/:name", dsHandler.Delete)
 		datasetsGroup.GET("/:namespace/:name", dsHandler.Show)
-		datasetsGroup.GET("/:namespace/:name/branches", dsHandler.Branches)
-		datasetsGroup.GET("/:namespace/:name/tags", dsHandler.Tags)
-		datasetsGroup.GET("/:namespace/:name/last_commit", dsHandler.LastCommit)
-		datasetsGroup.GET("/:namespace/:name/tree", dsHandler.Tree)
-		datasetsGroup.GET("/:namespace/:name/commits", dsHandler.Commits)
-		datasetsGroup.POST("/:namespace/:name/raw/*file_path", dsHandler.CreateFile)
-		datasetsGroup.GET("/:namespace/:name/raw/*file_path", dsHandler.FileRaw)
-		datasetsGroup.GET("/:namespace/:name/blob/*file_path", dsHandler.FileInfo)
-		datasetsGroup.GET("/:namespace/:name/download/*file_path", dsHandler.DownloadFile)
-		datasetsGroup.GET("/:namespace/:name/resolve/*file_path", dsHandler.ResolveDownload)
-		datasetsGroup.PUT("/:namespace/:name/raw/*file_path", dsHandler.UpdateFile)
-		datasetsGroup.POST("/:namespace/:name/update_downloads", dsHandler.UpdateDownloads)
-		datasetsGroup.POST("/:namespace/:name/upload_file", dsHandler.UploadFile)
+		datasetsGroup.GET("/:namespace/:name/branches", middleware.RepoType(types.DatasetRepo), repoCommonHandler.Branches)
+		datasetsGroup.GET("/:namespace/:name/tags", middleware.RepoType(types.DatasetRepo), repoCommonHandler.Tags)
+		datasetsGroup.GET("/:namespace/:name/last_commit", middleware.RepoType(types.DatasetRepo), repoCommonHandler.LastCommit)
+		datasetsGroup.GET("/:namespace/:name/tree", middleware.RepoType(types.DatasetRepo), repoCommonHandler.Tree)
+		datasetsGroup.GET("/:namespace/:name/commits", middleware.RepoType(types.DatasetRepo), repoCommonHandler.Commits)
+		datasetsGroup.POST("/:namespace/:name/raw/*file_path", middleware.RepoType(types.DatasetRepo), repoCommonHandler.CreateFile)
+		datasetsGroup.GET("/:namespace/:name/raw/*file_path", middleware.RepoType(types.DatasetRepo), repoCommonHandler.FileRaw)
+		datasetsGroup.GET("/:namespace/:name/blob/*file_path", middleware.RepoType(types.DatasetRepo), repoCommonHandler.FileInfo)
+		datasetsGroup.GET("/:namespace/:name/download/*file_path", middleware.RepoType(types.DatasetRepo), repoCommonHandler.DownloadFile)
+		datasetsGroup.GET("/:namespace/:name/resolve/*file_path", middleware.RepoType(types.DatasetRepo), repoCommonHandler.ResolveDownload)
+		datasetsGroup.PUT("/:namespace/:name/raw/*file_path", middleware.RepoType(types.DatasetRepo), repoCommonHandler.UpdateFile)
+		datasetsGroup.POST("/:namespace/:name/update_downloads", middleware.RepoType(types.DatasetRepo), repoCommonHandler.UpdateDownloads)
+		datasetsGroup.POST("/:namespace/:name/upload_file", middleware.RepoType(types.DatasetRepo), repoCommonHandler.UploadFile)
 	}
 
 	// Code routes
@@ -125,19 +131,19 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 		codesGroup.PUT("/:namespace/:name", codeHandler.Update)
 		codesGroup.DELETE("/:namespace/:name", codeHandler.Delete)
 		codesGroup.GET("/:namespace/:name", codeHandler.Show)
-		codesGroup.GET("/:namespace/:name/branches", codeHandler.Branches)
-		codesGroup.GET("/:namespace/:name/tags", codeHandler.Tags)
-		codesGroup.GET("/:namespace/:name/last_commit", codeHandler.LastCommit)
-		codesGroup.GET("/:namespace/:name/tree", codeHandler.Tree)
-		codesGroup.GET("/:namespace/:name/commits", codeHandler.Commits)
-		codesGroup.POST("/:namespace/:name/raw/*file_path", codeHandler.CreateFile)
-		codesGroup.GET("/:namespace/:name/raw/*file_path", codeHandler.FileRaw)
-		codesGroup.GET("/:namespace/:name/blob/*file_path", codeHandler.FileInfo)
-		codesGroup.GET("/:namespace/:name/download/*file_path", codeHandler.DownloadFile)
-		codesGroup.GET("/:namespace/:name/resolve/*file_path", codeHandler.ResolveDownload)
-		codesGroup.PUT("/:namespace/:name/raw/*file_path", codeHandler.UpdateFile)
-		codesGroup.POST("/:namespace/:name/update_downloads", codeHandler.UpdateDownloads)
-		codesGroup.POST("/:namespace/:name/upload_file", codeHandler.UploadFile)
+		codesGroup.GET("/:namespace/:name/branches", middleware.RepoType(types.CodeRepo), repoCommonHandler.Branches)
+		codesGroup.GET("/:namespace/:name/tags", middleware.RepoType(types.CodeRepo), repoCommonHandler.Tags)
+		codesGroup.GET("/:namespace/:name/last_commit", middleware.RepoType(types.CodeRepo), repoCommonHandler.LastCommit)
+		codesGroup.GET("/:namespace/:name/tree", middleware.RepoType(types.CodeRepo), repoCommonHandler.Tree)
+		codesGroup.GET("/:namespace/:name/commits", middleware.RepoType(types.CodeRepo), repoCommonHandler.Commits)
+		codesGroup.POST("/:namespace/:name/raw/*file_path", middleware.RepoType(types.CodeRepo), repoCommonHandler.CreateFile)
+		codesGroup.GET("/:namespace/:name/raw/*file_path", middleware.RepoType(types.CodeRepo), repoCommonHandler.FileRaw)
+		codesGroup.GET("/:namespace/:name/blob/*file_path", middleware.RepoType(types.CodeRepo), repoCommonHandler.FileInfo)
+		codesGroup.GET("/:namespace/:name/download/*file_path", middleware.RepoType(types.CodeRepo), repoCommonHandler.DownloadFile)
+		codesGroup.GET("/:namespace/:name/resolve/*file_path", middleware.RepoType(types.CodeRepo), repoCommonHandler.ResolveDownload)
+		codesGroup.PUT("/:namespace/:name/raw/*file_path", middleware.RepoType(types.CodeRepo), repoCommonHandler.UpdateFile)
+		codesGroup.POST("/:namespace/:name/update_downloads", middleware.RepoType(types.CodeRepo), repoCommonHandler.UpdateDownloads)
+		codesGroup.POST("/:namespace/:name/upload_file", middleware.RepoType(types.CodeRepo), repoCommonHandler.UploadFile)
 	}
 
 	// Dataset viewer
@@ -171,19 +177,19 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 		// call space webhook api
 		spaces.POST("/:namespace/:name/webhook", nil)
 
-		spaces.GET("/:namespace/:name/branches", spaceHandler.Branches)
-		spaces.GET("/:namespace/:name/tags", spaceHandler.Tags)
-		spaces.GET("/:namespace/:name/last_commit", spaceHandler.LastCommit)
-		spaces.GET("/:namespace/:name/tree", spaceHandler.Tree)
-		spaces.GET("/:namespace/:name/commits", spaceHandler.Commits)
-		spaces.POST("/:namespace/:name/raw/*file_path", spaceHandler.CreateFile)
-		spaces.GET("/:namespace/:name/raw/*file_path", spaceHandler.FileRaw)
-		spaces.GET("/:namespace/:name/blob/*file_path", spaceHandler.FileInfo)
-		spaces.GET("/:namespace/:name/download/*file_path", spaceHandler.DownloadFile)
-		spaces.GET("/:namespace/:name/resolve/*file_path", spaceHandler.ResolveDownload)
-		spaces.PUT("/:namespace/:name/raw/*file_path", spaceHandler.UpdateFile)
-		spaces.POST("/:namespace/:name/update_downloads", spaceHandler.UpdateDownloads)
-		spaces.POST("/:namespace/:name/upload_file", spaceHandler.UploadFile)
+		spaces.GET("/:namespace/:name/branches", middleware.RepoType(types.SpaceRepo), repoCommonHandler.Branches)
+		spaces.GET("/:namespace/:name/tags", middleware.RepoType(types.SpaceRepo), repoCommonHandler.Tags)
+		spaces.GET("/:namespace/:name/last_commit", middleware.RepoType(types.SpaceRepo), repoCommonHandler.LastCommit)
+		spaces.GET("/:namespace/:name/tree", middleware.RepoType(types.SpaceRepo), repoCommonHandler.Tree)
+		spaces.GET("/:namespace/:name/commits", middleware.RepoType(types.SpaceRepo), repoCommonHandler.Commits)
+		spaces.POST("/:namespace/:name/raw/*file_path", middleware.RepoType(types.SpaceRepo), repoCommonHandler.CreateFile)
+		spaces.GET("/:namespace/:name/raw/*file_path", middleware.RepoType(types.SpaceRepo), repoCommonHandler.FileRaw)
+		spaces.GET("/:namespace/:name/blob/*file_path", middleware.RepoType(types.SpaceRepo), repoCommonHandler.FileInfo)
+		spaces.GET("/:namespace/:name/download/*file_path", middleware.RepoType(types.SpaceRepo), repoCommonHandler.DownloadFile)
+		spaces.GET("/:namespace/:name/resolve/*file_path", middleware.RepoType(types.SpaceRepo), repoCommonHandler.ResolveDownload)
+		spaces.PUT("/:namespace/:name/raw/*file_path", middleware.RepoType(types.SpaceRepo), repoCommonHandler.UpdateFile)
+		spaces.POST("/:namespace/:name/update_downloads", middleware.RepoType(types.SpaceRepo), repoCommonHandler.UpdateDownloads)
+		spaces.POST("/:namespace/:name/upload_file", middleware.RepoType(types.SpaceRepo), repoCommonHandler.UploadFile)
 	}
 
 	spaceResourceHandler, err := handler.NewSpaceResourceHandler(config)

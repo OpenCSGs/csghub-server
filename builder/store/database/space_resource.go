@@ -15,8 +15,12 @@ func NewSpaceResourceStore() *SpaceResourceStore {
 }
 
 type SpaceResource struct {
-	ID   int64  `bun:",pk,autoincrement" json:"id"`
-	Name string `bun:",notnull" json:"name"`
+	ID     int64  `bun:",pk,autoincrement" json:"id"`
+	Name   string `bun:",notnull" json:"name"`
+	Cpu    int    `bun:",notnull" json:"cpu"`
+	Gpu    int    `bun:",notnull" json:"gpu"`
+	Memory int    `bun:",notnull" json:"memory"`
+	Disk   int    `bun:",notnull" json:"disk"`
 	times
 }
 

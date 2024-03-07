@@ -28,8 +28,12 @@ func (c *SpaceResourceComponent) Index(ctx context.Context) ([]types.SpaceResour
 	}
 	for _, r := range databaseSpaceResources {
 		result = append(result, types.SpaceResource{
-			ID:   r.ID,
-			Name: r.Name,
+			ID:     r.ID,
+			Name:   r.Name,
+			Cpu:    r.Cpu,
+			Gpu:    r.Gpu,
+			Memory: r.Memory,
+			Disk:   r.Disk,
 		})
 	}
 
@@ -51,8 +55,12 @@ func (c *SpaceResourceComponent) Update(ctx context.Context, req *types.UpdateSp
 	}
 
 	result := &types.SpaceResource{
-		ID:   sr.ID,
-		Name: sr.Name,
+		ID:     sr.ID,
+		Name:   sr.Name,
+		Cpu:    sr.Cpu,
+		Gpu:    sr.Gpu,
+		Memory: sr.Memory,
+		Disk:   sr.Disk,
 	}
 
 	return result, nil
@@ -69,8 +77,12 @@ func (c *SpaceResourceComponent) Create(ctx context.Context, req *types.CreateSp
 	}
 
 	result := &types.SpaceResource{
-		ID:   res.ID,
-		Name: res.Name,
+		ID:     res.ID,
+		Name:   res.Name,
+		Cpu:    res.Cpu,
+		Gpu:    res.Gpu,
+		Memory: res.Memory,
+		Disk:   res.Disk,
 	}
 
 	return result, nil
