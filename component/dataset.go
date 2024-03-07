@@ -118,7 +118,7 @@ func NewDatasetComponent(config *config.Config) (*DatasetComponent, error) {
 }
 
 type DatasetComponent struct {
-	repoComponent
+	RepoComponent
 	ts *database.TagStore
 }
 

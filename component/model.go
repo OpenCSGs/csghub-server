@@ -99,7 +99,7 @@ func NewModelComponent(config *config.Config) (*ModelComponent, error) {
 }
 
 type ModelComponent struct {
-	repoComponent
+	RepoComponent
 	infer inference.Client
 }
 

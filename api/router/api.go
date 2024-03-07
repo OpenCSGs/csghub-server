@@ -10,6 +10,7 @@ import (
 	"opencsg.com/csghub-server/api/handler/callback"
 	"opencsg.com/csghub-server/api/middleware"
 	"opencsg.com/csghub-server/common/config"
+	"opencsg.com/csghub-server/common/types"
 )
 
 func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
@@ -33,10 +34,15 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 	apiGroup.POST("/list/models_by_path", listHandler.ListModelsByPath)
 	apiGroup.POST("/list/datasets_by_path", listHandler.ListDatasetsByPath)
 
+	repoCommonHandler, err := handler.NewRepoHanlder(config)
+	if err != nil {
+		return nil, fmt.Errorf("error creating repo common handler: %w", err)
+	}
+
 	// Huggingface SDK routes
 	modelHandler, err := handler.NewModelHandler(config)
 	if err != nil {
-		return nil, fmt.Errorf("error creating model controller:%w", err)
+		return nil, fmt.Errorf("error creating model handler:%w", err)
 	}
 	dsHandler, err := handler.NewDatasetHandler(config)
 	if err != nil {
@@ -66,7 +72,8 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 		modelsGroup.GET("/:namespace/:name/branches", modelHandler.Branches)
 		modelsGroup.GET("/:namespace/:name/tags", modelHandler.Tags)
 		modelsGroup.GET("/:namespace/:name/last_commit", modelHandler.LastCommit)
-		modelsGroup.GET("/:namespace/:name/tree", modelHandler.Tree)
+		// modelsGroup.GET("/:namespace/:name/tree", modelHandler.Tree)
+		modelsGroup.GET("/:namespace/:name/tree", middleware.RepoType(types.ModelRepo), repoCommonHandler.Tree)
 		modelsGroup.GET("/:namespace/:name/commits", modelHandler.Commits)
 		modelsGroup.GET("/:namespace/:name/raw/*file_path", modelHandler.FileRaw)
 		modelsGroup.GET("/:namespace/:name/blob/*file_path", modelHandler.FileInfo)

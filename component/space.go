@@ -39,7 +39,7 @@ func NewSpaceComponent(config *config.Config) (*SpaceComponent, error) {
 }
 
 type SpaceComponent struct {
-	repoComponent
+	RepoComponent
 	space  *database.SpaceStore
 	rproxy *proxy.ReverseProxy
 	sss    *database.SpaceSdkStore
