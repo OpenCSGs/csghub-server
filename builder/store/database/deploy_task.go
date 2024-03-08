@@ -1,6 +1,10 @@
 package database
 
-import "context"
+import (
+	"context"
+	"fmt"
+	"time"
+)
 
 type Deploy struct {
 	ID        int64  `bun:",pk,autoincrement" json:"id"`
@@ -27,7 +31,9 @@ type DeployTask struct {
 
 type MonitorTask struct {
 	DeployTaskID int64 `bun:",pk" json:"deploy_task_id"`
-	DeployID     int64 `bun:",notnull" json:"deploy_id"`
+	// DeployID     int64     `bun:",notnull" json:"deploy_id"`
+	CreatedAt time.Time `bun:",nullzero,notnull,skipupdate,default:current_timestamp" json:"created_at"`
+	*DeployTask
 }
 
 type DeployTaskStore struct {
@@ -70,10 +76,16 @@ func (s *DeployTaskStore) GetDeployTask(ctx context.Context, id int64) (*DeployT
 	return deployTask, err
 }
 
-// GetNewTaskAfter return the new task after current task
-func (s *DeployTaskStore) GetNewTaskAfter(ctx context.Context, currentTaskId int64) (*DeployTask, error) {
+func (s *DeployTaskStore) GetDeployTasksOfDeploy(ctx context.Context, deployID int64) ([]*DeployTask, error) {
+	var deployTasks []*DeployTask
+	err := s.db.Core.NewSelect().Model((*DeployTask)(nil)).Where("deploy_id = ?", deployID).Scan(ctx, &deployTasks)
+	return deployTasks, err
+}
+
+// GetNewTaskAfter return the first task of the next deploy
+func (s *DeployTaskStore) GetNewTaskAfter(ctx context.Context, currentDeployID int64) (*DeployTask, error) {
 	deployTask := &DeployTask{}
-	err := s.db.Core.NewSelect().Model(deployTask).Where("id > ? and status = 0", currentTaskId).Order("id ASC").Limit(1).Scan(ctx, deployTask)
+	err := s.db.Core.NewSelect().Model(deployTask).Where("deploy_id > ? and status = 0", currentDeployID).Order("id ASC").Limit(1).Scan(ctx, deployTask)
 	return deployTask, err
 }
 
@@ -82,4 +94,38 @@ func (s *DeployTaskStore) GetNewTaskFirst(ctx context.Context) (*DeployTask, err
 	deployTask := &DeployTask{}
 	err := s.db.Core.NewSelect().Model(deployTask).Where("status = ?", 0).Order("id asc").Limit(1).Scan(ctx, deployTask)
 	return deployTask, err
+}
+
+func (s *DeployTaskStore) CreateMonitorTask(ctx context.Context, monitorTask *MonitorTask) error {
+	_, err := s.db.Core.NewInsert().Model(monitorTask).Exec(ctx)
+	return err
+}
+
+func (s *DeployTaskStore) GetAllMonitorTasks(ctx context.Context) ([]*MonitorTask, error) {
+	var monitorTasks []*MonitorTask
+	err := s.db.Core.NewSelect().Model(&monitorTasks).Scan(ctx)
+	return monitorTasks, err
+}
+
+func (s *DeployTaskStore) DeleteMonitorTask(ctx context.Context, deployTaskID int64) error {
+	_, err := s.db.Core.NewDelete().Model((*MonitorTask)(nil)).Where("deploy_task_id = ?", deployTaskID).Exec(ctx)
+	return err
+}
+
+func (s *DeployTaskStore) UpdateInTx(ctx context.Context, deploy *Deploy, deployTasks ...*DeployTask) error {
+	tx, err := s.db.Core.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("failed to begin transaction,%w", err)
+	}
+	_, err = tx.NewUpdate().Model(deploy).WherePK().Exec(ctx)
+	if err != nil {
+		tx.Rollback()
+		return fmt.Errorf("failed to update deploy,%w", err)
+	}
+	_, err = tx.NewUpdate().Model(&deployTasks).WherePK().Exec(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to update deploy task,%w", err)
+	}
+
+	return tx.Commit()
 }

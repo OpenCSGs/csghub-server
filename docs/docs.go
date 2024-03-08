@@ -4255,6 +4255,49 @@ const docTemplate = `{
                 }
             }
         },
+        "types.File": {
+            "type": "object",
+            "properties": {
+                "commit": {
+                    "$ref": "#/definitions/types.Commit"
+                },
+                "content": {
+                    "type": "string"
+                },
+                "last_commit_sha": {
+                    "type": "string"
+                },
+                "lfs": {
+                    "type": "boolean"
+                },
+                "lfs_relative_path": {
+                    "description": "relative path in lfs storage",
+                    "type": "string"
+                },
+                "mode": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "path": {
+                    "type": "string"
+                },
+                "sha": {
+                    "type": "string"
+                },
+                "size": {
+                    "type": "integer"
+                },
+                "type": {
+                    "type": "string"
+                },
+                "url": {
+                    "description": "URL to browse the file",
+                    "type": "string"
+                }
+            }
+        },
         "types.ListByPathReq": {
             "type": "object",
             "properties": {
