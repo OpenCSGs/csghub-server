@@ -7,10 +7,8 @@ import (
 	"log/slog"
 	"time"
 
-	"opencsg.com/csghub-server/builder/git"
 	"opencsg.com/csghub-server/builder/git/membership"
 	"opencsg.com/csghub-server/builder/store/database"
-	"opencsg.com/csghub-server/builder/store/s3"
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/types"
 )
@@ -82,43 +80,17 @@ const (
 
 func NewDatasetComponent(config *config.Config) (*DatasetComponent, error) {
 	c := &DatasetComponent{}
-	c.ds = database.NewDatasetStore()
-	c.namespace = database.NewNamespaceStore()
-	c.user = database.NewUserStore()
-	c.org = database.NewOrgStore()
-	c.repo = database.NewRepoStore()
 	c.ts = database.NewTagStore()
 	var err error
-	c.git, err = git.NewGitServer(config)
+	c.RepoComponent, err = NewRepoComponent(config)
 	if err != nil {
-		newError := fmt.Errorf("fail to create git server,error:%w", err)
-		slog.Error(newError.Error())
-		return nil, newError
-	}
-	c.tc, err = NewTagComponent(config)
-	if err != nil {
-		newError := fmt.Errorf("fail to create tag component,error:%w", err)
-		slog.Error(newError.Error())
-		return nil, newError
-	}
-	c.s3Client, err = s3.NewMinio(config)
-	if err != nil {
-		newError := fmt.Errorf("fail to init s3 client for dataset,error:%w", err)
-		slog.Error(newError.Error())
-		return nil, newError
-	}
-	c.lfsBucket = config.S3.Bucket
-	c.msc, err = NewMemberComponent(config)
-	if err != nil {
-		newError := fmt.Errorf("fail to create membership component,error:%w", err)
-		slog.Error(newError.Error())
-		return nil, newError
+		return nil, err
 	}
 	return c, nil
 }
 
 type DatasetComponent struct {
-	repoComponent
+	*RepoComponent
 	ts *database.TagStore
 }
 

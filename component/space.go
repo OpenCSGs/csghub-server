@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"log/slog"
 
-	"opencsg.com/csghub-server/builder/git"
 	"opencsg.com/csghub-server/builder/git/membership"
 	"opencsg.com/csghub-server/builder/proxy"
 	"opencsg.com/csghub-server/builder/store/database"
@@ -15,25 +14,23 @@ import (
 
 func NewSpaceComponent(config *config.Config) (*SpaceComponent, error) {
 	c := &SpaceComponent{}
-	c.user = database.NewUserStore()
 	c.space = database.NewSpaceStore()
-	c.org = database.NewOrgStore()
-	c.namespace = database.NewNamespaceStore()
-	c.repo = database.NewRepoStore()
 	var err error
-	c.git, err = git.NewGitServer(config)
+	c.sss = database.NewSpaceSdkStore()
+	c.srs = database.NewSpaceResourceStore()
+	c.RepoComponent, err = NewRepoComponent(config)
 	if err != nil {
-		newError := fmt.Errorf("fail to create git server,error:%w", err)
-		slog.Error(newError.Error())
-		return nil, newError
+		return nil, err
 	}
 	return c, nil
 }
 
 type SpaceComponent struct {
-	repoComponent
+	*RepoComponent
 	space  *database.SpaceStore
 	rproxy *proxy.ReverseProxy
+	sss    *database.SpaceSdkStore
+	srs    *database.SpaceResourceStore
 }
 
 func (c *SpaceComponent) Create(ctx context.Context, req types.CreateSpaceReq) (*types.Space, error) {
@@ -45,28 +42,76 @@ func (c *SpaceComponent) Create(ctx context.Context, req types.CreateSpaceReq) (
 	}
 
 	dbSpace := database.Space{
-		Repository: dbRepo,
-		Sdk:        req.Sdk,
+		RepositoryID:  dbRepo.ID,
+		Sdk:           req.Sdk,
+		SdkVersion:    req.SdkVersion,
+		CoverImageUrl: req.CoverImageUrl,
+		Env:           req.Env,
+		Hardware:      req.Hardware,
+		Secrets:       req.Secrets,
 	}
 
-	_, err = c.space.Create(ctx, dbSpace)
+	resSpace, err := c.space.Create(ctx, dbSpace)
 	if err != nil {
 		slog.Error("fail to create space in db", slog.Any("req", req), slog.String("error", err.Error()))
 		return nil, fmt.Errorf("fail to create space in db, error: %w", err)
 	}
 
 	space := &types.Space{
-		Creator:   req.Username,
-		Namespace: req.Namespace,
-		License:   req.License,
-		Name:      req.Name,
-		Sdk:       req.Sdk,
+		Creator:       req.Username,
+		Namespace:     req.Namespace,
+		License:       req.License,
+		Path:          dbRepo.Path,
+		Name:          req.Name,
+		Sdk:           req.Sdk,
+		SdkVersion:    req.SdkVersion,
+		Env:           req.Env,
+		Hardware:      req.Hardware,
+		Secrets:       req.Secrets,
+		CoverImageUrl: resSpace.CoverImageUrl,
 		// TODO: get running status and endpoint from inference service
 		Endpoint:      "",
 		RunningStatus: "",
 		Private:       req.Private,
+		CreatedAt:     resSpace.CreatedAt,
 	}
 	return space, nil
+}
+
+func (c *SpaceComponent) Update(ctx context.Context, req *types.UpdateSpaceReq) (*types.Space, error) {
+	req.RepoType = types.SpaceRepo
+	_, err := c.UpdateRepo(ctx, req.CreateRepoReq)
+	if err != nil {
+		return nil, err
+	}
+
+	space, err := c.space.FindByPath(ctx, req.Namespace, req.Name)
+	if err != nil {
+		return nil, fmt.Errorf("failed to find space, error: %w", err)
+	}
+
+	err = c.space.Update(ctx, *space)
+	if err != nil {
+		return nil, fmt.Errorf("failed to update database space, error: %w", err)
+	}
+
+	resDataset := &types.Space{
+		Name:          space.Repository.Name,
+		Path:          space.Repository.Path,
+		Sdk:           space.Sdk,
+		SdkVersion:    space.SdkVersion,
+		Template:      space.Template,
+		Env:           space.Env,
+		Hardware:      space.Hardware,
+		Secrets:       space.Secrets,
+		CoverImageUrl: space.CoverImageUrl,
+		License:       space.Repository.License,
+		Private:       space.Repository.Private,
+		Creator:       space.Repository.User.Username,
+		CreatedAt:     space.Repository.CreatedAt,
+	}
+
+	return resDataset, nil
 }
 
 func (c *SpaceComponent) Index(ctx context.Context, username, search, sort string, per, page int) ([]types.Space, int, error) {
@@ -98,17 +143,22 @@ func (c *SpaceComponent) Index(ctx context.Context, username, search, sort strin
 		spaces = append(spaces, types.Space{
 			// Creator:   data.Repository.Username,
 			// Namespace: data.Repository.,
-			Name:    data.Repository.Name,
-			Path:    data.Repository.Path,
-			Sdk:     data.Sdk,
-			License: data.Repository.License,
+			Name:          data.Repository.Name,
+			Path:          data.Repository.Path,
+			Sdk:           data.Sdk,
+			SdkVersion:    data.SdkVersion,
+			Template:      data.Template,
+			Env:           data.Env,
+			Hardware:      data.Hardware,
+			Secrets:       data.Secrets,
+			CoverImageUrl: data.CoverImageUrl,
+			License:       data.Repository.License,
 			// // TODO: get running status and endpoint from inference service
 			// Endpoint:      "",
 			// RunningStatus: "",
 			Private: data.Repository.Private,
 			// Likes:         data.Repository.Likes,
 			CreatedAt: data.Repository.CreatedAt,
-			CoverImg:  "",
 		})
 	}
 	return spaces, total, nil
@@ -123,4 +173,28 @@ func (c *SpaceComponent) AllowCallApi(ctx context.Context, namespace, name, user
 		return true, nil
 	}
 	return c.checkCurrentUserPermission(ctx, username, namespace, membership.RoleRead)
+}
+
+func (c *SpaceComponent) Delete(ctx context.Context, namespace, name, currentUser string) error {
+	space, err := c.space.FindByPath(ctx, namespace, name)
+	if err != nil {
+		return fmt.Errorf("failed to find space, error: %w", err)
+	}
+
+	deleteDatabaseRepoReq := types.DeleteRepoReq{
+		Username:  currentUser,
+		Namespace: namespace,
+		Name:      name,
+		RepoType:  types.SpaceRepo,
+	}
+	_, err = c.DeleteRepo(ctx, deleteDatabaseRepoReq)
+	if err != nil {
+		return fmt.Errorf("failed to delete repo of space, error: %w", err)
+	}
+
+	err = c.space.Delete(ctx, *space)
+	if err != nil {
+		return fmt.Errorf("failed to delete database space, error: %w", err)
+	}
+	return nil
 }

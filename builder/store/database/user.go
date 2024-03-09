@@ -29,6 +29,14 @@ type User struct {
 	times
 }
 
+func (s *UserStore) Index(ctx context.Context) (users []User, err error) {
+	err = s.db.Operator.Core.NewSelect().Model(&users).Scan(ctx, &users)
+	if err != nil {
+		return
+	}
+	return
+}
+
 func (s *UserStore) FindByUsername(ctx context.Context, username string) (user User, err error) {
 	user.Username = username
 	err = s.db.Operator.Core.NewSelect().Model(&user).Where("username = ?", username).Scan(ctx)

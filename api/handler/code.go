@@ -14,27 +14,25 @@ import (
 	"opencsg.com/csghub-server/component"
 )
 
-var Sorts = []string{"trending", "recently_update", "most_download", "most_favorite"}
-
-func NewDatasetHandler(config *config.Config) (*DatasetHandler, error) {
-	tc, err := component.NewDatasetComponent(config)
+func NewCodeHandler(config *config.Config) (*CodeHandler, error) {
+	tc, err := component.NewCodeComponent(config)
 	if err != nil {
 		return nil, err
 	}
-	return &DatasetHandler{
+	return &CodeHandler{
 		c: tc,
 	}, nil
 }
 
-type DatasetHandler struct {
-	c *component.DatasetComponent
+type CodeHandler struct {
+	c *component.CodeComponent
 }
 
-// CreateDatasetFile godoc
+// CreateCodeFile godoc
 // @Security     ApiKey
-// @Summary      Create dataset file
-// @Description  create dataset file
-// @Tags         Dataset
+// @Summary      Create code file
+// @Description  create code file
+// @Tags         Code
 // @Accept       json
 // @Produce      json
 // @Param        namespace path string true "namespace"
@@ -44,13 +42,13 @@ type DatasetHandler struct {
 // @Success      200  {object}  types.Response{data=types.CreateFileResp} "OK"
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
-// @Router       /datasets/{namespace}/{name}/raw/{file_path} [post]
+// @Router       /codes/{namespace}/{name}/raw/{file_path} [post]
 
-// UpdateDatasetFile godoc
+// UpdateCodeFile godoc
 // @Security     ApiKey
-// @Summary      Update dataset file
-// @Description  update dataset file
-// @Tags         Dataset
+// @Summary      Update code file
+// @Description  update code file
+// @Tags         Code
 // @Accept       json
 // @Produce      json
 // @Param        namespace path string true "namespace"
@@ -60,58 +58,56 @@ type DatasetHandler struct {
 // @Success      200  {object}  types.Response{data=types.UpdateFileResp} "OK"
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
-// @Router       /datasets/{namespace}/{name}/raw/{file_path} [put]
+// @Router       /codes/{namespace}/{name}/raw/{file_path} [put]
 
-// CreateDataset   godoc
+// CreateCode   godoc
 // @Security     ApiKey
-// @Summary      Create a new dataset
-// @Description  create a new dataset
-// @Tags         Dataset
+// @Summary      Create a new code
+// @Description  create a new code
+// @Tags         Code
 // @Accept       json
 // @Produce      json
-// @Param        body body types.CreateDatasetReq true "body"
-// @Success      200  {object}  types.Response{data=types.Dataset} "OK"
+// @Param        body body types.CreateCodeReq true "body"
+// @Success      200  {object}  types.Response{data=types.Code} "OK"
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
-// @Router       /datasets [post]
-func (h *DatasetHandler) Create(ctx *gin.Context) {
-	var req *types.CreateDatasetReq
+// @Router       /codes [post]
+func (h *CodeHandler) Create(ctx *gin.Context) {
+	var req *types.CreateCodeReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {
 		slog.Error("Bad request format", "error", err)
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
 
-	dataset, err := h.c.Create(ctx, req)
+	code, err := h.c.Create(ctx, req)
 	if err != nil {
-		slog.Error("Failed to create dataset", slog.Any("error", err))
+		slog.Error("Failed to create code", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
 		return
 	}
-	slog.Info("Create dataset succeed", slog.String("dataset", dataset.Name))
+	slog.Info("Create code succeed", slog.String("code", code.Name))
 	respData := gin.H{
-		"data": dataset,
+		"data": code,
 	}
 	ctx.JSON(http.StatusOK, respData)
 }
 
-// GetVisiableDatasets godoc
+// GetVisiableCodes godoc
 // @Security     ApiKey
-// @Summary      Get Visiable datasets for current user
-// @Description  get visiable datasets for current user
-// @Tags         Dataset
+// @Summary      Get Visiable codes for current user
+// @Description  get visiable codes for current user
+// @Tags         Code
 // @Accept       json
 // @Produce      json
 // @Param        per query int false "per" default(20)
 // @Param        page query int false "per page" default(1)
 // @Param        current_user query string true "current user"
-// @Param        search query string false "search text"
-// @Param        sort query string false "sort by"
-// @Success      200  {object}  types.ResponseWithTotal{data=[]types.Dataset,total=int} "OK"
+// @Success      200  {object}  types.ResponseWithTotal{data=[]types.Code,total=int} "OK"
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
-// @Router       /datasets [get]
-func (h *DatasetHandler) Index(ctx *gin.Context) {
+// @Router       /codes [get]
+func (h *CodeHandler) Index(ctx *gin.Context) {
 	tagReqs := parseTagReqs(ctx)
 	username := ctx.Query("current_user")
 	per, page, err := common.GetPerAndPageFromContext(ctx)
@@ -128,36 +124,36 @@ func (h *DatasetHandler) Index(ctx *gin.Context) {
 		return
 	}
 
-	datasets, total, err := h.c.Index(ctx, username, search, sort, tagReqs, per, page)
+	codes, total, err := h.c.Index(ctx, username, search, sort, tagReqs, per, page)
 	if err != nil {
-		slog.Error("Failed to get datasets", slog.Any("error", err))
+		slog.Error("Failed to get codes", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
 		return
 	}
-	slog.Info("Get public datasets succeed", slog.Int("count", total))
+	slog.Info("Get public codes succeed", slog.Int("count", total))
 	respData := gin.H{
-		"data":  datasets,
+		"data":  codes,
 		"total": total,
 	}
 	ctx.JSON(http.StatusOK, respData)
 }
 
-// UpdateDataset   godoc
+// UpdateCode   godoc
 // @Security     ApiKey
-// @Summary      Update a exists dataset
-// @Description  update a exists dataset
-// @Tags         Dataset
+// @Summary      Update a exists code
+// @Description  update a exists code
+// @Tags         Code
 // @Accept       json
 // @Produce      json
 // @Param        namespace path string true "namespace"
 // @Param        name path string true "name"
-// @Param        body body types.UpdateDatasetReq true "body"
-// @Success      200  {object}  types.Response{data=database.Dataset} "OK"
+// @Param        body body types.UpdateCodeReq true "body"
+// @Success      200  {object}  types.Response{data=database.Code} "OK"
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
-// @Router       /datasets/{namespace}/{name} [put]
-func (h *DatasetHandler) Update(ctx *gin.Context) {
-	var req *types.UpdateDatasetReq
+// @Router       /codes/{namespace}/{name} [put]
+func (h *CodeHandler) Update(ctx *gin.Context) {
+	var req *types.UpdateCodeReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {
 		slog.Error("Bad request format", "error", err)
 		httpbase.BadRequest(ctx, err.Error())
@@ -173,22 +169,22 @@ func (h *DatasetHandler) Update(ctx *gin.Context) {
 	req.Namespace = namespace
 	req.Name = name
 
-	dataset, err := h.c.Update(ctx, req)
+	code, err := h.c.Update(ctx, req)
 	if err != nil {
-		slog.Error("Failed to update dataset", slog.Any("error", err))
+		slog.Error("Failed to update code", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
 		return
 	}
 
-	slog.Info("Update dataset succeed", slog.String("dataset", dataset.Name))
-	httpbase.OK(ctx, dataset)
+	slog.Info("Update code succeed", slog.String("code", code.Name))
+	httpbase.OK(ctx, code)
 }
 
-// DeleteDataset   godoc
+// DeleteCode   godoc
 // @Security     ApiKey
-// @Summary      Delete a exists dataset
-// @Description  delete a exists dataset
-// @Tags         Dataset
+// @Summary      Delete a exists code
+// @Description  delete a exists code
+// @Tags         Code
 // @Accept       json
 // @Produce      json
 // @Param        namespace path string true "namespace"
@@ -197,8 +193,8 @@ func (h *DatasetHandler) Update(ctx *gin.Context) {
 // @Success      200  {object}  types.Response{} "OK"
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
-// @Router       /datasets/{namespace}/{name} [delete]
-func (h *DatasetHandler) Delete(ctx *gin.Context) {
+// @Router       /codes/{namespace}/{name} [delete]
+func (h *CodeHandler) Delete(ctx *gin.Context) {
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
 	if err != nil {
 		slog.Error("Bad request format", "error", err)
@@ -208,29 +204,29 @@ func (h *DatasetHandler) Delete(ctx *gin.Context) {
 	currentUser := ctx.Query("current_user")
 	err = h.c.Delete(ctx, namespace, name, currentUser)
 	if err != nil {
-		slog.Error("Failed to delete dataset", slog.Any("error", err))
+		slog.Error("Failed to delete code", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
 		return
 	}
-	slog.Info("Delete dataset succeed", slog.String("dataset", name))
+	slog.Info("Delete code succeed", slog.String("code", name))
 	httpbase.OK(ctx, nil)
 }
 
-// GetDataset      godoc
+// GetCode      godoc
 // @Security     ApiKey
-// @Summary      Get dataset detail
-// @Description  get dataset detail
-// @Tags         Dataset
+// @Summary      Get code detail
+// @Description  get code detail
+// @Tags         Code
 // @Accept       json
 // @Produce      json
 // @Param        namespace path string true "namespace"
 // @Param        name path string true "name"
 // @Param        current_user query string true "current_user"
-// @Success      200  {object}  types.Response{data=types.Dataset} "OK"
+// @Success      200  {object}  types.Response{data=types.Code} "OK"
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
-// @Router       /datasets/{namespace}/{name} [get]
-func (h *DatasetHandler) Show(ctx *gin.Context) {
+// @Router       /codes/{namespace}/{name} [get]
+func (h *CodeHandler) Show(ctx *gin.Context) {
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
 	if err != nil {
 		slog.Error("Bad request format", "error", err)
@@ -240,20 +236,20 @@ func (h *DatasetHandler) Show(ctx *gin.Context) {
 	currentUser := ctx.Query("current_user")
 	detail, err := h.c.Show(ctx, namespace, name, currentUser)
 	if err != nil {
-		slog.Error("Failed to get dataset", slog.Any("error", err))
+		slog.Error("Failed to get code", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
 		return
 	}
 
-	slog.Info("Get dataset succeed", slog.String("dataset", name))
+	slog.Info("Get code succeed", slog.String("code", name))
 	httpbase.OK(ctx, detail)
 }
 
-// GetDatasetCommits godoc
+// GetCodeCommits godoc
 // @Security     ApiKey
-// @Summary      Get dataset commits
-// @Description  get dataset commits
-// @Tags         Dataset
+// @Summary      Get code commits
+// @Description  get code commits
+// @Tags         Code
 // @Accept       json
 // @Produce      json
 // @Param        namespace path string true "namespace"
@@ -262,13 +258,13 @@ func (h *DatasetHandler) Show(ctx *gin.Context) {
 // @Success      200  {object}  types.Response{data=[]types.Commit} "OK"
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
-// @Router       /datasets/{namespace}/{name}/commits [get]
+// @Router       /codes/{namespace}/{name}/commits [get]
 
-// GetDatasetLastCommit godoc
+// GetCodeLastCommit godoc
 // @Security     ApiKey
-// @Summary      Get dataset last commit
-// @Description  get dataset last commit
-// @Tags         Dataset
+// @Summary      Get code last commit
+// @Description  get code last commit
+// @Tags         Code
 // @Accept       json
 // @Produce      json
 // @Param        namespace path string true "namespace"
@@ -277,29 +273,13 @@ func (h *DatasetHandler) Show(ctx *gin.Context) {
 // @Success      200  {object}  types.Response{data=types.Commit} "OK"
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
-// @Router       /datasets/{namespace}/{name}/last_commit [get]
+// @Router       /codes/{namespace}/{name}/last_commit [get]
 
-// GetDatasetFileRaw godoc
+// GetCodeFileRaw godoc
 // @Security     ApiKey
-// @Summary      Get dataset file raw
-// @Description  get dataset file raw
-// @Tags         Dataset
-// @Accept       json
-// @Produce      json
-// @Param        namespace path string true "namespace"
-// @Param        name path string true "name"
-// @Param        file_path path string true "file_path"
-// @Param        ref query string false "ref"
-// @Success      200  {object}  types.Response{data=types.Commit} "OK"
-// @Failure      400  {object}  types.APIBadRequest "Bad request"
-// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
-// @Router       /datasets/{namespace}/{name}/raw/{file_path} [get]
-
-// GetDatasetFileInfo godoc
-// @Security     ApiKey
-// @Summary      Get dataset file info
-// @Description  get dataset file info
-// @Tags         Dataset
+// @Summary      Get code file raw
+// @Description  get code file raw
+// @Tags         Code
 // @Accept       json
 // @Produce      json
 // @Param        namespace path string true "namespace"
@@ -309,13 +289,29 @@ func (h *DatasetHandler) Show(ctx *gin.Context) {
 // @Success      200  {object}  types.Response{data=types.Commit} "OK"
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
-// @Router       /datasets/{namespace}/{name}/blob/{file_path} [get]
+// @Router       /codes/{namespace}/{name}/raw/{file_path} [get]
 
-// DownloadDatasetFile godoc
+// GetCodeFileInfo godoc
 // @Security     ApiKey
-// @Summary      Download dataset file
-// @Description  download dataset file
-// @Tags         Dataset
+// @Summary      Get code file info
+// @Description  get code file info
+// @Tags         Code
+// @Accept       json
+// @Produce      json
+// @Param        namespace path string true "namespace"
+// @Param        name path string true "name"
+// @Param        file_path path string true "file_path"
+// @Param        ref query string false "ref"
+// @Success      200  {object}  types.Response{data=types.Commit} "OK"
+// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
+// @Router       /codes/{namespace}/{name}/blob/{file_path} [get]
+
+// DownloadCodeFile godoc
+// @Security     ApiKey
+// @Summary      Download code file
+// @Description  download code file
+// @Tags         Code
 // @Accept       json
 // @Produce      json
 // @Produce      octet-stream
@@ -328,13 +324,13 @@ func (h *DatasetHandler) Show(ctx *gin.Context) {
 // @Success      200  {object}  types.Response{data=string} "OK"
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
-// @Router       /datasets/{namespace}/{name}/download/{file_path} [get]
+// @Router       /codes/{namespace}/{name}/download/{file_path} [get]
 
-// GetDatasetBranches godoc
+// GetCodeBranches godoc
 // @Security     ApiKey
-// @Summary      Get dataset branches
-// @Description  get dataset branches
-// @Tags         Dataset
+// @Summary      Get code branches
+// @Description  get code branches
+// @Tags         Code
 // @Accept       json
 // @Produce      json
 // @Param        namespace path string true "namespace"
@@ -344,13 +340,13 @@ func (h *DatasetHandler) Show(ctx *gin.Context) {
 // @Success      200  {object}  types.Response{data=[]types.Branch} "OK"
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
-// @Router       /datasets/{namespace}/{name}/branches [get]
+// @Router       /codes/{namespace}/{name}/branches [get]
 
-// GetDatasetTags godoc
+// GetCodeTags godoc
 // @Security     ApiKey
-// @Summary      Get dataset tags
-// @Description  get dataset tags
-// @Tags         Dataset
+// @Summary      Get code tags
+// @Description  get code tags
+// @Tags         Code
 // @Accept       json
 // @Produce      json
 // @Param        namespace path string true "namespace"
@@ -358,13 +354,13 @@ func (h *DatasetHandler) Show(ctx *gin.Context) {
 // @Success      200  {object}  types.Response{data=[]types.Branch} "OK"
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
-// @Router       /datasets/{namespace}/{name}/tags [get]
+// @Router       /codes/{namespace}/{name}/tags [get]
 
-// GetDatasetFileTree godoc
+// GetCodeFileTree godoc
 // @Security     ApiKey
-// @Summary      Get dataset file tree
-// @Description  get dataset file tree
-// @Tags         Dataset
+// @Summary      Get code file tree
+// @Description  get code file tree
+// @Tags         Code
 // @Accept       json
 // @Produce      json
 // @Param        namespace path string true "namespace"
@@ -373,13 +369,13 @@ func (h *DatasetHandler) Show(ctx *gin.Context) {
 // @Success      200  {object}  types.Response{data=[]types.File} "OK"
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
-// @Router       /datasets/{namespace}/{name}/tree [get]
+// @Router       /codes/{namespace}/{name}/tree [get]
 
-// UpdateDatasetDownloads godoc
+// UpdateCodeDownloads godoc
 // @Security     ApiKey
-// @Summary      Update dataset downloads
-// @Description  update dataset downloads
-// @Tags         Dataset
+// @Summary      Update code downloads
+// @Description  update code downloads
+// @Tags         Code
 // @Accept       json
 // @Produce      json
 // @Param        namespace path string true "namespace"
@@ -388,22 +384,13 @@ func (h *DatasetHandler) Show(ctx *gin.Context) {
 // @Success      200  {object}  types.Response{data=[]types.File} "OK"
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
-// @Router       /datasets/{namespace}/{name}/update_downloads [post]
+// @Router       /codes/{namespace}/{name}/update_downloads [post]
 
-func getFilterFromContext(ctx *gin.Context) (searchKey, sort string) {
-	searchKey = ctx.Query("search")
-	sort = ctx.Query("sort")
-	if sort == "" {
-		sort = "recently_update"
-	}
-	return
-}
-
-// UploadDatasetFile godoc
+// UploadCodeFile godoc
 // @Security     ApiKey
-// @Summary      Create dataset file
-// @Description  upload dataset file to create or update a file in dataset repository
-// @Tags         Dataset
+// @Summary      Create code file
+// @Description  upload code file to create or update a file in code repository
+// @Tags         Code
 // @Accept       json
 // @Produce      json
 // @Param        namespace path string true "namespace"
@@ -417,13 +404,13 @@ func getFilterFromContext(ctx *gin.Context) (searchKey, sort string) {
 // @Success      200  {object}  types.Response{data=types.CreateFileResp} "OK"
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
-// @Router       /datasets/{namespace}/{name}/upload_file [post]
+// @Router       /codes/{namespace}/{name}/upload_file [post]
 
-// DownloadDatasetFile godoc
+// DownloadCodeFile godoc
 // @Security     ApiKey
-// @Summary      Download dataset file
-// @Description  download dataset file
-// @Tags         Dataset
+// @Summary      Download code file
+// @Description  download code file
+// @Tags         Code
 // @Accept       json
 // @Produce      json
 // @Produce      octet-stream
@@ -434,4 +421,4 @@ func getFilterFromContext(ctx *gin.Context) (searchKey, sort string) {
 // @Success      200  {object}  types.Response{data=string} "OK"
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
-// @Router       /datasets/{namespace}/{name}/resolve/{file_path} [get]
+// @Router       /codes/{namespace}/{name}/resolve/{file_path} [get]
