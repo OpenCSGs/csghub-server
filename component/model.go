@@ -199,7 +199,7 @@ func (c *ModelComponent) Create(ctx context.Context, req *types.CreateModelReq) 
 		Email:     user.Email,
 		Message:   initCommitMessage,
 		Branch:    req.DefaultBranch,
-		Content:   datasetGitattributesContent,
+		Content:   modelGitattributesContent,
 		NewBranch: req.DefaultBranch,
 		Namespace: req.Namespace,
 		Name:      req.Name,
