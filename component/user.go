@@ -209,3 +209,12 @@ func (c *UserComponent) Models(ctx context.Context, req *types.UserModelsReq) ([
 
 	return resModels, total, nil
 }
+
+func (c *UserComponent) FixUserData(ctx context.Context, userName string) error {
+	err := c.gs.FixUserData(ctx, userName)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}

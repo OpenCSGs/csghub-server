@@ -42,7 +42,7 @@ func (h *UserHandler) Create(ctx *gin.Context) {
 	var req *types.CreateUserRequest
 	if err := ctx.ShouldBindJSON(&req); err != nil {
 		slog.Error("Bad request format", "error", err)
-		ctx.JSON(http.StatusBadRequest, gin.H{"message": err.Error()})
+		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
 
@@ -50,7 +50,7 @@ func (h *UserHandler) Create(ctx *gin.Context) {
 	user, err := h.c.Create(ctx, req)
 	if err != nil {
 		slog.Error("Failed to create user", slog.Any("error", err))
-		ctx.JSON(http.StatusInternalServerError, gin.H{"message": err.Error()})
+		httpbase.ServerError(ctx, err)
 		return
 	}
 
@@ -75,14 +75,14 @@ func (h *UserHandler) Update(ctx *gin.Context) {
 	var req *types.UpdateUserRequest
 	if err := ctx.ShouldBindJSON(&req); err != nil {
 		slog.Error("Bad request format", "error", err)
-		ctx.JSON(http.StatusBadRequest, gin.H{"message": err.Error()})
+		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
 
 	user, err := h.c.Update(ctx, req)
 	if err != nil {
 		slog.Error("Failed to update user", slog.Any("error", err))
-		ctx.JSON(http.StatusInternalServerError, gin.H{"message": err.Error()})
+		httpbase.ServerError(ctx, err)
 		return
 	}
 
@@ -107,7 +107,7 @@ func (h *UserHandler) Datasets(ctx *gin.Context) {
 	per, page, err := common.GetPerAndPageFromContext(ctx)
 	if err != nil {
 		slog.Error("Bad request format of page and per", "error", err)
-		ctx.JSON(http.StatusBadRequest, gin.H{"message": err.Error()})
+		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
 
@@ -118,7 +118,7 @@ func (h *UserHandler) Datasets(ctx *gin.Context) {
 	ds, total, err := h.c.Datasets(ctx, &req)
 	if err != nil {
 		slog.Error("Failed to gat user datasets", slog.Any("error", err))
-		ctx.JSON(http.StatusInternalServerError, gin.H{"message": err.Error()})
+		httpbase.ServerError(ctx, err)
 		return
 	}
 
@@ -148,7 +148,7 @@ func (h *UserHandler) Models(ctx *gin.Context) {
 	per, page, err := common.GetPerAndPageFromContext(ctx)
 	if err != nil {
 		slog.Error("Bad request format of page and per", "error", err)
-		ctx.JSON(http.StatusBadRequest, gin.H{"message": err.Error()})
+		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
 
@@ -159,7 +159,7 @@ func (h *UserHandler) Models(ctx *gin.Context) {
 	ms, total, err := h.c.Models(ctx, &req)
 	if err != nil {
 		slog.Error("Failed to gat user models", slog.Any("error", err))
-		ctx.JSON(http.StatusInternalServerError, gin.H{"message": err.Error()})
+		httpbase.ServerError(ctx, err)
 		return
 	}
 
