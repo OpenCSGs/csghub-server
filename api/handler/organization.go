@@ -42,13 +42,13 @@ func (h *OrganizationHandler) Create(ctx *gin.Context) {
 	var req types.CreateOrgReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {
 		slog.Error("Bad request format", "error", err)
-		ctx.JSON(http.StatusBadRequest, gin.H{"message": err.Error()})
+		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
 	org, err := h.c.Create(ctx, &req)
 	if err != nil {
 		slog.Error("Failed to create organization", slog.Any("error", err))
-		ctx.JSON(http.StatusInternalServerError, gin.H{"message": err.Error()})
+		httpbase.ServerError(ctx, err)
 		return
 	}
 
@@ -71,7 +71,7 @@ func (h *OrganizationHandler) Index(ctx *gin.Context) {
 	orgs, err := h.c.Index(ctx, username)
 	if err != nil {
 		slog.Error("Failed to get organizations", slog.Any("error", err))
-		ctx.JSON(http.StatusInternalServerError, gin.H{"message": err.Error()})
+		httpbase.ServerError(ctx, err)
 		return
 	}
 
@@ -103,7 +103,7 @@ func (h *OrganizationHandler) Delete(ctx *gin.Context) {
 	err := h.c.Delete(ctx, &req)
 	if err != nil {
 		slog.Error("Failed to delete organizations", slog.Any("error", err))
-		ctx.JSON(http.StatusInternalServerError, gin.H{"message": err.Error()})
+		httpbase.ServerError(ctx, err)
 		return
 	}
 
@@ -128,14 +128,14 @@ func (h *OrganizationHandler) Update(ctx *gin.Context) {
 	var req types.EditOrgReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {
 		slog.Error("Bad request format", "error", err)
-		ctx.JSON(http.StatusBadRequest, gin.H{"message": err.Error()})
+		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
 	req.Name = ctx.Param("name")
 	org, err := h.c.Update(ctx, &req)
 	if err != nil {
 		slog.Error("Failed to update organizations", slog.Any("error", err))
-		ctx.JSON(http.StatusInternalServerError, gin.H{"message": err.Error()})
+		httpbase.ServerError(ctx, err)
 		return
 	}
 
@@ -166,7 +166,7 @@ func (h *OrganizationHandler) Models(ctx *gin.Context) {
 	per, page, err := common.GetPerAndPageFromContext(ctx)
 	if err != nil {
 		slog.Error("Bad request format", "error", err)
-		ctx.JSON(http.StatusBadRequest, gin.H{"message": err.Error()})
+		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
 	req.Page = page
@@ -211,7 +211,7 @@ func (h *OrganizationHandler) Datasets(ctx *gin.Context) {
 	per, page, err := common.GetPerAndPageFromContext(ctx)
 	if err != nil {
 		slog.Error("Bad request format", "error", err)
-		ctx.JSON(http.StatusBadRequest, gin.H{"message": err.Error()})
+		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
 	req.Page = page

@@ -2,7 +2,6 @@ package handler
 
 import (
 	"log/slog"
-	"net/http"
 
 	"github.com/gin-gonic/gin"
 	"opencsg.com/csghub-server/api/httpbase"
@@ -42,7 +41,7 @@ func (h *AccessTokenHandler) Create(ctx *gin.Context) {
 	var req types.CreateUserTokenRequest
 	if err := ctx.ShouldBindJSON(&req); err != nil {
 		slog.Error("Bad request format", "error", err)
-		ctx.JSON(http.StatusBadRequest, gin.H{"message": err.Error()})
+		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
 
@@ -50,7 +49,7 @@ func (h *AccessTokenHandler) Create(ctx *gin.Context) {
 	token, err := h.c.Create(ctx, &req)
 	if err != nil {
 		slog.Error("Failed to create user access token", slog.Any("error", err))
-		ctx.JSON(http.StatusInternalServerError, gin.H{"message": err.Error()})
+		httpbase.ServerError(ctx, err)
 		return
 	}
 
@@ -79,7 +78,7 @@ func (h *AccessTokenHandler) Delete(ctx *gin.Context) {
 	err := h.c.Delete(ctx, &req)
 	if err != nil {
 		slog.Error("Failed to delete user access token", slog.Any("error", err))
-		ctx.JSON(http.StatusInternalServerError, gin.H{"message": err.Error()})
+		httpbase.ServerError(ctx, err)
 		return
 	}
 

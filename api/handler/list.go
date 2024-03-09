@@ -2,7 +2,6 @@ package handler
 
 import (
 	"log/slog"
-	"net/http"
 
 	"github.com/gin-gonic/gin"
 	"opencsg.com/csghub-server/api/httpbase"
@@ -41,14 +40,14 @@ func (h *ListHandler) ListModelsByPath(ctx *gin.Context) {
 	var listTrendingReq types.ListByPathReq
 	if err := ctx.ShouldBindJSON(&listTrendingReq); err != nil {
 		slog.Error("Bad request format", "error", err)
-		ctx.JSON(http.StatusBadRequest, gin.H{"message": err.Error()})
+		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
 
 	resp, err := h.c.ListModelsByPath(ctx, &listTrendingReq)
 	if err != nil {
 		slog.Error("Failed to update dataset", slog.Any("error", err))
-		ctx.JSON(http.StatusInternalServerError, gin.H{"message": err.Error()})
+		httpbase.ServerError(ctx, err)
 		return
 	}
 	httpbase.OK(ctx, resp)
@@ -70,14 +69,14 @@ func (h *ListHandler) ListDatasetsByPath(ctx *gin.Context) {
 	var listTrendingReq types.ListByPathReq
 	if err := ctx.ShouldBindJSON(&listTrendingReq); err != nil {
 		slog.Error("Bad request format", "error", err)
-		ctx.JSON(http.StatusBadRequest, gin.H{"message": err.Error()})
+		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
 
 	resp, err := h.c.ListDatasetsByPath(ctx, &listTrendingReq)
 	if err != nil {
 		slog.Error("Failed to update dataset", slog.Any("error", err))
-		ctx.JSON(http.StatusInternalServerError, gin.H{"message": err.Error()})
+		httpbase.ServerError(ctx, err)
 		return
 	}
 	httpbase.OK(ctx, resp)

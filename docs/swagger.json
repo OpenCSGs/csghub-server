@@ -4,6 +4,359 @@
         "contact": {}
     },
     "paths": {
+        "/codes": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "description": "get visiable codes for current user",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Code"
+                ],
+                "summary": "Get Visiable codes for current user",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "default": 20,
+                        "description": "per",
+                        "name": "per",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "default": 1,
+                        "description": "per page",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "current user",
+                        "name": "current_user",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/types.ResponseWithTotal"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/definitions/types.Code"
+                                            }
+                                        },
+                                        "total": {
+                                            "type": "integer"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "description": "create a new code",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Code"
+                ],
+                "summary": "Create a new code",
+                "parameters": [
+                    {
+                        "description": "body",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/types.CreateCodeReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/types.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/types.Code"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            }
+        },
+        "/codes/{namespace}/{name}": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "description": "get code detail",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Code"
+                ],
+                "summary": "Get code detail",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "namespace",
+                        "name": "namespace",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "name",
+                        "name": "name",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "current_user",
+                        "name": "current_user",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/types.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/types.Code"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            },
+            "put": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "description": "update a exists code",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Code"
+                ],
+                "summary": "Update a exists code",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "namespace",
+                        "name": "namespace",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "name",
+                        "name": "name",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "body",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/types.UpdateCodeReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/types.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/database.Code"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "description": "delete a exists code",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Code"
+                ],
+                "summary": "Delete a exists code",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "namespace",
+                        "name": "namespace",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "name",
+                        "name": "name",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "current_user",
+                        "name": "current_user",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/types.Response"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            }
+        },
         "/datasets": {
             "get": {
                 "security": [
@@ -352,1081 +705,6 @@
                         "description": "OK",
                         "schema": {
                             "$ref": "#/definitions/types.Response"
-                        }
-                    },
-                    "400": {
-                        "description": "Bad request",
-                        "schema": {
-                            "$ref": "#/definitions/types.APIBadRequest"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal server error",
-                        "schema": {
-                            "$ref": "#/definitions/types.APIInternalServerError"
-                        }
-                    }
-                }
-            }
-        },
-        "/datasets/{namespace}/{name}/blob/{file_path}": {
-            "get": {
-                "security": [
-                    {
-                        "ApiKey": []
-                    }
-                ],
-                "description": "get dataset file info",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Dataset"
-                ],
-                "summary": "Get dataset file info",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "namespace",
-                        "name": "namespace",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "name",
-                        "name": "name",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "file_path",
-                        "name": "file_path",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "ref",
-                        "name": "ref",
-                        "in": "query"
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/types.Response"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "$ref": "#/definitions/types.Commit"
-                                        }
-                                    }
-                                }
-                            ]
-                        }
-                    },
-                    "400": {
-                        "description": "Bad request",
-                        "schema": {
-                            "$ref": "#/definitions/types.APIBadRequest"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal server error",
-                        "schema": {
-                            "$ref": "#/definitions/types.APIInternalServerError"
-                        }
-                    }
-                }
-            }
-        },
-        "/datasets/{namespace}/{name}/branches": {
-            "get": {
-                "security": [
-                    {
-                        "ApiKey": []
-                    }
-                ],
-                "description": "get dataset branches",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Dataset"
-                ],
-                "summary": "Get dataset branches",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "namespace",
-                        "name": "namespace",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "name",
-                        "name": "name",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "type": "integer",
-                        "default": 20,
-                        "description": "per",
-                        "name": "per",
-                        "in": "query"
-                    },
-                    {
-                        "type": "integer",
-                        "default": 1,
-                        "description": "page",
-                        "name": "page",
-                        "in": "query"
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/types.Response"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "type": "array",
-                                            "items": {
-                                                "$ref": "#/definitions/types.Branch"
-                                            }
-                                        }
-                                    }
-                                }
-                            ]
-                        }
-                    },
-                    "400": {
-                        "description": "Bad request",
-                        "schema": {
-                            "$ref": "#/definitions/types.APIBadRequest"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal server error",
-                        "schema": {
-                            "$ref": "#/definitions/types.APIInternalServerError"
-                        }
-                    }
-                }
-            }
-        },
-        "/datasets/{namespace}/{name}/commits": {
-            "get": {
-                "security": [
-                    {
-                        "ApiKey": []
-                    }
-                ],
-                "description": "get dataset commits",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Dataset"
-                ],
-                "summary": "Get dataset commits",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "namespace",
-                        "name": "namespace",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "name",
-                        "name": "name",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "ref",
-                        "name": "ref",
-                        "in": "query"
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/types.Response"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "type": "array",
-                                            "items": {
-                                                "$ref": "#/definitions/types.Commit"
-                                            }
-                                        }
-                                    }
-                                }
-                            ]
-                        }
-                    },
-                    "400": {
-                        "description": "Bad request",
-                        "schema": {
-                            "$ref": "#/definitions/types.APIBadRequest"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal server error",
-                        "schema": {
-                            "$ref": "#/definitions/types.APIInternalServerError"
-                        }
-                    }
-                }
-            }
-        },
-        "/datasets/{namespace}/{name}/download/{file_path}": {
-            "get": {
-                "security": [
-                    {
-                        "ApiKey": []
-                    }
-                ],
-                "description": "download dataset file",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json",
-                    "application/octet-stream"
-                ],
-                "tags": [
-                    "Dataset"
-                ],
-                "summary": "Download dataset file",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "namespace",
-                        "name": "namespace",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "name",
-                        "name": "name",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "file_path",
-                        "name": "file_path",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "type": "boolean",
-                        "description": "lfs",
-                        "name": "lfs",
-                        "in": "query"
-                    },
-                    {
-                        "type": "string",
-                        "description": "ref",
-                        "name": "ref",
-                        "in": "query"
-                    },
-                    {
-                        "type": "string",
-                        "description": "name of download file",
-                        "name": "save_as",
-                        "in": "query"
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/types.Response"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "type": "string"
-                                        }
-                                    }
-                                }
-                            ]
-                        }
-                    },
-                    "400": {
-                        "description": "Bad request",
-                        "schema": {
-                            "$ref": "#/definitions/types.APIBadRequest"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal server error",
-                        "schema": {
-                            "$ref": "#/definitions/types.APIInternalServerError"
-                        }
-                    }
-                }
-            }
-        },
-        "/datasets/{namespace}/{name}/last_commit": {
-            "get": {
-                "security": [
-                    {
-                        "ApiKey": []
-                    }
-                ],
-                "description": "get dataset last commit",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Dataset"
-                ],
-                "summary": "Get dataset last commit",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "namespace",
-                        "name": "namespace",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "name",
-                        "name": "name",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "ref",
-                        "name": "ref",
-                        "in": "query"
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/types.Response"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "$ref": "#/definitions/types.Commit"
-                                        }
-                                    }
-                                }
-                            ]
-                        }
-                    },
-                    "400": {
-                        "description": "Bad request",
-                        "schema": {
-                            "$ref": "#/definitions/types.APIBadRequest"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal server error",
-                        "schema": {
-                            "$ref": "#/definitions/types.APIInternalServerError"
-                        }
-                    }
-                }
-            }
-        },
-        "/datasets/{namespace}/{name}/raw/{file_path}": {
-            "get": {
-                "security": [
-                    {
-                        "ApiKey": []
-                    }
-                ],
-                "description": "get dataset file raw",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Dataset"
-                ],
-                "summary": "Get dataset file raw",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "namespace",
-                        "name": "namespace",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "name",
-                        "name": "name",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "file_path",
-                        "name": "file_path",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "ref",
-                        "name": "ref",
-                        "in": "query"
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/types.Response"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "$ref": "#/definitions/types.Commit"
-                                        }
-                                    }
-                                }
-                            ]
-                        }
-                    },
-                    "400": {
-                        "description": "Bad request",
-                        "schema": {
-                            "$ref": "#/definitions/types.APIBadRequest"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal server error",
-                        "schema": {
-                            "$ref": "#/definitions/types.APIInternalServerError"
-                        }
-                    }
-                }
-            },
-            "put": {
-                "security": [
-                    {
-                        "ApiKey": []
-                    }
-                ],
-                "description": "update dataset file",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Dataset"
-                ],
-                "summary": "Update dataset file",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "namespace",
-                        "name": "namespace",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "name",
-                        "name": "name",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "file_path",
-                        "name": "file_path",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "description": "body",
-                        "name": "body",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/types.UpdateFileReq"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/types.Response"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "$ref": "#/definitions/types.UpdateFileResp"
-                                        }
-                                    }
-                                }
-                            ]
-                        }
-                    },
-                    "400": {
-                        "description": "Bad request",
-                        "schema": {
-                            "$ref": "#/definitions/types.APIBadRequest"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal server error",
-                        "schema": {
-                            "$ref": "#/definitions/types.APIInternalServerError"
-                        }
-                    }
-                }
-            },
-            "post": {
-                "security": [
-                    {
-                        "ApiKey": []
-                    }
-                ],
-                "description": "create dataset file",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Dataset"
-                ],
-                "summary": "Create dataset file",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "namespace",
-                        "name": "namespace",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "name",
-                        "name": "name",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "file_path",
-                        "name": "file_path",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "description": "body",
-                        "name": "body",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/types.CreateFileReq"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/types.Response"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "$ref": "#/definitions/types.CreateFileResp"
-                                        }
-                                    }
-                                }
-                            ]
-                        }
-                    },
-                    "400": {
-                        "description": "Bad request",
-                        "schema": {
-                            "$ref": "#/definitions/types.APIBadRequest"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal server error",
-                        "schema": {
-                            "$ref": "#/definitions/types.APIInternalServerError"
-                        }
-                    }
-                }
-            }
-        },
-        "/datasets/{namespace}/{name}/resolve/{file_path}": {
-            "get": {
-                "security": [
-                    {
-                        "ApiKey": []
-                    }
-                ],
-                "description": "download dataset file",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json",
-                    "application/octet-stream"
-                ],
-                "tags": [
-                    "Dataset"
-                ],
-                "summary": "Download dataset file",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "namespace",
-                        "name": "namespace",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "name",
-                        "name": "name",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "file_path",
-                        "name": "file_path",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "ref",
-                        "name": "ref",
-                        "in": "query"
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/types.Response"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "type": "string"
-                                        }
-                                    }
-                                }
-                            ]
-                        }
-                    },
-                    "400": {
-                        "description": "Bad request",
-                        "schema": {
-                            "$ref": "#/definitions/types.APIBadRequest"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal server error",
-                        "schema": {
-                            "$ref": "#/definitions/types.APIInternalServerError"
-                        }
-                    }
-                }
-            }
-        },
-        "/datasets/{namespace}/{name}/tags": {
-            "get": {
-                "security": [
-                    {
-                        "ApiKey": []
-                    }
-                ],
-                "description": "get dataset tags",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Dataset"
-                ],
-                "summary": "Get dataset tags",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "namespace",
-                        "name": "namespace",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "name",
-                        "name": "name",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/types.Response"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "type": "array",
-                                            "items": {
-                                                "$ref": "#/definitions/types.Branch"
-                                            }
-                                        }
-                                    }
-                                }
-                            ]
-                        }
-                    },
-                    "400": {
-                        "description": "Bad request",
-                        "schema": {
-                            "$ref": "#/definitions/types.APIBadRequest"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal server error",
-                        "schema": {
-                            "$ref": "#/definitions/types.APIInternalServerError"
-                        }
-                    }
-                }
-            }
-        },
-        "/datasets/{namespace}/{name}/tree": {
-            "get": {
-                "security": [
-                    {
-                        "ApiKey": []
-                    }
-                ],
-                "description": "get dataset file tree",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Dataset"
-                ],
-                "summary": "Get dataset file tree",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "namespace",
-                        "name": "namespace",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "name",
-                        "name": "name",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "ref",
-                        "name": "ref",
-                        "in": "query"
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/types.Response"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "type": "array",
-                                            "items": {
-                                                "$ref": "#/definitions/types.File"
-                                            }
-                                        }
-                                    }
-                                }
-                            ]
-                        }
-                    },
-                    "400": {
-                        "description": "Bad request",
-                        "schema": {
-                            "$ref": "#/definitions/types.APIBadRequest"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal server error",
-                        "schema": {
-                            "$ref": "#/definitions/types.APIInternalServerError"
-                        }
-                    }
-                }
-            }
-        },
-        "/datasets/{namespace}/{name}/update_downloads": {
-            "post": {
-                "security": [
-                    {
-                        "ApiKey": []
-                    }
-                ],
-                "description": "update dataset downloads",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Dataset"
-                ],
-                "summary": "Update dataset downloads",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "namespace",
-                        "name": "namespace",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "name",
-                        "name": "name",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "description": "body",
-                        "name": "body",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/types.UpdateDownloadsReq"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/types.Response"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "type": "array",
-                                            "items": {
-                                                "$ref": "#/definitions/types.File"
-                                            }
-                                        }
-                                    }
-                                }
-                            ]
-                        }
-                    },
-                    "400": {
-                        "description": "Bad request",
-                        "schema": {
-                            "$ref": "#/definitions/types.APIBadRequest"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal server error",
-                        "schema": {
-                            "$ref": "#/definitions/types.APIInternalServerError"
-                        }
-                    }
-                }
-            }
-        },
-        "/datasets/{namespace}/{name}/upload_file": {
-            "post": {
-                "security": [
-                    {
-                        "ApiKey": []
-                    }
-                ],
-                "description": "upload dataset file to create or update a file in dataset repository",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Dataset"
-                ],
-                "summary": "Create dataset file",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "namespace",
-                        "name": "namespace",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "name",
-                        "name": "name",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "file_path",
-                        "name": "file_path",
-                        "in": "formData",
-                        "required": true
-                    },
-                    {
-                        "type": "file",
-                        "description": "file",
-                        "name": "file",
-                        "in": "formData",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "email",
-                        "name": "email",
-                        "in": "formData",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "message",
-                        "name": "message",
-                        "in": "formData",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "branch",
-                        "name": "branch",
-                        "in": "formData"
-                    },
-                    {
-                        "type": "string",
-                        "description": "username",
-                        "name": "username",
-                        "in": "formData",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/types.Response"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "$ref": "#/definitions/types.CreateFileResp"
-                                        }
-                                    }
-                                }
-                            ]
                         }
                     },
                     "400": {
@@ -2003,417 +1281,6 @@
                 }
             }
         },
-        "/models/{namespace}/{name}/blob/{file_path}": {
-            "get": {
-                "security": [
-                    {
-                        "ApiKey": []
-                    }
-                ],
-                "description": "get model file info",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Model"
-                ],
-                "summary": "Get model file info",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "namespace",
-                        "name": "namespace",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "name",
-                        "name": "name",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "file_path",
-                        "name": "file_path",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "ref",
-                        "name": "ref",
-                        "in": "query"
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/types.Response"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "$ref": "#/definitions/types.Commit"
-                                        }
-                                    }
-                                }
-                            ]
-                        }
-                    },
-                    "400": {
-                        "description": "Bad request",
-                        "schema": {
-                            "$ref": "#/definitions/types.APIBadRequest"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal server error",
-                        "schema": {
-                            "$ref": "#/definitions/types.APIInternalServerError"
-                        }
-                    }
-                }
-            }
-        },
-        "/models/{namespace}/{name}/branches": {
-            "get": {
-                "security": [
-                    {
-                        "ApiKey": []
-                    }
-                ],
-                "description": "get model branches",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Model"
-                ],
-                "summary": "Get model branches",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "namespace",
-                        "name": "namespace",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "name",
-                        "name": "name",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "type": "integer",
-                        "default": 20,
-                        "description": "per",
-                        "name": "per",
-                        "in": "query"
-                    },
-                    {
-                        "type": "integer",
-                        "default": 1,
-                        "description": "page",
-                        "name": "page",
-                        "in": "query"
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/types.Response"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "type": "array",
-                                            "items": {
-                                                "$ref": "#/definitions/types.Branch"
-                                            }
-                                        }
-                                    }
-                                }
-                            ]
-                        }
-                    },
-                    "400": {
-                        "description": "Bad request",
-                        "schema": {
-                            "$ref": "#/definitions/types.APIBadRequest"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal server error",
-                        "schema": {
-                            "$ref": "#/definitions/types.APIInternalServerError"
-                        }
-                    }
-                }
-            }
-        },
-        "/models/{namespace}/{name}/commits": {
-            "get": {
-                "security": [
-                    {
-                        "ApiKey": []
-                    }
-                ],
-                "description": "get model commits",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Model"
-                ],
-                "summary": "Get model commits",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "namespace",
-                        "name": "namespace",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "name",
-                        "name": "name",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "ref",
-                        "name": "ref",
-                        "in": "query"
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/types.Response"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "type": "array",
-                                            "items": {
-                                                "$ref": "#/definitions/types.Commit"
-                                            }
-                                        }
-                                    }
-                                }
-                            ]
-                        }
-                    },
-                    "400": {
-                        "description": "Bad request",
-                        "schema": {
-                            "$ref": "#/definitions/types.APIBadRequest"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal server error",
-                        "schema": {
-                            "$ref": "#/definitions/types.APIInternalServerError"
-                        }
-                    }
-                }
-            }
-        },
-        "/models/{namespace}/{name}/download/{file_path}": {
-            "get": {
-                "security": [
-                    {
-                        "ApiKey": []
-                    }
-                ],
-                "description": "download model file",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json",
-                    "application/octet-stream"
-                ],
-                "tags": [
-                    "Model"
-                ],
-                "summary": "Download model file",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "namespace",
-                        "name": "namespace",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "name",
-                        "name": "name",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "file_path",
-                        "name": "file_path",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "type": "boolean",
-                        "description": "lfs",
-                        "name": "lfs",
-                        "in": "query"
-                    },
-                    {
-                        "type": "string",
-                        "description": "ref",
-                        "name": "ref",
-                        "in": "query"
-                    },
-                    {
-                        "type": "string",
-                        "description": "name of download file",
-                        "name": "save_as",
-                        "in": "query"
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/types.Response"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "type": "string"
-                                        }
-                                    }
-                                }
-                            ]
-                        }
-                    },
-                    "400": {
-                        "description": "Bad request",
-                        "schema": {
-                            "$ref": "#/definitions/types.APIBadRequest"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal server error",
-                        "schema": {
-                            "$ref": "#/definitions/types.APIInternalServerError"
-                        }
-                    }
-                }
-            }
-        },
-        "/models/{namespace}/{name}/last_commit": {
-            "get": {
-                "security": [
-                    {
-                        "ApiKey": []
-                    }
-                ],
-                "description": "get model last commit",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Model"
-                ],
-                "summary": "Get model last commit",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "namespace",
-                        "name": "namespace",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "name",
-                        "name": "name",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "ref",
-                        "name": "ref",
-                        "in": "query"
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/types.Response"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "$ref": "#/definitions/types.Commit"
-                                        }
-                                    }
-                                }
-                            ]
-                        }
-                    },
-                    "400": {
-                        "description": "Bad request",
-                        "schema": {
-                            "$ref": "#/definitions/types.APIBadRequest"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal server error",
-                        "schema": {
-                            "$ref": "#/definitions/types.APIInternalServerError"
-                        }
-                    }
-                }
-            }
-        },
         "/models/{namespace}/{name}/predict": {
             "post": {
                 "security": [
@@ -2462,670 +1329,6 @@
                         "description": "OK",
                         "schema": {
                             "type": "string"
-                        }
-                    },
-                    "400": {
-                        "description": "Bad request",
-                        "schema": {
-                            "$ref": "#/definitions/types.APIBadRequest"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal server error",
-                        "schema": {
-                            "$ref": "#/definitions/types.APIInternalServerError"
-                        }
-                    }
-                }
-            }
-        },
-        "/models/{namespace}/{name}/raw/{file_path}": {
-            "get": {
-                "security": [
-                    {
-                        "ApiKey": []
-                    }
-                ],
-                "description": "get model file raw",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Model"
-                ],
-                "summary": "Get model file raw",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "namespace",
-                        "name": "namespace",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "name",
-                        "name": "name",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "file_path",
-                        "name": "file_path",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "ref",
-                        "name": "ref",
-                        "in": "query"
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/types.Response"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "$ref": "#/definitions/types.Commit"
-                                        }
-                                    }
-                                }
-                            ]
-                        }
-                    },
-                    "400": {
-                        "description": "Bad request",
-                        "schema": {
-                            "$ref": "#/definitions/types.APIBadRequest"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal server error",
-                        "schema": {
-                            "$ref": "#/definitions/types.APIInternalServerError"
-                        }
-                    }
-                }
-            },
-            "put": {
-                "security": [
-                    {
-                        "ApiKey": []
-                    }
-                ],
-                "description": "update model file",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Model"
-                ],
-                "summary": "Update model file",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "namespace",
-                        "name": "namespace",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "name",
-                        "name": "name",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "file_path",
-                        "name": "file_path",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "description": "body",
-                        "name": "body",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/types.UpdateFileReq"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/types.Response"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "$ref": "#/definitions/types.UpdateFileResp"
-                                        }
-                                    }
-                                }
-                            ]
-                        }
-                    },
-                    "400": {
-                        "description": "Bad request",
-                        "schema": {
-                            "$ref": "#/definitions/types.APIBadRequest"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal server error",
-                        "schema": {
-                            "$ref": "#/definitions/types.APIInternalServerError"
-                        }
-                    }
-                }
-            },
-            "post": {
-                "security": [
-                    {
-                        "ApiKey": []
-                    }
-                ],
-                "description": "create model file",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Model"
-                ],
-                "summary": "Create model file",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "namespace",
-                        "name": "namespace",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "name",
-                        "name": "name",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "file_path",
-                        "name": "file_path",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "description": "body",
-                        "name": "body",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/types.CreateFileReq"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/types.Response"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "$ref": "#/definitions/types.CreateFileResp"
-                                        }
-                                    }
-                                }
-                            ]
-                        }
-                    },
-                    "400": {
-                        "description": "Bad request",
-                        "schema": {
-                            "$ref": "#/definitions/types.APIBadRequest"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal server error",
-                        "schema": {
-                            "$ref": "#/definitions/types.APIInternalServerError"
-                        }
-                    }
-                }
-            }
-        },
-        "/models/{namespace}/{name}/resolve/{file_path}": {
-            "get": {
-                "security": [
-                    {
-                        "ApiKey": []
-                    }
-                ],
-                "description": "download model file",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json",
-                    "application/octet-stream"
-                ],
-                "tags": [
-                    "Model"
-                ],
-                "summary": "Download model file",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "namespace",
-                        "name": "namespace",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "name",
-                        "name": "name",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "file_path",
-                        "name": "file_path",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "ref",
-                        "name": "ref",
-                        "in": "query"
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/types.Response"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "type": "string"
-                                        }
-                                    }
-                                }
-                            ]
-                        }
-                    },
-                    "400": {
-                        "description": "Bad request",
-                        "schema": {
-                            "$ref": "#/definitions/types.APIBadRequest"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal server error",
-                        "schema": {
-                            "$ref": "#/definitions/types.APIInternalServerError"
-                        }
-                    }
-                }
-            }
-        },
-        "/models/{namespace}/{name}/tags": {
-            "get": {
-                "security": [
-                    {
-                        "ApiKey": []
-                    }
-                ],
-                "description": "get model tags",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Model"
-                ],
-                "summary": "Get model tags",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "namespace",
-                        "name": "namespace",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "name",
-                        "name": "name",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/types.Response"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "type": "array",
-                                            "items": {
-                                                "$ref": "#/definitions/types.Branch"
-                                            }
-                                        }
-                                    }
-                                }
-                            ]
-                        }
-                    },
-                    "400": {
-                        "description": "Bad request",
-                        "schema": {
-                            "$ref": "#/definitions/types.APIBadRequest"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal server error",
-                        "schema": {
-                            "$ref": "#/definitions/types.APIInternalServerError"
-                        }
-                    }
-                }
-            }
-        },
-        "/models/{namespace}/{name}/tree": {
-            "get": {
-                "security": [
-                    {
-                        "ApiKey": []
-                    }
-                ],
-                "description": "get model file tree",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Model"
-                ],
-                "summary": "Get model file tree",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "namespace",
-                        "name": "namespace",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "name",
-                        "name": "name",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "ref",
-                        "name": "ref",
-                        "in": "query"
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/types.Response"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "type": "array",
-                                            "items": {
-                                                "$ref": "#/definitions/types.File"
-                                            }
-                                        }
-                                    }
-                                }
-                            ]
-                        }
-                    },
-                    "400": {
-                        "description": "Bad request",
-                        "schema": {
-                            "$ref": "#/definitions/types.APIBadRequest"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal server error",
-                        "schema": {
-                            "$ref": "#/definitions/types.APIInternalServerError"
-                        }
-                    }
-                }
-            }
-        },
-        "/models/{namespace}/{name}/update_downloads": {
-            "post": {
-                "security": [
-                    {
-                        "ApiKey": []
-                    }
-                ],
-                "description": "update model downloads",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Model"
-                ],
-                "summary": "Update model downloads",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "namespace",
-                        "name": "namespace",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "name",
-                        "name": "name",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "description": "body",
-                        "name": "body",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/types.UpdateDownloadsReq"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/types.Response"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "type": "array",
-                                            "items": {
-                                                "$ref": "#/definitions/types.File"
-                                            }
-                                        }
-                                    }
-                                }
-                            ]
-                        }
-                    },
-                    "400": {
-                        "description": "Bad request",
-                        "schema": {
-                            "$ref": "#/definitions/types.APIBadRequest"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal server error",
-                        "schema": {
-                            "$ref": "#/definitions/types.APIInternalServerError"
-                        }
-                    }
-                }
-            }
-        },
-        "/models/{namespace}/{name}/upload_file": {
-            "post": {
-                "security": [
-                    {
-                        "ApiKey": []
-                    }
-                ],
-                "description": "upload model file to create or update a file in model repository",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Model"
-                ],
-                "summary": "Upload model file",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "namespace",
-                        "name": "namespace",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "name",
-                        "name": "name",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "file_path",
-                        "name": "file_path",
-                        "in": "formData",
-                        "required": true
-                    },
-                    {
-                        "type": "file",
-                        "description": "file",
-                        "name": "file",
-                        "in": "formData",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "email",
-                        "name": "email",
-                        "in": "formData",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "message",
-                        "name": "message",
-                        "in": "formData",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "branch",
-                        "name": "branch",
-                        "in": "formData"
-                    },
-                    {
-                        "type": "string",
-                        "description": "username",
-                        "name": "username",
-                        "in": "formData",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/types.Response"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "$ref": "#/definitions/types.CreateFileResp"
-                                        }
-                                    }
-                                }
-                            ]
                         }
                     },
                     "400": {
@@ -3671,6 +1874,490 @@
                 }
             }
         },
+        "/space_resources": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "description": "get space resources",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "SpaceReource"
+                ],
+                "summary": "Get space resources",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/types.ResponseWithTotal"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/definitions/types.SpaceResource"
+                                            }
+                                        },
+                                        "total": {
+                                            "type": "integer"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "description": "create space resource",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "SpaceReource"
+                ],
+                "summary": "Create space resource",
+                "parameters": [
+                    {
+                        "description": "body",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/types.CreateSpaceResourceReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/types.ResponseWithTotal"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/types.SpaceResource"
+                                        },
+                                        "total": {
+                                            "type": "integer"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            }
+        },
+        "/space_resources/{id}": {
+            "put": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "description": "update a exist space resource",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "SpaceReource"
+                ],
+                "summary": "Update a exist space resource",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "body",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/types.UpdateSpaceResourceReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/types.ResponseWithTotal"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/types.SpaceResource"
+                                        },
+                                        "total": {
+                                            "type": "integer"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "description": "delete a exist space resource",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "SpaceReource"
+                ],
+                "summary": "Delete a exist space resource",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/types.Response"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            }
+        },
+        "/space_sdks": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "description": "get space sdks",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "SpaceSdk"
+                ],
+                "summary": "Get space sdks",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/types.ResponseWithTotal"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/definitions/types.SpaceSdk"
+                                            }
+                                        },
+                                        "total": {
+                                            "type": "integer"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "description": "create space sdk",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "SpaceSdk"
+                ],
+                "summary": "Create space sdk",
+                "parameters": [
+                    {
+                        "description": "body",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/types.CreateSpaceSdkReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/types.ResponseWithTotal"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/types.SpaceSdk"
+                                        },
+                                        "total": {
+                                            "type": "integer"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            }
+        },
+        "/space_sdks/{id}": {
+            "put": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "description": "update a exist space sdk",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "SpaceSdk"
+                ],
+                "summary": "Update a exist space sdk",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "body",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/types.UpdateSpaceSdkReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/types.ResponseWithTotal"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/types.SpaceSdk"
+                                        },
+                                        "total": {
+                                            "type": "integer"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "description": "delete a exist space sdk",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "SpaceSdk"
+                ],
+                "summary": "Delete a exist space sdk",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "id",
+                        "name": "写id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/types.Response"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            }
+        },
         "/spaces": {
             "get": {
                 "security": [
@@ -3807,6 +2494,144 @@
                                     }
                                 }
                             ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            }
+        },
+        "/spaces/{namespace}/{name}": {
+            "put": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "description": "update a exists space",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Space"
+                ],
+                "summary": "Update a exists space",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "namespace",
+                        "name": "namespace",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "name",
+                        "name": "name",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "body",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/types.UpdateSpaceReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/types.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/types.Space"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "description": "delete a exists space",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Space"
+                ],
+                "summary": "Delete a exists space",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "namespace",
+                        "name": "namespace",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "name",
+                        "name": "name",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "current_user",
+                        "name": "current_user",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/types.Response"
                         }
                     },
                     "400": {
@@ -4565,6 +3390,29 @@
                 }
             }
         },
+        "database.Code": {
+            "type": "object",
+            "properties": {
+                "created_at": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "last_updated_at": {
+                    "type": "string"
+                },
+                "repository": {
+                    "$ref": "#/definitions/database.Repository"
+                },
+                "repository_id": {
+                    "type": "integer"
+                },
+                "updated_at": {
+                    "type": "string"
+                }
+            }
+        },
         "database.Dataset": {
             "type": "object",
             "properties": {
@@ -4939,49 +3787,98 @@
         "types.APIInternalServerError": {
             "type": "object"
         },
-        "types.Branch": {
+        "types.Code": {
             "type": "object",
             "properties": {
-                "commit": {
-                    "$ref": "#/definitions/types.RepoBranchCommit"
-                },
-                "message": {
-                    "type": "string"
-                },
-                "name": {
-                    "type": "string"
-                }
-            }
-        },
-        "types.Commit": {
-            "type": "object",
-            "properties": {
-                "author_email": {
-                    "type": "string"
-                },
-                "author_name": {
-                    "type": "string"
-                },
-                "authored_date": {
-                    "type": "string"
-                },
-                "committer_date": {
-                    "type": "string"
-                },
-                "committer_email": {
-                    "type": "string"
-                },
-                "committer_name": {
-                    "type": "string"
-                },
                 "created_at": {
                     "type": "string"
                 },
-                "id": {
+                "default_branch": {
                     "type": "string"
                 },
-                "message": {
+                "description": {
                     "type": "string"
+                },
+                "downloads": {
+                    "type": "integer"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "likes": {
+                    "type": "integer"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "nickname": {
+                    "type": "string"
+                },
+                "path": {
+                    "type": "string"
+                },
+                "private": {
+                    "type": "boolean"
+                },
+                "repository": {
+                    "$ref": "#/definitions/types.Repository"
+                },
+                "repository_id": {
+                    "type": "integer"
+                },
+                "tags": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/types.RepoTag"
+                    }
+                },
+                "updated_at": {
+                    "type": "string"
+                },
+                "user": {
+                    "$ref": "#/definitions/types.User"
+                }
+            }
+        },
+        "types.CreateCodeReq": {
+            "type": "object",
+            "properties": {
+                "default_branch": {
+                    "type": "string",
+                    "example": "main"
+                },
+                "description": {
+                    "type": "string"
+                },
+                "labels": {
+                    "type": "string",
+                    "example": ""
+                },
+                "license": {
+                    "type": "string",
+                    "example": "MIT"
+                },
+                "name": {
+                    "type": "string",
+                    "example": "model_name_1"
+                },
+                "namespace": {
+                    "type": "string",
+                    "example": "user_or_org_name"
+                },
+                "nickname": {
+                    "type": "string",
+                    "example": "model display name"
+                },
+                "private": {
+                    "type": "boolean"
+                },
+                "readme": {
+                    "type": "string"
+                },
+                "username": {
+                    "type": "string",
+                    "example": "creator_user_name"
                 }
             }
         },
@@ -5026,35 +3923,6 @@
                     "example": "creator_user_name"
                 }
             }
-        },
-        "types.CreateFileReq": {
-            "type": "object",
-            "properties": {
-                "branch": {
-                    "type": "string"
-                },
-                "content": {
-                    "type": "string"
-                },
-                "email": {
-                    "type": "string"
-                },
-                "message": {
-                    "type": "string"
-                },
-                "new_branch": {
-                    "type": "string"
-                },
-                "repoType": {
-                    "$ref": "#/definitions/types.RepositoryType"
-                },
-                "username": {
-                    "type": "string"
-                }
-            }
-        },
-        "types.CreateFileResp": {
-            "type": "object"
         },
         "types.CreateModelReq": {
             "type": "object",
@@ -5138,11 +4006,20 @@
         "types.CreateSpaceReq": {
             "type": "object",
             "properties": {
+                "cover_image_url": {
+                    "type": "string"
+                },
                 "default_branch": {
                     "type": "string",
                     "example": "main"
                 },
                 "description": {
+                    "type": "string"
+                },
+                "env": {
+                    "type": "string"
+                },
+                "hardware": {
                     "type": "string"
                 },
                 "labels": {
@@ -5174,11 +4051,63 @@
                 "sdk": {
                     "description": "Creator   string `json:\"username\" example:\"creator_user_name\"`\nNamespace string `json:\"namespace\" example:\"user_or_org_name\"`\nName      string `json:\"name\" example:\"space_name_1\"`\nLicense   string `json:\"license\" example:\"MIT\"`",
                     "type": "string",
-                    "example": "gradio"
+                    "example": "1"
+                },
+                "sdk_version": {
+                    "type": "string",
+                    "example": "v0.1"
+                },
+                "secrets": {
+                    "type": "string"
+                },
+                "template": {
+                    "type": "string"
                 },
                 "username": {
                     "type": "string",
                     "example": "creator_user_name"
+                }
+            }
+        },
+        "types.CreateSpaceResourceReq": {
+            "type": "object",
+            "required": [
+                "cpu",
+                "disk",
+                "gpu",
+                "memory",
+                "name"
+            ],
+            "properties": {
+                "cpu": {
+                    "type": "integer"
+                },
+                "disk": {
+                    "type": "integer"
+                },
+                "gpu": {
+                    "type": "integer"
+                },
+                "memory": {
+                    "type": "integer"
+                },
+                "name": {
+                    "type": "string"
+                }
+            }
+        },
+        "types.CreateSpaceSdkReq": {
+            "type": "object",
+            "required": [
+                "name",
+                "version"
+            ],
+            "properties": {
+                "name": {
+                    "type": "string"
+                },
+                "version": {
+                    "type": "string"
                 }
             }
         },
@@ -5315,53 +4244,6 @@
                 }
             }
         },
-        "types.File": {
-            "type": "object",
-            "properties": {
-                "commit": {
-                    "$ref": "#/definitions/types.Commit"
-                },
-                "content": {
-                    "type": "string"
-                },
-                "download_url": {
-                    "description": "URL to download the file, same with URL, except for lfs file",
-                    "type": "string"
-                },
-                "last_commit_sha": {
-                    "type": "string"
-                },
-                "lfs": {
-                    "type": "boolean"
-                },
-                "lfs_relative_path": {
-                    "description": "relative path in lfs storage",
-                    "type": "string"
-                },
-                "mode": {
-                    "type": "string"
-                },
-                "name": {
-                    "type": "string"
-                },
-                "path": {
-                    "type": "string"
-                },
-                "sha": {
-                    "type": "string"
-                },
-                "size": {
-                    "type": "integer"
-                },
-                "type": {
-                    "type": "string"
-                },
-                "url": {
-                    "description": "URL to browse the file",
-                    "type": "string"
-                }
-            }
-        },
         "types.ListByPathReq": {
             "type": "object",
             "properties": {
@@ -5482,14 +4364,6 @@
                 "ModelWidgetTypeChat"
             ]
         },
-        "types.RepoBranchCommit": {
-            "type": "object",
-            "properties": {
-                "id": {
-                    "type": "string"
-                }
-            }
-        },
         "types.RepoTag": {
             "type": "object",
             "properties": {
@@ -5568,7 +4442,7 @@
         "types.Space": {
             "type": "object",
             "properties": {
-                "cover_img": {
+                "cover_image_url": {
                     "type": "string"
                 },
                 "created_at": {
@@ -5578,6 +4452,12 @@
                     "description": "the serving endpoint url",
                     "type": "string",
                     "example": "https://localhost/spaces/myname/myspace"
+                },
+                "env": {
+                    "type": "string"
+                },
+                "hardware": {
+                    "type": "string"
                 },
                 "license": {
                     "type": "string",
@@ -5608,7 +4488,96 @@
                 "sdk": {
                     "description": "like gradio,steamlit etc",
                     "type": "string",
-                    "example": "gradio"
+                    "example": "1"
+                },
+                "sdk_version": {
+                    "type": "string",
+                    "example": "v0.1"
+                },
+                "secrets": {
+                    "type": "string"
+                },
+                "template": {
+                    "type": "string"
+                },
+                "username": {
+                    "type": "string",
+                    "example": "creator_user_name"
+                }
+            }
+        },
+        "types.SpaceResource": {
+            "type": "object",
+            "properties": {
+                "cpu": {
+                    "type": "integer"
+                },
+                "disk": {
+                    "type": "integer"
+                },
+                "gpu": {
+                    "type": "integer"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "memory": {
+                    "type": "integer"
+                },
+                "name": {
+                    "type": "string"
+                }
+            }
+        },
+        "types.SpaceSdk": {
+            "type": "object",
+            "properties": {
+                "id": {
+                    "type": "integer"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "version": {
+                    "type": "string"
+                }
+            }
+        },
+        "types.UpdateCodeReq": {
+            "type": "object",
+            "properties": {
+                "default_branch": {
+                    "type": "string",
+                    "example": "main"
+                },
+                "description": {
+                    "type": "string"
+                },
+                "labels": {
+                    "type": "string",
+                    "example": ""
+                },
+                "license": {
+                    "type": "string",
+                    "example": "MIT"
+                },
+                "name": {
+                    "type": "string",
+                    "example": "model_name_1"
+                },
+                "namespace": {
+                    "type": "string",
+                    "example": "user_or_org_name"
+                },
+                "nickname": {
+                    "type": "string",
+                    "example": "model display name"
+                },
+                "private": {
+                    "type": "boolean"
+                },
+                "readme": {
+                    "type": "string"
                 },
                 "username": {
                     "type": "string",
@@ -5658,61 +4627,6 @@
                 }
             }
         },
-        "types.UpdateDownloadsReq": {
-            "type": "object",
-            "properties": {
-                "date": {
-                    "type": "string"
-                },
-                "download_count": {
-                    "type": "integer"
-                },
-                "name": {
-                    "type": "string"
-                },
-                "namespace": {
-                    "type": "string"
-                },
-                "repoType": {
-                    "$ref": "#/definitions/types.RepositoryType"
-                }
-            }
-        },
-        "types.UpdateFileReq": {
-            "type": "object",
-            "properties": {
-                "branch": {
-                    "type": "string"
-                },
-                "content": {
-                    "type": "string"
-                },
-                "email": {
-                    "type": "string"
-                },
-                "message": {
-                    "type": "string"
-                },
-                "new_branch": {
-                    "type": "string"
-                },
-                "origin_path": {
-                    "type": "string"
-                },
-                "repoType": {
-                    "$ref": "#/definitions/types.RepositoryType"
-                },
-                "sha": {
-                    "type": "string"
-                },
-                "username": {
-                    "type": "string"
-                }
-            }
-        },
-        "types.UpdateFileResp": {
-            "type": "object"
-        },
         "types.UpdateModelReq": {
             "type": "object",
             "properties": {
@@ -5752,6 +4666,106 @@
                 "username": {
                     "type": "string",
                     "example": "creator_user_name"
+                }
+            }
+        },
+        "types.UpdateSpaceReq": {
+            "type": "object",
+            "properties": {
+                "cover_image_url": {
+                    "type": "string"
+                },
+                "default_branch": {
+                    "type": "string",
+                    "example": "main"
+                },
+                "description": {
+                    "type": "string"
+                },
+                "env": {
+                    "type": "string"
+                },
+                "hardware": {
+                    "type": "string"
+                },
+                "labels": {
+                    "type": "string",
+                    "example": ""
+                },
+                "license": {
+                    "type": "string",
+                    "example": "MIT"
+                },
+                "name": {
+                    "type": "string",
+                    "example": "model_name_1"
+                },
+                "namespace": {
+                    "type": "string",
+                    "example": "user_or_org_name"
+                },
+                "nickname": {
+                    "type": "string",
+                    "example": "model display name"
+                },
+                "private": {
+                    "type": "boolean"
+                },
+                "readme": {
+                    "type": "string"
+                },
+                "sdk": {
+                    "description": "Creator   string `json:\"username\" example:\"creator_user_name\"`\nNamespace string `json:\"namespace\" example:\"user_or_org_name\"`\nName      string `json:\"name\" example:\"space_name_1\"`\nLicense   string `json:\"license\" example:\"MIT\"`",
+                    "type": "string",
+                    "example": "1"
+                },
+                "sdk_version": {
+                    "type": "string",
+                    "example": "v0.1"
+                },
+                "secrets": {
+                    "type": "string"
+                },
+                "template": {
+                    "type": "string"
+                },
+                "username": {
+                    "type": "string",
+                    "example": "creator_user_name"
+                }
+            }
+        },
+        "types.UpdateSpaceResourceReq": {
+            "type": "object",
+            "properties": {
+                "cpu": {
+                    "type": "integer"
+                },
+                "disk": {
+                    "type": "integer"
+                },
+                "gpu": {
+                    "type": "integer"
+                },
+                "memory": {
+                    "type": "integer"
+                },
+                "name": {
+                    "type": "string"
+                }
+            }
+        },
+        "types.UpdateSpaceSdkReq": {
+            "type": "object",
+            "properties": {
+                "id": {
+                    "type": "integer"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "version": {
+                    "type": "string"
                 }
             }
         },
