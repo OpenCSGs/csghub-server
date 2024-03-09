@@ -40,6 +40,17 @@ func ServerError(c *gin.Context, err error) {
 	})
 }
 
+// UnauthorizedError responds with a JSON-formatted error message.
+//
+// Example:
+//
+//	UnauthorizedError(c, errors.New("permission denied"))
+func UnauthorizedError(c *gin.Context, err error) {
+	c.PureJSON(http.StatusUnauthorized, R{
+		Msg: err.Error(),
+	})
+}
+
 // R is the response envelope
 type R struct {
 	Code int    `json:"code,omitempty"`

@@ -97,3 +97,19 @@ func (s *UserStore) IsExist(ctx context.Context, username string) (exists bool, 
 	}
 	return
 }
+
+func (s *UserStore) FindByAccessToken(ctx context.Context, token string) (*User, error) {
+	var user User
+	_, err := s.db.Operator.Core.
+		NewSelect().
+		ColumnExpr("u.*").
+		TableExpr("users AS u").
+		Join("JOIN access_tokens AS t ON u.id = t.user_id").
+		Where("t.token = ?", token).
+		Exec(ctx, &user)
+
+	if err != nil {
+		return nil, err
+	}
+	return &user, nil
+}

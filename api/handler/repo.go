@@ -3,6 +3,8 @@ package handler
 import (
 	"bytes"
 	"encoding/base64"
+	"errors"
+	"fmt"
 	"io"
 	"log/slog"
 	"net/http"
@@ -441,6 +443,11 @@ func (h *RepoHandler) SDKListFiles(ctx *gin.Context) {
 
 	files, err := h.c.SDKListFiles(ctx, common.RepoTypeFromContext(ctx), namespace, name)
 	if err != nil {
+		if errors.Is(err, component.UnauthorizedError) {
+			slog.Error("permission denied when accessing repo", slog.String("repo_type", string(common.RepoTypeFromContext(ctx))), slog.Any("path", fmt.Sprintf("%s/%s", namespace, name)))
+			httpbase.UnauthorizedError(ctx, err)
+			return
+		}
 		slog.Error("Error listing repo files", "error", err)
 		httpbase.ServerError(ctx, err)
 		return
@@ -479,6 +486,11 @@ func (h *RepoHandler) HeadSDKDownload(ctx *gin.Context) {
 
 	file, err := h.c.HeadDownloadFile(ctx, req)
 	if err != nil {
+		if errors.Is(err, component.UnauthorizedError) {
+			slog.Error("permission denied when accessing repo", slog.String("repo_type", string(req.RepoType)), slog.Any("path", fmt.Sprintf("%s/%s", namespace, name)))
+			httpbase.UnauthorizedError(ctx, err)
+			return
+		}
 		slog.Error("Failed to download repo file", slog.String("repo_type", string(req.RepoType)), slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
 		return
@@ -525,6 +537,11 @@ func (h *RepoHandler) handleDownload(ctx *gin.Context, isResolve bool) {
 	req.Lfs = lfs
 	reader, url, err := h.c.SDKDownloadFile(ctx, req)
 	if err != nil {
+		if errors.Is(err, component.UnauthorizedError) {
+			slog.Error("permission denied when accessing repo", slog.String("repo_type", string(req.RepoType)), slog.Any("path", fmt.Sprintf("%s/%s", namespace, name)))
+			httpbase.UnauthorizedError(ctx, err)
+			return
+		}
 		slog.Error("Failed to download repo file", slog.String("repo_type", string(req.RepoType)), slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
 		return
