@@ -7,12 +7,10 @@ import (
 	"fmt"
 	"log/slog"
 
-	"opencsg.com/csghub-server/builder/git"
 	"opencsg.com/csghub-server/builder/git/gitserver"
 	"opencsg.com/csghub-server/builder/git/membership"
 	"opencsg.com/csghub-server/builder/inference"
 	"opencsg.com/csghub-server/builder/store/database"
-	"opencsg.com/csghub-server/builder/store/s3"
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/types"
 )
@@ -61,45 +59,16 @@ const LFSPrefix = "version https://git-lfs.github.com/spec/v1"
 
 func NewModelComponent(config *config.Config) (*ModelComponent, error) {
 	c := &ModelComponent{}
-	c.user = database.NewUserStore()
-	c.ms = database.NewModelStore()
-	c.org = database.NewOrgStore()
-	c.repo = database.NewRepoStore()
-	c.namespace = database.NewNamespaceStore()
 	var err error
-	c.git, err = git.NewGitServer(config)
+	c.RepoComponent, err = NewRepoComponent(config)
 	if err != nil {
-		newError := fmt.Errorf("failed to create git server,error:%w", err)
-		slog.Error(newError.Error())
-		return nil, newError
-	}
-	c.tc, err = NewTagComponent(config)
-	if err != nil {
-		newError := fmt.Errorf("fail to create tag component,error:%w", err)
-		slog.Error(newError.Error())
-		return nil, newError
-	}
-	c.s3Client, err = s3.NewMinio(config)
-	if err != nil {
-		newError := fmt.Errorf("fail to init s3 client for model,error:%w", err)
-		slog.Error(newError.Error())
-		return nil, newError
-	}
-	c.lfsBucket = config.S3.Bucket
-
-	c.infer = inference.NewInferClient(config.Inference.ServerAddr)
-
-	c.msc, err = NewMemberComponent(config)
-	if err != nil {
-		newError := fmt.Errorf("fail to create membership component,error:%w", err)
-		slog.Error(newError.Error())
-		return nil, newError
+		return nil, err
 	}
 	return c, nil
 }
 
 type ModelComponent struct {
-	repoComponent
+	*RepoComponent
 	infer inference.Client
 }
 
@@ -230,7 +199,7 @@ func (c *ModelComponent) Create(ctx context.Context, req *types.CreateModelReq) 
 		Email:     user.Email,
 		Message:   initCommitMessage,
 		Branch:    req.DefaultBranch,
-		Content:   datasetGitattributesContent,
+		Content:   modelGitattributesContent,
 		NewBranch: req.DefaultBranch,
 		Namespace: req.Namespace,
 		Name:      req.Name,

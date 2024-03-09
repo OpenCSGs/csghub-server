@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 	"strings"
+	"time"
 
 	"github.com/uptrace/bun"
 )
@@ -45,6 +46,12 @@ func (s *SpaceStore) Create(ctx context.Context, input Space) (*Space, error) {
 	return &input, nil
 }
 
+func (s *SpaceStore) Update(ctx context.Context, input Space) (err error) {
+	input.UpdatedAt = time.Now()
+	_, err = s.db.Core.NewUpdate().Model(&input).WherePK().Exec(ctx)
+	return
+}
+
 func (s *SpaceStore) PublicToUser(ctx context.Context, userID int64, search, sort string, per, page int) ([]Space, int, error) {
 	var (
 		spaces []Space
@@ -54,7 +61,9 @@ func (s *SpaceStore) PublicToUser(ctx context.Context, userID int64, search, sor
 	query := s.db.Operator.Core.
 		NewSelect().
 		Model(&spaces).
-		Relation("Repository")
+		Relation("Repository").
+		Relation("Resource").
+		Relation("Sdk")
 		// Relation("User")
 
 	if userID > 0 {
@@ -86,4 +95,27 @@ func (s *SpaceStore) PublicToUser(ctx context.Context, userID int64, search, sor
 		return nil, 0, err
 	}
 	return spaces, count, nil
+}
+
+func (s *SpaceStore) FindByPath(ctx context.Context, namespace, name string) (*Space, error) {
+	resSpace := new(Space)
+	err := s.db.Operator.Core.
+		NewSelect().
+		Model(resSpace).
+		Relation("Repository.User").
+		Where("repository.path =?", fmt.Sprintf("%s/%s", namespace, name)).
+		Scan(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to find space: %w", err)
+	}
+
+	return resSpace, err
+}
+
+func (s *SpaceStore) Delete(ctx context.Context, input Space) error {
+	res, err := s.db.Operator.Core.NewDelete().Model(&input).WherePK().Exec(ctx)
+	if err := assertAffectedOneRow(res, err); err != nil {
+		return fmt.Errorf("delete space in tx failed,error:%w", err)
+	}
+	return nil
 }

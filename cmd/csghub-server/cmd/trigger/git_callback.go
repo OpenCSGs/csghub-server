@@ -30,6 +30,7 @@ func init() {
 	Cmd.AddCommand(
 		gitCallbackCmd,
 		fixOrgDataCmd,
+		fixUserDataCmd,
 	)
 }
 

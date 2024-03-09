@@ -37,4 +37,5 @@ type GitServer interface {
 	UpdateOrganization(*types.EditOrgReq, *database.Organization) (*database.Organization, error)
 
 	FixOrganization(req *types.CreateOrgReq, orgOwner database.User) error
+	FixUserData(ctx context.Context, userName string) error
 }

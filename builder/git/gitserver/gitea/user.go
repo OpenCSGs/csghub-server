@@ -1,6 +1,7 @@
 package gitea
 
 import (
+	"context"
 	"crypto/rand"
 	"crypto/sha1"
 	"encoding/hex"
@@ -89,6 +90,7 @@ func (c *Client) createOrgsForUser(user *gitea.User) (err error) {
 		common.WithPrefix(user.UserName, ModelOrgPrefix),
 		common.WithPrefix(user.UserName, DatasetOrgPrefix),
 		common.WithPrefix(user.UserName, SpaceOrgPrefix),
+		common.WithPrefix(user.UserName, CodeOrgPrefix),
 	}
 
 	for _, orgName := range orgNames {
@@ -102,6 +104,28 @@ func (c *Client) createOrgsForUser(user *gitea.User) (err error) {
 		if err != nil {
 			return
 		}
+	}
+
+	return
+}
+
+// Create gitea orgs for user to store different type repositories
+func (c *Client) FixUserData(ctx context.Context, userName string) (err error) {
+	orgNames := []string{
+		common.WithPrefix(userName, ModelOrgPrefix),
+		common.WithPrefix(userName, DatasetOrgPrefix),
+		common.WithPrefix(userName, SpaceOrgPrefix),
+		common.WithPrefix(userName, CodeOrgPrefix),
+	}
+
+	for _, orgName := range orgNames {
+		_, _, err = c.giteaClient.AdminCreateOrg(
+			userName,
+			gitea.CreateOrgOption{
+				Name:     orgName,
+				FullName: orgName,
+			},
+		)
 	}
 
 	return
