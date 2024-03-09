@@ -22,6 +22,25 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 		r.GET("/api/v1/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 	}
 
+	repoCommonHandler, err := handler.NewRepoHandler(config)
+	if err != nil {
+		return nil, fmt.Errorf("error creating repo common handler: %w", err)
+	}
+
+	hfGroup := r.Group("/hf")
+	hfGroup.Use(middleware.GetUserFromAccessToken())
+	{
+		hfGroup.GET("/:namespace/:name/resolve/:branch/*file_path", middleware.RepoType(types.ModelRepo), repoCommonHandler.SDKDownload)
+		hfGroup.HEAD("/:namespace/:name/resolve/:branch/*file_path", middleware.RepoType(types.ModelRepo), repoCommonHandler.HeadSDKDownload)
+		hfGroup.GET("/datasets/:namespace/:name/resolve/:branch/*file_path", middleware.RepoType(types.DatasetRepo), repoCommonHandler.SDKDownload)
+		hfGroup.HEAD("/datasets/:namespace/:name/resolve/:branch/*file_path", middleware.RepoType(types.DatasetRepo), repoCommonHandler.HeadSDKDownload)
+		hfAPIGroup := hfGroup.Group("/api")
+		{
+			hfAPIGroup.GET("/models/:namespace/:name/revision/:branch", middleware.RepoType(types.ModelRepo), repoCommonHandler.SDKListFiles)
+			hfAPIGroup.GET("/datasets/:namespace/:name/revision/:branch", middleware.RepoType(types.DatasetRepo), repoCommonHandler.SDKListFiles)
+		}
+	}
+
 	r.Use(middleware.Authenticator(config))
 	apiGroup := r.Group("/api/v1")
 	// TODO:use middleware to handle common response
@@ -44,23 +63,6 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 		return nil, fmt.Errorf("error creating dataset handler:%w", err)
 	}
 
-	repoCommonHandler, err := handler.NewRepoHandler(config)
-	if err != nil {
-		return nil, fmt.Errorf("error creating repo common handler: %w", err)
-	}
-
-	hfGroup := r.Group("/hf")
-	{
-		hfGroup.GET("/:namespace/:name/resolve/:branch/*file_path", middleware.RepoType(types.ModelRepo), repoCommonHandler.SDKDownload)
-		hfGroup.HEAD("/:namespace/:name/resolve/:branch/*file_path", middleware.RepoType(types.ModelRepo), repoCommonHandler.HeadSDKDownload)
-		hfGroup.GET("/datasets/:namespace/:name/resolve/:branch/*file_path", middleware.RepoType(types.DatasetRepo), repoCommonHandler.SDKDownload)
-		hfGroup.HEAD("/datasets/:namespace/:name/resolve/:branch/*file_path", middleware.RepoType(types.DatasetRepo), repoCommonHandler.HeadSDKDownload)
-		hfAPIGroup := hfGroup.Group("/api")
-		{
-			hfAPIGroup.GET("/models/:namespace/:name/revision/:branch", middleware.RepoType(types.ModelRepo), repoCommonHandler.SDKListFiles)
-			hfAPIGroup.GET("/datasets/:namespace/:name/revision/:branch", middleware.RepoType(types.DatasetRepo), repoCommonHandler.SDKListFiles)
-		}
-	}
 	// Models routes
 	modelsGroup := apiGroup.Group("/models")
 	{

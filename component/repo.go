@@ -591,13 +591,16 @@ func (c *RepoComponent) SDKListFiles(ctx *gin.Context, repoType types.Repository
 
 	currentUser, exists := ctx.Get("currentUser")
 	// TODO: Use user access token to check permissions
-	if repo.Private && exists {
+	if repo.Private {
+		if !exists {
+			return nil, UnauthorizedError
+		}
 		canRead, err := c.checkCurrentUserPermission(ctx, currentUser, namespace, membership.RoleRead)
 		if err != nil {
 			return nil, err
 		}
 		if !canRead {
-			return nil, fmt.Errorf("permission denied")
+			return nil, UnauthorizedError
 		}
 	}
 
@@ -645,13 +648,16 @@ func (c *RepoComponent) HeadDownloadFile(ctx *gin.Context, req *types.GetFileReq
 	}
 	currentUser, exists := ctx.Get("currentUser")
 	// TODO: Use user access token to check permissions
-	if repo.Private && exists {
+	if repo.Private {
+		if !exists {
+			return nil, UnauthorizedError
+		}
 		canRead, err := c.checkCurrentUserPermission(ctx, currentUser, req.Namespace, membership.RoleRead)
 		if err != nil {
 			return nil, err
 		}
 		if !canRead {
-			return nil, fmt.Errorf("permission denied")
+			return nil, UnauthorizedError
 		}
 	}
 	if req.Ref == "" {
@@ -681,13 +687,16 @@ func (c *RepoComponent) SDKDownloadFile(ctx *gin.Context, req *types.GetFileReq)
 	}
 	currentUser, exists := ctx.Get("currentUser")
 	// TODO: Use user access token to check permissions
-	if repo.Private && exists {
+	if repo.Private {
+		if !exists {
+			return nil, "", UnauthorizedError
+		}
 		canRead, err := c.checkCurrentUserPermission(ctx, currentUser, req.Namespace, membership.RoleRead)
 		if err != nil {
 			return nil, "", err
 		}
 		if !canRead {
-			return nil, "", fmt.Errorf("permission denied")
+			return nil, "", UnauthorizedError
 		}
 	}
 	if req.Ref == "" {
