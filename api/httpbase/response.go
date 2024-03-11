@@ -51,6 +51,17 @@ func UnauthorizedError(c *gin.Context, err error) {
 	})
 }
 
+// NotFoundError responds with a JSON-formatted error message.
+//
+// Example:
+//
+//	NotFoundError(c, errors.New("permission denied"))
+func NotFoundError(c *gin.Context, err error) {
+	c.PureJSON(http.StatusNotFound, R{
+		Msg: err.Error(),
+	})
+}
+
 // R is the response envelope
 type R struct {
 	Code int    `json:"code,omitempty"`
