@@ -15,6 +15,9 @@ type Monitor interface {
 	Watch(id int64) error
 	Watching() int
 	Complete() <-chan int64
+
+	Status(ctx context.Context, deployID int64) (string, error)
+	Logs(ctx context.Context, deployID int64) (string, error)
 }
 
 var _ Monitor = (*DeployMonitor)(nil)
@@ -104,6 +107,14 @@ func (m *DeployMonitor) Watch(deployTaskID int64) error {
 	m.runningTasks = append(m.runningTasks, t)
 	m.reloadLock.Unlock()
 	return nil
+}
+
+func (m *DeployMonitor) Status(ctx context.Context, deployID int64) (string, error) {
+	return "", nil
+}
+
+func (m *DeployMonitor) Logs(ctx context.Context, deployID int64) (string, error) {
+	return "", nil
 }
 
 func (m *DeployMonitor) checkStatus(runningTasks []*database.MonitorTask) {

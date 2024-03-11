@@ -24,6 +24,7 @@ type Space struct {
 	Namespace string `json:"namespace" example:"user_or_org_name"`
 	Name      string `json:"name" example:"space_name_1"`
 	Path      string `json:"path" example:"user_or_org_name/space_name_1"`
+	Branch    string `json:"branch" example:""`
 	License   string `json:"license" example:"MIT"`
 	// like gradio,steamlit etc
 	Sdk           string `json:"sdk" example:"1"`

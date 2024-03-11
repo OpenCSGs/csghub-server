@@ -2,10 +2,12 @@ package component
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 
-	"opencsg.com/csghub-server/builder/git/membership"
+	"opencsg.com/csghub-server/builder/deploy"
+	"opencsg.com/csghub-server/builder/deploy/monitor"
 	"opencsg.com/csghub-server/builder/proxy"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/config"
@@ -22,15 +24,22 @@ func NewSpaceComponent(config *config.Config) (*SpaceComponent, error) {
 	if err != nil {
 		return nil, err
 	}
+	c.monitor = monitor.NewMonitor()
+	c.deployer, err = deploy.NewDeployer()
+	if err != nil {
+		return nil, fmt.Errorf("create space deployer,%w", err)
+	}
 	return c, nil
 }
 
 type SpaceComponent struct {
 	*RepoComponent
-	space  *database.SpaceStore
-	rproxy *proxy.ReverseProxy
-	sss    *database.SpaceSdkStore
-	srs    *database.SpaceResourceStore
+	space    *database.SpaceStore
+	rproxy   *proxy.ReverseProxy
+	sss      *database.SpaceSdkStore
+	srs      *database.SpaceResourceStore
+	monitor  monitor.Monitor
+	deployer deploy.Deployer
 }
 
 func (c *SpaceComponent) Create(ctx context.Context, req types.CreateSpaceReq) (*types.Space, error) {
@@ -165,14 +174,10 @@ func (c *SpaceComponent) Index(ctx context.Context, username, search, sort strin
 }
 
 func (c *SpaceComponent) AllowCallApi(ctx context.Context, namespace, name, username string) (bool, error) {
-	repo, err := c.repo.FindByPath(ctx, types.SpaceRepo, namespace, name)
-	if err != nil {
-		return false, fmt.Errorf("failed to find repo, error: %w", err)
+	if username == "" {
+		return false, errors.New("user not found, please login first")
 	}
-	if !repo.Private {
-		return true, nil
-	}
-	return c.checkCurrentUserPermission(ctx, username, namespace, membership.RoleRead)
+	return c.AllowReadAccess(ctx, namespace, name, username)
 }
 
 func (c *SpaceComponent) Delete(ctx context.Context, namespace, name, currentUser string) error {
@@ -197,4 +202,44 @@ func (c *SpaceComponent) Delete(ctx context.Context, namespace, name, currentUse
 		return fmt.Errorf("failed to delete database space, error: %w", err)
 	}
 	return nil
+}
+
+func (c *SpaceComponent) Deploy(ctx context.Context, namespace, name string) (int64, error) {
+	s, err := c.space.FindByPath(ctx, namespace, name)
+	if err != nil {
+		slog.Error("can't deploy space", slog.Any("error", err), slog.String("namespace", namespace), slog.String("name", name))
+		return -1, err
+	}
+
+	return c.deployer.Deploy(ctx, types.Space{
+		Creator:       s.Repository.User.Name,
+		Namespace:     s.Repository.Name,
+		Name:          s.Repository.Name,
+		Path:          s.Repository.GitPath,
+		Sdk:           s.Sdk,
+		SdkVersion:    s.SdkVersion,
+		CoverImageUrl: s.CoverImageUrl,
+		Template:      s.Template,
+		Env:           s.Env,
+		Hardware:      s.Hardware,
+		Secrets:       s.Secrets,
+	})
+}
+
+func (c *SpaceComponent) Status(ctx context.Context, namespace, name string) (string, error) {
+	s, err := c.space.FindByPath(ctx, namespace, name)
+	if err != nil {
+		slog.Error("can't get space status", slog.Any("error", err), slog.String("namespace", namespace), slog.String("name", name))
+		return "", err
+	}
+	return c.deployer.Status(ctx, s.ID)
+}
+
+func (c *SpaceComponent) Logs(ctx context.Context, namespace, name string) (string, error) {
+	s, err := c.space.FindByPath(ctx, namespace, name)
+	if err != nil {
+		slog.Error("can't get space logs", slog.Any("error", err), slog.String("namespace", namespace), slog.String("name", name))
+		return "", err
+	}
+	return c.monitor.Logs(ctx, s.ID)
 }

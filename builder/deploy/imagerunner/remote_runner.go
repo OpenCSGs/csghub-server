@@ -2,6 +2,7 @@ package imagerunner
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -28,7 +29,7 @@ func NewRemoteRunner(remoteURL string) (Runner, error) {
 	}, nil
 }
 
-func (h *RemoteRunner) Run(req *RunRequest) (*RunResponse, error) {
+func (h *RemoteRunner) Run(ctx context.Context, req *RunRequest) (*RunResponse, error) {
 	rel := &url.URL{Path: "/push_data"}
 	u := h.remote.ResolveReference(rel)
 	response, err := h.doRequest(http.MethodPost, u.String(), req)
@@ -45,7 +46,7 @@ func (h *RemoteRunner) Run(req *RunRequest) (*RunResponse, error) {
 	return &buildResponse, nil
 }
 
-func (h *RemoteRunner) Status(req *StatusRequest) (*StatusResponse, error) {
+func (h *RemoteRunner) Status(ctx context.Context, req *StatusRequest) (*StatusResponse, error) {
 	rel := &url.URL{Path: fmt.Sprintf("/%s/%s/%s/status", req.OrgName, req.Name, req.Ref)}
 	u := h.remote.ResolveReference(rel)
 	response, err := h.doRequest(http.MethodGet, u.String(), req)
@@ -62,7 +63,7 @@ func (h *RemoteRunner) Status(req *StatusRequest) (*StatusResponse, error) {
 	return &statusResponse, nil
 }
 
-func (h *RemoteRunner) Logs(req *LogsRequest) (*LogsResponse, error) {
+func (h *RemoteRunner) Logs(ctx context.Context, req *LogsRequest) (*LogsResponse, error) {
 	rel := &url.URL{Path: fmt.Sprintf("/%s/%s/%s/logs", req.OrgName, req.Name, req.Ref)}
 	u := h.remote.ResolveReference(rel)
 	response, err := h.doRequest(http.MethodGet, u.String(), req)

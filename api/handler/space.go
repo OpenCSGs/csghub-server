@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"net/http"
 	"slices"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"opencsg.com/csghub-server/api/httpbase"
@@ -233,6 +234,136 @@ func (h *SpaceHandler) Proxy(ctx *gin.Context) {
 	} else {
 		slog.Info("user not allowed to call sapce api", slog.String("namespace", namespace),
 			slog.String("name", name), slog.Any("username", username))
+	}
+}
+
+// GetSpaceStatus   godoc
+// @Security     JWT token
+// @Summary      get space status
+// @Tags         Space
+// @Accept       json
+// @Produce      json
+// @Param        namespace path string true "namespace"
+// @Param        name path string true "name"
+// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
+// @Router       /spaces/{namespace}/{name}/status [get]
+func (h *SpaceHandler) Status(ctx *gin.Context) {
+	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
+	if err != nil {
+		slog.Error("failed to get namespace from context", "error", err)
+		httpbase.BadRequest(ctx, err.Error())
+		return
+	}
+
+	var allow bool
+	username, exists := ctx.Get("currentUser")
+	if exists {
+		allow, err = h.c.AllowReadAccess(ctx, namespace, name, username.(string))
+	} else {
+		allow, err = h.c.AllowReadAccess(ctx, namespace, name, "")
+	}
+
+	if err != nil {
+		slog.Error("failed to check user permission", "error", err)
+		httpbase.ServerError(ctx, errors.New("failed to check user permission"))
+		return
+	}
+
+	if !allow {
+		slog.Info("user not allowed to query sapce status", slog.String("namespace", namespace),
+			slog.String("name", name), slog.Any("username", username))
+	}
+
+	ctx.Writer.Header().Set("Content-Type", "text/event-stream")
+	ctx.Writer.Header().Set("Cache-Control", "no-cache")
+	ctx.Writer.Header().Set("Connection", "keep-alive")
+	ctx.Writer.Header().Set("Transfer-Encoding", "chunked")
+
+	// 创建一个通知channel以监测客户端是否已经断开连接
+	closeNotify := ctx.Writer.CloseNotify()
+
+	for {
+		select {
+		case <-closeNotify:
+			return
+		default:
+			time.Sleep(time.Second * 5)
+			status, err := h.c.Status(ctx, namespace, name)
+			if err != nil {
+				slog.Error("failed to get space status", slog.Any("error", err), slog.String("namespace", namespace),
+					slog.String("name", name))
+				ctx.SSEvent("error", err.Error())
+			} else {
+				ctx.SSEvent("status", status)
+			}
+			ctx.Writer.Flush()
+		}
+	}
+}
+
+// GetSpaceLogs   godoc
+// @Security     JWT token
+// @Summary      get space logs
+// @Tags         Space
+// @Accept       json
+// @Produce      json
+// @Param        namespace path string true "namespace"
+// @Param        name path string true "name"
+// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
+// @Router       /spaces/{namespace}/{name}/logs [get]
+func (h *SpaceHandler) Logs(ctx *gin.Context) {
+	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
+	if err != nil {
+		slog.Error("failed to get namespace from context", "error", err)
+		httpbase.BadRequest(ctx, err.Error())
+		return
+	}
+
+	var allow bool
+	username, exists := ctx.Get("currentUser")
+	if exists {
+		allow, err = h.c.AllowReadAccess(ctx, namespace, name, username.(string))
+	} else {
+		allow, err = h.c.AllowReadAccess(ctx, namespace, name, "")
+	}
+
+	if err != nil {
+		slog.Error("failed to check user permission", "error", err)
+		httpbase.ServerError(ctx, errors.New("failed to check user permission"))
+		return
+	}
+
+	if !allow {
+		slog.Info("user not allowed to query sapce status", slog.String("namespace", namespace),
+			slog.String("name", name), slog.Any("username", username))
+	}
+
+	ctx.Writer.Header().Set("Content-Type", "text/event-stream")
+	ctx.Writer.Header().Set("Cache-Control", "no-cache")
+	ctx.Writer.Header().Set("Connection", "keep-alive")
+	ctx.Writer.Header().Set("Transfer-Encoding", "chunked")
+
+	// watch client connection
+	closeNotify := ctx.Writer.CloseNotify()
+
+	for {
+		select {
+		case <-closeNotify:
+			return
+		default:
+			time.Sleep(time.Second * 5)
+			logs, err := h.c.Logs(ctx, namespace, name)
+			if err != nil {
+				slog.Error("failed to get space log", slog.Any("error", err), slog.String("namespace", namespace),
+					slog.String("name", name))
+				ctx.SSEvent("error", err.Error())
+			} else {
+				ctx.SSEvent("status", logs)
+			}
+			ctx.Writer.Flush()
+		}
 	}
 }
 

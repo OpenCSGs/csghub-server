@@ -60,6 +60,12 @@ func (s *DeployTaskStore) GetDeploy(ctx context.Context, id int64) (*Deploy, err
 	return deploy, err
 }
 
+func (s *DeployTaskStore) GetSpaceLatestDeploy(ctx context.Context, spaceID int64) (*Deploy, error) {
+	deploy := &Deploy{}
+	err := s.db.Core.NewSelect().Model(deploy).Where("space_id = ?", spaceID).Order("created_at DESC").Limit(1).Scan(ctx, deploy)
+	return deploy, err
+}
+
 func (s *DeployTaskStore) CreateDeployTask(ctx context.Context, deployTask *DeployTask) error {
 	_, err := s.db.Core.NewInsert().Model(deployTask).Exec(ctx, deployTask)
 	return err

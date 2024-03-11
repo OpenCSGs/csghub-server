@@ -1,7 +1,9 @@
 package imagerunner
 
+import "context"
+
 type Runner interface {
-	Run(*RunRequest) (*RunResponse, error)
-	Status(*StatusRequest) (*StatusResponse, error)
-	Logs(*LogsRequest) (*LogsResponse, error)
+	Run(context.Context, *RunRequest) (*RunResponse, error)
+	Status(context.Context, *StatusRequest) (*StatusResponse, error)
+	Logs(context.Context, *LogsRequest) (*LogsResponse, error)
 }

@@ -111,11 +111,7 @@ var gitCallbackCmd = &cobra.Command{
 			var err error
 			// file paths relative to repository root
 			var filePaths []string
-			if repo.RepositoryType == "dataset" {
-				filePaths, err = getFilePaths(namespace, repoName, "", types.DatasetRepo, gs.GetRepoFileTree)
-			} else {
-				filePaths, err = getFilePaths(namespace, repoName, "", types.ModelRepo, gs.GetRepoFileTree)
-			}
+			filePaths, err = getFilePaths(namespace, repoName, "", repo.RepositoryType, gs.GetRepoFileTree)
 			if err != nil {
 				slog.Error("failed to get file names", slog.String("repo", repo.Path), slog.Any("error", err))
 				continue

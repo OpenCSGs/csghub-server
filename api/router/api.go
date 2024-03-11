@@ -175,7 +175,9 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 		// stop running space
 		spaces.POST("/:namespace/:name/stop", nil)
 		// pull space running status
-		spaces.POST("/:namespace/:name/status", nil)
+		spaces.POST("/:namespace/:name/status", spaceHandler.Status)
+		// pull space building and running logs
+		spaces.POST("/:namespace/:name/logs", spaceHandler.Logs)
 		// call space webhook api
 		spaces.POST("/:namespace/:name/webhook", nil)
 

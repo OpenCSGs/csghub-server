@@ -11,7 +11,9 @@ import (
 )
 
 type Deployer interface {
-	Deploy(s types.Space) (deployID int64, err error)
+	Deploy(ctx context.Context, s types.Space) (deployID int64, err error)
+	Status(ctx context.Context, spaceID int64) (status string, err error)
+	Logs(ctx context.Context, spaceID int64) (log string, err error)
 }
 
 var _ Deployer = (*deployer)(nil)
@@ -35,13 +37,13 @@ func NewDeployer() (Deployer, error) {
 	return d, nil
 }
 
-func (d *deployer) Deploy(s types.Space) (int64, error) {
+func (d *deployer) Deploy(ctx context.Context, s types.Space) (int64, error) {
 	deploy := &database.Deploy{
 		GitPath: s.Path,
+		// TODO:fix fields
 		// Env: s.Env,
 		// Secret: s.Secret,
 	}
-	ctx := context.Background()
 	// TODO:save deploy tasks in sql tx
 	err := d.store.CreateDeploy(ctx, deploy)
 	if err != nil {
@@ -59,4 +61,24 @@ func (d *deployer) Deploy(s types.Space) (int64, error) {
 	}
 	d.store.CreateDeployTask(ctx, runTask)
 	return deploy.ID, nil
+}
+
+func (d *deployer) Status(ctx context.Context, spaceID int64) (string, error) {
+	// get latest Deploy
+	deploy, err := d.store.GetSpaceLatestDeploy(ctx, spaceID)
+	if err != nil {
+		return "", err
+	}
+	// get status of the deploy
+	return d.m.Status(ctx, deploy.ID)
+}
+
+func (d *deployer) Logs(ctx context.Context, spaceID int64) (string, error) {
+	// get latest Deploy
+	deploy, err := d.store.GetSpaceLatestDeploy(ctx, spaceID)
+	if err != nil {
+		return "", err
+	}
+	// get logs of the deploy
+	return d.m.Logs(ctx, deploy.ID)
 }
