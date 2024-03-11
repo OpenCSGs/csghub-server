@@ -64,6 +64,7 @@ func NewModelComponent(config *config.Config) (*ModelComponent, error) {
 	if err != nil {
 		return nil, err
 	}
+	c.infer = inference.NewInferClient(config.Inference.ServerAddr)
 	return c, nil
 }
 

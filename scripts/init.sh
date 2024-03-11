@@ -72,9 +72,9 @@ fi
 
 # Create cron job
 echo "Creating cron job..."
-echo "0 23 * * * STARHUB_DATABASE_DSN=$STARHUB_DATABASE_DSN /starhub-bin/starhub logscan gitea --path /starhub-bin/logs/gitea.log >> /starhub-bin/cron.log 2>&1" | crontab 
-# Reload cron job by setting the log level
-crond -l 2
+(echo "0 23 * * * STARHUB_DATABASE_DSN=$STARHUB_DATABASE_DSN /starhub-bin/starhub logscan gitea --path /starhub-bin/logs/gitea.log >> /starhub-bin/cron.log 2>&1") | crontab -
+# Reload cron server
+service cron restart
 echo "Done."
 
 echo "Database setup..."

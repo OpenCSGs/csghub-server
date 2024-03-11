@@ -24,6 +24,8 @@ import (
 	"opencsg.com/csghub-server/common/types"
 )
 
+const ErrNotFoundMessage = "The target couldn't be found."
+
 type RepoComponent struct {
 	tc        *TagComponent
 	user      *database.UserStore
@@ -586,21 +588,21 @@ func (c *RepoComponent) SDKListFiles(ctx *gin.Context, repoType types.Repository
 	var sdkFiles []types.SDKFile
 	repo, err := c.repo.FindByPath(ctx, repoType, namespace, name)
 	if err != nil {
-		return nil, fmt.Errorf("failed to find repo, error: %w", err)
+		return nil, ErrNotFound
 	}
 
 	currentUser, exists := ctx.Get("currentUser")
 	// TODO: Use user access token to check permissions
 	if repo.Private {
 		if !exists {
-			return nil, UnauthorizedError
+			return nil, ErrUnauthorized
 		}
 		canRead, err := c.checkCurrentUserPermission(ctx, currentUser, namespace, membership.RoleRead)
 		if err != nil {
 			return nil, err
 		}
 		if !canRead {
-			return nil, UnauthorizedError
+			return nil, ErrUnauthorized
 		}
 	}
 
@@ -634,6 +636,9 @@ func (c *RepoComponent) IsLfs(ctx context.Context, req *types.GetFileReq) (bool,
 	content, err := c.git.GetRepoFileRaw(ctx, getFileRawReq)
 
 	if err != nil {
+		if err.Error() == ErrNotFoundMessage {
+			return false, ErrNotFound
+		}
 		slog.Error("failed to get %s file raw", string(req.RepoType), slog.String("namespace", req.Namespace), slog.String("name", req.Name), slog.String("path", req.Path))
 		return false, err
 	}
@@ -650,14 +655,14 @@ func (c *RepoComponent) HeadDownloadFile(ctx *gin.Context, req *types.GetFileReq
 	// TODO: Use user access token to check permissions
 	if repo.Private {
 		if !exists {
-			return nil, UnauthorizedError
+			return nil, ErrUnauthorized
 		}
 		canRead, err := c.checkCurrentUserPermission(ctx, currentUser, req.Namespace, membership.RoleRead)
 		if err != nil {
 			return nil, err
 		}
 		if !canRead {
-			return nil, UnauthorizedError
+			return nil, ErrUnauthorized
 		}
 	}
 	if req.Ref == "" {
@@ -672,6 +677,9 @@ func (c *RepoComponent) HeadDownloadFile(ctx *gin.Context, req *types.GetFileReq
 	}
 	file, err := c.git.GetRepoFileContents(ctx, getFileContentReq)
 	if err != nil {
+		if err.Error() == ErrNotFoundMessage {
+			return nil, ErrNotFound
+		}
 		return nil, fmt.Errorf("failed to download git %s repository file, error: %w", req.RepoType, err)
 	}
 	return file, nil
@@ -689,14 +697,14 @@ func (c *RepoComponent) SDKDownloadFile(ctx *gin.Context, req *types.GetFileReq)
 	// TODO: Use user access token to check permissions
 	if repo.Private {
 		if !exists {
-			return nil, "", UnauthorizedError
+			return nil, "", ErrUnauthorized
 		}
 		canRead, err := c.checkCurrentUserPermission(ctx, currentUser, req.Namespace, membership.RoleRead)
 		if err != nil {
 			return nil, "", err
 		}
 		if !canRead {
-			return nil, "", UnauthorizedError
+			return nil, "", ErrUnauthorized
 		}
 	}
 	if req.Ref == "" {
@@ -723,6 +731,9 @@ func (c *RepoComponent) SDKDownloadFile(ctx *gin.Context, req *types.GetFileReq)
 		}
 		signedUrl, err := c.s3Client.PresignedGetObject(ctx, c.lfsBucket, objectKey, ossFileExpireSeconds, reqParams)
 		if err != nil {
+			if err.Error() == ErrNotFoundMessage {
+				return nil, downloadUrl, ErrNotFound
+			}
 			return nil, downloadUrl, err
 		}
 		return nil, signedUrl.String(), nil
@@ -736,6 +747,9 @@ func (c *RepoComponent) SDKDownloadFile(ctx *gin.Context, req *types.GetFileReq)
 		}
 		reader, err := c.git.GetRepoFileReader(ctx, getFileReaderReq)
 		if err != nil {
+			if err.Error() == ErrNotFoundMessage {
+				return nil, downloadUrl, ErrNotFound
+			}
 			return nil, "", fmt.Errorf("failed to download git %s repository file, error: %w", req.RepoType, err)
 		}
 		return reader, downloadUrl, nil

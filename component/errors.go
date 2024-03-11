@@ -3,5 +3,6 @@ package component
 import "errors"
 
 var (
-	UnauthorizedError = errors.New("permission denied")
+	ErrUnauthorized = errors.New("permission denied")
+	ErrNotFound     = errors.New("not found")
 )
