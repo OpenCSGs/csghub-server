@@ -230,9 +230,14 @@ func (c *SpaceComponent) Status(ctx context.Context, namespace, name string) (st
 	s, err := c.space.FindByPath(ctx, namespace, name)
 	if err != nil {
 		slog.Error("can't get space status", slog.Any("error", err), slog.String("namespace", namespace), slog.String("name", name))
-		return "", err
+		return SpaceStatusUnkown, err
 	}
-	return c.deployer.Status(ctx, s.ID)
+	code, err := c.deployer.Status(ctx, s.ID)
+	if err != nil {
+		slog.Error("error happen when get space status", slog.Any("error", err), slog.String("namespace", namespace), slog.String("name", name))
+		return SpaceStatusUnkown, err
+	}
+	return c.statusCodeToString(code), nil
 }
 
 func (c *SpaceComponent) Logs(ctx context.Context, namespace, name string) (string, error) {
@@ -243,3 +248,50 @@ func (c *SpaceComponent) Logs(ctx context.Context, namespace, name string) (stri
 	}
 	return c.monitor.Logs(ctx, s.ID)
 }
+
+func (c *SpaceComponent) statusCodeToString(code int) string {
+	// DeployBuildPending    = 10
+	// DeployBuildInProgress = 11
+	// DeployBuildFailed     = 12
+	// DeployBuildSucceed    = 13
+	//
+	// DeployPrepareToRun = 20
+	// DeployStartUp      = 21
+	// DeployRunning      = 22
+	// DeployRunTimeError = 23
+
+	// simplified status for frontend show
+	var txt string
+	switch code {
+	case 10:
+		txt = SpaceStatusEmpty
+	case 11:
+		txt = SpaceStatusBuilding
+	case 12:
+		txt = SpaceStatusBuildFailed
+	case 13:
+		txt = SpaceStatusDeploying
+	case 20:
+		txt = SpaceStatusDeploying
+	case 21:
+		txt = SpaceStatusDeploying
+	case 22:
+		txt = SpaceStatusRunning
+	case 23:
+		txt = SpaceStatusRuntimeError
+	default:
+		txt = SpaceStatusUnkown
+	}
+	return txt
+}
+
+const (
+	// SpaceStatusEmpty is the init status by default
+	SpaceStatusEmpty        = ""
+	SpaceStatusBuilding     = "Building"
+	SpaceStatusBuildFailed  = "BuildFailed"
+	SpaceStatusDeploying    = "Deploying"
+	SpaceStatusRunning      = "Running"
+	SpaceStatusRuntimeError = "RuntimeError"
+	SpaceStatusUnkown       = "Unkown"
+)

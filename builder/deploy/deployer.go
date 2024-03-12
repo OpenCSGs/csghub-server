@@ -12,7 +12,7 @@ import (
 
 type Deployer interface {
 	Deploy(ctx context.Context, s types.Space) (deployID int64, err error)
-	Status(ctx context.Context, spaceID int64) (status string, err error)
+	Status(ctx context.Context, spaceID int64) (status int, err error)
 	Logs(ctx context.Context, spaceID int64) (log string, err error)
 }
 
@@ -63,14 +63,13 @@ func (d *deployer) Deploy(ctx context.Context, s types.Space) (int64, error) {
 	return deploy.ID, nil
 }
 
-func (d *deployer) Status(ctx context.Context, spaceID int64) (string, error) {
+func (d *deployer) Status(ctx context.Context, spaceID int64) (int, error) {
 	// get latest Deploy
 	deploy, err := d.store.GetSpaceLatestDeploy(ctx, spaceID)
 	if err != nil {
-		return "", err
+		return -1, err
 	}
-	// get status of the deploy
-	return d.m.Status(ctx, deploy.ID)
+	return deploy.Status, nil
 }
 
 func (d *deployer) Logs(ctx context.Context, spaceID int64) (string, error) {
