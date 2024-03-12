@@ -2725,6 +2725,104 @@ const docTemplate = `{
                 }
             }
         },
+        "/spaces/{namespace}/{name}/logs": {
+            "get": {
+                "security": [
+                    {
+                        "JWT token": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Space"
+                ],
+                "summary": "get space logs",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "namespace",
+                        "name": "namespace",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "name",
+                        "name": "name",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            }
+        },
+        "/spaces/{namespace}/{name}/status": {
+            "get": {
+                "security": [
+                    {
+                        "JWT token": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Space"
+                ],
+                "summary": "get space status",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "namespace",
+                        "name": "namespace",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "name",
+                        "name": "name",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            }
+        },
         "/tags": {
             "get": {
                 "security": [
@@ -4255,49 +4353,6 @@ const docTemplate = `{
                 }
             }
         },
-        "types.File": {
-            "type": "object",
-            "properties": {
-                "commit": {
-                    "$ref": "#/definitions/types.Commit"
-                },
-                "content": {
-                    "type": "string"
-                },
-                "last_commit_sha": {
-                    "type": "string"
-                },
-                "lfs": {
-                    "type": "boolean"
-                },
-                "lfs_relative_path": {
-                    "description": "relative path in lfs storage",
-                    "type": "string"
-                },
-                "mode": {
-                    "type": "string"
-                },
-                "name": {
-                    "type": "string"
-                },
-                "path": {
-                    "type": "string"
-                },
-                "sha": {
-                    "type": "string"
-                },
-                "size": {
-                    "type": "integer"
-                },
-                "type": {
-                    "type": "string"
-                },
-                "url": {
-                    "description": "URL to browse the file",
-                    "type": "string"
-                }
-            }
-        },
         "types.ListByPathReq": {
             "type": "object",
             "properties": {
@@ -4496,6 +4551,10 @@ const docTemplate = `{
         "types.Space": {
             "type": "object",
             "properties": {
+                "branch": {
+                    "type": "string",
+                    "example": ""
+                },
                 "cover_image_url": {
                     "type": "string"
                 },

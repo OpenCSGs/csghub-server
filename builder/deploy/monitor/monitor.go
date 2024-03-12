@@ -34,6 +34,7 @@ type DeployMonitor struct {
 
 func NewMonitor() Monitor {
 	return &DeployMonitor{
+		store:      database.NewDeployTaskStore(),
 		completed:  make(chan int64, 10),
 		interval:   10 * time.Second,
 		reloadLock: &sync.RWMutex{},

@@ -601,35 +601,6 @@ definitions:
         example: org display name
         type: string
     type: object
-  types.File:
-    properties:
-      commit:
-        $ref: '#/definitions/types.Commit'
-      content:
-        type: string
-      last_commit_sha:
-        type: string
-      lfs:
-        type: boolean
-      lfs_relative_path:
-        description: relative path in lfs storage
-        type: string
-      mode:
-        type: string
-      name:
-        type: string
-      path:
-        type: string
-      sha:
-        type: string
-      size:
-        type: integer
-      type:
-        type: string
-      url:
-        description: URL to browse the file
-        type: string
-    type: object
   types.ListByPathReq:
     properties:
       paths:
@@ -763,6 +734,9 @@ definitions:
     type: object
   types.Space:
     properties:
+      branch:
+        example: ""
+        type: string
       cover_image_url:
         type: string
       created_at:
@@ -2686,6 +2660,68 @@ paths:
       security:
       - JWT token: []
       summary: Call space api
+      tags:
+      - Space
+  /spaces/{namespace}/{name}/logs:
+    get:
+      consumes:
+      - application/json
+      parameters:
+      - description: namespace
+        in: path
+        name: namespace
+        required: true
+        type: string
+      - description: name
+        in: path
+        name: name
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - JWT token: []
+      summary: get space logs
+      tags:
+      - Space
+  /spaces/{namespace}/{name}/status:
+    get:
+      consumes:
+      - application/json
+      parameters:
+      - description: namespace
+        in: path
+        name: namespace
+        required: true
+        type: string
+      - description: name
+        in: path
+        name: name
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - JWT token: []
+      summary: get space status
       tags:
       - Space
   /tags:

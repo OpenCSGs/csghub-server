@@ -108,8 +108,8 @@ func (s *DeployTaskStore) CreateMonitorTask(ctx context.Context, monitorTask *Mo
 }
 
 func (s *DeployTaskStore) GetAllMonitorTasks(ctx context.Context) ([]*MonitorTask, error) {
-	var monitorTasks []*MonitorTask
-	err := s.db.Core.NewSelect().Model(&monitorTasks).Scan(ctx)
+	monitorTasks := make([]*MonitorTask, 0)
+	err := s.db.Core.NewSelect().Model((*MonitorTask)(nil)).Scan(ctx, &monitorTasks)
 	return monitorTasks, err
 }
 
