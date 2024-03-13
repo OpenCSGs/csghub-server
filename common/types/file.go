@@ -3,16 +3,17 @@ package types
 type File struct {
 	Name   string `json:"name"`
 	Type   string `json:"type"`
-	Lfs    bool   `json:"lfs"`
-	Size   int    `json:"size"`
+	Size   int64  `json:"size"`
 	Commit Commit `json:"commit"`
 	Path   string `json:"path"`
 	Mode   string `json:"mode"`
 	SHA    string `json:"sha"`
-	//URL to browse the file
-	URL     string `json:"url"`
-	Content string `json:"content"`
-	//relative path in lfs storage
+	// URL to browse the file
+	URL            string `json:"url"`
+	Content        string `json:"content"`
+	Lfs            bool   `json:"lfs"`
+	LfsPointerSize int    `json:"lfs_pointer_size"`
+	// relative path in lfs storage
 	LfsRelativePath string `json:"lfs_relative_path"`
 	LastCommitSHA   string `json:"last_commit_sha"`
 }
@@ -31,8 +32,7 @@ type CreateFileReq struct {
 	RepoType  RepositoryType
 }
 
-type CreateFileResp struct {
-}
+type CreateFileResp struct{}
 
 type UpdateFileReq struct {
 	Username   string `json:"username"`
@@ -46,7 +46,7 @@ type UpdateFileReq struct {
 
 	NameSpace string `json:"-"`
 	Name      string `json:"-"`
-	//new file path, it will be different from OriginPath if file renamed
+	// new file path, it will be different from OriginPath if file renamed
 	FilePath string `json:"-"`
 	RepoType RepositoryType
 }

@@ -508,8 +508,9 @@ func (h *RepoHandler) HeadSDKDownload(ctx *gin.Context) {
 		return
 	}
 
-	slog.Info("Head download repo file succeed", slog.String("repo_type", string(req.RepoType)), slog.String("name", name), slog.String("path", req.Path), slog.String("ref", req.Ref), slog.String("contentLength", strconv.Itoa(file.Size)))
-	ctx.Header("Content-Length", strconv.Itoa(file.Size))
+	slog.Info("Head download repo file succeed", slog.String("repo_type", string(req.RepoType)), slog.String("name", name), slog.String("path", req.Path), slog.String("ref", req.Ref),
+		slog.Int64("contentLength", file.Size))
+	ctx.Header("Content-Length", strconv.Itoa(int(file.Size)))
 	ctx.Header("X-Repo-Commit", file.SHA)
 	ctx.Header("ETag", file.SHA)
 	ctx.Status(http.StatusOK)
