@@ -47,9 +47,10 @@ func (c *Client) getRepoDir(namespace, name, ref, path string) (files []*types.F
 			Type:            entry.Type,
 			Lfs:             entry.IsLfs,
 			LfsRelativePath: entry.LfsRelativePath,
-			Size:            int(entry.Size),
+			Size:            entry.Size,
 			Commit: types.Commit{
-				Message: entry.CommitMsg, ID: entry.SHA, CommitterDate: entry.CommitterDate.String()},
+				Message: entry.CommitMsg, ID: entry.SHA, CommitterDate: entry.CommitterDate.String(),
+			},
 			Mode:          entry.Mode,
 			SHA:           entry.SHA,
 			URL:           entry.URL,
@@ -339,24 +340,27 @@ func (c *Client) getFileContents(owner, repo, ref, path string) (*types.File, er
 	f := &types.File{
 		Name:          fileContent.Name,
 		Type:          fileContent.Type,
-		Size:          int(fileContent.Size),
+		Size:          fileContent.Size,
 		SHA:           fileContent.SHA,
 		Path:          fileContent.Path,
 		Content:       content,
 		LastCommitSHA: fileContent.LastCommitSHA,
 	}
 
-	//base64 decode
+	// base64 decode
 	contentDecoded, _ := base64.StdEncoding.DecodeString(f.Content)
 	lfsPointer, err := ReadPointerFromBuffer(contentDecoded)
-	//not a lfs pointer, return file content directly
+	// not a lfs pointer, return file content directly
 	if err != nil || !lfsPointer.IsValid() {
 		slog.Info("Failed to parse lsf pointer", slog.Any("error", err), slog.Bool("isValidPointer", lfsPointer.IsValid()))
 		return f, nil
 	}
 
+	f.Lfs = true
 	f.LfsRelativePath = lfsPointer.RelativePath()
-	f.Size = int(lfsPointer.Size)
+	// file content is the lfs pointer if the file is a lfs file
+	f.LfsPointerSize = int(fileContent.Size)
+	f.Size = lfsPointer.Size
 	return f, nil
 }
 
