@@ -572,6 +572,8 @@ definitions:
         type: string
       downloads:
         type: integer
+      name:
+        type: string
       nickname:
         type: string
       path:
@@ -675,6 +677,8 @@ definitions:
         type: string
       downloads:
         type: integer
+      name:
+        type: string
       nickname:
         type: string
       path:

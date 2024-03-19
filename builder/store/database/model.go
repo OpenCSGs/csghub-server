@@ -89,7 +89,6 @@ func (s *ModelStore) ByUsername(ctx context.Context, username string, per, page 
 		Offset((page - 1) * per)
 
 	err = query.Scan(ctx)
-
 	if err != nil {
 		return
 	}
@@ -116,7 +115,6 @@ func (s *ModelStore) ByOrgPath(ctx context.Context, namespace string, per, page 
 		Offset((page - 1) * per)
 
 	err = query.Scan(ctx, &models)
-
 	if err != nil {
 		return
 	}
@@ -208,5 +206,15 @@ func (s *ModelStore) ListByPath(ctx context.Context, paths []string) ([]Model, e
 	if err != nil {
 		return nil, fmt.Errorf("failed to find models by path,error: %w", err)
 	}
-	return models, nil
+
+	var sortedModels []Model
+	for _, path := range paths {
+		for _, m := range models {
+			if m.Repository.Path == path {
+				sortedModels = append(sortedModels, m)
+			}
+		}
+	}
+
+	return sortedModels, nil
 }
