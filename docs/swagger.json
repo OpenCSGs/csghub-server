@@ -4200,6 +4200,9 @@
                 "downloads": {
                     "type": "integer"
                 },
+                "name": {
+                    "type": "string"
+                },
                 "nickname": {
                     "type": "string"
                 },
@@ -4356,6 +4359,9 @@
                 },
                 "downloads": {
                     "type": "integer"
+                },
+                "name": {
+                    "type": "string"
                 },
                 "nickname": {
                     "type": "string"
