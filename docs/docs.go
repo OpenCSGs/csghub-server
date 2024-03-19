@@ -4211,6 +4211,9 @@ const docTemplate = `{
                 "downloads": {
                     "type": "integer"
                 },
+                "name": {
+                    "type": "string"
+                },
                 "nickname": {
                     "type": "string"
                 },
@@ -4367,6 +4370,9 @@ const docTemplate = `{
                 },
                 "downloads": {
                     "type": "integer"
+                },
+                "name": {
+                    "type": "string"
                 },
                 "nickname": {
                     "type": "string"
