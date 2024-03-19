@@ -15,7 +15,7 @@ COPY scripts/init.sh /starhub-bin/scripts/
 COPY builder/store/database/seeds/. /starhub-bin/builder/store/database/seeds/
 RUN chmod +x /starhub-bin/scripts/init.sh
 
-RUN sed -i "s@/deb.debian.org@/mirrors.aliyun.com@g" /etc/apt/sources.list  && \
+RUN sed -i "s@/deb.debian.org@/mirrors.cloud.aliyuncs.com@g" /etc/apt/sources.list  && \
     apt-get update  && apt-get install -y cron && rm -rf /var/lib/apt/lists/*
 EXPOSE 8080
 ENTRYPOINT ["/starhub-bin/scripts/init.sh"]
