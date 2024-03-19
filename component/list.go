@@ -30,11 +30,27 @@ func (c *ListComponent) ListModelsByPath(ctx context.Context, req *types.ListByP
 		return nil, err
 	}
 	for _, model := range models {
+		var tags []types.RepoTag
+		for _, tag := range model.Repository.Tags {
+			tags = append(tags, types.RepoTag{
+				Name:      tag.Name,
+				Category:  tag.Category,
+				Group:     tag.Group,
+				BuiltIn:   tag.BuiltIn,
+				ShowName:  tag.ShowName,
+				CreatedAt: tag.CreatedAt,
+				UpdatedAt: tag.UpdatedAt,
+			})
+		}
 		modelResp = append(modelResp, &types.ModelResp{
-			Path:      model.Repository.Path,
-			Downloads: model.Repository.DownloadCount,
-			UpdatedAt: model.UpdatedAt,
-			Private:   model.Repository.Private,
+			Name:        model.Repository.Name,
+			Path:        model.Repository.Path,
+			Downloads:   model.Repository.DownloadCount,
+			UpdatedAt:   model.UpdatedAt,
+			Private:     model.Repository.Private,
+			Nickname:    model.Repository.Nickname,
+			Description: model.Repository.Description,
+			Tags:        tags,
 		})
 	}
 
@@ -50,11 +66,27 @@ func (c *ListComponent) ListDatasetsByPath(ctx context.Context, req *types.ListB
 		return nil, err
 	}
 	for _, dataset := range datasets {
+		var tags []types.RepoTag
+		for _, tag := range dataset.Repository.Tags {
+			tags = append(tags, types.RepoTag{
+				Name:      tag.Name,
+				Category:  tag.Category,
+				Group:     tag.Group,
+				BuiltIn:   tag.BuiltIn,
+				ShowName:  tag.ShowName,
+				CreatedAt: tag.CreatedAt,
+				UpdatedAt: tag.UpdatedAt,
+			})
+		}
 		datasetResp = append(datasetResp, &types.ModelResp{
-			Path:      dataset.Repository.Path,
-			Downloads: dataset.Repository.DownloadCount,
-			UpdatedAt: dataset.UpdatedAt,
-			Private:   dataset.Repository.Private,
+			Name:        dataset.Repository.Name,
+			Path:        dataset.Repository.Path,
+			Downloads:   dataset.Repository.DownloadCount,
+			UpdatedAt:   dataset.UpdatedAt,
+			Private:     dataset.Repository.Private,
+			Nickname:    dataset.Repository.Nickname,
+			Description: dataset.Repository.Description,
+			Tags:        tags,
 		})
 	}
 	return datasetResp, nil
