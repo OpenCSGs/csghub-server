@@ -4205,14 +4205,26 @@ const docTemplate = `{
         "types.DatasetResp": {
             "type": "object",
             "properties": {
+                "description": {
+                    "type": "string"
+                },
                 "downloads": {
                     "type": "integer"
+                },
+                "nickname": {
+                    "type": "string"
                 },
                 "path": {
                     "type": "string"
                 },
                 "private": {
                     "type": "boolean"
+                },
+                "tags": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/types.RepoTag"
+                    }
                 },
                 "updated_at": {
                     "type": "string"
@@ -4350,14 +4362,26 @@ const docTemplate = `{
         "types.ModelResp": {
             "type": "object",
             "properties": {
+                "description": {
+                    "type": "string"
+                },
                 "downloads": {
                     "type": "integer"
+                },
+                "nickname": {
+                    "type": "string"
                 },
                 "path": {
                     "type": "string"
                 },
                 "private": {
                     "type": "boolean"
+                },
+                "tags": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/types.RepoTag"
+                    }
                 },
                 "updated_at": {
                     "type": "string"

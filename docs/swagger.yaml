@@ -568,12 +568,20 @@ definitions:
     type: object
   types.DatasetResp:
     properties:
+      description:
+        type: string
       downloads:
         type: integer
+      nickname:
+        type: string
       path:
         type: string
       private:
         type: boolean
+      tags:
+        items:
+          $ref: '#/definitions/types.RepoTag'
+        type: array
       updated_at:
         type: string
     type: object
@@ -663,12 +671,20 @@ definitions:
     type: object
   types.ModelResp:
     properties:
+      description:
+        type: string
       downloads:
         type: integer
+      nickname:
+        type: string
       path:
         type: string
       private:
         type: boolean
+      tags:
+        items:
+          $ref: '#/definitions/types.RepoTag'
+        type: array
       updated_at:
         type: string
     type: object
