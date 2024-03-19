@@ -182,5 +182,16 @@ func (s *DatasetStore) ListByPath(ctx context.Context, paths []string) ([]Datase
 	if err != nil {
 		return nil, fmt.Errorf("failed to find models by path,error: %w", err)
 	}
-	return datasets, nil
+
+	var sortedDatasets []Dataset
+	for _, path := range paths {
+		for _, ds := range datasets {
+			if ds.Repository.Path == path {
+				sortedDatasets = append(sortedDatasets, ds)
+			}
+		}
+	}
+
+	datasets = nil
+	return sortedDatasets, nil
 }
