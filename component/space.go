@@ -2,9 +2,13 @@ package component
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
+	"time"
 
+	"opencsg.com/csghub-server/builder/deploy"
+	"opencsg.com/csghub-server/builder/git/gitserver"
 	"opencsg.com/csghub-server/builder/git/membership"
 	"opencsg.com/csghub-server/builder/proxy"
 	"opencsg.com/csghub-server/builder/store/database"
@@ -22,20 +26,53 @@ func NewSpaceComponent(config *config.Config) (*SpaceComponent, error) {
 	if err != nil {
 		return nil, err
 	}
+	c.deployer = deploy.NewDeployer()
 	return c, nil
 }
 
 type SpaceComponent struct {
 	*RepoComponent
-	space  *database.SpaceStore
-	rproxy *proxy.ReverseProxy
-	sss    *database.SpaceSdkStore
-	srs    *database.SpaceResourceStore
+	space    *database.SpaceStore
+	rproxy   *proxy.ReverseProxy
+	sss      *database.SpaceSdkStore
+	srs      *database.SpaceResourceStore
+	deployer deploy.Deployer
 }
 
 func (c *SpaceComponent) Create(ctx context.Context, req types.CreateSpaceReq) (*types.Space, error) {
+	var nickname string
+	namespace, err := c.namespace.FindByPath(ctx, req.Namespace)
+	if err != nil {
+		return nil, errors.New("namespace does not exist")
+	}
+
+	user, err := c.user.FindByUsername(ctx, req.Username)
+	if err != nil {
+		return nil, errors.New("user does not exist")
+	}
+
+	if namespace.NamespaceType == database.OrgNamespace {
+		canWrite, err := c.checkCurrentUserPermission(ctx, req.Username, req.Namespace, membership.RoleWrite)
+		if err != nil {
+			return nil, err
+		}
+		if !canWrite {
+			return nil, errors.New("users do not have permission to create models in this organization")
+		}
+	} else {
+		if namespace.Path != user.Username {
+			return nil, errors.New("users do not have permission to create models in this namespace")
+		}
+	}
+
+	if req.Nickname != "" {
+		nickname = req.Nickname
+	} else {
+		nickname = req.Name
+	}
+	req.Nickname = nickname
 	req.RepoType = types.SpaceRepo
-	req.Readme = "Please introduce your space!"
+	req.Readme = generateReadmeData(req.License)
 	_, dbRepo, err := c.CreateRepo(ctx, req.CreateRepoReq)
 	if err != nil {
 		return nil, err
@@ -57,6 +94,22 @@ func (c *SpaceComponent) Create(ctx context.Context, req types.CreateSpaceReq) (
 		return nil, fmt.Errorf("fail to create space in db, error: %w", err)
 	}
 
+	// Create README.md file
+	err = c.git.CreateRepoFile(buildCreateFileReq(&types.CreateFileParams{
+		Username:  user.Username,
+		Email:     user.Email,
+		Message:   initCommitMessage,
+		Branch:    req.DefaultBranch,
+		Content:   req.Readme,
+		NewBranch: req.DefaultBranch,
+		Namespace: req.Namespace,
+		Name:      req.Name,
+		FilePath:  readmeFileName,
+	}, types.SpaceRepo))
+	if err != nil {
+		return nil, fmt.Errorf("failed to create README.md file, cause: %w", err)
+	}
+
 	space := &types.Space{
 		Creator:       req.Username,
 		Namespace:     req.Namespace,
@@ -69,13 +122,65 @@ func (c *SpaceComponent) Create(ctx context.Context, req types.CreateSpaceReq) (
 		Hardware:      req.Hardware,
 		Secrets:       req.Secrets,
 		CoverImageUrl: resSpace.CoverImageUrl,
-		// TODO: get running status and endpoint from inference service
 		Endpoint:      "",
-		RunningStatus: "",
+		Status:        "",
 		Private:       req.Private,
 		CreatedAt:     resSpace.CreatedAt,
 	}
 	return space, nil
+}
+
+func (c *SpaceComponent) Show(ctx context.Context, namespace, name, current_user string) (*types.Space, error) {
+	var tags []types.RepoTag
+	space, err := c.space.FindByPath(ctx, namespace, name)
+	if err != nil {
+		return nil, fmt.Errorf("failed to find space, error: %w", err)
+	}
+
+	if space.Repository.Private {
+		if space.Repository.User.Username != current_user {
+			return nil, fmt.Errorf("failed to find space, error: %w", errors.New("the private space is not accessible to the current user"))
+		}
+	}
+
+	var status string
+	if c.HasAppFile(ctx, namespace, name) {
+		// get model rue status
+		ctxTimeout, cancel := context.WithTimeout(ctx, 2*time.Second)
+		defer cancel()
+		status, _ = c.status(ctxTimeout, space)
+
+	} else {
+		status = "NoAppFile"
+	}
+
+	resModel := &types.Space{
+		ID:            space.ID,
+		Name:          space.Repository.Name,
+		Nickname:      space.Repository.Nickname,
+		Description:   space.Repository.Description,
+		Likes:         space.Repository.Likes,
+		Path:          space.Repository.Path,
+		DefaultBranch: space.Repository.DefaultBranch,
+		Repository: types.Repository{
+			HTTPCloneURL: space.Repository.HTTPCloneURL,
+			SSHCloneURL:  space.Repository.SSHCloneURL,
+		},
+		Private: space.Repository.Private,
+		Tags:    tags,
+		User: types.User{
+			Username: space.Repository.User.Username,
+			Nickname: space.Repository.User.Name,
+			Email:    space.Repository.User.Email,
+		},
+		CreatedAt: space.CreatedAt,
+		UpdatedAt: space.UpdatedAt,
+		Status:    status,
+		Endpoint:  fmt.Sprintf("/%s/%s/api/", namespace, name),
+		Hardware:  space.Hardware,
+	}
+
+	return resModel, nil
 }
 
 func (c *SpaceComponent) Update(ctx context.Context, req *types.UpdateSpaceReq) (*types.Space, error) {
@@ -96,6 +201,7 @@ func (c *SpaceComponent) Update(ctx context.Context, req *types.UpdateSpaceReq) 
 	}
 
 	resDataset := &types.Space{
+		ID:            space.ID,
 		Name:          space.Repository.Name,
 		Path:          space.Repository.Path,
 		Sdk:           space.Sdk,
@@ -165,14 +271,10 @@ func (c *SpaceComponent) Index(ctx context.Context, username, search, sort strin
 }
 
 func (c *SpaceComponent) AllowCallApi(ctx context.Context, namespace, name, username string) (bool, error) {
-	repo, err := c.repo.FindByPath(ctx, types.SpaceRepo, namespace, name)
-	if err != nil {
-		return false, fmt.Errorf("failed to find repo, error: %w", err)
+	if username == "" {
+		return false, errors.New("user not found, please login first")
 	}
-	if !repo.Private {
-		return true, nil
-	}
-	return c.checkCurrentUserPermission(ctx, username, namespace, membership.RoleRead)
+	return c.AllowReadAccess(ctx, namespace, name, username)
 }
 
 func (c *SpaceComponent) Delete(ctx context.Context, namespace, name, currentUser string) error {
@@ -198,3 +300,133 @@ func (c *SpaceComponent) Delete(ctx context.Context, namespace, name, currentUse
 	}
 	return nil
 }
+
+func (c *SpaceComponent) Deploy(ctx context.Context, namespace, name string) (int64, error) {
+	s, err := c.space.FindByPath(ctx, namespace, name)
+	if err != nil {
+		slog.Error("can't deploy space", slog.Any("error", err), slog.String("namespace", namespace), slog.String("name", name))
+		return -1, err
+	}
+
+	return c.deployer.Deploy(ctx, types.Space{
+		ID:            s.ID,
+		Creator:       s.Repository.User.Name,
+		Namespace:     s.Repository.Name,
+		Name:          s.Repository.Name,
+		Path:          s.Repository.GitPath,
+		Sdk:           s.Sdk,
+		SdkVersion:    s.SdkVersion,
+		CoverImageUrl: s.CoverImageUrl,
+		Template:      s.Template,
+		Env:           s.Env,
+		Hardware:      s.Hardware,
+		Secrets:       s.Secrets,
+	})
+}
+
+func (c *SpaceComponent) Stop(ctx context.Context, namespace, name string) error {
+	s, err := c.space.FindByPath(ctx, namespace, name)
+	if err != nil {
+		slog.Error("can't stop space", slog.Any("error", err), slog.String("namespace", namespace), slog.String("name", name))
+		return err
+	}
+
+	return c.deployer.Stop(ctx, s.ID)
+}
+
+func (c *SpaceComponent) status(ctx context.Context, s *database.Space) (string, error) {
+	code, err := c.deployer.Status(ctx, s.ID)
+	if err != nil {
+		slog.Error("error happen when get space status", slog.Any("error", err), slog.String("path", s.Repository.Path))
+		return SpaceStatusUnkown, err
+	}
+	return c.statusCodeToString(code), nil
+}
+
+func (c *SpaceComponent) Status(ctx context.Context, namespace, name string) (string, error) {
+	s, err := c.space.FindByPath(ctx, namespace, name)
+	if err != nil {
+		slog.Error("can't get space status", slog.Any("error", err), slog.String("namespace", namespace), slog.String("name", name))
+		return SpaceStatusUnkown, err
+	}
+	return c.status(ctx, s)
+}
+
+func (c *SpaceComponent) Logs(ctx context.Context, namespace, name string) (*deploy.MultiLogReader, error) {
+	s, err := c.space.FindByPath(ctx, namespace, name)
+	if err != nil {
+		slog.Error("can't get space logs", slog.Any("error", err), slog.String("namespace", namespace), slog.String("name", name))
+		return nil, err
+	}
+	return c.deployer.Logs(ctx, s.ID)
+}
+
+func (c *SpaceComponent) HasAppFile(ctx context.Context, namespace, name string) bool {
+	var req gitserver.GetRepoInfoByPathReq
+	req.Namespace = namespace
+	req.Name = name
+	// root dir
+	req.Path = ""
+	req.RepoType = types.SpaceRepo
+	files, err := c.git.GetRepoFileTree(ctx, req)
+	if err != nil {
+		slog.Error("check repo app file existence failed", slog.Any("eror", err))
+		return false
+	}
+
+	for _, f := range files {
+		if f.Type == "file" && f.Path == "app.py" {
+			return true
+		}
+	}
+
+	slog.Info("space has not app file", slog.String("namespace", namespace), slog.String("name", name))
+	return false
+}
+
+func (c *SpaceComponent) statusCodeToString(code int) string {
+	// DeployBuildPending    = 10
+	// DeployBuildInProgress = 11
+	// DeployBuildFailed     = 12
+	// DeployBuildSucceed    = 13
+	//
+	// DeployPrepareToRun = 20
+	// DeployStartUp      = 21
+	// DeployRunning      = 22
+	// DeployRunTimeError = 23
+
+	// simplified status for frontend show
+	var txt string
+	switch code {
+	case 10:
+		txt = SpaceStatusEmpty
+	case 11:
+		txt = SpaceStatusBuilding
+	case 12:
+		txt = SpaceStatusBuildFailed
+	case 13:
+		txt = SpaceStatusDeploying
+	case 20:
+		txt = SpaceStatusDeploying
+	case 21:
+		txt = SpaceStatusDeploying
+	case 22:
+		txt = SpaceStatusRunning
+	case 23:
+		txt = SpaceStatusRuntimeError
+	default:
+		txt = SpaceStatusUnkown
+	}
+	return txt
+}
+
+const (
+	// SpaceStatusEmpty is the init status by default
+	SpaceStatusEmpty        = ""
+	SpaceStatusBuilding     = "Building"
+	SpaceStatusBuildFailed  = "BuildFailed"
+	SpaceStatusDeploying    = "Deploying"
+	SpaceStatusRunning      = "Running"
+	SpaceStatusRuntimeError = "RuntimeError"
+	SpaceStatusUnkown       = "Unkown"
+)

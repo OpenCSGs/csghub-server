@@ -61,10 +61,7 @@ func (s *SpaceStore) PublicToUser(ctx context.Context, userID int64, search, sor
 	query := s.db.Operator.Core.
 		NewSelect().
 		Model(&spaces).
-		Relation("Repository").
-		Relation("Resource").
-		Relation("Sdk")
-		// Relation("User")
+		Relation("Repository")
 
 	if userID > 0 {
 		query = query.Where("repository.private = ? or repository.user_id = ?", false, userID)
@@ -118,4 +115,61 @@ func (s *SpaceStore) Delete(ctx context.Context, input Space) error {
 		return fmt.Errorf("delete space in tx failed,error:%w", err)
 	}
 	return nil
+}
+
+func (s *SpaceStore) GetSpaceByID(ctx context.Context, id int64) (*Space, error) {
+	space := new(Space)
+	return space, s.db.Core.NewSelect().Model(space).Relation("Repository").Where("space.id = ?", id).Scan(ctx)
+}
+
+func (s *SpaceStore) ByUsername(ctx context.Context, username string, per, page int, onlyPublic bool) (spaces []Space, total int, err error) {
+	query := s.db.Operator.Core.
+		NewSelect().
+		Model(&spaces).
+		Relation("Repository.Tags").
+		Relation("Repository.User").
+		Where("repository.path like ?", fmt.Sprintf("%s/%%", username))
+
+	if onlyPublic {
+		query = query.Where("repository.private = ?", false)
+	}
+	query = query.Order("space.created_at DESC").
+		Limit(per).
+		Offset((page - 1) * per)
+
+	err = query.Scan(ctx)
+	if err != nil {
+		return
+	}
+	total, err = query.Count(ctx)
+	if err != nil {
+		return
+	}
+	return
+}
+
+func (s *SpaceStore) ByOrgPath(ctx context.Context, namespace string, per, page int, onlyPublic bool) (spaces []Space, total int, err error) {
+	query := s.db.Operator.Core.
+		NewSelect().
+		Model(&spaces).
+		Relation("Repository.Tags").
+		Relation("Repository.User").
+		Where("repository.path like ?", fmt.Sprintf("%s/%%", namespace))
+
+	if onlyPublic {
+		query = query.Where("repository.private = ?", false)
+	}
+	query = query.Order("space.created_at DESC").
+		Limit(per).
+		Offset((page - 1) * per)
+
+	err = query.Scan(ctx, &spaces)
+	if err != nil {
+		return
+	}
+	total, err = query.Count(ctx)
+	if err != nil {
+		return
+	}
+	return
 }

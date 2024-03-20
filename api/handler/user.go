@@ -172,3 +172,85 @@ func (h *UserHandler) Models(ctx *gin.Context) {
 	}
 	ctx.JSON(http.StatusOK, respData)
 }
+
+// GetUserCodes godoc
+// @Security     ApiKey
+// @Summary      Get user codes
+// @Description  get user codes
+// @Tags         User
+// @Accept       json
+// @Produce      json
+// @Param        username path string true "username"
+// @Success      200  {object}  types.ResponseWithTotal{data=[]types.Code,total=int} "OK"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
+// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Router       /user/{username}/codes [get]
+func (h *UserHandler) Codes(ctx *gin.Context) {
+	var req types.UserDatasetsReq
+	per, page, err := common.GetPerAndPageFromContext(ctx)
+	if err != nil {
+		slog.Error("Bad request format of page and per", "error", err)
+		httpbase.BadRequest(ctx, err.Error())
+		return
+	}
+
+	req.Owner = ctx.Param("username")
+	req.CurrentUser = ctx.Query("current_user")
+	req.Page = page
+	req.PageSize = per
+	ms, total, err := h.c.Codes(ctx, &req)
+	if err != nil {
+		slog.Error("Failed to gat user codes", slog.Any("error", err))
+		httpbase.ServerError(ctx, err)
+		return
+	}
+
+	slog.Info("Get user codes succeed", slog.String("user", req.Owner))
+
+	respData := gin.H{
+		"message": "OK",
+		"data":    ms,
+		"total":   total,
+	}
+	ctx.JSON(http.StatusOK, respData)
+}
+
+// GetUserSpaces godoc
+// @Security     ApiKey
+// @Summary      Get user spaces
+// @Tags         User
+// @Accept       json
+// @Produce      json
+// @Param        username path string true "username"
+// @Success      200  {object}  types.ResponseWithTotal{data=[]types.Space,total=int} "OK"
+// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
+// @Router       /user/{username}/spaces [get]
+func (h *UserHandler) Spaces(ctx *gin.Context) {
+	var req types.UserDatasetsReq
+	per, page, err := common.GetPerAndPageFromContext(ctx)
+	if err != nil {
+		slog.Error("Bad request format of page and per", "error", err)
+		httpbase.BadRequest(ctx, err.Error())
+		return
+	}
+
+	req.Owner = ctx.Param("username")
+	req.CurrentUser = ctx.Query("current_user")
+	req.Page = page
+	req.PageSize = per
+	ms, total, err := h.c.Spaces(ctx, &req)
+	if err != nil {
+		slog.Error("Failed to gat user space", slog.Any("error", err))
+		httpbase.ServerError(ctx, err)
+		return
+	}
+
+	respData := gin.H{
+		"message": "OK",
+		"data":    ms,
+		"total":   total,
+	}
+
+	ctx.JSON(http.StatusOK, respData)
+}
