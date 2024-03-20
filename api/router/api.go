@@ -3,6 +3,7 @@ package router
 import (
 	"fmt"
 
+	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	swaggerFiles "github.com/swaggo/files"
 	ginSwagger "github.com/swaggo/gin-swagger"
@@ -15,6 +16,12 @@ import (
 
 func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 	r := gin.New()
+	r.Use(cors.New(cors.Config{
+		AllowOrigins:     []string{"http://localhost:3000", "https://portal-stg.opencsg.com", "https://portal.opencsg.com"},
+		AllowCredentials: true,
+		AllowHeaders:     []string{"*"},
+		AllowMethods:     []string{"*"},
+	}))
 	r.Use(gin.Recovery())
 	r.Use(middleware.Log())
 
@@ -165,17 +172,19 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 		spaces.GET("", spaceHandler.Index)
 		spaces.POST("", spaceHandler.Create)
 		// show a user or org's space
-		spaces.GET("/:namespace/:name", spaceHandler.Get)
+		spaces.GET("/:namespace/:name", spaceHandler.Show)
 		spaces.PUT("/:namespace/:name", spaceHandler.Update)
 		spaces.DELETE("/:namespace/:name", spaceHandler.Delete)
 		// proxy any request to space api
 		spaces.Any("/:namespace/:name/api/*api_name", spaceHandler.Proxy)
 		// depoly and start running the space
-		spaces.POST("/:namespace/:name/run", nil)
+		spaces.POST("/:namespace/:name/run", spaceHandler.Run)
 		// stop running space
-		spaces.POST("/:namespace/:name/stop", nil)
+		spaces.POST("/:namespace/:name/stop", spaceHandler.Stop)
 		// pull space running status
-		spaces.POST("/:namespace/:name/status", nil)
+		spaces.GET("/:namespace/:name/status", spaceHandler.Status)
+		// pull space building and running logs
+		spaces.GET("/:namespace/:name/logs", spaceHandler.Logs)
 		// call space webhook api
 		spaces.POST("/:namespace/:name/webhook", nil)
 
@@ -231,6 +240,8 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 	apiGroup.GET("/user/:username/models", userHandler.Models)
 	// User datasets
 	apiGroup.GET("/user/:username/datasets", userHandler.Datasets)
+	apiGroup.GET("/user/:username/codes", userHandler.Codes)
+	apiGroup.GET("/user/:username/spaces", userHandler.Spaces)
 
 	acHandler, err := handler.NewAccessTokenHandler(config)
 	if err != nil {
@@ -260,6 +271,8 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 	apiGroup.GET("/organization/:namespace/models", orgHandler.Models)
 	// Organization datasets
 	apiGroup.GET("/organization/:namespace/datasets", orgHandler.Datasets)
+	apiGroup.GET("/organization/:namespace/codes", orgHandler.Codes)
+	apiGroup.GET("/organization/:namespace/spaces", orgHandler.Spaces)
 
 	// Member
 	memberCtrl, err := handler.NewMemberHandler(config)

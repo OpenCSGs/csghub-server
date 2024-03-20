@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -195,14 +196,24 @@ func (h *CodeHandler) Update(ctx *gin.Context) {
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
 // @Router       /codes/{namespace}/{name} [delete]
 func (h *CodeHandler) Delete(ctx *gin.Context) {
+	username, exists := ctx.Get("currentUser")
+	if !exists {
+		slog.Info("username not found in gin context")
+		httpbase.BadRequest(ctx, "user not found, please login first")
+		return
+	}
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
 	if err != nil {
 		slog.Error("Bad request format", "error", err)
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
-	currentUser := ctx.Query("current_user")
-	err = h.c.Delete(ctx, namespace, name, currentUser)
+	allow, _ := h.c.AllowAdminAccess(ctx, namespace, name, username.(string))
+	if !allow {
+		httpbase.UnauthorizedError(ctx, errors.New("user not allowed to delete space"))
+		return
+	}
+	err = h.c.Delete(ctx, namespace, name, username.(string))
 	if err != nil {
 		slog.Error("Failed to delete code", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)

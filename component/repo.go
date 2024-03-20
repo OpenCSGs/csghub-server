@@ -265,7 +265,7 @@ func (c *RepoComponent) CreateFile(ctx context.Context, req *types.CreateFileReq
 	if err != nil {
 		return nil, fmt.Errorf("fail to check user, cause: %w", err)
 	}
-	//TODO:check sensitive content of file
+	// TODO:check sensitive content of file
 	fileName := filepath.Base(req.FilePath)
 	if fileName == "README.md" {
 		slog.Debug("file is readme", slog.String("content", req.Content))
@@ -333,7 +333,7 @@ func (c *RepoComponent) UpdateFile(ctx context.Context, req *types.UpdateFileReq
 	if err != nil {
 		return nil, fmt.Errorf("failed to update %s file, cause: %w", req.RepoType, err)
 	}
-	//TODO:check sensitive content of file
+	// TODO:check sensitive content of file
 
 	fileName := filepath.Base(req.FilePath)
 	if fileName == "README.md" {
@@ -350,7 +350,7 @@ func (c *RepoComponent) updateLibraryFile(ctx context.Context, req *types.Update
 	resp := &types.UpdateFileResp{}
 
 	isFileRenamed := req.FilePath != req.OriginPath
-	//need to handle tag change only if file renamed
+	// need to handle tag change only if file renamed
 	if isFileRenamed {
 		c.tc.UpdateLibraryTags(ctx, getTagScopeByRepoType(req.RepoType), req.NameSpace, req.Name, req.OriginPath, req.FilePath)
 		if err != nil {
@@ -634,7 +634,6 @@ func (c *RepoComponent) IsLfs(ctx context.Context, req *types.GetFileReq) (bool,
 		RepoType:  req.RepoType,
 	}
 	content, err := c.git.GetRepoFileRaw(ctx, getFileRawReq)
-
 	if err != nil {
 		if err.Error() == ErrNotFoundMessage {
 			return false, ErrNotFound
@@ -686,9 +685,7 @@ func (c *RepoComponent) HeadDownloadFile(ctx *gin.Context, req *types.GetFileReq
 }
 
 func (c *RepoComponent) SDKDownloadFile(ctx *gin.Context, req *types.GetFileReq) (io.ReadCloser, string, error) {
-	var (
-		downloadUrl string
-	)
+	var downloadUrl string
 	repo, err := c.repo.FindByPath(ctx, req.RepoType, req.Namespace, req.Name)
 	if err != nil {
 		return nil, "", fmt.Errorf("failed to find repo, error: %w", err)
@@ -778,7 +775,7 @@ func (c *RepoComponent) FileInfo(ctx context.Context, req *types.GetFileReq) (*t
 		req.Ref = repo.DefaultBranch
 	}
 
-	var getFileContentReq = gitserver.GetRepoInfoByPathReq{
+	getFileContentReq := gitserver.GetRepoInfoByPathReq{
 		Namespace: req.Namespace,
 		Name:      req.Name,
 		Ref:       req.Ref,
@@ -798,6 +795,54 @@ func getTagScopeByRepoType(repoType types.RepositoryType) database.TagScope {
 	} else {
 		return database.DatasetTagScope
 	}
+}
+
+func (c *RepoComponent) AllowReadAccess(ctx context.Context, namespace, name, username string) (bool, error) {
+	repo, err := c.repo.FindByPath(ctx, types.SpaceRepo, namespace, name)
+	if err != nil {
+		return false, fmt.Errorf("failed to find repo, error: %w", err)
+	}
+	if !repo.Private {
+		return true, nil
+	}
+
+	if username == "" {
+		return false, errors.New("user not found, please login first")
+	}
+
+	return c.checkCurrentUserPermission(ctx, username, namespace, membership.RoleRead)
+}
+
+func (c *RepoComponent) AllowWriteAccess(ctx context.Context, namespace, name, username string) (bool, error) {
+	repo, err := c.repo.FindByPath(ctx, types.SpaceRepo, namespace, name)
+	if err != nil {
+		return false, fmt.Errorf("failed to find repo, error: %w", err)
+	}
+	if !repo.Private {
+		return true, nil
+	}
+
+	if username == "" {
+		return false, errors.New("user not found, please login first")
+	}
+
+	return c.checkCurrentUserPermission(ctx, username, namespace, membership.RoleWrite)
+}
+
+func (c *RepoComponent) AllowAdminAccess(ctx context.Context, namespace, name, username string) (bool, error) {
+	repo, err := c.repo.FindByPath(ctx, types.SpaceRepo, namespace, name)
+	if err != nil {
+		return false, fmt.Errorf("failed to find repo, error: %w", err)
+	}
+	if !repo.Private {
+		return true, nil
+	}
+
+	if username == "" {
+		return false, errors.New("user not found, please login first")
+	}
+
+	return c.checkCurrentUserPermission(ctx, username, namespace, membership.RoleAdmin)
 }
 
 func (c *RepoComponent) checkCurrentUserPermission(ctx context.Context, currentUser any, namespace string, role membership.Role) (bool, error) {
