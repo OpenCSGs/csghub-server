@@ -80,6 +80,22 @@ func (c *CodeComponent) Create(ctx context.Context, req *types.CreateCodeReq) (*
 		return nil, fmt.Errorf("failed to create database code, cause: %w", err)
 	}
 
+	// Create README.md file
+	err = c.git.CreateRepoFile(buildCreateFileReq(&types.CreateFileParams{
+		Username:  user.Username,
+		Email:     user.Email,
+		Message:   initCommitMessage,
+		Branch:    req.DefaultBranch,
+		Content:   req.Readme,
+		NewBranch: req.DefaultBranch,
+		Namespace: req.Namespace,
+		Name:      req.Name,
+		FilePath:  readmeFileName,
+	}, types.CodeRepo))
+	if err != nil {
+		return nil, fmt.Errorf("failed to create README.md file, cause: %w", err)
+	}
+
 	for _, tag := range code.Repository.Tags {
 		tags = append(tags, types.RepoTag{
 			Name:      tag.Name,

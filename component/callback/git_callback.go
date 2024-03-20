@@ -29,7 +29,8 @@ type GitCallbackComponent struct {
 	checker component.SensitiveChecker
 	ms      *database.ModelStore
 	ds      *database.DatasetStore
-	//set visibility if file content is sensitive
+	sc      *component.SpaceComponent
+	// set visibility if file content is sensitive
 	setRepoVisibility bool
 }
 
@@ -46,12 +47,17 @@ func NewGitCallback(config *config.Config) (*GitCallbackComponent, error) {
 	ms := database.NewModelStore()
 	ds := database.NewDatasetStore()
 	checker := component.NewSensitiveComponent(config)
+	sc, err := component.NewSpaceComponent(config)
+	if err != nil {
+		return nil, err
+	}
 	return &GitCallbackComponent{
 		config:  config,
 		gs:      gs,
 		tc:      tc,
 		ms:      ms,
 		ds:      ds,
+		sc:      sc,
 		checker: checker,
 	}, nil
 }
@@ -64,7 +70,7 @@ func (c *GitCallbackComponent) SetRepoVisibility(yes bool) {
 func (c *GitCallbackComponent) HandlePush(ctx context.Context, req *types.GiteaCallbackPushReq) error {
 	commits := req.Commits
 	ref := req.Ref
-	//split req.Repository.FullName by '/'
+	// split req.Repository.FullName by '/'
 	splits := strings.Split(req.Repository.FullName, "/")
 	fullNamespace, repoName := splits[0], splits[1]
 	repoType, namespace, _ := strings.Cut(fullNamespace, "_")
@@ -74,14 +80,31 @@ func (c *GitCallbackComponent) HandlePush(ctx context.Context, req *types.GiteaC
 		err = errors.Join(err, c.removeFiles(ctx, repoType, namespace, repoName, ref, commit.Removed))
 		err = errors.Join(err, c.addFiles(ctx, repoType, namespace, repoName, ref, commit.Added))
 	}
-	return err
+
+	if err != nil {
+		slog.Error("git callback push has error", slog.Any("error", err))
+		return err
+	}
+
+	// trigger space deployment
+	if repoType == "spaces" && c.sc.HasAppFile(ctx, namespace, repoName) {
+		go func() {
+			deployID, err := c.sc.Deploy(ctx, namespace, repoName)
+			if err != nil {
+				slog.Error("failed to trigger space delopy", slog.Any("error", err))
+			} else {
+				slog.Info("space deploy triggered", slog.Int64("deploy_id", deployID))
+			}
+		}()
+	}
+	return nil
 }
 
 // modifyFiles method handles modified files, skip if not modify README.md
 func (c *GitCallbackComponent) modifyFiles(ctx context.Context, repoType, namespace, repoName, ref string, fileNames []string) error {
 	for _, fileName := range fileNames {
 		slog.Debug("modify file", slog.String("file", fileName))
-		//only care about readme file under root directory
+		// only care about readme file under root directory
 		if fileName != ReadmeFileName {
 			continue
 		}
@@ -105,20 +128,20 @@ func (c *GitCallbackComponent) modifyFiles(ctx context.Context, repoType, namesp
 				}
 			}(content)
 		}
-		//should be only one README.md
+		// should be only one README.md
 		return c.updateMetaTags(ctx, repoType, namespace, repoName, ref, content)
 	}
 	return nil
 }
 
 func (c *GitCallbackComponent) removeFiles(ctx context.Context, repoType, namespace, repoName, ref string, fileNames []string) error {
-	//handle removed files
-	//delete tagss
+	// handle removed files
+	// delete tagss
 	for _, fileName := range fileNames {
 		slog.Debug("remove file", slog.String("file", fileName))
-		//only care about readme file under root directory
+		// only care about readme file under root directory
 		if fileName == ReadmeFileName {
-			//use empty content to clear all the meta tags
+			// use empty content to clear all the meta tags
 			const content string = ""
 			err := c.tc.ClearMetaTags(ctx, namespace, repoName)
 			if err != nil {
@@ -149,7 +172,7 @@ func (c *GitCallbackComponent) removeFiles(ctx context.Context, repoType, namesp
 func (c *GitCallbackComponent) addFiles(ctx context.Context, repoType, namespace, repoName, ref string, fileNames []string) error {
 	for _, fileName := range fileNames {
 		slog.Debug("add file", slog.String("file", fileName))
-		//only care about readme file under root directory
+		// only care about readme file under root directory
 		if fileName == ReadmeFileName {
 			content, err := c.getFileRaw(repoType, namespace, repoName, ref, fileName)
 			if err != nil {
@@ -227,7 +250,6 @@ func (c *GitCallbackComponent) getFileRaw(repoType, namespace, repoName, ref, fi
 		RepoType:  types.RepositoryType(repoType),
 	}
 	content, err = c.gs.GetRepoFileRaw(context.Background(), getFileRawReq)
-
 	if err != nil {
 		slog.Error("failed to get file content", slog.String("namespace", namespace),
 			slog.String("file", fileName), slog.String("repo", repoName), slog.String("ref", ref),

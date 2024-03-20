@@ -69,8 +69,10 @@ type Config struct {
 	}
 
 	Space struct {
+		BuilderEndpoint string `envconfig:"STARHUB_SERVER_SPACE_BUILDER_ENDPOINT" default:"http://localhost:8081"`
 		// base url for space api running in k8s cluster
-		K8SEndpoint string `envconfig:"STARHUB_SERVER_SPACE_K8SENDPOINT" default:"http://localhost:8080"`
+		RunnerEndpoint string `envconfig:"STARHUB_SERVER_SPACE_RUNNER_ENDPOINT" default:"http://localhost:8082"`
+		DockerRegBase  string `envconfig:"STARHUB_SERVER_DOCKER_REG_BASE" default:"registry.cn-beijing.aliyuncs.com/opencsg_public/"`
 	}
 }
 

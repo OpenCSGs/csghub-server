@@ -20,6 +20,8 @@ func NewOrganizationComponent(config *config.Config) (*OrganizationComponent, er
 	c.us = database.NewUserStore()
 	c.ds = database.NewDatasetStore()
 	c.ms = database.NewModelStore()
+	c.cs = database.NewCodeStore()
+	c.ss = database.NewSpaceStore()
 	var err error
 	c.gs, err = git.NewGitServer(config)
 	if err != nil {
@@ -42,6 +44,8 @@ type OrganizationComponent struct {
 	us *database.UserStore
 	ds *database.DatasetStore
 	ms *database.ModelStore
+	cs *database.CodeStore
+	ss *database.SpaceStore
 	gs gitserver.GitServer
 
 	msc *MemberComponent
@@ -228,4 +232,74 @@ func (c *OrganizationComponent) Datasets(ctx context.Context, req *types.OrgData
 	}
 
 	return resDatasets, total, nil
+}
+
+func (c *OrganizationComponent) Codes(ctx context.Context, req *types.OrgCodesReq) ([]types.Code, int, error) {
+	var resCodes []types.Code
+	r, err := c.msc.GetMemberRole(ctx, req.Namespace, req.CurrentUser)
+	// log error, and treat user as unkown role in org
+	if err != nil {
+		slog.Error("faild to get member role",
+			slog.String("org", req.Namespace), slog.String("user", req.CurrentUser),
+			slog.String("error", err.Error()))
+	}
+	onlyPublic := !r.CanRead()
+	codes, total, err := c.cs.ByOrgPath(ctx, req.Namespace, req.PageSize, req.Page, onlyPublic)
+	if err != nil {
+		newError := fmt.Errorf("failed to get org codes,error:%w", err)
+		slog.Error(newError.Error())
+		return nil, 0, newError
+	}
+
+	for _, data := range codes {
+		resCodes = append(resCodes, types.Code{
+			ID:           data.ID,
+			Name:         data.Repository.Name,
+			Nickname:     data.Repository.Nickname,
+			Description:  data.Repository.Description,
+			Likes:        data.Repository.Likes,
+			Downloads:    data.Repository.DownloadCount,
+			Path:         data.Repository.Path,
+			RepositoryID: data.RepositoryID,
+			Private:      data.Repository.Private,
+			CreatedAt:    data.CreatedAt,
+			UpdatedAt:    data.UpdatedAt,
+		})
+	}
+
+	return resCodes, total, nil
+}
+
+func (c *OrganizationComponent) Spaces(ctx context.Context, req *types.OrgSpacesReq) ([]types.Space, int, error) {
+	var resSpaces []types.Space
+	r, err := c.msc.GetMemberRole(ctx, req.Namespace, req.CurrentUser)
+	// log error, and treat user as unkown role in org
+	if err != nil {
+		slog.Error("faild to get member role",
+			slog.String("org", req.Namespace), slog.String("user", req.CurrentUser),
+			slog.String("error", err.Error()))
+	}
+	onlyPublic := !r.CanRead()
+	spaces, total, err := c.ss.ByOrgPath(ctx, req.Namespace, req.PageSize, req.Page, onlyPublic)
+	if err != nil {
+		newError := fmt.Errorf("failed to get org spaces,error:%w", err)
+		slog.Error(newError.Error())
+		return nil, 0, newError
+	}
+
+	for _, data := range spaces {
+		resSpaces = append(resSpaces, types.Space{
+			ID:          data.ID,
+			Name:        data.Repository.Name,
+			Nickname:    data.Repository.Nickname,
+			Description: data.Repository.Description,
+			Likes:       data.Repository.Likes,
+			Path:        data.Repository.Path,
+			Private:     data.Repository.Private,
+			CreatedAt:   data.CreatedAt,
+			UpdatedAt:   data.UpdatedAt,
+		})
+	}
+
+	return resSpaces, total, nil
 }

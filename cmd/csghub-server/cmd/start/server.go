@@ -2,10 +2,12 @@ package start
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/spf13/cobra"
 	"opencsg.com/csghub-server/api/httpbase"
 	"opencsg.com/csghub-server/api/router"
+	"opencsg.com/csghub-server/builder/deploy"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/docs"
@@ -52,6 +54,11 @@ var serverCmd = &cobra.Command{
 			DSN:     cfg.Database.DSN,
 		}
 		database.InitDB(dbConfig)
+		deploy.Init(deploy.DeployConfig{
+			ImageBuilderURL: cfg.Space.BuilderEndpoint,
+			ImageRunnerURL:  cfg.Space.RunnerEndpoint,
+			MonitorInterval: 10 * time.Second,
+		})
 		r, err := router.NewRouter(cfg, enableSwagger)
 		if err != nil {
 			return fmt.Errorf("failed to init router: %w", err)

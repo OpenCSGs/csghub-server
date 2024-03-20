@@ -18,6 +18,8 @@ func NewUserComponent(config *config.Config) (*UserComponent, error) {
 	c.ms = database.NewModelStore()
 	c.us = database.NewUserStore()
 	c.ds = database.NewDatasetStore()
+	c.cs = database.NewCodeStore()
+	c.ss = database.NewSpaceStore()
 	c.ns = database.NewNamespaceStore()
 	var err error
 	c.gs, err = git.NewGitServer(config)
@@ -33,6 +35,8 @@ type UserComponent struct {
 	us *database.UserStore
 	ms *database.ModelStore
 	ds *database.DatasetStore
+	cs *database.CodeStore
+	ss *database.SpaceStore
 	ns *database.NamespaceStore
 	gs gitserver.GitServer
 }
@@ -208,6 +212,110 @@ func (c *UserComponent) Models(ctx context.Context, req *types.UserModelsReq) ([
 	}
 
 	return resModels, total, nil
+}
+
+func (c *UserComponent) Codes(ctx context.Context, req *types.UserModelsReq) ([]types.Code, int, error) {
+	var resCodes []types.Code
+	userExists, err := c.us.IsExist(ctx, req.Owner)
+	if err != nil {
+		newError := fmt.Errorf("failed to check for the presence of the user,error:%w", err)
+		slog.Error(newError.Error())
+		return nil, 0, newError
+	}
+
+	if !userExists {
+		return nil, 0, errors.New("user not exists")
+	}
+
+	if req.CurrentUser != "" {
+		cuserExists, err := c.us.IsExist(ctx, req.CurrentUser)
+		if err != nil {
+			newError := fmt.Errorf("failed to check for the presence of current user,error:%w", err)
+			slog.Error(newError.Error())
+			return nil, 0, newError
+		}
+
+		if !cuserExists {
+			return nil, 0, errors.New("current user not exists")
+		}
+	}
+
+	onlyPublic := req.Owner != req.CurrentUser
+	ms, total, err := c.cs.ByUsername(ctx, req.Owner, req.PageSize, req.Page, onlyPublic)
+	if err != nil {
+		newError := fmt.Errorf("failed to get user codes,error:%w", err)
+		slog.Error(newError.Error())
+		return nil, 0, newError
+	}
+
+	for _, data := range ms {
+		resCodes = append(resCodes, types.Code{
+			ID:           data.ID,
+			Name:         data.Repository.Name,
+			Nickname:     data.Repository.Nickname,
+			Description:  data.Repository.Description,
+			Likes:        data.Repository.Likes,
+			Downloads:    data.Repository.DownloadCount,
+			Path:         data.Repository.Path,
+			RepositoryID: data.RepositoryID,
+			Private:      data.Repository.Private,
+			CreatedAt:    data.CreatedAt,
+			UpdatedAt:    data.UpdatedAt,
+		})
+	}
+
+	return resCodes, total, nil
+}
+
+func (c *UserComponent) Spaces(ctx context.Context, req *types.UserSpacesReq) ([]types.Space, int, error) {
+	var resSpaces []types.Space
+	userExists, err := c.us.IsExist(ctx, req.Owner)
+	if err != nil {
+		newError := fmt.Errorf("failed to check for the presence of the user,error:%w", err)
+		slog.Error(newError.Error())
+		return nil, 0, newError
+	}
+
+	if !userExists {
+		return nil, 0, errors.New("user not exists")
+	}
+
+	if req.CurrentUser != "" {
+		cuserExists, err := c.us.IsExist(ctx, req.CurrentUser)
+		if err != nil {
+			newError := fmt.Errorf("failed to check for the presence of current user,error:%w", err)
+			slog.Error(newError.Error())
+			return nil, 0, newError
+		}
+
+		if !cuserExists {
+			return nil, 0, errors.New("current user not exists")
+		}
+	}
+
+	onlyPublic := req.Owner != req.CurrentUser
+	ms, total, err := c.ss.ByUsername(ctx, req.Owner, req.PageSize, req.Page, onlyPublic)
+	if err != nil {
+		newError := fmt.Errorf("failed to get user spaces,error:%w", err)
+		slog.Error(newError.Error())
+		return nil, 0, newError
+	}
+
+	for _, data := range ms {
+		resSpaces = append(resSpaces, types.Space{
+			ID:          data.ID,
+			Name:        data.Repository.Name,
+			Nickname:    data.Repository.Nickname,
+			Description: data.Repository.Description,
+			Likes:       data.Repository.Likes,
+			Path:        data.Repository.Path,
+			Private:     data.Repository.Private,
+			CreatedAt:   data.CreatedAt,
+			UpdatedAt:   data.UpdatedAt,
+		})
+	}
+
+	return resSpaces, total, nil
 }
 
 func (c *UserComponent) FixUserData(ctx context.Context, userName string) error {
