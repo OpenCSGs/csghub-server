@@ -6,6 +6,7 @@ import (
 	"os"
 
 	"github.com/spf13/cobra"
+	"opencsg.com/csghub-server/cmd/csghub-server/cmd/deploy"
 	"opencsg.com/csghub-server/cmd/csghub-server/cmd/logscan"
 	"opencsg.com/csghub-server/cmd/csghub-server/cmd/migration"
 	"opencsg.com/csghub-server/cmd/csghub-server/cmd/start"
@@ -44,20 +45,22 @@ func init() {
 		start.Cmd,
 		logscan.Cmd,
 		trigger.Cmd,
+		deploy.Cmd,
 	)
 }
 
 func setupLog(lvl, format string) {
-	var logLevel = slog.LevelInfo.Level()
+	logLevel := slog.LevelInfo.Level()
 	var logger *slog.Logger
 	if len(lvl) > 0 {
 		err := logLevel.UnmarshalText([]byte(lvl))
-		//logLevel not change if unmarshall failed
+		// logLevel not change if unmarshall failed
 		if err != nil {
 			fmt.Println("input invalid log level, use default log level INFO")
 		}
 	}
-	opt := &slog.HandlerOptions{AddSource: true, Level: logLevel}
+	// TODO:log source file position
+	opt := &slog.HandlerOptions{AddSource: false, Level: logLevel}
 	var handler slog.Handler
 	switch format {
 	case "json":

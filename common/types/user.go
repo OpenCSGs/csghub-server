@@ -1,17 +1,17 @@
 package types
 
 type CreateUserRequest struct {
-	//Display name of the user
+	// Display name of the user
 	Name string `json:"name"`
-	//the login name
+	// the login name
 	Username string `json:"username"`
 	Email    string `json:"email"`
 }
 
 type UpdateUserRequest struct {
-	//Display name of the user
+	// Display name of the user
 	Name string `json:"name"`
-	//the login name
+	// the login name
 	Username string `json:"username"`
 	Email    string `json:"email"`
 }
@@ -32,8 +32,12 @@ type UserDatasetsReq struct {
 	PageOpts
 }
 
-type UserModelsReq = UserDatasetsReq
-type DeleteUserTokenRequest = CreateUserTokenRequest
+type (
+	UserModelsReq          = UserDatasetsReq
+	UserCodesReq           = UserDatasetsReq
+	UserSpacesReq          = UserDatasetsReq
+	DeleteUserTokenRequest = CreateUserTokenRequest
+)
 
 type PageOpts struct {
 	Page     int `json:"page"`

@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"net/http"
 	"slices"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"opencsg.com/csghub-server/api/httpbase"
@@ -21,10 +22,10 @@ func NewSpaceHandler(config *config.Config) (*SpaceHandler, error) {
 	if err != nil {
 		return nil, err
 	}
-	rp, err := proxy.NewReverseProxy(config.Space.K8SEndpoint)
+	rp, err := proxy.NewReverseProxy(config.Space.RunnerEndpoint)
 	if err != nil {
 		// log error and continue
-		slog.Error("failed to create space reverse proxy", slog.String("K8sEndpoint", config.Space.K8SEndpoint),
+		slog.Error("failed to create space reverse proxy", slog.String("K8sEndpoint", config.Space.RunnerEndpoint),
 			slog.Any("error", err))
 	}
 	return &SpaceHandler{
@@ -83,7 +84,36 @@ func (h *SpaceHandler) Index(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, respData)
 }
 
-func (h *SpaceHandler) Get(ctx *gin.Context) {
+// ShowSpaceDetail   godoc
+// @Security     ApiKey
+// @Summary      show space detail
+// @Tags         Space
+// @Accept       json
+// @Produce      json
+// @Param        namespace path string true "namespace"
+// @Param        name path string true "name"
+// @Param        current_user query string true "current_user"
+// @Success      200  {object}  types.Response{data=types.Space} "OK"
+// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
+// @Router       /spaces/{namespace}/{name} [get]
+func (h *SpaceHandler) Show(ctx *gin.Context) {
+	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
+	if err != nil {
+		slog.Error("Bad request format", "error", err)
+		httpbase.BadRequest(ctx, err.Error())
+		return
+	}
+	currentUser := ctx.Query("current_user")
+	detail, err := h.c.Show(ctx, namespace, name, currentUser)
+	if err != nil {
+		slog.Error("Failed to get space detail", slog.Any("error", err))
+		httpbase.ServerError(ctx, err)
+		return
+	}
+
+	slog.Info("Get space succeed", slog.String("space", name))
+	httpbase.OK(ctx, detail)
 }
 
 // CreateSpace   godoc
@@ -233,6 +263,258 @@ func (h *SpaceHandler) Proxy(ctx *gin.Context) {
 	} else {
 		slog.Info("user not allowed to call sapce api", slog.String("namespace", namespace),
 			slog.String("name", name), slog.Any("username", username))
+	}
+}
+
+// RunSpace   godoc
+// @Security     JWT token
+// @Summary      run space app
+// @Tags         Space
+// @Accept       json
+// @Produce      json
+// @Param        namespace path string true "namespace"
+// @Param        name path string true "name"
+// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
+// @Router       /spaces/{namespace}/{name}/run [post]
+func (h *SpaceHandler) Run(ctx *gin.Context) {
+	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
+	if err != nil {
+		slog.Error("failed to get namespace from context", "error", err)
+		httpbase.BadRequest(ctx, err.Error())
+		return
+	}
+	deployID, err := h.c.Deploy(ctx, namespace, name)
+	if err != nil {
+		slog.Error("failed to deploy space", slog.String("namespace", namespace),
+			slog.String("name", name), slog.Any("error", err))
+		httpbase.ServerError(ctx, errors.New("failed to deploy space"))
+		return
+	}
+
+	slog.Info("deploy space sucess", slog.String("namespace", namespace),
+		slog.String("name", name), slog.Int64("deploy_id", deployID))
+	httpbase.OK(ctx, nil)
+}
+
+// StopSpace   godoc
+// @Security     JWT token
+// @Summary      stop space app
+// @Tags         Space
+// @Accept       json
+// @Produce      json
+// @Param        namespace path string true "namespace"
+// @Param        name path string true "name"
+// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
+// @Router       /spaces/{namespace}/{name}/stop [post]
+func (h *SpaceHandler) Stop(ctx *gin.Context) {
+	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
+	if err != nil {
+		slog.Error("failed to get namespace from context", "error", err)
+		httpbase.BadRequest(ctx, err.Error())
+		return
+	}
+	err = h.c.Stop(ctx, namespace, name)
+	if err != nil {
+		slog.Error("failed to stop space", slog.String("namespace", namespace),
+			slog.String("name", name), slog.Any("error", err))
+		httpbase.ServerError(ctx, errors.New("failed to stop space"))
+		return
+	}
+
+	slog.Info("stop space sucess", slog.String("namespace", namespace),
+		slog.String("name", name))
+	httpbase.OK(ctx, nil)
+}
+
+// GetSpaceStatus   godoc
+// @Security     JWT token
+// @Summary      get space status
+// @Tags         Space
+// @Accept       json
+// @Produce      json
+// @Param        namespace path string true "namespace"
+// @Param        name path string true "name"
+// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
+// @Router       /spaces/{namespace}/{name}/status [get]
+func (h *SpaceHandler) Status(ctx *gin.Context) {
+	if ctx.Query("test") == "true" {
+		h.status(ctx)
+		return
+	}
+
+	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
+	if err != nil {
+		slog.Error("failed to get namespace from context", "error", err)
+		httpbase.BadRequest(ctx, err.Error())
+		return
+	}
+
+	var allow bool
+	username, exists := ctx.Get("currentUser")
+	if exists {
+		allow, err = h.c.AllowReadAccess(ctx, namespace, name, username.(string))
+	} else {
+		allow, err = h.c.AllowReadAccess(ctx, namespace, name, "")
+	}
+
+	if err != nil {
+		slog.Error("failed to check user permission", "error", err)
+		httpbase.ServerError(ctx, errors.New("failed to check user permission"))
+		return
+	}
+
+	if !allow {
+		slog.Info("user not allowed to query sapce status", slog.String("namespace", namespace),
+			slog.String("name", name), slog.Any("username", username))
+	}
+
+	ctx.Writer.Header().Set("Content-Type", "text/event-stream")
+	ctx.Writer.Header().Set("Cache-Control", "no-cache")
+	ctx.Writer.Header().Set("Connection", "keep-alive")
+	ctx.Writer.Header().Set("Transfer-Encoding", "chunked")
+
+	// 创建一个通知channel以监测客户端是否已经断开连接
+	closeNotify := ctx.Writer.CloseNotify()
+
+	for {
+		select {
+		case <-closeNotify:
+			return
+		default:
+			time.Sleep(time.Second * 5)
+			status, err := h.c.Status(ctx, namespace, name)
+			if err != nil {
+				slog.Error("failed to get space status", slog.Any("error", err), slog.String("namespace", namespace),
+					slog.String("name", name))
+				ctx.SSEvent("error", err.Error())
+			} else {
+				ctx.SSEvent("status", status)
+			}
+			ctx.Writer.Flush()
+		}
+	}
+}
+
+func (h *SpaceHandler) status(ctx *gin.Context) {
+	ctx.Writer.Header().Set("Content-Type", "text/event-stream")
+	ctx.Writer.Header().Set("Cache-Control", "no-cache")
+	ctx.Writer.Header().Set("Connection", "keep-alive")
+	ctx.Writer.Header().Set("Transfer-Encoding", "chunked")
+
+	// 创建一个通知channel以监测客户端是否已经断开连接
+	closeNotify := ctx.Writer.CloseNotify()
+
+	for {
+		select {
+		case <-closeNotify:
+			return
+		default:
+			time.Sleep(time.Second * 5)
+			ctx.SSEvent("status", "Running")
+			ctx.Writer.Flush()
+		}
+	}
+}
+
+// GetSpaceLogs   godoc
+// @Security     JWT token
+// @Summary      get space logs
+// @Tags         Space
+// @Accept       json
+// @Produce      json
+// @Param        namespace path string true "namespace"
+// @Param        name path string true "name"
+// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
+// @Router       /spaces/{namespace}/{name}/logs [get]
+func (h *SpaceHandler) Logs(ctx *gin.Context) {
+	if ctx.Query("test") == "true" {
+		h.testLogs(ctx)
+		return
+	}
+	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
+	if err != nil {
+		slog.Error("failed to get namespace from context", "error", err)
+		httpbase.BadRequest(ctx, err.Error())
+		return
+	}
+
+	var allow bool
+	username, exists := ctx.Get("currentUser")
+	if exists {
+		allow, err = h.c.AllowReadAccess(ctx, namespace, name, username.(string))
+	} else {
+		allow, err = h.c.AllowReadAccess(ctx, namespace, name, "")
+	}
+
+	if err != nil {
+		slog.Error("failed to check user permission", "error", err)
+		httpbase.ServerError(ctx, errors.New("failed to check user permission"))
+		return
+	}
+
+	if !allow {
+		slog.Info("user not allowed to query sapce status", slog.String("namespace", namespace),
+			slog.String("name", name), slog.Any("username", username))
+	}
+
+	ctx.Writer.Header().Set("Content-Type", "text/event-stream")
+	ctx.Writer.Header().Set("Cache-Control", "no-cache")
+	ctx.Writer.Header().Set("Connection", "keep-alive")
+	ctx.Writer.Header().Set("Transfer-Encoding", "chunked")
+
+	logs, err := h.c.Logs(ctx, namespace, name)
+	if err != nil {
+		httpbase.ServerError(ctx, err)
+		return
+	}
+	defer logs.Close()
+	closeNotify := ctx.Writer.CloseNotify()
+
+	type logContent struct {
+		Type    string `json:"type"`
+		Content string `json:"content"`
+	}
+
+	buildLogChan := logs.BuildLog()
+	runLogChan := logs.RunLog()
+	for {
+		select {
+		case <-closeNotify:
+			// logs.Close()
+			return
+		case data := <-buildLogChan:
+			ctx.SSEvent("Build", string(data))
+			ctx.Writer.Flush()
+		case data := <-runLogChan:
+			ctx.SSEvent("Container", string(data))
+			ctx.Writer.Flush()
+		}
+	}
+}
+
+func (h *SpaceHandler) testLogs(ctx *gin.Context) {
+	ctx.Writer.Header().Set("Content-Type", "text/event-stream")
+	ctx.Writer.Header().Set("Cache-Control", "no-cache")
+	ctx.Writer.Header().Set("Connection", "keep-alive")
+	ctx.Writer.Header().Set("Transfer-Encoding", "chunked")
+
+	// watch client connection
+	closeNotify := ctx.Writer.CloseNotify()
+
+	for {
+		select {
+		case <-closeNotify:
+			return
+		default:
+			ctx.SSEvent("Build", "test build log message")
+			ctx.SSEvent("Container", "test run log message")
+			ctx.Writer.Flush()
+		}
+		time.Sleep(time.Second * 5)
 	}
 }
 

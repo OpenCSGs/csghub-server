@@ -758,6 +758,11 @@ definitions:
         type: string
       created_at:
         type: string
+      default_branch:
+        type: string
+      description:
+        example: ""
+        type: string
       endpoint:
         description: the serving endpoint url
         example: https://localhost/spaces/myname/myspace
@@ -766,6 +771,8 @@ definitions:
         type: string
       hardware:
         type: string
+      id:
+        type: integer
       license:
         example: MIT
         type: string
@@ -777,14 +784,16 @@ definitions:
       namespace:
         example: user_or_org_name
         type: string
+      nickname:
+        example: ""
+        type: string
       path:
         example: user_or_org_name/space_name_1
         type: string
       private:
         type: boolean
-      running_status:
-        description: deploying, running, failed
-        type: string
+      repository:
+        $ref: '#/definitions/types.Repository'
       sdk:
         description: like gradio,steamlit etc
         example: "1"
@@ -794,8 +803,19 @@ definitions:
         type: string
       secrets:
         type: string
+      status:
+        description: deploying, running, failed
+        type: string
+      tags:
+        items:
+          $ref: '#/definitions/types.RepoTag'
+        type: array
       template:
         type: string
+      updated_at:
+        type: string
+      user:
+        $ref: '#/definitions/types.User'
       username:
         example: creator_user_name
         type: string
@@ -1840,6 +1860,58 @@ paths:
       summary: Invoke model prediction
       tags:
       - Model
+  /organization/{namespace}/codes:
+    get:
+      consumes:
+      - application/json
+      parameters:
+      - description: org name
+        in: path
+        name: namespace
+        required: true
+        type: string
+      - description: current user name
+        in: query
+        name: current_user
+        required: true
+        type: string
+      - description: page size
+        in: query
+        name: per
+        type: integer
+      - description: current page number
+        in: query
+        name: page
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/types.ResponseWithTotal'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/types.Code'
+                  type: array
+                total:
+                  type: integer
+              type: object
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Get organization codes
+      tags:
+      - Organization
   /organization/{namespace}/datasets:
     get:
       consumes:
@@ -1944,6 +2016,58 @@ paths:
       security:
       - ApiKey: []
       summary: Get organization models
+      tags:
+      - Organization
+  /organization/{namespace}/spaces:
+    get:
+      consumes:
+      - application/json
+      parameters:
+      - description: org name
+        in: path
+        name: namespace
+        required: true
+        type: string
+      - description: current user name
+        in: query
+        name: current_user
+        required: true
+        type: string
+      - description: page size
+        in: query
+        name: per
+        type: integer
+      - description: current page number
+        in: query
+        name: page
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/types.ResponseWithTotal'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/types.Space'
+                  type: array
+                total:
+                  type: integer
+              type: object
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Get organization Spaces
       tags:
       - Organization
   /organizations:
@@ -2591,6 +2715,50 @@ paths:
       summary: Delete a exists space
       tags:
       - Space
+    get:
+      consumes:
+      - application/json
+      parameters:
+      - description: namespace
+        in: path
+        name: namespace
+        required: true
+        type: string
+      - description: name
+        in: path
+        name: name
+        required: true
+        type: string
+      - description: current_user
+        in: query
+        name: current_user
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/types.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/types.Space'
+              type: object
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: show space detail
+      tags:
+      - Space
     put:
       consumes:
       - application/json
@@ -2679,6 +2847,130 @@ paths:
       summary: Call space api
       tags:
       - Space
+  /spaces/{namespace}/{name}/logs:
+    get:
+      consumes:
+      - application/json
+      parameters:
+      - description: namespace
+        in: path
+        name: namespace
+        required: true
+        type: string
+      - description: name
+        in: path
+        name: name
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - JWT token: []
+      summary: get space logs
+      tags:
+      - Space
+  /spaces/{namespace}/{name}/run:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: namespace
+        in: path
+        name: namespace
+        required: true
+        type: string
+      - description: name
+        in: path
+        name: name
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - JWT token: []
+      summary: run space app
+      tags:
+      - Space
+  /spaces/{namespace}/{name}/status:
+    get:
+      consumes:
+      - application/json
+      parameters:
+      - description: namespace
+        in: path
+        name: namespace
+        required: true
+        type: string
+      - description: name
+        in: path
+        name: name
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - JWT token: []
+      summary: get space status
+      tags:
+      - Space
+  /spaces/{namespace}/{name}/stop:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: namespace
+        in: path
+        name: namespace
+        required: true
+        type: string
+      - description: name
+        in: path
+        name: name
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - JWT token: []
+      summary: stop space app
+      tags:
+      - Space
   /tags:
     get:
       consumes:
@@ -2709,6 +3001,46 @@ paths:
       summary: Get all tags
       tags:
       - Tag
+  /user/{username}/codes:
+    get:
+      consumes:
+      - application/json
+      description: get user codes
+      parameters:
+      - description: username
+        in: path
+        name: username
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/types.ResponseWithTotal'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/types.Code'
+                  type: array
+                total:
+                  type: integer
+              type: object
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Get user codes
+      tags:
+      - User
   /user/{username}/datasets:
     get:
       consumes:
@@ -2787,6 +3119,45 @@ paths:
       security:
       - ApiKey: []
       summary: Get user models
+      tags:
+      - User
+  /user/{username}/spaces:
+    get:
+      consumes:
+      - application/json
+      parameters:
+      - description: username
+        in: path
+        name: username
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/types.ResponseWithTotal'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/types.Space'
+                  type: array
+                total:
+                  type: integer
+              type: object
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Get user spaces
       tags:
       - User
   /user/{username}/ssh_key/{name}:
