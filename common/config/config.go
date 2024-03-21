@@ -73,9 +73,11 @@ type Config struct {
 		// base url for space api running in k8s cluster
 		RunnerEndpoint string `envconfig:"STARHUB_SERVER_SPACE_RUNNER_ENDPOINT" default:"http://localhost:8082"`
 
-		RootDomain string `envconfig:"STARHUB_SERVER_ROOT_DOMAIN" default:"http://gradio-test-app-v1-0.spaces.opencsg.com/"`
+		RootDomain string `envconfig:"STARHUB_SERVER_ROOT_DOMAIN" default:"spaces.opencsg.com"`
 		// RootDomain     string `envconfig:"STARHUB_SERVER_ROOT_DOMAIN" default:"opencsg.space"`
 		DockerRegBase string `envconfig:"STARHUB_SERVER_DOCKER_REG_BASE" default:"registry.cn-beijing.aliyuncs.com/opencsg_public/"`
+		// reverse proxy listening port
+		RProxyServerPort int `envconfig:"STARHUB_SERVER_SPACE_RPROXY_SERVER_PORT" default:"8083"`
 	}
 }
 
