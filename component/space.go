@@ -246,10 +246,21 @@ func (c *SpaceComponent) Index(ctx context.Context, username, search, sort strin
 	}
 
 	for _, data := range spaceData {
+		var tags []types.RepoTag
+		for _, tag := range data.Repository.Tags {
+			tags = append(tags, types.RepoTag{
+				Name:      tag.Name,
+				Category:  tag.Category,
+				Group:     tag.Group,
+				BuiltIn:   tag.BuiltIn,
+				ShowName:  tag.ShowName,
+				CreatedAt: tag.CreatedAt,
+				UpdatedAt: tag.UpdatedAt,
+			})
+		}
 		spaces = append(spaces, types.Space{
-			// Creator:   data.Repository.Username,
-			// Namespace: data.Repository.,
 			Name:          data.Repository.Name,
+			Description:   data.Repository.Description,
 			Path:          data.Repository.Path,
 			Sdk:           data.Sdk,
 			SdkVersion:    data.SdkVersion,
@@ -259,12 +270,11 @@ func (c *SpaceComponent) Index(ctx context.Context, username, search, sort strin
 			Secrets:       data.Secrets,
 			CoverImageUrl: data.CoverImageUrl,
 			License:       data.Repository.License,
-			// // TODO: get running status and endpoint from inference service
-			// Endpoint:      "",
-			// RunningStatus: "",
-			Private: data.Repository.Private,
-			// Likes:         data.Repository.Likes,
-			CreatedAt: data.Repository.CreatedAt,
+			Private:       data.Repository.Private,
+			Likes:         data.Repository.Likes,
+			CreatedAt:     data.Repository.CreatedAt,
+			UpdatedAt:     data.Repository.UpdatedAt,
+			Tags:          tags,
 		})
 	}
 	return spaces, total, nil
