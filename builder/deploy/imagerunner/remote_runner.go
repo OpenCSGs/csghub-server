@@ -48,8 +48,7 @@ func (h *RemoteRunner) Run(ctx context.Context, req *RunRequest) (*RunResponse, 
 }
 
 func (h *RemoteRunner) Stop(ctx context.Context, req *StopRequest) (*StopResponse, error) {
-	u := fmt.Sprintf("%s/%s/%s/stop/%s?build_id=%d", h.remote,
-		req.OrgName, req.SpaceName, req.ImageID, req.BuildID)
+	u := fmt.Sprintf("%s/stop/%s", h.remote, req.ImageID)
 	response, err := h.doRequest(http.MethodPost, u, req)
 	if err != nil {
 		return nil, err
@@ -65,8 +64,7 @@ func (h *RemoteRunner) Stop(ctx context.Context, req *StopRequest) (*StopRespons
 }
 
 func (h *RemoteRunner) Status(ctx context.Context, req *StatusRequest) (*StatusResponse, error) {
-	u := fmt.Sprintf("%s/%s/%s/status/%s?build_id=%d", h.remote,
-		req.OrgName, req.SpaceName, req.ImageID, req.BuildID)
+	u := fmt.Sprintf("%s/status/%s", h.remote, req.ImageID)
 	response, err := h.doRequest(http.MethodGet, u, req)
 	if err != nil {
 		return nil, err
@@ -82,8 +80,7 @@ func (h *RemoteRunner) Status(ctx context.Context, req *StatusRequest) (*StatusR
 }
 
 func (h *RemoteRunner) Logs(ctx context.Context, req *LogsRequest) (*LogsResponse, error) {
-	u := fmt.Sprintf("%s/%s/%s/logs/%s?build_id=%d", h.remote,
-		req.OrgName, req.SpaceName, req.ImageID, req.BuildID)
+	u := fmt.Sprintf("%s/logs/%s", h.remote, req.ImageID)
 	rc, err := h.doSSERequest(http.MethodGet, u, req)
 	if err != nil {
 		return nil, err

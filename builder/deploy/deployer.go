@@ -117,7 +117,7 @@ func (d *deployer) Stop(ctx context.Context, spaceID int64) error {
 	resp, err := d.ir.Stop(ctx, &imagerunner.StopRequest{
 		OrgName:   "",
 		SpaceName: "",
-		BuildID:   0,
+		BuildID:   deploy.ID,
 		ImageID:   deploy.ImageID,
 	})
 

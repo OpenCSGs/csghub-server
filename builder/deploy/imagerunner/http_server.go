@@ -2,6 +2,7 @@ package imagerunner
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -12,6 +13,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	corev1 "k8s.io/api/core/v1"
+	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
@@ -64,8 +66,9 @@ func (s *HttpServer) Run(port int) error {
 	router.Use(middleware.Log())
 
 	router.POST("/run", s.runImage)
-	router.GET("/:namespace/:name/status/:imageID", s.imageStatus)
-	router.GET("/:namespace/:name/logs/:imageID", s.imageLogs)
+	router.POST("/stop/:imageID", s.StopImage)
+	router.GET("/status/:imageID", s.imageStatus)
+	router.GET("/logs/:imageID", s.imageLogs)
 
 	return router.Run(fmt.Sprintf(":%d", port))
 }
@@ -131,6 +134,54 @@ func (s *HttpServer) runImage(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "Service created successfully"})
 }
 
+func (s *HttpServer) StopImage(c *gin.Context) {
+	var resp StopResponse
+	imageID := c.Param("imageID")
+	srvName := s.imageIDToServiceName(imageID)
+	srv, err := s.knativeClient.ServingV1().Services(K8sNameSpace).
+		Get(c.Request.Context(), srvName, metav1.GetOptions{})
+	if err != nil {
+		k8serr := new(k8serrors.StatusError)
+		if errors.As(err, &k8serr) {
+			if k8serr.Status().Code == http.StatusNotFound {
+				slog.Info("stop image skip,service not exist", slog.Any("k8s_err", k8serr))
+				resp.Code = 0
+				resp.Message = "skip,service not exist"
+				c.JSON(http.StatusOK, nil)
+				return
+			}
+		}
+		slog.Error("stop image failed, cannot get service info", slog.Any("error", err),
+			slog.String("srv_name", srvName), slog.Any("image_id", imageID))
+		resp.Code = -1
+		resp.Message = "failed to get service status"
+		c.JSON(http.StatusInternalServerError, resp)
+		return
+	}
+
+	if srv == nil {
+		resp.Code = 0
+		resp.Message = "service not exist"
+		c.JSON(http.StatusOK, resp)
+		return
+	}
+
+	err = s.knativeClient.ServingV1().Services(K8sNameSpace).Delete(c, srvName, *metav1.NewDeleteOptions(0))
+	if err != nil {
+		slog.Error("stop image failed, cannot delete service ", slog.Any("error", err),
+			slog.String("srv_name", srvName), slog.Any("image_id", imageID))
+		resp.Code = -1
+		resp.Message = "failed to get service status"
+		c.JSON(http.StatusInternalServerError, resp)
+		return
+	}
+
+	slog.Info("service deleted", slog.String("srv_name", srvName), slog.String("image_id", imageID))
+	resp.Code = 0
+	resp.Message = "service deleted"
+	c.JSON(http.StatusOK, resp)
+}
+
 func (s *HttpServer) imageStatus(c *gin.Context) {
 	var resp StatusResponse
 	imageID := c.Param("imageID")
@@ -155,8 +206,7 @@ func (s *HttpServer) imageStatus(c *gin.Context) {
 	}
 
 	if srv.IsReady() {
-		labelSelector := fmt.Sprintf("serving.knative.dev/service=%s", imageID)
-		podNames, err := s.getPodsByLabelSelector(c.Request.Context(), labelSelector, K8sNameSpace)
+		podNames, err := s.getServicePods(c.Request.Context(), srvName, K8sNameSpace)
 		if err != nil {
 			slog.Error("get image status failed, cantnot get pods info", slog.Any("error", err))
 			c.JSON(http.StatusInternalServerError, gin.H{"code": 0, "message": "unkown service status, failed to get pods"})
@@ -186,8 +236,7 @@ func (s *HttpServer) imageStatus(c *gin.Context) {
 func (s *HttpServer) imageLogs(c *gin.Context) {
 	imageID := c.Param("imageID")
 	srvName := s.imageIDToServiceName(imageID)
-	labelSelector := fmt.Sprintf("serving.knative.dev/service=%s", srvName)
-	podNames, err := s.getPodsByLabelSelector(c.Request.Context(), labelSelector, K8sNameSpace)
+	podNames, err := s.getServicePods(c.Request.Context(), srvName, K8sNameSpace)
 	if err != nil {
 		slog.Error("failed to read image logs, cantnot get pods info", slog.Any("error", err), slog.String("srv_name", srvName), slog.String("image_id", imageID))
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to get pods info"})
@@ -246,7 +295,8 @@ func (s *HttpServer) imageLogs(c *gin.Context) {
 	}
 }
 
-func (s *HttpServer) getPodsByLabelSelector(ctx context.Context, labelSelector string, namespace string) ([]string, error) {
+func (s *HttpServer) getServicePods(ctx context.Context, srvName string, namespace string) ([]string, error) {
+	labelSelector := fmt.Sprintf("serving.knative.dev/service=%s", srvName)
 	// Get the list of Pods based on the label selector
 	pods, err := s.k8sClient.CoreV1().Pods(namespace).List(ctx, metav1.ListOptions{
 		LabelSelector: labelSelector,
@@ -266,5 +316,5 @@ func (s *HttpServer) getPodsByLabelSelector(ctx context.Context, labelSelector s
 }
 
 func (s *HttpServer) imageIDToServiceName(imageID string) string {
-	return strings.ReplaceAll(imageID, ":", "-")
+	return strings.ReplaceAll(strings.ReplaceAll(imageID, ":", "-"), ".", "-")
 }
