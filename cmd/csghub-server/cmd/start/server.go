@@ -17,7 +17,6 @@ var enableSwagger bool
 
 func init() {
 	serverCmd.Flags().BoolVar(&enableSwagger, "swagger", false, "Start swagger help docs")
-	Cmd.AddCommand(serverCmd)
 }
 
 var serverCmd = &cobra.Command{

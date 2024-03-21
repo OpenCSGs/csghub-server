@@ -2,6 +2,7 @@ package imagebuilder
 
 import (
 	"context"
+	"io"
 )
 
 var _ Builder = (*LocalBuilder)(nil)
@@ -22,6 +23,7 @@ func (*LocalBuilder) Build(ctx context.Context, req *BuildRequest) (*BuildRespon
 // Logs implements Builder.Logs
 func (*LocalBuilder) Logs(ctx context.Context, req *LogsRequest) (*LogsResponse, error) {
 	response := &LogsResponse{}
+	response.SSEReadCloser = &fakeLogReadClose{}
 	return response, nil
 }
 
@@ -35,3 +37,14 @@ func (*LocalBuilder) Status(ctx context.Context, req *StatusRequest) (*StatusRes
 	}
 	return responses, nil
 }
+
+var _ io.ReadCloser = &fakeLogReadClose{}
+
+type fakeLogReadClose struct{}
+
+func (f *fakeLogReadClose) Read(p []byte) (int, error) {
+	copy(p, "test build log")
+	return 0, nil
+}
+
+func (f *fakeLogReadClose) Close() error { return nil }

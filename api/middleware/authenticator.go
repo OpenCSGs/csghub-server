@@ -22,6 +22,7 @@ func Authenticator(config *config.Config) gin.HandlerFunc {
 
 		// Check Authorization Header formt
 		if authHeader == "" {
+			slog.Info("missing authorization header", slog.Any("url", c.Request.URL))
 			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "missing Authorization header"})
 			return
 		}

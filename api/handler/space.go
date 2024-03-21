@@ -22,7 +22,7 @@ func NewSpaceHandler(config *config.Config) (*SpaceHandler, error) {
 	if err != nil {
 		return nil, err
 	}
-	rp, err := proxy.NewReverseProxy(config.Space.RunnerEndpoint)
+	rp, err := proxy.NewReverseProxy(config.Space.RootDomain)
 	if err != nil {
 		// log error and continue
 		slog.Error("failed to create space reverse proxy", slog.String("K8sEndpoint", config.Space.RunnerEndpoint),
@@ -413,7 +413,16 @@ func (h *SpaceHandler) status(ctx *gin.Context) {
 			return
 		default:
 			time.Sleep(time.Second * 5)
+			ctx.SSEvent("status", "Building")
+			ctx.Writer.Flush()
+			time.Sleep(time.Second * 5)
 			ctx.SSEvent("status", "Running")
+			ctx.Writer.Flush()
+			time.Sleep(time.Second * 5)
+			ctx.SSEvent("status", "Sleeping")
+			ctx.Writer.Flush()
+			time.Sleep(time.Second * 5)
+			ctx.SSEvent("status", "Stopped")
 			ctx.Writer.Flush()
 		}
 	}
