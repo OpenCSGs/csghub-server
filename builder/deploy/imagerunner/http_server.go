@@ -109,7 +109,7 @@ func (s *HttpServer) runImage(c *gin.Context) {
 								// Image: "ghcr.io/knative/helloworld-go:latest",
 								Image: path.Join(s.dockerRegBase, request.ImageID),
 								Ports: []corev1.ContainerPort{{
-									ContainerPort: 8080,
+									ContainerPort: 7860,
 								}},
 								// TODO:set env
 								// Env: environment,
