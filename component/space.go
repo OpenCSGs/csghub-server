@@ -338,7 +338,7 @@ func (c *SpaceComponent) status(ctx context.Context, s *database.Space) (string,
 	code, err := c.deployer.Status(ctx, s.ID)
 	if err != nil {
 		slog.Error("error happen when get space status", slog.Any("error", err), slog.String("path", s.Repository.Path))
-		return SpaceStatusUnkown, err
+		return SpaceStatusStopped, err
 	}
 	return c.statusCodeToString(code), nil
 }
@@ -347,7 +347,7 @@ func (c *SpaceComponent) Status(ctx context.Context, namespace, name string) (st
 	s, err := c.space.FindByPath(ctx, namespace, name)
 	if err != nil {
 		slog.Error("can't get space status", slog.Any("error", err), slog.String("namespace", namespace), slog.String("name", name))
-		return SpaceStatusUnkown, err
+		return SpaceStatusStopped, err
 	}
 	return c.status(ctx, s)
 }
@@ -409,13 +409,17 @@ func (c *SpaceComponent) statusCodeToString(code int) string {
 	case 20:
 		txt = SpaceStatusDeploying
 	case 21:
-		txt = SpaceStatusDeploying
+		txt = SpaceStatusDeployFailed
 	case 22:
-		txt = SpaceStatusRunning
+		txt = SpaceStatusDeploying
 	case 23:
+		txt = SpaceStatusRunning
+	case 24:
 		txt = SpaceStatusRuntimeError
+	case 25:
+		txt = SpaceStatusSleeping
 	default:
-		txt = SpaceStatusUnkown
+		txt = SpaceStatusStopped
 	}
 	return txt
 }
@@ -426,7 +430,9 @@ const (
 	SpaceStatusBuilding     = "Building"
 	SpaceStatusBuildFailed  = "BuildFailed"
 	SpaceStatusDeploying    = "Deploying"
+	SpaceStatusDeployFailed = "DeployFailed"
 	SpaceStatusRunning      = "Running"
 	SpaceStatusRuntimeError = "RuntimeError"
-	SpaceStatusUnkown       = "Unkown"
+	SpaceStatusStopped      = "Stopped"
+	SpaceStatusSleeping     = "Sleeping"
 )

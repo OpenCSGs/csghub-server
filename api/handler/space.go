@@ -422,7 +422,7 @@ func (h *SpaceHandler) status(ctx *gin.Context) {
 			ctx.SSEvent("status", "Sleeping")
 			ctx.Writer.Flush()
 			time.Sleep(time.Second * 5)
-			ctx.SSEvent("status", "Stop")
+			ctx.SSEvent("status", "Stopped")
 			ctx.Writer.Flush()
 		}
 	}

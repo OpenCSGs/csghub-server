@@ -4,7 +4,9 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"time"
 
+	"opencsg.com/csghub-server/builder/deploy/common"
 	"opencsg.com/csghub-server/builder/deploy/imagebuilder"
 	"opencsg.com/csghub-server/builder/deploy/imagerunner"
 	"opencsg.com/csghub-server/builder/deploy/scheduler"
@@ -26,18 +28,21 @@ type deployer struct {
 	ib imagebuilder.Builder
 	ir imagerunner.Runner
 
-	store *database.DeployTaskStore
+	store       *database.DeployTaskStore
+	statuscache map[string]int
 }
 
 func newDeployer(s scheduler.Scheduler, ib imagebuilder.Builder, ir imagerunner.Runner) (Deployer, error) {
 	store := database.NewDeployTaskStore()
 	d := &deployer{
-		s:     s,
-		ib:    ib,
-		ir:    ir,
-		store: store,
+		s:           s,
+		ib:          ib,
+		ir:          ir,
+		store:       store,
+		statuscache: make(map[string]int),
 	}
 
+	go d.refreshStatus()
 	go d.s.Run()
 
 	return d, nil
@@ -75,13 +80,37 @@ func (d *deployer) Deploy(ctx context.Context, s types.Space) (int64, error) {
 	return deploy.ID, nil
 }
 
+func (d *deployer) refreshStatus() {
+	for {
+		ctxTimeout, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+		status, err := d.ir.StatusAll(ctxTimeout)
+		cancel()
+		if err != nil {
+			slog.Error("refresh status all failed", slog.Any("error", err))
+		} else {
+			slog.Info("refresh status all success", slog.Any("error", err))
+			slog.Debug("status all cached", slog.Any("status", d.statuscache))
+			d.statuscache = status
+		}
+
+		time.Sleep(5 * time.Second)
+	}
+}
+
 func (d *deployer) Status(ctx context.Context, spaceID int64) (int, error) {
 	// get latest Deploy
 	deploy, err := d.store.GetSpaceLatestDeploy(ctx, spaceID)
 	if err != nil {
+		slog.Debug("cannot get last deploy", slog.Any("space_id", spaceID), slog.Any("error", err))
 		return -1, err
 	}
-	return deploy.Status, nil
+	srvName := common.ImageIDToServiceName(deploy.ImageID)
+	code, found := d.statuscache[srvName]
+	if !found {
+		slog.Debug("status cache miss", slog.String("srv_name", srvName))
+		return deploy.Status, nil
+	}
+	return code, nil
 }
 
 func (d *deployer) Logs(ctx context.Context, spaceID int64) (*MultiLogReader, error) {

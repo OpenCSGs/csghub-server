@@ -6,5 +6,6 @@ type Runner interface {
 	Run(context.Context, *RunRequest) (*RunResponse, error)
 	Stop(context.Context, *StopRequest) (*StopResponse, error)
 	Status(context.Context, *StatusRequest) (*StatusResponse, error)
+	StatusAll(context.Context) (map[string]int, error)
 	Logs(context.Context, *LogsRequest) (*LogsResponse, error)
 }

@@ -1,5 +1,7 @@
 package common
 
+import "strings"
+
 // sub build task status
 
 const (
@@ -16,3 +18,7 @@ const (
 	RunTimeError = 24
 	Sleeping     = 25
 )
+
+func ImageIDToServiceName(imageID string) string {
+	return strings.ReplaceAll(strings.ReplaceAll(imageID, ":", "-"), ".", "-")
+}

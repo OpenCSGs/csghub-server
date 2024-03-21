@@ -8,7 +8,6 @@ import (
 	"net/http"
 	"path"
 	"path/filepath"
-	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -21,6 +20,7 @@ import (
 	v1 "knative.dev/serving/pkg/apis/serving/v1"
 	knative "knative.dev/serving/pkg/client/clientset/versioned"
 	"opencsg.com/csghub-server/api/middleware"
+	"opencsg.com/csghub-server/builder/deploy/common"
 	"opencsg.com/csghub-server/common/config"
 )
 
@@ -69,6 +69,7 @@ func (s *HttpServer) Run(port int) error {
 	router.POST("/stop/:imageID", s.StopImage)
 	router.GET("/status/:imageID", s.imageStatus)
 	router.GET("/logs/:imageID", s.imageLogs)
+	router.GET("/status-all", s.imageStatusAll)
 
 	return router.Run(fmt.Sprintf(":%d", port))
 }
@@ -84,7 +85,7 @@ func (s *HttpServer) runImage(c *gin.Context) {
 		return
 	}
 
-	srvName := s.imageIDToServiceName(request.ImageID)
+	srvName := common.ImageIDToServiceName(request.ImageID)
 	srv, err := s.knativeClient.ServingV1().Services(K8sNameSpace).
 		Get(c.Request.Context(), srvName, metav1.GetOptions{})
 	if err == nil {
@@ -137,7 +138,7 @@ func (s *HttpServer) runImage(c *gin.Context) {
 func (s *HttpServer) StopImage(c *gin.Context) {
 	var resp StopResponse
 	imageID := c.Param("imageID")
-	srvName := s.imageIDToServiceName(imageID)
+	srvName := common.ImageIDToServiceName(imageID)
 	srv, err := s.knativeClient.ServingV1().Services(K8sNameSpace).
 		Get(c.Request.Context(), srvName, metav1.GetOptions{})
 	if err != nil {
@@ -185,7 +186,7 @@ func (s *HttpServer) StopImage(c *gin.Context) {
 func (s *HttpServer) imageStatus(c *gin.Context) {
 	var resp StatusResponse
 	imageID := c.Param("imageID")
-	srvName := s.imageIDToServiceName(imageID)
+	srvName := common.ImageIDToServiceName(imageID)
 	srv, err := s.knativeClient.ServingV1().Services(K8sNameSpace).
 		Get(c.Request.Context(), srvName, metav1.GetOptions{})
 	if err != nil {
@@ -198,7 +199,7 @@ func (s *HttpServer) imageStatus(c *gin.Context) {
 	}
 
 	if srv.IsFailed() {
-		resp.Code = 21
+		resp.Code = common.Deploying
 		resp.Message = srv.Status.GetCondition(v1.ServiceConditionReady).Message
 		slog.Info("get image status success", slog.Any("resp", resp))
 		c.JSON(http.StatusOK, resp)
@@ -213,14 +214,14 @@ func (s *HttpServer) imageStatus(c *gin.Context) {
 			return
 		}
 		if len(podNames) == 0 {
-			resp.Code = 25
+			resp.Code = common.Sleeping
 			resp.Message = "service sleeping, no running pods"
 			slog.Info("get image status success", slog.Any("resp", resp))
 			c.JSON(http.StatusOK, resp)
 			return
 		}
 
-		resp.Code = 23
+		resp.Code = common.Running
 		resp.Message = "service running"
 		slog.Info("get image status success", slog.Any("resp", resp))
 		c.JSON(http.StatusOK, resp)
@@ -235,7 +236,7 @@ func (s *HttpServer) imageStatus(c *gin.Context) {
 
 func (s *HttpServer) imageLogs(c *gin.Context) {
 	imageID := c.Param("imageID")
-	srvName := s.imageIDToServiceName(imageID)
+	srvName := common.ImageIDToServiceName(imageID)
 	podNames, err := s.getServicePods(c.Request.Context(), srvName, K8sNameSpace)
 	if err != nil {
 		slog.Error("failed to read image logs, cantnot get pods info", slog.Any("error", err), slog.String("srv_name", srvName), slog.String("image_id", imageID))
@@ -295,6 +296,45 @@ func (s *HttpServer) imageLogs(c *gin.Context) {
 	}
 }
 
+func (s *HttpServer) imageStatusAll(c *gin.Context) {
+	services, err := s.knativeClient.ServingV1().Services(K8sNameSpace).
+		List(c.Request.Context(), metav1.ListOptions{})
+	if err != nil {
+		slog.Error("get image status all failed, cannot get service infos", slog.Any("error", err))
+		c.Status(http.StatusInternalServerError)
+		return
+	}
+	serviceStatus := make(map[string]int)
+	for _, srv := range services.Items {
+		if srv.IsFailed() {
+			serviceStatus[srv.Name] = common.DeployFailed
+			continue
+		}
+
+		if srv.IsReady() {
+			podNames, err := s.getServicePods(c.Request.Context(), srv.Name, K8sNameSpace)
+			if err != nil {
+				slog.Error("get image status failed, cantnot get pods info", slog.Any("error", err))
+				serviceStatus[srv.Name] = common.Running
+				continue
+			}
+
+			if len(podNames) == 0 {
+				serviceStatus[srv.Name] = common.Sleeping
+				continue
+			}
+
+			serviceStatus[srv.Name] = common.Running
+			continue
+		}
+
+		// default to deploying
+		serviceStatus[srv.Name] = common.Deploying
+	}
+
+	c.JSON(http.StatusOK, serviceStatus)
+}
+
 func (s *HttpServer) getServicePods(ctx context.Context, srvName string, namespace string) ([]string, error) {
 	labelSelector := fmt.Sprintf("serving.knative.dev/service=%s", srvName)
 	// Get the list of Pods based on the label selector
@@ -313,8 +353,4 @@ func (s *HttpServer) getServicePods(ctx context.Context, srvName string, namespa
 	}
 
 	return podNames, nil
-}
-
-func (s *HttpServer) imageIDToServiceName(imageID string) string {
-	return strings.ReplaceAll(strings.ReplaceAll(imageID, ":", "-"), ".", "-")
 }

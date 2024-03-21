@@ -79,6 +79,22 @@ func (h *RemoteRunner) Status(ctx context.Context, req *StatusRequest) (*StatusR
 	return &statusResponse, nil
 }
 
+func (h *RemoteRunner) StatusAll(ctx context.Context) (map[string]int, error) {
+	u := fmt.Sprintf("%s/status-all", h.remote)
+	response, err := h.doRequest(http.MethodGet, u, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer response.Body.Close()
+
+	statusAll := make(map[string]int)
+	if err := json.NewDecoder(response.Body).Decode(&statusAll); err != nil {
+		return nil, err
+	}
+
+	return statusAll, nil
+}
+
 func (h *RemoteRunner) Logs(ctx context.Context, req *LogsRequest) (*LogsResponse, error) {
 	u := fmt.Sprintf("%s/logs/%s", h.remote, req.ImageID)
 	rc, err := h.doSSERequest(http.MethodGet, u, req)
