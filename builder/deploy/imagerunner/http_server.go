@@ -287,10 +287,10 @@ func (s *HttpServer) imageLogs(c *gin.Context) {
 			if n > 0 {
 				c.Writer.Write(buf[:n])
 				c.Writer.Flush()
-				slog.Info("send pod logs", slog.String("image_id", imageID), slog.Int("len", n))
+				slog.Info("send pod logs", slog.String("image_id", imageID), slog.Int("len", n), slog.String("log", string(buf[:n])))
 			}
 			// c.Writer.WriteString("test messagetest messagetest messagetest messagetest messagetest messagetest messagetest messagetest message")
-			c.Writer.Flush()
+			// c.Writer.Flush()
 		}
 		time.Sleep(5 * time.Second)
 	}

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"io"
 	"log/slog"
+	"time"
 )
 
 type MultiLogReader struct {
@@ -25,7 +26,7 @@ func (r *MultiLogReader) Close() error {
 }
 
 func (r *MultiLogReader) BuildLog() <-chan []byte {
-	output := make(chan []byte)
+	output := make(chan []byte, 4)
 	go r.readToChannel(r.buildReader, output)
 	return output
 }
@@ -42,6 +43,7 @@ func (r *MultiLogReader) readToChannel(rc io.ReadCloser, output chan []byte) {
 
 	for {
 		n, err := br.Read(buf)
+		slog.Debug("read to channel", slog.Int("n", n), slog.Any("err", err))
 		if err != nil {
 			slog.Error("multi log reader get EOF from inner log reader", slog.Any("error", err))
 			rc.Close()
@@ -53,6 +55,8 @@ func (r *MultiLogReader) readToChannel(rc io.ReadCloser, output chan []byte) {
 			data := make([]byte, n)
 			copy(data, buf)
 			output <- data
+		} else {
+			time.Sleep(2 * time.Second)
 		}
 	}
 }
