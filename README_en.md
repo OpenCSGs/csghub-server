@@ -61,5 +61,16 @@ If you wish to contribute, please follow the [Contribution Guidelines](docs/en/c
 ## Acknowledgments
 This project is based on open source projects such as Gin, DuckDB, minio, and Gitea. We would like to express our sincere gratitude to them for their open source contributions!
 
-## Contact us
-If you have any questions during use, you can raise an issue on GitHub.
+### CONTACT WITH US
+Any problems in the process of use, you can contact with us by following ways:
+1. initiate an issue in github
+2. join our WeChat group by scaning wechat helper qrcode
+3. join our offical discord channel: [OpenCSG Discord Channel](https://discord.gg/bXnu4C9BkR)
+4. join our slack workspace:[OpenCSG Slack Channel](https://join.slack.com/t/opencsghq/shared_invite/zt-2fmtem7hs-s_RmMeoOIoF1qzslql2q~A)
+<div style="display:inline-block">
+<img src="/docs/images/wechat-assistant-new.png" width='200'>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+<img src="/docs/images/discord-qrcode.png" width='200'>
+  &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+<img src="/docs/images/slack-qrcode.png" width='200'>
+</div>
