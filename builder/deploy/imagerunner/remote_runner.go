@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log/slog"
 	"net/http"
 	"net/url"
 )
@@ -30,10 +29,8 @@ func NewRemoteRunner(remoteURL string) (Runner, error) {
 }
 
 func (h *RemoteRunner) Run(ctx context.Context, req *RunRequest) (*RunResponse, error) {
-	rel := &url.URL{Path: "/run"}
-	u := h.remote.ResolveReference(rel)
-	slog.Debug("cal run url", slog.Any("url", u))
-	response, err := h.doRequest(http.MethodPost, u.String(), req)
+	u := fmt.Sprintf("%s/%s/%s/run", h.remote, req.OrgName, req.SpaceName)
+	response, err := h.doRequest(http.MethodPost, u, req)
 	if err != nil {
 		return nil, err
 	}
@@ -48,7 +45,7 @@ func (h *RemoteRunner) Run(ctx context.Context, req *RunRequest) (*RunResponse, 
 }
 
 func (h *RemoteRunner) Stop(ctx context.Context, req *StopRequest) (*StopResponse, error) {
-	u := fmt.Sprintf("%s/stop/%s", h.remote, req.ImageID)
+	u := fmt.Sprintf("%s/%s/%s/stop", h.remote, req.OrgName, req.SpaceName)
 	response, err := h.doRequest(http.MethodPost, u, req)
 	if err != nil {
 		return nil, err
@@ -64,7 +61,7 @@ func (h *RemoteRunner) Stop(ctx context.Context, req *StopRequest) (*StopRespons
 }
 
 func (h *RemoteRunner) Status(ctx context.Context, req *StatusRequest) (*StatusResponse, error) {
-	u := fmt.Sprintf("%s/status/%s", h.remote, req.ImageID)
+	u := fmt.Sprintf("%s/%s/%s/status", h.remote, req.OrgName, req.SpaceName)
 	response, err := h.doRequest(http.MethodGet, u, req)
 	if err != nil {
 		return nil, err
@@ -96,7 +93,7 @@ func (h *RemoteRunner) StatusAll(ctx context.Context) (map[string]int, error) {
 }
 
 func (h *RemoteRunner) Logs(ctx context.Context, req *LogsRequest) (*LogsResponse, error) {
-	u := fmt.Sprintf("%s/logs/%s", h.remote, req.ImageID)
+	u := fmt.Sprintf("%s/%s/%s/logs", h.remote, req.OrgName, req.SpaceName)
 	rc, err := h.doSSERequest(http.MethodGet, u, req)
 	if err != nil {
 		return nil, err
