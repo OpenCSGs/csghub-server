@@ -7,11 +7,56 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/gin-contrib/sessions"
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/types"
 )
+
+func JwtSession(config *config.Config) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		token := c.Query("jwt")
+
+		// If no JWT provided, continue with the next middleware
+		if token == "" {
+			c.Next()
+			return
+		}
+		valid, msg, err := checkJWTToken(config, token)
+		if err != nil {
+			slog.Debug("JWT token is invalid", slog.String("token_get", token))
+			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": msg})
+			return
+		}
+
+		if !valid {
+			slog.Debug("Authenticator token is invalid", slog.String("token_get", token))
+			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": msg})
+			return
+		}
+
+		err = setCurrentUserToSession(c, config, token)
+		if err != nil {
+			slog.Debug("Error parsing claims from JWT token", slog.String("token_get", token))
+			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "error parsing claims from JWT token"})
+			return
+		}
+	}
+}
+
+func AuthSession() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		session := sessions.Default(c)
+		userName := session.Get("currentUser")
+		if userName == nil {
+			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "session not found, please access with jwt token first"})
+			return
+		}
+
+		c.Next()
+	}
+}
 
 func Authenticator(config *config.Config) gin.HandlerFunc {
 	return func(c *gin.Context) {
@@ -89,6 +134,24 @@ func setCurrentUser(ctx *gin.Context, config *config.Config, tokenString string)
 	claims, ok := token.Claims.(*types.JWTClaims)
 	if ok {
 		ctx.Set("currentUser", claims.CurrentUser)
+		slog.Info("user jwt token validated", slog.Any("currentUser", claims.CurrentUser))
+		return nil
+	}
+	return fmt.Errorf("error parsing claims: %v", token)
+}
+
+func setCurrentUserToSession(ctx *gin.Context, config *config.Config, tokenString string) error {
+	token, err := jwt.ParseWithClaims(tokenString, &types.JWTClaims{}, func(token *jwt.Token) (interface{}, error) {
+		return []byte(config.JWT.SigningKey), nil
+	})
+	if err != nil {
+		return err
+	}
+
+	claims, ok := token.Claims.(*types.JWTClaims)
+	if ok {
+		ctx.Set("currentUser", claims.CurrentUser)
+		sessions.Default(ctx).Set("currentUser", claims.CurrentUser)
 		slog.Info("user jwt token validated", slog.Any("currentUser", claims.CurrentUser))
 		return nil
 	}
