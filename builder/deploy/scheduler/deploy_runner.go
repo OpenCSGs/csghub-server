@@ -47,10 +47,9 @@ func (t *DeployRunner) Run(ctx context.Context) error {
 	for {
 		fields := strings.Split(t.space.Repository.Path, "/")
 		req := &imagerunner.StatusRequest{
+			SpaceID:   t.space.ID,
 			OrgName:   fields[0],
 			SpaceName: fields[1],
-			BuildID:   t.task.DeployID,
-			ImageID:   t.task.Deploy.ImageID,
 		}
 		timeoutCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
 		resp, err := t.ir.Status(timeoutCtx, req)
@@ -160,13 +159,13 @@ func (t *DeployRunner) runtimeError(msg string) {
 func (t *DeployRunner) makeDeployRequest() *imagerunner.RunRequest {
 	fields := strings.Split(t.space.Repository.Path, "/")
 	return &imagerunner.RunRequest{
+		SpaceID:   t.space.ID,
 		OrgName:   fields[0],
 		SpaceName: fields[1],
 		UserName:  t.space.Repository.User.Name,
 		Hardware:  t.space.Hardware,
 		Env:       t.space.Env,
 		GitRef:    t.space.Repository.DefaultBranch,
-		BuildID:   t.task.DeployID,
 		ImageID:   t.task.Deploy.ImageID,
 	}
 }

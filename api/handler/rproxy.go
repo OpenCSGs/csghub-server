@@ -4,6 +4,8 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"net/http"
+	"strconv"
 	"strings"
 
 	"github.com/gin-gonic/gin"
@@ -33,9 +35,15 @@ func (r *RProxyHandler) Proxy(ctx *gin.Context) {
 	slog.Debug("http request", slog.Any("request", ctx.Request.URL), slog.Any("header", ctx.Request.Header))
 	host := ctx.Request.Host
 	domainParts := strings.SplitN(host, ".", 2)
-	spaceSrvName := domainParts[0]
-	names := strings.SplitN(spaceSrvName, "-", 2)
-	namespace, name := names[0], names[1]
+	spaceAppName := domainParts[0]
+	nameParts := strings.Split(spaceAppName, "-")
+	spaceIDStr := nameParts[len(nameParts)-1]
+	spaceID, err := strconv.ParseInt(spaceIDStr, 10, 64)
+	if err != nil {
+		slog.Info("proxy request has invalid space ID", slog.Any("error", err))
+		ctx.Status(http.StatusNotFound)
+		return
+	}
 
 	username, exists := ctx.Get("currentUser")
 	if !exists {
@@ -56,7 +64,7 @@ func (r *RProxyHandler) Proxy(ctx *gin.Context) {
 		slog.Info("proxy space request", slog.String("namespace", namespace),
 			slog.String("name", name), slog.Any("username", username),
 			slog.String("api", apiname))
-		rp, _ := proxy.NewReverseProxy(fmt.Sprintf("http://%s.%s", spaceSrvName, r.SpaceRootDomain))
+		rp, _ := proxy.NewReverseProxy(fmt.Sprintf("http://%s.%s", spaceAppName, r.SpaceRootDomain))
 		rp.ServeHTTP(ctx.Writer, ctx.Request, apiname)
 	} else {
 		slog.Info("user not allowed to call sapce api", slog.Any("user_name", username))

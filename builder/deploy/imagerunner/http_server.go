@@ -64,10 +64,10 @@ func (s *HttpServer) Run(port int) error {
 	router := gin.Default()
 	router.Use(middleware.Log())
 
-	router.POST("/:namespace/:name/run", s.runImage)
-	router.POST("/:namespace/:name/stop", s.StopImage)
-	router.GET("/:namespace/:name/status", s.imageStatus)
-	router.GET("/:namespace/:name/logs", s.imageLogs)
+	router.POST("/:service/run", s.runImage)
+	router.POST("/:service/stop", s.StopImage)
+	router.GET("/:service/status", s.imageStatus)
+	router.GET("/:service/logs", s.imageLogs)
 	router.GET("/status-all", s.imageStatusAll)
 
 	return router.Run(fmt.Sprintf(":%d", port))
@@ -353,7 +353,5 @@ func (s *HttpServer) getServicePods(ctx context.Context, srvName string, namespa
 }
 
 func (s *HttpServer) getServiceNameFromRequest(c *gin.Context) string {
-	namespace := c.Params.ByName("namespace")
-	name := c.Params.ByName("name")
-	return fmt.Sprintf("%s-%s", namespace, name)
+	return c.Params.ByName("service")
 }
