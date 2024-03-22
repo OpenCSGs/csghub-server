@@ -62,7 +62,7 @@ If you wish to contribute, please follow the [Contribution Guidelines](docs/en/c
 This project is based on open source projects such as Gin, DuckDB, minio, and Gitea. We would like to express our sincere gratitude to them for their open source contributions!
 
 ### CONTACT WITH US
-Any problems in the process of use, you can contact with us by following ways:
+If you meet any problem during usage, you can contact with us by any following way:
 1. initiate an issue in github
 2. join our WeChat group by scaning wechat helper qrcode
 3. join our offical discord channel: [OpenCSG Discord Channel](https://discord.gg/bXnu4C9BkR)
