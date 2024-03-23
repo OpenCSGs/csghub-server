@@ -152,6 +152,7 @@ func setCurrentUserToSession(ctx *gin.Context, config *config.Config, tokenStrin
 	if ok {
 		ctx.Set("currentUser", claims.CurrentUser)
 		sessions.Default(ctx).Set("currentUser", claims.CurrentUser)
+		sessions.Default(ctx).Save()
 		slog.Info("user jwt token validated", slog.Any("currentUser", claims.CurrentUser))
 		return nil
 	}

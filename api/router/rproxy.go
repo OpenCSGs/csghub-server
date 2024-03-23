@@ -22,7 +22,7 @@ func NewRProxyRouter(config *config.Config) (*gin.Engine, error) {
 	}))
 	r.Use(gin.Recovery())
 	r.Use(middleware.Log())
-	store := cookie.NewStore([]byte("secret"))
+	store := cookie.NewStore([]byte(config.Space.SessionSecretKey))
 	r.Use(sessions.Sessions("jwt_session", store))
 	r.Use(middleware.JwtSession(config))
 
