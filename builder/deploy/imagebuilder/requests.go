@@ -49,3 +49,15 @@ type (
 		SSEReadCloser io.ReadCloser `json:"sse_read_closer"`
 	}
 )
+
+func (s *StatusResponse) Success() bool {
+	return s.Code == 0
+}
+
+func (s *StatusResponse) Fail() bool {
+	return s.Code == 1
+}
+
+func (s *StatusResponse) Inprogress() bool {
+	return s.Code == 2
+}

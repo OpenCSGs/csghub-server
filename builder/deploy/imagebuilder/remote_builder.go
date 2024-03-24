@@ -47,23 +47,33 @@ func (h *RemoteBuilder) Build(ctx context.Context, req *BuildRequest) (*BuildRes
 }
 
 func (h *RemoteBuilder) Status(ctx context.Context, req *StatusRequest) (*StatusResponse, error) {
-	u := fmt.Sprintf("/%s/%s/status?build_id=%d", req.OrgName, req.SpaceName, req.BuildID)
+	u := fmt.Sprintf("%s/%s/%s/status?build_id=%s", h.remote, req.OrgName, req.SpaceName, req.BuildID)
 	response, err := h.doRequest(http.MethodGet, u, req)
 	if err != nil {
 		return nil, err
 	}
 	defer response.Body.Close()
 
-	var statusResponse StatusResponse
-	if err := json.NewDecoder(response.Body).Decode(&statusResponse); err != nil {
+	var result map[string]int = make(map[string]int)
+	if err := json.NewDecoder(response.Body).Decode(&result); err != nil {
 		return nil, err
 	}
+	var imageID string
+	var code int
+	for k, v := range result {
+		imageID = k
+		code = v
+		break
+	}
 
+	var statusResponse StatusResponse
+	statusResponse.ImageID = imageID
+	statusResponse.Code = code
 	return &statusResponse, nil
 }
 
 func (h *RemoteBuilder) Logs(ctx context.Context, req *LogsRequest) (*LogsResponse, error) {
-	u := fmt.Sprintf("/%s/%s/status?build_id=%d", req.OrgName, req.SpaceName, req.BuildID)
+	u := fmt.Sprintf("%s/%s/%s/status?build_id=%s", h.remote, req.OrgName, req.SpaceName, req.BuildID)
 
 	rc, err := h.doSSERequest(http.MethodGet, u, req)
 	if err != nil {

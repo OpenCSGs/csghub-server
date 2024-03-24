@@ -49,7 +49,8 @@ func (t *BuilderRunner) makeBuildRequest() (*imagebuilder.BuildRequest, error) {
 		SDKVersion:    "3.37.0",
 		// SDKType:        t.space.Sdk,
 		// SDKVersion:     t.space.SdkVersion,
-		SpaceURL:       fmt.Sprintf("https://portal.opencsg.com/spaces/%s/%s.git", fields[0], fields[1]),
+		// SpaceURL:       fmt.Sprintf("https://portal.opencsg.com/spaces/%s/%s.git", fields[0], fields[1]),
+		SpaceURL:       "https://portal.opencsg.com/models/13581792646/testspace2.git",
 		GitRef:         t.space.Repository.DefaultBranch,
 		GitUserID:      token.User.Username,
 		GitAccessToken: token.Token,
@@ -98,17 +99,17 @@ func (t *BuilderRunner) Run(ctx context.Context) error {
 			time.Sleep(10 * time.Second)
 			continue
 		}
-		switch resp.Code {
-		case buildInProgress:
+		switch {
+		case resp.Inprogress():
 			// wait before next check
 			time.Sleep(10 * time.Second)
 			continue
-		case buildSucceed:
+		case resp.Success():
 			slog.Info("image build succeeded", slog.String("space_name", t.space.Repository.Name), slog.Any("deplopy_task_id", t.task.ID))
 			t.buildSuccess(*resp)
 
 			return nil
-		case buildFailed:
+		case resp.Fail():
 			slog.Info("image build failed", slog.String("space_name", t.space.Repository.Name), slog.Any("deplopy_task_id", t.task.ID))
 			t.buildFailed()
 

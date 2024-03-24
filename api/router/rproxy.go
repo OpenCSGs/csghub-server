@@ -26,6 +26,7 @@ func NewRProxyRouter(config *config.Config) (*gin.Engine, error) {
 	store := cookie.NewStore([]byte(config.Space.SessionSecretKey))
 	store.Options(sessions.Options{
 		SameSite: http.SameSiteNoneMode,
+		Secure:   true,
 	})
 	r.Use(sessions.Sessions("jwt_session", store))
 	r.Use(middleware.JwtSession(config))
