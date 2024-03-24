@@ -2,6 +2,7 @@ package router
 
 import (
 	"fmt"
+	"net/http"
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-contrib/sessions"
@@ -23,6 +24,9 @@ func NewRProxyRouter(config *config.Config) (*gin.Engine, error) {
 	r.Use(gin.Recovery())
 	r.Use(middleware.Log())
 	store := cookie.NewStore([]byte(config.Space.SessionSecretKey))
+	store.Options(sessions.Options{
+		SameSite: http.SameSiteNoneMode,
+	})
 	r.Use(sessions.Sessions("jwt_session", store))
 	r.Use(middleware.JwtSession(config))
 

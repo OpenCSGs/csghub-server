@@ -14,11 +14,11 @@ type (
 
 		SpaceURL       string `json:"space_url"`
 		GitRef         string `json:"git_ref"`
-		GitUserID      string `json:"git_user_id"`
+		GitUserID      string `json:"user_id"`
 		GitAccessToken string `json:"git_access_token"`
 
-		BuildID      int64 `json:"build_id"`
-		FactoryBuild bool  `json:"factory_build"`
+		BuildID      string `json:"build_id"`
+		FactoryBuild bool   `json:"factory_build"`
 	}
 	BuildResponse struct {
 		Code    int    `json:"code"`
@@ -28,7 +28,7 @@ type (
 	StatusRequest struct {
 		OrgName   string `json:"org_name"`
 		SpaceName string `json:"space_name"`
-		BuildID   int64  `json:"build_id"`
+		BuildID   string `json:"build_id"`
 		// for local builder test only
 		CurrentStatus int
 	}
@@ -42,7 +42,7 @@ type (
 	LogsRequest struct {
 		OrgName   string `json:"org_name"`
 		SpaceName string `json:"name"`
-		BuildID   int64  `json:"build_id"`
+		BuildID   string `json:"build_id"`
 	}
 
 	LogsResponse struct {

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"strconv"
 	"strings"
 	"time"
 
@@ -52,7 +53,7 @@ func (t *BuilderRunner) makeBuildRequest() (*imagebuilder.BuildRequest, error) {
 		GitRef:         t.space.Repository.DefaultBranch,
 		GitUserID:      token.User.Username,
 		GitAccessToken: token.Token,
-		BuildID:        t.task.DeployID,
+		BuildID:        strconv.FormatInt(t.task.DeployID, 10),
 		FactoryBuild:   false,
 	}, nil
 }
@@ -86,7 +87,7 @@ func (t *BuilderRunner) Run(ctx context.Context) error {
 		req := &imagebuilder.StatusRequest{
 			OrgName:   fields[0],
 			SpaceName: fields[1],
-			BuildID:   t.task.DeployID,
+			BuildID:   strconv.FormatInt(t.task.DeployID, 10),
 		}
 		resp, err := t.ib.Status(context.Background(), req)
 		slog.Debug("image builder called", slog.Any("resp", resp), slog.Any("error", err))

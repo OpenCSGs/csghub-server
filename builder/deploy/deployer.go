@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"strconv"
 	"strings"
 	"time"
 
@@ -129,7 +130,7 @@ func (d *deployer) Logs(ctx context.Context, spaceID int64) (*MultiLogReader, er
 	}
 	slog.Debug("get logs for space", slog.Any("deploy", deploy), slog.Int64("space_id", spaceID))
 	buildLog, err := d.ib.Logs(ctx, &imagebuilder.LogsRequest{
-		BuildID: deploy.ID,
+		BuildID: strconv.FormatInt(deploy.ID, 10),
 	})
 	if err != nil {
 		return nil, fmt.Errorf("connect to imagebuilder failed: %w", err)
