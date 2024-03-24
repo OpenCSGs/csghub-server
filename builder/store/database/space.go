@@ -119,7 +119,10 @@ func (s *SpaceStore) Delete(ctx context.Context, input Space) error {
 
 func (s *SpaceStore) GetSpaceByID(ctx context.Context, id int64) (*Space, error) {
 	space := new(Space)
-	return space, s.db.Core.NewSelect().Model(space).Relation("Repository").Where("space.id = ?", id).Scan(ctx)
+	return space, s.db.Core.NewSelect().Model(space).
+		Relation("Repository").
+		Where("space.id = ?", id).
+		Scan(ctx)
 }
 
 func (s *SpaceStore) ByUsername(ctx context.Context, username string, per, page int, onlyPublic bool) (spaces []Space, total int, err error) {

@@ -78,6 +78,8 @@ type Config struct {
 		DockerRegBase string `envconfig:"STARHUB_SERVER_DOCKER_REG_BASE" default:"registry.cn-beijing.aliyuncs.com/opencsg_public/"`
 		// reverse proxy listening port
 		RProxyServerPort int `envconfig:"STARHUB_SERVER_SPACE_RPROXY_SERVER_PORT" default:"8083"`
+		// secret key for session encryption
+		SessionSecretKey string `envconfig:"STARHUB_SERVER_SPACE_SESSION_SECRET_KEY default:"secret"`
 	}
 }
 

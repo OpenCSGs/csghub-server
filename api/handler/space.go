@@ -385,7 +385,7 @@ func (h *SpaceHandler) Status(ctx *gin.Context) {
 			return
 		default:
 			time.Sleep(time.Second * 5)
-			status, err := h.c.Status(ctx, namespace, name)
+			_, status, err := h.c.Status(ctx, namespace, name)
 			if err != nil {
 				slog.Error("failed to get space status", slog.Any("error", err), slog.String("namespace", namespace),
 					slog.String("name", name))

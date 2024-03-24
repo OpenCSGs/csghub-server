@@ -143,13 +143,15 @@ func (c *SpaceComponent) Show(ctx context.Context, namespace, name, current_user
 		}
 	}
 
+	var endpoint string
+	var srvName string
 	var status string
 	if c.HasAppFile(ctx, namespace, name) {
 		// get model rue status
 		ctxTimeout, cancel := context.WithTimeout(ctx, 2*time.Second)
 		defer cancel()
-		status, _ = c.status(ctxTimeout, space)
-
+		srvName, status, _ = c.status(ctxTimeout, space)
+		endpoint = fmt.Sprintf("%s.opencsg.space", srvName)
 	} else {
 		status = "NoAppFile"
 	}
@@ -176,7 +178,7 @@ func (c *SpaceComponent) Show(ctx context.Context, namespace, name, current_user
 		CreatedAt: space.CreatedAt,
 		UpdatedAt: space.UpdatedAt,
 		Status:    status,
-		Endpoint:  fmt.Sprintf("/%s/%s/api/", namespace, name),
+		Endpoint:  endpoint,
 		Hardware:  space.Hardware,
 	}
 
@@ -344,20 +346,20 @@ func (c *SpaceComponent) Stop(ctx context.Context, namespace, name string) error
 	return c.deployer.Stop(ctx, s.ID)
 }
 
-func (c *SpaceComponent) status(ctx context.Context, s *database.Space) (string, error) {
-	code, err := c.deployer.Status(ctx, s.ID)
+func (c *SpaceComponent) status(ctx context.Context, s *database.Space) (string, string, error) {
+	srvName, code, err := c.deployer.Status(ctx, s.ID)
 	if err != nil {
 		slog.Error("error happen when get space status", slog.Any("error", err), slog.String("path", s.Repository.Path))
-		return SpaceStatusStopped, err
+		return "", SpaceStatusStopped, err
 	}
-	return c.statusCodeToString(code), nil
+	return srvName, c.statusCodeToString(code), nil
 }
 
-func (c *SpaceComponent) Status(ctx context.Context, namespace, name string) (string, error) {
+func (c *SpaceComponent) Status(ctx context.Context, namespace, name string) (string, string, error) {
 	s, err := c.space.FindByPath(ctx, namespace, name)
 	if err != nil {
 		slog.Error("can't get space status", slog.Any("error", err), slog.String("namespace", namespace), slog.String("name", name))
-		return SpaceStatusStopped, err
+		return "", SpaceStatusStopped, err
 	}
 	return c.status(ctx, s)
 }

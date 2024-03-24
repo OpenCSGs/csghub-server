@@ -4,6 +4,7 @@ import "io"
 
 type (
 	RunRequest struct {
+		SpaceID   int64  `json:"space_id"`
 		UserName  string `json:"user_name"`
 		OrgName   string `json:"org_name"`
 		SpaceName string `json:"space_name"`
@@ -13,7 +14,6 @@ type (
 		Hardware string `json:"hardware"`
 		Env      string `json:"env"`
 
-		BuildID int64  `json:"build_id"`
 		ImageID string `json:"image_id"`
 	}
 
@@ -23,10 +23,9 @@ type (
 	}
 
 	StopRequest struct {
+		SpaceID   int64  `json:"space_id"`
 		OrgName   string `json:"org_name"`
 		SpaceName string `json:"space_name"`
-		BuildID   int64  `json:"build_id"`
-		ImageID   string `json:"image_id"`
 	}
 
 	StopResponse struct {
@@ -35,10 +34,9 @@ type (
 	}
 
 	StatusRequest struct {
+		SpaceID   int64  `json:"space_id"`
 		OrgName   string `json:"org_name"`
 		SpaceName string `json:"space_name"`
-		BuildID   int64  `json:"build_id"`
-		ImageID   string `json:"image_id"`
 	}
 
 	StatusResponse struct {
@@ -47,10 +45,9 @@ type (
 	}
 
 	LogsRequest struct {
+		SpaceID   int64  `json:"space_id"`
 		OrgName   string `json:"org_name"`
 		SpaceName string `json:"space_name"`
-		BuildID   int64  `json:"build_id"`
-		ImageID   string `json:"image_id"`
 	}
 
 	LogsResponse struct {

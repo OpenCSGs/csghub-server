@@ -15,8 +15,11 @@ var (
 )
 
 func Init(c DeployConfig) error {
-	var err error
-	ib := imagebuilder.NewLocalBuilder()
+	// ib := imagebuilder.NewLocalBuilder()
+	ib, err := imagebuilder.NewRemoteBuilder(c.ImageBuilderURL)
+	if err != nil {
+		panic(fmt.Errorf("failed to create image builder:%w", err))
+	}
 	ir, err := imagerunner.NewRemoteRunner(c.ImageRunnerURL)
 	if err != nil {
 		panic(fmt.Errorf("failed to create image runner:%w", err))

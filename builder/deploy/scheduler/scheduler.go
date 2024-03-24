@@ -138,8 +138,9 @@ func (rs *FIFOScheduler) next() (Runner, error) {
 	return t, err
 }
 
-func (rs *FIFOScheduler) failDeployFollowingTasks(depoytaskID int64) {
-	t, _ := rs.store.GetDeployTask(context.Background(), depoytaskID)
+func (rs *FIFOScheduler) failDeployFollowingTasks(deploytaskID int64) {
+	slog.Info("scheduler fail following tasks", slog.Any("deploy_task_id", deploytaskID))
+	t, _ := rs.store.GetDeployTask(context.Background(), deploytaskID)
 
 	dps, err := rs.store.GetDeployTasksOfDeploy(context.Background(), t.DeployID)
 	if err != nil {
