@@ -108,7 +108,7 @@ func (d *deployer) Status(ctx context.Context, spaceID int64) (string, int, erro
 		slog.Debug("cannot get last deploy", slog.Any("space_id", spaceID), slog.Any("error", err))
 		return "", -1, err
 	}
-	space, err := d.spaceStore.GetSpaceByID(ctx, spaceID)
+	space, err := d.spaceStore.ByID(ctx, spaceID)
 	if err != nil {
 		return "", -1, fmt.Errorf("can't get space:%w", err)
 	}
@@ -136,7 +136,7 @@ func (d *deployer) Logs(ctx context.Context, spaceID int64) (*MultiLogReader, er
 		return nil, fmt.Errorf("connect to imagebuilder failed: %w", err)
 	}
 
-	space, err := d.spaceStore.GetSpaceByID(ctx, spaceID)
+	space, err := d.spaceStore.ByID(ctx, spaceID)
 	if err != nil {
 		return nil, fmt.Errorf("can't get space:%w", err)
 	}
@@ -157,7 +157,7 @@ func (d *deployer) Logs(ctx context.Context, spaceID int64) (*MultiLogReader, er
 }
 
 func (d *deployer) Stop(ctx context.Context, spaceID int64) error {
-	space, err := d.spaceStore.GetSpaceByID(ctx, spaceID)
+	space, err := d.spaceStore.ByID(ctx, spaceID)
 	if err != nil {
 		return fmt.Errorf("can't get space:%w", err)
 	}

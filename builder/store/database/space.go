@@ -117,7 +117,7 @@ func (s *SpaceStore) Delete(ctx context.Context, input Space) error {
 	return nil
 }
 
-func (s *SpaceStore) GetSpaceByID(ctx context.Context, id int64) (*Space, error) {
+func (s *SpaceStore) ByID(ctx context.Context, id int64) (*Space, error) {
 	space := new(Space)
 	return space, s.db.Core.NewSelect().Model(space).
 		Relation("Repository").

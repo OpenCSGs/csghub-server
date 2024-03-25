@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"strings"
 	"time"
 
 	"opencsg.com/csghub-server/builder/deploy"
@@ -285,11 +286,16 @@ func (c *SpaceComponent) Index(ctx context.Context, username, search, sort strin
 	return spaces, total, nil
 }
 
-func (c *SpaceComponent) AllowCallApi(ctx context.Context, namespace, name, username string) (bool, error) {
+func (c *SpaceComponent) AllowCallApi(ctx context.Context, spaceID int64, username string) (bool, error) {
 	if username == "" {
 		return false, errors.New("user not found, please login first")
 	}
-	return c.AllowReadAccess(ctx, namespace, name, username)
+	s, err := c.space.ByID(ctx, spaceID)
+	if err != nil {
+		return false, fmt.Errorf("failed to get space by id", slog.Int("space_id", int(spaceID)), slog.Any("error", err))
+	}
+	fields := strings.Split(s.Repository.Path, "/")
+	return c.AllowReadAccess(ctx, fields[0], fields[1], username)
 }
 
 func (c *SpaceComponent) Delete(ctx context.Context, namespace, name, currentUser string) error {

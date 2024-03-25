@@ -213,52 +213,6 @@ func (h *SpaceHandler) Delete(ctx *gin.Context) {
 	httpbase.OK(ctx, nil)
 }
 
-// CallSpaceApi   godoc
-// @Security     JWT token
-// @Summary      Call space api
-// @Description  call space api
-// @Tags         Space
-// @Accept       json
-// @Produce      json
-// @Param        namespace path string true "namespace"
-// @Param        name path string true "name"
-// @Param        api_name path string true "api_name"
-// @Param        body body string false "body"
-// @Failure      400  {object}  types.APIBadRequest "Bad request"
-// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
-// @Router       /spaces/{namespace}/{name}/api/{api_name} [post]
-func (h *SpaceHandler) Proxy(ctx *gin.Context) {
-	username, exists := ctx.Get("currentUser")
-	if !exists {
-		slog.Info("username not found in gin context")
-		httpbase.BadRequest(ctx, "user not found, please login first")
-		return
-	}
-	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
-	if err != nil {
-		slog.Error("failed to get namespace from context", "error", err)
-		httpbase.BadRequest(ctx, err.Error())
-		return
-	}
-	allow, err := h.c.AllowCallApi(ctx, namespace, name, username.(string))
-	if err != nil {
-		slog.Error("failed to check user permission", "error", err)
-		httpbase.ServerError(ctx, errors.New("failed to check user permission"))
-		return
-	}
-
-	if allow {
-		apiname := ctx.Param("api_name")
-		slog.Info("proxy space request", slog.String("namespace", namespace),
-			slog.String("name", name), slog.Any("username", username),
-			slog.String("api_name", apiname))
-		h.rproxy.ServeHTTP(ctx.Writer, ctx.Request, apiname)
-	} else {
-		slog.Info("user not allowed to call sapce api", slog.String("namespace", namespace),
-			slog.String("name", name), slog.Any("username", username))
-	}
-}
-
 // RunSpace   godoc
 // @Security     JWT token
 // @Summary      run space app

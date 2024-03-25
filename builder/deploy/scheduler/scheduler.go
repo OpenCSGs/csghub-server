@@ -119,7 +119,7 @@ func (rs *FIFOScheduler) next() (Runner, error) {
 		}
 	}
 	var s *database.Space
-	s, err = rs.spaceStore.GetSpaceByID(ctx, deployTask.Deploy.SpaceID)
+	s, err = rs.spaceStore.ByID(ctx, deployTask.Deploy.SpaceID)
 	if err != nil {
 		return nil, fmt.Errorf("get space failed, %w", err)
 	}

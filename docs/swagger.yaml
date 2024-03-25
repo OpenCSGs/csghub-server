@@ -2805,48 +2805,6 @@ paths:
       summary: Update a exists space
       tags:
       - Space
-  /spaces/{namespace}/{name}/api/{api_name}:
-    post:
-      consumes:
-      - application/json
-      description: call space api
-      parameters:
-      - description: namespace
-        in: path
-        name: namespace
-        required: true
-        type: string
-      - description: name
-        in: path
-        name: name
-        required: true
-        type: string
-      - description: api_name
-        in: path
-        name: api_name
-        required: true
-        type: string
-      - description: body
-        in: body
-        name: body
-        schema:
-          type: string
-      produces:
-      - application/json
-      responses:
-        "400":
-          description: Bad request
-          schema:
-            $ref: '#/definitions/types.APIBadRequest'
-        "500":
-          description: Internal server error
-          schema:
-            $ref: '#/definitions/types.APIInternalServerError'
-      security:
-      - JWT token: []
-      summary: Call space api
-      tags:
-      - Space
   /spaces/{namespace}/{name}/logs:
     get:
       consumes:
