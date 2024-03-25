@@ -12,7 +12,7 @@ type (
 		SDKType       string `json:"sdk"`
 		SDKVersion    string `json:"sdk_version"`
 
-		SpaceURL       string `json:"space_url"`
+		SpaceGitURL    string `json:"space_url"`
 		GitRef         string `json:"git_ref"`
 		GitUserID      string `json:"user_id"`
 		GitAccessToken string `json:"git_access_token"`

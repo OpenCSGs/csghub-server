@@ -17,10 +17,10 @@ import (
 func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 	r := gin.New()
 	r.Use(cors.New(cors.Config{
-		AllowOrigins:     []string{"http://localhost:3000", "https://portal-stg.opencsg.com", "https://portal.opencsg.com"},
 		AllowCredentials: true,
 		AllowHeaders:     []string{"*"},
 		AllowMethods:     []string{"*"},
+		AllowAllOrigins:  true,
 	}))
 	r.Use(gin.Recovery())
 	r.Use(middleware.Log())

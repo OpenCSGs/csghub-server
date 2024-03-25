@@ -16,10 +16,10 @@ import (
 func NewRProxyRouter(config *config.Config) (*gin.Engine, error) {
 	r := gin.New()
 	r.Use(cors.New(cors.Config{
-		AllowOrigins:     []string{"http://localhost:3000", "http://8.146.211.34:8282", "https://portal-stg.opencsg.com", "https://portal.opencsg.com"},
 		AllowCredentials: true,
 		AllowHeaders:     []string{"*"},
 		AllowMethods:     []string{"*"},
+		AllowAllOrigins:  true,
 	}))
 	r.Use(gin.Recovery())
 	r.Use(middleware.Log())

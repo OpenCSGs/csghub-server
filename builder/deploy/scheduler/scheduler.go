@@ -70,7 +70,7 @@ func (rs *FIFOScheduler) Run() error {
 
 			if err := t.Run(ctx); err != nil {
 				slog.Error("failed to run task", slog.Any("error", err), slog.Any("task", t.WatchID()))
-				rs.failDeployFollowingTasks(t.WatchID())
+				rs.failDeployFollowingTasks(t.WatchID(), err.Error())
 			}
 
 			rs.next()
@@ -138,7 +138,7 @@ func (rs *FIFOScheduler) next() (Runner, error) {
 	return t, err
 }
 
-func (rs *FIFOScheduler) failDeployFollowingTasks(deploytaskID int64) {
+func (rs *FIFOScheduler) failDeployFollowingTasks(deploytaskID int64, reason string) {
 	slog.Info("scheduler fail following tasks", slog.Any("deploy_task_id", deploytaskID))
 	t, _ := rs.store.GetDeployTask(context.Background(), deploytaskID)
 
@@ -151,8 +151,14 @@ func (rs *FIFOScheduler) failDeployFollowingTasks(deploytaskID int64) {
 
 	// update following tasks to be failed to stop scheduler to run it
 	for _, dp := range dps {
-		// tasks from current task
-		if dp.ID >= t.ID {
+		// fail current task
+		if dp.ID == t.ID {
+			dp.Status = buildFailed
+			dp.Message = reason
+			continue
+		}
+		// tasks after current task
+		if dp.ID > t.ID {
 			dp.Status = cancelled
 			dp.Message = "cancel as previous task failed"
 		}
