@@ -22,7 +22,7 @@ func NewRProxyHandler(config *config.Config) (*RProxyHandler, error) {
 		return nil, fmt.Errorf("failed to create space component,%w", err)
 	}
 	return &RProxyHandler{
-		SpaceRootDomain: config.Space.RootDomain,
+		SpaceRootDomain: config.Space.InternalRootDomain,
 		spaceComp:       spaceComp,
 	}, nil
 }

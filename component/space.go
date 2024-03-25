@@ -27,6 +27,7 @@ func NewSpaceComponent(config *config.Config) (*SpaceComponent, error) {
 		return nil, err
 	}
 	c.deployer = deploy.NewDeployer()
+	c.publicRootDomain = config.Space.PublicRootDomain
 	return c, nil
 }
 
@@ -37,6 +38,8 @@ type SpaceComponent struct {
 	sss      *database.SpaceSdkStore
 	srs      *database.SpaceResourceStore
 	deployer deploy.Deployer
+
+	publicRootDomain string
 }
 
 func (c *SpaceComponent) Create(ctx context.Context, req types.CreateSpaceReq) (*types.Space, error) {
@@ -151,7 +154,7 @@ func (c *SpaceComponent) Show(ctx context.Context, namespace, name, current_user
 		ctxTimeout, cancel := context.WithTimeout(ctx, 2*time.Second)
 		defer cancel()
 		srvName, status, _ = c.status(ctxTimeout, space)
-		endpoint = fmt.Sprintf("%s.opencsg.space", srvName)
+		endpoint = fmt.Sprintf("%s.%s", srvName, c.publicRootDomain)
 	} else {
 		status = "NoAppFile"
 	}

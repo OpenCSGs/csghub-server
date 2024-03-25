@@ -22,15 +22,8 @@ func NewSpaceHandler(config *config.Config) (*SpaceHandler, error) {
 	if err != nil {
 		return nil, err
 	}
-	rp, err := proxy.NewReverseProxy(config.Space.RootDomain)
-	if err != nil {
-		// log error and continue
-		slog.Error("failed to create space reverse proxy", slog.String("K8sEndpoint", config.Space.RunnerEndpoint),
-			slog.Any("error", err))
-	}
 	return &SpaceHandler{
-		c:      sc,
-		rproxy: rp,
+		c: sc,
 	}, nil
 }
 
