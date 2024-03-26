@@ -26,12 +26,12 @@ const (
 func UniqueSpaceAppName(namespace, name string, spaceID int64) string {
 	encodedSpaceID := NumberToString(spaceID)
 	uniqueAppName := fmt.Sprintf("%s-%s-%s", namespace, name, encodedSpaceID)
-	return strings.ReplaceAll(strings.ReplaceAll(uniqueAppName, "_", "-"), ".", "-")
+	return strings.ToLower(strings.ReplaceAll(strings.ReplaceAll(uniqueAppName, "_", "-"), ".", "-"))
 }
 
 // NumberToString encodes a number into a shorter string representation without padding
 func NumberToString(num int64) string {
-	alphabet := "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
+	alphabet := "0123456789abcdefghijklmnopqrstuvwxyz"
 	var encodedBuilder strings.Builder
 	base := int64(len(alphabet))
 
@@ -53,7 +53,7 @@ func NumberToString(num int64) string {
 
 // StringToNumber decodes a string back into the original number without padding
 func StringToNumber(encoded string) (int64, error) {
-	alphabet := "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
+	alphabet := "0123456789abcdefghijklmnopqrstuvwxyz"
 	alphabetMap := make(map[rune]int64)
 	for i, c := range alphabet {
 		alphabetMap[c] = int64(i)

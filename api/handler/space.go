@@ -239,7 +239,7 @@ func (h *SpaceHandler) Run(ctx *gin.Context) {
 		return
 	}
 
-	slog.Info("deploy space sucess", slog.String("namespace", namespace),
+	slog.Info("space deployment created", slog.String("namespace", namespace),
 		slog.String("name", name), slog.Int64("deploy_id", deployID))
 	httpbase.OK(ctx, nil)
 }

@@ -124,7 +124,7 @@ func (t *BuilderRunner) buildInProgress() {
 	t.task.Deploy.Status = common.Building
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	if err := t.deployStore.UpdateInTx(ctx, t.task.Deploy, t.task); err != nil {
+	if err := t.deployStore.UpdateInTx(ctx, []string{"status"}, []string{"status", "message"}, t.task.Deploy, t.task); err != nil {
 		slog.Error("failed to change deploy status to `Building`", "error", err)
 	}
 }
@@ -137,7 +137,7 @@ func (t *BuilderRunner) buildSuccess(resp imagebuilder.StatusResponse) {
 	t.task.Deploy.ImageID = resp.ImageID
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	if err := t.deployStore.UpdateInTx(ctx, t.task.Deploy, t.task); err != nil {
+	if err := t.deployStore.UpdateInTx(ctx, []string{"status", "image_id"}, []string{"status", "message"}, t.task.Deploy, t.task); err != nil {
 		slog.Error("failed to change deploy status to `BuildSuccess`", "error", err)
 	}
 }
@@ -149,7 +149,7 @@ func (t *BuilderRunner) buildFailed() {
 	t.task.Deploy.Status = common.BuildFailed
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	if err := t.deployStore.UpdateInTx(ctx, t.task.Deploy, t.task); err != nil {
+	if err := t.deployStore.UpdateInTx(ctx, []string{"status"}, []string{"status", "message"}, t.task.Deploy, t.task); err != nil {
 		slog.Error("failed to change deploy status to `BuildFailed`", "error", err)
 	}
 }

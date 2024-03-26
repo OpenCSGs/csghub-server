@@ -80,6 +80,7 @@ func (s *HttpServer) runImage(c *gin.Context) {
 	}
 
 	if err := c.BindJSON(&request); err != nil {
+		slog.Error("runImage get bad request", slog.Any("error", err), slog.Any("req", request))
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}

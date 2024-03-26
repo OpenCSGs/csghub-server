@@ -9,7 +9,6 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
-	"net/http/httputil"
 	"net/url"
 	"time"
 )
@@ -130,12 +129,6 @@ func (h *RemoteBuilder) doRequest(method, url string, data interface{}) (*http.R
 	}
 	req.Header.Set("Content-Type", "application/json")
 
-	{
-
-		data, _ := httputil.DumpRequestOut(req, true)
-		fmt.Println(string(data))
-
-	}
 	resp, err := h.client.Do(req)
 	if err != nil {
 		return nil, err
@@ -170,10 +163,6 @@ func (h *RemoteBuilder) doSSERequest(method, url string, data interface{}) (io.R
 		return nil, err
 	}
 
-	{
-		data, _ := httputil.DumpResponse(resp, false)
-		fmt.Println(string(data))
-	}
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		return nil, fmt.Errorf("unexpected http status code:%d", resp.StatusCode)
 	}

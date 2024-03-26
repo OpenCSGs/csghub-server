@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"sync"
 	"time"
 
 	"opencsg.com/csghub-server/builder/deploy/imagebuilder"
@@ -29,6 +30,8 @@ type FIFOScheduler struct {
 	spaceStore *database.SpaceStore
 	ib         imagebuilder.Builder
 	ir         imagerunner.Runner
+
+	nextLock *sync.Mutex
 }
 
 func NewFIFOScheduler(ib imagebuilder.Builder, ir imagerunner.Runner) Scheduler {
@@ -44,6 +47,7 @@ func NewFIFOScheduler(ib imagebuilder.Builder, ir imagerunner.Runner) Scheduler 
 	// s.ir = imagerunner.NewLocalRunner()
 	s.ib = ib
 	s.ir = ir
+	s.nextLock = &sync.Mutex{}
 	return s
 }
 
@@ -90,6 +94,10 @@ func (rs *FIFOScheduler) Queue(deployTaskID int64) error {
 
 // run next task
 func (rs *FIFOScheduler) next() (Runner, error) {
+	rs.nextLock.Lock()
+	slog.Debug("FIFOScheduler try to get next task", slog.Any("last", rs.last))
+	defer rs.nextLock.Unlock()
+
 	var (
 		deployTask *database.DeployTask
 		t          Runner
@@ -100,10 +108,10 @@ func (rs *FIFOScheduler) next() (Runner, error) {
 	if rs.last == nil {
 		// TODO: save last task into db
 		deployTask, err = rs.store.GetNewTaskFirst(ctx)
-		slog.Debug("GetNewTaskFirst", slog.Any("deploy_task_id", deployTask.ID), slog.Any("error", err))
+		slog.Debug("GetNewTaskFirst", slog.Any("deploy_task", deployTask), slog.Any("error", err))
 	} else {
 		deployTask, err = rs.store.GetNewTaskAfter(ctx, rs.last.ID)
-		slog.Debug("GetNewTaskAfter", slog.Any("deploy_task_id", deployTask.ID), slog.Any("last", rs.last.ID), slog.Any("error", err))
+		slog.Debug("GetNewTaskAfter", slog.Any("deploy_task", deployTask), slog.Any("last", rs.last.ID), slog.Any("error", err))
 	}
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
@@ -123,10 +131,8 @@ func (rs *FIFOScheduler) next() (Runner, error) {
 	if err != nil {
 		return nil, fmt.Errorf("get space failed, %w", err)
 	}
-	// TODO:get space from db
 	// for build task
 	if deployTask.TaskType == 0 {
-		// t = &buildTask{data: deployTask}
 		t = NewBuidRunner(rs.ib, s, deployTask)
 	} else {
 		t = NewDeployRunner(rs.ir, s, deployTask)
@@ -163,7 +169,7 @@ func (rs *FIFOScheduler) failDeployFollowingTasks(deploytaskID int64, reason str
 			dp.Message = "cancel as previous task failed"
 		}
 	}
-	if err := rs.store.UpdateInTx(context.Background(), t.Deploy, dps...); err != nil {
+	if err := rs.store.UpdateInTx(context.Background(), nil, []string{"status", "message"}, nil, dps...); err != nil {
 		slog.Error("failed update deploy status to `BuildFailed`", slog.Int64("deploy_task_id", t.ID), "error", err)
 		return
 	}

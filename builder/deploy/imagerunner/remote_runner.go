@@ -34,6 +34,7 @@ func NewRemoteRunner(remoteURL string) (Runner, error) {
 }
 
 func (h *RemoteRunner) Run(ctx context.Context, req *RunRequest) (*RunResponse, error) {
+	slog.Debug("remote runner run with req", slog.Any("req", req))
 	u := fmt.Sprintf("%s/%s/run", h.remote, common.UniqueSpaceAppName(req.OrgName, req.SpaceName, req.SpaceID))
 	response, err := h.doRequest(http.MethodPost, u, req)
 	if err != nil {
