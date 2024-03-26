@@ -5,11 +5,11 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
-	"strconv"
 	"strings"
 
 	"github.com/gin-gonic/gin"
 	"opencsg.com/csghub-server/api/httpbase"
+	"opencsg.com/csghub-server/builder/deploy/common"
 	"opencsg.com/csghub-server/builder/proxy"
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/component"
@@ -38,7 +38,8 @@ func (r *RProxyHandler) Proxy(ctx *gin.Context) {
 	spaceAppName := domainParts[0]
 	nameParts := strings.Split(spaceAppName, "-")
 	spaceIDStr := nameParts[len(nameParts)-1]
-	spaceID, err := strconv.ParseInt(spaceIDStr, 10, 64)
+	// decode space id
+	spaceID, err := common.StringToNumber(spaceIDStr)
 	if err != nil {
 		slog.Info("proxy request has invalid space ID", slog.String("space_id_str", spaceIDStr), slog.Any("error", err))
 		ctx.Status(http.StatusNotFound)

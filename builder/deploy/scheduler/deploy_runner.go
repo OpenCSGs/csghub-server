@@ -61,7 +61,7 @@ func (t *DeployRunner) Run(ctx context.Context) error {
 		cancel()
 		if err != nil {
 			// return -1, fmt.Errorf("failed to call builder status api,%w", err)
-			slog.Error("failed to call runner status api", slog.Any("error", err), slog.Any("task", t))
+			slog.Error("failed to call runner status api", slog.Any("error", err), slog.Any("task", t.task))
 			// wait before next check
 			time.Sleep(10 * time.Second)
 			continue
