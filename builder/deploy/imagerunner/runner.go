@@ -7,5 +7,5 @@ type Runner interface {
 	Stop(context.Context, *StopRequest) (*StopResponse, error)
 	Status(context.Context, *StatusRequest) (*StatusResponse, error)
 	StatusAll(context.Context) (map[string]int, error)
-	Logs(context.Context, *LogsRequest) (*LogsResponse, error)
+	Logs(context.Context, *LogsRequest) (<-chan string, error)
 }

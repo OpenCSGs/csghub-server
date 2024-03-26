@@ -422,12 +422,11 @@ func (h *SpaceHandler) Logs(ctx *gin.Context) {
 	ctx.Writer.Header().Set("Connection", "keep-alive")
 	ctx.Writer.Header().Set("Transfer-Encoding", "chunked")
 
-	logs, err := h.c.Logs(ctx, namespace, name)
+	logReader, err := h.c.Logs(ctx, namespace, name)
 	if err != nil {
 		httpbase.ServerError(ctx, err)
 		return
 	}
-	defer logs.Close()
 	closeNotify := ctx.Writer.CloseNotify()
 
 	type logContent struct {
@@ -435,19 +434,20 @@ func (h *SpaceHandler) Logs(ctx *gin.Context) {
 		Content string `json:"content"`
 	}
 
-	buildLogChan := logs.BuildLog()
-	runLogChan := logs.RunLog()
 	for {
 		select {
 		case <-closeNotify:
-			// logs.Close()
 			return
-		case data := <-buildLogChan:
-			ctx.SSEvent("Build", string(data))
-			ctx.Writer.Flush()
-		case data := <-runLogChan:
-			ctx.SSEvent("Container", string(data))
-			ctx.Writer.Flush()
+		case data, ok := <-logReader.BuildLog():
+			if ok {
+				ctx.SSEvent("Build", string(data))
+				ctx.Writer.Flush()
+			}
+		case data, ok := <-logReader.RunLog():
+			if ok {
+				ctx.SSEvent("Container", string(data))
+				ctx.Writer.Flush()
+			}
 		}
 	}
 }

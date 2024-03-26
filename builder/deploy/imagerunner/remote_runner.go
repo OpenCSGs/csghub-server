@@ -1,6 +1,7 @@
 package imagerunner
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"encoding/json"
@@ -9,6 +10,7 @@ import (
 	"log/slog"
 	"net/http"
 	"net/url"
+	"time"
 
 	"opencsg.com/csghub-server/builder/deploy/common"
 )
@@ -95,7 +97,7 @@ func (h *RemoteRunner) StatusAll(ctx context.Context) (map[string]int, error) {
 	return statusAll, nil
 }
 
-func (h *RemoteRunner) Logs(ctx context.Context, req *LogsRequest) (*LogsResponse, error) {
+func (h *RemoteRunner) Logs(ctx context.Context, req *LogsRequest) (<-chan string, error) {
 	appNmae := common.UniqueSpaceAppName(req.OrgName, req.SpaceName, req.SpaceID)
 	u := fmt.Sprintf("%s/%s/logs", h.remote, appNmae)
 	slog.Debug("logs request", slog.String("url", u), slog.String("appname", appNmae))
@@ -104,9 +106,34 @@ func (h *RemoteRunner) Logs(ctx context.Context, req *LogsRequest) (*LogsRespons
 		return nil, err
 	}
 
-	return &LogsResponse{
-		SSEReadCloser: rc,
-	}, nil
+	return h.readToChannel(rc), nil
+}
+
+func (h *RemoteRunner) readToChannel(rc io.ReadCloser) <-chan string {
+	output := make(chan string, 2)
+
+	buf := make([]byte, 256)
+	br := bufio.NewReader(rc)
+
+	go func() {
+		for {
+			n, err := br.Read(buf)
+			if err != nil {
+				slog.Error("multi log reader get EOF from inner log reader", slog.Any("error", err))
+				rc.Close()
+				close(output)
+				break
+			}
+
+			if n > 0 {
+				output <- string(buf[:n])
+			} else {
+				time.Sleep(2 * time.Second)
+			}
+		}
+	}()
+
+	return output
 }
 
 // Helper method to execute the actual HTTP request and read the response.

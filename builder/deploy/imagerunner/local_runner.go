@@ -37,8 +37,10 @@ func (r *LocalRunner) StatusAll(ctx context.Context) (map[string]int, error) {
 	return status, nil
 }
 
-func (r *LocalRunner) Logs(ctx context.Context, req *LogsRequest) (*LogsResponse, error) {
-	return &LogsResponse{}, nil
+func (r *LocalRunner) Logs(ctx context.Context, req *LogsRequest) (<-chan string, error) {
+	output := make(chan string, 1)
+	output <- "test build log"
+	return output, nil
 }
 
 func (r *LocalRunner) Stop(ctx context.Context, req *StopRequest) (*StopResponse, error) {

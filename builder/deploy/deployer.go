@@ -123,37 +123,40 @@ func (d *deployer) Status(ctx context.Context, spaceID int64) (string, int, erro
 }
 
 func (d *deployer) Logs(ctx context.Context, spaceID int64) (*MultiLogReader, error) {
-	// get latest Deploy
-	deploy, err := d.store.GetSpaceLatestDeploy(ctx, spaceID)
-	if err != nil {
-		return nil, err
-	}
-	slog.Debug("get logs for space", slog.Any("deploy", deploy), slog.Int64("space_id", spaceID))
-	buildLog, err := d.ib.Logs(ctx, &imagebuilder.LogsRequest{
-		BuildID: strconv.FormatInt(deploy.ID, 10),
-	})
-	if err != nil {
-		return nil, fmt.Errorf("connect to imagebuilder failed: %w", err)
-	}
-
 	space, err := d.spaceStore.ByID(ctx, spaceID)
 	if err != nil {
 		return nil, fmt.Errorf("can't get space:%w", err)
 	}
 	fields := strings.Split(space.Repository.Path, "/")
+
+	// get latest Deploy
+	deploy, err := d.store.GetSpaceLatestDeploy(ctx, spaceID)
+	if err != nil {
+		return nil, err
+	}
+
+	slog.Debug("get logs for space", slog.Any("deploy", deploy), slog.Int64("space_id", spaceID))
+	buildLog, err := d.ib.Logs(ctx, &imagebuilder.LogsRequest{
+		OrgName:   fields[0],
+		SpaceName: fields[1],
+		BuildID:   strconv.FormatInt(deploy.ID, 10),
+	})
+	if err != nil {
+		// return nil, fmt.Errorf("connect to imagebuilder failed: %w", err)
+		slog.Error("failed to read log from image builder", slog.Any("error", err))
+	}
+
 	runLog, err := d.ir.Logs(ctx, &imagerunner.LogsRequest{
 		SpaceID:   space.ID,
 		OrgName:   fields[0],
 		SpaceName: fields[1],
 	})
 	if err != nil {
-		return nil, fmt.Errorf("connect to imagerunner failed: %w", err)
+		slog.Error("failed to read log from image runner", slog.Any("error", err))
+		// return nil, fmt.Errorf("connect to imagerunner failed: %w", err)
 	}
 
-	return &MultiLogReader{
-		buildReader:  buildLog.SSEReadCloser,
-		runnerReader: runLog.SSEReadCloser,
-	}, nil
+	return NewMultiLogReader(buildLog, runLog), nil
 }
 
 func (d *deployer) Stop(ctx context.Context, spaceID int64) error {

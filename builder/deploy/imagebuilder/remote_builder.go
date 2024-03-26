@@ -1,14 +1,17 @@
 package imagebuilder
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
+	"time"
 )
 
 var _ Builder = (*RemoteBuilder)(nil)
@@ -72,17 +75,42 @@ func (h *RemoteBuilder) Status(ctx context.Context, req *StatusRequest) (*Status
 	return &statusResponse, nil
 }
 
-func (h *RemoteBuilder) Logs(ctx context.Context, req *LogsRequest) (*LogsResponse, error) {
-	u := fmt.Sprintf("%s/%s/%s/status?build_id=%s", h.remote, req.OrgName, req.SpaceName, req.BuildID)
+func (h *RemoteBuilder) Logs(ctx context.Context, req *LogsRequest) (<-chan string, error) {
+	u := fmt.Sprintf("%s/%s/%s/logs?build_id=%s", h.remote, req.OrgName, req.SpaceName, req.BuildID)
 
 	rc, err := h.doSSERequest(http.MethodGet, u, req)
 	if err != nil {
 		return nil, err
 	}
 
-	return &LogsResponse{
-		SSEReadCloser: rc,
-	}, nil
+	return h.readToChannel(rc), nil
+}
+
+func (h *RemoteBuilder) readToChannel(rc io.ReadCloser) <-chan string {
+	output := make(chan string, 2)
+
+	buf := make([]byte, 256)
+	br := bufio.NewReader(rc)
+
+	go func() {
+		for {
+			n, err := br.Read(buf)
+			if err != nil {
+				slog.Error("multi log reader get EOF from inner log reader", slog.Any("error", err))
+				rc.Close()
+				close(output)
+				break
+			}
+
+			if n > 0 {
+				output <- string(buf[:n])
+			} else {
+				time.Sleep(2 * time.Second)
+			}
+		}
+	}()
+
+	return output
 }
 
 // Helper method to execute the actual HTTP request and read the response.
@@ -140,6 +168,11 @@ func (h *RemoteBuilder) doSSERequest(method, url string, data interface{}) (io.R
 	resp, err := h.client.Do(req)
 	if err != nil {
 		return nil, err
+	}
+
+	{
+		data, _ := httputil.DumpResponse(resp, false)
+		fmt.Println(string(data))
 	}
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		return nil, fmt.Errorf("unexpected http status code:%d", resp.StatusCode)

@@ -107,7 +107,7 @@ func (rs *FIFOScheduler) next() (Runner, error) {
 	}
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			slog.Info("no more tasks to run, schedule a sleeping task")
+			slog.Debug("no more tasks to run, schedule a sleeping task")
 			// using a sleep task to pause the scheduler
 			t = &sleepTask{
 				du: 5 * time.Second,
