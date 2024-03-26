@@ -42,22 +42,22 @@ build_server_image:commit:
   rules:
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH && $CI_COMMIT_BRANCH == $CI_COMMIT_REF_NAME # when commit to main branch
    
-build_runner_proxy_image:commit:
-  image: docker:24.0.6
-  stage: build
-  services:
-    - docker:24.0.6-dind
-  variables:
-    IMAGE_TAG: "$CI_REGISTRY_IMAGE/deploy:$CI_COMMIT_SHORT_SHA"
-    LATEST_IMAGE_TAG: "$CI_REGISTRY_IMAGE/deploy:latest"
-  script:
-    - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
-    - docker build -t $IMAGE_TAG -f docker/Dockerfile-runner-proxy .
-    - docker tag $IMAGE_TAG  $LATEST_IMAGE_TAG
-    - docker push $IMAGE_TAG
-    - docker push $LATEST_IMAGE_TAG
-  rules:
-    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH && $CI_COMMIT_BRANCH == $CI_COMMIT_REF_NAME # when commit to main branch
+# build_runner_proxy_image:commit:
+#   image: docker:24.0.6
+#   stage: build
+#   services:
+#     - docker:24.0.6-dind
+#   variables:
+#     IMAGE_TAG: "$CI_REGISTRY_IMAGE/deploy:$CI_COMMIT_SHORT_SHA"
+#     LATEST_IMAGE_TAG: "$CI_REGISTRY_IMAGE/deploy:latest"
+#   script:
+#     - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
+#     - docker build -t $IMAGE_TAG -f docker/Dockerfile-runner-proxy .
+#     - docker tag $IMAGE_TAG  $LATEST_IMAGE_TAG
+#     - docker push $IMAGE_TAG
+#     - docker push $LATEST_IMAGE_TAG
+#   rules:
+#     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH && $CI_COMMIT_BRANCH == $CI_COMMIT_REF_NAME # when commit to main branch
 
 build_server_image:tag:
   image: docker:24.0.6
@@ -74,20 +74,20 @@ build_server_image:tag:
     - docker build -t $IMAGE_TAG -f docker/Dockerfile .
     - docker push $IMAGE_TAG
 
-build_runner_proxy_image:tag:
-  image: docker:24.0.6
-  stage: build
-  services:
-    - docker:24.0.6-dind
-  only:
-    refs:
-      - tags
-  variables:
-    IMAGE_TAG: "$CI_REGISTRY_IMAGE/deploy:$CI_COMMIT_TAG"
-  script:
-    - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
-    - docker build -t $IMAGE_TAG -f docker/Dockerfile-runner-proxy .
-    - docker push $IMAGE_TAG
+# build_runner_proxy_image:tag:
+#   image: docker:24.0.6
+#   stage: build
+#   services:
+#     - docker:24.0.6-dind
+#   only:
+#     refs:
+#       - tags
+#   variables:
+#     IMAGE_TAG: "$CI_REGISTRY_IMAGE/deploy:$CI_COMMIT_TAG"
+#   script:
+#     - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
+#     - docker build -t $IMAGE_TAG -f docker/Dockerfile-runner-proxy .
+#     - docker push $IMAGE_TAG
 
 
 # trigger starhub-deploy project 
@@ -95,7 +95,7 @@ trigger_deploy_stg:
   stage: deploy
   needs: 
     - job: build_server_image:commit
-    - job: build_runner_proxy_image:commit
+    # - job: build_runner_proxy_image:commit
   image: docker.m.daocloud.io/alpine:3.14
   rules:
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH && $CI_COMMIT_BRANCH == $CI_COMMIT_REF_NAME
