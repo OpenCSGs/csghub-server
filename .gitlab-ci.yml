@@ -59,7 +59,7 @@ build_runner_proxy_image:commit:
   rules:
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH && $CI_COMMIT_BRANCH == $CI_COMMIT_REF_NAME # when commit to main branch
 
-build_image:tag:
+build_server_image:tag:
   image: docker:24.0.6
   stage: build
   services:
