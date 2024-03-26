@@ -54,6 +54,7 @@ func AuthSession() gin.HandlerFunc {
 			return
 		}
 
+		c.Set("currentUser", userName)
 		c.Next()
 	}
 }
