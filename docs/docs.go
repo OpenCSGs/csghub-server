@@ -4225,11 +4225,15 @@ const docTemplate = `{
             "type": "string",
             "enum": [
                 "model",
-                "dataset"
+                "dataset",
+                "code",
+                "space"
             ],
             "x-enum-varnames": [
                 "ModelTagScope",
-                "DatasetTagScope"
+                "DatasetTagScope",
+                "CodeTagScope",
+                "SpaceTagScope"
             ]
         },
         "database.User": {

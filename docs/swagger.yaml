@@ -230,10 +230,14 @@ definitions:
     enum:
     - model
     - dataset
+    - code
+    - space
     type: string
     x-enum-varnames:
     - ModelTagScope
     - DatasetTagScope
+    - CodeTagScope
+    - SpaceTagScope
   database.User:
     properties:
       accessTokens:

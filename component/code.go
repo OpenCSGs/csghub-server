@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"log/slog"
 
-	"opencsg.com/csghub-server/builder/git/membership"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/types"
@@ -31,30 +30,6 @@ func (c *CodeComponent) Create(ctx context.Context, req *types.CreateCodeReq) (*
 		nickname string
 		tags     []types.RepoTag
 	)
-
-	namespace, err := c.namespace.FindByPath(ctx, req.Namespace)
-	if err != nil {
-		return nil, errors.New("namespace does not exist")
-	}
-
-	user, err := c.user.FindByUsername(ctx, req.Username)
-	if err != nil {
-		return nil, errors.New("user does not exist")
-	}
-
-	if namespace.NamespaceType == database.OrgNamespace {
-		canWrite, err := c.checkCurrentUserPermission(ctx, req.Username, req.Namespace, membership.RoleWrite)
-		if err != nil {
-			return nil, err
-		}
-		if !canWrite {
-			return nil, errors.New("users do not have permission to create codes in this organization")
-		}
-	} else {
-		if namespace.Path != user.Username {
-			return nil, errors.New("users do not have permission to create codes in this namespace")
-		}
-	}
 
 	if req.Nickname != "" {
 		nickname = req.Nickname
@@ -82,8 +57,8 @@ func (c *CodeComponent) Create(ctx context.Context, req *types.CreateCodeReq) (*
 
 	// Create README.md file
 	err = c.git.CreateRepoFile(buildCreateFileReq(&types.CreateFileParams{
-		Username:  user.Username,
-		Email:     user.Email,
+		Username:  dbRepo.User.Username,
+		Email:     dbRepo.User.Email,
 		Message:   initCommitMessage,
 		Branch:    req.DefaultBranch,
 		Content:   req.Readme,
@@ -123,9 +98,9 @@ func (c *CodeComponent) Create(ctx context.Context, req *types.CreateCodeReq) (*
 		},
 		Private: code.Repository.Private,
 		User: types.User{
-			Username: user.Username,
-			Nickname: user.Name,
-			Email:    user.Email,
+			Username: dbRepo.User.Username,
+			Nickname: dbRepo.User.Name,
+			Email:    dbRepo.User.Email,
 		},
 		Tags:      tags,
 		CreatedAt: code.CreatedAt,
