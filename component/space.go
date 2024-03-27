@@ -168,13 +168,13 @@ func (c *SpaceComponent) Show(ctx context.Context, namespace, name, current_user
 		Likes:         space.Repository.Likes,
 		Path:          space.Repository.Path,
 		DefaultBranch: space.Repository.DefaultBranch,
-		Repository: types.Repository{
+		Repository: &types.Repository{
 			HTTPCloneURL: space.Repository.HTTPCloneURL,
 			SSHCloneURL:  space.Repository.SSHCloneURL,
 		},
 		Private: space.Repository.Private,
 		Tags:    tags,
-		User: types.User{
+		User: &types.User{
 			Username: space.Repository.User.Username,
 			Nickname: space.Repository.User.Name,
 			Email:    space.Repository.User.Email,
@@ -252,6 +252,7 @@ func (c *SpaceComponent) Index(ctx context.Context, username, search, sort strin
 	}
 
 	for _, data := range spaceData {
+		_, status, _ := c.status(ctx, &data)
 		var tags []types.RepoTag
 		for _, tag := range data.Repository.Tags {
 			tags = append(tags, types.RepoTag{
@@ -281,6 +282,7 @@ func (c *SpaceComponent) Index(ctx context.Context, username, search, sort strin
 			CreatedAt:     data.Repository.CreatedAt,
 			UpdatedAt:     data.Repository.UpdatedAt,
 			Tags:          tags,
+			Status:        status,
 		})
 	}
 	return spaces, total, nil
