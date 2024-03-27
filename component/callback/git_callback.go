@@ -18,6 +18,9 @@ import (
 
 const (
 	DatasetRepoType = "datasets"
+	ModelRepoType   = "models"
+	CodeRepoType    = "codes"
+	SpaceRepoType   = "spaces"
 	ReadmeFileName  = "README.md"
 )
 
@@ -152,10 +155,17 @@ func (c *GitCallbackComponent) removeFiles(ctx context.Context, repoType, namesp
 			}
 		} else {
 			var tagScope database.TagScope
-			if repoType == "datasets" {
+			switch repoType {
+			case DatasetRepoType:
 				tagScope = database.DatasetTagScope
-			} else {
+			case ModelRepoType:
 				tagScope = database.ModelTagScope
+			default:
+				return nil
+				// case CodeRepoType:
+				// 	tagScope = database.CodeTagScope
+				// case SpaceRepoType:
+				// 	tagScope = database.SpaceTagScope
 			}
 			err := c.tc.UpdateLibraryTags(ctx, tagScope, namespace, repoName, fileName, "")
 			if err != nil {
@@ -198,10 +208,17 @@ func (c *GitCallbackComponent) addFiles(ctx context.Context, repoType, namespace
 			}
 		} else {
 			var tagScope database.TagScope
-			if repoType == DatasetRepoType {
+			switch repoType {
+			case DatasetRepoType:
 				tagScope = database.DatasetTagScope
-			} else {
+			case ModelRepoType:
 				tagScope = database.ModelTagScope
+			default:
+				return nil
+				// case CodeRepoType:
+				// 	tagScope = database.CodeTagScope
+				// case SpaceRepoType:
+				// 	tagScope = database.SpaceTagScope
 			}
 			err := c.tc.UpdateLibraryTags(ctx, tagScope, namespace, repoName, "", fileName)
 			if err != nil {
@@ -220,10 +237,18 @@ func (c *GitCallbackComponent) updateMetaTags(ctx context.Context, repoType, nam
 		err      error
 		tagScope database.TagScope
 	)
-	if repoType == DatasetRepoType {
+	switch repoType {
+	case DatasetRepoType:
 		tagScope = database.DatasetTagScope
-	} else {
+	case ModelRepoType:
 		tagScope = database.ModelTagScope
+	default:
+		return nil
+		// TODO: support code and space
+		// case CodeRepoType:
+		// 	tagScope = database.CodeTagScope
+		// case SpaceRepoType:
+		// 	tagScope = database.SpaceTagScope
 	}
 	_, err = c.tc.UpdateMetaTags(ctx, tagScope, namespace, repoName, content)
 	if err != nil {

@@ -167,6 +167,7 @@ func (c *SpaceComponent) Show(ctx context.Context, namespace, name, current_user
 		Description:   space.Repository.Description,
 		Likes:         space.Repository.Likes,
 		Path:          space.Repository.Path,
+		License:       space.Repository.License,
 		DefaultBranch: space.Repository.DefaultBranch,
 		Repository: &types.Repository{
 			HTTPCloneURL: space.Repository.HTTPCloneURL,
