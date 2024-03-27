@@ -41,8 +41,7 @@ func (t *BuilderRunner) makeBuildRequest() (*imagebuilder.BuildRequest, error) {
 	return &imagebuilder.BuildRequest{
 		OrgName:   fields[0],
 		SpaceName: fields[1],
-		// Hardware:  t.space.Hardware,
-		Hardware: "cpu",
+		Hardware:  t.parseHardware(t.space.Hardware),
 		// PythonVersion:  t.space.PythonVersion,
 		PythonVersion: "3.10",
 		SDKType:       "gradio",
@@ -56,6 +55,14 @@ func (t *BuilderRunner) makeBuildRequest() (*imagebuilder.BuildRequest, error) {
 		BuildID:        strconv.FormatInt(t.task.DeployID, 10),
 		FactoryBuild:   false,
 	}, nil
+}
+
+func (t *BuilderRunner) parseHardware(intput string) string {
+	if strings.Contains(intput, "GPU") || strings.Contains(intput, "NVIDIA") {
+		return "gpu"
+	}
+
+	return "cpu"
 }
 
 // Run call image builder service to build a docker image
