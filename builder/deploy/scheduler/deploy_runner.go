@@ -164,7 +164,6 @@ func (t *DeployRunner) runtimeError(msg string) {
 func (t *DeployRunner) makeDeployRequest() *imagerunner.RunRequest {
 	fields := strings.Split(t.space.Repository.Path, "/")
 	deploy, _ := t.store.GetDeploy(context.Background(), t.task.DeployID)
-	slog.Debug("====make deploy  request", slog.Any("task", t.task), slog.Any("deploy", deploy))
 	return &imagerunner.RunRequest{
 		SpaceID:   t.space.ID,
 		OrgName:   fields[0],

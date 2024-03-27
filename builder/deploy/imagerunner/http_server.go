@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"path"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -24,12 +25,11 @@ import (
 	"opencsg.com/csghub-server/common/config"
 )
 
-const K8sNameSpace = "spaces"
-
 type HttpServer struct {
 	knativeClient *knative.Clientset
 	k8sClient     *kubernetes.Clientset
 	dockerRegBase string
+	k8sNameSpace  string
 }
 
 func NewHttpServer(config *config.Config) (*HttpServer, error) {
@@ -53,10 +53,12 @@ func NewHttpServer(config *config.Config) (*HttpServer, error) {
 		return nil, fmt.Errorf("falied to create k8s client,%w", err)
 	}
 
+	domainParts := strings.SplitN(config.Space.InternalRootDomain, ".", 2)
 	return &HttpServer{
 		knativeClient: knativeClient,
 		k8sClient:     k8sClient,
 		dockerRegBase: config.Space.DockerRegBase,
+		k8sNameSpace:  domainParts[0],
 	}, nil
 }
 
@@ -86,7 +88,7 @@ func (s *HttpServer) runImage(c *gin.Context) {
 	}
 
 	srvName := s.getServiceNameFromRequest(c)
-	srv, err := s.knativeClient.ServingV1().Services(K8sNameSpace).
+	srv, err := s.knativeClient.ServingV1().Services(s.k8sNameSpace).
 		Get(c.Request.Context(), srvName, metav1.GetOptions{})
 	if err == nil {
 		slog.Info("service already exists,skip create", slog.String("srv_name", srvName), slog.Any("image_id", request.ImageID),
@@ -98,7 +100,7 @@ func (s *HttpServer) runImage(c *gin.Context) {
 	service := &v1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      srvName,
-			Namespace: K8sNameSpace,
+			Namespace: s.k8sNameSpace,
 		},
 		Spec: v1.ServiceSpec{
 			ConfigurationSpec: v1.ConfigurationSpec{
@@ -122,7 +124,7 @@ func (s *HttpServer) runImage(c *gin.Context) {
 		},
 	}
 
-	service, err = s.knativeClient.ServingV1().Services(K8sNameSpace).
+	service, err = s.knativeClient.ServingV1().Services(s.k8sNameSpace).
 		Create(c, service, metav1.CreateOptions{})
 	if err != nil {
 		slog.Error("Failed to create service", "error", err, slog.String("image_id", request.ImageID),
@@ -139,7 +141,7 @@ func (s *HttpServer) StopImage(c *gin.Context) {
 	var resp StopResponse
 
 	srvName := s.getServiceNameFromRequest(c)
-	srv, err := s.knativeClient.ServingV1().Services(K8sNameSpace).
+	srv, err := s.knativeClient.ServingV1().Services(s.k8sNameSpace).
 		Get(c.Request.Context(), srvName, metav1.GetOptions{})
 	if err != nil {
 		k8serr := new(k8serrors.StatusError)
@@ -167,7 +169,7 @@ func (s *HttpServer) StopImage(c *gin.Context) {
 		return
 	}
 
-	err = s.knativeClient.ServingV1().Services(K8sNameSpace).Delete(c, srvName, *metav1.NewDeleteOptions(0))
+	err = s.knativeClient.ServingV1().Services(s.k8sNameSpace).Delete(c, srvName, *metav1.NewDeleteOptions(0))
 	if err != nil {
 		slog.Error("stop image failed, cannot delete service ", slog.Any("error", err),
 			slog.String("srv_name", srvName))
@@ -186,7 +188,7 @@ func (s *HttpServer) StopImage(c *gin.Context) {
 func (s *HttpServer) imageStatus(c *gin.Context) {
 	var resp StatusResponse
 	srvName := s.getServiceNameFromRequest(c)
-	srv, err := s.knativeClient.ServingV1().Services(K8sNameSpace).
+	srv, err := s.knativeClient.ServingV1().Services(s.k8sNameSpace).
 		Get(c.Request.Context(), srvName, metav1.GetOptions{})
 	if err != nil {
 		slog.Error("get image status failed, cannot get service info", slog.Any("error", err),
@@ -206,7 +208,7 @@ func (s *HttpServer) imageStatus(c *gin.Context) {
 	}
 
 	if srv.IsReady() {
-		podNames, err := s.getServicePods(c.Request.Context(), srvName, K8sNameSpace)
+		podNames, err := s.getServicePods(c.Request.Context(), srvName, s.k8sNameSpace)
 		if err != nil {
 			slog.Error("get image status failed, cantnot get pods info", slog.Any("error", err))
 			c.JSON(http.StatusInternalServerError, gin.H{"code": 0, "message": "unkown service status, failed to get pods"})
@@ -235,7 +237,7 @@ func (s *HttpServer) imageStatus(c *gin.Context) {
 
 func (s *HttpServer) imageLogs(c *gin.Context) {
 	srvName := s.getServiceNameFromRequest(c)
-	podNames, err := s.getServicePods(c.Request.Context(), srvName, K8sNameSpace)
+	podNames, err := s.getServicePods(c.Request.Context(), srvName, s.k8sNameSpace)
 	if err != nil {
 		slog.Error("failed to read image logs, cantnot get pods info", slog.Any("error", err), slog.String("srv_name", srvName))
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to get pods info"})
@@ -248,7 +250,7 @@ func (s *HttpServer) imageLogs(c *gin.Context) {
 	}
 	podName := podNames[0]
 
-	logs := s.k8sClient.CoreV1().Pods(K8sNameSpace).GetLogs(podName, &corev1.PodLogOptions{
+	logs := s.k8sClient.CoreV1().Pods(s.k8sNameSpace).GetLogs(podName, &corev1.PodLogOptions{
 		Container: "user-container",
 		Follow:    true,
 	})
@@ -295,7 +297,7 @@ func (s *HttpServer) imageLogs(c *gin.Context) {
 }
 
 func (s *HttpServer) imageStatusAll(c *gin.Context) {
-	services, err := s.knativeClient.ServingV1().Services(K8sNameSpace).
+	services, err := s.knativeClient.ServingV1().Services(s.k8sNameSpace).
 		List(c.Request.Context(), metav1.ListOptions{})
 	if err != nil {
 		slog.Error("get image status all failed, cannot get service infos", slog.Any("error", err))
@@ -310,7 +312,7 @@ func (s *HttpServer) imageStatusAll(c *gin.Context) {
 		}
 
 		if srv.IsReady() {
-			podNames, err := s.getServicePods(c.Request.Context(), srv.Name, K8sNameSpace)
+			podNames, err := s.getServicePods(c.Request.Context(), srv.Name, s.k8sNameSpace)
 			if err != nil {
 				slog.Error("get image status failed, cantnot get pods info", slog.Any("error", err))
 				serviceStatus[srv.Name] = common.Running
