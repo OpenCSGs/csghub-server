@@ -59,6 +59,7 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 	}
 	apiGroup.POST("/list/models_by_path", listHandler.ListModelsByPath)
 	apiGroup.POST("/list/datasets_by_path", listHandler.ListDatasetsByPath)
+	apiGroup.POST("/list/spaces_by_path", listHandler.ListSpacesByPath)
 
 	// Huggingface SDK routes
 	modelHandler, err := handler.NewModelHandler(config)

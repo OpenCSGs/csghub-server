@@ -176,3 +176,28 @@ func (s *SpaceStore) ByOrgPath(ctx context.Context, namespace string, per, page 
 	}
 	return
 }
+
+func (s *SpaceStore) ListByPath(ctx context.Context, paths []string) ([]Space, error) {
+	var spaces []Space
+	err := s.db.Operator.Core.
+		NewSelect().
+		Model(&Space{}).
+		Relation("Repository").
+		Where("path IN (?)", bun.In(paths)).
+		Scan(ctx, &spaces)
+	if err != nil {
+		return nil, fmt.Errorf("failed to find space by path,error: %w", err)
+	}
+
+	var sortedSpaces []Space
+	for _, path := range paths {
+		for _, ds := range spaces {
+			if ds.Repository.Path == path {
+				sortedSpaces = append(sortedSpaces, ds)
+			}
+		}
+	}
+
+	spaces = nil
+	return sortedSpaces, nil
+}

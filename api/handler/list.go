@@ -81,3 +81,29 @@ func (h *ListHandler) ListDatasetsByPath(ctx *gin.Context) {
 	}
 	httpbase.OK(ctx, resp)
 }
+
+// ListTrendingSpaces   godoc
+// @Security     ApiKey
+// @Summary      List spaces by paths
+// @Tags         List
+// @Accept       json
+// @Produce      json
+// @Param        body body types.ListByPathReq true "body"
+// @Success      200  {object}  types.Response{data=[]types.DatasetResp} "OK"
+// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
+// @Router       /list/spaces_by_path [post]
+func (h *ListHandler) ListSpacesByPath(ctx *gin.Context) {
+	var listTrendingReq types.ListByPathReq
+	if err := ctx.ShouldBindJSON(&listTrendingReq); err != nil {
+		httpbase.BadRequest(ctx, err.Error())
+		return
+	}
+
+	resp, err := h.c.ListSpacesByPath(ctx, &listTrendingReq)
+	if err != nil {
+		httpbase.ServerError(ctx, err)
+		return
+	}
+	httpbase.OK(ctx, resp)
+}

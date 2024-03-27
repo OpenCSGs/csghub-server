@@ -13,12 +13,14 @@ func NewListComponent(config *config.Config) (*ListComponent, error) {
 	c := &ListComponent{}
 	c.ds = database.NewDatasetStore()
 	c.ms = database.NewModelStore()
+	c.ss = database.NewSpaceStore()
 	return c, nil
 }
 
 type ListComponent struct {
 	ms *database.ModelStore
 	ds *database.DatasetStore
+	ss *database.SpaceStore
 }
 
 func (c *ListComponent) ListModelsByPath(ctx context.Context, req *types.ListByPathReq) ([]*types.ModelResp, error) {
@@ -90,4 +92,39 @@ func (c *ListComponent) ListDatasetsByPath(ctx context.Context, req *types.ListB
 		})
 	}
 	return datasetResp, nil
+}
+
+func (c *ListComponent) ListSpacesByPath(ctx context.Context, req *types.ListByPathReq) ([]*types.SpaceResp, error) {
+	var spacesResp []*types.SpaceResp
+
+	spaces, err := c.ss.ListByPath(ctx, req.Paths)
+	if err != nil {
+		slog.Error("error listing spaces by path: %v", err, slog.Any("paths", req.Paths))
+		return nil, err
+	}
+	for _, dataset := range spaces {
+		var tags []types.RepoTag
+		for _, tag := range dataset.Repository.Tags {
+			tags = append(tags, types.RepoTag{
+				Name:      tag.Name,
+				Category:  tag.Category,
+				Group:     tag.Group,
+				BuiltIn:   tag.BuiltIn,
+				ShowName:  tag.ShowName,
+				CreatedAt: tag.CreatedAt,
+				UpdatedAt: tag.UpdatedAt,
+			})
+		}
+		spacesResp = append(spacesResp, &types.SpaceResp{
+			Name:        dataset.Repository.Name,
+			Path:        dataset.Repository.Path,
+			Downloads:   dataset.Repository.DownloadCount,
+			UpdatedAt:   dataset.UpdatedAt,
+			Private:     dataset.Repository.Private,
+			Nickname:    dataset.Repository.Nickname,
+			Description: dataset.Repository.Description,
+			Tags:        tags,
+		})
+	}
+	return spacesResp, nil
 }
