@@ -177,6 +177,8 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 		spaces.DELETE("/:namespace/:name", spaceHandler.Delete)
 		// depoly and start running the space
 		spaces.POST("/:namespace/:name/run", spaceHandler.Run)
+		// wake a sleeping space
+		spaces.POST("/:namespace/:name/wakeup", spaceHandler.Wakeup)
 		// stop running space
 		spaces.POST("/:namespace/:name/stop", spaceHandler.Stop)
 		// pull space running status

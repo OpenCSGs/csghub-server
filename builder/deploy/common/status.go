@@ -20,6 +20,7 @@ const (
 	Running      = 23
 	RunTimeError = 24
 	Sleeping     = 25
+	Stopped      = 26
 )
 
 // UniqueSpaceAppName generates a unique app name for space deployment

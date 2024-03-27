@@ -244,6 +244,35 @@ func (h *SpaceHandler) Run(ctx *gin.Context) {
 	httpbase.OK(ctx, nil)
 }
 
+// WakeupSpace   godoc
+// @Security     JWT token
+// @Summary      wake up space app
+// @Tags         Space
+// @Accept       json
+// @Produce      json
+// @Param        namespace path string true "namespace"
+// @Param        name path string true "name"
+// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
+// @Router       /spaces/{namespace}/{name}/wakeup [post]
+func (h *SpaceHandler) Wakeup(ctx *gin.Context) {
+	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
+	if err != nil {
+		slog.Error("failed to get namespace from context", "error", err)
+		httpbase.BadRequest(ctx, err.Error())
+		return
+	}
+	err = h.c.Wakeup(ctx, namespace, name)
+	if err != nil {
+		slog.Error("failed to wakeup space", slog.String("namespace", namespace),
+			slog.String("name", name), slog.Any("error", err))
+		httpbase.ServerError(ctx, errors.New("failed to wakeup space"))
+		return
+	}
+
+	httpbase.OK(ctx, nil)
+}
+
 // StopSpace   godoc
 // @Security     JWT token
 // @Summary      stop space app

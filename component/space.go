@@ -323,6 +323,17 @@ func (c *SpaceComponent) Deploy(ctx context.Context, namespace, name string) (in
 	})
 }
 
+func (c *SpaceComponent) Wakeup(ctx context.Context, namespace, name string) error {
+	s, err := c.space.FindByPath(ctx, namespace, name)
+	if err != nil {
+		slog.Error("can't wakeup space", slog.Any("error", err), slog.String("namespace", namespace), slog.String("name", name))
+		return err
+
+	}
+
+	return c.deployer.Wakeup(ctx, s.ID)
+}
+
 func (c *SpaceComponent) Stop(ctx context.Context, namespace, name string) error {
 	s, err := c.space.FindByPath(ctx, namespace, name)
 	if err != nil {
@@ -345,8 +356,7 @@ func (c *SpaceComponent) status(ctx context.Context, s *database.Space) (string,
 func (c *SpaceComponent) Status(ctx context.Context, namespace, name string) (string, string, error) {
 	s, err := c.space.FindByPath(ctx, namespace, name)
 	if err != nil {
-		slog.Error("can't get space status", slog.Any("error", err), slog.String("namespace", namespace), slog.String("name", name))
-		return "", SpaceStatusStopped, err
+		return "", SpaceStatusStopped, fmt.Errorf("can't find space by path:%w", err)
 	}
 	return c.status(ctx, s)
 }
@@ -354,8 +364,7 @@ func (c *SpaceComponent) Status(ctx context.Context, namespace, name string) (st
 func (c *SpaceComponent) Logs(ctx context.Context, namespace, name string) (*deploy.MultiLogReader, error) {
 	s, err := c.space.FindByPath(ctx, namespace, name)
 	if err != nil {
-		slog.Error("can't get space logs", slog.Any("error", err), slog.String("namespace", namespace), slog.String("name", name))
-		return nil, err
+		return nil, fmt.Errorf("can't find space by path:%w", err)
 	}
 	return c.deployer.Logs(ctx, s.ID)
 }
@@ -398,7 +407,7 @@ func (c *SpaceComponent) statusCodeToString(code int) string {
 	var txt string
 	switch code {
 	case 10:
-		txt = SpaceStatusEmpty
+		txt = SpaceStatusStopped
 	case 11:
 		txt = SpaceStatusBuilding
 	case 12:

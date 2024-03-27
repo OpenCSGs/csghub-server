@@ -2933,6 +2933,37 @@ paths:
       summary: stop space app
       tags:
       - Space
+  /spaces/{namespace}/{name}/wakeup:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: namespace
+        in: path
+        name: namespace
+        required: true
+        type: string
+      - description: name
+        in: path
+        name: name
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - JWT token: []
+      summary: wake up space app
+      tags:
+      - Space
   /tags:
     get:
       consumes:
