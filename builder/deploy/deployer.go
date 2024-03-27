@@ -35,9 +35,11 @@ type deployer struct {
 	store       *database.DeployTaskStore
 	spaceStore  *database.SpaceStore
 	statuscache map[string]int
+
+	internalRootDomain string
 }
 
-func newDeployer(s scheduler.Scheduler, ib imagebuilder.Builder, ir imagerunner.Runner) (Deployer, error) {
+func newDeployer(s scheduler.Scheduler, ib imagebuilder.Builder, ir imagerunner.Runner) (*deployer, error) {
 	store := database.NewDeployTaskStore()
 	d := &deployer{
 		s:           s,
@@ -183,7 +185,7 @@ func (d *deployer) Wakeup(ctx context.Context, spaceID int64) error {
 	}
 	fields := strings.Split(space.Repository.Path, "/")
 	srvName := common.UniqueSpaceAppName(fields[0], fields[1], spaceID)
-	srvURL := fmt.Sprintf("http://%s.spaces.opencsg.com", srvName)
+	srvURL := fmt.Sprintf("http://%s.%s", srvName, d.internalRootDomain)
 	// Create a new HTTP client with a timeout
 	client := &http.Client{
 		Timeout: 10 * time.Second,

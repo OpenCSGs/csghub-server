@@ -31,6 +31,7 @@ func Init(c DeployConfig) error {
 		return fmt.Errorf("failed to create deployer:%w", err)
 	}
 
+	deployer.internalRootDomain = c.InternalRootDomain
 	defaultDeployer = deployer
 	return nil
 }
@@ -40,7 +41,8 @@ func NewDeployer() Deployer {
 }
 
 type DeployConfig struct {
-	ImageBuilderURL string `json:"image_builder_url"`
-	ImageRunnerURL  string `json:"image_runner_url"`
-	MonitorInterval time.Duration
+	ImageBuilderURL    string
+	ImageRunnerURL     string
+	MonitorInterval    time.Duration
+	InternalRootDomain string
 }
