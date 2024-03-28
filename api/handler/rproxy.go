@@ -39,7 +39,7 @@ func (r *RProxyHandler) Proxy(ctx *gin.Context) {
 	nameParts := strings.Split(spaceAppName, "-")
 	spaceIDStr := nameParts[len(nameParts)-1]
 	// decode space id
-	spaceID, err := common.StringToNumber(spaceIDStr)
+	spaceID, err := common.ParseUniqueSpaceAppName(spaceAppName)
 	if err != nil {
 		slog.Info("proxy request has invalid space ID", slog.String("space_id_str", spaceIDStr), slog.Any("error", err))
 		ctx.Status(http.StatusNotFound)
