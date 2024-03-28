@@ -18,7 +18,7 @@ import (
 
 func NewSpaceComponent(config *config.Config) (*SpaceComponent, error) {
 	c := &SpaceComponent{}
-	c.space = database.NewSpaceStore()
+	c.ss = database.NewSpaceStore()
 	var err error
 	c.sss = database.NewSpaceSdkStore()
 	c.srs = database.NewSpaceResourceStore()
@@ -33,7 +33,7 @@ func NewSpaceComponent(config *config.Config) (*SpaceComponent, error) {
 
 type SpaceComponent struct {
 	*RepoComponent
-	space    *database.SpaceStore
+	ss       *database.SpaceStore
 	rproxy   *proxy.ReverseProxy
 	sss      *database.SpaceSdkStore
 	srs      *database.SpaceResourceStore
@@ -67,7 +67,7 @@ func (c *SpaceComponent) Create(ctx context.Context, req types.CreateSpaceReq) (
 		Secrets:       req.Secrets,
 	}
 
-	resSpace, err := c.space.Create(ctx, dbSpace)
+	resSpace, err := c.ss.Create(ctx, dbSpace)
 	if err != nil {
 		slog.Error("fail to create space in db", slog.Any("req", req), slog.String("error", err.Error()))
 		return nil, fmt.Errorf("fail to create space in db, error: %w", err)
@@ -111,7 +111,7 @@ func (c *SpaceComponent) Create(ctx context.Context, req types.CreateSpaceReq) (
 
 func (c *SpaceComponent) Show(ctx context.Context, namespace, name, current_user string) (*types.Space, error) {
 	var tags []types.RepoTag
-	space, err := c.space.FindByPath(ctx, namespace, name)
+	space, err := c.ss.FindByPath(ctx, namespace, name)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find space, error: %w", err)
 	}
@@ -172,12 +172,12 @@ func (c *SpaceComponent) Update(ctx context.Context, req *types.UpdateSpaceReq) 
 		return nil, err
 	}
 
-	space, err := c.space.FindByPath(ctx, req.Namespace, req.Name)
+	space, err := c.ss.FindByPath(ctx, req.Namespace, req.Name)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find space, error: %w", err)
 	}
 
-	err = c.space.Update(ctx, *space)
+	err = c.ss.Update(ctx, *space)
 	if err != nil {
 		return nil, fmt.Errorf("failed to update database space, error: %w", err)
 	}
@@ -219,7 +219,7 @@ func (c *SpaceComponent) Index(ctx context.Context, username, search, sort strin
 			return nil, 0, newError
 		}
 	}
-	spaceData, total, err := c.space.PublicToUser(ctx, user.ID, search, sort, per, page)
+	spaceData, total, err := c.ss.PublicToUser(ctx, user.ID, search, sort, per, page)
 	if err != nil {
 		slog.Error("fail to get public spaces", slog.String("user", username), slog.String("search", search),
 			slog.String("error", err.Error()))
@@ -264,11 +264,55 @@ func (c *SpaceComponent) Index(ctx context.Context, username, search, sort strin
 	return spaces, total, nil
 }
 
+func (c *SpaceComponent) ListByPath(ctx context.Context, paths []string) ([]types.Space, error) {
+	var spaces []types.Space
+
+	spacesData, err := c.ss.ListByPath(ctx, paths)
+	if err != nil {
+		return nil, fmt.Errorf("list space db failed, %w", err)
+	}
+	for _, data := range spacesData {
+		_, status, _ := c.status(ctx, &data)
+		var tags []types.RepoTag
+		for _, tag := range data.Repository.Tags {
+			tags = append(tags, types.RepoTag{
+				Name:      tag.Name,
+				Category:  tag.Category,
+				Group:     tag.Group,
+				BuiltIn:   tag.BuiltIn,
+				ShowName:  tag.ShowName,
+				CreatedAt: tag.CreatedAt,
+				UpdatedAt: tag.UpdatedAt,
+			})
+		}
+		spaces = append(spaces, types.Space{
+			Name:          data.Repository.Name,
+			Description:   data.Repository.Description,
+			Path:          data.Repository.Path,
+			Sdk:           data.Sdk,
+			SdkVersion:    data.SdkVersion,
+			Template:      data.Template,
+			Env:           data.Env,
+			Hardware:      data.Hardware,
+			Secrets:       data.Secrets,
+			CoverImageUrl: data.CoverImageUrl,
+			License:       data.Repository.License,
+			Private:       data.Repository.Private,
+			Likes:         data.Repository.Likes,
+			CreatedAt:     data.Repository.CreatedAt,
+			UpdatedAt:     data.Repository.UpdatedAt,
+			Tags:          tags,
+			Status:        status,
+		})
+	}
+	return spaces, nil
+}
+
 func (c *SpaceComponent) AllowCallApi(ctx context.Context, spaceID int64, username string) (bool, error) {
 	if username == "" {
 		return false, errors.New("user not found, please login first")
 	}
-	s, err := c.space.ByID(ctx, spaceID)
+	s, err := c.ss.ByID(ctx, spaceID)
 	if err != nil {
 		return false, fmt.Errorf("failed to get space by id", slog.Int("space_id", int(spaceID)), slog.Any("error", err))
 	}
@@ -277,7 +321,7 @@ func (c *SpaceComponent) AllowCallApi(ctx context.Context, spaceID int64, userna
 }
 
 func (c *SpaceComponent) Delete(ctx context.Context, namespace, name, currentUser string) error {
-	space, err := c.space.FindByPath(ctx, namespace, name)
+	space, err := c.ss.FindByPath(ctx, namespace, name)
 	if err != nil {
 		return fmt.Errorf("failed to find space, error: %w", err)
 	}
@@ -293,7 +337,7 @@ func (c *SpaceComponent) Delete(ctx context.Context, namespace, name, currentUse
 		return fmt.Errorf("failed to delete repo of space, error: %w", err)
 	}
 
-	err = c.space.Delete(ctx, *space)
+	err = c.ss.Delete(ctx, *space)
 	if err != nil {
 		return fmt.Errorf("failed to delete database space, error: %w", err)
 	}
@@ -301,7 +345,7 @@ func (c *SpaceComponent) Delete(ctx context.Context, namespace, name, currentUse
 }
 
 func (c *SpaceComponent) Deploy(ctx context.Context, namespace, name string) (int64, error) {
-	s, err := c.space.FindByPath(ctx, namespace, name)
+	s, err := c.ss.FindByPath(ctx, namespace, name)
 	if err != nil {
 		slog.Error("can't deploy space", slog.Any("error", err), slog.String("namespace", namespace), slog.String("name", name))
 		return -1, err
@@ -324,7 +368,7 @@ func (c *SpaceComponent) Deploy(ctx context.Context, namespace, name string) (in
 }
 
 func (c *SpaceComponent) Wakeup(ctx context.Context, namespace, name string) error {
-	s, err := c.space.FindByPath(ctx, namespace, name)
+	s, err := c.ss.FindByPath(ctx, namespace, name)
 	if err != nil {
 		slog.Error("can't wakeup space", slog.Any("error", err), slog.String("namespace", namespace), slog.String("name", name))
 		return err
@@ -335,7 +379,7 @@ func (c *SpaceComponent) Wakeup(ctx context.Context, namespace, name string) err
 }
 
 func (c *SpaceComponent) Stop(ctx context.Context, namespace, name string) error {
-	s, err := c.space.FindByPath(ctx, namespace, name)
+	s, err := c.ss.FindByPath(ctx, namespace, name)
 	if err != nil {
 		slog.Error("can't stop space", slog.Any("error", err), slog.String("namespace", namespace), slog.String("name", name))
 		return err
@@ -354,7 +398,7 @@ func (c *SpaceComponent) status(ctx context.Context, s *database.Space) (string,
 }
 
 func (c *SpaceComponent) Status(ctx context.Context, namespace, name string) (string, string, error) {
-	s, err := c.space.FindByPath(ctx, namespace, name)
+	s, err := c.ss.FindByPath(ctx, namespace, name)
 	if err != nil {
 		return "", SpaceStatusStopped, fmt.Errorf("can't find space by path:%w", err)
 	}
@@ -362,7 +406,7 @@ func (c *SpaceComponent) Status(ctx context.Context, namespace, name string) (st
 }
 
 func (c *SpaceComponent) Logs(ctx context.Context, namespace, name string) (*deploy.MultiLogReader, error) {
-	s, err := c.space.FindByPath(ctx, namespace, name)
+	s, err := c.ss.FindByPath(ctx, namespace, name)
 	if err != nil {
 		return nil, fmt.Errorf("can't find space by path:%w", err)
 	}

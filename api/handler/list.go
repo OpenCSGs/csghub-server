@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"fmt"
 	"log/slog"
 
 	"github.com/gin-gonic/gin"
@@ -15,13 +16,19 @@ func NewListHandler(config *config.Config) (*ListHandler, error) {
 	if err != nil {
 		return nil, err
 	}
+	sc, err := component.NewSpaceComponent(config)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create space component,%w", err)
+	}
 	return &ListHandler{
-		c: uc,
+		c:  uc,
+		sc: sc,
 	}, nil
 }
 
 type ListHandler struct {
-	c *component.ListComponent
+	c  *component.ListComponent
+	sc *component.SpaceComponent
 }
 
 // ListTrendingModels   godoc
@@ -89,7 +96,7 @@ func (h *ListHandler) ListDatasetsByPath(ctx *gin.Context) {
 // @Accept       json
 // @Produce      json
 // @Param        body body types.ListByPathReq true "body"
-// @Success      200  {object}  types.Response{data=[]types.DatasetResp} "OK"
+// @Success      200  {object}  types.Response{data=[]types.Space} "OK"
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
 // @Router       /list/spaces_by_path [post]
@@ -100,7 +107,7 @@ func (h *ListHandler) ListSpacesByPath(ctx *gin.Context) {
 		return
 	}
 
-	resp, err := h.c.ListSpacesByPath(ctx, &listTrendingReq)
+	resp, err := h.sc.ListByPath(ctx, listTrendingReq.Paths)
 	if err != nil {
 		httpbase.ServerError(ctx, err)
 		return

@@ -970,7 +970,7 @@ const docTemplate = `{
                                         "data": {
                                             "type": "array",
                                             "items": {
-                                                "$ref": "#/definitions/types.DatasetResp"
+                                                "$ref": "#/definitions/types.Space"
                                             }
                                         }
                                     }

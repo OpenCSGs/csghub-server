@@ -1619,7 +1619,7 @@ paths:
             - properties:
                 data:
                   items:
-                    $ref: '#/definitions/types.DatasetResp'
+                    $ref: '#/definitions/types.Space'
                   type: array
               type: object
         "400":
