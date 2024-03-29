@@ -16,6 +16,8 @@ import (
 	"opencsg.com/csghub-server/common/types"
 )
 
+const spaceGitattributesContent = modelGitattributesContent
+
 func NewSpaceComponent(config *config.Config) (*SpaceComponent, error) {
 	c := &SpaceComponent{}
 	c.ss = database.NewSpaceStore()
@@ -87,6 +89,22 @@ func (c *SpaceComponent) Create(ctx context.Context, req types.CreateSpaceReq) (
 	}, types.SpaceRepo))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create README.md file, cause: %w", err)
+	}
+
+	// Create .gitattributes file
+	err = c.git.CreateRepoFile(buildCreateFileReq(&types.CreateFileParams{
+		Username:  dbRepo.User.Username,
+		Email:     dbRepo.User.Email,
+		Message:   initCommitMessage,
+		Branch:    req.DefaultBranch,
+		Content:   spaceGitattributesContent,
+		NewBranch: req.DefaultBranch,
+		Namespace: req.Namespace,
+		Name:      req.Name,
+		FilePath:  gitattributesFileName,
+	}, types.SpaceRepo))
+	if err != nil {
+		return nil, fmt.Errorf("failed to create .gitattributes file, cause: %w", err)
 	}
 
 	space := &types.Space{

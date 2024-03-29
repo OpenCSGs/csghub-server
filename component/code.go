@@ -11,6 +11,8 @@ import (
 	"opencsg.com/csghub-server/common/types"
 )
 
+const codeGitattributesContent = modelGitattributesContent
+
 func NewCodeComponent(config *config.Config) (*CodeComponent, error) {
 	c := &CodeComponent{}
 	var err error
@@ -69,6 +71,22 @@ func (c *CodeComponent) Create(ctx context.Context, req *types.CreateCodeReq) (*
 	}, types.CodeRepo))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create README.md file, cause: %w", err)
+	}
+
+	// Create .gitattributes file
+	err = c.git.CreateRepoFile(buildCreateFileReq(&types.CreateFileParams{
+		Username:  dbRepo.User.Username,
+		Email:     dbRepo.User.Email,
+		Message:   initCommitMessage,
+		Branch:    req.DefaultBranch,
+		Content:   codeGitattributesContent,
+		NewBranch: req.DefaultBranch,
+		Namespace: req.Namespace,
+		Name:      req.Name,
+		FilePath:  gitattributesFileName,
+	}, types.CodeRepo))
+	if err != nil {
+		return nil, fmt.Errorf("failed to create .gitattributes file, cause: %w", err)
 	}
 
 	for _, tag := range code.Repository.Tags {
