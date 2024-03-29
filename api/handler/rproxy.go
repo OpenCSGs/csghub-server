@@ -36,12 +36,10 @@ func (r *RProxyHandler) Proxy(ctx *gin.Context) {
 	host := ctx.Request.Host
 	domainParts := strings.SplitN(host, ".", 2)
 	spaceAppName := domainParts[0]
-	nameParts := strings.Split(spaceAppName, "-")
-	spaceIDStr := nameParts[len(nameParts)-1]
 	// decode space id
 	spaceID, err := common.ParseUniqueSpaceAppName(spaceAppName)
 	if err != nil {
-		slog.Info("proxy request has invalid space ID", slog.String("space_id_str", spaceIDStr), slog.Any("error", err))
+		slog.Info("proxy request has invalid space ID", slog.String("srv_name", spaceAppName), slog.Any("error", err))
 		ctx.Status(http.StatusNotFound)
 		return
 	}
@@ -49,7 +47,6 @@ func (r *RProxyHandler) Proxy(ctx *gin.Context) {
 	// user verified by cookie
 	username, exists := ctx.Get("currentUser")
 	if !exists {
-		slog.Info("user not found in gin context")
 		httpbase.BadRequest(ctx, "user not found, please login first")
 		return
 	}
@@ -70,7 +67,7 @@ func (r *RProxyHandler) Proxy(ctx *gin.Context) {
 		rp.ServeHTTP(ctx.Writer, ctx.Request, apiname)
 	} else {
 		// slog.Info("user not allowed to call sapce api", slog.Any("user_name", username))
-		slog.Info("user not allowed to call sapce api", slog.String("space_id_str", spaceIDStr), slog.Any("user_name", username))
-		ctx.Status(http.StatusNotFound)
+		slog.Info("user not allowed to call sapce api", slog.String("srv_name", spaceAppName), slog.Any("user_name", username))
+		ctx.Status(http.StatusForbidden)
 	}
 }

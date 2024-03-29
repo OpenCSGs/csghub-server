@@ -332,7 +332,7 @@ func (c *SpaceComponent) AllowCallApi(ctx context.Context, spaceID int64, userna
 	}
 	s, err := c.ss.ByID(ctx, spaceID)
 	if err != nil {
-		return false, fmt.Errorf("failed to get space by id", slog.Int("space_id", int(spaceID)), slog.Any("error", err))
+		return false, fmt.Errorf("failed to get space by id:%d, %w", spaceID, err)
 	}
 	fields := strings.Split(s.Repository.Path, "/")
 	return c.AllowReadAccess(ctx, fields[0], fields[1], username)
