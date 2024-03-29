@@ -15,6 +15,7 @@ import (
 	"github.com/gin-gonic/gin"
 	corev1 "k8s.io/api/core/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
@@ -90,6 +91,9 @@ func (s *HttpServer) runImage(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
+	if request.Hardware == "" {
+		request.Hardware = "cpu"
+	}
 
 	srvName := s.getServiceNameFromRequest(c)
 
@@ -98,6 +102,20 @@ func (s *HttpServer) runImage(c *gin.Context) {
 	if err == nil {
 		s.knativeClient.ServingV1().Services(s.k8sNameSpace).Delete(c, srvName, *metav1.NewDeleteOptions(0))
 		slog.Info("service already exists,delete it first", slog.String("srv_name", srvName), slog.Any("image_id", request.ImageID))
+	}
+
+	nodeSelector := make(map[string]string)
+	resources := corev1.ResourceRequirements{}
+	if request.Hardware == "gpu" {
+		nodeSelector["aliyun.accelerator/nvidia_name"] = "NVIDIA-A10"
+		resources = corev1.ResourceRequirements{
+			Limits: map[corev1.ResourceName]resource.Quantity{
+				"nvidia.com/gpu": *resource.NewQuantity(1, resource.DecimalSI),
+			},
+			Requests: map[corev1.ResourceName]resource.Quantity{
+				"nvidia.com/gpu": *resource.NewQuantity(1, resource.DecimalSI),
+			},
+		}
 	}
 
 	service := &v1.Service{
@@ -113,6 +131,7 @@ func (s *HttpServer) runImage(c *gin.Context) {
 				Template: v1.RevisionTemplateSpec{
 					Spec: v1.RevisionSpec{
 						PodSpec: corev1.PodSpec{
+							NodeSelector: nodeSelector,
 							Containers: []corev1.Container{{
 								// TODO: docker registry url + image id
 								// Image: "ghcr.io/knative/helloworld-go:latest",
@@ -120,6 +139,7 @@ func (s *HttpServer) runImage(c *gin.Context) {
 								Ports: []corev1.ContainerPort{{
 									ContainerPort: 7860,
 								}},
+								Resources: resources,
 								// TODO:set env
 								// Env: environment,
 							}},

@@ -174,10 +174,18 @@ func (t *DeployRunner) makeDeployRequest() *imagerunner.RunRequest {
 		OrgName:   fields[0],
 		SpaceName: fields[1],
 		UserName:  t.space.Repository.User.Name,
-		Hardware:  t.space.Hardware,
+		Hardware:  t.parseHardware(t.space.Hardware),
 		Env:       t.space.Env,
 		GitRef:    t.space.Repository.DefaultBranch,
 		ImageID:   deploy.ImageID,
 		DeployID:  deploy.ID,
 	}
+}
+
+func (t *DeployRunner) parseHardware(intput string) string {
+	if strings.Contains(intput, "GPU") || strings.Contains(intput, "NVIDIA") {
+		return "gpu"
+	}
+
+	return "cpu"
 }
