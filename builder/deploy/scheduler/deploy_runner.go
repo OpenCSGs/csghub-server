@@ -66,6 +66,11 @@ func (t *DeployRunner) Run(ctx context.Context) error {
 			time.Sleep(10 * time.Second)
 			continue
 		}
+
+		if resp.DeployID > t.task.DeployID {
+			t.deployFailed(fmt.Sprintf("cancel by new deploy:%d", resp.DeployID))
+			return nil
+		}
 		switch resp.Code {
 		case common.Deploying:
 			t.deployInProgress()
@@ -173,5 +178,6 @@ func (t *DeployRunner) makeDeployRequest() *imagerunner.RunRequest {
 		Env:       t.space.Env,
 		GitRef:    t.space.Repository.DefaultBranch,
 		ImageID:   deploy.ImageID,
+		DeployID:  deploy.ID,
 	}
 }

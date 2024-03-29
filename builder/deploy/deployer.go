@@ -32,9 +32,9 @@ type deployer struct {
 	ib imagebuilder.Builder
 	ir imagerunner.Runner
 
-	store       *database.DeployTaskStore
-	spaceStore  *database.SpaceStore
-	statuscache map[string]int
+	store             *database.DeployTaskStore
+	spaceStore        *database.SpaceStore
+	runnerStatuscache map[string]imagerunner.StatusResponse
 
 	internalRootDomain string
 }
@@ -42,12 +42,12 @@ type deployer struct {
 func newDeployer(s scheduler.Scheduler, ib imagebuilder.Builder, ir imagerunner.Runner) (*deployer, error) {
 	store := database.NewDeployTaskStore()
 	d := &deployer{
-		s:           s,
-		ib:          ib,
-		ir:          ir,
-		store:       store,
-		spaceStore:  database.NewSpaceStore(),
-		statuscache: make(map[string]int),
+		s:                 s,
+		ib:                ib,
+		ir:                ir,
+		store:             store,
+		spaceStore:        database.NewSpaceStore(),
+		runnerStatuscache: make(map[string]imagerunner.StatusResponse),
 	}
 
 	go d.refreshStatus()
@@ -96,9 +96,8 @@ func (d *deployer) refreshStatus() {
 		if err != nil {
 			slog.Error("refresh status all failed", slog.Any("error", err))
 		} else {
-			slog.Info("refresh status all success", slog.Any("error", err))
-			slog.Debug("status all cached", slog.Any("status", d.statuscache))
-			d.statuscache = status
+			slog.Debug("status all cached", slog.Any("status", d.runnerStatuscache))
+			d.runnerStatuscache = status
 		}
 
 		time.Sleep(5 * time.Second)
@@ -106,23 +105,33 @@ func (d *deployer) refreshStatus() {
 }
 
 func (d *deployer) Status(ctx context.Context, spaceID int64) (string, int, error) {
-	// get latest Deploy
-	_, err := d.store.GetSpaceLatestDeploy(ctx, spaceID)
-	if err != nil {
-		return "", 0, fmt.Errorf("can't get space delopyment,%w", err)
-	}
 	space, err := d.spaceStore.ByID(ctx, spaceID)
 	if err != nil {
 		return "", 0, fmt.Errorf("can't get space:%w", err)
 	}
+
+	// get latest Deploy
+	deploy, err := d.store.GetSpaceLatestDeploy(ctx, spaceID)
+	if err != nil {
+		return "", 0, fmt.Errorf("can't get space delopyment,%w", err)
+	}
+
 	fields := strings.Split(space.Repository.Path, "/")
 	srvName := common.UniqueSpaceAppName(fields[0], fields[1], space.ID)
-	code, found := d.statuscache[srvName]
+	rstatus, found := d.runnerStatuscache[srvName]
 	if !found {
 		slog.Debug("status cache miss", slog.String("srv_name", srvName))
-		return srvName, common.Stopped, nil
+		if deploy.Status == common.Running {
+			// service was Stopped or delete, so no running instance
+			return srvName, common.Stopped, nil
+		}
+		return srvName, deploy.Status, nil
 	}
-	return srvName, code, nil
+
+	if rstatus.DeployID == 0 || rstatus.DeployID >= deploy.ID {
+		return srvName, rstatus.Code, nil
+	}
+	return srvName, deploy.Status, nil
 }
 
 func (d *deployer) Logs(ctx context.Context, spaceID int64) (*MultiLogReader, error) {

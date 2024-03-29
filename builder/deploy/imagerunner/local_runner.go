@@ -29,11 +29,11 @@ func (r *LocalRunner) Status(ctx context.Context, req *StatusRequest) (*StatusRe
 	}, nil
 }
 
-func (r *LocalRunner) StatusAll(ctx context.Context) (map[string]int, error) {
-	status := make(map[string]int)
-	status["gradio-test-app"] = 21
-	status["gradio-test-app-v1-0"] = 20
-	status["image-123"] = 25
+func (r *LocalRunner) StatusAll(ctx context.Context) (map[string]StatusResponse, error) {
+	status := make(map[string]StatusResponse)
+	status["gradio-test-app"] = StatusResponse{Code: 21}
+	status["gradio-test-app-v1-0"] = StatusResponse{Code: 20}
+	status["image-123"] = StatusResponse{Code: 25}
 	return status, nil
 }
 

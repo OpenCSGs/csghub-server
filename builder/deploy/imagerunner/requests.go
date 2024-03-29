@@ -14,12 +14,14 @@ type (
 		Hardware string `json:"hardware"`
 		Env      string `json:"env"`
 
-		ImageID string `json:"image_id"`
+		ImageID  string `json:"image_id"`
+		DeployID int64  `json:"deploy_id"`
 	}
 
 	RunResponse struct {
-		Code    int    `json:"code"`
-		Message string `json:"message"`
+		DeployID int64  `json:"deploy_id"`
+		Code     int    `json:"code"`
+		Message  string `json:"message"`
 	}
 
 	StopRequest struct {
@@ -29,8 +31,9 @@ type (
 	}
 
 	StopResponse struct {
-		Code    int    `json:"code"`
-		Message string `json:"message"`
+		DeployID int64  `json:"deploy_id"`
+		Code     int    `json:"code"`
+		Message  string `json:"message"`
 	}
 
 	StatusRequest struct {
@@ -40,14 +43,16 @@ type (
 	}
 
 	StatusResponse struct {
-		Code    int    `json:"code"`
-		Message string `json:"message"`
+		DeployID int64  `json:"deploy_id"`
+		Code     int    `json:"code"`
+		Message  string `json:"message"`
 	}
 
 	LogsRequest struct {
 		SpaceID   int64  `json:"space_id"`
 		OrgName   string `json:"org_name"`
 		SpaceName string `json:"space_name"`
+		DeployID  int64  `json:"deploy_id"`
 	}
 
 	LogsResponse struct {

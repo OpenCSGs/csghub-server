@@ -85,7 +85,7 @@ func (rs *FIFOScheduler) Run() error {
 }
 
 func (rs *FIFOScheduler) Queue(deployTaskID int64) error {
-	slog.Info("queue next task", slog.Int64("deploy_task_id", deployTaskID))
+	// slog.Info("queue next task", slog.Int64("deploy_task_id", deployTaskID))
 	// simply trigger next task
 	rs.next()
 

@@ -42,12 +42,12 @@ func (h *RemoteRunner) Run(ctx context.Context, req *RunRequest) (*RunResponse, 
 	}
 	defer response.Body.Close()
 
-	var buildResponse RunResponse
-	if err := json.NewDecoder(response.Body).Decode(&buildResponse); err != nil {
+	var resp RunResponse
+	if err := json.NewDecoder(response.Body).Decode(&resp); err != nil {
 		return nil, err
 	}
 
-	return &buildResponse, nil
+	return &resp, nil
 }
 
 func (h *RemoteRunner) Stop(ctx context.Context, req *StopRequest) (*StopResponse, error) {
@@ -82,7 +82,7 @@ func (h *RemoteRunner) Status(ctx context.Context, req *StatusRequest) (*StatusR
 	return &statusResponse, nil
 }
 
-func (h *RemoteRunner) StatusAll(ctx context.Context) (map[string]int, error) {
+func (h *RemoteRunner) StatusAll(ctx context.Context) (map[string]StatusResponse, error) {
 	u := fmt.Sprintf("%s/status-all", h.remote)
 	response, err := h.doRequest(http.MethodGet, u, nil)
 	if err != nil {
@@ -90,7 +90,7 @@ func (h *RemoteRunner) StatusAll(ctx context.Context) (map[string]int, error) {
 	}
 	defer response.Body.Close()
 
-	statusAll := make(map[string]int)
+	statusAll := make(map[string]StatusResponse)
 	if err := json.NewDecoder(response.Body).Decode(&statusAll); err != nil {
 		return nil, err
 	}
