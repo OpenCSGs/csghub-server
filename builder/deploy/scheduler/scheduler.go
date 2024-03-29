@@ -42,7 +42,7 @@ func NewFIFOScheduler(ib imagebuilder.Builder, ir imagerunner.Runner) Scheduler 
 	s.spaceStore = database.NewSpaceStore()
 
 	// allow concurrent deployment tasks
-	s.tasks = make(chan Runner, 5)
+	s.tasks = make(chan Runner, 100)
 	// s.ib = imagebuilder.NewLocalBuilder()
 	// s.ir = imagerunner.NewLocalRunner()
 	s.ib = ib
