@@ -4,7 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"errors"
-	"fmt"
 	"log/slog"
 	"sync"
 	"time"
@@ -85,7 +84,6 @@ func (rs *FIFOScheduler) Run() error {
 }
 
 func (rs *FIFOScheduler) Queue(deployTaskID int64) error {
-	// slog.Info("queue next task", slog.Int64("deploy_task_id", deployTaskID))
 	// simply trigger next task
 	rs.next()
 
@@ -106,7 +104,6 @@ func (rs *FIFOScheduler) next() (Runner, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	if rs.last == nil {
-		// TODO: save last task into db
 		deployTask, err = rs.store.GetNewTaskFirst(ctx)
 		slog.Debug("GetNewTaskFirst", slog.Any("deploy_task", deployTask), slog.Any("error", err))
 	} else {
@@ -117,19 +114,32 @@ func (rs *FIFOScheduler) next() (Runner, error) {
 		if errors.Is(err, sql.ErrNoRows) {
 			slog.Debug("no more tasks to run, schedule a sleeping task")
 			// using a sleep task to pause the scheduler
-			t = &sleepTask{
-				du: 5 * time.Second,
-			}
-			rs.tasks <- t
-			return t, nil
 		} else {
-			return nil, fmt.Errorf("db operation failed, %w", err)
+			slog.Error("FIFOScheduler cannot get next task by db error", slog.Any("error", err))
 		}
+
+		t = &sleepTask{
+			du: 5 * time.Second,
+		}
+		rs.tasks <- t
+		return t, nil
 	}
 	var s *database.Space
 	s, err = rs.spaceStore.ByID(ctx, deployTask.Deploy.SpaceID)
 	if err != nil {
-		return nil, fmt.Errorf("get space failed, %w", err)
+		if errors.Is(err, sql.ErrNoRows) {
+			slog.Info("cancel deploy task as space not found", slog.Int64("deploy_task_id", deployTask.ID), slog.Int64("space_id", deployTask.Deploy.SpaceID))
+			// mark task as cancelled
+			deployTask.Status = cancelled
+			deployTask.Message = "space not found"
+			rs.store.UpdateDeployTask(ctx, deployTask)
+		}
+		t = &sleepTask{
+			du: 5 * time.Second,
+		}
+		rs.last = deployTask
+		rs.tasks <- t
+		return t, nil
 	}
 	// for build task
 	if deployTask.TaskType == 0 {

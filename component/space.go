@@ -498,7 +498,7 @@ const (
 	// SpaceStatusEmpty is the init status by default
 	SpaceStatusEmpty        = ""
 	SpaceStatusBuilding     = "Building"
-	SpaceStatusBuildFailed  = "BuildFailed"
+	SpaceStatusBuildFailed  = "BuildingFailed"
 	SpaceStatusDeploying    = "Deploying"
 	SpaceStatusDeployFailed = "DeployFailed"
 	SpaceStatusRunning      = "Running"

@@ -34,6 +34,11 @@ func NewRProxyHandler(config *config.Config) (*RProxyHandler, error) {
 func (r *RProxyHandler) Proxy(ctx *gin.Context) {
 	slog.Debug("http request", slog.Any("request", ctx.Request.URL), slog.Any("header", ctx.Request.Header))
 	host := ctx.Request.Host
+	// schema := "http"
+	// if IsWebSocketRequest(ctx.Request) {
+	// 	fmt.Println("===get ws req", *ctx.Request)
+	// 	schema = "ws"
+	// }
 	domainParts := strings.SplitN(host, ".", 2)
 	spaceAppName := domainParts[0]
 	// decode space id
@@ -63,11 +68,36 @@ func (r *RProxyHandler) Proxy(ctx *gin.Context) {
 		// slog.Info("proxy space request", slog.String("namespace", namespace),
 		// 	slog.String("name", name), slog.Any("username", username),
 		// 	slog.String("api", apiname))
-		rp, _ := proxy.NewReverseProxy(fmt.Sprintf("http://%s.%s", spaceAppName, r.SpaceRootDomain))
+		var rp *proxy.ReverseProxy
+		// fmt.Println(fmt.Sprintf("%s://%s.%s", schema, spaceAppName, r.SpaceRootDomain))
+		// rp, _ = proxy.NewReverseProxy(fmt.Sprintf("%s://%s.%s", schema, spaceAppName, r.SpaceRootDomain))
+		// fmt.Println(fmt.Sprintf("ws://%s.%s", spaceAppName, r.SpaceRootDomain))
+		//
+		//Special routing for graio app
+		if apiname == "queue/join" {
+			rp, _ = proxy.NewReverseProxy(fmt.Sprintf("ws://%s.%s", spaceAppName, r.SpaceRootDomain))
+		} else {
+			rp, _ = proxy.NewReverseProxy(fmt.Sprintf("http://%s.%s", spaceAppName, r.SpaceRootDomain))
+		}
 		rp.ServeHTTP(ctx.Writer, ctx.Request, apiname)
 	} else {
-		// slog.Info("user not allowed to call sapce api", slog.Any("user_name", username))
 		slog.Info("user not allowed to call sapce api", slog.String("srv_name", spaceAppName), slog.Any("user_name", username))
 		ctx.Status(http.StatusForbidden)
 	}
+}
+
+func IsWebSocketRequest(r *http.Request) bool {
+	connHeader := ""
+	connHeaders := r.Header["Connection"]
+	if len(connHeaders) > 0 {
+		connHeader = connHeaders[0]
+	}
+
+	upgradeWebsocket := false
+	upgradeHeaders := r.Header["Upgrade"]
+	if len(upgradeHeaders) > 0 {
+		upgradeWebsocket = upgradeHeaders[0] == "websocket"
+	}
+
+	return strings.ToLower(connHeader) == "upgrade" && upgradeWebsocket
 }

@@ -29,7 +29,7 @@ func NewRProxyRouter(config *config.Config) (*gin.Engine, error) {
 		Secure:   true,
 	})
 	r.Use(sessions.Sessions("jwt_session", store))
-	r.Use(middleware.JwtSession(config))
+	r.Use(middleware.BuildJwtSession(config))
 
 	handler, err := handler.NewRProxyHandler(config)
 	if err != nil {
