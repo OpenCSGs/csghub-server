@@ -112,7 +112,7 @@ func (h *UserHandler) Datasets(ctx *gin.Context) {
 	}
 
 	req.Owner = ctx.Param("username")
-	req.CurrentUser = ctx.Query("current_user")
+	req.CurrentUser = ctx.GetString("currentUser")
 	req.Page = page
 	req.PageSize = per
 	ds, total, err := h.c.Datasets(ctx, &req)
@@ -153,7 +153,7 @@ func (h *UserHandler) Models(ctx *gin.Context) {
 	}
 
 	req.Owner = ctx.Param("username")
-	req.CurrentUser = ctx.Query("current_user")
+	req.CurrentUser = ctx.GetString("currentUser")
 	req.Page = page
 	req.PageSize = per
 	ms, total, err := h.c.Models(ctx, &req)
@@ -195,7 +195,7 @@ func (h *UserHandler) Codes(ctx *gin.Context) {
 	}
 
 	req.Owner = ctx.Param("username")
-	req.CurrentUser = ctx.Query("current_user")
+	req.CurrentUser = ctx.GetString("currentUser")
 	req.Page = page
 	req.PageSize = per
 	ms, total, err := h.c.Codes(ctx, &req)
@@ -227,7 +227,7 @@ func (h *UserHandler) Codes(ctx *gin.Context) {
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
 // @Router       /user/{username}/spaces [get]
 func (h *UserHandler) Spaces(ctx *gin.Context) {
-	var req types.UserDatasetsReq
+	var req types.UserSpacesReq
 	per, page, err := common.GetPerAndPageFromContext(ctx)
 	if err != nil {
 		slog.Error("Bad request format of page and per", "error", err)
@@ -236,7 +236,7 @@ func (h *UserHandler) Spaces(ctx *gin.Context) {
 	}
 
 	req.Owner = ctx.Param("username")
-	req.CurrentUser = ctx.Query("current_user")
+	req.CurrentUser = ctx.GetString("currentUser")
 	req.Page = page
 	req.PageSize = per
 	ms, total, err := h.c.Spaces(ctx, &req)

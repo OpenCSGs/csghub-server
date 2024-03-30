@@ -412,7 +412,7 @@ func (c *SpaceComponent) status(ctx context.Context, s *database.Space) (string,
 		slog.Error("error happen when get space status", slog.Any("error", err), slog.String("path", s.Repository.Path))
 		return "", SpaceStatusStopped, err
 	}
-	return srvName, c.statusCodeToString(code), nil
+	return srvName, spaceStatusCodeToString(code), nil
 }
 
 func (c *SpaceComponent) Status(ctx context.Context, namespace, name string) (string, string, error) {
@@ -454,7 +454,7 @@ func (c *SpaceComponent) HasAppFile(ctx context.Context, namespace, name string)
 	return false
 }
 
-func (c *SpaceComponent) statusCodeToString(code int) string {
+func spaceStatusCodeToString(code int) string {
 	// DeployBuildPending    = 10
 	// DeployBuildInProgress = 11
 	// DeployBuildFailed     = 12

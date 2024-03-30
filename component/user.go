@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 
+	"opencsg.com/csghub-server/builder/deploy"
 	"opencsg.com/csghub-server/builder/git"
 	"opencsg.com/csghub-server/builder/git/gitserver"
 	"opencsg.com/csghub-server/builder/store/database"
@@ -28,17 +29,19 @@ func NewUserComponent(config *config.Config) (*UserComponent, error) {
 		slog.Error(newError.Error())
 		return nil, newError
 	}
+	c.deployer = deploy.NewDeployer()
 	return c, nil
 }
 
 type UserComponent struct {
-	us *database.UserStore
-	ms *database.ModelStore
-	ds *database.DatasetStore
-	cs *database.CodeStore
-	ss *database.SpaceStore
-	ns *database.NamespaceStore
-	gs gitserver.GitServer
+	us       *database.UserStore
+	ms       *database.ModelStore
+	ds       *database.DatasetStore
+	cs       *database.CodeStore
+	ss       *database.SpaceStore
+	ns       *database.NamespaceStore
+	gs       gitserver.GitServer
+	deployer deploy.Deployer
 }
 
 func (c *UserComponent) Create(ctx context.Context, req *types.CreateUserRequest) (*database.User, error) {
@@ -302,6 +305,7 @@ func (c *UserComponent) Spaces(ctx context.Context, req *types.UserSpacesReq) ([
 	}
 
 	for _, data := range ms {
+		_, status, _ := c.status(ctx, &data)
 		resSpaces = append(resSpaces, types.Space{
 			ID:          data.ID,
 			Name:        data.Repository.Name,
@@ -312,6 +316,7 @@ func (c *UserComponent) Spaces(ctx context.Context, req *types.UserSpacesReq) ([
 			Private:     data.Repository.Private,
 			CreatedAt:   data.CreatedAt,
 			UpdatedAt:   data.UpdatedAt,
+			Status:      status,
 		})
 	}
 
@@ -325,4 +330,13 @@ func (c *UserComponent) FixUserData(ctx context.Context, userName string) error 
 	}
 
 	return nil
+}
+
+func (c *UserComponent) status(ctx context.Context, s *database.Space) (string, string, error) {
+	srvName, code, err := c.deployer.Status(ctx, s.ID)
+	if err != nil {
+		slog.Error("error happen when get space status", slog.Any("error", err), slog.String("path", s.Repository.Path))
+		return "", SpaceStatusStopped, err
+	}
+	return srvName, spaceStatusCodeToString(code), nil
 }
