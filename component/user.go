@@ -316,6 +316,7 @@ func (c *UserComponent) Spaces(ctx context.Context, req *types.UserSpacesReq) ([
 			Private:     data.Repository.Private,
 			CreatedAt:   data.CreatedAt,
 			UpdatedAt:   data.UpdatedAt,
+			Hardware:    data.Hardware,
 			Status:      status,
 		})
 	}
