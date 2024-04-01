@@ -282,6 +282,43 @@ func (c *SpaceComponent) Index(ctx context.Context, username, search, sort strin
 	return spaces, total, nil
 }
 
+// UserSpaces get spaces of owner and visible to current user
+func (c *SpaceComponent) UserSpaces(ctx context.Context, req *types.UserSpacesReq) ([]types.Space, int, error) {
+	onlyPublic := req.Owner != req.CurrentUser
+	ms, total, err := c.ss.ByUsername(ctx, req.Owner, req.PageSize, req.Page, onlyPublic)
+	if err != nil {
+		newError := fmt.Errorf("failed to get spaces by username,%w", err)
+		return nil, 0, newError
+	}
+
+	var resSpaces []types.Space
+	for _, data := range ms {
+		ns, name := data.Repository.NamespaceAndName()
+		var status string
+		if c.HasAppFile(ctx, ns, name) {
+			_, status, _ = c.status(ctx, &data)
+		} else {
+			status = SpaceStatusNoAppFile
+		}
+
+		resSpaces = append(resSpaces, types.Space{
+			ID:          data.ID,
+			Name:        data.Repository.Name,
+			Nickname:    data.Repository.Nickname,
+			Description: data.Repository.Description,
+			Likes:       data.Repository.Likes,
+			Path:        data.Repository.Path,
+			Private:     data.Repository.Private,
+			CreatedAt:   data.CreatedAt,
+			UpdatedAt:   data.UpdatedAt,
+			Hardware:    data.Hardware,
+			Status:      status,
+		})
+	}
+
+	return resSpaces, total, nil
+}
+
 func (c *SpaceComponent) ListByPath(ctx context.Context, paths []string) ([]types.Space, error) {
 	var spaces []types.Space
 
@@ -450,7 +487,6 @@ func (c *SpaceComponent) HasAppFile(ctx context.Context, namespace, name string)
 		}
 	}
 
-	slog.Info("space has not app file", slog.String("namespace", namespace), slog.String("name", name))
 	return false
 }
 
@@ -505,4 +541,6 @@ const (
 	SpaceStatusRuntimeError = "RuntimeError"
 	SpaceStatusStopped      = "Stopped"
 	SpaceStatusSleeping     = "Sleeping"
+
+	SpaceStatusNoAppFile = "NoAppFile"
 )

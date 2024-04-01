@@ -130,7 +130,6 @@ func (s *SpaceStore) ByUsername(ctx context.Context, username string, per, page 
 		NewSelect().
 		Model(&spaces).
 		Relation("Repository.Tags").
-		Relation("Repository.User").
 		Where("repository.path like ?", fmt.Sprintf("%s/%%", username))
 
 	if onlyPublic {
