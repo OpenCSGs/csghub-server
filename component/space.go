@@ -246,7 +246,13 @@ func (c *SpaceComponent) Index(ctx context.Context, username, search, sort strin
 	}
 
 	for _, data := range spaceData {
-		_, status, _ := c.status(ctx, &data)
+		ns, name := data.Repository.NamespaceAndName()
+		var status string
+		if c.HasAppFile(ctx, ns, name) {
+			_, status, _ = c.status(ctx, &data)
+		} else {
+			status = SpaceStatusNoAppFile
+		}
 		var tags []types.RepoTag
 		for _, tag := range data.Repository.Tags {
 			tags = append(tags, types.RepoTag{
