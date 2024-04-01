@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"log/slog"
 	"strings"
-	"time"
 
 	"opencsg.com/csghub-server/builder/deploy"
 	"opencsg.com/csghub-server/builder/git/gitserver"
@@ -141,16 +140,9 @@ func (c *SpaceComponent) Show(ctx context.Context, namespace, name, current_user
 	}
 
 	var endpoint string
-	var srvName string
-	var status string
-	if c.HasAppFile(ctx, namespace, name) {
-		// get model rue status
-		ctxTimeout, cancel := context.WithTimeout(ctx, 2*time.Second)
-		defer cancel()
-		srvName, status, _ = c.status(ctxTimeout, space)
+	srvName, status, _ := c.status(ctx, space)
+	if len(srvName) > 0 {
 		endpoint = fmt.Sprintf("%s.%s", srvName, c.publicRootDomain)
-	} else {
-		status = "NoAppFile"
 	}
 
 	resModel := &types.Space{
@@ -246,13 +238,7 @@ func (c *SpaceComponent) Index(ctx context.Context, username, search, sort strin
 	}
 
 	for _, data := range spaceData {
-		ns, name := data.Repository.NamespaceAndName()
-		var status string
-		if c.HasAppFile(ctx, ns, name) {
-			_, status, _ = c.status(ctx, &data)
-		} else {
-			status = SpaceStatusNoAppFile
-		}
+		_, status, _ := c.status(ctx, &data)
 		var tags []types.RepoTag
 		for _, tag := range data.Repository.Tags {
 			tags = append(tags, types.RepoTag{
@@ -299,14 +285,7 @@ func (c *SpaceComponent) UserSpaces(ctx context.Context, req *types.UserSpacesRe
 
 	var resSpaces []types.Space
 	for _, data := range ms {
-		ns, name := data.Repository.NamespaceAndName()
-		var status string
-		if c.HasAppFile(ctx, ns, name) {
-			_, status, _ = c.status(ctx, &data)
-		} else {
-			status = SpaceStatusNoAppFile
-		}
-
+		_, status, _ := c.status(ctx, &data)
 		resSpaces = append(resSpaces, types.Space{
 			ID:          data.ID,
 			Name:        data.Repository.Name,
@@ -450,6 +429,10 @@ func (c *SpaceComponent) Stop(ctx context.Context, namespace, name string) error
 }
 
 func (c *SpaceComponent) status(ctx context.Context, s *database.Space) (string, string, error) {
+	ns, name := s.Repository.NamespaceAndName()
+	if !c.HasAppFile(ctx, ns, name) {
+		return "", SpaceStatusNoAppFile, nil
+	}
 	srvName, code, err := c.deployer.Status(ctx, s.ID)
 	if err != nil {
 		slog.Error("error happen when get space status", slog.Any("error", err), slog.String("path", s.Repository.Path))
