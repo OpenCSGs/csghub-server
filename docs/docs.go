@@ -796,6 +796,56 @@ const docTemplate = `{
                 }
             }
         },
+        "/jwt/token": {
+            "post": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "JWT"
+                ],
+                "summary": "generate jwt token for user",
+                "parameters": [
+                    {
+                        "description": "body",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/types.CreateJWTReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/types.CreateJWTResp"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            }
+        },
         "/list/datasets_by_path": {
             "post": {
                 "security": [
@@ -4556,6 +4606,34 @@ const docTemplate = `{
                 "username": {
                     "type": "string",
                     "example": "creator_user_name"
+                }
+            }
+        },
+        "types.CreateJWTReq": {
+            "type": "object",
+            "required": [
+                "current_user"
+            ],
+            "properties": {
+                "current_user": {
+                    "type": "string"
+                },
+                "organizations": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                }
+            }
+        },
+        "types.CreateJWTResp": {
+            "type": "object",
+            "properties": {
+                "expire_at": {
+                    "type": "string"
+                },
+                "token": {
+                    "type": "string"
                 }
             }
         },

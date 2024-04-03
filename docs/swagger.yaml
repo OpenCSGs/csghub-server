@@ -381,6 +381,24 @@ definitions:
         example: creator_user_name
         type: string
     type: object
+  types.CreateJWTReq:
+    properties:
+      current_user:
+        type: string
+      organizations:
+        items:
+          type: string
+        type: array
+    required:
+    - current_user
+    type: object
+  types.CreateJWTResp:
+    properties:
+      expire_at:
+        type: string
+      token:
+        type: string
+    type: object
   types.CreateModelReq:
     properties:
       default_branch:
@@ -1519,6 +1537,37 @@ paths:
       summary: Get the demo data of the dataset
       tags:
       - Dataset
+  /jwt/token:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: body
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/types.CreateJWTReq'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/types.CreateJWTResp'
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: generate jwt token for user
+      tags:
+      - JWT
   /list/datasets_by_path:
     post:
       consumes:
