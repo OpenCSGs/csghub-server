@@ -6,7 +6,6 @@ import (
 	"log/slog"
 	"net/http"
 	"strconv"
-	"strings"
 	"time"
 
 	"opencsg.com/csghub-server/builder/deploy/common"
@@ -19,10 +18,10 @@ import (
 
 type Deployer interface {
 	Deploy(ctx context.Context, s types.Space) (deployID int64, err error)
-	Status(ctx context.Context, spaceID int64) (srvName string, status int, err error)
-	Logs(ctx context.Context, spaceID int64) (*MultiLogReader, error)
-	Stop(ctx context.Context, spaceID int64) (err error)
-	Wakeup(ctx context.Context, spaceID int64) (err error)
+	Status(ctx context.Context, s types.Space) (srvName string, status int, err error)
+	Logs(ctx context.Context, s types.Space) (*MultiLogReader, error)
+	Stop(ctx context.Context, s types.Space) (err error)
+	Wakeup(ctx context.Context, s types.Space) (err error)
 }
 
 var _ Deployer = (*deployer)(nil)
@@ -104,20 +103,14 @@ func (d *deployer) refreshStatus() {
 	}
 }
 
-func (d *deployer) Status(ctx context.Context, spaceID int64) (string, int, error) {
-	space, err := d.spaceStore.ByID(ctx, spaceID)
-	if err != nil {
-		return "", 0, fmt.Errorf("can't get space:%w", err)
-	}
-
+func (d *deployer) Status(ctx context.Context, space types.Space) (string, int, error) {
 	// get latest Deploy
-	deploy, err := d.store.GetSpaceLatestDeploy(ctx, spaceID)
+	deploy, err := d.store.GetSpaceLatestDeploy(ctx, space.ID)
 	if err != nil {
 		return "", 0, fmt.Errorf("can't get space delopyment,%w", err)
 	}
 
-	fields := strings.Split(space.Repository.Path, "/")
-	srvName := common.UniqueSpaceAppName(fields[0], fields[1], space.ID)
+	srvName := common.UniqueSpaceAppName(space.Namespace, space.Name, space.ID)
 	rstatus, found := d.runnerStatuscache[srvName]
 	if !found {
 		slog.Debug("status cache miss", slog.String("srv_name", srvName))
@@ -134,23 +127,17 @@ func (d *deployer) Status(ctx context.Context, spaceID int64) (string, int, erro
 	return srvName, deploy.Status, nil
 }
 
-func (d *deployer) Logs(ctx context.Context, spaceID int64) (*MultiLogReader, error) {
-	space, err := d.spaceStore.ByID(ctx, spaceID)
-	if err != nil {
-		return nil, fmt.Errorf("can't get space:%w", err)
-	}
-	fields := strings.Split(space.Repository.Path, "/")
-
+func (d *deployer) Logs(ctx context.Context, space types.Space) (*MultiLogReader, error) {
 	// get latest Deploy
-	deploy, err := d.store.GetSpaceLatestDeploy(ctx, spaceID)
+	deploy, err := d.store.GetSpaceLatestDeploy(ctx, space.ID)
 	if err != nil {
 		return nil, fmt.Errorf("can't get space delopyment,%w", err)
 	}
 
-	slog.Debug("get logs for space", slog.Any("deploy", deploy), slog.Int64("space_id", spaceID))
+	slog.Debug("get logs for space", slog.Any("deploy", deploy), slog.Int64("space_id", space.ID))
 	buildLog, err := d.ib.Logs(ctx, &imagebuilder.LogsRequest{
-		OrgName:   fields[0],
-		SpaceName: fields[1],
+		OrgName:   space.Namespace,
+		SpaceName: space.Name,
 		BuildID:   strconv.FormatInt(deploy.ID, 10),
 	})
 	if err != nil {
@@ -160,8 +147,8 @@ func (d *deployer) Logs(ctx context.Context, spaceID int64) (*MultiLogReader, er
 
 	runLog, err := d.ir.Logs(ctx, &imagerunner.LogsRequest{
 		SpaceID:   space.ID,
-		OrgName:   fields[0],
-		SpaceName: fields[1],
+		OrgName:   space.Namespace,
+		SpaceName: space.Name,
 	})
 	if err != nil {
 		slog.Error("failed to read log from image runner", slog.Any("error", err))
@@ -171,29 +158,19 @@ func (d *deployer) Logs(ctx context.Context, spaceID int64) (*MultiLogReader, er
 	return NewMultiLogReader(buildLog, runLog), nil
 }
 
-func (d *deployer) Stop(ctx context.Context, spaceID int64) error {
-	space, err := d.spaceStore.ByID(ctx, spaceID)
-	if err != nil {
-		return fmt.Errorf("can't get space by id:%d, %w", spaceID, err)
-	}
-	fields := strings.Split(space.Repository.Path, "/")
+func (d *deployer) Stop(ctx context.Context, space types.Space) error {
 	resp, err := d.ir.Stop(ctx, &imagerunner.StopRequest{
 		SpaceID:   space.ID,
-		OrgName:   fields[0],
-		SpaceName: fields[1],
+		OrgName:   space.Namespace,
+		SpaceName: space.Name,
 	})
 
-	slog.Info("deployer stop space", slog.Any("runner_resp", resp), slog.Int64("space_id", spaceID), slog.Any("error", err))
+	slog.Info("deployer stop space", slog.Any("runner_resp", resp), slog.Int64("space_id", space.ID), slog.Any("error", err))
 	return err
 }
 
-func (d *deployer) Wakeup(ctx context.Context, spaceID int64) error {
-	space, err := d.spaceStore.ByID(ctx, spaceID)
-	if err != nil {
-		return fmt.Errorf("can't get space by id:%d, %w", spaceID, err)
-	}
-	fields := strings.Split(space.Repository.Path, "/")
-	srvName := common.UniqueSpaceAppName(fields[0], fields[1], spaceID)
+func (d *deployer) Wakeup(ctx context.Context, space types.Space) error {
+	srvName := common.UniqueSpaceAppName(space.Namespace, space.Name, space.ID)
 	srvURL := fmt.Sprintf("http://%s.%s", srvName, d.internalRootDomain)
 	// Create a new HTTP client with a timeout
 	client := &http.Client{

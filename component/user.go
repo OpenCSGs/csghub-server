@@ -311,12 +311,3 @@ func (c *UserComponent) FixUserData(ctx context.Context, userName string) error 
 
 	return nil
 }
-
-func (c *UserComponent) status(ctx context.Context, s *database.Space) (string, string, error) {
-	srvName, code, err := c.deployer.Status(ctx, s.ID)
-	if err != nil {
-		slog.Error("error happen when get space status", slog.Any("error", err), slog.String("path", s.Repository.Path))
-		return "", SpaceStatusStopped, err
-	}
-	return srvName, spaceStatusCodeToString(code), nil
-}

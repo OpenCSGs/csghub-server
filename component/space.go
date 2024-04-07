@@ -397,18 +397,14 @@ func (c *SpaceComponent) Deploy(ctx context.Context, namespace, name string) (in
 	}
 
 	return c.deployer.Deploy(ctx, types.Space{
-		ID:            s.ID,
-		Creator:       s.Repository.User.Name,
-		Namespace:     s.Repository.Name,
-		Name:          s.Repository.Name,
-		Path:          s.Repository.GitPath,
-		Sdk:           s.Sdk,
-		SdkVersion:    s.SdkVersion,
-		CoverImageUrl: s.CoverImageUrl,
-		Template:      s.Template,
-		Env:           s.Env,
-		Hardware:      s.Hardware,
-		Secrets:       s.Secrets,
+		ID:         s.ID,
+		Path:       s.Repository.GitPath,
+		Sdk:        s.Sdk,
+		SdkVersion: s.SdkVersion,
+		Template:   s.Template,
+		Env:        s.Env,
+		Hardware:   s.Hardware,
+		Secrets:    s.Secrets,
 	})
 }
 
@@ -420,7 +416,11 @@ func (c *SpaceComponent) Wakeup(ctx context.Context, namespace, name string) err
 
 	}
 
-	return c.deployer.Wakeup(ctx, s.ID)
+	return c.deployer.Wakeup(ctx, types.Space{
+		ID:        s.ID,
+		Namespace: namespace,
+		Name:      name,
+	})
 }
 
 func (c *SpaceComponent) Stop(ctx context.Context, namespace, name string) error {
@@ -430,7 +430,11 @@ func (c *SpaceComponent) Stop(ctx context.Context, namespace, name string) error
 		return err
 	}
 
-	return c.deployer.Stop(ctx, s.ID)
+	return c.deployer.Stop(ctx, types.Space{
+		ID:        s.ID,
+		Namespace: namespace,
+		Name:      name,
+	})
 }
 
 // FixHasAppFile checks whether git repo has app file and update space's HasAppFile property in db
@@ -454,7 +458,12 @@ func (c *SpaceComponent) status(ctx context.Context, s *database.Space) (string,
 	if !s.HasAppFile {
 		return "", SpaceStatusNoAppFile, nil
 	}
-	srvName, code, err := c.deployer.Status(ctx, s.ID)
+	namespace, name := s.Repository.NamespaceAndName()
+	srvName, code, err := c.deployer.Status(ctx, types.Space{
+		ID:        s.ID,
+		Namespace: namespace,
+		Name:      name,
+	})
 	if err != nil {
 		slog.Error("error happen when get space status", slog.Any("error", err), slog.String("path", s.Repository.Path))
 		return "", SpaceStatusStopped, err
@@ -475,7 +484,11 @@ func (c *SpaceComponent) Logs(ctx context.Context, namespace, name string) (*dep
 	if err != nil {
 		return nil, fmt.Errorf("can't find space by path:%w", err)
 	}
-	return c.deployer.Logs(ctx, s.ID)
+	return c.deployer.Logs(ctx, types.Space{
+		ID:        s.ID,
+		Namespace: namespace,
+		Name:      name,
+	})
 }
 
 func (c *SpaceComponent) HasAppFile(ctx context.Context, namespace, name string) bool {
