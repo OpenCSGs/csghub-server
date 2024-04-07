@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 	"strings"
+	"time"
 
 	"opencsg.com/csghub-server/builder/deploy"
 	"opencsg.com/csghub-server/builder/git/gitserver"
@@ -14,6 +15,10 @@ import (
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/types"
 )
+
+// TODO:remove after migration complete
+// Sunday, April 7, 2024 3:41:09 AM
+var migrate = time.Unix(1712461269, 0)
 
 const spaceGitattributesContent = modelGitattributesContent
 
@@ -428,9 +433,25 @@ func (c *SpaceComponent) Stop(ctx context.Context, namespace, name string) error
 	return c.deployer.Stop(ctx, s.ID)
 }
 
+// FixHasAppFile checks whether git repo has app file and update space's HasAppFile property in db
+func (c *SpaceComponent) FixHasAppFile(ctx context.Context, s *database.Space) *database.Space {
+	namespace, repoName := s.Repository.NamespaceAndName()
+	hasAppFile := c.HasAppFile(ctx, namespace, repoName)
+	if s.HasAppFile != hasAppFile {
+		s.HasAppFile = hasAppFile
+		c.ss.Update(ctx, *s)
+	}
+
+	return s
+}
+
 func (c *SpaceComponent) status(ctx context.Context, s *database.Space) (string, string, error) {
-	ns, name := s.Repository.NamespaceAndName()
-	if !c.HasAppFile(ctx, ns, name) {
+	// TODO: should be removed later.
+	// `HasAppFile` is a new field of type space, use folloing code to auto-fill its value
+	if !s.HasAppFile && s.CreatedAt.Before(migrate) {
+		s = c.FixHasAppFile(ctx, s)
+	}
+	if !s.HasAppFile {
 		return "", SpaceStatusNoAppFile, nil
 	}
 	srvName, code, err := c.deployer.Status(ctx, s.ID)

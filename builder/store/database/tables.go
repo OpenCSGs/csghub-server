@@ -14,5 +14,7 @@ type Space struct {
 	Hardware      string `bun:",notnull" json:"hardware"`
 	Secrets       string `bun:",notnull" json:"secrets"`
 
+	HasAppFile bool `bun:"," json:"has_app_file"`
+
 	times
 }
