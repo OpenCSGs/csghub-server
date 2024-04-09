@@ -273,6 +273,10 @@ definitions:
       user:
         description: name of user will be added to the org as a member
         type: string
+    required:
+    - op_user
+    - role
+    - user
     type: object
   handler.Delete.removeMemberRequest:
     properties:
@@ -281,6 +285,23 @@ definitions:
         type: string
       role:
         type: string
+    required:
+    - op_user
+    - role
+    type: object
+  handler.Update.updateMemberRequest:
+    properties:
+      new_role:
+        type: string
+      old_role:
+        type: string
+      op_user:
+        description: name of the operator
+        type: string
+    required:
+    - new_role
+    - old_role
+    - op_user
     type: object
   types.APIBadRequest:
     type: object
@@ -2378,6 +2399,46 @@ paths:
       security:
       - ApiKey: []
       summary: Remove membership between org and user
+      tags:
+      - Member
+    put:
+      consumes:
+      - application/json
+      parameters:
+      - description: org name
+        in: path
+        name: name
+        required: true
+        type: string
+      - description: user name
+        in: path
+        name: username
+        required: true
+        type: string
+      - description: body
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/handler.Update.updateMemberRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/types.Response'
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: update user membership
       tags:
       - Member
   /space_resources:

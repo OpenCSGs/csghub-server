@@ -2106,6 +2106,68 @@ const docTemplate = `{
             }
         },
         "/organizations/{name}/members/{username}": {
+            "put": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Member"
+                ],
+                "summary": "update user membership",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "org name",
+                        "name": "name",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "user name",
+                        "name": "username",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "body",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handler.Update.updateMemberRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/types.Response"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            },
             "delete": {
                 "security": [
                     {
@@ -4440,6 +4502,11 @@ const docTemplate = `{
         },
         "handler.Create.addMemberRequest": {
             "type": "object",
+            "required": [
+                "op_user",
+                "role",
+                "user"
+            ],
             "properties": {
                 "op_user": {
                     "description": "name of the operator",
@@ -4456,12 +4523,36 @@ const docTemplate = `{
         },
         "handler.Delete.removeMemberRequest": {
             "type": "object",
+            "required": [
+                "op_user",
+                "role"
+            ],
             "properties": {
                 "op_user": {
                     "description": "name of the operator",
                     "type": "string"
                 },
                 "role": {
+                    "type": "string"
+                }
+            }
+        },
+        "handler.Update.updateMemberRequest": {
+            "type": "object",
+            "required": [
+                "new_role",
+                "old_role",
+                "op_user"
+            ],
+            "properties": {
+                "new_role": {
+                    "type": "string"
+                },
+                "old_role": {
+                    "type": "string"
+                },
+                "op_user": {
+                    "description": "name of the operator",
                     "type": "string"
                 }
             }
