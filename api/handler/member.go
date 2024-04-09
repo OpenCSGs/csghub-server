@@ -34,14 +34,40 @@ func (h *MemberHandler) Index(ctx *gin.Context) {
 	httpbase.OK(ctx, members)
 }
 
+// UpdateMember   godoc
+// @Security     ApiKey
+// @Summary      update user membership
+// @Tags         Member
+// @Accept       json
+// @Produce      json
+// @Param        name path string true "org name"
+// @Param        username path string true "user name"
+// @Param        body body handler.Update.updateMemberRequest true "body"
+// @Success      200  {object}  types.Response{} "OK"
+// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
+// @Router       /organizations/{name}/members/{username} [put]
 func (h *MemberHandler) Update(ctx *gin.Context) {
-	member, err := h.c.Update(ctx)
+	type updateMemberRequest struct {
+		OldRole string `json:"old_role" binding:"required"`
+		NewRole string `json:"new_role" binding:"required"`
+		// name of the operator
+		OpUser string `json:"op_user" binding:"required"`
+	}
+	req := new(updateMemberRequest)
+	if err := ctx.ShouldBindJSON(req); err != nil {
+		httpbase.BadRequest(ctx, fmt.Errorf("failed to unmarshal request body,caused by:%w", err).Error())
+		return
+	}
+	org := ctx.Param("name")
+	userName := ctx.Param("username")
+	err := h.c.ChangeMemberRole(ctx, org, userName, req.OpUser, req.OldRole, req.NewRole)
 	if err != nil {
 		httpbase.ServerError(ctx, err)
 		return
 	}
 
-	httpbase.OK(ctx, member)
+	httpbase.OK(ctx, nil)
 }
 
 // Create   godoc
@@ -59,11 +85,11 @@ func (h *MemberHandler) Update(ctx *gin.Context) {
 // @Router       /organizations/{name}/members [post]
 func (h *MemberHandler) Create(ctx *gin.Context) {
 	type addMemberRequest struct {
-		//name of user will be added to the org as a member
-		User string `json:"user"`
-		Role string `json:"role"`
-		//name of the operator
-		OpUser string `json:"op_user"`
+		// name of user will be added to the org as a member
+		User string `json:"user" binding:"required"`
+		Role string `json:"role" binding:"required"`
+		// name of the operator
+		OpUser string `json:"op_user" binding:"required"`
 	}
 	req := new(addMemberRequest)
 	if err := ctx.ShouldBindJSON(req); err != nil {
@@ -101,9 +127,9 @@ func (h *MemberHandler) Create(ctx *gin.Context) {
 // @Router       /organizations/{name}/members/{username} [delete]
 func (h *MemberHandler) Delete(ctx *gin.Context) {
 	type removeMemberRequest struct {
-		Role string `json:"role"`
-		//name of the operator
-		OpUser string `json:"op_user"`
+		Role string `json:"role" binding:"required"`
+		// name of the operator
+		OpUser string `json:"op_user" binding:"required"`
 	}
 	req := new(removeMemberRequest)
 	if err := ctx.ShouldBindJSON(req); err != nil {
