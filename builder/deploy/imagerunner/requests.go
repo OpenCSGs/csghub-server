@@ -4,6 +4,7 @@ import "io"
 
 type (
 	RunRequest struct {
+		SpaceID   int64  `json:"space_id"`
 		UserName  string `json:"user_name"`
 		OrgName   string `json:"org_name"`
 		SpaceName string `json:"space_name"`
@@ -13,44 +14,45 @@ type (
 		Hardware string `json:"hardware"`
 		Env      string `json:"env"`
 
-		BuildID int64  `json:"build_id"`
-		ImageID string `json:"image_id"`
+		ImageID  string `json:"image_id"`
+		DeployID int64  `json:"deploy_id"`
 	}
 
 	RunResponse struct {
-		Code    int    `json:"code"`
-		Message string `json:"message"`
+		DeployID int64  `json:"deploy_id"`
+		Code     int    `json:"code"`
+		Message  string `json:"message"`
 	}
 
 	StopRequest struct {
+		SpaceID   int64  `json:"space_id"`
 		OrgName   string `json:"org_name"`
 		SpaceName string `json:"space_name"`
-		BuildID   int64  `json:"build_id"`
-		ImageID   string `json:"image_id"`
 	}
 
 	StopResponse struct {
-		Code    int    `json:"code"`
-		Message string `json:"message"`
+		DeployID int64  `json:"deploy_id"`
+		Code     int    `json:"code"`
+		Message  string `json:"message"`
 	}
 
 	StatusRequest struct {
+		SpaceID   int64  `json:"space_id"`
 		OrgName   string `json:"org_name"`
 		SpaceName string `json:"space_name"`
-		BuildID   int64  `json:"build_id"`
-		ImageID   string `json:"image_id"`
 	}
 
 	StatusResponse struct {
-		Code    int    `json:"code"`
-		Message string `json:"message"`
+		DeployID int64  `json:"deploy_id"`
+		Code     int    `json:"code"`
+		Message  string `json:"message"`
 	}
 
 	LogsRequest struct {
+		SpaceID   int64  `json:"space_id"`
 		OrgName   string `json:"org_name"`
 		SpaceName string `json:"space_name"`
-		BuildID   int64  `json:"build_id"`
-		ImageID   string `json:"image_id"`
+		DeployID  int64  `json:"deploy_id"`
 	}
 
 	LogsResponse struct {

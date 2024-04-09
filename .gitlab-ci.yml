@@ -1,0 +1,112 @@
+default:
+  image: docker:latest
+
+stages:
+  - test
+  - build
+  - deploy
+
+variables:
+  IMAGE_NAME: "csghub-server"
+  IMAGE_TAG: "latest"
+  SAST_IMAGE_SUFFIX: '-fips'
+
+include:
+  # - template: Security/Dependency-Scanning.gitlab-ci.yml
+  - template: Jobs/Secret-Detection.gitlab-ci.yml
+
+test:
+  stage: test
+  image: golang:1.21.0
+  script:
+    - go env -w GO111MODULE=on
+    - go env -w GOPROXY=https://goproxy.cn,direct
+    - go build -o starhub ./cmd/csghub-server
+  except:
+    - main
+
+build_server_image:commit:
+  image: docker:24.0.6
+  stage: build
+  services:
+    - docker:24.0.6-dind
+  variables:
+    IMAGE_TAG: "$CI_REGISTRY_IMAGE:$CI_COMMIT_SHORT_SHA"
+    LATEST_IMAGE_TAG: "$CI_REGISTRY_IMAGE:latest"
+  script:
+    - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
+    - docker build -t $IMAGE_TAG -f docker/Dockerfile .
+    - docker tag $IMAGE_TAG  $LATEST_IMAGE_TAG
+    - docker push $IMAGE_TAG
+    - docker push $LATEST_IMAGE_TAG
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH && $CI_COMMIT_BRANCH == $CI_COMMIT_REF_NAME # when commit to main branch
+   
+# build_runner_proxy_image:commit:
+#   image: docker:24.0.6
+#   stage: build
+#   services:
+#     - docker:24.0.6-dind
+#   variables:
+#     IMAGE_TAG: "$CI_REGISTRY_IMAGE/deploy:$CI_COMMIT_SHORT_SHA"
+#     LATEST_IMAGE_TAG: "$CI_REGISTRY_IMAGE/deploy:latest"
+#   script:
+#     - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
+#     - docker build -t $IMAGE_TAG -f docker/Dockerfile-runner-proxy .
+#     - docker tag $IMAGE_TAG  $LATEST_IMAGE_TAG
+#     - docker push $IMAGE_TAG
+#     - docker push $LATEST_IMAGE_TAG
+#   rules:
+#     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH && $CI_COMMIT_BRANCH == $CI_COMMIT_REF_NAME # when commit to main branch
+
+build_server_image:tag:
+  image: docker:24.0.6
+  stage: build
+  services:
+    - docker:24.0.6-dind
+  only:
+    refs:
+      - tags
+  variables:
+    IMAGE_TAG: "$CI_REGISTRY_IMAGE:$CI_COMMIT_TAG"
+  script:
+    - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
+    - docker build -t $IMAGE_TAG -f docker/Dockerfile .
+    - docker push $IMAGE_TAG
+
+# build_runner_proxy_image:tag:
+#   image: docker:24.0.6
+#   stage: build
+#   services:
+#     - docker:24.0.6-dind
+#   only:
+#     refs:
+#       - tags
+#   variables:
+#     IMAGE_TAG: "$CI_REGISTRY_IMAGE/deploy:$CI_COMMIT_TAG"
+#   script:
+#     - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
+#     - docker build -t $IMAGE_TAG -f docker/Dockerfile-runner-proxy .
+#     - docker push $IMAGE_TAG
+
+
+# trigger starhub-deploy project 
+trigger_deploy_stg:
+  stage: deploy
+  needs: 
+    - job: build_server_image:commit
+    # - job: build_runner_proxy_image:commit
+  image: docker.m.daocloud.io/alpine:3.14
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH && $CI_COMMIT_BRANCH == $CI_COMMIT_REF_NAME
+  script:
+  - |-
+    sed -i 's/dl-cdn.alpinelinux.org/mirrors.aliyun.com/g' /etc/apk/repositories
+    apk add --no-cache curl
+    curl --fail-with-body \
+    --request POST \
+    --form "token=${STARHUB_DEPLOY_TRIGGER_TOKEN}" \
+    --form ref=main \
+    --form "variables[starhub_tag]=${CI_COMMIT_SHORT_SHA}" \
+    --form "variables[ENV_NAME]=stg" \
+    https://git-devops.opencsg.com/api/v4/projects/58/trigger/pipeline

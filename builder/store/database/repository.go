@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"strings"
 	"time"
 
 	"github.com/uptrace/bun"
@@ -47,6 +48,12 @@ type Repository struct {
 	HTTPCloneURL   string               `bun:",nullzero" json:"http_clone_url"`
 	SSHCloneURL    string               `bun:",nullzero" json:"ssh_clone_url"`
 	times
+}
+
+// NamespaceAndName returns namespace and name by parsing repository path
+func (r Repository) NamespaceAndName() (namespace string, name string) {
+	fields := strings.Split(r.Path, "/")
+	return fields[0], fields[1]
 }
 
 type RepositoryTag struct {

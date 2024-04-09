@@ -1,0 +1,20 @@
+FROM golang:1.21.0-bullseye
+ENV GOPROXY=https://goproxy.cn,direct
+WORKDIR /starhub
+COPY . .
+RUN  CGO_ENABLED=1 GOOS=linux go build -tags netgo -a  -installsuffix cgo -ldflags '-extldflags "-static"'   -v -o /go/bin/starhub ./cmd/csghub-server && \
+     rm -rf /go/pkg && \
+     rm -rf /starhub
+
+FROM alpine:latest as prod
+WORKDIR /starhub-bin
+ENV GIN_MODE=release
+
+COPY --from=0 /go/bin/starhub .
+#RUN sed -i 's/dl-cdn.alpinelinux.org/mirrors.aliyun.com/g'  /etc/apk/repositories
+
+RUN chmod +x /starhub-bin/starhub
+EXPOSE 8080
+
+ENTRYPOINT ["/starhub-bin/starhub"]
+

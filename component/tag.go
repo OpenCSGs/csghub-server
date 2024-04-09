@@ -25,7 +25,7 @@ type TagComponent struct {
 }
 
 func (tc *TagComponent) AllTags(ctx context.Context) ([]database.Tag, error) {
-	//TODO: query cache for tags at first
+	// TODO: query cache for tags at first
 	return tc.ts.AllTags(ctx)
 }
 
@@ -35,13 +35,16 @@ func (c *TagComponent) ClearMetaTags(ctx context.Context, namespace, name string
 }
 
 func (c *TagComponent) UpdateMetaTags(ctx context.Context, tagScope database.TagScope, namespace, name, content string) ([]*database.RepositoryTag, error) {
-
 	var tp tagparser.TagProcessor
-	//TODO:load from cache
+	// TODO:load from cache
+
 	if tagScope == database.DatasetTagScope {
 		tp = tagparser.NewDatasetTagProcessor(c.ts)
-	} else {
+	} else if tagScope == database.ModelTagScope {
 		tp = tagparser.NewModelTagProcessor(c.ts)
+	} else {
+		// skip tag process for code and space now
+		return nil, nil
 	}
 	tagsMatched, tagToCreate, err := tp.ProcessReadme(ctx, content)
 	if err != nil {
@@ -50,8 +53,8 @@ func (c *TagComponent) UpdateMetaTags(ctx context.Context, tagScope database.Tag
 	}
 
 	if c.sensitiveChecker != nil {
-		//TODO:do tag name sensitive checking in batch
-		//remove sensitive tags by checking tag name of tag to create
+		// TODO:do tag name sensitive checking in batch
+		// remove sensitive tags by checking tag name of tag to create
 		tagToCreate = slices.DeleteFunc(tagToCreate, func(t *database.Tag) bool {
 			pass, _ := c.sensitiveChecker.CheckText(ctx, string(sensitive.ScenarioNicknameDetection), t.Name)
 			return !pass
@@ -78,15 +81,17 @@ func (c *TagComponent) UpdateMetaTags(ctx context.Context, tagScope database.Tag
 func (c *TagComponent) UpdateLibraryTags(ctx context.Context, tagScope database.TagScope, namespace, name, oldFilePath, newFilePath string) error {
 	oldLibTagName := tagparser.LibraryTag(oldFilePath)
 	newLibTagName := tagparser.LibraryTag(newFilePath)
-	//TODO:load from cache
+	// TODO:load from cache
 	var (
 		allTags []*database.Tag
 		err     error
 	)
 	if tagScope == database.DatasetTagScope {
 		allTags, err = c.ts.AllDatasetTags(ctx)
-	} else {
+	} else if tagScope == database.ModelTagScope {
 		allTags, err = c.ts.AllModelTags(ctx)
+	} else {
+		return nil
 	}
 	if err != nil {
 		return fmt.Errorf("failed to get all tags, error: %w", err)

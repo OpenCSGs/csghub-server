@@ -15,7 +15,9 @@ import (
 )
 
 type ModelID struct {
-	Owner, Name, Version string
+	Owner, Name string
+	// reserved, keep empty string ""
+	Version string
 }
 
 func (m ModelID) Hash() uint64 {

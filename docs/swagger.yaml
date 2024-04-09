@@ -230,10 +230,14 @@ definitions:
     enum:
     - model
     - dataset
+    - code
+    - space
     type: string
     x-enum-varnames:
     - ModelTagScope
     - DatasetTagScope
+    - CodeTagScope
+    - SpaceTagScope
   database.User:
     properties:
       accessTokens:
@@ -375,6 +379,24 @@ definitions:
         type: string
       username:
         example: creator_user_name
+        type: string
+    type: object
+  types.CreateJWTReq:
+    properties:
+      current_user:
+        type: string
+      organizations:
+        items:
+          type: string
+        type: array
+    required:
+    - current_user
+    type: object
+  types.CreateJWTResp:
+    properties:
+      expire_at:
+        type: string
+      token:
         type: string
     type: object
   types.CreateModelReq:
@@ -1515,6 +1537,37 @@ paths:
       summary: Get the demo data of the dataset
       tags:
       - Dataset
+  /jwt/token:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: body
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/types.CreateJWTReq'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/types.CreateJWTResp'
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: generate jwt token for user
+      tags:
+      - JWT
   /list/datasets_by_path:
     post:
       consumes:
@@ -1591,6 +1644,44 @@ paths:
       security:
       - ApiKey: []
       summary: List models by paths
+      tags:
+      - List
+  /list/spaces_by_path:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: body
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/types.ListByPathReq'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/types.Response'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/types.Space'
+                  type: array
+              type: object
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: List spaces by paths
       tags:
       - List
   /models:
@@ -2805,48 +2896,6 @@ paths:
       summary: Update a exists space
       tags:
       - Space
-  /spaces/{namespace}/{name}/api/{api_name}:
-    post:
-      consumes:
-      - application/json
-      description: call space api
-      parameters:
-      - description: namespace
-        in: path
-        name: namespace
-        required: true
-        type: string
-      - description: name
-        in: path
-        name: name
-        required: true
-        type: string
-      - description: api_name
-        in: path
-        name: api_name
-        required: true
-        type: string
-      - description: body
-        in: body
-        name: body
-        schema:
-          type: string
-      produces:
-      - application/json
-      responses:
-        "400":
-          description: Bad request
-          schema:
-            $ref: '#/definitions/types.APIBadRequest'
-        "500":
-          description: Internal server error
-          schema:
-            $ref: '#/definitions/types.APIInternalServerError'
-      security:
-      - JWT token: []
-      summary: Call space api
-      tags:
-      - Space
   /spaces/{namespace}/{name}/logs:
     get:
       consumes:
@@ -2969,6 +3018,37 @@ paths:
       security:
       - JWT token: []
       summary: stop space app
+      tags:
+      - Space
+  /spaces/{namespace}/{name}/wakeup:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: namespace
+        in: path
+        name: namespace
+        required: true
+        type: string
+      - description: name
+        in: path
+        name: name
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - JWT token: []
+      summary: wake up space app
       tags:
       - Space
   /tags:

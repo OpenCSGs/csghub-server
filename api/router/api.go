@@ -17,10 +17,10 @@ import (
 func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 	r := gin.New()
 	r.Use(cors.New(cors.Config{
-		AllowOrigins:     []string{"http://localhost:3000", "https://portal-stg.opencsg.com", "https://portal.opencsg.com"},
 		AllowCredentials: true,
 		AllowHeaders:     []string{"*"},
 		AllowMethods:     []string{"*"},
+		AllowAllOrigins:  true,
 	}))
 	r.Use(gin.Recovery())
 	r.Use(middleware.Log())
@@ -59,6 +59,7 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 	}
 	apiGroup.POST("/list/models_by_path", listHandler.ListModelsByPath)
 	apiGroup.POST("/list/datasets_by_path", listHandler.ListDatasetsByPath)
+	apiGroup.POST("/list/spaces_by_path", listHandler.ListSpacesByPath)
 
 	// Huggingface SDK routes
 	modelHandler, err := handler.NewModelHandler(config)
@@ -175,10 +176,10 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 		spaces.GET("/:namespace/:name", spaceHandler.Show)
 		spaces.PUT("/:namespace/:name", spaceHandler.Update)
 		spaces.DELETE("/:namespace/:name", spaceHandler.Delete)
-		// proxy any request to space api
-		spaces.Any("/:namespace/:name/api/*api_name", spaceHandler.Proxy)
 		// depoly and start running the space
 		spaces.POST("/:namespace/:name/run", spaceHandler.Run)
+		// wake a sleeping space
+		spaces.POST("/:namespace/:name/wakeup", spaceHandler.Wakeup)
 		// stop running space
 		spaces.POST("/:namespace/:name/stop", spaceHandler.Stop)
 		// pull space running status

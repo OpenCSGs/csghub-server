@@ -110,24 +110,32 @@ func (s *DeployTaskStore) GetNewTaskFirst(ctx context.Context) (*DeployTask, err
 	return deployTask, err
 }
 
-func (s *DeployTaskStore) UpdateInTx(ctx context.Context, deploy *Deploy, deployTasks ...*DeployTask) error {
-	deploy.UpdatedAt = time.Now()
-	for _, t := range deployTasks {
-		t.UpdatedAt = time.Now()
-	}
-
+func (s *DeployTaskStore) UpdateInTx(ctx context.Context, deployColumns, deployTaskColumns []string, deploy *Deploy, deployTasks ...*DeployTask) error {
 	tx, err := s.db.Core.BeginTx(ctx, nil)
 	if err != nil {
 		return fmt.Errorf("failed to begin transaction,%w", err)
 	}
-	_, err = tx.NewUpdate().Model(deploy).WherePK().Exec(ctx)
-	if err != nil {
-		tx.Rollback()
-		return fmt.Errorf("failed to update deploy,%w", err)
+
+	if deploy != nil {
+		deployColumns = append(deployColumns, "updated_at")
+		deploy.UpdatedAt = time.Now()
+		_, err = tx.NewUpdate().Model(deploy).
+			Column(deployColumns...).
+			WherePK().Exec(ctx)
+		if err != nil {
+			tx.Rollback()
+			return fmt.Errorf("failed to update deploy,%w", err)
+		}
 	}
+
+	for _, t := range deployTasks {
+		t.UpdatedAt = time.Now()
+	}
+	deployTaskColumns = append(deployTaskColumns, "updated_at")
 	_, err = tx.NewUpdate().
 		Model(&deployTasks).
-		Column("status", "message", "updated_at").
+		// Column("status", "message", "updated_at").
+		Column(deployTaskColumns...).
 		Bulk().
 		Exec(ctx)
 	if err != nil {

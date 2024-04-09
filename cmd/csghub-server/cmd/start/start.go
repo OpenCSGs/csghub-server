@@ -11,6 +11,11 @@ import (
 	"opencsg.com/csghub-server/common/config"
 )
 
+func init() {
+	Cmd.AddCommand(serverCmd)
+	Cmd.AddCommand(rproxyCmd)
+}
+
 var Cmd = &cobra.Command{
 	Use:   "start",
 	Short: "Start a service",

@@ -8,6 +8,8 @@ require (
 	github.com/alibabacloud-go/green-20220302 v1.2.0
 	github.com/alibabacloud-go/tea v1.2.1
 	github.com/aliyun/alibaba-cloud-sdk-go v1.62.648
+	github.com/gin-contrib/cors v1.7.0
+	github.com/gin-contrib/sessions v0.0.5
 	github.com/gin-gonic/gin v1.9.1
 	github.com/golang-jwt/jwt/v5 v5.2.0
 	github.com/kelseyhightower/envconfig v1.4.0
@@ -57,7 +59,6 @@ require (
 	github.com/evanphx/json-patch/v5 v5.8.0 // indirect
 	github.com/fatih/color v1.15.0 // indirect
 	github.com/gabriel-vasile/mimetype v1.4.3 // indirect
-	github.com/gin-contrib/cors v1.7.0 // indirect
 	github.com/gin-contrib/sse v0.1.0 // indirect
 	github.com/go-fed/httpsig v1.1.0 // indirect
 	github.com/go-logr/logr v1.3.0 // indirect
@@ -76,6 +77,9 @@ require (
 	github.com/google/go-containerregistry v0.13.0 // indirect
 	github.com/google/gofuzz v1.2.0 // indirect
 	github.com/google/uuid v1.5.0 // indirect
+	github.com/gorilla/context v1.1.1 // indirect
+	github.com/gorilla/securecookie v1.1.1 // indirect
+	github.com/gorilla/sessions v1.2.1 // indirect
 	github.com/hashicorp/go-version v1.6.0 // indirect
 	github.com/imdario/mergo v0.3.12 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
@@ -90,7 +94,7 @@ require (
 	github.com/mailru/easyjson v0.7.7 // indirect
 	github.com/mattn/go-colorable v0.1.13 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
-	github.com/mattn/go-sqlite3 v1.14.17 // indirect
+	github.com/mattn/go-sqlite3 v2.0.3+incompatible // indirect
 	github.com/minio/md5-simd v1.1.2 // indirect
 	github.com/mitchellh/mapstructure v1.5.0 // indirect
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect

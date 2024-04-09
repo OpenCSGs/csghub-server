@@ -17,7 +17,6 @@ var enableSwagger bool
 
 func init() {
 	serverCmd.Flags().BoolVar(&enableSwagger, "swagger", false, "Start swagger help docs")
-	Cmd.AddCommand(serverCmd)
 }
 
 var serverCmd = &cobra.Command{
@@ -55,9 +54,10 @@ var serverCmd = &cobra.Command{
 		}
 		database.InitDB(dbConfig)
 		deploy.Init(deploy.DeployConfig{
-			ImageBuilderURL: cfg.Space.BuilderEndpoint,
-			ImageRunnerURL:  cfg.Space.RunnerEndpoint,
-			MonitorInterval: 10 * time.Second,
+			ImageBuilderURL:    cfg.Space.BuilderEndpoint,
+			ImageRunnerURL:     cfg.Space.RunnerEndpoint,
+			MonitorInterval:    10 * time.Second,
+			InternalRootDomain: cfg.Space.InternalRootDomain,
 		})
 		r, err := router.NewRouter(cfg, enableSwagger)
 		if err != nil {

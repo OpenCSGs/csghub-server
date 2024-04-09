@@ -416,15 +416,9 @@ func getFilePaths(namespace, repoName, folder string, repoType types.RepositoryT
 }
 
 func (c *ModelComponent) Predict(ctx context.Context, req *types.ModelPredictReq) (*types.ModelPredictResp, error) {
-	model, err := c.ms.FindByPath(ctx, req.Namespace, req.Name)
-	if err != nil {
-		return nil, fmt.Errorf("failed to find model, error: %w", err)
-	}
-
 	mid := inference.ModelID{
-		Owner:   model.Repository.User.Username,
-		Name:    model.Repository.Name,
-		Version: req.Version,
+		Owner: req.Namespace,
+		Name:  req.Name,
 	}
 	inferReq := &inference.PredictRequest{
 		Prompt: req.Input,

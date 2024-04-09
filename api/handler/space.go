@@ -22,15 +22,8 @@ func NewSpaceHandler(config *config.Config) (*SpaceHandler, error) {
 	if err != nil {
 		return nil, err
 	}
-	rp, err := proxy.NewReverseProxy(config.Space.RunnerEndpoint)
-	if err != nil {
-		// log error and continue
-		slog.Error("failed to create space reverse proxy", slog.String("K8sEndpoint", config.Space.RunnerEndpoint),
-			slog.Any("error", err))
-	}
 	return &SpaceHandler{
-		c:      sc,
-		rproxy: rp,
+		c: sc,
 	}, nil
 }
 
@@ -220,52 +213,6 @@ func (h *SpaceHandler) Delete(ctx *gin.Context) {
 	httpbase.OK(ctx, nil)
 }
 
-// CallSpaceApi   godoc
-// @Security     JWT token
-// @Summary      Call space api
-// @Description  call space api
-// @Tags         Space
-// @Accept       json
-// @Produce      json
-// @Param        namespace path string true "namespace"
-// @Param        name path string true "name"
-// @Param        api_name path string true "api_name"
-// @Param        body body string false "body"
-// @Failure      400  {object}  types.APIBadRequest "Bad request"
-// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
-// @Router       /spaces/{namespace}/{name}/api/{api_name} [post]
-func (h *SpaceHandler) Proxy(ctx *gin.Context) {
-	username, exists := ctx.Get("currentUser")
-	if !exists {
-		slog.Info("username not found in gin context")
-		httpbase.BadRequest(ctx, "user not found, please login first")
-		return
-	}
-	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
-	if err != nil {
-		slog.Error("failed to get namespace from context", "error", err)
-		httpbase.BadRequest(ctx, err.Error())
-		return
-	}
-	allow, err := h.c.AllowCallApi(ctx, namespace, name, username.(string))
-	if err != nil {
-		slog.Error("failed to check user permission", "error", err)
-		httpbase.ServerError(ctx, errors.New("failed to check user permission"))
-		return
-	}
-
-	if allow {
-		apiname := ctx.Param("api_name")
-		slog.Info("proxy space request", slog.String("namespace", namespace),
-			slog.String("name", name), slog.Any("username", username),
-			slog.String("api_name", apiname))
-		h.rproxy.ServeHTTP(ctx.Writer, ctx.Request, apiname)
-	} else {
-		slog.Info("user not allowed to call sapce api", slog.String("namespace", namespace),
-			slog.String("name", name), slog.Any("username", username))
-	}
-}
-
 // RunSpace   godoc
 // @Security     JWT token
 // @Summary      run space app
@@ -292,8 +239,37 @@ func (h *SpaceHandler) Run(ctx *gin.Context) {
 		return
 	}
 
-	slog.Info("deploy space sucess", slog.String("namespace", namespace),
+	slog.Info("space deployment created", slog.String("namespace", namespace),
 		slog.String("name", name), slog.Int64("deploy_id", deployID))
+	httpbase.OK(ctx, nil)
+}
+
+// WakeupSpace   godoc
+// @Security     JWT token
+// @Summary      wake up space app
+// @Tags         Space
+// @Accept       json
+// @Produce      json
+// @Param        namespace path string true "namespace"
+// @Param        name path string true "name"
+// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
+// @Router       /spaces/{namespace}/{name}/wakeup [post]
+func (h *SpaceHandler) Wakeup(ctx *gin.Context) {
+	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
+	if err != nil {
+		slog.Error("failed to get namespace from context", "error", err)
+		httpbase.BadRequest(ctx, err.Error())
+		return
+	}
+	err = h.c.Wakeup(ctx, namespace, name)
+	if err != nil {
+		slog.Error("failed to wakeup space", slog.String("namespace", namespace),
+			slog.String("name", name), slog.Any("error", err))
+		httpbase.ServerError(ctx, errors.New("failed to wakeup space"))
+		return
+	}
+
 	httpbase.OK(ctx, nil)
 }
 
@@ -385,7 +361,7 @@ func (h *SpaceHandler) Status(ctx *gin.Context) {
 			return
 		default:
 			time.Sleep(time.Second * 5)
-			status, err := h.c.Status(ctx, namespace, name)
+			_, status, err := h.c.Status(ctx, namespace, name)
 			if err != nil {
 				slog.Error("failed to get space status", slog.Any("error", err), slog.String("namespace", namespace),
 					slog.String("name", name))
@@ -413,7 +389,16 @@ func (h *SpaceHandler) status(ctx *gin.Context) {
 			return
 		default:
 			time.Sleep(time.Second * 5)
+			ctx.SSEvent("status", "Building")
+			ctx.Writer.Flush()
+			time.Sleep(time.Second * 5)
 			ctx.SSEvent("status", "Running")
+			ctx.Writer.Flush()
+			time.Sleep(time.Second * 5)
+			ctx.SSEvent("status", "Sleeping")
+			ctx.Writer.Flush()
+			time.Sleep(time.Second * 5)
+			ctx.SSEvent("status", "Stopped")
 			ctx.Writer.Flush()
 		}
 	}
@@ -466,12 +451,11 @@ func (h *SpaceHandler) Logs(ctx *gin.Context) {
 	ctx.Writer.Header().Set("Connection", "keep-alive")
 	ctx.Writer.Header().Set("Transfer-Encoding", "chunked")
 
-	logs, err := h.c.Logs(ctx, namespace, name)
+	logReader, err := h.c.Logs(ctx, namespace, name)
 	if err != nil {
 		httpbase.ServerError(ctx, err)
 		return
 	}
-	defer logs.Close()
 	closeNotify := ctx.Writer.CloseNotify()
 
 	type logContent struct {
@@ -479,19 +463,20 @@ func (h *SpaceHandler) Logs(ctx *gin.Context) {
 		Content string `json:"content"`
 	}
 
-	buildLogChan := logs.BuildLog()
-	runLogChan := logs.RunLog()
 	for {
 		select {
 		case <-closeNotify:
-			// logs.Close()
 			return
-		case data := <-buildLogChan:
-			ctx.SSEvent("Build", string(data))
-			ctx.Writer.Flush()
-		case data := <-runLogChan:
-			ctx.SSEvent("Container", string(data))
-			ctx.Writer.Flush()
+		case data, ok := <-logReader.BuildLog():
+			if ok {
+				ctx.SSEvent("Build", string(data))
+				ctx.Writer.Flush()
+			}
+		case data, ok := <-logReader.RunLog():
+			if ok {
+				ctx.SSEvent("Container", string(data))
+				ctx.Writer.Flush()
+			}
 		}
 	}
 }

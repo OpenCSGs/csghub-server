@@ -22,7 +22,7 @@ type sleepTask struct {
 }
 
 func (t *sleepTask) Run(ctx context.Context) error {
-	slog.Info("sleeping task running", slog.Duration("time", t.du))
+	slog.Debug("sleeping task running", slog.Duration("time", t.du))
 	time.Sleep(t.du)
 	return nil
 }
