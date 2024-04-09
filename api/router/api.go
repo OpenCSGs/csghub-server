@@ -2,7 +2,10 @@ package router
 
 import (
 	"fmt"
+	"time"
 
+	cache "github.com/chenyahui/gin-cache"
+	"github.com/chenyahui/gin-cache/persist"
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	swaggerFiles "github.com/swaggo/files"
@@ -51,15 +54,17 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 	r.Use(middleware.Authenticator(config))
 	apiGroup := r.Group("/api/v1")
 	// TODO:use middleware to handle common response
+	//
+	memoryStore := persist.NewMemoryStore(1 * time.Minute)
 
 	// List trending models and datasets routes
 	listHandler, err := handler.NewListHandler(config)
 	if err != nil {
 		return nil, fmt.Errorf("error creatring list handler: %v", err)
 	}
-	apiGroup.POST("/list/models_by_path", listHandler.ListModelsByPath)
-	apiGroup.POST("/list/datasets_by_path", listHandler.ListDatasetsByPath)
-	apiGroup.POST("/list/spaces_by_path", listHandler.ListSpacesByPath)
+	apiGroup.POST("/list/models_by_path", cache.CacheByRequestURI(memoryStore, 1*time.Minute), listHandler.ListModelsByPath)
+	apiGroup.POST("/list/datasets_by_path", cache.CacheByRequestURI(memoryStore, 1*time.Minute), listHandler.ListDatasetsByPath)
+	apiGroup.POST("/list/spaces_by_path", cache.CacheByRequestURI(memoryStore, 1*time.Minute), listHandler.ListSpacesByPath)
 
 	// Huggingface SDK routes
 	modelHandler, err := handler.NewModelHandler(config)
