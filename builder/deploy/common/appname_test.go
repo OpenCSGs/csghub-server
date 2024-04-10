@@ -6,12 +6,17 @@ import (
 )
 
 func TestUniqueSpaceAppName(t *testing.T) {
-	namespace := "leida-test-20240327"
-	spaceName := "leida_test-space"
-	spaceID := int64(1)
+	namespace := "aaaaaaaalesdfsdfida-tededswsddst-2024asdfsadfsefsdfsdfsdf0327"
+	spaceName := "leasdfaida_tesdfsdfsdfst-spaasdasdascasdfasfase"
+	spaceID := int64(123456)
 
 	spaceAppName := UniqueSpaceAppName(namespace, spaceName, spaceID)
-	if spaceAppName != "u-leida-test-20240327-leida-test-space-1" {
+
+	if len(spaceAppName) > 63 {
+		t.Fatal("space app name is too long")
+	}
+
+	if spaceAppName != "u-aaaaaaaalesdfsdfida-tededswsddst-2024asdfsadfsefsdfsdfsd-2n9c" {
 		t.Fatal("space app name wrong")
 	}
 
@@ -20,7 +25,7 @@ func TestUniqueSpaceAppName(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if spaceID != 1 {
+	if spaceID != 123456 {
 		t.Fatal("spaceID wrong")
 	}
 

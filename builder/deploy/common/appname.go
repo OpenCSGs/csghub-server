@@ -8,7 +8,13 @@ import (
 // UniqueSpaceAppName generates a unique app name for space deployment
 func UniqueSpaceAppName(namespace, name string, spaceID int64) string {
 	encodedSpaceID := NumberToString(spaceID)
-	uniqueAppName := fmt.Sprintf("u-%s-%s-%s", namespace, name, encodedSpaceID)
+	// max length of uniqueAppName is 63
+	avaiMaxLen := 63 - len(encodedSpaceID) - 3
+	nameSpaceAndName := fmt.Sprintf("%s-%s", namespace, name)
+	if len(nameSpaceAndName) > avaiMaxLen {
+		nameSpaceAndName = nameSpaceAndName[:avaiMaxLen]
+	}
+	uniqueAppName := fmt.Sprintf("u-%s-%s", nameSpaceAndName, encodedSpaceID)
 	return strings.ToLower(strings.ReplaceAll(strings.ReplaceAll(uniqueAppName, "_", "-"), ".", "-"))
 }
 
