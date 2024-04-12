@@ -309,8 +309,8 @@ func (c *SpaceComponent) UserSpaces(ctx context.Context, req *types.UserSpacesRe
 	return resSpaces, total, nil
 }
 
-func (c *SpaceComponent) ListByPath(ctx context.Context, paths []string) ([]types.Space, error) {
-	var spaces []types.Space
+func (c *SpaceComponent) ListByPath(ctx context.Context, paths []string) ([]*types.Space, error) {
+	var spaces []*types.Space
 
 	spacesData, err := c.ss.ListByPath(ctx, paths)
 	if err != nil {
@@ -330,7 +330,7 @@ func (c *SpaceComponent) ListByPath(ctx context.Context, paths []string) ([]type
 				UpdatedAt: tag.UpdatedAt,
 			})
 		}
-		spaces = append(spaces, types.Space{
+		spaces = append(spaces, &types.Space{
 			Name:          data.Repository.Name,
 			Description:   data.Repository.Description,
 			Path:          data.Repository.Path,

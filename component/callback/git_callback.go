@@ -34,6 +34,8 @@ type GitCallbackComponent struct {
 	ds      *database.DatasetStore
 	sc      *component.SpaceComponent
 	ss      *database.SpaceStore
+	rs      *database.RepoStore
+	rrs     *database.RepoRelationsStore
 	// set visibility if file content is sensitive
 	setRepoVisibility bool
 }
@@ -51,6 +53,8 @@ func NewGitCallback(config *config.Config) (*GitCallbackComponent, error) {
 	ms := database.NewModelStore()
 	ds := database.NewDatasetStore()
 	ss := database.NewSpaceStore()
+	rs := database.NewRepoStore()
+	rrs := database.NewRepoRelationsStore()
 	checker := component.NewSensitiveComponent(config)
 	sc, err := component.NewSpaceComponent(config)
 	if err != nil {
@@ -64,6 +68,8 @@ func NewGitCallback(config *config.Config) (*GitCallbackComponent, error) {
 		ds:      ds,
 		ss:      ss,
 		sc:      sc,
+		rs:      rs,
+		rrs:     rrs,
 		checker: checker,
 	}, nil
 }
@@ -74,6 +80,20 @@ func (c *GitCallbackComponent) SetRepoVisibility(yes bool) {
 }
 
 func (c *GitCallbackComponent) HandlePush(ctx context.Context, req *types.GiteaCallbackPushReq) error {
+	go func() {
+		err := WatchSpaceChange(req, c.ss, c.sc).Run()
+		if err != nil {
+			slog.Error("watch space change failed", slog.Any("error", err))
+		}
+	}()
+
+	go func() {
+		err := WatchRepoRelation(req, c.rs, c.rrs, c.gs).Run()
+		if err != nil {
+			slog.Error("watch repo relation failed", slog.Any("error", err))
+		}
+	}()
+
 	commits := req.Commits
 	ref := req.Ref
 	// split req.Repository.FullName by '/'
@@ -92,26 +112,6 @@ func (c *GitCallbackComponent) HandlePush(ctx context.Context, req *types.GiteaC
 		return err
 	}
 
-	if repoType == "spaces" {
-		space, err := c.ss.FindByPath(ctx, namespace, repoName)
-		if err != nil {
-			slog.Error("git callback push failed when find space", slog.Any("error", err), slog.String("namespace", namespace), slog.String("name", repoName))
-			return nil
-		}
-		c.sc.FixHasAppFile(ctx, space)
-		if !space.HasAppFile {
-			return nil
-		}
-		// trigger space deployment
-		go func() {
-			deployID, err := c.sc.Deploy(ctx, namespace, repoName)
-			if err != nil {
-				slog.Error("failed to trigger space delopy", slog.Any("error", err))
-			} else {
-				slog.Info("space deploy triggered", slog.Int64("deploy_id", deployID))
-			}
-		}()
-	}
 	return nil
 }
 
@@ -130,7 +130,7 @@ func (c *GitCallbackComponent) modifyFiles(ctx context.Context, repoType, namesp
 		}
 		if c.setRepoVisibility {
 			go func(content string) {
-				ok, err := c.checkFileContent(ctx, repoType, namespace, repoName, ref, content)
+				ok, err := c.checkFileContent(ctx, repoType, namespace, repoName, content)
 				if err != nil {
 					slog.Error("callback check file failed", slog.String("repo", path.Join(namespace, repoName)), slog.String("file", fileName),
 						slog.String("error", err.Error()))
@@ -202,7 +202,7 @@ func (c *GitCallbackComponent) addFiles(ctx context.Context, repoType, namespace
 			}
 			if c.setRepoVisibility {
 				go func(content string) {
-					ok, err := c.checkFileContent(ctx, repoType, namespace, repoName, ref, content)
+					ok, err := c.checkFileContent(ctx, repoType, namespace, repoName, content)
 					if err != nil {
 						slog.Error("callback check file failed", slog.String("file", fileName), slog.String("error", err.Error()))
 						return
@@ -299,7 +299,7 @@ func (c *GitCallbackComponent) getFileRaw(repoType, namespace, repoName, ref, fi
 	return content, nil
 }
 
-func (c *GitCallbackComponent) checkFileContent(ctx context.Context, repoType, namespace, repoName, ref, content string) (bool, error) {
+func (c *GitCallbackComponent) checkFileContent(ctx context.Context, repoType, namespace, repoName, content string) (bool, error) {
 	ok, err := c.checkText(ctx, content)
 	if err != nil {
 		return ok, err

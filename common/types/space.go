@@ -21,29 +21,29 @@ type CreateSpaceReq struct {
 // Space is the domain object for spaces
 type Space struct {
 	ID            int64       `json:"id"`
-	Creator       string      `json:"username" example:"creator_user_name"`
+	Creator       string      `json:"username,omitempty" example:"creator_user_name"`
 	Namespace     string      `json:"namespace,omitempty" example:"user_or_org_name"`
 	Name          string      `json:"name,omitempty" example:"space_name_1"`
-	Nickname      string      `json:"nickname" example:""`
-	Description   string      `json:"description" example:""`
+	Nickname      string      `json:"nickname,omitempty" example:""`
+	Description   string      `json:"description,omitempty" example:""`
 	Path          string      `json:"path" example:"user_or_org_name/space_name_1"`
-	License       string      `json:"license" example:"MIT"`
+	License       string      `json:"license,omitempty" example:"MIT"`
 	Tags          []RepoTag   `json:"tags,omitempty"`
 	User          *User       `json:"user,omitempty"`
 	Repository    *Repository `json:"repository,omitempty"`
-	DefaultBranch string      `json:"default_branch"`
-	Likes         int64       `json:"like_count"`
+	DefaultBranch string      `json:"default_branch,omitempty"`
+	Likes         int64       `json:"like_count,omitempty"`
 	Private       bool        `json:"private"`
-	CreatedAt     time.Time   `json:"created_at"`
-	UpdatedAt     time.Time   `json:"updated_at"`
+	CreatedAt     time.Time   `json:"created_at,omitempty"`
+	UpdatedAt     time.Time   `json:"updated_at,omitempty"`
 
 	// like gradio,steamlit etc
-	Sdk           string `json:"sdk" example:"1"`
-	SdkVersion    string `json:"sdk_version" example:"v0.1"`
+	Sdk           string `json:"sdk,omitempty" example:"1"`
+	SdkVersion    string `json:"sdk_version,omitempty" example:"v0.1"`
 	CoverImageUrl string `json:"cover_image_url,omitempty"`
 	Template      string `json:"template,omitempty"`
 	Env           string `json:"env,omitempty"`
-	Hardware      string `json:"hardware"`
+	Hardware      string `json:"hardware,omitempty"`
 	Secrets       string `json:"secrets,omitempty"`
 	// the serving endpoint url
 	Endpoint string `json:"endpoint,omitempty" example:"https://localhost/spaces/myname/myspace"`
