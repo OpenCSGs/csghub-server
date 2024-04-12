@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -109,7 +110,7 @@ func (h *CodeHandler) Create(ctx *gin.Context) {
 // @Router       /codes [get]
 func (h *CodeHandler) Index(ctx *gin.Context) {
 	tagReqs := parseTagReqs(ctx)
-	username := ctx.Query("current_user")
+	username := httpbase.GetCurrentUser(ctx)
 	per, page, err := common.GetPerAndPageFromContext(ctx)
 	if err != nil {
 		slog.Error("Bad request format", "error", err)
@@ -201,7 +202,7 @@ func (h *CodeHandler) Delete(ctx *gin.Context) {
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
-	currentUser := ctx.Query("current_user")
+	currentUser := httpbase.GetCurrentUser(ctx)
 	err = h.c.Delete(ctx, namespace, name, currentUser)
 	if err != nil {
 		slog.Error("Failed to delete code", slog.Any("error", err))
@@ -233,7 +234,7 @@ func (h *CodeHandler) Show(ctx *gin.Context) {
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
-	currentUser := ctx.Query("current_user")
+	currentUser := httpbase.GetCurrentUser(ctx)
 	detail, err := h.c.Show(ctx, namespace, name, currentUser)
 	if err != nil {
 		slog.Error("Failed to get code", slog.Any("error", err))
@@ -242,6 +243,41 @@ func (h *CodeHandler) Show(ctx *gin.Context) {
 	}
 
 	slog.Info("Get code succeed", slog.String("code", name))
+	httpbase.OK(ctx, detail)
+}
+
+// CodelRelations      godoc
+// @Security     ApiKey
+// @Summary      Get code related assets
+// @Tags         Code
+// @Accept       json
+// @Produce      json
+// @Param        namespace path string true "namespace"
+// @Param        name path string true "name"
+// @Param        current_user query string false "current_user"
+// @Success      200  {object}  types.Response{data=types.Relations} "OK"
+// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
+// @Router       /codes/{namespace}/{name}/relations [get]
+func (h *CodeHandler) Relations(ctx *gin.Context) {
+	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
+	if err != nil {
+		slog.Error("Bad request format", "error", err)
+		httpbase.BadRequest(ctx, err.Error())
+		return
+	}
+	currentUser := httpbase.GetCurrentUser(ctx)
+	detail, err := h.c.Relations(ctx, namespace, name, currentUser)
+	if err != nil {
+		if errors.Is(err, component.ErrUnauthorized) {
+			httpbase.UnauthorizedError(ctx, err)
+			return
+		}
+		slog.Error("Failed to get code relations", slog.Any("error", err))
+		httpbase.ServerError(ctx, err)
+		return
+	}
+
 	httpbase.OK(ctx, detail)
 }
 

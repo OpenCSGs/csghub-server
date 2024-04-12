@@ -122,6 +122,20 @@ func (s *RepoStore) FindById(ctx context.Context, id int64) (*Repository, error)
 	return resRepo, err
 }
 
+func (s *RepoStore) FindByIds(ctx context.Context, ids []int64, opts ...SelectOption) ([]*Repository, error) {
+	repos := make([]*Repository, 0)
+	q := s.db.Operator.Core.
+		NewSelect()
+	for _, opt := range opts {
+		opt.Appply(q)
+	}
+	err := q.
+		Model(&repos).
+		Where("id in (?)", bun.In(ids)).
+		Scan(ctx)
+	return repos, err
+}
+
 func (s *RepoStore) FindByPath(ctx context.Context, repoType types.RepositoryType, namespace, name string) (*Repository, error) {
 	resRepo := new(Repository)
 	err := s.db.Operator.Core.
@@ -130,6 +144,29 @@ func (s *RepoStore) FindByPath(ctx context.Context, repoType types.RepositoryTyp
 		Where("git_path =?", fmt.Sprintf("%ss_%s/%s", repoType, namespace, name)).
 		Scan(ctx)
 	return resRepo, err
+}
+
+func (s *RepoStore) FindByGitPath(ctx context.Context, path string) (*Repository, error) {
+	resRepo := new(Repository)
+	err := s.db.Operator.Core.
+		NewSelect().
+		Model(resRepo).
+		Where("git_path =?", path).
+		Scan(ctx)
+	return resRepo, err
+}
+
+func (s *RepoStore) FindByGitPaths(ctx context.Context, paths []string, opts ...SelectOption) ([]*Repository, error) {
+	repos := make([]*Repository, 0)
+	q := s.db.Operator.Core.
+		NewSelect()
+	for _, opt := range opts {
+		opt.Appply(q)
+	}
+	err := q.Model(&repos).
+		Where("git_path in (?)", bun.In(paths)).
+		Scan(ctx)
+	return repos, err
 }
 
 func (s *RepoStore) All(ctx context.Context) ([]*Repository, error) {

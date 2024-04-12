@@ -64,13 +64,17 @@ func NewModelComponent(config *config.Config) (*ModelComponent, error) {
 	if err != nil {
 		return nil, err
 	}
+	c.spaceComonent, _ = NewSpaceComponent(config)
+	c.ms = database.NewModelStore()
 	c.infer = inference.NewInferClient(config.Inference.ServerAddr)
 	return c, nil
 }
 
 type ModelComponent struct {
 	*RepoComponent
-	infer inference.Client
+	spaceComonent *SpaceComponent
+	ms            *database.ModelStore
+	infer         inference.Client
 }
 
 func (c *ModelComponent) Index(ctx context.Context, username, search, sort string, ragReqs []database.TagReq, per, page int) ([]types.Model, int, error) {
@@ -330,7 +334,7 @@ func (c *ModelComponent) Show(ctx context.Context, namespace, name, current_user
 
 	if model.Repository.Private {
 		if model.Repository.User.Username != current_user {
-			return nil, fmt.Errorf("failed to find model, error: %w", errors.New("the private model is not accessible to the current user"))
+			return nil, ErrUnauthorized
 		}
 	}
 
@@ -384,6 +388,53 @@ func (c *ModelComponent) Show(ctx context.Context, namespace, name, current_user
 	}
 
 	return resModel, nil
+}
+
+func (c *ModelComponent) Relations(ctx context.Context, namespace, name, current_user string) (*types.Relations, error) {
+	model, err := c.ms.FindByPath(ctx, namespace, name)
+	if err != nil {
+		return nil, fmt.Errorf("failed to find model, error: %w", err)
+	}
+
+	if model.Repository.Private {
+		if model.Repository.User.Username != current_user {
+			return nil, ErrUnauthorized
+		}
+	}
+
+	return c.getRelations(ctx, model.RepositoryID, current_user)
+}
+
+func (c *ModelComponent) getRelations(ctx context.Context, fromRepoID int64, currentUser string) (*types.Relations, error) {
+	res, err := c.relatedRepos(ctx, fromRepoID, currentUser)
+	if err != nil {
+		return nil, err
+	}
+	rels := new(types.Relations)
+	datasetRepos := res["dataset"]
+	for _, repo := range datasetRepos {
+		rels.Datasets = append(rels.Datasets, &types.Dataset{
+			Path: repo.Path,
+		})
+	}
+	codeRepos := res["code"]
+	for _, repo := range codeRepos {
+		rels.Codes = append(rels.Codes, &types.Code{
+			Path: repo.Path,
+		})
+	}
+	spaceRepos := res["space"]
+	spacePaths := make([]string, 0)
+	for _, repo := range spaceRepos {
+		spacePaths = append(spacePaths, repo.Path)
+	}
+	spaces, err := c.spaceComonent.ListByPath(ctx, spacePaths)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get space info by paths, error: %w", err)
+	}
+	rels.Spaces = spaces
+
+	return rels, nil
 }
 
 func getFilePaths(namespace, repoName, folder string, repoType types.RepositoryType, gsTree func(ctx context.Context, req gitserver.GetRepoInfoByPathReq) ([]*types.File, error)) ([]string, error) {

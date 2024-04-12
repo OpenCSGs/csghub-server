@@ -81,6 +81,7 @@ const (
 func NewDatasetComponent(config *config.Config) (*DatasetComponent, error) {
 	c := &DatasetComponent{}
 	c.ts = database.NewTagStore()
+	c.ds = database.NewDatasetStore()
 	var err error
 	c.RepoComponent, err = NewRepoComponent(config)
 	if err != nil {
@@ -92,6 +93,7 @@ func NewDatasetComponent(config *config.Config) (*DatasetComponent, error) {
 type DatasetComponent struct {
 	*RepoComponent
 	ts *database.TagStore
+	ds *database.DatasetStore
 }
 
 func (c *DatasetComponent) Create(ctx context.Context, req *types.CreateDatasetReq) (*types.Dataset, error) {
@@ -340,7 +342,7 @@ func (c *DatasetComponent) Delete(ctx context.Context, namespace, name, currentU
 	return nil
 }
 
-func (c *DatasetComponent) Show(ctx context.Context, namespace, name, current_user string) (*types.Dataset, error) {
+func (c *DatasetComponent) Show(ctx context.Context, namespace, name, currentUser string) (*types.Dataset, error) {
 	var tags []types.RepoTag
 	dataset, err := c.ds.FindByPath(ctx, namespace, name)
 	if err != nil {
@@ -348,7 +350,7 @@ func (c *DatasetComponent) Show(ctx context.Context, namespace, name, current_us
 	}
 
 	if dataset.Repository.Private {
-		if dataset.Repository.User.Username != current_user {
+		if dataset.Repository.User.Username != currentUser {
 			return nil, fmt.Errorf("failed to find dataset, error: %w", errors.New("the private dataset is not accessible to the current user"))
 		}
 	}
@@ -391,6 +393,37 @@ func (c *DatasetComponent) Show(ctx context.Context, namespace, name, current_us
 	}
 
 	return resDataset, nil
+}
+
+func (c *DatasetComponent) Relations(ctx context.Context, namespace, name, current_user string) (*types.Relations, error) {
+	model, err := c.ds.FindByPath(ctx, namespace, name)
+	if err != nil {
+		return nil, fmt.Errorf("failed to find dataset repo, error: %w", err)
+	}
+
+	if model.Repository.Private {
+		if model.Repository.User.Username != current_user {
+			return nil, ErrUnauthorized
+		}
+	}
+
+	return c.getRelations(ctx, model.RepositoryID, current_user)
+}
+
+func (c *DatasetComponent) getRelations(ctx context.Context, repoID int64, currentUser string) (*types.Relations, error) {
+	res, err := c.relatedRepos(ctx, repoID, currentUser)
+	if err != nil {
+		return nil, err
+	}
+	rels := new(types.Relations)
+	modelRepos := res["model"]
+	for _, repo := range modelRepos {
+		rels.Models = append(rels.Models, &types.Model{
+			Path: repo.Path,
+		})
+	}
+
+	return rels, nil
 }
 
 func fileIsExist(tree []*types.File, path string) (*types.File, bool) {
