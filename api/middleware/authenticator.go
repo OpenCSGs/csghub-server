@@ -10,13 +10,9 @@ import (
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
+	"opencsg.com/csghub-server/api/httpbase"
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/types"
-)
-
-const (
-	currentUserCtxVar   = "currentUser"
-	currentUserQueryVar = "current_user"
 )
 
 // BuildJwtSession create and save session with jwt from query string
@@ -36,7 +32,7 @@ func BuildJwtSession(config *config.Config) gin.HandlerFunc {
 			return
 		}
 
-		sessions.Default(c).Set(currentUserCtxVar, claims.CurrentUser)
+		sessions.Default(c).Set(httpbase.CurrentUserCtxVar, claims.CurrentUser)
 		sessions.Default(c).Save()
 
 		c.Next()
@@ -47,13 +43,13 @@ func BuildJwtSession(config *config.Config) gin.HandlerFunc {
 func AuthSession() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		session := sessions.Default(c)
-		userName := session.Get(currentUserCtxVar)
+		userName := session.Get(httpbase.CurrentUserCtxVar)
 		if userName == nil {
 			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "session not found, please access with jwt token first"})
 			return
 		}
 
-		c.Set(currentUserCtxVar, userName)
+		httpbase.SetCurrentUser(c, userName.(string))
 		c.Next()
 	}
 }
@@ -77,9 +73,9 @@ func Authenticator(config *config.Config) gin.HandlerFunc {
 
 		if token == apiToken {
 			// get current user from query string
-			currentUser := c.Query(currentUserQueryVar)
+			currentUser := c.Query(httpbase.CurrentUserQueryVar)
 			if len(currentUser) > 0 {
-				c.Set(currentUserCtxVar, currentUser)
+				httpbase.SetCurrentUser(c, currentUser)
 			}
 		} else {
 			claims, err := parseJWTToken(config.JWT.SigningKey, token)
@@ -89,7 +85,7 @@ func Authenticator(config *config.Config) gin.HandlerFunc {
 				return
 			}
 
-			c.Set(currentUserCtxVar, claims.CurrentUser)
+			httpbase.SetCurrentUser(c, claims.CurrentUser)
 		}
 
 		c.Next()
