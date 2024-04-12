@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -246,6 +247,41 @@ func (h *DatasetHandler) Show(ctx *gin.Context) {
 	}
 
 	slog.Info("Get dataset succeed", slog.String("dataset", name))
+	httpbase.OK(ctx, detail)
+}
+
+// DatasetRelations      godoc
+// @Security     ApiKey
+// @Summary      Get dataset related assets
+// @Tags         Dataset
+// @Accept       json
+// @Produce      json
+// @Param        namespace path string true "namespace"
+// @Param        name path string true "name"
+// @Param        current_user query string false "current_user"
+// @Success      200  {object}  types.Response{data=types.Relations} "OK"
+// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
+// @Router       /datasets/{namespace}/{name}/relations [get]
+func (h *DatasetHandler) Relations(ctx *gin.Context) {
+	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
+	if err != nil {
+		slog.Error("Bad request format", "error", err)
+		httpbase.BadRequest(ctx, err.Error())
+		return
+	}
+	currentUser := httpbase.GetCurrentUser(ctx)
+	detail, err := h.c.Relations(ctx, namespace, name, currentUser)
+	if err != nil {
+		if errors.Is(err, component.ErrUnauthorized) {
+			httpbase.UnauthorizedError(ctx, err)
+			return
+		}
+		slog.Error("Failed to get dataset relations", slog.Any("error", err))
+		httpbase.ServerError(ctx, err)
+		return
+	}
+
 	httpbase.OK(ctx, detail)
 }
 

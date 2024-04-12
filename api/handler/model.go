@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -48,7 +49,7 @@ type ModelHandler struct {
 // @Router       /models [get]
 func (h *ModelHandler) Index(ctx *gin.Context) {
 	tagReqs := parseTagReqs(ctx)
-	username := ctx.Query("current_user")
+	username := httpbase.GetCurrentUser(ctx)
 	per, page, err := common.GetPerAndPageFromContext(ctx)
 	if err != nil {
 		slog.Error("Bad request format", "error", err)
@@ -169,7 +170,7 @@ func (h *ModelHandler) Delete(ctx *gin.Context) {
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
-	currentUser := ctx.Query("current_user")
+	currentUser := httpbase.GetCurrentUser(ctx)
 	err = h.c.Delete(ctx, namespace, name, currentUser)
 	if err != nil {
 		slog.Error("Failed to delete model", slog.Any("error", err))
@@ -201,15 +202,54 @@ func (h *ModelHandler) Show(ctx *gin.Context) {
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
-	currentUser := ctx.Query("current_user")
+	currentUser := httpbase.GetCurrentUser(ctx)
 	detail, err := h.c.Show(ctx, namespace, name, currentUser)
 	if err != nil {
+		if errors.Is(err, component.ErrUnauthorized) {
+			httpbase.UnauthorizedError(ctx, err)
+			return
+		}
 		slog.Error("Failed to get model detail", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
 		return
 	}
 
 	slog.Info("Get model succeed", slog.String("model", name))
+	httpbase.OK(ctx, detail)
+}
+
+// ModelRelations      godoc
+// @Security     ApiKey
+// @Summary      Get model related assets
+// @Tags         Model
+// @Accept       json
+// @Produce      json
+// @Param        namespace path string true "namespace"
+// @Param        name path string true "name"
+// @Param        current_user query string false "current_user"
+// @Success      200  {object}  types.Response{data=types.Relations} "OK"
+// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
+// @Router       /models/{namespace}/{name}/relations [get]
+func (h *ModelHandler) Relations(ctx *gin.Context) {
+	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
+	if err != nil {
+		slog.Error("Bad request format", "error", err)
+		httpbase.BadRequest(ctx, err.Error())
+		return
+	}
+	currentUser := httpbase.GetCurrentUser(ctx)
+	detail, err := h.c.Relations(ctx, namespace, name, currentUser)
+	if err != nil {
+		if errors.Is(err, component.ErrUnauthorized) {
+			httpbase.UnauthorizedError(ctx, err)
+			return
+		}
+		slog.Error("Failed to get model relations", slog.Any("error", err))
+		httpbase.ServerError(ctx, err)
+		return
+	}
+
 	httpbase.OK(ctx, detail)
 }
 

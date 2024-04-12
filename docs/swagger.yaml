@@ -743,6 +743,25 @@ definitions:
     x-enum-varnames:
     - ModelWidgetTypeGeneration
     - ModelWidgetTypeChat
+  types.Relations:
+    properties:
+      codes:
+        items:
+          $ref: '#/definitions/types.Code'
+        type: array
+      datasets:
+        items:
+          $ref: '#/definitions/types.Dataset'
+        type: array
+      models:
+        items:
+          $ref: '#/definitions/types.Model'
+        type: array
+      spaces:
+        items:
+          $ref: '#/definitions/types.Space'
+        type: array
+    type: object
   types.RepoTag:
     properties:
       built_in:
@@ -1291,6 +1310,50 @@ paths:
       summary: Update a exists code
       tags:
       - Code
+  /codes/{namespace}/{name}/relations:
+    get:
+      consumes:
+      - application/json
+      parameters:
+      - description: namespace
+        in: path
+        name: namespace
+        required: true
+        type: string
+      - description: name
+        in: path
+        name: name
+        required: true
+        type: string
+      - description: current_user
+        in: query
+        name: current_user
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/types.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/types.Relations'
+              type: object
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Get code related assets
+      tags:
+      - Code
   /datasets:
     get:
       consumes:
@@ -1515,6 +1578,50 @@ paths:
       security:
       - ApiKey: []
       summary: Update a exists dataset
+      tags:
+      - Dataset
+  /datasets/{namespace}/{name}/relations:
+    get:
+      consumes:
+      - application/json
+      parameters:
+      - description: namespace
+        in: path
+        name: namespace
+        required: true
+        type: string
+      - description: name
+        in: path
+        name: name
+        required: true
+        type: string
+      - description: current_user
+        in: query
+        name: current_user
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/types.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/types.Relations'
+              type: object
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Get dataset related assets
       tags:
       - Dataset
   /datasets/{namespace}/{name}/viewer/{file_path}:
@@ -1970,6 +2077,50 @@ paths:
       security:
       - ApiKey: []
       summary: Invoke model prediction
+      tags:
+      - Model
+  /models/{namespace}/{name}/relations:
+    get:
+      consumes:
+      - application/json
+      parameters:
+      - description: namespace
+        in: path
+        name: namespace
+        required: true
+        type: string
+      - description: name
+        in: path
+        name: name
+        required: true
+        type: string
+      - description: current_user
+        in: query
+        name: current_user
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/types.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/types.Relations'
+              type: object
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Get model related assets
       tags:
       - Model
   /organization/{namespace}/codes:
