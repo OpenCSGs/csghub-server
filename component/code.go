@@ -20,11 +20,13 @@ func NewCodeComponent(config *config.Config) (*CodeComponent, error) {
 	if err != nil {
 		return nil, err
 	}
+	c.cs = database.NewCodeStore()
 	return c, nil
 }
 
 type CodeComponent struct {
 	*RepoComponent
+	cs *database.CodeStore
 }
 
 func (c *CodeComponent) Create(ctx context.Context, req *types.CreateCodeReq) (*types.Code, error) {
@@ -228,7 +230,7 @@ func (c *CodeComponent) Delete(ctx context.Context, namespace, name, currentUser
 	return nil
 }
 
-func (c *CodeComponent) Show(ctx context.Context, namespace, name, current_user string) (*types.Code, error) {
+func (c *CodeComponent) Show(ctx context.Context, namespace, name, currentUser string) (*types.Code, error) {
 	var tags []types.RepoTag
 	code, err := c.cs.FindByPath(ctx, namespace, name)
 	if err != nil {
@@ -236,7 +238,7 @@ func (c *CodeComponent) Show(ctx context.Context, namespace, name, current_user 
 	}
 
 	if code.Repository.Private {
-		if code.Repository.User.Username != current_user {
+		if code.Repository.User.Username != currentUser {
 			return nil, fmt.Errorf("failed to find code, error: %w", errors.New("the private code is not accessible to the current user"))
 		}
 	}
@@ -279,4 +281,35 @@ func (c *CodeComponent) Show(ctx context.Context, namespace, name, current_user 
 	}
 
 	return resCode, nil
+}
+
+func (c *CodeComponent) Relations(ctx context.Context, namespace, name, current_user string) (*types.Relations, error) {
+	model, err := c.cs.FindByPath(ctx, namespace, name)
+	if err != nil {
+		return nil, fmt.Errorf("failed to find code repo, error: %w", err)
+	}
+
+	if model.Repository.Private {
+		if model.Repository.User.Username != current_user {
+			return nil, ErrUnauthorized
+		}
+	}
+
+	return c.getRelations(ctx, model.RepositoryID, current_user)
+}
+
+func (c *CodeComponent) getRelations(ctx context.Context, repoID int64, currentUser string) (*types.Relations, error) {
+	res, err := c.relatedRepos(ctx, repoID, currentUser)
+	if err != nil {
+		return nil, err
+	}
+	rels := new(types.Relations)
+	modelRepos := res["model"]
+	for _, repo := range modelRepos {
+		rels.Models = append(rels.Models, &types.Model{
+			Path: repo.Path,
+		})
+	}
+
+	return rels, nil
 }

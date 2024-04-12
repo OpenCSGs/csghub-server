@@ -59,6 +59,13 @@ type DeleteRepoReq struct {
 	RepoType  RepositoryType `json:"-"`
 }
 
+type Relations struct {
+	Models   []*Model   `json:"models,omitempty"`
+	Datasets []*Dataset `json:"datasets,omitempty"`
+	Codes    []*Code    `json:"codes,omitempty"`
+	Spaces   []*Space   `json:"spaces,omitempty"`
+}
+
 type Model struct {
 	ID            int64      `json:"id"`
 	Name          string     `json:"name"`

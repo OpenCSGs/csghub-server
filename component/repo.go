@@ -10,6 +10,7 @@ import (
 	"net/url"
 	"path"
 	"path/filepath"
+	"slices"
 	"strings"
 	"time"
 
@@ -32,9 +33,7 @@ type RepoComponent struct {
 	org       *database.OrgStore
 	namespace *database.NamespaceStore
 	repo      *database.RepoStore
-	ds        *database.DatasetStore
-	ms        *database.ModelStore
-	cs        *database.CodeStore
+	rel       *database.RepoRelationsStore
 	git       gitserver.GitServer
 	s3Client  *minio.Client
 	msc       *MemberComponent
@@ -43,13 +42,11 @@ type RepoComponent struct {
 
 func NewRepoComponent(config *config.Config) (*RepoComponent, error) {
 	c := &RepoComponent{}
-	c.cs = database.NewCodeStore()
-	c.ms = database.NewModelStore()
-	c.ds = database.NewDatasetStore()
 	c.namespace = database.NewNamespaceStore()
 	c.user = database.NewUserStore()
 	c.org = database.NewOrgStore()
 	c.repo = database.NewRepoStore()
+	c.rel = database.NewRepoRelationsStore()
 	var err error
 	c.git, err = git.NewGitServer(config)
 	if err != nil {
@@ -252,6 +249,74 @@ func (c *RepoComponent) DeleteRepo(ctx context.Context, req types.DeleteRepoReq)
 	}
 
 	return repo, nil
+}
+
+// relatedRepos gets all repos related to the given repo, and return them by repo type
+func (c *RepoComponent) relatedRepos(ctx context.Context, repoID int64, currentUser string) (map[string][]*database.Repository, error) {
+	fromRelations, err := c.rel.From(ctx, repoID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get repo relation from, error: %w", err)
+	}
+	var toRepoIDs []int64
+	for _, rel := range fromRelations {
+		toRepoIDs = append(toRepoIDs, rel.ToRepoID)
+	}
+
+	toRelations, err := c.rel.To(ctx, repoID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get repo relation to, error: %w", err)
+	}
+	var fromRepoIDs []int64
+	for _, rel := range toRelations {
+		fromRepoIDs = append(fromRepoIDs, rel.FromRepoID)
+	}
+
+	//combine from and to related repos and then remove duplicates
+	var relatedRepoIDs []int64
+	relatedRepoIDs = append(relatedRepoIDs, toRepoIDs...)
+	relatedRepoIDs = append(relatedRepoIDs, fromRepoIDs...)
+	slices.Sort(relatedRepoIDs)
+	relatedRepoIDs = slices.Compact(relatedRepoIDs)
+
+	var opts []database.SelectOption
+	opts = append(opts, database.Columns("id", "repository_type", "path", "user_id", "private"))
+
+	relatedRepos, err := c.repo.FindByIds(ctx, relatedRepoIDs, opts...)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get relation to repositories by ids, error: %w", err)
+	}
+
+	relatedRepos, err = c.visiableToUser(ctx, relatedRepos, currentUser)
+	if err != nil {
+		return nil, fmt.Errorf("failed to check related repositories visiable to user:%s, %w", currentUser, err)
+	}
+	res := make(map[string][]*database.Repository)
+	for _, repo := range relatedRepos {
+		res[string(repo.RepositoryType)] = append(res[string(repo.RepositoryType)], repo)
+	}
+	return res, nil
+}
+
+func (c *RepoComponent) visiableToUser(ctx context.Context, repos []*database.Repository, currentUser string) ([]*database.Repository, error) {
+	var res []*database.Repository
+	for _, repo := range repos {
+		if repo.Private {
+			if len(currentUser) == 0 {
+				continue
+			}
+			namespace, _ := repo.NamespaceAndName()
+			canRead, err := c.checkCurrentUserPermission(ctx, currentUser, namespace, membership.RoleRead)
+			if err != nil {
+				return nil, err
+			}
+			if canRead {
+				res = append(res, repo)
+			}
+		} else {
+			res = append(res, repo)
+		}
+	}
+	return res, nil
 }
 
 func (c *RepoComponent) CreateFile(ctx context.Context, req *types.CreateFileReq) (*types.CreateFileResp, error) {
@@ -598,7 +663,7 @@ func (c *RepoComponent) SDKListFiles(ctx *gin.Context, repoType types.Repository
 		if !exists {
 			return nil, ErrUnauthorized
 		}
-		canRead, err := c.checkCurrentUserPermission(ctx, currentUser, namespace, membership.RoleRead)
+		canRead, err := c.checkCurrentUserPermission(ctx, currentUser.(string), namespace, membership.RoleRead)
 		if err != nil {
 			return nil, err
 		}
@@ -657,7 +722,7 @@ func (c *RepoComponent) HeadDownloadFile(ctx *gin.Context, req *types.GetFileReq
 		if !exists {
 			return nil, ErrUnauthorized
 		}
-		canRead, err := c.checkCurrentUserPermission(ctx, currentUser, req.Namespace, membership.RoleRead)
+		canRead, err := c.checkCurrentUserPermission(ctx, currentUser.(string), req.Namespace, membership.RoleRead)
 		if err != nil {
 			return nil, err
 		}
@@ -697,7 +762,7 @@ func (c *RepoComponent) SDKDownloadFile(ctx *gin.Context, req *types.GetFileReq)
 		if !exists {
 			return nil, "", ErrUnauthorized
 		}
-		canRead, err := c.checkCurrentUserPermission(ctx, currentUser, req.Namespace, membership.RoleRead)
+		canRead, err := c.checkCurrentUserPermission(ctx, currentUser.(string), req.Namespace, membership.RoleRead)
 		if err != nil {
 			return nil, "", err
 		}
@@ -846,21 +911,16 @@ func (c *RepoComponent) AllowAdminAccess(ctx context.Context, namespace, name, u
 	return c.checkCurrentUserPermission(ctx, username, namespace, membership.RoleAdmin)
 }
 
-func (c *RepoComponent) checkCurrentUserPermission(ctx context.Context, currentUser any, namespace string, role membership.Role) (bool, error) {
-	cu, ok := currentUser.(string)
-	if !ok {
-		return false, fmt.Errorf("error parsing current user from context")
-	}
-
+func (c *RepoComponent) checkCurrentUserPermission(ctx context.Context, userName string, namespace string, role membership.Role) (bool, error) {
 	ns, err := c.namespace.FindByPath(ctx, namespace)
 	if err != nil {
 		return false, err
 	}
 
 	if ns.NamespaceType == "user" {
-		return cu == namespace, nil
+		return userName == namespace, nil
 	} else {
-		r, err := c.msc.GetMemberRole(ctx, namespace, cu)
+		r, err := c.msc.GetMemberRole(ctx, namespace, userName)
 		if err != nil {
 			return false, err
 		}
