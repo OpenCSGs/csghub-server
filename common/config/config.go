@@ -83,7 +83,16 @@ type Config struct {
 		// reverse proxy listening port
 		RProxyServerPort int `envconfig:"STARHUB_SERVER_SPACE_RPROXY_SERVER_PORT" default:"8083"`
 		// secret key for session encryption
-		SessionSecretKey string `envconfig:"STARHUB_SERVER_SPACE_SESSION_SECRET_KEY default:"secret"`
+		SessionSecretKey string `envconfig:"STARHUB_SERVER_SPACE_SESSION_SECRET_KEY" default:"secret"`
+	}
+
+	Casdoor struct {
+		ClientID         string `envconfig:"STARHUB_SERVER_CASDOOR_CLIENT_ID" default:"client_id"`
+		ClientSecret     string `envconfig:"STARHUB_SERVER_CASDOOR_CLIENT_SECRET" default:"client_secret"`
+		Endpoint         string `envconfig:"STARHUB_SERVER_CASDOOR_ENDPOINT" default:"http://localhost:80"`
+		Certificate      string `envconfig:"STARHUB_SERVER_CASDOOR_CERTIFICATE" default:"/etc/casdoor/certificate.pem"`
+		OrganizationName string `envconfig:"STARHUB_SERVER_CASDOOR_ORGANIZATION_NAME" default:"opencsg"`
+		ApplicationName  string `envconfig:"STARHUB_SERVER_CASDOOR_APPLICATION_NAME" default:"opencsg"`
 	}
 }
 
