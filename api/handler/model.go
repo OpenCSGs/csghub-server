@@ -57,7 +57,7 @@ func (h *ModelHandler) Index(ctx *gin.Context) {
 		return
 	}
 	search, sort := getFilterFromContext(ctx)
-	if !slices.Contains[[]string](Sorts, sort) {
+	if !slices.Contains(Sorts, sort) {
 		msg := fmt.Sprintf("sort parameter must be one of %v", Sorts)
 		slog.Error("Bad request format,", slog.String("error", msg))
 		ctx.JSON(http.StatusBadRequest, gin.H{"message": msg})
@@ -490,6 +490,14 @@ func parseTagReqs(ctx *gin.Context) (tags []database.TagReq) {
 		tags = append(tags, database.TagReq{
 			Name:     strings.ToLower(frameworkTag),
 			Category: "framework",
+		})
+	}
+
+	languageTag := ctx.Query("language_tag")
+	if languageTag != "" {
+		tags = append(tags, database.TagReq{
+			Name:     strings.ToLower(languageTag),
+			Category: "language",
 		})
 	}
 
