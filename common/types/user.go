@@ -14,6 +14,7 @@ type UpdateUserRequest struct {
 	// the login name
 	Username string `json:"username"`
 	Email    string `json:"email"`
+	Phone    string `json:"phone"`
 }
 
 type UpdateUserResp struct {
