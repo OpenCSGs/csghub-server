@@ -50,3 +50,9 @@ type User struct {
 	Nickname string `json:"nickname"`
 	Email    string `json:"email"`
 }
+
+type UserLikesRequest struct {
+	Username    string `json:"username"`
+	Repo_id     int64  `json:"repo_id"`
+	CurrentUser string `json:"current_user"`
+}
