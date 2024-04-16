@@ -102,6 +102,29 @@ func (s *DatasetStore) ByUsername(ctx context.Context, username string, per, pag
 	return
 }
 
+func (s *DatasetStore) UserLikesDatasets(ctx context.Context, userID int64, per, page int) (datasets []Dataset, total int, err error) {
+	query := s.db.Operator.Core.
+		NewSelect().
+		Model(&datasets).
+		Relation("Repository.Tags").
+		Relation("Repository.User").
+		Where("repository.id in (select repo_id from user_likes where user_id=?)", userID)
+
+	query = query.Order("dataset.created_at DESC").
+		Limit(per).
+		Offset((page - 1) * per)
+
+	err = query.Scan(ctx)
+	if err != nil {
+		return
+	}
+	total, err = query.Count(ctx)
+	if err != nil {
+		return
+	}
+	return
+}
+
 func (s *DatasetStore) ByOrgPath(ctx context.Context, namespace string, per, page int, onlyPublic bool) (datasets []Dataset, total int, err error) {
 	query := s.db.Operator.Core.
 		NewSelect().
