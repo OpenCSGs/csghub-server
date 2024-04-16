@@ -150,6 +150,28 @@ func (s *SpaceStore) ByUsername(ctx context.Context, username string, per, page 
 	return
 }
 
+func (s *SpaceStore) ByUserLikes(ctx context.Context, userID int64, per, page int) (spaces []Space, total int, err error) {
+	query := s.db.Operator.Core.
+		NewSelect().
+		Model(&spaces).
+		Relation("Repository.Tags").
+		Where("repository.id in (select repo_id from user_likes where user_id=?)", userID)
+
+	query = query.Order("space.created_at DESC").
+		Limit(per).
+		Offset((page - 1) * per)
+
+	err = query.Scan(ctx)
+	if err != nil {
+		return
+	}
+	total, err = query.Count(ctx)
+	if err != nil {
+		return
+	}
+	return
+}
+
 func (s *SpaceStore) ByOrgPath(ctx context.Context, namespace string, per, page int, onlyPublic bool) (spaces []Space, total int, err error) {
 	query := s.db.Operator.Core.
 		NewSelect().

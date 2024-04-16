@@ -99,6 +99,29 @@ func (s *ModelStore) ByUsername(ctx context.Context, username string, per, page 
 	return
 }
 
+func (s *ModelStore) UserLikesModels(ctx context.Context, userID int64, per, page int) (models []Model, total int, err error) {
+	query := s.db.Operator.Core.
+		NewSelect().
+		Model(&models).
+		Relation("Repository.Tags").
+		Relation("Repository.User").
+		Where("repository.id in (select repo_id from user_likes where user_id=?)", userID)
+
+	query = query.Order("model.created_at DESC").
+		Limit(per).
+		Offset((page - 1) * per)
+
+	err = query.Scan(ctx)
+	if err != nil {
+		return
+	}
+	total, err = query.Count(ctx)
+	if err != nil {
+		return
+	}
+	return
+}
+
 func (s *ModelStore) ByOrgPath(ctx context.Context, namespace string, per, page int, onlyPublic bool) (models []Model, total int, err error) {
 	query := s.db.Operator.Core.
 		NewSelect().
