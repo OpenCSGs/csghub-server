@@ -67,7 +67,7 @@ type Relations struct {
 }
 
 type Model struct {
-	ID            int64      `json:"id"`
+	ID            int64      `json:"id,omitempty"`
 	Name          string     `json:"name"`
 	Nickname      string     `json:"nickname"`
 	Description   string     `json:"description"`
