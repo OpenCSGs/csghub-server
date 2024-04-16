@@ -35,7 +35,14 @@ func NewUserComponent(config *config.Config) (*UserComponent, error) {
 		newError := fmt.Errorf("failed to create git server,error:%w", err)
 		return nil, newError
 	}
+	c.repoComponent, err = NewRepoComponent(config)
+	if err != nil {
+		newError := fmt.Errorf("failed to create repo component,error:%w", err)
+		return nil, newError
+	}
 	c.deployer = deploy.NewDeployer()
+	c.uls = database.NewUserLikesStore()
+	c.repo = database.NewRepoStore()
 	c.once = new(sync.Once)
 	c.casConfig = &casdoorsdk.AuthConfig{
 		Endpoint:         config.Casdoor.Endpoint,
@@ -57,7 +64,10 @@ type UserComponent struct {
 	ns             *database.NamespaceStore
 	gs             gitserver.GitServer
 	spaceComponent *SpaceComponent
+	repoComponent  *RepoComponent
 	deployer       deploy.Deployer
+	uls            *database.UserLikesStore
+	repo           *database.RepoStore
 	casc           *casdoorsdk.Client
 	casConfig      *casdoorsdk.AuthConfig
 	once           *sync.Once
@@ -365,4 +375,151 @@ func (c *UserComponent) FixUserData(ctx context.Context, userName string) error 
 	}
 
 	return nil
+}
+
+func (c *UserComponent) AddLikes(ctx context.Context, req *types.UserLikesRequest) error {
+	user, err := c.us.FindByUsername(ctx, req.CurrentUser)
+	if err != nil {
+		newError := fmt.Errorf("failed to check for the presence of the user, error:%w", err)
+		return newError
+	}
+	var likesRepoIDs []int64
+	likesRepoIDs = append(likesRepoIDs, req.Repo_id)
+
+	var opts []database.SelectOption
+	opts = append(opts, database.Columns("id", "repository_type", "path", "user_id", "private"))
+
+	likesRepos, err := c.repo.FindByIds(ctx, likesRepoIDs, opts...)
+	if err != nil {
+		return fmt.Errorf("failed to get likes repositories by ids, error: %w", err)
+	}
+	likesRepos, err = c.repoComponent.visiableToUser(ctx, likesRepos, req.CurrentUser)
+	if err != nil {
+		return fmt.Errorf("failed to check likes repositories visiable to user:%s, %w", req.CurrentUser, err)
+	}
+
+	if len(likesRepos) < 1 {
+		return fmt.Errorf("Do not found likes repositories visiable to user:%s, %w", req.CurrentUser, err)
+	}
+
+	err = c.uls.Add(ctx, user.ID, req.Repo_id)
+	return err
+}
+
+func (c *UserComponent) DeleteLikes(ctx context.Context, req *types.UserLikesRequest) error {
+	user, err := c.us.FindByUsername(ctx, req.CurrentUser)
+	if err != nil {
+		newError := fmt.Errorf("failed to check for the presence of the user,error:%w", err)
+		return newError
+	}
+	err = c.uls.Delete(ctx, user.ID, req.Repo_id)
+	return err
+}
+
+func (c *UserComponent) LikesSpaces(ctx context.Context, req *types.UserSpacesReq) ([]types.Space, int, error) {
+	user, err := c.us.FindByUsername(ctx, req.CurrentUser)
+	if err != nil {
+		newError := fmt.Errorf("failed to check for the presence of the user, error:%w", err)
+		return nil, 0, newError
+	}
+	return c.spaceComponent.UserLikesSpaces(ctx, req, user.ID)
+}
+
+func (c *UserComponent) LikesCodes(ctx context.Context, req *types.UserModelsReq) ([]types.Code, int, error) {
+	var resCodes []types.Code
+	user, err := c.us.FindByUsername(ctx, req.CurrentUser)
+	if err != nil {
+		newError := fmt.Errorf("failed to check for the presence of the user, error:%w", err)
+		return nil, 0, newError
+	}
+
+	ms, total, err := c.cs.UserLikesCodes(ctx, user.ID, req.PageSize, req.Page)
+	if err != nil {
+		newError := fmt.Errorf("failed to get user codes,error:%w", err)
+		return nil, 0, newError
+	}
+
+	for _, data := range ms {
+		resCodes = append(resCodes, types.Code{
+			ID:           data.ID,
+			Name:         data.Repository.Name,
+			Nickname:     data.Repository.Nickname,
+			Description:  data.Repository.Description,
+			Likes:        data.Repository.Likes,
+			Downloads:    data.Repository.DownloadCount,
+			Path:         data.Repository.Path,
+			RepositoryID: data.RepositoryID,
+			Private:      data.Repository.Private,
+			CreatedAt:    data.CreatedAt,
+			UpdatedAt:    data.UpdatedAt,
+		})
+	}
+
+	return resCodes, total, nil
+}
+
+func (c *UserComponent) LikesModels(ctx context.Context, req *types.UserModelsReq) ([]types.Model, int, error) {
+	var resModels []types.Model
+	user, err := c.us.FindByUsername(ctx, req.CurrentUser)
+	if err != nil {
+		newError := fmt.Errorf("failed to check for the presence of the user, error:%w", err)
+		return nil, 0, newError
+	}
+
+	ms, total, err := c.ms.UserLikesModels(ctx, user.ID, req.PageSize, req.Page)
+	if err != nil {
+		newError := fmt.Errorf("failed to get user models,error:%w", err)
+		return nil, 0, newError
+	}
+
+	for _, data := range ms {
+		resModels = append(resModels, types.Model{
+			ID:           data.ID,
+			Name:         data.Repository.Name,
+			Nickname:     data.Repository.Nickname,
+			Description:  data.Repository.Description,
+			Likes:        data.Repository.Likes,
+			Downloads:    data.Repository.DownloadCount,
+			Path:         data.Repository.Path,
+			RepositoryID: data.RepositoryID,
+			Private:      data.Repository.Private,
+			CreatedAt:    data.CreatedAt,
+			UpdatedAt:    data.UpdatedAt,
+		})
+	}
+
+	return resModels, total, nil
+}
+
+func (c *UserComponent) LikesDatasets(ctx context.Context, req *types.UserDatasetsReq) ([]types.Dataset, int, error) {
+	var resDatasets []types.Dataset
+	user, err := c.us.FindByUsername(ctx, req.CurrentUser)
+	if err != nil {
+		newError := fmt.Errorf("failed to check for the presence of the user, error:%w", err)
+		return nil, 0, newError
+	}
+
+	ds, total, err := c.ds.UserLikesDatasets(ctx, user.ID, req.PageSize, req.Page)
+	if err != nil {
+		newError := fmt.Errorf("failed to get user datasets,error:%w", err)
+		return nil, 0, newError
+	}
+
+	for _, data := range ds {
+		resDatasets = append(resDatasets, types.Dataset{
+			ID:           data.ID,
+			Name:         data.Repository.Name,
+			Nickname:     data.Repository.Nickname,
+			Description:  data.Repository.Description,
+			Likes:        data.Repository.Likes,
+			Downloads:    data.Repository.DownloadCount,
+			Path:         data.Repository.Path,
+			RepositoryID: data.RepositoryID,
+			Private:      data.Repository.Private,
+			CreatedAt:    data.CreatedAt,
+			UpdatedAt:    data.UpdatedAt,
+		})
+	}
+
+	return resDatasets, total, nil
 }
