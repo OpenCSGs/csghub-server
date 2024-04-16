@@ -251,6 +251,13 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 	apiGroup.GET("/user/:username/datasets", userHandler.Datasets)
 	apiGroup.GET("/user/:username/codes", userHandler.Codes)
 	apiGroup.GET("/user/:username/spaces", userHandler.Spaces)
+	// User likes
+	apiGroup.PUT("/user/:username/likes/:repo_id", userHandler.LikesAdd)
+	apiGroup.DELETE("/user/:username/likes/:repo_id", userHandler.LikesDelete)
+	apiGroup.GET("/user/:username/likes/spaces", userHandler.LikesSpaces)
+	apiGroup.GET("/user/:username/likes/codes", userHandler.LikesCodes)
+	apiGroup.GET("/user/:username/likes/models", userHandler.LikesModels)
+	apiGroup.GET("/user/:username/likes/datasets", userHandler.LikesDatasets)
 
 	acHandler, err := handler.NewAccessTokenHandler(config)
 	if err != nil {

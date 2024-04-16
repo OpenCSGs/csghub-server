@@ -95,6 +95,29 @@ func (s *CodeStore) ByUsername(ctx context.Context, username string, per, page i
 	return
 }
 
+func (s *CodeStore) UserLikesCodes(ctx context.Context, userID int64, per, page int) (codes []Code, total int, err error) {
+	query := s.db.Operator.Core.
+		NewSelect().
+		Model(&codes).
+		Relation("Repository.Tags").
+		Relation("Repository.User").
+		Where("repository.id in (select repo_id from user_likes where user_id=?)", userID)
+
+	query = query.Order("code.created_at DESC").
+		Limit(per).
+		Offset((page - 1) * per)
+
+	err = query.Scan(ctx)
+	if err != nil {
+		return
+	}
+	total, err = query.Count(ctx)
+	if err != nil {
+		return
+	}
+	return
+}
+
 func (s *CodeStore) ByOrgPath(ctx context.Context, namespace string, per, page int, onlyPublic bool) (codes []Code, total int, err error) {
 	query := s.db.Operator.Core.
 		NewSelect().
