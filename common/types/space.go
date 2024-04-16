@@ -20,7 +20,7 @@ type CreateSpaceReq struct {
 
 // Space is the domain object for spaces
 type Space struct {
-	ID            int64       `json:"id"`
+	ID            int64       `json:"id,omitempty"`
 	Creator       string      `json:"username,omitempty" example:"creator_user_name"`
 	Namespace     string      `json:"namespace,omitempty" example:"user_or_org_name"`
 	Name          string      `json:"name,omitempty" example:"space_name_1"`
