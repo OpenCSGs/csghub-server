@@ -419,7 +419,10 @@ func (c *DatasetComponent) getRelations(ctx context.Context, repoID int64, curre
 	modelRepos := res["model"]
 	for _, repo := range modelRepos {
 		rels.Models = append(rels.Models, &types.Model{
-			Path: repo.Path,
+			Path:        repo.Path,
+			Name:        repo.Name,
+			Nickname:    repo.Nickname,
+			Description: repo.Description,
 		})
 	}
 
