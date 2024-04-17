@@ -36,6 +36,11 @@ type RepoHandler struct {
 }
 
 func (h *RepoHandler) CreateFile(ctx *gin.Context) {
+	userName := httpbase.GetCurrentUser(ctx)
+	if userName == "" {
+		httpbase.UnauthorizedError(ctx, errors.New("user not found, please login first"))
+		return
+	}
 	var req *types.CreateFileReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {
 		slog.Error("Bad request format", "error", err)
@@ -56,8 +61,6 @@ func (h *RepoHandler) CreateFile(ctx *gin.Context) {
 	req.FilePath = filePath
 	req.RepoType = common.RepoTypeFromContext(ctx)
 
-	slog.Error("File path: ", slog.Any("file_path", ctx.Param("file_path")))
-	slog.Error("File path: ", slog.Any("file_path", req.FilePath))
 	resp, err := h.c.CreateFile(ctx, req)
 	if err != nil {
 		slog.Error("Failed to create repo file", slog.String("repo_type", string(req.RepoType)), slog.Any("error", err))
@@ -69,6 +72,11 @@ func (h *RepoHandler) CreateFile(ctx *gin.Context) {
 }
 
 func (h *RepoHandler) UpdateFile(ctx *gin.Context) {
+	userName := httpbase.GetCurrentUser(ctx)
+	if userName == "" {
+		httpbase.UnauthorizedError(ctx, errors.New("user not found, please login first"))
+		return
+	}
 	var req *types.UpdateFileReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {
 		slog.Error("Bad request format", "error", err)
@@ -377,59 +385,69 @@ func (h *RepoHandler) UpdateDownloads(ctx *gin.Context) {
 }
 
 func (h *RepoHandler) UploadFile(ctx *gin.Context) {
-	var req *types.CreateFileReq
-
+	userName := httpbase.GetCurrentUser(ctx)
+	if userName == "" {
+		httpbase.UnauthorizedError(ctx, errors.New("user not found, please login first"))
+		return
+	}
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
 	if err != nil {
 		slog.Error("Failed to get namespace from context", "error", err)
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
-	if err = ctx.ShouldBind(&req); err != nil {
-		slog.Error("Bad request format", "error", err)
-		httpbase.BadRequest(ctx, err.Error())
-		return
-	}
 
-	file, err := ctx.FormFile("file")
-	if err != nil {
-		slog.Error("Bad request format", "error", err)
-		httpbase.BadRequest(ctx, err.Error())
-		return
+	form, _ := ctx.MultipartForm()
+	fileList := form.File["file"]
+	paths := form.Value["file_path"]
+	var message, branch string
+	if len(form.Value["message"]) > 0 {
+		message = form.Value["message"][0]
 	}
-
-	openedFile, err := file.Open()
-	if err != nil {
-		slog.Error("Error opening uploaded file", "error", err)
-		httpbase.BadRequest(ctx, err.Error())
-		return
+	if len(form.Value["branch"]) > 0 {
+		branch = form.Value["branch"][0]
 	}
-	defer openedFile.Close()
-
 	var buf bytes.Buffer
-	w := base64.NewEncoder(base64.StdEncoding, &buf)
-	_, err = io.Copy(w, openedFile)
-	w.Close()
-	if err != nil {
-		slog.Info("Error encodeing uploaded file", "error", err)
-		httpbase.BadRequest(ctx, err.Error())
-		return
+	for idx, file := range fileList {
+		openedFile, err := file.Open()
+		if err != nil {
+			slog.Error("Error opening uploaded file", "error", err)
+			httpbase.BadRequest(ctx, err.Error())
+			return
+		}
+
+		buf.Reset()
+		w := base64.NewEncoder(base64.StdEncoding, &buf)
+		_, err = io.Copy(w, openedFile)
+		w.Close()
+		openedFile.Close()
+		if err != nil {
+			slog.Info("Error encodeing uploaded file", "error", err, slog.String("file_name", file.Filename))
+			httpbase.BadRequest(ctx, err.Error())
+			return
+		}
+		filePath := paths[idx]
+
+		upload := &types.CreateFileReq{
+			Username:  userName,
+			NameSpace: namespace,
+			Name:      name,
+			FilePath:  filePath,
+			Content:   buf.String(),
+			RepoType:  common.RepoTypeFromContext(ctx),
+			Message:   message,
+			Branch:    branch,
+		}
+		err = h.c.UploadFile(ctx, upload)
+		if err != nil {
+			slog.Error("Failed to upload repo file", slog.String("repo_type", string(upload.RepoType)), slog.Any("error", err), slog.String("file_path", filePath))
+			httpbase.ServerError(ctx, err)
+			return
+		}
+		slog.Info("Upload file succeed", slog.String("repo_type", string(upload.RepoType)), slog.Any("path", fmt.Sprintf("%s/%s", namespace, name)),
+			slog.String("file_name", file.Filename))
 	}
 
-	filePath := ctx.PostForm("file_path")
-	req.NameSpace = namespace
-	req.Name = name
-	req.FilePath = filePath
-	req.Content = buf.String()
-	req.RepoType = common.RepoTypeFromContext(ctx)
-
-	err = h.c.UploadFile(ctx, req)
-	if err != nil {
-		slog.Error("Failed to upload repo file", slog.String("repo_type", string(req.RepoType)), slog.Any("error", err), slog.String("file_path", filePath))
-		httpbase.ServerError(ctx, err)
-		return
-	}
-	slog.Info("Upload file succeed", slog.String("repo_type", string(req.RepoType)), slog.String("file_path", filePath))
 	httpbase.OK(ctx, nil)
 }
 
