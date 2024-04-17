@@ -10,6 +10,8 @@ variables:
   IMAGE_NAME: "csghub-server"
   IMAGE_TAG: "latest"
   SAST_IMAGE_SUFFIX: '-fips'
+  DOCKER_HOST: tcp://docker:2375
+  DOCKER_TLS_CERTDIR: ""
 
 include:
   # - template: Security/Dependency-Scanning.gitlab-ci.yml
