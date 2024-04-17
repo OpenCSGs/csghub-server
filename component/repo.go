@@ -322,19 +322,21 @@ func (c *RepoComponent) visiableToUser(ctx context.Context, repos []*database.Re
 func (c *RepoComponent) CreateFile(ctx context.Context, req *types.CreateFileReq) (*types.CreateFileResp, error) {
 	slog.Debug("creating file get request", slog.String("namespace", req.NameSpace), slog.String("filepath", req.FilePath))
 	var err error
+	var user database.User
+	user, err = c.user.FindByUsername(ctx, req.Username)
+	if err != nil {
+		return nil, fmt.Errorf("fail to check user, cause: %w", err)
+	}
+	req.Email = user.Email
+
 	_, err = c.namespace.FindByPath(ctx, req.NameSpace)
 	if err != nil {
 		return nil, fmt.Errorf("fail to check namespace, cause: %w", err)
 	}
 
-	_, err = c.user.FindByUsername(ctx, req.Username)
-	if err != nil {
-		return nil, fmt.Errorf("fail to check user, cause: %w", err)
-	}
 	// TODO:check sensitive content of file
 	fileName := filepath.Base(req.FilePath)
 	if fileName == "README.md" {
-		slog.Debug("file is readme", slog.String("content", req.Content))
 		return c.createReadmeFile(ctx, req)
 	} else {
 		return c.createLibraryFile(ctx, req)
@@ -385,14 +387,16 @@ func (c *RepoComponent) UpdateFile(ctx context.Context, req *types.UpdateFileReq
 		slog.String("origin_path", req.OriginPath))
 
 	var err error
+	var user database.User
+	user, err = c.user.FindByUsername(ctx, req.Username)
+	if err != nil {
+		return nil, fmt.Errorf("fail to check user, cause: %w", err)
+	}
+	req.Email = user.Email
+
 	_, err = c.namespace.FindByPath(ctx, req.NameSpace)
 	if err != nil {
 		return nil, fmt.Errorf("fail to check namespace, cause: %w", err)
-	}
-
-	_, err = c.user.FindByUsername(ctx, req.Username)
-	if err != nil {
-		return nil, fmt.Errorf("fail to check user, cause: %w", err)
 	}
 
 	err = c.git.UpdateRepoFile(req)
@@ -613,37 +617,32 @@ func (c *RepoComponent) UploadFile(ctx context.Context, req *types.CreateFileReq
 	if parentPath == "." {
 		parentPath = "/"
 	}
-	getRepoFileTree := gitserver.GetRepoInfoByPathReq{
+	f, err := c.git.GetRepoFileContents(ctx, gitserver.GetRepoInfoByPathReq{
 		Namespace: req.NameSpace,
 		Name:      req.Name,
 		Ref:       req.Branch,
-		Path:      parentPath,
+		Path:      req.FilePath,
 		RepoType:  req.RepoType,
-	}
-	tree, err := c.git.GetRepoFileTree(ctx, getRepoFileTree)
+	})
 	if err != nil {
-		slog.Error("Error getting %s file tree: %w", req.RepoType, err, slog.String("dataset", fmt.Sprintf("%s/%s", req.NameSpace, req.Name)), slog.String("file_path", req.FilePath))
-		return err
-	}
-	file, exists := fileIsExist(tree, req.FilePath)
-	if !exists {
 		_, err = c.CreateFile(ctx, req)
 		if err != nil {
-			return err
+			return fmt.Errorf("fail to create file for file uploading, %w", err)
 		}
 		return nil
 	}
 	var updateFileReq types.UpdateFileReq
 
 	updateFileReq.Username = req.Username
-	updateFileReq.Email = req.Email
 	updateFileReq.Message = req.Message
 	updateFileReq.Branch = req.Branch
 	updateFileReq.Content = req.Content
 	updateFileReq.NameSpace = req.NameSpace
 	updateFileReq.Name = req.Name
 	updateFileReq.FilePath = req.FilePath
-	updateFileReq.SHA = file.SHA
+	//we need file sha, not commit SHA
+	updateFileReq.SHA = f.SHA
+	updateFileReq.RepoType = req.RepoType
 
 	_, err = c.UpdateFile(ctx, &updateFileReq)
 

@@ -19,8 +19,8 @@ type File struct {
 }
 
 type CreateFileReq struct {
-	Username  string `json:"username" form:"username"`
-	Email     string `json:"email" form:"email"`
+	Username  string `json:"-"`
+	Email     string `json:"-"`
 	Message   string `json:"message" form:"message"`
 	Branch    string `json:"branch" form:"branch"`
 	Content   string `json:"content"`
@@ -28,15 +28,15 @@ type CreateFileReq struct {
 
 	NameSpace string `json:"-"`
 	Name      string `json:"-"`
-	FilePath  string `json:"-" form:"file_path"`
+	FilePath  string `json:"-"`
 	RepoType  RepositoryType
 }
 
 type CreateFileResp struct{}
 
 type UpdateFileReq struct {
-	Username   string `json:"username"`
-	Email      string `json:"email"`
+	Username   string `json:"-"`
+	Email      string `json:"-"`
 	Message    string `json:"message"`
 	Branch     string `json:"branch"`
 	Content    string `json:"content"`
