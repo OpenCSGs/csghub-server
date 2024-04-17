@@ -140,6 +140,7 @@ func (c *RepoComponent) CreateRepo(ctx context.Context, req types.CreateRepoReq)
 	if err != nil {
 		return nil, nil, fmt.Errorf("fail to create database repo, error: %w", err)
 	}
+	newDBRepo.User = user
 
 	return gitRepo, newDBRepo, nil
 }

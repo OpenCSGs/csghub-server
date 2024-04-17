@@ -73,7 +73,17 @@ type Config struct {
 		BuilderEndpoint string `envconfig:"STARHUB_SERVER_SPACE_BUILDER_ENDPOINT" default:"http://localhost:8081"`
 		// base url for space api running in k8s cluster
 		RunnerEndpoint string `envconfig:"STARHUB_SERVER_SPACE_RUNNER_ENDPOINT" default:"http://localhost:8082"`
-		DockerRegBase  string `envconfig:"STARHUB_SERVER_DOCKER_REG_BASE" default:"registry.cn-beijing.aliyuncs.com/opencsg_public/"`
+
+		// the internal root domain will be proxied to, should be internal access only
+		InternalRootDomain string `envconfig:"STARHUB_SERVER_INTERNAL_ROOT_DOMAIN" default:"internal.example.com"`
+		// the public root domain will be proxied from
+		PublicRootDomain string `envconfig:"STARHUB_SERVER_PUBLIC_ROOT_DOMAIN" default:"public.example.com"`
+		// RootDomain     string `envconfig:"STARHUB_SERVER_ROOT_DOMAIN" default:"opencsg.space"`
+		DockerRegBase string `envconfig:"STARHUB_SERVER_DOCKER_REG_BASE" default:"registry.cn-beijing.aliyuncs.com/opencsg_public/"`
+		// reverse proxy listening port
+		RProxyServerPort int `envconfig:"STARHUB_SERVER_SPACE_RPROXY_SERVER_PORT" default:"8083"`
+		// secret key for session encryption
+		SessionSecretKey string `envconfig:"STARHUB_SERVER_SPACE_SESSION_SECRET_KEY default:"secret"`
 	}
 }
 

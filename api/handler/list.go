@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"fmt"
 	"log/slog"
 
 	"github.com/gin-gonic/gin"
@@ -15,13 +16,19 @@ func NewListHandler(config *config.Config) (*ListHandler, error) {
 	if err != nil {
 		return nil, err
 	}
+	sc, err := component.NewSpaceComponent(config)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create space component,%w", err)
+	}
 	return &ListHandler{
-		c: uc,
+		c:  uc,
+		sc: sc,
 	}, nil
 }
 
 type ListHandler struct {
-	c *component.ListComponent
+	c  *component.ListComponent
+	sc *component.SpaceComponent
 }
 
 // ListTrendingModels   godoc
@@ -76,6 +83,32 @@ func (h *ListHandler) ListDatasetsByPath(ctx *gin.Context) {
 	resp, err := h.c.ListDatasetsByPath(ctx, &listTrendingReq)
 	if err != nil {
 		slog.Error("Failed to update dataset", slog.Any("error", err))
+		httpbase.ServerError(ctx, err)
+		return
+	}
+	httpbase.OK(ctx, resp)
+}
+
+// ListTrendingSpaces   godoc
+// @Security     ApiKey
+// @Summary      List spaces by paths
+// @Tags         List
+// @Accept       json
+// @Produce      json
+// @Param        body body types.ListByPathReq true "body"
+// @Success      200  {object}  types.Response{data=[]types.Space} "OK"
+// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
+// @Router       /list/spaces_by_path [post]
+func (h *ListHandler) ListSpacesByPath(ctx *gin.Context) {
+	var listTrendingReq types.ListByPathReq
+	if err := ctx.ShouldBindJSON(&listTrendingReq); err != nil {
+		httpbase.BadRequest(ctx, err.Error())
+		return
+	}
+
+	resp, err := h.sc.ListByPath(ctx, listTrendingReq.Paths)
+	if err != nil {
 		httpbase.ServerError(ctx, err)
 		return
 	}

@@ -15,4 +15,5 @@ const (
 	Running      = 23
 	RunTimeError = 24
 	Sleeping     = 25
+	Stopped      = 26
 )

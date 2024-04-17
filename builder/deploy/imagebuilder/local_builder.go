@@ -20,9 +20,10 @@ func (*LocalBuilder) Build(ctx context.Context, req *BuildRequest) (*BuildRespon
 }
 
 // Logs implements Builder.Logs
-func (*LocalBuilder) Logs(ctx context.Context, req *LogsRequest) (*LogsResponse, error) {
-	response := &LogsResponse{}
-	return response, nil
+func (*LocalBuilder) Logs(ctx context.Context, req *LogsRequest) (<-chan string, error) {
+	output := make(chan string, 1)
+	output <- "test build log"
+	return output, nil
 }
 
 // Status implements Builder.Status

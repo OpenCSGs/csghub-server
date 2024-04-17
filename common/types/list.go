@@ -14,7 +14,10 @@ type ModelResp struct {
 	Name        string    `json:"name"`
 	Nickname    string    `json:"nickname"`
 	Description string    `json:"description"`
-	Tags        []RepoTag `json:"tags"`
+	Tags        []RepoTag `json:"tags,omitempty"`
 }
 
-type DatasetResp = ModelResp
+type (
+	DatasetResp = ModelResp
+	SpaceResp   = ModelResp
+)

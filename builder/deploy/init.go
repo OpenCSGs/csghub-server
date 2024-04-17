@@ -15,8 +15,11 @@ var (
 )
 
 func Init(c DeployConfig) error {
-	var err error
-	ib := imagebuilder.NewLocalBuilder()
+	// ib := imagebuilder.NewLocalBuilder()
+	ib, err := imagebuilder.NewRemoteBuilder(c.ImageBuilderURL)
+	if err != nil {
+		panic(fmt.Errorf("failed to create image builder:%w", err))
+	}
 	ir, err := imagerunner.NewRemoteRunner(c.ImageRunnerURL)
 	if err != nil {
 		panic(fmt.Errorf("failed to create image runner:%w", err))
@@ -28,6 +31,7 @@ func Init(c DeployConfig) error {
 		return fmt.Errorf("failed to create deployer:%w", err)
 	}
 
+	deployer.internalRootDomain = c.InternalRootDomain
 	defaultDeployer = deployer
 	return nil
 }
@@ -37,7 +41,8 @@ func NewDeployer() Deployer {
 }
 
 type DeployConfig struct {
-	ImageBuilderURL string `json:"image_builder_url"`
-	ImageRunnerURL  string `json:"image_runner_url"`
-	MonitorInterval time.Duration
+	ImageBuilderURL    string
+	ImageRunnerURL     string
+	MonitorInterval    time.Duration
+	InternalRootDomain string
 }
