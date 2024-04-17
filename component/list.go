@@ -13,12 +13,14 @@ func NewListComponent(config *config.Config) (*ListComponent, error) {
 	c := &ListComponent{}
 	c.ds = database.NewDatasetStore()
 	c.ms = database.NewModelStore()
+	c.ss = database.NewSpaceStore()
 	return c, nil
 }
 
 type ListComponent struct {
 	ms *database.ModelStore
 	ds *database.DatasetStore
+	ss *database.SpaceStore
 }
 
 func (c *ListComponent) ListModelsByPath(ctx context.Context, req *types.ListByPathReq) ([]*types.ModelResp, error) {

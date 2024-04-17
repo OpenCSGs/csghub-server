@@ -1,6 +1,7 @@
 package imagerunner
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"encoding/json"
@@ -9,6 +10,9 @@ import (
 	"log/slog"
 	"net/http"
 	"net/url"
+	"time"
+
+	"opencsg.com/csghub-server/builder/deploy/common"
 )
 
 var _ Runner = (*RemoteRunner)(nil)
@@ -30,26 +34,24 @@ func NewRemoteRunner(remoteURL string) (Runner, error) {
 }
 
 func (h *RemoteRunner) Run(ctx context.Context, req *RunRequest) (*RunResponse, error) {
-	rel := &url.URL{Path: "/run"}
-	u := h.remote.ResolveReference(rel)
-	slog.Debug("cal run url", slog.Any("url", u))
-	response, err := h.doRequest(http.MethodPost, u.String(), req)
+	slog.Debug("remote runner run with req", slog.Any("req", req))
+	u := fmt.Sprintf("%s/%s/run", h.remote, common.UniqueSpaceAppName(req.OrgName, req.SpaceName, req.SpaceID))
+	response, err := h.doRequest(http.MethodPost, u, req)
 	if err != nil {
 		return nil, err
 	}
 	defer response.Body.Close()
 
-	var buildResponse RunResponse
-	if err := json.NewDecoder(response.Body).Decode(&buildResponse); err != nil {
+	var resp RunResponse
+	if err := json.NewDecoder(response.Body).Decode(&resp); err != nil {
 		return nil, err
 	}
 
-	return &buildResponse, nil
+	return &resp, nil
 }
 
 func (h *RemoteRunner) Stop(ctx context.Context, req *StopRequest) (*StopResponse, error) {
-	u := fmt.Sprintf("%s/%s/%s/stop/%s?build_id=%d", h.remote,
-		req.OrgName, req.SpaceName, req.ImageID, req.BuildID)
+	u := fmt.Sprintf("%s/%s/stop", h.remote, common.UniqueSpaceAppName(req.OrgName, req.SpaceName, req.SpaceID))
 	response, err := h.doRequest(http.MethodPost, u, req)
 	if err != nil {
 		return nil, err
@@ -65,8 +67,7 @@ func (h *RemoteRunner) Stop(ctx context.Context, req *StopRequest) (*StopRespons
 }
 
 func (h *RemoteRunner) Status(ctx context.Context, req *StatusRequest) (*StatusResponse, error) {
-	u := fmt.Sprintf("%s/%s/%s/status/%s?build_id=%d", h.remote,
-		req.OrgName, req.SpaceName, req.ImageID, req.BuildID)
+	u := fmt.Sprintf("%s/%s/status", h.remote, common.UniqueSpaceAppName(req.OrgName, req.SpaceName, req.SpaceID))
 	response, err := h.doRequest(http.MethodGet, u, req)
 	if err != nil {
 		return nil, err
@@ -81,17 +82,59 @@ func (h *RemoteRunner) Status(ctx context.Context, req *StatusRequest) (*StatusR
 	return &statusResponse, nil
 }
 
-func (h *RemoteRunner) Logs(ctx context.Context, req *LogsRequest) (*LogsResponse, error) {
-	u := fmt.Sprintf("%s/%s/%s/logs/%s?build_id=%d", h.remote,
-		req.OrgName, req.SpaceName, req.ImageID, req.BuildID)
+func (h *RemoteRunner) StatusAll(ctx context.Context) (map[string]StatusResponse, error) {
+	u := fmt.Sprintf("%s/status-all", h.remote)
+	response, err := h.doRequest(http.MethodGet, u, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer response.Body.Close()
+
+	statusAll := make(map[string]StatusResponse)
+	if err := json.NewDecoder(response.Body).Decode(&statusAll); err != nil {
+		return nil, err
+	}
+
+	return statusAll, nil
+}
+
+func (h *RemoteRunner) Logs(ctx context.Context, req *LogsRequest) (<-chan string, error) {
+	appNmae := common.UniqueSpaceAppName(req.OrgName, req.SpaceName, req.SpaceID)
+	u := fmt.Sprintf("%s/%s/logs", h.remote, appNmae)
+	slog.Debug("logs request", slog.String("url", u), slog.String("appname", appNmae))
 	rc, err := h.doSSERequest(http.MethodGet, u, req)
 	if err != nil {
 		return nil, err
 	}
 
-	return &LogsResponse{
-		SSEReadCloser: rc,
-	}, nil
+	return h.readToChannel(rc), nil
+}
+
+func (h *RemoteRunner) readToChannel(rc io.ReadCloser) <-chan string {
+	output := make(chan string, 2)
+
+	buf := make([]byte, 256)
+	br := bufio.NewReader(rc)
+
+	go func() {
+		for {
+			n, err := br.Read(buf)
+			if err != nil {
+				slog.Error("multi log reader get EOF from inner log reader", slog.Any("error", err))
+				rc.Close()
+				close(output)
+				break
+			}
+
+			if n > 0 {
+				output <- string(buf[:n])
+			} else {
+				time.Sleep(2 * time.Second)
+			}
+		}
+	}()
+
+	return output
 }
 
 // Helper method to execute the actual HTTP request and read the response.

@@ -31,6 +31,8 @@ type TagScope string
 const (
 	ModelTagScope   TagScope = "model"
 	DatasetTagScope TagScope = "dataset"
+	CodeTagScope    TagScope = "code"
+	SpaceTagScope   TagScope = "space"
 )
 
 const defaultTagGroup = ""
@@ -74,7 +76,6 @@ func (ts *TagStore) allTagsByScope(ctx context.Context, scope TagScope) ([]*Tag,
 		return nil, fmt.Errorf("failed to select tags by scope,cause: %w", err)
 	}
 	return tags, nil
-
 }
 
 func (ts *TagStore) AllModelTags(ctx context.Context) ([]*Tag, error) {
@@ -155,7 +156,6 @@ func (ts *TagStore) UpsertTags(ctx context.Context, tagScope TagScope, categoryT
 	}
 
 	return tags, nil
-
 }
 
 // SetMetaTags will delete existing tags and create new ones
@@ -176,14 +176,14 @@ func (ts *TagStore) SetMetaTags(ctx context.Context, namespace, name string, tag
 			metaTagIds = append(metaTagIds, tag.ID)
 		}
 	}
-	//select all repo tags which are not Library tags
+	// select all repo tags which are not Library tags
 	err = ts.db.Operator.Core.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
-		//remove all tags of the repository not belongs to category "Library", and then add new tags
+		// remove all tags of the repository not belongs to category "Library", and then add new tags
 		tx.NewDelete().
 			Model(&RepositoryTag{}).
 			Where("repository_id =? and tag_id in (?)", repo.ID, bun.In(metaTagIds)).
 			Exec(ctx)
-		//no new tags to insert
+		// no new tags to insert
 		if len(tags) == 0 {
 			return nil
 		}
@@ -194,7 +194,7 @@ func (ts *TagStore) SetMetaTags(ctx context.Context, namespace, name string, tag
 			repoTag := &RepositoryTag{RepositoryID: repo.ID, TagID: tag.ID, Repository: repo, Tag: tag, Count: 1}
 			repoTags = append(repoTags, repoTag)
 		}
-		//batch insert
+		// batch insert
 		_, err := tx.NewInsert().Model(&repoTags).Exec(ctx)
 		if err != nil {
 			return fmt.Errorf("failed to batch insert repository meta tags, path:%v/%v,error:%w", namespace, name, err)
@@ -217,7 +217,7 @@ func (ts *TagStore) SetLibraryTag(ctx context.Context, namespace, name string, n
 	}
 	err = ts.db.Operator.Core.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
 		var err error
-		//decrease count of old tag
+		// decrease count of old tag
 		if oldTag != nil {
 			oldRepoTag := RepositoryTag{RepositoryID: repo.ID, TagID: oldTag.ID}
 			_, err = tx.NewUpdate().Model(&oldRepoTag).
@@ -228,7 +228,7 @@ func (ts *TagStore) SetLibraryTag(ctx context.Context, namespace, name string, n
 				return err
 			}
 		}
-		//increase count of new tag
+		// increase count of new tag
 		if newTag != nil {
 			newRepoTag := RepositoryTag{RepositoryID: repo.ID, TagID: newTag.ID}
 			err = tx.NewSelect().Model(&newRepoTag).

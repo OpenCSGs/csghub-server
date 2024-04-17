@@ -18,6 +18,9 @@ import (
 
 const (
 	DatasetRepoType = "datasets"
+	ModelRepoType   = "models"
+	CodeRepoType    = "codes"
+	SpaceRepoType   = "spaces"
 	ReadmeFileName  = "README.md"
 )
 
@@ -30,6 +33,7 @@ type GitCallbackComponent struct {
 	ms      *database.ModelStore
 	ds      *database.DatasetStore
 	sc      *component.SpaceComponent
+	ss      *database.SpaceStore
 	// set visibility if file content is sensitive
 	setRepoVisibility bool
 }
@@ -46,6 +50,7 @@ func NewGitCallback(config *config.Config) (*GitCallbackComponent, error) {
 	}
 	ms := database.NewModelStore()
 	ds := database.NewDatasetStore()
+	ss := database.NewSpaceStore()
 	checker := component.NewSensitiveComponent(config)
 	sc, err := component.NewSpaceComponent(config)
 	if err != nil {
@@ -57,6 +62,7 @@ func NewGitCallback(config *config.Config) (*GitCallbackComponent, error) {
 		tc:      tc,
 		ms:      ms,
 		ds:      ds,
+		ss:      ss,
 		sc:      sc,
 		checker: checker,
 	}, nil
@@ -86,8 +92,17 @@ func (c *GitCallbackComponent) HandlePush(ctx context.Context, req *types.GiteaC
 		return err
 	}
 
-	// trigger space deployment
-	if repoType == "spaces" && c.sc.HasAppFile(ctx, namespace, repoName) {
+	if repoType == "spaces" {
+		space, err := c.ss.FindByPath(ctx, namespace, repoName)
+		if err != nil {
+			slog.Error("git callback push failed when find space", slog.Any("error", err), slog.String("namespace", namespace), slog.String("name", repoName))
+			return nil
+		}
+		c.sc.FixHasAppFile(ctx, space)
+		if !space.HasAppFile {
+			return nil
+		}
+		// trigger space deployment
 		go func() {
 			deployID, err := c.sc.Deploy(ctx, namespace, repoName)
 			if err != nil {
@@ -152,10 +167,17 @@ func (c *GitCallbackComponent) removeFiles(ctx context.Context, repoType, namesp
 			}
 		} else {
 			var tagScope database.TagScope
-			if repoType == "datasets" {
+			switch repoType {
+			case DatasetRepoType:
 				tagScope = database.DatasetTagScope
-			} else {
+			case ModelRepoType:
 				tagScope = database.ModelTagScope
+			default:
+				return nil
+				// case CodeRepoType:
+				// 	tagScope = database.CodeTagScope
+				// case SpaceRepoType:
+				// 	tagScope = database.SpaceTagScope
 			}
 			err := c.tc.UpdateLibraryTags(ctx, tagScope, namespace, repoName, fileName, "")
 			if err != nil {
@@ -198,10 +220,17 @@ func (c *GitCallbackComponent) addFiles(ctx context.Context, repoType, namespace
 			}
 		} else {
 			var tagScope database.TagScope
-			if repoType == DatasetRepoType {
+			switch repoType {
+			case DatasetRepoType:
 				tagScope = database.DatasetTagScope
-			} else {
+			case ModelRepoType:
 				tagScope = database.ModelTagScope
+			default:
+				return nil
+				// case CodeRepoType:
+				// 	tagScope = database.CodeTagScope
+				// case SpaceRepoType:
+				// 	tagScope = database.SpaceTagScope
 			}
 			err := c.tc.UpdateLibraryTags(ctx, tagScope, namespace, repoName, "", fileName)
 			if err != nil {
@@ -220,10 +249,18 @@ func (c *GitCallbackComponent) updateMetaTags(ctx context.Context, repoType, nam
 		err      error
 		tagScope database.TagScope
 	)
-	if repoType == DatasetRepoType {
+	switch repoType {
+	case DatasetRepoType:
 		tagScope = database.DatasetTagScope
-	} else {
+	case ModelRepoType:
 		tagScope = database.ModelTagScope
+	default:
+		return nil
+		// TODO: support code and space
+		// case CodeRepoType:
+		// 	tagScope = database.CodeTagScope
+		// case SpaceRepoType:
+		// 	tagScope = database.SpaceTagScope
 	}
 	_, err = c.tc.UpdateMetaTags(ctx, tagScope, namespace, repoName, content)
 	if err != nil {

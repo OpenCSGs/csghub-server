@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 
+	"opencsg.com/csghub-server/builder/deploy"
 	"opencsg.com/csghub-server/builder/git"
 	"opencsg.com/csghub-server/builder/git/gitserver"
 	"opencsg.com/csghub-server/builder/store/database"
@@ -22,23 +23,30 @@ func NewUserComponent(config *config.Config) (*UserComponent, error) {
 	c.ss = database.NewSpaceStore()
 	c.ns = database.NewNamespaceStore()
 	var err error
+	c.spaceComponent, err = NewSpaceComponent(config)
+	if err != nil {
+		newError := fmt.Errorf("failed to create space component,error:%w", err)
+		return nil, newError
+	}
 	c.gs, err = git.NewGitServer(config)
 	if err != nil {
 		newError := fmt.Errorf("failed to create git server,error:%w", err)
-		slog.Error(newError.Error())
 		return nil, newError
 	}
+	c.deployer = deploy.NewDeployer()
 	return c, nil
 }
 
 type UserComponent struct {
-	us *database.UserStore
-	ms *database.ModelStore
-	ds *database.DatasetStore
-	cs *database.CodeStore
-	ss *database.SpaceStore
-	ns *database.NamespaceStore
-	gs gitserver.GitServer
+	us             *database.UserStore
+	ms             *database.ModelStore
+	ds             *database.DatasetStore
+	cs             *database.CodeStore
+	ss             *database.SpaceStore
+	ns             *database.NamespaceStore
+	gs             gitserver.GitServer
+	spaceComponent *SpaceComponent
+	deployer       deploy.Deployer
 }
 
 func (c *UserComponent) Create(ctx context.Context, req *types.CreateUserRequest) (*database.User, error) {
@@ -268,7 +276,6 @@ func (c *UserComponent) Codes(ctx context.Context, req *types.UserModelsReq) ([]
 }
 
 func (c *UserComponent) Spaces(ctx context.Context, req *types.UserSpacesReq) ([]types.Space, int, error) {
-	var resSpaces []types.Space
 	userExists, err := c.us.IsExist(ctx, req.Owner)
 	if err != nil {
 		newError := fmt.Errorf("failed to check for the presence of the user,error:%w", err)
@@ -293,29 +300,7 @@ func (c *UserComponent) Spaces(ctx context.Context, req *types.UserSpacesReq) ([
 		}
 	}
 
-	onlyPublic := req.Owner != req.CurrentUser
-	ms, total, err := c.ss.ByUsername(ctx, req.Owner, req.PageSize, req.Page, onlyPublic)
-	if err != nil {
-		newError := fmt.Errorf("failed to get user spaces,error:%w", err)
-		slog.Error(newError.Error())
-		return nil, 0, newError
-	}
-
-	for _, data := range ms {
-		resSpaces = append(resSpaces, types.Space{
-			ID:          data.ID,
-			Name:        data.Repository.Name,
-			Nickname:    data.Repository.Nickname,
-			Description: data.Repository.Description,
-			Likes:       data.Repository.Likes,
-			Path:        data.Repository.Path,
-			Private:     data.Repository.Private,
-			CreatedAt:   data.CreatedAt,
-			UpdatedAt:   data.UpdatedAt,
-		})
-	}
-
-	return resSpaces, total, nil
+	return c.spaceComponent.UserSpaces(ctx, req)
 }
 
 func (c *UserComponent) FixUserData(ctx context.Context, userName string) error {

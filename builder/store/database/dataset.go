@@ -11,10 +11,10 @@ import (
 )
 
 var sortBy = map[string]string{
-	"trending":        "download_count DESC",
-	"recently_update": "updated_at DESC",
-	"most_download":   "download_count DESC",
-	"most_favorite":   "likes DESC",
+	"trending":        "download_count DESC NULLS LAST",
+	"recently_update": "updated_at DESC NULLS LAST",
+	"most_download":   "download_count DESC NULLS LAST",
+	"most_favorite":   "likes DESC NULLS LAST",
 }
 
 type DatasetStore struct {

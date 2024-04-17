@@ -2,6 +2,7 @@ package database
 
 import (
 	"context"
+	"errors"
 )
 
 type AccessTokenStore struct {
@@ -63,5 +64,23 @@ func (s *AccessTokenStore) IsExist(ctx context.Context, username, tkName string)
 		Where("u.username = ?", username).
 		Where("access_token.name = ?", tkName).
 		Exists(ctx)
+	return
+}
+
+func (s *AccessTokenStore) FindByUID(ctx context.Context, uid int64) (token *AccessToken, err error) {
+	var tokens []AccessToken
+	err = s.db.Operator.Core.
+		NewSelect().
+		Model(&tokens).
+		Relation("User").
+		Where("user_id = ?", uid).
+		Scan(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if len(tokens) == 0 {
+		return nil, errors.New("access token not found")
+	}
+	token = &tokens[0]
 	return
 }
