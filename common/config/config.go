@@ -77,8 +77,8 @@ type Config struct {
 		InternalRootDomain string `envconfig:"STARHUB_SERVER_INTERNAL_ROOT_DOMAIN" default:"internal.example.com"`
 		// the public root domain will be proxied from
 		PublicRootDomain string `envconfig:"STARHUB_SERVER_PUBLIC_ROOT_DOMAIN" default:"public.example.com"`
-		// RootDomain     string `envconfig:"STARHUB_SERVER_ROOT_DOMAIN" default:"opencsg.space"`
-		DockerRegBase string `envconfig:"STARHUB_SERVER_DOCKER_REG_BASE" default:"registry.cn-beijing.aliyuncs.com/opencsg_public/"`
+		DockerRegBase    string `envconfig:"STARHUB_SERVER_DOCKER_REG_BASE" default:"registry.cn-beijing.aliyuncs.com/opencsg_public/"`
+		ImagePullSecret  string `envconfig:"STARHUB_SERVER_DOCKER_IMAGE_PULL_SECRET" default:"opencsg-pull-secret"`
 		// reverse proxy listening port
 		RProxyServerPort int `envconfig:"STARHUB_SERVER_SPACE_RPROXY_SERVER_PORT" default:"8083"`
 		// secret key for session encryption
