@@ -2,7 +2,6 @@ package component
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"log/slog"
 
@@ -237,10 +236,9 @@ func (c *CodeComponent) Show(ctx context.Context, namespace, name, currentUser s
 		return nil, fmt.Errorf("failed to find code, error: %w", err)
 	}
 
-	if code.Repository.Private {
-		if code.Repository.User.Username != currentUser {
-			return nil, fmt.Errorf("failed to find code, error: %w", errors.New("the private code is not accessible to the current user"))
-		}
+	allow, _ := c.AllowReadAccessRepo(ctx, code.Repository, currentUser)
+	if !allow {
+		return nil, ErrUnauthorized
 	}
 
 	for _, tag := range code.Repository.Tags {
@@ -283,19 +281,18 @@ func (c *CodeComponent) Show(ctx context.Context, namespace, name, currentUser s
 	return resCode, nil
 }
 
-func (c *CodeComponent) Relations(ctx context.Context, namespace, name, current_user string) (*types.Relations, error) {
-	model, err := c.cs.FindByPath(ctx, namespace, name)
+func (c *CodeComponent) Relations(ctx context.Context, namespace, name, currentUser string) (*types.Relations, error) {
+	code, err := c.cs.FindByPath(ctx, namespace, name)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find code repo, error: %w", err)
 	}
 
-	if model.Repository.Private {
-		if model.Repository.User.Username != current_user {
-			return nil, ErrUnauthorized
-		}
+	allow, _ := c.AllowReadAccessRepo(ctx, code.Repository, currentUser)
+	if !allow {
+		return nil, ErrUnauthorized
 	}
 
-	return c.getRelations(ctx, model.RepositoryID, current_user)
+	return c.getRelations(ctx, code.RepositoryID, currentUser)
 }
 
 func (c *CodeComponent) getRelations(ctx context.Context, repoID int64, currentUser string) (*types.Relations, error) {
@@ -311,6 +308,9 @@ func (c *CodeComponent) getRelations(ctx context.Context, repoID int64, currentU
 			Name:        repo.Name,
 			Nickname:    repo.Nickname,
 			Description: repo.Description,
+			UpdatedAt:   repo.UpdatedAt,
+			Private:     repo.Private,
+			Downloads:   repo.DownloadCount,
 		})
 	}
 

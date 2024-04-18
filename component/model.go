@@ -325,17 +325,16 @@ func (c *ModelComponent) Delete(ctx context.Context, namespace, name, currentUse
 	return nil
 }
 
-func (c *ModelComponent) Show(ctx context.Context, namespace, name, current_user string) (*types.Model, error) {
+func (c *ModelComponent) Show(ctx context.Context, namespace, name, currentUser string) (*types.Model, error) {
 	var tags []types.RepoTag
 	model, err := c.ms.FindByPath(ctx, namespace, name)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find model, error: %w", err)
 	}
 
-	if model.Repository.Private {
-		if model.Repository.User.Username != current_user {
-			return nil, ErrUnauthorized
-		}
+	allow, _ := c.AllowReadAccessRepo(ctx, model.Repository, currentUser)
+	if !allow {
+		return nil, ErrUnauthorized
 	}
 
 	// get model running status
@@ -390,19 +389,18 @@ func (c *ModelComponent) Show(ctx context.Context, namespace, name, current_user
 	return resModel, nil
 }
 
-func (c *ModelComponent) Relations(ctx context.Context, namespace, name, current_user string) (*types.Relations, error) {
+func (c *ModelComponent) Relations(ctx context.Context, namespace, name, currentUser string) (*types.Relations, error) {
 	model, err := c.ms.FindByPath(ctx, namespace, name)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find model, error: %w", err)
 	}
 
-	if model.Repository.Private {
-		if model.Repository.User.Username != current_user {
-			return nil, ErrUnauthorized
-		}
+	allow, _ := c.AllowReadAccessRepo(ctx, model.Repository, currentUser)
+	if !allow {
+		return nil, ErrUnauthorized
 	}
 
-	return c.getRelations(ctx, model.RepositoryID, current_user)
+	return c.getRelations(ctx, model.RepositoryID, currentUser)
 }
 
 func (c *ModelComponent) getRelations(ctx context.Context, fromRepoID int64, currentUser string) (*types.Relations, error) {
@@ -418,12 +416,21 @@ func (c *ModelComponent) getRelations(ctx context.Context, fromRepoID int64, cur
 			Name:        repo.Name,
 			Nickname:    repo.Nickname,
 			Description: repo.Description,
+			UpdatedAt:   repo.UpdatedAt,
+			Private:     repo.Private,
+			Downloads:   repo.DownloadCount,
 		})
 	}
 	codeRepos := res["code"]
 	for _, repo := range codeRepos {
 		rels.Codes = append(rels.Codes, &types.Code{
-			Path: repo.Path,
+			Path:        repo.Path,
+			Name:        repo.Name,
+			Nickname:    repo.Nickname,
+			Description: repo.Description,
+			UpdatedAt:   repo.UpdatedAt,
+			Private:     repo.Private,
+			Downloads:   repo.DownloadCount,
 		})
 	}
 	spaceRepos := res["space"]
