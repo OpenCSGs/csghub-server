@@ -114,7 +114,7 @@ func (h *DatasetHandler) Create(ctx *gin.Context) {
 // @Router       /datasets [get]
 func (h *DatasetHandler) Index(ctx *gin.Context) {
 	tagReqs := parseTagReqs(ctx)
-	username := ctx.Query("current_user")
+	username := httpbase.GetCurrentUser(ctx)
 	per, page, err := common.GetPerAndPageFromContext(ctx)
 	if err != nil {
 		slog.Error("Bad request format", "error", err)
@@ -206,7 +206,7 @@ func (h *DatasetHandler) Delete(ctx *gin.Context) {
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
-	currentUser := ctx.Query("current_user")
+	currentUser := httpbase.GetCurrentUser(ctx)
 	err = h.c.Delete(ctx, namespace, name, currentUser)
 	if err != nil {
 		slog.Error("Failed to delete dataset", slog.Any("error", err))
@@ -238,9 +238,13 @@ func (h *DatasetHandler) Show(ctx *gin.Context) {
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
-	currentUser := ctx.Query("current_user")
+	currentUser := httpbase.GetCurrentUser(ctx)
 	detail, err := h.c.Show(ctx, namespace, name, currentUser)
 	if err != nil {
+		if errors.Is(err, component.ErrUnauthorized) {
+			httpbase.UnauthorizedError(ctx, err)
+			return
+		}
 		slog.Error("Failed to get dataset", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
 		return

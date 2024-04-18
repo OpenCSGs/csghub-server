@@ -862,11 +862,7 @@ func getTagScopeByRepoType(repoType types.RepositoryType) database.TagScope {
 	}
 }
 
-func (c *RepoComponent) AllowReadAccess(ctx context.Context, namespace, name, username string) (bool, error) {
-	repo, err := c.repo.FindByPath(ctx, types.SpaceRepo, namespace, name)
-	if err != nil {
-		return false, fmt.Errorf("failed to find repo, error: %w", err)
-	}
+func (c *RepoComponent) AllowReadAccessRepo(ctx context.Context, repo *database.Repository, username string) (bool, error) {
 	if !repo.Private {
 		return true, nil
 	}
@@ -875,7 +871,16 @@ func (c *RepoComponent) AllowReadAccess(ctx context.Context, namespace, name, us
 		return false, errors.New("user not found, please login first")
 	}
 
+	namespace, _ := repo.NamespaceAndName()
 	return c.checkCurrentUserPermission(ctx, username, namespace, membership.RoleRead)
+}
+
+func (c *RepoComponent) AllowReadAccess(ctx context.Context, namespace, name, username string) (bool, error) {
+	repo, err := c.repo.FindByPath(ctx, types.SpaceRepo, namespace, name)
+	if err != nil {
+		return false, fmt.Errorf("failed to find repo, error: %w", err)
+	}
+	return c.AllowReadAccessRepo(ctx, repo, username)
 }
 
 func (c *RepoComponent) AllowWriteAccess(ctx context.Context, namespace, name, username string) (bool, error) {

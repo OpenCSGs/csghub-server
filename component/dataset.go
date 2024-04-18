@@ -349,10 +349,9 @@ func (c *DatasetComponent) Show(ctx context.Context, namespace, name, currentUse
 		return nil, fmt.Errorf("failed to find dataset, error: %w", err)
 	}
 
-	if dataset.Repository.Private {
-		if dataset.Repository.User.Username != currentUser {
-			return nil, fmt.Errorf("failed to find dataset, error: %w", errors.New("the private dataset is not accessible to the current user"))
-		}
+	allow, _ := c.AllowReadAccessRepo(ctx, dataset.Repository, currentUser)
+	if !allow {
+		return nil, ErrUnauthorized
 	}
 
 	for _, tag := range dataset.Repository.Tags {
@@ -395,19 +394,18 @@ func (c *DatasetComponent) Show(ctx context.Context, namespace, name, currentUse
 	return resDataset, nil
 }
 
-func (c *DatasetComponent) Relations(ctx context.Context, namespace, name, current_user string) (*types.Relations, error) {
-	model, err := c.ds.FindByPath(ctx, namespace, name)
+func (c *DatasetComponent) Relations(ctx context.Context, namespace, name, currentUser string) (*types.Relations, error) {
+	dataset, err := c.ds.FindByPath(ctx, namespace, name)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find dataset repo, error: %w", err)
 	}
 
-	if model.Repository.Private {
-		if model.Repository.User.Username != current_user {
-			return nil, ErrUnauthorized
-		}
+	allow, _ := c.AllowReadAccessRepo(ctx, dataset.Repository, currentUser)
+	if !allow {
+		return nil, ErrUnauthorized
 	}
 
-	return c.getRelations(ctx, model.RepositoryID, current_user)
+	return c.getRelations(ctx, dataset.RepositoryID, currentUser)
 }
 
 func (c *DatasetComponent) getRelations(ctx context.Context, repoID int64, currentUser string) (*types.Relations, error) {
@@ -423,17 +421,11 @@ func (c *DatasetComponent) getRelations(ctx context.Context, repoID int64, curre
 			Name:        repo.Name,
 			Nickname:    repo.Nickname,
 			Description: repo.Description,
+			UpdatedAt:   repo.UpdatedAt,
+			Private:     repo.Private,
+			Downloads:   repo.DownloadCount,
 		})
 	}
 
 	return rels, nil
-}
-
-func fileIsExist(tree []*types.File, path string) (*types.File, bool) {
-	for _, f := range tree {
-		if f.Path == path {
-			return f, true
-		}
-	}
-	return nil, false
 }
