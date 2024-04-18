@@ -131,17 +131,16 @@ func (c *SpaceComponent) Create(ctx context.Context, req types.CreateSpaceReq) (
 	return space, nil
 }
 
-func (c *SpaceComponent) Show(ctx context.Context, namespace, name, current_user string) (*types.Space, error) {
+func (c *SpaceComponent) Show(ctx context.Context, namespace, name, currentUser string) (*types.Space, error) {
 	var tags []types.RepoTag
 	space, err := c.ss.FindByPath(ctx, namespace, name)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find space, error: %w", err)
 	}
 
-	if space.Repository.Private {
-		if space.Repository.User.Username != current_user {
-			return nil, fmt.Errorf("failed to find space, error: %w", errors.New("the private space is not accessible to the current user"))
-		}
+	allow, _ := c.AllowReadAccessRepo(ctx, space.Repository, currentUser)
+	if !allow {
+		return nil, ErrUnauthorized
 	}
 
 	var endpoint string

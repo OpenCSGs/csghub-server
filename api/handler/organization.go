@@ -161,7 +161,7 @@ func (h *OrganizationHandler) Update(ctx *gin.Context) {
 func (h *OrganizationHandler) Models(ctx *gin.Context) {
 	var req types.OrgModelsReq
 	req.Namespace = ctx.Param("namespace")
-	req.CurrentUser = ctx.Query("current_user")
+	req.CurrentUser = httpbase.GetCurrentUser(ctx)
 
 	per, page, err := common.GetPerAndPageFromContext(ctx)
 	if err != nil {
@@ -206,7 +206,7 @@ func (h *OrganizationHandler) Models(ctx *gin.Context) {
 func (h *OrganizationHandler) Datasets(ctx *gin.Context) {
 	var req types.OrgDatasetsReq
 	req.Namespace = ctx.Param("namespace")
-	req.CurrentUser = ctx.Query("current_user")
+	req.CurrentUser = httpbase.GetCurrentUser(ctx)
 
 	per, page, err := common.GetPerAndPageFromContext(ctx)
 	if err != nil {
@@ -250,7 +250,7 @@ func (h *OrganizationHandler) Datasets(ctx *gin.Context) {
 func (h *OrganizationHandler) Codes(ctx *gin.Context) {
 	var req types.OrgCodesReq
 	req.Namespace = ctx.Param("namespace")
-	req.CurrentUser = ctx.Query("current_user")
+	req.CurrentUser = httpbase.GetCurrentUser(ctx)
 
 	per, page, err := common.GetPerAndPageFromContext(ctx)
 	if err != nil {
@@ -294,7 +294,7 @@ func (h *OrganizationHandler) Codes(ctx *gin.Context) {
 func (h *OrganizationHandler) Spaces(ctx *gin.Context) {
 	var req types.OrgSpacesReq
 	req.Namespace = ctx.Param("namespace")
-	req.CurrentUser = ctx.Query("current_user")
+	req.CurrentUser = httpbase.GetCurrentUser(ctx)
 
 	per, page, err := common.GetPerAndPageFromContext(ctx)
 	if err != nil {
