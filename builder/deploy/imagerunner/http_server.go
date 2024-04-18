@@ -28,10 +28,11 @@ import (
 )
 
 type HttpServer struct {
-	knativeClient *knative.Clientset
-	k8sClient     *kubernetes.Clientset
-	dockerRegBase string
-	k8sNameSpace  string
+	knativeClient   *knative.Clientset
+	k8sClient       *kubernetes.Clientset
+	dockerRegBase   string
+	k8sNameSpace    string
+	imagePullSecret string
 }
 
 func NewHttpServer(config *config.Config) (*HttpServer, error) {
@@ -57,10 +58,11 @@ func NewHttpServer(config *config.Config) (*HttpServer, error) {
 
 	domainParts := strings.SplitN(config.Space.InternalRootDomain, ".", 2)
 	return &HttpServer{
-		knativeClient: knativeClient,
-		k8sClient:     k8sClient,
-		dockerRegBase: config.Space.DockerRegBase,
-		k8sNameSpace:  domainParts[0],
+		knativeClient:   knativeClient,
+		k8sClient:       k8sClient,
+		dockerRegBase:   config.Space.DockerRegBase,
+		k8sNameSpace:    domainParts[0],
+		imagePullSecret: config.Space.ImagePullSecret,
 	}, nil
 }
 
@@ -143,6 +145,11 @@ func (s *HttpServer) runImage(c *gin.Context) {
 								// TODO:set env
 								// Env: environment,
 							}},
+							ImagePullSecrets: []corev1.LocalObjectReference{
+								{
+									Name: s.imagePullSecret,
+								},
+							},
 						},
 					},
 				},
