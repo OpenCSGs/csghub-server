@@ -237,6 +237,10 @@ func (h *CodeHandler) Show(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
 	detail, err := h.c.Show(ctx, namespace, name, currentUser)
 	if err != nil {
+		if errors.Is(err, component.ErrUnauthorized) {
+			httpbase.UnauthorizedError(ctx, err)
+			return
+		}
 		slog.Error("Failed to get code", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
 		return
@@ -262,7 +266,6 @@ func (h *CodeHandler) Show(ctx *gin.Context) {
 func (h *CodeHandler) Relations(ctx *gin.Context) {
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
 	if err != nil {
-		slog.Error("Bad request format", "error", err)
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
