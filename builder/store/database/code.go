@@ -155,7 +155,6 @@ func (s *CodeStore) Create(ctx context.Context, input Code) (*Code, error) {
 }
 
 func (s *CodeStore) Update(ctx context.Context, input Code) (err error) {
-	input.UpdatedAt = time.Now()
 	_, err = s.db.Core.NewUpdate().Model(&input).WherePK().Exec(ctx)
 	return
 }
