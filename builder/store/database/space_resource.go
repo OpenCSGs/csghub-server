@@ -3,7 +3,6 @@ package database
 import (
 	"context"
 	"fmt"
-	"time"
 )
 
 type SpaceResourceStore struct {
@@ -46,7 +45,6 @@ func (s *SpaceResourceStore) Create(ctx context.Context, input SpaceResource) (*
 }
 
 func (s *SpaceResourceStore) Update(ctx context.Context, input SpaceResource) (*SpaceResource, error) {
-	input.UpdatedAt = time.Now()
 	_, err := s.db.Core.NewUpdate().Model(&input).WherePK().Exec(ctx)
 
 	return &input, err

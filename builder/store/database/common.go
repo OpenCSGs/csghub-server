@@ -1,14 +1,27 @@
 package database
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	"time"
+
+	"github.com/uptrace/bun"
+	"github.com/uptrace/bun/schema"
 )
 
 type times struct {
 	CreatedAt time.Time `bun:",nullzero,notnull,skipupdate,default:current_timestamp" json:"created_at"`
 	UpdatedAt time.Time `bun:",nullzero,notnull,default:current_timestamp" json:"updated_at"`
+}
+
+func (t *times) BeforeAppendModel(ctx context.Context, query schema.Query) error {
+	switch query.(type) {
+	case *bun.UpdateQuery:
+		t.UpdatedAt = time.Now()
+	}
+
+	return nil
 }
 
 func assertAffectedOneRow(result sql.Result, err error) error {

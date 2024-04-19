@@ -200,7 +200,6 @@ func (s *RepoStore) UpdateRepoFileDownloads(ctx context.Context, repo *Repositor
 		}
 	} else {
 		rd.ClickDownloadCount = rd.ClickDownloadCount + clickDownloadCount
-		rd.UpdatedAt = time.Now()
 		query := s.db.Operator.Core.NewUpdate().
 			Model(rd).
 			WherePK()
@@ -241,7 +240,6 @@ func (s *RepoStore) UpdateRepoCloneDownloads(ctx context.Context, repo *Reposito
 		}
 	} else {
 		rd.CloneCount = cloneCount
-		rd.UpdatedAt = time.Now()
 		query := s.db.Operator.Core.NewUpdate().
 			Model(rd).
 			WherePK()
