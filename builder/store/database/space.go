@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"log/slog"
 	"strings"
-	"time"
 
 	"github.com/uptrace/bun"
 )
@@ -47,7 +46,6 @@ func (s *SpaceStore) Create(ctx context.Context, input Space) (*Space, error) {
 }
 
 func (s *SpaceStore) Update(ctx context.Context, input Space) (err error) {
-	input.UpdatedAt = time.Now()
 	_, err = s.db.Core.NewUpdate().Model(&input).WherePK().Exec(ctx)
 	return
 }
