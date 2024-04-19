@@ -279,7 +279,8 @@ func (c *RepoComponent) relatedRepos(ctx context.Context, repoID int64, currentU
 	relatedRepoIDs = slices.Compact(relatedRepoIDs)
 
 	var opts []database.SelectOption
-	opts = append(opts, database.Columns("id", "repository_type", "path", "user_id", "private", "name", "nickname", "description", "download_count"))
+	opts = append(opts, database.Columns("id", "repository_type", "path", "user_id", "private", "name",
+		"nickname", "description", "download_count", "updated_at"))
 
 	relatedRepos, err := c.repo.FindByIds(ctx, relatedRepoIDs, opts...)
 	if err != nil {
