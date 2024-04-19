@@ -279,7 +279,7 @@ func (c *RepoComponent) relatedRepos(ctx context.Context, repoID int64, currentU
 	relatedRepoIDs = slices.Compact(relatedRepoIDs)
 
 	var opts []database.SelectOption
-	opts = append(opts, database.Columns("id", "repository_type", "path", "user_id", "private"))
+	opts = append(opts, database.Columns("id", "repository_type", "path", "user_id", "private", "name", "nickname", "description", "download_count"))
 
 	relatedRepos, err := c.repo.FindByIds(ctx, relatedRepoIDs, opts...)
 	if err != nil {
@@ -422,7 +422,7 @@ func (c *RepoComponent) updateLibraryFile(ctx context.Context, req *types.Update
 	isFileRenamed := req.FilePath != req.OriginPath
 	// need to handle tag change only if file renamed
 	if isFileRenamed {
-		c.tc.UpdateLibraryTags(ctx, getTagScopeByRepoType(req.RepoType), req.NameSpace, req.Name, req.OriginPath, req.FilePath)
+		err = c.tc.UpdateLibraryTags(ctx, getTagScopeByRepoType(req.RepoType), req.NameSpace, req.Name, req.OriginPath, req.FilePath)
 		if err != nil {
 			slog.Error(fmt.Sprintf("failed to set %s's tags", req.RepoType), slog.String("namespace", req.NameSpace),
 				slog.String("name", req.Name), slog.Any("error", err))
