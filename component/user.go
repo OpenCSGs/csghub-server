@@ -399,7 +399,7 @@ func (c *UserComponent) AddLikes(ctx context.Context, req *types.UserLikesReques
 	}
 
 	if len(likesRepos) < 1 {
-		return fmt.Errorf("Do not found likes repositories visiable to user:%s, %w", req.CurrentUser, err)
+		return fmt.Errorf("do not found likes repositories visiable to user:%s, %w", req.CurrentUser, err)
 	}
 
 	err = c.uls.Add(ctx, user.ID, req.Repo_id)

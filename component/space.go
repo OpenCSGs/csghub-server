@@ -10,7 +10,6 @@ import (
 
 	"opencsg.com/csghub-server/builder/deploy"
 	"opencsg.com/csghub-server/builder/git/gitserver"
-	"opencsg.com/csghub-server/builder/proxy"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/types"
@@ -40,7 +39,6 @@ func NewSpaceComponent(config *config.Config) (*SpaceComponent, error) {
 type SpaceComponent struct {
 	*RepoComponent
 	ss       *database.SpaceStore
-	rproxy   *proxy.ReverseProxy
 	sss      *database.SpaceSdkStore
 	srs      *database.SpaceResourceStore
 	deployer deploy.Deployer
