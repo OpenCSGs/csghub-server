@@ -184,7 +184,6 @@ func (s *ModelStore) Create(ctx context.Context, input Model) (*Model, error) {
 }
 
 func (s *ModelStore) Update(ctx context.Context, input Model) (*Model, error) {
-	input.UpdatedAt = time.Now()
 	_, err := s.db.Core.NewUpdate().Model(&input).WherePK().Exec(ctx)
 
 	return &input, err
