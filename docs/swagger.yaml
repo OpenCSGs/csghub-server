@@ -529,22 +529,13 @@ definitions:
     type: object
   types.CreateSpaceResourceReq:
     properties:
-      cpu:
-        type: integer
-      disk:
-        type: integer
-      gpu:
-        type: integer
-      memory:
-        type: integer
       name:
         type: string
+      resources:
+        type: string
     required:
-    - cpu
-    - disk
-    - gpu
-    - memory
     - name
+    - resources
     type: object
   types.CreateSpaceSdkReq:
     properties:
@@ -856,6 +847,8 @@ definitions:
         type: boolean
       repository:
         $ref: '#/definitions/types.Repository'
+      repository_id:
+        type: integer
       sdk:
         description: like gradio,steamlit etc
         example: "1"
@@ -884,17 +877,11 @@ definitions:
     type: object
   types.SpaceResource:
     properties:
-      cpu:
-        type: integer
-      disk:
-        type: integer
-      gpu:
-        type: integer
       id:
         type: integer
-      memory:
-        type: integer
       name:
+        type: string
+      resources:
         type: string
     type: object
   types.SpaceSdk:
@@ -1049,15 +1036,9 @@ definitions:
     type: object
   types.UpdateSpaceResourceReq:
     properties:
-      cpu:
-        type: integer
-      disk:
-        type: integer
-      gpu:
-        type: integer
-      memory:
-        type: integer
       name:
+        type: string
+      resources:
         type: string
     type: object
   types.UpdateSpaceSdkReq:

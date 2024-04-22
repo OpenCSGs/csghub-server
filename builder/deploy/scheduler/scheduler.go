@@ -25,10 +25,11 @@ type FIFOScheduler struct {
 	tasks chan Runner
 	last  *database.DeployTask
 
-	store      *database.DeployTaskStore
-	spaceStore *database.SpaceStore
-	ib         imagebuilder.Builder
-	ir         imagerunner.Runner
+	store               *database.DeployTaskStore
+	spaceStore          *database.SpaceStore
+	spaceResourcesStore *database.SpaceResourceStore
+	ib                  imagebuilder.Builder
+	ir                  imagerunner.Runner
 
 	nextLock *sync.Mutex
 }
@@ -39,7 +40,7 @@ func NewFIFOScheduler(ib imagebuilder.Builder, ir imagerunner.Runner) Scheduler 
 	s.timeout = 30 * time.Minute
 	s.store = database.NewDeployTaskStore()
 	s.spaceStore = database.NewSpaceStore()
-
+	s.spaceResourcesStore = database.NewSpaceResourceStore()
 	// allow concurrent deployment tasks
 	s.tasks = make(chan Runner, 100)
 	// s.ib = imagebuilder.NewLocalBuilder()
