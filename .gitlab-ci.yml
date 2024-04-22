@@ -98,7 +98,8 @@ trigger_deploy_stg:
   needs: 
     - job: build_server_image:commit
     # - job: build_runner_proxy_image:commit
-  image: docker.m.daocloud.io/alpine:3.14
+  #image: docker.m.daocloud.io/alpine:3.14
+  image: alpine:3.14
   rules:
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH && $CI_COMMIT_BRANCH == $CI_COMMIT_REF_NAME
   script:
