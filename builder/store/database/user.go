@@ -2,7 +2,6 @@ package database
 
 import (
 	"context"
-	"time"
 
 	"github.com/uptrace/bun"
 )
@@ -50,7 +49,6 @@ func (s *UserStore) FindByID(ctx context.Context, id int) (user User, err error)
 }
 
 func (s *UserStore) Update(ctx context.Context, user *User) (err error) {
-	user.UpdatedAt = time.Now()
 	err = assertAffectedOneRow(s.db.Operator.Core.NewUpdate().
 		Model(user).
 		WherePK().
@@ -61,7 +59,6 @@ func (s *UserStore) Update(ctx context.Context, user *User) (err error) {
 }
 
 func (s *UserStore) UpdateByUsername(ctx context.Context, u *User) (err error) {
-	u.UpdatedAt = time.Now()
 	err = assertAffectedOneRow(s.db.Operator.Core.NewUpdate().
 		Model(u).
 		Where("username = ?", u.Username).

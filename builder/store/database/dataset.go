@@ -162,7 +162,6 @@ func (s *DatasetStore) Create(ctx context.Context, input Dataset) (*Dataset, err
 }
 
 func (s *DatasetStore) Update(ctx context.Context, input Dataset) (err error) {
-	input.UpdatedAt = time.Now()
 	_, err = s.db.Core.NewUpdate().Model(&input).WherePK().Exec(ctx)
 	return
 }
