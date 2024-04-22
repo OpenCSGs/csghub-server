@@ -41,6 +41,7 @@ func (t *DeployRunner) Run(ctx context.Context) error {
 				time.Sleep(5 * time.Second)
 				continue
 			}
+			slog.Debug("After build deploy request", slog.Any("req", req))
 			_, err := t.ir.Run(ctx, req)
 			if err != nil {
 				// TODO:return retryable error
@@ -169,23 +170,29 @@ func (t *DeployRunner) runtimeError(msg string) {
 func (t *DeployRunner) makeDeployRequest() *imagerunner.RunRequest {
 	fields := strings.Split(t.space.Repository.Path, "/")
 	deploy, _ := t.store.GetDeploy(context.Background(), t.task.DeployID)
+	envMap, err := common.JsonStrToMap(t.space.Env)
+	if err != nil {
+		slog.Error("space env is invalid json data", slog.Any("env", t.space.Env))
+	}
+	sdkType := t.space.Sdk
+	if sdkType == GRADIO.name {
+		envMap["port"] = GRADIO.port
+	} else if sdkType == STREAMLIT.name {
+		envMap["port"] = STREAMLIT.port
+	}
+	envStr, err := common.MapToJsonStr(envMap)
+	if err != nil {
+		slog.Error("space env is invalid map", slog.Any("map", envMap))
+	}
 	return &imagerunner.RunRequest{
 		SpaceID:   t.space.ID,
 		OrgName:   fields[0],
 		SpaceName: fields[1],
 		UserName:  t.space.Repository.User.Name,
-		Hardware:  t.parseHardware(t.space.Hardware),
-		Env:       t.space.Env,
+		Hardware:  t.space.Hardware,
+		Env:       envStr,
 		GitRef:    t.space.Repository.DefaultBranch,
 		ImageID:   deploy.ImageID,
 		DeployID:  deploy.ID,
 	}
-}
-
-func (t *DeployRunner) parseHardware(intput string) string {
-	if strings.Contains(intput, "GPU") || strings.Contains(intput, "NVIDIA") {
-		return "gpu"
-	}
-
-	return "cpu"
 }

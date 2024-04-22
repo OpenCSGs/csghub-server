@@ -14,12 +14,9 @@ func NewSpaceResourceStore() *SpaceResourceStore {
 }
 
 type SpaceResource struct {
-	ID     int64  `bun:",pk,autoincrement" json:"id"`
-	Name   string `bun:",notnull" json:"name"`
-	Cpu    int    `bun:",notnull" json:"cpu"`
-	Gpu    int    `bun:",notnull" json:"gpu"`
-	Memory int    `bun:",notnull" json:"memory"`
-	Disk   int    `bun:",notnull" json:"disk"`
+	ID        int64  `bun:",pk,autoincrement" json:"id"`
+	Name      string `bun:",notnull" json:"name"`
+	Resources string `bun:",notnull" json:"resources"`
 	times
 }
 
@@ -60,6 +57,13 @@ func (s *SpaceResourceStore) FindByID(ctx context.Context, id int64) (*SpaceReso
 	var res SpaceResource
 	res.ID = id
 	_, err := s.db.Core.NewSelect().Model(&res).WherePK().Exec(ctx, &res)
+
+	return &res, err
+}
+
+func (s *SpaceResourceStore) FindByName(ctx context.Context, name string) (*SpaceResource, error) {
+	var res SpaceResource
+	err := s.db.Core.NewSelect().Model(&res).Where("name = ?", name).Scan(ctx)
 
 	return &res, err
 }

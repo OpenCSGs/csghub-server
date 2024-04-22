@@ -167,11 +167,12 @@ func (c *SpaceComponent) Show(ctx context.Context, namespace, name, currentUser 
 			Nickname: space.Repository.User.Name,
 			Email:    space.Repository.User.Email,
 		},
-		CreatedAt: space.CreatedAt,
-		UpdatedAt: space.UpdatedAt,
-		Status:    status,
-		Endpoint:  endpoint,
-		Hardware:  space.Hardware,
+		CreatedAt:    space.CreatedAt,
+		UpdatedAt:    space.UpdatedAt,
+		Status:       status,
+		Endpoint:     endpoint,
+		Hardware:     space.Hardware,
+		RepositoryID: space.Repository.ID,
 	}
 
 	return resModel, nil
@@ -271,6 +272,7 @@ func (c *SpaceComponent) Index(ctx context.Context, username, search, sort strin
 			UpdatedAt:     data.Repository.UpdatedAt,
 			Tags:          tags,
 			Status:        status,
+			RepositoryID:  data.Repository.ID,
 		})
 	}
 	return spaces, total, nil
@@ -289,17 +291,18 @@ func (c *SpaceComponent) UserSpaces(ctx context.Context, req *types.UserSpacesRe
 	for _, data := range ms {
 		_, status, _ := c.status(ctx, &data)
 		resSpaces = append(resSpaces, types.Space{
-			ID:          data.ID,
-			Name:        data.Repository.Name,
-			Nickname:    data.Repository.Nickname,
-			Description: data.Repository.Description,
-			Likes:       data.Repository.Likes,
-			Path:        data.Repository.Path,
-			Private:     data.Repository.Private,
-			CreatedAt:   data.CreatedAt,
-			UpdatedAt:   data.UpdatedAt,
-			Hardware:    data.Hardware,
-			Status:      status,
+			ID:           data.ID,
+			Name:         data.Repository.Name,
+			Nickname:     data.Repository.Nickname,
+			Description:  data.Repository.Description,
+			Likes:        data.Repository.Likes,
+			Path:         data.Repository.Path,
+			RepositoryID: data.RepositoryID,
+			Private:      data.Repository.Private,
+			CreatedAt:    data.CreatedAt,
+			UpdatedAt:    data.UpdatedAt,
+			Hardware:     data.Hardware,
+			Status:       status,
 		})
 	}
 
@@ -373,6 +376,7 @@ func (c *SpaceComponent) ListByPath(ctx context.Context, paths []string) ([]*typ
 			UpdatedAt:     data.Repository.UpdatedAt,
 			Tags:          tags,
 			Status:        status,
+			RepositoryID:  data.Repository.ID,
 		})
 	}
 	return spaces, nil

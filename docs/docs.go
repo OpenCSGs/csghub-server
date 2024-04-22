@@ -5471,26 +5471,14 @@ const docTemplate = `{
         "types.CreateSpaceResourceReq": {
             "type": "object",
             "required": [
-                "cpu",
-                "disk",
-                "gpu",
-                "memory",
-                "name"
+                "name",
+                "resources"
             ],
             "properties": {
-                "cpu": {
-                    "type": "integer"
-                },
-                "disk": {
-                    "type": "integer"
-                },
-                "gpu": {
-                    "type": "integer"
-                },
-                "memory": {
-                    "type": "integer"
-                },
                 "name": {
+                    "type": "string"
+                },
+                "resources": {
                     "type": "string"
                 }
             }
@@ -5956,6 +5944,9 @@ const docTemplate = `{
                 "repository": {
                     "$ref": "#/definitions/types.Repository"
                 },
+                "repository_id": {
+                    "type": "integer"
+                },
                 "sdk": {
                     "description": "like gradio,steamlit etc",
                     "type": "string",
@@ -5996,22 +5987,13 @@ const docTemplate = `{
         "types.SpaceResource": {
             "type": "object",
             "properties": {
-                "cpu": {
-                    "type": "integer"
-                },
-                "disk": {
-                    "type": "integer"
-                },
-                "gpu": {
-                    "type": "integer"
-                },
                 "id": {
                     "type": "integer"
                 },
-                "memory": {
-                    "type": "integer"
-                },
                 "name": {
+                    "type": "string"
+                },
+                "resources": {
                     "type": "string"
                 }
             }
@@ -6225,19 +6207,10 @@ const docTemplate = `{
         "types.UpdateSpaceResourceReq": {
             "type": "object",
             "properties": {
-                "cpu": {
-                    "type": "integer"
-                },
-                "disk": {
-                    "type": "integer"
-                },
-                "gpu": {
-                    "type": "integer"
-                },
-                "memory": {
-                    "type": "integer"
-                },
                 "name": {
+                    "type": "string"
+                },
+                "resources": {
                     "type": "string"
                 }
             }
