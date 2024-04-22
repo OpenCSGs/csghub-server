@@ -130,7 +130,7 @@ func (s *HttpServer) runImage(c *gin.Context) {
 		return
 	}
 	if requestHW.Memory != "" {
-		resReq[corev1.ResourceLimitsMemory] = resource.MustParse(requestHW.Memory)
+		resReq[corev1.ResourceMemory] = resource.MustParse(requestHW.Memory)
 	} else {
 		slog.Error("memory requirement is required")
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "memory requirement is required"})
