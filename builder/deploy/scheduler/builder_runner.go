@@ -38,16 +38,28 @@ func (t *BuilderRunner) makeBuildRequest() (*imagebuilder.BuildRequest, error) {
 		return nil, fmt.Errorf("cant get git access token:%w", err)
 	}
 	fields := strings.Split(t.space.Repository.Path, "/")
+	sdkVer := ""
+	if t.space.SdkVersion == "" {
+		slog.Warn("Use SDK default version", slog.Any("repository path", t.space.Repository.Path))
+		sdkType := t.space.Sdk
+		if sdkType == GRADIO.name {
+			sdkVer = GRADIO.version
+		} else if sdkType == STREAMLIT.name {
+			sdkVer = STREAMLIT.version
+		}
+	} else {
+		sdkVer = t.space.SdkVersion
+	}
 	return &imagebuilder.BuildRequest{
 		OrgName:   fields[0],
 		SpaceName: fields[1],
 		Hardware:  t.parseHardware(t.space.Hardware),
 		// PythonVersion:  t.space.PythonVersion,
 		PythonVersion: "3.10",
-		SDKType:       "gradio",
-		SDKVersion:    "3.37.0",
-		// SDKType:        t.space.Sdk,
-		// SDKVersion:     t.space.SdkVersion,
+		// SDKType:       "gradio",
+		// SDKVersion:    "3.37.0",
+		SDKType:        t.space.Sdk,
+		SDKVersion:     sdkVer,
 		SpaceGitURL:    t.space.Repository.HTTPCloneURL,
 		GitRef:         t.space.Repository.DefaultBranch,
 		GitUserID:      token.User.Username,
@@ -79,7 +91,6 @@ func (t *BuilderRunner) Run(ctx context.Context) error {
 			// TODO:return retryable error
 			return fmt.Errorf("call image builder failed: %w", err)
 		}
-
 		if resp.Code != 0 {
 			// job failed
 			return fmt.Errorf("image builder reported error,code:%d,msg:%s", resp.Code, resp.Message)

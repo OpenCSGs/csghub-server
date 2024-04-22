@@ -28,12 +28,9 @@ func (c *SpaceResourceComponent) Index(ctx context.Context) ([]types.SpaceResour
 	}
 	for _, r := range databaseSpaceResources {
 		result = append(result, types.SpaceResource{
-			ID:     r.ID,
-			Name:   r.Name,
-			Cpu:    r.Cpu,
-			Gpu:    r.Gpu,
-			Memory: r.Memory,
-			Disk:   r.Disk,
+			ID:        r.ID,
+			Name:      r.Name,
+			Resources: r.Resources,
 		})
 	}
 
@@ -47,10 +44,7 @@ func (c *SpaceResourceComponent) Update(ctx context.Context, req *types.UpdateSp
 		return nil, err
 	}
 	sr.Name = req.Name
-	sr.Cpu = req.Cpu
-	sr.Gpu = req.Gpu
-	sr.Memory = req.Memory
-	sr.Disk = req.Disk
+	sr.Resources = req.Resources
 
 	sr, err = c.srs.Update(ctx, *sr)
 	if err != nil {
@@ -59,12 +53,9 @@ func (c *SpaceResourceComponent) Update(ctx context.Context, req *types.UpdateSp
 	}
 
 	result := &types.SpaceResource{
-		ID:     sr.ID,
-		Name:   sr.Name,
-		Cpu:    sr.Cpu,
-		Gpu:    sr.Gpu,
-		Memory: sr.Memory,
-		Disk:   sr.Disk,
+		ID:        sr.ID,
+		Name:      sr.Name,
+		Resources: sr.Resources,
 	}
 
 	return result, nil
@@ -72,11 +63,8 @@ func (c *SpaceResourceComponent) Update(ctx context.Context, req *types.UpdateSp
 
 func (c *SpaceResourceComponent) Create(ctx context.Context, req *types.CreateSpaceResourceReq) (*types.SpaceResource, error) {
 	sr := database.SpaceResource{
-		Name:   req.Name,
-		Cpu:    req.Cpu,
-		Gpu:    req.Gpu,
-		Memory: req.Memory,
-		Disk:   req.Disk,
+		Name:      req.Name,
+		Resources: req.Resources,
 	}
 	res, err := c.srs.Create(ctx, sr)
 	if err != nil {
@@ -85,12 +73,9 @@ func (c *SpaceResourceComponent) Create(ctx context.Context, req *types.CreateSp
 	}
 
 	result := &types.SpaceResource{
-		ID:     res.ID,
-		Name:   res.Name,
-		Cpu:    res.Cpu,
-		Gpu:    res.Gpu,
-		Memory: res.Memory,
-		Disk:   res.Disk,
+		ID:        res.ID,
+		Name:      res.Name,
+		Resources: res.Resources,
 	}
 
 	return result, nil
