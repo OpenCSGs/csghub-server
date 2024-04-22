@@ -47,6 +47,7 @@ func (h *RepoHandler) CreateFile(ctx *gin.Context) {
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
+	req.Username = userName
 
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
 	if err != nil {
@@ -83,6 +84,7 @@ func (h *RepoHandler) UpdateFile(ctx *gin.Context) {
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
+	req.Username = userName
 
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
 	if err != nil {
