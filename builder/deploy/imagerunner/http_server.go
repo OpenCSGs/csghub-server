@@ -2,6 +2,7 @@ package imagerunner
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -33,6 +34,13 @@ type HttpServer struct {
 	dockerRegBase   string
 	k8sNameSpace    string
 	imagePullSecret string
+}
+
+type hardware struct {
+	Cpu              string `json:"cpu"`
+	Memory           string `json:"memory"`
+	EphemeralStorage string `json:"ephemeral-storage"`
+	Gpu              int    `json:"nvidia.com/gpu"`
 }
 
 func NewHttpServer(config *config.Config) (*HttpServer, error) {
@@ -81,25 +89,29 @@ func (s *HttpServer) Run(port int) error {
 
 func (s *HttpServer) runImage(c *gin.Context) {
 	var request struct {
-		ImageID string `json:"image_id" binding:"required"`
-		// default to CPU
+		ImageID  string `json:"image_id" binding:"required"`
 		Hardware string `json:"hardware"`
 		Env      string `json:"env"`
 		DeployID int64  `json:"deploy_id" binding:"required"`
 	}
 
-	if err := c.BindJSON(&request); err != nil {
+	err := c.BindJSON(&request)
+	if err != nil {
 		slog.Error("runImage get bad request", slog.Any("error", err), slog.Any("req", request))
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	if request.Hardware == "" {
-		request.Hardware = "cpu"
+	var requestHW hardware
+	err = json.Unmarshal([]byte(request.Hardware), &requestHW)
+	if err != nil {
+		slog.Error("runImage get bad request hardware", slog.Any("error", err), slog.Any("hardware", requestHW))
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
 	}
 
 	srvName := s.getServiceNameFromRequest(c)
 
-	_, err := s.knativeClient.ServingV1().Services(s.k8sNameSpace).
+	_, err = s.knativeClient.ServingV1().Services(s.k8sNameSpace).
 		Get(c.Request.Context(), srvName, metav1.GetOptions{})
 	if err == nil {
 		s.knativeClient.ServingV1().Services(s.k8sNameSpace).Delete(c, srvName, *metav1.NewDeleteOptions(0))
@@ -108,16 +120,57 @@ func (s *HttpServer) runImage(c *gin.Context) {
 
 	nodeSelector := make(map[string]string)
 	resources := corev1.ResourceRequirements{}
-	if request.Hardware == "gpu" {
+
+	resReq := make(map[corev1.ResourceName]resource.Quantity)
+	if requestHW.Cpu != "" {
+		resReq[corev1.ResourceCPU] = resource.MustParse(requestHW.Cpu)
+	} else {
+		slog.Error("cpu requirement is required")
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "cpu requirement is required"})
+		return
+	}
+	if requestHW.Memory != "" {
+		resReq[corev1.ResourceLimitsMemory] = resource.MustParse(requestHW.Memory)
+	} else {
+		slog.Error("memory requirement is required")
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "memory requirement is required"})
+		return
+	}
+	if requestHW.EphemeralStorage != "" {
+		resReq[corev1.ResourceEphemeralStorage] = resource.MustParse(requestHW.EphemeralStorage)
+	}
+	if requestHW.Gpu > 0 {
+		resReq["nvidia.com/gpu"] = resource.MustParse(strconv.Itoa(requestHW.Gpu))
 		nodeSelector["aliyun.accelerator/nvidia_name"] = "NVIDIA-A10"
-		resources = corev1.ResourceRequirements{
-			Limits: map[corev1.ResourceName]resource.Quantity{
-				"nvidia.com/gpu": *resource.NewQuantity(1, resource.DecimalSI),
-			},
-			Requests: map[corev1.ResourceName]resource.Quantity{
-				"nvidia.com/gpu": *resource.NewQuantity(1, resource.DecimalSI),
-			},
-		}
+	}
+	resources = corev1.ResourceRequirements{
+		Limits:   resReq,
+		Requests: resReq,
+	}
+
+	envMap, err := common.JsonStrToMap(request.Env)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Space env is not valid json string"})
+		return
+	}
+	val, ok := envMap["port"]
+	if !ok {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to find port from env"})
+		return
+	}
+	port, err := strconv.ParseInt(val.(string), 10, 32)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "port is not valid number"})
+		return
+	}
+
+	exposePorts := []corev1.ContainerPort{{
+		ContainerPort: int32(port),
+	}}
+
+	environments := []corev1.EnvVar{}
+	for key, value := range envMap {
+		environments = append(environments, corev1.EnvVar{Name: key, Value: value.(string)})
 	}
 
 	service := &v1.Service{
@@ -137,13 +190,10 @@ func (s *HttpServer) runImage(c *gin.Context) {
 							Containers: []corev1.Container{{
 								// TODO: docker registry url + image id
 								// Image: "ghcr.io/knative/helloworld-go:latest",
-								Image: path.Join(s.dockerRegBase, request.ImageID),
-								Ports: []corev1.ContainerPort{{
-									ContainerPort: 7860,
-								}},
+								Image:     path.Join(s.dockerRegBase, request.ImageID),
+								Ports:     exposePorts,
 								Resources: resources,
-								// TODO:set env
-								// Env: environment,
+								Env:       environments,
 							}},
 							ImagePullSecrets: []corev1.LocalObjectReference{
 								{
@@ -156,7 +206,6 @@ func (s *HttpServer) runImage(c *gin.Context) {
 			},
 		},
 	}
-
 	_, err = s.knativeClient.ServingV1().Services(s.k8sNameSpace).
 		Create(c, service, metav1.CreateOptions{})
 	if err != nil {
