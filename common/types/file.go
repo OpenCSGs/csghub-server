@@ -19,6 +19,7 @@ type File struct {
 }
 
 type CreateFileReq struct {
+	//will use login username, ignore username from http request body
 	Username  string `json:"-"`
 	Email     string `json:"-"`
 	Message   string `json:"message" form:"message"`
@@ -35,6 +36,7 @@ type CreateFileReq struct {
 type CreateFileResp struct{}
 
 type UpdateFileReq struct {
+	//will use login username, ignore username from http request body
 	Username   string `json:"-"`
 	Email      string `json:"-"`
 	Message    string `json:"message"`
