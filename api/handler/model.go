@@ -90,12 +90,18 @@ func (h *ModelHandler) Index(ctx *gin.Context) {
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
 // @Router       /models [post]
 func (h *ModelHandler) Create(ctx *gin.Context) {
+	currentUser := httpbase.GetCurrentUser(ctx)
+	if currentUser == "" {
+		httpbase.UnauthorizedError(ctx, errors.New("user not found, please login first"))
+		return
+	}
 	var req *types.CreateModelReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {
 		slog.Error("Bad request format", "error", err)
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
+	req.Username = currentUser
 
 	model, err := h.c.Create(ctx, req)
 	if err != nil {
@@ -116,12 +122,18 @@ func (h *ModelHandler) Create(ctx *gin.Context) {
 // @Produce      json
 // @Param        namespace path string true "namespace"
 // @Param        name path string true "name"
+// @Param        current_user query string false "current user, the model owner"
 // @Param        body body types.UpdateModelReq true "body"
 // @Success      200  {object}  types.Response{data=database.Model} "OK"
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
 // @Router       /models/{namespace}/{name} [put]
 func (h *ModelHandler) Update(ctx *gin.Context) {
+	currentUser := httpbase.GetCurrentUser(ctx)
+	if currentUser == "" {
+		httpbase.UnauthorizedError(ctx, errors.New("user not found, please login first"))
+		return
+	}
 	var req *types.UpdateModelReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {
 		slog.Error("Bad request format", "error", err)
@@ -137,6 +149,7 @@ func (h *ModelHandler) Update(ctx *gin.Context) {
 	}
 	req.Namespace = namespace
 	req.Name = name
+	req.Username = currentUser
 
 	model, err := h.c.Update(ctx, req)
 	if err != nil {
@@ -158,19 +171,23 @@ func (h *ModelHandler) Update(ctx *gin.Context) {
 // @Produce      json
 // @Param        namespace path string true "namespace"
 // @Param        name path string true "name"
-// @Param        current_user query string true "current_user"
+// @Param        current_user query string false "current user, the model owner"
 // @Success      200  {object}  types.Response{} "OK"
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
 // @Router       /models/{namespace}/{name} [delete]
 func (h *ModelHandler) Delete(ctx *gin.Context) {
+	currentUser := httpbase.GetCurrentUser(ctx)
+	if currentUser == "" {
+		httpbase.UnauthorizedError(ctx, errors.New("user not found, please login first"))
+		return
+	}
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
 	if err != nil {
 		slog.Error("Bad request format", "error", err)
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
-	currentUser := httpbase.GetCurrentUser(ctx)
 	err = h.c.Delete(ctx, namespace, name, currentUser)
 	if err != nil {
 		slog.Error("Failed to delete model", slog.Any("error", err))
@@ -226,7 +243,7 @@ func (h *ModelHandler) Show(ctx *gin.Context) {
 // @Produce      json
 // @Param        namespace path string true "namespace"
 // @Param        name path string true "name"
-// @Param        current_user query string false "current_user"
+// @Param        current_user query string false "current user"
 // @Success      200  {object}  types.Response{data=types.Relations} "OK"
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
@@ -253,179 +270,6 @@ func (h *ModelHandler) Relations(ctx *gin.Context) {
 	httpbase.OK(ctx, detail)
 }
 
-// CreateModelFile godoc
-// @Security     ApiKey
-// @Summary      Create model file
-// @Description  create model file
-// @Tags         Model
-// @Accept       json
-// @Produce      json
-// @Param        namespace path string true "namespace"
-// @Param        name path string true "name"
-// @Param        file_path path string true "file_path"
-// @Param        body body types.CreateFileReq true "body"
-// @Success      200  {object}  types.Response{data=types.CreateFileResp} "OK"
-// @Failure      400  {object}  types.APIBadRequest "Bad request"
-// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
-// @Router       /models/{namespace}/{name}/raw/{file_path} [post]
-
-// UpdateModelFile godoc
-// @Security     ApiKey
-// @Summary      Update model file
-// @Description  update model file
-// @Tags         Model
-// @Accept       json
-// @Produce      json
-// @Param        namespace path string true "namespace"
-// @Param        name path string true "name"
-// @Param        file_path path string true "file_path"
-// @Param        body body types.UpdateFileReq true "body"
-// @Success      200  {object}  types.Response{data=types.UpdateFileResp} "OK"
-// @Failure      400  {object}  types.APIBadRequest "Bad request"
-// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
-// @Router       /models/{namespace}/{name}/raw/{file_path} [put]
-
-// GetModelCommits godoc
-// @Security     ApiKey
-// @Summary      Get model commits
-// @Description  get model commits
-// @Tags         Model
-// @Accept       json
-// @Produce      json
-// @Param        namespace path string true "namespace"
-// @Param        name path string true "name"
-// @Param        ref query string false "ref"
-// @Success      200  {object}  types.Response{data=[]types.Commit} "OK"
-// @Failure      400  {object}  types.APIBadRequest "Bad request"
-// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
-// @Router       /models/{namespace}/{name}/commits [get]
-
-// GetModelLastCommit godoc
-// @Security     ApiKey
-// @Summary      Get model last commit
-// @Description  get model last commit
-// @Tags         Model
-// @Accept       json
-// @Produce      json
-// @Param        namespace path string true "namespace"
-// @Param        name path string true "name"
-// @Param        ref query string false "ref"
-// @Success      200  {object}  types.Response{data=types.Commit} "OK"
-// @Failure      400  {object}  types.APIBadRequest "Bad request"
-// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
-// @Router       /models/{namespace}/{name}/last_commit [get]
-
-// GetModelFileRaw godoc
-// @Security     ApiKey
-// @Summary      Get model file raw
-// @Description  get model file raw
-// @Tags         Model
-// @Accept       json
-// @Produce      json
-// @Param        namespace path string true "namespace"
-// @Param        name path string true "name"
-// @Param        file_path path string true "file_path"
-// @Param        ref query string false "ref"
-// @Success      200  {object}  types.Response{data=types.Commit} "OK"
-// @Failure      400  {object}  types.APIBadRequest "Bad request"
-// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
-// @Router       /models/{namespace}/{name}/raw/{file_path} [get]
-
-// GetModelFileInfo godoc
-// @Security     ApiKey
-// @Summary      Get model file info
-// @Description  get model file info
-// @Tags         Model
-// @Accept       json
-// @Produce      json
-// @Param        namespace path string true "namespace"
-// @Param        name path string true "name"
-// @Param        file_path path string true "file_path"
-// @Param        ref query string false "ref"
-// @Success      200  {object}  types.Response{data=types.Commit} "OK"
-// @Failure      400  {object}  types.APIBadRequest "Bad request"
-// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
-// @Router       /models/{namespace}/{name}/blob/{file_path} [get]
-
-// DownloadModelFile godoc
-// @Security     ApiKey
-// @Summary      Download model file
-// @Description  download model file
-// @Tags         Model
-// @Accept       json
-// @Produce      json
-// @Produce      octet-stream
-// @Param        namespace path string true "namespace"
-// @Param        name path string true "name"
-// @Param        file_path path string true "file_path"
-// @Param        lfs query bool false "lfs"
-// @Param        ref query string false "ref"
-// @Param        save_as query string false "name of download file"
-// @Success      200  {object}  types.Response{data=string} "OK"
-// @Failure      400  {object}  types.APIBadRequest "Bad request"
-// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
-// @Router       /models/{namespace}/{name}/download/{file_path} [get]
-
-// GetModelBranches godoc
-// @Security     ApiKey
-// @Summary      Get model branches
-// @Description  get model branches
-// @Tags         Model
-// @Accept       json
-// @Produce      json
-// @Param        namespace path string true "namespace"
-// @Param        name path string true "name"
-// @param        per query int false "per" default(20)
-// @Param        page query int false "page" default(1)
-// @Success      200  {object}  types.Response{data=[]types.Branch} "OK"
-// @Failure      400  {object}  types.APIBadRequest "Bad request"
-// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
-// @Router       /models/{namespace}/{name}/branches [get]
-
-// GetModelTags godoc
-// @Security     ApiKey
-// @Summary      Get model tags
-// @Description  get model tags
-// @Tags         Model
-// @Accept       json
-// @Produce      json
-// @Param        namespace path string true "namespace"
-// @Param        name path string true "name"
-// @Success      200  {object}  types.Response{data=[]types.Branch} "OK"
-// @Failure      400  {object}  types.APIBadRequest "Bad request"
-// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
-// @Router       /models/{namespace}/{name}/tags [get]
-
-// GetModelFileTree godoc
-// @Security     ApiKey
-// @Summary      Get model file tree
-// @Description  get model file tree
-// @Tags         Model
-// @Accept       json
-// @Produce      json
-// @Param        namespace path string true "namespace"
-// @Param        name path string true "name"
-// @Param        ref query string false "ref"
-// @Success      200  {object}  types.Response{data=[]types.File} "OK"
-// @Failure      400  {object}  types.APIBadRequest "Bad request"
-// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
-// @Router       /models/{namespace}/{name}/tree [get]
-
-// UpdateModelDownloads godoc
-// @Security     ApiKey
-// @Summary      Update model downloads
-// @Description  update model downloads
-// @Tags         Model
-// @Accept       json
-// @Produce      json
-// @Param        namespace path string true "namespace"
-// @Param        name path string true "name"
-// @Param        body body types.UpdateDownloadsReq true "body"
-// @Success      200  {object}  types.Response{data=[]types.File} "OK"
-// @Failure      400  {object}  types.APIBadRequest "Bad request"
-// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
-// @Router       /models/{namespace}/{name}/update_downloads [post]
-
 // Predict godoc
 // @Security     ApiKey
 // @Summary      Invoke model prediction
@@ -435,6 +279,7 @@ func (h *ModelHandler) Relations(ctx *gin.Context) {
 // @Produce      json
 // @Param        namespace path string true "namespace"
 // @Param        name path string true "name"
+// @Param        current_user query string false "current user"
 // @Param        body body types.ModelPredictReq true "input for model prediction"
 // @Success      200  {object}  string "OK"
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
@@ -507,40 +352,3 @@ func parseTagReqs(ctx *gin.Context) (tags []database.TagReq) {
 func convertFilePathFromRoute(path string) string {
 	return strings.TrimLeft(path, "/")
 }
-
-// UploadModelFile godoc
-// @Security     ApiKey
-// @Summary      Upload model file
-// @Description  upload model file to create or update a file in model repository
-// @Tags         Model
-// @Accept       json
-// @Produce      json
-// @Param        namespace path string true "namespace"
-// @Param        name path string true "name"
-// @Param        file_path formData string true "file_path"
-// @Param        file formData file true "file"
-// @Param        email formData string true "email"
-// @Param        message formData string true "message"
-// @Param        branch formData string false "branch"
-// @Param        username formData string true "username"
-// @Success      200  {object}  types.Response{data=types.CreateFileResp} "OK"
-// @Failure      400  {object}  types.APIBadRequest "Bad request"
-// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
-// @Router       /models/{namespace}/{name}/upload_file [post]
-
-// DownloadModelFile godoc
-// @Security     ApiKey
-// @Summary      Download model file
-// @Description  download model file
-// @Tags         Model
-// @Accept       json
-// @Produce      json
-// @Produce      octet-stream
-// @Param        namespace path string true "namespace"
-// @Param        name path string true "name"
-// @Param        file_path path string true "file_path"
-// @Param        ref query string false "ref"
-// @Success      200  {object}  types.Response{data=string} "OK"
-// @Failure      400  {object}  types.APIBadRequest "Bad request"
-// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
-// @Router       /models/{namespace}/{name}/resolve/{file_path} [get]

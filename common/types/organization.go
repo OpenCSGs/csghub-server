@@ -6,7 +6,7 @@ type CreateOrgReq struct {
 	// Display name
 	FullName    string `json:"full_name" example:"org display name"`
 	Description string `json:"description" example:"org description"`
-	Username    string `json:"username" example:"user_name_1"`
+	Username    string `json:"-"`
 }
 
 type EditOrgReq struct {
@@ -16,18 +16,18 @@ type EditOrgReq struct {
 	// TODO:rename json field name to 'name", need to negotiate with Portal engineer
 	// Org unique identifier
 	Name        string `json:"-"`
-	CurrentUser string `json:"current_user"`
+	CurrentUser string `json:"-"`
 }
 
 type DeleteOrgReq struct {
 	Name        string `json:"-"`
-	CurrentUser string `json:"current_user"`
+	CurrentUser string `json:"-"`
 }
 
 type OrgDatasetsReq struct {
 	// org name of dataset
 	Namespace   string `json:"namespace"`
-	CurrentUser string `json:"current_user"`
+	CurrentUser string `json:"-"`
 	PageOpts
 }
 
