@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"errors"
 	"log/slog"
 	"net/http"
 
@@ -33,18 +34,25 @@ type OrganizationHandler struct {
 // @Tags         Organization
 // @Accept       json
 // @Produce      json
+// @Param        current_user query string false "the op user"
 // @param        body body types.CreateOrgReq true "body"
 // @Success      200  {object}  types.Response{data=database.Organization} "OK"
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
 // @Router       /organizations [post]
 func (h *OrganizationHandler) Create(ctx *gin.Context) {
+	currentUser := httpbase.GetCurrentUser(ctx)
+	if currentUser == "" {
+		httpbase.UnauthorizedError(ctx, errors.New("user not found, please login first"))
+		return
+	}
 	var req types.CreateOrgReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {
 		slog.Error("Bad request format", "error", err)
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
+	req.Username = currentUser
 	org, err := h.c.Create(ctx, &req)
 	if err != nil {
 		slog.Error("Failed to create organization", slog.Any("error", err))
@@ -67,7 +75,7 @@ func (h *OrganizationHandler) Create(ctx *gin.Context) {
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
 // @Router       /organizations [get]
 func (h *OrganizationHandler) Index(ctx *gin.Context) {
-	username := ctx.Query("username")
+	username := httpbase.GetCurrentUser(ctx)
 	orgs, err := h.c.Index(ctx, username)
 	if err != nil {
 		slog.Error("Failed to get organizations", slog.Any("error", err))
@@ -87,18 +95,24 @@ func (h *OrganizationHandler) Index(ctx *gin.Context) {
 // @Accept       json
 // @Produce      json
 // @Param        name path string true "name"
+// @Param        current_user query string false "the op user"
 // @Param        body body types.DeleteOrgReq true "body"
 // @Success      200  {object}  types.Response{} "OK"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
 // @Router       /organizations/{name} [delete]
 func (h *OrganizationHandler) Delete(ctx *gin.Context) {
+	currentUser := httpbase.GetCurrentUser(ctx)
+	if currentUser == "" {
+		httpbase.UnauthorizedError(ctx, errors.New("user not found, please login first"))
+		return
+	}
 	var req types.DeleteOrgReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {
 		slog.Error("Bad request format", "error", err)
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
-
+	req.CurrentUser = currentUser
 	req.Name = ctx.Param("name")
 	err := h.c.Delete(ctx, &req)
 	if err != nil {
@@ -119,18 +133,25 @@ func (h *OrganizationHandler) Delete(ctx *gin.Context) {
 // @Accept       json
 // @Produce      json
 // @Param        name path string true "name"
+// @Param        current_user query string false "the op user"
 // @Param        body body types.EditOrgReq true "body"
 // @Success      200  {object}  types.Response{data=database.Organization} "OK"
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
 // @Router       /organizations/{name} [put]
 func (h *OrganizationHandler) Update(ctx *gin.Context) {
+	currentUser := httpbase.GetCurrentUser(ctx)
+	if currentUser == "" {
+		httpbase.UnauthorizedError(ctx, errors.New("user not found, please login first"))
+		return
+	}
 	var req types.EditOrgReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {
 		slog.Error("Bad request format", "error", err)
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
+	req.CurrentUser = currentUser
 	req.Name = ctx.Param("name")
 	org, err := h.c.Update(ctx, &req)
 	if err != nil {

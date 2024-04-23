@@ -103,6 +103,12 @@
                 "summary": "Create a new code",
                 "parameters": [
                     {
+                        "type": "string",
+                        "description": "current user, the owner",
+                        "name": "current_user",
+                        "in": "query"
+                    },
+                    {
                         "description": "body",
                         "name": "body",
                         "in": "body",
@@ -253,6 +259,12 @@
                         "required": true
                     },
                     {
+                        "type": "string",
+                        "description": "current user, the owner",
+                        "name": "current_user",
+                        "in": "query"
+                    },
+                    {
                         "description": "body",
                         "name": "body",
                         "in": "body",
@@ -329,10 +341,9 @@
                     },
                     {
                         "type": "string",
-                        "description": "current_user",
+                        "description": "current user, the owner",
                         "name": "current_user",
-                        "in": "query",
-                        "required": true
+                        "in": "query"
                     }
                 ],
                 "responses": {
@@ -541,6 +552,12 @@
                 "summary": "Create a new dataset",
                 "parameters": [
                     {
+                        "type": "string",
+                        "description": "current user, the owner",
+                        "name": "current_user",
+                        "in": "query"
+                    },
+                    {
                         "description": "body",
                         "name": "body",
                         "in": "body",
@@ -691,6 +708,12 @@
                         "required": true
                     },
                     {
+                        "type": "string",
+                        "description": "current user, the owner",
+                        "name": "current_user",
+                        "in": "query"
+                    },
+                    {
                         "description": "body",
                         "name": "body",
                         "in": "body",
@@ -767,10 +790,9 @@
                     },
                     {
                         "type": "string",
-                        "description": "current_user",
+                        "description": "current user, the owner",
                         "name": "current_user",
-                        "in": "query",
-                        "required": true
+                        "in": "query"
                     }
                 ],
                 "responses": {
@@ -1438,6 +1460,12 @@
                         "required": true
                     },
                     {
+                        "type": "string",
+                        "description": "current user, the model owner",
+                        "name": "current_user",
+                        "in": "query"
+                    },
+                    {
                         "description": "body",
                         "name": "body",
                         "in": "body",
@@ -1514,10 +1542,9 @@
                     },
                     {
                         "type": "string",
-                        "description": "current_user",
+                        "description": "current user, the model owner",
                         "name": "current_user",
-                        "in": "query",
-                        "required": true
+                        "in": "query"
                     }
                 ],
                 "responses": {
@@ -1574,6 +1601,12 @@
                         "name": "name",
                         "in": "path",
                         "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "current user",
+                        "name": "current_user",
+                        "in": "query"
                     },
                     {
                         "description": "input for model prediction",
@@ -1641,7 +1674,7 @@
                     },
                     {
                         "type": "string",
-                        "description": "current_user",
+                        "description": "current user",
                         "name": "current_user",
                         "in": "query"
                     }
@@ -2092,6 +2125,12 @@
                 "summary": "Create a new organization",
                 "parameters": [
                     {
+                        "type": "string",
+                        "description": "the op user",
+                        "name": "current_user",
+                        "in": "query"
+                    },
+                    {
                         "description": "body",
                         "name": "body",
                         "in": "body",
@@ -2162,6 +2201,12 @@
                         "required": true
                     },
                     {
+                        "type": "string",
+                        "description": "the op user",
+                        "name": "current_user",
+                        "in": "query"
+                    },
+                    {
                         "description": "body",
                         "name": "body",
                         "in": "body",
@@ -2230,6 +2275,12 @@
                         "required": true
                     },
                     {
+                        "type": "string",
+                        "description": "the op user",
+                        "name": "current_user",
+                        "in": "query"
+                    },
+                    {
                         "description": "body",
                         "name": "body",
                         "in": "body",
@@ -2280,6 +2331,12 @@
                         "name": "name",
                         "in": "path",
                         "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "the op user",
+                        "name": "current_user",
+                        "in": "query"
                     },
                     {
                         "description": "body",
@@ -2346,6 +2403,12 @@
                         "required": true
                     },
                     {
+                        "type": "string",
+                        "description": "the op user",
+                        "name": "current_user",
+                        "in": "query"
+                    },
+                    {
                         "description": "body",
                         "name": "body",
                         "in": "body",
@@ -2407,6 +2470,12 @@
                         "name": "username",
                         "in": "path",
                         "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "the op user",
+                        "name": "current_user",
+                        "in": "query"
                     },
                     {
                         "description": "body",
@@ -3034,6 +3103,13 @@
                 "summary": "Create a new space",
                 "parameters": [
                     {
+                        "type": "string",
+                        "description": "current_user",
+                        "name": "current_user",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
                         "description": "body",
                         "name": "body",
                         "in": "body",
@@ -3183,6 +3259,13 @@
                         "required": true
                     },
                     {
+                        "type": "string",
+                        "description": "current_user",
+                        "name": "current_user",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
                         "description": "body",
                         "name": "body",
                         "in": "body",
@@ -3318,6 +3401,13 @@
                         "name": "name",
                         "in": "path",
                         "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "current_user",
+                        "name": "current_user",
+                        "in": "query",
+                        "required": true
                     }
                 ],
                 "responses": {
@@ -3366,6 +3456,13 @@
                         "description": "name",
                         "name": "name",
                         "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "current_user",
+                        "name": "current_user",
+                        "in": "query",
                         "required": true
                     }
                 ],
@@ -3416,6 +3513,13 @@
                         "name": "name",
                         "in": "path",
                         "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "current_user",
+                        "name": "current_user",
+                        "in": "query",
+                        "required": true
                     }
                 ],
                 "responses": {
@@ -3464,6 +3568,13 @@
                         "description": "name",
                         "name": "name",
                         "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "current_user",
+                        "name": "current_user",
+                        "in": "query",
                         "required": true
                     }
                 ],
@@ -4445,6 +4556,13 @@
                         "required": true
                     },
                     {
+                        "type": "string",
+                        "description": "current user, the owner",
+                        "name": "current_user",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
                         "description": "body",
                         "name": "body",
                         "in": "body",
@@ -4519,6 +4637,13 @@
                         "description": "token_name",
                         "name": "token_name",
                         "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "current user, the owner",
+                        "name": "current_user",
+                        "in": "query",
                         "required": true
                     },
                     {
@@ -6182,15 +6307,10 @@
         "handler.Create.addMemberRequest": {
             "type": "object",
             "required": [
-                "op_user",
                 "role",
                 "user"
             ],
             "properties": {
-                "op_user": {
-                    "description": "name of the operator",
-                    "type": "string"
-                },
                 "role": {
                     "type": "string"
                 },
@@ -6203,14 +6323,9 @@
         "handler.Delete.removeMemberRequest": {
             "type": "object",
             "required": [
-                "op_user",
                 "role"
             ],
             "properties": {
-                "op_user": {
-                    "description": "name of the operator",
-                    "type": "string"
-                },
                 "role": {
                     "type": "string"
                 }
@@ -6220,18 +6335,13 @@
             "type": "object",
             "required": [
                 "new_role",
-                "old_role",
-                "op_user"
+                "old_role"
             ],
             "properties": {
                 "new_role": {
                     "type": "string"
                 },
                 "old_role": {
-                    "type": "string"
-                },
-                "op_user": {
-                    "description": "name of the operator",
                     "type": "string"
                 }
             }
@@ -6376,10 +6486,6 @@
                 },
                 "readme": {
                     "type": "string"
-                },
-                "username": {
-                    "type": "string",
-                    "example": "creator_user_name"
                 }
             }
         },
@@ -6418,10 +6524,6 @@
                 },
                 "readme": {
                     "type": "string"
-                },
-                "username": {
-                    "type": "string",
-                    "example": "creator_user_name"
                 }
             }
         },
@@ -6508,10 +6610,6 @@
                 },
                 "readme": {
                     "type": "string"
-                },
-                "username": {
-                    "type": "string",
-                    "example": "creator_user_name"
                 }
             }
         },
@@ -6531,10 +6629,6 @@
                     "description": "Org unique identifier",
                     "type": "string",
                     "example": "org_name_1"
-                },
-                "username": {
-                    "type": "string",
-                    "example": "user_name_1"
                 }
             }
         },
@@ -6611,10 +6705,6 @@
                 },
                 "template": {
                     "type": "string"
-                },
-                "username": {
-                    "type": "string",
-                    "example": "creator_user_name"
                 }
             }
         },
@@ -6761,12 +6851,7 @@
             }
         },
         "types.DeleteOrgReq": {
-            "type": "object",
-            "properties": {
-                "current_user": {
-                    "type": "string"
-                }
-            }
+            "type": "object"
         },
         "types.DeleteUserTokenRequest": {
             "type": "object",
@@ -6782,9 +6867,6 @@
         "types.EditOrgReq": {
             "type": "object",
             "properties": {
-                "current_user": {
-                    "type": "string"
-                },
                 "description": {
                     "type": "string",
                     "example": "org description"
@@ -7251,10 +7333,6 @@
                 },
                 "readme": {
                     "type": "string"
-                },
-                "username": {
-                    "type": "string",
-                    "example": "creator_user_name"
                 }
             }
         },
@@ -7293,10 +7371,6 @@
                 },
                 "readme": {
                     "type": "string"
-                },
-                "username": {
-                    "type": "string",
-                    "example": "creator_user_name"
                 }
             }
         },
@@ -7364,10 +7438,6 @@
                 },
                 "readme": {
                     "type": "string"
-                },
-                "username": {
-                    "type": "string",
-                    "example": "creator_user_name"
                 }
             }
         },
@@ -7430,10 +7500,6 @@
                 },
                 "template": {
                     "type": "string"
-                },
-                "username": {
-                    "type": "string",
-                    "example": "creator_user_name"
                 }
             }
         },

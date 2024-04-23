@@ -39,7 +39,7 @@ type ModelPredictResp struct {
 }
 
 type CreateRepoReq struct {
-	Username      string         `json:"username" example:"creator_user_name"`
+	Username      string         `json:"-" example:"creator_user_name"`
 	Namespace     string         `json:"namespace" example:"user_or_org_name"`
 	Name          string         `json:"name" example:"model_name_1"`
 	Nickname      string         `json:"nickname" example:"model display name"`

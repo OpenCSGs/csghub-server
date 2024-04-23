@@ -31,38 +31,6 @@ type DatasetHandler struct {
 	c *component.DatasetComponent
 }
 
-// CreateDatasetFile godoc
-// @Security     ApiKey
-// @Summary      Create dataset file
-// @Description  create dataset file
-// @Tags         Dataset
-// @Accept       json
-// @Produce      json
-// @Param        namespace path string true "namespace"
-// @Param        name path string true "name"
-// @Param        file_path path string true "file_path"
-// @Param        body body types.CreateFileReq true "body"
-// @Success      200  {object}  types.Response{data=types.CreateFileResp} "OK"
-// @Failure      400  {object}  types.APIBadRequest "Bad request"
-// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
-// @Router       /datasets/{namespace}/{name}/raw/{file_path} [post]
-
-// UpdateDatasetFile godoc
-// @Security     ApiKey
-// @Summary      Update dataset file
-// @Description  update dataset file
-// @Tags         Dataset
-// @Accept       json
-// @Produce      json
-// @Param        namespace path string true "namespace"
-// @Param        name path string true "name"
-// @Param        file_path path string true "file_path"
-// @Param        body body types.UpdateFileReq true "body"
-// @Success      200  {object}  types.Response{data=types.UpdateFileResp} "OK"
-// @Failure      400  {object}  types.APIBadRequest "Bad request"
-// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
-// @Router       /datasets/{namespace}/{name}/raw/{file_path} [put]
-
 // CreateDataset   godoc
 // @Security     ApiKey
 // @Summary      Create a new dataset
@@ -70,18 +38,25 @@ type DatasetHandler struct {
 // @Tags         Dataset
 // @Accept       json
 // @Produce      json
+// @Param        current_user query string false "current user, the owner"
 // @Param        body body types.CreateDatasetReq true "body"
 // @Success      200  {object}  types.Response{data=types.Dataset} "OK"
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
 // @Router       /datasets [post]
 func (h *DatasetHandler) Create(ctx *gin.Context) {
+	currentUser := httpbase.GetCurrentUser(ctx)
+	if currentUser == "" {
+		httpbase.UnauthorizedError(ctx, errors.New("user not found, please login first"))
+		return
+	}
 	var req *types.CreateDatasetReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {
 		slog.Error("Bad request format", "error", err)
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
+	req.Username = currentUser
 
 	dataset, err := h.c.Create(ctx, req)
 	if err != nil {
@@ -152,18 +127,25 @@ func (h *DatasetHandler) Index(ctx *gin.Context) {
 // @Produce      json
 // @Param        namespace path string true "namespace"
 // @Param        name path string true "name"
+// @Param        current_user query string false "current user, the owner"
 // @Param        body body types.UpdateDatasetReq true "body"
 // @Success      200  {object}  types.Response{data=database.Dataset} "OK"
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
 // @Router       /datasets/{namespace}/{name} [put]
 func (h *DatasetHandler) Update(ctx *gin.Context) {
+	currentUser := httpbase.GetCurrentUser(ctx)
+	if currentUser == "" {
+		httpbase.UnauthorizedError(ctx, errors.New("user not found, please login first"))
+		return
+	}
 	var req *types.UpdateDatasetReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {
 		slog.Error("Bad request format", "error", err)
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
+	req.Username = currentUser
 
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
 	if err != nil {
@@ -194,19 +176,23 @@ func (h *DatasetHandler) Update(ctx *gin.Context) {
 // @Produce      json
 // @Param        namespace path string true "namespace"
 // @Param        name path string true "name"
-// @Param        current_user query string true "current_user"
+// @Param        current_user query string false "current user, the owner"
 // @Success      200  {object}  types.Response{} "OK"
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
 // @Router       /datasets/{namespace}/{name} [delete]
 func (h *DatasetHandler) Delete(ctx *gin.Context) {
+	currentUser := httpbase.GetCurrentUser(ctx)
+	if currentUser == "" {
+		httpbase.UnauthorizedError(ctx, errors.New("user not found, please login first"))
+		return
+	}
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
 	if err != nil {
 		slog.Error("Bad request format", "error", err)
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
-	currentUser := httpbase.GetCurrentUser(ctx)
 	err = h.c.Delete(ctx, namespace, name, currentUser)
 	if err != nil {
 		slog.Error("Failed to delete dataset", slog.Any("error", err))
@@ -289,147 +275,6 @@ func (h *DatasetHandler) Relations(ctx *gin.Context) {
 	httpbase.OK(ctx, detail)
 }
 
-// GetDatasetCommits godoc
-// @Security     ApiKey
-// @Summary      Get dataset commits
-// @Description  get dataset commits
-// @Tags         Dataset
-// @Accept       json
-// @Produce      json
-// @Param        namespace path string true "namespace"
-// @Param        name path string true "name"
-// @Param        ref query string false "ref"
-// @Success      200  {object}  types.Response{data=[]types.Commit} "OK"
-// @Failure      400  {object}  types.APIBadRequest "Bad request"
-// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
-// @Router       /datasets/{namespace}/{name}/commits [get]
-
-// GetDatasetLastCommit godoc
-// @Security     ApiKey
-// @Summary      Get dataset last commit
-// @Description  get dataset last commit
-// @Tags         Dataset
-// @Accept       json
-// @Produce      json
-// @Param        namespace path string true "namespace"
-// @Param        name path string true "name"
-// @Param        ref query string false "ref"
-// @Success      200  {object}  types.Response{data=types.Commit} "OK"
-// @Failure      400  {object}  types.APIBadRequest "Bad request"
-// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
-// @Router       /datasets/{namespace}/{name}/last_commit [get]
-
-// GetDatasetFileRaw godoc
-// @Security     ApiKey
-// @Summary      Get dataset file raw
-// @Description  get dataset file raw
-// @Tags         Dataset
-// @Accept       json
-// @Produce      json
-// @Param        namespace path string true "namespace"
-// @Param        name path string true "name"
-// @Param        file_path path string true "file_path"
-// @Param        ref query string false "ref"
-// @Success      200  {object}  types.Response{data=types.Commit} "OK"
-// @Failure      400  {object}  types.APIBadRequest "Bad request"
-// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
-// @Router       /datasets/{namespace}/{name}/raw/{file_path} [get]
-
-// GetDatasetFileInfo godoc
-// @Security     ApiKey
-// @Summary      Get dataset file info
-// @Description  get dataset file info
-// @Tags         Dataset
-// @Accept       json
-// @Produce      json
-// @Param        namespace path string true "namespace"
-// @Param        name path string true "name"
-// @Param        file_path path string true "file_path"
-// @Param        ref query string false "ref"
-// @Success      200  {object}  types.Response{data=types.Commit} "OK"
-// @Failure      400  {object}  types.APIBadRequest "Bad request"
-// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
-// @Router       /datasets/{namespace}/{name}/blob/{file_path} [get]
-
-// DownloadDatasetFile godoc
-// @Security     ApiKey
-// @Summary      Download dataset file
-// @Description  download dataset file
-// @Tags         Dataset
-// @Accept       json
-// @Produce      json
-// @Produce      octet-stream
-// @Param        namespace path string true "namespace"
-// @Param        name path string true "name"
-// @Param        file_path path string true "file_path"
-// @Param        lfs query bool false "lfs"
-// @Param        ref query string false "ref"
-// @Param        save_as query string false "name of download file"
-// @Success      200  {object}  types.Response{data=string} "OK"
-// @Failure      400  {object}  types.APIBadRequest "Bad request"
-// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
-// @Router       /datasets/{namespace}/{name}/download/{file_path} [get]
-
-// GetDatasetBranches godoc
-// @Security     ApiKey
-// @Summary      Get dataset branches
-// @Description  get dataset branches
-// @Tags         Dataset
-// @Accept       json
-// @Produce      json
-// @Param        namespace path string true "namespace"
-// @Param        name path string true "name"
-// @param        per query int false "per" default(20)
-// @Param        page query int false "page" default(1)
-// @Success      200  {object}  types.Response{data=[]types.Branch} "OK"
-// @Failure      400  {object}  types.APIBadRequest "Bad request"
-// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
-// @Router       /datasets/{namespace}/{name}/branches [get]
-
-// GetDatasetTags godoc
-// @Security     ApiKey
-// @Summary      Get dataset tags
-// @Description  get dataset tags
-// @Tags         Dataset
-// @Accept       json
-// @Produce      json
-// @Param        namespace path string true "namespace"
-// @Param        name path string true "name"
-// @Success      200  {object}  types.Response{data=[]types.Branch} "OK"
-// @Failure      400  {object}  types.APIBadRequest "Bad request"
-// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
-// @Router       /datasets/{namespace}/{name}/tags [get]
-
-// GetDatasetFileTree godoc
-// @Security     ApiKey
-// @Summary      Get dataset file tree
-// @Description  get dataset file tree
-// @Tags         Dataset
-// @Accept       json
-// @Produce      json
-// @Param        namespace path string true "namespace"
-// @Param        name path string true "name"
-// @Param        ref query string false "ref"
-// @Success      200  {object}  types.Response{data=[]types.File} "OK"
-// @Failure      400  {object}  types.APIBadRequest "Bad request"
-// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
-// @Router       /datasets/{namespace}/{name}/tree [get]
-
-// UpdateDatasetDownloads godoc
-// @Security     ApiKey
-// @Summary      Update dataset downloads
-// @Description  update dataset downloads
-// @Tags         Dataset
-// @Accept       json
-// @Produce      json
-// @Param        namespace path string true "namespace"
-// @Param        name path string true "name"
-// @Param        body body types.UpdateDownloadsReq true "body"
-// @Success      200  {object}  types.Response{data=[]types.File} "OK"
-// @Failure      400  {object}  types.APIBadRequest "Bad request"
-// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
-// @Router       /datasets/{namespace}/{name}/update_downloads [post]
-
 func getFilterFromContext(ctx *gin.Context) (searchKey, sort string) {
 	searchKey = ctx.Query("search")
 	sort = ctx.Query("sort")
@@ -438,40 +283,3 @@ func getFilterFromContext(ctx *gin.Context) (searchKey, sort string) {
 	}
 	return
 }
-
-// UploadDatasetFile godoc
-// @Security     ApiKey
-// @Summary      Create dataset file
-// @Description  upload dataset file to create or update a file in dataset repository
-// @Tags         Dataset
-// @Accept       json
-// @Produce      json
-// @Param        namespace path string true "namespace"
-// @Param        name path string true "name"
-// @Param        file_path formData string true "file_path"
-// @Param        file formData file true "file"
-// @Param        email formData string true "email"
-// @Param        message formData string true "message"
-// @Param        branch formData string false "branch"
-// @Param        username formData string true "username"
-// @Success      200  {object}  types.Response{data=types.CreateFileResp} "OK"
-// @Failure      400  {object}  types.APIBadRequest "Bad request"
-// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
-// @Router       /datasets/{namespace}/{name}/upload_file [post]
-
-// DownloadDatasetFile godoc
-// @Security     ApiKey
-// @Summary      Download dataset file
-// @Description  download dataset file
-// @Tags         Dataset
-// @Accept       json
-// @Produce      json
-// @Produce      octet-stream
-// @Param        namespace path string true "namespace"
-// @Param        name path string true "name"
-// @Param        file_path path string true "file_path"
-// @Param        ref query string false "ref"
-// @Success      200  {object}  types.Response{data=string} "OK"
-// @Failure      400  {object}  types.APIBadRequest "Bad request"
-// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
-// @Router       /datasets/{namespace}/{name}/resolve/{file_path} [get]
