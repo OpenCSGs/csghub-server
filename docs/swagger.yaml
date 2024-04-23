@@ -307,6 +307,15 @@ definitions:
     type: object
   types.APIInternalServerError:
     type: object
+  types.Branch:
+    properties:
+      commit:
+        $ref: '#/definitions/types.RepoBranchCommit'
+      message:
+        type: string
+      name:
+        type: string
+    type: object
   types.Code:
     properties:
       created_at:
@@ -341,6 +350,27 @@ definitions:
         type: string
       user:
         $ref: '#/definitions/types.User'
+    type: object
+  types.Commit:
+    properties:
+      author_email:
+        type: string
+      author_name:
+        type: string
+      authored_date:
+        type: string
+      committer_date:
+        type: string
+      committer_email:
+        type: string
+      committer_name:
+        type: string
+      created_at:
+        type: string
+      id:
+        type: string
+      message:
+        type: string
     type: object
   types.CreateCodeReq:
     properties:
@@ -401,6 +431,19 @@ definitions:
       username:
         example: creator_user_name
         type: string
+    type: object
+  types.CreateFileReq:
+    properties:
+      branch:
+        type: string
+      content:
+        type: string
+      message:
+        type: string
+      new_branch:
+        type: string
+    type: object
+  types.CreateFileResp:
     type: object
   types.CreateJWTReq:
     properties:
@@ -645,6 +688,37 @@ definitions:
         example: org display name
         type: string
     type: object
+  types.File:
+    properties:
+      commit:
+        $ref: '#/definitions/types.Commit'
+      content:
+        type: string
+      last_commit_sha:
+        type: string
+      lfs:
+        type: boolean
+      lfs_pointer_size:
+        type: integer
+      lfs_relative_path:
+        description: relative path in lfs storage
+        type: string
+      mode:
+        type: string
+      name:
+        type: string
+      path:
+        type: string
+      sha:
+        type: string
+      size:
+        type: integer
+      type:
+        type: string
+      url:
+        description: URL to browse the file
+        type: string
+    type: object
   types.ListByPathReq:
     properties:
       paths:
@@ -752,6 +826,11 @@ definitions:
         items:
           $ref: '#/definitions/types.Space'
         type: array
+    type: object
+  types.RepoBranchCommit:
+    properties:
+      id:
+        type: string
     type: object
   types.RepoTag:
     properties:
@@ -953,6 +1032,25 @@ definitions:
         example: creator_user_name
         type: string
     type: object
+  types.UpdateFileReq:
+    properties:
+      branch:
+        type: string
+      content:
+        type: string
+      message:
+        type: string
+      new_branch:
+        type: string
+      origin_path:
+        type: string
+      repoType:
+        $ref: '#/definitions/types.RepositoryType'
+      sha:
+        type: string
+    type: object
+  types.UpdateFileResp:
+    type: object
   types.UpdateModelReq:
     properties:
       default_branch:
@@ -1075,6 +1173,705 @@ definitions:
 info:
   contact: {}
 paths:
+  /{repo_type}/{namespace}/{name}/blob/{file_path}:
+    get:
+      consumes:
+      - application/json
+      parameters:
+      - description: models,dataset,codes or spaces
+        enum:
+        - models
+        - datasets
+        - codes
+        - spaces
+        in: path
+        name: repo_type
+        required: true
+        type: string
+      - description: repo owner name
+        in: path
+        name: namespace
+        required: true
+        type: string
+      - description: repo name
+        in: path
+        name: name
+        required: true
+        type: string
+      - description: file path
+        in: path
+        name: file_path
+        required: true
+        type: string
+      - description: branch or tag
+        in: query
+        name: ref
+        required: true
+        type: string
+      - description: current user name
+        in: query
+        name: current_user
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/types.ResponseWithTotal'
+            - properties:
+                data:
+                  $ref: '#/definitions/types.File'
+              type: object
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey or JWT: []
+      summary: Get the repo file information like size, content, sha etc
+      tags:
+      - Repository
+  /{repo_type}/{namespace}/{name}/branches:
+    get:
+      consumes:
+      - application/json
+      parameters:
+      - description: models,dataset,codes or spaces
+        enum:
+        - models
+        - datasets
+        - codes
+        - spaces
+        in: path
+        name: repo_type
+        required: true
+        type: string
+      - description: repo owner name
+        in: path
+        name: namespace
+        required: true
+        type: string
+      - description: repo name
+        in: path
+        name: name
+        required: true
+        type: string
+      - description: branch or tag
+        in: query
+        name: ref
+        required: true
+        type: string
+      - description: current user name
+        in: query
+        name: current_user
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/types.ResponseWithTotal'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/types.Branch'
+                  type: array
+              type: object
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Get the branches of repository
+      tags:
+      - Repository
+  /{repo_type}/{namespace}/{name}/commits:
+    get:
+      consumes:
+      - application/json
+      parameters:
+      - description: models,dataset,codes or spaces
+        enum:
+        - models
+        - datasets
+        - codes
+        - spaces
+        in: path
+        name: repo_type
+        required: true
+        type: string
+      - description: repo owner name
+        in: path
+        name: namespace
+        required: true
+        type: string
+      - description: repo name
+        in: path
+        name: name
+        required: true
+        type: string
+      - description: branch or tag
+        in: query
+        name: ref
+        required: true
+        type: string
+      - description: current user name
+        in: query
+        name: current_user
+        type: string
+      - default: 20
+        description: per
+        in: query
+        name: per
+        type: integer
+      - default: 1
+        description: per page
+        in: query
+        name: page
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/types.ResponseWithTotal'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/types.Commit'
+                  type: array
+              type: object
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Get all commits of repository
+      tags:
+      - Repository
+  /{repo_type}/{namespace}/{name}/download/{file_path}:
+    get:
+      consumes:
+      - application/json
+      parameters:
+      - description: models,dataset,codes or spaces
+        enum:
+        - models
+        - datasets
+        - codes
+        - spaces
+        in: path
+        name: repo_type
+        required: true
+        type: string
+      - description: repo owner name
+        in: path
+        name: namespace
+        required: true
+        type: string
+      - description: repo name
+        in: path
+        name: name
+        required: true
+        type: string
+      - description: file path
+        in: path
+        name: file_path
+        required: true
+        type: string
+      - description: branch or tag
+        in: query
+        name: ref
+        type: string
+      - description: file name to save as
+        in: query
+        name: save_as
+        type: string
+      - description: current user name
+        in: query
+        name: current_user
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/types.ResponseWithTotal'
+            - properties:
+                data:
+                  type: object
+              type: object
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey or JWT: []
+      summary: 'Download a repo file [Depricated: use ''resolve'' api instead]'
+      tags:
+      - Repository
+  /{repo_type}/{namespace}/{name}/last_commit:
+    get:
+      consumes:
+      - application/json
+      parameters:
+      - description: models,dataset,codes or spaces
+        enum:
+        - models
+        - datasets
+        - codes
+        - spaces
+        in: path
+        name: repo_type
+        required: true
+        type: string
+      - description: repo owner name
+        in: path
+        name: namespace
+        required: true
+        type: string
+      - description: repo name
+        in: path
+        name: name
+        required: true
+        type: string
+      - description: branch or tag
+        in: query
+        name: ref
+        required: true
+        type: string
+      - description: current user name
+        in: query
+        name: current_user
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/types.ResponseWithTotal'
+            - properties:
+                data:
+                  $ref: '#/definitions/types.Commit'
+              type: object
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Get the last commit of repository
+      tags:
+      - Repository
+  /{repo_type}/{namespace}/{name}/raw/{file_path}:
+    get:
+      consumes:
+      - application/json
+      parameters:
+      - description: models,dataset,codes or spaces
+        enum:
+        - models
+        - datasets
+        - codes
+        - spaces
+        in: path
+        name: repo_type
+        required: true
+        type: string
+      - description: repo owner name
+        in: path
+        name: namespace
+        required: true
+        type: string
+      - description: repo name
+        in: path
+        name: name
+        required: true
+        type: string
+      - description: file path
+        in: path
+        name: file_path
+        required: true
+        type: string
+      - description: branch or tag
+        in: query
+        name: ref
+        required: true
+        type: string
+      - description: current user name
+        in: query
+        name: current_user
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/types.ResponseWithTotal'
+            - properties:
+                data:
+                  type: string
+              type: object
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Get the last commit of repository
+      tags:
+      - Repository
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: models,dataset,codes or spaces
+        enum:
+        - models
+        - datasets
+        - codes
+        - spaces
+        in: path
+        name: repo_type
+        required: true
+        type: string
+      - description: repo owner name
+        in: path
+        name: namespace
+        required: true
+        type: string
+      - description: repo name
+        in: path
+        name: name
+        required: true
+        type: string
+      - description: the new file relative path
+        in: path
+        name: file_path
+        required: true
+        type: string
+      - description: current user name
+        in: query
+        name: current_user
+        type: string
+      - description: create file request
+        in: body
+        name: req
+        required: true
+        schema:
+          $ref: '#/definitions/types.CreateFileReq'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/types.ResponseWithTotal'
+            - properties:
+                data:
+                  $ref: '#/definitions/types.CreateFileResp'
+              type: object
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Create a new file in repository
+      tags:
+      - Repository
+    put:
+      consumes:
+      - application/json
+      parameters:
+      - description: models,dataset,codes or spaces
+        enum:
+        - models
+        - datasets
+        - codes
+        - spaces
+        in: path
+        name: repo_type
+        required: true
+        type: string
+      - description: repo owner name
+        in: path
+        name: namespace
+        required: true
+        type: string
+      - description: repo name
+        in: path
+        name: name
+        required: true
+        type: string
+      - description: the new file relative path
+        in: path
+        name: file_path
+        required: true
+        type: string
+      - description: current user name
+        in: query
+        name: current_user
+        type: string
+      - description: create file request
+        in: body
+        name: req
+        required: true
+        schema:
+          $ref: '#/definitions/types.UpdateFileReq'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/types.ResponseWithTotal'
+            - properties:
+                data:
+                  $ref: '#/definitions/types.UpdateFileResp'
+              type: object
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Update existing file in repository
+      tags:
+      - Repository
+  /{repo_type}/{namespace}/{name}/resolve/{file_path}:
+    get:
+      consumes:
+      - application/json
+      parameters:
+      - description: models,dataset,codes or spaces
+        enum:
+        - models
+        - datasets
+        - codes
+        - spaces
+        in: path
+        name: repo_type
+        required: true
+        type: string
+      - description: repo owner name
+        in: path
+        name: namespace
+        required: true
+        type: string
+      - description: repo name
+        in: path
+        name: name
+        required: true
+        type: string
+      - description: file path
+        in: path
+        name: file_path
+        required: true
+        type: string
+      - description: branch or tag
+        in: query
+        name: ref
+        required: true
+        type: string
+      - description: current user name
+        in: query
+        name: current_user
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/types.ResponseWithTotal'
+            - properties:
+                data:
+                  type: string
+              type: object
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Download a rep file
+      tags:
+      - Repository
+  /{repo_type}/{namespace}/{name}/tags:
+    get:
+      consumes:
+      - application/json
+      parameters:
+      - description: models,dataset,codes or spaces
+        enum:
+        - models
+        - datasets
+        - codes
+        - spaces
+        in: path
+        name: repo_type
+        required: true
+        type: string
+      - description: repo owner name
+        in: path
+        name: namespace
+        required: true
+        type: string
+      - description: repo name
+        in: path
+        name: name
+        required: true
+        type: string
+      - description: git branch or tag
+        in: query
+        name: ref
+        required: true
+        type: string
+      - description: current user name
+        in: query
+        name: current_user
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/types.ResponseWithTotal'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/database.Tag'
+                  type: array
+              type: object
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Get the tags of repository
+      tags:
+      - Repository
+  /{repo_type}/{namespace}/{name}/tree:
+    get:
+      consumes:
+      - application/json
+      parameters:
+      - description: models,dataset,codes or spaces
+        enum:
+        - models
+        - datasets
+        - codes
+        - spaces
+        in: path
+        name: repo_type
+        required: true
+        type: string
+      - description: repo owner name
+        in: path
+        name: namespace
+        required: true
+        type: string
+      - description: repo name
+        in: path
+        name: name
+        required: true
+        type: string
+      - description: root dir
+        in: query
+        name: path
+        type: string
+      - description: branch or tag
+        in: query
+        name: ref
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/types.ResponseWithTotal'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/types.File'
+                  type: array
+              type: object
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Get repository file tree
+      tags:
+      - Repository
   /codes:
     get:
       consumes:
