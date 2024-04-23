@@ -35,6 +35,22 @@ type RepoHandler struct {
 	c *component.RepoComponent
 }
 
+// CreateRepoFile godoc
+// @Security     ApiKey
+// @Summary      Create a new file in repository
+// @Tags         Repository
+// @Accept       json
+// @Produce      json
+// @Param		 repo_type path string true "models,dataset,codes or spaces" Enums(models,datasets,codes,spaces)
+// @Param		 namespace path string true "repo owner name"
+// @Param		 name path string true "repo name"
+// @Param		 file_path path string true "the new file relative path"
+// @Param		 current_user query string false "current user name"
+// @Param        req body types.CreateFileReq true  "create file request"
+// @Success      200  {object}  types.ResponseWithTotal{data=types.CreateFileResp} "OK"
+// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
+// @Router       /{repo_type}/{namespace}/{name}/raw/{file_path} [post]
 func (h *RepoHandler) CreateFile(ctx *gin.Context) {
 	userName := httpbase.GetCurrentUser(ctx)
 	if userName == "" {
@@ -72,6 +88,22 @@ func (h *RepoHandler) CreateFile(ctx *gin.Context) {
 	httpbase.OK(ctx, resp)
 }
 
+// UpdateRepoFile godoc
+// @Security     ApiKey
+// @Summary      Update existing file in repository
+// @Tags         Repository
+// @Accept       json
+// @Produce      json
+// @Param		 repo_type path string true "models,dataset,codes or spaces" Enums(models,datasets,codes,spaces)
+// @Param		 namespace path string true "repo owner name"
+// @Param		 name path string true "repo name"
+// @Param		 file_path path string true "the new file relative path"
+// @Param		 current_user query string false "current user name"
+// @Param        req body types.UpdateFileReq true  "create file request"
+// @Success      200  {object}  types.ResponseWithTotal{data=types.UpdateFileResp} "OK"
+// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
+// @Router       /{repo_type}/{namespace}/{name}/raw/{file_path} [put]
 func (h *RepoHandler) UpdateFile(ctx *gin.Context) {
 	userName := httpbase.GetCurrentUser(ctx)
 	if userName == "" {
@@ -110,6 +142,23 @@ func (h *RepoHandler) UpdateFile(ctx *gin.Context) {
 	httpbase.OK(ctx, resp)
 }
 
+// GetRepoCommits godoc
+// @Security     ApiKey
+// @Summary      Get all commits of repository
+// @Tags         Repository
+// @Accept       json
+// @Produce      json
+// @Param		 repo_type path string true "models,dataset,codes or spaces" Enums(models,datasets,codes,spaces)
+// @Param		 namespace path string true "repo owner name"
+// @Param		 name path string true "repo name"
+// @Param		 ref query string true "branch or tag"
+// @Param		 current_user query string false "current user name"
+// @Param        per query int false "per" default(20)
+// @Param        page query int false "per page" default(1)
+// @Success      200  {object}  types.ResponseWithTotal{data=[]types.Commit} "OK"
+// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
+// @Router       /{repo_type}/{namespace}/{name}/commits [get]
 func (h *RepoHandler) Commits(ctx *gin.Context) {
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
 	if err != nil {
@@ -143,6 +192,21 @@ func (h *RepoHandler) Commits(ctx *gin.Context) {
 	httpbase.OK(ctx, commits)
 }
 
+// GetRepoLastCommit godoc
+// @Security     ApiKey
+// @Summary      Get the last commit of repository
+// @Tags         Repository
+// @Accept       json
+// @Produce      json
+// @Param		 repo_type path string true "models,dataset,codes or spaces" Enums(models,datasets,codes,spaces)
+// @Param		 namespace path string true "repo owner name"
+// @Param		 name path string true "repo name"
+// @Param		 ref query string true "branch or tag"
+// @Param		 current_user query string false "current user name"
+// @Success      200  {object}  types.ResponseWithTotal{data=types.Commit} "OK"
+// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
+// @Router       /{repo_type}/{namespace}/{name}/last_commit [get]
 func (h *RepoHandler) LastCommit(ctx *gin.Context) {
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
 	if err != nil {
@@ -168,6 +232,22 @@ func (h *RepoHandler) LastCommit(ctx *gin.Context) {
 	httpbase.OK(ctx, commit)
 }
 
+// GetRepoFileContent godoc
+// @Security     ApiKey
+// @Summary      Get the last commit of repository
+// @Tags         Repository
+// @Accept       json
+// @Produce      json
+// @Param		 repo_type path string true "models,dataset,codes or spaces" Enums(models,datasets,codes,spaces)
+// @Param		 namespace path string true "repo owner name"
+// @Param		 name path string true "repo name"
+// @Param		 file_path path string true "file path"
+// @Param		 ref query string true "branch or tag"
+// @Param		 current_user query string false "current user name"
+// @Success      200  {object}  types.ResponseWithTotal{data=string} "OK"
+// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
+// @Router       /{repo_type}/{namespace}/{name}/raw/{file_path} [get]
 func (h *RepoHandler) FileRaw(ctx *gin.Context) {
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
 	if err != nil {
@@ -195,6 +275,22 @@ func (h *RepoHandler) FileRaw(ctx *gin.Context) {
 	httpbase.OK(ctx, raw)
 }
 
+// GetRepoFileContent godoc
+// @Security     ApiKey or JWT
+// @Summary      Get the repo file information like size, content, sha etc
+// @Tags         Repository
+// @Accept       json
+// @Produce      json
+// @Param		 repo_type path string true "models,dataset,codes or spaces" Enums(models,datasets,codes,spaces)
+// @Param		 namespace path string true "repo owner name"
+// @Param		 name path string true "repo name"
+// @Param		 file_path path string true "file path"
+// @Param		 ref query string true "branch or tag"
+// @Param		 current_user query string false "current user name"
+// @Success      200  {object}  types.ResponseWithTotal{data=types.File} "OK"
+// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
+// @Router       /{repo_type}/{namespace}/{name}/blob/{file_path} [get]
 func (h *RepoHandler) FileInfo(ctx *gin.Context) {
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
 	if err != nil {
@@ -222,6 +318,23 @@ func (h *RepoHandler) FileInfo(ctx *gin.Context) {
 	httpbase.OK(ctx, file)
 }
 
+// DownloadRepoFile godoc
+// @Security     ApiKey or JWT
+// @Summary      Download a repo file [Depricated: use 'resolve' api instead]
+// @Tags         Repository
+// @Accept       json
+// @Produce      json
+// @Param		 repo_type path string true "models,dataset,codes or spaces" Enums(models,datasets,codes,spaces)
+// @Param		 namespace path string true "repo owner name"
+// @Param		 name path string true "repo name"
+// @Param		 file_path path string true "file path"
+// @Param		 ref query string false "branch or tag"
+// @Param		 save_as query string false "file name to save as"
+// @Param		 current_user query string false "current user name"
+// @Success      200  {object}  types.ResponseWithTotal{data=object} "OK"
+// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
+// @Router       /{repo_type}/{namespace}/{name}/download/{file_path} [get]
 func (h *RepoHandler) DownloadFile(ctx *gin.Context) {
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
 	if err != nil {
@@ -271,6 +384,21 @@ func (h *RepoHandler) DownloadFile(ctx *gin.Context) {
 	}
 }
 
+// GetRepoBranches
+// @Security     ApiKey
+// @Summary      Get the branches of repository
+// @Tags         Repository
+// @Accept       json
+// @Produce      json
+// @Param		 repo_type path string true "models,dataset,codes or spaces" Enums(models,datasets,codes,spaces)
+// @Param		 namespace path string true "repo owner name"
+// @Param		 name path string true "repo name"
+// @Param		 ref query string true "branch or tag"
+// @Param		 current_user query string false "current user name"
+// @Success      200  {object}  types.ResponseWithTotal{data=[]types.Branch} "OK"
+// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
+// @Router       /{repo_type}/{namespace}/{name}/branches [get]
 func (h *RepoHandler) Branches(ctx *gin.Context) {
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
 	if err != nil {
@@ -302,6 +430,21 @@ func (h *RepoHandler) Branches(ctx *gin.Context) {
 	httpbase.OK(ctx, branches)
 }
 
+// GetRepoTags
+// @Security     ApiKey
+// @Summary      Get the tags of repository
+// @Tags         Repository
+// @Accept       json
+// @Produce      json
+// @Param		 repo_type path string true "models,dataset,codes or spaces" Enums(models,datasets,codes,spaces)
+// @Param		 namespace path string true "repo owner name"
+// @Param		 name path string true "repo name"
+// @Param		 ref query string true "git branch or tag"
+// @Param		 current_user query string false "current user name"
+// @Success      200  {object}  types.ResponseWithTotal{data=[]database.Tag} "OK"
+// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
+// @Router       /{repo_type}/{namespace}/{name}/tags [get]
 func (h *RepoHandler) Tags(ctx *gin.Context) {
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
 	if err != nil {
@@ -325,6 +468,21 @@ func (h *RepoHandler) Tags(ctx *gin.Context) {
 	httpbase.OK(ctx, tags)
 }
 
+// GetRepoTree godoc
+// @Security     ApiKey
+// @Summary      Get repository file tree
+// @Tags         Repository
+// @Accept       json
+// @Produce      json
+// @Param		 repo_type path string true "models,dataset,codes or spaces" Enums(models,datasets,codes,spaces)
+// @Param		namespace path string true "repo owner name"
+// @Param		name path string true "repo name"
+// @Param        path query string false "root dir"
+// @Param        ref query string false "branch or tag"
+// @Success      200  {object}  types.ResponseWithTotal{data=[]types.File} "OK"
+// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
+// @Router       /{repo_type}/{namespace}/{name}/tree [get]
 func (h *RepoHandler) Tree(ctx *gin.Context) {
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
 	if err != nil {
@@ -485,6 +643,22 @@ func (h *RepoHandler) SDKDownload(ctx *gin.Context) {
 	h.handleDownload(ctx, false)
 }
 
+// DownloadRepoFile godoc
+// @Security     ApiKey
+// @Summary      Download a rep file
+// @Tags         Repository
+// @Accept       json
+// @Produce      json
+// @Param		 repo_type path string true "models,dataset,codes or spaces" Enums(models,datasets,codes,spaces)
+// @Param		 namespace path string true "repo owner name"
+// @Param		 name path string true "repo name"
+// @Param		 file_path path string true "file path"
+// @Param		 ref query string true "branch or tag"
+// @Param		 current_user query string false "current user name"
+// @Success      200  {object}  types.ResponseWithTotal{data=string} "OK"
+// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
+// @Router       /{repo_type}/{namespace}/{name}/resolve/{file_path} [get]
 func (h *RepoHandler) ResolveDownload(ctx *gin.Context) {
 	h.handleDownload(ctx, true)
 }

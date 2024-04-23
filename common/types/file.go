@@ -27,10 +27,10 @@ type CreateFileReq struct {
 	Content   string `json:"content"`
 	NewBranch string `json:"new_branch"`
 
-	NameSpace string `json:"-"`
-	Name      string `json:"-"`
-	FilePath  string `json:"-"`
-	RepoType  RepositoryType
+	NameSpace string         `json:"-"`
+	Name      string         `json:"-"`
+	FilePath  string         `json:"-"`
+	RepoType  RepositoryType `json:"-"`
 }
 
 type CreateFileResp struct{}
