@@ -265,28 +265,20 @@ definitions:
     type: object
   handler.Create.addMemberRequest:
     properties:
-      op_user:
-        description: name of the operator
-        type: string
       role:
         type: string
       user:
         description: name of user will be added to the org as a member
         type: string
     required:
-    - op_user
     - role
     - user
     type: object
   handler.Delete.removeMemberRequest:
     properties:
-      op_user:
-        description: name of the operator
-        type: string
       role:
         type: string
     required:
-    - op_user
     - role
     type: object
   handler.Update.updateMemberRequest:
@@ -295,13 +287,9 @@ definitions:
         type: string
       old_role:
         type: string
-      op_user:
-        description: name of the operator
-        type: string
     required:
     - new_role
     - old_role
-    - op_user
     type: object
   types.APIBadRequest:
     type: object
@@ -398,9 +386,6 @@ definitions:
         type: boolean
       readme:
         type: string
-      username:
-        example: creator_user_name
-        type: string
     type: object
   types.CreateDatasetReq:
     properties:
@@ -427,9 +412,6 @@ definitions:
       private:
         type: boolean
       readme:
-        type: string
-      username:
-        example: creator_user_name
         type: string
     type: object
   types.CreateFileReq:
@@ -489,9 +471,6 @@ definitions:
         type: boolean
       readme:
         type: string
-      username:
-        example: creator_user_name
-        type: string
     type: object
   types.CreateOrgReq:
     properties:
@@ -505,9 +484,6 @@ definitions:
       name:
         description: Org unique identifier
         example: org_name_1
-        type: string
-      username:
-        example: user_name_1
         type: string
     type: object
   types.CreateSSHKeyRequest:
@@ -565,9 +541,6 @@ definitions:
       secrets:
         type: string
       template:
-        type: string
-      username:
-        example: creator_user_name
         type: string
     type: object
   types.CreateSpaceResourceReq:
@@ -665,9 +638,6 @@ definitions:
         type: string
     type: object
   types.DeleteOrgReq:
-    properties:
-      current_user:
-        type: string
     type: object
   types.DeleteUserTokenRequest:
     properties:
@@ -678,8 +648,6 @@ definitions:
     type: object
   types.EditOrgReq:
     properties:
-      current_user:
-        type: string
       description:
         example: org description
         type: string
@@ -998,9 +966,6 @@ definitions:
         type: boolean
       readme:
         type: string
-      username:
-        example: creator_user_name
-        type: string
     type: object
   types.UpdateDatasetReq:
     properties:
@@ -1027,9 +992,6 @@ definitions:
       private:
         type: boolean
       readme:
-        type: string
-      username:
-        example: creator_user_name
         type: string
     type: object
   types.UpdateFileReq:
@@ -1076,9 +1038,6 @@ definitions:
       private:
         type: boolean
       readme:
-        type: string
-      username:
-        example: creator_user_name
         type: string
     type: object
   types.UpdateSpaceReq:
@@ -1127,9 +1086,6 @@ definitions:
       secrets:
         type: string
       template:
-        type: string
-      username:
-        example: creator_user_name
         type: string
     type: object
   types.UpdateSpaceResourceReq:
@@ -1927,6 +1883,10 @@ paths:
       - application/json
       description: create a new code
       parameters:
+      - description: current user, the owner
+        in: query
+        name: current_user
+        type: string
       - description: body
         in: body
         name: body
@@ -1974,10 +1934,9 @@ paths:
         name: name
         required: true
         type: string
-      - description: current_user
+      - description: current user, the owner
         in: query
         name: current_user
-        required: true
         type: string
       produces:
       - application/json
@@ -2058,6 +2017,10 @@ paths:
         in: path
         name: name
         required: true
+        type: string
+      - description: current user, the owner
+        in: query
+        name: current_user
         type: string
       - description: body
         in: body
@@ -2197,6 +2160,10 @@ paths:
       - application/json
       description: create a new dataset
       parameters:
+      - description: current user, the owner
+        in: query
+        name: current_user
+        type: string
       - description: body
         in: body
         name: body
@@ -2244,10 +2211,9 @@ paths:
         name: name
         required: true
         type: string
-      - description: current_user
+      - description: current user, the owner
         in: query
         name: current_user
-        required: true
         type: string
       produces:
       - application/json
@@ -2328,6 +2294,10 @@ paths:
         in: path
         name: name
         required: true
+        type: string
+      - description: current user, the owner
+        in: query
+        name: current_user
         type: string
       - description: body
         in: body
@@ -2701,10 +2671,9 @@ paths:
         name: name
         required: true
         type: string
-      - description: current_user
+      - description: current user, the model owner
         in: query
         name: current_user
-        required: true
         type: string
       produces:
       - application/json
@@ -2786,6 +2755,10 @@ paths:
         name: name
         required: true
         type: string
+      - description: current user, the model owner
+        in: query
+        name: current_user
+        type: string
       - description: body
         in: body
         name: body
@@ -2833,6 +2806,10 @@ paths:
         name: name
         required: true
         type: string
+      - description: current user
+        in: query
+        name: current_user
+        type: string
       - description: input for model prediction
         in: body
         name: body
@@ -2874,7 +2851,7 @@ paths:
         name: name
         required: true
         type: string
-      - description: current_user
+      - description: current user
         in: query
         name: current_user
         type: string
@@ -3148,6 +3125,10 @@ paths:
       - application/json
       description: create a new organization
       parameters:
+      - description: the op user
+        in: query
+        name: current_user
+        type: string
       - description: body
         in: body
         name: body
@@ -3190,6 +3171,10 @@ paths:
         name: name
         required: true
         type: string
+      - description: the op user
+        in: query
+        name: current_user
+        type: string
       - description: body
         in: body
         name: body
@@ -3221,6 +3206,10 @@ paths:
         in: path
         name: name
         required: true
+        type: string
+      - description: the op user
+        in: query
+        name: current_user
         type: string
       - description: body
         in: body
@@ -3264,6 +3253,10 @@ paths:
         name: name
         required: true
         type: string
+      - description: the op user
+        in: query
+        name: current_user
+        type: string
       - description: body
         in: body
         name: body
@@ -3306,6 +3299,10 @@ paths:
         name: username
         required: true
         type: string
+      - description: the op user
+        in: query
+        name: current_user
+        type: string
       - description: body
         in: body
         name: body
@@ -3345,6 +3342,10 @@ paths:
         in: path
         name: username
         required: true
+        type: string
+      - description: the op user
+        in: query
+        name: current_user
         type: string
       - description: body
         in: body
@@ -3726,6 +3727,11 @@ paths:
       - application/json
       description: create a new space
       parameters:
+      - description: current_user
+        in: query
+        name: current_user
+        required: true
+        type: string
       - description: body
         in: body
         name: body
@@ -3857,6 +3863,11 @@ paths:
         name: name
         required: true
         type: string
+      - description: current_user
+        in: query
+        name: current_user
+        required: true
+        type: string
       - description: body
         in: body
         name: body
@@ -3903,6 +3914,11 @@ paths:
         name: name
         required: true
         type: string
+      - description: current_user
+        in: query
+        name: current_user
+        required: true
+        type: string
       produces:
       - application/json
       responses:
@@ -3932,6 +3948,11 @@ paths:
       - description: name
         in: path
         name: name
+        required: true
+        type: string
+      - description: current_user
+        in: query
+        name: current_user
         required: true
         type: string
       produces:
@@ -3965,6 +3986,11 @@ paths:
         name: name
         required: true
         type: string
+      - description: current_user
+        in: query
+        name: current_user
+        required: true
+        type: string
       produces:
       - application/json
       responses:
@@ -3994,6 +4020,11 @@ paths:
       - description: name
         in: path
         name: name
+        required: true
+        type: string
+      - description: current_user
+        in: query
+        name: current_user
         required: true
         type: string
       produces:
@@ -4589,6 +4620,11 @@ paths:
         name: username
         required: true
         type: string
+      - description: current user, the owner
+        in: query
+        name: current_user
+        required: true
+        type: string
       - description: body
         in: body
         name: body
@@ -4634,6 +4670,11 @@ paths:
       - description: token_name
         in: path
         name: token_name
+        required: true
+        type: string
+      - description: current user, the owner
+        in: query
+        name: current_user
         required: true
         type: string
       - description: body

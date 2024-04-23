@@ -42,6 +42,7 @@ func (h *MemberHandler) Index(ctx *gin.Context) {
 // @Produce      json
 // @Param        name path string true "org name"
 // @Param        username path string true "user name"
+// @Param        current_user query string false "the op user"
 // @Param        body body handler.Update.updateMemberRequest true "body"
 // @Success      200  {object}  types.Response{} "OK"
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
@@ -51,17 +52,16 @@ func (h *MemberHandler) Update(ctx *gin.Context) {
 	type updateMemberRequest struct {
 		OldRole string `json:"old_role" binding:"required"`
 		NewRole string `json:"new_role" binding:"required"`
-		// name of the operator
-		OpUser string `json:"op_user" binding:"required"`
 	}
 	req := new(updateMemberRequest)
 	if err := ctx.ShouldBindJSON(req); err != nil {
 		httpbase.BadRequest(ctx, fmt.Errorf("failed to unmarshal request body,caused by:%w", err).Error())
 		return
 	}
+	currentUser := httpbase.GetCurrentUser(ctx)
 	org := ctx.Param("name")
 	userName := ctx.Param("username")
-	err := h.c.ChangeMemberRole(ctx, org, userName, req.OpUser, req.OldRole, req.NewRole)
+	err := h.c.ChangeMemberRole(ctx, org, userName, currentUser, req.OldRole, req.NewRole)
 	if err != nil {
 		httpbase.ServerError(ctx, err)
 		return
@@ -78,6 +78,7 @@ func (h *MemberHandler) Update(ctx *gin.Context) {
 // @Accept       json
 // @Produce      json
 // @Param        name path string true "org name"
+// @Param        current_user query string false "the op user"
 // @Param        body body handler.Create.addMemberRequest true "body"
 // @Success      200  {object}  types.Response{} "OK"
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
@@ -88,20 +89,19 @@ func (h *MemberHandler) Create(ctx *gin.Context) {
 		// name of user will be added to the org as a member
 		User string `json:"user" binding:"required"`
 		Role string `json:"role" binding:"required"`
-		// name of the operator
-		OpUser string `json:"op_user" binding:"required"`
 	}
 	req := new(addMemberRequest)
 	if err := ctx.ShouldBindJSON(req); err != nil {
 		httpbase.BadRequest(ctx, fmt.Errorf("failed to unmarshal request body,caused by:%w", err).Error())
 		return
 	}
+	currentUser := httpbase.GetCurrentUser(ctx)
 	org := ctx.Param("name")
-	err := h.c.AddMember(ctx, org, req.User, req.OpUser, req.Role)
+	err := h.c.AddMember(ctx, org, req.User, currentUser, req.Role)
 	if err != nil {
 		slog.ErrorContext(ctx, "create member fail", slog.Any("error", err),
 			slog.Group("request",
-				slog.String("org", org), slog.String("user", req.User), slog.String("role", req.Role), slog.String("op_user", req.OpUser),
+				slog.String("org", org), slog.String("user", req.User), slog.String("role", req.Role), slog.String("op_user", currentUser),
 			),
 		)
 		httpbase.ServerError(ctx, err)
@@ -120,6 +120,7 @@ func (h *MemberHandler) Create(ctx *gin.Context) {
 // @Produce      json
 // @Param        name path string true "org name"
 // @Param        username path string true "user name"
+// @Param        current_user query string false "the op user"
 // @Param        body body handler.Delete.removeMemberRequest true "body"
 // @Success      200  {object}  types.Response{} "OK"
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
@@ -128,21 +129,20 @@ func (h *MemberHandler) Create(ctx *gin.Context) {
 func (h *MemberHandler) Delete(ctx *gin.Context) {
 	type removeMemberRequest struct {
 		Role string `json:"role" binding:"required"`
-		// name of the operator
-		OpUser string `json:"op_user" binding:"required"`
 	}
 	req := new(removeMemberRequest)
 	if err := ctx.ShouldBindJSON(req); err != nil {
 		httpbase.BadRequest(ctx, fmt.Errorf("failed to unmarshal request body,caused by:%w", err).Error())
 		return
 	}
+	currentUser := httpbase.GetCurrentUser(ctx)
 	org := ctx.Param("name")
 	userName := ctx.Param("username")
-	err := h.c.Delete(ctx, org, userName, req.OpUser, req.Role)
+	err := h.c.Delete(ctx, org, userName, currentUser, req.Role)
 	if err != nil {
 		slog.ErrorContext(ctx, "delete member fail", slog.Any("error", err),
 			slog.Group("request",
-				slog.String("org", org), slog.String("username", userName), slog.String("role", req.Role), slog.String("op_user", req.OpUser),
+				slog.String("org", org), slog.String("username", userName), slog.String("role", req.Role), slog.String("op_user", currentUser),
 			),
 		)
 		httpbase.ServerError(ctx, err)
