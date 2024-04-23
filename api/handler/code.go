@@ -29,38 +29,6 @@ type CodeHandler struct {
 	c *component.CodeComponent
 }
 
-// CreateCodeFile godoc
-// @Security     ApiKey
-// @Summary      Create code file
-// @Description  create code file
-// @Tags         Code
-// @Accept       json
-// @Produce      json
-// @Param        namespace path string true "namespace"
-// @Param        name path string true "name"
-// @Param        file_path path string true "file_path"
-// @Param        body body types.CreateFileReq true "body"
-// @Success      200  {object}  types.Response{data=types.CreateFileResp} "OK"
-// @Failure      400  {object}  types.APIBadRequest "Bad request"
-// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
-// @Router       /codes/{namespace}/{name}/raw/{file_path} [post]
-
-// UpdateCodeFile godoc
-// @Security     ApiKey
-// @Summary      Update code file
-// @Description  update code file
-// @Tags         Code
-// @Accept       json
-// @Produce      json
-// @Param        namespace path string true "namespace"
-// @Param        name path string true "name"
-// @Param        file_path path string true "file_path"
-// @Param        body body types.UpdateFileReq true "body"
-// @Success      200  {object}  types.Response{data=types.UpdateFileResp} "OK"
-// @Failure      400  {object}  types.APIBadRequest "Bad request"
-// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
-// @Router       /codes/{namespace}/{name}/raw/{file_path} [put]
-
 // CreateCode   godoc
 // @Security     ApiKey
 // @Summary      Create a new code
@@ -68,18 +36,25 @@ type CodeHandler struct {
 // @Tags         Code
 // @Accept       json
 // @Produce      json
+// @Param        current_user query string false "current user, the owner"
 // @Param        body body types.CreateCodeReq true "body"
 // @Success      200  {object}  types.Response{data=types.Code} "OK"
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
 // @Router       /codes [post]
 func (h *CodeHandler) Create(ctx *gin.Context) {
+	currentUser := httpbase.GetCurrentUser(ctx)
+	if currentUser == "" {
+		httpbase.UnauthorizedError(ctx, errors.New("user not found, please login first"))
+		return
+	}
 	var req *types.CreateCodeReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {
 		slog.Error("Bad request format", "error", err)
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
+	req.Username = currentUser
 
 	code, err := h.c.Create(ctx, req)
 	if err != nil {
@@ -148,18 +123,25 @@ func (h *CodeHandler) Index(ctx *gin.Context) {
 // @Produce      json
 // @Param        namespace path string true "namespace"
 // @Param        name path string true "name"
+// @Param        current_user query string false "current user, the owner"
 // @Param        body body types.UpdateCodeReq true "body"
 // @Success      200  {object}  types.Response{data=database.Code} "OK"
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
 // @Router       /codes/{namespace}/{name} [put]
 func (h *CodeHandler) Update(ctx *gin.Context) {
+	currentUser := httpbase.GetCurrentUser(ctx)
+	if currentUser == "" {
+		httpbase.UnauthorizedError(ctx, errors.New("user not found, please login first"))
+		return
+	}
 	var req *types.UpdateCodeReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {
 		slog.Error("Bad request format", "error", err)
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
+	req.Username = currentUser
 
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
 	if err != nil {
@@ -190,19 +172,23 @@ func (h *CodeHandler) Update(ctx *gin.Context) {
 // @Produce      json
 // @Param        namespace path string true "namespace"
 // @Param        name path string true "name"
-// @Param        current_user query string true "current_user"
+// @Param        current_user query string false "current user, the owner"
 // @Success      200  {object}  types.Response{} "OK"
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
 // @Router       /codes/{namespace}/{name} [delete]
 func (h *CodeHandler) Delete(ctx *gin.Context) {
+	currentUser := httpbase.GetCurrentUser(ctx)
+	if currentUser == "" {
+		httpbase.UnauthorizedError(ctx, errors.New("user not found, please login first"))
+		return
+	}
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
 	if err != nil {
 		slog.Error("Bad request format", "error", err)
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
-	currentUser := httpbase.GetCurrentUser(ctx)
 	err = h.c.Delete(ctx, namespace, name, currentUser)
 	if err != nil {
 		slog.Error("Failed to delete code", slog.Any("error", err))
@@ -283,181 +269,3 @@ func (h *CodeHandler) Relations(ctx *gin.Context) {
 
 	httpbase.OK(ctx, detail)
 }
-
-// GetCodeCommits godoc
-// @Security     ApiKey
-// @Summary      Get code commits
-// @Description  get code commits
-// @Tags         Code
-// @Accept       json
-// @Produce      json
-// @Param        namespace path string true "namespace"
-// @Param        name path string true "name"
-// @Param        ref query string false "ref"
-// @Success      200  {object}  types.Response{data=[]types.Commit} "OK"
-// @Failure      400  {object}  types.APIBadRequest "Bad request"
-// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
-// @Router       /codes/{namespace}/{name}/commits [get]
-
-// GetCodeLastCommit godoc
-// @Security     ApiKey
-// @Summary      Get code last commit
-// @Description  get code last commit
-// @Tags         Code
-// @Accept       json
-// @Produce      json
-// @Param        namespace path string true "namespace"
-// @Param        name path string true "name"
-// @Param        ref query string false "ref"
-// @Success      200  {object}  types.Response{data=types.Commit} "OK"
-// @Failure      400  {object}  types.APIBadRequest "Bad request"
-// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
-// @Router       /codes/{namespace}/{name}/last_commit [get]
-
-// GetCodeFileRaw godoc
-// @Security     ApiKey
-// @Summary      Get code file raw
-// @Description  get code file raw
-// @Tags         Code
-// @Accept       json
-// @Produce      json
-// @Param        namespace path string true "namespace"
-// @Param        name path string true "name"
-// @Param        file_path path string true "file_path"
-// @Param        ref query string false "ref"
-// @Success      200  {object}  types.Response{data=types.Commit} "OK"
-// @Failure      400  {object}  types.APIBadRequest "Bad request"
-// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
-// @Router       /codes/{namespace}/{name}/raw/{file_path} [get]
-
-// GetCodeFileInfo godoc
-// @Security     ApiKey
-// @Summary      Get code file info
-// @Description  get code file info
-// @Tags         Code
-// @Accept       json
-// @Produce      json
-// @Param        namespace path string true "namespace"
-// @Param        name path string true "name"
-// @Param        file_path path string true "file_path"
-// @Param        ref query string false "ref"
-// @Success      200  {object}  types.Response{data=types.Commit} "OK"
-// @Failure      400  {object}  types.APIBadRequest "Bad request"
-// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
-// @Router       /codes/{namespace}/{name}/blob/{file_path} [get]
-
-// DownloadCodeFile godoc
-// @Security     ApiKey
-// @Summary      Download code file
-// @Description  download code file
-// @Tags         Code
-// @Accept       json
-// @Produce      json
-// @Produce      octet-stream
-// @Param        namespace path string true "namespace"
-// @Param        name path string true "name"
-// @Param        file_path path string true "file_path"
-// @Param        lfs query bool false "lfs"
-// @Param        ref query string false "ref"
-// @Param        save_as query string false "name of download file"
-// @Success      200  {object}  types.Response{data=string} "OK"
-// @Failure      400  {object}  types.APIBadRequest "Bad request"
-// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
-// @Router       /codes/{namespace}/{name}/download/{file_path} [get]
-
-// GetCodeBranches godoc
-// @Security     ApiKey
-// @Summary      Get code branches
-// @Description  get code branches
-// @Tags         Code
-// @Accept       json
-// @Produce      json
-// @Param        namespace path string true "namespace"
-// @Param        name path string true "name"
-// @param        per query int false "per" default(20)
-// @Param        page query int false "page" default(1)
-// @Success      200  {object}  types.Response{data=[]types.Branch} "OK"
-// @Failure      400  {object}  types.APIBadRequest "Bad request"
-// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
-// @Router       /codes/{namespace}/{name}/branches [get]
-
-// GetCodeTags godoc
-// @Security     ApiKey
-// @Summary      Get code tags
-// @Description  get code tags
-// @Tags         Code
-// @Accept       json
-// @Produce      json
-// @Param        namespace path string true "namespace"
-// @Param        name path string true "name"
-// @Success      200  {object}  types.Response{data=[]types.Branch} "OK"
-// @Failure      400  {object}  types.APIBadRequest "Bad request"
-// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
-// @Router       /codes/{namespace}/{name}/tags [get]
-
-// GetCodeFileTree godoc
-// @Security     ApiKey
-// @Summary      Get code file tree
-// @Description  get code file tree
-// @Tags         Code
-// @Accept       json
-// @Produce      json
-// @Param        namespace path string true "namespace"
-// @Param        name path string true "name"
-// @Param        ref query string false "ref"
-// @Success      200  {object}  types.Response{data=[]types.File} "OK"
-// @Failure      400  {object}  types.APIBadRequest "Bad request"
-// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
-// @Router       /codes/{namespace}/{name}/tree [get]
-
-// UpdateCodeDownloads godoc
-// @Security     ApiKey
-// @Summary      Update code downloads
-// @Description  update code downloads
-// @Tags         Code
-// @Accept       json
-// @Produce      json
-// @Param        namespace path string true "namespace"
-// @Param        name path string true "name"
-// @Param        body body types.UpdateDownloadsReq true "body"
-// @Success      200  {object}  types.Response{data=[]types.File} "OK"
-// @Failure      400  {object}  types.APIBadRequest "Bad request"
-// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
-// @Router       /codes/{namespace}/{name}/update_downloads [post]
-
-// UploadCodeFile godoc
-// @Security     ApiKey
-// @Summary      Create code file
-// @Description  upload code file to create or update a file in code repository
-// @Tags         Code
-// @Accept       json
-// @Produce      json
-// @Param        namespace path string true "namespace"
-// @Param        name path string true "name"
-// @Param        file_path formData string true "file_path"
-// @Param        file formData file true "file"
-// @Param        email formData string true "email"
-// @Param        message formData string true "message"
-// @Param        branch formData string false "branch"
-// @Param        username formData string true "username"
-// @Success      200  {object}  types.Response{data=types.CreateFileResp} "OK"
-// @Failure      400  {object}  types.APIBadRequest "Bad request"
-// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
-// @Router       /codes/{namespace}/{name}/upload_file [post]
-
-// DownloadCodeFile godoc
-// @Security     ApiKey
-// @Summary      Download code file
-// @Description  download code file
-// @Tags         Code
-// @Accept       json
-// @Produce      json
-// @Produce      octet-stream
-// @Param        namespace path string true "namespace"
-// @Param        name path string true "name"
-// @Param        file_path path string true "file_path"
-// @Param        ref query string false "ref"
-// @Success      200  {object}  types.Response{data=string} "OK"
-// @Failure      400  {object}  types.APIBadRequest "Bad request"
-// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
-// @Router       /codes/{namespace}/{name}/resolve/{file_path} [get]

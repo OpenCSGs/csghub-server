@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"errors"
 	"log/slog"
 
 	"github.com/gin-gonic/gin"
@@ -32,12 +33,18 @@ type AccessTokenHandler struct {
 // @Accept       json
 // @Produce      json
 // @Param        username path string true "username"
+// @Param        current_user query string true "current user, the owner"
 // @Param        body body types.CreateUserTokenRequest true "body"
 // @Success      200  {object}  types.Response{data=database.AccessToken} "OK"
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
 // @Router       /user/{username}/tokens [post]
 func (h *AccessTokenHandler) Create(ctx *gin.Context) {
+	currentUser := httpbase.GetCurrentUser(ctx)
+	if currentUser == "" {
+		httpbase.UnauthorizedError(ctx, errors.New("user not found, please login first"))
+		return
+	}
 	var req types.CreateUserTokenRequest
 	if err := ctx.ShouldBindJSON(&req); err != nil {
 		slog.Error("Bad request format", "error", err)
@@ -46,6 +53,11 @@ func (h *AccessTokenHandler) Create(ctx *gin.Context) {
 	}
 
 	req.Username = ctx.Param("username")
+	if currentUser != req.Username {
+		slog.Error("user can only create its own access token", slog.String("current_user", currentUser), slog.String("username", req.Username))
+		httpbase.UnauthorizedError(ctx, errors.New("user can only create its own access token"))
+		return
+	}
 	token, err := h.c.Create(ctx, &req)
 	if err != nil {
 		slog.Error("Failed to create user access token", slog.Any("error", err))
@@ -66,14 +78,25 @@ func (h *AccessTokenHandler) Create(ctx *gin.Context) {
 // @Produce      json
 // @Param        username path string true "username"
 // @Param        token_name path string true "token_name"
+// @Param        current_user query string true "current user, the owner"
 // @Param        body body types.DeleteUserTokenRequest true "body"
 // @Success      200  {object}  types.Response{} "OK"
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
 // @Router       /user/{username}/tokens/{token_name} [delete]
 func (h *AccessTokenHandler) Delete(ctx *gin.Context) {
+	currentUser := httpbase.GetCurrentUser(ctx)
+	if currentUser == "" {
+		httpbase.UnauthorizedError(ctx, errors.New("user not found, please login first"))
+		return
+	}
 	var req types.DeleteUserTokenRequest
 	req.Username = ctx.Param("username")
+	if currentUser != req.Username {
+		slog.Error("user can only delete its own access token", slog.String("current_user", currentUser), slog.String("username", req.Username))
+		httpbase.UnauthorizedError(ctx, errors.New("user can only delete its own access token"))
+		return
+	}
 	req.Name = ctx.Param("token_name")
 	err := h.c.Delete(ctx, &req)
 	if err != nil {
