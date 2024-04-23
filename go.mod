@@ -1,6 +1,6 @@
 module opencsg.com/csghub-server
 
-go 1.21
+go 1.22
 
 require (
 	github.com/OpenCSGs/gitea-go-sdk/gitea v0.0.0-20240117080153-8d03f7abd3db
@@ -120,7 +120,7 @@ require (
 	golang.org/x/arch v0.7.0 // indirect
 	golang.org/x/crypto v0.21.0 // indirect
 	golang.org/x/mod v0.14.0 // indirect
-	golang.org/x/net v0.22.0 // indirect
+	golang.org/x/net v0.23.0 // indirect
 	golang.org/x/oauth2 v0.16.0 // indirect
 	golang.org/x/sys v0.18.0 // indirect
 	golang.org/x/term v0.18.0 // indirect
