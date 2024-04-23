@@ -114,6 +114,12 @@ const docTemplate = `{
                 "summary": "Create a new code",
                 "parameters": [
                     {
+                        "type": "string",
+                        "description": "current user, the owner",
+                        "name": "current_user",
+                        "in": "query"
+                    },
+                    {
                         "description": "body",
                         "name": "body",
                         "in": "body",
@@ -264,6 +270,12 @@ const docTemplate = `{
                         "required": true
                     },
                     {
+                        "type": "string",
+                        "description": "current user, the owner",
+                        "name": "current_user",
+                        "in": "query"
+                    },
+                    {
                         "description": "body",
                         "name": "body",
                         "in": "body",
@@ -340,10 +352,9 @@ const docTemplate = `{
                     },
                     {
                         "type": "string",
-                        "description": "current_user",
+                        "description": "current user, the owner",
                         "name": "current_user",
-                        "in": "query",
-                        "required": true
+                        "in": "query"
                     }
                 ],
                 "responses": {
@@ -552,6 +563,12 @@ const docTemplate = `{
                 "summary": "Create a new dataset",
                 "parameters": [
                     {
+                        "type": "string",
+                        "description": "current user, the owner",
+                        "name": "current_user",
+                        "in": "query"
+                    },
+                    {
                         "description": "body",
                         "name": "body",
                         "in": "body",
@@ -702,6 +719,12 @@ const docTemplate = `{
                         "required": true
                     },
                     {
+                        "type": "string",
+                        "description": "current user, the owner",
+                        "name": "current_user",
+                        "in": "query"
+                    },
+                    {
                         "description": "body",
                         "name": "body",
                         "in": "body",
@@ -778,10 +801,9 @@ const docTemplate = `{
                     },
                     {
                         "type": "string",
-                        "description": "current_user",
+                        "description": "current user, the owner",
                         "name": "current_user",
-                        "in": "query",
-                        "required": true
+                        "in": "query"
                     }
                 ],
                 "responses": {
@@ -1449,6 +1471,12 @@ const docTemplate = `{
                         "required": true
                     },
                     {
+                        "type": "string",
+                        "description": "current user, the model owner",
+                        "name": "current_user",
+                        "in": "query"
+                    },
+                    {
                         "description": "body",
                         "name": "body",
                         "in": "body",
@@ -1525,10 +1553,9 @@ const docTemplate = `{
                     },
                     {
                         "type": "string",
-                        "description": "current_user",
+                        "description": "current user, the model owner",
                         "name": "current_user",
-                        "in": "query",
-                        "required": true
+                        "in": "query"
                     }
                 ],
                 "responses": {
@@ -1585,6 +1612,12 @@ const docTemplate = `{
                         "name": "name",
                         "in": "path",
                         "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "current user",
+                        "name": "current_user",
+                        "in": "query"
                     },
                     {
                         "description": "input for model prediction",
@@ -1652,7 +1685,7 @@ const docTemplate = `{
                     },
                     {
                         "type": "string",
-                        "description": "current_user",
+                        "description": "current user",
                         "name": "current_user",
                         "in": "query"
                     }
@@ -2103,6 +2136,12 @@ const docTemplate = `{
                 "summary": "Create a new organization",
                 "parameters": [
                     {
+                        "type": "string",
+                        "description": "the op user",
+                        "name": "current_user",
+                        "in": "query"
+                    },
+                    {
                         "description": "body",
                         "name": "body",
                         "in": "body",
@@ -2173,6 +2212,12 @@ const docTemplate = `{
                         "required": true
                     },
                     {
+                        "type": "string",
+                        "description": "the op user",
+                        "name": "current_user",
+                        "in": "query"
+                    },
+                    {
                         "description": "body",
                         "name": "body",
                         "in": "body",
@@ -2241,6 +2286,12 @@ const docTemplate = `{
                         "required": true
                     },
                     {
+                        "type": "string",
+                        "description": "the op user",
+                        "name": "current_user",
+                        "in": "query"
+                    },
+                    {
                         "description": "body",
                         "name": "body",
                         "in": "body",
@@ -2291,6 +2342,12 @@ const docTemplate = `{
                         "name": "name",
                         "in": "path",
                         "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "the op user",
+                        "name": "current_user",
+                        "in": "query"
                     },
                     {
                         "description": "body",
@@ -2357,6 +2414,12 @@ const docTemplate = `{
                         "required": true
                     },
                     {
+                        "type": "string",
+                        "description": "the op user",
+                        "name": "current_user",
+                        "in": "query"
+                    },
+                    {
                         "description": "body",
                         "name": "body",
                         "in": "body",
@@ -2418,6 +2481,12 @@ const docTemplate = `{
                         "name": "username",
                         "in": "path",
                         "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "the op user",
+                        "name": "current_user",
+                        "in": "query"
                     },
                     {
                         "description": "body",
@@ -3045,6 +3114,13 @@ const docTemplate = `{
                 "summary": "Create a new space",
                 "parameters": [
                     {
+                        "type": "string",
+                        "description": "current_user",
+                        "name": "current_user",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
                         "description": "body",
                         "name": "body",
                         "in": "body",
@@ -3194,6 +3270,13 @@ const docTemplate = `{
                         "required": true
                     },
                     {
+                        "type": "string",
+                        "description": "current_user",
+                        "name": "current_user",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
                         "description": "body",
                         "name": "body",
                         "in": "body",
@@ -3329,6 +3412,13 @@ const docTemplate = `{
                         "name": "name",
                         "in": "path",
                         "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "current_user",
+                        "name": "current_user",
+                        "in": "query",
+                        "required": true
                     }
                 ],
                 "responses": {
@@ -3377,6 +3467,13 @@ const docTemplate = `{
                         "description": "name",
                         "name": "name",
                         "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "current_user",
+                        "name": "current_user",
+                        "in": "query",
                         "required": true
                     }
                 ],
@@ -3427,6 +3524,13 @@ const docTemplate = `{
                         "name": "name",
                         "in": "path",
                         "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "current_user",
+                        "name": "current_user",
+                        "in": "query",
+                        "required": true
                     }
                 ],
                 "responses": {
@@ -3475,6 +3579,13 @@ const docTemplate = `{
                         "description": "name",
                         "name": "name",
                         "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "current_user",
+                        "name": "current_user",
+                        "in": "query",
                         "required": true
                     }
                 ],
@@ -4456,6 +4567,13 @@ const docTemplate = `{
                         "required": true
                     },
                     {
+                        "type": "string",
+                        "description": "current user, the owner",
+                        "name": "current_user",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
                         "description": "body",
                         "name": "body",
                         "in": "body",
@@ -4530,6 +4648,13 @@ const docTemplate = `{
                         "description": "token_name",
                         "name": "token_name",
                         "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "current user, the owner",
+                        "name": "current_user",
+                        "in": "query",
                         "required": true
                     },
                     {
@@ -6193,15 +6318,10 @@ const docTemplate = `{
         "handler.Create.addMemberRequest": {
             "type": "object",
             "required": [
-                "op_user",
                 "role",
                 "user"
             ],
             "properties": {
-                "op_user": {
-                    "description": "name of the operator",
-                    "type": "string"
-                },
                 "role": {
                     "type": "string"
                 },
@@ -6214,14 +6334,9 @@ const docTemplate = `{
         "handler.Delete.removeMemberRequest": {
             "type": "object",
             "required": [
-                "op_user",
                 "role"
             ],
             "properties": {
-                "op_user": {
-                    "description": "name of the operator",
-                    "type": "string"
-                },
                 "role": {
                     "type": "string"
                 }
@@ -6231,18 +6346,13 @@ const docTemplate = `{
             "type": "object",
             "required": [
                 "new_role",
-                "old_role",
-                "op_user"
+                "old_role"
             ],
             "properties": {
                 "new_role": {
                     "type": "string"
                 },
                 "old_role": {
-                    "type": "string"
-                },
-                "op_user": {
-                    "description": "name of the operator",
                     "type": "string"
                 }
             }
@@ -6387,10 +6497,6 @@ const docTemplate = `{
                 },
                 "readme": {
                     "type": "string"
-                },
-                "username": {
-                    "type": "string",
-                    "example": "creator_user_name"
                 }
             }
         },
@@ -6429,10 +6535,6 @@ const docTemplate = `{
                 },
                 "readme": {
                     "type": "string"
-                },
-                "username": {
-                    "type": "string",
-                    "example": "creator_user_name"
                 }
             }
         },
@@ -6519,10 +6621,6 @@ const docTemplate = `{
                 },
                 "readme": {
                     "type": "string"
-                },
-                "username": {
-                    "type": "string",
-                    "example": "creator_user_name"
                 }
             }
         },
@@ -6542,10 +6640,6 @@ const docTemplate = `{
                     "description": "Org unique identifier",
                     "type": "string",
                     "example": "org_name_1"
-                },
-                "username": {
-                    "type": "string",
-                    "example": "user_name_1"
                 }
             }
         },
@@ -6622,10 +6716,6 @@ const docTemplate = `{
                 },
                 "template": {
                     "type": "string"
-                },
-                "username": {
-                    "type": "string",
-                    "example": "creator_user_name"
                 }
             }
         },
@@ -6772,12 +6862,7 @@ const docTemplate = `{
             }
         },
         "types.DeleteOrgReq": {
-            "type": "object",
-            "properties": {
-                "current_user": {
-                    "type": "string"
-                }
-            }
+            "type": "object"
         },
         "types.DeleteUserTokenRequest": {
             "type": "object",
@@ -6793,9 +6878,6 @@ const docTemplate = `{
         "types.EditOrgReq": {
             "type": "object",
             "properties": {
-                "current_user": {
-                    "type": "string"
-                },
                 "description": {
                     "type": "string",
                     "example": "org description"
@@ -7262,10 +7344,6 @@ const docTemplate = `{
                 },
                 "readme": {
                     "type": "string"
-                },
-                "username": {
-                    "type": "string",
-                    "example": "creator_user_name"
                 }
             }
         },
@@ -7304,10 +7382,6 @@ const docTemplate = `{
                 },
                 "readme": {
                     "type": "string"
-                },
-                "username": {
-                    "type": "string",
-                    "example": "creator_user_name"
                 }
             }
         },
@@ -7375,10 +7449,6 @@ const docTemplate = `{
                 },
                 "readme": {
                     "type": "string"
-                },
-                "username": {
-                    "type": "string",
-                    "example": "creator_user_name"
                 }
             }
         },
@@ -7441,10 +7511,6 @@ const docTemplate = `{
                 },
                 "template": {
                     "type": "string"
-                },
-                "username": {
-                    "type": "string",
-                    "example": "creator_user_name"
                 }
             }
         },

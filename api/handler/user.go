@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"errors"
 	"log/slog"
 	"net/http"
 	"strconv"
@@ -113,7 +114,7 @@ func (h *UserHandler) Datasets(ctx *gin.Context) {
 	}
 
 	req.Owner = ctx.Param("username")
-	req.CurrentUser = ctx.GetString("currentUser")
+	req.CurrentUser = httpbase.GetCurrentUser(ctx)
 	req.Page = page
 	req.PageSize = per
 	ds, total, err := h.c.Datasets(ctx, &req)
@@ -154,7 +155,7 @@ func (h *UserHandler) Models(ctx *gin.Context) {
 	}
 
 	req.Owner = ctx.Param("username")
-	req.CurrentUser = ctx.GetString("currentUser")
+	req.CurrentUser = httpbase.GetCurrentUser(ctx)
 	req.Page = page
 	req.PageSize = per
 	ms, total, err := h.c.Models(ctx, &req)
@@ -196,7 +197,7 @@ func (h *UserHandler) Codes(ctx *gin.Context) {
 	}
 
 	req.Owner = ctx.Param("username")
-	req.CurrentUser = ctx.GetString("currentUser")
+	req.CurrentUser = httpbase.GetCurrentUser(ctx)
 	req.Page = page
 	req.PageSize = per
 	ms, total, err := h.c.Codes(ctx, &req)
@@ -237,7 +238,7 @@ func (h *UserHandler) Spaces(ctx *gin.Context) {
 	}
 
 	req.Owner = ctx.Param("username")
-	req.CurrentUser = ctx.GetString("currentUser")
+	req.CurrentUser = httpbase.GetCurrentUser(ctx)
 	req.Page = page
 	req.PageSize = per
 	ms, total, err := h.c.Spaces(ctx, &req)
@@ -269,9 +270,14 @@ func (h *UserHandler) Spaces(ctx *gin.Context) {
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
 // @Router       /user/{username}/likes/{repoid} [put]
 func (h *UserHandler) LikesAdd(ctx *gin.Context) {
+	currentUser := httpbase.GetCurrentUser(ctx)
+	if currentUser == "" {
+		httpbase.UnauthorizedError(ctx, errors.New("user not found, please login first"))
+		return
+	}
 	var req types.UserLikesRequest
 	req.Username = ctx.Param("username")
-	req.CurrentUser = httpbase.GetCurrentUser(ctx)
+	req.CurrentUser = currentUser
 	repo_id, err := strconv.ParseInt(ctx.Param("repo_id"), 10, 64)
 	if err != nil {
 		httpbase.ServerError(ctx, err)
@@ -300,9 +306,14 @@ func (h *UserHandler) LikesAdd(ctx *gin.Context) {
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
 // @Router       /user/{username}/likes/{repoid} [delete]
 func (h *UserHandler) LikesDelete(ctx *gin.Context) {
+	currentUser := httpbase.GetCurrentUser(ctx)
+	if currentUser == "" {
+		httpbase.UnauthorizedError(ctx, errors.New("user not found, please login first"))
+		return
+	}
 	var req types.UserLikesRequest
 	req.Username = ctx.Param("username")
-	req.CurrentUser = httpbase.GetCurrentUser(ctx)
+	req.CurrentUser = currentUser
 	repo_id, err := strconv.ParseInt(ctx.Param("repo_id"), 10, 64)
 	if err != nil {
 		httpbase.ServerError(ctx, err)
@@ -330,6 +341,11 @@ func (h *UserHandler) LikesDelete(ctx *gin.Context) {
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
 // @Router       /user/{username}/likes/spaces [get]
 func (h *UserHandler) LikesSpaces(ctx *gin.Context) {
+	currentUser := httpbase.GetCurrentUser(ctx)
+	if currentUser == "" {
+		httpbase.UnauthorizedError(ctx, errors.New("user not found, please login first"))
+		return
+	}
 	var req types.UserSpacesReq
 	per, page, err := common.GetPerAndPageFromContext(ctx)
 	if err != nil {
@@ -339,7 +355,7 @@ func (h *UserHandler) LikesSpaces(ctx *gin.Context) {
 	}
 
 	req.Owner = ctx.Param("username")
-	req.CurrentUser = httpbase.GetCurrentUser(ctx)
+	req.CurrentUser = currentUser
 	req.Page = page
 	req.PageSize = per
 
@@ -372,6 +388,11 @@ func (h *UserHandler) LikesSpaces(ctx *gin.Context) {
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
 // @Router       /user/{username}/likes/codes [get]
 func (h *UserHandler) LikesCodes(ctx *gin.Context) {
+	currentUser := httpbase.GetCurrentUser(ctx)
+	if currentUser == "" {
+		httpbase.UnauthorizedError(ctx, errors.New("user not found, please login first"))
+		return
+	}
 	var req types.UserDatasetsReq
 	per, page, err := common.GetPerAndPageFromContext(ctx)
 	if err != nil {
@@ -381,7 +402,7 @@ func (h *UserHandler) LikesCodes(ctx *gin.Context) {
 	}
 
 	req.Owner = ctx.Param("username")
-	req.CurrentUser = httpbase.GetCurrentUser(ctx)
+	req.CurrentUser = currentUser
 	req.Page = page
 	req.PageSize = per
 	ms, total, err := h.c.LikesCodes(ctx, &req)
@@ -414,6 +435,11 @@ func (h *UserHandler) LikesCodes(ctx *gin.Context) {
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
 // @Router       /user/{username}/likes/models [get]
 func (h *UserHandler) LikesModels(ctx *gin.Context) {
+	currentUser := httpbase.GetCurrentUser(ctx)
+	if currentUser == "" {
+		httpbase.UnauthorizedError(ctx, errors.New("user not found, please login first"))
+		return
+	}
 	var req types.UserDatasetsReq
 	per, page, err := common.GetPerAndPageFromContext(ctx)
 	if err != nil {
@@ -423,7 +449,7 @@ func (h *UserHandler) LikesModels(ctx *gin.Context) {
 	}
 
 	req.Owner = ctx.Param("username")
-	req.CurrentUser = httpbase.GetCurrentUser(ctx)
+	req.CurrentUser = currentUser
 	req.Page = page
 	req.PageSize = per
 	ms, total, err := h.c.LikesModels(ctx, &req)
@@ -456,6 +482,11 @@ func (h *UserHandler) LikesModels(ctx *gin.Context) {
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
 // @Router       /user/{username}/likes/datasets [get]
 func (h *UserHandler) LikesDatasets(ctx *gin.Context) {
+	currentUser := httpbase.GetCurrentUser(ctx)
+	if currentUser == "" {
+		httpbase.UnauthorizedError(ctx, errors.New("user not found, please login first"))
+		return
+	}
 	var req types.UserDatasetsReq
 	per, page, err := common.GetPerAndPageFromContext(ctx)
 	if err != nil {
@@ -465,7 +496,7 @@ func (h *UserHandler) LikesDatasets(ctx *gin.Context) {
 	}
 
 	req.Owner = ctx.Param("username")
-	req.CurrentUser = httpbase.GetCurrentUser(ctx)
+	req.CurrentUser = currentUser
 	req.Page = page
 	req.PageSize = per
 	ds, total, err := h.c.LikesDatasets(ctx, &req)
