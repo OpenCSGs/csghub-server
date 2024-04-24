@@ -85,7 +85,8 @@ type Model struct {
 	// widget UI style: generation,chat
 	WidgetType ModelWidgetType `json:"widget_type" example:"generation"`
 	// url to interact with the model
-	Status string `json:"status" example:"RUNNING"`
+	Status    string `json:"status" example:"RUNNING"`
+	UserLikes bool   `json:"userlikes"`
 }
 
 type ModelWidgetType string
