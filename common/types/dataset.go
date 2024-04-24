@@ -32,4 +32,5 @@ type Dataset struct {
 	DefaultBranch string     `json:"default_branch"`
 	CreatedAt     time.Time  `json:"created_at"`
 	UpdatedAt     time.Time  `json:"updated_at"`
+	UserLikes     bool       `json:"userlikes"`
 }
