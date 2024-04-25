@@ -196,6 +196,7 @@ func (c *SpaceComponent) Update(ctx context.Context, req *types.UpdateSpaceReq) 
 		return nil, fmt.Errorf("failed to find space, error: %w", err)
 	}
 
+	space = mergeUpdateSpaceRequest(space, req)
 	err = c.ss.Update(ctx, *space)
 	if err != nil {
 		return nil, fmt.Errorf("failed to update database space, error: %w", err)
@@ -586,6 +587,32 @@ func spaceStatusCodeToString(code int) string {
 		txt = SpaceStatusStopped
 	}
 	return txt
+}
+
+func mergeUpdateSpaceRequest(space *database.Space, req *types.UpdateSpaceReq) *database.Space {
+	// Do not update column value if request body do not have it
+	if req.Sdk != "" {
+		space.Sdk = req.Sdk
+	}
+	if req.SdkVersion != "" {
+		space.SdkVersion = req.SdkVersion
+	}
+	if req.Env != "" {
+		space.Env = req.Env
+	}
+	if req.Hardware != "" {
+		space.Hardware = req.Hardware
+	}
+	if req.Secrets != "" {
+		space.Secrets = req.Secrets
+	}
+	if req.Template != "" {
+		space.Template = req.Template
+	}
+	if req.CoverImageUrl != "" {
+		space.CoverImageUrl = req.CoverImageUrl
+	}
+	return space
 }
 
 const (
