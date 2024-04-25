@@ -86,7 +86,7 @@ type Model struct {
 	WidgetType ModelWidgetType `json:"widget_type" example:"generation"`
 	// url to interact with the model
 	Status    string `json:"status" example:"RUNNING"`
-	UserLikes bool   `json:"userlikes"`
+	UserLikes bool   `json:"user_likes"`
 }
 
 type ModelWidgetType string

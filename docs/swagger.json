@@ -6417,7 +6417,7 @@
                 "user": {
                     "$ref": "#/definitions/types.User"
                 },
-                "userlikes": {
+                "user_likes": {
                     "type": "boolean"
                 }
             }
@@ -6819,7 +6819,7 @@
                 "user": {
                     "$ref": "#/definitions/types.User"
                 },
-                "userlikes": {
+                "user_likes": {
                     "type": "boolean"
                 }
             }
@@ -6997,7 +6997,7 @@
                 "user": {
                     "$ref": "#/definitions/types.User"
                 },
-                "userlikes": {
+                "user_likes": {
                     "type": "boolean"
                 },
                 "widget_type": {
@@ -7273,7 +7273,7 @@
                 "user": {
                     "$ref": "#/definitions/types.User"
                 },
-                "userlikes": {
+                "user_likes": {
                     "type": "boolean"
                 },
                 "username": {
