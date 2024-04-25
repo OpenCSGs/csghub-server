@@ -50,7 +50,7 @@ type Space struct {
 	// deploying, running, failed
 	Status       string `json:"status"`
 	RepositoryID int64  `json:"repository_id,omitempty"`
-	UserLikes    bool   `json:"userlikes"`
+	UserLikes    bool   `json:"user_likes"`
 }
 
 type UpdateSpaceReq struct {
