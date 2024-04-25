@@ -6428,7 +6428,7 @@ const docTemplate = `{
                 "user": {
                     "$ref": "#/definitions/types.User"
                 },
-                "userlikes": {
+                "user_likes": {
                     "type": "boolean"
                 }
             }
@@ -6830,7 +6830,7 @@ const docTemplate = `{
                 "user": {
                     "$ref": "#/definitions/types.User"
                 },
-                "userlikes": {
+                "user_likes": {
                     "type": "boolean"
                 }
             }
@@ -7008,7 +7008,7 @@ const docTemplate = `{
                 "user": {
                     "$ref": "#/definitions/types.User"
                 },
-                "userlikes": {
+                "user_likes": {
                     "type": "boolean"
                 },
                 "widget_type": {
@@ -7284,7 +7284,7 @@ const docTemplate = `{
                 "user": {
                     "$ref": "#/definitions/types.User"
                 },
-                "userlikes": {
+                "user_likes": {
                     "type": "boolean"
                 },
                 "username": {
