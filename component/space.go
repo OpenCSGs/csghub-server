@@ -34,13 +34,11 @@ func NewSpaceComponent(config *config.Config) (*SpaceComponent, error) {
 	c.deployer = deploy.NewDeployer()
 	c.publicRootDomain = config.Space.PublicRootDomain
 	c.uls = database.NewUserLikesStore()
-	c.us = database.NewUserStore()
 	return c, nil
 }
 
 type SpaceComponent struct {
 	*RepoComponent
-	us               *database.UserStore
 	ss               *database.SpaceStore
 	sss              *database.SpaceSdkStore
 	srs              *database.SpaceResourceStore
@@ -150,13 +148,7 @@ func (c *SpaceComponent) Show(ctx context.Context, namespace, name, currentUser 
 		endpoint = fmt.Sprintf("%s.%s", srvName, c.publicRootDomain)
 	}
 
-	user, err := c.us.FindByUsername(ctx, currentUser)
-	if err != nil {
-		newError := fmt.Errorf("failed to check for the presence of the user,error:%w", err)
-		return nil, newError
-	}
-
-	likeExists, err := c.uls.IsExist(ctx, user.ID, space.Repository.ID)
+	likeExists, err := c.uls.IsExist(ctx, currentUser, space.Repository.ID)
 	if err != nil {
 		newError := fmt.Errorf("failed to check for the presence of the user likes,error:%w", err)
 		return nil, newError

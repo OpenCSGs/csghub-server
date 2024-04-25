@@ -68,7 +68,6 @@ func NewModelComponent(config *config.Config) (*ModelComponent, error) {
 	c.ms = database.NewModelStore()
 	c.infer = inference.NewInferClient(config.Inference.ServerAddr)
 	c.uls = database.NewUserLikesStore()
-	c.us = database.NewUserStore()
 	return c, nil
 }
 
@@ -77,7 +76,6 @@ type ModelComponent struct {
 	spaceComonent *SpaceComponent
 	ms            *database.ModelStore
 	infer         inference.Client
-	us            *database.UserStore
 	uls           *database.UserLikesStore
 }
 
@@ -361,13 +359,8 @@ func (c *ModelComponent) Show(ctx context.Context, namespace, name, currentUser 
 			UpdatedAt: tag.UpdatedAt,
 		})
 	}
-	user, err := c.us.FindByUsername(ctx, currentUser)
-	if err != nil {
-		newError := fmt.Errorf("failed to check for the presence of the user,error:%w", err)
-		return nil, newError
-	}
 
-	likeExists, err := c.uls.IsExist(ctx, user.ID, model.Repository.ID)
+	likeExists, err := c.uls.IsExist(ctx, currentUser, model.Repository.ID)
 	if err != nil {
 		newError := fmt.Errorf("failed to check for the presence of the user likes,error:%w", err)
 		return nil, newError
