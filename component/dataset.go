@@ -88,7 +88,6 @@ func NewDatasetComponent(config *config.Config) (*DatasetComponent, error) {
 		return nil, err
 	}
 	c.uls = database.NewUserLikesStore()
-	c.us = database.NewUserStore()
 	return c, nil
 }
 
@@ -96,7 +95,6 @@ type DatasetComponent struct {
 	*RepoComponent
 	ts  *database.TagStore
 	ds  *database.DatasetStore
-	us  *database.UserStore
 	uls *database.UserLikesStore
 }
 
@@ -370,13 +368,7 @@ func (c *DatasetComponent) Show(ctx context.Context, namespace, name, currentUse
 		})
 	}
 
-	user, err := c.us.FindByUsername(ctx, currentUser)
-	if err != nil {
-		newError := fmt.Errorf("failed to check for the presence of the user,error:%w", err)
-		return nil, newError
-	}
-
-	likeExists, err := c.uls.IsExist(ctx, user.ID, dataset.Repository.ID)
+	likeExists, err := c.uls.IsExist(ctx, currentUser, dataset.Repository.ID)
 	if err != nil {
 		newError := fmt.Errorf("failed to check for the presence of the user likes,error:%w", err)
 		return nil, newError

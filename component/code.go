@@ -21,14 +21,12 @@ func NewCodeComponent(config *config.Config) (*CodeComponent, error) {
 	}
 	c.cs = database.NewCodeStore()
 	c.uls = database.NewUserLikesStore()
-	c.us = database.NewUserStore()
 	return c, nil
 }
 
 type CodeComponent struct {
 	*RepoComponent
 	cs  *database.CodeStore
-	us  *database.UserStore
 	uls *database.UserLikesStore
 }
 
@@ -256,13 +254,8 @@ func (c *CodeComponent) Show(ctx context.Context, namespace, name, currentUser s
 			UpdatedAt: tag.UpdatedAt,
 		})
 	}
-	user, err := c.us.FindByUsername(ctx, currentUser)
-	if err != nil {
-		newError := fmt.Errorf("failed to check for the presence of the user,error:%w", err)
-		return nil, newError
-	}
 
-	likeExists, err := c.uls.IsExist(ctx, user.ID, code.Repository.ID)
+	likeExists, err := c.uls.IsExist(ctx, currentUser, code.Repository.ID)
 	if err != nil {
 		newError := fmt.Errorf("failed to check for the presence of the user likes,error:%w", err)
 		return nil, newError
