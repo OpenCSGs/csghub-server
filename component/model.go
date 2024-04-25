@@ -67,7 +67,6 @@ func NewModelComponent(config *config.Config) (*ModelComponent, error) {
 	c.spaceComonent, _ = NewSpaceComponent(config)
 	c.ms = database.NewModelStore()
 	c.infer = inference.NewInferClient(config.Inference.ServerAddr)
-	c.uls = database.NewUserLikesStore()
 	return c, nil
 }
 
@@ -76,7 +75,6 @@ type ModelComponent struct {
 	spaceComonent *SpaceComponent
 	ms            *database.ModelStore
 	infer         inference.Client
-	uls           *database.UserLikesStore
 }
 
 func (c *ModelComponent) Index(ctx context.Context, username, search, sort string, ragReqs []database.TagReq, per, page int) ([]types.Model, int, error) {

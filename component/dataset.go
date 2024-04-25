@@ -87,15 +87,13 @@ func NewDatasetComponent(config *config.Config) (*DatasetComponent, error) {
 	if err != nil {
 		return nil, err
 	}
-	c.uls = database.NewUserLikesStore()
 	return c, nil
 }
 
 type DatasetComponent struct {
 	*RepoComponent
-	ts  *database.TagStore
-	ds  *database.DatasetStore
-	uls *database.UserLikesStore
+	ts *database.TagStore
+	ds *database.DatasetStore
 }
 
 func (c *DatasetComponent) Create(ctx context.Context, req *types.CreateDatasetReq) (*types.Dataset, error) {

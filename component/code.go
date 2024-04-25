@@ -20,14 +20,12 @@ func NewCodeComponent(config *config.Config) (*CodeComponent, error) {
 		return nil, err
 	}
 	c.cs = database.NewCodeStore()
-	c.uls = database.NewUserLikesStore()
 	return c, nil
 }
 
 type CodeComponent struct {
 	*RepoComponent
-	cs  *database.CodeStore
-	uls *database.UserLikesStore
+	cs *database.CodeStore
 }
 
 func (c *CodeComponent) Create(ctx context.Context, req *types.CreateCodeReq) (*types.Code, error) {
