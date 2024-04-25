@@ -38,6 +38,7 @@ type RepoComponent struct {
 	s3Client  *minio.Client
 	msc       *MemberComponent
 	lfsBucket string
+	uls       *database.UserLikesStore
 }
 
 func NewRepoComponent(config *config.Config) (*RepoComponent, error) {
@@ -47,6 +48,7 @@ func NewRepoComponent(config *config.Config) (*RepoComponent, error) {
 	c.org = database.NewOrgStore()
 	c.repo = database.NewRepoStore()
 	c.rel = database.NewRepoRelationsStore()
+	c.uls = database.NewUserLikesStore()
 	var err error
 	c.git, err = git.NewGitServer(config)
 	if err != nil {
