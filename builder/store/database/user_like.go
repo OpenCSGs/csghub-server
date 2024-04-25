@@ -55,12 +55,13 @@ func (r *UserLikesStore) Delete(ctx context.Context, userId, repoId int64) error
 	return err
 }
 
-func (r *UserLikesStore) IsExist(ctx context.Context, userId, repoId int64) (exists bool, err error) {
+func (r *UserLikesStore) IsExist(ctx context.Context, username string, repoId int64) (exists bool, err error) {
 	var userLike UserLike
 	exists, err = r.db.Operator.Core.
 		NewSelect().
 		Model(&userLike).
-		Where("user_id = ? and repo_id = ?", userId, repoId).
+		Join("JOIN users ON users.id = user_like.user_id").
+		Where("user_like.repo_id = ? and users.username = ?", repoId, username).
 		Exists(ctx)
 	return
 }
