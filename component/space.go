@@ -179,6 +179,8 @@ func (c *SpaceComponent) Show(ctx context.Context, namespace, name, currentUser 
 		Hardware:     space.Hardware,
 		RepositoryID: space.Repository.ID,
 		UserLikes:    likeExists,
+		Sdk:          space.Sdk,
+		SdkVersion:   space.SdkVersion,
 	}
 
 	return resModel, nil
