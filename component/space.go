@@ -33,7 +33,6 @@ func NewSpaceComponent(config *config.Config) (*SpaceComponent, error) {
 	}
 	c.deployer = deploy.NewDeployer()
 	c.publicRootDomain = config.Space.PublicRootDomain
-	c.uls = database.NewUserLikesStore()
 	return c, nil
 }
 
@@ -42,7 +41,6 @@ type SpaceComponent struct {
 	ss               *database.SpaceStore
 	sss              *database.SpaceSdkStore
 	srs              *database.SpaceResourceStore
-	uls              *database.UserLikesStore
 	deployer         deploy.Deployer
 	publicRootDomain string
 }
