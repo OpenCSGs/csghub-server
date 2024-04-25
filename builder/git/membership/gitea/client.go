@@ -96,7 +96,7 @@ func encodeCredentials(username, password string) string {
 func generateAccessTokenFromGitea(config *config.Config) (string, error) {
 	username := config.GitServer.Username
 	password := config.GitServer.Password
-	giteaUrl := fmt.Sprintf("%s/api/v1/users/%s/tokens", config.GitServer.URL, username)
+	giteaUrl := fmt.Sprintf("%s/api/v1/users/%s/tokens", config.GitServer.Host, username)
 	authHeader := encodeCredentials(username, password)
 	data := map[string]any{
 		"name": "access_token",
