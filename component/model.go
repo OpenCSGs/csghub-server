@@ -358,6 +358,11 @@ func (c *ModelComponent) Show(ctx context.Context, namespace, name, currentUser 
 		})
 	}
 
+	likeExists, err := c.uls.IsExist(ctx, currentUser, model.Repository.ID)
+	if err != nil {
+		newError := fmt.Errorf("failed to check for the presence of the user likes,error:%w", err)
+		return nil, newError
+	}
 	resModel := &types.Model{
 		ID:            model.ID,
 		Name:          model.Repository.Name,
@@ -384,6 +389,7 @@ func (c *ModelComponent) Show(ctx context.Context, namespace, name, currentUser 
 		// TODO:default to ModelWidgetTypeGeneration, need to config later
 		WidgetType: types.ModelWidgetTypeGeneration,
 		Status:     mi.Status,
+		UserLikes:  likeExists,
 	}
 
 	return resModel, nil

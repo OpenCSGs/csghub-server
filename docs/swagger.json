@@ -6416,6 +6416,9 @@
                 },
                 "user": {
                     "$ref": "#/definitions/types.User"
+                },
+                "user_likes": {
+                    "type": "boolean"
                 }
             }
         },
@@ -6815,6 +6818,9 @@
                 },
                 "user": {
                     "$ref": "#/definitions/types.User"
+                },
+                "user_likes": {
+                    "type": "boolean"
                 }
             }
         },
@@ -6990,6 +6996,9 @@
                 },
                 "user": {
                     "$ref": "#/definitions/types.User"
+                },
+                "user_likes": {
+                    "type": "boolean"
                 },
                 "widget_type": {
                     "description": "widget UI style: generation,chat",
@@ -7263,6 +7272,9 @@
                 },
                 "user": {
                     "$ref": "#/definitions/types.User"
+                },
+                "user_likes": {
+                    "type": "boolean"
                 },
                 "username": {
                     "type": "string",

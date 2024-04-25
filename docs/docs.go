@@ -6427,6 +6427,9 @@ const docTemplate = `{
                 },
                 "user": {
                     "$ref": "#/definitions/types.User"
+                },
+                "user_likes": {
+                    "type": "boolean"
                 }
             }
         },
@@ -6826,6 +6829,9 @@ const docTemplate = `{
                 },
                 "user": {
                     "$ref": "#/definitions/types.User"
+                },
+                "user_likes": {
+                    "type": "boolean"
                 }
             }
         },
@@ -7001,6 +7007,9 @@ const docTemplate = `{
                 },
                 "user": {
                     "$ref": "#/definitions/types.User"
+                },
+                "user_likes": {
+                    "type": "boolean"
                 },
                 "widget_type": {
                     "description": "widget UI style: generation,chat",
@@ -7274,6 +7283,9 @@ const docTemplate = `{
                 },
                 "user": {
                     "$ref": "#/definitions/types.User"
+                },
+                "user_likes": {
+                    "type": "boolean"
                 },
                 "username": {
                     "type": "string",

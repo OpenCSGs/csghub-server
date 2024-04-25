@@ -366,6 +366,12 @@ func (c *DatasetComponent) Show(ctx context.Context, namespace, name, currentUse
 		})
 	}
 
+	likeExists, err := c.uls.IsExist(ctx, currentUser, dataset.Repository.ID)
+	if err != nil {
+		newError := fmt.Errorf("failed to check for the presence of the user likes,error:%w", err)
+		return nil, newError
+	}
+
 	resDataset := &types.Dataset{
 		ID:            dataset.ID,
 		Name:          dataset.Repository.Name,
@@ -389,6 +395,7 @@ func (c *DatasetComponent) Show(ctx context.Context, namespace, name, currentUse
 		Private:   dataset.Repository.Private,
 		CreatedAt: dataset.CreatedAt,
 		UpdatedAt: dataset.UpdatedAt,
+		UserLikes: likeExists,
 	}
 
 	return resDataset, nil

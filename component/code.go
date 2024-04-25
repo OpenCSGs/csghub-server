@@ -253,6 +253,12 @@ func (c *CodeComponent) Show(ctx context.Context, namespace, name, currentUser s
 		})
 	}
 
+	likeExists, err := c.uls.IsExist(ctx, currentUser, code.Repository.ID)
+	if err != nil {
+		newError := fmt.Errorf("failed to check for the presence of the user likes,error:%w", err)
+		return nil, newError
+	}
+
 	resCode := &types.Code{
 		ID:            code.ID,
 		Name:          code.Repository.Name,
@@ -276,6 +282,7 @@ func (c *CodeComponent) Show(ctx context.Context, namespace, name, currentUser s
 		Private:   code.Repository.Private,
 		CreatedAt: code.CreatedAt,
 		UpdatedAt: code.UpdatedAt,
+		UserLikes: likeExists,
 	}
 
 	return resCode, nil

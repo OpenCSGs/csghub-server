@@ -338,6 +338,8 @@ definitions:
         type: string
       user:
         $ref: '#/definitions/types.User'
+      user_likes:
+        type: boolean
     type: object
   types.Commit:
     properties:
@@ -615,6 +617,8 @@ definitions:
         type: string
       user:
         $ref: '#/definitions/types.User'
+      user_likes:
+        type: boolean
     type: object
   types.DatasetResp:
     properties:
@@ -732,6 +736,8 @@ definitions:
         type: string
       user:
         $ref: '#/definitions/types.User'
+      user_likes:
+        type: boolean
       widget_type:
         allOf:
         - $ref: '#/definitions/types.ModelWidgetType'
@@ -918,6 +924,8 @@ definitions:
         type: string
       user:
         $ref: '#/definitions/types.User'
+      user_likes:
+        type: boolean
       username:
         example: creator_user_name
         type: string
