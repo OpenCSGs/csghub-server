@@ -68,12 +68,18 @@ func (h *UserHandler) Create(ctx *gin.Context) {
 // @Accept       json
 // @Produce      json
 // @Param        username path string true "username"
+// @Param        current_user  query  string true "current user"
 // @Param        body   body  types.UpdateUserRequest true "body"
 // @Success      200  {object}  types.Response{data=database.User} "OK"
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
 // @Router       /users/{username} [put]
 func (h *UserHandler) Update(ctx *gin.Context) {
+	currentUser := httpbase.GetCurrentUser(ctx)
+	if currentUser == "" {
+		httpbase.UnauthorizedError(ctx, errors.New("user not found, please login first"))
+		return
+	}
 	var req *types.UpdateUserRequest
 	if err := ctx.ShouldBindJSON(&req); err != nil {
 		slog.Error("Bad request format", "error", err)
