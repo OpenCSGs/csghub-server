@@ -12,9 +12,10 @@ type UpdateUserRequest struct {
 	// Display name of the user
 	Name string `json:"name"`
 	// the login name
-	Username string `json:"username"`
-	Email    string `json:"email"`
-	Phone    string `json:"phone"`
+	Username   string `json:"username"`
+	Email      string `json:"email"`
+	Phone      string `json:"phone"`
+	CasdoorUID string `json:"casdoor_uid"`
 }
 
 type UpdateUserResp struct {

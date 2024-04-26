@@ -4786,6 +4786,13 @@ const docTemplate = `{
                         "schema": {
                             "$ref": "#/definitions/types.UpdateUserRequest"
                         }
+                    },
+                    {
+                        "type": "string",
+                        "description": "current user",
+                        "name": "current_user",
+                        "in": "query",
+                        "required": true
                     }
                 ],
                 "responses": {
@@ -7554,6 +7561,9 @@ const docTemplate = `{
         "types.UpdateUserRequest": {
             "type": "object",
             "properties": {
+                "casdoor_uid": {
+                    "type": "string"
+                },
                 "email": {
                     "type": "string"
                 },
