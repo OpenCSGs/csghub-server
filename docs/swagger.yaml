@@ -1114,6 +1114,8 @@ definitions:
     type: object
   types.UpdateUserRequest:
     properties:
+      casdoor_uid:
+        type: string
       email:
         type: string
       name:
@@ -4765,6 +4767,11 @@ paths:
         required: true
         schema:
           $ref: '#/definitions/types.UpdateUserRequest'
+      - description: current user
+        in: query
+        name: current_user
+        required: true
+        type: string
       produces:
       - application/json
       responses:

@@ -140,12 +140,14 @@ func (c *UserComponent) Update(ctx context.Context, req *types.UpdateUserRequest
 		return nil, newError
 	}
 
-	if req.Email != "" || req.Phone != "" {
-		err = c.updateCasdoorUser(req)
-		if err != nil {
-			newError := fmt.Errorf("failed to update casdoor user,error:%w", err)
-			return nil, newError
-		}
+	//skip casdoor update if it's not a casdoor user
+	if req.CasdoorUID == "" {
+		return respUser, nil
+	}
+	err = c.updateCasdoorUser(req)
+	if err != nil {
+		newError := fmt.Errorf("failed to update casdoor user,error:%w", err)
+		return nil, newError
 	}
 
 	return respUser, nil
@@ -154,9 +156,12 @@ func (c *UserComponent) Update(ctx context.Context, req *types.UpdateUserRequest
 func (c *UserComponent) updateCasdoorUser(req *types.UpdateUserRequest) error {
 	c.lazyInit()
 
-	casu, err := c.casc.GetUser(req.Username)
+	casu, err := c.casc.GetUserByUserId(req.CasdoorUID)
 	if err != nil {
 		return fmt.Errorf("failed to get user from casdoor,error:%w", err)
+	}
+	if casu == nil {
+		return fmt.Errorf("user not exists in casdoor")
 	}
 	var cols []string
 	if req.Email != "" {
