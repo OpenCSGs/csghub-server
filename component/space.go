@@ -173,7 +173,7 @@ func (c *SpaceComponent) Show(ctx context.Context, namespace, name, currentUser 
 			Email:    space.Repository.User.Email,
 		},
 		CreatedAt:    space.CreatedAt,
-		UpdatedAt:    space.UpdatedAt,
+		UpdatedAt:    space.Repository.UpdatedAt,
 		Status:       status,
 		Endpoint:     endpoint,
 		Hardware:     space.Hardware,
@@ -309,7 +309,7 @@ func (c *SpaceComponent) UserSpaces(ctx context.Context, req *types.UserSpacesRe
 			RepositoryID: data.RepositoryID,
 			Private:      data.Repository.Private,
 			CreatedAt:    data.CreatedAt,
-			UpdatedAt:    data.UpdatedAt,
+			UpdatedAt:    data.Repository.UpdatedAt,
 			Hardware:     data.Hardware,
 			Status:       status,
 		})
@@ -337,7 +337,7 @@ func (c *SpaceComponent) UserLikesSpaces(ctx context.Context, req *types.UserSpa
 			Path:        data.Repository.Path,
 			Private:     data.Repository.Private,
 			CreatedAt:   data.CreatedAt,
-			UpdatedAt:   data.UpdatedAt,
+			UpdatedAt:   data.Repository.UpdatedAt,
 			Hardware:    data.Hardware,
 			Status:      status,
 		})
