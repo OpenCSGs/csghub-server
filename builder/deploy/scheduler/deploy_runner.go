@@ -80,15 +80,15 @@ func (t *DeployRunner) Run(ctx context.Context) error {
 		}
 		switch resp.Code {
 		case common.Deploying:
-			t.deployInProgress()
-			// wait before next check
-			time.Sleep(10 * time.Second)
 			duration := time.Since(t.deployStartTime).Minutes()
 			if duration >= float64(t.deployTimeoutInMin) {
 				// space deploy duration is greater than timeout defined in env (default is 30 mins)
 				slog.Warn("Space is going to be undeploy due to timeout of deploying", slog.Any("duration", duration), slog.Any("timeout", t.deployTimeoutInMin))
-				return t.undeploySpace(ctx, fields[0], fields[1])
+				return t.cancelDeploySpace(ctx, fields[0], fields[1])
 			}
+			t.deployInProgress()
+			// wait before next check
+			time.Sleep(10 * time.Second)
 		case common.DeployFailed:
 			slog.Info("image deploy failed", slog.String("space_name", t.space.Repository.Name), slog.Any("deplopy_task_id", t.task.ID))
 			t.deployFailed(resp.Message)
@@ -210,7 +210,7 @@ func (t *DeployRunner) makeDeployRequest() *imagerunner.RunRequest {
 	}
 }
 
-func (t *DeployRunner) undeploySpace(ctx context.Context, orgName, spaceName string) error {
+func (t *DeployRunner) cancelDeploySpace(ctx context.Context, orgName, spaceName string) error {
 	stopReq := &imagerunner.StopRequest{
 		SpaceID:   t.space.ID,
 		OrgName:   orgName,
@@ -220,12 +220,6 @@ func (t *DeployRunner) undeploySpace(ctx context.Context, orgName, spaceName str
 	if err != nil {
 		return fmt.Errorf("fail to undeploy space with err: %v", err)
 	}
-	t.task.Status = deployFailed
-	t.task.Message = "space deploy timeout"
-	// change to deploy failed
-	t.task.Deploy.Status = common.DeployFailed
-	if err := t.store.UpdateInTx(ctx, []string{"status"}, []string{"status", "message"}, t.task.Deploy, t.task); err != nil {
-		slog.Error("failed to change deploy status to `DeployFailed`", "error", err)
-	}
+	t.deployFailed("space deploy timeout")
 	return nil
 }
