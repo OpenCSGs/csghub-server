@@ -4,8 +4,10 @@ type CreateUserRequest struct {
 	// Display name of the user
 	Name string `json:"name"`
 	// the login name
-	Username string `json:"username"`
-	Email    string `json:"email"`
+	Username   string `json:"username"`
+	Email      string `json:"email"`
+	Phone      string `json:"phone"`
+	CasdoorUID string `json:"casdoor_uid"`
 }
 
 type UpdateUserRequest struct {
