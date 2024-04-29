@@ -191,7 +191,7 @@ func (c *OrganizationComponent) Models(ctx context.Context, req *types.OrgModels
 			RepositoryID: data.RepositoryID,
 			Private:      data.Repository.Private,
 			CreatedAt:    data.CreatedAt,
-			UpdatedAt:    data.UpdatedAt,
+			UpdatedAt:    data.Repository.UpdatedAt,
 		})
 	}
 
@@ -227,7 +227,7 @@ func (c *OrganizationComponent) Datasets(ctx context.Context, req *types.OrgData
 			RepositoryID: data.RepositoryID,
 			Private:      data.Repository.Private,
 			CreatedAt:    data.CreatedAt,
-			UpdatedAt:    data.UpdatedAt,
+			UpdatedAt:    data.Repository.UpdatedAt,
 		})
 	}
 
@@ -263,7 +263,7 @@ func (c *OrganizationComponent) Codes(ctx context.Context, req *types.OrgCodesRe
 			RepositoryID: data.RepositoryID,
 			Private:      data.Repository.Private,
 			CreatedAt:    data.CreatedAt,
-			UpdatedAt:    data.UpdatedAt,
+			UpdatedAt:    data.Repository.UpdatedAt,
 		})
 	}
 
@@ -297,7 +297,7 @@ func (c *OrganizationComponent) Spaces(ctx context.Context, req *types.OrgSpaces
 			Path:         data.Repository.Path,
 			Private:      data.Repository.Private,
 			CreatedAt:    data.CreatedAt,
-			UpdatedAt:    data.UpdatedAt,
+			UpdatedAt:    data.Repository.UpdatedAt,
 			RepositoryID: data.Repository.ID,
 		})
 	}
