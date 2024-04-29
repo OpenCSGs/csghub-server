@@ -82,7 +82,8 @@ type Config struct {
 		// reverse proxy listening port
 		RProxyServerPort int `envconfig:"STARHUB_SERVER_SPACE_RPROXY_SERVER_PORT" default:"8083"`
 		// secret key for session encryption
-		SessionSecretKey string `envconfig:"STARHUB_SERVER_SPACE_SESSION_SECRET_KEY" default:"secret"`
+		SessionSecretKey   string `envconfig:"STARHUB_SERVER_SPACE_SESSION_SECRET_KEY" default:"secret"`
+		DeployTimeoutInMin int    `envconfig:"STARHUB_SERVER_SPACE_DEPLOY_TIMEOUT_IN_MINUTES" default:"30"`
 	}
 
 	Casdoor struct {

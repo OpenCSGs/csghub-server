@@ -31,10 +31,11 @@ type FIFOScheduler struct {
 	ib                  imagebuilder.Builder
 	ir                  imagerunner.Runner
 
-	nextLock *sync.Mutex
+	nextLock                *sync.Mutex
+	spaceDeployTimeoutInMin int
 }
 
-func NewFIFOScheduler(ib imagebuilder.Builder, ir imagerunner.Runner) Scheduler {
+func NewFIFOScheduler(ib imagebuilder.Builder, ir imagerunner.Runner, sdt int) Scheduler {
 	s := &FIFOScheduler{}
 	// TODO:allow config
 	s.timeout = 30 * time.Minute
@@ -48,6 +49,7 @@ func NewFIFOScheduler(ib imagebuilder.Builder, ir imagerunner.Runner) Scheduler 
 	s.ib = ib
 	s.ir = ir
 	s.nextLock = &sync.Mutex{}
+	s.spaceDeployTimeoutInMin = sdt
 	return s
 }
 
@@ -146,7 +148,7 @@ func (rs *FIFOScheduler) next() (Runner, error) {
 	if deployTask.TaskType == 0 {
 		t = NewBuidRunner(rs.ib, s, deployTask)
 	} else {
-		t = NewDeployRunner(rs.ir, s, deployTask)
+		t = NewDeployRunner(rs.ir, s, deployTask, rs.spaceDeployTimeoutInMin)
 	}
 
 	rs.last = deployTask

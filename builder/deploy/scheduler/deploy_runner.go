@@ -14,18 +14,22 @@ import (
 
 // DeployRunner defines a k8s image running task
 type DeployRunner struct {
-	space *database.Space
-	task  *database.DeployTask
-	ir    imagerunner.Runner
-	store *database.DeployTaskStore
+	space              *database.Space
+	task               *database.DeployTask
+	ir                 imagerunner.Runner
+	store              *database.DeployTaskStore
+	deployStartTime    time.Time
+	deployTimeoutInMin int
 }
 
-func NewDeployRunner(ir imagerunner.Runner, s *database.Space, t *database.DeployTask) Runner {
+func NewDeployRunner(ir imagerunner.Runner, s *database.Space, t *database.DeployTask, deployTimeout int) Runner {
 	return &DeployRunner{
-		space: s,
-		task:  t,
-		ir:    ir,
-		store: database.NewDeployTaskStore(),
+		space:              s,
+		task:               t,
+		ir:                 ir,
+		store:              database.NewDeployTaskStore(),
+		deployStartTime:    time.Now(),
+		deployTimeoutInMin: deployTimeout,
 	}
 }
 
@@ -49,6 +53,8 @@ func (t *DeployRunner) Run(ctx context.Context) error {
 			}
 
 			t.deployInProgress()
+			// record time of create knative service
+			t.deployStartTime = time.Now()
 		}
 
 		fields := strings.Split(t.space.Repository.Path, "/")
@@ -77,6 +83,12 @@ func (t *DeployRunner) Run(ctx context.Context) error {
 			t.deployInProgress()
 			// wait before next check
 			time.Sleep(10 * time.Second)
+			duration := time.Since(t.deployStartTime).Minutes()
+			if duration >= float64(t.deployTimeoutInMin) {
+				// space deploy duration is greater than timeout defined in env (default is 30 mins)
+				slog.Warn("Space is going to be undeploy due to timeout of deploying", slog.Any("duration", duration), slog.Any("timeout", t.deployTimeoutInMin))
+				return t.undeploySpace(ctx, fields[0], fields[1])
+			}
 		case common.DeployFailed:
 			slog.Info("image deploy failed", slog.String("space_name", t.space.Repository.Name), slog.Any("deplopy_task_id", t.task.ID))
 			t.deployFailed(resp.Message)
@@ -195,4 +207,24 @@ func (t *DeployRunner) makeDeployRequest() *imagerunner.RunRequest {
 		ImageID:   deploy.ImageID,
 		DeployID:  deploy.ID,
 	}
+}
+
+func (t *DeployRunner) undeploySpace(ctx context.Context, orgName, spaceName string) error {
+	stopReq := &imagerunner.StopRequest{
+		SpaceID:   t.space.ID,
+		OrgName:   orgName,
+		SpaceName: spaceName,
+	}
+	_, err := t.ir.Stop(ctx, stopReq)
+	if err != nil {
+		return fmt.Errorf("fail to undeploy space with err: %v", err)
+	}
+	t.task.Status = deployFailed
+	t.task.Message = "space deploy timeout"
+	// change to deploy failed
+	t.task.Deploy.Status = common.DeployFailed
+	if err := t.store.UpdateInTx(ctx, []string{"status"}, []string{"status", "message"}, t.task.Deploy, t.task); err != nil {
+		slog.Error("failed to change deploy status to `DeployFailed`", "error", err)
+	}
+	return nil
 }
