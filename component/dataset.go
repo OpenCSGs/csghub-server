@@ -277,7 +277,7 @@ func (c *DatasetComponent) Index(ctx context.Context, username, search, sort str
 			Private:      data.Repository.Private,
 			Tags:         tags,
 			CreatedAt:    data.CreatedAt,
-			UpdatedAt:    data.UpdatedAt,
+			UpdatedAt:    data.Repository.UpdatedAt,
 		})
 	}
 
@@ -394,7 +394,7 @@ func (c *DatasetComponent) Show(ctx context.Context, namespace, name, currentUse
 		},
 		Private:   dataset.Repository.Private,
 		CreatedAt: dataset.CreatedAt,
-		UpdatedAt: dataset.UpdatedAt,
+		UpdatedAt: dataset.Repository.UpdatedAt,
 		UserLikes: likeExists,
 	}
 

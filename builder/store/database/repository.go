@@ -47,6 +47,7 @@ type Repository struct {
 	RepositoryType types.RepositoryType `bun:",notnull" json:"repository_type"`
 	HTTPCloneURL   string               `bun:",nullzero" json:"http_clone_url"`
 	SSHCloneURL    string               `bun:",nullzero" json:"ssh_clone_url"`
+	// updated_at timestamp will be updated only if files changed
 	times
 }
 
@@ -292,4 +293,14 @@ func (s *RepoStore) Tags(ctx context.Context, repoType types.RepositoryType, nam
 	slog.Info(query.String())
 	err = query.Scan(ctx, &tags)
 	return
+}
+
+func (s *RepoStore) SetUpdateTimeByPath(ctx context.Context, repoType types.RepositoryType, namespace, name string, update time.Time) error {
+	repo := new(Repository)
+	repo.UpdatedAt = update
+	_, err := s.db.Operator.Core.NewUpdate().Model(repo).
+		Column("updated_at").
+		Where("git_path =?", fmt.Sprintf("%ss_%s/%s", repoType, namespace, name)).
+		Exec(ctx)
+	return err
 }

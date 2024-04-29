@@ -18,6 +18,24 @@ type times struct {
 func (t *times) BeforeAppendModel(ctx context.Context, query schema.Query) error {
 	switch query.(type) {
 	case *bun.UpdateQuery:
+		q := query.(*bun.UpdateQuery)
+		m := q.GetModel().Value()
+		//skip update for Repository, and related assets
+		if _, ok := m.(*Repository); ok {
+			return nil
+		}
+		if _, ok := m.(*Model); ok {
+			return nil
+		}
+		if _, ok := m.(*Dataset); ok {
+			return nil
+		}
+		if _, ok := m.(*Code); ok {
+			return nil
+		}
+		if _, ok := m.(*Space); ok {
+			return nil
+		}
 		t.UpdatedAt = time.Now()
 	}
 

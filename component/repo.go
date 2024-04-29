@@ -337,52 +337,67 @@ func (c *RepoComponent) CreateFile(ctx context.Context, req *types.CreateFileReq
 		return nil, fmt.Errorf("fail to check namespace, cause: %w", err)
 	}
 
-	// TODO:check sensitive content of file
-	fileName := filepath.Base(req.FilePath)
-	if fileName == "README.md" {
-		return c.createReadmeFile(ctx, req)
-	} else {
-		return c.createLibraryFile(ctx, req)
-	}
+	go func() {
+		var err error
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+		// TODO:check sensitive content of file
+		fileName := filepath.Base(req.FilePath)
+		if fileName == "README.md" {
+			err = c.createReadmeFile(ctx, req)
+		} else {
+			err = c.createLibraryFile(ctx, req)
+		}
+
+		if err != nil {
+			slog.Error("failed to create repo file", slog.String("file", req.FilePath), slog.Any("error", err), slog.String("namespace", req.NameSpace), slog.String("name", req.Name))
+		}
+
+		err = c.repo.SetUpdateTimeByPath(ctx, req.RepoType, req.NameSpace, req.Name, time.Now())
+		if err != nil {
+			slog.Error("failed to set repo update time", slog.Any("error", err), slog.String("repo_type", string(req.RepoType)), slog.String("namespace", req.NameSpace), slog.String("name", req.Name))
+		}
+
+	}()
+	var resp types.CreateFileResp
+	return &resp, nil
 }
 
-func (c *RepoComponent) createReadmeFile(ctx context.Context, req *types.CreateFileReq) (*types.CreateFileResp, error) {
+func (c *RepoComponent) createReadmeFile(ctx context.Context, req *types.CreateFileReq) error {
 	var (
-		err  error
-		resp types.CreateFileResp
+		err error
 	)
 	contentDecoded, _ := base64.RawStdEncoding.DecodeString(req.Content)
 	_, err = c.tc.UpdateMetaTags(ctx, getTagScopeByRepoType(req.RepoType), req.NameSpace, req.Name, string(contentDecoded))
 	if err != nil {
-		return nil, fmt.Errorf("failed to update meta tags, cause: %w", err)
+		return fmt.Errorf("failed to update meta tags, cause: %w", err)
 	}
 
 	err = c.git.CreateRepoFile(req)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create %s file, cause: %w", req.RepoType, err)
+		return fmt.Errorf("failed to create %s file, cause: %w", req.RepoType, err)
 	}
 
-	return &resp, err
+	return err
 }
 
-func (c *RepoComponent) createLibraryFile(ctx context.Context, req *types.CreateFileReq) (*types.CreateFileResp, error) {
+func (c *RepoComponent) createLibraryFile(ctx context.Context, req *types.CreateFileReq) error {
 	var (
-		err  error
-		resp types.CreateFileResp
+		err error
 	)
 
 	err = c.tc.UpdateLibraryTags(ctx, getTagScopeByRepoType(req.RepoType), req.NameSpace, req.Name, "", req.FilePath)
 	if err != nil {
 		slog.Error(fmt.Sprintf("failed to set %s's tags", req.RepoType), slog.String("namespace", req.NameSpace),
 			slog.String("name", req.Name), slog.Any("error", err))
-		return nil, fmt.Errorf("failed to set %s's tags, cause: %w", req.RepoType, err)
+		return fmt.Errorf("failed to set %s's tags, cause: %w", req.RepoType, err)
 	}
 	err = c.git.CreateRepoFile(req)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	return &resp, err
+	return err
 }
 
 func (c *RepoComponent) UpdateFile(ctx context.Context, req *types.UpdateFileReq) (*types.UpdateFileResp, error) {
@@ -406,21 +421,36 @@ func (c *RepoComponent) UpdateFile(ctx context.Context, req *types.UpdateFileReq
 	if err != nil {
 		return nil, fmt.Errorf("failed to update %s file, cause: %w", req.RepoType, err)
 	}
-	// TODO:check sensitive content of file
 
-	fileName := filepath.Base(req.FilePath)
-	if fileName == "README.md" {
-		slog.Debug("file is readme", slog.String("content", req.Content))
-		return c.updateReadmeFile(ctx, req)
-	} else {
-		slog.Debug("file is not readme", slog.String("filePath", req.FilePath), slog.String("originPath", req.OriginPath))
-		return c.updateLibraryFile(ctx, req)
-	}
+	go func() {
+		// TODO:check sensitive content of file
+		fileName := filepath.Base(req.FilePath)
+		var err error
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+		if fileName == "README.md" {
+			slog.Debug("file is readme", slog.String("content", req.Content))
+			err = c.updateReadmeFile(ctx, req)
+		} else {
+			slog.Debug("file is not readme", slog.String("filePath", req.FilePath), slog.String("originPath", req.OriginPath))
+			err = c.updateLibraryFile(ctx, req)
+		}
+		if err != nil {
+			slog.Error("failed to update file", slog.String("file", req.FilePath), slog.Any("error", err), slog.String("namespace", req.NameSpace), slog.String("name", req.Name))
+		}
+
+		err = c.repo.SetUpdateTimeByPath(ctx, req.RepoType, req.NameSpace, req.Name, time.Now())
+		if err != nil {
+			slog.Error("failed to set repo update time", slog.Any("error", err), slog.String("repo_type", string(req.RepoType)), slog.String("namespace", req.NameSpace), slog.String("name", req.Name))
+		}
+	}()
+
+	resp := new(types.UpdateFileResp)
+	return resp, nil
 }
 
-func (c *RepoComponent) updateLibraryFile(ctx context.Context, req *types.UpdateFileReq) (*types.UpdateFileResp, error) {
+func (c *RepoComponent) updateLibraryFile(ctx context.Context, req *types.UpdateFileReq) error {
 	var err error
-	resp := &types.UpdateFileResp{}
 
 	isFileRenamed := req.FilePath != req.OriginPath
 	// need to handle tag change only if file renamed
@@ -429,25 +459,24 @@ func (c *RepoComponent) updateLibraryFile(ctx context.Context, req *types.Update
 		if err != nil {
 			slog.Error(fmt.Sprintf("failed to set %s's tags", req.RepoType), slog.String("namespace", req.NameSpace),
 				slog.String("name", req.Name), slog.Any("error", err))
-			return nil, fmt.Errorf("failed to set %s's tags, cause: %w", req.RepoType, err)
+			return fmt.Errorf("failed to set %s's tags, cause: %w", req.RepoType, err)
 		}
 	}
 
-	return resp, err
+	return err
 }
 
-func (c *RepoComponent) updateReadmeFile(ctx context.Context, req *types.UpdateFileReq) (*types.UpdateFileResp, error) {
+func (c *RepoComponent) updateReadmeFile(ctx context.Context, req *types.UpdateFileReq) error {
 	slog.Debug("file is readme", slog.String("content", req.Content))
 	var err error
-	resp := new(types.UpdateFileResp)
 
 	contentDecoded, _ := base64.RawStdEncoding.DecodeString(req.Content)
 	_, err = c.tc.UpdateMetaTags(ctx, getTagScopeByRepoType(req.RepoType), req.NameSpace, req.Name, string(contentDecoded))
 	if err != nil {
-		return nil, fmt.Errorf("failed to update meta tags, cause: %w", err)
+		return fmt.Errorf("failed to update meta tags, cause: %w", err)
 	}
 
-	return resp, err
+	return err
 }
 
 func (c *RepoComponent) Commits(ctx context.Context, req *types.GetCommitsReq) ([]types.Commit, error) {
