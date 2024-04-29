@@ -54,10 +54,11 @@ var serverCmd = &cobra.Command{
 		}
 		database.InitDB(dbConfig)
 		deploy.Init(deploy.DeployConfig{
-			ImageBuilderURL:    cfg.Space.BuilderEndpoint,
-			ImageRunnerURL:     cfg.Space.RunnerEndpoint,
-			MonitorInterval:    10 * time.Second,
-			InternalRootDomain: cfg.Space.InternalRootDomain,
+			ImageBuilderURL:         cfg.Space.BuilderEndpoint,
+			ImageRunnerURL:          cfg.Space.RunnerEndpoint,
+			MonitorInterval:         10 * time.Second,
+			InternalRootDomain:      cfg.Space.InternalRootDomain,
+			SpaceDeployTimeoutInMin: cfg.Space.DeployTimeoutInMin,
 		})
 		r, err := router.NewRouter(cfg, enableSwagger)
 		if err != nil {
