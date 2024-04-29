@@ -124,7 +124,7 @@ func (c *ModelComponent) Index(ctx context.Context, username, search, sort strin
 			Private:      data.Repository.Private,
 			CreatedAt:    data.CreatedAt,
 			Tags:         tags,
-			UpdatedAt:    data.UpdatedAt,
+			UpdatedAt:    data.Repository.UpdatedAt,
 		})
 	}
 	return resModels, total, nil
@@ -385,7 +385,7 @@ func (c *ModelComponent) Show(ctx context.Context, namespace, name, currentUser 
 			Email:    model.Repository.User.Email,
 		},
 		CreatedAt: model.CreatedAt,
-		UpdatedAt: model.UpdatedAt,
+		UpdatedAt: model.Repository.UpdatedAt,
 		// TODO:default to ModelWidgetTypeGeneration, need to config later
 		WidgetType: types.ModelWidgetTypeGeneration,
 		Status:     mi.Status,

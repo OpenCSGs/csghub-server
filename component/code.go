@@ -164,7 +164,7 @@ func (c *CodeComponent) Index(ctx context.Context, username, search, sort string
 			RepositoryID: data.RepositoryID,
 			Private:      data.Repository.Private,
 			CreatedAt:    data.CreatedAt,
-			UpdatedAt:    data.UpdatedAt,
+			UpdatedAt:    data.Repository.UpdatedAt,
 		})
 	}
 
@@ -281,7 +281,7 @@ func (c *CodeComponent) Show(ctx context.Context, namespace, name, currentUser s
 		},
 		Private:   code.Repository.Private,
 		CreatedAt: code.CreatedAt,
-		UpdatedAt: code.UpdatedAt,
+		UpdatedAt: code.Repository.UpdatedAt,
 		UserLikes: likeExists,
 	}
 

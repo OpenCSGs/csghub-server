@@ -232,7 +232,7 @@ func (c *UserComponent) Datasets(ctx context.Context, req *types.UserDatasetsReq
 			RepositoryID: data.RepositoryID,
 			Private:      data.Repository.Private,
 			CreatedAt:    data.CreatedAt,
-			UpdatedAt:    data.UpdatedAt,
+			UpdatedAt:    data.Repository.UpdatedAt,
 		})
 	}
 
@@ -285,7 +285,7 @@ func (c *UserComponent) Models(ctx context.Context, req *types.UserModelsReq) ([
 			RepositoryID: data.RepositoryID,
 			Private:      data.Repository.Private,
 			CreatedAt:    data.CreatedAt,
-			UpdatedAt:    data.UpdatedAt,
+			UpdatedAt:    data.Repository.UpdatedAt,
 		})
 	}
 
@@ -338,7 +338,7 @@ func (c *UserComponent) Codes(ctx context.Context, req *types.UserModelsReq) ([]
 			RepositoryID: data.RepositoryID,
 			Private:      data.Repository.Private,
 			CreatedAt:    data.CreatedAt,
-			UpdatedAt:    data.UpdatedAt,
+			UpdatedAt:    data.Repository.UpdatedAt,
 		})
 	}
 
@@ -456,7 +456,7 @@ func (c *UserComponent) LikesCodes(ctx context.Context, req *types.UserModelsReq
 			RepositoryID: data.RepositoryID,
 			Private:      data.Repository.Private,
 			CreatedAt:    data.CreatedAt,
-			UpdatedAt:    data.UpdatedAt,
+			UpdatedAt:    data.Repository.UpdatedAt,
 		})
 	}
 
@@ -489,7 +489,7 @@ func (c *UserComponent) LikesModels(ctx context.Context, req *types.UserModelsRe
 			RepositoryID: data.RepositoryID,
 			Private:      data.Repository.Private,
 			CreatedAt:    data.CreatedAt,
-			UpdatedAt:    data.UpdatedAt,
+			UpdatedAt:    data.Repository.UpdatedAt,
 		})
 	}
 
@@ -522,7 +522,7 @@ func (c *UserComponent) LikesDatasets(ctx context.Context, req *types.UserDatase
 			RepositoryID: data.RepositoryID,
 			Private:      data.Repository.Private,
 			CreatedAt:    data.CreatedAt,
-			UpdatedAt:    data.UpdatedAt,
+			UpdatedAt:    data.Repository.UpdatedAt,
 		})
 	}
 
