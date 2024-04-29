@@ -173,6 +173,7 @@ func (t *DeployRunner) makeDeployRequest() *imagerunner.RunRequest {
 	envMap, err := common.JsonStrToMap(t.space.Env)
 	if err != nil {
 		slog.Error("space env is invalid json data", slog.Any("env", t.space.Env))
+		envMap = map[string]interface{}{}
 	}
 	sdkType := t.space.Sdk
 	if sdkType == GRADIO.name {
