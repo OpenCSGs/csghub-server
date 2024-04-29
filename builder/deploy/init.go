@@ -25,7 +25,7 @@ func Init(c DeployConfig) error {
 		panic(fmt.Errorf("failed to create image runner:%w", err))
 	}
 
-	fifoScheduler = scheduler.NewFIFOScheduler(ib, ir)
+	fifoScheduler = scheduler.NewFIFOScheduler(ib, ir, c.SpaceDeployTimeoutInMin)
 	deployer, err := newDeployer(fifoScheduler, ib, ir)
 	if err != nil {
 		return fmt.Errorf("failed to create deployer:%w", err)
@@ -41,8 +41,9 @@ func NewDeployer() Deployer {
 }
 
 type DeployConfig struct {
-	ImageBuilderURL    string
-	ImageRunnerURL     string
-	MonitorInterval    time.Duration
-	InternalRootDomain string
+	ImageBuilderURL         string
+	ImageRunnerURL          string
+	MonitorInterval         time.Duration
+	InternalRootDomain      string
+	SpaceDeployTimeoutInMin int
 }
