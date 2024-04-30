@@ -118,6 +118,23 @@ func (c *UserComponent) Create(ctx context.Context, req *types.CreateUserRequest
 		return nil, newError
 	}
 
+	//skip casdoor update if it's not a casdoor user
+	if req.CasdoorUID == "" {
+		return user, nil
+	}
+	ureq := &types.UpdateUserRequest{
+		Name:       req.Name,
+		Username:   req.Username,
+		Email:      req.Email,
+		Phone:      req.Phone,
+		CasdoorUID: req.CasdoorUID,
+	}
+	err = c.updateCasdoorUser(ureq)
+	if err != nil {
+		newError := fmt.Errorf("failed to update casdoor user,error:%w", err)
+		return nil, newError
+	}
+
 	return user, nil
 }
 
