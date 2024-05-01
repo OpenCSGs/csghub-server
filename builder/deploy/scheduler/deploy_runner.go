@@ -2,6 +2,7 @@ package scheduler
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log/slog"
 	"strings"
@@ -10,6 +11,7 @@ import (
 	"opencsg.com/csghub-server/builder/deploy/common"
 	"opencsg.com/csghub-server/builder/deploy/imagerunner"
 	"opencsg.com/csghub-server/builder/store/database"
+	"opencsg.com/csghub-server/common/types"
 )
 
 // DeployRunner defines a k8s image running task
@@ -40,13 +42,16 @@ func (t *DeployRunner) Run(ctx context.Context) error {
 	// keep checking deploy status
 	for {
 		if t.task.Status == deployPending {
-			req := t.makeDeployRequest()
+			req, err := t.makeDeployRequest()
+			if err != nil {
+				return fmt.Errorf("fail to make deploy request: %w", err)
+			}
 			if req.ImageID == "" {
 				time.Sleep(5 * time.Second)
 				continue
 			}
 			slog.Debug("After build deploy request", slog.Any("req", req))
-			_, err := t.ir.Run(ctx, req)
+			_, err = t.ir.Run(ctx, req)
 			if err != nil {
 				// TODO:return retryable error
 				return fmt.Errorf("call image runner failed: %w", err)
@@ -179,35 +184,41 @@ func (t *DeployRunner) runtimeError(msg string) {
 	}
 }
 
-func (t *DeployRunner) makeDeployRequest() *imagerunner.RunRequest {
+func (t *DeployRunner) makeDeployRequest() (*imagerunner.RunRequest, error) {
 	fields := strings.Split(t.space.Repository.Path, "/")
 	deploy, _ := t.store.GetDeploy(context.Background(), t.task.DeployID)
+
 	envMap, err := common.JsonStrToMap(t.space.Env)
 	if err != nil {
 		slog.Error("space env is invalid json data", slog.Any("env", t.space.Env))
-		envMap = map[string]interface{}{}
+		return nil, err
 	}
+
+	var hardware = types.HardWare{}
+	err = json.Unmarshal([]byte(t.space.Hardware), &hardware)
+	if err != nil {
+		slog.Error("space hardware is invalid", slog.Any("hardware", t.space.Hardware))
+		return nil, err
+	}
+
 	sdkType := t.space.Sdk
 	if sdkType == GRADIO.name {
 		envMap["port"] = GRADIO.port
 	} else if sdkType == STREAMLIT.name {
 		envMap["port"] = STREAMLIT.port
 	}
-	envStr, err := common.MapToJsonStr(envMap)
-	if err != nil {
-		slog.Error("space env is invalid map", slog.Any("map", envMap))
-	}
+
 	return &imagerunner.RunRequest{
 		SpaceID:   t.space.ID,
 		OrgName:   fields[0],
 		SpaceName: fields[1],
 		UserName:  t.space.Repository.User.Name,
-		Hardware:  t.space.Hardware,
-		Env:       envStr,
+		Hardware:  hardware,
+		Env:       envMap,
 		GitRef:    t.space.Repository.DefaultBranch,
 		ImageID:   deploy.ImageID,
 		DeployID:  deploy.ID,
-	}
+	}, nil
 }
 
 func (t *DeployRunner) cancelDeploySpace(ctx context.Context, orgName, spaceName string) error {
