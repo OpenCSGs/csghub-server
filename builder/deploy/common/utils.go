@@ -1,18 +1,15 @@
 package common
 
-import "encoding/json"
+import (
+	"encoding/json"
+	"strings"
+)
 
-func JsonStrToMap(jsonStr string) (map[string]interface{}, error) {
-	var resMap map[string]interface{}
-	if len(jsonStr) == 0 {
-		return map[string]interface{}{}, nil
+func JsonStrToMap(jsonStr string) (map[string]string, error) {
+	var resMap map[string]string
+	if len(strings.Trim(jsonStr, " ")) == 0 {
+		return map[string]string{}, nil
 	}
 	err := json.Unmarshal([]byte(jsonStr), &resMap)
 	return resMap, err
-}
-
-func MapToJsonStr(data map[string]interface{}) (string, error) {
-	jsonStr, err := json.Marshal(data)
-	return string(jsonStr), err
-
 }
