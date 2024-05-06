@@ -104,7 +104,7 @@ func (c *Client) GetRepoFileContents(ctx context.Context, req gitserver.GetRepoI
 	namespace := common.WithPrefix(req.Namespace, repoPrefixByType(req.RepoType))
 	file, err := c.getFileContents(namespace, req.Name, req.Ref, req.Path)
 	if err != nil {
-		return nil, errors.New("failed to get dataset file contents")
+		return nil, errors.New("failed to get repo file contents")
 	}
 	commit, _, err := c.giteaClient.GetSingleCommit(namespace, req.Name, file.LastCommitSHA, gitea.SpeedUpOtions{
 		DisableStat:         true,
@@ -112,7 +112,7 @@ func (c *Client) GetRepoFileContents(ctx context.Context, req gitserver.GetRepoI
 		DisableFiles:        true,
 	})
 	if err != nil {
-		return nil, errors.New("failed to get dataset file last commit")
+		return nil, errors.New("failed to get repo file last commit")
 	}
 
 	file.Commit = types.Commit{
