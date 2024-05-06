@@ -1,6 +1,10 @@
 package imagerunner
 
-import "io"
+import (
+	"io"
+
+	"opencsg.com/csghub-server/common/types"
+)
 
 type (
 	RunRequest struct {
@@ -11,8 +15,8 @@ type (
 
 		GitRef string `json:"git_ref"`
 
-		Hardware string `json:"hardware"`
-		Env      string `json:"env"`
+		Hardware types.HardWare    `json:"hardware,omitempty"`
+		Env      map[string]string `json:"env,omitempty"`
 
 		ImageID  string `json:"image_id"`
 		DeployID int64  `json:"deploy_id"`
