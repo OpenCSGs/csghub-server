@@ -337,28 +337,25 @@ func (c *RepoComponent) CreateFile(ctx context.Context, req *types.CreateFileReq
 		return nil, fmt.Errorf("fail to check namespace, cause: %w", err)
 	}
 
-	go func() {
-		var err error
-		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-		defer cancel()
-		// TODO:check sensitive content of file
-		fileName := filepath.Base(req.FilePath)
-		if fileName == "README.md" {
-			err = c.createReadmeFile(ctx, req)
-		} else {
-			err = c.createLibraryFile(ctx, req)
-		}
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	// TODO:check sensitive content of file
+	fileName := filepath.Base(req.FilePath)
+	if fileName == "README.md" {
+		err = c.createReadmeFile(ctx, req)
+	} else {
+		err = c.createLibraryFile(ctx, req)
+	}
 
-		if err != nil {
-			slog.Error("failed to create repo file", slog.String("file", req.FilePath), slog.Any("error", err), slog.String("namespace", req.NameSpace), slog.String("name", req.Name))
-		}
+	if err != nil {
+		slog.Error("failed to create repo file", slog.String("file", req.FilePath), slog.Any("error", err), slog.String("namespace", req.NameSpace), slog.String("name", req.Name))
+	}
 
-		err = c.repo.SetUpdateTimeByPath(ctx, req.RepoType, req.NameSpace, req.Name, time.Now())
-		if err != nil {
-			slog.Error("failed to set repo update time", slog.Any("error", err), slog.String("repo_type", string(req.RepoType)), slog.String("namespace", req.NameSpace), slog.String("name", req.Name))
-		}
+	err = c.repo.SetUpdateTimeByPath(ctx, req.RepoType, req.NameSpace, req.Name, time.Now())
+	if err != nil {
+		slog.Error("failed to set repo update time", slog.Any("error", err), slog.String("repo_type", string(req.RepoType)), slog.String("namespace", req.NameSpace), slog.String("name", req.Name))
+	}
 
-	}()
 	var resp types.CreateFileResp
 	return &resp, nil
 }
@@ -422,28 +419,25 @@ func (c *RepoComponent) UpdateFile(ctx context.Context, req *types.UpdateFileReq
 		return nil, fmt.Errorf("failed to update %s file, cause: %w", req.RepoType, err)
 	}
 
-	go func() {
-		// TODO:check sensitive content of file
-		fileName := filepath.Base(req.FilePath)
-		var err error
-		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-		defer cancel()
-		if fileName == "README.md" {
-			slog.Debug("file is readme", slog.String("content", req.Content))
-			err = c.updateReadmeFile(ctx, req)
-		} else {
-			slog.Debug("file is not readme", slog.String("filePath", req.FilePath), slog.String("originPath", req.OriginPath))
-			err = c.updateLibraryFile(ctx, req)
-		}
-		if err != nil {
-			slog.Error("failed to update file", slog.String("file", req.FilePath), slog.Any("error", err), slog.String("namespace", req.NameSpace), slog.String("name", req.Name))
-		}
+	// TODO:check sensitive content of file
+	fileName := filepath.Base(req.FilePath)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	if fileName == "README.md" {
+		slog.Debug("file is readme", slog.String("content", req.Content))
+		err = c.updateReadmeFile(ctx, req)
+	} else {
+		slog.Debug("file is not readme", slog.String("filePath", req.FilePath), slog.String("originPath", req.OriginPath))
+		err = c.updateLibraryFile(ctx, req)
+	}
+	if err != nil {
+		slog.Error("failed to update file", slog.String("file", req.FilePath), slog.Any("error", err), slog.String("namespace", req.NameSpace), slog.String("name", req.Name))
+	}
 
-		err = c.repo.SetUpdateTimeByPath(ctx, req.RepoType, req.NameSpace, req.Name, time.Now())
-		if err != nil {
-			slog.Error("failed to set repo update time", slog.Any("error", err), slog.String("repo_type", string(req.RepoType)), slog.String("namespace", req.NameSpace), slog.String("name", req.Name))
-		}
-	}()
+	err = c.repo.SetUpdateTimeByPath(ctx, req.RepoType, req.NameSpace, req.Name, time.Now())
+	if err != nil {
+		slog.Error("failed to set repo update time", slog.Any("error", err), slog.String("repo_type", string(req.RepoType)), slog.String("namespace", req.NameSpace), slog.String("name", req.Name))
+	}
 
 	resp := new(types.UpdateFileResp)
 	return resp, nil
