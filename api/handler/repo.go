@@ -309,7 +309,7 @@ func (h *RepoHandler) FileInfo(ctx *gin.Context) {
 	}
 	file, err := h.c.FileInfo(ctx, req)
 	if err != nil {
-		slog.Error("Failed to get repo file info", slog.String("repo_type", string(req.RepoType)), slog.Any("error", err))
+		slog.Error("Failed to get repo file info", slog.Any("req", req), slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
 		return
 	}
