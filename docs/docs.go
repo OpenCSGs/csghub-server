@@ -4779,6 +4779,13 @@ const docTemplate = `{
                         "required": true
                     },
                     {
+                        "type": "string",
+                        "description": "current user",
+                        "name": "current_user",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
                         "description": "body",
                         "name": "body",
                         "in": "body",
@@ -4786,13 +4793,6 @@ const docTemplate = `{
                         "schema": {
                             "$ref": "#/definitions/types.UpdateUserRequest"
                         }
-                    },
-                    {
-                        "type": "string",
-                        "description": "current user",
-                        "name": "current_user",
-                        "in": "query",
-                        "required": true
                     }
                 ],
                 "responses": {
@@ -6762,11 +6762,17 @@ const docTemplate = `{
         "types.CreateUserRequest": {
             "type": "object",
             "properties": {
+                "casdoor_uid": {
+                    "type": "string"
+                },
                 "email": {
                     "type": "string"
                 },
                 "name": {
                     "description": "Display name of the user",
+                    "type": "string"
+                },
+                "phone": {
                     "type": "string"
                 },
                 "username": {
