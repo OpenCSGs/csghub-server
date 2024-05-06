@@ -567,10 +567,14 @@ definitions:
     type: object
   types.CreateUserRequest:
     properties:
+      casdoor_uid:
+        type: string
       email:
         type: string
       name:
         description: Display name of the user
+        type: string
+      phone:
         type: string
       username:
         description: the login name
@@ -4761,17 +4765,17 @@ paths:
         name: username
         required: true
         type: string
+      - description: current user
+        in: query
+        name: current_user
+        required: true
+        type: string
       - description: body
         in: body
         name: body
         required: true
         schema:
           $ref: '#/definitions/types.UpdateUserRequest'
-      - description: current user
-        in: query
-        name: current_user
-        required: true
-        type: string
       produces:
       - application/json
       responses:
