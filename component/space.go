@@ -27,6 +27,7 @@ func NewSpaceComponent(config *config.Config) (*SpaceComponent, error) {
 	var err error
 	c.sss = database.NewSpaceSdkStore()
 	c.srs = database.NewSpaceResourceStore()
+	c.rs = database.NewRepoStore()
 	c.RepoComponent, err = NewRepoComponent(config)
 	if err != nil {
 		return nil, err
@@ -41,6 +42,7 @@ type SpaceComponent struct {
 	ss               *database.SpaceStore
 	sss              *database.SpaceSdkStore
 	srs              *database.SpaceResourceStore
+	rs               *database.RepoStore
 	deployer         deploy.Deployer
 	publicRootDomain string
 }
@@ -225,35 +227,50 @@ func (c *SpaceComponent) Update(ctx context.Context, req *types.UpdateSpaceReq) 
 	return resDataset, nil
 }
 
-func (c *SpaceComponent) Index(ctx context.Context, username, search, sort string, per, page int) ([]types.Space, int, error) {
+func (c *SpaceComponent) Index(ctx context.Context, username, search, sort string, tags []database.TagReq, per, page int) ([]types.Space, int, error) {
 	var (
-		spaces []types.Space
-		user   database.User
-		err    error
+		resSpaces []types.Space
+		user      database.User
+		err       error
 	)
-	if username == "" {
-		slog.Info("get spaces without current username", slog.String("search", search))
-	} else {
+	if username != "" {
 		user, err = c.user.FindByUsername(ctx, username)
 		if err != nil {
-			slog.Error("fail to get public spaces", slog.String("user", username), slog.String("search", search),
-				slog.String("error", err.Error()))
 			newError := fmt.Errorf("failed to get current user,error:%w", err)
 			return nil, 0, newError
 		}
 	}
-	spaceData, total, err := c.ss.PublicToUser(ctx, user.ID, search, sort, per, page)
+	repos, total, err := c.rs.PublicToUser(ctx, types.SpaceRepo, user.ID, search, sort, tags, per, page)
 	if err != nil {
-		slog.Error("fail to get public spaces", slog.String("user", username), slog.String("search", search),
-			slog.String("error", err.Error()))
-		newError := fmt.Errorf("failed to get public spaces,error:%w", err)
+		newError := fmt.Errorf("failed to get public space repos,error:%w", err)
+		return nil, 0, newError
+	}
+	var repoIDs []int64
+	for _, repo := range repos {
+		repoIDs = append(repoIDs, repo.ID)
+	}
+	spaces, err := c.ss.ByRepoIDs(ctx, repoIDs)
+	if err != nil {
+		newError := fmt.Errorf("failed to get spaces by repo ids,error:%w", err)
 		return nil, 0, newError
 	}
 
-	for _, data := range spaceData {
-		_, status, _ := c.status(ctx, &data)
+	//loop through repos to keep the repos in sort order
+	for _, repo := range repos {
+		var space *database.Space
+		for _, s := range spaces {
+			if s.RepositoryID == repo.ID {
+				space = &s
+				space.Repository = repo
+				break
+			}
+		}
+		if space == nil {
+			continue
+		}
+		_, status, _ := c.status(ctx, space)
 		var tags []types.RepoTag
-		for _, tag := range data.Repository.Tags {
+		for _, tag := range space.Repository.Tags {
 			tags = append(tags, types.RepoTag{
 				Name:      tag.Name,
 				Category:  tag.Category,
@@ -264,28 +281,28 @@ func (c *SpaceComponent) Index(ctx context.Context, username, search, sort strin
 				UpdatedAt: tag.UpdatedAt,
 			})
 		}
-		spaces = append(spaces, types.Space{
-			Name:          data.Repository.Name,
-			Description:   data.Repository.Description,
-			Path:          data.Repository.Path,
-			Sdk:           data.Sdk,
-			SdkVersion:    data.SdkVersion,
-			Template:      data.Template,
-			Env:           data.Env,
-			Hardware:      data.Hardware,
-			Secrets:       data.Secrets,
-			CoverImageUrl: data.CoverImageUrl,
-			License:       data.Repository.License,
-			Private:       data.Repository.Private,
-			Likes:         data.Repository.Likes,
-			CreatedAt:     data.Repository.CreatedAt,
-			UpdatedAt:     data.Repository.UpdatedAt,
+		resSpaces = append(resSpaces, types.Space{
+			Name:          space.Repository.Name,
+			Description:   space.Repository.Description,
+			Path:          space.Repository.Path,
+			Sdk:           space.Sdk,
+			SdkVersion:    space.SdkVersion,
+			Template:      space.Template,
+			Env:           space.Env,
+			Hardware:      space.Hardware,
+			Secrets:       space.Secrets,
+			CoverImageUrl: space.CoverImageUrl,
+			License:       space.Repository.License,
+			Private:       space.Repository.Private,
+			Likes:         space.Repository.Likes,
+			CreatedAt:     space.Repository.CreatedAt,
+			UpdatedAt:     space.Repository.UpdatedAt,
 			Tags:          tags,
 			Status:        status,
-			RepositoryID:  data.Repository.ID,
+			RepositoryID:  space.Repository.ID,
 		})
 	}
-	return spaces, total, nil
+	return resSpaces, total, nil
 }
 
 // UserSpaces get spaces of owner and visible to current user

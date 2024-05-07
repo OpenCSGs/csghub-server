@@ -66,6 +66,7 @@ func NewModelComponent(config *config.Config) (*ModelComponent, error) {
 	}
 	c.spaceComonent, _ = NewSpaceComponent(config)
 	c.ms = database.NewModelStore()
+	c.rs = database.NewRepoStore()
 	c.infer = inference.NewInferClient(config.Inference.ServerAddr)
 	return c, nil
 }
@@ -74,6 +75,7 @@ type ModelComponent struct {
 	*RepoComponent
 	spaceComonent *SpaceComponent
 	ms            *database.ModelStore
+	rs            *database.RepoStore
 	infer         inference.Client
 }
 
@@ -83,25 +85,42 @@ func (c *ModelComponent) Index(ctx context.Context, username, search, sort strin
 		err       error
 		resModels []types.Model
 	)
-	if username == "" {
-		slog.Info("get models without current username")
-	} else {
+	if username != "" {
 		user, err = c.user.FindByUsername(ctx, username)
 		if err != nil {
 			newError := fmt.Errorf("failed to get current user,error:%w", err)
-			slog.Error(newError.Error())
 			return nil, 0, newError
 		}
 	}
-	models, total, err := c.ms.PublicToUser(ctx, &user, search, sort, ragReqs, per, page)
+	repos, total, err := c.rs.PublicToUser(ctx, types.ModelRepo, user.ID, search, sort, ragReqs, per, page)
 	if err != nil {
-		newError := fmt.Errorf("failed to get public models,error:%w", err)
-		slog.Error(newError.Error())
+		newError := fmt.Errorf("failed to get public model repos,error:%w", err)
 		return nil, 0, newError
 	}
-	for _, data := range models {
+	var repoIDs []int64
+	for _, repo := range repos {
+		repoIDs = append(repoIDs, repo.ID)
+	}
+	models, err := c.ms.ByRepoIDs(ctx, repoIDs)
+	if err != nil {
+		newError := fmt.Errorf("failed to get models by repo ids,error:%w", err)
+		return nil, 0, newError
+	}
+
+	//loop through repos to keep the repos in sort order
+	for _, repo := range repos {
+		var model *database.Model
+		for _, m := range models {
+			if m.RepositoryID == repo.ID {
+				model = &m
+				break
+			}
+		}
+		if model == nil {
+			continue
+		}
 		var tags []types.RepoTag
-		for _, tag := range data.Repository.Tags {
+		for _, tag := range repo.Tags {
 			tags = append(tags, types.RepoTag{
 				Name:      tag.Name,
 				Category:  tag.Category,
@@ -113,18 +132,18 @@ func (c *ModelComponent) Index(ctx context.Context, username, search, sort strin
 			})
 		}
 		resModels = append(resModels, types.Model{
-			ID:           data.ID,
-			Name:         data.Repository.Name,
-			Nickname:     data.Repository.Nickname,
-			Description:  data.Repository.Description,
-			Likes:        data.Repository.Likes,
-			Downloads:    data.Repository.DownloadCount,
-			Path:         data.Repository.Path,
-			RepositoryID: data.RepositoryID,
-			Private:      data.Repository.Private,
-			CreatedAt:    data.CreatedAt,
+			ID:           model.ID,
+			Name:         repo.Name,
+			Nickname:     repo.Nickname,
+			Description:  repo.Description,
+			Likes:        repo.Likes,
+			Downloads:    repo.DownloadCount,
+			Path:         repo.Path,
+			RepositoryID: repo.ID,
+			Private:      repo.Private,
+			CreatedAt:    model.CreatedAt,
 			Tags:         tags,
-			UpdatedAt:    data.Repository.UpdatedAt,
+			UpdatedAt:    repo.UpdatedAt,
 		})
 	}
 	return resModels, total, nil
@@ -240,7 +259,7 @@ func (c *ModelComponent) Create(ctx context.Context, req *types.CreateModelReq) 
 			SSHCloneURL:  model.Repository.SSHCloneURL,
 		},
 		Private: model.Repository.Private,
-		User: types.User{
+		User: &types.User{
 			Username: user.Username,
 			Nickname: user.Name,
 			Email:    user.Email,
@@ -379,7 +398,7 @@ func (c *ModelComponent) Show(ctx context.Context, namespace, name, currentUser 
 		},
 		Private: model.Repository.Private,
 		Tags:    tags,
-		User: types.User{
+		User: &types.User{
 			Username: model.Repository.User.Username,
 			Nickname: model.Repository.User.Name,
 			Email:    model.Repository.User.Email,
@@ -465,8 +484,7 @@ func getFilePaths(namespace, repoName, folder string, repoType types.RepositoryT
 	}
 	gitFiles, err := gsTree(context.Background(), getRepoFileTree)
 	if err != nil {
-		slog.Error("Failed to get repo file contents", slog.String("path", folder), slog.Any("error", err))
-		return filePaths, err
+		return filePaths, fmt.Errorf("failed to get repo file tree,%w", err)
 	}
 	for _, file := range gitFiles {
 		if file.Type == "dir" {

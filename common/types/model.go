@@ -76,8 +76,8 @@ type Model struct {
 	Path          string     `json:"path"`
 	RepositoryID  int64      `json:"repository_id"`
 	Private       bool       `json:"private"`
-	User          User       `json:"user"`
-	Tags          []RepoTag  `json:"tags"`
+	User          *User      `json:"user,omitempty"`
+	Tags          []RepoTag  `json:"tags,omitempty"`
 	Repository    Repository `json:"repository"`
 	DefaultBranch string     `json:"default_branch"`
 	CreatedAt     time.Time  `json:"created_at"`
