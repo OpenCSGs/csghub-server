@@ -304,3 +304,47 @@ func (s *RepoStore) SetUpdateTimeByPath(ctx context.Context, repoType types.Repo
 		Exec(ctx)
 	return err
 }
+
+func (s *RepoStore) PublicToUser(ctx context.Context, repoType types.RepositoryType, userID int64, search, sort string, tags []TagReq, per, page int) (repos []*Repository, count int, err error) {
+	q := s.db.Operator.Core.
+		NewSelect().
+		Column("repository.*").
+		Model(&repos).
+		Relation("Tags")
+
+	q.Where("repository.repository_type = ?", repoType)
+	q.Where("repository.private = ? or repository.user_id = ?", false, userID)
+
+	if search != "" {
+		search = strings.ToLower(search)
+		q.Where(
+			"LOWER(repository.path) like ? or LOWER(repository.description) like ? or LOWER(repository.nickname) like ?",
+			fmt.Sprintf("%%%s%%", search),
+			fmt.Sprintf("%%%s%%", search),
+			fmt.Sprintf("%%%s%%", search),
+		)
+	}
+	if len(tags) > 0 {
+		q.Join("JOIN repository_tags ON repository.id = repository_tags.repository_id").
+			Join("JOIN tags ON repository_tags.tag_id = tags.id")
+		for _, tag := range tags {
+			q.Where("tags.category = ? AND tags.name = ?", tag.Category, tag.Name)
+		}
+	}
+
+	count, err = q.Count(ctx)
+	if err != nil {
+		return
+	}
+
+	if sort == "trending" {
+		q.Join("Left Join recom_repo_scores on repository.id = recom_repo_scores.repository_id")
+		q.ColumnExpr(`COALESCE(recom_repo_scores.score, 0) AS popularity`)
+	}
+
+	err = q.Order(sortBy[sort]).
+		Limit(per).Offset((page - 1) * per).
+		Scan(ctx)
+
+	return
+}

@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
-	"strings"
 	"time"
 
 	"github.com/uptrace/bun"
@@ -26,46 +25,12 @@ type Code struct {
 	times
 }
 
-func (s *CodeStore) PublicToUser(ctx context.Context, user *User, search, sort string, tags []TagReq, per, page int) (codes []Code, count int, err error) {
-	query := s.db.Operator.Core.
-		NewSelect().
+func (s *CodeStore) ByRepoIDs(ctx context.Context, repoIDs []int64) (codes []Code, err error) {
+	err = s.db.Operator.Core.NewSelect().
 		Model(&codes).
-		Relation("Repository.Tags")
+		Where("repository_id in (?)", bun.In(repoIDs)).
+		Scan(ctx)
 
-	if user != nil {
-		query = query.Where("repository.private = ? or repository.user_id = ?", false, user.ID)
-	} else {
-		query = query.Where("repository.private = ?", false)
-	}
-
-	if search != "" {
-		search = strings.ToLower(search)
-		query = query.Where(
-			"LOWER(repository.path) like ? or LOWER(repository.description) like ? or LOWER(repository.nickname) like ?",
-			fmt.Sprintf("%%%s%%", search),
-			fmt.Sprintf("%%%s%%", search),
-			fmt.Sprintf("%%%s%%", search),
-		)
-	}
-	// TODO：Optimize SQL
-	if len(tags) > 0 {
-		for _, tag := range tags {
-			query = query.Where("code.repository_id IN (SELECT repository_id FROM repository_tags JOIN tags ON repository_tags.tag_id = tags.id WHERE tags.category = ? AND tags.name = ?)", tag.Category, tag.Name)
-		}
-	}
-	count, err = query.Count(ctx)
-	if err != nil {
-		return
-	}
-
-	query = query.Order(fmt.Sprintf("repository.%s", sortBy[sort]))
-	query = query.Limit(per).
-		Offset((page - 1) * per)
-
-	err = query.Scan(ctx)
-	if err != nil {
-		return
-	}
 	return
 }
 

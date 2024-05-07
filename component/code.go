@@ -3,7 +3,6 @@ package component
 import (
 	"context"
 	"fmt"
-	"log/slog"
 
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/config"
@@ -20,12 +19,14 @@ func NewCodeComponent(config *config.Config) (*CodeComponent, error) {
 		return nil, err
 	}
 	c.cs = database.NewCodeStore()
+	c.rs = database.NewRepoStore()
 	return c, nil
 }
 
 type CodeComponent struct {
 	*RepoComponent
 	cs *database.CodeStore
+	rs *database.RepoStore
 }
 
 func (c *CodeComponent) Create(ctx context.Context, req *types.CreateCodeReq) (*types.Code, error) {
@@ -135,36 +136,63 @@ func (c *CodeComponent) Index(ctx context.Context, username, search, sort string
 		err      error
 		resCodes []types.Code
 	)
-	if username == "" {
-		slog.Info("get codes without current username")
-	} else {
+	if username != "" {
 		user, err = c.user.FindByUsername(ctx, username)
 		if err != nil {
 			newError := fmt.Errorf("failed to get current user,error:%w", err)
-			slog.Error(newError.Error())
 			return nil, 0, newError
 		}
 	}
-	codes, total, err := c.cs.PublicToUser(ctx, &user, search, sort, tags, per, page)
+	repos, total, err := c.rs.PublicToUser(ctx, types.CodeRepo, user.ID, search, sort, tags, per, page)
 	if err != nil {
-		newError := fmt.Errorf("failed to get public codes,error:%w", err)
-		slog.Error(newError.Error())
+		newError := fmt.Errorf("failed to get public code repos,error:%w", err)
+		return nil, 0, newError
+	}
+	var repoIDs []int64
+	for _, repo := range repos {
+		repoIDs = append(repoIDs, repo.ID)
+	}
+	codes, err := c.cs.ByRepoIDs(ctx, repoIDs)
+	if err != nil {
+		newError := fmt.Errorf("failed to get codes by repo ids,error:%w", err)
 		return nil, 0, newError
 	}
 
-	for _, data := range codes {
+	//loop through repos to keep the repos in sort order
+	for _, repo := range repos {
+		var code *database.Code
+		for _, c := range codes {
+			if c.RepositoryID == repo.ID {
+				code = &c
+				code.Repository = repo
+				break
+			}
+		}
+		var tags []types.RepoTag
+		for _, tag := range repo.Tags {
+			tags = append(tags, types.RepoTag{
+				Name:      tag.Name,
+				Category:  tag.Category,
+				Group:     tag.Group,
+				BuiltIn:   tag.BuiltIn,
+				ShowName:  tag.ShowName,
+				CreatedAt: tag.CreatedAt,
+				UpdatedAt: tag.UpdatedAt,
+			})
+		}
 		resCodes = append(resCodes, types.Code{
-			ID:           data.ID,
-			Name:         data.Repository.Name,
-			Nickname:     data.Repository.Nickname,
-			Description:  data.Repository.Description,
-			Likes:        data.Repository.Likes,
-			Downloads:    data.Repository.DownloadCount,
-			Path:         data.Repository.Path,
-			RepositoryID: data.RepositoryID,
-			Private:      data.Repository.Private,
-			CreatedAt:    data.CreatedAt,
-			UpdatedAt:    data.Repository.UpdatedAt,
+			ID:           code.ID,
+			Name:         repo.Name,
+			Nickname:     repo.Nickname,
+			Description:  repo.Description,
+			Likes:        repo.Likes,
+			Downloads:    repo.DownloadCount,
+			Path:         repo.Path,
+			RepositoryID: repo.ID,
+			Private:      repo.Private,
+			CreatedAt:    code.CreatedAt,
+			UpdatedAt:    repo.UpdatedAt,
+			Tags:         tags,
 		})
 	}
 

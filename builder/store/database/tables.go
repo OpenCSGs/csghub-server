@@ -18,3 +18,28 @@ type Space struct {
 
 	times
 }
+
+/* tables for recommendations */
+
+// RecomWeight are recommendation weight settings
+type RecomWeight struct {
+	Name string `bun:",pk" json:"name"`
+	//the expression to calculate weight
+	WeightExp string `bun:",notnull" json:"weight_exp" `
+	times
+}
+
+// RecomOpWeight are the special weights of a repository manually set by operator
+type RecomOpWeight struct {
+	RepositoryID int64 `bun:",pk" json:"repository_id"`
+	Weight       int   `bun:",notnull" json:"weight" `
+	times
+}
+
+// RecomRepoScore is the recommendation score of a repository
+type RecomRepoScore struct {
+	RepositoryID int64 `bun:",pk" json:"repository_id"`
+	//the total recommendation score calculated by all the recommendation weights
+	Score float64 `bun:",notnull" json:"score"`
+	times
+}
