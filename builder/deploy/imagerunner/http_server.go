@@ -290,7 +290,13 @@ func (s *HttpServer) imageStatus(c *gin.Context) {
 
 	if srv.IsFailed() {
 		resp.Code = common.DeployFailed
+		// read message of Ready
 		resp.Message = srv.Status.GetCondition(v1.ServiceConditionReady).Message
+		// append message of ConfigurationsReady
+		srvConfigReady := srv.Status.GetCondition(v1.ServiceConditionConfigurationsReady)
+		if srvConfigReady != nil {
+			resp.Message += srvConfigReady.Message
+		}
 		slog.Info("get image status success", slog.String("srv_name", srvName), slog.Any("resp", resp))
 		c.JSON(http.StatusOK, resp)
 		return
