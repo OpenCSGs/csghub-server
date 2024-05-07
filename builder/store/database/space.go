@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
-	"strings"
 
 	"github.com/uptrace/bun"
 )
@@ -50,48 +49,6 @@ func (s *SpaceStore) Update(ctx context.Context, input Space) (err error) {
 	return
 }
 
-func (s *SpaceStore) PublicToUser(ctx context.Context, userID int64, search, sort string, per, page int) ([]Space, int, error) {
-	var (
-		spaces []Space
-		count  int
-		err    error
-	)
-	query := s.db.Operator.Core.
-		NewSelect().
-		Model(&spaces).
-		Relation("Repository")
-
-	if userID > 0 {
-		query = query.Where("repository.private = ? or repository.user_id = ?", false, userID)
-	} else {
-		query = query.Where("repository.private = ?", false)
-	}
-
-	if search != "" {
-		search = strings.ToLower(search)
-		query = query.Where(
-			"LOWER(repository.path) like ? or LOWER(repository.name) like ?",
-			fmt.Sprintf("%%%s%%", search),
-			fmt.Sprintf("%%%s%%", search),
-		)
-	}
-
-	count, err = query.Count(ctx)
-	if err != nil {
-		return nil, 0, err
-	}
-
-	query = query.Order(sortBy[sort])
-	query = query.Limit(per).
-		Offset((page - 1) * per)
-
-	err = query.Scan(ctx)
-	if err != nil {
-		return nil, 0, err
-	}
-	return spaces, count, nil
-}
-
 func (s *SpaceStore) FindByPath(ctx context.Context, namespace, name string) (*Space, error) {
 	resSpace := new(Space)
 	err := s.db.Operator.Core.
@@ -121,6 +78,16 @@ func (s *SpaceStore) ByID(ctx context.Context, id int64) (*Space, error) {
 		Relation("Repository").
 		Where("space.id = ?", id).
 		Scan(ctx)
+}
+
+// ByRepoIDs get spaces by repoIDs, only basice info, no related repo
+func (s *SpaceStore) ByRepoIDs(ctx context.Context, repoIDs []int64) (spaces []Space, err error) {
+	err = s.db.Operator.Core.NewSelect().
+		Model(&spaces).
+		Where("repository_id in (?)", bun.In(repoIDs)).
+		Scan(ctx)
+
+	return
 }
 
 func (s *SpaceStore) ByUsername(ctx context.Context, username string, per, page int, onlyPublic bool) (spaces []Space, total int, err error) {

@@ -38,11 +38,15 @@ type ModelHandler struct {
 // @Tags         Model
 // @Accept       json
 // @Produce      json
-// @Param        per query int false "per" default(20)
-// @Param        page query int false "per page" default(1)
 // @Param        current_user query string false "current user"
 // @Param        search query string false "search text"
+// @Param        task_tag query string false "filter by task tag"
+// @Param        framework_tag query string false "filter by framework tag"
+// @Param        license_tag query string false "filter by license tag"
+// @Param        language_tag query string false "filter by language tag"
 // @Param        sort query string false "sort by"
+// @Param        per query int false "per" default(20)
+// @Param        page query int false "per page" default(1)
 // @Success      200  {object}  types.ResponseWithTotal{data=[]types.Model,total=int} "OK"
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"

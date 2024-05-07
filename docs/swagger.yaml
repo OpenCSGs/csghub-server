@@ -1848,6 +1848,30 @@ paths:
       - application/json
       description: get visiable codes for current user
       parameters:
+      - description: current user
+        in: query
+        name: current_user
+        type: string
+      - description: search text
+        in: query
+        name: search
+        type: string
+      - description: filter by task tag
+        in: query
+        name: task_tag
+        type: string
+      - description: filter by framework tag
+        in: query
+        name: framework_tag
+        type: string
+      - description: filter by task tag
+        in: query
+        name: license_tag
+        type: string
+      - description: sort by
+        in: query
+        name: sort
+        type: string
       - default: 20
         description: per
         in: query
@@ -1858,11 +1882,6 @@ paths:
         in: query
         name: page
         type: integer
-      - description: current user
-        in: query
-        name: current_user
-        required: true
-        type: string
       produces:
       - application/json
       responses:
@@ -2117,6 +2136,30 @@ paths:
       - application/json
       description: get visiable datasets for current user
       parameters:
+      - description: current user
+        in: query
+        name: current_user
+        type: string
+      - description: search text
+        in: query
+        name: search
+        type: string
+      - description: filter by task tag
+        in: query
+        name: task_tag
+        type: string
+      - description: filter by framework tag
+        in: query
+        name: framework_tag
+        type: string
+      - description: filter by task tag
+        in: query
+        name: license_tag
+        type: string
+      - description: sort by
+        in: query
+        name: sort
+        type: string
       - default: 20
         description: per
         in: query
@@ -2127,19 +2170,6 @@ paths:
         in: query
         name: page
         type: integer
-      - description: current user
-        in: query
-        name: current_user
-        required: true
-        type: string
-      - description: search text
-        in: query
-        name: search
-        type: string
-      - description: sort by
-        in: query
-        name: sort
-        type: string
       produces:
       - application/json
       responses:
@@ -2582,6 +2612,30 @@ paths:
       - application/json
       description: get visiable models for current user
       parameters:
+      - description: current user
+        in: query
+        name: current_user
+        type: string
+      - description: search text
+        in: query
+        name: search
+        type: string
+      - description: filter by task tag
+        in: query
+        name: task_tag
+        type: string
+      - description: filter by framework tag
+        in: query
+        name: framework_tag
+        type: string
+      - description: filter by task tag
+        in: query
+        name: license_tag
+        type: string
+      - description: sort by
+        in: query
+        name: sort
+        type: string
       - default: 20
         description: per
         in: query
@@ -2592,18 +2646,6 @@ paths:
         in: query
         name: page
         type: integer
-      - description: current user
-        in: query
-        name: current_user
-        type: string
-      - description: search text
-        in: query
-        name: search
-        type: string
-      - description: sort by
-        in: query
-        name: sort
-        type: string
       produces:
       - application/json
       responses:
@@ -3685,6 +3727,30 @@ paths:
       - application/json
       description: get spaces visible to current user
       parameters:
+      - description: current user
+        in: query
+        name: current_user
+        type: string
+      - description: search text
+        in: query
+        name: search
+        type: string
+      - description: filter by task tag
+        in: query
+        name: task_tag
+        type: string
+      - description: filter by framework tag
+        in: query
+        name: framework_tag
+        type: string
+      - description: filter by task tag
+        in: query
+        name: license_tag
+        type: string
+      - description: sort by
+        in: query
+        name: sort
+        type: string
       - default: 20
         description: per
         in: query
@@ -3695,18 +3761,6 @@ paths:
         in: query
         name: page
         type: integer
-      - description: current user
-        in: query
-        name: current_user
-        type: string
-      - description: search text
-        in: query
-        name: search
-        type: string
-      - description: sort by
-        in: query
-        name: sort
-        type: string
       produces:
       - application/json
       responses:

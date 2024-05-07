@@ -24,6 +24,42 @@
                 "summary": "Get Visiable codes for current user",
                 "parameters": [
                     {
+                        "type": "string",
+                        "description": "current user",
+                        "name": "current_user",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "search text",
+                        "name": "search",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "filter by task tag",
+                        "name": "task_tag",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "filter by framework tag",
+                        "name": "framework_tag",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "filter by task tag",
+                        "name": "license_tag",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "sort by",
+                        "name": "sort",
+                        "in": "query"
+                    },
+                    {
                         "type": "integer",
                         "default": 20,
                         "description": "per",
@@ -36,13 +72,6 @@
                         "description": "per page",
                         "name": "page",
                         "in": "query"
-                    },
-                    {
-                        "type": "string",
-                        "description": "current user",
-                        "name": "current_user",
-                        "in": "query",
-                        "required": true
                     }
                 ],
                 "responses": {
@@ -461,6 +490,42 @@
                 "summary": "Get Visiable datasets for current user",
                 "parameters": [
                     {
+                        "type": "string",
+                        "description": "current user",
+                        "name": "current_user",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "search text",
+                        "name": "search",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "filter by task tag",
+                        "name": "task_tag",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "filter by framework tag",
+                        "name": "framework_tag",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "filter by task tag",
+                        "name": "license_tag",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "sort by",
+                        "name": "sort",
+                        "in": "query"
+                    },
+                    {
                         "type": "integer",
                         "default": 20,
                         "description": "per",
@@ -472,25 +537,6 @@
                         "default": 1,
                         "description": "per page",
                         "name": "page",
-                        "in": "query"
-                    },
-                    {
-                        "type": "string",
-                        "description": "current user",
-                        "name": "current_user",
-                        "in": "query",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "search text",
-                        "name": "search",
-                        "in": "query"
-                    },
-                    {
-                        "type": "string",
-                        "description": "sort by",
-                        "name": "sort",
                         "in": "query"
                     }
                 ],
@@ -1220,20 +1266,6 @@
                 "summary": "Get Visiable models for current user",
                 "parameters": [
                     {
-                        "type": "integer",
-                        "default": 20,
-                        "description": "per",
-                        "name": "per",
-                        "in": "query"
-                    },
-                    {
-                        "type": "integer",
-                        "default": 1,
-                        "description": "per page",
-                        "name": "page",
-                        "in": "query"
-                    },
-                    {
                         "type": "string",
                         "description": "current user",
                         "name": "current_user",
@@ -1247,8 +1279,40 @@
                     },
                     {
                         "type": "string",
+                        "description": "filter by task tag",
+                        "name": "task_tag",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "filter by framework tag",
+                        "name": "framework_tag",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "filter by task tag",
+                        "name": "license_tag",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
                         "description": "sort by",
                         "name": "sort",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "default": 20,
+                        "description": "per",
+                        "name": "per",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "default": 1,
+                        "description": "per page",
+                        "name": "page",
                         "in": "query"
                     }
                 ],
@@ -3013,20 +3077,6 @@
                 "summary": "Get spaces visible to current user",
                 "parameters": [
                     {
-                        "type": "integer",
-                        "default": 20,
-                        "description": "per",
-                        "name": "per",
-                        "in": "query"
-                    },
-                    {
-                        "type": "integer",
-                        "default": 1,
-                        "description": "per page",
-                        "name": "page",
-                        "in": "query"
-                    },
-                    {
                         "type": "string",
                         "description": "current user",
                         "name": "current_user",
@@ -3040,8 +3090,40 @@
                     },
                     {
                         "type": "string",
+                        "description": "filter by task tag",
+                        "name": "task_tag",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "filter by framework tag",
+                        "name": "framework_tag",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "filter by task tag",
+                        "name": "license_tag",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
                         "description": "sort by",
                         "name": "sort",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "default": 20,
+                        "description": "per",
+                        "name": "per",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "default": 1,
+                        "description": "per page",
+                        "name": "page",
                         "in": "query"
                     }
                 ],
