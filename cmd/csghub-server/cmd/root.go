@@ -6,6 +6,7 @@ import (
 	"os"
 
 	"github.com/spf13/cobra"
+	"opencsg.com/csghub-server/cmd/csghub-server/cmd/cron"
 	"opencsg.com/csghub-server/cmd/csghub-server/cmd/deploy"
 	"opencsg.com/csghub-server/cmd/csghub-server/cmd/logscan"
 	"opencsg.com/csghub-server/cmd/csghub-server/cmd/migration"
@@ -46,6 +47,7 @@ func init() {
 		logscan.Cmd,
 		trigger.Cmd,
 		deploy.Cmd,
+		cron.Cmd,
 	)
 }
 

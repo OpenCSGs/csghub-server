@@ -35,6 +35,42 @@ const docTemplate = `{
                 "summary": "Get Visiable codes for current user",
                 "parameters": [
                     {
+                        "type": "string",
+                        "description": "current user",
+                        "name": "current_user",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "search text",
+                        "name": "search",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "filter by task tag",
+                        "name": "task_tag",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "filter by framework tag",
+                        "name": "framework_tag",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "filter by task tag",
+                        "name": "license_tag",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "sort by",
+                        "name": "sort",
+                        "in": "query"
+                    },
+                    {
                         "type": "integer",
                         "default": 20,
                         "description": "per",
@@ -47,13 +83,6 @@ const docTemplate = `{
                         "description": "per page",
                         "name": "page",
                         "in": "query"
-                    },
-                    {
-                        "type": "string",
-                        "description": "current user",
-                        "name": "current_user",
-                        "in": "query",
-                        "required": true
                     }
                 ],
                 "responses": {
@@ -472,6 +501,42 @@ const docTemplate = `{
                 "summary": "Get Visiable datasets for current user",
                 "parameters": [
                     {
+                        "type": "string",
+                        "description": "current user",
+                        "name": "current_user",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "search text",
+                        "name": "search",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "filter by task tag",
+                        "name": "task_tag",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "filter by framework tag",
+                        "name": "framework_tag",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "filter by task tag",
+                        "name": "license_tag",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "sort by",
+                        "name": "sort",
+                        "in": "query"
+                    },
+                    {
                         "type": "integer",
                         "default": 20,
                         "description": "per",
@@ -483,25 +548,6 @@ const docTemplate = `{
                         "default": 1,
                         "description": "per page",
                         "name": "page",
-                        "in": "query"
-                    },
-                    {
-                        "type": "string",
-                        "description": "current user",
-                        "name": "current_user",
-                        "in": "query",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "search text",
-                        "name": "search",
-                        "in": "query"
-                    },
-                    {
-                        "type": "string",
-                        "description": "sort by",
-                        "name": "sort",
                         "in": "query"
                     }
                 ],
@@ -1231,20 +1277,6 @@ const docTemplate = `{
                 "summary": "Get Visiable models for current user",
                 "parameters": [
                     {
-                        "type": "integer",
-                        "default": 20,
-                        "description": "per",
-                        "name": "per",
-                        "in": "query"
-                    },
-                    {
-                        "type": "integer",
-                        "default": 1,
-                        "description": "per page",
-                        "name": "page",
-                        "in": "query"
-                    },
-                    {
                         "type": "string",
                         "description": "current user",
                         "name": "current_user",
@@ -1258,8 +1290,40 @@ const docTemplate = `{
                     },
                     {
                         "type": "string",
+                        "description": "filter by task tag",
+                        "name": "task_tag",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "filter by framework tag",
+                        "name": "framework_tag",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "filter by task tag",
+                        "name": "license_tag",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
                         "description": "sort by",
                         "name": "sort",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "default": 20,
+                        "description": "per",
+                        "name": "per",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "default": 1,
+                        "description": "per page",
+                        "name": "page",
                         "in": "query"
                     }
                 ],
@@ -3024,20 +3088,6 @@ const docTemplate = `{
                 "summary": "Get spaces visible to current user",
                 "parameters": [
                     {
-                        "type": "integer",
-                        "default": 20,
-                        "description": "per",
-                        "name": "per",
-                        "in": "query"
-                    },
-                    {
-                        "type": "integer",
-                        "default": 1,
-                        "description": "per page",
-                        "name": "page",
-                        "in": "query"
-                    },
-                    {
                         "type": "string",
                         "description": "current user",
                         "name": "current_user",
@@ -3051,8 +3101,40 @@ const docTemplate = `{
                     },
                     {
                         "type": "string",
+                        "description": "filter by task tag",
+                        "name": "task_tag",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "filter by framework tag",
+                        "name": "framework_tag",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "filter by task tag",
+                        "name": "license_tag",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
                         "description": "sort by",
                         "name": "sort",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "default": 20,
+                        "description": "per",
+                        "name": "per",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "default": 1,
+                        "description": "per page",
+                        "name": "page",
                         "in": "query"
                     }
                 ],
