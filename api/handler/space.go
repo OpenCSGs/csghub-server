@@ -37,16 +37,21 @@ type SpaceHandler struct {
 // @Tags         Space
 // @Accept       json
 // @Produce      json
-// @Param        per query int false "per" default(20)data
-// @Param        page query int false "per page" default(1)
 // @Param        current_user query string false "current user"
 // @Param        search query string false "search text"
+// @Param        task_tag query string false "filter by task tag"
+// @Param        framework_tag query string false "filter by framework tag"
+// @Param        license_tag query string false "filter by license tag"
+// @Param        language_tag query string false "filter by language tag"
 // @Param        sort query string false "sort by"
+// @Param        per query int false "per" default(20)
+// @Param        page query int false "per page" default(1)
 // @Success      200  {object}  types.ResponseWithTotal{data=[]types.Space,total=int} "OK"
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
 // @Router       /spaces [get]
 func (h *SpaceHandler) Index(ctx *gin.Context) {
+	tagReqs := parseTagReqs(ctx)
 	username := httpbase.GetCurrentUser(ctx)
 	per, page, err := common.GetPerAndPageFromContext(ctx)
 	if err != nil {
@@ -61,7 +66,7 @@ func (h *SpaceHandler) Index(ctx *gin.Context) {
 		httpbase.BadRequest(ctx, msg)
 		return
 	}
-	spaces, total, err := h.c.Index(ctx, username, search, sort, per, page)
+	spaces, total, err := h.c.Index(ctx, username, search, sort, tagReqs, per, page)
 	if err != nil {
 		slog.Error("Failed to get spaces", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)

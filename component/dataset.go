@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log/slog"
 	"time"
 
 	"opencsg.com/csghub-server/builder/git/membership"
@@ -82,6 +81,7 @@ func NewDatasetComponent(config *config.Config) (*DatasetComponent, error) {
 	c := &DatasetComponent{}
 	c.ts = database.NewTagStore()
 	c.ds = database.NewDatasetStore()
+	c.rs = database.NewRepoStore()
 	var err error
 	c.RepoComponent, err = NewRepoComponent(config)
 	if err != nil {
@@ -94,6 +94,7 @@ type DatasetComponent struct {
 	*RepoComponent
 	ts *database.TagStore
 	ds *database.DatasetStore
+	rs *database.RepoStore
 }
 
 func (c *DatasetComponent) Create(ctx context.Context, req *types.CreateDatasetReq) (*types.Dataset, error) {
@@ -235,26 +236,42 @@ func (c *DatasetComponent) Index(ctx context.Context, username, search, sort str
 		err         error
 		resDatasets []types.Dataset
 	)
-	if username == "" {
-		slog.Info("get datasets without current username")
-	} else {
+	if username != "" {
 		user, err = c.user.FindByUsername(ctx, username)
 		if err != nil {
 			newError := fmt.Errorf("failed to get current user,error:%w", err)
-			slog.Error(newError.Error())
 			return nil, 0, newError
 		}
 	}
-	datasets, total, err := c.ds.PublicToUser(ctx, &user, search, sort, tags, per, page)
+	repos, total, err := c.rs.PublicToUser(ctx, types.DatasetRepo, user.ID, search, sort, tags, per, page)
 	if err != nil {
-		newError := fmt.Errorf("failed to get public datasets,error:%w", err)
-		slog.Error(newError.Error())
+		newError := fmt.Errorf("failed to get public dataset repos,error:%w", err)
+		return nil, 0, newError
+	}
+	var repoIDs []int64
+	for _, repo := range repos {
+		repoIDs = append(repoIDs, repo.ID)
+	}
+	datasets, err := c.ds.ByRepoIDs(ctx, repoIDs)
+	if err != nil {
+		newError := fmt.Errorf("failed to get datasets by repo ids,error:%w", err)
 		return nil, 0, newError
 	}
 
-	for _, data := range datasets {
+	//loop through repos to keep the repos in sort order
+	for _, repo := range repos {
+		var dataset *database.Dataset
+		for _, d := range datasets {
+			if repo.ID == d.RepositoryID {
+				dataset = &d
+				break
+			}
+		}
+		if dataset == nil {
+			continue
+		}
 		var tags []types.RepoTag
-		for _, tag := range data.Repository.Tags {
+		for _, tag := range repo.Tags {
 			tags = append(tags, types.RepoTag{
 				Name:      tag.Name,
 				Category:  tag.Category,
@@ -266,18 +283,18 @@ func (c *DatasetComponent) Index(ctx context.Context, username, search, sort str
 			})
 		}
 		resDatasets = append(resDatasets, types.Dataset{
-			ID:           data.ID,
-			Name:         data.Repository.Name,
-			Nickname:     data.Repository.Nickname,
-			Description:  data.Repository.Description,
-			Likes:        data.Repository.Likes,
-			Downloads:    data.Repository.DownloadCount,
-			Path:         data.Repository.Path,
-			RepositoryID: data.RepositoryID,
-			Private:      data.Repository.Private,
+			ID:           dataset.ID,
+			Name:         repo.Name,
+			Nickname:     repo.Nickname,
+			Description:  repo.Description,
+			Likes:        repo.Likes,
+			Downloads:    repo.DownloadCount,
+			Path:         repo.Path,
+			RepositoryID: repo.ID,
+			Private:      repo.Private,
 			Tags:         tags,
-			CreatedAt:    data.CreatedAt,
-			UpdatedAt:    data.Repository.UpdatedAt,
+			CreatedAt:    dataset.CreatedAt,
+			UpdatedAt:    repo.UpdatedAt,
 		})
 	}
 
