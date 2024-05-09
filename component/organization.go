@@ -289,16 +289,17 @@ func (c *OrganizationComponent) Spaces(ctx context.Context, req *types.OrgSpaces
 
 	for _, data := range spaces {
 		resSpaces = append(resSpaces, types.Space{
-			ID:           data.ID,
-			Name:         data.Repository.Name,
-			Nickname:     data.Repository.Nickname,
-			Description:  data.Repository.Description,
-			Likes:        data.Repository.Likes,
-			Path:         data.Repository.Path,
-			Private:      data.Repository.Private,
-			CreatedAt:    data.CreatedAt,
-			UpdatedAt:    data.Repository.UpdatedAt,
-			RepositoryID: data.Repository.ID,
+			ID:            data.ID,
+			Name:          data.Repository.Name,
+			Nickname:      data.Repository.Nickname,
+			Description:   data.Repository.Description,
+			Likes:         data.Repository.Likes,
+			Path:          data.Repository.Path,
+			Private:       data.Repository.Private,
+			CreatedAt:     data.CreatedAt,
+			UpdatedAt:     data.Repository.UpdatedAt,
+			RepositoryID:  data.Repository.ID,
+			CoverImageUrl: data.CoverImageUrl,
 		})
 	}
 
