@@ -318,18 +318,19 @@ func (c *SpaceComponent) UserSpaces(ctx context.Context, req *types.UserSpacesRe
 	for _, data := range ms {
 		_, status, _ := c.status(ctx, &data)
 		resSpaces = append(resSpaces, types.Space{
-			ID:           data.ID,
-			Name:         data.Repository.Name,
-			Nickname:     data.Repository.Nickname,
-			Description:  data.Repository.Description,
-			Likes:        data.Repository.Likes,
-			Path:         data.Repository.Path,
-			RepositoryID: data.RepositoryID,
-			Private:      data.Repository.Private,
-			CreatedAt:    data.CreatedAt,
-			UpdatedAt:    data.Repository.UpdatedAt,
-			Hardware:     data.Hardware,
-			Status:       status,
+			ID:            data.ID,
+			Name:          data.Repository.Name,
+			Nickname:      data.Repository.Nickname,
+			Description:   data.Repository.Description,
+			Likes:         data.Repository.Likes,
+			Path:          data.Repository.Path,
+			RepositoryID:  data.RepositoryID,
+			Private:       data.Repository.Private,
+			CreatedAt:     data.CreatedAt,
+			UpdatedAt:     data.Repository.UpdatedAt,
+			Hardware:      data.Hardware,
+			Status:        status,
+			CoverImageUrl: data.CoverImageUrl,
 		})
 	}
 
@@ -347,17 +348,18 @@ func (c *SpaceComponent) UserLikesSpaces(ctx context.Context, req *types.UserSpa
 	for _, data := range ms {
 		_, status, _ := c.status(ctx, &data)
 		resSpaces = append(resSpaces, types.Space{
-			ID:          data.ID,
-			Name:        data.Repository.Name,
-			Nickname:    data.Repository.Nickname,
-			Description: data.Repository.Description,
-			Likes:       data.Repository.Likes,
-			Path:        data.Repository.Path,
-			Private:     data.Repository.Private,
-			CreatedAt:   data.CreatedAt,
-			UpdatedAt:   data.Repository.UpdatedAt,
-			Hardware:    data.Hardware,
-			Status:      status,
+			ID:            data.ID,
+			Name:          data.Repository.Name,
+			Nickname:      data.Repository.Nickname,
+			Description:   data.Repository.Description,
+			Likes:         data.Repository.Likes,
+			Path:          data.Repository.Path,
+			Private:       data.Repository.Private,
+			CreatedAt:     data.CreatedAt,
+			UpdatedAt:     data.Repository.UpdatedAt,
+			Hardware:      data.Hardware,
+			Status:        status,
+			CoverImageUrl: data.CoverImageUrl,
 		})
 	}
 
