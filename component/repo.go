@@ -966,3 +966,63 @@ func (c *RepoComponent) checkCurrentUserPermission(ctx context.Context, userName
 		}
 	}
 }
+
+func (c *RepoComponent) GetCommitWithDiff(ctx context.Context, req *types.GetCommitsReq) (*types.CommitResponse, error) {
+	// get commit diff by commit id
+	if req.Ref == "" {
+		return nil, fmt.Errorf("failed to find request commit id")
+	}
+	getCommitReq := gitserver.GetRepoLastCommitReq{
+		Namespace: req.Namespace, // user name or org name
+		Name:      req.Name,      // repo name
+		Ref:       req.Ref,       // commit id
+		RepoType:  req.RepoType,  // repo type
+	}
+	commit, errGSC := c.git.GetSingleCommit(ctx, getCommitReq)
+	if errGSC != nil {
+		return nil, fmt.Errorf("failed to get git %s repository %s commit id '%s', error: %w", req.RepoType, req.Name, req.Ref, errGSC)
+	}
+	diff, errGCD := c.git.GetCommitDiff(ctx, getCommitReq)
+	if errGCD != nil {
+		return nil, fmt.Errorf("failed to get git %s repository %s commit id '%s' diff, error: %w", req.RepoType, req.Name, req.Ref, errGCD)
+	}
+	commitFiles := []string{}
+	if commit.Files != nil {
+		for _, file := range commit.Files {
+			commitFiles = append(commitFiles, file.Filename)
+		}
+	}
+	commitParents := []*types.CommitMeta{}
+	if commit.Parents != nil {
+		for _, parent := range commit.Parents {
+			commitParents = append(commitParents, &types.CommitMeta{
+				SHA: parent.SHA,
+			})
+		}
+	}
+	commitStats := &types.CommitStats{}
+	if commit.Stats != nil {
+		commitStats.Total = commit.Stats.Total
+		commitStats.Additions = commit.Stats.Additions
+		commitStats.Deletions = commit.Stats.Deletions
+	}
+
+	var commitResponse = &types.CommitResponse{
+		Commit: &types.Commit{
+			ID:             commit.SHA,
+			AuthorName:     commit.RepoCommit.Author.Name,
+			AuthorEmail:    commit.RepoCommit.Author.Email,
+			AuthoredDate:   commit.RepoCommit.Author.Date,
+			CommitterName:  commit.RepoCommit.Committer.Name,
+			CommitterEmail: commit.RepoCommit.Committer.Email,
+			CommitterDate:  commit.RepoCommit.Committer.Date,
+			Message:        commit.RepoCommit.Message,
+			CreatedAt:      commit.CommitMeta.Created.Format("2006-01-02 15:04:05"),
+		},
+		Files:   commitFiles,
+		Parents: commitParents,
+		Diff:    diff,
+		Stats:   commitStats,
+	}
+	return commitResponse, nil
+}

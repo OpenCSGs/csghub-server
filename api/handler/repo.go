@@ -782,3 +782,43 @@ func (h *RepoHandler) handleDownload(ctx *gin.Context, isResolve bool) {
 		}
 	}
 }
+
+// GetRepoCommitDiff godoc
+// @Security     ApiKey
+// @Summary      Get commit diff of repository and data field of response need to be decode with base64
+// @Tags         Repository
+// @Accept       json
+// @Produce      json
+// @Param		 repo_type path string true "models,datasets,codes or spaces" Enums(models,datasets,codes,spaces)
+// @Param		 namespace path string true "repo owner name"
+// @Param		 name path string true "repo name"
+// @Param		 commit_id path string true "commit id"
+// @Param		 current_user query string false "current user name"
+// @Success      200  {object}  types.Response{data=types.CommitResponse} "OK"
+// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
+// @Router       /{repo_type}/{namespace}/{name}/commit/{commit_id} [get]
+func (h *RepoHandler) CommitWithDiff(ctx *gin.Context) {
+	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
+	if err != nil {
+		slog.Error("Bad request format", "error", err)
+		httpbase.BadRequest(ctx, err.Error())
+		return
+	}
+	commitID := ctx.Param("commit_id")
+	req := &types.GetCommitsReq{
+		Namespace: namespace,
+		Name:      name,
+		Ref:       commitID,
+		RepoType:  common.RepoTypeFromContext(ctx),
+	}
+	commit, err := h.c.GetCommitWithDiff(ctx, req)
+	if err != nil {
+		slog.Error("Failed to get repo with commit diff", slog.String("repo_type", string(req.RepoType)), slog.Any("error", err))
+		httpbase.ServerError(ctx, err)
+		return
+	}
+	slog.Info("Get repo commit with diff succeed", slog.String("repo_type", string(req.RepoType)), slog.String("name", name), slog.String("commit id", req.Ref))
+	// client need base64 decode for diff, for example: echo <diff> | base64 -d
+	httpbase.OK(ctx, commit)
+}

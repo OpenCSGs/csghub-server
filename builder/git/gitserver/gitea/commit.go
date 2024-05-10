@@ -2,6 +2,7 @@ package gitea
 
 import (
 	"context"
+	"log/slog"
 
 	"github.com/OpenCSGs/gitea-go-sdk/gitea"
 	"opencsg.com/csghub-server/builder/git/gitserver"
@@ -78,4 +79,33 @@ func (c *Client) GetRepoLastCommit(ctx context.Context, req gitserver.GetRepoLas
 		AuthoredDate:   giteaCommit.RepoCommit.Author.Date,
 	}
 	return commit, nil
+}
+
+func (c *Client) GetCommitDiff(ctx context.Context, req gitserver.GetRepoLastCommitReq) ([]byte, error) {
+	// namespace is user of gitea
+	namespace := common.WithPrefix(req.Namespace, repoPrefixByType(req.RepoType))
+	data, response, err := c.giteaClient.GetCommitDiff(namespace, req.Name, req.Ref)
+	// response is instance of *gitea.Response
+	if err != nil {
+		slog.Error("Fail to get commit diff", slog.Any("user", namespace), slog.Any("repo", req.Name), slog.Any("commit id", req.Ref), slog.Any("response", response))
+	}
+	return data, err
+}
+
+func (c *Client) GetSingleCommit(ctx context.Context, req gitserver.GetRepoLastCommitReq) (*gitea.Commit, error) {
+	namespace := common.WithPrefix(req.Namespace, repoPrefixByType(req.RepoType))
+	commit, response, err := c.giteaClient.GetSingleCommit(
+		namespace,
+		req.Name,
+		req.Ref,
+		gitea.SpeedUpOtions{
+			DisableStat:         false,
+			DisableVerification: false,
+			DisableFiles:        false,
+		},
+	)
+	if err != nil {
+		slog.Error("Fail to get single commit", slog.Any("user", namespace), slog.Any("repo", req.Name), slog.Any("commit id", req.Ref), slog.Any("response", response))
+	}
+	return commit, err
 }
