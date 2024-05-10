@@ -4,6 +4,7 @@ import (
 	"context"
 	"io"
 
+	"github.com/OpenCSGs/gitea-go-sdk/gitea"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/types"
 )
@@ -20,6 +21,8 @@ type GitServer interface {
 	GetRepoBranches(ctx context.Context, req GetBranchesReq) ([]types.Branch, error)
 	GetRepoCommits(ctx context.Context, req GetRepoCommitsReq) ([]types.Commit, error)
 	GetRepoLastCommit(ctx context.Context, req GetRepoLastCommitReq) (*types.Commit, error)
+	GetSingleCommit(ctx context.Context, req GetRepoLastCommitReq) (*gitea.Commit, error)
+	GetCommitDiff(ctx context.Context, req GetRepoLastCommitReq) ([]byte, error)
 	GetRepoFileTree(ctx context.Context, req GetRepoInfoByPathReq) ([]*types.File, error)
 	GetRepoFileRaw(ctx context.Context, req GetRepoInfoByPathReq) (string, error)
 	GetRepoFileReader(ctx context.Context, req GetRepoInfoByPathReq) (io.ReadCloser, error)
