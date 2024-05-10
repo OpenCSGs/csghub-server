@@ -60,8 +60,14 @@ const docTemplate = `{
                     },
                     {
                         "type": "string",
-                        "description": "filter by task tag",
+                        "description": "filter by license tag",
                         "name": "license_tag",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "filter by language tag",
+                        "name": "language_tag",
                         "in": "query"
                     },
                     {
@@ -526,8 +532,14 @@ const docTemplate = `{
                     },
                     {
                         "type": "string",
-                        "description": "filter by task tag",
+                        "description": "filter by license tag",
                         "name": "license_tag",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "filter by language tag",
+                        "name": "language_tag",
                         "in": "query"
                     },
                     {
@@ -1302,8 +1314,14 @@ const docTemplate = `{
                     },
                     {
                         "type": "string",
-                        "description": "filter by task tag",
+                        "description": "filter by license tag",
                         "name": "license_tag",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "filter by language tag",
+                        "name": "language_tag",
                         "in": "query"
                     },
                     {
@@ -3113,8 +3131,14 @@ const docTemplate = `{
                     },
                     {
                         "type": "string",
-                        "description": "filter by task tag",
+                        "description": "filter by license tag",
                         "name": "license_tag",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "filter by language tag",
+                        "name": "language_tag",
                         "in": "query"
                     },
                     {
@@ -5107,6 +5131,99 @@ const docTemplate = `{
                 }
             }
         },
+        "/{repo_type}/{namespace}/{name}/commit/{commit_id}": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Repository"
+                ],
+                "summary": "Get commit diff of repository and data field of response need to be decode with base64",
+                "parameters": [
+                    {
+                        "enum": [
+                            "models",
+                            "datasets",
+                            "codes",
+                            "spaces"
+                        ],
+                        "type": "string",
+                        "description": "models,datasets,codes or spaces",
+                        "name": "repo_type",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "repo owner name",
+                        "name": "namespace",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "repo name",
+                        "name": "name",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "commit id",
+                        "name": "commit_id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "current user name",
+                        "name": "current_user",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/types.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/types.CommitResponse"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            }
+        },
         "/{repo_type}/{namespace}/{name}/commits": {
             "get": {
                 "security": [
@@ -6554,6 +6671,81 @@ const docTemplate = `{
                 }
             }
         },
+        "types.CommitMeta": {
+            "type": "object",
+            "properties": {
+                "sha": {
+                    "type": "string"
+                }
+            }
+        },
+        "types.CommitResponse": {
+            "type": "object",
+            "properties": {
+                "author_email": {
+                    "type": "string"
+                },
+                "author_name": {
+                    "type": "string"
+                },
+                "authored_date": {
+                    "type": "string"
+                },
+                "committer_date": {
+                    "type": "string"
+                },
+                "committer_email": {
+                    "type": "string"
+                },
+                "committer_name": {
+                    "type": "string"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "diff": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                },
+                "files": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "id": {
+                    "type": "string"
+                },
+                "message": {
+                    "type": "string"
+                },
+                "parents": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/types.CommitMeta"
+                    }
+                },
+                "stats": {
+                    "$ref": "#/definitions/types.CommitStats"
+                }
+            }
+        },
+        "types.CommitStats": {
+            "type": "object",
+            "properties": {
+                "additions": {
+                    "type": "integer"
+                },
+                "deletions": {
+                    "type": "integer"
+                },
+                "total": {
+                    "type": "integer"
+                }
+            }
+        },
         "types.CreateCodeReq": {
             "type": "object",
             "properties": {
@@ -7269,7 +7461,7 @@ const docTemplate = `{
             "type": "object",
             "properties": {
                 "data": {},
-                "message": {
+                "msg": {
                     "type": "string"
                 }
             }
@@ -7278,7 +7470,7 @@ const docTemplate = `{
             "type": "object",
             "properties": {
                 "data": {},
-                "message": {
+                "msg": {
                     "type": "string"
                 },
                 "total": {
