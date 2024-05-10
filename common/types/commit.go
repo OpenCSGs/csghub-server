@@ -11,3 +11,21 @@ type Commit struct {
 	AuthorEmail    string `json:"author_email"`
 	AuthoredDate   string `json:"authored_date"`
 }
+
+type CommitMeta struct {
+	SHA string `json:"sha"`
+}
+
+type CommitStats struct {
+	Total     int `json:"total"`
+	Additions int `json:"additions"`
+	Deletions int `json:"deletions"`
+}
+
+type CommitResponse struct {
+	*Commit
+	Files   []string      `json:"files"`
+	Parents []*CommitMeta `json:"parents"`
+	Diff    []byte        `json:"diff"`
+	Stats   *CommitStats  `json:"stats"`
+}
