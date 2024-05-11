@@ -5,7 +5,9 @@ import "github.com/kelseyhightower/envconfig"
 type Config struct {
 	InstanceID    string `envconfig:"STARHUB_SERVER_INSTANCE_ID"`
 	EnableSwagger bool   `envconfig:"STARHUB_SERVER_ENABLE_SWAGGER" default:"false"`
-	APIToken      string `envconfig:"STARHUB_SERVER_API_TOKEN" default:"f3a7b9c1d6e5f8e2a1b5d4f9e6a2b8d7c3a4e2b1d9f6e7a8d2c5a7b4c1e3f5b8a1d4f9b7d6e2f8a5d3b1e7f9c6a8b2d1e4f7d5b6e9f2a4b3c8e1d7f995hd82hf"`
+	// enable if you want to acess csghub through https, especially for space rproxy
+	EnableHTTPS bool   `envconfig:"STARHUB_SERVER_ENABLE_HTTPS" default:"false"`
+	APIToken    string `envconfig:"STARHUB_SERVER_API_TOKEN" default:"f3a7b9c1d6e5f8e2a1b5d4f9e6a2b8d7c3a4e2b1d9f6e7a8d2c5a7b4c1e3f5b8a1d4f9b7d6e2f8a5d3b1e7f9c6a8b2d1e4f7d5b6e9f2a4b3c8e1d7f995hd82hf"`
 
 	APIServer struct {
 		Port         int    `envconfig:"STARHUB_SERVER_SERVER_PORT" default:"8080"`
