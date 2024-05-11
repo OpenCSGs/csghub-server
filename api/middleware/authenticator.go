@@ -16,7 +16,7 @@ import (
 )
 
 // BuildJwtSession create and save session with jwt from query string
-func BuildJwtSession(config *config.Config) gin.HandlerFunc {
+func BuildJwtSession(jwtSignKey string) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		token := c.Query("jwt")
 
@@ -25,7 +25,7 @@ func BuildJwtSession(config *config.Config) gin.HandlerFunc {
 			c.Next()
 			return
 		}
-		claims, err := parseJWTToken(config.JWT.SigningKey, token)
+		claims, err := parseJWTToken(jwtSignKey, token)
 		if err != nil {
 			slog.Debug("fail to parse jwt token", slog.String("token_get", token), slog.Any("error", err))
 			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
