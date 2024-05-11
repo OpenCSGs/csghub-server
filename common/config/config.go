@@ -6,6 +6,8 @@ type Config struct {
 	InstanceID    string `envconfig:"STARHUB_SERVER_INSTANCE_ID"`
 	EnableSwagger bool   `envconfig:"STARHUB_SERVER_ENABLE_SWAGGER" default:"false"`
 	APIToken      string `envconfig:"STARHUB_SERVER_API_TOKEN" default:"0c11e6e4f2054444374ba3f0b70de4145935a7312289d404814cd5907c6aa93cc65cd35dbf94e04c13a3dedbf51f1694de84240c8acb7238b54a2c3ac8e87c59"`
+	// enable if you want to acess csghub through https, especially for space rproxy
+	EnableHTTPS bool `envconfig:"STARHUB_SERVER_ENABLE_HTTPS" default:"false"`
 
 	APIServer struct {
 		Port         int    `envconfig:"STARHUB_SERVER_SERVER_PORT" default:"8080"`
