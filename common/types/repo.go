@@ -35,3 +35,9 @@ type Repository struct {
 	HTTPCloneURL string `json:"http_clone_url"`
 	SSHCloneURL  string `json:"ssh_clone_url"`
 }
+
+type RepoPageOpts struct {
+	PageOpts
+	PageCount int `json:"page_count"`
+	Total     int `json:"total"`
+}

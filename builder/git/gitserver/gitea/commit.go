@@ -3,6 +3,7 @@ package gitea
 import (
 	"context"
 	"log/slog"
+	"strconv"
 
 	"github.com/OpenCSGs/gitea-go-sdk/gitea"
 	"opencsg.com/csghub-server/builder/git/gitserver"
@@ -10,10 +11,10 @@ import (
 	"opencsg.com/csghub-server/common/utils/common"
 )
 
-func (c *Client) GetRepoCommits(ctx context.Context, req gitserver.GetRepoCommitsReq) ([]types.Commit, error) {
+func (c *Client) GetRepoCommits(ctx context.Context, req gitserver.GetRepoCommitsReq) ([]types.Commit, *types.RepoPageOpts, error) {
 	var commits []types.Commit
 	namespace := common.WithPrefix(req.Namespace, repoPrefixByType(req.RepoType))
-	giteaCommits, _, err := c.giteaClient.ListRepoCommits(
+	giteaCommits, response, err := c.giteaClient.ListRepoCommits(
 		namespace,
 		req.Name,
 		gitea.ListCommitOptions{
@@ -31,7 +32,16 @@ func (c *Client) GetRepoCommits(ctx context.Context, req gitserver.GetRepoCommit
 	)
 
 	if err != nil {
-		return nil, err
+		return nil, nil, err
+	}
+	var commitPageOpt types.RepoPageOpts
+	commitPageOpt.PageCount, err = strconv.Atoi(response.Header.Get(gitserver.Git_Header_X_Pagecount))
+	if err != nil {
+		return nil, nil, err
+	}
+	commitPageOpt.Total, err = strconv.Atoi(response.Header.Get(gitserver.Git_Header_X_Total))
+	if err != nil {
+		return nil, nil, err
 	}
 
 	for _, giteaCommit := range giteaCommits {
@@ -47,7 +57,7 @@ func (c *Client) GetRepoCommits(ctx context.Context, req gitserver.GetRepoCommit
 			AuthoredDate:   giteaCommit.RepoCommit.Author.Date,
 		})
 	}
-	return commits, nil
+	return commits, &commitPageOpt, nil
 }
 
 func (c *Client) GetRepoLastCommit(ctx context.Context, req gitserver.GetRepoLastCommitReq) (*types.Commit, error) {
