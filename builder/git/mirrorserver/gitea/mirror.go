@@ -8,7 +8,7 @@ import (
 )
 
 func (c *MirrorClient) CreateMirrorRepo(ctx context.Context, req mirrorserver.CreateMirrorRepoReq) error {
-	c.giteaClient.MigrateRepo(gitea.MigrateRepoOption{
+	_, _, err := c.giteaClient.MigrateRepo(gitea.MigrateRepoOption{
 		RepoName:       req.Name,
 		RepoOwner:      req.Namespace,
 		CloneAddr:      req.CloneUrl,
@@ -24,8 +24,11 @@ func (c *MirrorClient) CreateMirrorRepo(ctx context.Context, req mirrorserver.Cr
 		Issues:         false,
 		PullRequests:   false,
 		Releases:       false,
-		MirrorInterval: req.Interval,
+		MirrorInterval: req.Interval.String(),
 		LFS:            true,
 	})
+	if err != nil {
+		return err
+	}
 	return nil
 }
