@@ -12,9 +12,17 @@ func NewGitServerAccessTokenStore() *GitServerAccessTokenStore {
 	}
 }
 
+type GitServerType string
+
+const (
+	MirrorServer GitServerType = "mirror"
+	GitServer    GitServerType = "git"
+)
+
 type GitServerAccessToken struct {
-	ID    int64  `bun:",pk,autoincrement" json:"id"`
-	Token string `bun:",notnull" json:"token"`
+	ID         int64         `bun:",pk,autoincrement" json:"id"`
+	Token      string        `bun:",notnull" json:"token"`
+	ServerType GitServerType `bun:",notnull" json:"server_type"`
 	times
 }
 
