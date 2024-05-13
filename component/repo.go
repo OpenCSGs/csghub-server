@@ -34,6 +34,7 @@ type RepoComponent struct {
 	namespace *database.NamespaceStore
 	repo      *database.RepoStore
 	rel       *database.RepoRelationsStore
+	mirror    *database.MirrorStore
 	git       gitserver.GitServer
 	s3Client  *minio.Client
 	msc       *MemberComponent
@@ -49,6 +50,7 @@ func NewRepoComponent(config *config.Config) (*RepoComponent, error) {
 	c.repo = database.NewRepoStore()
 	c.rel = database.NewRepoRelationsStore()
 	c.uls = database.NewUserLikesStore()
+	c.mirror = database.NewMirrorStore()
 	var err error
 	c.git, err = git.NewGitServer(config)
 	if err != nil {
@@ -1044,4 +1046,82 @@ func (c *RepoComponent) GetCommitWithDiff(ctx context.Context, req *types.GetCom
 		Stats:   commitStats,
 	}
 	return commitResponse, nil
+}
+
+func (c *RepoComponent) CreateMirror(ctx context.Context, req types.CreateMirrorReq) (*database.Mirror, error) {
+	var mirror database.Mirror
+	repo, err := c.repo.FindByPath(ctx, req.RepoType, req.Namespace, req.Name)
+	if err != nil {
+		return nil, fmt.Errorf("failed to find repo, error: %w", err)
+	}
+	exists, err := c.mirror.IsExist(ctx, repo.ID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to find mirror, error: %w", err)
+	}
+	if exists {
+		return nil, fmt.Errorf("mirror already exists")
+	}
+	mirror.Interval = req.Interval
+	mirror.SourceUrl = req.SourceUrl
+	mirror.MirrorSourceID = req.MirrorSourceID
+	mirror.Username = req.Username
+	mirror.AccessToken = req.AccessToken
+	mirror.RepositoryID = repo.ID
+
+	reqMirror, err := c.mirror.Create(ctx, &mirror)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create mirror")
+	}
+	return reqMirror, nil
+}
+
+func (c *RepoComponent) GetMirror(ctx context.Context, req types.GetMirrorReq) (*database.Mirror, error) {
+	repo, err := c.repo.FindByPath(ctx, req.RepoType, req.Namespace, req.Name)
+	if err != nil {
+		return nil, fmt.Errorf("failed to find repo, error: %w", err)
+	}
+	mirror, err := c.mirror.FindByRepoID(ctx, repo.ID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to find mirror, error: %w", err)
+	}
+	return mirror, nil
+}
+
+func (c *RepoComponent) UpdateMirror(ctx context.Context, req types.UpdateMirrorReq) (*database.Mirror, error) {
+	repo, err := c.repo.FindByPath(ctx, req.RepoType, req.Namespace, req.Name)
+	if err != nil {
+		return nil, fmt.Errorf("failed to find repo, error: %w", err)
+	}
+	mirror, err := c.mirror.FindByRepoID(ctx, repo.ID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to find mirror, error: %w", err)
+	}
+
+	mirror.Interval = req.Interval
+	mirror.SourceUrl = req.SourceUrl
+	mirror.MirrorSourceID = req.MirrorSourceID
+	mirror.Username = req.Username
+	mirror.AccessToken = req.AccessToken
+	err = c.mirror.Update(ctx, mirror)
+	if err != nil {
+		return nil, fmt.Errorf("failed to update mirror, error: %w", err)
+	}
+	return mirror, nil
+}
+
+func (c *RepoComponent) DeleteMirror(ctx context.Context, req types.DeleteMirrorReq) error {
+	repo, err := c.repo.FindByPath(ctx, req.RepoType, req.Namespace, req.Name)
+	if err != nil {
+		return fmt.Errorf("failed to find repo, error: %w", err)
+	}
+	mirror, err := c.mirror.FindByRepoID(ctx, repo.ID)
+	if err != nil {
+		return fmt.Errorf("failed to find mirror, error: %w", err)
+	}
+	err = c.mirror.Delete(ctx, mirror)
+	if err != nil {
+		return fmt.Errorf("failed to delete mirror, error: %w", err)
+	}
+	return nil
+>>>>>>> d647a9a (Add mirror sync feature)
 }

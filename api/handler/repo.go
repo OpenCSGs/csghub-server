@@ -833,6 +833,7 @@ func (h *RepoHandler) handleDownload(ctx *gin.Context, isResolve bool) {
 	}
 }
 
+<<<<<<< HEAD
 // GetRepoCommitDiff godoc
 // @Security     ApiKey
 // @Summary      Get commit diff of repository and data field of response need to be decode with base64
@@ -871,4 +872,95 @@ func (h *RepoHandler) CommitWithDiff(ctx *gin.Context) {
 	slog.Info("Get repo commit with diff succeed", slog.String("repo_type", string(req.RepoType)), slog.String("name", name), slog.String("commit id", req.Ref))
 	// client need base64 decode for diff, for example: echo <diff> | base64 -d
 	httpbase.OK(ctx, commit)
+}
+
+func (h *RepoHandler) CreateMirror(ctx *gin.Context) {
+	var mirrorReq types.CreateMirrorReq
+	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
+	if err != nil {
+		slog.Error("Bad request format", "error", err)
+		httpbase.BadRequest(ctx, err.Error())
+		return
+	}
+	if err = ctx.ShouldBindJSON(&mirrorReq); err != nil {
+		slog.Error("Bad request format", "error", err)
+		httpbase.BadRequest(ctx, err.Error())
+		return
+	}
+	mirrorReq.Namespace = namespace
+	mirrorReq.Name = name
+	mirrorReq.RepoType = common.RepoTypeFromContext(ctx)
+	mirror, err := h.c.CreateMirror(ctx, mirrorReq)
+	if err != nil {
+		slog.Error("Failed to create mirror for", slog.String("repo_type", string(mirrorReq.RepoType)), slog.String("path", fmt.Sprintf("%s/%s", mirrorReq.Namespace, mirrorReq.Name)), "error", err)
+		httpbase.ServerError(ctx, err)
+		return
+	}
+	httpbase.OK(ctx, mirror)
+}
+
+func (h *RepoHandler) GetMirror(ctx *gin.Context) {
+	var mirrorReq types.GetMirrorReq
+	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
+	if err != nil {
+		slog.Error("Bad request format", "error", err)
+		httpbase.BadRequest(ctx, err.Error())
+		return
+	}
+	mirrorReq.Namespace = namespace
+	mirrorReq.Name = name
+	mirrorReq.RepoType = common.RepoTypeFromContext(ctx)
+	mirror, err := h.c.GetMirror(ctx, mirrorReq)
+	if err != nil {
+		slog.Error("Failed to get mirror of", slog.String("repo_type", string(mirrorReq.RepoType)), slog.String("path", fmt.Sprintf("%s/%s", mirrorReq.Namespace, mirrorReq.Name)), "error", err)
+		httpbase.ServerError(ctx, err)
+		return
+	}
+	httpbase.OK(ctx, mirror)
+}
+
+func (h *RepoHandler) UpdateMirror(ctx *gin.Context) {
+	var mirrorReq types.UpdateMirrorReq
+	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
+	if err != nil {
+		slog.Error("Bad request format", "error", err)
+		httpbase.BadRequest(ctx, err.Error())
+		return
+	}
+	if err = ctx.ShouldBindJSON(&mirrorReq); err != nil {
+		slog.Error("Bad request format", "error", err)
+		httpbase.BadRequest(ctx, err.Error())
+		return
+	}
+	mirrorReq.Namespace = namespace
+	mirrorReq.Name = name
+	mirrorReq.RepoType = common.RepoTypeFromContext(ctx)
+	mirror, err := h.c.UpdateMirror(ctx, mirrorReq)
+	if err != nil {
+		slog.Error("Failed to update mirror for", slog.String("repo_type", string(mirrorReq.RepoType)), slog.String("path", fmt.Sprintf("%s/%s", mirrorReq.Namespace, mirrorReq.Name)), "error", err)
+		httpbase.ServerError(ctx, err)
+		return
+	}
+	httpbase.OK(ctx, mirror)
+}
+
+func (h *RepoHandler) DeleteMirror(ctx *gin.Context) {
+	var mirrorReq types.DeleteMirrorReq
+	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
+	if err != nil {
+		slog.Error("Bad request format", "error", err)
+		httpbase.BadRequest(ctx, err.Error())
+		return
+	}
+	mirrorReq.Namespace = namespace
+	mirrorReq.Name = name
+	mirrorReq.RepoType = common.RepoTypeFromContext(ctx)
+	err = h.c.DeleteMirror(ctx, mirrorReq)
+	if err != nil {
+		slog.Error("Failed to delete mirror of", slog.String("repo_type", string(mirrorReq.RepoType)), slog.String("path", fmt.Sprintf("%s/%s", mirrorReq.Namespace, mirrorReq.Name)), "error", err)
+		httpbase.ServerError(ctx, err)
+		return
+	}
+	httpbase.OK(ctx, nil)
+>>>>>>> d647a9a (Add mirror sync feature)
 }
