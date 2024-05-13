@@ -37,7 +37,9 @@ type Mirror struct {
 
 var _ bun.AfterInsertHook = (*Mirror)(nil)
 
-func (*Mirror) AfterInsert(ctx context.Context, query *bun.InsertQuery) error { return nil }
+func (*Mirror) AfterInsert(ctx context.Context, query *bun.InsertQuery) error {
+	return nil
+}
 
 func (s *MirrorStore) IsExist(ctx context.Context, repoID int64) (exists bool, err error) {
 	var mirror *Mirror
