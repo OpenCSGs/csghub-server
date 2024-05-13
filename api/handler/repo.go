@@ -181,7 +181,7 @@ func (h *RepoHandler) Commits(ctx *gin.Context) {
 		Page:      page,
 		RepoType:  common.RepoTypeFromContext(ctx),
 	}
-	commits, err := h.c.Commits(ctx, req)
+	commits, pageOpt, err := h.c.Commits(ctx, req)
 	if err != nil {
 		slog.Error("Failed to get repo commits", slog.String("repo_type", string(req.RepoType)), slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
@@ -189,7 +189,12 @@ func (h *RepoHandler) Commits(ctx *gin.Context) {
 	}
 
 	slog.Info("Get repo commits succeed", slog.String("repo_type", string(req.RepoType)), slog.String("name", name), slog.String("ref", req.Ref))
-	httpbase.OK(ctx, commits)
+	resData := gin.H{
+		"commits":    commits,
+		"total":      pageOpt.Total,
+		"page_count": pageOpt.PageCount,
+	}
+	httpbase.OK(ctx, resData)
 }
 
 // GetRepoLastCommit godoc

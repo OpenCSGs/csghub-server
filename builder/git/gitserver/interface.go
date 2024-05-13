@@ -9,6 +9,11 @@ import (
 	"opencsg.com/csghub-server/common/types"
 )
 
+const (
+	Git_Header_X_Pagecount = "x-pagecount"
+	Git_Header_X_Total     = "x-total"
+)
+
 type GitServer interface {
 	CreateUser(*types.CreateUserRequest) (*database.User, error)
 	UpdateUser(*types.UpdateUserRequest, *database.User) (*database.User, error)
@@ -19,7 +24,7 @@ type GitServer interface {
 	UpdateRepo(ctx context.Context, req UpdateRepoReq) (*CreateRepoResp, error)
 	DeleteRepo(ctx context.Context, req DeleteRepoReq) error
 	GetRepoBranches(ctx context.Context, req GetBranchesReq) ([]types.Branch, error)
-	GetRepoCommits(ctx context.Context, req GetRepoCommitsReq) ([]types.Commit, error)
+	GetRepoCommits(ctx context.Context, req GetRepoCommitsReq) ([]types.Commit, *types.RepoPageOpts, error)
 	GetRepoLastCommit(ctx context.Context, req GetRepoLastCommitReq) (*types.Commit, error)
 	GetSingleCommit(ctx context.Context, req GetRepoLastCommitReq) (*gitea.Commit, error)
 	GetCommitDiff(ctx context.Context, req GetRepoLastCommitReq) ([]byte, error)

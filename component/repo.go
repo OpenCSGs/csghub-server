@@ -473,10 +473,10 @@ func (c *RepoComponent) updateReadmeFile(ctx context.Context, req *types.UpdateF
 	return err
 }
 
-func (c *RepoComponent) Commits(ctx context.Context, req *types.GetCommitsReq) ([]types.Commit, error) {
+func (c *RepoComponent) Commits(ctx context.Context, req *types.GetCommitsReq) ([]types.Commit, *types.RepoPageOpts, error) {
 	repo, err := c.repo.FindByPath(ctx, req.RepoType, req.Namespace, req.Name)
 	if err != nil {
-		return nil, fmt.Errorf("failed to find repo, error: %w", err)
+		return nil, nil, fmt.Errorf("failed to find repo, error: %w", err)
 	}
 	if req.Ref == "" {
 		req.Ref = repo.DefaultBranch
@@ -489,11 +489,11 @@ func (c *RepoComponent) Commits(ctx context.Context, req *types.GetCommitsReq) (
 		Page:      req.Page,
 		RepoType:  req.RepoType,
 	}
-	commits, err := c.git.GetRepoCommits(ctx, getCommitsReq)
+	commits, pageOpt, err := c.git.GetRepoCommits(ctx, getCommitsReq)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get git %s repository commits, error: %w", req.RepoType, err)
+		return nil, nil, fmt.Errorf("failed to get git %s repository commits, error: %w", req.RepoType, err)
 	}
-	return commits, nil
+	return commits, pageOpt, nil
 }
 
 func (c *RepoComponent) LastCommit(ctx context.Context, req *types.GetCommitsReq) (*types.Commit, error) {
