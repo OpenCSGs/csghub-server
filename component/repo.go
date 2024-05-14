@@ -19,6 +19,7 @@ import (
 	"opencsg.com/csghub-server/builder/git"
 	"opencsg.com/csghub-server/builder/git/gitserver"
 	"opencsg.com/csghub-server/builder/git/membership"
+	"opencsg.com/csghub-server/builder/git/mirrorserver"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/builder/store/s3"
 	"opencsg.com/csghub-server/common/config"
@@ -28,18 +29,19 @@ import (
 const ErrNotFoundMessage = "The target couldn't be found."
 
 type RepoComponent struct {
-	tc        *TagComponent
-	user      *database.UserStore
-	org       *database.OrgStore
-	namespace *database.NamespaceStore
-	repo      *database.RepoStore
-	rel       *database.RepoRelationsStore
-	mirror    *database.MirrorStore
-	git       gitserver.GitServer
-	s3Client  *minio.Client
-	msc       *MemberComponent
-	lfsBucket string
-	uls       *database.UserLikesStore
+	tc           *TagComponent
+	user         *database.UserStore
+	org          *database.OrgStore
+	namespace    *database.NamespaceStore
+	repo         *database.RepoStore
+	rel          *database.RepoRelationsStore
+	mirror       *database.MirrorStore
+	git          gitserver.GitServer
+	s3Client     *minio.Client
+	msc          *MemberComponent
+	lfsBucket    string
+	uls          *database.UserLikesStore
+	mirrorServer mirrorserver.MirrorServer
 }
 
 func NewRepoComponent(config *config.Config) (*RepoComponent, error) {
@@ -55,6 +57,12 @@ func NewRepoComponent(config *config.Config) (*RepoComponent, error) {
 	c.git, err = git.NewGitServer(config)
 	if err != nil {
 		newError := fmt.Errorf("fail to create git server,error:%w", err)
+		slog.Error(newError.Error())
+		return nil, newError
+	}
+	c.mirrorServer, err = git.NewMirrorServer(config)
+	if err != nil {
+		newError := fmt.Errorf("fail to create git mirror server,error:%w", err)
 		slog.Error(newError.Error())
 		return nil, newError
 	}
@@ -1065,13 +1073,38 @@ func (c *RepoComponent) CreateMirror(ctx context.Context, req types.CreateMirror
 	mirror.SourceUrl = req.SourceUrl
 	mirror.MirrorSourceID = req.MirrorSourceID
 	mirror.Username = req.Username
+	mirror.PushUrl = req.PushUrl
 	mirror.AccessToken = req.AccessToken
+	mirror.PushUsername = req.PushUsername
+	mirror.PushAccessToken = req.PushAccessToken
 	mirror.RepositoryID = repo.ID
 
 	reqMirror, err := c.mirror.Create(ctx, &mirror)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create mirror")
 	}
+
+	go c.mirrorServer.CreateMirrorRepo(ctx, mirrorserver.CreateMirrorRepoReq{
+		Namespace:   "root",
+		Name:        req.Name,
+		CloneUrl:    mirror.SourceUrl,
+		Username:    mirror.Username,
+		AccessToken: mirror.AccessToken,
+		Private:     false,
+	})
+
+	err = c.mirrorServer.CreatePushMirror(ctx, mirrorserver.CreatePushMirrorReq{
+		Name:        req.Name,
+		PushUrl:     req.PushUrl,
+		Username:    req.PushUsername,
+		AccessToken: req.PushAccessToken,
+		RepoType:    req.RepoType,
+	})
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to create push mirror in mirror server: %v", err)
+	}
+
 	return reqMirror, nil
 }
 
@@ -1101,7 +1134,10 @@ func (c *RepoComponent) UpdateMirror(ctx context.Context, req types.UpdateMirror
 	mirror.SourceUrl = req.SourceUrl
 	mirror.MirrorSourceID = req.MirrorSourceID
 	mirror.Username = req.Username
+	mirror.PushUrl = req.PushUrl
 	mirror.AccessToken = req.AccessToken
+	mirror.PushUsername = req.PushUsername
+	mirror.PushAccessToken = req.PushAccessToken
 	err = c.mirror.Update(ctx, mirror)
 	if err != nil {
 		return nil, fmt.Errorf("failed to update mirror, error: %w", err)

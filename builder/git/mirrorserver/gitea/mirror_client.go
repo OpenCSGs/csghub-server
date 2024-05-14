@@ -11,7 +11,7 @@ import (
 	"log/slog"
 	"net/http"
 
-	"github.com/OpenCSGs/gitea-go-sdk/gitea"
+	"github.com/pulltheflower/gitea-go-sdk/gitea"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/config"
 )
@@ -34,10 +34,10 @@ func NewMirrorClient(config *config.Config) (client *MirrorClient, err error) {
 		return nil, err
 	}
 	giteaClient, err := gitea.NewClient(
-		config.GitServer.Host,
+		config.MirrorServer.Host,
 		gitea.SetContext(ctx),
 		gitea.SetToken(token.Token),
-		gitea.SetBasicAuth(config.GitServer.Username, config.GitServer.Password),
+		gitea.SetBasicAuth(config.MirrorServer.Username, config.MirrorServer.Password),
 	)
 	if err != nil {
 		return nil, err
@@ -48,7 +48,7 @@ func NewMirrorClient(config *config.Config) (client *MirrorClient, err error) {
 
 func findOrCreateAccessToken(ctx context.Context, config *config.Config) (*database.GitServerAccessToken, error) {
 	gs := database.NewGitServerAccessTokenStore()
-	tokens, err := gs.Index(ctx)
+	tokens, err := gs.FindByType(ctx, "mirror")
 	if err != nil {
 		slog.Error("Fail to get mirror server access token from database", slog.String("error: ", err.Error()))
 		return nil, err

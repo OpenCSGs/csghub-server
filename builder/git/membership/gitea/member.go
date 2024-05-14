@@ -7,7 +7,7 @@ import (
 	"log/slog"
 	"net/http"
 
-	"github.com/OpenCSGs/gitea-go-sdk/gitea"
+	"github.com/pulltheflower/gitea-go-sdk/gitea"
 	"opencsg.com/csghub-server/builder/git/membership"
 	"opencsg.com/csghub-server/common/utils/common"
 )

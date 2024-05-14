@@ -1,14 +1,17 @@
 package types
 
 type CreateMirrorReq struct {
-	Namespace      string         `json:"namespace"`
-	Name           string         `json:"name"`
-	Interval       int64          `json:"interval"`
-	SourceUrl      string         `json:"source_url" binding:"required"`
-	MirrorSourceID int64          `json:"mirror_source_id" binding:"required"`
-	Username       string         `json:"-"`
-	AccessToken    string         `json:"-"`
-	RepoType       RepositoryType `json:"repo_type"`
+	Namespace       string         `json:"namespace"`
+	Name            string         `json:"name"`
+	Interval        string         `json:"interval"`
+	SourceUrl       string         `json:"source_url" binding:"required"`
+	MirrorSourceID  int64          `json:"mirror_source_id" binding:"required"`
+	Username        string         `json:"-"`
+	AccessToken     string         `json:"-"`
+	PushUrl         string         `json:"push_url" binding:"required"`
+	PushUsername    string         `json:"push_username" binding:"required"`
+	PushAccessToken string         `json:"push_access_token" binding:"required"`
+	RepoType        RepositoryType `json:"repo_type"`
 }
 
 type GetMirrorReq struct {

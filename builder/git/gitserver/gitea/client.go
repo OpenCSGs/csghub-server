@@ -11,7 +11,7 @@ import (
 	"log/slog"
 	"net/http"
 
-	"github.com/OpenCSGs/gitea-go-sdk/gitea"
+	"github.com/pulltheflower/gitea-go-sdk/gitea"
 	"opencsg.com/csghub-server/builder/git/gitserver"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/config"
@@ -57,7 +57,7 @@ func NewClient(config *config.Config) (client *Client, err error) {
 
 func findOrCreateAccessToken(ctx context.Context, config *config.Config) (*database.GitServerAccessToken, error) {
 	gs := database.NewGitServerAccessTokenStore()
-	tokens, err := gs.Index(ctx)
+	tokens, err := gs.FindByType(ctx, "git")
 	if err != nil {
 		slog.Error("Fail to get git server access token from database", slog.String("error: ", err.Error()))
 		return nil, err
