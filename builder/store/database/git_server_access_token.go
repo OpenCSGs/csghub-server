@@ -46,3 +46,15 @@ func (s *GitServerAccessTokenStore) Index(ctx context.Context) ([]GitServerAcces
 	}
 	return gTokens, nil
 }
+
+func (s *GitServerAccessTokenStore) FindByType(ctx context.Context, serverType string) ([]GitServerAccessToken, error) {
+	var gTokens []GitServerAccessToken
+	err := s.db.Operator.Core.NewSelect().
+		Model(&gTokens).
+		Where("server_type = ?", serverType).
+		Scan(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return gTokens, nil
+}
