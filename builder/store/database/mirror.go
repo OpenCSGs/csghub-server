@@ -3,8 +3,6 @@ package database
 import (
 	"context"
 	"time"
-
-	"github.com/uptrace/bun"
 )
 
 type MirrorStore struct {
@@ -18,27 +16,24 @@ func NewMirrorStore() *MirrorStore {
 }
 
 type Mirror struct {
-	ID             int64        `bun:",pk,autoincrement" json:"id"`
-	Interval       int64        `bun:",notnull" json:"interval"`
-	SourceUrl      string       `bun:",notnull" json:"source_url"`
-	MirrorSourceID int64        `bun:",notnull" json:"mirror_source_id"`
-	MirrorSource   MirrorSource `bun:"rel:belongs-to,join:mirror_source_id=id" json:"mirror_source"`
-	Username       string       `bun:",nullzero" json:"-"`
-	AccessToken    string       `bun:",nullzero" json:"-"`
-	RepositoryID   int64        `bun:",notnull" json:"repository_id"`
-	Repository     *Repository  `bun:"rel:belongs-to,join:repository_id=id" json:"repository"`
-	LastUpdatedAt  time.Time    `bun:",nullzero" json:"last_updated_at"`
-	SourceRepoPath string       `bun:",nullzero" json:"source_repo_path"`
-	LocalRepoPath  string       `bun:",nullzero" json:"local_repo_path"`
-	LastMessage    string       `bun:",nullzero" json:"last_message"`
+	ID              int64        `bun:",pk,autoincrement" json:"id"`
+	Interval        string       `bun:",notnull" json:"interval"`
+	SourceUrl       string       `bun:",notnull" json:"source_url"`
+	MirrorSourceID  int64        `bun:",notnull" json:"mirror_source_id"`
+	MirrorSource    MirrorSource `bun:"rel:belongs-to,join:mirror_source_id=id" json:"mirror_source"`
+	Username        string       `bun:",nullzero" json:"-"`
+	AccessToken     string       `bun:",nullzero" json:"-"`
+	PushUrl         string       `bun:",nullzero" json:"-"`
+	PushUsername    string       `bun:",nullzero" json:"-"`
+	PushAccessToken string       `bun:",nullzero" json:"-"`
+	RepositoryID    int64        `bun:",notnull" json:"repository_id"`
+	Repository      *Repository  `bun:"rel:belongs-to,join:repository_id=id" json:"repository"`
+	LastUpdatedAt   time.Time    `bun:",nullzero" json:"last_updated_at"`
+	SourceRepoPath  string       `bun:",nullzero" json:"source_repo_path"`
+	LocalRepoPath   string       `bun:",nullzero" json:"local_repo_path"`
+	LastMessage     string       `bun:",nullzero" json:"last_message"`
 
 	times
-}
-
-var _ bun.AfterInsertHook = (*Mirror)(nil)
-
-func (*Mirror) AfterInsert(ctx context.Context, query *bun.InsertQuery) error {
-	return nil
 }
 
 func (s *MirrorStore) IsExist(ctx context.Context, repoID int64) (exists bool, err error) {
