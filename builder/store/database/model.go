@@ -168,7 +168,9 @@ func (s *ModelStore) FindByPath(ctx context.Context, namespace string, repoPath 
 	err = s.db.Operator.Core.NewSelect().
 		Model(resModel.Repository).
 		WherePK().
-		Relation("Tags").
+		Relation("Tags", func(sq *bun.SelectQuery) *bun.SelectQuery {
+			return sq.Where("repository_tag.count > 0")
+		}).
 		Scan(ctx)
 	return resModel, err
 }

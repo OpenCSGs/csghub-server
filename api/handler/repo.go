@@ -444,7 +444,6 @@ func (h *RepoHandler) Branches(ctx *gin.Context) {
 // @Param		 repo_type path string true "models,dataset,codes or spaces" Enums(models,datasets,codes,spaces)
 // @Param		 namespace path string true "repo owner name"
 // @Param		 name path string true "repo name"
-// @Param		 ref query string true "git branch or tag"
 // @Param		 current_user query string false "current user name"
 // @Success      200  {object}  types.ResponseWithTotal{data=[]database.Tag} "OK"
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
@@ -471,6 +470,52 @@ func (h *RepoHandler) Tags(ctx *gin.Context) {
 
 	slog.Info("Get repo tags succeed", slog.String("repo_type", string(req.RepoType)), slog.String("name", name))
 	httpbase.OK(ctx, tags)
+}
+
+// UpdateRepoTags
+// @Security     ApiKey
+// @Summary      update the tags of a certain category
+// @Tags         Repository
+// @Accept       json
+// @Produce      json
+// @Param		 repo_type path string true "models,dataset,codes or spaces" Enums(models,datasets,codes,spaces)
+// @Param		 namespace path string true "repo owner name"
+// @Param		 name path string true "repo name"
+// @Param		 current_user query string true "current user name"
+// @Param		 category path string true "tag category" Enums(task, license, framework, language, industry)
+// @Param		 tags body []string true "tag names in array"
+// @Success      200  {object}  types.Response "OK"
+// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
+// @Router       /{repo_type}/{namespace}/{name}/tags/{category} [post]
+func (h *RepoHandler) UpdateTags(ctx *gin.Context) {
+	currentUser := httpbase.GetCurrentUser(ctx)
+	if currentUser == "" {
+		httpbase.UnauthorizedError(ctx, httpbase.ErrorNeedLogin)
+		return
+	}
+	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
+	if err != nil {
+		slog.Error("Failed update tags", "error", err)
+		httpbase.BadRequest(ctx, err.Error())
+		return
+	}
+	var tags []string
+	if err := ctx.ShouldBindJSON(&tags); err != nil {
+		httpbase.BadRequest(ctx, fmt.Errorf("failed to unmarshal tags: %w", err).Error())
+		return
+	}
+	category := ctx.Param("category")
+	repoType := common.RepoTypeFromContext(ctx)
+	err = h.c.UpdateTags(ctx, namespace, name, repoType, category, tags)
+	if err != nil {
+		slog.Error("Failed to update tags", slog.String("error", err.Error()), slog.String("category", category), slog.String("repo_type", string(repoType)),
+			slog.String("namespace", namespace), slog.String("name", name))
+		httpbase.ServerError(ctx, err)
+		return
+	}
+
+	httpbase.OK(ctx, nil)
 }
 
 // GetRepoTree godoc
