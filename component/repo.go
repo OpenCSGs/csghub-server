@@ -605,15 +605,27 @@ func (c *RepoComponent) Branches(ctx context.Context, req *types.GetBranchesReq)
 }
 
 func (c *RepoComponent) Tags(ctx context.Context, req *types.GetTagsReq) ([]database.Tag, error) {
-	_, err := c.repo.FindByPath(ctx, req.RepoType, req.Namespace, req.Name)
+	repo, err := c.repo.FindByPath(ctx, req.RepoType, req.Namespace, req.Name)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find %s, error: %w", req.RepoType, err)
 	}
-	tags, err := c.repo.Tags(ctx, req.RepoType, req.Namespace, req.Name)
+	tags, err := c.repo.Tags(ctx, repo.ID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get %s tags, error: %w", req.RepoType, err)
 	}
 	return tags, nil
+}
+
+func (c *RepoComponent) UpdateTags(ctx context.Context, namespace, name string, repoType types.RepositoryType, category string, tags []string) error {
+	repo, err := c.repo.FindByPath(ctx, repoType, namespace, name)
+	if err != nil {
+		return fmt.Errorf("failed to find repo, error: %w", err)
+	}
+
+	tagScope := getTagScopeByRepoType(repoType)
+	err = c.tc.UpdateRepoTagsByCategory(ctx, tagScope, repo.ID, category, tags)
+
+	return err
 }
 
 func (c *RepoComponent) Tree(ctx context.Context, req *types.GetFileReq) ([]*types.File, error) {
@@ -881,10 +893,17 @@ func (c *RepoComponent) FileInfo(ctx context.Context, req *types.GetFileReq) (*t
 }
 
 func getTagScopeByRepoType(repoType types.RepositoryType) database.TagScope {
-	if repoType == types.ModelRepo {
+	switch repoType {
+	case types.ModelRepo:
 		return database.ModelTagScope
-	} else {
+	case types.DatasetRepo:
 		return database.DatasetTagScope
+	case types.CodeRepo:
+		return database.CodeTagScope
+	case types.SpaceRepo:
+		return database.SpaceTagScope
+	default:
+		panic("convert repo type to tag scope failed, unknown repo type:" + repoType)
 	}
 }
 

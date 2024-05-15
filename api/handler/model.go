@@ -350,6 +350,13 @@ func parseTagReqs(ctx *gin.Context) (tags []database.TagReq) {
 		})
 	}
 
+	industryTag := ctx.Query("industry_tag")
+	if industryTag != "" {
+		tags = append(tags, database.TagReq{
+			Name:     strings.ToLower(industryTag),
+			Category: "industry",
+		})
+	}
 	return
 }
 
