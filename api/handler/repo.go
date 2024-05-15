@@ -833,7 +833,6 @@ func (h *RepoHandler) handleDownload(ctx *gin.Context, isResolve bool) {
 	}
 }
 
-<<<<<<< HEAD
 // GetRepoCommitDiff godoc
 // @Security     ApiKey
 // @Summary      Get commit diff of repository and data field of response need to be decode with base64
@@ -962,5 +961,4 @@ func (h *RepoHandler) DeleteMirror(ctx *gin.Context) {
 		return
 	}
 	httpbase.OK(ctx, nil)
->>>>>>> d647a9a (Add mirror sync feature)
 }

@@ -4,7 +4,7 @@ import (
 	"context"
 	"log/slog"
 
-	"github.com/pulltheflower/gitea-go-sdk/gitea"
+	"github.com/OpenCSGs/gitea-go-sdk/gitea"
 	"opencsg.com/csghub-server/builder/git/gitserver"
 	"opencsg.com/csghub-server/common/utils/common"
 )

@@ -3,21 +3,22 @@ package gitea
 import (
 	"context"
 
-	"github.com/pulltheflower/gitea-go-sdk/gitea"
+	"github.com/OpenCSGs/gitea-go-sdk/gitea"
 	"opencsg.com/csghub-server/builder/git/mirrorserver"
 	"opencsg.com/csghub-server/common/types"
 	"opencsg.com/csghub-server/common/utils/common"
 )
 
 const (
-	ModelOrgPrefix   = "models_"
-	DatasetOrgPrefix = "datasets_"
-	SpaceOrgPrefix   = "spaces_"
-	CodeOrgPrefix    = "codes_"
+	ModelOrgPrefix        = "models_"
+	DatasetOrgPrefix      = "datasets_"
+	SpaceOrgPrefix        = "spaces_"
+	CodeOrgPrefix         = "codes_"
+	MirrorServerNamespace = "root"
 )
 
-func (c *MirrorClient) CreateMirrorRepo(ctx context.Context, req mirrorserver.CreateMirrorRepoReq) error {
-	_, _, err := c.giteaClient.MigrateRepo(gitea.MigrateRepoOption{
+func (c *MirrorClient) CreateMirrorRepo(ctx context.Context, req mirrorserver.CreateMirrorRepoReq) (int64, error) {
+	task, _, err := c.giteaClient.MigrateRepo(gitea.MigrateRepoOption{
 		RepoName:     req.Name,
 		RepoOwner:    req.Namespace,
 		CloneAddr:    req.CloneUrl,
@@ -36,13 +37,30 @@ func (c *MirrorClient) CreateMirrorRepo(ctx context.Context, req mirrorserver.Cr
 		LFS:          true,
 	})
 	if err != nil {
-		return err
+		return 0, err
 	}
-	return nil
+	return task.ID, nil
+}
+
+func (c *MirrorClient) GetMirrorTaskInfo(ctx context.Context, taskId int64) (*mirrorserver.MirrorTaskInfo, error) {
+	ts, _, err := c.giteaClient.GetUserTaskInfo(taskId)
+	if err != nil {
+		return nil, err
+	}
+
+	mti := &mirrorserver.MirrorTaskInfo{
+		Status:    mirrorserver.TaskStatus(ts.Status),
+		Message:   ts.Message,
+		RepoID:    ts.RepoID,
+		RepoName:  ts.RepoName,
+		StartedAt: ts.StartedAt,
+		EndedAt:   ts.EndedAt,
+	}
+	return mti, nil
 }
 
 func (c *MirrorClient) CreatePushMirror(ctx context.Context, req mirrorserver.CreatePushMirrorReq) error {
-	_, err := c.giteaClient.CreatePushMirror("root", req.Name, gitea.CreatePushMirrorOption{
+	_, err := c.giteaClient.CreatePushMirror(MirrorServerNamespace, req.Name, gitea.CreatePushMirrorOption{
 		RemoteAddress:  req.PushUrl,
 		RemoteUsername: req.Username,
 		RemotePassword: req.AccessToken,
