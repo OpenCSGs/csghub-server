@@ -9,6 +9,8 @@ github.com/BurntSushi/xgb v0.0.0-20160522181843-27f122750802/go.mod h1:IVnqGOEym
 github.com/HdrHistogram/hdrhistogram-go v1.1.2/go.mod h1:yDgFjdqOqDEKOvasDdhWNXYg9BVp4O+o5f6V/ehm6Oo=
 github.com/KyleBanks/depth v1.2.1 h1:5h8fQADFrWtarTdtDudMmGsC7GPbOAu6RVB3ffsVFHc=
 github.com/KyleBanks/depth v1.2.1/go.mod h1:jzSb9d0L43HxTQfT+oSA1EEp2q+ne2uh6XgeJcm8brE=
+github.com/OpenCSGs/gitea-go-sdk/gitea v0.0.0-20240515084628-cc07726bfba0 h1:/arzNg/qx/Q9qGUSBQWpXh/3KO+njTGN119OphfJ34w=
+github.com/OpenCSGs/gitea-go-sdk/gitea v0.0.0-20240515084628-cc07726bfba0/go.mod h1:QDTH3lw9zQNfXxqapFE894/37UEE2KGVk5K0fzO0tXs=
 github.com/ajstarks/svgo v0.0.0-20180226025133-644b8db467af/go.mod h1:K08gAheRH3/J6wwsYMMT4xOr94bZjxIelGM0+d/wbFw=
 github.com/alibabacloud-go/alibabacloud-gateway-spi v0.0.4 h1:iC9YFYKDGEy3n/FtqJnOkZsene9olVspKmkX5A2YBEo=
 github.com/alibabacloud-go/alibabacloud-gateway-spi v0.0.4/go.mod h1:sCavSAvdzOjul4cEqeVtvlSaSScfNsTQ+46HwlTL1hc=
@@ -332,8 +334,6 @@ github.com/prometheus/procfs v0.12.0 h1:jluTpSng7V9hY0O2R9DzzJHYb2xULk9VTR1V1R/k
 github.com/prometheus/procfs v0.12.0/go.mod h1:pcuDEFsWDnvcgNzo4EEweacyhjeA9Zk3cnaOZAZEfOo=
 github.com/prometheus/statsd_exporter v0.22.7 h1:7Pji/i2GuhK6Lu7DHrtTkFmNBCudCPT1pX2CziuyQR0=
 github.com/prometheus/statsd_exporter v0.22.7/go.mod h1:N/TevpjkIh9ccs6nuzY3jQn9dFqnUakOjnEuMPJJJnI=
-github.com/pulltheflower/gitea-go-sdk/gitea v0.0.0-20240513082715-cc44a668e277 h1:Pn5b3vNGOSYgbjKq4yu3cDV4HIKPuOcN3xoz9rFrYqw=
-github.com/pulltheflower/gitea-go-sdk/gitea v0.0.0-20240513082715-cc44a668e277/go.mod h1:OD9EVW0oAF5aSABjYdmLH6ZGzep7BPEv48PTGp4bJHM=
 github.com/redis/go-redis/v9 v9.3.0 h1:RiVDjmig62jIWp7Kk4XVLs0hzV6pI3PyTnnL0cnn0u0=
 github.com/redis/go-redis/v9 v9.3.0/go.mod h1:hdY0cQFCN4fnSYT6TkisLufl/4W5UIXyv0b/CLO2V2M=
 github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec h1:W09IVJc94icq4NjY3clb7Lk8O1qJ8BdBEF8z0ibU0rE=

@@ -363,12 +363,19 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 	// MirrorSource
 	msHandler, err := handler.NewMirrorSourceHandler(config)
 	if err != nil {
-		return nil, fmt.Errorf("error creating user controller:%w", err)
+		return nil, fmt.Errorf("error creating mirror source controller:%w", err)
 	}
 	apiGroup.GET("/mirror_sources", msHandler.Index)
 	apiGroup.POST("/mirror_sources", msHandler.Create)
 	apiGroup.PUT("/mirror_sources/:id", msHandler.Update)
 	apiGroup.DELETE("/mirror_sources/:id", msHandler.Delete)
 	apiGroup.GET("/mirror_sources/:id", msHandler.Get)
+	// Mirror
+	mirrorHandler, err := handler.NewMirrorHandler(config)
+	if err != nil {
+		return nil, fmt.Errorf("error creating mirror controller:%w", err)
+	}
+	apiGroup.POST("/mirror/repo", mirrorHandler.CreateMirrorRepo)
+
 	return r, nil
 }

@@ -1,7 +1,7 @@
 package gitea
 
 import (
-	"github.com/pulltheflower/gitea-go-sdk/gitea"
+	"github.com/OpenCSGs/gitea-go-sdk/gitea"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/types"
 )

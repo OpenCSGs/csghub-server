@@ -7,6 +7,7 @@ import (
 func init() {
 	// add subcommands here
 	Cmd.AddCommand(cmdCalcRecomScore)
+	Cmd.AddCommand(cmdCreatePushMirror)
 }
 
 var Cmd = &cobra.Command{

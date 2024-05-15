@@ -1077,14 +1077,11 @@ func (c *RepoComponent) CreateMirror(ctx context.Context, req types.CreateMirror
 	mirror.AccessToken = req.AccessToken
 	mirror.PushUsername = req.PushUsername
 	mirror.PushAccessToken = req.PushAccessToken
+	mirror.SourceRepoPath = req.SourceRepoPath
+	mirror.LocalRepoPath = req.LocalRepoPath
 	mirror.RepositoryID = repo.ID
 
-	reqMirror, err := c.mirror.Create(ctx, &mirror)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create mirror")
-	}
-
-	go c.mirrorServer.CreateMirrorRepo(ctx, mirrorserver.CreateMirrorRepoReq{
+	taskId, err := c.mirrorServer.CreateMirrorRepo(ctx, mirrorserver.CreateMirrorRepoReq{
 		Namespace:   "root",
 		Name:        req.Name,
 		CloneUrl:    mirror.SourceUrl,
@@ -1092,17 +1089,15 @@ func (c *RepoComponent) CreateMirror(ctx context.Context, req types.CreateMirror
 		AccessToken: mirror.AccessToken,
 		Private:     false,
 	})
-
-	err = c.mirrorServer.CreatePushMirror(ctx, mirrorserver.CreatePushMirrorReq{
-		Name:        req.Name,
-		PushUrl:     req.PushUrl,
-		Username:    req.PushUsername,
-		AccessToken: req.PushAccessToken,
-		RepoType:    req.RepoType,
-	})
-
 	if err != nil {
-		return nil, fmt.Errorf("failed to create push mirror in mirror server: %v", err)
+		return nil, fmt.Errorf("failed to create pull mirror in mirror server: %v", err)
+	}
+
+	mirror.MirrorTaskID = taskId
+
+	reqMirror, err := c.mirror.Create(ctx, &mirror)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create mirror")
 	}
 
 	return reqMirror, nil
@@ -1138,6 +1133,8 @@ func (c *RepoComponent) UpdateMirror(ctx context.Context, req types.UpdateMirror
 	mirror.AccessToken = req.AccessToken
 	mirror.PushUsername = req.PushUsername
 	mirror.PushAccessToken = req.PushAccessToken
+	mirror.SourceRepoPath = req.SourceRepoPath
+	mirror.LocalRepoPath = req.LocalRepoPath
 	err = c.mirror.Update(ctx, mirror)
 	if err != nil {
 		return nil, fmt.Errorf("failed to update mirror, error: %w", err)
@@ -1159,5 +1156,4 @@ func (c *RepoComponent) DeleteMirror(ctx context.Context, req types.DeleteMirror
 		return fmt.Errorf("failed to delete mirror, error: %w", err)
 	}
 	return nil
->>>>>>> d647a9a (Add mirror sync feature)
 }
