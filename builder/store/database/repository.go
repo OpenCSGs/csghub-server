@@ -281,18 +281,29 @@ func (s *RepoStore) UpdateDownloads(ctx context.Context, repo *Repository) error
 	return nil
 }
 
-func (s *RepoStore) Tags(ctx context.Context, repoType types.RepositoryType, namespace, name string) (tags []Tag, err error) {
+func (s *RepoStore) Tags(ctx context.Context, repoID int64) (tags []Tag, err error) {
 	query := s.db.Operator.Core.NewSelect().
 		ColumnExpr("tags.*").
-		Model(&Repository{}).
-		Join("JOIN repository_tags ON repository.id = repository_tags.repository_id").
-		Join("JOIN tags ON repository_tags.tag_id = tags.id").
-		Where("repository.repository_type = ?", repoType).
-		Where("repository.path = ?", fmt.Sprintf("%v/%v", namespace, name))
-
-	slog.Info(query.String())
+		Model(&RepositoryTag{}).
+		Join("JOIN tags ON repository_tag.tag_id = tags.id").
+		Where("repository_tag.repository_id = ?", repoID).
+		Where("repository_tag.count > 0")
 	err = query.Scan(ctx, &tags)
 	return
+}
+
+// TagIDs get tag ids by repo id, if category is not empty, return only tags of the category
+func (s *RepoStore) TagIDs(ctx context.Context, repoID int64, category string) (tagIDs []int64, err error) {
+	query := s.db.Operator.Core.NewSelect().
+		Model(&RepositoryTag{}).
+		Join("JOIN tags ON repository_tag.tag_id = tags.id").
+		Where("repository_id = ?", repoID)
+	if len(category) > 0 {
+		query.Where("tags.category = ?", category)
+	}
+	query.Column("repository_tag.tag_id")
+	err = query.Scan(ctx, &tagIDs)
+	return tagIDs, err
 }
 
 func (s *RepoStore) SetUpdateTimeByPath(ctx context.Context, repoType types.RepositoryType, namespace, name string, update time.Time) error {

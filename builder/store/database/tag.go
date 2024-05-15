@@ -66,24 +66,42 @@ func (ts *TagStore) AllTags(ctx context.Context) ([]Tag, error) {
 	return tags, nil
 }
 
-func (ts *TagStore) allTagsByScope(ctx context.Context, scope TagScope) ([]*Tag, error) {
+func (ts *TagStore) AllTagsByScope(ctx context.Context, scope TagScope) ([]*Tag, error) {
 	var tags []*Tag
 	err := ts.db.Operator.Core.NewSelect().Model(&tags).
 		Where("scope =?", scope).
 		Scan(ctx)
 	if err != nil {
-		slog.Error("Failed to select tags by scope", slog.Any("scope", scope), slog.Any("error", err))
+		return nil, fmt.Errorf("failed to select tags by scope,cause: %w", err)
+	}
+	return tags, nil
+}
+
+func (ts *TagStore) AllTagsByScopeAndCategory(ctx context.Context, scope TagScope, category string) ([]*Tag, error) {
+	var tags []*Tag
+	err := ts.db.Operator.Core.NewSelect().Model(&tags).
+		Where("scope =? and category = ?", scope, category).
+		Scan(ctx)
+	if err != nil {
 		return nil, fmt.Errorf("failed to select tags by scope,cause: %w", err)
 	}
 	return tags, nil
 }
 
 func (ts *TagStore) AllModelTags(ctx context.Context) ([]*Tag, error) {
-	return ts.allTagsByScope(ctx, ModelTagScope)
+	return ts.AllTagsByScope(ctx, ModelTagScope)
 }
 
 func (ts *TagStore) AllDatasetTags(ctx context.Context) ([]*Tag, error) {
-	return ts.allTagsByScope(ctx, DatasetTagScope)
+	return ts.AllTagsByScope(ctx, DatasetTagScope)
+}
+
+func (ts *TagStore) AllCodeTags(ctx context.Context) ([]*Tag, error) {
+	return ts.AllTagsByScope(ctx, CodeTagScope)
+}
+
+func (ts *TagStore) AllSpaceTags(ctx context.Context) ([]*Tag, error) {
+	return ts.AllTagsByScope(ctx, SpaceTagScope)
 }
 
 func (ts *TagStore) AllModelCategories(ctx context.Context) ([]TagCategory, error) {
@@ -92,6 +110,14 @@ func (ts *TagStore) AllModelCategories(ctx context.Context) ([]TagCategory, erro
 
 func (ts *TagStore) AllDatasetCategories(ctx context.Context) ([]TagCategory, error) {
 	return ts.allCategories(ctx, DatasetTagScope)
+}
+
+func (ts *TagStore) AllCodeCategories(ctx context.Context) ([]TagCategory, error) {
+	return ts.allCategories(ctx, CodeTagScope)
+}
+
+func (ts *TagStore) AllSpaceCategories(ctx context.Context) ([]TagCategory, error) {
+	return ts.allCategories(ctx, SpaceTagScope)
 }
 
 func (ts *TagStore) allCategories(ctx context.Context, scope TagScope) ([]TagCategory, error) {
@@ -252,6 +278,44 @@ func (ts *TagStore) SetLibraryTag(ctx context.Context, namespace, name string, n
 			slog.String("name", name), slog.Any("oldTag", oldTag), slog.Any("newTag", newTag), slog.Any("error", err))
 		return fmt.Errorf("failed to update repository library tags, path:%v/%v,error:%w", namespace, name, err)
 	}
+
+	return err
+}
+
+func (ts *TagStore) UpsertRepoTags(ctx context.Context, repoID int64, oldTagIDs, newTagIDs []int64) (err error) {
+	err = ts.db.Operator.Core.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
+		var err error
+		if len(oldTagIDs) > 0 {
+			for _, tagID := range oldTagIDs {
+				_, err = tx.NewUpdate().Model((*RepositoryTag)(nil)).
+					Where("repository_id = ? and tag_id = ? and count > 0", repoID, tagID).
+					Set("count = count-1").
+					Exec(ctx)
+				if err != nil {
+					return fmt.Errorf("failed to delete repository tags,error:%w", err)
+				}
+			}
+		}
+		// increase count of new tag
+		if len(newTagIDs) > 0 {
+			for _, tagID := range newTagIDs {
+				newRepoTag := RepositoryTag{
+					RepositoryID: repoID,
+					TagID:        tagID,
+					Count:        1,
+				}
+				_, err = tx.NewInsert().Model(&newRepoTag).
+					On("CONFLICT (repository_id, tag_id) DO UPDATE SET count = repository_tag.count+1").
+					Exec(ctx)
+
+				if err != nil {
+					return fmt.Errorf("failed to upsert repository tags,error:%w", err)
+				}
+
+			}
+		}
+		return nil
+	})
 
 	return err
 }
