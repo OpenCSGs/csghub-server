@@ -11,7 +11,7 @@ import (
 	"log/slog"
 	"net/http"
 
-	"github.com/pulltheflower/gitea-go-sdk/gitea"
+	"github.com/OpenCSGs/gitea-go-sdk/gitea"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/config"
 )
