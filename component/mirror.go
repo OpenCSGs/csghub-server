@@ -70,6 +70,7 @@ func (c *MirrorComponent) CreatePushMirrorForFinishedMirrorTask(ctx context.Cont
 				slog.Error("fail to update mirror", slog.Int64("mirrorId", mirror.ID), slog.String("error", err.Error()))
 				return fmt.Errorf("fail to update mirror, %w", err)
 			}
+			slog.Info("create push mirror successfully", slog.Int64("mirrorId", mirror.ID), slog.String("push_url", mirror.PushUrl))
 		}
 	}
 	return nil
