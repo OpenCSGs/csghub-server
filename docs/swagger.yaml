@@ -1855,11 +1855,6 @@ paths:
         name: name
         required: true
         type: string
-      - description: git branch or tag
-        in: query
-        name: ref
-        required: true
-        type: string
       - description: current user name
         in: query
         name: current_user
@@ -1889,6 +1884,75 @@ paths:
       security:
       - ApiKey: []
       summary: Get the tags of repository
+      tags:
+      - Repository
+  /{repo_type}/{namespace}/{name}/tags/{category}:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: models,dataset,codes or spaces
+        enum:
+        - models
+        - datasets
+        - codes
+        - spaces
+        in: path
+        name: repo_type
+        required: true
+        type: string
+      - description: repo owner name
+        in: path
+        name: namespace
+        required: true
+        type: string
+      - description: repo name
+        in: path
+        name: name
+        required: true
+        type: string
+      - description: current user name
+        in: query
+        name: current_user
+        required: true
+        type: string
+      - description: tag category
+        enum:
+        - task
+        - license
+        - framework
+        - language
+        - industry
+        in: path
+        name: category
+        required: true
+        type: string
+      - description: tag names in array
+        in: body
+        name: tags
+        required: true
+        schema:
+          items:
+            type: string
+          type: array
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/types.Response'
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: update the tags of a certain category
       tags:
       - Repository
   /{repo_type}/{namespace}/{name}/tree:
