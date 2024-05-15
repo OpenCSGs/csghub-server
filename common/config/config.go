@@ -43,12 +43,12 @@ type Config struct {
 	}
 
 	MirrorServer struct {
-		URL       string `envconfig:"STARHUB_SERVER_MIRROR_SERVER_URL"    default:"http://localhost:3001"`
-		Type      string `envconfig:"STARHUB_SERVER_MIRROR_SERVER_TYPE"    default:"gitea"`
-		Host      string `envconfig:"STARHUB_SERVER_MIRROR_SERVER_HOST"       default:"http://localhost:3001"`
-		SecretKey string `envconfig:"STARHUB_SERVER_MIRROR_SERVER_SECRET_KEY" default:"619c849c49e03754454ccd4cda79a209ce0b30b3"`
-		Username  string `envconfig:"STARHUB_SERVER_MIRROR_SERVER_USERNAME" default:"root"`
-		Password  string `envconfig:"STARHUB_SERVER_MIRROR_SERVER_PASSWORD" default:"password123"`
+		URL       string `envconfig:"STARHUB_SERVER_MIRRORSERVER_URL"    default:"http://localhost:3001"`
+		Type      string `envconfig:"STARHUB_SERVER_MIRRORSERVER_TYPE"    default:"gitea"`
+		Host      string `envconfig:"STARHUB_SERVER_MIRRORSERVER_HOST"       default:"http://localhost:3001"`
+		SecretKey string `envconfig:"STARHUB_SERVER_MIRRORSERVER_SECRET_KEY" default:"619c849c49e03754454ccd4cda79a209ce0b30b3"`
+		Username  string `envconfig:"STARHUB_SERVER_MIRRORSERVER_USERNAME" default:"root"`
+		Password  string `envconfig:"STARHUB_SERVER_MIRRORSERVER_PASSWORD" default:"password123"`
 	}
 
 	Frontend struct {
