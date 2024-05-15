@@ -15,12 +15,14 @@ import (
 func NewTagComponent(config *config.Config) (*TagComponent, error) {
 	tc := &TagComponent{}
 	tc.ts = database.NewTagStore()
+	tc.rs = database.NewRepoStore()
 	tc.sensitiveChecker = NewSensitiveComponent(config)
 	return tc, nil
 }
 
 type TagComponent struct {
 	ts               *database.TagStore
+	rs               *database.RepoStore
 	sensitiveChecker SensitiveChecker
 }
 
@@ -115,4 +117,31 @@ func (c *TagComponent) UpdateLibraryTags(ctx context.Context, tagScope database.
 		return fmt.Errorf("failed to set Library tags, cause: %w", err)
 	}
 	return nil
+}
+
+func (c *TagComponent) UpdateRepoTagsByCategory(ctx context.Context, tagScope database.TagScope, repoID int64, category string, tagNames []string) error {
+	allTags, err := c.ts.AllTagsByScopeAndCategory(ctx, tagScope, category)
+	if err != nil {
+		return fmt.Errorf("failed to get all tags of scope `%s`, error: %w", tagScope, err)
+	}
+
+	if len(allTags) == 0 {
+		return fmt.Errorf("no tags found for scope `%s` and category `%s`", tagScope, category)
+	}
+
+	var tagIDs []int64
+	for _, tagName := range tagNames {
+		for _, t := range allTags {
+			if t.Name == tagName {
+				tagIDs = append(tagIDs, t.ID)
+			}
+		}
+	}
+
+	var oldTagIDs []int64
+	oldTagIDs, err = c.rs.TagIDs(ctx, repoID, category)
+	if err != nil {
+		return fmt.Errorf("failed to get old tag ids, error: %w", err)
+	}
+	return c.ts.UpsertRepoTags(ctx, repoID, oldTagIDs, tagIDs)
 }
