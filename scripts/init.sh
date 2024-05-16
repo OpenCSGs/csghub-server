@@ -71,12 +71,30 @@ else
 fi
 
 # Create cron job
+cron=""
+read_and_set_cron() {
+    env_variable=$1
+    default_value=$2
+    
+    cron=${!env_variable}
+
+    if [[ -z $cron ]]; then
+        cron=$default_value
+    fi
+}
+
 echo "Creating cron job for gitea logscan..."
-(echo "0 23 * * * STARHUB_DATABASE_DSN=$STARHUB_DATABASE_DSN /starhub-bin/starhub logscan gitea --path /starhub-bin/logs/gitea.log >> /starhub-bin/cron.log 2>&1") | crontab -
+read_and_set_cron "STARHUB_SERVER_CRON_LOGSCAN" "0 23 * * *"
+(echo "$cron STARHUB_DATABASE_DSN=$STARHUB_DATABASE_DSN /starhub-bin/starhub logscan gitea --path /starhub-bin/logs/gitea.log >> /starhub-bin/cron.log 2>&1") | crontab -
+
 echo "Creating cron job for repository recommendation score calculation..."
-(echo "*/10 * * * * STARHUB_DATABASE_DSN=$STARHUB_DATABASE_DSN STARHUB_SERVER_GITSERVER_HOST=$STARHUB_SERVER_GITSERVER_HOST STARHUB_SERVER_GITSERVER_USERNAME=$STARHUB_SERVER_GITSERVER_USERNAME STARHUB_SERVER_GITSERVER_PASSWORD=$STARHUB_SERVER_GITSERVER_PASSWORD /starhub-bin/starhub cron calc-recom-score >> /starhub-bin/cron-calc-recom-score.log 2>&1") | crontab -
+read_and_set_cron "STARHUB_SERVER_CRON_CALC_RECOM_SCORE" "0 1 * * *"
+(echo "$cron STARHUB_DATABASE_DSN=$STARHUB_DATABASE_DSN STARHUB_SERVER_GITSERVER_HOST=$STARHUB_SERVER_GITSERVER_HOST STARHUB_SERVER_GITSERVER_USERNAME=$STARHUB_SERVER_GITSERVER_USERNAME STARHUB_SERVER_GITSERVER_PASSWORD=$STARHUB_SERVER_GITSERVER_PASSWORD /starhub-bin/starhub cron calc-recom-score >> /starhub-bin/cron-calc-recom-score.log 2>&1") | crontab -
+
 echo "Creating cron job for push mirror creation..."
-(echo "*/10 * * * * STARHUB_DATABASE_DSN=$STARHUB_DATABASE_DSN STARHUB_SERVER_GITSERVER_HOST=$STARHUB_SERVER_GITSERVER_HOST STARHUB_SERVER_GITSERVER_USERNAME=$STARHUB_SERVER_GITSERVER_USERNAME STARHUB_SERVER_GITSERVER_PASSWORD=$STARHUB_SERVER_GITSERVER_PASSWORD STARHUB_SERVER_MIRRORSERVER_HOST=$STARHUB_SERVER_MIRRORSERVER_HOST STARHUB_SERVER_MIRRORSERVER_USERNAME=$STARHUB_SERVER_MIRRORSERVER_USERNAME STARHUB_SERVER_MIRRORSERVER_PASSWORD=$STARHUB_SERVER_MIRRORSERVER_PASSWORD /starhub-bin/starhub cron create-push-mirror >> /starhub-bin/create-push-mirror.log 2>&1") | crontab -
+read_and_set_cron "STARHUB_SERVER_CRON_PUSH_MIRROR" "*/10 * * * *"
+(echo "$cron STARHUB_DATABASE_DSN=$STARHUB_DATABASE_DSN STARHUB_SERVER_GITSERVER_HOST=$STARHUB_SERVER_GITSERVER_HOST STARHUB_SERVER_GITSERVER_USERNAME=$STARHUB_SERVER_GITSERVER_USERNAME STARHUB_SERVER_GITSERVER_PASSWORD=$STARHUB_SERVER_GITSERVER_PASSWORD STARHUB_SERVER_MIRRORSERVER_HOST=$STARHUB_SERVER_MIRRORSERVER_HOST STARHUB_SERVER_MIRRORSERVER_USERNAME=$STARHUB_SERVER_MIRRORSERVER_USERNAME STARHUB_SERVER_MIRRORSERVER_PASSWORD=$STARHUB_SERVER_MIRRORSERVER_PASSWORD /starhub-bin/starhub cron create-push-mirror >> /starhub-bin/create-push-mirror.log 2>&1") | crontab -
+
 # Reload cron server
 service cron restart
 echo "Done."
