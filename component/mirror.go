@@ -15,6 +15,9 @@ import (
 type MirrorComponent struct {
 	mirrorStore       *database.MirrorStore
 	repoStore         *database.RepoStore
+	modelStore        *database.ModelStore
+	datasetStore      *database.DatasetStore
+	codeStore         *database.CodeStore
 	repoComp          *RepoComponent
 	tokenStore        *database.GitServerAccessTokenStore
 	mirrorSourceStore *database.MirrorSourceStore
@@ -34,6 +37,9 @@ func NewMirrorComponent(config *config.Config) (*MirrorComponent, error) {
 	if err != nil {
 		return nil, fmt.Errorf("fail to create repo component,error:%w", err)
 	}
+	c.modelStore = database.NewModelStore()
+	c.datasetStore = database.NewDatasetStore()
+	c.codeStore = database.NewCodeStore()
 	c.repoStore = database.NewRepoStore()
 	c.mirrorStore = database.NewMirrorStore()
 	c.tokenStore = database.NewGitServerAccessTokenStore()
@@ -97,7 +103,8 @@ func (c *MirrorComponent) CreateMirrorRepo(ctx context.Context, req types.Create
 				req.RepoType, req.SourceNamespace, req.SourceName, namespace, name)
 		}
 	}
-	//create repo, create mirror repo
+
+	// create repo, create mirror repo
 	gitRepo, repo, err := c.repoComp.CreateRepo(ctx, types.CreateRepoReq{
 		Username:  namespace,
 		Namespace: namespace,
@@ -111,8 +118,41 @@ func (c *MirrorComponent) CreateMirrorRepo(ctx context.Context, req types.Create
 		DefaultBranch: req.DefaultBranch,
 		RepoType:      req.RepoType,
 	})
+
 	if err != nil {
 		return nil, fmt.Errorf("failed to create OpenCSG repo, error: %w", err)
+	}
+
+	if req.RepoType == types.ModelRepo {
+		dbModel := database.Model{
+			Repository:   repo,
+			RepositoryID: repo.ID,
+		}
+
+		_, err := c.modelStore.Create(ctx, dbModel)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create model, error: %w", err)
+		}
+	} else if req.RepoType == types.DatasetRepo {
+		dbDataset := database.Dataset{
+			Repository:   repo,
+			RepositoryID: repo.ID,
+		}
+
+		_, err := c.datasetStore.Create(ctx, dbDataset)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create dataset, error: %w", err)
+		}
+	} else if req.RepoType == types.CodeRepo {
+		dbCode := database.Code{
+			Repository:   repo,
+			RepositoryID: repo.ID,
+		}
+
+		_, err := c.codeStore.Create(ctx, dbCode)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create code, error: %w", err)
+		}
 	}
 
 	pushAccessToken, err := c.tokenStore.FindByType(ctx, "git")
