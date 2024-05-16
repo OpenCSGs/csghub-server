@@ -2,8 +2,6 @@ package component
 
 import (
 	"context"
-	"database/sql"
-	"errors"
 	"fmt"
 	"log/slog"
 
@@ -15,11 +13,12 @@ import (
 )
 
 type MirrorComponent struct {
-	mirrorStore  *database.MirrorStore
-	repoStore    *database.RepoStore
-	repoComp     *RepoComponent
-	tokenStore   *database.GitServerAccessTokenStore
-	mirrorServer mirrorserver.MirrorServer
+	mirrorStore       *database.MirrorStore
+	repoStore         *database.RepoStore
+	repoComp          *RepoComponent
+	tokenStore        *database.GitServerAccessTokenStore
+	mirrorSourceStore *database.MirrorSourceStore
+	mirrorServer      mirrorserver.MirrorServer
 }
 
 func NewMirrorComponent(config *config.Config) (*MirrorComponent, error) {
@@ -38,6 +37,7 @@ func NewMirrorComponent(config *config.Config) (*MirrorComponent, error) {
 	c.repoStore = database.NewRepoStore()
 	c.mirrorStore = database.NewMirrorStore()
 	c.tokenStore = database.NewGitServerAccessTokenStore()
+	c.mirrorSourceStore = database.NewMirrorSourceStore()
 	return c, nil
 }
 
@@ -83,13 +83,13 @@ func (c *MirrorComponent) CreateMirrorRepo(ctx context.Context, req types.Create
 	namespace := c.mapNamespaceAndName(req.SourceNamespace)
 	name := req.SourceName
 	repo, err := c.repoStore.FindByPath(ctx, req.RepoType, namespace, name)
-	if err != nil && !errors.Is(err, sql.ErrNoRows) {
+	if err != nil {
 		return nil, fmt.Errorf("failed to check repo existance, error: %w", err)
 	}
 	if repo != nil {
 		name = fmt.Sprintf("%s_%s", req.SourceNamespace, req.SourceName)
 		repo, err = c.repoStore.FindByPath(ctx, req.RepoType, namespace, name)
-		if err != nil && !errors.Is(err, sql.ErrNoRows) {
+		if err != nil {
 			return nil, fmt.Errorf("failed to check repo existance, error: %w", err)
 		}
 		if repo != nil {
@@ -122,6 +122,11 @@ func (c *MirrorComponent) CreateMirrorRepo(ctx context.Context, req types.Create
 	if len(pushAccessToken) == 0 {
 		return nil, fmt.Errorf("failed to find git access token, error: empty table")
 	}
+
+	mirrorSource, err := c.mirrorSourceStore.Get(ctx, req.MirrorSourceID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to find mirror Source, error: %w", err)
+	}
 	var mirror database.Mirror
 	// mirror.Interval = req.Interval
 	mirror.SourceUrl = req.SourceGitCloneUrl
@@ -133,7 +138,7 @@ func (c *MirrorComponent) CreateMirrorRepo(ctx context.Context, req types.Create
 	mirror.PushAccessToken = pushAccessToken[0].Token
 	mirror.RepositoryID = repo.ID
 	mirror.Repository = repo
-	mirror.LocalRepoPath = fmt.Sprintf("%d_%s_%s_%s", req.MirrorSourceID, req.RepoType, req.SourceNamespace, req.SourceName)
+	mirror.LocalRepoPath = fmt.Sprintf("%s_%s_%s_%s", mirrorSource.SourceName, req.RepoType, req.SourceNamespace, req.SourceName)
 	mirror.SourceRepoPath = fmt.Sprintf("%s/%s", namespace, name)
 
 	reqMirror, err := c.mirrorStore.Create(ctx, &mirror)

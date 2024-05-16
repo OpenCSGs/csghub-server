@@ -1058,6 +1058,15 @@ func (c *RepoComponent) GetCommitWithDiff(ctx context.Context, req *types.GetCom
 
 func (c *RepoComponent) CreateMirror(ctx context.Context, req types.CreateMirrorReq) (*database.Mirror, error) {
 	var mirror database.Mirror
+	admin, err := c.checkCurrentUserPermission(ctx, req.CurrentUser, req.Namespace, membership.RoleAdmin)
+	if err != nil {
+		return nil, fmt.Errorf("failed to check permission to create mirror, error: %w", err)
+	}
+
+	if !admin {
+		return nil, fmt.Errorf("users do not have permission to create mirror for this repo")
+	}
+
 	repo, err := c.repo.FindByPath(ctx, req.RepoType, req.Namespace, req.Name)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find repo, error: %w", err)
@@ -1104,6 +1113,14 @@ func (c *RepoComponent) CreateMirror(ctx context.Context, req types.CreateMirror
 }
 
 func (c *RepoComponent) GetMirror(ctx context.Context, req types.GetMirrorReq) (*database.Mirror, error) {
+	admin, err := c.checkCurrentUserPermission(ctx, req.CurrentUser, req.Namespace, membership.RoleAdmin)
+	if err != nil {
+		return nil, fmt.Errorf("failed to check permission to create mirror, error: %w", err)
+	}
+
+	if !admin {
+		return nil, fmt.Errorf("users do not have permission to get mirror for this repo")
+	}
 	repo, err := c.repo.FindByPath(ctx, req.RepoType, req.Namespace, req.Name)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find repo, error: %w", err)
@@ -1116,6 +1133,14 @@ func (c *RepoComponent) GetMirror(ctx context.Context, req types.GetMirrorReq) (
 }
 
 func (c *RepoComponent) UpdateMirror(ctx context.Context, req types.UpdateMirrorReq) (*database.Mirror, error) {
+	admin, err := c.checkCurrentUserPermission(ctx, req.CurrentUser, req.Namespace, membership.RoleAdmin)
+	if err != nil {
+		return nil, fmt.Errorf("failed to check permission to create mirror, error: %w", err)
+	}
+
+	if !admin {
+		return nil, fmt.Errorf("users do not have permission to update mirror for this repo")
+	}
 	repo, err := c.repo.FindByPath(ctx, req.RepoType, req.Namespace, req.Name)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find repo, error: %w", err)
@@ -1143,6 +1168,14 @@ func (c *RepoComponent) UpdateMirror(ctx context.Context, req types.UpdateMirror
 }
 
 func (c *RepoComponent) DeleteMirror(ctx context.Context, req types.DeleteMirrorReq) error {
+	admin, err := c.checkCurrentUserPermission(ctx, req.CurrentUser, req.Namespace, membership.RoleAdmin)
+	if err != nil {
+		return fmt.Errorf("failed to check permission to create mirror, error: %w", err)
+	}
+
+	if !admin {
+		return fmt.Errorf("users do not have permission to delete mirror for this repo")
+	}
 	repo, err := c.repo.FindByPath(ctx, req.RepoType, req.Namespace, req.Name)
 	if err != nil {
 		return fmt.Errorf("failed to find repo, error: %w", err)
