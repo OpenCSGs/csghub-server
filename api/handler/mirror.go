@@ -26,6 +26,17 @@ type MirrorHandler struct {
 	mc *component.MirrorComponent
 }
 
+// CreateMirrorRepo godoc
+// @Security     ApiKey
+// @Summary      Create mirror repo
+// @Tags         Mirror
+// @Accept       json
+// @Produce      json
+// @Param        body body types.CreateMirrorRepoReq true "body"
+// @Success      200  {object}  types.Response{} "OK"
+// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
+// @Router       /mirror/repo [post]
 func (h *MirrorHandler) CreateMirrorRepo(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
 	if currentUser == "" {

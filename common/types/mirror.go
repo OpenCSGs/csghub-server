@@ -13,13 +13,15 @@ type CreateMirrorReq struct {
 	PushAccessToken string         `json:"push_access_token" binding:"required"`
 	SourceRepoPath  string         `json:"source_repo_path" binding:"required"`
 	LocalRepoPath   string         `json:"local_repo_path" binding:"required"`
+	CurrentUser     string         `json:"current_user"`
 	RepoType        RepositoryType `json:"repo_type"`
 }
 
 type GetMirrorReq struct {
-	Namespace string         `json:"namespace"`
-	Name      string         `json:"name"`
-	RepoType  RepositoryType `json:"repo_type"`
+	Namespace   string         `json:"namespace"`
+	Name        string         `json:"name"`
+	RepoType    RepositoryType `json:"repo_type"`
+	CurrentUser string         `json:"current_user"`
 }
 
 type UpdateMirrorReq = CreateMirrorReq

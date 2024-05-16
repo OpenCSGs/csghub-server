@@ -26,6 +26,17 @@ type MirrorSourceHandler struct {
 	c *component.MirrorSourceComponent
 }
 
+// CreateMirrorSource godoc
+// @Security     ApiKey
+// @Summary      Create mirror source
+// @Tags         Mirror
+// @Accept       json
+// @Produce      json
+// @Param        body body types.CreateMirrorSourceReq true "body"
+// @Success      200  {object}  types.Response{data=database.MirrorSource} "OK"
+// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
+// @Router       /mirror/sources [post]
 func (h *MirrorSourceHandler) Create(ctx *gin.Context) {
 	var msReq types.CreateMirrorSourceReq
 	if err := ctx.ShouldBindJSON(&msReq); err != nil {
@@ -42,6 +53,16 @@ func (h *MirrorSourceHandler) Create(ctx *gin.Context) {
 	httpbase.OK(ctx, ms)
 }
 
+// GetMirrorSources godoc
+// @Security     ApiKey
+// @Summary      Get mirror sources
+// @Tags         Mirror
+// @Accept       json
+// @Produce      json
+// @Success      200  {object}  types.Response{data=[]database.MirrorSource} "OK"
+// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
+// @Router       /mirror/sources [get]
 func (h *MirrorSourceHandler) Index(ctx *gin.Context) {
 	ms, err := h.c.Index(ctx)
 	if err != nil {
@@ -52,6 +73,18 @@ func (h *MirrorSourceHandler) Index(ctx *gin.Context) {
 	httpbase.OK(ctx, ms)
 }
 
+// UpdateMirrorSource godoc
+// @Security     ApiKey
+// @Summary      Update mirror source
+// @Tags         Mirror
+// @Accept       json
+// @Produce      json
+// @Param        id path string true "id"
+// @Param        body body types.UpdateMirrorSourceReq true "body"
+// @Success      200  {object}  types.Response{data=database.MirrorSource} "OK"
+// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
+// @Router       /mirror/sources/{id} [put]
 func (h *MirrorSourceHandler) Update(ctx *gin.Context) {
 	var msReq types.UpdateMirrorSourceReq
 	var msId int64
@@ -83,6 +116,17 @@ func (h *MirrorSourceHandler) Update(ctx *gin.Context) {
 	httpbase.OK(ctx, ms)
 }
 
+// GetMirrorSource godoc
+// @Security     ApiKey
+// @Summary      Get mirror source
+// @Tags         Mirror
+// @Accept       json
+// @Produce      json
+// @Param        id path string true "id"
+// @Success      200  {object}  types.Response{data=database.MirrorSource} "OK"
+// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
+// @Router       /mirror/sources/{id} [get]
 func (h *MirrorSourceHandler) Get(ctx *gin.Context) {
 	var msId int64
 	id := ctx.Param("id")
@@ -107,6 +151,17 @@ func (h *MirrorSourceHandler) Get(ctx *gin.Context) {
 	httpbase.OK(ctx, ms)
 }
 
+// DeleteMirrorSource godoc
+// @Security     ApiKey
+// @Summary      Delete mirror source
+// @Tags         Mirror
+// @Accept       json
+// @Produce      json
+// @Param        id path string true "id"
+// @Success      200  {object}  types.Response{} "OK"
+// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
+// @Router       /mirror/sources/{id} [delete]
 func (h *MirrorSourceHandler) Delete(ctx *gin.Context) {
 	var msId int64
 	id := ctx.Param("id")
