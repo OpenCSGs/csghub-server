@@ -138,12 +138,19 @@ func (s *RepoStore) FindByIds(ctx context.Context, ids []int64, opts ...SelectOp
 }
 
 func (s *RepoStore) FindByPath(ctx context.Context, repoType types.RepositoryType, namespace, name string) (*Repository, error) {
-	var resRepo *Repository
+	resRepo := new(Repository)
 	err := s.db.Operator.Core.
 		NewSelect().
 		Model(resRepo).
 		Where("git_path =?", fmt.Sprintf("%ss_%s/%s", repoType, namespace, name)).
+		Limit(1).
 		Scan(ctx)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, nil
+		}
+		return nil, err
+	}
 	return resRepo, err
 }
 
