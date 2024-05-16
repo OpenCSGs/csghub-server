@@ -40,7 +40,12 @@ func (h *MirrorHandler) CreateMirrorRepo(ctx *gin.Context) {
 		return
 	}
 	m, err := h.mc.CreateMirrorRepo(ctx, req)
-	slog.Debug("create mirror repo", slog.Any("mirror", *m.Repository), slog.Any("req", req))
+	if err != nil {
+		slog.Error("failed to create mirror repo", slog.Any("error", err))
+		httpbase.ServerError(ctx, err)
+		return
+	}
+	slog.Debug("create mirror repo", slog.Any("mirror", m.Repository), slog.Any("req", req))
 
 	httpbase.OK(ctx, nil)
 }
