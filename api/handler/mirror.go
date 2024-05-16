@@ -1,7 +1,6 @@
 package handler
 
 import (
-	"errors"
 	"log/slog"
 
 	"github.com/gin-gonic/gin"
@@ -38,12 +37,6 @@ type MirrorHandler struct {
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
 // @Router       /mirror/repo [post]
 func (h *MirrorHandler) CreateMirrorRepo(ctx *gin.Context) {
-	currentUser := httpbase.GetCurrentUser(ctx)
-	if currentUser == "" {
-		httpbase.UnauthorizedError(ctx, errors.New("user not found in context, please login first"))
-		return
-	}
-
 	var req types.CreateMirrorRepoReq
 	err := ctx.ShouldBindJSON(&req)
 	if err != nil {

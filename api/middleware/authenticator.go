@@ -110,3 +110,35 @@ func parseJWTToken(signKey, tokenString string) (*types.JWTClaims, error) {
 	}
 	return nil, fmt.Errorf("JWT token claims not match: %+v", *token)
 }
+
+func OnlyAPIKeyAuthenticator(config *config.Config) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		apiToken := config.APIToken
+
+		// Get Auzhorization token
+		authHeader := c.Request.Header.Get("Authorization")
+
+		// Check Authorization Header formt
+		if authHeader == "" {
+			slog.Info("missing authorization header", slog.Any("url", c.Request.URL))
+			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "missing Authorization header"})
+			return
+		}
+
+		// Get token
+		token := strings.TrimPrefix(authHeader, "Bearer ")
+
+		if token == apiToken {
+			// get current user from query string
+			currentUser := c.Query(httpbase.CurrentUserQueryVar)
+			if len(currentUser) > 0 {
+				httpbase.SetCurrentUser(c, currentUser)
+			}
+		} else {
+			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "please use API key for authentication"})
+			return
+		}
+
+		c.Next()
+	}
+}
