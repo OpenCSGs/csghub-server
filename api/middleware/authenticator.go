@@ -135,7 +135,7 @@ func OnlyAPIKeyAuthenticator(config *config.Config) gin.HandlerFunc {
 				httpbase.SetCurrentUser(c, currentUser)
 			}
 		} else {
-			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "missing authorization header"})
+			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "please use API key for authentication"})
 			return
 		}
 
