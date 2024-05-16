@@ -373,6 +373,7 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 	}
 
 	mirror := apiGroup.Group("/mirror")
+	mirror.Use(middleware.OnlyAPIKeyAuthenticator(config))
 	{
 		mirror.GET("/sources", msHandler.Index)
 		mirror.POST("/sources", msHandler.Create)
