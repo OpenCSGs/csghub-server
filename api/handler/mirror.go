@@ -39,8 +39,8 @@ type MirrorHandler struct {
 // @Router       /mirror/repo [post]
 func (h *MirrorHandler) CreateMirrorRepo(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
-	if currentUser == "" {
-		httpbase.UnauthorizedError(ctx, errors.New("user not found in context, please login first"))
+	if currentUser != "" {
+		httpbase.UnauthorizedError(ctx, errors.New("please use API key for authorization"))
 		return
 	}
 
