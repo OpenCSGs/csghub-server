@@ -138,7 +138,7 @@ func (s *RepoStore) FindByIds(ctx context.Context, ids []int64, opts ...SelectOp
 }
 
 func (s *RepoStore) FindByPath(ctx context.Context, repoType types.RepositoryType, namespace, name string) (*Repository, error) {
-	resRepo := new(Repository)
+	var resRepo *Repository
 	err := s.db.Operator.Core.
 		NewSelect().
 		Model(resRepo).

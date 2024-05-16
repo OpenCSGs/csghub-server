@@ -18,6 +18,7 @@ type MirrorComponent struct {
 	mirrorStore  *database.MirrorStore
 	repoStore    *database.RepoStore
 	repoComp     *RepoComponent
+	tokenStore   *database.GitServerAccessTokenStore
 	mirrorServer mirrorserver.MirrorServer
 }
 
@@ -36,6 +37,7 @@ func NewMirrorComponent(config *config.Config) (*MirrorComponent, error) {
 	}
 	c.repoStore = database.NewRepoStore()
 	c.mirrorStore = database.NewMirrorStore()
+	c.tokenStore = database.NewGitServerAccessTokenStore()
 	return c, nil
 }
 
@@ -96,7 +98,7 @@ func (c *MirrorComponent) CreateMirrorRepo(ctx context.Context, req types.Create
 		}
 	}
 	//create repo, create mirror repo
-	gitRepo, _, err := c.repoComp.CreateRepo(ctx, types.CreateRepoReq{
+	gitRepo, repo, err := c.repoComp.CreateRepo(ctx, types.CreateRepoReq{
 		Username:  namespace,
 		Namespace: namespace,
 		Name:      name,
@@ -112,6 +114,14 @@ func (c *MirrorComponent) CreateMirrorRepo(ctx context.Context, req types.Create
 	if err != nil {
 		return nil, fmt.Errorf("failed to create OpenCSG repo, error: %w", err)
 	}
+
+	pushAccessToken, err := c.tokenStore.FindByType(ctx, "git")
+	if err != nil {
+		return nil, fmt.Errorf("failed to find git access token, error: %w", err)
+	}
+	if len(pushAccessToken) == 0 {
+		return nil, fmt.Errorf("failed to find git access token, error: empty table")
+	}
 	var mirror database.Mirror
 	// mirror.Interval = req.Interval
 	mirror.SourceUrl = req.SourceGitCloneUrl
@@ -120,8 +130,11 @@ func (c *MirrorComponent) CreateMirrorRepo(ctx context.Context, req types.Create
 	mirror.Username = req.SourceNamespace
 	mirror.PushUsername = "root"
 	//TODO: get user git access token from db git access token
-	mirror.PushAccessToken = ""
+	mirror.PushAccessToken = pushAccessToken[0].Token
 	mirror.RepositoryID = repo.ID
+	mirror.Repository = repo
+	mirror.LocalRepoPath = fmt.Sprintf("%d_%s_%s_%s", req.MirrorSourceID, req.RepoType, req.SourceNamespace, req.SourceName)
+	mirror.SourceRepoPath = fmt.Sprintf("%s/%s", namespace, name)
 
 	reqMirror, err := c.mirrorStore.Create(ctx, &mirror)
 	if err != nil {
@@ -130,7 +143,7 @@ func (c *MirrorComponent) CreateMirrorRepo(ctx context.Context, req types.Create
 
 	c.mirrorServer.CreateMirrorRepo(ctx, mirrorserver.CreateMirrorRepoReq{
 		Namespace: "root",
-		Name:      fmt.Sprintf("%d_%s_%s_%s", req.MirrorSourceID, req.RepoType, req.SourceNamespace, req.SourceName),
+		Name:      mirror.LocalRepoPath,
 		CloneUrl:  mirror.SourceUrl,
 		// Username:    req.SourceNamespace,
 		// AccessToken: mirror.AccessToken,
