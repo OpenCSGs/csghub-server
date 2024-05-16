@@ -12,9 +12,17 @@ func NewGitServerAccessTokenStore() *GitServerAccessTokenStore {
 	}
 }
 
+type GitServerType string
+
+const (
+	MirrorServer GitServerType = "mirror"
+	GitServer    GitServerType = "git"
+)
+
 type GitServerAccessToken struct {
-	ID    int64  `bun:",pk,autoincrement" json:"id"`
-	Token string `bun:",notnull" json:"token"`
+	ID         int64         `bun:",pk,autoincrement" json:"id"`
+	Token      string        `bun:",notnull" json:"token"`
+	ServerType GitServerType `bun:",notnull" json:"server_type"`
 	times
 }
 
@@ -32,6 +40,18 @@ func (s *GitServerAccessTokenStore) Index(ctx context.Context) ([]GitServerAcces
 	var gTokens []GitServerAccessToken
 	err := s.db.Operator.Core.NewSelect().
 		Model(&gTokens).
+		Scan(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return gTokens, nil
+}
+
+func (s *GitServerAccessTokenStore) FindByType(ctx context.Context, serverType string) ([]GitServerAccessToken, error) {
+	var gTokens []GitServerAccessToken
+	err := s.db.Operator.Core.NewSelect().
+		Model(&gTokens).
+		Where("server_type = ?", serverType).
 		Scan(ctx)
 	if err != nil {
 		return nil, err

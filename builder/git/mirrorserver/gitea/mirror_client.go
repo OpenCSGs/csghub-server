@@ -12,22 +12,13 @@ import (
 	"net/http"
 
 	"github.com/OpenCSGs/gitea-go-sdk/gitea"
-	"opencsg.com/csghub-server/builder/git/gitserver"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/config"
 )
 
-var _ gitserver.GitServer = (*Client)(nil)
-
-type Client struct {
+type MirrorClient struct {
 	giteaClient *gitea.Client
 	config      *config.Config
-}
-
-type Response struct {
-	Code    int    `json:"code"`
-	Message string `json:"message"`
-	Data    any    `json:"data"`
 }
 
 type TokenResponse struct {
@@ -35,7 +26,7 @@ type TokenResponse struct {
 	Message string `json:"message"`
 }
 
-func NewClient(config *config.Config) (client *Client, err error) {
+func NewMirrorClient(config *config.Config) (client *MirrorClient, err error) {
 	ctx := context.Background()
 	token, err := findOrCreateAccessToken(ctx, config)
 	if err != nil {
@@ -43,39 +34,40 @@ func NewClient(config *config.Config) (client *Client, err error) {
 		return nil, err
 	}
 	giteaClient, err := gitea.NewClient(
-		config.GitServer.Host,
+		config.MirrorServer.Host,
 		gitea.SetContext(ctx),
 		gitea.SetToken(token.Token),
-		gitea.SetBasicAuth(config.GitServer.Username, config.GitServer.Password),
+		gitea.SetBasicAuth(config.MirrorServer.Username, config.MirrorServer.Password),
 	)
 	if err != nil {
 		return nil, err
 	}
 
-	return &Client{giteaClient: giteaClient, config: config}, nil
+	return &MirrorClient{giteaClient: giteaClient, config: config}, nil
 }
 
 func findOrCreateAccessToken(ctx context.Context, config *config.Config) (*database.GitServerAccessToken, error) {
 	gs := database.NewGitServerAccessTokenStore()
-	tokens, err := gs.FindByType(ctx, "git")
+	tokens, err := gs.FindByType(ctx, "mirror")
 	if err != nil {
-		slog.Error("Fail to get git server access token from database", slog.String("error: ", err.Error()))
+		slog.Error("Fail to get mirror server access token from database", slog.String("error: ", err.Error()))
 		return nil, err
 	}
 
 	if len(tokens) == 0 {
 		access_token, err := generateAccessTokenFromGitea(config)
 		if err != nil {
-			slog.Error("Fail to create git server access token", slog.String("error: ", err.Error()))
+			slog.Error("Fail to create mirror server access token", slog.String("error: ", err.Error()))
 			return nil, err
 		}
 		gToken := &database.GitServerAccessToken{
-			Token: access_token,
+			Token:      access_token,
+			ServerType: database.MirrorServer,
 		}
 
 		gToken, err = gs.Create(ctx, gToken)
 		if err != nil {
-			slog.Error("Fail to create git server access token", slog.String("error: ", err.Error()))
+			slog.Error("Fail to create mirror server access token", slog.String("error: ", err.Error()))
 			return nil, err
 		}
 
@@ -90,9 +82,9 @@ func encodeCredentials(username, password string) string {
 }
 
 func generateAccessTokenFromGitea(config *config.Config) (string, error) {
-	username := config.GitServer.Username
-	password := config.GitServer.Password
-	giteaUrl := fmt.Sprintf("%s/api/v1/users/%s/tokens", config.GitServer.Host, username)
+	username := config.MirrorServer.Username
+	password := config.MirrorServer.Password
+	giteaUrl := fmt.Sprintf("%s/api/v1/users/%s/tokens", config.MirrorServer.Host, username)
 	authHeader := encodeCredentials(username, password)
 	data := map[string]any{
 		"name": "access_token",

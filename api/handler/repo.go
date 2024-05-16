@@ -872,3 +872,171 @@ func (h *RepoHandler) CommitWithDiff(ctx *gin.Context) {
 	// client need base64 decode for diff, for example: echo <diff> | base64 -d
 	httpbase.OK(ctx, commit)
 }
+
+// CreateMirror godoc
+// @Security     ApiKey
+// @Summary      Create mirror for a existing repository
+// @Tags         Repository
+// @Accept       json
+// @Produce      json
+// @Param        repo_type path string true "models,datasets,codes or spaces" Enums(models,datasets,codes,spaces)
+// @Param        namespace path string true "repo owner name"
+// @Param        name path string true "repo name"
+// @Param        body body types.CreateMirrorReq true "body"
+// @Success      200  {object}  types.Response{data=database.Mirror} "OK"
+// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
+// @Router       /{repo_type}/{namespace}/{name}/mirror [post]
+func (h *RepoHandler) CreateMirror(ctx *gin.Context) {
+	var mirrorReq types.CreateMirrorReq
+	currentUser := httpbase.GetCurrentUser(ctx)
+	if currentUser == "" {
+		httpbase.UnauthorizedError(ctx, errors.New("user not found, please login first"))
+		return
+	}
+	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
+	if err != nil {
+		slog.Error("Bad request format", "error", err)
+		httpbase.BadRequest(ctx, err.Error())
+		return
+	}
+	if err = ctx.ShouldBindJSON(&mirrorReq); err != nil {
+		slog.Error("Bad request format", "error", err)
+		httpbase.BadRequest(ctx, err.Error())
+		return
+	}
+	mirrorReq.Namespace = namespace
+	mirrorReq.Name = name
+	mirrorReq.RepoType = common.RepoTypeFromContext(ctx)
+	mirrorReq.CurrentUser = currentUser
+	mirror, err := h.c.CreateMirror(ctx, mirrorReq)
+	if err != nil {
+		slog.Error("Failed to create mirror for", slog.String("repo_type", string(mirrorReq.RepoType)), slog.String("path", fmt.Sprintf("%s/%s", mirrorReq.Namespace, mirrorReq.Name)), "error", err)
+		httpbase.ServerError(ctx, err)
+		return
+	}
+	httpbase.OK(ctx, mirror)
+}
+
+// GetMirror godoc
+// @Security     ApiKey
+// @Summary      Get a mirror
+// @Tags         Repository
+// @Accept       json
+// @Produce      json
+// @Param        repo_type path string true "models,datasets,codes or spaces" Enums(models,datasets,codes,spaces)
+// @Param        namespace path string true "repo owner name"
+// @Param        name path string true "repo name"
+// @Success      200  {object}  types.Response{data=database.Mirror} "OK"
+// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
+// @Router       /{repo_type}/{namespace}/{name}/mirror [get]
+func (h *RepoHandler) GetMirror(ctx *gin.Context) {
+	var mirrorReq types.GetMirrorReq
+	currentUser := httpbase.GetCurrentUser(ctx)
+	if currentUser == "" {
+		httpbase.UnauthorizedError(ctx, errors.New("user not found, please login first"))
+		return
+	}
+	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
+	if err != nil {
+		slog.Error("Bad request format", "error", err)
+		httpbase.BadRequest(ctx, err.Error())
+		return
+	}
+	mirrorReq.Namespace = namespace
+	mirrorReq.Name = name
+	mirrorReq.RepoType = common.RepoTypeFromContext(ctx)
+	mirrorReq.CurrentUser = currentUser
+	mirror, err := h.c.GetMirror(ctx, mirrorReq)
+	if err != nil {
+		slog.Error("Failed to get mirror of", slog.String("repo_type", string(mirrorReq.RepoType)), slog.String("path", fmt.Sprintf("%s/%s", mirrorReq.Namespace, mirrorReq.Name)), "error", err)
+		httpbase.ServerError(ctx, err)
+		return
+	}
+	httpbase.OK(ctx, mirror)
+}
+
+// UpdateMirror godoc
+// @Security     ApiKey
+// @Summary      Update a mirror for a existing repository
+// @Tags         Repository
+// @Accept       json
+// @Produce      json
+// @Param        repo_type path string true "models,datasets,codes or spaces" Enums(models,datasets,codes,spaces)
+// @Param        namespace path string true "repo owner name"
+// @Param        name path string true "repo name"
+// @Param        body body types.UpdateMirrorReq true "body"
+// @Success      200  {object}  types.Response{data=database.Mirror} "OK"
+// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
+// @Router       /{repo_type}/{namespace}/{name}/mirror [put]
+func (h *RepoHandler) UpdateMirror(ctx *gin.Context) {
+	var mirrorReq types.UpdateMirrorReq
+	currentUser := httpbase.GetCurrentUser(ctx)
+	if currentUser == "" {
+		httpbase.UnauthorizedError(ctx, errors.New("user not found, please login first"))
+		return
+	}
+	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
+	if err != nil {
+		slog.Error("Bad request format", "error", err)
+		httpbase.BadRequest(ctx, err.Error())
+		return
+	}
+	if err = ctx.ShouldBindJSON(&mirrorReq); err != nil {
+		slog.Error("Bad request format", "error", err)
+		httpbase.BadRequest(ctx, err.Error())
+		return
+	}
+	mirrorReq.Namespace = namespace
+	mirrorReq.Name = name
+	mirrorReq.RepoType = common.RepoTypeFromContext(ctx)
+	mirrorReq.CurrentUser = currentUser
+	mirror, err := h.c.UpdateMirror(ctx, mirrorReq)
+	if err != nil {
+		slog.Error("Failed to update mirror for", slog.String("repo_type", string(mirrorReq.RepoType)), slog.String("path", fmt.Sprintf("%s/%s", mirrorReq.Namespace, mirrorReq.Name)), "error", err)
+		httpbase.ServerError(ctx, err)
+		return
+	}
+	httpbase.OK(ctx, mirror)
+}
+
+// DeleteMirror godoc
+// @Security     ApiKey
+// @Summary      Delete a mirror
+// @Tags         Repository
+// @Accept       json
+// @Produce      json
+// @Param        repo_type path string true "models,datasets,codes or spaces" Enums(models,datasets,codes,spaces)
+// @Param        namespace path string true "repo owner name"
+// @Param        name path string true "repo name"
+// @Success      200  {object}  types.Response{} "OK"
+// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
+// @Router       /{repo_type}/{namespace}/{name}/mirror [delete]
+func (h *RepoHandler) DeleteMirror(ctx *gin.Context) {
+	var mirrorReq types.DeleteMirrorReq
+	currentUser := httpbase.GetCurrentUser(ctx)
+	if currentUser == "" {
+		httpbase.UnauthorizedError(ctx, errors.New("user not found, please login first"))
+		return
+	}
+	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
+	if err != nil {
+		slog.Error("Bad request format", "error", err)
+		httpbase.BadRequest(ctx, err.Error())
+		return
+	}
+	mirrorReq.Namespace = namespace
+	mirrorReq.Name = name
+	mirrorReq.RepoType = common.RepoTypeFromContext(ctx)
+	mirrorReq.CurrentUser = currentUser
+	err = h.c.DeleteMirror(ctx, mirrorReq)
+	if err != nil {
+		slog.Error("Failed to delete mirror of", slog.String("repo_type", string(mirrorReq.RepoType)), slog.String("path", fmt.Sprintf("%s/%s", mirrorReq.Namespace, mirrorReq.Name)), "error", err)
+		httpbase.ServerError(ctx, err)
+		return
+	}
+	httpbase.OK(ctx, nil)
+}

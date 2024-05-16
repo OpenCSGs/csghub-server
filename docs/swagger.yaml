@@ -48,6 +48,52 @@ definitions:
       updated_at:
         type: string
     type: object
+  database.Mirror:
+    properties:
+      created_at:
+        type: string
+      id:
+        type: integer
+      interval:
+        type: string
+      last_message:
+        type: string
+      last_updated_at:
+        type: string
+      local_repo_path:
+        type: string
+      mirror_source:
+        $ref: '#/definitions/database.MirrorSource'
+      mirror_source_id:
+        type: integer
+      mirror_task_id:
+        type: integer
+      push_mirror_created:
+        type: boolean
+      repository:
+        $ref: '#/definitions/database.Repository'
+      repository_id:
+        type: integer
+      source_repo_path:
+        type: string
+      source_url:
+        type: string
+      updated_at:
+        type: string
+    type: object
+  database.MirrorSource:
+    properties:
+      created_at:
+        type: string
+      id:
+        type: integer
+      info_api_url:
+        type: string
+      source_name:
+        type: string
+      updated_at:
+        type: string
+    type: object
   database.Model:
     properties:
       created_at:
@@ -495,6 +541,79 @@ definitions:
         type: string
       token:
         type: string
+    type: object
+  types.CreateMirrorRepoReq:
+    properties:
+      branch:
+        type: string
+      description:
+        type: string
+      license:
+        type: string
+      mirror_source_id:
+        description: source id for HF,github etc
+        type: integer
+      repo_type:
+        allOf:
+        - $ref: '#/definitions/types.RepositoryType'
+        description: repo basic info
+      source_name:
+        type: string
+      source_namespace:
+        type: string
+      source_url:
+        description: mirror source info
+        type: string
+    required:
+    - mirror_source_id
+    - repo_type
+    - source_name
+    - source_namespace
+    - source_url
+    type: object
+  types.CreateMirrorReq:
+    properties:
+      current_user:
+        type: string
+      interval:
+        type: string
+      local_repo_path:
+        type: string
+      mirror_source_id:
+        type: integer
+      name:
+        type: string
+      namespace:
+        type: string
+      push_access_token:
+        type: string
+      push_url:
+        type: string
+      push_username:
+        type: string
+      repo_type:
+        $ref: '#/definitions/types.RepositoryType'
+      source_repo_path:
+        type: string
+      source_url:
+        type: string
+    required:
+    - local_repo_path
+    - mirror_source_id
+    - push_access_token
+    - push_url
+    - push_username
+    - source_repo_path
+    - source_url
+    type: object
+  types.CreateMirrorSourceReq:
+    properties:
+      info_api_url:
+        type: string
+      source_name:
+        type: string
+    required:
+    - source_name
     type: object
   types.CreateModelReq:
     properties:
@@ -1074,6 +1193,52 @@ definitions:
     type: object
   types.UpdateFileResp:
     type: object
+  types.UpdateMirrorReq:
+    properties:
+      current_user:
+        type: string
+      interval:
+        type: string
+      local_repo_path:
+        type: string
+      mirror_source_id:
+        type: integer
+      name:
+        type: string
+      namespace:
+        type: string
+      push_access_token:
+        type: string
+      push_url:
+        type: string
+      push_username:
+        type: string
+      repo_type:
+        $ref: '#/definitions/types.RepositoryType'
+      source_repo_path:
+        type: string
+      source_url:
+        type: string
+    required:
+    - local_repo_path
+    - mirror_source_id
+    - push_access_token
+    - push_url
+    - push_username
+    - source_repo_path
+    - source_url
+    type: object
+  types.UpdateMirrorSourceReq:
+    properties:
+      id:
+        type: integer
+      info_api_url:
+        type: string
+      source_name:
+        type: string
+    required:
+    - source_name
+    type: object
   types.UpdateModelReq:
     properties:
       default_branch:
@@ -1572,6 +1737,210 @@ paths:
       security:
       - ApiKey: []
       summary: Get the last commit of repository
+      tags:
+      - Repository
+  /{repo_type}/{namespace}/{name}/mirror:
+    delete:
+      consumes:
+      - application/json
+      parameters:
+      - description: models,datasets,codes or spaces
+        enum:
+        - models
+        - datasets
+        - codes
+        - spaces
+        in: path
+        name: repo_type
+        required: true
+        type: string
+      - description: repo owner name
+        in: path
+        name: namespace
+        required: true
+        type: string
+      - description: repo name
+        in: path
+        name: name
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/types.Response'
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Delete a mirror
+      tags:
+      - Repository
+    get:
+      consumes:
+      - application/json
+      parameters:
+      - description: models,datasets,codes or spaces
+        enum:
+        - models
+        - datasets
+        - codes
+        - spaces
+        in: path
+        name: repo_type
+        required: true
+        type: string
+      - description: repo owner name
+        in: path
+        name: namespace
+        required: true
+        type: string
+      - description: repo name
+        in: path
+        name: name
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/types.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/database.Mirror'
+              type: object
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Get a mirror
+      tags:
+      - Repository
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: models,datasets,codes or spaces
+        enum:
+        - models
+        - datasets
+        - codes
+        - spaces
+        in: path
+        name: repo_type
+        required: true
+        type: string
+      - description: repo owner name
+        in: path
+        name: namespace
+        required: true
+        type: string
+      - description: repo name
+        in: path
+        name: name
+        required: true
+        type: string
+      - description: body
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/types.CreateMirrorReq'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/types.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/database.Mirror'
+              type: object
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Create mirror for a existing repository
+      tags:
+      - Repository
+    put:
+      consumes:
+      - application/json
+      parameters:
+      - description: models,datasets,codes or spaces
+        enum:
+        - models
+        - datasets
+        - codes
+        - spaces
+        in: path
+        name: repo_type
+        required: true
+        type: string
+      - description: repo owner name
+        in: path
+        name: namespace
+        required: true
+        type: string
+      - description: repo name
+        in: path
+        name: name
+        required: true
+        type: string
+      - description: body
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/types.UpdateMirrorReq'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/types.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/database.Mirror'
+              type: object
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Update a mirror for a existing repository
       tags:
       - Repository
   /{repo_type}/{namespace}/{name}/raw/{file_path}:
@@ -2787,6 +3156,207 @@ paths:
       summary: List spaces by paths
       tags:
       - List
+  /mirror/repo:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: body
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/types.CreateMirrorRepoReq'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/types.Response'
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Create mirror repo
+      tags:
+      - Mirror
+  /mirror/sources:
+    get:
+      consumes:
+      - application/json
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/types.Response'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/database.MirrorSource'
+                  type: array
+              type: object
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Get mirror sources
+      tags:
+      - Mirror
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: body
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/types.CreateMirrorSourceReq'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/types.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/database.MirrorSource'
+              type: object
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Create mirror source
+      tags:
+      - Mirror
+  /mirror/sources/{id}:
+    delete:
+      consumes:
+      - application/json
+      parameters:
+      - description: id
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/types.Response'
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Delete mirror source
+      tags:
+      - Mirror
+    get:
+      consumes:
+      - application/json
+      parameters:
+      - description: id
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/types.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/database.MirrorSource'
+              type: object
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Get mirror source
+      tags:
+      - Mirror
+    put:
+      consumes:
+      - application/json
+      parameters:
+      - description: id
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: body
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/types.UpdateMirrorSourceReq'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/types.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/database.MirrorSource'
+              type: object
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Update mirror source
+      tags:
+      - Mirror
   /models:
     get:
       consumes:

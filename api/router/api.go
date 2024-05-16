@@ -111,6 +111,10 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 		modelsGroup.POST("/:namespace/:name/upload_file", middleware.RepoType(types.ModelRepo), repoCommonHandler.UploadFile)
 		// invoke model endpoint to do pediction
 		modelsGroup.POST("/:namespace/:name/predict", modelHandler.Predict)
+		modelsGroup.POST("/:namespace/:name/mirror", middleware.RepoType(types.ModelRepo), repoCommonHandler.CreateMirror)
+		modelsGroup.GET("/:namespace/:name/mirror", middleware.RepoType(types.ModelRepo), repoCommonHandler.GetMirror)
+		modelsGroup.PUT("/:namespace/:name/mirror", middleware.RepoType(types.ModelRepo), repoCommonHandler.UpdateMirror)
+		modelsGroup.DELETE("/:namespace/:name/mirror", middleware.RepoType(types.ModelRepo), repoCommonHandler.DeleteMirror)
 	}
 
 	// Dataset routes
@@ -139,6 +143,11 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 		datasetsGroup.PUT("/:namespace/:name/raw/*file_path", middleware.RepoType(types.DatasetRepo), repoCommonHandler.UpdateFile)
 		datasetsGroup.POST("/:namespace/:name/update_downloads", middleware.RepoType(types.DatasetRepo), repoCommonHandler.UpdateDownloads)
 		datasetsGroup.POST("/:namespace/:name/upload_file", middleware.RepoType(types.DatasetRepo), repoCommonHandler.UploadFile)
+		datasetsGroup.POST("/:namespace/:name/mirrors", middleware.RepoType(types.DatasetRepo), repoCommonHandler.CreateMirror)
+		datasetsGroup.GET("/:namespace/:name/mirror", middleware.RepoType(types.DatasetRepo), repoCommonHandler.GetMirror)
+		datasetsGroup.PUT("/:namespace/:name/mirror", middleware.RepoType(types.DatasetRepo), repoCommonHandler.UpdateMirror)
+		datasetsGroup.DELETE("/:namespace/:name/mirror", middleware.RepoType(types.DatasetRepo), repoCommonHandler.DeleteMirror)
+
 	}
 
 	// Code routes
@@ -171,6 +180,11 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 		codesGroup.PUT("/:namespace/:name/raw/*file_path", middleware.RepoType(types.CodeRepo), repoCommonHandler.UpdateFile)
 		codesGroup.POST("/:namespace/:name/update_downloads", middleware.RepoType(types.CodeRepo), repoCommonHandler.UpdateDownloads)
 		codesGroup.POST("/:namespace/:name/upload_file", middleware.RepoType(types.CodeRepo), repoCommonHandler.UploadFile)
+		codesGroup.POST("/:namespace/:name/mirrors", middleware.RepoType(types.CodeRepo), repoCommonHandler.CreateMirror)
+		codesGroup.GET("/:namespace/:name/mirror", middleware.RepoType(types.CodeRepo), repoCommonHandler.GetMirror)
+		codesGroup.PUT("/:namespace/:name/mirror", middleware.RepoType(types.CodeRepo), repoCommonHandler.UpdateMirror)
+		codesGroup.DELETE("/:namespace/:name/mirror", middleware.RepoType(types.CodeRepo), repoCommonHandler.DeleteMirror)
+
 	}
 
 	// Dataset viewer
@@ -222,6 +236,10 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 		spaces.PUT("/:namespace/:name/raw/*file_path", middleware.RepoType(types.SpaceRepo), repoCommonHandler.UpdateFile)
 		spaces.POST("/:namespace/:name/update_downloads", middleware.RepoType(types.SpaceRepo), repoCommonHandler.UpdateDownloads)
 		spaces.POST("/:namespace/:name/upload_file", middleware.RepoType(types.SpaceRepo), repoCommonHandler.UploadFile)
+		spaces.POST("/:namespace/:name/mirrors", middleware.RepoType(types.SpaceRepo), repoCommonHandler.CreateMirror)
+		spaces.GET("/:namespace/:name/mirror", middleware.RepoType(types.SpaceRepo), repoCommonHandler.GetMirror)
+		spaces.PUT("/:namespace/:name/mirror", middleware.RepoType(types.SpaceRepo), repoCommonHandler.UpdateMirror)
+		spaces.DELETE("/:namespace/:name/mirror", middleware.RepoType(types.SpaceRepo), repoCommonHandler.DeleteMirror)
 	}
 
 	spaceResourceHandler, err := handler.NewSpaceResourceHandler(config)
@@ -341,5 +359,28 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 		apiGroup.POST("/sensitive/text", sensitiveCtrl.Text)
 		apiGroup.POST("/sensitive/image", sensitiveCtrl.Image)
 	}
+
+	// MirrorSource
+	msHandler, err := handler.NewMirrorSourceHandler(config)
+	if err != nil {
+		return nil, fmt.Errorf("error creating mirror source controller:%w", err)
+	}
+
+	// Mirror
+	mirrorHandler, err := handler.NewMirrorHandler(config)
+	if err != nil {
+		return nil, fmt.Errorf("error creating mirror controller:%w", err)
+	}
+
+	mirror := apiGroup.Group("/mirror")
+	{
+		mirror.GET("/sources", msHandler.Index)
+		mirror.POST("/sources", msHandler.Create)
+		mirror.PUT("/sources/:id", msHandler.Update)
+		mirror.DELETE("/sources/:id", msHandler.Delete)
+		mirror.GET("/sources/:id", msHandler.Get)
+		mirror.POST("/repo", mirrorHandler.CreateMirrorRepo)
+	}
+
 	return r, nil
 }
