@@ -87,7 +87,7 @@ func generateAccessTokenFromGitea(config *config.Config) (string, error) {
 	giteaUrl := fmt.Sprintf("%s/api/v1/users/%s/tokens", config.MirrorServer.Host, username)
 	authHeader := encodeCredentials(username, password)
 	data := map[string]any{
-		"name": "access_token",
+		"name": "mirror_access_token",
 		"scopes": []string{
 			"write:user",
 			"write:admin",
