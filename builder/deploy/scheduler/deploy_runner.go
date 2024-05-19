@@ -218,6 +218,7 @@ func (t *DeployRunner) makeDeployRequest() (*imagerunner.RunRequest, error) {
 		GitRef:    t.space.Repository.DefaultBranch,
 		ImageID:   deploy.ImageID,
 		DeployID:  deploy.ID,
+		ClusterId: "config",
 	}, nil
 }
 

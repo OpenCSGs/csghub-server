@@ -17,7 +17,8 @@ type Deploy struct {
 	Template  string `bun:",notnull" json:"tmeplate"`
 	Hardware  string `bun:",notnull" json:"hardware"`
 	// for image run task, aka task_type = 1
-	ImageID string `bun:",nullzero" json:"image_id"`
+	ImageID   string `bun:",nullzero" json:"image_id"`
+	ClusterID string `bun:",nullzero" json:"cluster_id"`
 	times
 }
 
