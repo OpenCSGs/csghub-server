@@ -3,6 +3,7 @@ package imagerunner
 import (
 	"io"
 
+	"opencsg.com/csghub-server/builder/deploy/cluster"
 	"opencsg.com/csghub-server/common/types"
 )
 
@@ -18,8 +19,9 @@ type (
 		Hardware types.HardWare    `json:"hardware,omitempty"`
 		Env      map[string]string `json:"env,omitempty"`
 
-		ImageID  string `json:"image_id"`
-		DeployID int64  `json:"deploy_id"`
+		ImageID   string `json:"image_id"`
+		DeployID  int64  `json:"deploy_id"`
+		ClusterId string `json:"cluster_id"`
 	}
 
 	RunResponse struct {
@@ -61,5 +63,12 @@ type (
 
 	LogsResponse struct {
 		SSEReadCloser io.ReadCloser `json:"sse_read_closer"`
+	}
+
+	CluserInfo struct {
+		ClusterID     string                              `json:"cluster_id"`
+		ClusterName   string                              `json:"cluster_name"`
+		ClusterRegion string                              `json:"cluster_region"`
+		Nodes         map[string]cluster.NodeResourceInfo `json:"nodes"`
 	}
 )
