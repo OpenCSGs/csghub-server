@@ -96,6 +96,10 @@ type Config struct {
 		// secret key for session encryption
 		SessionSecretKey   string `envconfig:"STARHUB_SERVER_SPACE_SESSION_SECRET_KEY" default:"secret"`
 		DeployTimeoutInMin int    `envconfig:"STARHUB_SERVER_SPACE_DEPLOY_TIMEOUT_IN_MINUTES" default:"30"`
+		// gpu model label
+		NodeRegion string `envconfig:"STARHUB_NODE_REGION" default:"topology.kubernetes.io/region"`
+		// gpu model label
+		GPUModelLablel string `envconfig:"STARHUB_SERVER_GPU_MODEL_LABEL" default:"aliyun.accelerator/nvidia_name"`
 	}
 
 	Casdoor struct {
