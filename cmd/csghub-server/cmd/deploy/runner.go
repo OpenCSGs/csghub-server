@@ -3,6 +3,7 @@ package deploy
 import (
 	"github.com/spf13/cobra"
 	"opencsg.com/csghub-server/builder/deploy/imagerunner"
+	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/config"
 )
 
@@ -17,6 +18,12 @@ var startRunnerCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
+
+		dbConfig := database.DBConfig{
+			Dialect: database.DatabaseDialect(config.Database.Driver),
+			DSN:     config.Database.DSN,
+		}
+		database.InitDB(dbConfig)
 
 		s, err := imagerunner.NewHttpServer(config)
 		if err != nil {
