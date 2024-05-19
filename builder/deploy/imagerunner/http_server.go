@@ -293,7 +293,7 @@ func (s *HttpServer) serviceStatus(c *gin.Context) {
 	err := c.BindJSON(request)
 
 	if err != nil {
-		slog.Error("stopService get bad request", slog.Any("error", err), slog.Any("req", request))
+		slog.Error("serviceStatus get bad request", slog.Any("error", err), slog.Any("req", request))
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
@@ -371,7 +371,7 @@ func (s *HttpServer) serviceLogs(c *gin.Context) {
 	err := c.BindJSON(request)
 
 	if err != nil {
-		slog.Error("stopService get bad request", slog.Any("error", err), slog.Any("req", request))
+		slog.Error("serviceLogs get bad request", slog.Any("error", err), slog.Any("req", request))
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
