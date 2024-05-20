@@ -245,6 +245,7 @@ func (h *SpaceHandler) Delete(ctx *gin.Context) {
 // @Param        namespace path string true "namespace"
 // @Param        name path string true "name"
 // @Param        current_user query string true "current_user"
+// @Success      200  {object}  string "OK"
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
 // @Router       /spaces/{namespace}/{name}/run [post]
@@ -260,7 +261,7 @@ func (h *SpaceHandler) Run(ctx *gin.Context) {
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
-	allow, err := h.c.AllowAdminAccess(ctx, namespace, name, currentUser)
+	allow, err := h.c.AllowAdminAccess(ctx, types.SpaceRepo, namespace, name, currentUser)
 	if err != nil {
 		slog.Error("failed to check user permission", "error", err)
 		httpbase.ServerError(ctx, errors.New("failed to check user permission"))
@@ -272,7 +273,7 @@ func (h *SpaceHandler) Run(ctx *gin.Context) {
 		httpbase.UnauthorizedError(ctx, errors.New("user not allowed to run sapce"))
 		return
 	}
-	deployID, err := h.c.Deploy(ctx, namespace, name)
+	deployID, err := h.c.Deploy(ctx, namespace, name, currentUser)
 	if err != nil {
 		slog.Error("failed to deploy space", slog.String("namespace", namespace),
 			slog.String("name", name), slog.Any("error", err))
@@ -338,7 +339,7 @@ func (h *SpaceHandler) Stop(ctx *gin.Context) {
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
-	allow, err := h.c.AllowAdminAccess(ctx, namespace, name, currentUser)
+	allow, err := h.c.AllowAdminAccess(ctx, types.SpaceRepo, namespace, name, currentUser)
 	if err != nil {
 		slog.Error("failed to check user permission", "error", err)
 		httpbase.ServerError(ctx, errors.New("failed to check user permission"))

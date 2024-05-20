@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"net/http"
 	"slices"
+	"strconv"
 	"strings"
 
 	"github.com/gin-gonic/gin"
@@ -362,4 +363,117 @@ func parseTagReqs(ctx *gin.Context) (tags []database.TagReq) {
 
 func convertFilePathFromRoute(path string) string {
 	return strings.TrimLeft(path, "/")
+}
+
+// ModelRun      godoc
+// @Security     ApiKey
+// @Summary      run model as inference
+// @Tags         Model
+// @Accept       json
+// @Produce      json
+// @Param        namespace path string true "namespace"
+// @Param        name path string true "name"
+// @Param        current_user query string true "current_user"
+// @Param        body body types.ModelRunReq true "deploy setting of inference"
+// @Success      200  {object}  string "OK"
+// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
+// @Router       /models/{namespace}/{name}/run [post]
+func (h *ModelHandler) DeployRun(ctx *gin.Context) {
+	currentUser := httpbase.GetCurrentUser(ctx)
+	if currentUser == "" {
+		httpbase.UnauthorizedError(ctx, errors.New("user not found, please login first"))
+		return
+	}
+
+	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
+	if err != nil {
+		slog.Error("failed to get namespace from context", "error", err)
+		httpbase.BadRequest(ctx, err.Error())
+		return
+	}
+	allow, err := h.c.AllowAdminAccess(ctx, types.ModelRepo, namespace, name, currentUser)
+	if err != nil {
+		slog.Error("failed to check user permission", "error", err)
+		httpbase.ServerError(ctx, errors.New("failed to check user permission"))
+		return
+	}
+	if !allow {
+		slog.Info("user not allowed to run model", slog.String("namespace", namespace),
+			slog.String("name", name), slog.Any("username", currentUser))
+		httpbase.UnauthorizedError(ctx, errors.New("user not allowed to run model"))
+		return
+	}
+
+	var req types.ModelRunReq
+	if err := ctx.ShouldBindJSON(&req); err != nil {
+		slog.Error("Bad request format", "error", err)
+		httpbase.BadRequest(ctx, err.Error())
+		return
+	}
+
+	if req.MinReplica < 0 || req.MaxReplica < 0 || req.MinReplica > req.MaxReplica {
+		slog.Error("Bad request setting for replica", slog.Any("MinReplica", req.MinReplica), slog.Any("MaxReplica", req.MaxReplica))
+		httpbase.BadRequest(ctx, "Bad request setting for replica")
+		return
+	}
+
+	deployID, err := h.c.Deploy(ctx, namespace, name, currentUser, req)
+	if err != nil {
+		slog.Error("failed to deploy model as inference", slog.String("namespace", namespace),
+			slog.String("name", name), slog.Any("error", err))
+		httpbase.ServerError(ctx, errors.New("failed to deploy space"))
+		return
+	}
+
+	slog.Debug("deploy model as inference created", slog.String("namespace", namespace),
+		slog.String("name", name), slog.Int64("deploy_id", deployID))
+	httpbase.OK(ctx, nil)
+}
+
+// DeleteDeploy  godoc
+// @Security     ApiKey
+// @Summary      Delete a model inference
+// @Description  delete a model inference
+// @Tags         Model
+// @Accept       json
+// @Produce      json
+// @Param        namespace path string true "namespace"
+// @Param        name path string true "name"
+// @Param        id path int true "id"
+// @Param        current_user query string false "current user"
+// @Success      200  {object}  types.Response{} "OK"
+// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
+// @Router       /models/{namespace}/{name}/run/{id} [delete]
+func (h *ModelHandler) DeployDelete(ctx *gin.Context) {
+	var (
+		id  int64
+		err error
+	)
+	currentUser := httpbase.GetCurrentUser(ctx)
+	if currentUser == "" {
+		httpbase.UnauthorizedError(ctx, errors.New("user not found, please login first"))
+		return
+	}
+	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
+	if err != nil {
+		slog.Error("Bad request format", "error", err)
+		httpbase.BadRequest(ctx, err.Error())
+		return
+	}
+	id, err = strconv.ParseInt(ctx.Param("id"), 10, 64)
+	if err != nil {
+		slog.Error("Bad request format", "error", err)
+		httpbase.BadRequest(ctx, err.Error())
+		return
+	}
+
+	err = h.c.DeleteDeploy(ctx, types.ModelRepo, namespace, name, currentUser, id)
+	if err != nil {
+		slog.Error("Failed to delete deploy", slog.Any("error", err))
+		httpbase.ServerError(ctx, err)
+		return
+	}
+	httpbase.OK(ctx, nil)
 }

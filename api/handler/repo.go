@@ -1040,3 +1040,198 @@ func (h *RepoHandler) DeleteMirror(ctx *gin.Context) {
 	}
 	httpbase.OK(ctx, nil)
 }
+
+// RuntimeFramework godoc
+// @Security     ApiKey
+// @Summary      List repo runtime framework
+// @Description  List repo runtime framework
+// @Tags         Repository
+// @Accept       json
+// @Produce      json
+// @Param        repo_type path string true "models,spaces" Enums(models,spaces)
+// @Param        namespace path string true "namespace"
+// @Param        name path string true "name"
+// @Param        current_user query string false "current user"
+// @Success      200  {object}  string "OK"
+// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
+// @Router       /{repo_type}/{namespace}/{name}/runtime_framework [get]
+func (h *RepoHandler) RuntimeFrameworkList(ctx *gin.Context) {
+	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
+	if err != nil {
+		slog.Error("Bad request format", "error", err)
+		httpbase.BadRequest(ctx, err.Error())
+		return
+	}
+	slog.Debug("list runtime framework", slog.Any("namespace", namespace), slog.Any("name", name))
+	response, err := h.c.ListRuntimeFramework(ctx)
+	if err != nil {
+		slog.Error("fail to list runtime framework", slog.String("error", err.Error()))
+		httpbase.ServerError(ctx, err)
+		return
+	}
+
+	httpbase.OK(ctx, response)
+}
+
+// CreateRuntimeFramework godoc
+// @Security     ApiKey
+// @Summary      Create runtime framework
+// @Description  create runtime framework
+// @Tags         Repository
+// @Accept       json
+// @Produce      json
+// @Param        repo_type path string true "models,spaces" Enums(models,spaces)
+// @Param        namespace path string true "namespace"
+// @Param        name path string true "name"
+// @Param        current_user query string false "current user"
+// @Param        body body types.RuntimeFrameworkReq true "body"
+// @Success      200  {object}  types.RuntimeFramework "OK"
+// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
+// @Router       /{repo_type}/{namespace}/{name}/runtime_framework [post]
+func (h *RepoHandler) RuntimeFrameworkCreate(ctx *gin.Context) {
+	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
+	if err != nil {
+		slog.Error("Bad request format", "error", err)
+		httpbase.BadRequest(ctx, err.Error())
+		return
+	}
+	slog.Debug("create runtime framework", slog.Any("namespace", namespace), slog.Any("name", name))
+	var req types.RuntimeFrameworkReq
+	if err := ctx.ShouldBindJSON(&req); err != nil {
+		slog.Error("Bad request format", "error", err)
+		httpbase.BadRequest(ctx, err.Error())
+		return
+	}
+
+	frame, err := h.c.CreateRuntimeFramework(ctx, &req)
+	if err != nil {
+		slog.Error("Failed to create runtime framework", slog.Any("error", err))
+		httpbase.ServerError(ctx, err)
+		return
+	}
+	httpbase.OK(ctx, frame)
+}
+
+// UpdateRuntimeFramework godoc
+// @Security     ApiKey
+// @Summary      Update runtime framework
+// @Description  Update runtime framework
+// @Tags         Repository
+// @Accept       json
+// @Produce      json
+// @Param        repo_type path string true "models,spaces" Enums(models,spaces)
+// @Param        namespace path string true "namespace"
+// @Param        name path string true "name"
+// @Param        id path int true "id"
+// @Param        current_user query string false "current user"
+// @Param        body body types.RuntimeFrameworkReq true "body"
+// @Success      200  {object}  types.RuntimeFramework "OK"
+// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
+// @Router       /{repo_type}/{namespace}/{name}/runtime_framework/{id} [put]
+func (h *RepoHandler) RuntimeFrameworkUpdate(ctx *gin.Context) {
+	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
+	if err != nil {
+		slog.Error("Bad request format", "error", err)
+		httpbase.BadRequest(ctx, err.Error())
+		return
+	}
+	slog.Debug("update runtime framework", slog.Any("namespace", namespace), slog.Any("name", name))
+	var req types.RuntimeFrameworkReq
+	if err := ctx.ShouldBindJSON(&req); err != nil {
+		slog.Error("Bad request format", "error", err)
+		httpbase.BadRequest(ctx, err.Error())
+		return
+	}
+	id, err := strconv.ParseInt(ctx.Param("id"), 10, 64)
+	if err != nil {
+		slog.Error("Bad request url format", "error", err)
+		httpbase.BadRequest(ctx, err.Error())
+		return
+	}
+
+	frame, err := h.c.UpdateRuntimeFramework(ctx, id, &req)
+	if err != nil {
+		slog.Error("Failed to update runtime framework", slog.Any("error", err))
+		httpbase.ServerError(ctx, err)
+		return
+	}
+	httpbase.OK(ctx, frame)
+}
+
+// DeleteRuntimeFramework godoc
+// @Security     ApiKey
+// @Summary      Delete a exist RuntimeFramework
+// @Description  delete a exist RuntimeFramework
+// @Tags         Repository
+// @Accept       json
+// @Produce      json
+// @Param        repo_type path string true "models,spaces" Enums(models,spaces)
+// @Param        namespace path string true "namespace"
+// @Param        name path string true "name"
+// @Param        id path int true "id"
+// @Param        current_user query string false "current user"
+// @Success      200  {object}  types.Response{} "OK"
+// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
+// @Router       /{repo_type}/{namespace}/{name}/runtime_framework/{id} [delete]
+func (h *RepoHandler) RuntimeFrameworkDelete(ctx *gin.Context) {
+	var (
+		id  int64
+		err error
+	)
+	id, err = strconv.ParseInt(ctx.Param("id"), 10, 64)
+	if err != nil {
+		slog.Error("Bad request format", "error", err)
+		httpbase.BadRequest(ctx, err.Error())
+		return
+	}
+
+	err = h.c.DeleteRuntimeFramework(ctx, id)
+	if err != nil {
+		slog.Error("Failed to delete runtime framework", slog.Any("error", err))
+		httpbase.ServerError(ctx, err)
+		return
+	}
+	httpbase.OK(ctx, nil)
+}
+
+// DeployList godoc
+// @Security     ApiKey
+// @Summary      List repo deploys
+// @Description  List repo deploys
+// @Tags         Repository
+// @Accept       json
+// @Produce      json
+// @Param        repo_type path string true "models,spaces" Enums(models,spaces)
+// @Param        namespace path string true "namespace"
+// @Param        name path string true "name"
+// @Param        current_user query string false "current user"
+// @Success      200  {object}  string "OK"
+// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
+// @Router       /{repo_type}/{namespace}/{name}/run [get]
+func (h *RepoHandler) DeployList(ctx *gin.Context) {
+	currentUser := httpbase.GetCurrentUser(ctx)
+	if currentUser == "" {
+		httpbase.UnauthorizedError(ctx, errors.New("user not found, please login first"))
+		return
+	}
+	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
+	if err != nil {
+		slog.Error("Bad request format", "error", err)
+		httpbase.BadRequest(ctx, err.Error())
+		return
+	}
+	repoType := common.RepoTypeFromContext(ctx)
+	response, err := h.c.ListDeploy(ctx, repoType, namespace, name, currentUser)
+	if err != nil {
+		slog.Error("fail to list deploy", slog.String("error", err.Error()), slog.Any("repotype", repoType), slog.Any("namespace", namespace), slog.Any("name", name))
+		httpbase.ServerError(ctx, err)
+		return
+	}
+
+	httpbase.OK(ctx, response)
+}

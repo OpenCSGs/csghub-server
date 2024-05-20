@@ -21,3 +21,17 @@ var STREAMLIT = SDKConfig{
 	version: "1.33.0",
 	port:    "8501",
 }
+
+type RepoInfo struct {
+	DeployID     int64
+	SpaceID      int64
+	ModelID      int64
+	RepoID       int64
+	Path         string
+	Name         string
+	Sdk          string
+	SdkVersion   string
+	HTTPCloneURL string
+	UserName     string
+	RepoType     string
+}

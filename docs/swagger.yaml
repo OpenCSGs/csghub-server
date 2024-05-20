@@ -946,6 +946,29 @@ definitions:
       updated_at:
         type: string
     type: object
+  types.ModelRunReq:
+    properties:
+      cluster_id:
+        type: string
+      cost_per_hour:
+        type: integer
+      deploy_name:
+        type: string
+      env:
+        type: string
+      hardware:
+        type: string
+      max_replica:
+        type: integer
+      min_replica:
+        type: integer
+      revision:
+        type: string
+      runtime_framework_id:
+        type: integer
+      secure_level:
+        type: integer
+    type: object
   types.ModelWidgetType:
     enum:
     - generation
@@ -1029,6 +1052,30 @@ definitions:
         type: string
       total:
         type: integer
+    type: object
+  types.RuntimeFramework:
+    properties:
+      enabled:
+        type: integer
+      frame_image:
+        type: string
+      frame_name:
+        type: string
+      frame_version:
+        type: string
+      id:
+        type: integer
+    type: object
+  types.RuntimeFrameworkReq:
+    properties:
+      enabled:
+        type: integer
+      frame_image:
+        type: string
+      frame_name:
+        type: string
+      frame_version:
+        type: string
     type: object
   types.Space:
     properties:
@@ -2197,6 +2244,266 @@ paths:
       security:
       - ApiKey: []
       summary: Download a rep file
+      tags:
+      - Repository
+  /{repo_type}/{namespace}/{name}/run:
+    get:
+      consumes:
+      - application/json
+      description: List repo deploys
+      parameters:
+      - description: models,spaces
+        enum:
+        - models
+        - spaces
+        in: path
+        name: repo_type
+        required: true
+        type: string
+      - description: namespace
+        in: path
+        name: namespace
+        required: true
+        type: string
+      - description: name
+        in: path
+        name: name
+        required: true
+        type: string
+      - description: current user
+        in: query
+        name: current_user
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            type: string
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: List repo deploys
+      tags:
+      - Repository
+  /{repo_type}/{namespace}/{name}/runtime_framework:
+    get:
+      consumes:
+      - application/json
+      description: List repo runtime framework
+      parameters:
+      - description: models,spaces
+        enum:
+        - models
+        - spaces
+        in: path
+        name: repo_type
+        required: true
+        type: string
+      - description: namespace
+        in: path
+        name: namespace
+        required: true
+        type: string
+      - description: name
+        in: path
+        name: name
+        required: true
+        type: string
+      - description: current user
+        in: query
+        name: current_user
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            type: string
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: List repo runtime framework
+      tags:
+      - Repository
+    post:
+      consumes:
+      - application/json
+      description: create runtime framework
+      parameters:
+      - description: models,spaces
+        enum:
+        - models
+        - spaces
+        in: path
+        name: repo_type
+        required: true
+        type: string
+      - description: namespace
+        in: path
+        name: namespace
+        required: true
+        type: string
+      - description: name
+        in: path
+        name: name
+        required: true
+        type: string
+      - description: current user
+        in: query
+        name: current_user
+        type: string
+      - description: body
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/types.RuntimeFrameworkReq'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/types.RuntimeFramework'
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Create runtime framework
+      tags:
+      - Repository
+  /{repo_type}/{namespace}/{name}/runtime_framework/{id}:
+    delete:
+      consumes:
+      - application/json
+      description: delete a exist RuntimeFramework
+      parameters:
+      - description: models,spaces
+        enum:
+        - models
+        - spaces
+        in: path
+        name: repo_type
+        required: true
+        type: string
+      - description: namespace
+        in: path
+        name: namespace
+        required: true
+        type: string
+      - description: name
+        in: path
+        name: name
+        required: true
+        type: string
+      - description: id
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: current user
+        in: query
+        name: current_user
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/types.Response'
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Delete a exist RuntimeFramework
+      tags:
+      - Repository
+    put:
+      consumes:
+      - application/json
+      description: Update runtime framework
+      parameters:
+      - description: models,spaces
+        enum:
+        - models
+        - spaces
+        in: path
+        name: repo_type
+        required: true
+        type: string
+      - description: namespace
+        in: path
+        name: namespace
+        required: true
+        type: string
+      - description: name
+        in: path
+        name: name
+        required: true
+        type: string
+      - description: id
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: current user
+        in: query
+        name: current_user
+        type: string
+      - description: body
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/types.RuntimeFrameworkReq'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/types.RuntimeFramework'
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Update runtime framework
       tags:
       - Repository
   /{repo_type}/{namespace}/{name}/tags:
@@ -3691,6 +3998,97 @@ paths:
       summary: Get model related assets
       tags:
       - Model
+  /models/{namespace}/{name}/run:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: namespace
+        in: path
+        name: namespace
+        required: true
+        type: string
+      - description: name
+        in: path
+        name: name
+        required: true
+        type: string
+      - description: current_user
+        in: query
+        name: current_user
+        required: true
+        type: string
+      - description: deploy setting of inference
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/types.ModelRunReq'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            type: string
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: run model as inference
+      tags:
+      - Model
+  /models/{namespace}/{name}/run/{id}:
+    delete:
+      consumes:
+      - application/json
+      description: delete a model inference
+      parameters:
+      - description: namespace
+        in: path
+        name: namespace
+        required: true
+        type: string
+      - description: name
+        in: path
+        name: name
+        required: true
+        type: string
+      - description: id
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: current user
+        in: query
+        name: current_user
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/types.Response'
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Delete a model inference
+      tags:
+      - Model
   /organization/{namespace}/codes:
     get:
       consumes:
@@ -4785,6 +5183,10 @@ paths:
       produces:
       - application/json
       responses:
+        "200":
+          description: OK
+          schema:
+            type: string
         "400":
           description: Bad request
           schema:
