@@ -7,6 +7,7 @@ import (
 	"math"
 	"math/rand"
 	"path/filepath"
+	"strings"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -15,6 +16,7 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/util/homedir"
 	knative "knative.dev/serving/pkg/client/clientset/versioned"
+	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/config"
 )
 
@@ -28,23 +30,26 @@ type Cluster struct {
 
 // ClusterPool is a resource pool of cluster information
 type ClusterPool struct {
-	Clusters []Cluster
+	Clusters     []Cluster
+	clusterStore *database.ClusterInfoStore
 }
 
 // NodeResourceInfo struct includes details about the node's resources and region
 type NodeResourceInfo struct {
-	NodeName string  `json:"node_name"`
-	GPUModel string  `json:"gpu_model"`
-	Region   string  `json:"region"`
-	TotalCPU float64 `json:"total_cpu"`
-	UsedCPU  float64 `json:"used_cpu"`
-	TotalGPU int64   `json:"total_gpu"`
-	UsedGPU  int64   `json:"used_gpu"`
+	NodeName  string  `json:"node_name"`
+	GPUModel  string  `json:"gpu_model"`
+	Region    string  `json:"region"`
+	TotalCPU  float64 `json:"total_cpu"`
+	UsedCPU   float64 `json:"used_cpu"`
+	TotalGPU  int64   `json:"total_gpu"`
+	UsedGPU   int64   `json:"used_gpu"`
+	GPUVendor string  `json:"gpu_vendor"`
 }
 
 // NewClusterPool initializes and returns a ClusterPool by reading kubeconfig files from $HOME/.kube directory
 func NewClusterPool() (*ClusterPool, error) {
 	pool := &ClusterPool{}
+	pool.clusterStore = database.NewClusterInfoStore()
 
 	home := homedir.HomeDir()
 	kubeconfigFolderPath := filepath.Join(home, ".kube")
@@ -78,6 +83,10 @@ func NewClusterPool() (*ClusterPool, error) {
 			Client:        client,
 			KnativeClient: knativeClient,
 		})
+		err = pool.clusterStore.Add(context.TODO(), id, "华中区")
+		if err != nil {
+			slog.Error("falied to add cluster info to db", "error", err)
+		}
 	}
 
 	return pool, nil
@@ -98,9 +107,14 @@ func (p *ClusterPool) GetCluster() (*Cluster, error) {
 }
 
 // GetClusterByID retrieves a cluster from the pool given its unique ID
-func (p *ClusterPool) GetClusterByID(id string) (*Cluster, error) {
+func (p *ClusterPool) GetClusterByID(ctx context.Context, id string) (*Cluster, error) {
+	cfId := "config"
+	if len(id) != 0 {
+		cInfo, _ := p.clusterStore.ByClusterID(ctx, id)
+		cfId = cInfo.ClusterConfig
+	}
 	for _, Cluster := range p.Clusters {
-		if Cluster.ID == id {
+		if Cluster.ID == cfId {
 			return &Cluster, nil
 		}
 	}
@@ -130,15 +144,19 @@ func GetNodeResources(clientset *kubernetes.Clientset, config *config.Config) (m
 		}
 
 		region := node.Labels[config.Space.NodeRegion]
-		gpuModel := node.Labels[config.Space.GPUModelLablel]
-
+		gpuModelVendor := strings.Split(node.Labels[config.Space.GPUModelLablel], "-")
+		gpuVendor := ""
+		if len(gpuModelVendor) > 1 {
+			gpuVendor = gpuModelVendor[1]
+		}
 		nodeResourcesMap[node.Name] = NodeResourceInfo{
-			NodeName: node.Name,
-			Region:   region,
-			TotalCPU: millicoresToCores(totalCPU),
-			UsedCPU:  millicoresToCores(allocatableCPU),
-			GPUModel: gpuModel,
-			TotalGPU: parseQuantityToInt64(totalGPU),
+			NodeName:  node.Name,
+			Region:    region,
+			TotalCPU:  millicoresToCores(totalCPU),
+			UsedCPU:   millicoresToCores(allocatableCPU),
+			GPUModel:  gpuModelVendor[0],
+			GPUVendor: gpuVendor,
+			TotalGPU:  parseQuantityToInt64(totalGPU),
 		}
 	}
 
