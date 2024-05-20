@@ -85,6 +85,7 @@ func NewClusterPool() (*ClusterPool, error) {
 		err = pool.clusterStore.Add(context.TODO(), id, "华中区")
 		if err != nil {
 			slog.Error("falied to add cluster info to db", "error", err)
+			return nil, fmt.Errorf("falied to add cluster info to db,%w", err)
 		}
 	}
 
