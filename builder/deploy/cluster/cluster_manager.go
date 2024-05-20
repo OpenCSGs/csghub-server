@@ -38,7 +38,6 @@ type ClusterPool struct {
 type NodeResourceInfo struct {
 	NodeName  string  `json:"node_name"`
 	GPUModel  string  `json:"gpu_model"`
-	Region    string  `json:"region"`
 	TotalCPU  float64 `json:"total_cpu"`
 	UsedCPU   float64 `json:"used_cpu"`
 	TotalGPU  int64   `json:"total_gpu"`
@@ -143,7 +142,6 @@ func GetNodeResources(clientset *kubernetes.Clientset, config *config.Config) (m
 			totalGPU = resource.Quantity{}
 		}
 
-		region := node.Labels[config.Space.NodeRegion]
 		gpuModelVendor := strings.Split(node.Labels[config.Space.GPUModelLablel], "-")
 		gpuModel := ""
 		if len(gpuModelVendor) > 1 {
@@ -151,7 +149,6 @@ func GetNodeResources(clientset *kubernetes.Clientset, config *config.Config) (m
 		}
 		nodeResourcesMap[node.Name] = NodeResourceInfo{
 			NodeName:  node.Name,
-			Region:    region,
 			TotalCPU:  millicoresToCores(totalCPU),
 			UsedCPU:   millicoresToCores(allocatableCPU),
 			GPUModel:  gpuModel,
