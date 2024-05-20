@@ -510,10 +510,6 @@ func (s *HttpServer) getClusterStatus(c *gin.Context) {
 			clusterInfo.ClusterID = cls.ID
 			clusterInfo.ClusterName = fmt.Sprintf("cluster%d", index)
 			clusterInfo.Nodes = nodes
-			for _, node := range nodes {
-				clusterInfo.ClusterRegion = node.Region
-				break
-			}
 			clusterRes = append(clusterRes, clusterInfo)
 		}
 
