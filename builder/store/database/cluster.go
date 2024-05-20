@@ -33,7 +33,7 @@ func (r *ClusterInfoStore) Add(ctx context.Context, clusterConfig string, region
 
 		_, err := r.ByClusterConfig(ctx, clusterConfig)
 		if err != nil {
-			if err := assertAffectedOneRow(tx.NewInsert().Model(cluster).Exec(ctx)); err != nil {
+			if err := assertAffectedOneRow(r.db.Operator.Core.NewInsert().Model(cluster).Exec(ctx)); err != nil {
 				return err
 			}
 		}
