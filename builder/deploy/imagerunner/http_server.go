@@ -58,6 +58,7 @@ func (s *HttpServer) Run(port int) error {
 	router.GET("/:service/logs", s.serviceLogs)
 	router.GET("/status-all", s.serviceStatusAll)
 	router.GET("/cluster/status", s.getClusterStatus)
+	router.GET("/:service/get", s.getServiceByName)
 
 	return router.Run(fmt.Sprintf(":%d", port))
 }
@@ -342,6 +343,11 @@ func (s *HttpServer) serviceStatus(c *gin.Context) {
 
 		resp.Code = common.Running
 		resp.Message = "service running"
+		if srv.Status.URL != nil {
+			slog.Info("knative endpoint", slog.Any("svc name", srvName), slog.Any("url", srv.Status.URL.URL().String()))
+			resp.Endpoint = srv.Status.URL.URL().String()
+		}
+
 		slog.Info("get image status success", slog.String("srv_name", srvName), slog.Any("resp", resp))
 		c.JSON(http.StatusOK, resp)
 		return
@@ -519,4 +525,50 @@ func (s *HttpServer) getClusterStatus(c *gin.Context) {
 
 func (s *HttpServer) getServiceNameFromRequest(c *gin.Context) string {
 	return c.Params.ByName("service")
+}
+
+func (s *HttpServer) getServiceByName(c *gin.Context) {
+	var resp StatusResponse
+	var request = &CheckRequest{}
+	err := c.BindJSON(request)
+	cluster, err := s.clusterPool.GetClusterByID(c, request.ClusterID)
+	srvName := s.getServiceNameFromRequest(c)
+	srv, err := cluster.KnativeClient.ServingV1().Services(s.k8sNameSpace).Get(c.Request.Context(), srvName, metav1.GetOptions{})
+	if err != nil {
+		k8serr := new(k8serrors.StatusError)
+		if errors.As(err, &k8serr) {
+			if k8serr.Status().Code == http.StatusNotFound {
+				// service not exist
+				resp.Code = 0
+				resp.Message = "service not exist"
+				c.JSON(http.StatusOK, resp)
+				return
+			}
+		}
+		// get service with error
+		slog.Error("fail to get service with error", slog.Any("error", err))
+		resp.Code = -1
+		resp.Message = "fail to get service"
+		c.JSON(http.StatusOK, resp)
+		return
+	}
+
+	if srv == nil {
+		// service not exist
+		resp.Code = 0
+		resp.Message = "service not exist"
+		c.JSON(http.StatusOK, resp)
+		return
+	}
+
+	// service exist
+	deployIDStr := srv.Annotations[types.ResDeployID]
+	deployID, _ := strconv.ParseInt(deployIDStr, 10, 64)
+	resp.DeployID = deployID
+	resp.Code = 1
+	resp.Message = srvName
+	if srv.Status.URL != nil {
+		resp.Endpoint = srv.Status.URL.URL().String()
+	}
+	c.JSON(http.StatusOK, resp)
 }
