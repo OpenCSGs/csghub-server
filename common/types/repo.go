@@ -3,6 +3,10 @@ package types
 type RepositoryType string
 
 const (
+	ResTypeKey  string = "hub-res-type"
+	ResNameKey  string = "hub-res-name"
+	ResDeployID string = "hub-deploy-id"
+
 	ModelRepo   RepositoryType = "model"
 	DatasetRepo RepositoryType = "dataset"
 	SpaceRepo   RepositoryType = "space"
