@@ -20,7 +20,6 @@ import (
 	"opencsg.com/csghub-server/api/middleware"
 	"opencsg.com/csghub-server/builder/deploy/cluster"
 	"opencsg.com/csghub-server/builder/deploy/common"
-	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/types"
 )
@@ -30,14 +29,7 @@ type HttpServer struct {
 	dockerRegBase   string
 	k8sNameSpace    string
 	imagePullSecret string
-	deployStore     *database.DeployTaskStore
 	env             *config.Config
-}
-
-type CommonRequest struct {
-	SpaceID   int64  `json:"space_id"`
-	OrgName   string `json:"org_name"`
-	SpaceName string `json:"space_name"`
 }
 
 func NewHttpServer(config *config.Config) (*HttpServer, error) {
@@ -51,7 +43,6 @@ func NewHttpServer(config *config.Config) (*HttpServer, error) {
 		dockerRegBase:   config.Space.DockerRegBase,
 		k8sNameSpace:    domainParts[0],
 		imagePullSecret: config.Space.ImagePullSecret,
-		deployStore:     database.NewDeployTaskStore(),
 		clusterPool:     clusterPool,
 		env:             config,
 	}, nil
@@ -78,7 +69,7 @@ func (s *HttpServer) runService(c *gin.Context) {
 		Env        map[string]string `json:"env,omitempty"`
 		DeployID   int64             `json:"deploy_id" binding:"required"`
 		DeployType string            `json:"deploy_type" binding:"required"`
-		ClusterId  string            `json:"cluster_id" binding:"required"`
+		ClusterID  string            `json:"cluster_id" binding:"required"`
 	}
 
 	err := c.BindJSON(&request)
@@ -89,7 +80,7 @@ func (s *HttpServer) runService(c *gin.Context) {
 	}
 	slog.Debug("Recv request", slog.Any("body", request))
 
-	cluster, err := s.clusterPool.GetClusterByID(request.ClusterId)
+	cluster, err := s.clusterPool.GetClusterByID(c, request.ClusterID)
 	if err != nil {
 		slog.Error("fail to get cluster ", slog.Any("error", err), slog.Any("req", request))
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -232,9 +223,7 @@ func (s *HttpServer) stopService(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-
-	deploy, _ := s.deployStore.GetSpaceLatestDeploy(c, request.SpaceID)
-	cluster, err := s.clusterPool.GetClusterByID(deploy.ClusterID)
+	cluster, err := s.clusterPool.GetClusterByID(c, request.ClusterID)
 	if err != nil {
 		slog.Error("fail to get cluster ", slog.Any("error", err))
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -298,8 +287,7 @@ func (s *HttpServer) serviceStatus(c *gin.Context) {
 		return
 	}
 
-	deploy, _ := s.deployStore.GetSpaceLatestDeploy(c, request.SpaceID)
-	cluster, err := s.clusterPool.GetClusterByID(deploy.ClusterID)
+	cluster, err := s.clusterPool.GetClusterByID(c, request.ClusterID)
 
 	if err != nil {
 		slog.Error("fail to get cluster ", slog.Any("error", err))
@@ -375,8 +363,7 @@ func (s *HttpServer) serviceLogs(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	deploy, _ := s.deployStore.GetSpaceLatestDeploy(c, request.SpaceID)
-	cluster, err := s.clusterPool.GetClusterByID(deploy.ClusterID)
+	cluster, err := s.clusterPool.GetClusterByID(c, request.ClusterID)
 	if err != nil {
 		slog.Error("fail to get cluster ", slog.Any("error", err))
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})

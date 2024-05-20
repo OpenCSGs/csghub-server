@@ -146,9 +146,9 @@ func (d *deployer) Logs(ctx context.Context, space types.Space) (*MultiLogReader
 	}
 
 	runLog, err := d.ir.Logs(ctx, &imagerunner.LogsRequest{
-		SpaceID:   space.ID,
-		OrgName:   space.Namespace,
-		SpaceName: space.Name,
+		ID:       space.ID,
+		OrgName:  space.Namespace,
+		RepoName: space.Name,
 	})
 	if err != nil {
 		slog.Error("failed to read log from image runner", slog.Any("error", err))
@@ -160,9 +160,9 @@ func (d *deployer) Logs(ctx context.Context, space types.Space) (*MultiLogReader
 
 func (d *deployer) Stop(ctx context.Context, space types.Space) error {
 	resp, err := d.ir.Stop(ctx, &imagerunner.StopRequest{
-		SpaceID:   space.ID,
-		OrgName:   space.Namespace,
-		SpaceName: space.Name,
+		ID:       space.ID,
+		OrgName:  space.Namespace,
+		RepoName: space.Name,
 	})
 
 	slog.Info("deployer stop space", slog.Any("runner_resp", resp), slog.Int64("space_id", space.ID), slog.Any("error", err))
