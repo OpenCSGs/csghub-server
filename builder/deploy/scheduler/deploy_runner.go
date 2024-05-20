@@ -64,9 +64,9 @@ func (t *DeployRunner) Run(ctx context.Context) error {
 
 		fields := strings.Split(t.space.Repository.Path, "/")
 		req := &imagerunner.StatusRequest{
-			SpaceID:   t.space.ID,
-			OrgName:   fields[0],
-			SpaceName: fields[1],
+			ID:       t.space.ID,
+			OrgName:  fields[0],
+			RepoName: fields[1],
 		}
 		timeoutCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
 		resp, err := t.ir.Status(timeoutCtx, req)
@@ -209,23 +209,24 @@ func (t *DeployRunner) makeDeployRequest() (*imagerunner.RunRequest, error) {
 	}
 
 	return &imagerunner.RunRequest{
-		SpaceID:   t.space.ID,
+		ID:        t.space.ID,
 		OrgName:   fields[0],
-		SpaceName: fields[1],
+		RepoName:  fields[1],
 		UserName:  t.space.Repository.User.Name,
 		Hardware:  hardware,
 		Env:       envMap,
 		GitRef:    t.space.Repository.DefaultBranch,
 		ImageID:   deploy.ImageID,
 		DeployID:  deploy.ID,
+		ClusterID: "config",
 	}, nil
 }
 
 func (t *DeployRunner) cancelDeploySpace(ctx context.Context, orgName, spaceName string) error {
 	stopReq := &imagerunner.StopRequest{
-		SpaceID:   t.space.ID,
-		OrgName:   orgName,
-		SpaceName: spaceName,
+		ID:       t.space.ID,
+		OrgName:  orgName,
+		RepoName: spaceName,
 	}
 	_, err := t.ir.Stop(ctx, stopReq)
 	if err != nil {
