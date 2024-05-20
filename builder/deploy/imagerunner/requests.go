@@ -9,19 +9,26 @@ import (
 
 type (
 	RunRequest struct {
-		SpaceID   int64  `json:"space_id"`
-		UserName  string `json:"user_name"`
-		OrgName   string `json:"org_name"`
-		SpaceName string `json:"space_name"`
+		ID       int64  `json:"id"`
+		UserName string `json:"user_name"`
+		OrgName  string `json:"org_name"`
+		RepoName string `json:"repo_name"`
 
-		GitRef string `json:"git_ref"`
+		GitPath string `json:"git_path"` // git repo path
+		GitRef  string `json:"git_ref"`  // git repo branch
 
-		Hardware types.HardWare    `json:"hardware,omitempty"`
-		Env      map[string]string `json:"env,omitempty"`
+		MinReplica int `json:"min_replica"` // min replica of instance/pod
+		MaxReplica int `json:"max_replica"` // max replica of instance/pod
 
-		ImageID   string `json:"image_id"`
-		DeployID  int64  `json:"deploy_id"`
-		ClusterId string `json:"cluster_id"`
+		Hardware   types.HardWare    `json:"hardware,omitempty"`   // resource requirements
+		Env        map[string]string `json:"env,omitempty"`        // runtime env variables
+		Annotation map[string]string `json:"annotation,omitempty"` // resource annotations
+
+		RuntimeFramework string `json:"runtime_framework"` // runtime framework of image, TGI/vllm/Pipeline/Deepspeed/LLamacpp
+		ImageID          string `json:"image_id"`          // container_image
+		DeployID         int64  `json:"deploy_id"`
+		Accesstoken      string `json:"access_token"`
+		ClusterID        string `json:"cluster_id"`
 	}
 
 	RunResponse struct {
@@ -31,9 +38,10 @@ type (
 	}
 
 	StopRequest struct {
-		SpaceID   int64  `json:"space_id"`
+		ID        int64  `json:"id"`
 		OrgName   string `json:"org_name"`
-		SpaceName string `json:"space_name"`
+		RepoName  string `json:"repo_name"`
+		ClusterID string `json:"cluster_id"`
 	}
 
 	StopResponse struct {
@@ -43,26 +51,36 @@ type (
 	}
 
 	StatusRequest struct {
-		SpaceID   int64  `json:"space_id"`
+		ID        int64  `json:"id"`
 		OrgName   string `json:"org_name"`
-		SpaceName string `json:"space_name"`
+		RepoName  string `json:"repo_name"`
+		ClusterID string `json:"cluster_id"`
 	}
 
 	StatusResponse struct {
 		DeployID int64  `json:"deploy_id"`
 		Code     int    `json:"code"`
 		Message  string `json:"message"`
+		Endpoint string `json:"url"`
 	}
 
 	LogsRequest struct {
-		SpaceID   int64  `json:"space_id"`
+		ID        int64  `json:"id"`
 		OrgName   string `json:"org_name"`
-		SpaceName string `json:"space_name"`
+		RepoName  string `json:"repo_name"`
 		DeployID  int64  `json:"deploy_id"`
+		ClusterID string `json:"cluster_id"`
 	}
 
 	LogsResponse struct {
 		SSEReadCloser io.ReadCloser `json:"sse_read_closer"`
+	}
+
+	CheckRequest struct {
+		ID        int64  `json:"id"`
+		OrgName   string `json:"org_name"`
+		RepoName  string `json:"repo_name"`
+		ClusterID string `json:"cluster_id"`
 	}
 
 	CluserInfo struct {
