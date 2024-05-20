@@ -143,7 +143,7 @@ func GetNodeResources(clientset *kubernetes.Clientset, config *config.Config) (m
 			totalGPU = resource.Quantity{}
 		}
 
-		gpuModelVendor := strings.Split(node.Labels[config.Space.GPUModelLablel], "-")
+		gpuModelVendor := strings.Split(node.Labels[config.Space.GPUModelLabel], "-")
 		gpuModel := ""
 		if len(gpuModelVendor) > 1 {
 			gpuModel = gpuModelVendor[1]
