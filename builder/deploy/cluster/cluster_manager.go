@@ -145,17 +145,17 @@ func GetNodeResources(clientset *kubernetes.Clientset, config *config.Config) (m
 
 		region := node.Labels[config.Space.NodeRegion]
 		gpuModelVendor := strings.Split(node.Labels[config.Space.GPUModelLablel], "-")
-		gpuVendor := ""
+		gpuModel := ""
 		if len(gpuModelVendor) > 1 {
-			gpuVendor = gpuModelVendor[1]
+			gpuModel = gpuModelVendor[1]
 		}
 		nodeResourcesMap[node.Name] = NodeResourceInfo{
 			NodeName:  node.Name,
 			Region:    region,
 			TotalCPU:  millicoresToCores(totalCPU),
 			UsedCPU:   millicoresToCores(allocatableCPU),
-			GPUModel:  gpuModelVendor[0],
-			GPUVendor: gpuVendor,
+			GPUModel:  gpuModel,
+			GPUVendor: gpuModelVendor[0],
 			TotalGPU:  parseQuantityToInt64(totalGPU),
 		}
 	}
