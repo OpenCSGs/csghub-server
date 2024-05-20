@@ -68,9 +68,10 @@ func (s *HttpServer) runService(c *gin.Context) {
 		ImageID    string            `json:"image_id" binding:"required"`
 		Hardware   types.HardWare    `json:"hardware,omitempty"`
 		Env        map[string]string `json:"env,omitempty"`
+		Annotation map[string]string `json:"annotation,omitempty"`
 		DeployID   int64             `json:"deploy_id" binding:"required"`
-		DeployType string            `json:"deploy_type" binding:"required"`
-		ClusterID  string            `json:"cluster_id" binding:"required"`
+		RepoType   string            `json:"repo_type"`
+		ClusterID  string            `json:"cluster_id"`
 	}
 
 	err := c.BindJSON(&request)
@@ -96,6 +97,7 @@ func (s *HttpServer) runService(c *gin.Context) {
 		slog.Info("service already exists,delete it first", slog.String("srv_name", srvName), slog.Any("image_id", request.ImageID))
 	}
 
+	annotations := request.Annotation
 	nodeSelector := make(map[string]string)
 	resources := corev1.ResourceRequirements{}
 	resReq := make(map[corev1.ResourceName]resource.Quantity)
@@ -164,13 +166,12 @@ func (s *HttpServer) runService(c *gin.Context) {
 		Requests: resReq,
 	}
 
+	annotations["deploy_id"] = strconv.FormatInt(request.DeployID, 10)
 	service := &v1.Service{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      srvName,
-			Namespace: s.k8sNameSpace,
-			Annotations: map[string]string{
-				"deploy_id": strconv.FormatInt(request.DeployID, 10),
-			},
+			Name:        srvName,
+			Namespace:   s.k8sNameSpace,
+			Annotations: annotations,
 		},
 		Spec: v1.ServiceSpec{
 			ConfigurationSpec: v1.ConfigurationSpec{
@@ -307,7 +308,6 @@ func (s *HttpServer) serviceStatus(c *gin.Context) {
 		c.JSON(http.StatusOK, resp)
 		return
 	}
-
 	deployIDStr := srv.Annotations["deploy_id"]
 	deployID, _ := strconv.ParseInt(deployIDStr, 10, 64)
 	resp.DeployID = deployID
@@ -534,7 +534,21 @@ func (s *HttpServer) getServiceByName(c *gin.Context) {
 	var resp StatusResponse
 	var request = &CheckRequest{}
 	err := c.BindJSON(request)
+	if err != nil {
+		slog.Error("fail to parse input parameters", slog.Any("error", err))
+		resp.Code = -1
+		resp.Message = "fail to parse input parameters"
+		c.JSON(http.StatusOK, resp)
+		return
+	}
 	cluster, err := s.clusterPool.GetClusterByID(c, request.ClusterID)
+	if err != nil {
+		slog.Error("fail to get cluster config", slog.Any("error", err))
+		resp.Code = -1
+		resp.Message = "fail to get cluster config"
+		c.JSON(http.StatusOK, resp)
+		return
+	}
 	srvName := s.getServiceNameFromRequest(c)
 	srv, err := cluster.KnativeClient.ServingV1().Services(s.k8sNameSpace).Get(c.Request.Context(), srvName, metav1.GetOptions{})
 	if err != nil {

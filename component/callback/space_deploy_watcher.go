@@ -22,7 +22,7 @@ func WatchSpaceChange(req *types.GiteaCallbackPushReq, ss *database.SpaceStore, 
 	watcher := new(spaceDeployWatcher)
 	watcher.ss = ss
 	watcher.sc = sc
-	// split req.Repository.FullName by '/'
+	// split req.Repository.FullName by '/' for example: <repotype>_<namespace>/<reponame>
 	splits := strings.Split(req.Repository.FullName, "/")
 	fullNamespace, repoName := splits[0], splits[1]
 	repoType, namespace, _ := strings.Cut(fullNamespace, "_")
@@ -30,8 +30,8 @@ func WatchSpaceChange(req *types.GiteaCallbackPushReq, ss *database.SpaceStore, 
 	if repoType != "spaces" {
 		return watcher
 	}
-
-	watcher.deploy(namespace, repoName)
+	// username = namespace in fullname of gitea
+	watcher.deploy(namespace, repoName, namespace)
 	return watcher
 }
 
@@ -43,7 +43,7 @@ func (w *spaceDeployWatcher) Run() error {
 	return err
 }
 
-func (w *spaceDeployWatcher) deploy(namespace string, repoName string) *spaceDeployWatcher {
+func (w *spaceDeployWatcher) deploy(namespace string, repoName string, currentUser string) *spaceDeployWatcher {
 	w.ops = append(w.ops,
 		func() error {
 			ctx, cancel := context.WithTimeout(context.Background(), 1*time.Minute)
@@ -58,8 +58,8 @@ func (w *spaceDeployWatcher) deploy(namespace string, repoName string) *spaceDep
 			if !space.HasAppFile {
 				return nil
 			}
-			// trigger space deployment
-			_, err = w.sc.Deploy(ctx, namespace, repoName)
+			// trigger space deployment by gitea call back
+			_, err = w.sc.Deploy(ctx, namespace, repoName, currentUser)
 			if err != nil {
 				return fmt.Errorf("failed to trigger space delopy: %w", err)
 			} else {

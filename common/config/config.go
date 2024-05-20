@@ -99,6 +99,10 @@ type Config struct {
 		GPUModelLabel string `envconfig:"STARHUB_SERVER_GPU_MODEL_LABEL" default:"aliyun.accelerator/nvidia_name"`
 	}
 
+	Model struct {
+		DeployTimeoutInMin int `envconfig:"STARHUB_SERVER_MODEL_DEPLOY_TIMEOUT_IN_MINUTES" default:"30"`
+	}
+
 	Casdoor struct {
 		ClientID         string `envconfig:"STARHUB_SERVER_CASDOOR_CLIENT_ID" default:"client_id"`
 		ClientSecret     string `envconfig:"STARHUB_SERVER_CASDOOR_CLIENT_SECRET" default:"client_secret"`
