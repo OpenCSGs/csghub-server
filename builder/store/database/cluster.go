@@ -2,7 +2,6 @@ package database
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/google/uuid"
 	"github.com/uptrace/bun"
@@ -48,13 +47,8 @@ func (r *ClusterInfoStore) Update(ctx context.Context, clusterConfig string, reg
 		cluster, err := r.ByClusterConfig(ctx, clusterConfig)
 		if err == nil {
 			cluster.Region = region
-			_, err = tx.NewUpdate().Model(cluster).
-				WherePK().Exec(ctx)
-			if err != nil {
-				tx.Rollback()
-				return fmt.Errorf("failed to update deploy,%w", err)
-			}
-
+			err = assertAffectedOneRow(r.db.Operator.Core.NewUpdate().Model(cluster).WherePK().Exec(ctx))
+			return err
 		}
 		return nil
 	})
