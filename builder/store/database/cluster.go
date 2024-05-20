@@ -3,6 +3,7 @@ package database
 import (
 	"context"
 
+	"github.com/google/uuid"
 	"github.com/uptrace/bun"
 )
 
@@ -17,22 +18,23 @@ func NewClusterInfoStore() *ClusterInfoStore {
 }
 
 type ClusterInfo struct {
-	ID     int64  `bun:",pk,autoincrement" json:"id"`
-	Region string `bun:",notnull" json:"region"`
-	Config string `bun:",notnull" json:"repo_id"`
+	ClusterID     string `bun:",pk" json:"cluster_id"`
+	ClusterConfig string `bun:",notnull" json:"cluster_config"`
+	Region        string `bun:",notnull" json:"region"`
 }
 
-func (r *ClusterInfoStore) Add(ctx context.Context, userId, repoId int64) error {
+func (r *ClusterInfoStore) Add(ctx context.Context, clusterConfig string, region string) error {
 	err := r.db.Operator.Core.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
-		userLikes := &UserLike{
-			UserID: userId,
-			RepoID: repoId,
+		cluster := &ClusterInfo{
+			ClusterID:     uuid.New().String(),
+			ClusterConfig: clusterConfig,
+			Region:        region,
 		}
-		if err := assertAffectedOneRow(tx.NewInsert().Model(userLikes).Exec(ctx)); err != nil {
+		if err := assertAffectedOneRow(tx.NewInsert().Model(cluster).Exec(ctx)); err != nil {
 			return err
 		}
 
-		if err := assertAffectedOneRow(tx.Exec("update repositories set likes=COALESCE(likes, 0)+1 where id=?", repoId)); err != nil {
+		if err := assertAffectedOneRow(tx.Exec("update cluster_infos set region=? where cluster_config=?", region, clusterConfig)); err != nil {
 			return err
 		}
 		return nil
@@ -40,28 +42,8 @@ func (r *ClusterInfoStore) Add(ctx context.Context, userId, repoId int64) error 
 	return err
 }
 
-func (r *ClusterInfoStore) Delete(ctx context.Context, userId, repoId int64) error {
-	err := r.db.Operator.Core.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
-		var userLikes UserLike
-		if err := assertAffectedOneRow(r.db.Core.NewDelete().Model(&userLikes).Where("user_id = ? and repo_id = ?", userId, repoId).Exec(ctx)); err != nil {
-			return err
-		}
-
-		if err := assertAffectedOneRow(tx.Exec("update repositories set likes=COALESCE(likes, 1)-1 where id=?", repoId)); err != nil {
-			return err
-		}
-		return nil
-	})
-	return err
-}
-
-func (r *ClusterInfoStore) IsExist(ctx context.Context, username string, repoId int64) (exists bool, err error) {
-	var userLike UserLike
-	exists, err = r.db.Operator.Core.
-		NewSelect().
-		Model(&userLike).
-		Join("JOIN users ON users.id = user_like.user_id").
-		Where("user_like.repo_id = ? and users.username = ?", repoId, username).
-		Exists(ctx)
+func (s *ClusterInfoStore) ByClusterID(ctx context.Context, clusterId string) (clusterInfo ClusterInfo, err error) {
+	clusterInfo.ClusterID = clusterId
+	err = s.db.Operator.Core.NewSelect().Model(&clusterInfo).Where("cluster_id = ?", clusterId).Scan(ctx)
 	return
 }
