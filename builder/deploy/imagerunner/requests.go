@@ -13,6 +13,7 @@ type (
 		UserName string `json:"user_name"`
 		OrgName  string `json:"org_name"`
 		RepoName string `json:"repo_name"`
+		RepoType string `json:"repo_type"`
 
 		GitPath string `json:"git_path"` // git repo path
 		GitRef  string `json:"git_ref"`  // git repo branch

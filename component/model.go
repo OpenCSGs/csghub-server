@@ -3,10 +3,12 @@ package component
 import (
 	"context"
 	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
 
+	"opencsg.com/csghub-server/builder/deploy"
 	"opencsg.com/csghub-server/builder/git/gitserver"
 	"opencsg.com/csghub-server/builder/git/membership"
 	"opencsg.com/csghub-server/builder/inference"
@@ -68,6 +70,9 @@ func NewModelComponent(config *config.Config) (*ModelComponent, error) {
 	c.ms = database.NewModelStore()
 	c.rs = database.NewRepoStore()
 	c.infer = inference.NewInferClient(config.Inference.ServerAddr)
+	c.us = database.NewUserStore()
+	c.deployer = deploy.NewDeployer()
+	c.rtfm = database.NewRuntimeFrameworksStore()
 	return c, nil
 }
 
@@ -77,6 +82,9 @@ type ModelComponent struct {
 	ms            *database.ModelStore
 	rs            *database.RepoStore
 	infer         inference.Client
+	us            *database.UserStore
+	deployer      deploy.Deployer
+	rtfm          *database.RuntimeFrameworksStore
 }
 
 func (c *ModelComponent) Index(ctx context.Context, username, search, sort string, ragReqs []database.TagReq, per, page int) ([]types.Model, int, error) {
@@ -517,4 +525,56 @@ func (c *ModelComponent) Predict(ctx context.Context, req *types.ModelPredictReq
 		Content: inferResp.GeneratedText,
 	}
 	return resp, nil
+}
+
+// create model deploy as inference
+func (c *ModelComponent) Deploy(ctx context.Context, namespace, name, currentUser string, req types.ModelRunReq) (int64, error) {
+	m, err := c.ms.FindByPath(ctx, namespace, name)
+	if err != nil {
+		slog.Error("can't find model", slog.Any("error", err), slog.String("namespace", namespace), slog.String("name", name))
+		return -1, err
+	}
+	// found user id
+	user, err := c.us.FindByUsername(ctx, currentUser)
+	if err != nil {
+		slog.Error("can't find user for deploy model", slog.Any("error", err), slog.String("username", currentUser))
+		return -1, err
+	}
+
+	frame, err := c.rtfm.FindByID(ctx, req.RuntimeFrameworkID)
+	if err != nil {
+		slog.Error("can't find available runtime framework", slog.Any("error", err), slog.Any("frameworkID", req.RuntimeFrameworkID))
+		return -1, err
+	}
+
+	// put repo-type and namespace/name in annotation
+	annotations := make(map[string]string)
+	annotations[types.ResTypeKey] = string(types.ModelRepo)
+	annotations[types.ResNameKey] = fmt.Sprintf("%s/%s", namespace, name)
+	annoStr, err := json.Marshal(annotations)
+	if err != nil {
+		slog.Error("fail to create annotations for deploy model", slog.Any("error", err), slog.String("username", currentUser))
+		return -1, err
+	}
+
+	// create deploy for model
+	return c.deployer.Deploy(ctx, types.DeployRepo{
+		DeployName:       req.DeployName,
+		SpaceID:          0,
+		GitPath:          m.Repository.GitPath,
+		GitBranch:        req.Revision,
+		Env:              req.Env,
+		Hardware:         req.Hardware,
+		UserID:           user.ID,
+		ModelID:          m.ID,
+		RepoID:           m.Repository.ID,
+		RuntimeFramework: frame.FrameName,
+		ImageID:          frame.FrameImage, // do not need build pod image for model
+		MinReplica:       req.MinReplica,
+		MaxReplica:       req.MaxReplica,
+		Annotation:       string(annoStr),
+		CostPerHour:      req.CostPerHour,
+		ClusterID:        req.ClusterID,
+		SecureLevel:      req.SecureLevel,
+	})
 }

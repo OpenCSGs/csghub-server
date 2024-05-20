@@ -4,10 +4,14 @@ import (
 	"context"
 	"fmt"
 	"time"
+
+	"opencsg.com/csghub-server/builder/deploy/common"
+	"opencsg.com/csghub-server/common/types"
 )
 
 type Deploy struct {
-	ID        int64  `bun:",pk,autoincrement" json:"id"`
+	ID int64 `bun:",pk,autoincrement" json:"id"`
+	// space_id to deploy, it's 0 if deploy model
 	SpaceID   int64  `bun:",notnull" json:"space_id"`
 	Status    int    `bun:",notnull" json:"status"`
 	GitPath   string `bun:",notnull" json:"git_path"`
@@ -17,8 +21,27 @@ type Deploy struct {
 	Template  string `bun:",notnull" json:"tmeplate"`
 	Hardware  string `bun:",notnull" json:"hardware"`
 	// for image run task, aka task_type = 1
-	ImageID   string `bun:",nullzero" json:"image_id"`
-	ClusterID string `bun:",nullzero" json:"cluster_id"`
+	// running image of cluster, comes from builder or pre-define
+	ImageID string `bun:",nullzero" json:"image_id"`
+	// add at 2024-05
+	DeployName string `json:"deploy_name"`
+	// user_id trigger deploy action, rather than repo owner user_id
+	UserID int64 `json:"user_id"`
+	// model_id to deploy, it's 0 if deploy space
+	ModelID int64 `json:"model_id"`
+	// repository_id of model/space/code/dataset
+	RepoID int64 `json:"repo_id"`
+	// model running engine vllm or TGI
+	RuntimeFramework string `bun:",nullzero" json:"runtime_framework"`
+	Annotation       string `bun:",nullzero" json:"annotation"`
+	MinReplica       int    `json:"min_replica"`
+	MaxReplica       int    `json:"max_replica"`
+	SvcName          string `json:"svc_name"`
+	Endpoint         string `json:"endpoint"`
+	// minimum unit of money for counting cost
+	CostPerHour int64  `json:"cost_per_hour"`
+	ClusterID   string `json:"cluster_id"`
+	SecureLevel int    `json:"secure_level"`
 	times
 }
 
@@ -57,7 +80,7 @@ func (s *DeployTaskStore) GetDeploy(ctx context.Context, id int64) (*Deploy, err
 	return deploy, err
 }
 
-func (s *DeployTaskStore) GetSpaceLatestDeploy(ctx context.Context, spaceID int64) (*Deploy, error) {
+func (s *DeployTaskStore) GetLatestDeployBySpaceID(ctx context.Context, spaceID int64) (*Deploy, error) {
 	deploy := &Deploy{}
 	err := s.db.Core.NewSelect().Model(deploy).Where("space_id = ?", spaceID).Order("created_at DESC").Limit(1).Scan(ctx, deploy)
 	return deploy, err
@@ -145,4 +168,31 @@ func (s *DeployTaskStore) UpdateInTx(ctx context.Context, deployColumns, deployT
 	}
 
 	return tx.Commit()
+}
+
+func (s *DeployTaskStore) ListDeploy(ctx context.Context, repoType types.RepositoryType, repoID, userID int64) ([]Deploy, error) {
+	var result []Deploy
+	query := s.db.Operator.Core.NewSelect().Model(&result).Where("repo_id = ? and user_id = ?", repoID, userID)
+	if repoType == types.ModelRepo {
+		query = query.Where("status != ?", common.Deleted)
+	}
+	query = query.Order("id desc")
+	if repoType == types.SpaceRepo {
+		query = query.Limit(1)
+	}
+	_, err := query.Exec(ctx, &result)
+	if err != nil {
+		return nil, err
+	}
+	return result, nil
+}
+
+func (s *DeployTaskStore) DeleteDeploy(ctx context.Context, repoType types.RepositoryType, repoID, userID int64, deployID int64) error {
+	// only delete the deploy of specific repo was triggered by current login user
+	res, err := s.db.BunDB.Exec("Update deploys set status = ? where id = ? and repo_id = ? and user_id = ?", common.Deleted, deployID, repoID, userID)
+	if err != nil {
+		return err
+	}
+	err = assertAffectedOneRow(res, err)
+	return err
 }

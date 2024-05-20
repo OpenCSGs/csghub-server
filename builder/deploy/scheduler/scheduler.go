@@ -11,6 +11,7 @@ import (
 	"opencsg.com/csghub-server/builder/deploy/imagebuilder"
 	"opencsg.com/csghub-server/builder/deploy/imagerunner"
 	"opencsg.com/csghub-server/builder/store/database"
+	"opencsg.com/csghub-server/common/types"
 )
 
 type Scheduler interface {
@@ -27,20 +28,23 @@ type FIFOScheduler struct {
 
 	store               *database.DeployTaskStore
 	spaceStore          *database.SpaceStore
+	modelStore          *database.ModelStore
 	spaceResourcesStore *database.SpaceResourceStore
 	ib                  imagebuilder.Builder
 	ir                  imagerunner.Runner
 
 	nextLock                *sync.Mutex
 	spaceDeployTimeoutInMin int
+	modelDeployTimeoutInMin int
 }
 
-func NewFIFOScheduler(ib imagebuilder.Builder, ir imagerunner.Runner, sdt int) Scheduler {
+func NewFIFOScheduler(ib imagebuilder.Builder, ir imagerunner.Runner, sdt, mdt int) Scheduler {
 	s := &FIFOScheduler{}
 	// TODO:allow config
 	s.timeout = 30 * time.Minute
 	s.store = database.NewDeployTaskStore()
 	s.spaceStore = database.NewSpaceStore()
+	s.modelStore = database.NewModelStore()
 	s.spaceResourcesStore = database.NewSpaceResourceStore()
 	// allow concurrent deployment tasks
 	s.tasks = make(chan Runner, 100)
@@ -50,6 +54,7 @@ func NewFIFOScheduler(ib imagebuilder.Builder, ir imagerunner.Runner, sdt int) S
 	s.ir = ir
 	s.nextLock = &sync.Mutex{}
 	s.spaceDeployTimeoutInMin = sdt
+	s.modelDeployTimeoutInMin = mdt
 	return s
 }
 
@@ -127,8 +132,38 @@ func (rs *FIFOScheduler) next() (Runner, error) {
 		rs.tasks <- t
 		return t, nil
 	}
-	var s *database.Space
-	s, err = rs.spaceStore.ByID(ctx, deployTask.Deploy.SpaceID)
+
+	var repo RepoInfo
+
+	if deployTask.Deploy.SpaceID > 0 {
+		// handle space
+		var s *database.Space
+		s, err = rs.spaceStore.ByID(ctx, deployTask.Deploy.SpaceID)
+		repo.Path = s.Repository.Path
+		repo.Name = s.Repository.Name
+		repo.Sdk = s.Sdk
+		repo.SdkVersion = s.SdkVersion
+		repo.HTTPCloneURL = s.Repository.HTTPCloneURL
+		repo.SpaceID = s.ID
+		repo.RepoID = s.Repository.ID
+		repo.UserName = s.Repository.User.Name
+		repo.DeployID = deployTask.Deploy.ID
+		repo.ModelID = 0
+		repo.RepoType = string(types.SpaceRepo)
+	} else if deployTask.Deploy.ModelID > 0 {
+		// handle model
+		var m *database.Model
+		m, err = rs.modelStore.ByID(ctx, deployTask.Deploy.ModelID)
+		repo.Path = m.Repository.Path
+		repo.Name = m.Repository.Name
+		repo.ModelID = m.ID
+		repo.RepoID = m.Repository.ID
+		repo.UserName = m.Repository.User.Name
+		repo.DeployID = deployTask.Deploy.ID
+		repo.SpaceID = 0
+		repo.RepoType = string(types.ModelRepo)
+	}
+
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			slog.Info("cancel deploy task as space not found", slog.Int64("deploy_task_id", deployTask.ID), slog.Int64("space_id", deployTask.Deploy.SpaceID))
@@ -146,9 +181,14 @@ func (rs *FIFOScheduler) next() (Runner, error) {
 	}
 	// for build task
 	if deployTask.TaskType == 0 {
-		t = NewBuidRunner(rs.ib, s, deployTask)
+		t = NewBuidRunner(rs.ib, &repo, deployTask)
 	} else {
-		t = NewDeployRunner(rs.ir, s, deployTask, rs.spaceDeployTimeoutInMin)
+		t = NewDeployRunner(rs.ir, &repo, deployTask,
+			&DeployTimeout{
+				deploySpaceTimeoutInMin: rs.spaceDeployTimeoutInMin,
+				deployModelTimeoutInMin: rs.modelDeployTimeoutInMin,
+			},
+		)
 	}
 
 	rs.last = deployTask
