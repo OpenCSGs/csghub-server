@@ -31,7 +31,7 @@ type Cluster struct {
 // ClusterPool is a resource pool of cluster information
 type ClusterPool struct {
 	Clusters     []Cluster
-	clusterStore *database.ClusterInfoStore
+	ClusterStore *database.ClusterInfoStore
 }
 
 // NodeResourceInfo struct includes details about the node's resources and region
@@ -48,7 +48,7 @@ type NodeResourceInfo struct {
 // NewClusterPool initializes and returns a ClusterPool by reading kubeconfig files from $HOME/.kube directory
 func NewClusterPool() (*ClusterPool, error) {
 	pool := &ClusterPool{}
-	pool.clusterStore = database.NewClusterInfoStore()
+	pool.ClusterStore = database.NewClusterInfoStore()
 
 	home := homedir.HomeDir()
 	kubeconfigFolderPath := filepath.Join(home, ".kube")
@@ -82,7 +82,7 @@ func NewClusterPool() (*ClusterPool, error) {
 			Client:        client,
 			KnativeClient: knativeClient,
 		})
-		err = pool.clusterStore.Add(context.TODO(), id, "华中区")
+		err = pool.ClusterStore.Add(context.TODO(), id, "华中区")
 		if err != nil {
 			slog.Error("falied to add cluster info to db", "error", err)
 			return nil, fmt.Errorf("falied to add cluster info to db,%w", err)
@@ -110,7 +110,7 @@ func (p *ClusterPool) GetCluster() (*Cluster, error) {
 func (p *ClusterPool) GetClusterByID(ctx context.Context, id string) (*Cluster, error) {
 	cfId := "config"
 	if len(id) != 0 {
-		cInfo, _ := p.clusterStore.ByClusterID(ctx, id)
+		cInfo, _ := p.ClusterStore.ByClusterID(ctx, id)
 		cfId = cInfo.ClusterConfig
 	}
 	for _, Cluster := range p.Clusters {

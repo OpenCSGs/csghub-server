@@ -510,10 +510,13 @@ func (s *HttpServer) getClusterStatus(c *gin.Context) {
 	for index := range s.clusterPool.Clusters {
 		cls := s.clusterPool.Clusters[index]
 		nodes, err := cluster.GetNodeResources(cls.Client, s.env)
+
 		if err == nil {
+			cInfo, _ := s.clusterPool.ClusterStore.ByClusterConfig(context.TODO(), cls.ID)
 			clusterInfo := CluserInfo{}
 			clusterInfo.Nodes = nodes
-			clusterInfo.ClusterID = cls.ID
+			clusterInfo.ClusterRegion = cInfo.Region
+			clusterInfo.ClusterID = cInfo.ClusterID
 			clusterInfo.ClusterName = fmt.Sprintf("cluster%d", index)
 			clusterInfo.Nodes = nodes
 			clusterRes = append(clusterRes, clusterInfo)
