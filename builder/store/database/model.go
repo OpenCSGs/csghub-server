@@ -206,3 +206,11 @@ func (s *ModelStore) ListByPath(ctx context.Context, paths []string) ([]Model, e
 
 	return sortedModels, nil
 }
+
+func (s *ModelStore) ByID(ctx context.Context, id int64) (*Model, error) {
+	model := new(Model)
+	return model, s.db.Core.NewSelect().Model(model).
+		Relation("Repository").
+		Where("model.id = ?", id).
+		Scan(ctx)
+}

@@ -35,6 +35,7 @@ const (
 	buildInProgress = 1
 	buildFailed     = 2
 	buildSucceed    = 3
+	BuildSkip       = 4 // export for other package
 )
 
 // sub deploy task status

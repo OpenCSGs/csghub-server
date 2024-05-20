@@ -11,6 +11,14 @@ var _ Runner = (*LocalRunner)(nil)
 // Typically this is for local test only
 type LocalRunner struct{}
 
+// Exist implements Runner.
+func (r *LocalRunner) Exist(context.Context, *CheckRequest) (*StatusResponse, error) {
+	return &StatusResponse{
+		Code:    1,
+		Message: "deploy exist",
+	}, nil
+}
+
 func NewLocalRunner() Runner {
 	return &LocalRunner{}
 }
