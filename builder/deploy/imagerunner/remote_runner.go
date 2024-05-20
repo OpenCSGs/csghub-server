@@ -35,7 +35,8 @@ func NewRemoteRunner(remoteURL string) (Runner, error) {
 
 func (h *RemoteRunner) Run(ctx context.Context, req *RunRequest) (*RunResponse, error) {
 	slog.Debug("send request", slog.Any("body", req))
-	u := fmt.Sprintf("%s/%s/run", h.remote, common.UniqueSpaceAppName(req.OrgName, req.RepoName, req.ID))
+	svcName := common.UniqueSpaceAppName(req.OrgName, req.RepoName, req.ID)
+	u := fmt.Sprintf("%s/%s/run", h.remote, svcName)
 	response, err := h.doRequest(http.MethodPost, u, req)
 	if err != nil {
 		return nil, err
@@ -46,7 +47,8 @@ func (h *RemoteRunner) Run(ctx context.Context, req *RunRequest) (*RunResponse, 
 	if err := json.NewDecoder(response.Body).Decode(&resp); err != nil {
 		return nil, err
 	}
-
+	resp.Message = svcName
+	slog.Debug("call image run", slog.Any("response", resp))
 	return &resp, nil
 }
 
@@ -99,15 +101,31 @@ func (h *RemoteRunner) StatusAll(ctx context.Context) (map[string]StatusResponse
 }
 
 func (h *RemoteRunner) Logs(ctx context.Context, req *LogsRequest) (<-chan string, error) {
-	appNmae := common.UniqueSpaceAppName(req.OrgName, req.RepoName, req.ID)
-	u := fmt.Sprintf("%s/%s/logs", h.remote, appNmae)
-	slog.Debug("logs request", slog.String("url", u), slog.String("appname", appNmae))
+	appName := common.UniqueSpaceAppName(req.OrgName, req.RepoName, req.ID)
+	u := fmt.Sprintf("%s/%s/logs", h.remote, appName)
+	slog.Debug("logs request", slog.String("url", u), slog.String("appname", appName))
 	rc, err := h.doSSERequest(http.MethodGet, u, req)
 	if err != nil {
 		return nil, err
 	}
 
 	return h.readToChannel(rc), nil
+}
+
+func (h *RemoteRunner) Exist(ctx context.Context, req *CheckRequest) (*StatusResponse, error) {
+	u := fmt.Sprintf("%s/%s/get", h.remote, common.UniqueSpaceAppName(req.OrgName, req.RepoName, req.ID))
+	response, err := h.doRequest(http.MethodGet, u, req)
+	if err != nil {
+		return nil, err
+	}
+	defer response.Body.Close()
+
+	var statusResponse StatusResponse
+	if err := json.NewDecoder(response.Body).Decode(&statusResponse); err != nil {
+		return nil, err
+	}
+
+	return &statusResponse, nil
 }
 
 func (h *RemoteRunner) readToChannel(rc io.ReadCloser) <-chan string {

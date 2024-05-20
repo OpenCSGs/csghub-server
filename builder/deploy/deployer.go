@@ -2,10 +2,12 @@ package deploy
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"opencsg.com/csghub-server/builder/deploy/common"
@@ -17,11 +19,12 @@ import (
 )
 
 type Deployer interface {
-	Deploy(ctx context.Context, s types.Space) (deployID int64, err error)
-	Status(ctx context.Context, s types.Space) (srvName string, status int, err error)
-	Logs(ctx context.Context, s types.Space) (*MultiLogReader, error)
-	Stop(ctx context.Context, s types.Space) (err error)
-	Wakeup(ctx context.Context, s types.Space) (err error)
+	Deploy(ctx context.Context, dr types.DeployRepo) (deployID int64, err error)
+	Status(ctx context.Context, dr types.DeployRepo) (srvName string, status int, err error)
+	Logs(ctx context.Context, dr types.DeployRepo) (*MultiLogReader, error)
+	Stop(ctx context.Context, dr types.DeployRepo) (err error)
+	Wakeup(ctx context.Context, dr types.DeployRepo) (err error)
+	Exist(ctx context.Context, dr types.DeployRepo) (bool, error)
 }
 
 var _ Deployer = (*deployer)(nil)
@@ -55,15 +58,27 @@ func newDeployer(s scheduler.Scheduler, ib imagebuilder.Builder, ir imagerunner.
 	return d, nil
 }
 
-func (d *deployer) Deploy(ctx context.Context, s types.Space) (int64, error) {
+func (d *deployer) Deploy(ctx context.Context, dr types.DeployRepo) (int64, error) {
 	deploy := &database.Deploy{
-		SpaceID:   s.ID,
-		GitPath:   s.Path,
-		GitBranch: s.DefaultBranch,
-		Env:       s.Env,
-		Secret:    s.Secrets,
-		Template:  s.Template,
-		Hardware:  s.Hardware,
+		DeployName:       dr.DeployName,
+		SpaceID:          dr.SpaceID,
+		GitPath:          dr.GitPath,
+		GitBranch:        dr.GitBranch,
+		Secret:           dr.Secret,
+		Template:         dr.Template,
+		Env:              dr.Env,
+		Hardware:         dr.Hardware,
+		ImageID:          dr.ImageID,
+		ModelID:          dr.ModelID,
+		UserID:           dr.UserID,
+		RepoID:           dr.RepoID,
+		RuntimeFramework: dr.RuntimeFramework,
+		Annotation:       dr.Annotation,
+		MinReplica:       dr.MinReplica,
+		MaxReplica:       dr.MaxReplica,
+		CostPerHour:      dr.CostPerHour,
+		ClusterID:        dr.ClusterID,
+		SecureLevel:      dr.SecureLevel,
 	}
 	// TODO:save deploy tasks in sql tx
 	err := d.store.CreateDeploy(ctx, deploy)
@@ -71,9 +86,18 @@ func (d *deployer) Deploy(ctx context.Context, s types.Space) (int64, error) {
 		slog.Error("failed to create deploy in db", slog.Any("error", err))
 		return -1, err
 	}
+	// skip build step for model as inference
+	bldTaskStatus := 0
+	bldTaskMsg := ""
+	if len(strings.Trim(deploy.ImageID, " ")) > 0 {
+		bldTaskStatus = scheduler.BuildSkip
+		bldTaskMsg = "Skip"
+	}
 	buildTask := &database.DeployTask{
 		DeployID: deploy.ID,
 		TaskType: 0,
+		Status:   bldTaskStatus,
+		Message:  bldTaskMsg,
 	}
 	d.store.CreateDeployTask(ctx, buildTask)
 	runTask := &database.DeployTask{
@@ -103,14 +127,14 @@ func (d *deployer) refreshStatus() {
 	}
 }
 
-func (d *deployer) Status(ctx context.Context, space types.Space) (string, int, error) {
+func (d *deployer) Status(ctx context.Context, dr types.DeployRepo) (string, int, error) {
 	// get latest Deploy
-	deploy, err := d.store.GetSpaceLatestDeploy(ctx, space.ID)
+	deploy, err := d.store.GetLatestDeployBySpaceID(ctx, dr.SpaceID)
 	if err != nil {
 		return "", 0, fmt.Errorf("can't get space delopyment,%w", err)
 	}
 
-	srvName := common.UniqueSpaceAppName(space.Namespace, space.Name, space.ID)
+	srvName := common.UniqueSpaceAppName(dr.Namespace, dr.Name, dr.SpaceID)
 	rstatus, found := d.runnerStatuscache[srvName]
 	if !found {
 		slog.Debug("status cache miss", slog.String("srv_name", srvName))
@@ -127,17 +151,17 @@ func (d *deployer) Status(ctx context.Context, space types.Space) (string, int, 
 	return srvName, deploy.Status, nil
 }
 
-func (d *deployer) Logs(ctx context.Context, space types.Space) (*MultiLogReader, error) {
+func (d *deployer) Logs(ctx context.Context, dr types.DeployRepo) (*MultiLogReader, error) {
 	// get latest Deploy
-	deploy, err := d.store.GetSpaceLatestDeploy(ctx, space.ID)
+	deploy, err := d.store.GetLatestDeployBySpaceID(ctx, dr.SpaceID)
 	if err != nil {
 		return nil, fmt.Errorf("can't get space delopyment,%w", err)
 	}
 
-	slog.Debug("get logs for space", slog.Any("deploy", deploy), slog.Int64("space_id", space.ID))
+	slog.Debug("get logs for space", slog.Any("deploy", deploy), slog.Int64("space_id", dr.SpaceID))
 	buildLog, err := d.ib.Logs(ctx, &imagebuilder.LogsRequest{
-		OrgName:   space.Namespace,
-		SpaceName: space.Name,
+		OrgName:   dr.Namespace,
+		SpaceName: dr.Name,
 		BuildID:   strconv.FormatInt(deploy.ID, 10),
 	})
 	if err != nil {
@@ -145,11 +169,16 @@ func (d *deployer) Logs(ctx context.Context, space types.Space) (*MultiLogReader
 		slog.Error("failed to read log from image builder", slog.Any("error", err))
 	}
 
+	targetID := dr.SpaceID // support space only one instance
+	if dr.SpaceID == 0 {
+		targetID = dr.DeployID // support model deploy with multi-instance
+	}
 	runLog, err := d.ir.Logs(ctx, &imagerunner.LogsRequest{
-		ID:       space.ID,
-		OrgName:  space.Namespace,
-		RepoName: space.Name,
+		ID:       targetID,
+		OrgName:  dr.Namespace,
+		RepoName: dr.Name,
 	})
+
 	if err != nil {
 		slog.Error("failed to read log from image runner", slog.Any("error", err))
 		// return nil, fmt.Errorf("connect to imagerunner failed: %w", err)
@@ -158,19 +187,24 @@ func (d *deployer) Logs(ctx context.Context, space types.Space) (*MultiLogReader
 	return NewMultiLogReader(buildLog, runLog), nil
 }
 
-func (d *deployer) Stop(ctx context.Context, space types.Space) error {
+func (d *deployer) Stop(ctx context.Context, dr types.DeployRepo) error {
+	targetID := dr.SpaceID // support space only one instance
+	if dr.SpaceID == 0 {
+		targetID = dr.DeployID // support model deploy with multi-instance
+	}
 	resp, err := d.ir.Stop(ctx, &imagerunner.StopRequest{
-		ID:       space.ID,
-		OrgName:  space.Namespace,
-		RepoName: space.Name,
+		ID:       targetID,
+		OrgName:  dr.Namespace,
+		RepoName: dr.Name,
 	})
-
-	slog.Info("deployer stop space", slog.Any("runner_resp", resp), slog.Int64("space_id", space.ID), slog.Any("error", err))
+	if err != nil {
+		slog.Error("deployer stop deploy", slog.Any("runner_resp", resp), slog.Int64("space_id", dr.SpaceID), slog.Any("deploy_id", dr.DeployID), slog.Any("error", err))
+	}
 	return err
 }
 
-func (d *deployer) Wakeup(ctx context.Context, space types.Space) error {
-	srvName := common.UniqueSpaceAppName(space.Namespace, space.Name, space.ID)
+func (d *deployer) Wakeup(ctx context.Context, dr types.DeployRepo) error {
+	srvName := common.UniqueSpaceAppName(dr.Namespace, dr.Name, dr.SpaceID)
 	srvURL := fmt.Sprintf("http://%s.%s", srvName, d.internalRootDomain)
 	// Create a new HTTP client with a timeout
 	client := &http.Client{
@@ -191,4 +225,32 @@ func (d *deployer) Wakeup(ctx context.Context, space types.Space) error {
 	} else {
 		return fmt.Errorf("space endpoint status not ok, status:%d", resp.StatusCode)
 	}
+}
+
+func (d *deployer) Exist(ctx context.Context, dr types.DeployRepo) (bool, error) {
+	targetID := dr.SpaceID // support space only one instance
+	if dr.SpaceID == 0 {
+		targetID = dr.DeployID // support model deploy with multi-instance
+	}
+	req := &imagerunner.CheckRequest{
+		ID:       targetID,
+		OrgName:  dr.Namespace,
+		RepoName: dr.Name,
+	}
+	resp, err := d.ir.Exist(ctx, req)
+	if err != nil {
+		slog.Error("fail to check deploy", slog.Any("req", req), slog.Any("error", err))
+		return true, err
+	}
+
+	if resp.Code == -1 {
+		// service check with error
+		slog.Error("deploy check result", slog.Any("resp", resp))
+		return true, errors.New("fail to check deploy instance")
+	} else if resp.Code == 1 {
+		// service exist
+		return true, nil
+	}
+	// service not exist
+	return false, nil
 }

@@ -95,3 +95,16 @@ const (
 	ModelWidgetTypeGeneration ModelWidgetType = "generation"
 	ModelWidgetTypeChat       ModelWidgetType = "chat"
 )
+
+type ModelRunReq struct {
+	DeployName         string `json:"deploy_name"`
+	ClusterID          string `json:"cluster_id"`
+	Env                string `json:"env"`
+	Hardware           string `json:"hardware"`
+	RuntimeFrameworkID int64  `json:"runtime_framework_id"`
+	MinReplica         int    `json:"min_replica"`
+	MaxReplica         int    `json:"max_replica"`
+	Revision           string `json:"revision"`
+	SecureLevel        int    `json:"secure_level"`
+	CostPerHour        int64  `json:"cost_per_hour"`
+}

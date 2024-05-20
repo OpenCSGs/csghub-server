@@ -8,6 +8,7 @@ const (
 	Building     = 11
 	BuildFailed  = 12
 	BuildSuccess = 13
+	BuildSkip    = 14 // Used when the build step is skipped
 	// step two: deploy and run
 	Deploying    = 20
 	DeployFailed = 21
@@ -16,4 +17,5 @@ const (
 	RunTimeError = 24
 	Sleeping     = 25
 	Stopped      = 26
+	Deleted      = 27 // end user trigger delete action for deploy
 )

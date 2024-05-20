@@ -83,7 +83,7 @@ func (h *SpaceResourceHandler) Create(ctx *gin.Context) {
 // @Tags         SpaceReource
 // @Accept       json
 // @Produce      json
-// @Param         id path int true "id"
+// @Param        id path int true "id"
 // @Param        body body types.UpdateSpaceResourceReq true "body"
 // @Success      200  {object}  types.ResponseWithTotal{data=types.SpaceResource,total=int} "OK"
 // @Failure      400  {object}  types.APIBadRequest "Bad request"

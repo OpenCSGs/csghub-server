@@ -16,6 +16,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/minio/minio-go/v7"
+	"opencsg.com/csghub-server/builder/deploy"
 	"opencsg.com/csghub-server/builder/git"
 	"opencsg.com/csghub-server/builder/git/gitserver"
 	"opencsg.com/csghub-server/builder/git/membership"
@@ -42,6 +43,9 @@ type RepoComponent struct {
 	lfsBucket    string
 	uls          *database.UserLikesStore
 	mirrorServer mirrorserver.MirrorServer
+	runFrame     *database.RuntimeFrameworksStore
+	deploy       *database.DeployTaskStore
+	deployer     deploy.Deployer
 }
 
 func NewRepoComponent(config *config.Config) (*RepoComponent, error) {
@@ -85,6 +89,9 @@ func NewRepoComponent(config *config.Config) (*RepoComponent, error) {
 		slog.Error(newError.Error())
 		return nil, newError
 	}
+	c.runFrame = database.NewRuntimeFrameworksStore()
+	c.deploy = database.NewDeployTaskStore()
+	c.deployer = deploy.NewDeployer()
 	return c, nil
 }
 
@@ -954,8 +961,8 @@ func (c *RepoComponent) AllowWriteAccess(ctx context.Context, namespace, name, u
 	return c.checkCurrentUserPermission(ctx, username, namespace, membership.RoleWrite)
 }
 
-func (c *RepoComponent) AllowAdminAccess(ctx context.Context, namespace, name, username string) (bool, error) {
-	repo, err := c.repo.FindByPath(ctx, types.SpaceRepo, namespace, name)
+func (c *RepoComponent) AllowAdminAccess(ctx context.Context, repoType types.RepositoryType, namespace, name, username string) (bool, error) {
+	repo, err := c.repo.FindByPath(ctx, repoType, namespace, name)
 	if err != nil {
 		return false, fmt.Errorf("failed to find repo, error: %w", err)
 	}
@@ -1189,4 +1196,162 @@ func (c *RepoComponent) DeleteMirror(ctx context.Context, req types.DeleteMirror
 		return fmt.Errorf("failed to delete mirror, error: %w", err)
 	}
 	return nil
+}
+
+// get runtime framework list
+func (c *RepoComponent) ListRuntimeFramework(ctx context.Context) ([]types.RuntimeFramework, error) {
+	frames, err := c.runFrame.List(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list runtime frameworks, error: %w", err)
+	}
+	var frameList []types.RuntimeFramework
+	for _, frame := range frames {
+		frameList = append(frameList, types.RuntimeFramework{
+			ID:           frame.ID,
+			FrameName:    frame.FrameName,
+			FrameVersion: frame.FrameVersion,
+			FrameImage:   frame.FrameImage,
+			Enabled:      frame.Enabled,
+		})
+	}
+	return frameList, nil
+}
+
+func (c *RepoComponent) CreateRuntimeFramework(ctx context.Context, req *types.RuntimeFrameworkReq) (*types.RuntimeFramework, error) {
+	newFrame := database.RuntimeFramework{
+		FrameName:    req.FrameName,
+		FrameVersion: req.FrameVersion,
+		FrameImage:   req.FrameImage,
+		Enabled:      req.Enabled,
+	}
+	err := c.runFrame.Add(ctx, newFrame)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create runtime framework, error: %w", err)
+	}
+	frame := &types.RuntimeFramework{
+		FrameName:    req.FrameName,
+		FrameVersion: req.FrameVersion,
+		FrameImage:   req.FrameImage,
+		Enabled:      req.Enabled,
+	}
+	return frame, nil
+}
+
+func (c *RepoComponent) UpdateRuntimeFramework(ctx context.Context, id int64, req *types.RuntimeFrameworkReq) (*types.RuntimeFramework, error) {
+	newFrame := database.RuntimeFramework{
+		ID:           id,
+		FrameName:    req.FrameName,
+		FrameVersion: req.FrameVersion,
+		FrameImage:   req.FrameImage,
+		Enabled:      req.Enabled,
+	}
+	frame, err := c.runFrame.Update(ctx, newFrame)
+	if err != nil {
+		return nil, fmt.Errorf("failed to update runtime frameworks, error: %w", err)
+	}
+	return &types.RuntimeFramework{
+		ID:           frame.ID,
+		FrameName:    frame.FrameName,
+		FrameVersion: frame.FrameVersion,
+		FrameImage:   frame.FrameImage,
+		Enabled:      frame.Enabled,
+	}, nil
+}
+
+func (c *RepoComponent) DeleteRuntimeFramework(ctx context.Context, id int64) error {
+	frame, err := c.runFrame.FindByID(ctx, id)
+	if err != nil {
+		return fmt.Errorf("failed to find runtime frameworks, error: %w", err)
+	}
+	err = c.runFrame.Delete(ctx, *frame)
+	return err
+}
+
+func (c *RepoComponent) ListDeploy(ctx context.Context, repoType types.RepositoryType, namespace, name, currentUser string) ([]types.DeployRepo, error) {
+	user, err := c.user.FindByUsername(ctx, currentUser)
+	if err != nil {
+		return nil, errors.New("user does not exist")
+	}
+	repo, err := c.repo.FindByPath(ctx, repoType, namespace, name)
+	if err != nil {
+		slog.Error("Failed to query deploy", slog.Any("error", err), slog.Any("repotype", repoType), slog.Any("namespace", namespace), slog.Any("name", name))
+		return nil, errors.New("invalid repository for query parameters")
+	}
+	if repo == nil {
+		slog.Error("nothing found for deploys", slog.Any("repotype", repoType), slog.Any("namespace", namespace), slog.Any("name", name))
+		return nil, errors.New("nothing found for deploys")
+	}
+	deploys, err := c.deploy.ListDeploy(ctx, repoType, repo.ID, user.ID)
+	if err != nil {
+		return nil, errors.New("fail to list user deploys")
+	}
+	var resDeploys []types.DeployRepo
+	for _, deploy := range deploys {
+		resDeploys = append(resDeploys, types.DeployRepo{
+			DeployID:         deploy.ID,
+			DeployName:       deploy.DeployName,
+			RepoID:           deploy.RepoID,
+			SvcName:          deploy.SvcName,
+			Endpoint:         deploy.Endpoint,
+			Status:           deploy.Status,
+			Hardware:         deploy.Hardware,
+			Env:              deploy.Env,
+			RuntimeFramework: deploy.RuntimeFramework,
+			ImageID:          deploy.ImageID,
+			MinReplica:       deploy.MinReplica,
+			MaxReplica:       deploy.MaxReplica,
+			GitBranch:        deploy.GitBranch,
+			CostPerHour:      deploy.CostPerHour,
+			ClusterID:        deploy.ClusterID,
+			SecureLevel:      deploy.SecureLevel,
+			Createtime:       deploy.CreatedAt.Format("2006-01-02 15:04:05"),
+			Updatetime:       deploy.UpdatedAt.Format("2006-01-02 15:04:05"),
+			Replica:          0,
+		})
+	}
+	return resDeploys, nil
+}
+
+func (c *RepoComponent) DeleteDeploy(ctx context.Context, repoType types.RepositoryType, namespace, name, currentUser string, deployID int64) error {
+	user, err := c.user.FindByUsername(ctx, currentUser)
+	if err != nil {
+		return errors.New("user does not exist")
+	}
+	repo, err := c.repo.FindByPath(ctx, repoType, namespace, name)
+	if err != nil {
+		slog.Error("invalid repository", slog.Any("error", err), slog.Any("repoType", repoType), slog.String("namespace", namespace), slog.String("name", name))
+		return errors.New("invalid repository")
+	}
+	// delete service
+	deployRepo := types.DeployRepo{
+		SpaceID:   0,
+		DeployID:  deployID,
+		Namespace: namespace,
+		Name:      name,
+	}
+	err = c.deployer.Stop(ctx, deployRepo)
+	if err != nil {
+		// fail to stop deploy instance, maybe service is gone
+		slog.Error("Stop deploy instance", slog.Any("error", err))
+	}
+
+	exist, err := c.deployer.Exist(ctx, deployRepo)
+	if err != nil {
+		// fail to check service
+		return err
+	}
+
+	if exist {
+		// fail to delete service
+		return errors.New("fail to delete service")
+	}
+
+	// update database deploy
+	err = c.deploy.DeleteDeploy(ctx, types.RepositoryType(repoType), repo.ID, user.ID, deployID)
+	if err != nil {
+		slog.Error("Failed to mark deploy instance as delete", slog.Any("error", err))
+		return errors.New("fail to remove deploy instance")
+	}
+
+	return err
 }

@@ -115,11 +115,21 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 		modelsGroup.GET("/:namespace/:name/mirror", middleware.RepoType(types.ModelRepo), repoCommonHandler.GetMirror)
 		modelsGroup.PUT("/:namespace/:name/mirror", middleware.RepoType(types.ModelRepo), repoCommonHandler.UpdateMirror)
 		modelsGroup.DELETE("/:namespace/:name/mirror", middleware.RepoType(types.ModelRepo), repoCommonHandler.DeleteMirror)
+		// runtime framework
+		modelsGroup.GET("/:namespace/:name/runtime_framework", middleware.RepoType(types.ModelRepo), repoCommonHandler.RuntimeFrameworkList)
+		modelsGroup.POST("/:namespace/:name/runtime_framework", middleware.RepoType(types.ModelRepo), repoCommonHandler.RuntimeFrameworkCreate)
+		modelsGroup.PUT("/:namespace/:name/runtime_framework/:id", middleware.RepoType(types.ModelRepo), repoCommonHandler.RuntimeFrameworkUpdate)
+		modelsGroup.DELETE("/:namespace/:name/runtime_framework/:id", middleware.RepoType(types.ModelRepo), repoCommonHandler.RuntimeFrameworkDelete)
+		// list model inference
+		modelsGroup.GET("/:namespace/:name/run", middleware.RepoType(types.ModelRepo), repoCommonHandler.DeployList)
+		// depoly model as inference
+		modelsGroup.POST("/:namespace/:name/run", middleware.RepoType(types.ModelRepo), modelHandler.DeployRun)
+		// delete a deployed inference
+		modelsGroup.DELETE("/:namespace/:name/run/:id", middleware.RepoType(types.ModelRepo), modelHandler.DeployDelete)
 	}
 
 	// Dataset routes
 	datasetsGroup := apiGroup.Group("/datasets")
-
 	{
 		datasetsGroup.POST("", dsHandler.Create)
 		datasetsGroup.GET("", dsHandler.Index)
@@ -240,6 +250,11 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 		spaces.GET("/:namespace/:name/mirror", middleware.RepoType(types.SpaceRepo), repoCommonHandler.GetMirror)
 		spaces.PUT("/:namespace/:name/mirror", middleware.RepoType(types.SpaceRepo), repoCommonHandler.UpdateMirror)
 		spaces.DELETE("/:namespace/:name/mirror", middleware.RepoType(types.SpaceRepo), repoCommonHandler.DeleteMirror)
+		spaces.GET("/:namespace/:name/runtime_framework", middleware.RepoType(types.SpaceRepo), repoCommonHandler.RuntimeFrameworkList)
+		spaces.POST("/:namespace/:name/runtime_framework", middleware.RepoType(types.SpaceRepo), repoCommonHandler.RuntimeFrameworkCreate)
+		spaces.PUT("/:namespace/:name/runtime_framework/:id", middleware.RepoType(types.SpaceRepo), repoCommonHandler.RuntimeFrameworkUpdate)
+		spaces.DELETE("/:namespace/:name/runtime_framework/:id", middleware.RepoType(types.SpaceRepo), repoCommonHandler.RuntimeFrameworkDelete)
+		spaces.GET("/:namespace/:name/run", middleware.RepoType(types.SpaceRepo), repoCommonHandler.DeployList)
 	}
 
 	spaceResourceHandler, err := handler.NewSpaceResourceHandler(config)

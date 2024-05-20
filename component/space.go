@@ -2,6 +2,7 @@ package component
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -34,6 +35,7 @@ func NewSpaceComponent(config *config.Config) (*SpaceComponent, error) {
 	}
 	c.deployer = deploy.NewDeployer()
 	c.publicRootDomain = config.Space.PublicRootDomain
+	c.us = database.NewUserStore()
 	return c, nil
 }
 
@@ -43,6 +45,7 @@ type SpaceComponent struct {
 	sss              *database.SpaceSdkStore
 	srs              *database.SpaceResourceStore
 	rs               *database.RepoStore
+	us               *database.UserStore
 	deployer         deploy.Deployer
 	publicRootDomain string
 }
@@ -447,22 +450,44 @@ func (c *SpaceComponent) Delete(ctx context.Context, namespace, name, currentUse
 	return nil
 }
 
-func (c *SpaceComponent) Deploy(ctx context.Context, namespace, name string) (int64, error) {
+func (c *SpaceComponent) Deploy(ctx context.Context, namespace, name, currentUser string) (int64, error) {
 	s, err := c.ss.FindByPath(ctx, namespace, name)
 	if err != nil {
 		slog.Error("can't deploy space", slog.Any("error", err), slog.String("namespace", namespace), slog.String("name", name))
 		return -1, err
 	}
+	// found user id
+	user, err := c.us.FindByUsername(ctx, currentUser)
+	if err != nil {
+		slog.Error("can't find user for create deploy space", slog.Any("error", err), slog.String("username", currentUser))
+		return -1, err
+	}
 
-	return c.deployer.Deploy(ctx, types.Space{
-		ID:         s.ID,
-		Path:       s.Repository.GitPath,
+	// put repo-type and namespace/name in annotation
+	annotations := make(map[string]string)
+	annotations[types.ResTypeKey] = string(types.SpaceRepo)
+	annotations[types.ResNameKey] = fmt.Sprintf("%s/%s", namespace, name)
+	annoStr, err := json.Marshal(annotations)
+	if err != nil {
+		slog.Error("fail to create annotations for deploy space", slog.Any("error", err), slog.String("username", currentUser))
+		return -1, err
+	}
+
+	// create deploy for space
+	return c.deployer.Deploy(ctx, types.DeployRepo{
+		SpaceID:    s.ID,
+		GitPath:    s.Repository.GitPath,
+		GitBranch:  s.Repository.DefaultBranch,
 		Sdk:        s.Sdk,
 		SdkVersion: s.SdkVersion,
 		Template:   s.Template,
 		Env:        s.Env,
 		Hardware:   s.Hardware,
-		Secrets:    s.Secrets,
+		Secret:     s.Secrets,
+		RepoID:     s.Repository.ID,
+		ModelID:    0,
+		UserID:     user.ID,
+		Annotation: string(annoStr),
 	})
 }
 
@@ -474,8 +499,8 @@ func (c *SpaceComponent) Wakeup(ctx context.Context, namespace, name string) err
 
 	}
 
-	return c.deployer.Wakeup(ctx, types.Space{
-		ID:        s.ID,
+	return c.deployer.Wakeup(ctx, types.DeployRepo{
+		SpaceID:   s.ID,
 		Namespace: namespace,
 		Name:      name,
 	})
@@ -488,8 +513,8 @@ func (c *SpaceComponent) Stop(ctx context.Context, namespace, name string) error
 		return err
 	}
 
-	return c.deployer.Stop(ctx, types.Space{
-		ID:        s.ID,
+	return c.deployer.Stop(ctx, types.DeployRepo{
+		SpaceID:   s.ID,
 		Namespace: namespace,
 		Name:      name,
 	})
@@ -517,8 +542,8 @@ func (c *SpaceComponent) status(ctx context.Context, s *database.Space) (string,
 		return "", SpaceStatusNoAppFile, nil
 	}
 	namespace, name := s.Repository.NamespaceAndName()
-	srvName, code, err := c.deployer.Status(ctx, types.Space{
-		ID:        s.ID,
+	srvName, code, err := c.deployer.Status(ctx, types.DeployRepo{
+		SpaceID:   s.ID,
 		Namespace: namespace,
 		Name:      name,
 	})
@@ -542,8 +567,8 @@ func (c *SpaceComponent) Logs(ctx context.Context, namespace, name string) (*dep
 	if err != nil {
 		return nil, fmt.Errorf("can't find space by path:%w", err)
 	}
-	return c.deployer.Logs(ctx, types.Space{
-		ID:        s.ID,
+	return c.deployer.Logs(ctx, types.DeployRepo{
+		SpaceID:   s.ID,
 		Namespace: namespace,
 		Name:      name,
 	})

@@ -14,24 +14,31 @@ import (
 	"opencsg.com/csghub-server/common/types"
 )
 
-// DeployRunner defines a k8s image running task
-type DeployRunner struct {
-	space              *database.Space
-	task               *database.DeployTask
-	ir                 imagerunner.Runner
-	store              *database.DeployTaskStore
-	deployStartTime    time.Time
-	deployTimeoutInMin int
+type DeployTimeout struct {
+	deploySpaceTimeoutInMin int
+	deployModelTimeoutInMin int
 }
 
-func NewDeployRunner(ir imagerunner.Runner, s *database.Space, t *database.DeployTask, deployTimeout int) Runner {
+// DeployRunner defines a k8s image running task
+type DeployRunner struct {
+	repo            *RepoInfo
+	task            *database.DeployTask
+	ir              imagerunner.Runner
+	store           *database.DeployTaskStore
+	tokenStore      *database.AccessTokenStore
+	deployStartTime time.Time
+	deployTimeout   *DeployTimeout
+}
+
+func NewDeployRunner(ir imagerunner.Runner, r *RepoInfo, t *database.DeployTask, dto *DeployTimeout) Runner {
 	return &DeployRunner{
-		space:              s,
-		task:               t,
-		ir:                 ir,
-		store:              database.NewDeployTaskStore(),
-		deployStartTime:    time.Now(),
-		deployTimeoutInMin: deployTimeout,
+		repo:            r,
+		task:            t,
+		ir:              ir,
+		store:           database.NewDeployTaskStore(),
+		deployStartTime: time.Now(),
+		deployTimeout:   dto,
+		tokenStore:      database.NewAccessTokenStore(),
 	}
 }
 
@@ -51,20 +58,25 @@ func (t *DeployRunner) Run(ctx context.Context) error {
 				continue
 			}
 			slog.Debug("After build deploy request", slog.Any("req", req))
-			_, err = t.ir.Run(ctx, req)
+			resp, err := t.ir.Run(ctx, req)
 			if err != nil {
 				// TODO:return retryable error
 				return fmt.Errorf("call image runner failed: %w", err)
 			}
 
-			t.deployInProgress()
+			t.deployInProgress(resp.Message)
 			// record time of create knative service
 			t.deployStartTime = time.Now()
 		}
 
-		fields := strings.Split(t.space.Repository.Path, "/")
+		fields := strings.Split(t.repo.Path, "/")
+
+		targetID := t.task.Deploy.SpaceID
+		if t.task.Deploy.SpaceID == 0 {
+			targetID = t.task.Deploy.ID // support model deploy with multi-instance
+		}
 		req := &imagerunner.StatusRequest{
-			ID:       t.space.ID,
+			ID:       targetID,
 			OrgName:  fields[0],
 			RepoName: fields[1],
 		}
@@ -86,52 +98,60 @@ func (t *DeployRunner) Run(ctx context.Context) error {
 		switch resp.Code {
 		case common.Deploying:
 			duration := time.Since(t.deployStartTime).Minutes()
-			if duration >= float64(t.deployTimeoutInMin) {
-				// space deploy duration is greater than timeout defined in env (default is 30 mins)
-				slog.Warn("Space is going to be undeploy due to timeout of deploying", slog.Any("duration", duration), slog.Any("timeout", t.deployTimeoutInMin))
-				return t.cancelDeploySpace(ctx, fields[0], fields[1])
+			limitTime := t.deployTimeout.deploySpaceTimeoutInMin
+			if t.task.Deploy.SpaceID == 0 && t.task.Deploy.ModelID > 0 {
+				limitTime = t.deployTimeout.deployModelTimeoutInMin
 			}
-			t.deployInProgress()
+			if duration >= float64(limitTime) {
+				// space or model deploy duration is greater than timeout defined in env (default is 30 mins)
+				slog.Warn("Space or Model is going to be undeploy due to timeout of deploying", slog.Any("duration", duration), slog.Any("timeout", limitTime), slog.Any("namespace", fields[0]), slog.Any("repoName", fields[1]))
+				return t.cancelDeploy(ctx, fields[0], fields[1])
+			}
+			t.deployInProgress("")
 			// wait before next check
 			time.Sleep(10 * time.Second)
 		case common.DeployFailed:
-			slog.Info("image deploy failed", slog.String("space_name", t.space.Repository.Name), slog.Any("deplopy_task_id", t.task.ID))
+			slog.Info("image deploy failed", slog.String("space_name", t.repo.Name), slog.Any("deplopy_task_id", t.task.ID))
 			t.deployFailed(resp.Message)
 
 			return fmt.Errorf("deploy failed, resp msg:%s", resp.Message)
 		case common.Startup:
-			slog.Info("image deploy success", slog.String("space_name", t.space.Repository.Name), slog.Any("deplopy_task_id", t.task.ID))
+			slog.Info("image deploy success", slog.String("space_name", t.repo.Name), slog.Any("deplopy_task_id", t.task.ID))
 			t.deploySuccess()
 			// wait before next check
 			time.Sleep(10 * time.Second)
 
 		case common.Running:
-			slog.Info("image running", slog.String("space_name", t.space.Repository.Name), slog.Any("deplopy_task_id", t.task.ID))
-			t.running()
+			slog.Info("image running", slog.String("space_name", t.repo.Name), slog.Any("deplopy_task_id", t.task.ID))
+			t.running(resp.Endpoint)
 
 			return nil
 		case common.RunTimeError:
-			slog.Error("image runtime erro", slog.String("space_name", t.space.Repository.Name), slog.Any("deplopy_task_id", t.task.ID))
+			slog.Error("image runtime erro", slog.String("space_name", t.repo.Name), slog.Any("deplopy_task_id", t.task.ID))
 			t.runtimeError(resp.Message)
 
 			return fmt.Errorf("runtime error, resp msg:%s", resp.Message)
 		default:
-			slog.Error("unknown image status", slog.String("space_name", t.space.Repository.Name), slog.Any("deplopy_task_id", t.task.ID),
+			slog.Error("unknown image status", slog.String("space_name", t.repo.Name), slog.Any("deplopy_task_id", t.task.ID),
 				slog.Int("status", resp.Code))
 			return fmt.Errorf("unknown image status, resp msg:%s", resp.Message)
 		}
 	}
 }
+
 func (t *DeployRunner) WatchID() int64 { return t.task.ID }
 
-func (t *DeployRunner) deployInProgress() {
+func (t *DeployRunner) deployInProgress(svcName string) {
 	t.task.Status = deploying
 	t.task.Message = "deploy in progress"
 	// change to buidling status
 	t.task.Deploy.Status = common.Deploying
+	if len(svcName) > 0 {
+		t.task.Deploy.SvcName = svcName
+	}
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	if err := t.store.UpdateInTx(ctx, []string{"status"}, []string{"status", "message"}, t.task.Deploy, t.task); err != nil {
+	if err := t.store.UpdateInTx(ctx, []string{"status", "svc_name"}, []string{"status", "message"}, t.task.Deploy, t.task); err != nil {
 		slog.Error("failed to change deploy status to `Deploying`", "error", err)
 	}
 }
@@ -160,14 +180,15 @@ func (t *DeployRunner) deployFailed(msg string) {
 	}
 }
 
-func (t *DeployRunner) running() {
+func (t *DeployRunner) running(endpoint string) {
 	t.task.Status = deployRunning
 	t.task.Message = "running"
 	// change to buidling status
 	t.task.Deploy.Status = common.Running
+	t.task.Deploy.Endpoint = endpoint
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	if err := t.store.UpdateInTx(ctx, []string{"status"}, []string{"status", "message"}, t.task.Deploy, t.task); err != nil {
+	if err := t.store.UpdateInTx(ctx, []string{"status", "endpoint"}, []string{"status", "message"}, t.task.Deploy, t.task); err != nil {
 		slog.Error("failed to change deploy status to `Running`", "error", err)
 	}
 }
@@ -185,53 +206,85 @@ func (t *DeployRunner) runtimeError(msg string) {
 }
 
 func (t *DeployRunner) makeDeployRequest() (*imagerunner.RunRequest, error) {
-	fields := strings.Split(t.space.Repository.Path, "/")
-	deploy, _ := t.store.GetDeploy(context.Background(), t.task.DeployID)
-
-	envMap, err := common.JsonStrToMap(t.space.Env)
+	token, err := t.tokenStore.FindByUID(context.Background(), t.task.Deploy.UserID)
 	if err != nil {
-		slog.Error("space env is invalid json data", slog.Any("env", t.space.Env))
+		return nil, fmt.Errorf("cant get git access token:%w", err)
+	}
+	fields := strings.Split(t.repo.Path, "/")
+	deploy, err := t.store.GetDeploy(context.Background(), t.task.DeployID)
+	if err != nil {
+		return nil, fmt.Errorf("fail to get deploy with error :%w", err)
+	}
+
+	annoMap, err := common.JsonStrToMap(deploy.Annotation)
+	if err != nil {
+		slog.Error("deploy annotation is invalid json data", slog.Any("Annotation", deploy.Annotation))
+		return nil, err
+	}
+	annoMap[types.ResDeployID] = fmt.Sprintf("%v", deploy.ID)
+
+	envMap, err := common.JsonStrToMap(deploy.Env)
+	if err != nil {
+		slog.Error("deploy env is invalid json data", slog.Any("env", deploy.Env))
 		return nil, err
 	}
 
 	var hardware = types.HardWare{}
-	err = json.Unmarshal([]byte(t.space.Hardware), &hardware)
+	err = json.Unmarshal([]byte(deploy.Hardware), &hardware)
 	if err != nil {
-		slog.Error("space hardware is invalid", slog.Any("hardware", t.space.Hardware))
+		slog.Error("deploy hardware is invalid format", slog.Any("hardware", deploy.Hardware))
 		return nil, err
 	}
 
-	sdkType := t.space.Sdk
-	if sdkType == GRADIO.name {
+	if t.repo.Sdk == GRADIO.name {
 		envMap["port"] = GRADIO.port
-	} else if sdkType == STREAMLIT.name {
+	} else if t.repo.Sdk == STREAMLIT.name {
 		envMap["port"] = STREAMLIT.port
+	} else {
+		envMap["port"] = "8080"
+	}
+
+	targetID := deploy.SpaceID
+	// deployID is unique for space and model
+	if deploy.SpaceID == 0 && deploy.ModelID > 0 {
+		targetID = deploy.ID // support model deploy with multi-instance
 	}
 
 	return &imagerunner.RunRequest{
-		ID:        t.space.ID,
-		OrgName:   fields[0],
-		RepoName:  fields[1],
-		UserName:  t.space.Repository.User.Name,
-		Hardware:  hardware,
-		Env:       envMap,
-		GitRef:    t.space.Repository.DefaultBranch,
-		ImageID:   deploy.ImageID,
-		DeployID:  deploy.ID,
-		ClusterID: "config",
+		ID:          targetID,
+		OrgName:     fields[0],
+		RepoName:    fields[1],
+		RepoType:    t.repo.RepoType,
+		UserName:    t.repo.UserName,
+		Annotation:  annoMap,
+		Hardware:    hardware,
+		Env:         envMap,
+		GitPath:     deploy.GitPath,
+		GitRef:      deploy.GitBranch,
+		ImageID:     deploy.ImageID,
+		DeployID:    deploy.ID,
+		MinReplica:  deploy.MinReplica,
+		MaxReplica:  deploy.MaxReplica,
+		Accesstoken: token.Token,
+		ClusterID:   deploy.ClusterID,
 	}, nil
 }
 
-func (t *DeployRunner) cancelDeploySpace(ctx context.Context, orgName, spaceName string) error {
+func (t *DeployRunner) cancelDeploy(ctx context.Context, orgName, repoName string) error {
+	targetID := t.task.Deploy.SpaceID
+	if t.task.Deploy.SpaceID == 0 {
+		// support model deploy with multi-instance
+		targetID = t.task.Deploy.ID
+	}
 	stopReq := &imagerunner.StopRequest{
-		ID:       t.space.ID,
+		ID:       targetID,
 		OrgName:  orgName,
-		RepoName: spaceName,
+		RepoName: repoName,
 	}
 	_, err := t.ir.Stop(ctx, stopReq)
 	if err != nil {
-		return fmt.Errorf("fail to undeploy space with err: %v", err)
+		return fmt.Errorf("fail to undeploy space/model with err: %v", err)
 	}
-	t.deployFailed("space deploy timeout")
+	t.deployFailed("space/model deploy timeout")
 	return nil
 }
