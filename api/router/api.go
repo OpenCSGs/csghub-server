@@ -33,6 +33,12 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 		r.GET("/api/v1/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 	}
 
+	// User routes
+	userHandler, err := handler.NewUserHandler(config)
+	if err != nil {
+		return nil, fmt.Errorf("error creating user controller:%w", err)
+	}
+
 	repoCommonHandler, err := handler.NewRepoHandler(config)
 	if err != nil {
 		return nil, fmt.Errorf("error creating repo common handler: %w", err)
@@ -48,6 +54,7 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 		{
 			hfAPIGroup.GET("/models/:namespace/:name/revision/:branch", middleware.RepoType(types.ModelRepo), repoCommonHandler.SDKListFiles)
 			hfAPIGroup.GET("/datasets/:namespace/:name/revision/:branch", middleware.RepoType(types.DatasetRepo), repoCommonHandler.SDKListFiles)
+			hfAPIGroup.GET("/whoami-v2", userHandler.UserPermission)
 		}
 	}
 
@@ -282,11 +289,6 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 		spaceSdk.DELETE("/:id", spaceSdkHandler.Delete)
 	}
 
-	// User routes
-	userHandler, err := handler.NewUserHandler(config)
-	if err != nil {
-		return nil, fmt.Errorf("error creating user controller:%w", err)
-	}
 	apiGroup.POST("/users", userHandler.Create)
 	apiGroup.PUT("/users/:username", userHandler.Update)
 	// User models
