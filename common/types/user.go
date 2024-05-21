@@ -59,3 +59,19 @@ type UserLikesRequest struct {
 	Repo_id     int64  `json:"repo_id"`
 	CurrentUser string `json:"current_user"`
 }
+
+type WhoamiResponse struct {
+	Name  string `json:"name"`
+	Email string `json:"email"`
+	Auth  Auth   `json:"auth"`
+}
+
+type AccessToken struct {
+	DisplayName string `json:"displayName,omitempty"`
+	Role        string `json:"role,omitempty"`
+}
+
+type Auth struct {
+	AccessToken `json:"accessToken,omitempty"`
+	Type        string `json:"type,omitempty"`
+}
