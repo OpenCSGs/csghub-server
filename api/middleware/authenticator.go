@@ -98,7 +98,7 @@ func Authenticator(config *config.Config) gin.HandlerFunc {
 			//TODO:use cache to check access token
 			user, _ := userStore.FindByAccessToken(context.Background(), token)
 			if user != nil {
-				httpbase.SetCurrentUser(c, user.Name)
+				httpbase.SetCurrentUser(c, user.Username)
 				httpbase.SetAccessToken(c, token)
 				httpbase.SetAuthType(c, httpbase.AuthTypeAccessToken)
 				c.Next()
