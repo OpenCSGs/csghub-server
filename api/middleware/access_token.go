@@ -6,10 +6,12 @@ import (
 	"strings"
 
 	"github.com/gin-gonic/gin"
+	"opencsg.com/csghub-server/api/httpbase"
 	"opencsg.com/csghub-server/builder/store/database"
 )
 
 func GetUserFromAccessToken() gin.HandlerFunc {
+	userStore := database.NewUserStore()
 	return func(c *gin.Context) {
 		// Get Auzhorization token
 		authHeader := c.Request.Header.Get("Authorization")
@@ -17,7 +19,6 @@ func GetUserFromAccessToken() gin.HandlerFunc {
 		if authHeader != "" {
 			// Get token
 			token := strings.TrimPrefix(authHeader, "Bearer ")
-			userStore := database.NewUserStore()
 			user, err := userStore.FindByAccessToken(context.Background(), token)
 			if err != nil {
 				slog.Debug("Can not find user by access token", slog.String("token", token))
@@ -25,7 +26,8 @@ func GetUserFromAccessToken() gin.HandlerFunc {
 				return
 			}
 			if user != nil {
-				c.Set("currentUser", user.Username)
+				httpbase.SetCurrentUser(c, user.Username)
+				httpbase.SetAuthType(c, httpbase.AuthTypeAccessToken)
 			}
 		}
 

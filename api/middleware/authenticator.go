@@ -1,6 +1,7 @@
 package middleware
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -11,6 +12,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
 	"opencsg.com/csghub-server/api/httpbase"
+	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/types"
 )
@@ -55,40 +57,62 @@ func AuthSession() gin.HandlerFunc {
 }
 
 func Authenticator(config *config.Config) gin.HandlerFunc {
+	//TODO:change to component
+	userStore := database.NewUserStore()
 	return func(c *gin.Context) {
 		apiToken := config.APIToken
 
 		// Get Auzhorization token
 		authHeader := c.Request.Header.Get("Authorization")
-
-		// Check Authorization Header formt
 		if authHeader == "" {
-			slog.Info("missing authorization header", slog.Any("url", c.Request.URL))
-			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "missing Authorization header"})
+			c.Next()
 			return
 		}
 
+		if !strings.HasPrefix(authHeader, "Bearer ") {
+			httpbase.UnauthorizedError(c, errors.New("authorization header must starts with `Bearer `"))
+			c.Abort()
+			return
+		}
 		// Get token
 		token := strings.TrimPrefix(authHeader, "Bearer ")
-
 		if token == apiToken {
 			// get current user from query string
 			currentUser := c.Query(httpbase.CurrentUserQueryVar)
 			if len(currentUser) > 0 {
 				httpbase.SetCurrentUser(c, currentUser)
 			}
-		} else {
-			claims, err := parseJWTToken(config.JWT.SigningKey, token)
-			if err != nil {
-				slog.Debug("fail to parse jwt token", slog.String("token_get", token), slog.Any("error", err))
-				c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
-				return
-			}
-
-			httpbase.SetCurrentUser(c, claims.CurrentUser)
+			httpbase.SetAuthType(c, httpbase.AuthTypeApiKey)
+			c.Next()
+			return
 		}
 
-		c.Next()
+		if strings.Contains(token, ".") {
+			claims, err := parseJWTToken(config.JWT.SigningKey, token)
+			if err == nil {
+				httpbase.SetCurrentUser(c, claims.CurrentUser)
+				httpbase.SetAuthType(c, httpbase.AuthTypeJwt)
+				return
+			}
+		} else {
+			//TODO:use cache to check access token
+			user, _ := userStore.FindByAccessToken(context.Background(), token)
+			if user != nil {
+				httpbase.SetCurrentUser(c, user.Name)
+				httpbase.SetAccessToken(c, token)
+				httpbase.SetAuthType(c, httpbase.AuthTypeAccessToken)
+				c.Next()
+				return
+			}
+		}
+
+		slog.ErrorContext(c, "invalid Bearer token", slog.String("token", token),
+			slog.String("ip", c.ClientIP()),
+			slog.String("method", c.Request.Method),
+			slog.String("url", c.Request.URL.RequestURI()),
+		)
+		httpbase.UnauthorizedError(c, errors.New("invalid Bearer token"))
+		c.Abort()
 	}
 }
 
