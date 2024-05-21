@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"opencsg.com/csghub-server/api/httpbase"
 )
 
 func Log() gin.HandlerFunc {
@@ -24,6 +25,8 @@ func Log() gin.HandlerFunc {
 			slog.String("method", ctx.Request.Method),
 			slog.Int("latency(ms)", int(latency)),
 			slog.Int("status", ctx.Writer.Status()),
+			slog.String("current_user", httpbase.GetCurrentUser(ctx)),
+			slog.Any("auth_type", httpbase.GetAuthType(ctx)),
 			slog.String("url", ctx.Request.URL.RequestURI()),
 		)
 	}
