@@ -27,6 +27,7 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 	}))
 	r.Use(gin.Recovery())
 	r.Use(middleware.Log())
+	r.Use(middleware.Authenticator(config))
 
 	if enableSwagger {
 		r.GET("/api/v1/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
@@ -38,7 +39,6 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 	}
 
 	hfGroup := r.Group("/hf")
-	hfGroup.Use(middleware.GetUserFromAccessToken())
 	{
 		hfGroup.GET("/:namespace/:name/resolve/:branch/*file_path", middleware.RepoType(types.ModelRepo), repoCommonHandler.SDKDownload)
 		hfGroup.HEAD("/:namespace/:name/resolve/:branch/*file_path", middleware.RepoType(types.ModelRepo), repoCommonHandler.HeadSDKDownload)
@@ -51,7 +51,6 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 		}
 	}
 
-	r.Use(middleware.Authenticator(config))
 	apiGroup := r.Group("/api/v1")
 	// TODO:use middleware to handle common response
 	//

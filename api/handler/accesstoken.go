@@ -60,12 +60,11 @@ func (h *AccessTokenHandler) Create(ctx *gin.Context) {
 	}
 	token, err := h.c.Create(ctx, &req)
 	if err != nil {
-		slog.Error("Failed to create user access token", slog.Any("error", err))
+		slog.Error("Failed to create user access token", slog.String("user_name", req.Username), slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
 		return
 	}
 
-	slog.Info("Create user access token succeed")
 	httpbase.OK(ctx, token)
 }
 
