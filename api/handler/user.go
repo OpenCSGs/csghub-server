@@ -520,3 +520,22 @@ func (h *UserHandler) LikesDatasets(ctx *gin.Context) {
 	}
 	ctx.JSON(http.StatusOK, respData)
 }
+
+func (h *UserHandler) UserPermission(ctx *gin.Context) {
+	currentUser := httpbase.GetCurrentUser(ctx)
+	if currentUser == "" {
+		httpbase.UnauthorizedError(ctx, errors.New("user not found, please login first"))
+		return
+	}
+	response := types.WhoamiResponse{
+		Name: currentUser,
+		Auth: types.Auth{
+			AccessToken: types.AccessToken{
+				DisplayName: currentUser,
+				Role:        "write",
+			},
+			Type: "Bearer",
+		},
+	}
+	ctx.JSON(http.StatusOK, response)
+}
