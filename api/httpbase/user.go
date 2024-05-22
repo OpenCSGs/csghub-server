@@ -33,7 +33,7 @@ func GetAccessToken(ctx *gin.Context) string {
 }
 
 func SetAccessToken(ctx *gin.Context, user string) {
-	ctx.Set(CurrentUserCtxVar, user)
+	ctx.Set(AccessTokenCtxVar, user)
 }
 
 func GetAuthType(ctx *gin.Context) AuthType {
