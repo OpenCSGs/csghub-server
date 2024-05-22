@@ -10,6 +10,7 @@ import (
 	"opencsg.com/csghub-server/cmd/csghub-server/cmd/deploy"
 	"opencsg.com/csghub-server/cmd/csghub-server/cmd/logscan"
 	"opencsg.com/csghub-server/cmd/csghub-server/cmd/migration"
+	"opencsg.com/csghub-server/cmd/csghub-server/cmd/mirror"
 	"opencsg.com/csghub-server/cmd/csghub-server/cmd/start"
 	"opencsg.com/csghub-server/cmd/csghub-server/cmd/trigger"
 )
@@ -48,6 +49,7 @@ func init() {
 		trigger.Cmd,
 		deploy.Cmd,
 		cron.Cmd,
+		mirror.Cmd,
 	)
 }
 
