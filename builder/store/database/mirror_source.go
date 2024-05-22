@@ -53,6 +53,18 @@ func (s *MirrorSourceStore) Get(ctx context.Context, id int64) (*MirrorSource, e
 	return &mirrorSource, nil
 }
 
+func (s *MirrorSourceStore) FindByName(ctx context.Context, name string) (*MirrorSource, error) {
+	var mirrorSource MirrorSource
+	err := s.db.Operator.Core.NewSelect().
+		Model(&mirrorSource).
+		Where("source_name=?", name).
+		Scan(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return &mirrorSource, nil
+}
+
 func (s *MirrorSourceStore) Update(ctx context.Context, mirrorSource *MirrorSource) (err error) {
 	err = assertAffectedOneRow(s.db.Operator.Core.NewUpdate().
 		Model(mirrorSource).
