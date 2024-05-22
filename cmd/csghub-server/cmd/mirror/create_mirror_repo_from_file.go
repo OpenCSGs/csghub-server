@@ -17,12 +17,19 @@ import (
 	"opencsg.com/csghub-server/component"
 )
 
-const filePath = "files/mirror_data.json"
+var filePath string
+
+func init() {
+	createMirrorRepoFromFile.Flags().StringVar(&filePath, "file", "", "the path of the file")
+}
 
 var createMirrorRepoFromFile = &cobra.Command{
 	Use:   "create-mirror-from-file",
 	Short: "the cmd to create mirror repository from file",
 	PersistentPreRunE: func(cmd *cobra.Command, args []string) (err error) {
+		if filePath == "" {
+			return fmt.Errorf("empty file path")
+		}
 		config, err := config.LoadConfig()
 		if err != nil {
 			return fmt.Errorf("failed to load config,%w", err)
