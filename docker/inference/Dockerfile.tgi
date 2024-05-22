@@ -1,0 +1,12 @@
+FROM ghcr.io/huggingface/text-generation-inference:2.0
+
+COPY ./tgi/serve.sh serve.sh
+COPY ./tgi/entry.py entry.py
+
+RUN mkdir -p /data
+ENV HUGGINGFACE_HUB_CACHE=/data \
+    HF_HUB_ENABLE_HF_TRANSFER=0 
+ENV PORT=8000
+EXPOSE 8000
+
+ENTRYPOINT ["bash", "serve.sh"]
