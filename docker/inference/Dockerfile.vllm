@@ -1,0 +1,12 @@
+FROM vllm/vllm-openai:latest
+
+COPY ./vllm/serve.sh serve.sh
+COPY ./vllm/entry.py entry.py
+
+RUN mkdir -p /data
+ENV HUGGINGFACE_HUB_CACHE=/data \
+    HF_HUB_ENABLE_HF_TRANSFER=0 
+    
+EXPOSE 8000
+
+ENTRYPOINT ["bash", "serve.sh"]
