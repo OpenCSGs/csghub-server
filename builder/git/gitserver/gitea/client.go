@@ -70,7 +70,8 @@ func findOrCreateAccessToken(ctx context.Context, config *config.Config) (*datab
 			return nil, err
 		}
 		gToken := &database.GitServerAccessToken{
-			Token: access_token,
+			Token:      access_token,
+			ServerType: "git",
 		}
 
 		gToken, err = gs.Create(ctx, gToken)
