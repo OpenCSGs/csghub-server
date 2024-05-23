@@ -115,7 +115,7 @@ func (c *ModelComponent) Index(ctx context.Context, username, search, sort strin
 		return nil, 0, newError
 	}
 
-	//loop through repos to keep the repos in sort order
+	// loop through repos to keep the repos in sort order
 	for _, repo := range repos {
 		var model *database.Model
 		for _, m := range models {
@@ -422,6 +422,80 @@ func (c *ModelComponent) Show(ctx context.Context, namespace, name, currentUser 
 	return resModel, nil
 }
 
+func (c *ModelComponent) SDKModelInfo(ctx context.Context, namespace, name, ref, currentUser string) (*types.SDKModelInfo, error) {
+	model, err := c.ms.FindByPath(ctx, namespace, name)
+	if err != nil {
+		return nil, fmt.Errorf("failed to find model, error: %w", err)
+	}
+
+	allow, _ := c.AllowReadAccessRepo(ctx, model.Repository, currentUser)
+	if !allow {
+		return nil, ErrUnauthorized
+	}
+
+	var pipelineTag, libraryTag string
+	var tags []string
+	for _, tag := range model.Repository.Tags {
+		tags = append(tags, tag.Name)
+		if tag.Category == "task" {
+			pipelineTag = tag.Name
+		}
+		if tag.Category == "framework" {
+			libraryTag = tag.Name
+		}
+	}
+
+	filePaths, err := getFilePaths(namespace, name, "", types.ModelRepo, c.git.GetRepoFileTree)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get all %s files, error: %w", types.ModelRepo, err)
+	}
+
+	var sdkFiles []types.SDKFile
+	for _, filePath := range filePaths {
+		sdkFiles = append(sdkFiles, types.SDKFile{Filename: filePath})
+	}
+	lastCommit, _ := c.LastCommit(ctx, &types.GetCommitsReq{
+		Namespace: namespace,
+		Name:      name,
+		Ref:       ref,
+		RepoType:  types.ModelRepo,
+	})
+
+	relatedRepos, _ := c.relatedRepos(ctx, model.RepositoryID, currentUser)
+	relatedSpaces := relatedRepos[types.SpaceRepo]
+	spaceNames := make([]string, len(relatedSpaces))
+	for idx, s := range relatedSpaces {
+		spaceNames[idx] = s.Name
+	}
+
+	resModel := &types.SDKModelInfo{
+		ID:               model.Repository.Path,
+		Author:           model.Repository.User.Username,
+		Sha:              lastCommit.ID,
+		CreatedAt:        model.Repository.CreatedAt,
+		LastModified:     model.Repository.UpdatedAt,
+		Private:          model.Repository.Private,
+		Disabled:         false,
+		Gated:            nil,
+		Downloads:        int(model.Repository.DownloadCount),
+		Likes:            int(model.Repository.Likes),
+		LibraryName:      libraryTag,
+		Tags:             tags,
+		PipelineTag:      pipelineTag,
+		MaskToken:        "",
+		WidgetData:       nil,
+		ModelIndex:       nil,
+		Config:           nil,
+		TransformersInfo: nil,
+		CardData:         nil,
+		Siblings:         sdkFiles,
+		Spaces:           spaceNames,
+		SafeTensors:      nil,
+	}
+
+	return resModel, nil
+}
+
 func (c *ModelComponent) Relations(ctx context.Context, namespace, name, currentUser string) (*types.Relations, error) {
 	model, err := c.ms.FindByPath(ctx, namespace, name)
 	if err != nil {
@@ -442,7 +516,7 @@ func (c *ModelComponent) getRelations(ctx context.Context, fromRepoID int64, cur
 		return nil, err
 	}
 	rels := new(types.Relations)
-	datasetRepos := res["dataset"]
+	datasetRepos := res[types.DatasetRepo]
 	for _, repo := range datasetRepos {
 		rels.Datasets = append(rels.Datasets, &types.Dataset{
 			Path:        repo.Path,
@@ -454,7 +528,7 @@ func (c *ModelComponent) getRelations(ctx context.Context, fromRepoID int64, cur
 			Downloads:   repo.DownloadCount,
 		})
 	}
-	codeRepos := res["code"]
+	codeRepos := res[types.CodeRepo]
 	for _, repo := range codeRepos {
 		rels.Codes = append(rels.Codes, &types.Code{
 			Path:        repo.Path,
@@ -466,7 +540,7 @@ func (c *ModelComponent) getRelations(ctx context.Context, fromRepoID int64, cur
 			Downloads:   repo.DownloadCount,
 		})
 	}
-	spaceRepos := res["space"]
+	spaceRepos := res[types.SpaceRepo]
 	spacePaths := make([]string, 0)
 	for _, repo := range spaceRepos {
 		spacePaths = append(spacePaths, repo.Path)
