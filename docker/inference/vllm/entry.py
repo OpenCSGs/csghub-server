@@ -4,15 +4,15 @@ import subprocess
 
 
 DOWNLOAD_DIR = "/data"
-MODEL_ID = os.environ['MODEL_ID']
-REVISION = os.getenv('MODEL_REVISION', 'main')
-TOKEN = os.environ['HF_TOKEN']
+REPO_ID = os.environ['REPO_ID']
+REVISION = os.getenv('REVISION', 'main')
+TOKEN = os.environ['ACCESS_TOKEN']
 
 
 def parse_and_download():
 
-    local_dir = f'{DOWNLOAD_DIR}/{MODEL_ID}'
-    snapshot_download(repo_id=MODEL_ID, revision=REVISION, token=TOKEN, local_dir=local_dir, repo_type="model")
+    local_dir = f'{DOWNLOAD_DIR}/{REPO_ID}'
+    snapshot_download(repo_id=REPO_ID, revision=REVISION, token=TOKEN, local_dir=local_dir, repo_type="model")
 
     other_args = ['--model', local_dir]
 
