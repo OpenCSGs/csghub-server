@@ -336,7 +336,7 @@ func (c *CodeComponent) getRelations(ctx context.Context, repoID int64, currentU
 		return nil, err
 	}
 	rels := new(types.Relations)
-	modelRepos := res["model"]
+	modelRepos := res[types.ModelRepo]
 	for _, repo := range modelRepos {
 		rels.Models = append(rels.Models, &types.Model{
 			Path:        repo.Path,
