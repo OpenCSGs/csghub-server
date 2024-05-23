@@ -1,0 +1,6 @@
+FROM registry.cn-beijing.aliyuncs.com/opencsg/nginx:latest
+
+WORKDIR /usr/share/nginx/html
+COPY ./nginx/serve.sh serve.sh
+
+CMD ["serve.sh"]
