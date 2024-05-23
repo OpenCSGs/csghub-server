@@ -43,7 +43,16 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 	if err != nil {
 		return nil, fmt.Errorf("error creating repo common handler: %w", err)
 	}
+	modelHandler, err := handler.NewModelHandler(config)
+	if err != nil {
+		return nil, fmt.Errorf("error creating model controller:%w", err)
+	}
+	dsHandler, err := handler.NewDatasetHandler(config)
+	if err != nil {
+		return nil, fmt.Errorf("error creating dataset handler:%w", err)
+	}
 
+	// Huggingface SDK routes
 	hfGroup := r.Group("/hf")
 	{
 		hfGroup.GET("/:namespace/:name/resolve/:branch/*file_path", middleware.RepoType(types.ModelRepo), repoCommonHandler.SDKDownload)
@@ -52,8 +61,10 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 		hfGroup.HEAD("/datasets/:namespace/:name/resolve/:branch/*file_path", middleware.RepoType(types.DatasetRepo), repoCommonHandler.HeadSDKDownload)
 		hfAPIGroup := hfGroup.Group("/api")
 		{
-			hfAPIGroup.GET("/models/:namespace/:name/revision/:branch", middleware.RepoType(types.ModelRepo), repoCommonHandler.SDKListFiles)
-			hfAPIGroup.GET("/datasets/:namespace/:name/revision/:branch", middleware.RepoType(types.DatasetRepo), repoCommonHandler.SDKListFiles)
+			// compitable with HF model info api, used for sdk like this:  huggingface_hub.model_info(repo_id, revision)
+			hfAPIGroup.GET("/models/:namespace/:name/revision/:ref", modelHandler.SDKModelInfo)
+			// compitable with HF dataset info api, used for sdk like this: huggingface_hub.dataset_info(repo_id, revision)
+			hfAPIGroup.GET("/datasets/:namespace/:name/revision/:ref", middleware.RepoType(types.DatasetRepo), repoCommonHandler.SDKListFiles)
 			hfAPIGroup.GET("/whoami-v2", userHandler.UserPermission)
 		}
 	}
@@ -72,16 +83,6 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 	apiGroup.POST("/list/datasets_by_path", cache.CacheByRequestURI(memoryStore, 1*time.Minute), listHandler.ListDatasetsByPath)
 	apiGroup.POST("/list/spaces_by_path", cache.CacheByRequestURI(memoryStore, 1*time.Minute), listHandler.ListSpacesByPath)
 
-	// Huggingface SDK routes
-	modelHandler, err := handler.NewModelHandler(config)
-	if err != nil {
-		return nil, fmt.Errorf("error creating model controller:%w", err)
-	}
-	dsHandler, err := handler.NewDatasetHandler(config)
-	if err != nil {
-		return nil, fmt.Errorf("error creating dataset handler:%w", err)
-	}
-
 	// Models routes
 	modelsGroup := apiGroup.Group("/models")
 	{
@@ -93,7 +94,7 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 		modelsGroup.GET("/:namespace/:name/relations", modelHandler.Relations)
 		modelsGroup.GET("/:namespace/:name/branches", middleware.RepoType(types.ModelRepo), repoCommonHandler.Branches)
 		modelsGroup.GET("/:namespace/:name/tags", middleware.RepoType(types.ModelRepo), repoCommonHandler.Tags)
-		//update tags of a certain category
+		// update tags of a certain category
 		modelsGroup.POST("/:namespace/:name/tags/:category", middleware.RepoType(types.ModelRepo), repoCommonHandler.UpdateTags)
 		modelsGroup.GET("/:namespace/:name/last_commit", middleware.RepoType(types.ModelRepo), repoCommonHandler.LastCommit)
 		modelsGroup.GET("/:namespace/:name/commit/:commit_id", middleware.RepoType(types.ModelRepo), repoCommonHandler.CommitWithDiff)
@@ -145,7 +146,7 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 		datasetsGroup.GET("/:namespace/:name/relations", dsHandler.Relations)
 		datasetsGroup.GET("/:namespace/:name/branches", middleware.RepoType(types.DatasetRepo), repoCommonHandler.Branches)
 		datasetsGroup.GET("/:namespace/:name/tags", middleware.RepoType(types.DatasetRepo), repoCommonHandler.Tags)
-		//update tags of a certain category
+		// update tags of a certain category
 		datasetsGroup.POST("/:namespace/:name/tags/:category", middleware.RepoType(types.DatasetRepo), repoCommonHandler.UpdateTags)
 		datasetsGroup.GET("/:namespace/:name/last_commit", middleware.RepoType(types.DatasetRepo), repoCommonHandler.LastCommit)
 		datasetsGroup.GET("/:namespace/:name/commit/:commit_id", middleware.RepoType(types.DatasetRepo), repoCommonHandler.CommitWithDiff)
@@ -182,7 +183,7 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 		codesGroup.GET("/:namespace/:name/relations", codeHandler.Relations)
 		codesGroup.GET("/:namespace/:name/branches", middleware.RepoType(types.CodeRepo), repoCommonHandler.Branches)
 		codesGroup.GET("/:namespace/:name/tags", middleware.RepoType(types.CodeRepo), repoCommonHandler.Tags)
-		//update tags of a certain category
+		// update tags of a certain category
 		codesGroup.POST("/:namespace/:name/tags/:category", middleware.RepoType(types.CodeRepo), repoCommonHandler.UpdateTags)
 		codesGroup.GET("/:namespace/:name/last_commit", middleware.RepoType(types.CodeRepo), repoCommonHandler.LastCommit)
 		codesGroup.GET("/:namespace/:name/commit/:commit_id", middleware.RepoType(types.CodeRepo), repoCommonHandler.CommitWithDiff)
@@ -238,7 +239,7 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 
 		spaces.GET("/:namespace/:name/branches", middleware.RepoType(types.SpaceRepo), repoCommonHandler.Branches)
 		spaces.GET("/:namespace/:name/tags", middleware.RepoType(types.SpaceRepo), repoCommonHandler.Tags)
-		//update tags of a certain category
+		// update tags of a certain category
 		spaces.POST("/:namespace/:name/tags/:category", middleware.RepoType(types.SpaceRepo), repoCommonHandler.UpdateTags)
 		spaces.GET("/:namespace/:name/last_commit", middleware.RepoType(types.SpaceRepo), repoCommonHandler.LastCommit)
 		spaces.GET("/:namespace/:name/commit/:commit_id", middleware.RepoType(types.SpaceRepo), repoCommonHandler.CommitWithDiff)
