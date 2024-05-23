@@ -271,7 +271,7 @@ func (c *RepoComponent) DeleteRepo(ctx context.Context, req types.DeleteRepoReq)
 }
 
 // relatedRepos gets all repos related to the given repo, and return them by repo type
-func (c *RepoComponent) relatedRepos(ctx context.Context, repoID int64, currentUser string) (map[string][]*database.Repository, error) {
+func (c *RepoComponent) relatedRepos(ctx context.Context, repoID int64, currentUser string) (map[types.RepositoryType][]*database.Repository, error) {
 	fromRelations, err := c.rel.From(ctx, repoID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get repo relation from, error: %w", err)
@@ -310,9 +310,9 @@ func (c *RepoComponent) relatedRepos(ctx context.Context, repoID int64, currentU
 	if err != nil {
 		return nil, fmt.Errorf("failed to check related repositories visiable to user:%s, %w", currentUser, err)
 	}
-	res := make(map[string][]*database.Repository)
+	res := make(map[types.RepositoryType][]*database.Repository)
 	for _, repo := range relatedRepos {
-		res[string(repo.RepositoryType)] = append(res[string(repo.RepositoryType)], repo)
+		res[repo.RepositoryType] = append(res[repo.RepositoryType], repo)
 	}
 	return res, nil
 }

@@ -89,6 +89,32 @@ type Model struct {
 	UserLikes bool   `json:"user_likes"`
 }
 
+type SDKModelInfo struct {
+	ID     string `json:"id"`
+	Author string `json:"author,omitempty"`
+	// last commit sha
+	Sha              string                 `json:"sha,omitempty"`
+	CreatedAt        time.Time              `json:"created_at,omitempty"`
+	LastModified     time.Time              `json:"last_modified,omitempty"`
+	Private          bool                   `json:"private"`
+	Disabled         bool                   `json:"disabled,omitempty"`
+	Gated            interface{}            `json:"gated,omitempty"` // "auto", "manual", or false
+	Downloads        int                    `json:"downloads"`
+	Likes            int                    `json:"likes"`
+	LibraryName      string                 `json:"library_name,omitempty"`
+	Tags             []string               `json:"tags"`
+	PipelineTag      string                 `json:"pipeline_tag,omitempty"`
+	MaskToken        string                 `json:"mask_token,omitempty"`
+	WidgetData       interface{}            `json:"widget_data,omitempty"`       // Type Any
+	ModelIndex       map[string]interface{} `json:"model_index,omitempty"`       // Dict
+	Config           map[string]interface{} `json:"config,omitempty"`            // Dict
+	TransformersInfo interface{}            `json:"transformers_info,omitempty"` // TransformersInfo
+	CardData         interface{}            `json:"card_data,omitempty"`         // ModelCardData
+	Siblings         []SDKFile              `json:"siblings"`
+	Spaces           []string               `json:"spaces,omitempty"`
+	SafeTensors      interface{}            `json:"safetensors,omitempty"` // SafeTensorsInfo
+}
+
 type ModelWidgetType string
 
 const (
