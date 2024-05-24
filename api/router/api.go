@@ -400,5 +400,12 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 		mirror.POST("/repo", mirrorHandler.CreateMirrorRepo)
 	}
 
+	eventHandler, err := handler.NewEventHandler()
+	if err != nil {
+		return nil, fmt.Errorf("error creating event handler:%w", err)
+	}
+	event := apiGroup.Group("/events")
+	event.POST("", eventHandler.Create)
+
 	return r, nil
 }
