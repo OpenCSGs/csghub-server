@@ -46,6 +46,8 @@ type RepoComponent struct {
 	runFrame     *database.RuntimeFrameworksStore
 	deploy       *database.DeployTaskStore
 	deployer     deploy.Deployer
+	mirrorSource *database.MirrorSourceStore
+	tokenStore   *database.AccessTokenStore
 }
 
 func NewRepoComponent(config *config.Config) (*RepoComponent, error) {
@@ -57,6 +59,8 @@ func NewRepoComponent(config *config.Config) (*RepoComponent, error) {
 	c.rel = database.NewRepoRelationsStore()
 	c.uls = database.NewUserLikesStore()
 	c.mirror = database.NewMirrorStore()
+	c.mirrorSource = database.NewMirrorSourceStore()
+	c.tokenStore = database.NewAccessTokenStore()
 	var err error
 	c.git, err = git.NewGitServer(config)
 	if err != nil {
@@ -1085,21 +1089,29 @@ func (c *RepoComponent) CreateMirror(ctx context.Context, req types.CreateMirror
 	if exists {
 		return nil, fmt.Errorf("mirror already exists")
 	}
+	mirrorSource, err := c.mirrorSource.Get(ctx, req.MirrorSourceID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get mirror source, err: %w, id: %d", err, req.MirrorSourceID)
+	}
+	pushAccessToken, err := c.tokenStore.FindByUsername(ctx, req.CurrentUser)
+	if err != nil {
+		return nil, fmt.Errorf("failed to find access token, error: %w", err)
+	}
 	mirror.Interval = req.Interval
 	mirror.SourceUrl = req.SourceUrl
 	mirror.MirrorSourceID = req.MirrorSourceID
 	mirror.Username = req.Username
-	mirror.PushUrl = req.PushUrl
+	mirror.PushUrl = repo.HTTPCloneURL
 	mirror.AccessToken = req.AccessToken
-	mirror.PushUsername = req.PushUsername
-	mirror.PushAccessToken = req.PushAccessToken
+	mirror.PushUsername = req.CurrentUser
+	mirror.PushAccessToken = pushAccessToken.Token
 	mirror.SourceRepoPath = req.SourceRepoPath
-	mirror.LocalRepoPath = req.LocalRepoPath
+	mirror.LocalRepoPath = fmt.Sprintf("%s_%s_%s_%s", mirrorSource.SourceName, req.RepoType, req.Namespace, req.Name)
 	mirror.RepositoryID = repo.ID
 
 	taskId, err := c.mirrorServer.CreateMirrorRepo(ctx, mirrorserver.CreateMirrorRepoReq{
 		Namespace:   "root",
-		Name:        req.Name,
+		Name:        mirror.LocalRepoPath,
 		CloneUrl:    mirror.SourceUrl,
 		Username:    mirror.Username,
 		AccessToken: mirror.AccessToken,
@@ -1156,6 +1168,15 @@ func (c *RepoComponent) UpdateMirror(ctx context.Context, req types.UpdateMirror
 	if err != nil {
 		return nil, fmt.Errorf("failed to find mirror, error: %w", err)
 	}
+	mirrorSource, err := c.mirrorSource.Get(ctx, req.MirrorSourceID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get mirror source, err: %w, id: %d", err, req.MirrorSourceID)
+	}
+
+	pushAccessToken, err := c.tokenStore.FindByUsername(ctx, req.CurrentUser)
+	if err != nil {
+		return nil, fmt.Errorf("failed to find access token, error: %w", err)
+	}
 
 	mirror.Interval = req.Interval
 	mirror.SourceUrl = req.SourceUrl
@@ -1163,10 +1184,10 @@ func (c *RepoComponent) UpdateMirror(ctx context.Context, req types.UpdateMirror
 	mirror.Username = req.Username
 	mirror.PushUrl = req.PushUrl
 	mirror.AccessToken = req.AccessToken
-	mirror.PushUsername = req.PushUsername
-	mirror.PushAccessToken = req.PushAccessToken
+	mirror.PushUsername = req.CurrentUser
+	mirror.PushAccessToken = pushAccessToken.Token
 	mirror.SourceRepoPath = req.SourceRepoPath
-	mirror.LocalRepoPath = req.LocalRepoPath
+	mirror.LocalRepoPath = fmt.Sprintf("%s_%s_%s_%s", mirrorSource.SourceName, req.RepoType, req.Namespace, req.Name)
 	err = c.mirror.Update(ctx, mirror)
 	if err != nil {
 		return nil, fmt.Errorf("failed to update mirror, error: %w", err)
