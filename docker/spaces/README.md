@@ -16,6 +16,7 @@ ACCESS_TOKEN=xxx
 REPO_ID=xxx
 ```
 ## latest images
-opencsg-registry.cn-beijing.cr.aliyuncs.com/public/csg-nginx:1.1
+registry.cn-beijing.aliyuncs.com/opencsg_space/csg-nginx:1.2
+opencsg-registry.cn-beijing.cr.aliyuncs.com/opencsg_space/csg-nginx:1.2
 
 
