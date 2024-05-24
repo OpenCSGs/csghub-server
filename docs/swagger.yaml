@@ -832,6 +832,28 @@ definitions:
         example: org display name
         type: string
     type: object
+  types.Event:
+    properties:
+      c_id:
+        example: ""
+        type: string
+      c_ip:
+        example: ""
+        type: string
+      ext:
+        description: reserved for future use
+        example: ""
+        type: string
+      id:
+        example: space_card
+        type: string
+      m:
+        example: space
+        type: string
+      v:
+        example: "1"
+        type: string
+    type: object
   types.File:
     properties:
       commit:
@@ -3316,6 +3338,37 @@ paths:
       summary: Get the demo data of the dataset
       tags:
       - Dataset
+  /events:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Events
+        in: body
+        name: events
+        required: true
+        schema:
+          items:
+            $ref: '#/definitions/types.Event'
+          type: array
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            type: object
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      summary: Report client events
+      tags:
+      - Events
   /jwt/token:
     post:
       consumes:
