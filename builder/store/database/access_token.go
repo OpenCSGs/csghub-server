@@ -84,3 +84,19 @@ func (s *AccessTokenStore) FindByUID(ctx context.Context, uid int64) (token *Acc
 	token = &tokens[0]
 	return
 }
+
+func (s *AccessTokenStore) FindByUsername(ctx context.Context, username string) (*AccessToken, error) {
+	var token AccessToken
+	err := s.db.Operator.Core.
+		NewSelect().
+		Model(&token).
+		Join("JOIN users AS u ON u.id = access_token.user_id").
+		Where("u.username = ?", username).
+		Order("created_at DESC").
+		Limit(1).
+		Scan(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return &token, nil
+}

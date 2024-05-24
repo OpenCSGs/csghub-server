@@ -8,9 +8,11 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"net/url"
 	"path"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -882,7 +884,7 @@ func (h *RepoHandler) CommitWithDiff(ctx *gin.Context) {
 // @Param        repo_type path string true "models,datasets,codes or spaces" Enums(models,datasets,codes,spaces)
 // @Param        namespace path string true "repo owner name"
 // @Param        name path string true "repo name"
-// @Param        body body types.CreateMirrorReq true "body"
+// @Param        body body types.CreateMirrorParams true "body"
 // @Success      200  {object}  types.Response{data=database.Mirror} "OK"
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
@@ -905,10 +907,17 @@ func (h *RepoHandler) CreateMirror(ctx *gin.Context) {
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
+	sourceRepoPath, err := getSourceRepoPathFromSourceUrl(mirrorReq.SourceUrl)
+	if err != nil {
+		slog.Error("Bad request format", "error", err)
+		httpbase.BadRequest(ctx, err.Error())
+		return
+	}
 	mirrorReq.Namespace = namespace
 	mirrorReq.Name = name
 	mirrorReq.RepoType = common.RepoTypeFromContext(ctx)
 	mirrorReq.CurrentUser = currentUser
+	mirrorReq.SourceRepoPath = sourceRepoPath
 	mirror, err := h.c.CreateMirror(ctx, mirrorReq)
 	if err != nil {
 		slog.Error("Failed to create mirror for", slog.String("repo_type", string(mirrorReq.RepoType)), slog.String("path", fmt.Sprintf("%s/%s", mirrorReq.Namespace, mirrorReq.Name)), "error", err)
@@ -966,7 +975,7 @@ func (h *RepoHandler) GetMirror(ctx *gin.Context) {
 // @Param        repo_type path string true "models,datasets,codes or spaces" Enums(models,datasets,codes,spaces)
 // @Param        namespace path string true "repo owner name"
 // @Param        name path string true "repo name"
-// @Param        body body types.UpdateMirrorReq true "body"
+// @Param        body body types.UpdateMirrorParams true "body"
 // @Success      200  {object}  types.Response{data=database.Mirror} "OK"
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
@@ -989,6 +998,13 @@ func (h *RepoHandler) UpdateMirror(ctx *gin.Context) {
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
+	sourceRepoPath, err := getSourceRepoPathFromSourceUrl(mirrorReq.SourceUrl)
+	if err != nil {
+		slog.Error("Bad request format", "error", err)
+		httpbase.BadRequest(ctx, err.Error())
+		return
+	}
+	mirrorReq.SourceRepoPath = sourceRepoPath
 	mirrorReq.Namespace = namespace
 	mirrorReq.Name = name
 	mirrorReq.RepoType = common.RepoTypeFromContext(ctx)
@@ -1234,4 +1250,21 @@ func (h *RepoHandler) DeployList(ctx *gin.Context) {
 	}
 
 	httpbase.OK(ctx, response)
+}
+
+func getSourceRepoPathFromSourceUrl(sourceUrl string) (string, error) {
+	parsedURL, err := url.Parse(sourceUrl)
+	if err != nil {
+		return "", err
+	}
+
+	// Remove leading and trailing slashes
+	path := strings.Trim(parsedURL.Path, "/")
+
+	// Remove ".git" suffix if present
+	if strings.HasSuffix(path, ".git") {
+		path = strings.TrimSuffix(path, ".git")
+	}
+
+	return path, nil
 }

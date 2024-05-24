@@ -6,15 +6,22 @@ type CreateMirrorReq struct {
 	Interval        string         `json:"interval"`
 	SourceUrl       string         `json:"source_url" binding:"required"`
 	MirrorSourceID  int64          `json:"mirror_source_id" binding:"required"`
-	Username        string         `json:"-"`
-	AccessToken     string         `json:"-"`
-	PushUrl         string         `json:"push_url" binding:"required"`
-	PushUsername    string         `json:"push_username" binding:"required"`
-	PushAccessToken string         `json:"push_access_token" binding:"required"`
-	SourceRepoPath  string         `json:"source_repo_path" binding:"required"`
-	LocalRepoPath   string         `json:"local_repo_path" binding:"required"`
+	Username        string         `json:"username"`
+	AccessToken     string         `json:"password"`
+	PushUrl         string         `json:"push_url"`
+	PushUsername    string         `json:"push_username"`
+	PushAccessToken string         `json:"push_access_token"`
+	SourceRepoPath  string         `json:"source_repo_path"`
+	LocalRepoPath   string         `json:"local_repo_path"`
 	CurrentUser     string         `json:"current_user"`
 	RepoType        RepositoryType `json:"repo_type"`
+}
+
+type CreateMirrorParams struct {
+	SourceUrl      string `json:"source_url"`
+	MirrorSourceID int64  `json:"mirror_source_id"`
+	Username       string `json:"username"`
+	AccessToken    string `json:"password"`
 }
 
 type GetMirrorReq struct {
@@ -25,6 +32,8 @@ type GetMirrorReq struct {
 }
 
 type UpdateMirrorReq = CreateMirrorReq
+
+type UpdateMirrorParams = CreateMirrorParams
 
 type DeleteMirrorReq = GetMirrorReq
 

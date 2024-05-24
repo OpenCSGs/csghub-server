@@ -179,14 +179,9 @@ func (c *MirrorComponent) CreateMirrorRepo(ctx context.Context, req types.Create
 	mirror.RepositoryID = repo.ID
 	mirror.Repository = repo
 	mirror.LocalRepoPath = fmt.Sprintf("%s_%s_%s_%s", mirrorSource.SourceName, req.RepoType, req.SourceNamespace, req.SourceName)
-	mirror.SourceRepoPath = fmt.Sprintf("%s/%s", namespace, name)
+	mirror.SourceRepoPath = fmt.Sprintf("%s/%s", req.SourceNamespace, req.SourceName)
 
-	reqMirror, err := c.mirrorStore.Create(ctx, &mirror)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create mirror")
-	}
-
-	c.mirrorServer.CreateMirrorRepo(ctx, mirrorserver.CreateMirrorRepoReq{
+	taskId, err := c.mirrorServer.CreateMirrorRepo(ctx, mirrorserver.CreateMirrorRepoReq{
 		Namespace: "root",
 		Name:      mirror.LocalRepoPath,
 		CloneUrl:  mirror.SourceUrl,
@@ -197,6 +192,13 @@ func (c *MirrorComponent) CreateMirrorRepo(ctx context.Context, req types.Create
 
 	if err != nil {
 		return nil, fmt.Errorf("failed to create push mirror in mirror server: %v", err)
+	}
+
+	mirror.MirrorTaskID = taskId
+
+	reqMirror, err := c.mirrorStore.Create(ctx, &mirror)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create mirror")
 	}
 
 	return reqMirror, nil
