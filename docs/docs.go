@@ -6192,7 +6192,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/types.UpdateMirrorReq"
+                            "$ref": "#/definitions/types.UpdateMirrorParams"
                         }
                     }
                 ],
@@ -6279,7 +6279,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/types.CreateMirrorReq"
+                            "$ref": "#/definitions/types.CreateMirrorParams"
                         }
                     }
                 ],
@@ -8278,6 +8278,23 @@ const docTemplate = `{
                 }
             }
         },
+        "types.CreateMirrorParams": {
+            "type": "object",
+            "properties": {
+                "mirror_source_id": {
+                    "type": "integer"
+                },
+                "password": {
+                    "type": "string"
+                },
+                "source_url": {
+                    "type": "string"
+                },
+                "username": {
+                    "type": "string"
+                }
+            }
+        },
         "types.CreateMirrorRepoReq": {
             "type": "object",
             "required": [
@@ -8317,56 +8334,6 @@ const docTemplate = `{
                 },
                 "source_url": {
                     "description": "mirror source info",
-                    "type": "string"
-                }
-            }
-        },
-        "types.CreateMirrorReq": {
-            "type": "object",
-            "required": [
-                "local_repo_path",
-                "mirror_source_id",
-                "push_access_token",
-                "push_url",
-                "push_username",
-                "source_repo_path",
-                "source_url"
-            ],
-            "properties": {
-                "current_user": {
-                    "type": "string"
-                },
-                "interval": {
-                    "type": "string"
-                },
-                "local_repo_path": {
-                    "type": "string"
-                },
-                "mirror_source_id": {
-                    "type": "integer"
-                },
-                "name": {
-                    "type": "string"
-                },
-                "namespace": {
-                    "type": "string"
-                },
-                "push_access_token": {
-                    "type": "string"
-                },
-                "push_url": {
-                    "type": "string"
-                },
-                "push_username": {
-                    "type": "string"
-                },
-                "repo_type": {
-                    "$ref": "#/definitions/types.RepositoryType"
-                },
-                "source_repo_path": {
-                    "type": "string"
-                },
-                "source_url": {
                     "type": "string"
                 }
             }
@@ -9330,52 +9297,19 @@ const docTemplate = `{
         "types.UpdateFileResp": {
             "type": "object"
         },
-        "types.UpdateMirrorReq": {
+        "types.UpdateMirrorParams": {
             "type": "object",
-            "required": [
-                "local_repo_path",
-                "mirror_source_id",
-                "push_access_token",
-                "push_url",
-                "push_username",
-                "source_repo_path",
-                "source_url"
-            ],
             "properties": {
-                "current_user": {
-                    "type": "string"
-                },
-                "interval": {
-                    "type": "string"
-                },
-                "local_repo_path": {
-                    "type": "string"
-                },
                 "mirror_source_id": {
                     "type": "integer"
                 },
-                "name": {
-                    "type": "string"
-                },
-                "namespace": {
-                    "type": "string"
-                },
-                "push_access_token": {
-                    "type": "string"
-                },
-                "push_url": {
-                    "type": "string"
-                },
-                "push_username": {
-                    "type": "string"
-                },
-                "repo_type": {
-                    "$ref": "#/definitions/types.RepositoryType"
-                },
-                "source_repo_path": {
+                "password": {
                     "type": "string"
                 },
                 "source_url": {
+                    "type": "string"
+                },
+                "username": {
                     "type": "string"
                 }
             }
