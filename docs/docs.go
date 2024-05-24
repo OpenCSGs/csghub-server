@@ -1022,6 +1022,54 @@ const docTemplate = `{
                 }
             }
         },
+        "/events": {
+            "post": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Events"
+                ],
+                "summary": "Report client events",
+                "parameters": [
+                    {
+                        "description": "Events",
+                        "name": "events",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/types.Event"
+                            }
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            }
+        },
         "/jwt/token": {
             "post": {
                 "security": [
@@ -8646,6 +8694,36 @@ const docTemplate = `{
                     "description": "Display name",
                     "type": "string",
                     "example": "org display name"
+                }
+            }
+        },
+        "types.Event": {
+            "type": "object",
+            "properties": {
+                "c_id": {
+                    "type": "string",
+                    "example": ""
+                },
+                "c_ip": {
+                    "type": "string",
+                    "example": ""
+                },
+                "ext": {
+                    "description": "reserved for future use",
+                    "type": "string",
+                    "example": ""
+                },
+                "id": {
+                    "type": "string",
+                    "example": "space_card"
+                },
+                "m": {
+                    "type": "string",
+                    "example": "space"
+                },
+                "v": {
+                    "type": "string",
+                    "example": "1"
                 }
             }
         },
