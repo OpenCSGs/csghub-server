@@ -1,5 +1,7 @@
 package database
 
+import "time"
+
 type Space struct {
 	ID           int64       `bun:",pk,autoincrement" json:"id"`
 	RepositoryID int64       `bun:",notnull" json:"repository_id"`
@@ -42,4 +44,15 @@ type RecomRepoScore struct {
 	//the total recommendation score calculated by all the recommendation weights
 	Score float64 `bun:",notnull" json:"score"`
 	times
+}
+
+/* tables for client events */
+type Event struct {
+	ID        int64     `bun:",pk,autoincrement" json:"id"`
+	Module    string    `bun:",notnull" json:"module"`
+	EventID   string    `bun:",notnull" json:"event_id"`
+	Value     string    `bun:",notnull" json:"value"`
+	ClientID  string    `bun:"," json:"client_id"`
+	ClientIP  string    `bun:"," json:"client_ip"`
+	CreatedAt time.Time `bun:"created_at,notnull,default:current_timestamp" json:"created_at"`
 }
