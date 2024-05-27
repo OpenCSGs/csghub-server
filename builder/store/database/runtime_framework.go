@@ -17,11 +17,13 @@ func NewRuntimeFrameworksStore() *RuntimeFrameworksStore {
 }
 
 type RuntimeFramework struct {
-	ID           int64  `bun:",pk,autoincrement" json:"id"`
-	FrameName    string `bun:",notnull" json:"frame_name"`
-	FrameVersion string `bun:",notnull" json:"frame_version"`
-	FrameImage   string `bun:",notnull" json:"frame_image"`
-	Enabled      int64  `bun:",notnull" json:"enabled"`
+	ID            int64  `bun:",pk,autoincrement" json:"id"`
+	FrameName     string `bun:",notnull" json:"frame_name"`
+	FrameVersion  string `bun:",notnull" json:"frame_version"`
+	FrameImage    string `bun:",notnull" json:"frame_image"`
+	FrameCpuImage string `bun:",notnull" json:"frame_cpu_image"`
+	Enabled       int64  `bun:",notnull" json:"enabled"`
+	ContainerPort int    `bun:",notnull" json:"container_port"`
 	times
 }
 
@@ -37,7 +39,7 @@ func (rf *RuntimeFrameworksStore) List(ctx context.Context) ([]RuntimeFramework,
 func (rf *RuntimeFrameworksStore) FindByID(ctx context.Context, id int64) (*RuntimeFramework, error) {
 	var res RuntimeFramework
 	res.ID = id
-	_, err := rf.db.Core.NewSelect().Model(&res).WherePK().Where("enabled = 1").Exec(ctx, &res)
+	_, err := rf.db.Core.NewSelect().Model(&res).WherePK().Exec(ctx, &res)
 	return &res, err
 }
 
@@ -58,4 +60,11 @@ func (rf *RuntimeFrameworksStore) Update(ctx context.Context, frame RuntimeFrame
 func (rf *RuntimeFrameworksStore) Delete(ctx context.Context, frame RuntimeFramework) error {
 	_, err := rf.db.Core.NewDelete().Model(&frame).WherePK().Exec(ctx)
 	return err
+}
+
+func (rf *RuntimeFrameworksStore) FindEnabledByID(ctx context.Context, id int64) (*RuntimeFramework, error) {
+	var res RuntimeFramework
+	res.ID = id
+	_, err := rf.db.Core.NewSelect().Model(&res).WherePK().Where("enabled = 1").Exec(ctx, &res)
+	return &res, err
 }

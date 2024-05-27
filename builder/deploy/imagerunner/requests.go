@@ -30,6 +30,7 @@ type (
 		DeployID         int64  `json:"deploy_id"`
 		Accesstoken      string `json:"access_token"`
 		ClusterID        string `json:"cluster_id"`
+		SvcName          string `json:"svc_name"`
 	}
 
 	RunResponse struct {
@@ -43,6 +44,7 @@ type (
 		OrgName   string `json:"org_name"`
 		RepoName  string `json:"repo_name"`
 		ClusterID string `json:"cluster_id"`
+		SvcName   string `json:"svc_name"`
 	}
 
 	StopResponse struct {
@@ -56,6 +58,7 @@ type (
 		OrgName   string `json:"org_name"`
 		RepoName  string `json:"repo_name"`
 		ClusterID string `json:"cluster_id"`
+		SvcName   string `json:"svc_name"`
 	}
 
 	StatusResponse struct {
@@ -71,6 +74,7 @@ type (
 		RepoName  string `json:"repo_name"`
 		DeployID  int64  `json:"deploy_id"`
 		ClusterID string `json:"cluster_id"`
+		SvcName   string `json:"svc_name"`
 	}
 
 	LogsResponse struct {
@@ -82,12 +86,51 @@ type (
 		OrgName   string `json:"org_name"`
 		RepoName  string `json:"repo_name"`
 		ClusterID string `json:"cluster_id"`
+		SvcName   string `json:"svc_name"`
 	}
 
-	CluserInfo struct {
+	CluserResponse struct {
 		ClusterID     string                              `json:"cluster_id"`
 		ClusterName   string                              `json:"cluster_name"`
 		ClusterRegion string                              `json:"cluster_region"`
 		Nodes         map[string]cluster.NodeResourceInfo `json:"nodes"`
+		Zone          string                              `json:"zone"`
+		Provider      string                              `json:"provider"`
+	}
+
+	CluserRequest struct {
+		ClusterID     string `json:"cluster_id"`
+		ClusterConfig string `json:"cluster_config"`
+		Region        string `json:"region"`
+		Zone          string `json:"zone"`     //cn-beijing
+		Provider      string `json:"provider"` //ali
+		Enable        bool   `json:"enable"`
+	}
+
+	ReplicaResponse struct {
+		DeployID       int64            `json:"deploy_id"`
+		Code           int              `json:"code"`
+		Message        string           `json:"message"`
+		ActualReplica  int              `json:"actual_replica"`
+		DesiredReplica int              `json:"desired_replica"`
+		Instances      []types.Instance `json:"instance"`
+	}
+
+	ServiceRequest struct {
+		ClusterID string `json:"cluster_id"`
+	}
+
+	ServiceInfoResponse struct {
+		ServiceName string   `json:"service_name"`
+		PodNames    []string `json:"pod_names"`
+	}
+
+	InstanceLogsRequest struct {
+		ID           int64  `json:"id"`
+		OrgName      string `json:"org_name"`
+		RepoName     string `json:"repo_name"`
+		ClusterID    string `json:"cluster_id"`
+		SvcName      string `json:"svc_name"`
+		InstanceName string `json:"instance_name"`
 	}
 )

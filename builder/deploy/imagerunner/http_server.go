@@ -20,16 +20,18 @@ import (
 	"opencsg.com/csghub-server/api/middleware"
 	"opencsg.com/csghub-server/builder/deploy/cluster"
 	"opencsg.com/csghub-server/builder/deploy/common"
+	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/types"
 )
 
 type HttpServer struct {
-	clusterPool     *cluster.ClusterPool
-	dockerRegBase   string
-	k8sNameSpace    string
-	imagePullSecret string
-	env             *config.Config
+	clusterPool        *cluster.ClusterPool
+	spaceDockerRegBase string
+	modelDockerRegBase string
+	k8sNameSpace       string
+	imagePullSecret    string
+	env                *config.Config
 }
 
 func NewHttpServer(config *config.Config) (*HttpServer, error) {
@@ -40,11 +42,12 @@ func NewHttpServer(config *config.Config) (*HttpServer, error) {
 	}
 	domainParts := strings.SplitN(config.Space.InternalRootDomain, ".", 2)
 	return &HttpServer{
-		dockerRegBase:   config.Space.DockerRegBase,
-		k8sNameSpace:    domainParts[0],
-		imagePullSecret: config.Space.ImagePullSecret,
-		clusterPool:     clusterPool,
-		env:             config,
+		spaceDockerRegBase: config.Space.DockerRegBase,
+		modelDockerRegBase: config.Model.DockerRegBase,
+		k8sNameSpace:       domainParts[0],
+		imagePullSecret:    config.Space.ImagePullSecret,
+		clusterPool:        clusterPool,
+		env:                config,
 	}, nil
 }
 
@@ -56,9 +59,13 @@ func (s *HttpServer) Run(port int) error {
 	router.POST("/:service/stop", s.stopService)
 	router.GET("/:service/status", s.serviceStatus)
 	router.GET("/:service/logs", s.serviceLogs)
+	router.GET("/:service/logs/:pod_name", s.serviceLogsByPod)
+	router.GET("/:service/info", s.getServiceInfo)
 	router.GET("/status-all", s.serviceStatusAll)
 	router.GET("/cluster/status", s.getClusterStatus)
+	router.PUT("/cluster", s.updateCluster)
 	router.GET("/:service/get", s.getServiceByName)
+	router.GET("/:service/replica", s.getReplica)
 
 	return router.Run(fmt.Sprintf(":%d", port))
 }
@@ -71,6 +78,8 @@ func (s *HttpServer) runService(c *gin.Context) {
 		Annotation map[string]string `json:"annotation,omitempty"`
 		DeployID   int64             `json:"deploy_id" binding:"required"`
 		RepoType   string            `json:"repo_type"`
+		MinReplica int               `json:"min_replica"`
+		MaxReplica int               `json:"max_replica"`
 		ClusterID  string            `json:"cluster_id"`
 	}
 
@@ -167,6 +176,25 @@ func (s *HttpServer) runService(c *gin.Context) {
 	}
 
 	annotations["deploy_id"] = strconv.FormatInt(request.DeployID, 10)
+
+	containerImg := path.Join(s.spaceDockerRegBase, request.ImageID)
+	if request.RepoType == string(types.ModelRepo) {
+		// choose registry
+		containerImg = path.Join(s.modelDockerRegBase, request.ImageID)
+	}
+
+	templateAnnotations := make(map[string]string)
+	if request.RepoType == string(types.ModelRepo) {
+		// auto scaling
+		templateAnnotations["autoscaling.knative.dev/class"] = "kpa.autoscaling.knative.dev"
+		templateAnnotations["enable-scale-to-zero"] = "false"
+		templateAnnotations["autoscaling.knative.dev/metric"] = "concurrency"
+		templateAnnotations["autoscaling.knative.dev/target"] = "5"
+		templateAnnotations["autoscaling.knative.dev/target-utilization-percentage"] = "90"
+		templateAnnotations["autoscaling.knative.dev/min-scale"] = strconv.Itoa(request.MinReplica)
+		templateAnnotations["autoscaling.knative.dev/max-scale"] = strconv.Itoa(request.MaxReplica)
+	}
+
 	service := &v1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        srvName,
@@ -176,13 +204,16 @@ func (s *HttpServer) runService(c *gin.Context) {
 		Spec: v1.ServiceSpec{
 			ConfigurationSpec: v1.ConfigurationSpec{
 				Template: v1.RevisionTemplateSpec{
+					ObjectMeta: metav1.ObjectMeta{
+						Annotations: templateAnnotations,
+					},
 					Spec: v1.RevisionSpec{
 						PodSpec: corev1.PodSpec{
 							NodeSelector: nodeSelector,
 							Containers: []corev1.Container{{
 								// TODO: docker registry url + image id
 								// Image: "ghcr.io/knative/helloworld-go:latest",
-								Image:     path.Join(s.dockerRegBase, request.ImageID),
+								Image:     containerImg,
 								Ports:     exposePorts,
 								Resources: resources,
 								Env:       environments,
@@ -327,7 +358,7 @@ func (s *HttpServer) serviceStatus(c *gin.Context) {
 	}
 
 	if srv.IsReady() {
-		podNames, err := s.getServicePods(c.Request.Context(), *cluster, srvName, s.k8sNameSpace)
+		podNames, err := s.getServicePods(c.Request.Context(), *cluster, srvName, s.k8sNameSpace, 1)
 		if err != nil {
 			slog.Error("get image status failed, cantnot get pods info", slog.String("srv_name", srvName), slog.Any("error", err))
 			c.JSON(http.StatusInternalServerError, gin.H{"code": 0, "message": "unkown service status, failed to get pods"})
@@ -376,7 +407,7 @@ func (s *HttpServer) serviceLogs(c *gin.Context) {
 		return
 	}
 	srvName := s.getServiceNameFromRequest(c)
-	podNames, err := s.getServicePods(c.Request.Context(), *cluster, srvName, s.k8sNameSpace)
+	podNames, err := s.getServicePods(c.Request.Context(), *cluster, srvName, s.k8sNameSpace, 1)
 	if err != nil {
 		slog.Error("failed to read image logs, cannot get pods info", slog.Any("error", err), slog.String("srv_name", srvName))
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to get pods info"})
@@ -387,7 +418,30 @@ func (s *HttpServer) serviceLogs(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "no running pods, service maybe sleeping"})
 		return
 	}
-	podName := podNames[0]
+	s.getLogsByPod(c, *cluster, podNames[0], srvName)
+}
+
+func (s *HttpServer) serviceLogsByPod(c *gin.Context) {
+	var request = &ServiceRequest{}
+	err := c.BindJSON(request)
+
+	if err != nil {
+		slog.Error("serviceLogs get bad request", slog.Any("error", err), slog.Any("req", request))
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	cluster, err := s.clusterPool.GetClusterByID(c, request.ClusterID)
+	if err != nil {
+		slog.Error("fail to get cluster ", slog.Any("error", err))
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	srvName := s.getServiceNameFromRequest(c)
+	podName := s.getPodNameFromRequest(c)
+	s.getLogsByPod(c, *cluster, podName, srvName)
+}
+
+func (s *HttpServer) getLogsByPod(c *gin.Context, cluster cluster.Cluster, podName string, srvName string) {
 
 	logs := cluster.Client.CoreV1().Pods(s.k8sNameSpace).GetLogs(podName, &corev1.PodLogOptions{
 		Container: "user-container",
@@ -461,7 +515,7 @@ func (s *HttpServer) serviceStatusAll(c *gin.Context) {
 			}
 
 			if srv.IsReady() {
-				podNames, err := s.getServicePods(c.Request.Context(), cluster, srv.Name, s.k8sNameSpace)
+				podNames, err := s.getServicePods(c.Request.Context(), cluster, srv.Name, s.k8sNameSpace, 1)
 				if err != nil {
 					slog.Error("get image status failed, cannot get pods info", slog.Any("error", err))
 					status.Code = common.Running
@@ -485,13 +539,19 @@ func (s *HttpServer) serviceStatusAll(c *gin.Context) {
 	c.JSON(http.StatusOK, allStatus)
 }
 
-func (s *HttpServer) getServicePods(ctx context.Context, cluster cluster.Cluster, srvName string, namespace string) ([]string, error) {
+func (s *HttpServer) getServicePods(ctx context.Context, cluster cluster.Cluster, srvName string, namespace string, limit int64) ([]string, error) {
 	labelSelector := fmt.Sprintf("serving.knative.dev/service=%s", srvName)
 	// Get the list of Pods based on the label selector
-	pods, err := cluster.Client.CoreV1().Pods(namespace).List(ctx, metav1.ListOptions{
+	opts := metav1.ListOptions{
 		LabelSelector: labelSelector,
-		Limit:         1,
-	})
+	}
+	if limit > 0 {
+		opts = metav1.ListOptions{
+			LabelSelector: labelSelector,
+			Limit:         limit,
+		}
+	}
+	pods, err := cluster.Client.CoreV1().Pods(namespace).List(ctx, opts)
 	if err != nil {
 		return nil, err
 	}
@@ -506,14 +566,16 @@ func (s *HttpServer) getServicePods(ctx context.Context, cluster cluster.Cluster
 }
 
 func (s *HttpServer) getClusterStatus(c *gin.Context) {
-	clusterRes := []CluserInfo{}
+	clusterRes := []CluserResponse{}
 	for index := range s.clusterPool.Clusters {
 		cls := s.clusterPool.Clusters[index]
+		cInfo, _ := s.clusterPool.ClusterStore.ByClusterConfig(c.Request.Context(), cls.ID)
+		if !cInfo.Enable {
+			continue
+		}
 		nodes, err := cluster.GetNodeResources(cls.Client, s.env)
-
 		if err == nil {
-			cInfo, _ := s.clusterPool.ClusterStore.ByClusterConfig(context.TODO(), cls.ID)
-			clusterInfo := CluserInfo{}
+			clusterInfo := CluserResponse{}
 			clusterInfo.Nodes = nodes
 			clusterInfo.ClusterRegion = cInfo.Region
 			clusterInfo.ClusterID = cInfo.ClusterID
@@ -528,6 +590,10 @@ func (s *HttpServer) getClusterStatus(c *gin.Context) {
 
 func (s *HttpServer) getServiceNameFromRequest(c *gin.Context) string {
 	return c.Params.ByName("service")
+}
+
+func (s *HttpServer) getPodNameFromRequest(c *gin.Context) string {
+	return c.Params.ByName("pod_name")
 }
 
 func (s *HttpServer) getServiceByName(c *gin.Context) {
@@ -588,4 +654,170 @@ func (s *HttpServer) getServiceByName(c *gin.Context) {
 		resp.Endpoint = srv.Status.URL.URL().String()
 	}
 	c.JSON(http.StatusOK, resp)
+}
+
+func (s *HttpServer) getReplica(c *gin.Context) {
+	var resp ReplicaResponse
+	var request = &StatusRequest{}
+	err := c.BindJSON(request)
+	if err != nil {
+		slog.Error("fail to parse input parameters", slog.Any("error", err))
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "fail to parse input parameters"})
+		return
+	}
+	cluster, err := s.clusterPool.GetClusterByID(c, request.ClusterID)
+	if err != nil {
+		slog.Error("fail to get cluster config", slog.Any("error", err))
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "fail to get cluster config"})
+		return
+	}
+	srvName := s.getServiceNameFromRequest(c)
+	srv, err := cluster.KnativeClient.ServingV1().Services(s.k8sNameSpace).Get(c.Request.Context(), srvName, metav1.GetOptions{})
+	if err != nil {
+		// get service with error
+		slog.Error("fail to get service", slog.Any("error", err))
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "fail to get service"})
+		return
+	}
+
+	if srv == nil {
+		// service not exist
+		slog.Error("service not exist")
+		c.JSON(http.StatusNotFound, gin.H{"error": "service not exist"})
+		return
+	}
+	// revisionName := srv.Status.LatestReadyRevisionName
+	revisionName := srv.Status.LatestCreatedRevisionName
+	if len(revisionName) < 1 {
+		slog.Error("fail to get latest created revision")
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "fail to get latest created revision"})
+		return
+	}
+	revision, err := cluster.KnativeClient.ServingV1().Revisions(s.k8sNameSpace).Get(c.Request.Context(), revisionName, metav1.GetOptions{})
+	if err != nil {
+		slog.Error("fail to get revision with error", slog.Any("error", err))
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "fail to get revision with error"})
+		return
+	}
+
+	if revision == nil {
+		slog.Error("revision not exist")
+		c.JSON(http.StatusNotFound, gin.H{"error": "revision not exist"})
+		return
+	}
+	instList, err := s.getServicePodsWithStatus(c.Request.Context(), *cluster, srvName, s.k8sNameSpace)
+	if err != nil {
+		slog.Error("fail to get service pod name list", slog.Any("error", err))
+		c.JSON(http.StatusNotFound, gin.H{"error": "fail to get service pod name list"})
+		return
+	}
+
+	// revision exist
+	deployIDStr := srv.Annotations[types.ResDeployID]
+	deployID, _ := strconv.ParseInt(deployIDStr, 10, 64)
+	resp.DeployID = deployID
+	resp.Code = 1
+	resp.Message = srvName
+	resp.ActualReplica = int(*revision.Status.ActualReplicas)
+	resp.DesiredReplica = int(*revision.Status.DesiredReplicas)
+	resp.Instances = instList
+	c.JSON(http.StatusOK, resp)
+}
+
+func (s *HttpServer) updateCluster(c *gin.Context) {
+	var resp StatusResponse
+	var request = &database.ClusterInfo{}
+	err := c.BindJSON(request)
+	if err != nil {
+		slog.Error("fail to parse input parameters", slog.Any("error", err))
+		resp.Code = -1
+		resp.Message = "fail to parse input parameters"
+		c.JSON(http.StatusBadRequest, resp)
+		return
+	}
+	err = s.clusterPool.ClusterStore.Update(c, *request)
+	if err != nil {
+		slog.Error("fail to update cluster", slog.Any("error", err))
+		resp.Code = -1
+		resp.Message = "fail to update cluster"
+		c.JSON(http.StatusInternalServerError, resp)
+		return
+	}
+	resp.Code = 0
+	resp.Message = "succeed to update cluster"
+	c.JSON(http.StatusOK, resp)
+}
+
+func (s *HttpServer) getServiceInfo(c *gin.Context) {
+	var resp ServiceInfoResponse
+	var request = &ServiceRequest{}
+	err := c.BindJSON(request)
+	if err != nil {
+		slog.Error("fail to parse input parameters", slog.Any("error", err))
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "fail to parse input parameters"})
+		return
+	}
+	cluster, err := s.clusterPool.GetClusterByID(c, request.ClusterID)
+	if err != nil {
+		slog.Error("fail to get cluster config", slog.Any("error", err))
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "fail to get cluster config"})
+		return
+	}
+
+	srvName := s.getServiceNameFromRequest(c)
+	podNames, err := s.getServicePods(c.Request.Context(), *cluster, srvName, s.k8sNameSpace, -1)
+	if err != nil {
+		slog.Error("failed to read image logs, cannot get pods info", slog.Any("error", err), slog.String("srv_name", srvName))
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to get pods info"})
+		return
+	}
+	resp.PodNames = podNames
+	resp.ServiceName = srvName
+	c.JSON(http.StatusOK, resp)
+}
+
+func (s *HttpServer) getServicePodsWithStatus(ctx context.Context, cluster cluster.Cluster, srvName string, namespace string) ([]types.Instance, error) {
+	labelSelector := fmt.Sprintf("serving.knative.dev/service=%s", srvName)
+	// Get the list of Pods based on the label selector
+	pods, err := cluster.Client.CoreV1().Pods(namespace).List(ctx, metav1.ListOptions{
+		LabelSelector: labelSelector,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	// Extract the Pod names and status
+	var podInstances []types.Instance
+	for _, pod := range pods.Items {
+		podInstances = append(podInstances,
+			types.Instance{
+				Name:   pod.Name,
+				Status: getPodStatus(pod.Status.ContainerStatuses),
+			},
+		)
+	}
+
+	return podInstances, nil
+}
+
+func getPodStatus(containerStatuses []corev1.ContainerStatus) string {
+	// get knative user-container status
+	status := string(corev1.PodFailed)
+	for _, container := range containerStatuses {
+		if container.Name == "user-container" {
+			if container.Ready && container.State.Running != nil {
+				status = string(corev1.PodRunning)
+				return status
+			}
+			if !container.Ready && container.State.Waiting != nil {
+				status = container.State.Waiting.Reason
+				return status
+			}
+			if !container.Ready && container.State.Terminated != nil {
+				status = container.State.Terminated.Reason
+				return status
+			}
+		}
+	}
+	return status
 }

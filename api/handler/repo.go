@@ -1252,6 +1252,138 @@ func (h *RepoHandler) DeployList(ctx *gin.Context) {
 	httpbase.OK(ctx, response)
 }
 
+// DeployDetail  godoc
+// @Security     ApiKey
+// @Summary      Get repo deploy detail
+// @Description  Get repo deploy detail
+// @Tags         Repository
+// @Accept       json
+// @Produce      json
+// @Param        repo_type path string true "models,spaces" Enums(models,spaces)
+// @Param        namespace path string true "namespace"
+// @Param        name path string true "name"
+// @Param        id path string true "id"
+// @Param        current_user query string false "current user"
+// @Success      200  {object}  string "OK"
+// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
+// @Router       /{repo_type}/{namespace}/{name}/run/{id} [get]
+func (h *RepoHandler) DeployDetail(ctx *gin.Context) {
+	currentUser := httpbase.GetCurrentUser(ctx)
+	if currentUser == "" {
+		httpbase.UnauthorizedError(ctx, errors.New("user not found, please login first"))
+		return
+	}
+	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
+	if err != nil {
+		slog.Error("Bad request format", "error", err)
+		httpbase.BadRequest(ctx, err.Error())
+		return
+	}
+	repoType := common.RepoTypeFromContext(ctx)
+	deployID, err := strconv.ParseInt(ctx.Param("id"), 10, 64)
+	if err != nil {
+		slog.Error("Bad request format", "error", err)
+		httpbase.BadRequest(ctx, err.Error())
+		return
+	}
+	response, err := h.c.DeployDetail(ctx, repoType, namespace, name, currentUser, deployID)
+	if err != nil {
+		slog.Error("fail to deploy detail", slog.String("error", err.Error()), slog.Any("repotype", repoType), slog.Any("namespace", namespace), slog.Any("name", name), slog.Any("deploy id", deployID))
+		httpbase.ServerError(ctx, err)
+		return
+	}
+
+	httpbase.OK(ctx, response)
+}
+
+// GetInferenceLogs   godoc
+// @Security     ApiKey
+// @Summary      get deploy instance logs
+// @Tags         Repository
+// @Accept       json
+// @Produce      json
+// @Param        repo_type path string true "models,spaces" Enums(models,spaces)
+// @Param        namespace path string true "namespace"
+// @Param        name path string true "name"
+// @Param        id path string true "id"
+// @Param        instance path string true "instance"
+// @Param        current_user query string true "current_user"
+// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
+// @Router       /{repo_type}/{namespace}/{name}/run/{id}/logs/{instance} [get]
+func (h *RepoHandler) DeployInstanceLogs(ctx *gin.Context) {
+	if ctx.Query("test") == "true" {
+		h.testLogs(ctx)
+		return
+	}
+	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
+	if err != nil {
+		slog.Error("failed to get namespace and name from context", "error", err)
+		httpbase.BadRequest(ctx, err.Error())
+		return
+	}
+
+	currentUser := httpbase.GetCurrentUser(ctx)
+	repoType := common.RepoTypeFromContext(ctx)
+	deployID, err := strconv.ParseInt(ctx.Param("id"), 10, 64)
+	if err != nil {
+		slog.Error("Bad request format", "error", err)
+		httpbase.BadRequest(ctx, err.Error())
+		return
+	}
+	instance := ctx.Param("instance")
+	if len(instance) < 1 {
+		httpbase.UnauthorizedError(ctx, errors.New("fail to get deploy instance"))
+		return
+	}
+	ctx.Writer.Header().Set("Content-Type", "text/event-stream")
+	ctx.Writer.Header().Set("Cache-Control", "no-cache")
+	ctx.Writer.Header().Set("Connection", "keep-alive")
+	ctx.Writer.Header().Set("Transfer-Encoding", "chunked")
+
+	//user http request context instead of gin context, so that server knows the life cycle of the request
+	logReader, err := h.c.DeployInstanceLogs(ctx.Request.Context(), repoType, namespace, name, currentUser, deployID, instance)
+	if err != nil {
+		httpbase.ServerError(ctx, err)
+		return
+	}
+
+	for {
+		select {
+		case <-ctx.Request.Context().Done():
+			slog.Info("repo handler logs request context done", slog.Any("error", ctx.Request.Context().Err()))
+			return
+		case data, ok := <-logReader.RunLog():
+			if ok {
+				ctx.SSEvent("Container", string(data))
+				ctx.Writer.Flush()
+			}
+		}
+	}
+}
+
+func (h *RepoHandler) testLogs(ctx *gin.Context) {
+	ctx.Writer.Header().Set("Content-Type", "text/event-stream")
+	ctx.Writer.Header().Set("Cache-Control", "no-cache")
+	ctx.Writer.Header().Set("Connection", "keep-alive")
+	ctx.Writer.Header().Set("Transfer-Encoding", "chunked")
+
+	// watch client connection
+	closeNotify := ctx.Writer.CloseNotify()
+
+	for {
+		select {
+		case <-closeNotify:
+			return
+		default:
+			ctx.SSEvent("Container", "test run log message")
+			ctx.Writer.Flush()
+		}
+		time.Sleep(time.Second * 5)
+	}
+}
+
 func getSourceRepoPathFromSourceUrl(sourceUrl string) (string, error) {
 	parsedURL, err := url.Parse(sourceUrl)
 	if err != nil {

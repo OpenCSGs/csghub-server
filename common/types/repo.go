@@ -1,5 +1,7 @@
 package types
 
+import "time"
+
 type RepositoryType string
 
 const (
@@ -46,51 +48,66 @@ type RepoPageOpts struct {
 	Total     int `json:"total"`
 }
 
+type Instance struct {
+	Name   string `json:"name"`
+	Status string `json:"status"`
+}
+
 // repo object(cover model/space/code/dataset) for deployer
 type DeployRepo struct {
-	DeployID         int64  `json:"deploy_id,omitempty"`
-	DeployName       string `json:"deploy_name,omitempty"`
-	SpaceID          int64  `json:"space_id,omitempty"`
-	Namespace        string `json:"namespace,omitempty"`
-	Name             string `json:"name,omitempty"`
-	Status           int    `json:"status"`
-	GitPath          string `json:"git_path,omitempty"`
-	GitBranch        string `json:"git_branch,omitempty"`
-	Sdk              string `json:"sdk,omitempty"`
-	SdkVersion       string `json:"sdk_version,omitempty"`
-	Env              string `json:"env,omitempty"`
-	Secret           string `json:"secret,omitempty"`
-	Template         string `json:"template,omitempty"`
-	Hardware         string `json:"hardware,omitempty"`
-	ImageID          string `json:"image_id,omitempty"`
-	UserID           int64  `json:"user_id,omitempty"`
-	ModelID          int64  `json:"model_id,omitempty"`
-	RepoID           int64  `json:"repo_id,omitempty"`
-	RuntimeFramework string `json:"runtime_framework,omitempty"`
-	Annotation       string `json:"annotation,omitempty"`
-	MinReplica       int    `json:"min_replica,omitempty"`
-	MaxReplica       int    `json:"max_replica,omitempty"`
-	SvcName          string `json:"svc_name,omitempty"`
-	Endpoint         string `json:"end_point,omitempty"`
-	Createtime       string `json:"create_time,omitempty"`
-	Updatetime       string `json:"update_time,omitempty"`
-	CostPerHour      int64  `json:"cost_per_hour,omitempty"`
-	ClusterID        string `json:"cluster_id,omitempty"`
-	SecureLevel      int    `json:"secure_level,omitempty"`
-	Replica          int    `json:"replica,omitempty"`
+	DeployID         int64      `json:"deploy_id,omitempty"`
+	DeployName       string     `json:"deploy_name,omitempty"`
+	SpaceID          int64      `json:"space_id,omitempty"`
+	Path             string     `json:"path,omitempty"`
+	Namespace        string     `json:"namespace,omitempty"`
+	Name             string     `json:"name,omitempty"`
+	Status           string     `json:"status"`
+	GitPath          string     `json:"git_path,omitempty"`
+	GitBranch        string     `json:"git_branch,omitempty"`
+	Sdk              string     `json:"sdk,omitempty"`
+	SdkVersion       string     `json:"sdk_version,omitempty"`
+	Env              string     `json:"env,omitempty"`
+	Secret           string     `json:"secret,omitempty"`
+	Template         string     `json:"template,omitempty"`
+	Hardware         string     `json:"hardware,omitempty"`
+	ImageID          string     `json:"image_id,omitempty"`
+	UserID           int64      `json:"user_id,omitempty"`
+	ModelID          int64      `json:"model_id,omitempty"`
+	RepoID           int64      `json:"repository_id,omitempty"`
+	RuntimeFramework string     `json:"runtime_framework,omitempty"`
+	ContainerPort    int        `json:"container_port,omitempty"`
+	Annotation       string     `json:"annotation,omitempty"`
+	MinReplica       int        `json:"min_replica,omitempty"`
+	MaxReplica       int        `json:"max_replica,omitempty"`
+	SvcName          string     `json:"svc_name,omitempty"`
+	Endpoint         string     `json:"endpoint,omitempty"`
+	CreatedAt        time.Time  `json:"created_at,omitempty"`
+	UpdatedAt        time.Time  `json:"updated_at,omitempty"`
+	CostPerHour      int64      `json:"cost_per_hour,omitempty"`
+	ClusterID        string     `json:"cluster_id,omitempty"`
+	SecureLevel      int        `json:"secure_level,omitempty"`
+	ActualReplica    int        `json:"actual_replica,omitempty"`
+	DesiredReplica   int        `json:"desired_replica,omitempty"`
+	Instances        []Instance `json:"instances,omitempty"`
+	InstanceName     string     `json:"instance_name,omitempty"`
+	Private          bool       `json:"private"`
 }
 
 type RuntimeFrameworkReq struct {
-	FrameName    string `json:"frame_name"`
-	FrameVersion string `json:"frame_version"`
-	FrameImage   string `json:"frame_image"`
-	Enabled      int64  `json:"enabled"`
+	FrameName     string `json:"frame_name"`
+	FrameVersion  string `json:"frame_version"`
+	FrameImage    string `json:"frame_image"`
+	FrameCpuImage string `json:"frame_cpu_image"`
+	Enabled       int64  `json:"enabled"`
+	ContainerPort int    `json:"container_port"`
 }
 
 type RuntimeFramework struct {
-	ID           int64  `json:"id"`
-	FrameName    string `json:"frame_name"`
-	FrameVersion string `json:"frame_version"`
-	FrameImage   string `json:"frame_image"`
-	Enabled      int64  `json:"enabled"`
+	ID            int64  `json:"id"`
+	FrameName     string `json:"frame_name"`
+	FrameVersion  string `json:"frame_version"`
+	FrameImage    string `json:"frame_image"`
+	FrameCpuImage string `json:"frame_cpu_image"`
+	Enabled       int64  `json:"enabled"`
+	ContainerPort int    `json:"container_port"`
 }

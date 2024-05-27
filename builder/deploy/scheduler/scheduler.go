@@ -36,9 +36,10 @@ type FIFOScheduler struct {
 	nextLock                *sync.Mutex
 	spaceDeployTimeoutInMin int
 	modelDeployTimeoutInMin int
+	modelDownloadEndpoint   string
 }
 
-func NewFIFOScheduler(ib imagebuilder.Builder, ir imagerunner.Runner, sdt, mdt int) Scheduler {
+func NewFIFOScheduler(ib imagebuilder.Builder, ir imagerunner.Runner, sdt, mdt int, mdep string) Scheduler {
 	s := &FIFOScheduler{}
 	// TODO:allow config
 	s.timeout = 30 * time.Minute
@@ -55,6 +56,7 @@ func NewFIFOScheduler(ib imagebuilder.Builder, ir imagerunner.Runner, sdt, mdt i
 	s.nextLock = &sync.Mutex{}
 	s.spaceDeployTimeoutInMin = sdt
 	s.modelDeployTimeoutInMin = mdt
+	s.modelDownloadEndpoint = mdep
 	return s
 }
 
@@ -72,7 +74,7 @@ func (rs *FIFOScheduler) Run() error {
 		}
 	}()
 
-	slog.Debug("scheudler try to loop through tasks channel")
+	slog.Debug("scheduler try to loop through tasks channel")
 	for t := range rs.tasks {
 		go func(t Runner) {
 			slog.Debug("dequeue a task to run", slog.Any("task", t.WatchID()))
@@ -188,6 +190,7 @@ func (rs *FIFOScheduler) next() (Runner, error) {
 				deploySpaceTimeoutInMin: rs.spaceDeployTimeoutInMin,
 				deployModelTimeoutInMin: rs.modelDeployTimeoutInMin,
 			},
+			rs.modelDownloadEndpoint,
 		)
 	}
 

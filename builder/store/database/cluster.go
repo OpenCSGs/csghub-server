@@ -21,6 +21,9 @@ type ClusterInfo struct {
 	ClusterID     string `bun:",pk" json:"cluster_id"`
 	ClusterConfig string `bun:",notnull" json:"cluster_config"`
 	Region        string `bun:",notnull" json:"region"`
+	Zone          string `bun:",notnull" json:"zone"`     //cn-beijing
+	Provider      string `bun:",notnull" json:"provider"` //ali
+	Enable        bool   `bun:",notnull" json:"enable"`
 }
 
 func (r *ClusterInfoStore) Add(ctx context.Context, clusterConfig string, region string) error {
@@ -42,12 +45,11 @@ func (r *ClusterInfoStore) Add(ctx context.Context, clusterConfig string, region
 	return err
 }
 
-func (r *ClusterInfoStore) Update(ctx context.Context, clusterConfig string, region string) error {
+func (r *ClusterInfoStore) Update(ctx context.Context, clusterInfo ClusterInfo) error {
 	err := r.db.Operator.Core.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
-		cluster, err := r.ByClusterConfig(ctx, clusterConfig)
+		_, err := r.ByClusterConfig(ctx, clusterInfo.ClusterConfig)
 		if err == nil {
-			cluster.Region = region
-			err = assertAffectedOneRow(r.db.Operator.Core.NewUpdate().Model(cluster).WherePK().Exec(ctx))
+			err = assertAffectedOneRow(r.db.Operator.Core.NewUpdate().Model(&clusterInfo).WherePK().Exec(ctx))
 			return err
 		}
 		return nil
@@ -65,4 +67,13 @@ func (s *ClusterInfoStore) ByClusterConfig(ctx context.Context, clusterConfig st
 	clusterInfo.ClusterConfig = clusterConfig
 	err = s.db.Operator.Core.NewSelect().Model(&clusterInfo).Where("cluster_config = ?", clusterConfig).Scan(ctx)
 	return
+}
+
+func (s *ClusterInfoStore) List(ctx context.Context) ([]ClusterInfo, error) {
+	var result []ClusterInfo
+	_, err := s.db.Operator.Core.NewSelect().Model(&result).Order("region").Exec(ctx, &result)
+	if err != nil {
+		return nil, err
+	}
+	return result, nil
 }
