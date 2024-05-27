@@ -11,8 +11,6 @@ import (
 	"net/http"
 	"net/url"
 	"time"
-
-	"opencsg.com/csghub-server/builder/deploy/common"
 )
 
 var _ Runner = (*RemoteRunner)(nil)
@@ -35,7 +33,8 @@ func NewRemoteRunner(remoteURL string) (Runner, error) {
 
 func (h *RemoteRunner) Run(ctx context.Context, req *RunRequest) (*RunResponse, error) {
 	slog.Debug("send request", slog.Any("body", req))
-	svcName := common.UniqueSpaceAppName(req.OrgName, req.RepoName, req.ID)
+	// svcName := common.UniqueSpaceAppName(req.OrgName, req.RepoName, req.ID)
+	svcName := req.SvcName
 	u := fmt.Sprintf("%s/%s/run", h.remote, svcName)
 	response, err := h.doRequest(http.MethodPost, u, req)
 	if err != nil {
@@ -53,7 +52,9 @@ func (h *RemoteRunner) Run(ctx context.Context, req *RunRequest) (*RunResponse, 
 }
 
 func (h *RemoteRunner) Stop(ctx context.Context, req *StopRequest) (*StopResponse, error) {
-	u := fmt.Sprintf("%s/%s/stop", h.remote, common.UniqueSpaceAppName(req.OrgName, req.RepoName, req.ID))
+	// u := fmt.Sprintf("%s/%s/stop", h.remote, common.UniqueSpaceAppName(req.OrgName, req.RepoName, req.ID))
+	svcName := req.SvcName
+	u := fmt.Sprintf("%s/%s/stop", h.remote, svcName)
 	response, err := h.doRequest(http.MethodPost, u, req)
 	if err != nil {
 		return nil, err
@@ -69,7 +70,10 @@ func (h *RemoteRunner) Stop(ctx context.Context, req *StopRequest) (*StopRespons
 }
 
 func (h *RemoteRunner) Status(ctx context.Context, req *StatusRequest) (*StatusResponse, error) {
-	u := fmt.Sprintf("%s/%s/status", h.remote, common.UniqueSpaceAppName(req.OrgName, req.RepoName, req.ID))
+	// u := fmt.Sprintf("%s/%s/status", h.remote, common.UniqueSpaceAppName(req.OrgName, req.RepoName, req.ID))
+	svcName := req.SvcName
+	u := fmt.Sprintf("%s/%s/status", h.remote, svcName)
+
 	response, err := h.doRequest(http.MethodGet, u, req)
 	if err != nil {
 		return nil, err
@@ -101,10 +105,11 @@ func (h *RemoteRunner) StatusAll(ctx context.Context) (map[string]StatusResponse
 }
 
 func (h *RemoteRunner) Logs(ctx context.Context, req *LogsRequest) (<-chan string, error) {
-	appName := common.UniqueSpaceAppName(req.OrgName, req.RepoName, req.ID)
-	u := fmt.Sprintf("%s/%s/logs", h.remote, appName)
-	slog.Debug("logs request", slog.String("url", u), slog.String("appname", appName))
-	rc, err := h.doSSERequest(http.MethodGet, u, req)
+	// appName := common.UniqueSpaceAppName(req.OrgName, req.RepoName, req.ID)
+	svcName := req.SvcName
+	u := fmt.Sprintf("%s/%s/logs", h.remote, svcName)
+	slog.Debug("logs request", slog.String("url", u), slog.String("appname", svcName))
+	rc, err := h.doSteamRequest(ctx, http.MethodGet, u, req)
 	if err != nil {
 		return nil, err
 	}
@@ -113,7 +118,9 @@ func (h *RemoteRunner) Logs(ctx context.Context, req *LogsRequest) (<-chan strin
 }
 
 func (h *RemoteRunner) Exist(ctx context.Context, req *CheckRequest) (*StatusResponse, error) {
-	u := fmt.Sprintf("%s/%s/get", h.remote, common.UniqueSpaceAppName(req.OrgName, req.RepoName, req.ID))
+	// u := fmt.Sprintf("%s/%s/get", h.remote, common.UniqueSpaceAppName(req.OrgName, req.RepoName, req.ID))
+	svcName := req.SvcName
+	u := fmt.Sprintf("%s/%s/get", h.remote, svcName)
 	response, err := h.doRequest(http.MethodGet, u, req)
 	if err != nil {
 		return nil, err
@@ -128,6 +135,24 @@ func (h *RemoteRunner) Exist(ctx context.Context, req *CheckRequest) (*StatusRes
 	return &statusResponse, nil
 }
 
+func (h *RemoteRunner) GetReplica(ctx context.Context, req *StatusRequest) (*ReplicaResponse, error) {
+	// u := fmt.Sprintf("%s/%s/replica", h.remote, common.UniqueSpaceAppName(req.OrgName, req.RepoName, req.ID))
+	svcName := req.SvcName
+	u := fmt.Sprintf("%s/%s/replica", h.remote, svcName)
+	response, err := h.doRequest(http.MethodGet, u, req)
+	if err != nil {
+		return nil, err
+	}
+	defer response.Body.Close()
+
+	var resp ReplicaResponse
+	if err := json.NewDecoder(response.Body).Decode(&resp); err != nil {
+		return nil, err
+	}
+
+	return &resp, nil
+}
+
 func (h *RemoteRunner) readToChannel(rc io.ReadCloser) <-chan string {
 	output := make(chan string, 2)
 
@@ -138,7 +163,7 @@ func (h *RemoteRunner) readToChannel(rc io.ReadCloser) <-chan string {
 		for {
 			n, err := br.Read(buf)
 			if err != nil {
-				slog.Error("multi log reader get EOF from inner log reader", slog.Any("error", err))
+				slog.Error("remot runner log reader aborted", slog.Any("error", err))
 				rc.Close()
 				close(output)
 				break
@@ -183,7 +208,7 @@ func (h *RemoteRunner) doRequest(method, url string, data interface{}) (*http.Re
 	return resp, nil
 }
 
-func (h *RemoteRunner) doSSERequest(method, url string, data interface{}) (io.ReadCloser, error) {
+func (h *RemoteRunner) doSteamRequest(ctx context.Context, method, url string, data interface{}) (io.ReadCloser, error) {
 	var buf io.Reader
 	if data != nil {
 		jsonData, err := json.Marshal(data)
@@ -193,7 +218,7 @@ func (h *RemoteRunner) doSSERequest(method, url string, data interface{}) (io.Re
 		buf = bytes.NewBuffer(jsonData)
 	}
 
-	req, err := http.NewRequest(method, url, buf)
+	req, err := http.NewRequestWithContext(ctx, method, url, buf)
 	if err != nil {
 		return nil, err
 	}
@@ -210,4 +235,16 @@ func (h *RemoteRunner) doSSERequest(method, url string, data interface{}) (io.Re
 	}
 
 	return resp.Body, nil
+}
+
+// InstanceLogs implements Runner.
+func (h *RemoteRunner) InstanceLogs(ctx context.Context, req *InstanceLogsRequest) (<-chan string, error) {
+	u := fmt.Sprintf("%s/%s/logs/%s", h.remote, req.SvcName, req.InstanceName)
+	slog.Info("Instance logs request", slog.String("url", u), slog.String("svcname", req.SvcName))
+	rc, err := h.doSteamRequest(ctx, http.MethodGet, u, req)
+	if err != nil {
+		return nil, err
+	}
+
+	return h.readToChannel(rc), nil
 }

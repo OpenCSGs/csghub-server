@@ -6,20 +6,30 @@ type Config struct {
 }
 
 type SDKConfig struct {
-	name    string
-	version string
-	port    string
+	Name    string
+	Version string
+	Port    string
+	Image   string
 }
 
 var GRADIO = SDKConfig{
-	name:    "gradio",
-	version: "3.37.0",
-	port:    "7860",
+	Name:    "gradio",
+	Version: "3.37.0",
+	Port:    "7860",
+	Image:   "",
 }
 var STREAMLIT = SDKConfig{
-	name:    "streamlit",
-	version: "1.33.0",
-	port:    "8501",
+	Name:    "streamlit",
+	Version: "1.33.0",
+	Port:    "8501",
+	Image:   "",
+}
+
+var NGINX = SDKConfig{
+	Name:    "nginx",
+	Version: "1.25.0",
+	Port:    "8000",
+	Image:   "csg-nginx:1.2",
 }
 
 type RepoInfo struct {

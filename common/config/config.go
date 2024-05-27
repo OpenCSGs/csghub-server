@@ -101,7 +101,9 @@ type Config struct {
 	}
 
 	Model struct {
-		DeployTimeoutInMin int `envconfig:"STARHUB_SERVER_MODEL_DEPLOY_TIMEOUT_IN_MINUTES" default:"30"`
+		DeployTimeoutInMin int    `envconfig:"STARHUB_SERVER_MODEL_DEPLOY_TIMEOUT_IN_MINUTES" default:"30"`
+		DownloadEndpoint   string `envconfig:"STARHUB_SERVER_MODEL_DOWNLOAD_ENDPOINT" default:"https://hub-stg.opencsg.com/"`
+		DockerRegBase      string `envconfig:"STARHUB_SERVER_MODEL_DOCKER_REG_BASE" default:"opencsg-registry.cn-beijing.cr.aliyuncs.com/public/"`
 	}
 
 	Casdoor struct {

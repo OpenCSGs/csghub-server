@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/bwmarrin/snowflake"
 	"opencsg.com/csghub-server/builder/deploy/common"
 	"opencsg.com/csghub-server/builder/deploy/imagebuilder"
 	"opencsg.com/csghub-server/builder/deploy/imagerunner"
@@ -25,6 +26,8 @@ type Deployer interface {
 	Stop(ctx context.Context, dr types.DeployRepo) (err error)
 	Wakeup(ctx context.Context, dr types.DeployRepo) (err error)
 	Exist(ctx context.Context, dr types.DeployRepo) (bool, error)
+	GetReplica(ctx context.Context, dr types.DeployRepo) (int, int, []types.Instance, error)
+	InstanceLogs(ctx context.Context, dr types.DeployRepo) (*MultiLogReader, error)
 }
 
 var _ Deployer = (*deployer)(nil)
@@ -34,15 +37,20 @@ type deployer struct {
 	ib imagebuilder.Builder
 	ir imagerunner.Runner
 
-	store             *database.DeployTaskStore
-	spaceStore        *database.SpaceStore
-	runnerStatuscache map[string]imagerunner.StatusResponse
-
+	store              *database.DeployTaskStore
+	spaceStore         *database.SpaceStore
+	runnerStatuscache  map[string]imagerunner.StatusResponse
 	internalRootDomain string
+	sfNode             *snowflake.Node
 }
 
 func newDeployer(s scheduler.Scheduler, ib imagebuilder.Builder, ir imagerunner.Runner) (*deployer, error) {
 	store := database.NewDeployTaskStore()
+	node, err := snowflake.NewNode(1)
+	if err != nil || node == nil {
+		slog.Error("fail to generate uuid for inference service name", slog.Any("error", err))
+		return nil, err
+	}
 	d := &deployer{
 		s:                 s,
 		ib:                ib,
@@ -50,6 +58,7 @@ func newDeployer(s scheduler.Scheduler, ib imagebuilder.Builder, ir imagerunner.
 		store:             store,
 		spaceStore:        database.NewSpaceStore(),
 		runnerStatuscache: make(map[string]imagerunner.StatusResponse),
+		sfNode:            node,
 	}
 
 	go d.refreshStatus()
@@ -58,7 +67,25 @@ func newDeployer(s scheduler.Scheduler, ib imagebuilder.Builder, ir imagerunner.
 	return d, nil
 }
 
+func (d *deployer) GenerateUniqueSvcName(dr types.DeployRepo) string {
+	uniqueSvcName := ""
+	if dr.SpaceID > 0 {
+		// space
+		fields := strings.Split(dr.Path, "/")
+		uniqueSvcName = common.UniqueSpaceAppName(fields[0], fields[1], dr.SpaceID)
+	} else {
+		// model
+		// generate unique service name from uuid when create new deploy by snowflake
+		uniqueSvcName = d.sfNode.Generate().Base36()
+	}
+	return uniqueSvcName
+}
+
 func (d *deployer) Deploy(ctx context.Context, dr types.DeployRepo) (int64, error) {
+	uniqueSvcName := d.GenerateUniqueSvcName(dr)
+	if len(uniqueSvcName) < 1 {
+		return -1, fmt.Errorf("fail to generate uuid for deploy")
+	}
 	deploy := &database.Deploy{
 		DeployName:       dr.DeployName,
 		SpaceID:          dr.SpaceID,
@@ -73,12 +100,14 @@ func (d *deployer) Deploy(ctx context.Context, dr types.DeployRepo) (int64, erro
 		UserID:           dr.UserID,
 		RepoID:           dr.RepoID,
 		RuntimeFramework: dr.RuntimeFramework,
+		ContainerPort:    dr.ContainerPort,
 		Annotation:       dr.Annotation,
 		MinReplica:       dr.MinReplica,
 		MaxReplica:       dr.MaxReplica,
 		CostPerHour:      dr.CostPerHour,
 		ClusterID:        dr.ClusterID,
 		SecureLevel:      dr.SecureLevel,
+		SvcName:          uniqueSvcName,
 	}
 	// TODO:save deploy tasks in sql tx
 	err := d.store.CreateDeploy(ctx, deploy)
@@ -131,24 +160,25 @@ func (d *deployer) Status(ctx context.Context, dr types.DeployRepo) (string, int
 	// get latest Deploy
 	deploy, err := d.store.GetLatestDeployBySpaceID(ctx, dr.SpaceID)
 	if err != nil {
-		return "", 0, fmt.Errorf("can't get space delopyment,%w", err)
+		slog.Error("fail to get latest deploy by space id", slog.Any("SpaceID", dr.SpaceID))
+		return "", 0, fmt.Errorf("can't get space deployment,%w", err)
 	}
-
-	srvName := common.UniqueSpaceAppName(dr.Namespace, dr.Name, dr.SpaceID)
-	rstatus, found := d.runnerStatuscache[srvName]
+	svcName := deploy.SvcName
+	// srvName := common.UniqueSpaceAppName(dr.Namespace, dr.Name, dr.SpaceID)
+	rstatus, found := d.runnerStatuscache[svcName]
 	if !found {
-		slog.Debug("status cache miss", slog.String("srv_name", srvName))
+		slog.Debug("status cache miss", slog.String("svc_name", svcName))
 		if deploy.Status == common.Running {
 			// service was Stopped or delete, so no running instance
-			return srvName, common.Stopped, nil
+			return svcName, common.Stopped, nil
 		}
-		return srvName, deploy.Status, nil
+		return svcName, deploy.Status, nil
 	}
 
 	if rstatus.DeployID == 0 || rstatus.DeployID >= deploy.ID {
-		return srvName, rstatus.Code, nil
+		return svcName, rstatus.Code, nil
 	}
-	return srvName, deploy.Status, nil
+	return svcName, deploy.Status, nil
 }
 
 func (d *deployer) Logs(ctx context.Context, dr types.DeployRepo) (*MultiLogReader, error) {
@@ -177,6 +207,7 @@ func (d *deployer) Logs(ctx context.Context, dr types.DeployRepo) (*MultiLogRead
 		ID:       targetID,
 		OrgName:  dr.Namespace,
 		RepoName: dr.Name,
+		SvcName:  deploy.SvcName,
 	})
 
 	if err != nil {
@@ -196,6 +227,7 @@ func (d *deployer) Stop(ctx context.Context, dr types.DeployRepo) error {
 		ID:       targetID,
 		OrgName:  dr.Namespace,
 		RepoName: dr.Name,
+		SvcName:  dr.SvcName,
 	})
 	if err != nil {
 		slog.Error("deployer stop deploy", slog.Any("runner_resp", resp), slog.Int64("space_id", dr.SpaceID), slog.Any("deploy_id", dr.DeployID), slog.Any("error", err))
@@ -204,8 +236,9 @@ func (d *deployer) Stop(ctx context.Context, dr types.DeployRepo) error {
 }
 
 func (d *deployer) Wakeup(ctx context.Context, dr types.DeployRepo) error {
-	srvName := common.UniqueSpaceAppName(dr.Namespace, dr.Name, dr.SpaceID)
-	srvURL := fmt.Sprintf("http://%s.%s", srvName, d.internalRootDomain)
+	// srvName := common.UniqueSpaceAppName(dr.Namespace, dr.Name, dr.SpaceID)
+	svcName := dr.SvcName
+	srvURL := fmt.Sprintf("http://%s.%s", svcName, d.internalRootDomain)
 	// Create a new HTTP client with a timeout
 	client := &http.Client{
 		Timeout: 10 * time.Second,
@@ -236,6 +269,7 @@ func (d *deployer) Exist(ctx context.Context, dr types.DeployRepo) (bool, error)
 		ID:       targetID,
 		OrgName:  dr.Namespace,
 		RepoName: dr.Name,
+		SvcName:  dr.SvcName,
 	}
 	resp, err := d.ir.Exist(ctx, req)
 	if err != nil {
@@ -253,4 +287,48 @@ func (d *deployer) Exist(ctx context.Context, dr types.DeployRepo) (bool, error)
 	}
 	// service not exist
 	return false, nil
+}
+
+func (d *deployer) GetReplica(ctx context.Context, dr types.DeployRepo) (int, int, []types.Instance, error) {
+	targetID := dr.SpaceID // support space only one instance
+	if dr.SpaceID == 0 {
+		targetID = dr.DeployID // support model deploy with multi-instance
+	}
+	req := &imagerunner.StatusRequest{
+		ID:        targetID,
+		OrgName:   dr.Namespace,
+		RepoName:  dr.Name,
+		ClusterID: dr.ClusterID,
+		SvcName:   dr.SvcName,
+	}
+	resp, err := d.ir.GetReplica(ctx, req)
+	if err != nil {
+		slog.Error("fail to get deploy replica with error", slog.Any("req", req), slog.Any("error", err))
+		return 0, 0, []types.Instance{}, err
+	}
+	return resp.ActualReplica, resp.DesiredReplica, resp.Instances, nil
+}
+
+func (d *deployer) InstanceLogs(ctx context.Context, dr types.DeployRepo) (*MultiLogReader, error) {
+	slog.Debug("get logs for deploy", slog.Any("deploy", dr))
+
+	targetID := dr.SpaceID // support space only one instance
+	if dr.SpaceID == 0 {
+		targetID = dr.DeployID // support model deploy with multi-instance
+	}
+	runLog, err := d.ir.InstanceLogs(ctx, &imagerunner.InstanceLogsRequest{
+		ID:           targetID,
+		OrgName:      dr.Namespace,
+		RepoName:     dr.Name,
+		ClusterID:    dr.ClusterID,
+		SvcName:      dr.SvcName,
+		InstanceName: dr.InstanceName,
+	})
+
+	if err != nil {
+		slog.Error("failed to read log from deploy runner", slog.Any("error", err))
+		// return nil, fmt.Errorf("connect to imagerunner failed: %w", err)
+	}
+
+	return NewMultiLogReader(nil, runLog), nil
 }
