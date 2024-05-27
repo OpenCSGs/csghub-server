@@ -75,3 +75,8 @@ type Auth struct {
 	AccessToken `json:"accessToken,omitempty"`
 	Type        string `json:"type,omitempty"`
 }
+
+type UserRepoReq struct {
+	CurrentUser string `json:"current_user"`
+	PageOpts
+}

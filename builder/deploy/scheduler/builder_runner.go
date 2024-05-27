@@ -41,10 +41,10 @@ func (t *BuilderRunner) makeBuildRequest() (*imagebuilder.BuildRequest, error) {
 	sdkVer := ""
 	if t.repo.SdkVersion == "" {
 		slog.Warn("Use SDK default version", slog.Any("repository path", t.repo.Path))
-		if t.repo.Sdk == GRADIO.name {
-			sdkVer = GRADIO.version
-		} else if t.repo.Sdk == STREAMLIT.name {
-			sdkVer = STREAMLIT.version
+		if t.repo.Sdk == GRADIO.Name {
+			sdkVer = GRADIO.Version
+		} else if t.repo.Sdk == STREAMLIT.Name {
+			sdkVer = STREAMLIT.Version
 		}
 	} else {
 		sdkVer = t.repo.SdkVersion

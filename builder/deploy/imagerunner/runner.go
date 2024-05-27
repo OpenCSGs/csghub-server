@@ -9,4 +9,6 @@ type Runner interface {
 	StatusAll(context.Context) (map[string]StatusResponse, error)
 	Logs(context.Context, *LogsRequest) (<-chan string, error)
 	Exist(context.Context, *CheckRequest) (*StatusResponse, error)
+	GetReplica(context.Context, *StatusRequest) (*ReplicaResponse, error)
+	InstanceLogs(context.Context, *InstanceLogsRequest) (<-chan string, error)
 }

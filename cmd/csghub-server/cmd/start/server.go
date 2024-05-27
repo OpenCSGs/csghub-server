@@ -60,6 +60,7 @@ var serverCmd = &cobra.Command{
 			InternalRootDomain:      cfg.Space.InternalRootDomain,
 			SpaceDeployTimeoutInMin: cfg.Space.DeployTimeoutInMin,
 			ModelDeployTimeoutInMin: cfg.Model.DeployTimeoutInMin,
+			ModelDownloadEndpoint:   cfg.Model.DownloadEndpoint,
 		})
 		r, err := router.NewRouter(cfg, enableSwagger)
 		if err != nil {

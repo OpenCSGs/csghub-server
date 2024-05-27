@@ -7,18 +7,14 @@ import (
 	"fmt"
 	"log/slog"
 	"strings"
-	"time"
 
 	"opencsg.com/csghub-server/builder/deploy"
+	"opencsg.com/csghub-server/builder/deploy/scheduler"
 	"opencsg.com/csghub-server/builder/git/gitserver"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/types"
 )
-
-// TODO:remove after migration complete
-// Sunday, April 7, 2024 3:41:09 AM
-var migrate = time.Unix(1712461269, 0)
 
 const spaceGitattributesContent = modelGitattributesContent
 
@@ -423,7 +419,7 @@ func (c *SpaceComponent) AllowCallApi(ctx context.Context, spaceID int64, userna
 		return false, fmt.Errorf("failed to get space by id:%d, %w", spaceID, err)
 	}
 	fields := strings.Split(s.Repository.Path, "/")
-	return c.AllowReadAccess(ctx, fields[0], fields[1], username)
+	return c.AllowReadAccess(ctx, s.Repository.RepositoryType, fields[0], fields[1], username)
 }
 
 func (c *SpaceComponent) Delete(ctx context.Context, namespace, name, currentUser string) error {
@@ -473,9 +469,16 @@ func (c *SpaceComponent) Deploy(ctx context.Context, namespace, name, currentUse
 		return -1, err
 	}
 
+	containerImg := ""
+	if s.Sdk == scheduler.NGINX.Name {
+		// Use default image for nginx space
+		containerImg = scheduler.NGINX.Image
+	}
+
 	// create deploy for space
 	return c.deployer.Deploy(ctx, types.DeployRepo{
 		SpaceID:    s.ID,
+		Path:       s.Repository.Path,
 		GitPath:    s.Repository.GitPath,
 		GitBranch:  s.Repository.DefaultBranch,
 		Sdk:        s.Sdk,
@@ -488,6 +491,7 @@ func (c *SpaceComponent) Deploy(ctx context.Context, namespace, name, currentUse
 		ModelID:    0,
 		UserID:     user.ID,
 		Annotation: string(annoStr),
+		ImageID:    containerImg,
 	})
 }
 
@@ -496,13 +500,17 @@ func (c *SpaceComponent) Wakeup(ctx context.Context, namespace, name string) err
 	if err != nil {
 		slog.Error("can't wakeup space", slog.Any("error", err), slog.String("namespace", namespace), slog.String("name", name))
 		return err
-
 	}
-
+	// get latest Deploy for space
+	deploy, err := c.deploy.GetLatestDeployBySpaceID(ctx, s.ID)
+	if err != nil {
+		return fmt.Errorf("can't get space delopyment,%w", err)
+	}
 	return c.deployer.Wakeup(ctx, types.DeployRepo{
 		SpaceID:   s.ID,
 		Namespace: namespace,
 		Name:      name,
+		SvcName:   deploy.SvcName,
 	})
 }
 
@@ -512,18 +520,27 @@ func (c *SpaceComponent) Stop(ctx context.Context, namespace, name string) error
 		slog.Error("can't stop space", slog.Any("error", err), slog.String("namespace", namespace), slog.String("name", name))
 		return err
 	}
+	// get latest Deploy of space
+	deploy, err := c.deploy.GetLatestDeployBySpaceID(ctx, s.ID)
+	if err != nil {
+		slog.Error("can't get space deployment", slog.Any("error", err), slog.Any("space id", s.ID))
+		return fmt.Errorf("can't get space deployment,%w", err)
+	}
+	if deploy == nil {
+		return fmt.Errorf("can't get space deployment")
+	}
 
 	return c.deployer.Stop(ctx, types.DeployRepo{
 		SpaceID:   s.ID,
 		Namespace: namespace,
 		Name:      name,
+		SvcName:   deploy.SvcName,
 	})
 }
 
-// FixHasAppFile checks whether git repo has app file and update space's HasAppFile property in db
-func (c *SpaceComponent) FixHasAppFile(ctx context.Context, s *database.Space) *database.Space {
-	namespace, repoName := s.Repository.NamespaceAndName()
-	hasAppFile := c.HasAppFile(ctx, namespace, repoName)
+// FixHasEntryFile checks whether git repo has entry point file and update space's HasAppFile property in db
+func (c *SpaceComponent) FixHasEntryFile(ctx context.Context, s *database.Space) *database.Space {
+	hasAppFile := c.HasEntryFile(ctx, s)
 	if s.HasAppFile != hasAppFile {
 		s.HasAppFile = hasAppFile
 		c.ss.Update(ctx, *s)
@@ -533,14 +550,13 @@ func (c *SpaceComponent) FixHasAppFile(ctx context.Context, s *database.Space) *
 }
 
 func (c *SpaceComponent) status(ctx context.Context, s *database.Space) (string, string, error) {
-	// TODO: should be removed later.
-	// `HasAppFile` is a new field of type space, use folloing code to auto-fill its value
-	if !s.HasAppFile && s.CreatedAt.Before(migrate) {
-		s = c.FixHasAppFile(ctx, s)
-	}
 	if !s.HasAppFile {
+		if s.Sdk == scheduler.NGINX.Name {
+			return "", SpaceStatusNoNGINXConf, nil
+		}
 		return "", SpaceStatusNoAppFile, nil
 	}
+
 	namespace, name := s.Repository.NamespaceAndName()
 	srvName, code, err := c.deployer.Status(ctx, types.DeployRepo{
 		SpaceID:   s.ID,
@@ -574,7 +590,17 @@ func (c *SpaceComponent) Logs(ctx context.Context, namespace, name string) (*dep
 	})
 }
 
-func (c *SpaceComponent) HasAppFile(ctx context.Context, namespace, name string) bool {
+// HasEntryFile checks whether space repo has entry point file to run with
+func (c *SpaceComponent) HasEntryFile(ctx context.Context, space *database.Space) bool {
+	namespace, name := space.Repository.NamespaceAndName()
+	var entryFile = "app.py"
+	if space.Sdk == scheduler.NGINX.Name {
+		entryFile = "nginx.conf"
+	}
+
+	return c.hasEntryFile(ctx, namespace, name, entryFile)
+}
+func (c *SpaceComponent) hasEntryFile(ctx context.Context, namespace, name, entryFile string) bool {
 	var req gitserver.GetRepoInfoByPathReq
 	req.Namespace = namespace
 	req.Name = name
@@ -588,52 +614,12 @@ func (c *SpaceComponent) HasAppFile(ctx context.Context, namespace, name string)
 	}
 
 	for _, f := range files {
-		if f.Type == "file" && f.Path == "app.py" {
+		if f.Type == "file" && f.Path == entryFile {
 			return true
 		}
 	}
 
 	return false
-}
-
-func spaceStatusCodeToString(code int) string {
-	// DeployBuildPending    = 10
-	// DeployBuildInProgress = 11
-	// DeployBuildFailed     = 12
-	// DeployBuildSucceed    = 13
-	//
-	// DeployPrepareToRun = 20
-	// DeployStartUp      = 21
-	// DeployRunning      = 22
-	// DeployRunTimeError = 23
-
-	// simplified status for frontend show
-	var txt string
-	switch code {
-	case 10:
-		txt = SpaceStatusStopped
-	case 11:
-		txt = SpaceStatusBuilding
-	case 12:
-		txt = SpaceStatusBuildFailed
-	case 13:
-		txt = SpaceStatusDeploying
-	case 20:
-		txt = SpaceStatusDeploying
-	case 21:
-		txt = SpaceStatusDeployFailed
-	case 22:
-		txt = SpaceStatusDeploying
-	case 23:
-		txt = SpaceStatusRunning
-	case 24:
-		txt = SpaceStatusRuntimeError
-	case 25:
-		txt = SpaceStatusSleeping
-	default:
-		txt = SpaceStatusStopped
-	}
-	return txt
 }
 
 func mergeUpdateSpaceRequest(space *database.Space, req *types.UpdateSpaceReq) *database.Space {
@@ -674,5 +660,7 @@ const (
 	SpaceStatusStopped      = "Stopped"
 	SpaceStatusSleeping     = "Sleeping"
 
-	SpaceStatusNoAppFile = "NoAppFile"
+	SpaceStatusNoAppFile   = "NoAppFile"
+	RepoStatusDeleted      = "Deleted"
+	SpaceStatusNoNGINXConf = "NoNGINXConf"
 )

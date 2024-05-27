@@ -391,7 +391,7 @@ func (h *SpaceHandler) Status(ctx *gin.Context) {
 	}
 
 	currentUser := httpbase.GetCurrentUser(ctx)
-	allow, err := h.c.AllowReadAccess(ctx, namespace, name, currentUser)
+	allow, err := h.c.AllowReadAccess(ctx, types.SpaceRepo, namespace, name, currentUser)
 	if err != nil {
 		slog.Error("failed to check user permission", "error", err)
 		httpbase.ServerError(ctx, errors.New("failed to check user permission"))
@@ -408,16 +408,15 @@ func (h *SpaceHandler) Status(ctx *gin.Context) {
 	ctx.Writer.Header().Set("Connection", "keep-alive")
 	ctx.Writer.Header().Set("Transfer-Encoding", "chunked")
 
-	// 创建一个通知channel以监测客户端是否已经断开连接
-	closeNotify := ctx.Writer.CloseNotify()
-
 	for {
 		select {
-		case <-closeNotify:
+		case <-ctx.Request.Context().Done():
+			slog.Info("space handler status request context done", slog.Any("error", ctx.Request.Context().Err()))
 			return
 		default:
 			time.Sleep(time.Second * 5)
-			_, status, err := h.c.Status(ctx, namespace, name)
+			//user http request context instead of gin context, so that server knows the life cycle of the request
+			_, status, err := h.c.Status(ctx.Request.Context(), namespace, name)
 			if err != nil {
 				slog.Error("failed to get space status", slog.Any("error", err), slog.String("namespace", namespace),
 					slog.String("name", name))
@@ -436,12 +435,10 @@ func (h *SpaceHandler) status(ctx *gin.Context) {
 	ctx.Writer.Header().Set("Connection", "keep-alive")
 	ctx.Writer.Header().Set("Transfer-Encoding", "chunked")
 
-	// 创建一个通知channel以监测客户端是否已经断开连接
-	closeNotify := ctx.Writer.CloseNotify()
-
 	for {
 		select {
-		case <-closeNotify:
+		case <-ctx.Request.Context().Done():
+			slog.Info("space handler status request context done", slog.Any("error", ctx.Request.Context().Err()))
 			return
 		default:
 			time.Sleep(time.Second * 5)
@@ -485,7 +482,7 @@ func (h *SpaceHandler) Logs(ctx *gin.Context) {
 	}
 
 	currentUser := httpbase.GetCurrentUser(ctx)
-	allow, err := h.c.AllowReadAccess(ctx, namespace, name, currentUser)
+	allow, err := h.c.AllowReadAccess(ctx, types.SpaceRepo, namespace, name, currentUser)
 	if err != nil {
 		slog.Error("failed to check user permission", "error", err)
 		httpbase.ServerError(ctx, errors.New("failed to check user permission"))
@@ -504,16 +501,17 @@ func (h *SpaceHandler) Logs(ctx *gin.Context) {
 	ctx.Writer.Header().Set("Connection", "keep-alive")
 	ctx.Writer.Header().Set("Transfer-Encoding", "chunked")
 
-	logReader, err := h.c.Logs(ctx, namespace, name)
+	//user http request context instead of gin context, so that server knows the life cycle of the request
+	logReader, err := h.c.Logs(ctx.Request.Context(), namespace, name)
 	if err != nil {
 		httpbase.ServerError(ctx, err)
 		return
 	}
-	closeNotify := ctx.Writer.CloseNotify()
 
 	for {
 		select {
-		case <-closeNotify:
+		case <-ctx.Request.Context().Done():
+			slog.Info("space handler logs request context done", slog.Any("error", ctx.Request.Context().Err()))
 			return
 		case data, ok := <-logReader.BuildLog():
 			if ok {
