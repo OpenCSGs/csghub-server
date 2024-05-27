@@ -51,3 +51,9 @@ func RepoTypeFromContext(ctx *gin.Context) types.RepositoryType {
 func SetRepoTypeContext(ctx *gin.Context, t types.RepositoryType) {
 	ctx.Set("repo_type", t)
 }
+
+func RepoTypeFromParam(ctx *gin.Context) types.RepositoryType {
+	rawRp := ctx.Param("repo_type")
+	slog.Debug("get repo type from parameters", "repo_type", rawRp)
+	return types.RepositoryType(rawRp)
+}

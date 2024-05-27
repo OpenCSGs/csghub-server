@@ -1053,8 +1053,12 @@ definitions:
     type: object
   types.RuntimeFramework:
     properties:
+      container_port:
+        type: integer
       enabled:
         type: integer
+      frame_cpu_image:
+        type: string
       frame_image:
         type: string
       frame_name:
@@ -1066,8 +1070,12 @@ definitions:
     type: object
   types.RuntimeFrameworkReq:
     properties:
+      container_port:
+        type: integer
       enabled:
         type: integer
+      frame_cpu_image:
+        type: string
       frame_image:
         type: string
       frame_name:
@@ -2268,6 +2276,113 @@ paths:
       summary: List repo deploys
       tags:
       - Repository
+  /{repo_type}/{namespace}/{name}/run/{id}:
+    get:
+      consumes:
+      - application/json
+      description: Get repo deploy detail
+      parameters:
+      - description: models,spaces
+        enum:
+        - models
+        - spaces
+        in: path
+        name: repo_type
+        required: true
+        type: string
+      - description: namespace
+        in: path
+        name: namespace
+        required: true
+        type: string
+      - description: name
+        in: path
+        name: name
+        required: true
+        type: string
+      - description: id
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: current user
+        in: query
+        name: current_user
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            type: string
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Get repo deploy detail
+      tags:
+      - Repository
+  /{repo_type}/{namespace}/{name}/run/{id}/logs/{instance}:
+    get:
+      consumes:
+      - application/json
+      parameters:
+      - description: models,spaces
+        enum:
+        - models
+        - spaces
+        in: path
+        name: repo_type
+        required: true
+        type: string
+      - description: namespace
+        in: path
+        name: namespace
+        required: true
+        type: string
+      - description: name
+        in: path
+        name: name
+        required: true
+        type: string
+      - description: id
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: instance
+        in: path
+        name: instance
+        required: true
+        type: string
+      - description: current_user
+        in: query
+        name: current_user
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: get deploy instance logs
+      tags:
+      - Repository
   /{repo_type}/{namespace}/{name}/runtime_framework:
     get:
       consumes:
@@ -2665,6 +2780,31 @@ paths:
       summary: Get repository file tree
       tags:
       - Repository
+  /cluster:
+    get:
+      consumes:
+      - application/json
+      description: Get cluster list
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/types.Response'
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Get cluster list
+      tags:
+      - Cluster
   /codes:
     get:
       consumes:
@@ -4092,6 +4232,51 @@ paths:
       security:
       - ApiKey: []
       summary: Delete a model inference
+      tags:
+      - Model
+  /models/{namespace}/{name}/stop/{id}:
+    put:
+      consumes:
+      - application/json
+      description: Stop a model inference
+      parameters:
+      - description: namespace
+        in: path
+        name: namespace
+        required: true
+        type: string
+      - description: name
+        in: path
+        name: name
+        required: true
+        type: string
+      - description: id
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: current user
+        in: query
+        name: current_user
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/types.Response'
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Stop a model inference
       tags:
       - Model
   /organization/{namespace}/codes:
@@ -5685,6 +5870,59 @@ paths:
       security:
       - ApiKey: []
       summary: Get user models
+      tags:
+      - User
+  /user/{username}/run/{repo_type}:
+    get:
+      consumes:
+      - application/json
+      description: Get user running deploys
+      parameters:
+      - description: username
+        in: path
+        name: username
+        required: true
+        type: string
+      - description: model,space
+        enum:
+        - model
+        - space
+        in: path
+        name: repo_type
+        required: true
+        type: string
+      - default: 50
+        description: per
+        in: query
+        name: per
+        type: integer
+      - default: 1
+        description: page index
+        in: query
+        name: page
+        type: integer
+      - description: current user
+        in: query
+        name: current_user
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/types.Response'
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Get user running deploys
       tags:
       - User
   /user/{username}/spaces:
