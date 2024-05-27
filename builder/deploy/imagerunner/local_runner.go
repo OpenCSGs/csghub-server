@@ -4,12 +4,31 @@ import (
 	"context"
 
 	"opencsg.com/csghub-server/builder/deploy/common"
+	"opencsg.com/csghub-server/common/types"
 )
 
 var _ Runner = (*LocalRunner)(nil)
 
 // Typically this is for local test only
 type LocalRunner struct{}
+
+// InstanceLogs implements Runner.
+func (r *LocalRunner) InstanceLogs(context.Context, *InstanceLogsRequest) (<-chan string, error) {
+	output := make(chan string, 1)
+	output <- "test build log"
+	return output, nil
+}
+
+// GetReplica implements Runner.
+func (r *LocalRunner) GetReplica(context.Context, *StatusRequest) (*ReplicaResponse, error) {
+	return &ReplicaResponse{
+		Code:           1,
+		Message:        "success",
+		ActualReplica:  0,
+		DesiredReplica: 0,
+		Instances:      []types.Instance{},
+	}, nil
+}
 
 // Exist implements Runner.
 func (r *LocalRunner) Exist(context.Context, *CheckRequest) (*StatusResponse, error) {

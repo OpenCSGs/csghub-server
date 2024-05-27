@@ -79,9 +79,20 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 	if err != nil {
 		return nil, fmt.Errorf("error creatring list handler: %v", err)
 	}
-	apiGroup.POST("/list/models_by_path", cache.CacheByRequestURI(memoryStore, 1*time.Minute), listHandler.ListModelsByPath)
-	apiGroup.POST("/list/datasets_by_path", cache.CacheByRequestURI(memoryStore, 1*time.Minute), listHandler.ListDatasetsByPath)
-	apiGroup.POST("/list/spaces_by_path", cache.CacheByRequestURI(memoryStore, 1*time.Minute), listHandler.ListSpacesByPath)
+	{
+		apiGroup.POST("/list/models_by_path", cache.CacheByRequestURI(memoryStore, 1*time.Minute), listHandler.ListModelsByPath)
+		apiGroup.POST("/list/datasets_by_path", cache.CacheByRequestURI(memoryStore, 1*time.Minute), listHandler.ListDatasetsByPath)
+		apiGroup.POST("/list/spaces_by_path", cache.CacheByRequestURI(memoryStore, 1*time.Minute), listHandler.ListSpacesByPath)
+	}
+	// Huggingface SDK routes
+	modelHandler, err = handler.NewModelHandler(config)
+	if err != nil {
+		return nil, fmt.Errorf("error creating model controller:%w", err)
+	}
+	dsHandler, err = handler.NewDatasetHandler(config)
+	if err != nil {
+		return nil, fmt.Errorf("error creating dataset handler:%w", err)
+	}
 
 	// Models routes
 	modelsGroup := apiGroup.Group("/models")
@@ -129,10 +140,13 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 		modelsGroup.DELETE("/:namespace/:name/runtime_framework/:id", middleware.RepoType(types.ModelRepo), repoCommonHandler.RuntimeFrameworkDelete)
 		// list model inference
 		modelsGroup.GET("/:namespace/:name/run", middleware.RepoType(types.ModelRepo), repoCommonHandler.DeployList)
-		// depoly model as inference
-		modelsGroup.POST("/:namespace/:name/run", middleware.RepoType(types.ModelRepo), modelHandler.DeployRun)
+		// deploy model as inference
+		modelsGroup.POST("/:namespace/:name/run", middleware.RepoType(types.ModelRepo), modelHandler.DeployDedicated)
 		// delete a deployed inference
 		modelsGroup.DELETE("/:namespace/:name/run/:id", middleware.RepoType(types.ModelRepo), modelHandler.DeployDelete)
+		modelsGroup.GET("/:namespace/:name/run/:id", middleware.RepoType(types.ModelRepo), repoCommonHandler.DeployDetail)
+		modelsGroup.GET("/:namespace/:name/run/:id/logs/:instance", middleware.RepoType(types.ModelRepo), repoCommonHandler.DeployInstanceLogs)
+		modelsGroup.PUT("/:namespace/:name/stop/:id", middleware.RepoType(types.ModelRepo), modelHandler.DeployStop)
 	}
 
 	// Dataset routes
@@ -164,7 +178,6 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 		datasetsGroup.GET("/:namespace/:name/mirror", middleware.RepoType(types.DatasetRepo), repoCommonHandler.GetMirror)
 		datasetsGroup.PUT("/:namespace/:name/mirror", middleware.RepoType(types.DatasetRepo), repoCommonHandler.UpdateMirror)
 		datasetsGroup.DELETE("/:namespace/:name/mirror", middleware.RepoType(types.DatasetRepo), repoCommonHandler.DeleteMirror)
-
 	}
 
 	// Code routes
@@ -201,7 +214,6 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 		codesGroup.GET("/:namespace/:name/mirror", middleware.RepoType(types.CodeRepo), repoCommonHandler.GetMirror)
 		codesGroup.PUT("/:namespace/:name/mirror", middleware.RepoType(types.CodeRepo), repoCommonHandler.UpdateMirror)
 		codesGroup.DELETE("/:namespace/:name/mirror", middleware.RepoType(types.CodeRepo), repoCommonHandler.DeleteMirror)
-
 	}
 
 	// Dataset viewer
@@ -262,6 +274,8 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 		spaces.PUT("/:namespace/:name/runtime_framework/:id", middleware.RepoType(types.SpaceRepo), repoCommonHandler.RuntimeFrameworkUpdate)
 		spaces.DELETE("/:namespace/:name/runtime_framework/:id", middleware.RepoType(types.SpaceRepo), repoCommonHandler.RuntimeFrameworkDelete)
 		spaces.GET("/:namespace/:name/run", middleware.RepoType(types.SpaceRepo), repoCommonHandler.DeployList)
+		spaces.GET("/:namespace/:name/run/:id", middleware.RepoType(types.SpaceRepo), repoCommonHandler.DeployDetail)
+		spaces.GET("/:namespace/:name/run/:id/logs/:instance", middleware.RepoType(types.SpaceRepo), repoCommonHandler.DeployInstanceLogs)
 	}
 
 	spaceResourceHandler, err := handler.NewSpaceResourceHandler(config)
@@ -290,63 +304,69 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 		spaceSdk.DELETE("/:id", spaceSdkHandler.Delete)
 	}
 
-	apiGroup.POST("/users", userHandler.Create)
-	apiGroup.PUT("/users/:username", userHandler.Update)
-	// User models
-	apiGroup.GET("/user/:username/models", userHandler.Models)
-	// User datasets
-	apiGroup.GET("/user/:username/datasets", userHandler.Datasets)
-	apiGroup.GET("/user/:username/codes", userHandler.Codes)
-	apiGroup.GET("/user/:username/spaces", userHandler.Spaces)
-	// User likes
-	apiGroup.PUT("/user/:username/likes/:repo_id", userHandler.LikesAdd)
-	apiGroup.DELETE("/user/:username/likes/:repo_id", userHandler.LikesDelete)
-	apiGroup.GET("/user/:username/likes/spaces", userHandler.LikesSpaces)
-	apiGroup.GET("/user/:username/likes/codes", userHandler.LikesCodes)
-	apiGroup.GET("/user/:username/likes/models", userHandler.LikesModels)
-	apiGroup.GET("/user/:username/likes/datasets", userHandler.LikesDatasets)
-
+	{
+		apiGroup.POST("/users", userHandler.Create)
+		apiGroup.PUT("/users/:username", userHandler.Update)
+		// User models
+		apiGroup.GET("/user/:username/models", userHandler.Models)
+		// User datasets
+		apiGroup.GET("/user/:username/datasets", userHandler.Datasets)
+		apiGroup.GET("/user/:username/codes", userHandler.Codes)
+		apiGroup.GET("/user/:username/spaces", userHandler.Spaces)
+		// User likes
+		apiGroup.PUT("/user/:username/likes/:repo_id", userHandler.LikesAdd)
+		apiGroup.DELETE("/user/:username/likes/:repo_id", userHandler.LikesDelete)
+		apiGroup.GET("/user/:username/likes/spaces", userHandler.LikesSpaces)
+		apiGroup.GET("/user/:username/likes/codes", userHandler.LikesCodes)
+		apiGroup.GET("/user/:username/likes/models", userHandler.LikesModels)
+		apiGroup.GET("/user/:username/likes/datasets", userHandler.LikesDatasets)
+		apiGroup.GET("/user/:username/run/:repo_type", userHandler.GetRunDeploys)
+	}
 	acHandler, err := handler.NewAccessTokenHandler(config)
 	if err != nil {
 		return nil, fmt.Errorf("error creating user controller:%w", err)
 	}
-	apiGroup.POST("/user/:username/tokens", acHandler.Create)
-	apiGroup.DELETE("/user/:username/tokens/:token_name", acHandler.Delete)
-
+	{
+		apiGroup.POST("/user/:username/tokens", acHandler.Create)
+		apiGroup.DELETE("/user/:username/tokens/:token_name", acHandler.Delete)
+	}
 	sshKeyHandler, err := handler.NewSSHKeyHandler(config)
 	if err != nil {
 		return nil, fmt.Errorf("error creating user controller:%w", err)
 	}
-	apiGroup.GET("/user/:username/ssh_keys", sshKeyHandler.Index)
-	apiGroup.POST("/user/:username/ssh_keys", sshKeyHandler.Create)
-	apiGroup.DELETE("/user/:username/ssh_key/:name", sshKeyHandler.Delete)
-
+	{
+		apiGroup.GET("/user/:username/ssh_keys", sshKeyHandler.Index)
+		apiGroup.POST("/user/:username/ssh_keys", sshKeyHandler.Create)
+		apiGroup.DELETE("/user/:username/ssh_key/:name", sshKeyHandler.Delete)
+	}
 	// Organization
 	orgHandler, err := handler.NewOrganizationHandler(config)
 	if err != nil {
 		return nil, fmt.Errorf("error creating user controller:%w", err)
 	}
-	apiGroup.GET("/organizations", orgHandler.Index)
-	apiGroup.POST("/organizations", orgHandler.Create)
-	apiGroup.PUT("/organizations/:name", orgHandler.Update)
-	apiGroup.DELETE("/organizations/:name", orgHandler.Delete)
-	// Organization models
-	apiGroup.GET("/organization/:namespace/models", orgHandler.Models)
-	// Organization datasets
-	apiGroup.GET("/organization/:namespace/datasets", orgHandler.Datasets)
-	apiGroup.GET("/organization/:namespace/codes", orgHandler.Codes)
-	apiGroup.GET("/organization/:namespace/spaces", orgHandler.Spaces)
-
+	{
+		apiGroup.GET("/organizations", orgHandler.Index)
+		apiGroup.POST("/organizations", orgHandler.Create)
+		apiGroup.PUT("/organizations/:name", orgHandler.Update)
+		apiGroup.DELETE("/organizations/:name", orgHandler.Delete)
+		// Organization models
+		apiGroup.GET("/organization/:namespace/models", orgHandler.Models)
+		// Organization datasets
+		apiGroup.GET("/organization/:namespace/datasets", orgHandler.Datasets)
+		apiGroup.GET("/organization/:namespace/codes", orgHandler.Codes)
+		apiGroup.GET("/organization/:namespace/spaces", orgHandler.Spaces)
+	}
 	// Member
 	memberCtrl, err := handler.NewMemberHandler(config)
 	if err != nil {
 		return nil, fmt.Errorf("error creating user controller:%w", err)
 	}
-	apiGroup.GET("/organizations/:name/members", memberCtrl.Index)
-	apiGroup.POST("/organizations/:name/members", memberCtrl.Create)
-	apiGroup.PUT("/organizations/:name/members/:username", memberCtrl.Update)
-	apiGroup.DELETE("/organizations/:name/members/:username", memberCtrl.Delete)
-
+	{
+		apiGroup.GET("/organizations/:name/members", memberCtrl.Index)
+		apiGroup.POST("/organizations/:name/members", memberCtrl.Create)
+		apiGroup.PUT("/organizations/:name/members/:username", memberCtrl.Update)
+		apiGroup.DELETE("/organizations/:name/members/:username", memberCtrl.Delete)
+	}
 	// Tag
 	tagCtrl, err := handler.NewTagHandler(config)
 	if err != nil {
@@ -398,6 +418,16 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 		mirror.DELETE("/sources/:id", msHandler.Delete)
 		mirror.GET("/sources/:id", msHandler.Get)
 		mirror.POST("/repo", mirrorHandler.CreateMirrorRepo)
+	}
+
+	// cluster infos
+	clusterHandler, err := handler.NewClusterHandler(config)
+	if err != nil {
+		return nil, fmt.Errorf("fail to creating cluster handler: %w", err)
+	}
+	cluster := apiGroup.Group("/cluster")
+	{
+		cluster.GET("", clusterHandler.Index)
 	}
 
 	eventHandler, err := handler.NewEventHandler()

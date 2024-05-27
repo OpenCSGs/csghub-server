@@ -54,7 +54,7 @@ func (w *spaceDeployWatcher) deploy(namespace string, repoName string, currentUs
 				return fmt.Errorf("failed to find space: %w", err)
 			}
 
-			w.sc.FixHasAppFile(ctx, space)
+			w.sc.FixHasEntryFile(ctx, space)
 			if !space.HasAppFile {
 				return nil
 			}

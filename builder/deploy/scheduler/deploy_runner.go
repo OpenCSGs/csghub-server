@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"strconv"
 	"strings"
 	"time"
 
@@ -21,24 +22,26 @@ type DeployTimeout struct {
 
 // DeployRunner defines a k8s image running task
 type DeployRunner struct {
-	repo            *RepoInfo
-	task            *database.DeployTask
-	ir              imagerunner.Runner
-	store           *database.DeployTaskStore
-	tokenStore      *database.AccessTokenStore
-	deployStartTime time.Time
-	deployTimeout   *DeployTimeout
+	repo                  *RepoInfo
+	task                  *database.DeployTask
+	ir                    imagerunner.Runner
+	store                 *database.DeployTaskStore
+	tokenStore            *database.AccessTokenStore
+	deployStartTime       time.Time
+	deployTimeout         *DeployTimeout
+	modelDownloadEndpoint string
 }
 
-func NewDeployRunner(ir imagerunner.Runner, r *RepoInfo, t *database.DeployTask, dto *DeployTimeout) Runner {
+func NewDeployRunner(ir imagerunner.Runner, r *RepoInfo, t *database.DeployTask, dto *DeployTimeout, mdep string) Runner {
 	return &DeployRunner{
-		repo:            r,
-		task:            t,
-		ir:              ir,
-		store:           database.NewDeployTaskStore(),
-		deployStartTime: time.Now(),
-		deployTimeout:   dto,
-		tokenStore:      database.NewAccessTokenStore(),
+		repo:                  r,
+		task:                  t,
+		ir:                    ir,
+		store:                 database.NewDeployTaskStore(),
+		deployStartTime:       time.Now(),
+		deployTimeout:         dto,
+		tokenStore:            database.NewAccessTokenStore(),
+		modelDownloadEndpoint: mdep,
 	}
 }
 
@@ -79,6 +82,7 @@ func (t *DeployRunner) Run(ctx context.Context) error {
 			ID:       targetID,
 			OrgName:  fields[0],
 			RepoName: fields[1],
+			SvcName:  t.task.Deploy.SvcName,
 		}
 		timeoutCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
 		resp, err := t.ir.Status(timeoutCtx, req)
@@ -111,28 +115,28 @@ func (t *DeployRunner) Run(ctx context.Context) error {
 			// wait before next check
 			time.Sleep(10 * time.Second)
 		case common.DeployFailed:
-			slog.Info("image deploy failed", slog.String("space_name", t.repo.Name), slog.Any("deplopy_task_id", t.task.ID))
+			slog.Info("image deploy failed", slog.String("repo_name", t.repo.Name), slog.Any("deplopy_task_id", t.task.ID))
 			t.deployFailed(resp.Message)
 
 			return fmt.Errorf("deploy failed, resp msg:%s", resp.Message)
 		case common.Startup:
-			slog.Info("image deploy success", slog.String("space_name", t.repo.Name), slog.Any("deplopy_task_id", t.task.ID))
+			slog.Info("image deploy success", slog.String("repo_name", t.repo.Name), slog.Any("deplopy_task_id", t.task.ID))
 			t.deploySuccess()
 			// wait before next check
 			time.Sleep(10 * time.Second)
 
 		case common.Running:
-			slog.Info("image running", slog.String("space_name", t.repo.Name), slog.Any("deplopy_task_id", t.task.ID))
+			slog.Info("image running", slog.String("repo_name", t.repo.Name), slog.Any("deplopy_task_id", t.task.ID))
 			t.running(resp.Endpoint)
 
 			return nil
 		case common.RunTimeError:
-			slog.Error("image runtime erro", slog.String("space_name", t.repo.Name), slog.Any("deplopy_task_id", t.task.ID))
+			slog.Error("image runtime erro", slog.String("repo_name", t.repo.Name), slog.Any("deplopy_task_id", t.task.ID))
 			t.runtimeError(resp.Message)
 
 			return fmt.Errorf("runtime error, resp msg:%s", resp.Message)
 		default:
-			slog.Error("unknown image status", slog.String("space_name", t.repo.Name), slog.Any("deplopy_task_id", t.task.ID),
+			slog.Error("unknown image status", slog.String("repo_name", t.repo.Name), slog.Any("deplopy_task_id", t.task.ID),
 				slog.Int("status", resp.Code))
 			return fmt.Errorf("unknown image status, resp msg:%s", resp.Message)
 		}
@@ -236,12 +240,29 @@ func (t *DeployRunner) makeDeployRequest() (*imagerunner.RunRequest, error) {
 		return nil, err
 	}
 
-	if t.repo.Sdk == GRADIO.name {
-		envMap["port"] = GRADIO.port
-	} else if t.repo.Sdk == STREAMLIT.name {
-		envMap["port"] = STREAMLIT.port
-	} else {
-		envMap["port"] = "8080"
+	// for space and models
+	envMap["HTTPCloneURL"] = t.getHttpCloneURLWithToken(t.repo.HTTPCloneURL, token.Token)
+	envMap["ACCESS_TOKEN"] = token.Token
+	envMap["REPO_ID"] = t.repo.Path       // "namespace/name"
+	envMap["REVISION"] = deploy.GitBranch // branch
+
+	if deploy.SpaceID > 0 {
+		// sdk port for space
+		if t.repo.Sdk == GRADIO.Name {
+			envMap["port"] = GRADIO.Port
+		} else if t.repo.Sdk == STREAMLIT.Name {
+			envMap["port"] = STREAMLIT.Port
+		} else if t.repo.Sdk == NGINX.Name {
+			envMap["port"] = NGINX.Port
+		} else {
+			envMap["port"] = "8080"
+		}
+	}
+
+	if deploy.ModelID > 0 {
+		// runtime framework port for model
+		envMap["port"] = strconv.Itoa(deploy.ContainerPort)
+		envMap["HF_ENDPOINT"] = t.modelDownloadEndpoint // "https://hub-stg.opencsg.com/hf"
 	}
 
 	targetID := deploy.SpaceID
@@ -267,6 +288,7 @@ func (t *DeployRunner) makeDeployRequest() (*imagerunner.RunRequest, error) {
 		MaxReplica:  deploy.MaxReplica,
 		Accesstoken: token.Token,
 		ClusterID:   deploy.ClusterID,
+		SvcName:     deploy.SvcName,
 	}, nil
 }
 
@@ -280,6 +302,7 @@ func (t *DeployRunner) cancelDeploy(ctx context.Context, orgName, repoName strin
 		ID:       targetID,
 		OrgName:  orgName,
 		RepoName: repoName,
+		SvcName:  t.task.Deploy.SvcName,
 	}
 	_, err := t.ir.Stop(ctx, stopReq)
 	if err != nil {
@@ -287,4 +310,12 @@ func (t *DeployRunner) cancelDeploy(ctx context.Context, orgName, repoName strin
 	}
 	t.deployFailed("space/model deploy timeout")
 	return nil
+}
+
+func (t *DeployRunner) getHttpCloneURLWithToken(httpCloneUrl, token string) string {
+	num := strings.Index(httpCloneUrl, "://")
+	if num > -1 {
+		return fmt.Sprintf("%s%s@%s", httpCloneUrl[0:num+3], token, httpCloneUrl[num+3:])
+	}
+	return httpCloneUrl
 }

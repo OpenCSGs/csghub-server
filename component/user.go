@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"strings"
 	"sync"
 
 	"github.com/casdoor/casdoor-go-sdk/casdoorsdk"
@@ -52,6 +53,7 @@ func NewUserComponent(config *config.Config) (*UserComponent, error) {
 		OrganizationName: config.Casdoor.OrganizationName,
 		ApplicationName:  config.Casdoor.ApplicationName,
 	}
+	c.deploy = database.NewDeployTaskStore()
 	return c, nil
 }
 
@@ -71,6 +73,7 @@ type UserComponent struct {
 	casc           *casdoorsdk.Client
 	casConfig      *casdoorsdk.AuthConfig
 	once           *sync.Once
+	deploy         *database.DeployTaskStore
 }
 
 func (c *UserComponent) lazyInit() {
@@ -544,4 +547,44 @@ func (c *UserComponent) LikesDatasets(ctx context.Context, req *types.UserDatase
 	}
 
 	return resDatasets, total, nil
+}
+
+func (c *UserComponent) ListDeploys(ctx context.Context, repoType types.RepositoryType, req *types.UserRepoReq) ([]types.DeployRepo, int, error) {
+	user, err := c.us.FindByUsername(ctx, req.CurrentUser)
+	if err != nil {
+		newError := fmt.Errorf("failed to check for the presence of the user:%s, error:%w", req.CurrentUser, err)
+		return nil, 0, newError
+	}
+	deploys, total, err := c.deploy.ListDeployByUserID(ctx, repoType, user.ID, req.PageSize, req.Page)
+	if err != nil {
+		newError := fmt.Errorf("failed to get user deploys for %s with error:%w", repoType, err)
+		return nil, 0, newError
+	}
+
+	var resDeploys []types.DeployRepo
+	for _, deploy := range deploys {
+		repoPath := strings.TrimPrefix(deploy.GitPath, string(repoType)+"_")
+		resDeploys = append(resDeploys, types.DeployRepo{
+			DeployID:         deploy.ID,
+			DeployName:       deploy.DeployName,
+			Path:             repoPath,
+			RepoID:           deploy.RepoID,
+			SvcName:          deploy.SvcName,
+			Status:           spaceStatusCodeToString(deploy.Status),
+			Hardware:         deploy.Hardware,
+			Env:              deploy.Env,
+			RuntimeFramework: deploy.RuntimeFramework,
+			ImageID:          deploy.ImageID,
+			MinReplica:       deploy.MinReplica,
+			MaxReplica:       deploy.MaxReplica,
+			GitPath:          deploy.GitPath,
+			GitBranch:        deploy.GitBranch,
+			CostPerHour:      deploy.CostPerHour,
+			ClusterID:        deploy.ClusterID,
+			SecureLevel:      deploy.SecureLevel,
+			CreatedAt:        deploy.CreatedAt,
+			UpdatedAt:        deploy.UpdatedAt,
+		})
+	}
+	return resDeploys, total, nil
 }

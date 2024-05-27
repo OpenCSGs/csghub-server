@@ -33,6 +33,7 @@ type Deploy struct {
 	RepoID int64 `json:"repo_id"`
 	// model running engine vllm or TGI
 	RuntimeFramework string `bun:",nullzero" json:"runtime_framework"`
+	ContainerPort    int    `json:"container_port"`
 	Annotation       string `bun:",nullzero" json:"annotation"`
 	MinReplica       int    `json:"min_replica"`
 	MaxReplica       int    `json:"max_replica"`
@@ -190,6 +191,51 @@ func (s *DeployTaskStore) ListDeploy(ctx context.Context, repoType types.Reposit
 func (s *DeployTaskStore) DeleteDeploy(ctx context.Context, repoType types.RepositoryType, repoID, userID int64, deployID int64) error {
 	// only delete the deploy of specific repo was triggered by current login user
 	res, err := s.db.BunDB.Exec("Update deploys set status = ? where id = ? and repo_id = ? and user_id = ?", common.Deleted, deployID, repoID, userID)
+	if err != nil {
+		return err
+	}
+	err = assertAffectedOneRow(res, err)
+	return err
+}
+
+func (s *DeployTaskStore) ListDeployByUserID(ctx context.Context, repoType types.RepositoryType, userID int64, per, page int) ([]Deploy, int, error) {
+	var result []Deploy
+	query := s.db.Operator.Core.NewSelect().Model(&result).Where("user_id = ?", userID)
+	if repoType == types.ModelRepo {
+		query = query.Where("model_id > 0 and status != ?", common.Deleted)
+	}
+	query = query.Order("id desc")
+	if repoType == types.SpaceRepo {
+		query = query.Where("space_id > 0")
+		query = query.Limit(1)
+	}
+	query = query.Limit(per).Offset((page - 1) * per)
+	_, err := query.Exec(ctx, &result)
+	if err != nil {
+		return nil, 0, err
+	}
+	total, err := query.Count(ctx)
+	if err != nil {
+		return nil, 0, err
+	}
+	return result, total, nil
+}
+
+func (s *DeployTaskStore) GetDeployByID(ctx context.Context, deployID int64) (*Deploy, error) {
+	deploy := &Deploy{}
+	err := s.db.Operator.Core.NewSelect().Model(deploy).Where("id = ?", deployID).Scan(ctx, deploy)
+	return deploy, err
+}
+
+func (s *DeployTaskStore) GetDeployBySvcName(ctx context.Context, svcName string) (*Deploy, error) {
+	deploy := &Deploy{}
+	err := s.db.Operator.Core.NewSelect().Model(deploy).Where("svc_name = ?", svcName).Scan(ctx, deploy)
+	return deploy, err
+}
+
+func (s *DeployTaskStore) StopDeploy(ctx context.Context, repoType types.RepositoryType, repoID, userID int64, deployID int64) error {
+	// only stop the deploy of specific repo was triggered by current login user
+	res, err := s.db.BunDB.Exec("Update deploys set status = ? where id = ? and repo_id = ? and user_id = ?", common.Stopped, deployID, repoID, userID)
 	if err != nil {
 		return err
 	}

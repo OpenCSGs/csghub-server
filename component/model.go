@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"strconv"
 
 	"opencsg.com/csghub-server/builder/deploy"
 	"opencsg.com/csghub-server/builder/git/gitserver"
@@ -615,7 +616,7 @@ func (c *ModelComponent) Deploy(ctx context.Context, namespace, name, currentUse
 		return -1, err
 	}
 
-	frame, err := c.rtfm.FindByID(ctx, req.RuntimeFrameworkID)
+	frame, err := c.rtfm.FindEnabledByID(ctx, req.RuntimeFrameworkID)
 	if err != nil {
 		slog.Error("can't find available runtime framework", slog.Any("error", err), slog.Any("frameworkID", req.RuntimeFrameworkID))
 		return -1, err
@@ -631,10 +632,32 @@ func (c *ModelComponent) Deploy(ctx context.Context, namespace, name, currentUse
 		return -1, err
 	}
 
+	var hardware types.HardWare
+	err = json.Unmarshal([]byte(req.Hardware), &hardware)
+	if err != nil {
+		slog.Error("invalid hardware setting", slog.Any("error", err), slog.String("hardware", req.Hardware))
+		return -1, err
+	}
+
+	// choose image
+	containerImg := frame.FrameCpuImage
+	if hardware.Gpu.Num != "" {
+		gpuNum, err := strconv.Atoi(hardware.Gpu.Num)
+		if err != nil {
+			slog.Error("invalid hardware gpu setting", slog.Any("error", err), slog.String("hardware", req.Hardware))
+			return -1, err
+		}
+		if gpuNum > 0 {
+			// use gpu image
+			containerImg = frame.FrameImage
+		}
+	}
+
 	// create deploy for model
 	return c.deployer.Deploy(ctx, types.DeployRepo{
 		DeployName:       req.DeployName,
 		SpaceID:          0,
+		Path:             m.Repository.Path,
 		GitPath:          m.Repository.GitPath,
 		GitBranch:        req.Revision,
 		Env:              req.Env,
@@ -643,7 +666,8 @@ func (c *ModelComponent) Deploy(ctx context.Context, namespace, name, currentUse
 		ModelID:          m.ID,
 		RepoID:           m.Repository.ID,
 		RuntimeFramework: frame.FrameName,
-		ImageID:          frame.FrameImage, // do not need build pod image for model
+		ContainerPort:    frame.ContainerPort, // default container port
+		ImageID:          containerImg,        // do not need build pod image for model
 		MinReplica:       req.MinReplica,
 		MaxReplica:       req.MaxReplica,
 		Annotation:       string(annoStr),
