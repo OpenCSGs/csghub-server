@@ -566,18 +566,22 @@ func (c *RepoComponent) FileRaw(ctx context.Context, req *types.GetFileReq) (str
 	return raw, nil
 }
 
-func (c *RepoComponent) DownloadFile(ctx context.Context, req *types.GetFileReq) (io.ReadCloser, string, error) {
+func (c *RepoComponent) DownloadFile(ctx context.Context, req *types.GetFileReq) (io.ReadCloser, int64, string, error) {
 	var (
 		reader      io.ReadCloser
 		downloadUrl string
+		size        int64
 	)
 	repo, err := c.repo.FindByPath(ctx, req.RepoType, req.Namespace, req.Name)
 	if err != nil {
-		return nil, "", fmt.Errorf("failed to find repo, error: %w", err)
+		return nil, 0, "", fmt.Errorf("failed to find repo, error: %w", err)
+	}
+	if repo == nil {
+		return nil, 0, "", errors.New("repo not found")
 	}
 	err = c.repo.UpdateRepoFileDownloads(ctx, repo, time.Now(), 1)
 	if err != nil {
-		return nil, "", fmt.Errorf("failed to update %s file download count, error: %w", req.RepoType, err)
+		return nil, 0, "", fmt.Errorf("failed to update %s file download count, error: %w", req.RepoType, err)
 	}
 	if req.Ref == "" {
 		req.Ref = repo.DefaultBranch
@@ -592,9 +596,9 @@ func (c *RepoComponent) DownloadFile(ctx context.Context, req *types.GetFileReq)
 		}
 		signedUrl, err := c.s3Client.PresignedGetObject(ctx, c.lfsBucket, objectKey, ossFileExpireSeconds, reqParams)
 		if err != nil {
-			return nil, downloadUrl, err
+			return nil, 0, downloadUrl, err
 		}
-		return nil, signedUrl.String(), nil
+		return nil, 0, signedUrl.String(), nil
 	} else {
 		getFileReaderReq := gitserver.GetRepoInfoByPathReq{
 			Namespace: req.Namespace,
@@ -603,11 +607,11 @@ func (c *RepoComponent) DownloadFile(ctx context.Context, req *types.GetFileReq)
 			Path:      req.Path,
 			RepoType:  req.RepoType,
 		}
-		reader, err = c.git.GetRepoFileReader(ctx, getFileReaderReq)
+		reader, size, err = c.git.GetRepoFileReader(ctx, getFileReaderReq)
 		if err != nil {
-			return nil, "", fmt.Errorf("failed to download git %s repository file, error: %w", req.RepoType, err)
+			return nil, 0, "", fmt.Errorf("failed to download git %s repository file, error: %w", req.RepoType, err)
 		}
-		return reader, downloadUrl, nil
+		return reader, size, downloadUrl, nil
 	}
 }
 
@@ -813,24 +817,24 @@ func (c *RepoComponent) HeadDownloadFile(ctx *gin.Context, req *types.GetFileReq
 	return file, nil
 }
 
-func (c *RepoComponent) SDKDownloadFile(ctx *gin.Context, req *types.GetFileReq) (io.ReadCloser, string, error) {
+func (c *RepoComponent) SDKDownloadFile(ctx *gin.Context, req *types.GetFileReq) (io.ReadCloser, int64, string, error) {
 	var downloadUrl string
 	repo, err := c.repo.FindByPath(ctx, req.RepoType, req.Namespace, req.Name)
 	if err != nil {
-		return nil, "", fmt.Errorf("failed to find repo, error: %w", err)
+		return nil, 0, "", fmt.Errorf("failed to find repo, error: %w", err)
 	}
 	currentUser, exists := ctx.Get("currentUser")
 	// TODO: Use user access token to check permissions
 	if repo.Private {
 		if !exists {
-			return nil, "", ErrUnauthorized
+			return nil, 0, "", ErrUnauthorized
 		}
 		canRead, err := c.checkCurrentUserPermission(ctx, currentUser.(string), req.Namespace, membership.RoleRead)
 		if err != nil {
-			return nil, "", err
+			return nil, 0, "", err
 		}
 		if !canRead {
-			return nil, "", ErrUnauthorized
+			return nil, 0, "", ErrUnauthorized
 		}
 	}
 	if req.Ref == "" {
@@ -846,7 +850,7 @@ func (c *RepoComponent) SDKDownloadFile(ctx *gin.Context, req *types.GetFileReq)
 		}
 		file, err := c.git.GetRepoFileContents(ctx, getFileContentReq)
 		if err != nil {
-			return nil, "", err
+			return nil, 0, "", err
 		}
 		objectKey := file.LfsRelativePath
 		objectKey = path.Join("lfs", objectKey)
@@ -858,11 +862,11 @@ func (c *RepoComponent) SDKDownloadFile(ctx *gin.Context, req *types.GetFileReq)
 		signedUrl, err := c.s3Client.PresignedGetObject(ctx, c.lfsBucket, objectKey, ossFileExpireSeconds, reqParams)
 		if err != nil {
 			if err.Error() == ErrNotFoundMessage {
-				return nil, downloadUrl, ErrNotFound
+				return nil, 0, downloadUrl, ErrNotFound
 			}
-			return nil, downloadUrl, err
+			return nil, 0, downloadUrl, err
 		}
-		return nil, signedUrl.String(), nil
+		return nil, 0, signedUrl.String(), nil
 	} else {
 		getFileReaderReq := gitserver.GetRepoInfoByPathReq{
 			Namespace: req.Namespace,
@@ -871,14 +875,14 @@ func (c *RepoComponent) SDKDownloadFile(ctx *gin.Context, req *types.GetFileReq)
 			Path:      req.Path,
 			RepoType:  req.RepoType,
 		}
-		reader, err := c.git.GetRepoFileReader(ctx, getFileReaderReq)
+		reader, size, err := c.git.GetRepoFileReader(ctx, getFileReaderReq)
 		if err != nil {
 			if err.Error() == ErrNotFoundMessage {
-				return nil, downloadUrl, ErrNotFound
+				return nil, 0, downloadUrl, ErrNotFound
 			}
-			return nil, "", fmt.Errorf("failed to download git %s repository file, error: %w", req.RepoType, err)
+			return nil, 0, "", fmt.Errorf("failed to download git %s repository file, error: %w", req.RepoType, err)
 		}
-		return reader, downloadUrl, nil
+		return reader, size, downloadUrl, nil
 	}
 }
 
