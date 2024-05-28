@@ -1,6 +1,8 @@
 package mirrorserver
 
 import (
+	"time"
+
 	"opencsg.com/csghub-server/common/types"
 )
 
@@ -48,3 +50,13 @@ type MirrorTaskInfo struct {
 }
 
 type TaskStatus int
+
+type GetRepoInfoReq struct {
+	Namespace string `json:"namespace"`
+	Name      string `json:name"`
+}
+
+type RepoInfo struct {
+	UpdatedAt       time.Time `json:"updated_at"`
+	MirrorUpdatedAt time.Time `json:"mirror_updated_at"`
+}
