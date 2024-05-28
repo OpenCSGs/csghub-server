@@ -157,11 +157,10 @@ func (d *deployer) refreshStatus() {
 }
 
 func (d *deployer) Status(ctx context.Context, dr types.DeployRepo) (string, int, error) {
-	// get latest Deploy
-	deploy, err := d.store.GetLatestDeployBySpaceID(ctx, dr.SpaceID)
-	if err != nil {
-		slog.Error("fail to get latest deploy by space id", slog.Any("SpaceID", dr.SpaceID))
-		return "", 0, fmt.Errorf("can't get space deployment,%w", err)
+	deploy, err := d.store.GetDeployByID(ctx, dr.DeployID)
+	if err != nil || deploy == nil {
+		slog.Error("fail to get deploy by deploy id", slog.Any("DeployID", deploy.ID), slog.Any("error", err))
+		return "", common.Stopped, fmt.Errorf("can't get deploy, %w", err)
 	}
 	svcName := deploy.SvcName
 	// srvName := common.UniqueSpaceAppName(dr.Namespace, dr.Name, dr.SpaceID)

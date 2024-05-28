@@ -2383,6 +2383,55 @@ paths:
       summary: get deploy instance logs
       tags:
       - Repository
+  /{repo_type}/{namespace}/{name}/run/{id}/status:
+    get:
+      consumes:
+      - application/json
+      parameters:
+      - description: models,spaces
+        enum:
+        - models
+        - spaces
+        in: path
+        name: repo_type
+        required: true
+        type: string
+      - description: namespace
+        in: path
+        name: namespace
+        required: true
+        type: string
+      - description: name
+        in: path
+        name: name
+        required: true
+        type: string
+      - description: deploy id
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: current_user
+        in: query
+        name: current_user
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - JWT token: []
+      summary: get deploy status
+      tags:
+      - Repository
   /{repo_type}/{namespace}/{name}/runtime_framework:
     get:
       consumes:
