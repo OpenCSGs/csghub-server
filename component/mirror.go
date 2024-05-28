@@ -22,6 +22,7 @@ type MirrorComponent struct {
 	tokenStore        *database.GitServerAccessTokenStore
 	mirrorSourceStore *database.MirrorSourceStore
 	mirrorServer      mirrorserver.MirrorServer
+	namespaceStore    *database.NamespaceStore
 }
 
 func NewMirrorComponent(config *config.Config) (*MirrorComponent, error) {
@@ -44,6 +45,7 @@ func NewMirrorComponent(config *config.Config) (*MirrorComponent, error) {
 	c.mirrorStore = database.NewMirrorStore()
 	c.tokenStore = database.NewGitServerAccessTokenStore()
 	c.mirrorSourceStore = database.NewMirrorSourceStore()
+	c.namespaceStore = database.NewNamespaceStore()
 	return c, nil
 }
 
@@ -86,6 +88,7 @@ func (c *MirrorComponent) CreatePushMirrorForFinishedMirrorTask(ctx context.Cont
 
 // CreateMirrorRepo often called by the crawler server to create new repo which will then be mirrored from other sources
 func (c *MirrorComponent) CreateMirrorRepo(ctx context.Context, req types.CreateMirrorRepoReq) (*database.Mirror, error) {
+	var username string
 	namespace := c.mapNamespaceAndName(req.SourceNamespace)
 	name := req.SourceName
 	repo, err := c.repoStore.FindByPath(ctx, req.RepoType, namespace, name)
@@ -104,9 +107,15 @@ func (c *MirrorComponent) CreateMirrorRepo(ctx context.Context, req types.Create
 		}
 	}
 
+	dbNamespace, err := c.namespaceStore.FindByPath(ctx, namespace)
+	if err != nil {
+		return nil, fmt.Errorf("namespace does not exist, namespace: %s", namespace)
+	}
+	username = dbNamespace.User.Username
+
 	// create repo, create mirror repo
 	gitRepo, repo, err := c.repoComp.CreateRepo(ctx, types.CreateRepoReq{
-		Username:  namespace,
+		Username:  username,
 		Namespace: namespace,
 		Name:      name,
 		Nickname:  name,
