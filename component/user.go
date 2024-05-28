@@ -570,7 +570,7 @@ func (c *UserComponent) ListDeploys(ctx context.Context, repoType types.Reposito
 			Path:             repoPath,
 			RepoID:           deploy.RepoID,
 			SvcName:          deploy.SvcName,
-			Status:           spaceStatusCodeToString(deploy.Status),
+			Status:           deployStatusCodeToString(deploy.Status),
 			Hardware:         deploy.Hardware,
 			Env:              deploy.Env,
 			RuntimeFramework: deploy.RuntimeFramework,

@@ -556,18 +556,28 @@ func (c *SpaceComponent) status(ctx context.Context, s *database.Space) (string,
 		}
 		return "", SpaceStatusNoAppFile, nil
 	}
+	// get latest Deploy for space by space id
+	deploy, err := c.deploy.GetLatestDeployBySpaceID(ctx, s.ID)
+	if err != nil || deploy == nil {
+		slog.Error("fail to get latest space deploy by space id", slog.Any("SpaceID", s.ID))
+		return "", SpaceStatusStopped, fmt.Errorf("can't get space deployment,%w", err)
+	}
 
 	namespace, name := s.Repository.NamespaceAndName()
+	// request space deploy status by deploy id
 	srvName, code, err := c.deployer.Status(ctx, types.DeployRepo{
-		SpaceID:   s.ID,
+		DeployID:  deploy.ID,
+		SpaceID:   deploy.SpaceID,
+		ModelID:   deploy.ModelID,
 		Namespace: namespace,
 		Name:      name,
+		SvcName:   deploy.SvcName,
 	})
 	if err != nil {
 		slog.Error("error happen when get space status", slog.Any("error", err), slog.String("path", s.Repository.Path))
 		return "", SpaceStatusStopped, err
 	}
-	return srvName, spaceStatusCodeToString(code), nil
+	return srvName, deployStatusCodeToString(code), nil
 }
 
 func (c *SpaceComponent) Status(ctx context.Context, namespace, name string) (string, string, error) {

@@ -1332,7 +1332,7 @@ func (c *RepoComponent) ListDeploy(ctx context.Context, repoType types.Repositor
 			DeployName:       deploy.DeployName,
 			RepoID:           deploy.RepoID,
 			SvcName:          deploy.SvcName,
-			Status:           spaceStatusCodeToString(deploy.Status),
+			Status:           deployStatusCodeToString(deploy.Status),
 			Hardware:         deploy.Hardware,
 			Env:              deploy.Env,
 			RuntimeFramework: deploy.RuntimeFramework,
@@ -1473,7 +1473,7 @@ func (c *RepoComponent) DeployDetail(ctx context.Context, repoType types.Reposit
 		DeployName:       deploy.DeployName,
 		RepoID:           deploy.RepoID,
 		SvcName:          deploy.SvcName,
-		Status:           spaceStatusCodeToString(deploy.Status),
+		Status:           deployStatusCodeToString(deploy.Status),
 		Hardware:         deploy.Hardware,
 		Env:              deploy.Env,
 		RuntimeFramework: deploy.RuntimeFramework,
@@ -1497,7 +1497,7 @@ func (c *RepoComponent) DeployDetail(ctx context.Context, repoType types.Reposit
 	return &resDeploy, nil
 }
 
-func spaceStatusCodeToString(code int) string {
+func deployStatusCodeToString(code int) string {
 	// DeployBuildPending    = 10
 	// DeployBuildInProgress = 11
 	// DeployBuildFailed     = 12
@@ -1621,10 +1621,12 @@ func (c *RepoComponent) StopDeploy(ctx context.Context, repoType types.Repositor
 	}
 	// delete service
 	deployRepo := types.DeployRepo{
-		SpaceID:   0,
 		DeployID:  deployID,
+		SpaceID:   deploy.SpaceID,
+		ModelID:   deploy.ModelID,
 		Namespace: namespace,
 		Name:      name,
+		SvcName:   deploy.SvcName,
 	}
 	err = c.deployer.Stop(ctx, deployRepo)
 	if err != nil {
@@ -1651,4 +1653,50 @@ func (c *RepoComponent) StopDeploy(ctx context.Context, repoType types.Repositor
 	}
 
 	return err
+}
+
+func (c *RepoComponent) AllowReadAccessByDeployID(ctx context.Context, repoType types.RepositoryType, namespace, name, currentUser string, deployID int64) (bool, error) {
+	user, err := c.user.FindByUsername(ctx, currentUser)
+	if err != nil {
+		return false, errors.New("user does not exist")
+	}
+	repo, err := c.repo.FindByPath(ctx, repoType, namespace, name)
+	if err != nil {
+		return false, fmt.Errorf("failed to find repo, error: %w", err)
+	}
+	deploy, err := c.deploy.GetDeployByID(ctx, deployID)
+	if err != nil {
+		return false, err
+	}
+	if deploy == nil {
+		return false, errors.New("fail to get deploy by ID")
+	}
+	if deploy.UserID != user.ID {
+		return false, errors.New("deploy was not created by user")
+	}
+	if deploy.RepoID != repo.ID {
+		return false, errors.New("found incorrect repo")
+	}
+	return c.AllowReadAccessRepo(ctx, repo, currentUser)
+}
+
+func (c *RepoComponent) DeployStatus(ctx context.Context, repoType types.RepositoryType, namespace, name string, deployID int64) (string, string, error) {
+	deploy, err := c.deploy.GetDeployByID(ctx, deployID)
+	if err != nil {
+		return "", SpaceStatusStopped, err
+	}
+	// request deploy status by deploy id
+	srvName, code, err := c.deployer.Status(ctx, types.DeployRepo{
+		DeployID:  deploy.ID,
+		SpaceID:   deploy.SpaceID,
+		ModelID:   deploy.ModelID,
+		Namespace: namespace,
+		Name:      name,
+		SvcName:   deploy.SvcName,
+	})
+	if err != nil {
+		slog.Error("error happen when get deploy status", slog.Any("error", err), slog.String("path", deploy.GitPath))
+		return "", SpaceStatusStopped, err
+	}
+	return srvName, deployStatusCodeToString(code), nil
 }
