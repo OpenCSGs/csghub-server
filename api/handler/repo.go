@@ -1403,3 +1403,110 @@ func getSourceRepoPathFromSourceUrl(sourceUrl string) (string, error) {
 
 	return path, nil
 }
+
+// GetDeployStatus   godoc
+// @Security     JWT token
+// @Summary      get deploy status
+// @Tags         Repository
+// @Accept       json
+// @Produce      json
+// @Param        repo_type path string true "models,spaces" Enums(models,spaces)
+// @Param        namespace path string true "namespace"
+// @Param        name path string true "name"
+// @Param        id path string true "deploy id"
+// @Param        current_user query string true "current_user"
+// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
+// @Router       /{repo_type}/{namespace}/{name}/run/{id}/status [get]
+func (h *RepoHandler) DeployStatus(ctx *gin.Context) {
+	if ctx.Query("test") == "true" {
+		h.testStatus(ctx)
+		return
+	}
+
+	currentUser := httpbase.GetCurrentUser(ctx)
+	if currentUser == "" {
+		httpbase.UnauthorizedError(ctx, errors.New("user not found, please login first"))
+		return
+	}
+
+	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
+	if err != nil {
+		slog.Error("failed to get namespace from context", "error", err)
+		httpbase.BadRequest(ctx, err.Error())
+		return
+	}
+
+	repoType := common.RepoTypeFromContext(ctx)
+	deployID, err := strconv.ParseInt(ctx.Param("id"), 10, 64)
+	if err != nil {
+		slog.Error("Bad request format", "error", err)
+		httpbase.BadRequest(ctx, err.Error())
+		return
+	}
+
+	allow, err := h.c.AllowReadAccessByDeployID(ctx, repoType, namespace, name, currentUser, deployID)
+	if err != nil {
+		slog.Error("failed to check user permission", "error", err)
+		httpbase.ServerError(ctx, errors.New("failed to check user permission"))
+		return
+	}
+
+	if !allow {
+		slog.Info("user not allowed to query deploy status", slog.String("namespace", namespace),
+			slog.String("name", name), slog.Any("username", currentUser), slog.Any("deploy_id", deployID))
+	}
+
+	ctx.Writer.Header().Set("Content-Type", "text/event-stream")
+	ctx.Writer.Header().Set("Cache-Control", "no-cache")
+	ctx.Writer.Header().Set("Connection", "keep-alive")
+	ctx.Writer.Header().Set("Transfer-Encoding", "chunked")
+
+	for {
+		select {
+		case <-ctx.Request.Context().Done():
+			slog.Info("deploy handler status request context done", slog.Any("error", ctx.Request.Context().Err()))
+			return
+		default:
+			time.Sleep(time.Second * 5)
+			//user http request context instead of gin context, so that server knows the life cycle of the request
+			_, status, err := h.c.DeployStatus(ctx.Request.Context(), repoType, namespace, name, deployID)
+			if err != nil {
+				slog.Error("failed to get deploy status", slog.Any("error", err), slog.String("namespace", namespace),
+					slog.String("name", name), slog.Any("deploy_id", deployID))
+				ctx.SSEvent("error", err.Error())
+			} else {
+				ctx.SSEvent("status", status)
+			}
+			ctx.Writer.Flush()
+		}
+	}
+}
+
+func (h *RepoHandler) testStatus(ctx *gin.Context) {
+	ctx.Writer.Header().Set("Content-Type", "text/event-stream")
+	ctx.Writer.Header().Set("Cache-Control", "no-cache")
+	ctx.Writer.Header().Set("Connection", "keep-alive")
+	ctx.Writer.Header().Set("Transfer-Encoding", "chunked")
+
+	for {
+		select {
+		case <-ctx.Request.Context().Done():
+			slog.Info("deploy handler status request context done", slog.Any("error", ctx.Request.Context().Err()))
+			return
+		default:
+			time.Sleep(time.Second * 5)
+			ctx.SSEvent("status", "Building")
+			ctx.Writer.Flush()
+			time.Sleep(time.Second * 5)
+			ctx.SSEvent("status", "Running")
+			ctx.Writer.Flush()
+			time.Sleep(time.Second * 5)
+			ctx.SSEvent("status", "Sleeping")
+			ctx.Writer.Flush()
+			time.Sleep(time.Second * 5)
+			ctx.SSEvent("status", "Stopped")
+			ctx.Writer.Flush()
+		}
+	}
+}
