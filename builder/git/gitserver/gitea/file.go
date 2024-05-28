@@ -78,20 +78,20 @@ func (c *Client) GetRepoFileRaw(ctx context.Context, req gitserver.GetRepoInfoBy
 	return string(giteaFileData), nil
 }
 
-func (c *Client) GetRepoFileReader(ctx context.Context, req gitserver.GetRepoInfoByPathReq) (io.ReadCloser, error) {
+func (c *Client) GetRepoFileReader(ctx context.Context, req gitserver.GetRepoInfoByPathReq) (io.ReadCloser, int64, error) {
 	namespace := common.WithPrefix(req.Namespace, repoPrefixByType(req.RepoType))
 	entries, _, err := c.giteaClient.GetDir(namespace, req.Name, req.Ref, req.Path)
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 	if entries[0].Size > NonLFSFileSizeLimit {
-		return nil, errors.New("file is larger than 10MB")
+		return nil, 0, errors.New("file is larger than 10MB")
 	}
 	giteaFileReader, _, err := c.giteaClient.GetFileReader(namespace, req.Name, req.Ref, req.Path)
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
-	return giteaFileReader, nil
+	return giteaFileReader, entries[0].Size, nil
 }
 
 func (c *Client) GetRepoLfsFileRaw(ctx context.Context, req gitserver.GetRepoInfoByPathReq) (io.ReadCloser, error) {
