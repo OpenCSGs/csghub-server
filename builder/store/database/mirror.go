@@ -110,6 +110,19 @@ func (s *MirrorStore) NoPushMirror(ctx context.Context) ([]Mirror, error) {
 	return mirrors, nil
 }
 
+func (s *MirrorStore) PushedMirror(ctx context.Context) ([]Mirror, error) {
+	var mirrors []Mirror
+	err := s.db.Operator.Core.NewSelect().
+		Model(&mirrors).
+		Relation("Repository").
+		Where("push_mirror_created = ?", true).
+		Scan(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return mirrors, nil
+}
+
 func (s *MirrorStore) Update(ctx context.Context, mirror *Mirror) (err error) {
 	err = assertAffectedOneRow(s.db.Operator.Core.NewUpdate().
 		Model(mirror).
