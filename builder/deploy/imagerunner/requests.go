@@ -90,12 +90,12 @@ type (
 	}
 
 	CluserResponse struct {
-		ClusterID     string                              `json:"cluster_id"`
-		ClusterName   string                              `json:"cluster_name"`
-		ClusterRegion string                              `json:"cluster_region"`
-		Nodes         map[string]cluster.NodeResourceInfo `json:"nodes"`
-		Zone          string                              `json:"zone"`
-		Provider      string                              `json:"provider"`
+		ClusterID   string                              `json:"cluster_id"`
+		ClusterName string                              `json:"cluster_name"`
+		Region      string                              `json:"region"`
+		Nodes       map[string]cluster.NodeResourceInfo `json:"nodes"`
+		Zone        string                              `json:"zone"`
+		Provider    string                              `json:"provider"`
 	}
 
 	CluserRequest struct {
@@ -132,5 +132,26 @@ type (
 		ClusterID    string `json:"cluster_id"`
 		SvcName      string `json:"svc_name"`
 		InstanceName string `json:"instance_name"`
+	}
+	UpdateClusterResponse struct {
+		Code    int    `json:"code"`
+		Message string `json:"message"`
+	}
+
+	ClusterRes struct {
+		ClusterID string            `json:"cluster_id"`
+		Region    string            `json:"region"`
+		Zone      string            `json:"zone"`     //cn-beijing
+		Provider  string            `json:"provider"` //ali
+		Resources []types.Resources `json:"resources"`
+	}
+
+	ClusterResponse struct {
+		ClusterID string                            `json:"cluster_id"`
+		Region    string                            `json:"region"`
+		Zone      string                            `json:"zone"`     //cn-beijing
+		Provider  string                            `json:"provider"` //ali
+		Enable    bool                              `json:"enable"`
+		Nodes     map[string]types.NodeResourceInfo `json:"nodes"`
 	}
 )
