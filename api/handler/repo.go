@@ -368,7 +368,7 @@ func (h *RepoHandler) DownloadFile(ctx *gin.Context) {
 			return
 		}
 	}
-	reader, url, err := h.c.DownloadFile(ctx, req)
+	reader, size, url, err := h.c.DownloadFile(ctx, req)
 	if err != nil {
 		slog.Error("Failed to download repo file", slog.String("repo_type", string(req.RepoType)), slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
@@ -382,6 +382,7 @@ func (h *RepoHandler) DownloadFile(ctx *gin.Context) {
 		fileName := path.Base(req.Path)
 		ctx.Header("Content-Type", "application/octet-stream")
 		ctx.Header("Content-Disposition", `attachment; filename="`+fileName+`"`)
+		ctx.Header("Content-Length", strconv.FormatInt(size, 10))
 		_, err = io.Copy(ctx.Writer, reader)
 		if err != nil {
 			slog.Error("Failed to download repo file", slog.String("repo_type", string(req.RepoType)), slog.Any("error", err))
@@ -787,6 +788,7 @@ func (h *RepoHandler) handleDownload(ctx *gin.Context, isResolve bool) {
 		SaveAs:    filepath.Base(filePath),
 		RepoType:  common.RepoTypeFromContext(ctx),
 	}
+	// TODO:move the check into SDKDownloadFile, and can return the file content as we get all the content before check lfs pointer
 	lfs, err := h.c.IsLfs(ctx, req)
 	if err != nil {
 		if errors.Is(err, component.ErrNotFound) {
@@ -800,7 +802,7 @@ func (h *RepoHandler) handleDownload(ctx *gin.Context, isResolve bool) {
 		return
 	}
 	req.Lfs = lfs
-	reader, url, err := h.c.SDKDownloadFile(ctx, req)
+	reader, size, url, err := h.c.SDKDownloadFile(ctx, req)
 	if err != nil {
 		if errors.Is(err, component.ErrUnauthorized) {
 			slog.Error("permission denied when accessing repo", slog.String("repo_type", string(req.RepoType)), slog.Any("path", fmt.Sprintf("%s/%s", namespace, name)))
@@ -826,6 +828,7 @@ func (h *RepoHandler) handleDownload(ctx *gin.Context, isResolve bool) {
 		fileName := path.Base(req.Path)
 		ctx.Header("Content-Type", "application/octet-stream")
 		ctx.Header("Content-Disposition", `attachment; filename="`+fileName+`"`)
+		ctx.Header("Content-Length", strconv.FormatInt(size, 10))
 		_, err = io.Copy(ctx.Writer, reader)
 		if err != nil {
 			slog.Error("Failed to download repo file", slog.String("repo_type", string(req.RepoType)), slog.Any("error", err))
