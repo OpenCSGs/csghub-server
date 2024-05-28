@@ -30,7 +30,7 @@ type Namespace struct {
 
 func (s *NamespaceStore) FindByPath(ctx context.Context, path string) (namespace Namespace, err error) {
 	namespace.Path = path
-	err = s.db.Operator.Core.NewSelect().Model(&namespace).Where("path = ?", path).Scan(ctx)
+	err = s.db.Operator.Core.NewSelect().Model(&namespace).Relation("User").Where("path = ?", path).Scan(ctx)
 	return
 }
 
