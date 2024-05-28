@@ -399,7 +399,7 @@ func (h *SpaceHandler) Status(ctx *gin.Context) {
 	}
 
 	if !allow {
-		slog.Info("user not allowed to query sapce status", slog.String("namespace", namespace),
+		slog.Info("user not allowed to query space status", slog.String("namespace", namespace),
 			slog.String("name", name), slog.Any("username", currentUser))
 	}
 
