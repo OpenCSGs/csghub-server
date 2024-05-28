@@ -213,6 +213,46 @@ func (c *MirrorComponent) CreateMirrorRepo(ctx context.Context, req types.Create
 	return reqMirror, nil
 
 }
+
+func (c *MirrorComponent) SyncMirrorData(ctx context.Context) error {
+	mirrors, err := c.mirrorStore.PushedMirror(ctx)
+	if err != nil {
+		return fmt.Errorf("fail to find all mirrors, %w", err)
+	}
+
+	for _, mirror := range mirrors {
+		repoInfo, err := c.mirrorServer.GetRepoInfo(ctx, mirrorserver.GetRepoInfoReq{
+			Namespace: "root",
+			Name:      mirror.LocalRepoPath,
+		})
+
+		if err != nil {
+			slog.Error("fail to get mirror repo info", slog.Int64("mirrorId", mirror.ID), slog.String("error", err.Error()))
+			continue
+		}
+
+		if mirror.Repository != nil {
+			mirror.Repository.UpdatedAt = repoInfo.UpdatedAt
+			_, err = c.repoStore.UpdateRepo(ctx, *mirror.Repository)
+			if err != nil {
+				slog.Error("fail to update repo info", slog.Int64("mirrorId", mirror.ID), slog.String("error", err.Error()))
+				continue
+			}
+		}
+
+		mirror.LastUpdatedAt = repoInfo.MirrorUpdatedAt
+
+		err = c.mirrorStore.Update(ctx, &mirror)
+		if err != nil {
+			slog.Error("fail to update mirror", slog.Int64("mirrorId", mirror.ID), slog.String("error", err.Error()))
+			continue
+		}
+
+		slog.Info("update mirror repo info successfully", slog.Int64("mirrorId", mirror.ID), slog.String("push_url", mirror.PushUrl))
+	}
+	return nil
+}
+
 func (m *MirrorComponent) mapNamespaceAndName(sourceNamespace string) string {
 	namespace := sourceNamespace
 	if ns, found := mirrorOrganizationMap[sourceNamespace]; found {
