@@ -73,3 +73,11 @@ func (r *LocalRunner) Logs(ctx context.Context, req *LogsRequest) (<-chan string
 func (r *LocalRunner) Stop(ctx context.Context, req *StopRequest) (*StopResponse, error) {
 	return &StopResponse{}, nil
 }
+
+func (h *LocalRunner) ListCluster(ctx context.Context) ([]ClusterResponse, error) {
+	return nil, nil
+}
+
+func (h *LocalRunner) UpdateCluster(ctx context.Context, data interface{}) (*UpdateClusterResponse, error) {
+	return nil, nil
+}

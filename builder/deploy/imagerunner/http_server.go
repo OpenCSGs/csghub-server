@@ -577,7 +577,9 @@ func (s *HttpServer) getClusterStatus(c *gin.Context) {
 		if err == nil {
 			clusterInfo := CluserResponse{}
 			clusterInfo.Nodes = nodes
-			clusterInfo.ClusterRegion = cInfo.Region
+			clusterInfo.Region = cInfo.Region
+			clusterInfo.Zone = cInfo.Zone
+			clusterInfo.Provider = cInfo.Provider
 			clusterInfo.ClusterID = cInfo.ClusterID
 			clusterInfo.ClusterName = fmt.Sprintf("cluster%d", index)
 			clusterInfo.Nodes = nodes
@@ -725,7 +727,7 @@ func (s *HttpServer) getReplica(c *gin.Context) {
 }
 
 func (s *HttpServer) updateCluster(c *gin.Context) {
-	var resp StatusResponse
+	var resp UpdateClusterResponse
 	var request = &database.ClusterInfo{}
 	err := c.BindJSON(request)
 	if err != nil {

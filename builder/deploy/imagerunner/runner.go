@@ -1,6 +1,8 @@
 package imagerunner
 
-import "context"
+import (
+	"context"
+)
 
 type Runner interface {
 	Run(context.Context, *RunRequest) (*RunResponse, error)
@@ -11,4 +13,6 @@ type Runner interface {
 	Exist(context.Context, *CheckRequest) (*StatusResponse, error)
 	GetReplica(context.Context, *StatusRequest) (*ReplicaResponse, error)
 	InstanceLogs(context.Context, *InstanceLogsRequest) (<-chan string, error)
+	ListCluster(ctx context.Context) ([]ClusterResponse, error)
+	UpdateCluster(ctx context.Context, data interface{}) (*UpdateClusterResponse, error)
 }

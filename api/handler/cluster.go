@@ -1,11 +1,13 @@
 package handler
 
 import (
+	"errors"
 	"log/slog"
 
 	"github.com/gin-gonic/gin"
 	"opencsg.com/csghub-server/api/httpbase"
 	"opencsg.com/csghub-server/common/config"
+	"opencsg.com/csghub-server/common/types"
 	"opencsg.com/csghub-server/component"
 )
 
@@ -35,6 +37,11 @@ type ClusterHandler struct {
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
 // @Router       /cluster [get]
 func (h *ClusterHandler) Index(ctx *gin.Context) {
+	currentUser := httpbase.GetCurrentUser(ctx)
+	if currentUser == "" {
+		httpbase.UnauthorizedError(ctx, errors.New("user not found, please login first"))
+		return
+	}
 	clusters, err := h.c.Index(ctx)
 	if err != nil {
 		slog.Error("Failed to get cluster list", slog.Any("error", err))
@@ -42,4 +49,25 @@ func (h *ClusterHandler) Index(ctx *gin.Context) {
 		return
 	}
 	httpbase.OK(ctx, clusters)
+}
+
+func (h *ClusterHandler) Update(ctx *gin.Context) {
+	currentUser := httpbase.GetCurrentUser(ctx)
+	if currentUser == "" {
+		httpbase.UnauthorizedError(ctx, errors.New("user not found, please login first"))
+		return
+	}
+	var req *types.ClusterRequest
+	if err := ctx.ShouldBindJSON(&req); err != nil {
+		slog.Error("Bad request format", "error", err)
+		httpbase.BadRequest(ctx, err.Error())
+		return
+	}
+	result, err := h.c.Update(ctx, req)
+	if err != nil {
+		slog.Error("Failed to update cluster info", slog.Any("error", err))
+		httpbase.ServerError(ctx, err)
+		return
+	}
+	httpbase.OK(ctx, result)
 }
