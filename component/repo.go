@@ -1486,8 +1486,8 @@ func (c *RepoComponent) DeployDetail(ctx context.Context, repoType types.Reposit
 		ActualReplica:    actualReplica,
 		DesiredReplica:   desiredReplica,
 		Instances:        instList,
-		ModelID:          deploy.ModelID,
 		Private:          repo.Private,
+		Path:             repo.Path,
 	}
 
 	return &resDeploy, nil
