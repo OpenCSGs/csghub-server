@@ -28,6 +28,8 @@ type Deployer interface {
 	Exist(ctx context.Context, dr types.DeployRepo) (bool, error)
 	GetReplica(ctx context.Context, dr types.DeployRepo) (int, int, []types.Instance, error)
 	InstanceLogs(ctx context.Context, dr types.DeployRepo) (*MultiLogReader, error)
+	ListCluster(ctx context.Context) ([]types.ClusterRes, error)
+	UpdateCluster(ctx context.Context, data interface{}) (*types.UpdateClusterResponse, error)
 }
 
 var _ Deployer = (*deployer)(nil)
@@ -330,4 +332,53 @@ func (d *deployer) InstanceLogs(ctx context.Context, dr types.DeployRepo) (*Mult
 	}
 
 	return NewMultiLogReader(nil, runLog), nil
+}
+
+func (d *deployer) ListCluster(ctx context.Context) ([]types.ClusterRes, error) {
+	resp, err := d.ir.ListCluster(ctx)
+	if err != nil {
+		return nil, err
+	}
+	var result []types.ClusterRes
+	for _, c := range resp {
+		availableGPUs := make(map[string]types.Resources)
+
+		for _, node := range c.Nodes {
+			if len(node.GPUVendor) == 0 {
+				continue
+			}
+			gpuModel := node.GPUModel
+			usedGPUs := node.UsedGPU
+			totalGPUs := node.TotalGPU
+
+			if gpuModel != "" && totalGPUs >= usedGPUs {
+				availableGPUs[gpuModel] = types.Resources{
+					GPUVendor:    node.GPUVendor,
+					AvailableGPU: totalGPUs - usedGPUs,
+					GPUModel:     gpuModel,
+				}
+			}
+		}
+		resources := make([]types.Resources, 0)
+		for k, v := range availableGPUs {
+			resources = append(resources, types.Resources{
+				GPUModel:     k,
+				AvailableGPU: v.AvailableGPU,
+				GPUVendor:    v.GPUVendor,
+			})
+		}
+		result = append(result, types.ClusterRes{
+			ClusterID: c.ClusterID,
+			Region:    c.Region,
+			Zone:      c.Zone,
+			Provider:  c.Provider,
+			Resources: resources,
+		})
+	}
+	return result, err
+}
+
+func (d *deployer) UpdateCluster(ctx context.Context, data interface{}) (*types.UpdateClusterResponse, error) {
+	resp, err := d.ir.UpdateCluster(ctx, data)
+	return (*types.UpdateClusterResponse)(resp), err
 }
