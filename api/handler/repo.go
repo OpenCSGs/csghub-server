@@ -1352,6 +1352,15 @@ func (h *RepoHandler) DeployInstanceLogs(ctx *gin.Context) {
 		return
 	}
 
+	if logReader.RunLog() == nil {
+		httpbase.ServerError(ctx, errors.New("don't find any deploy instance log"))
+		return
+	}
+
+	//to quickly respond the http request
+	ctx.Writer.WriteHeader(http.StatusOK)
+	ctx.Writer.Flush()
+
 	for {
 		select {
 		case <-ctx.Request.Context().Done():
@@ -1372,12 +1381,9 @@ func (h *RepoHandler) testLogs(ctx *gin.Context) {
 	ctx.Writer.Header().Set("Connection", "keep-alive")
 	ctx.Writer.Header().Set("Transfer-Encoding", "chunked")
 
-	// watch client connection
-	closeNotify := ctx.Writer.CloseNotify()
-
 	for {
 		select {
-		case <-closeNotify:
+		case <-ctx.Request.Context().Done():
 			return
 		default:
 			ctx.SSEvent("Container", "test run log message")
@@ -1462,6 +1468,9 @@ func (h *RepoHandler) DeployStatus(ctx *gin.Context) {
 	ctx.Writer.Header().Set("Connection", "keep-alive")
 	ctx.Writer.Header().Set("Transfer-Encoding", "chunked")
 
+	ctx.Writer.WriteHeader(http.StatusOK)
+	ctx.Writer.Flush()
+
 	for {
 		select {
 		case <-ctx.Request.Context().Done():
@@ -1488,6 +1497,9 @@ func (h *RepoHandler) testStatus(ctx *gin.Context) {
 	ctx.Writer.Header().Set("Cache-Control", "no-cache")
 	ctx.Writer.Header().Set("Connection", "keep-alive")
 	ctx.Writer.Header().Set("Transfer-Encoding", "chunked")
+
+	ctx.Writer.WriteHeader(http.StatusOK)
+	ctx.Writer.Flush()
 
 	for {
 		select {
