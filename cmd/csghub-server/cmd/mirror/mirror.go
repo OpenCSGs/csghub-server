@@ -7,7 +7,6 @@ import (
 func init() {
 	// add subcommands here
 	Cmd.AddCommand(createMirrorRepoFromFile)
-	Cmd.AddCommand(cmdSyncMirrorRepoData)
 }
 
 var Cmd = &cobra.Command{

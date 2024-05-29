@@ -2,7 +2,10 @@ package database
 
 import (
 	"context"
+	"fmt"
 	"time"
+
+	"opencsg.com/csghub-server/common/types"
 )
 
 type MirrorStore struct {
@@ -58,6 +61,19 @@ func (s *MirrorStore) FindByRepoID(ctx context.Context, repoID int64) (*Mirror, 
 	err := s.db.Operator.Core.NewSelect().
 		Model(&mirror).
 		Where("repository_id=?", repoID).
+		Scan(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return &mirror, nil
+}
+
+func (s *MirrorStore) FindByRepoPath(ctx context.Context, repoType types.RepositoryType, namespace, name string) (*Mirror, error) {
+	var mirror Mirror
+	err := s.db.Operator.Core.NewSelect().
+		Model(&mirror).
+		Join("JOIN repositories AS r ON mirror.repository_id = r.id ").
+		Where("r.git_path=?", fmt.Sprintf("%ss_%s/%s", repoType, namespace, name)).
 		Scan(ctx)
 	if err != nil {
 		return nil, err
