@@ -117,7 +117,7 @@ func (c *GitCallbackComponent) HandlePush(ctx context.Context, req *types.GiteaC
 		if isMirrorRepo {
 			updated, err := time.Parse(time.RFC3339, req.HeadCommit.Timestamp)
 			if err != nil {
-				fmt.Println("Error parsing time:", err)
+				slog.Error("Error parsing time:", slog.Any("error", err), slog.String("timestamp", req.HeadCommit.Timestamp))
 				return
 			}
 			err = c.rs.SetUpdateTimeByPath(ctx, adjustedRepoType, namespace, repoName, updated)
