@@ -56,6 +56,7 @@ func (s *HttpServer) Run(port int) error {
 	router.Use(middleware.Log())
 
 	router.POST("/:service/run", s.runService)
+	router.PUT("/:service/update", s.updateService)
 	router.POST("/:service/stop", s.stopService)
 	router.GET("/:service/status", s.serviceStatus)
 	router.GET("/:service/logs", s.serviceLogs)
@@ -107,38 +108,11 @@ func (s *HttpServer) runService(c *gin.Context) {
 	}
 
 	annotations := request.Annotation
-	nodeSelector := make(map[string]string)
-	resources := corev1.ResourceRequirements{}
-	resReq := make(map[corev1.ResourceName]resource.Quantity)
+
 	environments := []corev1.EnvVar{}
 	appPort := 0
-
 	hardware := request.Hardware
-	// generate node selector
-	if hardware.Gpu.Labels != nil {
-		for key, value := range hardware.Gpu.Labels {
-			nodeSelector[key] = value
-		}
-	}
-	if hardware.Cpu.Labels != nil {
-		for key, value := range hardware.Cpu.Labels {
-			nodeSelector[key] = value
-		}
-	}
-
-	// generate knative resource requirement
-	if hardware.Cpu.Num != "" {
-		resReq[corev1.ResourceCPU] = resource.MustParse(hardware.Cpu.Num)
-	}
-	if hardware.Memory != "" {
-		resReq[corev1.ResourceMemory] = resource.MustParse(hardware.Memory)
-	}
-	if hardware.EphemeralStorage != "" {
-		resReq[corev1.ResourceEphemeralStorage] = resource.MustParse(hardware.EphemeralStorage)
-	}
-	if hardware.Gpu.ResourceName != "" && hardware.Gpu.Num != "" {
-		resReq[corev1.ResourceName(hardware.Gpu.ResourceName)] = resource.MustParse(hardware.Gpu.Num)
-	}
+	resReq, nodeSelector := GenerateResources(hardware)
 
 	if request.Env != nil {
 		// generate env
@@ -170,7 +144,7 @@ func (s *HttpServer) runService(c *gin.Context) {
 		ContainerPort: int32(appPort),
 	}}
 	// knative service spec resource requirement
-	resources = corev1.ResourceRequirements{
+	resources := corev1.ResourceRequirements{
 		Limits:   resReq,
 		Requests: resReq,
 	}
@@ -305,6 +279,91 @@ func (s *HttpServer) stopService(c *gin.Context) {
 	slog.Info("service deleted", slog.String("srv_name", srvName))
 	resp.Code = 0
 	resp.Message = "service deleted"
+	c.JSON(http.StatusOK, resp)
+}
+
+func (s *HttpServer) updateService(c *gin.Context) {
+	var resp types.ModelUpdateResponse
+	var request = &types.ModelUpdateRequest{}
+	err := c.BindJSON(request)
+
+	if err != nil {
+		slog.Error("updateService get bad request", slog.Any("error", err), slog.Any("req", request))
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	cluster, err := s.clusterPool.GetClusterByID(c, request.ClusterID)
+	if err != nil {
+		slog.Error("fail to get cluster ", slog.Any("error", err))
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	srvName := s.getServiceNameFromRequest(c)
+	srv, err := cluster.KnativeClient.ServingV1().Services(s.k8sNameSpace).
+		Get(c.Request.Context(), srvName, metav1.GetOptions{})
+	if err != nil {
+		k8serr := new(k8serrors.StatusError)
+		if errors.As(err, &k8serr) {
+			if k8serr.Status().Code == http.StatusNotFound {
+				slog.Info("update service skip,service not exist", slog.String("srv_name", srvName), slog.Any("k8s_err", k8serr))
+				resp.Code = 0
+				resp.Message = "skip,service not exist"
+				c.JSON(http.StatusOK, nil)
+				return
+			}
+		}
+		slog.Error("update service failed, cannot get service info", slog.String("srv_name", srvName), slog.Any("error", err),
+			slog.String("srv_name", srvName))
+		resp.Code = -1
+		resp.Message = "failed to get service status"
+		c.JSON(http.StatusInternalServerError, resp)
+		return
+	}
+
+	if srv == nil {
+		resp.Code = 0
+		resp.Message = "service not exist"
+		c.JSON(http.StatusOK, resp)
+		return
+	}
+	// Update Image
+	containerImg := path.Join(s.modelDockerRegBase, request.ImageID)
+	srv.Spec.Template.Spec.Containers[0].Image = containerImg
+	// Update env
+	environments := []corev1.EnvVar{}
+	if request.Env != nil {
+		// generate env
+		for key, value := range request.Env {
+			environments = append(environments, corev1.EnvVar{Name: key, Value: value})
+		}
+		srv.Spec.Template.Spec.Containers[0].Env = environments
+	}
+	// Update CPU and Memory requests and limits
+	hardware := request.Hardware
+	resReq, _ := GenerateResources(hardware)
+	resources := corev1.ResourceRequirements{
+		Limits:   resReq,
+		Requests: resReq,
+	}
+	srv.Spec.Template.Spec.Containers[0].Resources = resources
+	// Update replica
+	srv.Spec.Template.Annotations["autoscaling.knative.dev/min-scale"] = strconv.Itoa(request.MinReplica)
+	srv.Spec.Template.Annotations["autoscaling.knative.dev/max-scale"] = strconv.Itoa(request.MaxReplica)
+
+	_, err = cluster.KnativeClient.ServingV1().Services(s.k8sNameSpace).Update(c, srv, metav1.UpdateOptions{})
+	if err != nil {
+		slog.Error("failed to update service ", slog.String("srv_name", srvName), slog.Any("error", err),
+			slog.String("srv_name", srvName))
+		resp.Code = -1
+		resp.Message = "failed to update service"
+		c.JSON(http.StatusInternalServerError, resp)
+		return
+	}
+
+	slog.Info("service updated", slog.String("srv_name", srvName))
+	resp.Code = 0
+	resp.Message = "service updated"
 	c.JSON(http.StatusOK, resp)
 }
 
@@ -822,4 +881,36 @@ func getPodStatus(containerStatuses []corev1.ContainerStatus) string {
 		}
 	}
 	return status
+}
+
+func GenerateResources(hardware types.HardWare) (map[corev1.ResourceName]resource.Quantity, map[string]string) {
+	nodeSelector := make(map[string]string)
+	resReq := make(map[corev1.ResourceName]resource.Quantity)
+
+	// generate node selector
+	if hardware.Gpu.Labels != nil {
+		for key, value := range hardware.Gpu.Labels {
+			nodeSelector[key] = value
+		}
+	}
+	if hardware.Cpu.Labels != nil {
+		for key, value := range hardware.Cpu.Labels {
+			nodeSelector[key] = value
+		}
+	}
+
+	// generate knative resource requirement
+	if hardware.Cpu.Num != "" {
+		resReq[corev1.ResourceCPU] = resource.MustParse(hardware.Cpu.Num)
+	}
+	if hardware.Memory != "" {
+		resReq[corev1.ResourceMemory] = resource.MustParse(hardware.Memory)
+	}
+	if hardware.EphemeralStorage != "" {
+		resReq[corev1.ResourceEphemeralStorage] = resource.MustParse(hardware.EphemeralStorage)
+	}
+	if hardware.Gpu.ResourceName != "" && hardware.Gpu.Num != "" {
+		resReq[corev1.ResourceName(hardware.Gpu.ResourceName)] = resource.MustParse(hardware.Gpu.Num)
+	}
+	return resReq, nodeSelector
 }

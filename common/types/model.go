@@ -134,3 +134,19 @@ type ModelRunReq struct {
 	SecureLevel        int    `json:"secure_level"`
 	CostPerHour        int64  `json:"cost_per_hour"`
 }
+
+type ModelUpdateRequest struct {
+	MinReplica int               `json:"min_replica"` // min replica of instance/pod
+	MaxReplica int               `json:"max_replica"` // max replica of instance/pod
+	Hardware   HardWare          `json:"hardware"`    // resource requirements
+	ImageID    string            `json:"image_id" binding:"required"`
+	Env        map[string]string `json:"env"` // runtime env variables
+	ClusterID  string            `json:"cluster_id"`
+	SvcName    string            `json:"svc_name"`
+}
+
+type ModelUpdateResponse struct {
+	DeployID int64  `json:"deploy_id"`
+	Code     int    `json:"code"`
+	Message  string `json:"message"`
+}
