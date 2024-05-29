@@ -366,3 +366,22 @@ func (s *RepoStore) PublicToUser(ctx context.Context, repoType types.RepositoryT
 
 	return
 }
+
+func (s *RepoStore) IsMirrorRepo(ctx context.Context, repoType types.RepositoryType, namespace, name string) (bool, error) {
+	var result struct {
+		Exists bool `bun:"exists"`
+	}
+
+	query := s.db.Operator.Core.NewSelect().
+		ColumnExpr("EXISTS(SELECT 1 FROM mirrors WHERE mirrors.repository_id = repositories.id) AS exists").
+		Table("repositories").
+		Where("repositories.git_path = ?", fmt.Sprintf("%ss_%s/%s", repoType, namespace, name)).
+		Limit(1)
+
+	err := query.Scan(ctx, &result)
+	if err != nil {
+		return false, err
+	}
+
+	return result.Exists, nil
+}
