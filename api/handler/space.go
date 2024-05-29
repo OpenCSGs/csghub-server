@@ -408,6 +408,9 @@ func (h *SpaceHandler) Status(ctx *gin.Context) {
 	ctx.Writer.Header().Set("Connection", "keep-alive")
 	ctx.Writer.Header().Set("Transfer-Encoding", "chunked")
 
+	ctx.Writer.WriteHeader(http.StatusOK)
+	ctx.Writer.Flush()
+
 	for {
 		select {
 		case <-ctx.Request.Context().Done():
@@ -434,6 +437,9 @@ func (h *SpaceHandler) status(ctx *gin.Context) {
 	ctx.Writer.Header().Set("Cache-Control", "no-cache")
 	ctx.Writer.Header().Set("Connection", "keep-alive")
 	ctx.Writer.Header().Set("Transfer-Encoding", "chunked")
+
+	ctx.Writer.WriteHeader(http.StatusOK)
+	ctx.Writer.Flush()
 
 	for {
 		select {
@@ -508,6 +514,15 @@ func (h *SpaceHandler) Logs(ctx *gin.Context) {
 		return
 	}
 
+	if logReader.RunLog() == nil && logReader.BuildLog() == nil {
+		httpbase.ServerError(ctx, errors.New("don't find any space deploy log"))
+		return
+	}
+
+	//to quickly respond the http request
+	ctx.Writer.WriteHeader(http.StatusOK)
+	ctx.Writer.Flush()
+
 	for {
 		select {
 		case <-ctx.Request.Context().Done():
@@ -533,12 +548,9 @@ func (h *SpaceHandler) testLogs(ctx *gin.Context) {
 	ctx.Writer.Header().Set("Connection", "keep-alive")
 	ctx.Writer.Header().Set("Transfer-Encoding", "chunked")
 
-	// watch client connection
-	closeNotify := ctx.Writer.CloseNotify()
-
 	for {
 		select {
-		case <-closeNotify:
+		case <-ctx.Request.Context().Done():
 			return
 		default:
 			ctx.SSEvent("Build", "test build log message")
