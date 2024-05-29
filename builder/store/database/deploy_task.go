@@ -75,12 +75,6 @@ func (s *DeployTaskStore) UpdateDeploy(ctx context.Context, deploy *Deploy) erro
 	return err
 }
 
-func (s *DeployTaskStore) GetDeploy(ctx context.Context, id int64) (*Deploy, error) {
-	deploy := &Deploy{}
-	err := s.db.Core.NewSelect().Model(deploy).Where("id = ?", id).Limit(1).Scan(ctx, deploy)
-	return deploy, err
-}
-
 func (s *DeployTaskStore) GetLatestDeployBySpaceID(ctx context.Context, spaceID int64) (*Deploy, error) {
 	deploy := &Deploy{}
 	err := s.db.Core.NewSelect().Model(deploy).Where("space_id = ?", spaceID).Order("created_at DESC").Limit(1).Scan(ctx, deploy)
@@ -173,7 +167,7 @@ func (s *DeployTaskStore) UpdateInTx(ctx context.Context, deployColumns, deployT
 
 func (s *DeployTaskStore) ListDeploy(ctx context.Context, repoType types.RepositoryType, repoID, userID int64) ([]Deploy, error) {
 	var result []Deploy
-	query := s.db.Operator.Core.NewSelect().Model(&result).Where("repo_id = ? and user_id = ?", repoID, userID)
+	query := s.db.Operator.Core.NewSelect().Model(&result).Where("user_id = ? and repo_id = ?", userID, repoID)
 	if repoType == types.ModelRepo {
 		query = query.Where("status != ?", common.Deleted)
 	}
