@@ -455,7 +455,11 @@ func (h *ModelHandler) DeployDedicated(ctx *gin.Context) {
 
 	slog.Debug("deploy model as inference created", slog.String("namespace", namespace),
 		slog.String("name", name), slog.Int64("deploy_id", deployID))
-	httpbase.OK(ctx, nil)
+
+	// return deploy_id
+	response := types.DeployRepo{DeployID: deployID}
+
+	httpbase.OK(ctx, response)
 }
 
 // DeleteDeploy  godoc
