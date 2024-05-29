@@ -27,16 +27,17 @@ const (
 
 // define GitCallbackComponent struct
 type GitCallbackComponent struct {
-	config  *config.Config
-	gs      gitserver.GitServer
-	tc      *component.TagComponent
-	checker component.SensitiveChecker
-	ms      *database.ModelStore
-	ds      *database.DatasetStore
-	sc      *component.SpaceComponent
-	ss      *database.SpaceStore
-	rs      *database.RepoStore
-	rrs     *database.RepoRelationsStore
+	config      *config.Config
+	gs          gitserver.GitServer
+	tc          *component.TagComponent
+	checker     component.SensitiveChecker
+	ms          *database.ModelStore
+	ds          *database.DatasetStore
+	sc          *component.SpaceComponent
+	ss          *database.SpaceStore
+	rs          *database.RepoStore
+	rrs         *database.RepoRelationsStore
+	mirrorStore *database.MirrorStore
 	// set visibility if file content is sensitive
 	setRepoVisibility bool
 }
@@ -56,22 +57,24 @@ func NewGitCallback(config *config.Config) (*GitCallbackComponent, error) {
 	ss := database.NewSpaceStore()
 	rs := database.NewRepoStore()
 	rrs := database.NewRepoRelationsStore()
+	mirrorStore := database.NewMirrorStore()
 	checker := component.NewSensitiveComponent(config)
 	sc, err := component.NewSpaceComponent(config)
 	if err != nil {
 		return nil, err
 	}
 	return &GitCallbackComponent{
-		config:  config,
-		gs:      gs,
-		tc:      tc,
-		ms:      ms,
-		ds:      ds,
-		ss:      ss,
-		sc:      sc,
-		rs:      rs,
-		rrs:     rrs,
-		checker: checker,
+		config:      config,
+		gs:          gs,
+		tc:          tc,
+		ms:          ms,
+		ds:          ds,
+		ss:          ss,
+		sc:          sc,
+		rs:          rs,
+		rrs:         rrs,
+		mirrorStore: mirrorStore,
+		checker:     checker,
 	}, nil
 }
 
@@ -106,9 +109,35 @@ func (c *GitCallbackComponent) HandlePush(ctx context.Context, req *types.GiteaC
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
 		adjustedRepoType := types.RepositoryType(strings.TrimRight(repoType, "s"))
-		err := c.rs.SetUpdateTimeByPath(ctx, adjustedRepoType, namespace, repoName, time.Now())
+
+		isMirrorRepo, err := c.rs.IsMirrorRepo(ctx, adjustedRepoType, namespace, repoName)
 		if err != nil {
-			slog.Error("failed to set repo update time", slog.Any("error", err), slog.String("repo_type", string(adjustedRepoType)), slog.String("namespace", namespace), slog.String("name", repoName))
+			slog.Error("failed to check if a mirror repo", slog.Any("error", err), slog.String("repo_type", string(adjustedRepoType)), slog.String("namespace", namespace), slog.String("name", repoName))
+		}
+		if isMirrorRepo {
+			updated, err := time.Parse(time.RFC3339, req.HeadCommit.Timestamp)
+			if err != nil {
+				fmt.Println("Error parsing time:", err)
+				return
+			}
+			err = c.rs.SetUpdateTimeByPath(ctx, adjustedRepoType, namespace, repoName, updated)
+			if err != nil {
+				slog.Error("failed to set repo update time", slog.Any("error", err), slog.String("repo_type", string(adjustedRepoType)), slog.String("namespace", namespace), slog.String("name", repoName))
+			}
+			mirror, err := c.mirrorStore.FindByRepoPath(ctx, adjustedRepoType, namespace, repoName)
+			if err != nil {
+				slog.Error("failed to find repo mirror", slog.Any("error", err), slog.String("repo_type", string(adjustedRepoType)), slog.String("namespace", namespace), slog.String("name", repoName))
+			}
+			mirror.LastUpdatedAt = time.Now()
+			err = c.mirrorStore.Update(ctx, mirror)
+			if err != nil {
+				slog.Error("failed to update repo mirror last_updated_at", slog.Any("error", err), slog.String("repo_type", string(adjustedRepoType)), slog.String("namespace", namespace), slog.String("name", repoName))
+			}
+		} else {
+			err := c.rs.SetUpdateTimeByPath(ctx, adjustedRepoType, namespace, repoName, time.Now())
+			if err != nil {
+				slog.Error("failed to set repo update time", slog.Any("error", err), slog.String("repo_type", string(adjustedRepoType)), slog.String("namespace", namespace), slog.String("name", repoName))
+			}
 		}
 	}()
 
