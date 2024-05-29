@@ -82,19 +82,6 @@ func (c *MirrorClient) MirrorSync(ctx context.Context, req mirrorserver.MirrorSy
 	return nil
 }
 
-func (c *MirrorClient) GetRepoInfo(ctx context.Context, req mirrorserver.GetRepoInfoReq) (*mirrorserver.RepoInfo, error) {
-	repo, _, err := c.giteaClient.GetRepo(req.Namespace, req.Name)
-	if err != nil {
-		return nil, err
-	}
-	info := &mirrorserver.RepoInfo{
-		UpdatedAt:       repo.Updated,
-		MirrorUpdatedAt: repo.MirrorUpdated,
-	}
-
-	return info, nil
-}
-
 func repoPrefixByType(repoType types.RepositoryType) string {
 	var prefix string
 	switch repoType {

@@ -7,5 +7,4 @@ type MirrorServer interface {
 	GetMirrorTaskInfo(ctx context.Context, taskId int64) (*MirrorTaskInfo, error)
 	CreatePushMirror(ctx context.Context, req CreatePushMirrorReq) error
 	MirrorSync(ctx context.Context, req MirrorSyncReq) error
-	GetRepoInfo(ctx context.Context, req GetRepoInfoReq) (*RepoInfo, error)
 }
