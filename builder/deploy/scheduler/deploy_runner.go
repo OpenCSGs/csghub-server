@@ -215,7 +215,7 @@ func (t *DeployRunner) makeDeployRequest() (*imagerunner.RunRequest, error) {
 		return nil, fmt.Errorf("cant get git access token:%w", err)
 	}
 	fields := strings.Split(t.repo.Path, "/")
-	deploy, err := t.store.GetDeploy(context.Background(), t.task.DeployID)
+	deploy, err := t.store.GetDeployByID(context.Background(), t.task.DeployID)
 	if err != nil {
 		return nil, fmt.Errorf("fail to get deploy with error :%w", err)
 	}
