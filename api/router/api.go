@@ -133,6 +133,7 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 		modelsGroup.GET("/:namespace/:name/mirror", middleware.RepoType(types.ModelRepo), repoCommonHandler.GetMirror)
 		modelsGroup.PUT("/:namespace/:name/mirror", middleware.RepoType(types.ModelRepo), repoCommonHandler.UpdateMirror)
 		modelsGroup.DELETE("/:namespace/:name/mirror", middleware.RepoType(types.ModelRepo), repoCommonHandler.DeleteMirror)
+		modelsGroup.POST("/:namespace/:name/mirror/sync", middleware.RepoType(types.ModelRepo), repoCommonHandler.SyncMirror)
 		// runtime framework
 		modelsGroup.GET("/:namespace/:name/runtime_framework", middleware.RepoType(types.ModelRepo), repoCommonHandler.RuntimeFrameworkList)
 		modelsGroup.POST("/:namespace/:name/runtime_framework", middleware.RepoType(types.ModelRepo), repoCommonHandler.RuntimeFrameworkCreate)
@@ -179,6 +180,7 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 		datasetsGroup.GET("/:namespace/:name/mirror", middleware.RepoType(types.DatasetRepo), repoCommonHandler.GetMirror)
 		datasetsGroup.PUT("/:namespace/:name/mirror", middleware.RepoType(types.DatasetRepo), repoCommonHandler.UpdateMirror)
 		datasetsGroup.DELETE("/:namespace/:name/mirror", middleware.RepoType(types.DatasetRepo), repoCommonHandler.DeleteMirror)
+		datasetsGroup.POST("/:namespace/:name/mirror/sync", middleware.RepoType(types.DatasetRepo), repoCommonHandler.SyncMirror)
 	}
 
 	// Code routes
@@ -215,6 +217,7 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 		codesGroup.GET("/:namespace/:name/mirror", middleware.RepoType(types.CodeRepo), repoCommonHandler.GetMirror)
 		codesGroup.PUT("/:namespace/:name/mirror", middleware.RepoType(types.CodeRepo), repoCommonHandler.UpdateMirror)
 		codesGroup.DELETE("/:namespace/:name/mirror", middleware.RepoType(types.CodeRepo), repoCommonHandler.DeleteMirror)
+		codesGroup.POST("/:namespace/:name/mirror/sync", middleware.RepoType(types.CodeRepo), repoCommonHandler.SyncMirror)
 	}
 
 	// Dataset viewer
@@ -266,10 +269,11 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 		spaces.PUT("/:namespace/:name/raw/*file_path", middleware.RepoType(types.SpaceRepo), repoCommonHandler.UpdateFile)
 		spaces.POST("/:namespace/:name/update_downloads", middleware.RepoType(types.SpaceRepo), repoCommonHandler.UpdateDownloads)
 		spaces.POST("/:namespace/:name/upload_file", middleware.RepoType(types.SpaceRepo), repoCommonHandler.UploadFile)
-		spaces.POST("/:namespace/:name/mirrors", middleware.RepoType(types.SpaceRepo), repoCommonHandler.CreateMirror)
+		spaces.POST("/:namespace/:name/mirror", middleware.RepoType(types.SpaceRepo), repoCommonHandler.CreateMirror)
 		spaces.GET("/:namespace/:name/mirror", middleware.RepoType(types.SpaceRepo), repoCommonHandler.GetMirror)
 		spaces.PUT("/:namespace/:name/mirror", middleware.RepoType(types.SpaceRepo), repoCommonHandler.UpdateMirror)
 		spaces.DELETE("/:namespace/:name/mirror", middleware.RepoType(types.SpaceRepo), repoCommonHandler.DeleteMirror)
+		spaces.POST("/:namespace/:name/mirror/sync", middleware.RepoType(types.SpaceRepo), repoCommonHandler.SyncMirror)
 		spaces.GET("/:namespace/:name/runtime_framework", middleware.RepoType(types.SpaceRepo), repoCommonHandler.RuntimeFrameworkList)
 		spaces.POST("/:namespace/:name/runtime_framework", middleware.RepoType(types.SpaceRepo), repoCommonHandler.RuntimeFrameworkCreate)
 		spaces.PUT("/:namespace/:name/runtime_framework/:id", middleware.RepoType(types.SpaceRepo), repoCommonHandler.RuntimeFrameworkUpdate)

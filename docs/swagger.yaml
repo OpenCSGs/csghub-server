@@ -1972,6 +1972,51 @@ paths:
       summary: Update a mirror for a existing repository
       tags:
       - Repository
+  /{repo_type}/{namespace}/{name}/mirror/sync:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: models,datasets,codes or spaces
+        enum:
+        - models
+        - datasets
+        - codes
+        - spaces
+        in: path
+        name: repo_type
+        required: true
+        type: string
+      - description: repo owner name
+        in: path
+        name: namespace
+        required: true
+        type: string
+      - description: repo name
+        in: path
+        name: name
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/types.Response'
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Triggers the mirror synchronization
+      tags:
+      - Repository
   /{repo_type}/{namespace}/{name}/raw/{file_path}:
     get:
       consumes:
