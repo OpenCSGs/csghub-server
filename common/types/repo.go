@@ -14,6 +14,9 @@ const (
 	SpaceRepo   RepositoryType = "space"
 	CodeRepo    RepositoryType = "code"
 	UnknownRepo RepositoryType = ""
+
+	EndpointPublic  int = 1 // public - anyone can access
+	EndpointPrivate int = 2 // private - access with read permission
 )
 
 type RepoRequest struct {

@@ -1290,6 +1290,16 @@ func (h *RepoHandler) DeployDetail(ctx *gin.Context) {
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
+	allow, err := h.c.AllowAccessDeploy(ctx, repoType, namespace, name, currentUser, deployID)
+	if err != nil {
+		slog.Error("failed to check user permission", "error", err)
+		httpbase.ServerError(ctx, errors.New("failed to check user permission"))
+		return
+	}
+	if !allow {
+		slog.Info("user not allowed to query deploy detail", slog.String("namespace", namespace),
+			slog.String("name", name), slog.Any("username", currentUser), slog.Any("deploy_id", deployID))
+	}
 	response, err := h.c.DeployDetail(ctx, repoType, namespace, name, currentUser, deployID)
 	if err != nil {
 		slog.Error("fail to deploy detail", slog.String("error", err.Error()), slog.Any("repotype", repoType), slog.Any("namespace", namespace), slog.Any("name", name), slog.Any("deploy id", deployID))
@@ -1451,7 +1461,7 @@ func (h *RepoHandler) DeployStatus(ctx *gin.Context) {
 		return
 	}
 
-	allow, err := h.c.AllowReadAccessByDeployID(ctx, repoType, namespace, name, currentUser, deployID)
+	allow, err := h.c.AllowAccessDeploy(ctx, repoType, namespace, name, currentUser, deployID)
 	if err != nil {
 		slog.Error("failed to check user permission", "error", err)
 		httpbase.ServerError(ctx, errors.New("failed to check user permission"))

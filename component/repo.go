@@ -1577,23 +1577,59 @@ func (c *RepoComponent) DeployInstanceLogs(ctx context.Context, repoType types.R
 	})
 }
 
-func (c *RepoComponent) AllowCallApi(ctx context.Context, svcName, username string) (bool, error) {
-	if username == "" {
-		return false, errors.New("user not found, please login first")
-	}
-	d, err := c.deploy.GetDeployBySvcName(ctx, svcName)
+// check access repo permission by repo id
+func (c *RepoComponent) AllowAccessByRepoID(ctx context.Context, repoID int64, username string) (bool, error) {
+	r, err := c.repo.FindById(ctx, repoID)
 	if err != nil {
-		return false, fmt.Errorf("failed to get deploy by svc name:%s, %w", svcName, err)
+		return false, fmt.Errorf("failed to get repository by repo_id: %d, %w", repoID, err)
 	}
-	if d == nil {
-		return false, fmt.Errorf("failed to get deploy by svc name:%s", svcName)
-	}
-	r, err := c.repo.FindById(ctx, d.RepoID)
-	if err != nil {
-		return false, fmt.Errorf("failed to get repository by repo_id:%d, %w", d.RepoID, err)
+	if r == nil {
+		return false, fmt.Errorf("invalid repository by repo_id: %d", repoID)
 	}
 	fields := strings.Split(r.Path, "/")
 	return c.AllowReadAccess(ctx, r.RepositoryType, fields[0], fields[1], username)
+}
+
+// check access endpoint for rproxy
+func (c *RepoComponent) AllowAccessEndpoint(ctx context.Context, currentUser string, deploy *database.Deploy) (bool, error) {
+	if deploy.SecureLevel == types.EndpointPublic {
+		// public endpoint
+		return true, nil
+	}
+	return c.checkAccessDeploy(ctx, deploy.RepoID, currentUser, deploy)
+}
+
+// check access deploy permission
+func (c *RepoComponent) AllowAccessDeploy(ctx context.Context, repoType types.RepositoryType, namespace, name, currentUser string, deployID int64) (bool, error) {
+	repo, err := c.repo.FindByPath(ctx, repoType, namespace, name)
+	if err != nil {
+		return false, fmt.Errorf("failed to find repo, error: %w", err)
+	}
+	deploy, err := c.deploy.GetDeployByID(ctx, deployID)
+	if err != nil {
+		return false, err
+	}
+	if deploy == nil {
+		return false, fmt.Errorf("ail to get deploy by ID: %v", deployID)
+	}
+	return c.checkAccessDeploy(ctx, repo.ID, currentUser, deploy)
+}
+
+// common check function for apiserver and rproxy
+func (c *RepoComponent) checkAccessDeploy(ctx context.Context, repoID int64, currentUser string, deploy *database.Deploy) (bool, error) {
+	user, err := c.user.FindByUsername(ctx, currentUser)
+	if err != nil {
+		return false, errors.New("user does not exist")
+	}
+	if deploy.UserID != user.ID {
+		// deny access due to deploy was not created by
+		return false, errors.New("deploy was not created by user")
+	}
+	if deploy.RepoID != repoID {
+		// deny access for invalid repo
+		return false, errors.New("invalid deploy found")
+	}
+	return true, nil
 }
 
 func (c *RepoComponent) StopDeploy(ctx context.Context, repoType types.RepositoryType, namespace, name, currentUser string, deployID int64) error {
@@ -1700,4 +1736,15 @@ func (c *RepoComponent) DeployStatus(ctx context.Context, repoType types.Reposit
 		return "", SpaceStatusStopped, nil, err
 	}
 	return srvName, deployStatusCodeToString(code), instances, nil
+}
+
+func (c *RepoComponent) GetDeployBySvcName(ctx context.Context, svcName string) (*database.Deploy, error) {
+	d, err := c.deploy.GetDeployBySvcName(ctx, svcName)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get deploy by svc name:%s, %w", svcName, err)
+	}
+	if d == nil {
+		return nil, fmt.Errorf("do not found deploy by svc name:%s", svcName)
+	}
+	return d, nil
 }
