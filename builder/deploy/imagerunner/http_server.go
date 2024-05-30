@@ -402,6 +402,15 @@ func (s *HttpServer) serviceStatus(c *gin.Context) {
 	deployID, _ := strconv.ParseInt(deployIDStr, 10, 64)
 	resp.DeployID = deployID
 
+	// retrive pod list and status
+	instList, err := s.getServicePodsWithStatus(c.Request.Context(), *cluster, srvName, s.k8sNameSpace)
+	if err != nil {
+		slog.Error("fail to get service pod name list", slog.Any("error", err))
+		c.JSON(http.StatusNotFound, gin.H{"error": "fail to get service pod name list"})
+		return
+	}
+	resp.Instances = instList
+
 	if srv.IsFailed() {
 		resp.Code = common.DeployFailed
 		// read message of Ready
@@ -567,7 +576,6 @@ func (s *HttpServer) serviceStatusAll(c *gin.Context) {
 				DeployID: deployID,
 			}
 			allStatus[srv.Name] = status
-
 			if srv.IsFailed() {
 				status.Code = common.DeployFailed
 				continue
