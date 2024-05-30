@@ -1748,3 +1748,30 @@ func (c *RepoComponent) GetDeployBySvcName(ctx context.Context, svcName string) 
 	}
 	return d, nil
 }
+
+func (c *RepoComponent) SyncMirror(ctx context.Context, repoType types.RepositoryType, namespace, name, currentUser string) error {
+	admin, err := c.checkCurrentUserPermission(ctx, currentUser, namespace, membership.RoleAdmin)
+	if err != nil {
+		return fmt.Errorf("failed to check permission to create mirror, error: %w", err)
+	}
+
+	if !admin {
+		return fmt.Errorf("users do not have permission to delete mirror for this repo")
+	}
+	repo, err := c.repo.FindByPath(ctx, repoType, namespace, name)
+	if err != nil {
+		return fmt.Errorf("failed to find repo, error: %w", err)
+	}
+	mirror, err := c.mirror.FindByRepoID(ctx, repo.ID)
+	if err != nil {
+		return fmt.Errorf("failed to find mirror, error: %w", err)
+	}
+	err = c.mirrorServer.MirrorSync(ctx, mirrorserver.MirrorSyncReq{
+		Namespace: "root",
+		Name:      mirror.LocalRepoPath,
+	})
+	if err != nil {
+		return fmt.Errorf("failed to sync mirror, error: %w", err)
+	}
+	return nil
+}

@@ -6561,6 +6561,74 @@
                 }
             }
         },
+        "/{repo_type}/{namespace}/{name}/mirror/sync": {
+            "post": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Repository"
+                ],
+                "summary": "Triggers the mirror synchronization",
+                "parameters": [
+                    {
+                        "enum": [
+                            "models",
+                            "datasets",
+                            "codes",
+                            "spaces"
+                        ],
+                        "type": "string",
+                        "description": "models,datasets,codes or spaces",
+                        "name": "repo_type",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "repo owner name",
+                        "name": "namespace",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "repo name",
+                        "name": "name",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/types.Response"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            }
+        },
         "/{repo_type}/{namespace}/{name}/raw/{file_path}": {
             "get": {
                 "security": [
