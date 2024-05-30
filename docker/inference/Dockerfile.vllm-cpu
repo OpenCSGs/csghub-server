@@ -1,14 +1,16 @@
 FROM cledge/vllm-cpu:0.4.12-fix1
 
-RUN pip install huggingface_hub -i https://pypi.tuna.tsinghua.edu.cn/simple/
+RUN pip config set global.index-url https://pypi.tuna.tsinghua.edu.cn/simple 
+RUN pip install git+https://git-devops.opencsg.com/csg-hub-sdk/csghub-sdk
 
-COPY ./vllm/serve.sh serve.sh
+WORKDIR /workspace/
 COPY ./vllm/entry.py entry.py
+COPY ./vllm/serve.sh serve.sh
 
 RUN mkdir -p /data
 ENV HUGGINGFACE_HUB_CACHE=/data \
-    HF_HUB_ENABLE_HF_TRANSFER=0 
-    
+    HF_HUB_ENABLE_HF_TRANSFER=0
+
 EXPOSE 8000
 
 ENTRYPOINT ["bash", "serve.sh"]
