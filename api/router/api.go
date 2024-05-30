@@ -384,7 +384,7 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 	if err != nil {
 		return nil, fmt.Errorf("error creating jwt token controller:%w", err)
 	}
-	apiGroup.POST("/jwt/token", jwtCtrl.Create)
+	apiGroup.POST("/jwt/token", middleware.OnlyAPIKeyAuthenticator(config), jwtCtrl.Create)
 
 	// callback
 	callbackCtrl, err := callback.NewGitCallbackHandler(config)
