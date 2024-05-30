@@ -1680,23 +1680,24 @@ func (c *RepoComponent) AllowReadAccessByDeployID(ctx context.Context, repoType 
 	return c.AllowReadAccessRepo(ctx, repo, currentUser)
 }
 
-func (c *RepoComponent) DeployStatus(ctx context.Context, repoType types.RepositoryType, namespace, name string, deployID int64) (string, string, error) {
+func (c *RepoComponent) DeployStatus(ctx context.Context, repoType types.RepositoryType, namespace, name string, deployID int64) (string, string, []types.Instance, error) {
 	deploy, err := c.deploy.GetDeployByID(ctx, deployID)
 	if err != nil {
-		return "", SpaceStatusStopped, err
+		return "", SpaceStatusStopped, nil, err
 	}
 	// request deploy status by deploy id
-	srvName, code, err := c.deployer.Status(ctx, types.DeployRepo{
+	srvName, code, instances, err := c.deployer.Status(ctx, types.DeployRepo{
 		DeployID:  deploy.ID,
 		SpaceID:   deploy.SpaceID,
 		ModelID:   deploy.ModelID,
 		Namespace: namespace,
 		Name:      name,
 		SvcName:   deploy.SvcName,
+		ClusterID: deploy.ClusterID,
 	})
 	if err != nil {
 		slog.Error("error happen when get deploy status", slog.Any("error", err), slog.String("path", deploy.GitPath))
-		return "", SpaceStatusStopped, err
+		return "", SpaceStatusStopped, nil, err
 	}
-	return srvName, deployStatusCodeToString(code), nil
+	return srvName, deployStatusCodeToString(code), instances, nil
 }

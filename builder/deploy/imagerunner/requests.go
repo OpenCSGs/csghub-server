@@ -62,10 +62,11 @@ type (
 	}
 
 	StatusResponse struct {
-		DeployID int64  `json:"deploy_id"`
-		Code     int    `json:"code"`
-		Message  string `json:"message"`
-		Endpoint string `json:"url"`
+		DeployID  int64            `json:"deploy_id"`
+		Code      int              `json:"code"`
+		Message   string           `json:"message"`
+		Endpoint  string           `json:"url"`
+		Instances []types.Instance `json:"instance"`
 	}
 
 	LogsRequest struct {

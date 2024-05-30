@@ -21,7 +21,7 @@ import (
 
 type Deployer interface {
 	Deploy(ctx context.Context, dr types.DeployRepo) (deployID int64, err error)
-	Status(ctx context.Context, dr types.DeployRepo) (srvName string, status int, err error)
+	Status(ctx context.Context, dr types.DeployRepo) (srvName string, status int, instances []types.Instance, err error)
 	Logs(ctx context.Context, dr types.DeployRepo) (*MultiLogReader, error)
 	Stop(ctx context.Context, dr types.DeployRepo) (err error)
 	Wakeup(ctx context.Context, dr types.DeployRepo) (err error)
@@ -158,11 +158,11 @@ func (d *deployer) refreshStatus() {
 	}
 }
 
-func (d *deployer) Status(ctx context.Context, dr types.DeployRepo) (string, int, error) {
+func (d *deployer) Status(ctx context.Context, dr types.DeployRepo) (string, int, []types.Instance, error) {
 	deploy, err := d.store.GetDeployByID(ctx, dr.DeployID)
 	if err != nil || deploy == nil {
 		slog.Error("fail to get deploy by deploy id", slog.Any("DeployID", deploy.ID), slog.Any("error", err))
-		return "", common.Stopped, fmt.Errorf("can't get deploy, %w", err)
+		return "", common.Stopped, nil, fmt.Errorf("can't get deploy, %w", err)
 	}
 	svcName := deploy.SvcName
 	// srvName := common.UniqueSpaceAppName(dr.Namespace, dr.Name, dr.SpaceID)
@@ -171,15 +171,31 @@ func (d *deployer) Status(ctx context.Context, dr types.DeployRepo) (string, int
 		slog.Debug("status cache miss", slog.String("svc_name", svcName))
 		if deploy.Status == common.Running {
 			// service was Stopped or delete, so no running instance
-			return svcName, common.Stopped, nil
+			return svcName, common.Stopped, nil, nil
 		}
-		return svcName, deploy.Status, nil
+		return svcName, deploy.Status, nil, nil
+	}
+
+	targetID := dr.SpaceID // support space only one instance
+	if dr.SpaceID == 0 {
+		targetID = dr.DeployID // support model deploy with multi-instance
+	}
+	status, err := d.ir.Status(ctx, &imagerunner.StatusRequest{
+		ClusterID: dr.ClusterID,
+		OrgName:   dr.Namespace,
+		RepoName:  dr.Name,
+		SvcName:   deploy.SvcName,
+		ID:        targetID,
+	})
+	if err != nil {
+		slog.Error("fail to get status by deploy id", slog.Any("DeployID", deploy.ID), slog.Any("error", err))
+		return "", common.RunTimeError, nil, fmt.Errorf("can't get deploy status, %w", err)
 	}
 
 	if rstatus.DeployID == 0 || rstatus.DeployID >= deploy.ID {
-		return svcName, rstatus.Code, nil
+		return svcName, rstatus.Code, nil, nil
 	}
-	return svcName, deploy.Status, nil
+	return svcName, deploy.Status, status.Instances, nil
 }
 
 func (d *deployer) Logs(ctx context.Context, dr types.DeployRepo) (*MultiLogReader, error) {

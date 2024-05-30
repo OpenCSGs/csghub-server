@@ -1479,13 +1479,17 @@ func (h *RepoHandler) DeployStatus(ctx *gin.Context) {
 		default:
 			time.Sleep(time.Second * 5)
 			//user http request context instead of gin context, so that server knows the life cycle of the request
-			_, status, err := h.c.DeployStatus(ctx.Request.Context(), repoType, namespace, name, deployID)
+			_, status, instances, err := h.c.DeployStatus(ctx.Request.Context(), repoType, namespace, name, deployID)
 			if err != nil {
 				slog.Error("failed to get deploy status", slog.Any("error", err), slog.String("namespace", namespace),
 					slog.String("name", name), slog.Any("deploy_id", deployID))
 				ctx.SSEvent("error", err.Error())
 			} else {
 				ctx.SSEvent("status", status)
+				if len(instances) != 0 {
+					ctx.SSEvent("details", instances)
+				}
+
 			}
 			ctx.Writer.Flush()
 		}
