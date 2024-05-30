@@ -2,8 +2,6 @@ package mirrorserver
 
 import (
 	"time"
-
-	"opencsg.com/csghub-server/common/types"
 )
 
 // enumerate all the kinds of task status
@@ -35,9 +33,8 @@ type CreatePushMirrorReq struct {
 }
 
 type MirrorSyncReq struct {
-	Namespace string               `json:"namespace"`
-	Name      string               `json:"name"`
-	RepoType  types.RepositoryType `json:"repo_type"`
+	Namespace string `json:"namespace"`
+	Name      string `json:"name"`
 }
 
 type MirrorTaskInfo struct {
