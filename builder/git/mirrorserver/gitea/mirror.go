@@ -5,8 +5,6 @@ import (
 
 	"github.com/OpenCSGs/gitea-go-sdk/gitea"
 	"opencsg.com/csghub-server/builder/git/mirrorserver"
-	"opencsg.com/csghub-server/common/types"
-	"opencsg.com/csghub-server/common/utils/common"
 )
 
 const (
@@ -74,26 +72,9 @@ func (c *MirrorClient) CreatePushMirror(ctx context.Context, req mirrorserver.Cr
 }
 
 func (c *MirrorClient) MirrorSync(ctx context.Context, req mirrorserver.MirrorSyncReq) error {
-	namespace := common.WithPrefix(req.Namespace, repoPrefixByType(req.RepoType))
-	_, err := c.giteaClient.MirrorSync(namespace, req.Name)
+	_, err := c.giteaClient.MirrorSync(req.Namespace, req.Name)
 	if err != nil {
 		return err
 	}
 	return nil
-}
-
-func repoPrefixByType(repoType types.RepositoryType) string {
-	var prefix string
-	switch repoType {
-	case types.ModelRepo:
-		prefix = ModelOrgPrefix
-	case types.DatasetRepo:
-		prefix = DatasetOrgPrefix
-	case types.SpaceRepo:
-		prefix = SpaceOrgPrefix
-	case types.CodeRepo:
-		prefix = CodeOrgPrefix
-	}
-
-	return prefix
 }
