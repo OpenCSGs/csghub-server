@@ -254,7 +254,7 @@ func (c *SpaceComponent) Index(ctx context.Context, username, search, sort strin
 		return nil, 0, newError
 	}
 
-	//loop through repos to keep the repos in sort order
+	// loop through repos to keep the repos in sort order
 	for _, repo := range repos {
 		var space *database.Space
 		for _, s := range spaces {
@@ -443,6 +443,10 @@ func (c *SpaceComponent) Delete(ctx context.Context, namespace, name, currentUse
 	if err != nil {
 		return fmt.Errorf("failed to delete database space, error: %w", err)
 	}
+
+	// stop any running space instance
+	go c.Stop(ctx, namespace, name)
+
 	return nil
 }
 
@@ -603,13 +607,14 @@ func (c *SpaceComponent) Logs(ctx context.Context, namespace, name string) (*dep
 // HasEntryFile checks whether space repo has entry point file to run with
 func (c *SpaceComponent) HasEntryFile(ctx context.Context, space *database.Space) bool {
 	namespace, name := space.Repository.NamespaceAndName()
-	var entryFile = "app.py"
+	entryFile := "app.py"
 	if space.Sdk == scheduler.NGINX.Name {
 		entryFile = "nginx.conf"
 	}
 
 	return c.hasEntryFile(ctx, namespace, name, entryFile)
 }
+
 func (c *SpaceComponent) hasEntryFile(ctx context.Context, namespace, name, entryFile string) bool {
 	var req gitserver.GetRepoInfoByPathReq
 	req.Namespace = namespace
