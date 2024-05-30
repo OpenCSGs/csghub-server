@@ -1,5 +1,6 @@
 FROM ghcr.io/huggingface/text-generation-inference:2.0
-
+RUN pip config set global.index-url https://pypi.tuna.tsinghua.edu.cn/simple 
+RUN pip install git+https://git-devops.opencsg.com/csg-hub-sdk/csghub-sdk
 COPY ./tgi/serve.sh serve.sh
 COPY ./tgi/entry.py entry.py
 
