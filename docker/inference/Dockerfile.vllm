@@ -1,12 +1,13 @@
-FROM vllm/vllm-openai:latest
-
-COPY ./vllm/serve.sh serve.sh
+FROM vllm/vllm-openai:v0.4.2
+RUN pip config set global.index-url https://pypi.tuna.tsinghua.edu.cn/simple 
+RUN pip install git+https://git-devops.opencsg.com/csg-hub-sdk/csghub-sdk
 COPY ./vllm/entry.py entry.py
+COPY ./vllm/serve.sh serve.sh
 
 RUN mkdir -p /data
 ENV HUGGINGFACE_HUB_CACHE=/data \
-    HF_HUB_ENABLE_HF_TRANSFER=0 
-    
+    HF_HUB_ENABLE_HF_TRANSFER=0
+
 EXPOSE 8000
 
 ENTRYPOINT ["bash", "serve.sh"]
