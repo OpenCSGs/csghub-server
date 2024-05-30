@@ -565,7 +565,7 @@ func (c *SpaceComponent) status(ctx context.Context, s *database.Space) (string,
 
 	namespace, name := s.Repository.NamespaceAndName()
 	// request space deploy status by deploy id
-	srvName, code, err := c.deployer.Status(ctx, types.DeployRepo{
+	srvName, code, _, err := c.deployer.Status(ctx, types.DeployRepo{
 		DeployID:  deploy.ID,
 		SpaceID:   deploy.SpaceID,
 		ModelID:   deploy.ModelID,
