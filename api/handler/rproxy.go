@@ -66,8 +66,24 @@ func (r *RProxyHandler) Proxy(ctx *gin.Context) {
 	// 	return
 	// }
 
-	// verify by ksvc name
-	allow, err := r.repoComp.AllowCallApi(ctx, appSrvName, username.(string))
+	deploy, err := r.repoComp.GetDeployBySvcName(ctx, appSrvName)
+	if err != nil {
+		slog.Error("failed to get deploy", slog.Any("error", err), slog.Any("appSrvName", appSrvName))
+		httpbase.ServerError(ctx, fmt.Errorf("failed to get deploy, %w", err))
+		return
+	}
+
+	allow := false
+	err = nil
+	// verify by repo_id, user name
+	if deploy.SpaceID > 0 {
+		// check space
+		allow, err = r.repoComp.AllowAccessByRepoID(ctx, deploy.RepoID, username.(string))
+	} else if deploy.ModelID > 0 {
+		// check model inference
+		allow, err = r.repoComp.AllowAccessEndpoint(ctx, username.(string), deploy)
+	}
+
 	if err != nil {
 		slog.Error("failed to check user permission", "error", err)
 		httpbase.ServerError(ctx, fmt.Errorf("failed to check user permission,%w", err))
@@ -80,7 +96,7 @@ func (r *RProxyHandler) Proxy(ctx *gin.Context) {
 		rp, _ := proxy.NewReverseProxy(target)
 		rp.ServeHTTP(ctx.Writer, ctx.Request, apiname)
 	} else {
-		slog.Info("user not allowed to call space api", slog.String("srv_name", appSrvName), slog.Any("user_name", username))
+		slog.Warn("user not allowed to call endpoint api", slog.String("srv_name", appSrvName), slog.Any("user_name", username), slog.Any("deployID", deploy.ID))
 		ctx.Status(http.StatusForbidden)
 	}
 }
