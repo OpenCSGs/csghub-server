@@ -150,3 +150,8 @@ type ModelUpdateResponse struct {
 	Code     int    `json:"code"`
 	Message  string `json:"message"`
 }
+
+type ModelStatusEventData struct {
+	Status  string     `json:"status"`
+	Details []Instance `json:"details"`
+}
