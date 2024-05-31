@@ -1572,3 +1572,80 @@ func (h *RepoHandler) testStatus(ctx *gin.Context) {
 		}
 	}
 }
+
+// DeployUpdate  godoc
+// @Security     ApiKey
+// @Summary      Update deploy parameters
+// @Tags         Repository
+// @Accept       json
+// @Produce      json
+// @Param        repo_type path string true "models" Enums(models)
+// @Param        namespace path string true "namespace"
+// @Param        name path string true "name"
+// @Param        id path string true "deploy id"
+// @Param        current_user query string true "current_user"
+// @Param        body body types.ModelRunReq true "deploy setting of inference"
+// @Success      200  {object}  types.Response{} "OK"
+// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
+// @Router       /{repo_type}/{namespace}/{name}/run/{id} [post]
+func (h *RepoHandler) DeployUpdate(ctx *gin.Context) {
+	currentUser := httpbase.GetCurrentUser(ctx)
+	if currentUser == "" {
+		httpbase.UnauthorizedError(ctx, errors.New("user not found, please login first"))
+		return
+	}
+
+	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
+	if err != nil {
+		slog.Error("failed to get namespace and name from context", "error", err)
+		httpbase.BadRequest(ctx, err.Error())
+		return
+	}
+	allow, err := h.c.AllowAdminAccess(ctx, types.ModelRepo, namespace, name, currentUser)
+	if err != nil {
+		slog.Error("failed to check user permission", "error", err, slog.Any("currentUser", currentUser), slog.Any("namespace", name), slog.Any("name", name))
+		httpbase.ServerError(ctx, errors.New("failed to check user permission"))
+		return
+	}
+	if !allow {
+		slog.Info("user not allowed to update deploy", slog.String("namespace", namespace),
+			slog.String("name", name), slog.Any("username", currentUser))
+		httpbase.UnauthorizedError(ctx, errors.New("user not allowed to update deploy"))
+		return
+	}
+
+	var req types.ModelRunReq
+	if err := ctx.ShouldBindJSON(&req); err != nil {
+		slog.Error("Bad request format", "error", err, slog.Any("request.body", ctx.Request.Body))
+		httpbase.BadRequest(ctx, err.Error())
+		return
+	}
+
+	if req.Revision == "" {
+		req.Revision = "main" // default repo branch
+	}
+
+	if req.MinReplica < 0 || req.MaxReplica < 0 || req.MinReplica > req.MaxReplica {
+		slog.Error("Bad request setting for replica", slog.Any("MinReplica", req.MinReplica), slog.Any("MaxReplica", req.MaxReplica))
+		httpbase.BadRequest(ctx, "Bad request setting for replica")
+		return
+	}
+
+	repoType := common.RepoTypeFromContext(ctx)
+	deployID, err := strconv.ParseInt(ctx.Param("id"), 10, 64)
+	if err != nil {
+		slog.Error("Bad request format", slog.Any("error", err), slog.Any("id", ctx.Param("id")))
+		httpbase.BadRequest(ctx, err.Error())
+		return
+	}
+
+	err = h.c.DeployUpdate(ctx, repoType, namespace, name, currentUser, deployID, req)
+	if err != nil {
+		slog.Error("failed to update deploy", slog.String("namespace", namespace), slog.String("name", name), slog.Any("username", currentUser), slog.Int64("deploy_id", deployID), slog.Any("error", err))
+		httpbase.ServerError(ctx, fmt.Errorf("failed to update deploy, %w", err))
+		return
+	}
+
+	httpbase.OK(ctx, nil)
+}
