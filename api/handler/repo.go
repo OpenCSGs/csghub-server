@@ -1495,10 +1495,11 @@ func (h *RepoHandler) DeployStatus(ctx *gin.Context) {
 					slog.String("name", name), slog.Any("deploy_id", deployID))
 				ctx.SSEvent("error", err.Error())
 			} else {
-				ctx.SSEvent("status", status)
-				if len(instances) != 0 {
-					ctx.SSEvent("details", instances)
+				eventData := &types.ModelStatusEventData{
+					Status:  status,
+					Details: instances,
 				}
+				ctx.SSEvent("status", eventData)
 
 			}
 			ctx.Writer.Flush()
