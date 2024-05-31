@@ -523,7 +523,7 @@ func (h *ModelHandler) DeployDelete(ctx *gin.Context) {
 // @Success      200  {object}  types.Response{} "OK"
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
-// @Router       /models/{namespace}/{name}/stop/{id} [put]
+// @Router       /models/{namespace}/{name}/run/{id}/stop [put]
 func (h *ModelHandler) DeployStop(ctx *gin.Context) {
 	var (
 		id  int64
@@ -547,9 +547,56 @@ func (h *ModelHandler) DeployStop(ctx *gin.Context) {
 		return
 	}
 
-	err = h.c.StopDeploy(ctx, types.ModelRepo, namespace, name, currentUser, id)
+	err = h.c.DeployStop(ctx, types.ModelRepo, namespace, name, currentUser, id)
 	if err != nil {
 		slog.Error("Failed to stop deploy", slog.Any("error", err))
+		httpbase.ServerError(ctx, err)
+		return
+	}
+	httpbase.OK(ctx, nil)
+}
+
+// StartDeploy   godoc
+// @Security     ApiKey
+// @Summary      Start a model inference
+// @Description  Start a model inference
+// @Tags         Model
+// @Accept       json
+// @Produce      json
+// @Param        namespace path string true "namespace"
+// @Param        name path string true "name"
+// @Param        id path int true "deploy id"
+// @Param        current_user query string false "current user"
+// @Success      200  {object}  types.Response{} "OK"
+// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
+// @Router       /models/{namespace}/{name}/run/{id}/start [put]
+func (h *ModelHandler) DeployStart(ctx *gin.Context) {
+	var (
+		id  int64
+		err error
+	)
+	currentUser := httpbase.GetCurrentUser(ctx)
+	if currentUser == "" {
+		httpbase.UnauthorizedError(ctx, errors.New("user not found, please login first"))
+		return
+	}
+	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
+	if err != nil {
+		slog.Error("Bad request format", "error", err)
+		httpbase.BadRequest(ctx, err.Error())
+		return
+	}
+	id, err = strconv.ParseInt(ctx.Param("id"), 10, 64)
+	if err != nil {
+		slog.Error("Bad request format", "error", err)
+		httpbase.BadRequest(ctx, err.Error())
+		return
+	}
+
+	err = h.c.DeployStart(ctx, types.ModelRepo, namespace, name, currentUser, id)
+	if err != nil {
+		slog.Error("Failed to start deploy", slog.Any("error", err), slog.Any("repoType", types.ModelRepo), slog.String("namespace", namespace), slog.String("name", name), slog.Any("deployID", id))
 		httpbase.ServerError(ctx, err)
 		return
 	}
