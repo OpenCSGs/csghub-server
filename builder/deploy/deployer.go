@@ -193,7 +193,7 @@ func (d *deployer) Status(ctx context.Context, dr types.DeployRepo) (string, int
 	}
 
 	if rstatus.DeployID == 0 || rstatus.DeployID >= deploy.ID {
-		return svcName, rstatus.Code, nil, nil
+		return svcName, rstatus.Code, status.Instances, nil
 	}
 	return svcName, deploy.Status, status.Instances, nil
 }
