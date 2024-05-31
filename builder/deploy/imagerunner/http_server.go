@@ -528,10 +528,27 @@ func (s *HttpServer) getLogsByPod(c *gin.Context, cluster cluster.Cluster, podNa
 	c.Header("Connection", "keep-alive")
 	c.Header("Transfer-Encoding", "chunked")
 	c.Writer.WriteHeader(http.StatusOK)
-
 	closeNotify := c.Writer.CloseNotify()
+	buf := make([]byte, 32*1024)
 
-	buf := make([]byte, 1024)
+	pod, err := cluster.Client.CoreV1().Pods(s.k8sNameSpace).Get(context.Background(), podName, metav1.GetOptions{})
+	if err != nil {
+		slog.Error("fail to get pod ", slog.Any("error", err), slog.String("pod name", podName))
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	if pod.Status.Phase == "Pending" {
+		for _, condition := range pod.Status.Conditions {
+			if condition.Type == "PodScheduled" && condition.Status == "False" {
+				message := fmt.Sprintf("Pod is pending due to reason: %s, message: %s", condition.Reason, condition.Message)
+				c.Writer.Write([]byte(message))
+				c.Writer.Flush()
+				return
+			}
+		}
+	}
+
 	for {
 		select {
 		case <-closeNotify:
