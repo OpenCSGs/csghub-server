@@ -2,6 +2,7 @@ package deploy
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -30,6 +31,8 @@ type Deployer interface {
 	InstanceLogs(ctx context.Context, dr types.DeployRepo) (*MultiLogReader, error)
 	ListCluster(ctx context.Context) ([]types.ClusterRes, error)
 	UpdateCluster(ctx context.Context, data interface{}) (*types.UpdateClusterResponse, error)
+	UpdateDeploy(ctx context.Context, mrr types.ModelRunReq, deploy *database.Deploy, frame *database.RuntimeFramework) error
+	StartDeploy(ctx context.Context, deploy *database.Deploy) error
 }
 
 var _ Deployer = (*deployer)(nil)
@@ -320,7 +323,7 @@ func (d *deployer) GetReplica(ctx context.Context, dr types.DeployRepo) (int, in
 	}
 	resp, err := d.ir.GetReplica(ctx, req)
 	if err != nil {
-		slog.Error("fail to get deploy replica with error", slog.Any("req", req), slog.Any("error", err))
+		slog.Warn("fail to get deploy replica with error", slog.Any("req", req), slog.Any("error", err))
 		return 0, 0, []types.Instance{}, err
 	}
 	return resp.ActualReplica, resp.DesiredReplica, resp.Instances, nil
@@ -397,4 +400,68 @@ func (d *deployer) ListCluster(ctx context.Context) ([]types.ClusterRes, error) 
 func (d *deployer) UpdateCluster(ctx context.Context, data interface{}) (*types.UpdateClusterResponse, error) {
 	resp, err := d.ir.UpdateCluster(ctx, data)
 	return (*types.UpdateClusterResponse)(resp), err
+}
+
+// UpdateDeploy implements Deployer.
+func (d *deployer) UpdateDeploy(ctx context.Context, mrr types.ModelRunReq, deploy *database.Deploy, frame *database.RuntimeFramework) error {
+	var hardware types.HardWare
+	err := json.Unmarshal([]byte(mrr.Hardware), &hardware)
+	if err != nil {
+		return fmt.Errorf("invalid hardware setting: %v, %w", mrr.Hardware, err)
+	}
+
+	// choose image
+	containerImg := frame.FrameCpuImage
+	if hardware.Gpu.Num != "" {
+		gpuNum, err := strconv.Atoi(hardware.Gpu.Num)
+		if err != nil {
+			return fmt.Errorf("invalid hardware gpu setting: %v, %w", mrr.Hardware, err)
+		}
+		if gpuNum > 0 {
+			// use gpu image
+			containerImg = frame.FrameImage
+		}
+	}
+
+	deploy.DeployName = mrr.DeployName
+	deploy.Env = mrr.Env
+	deploy.RuntimeFramework = frame.FrameName
+	deploy.ImageID = containerImg
+	deploy.ContainerPort = frame.ContainerPort
+	deploy.Hardware = mrr.Hardware
+	deploy.MinReplica = mrr.MinReplica
+	deploy.MaxReplica = mrr.MaxReplica
+	deploy.GitBranch = mrr.Revision
+	deploy.SecureLevel = mrr.SecureLevel
+	deploy.CostPerHour = mrr.CostPerHour
+	deploy.ClusterID = mrr.ClusterID
+
+	// deploy.Status = common.Pending
+	// update deploy table
+	err = d.store.UpdateDeploy(ctx, deploy)
+	if err != nil {
+		return fmt.Errorf("failed to update deploy, %w", err)
+	}
+
+	return nil
+}
+
+func (d *deployer) StartDeploy(ctx context.Context, deploy *database.Deploy) error {
+	deploy.Status = common.Pending
+	// update deploy table
+	err := d.store.UpdateDeploy(ctx, deploy)
+	if err != nil {
+		return fmt.Errorf("failed to update deploy, %w", err)
+	}
+
+	// create run model as inference task
+	runTask := &database.DeployTask{
+		DeployID: deploy.ID,
+		TaskType: 1,
+	}
+	d.store.CreateDeployTask(ctx, runTask)
+
+	go d.s.Queue(runTask.ID)
+
+	return nil
 }

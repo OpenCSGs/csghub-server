@@ -42,7 +42,7 @@ type Deploy struct {
 	// minimum unit of money for counting cost
 	CostPerHour int64  `json:"cost_per_hour"`
 	ClusterID   string `json:"cluster_id"`
-	SecureLevel int    `json:"secure_level"`
+	SecureLevel int    `json:"secure_level"` // 1-public, 2-private, 3-extension in future
 	times
 }
 
@@ -229,7 +229,7 @@ func (s *DeployTaskStore) GetDeployBySvcName(ctx context.Context, svcName string
 
 func (s *DeployTaskStore) StopDeploy(ctx context.Context, repoType types.RepositoryType, repoID, userID int64, deployID int64) error {
 	// only stop the deploy of specific repo was triggered by current login user
-	res, err := s.db.BunDB.Exec("Update deploys set status = ? where id = ? and repo_id = ? and user_id = ?", common.Stopped, deployID, repoID, userID)
+	res, err := s.db.BunDB.Exec("Update deploys set status=?,updated_at=current_timestamp where id = ? and repo_id = ? and user_id = ?", common.Stopped, deployID, repoID, userID)
 	if err != nil {
 		return err
 	}

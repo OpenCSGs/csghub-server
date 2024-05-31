@@ -51,6 +51,7 @@ type RepoComponent struct {
 	cluster          *database.ClusterInfoStore
 	mirrorSource     *database.MirrorSourceStore
 	tokenStore       *database.AccessTokenStore
+	rtfm             *database.RuntimeFrameworksStore
 }
 
 func NewRepoComponent(config *config.Config) (*RepoComponent, error) {
@@ -101,6 +102,7 @@ func NewRepoComponent(config *config.Config) (*RepoComponent, error) {
 	c.deployer = deploy.NewDeployer()
 	c.publicRootDomain = config.Space.PublicRootDomain
 	c.cluster = database.NewClusterInfoStore()
+	c.rtfm = database.NewRuntimeFrameworksStore()
 	return c, nil
 }
 
@@ -1351,30 +1353,9 @@ func (c *RepoComponent) ListDeploy(ctx context.Context, repoType types.Repositor
 }
 
 func (c *RepoComponent) DeleteDeploy(ctx context.Context, repoType types.RepositoryType, namespace, name, currentUser string, deployID int64) error {
-	user, err := c.user.FindByUsername(ctx, currentUser)
-	if err != nil {
-		return errors.New("user does not exist")
-	}
-	repo, err := c.repo.FindByPath(ctx, repoType, namespace, name)
-	if err != nil {
-		slog.Error("invalid repository", slog.Any("error", err), slog.Any("repoType", repoType), slog.String("namespace", namespace), slog.String("name", name))
-		return errors.New("invalid repository")
-	}
-	if repo == nil {
-		return errors.New("invalid repository")
-	}
-	deploy, err := c.deploy.GetDeployByID(ctx, deployID)
+	user, repo, deploy, err := c.checkDeployPermission(ctx, repoType, namespace, name, currentUser, deployID)
 	if err != nil {
 		return err
-	}
-	if deploy == nil {
-		return errors.New("fail to get user deploy")
-	}
-	if deploy.UserID != user.ID {
-		return errors.New("deploy was not created by user")
-	}
-	if deploy.RepoID != repo.ID {
-		return errors.New("found incorrect repo")
 	}
 	// delete service
 	deployRepo := types.DeployRepo{
@@ -1387,7 +1368,7 @@ func (c *RepoComponent) DeleteDeploy(ctx context.Context, repoType types.Reposit
 	err = c.deployer.Stop(ctx, deployRepo)
 	if err != nil {
 		// fail to stop deploy instance, maybe service is gone
-		slog.Error("Stop deploy instance", slog.Any("error", err))
+		slog.Warn("Stop deploy instance", slog.Any("error", err))
 	}
 
 	exist, err := c.deployer.Exist(ctx, deployRepo)
@@ -1404,39 +1385,16 @@ func (c *RepoComponent) DeleteDeploy(ctx context.Context, repoType types.Reposit
 	// update database deploy
 	err = c.deploy.DeleteDeploy(ctx, types.RepositoryType(repoType), repo.ID, user.ID, deployID)
 	if err != nil {
-		slog.Error("Failed to mark deploy instance as delete", slog.Any("error", err))
-		return errors.New("fail to remove deploy instance")
+		return fmt.Errorf("fail to remove deploy instance, %w", err)
 	}
 
 	return err
 }
 
 func (c *RepoComponent) DeployDetail(ctx context.Context, repoType types.RepositoryType, namespace, name, currentUser string, deployID int64) (*types.DeployRepo, error) {
-	user, err := c.user.FindByUsername(ctx, currentUser)
-	if err != nil {
-		return nil, errors.New("user does not exist")
-	}
-	repo, err := c.repo.FindByPath(ctx, repoType, namespace, name)
-	if err != nil {
-		slog.Error("Failed to query deploy", slog.Any("error", err), slog.Any("repotype", repoType), slog.Any("namespace", namespace), slog.Any("name", name))
-		return nil, errors.New("invalid repository for query parameters")
-	}
-	if repo == nil {
-		slog.Error("nothing found for deploys", slog.Any("repotype", repoType), slog.Any("namespace", namespace), slog.Any("name", name))
-		return nil, errors.New("nothing found for deploys")
-	}
-	deploy, err := c.deploy.GetDeployByID(ctx, deployID)
+	_, repo, deploy, err := c.checkDeployPermission(ctx, repoType, namespace, name, currentUser, deployID)
 	if err != nil {
 		return nil, err
-	}
-	if deploy == nil {
-		return nil, errors.New("fail to get user deploy")
-	}
-	if deploy.UserID != user.ID {
-		return nil, errors.New("deploy was not created by user")
-	}
-	if deploy.RepoID != repo.ID {
-		return nil, errors.New("found incorrect repo")
 	}
 	var endpoint string
 	if len(deploy.SvcName) > 0 && deploy.Status == deployStatus.Running {
@@ -1445,7 +1403,7 @@ func (c *RepoComponent) DeployDetail(ctx context.Context, repoType types.Reposit
 		zone := ""
 		provider := ""
 		if err != nil {
-			slog.Error("Get cluster with error: %v", err)
+			slog.Warn("Get cluster with error: %v", err)
 		} else {
 			zone = cls.Zone
 			provider = cls.Provider
@@ -1544,26 +1502,9 @@ func deployStatusCodeToString(code int) string {
 }
 
 func (c *RepoComponent) DeployInstanceLogs(ctx context.Context, repoType types.RepositoryType, namespace, name, currentUser string, deployID int64, instance string) (*deploy.MultiLogReader, error) {
-	user, err := c.user.FindByUsername(ctx, currentUser)
-	if err != nil {
-		return nil, errors.New("user does not exist")
-	}
-	repo, err := c.repo.FindByPath(ctx, repoType, namespace, name)
-	if err != nil {
-		return nil, fmt.Errorf("can't find repo by path:%w", err)
-	}
-	deploy, err := c.deploy.GetDeployByID(ctx, deployID)
+	_, _, deploy, err := c.checkDeployPermission(ctx, repoType, namespace, name, currentUser, deployID)
 	if err != nil {
 		return nil, err
-	}
-	if deploy == nil {
-		return nil, errors.New("fail to get user deploy")
-	}
-	if deploy.UserID != user.ID {
-		return nil, errors.New("deploy was not created by user")
-	}
-	if deploy.RepoID != repo.ID {
-		return nil, errors.New("invalid repo")
 	}
 	return c.deployer.InstanceLogs(ctx, types.DeployRepo{
 		DeployID:     deploy.ID,
@@ -1632,28 +1573,10 @@ func (c *RepoComponent) checkAccessDeploy(ctx context.Context, repoID int64, cur
 	return true, nil
 }
 
-func (c *RepoComponent) StopDeploy(ctx context.Context, repoType types.RepositoryType, namespace, name, currentUser string, deployID int64) error {
-	user, err := c.user.FindByUsername(ctx, currentUser)
-	if err != nil {
-		return errors.New("user does not exist")
-	}
-	repo, err := c.repo.FindByPath(ctx, repoType, namespace, name)
-	if err != nil {
-		slog.Error("invalid repository", slog.Any("error", err), slog.Any("repoType", repoType), slog.String("namespace", namespace), slog.String("name", name), slog.Any("deployID", deployID))
-		return errors.New("invalid repository")
-	}
-	deploy, err := c.deploy.GetDeployByID(ctx, deployID)
+func (c *RepoComponent) DeployStop(ctx context.Context, repoType types.RepositoryType, namespace, name, currentUser string, deployID int64) error {
+	user, repo, deploy, err := c.checkDeployPermission(ctx, repoType, namespace, name, currentUser, deployID)
 	if err != nil {
 		return err
-	}
-	if deploy == nil {
-		return errors.New("fail to get user deploy")
-	}
-	if deploy.UserID != user.ID {
-		return errors.New("deploy was not created by user")
-	}
-	if deploy.RepoID != repo.ID {
-		return errors.New("found incorrect repo")
 	}
 	// delete service
 	deployRepo := types.DeployRepo{
@@ -1667,7 +1590,7 @@ func (c *RepoComponent) StopDeploy(ctx context.Context, repoType types.Repositor
 	err = c.deployer.Stop(ctx, deployRepo)
 	if err != nil {
 		// fail to stop deploy instance, maybe service is gone
-		slog.Error("stop deploy instance with error", slog.Any("error", err), slog.Any("namespace", namespace), slog.Any("name", name), slog.Any("deployID", deployID))
+		slog.Warn("stop deploy instance with error", slog.Any("error", err), slog.Any("namespace", namespace), slog.Any("name", name), slog.Any("deployID", deployID))
 	}
 
 	exist, err := c.deployer.Exist(ctx, deployRepo)
@@ -1684,8 +1607,7 @@ func (c *RepoComponent) StopDeploy(ctx context.Context, repoType types.Repositor
 	// update database deploy to stopped
 	err = c.deploy.StopDeploy(ctx, types.RepositoryType(repoType), repo.ID, user.ID, deployID)
 	if err != nil {
-		slog.Error("Failed to mark deploy instance as stop", slog.Any("error", err))
-		return errors.New("fail to stop deploy instance")
+		return fmt.Errorf("fail to stop deploy instance, %w", err)
 	}
 
 	return err
@@ -1774,4 +1696,105 @@ func (c *RepoComponent) SyncMirror(ctx context.Context, repoType types.Repositor
 		return fmt.Errorf("failed to sync mirror, error: %w", err)
 	}
 	return nil
+}
+
+func (c *RepoComponent) checkDeployPermission(ctx context.Context, repoType types.RepositoryType, namespace, name, currentUser string, deployID int64) (*database.User, *database.Repository, *database.Deploy, error) {
+	user, err := c.user.FindByUsername(ctx, currentUser)
+	if err != nil {
+		return nil, nil, nil, errors.New("user does not exist")
+	}
+	repo, err := c.repo.FindByPath(ctx, repoType, namespace, name)
+	if err != nil {
+		return nil, nil, nil, fmt.Errorf("fail to get repository %v %s/%s, %w", repoType, namespace, name, err)
+	}
+	if repo == nil {
+		return nil, nil, nil, fmt.Errorf("do not found repository %s/%s", namespace, name)
+	}
+	deploy, err := c.deploy.GetDeployByID(ctx, deployID)
+	if err != nil {
+		return nil, nil, nil, fmt.Errorf("fail to get user deploy %v, %w", deployID, err)
+	}
+	if deploy == nil {
+		return nil, nil, nil, fmt.Errorf("do not found user deploy %v", deployID)
+	}
+	if deploy.UserID != user.ID {
+		return nil, nil, nil, errors.New("deploy was not created by user")
+	}
+	if deploy.RepoID != repo.ID {
+		return nil, nil, nil, errors.New("found incorrect repo")
+	}
+	return &user, repo, deploy, nil
+}
+
+func (c *RepoComponent) DeployUpdate(ctx context.Context, repoType types.RepositoryType, namespace, name, currentUser string, deployID int64, req types.ModelRunReq) error {
+	_, _, deploy, err := c.checkDeployPermission(ctx, repoType, namespace, name, currentUser, deployID)
+	if err != nil {
+		return err
+	}
+
+	frame, err := c.rtfm.FindEnabledByID(ctx, req.RuntimeFrameworkID)
+	if err != nil || frame == nil {
+		return fmt.Errorf("can't find available runtime framework %v, %w", req.RuntimeFrameworkID, err)
+	}
+
+	_, err = c.cluster.ByClusterID(ctx, req.ClusterID)
+	if err != nil {
+		return fmt.Errorf("invalid cluster %v, %w", req.ClusterID, err)
+	}
+
+	// check service
+	deployRepo := types.DeployRepo{
+		DeployID:  deployID,
+		SpaceID:   deploy.SpaceID,
+		ModelID:   deploy.ModelID,
+		Namespace: namespace,
+		Name:      name,
+		SvcName:   deploy.SvcName,
+	}
+	exist, err := c.deployer.Exist(ctx, deployRepo)
+	if err != nil {
+		return err
+	}
+
+	if exist {
+		// deploy instance is running
+		return errors.New("stop deploy first")
+	}
+
+	// update inference service and keep deploy_id and svc_name unchanged
+	err = c.deployer.UpdateDeploy(ctx, req, deploy, frame)
+	return err
+}
+
+func (c *RepoComponent) DeployStart(ctx context.Context, repoType types.RepositoryType, namespace, name, currentUser string, deployID int64) error {
+	_, _, deploy, err := c.checkDeployPermission(ctx, repoType, namespace, name, currentUser, deployID)
+	if err != nil {
+		return err
+	}
+	// check service
+	deployRepo := types.DeployRepo{
+		DeployID:  deployID,
+		SpaceID:   deploy.SpaceID,
+		ModelID:   deploy.ModelID,
+		Namespace: namespace,
+		Name:      name,
+		SvcName:   deploy.SvcName,
+	}
+	exist, err := c.deployer.Exist(ctx, deployRepo)
+	if err != nil {
+		return err
+	}
+
+	if exist {
+		// deploy instance is running
+		return errors.New("stop deploy first")
+	}
+
+	// start deploy
+	err = c.deployer.StartDeploy(ctx, deploy)
+	if err != nil {
+		return fmt.Errorf("fail to start deploy, %w", err)
+	}
+
+	return err
 }

@@ -73,7 +73,6 @@ func NewModelComponent(config *config.Config) (*ModelComponent, error) {
 	c.infer = inference.NewInferClient(config.Inference.ServerAddr)
 	c.us = database.NewUserStore()
 	c.deployer = deploy.NewDeployer()
-	c.rtfm = database.NewRuntimeFrameworksStore()
 	return c, nil
 }
 
@@ -85,7 +84,6 @@ type ModelComponent struct {
 	infer         inference.Client
 	us            *database.UserStore
 	deployer      deploy.Deployer
-	rtfm          *database.RuntimeFrameworksStore
 }
 
 func (c *ModelComponent) Index(ctx context.Context, username, search, sort string, ragReqs []database.TagReq, per, page int) ([]types.Model, int, error) {

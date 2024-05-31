@@ -2374,6 +2374,63 @@ paths:
       summary: Get repo deploy detail
       tags:
       - Repository
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: models
+        enum:
+        - models
+        in: path
+        name: repo_type
+        required: true
+        type: string
+      - description: namespace
+        in: path
+        name: namespace
+        required: true
+        type: string
+      - description: name
+        in: path
+        name: name
+        required: true
+        type: string
+      - description: deploy id
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: current_user
+        in: query
+        name: current_user
+        required: true
+        type: string
+      - description: deploy setting of inference
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/types.ModelRunReq'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/types.Response'
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Update deploy parameters
+      tags:
+      - Repository
   /{repo_type}/{namespace}/{name}/run/{id}/logs/{instance}:
     get:
       consumes:
@@ -4328,7 +4385,52 @@ paths:
       summary: Delete a model inference
       tags:
       - Model
-  /models/{namespace}/{name}/stop/{id}:
+  /models/{namespace}/{name}/run/{id}/start:
+    put:
+      consumes:
+      - application/json
+      description: Start a model inference
+      parameters:
+      - description: namespace
+        in: path
+        name: namespace
+        required: true
+        type: string
+      - description: name
+        in: path
+        name: name
+        required: true
+        type: string
+      - description: deploy id
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: current user
+        in: query
+        name: current_user
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/types.Response'
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Start a model inference
+      tags:
+      - Model
+  /models/{namespace}/{name}/run/{id}/stop:
     put:
       consumes:
       - application/json
