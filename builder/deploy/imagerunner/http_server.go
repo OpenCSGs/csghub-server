@@ -560,16 +560,17 @@ func (s *HttpServer) getLogsByPod(c *gin.Context, cluster cluster.Cluster, podNa
 				slog.Error("read pod logs failed", slog.Any("error", err), slog.String("srv_name", srvName))
 				break
 			}
+			if n == 0 {
+				time.Sleep(5 * time.Second)
+			}
 
 			if n > 0 {
 				c.Writer.Write(buf[:n])
 				c.Writer.Flush()
 				slog.Info("send pod logs", slog.String("srv_name", srvName), slog.String("srv_name", srvName), slog.Int("len", n), slog.String("log", string(buf[:n])))
 			}
-			// c.Writer.WriteString("test messagetest messagetest messagetest messagetest messagetest messagetest messagetest messagetest message")
-			// c.Writer.Flush()
 		}
-		time.Sleep(5 * time.Second)
+
 	}
 }
 
