@@ -528,15 +528,31 @@ func (s *HttpServer) getLogsByPod(c *gin.Context, cluster cluster.Cluster, podNa
 	c.Header("Connection", "keep-alive")
 	c.Header("Transfer-Encoding", "chunked")
 	c.Writer.WriteHeader(http.StatusOK)
+	buf := make([]byte, 32*1024)
 
-	closeNotify := c.Writer.CloseNotify()
+	pod, err := cluster.Client.CoreV1().Pods(s.k8sNameSpace).Get(context.Background(), podName, metav1.GetOptions{})
+	if err != nil {
+		slog.Error("fail to get pod ", slog.Any("error", err), slog.String("pod name", podName))
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
 
-	buf := make([]byte, 1024)
+	if pod.Status.Phase == "Pending" {
+		for _, condition := range pod.Status.Conditions {
+			if condition.Type == "PodScheduled" && condition.Status == "False" {
+				message := fmt.Sprintf("Pod is pending due to reason: %s, message: %s", condition.Reason, condition.Message)
+				c.Writer.Write([]byte(message))
+				c.Writer.Flush()
+				c.JSON(http.StatusBadRequest, gin.H{"error": message})
+				return
+			}
+		}
+	}
+
 	for {
 		select {
-		case <-closeNotify:
-			// slog.Info("client disconnect from logs api", slog.String("image_id", imageID))
-			slog.Info("client disconnect from logs api")
+		case <-c.Request.Context().Done():
+			slog.Info("logs request context done", slog.Any("error", c.Request.Context().Err()))
 			return
 		default:
 			n, err := stream.Read(buf)
@@ -544,16 +560,17 @@ func (s *HttpServer) getLogsByPod(c *gin.Context, cluster cluster.Cluster, podNa
 				slog.Error("read pod logs failed", slog.Any("error", err), slog.String("srv_name", srvName))
 				break
 			}
+			if n == 0 {
+				time.Sleep(5 * time.Second)
+			}
 
 			if n > 0 {
 				c.Writer.Write(buf[:n])
 				c.Writer.Flush()
 				slog.Info("send pod logs", slog.String("srv_name", srvName), slog.String("srv_name", srvName), slog.Int("len", n), slog.String("log", string(buf[:n])))
 			}
-			// c.Writer.WriteString("test messagetest messagetest messagetest messagetest messagetest messagetest messagetest messagetest message")
-			// c.Writer.Flush()
 		}
-		time.Sleep(5 * time.Second)
+
 	}
 }
 
