@@ -544,6 +544,7 @@ func (s *HttpServer) getLogsByPod(c *gin.Context, cluster cluster.Cluster, podNa
 				message := fmt.Sprintf("Pod is pending due to reason: %s, message: %s", condition.Reason, condition.Message)
 				c.Writer.Write([]byte(message))
 				c.Writer.Flush()
+				c.JSON(http.StatusBadRequest, gin.H{"error": message})
 				return
 			}
 		}
