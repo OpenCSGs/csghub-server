@@ -528,7 +528,6 @@ func (s *HttpServer) getLogsByPod(c *gin.Context, cluster cluster.Cluster, podNa
 	c.Header("Connection", "keep-alive")
 	c.Header("Transfer-Encoding", "chunked")
 	c.Writer.WriteHeader(http.StatusOK)
-	closeNotify := c.Writer.CloseNotify()
 	buf := make([]byte, 32*1024)
 
 	pod, err := cluster.Client.CoreV1().Pods(s.k8sNameSpace).Get(context.Background(), podName, metav1.GetOptions{})
@@ -552,9 +551,8 @@ func (s *HttpServer) getLogsByPod(c *gin.Context, cluster cluster.Cluster, podNa
 
 	for {
 		select {
-		case <-closeNotify:
-			// slog.Info("client disconnect from logs api", slog.String("image_id", imageID))
-			slog.Info("client disconnect from logs api")
+		case <-c.Request.Context().Done():
+			slog.Info("logs request context done", slog.Any("error", c.Request.Context().Err()))
 			return
 		default:
 			n, err := stream.Read(buf)
