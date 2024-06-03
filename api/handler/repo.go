@@ -1588,7 +1588,7 @@ func (h *RepoHandler) testStatus(ctx *gin.Context) {
 // @Success      200  {object}  types.Response{} "OK"
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
-// @Router       /{repo_type}/{namespace}/{name}/run/{id} [post]
+// @Router       /{repo_type}/{namespace}/{name}/run/{id} [put]
 func (h *RepoHandler) DeployUpdate(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
 	if currentUser == "" {

@@ -2374,7 +2374,7 @@ paths:
       summary: Get repo deploy detail
       tags:
       - Repository
-    post:
+    put:
       consumes:
       - application/json
       parameters:
