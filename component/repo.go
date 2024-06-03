@@ -1426,6 +1426,10 @@ func (c *RepoComponent) DeployDetail(ctx context.Context, repoType types.Reposit
 	if err != nil {
 		slog.Warn("fail to get deploy replica", slog.Any("repotype", repoType), slog.Any("req", req), slog.Any("error", err))
 	}
+	endpointPrivate := true
+	if deploy.SecureLevel == types.EndpointPublic {
+		endpointPrivate = false
+	}
 	resDeploy := types.DeployRepo{
 		DeployID:         deploy.ID,
 		DeployName:       deploy.DeployName,
@@ -1448,7 +1452,7 @@ func (c *RepoComponent) DeployDetail(ctx context.Context, repoType types.Reposit
 		ActualReplica:    actualReplica,
 		DesiredReplica:   desiredReplica,
 		Instances:        instList,
-		Private:          repo.Private,
+		Private:          endpointPrivate,
 		Path:             repo.Path,
 	}
 
