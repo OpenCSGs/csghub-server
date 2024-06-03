@@ -7250,7 +7250,7 @@
                     }
                 }
             },
-            "post": {
+            "put": {
                 "security": [
                     {
                         "ApiKey": []
