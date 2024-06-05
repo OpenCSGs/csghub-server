@@ -1,6 +1,5 @@
-FROM cledge/vllm-cpu:0.4.12-fix1
-
-RUN pip config set global.index-url https://pypi.tuna.tsinghua.edu.cn/simple 
+FROM cledge/vllm-cpu:0.4.12-fix1 
+RUN pip config set global.index-url https://pypi.tuna.tsinghua.edu.cn/simple
 RUN pip install git+https://git-devops.opencsg.com/csg-hub-sdk/csghub-sdk
 
 WORKDIR /workspace/
