@@ -1,5 +1,5 @@
 FROM vllm/vllm-openai:v0.4.2
-RUN pip config set global.index-url https://pypi.tuna.tsinghua.edu.cn/simple 
+RUN pip config set global.index-url https://pypi.tuna.tsinghua.edu.cn/simple
 RUN pip install git+https://git-devops.opencsg.com/csg-hub-sdk/csghub-sdk
 COPY ./vllm/entry.py entry.py
 COPY ./vllm/serve.sh serve.sh
