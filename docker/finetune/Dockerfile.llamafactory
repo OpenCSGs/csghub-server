@@ -1,0 +1,42 @@
+# pull from devel image instead of base
+FROM nvidia/cuda:12.1.1-devel-ubuntu22.04
+# Set bash as the default shell
+ENV SHELL=/bin/bash
+ENV JUPYTERHUB_SERVICE_PREFIX=/proxy/
+ENV GRADIO_ROOT_PATH=/proxy/7860/
+ENV TZ=Asia/Shanghai
+ENV NCCL_IB_DISABLE=1 NCCL_P2P_DISABLE=1
+
+# Create a working directory
+WORKDIR /workspace/
+
+# Build with some basic utilities
+RUN apt-get update && apt-get install -y \
+    python3-pip apt-utils \
+    wget curl vim \
+    git git-lfs \
+    supervisor \
+    unzip
+
+# alias python='python3'
+RUN ln -s /usr/bin/python3 /usr/bin/python
+RUN pip config set global.index-url https://pypi.tuna.tsinghua.edu.cn/simple
+
+# Install the appropriate torch version 
+#RUN pip install torch==2.1.2 torchvision==0.16.2 torchaudio==2.1.2 --index-url https://download.pytorch.org/whl/cu121
+RUN pip install jupyterlab numpy \
+    torch==2.1.2 torchvision==0.16.2 torchaudio==2.1.2 \
+    jupyter-server-proxy \
+    llamafactory[metrics]==0.7.1
+# setup supervisord
+RUN mkdir -p /var/log/supervisord
+COPY script/supervisord.conf /etc/supervisor/conf.d/supervisord.conf
+COPY script/jupyter_notebook_config.py /root/.jupyter/jupyter_notebook_config.py
+#use dark mode
+RUN mkdir -p /root/.jupyter/lab/user-settings/@jupyterlab/apputils-extension && \
+	    echo '{"theme":"JupyterLab Dark"}' > /root/.jupyter/lab/user-settings/@jupyterlab/apputils-extension/themes.jupyterlab-settings && \
+	    mkdir -p /root/.jupyter/lab/user-settings/@jupyterlab/notebook-extension && \
+	    echo '{"codeCellConfig":{"lineNumbers":true }}' >   /root/.jupyter/lab/user-settings/@jupyterlab/notebook-extension/tracker.jupyterlab-settings
+
+ENTRYPOINT ["/usr/bin/supervisord", "-c", "/etc/supervisor/conf.d/supervisord.conf"]
+EXPOSE 8000
