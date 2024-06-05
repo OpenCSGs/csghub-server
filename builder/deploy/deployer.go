@@ -2,6 +2,7 @@ package deploy
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -86,10 +87,28 @@ func (d *deployer) GenerateUniqueSvcName(dr types.DeployRepo) string {
 	return uniqueSvcName
 }
 
-func (d *deployer) Deploy(ctx context.Context, dr types.DeployRepo) (int64, error) {
+func (d *deployer) serverlessDeploy(ctx context.Context, dr types.DeployRepo) (*database.Deploy, error) {
+	deploy, err := d.store.GetLatestDeployBySpaceID(ctx, dr.SpaceID)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("fail to found the latest deploy for spaceID %v, %w", dr.SpaceID, err)
+	}
+
+	deploy.ImageID = ""
+	err = d.store.UpdateDeploy(ctx, deploy)
+	if err != nil {
+		return nil, fmt.Errorf("fail reset deploy image, %w", err)
+	}
+
+	return deploy, nil
+}
+
+func (d *deployer) dedicatedDeploy(ctx context.Context, dr types.DeployRepo) (*database.Deploy, error) {
 	uniqueSvcName := d.GenerateUniqueSvcName(dr)
 	if len(uniqueSvcName) < 1 {
-		return -1, fmt.Errorf("fail to generate uuid for deploy")
+		return nil, fmt.Errorf("fail to generate uuid for deploy")
 	}
 	deploy := &database.Deploy{
 		DeployName:       dr.DeployName,
@@ -114,11 +133,36 @@ func (d *deployer) Deploy(ctx context.Context, dr types.DeployRepo) (int64, erro
 		SecureLevel:      dr.SecureLevel,
 		SvcName:          uniqueSvcName,
 	}
-	// TODO:save deploy tasks in sql tx
 	err := d.store.CreateDeploy(ctx, deploy)
+	return deploy, err
+}
+
+func (d *deployer) buildDeploy(ctx context.Context, dr types.DeployRepo) (*database.Deploy, error) {
+	var deploy *database.Deploy = nil
+	var err error = nil
+	if dr.SpaceID > 0 {
+		// space case: SpaceID>0 and ModelID=0, reuse latest deploy of spaces
+		deploy, err = d.serverlessDeploy(ctx, dr)
+		if err != nil {
+			return nil, fmt.Errorf("fail to check serverless deploy for spaceID %v, %w", dr.SpaceID, err)
+		}
+	}
+
+	if deploy == nil {
+		// create new deploy for model inference and no latest deploy of space
+		deploy, err = d.dedicatedDeploy(ctx, dr)
+	}
+
 	if err != nil {
-		slog.Error("failed to create deploy in db", slog.Any("error", err))
-		return -1, err
+		return nil, err
+	}
+	return deploy, nil
+}
+
+func (d *deployer) Deploy(ctx context.Context, dr types.DeployRepo) (int64, error) {
+	deploy, err := d.buildDeploy(ctx, dr)
+	if err != nil || deploy == nil {
+		return -1, fmt.Errorf("failed to create deploy in db, %w", err)
 	}
 	// skip build step for model as inference
 	bldTaskStatus := 0
