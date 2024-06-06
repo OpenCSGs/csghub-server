@@ -223,26 +223,26 @@ func (d *deployer) Status(ctx context.Context, dr types.DeployRepo) (string, int
 		return svcName, deploy.Status, nil, nil
 	}
 
-	targetID := dr.SpaceID // support space only one instance
-	if dr.SpaceID == 0 {
-		targetID = dr.DeployID // support model deploy with multi-instance
-	}
-	status, err := d.ir.Status(ctx, &imagerunner.StatusRequest{
-		ClusterID: dr.ClusterID,
-		OrgName:   dr.Namespace,
-		RepoName:  dr.Name,
-		SvcName:   deploy.SvcName,
-		ID:        targetID,
-	})
-	if err != nil {
-		slog.Error("fail to get status by deploy id", slog.Any("DeployID", deploy.ID), slog.Any("error", err))
-		return "", common.RunTimeError, nil, fmt.Errorf("can't get deploy status, %w", err)
-	}
+	if dr.ModelID > 0 {
+		targetID := dr.DeployID // support model deploy with multi-instance
+		status, err := d.ir.Status(ctx, &imagerunner.StatusRequest{
+			ClusterID: dr.ClusterID,
+			OrgName:   dr.Namespace,
+			RepoName:  dr.Name,
+			SvcName:   deploy.SvcName,
+			ID:        targetID,
+		})
+		if err != nil {
+			slog.Error("fail to get status by deploy id", slog.Any("DeployID", deploy.ID), slog.Any("error", err))
+			return "", common.RunTimeError, nil, fmt.Errorf("can't get deploy status, %w", err)
+		}
+		rstatus.Instances = status.Instances
 
-	if rstatus.DeployID == 0 || rstatus.DeployID >= deploy.ID {
-		return svcName, rstatus.Code, status.Instances, nil
 	}
-	return svcName, deploy.Status, status.Instances, nil
+	if rstatus.DeployID == 0 || rstatus.DeployID >= deploy.ID {
+		return svcName, rstatus.Code, rstatus.Instances, nil
+	}
+	return svcName, deploy.Status, rstatus.Instances, nil
 }
 
 func (d *deployer) Logs(ctx context.Context, dr types.DeployRepo) (*MultiLogReader, error) {
@@ -273,7 +273,6 @@ func (d *deployer) Logs(ctx context.Context, dr types.DeployRepo) (*MultiLogRead
 		RepoName: dr.Name,
 		SvcName:  deploy.SvcName,
 	})
-
 	if err != nil {
 		slog.Error("failed to read log from image runner", slog.Any("error", err))
 		// return nil, fmt.Errorf("connect to imagerunner failed: %w", err)
@@ -388,7 +387,6 @@ func (d *deployer) InstanceLogs(ctx context.Context, dr types.DeployRepo) (*Mult
 		SvcName:      dr.SvcName,
 		InstanceName: dr.InstanceName,
 	})
-
 	if err != nil {
 		slog.Error("failed to read log from deploy runner", slog.Any("error", err))
 		// return nil, fmt.Errorf("connect to imagerunner failed: %w", err)
