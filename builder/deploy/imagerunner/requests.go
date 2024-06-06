@@ -54,11 +54,12 @@ type (
 	}
 
 	StatusRequest struct {
-		ID        int64  `json:"id"`
-		OrgName   string `json:"org_name"`
-		RepoName  string `json:"repo_name"`
-		ClusterID string `json:"cluster_id"`
-		SvcName   string `json:"svc_name"`
+		ID          int64  `json:"id"`
+		OrgName     string `json:"org_name"`
+		RepoName    string `json:"repo_name"`
+		ClusterID   string `json:"cluster_id"`
+		SvcName     string `json:"svc_name"`
+		NeedDetails bool   `json:"need_details"`
 	}
 
 	StatusResponse struct {

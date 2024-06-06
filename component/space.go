@@ -576,7 +576,7 @@ func (c *SpaceComponent) status(ctx context.Context, s *database.Space) (string,
 		Namespace: namespace,
 		Name:      name,
 		SvcName:   deploy.SvcName,
-	})
+	}, false)
 	if err != nil {
 		slog.Error("error happen when get space status", slog.Any("error", err), slog.String("path", s.Repository.Path))
 		return "", SpaceStatusStopped, err
