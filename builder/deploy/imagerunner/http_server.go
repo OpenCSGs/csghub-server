@@ -403,13 +403,15 @@ func (s *HttpServer) serviceStatus(c *gin.Context) {
 	resp.DeployID = deployID
 
 	// retrive pod list and status
-	instList, err := s.getServicePodsWithStatus(c.Request.Context(), *cluster, srvName, s.k8sNameSpace)
-	if err != nil {
-		slog.Error("fail to get service pod name list", slog.Any("error", err))
-		c.JSON(http.StatusNotFound, gin.H{"error": "fail to get service pod name list"})
-		return
+	if request.NeedDetails {
+		instList, err := s.getServicePodsWithStatus(c.Request.Context(), *cluster, srvName, s.k8sNameSpace)
+		if err != nil {
+			slog.Error("fail to get service pod name list", slog.Any("error", err))
+			c.JSON(http.StatusNotFound, gin.H{"error": "fail to get service pod name list"})
+			return
+		}
+		resp.Instances = instList
 	}
-	resp.Instances = instList
 
 	if srv.IsFailed() {
 		resp.Code = common.DeployFailed
