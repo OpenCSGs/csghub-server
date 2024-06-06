@@ -14,7 +14,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gin-gonic/gin"
 	"github.com/minio/minio-go/v7"
 	"opencsg.com/csghub-server/builder/deploy"
 	deployStatus "opencsg.com/csghub-server/builder/deploy/common"
@@ -301,7 +300,7 @@ func (c *RepoComponent) relatedRepos(ctx context.Context, repoID int64, currentU
 		fromRepoIDs = append(fromRepoIDs, rel.FromRepoID)
 	}
 
-	//combine from and to related repos and then remove duplicates
+	// combine from and to related repos and then remove duplicates
 	var relatedRepoIDs []int64
 	relatedRepoIDs = append(relatedRepoIDs, toRepoIDs...)
 	relatedRepoIDs = append(relatedRepoIDs, fromRepoIDs...)
@@ -389,9 +388,7 @@ func (c *RepoComponent) CreateFile(ctx context.Context, req *types.CreateFileReq
 }
 
 func (c *RepoComponent) createReadmeFile(ctx context.Context, req *types.CreateFileReq) error {
-	var (
-		err error
-	)
+	var err error
 	contentDecoded, _ := base64.RawStdEncoding.DecodeString(req.Content)
 	_, err = c.tc.UpdateMetaTags(ctx, getTagScopeByRepoType(req.RepoType), req.NameSpace, req.Name, string(contentDecoded))
 	if err != nil {
@@ -407,9 +404,7 @@ func (c *RepoComponent) createReadmeFile(ctx context.Context, req *types.CreateF
 }
 
 func (c *RepoComponent) createLibraryFile(ctx context.Context, req *types.CreateFileReq) error {
-	var (
-		err error
-	)
+	var err error
 
 	err = c.tc.UpdateLibraryTags(ctx, getTagScopeByRepoType(req.RepoType), req.NameSpace, req.Name, "", req.FilePath)
 	if err != nil {
@@ -568,7 +563,7 @@ func (c *RepoComponent) FileRaw(ctx context.Context, req *types.GetFileReq) (str
 	return raw, nil
 }
 
-func (c *RepoComponent) DownloadFile(ctx context.Context, req *types.GetFileReq) (io.ReadCloser, int64, string, error) {
+func (c *RepoComponent) DownloadFile(ctx context.Context, req *types.GetFileReq, userName string) (io.ReadCloser, int64, string, error) {
 	var (
 		reader      io.ReadCloser
 		downloadUrl string
@@ -581,6 +576,14 @@ func (c *RepoComponent) DownloadFile(ctx context.Context, req *types.GetFileReq)
 	if repo == nil {
 		return nil, 0, "", errors.New("repo not found")
 	}
+	canRead, err := c.AllowReadAccessRepo(ctx, repo, userName)
+	if err != nil {
+		return nil, 0, "", err
+	}
+	if !canRead {
+		return nil, 0, "", ErrUnauthorized
+	}
+
 	err = c.repo.UpdateRepoFileDownloads(ctx, repo, time.Now(), 1)
 	if err != nil {
 		return nil, 0, "", fmt.Errorf("failed to update %s file download count, error: %w", req.RepoType, err)
@@ -710,7 +713,7 @@ func (c *RepoComponent) UploadFile(ctx context.Context, req *types.CreateFileReq
 	updateFileReq.NameSpace = req.NameSpace
 	updateFileReq.Name = req.Name
 	updateFileReq.FilePath = req.FilePath
-	//we need file sha, not commit SHA
+	// we need file sha, not commit SHA
 	updateFileReq.SHA = f.SHA
 	updateFileReq.RepoType = req.RepoType
 
@@ -719,26 +722,19 @@ func (c *RepoComponent) UploadFile(ctx context.Context, req *types.CreateFileReq
 	return err
 }
 
-func (c *RepoComponent) SDKListFiles(ctx *gin.Context, repoType types.RepositoryType, namespace, name string) (*types.SDKFiles, error) {
+func (c *RepoComponent) SDKListFiles(ctx context.Context, repoType types.RepositoryType, namespace, name, userName string) (*types.SDKFiles, error) {
 	var sdkFiles []types.SDKFile
 	repo, err := c.repo.FindByPath(ctx, repoType, namespace, name)
 	if err != nil {
 		return nil, ErrNotFound
 	}
 
-	currentUser, exists := ctx.Get("currentUser")
-	// TODO: Use user access token to check permissions
-	if repo.Private {
-		if !exists {
-			return nil, ErrUnauthorized
-		}
-		canRead, err := c.checkCurrentUserPermission(ctx, currentUser.(string), namespace, membership.RoleRead)
-		if err != nil {
-			return nil, err
-		}
-		if !canRead {
-			return nil, ErrUnauthorized
-		}
+	canRead, err := c.AllowReadAccessRepo(ctx, repo, userName)
+	if err != nil {
+		return nil, err
+	}
+	if !canRead {
+		return nil, ErrUnauthorized
 	}
 
 	filePaths, err := getFilePaths(namespace, name, "", repoType, c.git.GetRepoFileTree)
@@ -780,24 +776,17 @@ func (c *RepoComponent) IsLfs(ctx context.Context, req *types.GetFileReq) (bool,
 	return strings.HasPrefix(content, LFSPrefix), nil
 }
 
-func (c *RepoComponent) HeadDownloadFile(ctx *gin.Context, req *types.GetFileReq) (*types.File, error) {
+func (c *RepoComponent) HeadDownloadFile(ctx context.Context, req *types.GetFileReq, userName string) (*types.File, error) {
 	repo, err := c.repo.FindByPath(ctx, req.RepoType, req.Namespace, req.Name)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find repo, error: %w", err)
 	}
-	currentUser, exists := ctx.Get("currentUser")
-	// TODO: Use user access token to check permissions
-	if repo.Private {
-		if !exists {
-			return nil, ErrUnauthorized
-		}
-		canRead, err := c.checkCurrentUserPermission(ctx, currentUser.(string), req.Namespace, membership.RoleRead)
-		if err != nil {
-			return nil, err
-		}
-		if !canRead {
-			return nil, ErrUnauthorized
-		}
+	canRead, err := c.AllowReadAccessRepo(ctx, repo, userName)
+	if err != nil {
+		return nil, err
+	}
+	if !canRead {
+		return nil, ErrUnauthorized
 	}
 	if req.Ref == "" {
 		req.Ref = repo.DefaultBranch
@@ -819,25 +808,19 @@ func (c *RepoComponent) HeadDownloadFile(ctx *gin.Context, req *types.GetFileReq
 	return file, nil
 }
 
-func (c *RepoComponent) SDKDownloadFile(ctx *gin.Context, req *types.GetFileReq) (io.ReadCloser, int64, string, error) {
+func (c *RepoComponent) SDKDownloadFile(ctx context.Context, req *types.GetFileReq, userName string) (io.ReadCloser, int64, string, error) {
 	var downloadUrl string
 	repo, err := c.repo.FindByPath(ctx, req.RepoType, req.Namespace, req.Name)
 	if err != nil {
 		return nil, 0, "", fmt.Errorf("failed to find repo, error: %w", err)
 	}
-	currentUser, exists := ctx.Get("currentUser")
-	// TODO: Use user access token to check permissions
-	if repo.Private {
-		if !exists {
-			return nil, 0, "", ErrUnauthorized
-		}
-		canRead, err := c.checkCurrentUserPermission(ctx, currentUser.(string), req.Namespace, membership.RoleRead)
-		if err != nil {
-			return nil, 0, "", err
-		}
-		if !canRead {
-			return nil, 0, "", ErrUnauthorized
-		}
+
+	canRead, err := c.AllowReadAccessRepo(ctx, repo, userName)
+	if err != nil {
+		return nil, 0, "", err
+	}
+	if !canRead {
+		return nil, 0, "", ErrUnauthorized
 	}
 	if req.Ref == "" {
 		req.Ref = repo.DefaultBranch
@@ -1058,7 +1041,7 @@ func (c *RepoComponent) GetCommitWithDiff(ctx context.Context, req *types.GetCom
 		commitStats.Deletions = commit.Stats.Deletions
 	}
 
-	var commitResponse = &types.CommitResponse{
+	commitResponse := &types.CommitResponse{
 		Commit: &types.Commit{
 			ID:             commit.SHA,
 			AuthorName:     commit.RepoCommit.Author.Name,
