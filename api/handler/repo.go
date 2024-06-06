@@ -343,6 +343,7 @@ func (h *RepoHandler) FileInfo(ctx *gin.Context) {
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
 // @Router       /{repo_type}/{namespace}/{name}/download/{file_path} [get]
 func (h *RepoHandler) DownloadFile(ctx *gin.Context) {
+	currentUser := httpbase.GetCurrentUser(ctx)
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
 	if err != nil {
 		slog.Error("Bad request format", "error", err)
@@ -368,7 +369,7 @@ func (h *RepoHandler) DownloadFile(ctx *gin.Context) {
 			return
 		}
 	}
-	reader, size, url, err := h.c.DownloadFile(ctx, req)
+	reader, size, url, err := h.c.DownloadFile(ctx, req, currentUser)
 	if err != nil {
 		slog.Error("Failed to download repo file", slog.String("repo_type", string(req.RepoType)), slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
@@ -665,6 +666,7 @@ func (h *RepoHandler) UploadFile(ctx *gin.Context) {
 }
 
 func (h *RepoHandler) SDKListFiles(ctx *gin.Context) {
+	currentUser := httpbase.GetCurrentUser(ctx)
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
 	if err != nil {
 		slog.Error("Bad request format", "error", err)
@@ -672,7 +674,7 @@ func (h *RepoHandler) SDKListFiles(ctx *gin.Context) {
 		return
 	}
 
-	files, err := h.c.SDKListFiles(ctx, common.RepoTypeFromContext(ctx), namespace, name)
+	files, err := h.c.SDKListFiles(ctx, common.RepoTypeFromContext(ctx), namespace, name, currentUser)
 	if err != nil {
 		if errors.Is(err, component.ErrUnauthorized) {
 			slog.Error("permission denied when accessing repo", slog.String("repo_type", string(common.RepoTypeFromContext(ctx))), slog.Any("path", fmt.Sprintf("%s/%s", namespace, name)))
@@ -717,6 +719,7 @@ func (h *RepoHandler) ResolveDownload(ctx *gin.Context) {
 }
 
 func (h *RepoHandler) HeadSDKDownload(ctx *gin.Context) {
+	currentUser := httpbase.GetCurrentUser(ctx)
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
 	if err != nil {
 		slog.Error("Bad request format", "error", err)
@@ -736,7 +739,7 @@ func (h *RepoHandler) HeadSDKDownload(ctx *gin.Context) {
 		RepoType:  common.RepoTypeFromContext(ctx),
 	}
 
-	file, err := h.c.HeadDownloadFile(ctx, req)
+	file, err := h.c.HeadDownloadFile(ctx, req, currentUser)
 	if err != nil {
 		if errors.Is(err, component.ErrUnauthorized) {
 			slog.Error("permission denied when accessing repo", slog.String("repo_type", string(req.RepoType)), slog.Any("path", fmt.Sprintf("%s/%s", namespace, name)))
@@ -764,6 +767,7 @@ func (h *RepoHandler) HeadSDKDownload(ctx *gin.Context) {
 }
 
 func (h *RepoHandler) handleDownload(ctx *gin.Context, isResolve bool) {
+	currentUser := httpbase.GetCurrentUser(ctx)
 	var branch string
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
 	if err != nil {
@@ -802,7 +806,7 @@ func (h *RepoHandler) handleDownload(ctx *gin.Context, isResolve bool) {
 		return
 	}
 	req.Lfs = lfs
-	reader, size, url, err := h.c.SDKDownloadFile(ctx, req)
+	reader, size, url, err := h.c.SDKDownloadFile(ctx, req, currentUser)
 	if err != nil {
 		if errors.Is(err, component.ErrUnauthorized) {
 			slog.Error("permission denied when accessing repo", slog.String("repo_type", string(req.RepoType)), slog.Any("path", fmt.Sprintf("%s/%s", namespace, name)))
@@ -1355,7 +1359,7 @@ func (h *RepoHandler) DeployInstanceLogs(ctx *gin.Context) {
 	ctx.Writer.Header().Set("Connection", "keep-alive")
 	ctx.Writer.Header().Set("Transfer-Encoding", "chunked")
 
-	//user http request context instead of gin context, so that server knows the life cycle of the request
+	// user http request context instead of gin context, so that server knows the life cycle of the request
 	logReader, err := h.c.DeployInstanceLogs(ctx.Request.Context(), repoType, namespace, name, currentUser, deployID, instance)
 	if err != nil {
 		httpbase.ServerError(ctx, err)
@@ -1367,7 +1371,7 @@ func (h *RepoHandler) DeployInstanceLogs(ctx *gin.Context) {
 		return
 	}
 
-	//to quickly respond the http request
+	// to quickly respond the http request
 	ctx.Writer.WriteHeader(http.StatusOK)
 	ctx.Writer.Flush()
 
@@ -1488,7 +1492,7 @@ func (h *RepoHandler) DeployStatus(ctx *gin.Context) {
 			return
 		default:
 			time.Sleep(time.Second * 5)
-			//user http request context instead of gin context, so that server knows the life cycle of the request
+			// user http request context instead of gin context, so that server knows the life cycle of the request
 			_, status, instances, err := h.c.DeployStatus(ctx.Request.Context(), repoType, namespace, name, deployID)
 			if err != nil {
 				slog.Error("failed to get deploy status", slog.Any("error", err), slog.String("namespace", namespace),
