@@ -23,7 +23,7 @@ import (
 
 type Deployer interface {
 	Deploy(ctx context.Context, dr types.DeployRepo) (deployID int64, err error)
-	Status(ctx context.Context, dr types.DeployRepo) (srvName string, status int, instances []types.Instance, err error)
+	Status(ctx context.Context, dr types.DeployRepo, needDetails bool) (srvName string, status int, instances []types.Instance, err error)
 	Logs(ctx context.Context, dr types.DeployRepo) (*MultiLogReader, error)
 	Stop(ctx context.Context, dr types.DeployRepo) (err error)
 	Wakeup(ctx context.Context, dr types.DeployRepo) (err error)
@@ -205,7 +205,7 @@ func (d *deployer) refreshStatus() {
 	}
 }
 
-func (d *deployer) Status(ctx context.Context, dr types.DeployRepo) (string, int, []types.Instance, error) {
+func (d *deployer) Status(ctx context.Context, dr types.DeployRepo, needDetails bool) (string, int, []types.Instance, error) {
 	deploy, err := d.store.GetDeployByID(ctx, dr.DeployID)
 	if err != nil || deploy == nil {
 		slog.Error("fail to get deploy by deploy id", slog.Any("DeployID", deploy.ID), slog.Any("error", err))
@@ -226,11 +226,12 @@ func (d *deployer) Status(ctx context.Context, dr types.DeployRepo) (string, int
 	if dr.ModelID > 0 {
 		targetID := dr.DeployID // support model deploy with multi-instance
 		status, err := d.ir.Status(ctx, &imagerunner.StatusRequest{
-			ClusterID: dr.ClusterID,
-			OrgName:   dr.Namespace,
-			RepoName:  dr.Name,
-			SvcName:   deploy.SvcName,
-			ID:        targetID,
+			ClusterID:   dr.ClusterID,
+			OrgName:     dr.Namespace,
+			RepoName:    dr.Name,
+			SvcName:     deploy.SvcName,
+			ID:          targetID,
+			NeedDetails: needDetails,
 		})
 		if err != nil {
 			slog.Error("fail to get status by deploy id", slog.Any("DeployID", deploy.ID), slog.Any("error", err))

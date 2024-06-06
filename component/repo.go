@@ -1639,7 +1639,7 @@ func (c *RepoComponent) DeployStatus(ctx context.Context, repoType types.Reposit
 		Name:      name,
 		SvcName:   deploy.SvcName,
 		ClusterID: deploy.ClusterID,
-	})
+	}, true)
 	if err != nil {
 		slog.Error("error happen when get deploy status", slog.Any("error", err), slog.String("path", deploy.GitPath))
 		return "", SpaceStatusStopped, instances, err
