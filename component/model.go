@@ -674,3 +674,49 @@ func (c *ModelComponent) Deploy(ctx context.Context, namespace, name, currentUse
 		SecureLevel:      req.SecureLevel,
 	})
 }
+
+func (c *ModelComponent) ListModelsByRuntimeFrameworkID(ctx context.Context, currentUser string, per, page int, id int64) ([]types.Model, int, error) {
+	var (
+		user      database.User
+		err       error
+		resModels []types.Model
+	)
+	if currentUser != "" {
+		user, err = c.user.FindByUsername(ctx, currentUser)
+		if err != nil {
+			return nil, 0, fmt.Errorf("failed to get current user,error:%w", err)
+		}
+	}
+
+	runtimeRepos, err := c.rrtfms.ListByRuntimeFrameworkID(ctx, id)
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to get repo by runtime,error:%w", err)
+	}
+
+	if runtimeRepos == nil {
+		return nil, 0, nil
+	}
+
+	var repoIDs []int64
+	for _, repo := range runtimeRepos {
+		repoIDs = append(repoIDs, repo.RepoID)
+	}
+
+	repos, total, err := c.rs.ListRepoPublicToUserByRepoIDs(ctx, types.ModelRepo, user.ID, per, page, repoIDs)
+	if err != nil {
+		newError := fmt.Errorf("failed to get public model repos,error:%w", err)
+		return nil, 0, newError
+	}
+
+	for _, repo := range repos {
+		resModels = append(resModels, types.Model{
+			Name:         repo.Name,
+			Nickname:     repo.Nickname,
+			Description:  repo.Description,
+			Path:         repo.Path,
+			RepositoryID: repo.ID,
+			Private:      repo.Private,
+		})
+	}
+	return resModels, total, nil
+}
