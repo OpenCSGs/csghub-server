@@ -385,3 +385,26 @@ func (s *RepoStore) IsMirrorRepo(ctx context.Context, repoType types.RepositoryT
 
 	return result.Exists, nil
 }
+
+func (s *RepoStore) ListRepoPublicToUserByRepoIDs(ctx context.Context, repoType types.RepositoryType, userID int64, per, page int, repoIDs []int64) (repos []*Repository, count int, err error) {
+	q := s.db.Operator.Core.
+		NewSelect().
+		Column("repository.*").
+		Model(&repos).
+		Relation("Tags")
+
+	q.Where("repository.repository_type = ?", repoType)
+	q.Where("repository.private = ? or repository.user_id = ?", false, userID)
+	q.Where("id in (?)", bun.In(repoIDs))
+
+	count, err = q.Count(ctx)
+	if err != nil {
+		return
+	}
+
+	err = q.Order("path").
+		Limit(per).Offset((page - 1) * per).
+		Scan(ctx)
+
+	return
+}

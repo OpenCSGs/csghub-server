@@ -1087,7 +1087,13 @@ func (h *RepoHandler) RuntimeFrameworkList(ctx *gin.Context) {
 		return
 	}
 	slog.Debug("list runtime framework", slog.Any("namespace", namespace), slog.Any("name", name))
-	response, err := h.c.ListRuntimeFramework(ctx)
+	repoType := common.RepoTypeFromContext(ctx)
+	if repoType == types.UnknownRepo {
+		slog.Error("Bad request of repo type")
+		httpbase.BadRequest(ctx, "Bad request of repo type")
+		return
+	}
+	response, err := h.c.ListRuntimeFramework(ctx, repoType, namespace, name)
 	if err != nil {
 		slog.Error("fail to list runtime framework", slog.String("error", err.Error()))
 		httpbase.ServerError(ctx, err)
