@@ -55,4 +55,5 @@ type Event struct {
 	ClientID  string    `bun:"," json:"client_id"`
 	ClientIP  string    `bun:"," json:"client_ip"`
 	CreatedAt time.Time `bun:"created_at,notnull,default:current_timestamp" json:"created_at"`
+	Extension string    `bun:"," json:"extension"`
 }
