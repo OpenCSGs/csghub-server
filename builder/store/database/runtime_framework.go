@@ -36,6 +36,15 @@ func (rf *RuntimeFrameworksStore) List(ctx context.Context) ([]RuntimeFramework,
 	return result, nil
 }
 
+func (rf *RuntimeFrameworksStore) ListByRepoID(ctx context.Context, repoID int64) ([]RepositoriesRuntimeFramework, error) {
+	var result []RepositoriesRuntimeFramework
+	err := rf.db.Operator.Core.NewSelect().Model(&RepositoriesRuntimeFramework{}).Relation("RuntimeFramework").Where("repo_id = ?", repoID).Scan(ctx, &result)
+	if err != nil {
+		return nil, err
+	}
+	return result, err
+}
+
 func (rf *RuntimeFrameworksStore) FindByID(ctx context.Context, id int64) (*RuntimeFramework, error) {
 	var res RuntimeFramework
 	res.ID = id

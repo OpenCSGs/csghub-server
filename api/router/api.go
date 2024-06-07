@@ -446,5 +446,10 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 	event := apiGroup.Group("/events")
 	event.POST("", eventHandler.Create)
 
+	runtimeFramework := apiGroup.Group("/runtime_framework")
+	{
+		runtimeFramework.GET("/:id/models", modelHandler.ListByRuntimeFrameworkID)
+	}
+
 	return r, nil
 }
