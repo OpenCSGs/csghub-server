@@ -1,4 +1,4 @@
-package cron
+package mirror
 
 import (
 	"context"
@@ -11,9 +11,15 @@ import (
 	"opencsg.com/csghub-server/component"
 )
 
-var cmdCreatePushMirror = &cobra.Command{
-	Use:   "create-push-mirror",
-	Short: "the cmd to create push mirror for mirrored repositories",
+var resync bool
+
+func init() {
+	checkMirrorProgress.Flags().BoolVar(&resync, "resync", false, "the path of the file")
+}
+
+var checkMirrorProgress = &cobra.Command{
+	Use:   "check-mirror-progress",
+	Short: "the cmd to check mirror progress",
 	PersistentPreRunE: func(cmd *cobra.Command, args []string) (err error) {
 		config, err := config.LoadConfig()
 		if err != nil {
@@ -40,14 +46,16 @@ var cmdCreatePushMirror = &cobra.Command{
 			slog.Error("config not found in context")
 			return
 		}
-		if !config.Saas {
-			return
-		}
+
 		c, err := component.NewMirrorComponent(config)
 		if err != nil {
 			slog.Error("failed to create mirror component", "err", err)
 			return
 		}
-		c.CreatePushMirrorForFinishedMirrorTask(cmd.Context())
+		err = c.CheckMirrorProgress(ctx)
+		if err != nil {
+			slog.Error("failed to check mirror progess", "err", err)
+			return
+		}
 	},
 }

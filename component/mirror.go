@@ -4,10 +4,15 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"path"
+	"strings"
 
+	"github.com/minio/minio-go/v7"
 	"opencsg.com/csghub-server/builder/git"
+	"opencsg.com/csghub-server/builder/git/gitserver"
 	"opencsg.com/csghub-server/builder/git/mirrorserver"
 	"opencsg.com/csghub-server/builder/store/database"
+	"opencsg.com/csghub-server/builder/store/s3"
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/types"
 )
@@ -23,6 +28,10 @@ type MirrorComponent struct {
 	mirrorSourceStore *database.MirrorSourceStore
 	mirrorServer      mirrorserver.MirrorServer
 	namespaceStore    *database.NamespaceStore
+	git               gitserver.GitServer
+	s3Client          *minio.Client
+	lfsBucket         string
+	saas              bool
 }
 
 func NewMirrorComponent(config *config.Config) (*MirrorComponent, error) {
@@ -38,6 +47,19 @@ func NewMirrorComponent(config *config.Config) (*MirrorComponent, error) {
 	if err != nil {
 		return nil, fmt.Errorf("fail to create repo component,error:%w", err)
 	}
+	c.git, err = git.NewGitServer(config)
+	if err != nil {
+		newError := fmt.Errorf("fail to create git server,error:%w", err)
+		slog.Error(newError.Error())
+		return nil, newError
+	}
+	c.s3Client, err = s3.NewMinio(config)
+	if err != nil {
+		newError := fmt.Errorf("fail to init s3 client for code,error:%w", err)
+		slog.Error(newError.Error())
+		return nil, newError
+	}
+	c.lfsBucket = config.S3.Bucket
 	c.modelStore = database.NewModelStore()
 	c.datasetStore = database.NewDatasetStore()
 	c.codeStore = database.NewCodeStore()
@@ -46,6 +68,7 @@ func NewMirrorComponent(config *config.Config) (*MirrorComponent, error) {
 	c.tokenStore = database.NewGitServerAccessTokenStore()
 	c.mirrorSourceStore = database.NewMirrorSourceStore()
 	c.namespaceStore = database.NewNamespaceStore()
+	c.saas = config.Saas
 	return c, nil
 }
 
@@ -226,6 +249,20 @@ func (m *MirrorComponent) mapNamespaceAndName(sourceNamespace string) string {
 	return namespace
 }
 
+func (c *MirrorComponent) CheckMirrorProgress(ctx context.Context) error {
+	mirrors, err := c.mirrorStore.Unfinished(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to get unfinished mirrors: %v", err)
+	}
+	for _, mirror := range mirrors {
+		err := c.checkAndUpdateMirrorStatus(ctx, mirror)
+		if err != nil {
+			slog.Error("fail to check and update mirror status", slog.Int64("mirrorId", mirror.ID), slog.String("error", err.Error()))
+		}
+	}
+	return nil
+}
+
 var mirrorOrganizationMap = map[string]string{
 	"THUDM":          "THUDM",
 	"baichuan-inc":   "BaiChuanAI",
@@ -247,4 +284,162 @@ var mirrorOrganizationMap = map[string]string{
 	"openbmb":        "OpenBMB",
 	"netease-youdao": "Netease-youdao",
 	"ByteDance":      "ByteDance",
+}
+
+func (c *MirrorComponent) checkAndUpdateMirrorStatus(ctx context.Context, mirror database.Mirror) error {
+	var statusAndProgressFunc func(ctx context.Context, mirror database.Mirror) (database.MirrorTaskStatus, int8, error)
+	if mirror.Repository == nil {
+		return nil
+	}
+	if c.saas {
+		statusAndProgressFunc = c.getMirrorStatusAndProgressSaas
+	} else {
+		statusAndProgressFunc = c.getMirrorStatusAndProgressOnPremise
+	}
+	status, progress, err := statusAndProgressFunc(ctx, mirror)
+	if err != nil {
+		slog.Error("fail to get mirror status and progress", slog.Int64("mirrorId", mirror.ID), slog.String("error", err.Error()))
+	}
+	mirror.Status = status
+	mirror.Progress = progress
+	err = c.mirrorStore.Update(ctx, &mirror)
+	if err != nil {
+		slog.Error("fail to update mirror", slog.Int64("mirrorId", mirror.ID), slog.String("error", err.Error()))
+		return err
+	}
+
+	return nil
+}
+
+func getAllFiles(namespace, repoName, folder string, repoType types.RepositoryType, gsTree func(ctx context.Context, req gitserver.GetRepoInfoByPathReq) ([]*types.File, error)) ([]*types.File, error) {
+	var files []*types.File
+
+	getRepoFileTree := gitserver.GetRepoInfoByPathReq{
+		Namespace: namespace,
+		Name:      repoName,
+		Ref:       "",
+		Path:      folder,
+		RepoType:  repoType,
+	}
+	gitFiles, err := gsTree(context.Background(), getRepoFileTree)
+	if err != nil {
+		return files, fmt.Errorf("failed to get repo file tree,%w", err)
+	}
+	for _, file := range gitFiles {
+		if file.Type == "dir" {
+			subFiles, err := getAllFiles(namespace, repoName, file.Path, repoType, gsTree)
+			if err != nil {
+				return files, err
+			}
+			files = append(files, subFiles...)
+		} else {
+			files = append(files, file)
+		}
+	}
+	return files, nil
+}
+
+func (c *MirrorComponent) getMirrorStatusAndProgressOnPremise(ctx context.Context, mirror database.Mirror) (database.MirrorTaskStatus, int8, error) {
+	task, err := c.git.GetMirrorTaskInfo(ctx, mirror.MirrorTaskID)
+	if err != nil {
+		slog.Error("fail to get mirror task info", slog.Int64("taskId", mirror.MirrorTaskID), slog.String("error", err.Error()))
+		return database.MirrorFailed, 0, fmt.Errorf("fail to get mirror task info, %w", err)
+	}
+	if task.Status == gitserver.TaskStatusQueued {
+		return database.MirrorWaiting, 0, nil
+	} else if task.Status == gitserver.TaskStatusRunning {
+		progress, err := c.countMirrorProgress(ctx, mirror)
+		if err != nil {
+			return database.MirrorRunning, 0, err
+		}
+		return database.MirrorRunning, progress, nil
+	} else if task.Status == gitserver.TaskStatusFailed {
+		return database.MirrorFailed, 0, nil
+	} else if task.Status == gitserver.TaskStatusFinished {
+		progress, err := c.countMirrorProgress(ctx, mirror)
+		if err != nil {
+			return database.MirrorFailed, 0, err
+		}
+		if progress == 100 {
+			return database.MirrorFinished, progress, nil
+		} else {
+			return database.MirrorIncomplete, progress, nil
+		}
+	} else {
+		return database.MirrorFailed, 0, nil
+	}
+}
+
+func (c *MirrorComponent) getMirrorStatusAndProgressSaas(ctx context.Context, mirror database.Mirror) (database.MirrorTaskStatus, int8, error) {
+	task, err := c.mirrorServer.GetMirrorTaskInfo(ctx, mirror.MirrorTaskID)
+	if err != nil {
+		slog.Error("fail to get mirror task info", slog.Int64("taskId", mirror.MirrorTaskID), slog.String("error", err.Error()))
+		return database.MirrorFailed, 0, fmt.Errorf("fail to get mirror task info, %w", err)
+	}
+	if task.Status == mirrorserver.TaskStatusQueued {
+		return database.MirrorWaiting, 0, nil
+	} else if task.Status == mirrorserver.TaskStatusRunning {
+		progress, err := c.countMirrorProgress(ctx, mirror)
+		if err != nil {
+			return database.MirrorRunning, 0, err
+		}
+		return database.MirrorRunning, progress, nil
+	} else if task.Status == mirrorserver.TaskStatusFailed {
+		return database.MirrorFailed, 0, nil
+	} else if task.Status == mirrorserver.TaskStatusFinished {
+		progress, err := c.countMirrorProgress(ctx, mirror)
+		if err != nil {
+			return database.MirrorFailed, 0, err
+		}
+		if progress == 100 {
+			return database.MirrorFinished, progress, nil
+		} else {
+			return database.MirrorIncomplete, progress, nil
+		}
+	} else {
+		return database.MirrorFailed, 0, nil
+	}
+}
+
+func (c *MirrorComponent) countMirrorProgress(ctx context.Context, mirror database.Mirror) (int8, error) {
+	var (
+		lfsFiles          []*types.File
+		finishedFileCount int
+	)
+	namespaceAndName := strings.Split(mirror.Repository.Path, "/")
+	namespace := namespaceAndName[0]
+	name := namespaceAndName[1]
+	allFiles, err := getAllFiles(namespace, name, "", mirror.Repository.RepositoryType, c.git.GetRepoFileTree)
+
+	if err != nil {
+		slog.Error("fail to get all files of mirror repository", slog.Int64("mirrorId", mirror.ID), slog.String("namespace", namespace), slog.String("name", name), slog.String("error", err.Error()))
+		return 0, err
+	}
+	if len(allFiles) == 0 {
+		return 0, nil
+	}
+	for _, f := range allFiles {
+		if f.Lfs {
+			lfsFiles = append(lfsFiles, f)
+		}
+	}
+	if len(lfsFiles) == 0 {
+		return 100, nil
+	}
+	for _, f := range lfsFiles {
+		objectKey := f.LfsRelativePath
+		objectKey = path.Join("lfs", objectKey)
+		_, err := c.s3Client.StatObject(ctx, c.lfsBucket, objectKey, minio.GetObjectOptions{})
+		if err != nil {
+			if minio.ToErrorResponse(err).Code != "NoSuchKey" {
+				slog.Error("fail to check lfs file", slog.Int64("mirrorId", mirror.ID), slog.String("namespace", namespace), slog.String("name", name), slog.String("filename", f.Path), slog.String("error", err.Error()))
+				return 0, err
+			}
+		} else {
+			finishedFileCount += 1
+		}
+	}
+
+	progress := (finishedFileCount * 100) / len(lfsFiles)
+	return int8(progress), nil
 }

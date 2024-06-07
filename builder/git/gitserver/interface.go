@@ -46,4 +46,9 @@ type GitServer interface {
 
 	FixOrganization(req *types.CreateOrgReq, orgOwner database.User) error
 	FixUserData(ctx context.Context, userName string) error
+
+	// Mirror
+	CreateMirrorRepo(ctx context.Context, req CreateMirrorRepoReq) (int64, error)
+	GetMirrorTaskInfo(ctx context.Context, taskId int64) (*MirrorTaskInfo, error)
+	MirrorSync(ctx context.Context, req MirrorSyncReq) error
 }
