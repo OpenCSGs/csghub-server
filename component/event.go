@@ -22,9 +22,10 @@ func (ec *EventComponent) NewEvents(ctx context.Context, events []types.Event) e
 	var dbevents []database.Event
 	for _, e := range events {
 		dbevents = append(dbevents, database.Event{
-			Module:  e.Module,
-			EventID: e.ID,
-			Value:   e.Value,
+			Module:    e.Module,
+			EventID:   e.ID,
+			Value:     e.Value,
+			Extension: e.Extension,
 		})
 	}
 
