@@ -51,6 +51,7 @@ type RepoComponent struct {
 	mirrorSource     *database.MirrorSourceStore
 	tokenStore       *database.AccessTokenStore
 	rtfm             *database.RuntimeFrameworksStore
+	rrtfms           *database.RepositoriesRuntimeFrameworkStore
 }
 
 func NewRepoComponent(config *config.Config) (*RepoComponent, error) {
@@ -102,6 +103,7 @@ func NewRepoComponent(config *config.Config) (*RepoComponent, error) {
 	c.publicRootDomain = config.Space.PublicRootDomain
 	c.cluster = database.NewClusterInfoStore()
 	c.rtfm = database.NewRuntimeFrameworksStore()
+	c.rrtfms = database.NewRepositoriesRuntimeFramework()
 	return c, nil
 }
 
@@ -1214,22 +1216,31 @@ func (c *RepoComponent) DeleteMirror(ctx context.Context, req types.DeleteMirror
 }
 
 // get runtime framework list
-func (c *RepoComponent) ListRuntimeFramework(ctx context.Context) ([]types.RuntimeFramework, error) {
-	frames, err := c.runFrame.List(ctx)
+func (c *RepoComponent) ListRuntimeFramework(ctx context.Context, repoType types.RepositoryType, namespace, name string) ([]types.RuntimeFramework, error) {
+	repo, err := c.repo.FindByPath(ctx, repoType, namespace, name)
+	if err != nil {
+		return nil, fmt.Errorf("failed to find repo, error: %w", err)
+	}
+	if repo == nil {
+		return nil, fmt.Errorf("repo not exist, %s %s/%s", repoType, namespace, name)
+	}
+	frames, err := c.runFrame.ListByRepoID(ctx, repo.ID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list runtime frameworks, error: %w", err)
 	}
 	var frameList []types.RuntimeFramework
-	for _, frame := range frames {
-		frameList = append(frameList, types.RuntimeFramework{
-			ID:            frame.ID,
-			FrameName:     frame.FrameName,
-			FrameVersion:  frame.FrameVersion,
-			FrameImage:    frame.FrameImage,
-			FrameCpuImage: frame.FrameCpuImage,
-			Enabled:       frame.Enabled,
-			ContainerPort: frame.ContainerPort,
-		})
+	for _, modelFrame := range frames {
+		if modelFrame.RuntimeFramework != nil {
+			frameList = append(frameList, types.RuntimeFramework{
+				ID:            modelFrame.RuntimeFramework.ID,
+				FrameName:     modelFrame.RuntimeFramework.FrameName,
+				FrameVersion:  modelFrame.RuntimeFramework.FrameVersion,
+				FrameImage:    modelFrame.RuntimeFramework.FrameImage,
+				FrameCpuImage: modelFrame.RuntimeFramework.FrameCpuImage,
+				Enabled:       modelFrame.RuntimeFramework.Enabled,
+				ContainerPort: modelFrame.RuntimeFramework.ContainerPort,
+			})
+		}
 	}
 	return frameList, nil
 }

@@ -602,3 +602,50 @@ func (h *ModelHandler) DeployStart(ctx *gin.Context) {
 	}
 	httpbase.OK(ctx, nil)
 }
+
+// GetModelsByRuntime godoc
+// @Security     ApiKey
+// @Summary      Get Visible models by runtime framework for current user
+// @Description  get visible models by runtime framework for current user
+// @Tags         RuntimeFramework
+// @Accept       json
+// @Produce      json
+// @Param        id path int true "runtime framework id"
+// @Param        current_user query string false "current user"
+// @Param        per query int false "per" default(20)
+// @Param        page query int false "per page" default(1)
+// @Success      200  {object}  types.Response{} "OK"
+// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
+// @Router       /runtime_framework/{id}/models [get]
+func (h *ModelHandler) ListByRuntimeFrameworkID(ctx *gin.Context) {
+	currentUser := httpbase.GetCurrentUser(ctx)
+	if currentUser == "" {
+		httpbase.UnauthorizedError(ctx, errors.New("user not found, please login first"))
+		return
+	}
+	per, page, err := common.GetPerAndPageFromContext(ctx)
+	if err != nil {
+		slog.Error("Bad request format", "error", err)
+		httpbase.BadRequest(ctx, err.Error())
+		return
+	}
+	id, err := strconv.ParseInt(ctx.Param("id"), 10, 64)
+	if err != nil {
+		slog.Error("Bad request format", "error", err)
+		httpbase.BadRequest(ctx, err.Error())
+		return
+	}
+
+	models, total, err := h.c.ListModelsByRuntimeFrameworkID(ctx, currentUser, per, page, id)
+	if err != nil {
+		slog.Error("Failed to get models", slog.Any("error", err))
+		httpbase.ServerError(ctx, err)
+		return
+	}
+	respData := gin.H{
+		"data":  models,
+		"total": total,
+	}
+	ctx.JSON(http.StatusOK, respData)
+}
