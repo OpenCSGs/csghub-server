@@ -1,4 +1,4 @@
-FROM golang:1.21.0-bullseye
+FROM opencsg-registry.cn-beijing.cr.aliyuncs.com/public/golang:1.21.0-bullseye
 ENV GOPROXY=https://goproxy.cn,direct
 WORKDIR /starhub
 COPY . .
