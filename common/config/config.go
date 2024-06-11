@@ -3,6 +3,7 @@ package config
 import "github.com/kelseyhightower/envconfig"
 
 type Config struct {
+	Saas          bool   `envconfig:"STARHUB_SERVER_SAAS" default:"true"`
 	InstanceID    string `envconfig:"STARHUB_SERVER_INSTANCE_ID"`
 	EnableSwagger bool   `envconfig:"STARHUB_SERVER_ENABLE_SWAGGER" default:"false"`
 	// enable if you want to acess csghub through https, especially for space rproxy
@@ -43,6 +44,7 @@ type Config struct {
 	}
 
 	MirrorServer struct {
+		Enable    bool   `envconfig:"STARHUB_SERVER_MIRRORSERVER_ENABLE" default:"true"`
 		URL       string `envconfig:"STARHUB_SERVER_MIRRORSERVER_URL"    default:"http://localhost:3001"`
 		Type      string `envconfig:"STARHUB_SERVER_MIRRORSERVER_TYPE"    default:"gitea"`
 		Host      string `envconfig:"STARHUB_SERVER_MIRRORSERVER_HOST"       default:"http://localhost:3001"`

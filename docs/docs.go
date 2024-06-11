@@ -8215,6 +8215,9 @@ const docTemplate = `{
                 "mirror_task_id": {
                     "type": "integer"
                 },
+                "progress": {
+                    "type": "integer"
+                },
                 "push_mirror_created": {
                     "type": "boolean"
                 },
@@ -8229,6 +8232,9 @@ const docTemplate = `{
                 },
                 "source_url": {
                     "type": "string"
+                },
+                "status": {
+                    "$ref": "#/definitions/database.MirrorTaskStatus"
                 },
                 "updated_at": {
                     "type": "string"
@@ -8254,6 +8260,25 @@ const docTemplate = `{
                     "type": "string"
                 }
             }
+        },
+        "database.MirrorTaskStatus": {
+            "type": "string",
+            "enum": [
+                "waiting",
+                "running",
+                "finished",
+                "mirroring",
+                "failed",
+                "incomplete"
+            ],
+            "x-enum-varnames": [
+                "MirrorWaiting",
+                "MirrorRunning",
+                "MirrorFinished",
+                "MirrorMirroring",
+                "MirrorFailed",
+                "MirrorIncomplete"
+            ]
         },
         "database.Model": {
             "type": "object",

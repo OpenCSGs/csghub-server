@@ -68,6 +68,8 @@ definitions:
         type: integer
       mirror_task_id:
         type: integer
+      progress:
+        type: integer
       push_mirror_created:
         type: boolean
       repository:
@@ -78,6 +80,8 @@ definitions:
         type: string
       source_url:
         type: string
+      status:
+        $ref: '#/definitions/database.MirrorTaskStatus'
       updated_at:
         type: string
     type: object
@@ -94,6 +98,22 @@ definitions:
       updated_at:
         type: string
     type: object
+  database.MirrorTaskStatus:
+    enum:
+    - waiting
+    - running
+    - finished
+    - mirroring
+    - failed
+    - incomplete
+    type: string
+    x-enum-varnames:
+    - MirrorWaiting
+    - MirrorRunning
+    - MirrorFinished
+    - MirrorMirroring
+    - MirrorFailed
+    - MirrorIncomplete
   database.Model:
     properties:
       created_at:
