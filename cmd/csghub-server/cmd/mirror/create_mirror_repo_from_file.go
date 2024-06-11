@@ -55,6 +55,9 @@ var createMirrorRepoFromFile = &cobra.Command{
 			slog.Error("config not found in context")
 			return
 		}
+		if !config.Saas {
+			return
+		}
 
 		c, err := component.NewMirrorComponent(config)
 		if err != nil {
