@@ -1233,6 +1233,28 @@ func (c *RepoComponent) DeleteMirror(ctx context.Context, req types.DeleteMirror
 	return nil
 }
 
+// get runtime framework list with type
+func (c *RepoComponent) ListRuntimeFrameworkWithType(ctx context.Context, deployType int) ([]types.RuntimeFramework, error) {
+	frames, err := c.runFrame.List(ctx, deployType)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list runtime frameworks, error: %w", err)
+	}
+	var frameList []types.RuntimeFramework
+	for _, frame := range frames {
+		frameList = append(frameList, types.RuntimeFramework{
+			ID:            frame.ID,
+			FrameName:     frame.FrameName,
+			FrameVersion:  frame.FrameVersion,
+			FrameImage:    frame.FrameImage,
+			FrameCpuImage: frame.FrameCpuImage,
+			Enabled:       frame.Enabled,
+			ContainerPort: frame.ContainerPort,
+			Type:          frame.Type,
+		})
+	}
+	return frameList, nil
+}
+
 // get runtime framework list
 func (c *RepoComponent) ListRuntimeFramework(ctx context.Context, repoType types.RepositoryType, namespace, name string) ([]types.RuntimeFramework, error) {
 	repo, err := c.repo.FindByPath(ctx, repoType, namespace, name)
@@ -1271,6 +1293,7 @@ func (c *RepoComponent) CreateRuntimeFramework(ctx context.Context, req *types.R
 		FrameCpuImage: req.FrameCpuImage,
 		Enabled:       req.Enabled,
 		ContainerPort: req.ContainerPort,
+		Type:          req.Type,
 	}
 	err := c.runFrame.Add(ctx, newFrame)
 	if err != nil {
@@ -1283,6 +1306,7 @@ func (c *RepoComponent) CreateRuntimeFramework(ctx context.Context, req *types.R
 		FrameCpuImage: req.FrameCpuImage,
 		Enabled:       req.Enabled,
 		ContainerPort: req.ContainerPort,
+		Type:          req.Type,
 	}
 	return frame, nil
 }
@@ -1296,6 +1320,7 @@ func (c *RepoComponent) UpdateRuntimeFramework(ctx context.Context, id int64, re
 		FrameCpuImage: req.FrameCpuImage,
 		Enabled:       req.Enabled,
 		ContainerPort: req.ContainerPort,
+		Type:          req.Type,
 	}
 	frame, err := c.runFrame.Update(ctx, newFrame)
 	if err != nil {
@@ -1309,6 +1334,7 @@ func (c *RepoComponent) UpdateRuntimeFramework(ctx context.Context, id int64, re
 		FrameCpuImage: frame.FrameCpuImage,
 		Enabled:       frame.Enabled,
 		ContainerPort: frame.ContainerPort,
+		Type:          req.Type,
 	}, nil
 }
 
@@ -1442,6 +1468,11 @@ func (c *RepoComponent) DeployDetail(ctx context.Context, repoType types.Reposit
 	if deploy.SecureLevel == types.EndpointPublic {
 		endpointPrivate = false
 	}
+	proxyEndPoint := ""
+	if deploy.Type == types.FinetuneType {
+		proxyEndPoint = endpoint + "/proxy/7860/"
+	}
+
 	resDeploy := types.DeployRepo{
 		DeployID:         deploy.ID,
 		DeployName:       deploy.DeployName,
@@ -1466,6 +1497,7 @@ func (c *RepoComponent) DeployDetail(ctx context.Context, repoType types.Reposit
 		Instances:        instList,
 		Private:          endpointPrivate,
 		Path:             repo.Path,
+		ProxyEndpoint:    proxyEndPoint,
 	}
 
 	return &resDeploy, nil

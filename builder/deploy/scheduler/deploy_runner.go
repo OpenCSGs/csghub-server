@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"path"
 	"strconv"
 	"strings"
 	"time"
@@ -259,10 +260,16 @@ func (t *DeployRunner) makeDeployRequest() (*imagerunner.RunRequest, error) {
 		}
 	}
 
-	if deploy.ModelID > 0 {
+	if deploy.Type == types.InferenceType {
 		// runtime framework port for model
 		envMap["port"] = strconv.Itoa(deploy.ContainerPort)
 		envMap["HF_ENDPOINT"] = t.modelDownloadEndpoint // "https://hub-stg.opencsg.com/hf"
+	}
+
+	if deploy.Type == types.FinetuneType {
+		envMap["port"] = strconv.Itoa(deploy.ContainerPort)
+		envMap["HF_ENDPOINT"] = path.Join(t.modelDownloadEndpoint, "/hf")
+		envMap["HF_TOKEN"] = token.Token
 	}
 
 	targetID := deploy.SpaceID

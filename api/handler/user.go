@@ -606,3 +606,63 @@ func (h *UserHandler) GetRunDeploys(ctx *gin.Context) {
 	}
 	ctx.JSON(http.StatusOK, respData)
 }
+
+// GetFinetuneInstances godoc
+// @Security     ApiKey
+// @Summary      Get user running notebook instances
+// @Description  Get user running notebook instances
+// @Tags         User
+// @Accept       json
+// @Produce      json
+// @Param        username path string true "username"
+// @Param        per query int false "per" default(50)
+// @Param        page query int false "page index" default(1)
+// @Param        current_user query string false "current user"
+// @Success      200  {object}  types.Response{} "OK"
+// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
+// @Router       /user/{username}/finetune/instances [get]
+func (h *UserHandler) GetFinetuneInstances(ctx *gin.Context) {
+	respData := gin.H{
+		"message": "OK",
+		"data":    nil,
+		"total":   0,
+	}
+
+	var req types.UserRepoReq
+	currentUser := httpbase.GetCurrentUser(ctx)
+	if currentUser == "" {
+		ctx.JSON(http.StatusOK, respData)
+		return
+	}
+
+	username := ctx.Param("username")
+	if currentUser != username {
+		slog.Warn("invalid user to list deploys", slog.String("currentUser", currentUser), slog.String("username", username))
+		ctx.JSON(http.StatusOK, respData)
+		return
+	}
+
+	per, page, err := common.GetPerAndPageFromContext(ctx)
+	if err != nil {
+		slog.Error("Bad request format of page and per %v", err)
+		httpbase.BadRequest(ctx, err.Error())
+		return
+	}
+
+	req.CurrentUser = currentUser
+	req.Page = page
+	req.PageSize = per
+	ds, total, err := h.c.ListInstances(ctx, &req)
+	if err != nil {
+		slog.Error("Failed to get instance list", slog.Any("error", err), slog.Any("req", req))
+		httpbase.ServerError(ctx, err)
+		return
+	}
+	respData = gin.H{
+		"message": "OK",
+		"data":    ds,
+		"total":   total,
+	}
+	ctx.JSON(http.StatusOK, respData)
+}
