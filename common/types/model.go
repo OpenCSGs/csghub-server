@@ -135,6 +135,15 @@ type ModelRunReq struct {
 	CostPerHour        int64  `json:"cost_per_hour"`
 }
 
+type InstanceRunReq struct {
+	DeployName         string `json:"deploy_name"`
+	ClusterID          string `json:"cluster_id"`
+	Hardware           string `json:"hardware"`
+	RuntimeFrameworkID int64  `json:"runtime_framework_id"`
+	Revision           string `json:"revision"`
+	CostPerHour        int64  `json:"cost_per_hour"`
+}
+
 type ModelUpdateRequest struct {
 	MinReplica int               `json:"min_replica"` // min replica of instance/pod
 	MaxReplica int               `json:"max_replica"` // max replica of instance/pod
@@ -155,3 +164,9 @@ type ModelStatusEventData struct {
 	Status  string     `json:"status"`
 	Details []Instance `json:"details"`
 }
+
+const (
+	SpaceType     = 0
+	InferenceType = 1
+	FinetuneType  = 2
+)

@@ -151,6 +151,19 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 		modelsGroup.PUT("/:namespace/:name/run/:id", middleware.RepoType(types.ModelRepo), repoCommonHandler.DeployUpdate)
 		modelsGroup.PUT("/:namespace/:name/run/:id/stop", middleware.RepoType(types.ModelRepo), modelHandler.DeployStop)
 		modelsGroup.PUT("/:namespace/:name/run/:id/start", middleware.RepoType(types.ModelRepo), modelHandler.DeployStart)
+
+		// runtime framework for both finetune and inference
+		modelsGroup.GET("/runtime_framework", middleware.RepoType(types.ModelRepo), repoCommonHandler.RuntimeFrameworkListWithType)
+
+		// deploy model as finetune instance
+		modelsGroup.POST("/:namespace/:name/finetune", middleware.RepoType(types.ModelRepo), modelHandler.FinetuneCreate)
+		// stop a finetune instance
+		modelsGroup.PUT("/:namespace/:name/finetune/:id/stop", middleware.RepoType(types.ModelRepo), modelHandler.FinetuneStop)
+		// start a finetune instance
+		modelsGroup.PUT("/:namespace/:name/finetune/:id/start", middleware.RepoType(types.ModelRepo), modelHandler.FinetuneStart)
+		// delete a finetune instance
+		modelsGroup.DELETE("/:namespace/:name/finetune/:id", middleware.RepoType(types.ModelRepo), modelHandler.FinetuneDelete)
+
 	}
 
 	// Dataset routes
@@ -329,6 +342,7 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 		apiGroup.GET("/user/:username/likes/models", userHandler.LikesModels)
 		apiGroup.GET("/user/:username/likes/datasets", userHandler.LikesDatasets)
 		apiGroup.GET("/user/:username/run/:repo_type", userHandler.GetRunDeploys)
+		apiGroup.GET("/user/:username/finetune/instances", userHandler.GetFinetuneInstances)
 	}
 	acHandler, err := handler.NewAccessTokenHandler(config)
 	if err != nil {

@@ -1,0 +1,10 @@
+register_model_group(
+    models={
+        "csg-wukong-1B": {
+            DownloadSource.DEFAULT: "OpenCSG/csg-wukong-1B"
+        },
+        "csg-wukong-1B-xzgan001": {
+            DownloadSource.DEFAULT: "xzgan001/csg-wukong-1B"
+        },
+    }
+)

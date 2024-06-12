@@ -881,6 +881,21 @@ definitions:
         description: URL to browse the file
         type: string
     type: object
+  types.InstanceRunReq:
+    properties:
+      cluster_id:
+        type: string
+      cost_per_hour:
+        type: integer
+      deploy_name:
+        type: string
+      hardware:
+        type: string
+      revision:
+        type: string
+      runtime_framework_id:
+        type: integer
+    type: object
   types.ListByPathReq:
     properties:
       paths:
@@ -1087,6 +1102,8 @@ definitions:
         type: string
       id:
         type: integer
+      type:
+        type: integer
     type: object
   types.RuntimeFrameworkReq:
     properties:
@@ -1102,6 +1119,8 @@ definitions:
         type: string
       frame_version:
         type: string
+      type:
+        type: integer
     type: object
   types.Space:
     properties:
@@ -2951,6 +2970,63 @@ paths:
       summary: Get repository file tree
       tags:
       - Repository
+  /{repo_type}/runtime_framework:
+    get:
+      consumes:
+      - application/json
+      description: List repo runtime framework
+      parameters:
+      - description: models,spaces
+        enum:
+        - models
+        - spaces
+        in: path
+        name: repo_type
+        required: true
+        type: string
+      - description: namespace
+        in: path
+        name: namespace
+        required: true
+        type: string
+      - description: name
+        in: path
+        name: name
+        required: true
+        type: string
+      - description: current user
+        in: query
+        name: current_user
+        type: string
+      - default: 1
+        description: deploy_type
+        enum:
+        - 0
+        - 1
+        - 2
+        in: query
+        name: deploy_type
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            type: string
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: List repo runtime framework
+      tags:
+      - Repository
   /cluster:
     get:
       consumes:
@@ -4224,6 +4300,187 @@ paths:
       summary: Update a exists model
       tags:
       - Model
+  /models/{namespace}/{name}/finetune:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: namespace
+        in: path
+        name: namespace
+        required: true
+        type: string
+      - description: name
+        in: path
+        name: name
+        required: true
+        type: string
+      - description: current_user
+        in: query
+        name: current_user
+        required: true
+        type: string
+      - description: deploy setting of instance
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/types.InstanceRunReq'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            type: string
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: create a finetune instance
+      tags:
+      - Model
+  /models/{namespace}/{name}/finetune/{id}:
+    delete:
+      consumes:
+      - application/json
+      description: delete a finetune instance
+      parameters:
+      - description: namespace
+        in: path
+        name: namespace
+        required: true
+        type: string
+      - description: name
+        in: path
+        name: name
+        required: true
+        type: string
+      - description: id
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: current user
+        in: query
+        name: current_user
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/types.Response'
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Delete a finetune instance
+      tags:
+      - Model
+  /models/{namespace}/{name}/finetune/{id}/start:
+    put:
+      consumes:
+      - application/json
+      description: Start a finetune instance
+      parameters:
+      - description: namespace
+        in: path
+        name: namespace
+        required: true
+        type: string
+      - description: name
+        in: path
+        name: name
+        required: true
+        type: string
+      - description: deploy id
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: current user
+        in: query
+        name: current_user
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/types.Response'
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Start a finetune instance
+      tags:
+      - Model
+  /models/{namespace}/{name}/finetune/{id}/stop:
+    put:
+      consumes:
+      - application/json
+      description: Stop a finetune instance
+      parameters:
+      - description: namespace
+        in: path
+        name: namespace
+        required: true
+        type: string
+      - description: name
+        in: path
+        name: name
+        required: true
+        type: string
+      - description: id
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: current user
+        in: query
+        name: current_user
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/types.Response'
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Stop a finetune instance
+      tags:
+      - Model
   /models/{namespace}/{name}/predict:
     post:
       consumes:
@@ -4988,6 +5245,51 @@ paths:
       summary: update user membership
       tags:
       - Member
+  /runtime_framework/{id}/models:
+    get:
+      consumes:
+      - application/json
+      description: get visible models by runtime framework for current user
+      parameters:
+      - description: runtime framework id
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: current user
+        in: query
+        name: current_user
+        type: string
+      - default: 20
+        description: per
+        in: query
+        name: per
+        type: integer
+      - default: 1
+        description: per page
+        in: query
+        name: page
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/types.Response'
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Get Visible models by runtime framework for current user
+      tags:
+      - RuntimeFramework
   /space_resources:
     get:
       consumes:
@@ -5817,6 +6119,51 @@ paths:
       security:
       - ApiKey: []
       summary: Get user datasets
+      tags:
+      - User
+  /user/{username}/finetune/instances:
+    get:
+      consumes:
+      - application/json
+      description: Get user running notebook instances
+      parameters:
+      - description: username
+        in: path
+        name: username
+        required: true
+        type: string
+      - default: 50
+        description: per
+        in: query
+        name: per
+        type: integer
+      - default: 1
+        description: page index
+        in: query
+        name: page
+        type: integer
+      - description: current user
+        in: query
+        name: current_user
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/types.Response'
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Get user running notebook instances
       tags:
       - User
   /user/{username}/likes/{repoid}:

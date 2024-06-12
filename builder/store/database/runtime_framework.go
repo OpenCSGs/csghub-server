@@ -24,12 +24,13 @@ type RuntimeFramework struct {
 	FrameCpuImage string `bun:",notnull" json:"frame_cpu_image"`
 	Enabled       int64  `bun:",notnull" json:"enabled"`
 	ContainerPort int    `bun:",notnull" json:"container_port"`
+	Type          int    `bun:",notnull" json:"type"` // 0-space, 1-inference, 2-finetune
 	times
 }
 
-func (rf *RuntimeFrameworksStore) List(ctx context.Context) ([]RuntimeFramework, error) {
+func (rf *RuntimeFrameworksStore) List(ctx context.Context, deployType int) ([]RuntimeFramework, error) {
 	var result []RuntimeFramework
-	_, err := rf.db.Operator.Core.NewSelect().Model(&result).Exec(ctx, &result)
+	_, err := rf.db.Operator.Core.NewSelect().Model(&result).Where("type = ?", deployType).Exec(ctx, &result)
 	if err != nil {
 		return nil, err
 	}

@@ -43,6 +43,7 @@ type Deploy struct {
 	CostPerHour int64  `json:"cost_per_hour"`
 	ClusterID   string `json:"cluster_id"`
 	SecureLevel int    `json:"secure_level"` // 1-public, 2-private, 3-extension in future
+	Type        int    `json:"type"`         // 0-space, 1-inference, 2-finetune
 	times
 }
 
@@ -203,6 +204,23 @@ func (s *DeployTaskStore) ListDeployByUserID(ctx context.Context, repoType types
 		query = query.Where("space_id > 0")
 		query = query.Limit(1)
 	}
+	query = query.Limit(per).Offset((page - 1) * per)
+	_, err := query.Exec(ctx, &result)
+	if err != nil {
+		return nil, 0, err
+	}
+	total, err := query.Count(ctx)
+	if err != nil {
+		return nil, 0, err
+	}
+	return result, total, nil
+}
+
+func (s *DeployTaskStore) ListInstancesByUserID(ctx context.Context, userID int64, per, page int) ([]Deploy, int, error) {
+	var result []Deploy
+	query := s.db.Operator.Core.NewSelect().Model(&result).Where("user_id = ?", userID)
+	query = query.Where("type = ? and status != ?", types.FinetuneType, common.Deleted)
+	query = query.Order("id desc")
 	query = query.Limit(per).Offset((page - 1) * per)
 	_, err := query.Exec(ctx, &result)
 	if err != nil {

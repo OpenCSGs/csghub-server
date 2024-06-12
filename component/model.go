@@ -601,7 +601,7 @@ func (c *ModelComponent) Predict(ctx context.Context, req *types.ModelPredictReq
 }
 
 // create model deploy as inference
-func (c *ModelComponent) Deploy(ctx context.Context, namespace, name, currentUser string, req types.ModelRunReq) (int64, error) {
+func (c *ModelComponent) Deploy(ctx context.Context, namespace, name, currentUser string, req types.ModelRunReq, deployType int) (int64, error) {
 	m, err := c.ms.FindByPath(ctx, namespace, name)
 	if err != nil {
 		slog.Error("can't find model", slog.Any("error", err), slog.String("namespace", namespace), slog.String("name", name))
@@ -672,6 +672,7 @@ func (c *ModelComponent) Deploy(ctx context.Context, namespace, name, currentUse
 		CostPerHour:      req.CostPerHour,
 		ClusterID:        req.ClusterID,
 		SecureLevel:      req.SecureLevel,
+		Type:             deployType,
 	})
 }
 

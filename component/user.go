@@ -584,6 +584,48 @@ func (c *UserComponent) ListDeploys(ctx context.Context, repoType types.Reposito
 			SecureLevel:      deploy.SecureLevel,
 			CreatedAt:        deploy.CreatedAt,
 			UpdatedAt:        deploy.UpdatedAt,
+			Type:             deploy.Type,
+		})
+	}
+	return resDeploys, total, nil
+}
+
+func (c *UserComponent) ListInstances(ctx context.Context, req *types.UserRepoReq) ([]types.DeployRepo, int, error) {
+	user, err := c.us.FindByUsername(ctx, req.CurrentUser)
+	if err != nil {
+		newError := fmt.Errorf("failed to check for the presence of the user:%s, error:%w", req.CurrentUser, err)
+		return nil, 0, newError
+	}
+	deploys, total, err := c.deploy.ListInstancesByUserID(ctx, user.ID, req.PageSize, req.Page)
+	if err != nil {
+		newError := fmt.Errorf("failed to get user instances error:%w", err)
+		return nil, 0, newError
+	}
+
+	var resDeploys []types.DeployRepo
+	for _, deploy := range deploys {
+		repoPath := strings.TrimPrefix(deploy.GitPath, "models_")
+		resDeploys = append(resDeploys, types.DeployRepo{
+			DeployID:         deploy.ID,
+			DeployName:       deploy.DeployName,
+			Path:             repoPath,
+			RepoID:           deploy.RepoID,
+			SvcName:          deploy.SvcName,
+			Status:           deployStatusCodeToString(deploy.Status),
+			Hardware:         deploy.Hardware,
+			Env:              deploy.Env,
+			RuntimeFramework: deploy.RuntimeFramework,
+			ImageID:          deploy.ImageID,
+			MinReplica:       deploy.MinReplica,
+			MaxReplica:       deploy.MaxReplica,
+			GitPath:          deploy.GitPath,
+			GitBranch:        deploy.GitBranch,
+			CostPerHour:      deploy.CostPerHour,
+			ClusterID:        deploy.ClusterID,
+			SecureLevel:      deploy.SecureLevel,
+			CreatedAt:        deploy.CreatedAt,
+			UpdatedAt:        deploy.UpdatedAt,
+			Type:             deploy.Type,
 		})
 	}
 	return resDeploys, total, nil

@@ -94,6 +94,8 @@ type DeployRepo struct {
 	Instances        []Instance `json:"instances,omitempty"`
 	InstanceName     string     `json:"instance_name,omitempty"`
 	Private          bool       `json:"private"`
+	Type             int        `json:"type,omitempty"`
+	ProxyEndpoint    string     `json:"proxy_endpoint,omitempty"`
 }
 
 type RuntimeFrameworkReq struct {
@@ -103,6 +105,7 @@ type RuntimeFrameworkReq struct {
 	FrameCpuImage string `json:"frame_cpu_image"`
 	Enabled       int64  `json:"enabled"`
 	ContainerPort int    `json:"container_port"`
+	Type          int    `json:"type"`
 }
 
 type RuntimeFramework struct {
@@ -113,4 +116,5 @@ type RuntimeFramework struct {
 	FrameCpuImage string `json:"frame_cpu_image"`
 	Enabled       int64  `json:"enabled"`
 	ContainerPort int    `json:"container_port"`
+	Type          int    `json:"type"`
 }

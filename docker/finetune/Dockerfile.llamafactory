@@ -7,9 +7,6 @@ ENV GRADIO_ROOT_PATH=/proxy/7860/
 ENV TZ=Asia/Shanghai
 ENV NCCL_IB_DISABLE=1 NCCL_P2P_DISABLE=1
 
-# Create a working directory
-WORKDIR /workspace/
-
 # Build with some basic utilities
 RUN apt-get update && apt-get install -y \
     python3-pip apt-utils \
@@ -26,17 +23,24 @@ RUN pip config set global.index-url https://pypi.tuna.tsinghua.edu.cn/simple
 #RUN pip install torch==2.1.2 torchvision==0.16.2 torchaudio==2.1.2 --index-url https://download.pytorch.org/whl/cu121
 RUN pip install jupyterlab numpy \
     torch==2.1.2 torchvision==0.16.2 torchaudio==2.1.2 \
-    jupyter-server-proxy \
-    llamafactory[metrics]==0.7.1
+    jupyter-server-proxy 
+# Create a working directory
+WORKDIR /etc/csghub
+RUN git clone --depth 1 https://github.com/hiyouga/LLaMA-Factory.git
+RUN cd LLaMA-Factory && pip install -e ".[metrics]"
 # setup supervisord
 RUN mkdir -p /var/log/supervisord
 COPY script/supervisord.conf /etc/supervisor/conf.d/supervisord.conf
 COPY script/jupyter_notebook_config.py /root/.jupyter/jupyter_notebook_config.py
+COPY script/ /etc/csghub/
+RUN chmod +x /etc/csghub/*.sh
 #use dark mode
 RUN mkdir -p /root/.jupyter/lab/user-settings/@jupyterlab/apputils-extension && \
 	    echo '{"theme":"JupyterLab Dark"}' > /root/.jupyter/lab/user-settings/@jupyterlab/apputils-extension/themes.jupyterlab-settings && \
 	    mkdir -p /root/.jupyter/lab/user-settings/@jupyterlab/notebook-extension && \
 	    echo '{"codeCellConfig":{"lineNumbers":true }}' >   /root/.jupyter/lab/user-settings/@jupyterlab/notebook-extension/tracker.jupyterlab-settings
 
+# Create a working directory
+WORKDIR /workspace/
 ENTRYPOINT ["/usr/bin/supervisord", "-c", "/etc/supervisor/conf.d/supervisord.conf"]
 EXPOSE 8000

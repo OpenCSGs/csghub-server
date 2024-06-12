@@ -17,12 +17,12 @@ docker push xxx
 ## latest images
 ```
 #for llama-factory image
-opencsg-registry.cn-beijing.cr.aliyuncs.com/public/llama-factory:1.0-cuda12.1-devel-ubuntu22.04-py310-torch2.1.2
+opencsg-registry.cn-beijing.cr.aliyuncs.com/public/llama-factory:1.2-cuda12.1-devel-ubuntu22.04-py310-torch2.1.2
 ```
 ## Run image locally
 ```
 
-docker run -d -e ACCESS_TOKEN=xxx -e REPO_ID="OpenCSG/csg-wukong-1B"  -e HF_ENDPOINT=https://hub.opencsg.com/hf  opencsg-registry.cn-beijing.cr.aliyuncs.com/public/llama-factory:1.0-cuda12.1-devel-ubuntu22.04-py310-torch2.1.2
+docker run -d -e ACCESS_TOKEN=xxx -e REPO_ID="OpenCSG/csg-wukong-1B"  -e HF_ENDPOINT=https://hub.opencsg.com/hf  opencsg-registry.cn-beijing.cr.aliyuncs.com/public/llama-factory:1.2-cuda12.1-devel-ubuntu22.04-py310-torch2.1.2
 
 ```
 Note: HF_ENDPOINT should be use the real csghub address

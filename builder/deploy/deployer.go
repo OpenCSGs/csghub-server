@@ -132,6 +132,7 @@ func (d *deployer) dedicatedDeploy(ctx context.Context, dr types.DeployRepo) (*d
 		ClusterID:        dr.ClusterID,
 		SecureLevel:      dr.SecureLevel,
 		SvcName:          uniqueSvcName,
+		Type:             dr.Type,
 	}
 	err := d.store.CreateDeploy(ctx, deploy)
 	return deploy, err
