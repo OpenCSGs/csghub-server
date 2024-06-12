@@ -3305,6 +3305,75 @@ const docTemplate = `{
                 }
             }
         },
+        "/runtime_framework/{id}/models": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "description": "get visible models by runtime framework for current user",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "RuntimeFramework"
+                ],
+                "summary": "Get Visible models by runtime framework for current user",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "runtime framework id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "current user",
+                        "name": "current_user",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "default": 20,
+                        "description": "per",
+                        "name": "per",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "default": 1,
+                        "description": "per page",
+                        "name": "page",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/types.Response"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            }
+        },
         "/space_resources": {
             "get": {
                 "security": [
@@ -9007,6 +9076,9 @@ const docTemplate = `{
                 "source_url": {
                     "description": "mirror source info",
                     "type": "string"
+                },
+                "sync_lfs": {
+                    "type": "boolean"
                 }
             }
         },

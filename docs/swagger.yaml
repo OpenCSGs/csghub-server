@@ -595,6 +595,8 @@ definitions:
       source_url:
         description: mirror source info
         type: string
+      sync_lfs:
+        type: boolean
     required:
     - mirror_source_id
     - repo_type
@@ -4988,6 +4990,51 @@ paths:
       summary: update user membership
       tags:
       - Member
+  /runtime_framework/{id}/models:
+    get:
+      consumes:
+      - application/json
+      description: get visible models by runtime framework for current user
+      parameters:
+      - description: runtime framework id
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: current user
+        in: query
+        name: current_user
+        type: string
+      - default: 20
+        description: per
+        in: query
+        name: per
+        type: integer
+      - default: 1
+        description: per page
+        in: query
+        name: page
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/types.Response'
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Get Visible models by runtime framework for current user
+      tags:
+      - RuntimeFramework
   /space_resources:
     get:
       consumes:

@@ -1078,6 +1078,9 @@ func (c *RepoComponent) CreateMirror(ctx context.Context, req types.CreateMirror
 	if err != nil {
 		return nil, fmt.Errorf("failed to find repo, error: %w", err)
 	}
+	if repo == nil {
+		return nil, fmt.Errorf("repo not found")
+	}
 	exists, err := c.mirror.IsExist(ctx, repo.ID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find mirror, error: %w", err)
