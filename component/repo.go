@@ -873,6 +873,7 @@ func (c *RepoComponent) SDKDownloadFile(ctx context.Context, req *types.GetFileR
 	}
 }
 
+// UpdateDownloads increase clone download count for repo by given count
 func (c *RepoComponent) UpdateDownloads(ctx context.Context, req *types.UpdateDownloadsReq) error {
 	repo, err := c.repo.FindByPath(ctx, req.RepoType, req.Namespace, req.Name)
 	if err != nil {
@@ -882,6 +883,20 @@ func (c *RepoComponent) UpdateDownloads(ctx context.Context, req *types.UpdateDo
 	err = c.repo.UpdateRepoCloneDownloads(ctx, repo, req.Date, req.CloneCount)
 	if err != nil {
 		return fmt.Errorf("failed to update %s download count, error: %w", req.RepoType, err)
+	}
+	return err
+}
+
+// IncrDownloads increase the click download count for repo by 1
+func (c *RepoComponent) IncrDownloads(ctx context.Context, repoType types.RepositoryType, namespace, name string) error {
+	repo, err := c.repo.FindByPath(ctx, repoType, namespace, name)
+	if err != nil {
+		return fmt.Errorf("failed to find %s, error: %w", repoType, err)
+	}
+
+	err = c.repo.UpdateRepoFileDownloads(ctx, repo, time.Now(), 1)
+	if err != nil {
+		return fmt.Errorf("failed to incr download count, error: %w", err)
 	}
 	return err
 }
