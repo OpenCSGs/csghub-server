@@ -598,6 +598,39 @@ func (h *RepoHandler) UpdateDownloads(ctx *gin.Context) {
 	httpbase.OK(ctx, nil)
 }
 
+// IncrDownloads godoc
+// @Security     ApiKey
+// @Summary      Increase repo download count by 1
+// @Tags         Repository
+// @Accept       json
+// @Produce      json
+// @Param		 repo_type path string true "models,dataset,codes or spaces" Enums(models,datasets,codes,spaces)
+// @Param		namespace path string true "repo owner name"
+// @Param		name path string true "repo name"
+// @Success      200  {object}  types.Response "OK"
+// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
+// @Router       /{repo_type}/{namespace}/{name}/incr_downloads [put]
+func (h *RepoHandler) IncrDownloads(ctx *gin.Context) {
+	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
+	if err != nil {
+		slog.Error("Bad request format", "error", err)
+		httpbase.BadRequest(ctx, err.Error())
+		return
+	}
+
+	repoType := common.RepoTypeFromContext(ctx)
+
+	err = h.c.IncrDownloads(ctx, repoType, namespace, name)
+	if err != nil {
+		slog.Error("Failed to increase repo download count", slog.String("repo_type", string(repoType)), slog.Any("error", err), slog.String("namespace", namespace), slog.String("name", name))
+		httpbase.ServerError(ctx, err)
+		return
+	}
+	slog.Info("increase repo download count succeed", slog.String("repo_type", string(repoType)), slog.String("namespace", namespace), slog.String("name", name))
+	httpbase.OK(ctx, nil)
+}
+
 func (h *RepoHandler) UploadFile(ctx *gin.Context) {
 	userName := httpbase.GetCurrentUser(ctx)
 	if userName == "" {
