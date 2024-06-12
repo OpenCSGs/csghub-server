@@ -1,6 +1,10 @@
 package database
 
-import "time"
+import (
+	"time"
+
+	"opencsg.com/csghub-server/common/types"
+)
 
 type Space struct {
 	ID           int64       `bun:",pk,autoincrement" json:"id"`
@@ -56,4 +60,14 @@ type Event struct {
 	ClientIP  string    `bun:"," json:"client_ip"`
 	CreatedAt time.Time `bun:"created_at,notnull,default:current_timestamp" json:"created_at"`
 	Extension string    `bun:"," json:"extension"`
+}
+
+/* tables for on-premises repo synchronization */
+type SyncVersion struct {
+	Version        int64                `bun:",pk,autoincrement" json:"version"`
+	Source         int                  `bun:",notnull" json:"source"`
+	RepoPath       string               `bun:",notnull" json:"repo_path"`
+	RepoType       types.RepositoryType `bun:",notnull" json:"repo_type"`
+	LastModifiedAt time.Time            `bun:",notnull" json:"last_modified_at"`
+	ChangeLog      string               `bun:"," json:"change_log"`
 }

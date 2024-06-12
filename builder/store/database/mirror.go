@@ -180,3 +180,16 @@ func (s *MirrorStore) Unfinished(ctx context.Context) ([]Mirror, error) {
 	}
 	return mirrors, nil
 }
+
+func (s *MirrorStore) Finished(ctx context.Context) ([]Mirror, error) {
+	var mirrors []Mirror
+	err := s.db.Operator.Core.NewSelect().
+		Model(&mirrors).
+		Relation("Repository").
+		Where("status = ?", MirrorFinished).
+		Scan(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return mirrors, nil
+}
