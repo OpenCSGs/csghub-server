@@ -57,15 +57,12 @@ type Mirror struct {
 }
 
 func (s *MirrorStore) IsExist(ctx context.Context, repoID int64) (exists bool, err error) {
-	var mirror *Mirror
+	var mirror Mirror
 	exists, err = s.db.Operator.Core.
 		NewSelect().
-		Model(mirror).
+		Model(&mirror).
 		Where("repository_id=?", repoID).
 		Exists(ctx)
-	if err != nil {
-		return
-	}
 	return
 }
 

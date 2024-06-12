@@ -595,6 +595,8 @@ definitions:
       source_url:
         description: mirror source info
         type: string
+      sync_lfs:
+        type: boolean
     required:
     - mirror_source_id
     - repo_type

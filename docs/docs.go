@@ -9144,6 +9144,9 @@ const docTemplate = `{
                 "source_url": {
                     "description": "mirror source info",
                     "type": "string"
+                },
+                "sync_lfs": {
+                    "type": "boolean"
                 }
             }
         },

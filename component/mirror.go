@@ -220,6 +220,7 @@ func (c *MirrorComponent) CreateMirrorRepo(ctx context.Context, req types.Create
 		// Username:    req.SourceNamespace,
 		// AccessToken: mirror.AccessToken,
 		Private: false,
+		SyncLfs: req.SyncLfs,
 	})
 
 	if err != nil {
