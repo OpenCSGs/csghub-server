@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
-	"path"
 	"strconv"
 	"strings"
 	"time"
@@ -268,7 +267,7 @@ func (t *DeployRunner) makeDeployRequest() (*imagerunner.RunRequest, error) {
 
 	if deploy.Type == types.FinetuneType {
 		envMap["port"] = strconv.Itoa(deploy.ContainerPort)
-		envMap["HF_ENDPOINT"] = path.Join(t.modelDownloadEndpoint, "/hf")
+		envMap["HF_ENDPOINT"] = t.modelDownloadEndpoint + "/hf"
 		envMap["HF_TOKEN"] = token.Token
 	}
 
@@ -296,6 +295,7 @@ func (t *DeployRunner) makeDeployRequest() (*imagerunner.RunRequest, error) {
 		Accesstoken: token.Token,
 		ClusterID:   deploy.ClusterID,
 		SvcName:     deploy.SvcName,
+		DeployType:  deploy.Type,
 	}, nil
 }
 

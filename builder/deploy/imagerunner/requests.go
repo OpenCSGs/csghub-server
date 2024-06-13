@@ -31,6 +31,7 @@ type (
 		Accesstoken      string `json:"access_token"`
 		ClusterID        string `json:"cluster_id"`
 		SvcName          string `json:"svc_name"`
+		DeployType       int    `json:"deploy_type"`
 	}
 
 	RunResponse struct {
