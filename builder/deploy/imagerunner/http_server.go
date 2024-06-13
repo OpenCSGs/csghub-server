@@ -134,6 +134,11 @@ func (s *HttpServer) runService(c *gin.Context) {
 		}
 	}
 
+	// fix no gpu request case
+	if hardware.Gpu.ResourceName == "" || hardware.Gpu.Num == "" {
+		environments = append(environments, corev1.EnvVar{Name: "NVIDIA_VISIBLE_DEVICES", Value: "none"})
+	}
+
 	if appPort == 0 {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "app export port is not defined"})
 		return
