@@ -4,11 +4,18 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"time"
 
 	"github.com/spf13/cobra"
+	"opencsg.com/csghub-server/builder/store/cache"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/component"
+)
+
+const (
+	resourceName   = "check-mirror-progress"
+	expirationTime = 1 * time.Hour
 )
 
 var resync bool
@@ -46,16 +53,35 @@ var checkMirrorProgress = &cobra.Command{
 			slog.Error("config not found in context")
 			return
 		}
+		locker, err := cache.NewCache(ctx, cache.RedisConfig{
+			Addr:     config.Redis.Endpoint,
+			Username: config.Redis.User,
+			Password: config.Redis.Password,
+		})
 
-		c, err := component.NewMirrorComponent(config)
 		if err != nil {
-			slog.Error("failed to create mirror component", "err", err)
+			slog.Error("failed to initialize redis", "err", err)
 			return
 		}
-		err = c.CheckMirrorProgress(ctx)
+
+		err = locker.RunWhileLocked(ctx, resourceName, expirationTime, func() error {
+			c, err := component.NewMirrorComponent(config)
+			if err != nil {
+				slog.Error("failed to create mirror component", "err", err)
+				return err
+			}
+
+			err = c.CheckMirrorProgress(ctx)
+			if err != nil {
+				slog.Error("failed to check mirror progress", "err", err)
+				return err
+			}
+			return nil
+		})
 		if err != nil {
-			slog.Error("failed to check mirror progess", "err", err)
+			slog.Error("failed to check mirror progress", "err", err)
 			return
 		}
+
 	},
 }
