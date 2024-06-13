@@ -25,6 +25,7 @@ import (
 	"opencsg.com/csghub-server/builder/store/s3"
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/types"
+	"opencsg.com/csghub-server/common/utils/common"
 )
 
 const ErrNotFoundMessage = "The target couldn't be found."
@@ -53,6 +54,7 @@ type RepoComponent struct {
 	rtfm             *database.RuntimeFrameworksStore
 	rrtfms           *database.RepositoriesRuntimeFrameworkStore
 	needPurge        bool
+	config           *config.Config
 }
 
 func NewRepoComponent(config *config.Config) (*RepoComponent, error) {
@@ -108,6 +110,7 @@ func NewRepoComponent(config *config.Config) (*RepoComponent, error) {
 	if config.Space.StorageClass != "" {
 		c.needPurge = true
 	}
+	c.config = config
 	return c, nil
 }
 
@@ -1083,7 +1086,10 @@ func (c *RepoComponent) GetCommitWithDiff(ctx context.Context, req *types.GetCom
 }
 
 func (c *RepoComponent) CreateMirror(ctx context.Context, req types.CreateMirrorReq) (*database.Mirror, error) {
-	var mirror database.Mirror
+	var (
+		mirror database.Mirror
+		taskId int64
+	)
 	admin, err := c.checkCurrentUserPermission(ctx, req.CurrentUser, req.Namespace, membership.RoleAdmin)
 	if err != nil {
 		return nil, fmt.Errorf("failed to check permission to create mirror, error: %w", err)
@@ -1121,22 +1127,37 @@ func (c *RepoComponent) CreateMirror(ctx context.Context, req types.CreateMirror
 	mirror.Username = req.Username
 	mirror.PushUrl = repo.HTTPCloneURL
 	mirror.AccessToken = req.AccessToken
-	mirror.PushUsername = req.CurrentUser
-	mirror.PushAccessToken = pushAccessToken.Token
 	mirror.SourceRepoPath = req.SourceRepoPath
 	mirror.LocalRepoPath = fmt.Sprintf("%s_%s_%s_%s", mirrorSource.SourceName, req.RepoType, req.Namespace, req.Name)
 	mirror.RepositoryID = repo.ID
 
-	taskId, err := c.mirrorServer.CreateMirrorRepo(ctx, mirrorserver.CreateMirrorRepoReq{
-		Namespace:   "root",
-		Name:        mirror.LocalRepoPath,
-		CloneUrl:    mirror.SourceUrl,
-		Username:    mirror.Username,
-		AccessToken: mirror.AccessToken,
-		Private:     false,
-	})
-	if err != nil {
-		return nil, fmt.Errorf("failed to create pull mirror in mirror server: %v", err)
+	if c.config.Saas {
+		mirror.PushUsername = req.CurrentUser
+		mirror.PushAccessToken = pushAccessToken.Token
+		taskId, err = c.mirrorServer.CreateMirrorRepo(ctx, mirrorserver.CreateMirrorRepoReq{
+			Namespace:   "root",
+			Name:        mirror.LocalRepoPath,
+			CloneUrl:    mirror.SourceUrl,
+			Username:    mirror.Username,
+			AccessToken: mirror.AccessToken,
+			Private:     false,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("failed to create pull mirror in mirror server: %v", err)
+		}
+	} else {
+		taskId, err = c.git.CreateMirrorRepo(ctx, gitserver.CreateMirrorRepoReq{
+			Namespace:   req.Namespace,
+			Name:        req.Name,
+			CloneUrl:    mirror.SourceUrl,
+			Username:    mirror.Username,
+			AccessToken: mirror.AccessToken,
+			RepoType:    req.RepoType,
+			Private:     false,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("failed to create pull mirror in mirror server: %v", err)
+		}
 	}
 
 	mirror.MirrorTaskID = taskId
@@ -1147,6 +1168,94 @@ func (c *RepoComponent) CreateMirror(ctx context.Context, req types.CreateMirror
 	}
 
 	return reqMirror, nil
+}
+
+func (c *RepoComponent) MirrorFromSaas(ctx context.Context, namespace, name, currentUser string, repoType types.RepositoryType) error {
+	var mirror database.Mirror
+	admin, err := c.checkCurrentUserPermission(ctx, currentUser, namespace, membership.RoleAdmin)
+	if err != nil {
+		return fmt.Errorf("failed to check permission to create mirror, error: %w", err)
+	}
+
+	if !admin {
+		return fmt.Errorf("users do not have permission to create mirror for this repo")
+	}
+
+	repo, err := c.repo.FindByPath(ctx, repoType, namespace, name)
+	if err != nil {
+		return fmt.Errorf("failed to find repo, error: %w", err)
+	}
+	if repo == nil {
+		return fmt.Errorf("repo not found")
+	}
+	exists, err := c.mirror.IsExist(ctx, repo.ID)
+	if err != nil {
+		return fmt.Errorf("failed to find mirror, error: %w", err)
+	}
+	if exists {
+		return fmt.Errorf("mirror already exists")
+	}
+	mirrorSource, err := c.mirrorSource.FindByName(ctx, "OpenCSG")
+	if err != nil {
+		return fmt.Errorf("failed to get mirror source, err: %w, name: %s", err, "OpenCSG")
+	}
+
+	sourceUrl := common.BuildCloneURL(c.config.Frontend.URL, string(repoType), common.RemoveOpencsgPrefix(namespace), name)
+	mirror.SourceUrl = sourceUrl
+	mirror.MirrorSourceID = mirrorSource.ID
+	mirror.RepositoryID = repo.ID
+	mirror.Username = currentUser
+	mirror.AccessToken = c.config.Mirror.Token
+	mirror.SourceRepoPath = fmt.Sprintf("%s/%s", namespace, name)
+
+	taskId, err := c.git.CreateMirrorRepo(ctx, gitserver.CreateMirrorRepoReq{
+		Namespace:   namespace,
+		Name:        name,
+		CloneUrl:    mirror.SourceUrl,
+		Username:    mirror.Username,
+		AccessToken: mirror.AccessToken,
+		RepoType:    repoType,
+		Private:     false,
+	})
+	if err != nil {
+		return fmt.Errorf("failed to create pull mirror in mirror server: %v", err)
+	}
+
+	mirror.MirrorTaskID = taskId
+
+	_, err = c.mirror.Create(ctx, &mirror)
+	if err != nil {
+		return fmt.Errorf("failed to create mirror")
+	}
+	return nil
+}
+
+func (c *RepoComponent) MirrorFromSaasSync(ctx context.Context, namespace, name, currentUser string, repoType types.RepositoryType) error {
+	admin, err := c.checkCurrentUserPermission(ctx, currentUser, namespace, membership.RoleAdmin)
+	if err != nil {
+		return fmt.Errorf("failed to check permission to create mirror, error: %w", err)
+	}
+
+	if !admin {
+		return fmt.Errorf("users do not have permission to delete mirror for this repo")
+	}
+	repo, err := c.repo.FindByPath(ctx, repoType, namespace, name)
+	if err != nil {
+		return fmt.Errorf("failed to find repo, error: %w", err)
+	}
+	_, err = c.mirror.FindByRepoID(ctx, repo.ID)
+	if err != nil {
+		return fmt.Errorf("failed to find mirror, error: %w", err)
+	}
+	err = c.git.MirrorSync(ctx, gitserver.MirrorSyncReq{
+		Namespace: namespace,
+		Name:      name,
+		RepoType:  repoType,
+	})
+	if err != nil {
+		return fmt.Errorf("failed to sync mirror, error: %w", err)
+	}
+	return nil
 }
 
 func (c *RepoComponent) GetMirror(ctx context.Context, req types.GetMirrorReq) (*database.Mirror, error) {

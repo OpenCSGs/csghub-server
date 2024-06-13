@@ -3,7 +3,7 @@ package config
 import "github.com/kelseyhightower/envconfig"
 
 type Config struct {
-	Saas          bool   `envconfig:"STARHUB_SERVER_SAAS" default:"true"`
+	Saas          bool   `envconfig:"STARHUB_SERVER_SAAS" default:"false"`
 	InstanceID    string `envconfig:"STARHUB_SERVER_INSTANCE_ID"`
 	EnableSwagger bool   `envconfig:"STARHUB_SERVER_ENABLE_SWAGGER" default:"false"`
 	// enable if you want to acess csghub through https, especially for space rproxy
@@ -13,6 +13,10 @@ type Config struct {
 	APIServer struct {
 		Port         int    `envconfig:"STARHUB_SERVER_SERVER_PORT" default:"8080"`
 		PublicDomain string `envconfig:"STARHUB_SERVER_PUBLIC_DOMAIN" default:"localhost:8080"`
+	}
+
+	Mirror struct {
+		Token string `envconfig:"STARHUB_SERVER_MIRROR_Token" default:""`
 	}
 
 	DocsHost string `envconfig:"STARHUB_SERVER_SERVER_DOCS_HOST" default:"http://localhost:6636"`
@@ -54,7 +58,7 @@ type Config struct {
 	}
 
 	Frontend struct {
-		URL string `envconfig:"STARHUB_SERVER_FRONTEND_URL" default:"https://portal-stg.opencsg.com"`
+		URL string `envconfig:"STARHUB_SERVER_FRONTEND_URL" default:"https://opencsg.com"`
 	}
 
 	S3 struct {
@@ -105,7 +109,7 @@ type Config struct {
 
 	Model struct {
 		DeployTimeoutInMin int    `envconfig:"STARHUB_SERVER_MODEL_DEPLOY_TIMEOUT_IN_MINUTES" default:"30"`
-		DownloadEndpoint   string `envconfig:"STARHUB_SERVER_MODEL_DOWNLOAD_ENDPOINT" default:"https://hub-stg.opencsg.com/"`
+		DownloadEndpoint   string `envconfig:"STARHUB_SERVER_MODEL_DOWNLOAD_ENDPOINT" default:"https://hub-stg./"`
 		DockerRegBase      string `envconfig:"STARHUB_SERVER_MODEL_DOCKER_REG_BASE" default:"opencsg-registry.cn-beijing.cr.aliyuncs.com/public/"`
 	}
 

@@ -967,6 +967,58 @@ func (h *RepoHandler) CreateMirror(ctx *gin.Context) {
 	httpbase.OK(ctx, mirror)
 }
 
+func (h *RepoHandler) MirrorFromSaas(ctx *gin.Context) {
+	currentUser := httpbase.GetCurrentUser(ctx)
+	if currentUser == "" {
+		httpbase.UnauthorizedError(ctx, errors.New("user not found, please login first"))
+		return
+	}
+	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
+	if err != nil {
+		slog.Error("Bad request format", "error", err)
+		httpbase.BadRequest(ctx, err.Error())
+		return
+	}
+	repoType := common.RepoTypeFromContext(ctx)
+	if !strings.HasPrefix(namespace, types.OpenCSGPrefix) {
+		httpbase.BadRequest(ctx, "Repo could not be mirrored")
+		return
+	}
+	err = h.c.MirrorFromSaas(ctx, namespace, name, currentUser, repoType)
+	if err != nil {
+		slog.Error("Failed to create mirror for", slog.String("repo_type", string(repoType)), slog.String("path", fmt.Sprintf("%s/%s", namespace, name)), "error", err)
+		httpbase.ServerError(ctx, err)
+		return
+	}
+	httpbase.OK(ctx, nil)
+}
+
+func (h *RepoHandler) MirrorFromSaasSync(ctx *gin.Context) {
+	currentUser := httpbase.GetCurrentUser(ctx)
+	if currentUser == "" {
+		httpbase.UnauthorizedError(ctx, errors.New("user not found, please login first"))
+		return
+	}
+	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
+	if err != nil {
+		slog.Error("Bad request format", "error", err)
+		httpbase.BadRequest(ctx, err.Error())
+		return
+	}
+	repoType := common.RepoTypeFromContext(ctx)
+	if !strings.HasPrefix(namespace, types.OpenCSGPrefix) {
+		httpbase.BadRequest(ctx, "Repo could not be mirrored")
+		return
+	}
+	err = h.c.MirrorFromSaasSync(ctx, namespace, name, currentUser, repoType)
+	if err != nil {
+		slog.Error("Failed to sync mirror for", slog.String("repo_type", string(repoType)), slog.String("path", fmt.Sprintf("%s/%s", namespace, name)), "error", err)
+		httpbase.ServerError(ctx, err)
+		return
+	}
+	httpbase.OK(ctx, nil)
+}
+
 // GetMirror godoc
 // @Security     ApiKey
 // @Summary      Get a mirror

@@ -110,11 +110,13 @@ type CreateMirrorRepoReq struct {
 	Private     bool   `json:"private"`
 	Description string `json:"description"`
 	Interval    string `json:"interval"`
+	RepoType    types.RepositoryType
 }
 
 type MirrorSyncReq struct {
 	Namespace string `json:"namespace"`
 	Name      string `json:"name"`
+	RepoType  types.RepositoryType
 }
 
 type MirrorTaskInfo struct {
