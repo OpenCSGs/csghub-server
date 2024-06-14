@@ -83,6 +83,9 @@ read_and_set_cron() {
     fi
 }
 
+# Clear all cron jobs before creating new jobs
+crontab -r
+
 echo "Creating cron job for gitea logscan..."
 read_and_set_cron "STARHUB_SERVER_CRON_LOGSCAN" "0 23 * * *"
 (crontab -l ;echo "$cron STARHUB_DATABASE_DSN=$STARHUB_DATABASE_DSN /starhub-bin/starhub logscan gitea --path /starhub-bin/logs/gitea.log >> /starhub-bin/cron.log 2>&1") | crontab -
