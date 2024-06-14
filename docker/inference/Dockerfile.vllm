@@ -4,8 +4,8 @@ RUN pip install git+https://git-devops.opencsg.com/csg-hub-sdk/csghub-sdk
 COPY ./vllm/entry.py entry.py
 COPY ./vllm/serve.sh serve.sh
 
-RUN mkdir -p /data
-ENV HUGGINGFACE_HUB_CACHE=/data \
+WORKDIR /workspace/
+ENV HUGGINGFACE_HUB_CACHE=/workspace \
     HF_HUB_ENABLE_HF_TRANSFER=0
 
 EXPOSE 8000

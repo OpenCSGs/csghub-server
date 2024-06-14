@@ -52,6 +52,7 @@ type RepoComponent struct {
 	tokenStore       *database.AccessTokenStore
 	rtfm             *database.RuntimeFrameworksStore
 	rrtfms           *database.RepositoriesRuntimeFrameworkStore
+	needPurge        bool
 }
 
 func NewRepoComponent(config *config.Config) (*RepoComponent, error) {
@@ -104,6 +105,9 @@ func NewRepoComponent(config *config.Config) (*RepoComponent, error) {
 	c.cluster = database.NewClusterInfoStore()
 	c.rtfm = database.NewRuntimeFrameworksStore()
 	c.rrtfms = database.NewRepositoriesRuntimeFramework()
+	if config.Space.StorageClass != "" {
+		c.needPurge = true
+	}
 	return c, nil
 }
 
@@ -1402,11 +1406,13 @@ func (c *RepoComponent) DeleteDeploy(ctx context.Context, repoType types.Reposit
 		Namespace: namespace,
 		Name:      name,
 		SvcName:   deploy.SvcName,
+		ClusterID: deploy.ClusterID,
 	}
-	err = c.deployer.Stop(ctx, deployRepo)
+	// purge service
+	err = c.deployer.Purge(ctx, deployRepo)
 	if err != nil {
-		// fail to stop deploy instance, maybe service is gone
-		slog.Warn("Stop deploy instance", slog.Any("error", err))
+		// fail to purge deploy instance, maybe service is gone
+		slog.Warn("purge deploy instance", slog.Any("error", err))
 	}
 
 	exist, err := c.deployer.Exist(ctx, deployRepo)
@@ -1459,6 +1465,7 @@ func (c *RepoComponent) DeployDetail(ctx context.Context, repoType types.Reposit
 		Namespace: namespace,
 		Name:      name,
 		SvcName:   deploy.SvcName,
+		ClusterID: deploy.ClusterID,
 	}
 	actualReplica, desiredReplica, instList, err := c.deployer.GetReplica(ctx, req)
 	if err != nil {
@@ -1634,6 +1641,7 @@ func (c *RepoComponent) DeployStop(ctx context.Context, repoType types.Repositor
 		Namespace: namespace,
 		Name:      name,
 		SvcName:   deploy.SvcName,
+		ClusterID: deploy.ClusterID,
 	}
 	err = c.deployer.Stop(ctx, deployRepo)
 	if err != nil {
@@ -1798,6 +1806,7 @@ func (c *RepoComponent) DeployUpdate(ctx context.Context, repoType types.Reposit
 		Namespace: namespace,
 		Name:      name,
 		SvcName:   deploy.SvcName,
+		ClusterID: deploy.ClusterID,
 	}
 	exist, err := c.deployer.Exist(ctx, deployRepo)
 	if err != nil {
@@ -1827,6 +1836,7 @@ func (c *RepoComponent) DeployStart(ctx context.Context, repoType types.Reposito
 		Namespace: namespace,
 		Name:      name,
 		SvcName:   deploy.SvcName,
+		ClusterID: deploy.ClusterID,
 	}
 	exist, err := c.deployer.Exist(ctx, deployRepo)
 	if err != nil {

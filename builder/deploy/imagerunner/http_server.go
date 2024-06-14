@@ -67,6 +67,7 @@ func (s *HttpServer) Run(port int) error {
 	router.PUT("/cluster", s.updateCluster)
 	router.GET("/:service/get", s.getServiceByName)
 	router.GET("/:service/replica", s.getReplica)
+	router.DELETE("/:service/purge", s.purgeService)
 
 	return router.Run(fmt.Sprintf(":%d", port))
 }
@@ -82,6 +83,7 @@ func (s *HttpServer) runService(c *gin.Context) {
 		MinReplica int               `json:"min_replica"`
 		MaxReplica int               `json:"max_replica"`
 		ClusterID  string            `json:"cluster_id"`
+		DeployType int               `json:"deploy_type"`
 	}
 
 	err := c.BindJSON(&request)
@@ -207,6 +209,32 @@ func (s *HttpServer) runService(c *gin.Context) {
 				},
 			},
 		},
+	}
+	// add pvc if possible
+	if s.env.Space.StorageClass != "" && request.DeployType != types.SpaceType {
+		err = s.NewPersistentVolumeClaim(srvName, c, *cluster, hardware)
+		if err != nil {
+			slog.Error("Failed to create persist volume", "error", err)
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create persist volume"})
+			return
+		}
+		service.Spec.Template.Spec.Volumes = []corev1.Volume{
+			{
+				Name: "nas-pvc",
+				VolumeSource: corev1.VolumeSource{
+					PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
+						ClaimName: srvName,
+					},
+				},
+			},
+		}
+
+		service.Spec.Template.Spec.Containers[0].VolumeMounts = []corev1.VolumeMount{
+			{
+				Name:      "nas-pvc",
+				MountPath: "/workspace",
+			},
+		}
 	}
 
 	slog.Debug("ksvc", slog.Any("knative service", service))
@@ -841,6 +869,61 @@ func (s *HttpServer) updateCluster(c *gin.Context) {
 	c.JSON(http.StatusOK, resp)
 }
 
+func (s *HttpServer) purgeService(c *gin.Context) {
+	var resp PurgeResponse
+	var request = &PurgeRequest{}
+	err := c.BindJSON(request)
+	if err != nil {
+		slog.Error("fail to parse input parameters", slog.Any("error", err))
+		resp.Code = -1
+		resp.Message = "fail to parse cluster id"
+		c.JSON(http.StatusBadRequest, resp)
+		return
+	}
+	cluster, err := s.clusterPool.GetClusterByID(c, request.ClusterID)
+	if err != nil {
+		slog.Error("fail to get cluster config", slog.Any("error", err))
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "fail to get cluster config"})
+		return
+	}
+	srvName := s.getServiceNameFromRequest(c)
+	_, err = cluster.KnativeClient.ServingV1().Services(s.k8sNameSpace).
+		Get(c.Request.Context(), srvName, metav1.GetOptions{})
+	if err != nil {
+		k8serr := new(k8serrors.StatusError)
+		if errors.As(err, &k8serr) {
+			if k8serr.Status().Code == http.StatusNotFound {
+				slog.Info("service not exist", slog.String("srv_name", srvName), slog.Any("k8s_err", k8serr))
+			}
+		}
+		slog.Error("purge service failed, cannot get service info", slog.String("srv_name", srvName), slog.Any("error", err),
+			slog.String("srv_name", srvName))
+	} else {
+		// 1 delete service
+		err = cluster.KnativeClient.ServingV1().Services(s.k8sNameSpace).Delete(c, srvName, *metav1.NewDeleteOptions(0))
+		if err != nil {
+			slog.Error("failed to delete service ", slog.String("srv_name", srvName), slog.Any("error", err),
+				slog.String("srv_name", srvName))
+			resp.Code = -1
+			resp.Message = "failed to get service status"
+			c.JSON(http.StatusInternalServerError, resp)
+			return
+		}
+	}
+
+	// 2 clean up pvc
+	err = cluster.Client.CoreV1().PersistentVolumeClaims(s.k8sNameSpace).Delete(c, srvName, metav1.DeleteOptions{})
+	if err != nil {
+		slog.Error("fail to delete pvc", slog.Any("error", err))
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "fail to delete pvc"})
+		return
+	}
+	slog.Info("service deleted, PVC deleted.", slog.String("srv_name", srvName))
+	resp.Code = 0
+	resp.Message = "succeed to clean up service"
+	c.JSON(http.StatusOK, resp)
+}
+
 func (s *HttpServer) getServiceInfo(c *gin.Context) {
 	var resp ServiceInfoResponse
 	var request = &ServiceRequest{}
@@ -945,4 +1028,42 @@ func GenerateResources(hardware types.HardWare) (map[corev1.ResourceName]resourc
 		resReq[corev1.ResourceName(hardware.Gpu.ResourceName)] = resource.MustParse(hardware.Gpu.Num)
 	}
 	return resReq, nodeSelector
+}
+
+// NewPersistentVolumeClaim creates a new k8s PVC with some default values set.
+func (s *HttpServer) NewPersistentVolumeClaim(name string, ctx context.Context, cluster cluster.Cluster, hardware types.HardWare) error {
+	// Check if it already exists
+	_, err := cluster.Client.CoreV1().PersistentVolumeClaims(s.k8sNameSpace).Get(ctx, name, metav1.GetOptions{})
+	if err == nil {
+		return nil
+	}
+
+	storageSize := hardware.EphemeralStorage
+	if storageSize == "" {
+		storageSize = "50Gi"
+	}
+
+	storage, err := resource.ParseQuantity(storageSize)
+	if err != nil {
+		return err
+	}
+	pvc := corev1.PersistentVolumeClaim{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: s.k8sNameSpace,
+		},
+		Spec: corev1.PersistentVolumeClaimSpec{
+			AccessModes: []corev1.PersistentVolumeAccessMode{
+				corev1.ReadWriteOnce,
+			},
+			Resources: corev1.VolumeResourceRequirements{
+				Requests: corev1.ResourceList{
+					corev1.ResourceStorage: storage,
+				},
+			},
+			StorageClassName: &s.env.Space.StorageClass,
+		},
+	}
+	_, err = cluster.Client.CoreV1().PersistentVolumeClaims(s.k8sNameSpace).Create(ctx, &pvc, metav1.CreateOptions{})
+	return err
 }
