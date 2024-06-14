@@ -26,6 +26,7 @@ type Deployer interface {
 	Status(ctx context.Context, dr types.DeployRepo, needDetails bool) (srvName string, status int, instances []types.Instance, err error)
 	Logs(ctx context.Context, dr types.DeployRepo) (*MultiLogReader, error)
 	Stop(ctx context.Context, dr types.DeployRepo) (err error)
+	Purge(ctx context.Context, dr types.DeployRepo) (err error)
 	Wakeup(ctx context.Context, dr types.DeployRepo) (err error)
 	Exist(ctx context.Context, dr types.DeployRepo) (bool, error)
 	GetReplica(ctx context.Context, dr types.DeployRepo) (int, int, []types.Instance, error)
@@ -270,10 +271,11 @@ func (d *deployer) Logs(ctx context.Context, dr types.DeployRepo) (*MultiLogRead
 		targetID = dr.DeployID // support model deploy with multi-instance
 	}
 	runLog, err := d.ir.Logs(ctx, &imagerunner.LogsRequest{
-		ID:       targetID,
-		OrgName:  dr.Namespace,
-		RepoName: dr.Name,
-		SvcName:  deploy.SvcName,
+		ID:        targetID,
+		OrgName:   dr.Namespace,
+		RepoName:  dr.Name,
+		SvcName:   deploy.SvcName,
+		ClusterID: dr.ClusterID,
 	})
 	if err != nil {
 		slog.Error("failed to read log from image runner", slog.Any("error", err))
@@ -289,10 +291,29 @@ func (d *deployer) Stop(ctx context.Context, dr types.DeployRepo) error {
 		targetID = dr.DeployID // support model deploy with multi-instance
 	}
 	resp, err := d.ir.Stop(ctx, &imagerunner.StopRequest{
-		ID:       targetID,
-		OrgName:  dr.Namespace,
-		RepoName: dr.Name,
-		SvcName:  dr.SvcName,
+		ID:        targetID,
+		OrgName:   dr.Namespace,
+		RepoName:  dr.Name,
+		SvcName:   dr.SvcName,
+		ClusterID: dr.ClusterID,
+	})
+	if err != nil {
+		slog.Error("deployer stop deploy", slog.Any("runner_resp", resp), slog.Int64("space_id", dr.SpaceID), slog.Any("deploy_id", dr.DeployID), slog.Any("error", err))
+	}
+	return err
+}
+
+func (d *deployer) Purge(ctx context.Context, dr types.DeployRepo) error {
+	targetID := dr.SpaceID // support space only one instance
+	if dr.SpaceID == 0 {
+		targetID = dr.DeployID // support model deploy with multi-instance
+	}
+	resp, err := d.ir.Purge(ctx, &imagerunner.PurgeRequest{
+		ID:        targetID,
+		OrgName:   dr.Namespace,
+		RepoName:  dr.Name,
+		SvcName:   dr.SvcName,
+		ClusterID: dr.ClusterID,
 	})
 	if err != nil {
 		slog.Error("deployer stop deploy", slog.Any("runner_resp", resp), slog.Int64("space_id", dr.SpaceID), slog.Any("deploy_id", dr.DeployID), slog.Any("error", err))
@@ -331,10 +352,11 @@ func (d *deployer) Exist(ctx context.Context, dr types.DeployRepo) (bool, error)
 		targetID = dr.DeployID // support model deploy with multi-instance
 	}
 	req := &imagerunner.CheckRequest{
-		ID:       targetID,
-		OrgName:  dr.Namespace,
-		RepoName: dr.Name,
-		SvcName:  dr.SvcName,
+		ID:        targetID,
+		OrgName:   dr.Namespace,
+		RepoName:  dr.Name,
+		SvcName:   dr.SvcName,
+		ClusterID: dr.ClusterID,
 	}
 	resp, err := d.ir.Exist(ctx, req)
 	if err != nil {

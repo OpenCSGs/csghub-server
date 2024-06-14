@@ -74,6 +74,10 @@ func (r *LocalRunner) Stop(ctx context.Context, req *StopRequest) (*StopResponse
 	return &StopResponse{}, nil
 }
 
+func (r *LocalRunner) Purge(ctx context.Context, req *PurgeRequest) (*PurgeResponse, error) {
+	return nil, nil
+}
+
 func (h *LocalRunner) ListCluster(ctx context.Context) ([]ClusterResponse, error) {
 	return nil, nil
 }

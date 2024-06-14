@@ -99,6 +99,8 @@ type Config struct {
 		DeployTimeoutInMin int    `envconfig:"STARHUB_SERVER_SPACE_DEPLOY_TIMEOUT_IN_MINUTES" default:"30"`
 		// gpu model label
 		GPUModelLabel string `envconfig:"STARHUB_SERVER_GPU_MODEL_LABEL" default:"aliyun.accelerator/nvidia_name"`
+		// Persist volume storage class
+		StorageClass string `envconfig:"STARHUB_SERVER_STORAGE_CLASS"`
 	}
 
 	Model struct {

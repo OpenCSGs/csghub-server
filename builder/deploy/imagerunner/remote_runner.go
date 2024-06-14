@@ -69,6 +69,24 @@ func (h *RemoteRunner) Stop(ctx context.Context, req *StopRequest) (*StopRespons
 	return &stopResponse, nil
 }
 
+func (h *RemoteRunner) Purge(ctx context.Context, req *PurgeRequest) (*PurgeResponse, error) {
+	// u := fmt.Sprintf("%s/%s/stop", h.remote, common.UniqueSpaceAppName(req.OrgName, req.RepoName, req.ID))
+	svcName := req.SvcName
+	u := fmt.Sprintf("%s/%s/purge", h.remote, svcName)
+	response, err := h.doRequest(http.MethodDelete, u, req)
+	if err != nil {
+		return nil, err
+	}
+	defer response.Body.Close()
+
+	var purgeResponse PurgeResponse
+	if err := json.NewDecoder(response.Body).Decode(&purgeResponse); err != nil {
+		return nil, err
+	}
+
+	return &purgeResponse, nil
+}
+
 func (h *RemoteRunner) Status(ctx context.Context, req *StatusRequest) (*StatusResponse, error) {
 	// u := fmt.Sprintf("%s/%s/status", h.remote, common.UniqueSpaceAppName(req.OrgName, req.RepoName, req.ID))
 	svcName := req.SvcName

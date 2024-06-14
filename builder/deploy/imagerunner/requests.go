@@ -157,4 +157,17 @@ type (
 		Enable    bool                              `json:"enable"`
 		Nodes     map[string]types.NodeResourceInfo `json:"nodes"`
 	}
+
+	PurgeRequest struct {
+		ID        int64  `json:"id"`
+		OrgName   string `json:"org_name"`
+		RepoName  string `json:"repo_name"`
+		ClusterID string `json:"cluster_id"`
+		SvcName   string `json:"svc_name"`
+	}
+
+	PurgeResponse struct {
+		Code    int    `json:"code"`
+		Message string `json:"message"`
+	}
 )

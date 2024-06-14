@@ -14,9 +14,9 @@ docker push xxx
 ## latest images
 ```
 #for vllm image
-opencsg-registry.cn-beijing.cr.aliyuncs.com/public/vllm-local:1.7
+opencsg-registry.cn-beijing.cr.aliyuncs.com/public/vllm-local:1.8
 #for vllm cpu only
-opencsg-registry.cn-beijing.cr.aliyuncs.com/public/vllm-cpu:1.7
+opencsg-registry.cn-beijing.cr.aliyuncs.com/public/vllm-cpu:1.8
 #for tgi image
 opencsg-registry.cn-beijing.cr.aliyuncs.com/public/tgi-local:1.6
 ```
