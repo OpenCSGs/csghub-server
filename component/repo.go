@@ -25,7 +25,6 @@ import (
 	"opencsg.com/csghub-server/builder/store/s3"
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/types"
-	"opencsg.com/csghub-server/common/utils/common"
 )
 
 const ErrNotFoundMessage = "The target couldn't be found."
@@ -54,6 +53,7 @@ type RepoComponent struct {
 	rtfm             *database.RuntimeFrameworksStore
 	rrtfms           *database.RepositoriesRuntimeFrameworkStore
 	needPurge        bool
+	syncVersion      *database.SyncVersionStore
 	config           *config.Config
 }
 
@@ -68,6 +68,7 @@ func NewRepoComponent(config *config.Config) (*RepoComponent, error) {
 	c.mirror = database.NewMirrorStore()
 	c.mirrorSource = database.NewMirrorSourceStore()
 	c.tokenStore = database.NewAccessTokenStore()
+	c.syncVersion = database.NewSyncVersionStore()
 	var err error
 	c.git, err = git.NewGitServer(config)
 	if err != nil {
@@ -1195,12 +1196,13 @@ func (c *RepoComponent) MirrorFromSaas(ctx context.Context, namespace, name, cur
 	if exists {
 		return fmt.Errorf("mirror already exists")
 	}
-	mirrorSource, err := c.mirrorSource.FindByName(ctx, "OpenCSG")
+	syncVersion, err := c.syncVersion.FindByPath(ctx, fmt.Sprintf("%s/%s", namespace, name))
 	if err != nil {
-		return fmt.Errorf("failed to get mirror source, err: %w, name: %s", err, "OpenCSG")
+		return fmt.Errorf("failed to find sync version, error: %w", err)
 	}
+	mirrorSource := syncVersion.MirrorSource
 
-	sourceUrl := common.BuildCloneURL(c.config.Frontend.URL, string(repoType), common.RemoveOpencsgPrefix(namespace), name)
+	sourceUrl := mirrorSource.BuildCloneURL(c.config.Frontend.URL, string(repoType), namespace, name)
 	mirror.SourceUrl = sourceUrl
 	mirror.MirrorSourceID = mirrorSource.ID
 	mirror.RepositoryID = repo.ID

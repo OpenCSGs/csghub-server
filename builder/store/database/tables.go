@@ -65,7 +65,8 @@ type Event struct {
 /* tables for on-premises repo synchronization */
 type SyncVersion struct {
 	Version        int64                `bun:",pk,autoincrement" json:"version"`
-	Source         int                  `bun:",notnull" json:"source"`
+	MirrorSourceID int64                `bun:",notnull" json:"mirror_source_id"`
+	MirrorSource   MirrorSource         `bun:"rel:belongs-to,join:mirror_source_id=id" json:"mirror_source"`
 	RepoPath       string               `bun:",notnull" json:"repo_path"`
 	RepoType       types.RepositoryType `bun:",notnull" json:"repo_type"`
 	LastModifiedAt time.Time            `bun:",notnull" json:"last_modified_at"`

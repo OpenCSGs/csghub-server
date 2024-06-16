@@ -10,11 +10,6 @@ type SyncVersionStore struct {
 
 type SyncVersionSource int
 
-const (
-	OpenCSGSource = iota
-	HFSource
-)
-
 func NewSyncVersionStore() *SyncVersionStore {
 	return &SyncVersionStore{
 		db: defaultDB,
@@ -29,4 +24,17 @@ func (s *SyncVersionStore) Create(ctx context.Context, version *SyncVersion) (er
 func (s *SyncVersionStore) BatchCreate(ctx context.Context, versions []SyncVersion) error {
 	result, err := s.db.Core.NewInsert().Model(&versions).Exec(ctx)
 	return assertAffectedXRows(int64(len(versions)), result, err)
+}
+
+func (s *SyncVersionStore) FindByPath(ctx context.Context, path string) (*SyncVersion, error) {
+	var syncVersion *SyncVersion
+	err := s.db.Core.NewSelect().
+		Model(syncVersion).
+		Relation("MirrorSource").
+		Where("repo_path = ?", path).
+		Scan(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return syncVersion, nil
 }

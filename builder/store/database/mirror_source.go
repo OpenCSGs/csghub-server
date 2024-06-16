@@ -1,6 +1,10 @@
 package database
 
-import "context"
+import (
+	"context"
+	"fmt"
+	"strings"
+)
 
 type MirrorSourceStore struct {
 	db *DB
@@ -82,4 +86,9 @@ func (s *MirrorSourceStore) Delete(ctx context.Context, mirrorSource *MirrorSour
 		WherePK().
 		Exec(ctx)
 	return
+}
+
+func (m *MirrorSource) BuildCloneURL(url, repoType, namespace, name string) string {
+	namespace, _ = strings.CutPrefix(namespace, m.SourceName)
+	return fmt.Sprintf("%s/%ss/%s/%s.git", url, repoType, namespace, name)
 }

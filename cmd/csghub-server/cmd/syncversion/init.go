@@ -74,7 +74,7 @@ var InitCmd = &cobra.Command{
 			}
 
 			versions = append(versions, database.SyncVersion{
-				Source:         database.HFSource,
+				MirrorSourceID: mirror.MirrorSourceID,
 				RepoPath:       repo.Path,
 				RepoType:       repo.RepositoryType,
 				LastModifiedAt: repo.UpdatedAt,
