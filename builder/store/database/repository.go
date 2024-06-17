@@ -177,6 +177,12 @@ func (s *RepoStore) FindByGitPaths(ctx context.Context, paths []string, opts ...
 	return repos, err
 }
 
+func (s *RepoStore) Exists(ctx context.Context, repoType types.RepositoryType, namespace string, name string) (bool, error) {
+	return s.db.Operator.Core.NewSelect().Model((*Repository)(nil)).
+		Where("git_path =?", fmt.Sprintf("%ss_%s/%s", repoType, namespace, name)).
+		Exists(ctx)
+}
+
 func (s *RepoStore) All(ctx context.Context) ([]*Repository, error) {
 	repos := make([]*Repository, 0)
 	err := s.db.Operator.Core.

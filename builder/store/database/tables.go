@@ -65,10 +65,14 @@ type Event struct {
 /* tables for on-premises repo synchronization */
 type SyncVersion struct {
 	Version        int64                `bun:",pk,autoincrement" json:"version"`
-	MirrorSourceID int64                `bun:",notnull" json:"mirror_source_id"`
-	MirrorSource   MirrorSource         `bun:"rel:belongs-to,join:mirror_source_id=id" json:"mirror_source"`
+	SourceID       int64                `bun:",notnull" json:"source_id"`
 	RepoPath       string               `bun:",notnull" json:"repo_path"`
 	RepoType       types.RepositoryType `bun:",notnull" json:"repo_type"`
 	LastModifiedAt time.Time            `bun:",notnull" json:"last_modified_at"`
 	ChangeLog      string               `bun:"," json:"change_log"`
 }
+
+const (
+	SyncVersionSourceOpenCSG = iota
+	SyncVersionSourceHF
+)

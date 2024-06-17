@@ -88,7 +88,7 @@ func (s *MirrorSourceStore) Delete(ctx context.Context, mirrorSource *MirrorSour
 	return
 }
 
-func (m *MirrorSource) BuildCloneURL(url, repoType, namespace, name string) string {
+func (m MirrorSource) BuildCloneURL(url, repoType, namespace, name string) string {
 	namespace, _ = strings.CutPrefix(namespace, m.SourceName)
 	return fmt.Sprintf("%s/%ss/%s/%s.git", url, repoType, namespace, name)
 }

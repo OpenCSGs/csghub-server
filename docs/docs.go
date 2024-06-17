@@ -4816,6 +4816,70 @@ const docTemplate = `{
                 }
             }
         },
+        "/sync/version/latest": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Sync"
+                ],
+                "summary": "Get latest version",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "current version",
+                        "name": "cur",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "current_user",
+                        "name": "current_user",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/types.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/types.SyncVersionResponse"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            }
+        },
         "/tags": {
             "get": {
                 "security": [
@@ -10474,6 +10538,44 @@ const docTemplate = `{
                 },
                 "version": {
                     "type": "string"
+                }
+            }
+        },
+        "types.SyncVersion": {
+            "type": "object",
+            "properties": {
+                "change_log": {
+                    "type": "string"
+                },
+                "last_modify_time": {
+                    "type": "string"
+                },
+                "repo_path": {
+                    "type": "string"
+                },
+                "repo_type": {
+                    "$ref": "#/definitions/types.RepositoryType"
+                },
+                "source_id": {
+                    "description": "0: opencsg, 1: HF",
+                    "type": "integer"
+                },
+                "version": {
+                    "type": "integer"
+                }
+            }
+        },
+        "types.SyncVersionResponse": {
+            "type": "object",
+            "properties": {
+                "has_more": {
+                    "type": "boolean"
+                },
+                "versions": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/types.SyncVersion"
+                    }
                 }
             }
         },

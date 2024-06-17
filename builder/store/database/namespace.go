@@ -36,13 +36,9 @@ func (s *NamespaceStore) FindByPath(ctx context.Context, path string) (namespace
 
 func (s *NamespaceStore) Exists(ctx context.Context, path string) (exists bool, err error) {
 	var namespace Namespace
-	exists, err = s.db.Operator.Core.
+	return s.db.Operator.Core.
 		NewSelect().
 		Model(&namespace).
 		Where("path =?", path).
 		Exists(ctx)
-	if err != nil {
-		return
-	}
-	return
 }

@@ -495,6 +495,12 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 	{
 		runtimeFramework.GET("/:id/models", modelHandler.ListByRuntimeFrameworkID)
 	}
+	syncHandler, err := handler.NewSyncHandler(config)
+	syncGroup := apiGroup.Group("sync")
+	{
+		syncGroup.GET("/version/latest", syncHandler.Latest)
+		// syncGroup.GET("/version/oldest", syncHandler.Oldest)
+	}
 
 	return r, nil
 }

@@ -1200,7 +1200,13 @@ func (c *RepoComponent) MirrorFromSaas(ctx context.Context, namespace, name, cur
 	if err != nil {
 		return fmt.Errorf("failed to find sync version, error: %w", err)
 	}
-	mirrorSource := syncVersion.MirrorSource
+	mirrorSource := &database.MirrorSource{}
+	if syncVersion.SourceID == database.SyncVersionSourceOpenCSG {
+		mirrorSource.SourceName = types.OpenCSGPrefix
+	} else if syncVersion.SourceID == database.SyncVersionSourceHF {
+		// mirrorSource.SourceName = types.
+		//TODO: HF prefix
+	}
 
 	sourceUrl := mirrorSource.BuildCloneURL(c.config.Frontend.URL, string(repoType), namespace, name)
 	mirror.SourceUrl = sourceUrl

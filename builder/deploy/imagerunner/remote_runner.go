@@ -33,7 +33,6 @@ func NewRemoteRunner(remoteURL string) (Runner, error) {
 
 func (h *RemoteRunner) Run(ctx context.Context, req *RunRequest) (*RunResponse, error) {
 	slog.Debug("send request", slog.Any("body", req))
-	// svcName := common.UniqueSpaceAppName(req.OrgName, req.RepoName, req.ID)
 	svcName := req.SvcName
 	u := fmt.Sprintf("%s/%s/run", h.remote, svcName)
 	response, err := h.doRequest(http.MethodPost, u, req)
@@ -52,7 +51,6 @@ func (h *RemoteRunner) Run(ctx context.Context, req *RunRequest) (*RunResponse, 
 }
 
 func (h *RemoteRunner) Stop(ctx context.Context, req *StopRequest) (*StopResponse, error) {
-	// u := fmt.Sprintf("%s/%s/stop", h.remote, common.UniqueSpaceAppName(req.OrgName, req.RepoName, req.ID))
 	svcName := req.SvcName
 	u := fmt.Sprintf("%s/%s/stop", h.remote, svcName)
 	response, err := h.doRequest(http.MethodPost, u, req)
@@ -88,7 +86,6 @@ func (h *RemoteRunner) Purge(ctx context.Context, req *PurgeRequest) (*PurgeResp
 }
 
 func (h *RemoteRunner) Status(ctx context.Context, req *StatusRequest) (*StatusResponse, error) {
-	// u := fmt.Sprintf("%s/%s/status", h.remote, common.UniqueSpaceAppName(req.OrgName, req.RepoName, req.ID))
 	svcName := req.SvcName
 	u := fmt.Sprintf("%s/%s/status", h.remote, svcName)
 
@@ -123,7 +120,6 @@ func (h *RemoteRunner) StatusAll(ctx context.Context) (map[string]StatusResponse
 }
 
 func (h *RemoteRunner) Logs(ctx context.Context, req *LogsRequest) (<-chan string, error) {
-	// appName := common.UniqueSpaceAppName(req.OrgName, req.RepoName, req.ID)
 	svcName := req.SvcName
 	u := fmt.Sprintf("%s/%s/logs", h.remote, svcName)
 	slog.Debug("logs request", slog.String("url", u), slog.String("appname", svcName))
@@ -136,7 +132,6 @@ func (h *RemoteRunner) Logs(ctx context.Context, req *LogsRequest) (<-chan strin
 }
 
 func (h *RemoteRunner) Exist(ctx context.Context, req *CheckRequest) (*StatusResponse, error) {
-	// u := fmt.Sprintf("%s/%s/get", h.remote, common.UniqueSpaceAppName(req.OrgName, req.RepoName, req.ID))
 	svcName := req.SvcName
 	u := fmt.Sprintf("%s/%s/get", h.remote, svcName)
 	response, err := h.doRequest(http.MethodGet, u, req)
@@ -154,7 +149,6 @@ func (h *RemoteRunner) Exist(ctx context.Context, req *CheckRequest) (*StatusRes
 }
 
 func (h *RemoteRunner) GetReplica(ctx context.Context, req *StatusRequest) (*ReplicaResponse, error) {
-	// u := fmt.Sprintf("%s/%s/replica", h.remote, common.UniqueSpaceAppName(req.OrgName, req.RepoName, req.ID))
 	svcName := req.SvcName
 	u := fmt.Sprintf("%s/%s/replica", h.remote, svcName)
 	response, err := h.doRequest(http.MethodGet, u, req)
@@ -241,7 +235,6 @@ func (h *RemoteRunner) doSteamRequest(ctx context.Context, method, url string, d
 		return nil, err
 	}
 	req.Header.Set("Content-Type", "application/json")
-	// req.Header.Set("Accept", "text/event-stream")
 	req.Header.Set("Connection", "keep-alive")
 
 	resp, err := h.client.Do(req)

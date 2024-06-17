@@ -129,6 +129,10 @@ type Config struct {
 		FeeNotifyNoBalanceSubject string `envconfig:"OPENCSG_ACCOUNTING_NOTIFY_NOBALANCE_SUBJECT" default:"accounting.notify.nobalance"`
 		MsgFetchTimeoutInSEC      int    `envconfig:"OPENCSG_ACCOUNTING_MSG_FETCH_TIMEOUTINSEC" default:"5"`
 	}
+
+	MultiSync struct {
+		// Enabled bool `envconfig:"STARHUB_SERVER_MULTI_SYNC_ENABLED" default:"false"`
+	}
 }
 
 func LoadConfig() (cfg *Config, err error) {
