@@ -3,6 +3,9 @@ package database
 import (
 	"context"
 	"errors"
+	"time"
+
+	"opencsg.com/csghub-server/common/types"
 )
 
 type AccessTokenStore struct {
@@ -16,12 +19,15 @@ func NewAccessTokenStore() *AccessTokenStore {
 }
 
 type AccessToken struct {
-	ID     int64  `bun:",pk,autoincrement" json:"id"`
-	GitID  int64  `bun:",notnull" json:"git_id"`
-	Name   string `bun:",notnull" json:"name"`
-	Token  string `bun:",notnull" json:"token"`
-	UserID int64  `bun:",notnull" json:"user_id"`
-	User   *User  `bun:"rel:belongs-to,join:user_id=id" json:"user"`
+	ID          int64                        `bun:",pk,autoincrement" json:"id"`
+	GitID       int64                        `bun:",notnull" json:"git_id"`
+	Name        string                       `bun:",notnull" json:"name"`
+	Token       string                       `bun:",notnull" json:"token"`
+	UserID      int64                        `bun:",notnull" json:"user_id"`
+	User        *User                        `bun:"rel:belongs-to,join:user_id=id" json:"user"`
+	Application types.AccessTokenApplication `bun:"app,notnull" json:"app"`
+	ExpiredAt   time.Time                    `bun:"" json:"expired_at"`
+	IsActive    bool                         `bun:",notnull" json:"is_active"`
 	times
 }
 

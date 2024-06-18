@@ -110,6 +110,7 @@ type CreateMirrorRepoReq struct {
 	Private     bool   `json:"private"`
 	Description string `json:"description"`
 	Interval    string `json:"interval"`
+	MirrorToken string `json:"mirror_token"`
 	RepoType    types.RepositoryType
 }
 

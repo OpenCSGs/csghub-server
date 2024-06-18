@@ -54,6 +54,7 @@ type RepoComponent struct {
 	rrtfms           *database.RepositoriesRuntimeFrameworkStore
 	needPurge        bool
 	syncVersion      *database.SyncVersionStore
+	mirrorToken      *database.MirrorTokenStore
 	config           *config.Config
 }
 
@@ -69,6 +70,7 @@ func NewRepoComponent(config *config.Config) (*RepoComponent, error) {
 	c.mirrorSource = database.NewMirrorSourceStore()
 	c.tokenStore = database.NewAccessTokenStore()
 	c.syncVersion = database.NewSyncVersionStore()
+	c.mirrorToken = database.NewMirrorTokenStore()
 	var err error
 	c.git, err = git.NewGitServer(config)
 	if err != nil {
@@ -1173,6 +1175,7 @@ func (c *RepoComponent) CreateMirror(ctx context.Context, req types.CreateMirror
 
 func (c *RepoComponent) MirrorFromSaas(ctx context.Context, namespace, name, currentUser string, repoType types.RepositoryType) error {
 	var mirror database.Mirror
+	// TODO:
 	admin, err := c.checkCurrentUserPermission(ctx, currentUser, namespace, membership.RoleAdmin)
 	if err != nil {
 		return fmt.Errorf("failed to check permission to create mirror, error: %w", err)
@@ -1196,19 +1199,25 @@ func (c *RepoComponent) MirrorFromSaas(ctx context.Context, namespace, name, cur
 	if exists {
 		return fmt.Errorf("mirror already exists")
 	}
-	syncVersion, err := c.syncVersion.FindByPath(ctx, fmt.Sprintf("%s/%s", namespace, name))
-	if err != nil {
-		return fmt.Errorf("failed to find sync version, error: %w", err)
-	}
+	// syncVersion, err := c.syncVersion.FindByPath(ctx, fmt.Sprintf("%s/%s", namespace, name))
+	// if err != nil {
+	// 	return fmt.Errorf("failed to find sync version, error: %w", err)
+	// }
 	mirrorSource := &database.MirrorSource{}
-	if syncVersion.SourceID == database.SyncVersionSourceOpenCSG {
-		mirrorSource.SourceName = types.OpenCSGPrefix
-	} else if syncVersion.SourceID == database.SyncVersionSourceHF {
-		// mirrorSource.SourceName = types.
-		//TODO: HF prefix
+	// if syncVersion.SourceID == database.SyncVersionSourceOpenCSG {
+	// 	mirrorSource.SourceName = types.OpenCSGPrefix
+	// } else if syncVersion.SourceID == database.SyncVersionSourceHF {
+	// 	// mirrorSource.SourceName = types.
+	// 	//TODO: HF prefix
+	// }
+
+	mirrorSource.SourceName = types.OpenCSGPrefix
+	mirrorToken, err := c.mirrorToken.First(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to find mirror token, error: %w", err)
 	}
 
-	sourceUrl := mirrorSource.BuildCloneURL(c.config.Frontend.URL, string(repoType), namespace, name)
+	sourceUrl := mirrorSource.BuildCloneURL(c.config.Mirror.URL, string(repoType), namespace, name)
 	mirror.SourceUrl = sourceUrl
 	mirror.MirrorSourceID = mirrorSource.ID
 	mirror.RepositoryID = repo.ID
@@ -1223,6 +1232,7 @@ func (c *RepoComponent) MirrorFromSaas(ctx context.Context, namespace, name, cur
 		Username:    mirror.Username,
 		AccessToken: mirror.AccessToken,
 		RepoType:    repoType,
+		MirrorToken: mirrorToken.Token,
 		Private:     false,
 	})
 	if err != nil {

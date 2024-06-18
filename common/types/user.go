@@ -1,5 +1,7 @@
 package types
 
+import "time"
+
 type CreateUserRequest struct {
 	// Display name of the user
 	Name string `json:"name"`
@@ -26,8 +28,10 @@ type UpdateUserResp struct {
 }
 
 type CreateUserTokenRequest struct {
-	Username string `json:"username"`
-	Name     string `json:"name"`
+	Username    string                 `json:"username"`
+	Name        string                 `json:"name"`
+	ExpiredAt   time.Time              `json:"expired_at"`
+	Application AccessTokenApplication `json:"application"`
 }
 
 type UserDatasetsReq struct {
@@ -80,3 +84,10 @@ type UserRepoReq struct {
 	CurrentUser string `json:"current_user"`
 	PageOpts
 }
+
+type AccessTokenApplication string
+
+const (
+	AccessTokenApplicationGit    AccessTokenApplication = "git"
+	AccessTokenApplicationMirror AccessTokenApplication = "mirror"
+)

@@ -27,6 +27,7 @@ func (c *Client) CreateMirrorRepo(ctx context.Context, req gitserver.CreateMirro
 		Releases:       false,
 		LFS:            true,
 		MirrorInterval: "0",
+		Token:          req.MirrorToken,
 	})
 	if err != nil {
 		return 0, err
