@@ -6,8 +6,8 @@ import (
 	"github.com/gin-gonic/gin"
 	"opencsg.com/csghub-server/api/httpbase"
 	"opencsg.com/csghub-server/common/config"
-	"opencsg.com/csghub-server/mirror_proxy/component"
-	"opencsg.com/csghub-server/mirror_proxy/types"
+	"opencsg.com/csghub-server/multisync/component"
+	"opencsg.com/csghub-server/multisync/types"
 )
 
 type MirrorTokenHandler struct {

@@ -7,7 +7,7 @@ import (
 	"opencsg.com/csghub-server/api/httpbase"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/config"
-	"opencsg.com/csghub-server/mirror_proxy/router"
+	"opencsg.com/csghub-server/multisync/router"
 )
 
 var mirrorCmd = &cobra.Command{

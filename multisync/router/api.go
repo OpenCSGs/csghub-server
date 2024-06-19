@@ -6,7 +6,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"opencsg.com/csghub-server/api/middleware"
 	"opencsg.com/csghub-server/common/config"
-	"opencsg.com/csghub-server/mirror_proxy/handler"
+	"opencsg.com/csghub-server/multisync/handler"
 )
 
 func NewMirrorRouter(config *config.Config) (*gin.Engine, error) {
