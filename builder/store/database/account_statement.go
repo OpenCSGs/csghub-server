@@ -2,6 +2,8 @@ package database
 
 import (
 	"context"
+	"database/sql"
+	"errors"
 	"fmt"
 	"time"
 
@@ -32,13 +34,18 @@ var (
 )
 
 type AccountStatement struct {
-	ID        int64     `bun:",pk,autoincrement" json:"id"`
-	EventUUID uuid.UUID `bun:"type:uuid,notnull" json:"event_uuid"`
-	UserID    string    `bun:",notnull" json:"user_id"`
-	Value     float64   `bun:",notnull" json:"value"`
-	Scene     SceneType `bun:",notnull" json:"scene"`
-	OpUID     int64     `bun:",nullzero" json:"op_uid"`
-	CreatedAt time.Time `bun:",notnull,skipupdate,default:current_timestamp" json:"created_at"`
+	ID          int64     `bun:",pk,autoincrement" json:"id"`
+	EventUUID   uuid.UUID `bun:"type:uuid,notnull" json:"event_uuid"`
+	UserID      string    `bun:",notnull" json:"user_id"`
+	Value       float64   `bun:",notnull" json:"value"`
+	Scene       SceneType `bun:",notnull" json:"scene"`
+	OpUID       int64     `bun:",nullzero" json:"op_uid"`
+	CreatedAt   time.Time `bun:",notnull,skipupdate,default:current_timestamp" json:"created_at"`
+	CustomerID  string    `json:"customer_id"`
+	EventDate   time.Time `bun:"type:date" json:"event_date"`
+	Price       float64   `json:"price"`
+	PriceUnit   string    `json:"price_unit"`
+	Consumption float64   `json:"consumption"`
 }
 
 func (as *AccountStatementStore) Create(ctx context.Context, input AccountStatement, changeValue float64) error {
@@ -46,19 +53,42 @@ func (as *AccountStatementStore) Create(ctx context.Context, input AccountStatem
 		if err := assertAffectedOneRow(tx.NewInsert().Model(&input).Exec(ctx)); err != nil {
 			return err
 		}
-		sql := "update account_users set balance=balance + ? where user_id=?"
-		if err := assertAffectedOneRow(tx.Exec(sql, changeValue, input.UserID)); err != nil {
+		runSql := "update account_users set balance=balance + ? where user_id=?"
+		if err := assertAffectedOneRow(tx.Exec(runSql, changeValue, input.UserID)); err != nil {
 			return err
 		}
+
+		if input.Scene == SceneModelInference || input.Scene == SceneSpace || input.Scene == SceneModelFinetune || input.Scene == SceneStarship {
+			// calculate bill
+			bill := AccountBill{
+				BillDate:    input.EventDate,
+				UserID:      input.UserID,
+				Scene:       input.Scene,
+				CustomerID:  input.CustomerID,
+				Value:       changeValue,
+				Consumption: input.Consumption,
+			}
+			err := tx.NewSelect().Model(&bill).Where("bill_date = ? and user_id = ? and scene = ? and customer_id = ?", input.EventDate, input.UserID, input.Scene, input.CustomerID).Scan(ctx)
+			if err != nil && !errors.Is(err, sql.ErrNoRows) {
+				return err
+			}
+			if errors.Is(err, sql.ErrNoRows) {
+				_, err = tx.NewInsert().Model(&bill).Exec(ctx)
+			} else {
+				_, err = tx.NewUpdate().Model(&bill).Where("bill_date = ? and user_id = ? and scene = ? and customer_id = ?", input.EventDate, input.UserID, input.Scene, input.CustomerID).Set("value = value + ?, consumption = consumption + ?, updated_at=current_timestamp", input.Value, input.Consumption).Exec(ctx)
+			}
+			return err
+		}
+
 		return nil
 	})
 
 	return err
 }
 
-func (as *AccountStatementStore) ListByUserIDAndTime(ctx context.Context, userID, startTime, endTime string) ([]AccountStatement, error) {
+func (as *AccountStatementStore) ListByUserIDAndTime(ctx context.Context, userID, startTime, endTime string, per, page int) ([]AccountStatement, error) {
 	var result []AccountStatement
-	_, err := as.db.Operator.Core.NewSelect().Model(&result).Where("user_id = ? and created_at >= ? and created_at <= ?", userID, startTime, endTime).Exec(ctx, &result)
+	_, err := as.db.Operator.Core.NewSelect().Model(&result).Where("user_id = ? and created_at >= ? and created_at <= ?", userID, startTime, endTime).Order("id DESC").Limit(per).Offset((page-1)*per).Exec(ctx, &result)
 	if err != nil {
 		return nil, fmt.Errorf("list all statement, error:%w", err)
 	}

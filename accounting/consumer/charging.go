@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/nats-io/nats.go"
@@ -157,51 +159,74 @@ func (c *Charging) handleReadMsgs(sub *nats.Subscription) {
 }
 
 func (c *Charging) handleRetryMsg(msg *nats.Msg) {
-	// max try 3 times
+	// A maximum of 3 attempts
 	var err error = nil
 	for j := 0; j < 3; j++ {
 		err = c.handleMsgData(msg)
 		if err != nil {
-			slog.Error("error happen when handle single msg", slog.Any("error", err))
+			tip := fmt.Sprintf("error happen when handle single msg for the %d time", (j + 1))
+			slog.Error(tip, slog.Any("error", err))
 		} else {
 			break
 		}
 	}
-	if err != nil {
-		// fail to retry 3 time for handle message
-		c.dlqTimeout.Reset(idleDuration)
-		select {
-		case c.dlq.CH <- msg.Data:
-			err = msg.Ack()
-			if err != nil {
-				slog.Warn("fail to do msg ack for message handling retry 3 times", slog.Any("error", err))
-			}
-		case <-c.dlqTimeout.C:
-		}
-	} else {
+
+	if err == nil {
 		// handle message success
 		err = msg.Ack()
 		if err != nil {
 			slog.Warn("fail to do msg ack for deal with message success", slog.Any("error", err))
 		}
+		return
+	}
+
+	// move DLQ for fail to handle message
+	c.reTryMoveMsgToDLQ(msg)
+}
+
+func (c *Charging) reTryMoveMsgToDLQ(msg *nats.Msg) {
+	// A maximum of three attempts for move DLQ
+	var err error = nil
+	for i := 0; i < 3; i++ {
+		err = c.moveMsgToDLQ(msg)
+		if err != nil {
+			tip := fmt.Sprintf("fail to move DLQ for the %d time", (i + 1))
+			slog.Warn(tip, slog.Any("msg.data", string(msg.Data)))
+		} else {
+			break
+		}
+	}
+
+	if err == nil {
+		err = msg.Ack()
+		if err != nil {
+			slog.Warn("fail to do msg ack for message handling retry 3 times", slog.Any("error", err))
+		}
+	}
+}
+
+func (c *Charging) moveMsgToDLQ(msg *nats.Msg) error {
+	c.dlqTimeout.Reset(idleDuration)
+	select {
+	case c.dlq.CH <- msg.Data:
+		return nil
+	case <-c.dlqTimeout.C:
+		return fmt.Errorf("try to move DLQ with timeout, %v", idleDuration)
 	}
 }
 
 func (c *Charging) handleMsgData(msg *nats.Msg) error {
-	strData := string(msg.Data)
-	slog.Info("Sub received", slog.Any("msg.data", strData), slog.Any("msg.subject", msg.Subject))
-	event := types.ACC_EVENT{}
-	err := json.Unmarshal(msg.Data, &event)
+	event, eventExtra, err := c.parseMessageData(msg)
 	if err != nil {
-		return fmt.Errorf("fail to unmarshal, %v, %w", strData, err)
+		return err
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	err = c.acctEvtComp.AddNewAccountingEvent(ctx, &event)
+	err = c.acctEvtComp.AddNewAccountingEvent(ctx, event)
 	if err != nil {
 		return fmt.Errorf("fail to record event log, %v, %w", event, err)
 	}
-	st, err := c.acctSMComp.FindStatementByEventID(ctx, &event)
+	st, err := c.acctSMComp.FindStatementByEventID(ctx, event)
 	if err != nil {
 		return fmt.Errorf("fail to check event statement, %v, %w", event, err)
 	}
@@ -213,22 +238,82 @@ func (c *Charging) handleMsgData(msg *nats.Msg) error {
 	if err != nil {
 		return fmt.Errorf("fail to check user balance, %v, %w", event.UserID, err)
 	}
-	err = c.acctSMComp.AddNewStatement(ctx, &event, c.getCredit(&event))
+	err = c.acctSMComp.AddNewStatement(ctx, event, eventExtra, c.getCredit(event))
 	if err != nil {
 		return fmt.Errorf("fail to add statement and change balance, %v, %w", event, err)
 	}
-	account, err := c.acctUserComp.ListAccountingByUserID(ctx, event.UserID)
-	if err != nil {
-		slog.Warn("fail to query account", slog.Any("userid", event.UserID), slog.Any("error", err))
-	} else {
-		if account.Balance <= 0 {
-			c.sendNotification(types.REASON_LACK_BALANCE, "insufficient funds", &event)
-		}
-	}
+	c.checkBalanceAndSendNotification(ctx, event)
 	return nil
 }
 
-func (c *Charging) sendNotification(reasonCode int, reasonMsg string, event *types.ACC_EVENT) {
+func (c *Charging) parseMessageData(msg *nats.Msg) (*types.ACC_EVENT, *types.ACC_EVENT_EXTRA, error) {
+	strData := string(msg.Data)
+	slog.Info("Sub received", slog.Any("msg.data", strData), slog.Any("msg.subject", msg.Subject))
+	evt := types.ACC_EVENT{}
+	err := json.Unmarshal(msg.Data, &evt)
+	if err != nil {
+		return nil, nil, fmt.Errorf("fail to unmarshal event, %v, %w", strData, err)
+	}
+	evtExtra := types.ACC_EVENT_EXTRA{
+		CustomerID:       "",
+		CustomerPrice:    0,
+		PriceUnit:        "",
+		CustomerDuration: 0,
+	}
+	if len(strings.TrimSpace(evt.Extra)) < 1 {
+		// extra is null
+		return &evt, &evtExtra, nil
+	}
+	var exMap map[string]string
+	err = json.Unmarshal([]byte(evt.Extra), &exMap)
+	if err != nil {
+		return nil, nil, fmt.Errorf("fail to unmarshal event extra, %v, %w", strData, err)
+	}
+	evtExtra.CustomerID = exMap["customer_id"]
+	cusPriceStr, exists := exMap["customer_price"]
+	if exists {
+		cusPriceFloat, err := strconv.ParseFloat(cusPriceStr, 64)
+		if err != nil {
+			return nil, nil, fmt.Errorf("fail to unmarshal event extra customer_price, %v, %w", strData, err)
+		}
+		evtExtra.CustomerPrice = cusPriceFloat
+	}
+	evtExtra.PriceUnit = exMap["price_unit"]
+	cusDurStr, exists := exMap["customer_duration"]
+	if exists {
+		cusDurFloat, err := strconv.ParseFloat(cusDurStr, 64)
+		if err != nil {
+			return nil, nil, fmt.Errorf("fail to unmarshal event extra customer_duration, %v, %w", strData, err)
+		}
+		evtExtra.CustomerDuration = cusDurFloat
+	}
+	return &evt, &evtExtra, nil
+}
+
+func (c *Charging) checkBalanceAndSendNotification(ctx context.Context, event *types.ACC_EVENT) {
+	account, err := c.acctUserComp.ListAccountingByUserID(ctx, event.UserID)
+	if err != nil {
+		slog.Warn("fail to query account", slog.Any("userid", event.UserID), slog.Any("error", err))
+		return
+	}
+	if account == nil {
+		return
+	}
+	if account.Balance <= 0 {
+		// retry 3 times for notification
+		for i := 0; i < 3; i++ {
+			err = c.sendNotification(types.REASON_LACK_BALANCE, "insufficient funds", event)
+			if err != nil {
+				tip := fmt.Sprintf("fail to notify for the %d time", (i + 1))
+				slog.Warn(tip, slog.Any("event", event), slog.Any("error", err))
+			} else {
+				break
+			}
+		}
+	}
+}
+
+func (c *Charging) sendNotification(reasonCode int, reasonMsg string, event *types.ACC_EVENT) error {
 	notify := types.ACC_NOTIFY{
 		CreatedAt:  time.Now(),
 		ReasonCode: reasonCode,
@@ -241,7 +326,9 @@ func (c *Charging) sendNotification(reasonCode int, reasonMsg string, event *typ
 	c.notifyTimeOut.Reset(idleDuration)
 	select {
 	case c.notify.CH <- notify:
+		return nil
 	case <-c.notifyTimeOut.C:
+		return fmt.Errorf("try to sent notification with timeout, %v", idleDuration)
 	}
 }
 

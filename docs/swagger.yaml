@@ -3074,6 +3074,169 @@ paths:
       summary: List repo runtime framework
       tags:
       - Repository
+  /accounting/credit/:id/balance:
+    get:
+      consumes:
+      - application/json
+      description: Get user balance by casdoor user uuid
+      parameters:
+      - description: casdoor user uuid
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: current_user
+        in: query
+        name: current_user
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/types.Response'
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Get user balance by casdoor user uuid
+      tags:
+      - Accounting
+  /accounting/credit/:id/bills:
+    get:
+      consumes:
+      - application/json
+      description: List user bills by casdoor user uuid and start date and end date
+      parameters:
+      - description: casdoor user uuid
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: 'start_date, format: ''2024-06-12'''
+        in: query
+        name: start_date
+        required: true
+        type: string
+      - description: 'end_date, format: ''2024-07-12'''
+        in: query
+        name: end_date
+        required: true
+        type: string
+      - description: current_user
+        in: query
+        name: current_user
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/types.Response'
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: List user bills by casdoor user uuid and start date and end date
+      tags:
+      - Accounting
+  /accounting/credit/:id/statements:
+    get:
+      consumes:
+      - application/json
+      description: List statements by casdoor user uuid and start time and end time
+      parameters:
+      - description: casdoor user uuid
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: 'start_time, format: ''2024-06-12 08:27:22'''
+        in: query
+        name: start_time
+        required: true
+        type: string
+      - description: 'end_time, format: ''2024-06-12 17:17:22'''
+        in: query
+        name: end_time
+        required: true
+        type: string
+      - description: current_user
+        in: query
+        name: current_user
+        required: true
+        type: string
+      - default: 20
+        description: per
+        in: query
+        name: per
+        type: integer
+      - default: 1
+        description: per page
+        in: query
+        name: page
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/types.Response'
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: List statements by casdoor user uuid and start time and end time
+      tags:
+      - Accounting
+  /accounting/credit/balance:
+    get:
+      consumes:
+      - application/json
+      description: Get all users balance
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/types.Response'
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Get all users balance
+      tags:
+      - Accounting
   /cluster:
     get:
       consumes:
