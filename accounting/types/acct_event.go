@@ -26,6 +26,13 @@ type ACC_EVENT struct {
 	Extra     string    `json:"extra"`
 }
 
+type ACC_EVENT_EXTRA struct {
+	CustomerID       string  `json:"customer_id"`
+	CustomerPrice    float64 `json:"customer_price"`
+	PriceUnit        string  `json:"price_unit"`
+	CustomerDuration float64 `json:"customer_duration"`
+}
+
 // notify response to client
 type ACC_NOTIFY struct {
 	Uuid       uuid.UUID `json:"uuid"`

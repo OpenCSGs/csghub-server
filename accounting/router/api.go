@@ -27,7 +27,8 @@ func NewAccountRouter(config *config.Config) (*gin.Engine, error) {
 	{
 		creditGroup.GET("/balance", creditHandler.QueryAllUsersBalance)
 		creditGroup.GET("/:id/balance", creditHandler.QueryBalanceByUserID)
-		creditGroup.GET("/:id/statement", creditHandler.QueryStatementByUserID)
+		creditGroup.GET("/:id/statements", creditHandler.QueryStatementByUserID)
+		creditGroup.GET("/:id/bills", creditHandler.QueryBillsByUserID)
 	}
 
 	return r, nil
