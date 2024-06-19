@@ -6,6 +6,7 @@ ENV JUPYTERHUB_SERVICE_PREFIX=/proxy/
 ENV GRADIO_ROOT_PATH=/proxy/7860/
 ENV TZ=Asia/Shanghai
 ENV NCCL_IB_DISABLE=1 NCCL_P2P_DISABLE=1
+ENV HF_HOME=/workspace/.cache
 
 # Build with some basic utilities
 RUN apt-get update && apt-get install -y \
@@ -14,6 +15,12 @@ RUN apt-get update && apt-get install -y \
     git git-lfs \
     supervisor \
     unzip
+# set timezone
+ARG DEBIAN_FRONTEND=noninteractive
+RUN apt-get install -y tzdata \
+    && ln -snf /usr/share/zoneinfo/$TZ /etc/localtime \
+    && echo $TZ > /etc/timezone \
+    && dpkg-reconfigure -f noninteractive tzdata
 
 # alias python='python3'
 RUN ln -s /usr/bin/python3 /usr/bin/python
@@ -21,25 +28,25 @@ RUN pip config set global.index-url https://pypi.tuna.tsinghua.edu.cn/simple
 
 # Install the appropriate torch version 
 #RUN pip install torch==2.1.2 torchvision==0.16.2 torchaudio==2.1.2 --index-url https://download.pytorch.org/whl/cu121
-RUN pip install jupyterlab numpy \
+RUN pip install --no-cache-dir jupyterlab numpy==1.26.4 \
     torch==2.1.2 torchvision==0.16.2 torchaudio==2.1.2 \
-    jupyter-server-proxy 
+    jupyter-server-proxy==4.2.0 
 # Create a working directory
 WORKDIR /etc/csghub
-RUN git clone --depth 1 https://github.com/hiyouga/LLaMA-Factory.git
-RUN cd LLaMA-Factory && pip install -e ".[metrics]"
+RUN git clone https://github.com/hiyouga/LLaMA-Factory.git --branch v0.8.1 --single-branch
+RUN cd LLaMA-Factory && pip install --no-cache-dir -e ".[metrics,deepspeed]"
 # setup supervisord
 RUN mkdir -p /var/log/supervisord
 COPY script/supervisord.conf /etc/supervisor/conf.d/supervisord.conf
 COPY script/jupyter_notebook_config.py /root/.jupyter/jupyter_notebook_config.py
 COPY script/ /etc/csghub/
+COPY script/handlers.py /usr/local/lib/python3.10/dist-packages/jupyter_server_proxy/handlers.py
 RUN chmod +x /etc/csghub/*.sh
 #use dark mode
 RUN mkdir -p /root/.jupyter/lab/user-settings/@jupyterlab/apputils-extension && \
 	    echo '{"theme":"JupyterLab Dark"}' > /root/.jupyter/lab/user-settings/@jupyterlab/apputils-extension/themes.jupyterlab-settings && \
 	    mkdir -p /root/.jupyter/lab/user-settings/@jupyterlab/notebook-extension && \
 	    echo '{"codeCellConfig":{"lineNumbers":true }}' >   /root/.jupyter/lab/user-settings/@jupyterlab/notebook-extension/tracker.jupyterlab-settings
-
 # Create a working directory
 WORKDIR /workspace/
 ENTRYPOINT ["/usr/bin/supervisord", "-c", "/etc/supervisor/conf.d/supervisord.conf"]

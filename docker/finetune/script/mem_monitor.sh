@@ -15,8 +15,8 @@ while true; do
     sleep 86400
     continue
   fi
-  
-  threshold=1048576000
+  # reserve 200M
+  threshold=209715200
   less_max_memory=$((max_memory - threshold))
   if [ "$current_memory" -gt "$less_max_memory" ]; then
     # Get the PID of the process with the highest memory usage
