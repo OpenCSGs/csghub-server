@@ -3,7 +3,6 @@ package router
 import (
 	"fmt"
 
-	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	"opencsg.com/csghub-server/api/handler"
 	"opencsg.com/csghub-server/api/middleware"
@@ -12,12 +11,6 @@ import (
 
 func NewMirrorRouter(config *config.Config) (*gin.Engine, error) {
 	r := gin.New()
-	r.Use(cors.New(cors.Config{
-		AllowCredentials: true,
-		AllowHeaders:     []string{"*"},
-		AllowMethods:     []string{"*"},
-		AllowAllOrigins:  true,
-	}))
 	r.Use(gin.Recovery())
 	r.Use(middleware.Log())
 	// store := cookie.NewStore([]byte(config.Mirror.SessionSecretKey))
@@ -32,7 +25,7 @@ func NewMirrorRouter(config *config.Config) (*gin.Engine, error) {
 	if err != nil {
 		return nil, fmt.Errorf("error creating rproxy handler:%w", err)
 	}
-	rGroup := r.Group("/:namespace/:name.git")
+	rGroup := r.Group("/:repo_type/:namespace/:name.git")
 	{
 		rGroup.POST("/git-upload-pack", mpHandler.Serve)
 		rGroup.POST("/git-receive-pack", mpHandler.Serve)

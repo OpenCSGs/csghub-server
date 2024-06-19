@@ -2,6 +2,7 @@ package handler
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"opencsg.com/csghub-server/builder/proxy"
@@ -68,8 +69,10 @@ func (r *MirrorProxyHandler) Serve(ctx *gin.Context) {
 	// Accounting
 	token := getMirrorTokenFromContext(ctx)
 	fmt.Println(token)
+	repoType := ctx.Param("repo_type")
+	path := strings.Replace(ctx.Request.URL.Path, fmt.Sprintf("%s/", repoType), fmt.Sprintf("%s_", repoType), 1)
 	rp, _ := proxy.NewReverseProxy(r.gitServerURL)
-	rp.ServeHTTP(ctx.Writer, ctx.Request, ctx.Request.URL.Path)
+	rp.ServeHTTP(ctx.Writer, ctx.Request, path)
 }
 
 func getMirrorTokenFromContext(ctx *gin.Context) string {

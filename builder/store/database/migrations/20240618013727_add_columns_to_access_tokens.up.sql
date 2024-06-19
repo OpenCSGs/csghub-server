@@ -11,3 +11,8 @@ ALTER TABLE access_tokens ADD COLUMN IF NOT EXISTS is_active BOOLEAN default tru
 --bun:split
 
 ALTER TABLE access_tokens ADD COLUMN IF NOT EXISTS app VARCHAR default 'git';
+
+--bun:split
+
+ALTER TABLE access_tokens ADD COLUMN IF NOT EXISTS permission VARCHAR;
+

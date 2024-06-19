@@ -46,7 +46,13 @@ var cmdSyncAsClient = &cobra.Command{
 			slog.Error("failed to create recom component", "err", err)
 			return
 		}
-		sc := multisync.FromOpenCSG()
+		mirrorTokenStore := database.NewMirrorTokenStore()
+		mirrorToken, err := mirrorTokenStore.First(ctx)
+		if err != nil {
+			slog.Error("failed to find mirror token, error: %w", err)
+			return
+		}
+		sc := multisync.FromOpenCSG(mirrorToken.Token)
 		err = c.SyncAsClient(ctx, sc)
 		if err != nil {
 			slog.Error("failed to sync as client", "err", err)

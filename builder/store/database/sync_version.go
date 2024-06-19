@@ -27,14 +27,14 @@ func (s *SyncVersionStore) BatchCreate(ctx context.Context, versions []SyncVersi
 }
 
 func (s *SyncVersionStore) FindByPath(ctx context.Context, path string) (*SyncVersion, error) {
-	var syncVersion *SyncVersion
+	var syncVersion SyncVersion
 	err := s.db.Core.NewSelect().
-		Model(syncVersion).
-		Relation("MirrorSource").
+		Model(&syncVersion).
 		Where("repo_path = ?", path).
+		Limit(1).
 		Scan(ctx)
 	if err != nil {
 		return nil, err
 	}
-	return syncVersion, nil
+	return &syncVersion, nil
 }

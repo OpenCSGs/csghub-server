@@ -1199,17 +1199,17 @@ func (c *RepoComponent) MirrorFromSaas(ctx context.Context, namespace, name, cur
 	if exists {
 		return fmt.Errorf("mirror already exists")
 	}
-	// syncVersion, err := c.syncVersion.FindByPath(ctx, fmt.Sprintf("%s/%s", namespace, name))
-	// if err != nil {
-	// 	return fmt.Errorf("failed to find sync version, error: %w", err)
-	// }
+	syncVersion, err := c.syncVersion.FindByPath(ctx, fmt.Sprintf("%s/%s", namespace, name))
+	if err != nil {
+		return fmt.Errorf("failed to find sync version, error: %w", err)
+	}
 	mirrorSource := &database.MirrorSource{}
-	// if syncVersion.SourceID == database.SyncVersionSourceOpenCSG {
-	// 	mirrorSource.SourceName = types.OpenCSGPrefix
-	// } else if syncVersion.SourceID == database.SyncVersionSourceHF {
-	// 	// mirrorSource.SourceName = types.
-	// 	//TODO: HF prefix
-	// }
+	if syncVersion.SourceID == database.SyncVersionSourceOpenCSG {
+		mirrorSource.SourceName = types.OpenCSGPrefix
+	} else if syncVersion.SourceID == database.SyncVersionSourceHF {
+		// mirrorSource.SourceName = types.
+		//TODO: HF prefix
+	}
 
 	mirrorSource.SourceName = types.OpenCSGPrefix
 	mirrorToken, err := c.mirrorToken.First(ctx)

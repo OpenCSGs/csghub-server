@@ -16,7 +16,7 @@ type Config struct {
 	}
 
 	Mirror struct {
-		URL              string `envconfig:"STARHUB_SERVER_MIRROR_URL" default:"https://mirror.opencsg.com"`
+		URL              string `envconfig:"STARHUB_SERVER_MIRROR_URL" default:"http://localhost:8085"`
 		Token            string `envconfig:"STARHUB_SERVER_MIRROR_Token" default:""`
 		Port             int    `envconfig:"STARHUB_SERVER_MIRROR_PORT" default:"8085"`
 		SessionSecretKey string `envconfig:"STARHUB_SERVER_MIRROR_SESSION_SECRET_KEY" default:"mirror"`

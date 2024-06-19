@@ -44,7 +44,7 @@ var InitCmd = &cobra.Command{
 		var versions []database.SyncVersion
 		repoComponent, err := component.NewRepoComponent(config)
 		if err != nil {
-			slog.Error("failed to create repository component")
+			slog.Error("failed to create repository component: %v", err)
 			return
 		}
 		mirrorRepo := database.NewMirrorStore()
@@ -52,7 +52,7 @@ var InitCmd = &cobra.Command{
 
 		mirrors, err := mirrorRepo.Finished(ctx)
 		if err != nil {
-			slog.Error("error finding mirror repositories")
+			slog.Error("error finding mirror repositories: %v", err)
 			return
 		}
 		for _, mirror := range mirrors {
@@ -74,7 +74,7 @@ var InitCmd = &cobra.Command{
 			}
 
 			versions = append(versions, database.SyncVersion{
-				SourceID:       mirror.MirrorSourceID,
+				SourceID:       database.SyncVersionSourceOpenCSG,
 				RepoPath:       repo.Path,
 				RepoType:       repo.RepositoryType,
 				LastModifiedAt: repo.UpdatedAt,
@@ -83,6 +83,7 @@ var InitCmd = &cobra.Command{
 		}
 		if len(versions) == 0 {
 			slog.Error("there are no finished mirror repositories")
+			return
 		}
 		err = syncVersionStore.BatchCreate(ctx, versions)
 		if err != nil {
