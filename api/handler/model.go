@@ -737,6 +737,7 @@ func (h *ModelHandler) DeployStart(ctx *gin.Context) {
 // @Param        current_user query string false "current user"
 // @Param        per query int false "per" default(20)
 // @Param        page query int false "per page" default(1)
+// @Param 		 deploy_type query int false "deploy_type" Enums(0, 1, 2) default(1)
 // @Success      200  {object}  types.Response{} "OK"
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
@@ -745,6 +746,17 @@ func (h *ModelHandler) ListByRuntimeFrameworkID(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
 	if currentUser == "" {
 		httpbase.UnauthorizedError(ctx, errors.New("user not found, please login first"))
+		return
+	}
+	deployTypeStr := ctx.Query("deploy_type")
+	if deployTypeStr == "" {
+		// backward compatibility for inferences
+		deployTypeStr = strconv.Itoa(types.InferenceType)
+	}
+	deployType, err := strconv.Atoi(deployTypeStr)
+	if err != nil {
+		slog.Error("Bad request format", "error", err)
+		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
 	per, page, err := common.GetPerAndPageFromContext(ctx)
@@ -760,7 +772,7 @@ func (h *ModelHandler) ListByRuntimeFrameworkID(ctx *gin.Context) {
 		return
 	}
 
-	models, total, err := h.c.ListModelsByRuntimeFrameworkID(ctx, currentUser, per, page, id)
+	models, total, err := h.c.ListModelsByRuntimeFrameworkID(ctx, currentUser, per, page, id, deployType)
 	if err != nil {
 		slog.Error("Failed to get models", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
@@ -865,4 +877,155 @@ func (h *ModelHandler) FinetuneStart(ctx *gin.Context) {
 		return
 	}
 	httpbase.OK(ctx, nil)
+}
+
+// GetRuntime godoc
+// @Security     ApiKey
+// @Summary      Get all runtime frameworks for current user
+// @Description  get all runtime frameworks for current user
+// @Tags         RuntimeFramework
+// @Accept       json
+// @Produce      json
+// @Param        current_user query string false "current user"
+// @Success      200  {object}  types.Response{} "OK"
+// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
+// @Router       /runtime_framework [get]
+func (h *ModelHandler) ListAllRuntimeFramework(ctx *gin.Context) {
+	currentUser := httpbase.GetCurrentUser(ctx)
+	if currentUser == "" {
+		httpbase.UnauthorizedError(ctx, errors.New("user not found, please login first"))
+		return
+	}
+
+	runtimes, err := h.c.ListAllByRuntimeFramework(ctx, currentUser)
+	if err != nil {
+		slog.Error("Failed to get runtime frameworks", slog.Any("error", err))
+		httpbase.ServerError(ctx, err)
+		return
+	}
+	respData := gin.H{
+		"data": runtimes,
+	}
+	ctx.JSON(http.StatusOK, respData)
+}
+
+// UpdateModelRuntime godoc
+// @Security     ApiKey
+// @Summary      Set model runtime frameworks
+// @Description  set model runtime frameworks
+// @Tags         RuntimeFramework
+// @Accept       json
+// @Produce      json
+// @Param        id path int true "runtime framework id"
+// @Param 		 deploy_type query int false "deploy_type" Enums(0, 1, 2) default(1)
+// @Param        current_user query string false "current user"
+// @Param        body body types.RuntimeFrameworkModels true "body"
+// @Success      200  {object}  types.Response{} "OK"
+// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
+// @Router       /runtime_framework/{id} [post]
+func (h *ModelHandler) UpdateModelRuntimeFrameworks(ctx *gin.Context) {
+	currentUser := httpbase.GetCurrentUser(ctx)
+	if currentUser == "" {
+		httpbase.UnauthorizedError(ctx, errors.New("user not found, please login first"))
+		return
+	}
+
+	var req types.RuntimeFrameworkModels
+	if err := ctx.ShouldBindJSON(&req); err != nil {
+		slog.Error("Bad request format", "error", err)
+		httpbase.BadRequest(ctx, err.Error())
+		return
+	}
+
+	id, err := strconv.ParseInt(ctx.Param("id"), 10, 64)
+	if err != nil {
+		slog.Error("Bad request format", "error", err)
+		httpbase.BadRequest(ctx, err.Error())
+		return
+	}
+
+	deployTypeStr := ctx.Query("deploy_type")
+	if deployTypeStr == "" {
+		// backward compatibility for inferences
+		deployTypeStr = strconv.Itoa(types.InferenceType)
+	}
+	deployType, err := strconv.Atoi(deployTypeStr)
+	if err != nil {
+		slog.Error("Bad request format", "error", err)
+		httpbase.BadRequest(ctx, err.Error())
+		return
+	}
+
+	slog.Info("update runtime frameworks models", slog.Any("req", req), slog.Any("runtime framework id", id), slog.Any("deployType", deployType))
+
+	list, err := h.c.SetRuntimeFrameworkModes(ctx, currentUser, deployType, id, req.Models)
+	if err != nil {
+		slog.Error("Failed to set models runtime framework", slog.Any("error", err))
+		httpbase.ServerError(ctx, err)
+		return
+	}
+
+	httpbase.OK(ctx, list)
+}
+
+// UpdateModelRuntime godoc
+// @Security     ApiKey
+// @Summary      Set model runtime frameworks
+// @Description  set model runtime frameworks
+// @Tags         RuntimeFramework
+// @Accept       json
+// @Produce      json
+// @Param        id path int true "runtime framework id"
+// @Param 		 deploy_type query int false "deploy_type" Enums(0, 1, 2) default(1)
+// @Param        current_user query string false "current user"
+// @Param        body body types.RuntimeFrameworkModels true "body"
+// @Success      200  {object}  types.Response{} "OK"
+// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
+// @Router       /runtime_framework/{id} [delete]
+func (h *ModelHandler) DeleteModelRuntimeFrameworks(ctx *gin.Context) {
+	currentUser := httpbase.GetCurrentUser(ctx)
+	if currentUser == "" {
+		httpbase.UnauthorizedError(ctx, errors.New("user not found, please login first"))
+		return
+	}
+
+	var req types.RuntimeFrameworkModels
+	if err := ctx.ShouldBindJSON(&req); err != nil {
+		slog.Error("Bad request format", "error", err)
+		httpbase.BadRequest(ctx, err.Error())
+		return
+	}
+
+	id, err := strconv.ParseInt(ctx.Param("id"), 10, 64)
+	if err != nil {
+		slog.Error("Bad request format", "error", err)
+		httpbase.BadRequest(ctx, err.Error())
+		return
+	}
+
+	deployTypeStr := ctx.Query("deploy_type")
+	if deployTypeStr == "" {
+		// backward compatibility for inferences
+		deployTypeStr = strconv.Itoa(types.InferenceType)
+	}
+	deployType, err := strconv.Atoi(deployTypeStr)
+	if err != nil {
+		slog.Error("Bad request format", "error", err)
+		httpbase.BadRequest(ctx, err.Error())
+		return
+	}
+
+	slog.Info("update runtime frameworks models", slog.Any("req", req), slog.Any("runtime framework id", id), slog.Any("deployType", deployType))
+
+	list, err := h.c.DeleteRuntimeFrameworkModes(ctx, currentUser, deployType, id, req.Models)
+	if err != nil {
+		slog.Error("Failed to set models runtime framework", slog.Any("error", err))
+		httpbase.ServerError(ctx, err)
+		return
+	}
+
+	httpbase.OK(ctx, list)
 }

@@ -1107,6 +1107,13 @@ definitions:
       type:
         type: integer
     type: object
+  types.RuntimeFrameworkModels:
+    properties:
+      models:
+        items:
+          type: string
+        type: array
+    type: object
   types.RuntimeFrameworkReq:
     properties:
       container_port:
@@ -2648,6 +2655,15 @@ paths:
         in: query
         name: current_user
         type: string
+      - default: 1
+        description: deploy_type
+        enum:
+        - 0
+        - 1
+        - 2
+        in: query
+        name: deploy_type
+        type: integer
       produces:
       - application/json
       responses:
@@ -5292,6 +5308,135 @@ paths:
       summary: update user membership
       tags:
       - Member
+  /runtime_framework:
+    get:
+      consumes:
+      - application/json
+      description: get all runtime frameworks for current user
+      parameters:
+      - description: current user
+        in: query
+        name: current_user
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/types.Response'
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Get all runtime frameworks for current user
+      tags:
+      - RuntimeFramework
+  /runtime_framework/{id}:
+    delete:
+      consumes:
+      - application/json
+      description: set model runtime frameworks
+      parameters:
+      - description: runtime framework id
+        in: path
+        name: id
+        required: true
+        type: integer
+      - default: 1
+        description: deploy_type
+        enum:
+        - 0
+        - 1
+        - 2
+        in: query
+        name: deploy_type
+        type: integer
+      - description: current user
+        in: query
+        name: current_user
+        type: string
+      - description: body
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/types.RuntimeFrameworkModels'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/types.Response'
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Set model runtime frameworks
+      tags:
+      - RuntimeFramework
+    post:
+      consumes:
+      - application/json
+      description: set model runtime frameworks
+      parameters:
+      - description: runtime framework id
+        in: path
+        name: id
+        required: true
+        type: integer
+      - default: 1
+        description: deploy_type
+        enum:
+        - 0
+        - 1
+        - 2
+        in: query
+        name: deploy_type
+        type: integer
+      - description: current user
+        in: query
+        name: current_user
+        type: string
+      - description: body
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/types.RuntimeFrameworkModels'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/types.Response'
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Set model runtime frameworks
+      tags:
+      - RuntimeFramework
   /runtime_framework/{id}/models:
     get:
       consumes:
@@ -5316,6 +5461,15 @@ paths:
         description: per page
         in: query
         name: page
+        type: integer
+      - default: 1
+        description: deploy_type
+        enum:
+        - 0
+        - 1
+        - 2
+        in: query
+        name: deploy_type
         type: integer
       produces:
       - application/json

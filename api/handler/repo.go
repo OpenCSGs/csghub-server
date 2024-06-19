@@ -1108,12 +1108,24 @@ func (h *RepoHandler) DeleteMirror(ctx *gin.Context) {
 // @Param        namespace path string true "namespace"
 // @Param        name path string true "name"
 // @Param        current_user query string false "current user"
+// @Param 		 deploy_type query int false "deploy_type" Enums(0, 1, 2) default(1)
 // @Success      200  {object}  string "OK"
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
 // @Router       /{repo_type}/{namespace}/{name}/runtime_framework [get]
 func (h *RepoHandler) RuntimeFrameworkList(ctx *gin.Context) {
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
+	if err != nil {
+		slog.Error("Bad request format", "error", err)
+		httpbase.BadRequest(ctx, err.Error())
+		return
+	}
+	deployTypeStr := ctx.Query("deploy_type")
+	if deployTypeStr == "" {
+		// backward compatibility for inferences
+		deployTypeStr = strconv.Itoa(types.InferenceType)
+	}
+	deployType, err := strconv.Atoi(deployTypeStr)
 	if err != nil {
 		slog.Error("Bad request format", "error", err)
 		httpbase.BadRequest(ctx, err.Error())
@@ -1126,7 +1138,7 @@ func (h *RepoHandler) RuntimeFrameworkList(ctx *gin.Context) {
 		httpbase.BadRequest(ctx, "Bad request of repo type")
 		return
 	}
-	response, err := h.c.ListRuntimeFramework(ctx, repoType, namespace, name)
+	response, err := h.c.ListRuntimeFramework(ctx, repoType, namespace, name, deployType)
 	if err != nil {
 		slog.Error("fail to list runtime framework", slog.String("error", err.Error()))
 		httpbase.ServerError(ctx, err)

@@ -676,7 +676,7 @@ func (c *ModelComponent) Deploy(ctx context.Context, namespace, name, currentUse
 	})
 }
 
-func (c *ModelComponent) ListModelsByRuntimeFrameworkID(ctx context.Context, currentUser string, per, page int, id int64) ([]types.Model, int, error) {
+func (c *ModelComponent) ListModelsByRuntimeFrameworkID(ctx context.Context, currentUser string, per, page int, id int64, deployType int) ([]types.Model, int, error) {
 	var (
 		user      database.User
 		err       error
@@ -689,7 +689,7 @@ func (c *ModelComponent) ListModelsByRuntimeFrameworkID(ctx context.Context, cur
 		}
 	}
 
-	runtimeRepos, err := c.rrtfms.ListByRuntimeFrameworkID(ctx, id)
+	runtimeRepos, err := c.rrtfms.ListByRuntimeFrameworkID(ctx, id, deployType)
 	if err != nil {
 		return nil, 0, fmt.Errorf("failed to get repo by runtime,error:%w", err)
 	}
@@ -720,4 +720,63 @@ func (c *ModelComponent) ListModelsByRuntimeFrameworkID(ctx context.Context, cur
 		})
 	}
 	return resModels, total, nil
+}
+
+func (c *ModelComponent) ListAllByRuntimeFramework(ctx context.Context, currentUser string) ([]database.RuntimeFramework, error) {
+	runtimes, err := c.runFrame.ListAll(ctx)
+	if err != nil {
+		newError := fmt.Errorf("failed to get public model repos,error:%w", err)
+		return nil, newError
+	}
+
+	return runtimes, nil
+}
+
+func (c *ModelComponent) SetRuntimeFrameworkModes(ctx context.Context, currentUser string, deployType int, id int64, paths []string) ([]string, error) {
+	runtimeRepos, err := c.rtfm.FindByID(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+
+	if runtimeRepos == nil {
+		return nil, fmt.Errorf("failed to get runtime framework")
+	}
+
+	models, err := c.ms.ListByPath(ctx, paths)
+	if err != nil {
+		return nil, err
+	}
+
+	var failedModels []string
+	for _, model := range models {
+		relations, err := c.rrtfms.GetByIDsAndType(ctx, id, model.Repository.ID, deployType)
+		if err != nil {
+			return nil, err
+		}
+		if relations == nil || len(relations) < 1 {
+			err = c.rrtfms.Add(ctx, id, model.Repository.ID, deployType)
+			if err != nil {
+				failedModels = append(failedModels, model.Repository.Path)
+			}
+		}
+	}
+
+	return failedModels, nil
+}
+
+func (c *ModelComponent) DeleteRuntimeFrameworkModes(ctx context.Context, currentUser string, deployType int, id int64, paths []string) ([]string, error) {
+	models, err := c.ms.ListByPath(ctx, paths)
+	if err != nil {
+		return nil, err
+	}
+
+	var failedModels []string
+	for _, model := range models {
+		err = c.rrtfms.Delete(ctx, id, model.Repository.ID, deployType)
+		if err != nil {
+			failedModels = append(failedModels, model.Repository.Path)
+		}
+	}
+
+	return failedModels, nil
 }
