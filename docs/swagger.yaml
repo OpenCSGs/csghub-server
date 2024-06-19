@@ -1,13 +1,21 @@
 definitions:
   database.AccessToken:
     properties:
+      app:
+        $ref: '#/definitions/types.AccessTokenApplication'
       created_at:
+        type: string
+      expired_at:
         type: string
       git_id:
         type: integer
       id:
         type: integer
+      is_active:
+        type: boolean
       name:
+        type: string
+      permission:
         type: string
       token:
         type: string
@@ -361,6 +369,14 @@ definitions:
     type: object
   types.APIInternalServerError:
     type: object
+  types.AccessTokenApplication:
+    enum:
+    - git
+    - mirror
+    type: string
+    x-enum-varnames:
+    - AccessTokenApplicationGit
+    - AccessTokenApplicationMirror
   types.Branch:
     properties:
       commit:
@@ -748,6 +764,10 @@ definitions:
     type: object
   types.CreateUserTokenRequest:
     properties:
+      application:
+        $ref: '#/definitions/types.AccessTokenApplication'
+      expired_at:
+        type: string
       name:
         type: string
       username:
@@ -815,6 +835,10 @@ definitions:
     type: object
   types.DeleteUserTokenRequest:
     properties:
+      application:
+        $ref: '#/definitions/types.AccessTokenApplication'
+      expired_at:
+        type: string
       name:
         type: string
       username:
@@ -2133,6 +2157,106 @@ paths:
       security:
       - ApiKey: []
       summary: Triggers the mirror synchronization
+      tags:
+      - Repository
+  /{repo_type}/{namespace}/{name}/mirror_from_saas:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: models,datasets,codes or spaces
+        enum:
+        - models
+        - datasets
+        - codes
+        - spaces
+        in: path
+        name: repo_type
+        required: true
+        type: string
+      - description: repo owner name
+        in: path
+        name: namespace
+        required: true
+        type: string
+      - description: repo name
+        in: path
+        name: name
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/types.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/database.Mirror'
+              type: object
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Mirror repo from OpenCSG Saas(only on-premises)
+      tags:
+      - Repository
+  /{repo_type}/{namespace}/{name}/mirror_from_saas/sync:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: models,datasets,codes or spaces
+        enum:
+        - models
+        - datasets
+        - codes
+        - spaces
+        in: path
+        name: repo_type
+        required: true
+        type: string
+      - description: repo owner name
+        in: path
+        name: namespace
+        required: true
+        type: string
+      - description: repo name
+        in: path
+        name: name
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/types.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/database.Mirror'
+              type: object
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Manually trigger mirror sync(only on-premises)
       tags:
       - Repository
   /{repo_type}/{namespace}/{name}/raw/{file_path}:

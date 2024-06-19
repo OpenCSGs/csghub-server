@@ -7802,6 +7802,166 @@ const docTemplate = `{
                 }
             }
         },
+        "/{repo_type}/{namespace}/{name}/mirror_from_saas": {
+            "post": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Repository"
+                ],
+                "summary": "Mirror repo from OpenCSG Saas(only on-premises)",
+                "parameters": [
+                    {
+                        "enum": [
+                            "models",
+                            "datasets",
+                            "codes",
+                            "spaces"
+                        ],
+                        "type": "string",
+                        "description": "models,datasets,codes or spaces",
+                        "name": "repo_type",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "repo owner name",
+                        "name": "namespace",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "repo name",
+                        "name": "name",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/types.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/database.Mirror"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            }
+        },
+        "/{repo_type}/{namespace}/{name}/mirror_from_saas/sync": {
+            "post": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Repository"
+                ],
+                "summary": "Manually trigger mirror sync(only on-premises)",
+                "parameters": [
+                    {
+                        "enum": [
+                            "models",
+                            "datasets",
+                            "codes",
+                            "spaces"
+                        ],
+                        "type": "string",
+                        "description": "models,datasets,codes or spaces",
+                        "name": "repo_type",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "repo owner name",
+                        "name": "namespace",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "repo name",
+                        "name": "name",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/types.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/database.Mirror"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            }
+        },
         "/{repo_type}/{namespace}/{name}/raw/{file_path}": {
             "get": {
                 "security": [
@@ -9218,7 +9378,13 @@ const docTemplate = `{
         "database.AccessToken": {
             "type": "object",
             "properties": {
+                "app": {
+                    "$ref": "#/definitions/types.AccessTokenApplication"
+                },
                 "created_at": {
+                    "type": "string"
+                },
+                "expired_at": {
                     "type": "string"
                 },
                 "git_id": {
@@ -9227,7 +9393,13 @@ const docTemplate = `{
                 "id": {
                     "type": "integer"
                 },
+                "is_active": {
+                    "type": "boolean"
+                },
                 "name": {
+                    "type": "string"
+                },
+                "permission": {
                     "type": "string"
                 },
                 "token": {
@@ -9753,6 +9925,17 @@ const docTemplate = `{
         },
         "types.APIInternalServerError": {
             "type": "object"
+        },
+        "types.AccessTokenApplication": {
+            "type": "string",
+            "enum": [
+                "git",
+                "mirror"
+            ],
+            "x-enum-varnames": [
+                "AccessTokenApplicationGit",
+                "AccessTokenApplicationMirror"
+            ]
         },
         "types.Branch": {
             "type": "object",
@@ -10320,6 +10503,12 @@ const docTemplate = `{
         "types.CreateUserTokenRequest": {
             "type": "object",
             "properties": {
+                "application": {
+                    "$ref": "#/definitions/types.AccessTokenApplication"
+                },
+                "expired_at": {
+                    "type": "string"
+                },
                 "name": {
                     "type": "string"
                 },
@@ -10422,6 +10611,12 @@ const docTemplate = `{
         "types.DeleteUserTokenRequest": {
             "type": "object",
             "properties": {
+                "application": {
+                    "$ref": "#/definitions/types.AccessTokenApplication"
+                },
+                "expired_at": {
+                    "type": "string"
+                },
                 "name": {
                     "type": "string"
                 },
