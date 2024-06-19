@@ -1387,7 +1387,7 @@ func (c *RepoComponent) ListRuntimeFrameworkWithType(ctx context.Context, deploy
 }
 
 // get runtime framework list
-func (c *RepoComponent) ListRuntimeFramework(ctx context.Context, repoType types.RepositoryType, namespace, name string) ([]types.RuntimeFramework, error) {
+func (c *RepoComponent) ListRuntimeFramework(ctx context.Context, repoType types.RepositoryType, namespace, name string, deployType int) ([]types.RuntimeFramework, error) {
 	repo, err := c.repo.FindByPath(ctx, repoType, namespace, name)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find repo, error: %w", err)
@@ -1395,7 +1395,7 @@ func (c *RepoComponent) ListRuntimeFramework(ctx context.Context, repoType types
 	if repo == nil {
 		return nil, fmt.Errorf("repo not exist, %s %s/%s", repoType, namespace, name)
 	}
-	frames, err := c.runFrame.ListByRepoID(ctx, repo.ID)
+	frames, err := c.runFrame.ListByRepoID(ctx, repo.ID, deployType)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list runtime frameworks, error: %w", err)
 	}

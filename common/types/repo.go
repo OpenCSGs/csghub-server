@@ -118,3 +118,7 @@ type RuntimeFramework struct {
 	ContainerPort int    `json:"container_port"`
 	Type          int    `json:"type"`
 }
+
+type RuntimeFrameworkModels struct {
+	Models []string `json:"models"`
+}
