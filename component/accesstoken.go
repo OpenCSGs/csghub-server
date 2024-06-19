@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 
+	"github.com/google/uuid"
 	"opencsg.com/csghub-server/builder/git"
 	"opencsg.com/csghub-server/builder/git/gitserver"
 	"opencsg.com/csghub-server/builder/store/database"
@@ -33,22 +34,32 @@ type AccessTokenComponent struct {
 }
 
 func (c *AccessTokenComponent) Create(ctx context.Context, req *types.CreateUserTokenRequest) (*database.AccessToken, error) {
+	var token database.AccessToken
 	user, err := c.us.FindByUsername(ctx, req.Username)
 	if err != nil {
 		return nil, fmt.Errorf("fail to find user,error:%w", err)
 	}
 
-	token, err := c.gs.CreateUserToken(req)
-	if err != nil {
-		return nil, fmt.Errorf("fail to create git user access token,error:%w", err)
-	}
+	if req.Application == types.AccessTokenApplicationGit {
+		token, err := c.gs.CreateUserToken(req)
+		if err != nil {
+			return nil, fmt.Errorf("fail to create git user access token,error:%w", err)
+		}
 
-	token.UserID = user.ID
-	err = c.ts.Create(ctx, token)
+		token.UserID = user.ID
+	} else {
+		token.GitID = int64(0)
+		token.Application = req.Application
+		token.Name = req.Name
+		token.UserID = user.ID
+		token.Token = uuid.New().String()
+	}
+	err = c.ts.Create(ctx, &token)
 	if err != nil {
 		return nil, fmt.Errorf("fail to create database user access token,error:%w", err)
 	}
-	return token, nil
+
+	return &token, nil
 }
 
 func (c *AccessTokenComponent) Delete(ctx context.Context, req *types.DeleteUserTokenRequest) error {

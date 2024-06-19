@@ -51,6 +51,9 @@ func (h *AccessTokenHandler) Create(ctx *gin.Context) {
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
+	if req.Application == "" {
+		req.Application = types.AccessTokenApplicationGit
+	}
 
 	req.Username = ctx.Param("username")
 	if currentUser != req.Username {

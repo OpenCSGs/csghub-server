@@ -130,11 +130,19 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 		modelsGroup.POST("/:namespace/:name/upload_file", middleware.RepoType(types.ModelRepo), repoCommonHandler.UploadFile)
 		// invoke model endpoint to do pediction
 		modelsGroup.POST("/:namespace/:name/predict", modelHandler.Predict)
+
 		modelsGroup.POST("/:namespace/:name/mirror", middleware.RepoType(types.ModelRepo), repoCommonHandler.CreateMirror)
 		modelsGroup.GET("/:namespace/:name/mirror", middleware.RepoType(types.ModelRepo), repoCommonHandler.GetMirror)
 		modelsGroup.PUT("/:namespace/:name/mirror", middleware.RepoType(types.ModelRepo), repoCommonHandler.UpdateMirror)
 		modelsGroup.DELETE("/:namespace/:name/mirror", middleware.RepoType(types.ModelRepo), repoCommonHandler.DeleteMirror)
 		modelsGroup.POST("/:namespace/:name/mirror/sync", middleware.RepoType(types.ModelRepo), repoCommonHandler.SyncMirror)
+
+		// mirror from SaaS, only on-premises available
+		if !config.Saas {
+			modelsGroup.POST("/:namespace/:name/mirror_from_saas", middleware.RepoType(types.ModelRepo), repoCommonHandler.MirrorFromSaas)
+			modelsGroup.POST("/:namespace/:name/mirror_from_saas/sync", middleware.RepoType(types.ModelRepo), repoCommonHandler.MirrorFromSaasSync)
+		}
+
 		// runtime framework
 		modelsGroup.GET("/:namespace/:name/runtime_framework", middleware.RepoType(types.ModelRepo), repoCommonHandler.RuntimeFrameworkList)
 		modelsGroup.POST("/:namespace/:name/runtime_framework", middleware.RepoType(types.ModelRepo), repoCommonHandler.RuntimeFrameworkCreate)
@@ -198,6 +206,12 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 		datasetsGroup.PUT("/:namespace/:name/mirror", middleware.RepoType(types.DatasetRepo), repoCommonHandler.UpdateMirror)
 		datasetsGroup.DELETE("/:namespace/:name/mirror", middleware.RepoType(types.DatasetRepo), repoCommonHandler.DeleteMirror)
 		datasetsGroup.POST("/:namespace/:name/mirror/sync", middleware.RepoType(types.DatasetRepo), repoCommonHandler.SyncMirror)
+
+		// mirror from SaaS, only on-premises available
+		if !config.Saas {
+			datasetsGroup.POST("/:namespace/:name/mirror_from_saas", middleware.RepoType(types.DatasetRepo), repoCommonHandler.MirrorFromSaas)
+			datasetsGroup.POST("/:namespace/:name/mirror_from_saas/sync", middleware.RepoType(types.DatasetRepo), repoCommonHandler.MirrorFromSaasSync)
+		}
 	}
 
 	// Code routes
@@ -236,6 +250,12 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 		codesGroup.PUT("/:namespace/:name/mirror", middleware.RepoType(types.CodeRepo), repoCommonHandler.UpdateMirror)
 		codesGroup.DELETE("/:namespace/:name/mirror", middleware.RepoType(types.CodeRepo), repoCommonHandler.DeleteMirror)
 		codesGroup.POST("/:namespace/:name/mirror/sync", middleware.RepoType(types.CodeRepo), repoCommonHandler.SyncMirror)
+
+		// mirror from SaaS, only on-premises available
+		if !config.Saas {
+			codesGroup.POST("/:namespace/:name/mirror_from_saas", middleware.RepoType(types.CodeRepo), repoCommonHandler.MirrorFromSaas)
+			codesGroup.POST("/:namespace/:name/mirror_from_saas/sync", middleware.RepoType(types.CodeRepo), repoCommonHandler.MirrorFromSaasSync)
+		}
 	}
 
 	// Dataset viewer
@@ -293,6 +313,13 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 		spaces.PUT("/:namespace/:name/mirror", middleware.RepoType(types.SpaceRepo), repoCommonHandler.UpdateMirror)
 		spaces.DELETE("/:namespace/:name/mirror", middleware.RepoType(types.SpaceRepo), repoCommonHandler.DeleteMirror)
 		spaces.POST("/:namespace/:name/mirror/sync", middleware.RepoType(types.SpaceRepo), repoCommonHandler.SyncMirror)
+
+		// mirror from SaaS, only on-premises available
+		if !config.Saas {
+			spaces.POST("/:namespace/:name/mirror_from_saas", middleware.RepoType(types.SpaceRepo), repoCommonHandler.MirrorFromSaas)
+			spaces.POST("/:namespace/:name/mirror_from_saas/sync", middleware.RepoType(types.SpaceRepo), repoCommonHandler.MirrorFromSaasSync)
+		}
+
 		spaces.GET("/:namespace/:name/runtime_framework", middleware.RepoType(types.SpaceRepo), repoCommonHandler.RuntimeFrameworkList)
 		spaces.POST("/:namespace/:name/runtime_framework", middleware.RepoType(types.SpaceRepo), repoCommonHandler.RuntimeFrameworkCreate)
 		spaces.PUT("/:namespace/:name/runtime_framework/:id", middleware.RepoType(types.SpaceRepo), repoCommonHandler.RuntimeFrameworkUpdate)
@@ -467,6 +494,12 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 	runtimeFramework := apiGroup.Group("/runtime_framework")
 	{
 		runtimeFramework.GET("/:id/models", modelHandler.ListByRuntimeFrameworkID)
+	}
+	syncHandler, err := handler.NewSyncHandler(config)
+	syncGroup := apiGroup.Group("sync")
+	{
+		syncGroup.GET("/version/latest", syncHandler.Latest)
+		// syncGroup.GET("/version/oldest", syncHandler.Oldest)
 	}
 
 	return r, nil

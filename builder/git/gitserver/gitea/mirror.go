@@ -5,26 +5,29 @@ import (
 
 	"github.com/OpenCSGs/gitea-go-sdk/gitea"
 	"opencsg.com/csghub-server/builder/git/gitserver"
+	"opencsg.com/csghub-server/common/utils/common"
 )
 
 func (c *Client) CreateMirrorRepo(ctx context.Context, req gitserver.CreateMirrorRepoReq) (int64, error) {
 	task, _, err := c.giteaClient.MigrateRepo(gitea.MigrateRepoOption{
-		RepoName:     req.Name,
-		RepoOwner:    req.Namespace,
-		CloneAddr:    req.CloneUrl,
-		Service:      gitea.GitServicePlain,
-		AuthUsername: req.Username,
-		AuthPassword: req.AccessToken,
-		Mirror:       true,
-		Private:      req.Private,
-		Description:  req.Description,
-		Wiki:         false,
-		Milestones:   false,
-		Labels:       false,
-		Issues:       false,
-		PullRequests: false,
-		Releases:     false,
-		LFS:          true,
+		RepoName:       req.Name,
+		RepoOwner:      common.WithPrefix(req.Namespace, repoPrefixByType(req.RepoType)),
+		CloneAddr:      req.CloneUrl,
+		Service:        gitea.GitServicePlain,
+		AuthUsername:   req.Username,
+		AuthPassword:   req.AccessToken,
+		Mirror:         true,
+		Private:        req.Private,
+		Description:    req.Description,
+		Wiki:           false,
+		Milestones:     false,
+		Labels:         false,
+		Issues:         false,
+		PullRequests:   false,
+		Releases:       false,
+		LFS:            true,
+		MirrorInterval: "0",
+		Token:          req.MirrorToken,
 	})
 	if err != nil {
 		return 0, err
@@ -50,7 +53,8 @@ func (c *Client) GetMirrorTaskInfo(ctx context.Context, taskId int64) (*gitserve
 }
 
 func (c *Client) MirrorSync(ctx context.Context, req gitserver.MirrorSyncReq) error {
-	_, err := c.giteaClient.MirrorSync(req.Namespace, req.Name)
+	namespace := common.WithPrefix(req.Namespace, repoPrefixByType(req.RepoType))
+	_, err := c.giteaClient.MirrorSync(namespace, req.Name)
 	if err != nil {
 		return err
 	}

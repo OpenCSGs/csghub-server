@@ -13,6 +13,7 @@ import (
 	"opencsg.com/csghub-server/cmd/csghub-server/cmd/migration"
 	"opencsg.com/csghub-server/cmd/csghub-server/cmd/mirror"
 	"opencsg.com/csghub-server/cmd/csghub-server/cmd/start"
+	"opencsg.com/csghub-server/cmd/csghub-server/cmd/syncversion"
 	"opencsg.com/csghub-server/cmd/csghub-server/cmd/trigger"
 )
 
@@ -52,6 +53,7 @@ func init() {
 		cron.Cmd,
 		mirror.Cmd,
 		accounting.Cmd,
+		syncversion.Cmd,
 	)
 }
 

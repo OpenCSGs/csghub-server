@@ -153,13 +153,13 @@ func (s *ModelStore) Update(ctx context.Context, input Model) (*Model, error) {
 	return &input, err
 }
 
-func (s *ModelStore) FindByPath(ctx context.Context, namespace string, repoPath string) (*Model, error) {
+func (s *ModelStore) FindByPath(ctx context.Context, namespace string, name string) (*Model, error) {
 	resModel := new(Model)
 	err := s.db.Operator.Core.
 		NewSelect().
 		Model(resModel).
 		Relation("Repository.User").
-		Where("repository.path =?", fmt.Sprintf("%s/%s", namespace, repoPath)).
+		Where("repository.path =?", fmt.Sprintf("%s/%s", namespace, name)).
 		Limit(1).
 		Scan(ctx)
 	if err != nil {

@@ -3,7 +3,7 @@ package config
 import "github.com/kelseyhightower/envconfig"
 
 type Config struct {
-	Saas          bool   `envconfig:"STARHUB_SERVER_SAAS" default:"true"`
+	Saas          bool   `envconfig:"STARHUB_SERVER_SAAS" default:"false"`
 	InstanceID    string `envconfig:"STARHUB_SERVER_INSTANCE_ID"`
 	EnableSwagger bool   `envconfig:"STARHUB_SERVER_ENABLE_SWAGGER" default:"false"`
 	// enable if you want to acess csghub through https, especially for space rproxy
@@ -13,6 +13,13 @@ type Config struct {
 	APIServer struct {
 		Port         int    `envconfig:"STARHUB_SERVER_SERVER_PORT" default:"8080"`
 		PublicDomain string `envconfig:"STARHUB_SERVER_PUBLIC_DOMAIN" default:"localhost:8080"`
+	}
+
+	Mirror struct {
+		URL              string `envconfig:"STARHUB_SERVER_MIRROR_URL" default:"http://localhost:8085"`
+		Token            string `envconfig:"STARHUB_SERVER_MIRROR_Token" default:""`
+		Port             int    `envconfig:"STARHUB_SERVER_MIRROR_PORT" default:"8085"`
+		SessionSecretKey string `envconfig:"STARHUB_SERVER_MIRROR_SESSION_SECRET_KEY" default:"mirror"`
 	}
 
 	DocsHost string `envconfig:"STARHUB_SERVER_SERVER_DOCS_HOST" default:"http://localhost:6636"`
@@ -54,7 +61,7 @@ type Config struct {
 	}
 
 	Frontend struct {
-		URL string `envconfig:"STARHUB_SERVER_FRONTEND_URL" default:"https://portal-stg.opencsg.com"`
+		URL string `envconfig:"STARHUB_SERVER_FRONTEND_URL" default:"https://opencsg.com"`
 	}
 
 	S3 struct {
@@ -105,7 +112,7 @@ type Config struct {
 
 	Model struct {
 		DeployTimeoutInMin int    `envconfig:"STARHUB_SERVER_MODEL_DEPLOY_TIMEOUT_IN_MINUTES" default:"30"`
-		DownloadEndpoint   string `envconfig:"STARHUB_SERVER_MODEL_DOWNLOAD_ENDPOINT" default:"https://hub-stg.opencsg.com/"`
+		DownloadEndpoint   string `envconfig:"STARHUB_SERVER_MODEL_DOWNLOAD_ENDPOINT" default:"https://hub-stg./"`
 		DockerRegBase      string `envconfig:"STARHUB_SERVER_MODEL_DOCKER_REG_BASE" default:"opencsg-registry.cn-beijing.cr.aliyuncs.com/public/"`
 	}
 
@@ -124,6 +131,10 @@ type Config struct {
 		FeeRequestSubject         string `envconfig:"OPENCSG_ACCOUNTING_FEE_EVENT_SUBJECT" default:"accounting.fee.>"`
 		FeeNotifyNoBalanceSubject string `envconfig:"OPENCSG_ACCOUNTING_NOTIFY_NOBALANCE_SUBJECT" default:"accounting.notify.nobalance"`
 		MsgFetchTimeoutInSEC      int    `envconfig:"OPENCSG_ACCOUNTING_MSG_FETCH_TIMEOUTINSEC" default:"5"`
+	}
+
+	MultiSync struct {
+		// Enabled bool `envconfig:"STARHUB_SERVER_MULTI_SYNC_ENABLED" default:"false"`
 	}
 }
 

@@ -1214,6 +1214,31 @@ definitions:
       version:
         type: string
     type: object
+  types.SyncVersion:
+    properties:
+      change_log:
+        type: string
+      last_modify_time:
+        type: string
+      repo_path:
+        type: string
+      repo_type:
+        $ref: '#/definitions/types.RepositoryType'
+      source_id:
+        description: '0: opencsg, 1: HF'
+        type: integer
+      version:
+        type: integer
+    type: object
+  types.SyncVersionResponse:
+    properties:
+      has_more:
+        type: boolean
+      versions:
+        items:
+          $ref: '#/definitions/types.SyncVersion'
+        type: array
+    type: object
   types.UpdateCodeReq:
     properties:
       default_branch:
@@ -6221,6 +6246,44 @@ paths:
       summary: wake up space app
       tags:
       - Space
+  /sync/version/latest:
+    get:
+      parameters:
+      - description: current version
+        in: query
+        name: cur
+        required: true
+        type: string
+      - description: current_user
+        in: query
+        name: current_user
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/types.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/types.SyncVersionResponse'
+              type: object
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Get latest version
+      tags:
+      - Sync
   /tags:
     get:
       consumes:
