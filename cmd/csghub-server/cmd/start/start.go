@@ -14,7 +14,7 @@ import (
 func init() {
 	Cmd.AddCommand(serverCmd)
 	Cmd.AddCommand(rproxyCmd)
-	Cmd.AddCommand(mirrorCmd)
+	Cmd.AddCommand(syncServerCmd)
 }
 
 var Cmd = &cobra.Command{

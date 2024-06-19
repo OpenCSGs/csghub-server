@@ -9,7 +9,7 @@ import (
 	"opencsg.com/csghub-server/multisync/handler"
 )
 
-func NewMirrorRouter(config *config.Config) (*gin.Engine, error) {
+func NewRouter(config *config.Config) (*gin.Engine, error) {
 	r := gin.New()
 	r.Use(gin.Recovery())
 	r.Use(middleware.Log())

@@ -10,9 +10,9 @@ import (
 	"opencsg.com/csghub-server/multisync/router"
 )
 
-var mirrorCmd = &cobra.Command{
-	Use:     "mirror",
-	Short:   "Start the reverse proxy server",
+var syncServerCmd = &cobra.Command{
+	Use:     "sync-server",
+	Short:   "Start the multi source sync server",
 	Example: rproxyExample(),
 	RunE: func(*cobra.Command, []string) (err error) {
 		cfg, err := config.LoadConfig()
@@ -25,7 +25,7 @@ var mirrorCmd = &cobra.Command{
 			DSN:     cfg.Database.DSN,
 		}
 		database.InitDB(dbConfig)
-		r, err := router.NewMirrorRouter(cfg)
+		r, err := router.NewRouter(cfg)
 		if err != nil {
 			return fmt.Errorf("failed to init router: %w", err)
 		}
@@ -41,9 +41,9 @@ var mirrorCmd = &cobra.Command{
 	},
 }
 
-func mirrorExample() string {
+func syncServerExample() string {
 	return `
 # for development
-csghub-server start rproxy
+csghub-server start sync-server
 `
 }
