@@ -28,6 +28,7 @@ type AccessToken struct {
 	Application types.AccessTokenApplication `bun:"app,notnull" json:"app"`
 	ExpiredAt   time.Time                    `bun:"" json:"expired_at"`
 	IsActive    bool                         `bun:",notnull" json:"is_active"`
+	Permission  string                       `bun:"," json:"permission"`
 	times
 }
 
