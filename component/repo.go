@@ -1120,7 +1120,7 @@ func (c *RepoComponent) CreateMirror(ctx context.Context, req types.CreateMirror
 	if err != nil {
 		return nil, fmt.Errorf("failed to get mirror source, err: %w, id: %d", err, req.MirrorSourceID)
 	}
-	pushAccessToken, err := c.tokenStore.FindByUsername(ctx, req.CurrentUser)
+	pushAccessToken, err := c.tokenStore.GetUserGitToken(ctx, req.CurrentUser)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find access token, error: %w", err)
 	}
@@ -1318,7 +1318,7 @@ func (c *RepoComponent) UpdateMirror(ctx context.Context, req types.UpdateMirror
 		return nil, fmt.Errorf("failed to get mirror source, err: %w, id: %d", err, req.MirrorSourceID)
 	}
 
-	pushAccessToken, err := c.tokenStore.FindByUsername(ctx, req.CurrentUser)
+	pushAccessToken, err := c.tokenStore.GetUserGitToken(ctx, req.CurrentUser)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find access token, error: %w", err)
 	}

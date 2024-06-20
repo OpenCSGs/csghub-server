@@ -1,8 +1,10 @@
 definitions:
   database.AccessToken:
     properties:
-      app:
-        $ref: '#/definitions/types.AccessTokenApplication'
+      application:
+        allOf:
+        - $ref: '#/definitions/types.AccessTokenApp'
+        description: 'example: csghub, starship'
       created_at:
         type: string
       expired_at:
@@ -318,6 +320,9 @@ definitions:
         items:
           $ref: '#/definitions/database.AccessToken'
         type: array
+      casdoor_uuid:
+        description: TODO:add unique index after migration
+        type: string
       created_at:
         type: string
       email:
@@ -369,14 +374,18 @@ definitions:
     type: object
   types.APIInternalServerError:
     type: object
-  types.AccessTokenApplication:
+  types.AccessTokenApp:
     enum:
     - git
+    - git
     - mirror
+    - starship
     type: string
     x-enum-varnames:
-    - AccessTokenApplicationGit
-    - AccessTokenApplicationMirror
+    - AccessTokenAppGit
+    - AccessTokenAppCSGHub
+    - AccessTokenAppMirror
+    - AccessTokenAppStarship
   types.Branch:
     properties:
       commit:
@@ -765,13 +774,18 @@ definitions:
   types.CreateUserTokenRequest:
     properties:
       application:
-        $ref: '#/definitions/types.AccessTokenApplication'
+        allOf:
+        - $ref: '#/definitions/types.AccessTokenApp'
+        description: default to csghub
       expired_at:
         type: string
       name:
         type: string
-      username:
+      permission:
+        description: default to empty, means full permission
         type: string
+    required:
+    - name
     type: object
   types.Dataset:
     properties:
@@ -836,13 +850,18 @@ definitions:
   types.DeleteUserTokenRequest:
     properties:
       application:
-        $ref: '#/definitions/types.AccessTokenApplication'
+        allOf:
+        - $ref: '#/definitions/types.AccessTokenApp'
+        description: default to csghub
       expired_at:
         type: string
       name:
         type: string
-      username:
+      permission:
+        description: default to empty, means full permission
         type: string
+    required:
+    - name
     type: object
   types.EditOrgReq:
     properties:
@@ -6592,6 +6611,186 @@ paths:
       summary: Get all tags
       tags:
       - Tag
+  /token/{app}/{token_name}:
+    delete:
+      consumes:
+      - application/json
+      parameters:
+      - description: application
+        enum:
+        - git
+        - starship
+        in: path
+        name: app
+        required: true
+        type: string
+      - description: token_name
+        in: path
+        name: token_name
+        required: true
+        type: string
+      - description: current user, the owner
+        in: query
+        name: current_user
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/types.Response'
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Delete access token of a app
+      tags:
+      - Access token
+    put:
+      consumes:
+      - application/json
+      parameters:
+      - description: application
+        enum:
+        - git
+        - starship
+        in: path
+        name: app
+        required: true
+        type: string
+      - description: token_name
+        in: path
+        name: token_name
+        required: true
+        type: string
+      - description: current user, the owner
+        in: query
+        name: current_user
+        required: true
+        type: string
+      - description: new expire time, in format RFC3339, like 2006-01-02T15:04:05Z07:00
+        in: query
+        name: expired_at
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/types.Response'
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Refresh a access token for a user
+      tags:
+      - Access token
+  /token/{app}/{username}:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: username
+        in: path
+        name: username
+        required: true
+        type: string
+      - description: application
+        enum:
+        - git
+        - starship
+        in: path
+        name: app
+        required: true
+        type: string
+      - description: current user, the owner
+        in: query
+        name: current_user
+        required: true
+        type: string
+      - description: body
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/types.CreateUserTokenRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/types.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/database.AccessToken'
+              type: object
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Create access token for an special application
+      tags:
+      - Access token
+  /token/{token_value}:
+    get:
+      consumes:
+      - application/json
+      parameters:
+      - description: token_value
+        in: path
+        name: token_value
+        required: true
+        type: string
+      - description: application
+        enum:
+        - git
+        - starship
+        in: query
+        name: app
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/types.Response'
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Get token and owner's detail by the token value
+      tags:
+      - Access token
   /user/{username}/codes:
     get:
       consumes:
@@ -7196,6 +7395,46 @@ paths:
       tags:
       - SSH Key
   /user/{username}/tokens:
+    get:
+      consumes:
+      - application/json
+      parameters:
+      - description: username
+        in: path
+        name: username
+        required: true
+        type: string
+      - description: current user name
+        in: query
+        name: current_user
+        type: string
+      - description: application
+        enum:
+        - git
+        - starship
+        in: query
+        name: app
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/types.Response'
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Get all access tokens for a user
+      tags:
+      - Access token
     post:
       consumes:
       - application/json
@@ -7239,14 +7478,13 @@ paths:
             $ref: '#/definitions/types.APIInternalServerError'
       security:
       - ApiKey: []
-      summary: Create access token for a user
+      summary: '[Deprecated: use POST:/token/{app}/{username} instead]'
       tags:
       - Access token
   /user/{username}/tokens/{token_name}:
     delete:
       consumes:
       - application/json
-      description: delete access token for a user
       parameters:
       - description: username
         in: path
@@ -7286,7 +7524,7 @@ paths:
             $ref: '#/definitions/types.APIInternalServerError'
       security:
       - ApiKey: []
-      summary: Delete access token for a user
+      summary: '[Deprecated: use DELETE:/token/{app}/{token_name} instead]'
       tags:
       - Access token
   /users:

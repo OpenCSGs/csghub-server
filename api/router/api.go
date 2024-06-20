@@ -29,6 +29,8 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 	r.Use(middleware.Log())
 	r.Use(middleware.Authenticator(config))
 
+	needAPIKey := middleware.OnlyAPIKeyAuthenticator(config)
+
 	if enableSwagger {
 		r.GET("/api/v1/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 	}
@@ -356,6 +358,11 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 		spaceSdk.DELETE("/:id", spaceSdkHandler.Delete)
 	}
 
+	acHandler, err := handler.NewAccessTokenHandler(config)
+	if err != nil {
+		return nil, fmt.Errorf("error creating user controller:%w", err)
+	}
+
 	{
 		apiGroup.POST("/users", userHandler.Create)
 		apiGroup.PUT("/users/:username", userHandler.Update)
@@ -374,11 +381,19 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 		apiGroup.GET("/user/:username/likes/datasets", userHandler.LikesDatasets)
 		apiGroup.GET("/user/:username/run/:repo_type", userHandler.GetRunDeploys)
 		apiGroup.GET("/user/:username/finetune/instances", userHandler.GetFinetuneInstances)
+		//user owned tokens
+		apiGroup.GET("/user/:username/tokens", acHandler.GetUserTokens)
 	}
-	acHandler, err := handler.NewAccessTokenHandler(config)
-	if err != nil {
-		return nil, fmt.Errorf("error creating user controller:%w", err)
+
+	tokenGroup := apiGroup.Group("token")
+	{
+		tokenGroup.POST("/:app/:token_name", acHandler.CreateAppToken)
+		tokenGroup.PUT("/:app/:token_name", acHandler.Refresh)
+		tokenGroup.DELETE("/:app/:token_name", acHandler.DeleteAppToken)
+		// check token info
+		tokenGroup.GET("/:token_value", needAPIKey, acHandler.Get)
 	}
+	//Depreated:
 	{
 		apiGroup.POST("/user/:username/tokens", acHandler.Create)
 		apiGroup.DELETE("/user/:username/tokens/:token_name", acHandler.Delete)
@@ -435,7 +450,7 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 	if err != nil {
 		return nil, fmt.Errorf("error creating jwt token controller:%w", err)
 	}
-	apiGroup.POST("/jwt/token", middleware.OnlyAPIKeyAuthenticator(config), jwtCtrl.Create)
+	apiGroup.POST("/jwt/token", needAPIKey, jwtCtrl.Create)
 
 	// callback
 	callbackCtrl, err := callback.NewGitCallbackHandler(config)
@@ -463,7 +478,7 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 	}
 
 	mirror := apiGroup.Group("/mirror")
-	mirror.Use(middleware.OnlyAPIKeyAuthenticator(config))
+	mirror.Use(needAPIKey)
 	{
 		mirror.GET("/sources", msHandler.Index)
 		mirror.POST("/sources", msHandler.Create)

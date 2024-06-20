@@ -28,10 +28,30 @@ type UpdateUserResp struct {
 }
 
 type CreateUserTokenRequest struct {
-	Username    string                 `json:"username"`
-	Name        string                 `json:"name"`
-	ExpiredAt   time.Time              `json:"expired_at"`
-	Application AccessTokenApplication `json:"application"`
+	Username  string `json:"-" `
+	TokenName string `json:"name" binding:"required"`
+	//default to csghub
+	Application AccessTokenApp `json:"application,omitempty"`
+	//default to empty, means full permission
+	Permission string    `json:"permission,omitempty"`
+	ExpiredAt  time.Time `json:"expired_at"`
+}
+
+type CheckAccessTokenReq struct {
+	Token string `json:"token" binding:"required"`
+	//Optional, if given only check the token belongs to this application
+	Application string `json:"application"`
+}
+
+type CheckAccessTokenResp struct {
+	Token       string         `json:"token"`
+	TokenName   string         `json:"token_name"`
+	Application AccessTokenApp `json:"application"`
+	Permission  string         `json:"permission,omitempty"`
+	// the login name
+	Username   string    `json:"username"`
+	CasdoorUID string    `json:"casdoor_uid"`
+	ExpireAt   time.Time `json:"expire_at"`
 }
 
 type UserDatasetsReq struct {
@@ -64,6 +84,7 @@ type UserLikesRequest struct {
 	CurrentUser string `json:"current_user"`
 }
 
+/* for HF compitable apis  */
 type WhoamiResponse struct {
 	Name  string `json:"name"`
 	Email string `json:"email"`
@@ -85,9 +106,11 @@ type UserRepoReq struct {
 	PageOpts
 }
 
-type AccessTokenApplication string
+type AccessTokenApp string
 
 const (
-	AccessTokenApplicationGit    AccessTokenApplication = "git"
-	AccessTokenApplicationMirror AccessTokenApplication = "mirror"
+	AccessTokenAppGit      AccessTokenApp = "git"
+	AccessTokenAppCSGHub                  = AccessTokenAppGit
+	AccessTokenAppMirror   AccessTokenApp = "mirror"
+	AccessTokenAppStarship AccessTokenApp = "starship"
 )

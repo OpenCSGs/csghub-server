@@ -114,6 +114,7 @@ func (c *UserComponent) Create(ctx context.Context, req *types.CreateUserRequest
 	namespace := &database.Namespace{
 		Path: user.Username,
 	}
+	user.CasdoorUUID = req.CasdoorUID
 	err = c.us.Create(ctx, user, namespace)
 	if err != nil {
 		newError := fmt.Errorf("failed to create user,error:%w", err)
