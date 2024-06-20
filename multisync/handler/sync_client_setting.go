@@ -10,22 +10,22 @@ import (
 	"opencsg.com/csghub-server/multisync/types"
 )
 
-type MirrorTokenHandler struct {
-	c *component.MirrorTokenComponent
+type SyncClientSettingHandler struct {
+	c *component.SyncClientSettingComponent
 }
 
-func NewMirrorTokenHandler(config *config.Config) (*MirrorTokenHandler, error) {
-	c, err := component.NewMirrorTokenComponent(config)
+func NewSyncClientSettingHandler(config *config.Config) (*SyncClientSettingHandler, error) {
+	c, err := component.NewSyncClientSettingComponent(config)
 	if err != nil {
 		return nil, err
 	}
-	return &MirrorTokenHandler{
+	return &SyncClientSettingHandler{
 		c: c,
 	}, nil
 }
 
-func (h *MirrorTokenHandler) Create(ctx *gin.Context) {
-	var req types.CreateMirrorTokenReq
+func (h *SyncClientSettingHandler) Create(ctx *gin.Context) {
+	var req types.CreateSyncClientSettingReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {
 		slog.Error("Bad request format", "error", err)
 		httpbase.BadRequest(ctx, err.Error())

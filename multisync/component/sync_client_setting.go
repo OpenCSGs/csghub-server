@@ -9,18 +9,18 @@ import (
 	"opencsg.com/csghub-server/multisync/types"
 )
 
-type MirrorTokenComponent struct {
-	mtStore *database.MirrorTokenStore
+type SyncClientSettingComponent struct {
+	mtStore *database.SyncClientSettingStore
 }
 
-func NewMirrorTokenComponent(config *config.Config) (*MirrorTokenComponent, error) {
-	return &MirrorTokenComponent{
-		mtStore: database.NewMirrorTokenStore(),
+func NewSyncClientSettingComponent(config *config.Config) (*SyncClientSettingComponent, error) {
+	return &SyncClientSettingComponent{
+		mtStore: database.NewSyncClientSettingStore(),
 	}, nil
 }
 
-func (c *MirrorTokenComponent) Create(ctx context.Context, req types.CreateMirrorTokenReq) (*database.MirrorToken, error) {
-	exists, err := c.mtStore.MirrorTokenExists(ctx)
+func (c *SyncClientSettingComponent) Create(ctx context.Context, req types.CreateSyncClientSettingReq) (*database.SyncClientSetting, error) {
+	exists, err := c.mtStore.SyncClientSettingExists(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to check mirror token if exists, error: %w", err)
 	}
@@ -30,7 +30,7 @@ func (c *MirrorTokenComponent) Create(ctx context.Context, req types.CreateMirro
 			return nil, fmt.Errorf("failed to delete existing mirror token, error: %w", err)
 		}
 	}
-	var mt database.MirrorToken
+	var mt database.SyncClientSetting
 	mt.Token = req.Token
 	mt.ConcurrentCount = req.ConcurrentCount
 	mt.MaxBandwidth = req.MaxBandwidth
