@@ -363,7 +363,8 @@ func (s *RepoStore) PublicToUser(ctx context.Context, repoType types.RepositoryT
 
 	if sort == "trending" {
 		q.Join("Left Join recom_repo_scores on repository.id = recom_repo_scores.repository_id")
-		q.ColumnExpr(`COALESCE(recom_repo_scores.score, 0) AS popularity`)
+		q.Join("Left Join recom_op_weights on repository.id = recom_op_weights.repository_id")
+		q.ColumnExpr(`COALESCE(recom_repo_scores.score, 0)+COALESCE(recom_op_weights.weight, 0) AS popularity`)
 	}
 
 	err = q.Order(sortBy[sort]).
