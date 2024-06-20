@@ -39,15 +39,6 @@ func NewRouter(config *config.Config) (*gin.Engine, error) {
 		rGroup.GET("/objects/pack/pack-:file", mpHandler.Serve)
 	}
 
-	syncClientSettingHandler, err := handler.NewSyncClientSettingHandler(config)
-	if err != nil {
-		return nil, fmt.Errorf("error creating sync client setting handler:%w", err)
-	}
-	apiGroup := r.Group("/api/v1")
-	{
-		apiGroup.POST("/sync_client_setting", syncClientSettingHandler.Create)
-	}
-
 	// r.Any("/*api", handler.Serve)
 
 	return r, nil
