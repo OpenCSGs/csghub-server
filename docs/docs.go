@@ -5392,6 +5392,287 @@ const docTemplate = `{
                 }
             }
         },
+        "/token/{app}/{token_name}": {
+            "put": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Access token"
+                ],
+                "summary": "Refresh a access token for a user",
+                "parameters": [
+                    {
+                        "enum": [
+                            "git",
+                            "starship"
+                        ],
+                        "type": "string",
+                        "description": "application",
+                        "name": "app",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "token_name",
+                        "name": "token_name",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "current user, the owner",
+                        "name": "current_user",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "new expire time, in format RFC3339, like 2006-01-02T15:04:05Z07:00",
+                        "name": "expired_at",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/types.Response"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Access token"
+                ],
+                "summary": "Delete access token of a app",
+                "parameters": [
+                    {
+                        "enum": [
+                            "git",
+                            "starship"
+                        ],
+                        "type": "string",
+                        "description": "application",
+                        "name": "app",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "token_name",
+                        "name": "token_name",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "current user, the owner",
+                        "name": "current_user",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/types.Response"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            }
+        },
+        "/token/{app}/{username}": {
+            "post": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Access token"
+                ],
+                "summary": "Create access token for an special application",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "username",
+                        "name": "username",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "enum": [
+                            "git",
+                            "starship"
+                        ],
+                        "type": "string",
+                        "description": "application",
+                        "name": "app",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "current user, the owner",
+                        "name": "current_user",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "description": "body",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/types.CreateUserTokenRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/types.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/database.AccessToken"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            }
+        },
+        "/token/{token_value}": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Access token"
+                ],
+                "summary": "Get token and owner's detail by the token value",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "token_value",
+                        "name": "token_value",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "enum": [
+                            "git",
+                            "starship"
+                        ],
+                        "type": "string",
+                        "description": "application",
+                        "name": "app",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/types.Response"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            }
+        },
         "/user/{username}/codes": {
             "get": {
                 "security": [
@@ -6376,6 +6657,68 @@ const docTemplate = `{
             }
         },
         "/user/{username}/tokens": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Access token"
+                ],
+                "summary": "Get all access tokens for a user",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "username",
+                        "name": "username",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "current user name",
+                        "name": "current_user",
+                        "in": "query"
+                    },
+                    {
+                        "enum": [
+                            "git",
+                            "starship"
+                        ],
+                        "type": "string",
+                        "description": "application",
+                        "name": "app",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/types.Response"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            },
             "post": {
                 "security": [
                     {
@@ -6392,7 +6735,7 @@ const docTemplate = `{
                 "tags": [
                     "Access token"
                 ],
-                "summary": "Create access token for a user",
+                "summary": "[Deprecated: use POST:/token/{app}/{username} instead]",
                 "parameters": [
                     {
                         "type": "string",
@@ -6459,7 +6802,6 @@ const docTemplate = `{
                         "ApiKey": []
                     }
                 ],
-                "description": "delete access token for a user",
                 "consumes": [
                     "application/json"
                 ],
@@ -6469,7 +6811,7 @@ const docTemplate = `{
                 "tags": [
                     "Access token"
                 ],
-                "summary": "Delete access token for a user",
+                "summary": "[Deprecated: use DELETE:/token/{app}/{token_name} instead]",
                 "parameters": [
                     {
                         "type": "string",
@@ -9378,8 +9720,13 @@ const docTemplate = `{
         "database.AccessToken": {
             "type": "object",
             "properties": {
-                "app": {
-                    "$ref": "#/definitions/types.AccessTokenApplication"
+                "application": {
+                    "description": "example: csghub, starship",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/types.AccessTokenApp"
+                        }
+                    ]
                 },
                 "created_at": {
                     "type": "string"
@@ -9849,6 +10196,10 @@ const docTemplate = `{
                         "$ref": "#/definitions/database.AccessToken"
                     }
                 },
+                "casdoor_uuid": {
+                    "description": "TODO:add unique index after migration",
+                    "type": "string"
+                },
                 "created_at": {
                     "type": "string"
                 },
@@ -9926,15 +10277,19 @@ const docTemplate = `{
         "types.APIInternalServerError": {
             "type": "object"
         },
-        "types.AccessTokenApplication": {
+        "types.AccessTokenApp": {
             "type": "string",
             "enum": [
                 "git",
-                "mirror"
+                "git",
+                "mirror",
+                "starship"
             ],
             "x-enum-varnames": [
-                "AccessTokenApplicationGit",
-                "AccessTokenApplicationMirror"
+                "AccessTokenAppGit",
+                "AccessTokenAppCSGHub",
+                "AccessTokenAppMirror",
+                "AccessTokenAppStarship"
             ]
         },
         "types.Branch": {
@@ -10502,9 +10857,17 @@ const docTemplate = `{
         },
         "types.CreateUserTokenRequest": {
             "type": "object",
+            "required": [
+                "name"
+            ],
             "properties": {
                 "application": {
-                    "$ref": "#/definitions/types.AccessTokenApplication"
+                    "description": "default to csghub",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/types.AccessTokenApp"
+                        }
+                    ]
                 },
                 "expired_at": {
                     "type": "string"
@@ -10512,7 +10875,8 @@ const docTemplate = `{
                 "name": {
                     "type": "string"
                 },
-                "username": {
+                "permission": {
+                    "description": "default to empty, means full permission",
                     "type": "string"
                 }
             }
@@ -10610,9 +10974,17 @@ const docTemplate = `{
         },
         "types.DeleteUserTokenRequest": {
             "type": "object",
+            "required": [
+                "name"
+            ],
             "properties": {
                 "application": {
-                    "$ref": "#/definitions/types.AccessTokenApplication"
+                    "description": "default to csghub",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/types.AccessTokenApp"
+                        }
+                    ]
                 },
                 "expired_at": {
                     "type": "string"
@@ -10620,7 +10992,8 @@ const docTemplate = `{
                 "name": {
                     "type": "string"
                 },
-                "username": {
+                "permission": {
+                    "description": "default to empty, means full permission",
                     "type": "string"
                 }
             }

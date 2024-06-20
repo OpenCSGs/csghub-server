@@ -25,6 +25,8 @@ type User struct {
 	Password     string        `bun:",notnull" json:"-"`
 	AccessTokens []AccessToken `bun:"rel:has-many,join:id=user_id"`
 	Namespaces   []Namespace   `bun:"rel:has-many,join:id=user_id" json:"namespace"`
+	//TODO:add unique index after migration
+	CasdoorUUID string `bun:"," json:"casdoor_uuid"`
 	times
 }
 
