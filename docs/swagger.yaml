@@ -281,6 +281,21 @@ definitions:
       user_id:
         type: integer
     type: object
+  database.SyncClientSetting:
+    properties:
+      concurrent_count:
+        type: integer
+      created_at:
+        type: string
+      id:
+        type: integer
+      max_bandwidth:
+        type: integer
+      token:
+        type: string
+      updated_at:
+        type: string
+    type: object
   database.Tag:
     properties:
       built_in:
@@ -755,6 +770,17 @@ definitions:
     required:
     - name
     - version
+    type: object
+  types.CreateSyncClientSettingReq:
+    properties:
+      concurrent_count:
+        type: integer
+      max_bandwidth:
+        type: integer
+      token:
+        type: string
+    required:
+    - token
     type: object
   types.CreateUserRequest:
     properties:
@@ -6543,6 +6569,43 @@ paths:
       summary: wake up space app
       tags:
       - Space
+  /sync/client_setting:
+    post:
+      consumes:
+      - application/json
+      description: Create sync client setting or update an existing sync client setting
+      parameters:
+      - description: body
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/types.CreateSyncClientSettingReq'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/types.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/database.SyncClientSetting'
+              type: object
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Create sync client setting or update an existing sync client setting
+      tags:
+      - Sync
   /sync/version/latest:
     get:
       parameters:

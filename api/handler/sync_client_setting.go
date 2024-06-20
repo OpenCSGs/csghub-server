@@ -24,6 +24,18 @@ func NewSyncClientSettingHandler(config *config.Config) (*SyncClientSettingHandl
 	}, nil
 }
 
+// CreateSyncClientSetting  godoc
+// @Security     ApiKey
+// @Summary      Create sync client setting or update an existing sync client setting
+// @Description  Create sync client setting or update an existing sync client setting
+// @Tags         Sync
+// @Accept       json
+// @Produce      json
+// @Param        body   body  types.CreateSyncClientSettingReq true "body"
+// @Success      200  {object}  types.Response{data=database.SyncClientSetting} "OK"
+// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
+// @Router       /sync/client_setting [post]
 func (h *SyncClientSettingHandler) Create(ctx *gin.Context) {
 	var req types.CreateSyncClientSettingReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {

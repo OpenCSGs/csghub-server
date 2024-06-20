@@ -5276,6 +5276,69 @@ const docTemplate = `{
                 }
             }
         },
+        "/sync/client_setting": {
+            "post": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "description": "Create sync client setting or update an existing sync client setting",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Sync"
+                ],
+                "summary": "Create sync client setting or update an existing sync client setting",
+                "parameters": [
+                    {
+                        "description": "body",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/types.CreateSyncClientSettingReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/types.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/database.SyncClientSetting"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            }
+        },
         "/sync/version/latest": {
             "get": {
                 "security": [
@@ -10140,6 +10203,29 @@ const docTemplate = `{
                 }
             }
         },
+        "database.SyncClientSetting": {
+            "type": "object",
+            "properties": {
+                "concurrent_count": {
+                    "type": "integer"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "max_bandwidth": {
+                    "type": "integer"
+                },
+                "token": {
+                    "type": "string"
+                },
+                "updated_at": {
+                    "type": "string"
+                }
+            }
+        },
         "database.Tag": {
             "type": "object",
             "properties": {
@@ -10829,6 +10915,23 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "version": {
+                    "type": "string"
+                }
+            }
+        },
+        "types.CreateSyncClientSettingReq": {
+            "type": "object",
+            "required": [
+                "token"
+            ],
+            "properties": {
+                "concurrent_count": {
+                    "type": "integer"
+                },
+                "max_bandwidth": {
+                    "type": "integer"
+                },
+                "token": {
                     "type": "string"
                 }
             }

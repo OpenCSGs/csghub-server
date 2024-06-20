@@ -517,17 +517,16 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 	if err != nil {
 		return nil, fmt.Errorf("error creating sync handler:%w", err)
 	}
-	syncGroup := apiGroup.Group("sync")
-	{
-		syncGroup.GET("/version/latest", syncHandler.Latest)
-		// syncGroup.GET("/version/oldest", syncHandler.Oldest)
-	}
-
 	syncClientSettingHandler, err := handler.NewSyncClientSettingHandler(config)
 	if err != nil {
 		return nil, fmt.Errorf("error creating sync client setting handler:%w", err)
 	}
-	apiGroup.POST("/sync_client_setting", syncClientSettingHandler.Create)
+	syncGroup := apiGroup.Group("sync")
+	{
+		syncGroup.GET("/version/latest", syncHandler.Latest)
+		// syncGroup.GET("/version/oldest", syncHandler.Oldest)
+		syncGroup.POST("/client_setting", syncClientSettingHandler.Create)
+	}
 
 	return r, nil
 }
