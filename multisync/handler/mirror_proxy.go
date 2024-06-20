@@ -5,71 +5,46 @@ import (
 	"strings"
 
 	"github.com/gin-gonic/gin"
+	"opencsg.com/csghub-server/api/httpbase"
 	"opencsg.com/csghub-server/builder/proxy"
 	"opencsg.com/csghub-server/common/config"
-	"opencsg.com/csghub-server/component"
+	"opencsg.com/csghub-server/multisync/component"
+	"opencsg.com/csghub-server/multisync/types"
 )
 
 const MirrorTokenHeaderKey = "X-OPENCSG-Sync-Token"
 
 type MirrorProxyHandler struct {
 	gitServerURL string
-	repoComp     *component.RepoComponent
+	mpComp       *component.MirrorProxyComponent
 }
 
 func NewMirrorProxyHandler(config *config.Config) (*MirrorProxyHandler, error) {
-	repoComp, err := component.NewRepoComponent(config)
+	mpComp, err := component.NewMirrorProxyComponent(config)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create repo component,%w", err)
 	}
 
 	return &MirrorProxyHandler{
-		repoComp:     repoComp,
+		mpComp:       mpComp,
 		gitServerURL: config.GitServer.URL,
 	}, nil
 }
 
 func (r *MirrorProxyHandler) Serve(ctx *gin.Context) {
-	// slog.Debug("http request", slog.Any("request", ctx.Request.URL), slog.Any("header", ctx.Request.Header))
-	// host := ctx.Request.Host
-	// domainParts := strings.SplitN(host, ".", 2)
-	// appSrvName := domainParts[0]
-
-	// // user verified by cookie
-	// username, exists := ctx.Get("currentUser")
-	// if !exists {
-	// 	httpbase.BadRequest(ctx, "user not found, please login first")
-	// 	return
-	// }
-
-	// deploy, err := r.repoComp.GetDeployBySvcName(ctx, appSrvName)
-	// if err != nil {
-	// 	slog.Error("failed to get deploy", slog.Any("error", err), slog.Any("appSrvName", appSrvName))
-	// 	httpbase.ServerError(ctx, fmt.Errorf("failed to get deploy, %w", err))
-	// 	return
-	// }
-
-	// allow := false
-	// err = nil
-	// // verify by repo_id, user name
-	// if deploy.SpaceID > 0 {
-	// 	// check space
-	// 	allow, err = r.repoComp.AllowAccessByRepoID(ctx, deploy.RepoID, username.(string))
-	// } else if deploy.ModelID > 0 {
-	// 	// check model inference
-	// 	allow, err = r.repoComp.AllowAccessEndpoint(ctx, username.(string), deploy)
-	// }
-
-	// if err != nil {
-	// 	slog.Error("failed to check user permission", "error", err)
-	// 	httpbase.ServerError(ctx, fmt.Errorf("failed to check user permission,%w", err))
-	// 	return
-	// }
-
-	// Accounting
+	var req types.GetSyncQuotaStatementReq
 	token := getMirrorTokenFromContext(ctx)
-	fmt.Println(token)
 	repoType := ctx.Param("repo_type")
+	namespace := ctx.Param("namespace")
+	name := ctx.Param("name")
+	req.RepoPath = fmt.Sprintf("%s/%s", namespace, name)
+	req.RepoType = repoType
+	req.Token = token
+	err := r.mpComp.Serve(ctx, &req)
+	if err != nil {
+		httpbase.BadRequest(ctx, err.Error())
+		return
+	}
 	path := strings.Replace(ctx.Request.URL.Path, fmt.Sprintf("%s/", repoType), fmt.Sprintf("%s_", repoType), 1)
 	rp, _ := proxy.NewReverseProxy(r.gitServerURL)
 	rp.ServeHTTP(ctx.Writer, ctx.Request, path)
