@@ -7,6 +7,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"opencsg.com/csghub-server/accounting/component"
+	"opencsg.com/csghub-server/accounting/types"
 	"opencsg.com/csghub-server/api/httpbase"
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/utils/common"
@@ -64,7 +65,7 @@ func (ch *CreditHandler) QueryAllUsersBalance(ctx *gin.Context) {
 // @Success      200  {object}  types.Response{} "OK"
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
-// @Router       /accounting/credit/:id/balance [get]
+// @Router       /accounting/credit/{id}/balance [get]
 func (ch *CreditHandler) QueryBalanceByUserID(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
 	if currentUser == "" {
@@ -77,8 +78,8 @@ func (ch *CreditHandler) QueryBalanceByUserID(ctx *gin.Context) {
 		httpbase.BadRequest(ctx, "Bad request format")
 		return
 	}
-	account, err := ch.auc.ListAccountingByUserID(ctx, userID)
-	if err != nil {
+	account, err := ch.auc.GetAccountingByUserID(ctx, userID)
+	if err != nil || account == nil {
 		slog.Error("fail to query account by user id", slog.Any("userid", userID), slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
 		return
@@ -102,7 +103,7 @@ func (ch *CreditHandler) QueryBalanceByUserID(ctx *gin.Context) {
 // @Success      200  {object}  types.Response{} "OK"
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
-// @Router       /accounting/credit/:id/statements [get]
+// @Router       /accounting/credit/{id}/statements [get]
 func (ch *CreditHandler) QueryStatementByUserID(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
 	if currentUser == "" {
@@ -148,14 +149,22 @@ func (ch *CreditHandler) QueryStatementByUserID(ctx *gin.Context) {
 // @Param        start_date query string true "start_date, format: '2024-06-12'"
 // @Param        end_date query string true "end_date, format: '2024-07-12'"
 // @Param        current_user query string true "current_user"
+// @Param        per query int false "per" default(20)
+// @Param        page query int false "per page" default(1)
 // @Success      200  {object}  types.Response{} "OK"
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
-// @Router       /accounting/credit/:id/bills [get]
+// @Router       /accounting/credit/{id}/bills [get]
 func (ch *CreditHandler) QueryBillsByUserID(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
 	if currentUser == "" {
 		httpbase.UnauthorizedError(ctx, errors.New("user not found, please login first"))
+		return
+	}
+	per, page, err := common.GetPerAndPageFromContext(ctx)
+	if err != nil {
+		slog.Error("Bad request format", "error", err)
+		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
 	userID := ctx.Param("id")
@@ -173,7 +182,7 @@ func (ch *CreditHandler) QueryBillsByUserID(ctx *gin.Context) {
 		return
 	}
 
-	bills, err := ch.abc.ListBillsByUserIDAndDate(ctx, userID, startDate, endDate)
+	bills, err := ch.abc.ListBillsByUserIDAndDate(ctx, userID, startDate, endDate, per, page)
 	if err != nil {
 		slog.Error("fail to query bills by user", slog.Any("userid", userID), slog.Any("start_date", startDate), slog.Any("end_date", endDate), slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
@@ -185,4 +194,71 @@ func (ch *CreditHandler) QueryBillsByUserID(ctx *gin.Context) {
 func validateDateTimeFormat(timeStr, layout string) bool {
 	_, err := time.Parse(layout, timeStr)
 	return err == nil
+}
+
+// AccountRecharge     godoc
+// @Security     ApiKey
+// @Summary      Recharge fee for account
+// @Description  Recharge fee for account
+// @Tags         Accounting
+// @Accept       json
+// @Produce      json
+// @Param        id path int true "casdoor user uuid"
+// @Param        current_user query string true "current_user"
+// @Param        body body types.RECHARGE_REQ true "body"
+// @Success      200  {object}  types.Response{} "OK"
+// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
+// @Router       /accounting/credit/{id}/recharge [put]
+func (ch *CreditHandler) RechargeByUserID(ctx *gin.Context) {
+	currentUser := httpbase.GetCurrentUser(ctx)
+	if currentUser == "" {
+		httpbase.UnauthorizedError(ctx, errors.New("user not found, please login first"))
+		return
+	}
+	var req types.RECHARGE_REQ
+	err := ctx.ShouldBindJSON(&req)
+	if err != nil {
+		slog.Error("Bad recharge request format", "error", err)
+		httpbase.BadRequest(ctx, err.Error())
+		return
+	}
+	if req.Value < 0 {
+		slog.Error("Bad recharge value")
+		httpbase.BadRequest(ctx, "Bad recharge value")
+		return
+	}
+	if req.OpUID < 0 {
+		slog.Error("Bad operate user id")
+		httpbase.BadRequest(ctx, "Bad operate user id")
+		return
+	}
+	userID := ctx.Param("id")
+	if len(userID) < 1 {
+		slog.Error("Bad recharge user id")
+		httpbase.BadRequest(ctx, "Bad recharge user id")
+		return
+	}
+	err = ch.auc.CheckAccountingUser(ctx, userID)
+	if err != nil {
+		slog.Error("fail to check user balance", slog.Any("userID", userID), slog.Any("error", err))
+		httpbase.BadRequest(ctx, err.Error())
+		return
+	}
+
+	err = ch.asc.RechargeAccountingUser(ctx, userID, req)
+	if err != nil {
+		slog.Error("fail to recharge account by user", slog.Any("userID", userID), slog.Any("req", req), slog.Any("error", err))
+		httpbase.ServerError(ctx, err)
+		return
+	}
+
+	account, err := ch.auc.GetAccountingByUserID(ctx, userID)
+	if err != nil || account == nil {
+		slog.Error("fail to get account by user id", slog.Any("userID", userID), slog.Any("error", err))
+		httpbase.ServerError(ctx, err)
+		return
+	}
+
+	httpbase.OK(ctx, account)
 }

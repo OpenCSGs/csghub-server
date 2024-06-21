@@ -291,7 +291,7 @@ func (c *Charging) parseMessageData(msg *nats.Msg) (*types.ACC_EVENT, *types.ACC
 }
 
 func (c *Charging) checkBalanceAndSendNotification(ctx context.Context, event *types.ACC_EVENT) {
-	account, err := c.acctUserComp.ListAccountingByUserID(ctx, event.UserID)
+	account, err := c.acctUserComp.GetAccountingByUserID(ctx, event.UserID)
 	if err != nil {
 		slog.Warn("fail to query account", slog.Any("userid", event.UserID), slog.Any("error", err))
 		return
