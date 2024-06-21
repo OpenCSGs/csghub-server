@@ -41,3 +41,8 @@ type ACC_NOTIFY struct {
 	ReasonCode int       `json:"reason_code"`
 	ReasonMsg  string    `json:"reason_msg"`
 }
+
+type RECHARGE_REQ struct {
+	Value float64 `json:"value"`
+	OpUID int64   `json:"op_uid"`
+}

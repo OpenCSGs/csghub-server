@@ -3,7 +3,10 @@ package component
 import (
 	"context"
 	"database/sql"
+	"fmt"
+	"time"
 
+	"github.com/google/uuid"
 	"opencsg.com/csghub-server/accounting/types"
 	"opencsg.com/csghub-server/builder/store/database"
 )
@@ -72,4 +75,23 @@ func (a *AccountingStatementComponent) getValidSceneType(scene int) database.Sce
 	default:
 		return database.SceneUnknow
 	}
+}
+
+func (a *AccountingStatementComponent) RechargeAccountingUser(ctx context.Context, userID string, req types.RECHARGE_REQ) error {
+	event := types.ACC_EVENT{
+		Uuid:      uuid.New(),
+		UserID:    userID,
+		Value:     req.Value,
+		ValueType: 0,
+		Scene:     int(database.ScenePortalCharge),
+		OpUID:     req.OpUID,
+		CreatedAt: time.Now(),
+		Extra:     "",
+	}
+	eventExtra := types.ACC_EVENT_EXTRA{}
+	err := a.AddNewStatement(ctx, &event, &eventExtra, event.Value)
+	if err != nil {
+		return fmt.Errorf("fail to add statement and rechange balance, %v, %w", event, err)
+	}
+	return err
 }

@@ -23,7 +23,7 @@ func (a *AccountingUserComponent) ListAccountingUser(ctx context.Context) ([]dat
 	return a.au.List(ctx)
 }
 
-func (a *AccountingUserComponent) ListAccountingByUserID(ctx context.Context, userID string) (*database.AccountUser, error) {
+func (a *AccountingUserComponent) GetAccountingByUserID(ctx context.Context, userID string) (*database.AccountUser, error) {
 	return a.au.FindUserByID(ctx, userID)
 }
 

@@ -385,6 +385,22 @@ definitions:
     - new_role
     - old_role
     type: object
+  types.ACCT_QUOTA_REQ:
+    properties:
+      repo_count_limit:
+        type: integer
+      speed_limit:
+        type: integer
+      traffic_limit:
+        type: integer
+    type: object
+  types.ACCT_QUOTA_STATEMENT_REQ:
+    properties:
+      repo_path:
+        type: string
+      repo_type:
+        type: string
+    type: object
   types.APIBadRequest:
     type: object
   types.APIInternalServerError:
@@ -1081,6 +1097,13 @@ definitions:
     x-enum-varnames:
     - ModelWidgetTypeGeneration
     - ModelWidgetTypeChat
+  types.RECHARGE_REQ:
+    properties:
+      op_uid:
+        type: integer
+      value:
+        type: number
+    type: object
   types.Relations:
     properties:
       codes:
@@ -3284,7 +3307,7 @@ paths:
       summary: List repo runtime framework
       tags:
       - Repository
-  /accounting/credit/:id/balance:
+  /accounting/credit/{id}/balance:
     get:
       consumes:
       - application/json
@@ -3320,7 +3343,7 @@ paths:
       summary: Get user balance by casdoor user uuid
       tags:
       - Accounting
-  /accounting/credit/:id/bills:
+  /accounting/credit/{id}/bills:
     get:
       consumes:
       - application/json
@@ -3346,6 +3369,16 @@ paths:
         name: current_user
         required: true
         type: string
+      - default: 20
+        description: per
+        in: query
+        name: per
+        type: integer
+      - default: 1
+        description: per page
+        in: query
+        name: page
+        type: integer
       produces:
       - application/json
       responses:
@@ -3366,7 +3399,49 @@ paths:
       summary: List user bills by casdoor user uuid and start date and end date
       tags:
       - Accounting
-  /accounting/credit/:id/statements:
+  /accounting/credit/{id}/recharge:
+    put:
+      consumes:
+      - application/json
+      description: Recharge fee for account
+      parameters:
+      - description: casdoor user uuid
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: current_user
+        in: query
+        name: current_user
+        required: true
+        type: string
+      - description: body
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/types.RECHARGE_REQ'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/types.Response'
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Recharge fee for account
+      tags:
+      - Accounting
+  /accounting/credit/{id}/statements:
     get:
       consumes:
       - application/json
@@ -3445,6 +3520,146 @@ paths:
       security:
       - ApiKey: []
       summary: Get all users balance
+      tags:
+      - Accounting
+  /accounting/multisync/download:
+    get:
+      consumes:
+      - application/json
+      description: Get account quota statement
+      parameters:
+      - description: repo path
+        in: query
+        name: repo_path
+        required: true
+        type: string
+      - description: repo type
+        in: query
+        name: repo_type
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/types.Response'
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Get account quota statement
+      tags:
+      - Accounting
+    post:
+      consumes:
+      - application/json
+      description: Add download count
+      parameters:
+      - description: current_user
+        in: query
+        name: current_user
+        required: true
+        type: string
+      - description: body
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/types.ACCT_QUOTA_STATEMENT_REQ'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/types.Response'
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Add download count
+      tags:
+      - Accounting
+  /accounting/multisync/quota:
+    get:
+      consumes:
+      - application/json
+      description: Get account quota by user id
+      parameters:
+      - description: current_user
+        in: query
+        name: current_user
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/types.Response'
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Get account quota by user id
+      tags:
+      - Accounting
+  /accounting/multisync/quotas:
+    post:
+      consumes:
+      - application/json
+      description: Add or update account quota
+      parameters:
+      - description: current_user
+        in: query
+        name: current_user
+        required: true
+        type: string
+      - description: body
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/types.ACCT_QUOTA_REQ'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/types.Response'
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Add or update account quota
       tags:
       - Accounting
   /cluster:

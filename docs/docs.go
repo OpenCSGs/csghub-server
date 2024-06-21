@@ -15,7 +15,47 @@ const docTemplate = `{
     "host": "{{.Host}}",
     "basePath": "{{.BasePath}}",
     "paths": {
-        "/accounting/credit/:id/balance": {
+        "/accounting/credit/balance": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "description": "Get all users balance",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Accounting"
+                ],
+                "summary": "Get all users balance",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/types.Response"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            }
+        },
+        "/accounting/credit/{id}/balance": {
             "get": {
                 "security": [
                     {
@@ -71,7 +111,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/accounting/credit/:id/bills": {
+        "/accounting/credit/{id}/bills": {
             "get": {
                 "security": [
                     {
@@ -117,6 +157,20 @@ const docTemplate = `{
                         "name": "current_user",
                         "in": "query",
                         "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "default": 20,
+                        "description": "per",
+                        "name": "per",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "default": 1,
+                        "description": "per page",
+                        "name": "page",
+                        "in": "query"
                     }
                 ],
                 "responses": {
@@ -141,7 +195,72 @@ const docTemplate = `{
                 }
             }
         },
-        "/accounting/credit/:id/statements": {
+        "/accounting/credit/{id}/recharge": {
+            "put": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "description": "Recharge fee for account",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Accounting"
+                ],
+                "summary": "Recharge fee for account",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "casdoor user uuid",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "current_user",
+                        "name": "current_user",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "description": "body",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/types.RECHARGE_REQ"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/types.Response"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            }
+        },
+        "/accounting/credit/{id}/statements": {
             "get": {
                 "security": [
                     {
@@ -225,14 +344,14 @@ const docTemplate = `{
                 }
             }
         },
-        "/accounting/credit/balance": {
+        "/accounting/multisync/download": {
             "get": {
                 "security": [
                     {
                         "ApiKey": []
                     }
                 ],
-                "description": "Get all users balance",
+                "description": "Get account quota statement",
                 "consumes": [
                     "application/json"
                 ],
@@ -242,7 +361,186 @@ const docTemplate = `{
                 "tags": [
                     "Accounting"
                 ],
-                "summary": "Get all users balance",
+                "summary": "Get account quota statement",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "repo path",
+                        "name": "repo_path",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "repo type",
+                        "name": "repo_type",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/types.Response"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "description": "Add download count",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Accounting"
+                ],
+                "summary": "Add download count",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "current_user",
+                        "name": "current_user",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "description": "body",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/types.ACCT_QUOTA_STATEMENT_REQ"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/types.Response"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            }
+        },
+        "/accounting/multisync/quota": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "description": "Get account quota by user id",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Accounting"
+                ],
+                "summary": "Get account quota by user id",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "current_user",
+                        "name": "current_user",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/types.Response"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            }
+        },
+        "/accounting/multisync/quotas": {
+            "post": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "description": "Add or update account quota",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Accounting"
+                ],
+                "summary": "Add or update account quota",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "current_user",
+                        "name": "current_user",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "description": "body",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/types.ACCT_QUOTA_REQ"
+                        }
+                    }
+                ],
                 "responses": {
                     "200": {
                         "description": "OK",
@@ -10357,6 +10655,31 @@ const docTemplate = `{
                 }
             }
         },
+        "types.ACCT_QUOTA_REQ": {
+            "type": "object",
+            "properties": {
+                "repo_count_limit": {
+                    "type": "integer"
+                },
+                "speed_limit": {
+                    "type": "integer"
+                },
+                "traffic_limit": {
+                    "type": "integer"
+                }
+            }
+        },
+        "types.ACCT_QUOTA_STATEMENT_REQ": {
+            "type": "object",
+            "properties": {
+                "repo_path": {
+                    "type": "string"
+                },
+                "repo_type": {
+                    "type": "string"
+                }
+            }
+        },
         "types.APIBadRequest": {
             "type": "object"
         },
@@ -11386,6 +11709,17 @@ const docTemplate = `{
                 "ModelWidgetTypeGeneration",
                 "ModelWidgetTypeChat"
             ]
+        },
+        "types.RECHARGE_REQ": {
+            "type": "object",
+            "properties": {
+                "op_uid": {
+                    "type": "integer"
+                },
+                "value": {
+                    "type": "number"
+                }
+            }
         },
         "types.Relations": {
             "type": "object",
