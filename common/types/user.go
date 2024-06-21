@@ -29,17 +29,17 @@ type UpdateUserResp struct {
 
 type CreateUserTokenRequest struct {
 	Username  string `json:"-" `
-	TokenName string `json:"name" binding:"required"`
-	//default to csghub
+	TokenName string `json:"name"`
+	// default to csghub
 	Application AccessTokenApp `json:"application,omitempty"`
-	//default to empty, means full permission
+	// default to empty, means full permission
 	Permission string    `json:"permission,omitempty"`
 	ExpiredAt  time.Time `json:"expired_at"`
 }
 
 type CheckAccessTokenReq struct {
 	Token string `json:"token" binding:"required"`
-	//Optional, if given only check the token belongs to this application
+	// Optional, if given only check the token belongs to this application
 	Application string `json:"application"`
 }
 
