@@ -514,10 +514,18 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 		runtimeFramework.DELETE("/:id", modelHandler.DeleteModelRuntimeFrameworks)
 	}
 	syncHandler, err := handler.NewSyncHandler(config)
+	if err != nil {
+		return nil, fmt.Errorf("error creating sync handler:%w", err)
+	}
+	syncClientSettingHandler, err := handler.NewSyncClientSettingHandler(config)
+	if err != nil {
+		return nil, fmt.Errorf("error creating sync client setting handler:%w", err)
+	}
 	syncGroup := apiGroup.Group("sync")
 	{
 		syncGroup.GET("/version/latest", syncHandler.Latest)
 		// syncGroup.GET("/version/oldest", syncHandler.Oldest)
+		syncGroup.POST("/client_setting", syncClientSettingHandler.Create)
 	}
 
 	return r, nil

@@ -30,32 +30,32 @@ import (
 const ErrNotFoundMessage = "The target couldn't be found."
 
 type RepoComponent struct {
-	tc               *TagComponent
-	user             *database.UserStore
-	org              *database.OrgStore
-	namespace        *database.NamespaceStore
-	repo             *database.RepoStore
-	rel              *database.RepoRelationsStore
-	mirror           *database.MirrorStore
-	git              gitserver.GitServer
-	s3Client         *minio.Client
-	msc              *MemberComponent
-	lfsBucket        string
-	uls              *database.UserLikesStore
-	mirrorServer     mirrorserver.MirrorServer
-	runFrame         *database.RuntimeFrameworksStore
-	deploy           *database.DeployTaskStore
-	deployer         deploy.Deployer
-	publicRootDomain string
-	cluster          *database.ClusterInfoStore
-	mirrorSource     *database.MirrorSourceStore
-	tokenStore       *database.AccessTokenStore
-	rtfm             *database.RuntimeFrameworksStore
-	rrtfms           *database.RepositoriesRuntimeFrameworkStore
-	needPurge        bool
-	syncVersion      *database.SyncVersionStore
-	mirrorToken      *database.MirrorTokenStore
-	config           *config.Config
+	tc                *TagComponent
+	user              *database.UserStore
+	org               *database.OrgStore
+	namespace         *database.NamespaceStore
+	repo              *database.RepoStore
+	rel               *database.RepoRelationsStore
+	mirror            *database.MirrorStore
+	git               gitserver.GitServer
+	s3Client          *minio.Client
+	msc               *MemberComponent
+	lfsBucket         string
+	uls               *database.UserLikesStore
+	mirrorServer      mirrorserver.MirrorServer
+	runFrame          *database.RuntimeFrameworksStore
+	deploy            *database.DeployTaskStore
+	deployer          deploy.Deployer
+	publicRootDomain  string
+	cluster           *database.ClusterInfoStore
+	mirrorSource      *database.MirrorSourceStore
+	tokenStore        *database.AccessTokenStore
+	rtfm              *database.RuntimeFrameworksStore
+	rrtfms            *database.RepositoriesRuntimeFrameworkStore
+	needPurge         bool
+	syncVersion       *database.SyncVersionStore
+	syncClientSetting *database.SyncClientSettingStore
+	config            *config.Config
 }
 
 func NewRepoComponent(config *config.Config) (*RepoComponent, error) {
@@ -70,7 +70,7 @@ func NewRepoComponent(config *config.Config) (*RepoComponent, error) {
 	c.mirrorSource = database.NewMirrorSourceStore()
 	c.tokenStore = database.NewAccessTokenStore()
 	c.syncVersion = database.NewSyncVersionStore()
-	c.mirrorToken = database.NewMirrorTokenStore()
+	c.syncClientSetting = database.NewSyncClientSettingStore()
 	var err error
 	c.git, err = git.NewGitServer(config)
 	if err != nil {
@@ -1212,7 +1212,7 @@ func (c *RepoComponent) MirrorFromSaas(ctx context.Context, namespace, name, cur
 	}
 
 	mirrorSource.SourceName = types.OpenCSGPrefix
-	mirrorToken, err := c.mirrorToken.First(ctx)
+	syncClientSetting, err := c.syncClientSetting.First(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to find mirror token, error: %w", err)
 	}
@@ -1232,7 +1232,7 @@ func (c *RepoComponent) MirrorFromSaas(ctx context.Context, namespace, name, cur
 		Username:    mirror.Username,
 		AccessToken: mirror.AccessToken,
 		RepoType:    repoType,
-		MirrorToken: mirrorToken.Token,
+		MirrorToken: syncClientSetting.Token,
 		Private:     false,
 	})
 	if err != nil {

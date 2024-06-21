@@ -39,15 +39,6 @@ func NewRouter(config *config.Config) (*gin.Engine, error) {
 		rGroup.GET("/objects/pack/pack-:file", mpHandler.Serve)
 	}
 
-	mtHandler, err := handler.NewMirrorTokenHandler(config)
-	if err != nil {
-		return nil, fmt.Errorf("error creating mirror token handler:%w", err)
-	}
-	apiGroup := r.Group("/api/v1")
-	{
-		apiGroup.POST("mirror_token", mtHandler.Create)
-	}
-
 	// r.Any("/*api", handler.Serve)
 
 	return r, nil
