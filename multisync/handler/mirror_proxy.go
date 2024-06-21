@@ -39,7 +39,7 @@ func (r *MirrorProxyHandler) Serve(ctx *gin.Context) {
 	name := ctx.Param("name")
 	req.RepoPath = fmt.Sprintf("%s/%s", namespace, name)
 	req.RepoType = repoType
-	req.Token = token
+	req.AccessToken = token
 	err := r.mpComp.Serve(ctx, &req)
 	if err != nil {
 		httpbase.BadRequest(ctx, err.Error())

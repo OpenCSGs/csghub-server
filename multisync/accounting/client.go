@@ -15,11 +15,10 @@ import (
 var jsonHeader = http.Header{"content-type": []string{"application/json"}}
 
 type AccountingClient struct {
-	baseURL     string
-	accessToken string
-	httpClient  *http.Client
-	mutex       sync.RWMutex
-	ctx         context.Context
+	baseURL    string
+	httpClient *http.Client
+	mutex      sync.RWMutex
+	ctx        context.Context
 }
 
 type Response struct {
@@ -39,8 +38,7 @@ func NewAccountingClient(config *config.Config) (*AccountingClient, error) {
 	}
 
 	return &AccountingClient{
-		baseURL:     fmt.Sprintf("%s:%d", config.Accounting.Host, config.Accounting.Port),
-		accessToken: config.APIToken,
+		baseURL: fmt.Sprintf("%s:%d", config.Accounting.Host, config.Accounting.Port),
 		httpClient: &http.Client{
 			Timeout: time.Second * 5,
 		},
@@ -122,9 +120,6 @@ func (c *AccountingClient) doRequest(method, path string, header http.Header, bo
 	if err != nil {
 		c.mutex.RUnlock()
 		return nil, err
-	}
-	if len(c.accessToken) != 0 {
-		req.Header.Set("Authorization", "Berer "+c.accessToken)
 	}
 
 	client := c.httpClient

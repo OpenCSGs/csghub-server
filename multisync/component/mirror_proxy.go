@@ -3,7 +3,6 @@ package component
 import (
 	"context"
 	"fmt"
-	"log/slog"
 	"net/http"
 
 	"opencsg.com/csghub-server/builder/store/database"
@@ -29,24 +28,19 @@ func NewMirrorProxyComponent(config *config.Config) (*MirrorProxyComponent, erro
 }
 
 func (c *MirrorProxyComponent) Serve(ctx context.Context, req *types.GetSyncQuotaStatementReq) error {
-	user, err := c.user.FindByAccessToken(ctx, req.Token)
-	if err != nil {
-		slog.Error("error getting user by access token: ", slog.String("err", err.Error()), slog.String("access_token", req.Token))
-		return fmt.Errorf("error getting user by access token: %v", err)
-	}
 	sq, _, err := c.ac.GetSyncQuota(&accounting.GetSyncQuotaReq{
-		UserID: user.ID,
+		AccessToken: req.AccessToken,
 	})
 	if err != nil {
 		return fmt.Errorf("error getting sync quota: %v", err)
 	}
-	if sq.RepoCountLimit <= 0 {
+	if sq.RepoCountLimit <= sq.RepoCountUsed {
 		return fmt.Errorf("sync repository count limit exceeded")
 	}
 	sqs, _, err := c.ac.GetSyncQuotaStatement(&accounting.GetSyncQuotaStatementsReq{
-		UserID:   user.ID,
-		RepoPath: req.RepoPath,
-		RepoType: req.RepoType,
+		AccessToken: req.AccessToken,
+		RepoPath:    req.RepoPath,
+		RepoType:    req.RepoType,
 	})
 	if err != nil {
 		return fmt.Errorf("error getting sync quota statement: %v", err)
@@ -55,9 +49,9 @@ func (c *MirrorProxyComponent) Serve(ctx context.Context, req *types.GetSyncQuot
 		return nil
 	}
 	resp, err := c.ac.CreateSyncQuotaStatement(&accounting.CreateSyncQuotaStatementReq{
-		UserID:   user.ID,
-		RepoPath: req.RepoPath,
-		RepoType: req.RepoType,
+		AccessToken: req.AccessToken,
+		RepoPath:    req.RepoPath,
+		RepoType:    req.RepoType,
 	})
 	if err != nil {
 		return fmt.Errorf("error creating sync quota statement: %v", err)
