@@ -78,14 +78,14 @@ func (h *AccessTokenHandler) Create(ctx *gin.Context) {
 // @Tags         Access token
 // @Accept       json
 // @Produce      json
-// @Param        username path string true "username"
+// @Param        token_name path string true "token name"
 // @Param        app path string true "application" Enums(git,starship)
 // @Param        current_user query string true "current user, the owner"
 // @Param        body body types.CreateUserTokenRequest true "body"
 // @Success      200  {object}  types.Response{data=database.AccessToken} "OK"
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
-// @Router       /token/{app}/{username} [post]
+// @Router       /token/{app}/{token_name} [post]
 func (h *AccessTokenHandler) CreateAppToken(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
 	if currentUser == "" {
@@ -100,7 +100,8 @@ func (h *AccessTokenHandler) CreateAppToken(ctx *gin.Context) {
 	}
 
 	req.Application = types.AccessTokenApp(ctx.Param("app"))
-	req.Username = ctx.Param("username")
+	req.Username = currentUser
+	req.TokenName = ctx.Param("token_name")
 	token, err := h.c.Create(ctx, &req)
 	if err != nil {
 		slog.Error("Failed to create user access token", slog.String("user_name", req.Username), slog.Any("error", err))

@@ -41,6 +41,14 @@ func (c *AccessTokenComponent) Create(ctx context.Context, req *types.CreateUser
 		return nil, fmt.Errorf("fail to find user,error:%w", err)
 	}
 
+	exist, err := c.ts.IsExist(ctx, req.Username, req.TokenName, string(req.Application))
+	if err != nil {
+		return nil, fmt.Errorf("fail to check if token exists,error:%w", err)
+	}
+	if exist {
+		return nil, fmt.Errorf("token name duplicated, token_name:%s, app:%s", req.TokenName, req.Application)
+	}
+
 	var token *database.AccessToken
 	// csghub token is shared with git server
 	if req.Application == types.AccessTokenAppGit {
@@ -157,7 +165,7 @@ func (c *AccessTokenComponent) RefreshToken(ctx context.Context, userName, token
 	}
 	// csghub token is shared with git server
 	if req.Application == "" || req.Application == types.AccessTokenAppCSGHub {
-		//TODO:allow git client to refresh token
+		// TODO:allow git client to refresh token
 		// git server cannot create tokens with the same nanme
 		err := c.gs.DeleteUserToken(&types.DeleteUserTokenRequest{
 			Username:  userName,
