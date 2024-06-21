@@ -155,6 +155,7 @@ func (c *UserComponent) Update(ctx context.Context, req *types.UpdateUserRequest
 		return nil, newError
 	}
 
+	respUser.CasdoorUUID = req.CasdoorUID
 	err = c.us.Update(ctx, respUser)
 	if err != nil {
 		newError := fmt.Errorf("failed to update database user,error:%w", err)
