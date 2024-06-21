@@ -5754,6 +5754,70 @@ const docTemplate = `{
             }
         },
         "/token/{app}/{token_name}": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Accounting"
+                ],
+                "summary": "Get accounting bills of a user",
+                "parameters": [
+                    {
+                        "enum": [
+                            "git",
+                            "starship"
+                        ],
+                        "type": "string",
+                        "description": "application",
+                        "name": "app",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "token_name",
+                        "name": "token_name",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "current user, the owner",
+                        "name": "current_user",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/types.Response"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            },
             "put": {
                 "security": [
                     {
@@ -5824,72 +5888,6 @@ const docTemplate = `{
                     }
                 }
             },
-            "delete": {
-                "security": [
-                    {
-                        "ApiKey": []
-                    }
-                ],
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Access token"
-                ],
-                "summary": "Delete access token of a app",
-                "parameters": [
-                    {
-                        "enum": [
-                            "git",
-                            "starship"
-                        ],
-                        "type": "string",
-                        "description": "application",
-                        "name": "app",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "token_name",
-                        "name": "token_name",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "current user, the owner",
-                        "name": "current_user",
-                        "in": "query",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/types.Response"
-                        }
-                    },
-                    "400": {
-                        "description": "Bad request",
-                        "schema": {
-                            "$ref": "#/definitions/types.APIBadRequest"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal server error",
-                        "schema": {
-                            "$ref": "#/definitions/types.APIInternalServerError"
-                        }
-                    }
-                }
-            }
-        },
-        "/token/{app}/{username}": {
             "post": {
                 "security": [
                     {
@@ -5909,8 +5907,8 @@ const docTemplate = `{
                 "parameters": [
                     {
                         "type": "string",
-                        "description": "username",
-                        "name": "username",
+                        "description": "token name",
+                        "name": "token_name",
                         "in": "path",
                         "required": true
                     },
@@ -5959,6 +5957,70 @@ const docTemplate = `{
                                     }
                                 }
                             ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Access token"
+                ],
+                "summary": "Delete access token of a app",
+                "parameters": [
+                    {
+                        "enum": [
+                            "git",
+                            "starship"
+                        ],
+                        "type": "string",
+                        "description": "application",
+                        "name": "app",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "token_name",
+                        "name": "token_name",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "current user, the owner",
+                        "name": "current_user",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/types.Response"
                         }
                     },
                     "400": {
@@ -11283,9 +11345,6 @@ const docTemplate = `{
         },
         "types.CreateUserTokenRequest": {
             "type": "object",
-            "required": [
-                "name"
-            ],
             "properties": {
                 "application": {
                     "description": "default to csghub",
@@ -11400,9 +11459,6 @@ const docTemplate = `{
         },
         "types.DeleteUserTokenRequest": {
             "type": "object",
-            "required": [
-                "name"
-            ],
             "properties": {
                 "application": {
                     "description": "default to csghub",
