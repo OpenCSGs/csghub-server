@@ -512,6 +512,7 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 		runtimeFramework.GET("", modelHandler.ListAllRuntimeFramework)
 		runtimeFramework.POST("/:id", modelHandler.UpdateModelRuntimeFrameworks)
 		runtimeFramework.DELETE("/:id", modelHandler.DeleteModelRuntimeFrameworks)
+		runtimeFramework.GET("/models", modelHandler.ListModelsOfRuntimeFrameworks)
 	}
 	syncHandler, err := handler.NewSyncHandler(config)
 	if err != nil {
