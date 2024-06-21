@@ -393,7 +393,7 @@ func (s *RepoStore) IsMirrorRepo(ctx context.Context, repoType types.RepositoryT
 	return result.Exists, nil
 }
 
-func (s *RepoStore) ListRepoPublicToUserByRepoIDs(ctx context.Context, repoType types.RepositoryType, userID int64, per, page int, repoIDs []int64) (repos []*Repository, count int, err error) {
+func (s *RepoStore) ListRepoPublicToUserByRepoIDs(ctx context.Context, repoType types.RepositoryType, userID int64, search, sort string, per, page int, repoIDs []int64) (repos []*Repository, count int, err error) {
 	q := s.db.Operator.Core.
 		NewSelect().
 		Column("repository.*").
@@ -404,12 +404,36 @@ func (s *RepoStore) ListRepoPublicToUserByRepoIDs(ctx context.Context, repoType 
 	q.Where("repository.private = ? or repository.user_id = ?", false, userID)
 	q.Where("id in (?)", bun.In(repoIDs))
 
+	if search != "" {
+		search = strings.ToLower(search)
+		q.Where(
+			"LOWER(repository.path) like ? or LOWER(repository.description) like ? or LOWER(repository.nickname) like ?",
+			fmt.Sprintf("%%%s%%", search),
+			fmt.Sprintf("%%%s%%", search),
+			fmt.Sprintf("%%%s%%", search),
+		)
+	}
+
 	count, err = q.Count(ctx)
 	if err != nil {
 		return
 	}
 
-	err = q.Order("path").
+	orderBy := "path"
+
+	if sort != "" {
+		if sort == "trending" {
+			q.Join("Left Join recom_repo_scores on repository.id = recom_repo_scores.repository_id")
+			q.Join("Left Join recom_op_weights on repository.id = recom_op_weights.repository_id")
+			q.ColumnExpr(`COALESCE(recom_repo_scores.score, 0)+COALESCE(recom_op_weights.weight, 0) AS popularity`)
+		}
+		sortByStr, exits := sortBy[sort]
+		if exits {
+			orderBy = sortByStr
+		}
+	}
+
+	err = q.Order(orderBy).
 		Limit(per).Offset((page - 1) * per).
 		Scan(ctx)
 

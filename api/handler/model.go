@@ -1029,3 +1029,58 @@ func (h *ModelHandler) DeleteModelRuntimeFrameworks(ctx *gin.Context) {
 
 	httpbase.OK(ctx, list)
 }
+
+// GetRuntimeFrameworkModels godoc
+// @Security     ApiKey
+// @Summary      Get Visible models for all runtime frameworks for current user
+// @Description  get visible models for all runtime frameworks for current user
+// @Tags         RuntimeFramework
+// @Accept       json
+// @Produce      json
+// @Param        search query string false "search text"
+// @Param        sort query string false "sort by"
+// @Param        current_user query string false "current user"
+// @Param        per query int false "per" default(20)
+// @Param        page query int false "per page" default(1)
+// @Param     	 deploy_type query int false "deploy_type" Enums(1, 2) default(1)
+// @Success      200  {object}  types.Response{} "OK"
+// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
+// @Router       /runtime_framework/models [get]
+func (h *ModelHandler) ListModelsOfRuntimeFrameworks(ctx *gin.Context) {
+	currentUser := httpbase.GetCurrentUser(ctx)
+	if currentUser == "" {
+		httpbase.UnauthorizedError(ctx, errors.New("user not found, please login first"))
+		return
+	}
+	search, sort := getFilterFromContext(ctx)
+	deployTypeStr := ctx.Query("deploy_type")
+	if deployTypeStr == "" {
+		// backward compatibility for inferences
+		deployTypeStr = strconv.Itoa(types.InferenceType)
+	}
+	deployType, err := strconv.Atoi(deployTypeStr)
+	if err != nil {
+		slog.Error("Bad request deploy type format", "error", err)
+		httpbase.BadRequest(ctx, err.Error())
+		return
+	}
+	per, page, err := common.GetPerAndPageFromContext(ctx)
+	if err != nil {
+		slog.Error("Bad request per and page format", "error", err)
+		httpbase.BadRequest(ctx, err.Error())
+		return
+	}
+
+	models, total, err := h.c.ListModelsOfRuntimeFrameworks(ctx, currentUser, search, sort, per, page, deployType)
+	if err != nil {
+		slog.Error("fail to get models for all runtime frameworks", slog.Any("deployType", deployType), slog.Any("per", per), slog.Any("page", page), slog.Any("error", err))
+		httpbase.ServerError(ctx, err)
+		return
+	}
+	respData := gin.H{
+		"data":  models,
+		"total": total,
+	}
+	ctx.JSON(http.StatusOK, respData)
+}

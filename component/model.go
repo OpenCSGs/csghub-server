@@ -703,7 +703,7 @@ func (c *ModelComponent) ListModelsByRuntimeFrameworkID(ctx context.Context, cur
 		repoIDs = append(repoIDs, repo.RepoID)
 	}
 
-	repos, total, err := c.rs.ListRepoPublicToUserByRepoIDs(ctx, types.ModelRepo, user.ID, per, page, repoIDs)
+	repos, total, err := c.rs.ListRepoPublicToUserByRepoIDs(ctx, types.ModelRepo, user.ID, "", "", per, page, repoIDs)
 	if err != nil {
 		newError := fmt.Errorf("failed to get public model repos,error:%w", err)
 		return nil, 0, newError
@@ -779,4 +779,49 @@ func (c *ModelComponent) DeleteRuntimeFrameworkModes(ctx context.Context, curren
 	}
 
 	return failedModels, nil
+}
+
+func (c *ModelComponent) ListModelsOfRuntimeFrameworks(ctx context.Context, currentUser, search, sort string, per, page int, deployType int) ([]types.Model, int, error) {
+	var (
+		user      database.User
+		err       error
+		resModels []types.Model
+	)
+
+	user, err = c.user.FindByUsername(ctx, currentUser)
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to get current user %s, error:%w", currentUser, err)
+	}
+
+	runtimeRepos, err := c.rrtfms.ListRepoIDsByType(ctx, deployType)
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to get repo by deploy type, error:%w", err)
+	}
+
+	if runtimeRepos == nil || len(runtimeRepos) < 1 {
+		return nil, 0, nil
+	}
+
+	var repoIDs []int64
+	for _, repo := range runtimeRepos {
+		repoIDs = append(repoIDs, repo.RepoID)
+	}
+
+	repos, total, err := c.rs.ListRepoPublicToUserByRepoIDs(ctx, types.ModelRepo, user.ID, search, sort, per, page, repoIDs)
+	if err != nil {
+		newError := fmt.Errorf("failed to get public model repos, error:%w", err)
+		return nil, 0, newError
+	}
+
+	for _, repo := range repos {
+		resModels = append(resModels, types.Model{
+			Name:         repo.Name,
+			Nickname:     repo.Nickname,
+			Description:  repo.Description,
+			Path:         repo.Path,
+			RepositoryID: repo.ID,
+			Private:      repo.Private,
+		})
+	}
+	return resModels, total, nil
 }

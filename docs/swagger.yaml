@@ -6063,6 +6063,62 @@ paths:
       summary: Get Visible models by runtime framework for current user
       tags:
       - RuntimeFramework
+  /runtime_framework/models:
+    get:
+      consumes:
+      - application/json
+      description: get visible models for all runtime frameworks for current user
+      parameters:
+      - description: search text
+        in: query
+        name: search
+        type: string
+      - description: sort by
+        in: query
+        name: sort
+        type: string
+      - description: current user
+        in: query
+        name: current_user
+        type: string
+      - default: 20
+        description: per
+        in: query
+        name: per
+        type: integer
+      - default: 1
+        description: per page
+        in: query
+        name: page
+        type: integer
+      - default: 1
+        description: deploy_type
+        enum:
+        - 1
+        - 2
+        in: query
+        name: deploy_type
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/types.Response'
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Get Visible models for all runtime frameworks for current user
+      tags:
+      - RuntimeFramework
   /space_resources:
     get:
       consumes:
