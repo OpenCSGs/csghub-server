@@ -29,6 +29,9 @@ func (a *AccountingSyncQuotaComponent) GetQuotaByID(ctx context.Context, current
 		return nil, errors.New("user does not exist")
 	}
 	acctQuota, err := a.asq.GetByID(ctx, user.ID)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, nil
+	}
 	if err != nil {
 		return nil, fmt.Errorf("fail to get account quota, %w", err)
 	}

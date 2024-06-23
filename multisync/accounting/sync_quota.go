@@ -3,6 +3,7 @@ package accounting
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"net/http"
 )
 
@@ -19,6 +20,11 @@ type SyncQuota struct {
 	TrafficUsed    int64  `json:"traffic_used"`
 }
 
+type SyncQuotaRes struct {
+	Message string    `json:"msg"`
+	Data    SyncQuota `json:"data"`
+}
+
 type CreateSyncQuotaReq = SyncQuota
 
 type UpdateSyncQuotaReq = SyncQuota
@@ -29,18 +35,19 @@ func (c *AccountingClient) CreateOrUpdateSyncQuota(opt *CreateSyncQuotaReq) (*Re
 		return nil, err
 	}
 	if opt.AccessToken != "" {
-		jsonHeader.Add("Authorization", "Berer "+opt.AccessToken)
+		jsonHeader.Add("Authorization", "Bearer "+opt.AccessToken)
 	}
 	_, resp, err := c.getResponse("POST", "/accounting/multisync/quotas", jsonHeader, bytes.NewReader(body))
 	return resp, err
 }
 
 func (c *AccountingClient) GetSyncQuota(opt *GetSyncQuotaReq) (*SyncQuota, *Response, error) {
-	s := new(SyncQuota)
+	s := new(SyncQuotaRes)
 	header := http.Header{}
 	if opt.AccessToken != "" {
-		header.Add("Authorization", "Berer "+opt.AccessToken)
+		header.Add("Authorization", "Bearer "+opt.AccessToken)
 	}
 	resp, err := c.getParsedResponse("GET", "/accounting/multisync/quota", header, nil, s)
-	return s, resp, err
+	fmt.Println(resp)
+	return &s.Data, resp, err
 }

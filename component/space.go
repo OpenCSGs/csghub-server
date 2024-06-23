@@ -183,6 +183,8 @@ func (c *SpaceComponent) Show(ctx context.Context, namespace, name, currentUser 
 		Sdk:           space.Sdk,
 		SdkVersion:    space.SdkVersion,
 		CoverImageUrl: space.CoverImageUrl,
+		Source:        space.Repository.Source,
+		SyncStatus:    space.Repository.SyncStatus,
 	}
 
 	return resModel, nil
@@ -226,20 +228,20 @@ func (c *SpaceComponent) Update(ctx context.Context, req *types.UpdateSpaceReq) 
 	return resDataset, nil
 }
 
-func (c *SpaceComponent) Index(ctx context.Context, username, search, sort string, tags []database.TagReq, per, page int) ([]types.Space, int, error) {
+func (c *SpaceComponent) Index(ctx context.Context, filter *types.RepoFilter, per, page int) ([]types.Space, int, error) {
 	var (
 		resSpaces []types.Space
 		user      database.User
 		err       error
 	)
-	if username != "" {
-		user, err = c.user.FindByUsername(ctx, username)
+	if filter.Username != "" {
+		user, err = c.user.FindByUsername(ctx, filter.Username)
 		if err != nil {
 			newError := fmt.Errorf("failed to get current user,error:%w", err)
 			return nil, 0, newError
 		}
 	}
-	repos, total, err := c.rs.PublicToUser(ctx, types.SpaceRepo, user.ID, search, sort, tags, per, page)
+	repos, total, err := c.rs.PublicToUser(ctx, types.SpaceRepo, user.ID, filter, per, page)
 	if err != nil {
 		newError := fmt.Errorf("failed to get public space repos,error:%w", err)
 		return nil, 0, newError
@@ -299,6 +301,8 @@ func (c *SpaceComponent) Index(ctx context.Context, username, search, sort strin
 			Tags:          tags,
 			Status:        status,
 			RepositoryID:  space.Repository.ID,
+			Source:        repo.Source,
+			SyncStatus:    repo.SyncStatus,
 		})
 	}
 	return resSpaces, total, nil

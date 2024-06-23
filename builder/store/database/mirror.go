@@ -24,7 +24,6 @@ const (
 	MirrorWaiting    MirrorTaskStatus = "waiting"
 	MirrorRunning    MirrorTaskStatus = "running"
 	MirrorFinished   MirrorTaskStatus = "finished"
-	MirrorMirroring  MirrorTaskStatus = "mirroring"
 	MirrorFailed     MirrorTaskStatus = "failed"
 	MirrorIncomplete MirrorTaskStatus = "incomplete"
 )

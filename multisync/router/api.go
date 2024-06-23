@@ -25,7 +25,7 @@ func NewRouter(config *config.Config) (*gin.Engine, error) {
 	if err != nil {
 		return nil, fmt.Errorf("error creating rproxy handler:%w", err)
 	}
-	rGroup := r.Group("/:repo_type/:namespace/:name.git")
+	rGroup := r.Group("/:repo_type/:namespace/:name")
 	{
 		rGroup.POST("/git-upload-pack", mpHandler.Serve)
 		rGroup.POST("/git-receive-pack", mpHandler.Serve)

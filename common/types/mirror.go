@@ -66,3 +66,10 @@ type CreateMirrorRepoReq struct {
 	License           string `json:"license"`
 	SyncLfs           bool   `json:"sync_lfs"`
 }
+
+type MirrorRepo struct {
+	Path       string               `json:"path"`
+	SyncStatus RepositorySyncStatus `json:"sync_status"`
+	Progress   int8                 `json:"progress"`
+	RepoType   RepositoryType       `json:"repo_type"`
+}

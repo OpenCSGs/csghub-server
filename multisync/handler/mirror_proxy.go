@@ -37,14 +37,19 @@ func (r *MirrorProxyHandler) Serve(ctx *gin.Context) {
 	repoType := ctx.Param("repo_type")
 	namespace := ctx.Param("namespace")
 	name := ctx.Param("name")
+	name, _ = strings.CutSuffix(name, ".git")
 	req.RepoPath = fmt.Sprintf("%s/%s", namespace, name)
 	req.RepoType = repoType
 	req.AccessToken = token
-	err := r.mpComp.Serve(ctx, &req)
-	if err != nil {
-		httpbase.BadRequest(ctx, err.Error())
-		return
+
+	if strings.HasSuffix(ctx.Request.URL.Path, "git-upload-pack") {
+		err := r.mpComp.Serve(ctx, &req)
+		if err != nil {
+			httpbase.BadRequest(ctx, err.Error())
+			return
+		}
 	}
+
 	path := strings.Replace(ctx.Request.URL.Path, fmt.Sprintf("%s/", repoType), fmt.Sprintf("%s_", repoType), 1)
 	rp, _ := proxy.NewReverseProxy(r.gitServerURL)
 	rp.ServeHTTP(ctx.Writer, ctx.Request, path)

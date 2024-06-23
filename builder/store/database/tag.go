@@ -21,11 +21,6 @@ func NewTagStore() *TagStore {
 	}
 }
 
-type TagReq struct {
-	Name     string `json:"name"`
-	Category string `json:"category"`
-}
-
 type TagScope string
 
 const (

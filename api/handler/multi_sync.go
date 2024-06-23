@@ -46,6 +46,7 @@ func (h *SyncHandler) Latest(c *gin.Context) {
 
 	varCur := c.Query("cur")
 	cur, err := strconv.ParseInt(varCur, 10, 64)
+
 	if err != nil {
 		httpbase.BadRequest(c, fmt.Sprintf("invalid param cur: %s", err.Error()))
 		return
@@ -57,7 +58,7 @@ func (h *SyncHandler) Latest(c *gin.Context) {
 		return
 	}
 
-	var resp types.SyncVersionResponse
+	var resp types.SyncVersionData
 	resp.Versions = versions
 	if len(versions) == int(limit) {
 		resp.HasMore = true

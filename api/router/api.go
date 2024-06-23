@@ -142,7 +142,6 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 		// mirror from SaaS, only on-premises available
 		if !config.Saas {
 			modelsGroup.POST("/:namespace/:name/mirror_from_saas", middleware.RepoType(types.ModelRepo), repoCommonHandler.MirrorFromSaas)
-			modelsGroup.POST("/:namespace/:name/mirror_from_saas/sync", middleware.RepoType(types.ModelRepo), repoCommonHandler.MirrorFromSaasSync)
 		}
 
 		// runtime framework
@@ -212,7 +211,6 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 		// mirror from SaaS, only on-premises available
 		if !config.Saas {
 			datasetsGroup.POST("/:namespace/:name/mirror_from_saas", middleware.RepoType(types.DatasetRepo), repoCommonHandler.MirrorFromSaas)
-			datasetsGroup.POST("/:namespace/:name/mirror_from_saas/sync", middleware.RepoType(types.DatasetRepo), repoCommonHandler.MirrorFromSaasSync)
 		}
 	}
 
@@ -256,7 +254,6 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 		// mirror from SaaS, only on-premises available
 		if !config.Saas {
 			codesGroup.POST("/:namespace/:name/mirror_from_saas", middleware.RepoType(types.CodeRepo), repoCommonHandler.MirrorFromSaas)
-			codesGroup.POST("/:namespace/:name/mirror_from_saas/sync", middleware.RepoType(types.CodeRepo), repoCommonHandler.MirrorFromSaasSync)
 		}
 	}
 
@@ -319,7 +316,6 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 		// mirror from SaaS, only on-premises available
 		if !config.Saas {
 			spaces.POST("/:namespace/:name/mirror_from_saas", middleware.RepoType(types.SpaceRepo), repoCommonHandler.MirrorFromSaas)
-			spaces.POST("/:namespace/:name/mirror_from_saas/sync", middleware.RepoType(types.SpaceRepo), repoCommonHandler.MirrorFromSaasSync)
 		}
 
 		spaces.GET("/:namespace/:name/runtime_framework", middleware.RepoType(types.SpaceRepo), repoCommonHandler.RuntimeFrameworkList)
@@ -486,6 +482,8 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 		mirror.DELETE("/sources/:id", msHandler.Delete)
 		mirror.GET("/sources/:id", msHandler.Get)
 		mirror.POST("/repo", mirrorHandler.CreateMirrorRepo)
+		mirror.GET("/repos", mirrorHandler.Repos)
+
 	}
 
 	// cluster infos

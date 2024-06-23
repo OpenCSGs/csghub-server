@@ -68,12 +68,16 @@ func (c *commonClient) ModelInfo(ctx context.Context, v types.SyncVersion) (*typ
 		return nil, fmt.Errorf("failed to get model info from endpoint %s, repo path:%s, cause: %w",
 			c.endpoint, v.RepoPath, err)
 	}
-	var model types.Model
-	err = json.NewDecoder(resp.Body).Decode(&model)
+	if resp.StatusCode != 200 {
+		return nil, fmt.Errorf("failed to get model info from endpoint %s, repo path:%s, status code: %d",
+			c.endpoint, v.RepoPath, resp.StatusCode)
+	}
+	var res types.ModelResponse
+	err = json.NewDecoder(resp.Body).Decode(&res)
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode response body as types.Model, cause: %w", err)
 	}
-	return nil, nil
+	return &res.Data, nil
 }
 
 func (c *commonClient) DatasetInfo(ctx context.Context, v types.SyncVersion) (*types.Dataset, error) {
@@ -86,10 +90,14 @@ func (c *commonClient) DatasetInfo(ctx context.Context, v types.SyncVersion) (*t
 		return nil, fmt.Errorf("failed to get dataset info from endpoint %s, repo path:%s, cause: %w",
 			c.endpoint, v.RepoPath, err)
 	}
-	var dataset types.Dataset
-	err = json.NewDecoder(resp.Body).Decode(&dataset)
+	if resp.StatusCode != 200 {
+		return nil, fmt.Errorf("failed to get dataset info from endpoint %s, repo path:%s, status code: %d",
+			c.endpoint, v.RepoPath, resp.StatusCode)
+	}
+	var res types.DatasetResponse
+	err = json.NewDecoder(resp.Body).Decode(&res)
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode response body as types.Dataset, cause: %w", err)
 	}
-	return nil, nil
+	return &res.Data, nil
 }

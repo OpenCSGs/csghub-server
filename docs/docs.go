@@ -665,6 +665,17 @@ const docTemplate = `{
                         "in": "query"
                     },
                     {
+                        "enum": [
+                            "opencsg",
+                            "huggingface",
+                            "local"
+                        ],
+                        "type": "string",
+                        "description": "source",
+                        "name": "source",
+                        "in": "query"
+                    },
+                    {
                         "type": "integer",
                         "default": 20,
                         "description": "per",
@@ -1134,6 +1145,17 @@ const docTemplate = `{
                         "type": "string",
                         "description": "sort by",
                         "name": "sort",
+                        "in": "query"
+                    },
+                    {
+                        "enum": [
+                            "opencsg",
+                            "huggingface",
+                            "local"
+                        ],
+                        "type": "string",
+                        "description": "source",
+                        "name": "source",
                         "in": "query"
                     },
                     {
@@ -1955,6 +1977,73 @@ const docTemplate = `{
                 }
             }
         },
+        "/mirror/repos": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Mirror"
+                ],
+                "summary": "Get mirror repos",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "default": 20,
+                        "description": "per",
+                        "name": "per",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "default": 1,
+                        "description": "page",
+                        "name": "page",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/types.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/types.MirrorRepo"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            }
+        },
         "/mirror/sources": {
             "get": {
                 "security": [
@@ -2301,6 +2390,17 @@ const docTemplate = `{
                         "type": "string",
                         "description": "sort by",
                         "name": "sort",
+                        "in": "query"
+                    },
+                    {
+                        "enum": [
+                            "opencsg",
+                            "huggingface",
+                            "local"
+                        ],
+                        "type": "string",
+                        "description": "source",
+                        "name": "source",
                         "in": "query"
                     },
                     {
@@ -5038,6 +5138,17 @@ const docTemplate = `{
                         "type": "string",
                         "description": "sort by",
                         "name": "sort",
+                        "in": "query"
+                    },
+                    {
+                        "enum": [
+                            "opencsg",
+                            "huggingface",
+                            "local"
+                        ],
+                        "type": "string",
+                        "description": "source",
+                        "name": "source",
                         "in": "query"
                     },
                     {
@@ -8732,86 +8843,6 @@ const docTemplate = `{
                 }
             }
         },
-        "/{repo_type}/{namespace}/{name}/mirror_from_saas/sync": {
-            "post": {
-                "security": [
-                    {
-                        "ApiKey": []
-                    }
-                ],
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Repository"
-                ],
-                "summary": "Manually trigger mirror sync(only on-premises)",
-                "parameters": [
-                    {
-                        "enum": [
-                            "models",
-                            "datasets",
-                            "codes",
-                            "spaces"
-                        ],
-                        "type": "string",
-                        "description": "models,datasets,codes or spaces",
-                        "name": "repo_type",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "repo owner name",
-                        "name": "namespace",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "repo name",
-                        "name": "name",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/types.Response"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "$ref": "#/definitions/database.Mirror"
-                                        }
-                                    }
-                                }
-                            ]
-                        }
-                    },
-                    "400": {
-                        "description": "Bad request",
-                        "schema": {
-                            "$ref": "#/definitions/types.APIBadRequest"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal server error",
-                        "schema": {
-                            "$ref": "#/definitions/types.APIInternalServerError"
-                        }
-                    }
-                }
-            }
-        },
         "/{repo_type}/{namespace}/{name}/raw/{file_path}": {
             "get": {
                 "security": [
@@ -10399,7 +10430,6 @@ const docTemplate = `{
                 "waiting",
                 "running",
                 "finished",
-                "mirroring",
                 "failed",
                 "incomplete"
             ],
@@ -10407,7 +10437,6 @@ const docTemplate = `{
                 "MirrorWaiting",
                 "MirrorRunning",
                 "MirrorFinished",
-                "MirrorMirroring",
                 "MirrorFailed",
                 "MirrorIncomplete"
             ]
@@ -10443,6 +10472,9 @@ const docTemplate = `{
                 },
                 "id": {
                     "type": "integer"
+                },
+                "mirrored": {
+                    "type": "boolean"
                 },
                 "namespace_type": {
                     "$ref": "#/definitions/database.NamespaceType"
@@ -10551,6 +10583,9 @@ const docTemplate = `{
                 "likes": {
                     "type": "integer"
                 },
+                "mirror": {
+                    "$ref": "#/definitions/database.Mirror"
+                },
                 "name": {
                     "type": "string"
                 },
@@ -10570,8 +10605,14 @@ const docTemplate = `{
                 "repository_type": {
                     "$ref": "#/definitions/types.RepositoryType"
                 },
+                "source": {
+                    "$ref": "#/definitions/types.RepositorySource"
+                },
                 "ssh_clone_url": {
                     "type": "string"
+                },
+                "sync_status": {
+                    "$ref": "#/definitions/types.RepositorySyncStatus"
                 },
                 "tags": {
                     "type": "array",
@@ -10900,6 +10941,12 @@ const docTemplate = `{
                 },
                 "repository_id": {
                     "type": "integer"
+                },
+                "source": {
+                    "$ref": "#/definitions/types.RepositorySource"
+                },
+                "sync_status": {
+                    "$ref": "#/definitions/types.RepositorySyncStatus"
                 },
                 "tags": {
                     "type": "array",
@@ -11490,6 +11537,12 @@ const docTemplate = `{
                 "repository_id": {
                     "type": "integer"
                 },
+                "source": {
+                    "$ref": "#/definitions/types.RepositorySource"
+                },
+                "sync_status": {
+                    "$ref": "#/definitions/types.RepositorySyncStatus"
+                },
                 "tags": {
                     "type": "array",
                     "items": {
@@ -11689,6 +11742,23 @@ const docTemplate = `{
                 }
             }
         },
+        "types.MirrorRepo": {
+            "type": "object",
+            "properties": {
+                "path": {
+                    "type": "string"
+                },
+                "progress": {
+                    "type": "integer"
+                },
+                "repo_type": {
+                    "$ref": "#/definitions/types.RepositoryType"
+                },
+                "sync_status": {
+                    "$ref": "#/definitions/types.RepositorySyncStatus"
+                }
+            }
+        },
         "types.Model": {
             "type": "object",
             "properties": {
@@ -11728,10 +11798,16 @@ const docTemplate = `{
                 "repository_id": {
                     "type": "integer"
                 },
+                "source": {
+                    "$ref": "#/definitions/types.RepositorySource"
+                },
                 "status": {
                     "description": "url to interact with the model",
                     "type": "string",
                     "example": "RUNNING"
+                },
+                "sync_status": {
+                    "$ref": "#/definitions/types.RepositorySyncStatus"
                 },
                 "tags": {
                     "type": "array",
@@ -11936,6 +12012,30 @@ const docTemplate = `{
                 }
             }
         },
+        "types.RepositorySource": {
+            "type": "string",
+            "enum": [
+                "opencsg"
+            ],
+            "x-enum-varnames": [
+                "OpenCSGSource"
+            ]
+        },
+        "types.RepositorySyncStatus": {
+            "type": "string",
+            "enum": [
+                "pending",
+                "inprogress",
+                "failed",
+                "completed"
+            ],
+            "x-enum-varnames": [
+                "SyncStatusPending",
+                "SyncStatusInProgress",
+                "SyncStatusFailed",
+                "SyncStatusCompleted"
+            ]
+        },
         "types.RepositoryType": {
             "type": "string",
             "enum": [
@@ -12114,9 +12214,15 @@ const docTemplate = `{
                 "secrets": {
                     "type": "string"
                 },
+                "source": {
+                    "$ref": "#/definitions/types.RepositorySource"
+                },
                 "status": {
                     "description": "deploying, running, failed",
                     "type": "string"
+                },
+                "sync_status": {
+                    "$ref": "#/definitions/types.RepositorySyncStatus"
                 },
                 "tags": {
                     "type": "array",
@@ -12197,14 +12303,22 @@ const docTemplate = `{
         "types.SyncVersionResponse": {
             "type": "object",
             "properties": {
-                "has_more": {
-                    "type": "boolean"
-                },
-                "versions": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/types.SyncVersion"
+                "data": {
+                    "type": "object",
+                    "properties": {
+                        "has_more": {
+                            "type": "boolean"
+                        },
+                        "versions": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/types.SyncVersion"
+                            }
+                        }
                     }
+                },
+                "msg": {
+                    "type": "string"
                 }
             }
         },

@@ -17,7 +17,7 @@ func NewSyncVersionStore() *SyncVersionStore {
 }
 
 func (s *SyncVersionStore) Create(ctx context.Context, version *SyncVersion) (err error) {
-	err = s.db.Operator.Core.NewInsert().Model(version).Scan(ctx)
+	_, err = s.db.Operator.Core.NewInsert().Model(version).Exec(ctx)
 	return
 }
 

@@ -85,8 +85,10 @@ type Model struct {
 	// widget UI style: generation,chat
 	WidgetType ModelWidgetType `json:"widget_type" example:"generation"`
 	// url to interact with the model
-	Status    string `json:"status" example:"RUNNING"`
-	UserLikes bool   `json:"user_likes"`
+	Status     string               `json:"status" example:"RUNNING"`
+	UserLikes  bool                 `json:"user_likes"`
+	Source     RepositorySource     `json:"source"`
+	SyncStatus RepositorySyncStatus `json:"sync_status"`
 }
 
 type SDKModelInfo struct {

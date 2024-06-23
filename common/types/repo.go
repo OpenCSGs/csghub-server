@@ -1,8 +1,12 @@
 package types
 
-import "time"
+import (
+	"time"
+)
 
 type RepositoryType string
+type RepositorySource string
+type RepositorySyncStatus string
 
 const (
 	ResTypeKey  string = "hub-res-type"
@@ -14,6 +18,13 @@ const (
 	SpaceRepo   RepositoryType = "space"
 	CodeRepo    RepositoryType = "code"
 	UnknownRepo RepositoryType = ""
+
+	OpenCSGSource RepositorySource = "opencsg"
+
+	SyncStatusPending    RepositorySyncStatus = "pending"
+	SyncStatusInProgress RepositorySyncStatus = "inprogress"
+	SyncStatusFailed     RepositorySyncStatus = "failed"
+	SyncStatusCompleted  RepositorySyncStatus = "completed"
 
 	EndpointPublic  int = 1 // public - anyone can access
 	EndpointPrivate int = 2 // private - access with read permission
@@ -121,4 +132,17 @@ type RuntimeFramework struct {
 
 type RuntimeFrameworkModels struct {
 	Models []string `json:"models"`
+}
+
+type RepoFilter struct {
+	Tags     []TagReq
+	Sort     string
+	Search   string
+	Source   string
+	Username string
+}
+
+type TagReq struct {
+	Name     string `json:"name"`
+	Category string `json:"category"`
 }
