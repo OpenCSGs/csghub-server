@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log"
 	"log/slog"
 	"net/http"
 	"strconv"
@@ -13,10 +14,13 @@ import (
 	"time"
 
 	"github.com/bwmarrin/snowflake"
+	"github.com/google/uuid"
+	"github.com/nats-io/nats.go"
 	"opencsg.com/csghub-server/builder/deploy/common"
 	"opencsg.com/csghub-server/builder/deploy/imagebuilder"
 	"opencsg.com/csghub-server/builder/deploy/imagerunner"
 	"opencsg.com/csghub-server/builder/deploy/scheduler"
+	"opencsg.com/csghub-server/builder/event"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/types"
 )
@@ -46,9 +50,11 @@ type deployer struct {
 
 	store              *database.DeployTaskStore
 	spaceStore         *database.SpaceStore
+	spaceResourceStore *database.SpaceResourceStore
 	runnerStatuscache  map[string]imagerunner.StatusResponse
 	internalRootDomain string
 	sfNode             *snowflake.Node
+	consumer           *event.EventPublisher
 }
 
 func newDeployer(s scheduler.Scheduler, ib imagebuilder.Builder, ir imagerunner.Runner) (*deployer, error) {
@@ -66,10 +72,17 @@ func newDeployer(s scheduler.Scheduler, ib imagebuilder.Builder, ir imagerunner.
 		spaceStore:        database.NewSpaceStore(),
 		runnerStatuscache: make(map[string]imagerunner.StatusResponse),
 		sfNode:            node,
+		consumer:          event.NewEventPublisher(),
+	}
+	// Subscribe to a subject and handle incoming messages
+	_, err = d.consumer.Connector.Conn.Subscribe(d.consumer.Connector.NotifySubject, d.handleMessage)
+	if err != nil {
+		log.Fatal("Failed to Subscribe nats notify subject: ", err)
 	}
 
 	go d.refreshStatus()
 	go d.s.Run()
+	go d.startAccounting()
 
 	return d, nil
 }
@@ -96,7 +109,8 @@ func (d *deployer) serverlessDeploy(ctx context.Context, dr types.DeployRepo) (*
 	if err != nil {
 		return nil, fmt.Errorf("fail to found the latest deploy for spaceID %v, %w", dr.SpaceID, err)
 	}
-
+	deploy.CasdoorUUID = dr.CasdoorUID
+	deploy.SKU = dr.SKU
 	deploy.ImageID = ""
 	err = d.store.UpdateDeploy(ctx, deploy)
 	if err != nil {
@@ -134,6 +148,8 @@ func (d *deployer) dedicatedDeploy(ctx context.Context, dr types.DeployRepo) (*d
 		SecureLevel:      dr.SecureLevel,
 		SvcName:          uniqueSvcName,
 		Type:             dr.Type,
+		CasdoorUUID:      dr.CasdoorUID,
+		SKU:              dr.SKU,
 	}
 	err := d.store.CreateDeploy(ctx, deploy)
 	return deploy, err
@@ -470,23 +486,24 @@ func (d *deployer) UpdateCluster(ctx context.Context, data interface{}) (*types.
 
 // UpdateDeploy implements Deployer.
 func (d *deployer) UpdateDeploy(ctx context.Context, mrr types.ModelRunReq, deploy *database.Deploy, frame *database.RuntimeFramework) error {
-	var hardware types.HardWare
-	err := json.Unmarshal([]byte(mrr.Hardware), &hardware)
+	resource, err := d.spaceResourceStore.FindByID(ctx, mrr.ResourceID)
 	if err != nil {
-		return fmt.Errorf("invalid hardware setting: %v, %w", mrr.Hardware, err)
+		slog.Error("error finding space resource", slog.Any("error", err))
+		return err
+	}
+
+	var hardware types.HardWare
+	err = json.Unmarshal([]byte(resource.Resources), &hardware)
+	if err != nil {
+		slog.Error("invalid hardware setting", slog.Any("error", err), slog.String("hardware", resource.Resources))
+		return err
 	}
 
 	// choose image
 	containerImg := frame.FrameCpuImage
 	if hardware.Gpu.Num != "" {
-		gpuNum, err := strconv.Atoi(hardware.Gpu.Num)
-		if err != nil {
-			return fmt.Errorf("invalid hardware gpu setting: %v, %w", mrr.Hardware, err)
-		}
-		if gpuNum > 0 {
-			// use gpu image
-			containerImg = frame.FrameImage
-		}
+		// use gpu image
+		containerImg = frame.FrameImage
 	}
 
 	deploy.DeployName = mrr.DeployName
@@ -494,12 +511,12 @@ func (d *deployer) UpdateDeploy(ctx context.Context, mrr types.ModelRunReq, depl
 	deploy.RuntimeFramework = frame.FrameName
 	deploy.ImageID = containerImg
 	deploy.ContainerPort = frame.ContainerPort
-	deploy.Hardware = mrr.Hardware
+	deploy.Hardware = resource.Resources
 	deploy.MinReplica = mrr.MinReplica
 	deploy.MaxReplica = mrr.MaxReplica
 	deploy.GitBranch = mrr.Revision
 	deploy.SecureLevel = mrr.SecureLevel
-	deploy.CostPerHour = mrr.CostPerHour
+	deploy.CostPerHour = resource.CostPerHour
 	deploy.ClusterID = mrr.ClusterID
 
 	// deploy.Status = common.Pending
@@ -530,4 +547,72 @@ func (d *deployer) StartDeploy(ctx context.Context, deploy *database.Deploy) err
 	go d.s.Queue(runTask.ID)
 
 	return nil
+}
+
+// accounting timer
+func (d *deployer) startAccounting() {
+	for {
+		for _, svc := range d.runnerStatuscache {
+			//ignore not ready svc
+			if svc.Code != common.Running {
+				continue
+			}
+			// ignore existing space and cpu resources
+			if svc.CostPerHour == 0 {
+				continue
+			}
+			duration := float64(d.consumer.Connector.SyncInterval) / 60.0
+
+			consumerInfo := types.CONSUMER_INFO{
+				ConsumerID:    svc.ServiceName,
+				ConsumerPrice: fmt.Sprintf("%.3f", svc.CostPerHour),
+				PriceUnit:     "hour",
+				Duration:      fmt.Sprintf("%.3f", duration),
+			}
+			consumerInfoStr, err := json.Marshal(consumerInfo)
+			if err != nil {
+				slog.Error("Error marshal consumer info", slog.Any("error", err))
+				continue
+			}
+			event := types.ACC_EVENT{
+				Uuid:      uuid.New(),
+				UserID:    svc.UserID,
+				Value:     -(svc.CostPerHour * float64(svc.Replica) * duration),
+				ValueType: 0, // for credit
+				Scene:     int(getValidSceneType(svc.DeployType)),
+				OpUID:     0,
+				CreatedAt: time.Now(),
+				Extra:     string(consumerInfoStr),
+			}
+			str, err := json.Marshal(event)
+			if err != nil {
+				slog.Error("Error marshal event", slog.Any("error", err))
+			} else {
+				d.consumer.Publish(d.consumer.Connector.Subject, str)
+			}
+
+		}
+		// accounting interval 1 min
+		time.Sleep(1 * time.Minute)
+	}
+}
+
+func getValidSceneType(scene int) database.SceneType {
+	switch scene {
+	case 0:
+		return database.SceneSpace
+	case 1:
+		return database.SceneModelInference
+	case 2:
+		return database.SceneModelFinetune
+	default:
+		return database.SceneUnknow
+	}
+}
+
+// Add your own logic to process the received message
+func (d *deployer) handleMessage(msg *nats.Msg) {
+	// to do for no balance case
+	log.Printf("Received message: %s", string(msg.Data))
+
 }

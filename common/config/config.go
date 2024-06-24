@@ -115,6 +115,13 @@ type Config struct {
 		DownloadEndpoint   string `envconfig:"STARHUB_SERVER_MODEL_DOWNLOAD_ENDPOINT" default:"https://hub-stg./"`
 		DockerRegBase      string `envconfig:"STARHUB_SERVER_MODEL_DOCKER_REG_BASE" default:"opencsg-registry.cn-beijing.cr.aliyuncs.com/public/"`
 	}
+	// send events
+	Event struct {
+		SyncInterval            int    `envconfig:"STARHUB_SERVER_SYNC_IN_MINUTES" default:"1"`
+		FeeSendSubject          string `envconfig:"STARHUB_SERVER_FEE_SEND_SUBJECT" default:"accounting.fee.credit"`
+		FeeSendRetrySubject     string `envconfig:"STARHUB_SERVER_FEE_RETRY_SUBJECT" default:"accounting.dlq.fee"`
+		NoBalanceReceiveSubject string `envconfig:"STARHUB_SERVER_NOTIFY_NOBALANCE_SUBJECT" default:"accounting.notify.nobalance"`
+	}
 
 	Casdoor struct {
 		ClientID         string `envconfig:"STARHUB_SERVER_CASDOOR_CLIENT_ID" default:"client_id"`

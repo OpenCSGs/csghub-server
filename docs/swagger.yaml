@@ -721,6 +721,8 @@ definitions:
     type: object
   types.CreateSpaceReq:
     properties:
+      casdoor_uid:
+        type: string
       cover_image_url:
         type: string
       default_branch:
@@ -729,8 +731,6 @@ definitions:
       description:
         type: string
       env:
-        type: string
-      hardware:
         type: string
       labels:
         example: ""
@@ -751,6 +751,8 @@ definitions:
         type: boolean
       readme:
         type: string
+      resource_id:
+        type: integer
       sdk:
         description: |-
           Creator   string `json:"username" example:"creator_user_name"`
@@ -769,11 +771,14 @@ definitions:
     type: object
   types.CreateSpaceResourceReq:
     properties:
+      cost_per_hour:
+        type: number
       name:
         type: string
       resources:
         type: string
     required:
+    - cost_per_hour
     - name
     - resources
     type: object
@@ -968,12 +973,10 @@ definitions:
     properties:
       cluster_id:
         type: string
-      cost_per_hour:
-        type: integer
       deploy_name:
         type: string
-      hardware:
-        type: string
+      resource_id:
+        type: integer
       revision:
         type: string
       runtime_framework_id:
@@ -1066,17 +1069,15 @@ definitions:
     properties:
       cluster_id:
         type: string
-      cost_per_hour:
-        type: integer
       deploy_name:
         type: string
       env:
         type: string
-      hardware:
-        type: string
       max_replica:
         type: integer
       min_replica:
+        type: integer
+      resource_id:
         type: integer
       revision:
         type: string
@@ -1293,6 +1294,8 @@ definitions:
     type: object
   types.SpaceResource:
     properties:
+      cost_per_hour:
+        type: number
       id:
         type: integer
       name:
@@ -1467,8 +1470,6 @@ definitions:
         type: string
       env:
         type: string
-      hardware:
-        type: string
       labels:
         example: ""
         type: string
@@ -1488,6 +1489,8 @@ definitions:
         type: boolean
       readme:
         type: string
+      resource_id:
+        type: integer
       sdk:
         description: |-
           Creator   string `json:"username" example:"creator_user_name"`
@@ -1506,6 +1509,8 @@ definitions:
     type: object
   types.UpdateSpaceResourceReq:
     properties:
+      cost_per_hour:
+        type: number
       name:
         type: string
       resources:

@@ -7,7 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
-	"strconv"
 
 	"opencsg.com/csghub-server/builder/deploy"
 	"opencsg.com/csghub-server/builder/git/gitserver"
@@ -70,6 +69,7 @@ func NewModelComponent(config *config.Config) (*ModelComponent, error) {
 	c.spaceComonent, _ = NewSpaceComponent(config)
 	c.ms = database.NewModelStore()
 	c.rs = database.NewRepoStore()
+	c.SS = database.NewSpaceResourceStore()
 	c.infer = inference.NewInferClient(config.Inference.ServerAddr)
 	c.us = database.NewUserStore()
 	c.deployer = deploy.NewDeployer()
@@ -81,6 +81,7 @@ type ModelComponent struct {
 	spaceComonent *SpaceComponent
 	ms            *database.ModelStore
 	rs            *database.RepoStore
+	SS            *database.SpaceResourceStore
 	infer         inference.Client
 	us            *database.UserStore
 	deployer      deploy.Deployer
@@ -630,25 +631,24 @@ func (c *ModelComponent) Deploy(ctx context.Context, namespace, name, currentUse
 		return -1, err
 	}
 
-	var hardware types.HardWare
-	err = json.Unmarshal([]byte(req.Hardware), &hardware)
+	resource, err := c.SS.FindByID(ctx, req.ResourceID)
 	if err != nil {
-		slog.Error("invalid hardware setting", slog.Any("error", err), slog.String("hardware", req.Hardware))
+		slog.Error("error finding space resource", slog.Any("error", err))
+		return -1, err
+	}
+
+	var hardware types.HardWare
+	err = json.Unmarshal([]byte(resource.Resources), &hardware)
+	if err != nil {
+		slog.Error("invalid hardware setting", slog.Any("error", err), slog.String("hardware", resource.Resources))
 		return -1, err
 	}
 
 	// choose image
 	containerImg := frame.FrameCpuImage
 	if hardware.Gpu.Num != "" {
-		gpuNum, err := strconv.Atoi(hardware.Gpu.Num)
-		if err != nil {
-			slog.Error("invalid hardware gpu setting", slog.Any("error", err), slog.String("hardware", req.Hardware))
-			return -1, err
-		}
-		if gpuNum > 0 {
-			// use gpu image
-			containerImg = frame.FrameImage
-		}
+		// use gpu image
+		containerImg = frame.FrameImage
 	}
 
 	// create deploy for model
@@ -659,7 +659,7 @@ func (c *ModelComponent) Deploy(ctx context.Context, namespace, name, currentUse
 		GitPath:          m.Repository.GitPath,
 		GitBranch:        req.Revision,
 		Env:              req.Env,
-		Hardware:         req.Hardware,
+		Hardware:         resource.Resources,
 		UserID:           user.ID,
 		ModelID:          m.ID,
 		RepoID:           m.Repository.ID,
@@ -669,10 +669,12 @@ func (c *ModelComponent) Deploy(ctx context.Context, namespace, name, currentUse
 		MinReplica:       req.MinReplica,
 		MaxReplica:       req.MaxReplica,
 		Annotation:       string(annoStr),
-		CostPerHour:      req.CostPerHour,
+		CostPerHour:      resource.CostPerHour,
 		ClusterID:        req.ClusterID,
 		SecureLevel:      req.SecureLevel,
 		Type:             deployType,
+		CasdoorUID:       user.CasdoorUUID,
+		SKU:              string(resource.ID),
 	})
 }
 

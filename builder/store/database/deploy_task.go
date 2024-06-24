@@ -40,10 +40,12 @@ type Deploy struct {
 	SvcName          string `json:"svc_name"`
 	Endpoint         string `json:"endpoint"`
 	// minimum unit of money for counting cost
-	CostPerHour int64  `json:"cost_per_hour"`
-	ClusterID   string `json:"cluster_id"`
-	SecureLevel int    `json:"secure_level"` // 1-public, 2-private, 3-extension in future
-	Type        int    `json:"type"`         // 0-space, 1-inference, 2-finetune
+	CostPerHour float64 `json:"cost_per_hour"`
+	ClusterID   string  `json:"cluster_id"`
+	SecureLevel int     `json:"secure_level"` // 1-public, 2-private, 3-extension in future
+	Type        int     `json:"type"`         // 0-space, 1-inference, 2-finetune
+	CasdoorUUID string  `bun:"," json:"casdoor_uuid"`
+	SKU         string  `bun:"," json:"sku"`
 	times
 }
 

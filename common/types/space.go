@@ -13,8 +13,9 @@ type CreateSpaceReq struct {
 	CoverImageUrl string `json:"cover_image_url"`
 	Template      string `json:"template"`
 	Env           string `json:"env"`
-	Hardware      string `json:"hardware"`
 	Secrets       string `json:"secrets"`
+	ResourceID    int64  `json:"resource_id"`
+	CasdoorUID    string `json:"casdoor_uid"`
 	// Private   bool   `json:"private"`
 }
 
@@ -64,7 +65,7 @@ type UpdateSpaceReq struct {
 	CoverImageUrl string `json:"cover_image_url"`
 	Template      string `json:"template"`
 	Env           string `json:"env"`
-	Hardware      string `json:"hardware"`
+	ResourceID    int64  `json:"resource_id"`
 	Secrets       string `json:"secrets"`
 	// Private   bool   `json:"private"`
 }
