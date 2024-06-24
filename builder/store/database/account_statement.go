@@ -9,6 +9,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/uptrace/bun"
+	commonTypes "opencsg.com/csghub-server/common/types"
 )
 
 type AccountStatementStore struct {
@@ -86,13 +87,20 @@ func (as *AccountStatementStore) Create(ctx context.Context, input AccountStatem
 	return err
 }
 
-func (as *AccountStatementStore) ListByUserIDAndTime(ctx context.Context, userID, startTime, endTime string, per, page int) ([]AccountStatement, error) {
+func (as *AccountStatementStore) ListByUserIDAndTime(ctx context.Context, req commonTypes.ACCT_STATEMENTS_REQ) ([]AccountStatement, int, error) {
 	var result []AccountStatement
-	_, err := as.db.Operator.Core.NewSelect().Model(&result).Where("user_id = ? and created_at >= ? and created_at <= ?", userID, startTime, endTime).Order("id DESC").Limit(per).Offset((page-1)*per).Exec(ctx, &result)
+	q := as.db.Operator.Core.NewSelect().Model(&result).Where("user_id = ? and scene = ? and customer_id = ? and created_at >= ? and created_at <= ?", req.UserID, req.Scene, req.InstanceName, req.StartTime, req.EndTime)
+
+	count, err := q.Count(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("list all statement, error:%w", err)
+		return nil, 0, err
 	}
-	return result, nil
+
+	_, err = q.Order("id DESC").Limit(req.Per).Offset((req.Page-1)*req.Per).Exec(ctx, &result)
+	if err != nil {
+		return nil, 0, fmt.Errorf("list all statement, error:%w", err)
+	}
+	return result, count, nil
 }
 
 func (as *AccountStatementStore) GetByEventID(ctx context.Context, eventID uuid.UUID) (AccountStatement, error) {

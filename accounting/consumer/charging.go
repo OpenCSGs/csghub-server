@@ -11,8 +11,8 @@ import (
 
 	"github.com/nats-io/nats.go"
 	"opencsg.com/csghub-server/accounting/component"
-	"opencsg.com/csghub-server/accounting/types"
 	"opencsg.com/csghub-server/common/config"
+	"opencsg.com/csghub-server/common/types"
 )
 
 type Charging struct {
@@ -84,7 +84,9 @@ func (c *Charging) Run() {
 }
 
 func (c *Charging) buildNatsConn() (*nats.Conn, error) {
-	nc, err := nats.Connect(c.NatsURL)
+	nc, err := nats.Connect(c.NatsURL, nats.Timeout(2*time.Second),
+		nats.ReconnectWait(2*time.Second),
+		nats.MaxReconnects(-1))
 	return nc, err
 }
 
@@ -99,54 +101,68 @@ func (c *Charging) startCharging(nc *nats.Conn) {
 	for i := 0; i < 5; i++ {
 		js, err := nc.JetStream()
 		if err != nil {
-			slog.Error("fail to get jetstream", slog.Any("err", err))
+			tip := fmt.Sprintf("fail to get jetstream for the %d time", (i + 1))
+			slog.Error(tip, slog.Any("err", err))
 			continue
 		}
 
 		_, err = js.AddStream(c.streamCfg)
 		if err != nil {
-			slog.Warn("fail to add nats stream", slog.Any("streamName", eventStreamName), slog.Any("err", err))
+			tip := fmt.Sprintf("fail to add nats stream for the %d time", (i + 1))
+			slog.Warn(tip, slog.Any("streamName", eventStreamName), slog.Any("err", err))
 			_, err = js.UpdateStream(c.streamCfg)
 			if err != nil {
-				slog.Warn("fail to update nats stream", slog.Any("streamName", eventStreamName), slog.Any("err", err))
+				tip := fmt.Sprintf("fail to update nats stream for the %d time", (i + 1))
+				slog.Warn(tip, slog.Any("streamName", eventStreamName), slog.Any("err", err))
 				continue
 			}
 		}
 
 		_, err = js.AddConsumer(eventStreamName, c.consumerConfig)
 		if err != nil {
-			slog.Error("fail to add consumer", slog.Any("consumer", eventStreamName), slog.Any("err", err))
+			tip := fmt.Sprintf("fail to add consumer for the %d time", (i + 1))
+			slog.Error(tip, slog.Any("consumer", eventStreamName), slog.Any("err", err))
 			continue
 		}
 
 		sub, err := js.PullSubscribe(c.FeeRequestSubject, accountingConsumerName)
 		if err != nil {
-			slog.Error("fail to PullSubscribe", slog.Any("FeeRequestSubject", c.FeeRequestSubject), slog.Any("consumer", accountingConsumerName), slog.Any("err", err))
+			tip := fmt.Sprintf("fail to PullSubscribe for the %d time", (i + 1))
+			slog.Error(tip, slog.Any("FeeRequestSubject", c.FeeRequestSubject), slog.Any("consumer", accountingConsumerName), slog.Any("err", err))
 			continue
 		}
-		c.handleReadMsgs(sub)
+		c.handleReadMsgs(js, sub)
 	}
 	c.CH <- 1
 }
 
-func (c *Charging) handleReadMsgs(sub *nats.Subscription) {
+func (c *Charging) handleReadMsgs(js nats.JetStreamContext, sub *nats.Subscription) {
 	failReadTime := 0
 	for {
 		// reset JetStream if read msg fail times is more than 10
 		if failReadTime >= 10 {
 			break
 		}
+		err := c.checkStreams(js)
+		if err != nil {
+			tip := fmt.Sprintf("fail to find streams for the %d time", (failReadTime + 1))
+			slog.Error(tip, slog.Any("subjectName", c.FeeRequestSubject), slog.Any("err", err))
+			failReadTime++
+			continue
+		}
 		msgs, err := sub.Fetch(5, nats.MaxWait(time.Duration(c.MsgFetchTimeoutInSec)*time.Second))
 		if err == nats.ErrTimeout {
 			continue
 		}
 		if err != nil {
-			slog.Error("fail to read NextMsg", slog.Any("subjectName", c.FeeRequestSubject), slog.Any("err", err))
+			tip := fmt.Sprintf("fail to read NextMsg for the %d time", (failReadTime + 1))
+			slog.Error(tip, slog.Any("subjectName", c.FeeRequestSubject), slog.Any("err", err))
 			failReadTime++
 			continue
 		}
 		if msgs == nil {
-			slog.Warn("msgs is null", slog.Any("subjectName", c.FeeRequestSubject))
+			tip := fmt.Sprintf("msgs is null for the %d time", (failReadTime + 1))
+			slog.Warn(tip, slog.Any("subjectName", c.FeeRequestSubject))
 			failReadTime++
 			continue
 		}
@@ -155,6 +171,27 @@ func (c *Charging) handleReadMsgs(sub *nats.Subscription) {
 			c.handleRetryMsg(msg)
 		}
 
+	}
+}
+
+func (c *Charging) checkStreams(js nats.JetStreamContext) error {
+	streamNames := js.StreamNames()
+	requiredStreams := map[string]bool{
+		eventStreamName:  true,
+		notifyStreamName: true,
+		dlqStreamName:    true,
+	}
+	for s := range streamNames {
+		delete(requiredStreams, s)
+	}
+	if len(requiredStreams) < 1 {
+		return nil
+	} else {
+		keys := make([]string, 0, len(requiredStreams))
+		for k := range requiredStreams {
+			keys = append(keys, k)
+		}
+		return fmt.Errorf("stream %v lost", keys)
 	}
 }
 

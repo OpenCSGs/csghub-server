@@ -42,7 +42,44 @@ type ACC_NOTIFY struct {
 	ReasonMsg  string    `json:"reason_msg"`
 }
 
+type ACCT_STATEMENTS_REQ struct {
+	CurrentUser  string `json:"current_user"`
+	UserID       string `json:"user_id"`
+	Scene        int    `json:"scene"`
+	InstanceName string `json:"instance_name"`
+	StartTime    string `json:"start_time"`
+	EndTime      string `json:"end_time"`
+	Per          int    `json:"per"`
+	Page         int    `json:"page"`
+}
+
+type ACCT_STATEMENTS_RES struct {
+	ID          int64     `json:"id"`
+	EventUUID   uuid.UUID `json:"event_uuid"`
+	UserID      string    `json:"user_id"`
+	Value       float64   `json:"value"`
+	Scene       int       `json:"scene"`
+	OpUID       int64     `json:"op_uid"`
+	CreatedAt   time.Time `json:"created_at"`
+	CustomerID  string    `json:"instance_name"`
+	EventDate   time.Time `json:"event_date"`
+	Price       float64   `json:"price"`
+	PriceUnit   string    `json:"price_unit"`
+	Consumption float64   `json:"consumption"`
+}
+
 type RECHARGE_REQ struct {
 	Value float64 `json:"value"`
 	OpUID int64   `json:"op_uid"`
+}
+
+type ACCT_QUOTA_REQ struct {
+	RepoCountLimit int64 `json:"repo_count_limit"`
+	SpeedLimit     int64 `json:"speed_limit"`
+	TrafficLimit   int64 `json:"traffic_limit"`
+}
+
+type ACCT_QUOTA_STATEMENT_REQ struct {
+	RepoPath string `json:"repo_path"`
+	RepoType string `json:"repo_type"`
 }

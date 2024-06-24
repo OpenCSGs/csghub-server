@@ -3361,6 +3361,16 @@ paths:
         name: id
         required: true
         type: integer
+      - default: 10
+        description: scene
+        enum:
+        - 10
+        - 11
+        - 12
+        - 20
+        in: query
+        name: scene
+        type: integer
       - description: 'start_date, format: ''2024-06-12'''
         in: query
         name: start_date
@@ -3459,6 +3469,21 @@ paths:
         name: id
         required: true
         type: integer
+      - default: 10
+        description: scene
+        enum:
+        - 10
+        - 11
+        - 12
+        - 20
+        in: query
+        name: scene
+        type: integer
+      - description: instance name
+        in: query
+        name: instance_name
+        required: true
+        type: string
       - description: 'start_time, format: ''2024-06-12 08:27:22'''
         in: query
         name: start_time
@@ -3565,6 +3590,7 @@ paths:
       summary: Get account quota statement
       tags:
       - Accounting
+  /accounting/multisync/downloads:
     post:
       consumes:
       - application/json
@@ -7067,48 +7093,6 @@ paths:
       summary: Delete access token of a app
       tags:
       - Access token
-    get:
-      consumes:
-      - application/json
-      parameters:
-      - description: application
-        enum:
-        - git
-        - starship
-        in: path
-        name: app
-        required: true
-        type: string
-      - description: token_name
-        in: path
-        name: token_name
-        required: true
-        type: string
-      - description: current user, the owner
-        in: query
-        name: current_user
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/types.Response'
-        "400":
-          description: Bad request
-          schema:
-            $ref: '#/definitions/types.APIBadRequest'
-        "500":
-          description: Internal server error
-          schema:
-            $ref: '#/definitions/types.APIInternalServerError'
-      security:
-      - ApiKey: []
-      summary: Get accounting bills of a user
-      tags:
-      - Accounting
     post:
       consumes:
       - application/json

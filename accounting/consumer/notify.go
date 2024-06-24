@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/nats-io/nats.go"
-	"opencsg.com/csghub-server/accounting/types"
+	"opencsg.com/csghub-server/common/types"
 )
 
 var (
@@ -72,14 +72,30 @@ func (n *Notify) notifyWithRetry(nc *nats.Conn, js nats.JetStreamContext) {
 		if nc == nil || nc.IsClosed() {
 			break
 		}
+		err := n.checkNotifyStream(js)
+		if err != nil {
+			slog.Error("fail to check notify stream", slog.Any("error", err))
+			break
+		}
 		if notify.ReasonCode == -1 {
 			continue
 		}
-		err := n.retryPublishNotification(js, notify)
+		err = n.retryPublishNotification(js, notify)
 		if err != nil {
 			break
 		}
 	}
+}
+
+func (n *Notify) checkNotifyStream(js nats.JetStreamContext) error {
+	info, err := js.StreamInfo(dlqStreamName)
+	if err != nil {
+		return fmt.Errorf("fail to get stream %s info", notifyStreamName)
+	}
+	if info == nil {
+		return fmt.Errorf("stream %s lost", notifyStreamName)
+	}
+	return nil
 }
 
 func (n *Notify) retryPublishNotification(js nats.JetStreamContext, notify types.ACC_NOTIFY) error {

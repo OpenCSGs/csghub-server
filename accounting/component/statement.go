@@ -7,8 +7,8 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"opencsg.com/csghub-server/accounting/types"
 	"opencsg.com/csghub-server/builder/store/database"
+	"opencsg.com/csghub-server/common/types"
 )
 
 type AccountingStatementComponent struct {
@@ -46,8 +46,31 @@ func (a *AccountingStatementComponent) AddNewStatement(ctx context.Context, even
 	return a.asms.Create(ctx, statement, changeValue)
 }
 
-func (a *AccountingStatementComponent) ListStatementByUserIDAndTime(ctx context.Context, userID, startTime, endTime string, per, page int) ([]database.AccountStatement, error) {
-	return a.asms.ListByUserIDAndTime(ctx, userID, startTime, endTime, per, page)
+func (a *AccountingStatementComponent) ListStatementByUserIDAndTime(ctx context.Context, req types.ACCT_STATEMENTS_REQ) ([]types.ACCT_STATEMENTS_RES, int, error) {
+	statements, total, err := a.asms.ListByUserIDAndTime(ctx, req)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	var resStatements []types.ACCT_STATEMENTS_RES
+	for _, st := range statements {
+		resStatements = append(resStatements, types.ACCT_STATEMENTS_RES{
+			ID:          st.ID,
+			EventUUID:   st.EventUUID,
+			UserID:      st.UserID,
+			Value:       st.Value,
+			Scene:       int(st.Scene),
+			OpUID:       st.OpUID,
+			CreatedAt:   st.CreatedAt,
+			CustomerID:  st.CustomerID,
+			EventDate:   st.EventDate,
+			Price:       st.Price,
+			PriceUnit:   st.PriceUnit,
+			Consumption: st.Consumption,
+		})
+	}
+
+	return resStatements, total, err
 }
 
 func (a *AccountingStatementComponent) FindStatementByEventID(ctx context.Context, event *types.ACC_EVENT) (*database.AccountStatement, error) {

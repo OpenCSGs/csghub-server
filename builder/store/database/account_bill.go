@@ -26,8 +26,16 @@ type AccountBill struct {
 	times
 }
 
-func (s *AccountBillStore) ListByUserIDAndDate(ctx context.Context, userID string, startDate, endDate string, per, page int) ([]AccountBill, error) {
+func (s *AccountBillStore) ListByUserIDAndDate(ctx context.Context, userID string, startDate, endDate string, scene, per, page int) ([]map[string]interface{}, int, error) {
 	var result []AccountBill
-	_, err := s.db.Operator.Core.NewSelect().Model(&result).Where("bill_date >= ? and bill_date <= ? and user_id = ?", startDate, endDate, userID).Order("scene").Order("bill_date DESC").Limit(per).Offset((page-1)*per).Exec(ctx, &result)
-	return result, err
+	var res []map[string]interface{}
+	q := s.db.Operator.Core.NewSelect().Model(&result).ColumnExpr("customer_id as instance_name, sum(value) as value, sum(consumption) as consumption").Where("bill_date >= ? and bill_date <= ? and user_id = ? and scene = ?", startDate, endDate, userID, scene).Group("customer_id")
+
+	count, err := q.Count(ctx)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	q.Order("customer_id").Limit(per).Offset((page-1)*per).Scan(ctx, &res)
+	return res, count, err
 }
