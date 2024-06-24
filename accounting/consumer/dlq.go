@@ -1,6 +1,7 @@
 package consumer
 
 import (
+	"fmt"
 	"log/slog"
 	"time"
 
@@ -68,14 +69,30 @@ func (d *Dlq) moveWithRetry(nc *nats.Conn, js nats.JetStreamContext) {
 		if nc == nil || nc.IsClosed() {
 			break
 		}
+		err := d.checkDLQStream(js)
+		if err != nil {
+			slog.Error("fail to check DLQ stream", slog.Any("error", err))
+			break
+		}
 		if len(data) < 1 {
 			continue
 		}
-		err := d.retryPublishToDlq(js, data)
+		err = d.retryPublishToDlq(js, data)
 		if err != nil {
 			break
 		}
 	}
+}
+
+func (d *Dlq) checkDLQStream(js nats.JetStreamContext) error {
+	info, err := js.StreamInfo(dlqStreamName)
+	if err != nil {
+		return fmt.Errorf("fail to get stream %s info", dlqStreamName)
+	}
+	if info == nil {
+		return fmt.Errorf("stream %s lost", dlqStreamName)
+	}
+	return nil
 }
 
 func (d *Dlq) retryPublishToDlq(js nats.JetStreamContext, data []byte) error {

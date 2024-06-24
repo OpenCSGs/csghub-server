@@ -1,15 +1,16 @@
 package handler
 
 import (
-	"errors"
+	"fmt"
 	"log/slog"
+	"strconv"
 	"time"
 
 	"github.com/gin-gonic/gin"
 	"opencsg.com/csghub-server/accounting/component"
-	"opencsg.com/csghub-server/accounting/types"
 	"opencsg.com/csghub-server/api/httpbase"
 	"opencsg.com/csghub-server/common/config"
+	"opencsg.com/csghub-server/common/types"
 	"opencsg.com/csghub-server/common/utils/common"
 )
 
@@ -27,23 +28,7 @@ type CreditHandler struct {
 	abc *component.AccountingBillComponent
 }
 
-// GetBalances   godoc
-// @Security     ApiKey
-// @Summary      Get all users balance
-// @Description  Get all users balance
-// @Tags         Accounting
-// @Accept       json
-// @Produce      json
-// @Success      200  {object}  types.Response{} "OK"
-// @Failure      400  {object}  types.APIBadRequest "Bad request"
-// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
-// @Router       /accounting/credit/balance [get]
 func (ch *CreditHandler) QueryAllUsersBalance(ctx *gin.Context) {
-	currentUser := httpbase.GetCurrentUser(ctx)
-	if currentUser == "" {
-		httpbase.UnauthorizedError(ctx, errors.New("user not found, please login first"))
-		return
-	}
 	accounts, err := ch.auc.ListAccountingUser(ctx)
 	if err != nil {
 		slog.Error("fail to list all accounts", slog.Any("error", err))
@@ -53,70 +38,37 @@ func (ch *CreditHandler) QueryAllUsersBalance(ctx *gin.Context) {
 	httpbase.OK(ctx, accounts)
 }
 
-// GetUserBalance   godoc
-// @Security     ApiKey
-// @Summary      Get user balance by casdoor user uuid
-// @Description  Get user balance by casdoor user uuid
-// @Tags         Accounting
-// @Accept       json
-// @Produce      json
-// @Param        id path int true "casdoor user uuid"
-// @Param        current_user query string true "current_user"
-// @Success      200  {object}  types.Response{} "OK"
-// @Failure      400  {object}  types.APIBadRequest "Bad request"
-// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
-// @Router       /accounting/credit/{id}/balance [get]
 func (ch *CreditHandler) QueryBalanceByUserID(ctx *gin.Context) {
-	currentUser := httpbase.GetCurrentUser(ctx)
-	if currentUser == "" {
-		httpbase.UnauthorizedError(ctx, errors.New("user not found, please login first"))
-		return
-	}
-	userID := ctx.Param("id")
-	if len(userID) < 1 {
+	userUUID := ctx.Param("id")
+	if len(userUUID) < 1 {
 		slog.Error("Bad request format")
 		httpbase.BadRequest(ctx, "Bad request format")
 		return
 	}
-	account, err := ch.auc.GetAccountingByUserID(ctx, userID)
+	account, err := ch.auc.GetAccountingByUserID(ctx, userUUID)
 	if err != nil || account == nil {
-		slog.Error("fail to query account by user id", slog.Any("userid", userID), slog.Any("error", err))
+		slog.Error("fail to query account by user id", slog.Any("userid", userUUID), slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
 		return
 	}
 	httpbase.OK(ctx, account)
 }
 
-// ListStatement   godoc
-// @Security     ApiKey
-// @Summary      List statements by casdoor user uuid and start time and end time
-// @Description  List statements by casdoor user uuid and start time and end time
-// @Tags         Accounting
-// @Accept       json
-// @Produce      json
-// @Param        id path int true "casdoor user uuid"
-// @Param        start_time query string true "start_time, format: '2024-06-12 08:27:22'"
-// @Param        end_time query string true "end_time, format: '2024-06-12 17:17:22'"
-// @Param        current_user query string true "current_user"
-// @Param        per query int false "per" default(20)
-// @Param        page query int false "per page" default(1)
-// @Success      200  {object}  types.Response{} "OK"
-// @Failure      400  {object}  types.APIBadRequest "Bad request"
-// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
-// @Router       /accounting/credit/{id}/statements [get]
 func (ch *CreditHandler) QueryStatementByUserID(ctx *gin.Context) {
-	currentUser := httpbase.GetCurrentUser(ctx)
-	if currentUser == "" {
-		httpbase.UnauthorizedError(ctx, errors.New("user not found, please login first"))
-		return
-	}
 	per, page, err := common.GetPerAndPageFromContext(ctx)
 	if err != nil {
 		slog.Error("Bad request format", "error", err)
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
+	scene, err := getSceneFromContext(ctx)
+	if err != nil {
+		slog.Error("Bad request scene format", "error", err)
+		httpbase.BadRequest(ctx, err.Error())
+		return
+	}
 	userID := ctx.Param("id")
+	instance_name := ctx.Query("instance_name")
 	startTime := ctx.Query("start_time") // format: '2024-06-12 08:27:22'
 	endTime := ctx.Query("end_time")     // format: '2024-06-12 17:17:22'
 	if len(startTime) < 1 || len(endTime) < 1 || len(userID) < 1 {
@@ -129,48 +81,47 @@ func (ch *CreditHandler) QueryStatementByUserID(ctx *gin.Context) {
 		httpbase.BadRequest(ctx, "Bad request datetime format")
 		return
 	}
-	statements, err := ch.asc.ListStatementByUserIDAndTime(ctx, userID, startTime, endTime, per, page)
+
+	req := types.ACCT_STATEMENTS_REQ{
+		UserID:       userID,
+		Scene:        scene,
+		InstanceName: instance_name,
+		StartTime:    startTime,
+		EndTime:      endTime,
+		Per:          per,
+		Page:         page,
+	}
+
+	statements, total, err := ch.asc.ListStatementByUserIDAndTime(ctx, req)
 	if err != nil {
 		slog.Error("fail to query statement by user", slog.Any("userid", userID), slog.Any("start_time", startTime), slog.Any("end_time", endTime), slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
 		return
 	}
-	httpbase.OK(ctx, statements)
+	respData := gin.H{
+		"data":  statements,
+		"total": total,
+	}
+	httpbase.OK(ctx, respData)
 }
 
-// ListBills     godoc
-// @Security     ApiKey
-// @Summary      List user bills by casdoor user uuid and start date and end date
-// @Description  List user bills by casdoor user uuid and start date and end date
-// @Tags         Accounting
-// @Accept       json
-// @Produce      json
-// @Param        id path int true "casdoor user uuid"
-// @Param        start_date query string true "start_date, format: '2024-06-12'"
-// @Param        end_date query string true "end_date, format: '2024-07-12'"
-// @Param        current_user query string true "current_user"
-// @Param        per query int false "per" default(20)
-// @Param        page query int false "per page" default(1)
-// @Success      200  {object}  types.Response{} "OK"
-// @Failure      400  {object}  types.APIBadRequest "Bad request"
-// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
-// @Router       /accounting/credit/{id}/bills [get]
 func (ch *CreditHandler) QueryBillsByUserID(ctx *gin.Context) {
-	currentUser := httpbase.GetCurrentUser(ctx)
-	if currentUser == "" {
-		httpbase.UnauthorizedError(ctx, errors.New("user not found, please login first"))
-		return
-	}
 	per, page, err := common.GetPerAndPageFromContext(ctx)
 	if err != nil {
 		slog.Error("Bad request format", "error", err)
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
-	userID := ctx.Param("id")
+	scene, err := getSceneFromContext(ctx)
+	if err != nil {
+		slog.Error("Bad request scene format", "error", err)
+		httpbase.BadRequest(ctx, err.Error())
+		return
+	}
+	userUUID := ctx.Param("id")
 	startDate := ctx.Query("start_date") // format: '2024-06-12'
 	endDate := ctx.Query("end_date")     // format: '2024-06-12'
-	if len(startDate) < 1 || len(endDate) < 1 || len(userID) < 1 {
+	if len(startDate) < 1 || len(endDate) < 1 || len(userUUID) < 1 {
 		slog.Error("Bad request format")
 		httpbase.BadRequest(ctx, "Bad request format")
 		return
@@ -182,13 +133,17 @@ func (ch *CreditHandler) QueryBillsByUserID(ctx *gin.Context) {
 		return
 	}
 
-	bills, err := ch.abc.ListBillsByUserIDAndDate(ctx, userID, startDate, endDate, per, page)
+	bills, total, err := ch.abc.ListBillsByUserIDAndDate(ctx, userUUID, startDate, endDate, scene, per, page)
 	if err != nil {
-		slog.Error("fail to query bills by user", slog.Any("userid", userID), slog.Any("start_date", startDate), slog.Any("end_date", endDate), slog.Any("error", err))
+		slog.Error("fail to query bills by user", slog.Any("userUUID", userUUID), slog.Any("start_date", startDate), slog.Any("end_date", endDate), slog.Any("scene", scene), slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
 		return
 	}
-	httpbase.OK(ctx, bills)
+	respData := gin.H{
+		"data":  bills,
+		"total": total,
+	}
+	httpbase.OK(ctx, respData)
 }
 
 func validateDateTimeFormat(timeStr, layout string) bool {
@@ -196,26 +151,16 @@ func validateDateTimeFormat(timeStr, layout string) bool {
 	return err == nil
 }
 
-// AccountRecharge     godoc
-// @Security     ApiKey
-// @Summary      Recharge fee for account
-// @Description  Recharge fee for account
-// @Tags         Accounting
-// @Accept       json
-// @Produce      json
-// @Param        id path int true "casdoor user uuid"
-// @Param        current_user query string true "current_user"
-// @Param        body body types.RECHARGE_REQ true "body"
-// @Success      200  {object}  types.Response{} "OK"
-// @Failure      400  {object}  types.APIBadRequest "Bad request"
-// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
-// @Router       /accounting/credit/{id}/recharge [put]
-func (ch *CreditHandler) RechargeByUserID(ctx *gin.Context) {
-	currentUser := httpbase.GetCurrentUser(ctx)
-	if currentUser == "" {
-		httpbase.UnauthorizedError(ctx, errors.New("user not found, please login first"))
-		return
+func getSceneFromContext(ctx *gin.Context) (int, error) {
+	str := ctx.Query("scene")
+	if str == "" {
+		return 0, fmt.Errorf("bad request scene format")
 	}
+	scene, err := strconv.Atoi(str)
+	return scene, err
+}
+
+func (ch *CreditHandler) RechargeByUserID(ctx *gin.Context) {
 	var req types.RECHARGE_REQ
 	err := ctx.ShouldBindJSON(&req)
 	if err != nil {

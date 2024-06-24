@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/uptrace/bun"
-	"opencsg.com/csghub-server/accounting/types"
+	"opencsg.com/csghub-server/common/types"
 )
 
 type AccountSyncQuotaStatementStore struct {

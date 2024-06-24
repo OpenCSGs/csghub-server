@@ -527,5 +527,28 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 		syncGroup.POST("/client_setting", syncClientSettingHandler.Create)
 	}
 
+	accountingHandler, err := handler.NewAccountingHandler(config)
+	if err != nil {
+		return nil, fmt.Errorf("error creating accounting handler setting handler:%w", err)
+	}
+	accountingGroup := apiGroup.Group("/accounting")
+	{
+		creditGroup := accountingGroup.Group("/credit")
+		{
+			// creditGroup.GET("/balance", accountingHandler.QueryAllUsersBalance)
+			creditGroup.GET("/:id/balance", accountingHandler.QueryBalanceByUserID)
+			creditGroup.GET("/:id/statements", accountingHandler.QueryStatementByUserID)
+			creditGroup.GET("/:id/bills", accountingHandler.QueryBillsByUserID)
+			creditGroup.PUT("/:id/recharge", accountingHandler.RechargeByUserID)
+		}
+		multiSyncGroup := accountingGroup.Group("/multisync")
+		{
+			multiSyncGroup.POST("/quotas", accountingHandler.CreateOrUpdateQuota)
+			multiSyncGroup.GET("/quota", accountingHandler.QueryQuota)
+			multiSyncGroup.POST("/downloads", accountingHandler.CreateQuotaStatement)
+			multiSyncGroup.GET("/download", accountingHandler.QueryQuotaStatement)
+		}
+	}
+
 	return r, nil
 }

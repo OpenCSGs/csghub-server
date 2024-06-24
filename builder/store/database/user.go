@@ -112,3 +112,9 @@ func (s *UserStore) FindByAccessToken(ctx context.Context, token string) (*User,
 	}
 	return &user, nil
 }
+
+func (s *UserStore) FindByCasdoorUUID(ctx context.Context, uuid string) (user User, err error) {
+	user.CasdoorUUID = uuid
+	err = s.db.Operator.Core.NewSelect().Model(&user).Where("casdoor_uuid = ?", uuid).Scan(ctx)
+	return
+}

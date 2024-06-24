@@ -17,6 +17,6 @@ func NewAccountingBill() *AccountingBillComponent {
 	return abc
 }
 
-func (a *AccountingBillComponent) ListBillsByUserIDAndDate(ctx context.Context, userID, startDate, endDate string, per, page int) ([]database.AccountBill, error) {
-	return a.abs.ListByUserIDAndDate(ctx, userID, startDate, endDate, per, page)
+func (a *AccountingBillComponent) ListBillsByUserIDAndDate(ctx context.Context, userUUID, startDate, endDate string, scene, per, page int) ([]map[string]interface{}, int, error) {
+	return a.abs.ListByUserIDAndDate(ctx, userUUID, startDate, endDate, scene, per, page)
 }

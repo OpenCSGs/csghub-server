@@ -7,8 +7,8 @@ import (
 	"fmt"
 	"strings"
 
-	"opencsg.com/csghub-server/accounting/types"
 	"opencsg.com/csghub-server/builder/store/database"
+	"opencsg.com/csghub-server/common/types"
 	commontypes "opencsg.com/csghub-server/common/types"
 )
 
