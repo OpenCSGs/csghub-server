@@ -2,6 +2,7 @@ package component
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"fmt"
 	"strings"
@@ -60,6 +61,9 @@ func (a *AccountingSyncQuotaStatementComponent) GetQuotaStatement(ctx context.Co
 		return nil, errors.New("user does not exist")
 	}
 	quotaSM, err := a.asq.Get(ctx, user.ID, req)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, nil
+	}
 	if err != nil {
 		return nil, fmt.Errorf("fail to get quota statement, %w", err)
 	}

@@ -49,9 +49,11 @@ type Space struct {
 	// the serving endpoint url
 	Endpoint string `json:"endpoint,omitempty" example:"https://localhost/spaces/myname/myspace"`
 	// deploying, running, failed
-	Status       string `json:"status"`
-	RepositoryID int64  `json:"repository_id,omitempty"`
-	UserLikes    bool   `json:"user_likes"`
+	Status       string               `json:"status"`
+	RepositoryID int64                `json:"repository_id,omitempty"`
+	UserLikes    bool                 `json:"user_likes"`
+	Source       RepositorySource     `json:"source"`
+	SyncStatus   RepositorySyncStatus `json:"sync_status"`
 }
 
 type UpdateSpaceReq struct {

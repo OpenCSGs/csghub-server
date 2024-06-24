@@ -37,16 +37,19 @@ type Repository struct {
 	Labels  string `bun:",nullzero" json:"labels"`
 	License string `bun:",nullzero" json:"license"`
 	// Depreated
-	Readme         string               `bun:",nullzero" json:"readme"`
-	DefaultBranch  string               `bun:",notnull" json:"default_branch"`
-	LfsFiles       []LfsFile            `bun:"rel:has-many,join:id=repository_id" json:"-"`
-	Likes          int64                `bun:",nullzero" json:"likes"`
-	DownloadCount  int64                `bun:",nullzero" json:"download_count"`
-	Downloads      []RepositoryDownload `bun:"rel:has-many,join:id=repository_id" json:"downloads"`
-	Tags           []Tag                `bun:"m2m:repository_tags,join:Repository=Tag" json:"tags"`
-	RepositoryType types.RepositoryType `bun:",notnull" json:"repository_type"`
-	HTTPCloneURL   string               `bun:",nullzero" json:"http_clone_url"`
-	SSHCloneURL    string               `bun:",nullzero" json:"ssh_clone_url"`
+	Readme         string                     `bun:",nullzero" json:"readme"`
+	DefaultBranch  string                     `bun:",notnull" json:"default_branch"`
+	LfsFiles       []LfsFile                  `bun:"rel:has-many,join:id=repository_id" json:"-"`
+	Likes          int64                      `bun:",nullzero" json:"likes"`
+	DownloadCount  int64                      `bun:",nullzero" json:"download_count"`
+	Downloads      []RepositoryDownload       `bun:"rel:has-many,join:id=repository_id" json:"downloads"`
+	Tags           []Tag                      `bun:"m2m:repository_tags,join:Repository=Tag" json:"tags"`
+	Mirror         Mirror                     `bun:"rel:has-one,join:id=repository_id" json:"mirror"`
+	RepositoryType types.RepositoryType       `bun:",notnull" json:"repository_type"`
+	HTTPCloneURL   string                     `bun:",nullzero" json:"http_clone_url"`
+	SSHCloneURL    string                     `bun:",nullzero" json:"ssh_clone_url"`
+	Source         types.RepositorySource     `bun:",nullzero" json:"source"`
+	SyncStatus     types.RepositorySyncStatus `bun:",nullzero" json:"sync_status"`
 	// updated_at timestamp will be updated only if files changed
 	times
 }
@@ -329,7 +332,7 @@ func (s *RepoStore) SetUpdateTimeByPath(ctx context.Context, repoType types.Repo
 	return err
 }
 
-func (s *RepoStore) PublicToUser(ctx context.Context, repoType types.RepositoryType, userID int64, search, sort string, tags []TagReq, per, page int) (repos []*Repository, count int, err error) {
+func (s *RepoStore) PublicToUser(ctx context.Context, repoType types.RepositoryType, userID int64, filter *types.RepoFilter, per, page int) (repos []*Repository, count int, err error) {
 	q := s.db.Operator.Core.
 		NewSelect().
 		Column("repository.*").
@@ -339,19 +342,23 @@ func (s *RepoStore) PublicToUser(ctx context.Context, repoType types.RepositoryT
 	q.Where("repository.repository_type = ?", repoType)
 	q.Where("repository.private = ? or repository.user_id = ?", false, userID)
 
-	if search != "" {
-		search = strings.ToLower(search)
+	if filter.Source != "" {
+		q.Where("repository.source = ?", filter.Source)
+	}
+
+	if filter.Search != "" {
+		filter.Search = strings.ToLower(filter.Search)
 		q.Where(
 			"LOWER(repository.path) like ? or LOWER(repository.description) like ? or LOWER(repository.nickname) like ?",
-			fmt.Sprintf("%%%s%%", search),
-			fmt.Sprintf("%%%s%%", search),
-			fmt.Sprintf("%%%s%%", search),
+			fmt.Sprintf("%%%s%%", filter.Search),
+			fmt.Sprintf("%%%s%%", filter.Search),
+			fmt.Sprintf("%%%s%%", filter.Search),
 		)
 	}
-	if len(tags) > 0 {
+	if len(filter.Tags) > 0 {
 		q.Join("JOIN repository_tags ON repository.id = repository_tags.repository_id").
 			Join("JOIN tags ON repository_tags.tag_id = tags.id")
-		for _, tag := range tags {
+		for _, tag := range filter.Tags {
 			q.Where("tags.category = ? AND tags.name = ?", tag.Category, tag.Name)
 		}
 	}
@@ -361,13 +368,13 @@ func (s *RepoStore) PublicToUser(ctx context.Context, repoType types.RepositoryT
 		return
 	}
 
-	if sort == "trending" {
+	if filter.Sort == "trending" {
 		q.Join("Left Join recom_repo_scores on repository.id = recom_repo_scores.repository_id")
 		q.Join("Left Join recom_op_weights on repository.id = recom_op_weights.repository_id")
 		q.ColumnExpr(`COALESCE(recom_repo_scores.score, 0)+COALESCE(recom_op_weights.weight, 0) AS popularity`)
 	}
 
-	err = q.Order(sortBy[sort]).
+	err = q.Order(sortBy[filter.Sort]).
 		Limit(per).Offset((page - 1) * per).
 		Scan(ctx)
 
@@ -438,4 +445,18 @@ func (s *RepoStore) ListRepoPublicToUserByRepoIDs(ctx context.Context, repoType 
 		Scan(ctx)
 
 	return
+}
+
+func (s *RepoStore) WithMirror(ctx context.Context, per, page int) ([]Repository, error) {
+	var repos []Repository
+	err := s.db.Operator.Core.NewSelect().
+		Model(&repos).
+		Relation("Mirror").
+		Limit(per).Offset((page - 1) * per).
+		Scan(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	return repos, nil
 }

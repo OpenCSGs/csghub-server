@@ -60,6 +60,9 @@ var InitCmd = &cobra.Command{
 			if repo == nil {
 				continue
 			}
+			if repo.Private {
+				continue
+			}
 			namespace, name := repo.NamespaceAndName()
 			req := &types.GetCommitsReq{
 				Namespace: namespace,

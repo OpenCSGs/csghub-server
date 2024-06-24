@@ -25,6 +25,7 @@ type Namespace struct {
 	UserID        int64         `bun:",notnull" json:"user_id"`
 	User          User          `bun:"rel:belongs-to,join:user_id=id" json:"user"`
 	NamespaceType NamespaceType `bun:",notnull" json:"namespace_type"`
+	Mirrored      bool          `bun:",notnull" json:"mirrored"`
 	times
 }
 

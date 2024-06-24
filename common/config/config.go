@@ -133,11 +133,13 @@ type Config struct {
 	}
 
 	Accounting struct {
+		Host                      string `envconfig:"OPENCSG_ACCOUNTING_SERVER_HOST" default:"http://localhost"`
 		Port                      int    `envconfig:"OPENCSG_ACCOUNTING_SERVER_PORT" default:"8086"`
 		NatsURL                   string `envconfig:"OPENCSG_ACCOUNTING_NATS_URL" default:"nats://account:g98dc5FA8v4J7ck90w@natsmaster:4222"`
 		FeeRequestSubject         string `envconfig:"OPENCSG_ACCOUNTING_FEE_EVENT_SUBJECT" default:"accounting.fee.>"`
 		FeeNotifyNoBalanceSubject string `envconfig:"OPENCSG_ACCOUNTING_NOTIFY_NOBALANCE_SUBJECT" default:"accounting.notify.nobalance"`
 		MsgFetchTimeoutInSEC      int    `envconfig:"OPENCSG_ACCOUNTING_MSG_FETCH_TIMEOUTINSEC" default:"5"`
+		AccessToken               string `envconfig:"OPENCSG_ACCOUNTING_ACCESS_TOKEN" default:""`
 	}
 
 	MultiSync struct {

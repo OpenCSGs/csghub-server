@@ -150,7 +150,7 @@ func (msh *MultiSyncHandler) QueryQuotaStatement(ctx *gin.Context) {
 	}
 
 	account, err := msh.asqsc.GetQuotaStatement(ctx, currentUser, req)
-	if err != nil || account == nil {
+	if err != nil {
 		slog.Error("fail to get account quota statement", slog.Any("req", req), slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
 		return

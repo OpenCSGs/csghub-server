@@ -18,13 +18,14 @@ import (
 )
 
 type MultiSyncComponent struct {
-	s         *database.MultiSyncStore
-	repo      *database.RepoStore
-	model     *database.ModelStore
-	dataset   *database.DatasetStore
-	namespace *database.NamespaceStore
-	user      *database.UserStore
-	git       gitserver.GitServer
+	s            *database.MultiSyncStore
+	repo         *database.RepoStore
+	model        *database.ModelStore
+	dataset      *database.DatasetStore
+	namespace    *database.NamespaceStore
+	user         *database.UserStore
+	versionStore *database.SyncVersionStore
+	git          gitserver.GitServer
 }
 
 func NewMultiSyncComponent(config *config.Config) (*MultiSyncComponent, error) {
@@ -33,13 +34,14 @@ func NewMultiSyncComponent(config *config.Config) (*MultiSyncComponent, error) {
 		return nil, fmt.Errorf("failed to create git server: %w", err)
 	}
 	return &MultiSyncComponent{
-		s:         database.NewMultiSyncStore(),
-		repo:      database.NewRepoStore(),
-		model:     database.NewModelStore(),
-		dataset:   database.NewDatasetStore(),
-		namespace: database.NewNamespaceStore(),
-		user:      database.NewUserStore(),
-		git:       git,
+		s:            database.NewMultiSyncStore(),
+		repo:         database.NewRepoStore(),
+		model:        database.NewModelStore(),
+		dataset:      database.NewDatasetStore(),
+		namespace:    database.NewNamespaceStore(),
+		user:         database.NewUserStore(),
+		versionStore: database.NewSyncVersionStore(),
+		git:          git,
 	}, nil
 }
 
@@ -63,14 +65,17 @@ func (c *MultiSyncComponent) More(ctx context.Context, cur int64, limit int64) (
 }
 
 func (c *MultiSyncComponent) SyncAsClient(ctx context.Context, sc multisync.Client) error {
+	var currentVersion int64
 	v, err := c.s.GetLatest(ctx)
 	if err != nil {
 		if err != sql.ErrNoRows {
 			return fmt.Errorf("failed to get latest sync version from db: %w", err)
+		} else {
+			currentVersion = 0
 		}
 	}
 
-	currentVersion := v.Version
+	currentVersion = v.Version
 	var hasMore = true
 	for hasMore {
 		ctxWithTimeout, cancel := context.WithTimeout(ctx, 60*time.Second)
@@ -80,7 +85,7 @@ func (c *MultiSyncComponent) SyncAsClient(ctx context.Context, sc multisync.Clie
 			return fmt.Errorf("failed to sync latest version from client, current version:%d, error: %w", currentVersion, err)
 		}
 		//create local repo
-		for _, v := range resp.Versions {
+		for _, v := range resp.Data.Versions {
 			switch v.RepoType {
 			case types.ModelRepo:
 				ctxGetModel, cancel := context.WithTimeout(ctx, 10*time.Second)
@@ -113,10 +118,15 @@ func (c *MultiSyncComponent) SyncAsClient(ctx context.Context, sc multisync.Clie
 			default:
 				slog.Error("failed to create local synced repo, unsupported repo type", slog.Any("sync_version", v))
 			}
+			err := c.createLocalSyncVersion(ctx, v)
+			if err != nil {
+				slog.Error("failed to create database sync version", slog.Any("sync_version", v), slog.Any("error", err))
+				continue
+			}
 		}
-		hasMore = resp.HasMore
-		if len(resp.Versions) > 0 {
-			currentVersion = resp.Versions[len(resp.Versions)-1].Version
+		hasMore = resp.Data.HasMore
+		if len(resp.Data.Versions) > 0 {
+			currentVersion = resp.Data.Versions[len(resp.Data.Versions)-1].Version
 		}
 	}
 
@@ -124,7 +134,7 @@ func (c *MultiSyncComponent) SyncAsClient(ctx context.Context, sc multisync.Clie
 }
 
 func (c *MultiSyncComponent) createLocalDataset(ctx context.Context, m *types.Dataset) error {
-	namespace, name, _ := strings.Cut(m.Path, "_")
+	namespace, name, _ := strings.Cut(m.Path, "/")
 	//add prefix to avoid namespace conflict
 	namespace = fmt.Sprintf("%s%s", types.OpenCSGPrefix, namespace)
 	exists, err := c.repo.Exists(ctx, types.DatasetRepo, namespace, name)
@@ -162,7 +172,7 @@ func (c *MultiSyncComponent) createLocalDataset(ctx context.Context, m *types.Da
 		UserID: user.ID,
 		//new path with prefixed namespace
 		Path:        path.Join(namespace, name),
-		GitPath:     fmt.Sprintf("%ss_%s_%s", types.DatasetRepo, namespace, name),
+		GitPath:     fmt.Sprintf("%ss_%s/%s", types.DatasetRepo, namespace, name),
 		Name:        name,
 		Nickname:    m.Nickname,
 		Description: m.Description,
@@ -170,6 +180,8 @@ func (c *MultiSyncComponent) createLocalDataset(ctx context.Context, m *types.Da
 		// License:        req.License,
 		// DefaultBranch:  gitRepo.DefaultBranch,
 		RepositoryType: types.ModelRepo,
+		Source:         types.OpenCSGSource,
+		SyncStatus:     types.SyncStatusPending,
 		// HTTPCloneURL:   gitRepo.HttpCloneURL,
 		// SSHCloneURL:    gitRepo.SshCloneURL,
 	}
@@ -191,7 +203,7 @@ func (c *MultiSyncComponent) createLocalDataset(ctx context.Context, m *types.Da
 
 }
 func (c *MultiSyncComponent) createLocalModel(ctx context.Context, m *types.Model) error {
-	namespace, name, _ := strings.Cut(m.Path, "_")
+	namespace, name, _ := strings.Cut(m.Path, "/")
 	//add prefix to avoid namespace conflict
 	namespace = fmt.Sprintf("%s%s", types.OpenCSGPrefix, namespace)
 	exists, err := c.repo.Exists(ctx, types.ModelRepo, namespace, name)
@@ -229,7 +241,7 @@ func (c *MultiSyncComponent) createLocalModel(ctx context.Context, m *types.Mode
 		UserID: user.ID,
 		//new path with prefixed namespace
 		Path:        path.Join(namespace, name),
-		GitPath:     fmt.Sprintf("%ss_%s_%s", types.ModelRepo, namespace, name),
+		GitPath:     fmt.Sprintf("%ss_%s/%s", types.ModelRepo, namespace, name),
 		Name:        name,
 		Nickname:    m.Nickname,
 		Description: m.Description,
@@ -237,6 +249,8 @@ func (c *MultiSyncComponent) createLocalModel(ctx context.Context, m *types.Mode
 		// License:        req.License,
 		// DefaultBranch:  gitRepo.DefaultBranch,
 		RepositoryType: types.ModelRepo,
+		Source:         types.OpenCSGSource,
+		SyncStatus:     types.SyncStatusPending,
 		// HTTPCloneURL:   gitRepo.HttpCloneURL,
 		// SSHCloneURL:    gitRepo.SshCloneURL,
 	}
@@ -266,7 +280,8 @@ func (c *MultiSyncComponent) createUser(ctx context.Context, req types.CreateUse
 	}
 
 	namespace := &database.Namespace{
-		Path: user.Username,
+		Path:     user.Username,
+		Mirrored: true,
 	}
 	err = c.user.Create(ctx, user, namespace)
 	if err != nil {
@@ -280,4 +295,20 @@ func (c *MultiSyncComponent) createUser(ctx context.Context, req types.CreateUse
 
 func (c *MultiSyncComponent) getUser(ctx context.Context, userName string) (database.User, error) {
 	return c.user.FindByUsername(ctx, userName)
+}
+
+func (c *MultiSyncComponent) createLocalSyncVersion(ctx context.Context, v types.SyncVersion) error {
+	syncVersion := database.SyncVersion{
+		Version:        v.Version,
+		SourceID:       v.SourceID,
+		RepoPath:       v.RepoPath,
+		RepoType:       v.RepoType,
+		LastModifiedAt: v.LastModifyTime,
+		ChangeLog:      v.ChangeLog,
+	}
+	err := c.versionStore.Create(ctx, &syncVersion)
+	if err != nil {
+		return err
+	}
+	return nil
 }

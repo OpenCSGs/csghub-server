@@ -2,6 +2,7 @@ package component
 
 import (
 	"context"
+	"database/sql"
 	"encoding/base64"
 	"errors"
 	"fmt"
@@ -1174,8 +1175,6 @@ func (c *RepoComponent) CreateMirror(ctx context.Context, req types.CreateMirror
 }
 
 func (c *RepoComponent) MirrorFromSaas(ctx context.Context, namespace, name, currentUser string, repoType types.RepositoryType) error {
-	var mirror database.Mirror
-	// TODO:
 	admin, err := c.checkCurrentUserPermission(ctx, currentUser, namespace, membership.RoleAdmin)
 	if err != nil {
 		return fmt.Errorf("failed to check permission to create mirror, error: %w", err)
@@ -1192,13 +1191,20 @@ func (c *RepoComponent) MirrorFromSaas(ctx context.Context, namespace, name, cur
 	if repo == nil {
 		return fmt.Errorf("repo not found")
 	}
-	exists, err := c.mirror.IsExist(ctx, repo.ID)
+	m, err := c.mirror.FindByRepoID(ctx, repo.ID)
 	if err != nil {
-		return fmt.Errorf("failed to find mirror, error: %w", err)
+		if !errors.Is(err, sql.ErrNoRows) {
+			return fmt.Errorf("failed to find mirror, error: %w", err)
+		}
 	}
-	if exists {
-		return fmt.Errorf("mirror already exists")
+	if m != nil {
+		err := c.mirrorFromSaasSync(ctx, repo, namespace, name, repoType)
+		if err != nil {
+			return fmt.Errorf("failed to trigger mirror sync, error: %w", err)
+		}
+		return nil
 	}
+	var mirror database.Mirror
 	syncVersion, err := c.syncVersion.FindByPath(ctx, fmt.Sprintf("%s/%s", namespace, name))
 	if err != nil {
 		return fmt.Errorf("failed to find sync version, error: %w", err)
@@ -1242,36 +1248,31 @@ func (c *RepoComponent) MirrorFromSaas(ctx context.Context, namespace, name, cur
 	mirror.MirrorTaskID = taskId
 
 	_, err = c.mirror.Create(ctx, &mirror)
+
 	if err != nil {
 		return fmt.Errorf("failed to create mirror")
+	}
+	repo.SyncStatus = types.SyncStatusInProgress
+	_, err = c.repo.UpdateRepo(ctx, *repo)
+	if err != nil {
+		return fmt.Errorf("failed to update repo sync status")
 	}
 	return nil
 }
 
-func (c *RepoComponent) MirrorFromSaasSync(ctx context.Context, namespace, name, currentUser string, repoType types.RepositoryType) error {
-	admin, err := c.checkCurrentUserPermission(ctx, currentUser, namespace, membership.RoleAdmin)
-	if err != nil {
-		return fmt.Errorf("failed to check permission to create mirror, error: %w", err)
-	}
-
-	if !admin {
-		return fmt.Errorf("users do not have permission to delete mirror for this repo")
-	}
-	repo, err := c.repo.FindByPath(ctx, repoType, namespace, name)
-	if err != nil {
-		return fmt.Errorf("failed to find repo, error: %w", err)
-	}
-	_, err = c.mirror.FindByRepoID(ctx, repo.ID)
-	if err != nil {
-		return fmt.Errorf("failed to find mirror, error: %w", err)
-	}
-	err = c.git.MirrorSync(ctx, gitserver.MirrorSyncReq{
+func (c *RepoComponent) mirrorFromSaasSync(ctx context.Context, repo *database.Repository, namespace, name string, repoType types.RepositoryType) error {
+	err := c.git.MirrorSync(ctx, gitserver.MirrorSyncReq{
 		Namespace: namespace,
 		Name:      name,
 		RepoType:  repoType,
 	})
 	if err != nil {
 		return fmt.Errorf("failed to sync mirror, error: %w", err)
+	}
+	repo.SyncStatus = types.SyncStatusInProgress
+	_, err = c.repo.UpdateRepo(ctx, *repo)
+	if err != nil {
+		return fmt.Errorf("failed to update repo sync status")
 	}
 	return nil
 }

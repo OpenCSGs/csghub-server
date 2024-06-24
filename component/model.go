@@ -87,20 +87,20 @@ type ModelComponent struct {
 	deployer      deploy.Deployer
 }
 
-func (c *ModelComponent) Index(ctx context.Context, username, search, sort string, ragReqs []database.TagReq, per, page int) ([]types.Model, int, error) {
+func (c *ModelComponent) Index(ctx context.Context, filter *types.RepoFilter, per, page int) ([]types.Model, int, error) {
 	var (
 		user      database.User
 		err       error
 		resModels []types.Model
 	)
-	if username != "" {
-		user, err = c.user.FindByUsername(ctx, username)
+	if filter.Username != "" {
+		user, err = c.user.FindByUsername(ctx, filter.Username)
 		if err != nil {
 			newError := fmt.Errorf("failed to get current user,error:%w", err)
 			return nil, 0, newError
 		}
 	}
-	repos, total, err := c.rs.PublicToUser(ctx, types.ModelRepo, user.ID, search, sort, ragReqs, per, page)
+	repos, total, err := c.rs.PublicToUser(ctx, types.ModelRepo, user.ID, filter, per, page)
 	if err != nil {
 		newError := fmt.Errorf("failed to get public model repos,error:%w", err)
 		return nil, 0, newError
@@ -152,6 +152,8 @@ func (c *ModelComponent) Index(ctx context.Context, username, search, sort strin
 			CreatedAt:    model.CreatedAt,
 			Tags:         tags,
 			UpdatedAt:    repo.UpdatedAt,
+			Source:       repo.Source,
+			SyncStatus:   repo.SyncStatus,
 		})
 	}
 	return resModels, total, nil
@@ -417,6 +419,8 @@ func (c *ModelComponent) Show(ctx context.Context, namespace, name, currentUser 
 		WidgetType: types.ModelWidgetTypeGeneration,
 		Status:     mi.Status,
 		UserLikes:  likeExists,
+		Source:     model.Repository.Source,
+		SyncStatus: model.Repository.SyncStatus,
 	}
 
 	return resModel, nil

@@ -49,10 +49,11 @@ var cmdSyncAsClient = &cobra.Command{
 		syncClientSettingStore := database.NewSyncClientSettingStore()
 		setting, err := syncClientSettingStore.First(ctx)
 		if err != nil {
-			slog.Error("failed to find mirror token, error: %w", err)
+			slog.Error("failed to find sync client setting, error: %w", err)
 			return
 		}
-		sc := multisync.FromOpenCSG(setting.Token)
+		apiDomain := config.APIServer.PublicDomain
+		sc := multisync.FromOpenCSG(apiDomain, setting.Token)
 		err = c.SyncAsClient(ctx, sc)
 		if err != nil {
 			slog.Error("failed to sync as client", "err", err)

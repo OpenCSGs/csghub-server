@@ -5,6 +5,14 @@ import (
 )
 
 type SyncVersionResponse struct {
+	Message string `json:"msg"`
+	Data    struct {
+		Versions []SyncVersion `json:"versions"`
+		HasMore  bool          `json:"has_more"`
+	}
+}
+
+type SyncVersionData struct {
 	Versions []SyncVersion `json:"versions"`
 	HasMore  bool          `json:"has_more"`
 }
@@ -17,4 +25,14 @@ type SyncVersion struct {
 	RepoType       RepositoryType `json:"repo_type"`
 	LastModifyTime time.Time      `json:"last_modify_time"`
 	ChangeLog      string         `json:"change_log"`
+}
+
+type ModelResponse struct {
+	Message string `json:"msg"`
+	Data    Model  `json:"data"`
+}
+
+type DatasetResponse struct {
+	Message string  `json:"msg"`
+	Data    Dataset `json:"data"`
 }

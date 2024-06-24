@@ -287,6 +287,14 @@ var mirrorOrganizationMap = map[string]string{
 	"ByteDance":      "ByteDance",
 }
 
+var mirrorStatusAndRepoSyncStatusMapping = map[database.MirrorTaskStatus]types.RepositorySyncStatus{
+	database.MirrorWaiting:    types.SyncStatusPending,
+	database.MirrorRunning:    types.SyncStatusInProgress,
+	database.MirrorFinished:   types.SyncStatusCompleted,
+	database.MirrorFailed:     types.SyncStatusFailed,
+	database.MirrorIncomplete: types.SyncStatusFailed,
+}
+
 func (c *MirrorComponent) checkAndUpdateMirrorStatus(ctx context.Context, mirror database.Mirror) error {
 	var statusAndProgressFunc func(ctx context.Context, mirror database.Mirror) (database.MirrorTaskStatus, int8, error)
 	if mirror.Repository == nil {
@@ -306,6 +314,13 @@ func (c *MirrorComponent) checkAndUpdateMirrorStatus(ctx context.Context, mirror
 	err = c.mirrorStore.Update(ctx, &mirror)
 	if err != nil {
 		slog.Error("fail to update mirror", slog.Int64("mirrorId", mirror.ID), slog.String("error", err.Error()))
+		return err
+	}
+	syncStatus := mirrorStatusAndRepoSyncStatusMapping[status]
+	mirror.Repository.SyncStatus = syncStatus
+	_, err = c.repoStore.UpdateRepo(ctx, *mirror.Repository)
+	if err != nil {
+		slog.Error("fail to update repo sync status", slog.Int64("mirrorId", mirror.ID), slog.String("error", err.Error()))
 		return err
 	}
 
@@ -443,4 +458,21 @@ func (c *MirrorComponent) countMirrorProgress(ctx context.Context, mirror databa
 
 	progress := (finishedFileCount * 100) / len(lfsFiles)
 	return int8(progress), nil
+}
+
+func (c *MirrorComponent) Repos(ctx context.Context, per, page int) ([]types.MirrorRepo, error) {
+	var mirrorRepos []types.MirrorRepo
+	repos, err := c.repoStore.WithMirror(ctx, per, page)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get mirror repositories: %v", err)
+	}
+	for _, repo := range repos {
+		mirrorRepos = append(mirrorRepos, types.MirrorRepo{
+			Path:       repo.Path,
+			SyncStatus: repo.SyncStatus,
+			RepoType:   repo.RepositoryType,
+			Progress:   repo.Mirror.Progress,
+		})
+	}
+	return mirrorRepos, nil
 }

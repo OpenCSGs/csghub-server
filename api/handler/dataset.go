@@ -16,6 +16,7 @@ import (
 )
 
 var Sorts = []string{"trending", "recently_update", "most_download", "most_favorite"}
+var Sources = []string{"opencsg", "huggingface", "local"}
 
 func NewDatasetHandler(config *config.Config) (*DatasetHandler, error) {
 	tc, err := component.NewDatasetComponent(config)
@@ -85,6 +86,7 @@ func (h *DatasetHandler) Create(ctx *gin.Context) {
 // @Param        license_tag query string false "filter by license tag"
 // @Param        language_tag query string false "filter by language tag"
 // @Param        sort query string false "sort by"
+// @Param        source query string false "source" Enums(opencsg, huggingface, local)
 // @Param        per query int false "per" default(20)
 // @Param        page query int false "per page" default(1)
 // @Success      200  {object}  types.ResponseWithTotal{data=[]types.Dataset,total=int} "OK"
@@ -92,23 +94,31 @@ func (h *DatasetHandler) Create(ctx *gin.Context) {
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
 // @Router       /datasets [get]
 func (h *DatasetHandler) Index(ctx *gin.Context) {
-	tagReqs := parseTagReqs(ctx)
-	username := httpbase.GetCurrentUser(ctx)
+	filter := new(types.RepoFilter)
+	filter.Tags = parseTagReqs(ctx)
+	filter.Username = httpbase.GetCurrentUser(ctx)
 	per, page, err := common.GetPerAndPageFromContext(ctx)
 	if err != nil {
 		slog.Error("Bad request format", "error", err)
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
-	search, sort := getFilterFromContext(ctx)
-	if !slices.Contains[[]string](Sorts, sort) {
+	filter = getFilterFromContext(ctx, filter)
+	if !slices.Contains[[]string](Sorts, filter.Sort) {
 		msg := fmt.Sprintf("sort parameter must be one of %v", Sorts)
 		slog.Error("Bad request format,", slog.String("error", msg))
 		ctx.JSON(http.StatusBadRequest, gin.H{"message": msg})
 		return
 	}
 
-	datasets, total, err := h.c.Index(ctx, username, search, sort, tagReqs, per, page)
+	if filter.Source != "" && !slices.Contains[[]string](Sources, filter.Source) {
+		msg := fmt.Sprintf("source parameter must be one of %v", Sources)
+		slog.Error("Bad request format,", slog.String("error", msg))
+		ctx.JSON(http.StatusBadRequest, gin.H{"message": msg})
+		return
+	}
+
+	datasets, total, err := h.c.Index(ctx, filter, per, page)
 	if err != nil {
 		slog.Error("Failed to get datasets", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
@@ -279,11 +289,12 @@ func (h *DatasetHandler) Relations(ctx *gin.Context) {
 	httpbase.OK(ctx, detail)
 }
 
-func getFilterFromContext(ctx *gin.Context) (searchKey, sort string) {
-	searchKey = ctx.Query("search")
-	sort = ctx.Query("sort")
-	if sort == "" {
-		sort = "recently_update"
+func getFilterFromContext(ctx *gin.Context, filter *types.RepoFilter) *types.RepoFilter {
+	filter.Search = ctx.Query("search")
+	filter.Sort = ctx.Query("sort")
+	if filter.Sort == "" {
+		filter.Sort = "recently_update"
 	}
-	return
+	filter.Source = ctx.Query("source")
+	return filter
 }

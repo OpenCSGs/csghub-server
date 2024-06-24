@@ -11,7 +11,6 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"opencsg.com/csghub-server/api/httpbase"
-	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/types"
 	"opencsg.com/csghub-server/common/utils/common"
@@ -46,6 +45,7 @@ type ModelHandler struct {
 // @Param        license_tag query string false "filter by license tag"
 // @Param        language_tag query string false "filter by language tag"
 // @Param        sort query string false "sort by"
+// @Param        source query string false "source" Enums(opencsg, huggingface, local)
 // @Param        per query int false "per" default(20)
 // @Param        page query int false "per page" default(1)
 // @Success      200  {object}  types.ResponseWithTotal{data=[]types.Model,total=int} "OK"
@@ -53,22 +53,31 @@ type ModelHandler struct {
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
 // @Router       /models [get]
 func (h *ModelHandler) Index(ctx *gin.Context) {
-	tagReqs := parseTagReqs(ctx)
-	username := httpbase.GetCurrentUser(ctx)
+	filter := new(types.RepoFilter)
+	filter.Tags = parseTagReqs(ctx)
+	filter.Username = httpbase.GetCurrentUser(ctx)
 	per, page, err := common.GetPerAndPageFromContext(ctx)
 	if err != nil {
 		slog.Error("Bad request format", "error", err)
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
-	search, sort := getFilterFromContext(ctx)
-	if !slices.Contains(Sorts, sort) {
+	filter = getFilterFromContext(ctx, filter)
+	if !slices.Contains(Sorts, filter.Sort) {
 		msg := fmt.Sprintf("sort parameter must be one of %v", Sorts)
 		slog.Error("Bad request format,", slog.String("error", msg))
 		ctx.JSON(http.StatusBadRequest, gin.H{"message": msg})
 		return
 	}
-	models, total, err := h.c.Index(ctx, username, search, sort, tagReqs, per, page)
+
+	if filter.Source != "" && !slices.Contains[[]string](Sources, filter.Source) {
+		msg := fmt.Sprintf("source parameter must be one of %v", Sources)
+		slog.Error("Bad request format,", slog.String("error", msg))
+		ctx.JSON(http.StatusBadRequest, gin.H{"message": msg})
+		return
+	}
+
+	models, total, err := h.c.Index(ctx, filter, per, page)
 	if err != nil {
 		slog.Error("Failed to get models", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
@@ -341,26 +350,26 @@ func (h *ModelHandler) Predict(ctx *gin.Context) {
 	httpbase.OK(ctx, resp)
 }
 
-func parseTagReqs(ctx *gin.Context) (tags []database.TagReq) {
+func parseTagReqs(ctx *gin.Context) (tags []types.TagReq) {
 	licenseTag := ctx.Query("license_tag")
 	taskTag := ctx.Query("task_tag")
 	frameworkTag := ctx.Query("framework_tag")
 	if licenseTag != "" {
-		tags = append(tags, database.TagReq{
+		tags = append(tags, types.TagReq{
 			Name:     strings.ToLower(licenseTag),
 			Category: "license",
 		})
 	}
 
 	if taskTag != "" {
-		tags = append(tags, database.TagReq{
+		tags = append(tags, types.TagReq{
 			Name:     strings.ToLower(taskTag),
 			Category: "task",
 		})
 	}
 
 	if frameworkTag != "" {
-		tags = append(tags, database.TagReq{
+		tags = append(tags, types.TagReq{
 			Name:     strings.ToLower(frameworkTag),
 			Category: "framework",
 		})
@@ -368,7 +377,7 @@ func parseTagReqs(ctx *gin.Context) (tags []database.TagReq) {
 
 	languageTag := ctx.Query("language_tag")
 	if languageTag != "" {
-		tags = append(tags, database.TagReq{
+		tags = append(tags, types.TagReq{
 			Name:     strings.ToLower(languageTag),
 			Category: "language",
 		})
@@ -376,7 +385,7 @@ func parseTagReqs(ctx *gin.Context) (tags []database.TagReq) {
 
 	industryTag := ctx.Query("industry_tag")
 	if industryTag != "" {
-		tags = append(tags, database.TagReq{
+		tags = append(tags, types.TagReq{
 			Name:     strings.ToLower(industryTag),
 			Category: "industry",
 		})
@@ -1047,12 +1056,13 @@ func (h *ModelHandler) DeleteModelRuntimeFrameworks(ctx *gin.Context) {
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
 // @Router       /runtime_framework/models [get]
 func (h *ModelHandler) ListModelsOfRuntimeFrameworks(ctx *gin.Context) {
+	filter := new(types.RepoFilter)
 	currentUser := httpbase.GetCurrentUser(ctx)
 	if currentUser == "" {
 		httpbase.UnauthorizedError(ctx, errors.New("user not found, please login first"))
 		return
 	}
-	search, sort := getFilterFromContext(ctx)
+	filter = getFilterFromContext(ctx, filter)
 	deployTypeStr := ctx.Query("deploy_type")
 	if deployTypeStr == "" {
 		// backward compatibility for inferences
@@ -1071,7 +1081,7 @@ func (h *ModelHandler) ListModelsOfRuntimeFrameworks(ctx *gin.Context) {
 		return
 	}
 
-	models, total, err := h.c.ListModelsOfRuntimeFrameworks(ctx, currentUser, search, sort, per, page, deployType)
+	models, total, err := h.c.ListModelsOfRuntimeFrameworks(ctx, currentUser, filter.Search, filter.Sort, per, page, deployType)
 	if err != nil {
 		slog.Error("fail to get models for all runtime frameworks", slog.Any("deployType", deployType), slog.Any("per", per), slog.Any("page", page), slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
