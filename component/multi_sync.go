@@ -161,7 +161,7 @@ func (c *MultiSyncComponent) createLocalDataset(ctx context.Context, m *types.Da
 		user, err = c.createUser(ctx, types.CreateUserRequest{
 			Name:     m.User.Nickname,
 			Username: userName,
-			Email:    m.User.Email,
+			Email:    fmt.Sprintf("%s%s", types.OpenCSGPrefix, m.User.Email),
 		})
 		if err != nil {
 			return fmt.Errorf("fail to create user for namespace, namespace:%s, error: %w", namespace, err)
@@ -230,7 +230,7 @@ func (c *MultiSyncComponent) createLocalModel(ctx context.Context, m *types.Mode
 		user, err = c.createUser(ctx, types.CreateUserRequest{
 			Name:     m.User.Nickname,
 			Username: userName,
-			Email:    m.User.Email,
+			Email:    fmt.Sprintf("%s%s", types.OpenCSGPrefix, m.User.Email),
 		})
 		if err != nil {
 			return fmt.Errorf("fail to create user for namespace, namespace:%s, error: %w", namespace, err)
