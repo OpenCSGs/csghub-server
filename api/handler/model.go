@@ -458,7 +458,7 @@ func (h *ModelHandler) DeployDedicated(ctx *gin.Context) {
 	if err != nil {
 		slog.Error("failed to deploy model as inference", slog.String("namespace", namespace),
 			slog.String("name", name), slog.Any("error", err))
-		httpbase.ServerError(ctx, errors.New("failed to deploy space"))
+		httpbase.ServerError(ctx, err)
 		return
 	}
 
@@ -533,7 +533,7 @@ func (h *ModelHandler) FinetuneCreate(ctx *gin.Context) {
 	if err != nil {
 		slog.Error("failed to deploy model as notebook instance", slog.String("namespace", namespace),
 			slog.String("name", name), slog.Any("error", err))
-		httpbase.ServerError(ctx, errors.New("failed to deploy space"))
+		httpbase.ServerError(ctx, err)
 		return
 	}
 

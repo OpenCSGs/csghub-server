@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"strconv"
 	"strings"
 
 	"opencsg.com/csghub-server/builder/deploy"
@@ -32,6 +33,11 @@ func NewSpaceComponent(config *config.Config) (*SpaceComponent, error) {
 	c.deployer = deploy.NewDeployer()
 	c.publicRootDomain = config.Space.PublicRootDomain
 	c.us = database.NewUserStore()
+	c.ac, err = NewAccountingComponent(config)
+	if err != nil {
+		return nil, err
+	}
+
 	return c, nil
 }
 
@@ -44,6 +50,7 @@ type SpaceComponent struct {
 	us               *database.UserStore
 	deployer         deploy.Deployer
 	publicRootDomain string
+	ac               *AccountingComponent
 }
 
 func (c *SpaceComponent) Create(ctx context.Context, req types.CreateSpaceReq) (*types.Space, error) {
@@ -63,8 +70,14 @@ func (c *SpaceComponent) Create(ctx context.Context, req types.CreateSpaceReq) (
 
 	resource, err := c.srs.FindByID(ctx, req.ResourceID)
 	if err != nil {
-		slog.Error("error finding space resource", slog.Any("error", err))
 		return nil, err
+	}
+	account, err := c.ac.QueryBalanceByUserIDInternal(ctx, req.Username)
+	if err != nil {
+		return nil, fmt.Errorf("error to get user balance data,%w", err)
+	}
+	if resource.CostPerHour != 0 && account.Balance <= 0 {
+		return nil, fmt.Errorf("balance is not enough to run GPU resources, current balance: %f", account.Balance)
 	}
 
 	dbSpace := database.Space{
@@ -76,7 +89,7 @@ func (c *SpaceComponent) Create(ctx context.Context, req types.CreateSpaceReq) (
 		Hardware:      resource.Resources,
 		Secrets:       req.Secrets,
 		CostPerHour:   resource.CostPerHour,
-		SKU:           string(resource.ID),
+		SKU:           strconv.FormatInt(resource.ID, 10),
 	}
 
 	resSpace, err := c.ss.Create(ctx, dbSpace)

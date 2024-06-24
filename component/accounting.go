@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"time"
 
 	"opencsg.com/csghub-server/builder/accounting"
@@ -60,6 +61,30 @@ func (ac *AccountingComponent) QueryBalanceByUserID(ctx context.Context, current
 		return nil, errors.New("invalid user")
 	}
 	return ac.acctClient.QueryBalanceByUserID(userUUID)
+}
+
+func (ac *AccountingComponent) QueryBalanceByUserIDInternal(ctx context.Context, currentUser string) (*database.AccountUser, error) {
+	user, err := ac.user.FindByUsername(ctx, currentUser)
+	if err != nil {
+		return nil, fmt.Errorf("user does not exist, %w", err)
+	}
+	resp, err := ac.acctClient.QueryBalanceByUserID(user.CasdoorUUID)
+	if err != nil {
+		slog.Error("error to get user balance data", slog.Any("error", err))
+		return nil, err
+	}
+
+	tempJSON, err := json.Marshal(resp)
+	if err != nil {
+		slog.Error("error to marshal json", slog.Any("error", err))
+		return nil, err
+	}
+	var account *database.AccountUser
+	if err := json.Unmarshal(tempJSON, &account); err != nil {
+		slog.Error("error to unmarshal json", slog.Any("error", err))
+		return nil, err
+	}
+	return account, nil
 }
 
 func (ac *AccountingComponent) ListStatementByUserIDAndTime(ctx context.Context, req types.ACCT_STATEMENTS_REQ) (interface{}, error) {
