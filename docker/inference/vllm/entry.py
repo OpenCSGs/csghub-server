@@ -1,7 +1,7 @@
 from pycsghub.snapshot_download import snapshot_download
 import os
 
-DOWNLOAD_DIR = "/data"
+DOWNLOAD_DIR = "/workspace"
 REPO_ID = os.environ['REPO_ID']
 REVISION = os.getenv('REVISION', 'main')
 TOKEN = os.environ['ACCESS_TOKEN']
