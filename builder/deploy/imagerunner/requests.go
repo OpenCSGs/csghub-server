@@ -25,13 +25,15 @@ type (
 		Env        map[string]string `json:"env,omitempty"`        // runtime env variables
 		Annotation map[string]string `json:"annotation,omitempty"` // resource annotations
 
-		RuntimeFramework string `json:"runtime_framework"` // runtime framework of image, TGI/vllm/Pipeline/Deepspeed/LLamacpp
-		ImageID          string `json:"image_id"`          // container_image
-		DeployID         int64  `json:"deploy_id"`
-		Accesstoken      string `json:"access_token"`
-		ClusterID        string `json:"cluster_id"`
-		SvcName          string `json:"svc_name"`
-		DeployType       int    `json:"deploy_type"`
+		RuntimeFramework string  `json:"runtime_framework"` // runtime framework of image, TGI/vllm/Pipeline/Deepspeed/LLamacpp
+		ImageID          string  `json:"image_id"`          // container_image
+		DeployID         int64   `json:"deploy_id"`
+		Accesstoken      string  `json:"access_token"`
+		ClusterID        string  `json:"cluster_id"`
+		SvcName          string  `json:"svc_name"`
+		DeployType       int     `json:"deploy_type"`
+		UserID           string  `json:"user_id"`
+		CostPerHour      float64 `json:"cost_per_hour"`
 	}
 
 	RunResponse struct {
@@ -64,11 +66,16 @@ type (
 	}
 
 	StatusResponse struct {
-		DeployID  int64            `json:"deploy_id"`
-		Code      int              `json:"code"`
-		Message   string           `json:"message"`
-		Endpoint  string           `json:"url"`
-		Instances []types.Instance `json:"instance"`
+		DeployID    int64            `json:"deploy_id"`
+		UserID      string           `json:"user_id"`
+		CostPerHour float64          `json:"cost_per_hour"`
+		Code        int              `json:"code"`
+		Message     string           `json:"message"`
+		Endpoint    string           `json:"url"`
+		Instances   []types.Instance `json:"instance"`
+		Replica     int              `json:"replica"`
+		DeployType  int              `json:"deploy_type"`
+		ServiceName string           `json:"service_name"`
 	}
 
 	LogsRequest struct {

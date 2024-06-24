@@ -28,9 +28,10 @@ func (c *SpaceResourceComponent) Index(ctx context.Context) ([]types.SpaceResour
 	}
 	for _, r := range databaseSpaceResources {
 		result = append(result, types.SpaceResource{
-			ID:        r.ID,
-			Name:      r.Name,
-			Resources: r.Resources,
+			ID:          r.ID,
+			Name:        r.Name,
+			Resources:   r.Resources,
+			CostPerHour: r.CostPerHour,
 		})
 	}
 
@@ -45,6 +46,7 @@ func (c *SpaceResourceComponent) Update(ctx context.Context, req *types.UpdateSp
 	}
 	sr.Name = req.Name
 	sr.Resources = req.Resources
+	sr.CostPerHour = req.CostPerHour
 
 	sr, err = c.srs.Update(ctx, *sr)
 	if err != nil {
@@ -53,9 +55,10 @@ func (c *SpaceResourceComponent) Update(ctx context.Context, req *types.UpdateSp
 	}
 
 	result := &types.SpaceResource{
-		ID:        sr.ID,
-		Name:      sr.Name,
-		Resources: sr.Resources,
+		ID:          sr.ID,
+		Name:        sr.Name,
+		Resources:   sr.Resources,
+		CostPerHour: sr.CostPerHour,
 	}
 
 	return result, nil
@@ -63,8 +66,9 @@ func (c *SpaceResourceComponent) Update(ctx context.Context, req *types.UpdateSp
 
 func (c *SpaceResourceComponent) Create(ctx context.Context, req *types.CreateSpaceResourceReq) (*types.SpaceResource, error) {
 	sr := database.SpaceResource{
-		Name:      req.Name,
-		Resources: req.Resources,
+		Name:        req.Name,
+		Resources:   req.Resources,
+		CostPerHour: req.CostPerHour,
 	}
 	res, err := c.srs.Create(ctx, sr)
 	if err != nil {
@@ -73,9 +77,10 @@ func (c *SpaceResourceComponent) Create(ctx context.Context, req *types.CreateSp
 	}
 
 	result := &types.SpaceResource{
-		ID:        res.ID,
-		Name:      res.Name,
-		Resources: res.Resources,
+		ID:          res.ID,
+		Name:        res.Name,
+		Resources:   res.Resources,
+		CostPerHour: res.CostPerHour,
 	}
 
 	return result, nil

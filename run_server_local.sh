@@ -18,6 +18,9 @@ export STARHUB_SERVER_S3_ACCESS_KEY_ID=$STARHUB_SERVER_S3_ACCESS_KEY_ID
 export STARHUB_SERVER_S3_ACCESS_KEY_SECRET=$STARHUB_SERVER_S3_ACCESS_KEY_SECRET
 export STARHUB_SERVER_S3_REGION=$STARHUB_SERVER_S3_REGION
 #  export STARHUB_SERVER_S3_BUCKET: $STARHUB_SERVER_S3_BUCKET
+export OPENCSG_ACCOUNTING_NATS_URL=nats://natsadmin:cE90aPsV7nws83xubzP3ce3F9xg@127.0.0.1:4222
+export OPENCSG_ACCOUNTING_FEE_EVENT_SUBJECT="accounting.fee.>"
+export OPENCSG_ACCOUNTING_NOTIFY_NOBALANCE_SUBJECT="accounting.notify.nobalance"
 
 #export GIN_MODE="release"
 
@@ -42,5 +45,5 @@ fi
 #./bin/csghub-server migration create_sql create_table_spaces
 ./bin/csghub-server migration migrate
 
-./bin/csghub-server start server -l DEBUG -f json --swagger true
+./bin/csghub-server start server -l Info -f json --swagger true
 #./bin/csghub-server trigger fix-org-data -l DEBUG -f json

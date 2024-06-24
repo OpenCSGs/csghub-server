@@ -512,12 +512,11 @@ func (h *ModelHandler) FinetuneCreate(ctx *gin.Context) {
 	modelReq := &types.ModelRunReq{
 		DeployName:         req.DeployName,
 		ClusterID:          req.ClusterID,
-		Hardware:           req.Hardware,
+		ResourceID:         req.ResourceID,
 		RuntimeFrameworkID: req.RuntimeFrameworkID,
 		MinReplica:         1,
 		MaxReplica:         1,
 		SecureLevel:        2,
-		CostPerHour:        req.CostPerHour,
 		Revision:           req.Revision,
 	}
 

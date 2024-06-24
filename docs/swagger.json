@@ -11289,6 +11289,9 @@
         "types.CreateSpaceReq": {
             "type": "object",
             "properties": {
+                "casdoor_uid": {
+                    "type": "string"
+                },
                 "cover_image_url": {
                     "type": "string"
                 },
@@ -11300,9 +11303,6 @@
                     "type": "string"
                 },
                 "env": {
-                    "type": "string"
-                },
-                "hardware": {
                     "type": "string"
                 },
                 "labels": {
@@ -11331,6 +11331,9 @@
                 "readme": {
                     "type": "string"
                 },
+                "resource_id": {
+                    "type": "integer"
+                },
                 "sdk": {
                     "description": "Creator   string `json:\"username\" example:\"creator_user_name\"`\nNamespace string `json:\"namespace\" example:\"user_or_org_name\"`\nName      string `json:\"name\" example:\"space_name_1\"`\nLicense   string `json:\"license\" example:\"MIT\"`",
                     "type": "string",
@@ -11351,10 +11354,14 @@
         "types.CreateSpaceResourceReq": {
             "type": "object",
             "required": [
+                "cost_per_hour",
                 "name",
                 "resources"
             ],
             "properties": {
+                "cost_per_hour": {
+                    "type": "number"
+                },
                 "name": {
                     "type": "string"
                 },
@@ -11650,14 +11657,11 @@
                 "cluster_id": {
                     "type": "string"
                 },
-                "cost_per_hour": {
-                    "type": "integer"
-                },
                 "deploy_name": {
                     "type": "string"
                 },
-                "hardware": {
-                    "type": "string"
+                "resource_id": {
+                    "type": "integer"
                 },
                 "revision": {
                     "type": "string"
@@ -11800,22 +11804,19 @@
                 "cluster_id": {
                     "type": "string"
                 },
-                "cost_per_hour": {
-                    "type": "integer"
-                },
                 "deploy_name": {
                     "type": "string"
                 },
                 "env": {
                     "type": "string"
                 },
-                "hardware": {
-                    "type": "string"
-                },
                 "max_replica": {
                     "type": "integer"
                 },
                 "min_replica": {
+                    "type": "integer"
+                },
+                "resource_id": {
                     "type": "integer"
                 },
                 "revision": {
@@ -12134,6 +12135,9 @@
         "types.SpaceResource": {
             "type": "object",
             "properties": {
+                "cost_per_hour": {
+                    "type": "number"
+                },
                 "id": {
                     "type": "integer"
                 },
@@ -12390,9 +12394,6 @@
                 "env": {
                     "type": "string"
                 },
-                "hardware": {
-                    "type": "string"
-                },
                 "labels": {
                     "type": "string",
                     "example": ""
@@ -12419,6 +12420,9 @@
                 "readme": {
                     "type": "string"
                 },
+                "resource_id": {
+                    "type": "integer"
+                },
                 "sdk": {
                     "description": "Creator   string `json:\"username\" example:\"creator_user_name\"`\nNamespace string `json:\"namespace\" example:\"user_or_org_name\"`\nName      string `json:\"name\" example:\"space_name_1\"`\nLicense   string `json:\"license\" example:\"MIT\"`",
                     "type": "string",
@@ -12439,6 +12443,9 @@
         "types.UpdateSpaceResourceReq": {
             "type": "object",
             "properties": {
+                "cost_per_hour": {
+                    "type": "number"
+                },
                 "name": {
                     "type": "string"
                 },

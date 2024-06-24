@@ -11300,6 +11300,9 @@ const docTemplate = `{
         "types.CreateSpaceReq": {
             "type": "object",
             "properties": {
+                "casdoor_uid": {
+                    "type": "string"
+                },
                 "cover_image_url": {
                     "type": "string"
                 },
@@ -11311,9 +11314,6 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "env": {
-                    "type": "string"
-                },
-                "hardware": {
                     "type": "string"
                 },
                 "labels": {
@@ -11342,6 +11342,9 @@ const docTemplate = `{
                 "readme": {
                     "type": "string"
                 },
+                "resource_id": {
+                    "type": "integer"
+                },
                 "sdk": {
                     "description": "Creator   string ` + "`" + `json:\"username\" example:\"creator_user_name\"` + "`" + `\nNamespace string ` + "`" + `json:\"namespace\" example:\"user_or_org_name\"` + "`" + `\nName      string ` + "`" + `json:\"name\" example:\"space_name_1\"` + "`" + `\nLicense   string ` + "`" + `json:\"license\" example:\"MIT\"` + "`" + `",
                     "type": "string",
@@ -11362,10 +11365,14 @@ const docTemplate = `{
         "types.CreateSpaceResourceReq": {
             "type": "object",
             "required": [
+                "cost_per_hour",
                 "name",
                 "resources"
             ],
             "properties": {
+                "cost_per_hour": {
+                    "type": "number"
+                },
                 "name": {
                     "type": "string"
                 },
@@ -11661,14 +11668,11 @@ const docTemplate = `{
                 "cluster_id": {
                     "type": "string"
                 },
-                "cost_per_hour": {
-                    "type": "integer"
-                },
                 "deploy_name": {
                     "type": "string"
                 },
-                "hardware": {
-                    "type": "string"
+                "resource_id": {
+                    "type": "integer"
                 },
                 "revision": {
                     "type": "string"
@@ -11811,22 +11815,19 @@ const docTemplate = `{
                 "cluster_id": {
                     "type": "string"
                 },
-                "cost_per_hour": {
-                    "type": "integer"
-                },
                 "deploy_name": {
                     "type": "string"
                 },
                 "env": {
                     "type": "string"
                 },
-                "hardware": {
-                    "type": "string"
-                },
                 "max_replica": {
                     "type": "integer"
                 },
                 "min_replica": {
+                    "type": "integer"
+                },
+                "resource_id": {
                     "type": "integer"
                 },
                 "revision": {
@@ -12145,6 +12146,9 @@ const docTemplate = `{
         "types.SpaceResource": {
             "type": "object",
             "properties": {
+                "cost_per_hour": {
+                    "type": "number"
+                },
                 "id": {
                     "type": "integer"
                 },
@@ -12401,9 +12405,6 @@ const docTemplate = `{
                 "env": {
                     "type": "string"
                 },
-                "hardware": {
-                    "type": "string"
-                },
                 "labels": {
                     "type": "string",
                     "example": ""
@@ -12430,6 +12431,9 @@ const docTemplate = `{
                 "readme": {
                     "type": "string"
                 },
+                "resource_id": {
+                    "type": "integer"
+                },
                 "sdk": {
                     "description": "Creator   string ` + "`" + `json:\"username\" example:\"creator_user_name\"` + "`" + `\nNamespace string ` + "`" + `json:\"namespace\" example:\"user_or_org_name\"` + "`" + `\nName      string ` + "`" + `json:\"name\" example:\"space_name_1\"` + "`" + `\nLicense   string ` + "`" + `json:\"license\" example:\"MIT\"` + "`" + `",
                     "type": "string",
@@ -12450,6 +12454,9 @@ const docTemplate = `{
         "types.UpdateSpaceResourceReq": {
             "type": "object",
             "properties": {
+                "cost_per_hour": {
+                    "type": "number"
+                },
                 "name": {
                     "type": "string"
                 },

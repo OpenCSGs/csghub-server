@@ -74,16 +74,18 @@ func (s *HttpServer) Run(port int) error {
 
 func (s *HttpServer) runService(c *gin.Context) {
 	var request struct {
-		ImageID    string            `json:"image_id" binding:"required"`
-		Hardware   types.HardWare    `json:"hardware,omitempty"`
-		Env        map[string]string `json:"env,omitempty"`
-		Annotation map[string]string `json:"annotation,omitempty"`
-		DeployID   int64             `json:"deploy_id" binding:"required"`
-		RepoType   string            `json:"repo_type"`
-		MinReplica int               `json:"min_replica"`
-		MaxReplica int               `json:"max_replica"`
-		ClusterID  string            `json:"cluster_id"`
-		DeployType int               `json:"deploy_type"`
+		ImageID     string            `json:"image_id" binding:"required"`
+		Hardware    types.HardWare    `json:"hardware,omitempty"`
+		Env         map[string]string `json:"env,omitempty"`
+		Annotation  map[string]string `json:"annotation,omitempty"`
+		DeployID    int64             `json:"deploy_id" binding:"required"`
+		RepoType    string            `json:"repo_type"`
+		MinReplica  int               `json:"min_replica"`
+		MaxReplica  int               `json:"max_replica"`
+		ClusterID   string            `json:"cluster_id"`
+		DeployType  int               `json:"deploy_type"`
+		UserID      string            `json:"user_id"`
+		CostPerHour float64           `json:"cost_per_hour"`
 	}
 
 	err := c.BindJSON(&request)
@@ -157,6 +159,9 @@ func (s *HttpServer) runService(c *gin.Context) {
 	}
 
 	annotations["deploy_id"] = strconv.FormatInt(request.DeployID, 10)
+	annotations["deploy_type"] = strconv.Itoa(request.DeployType)
+	annotations["user_id"] = request.UserID
+	annotations["cost_per_hour"] = strconv.FormatFloat(request.CostPerHour, 'f', 2, 64)
 
 	containerImg := path.Join(s.spaceDockerRegBase, request.ImageID)
 	if request.RepoType == string(types.ModelRepo) {
@@ -433,7 +438,11 @@ func (s *HttpServer) serviceStatus(c *gin.Context) {
 	}
 	deployIDStr := srv.Annotations["deploy_id"]
 	deployID, _ := strconv.ParseInt(deployIDStr, 10, 64)
+	costStr := srv.Annotations["cost_per_hour"]
+	cost, _ := strconv.ParseFloat(costStr, 32)
 	resp.DeployID = deployID
+	resp.CostPerHour = cost
+	resp.UserID = srv.Annotations["user_id"]
 
 	// retrive pod list and status
 	if request.NeedDetails {
@@ -624,8 +633,23 @@ func (s *HttpServer) serviceStatusAll(c *gin.Context) {
 		for _, srv := range services.Items {
 			deployIDStr := srv.Annotations["deploy_id"]
 			deployID, _ := strconv.ParseInt(deployIDStr, 10, 64)
+			deployTypeStr := srv.Annotations["deploy_type"]
+			deployType, err := strconv.ParseInt(deployTypeStr, 10, 64)
+			if err != nil {
+				deployType = 0
+			}
+			costStr := srv.Annotations["cost_per_hour"]
+			cost, err := strconv.ParseFloat(costStr, 32)
+			if err != nil {
+				// for old space, no charge
+				cost = 0
+			}
 			status := &StatusResponse{
-				DeployID: deployID,
+				DeployID:    deployID,
+				UserID:      srv.Annotations["user_id"],
+				CostPerHour: cost,
+				DeployType:  int(deployType),
+				ServiceName: srv.Name,
 			}
 			allStatus[srv.Name] = status
 			if srv.IsFailed() {
@@ -640,7 +664,7 @@ func (s *HttpServer) serviceStatusAll(c *gin.Context) {
 					status.Code = common.Running
 					continue
 				}
-
+				status.Replica = len(podNames)
 				if len(podNames) == 0 {
 					status.Code = common.Sleeping
 					continue

@@ -86,7 +86,7 @@ type DeployRepo struct {
 	Endpoint         string     `json:"endpoint,omitempty"`
 	CreatedAt        time.Time  `json:"created_at,omitempty"`
 	UpdatedAt        time.Time  `json:"updated_at,omitempty"`
-	CostPerHour      int64      `json:"cost_per_hour,omitempty"`
+	CostPerHour      float64    `json:"cost_per_hour,omitempty"`
 	ClusterID        string     `json:"cluster_id,omitempty"`
 	SecureLevel      int        `json:"secure_level,omitempty"`
 	ActualReplica    int        `json:"actual_replica,omitempty"`
@@ -96,6 +96,8 @@ type DeployRepo struct {
 	Private          bool       `json:"private"`
 	Type             int        `json:"type,omitempty"`
 	ProxyEndpoint    string     `json:"proxy_endpoint,omitempty"`
+	CasdoorUID       string     `json:"casdoor_uid,omitempty"`
+	SKU              string     `json:"sku,omitempty"`
 }
 
 type RuntimeFrameworkReq struct {
