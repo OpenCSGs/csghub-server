@@ -3,12 +3,13 @@ RUN pip config set global.index-url https://pypi.tuna.tsinghua.edu.cn/simple
 RUN pip install git+https://git-devops.opencsg.com/csg-hub-sdk/csghub-sdk
 
 WORKDIR /workspace/
-COPY ./vllm/entry.py entry.py
-COPY ./vllm/serve.sh serve.sh
+
+COPY ./vllm/ /etc/csghub/
+RUN chmod +x /etc/csghub/*.sh
 
 ENV HUGGINGFACE_HUB_CACHE=/workspace/ \
     HF_HUB_ENABLE_HF_TRANSFER=0
 
 EXPOSE 8000
 
-ENTRYPOINT ["bash", "serve.sh"]
+ENTRYPOINT ["bash", "/etc/csghub/serve.sh"]
