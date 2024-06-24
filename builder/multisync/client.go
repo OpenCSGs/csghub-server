@@ -17,13 +17,10 @@ type Client interface {
 	DatasetInfo(ctx context.Context, v types.SyncVersion) (*types.Dataset, error)
 }
 
-func FromOpenCSG(accessToken string) Client {
+func FromOpenCSG(endpoint string, accessToken string) Client {
 	return &commonClient{
-		//TODO:config
-		// endpoint: "https://opencsg.com",
-		endpoint: "http://localhost:8080",
-		hc:       http.DefaultClient,
-		//TODO:read from multi sync config
+		endpoint:  endpoint,
+		hc:        http.DefaultClient,
 		authToken: accessToken,
 	}
 }
