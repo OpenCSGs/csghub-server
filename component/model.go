@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"strconv"
 
 	"opencsg.com/csghub-server/builder/deploy"
 	"opencsg.com/csghub-server/builder/git/gitserver"
@@ -73,6 +74,7 @@ func NewModelComponent(config *config.Config) (*ModelComponent, error) {
 	c.infer = inference.NewInferClient(config.Inference.ServerAddr)
 	c.us = database.NewUserStore()
 	c.deployer = deploy.NewDeployer()
+	c.ac, err = NewAccountingComponent(config)
 	return c, nil
 }
 
@@ -85,6 +87,7 @@ type ModelComponent struct {
 	infer         inference.Client
 	us            *database.UserStore
 	deployer      deploy.Deployer
+	ac            *AccountingComponent
 }
 
 func (c *ModelComponent) Index(ctx context.Context, filter *types.RepoFilter, per, page int) ([]types.Model, int, error) {
@@ -637,8 +640,16 @@ func (c *ModelComponent) Deploy(ctx context.Context, namespace, name, currentUse
 
 	resource, err := c.SS.FindByID(ctx, req.ResourceID)
 	if err != nil {
-		slog.Error("error finding space resource", slog.Any("error", err))
 		return -1, err
+	}
+
+	// check balance
+	account, err := c.ac.QueryBalanceByUserIDInternal(ctx, currentUser)
+	if err != nil {
+		return -1, err
+	}
+	if resource.CostPerHour != 0 && account.Balance <= 0 {
+		return -1, fmt.Errorf("balance is not enough to run fee resources. current balance: %f", account.Balance)
 	}
 
 	var hardware types.HardWare
@@ -678,7 +689,7 @@ func (c *ModelComponent) Deploy(ctx context.Context, namespace, name, currentUse
 		SecureLevel:      req.SecureLevel,
 		Type:             deployType,
 		CasdoorUID:       user.CasdoorUUID,
-		SKU:              string(resource.ID),
+		SKU:              strconv.FormatInt(resource.ID, 10),
 	})
 }
 
