@@ -29,13 +29,23 @@ type CreditHandler struct {
 }
 
 func (ch *CreditHandler) QueryAllUsersBalance(ctx *gin.Context) {
-	accounts, err := ch.auc.ListAccountingUser(ctx)
+	per, page, err := common.GetPerAndPageFromContext(ctx)
+	if err != nil {
+		slog.Error("Bad request format", "error", err)
+		httpbase.BadRequest(ctx, err.Error())
+		return
+	}
+	accounts, total, err := ch.auc.ListAccountingUser(ctx, per, page)
 	if err != nil {
 		slog.Error("fail to list all accounts", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
 		return
 	}
-	httpbase.OK(ctx, accounts)
+	respData := gin.H{
+		"data":  accounts,
+		"total": total,
+	}
+	httpbase.OK(ctx, respData)
 }
 
 func (ch *CreditHandler) QueryBalanceByUserID(ctx *gin.Context) {

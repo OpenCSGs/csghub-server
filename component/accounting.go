@@ -44,12 +44,12 @@ func NewAccountingComponent(config *config.Config) (*AccountingComponent, error)
 	}, nil
 }
 
-func (ac *AccountingComponent) QueryAllUsersBalance(ctx context.Context, currentUser string) (interface{}, error) {
+func (ac *AccountingComponent) QueryAllUsersBalance(ctx context.Context, currentUser string, per, page int) (interface{}, error) {
 	_, err := ac.user.FindByUsername(ctx, currentUser)
 	if err != nil {
 		return nil, fmt.Errorf("user does not exist, %w", err)
 	}
-	return ac.acctClient.QueryAllUsersBalance()
+	return ac.acctClient.QueryAllUsersBalance(per, page)
 }
 
 func (ac *AccountingComponent) QueryBalanceByUserID(ctx context.Context, currentUser, userUUID string) (interface{}, error) {

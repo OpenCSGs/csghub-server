@@ -21,13 +21,18 @@ type AccountUser struct {
 	Balance float64 `bun:",notnull" json:"balance"`
 }
 
-func (s *AccountUserStore) List(ctx context.Context) ([]AccountUser, error) {
+func (s *AccountUserStore) List(ctx context.Context, per, page int) ([]AccountUser, int, error) {
 	var result []AccountUser
-	_, err := s.db.Operator.Core.NewSelect().Model(&result).Exec(ctx, &result)
+	q := s.db.Operator.Core.NewSelect().Model(&result)
+	count, err := q.Count(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("list all accounts, error:%w", err)
+		return nil, 0, err
 	}
-	return result, nil
+	_, err = q.Order("user_id").Limit(per).Offset((page-1)*per).Exec(ctx, &result)
+	if err != nil {
+		return nil, 0, fmt.Errorf("list all accounts, error:%w", err)
+	}
+	return result, count, nil
 }
 
 func (s *AccountUserStore) Create(ctx context.Context, input AccountUser) error {

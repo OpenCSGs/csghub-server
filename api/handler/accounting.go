@@ -38,6 +38,9 @@ func NewAccountingHandler(config *config.Config) (*AccountingHandler, error) {
 // @Tags         Accounting
 // @Accept       json
 // @Produce      json
+// @Param        current_user query string true "current_user"
+// @Param        per query int false "per" default(20)
+// @Param        page query int false "per page" default(1)
 // @Success      200  {object}  types.Response{} "OK"
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
@@ -48,7 +51,19 @@ func (ah *AccountingHandler) QueryAllUsersBalance(ctx *gin.Context) {
 		httpbase.UnauthorizedError(ctx, errors.New("user not found, please login first"))
 		return
 	}
-	data, err := ah.ac.QueryAllUsersBalance(ctx, currentUser)
+	access := verifyApiToken(ctx, ah.apiToken)
+	if !access {
+		slog.Error("Do not have permission to recharge")
+		httpbase.BadRequest(ctx, "Do not have permission")
+		return
+	}
+	per, page, err := common.GetPerAndPageFromContext(ctx)
+	if err != nil {
+		slog.Error("Bad request format", "error", err)
+		httpbase.BadRequest(ctx, err.Error())
+		return
+	}
+	data, err := ah.ac.QueryAllUsersBalance(ctx, currentUser, per, page)
 	if err != nil {
 		slog.Error("fail to get all accounts balance", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
@@ -249,8 +264,8 @@ func (ah *AccountingHandler) RechargeByUserID(ctx *gin.Context) {
 		httpbase.UnauthorizedError(ctx, errors.New("user not found, please login first"))
 		return
 	}
-	authHeader := ctx.GetHeader("Authorization")
-	if authHeader != ("Bearer " + ah.apiToken) {
+	access := verifyApiToken(ctx, ah.apiToken)
+	if !access {
 		slog.Error("Do not have permission to recharge")
 		httpbase.BadRequest(ctx, "Do not have permission")
 		return
@@ -438,4 +453,9 @@ func getSceneFromContext(ctx *gin.Context) (int, error) {
 	}
 	scene, err := strconv.Atoi(str)
 	return scene, err
+}
+
+func verifyApiToken(ctx *gin.Context, apiToken string) bool {
+	authHeader := ctx.GetHeader("Authorization")
+	return authHeader == ("Bearer " + apiToken)
 }
