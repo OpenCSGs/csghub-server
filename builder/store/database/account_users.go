@@ -28,7 +28,7 @@ func (s *AccountUserStore) List(ctx context.Context, per, page int) ([]AccountUs
 	if err != nil {
 		return nil, 0, err
 	}
-	_, err = q.Order("user_id").Limit(per).Offset((page-1)*per).Exec(ctx, &result)
+	_, err = q.Order("user_uuid").Limit(per).Offset((page-1)*per).Exec(ctx, &result)
 	if err != nil {
 		return nil, 0, fmt.Errorf("list all accounts, error:%w", err)
 	}

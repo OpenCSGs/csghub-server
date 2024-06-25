@@ -341,9 +341,6 @@ definitions:
         items:
           $ref: '#/definitions/database.AccessToken'
         type: array
-      casdoor_uuid:
-        description: TODO:add unique index after migration
-        type: string
       created_at:
         type: string
       email:
@@ -358,9 +355,19 @@ definitions:
         items:
           $ref: '#/definitions/database.Namespace'
         type: array
+      reg_provider:
+        description: |-
+          user registered from default login page, from casdoor, etc. Possible values:
+
+          - "default"
+          - "casdoor"
+        type: string
       updated_at:
         type: string
       username:
+        type: string
+      uuid:
+        description: TODO:add unique index after migration
         type: string
     type: object
   handler.Create.addMemberRequest:
@@ -731,8 +738,6 @@ definitions:
     type: object
   types.CreateSpaceReq:
     properties:
-      casdoor_uid:
-        type: string
       cover_image_url:
         type: string
       default_branch:
@@ -764,11 +769,6 @@ definitions:
       resource_id:
         type: integer
       sdk:
-        description: |-
-          Creator   string `json:"username" example:"creator_user_name"`
-          Namespace string `json:"namespace" example:"user_or_org_name"`
-          Name      string `json:"name" example:"space_name_1"`
-          License   string `json:"license" example:"MIT"`
         example: "1"
         type: string
       sdk_version:
@@ -815,8 +815,6 @@ definitions:
     type: object
   types.CreateUserRequest:
     properties:
-      casdoor_uid:
-        type: string
       email:
         type: string
       name:
@@ -824,8 +822,17 @@ definitions:
         type: string
       phone:
         type: string
+      reg_provider:
+        description: |-
+          user registered from default login page, from casdoor, etc. Possible values:
+
+          - "default"
+          - "casdoor"
+        type: string
       username:
         description: the login name
+        type: string
+      uuid:
         type: string
     type: object
   types.CreateUserTokenRequest:
@@ -1548,11 +1555,6 @@ definitions:
       resource_id:
         type: integer
       sdk:
-        description: |-
-          Creator   string `json:"username" example:"creator_user_name"`
-          Namespace string `json:"namespace" example:"user_or_org_name"`
-          Name      string `json:"name" example:"space_name_1"`
-          License   string `json:"license" example:"MIT"`
         example: "1"
         type: string
       sdk_version:
@@ -1583,8 +1585,6 @@ definitions:
     type: object
   types.UpdateUserRequest:
     properties:
-      casdoor_uid:
-        type: string
       email:
         type: string
       name:
@@ -1594,6 +1594,8 @@ definitions:
         type: string
       username:
         description: the login name
+        type: string
+      uuid:
         type: string
     type: object
   types.User:
@@ -3318,9 +3320,9 @@ paths:
     get:
       consumes:
       - application/json
-      description: Get user balance by casdoor user uuid
+      description: Get user balance by user uuid
       parameters:
-      - description: casdoor user uuid
+      - description: user uuid
         in: path
         name: id
         required: true
@@ -3347,16 +3349,16 @@ paths:
             $ref: '#/definitions/types.APIInternalServerError'
       security:
       - ApiKey: []
-      summary: Get user balance by casdoor user uuid
+      summary: Get user balance by user uuid
       tags:
       - Accounting
   /accounting/credit/{id}/bills:
     get:
       consumes:
       - application/json
-      description: List user bills by casdoor user uuid and start date and end date
+      description: List user bills by user uuid and start date and end date
       parameters:
-      - description: casdoor user uuid
+      - description: user uuid
         in: path
         name: id
         required: true
@@ -3413,7 +3415,7 @@ paths:
             $ref: '#/definitions/types.APIInternalServerError'
       security:
       - ApiKey: []
-      summary: List user bills by casdoor user uuid and start date and end date
+      summary: List user bills by user uuid and start date and end date
       tags:
       - Accounting
   /accounting/credit/{id}/recharge:
@@ -3422,7 +3424,7 @@ paths:
       - application/json
       description: Recharge fee for account
       parameters:
-      - description: casdoor user uuid
+      - description: user uuid
         in: path
         name: id
         required: true
@@ -3462,9 +3464,9 @@ paths:
     get:
       consumes:
       - application/json
-      description: List statements by casdoor user uuid and start time and end time
+      description: List statements by user uuid and start time and end time
       parameters:
-      - description: casdoor user uuid
+      - description: user uuid
         in: path
         name: id
         required: true
@@ -3526,7 +3528,7 @@ paths:
             $ref: '#/definitions/types.APIInternalServerError'
       security:
       - ApiKey: []
-      summary: List statements by casdoor user uuid and start time and end time
+      summary: List statements by user uuid and start time and end time
       tags:
       - Accounting
   /accounting/credit/balance:
