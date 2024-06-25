@@ -6,20 +6,25 @@ type CreateUserRequest struct {
 	// Display name of the user
 	Name string `json:"name"`
 	// the login name
-	Username   string `json:"username"`
-	Email      string `json:"email"`
-	Phone      string `json:"phone"`
-	CasdoorUID string `json:"casdoor_uid"`
+	Username string `json:"username"`
+	Email    string `json:"email"`
+	Phone    string `json:"phone"`
+	UUID     string `json:"uuid"`
+	// user registered from default login page, from casdoor, etc. Possible values:
+	//
+	// - "default"
+	// - "casdoor"
+	RegProvider string `json:"reg_provider"`
 }
 
 type UpdateUserRequest struct {
 	// Display name of the user
 	Name string `json:"name"`
 	// the login name
-	Username   string `json:"username"`
-	Email      string `json:"email"`
-	Phone      string `json:"phone"`
-	CasdoorUID string `json:"casdoor_uid"`
+	Username string `json:"username"`
+	Email    string `json:"email"`
+	Phone    string `json:"phone"`
+	UUID     string `json:"uuid"`
 }
 
 type UpdateUserResp struct {
@@ -49,9 +54,9 @@ type CheckAccessTokenResp struct {
 	Application AccessTokenApp `json:"application"`
 	Permission  string         `json:"permission,omitempty"`
 	// the login name
-	Username   string    `json:"username"`
-	CasdoorUID string    `json:"casdoor_uid"`
-	ExpireAt   time.Time `json:"expire_at"`
+	Username string    `json:"user_name"`
+	UserUUID string    `json:"user_uuid"`
+	ExpireAt time.Time `json:"expire_at"`
 }
 
 type UserDatasetsReq struct {

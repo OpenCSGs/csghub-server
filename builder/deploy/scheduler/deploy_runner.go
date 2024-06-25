@@ -296,7 +296,7 @@ func (t *DeployRunner) makeDeployRequest() (*imagerunner.RunRequest, error) {
 		ClusterID:   deploy.ClusterID,
 		SvcName:     deploy.SvcName,
 		DeployType:  deploy.Type,
-		UserID:      deploy.CasdoorUUID,
+		UserID:      deploy.UserUUID,
 		CostPerHour: deploy.CostPerHour,
 	}, nil
 }

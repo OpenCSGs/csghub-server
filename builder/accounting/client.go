@@ -55,12 +55,12 @@ func (ac *AccountingClient) QueryBalanceByUserID(userUUID string) (interface{}, 
 }
 
 func (ac *AccountingClient) ListStatementByUserIDAndTime(req types.ACCT_STATEMENTS_REQ) (interface{}, error) {
-	subUrlPath := fmt.Sprintf("/credit/%s/statements?current_user=%s&scene=%d&instance_name=%s&start_time=%s&end_time=%s&per=%d&page=%d", req.UserID, req.CurrentUser, req.Scene, req.InstanceName, url.QueryEscape(req.StartTime), url.QueryEscape(req.EndTime), req.Per, req.Page)
+	subUrlPath := fmt.Sprintf("/credit/%s/statements?current_user=%s&scene=%d&instance_name=%s&start_time=%s&end_time=%s&per=%d&page=%d", req.UserUUID, req.CurrentUser, req.Scene, req.InstanceName, url.QueryEscape(req.StartTime), url.QueryEscape(req.EndTime), req.Per, req.Page)
 	return ac.handleResponse(ac.doRequest(http.MethodGet, subUrlPath, nil))
 }
 
 func (ac *AccountingClient) ListBillsByUserIDAndDate(req types.ACCT_STATEMENTS_REQ) (interface{}, error) {
-	subUrlPath := fmt.Sprintf("/credit/%s/bills?current_user=%s&scene=%d&start_date=%s&end_date=%s&per=%d&page=%d", req.UserID, req.CurrentUser, req.Scene, url.QueryEscape(req.StartTime), url.QueryEscape(req.EndTime), req.Per, req.Page)
+	subUrlPath := fmt.Sprintf("/credit/%s/bills?current_user=%s&scene=%d&start_date=%s&end_date=%s&per=%d&page=%d", req.UserUUID, req.CurrentUser, req.Scene, url.QueryEscape(req.StartTime), url.QueryEscape(req.EndTime), req.Per, req.Page)
 	return ac.handleResponse(ac.doRequest(http.MethodGet, subUrlPath, nil))
 }
 

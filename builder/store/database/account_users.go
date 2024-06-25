@@ -16,9 +16,9 @@ func NewAccountUserStore() *AccountUserStore {
 }
 
 type AccountUser struct {
-	ID      int64   `bun:",pk,autoincrement" json:"id"`
-	UserID  string  `bun:",notnull" json:"user_id"` // casdoor uuid
-	Balance float64 `bun:",notnull" json:"balance"`
+	ID       int64   `bun:",pk,autoincrement" json:"id"`
+	UserUUID string  `bun:",notnull" json:"user_uuid"`
+	Balance  float64 `bun:",notnull" json:"balance"`
 }
 
 func (s *AccountUserStore) List(ctx context.Context, per, page int) ([]AccountUser, int, error) {
@@ -45,6 +45,6 @@ func (s *AccountUserStore) Create(ctx context.Context, input AccountUser) error 
 
 func (s *AccountUserStore) FindUserByID(ctx context.Context, userID string) (*AccountUser, error) {
 	user := &AccountUser{}
-	err := s.db.Core.NewSelect().Model(user).Where("user_id = ?", userID).Scan(ctx, user)
+	err := s.db.Core.NewSelect().Model(user).Where("user_uuid = ?", userID).Scan(ctx, user)
 	return user, err
 }

@@ -107,7 +107,7 @@ type DeployRepo struct {
 	Private          bool       `json:"private"`
 	Type             int        `json:"type,omitempty"`
 	ProxyEndpoint    string     `json:"proxy_endpoint,omitempty"`
-	CasdoorUID       string     `json:"casdoor_uid,omitempty"`
+	UserUUID         string     `json:"user_uuid,omitempty"`
 	SKU              string     `json:"sku,omitempty"`
 }
 

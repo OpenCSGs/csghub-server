@@ -114,7 +114,12 @@ func (c *UserComponent) Create(ctx context.Context, req *types.CreateUserRequest
 	namespace := &database.Namespace{
 		Path: user.Username,
 	}
-	user.CasdoorUUID = req.CasdoorUID
+	user.UUID = req.UUID
+	if req.RegProvider == "" {
+		user.RegProvider = "default"
+	} else {
+		user.RegProvider = req.RegProvider
+	}
 	err = c.us.Create(ctx, user, namespace)
 	if err != nil {
 		newError := fmt.Errorf("failed to create user,error:%w", err)
@@ -123,15 +128,16 @@ func (c *UserComponent) Create(ctx context.Context, req *types.CreateUserRequest
 	}
 
 	//skip casdoor update if it's not a casdoor user
-	if req.CasdoorUID == "" {
+	if req.UUID == "" || user.RegProvider != "casdoor" {
 		return user, nil
 	}
+
 	ureq := &types.UpdateUserRequest{
-		Name:       req.Name,
-		Username:   req.Username,
-		Email:      req.Email,
-		Phone:      req.Phone,
-		CasdoorUID: req.CasdoorUID,
+		Name:     req.Name,
+		Username: req.Username,
+		Email:    req.Email,
+		Phone:    req.Phone,
+		UUID:     req.UUID,
 	}
 	err = c.updateCasdoorUser(ureq)
 	if err != nil {
@@ -155,7 +161,7 @@ func (c *UserComponent) Update(ctx context.Context, req *types.UpdateUserRequest
 		return nil, newError
 	}
 
-	respUser.CasdoorUUID = req.CasdoorUID
+	respUser.UUID = req.UUID
 	err = c.us.Update(ctx, respUser)
 	if err != nil {
 		newError := fmt.Errorf("failed to update database user,error:%w", err)
@@ -163,7 +169,7 @@ func (c *UserComponent) Update(ctx context.Context, req *types.UpdateUserRequest
 	}
 
 	//skip casdoor update if it's not a casdoor user
-	if req.CasdoorUID == "" {
+	if req.UUID == "" || user.RegProvider != "casdoor" {
 		return respUser, nil
 	}
 	err = c.updateCasdoorUser(req)
@@ -178,7 +184,7 @@ func (c *UserComponent) Update(ctx context.Context, req *types.UpdateUserRequest
 func (c *UserComponent) updateCasdoorUser(req *types.UpdateUserRequest) error {
 	c.lazyInit()
 
-	casu, err := c.casc.GetUserByUserId(req.CasdoorUID)
+	casu, err := c.casc.GetUserByUserId(req.UUID)
 	if err != nil {
 		return fmt.Errorf("failed to get user from casdoor,error:%w", err)
 	}

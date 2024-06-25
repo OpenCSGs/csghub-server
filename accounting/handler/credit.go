@@ -93,7 +93,7 @@ func (ch *CreditHandler) QueryStatementByUserID(ctx *gin.Context) {
 	}
 
 	req := types.ACCT_STATEMENTS_REQ{
-		UserID:       userID,
+		UserUUID:     userID,
 		Scene:        scene,
 		InstanceName: instance_name,
 		StartTime:    startTime,
@@ -188,29 +188,29 @@ func (ch *CreditHandler) RechargeByUserID(ctx *gin.Context) {
 		httpbase.BadRequest(ctx, "Bad operate user id")
 		return
 	}
-	userID := ctx.Param("id")
-	if len(userID) < 1 {
+	userUUID := ctx.Param("id")
+	if len(userUUID) < 1 {
 		slog.Error("Bad recharge user id")
 		httpbase.BadRequest(ctx, "Bad recharge user id")
 		return
 	}
-	err = ch.auc.CheckAccountingUser(ctx, userID)
+	err = ch.auc.CheckAccountingUser(ctx, userUUID)
 	if err != nil {
-		slog.Error("fail to check user balance", slog.Any("userID", userID), slog.Any("error", err))
+		slog.Error("fail to check user balance", slog.Any("user_uuid", userUUID), slog.Any("error", err))
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
 
-	err = ch.asc.RechargeAccountingUser(ctx, userID, req)
+	err = ch.asc.RechargeAccountingUser(ctx, userUUID, req)
 	if err != nil {
-		slog.Error("fail to recharge account by user", slog.Any("userID", userID), slog.Any("req", req), slog.Any("error", err))
+		slog.Error("fail to recharge account by user", slog.Any("user_uuid", userUUID), slog.Any("req", req), slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
 		return
 	}
 
-	account, err := ch.auc.GetAccountingByUserID(ctx, userID)
+	account, err := ch.auc.GetAccountingByUserID(ctx, userUUID)
 	if err != nil || account == nil {
-		slog.Error("fail to get account by user id", slog.Any("userID", userID), slog.Any("error", err))
+		slog.Error("fail to get account by user id", slog.Any("user_uuid", userUUID), slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
 		return
 	}

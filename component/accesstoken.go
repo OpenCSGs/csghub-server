@@ -122,7 +122,7 @@ func (c *AccessTokenComponent) Check(ctx context.Context, req *types.CheckAccess
 	resp.Application = t.Application
 	resp.Permission = t.Permission
 	resp.Username = t.User.Username
-	resp.CasdoorUID = t.User.CasdoorUUID
+	resp.UserUUID = t.User.UUID
 	resp.ExpireAt = t.ExpiredAt
 	return resp, nil
 }
@@ -141,7 +141,7 @@ func (c *AccessTokenComponent) GetTokens(ctx context.Context, username, app stri
 		resp.Application = t.Application
 		resp.Permission = t.Permission
 		resp.Username = t.User.Username
-		resp.CasdoorUID = t.User.CasdoorUUID
+		resp.UserUUID = t.User.UUID
 		resp.ExpireAt = t.ExpiredAt
 
 		resps = append(resps, resp)
@@ -193,7 +193,7 @@ func (c *AccessTokenComponent) RefreshToken(ctx context.Context, userName, token
 	resp.Application = newToken.Application
 	resp.Permission = newToken.Permission
 	resp.Username = newToken.User.Username
-	resp.CasdoorUID = newToken.User.CasdoorUUID
+	resp.UserUUID = newToken.User.UUID
 	resp.ExpireAt = newToken.ExpiredAt
 
 	return resp, nil

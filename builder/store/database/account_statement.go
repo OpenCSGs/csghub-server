@@ -37,7 +37,7 @@ var (
 type AccountStatement struct {
 	ID          int64     `bun:",pk,autoincrement" json:"id"`
 	EventUUID   uuid.UUID `bun:"type:uuid,notnull" json:"event_uuid"`
-	UserID      string    `bun:",notnull" json:"user_id"`
+	UserUUID    string    `bun:",notnull" json:"user_uuid"`
 	Value       float64   `bun:",notnull" json:"value"`
 	Scene       SceneType `bun:",notnull" json:"scene"`
 	OpUID       int64     `bun:",nullzero" json:"op_uid"`
@@ -54,8 +54,8 @@ func (as *AccountStatementStore) Create(ctx context.Context, input AccountStatem
 		if err := assertAffectedOneRow(tx.NewInsert().Model(&input).Exec(ctx)); err != nil {
 			return err
 		}
-		runSql := "update account_users set balance=balance + ? where user_id=?"
-		if err := assertAffectedOneRow(tx.Exec(runSql, changeValue, input.UserID)); err != nil {
+		runSql := "update account_users set balance=balance + ? where user_uuid=?"
+		if err := assertAffectedOneRow(tx.Exec(runSql, changeValue, input.UserUUID)); err != nil {
 			return err
 		}
 
@@ -63,20 +63,20 @@ func (as *AccountStatementStore) Create(ctx context.Context, input AccountStatem
 			// calculate bill
 			bill := AccountBill{
 				BillDate:    input.EventDate,
-				UserID:      input.UserID,
+				UserUUID:    input.UserUUID,
 				Scene:       input.Scene,
 				CustomerID:  input.CustomerID,
 				Value:       changeValue,
 				Consumption: input.Consumption,
 			}
-			err := tx.NewSelect().Model(&bill).Where("bill_date = ? and user_id = ? and scene = ? and customer_id = ?", input.EventDate, input.UserID, input.Scene, input.CustomerID).Scan(ctx)
+			err := tx.NewSelect().Model(&bill).Where("bill_date = ? and user_uuid = ? and scene = ? and customer_id = ?", input.EventDate, input.UserUUID, input.Scene, input.CustomerID).Scan(ctx)
 			if err != nil && !errors.Is(err, sql.ErrNoRows) {
 				return err
 			}
 			if errors.Is(err, sql.ErrNoRows) {
 				_, err = tx.NewInsert().Model(&bill).Exec(ctx)
 			} else {
-				_, err = tx.NewUpdate().Model(&bill).Where("bill_date = ? and user_id = ? and scene = ? and customer_id = ?", input.EventDate, input.UserID, input.Scene, input.CustomerID).Set("value = value + ?, consumption = consumption + ?, updated_at=current_timestamp", input.Value, input.Consumption).Exec(ctx)
+				_, err = tx.NewUpdate().Model(&bill).Where("bill_date = ? and user_uuid = ? and scene = ? and customer_id = ?", input.EventDate, input.UserUUID, input.Scene, input.CustomerID).Set("value = value + ?, consumption = consumption + ?, updated_at=current_timestamp", input.Value, input.Consumption).Exec(ctx)
 			}
 			return err
 		}
@@ -89,7 +89,7 @@ func (as *AccountStatementStore) Create(ctx context.Context, input AccountStatem
 
 func (as *AccountStatementStore) ListByUserIDAndTime(ctx context.Context, req commonTypes.ACCT_STATEMENTS_REQ) ([]AccountStatement, int, error) {
 	var result []AccountStatement
-	q := as.db.Operator.Core.NewSelect().Model(&result).Where("user_id = ? and scene = ? and customer_id = ? and created_at >= ? and created_at <= ?", req.UserID, req.Scene, req.InstanceName, req.StartTime, req.EndTime)
+	q := as.db.Operator.Core.NewSelect().Model(&result).Where("user_uuid = ? and scene = ? and customer_id = ? and created_at >= ? and created_at <= ?", req.UserUUID, req.Scene, req.InstanceName, req.StartTime, req.EndTime)
 
 	count, err := q.Count(ctx)
 	if err != nil {

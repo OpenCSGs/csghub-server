@@ -69,12 +69,12 @@ func (ah *AccountingHandler) QueryAllUsersBalance(ctx *gin.Context) {
 
 // GetUserBalance   godoc
 // @Security     ApiKey
-// @Summary      Get user balance by casdoor user uuid
-// @Description  Get user balance by casdoor user uuid
+// @Summary      Get user balance by user uuid
+// @Description  Get user balance by user uuid
 // @Tags         Accounting
 // @Accept       json
 // @Produce      json
-// @Param        id path int true "casdoor user uuid"
+// @Param        id path int true "user uuid"
 // @Param        current_user query string true "current_user"
 // @Success      200  {object}  types.Response{} "OK"
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
@@ -104,12 +104,12 @@ func (ah *AccountingHandler) QueryBalanceByUserID(ctx *gin.Context) {
 
 // ListStatement godoc
 // @Security     ApiKey
-// @Summary      List statements by casdoor user uuid and start time and end time
-// @Description  List statements by casdoor user uuid and start time and end time
+// @Summary      List statements by user uuid and start time and end time
+// @Description  List statements by user uuid and start time and end time
 // @Tags         Accounting
 // @Accept       json
 // @Produce      json
-// @Param        id path int true "casdoor user uuid"
+// @Param        id path int true "user uuid"
 // @Param 		 scene query int false "scene" Enums(10, 11, 12, 20) default(10)
 // @Param        instance_name query string true "instance name"
 // @Param        start_time query string true "start_time, format: '2024-06-12 08:27:22'"
@@ -155,7 +155,7 @@ func (ah *AccountingHandler) QueryStatementByUserID(ctx *gin.Context) {
 	}
 	req := types.ACCT_STATEMENTS_REQ{
 		CurrentUser:  currentUser,
-		UserID:       userUUID,
+		UserUUID:     userUUID,
 		Scene:        scene,
 		InstanceName: instance_name,
 		StartTime:    startTime,
@@ -175,12 +175,12 @@ func (ah *AccountingHandler) QueryStatementByUserID(ctx *gin.Context) {
 
 // ListBills     godoc
 // @Security     ApiKey
-// @Summary      List user bills by casdoor user uuid and start date and end date
-// @Description  List user bills by casdoor user uuid and start date and end date
+// @Summary      List user bills by user uuid and start date and end date
+// @Description  List user bills by user uuid and start date and end date
 // @Tags         Accounting
 // @Accept       json
 // @Produce      json
-// @Param        id path int true "casdoor user uuid"
+// @Param        id path int true "user uuid"
 // @Param 		 scene query int false "scene" Enums(10, 11, 12, 20) default(10)
 // @Param        start_date query string true "start_date, format: '2024-06-12'"
 // @Param        end_date query string true "end_date, format: '2024-07-12'"
@@ -225,7 +225,7 @@ func (ah *AccountingHandler) QueryBillsByUserID(ctx *gin.Context) {
 	}
 	req := types.ACCT_STATEMENTS_REQ{
 		CurrentUser: currentUser,
-		UserID:      userUUID,
+		UserUUID:    userUUID,
 		Scene:       scene,
 		StartTime:   startDate,
 		EndTime:     endDate,
@@ -249,7 +249,7 @@ func (ah *AccountingHandler) QueryBillsByUserID(ctx *gin.Context) {
 // @Tags         Accounting
 // @Accept       json
 // @Produce      json
-// @Param        id path int true "casdoor user uuid"
+// @Param        id path int true "user uuid"
 // @Param        current_user query string true "current_user"
 // @Param        body body types.RECHARGE_REQ true "body"
 // @Success      200  {object}  types.Response{} "OK"

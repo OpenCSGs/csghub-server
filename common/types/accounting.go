@@ -17,7 +17,7 @@ var (
 // generate charge event from client
 type ACC_EVENT struct {
 	Uuid      uuid.UUID `json:"uuid"`
-	UserID    string    `json:"user_id"`
+	UserUUID  string    `json:"user_id"`
 	Value     float64   `json:"value"`
 	ValueType int       `json:"value_type"`
 	Scene     int       `json:"scene"`
@@ -36,7 +36,7 @@ type ACC_EVENT_EXTRA struct {
 // notify response to client
 type ACC_NOTIFY struct {
 	Uuid       uuid.UUID `json:"uuid"`
-	UserID     string    `json:"user_id"`
+	UserUUID   string    `json:"user_id"`
 	CreatedAt  time.Time `json:"created_at"`
 	ReasonCode int       `json:"reason_code"`
 	ReasonMsg  string    `json:"reason_msg"`
@@ -44,7 +44,7 @@ type ACC_NOTIFY struct {
 
 type ACCT_STATEMENTS_REQ struct {
 	CurrentUser  string `json:"current_user"`
-	UserID       string `json:"user_id"`
+	UserUUID     string `json:"user_id"`
 	Scene        int    `json:"scene"`
 	InstanceName string `json:"instance_name"`
 	StartTime    string `json:"start_time"`
@@ -56,7 +56,7 @@ type ACCT_STATEMENTS_REQ struct {
 type ACCT_STATEMENTS_RES struct {
 	ID          int64     `json:"id"`
 	EventUUID   uuid.UUID `json:"event_uuid"`
-	UserID      string    `json:"user_id"`
+	UserUUID    string    `json:"user_id"`
 	Value       float64   `json:"value"`
 	Scene       int       `json:"scene"`
 	OpUID       int64     `json:"op_uid"`
