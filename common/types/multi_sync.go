@@ -36,3 +36,8 @@ type DatasetResponse struct {
 	Message string  `json:"msg"`
 	Data    Dataset `json:"data"`
 }
+
+const (
+	SyncVersionSourceOpenCSG = iota
+	SyncVersionSourceHF
+)

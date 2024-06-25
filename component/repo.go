@@ -26,6 +26,7 @@ import (
 	"opencsg.com/csghub-server/builder/store/s3"
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/types"
+	"opencsg.com/csghub-server/common/utils/common"
 )
 
 const ErrNotFoundMessage = "The target couldn't be found."
@@ -1210,11 +1211,10 @@ func (c *RepoComponent) MirrorFromSaas(ctx context.Context, namespace, name, cur
 		return fmt.Errorf("failed to find sync version, error: %w", err)
 	}
 	mirrorSource := &database.MirrorSource{}
-	if syncVersion.SourceID == database.SyncVersionSourceOpenCSG {
+	if syncVersion.SourceID == types.SyncVersionSourceOpenCSG {
 		mirrorSource.SourceName = types.OpenCSGPrefix
-	} else if syncVersion.SourceID == database.SyncVersionSourceHF {
-		// mirrorSource.SourceName = types.
-		//TODO: HF prefix
+	} else if syncVersion.SourceID == types.SyncVersionSourceHF {
+		mirrorSource.SourceName = types.HuggingfacePrefix
 	}
 
 	mirrorSource.SourceName = types.OpenCSGPrefix
@@ -1223,7 +1223,7 @@ func (c *RepoComponent) MirrorFromSaas(ctx context.Context, namespace, name, cur
 		return fmt.Errorf("failed to find mirror token, error: %w", err)
 	}
 
-	sourceUrl := mirrorSource.BuildCloneURL(c.config.Mirror.URL, string(repoType), namespace, name)
+	sourceUrl := common.TrimPrefixCloneURLBySourceID(c.config.Mirror.URL, string(repoType), namespace, name, syncVersion.SourceID)
 	mirror.SourceUrl = sourceUrl
 	mirror.MirrorSourceID = mirrorSource.ID
 	mirror.RepositoryID = repo.ID
