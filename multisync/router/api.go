@@ -37,6 +37,7 @@ func NewRouter(config *config.Config) (*gin.Engine, error) {
 		rGroup.GET("/objects/info/:file", mpHandler.Serve)
 		rGroup.GET("/objects/:head/:hash", mpHandler.Serve)
 		rGroup.GET("/objects/pack/pack-:file", mpHandler.Serve)
+		rGroup.POST("/info/lfs/objects/batch", mpHandler.Serve)
 	}
 
 	// r.Any("/*api", handler.Serve)
