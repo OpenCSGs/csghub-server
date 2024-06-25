@@ -85,7 +85,7 @@ const docTemplate = `{
                         "ApiKey": []
                     }
                 ],
-                "description": "Get user balance by casdoor user uuid",
+                "description": "Get user balance by user uuid",
                 "consumes": [
                     "application/json"
                 ],
@@ -95,11 +95,11 @@ const docTemplate = `{
                 "tags": [
                     "Accounting"
                 ],
-                "summary": "Get user balance by casdoor user uuid",
+                "summary": "Get user balance by user uuid",
                 "parameters": [
                     {
                         "type": "integer",
-                        "description": "casdoor user uuid",
+                        "description": "user uuid",
                         "name": "id",
                         "in": "path",
                         "required": true
@@ -141,7 +141,7 @@ const docTemplate = `{
                         "ApiKey": []
                     }
                 ],
-                "description": "List user bills by casdoor user uuid and start date and end date",
+                "description": "List user bills by user uuid and start date and end date",
                 "consumes": [
                     "application/json"
                 ],
@@ -151,11 +151,11 @@ const docTemplate = `{
                 "tags": [
                     "Accounting"
                 ],
-                "summary": "List user bills by casdoor user uuid and start date and end date",
+                "summary": "List user bills by user uuid and start date and end date",
                 "parameters": [
                     {
                         "type": "integer",
-                        "description": "casdoor user uuid",
+                        "description": "user uuid",
                         "name": "id",
                         "in": "path",
                         "required": true
@@ -252,7 +252,7 @@ const docTemplate = `{
                 "parameters": [
                     {
                         "type": "integer",
-                        "description": "casdoor user uuid",
+                        "description": "user uuid",
                         "name": "id",
                         "in": "path",
                         "required": true
@@ -303,7 +303,7 @@ const docTemplate = `{
                         "ApiKey": []
                     }
                 ],
-                "description": "List statements by casdoor user uuid and start time and end time",
+                "description": "List statements by user uuid and start time and end time",
                 "consumes": [
                     "application/json"
                 ],
@@ -313,11 +313,11 @@ const docTemplate = `{
                 "tags": [
                     "Accounting"
                 ],
-                "summary": "List statements by casdoor user uuid and start time and end time",
+                "summary": "List statements by user uuid and start time and end time",
                 "parameters": [
                     {
                         "type": "integer",
-                        "description": "casdoor user uuid",
+                        "description": "user uuid",
                         "name": "id",
                         "in": "path",
                         "required": true
@@ -10812,10 +10812,6 @@ const docTemplate = `{
                         "$ref": "#/definitions/database.AccessToken"
                     }
                 },
-                "casdoor_uuid": {
-                    "description": "TODO:add unique index after migration",
-                    "type": "string"
-                },
                 "created_at": {
                     "type": "string"
                 },
@@ -10837,10 +10833,18 @@ const docTemplate = `{
                         "$ref": "#/definitions/database.Namespace"
                     }
                 },
+                "reg_provider": {
+                    "description": "user registered from default login page, from casdoor, etc. Possible values:\n\n- \"default\"\n- \"casdoor\"",
+                    "type": "string"
+                },
                 "updated_at": {
                     "type": "string"
                 },
                 "username": {
+                    "type": "string"
+                },
+                "uuid": {
+                    "description": "TODO:add unique index after migration",
                     "type": "string"
                 }
             }
@@ -11391,9 +11395,6 @@ const docTemplate = `{
         "types.CreateSpaceReq": {
             "type": "object",
             "properties": {
-                "casdoor_uid": {
-                    "type": "string"
-                },
                 "cover_image_url": {
                     "type": "string"
                 },
@@ -11437,7 +11438,6 @@ const docTemplate = `{
                     "type": "integer"
                 },
                 "sdk": {
-                    "description": "Creator   string ` + "`" + `json:\"username\" example:\"creator_user_name\"` + "`" + `\nNamespace string ` + "`" + `json:\"namespace\" example:\"user_or_org_name\"` + "`" + `\nName      string ` + "`" + `json:\"name\" example:\"space_name_1\"` + "`" + `\nLicense   string ` + "`" + `json:\"license\" example:\"MIT\"` + "`" + `",
                     "type": "string",
                     "example": "1"
                 },
@@ -11507,9 +11507,6 @@ const docTemplate = `{
         "types.CreateUserRequest": {
             "type": "object",
             "properties": {
-                "casdoor_uid": {
-                    "type": "string"
-                },
                 "email": {
                     "type": "string"
                 },
@@ -11520,8 +11517,15 @@ const docTemplate = `{
                 "phone": {
                     "type": "string"
                 },
+                "reg_provider": {
+                    "description": "user registered from default login page, from casdoor, etc. Possible values:\n\n- \"default\"\n- \"casdoor\"",
+                    "type": "string"
+                },
                 "username": {
                     "description": "the login name",
+                    "type": "string"
+                },
+                "uuid": {
                     "type": "string"
                 }
             }
@@ -12593,7 +12597,6 @@ const docTemplate = `{
                     "type": "integer"
                 },
                 "sdk": {
-                    "description": "Creator   string ` + "`" + `json:\"username\" example:\"creator_user_name\"` + "`" + `\nNamespace string ` + "`" + `json:\"namespace\" example:\"user_or_org_name\"` + "`" + `\nName      string ` + "`" + `json:\"name\" example:\"space_name_1\"` + "`" + `\nLicense   string ` + "`" + `json:\"license\" example:\"MIT\"` + "`" + `",
                     "type": "string",
                     "example": "1"
                 },
@@ -12640,9 +12643,6 @@ const docTemplate = `{
         "types.UpdateUserRequest": {
             "type": "object",
             "properties": {
-                "casdoor_uid": {
-                    "type": "string"
-                },
                 "email": {
                     "type": "string"
                 },
@@ -12655,6 +12655,9 @@ const docTemplate = `{
                 },
                 "username": {
                     "description": "the login name",
+                    "type": "string"
+                },
+                "uuid": {
                     "type": "string"
                 }
             }
