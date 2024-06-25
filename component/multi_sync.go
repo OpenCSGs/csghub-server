@@ -15,6 +15,7 @@ import (
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/types"
+	"opencsg.com/csghub-server/common/utils/common"
 )
 
 type MultiSyncComponent struct {
@@ -136,7 +137,7 @@ func (c *MultiSyncComponent) SyncAsClient(ctx context.Context, sc multisync.Clie
 func (c *MultiSyncComponent) createLocalDataset(ctx context.Context, m *types.Dataset, s types.SyncVersion) error {
 	namespace, name, _ := strings.Cut(m.Path, "/")
 	//add prefix to avoid namespace conflict
-	namespace = s.BuildLocalVaule(namespace)
+	namespace = common.AddPrefixBySourceID(s.SourceID, namespace)
 	exists, err := c.repo.Exists(ctx, types.DatasetRepo, namespace, name)
 	if err != nil {
 		return fmt.Errorf("fail to check if model exists, path:%s/%s, error: %w", namespace, name, err)
@@ -161,7 +162,7 @@ func (c *MultiSyncComponent) createLocalDataset(ctx context.Context, m *types.Da
 		user, err = c.createUser(ctx, types.CreateUserRequest{
 			Name:     m.User.Nickname,
 			Username: userName,
-			Email:    s.BuildLocalVaule(m.User.Email),
+			Email:    common.AddPrefixBySourceID(s.SourceID, m.User.Email),
 		})
 		if err != nil {
 			return fmt.Errorf("fail to create user for namespace, namespace:%s, error: %w", namespace, err)
@@ -205,7 +206,7 @@ func (c *MultiSyncComponent) createLocalDataset(ctx context.Context, m *types.Da
 func (c *MultiSyncComponent) createLocalModel(ctx context.Context, m *types.Model, s types.SyncVersion) error {
 	namespace, name, _ := strings.Cut(m.Path, "/")
 	//add prefix to avoid namespace conflict
-	namespace = s.BuildLocalVaule(namespace)
+	namespace = common.AddPrefixBySourceID(s.SourceID, namespace)
 	exists, err := c.repo.Exists(ctx, types.ModelRepo, namespace, name)
 	if err != nil {
 		return fmt.Errorf("fail to check if model exists, path:%s/%s, error: %w", namespace, name, err)
@@ -230,7 +231,7 @@ func (c *MultiSyncComponent) createLocalModel(ctx context.Context, m *types.Mode
 		user, err = c.createUser(ctx, types.CreateUserRequest{
 			Name:     m.User.Nickname,
 			Username: userName,
-			Email:    s.BuildLocalVaule(m.User.Email),
+			Email:    common.AddPrefixBySourceID(s.SourceID, m.User.Email),
 		})
 		if err != nil {
 			return fmt.Errorf("fail to create user for namespace, namespace:%s, error: %w", namespace, err)
