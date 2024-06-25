@@ -14,7 +14,7 @@ type GetSyncQuotaReq struct {
 type SyncQuota struct {
 	RepoCountLimit int64  `json:"repo_count_limit"`
 	TrafficLimit   int64  `json:"traffic_limit"`
-	AccessToken    string `json:"access_token"`
+	AccessToken    string `json:"-"`
 	RepoCountUsed  int64  `json:"repo_count_used"`
 	SpeedLimit     int64  `json:"speed_limit"`
 	TrafficUsed    int64  `json:"traffic_used"`
