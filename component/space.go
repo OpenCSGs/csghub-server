@@ -206,6 +206,7 @@ func (c *SpaceComponent) Show(ctx context.Context, namespace, name, currentUser 
 		CoverImageUrl: space.CoverImageUrl,
 		Source:        space.Repository.Source,
 		SyncStatus:    space.Repository.SyncStatus,
+		SKU:           space.SKU,
 	}
 
 	return resModel, nil
