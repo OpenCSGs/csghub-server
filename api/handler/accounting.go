@@ -51,12 +51,6 @@ func (ah *AccountingHandler) QueryAllUsersBalance(ctx *gin.Context) {
 		httpbase.UnauthorizedError(ctx, errors.New("user not found, please login first"))
 		return
 	}
-	access := verifyApiToken(ctx, ah.apiToken)
-	if !access {
-		slog.Error("Do not have permission to recharge")
-		httpbase.BadRequest(ctx, "Do not have permission")
-		return
-	}
 	per, page, err := common.GetPerAndPageFromContext(ctx)
 	if err != nil {
 		slog.Error("Bad request format", "error", err)
@@ -65,8 +59,9 @@ func (ah *AccountingHandler) QueryAllUsersBalance(ctx *gin.Context) {
 	}
 	data, err := ah.ac.QueryAllUsersBalance(ctx, currentUser, per, page)
 	if err != nil {
-		slog.Error("fail to get all accounts balance", slog.Any("error", err))
-		httpbase.ServerError(ctx, err)
+		errTip := "fail to get all accounts balance"
+		slog.Error(errTip, slog.Any("error", err))
+		httpbase.ServerError(ctx, errors.New(errTip))
 		return
 	}
 	httpbase.OK(ctx, data)
@@ -99,8 +94,9 @@ func (ah *AccountingHandler) QueryBalanceByUserID(ctx *gin.Context) {
 	}
 	data, err := ah.ac.QueryBalanceByUserID(ctx, currentUser, userUUID)
 	if err != nil {
-		slog.Error("fai to get account balance", slog.Any("currentUser", currentUser), slog.Any("userUUID", userUUID), slog.Any("error", err))
-		httpbase.ServerError(ctx, err)
+		errTip := "fail to get account balance"
+		slog.Error(errTip, slog.Any("currentUser", currentUser), slog.Any("userUUID", userUUID), slog.Any("error", err))
+		httpbase.ServerError(ctx, errors.New(errTip))
 		return
 	}
 	httpbase.OK(ctx, data)
@@ -169,8 +165,9 @@ func (ah *AccountingHandler) QueryStatementByUserID(ctx *gin.Context) {
 	}
 	data, err := ah.ac.ListStatementByUserIDAndTime(ctx, req)
 	if err != nil {
-		slog.Error("fail to query statement by user", slog.Any("req", req), slog.Any("error", err))
-		httpbase.ServerError(ctx, err)
+		errTip := "fail to query statement by user"
+		slog.Error(errTip, slog.Any("req", req), slog.Any("error", err))
+		httpbase.ServerError(ctx, errors.New(errTip))
 		return
 	}
 	httpbase.OK(ctx, data)
@@ -237,8 +234,9 @@ func (ah *AccountingHandler) QueryBillsByUserID(ctx *gin.Context) {
 	}
 	data, err := ah.ac.ListBillsByUserIDAndDate(ctx, req)
 	if err != nil {
-		slog.Error("fail to query bills by user", slog.Any("req", req), slog.Any("error", err))
-		httpbase.ServerError(ctx, err)
+		errTip := "fail to query bills by user"
+		slog.Error(errTip, slog.Any("req", req), slog.Any("error", err))
+		httpbase.ServerError(ctx, errors.New(errTip))
 		return
 	}
 	httpbase.OK(ctx, data)
@@ -262,12 +260,6 @@ func (ah *AccountingHandler) RechargeByUserID(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
 	if currentUser == "" {
 		httpbase.UnauthorizedError(ctx, errors.New("user not found, please login first"))
-		return
-	}
-	access := verifyApiToken(ctx, ah.apiToken)
-	if !access {
-		slog.Error("Do not have permission to recharge")
-		httpbase.BadRequest(ctx, "Do not have permission")
 		return
 	}
 	var req types.RECHARGE_REQ
@@ -296,8 +288,9 @@ func (ah *AccountingHandler) RechargeByUserID(ctx *gin.Context) {
 
 	data, err := ah.ac.RechargeAccountingUser(ctx, currentUser, userUUID, req)
 	if err != nil {
-		slog.Error("fail to recharge user", slog.Any("currentUser", currentUser), slog.Any("userUUID", userUUID), slog.Any("req", req), slog.Any("error", err))
-		httpbase.ServerError(ctx, err)
+		errTip := "fail to recharge user"
+		slog.Error(errTip, slog.Any("currentUser", currentUser), slog.Any("userUUID", userUUID), slog.Any("req", req), slog.Any("error", err))
+		httpbase.ServerError(ctx, errors.New(errTip))
 		return
 	}
 
@@ -333,8 +326,9 @@ func (ah *AccountingHandler) CreateOrUpdateQuota(ctx *gin.Context) {
 
 	data, err := ah.ac.CreateOrUpdateQuota(currentUser, req)
 	if err != nil {
-		slog.Error("fail to add or update account quota", slog.Any("currentUser", currentUser), slog.Any("req", req), slog.Any("error", err))
-		httpbase.ServerError(ctx, err)
+		errTip := "fail to add or update account quota"
+		slog.Error(errTip, slog.Any("currentUser", currentUser), slog.Any("req", req), slog.Any("error", err))
+		httpbase.ServerError(ctx, errors.New(errTip))
 		return
 	}
 	httpbase.OK(ctx, data)
@@ -361,8 +355,9 @@ func (ah *AccountingHandler) QueryQuota(ctx *gin.Context) {
 
 	data, err := ah.ac.GetQuotaByID(currentUser)
 	if err != nil {
-		slog.Error("fail to get quota by user", slog.Any("currentUser", currentUser), slog.Any("error", err))
-		httpbase.ServerError(ctx, err)
+		errTip := "fail to get quota by user"
+		slog.Error(errTip, slog.Any("currentUser", currentUser), slog.Any("error", err))
+		httpbase.ServerError(ctx, errors.New(errTip))
 		return
 	}
 	httpbase.OK(ctx, data)
@@ -397,8 +392,9 @@ func (ah *AccountingHandler) CreateQuotaStatement(ctx *gin.Context) {
 
 	data, err := ah.ac.CreateQuotaStatement(currentUser, req)
 	if err != nil {
-		slog.Error("fail to create quota statement by user", slog.Any("currentUser", currentUser), slog.Any("req", req), slog.Any("error", err))
-		httpbase.ServerError(ctx, err)
+		errTip := "fail to create quota statement by user"
+		slog.Error(errTip, slog.Any("currentUser", currentUser), slog.Any("req", req), slog.Any("error", err))
+		httpbase.ServerError(ctx, errors.New(errTip))
 		return
 	}
 	httpbase.OK(ctx, data)
@@ -433,8 +429,9 @@ func (ah *AccountingHandler) QueryQuotaStatement(ctx *gin.Context) {
 
 	data, err := ah.ac.GetQuotaStatement(currentUser, req)
 	if err != nil {
-		slog.Error("fail to get account quota statement", slog.Any("currentUser", currentUser), slog.Any("req", req), slog.Any("error", err))
-		httpbase.ServerError(ctx, err)
+		errTip := "fail to get account quota statement"
+		slog.Error(errTip, slog.Any("currentUser", currentUser), slog.Any("req", req), slog.Any("error", err))
+		httpbase.ServerError(ctx, errors.New(errTip))
 		return
 	}
 
@@ -453,9 +450,4 @@ func getSceneFromContext(ctx *gin.Context) (int, error) {
 	}
 	scene, err := strconv.Atoi(str)
 	return scene, err
-}
-
-func verifyApiToken(ctx *gin.Context, apiToken string) bool {
-	authHeader := ctx.GetHeader("Authorization")
-	return authHeader == ("Bearer " + apiToken)
 }
