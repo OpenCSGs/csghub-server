@@ -126,8 +126,8 @@ func (ac *AccountingComponent) ListBillsByUserIDAndDate(ctx context.Context, req
 			InstanceName: item.InstanceName,
 			Value:        item.Value,
 		}
-		d, err := ac.deploy.GetDeployBySvcName(ctx, item.InstanceName)
-		if err == nil || d != nil {
+		d, _ := ac.deploy.GetDeployBySvcName(ctx, item.InstanceName)
+		if d != nil {
 			newItem.Status = deployStatusCodeToString(d.Status)
 			newItem.CreatedAt = d.CreatedAt
 		}
