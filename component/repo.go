@@ -1633,6 +1633,7 @@ func (c *RepoComponent) DeployDetail(ctx context.Context, repoType types.Reposit
 		Private:          endpointPrivate,
 		Path:             repo.Path,
 		ProxyEndpoint:    proxyEndPoint,
+		SKU:              deploy.SKU,
 	}
 
 	return &resDeploy, nil
