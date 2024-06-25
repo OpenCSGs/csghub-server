@@ -2,6 +2,7 @@ package handler
 
 import (
 	"fmt"
+	"log/slog"
 	"strings"
 
 	"github.com/gin-gonic/gin"
@@ -45,6 +46,7 @@ func (r *MirrorProxyHandler) Serve(ctx *gin.Context) {
 	if strings.HasSuffix(ctx.Request.URL.Path, "git-upload-pack") {
 		err := r.mpComp.Serve(ctx, &req)
 		if err != nil {
+			slog.Error("failed to serve git upload pack request:", slog.Any("err", err))
 			httpbase.BadRequest(ctx, err.Error())
 			return
 		}
