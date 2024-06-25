@@ -2,6 +2,8 @@ package database
 
 import (
 	"context"
+	"database/sql"
+	"errors"
 
 	"github.com/google/uuid"
 	"github.com/uptrace/bun"
@@ -32,15 +34,14 @@ func (r *ClusterInfoStore) Add(ctx context.Context, clusterConfig string, region
 			ClusterID:     uuid.New().String(),
 			ClusterConfig: clusterConfig,
 			Region:        region,
+			Enable:        true,
 		}
 
 		_, err := r.ByClusterConfig(ctx, clusterConfig)
-		if err != nil {
-			if err := assertAffectedOneRow(r.db.Operator.Core.NewInsert().Model(cluster).Exec(ctx)); err != nil {
-				return err
-			}
+		if errors.Is(err, sql.ErrNoRows) {
+			return assertAffectedOneRow(r.db.Operator.Core.NewInsert().Model(cluster).Exec(ctx))
 		}
-		return nil
+		return err
 	})
 	return err
 }
@@ -49,8 +50,7 @@ func (r *ClusterInfoStore) Update(ctx context.Context, clusterInfo ClusterInfo) 
 	err := r.db.Operator.Core.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
 		_, err := r.ByClusterConfig(ctx, clusterInfo.ClusterConfig)
 		if err == nil {
-			err = assertAffectedOneRow(r.db.Operator.Core.NewUpdate().Model(&clusterInfo).WherePK().Exec(ctx))
-			return err
+			return assertAffectedOneRow(r.db.Operator.Core.NewUpdate().Model(&clusterInfo).WherePK().Exec(ctx))
 		}
 		return nil
 	})

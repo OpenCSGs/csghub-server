@@ -61,7 +61,7 @@ func NewClusterPool() (*ClusterPool, error) {
 		slog.Error("No kubeconfig files", slog.Any("path", kubeconfigFolderPath))
 	}
 
-	for _, kubeconfig := range kubeconfigFiles {
+	for i, kubeconfig := range kubeconfigFiles {
 		config, err := clientcmd.BuildConfigFromFlags("", kubeconfig)
 		if err != nil {
 			return nil, err
@@ -82,7 +82,7 @@ func NewClusterPool() (*ClusterPool, error) {
 			Client:        client,
 			KnativeClient: knativeClient,
 		})
-		err = pool.ClusterStore.Add(context.TODO(), id, "华中区")
+		err = pool.ClusterStore.Add(context.TODO(), id, fmt.Sprintf("region-%d", i))
 		if err != nil {
 			slog.Error("falied to add cluster info to db", "error", err)
 			return nil, fmt.Errorf("falied to add cluster info to db,%w", err)
