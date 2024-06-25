@@ -48,6 +48,7 @@ type Space struct {
 	UserLikes    bool                 `json:"user_likes"`
 	Source       RepositorySource     `json:"source"`
 	SyncStatus   RepositorySyncStatus `json:"sync_status"`
+	SKU          string               `json:"sku,omitempty"`
 }
 
 type UpdateSpaceReq struct {

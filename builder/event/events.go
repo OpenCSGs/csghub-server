@@ -23,7 +23,7 @@ func (ec *EventPublisher) Publish(subject string, message []byte) error {
 	}
 	err = ec.Connector.Conn.Publish(subject, message)
 	if err == nil {
-		slog.Info("Published event", slog.Any("event", message))
+		slog.Debug("Published event", slog.Any("event", message))
 		return nil
 	}
 	slog.Error("Failed to publish event, send to retry channel", slog.Any("error", err))
