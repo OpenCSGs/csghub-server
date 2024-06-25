@@ -44,8 +44,9 @@ func NewAccountingClient(config *config.Config) (*AccountingClient, error) {
 	}, nil
 }
 
-func (ac *AccountingClient) QueryAllUsersBalance() (interface{}, error) {
-	return ac.handleResponse(ac.doRequest(http.MethodGet, "/credit/balance", nil))
+func (ac *AccountingClient) QueryAllUsersBalance(per, page int) (interface{}, error) {
+	subUrlPath := fmt.Sprintf("/credit/balance?per=%d&page=%d", per, page)
+	return ac.handleResponse(ac.doRequest(http.MethodGet, subUrlPath, nil))
 }
 
 func (ac *AccountingClient) QueryBalanceByUserID(userUUID string) (interface{}, error) {

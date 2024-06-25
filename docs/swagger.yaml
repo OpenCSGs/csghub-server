@@ -3534,6 +3534,22 @@ paths:
       consumes:
       - application/json
       description: Get all users balance
+      parameters:
+      - description: current_user
+        in: query
+        name: current_user
+        required: true
+        type: string
+      - default: 20
+        description: per
+        in: query
+        name: per
+        type: integer
+      - default: 1
+        description: per page
+        in: query
+        name: page
+        type: integer
       produces:
       - application/json
       responses:

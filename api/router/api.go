@@ -535,7 +535,7 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 	{
 		creditGroup := accountingGroup.Group("/credit")
 		{
-			// creditGroup.GET("/balance", accountingHandler.QueryAllUsersBalance)
+			creditGroup.GET("/balance", accountingHandler.QueryAllUsersBalance)
 			creditGroup.GET("/:id/balance", accountingHandler.QueryBalanceByUserID)
 			creditGroup.GET("/:id/statements", accountingHandler.QueryStatementByUserID)
 			creditGroup.GET("/:id/bills", accountingHandler.QueryBillsByUserID)
