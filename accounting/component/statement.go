@@ -25,7 +25,7 @@ func NewAccountingStatement() *AccountingStatementComponent {
 func (a *AccountingStatementComponent) AddNewStatement(ctx context.Context, event *types.ACC_EVENT, eventExtra *types.ACC_EVENT_EXTRA, changeValue float64) error {
 	statement := database.AccountStatement{
 		EventUUID:  event.Uuid,
-		UserID:     event.UserID,
+		UserUUID:   event.UserUUID,
 		Value:      event.Value,
 		Scene:      a.getValidSceneType(event.Scene),
 		OpUID:      event.OpUID,
@@ -57,7 +57,7 @@ func (a *AccountingStatementComponent) ListStatementByUserIDAndTime(ctx context.
 		resStatements = append(resStatements, types.ACCT_STATEMENTS_RES{
 			ID:          st.ID,
 			EventUUID:   st.EventUUID,
-			UserID:      st.UserID,
+			UserUUID:    st.UserUUID,
 			Value:       st.Value,
 			Scene:       int(st.Scene),
 			OpUID:       st.OpUID,
@@ -100,10 +100,10 @@ func (a *AccountingStatementComponent) getValidSceneType(scene int) database.Sce
 	}
 }
 
-func (a *AccountingStatementComponent) RechargeAccountingUser(ctx context.Context, userID string, req types.RECHARGE_REQ) error {
+func (a *AccountingStatementComponent) RechargeAccountingUser(ctx context.Context, userUUID string, req types.RECHARGE_REQ) error {
 	event := types.ACC_EVENT{
 		Uuid:      uuid.New(),
-		UserID:    userID,
+		UserUUID:  userUUID,
 		Value:     req.Value,
 		ValueType: 0,
 		Scene:     int(database.ScenePortalCharge),

@@ -4,10 +4,6 @@ import "time"
 
 type CreateSpaceReq struct {
 	CreateRepoReq
-	// Creator   string `json:"username" example:"creator_user_name"`
-	// Namespace string `json:"namespace" example:"user_or_org_name"`
-	// Name      string `json:"name" example:"space_name_1"`
-	// License   string `json:"license" example:"MIT"`
 	Sdk           string `json:"sdk" example:"1"`
 	SdkVersion    string `json:"sdk_version" example:"v0.1"`
 	CoverImageUrl string `json:"cover_image_url"`
@@ -15,8 +11,6 @@ type CreateSpaceReq struct {
 	Env           string `json:"env"`
 	Secrets       string `json:"secrets"`
 	ResourceID    int64  `json:"resource_id"`
-	CasdoorUID    string `json:"casdoor_uid"`
-	// Private   bool   `json:"private"`
 }
 
 // Space is the domain object for spaces
@@ -58,10 +52,6 @@ type Space struct {
 
 type UpdateSpaceReq struct {
 	CreateRepoReq
-	// Creator   string `json:"username" example:"creator_user_name"`
-	// Namespace string `json:"namespace" example:"user_or_org_name"`
-	// Name      string `json:"name" example:"space_name_1"`
-	// License   string `json:"license" example:"MIT"`
 	Sdk           string `json:"sdk" example:"1"`
 	SdkVersion    string `json:"sdk_version" example:"v0.1"`
 	CoverImageUrl string `json:"cover_image_url"`
@@ -69,5 +59,4 @@ type UpdateSpaceReq struct {
 	Env           string `json:"env"`
 	ResourceID    int64  `json:"resource_id"`
 	Secrets       string `json:"secrets"`
-	// Private   bool   `json:"private"`
 }

@@ -271,9 +271,9 @@ func (c *Charging) handleMsgData(msg *nats.Msg) error {
 		slog.Warn("duplicated event id", slog.Any("event", event))
 		return nil
 	}
-	err = c.acctUserComp.CheckAccountingUser(ctx, event.UserID)
+	err = c.acctUserComp.CheckAccountingUser(ctx, event.UserUUID)
 	if err != nil {
-		return fmt.Errorf("fail to check user balance, %v, %w", event.UserID, err)
+		return fmt.Errorf("fail to check user balance, %v, %w", event.UserUUID, err)
 	}
 	err = c.acctSMComp.AddNewStatement(ctx, event, eventExtra, c.getCredit(event))
 	if err != nil {
@@ -328,9 +328,9 @@ func (c *Charging) parseMessageData(msg *nats.Msg) (*types.ACC_EVENT, *types.ACC
 }
 
 func (c *Charging) checkBalanceAndSendNotification(ctx context.Context, event *types.ACC_EVENT) {
-	account, err := c.acctUserComp.GetAccountingByUserID(ctx, event.UserID)
+	account, err := c.acctUserComp.GetAccountingByUserID(ctx, event.UserUUID)
 	if err != nil {
-		slog.Warn("fail to query account", slog.Any("userid", event.UserID), slog.Any("error", err))
+		slog.Warn("fail to query account", slog.Any("user_uuid", event.UserUUID), slog.Any("error", err))
 		return
 	}
 	if account == nil {
@@ -358,7 +358,7 @@ func (c *Charging) sendNotification(reasonCode int, reasonMsg string, event *typ
 	}
 	if event != nil {
 		notify.Uuid = event.Uuid
-		notify.UserID = event.UserID
+		notify.UserUUID = event.UserUUID
 	}
 	c.notifyTimeOut.Reset(idleDuration)
 	select {

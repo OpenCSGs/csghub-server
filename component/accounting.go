@@ -57,7 +57,7 @@ func (ac *AccountingComponent) QueryBalanceByUserID(ctx context.Context, current
 	if err != nil {
 		return nil, fmt.Errorf("user does not exist, %w", err)
 	}
-	if user.CasdoorUUID != userUUID {
+	if user.UUID != userUUID {
 		return nil, errors.New("invalid user")
 	}
 	return ac.acctClient.QueryBalanceByUserID(userUUID)
@@ -68,7 +68,7 @@ func (ac *AccountingComponent) QueryBalanceByUserIDInternal(ctx context.Context,
 	if err != nil {
 		return nil, fmt.Errorf("user does not exist, %w", err)
 	}
-	resp, err := ac.acctClient.QueryBalanceByUserID(user.CasdoorUUID)
+	resp, err := ac.acctClient.QueryBalanceByUserID(user.UUID)
 	if err != nil {
 		slog.Error("error to get user balance data", slog.Any("error", err))
 		return nil, err
@@ -92,7 +92,7 @@ func (ac *AccountingComponent) ListStatementByUserIDAndTime(ctx context.Context,
 	if err != nil {
 		return nil, fmt.Errorf("user does not exist, %w", err)
 	}
-	if user.CasdoorUUID != req.UserID {
+	if user.UUID != req.UserUUID {
 		return nil, errors.New("invalid user")
 	}
 	return ac.acctClient.ListStatementByUserIDAndTime(req)
@@ -103,7 +103,7 @@ func (ac *AccountingComponent) ListBillsByUserIDAndDate(ctx context.Context, req
 	if err != nil {
 		return nil, fmt.Errorf("user does not exist, %w", err)
 	}
-	if user.CasdoorUUID != req.UserID {
+	if user.UUID != req.UserUUID {
 		return nil, errors.New("invalid user")
 	}
 
@@ -136,17 +136,17 @@ func (ac *AccountingComponent) ListBillsByUserIDAndDate(ctx context.Context, req
 	return Bills{Data: mergedItems, Total: bills.Total}, err
 }
 
-func (ac *AccountingComponent) RechargeAccountingUser(ctx context.Context, currentUser, userID string, req types.RECHARGE_REQ) (interface{}, error) {
+func (ac *AccountingComponent) RechargeAccountingUser(ctx context.Context, currentUser, userUUID string, req types.RECHARGE_REQ) (interface{}, error) {
 	_, err := ac.user.FindByUsername(ctx, currentUser)
 	if err != nil {
 		return nil, fmt.Errorf("user does not exist, %w", err)
 	}
-	_, err = ac.user.FindByCasdoorUUID(ctx, userID)
+	_, err = ac.user.FindByUUID(ctx, userUUID)
 	if err != nil {
-		return nil, fmt.Errorf("invalid user casdoor uuid, %w", err)
+		return nil, fmt.Errorf("invalid user uuid, %w", err)
 	}
 	// Todo: check super admin to do this action
-	return ac.acctClient.RechargeAccountingUser(userID, req)
+	return ac.acctClient.RechargeAccountingUser(userUUID, req)
 }
 
 func (ac *AccountingComponent) CreateOrUpdateQuota(currentUser string, req types.ACCT_QUOTA_REQ) (interface{}, error) {

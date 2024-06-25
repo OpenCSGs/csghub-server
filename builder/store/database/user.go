@@ -26,7 +26,12 @@ type User struct {
 	AccessTokens []AccessToken `bun:"rel:has-many,join:id=user_id"`
 	Namespaces   []Namespace   `bun:"rel:has-many,join:id=user_id" json:"namespace"`
 	//TODO:add unique index after migration
-	CasdoorUUID string `bun:"," json:"casdoor_uuid"`
+	UUID string `bun:"," json:"uuid"`
+	// user registered from default login page, from casdoor, etc. Possible values:
+	//
+	// - "default"
+	// - "casdoor"
+	RegProvider string `bun:"," json:"reg_provider"`
 	times
 }
 
@@ -113,8 +118,8 @@ func (s *UserStore) FindByAccessToken(ctx context.Context, token string) (*User,
 	return &user, nil
 }
 
-func (s *UserStore) FindByCasdoorUUID(ctx context.Context, uuid string) (user User, err error) {
-	user.CasdoorUUID = uuid
-	err = s.db.Operator.Core.NewSelect().Model(&user).Where("casdoor_uuid = ?", uuid).Scan(ctx)
+func (s *UserStore) FindByUUID(ctx context.Context, uuid string) (user User, err error) {
+	user.UUID = uuid
+	err = s.db.Operator.Core.NewSelect().Model(&user).Where("uuid = ?", uuid).Scan(ctx)
 	return
 }

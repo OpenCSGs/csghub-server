@@ -109,7 +109,7 @@ func (d *deployer) serverlessDeploy(ctx context.Context, dr types.DeployRepo) (*
 	if err != nil {
 		return nil, fmt.Errorf("fail to found the latest deploy for spaceID %v, %w", dr.SpaceID, err)
 	}
-	deploy.CasdoorUUID = dr.CasdoorUID
+	deploy.UserUUID = dr.UserUUID
 	deploy.SKU = dr.SKU
 	deploy.ImageID = ""
 	err = d.store.UpdateDeploy(ctx, deploy)
@@ -148,7 +148,7 @@ func (d *deployer) dedicatedDeploy(ctx context.Context, dr types.DeployRepo) (*d
 		SecureLevel:      dr.SecureLevel,
 		SvcName:          uniqueSvcName,
 		Type:             dr.Type,
-		CasdoorUUID:      dr.CasdoorUID,
+		UserUUID:         dr.UserUUID,
 		SKU:              dr.SKU,
 	}
 	err := d.store.CreateDeploy(ctx, deploy)
@@ -576,7 +576,7 @@ func (d *deployer) startAccounting() {
 			}
 			event := types.ACC_EVENT{
 				Uuid:      uuid.New(),
-				UserID:    svc.UserID,
+				UserUUID:  svc.UserID,
 				Value:     -(svc.CostPerHour * float64(svc.Replica) * duration),
 				ValueType: 0, // for credit
 				Scene:     int(getValidSceneType(svc.DeployType)),

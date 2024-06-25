@@ -688,7 +688,7 @@ func (c *ModelComponent) Deploy(ctx context.Context, namespace, name, currentUse
 		ClusterID:        req.ClusterID,
 		SecureLevel:      req.SecureLevel,
 		Type:             deployType,
-		CasdoorUID:       user.CasdoorUUID,
+		UserUUID:         user.UUID,
 		SKU:              strconv.FormatInt(resource.ID, 10),
 	})
 }

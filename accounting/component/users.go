@@ -24,12 +24,12 @@ func (a *AccountingUserComponent) ListAccountingUser(ctx context.Context, per, p
 	return a.au.List(ctx, per, page)
 }
 
-func (a *AccountingUserComponent) GetAccountingByUserID(ctx context.Context, userID string) (*database.AccountUser, error) {
-	account, err := a.au.FindUserByID(ctx, userID)
+func (a *AccountingUserComponent) GetAccountingByUserID(ctx context.Context, userUUID string) (*database.AccountUser, error) {
+	account, err := a.au.FindUserByID(ctx, userUUID)
 	if errors.Is(err, sql.ErrNoRows) {
 		return &database.AccountUser{
-			UserID:  userID,
-			Balance: 0,
+			UserUUID: userUUID,
+			Balance:  0,
 		}, nil
 	}
 	return account, err
@@ -37,18 +37,18 @@ func (a *AccountingUserComponent) GetAccountingByUserID(ctx context.Context, use
 
 func (a *AccountingUserComponent) AddNewAccountingUser(ctx context.Context, event *types.ACC_EVENT) error {
 	statement := database.AccountUser{
-		UserID:  event.UserID,
-		Balance: 0,
+		UserUUID: event.UserUUID,
+		Balance:  0,
 	}
 	return a.au.Create(ctx, statement)
 }
 
-func (a *AccountingUserComponent) CheckAccountingUser(ctx context.Context, userID string) error {
-	_, err := a.au.FindUserByID(ctx, userID)
+func (a *AccountingUserComponent) CheckAccountingUser(ctx context.Context, userUUID string) error {
+	_, err := a.au.FindUserByID(ctx, userUUID)
 	if errors.Is(err, sql.ErrNoRows) {
 		statement := database.AccountUser{
-			UserID:  userID,
-			Balance: 0,
+			UserUUID: userUUID,
+			Balance:  0,
 		}
 		return a.au.Create(ctx, statement)
 	}
