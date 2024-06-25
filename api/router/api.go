@@ -524,6 +524,7 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 	{
 		syncGroup.GET("/version/latest", syncHandler.Latest)
 		// syncGroup.GET("/version/oldest", syncHandler.Oldest)
+		syncGroup.GET("/client_setting", syncClientSettingHandler.Show)
 		syncGroup.POST("/client_setting", syncClientSettingHandler.Create)
 	}
 

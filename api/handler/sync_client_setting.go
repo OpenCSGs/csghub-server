@@ -45,7 +45,28 @@ func (h *SyncClientSettingHandler) Create(ctx *gin.Context) {
 	}
 	ms, err := h.c.Create(ctx, req)
 	if err != nil {
-		slog.Error("Failed to create mirror source", "error", err)
+		slog.Error("Failed to create sync client setting", "error", err)
+		httpbase.ServerError(ctx, err)
+		return
+	}
+	httpbase.OK(ctx, ms)
+}
+
+// GetSyncClientSetting  godoc
+// @Security     ApiKey
+// @Summary      Get sync client setting
+// @Description  Get sync client setting
+// @Tags         Sync
+// @Accept       json
+// @Produce      json
+// @Success      200  {object}  types.Response{data=database.SyncClientSetting} "OK"
+// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
+// @Router       /sync/client_setting [get]
+func (h *SyncClientSettingHandler) Show(ctx *gin.Context) {
+	ms, err := h.c.Show(ctx)
+	if err != nil {
+		slog.Error("Failed to find sync client setting", "error", err)
 		httpbase.ServerError(ctx, err)
 		return
 	}
