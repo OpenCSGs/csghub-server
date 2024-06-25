@@ -6962,6 +6962,35 @@ paths:
       tags:
       - Space
   /sync/client_setting:
+    get:
+      consumes:
+      - application/json
+      description: Get sync client setting
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/types.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/database.SyncClientSetting'
+              type: object
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Get sync client setting
+      tags:
+      - Sync
     post:
       consumes:
       - application/json

@@ -101,12 +101,14 @@ func (c *GitCallbackComponent) HandlePush(ctx context.Context, req *types.GiteaC
 		}
 	}()
 
-	go func() {
-		err := c.svGen.GenSyncVersion(req)
-		if err != nil {
-			slog.Error("generate sync version failed", slog.Any("error", err))
-		}
-	}()
+	if !req.Repository.Private {
+		go func() {
+			err := c.svGen.GenSyncVersion(req)
+			if err != nil {
+				slog.Error("generate sync version failed", slog.Any("error", err))
+			}
+		}()
+	}
 
 	commits := req.Commits
 	ref := req.Ref

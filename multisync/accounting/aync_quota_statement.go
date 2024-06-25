@@ -3,6 +3,7 @@ package accounting
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"time"
 )
@@ -21,10 +22,9 @@ type SyncQuotaStatementRes struct {
 }
 
 type GetSyncQuotaStatementsReq struct {
-	UserID      int64  `json:"user_id"`
 	RepoPath    string `json:"repo_path"`
 	RepoType    string `json:"repo_type"`
-	AccessToken string `json:"access_token"`
+	AccessToken string `json:"-"`
 }
 
 type CreateSyncQuotaStatementReq = GetSyncQuotaStatementsReq
@@ -47,6 +47,6 @@ func (c *AccountingClient) GetSyncQuotaStatement(opt *GetSyncQuotaStatementsReq)
 	if opt.AccessToken != "" {
 		header.Add("Authorization", "Bearer "+opt.AccessToken)
 	}
-	resp, err := c.getParsedResponse("GET", "/accounting/multisync/download", header, nil, s)
+	resp, err := c.getParsedResponse("GET", fmt.Sprintf("/accounting/multisync/download?repo_path=%s&repo_type=%s", opt.RepoPath, opt.RepoType), header, nil, s)
 	return &s.Data, resp, err
 }

@@ -2,6 +2,8 @@ package component
 
 import (
 	"context"
+	"database/sql"
+	"errors"
 	"fmt"
 
 	"opencsg.com/csghub-server/builder/store/database"
@@ -36,6 +38,17 @@ func (c *SyncClientSettingComponent) Create(ctx context.Context, req types.Creat
 	mt.MaxBandwidth = req.MaxBandwidth
 	res, err := c.settingStore.Create(ctx, &mt)
 	if err != nil {
+		return nil, fmt.Errorf("failed to create mirror token, error: %w", err)
+	}
+	return res, nil
+}
+
+func (c *SyncClientSettingComponent) Show(ctx context.Context) (*database.SyncClientSetting, error) {
+	res, err := c.settingStore.First(ctx)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, nil
+		}
 		return nil, fmt.Errorf("failed to create mirror token, error: %w", err)
 	}
 	return res, nil
