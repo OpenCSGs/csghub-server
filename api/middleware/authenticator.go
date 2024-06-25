@@ -139,10 +139,10 @@ func OnlyAPIKeyAuthenticator(config *config.Config) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		apiToken := config.APIToken
 
-		// Get Auzhorization token
+		// Get Authorization token
 		authHeader := c.Request.Header.Get("Authorization")
 
-		// Check Authorization Header formt
+		// Check Authorization Header format
 		if authHeader == "" {
 			slog.Info("missing authorization header", slog.Any("url", c.Request.URL))
 			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "missing Authorization header"})
