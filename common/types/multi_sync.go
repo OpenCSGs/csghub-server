@@ -1,6 +1,8 @@
 package types
 
 import (
+	"fmt"
+	"strings"
 	"time"
 )
 
@@ -35,4 +37,28 @@ type ModelResponse struct {
 type DatasetResponse struct {
 	Message string  `json:"msg"`
 	Data    Dataset `json:"data"`
+}
+
+const (
+	SyncVersionSourceOpenCSG = iota
+	SyncVersionSourceHF
+)
+
+func (s *SyncVersion) Prefix() string {
+	var prefix string
+	if s.SourceID == SyncVersionSourceOpenCSG {
+		prefix = OpenCSGPrefix
+	} else if s.SourceID == SyncVersionSourceHF {
+		prefix = HuggingfacePrefix
+	}
+	return prefix
+}
+
+func (s *SyncVersion) BuildCloneURL(url, repoType, namespace, name string) string {
+	namespace, _ = strings.CutPrefix(namespace, s.Prefix())
+	return fmt.Sprintf("%s/%ss/%s/%s.git", url, repoType, namespace, name)
+}
+
+func (s *SyncVersion) BuildLocalVaule(originVaule string) string {
+	return fmt.Sprintf("%s_%s", s.Prefix(), originVaule)
 }

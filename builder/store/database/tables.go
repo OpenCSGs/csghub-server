@@ -71,8 +71,3 @@ type SyncVersion struct {
 	LastModifiedAt time.Time            `bun:",notnull" json:"last_modified_at"`
 	ChangeLog      string               `bun:"," json:"change_log"`
 }
-
-const (
-	SyncVersionSourceOpenCSG = iota
-	SyncVersionSourceHF
-)

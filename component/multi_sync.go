@@ -96,7 +96,7 @@ func (c *MultiSyncComponent) SyncAsClient(ctx context.Context, sc multisync.Clie
 					continue
 				}
 				ctxCreateModel, cancel := context.WithTimeout(ctx, 5*time.Second)
-				err = c.createLocalModel(ctxCreateModel, modelInfo)
+				err = c.createLocalModel(ctxCreateModel, modelInfo, v)
 				cancel()
 				if err != nil {
 					slog.Error("failed to create local synced repo", slog.Any("sync_version", v))
@@ -110,7 +110,7 @@ func (c *MultiSyncComponent) SyncAsClient(ctx context.Context, sc multisync.Clie
 					continue
 				}
 				ctxCreateDataset, cancel := context.WithTimeout(ctx, 5*time.Second)
-				err = c.createLocalDataset(ctxCreateDataset, datasetInfo)
+				err = c.createLocalDataset(ctxCreateDataset, datasetInfo, v)
 				cancel()
 				if err != nil {
 					slog.Error("failed to create local synced repo", slog.Any("sync_version", v))
@@ -133,10 +133,10 @@ func (c *MultiSyncComponent) SyncAsClient(ctx context.Context, sc multisync.Clie
 	return nil
 }
 
-func (c *MultiSyncComponent) createLocalDataset(ctx context.Context, m *types.Dataset) error {
+func (c *MultiSyncComponent) createLocalDataset(ctx context.Context, m *types.Dataset, s types.SyncVersion) error {
 	namespace, name, _ := strings.Cut(m.Path, "/")
 	//add prefix to avoid namespace conflict
-	namespace = fmt.Sprintf("%s%s", types.OpenCSGPrefix, namespace)
+	namespace = s.BuildLocalVaule(namespace)
 	exists, err := c.repo.Exists(ctx, types.DatasetRepo, namespace, name)
 	if err != nil {
 		return fmt.Errorf("fail to check if model exists, path:%s/%s, error: %w", namespace, name, err)
@@ -161,7 +161,7 @@ func (c *MultiSyncComponent) createLocalDataset(ctx context.Context, m *types.Da
 		user, err = c.createUser(ctx, types.CreateUserRequest{
 			Name:     m.User.Nickname,
 			Username: userName,
-			Email:    fmt.Sprintf("%s%s", types.OpenCSGPrefix, m.User.Email),
+			Email:    s.BuildLocalVaule(m.User.Email),
 		})
 		if err != nil {
 			return fmt.Errorf("fail to create user for namespace, namespace:%s, error: %w", namespace, err)
@@ -202,10 +202,10 @@ func (c *MultiSyncComponent) createLocalDataset(ctx context.Context, m *types.Da
 	return nil
 
 }
-func (c *MultiSyncComponent) createLocalModel(ctx context.Context, m *types.Model) error {
+func (c *MultiSyncComponent) createLocalModel(ctx context.Context, m *types.Model, s types.SyncVersion) error {
 	namespace, name, _ := strings.Cut(m.Path, "/")
 	//add prefix to avoid namespace conflict
-	namespace = fmt.Sprintf("%s%s", types.OpenCSGPrefix, namespace)
+	namespace = s.BuildLocalVaule(namespace)
 	exists, err := c.repo.Exists(ctx, types.ModelRepo, namespace, name)
 	if err != nil {
 		return fmt.Errorf("fail to check if model exists, path:%s/%s, error: %w", namespace, name, err)
@@ -230,7 +230,7 @@ func (c *MultiSyncComponent) createLocalModel(ctx context.Context, m *types.Mode
 		user, err = c.createUser(ctx, types.CreateUserRequest{
 			Name:     m.User.Nickname,
 			Username: userName,
-			Email:    fmt.Sprintf("%s%s", types.OpenCSGPrefix, m.User.Email),
+			Email:    s.BuildLocalVaule(m.User.Email),
 		})
 		if err != nil {
 			return fmt.Errorf("fail to create user for namespace, namespace:%s, error: %w", namespace, err)

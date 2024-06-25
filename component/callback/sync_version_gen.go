@@ -27,7 +27,7 @@ func (g *SyncVersionGenerator) GenSyncVersion(req *types.GiteaCallbackPushReq) e
 	fullNamespace, repoName := splits[0], splits[1]
 	repoType, namespace, _ := strings.Cut(fullNamespace, "_")
 	_, err := g.s.Create(ctx, database.SyncVersion{
-		SourceID:       database.SyncVersionSourceOpenCSG,
+		SourceID:       types.SyncVersionSourceOpenCSG,
 		RepoPath:       fmt.Sprintf("%s/%s", namespace, repoName),
 		RepoType:       types.RepositoryType(strings.TrimRight(repoType, "s")),
 		LastModifiedAt: req.HeadCommit.LastModifyTime,

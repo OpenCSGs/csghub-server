@@ -77,7 +77,7 @@ var InitCmd = &cobra.Command{
 			}
 
 			versions = append(versions, database.SyncVersion{
-				SourceID:       database.SyncVersionSourceOpenCSG,
+				SourceID:       types.SyncVersionSourceOpenCSG,
 				RepoPath:       repo.Path,
 				RepoType:       repo.RepositoryType,
 				LastModifiedAt: repo.UpdatedAt,

@@ -1210,11 +1210,10 @@ func (c *RepoComponent) MirrorFromSaas(ctx context.Context, namespace, name, cur
 		return fmt.Errorf("failed to find sync version, error: %w", err)
 	}
 	mirrorSource := &database.MirrorSource{}
-	if syncVersion.SourceID == database.SyncVersionSourceOpenCSG {
+	if syncVersion.SourceID == types.SyncVersionSourceOpenCSG {
 		mirrorSource.SourceName = types.OpenCSGPrefix
-	} else if syncVersion.SourceID == database.SyncVersionSourceHF {
-		// mirrorSource.SourceName = types.
-		//TODO: HF prefix
+	} else if syncVersion.SourceID == types.SyncVersionSourceHF {
+		mirrorSource.SourceName = types.HuggingfacePrefix
 	}
 
 	mirrorSource.SourceName = types.OpenCSGPrefix
@@ -1223,7 +1222,7 @@ func (c *RepoComponent) MirrorFromSaas(ctx context.Context, namespace, name, cur
 		return fmt.Errorf("failed to find mirror token, error: %w", err)
 	}
 
-	sourceUrl := mirrorSource.BuildCloneURL(c.config.Mirror.URL, string(repoType), namespace, name)
+	sourceUrl := syncVersion.BuildCloneURL(c.config.Mirror.URL, string(repoType), namespace, name)
 	mirror.SourceUrl = sourceUrl
 	mirror.MirrorSourceID = mirrorSource.ID
 	mirror.RepositoryID = repo.ID
