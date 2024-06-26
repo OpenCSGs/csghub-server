@@ -447,16 +447,22 @@ func (s *RepoStore) ListRepoPublicToUserByRepoIDs(ctx context.Context, repoType 
 	return
 }
 
-func (s *RepoStore) WithMirror(ctx context.Context, per, page int) ([]Repository, error) {
-	var repos []Repository
-	err := s.db.Operator.Core.NewSelect().
+func (s *RepoStore) WithMirror(ctx context.Context, per, page int) (repos []Repository, count int, err error) {
+	q := s.db.Operator.Core.NewSelect().
 		Model(&repos).
 		Relation("Mirror").
-		Limit(per).Offset((page - 1) * per).
-		Scan(ctx)
+		Where("mirror.id is not null")
+	count, err = q.Count(ctx)
 	if err != nil {
-		return nil, err
+		return
+	}
+	err = q.Limit(per).
+		Offset((page - 1) * per).
+		Scan(ctx)
+
+	if err != nil {
+		return
 	}
 
-	return repos, nil
+	return
 }
