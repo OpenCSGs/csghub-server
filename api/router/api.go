@@ -377,7 +377,7 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 		apiGroup.GET("/user/:username/likes/datasets", userHandler.LikesDatasets)
 		apiGroup.GET("/user/:username/run/:repo_type", userHandler.GetRunDeploys)
 		apiGroup.GET("/user/:username/finetune/instances", userHandler.GetFinetuneInstances)
-		//user owned tokens
+		// user owned tokens
 		apiGroup.GET("/user/:username/tokens", acHandler.GetUserTokens)
 	}
 
@@ -389,7 +389,7 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 		// check token info
 		tokenGroup.GET("/:token_value", needAPIKey, acHandler.Get)
 	}
-	//Depreated:
+	// Depreated:
 	{
 		apiGroup.POST("/user/:username/tokens", acHandler.Create)
 		apiGroup.DELETE("/user/:username/tokens/:token_name", acHandler.Delete)
@@ -549,6 +549,15 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 			multiSyncGroup.POST("/downloads", accountingHandler.CreateQuotaStatement)
 			multiSyncGroup.GET("/download", accountingHandler.QueryQuotaStatement)
 		}
+	}
+
+	recomHandler, err := handler.NewRecomHandler(config)
+	if err != nil {
+		return nil, fmt.Errorf("error creating recomHandler,%w", err)
+	}
+	recomGroup := apiGroup.Group("/recom")
+	{
+		recomGroup.POST("opweight", needAPIKey, recomHandler.SetOpWeight)
 	}
 
 	return r, nil

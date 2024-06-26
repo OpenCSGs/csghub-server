@@ -32,6 +32,14 @@ func NewRecomComponent(cfg *config.Config) (*RecomComponent, error) {
 	}, nil
 }
 
+func (rc *RecomComponent) SetOpWeight(ctx context.Context, repoID, weight int64) error {
+	_, err := rc.repos.FindById(ctx, repoID)
+	if err != nil {
+		return fmt.Errorf("failed to find repository with id %d, err:%w", repoID, err)
+	}
+	return rc.rs.UpsetOpWeights(ctx, repoID, weight)
+}
+
 // loop through repositories and calculate the recom score of the repository
 func (rc *RecomComponent) CalculateRecomScore(ctx context.Context) {
 	weights, err := rc.loadWeights()
