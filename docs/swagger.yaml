@@ -4625,7 +4625,11 @@ paths:
             - $ref: '#/definitions/types.Response'
             - properties:
                 data:
-                  $ref: '#/definitions/types.MirrorRepo'
+                  items:
+                    $ref: '#/definitions/types.MirrorRepo'
+                  type: array
+                total:
+                  type: integer
               type: object
         "400":
           description: Bad request

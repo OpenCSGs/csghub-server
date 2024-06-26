@@ -2080,7 +2080,13 @@ const docTemplate = `{
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/types.MirrorRepo"
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/definitions/types.MirrorRepo"
+                                            }
+                                        },
+                                        "total": {
+                                            "type": "integer"
                                         }
                                     }
                                 }

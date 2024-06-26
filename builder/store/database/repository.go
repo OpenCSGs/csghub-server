@@ -452,7 +452,6 @@ func (s *RepoStore) WithMirror(ctx context.Context, per, page int) (repos []Repo
 		Model(&repos).
 		Relation("Mirror").
 		Where("mirror.id is not null")
-	fmt.Println(q.String())
 	count, err = q.Count(ctx)
 	if err != nil {
 		return

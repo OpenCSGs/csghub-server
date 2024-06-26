@@ -63,7 +63,7 @@ func (h *MirrorHandler) CreateMirrorRepo(ctx *gin.Context) {
 // @Produce      json
 // @Param        per query int false "per" default(20)
 // @Param        page query int false "page" default(1)
-// @Success      200  {object}  types.Response{data=[]types.ModelRepo,total=int} "OK"
+// @Success      200  {object}  types.Response{data=[]types.MirrorRepo,total=int} "OK"
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
 // @Router       /mirror/repos [get]
