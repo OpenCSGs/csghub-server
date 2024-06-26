@@ -45,7 +45,7 @@ func (c *MirrorProxyComponent) Serve(ctx context.Context, req *types.GetSyncQuot
 	if err != nil {
 		return fmt.Errorf("error getting sync quota statement: %v", err)
 	}
-	if sqs != nil {
+	if sqs.ID != 0 {
 		return nil
 	}
 	resp, err := c.ac.CreateSyncQuotaStatement(&accounting.CreateSyncQuotaStatementReq{

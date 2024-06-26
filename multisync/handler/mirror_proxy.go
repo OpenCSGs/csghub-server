@@ -40,7 +40,7 @@ func (r *MirrorProxyHandler) Serve(ctx *gin.Context) {
 	name := ctx.Param("name")
 	name, _ = strings.CutSuffix(name, ".git")
 	req.RepoPath = fmt.Sprintf("%s/%s", namespace, name)
-	req.RepoType = repoType
+	req.RepoType = strings.TrimSuffix(repoType, "s")
 	req.AccessToken = token
 
 	if strings.HasSuffix(ctx.Request.URL.Path, "git-upload-pack") {
