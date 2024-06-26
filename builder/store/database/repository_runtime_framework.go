@@ -64,3 +64,9 @@ func (m *RepositoriesRuntimeFrameworkStore) ListRepoIDsByType(ctx context.Contex
 	_, err := m.db.Operator.Core.NewSelect().Model(&result).Where("type = ?", deployType).Exec(ctx, &result)
 	return result, err
 }
+
+func (m *RepositoriesRuntimeFrameworkStore) GetByRepoIDsAndType(ctx context.Context, repoID int64, deployType int) ([]RepositoriesRuntimeFramework, error) {
+	var result []RepositoriesRuntimeFramework
+	_, err := m.db.Operator.Core.NewSelect().Model(&result).Where("type = ? and repo_id=?", deployType, repoID).Exec(ctx, &result)
+	return result, err
+}

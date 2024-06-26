@@ -395,6 +395,7 @@ func (c *ModelComponent) Show(ctx context.Context, namespace, name, currentUser 
 		newError := fmt.Errorf("failed to check for the presence of the user likes,error:%w", err)
 		return nil, newError
 	}
+
 	resModel := &types.Model{
 		ID:            model.ID,
 		Name:          model.Repository.Name,
@@ -425,7 +426,14 @@ func (c *ModelComponent) Show(ctx context.Context, namespace, name, currentUser 
 		Source:     model.Repository.Source,
 		SyncStatus: model.Repository.SyncStatus,
 	}
-
+	inferences, _ := c.rrtfms.GetByRepoIDsAndType(ctx, model.Repository.ID, types.InferenceType)
+	if len(inferences) > 0 {
+		resModel.EnableInference = true
+	}
+	finetunes, _ := c.rrtfms.GetByRepoIDsAndType(ctx, model.Repository.ID, types.FinetuneType)
+	if len(finetunes) > 0 {
+		resModel.EnableFinetune = true
+	}
 	return resModel, nil
 }
 

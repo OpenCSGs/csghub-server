@@ -11891,6 +11891,12 @@ const docTemplate = `{
                 "downloads": {
                     "type": "integer"
                 },
+                "enable_finetune": {
+                    "type": "boolean"
+                },
+                "enable_inference": {
+                    "type": "boolean"
+                },
                 "id": {
                     "type": "integer"
                 },
