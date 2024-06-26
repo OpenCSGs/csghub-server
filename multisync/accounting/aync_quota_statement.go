@@ -30,14 +30,15 @@ type GetSyncQuotaStatementsReq struct {
 type CreateSyncQuotaStatementReq = GetSyncQuotaStatementsReq
 
 func (c *AccountingClient) CreateSyncQuotaStatement(opt *CreateSyncQuotaStatementReq) (*Response, error) {
+	header := http.Header{"content-type": []string{"application/json"}}
 	body, err := json.Marshal(&opt)
 	if err != nil {
 		return nil, err
 	}
 	if opt.AccessToken != "" {
-		jsonHeader.Add("Authorization", "Bearer "+opt.AccessToken)
+		header.Add("Authorization", "Bearer "+opt.AccessToken)
 	}
-	_, resp, err := c.getResponse("POST", "/accounting/multisync/downloads", jsonHeader, bytes.NewReader(body))
+	_, resp, err := c.getResponse("POST", "/accounting/multisync/downloads", header, bytes.NewReader(body))
 	return resp, err
 }
 

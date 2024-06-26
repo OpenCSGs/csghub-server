@@ -12,8 +12,6 @@ import (
 	"opencsg.com/csghub-server/common/config"
 )
 
-var jsonHeader = http.Header{"content-type": []string{"application/json"}}
-
 type AccountingClient struct {
 	baseURL    string
 	httpClient *http.Client
