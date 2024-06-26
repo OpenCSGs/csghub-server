@@ -460,11 +460,11 @@ func (c *MirrorComponent) countMirrorProgress(ctx context.Context, mirror databa
 	return int8(progress), nil
 }
 
-func (c *MirrorComponent) Repos(ctx context.Context, per, page int) ([]types.MirrorRepo, error) {
+func (c *MirrorComponent) Repos(ctx context.Context, per, page int) ([]types.MirrorRepo, int, error) {
 	var mirrorRepos []types.MirrorRepo
-	repos, err := c.repoStore.WithMirror(ctx, per, page)
+	repos, total, err := c.repoStore.WithMirror(ctx, per, page)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get mirror repositories: %v", err)
+		return nil, 0, fmt.Errorf("failed to get mirror repositories: %v", err)
 	}
 	for _, repo := range repos {
 		mirrorRepos = append(mirrorRepos, types.MirrorRepo{
@@ -474,5 +474,5 @@ func (c *MirrorComponent) Repos(ctx context.Context, per, page int) ([]types.Mir
 			Progress:   repo.Mirror.Progress,
 		})
 	}
-	return mirrorRepos, nil
+	return mirrorRepos, total, nil
 }

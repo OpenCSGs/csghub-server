@@ -63,7 +63,7 @@ func (h *MirrorHandler) CreateMirrorRepo(ctx *gin.Context) {
 // @Produce      json
 // @Param        per query int false "per" default(20)
 // @Param        page query int false "page" default(1)
-// @Success      200  {object}  types.Response{data=types.MirrorRepo} "OK"
+// @Success      200  {object}  types.Response{data=[]types.ModelRepo,total=int} "OK"
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
 // @Router       /mirror/repos [get]
@@ -74,12 +74,16 @@ func (h *MirrorHandler) Repos(ctx *gin.Context) {
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
-	repos, err := h.mc.Repos(ctx, per, page)
+	repos, total, err := h.mc.Repos(ctx, per, page)
 	if err != nil {
 		slog.Error("failed to get mirror repos", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
 		return
 	}
+	respData := gin.H{
+		"data":  repos,
+		"total": total,
+	}
 
-	httpbase.OK(ctx, repos)
+	httpbase.OK(ctx, respData)
 }
