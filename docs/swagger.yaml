@@ -388,6 +388,16 @@ definitions:
     required:
     - role
     type: object
+  handler.SetOpWeight.SetOpWeightReq:
+    properties:
+      repo_id:
+        type: integer
+      weight:
+        type: integer
+    required:
+    - repo_id
+    - weight
+    type: object
   handler.Update.updateMemberRequest:
     properties:
       new_role:
@@ -5997,6 +6007,37 @@ paths:
       summary: update user membership
       tags:
       - Member
+  /recom/opweight:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: json request body
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/handler.SetOpWeight.SetOpWeightReq'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/types.Response'
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: set op weight for repo recommendation
+      tags:
+      - Recommendation
   /runtime_framework:
     get:
       consumes:
