@@ -98,7 +98,7 @@ const docTemplate = `{
                 "summary": "Get user balance by user uuid",
                 "parameters": [
                     {
-                        "type": "integer",
+                        "type": "string",
                         "description": "user uuid",
                         "name": "id",
                         "in": "path",
@@ -154,7 +154,7 @@ const docTemplate = `{
                 "summary": "List user bills by user uuid and start date and end date",
                 "parameters": [
                     {
-                        "type": "integer",
+                        "type": "string",
                         "description": "user uuid",
                         "name": "id",
                         "in": "path",
@@ -251,7 +251,7 @@ const docTemplate = `{
                 "summary": "Recharge fee for account",
                 "parameters": [
                     {
-                        "type": "integer",
+                        "type": "string",
                         "description": "user uuid",
                         "name": "id",
                         "in": "path",
@@ -316,7 +316,7 @@ const docTemplate = `{
                 "summary": "List statements by user uuid and start time and end time",
                 "parameters": [
                     {
-                        "type": "integer",
+                        "type": "string",
                         "description": "user uuid",
                         "name": "id",
                         "in": "path",
@@ -12261,6 +12261,9 @@ const docTemplate = `{
                     "example": "v0.1"
                 },
                 "secrets": {
+                    "type": "string"
+                },
+                "sku": {
                     "type": "string"
                 },
                 "source": {
