@@ -1327,6 +1327,8 @@ definitions:
         type: string
       secrets:
         type: string
+      sku:
+        type: string
       source:
         $ref: '#/definitions/types.RepositorySource'
       status:
@@ -3326,7 +3328,7 @@ paths:
         in: path
         name: id
         required: true
-        type: integer
+        type: string
       - description: current_user
         in: query
         name: current_user
@@ -3362,7 +3364,7 @@ paths:
         in: path
         name: id
         required: true
-        type: integer
+        type: string
       - default: 10
         description: scene
         enum:
@@ -3428,7 +3430,7 @@ paths:
         in: path
         name: id
         required: true
-        type: integer
+        type: string
       - description: current_user
         in: query
         name: current_user
@@ -3470,7 +3472,7 @@ paths:
         in: path
         name: id
         required: true
-        type: integer
+        type: string
       - default: 10
         description: scene
         enum:
