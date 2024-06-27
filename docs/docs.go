@@ -12141,10 +12141,14 @@ const docTemplate = `{
         "types.RepositorySource": {
             "type": "string",
             "enum": [
-                "opencsg"
+                "opencsg",
+                "local",
+                "huggingface"
             ],
             "x-enum-varnames": [
-                "OpenCSGSource"
+                "OpenCSGSource",
+                "LocalSource",
+                "HuggingfaceSource"
             ]
         },
         "types.RepositorySyncStatus": {

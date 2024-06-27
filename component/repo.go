@@ -635,7 +635,7 @@ func (c *RepoComponent) DownloadFile(ctx context.Context, req *types.GetFileReq,
 }
 
 func (c *RepoComponent) Branches(ctx context.Context, req *types.GetBranchesReq) ([]types.Branch, error) {
-	_, err := c.repo.FindByPath(ctx, req.RepoType, req.Namespace, req.Name)
+	repo, err := c.repo.FindByPath(ctx, req.RepoType, req.Namespace, req.Name)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find repo, error: %w", err)
 	}
@@ -648,6 +648,9 @@ func (c *RepoComponent) Branches(ctx context.Context, req *types.GetBranchesReq)
 	}
 	bs, err := c.git.GetRepoBranches(ctx, getBranchesReq)
 	if err != nil {
+		if repo.Source != types.LocalSource {
+			return []types.Branch{}, nil
+		}
 		return nil, fmt.Errorf("failed to get git %s repository branches, error: %w", req.RepoType, err)
 	}
 	return bs, nil
@@ -1176,15 +1179,6 @@ func (c *RepoComponent) CreateMirror(ctx context.Context, req types.CreateMirror
 }
 
 func (c *RepoComponent) MirrorFromSaas(ctx context.Context, namespace, name, currentUser string, repoType types.RepositoryType) error {
-	admin, err := c.checkCurrentUserPermission(ctx, currentUser, namespace, membership.RoleAdmin)
-	if err != nil {
-		return fmt.Errorf("failed to check permission to create mirror, error: %w", err)
-	}
-
-	if !admin {
-		return fmt.Errorf("users do not have permission to create mirror for this repo")
-	}
-
 	repo, err := c.repo.FindByPath(ctx, repoType, namespace, name)
 	if err != nil {
 		return fmt.Errorf("failed to find repo, error: %w", err)
@@ -1220,7 +1214,7 @@ func (c *RepoComponent) MirrorFromSaas(ctx context.Context, namespace, name, cur
 	mirrorSource.SourceName = types.OpenCSGPrefix
 	syncClientSetting, err := c.syncClientSetting.First(ctx)
 	if err != nil {
-		return fmt.Errorf("failed to find mirror token, error: %w", err)
+		return fmt.Errorf("failed to find sync client setting, error: %w", err)
 	}
 
 	sourceUrl := common.TrimPrefixCloneURLBySourceID(c.config.Mirror.URL, string(repoType), namespace, name, syncVersion.SourceID)
