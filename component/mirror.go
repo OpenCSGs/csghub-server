@@ -287,16 +287,16 @@ var mirrorOrganizationMap = map[string]string{
 	"ByteDance":      "ByteDance",
 }
 
-var mirrorStatusAndRepoSyncStatusMapping = map[database.MirrorTaskStatus]types.RepositorySyncStatus{
-	database.MirrorWaiting:    types.SyncStatusPending,
-	database.MirrorRunning:    types.SyncStatusInProgress,
-	database.MirrorFinished:   types.SyncStatusCompleted,
-	database.MirrorFailed:     types.SyncStatusFailed,
-	database.MirrorIncomplete: types.SyncStatusFailed,
+var mirrorStatusAndRepoSyncStatusMapping = map[types.MirrorTaskStatus]types.RepositorySyncStatus{
+	types.MirrorWaiting:    types.SyncStatusPending,
+	types.MirrorRunning:    types.SyncStatusInProgress,
+	types.MirrorFinished:   types.SyncStatusCompleted,
+	types.MirrorFailed:     types.SyncStatusFailed,
+	types.MirrorIncomplete: types.SyncStatusFailed,
 }
 
 func (c *MirrorComponent) checkAndUpdateMirrorStatus(ctx context.Context, mirror database.Mirror) error {
-	var statusAndProgressFunc func(ctx context.Context, mirror database.Mirror) (database.MirrorTaskStatus, int8, error)
+	var statusAndProgressFunc func(ctx context.Context, mirror database.Mirror) (types.MirrorResp, error)
 	if mirror.Repository == nil {
 		return nil
 	}
@@ -305,18 +305,19 @@ func (c *MirrorComponent) checkAndUpdateMirrorStatus(ctx context.Context, mirror
 	} else {
 		statusAndProgressFunc = c.getMirrorStatusAndProgressOnPremise
 	}
-	status, progress, err := statusAndProgressFunc(ctx, mirror)
+	mirrorResp, err := statusAndProgressFunc(ctx, mirror)
 	if err != nil {
 		slog.Error("fail to get mirror status and progress", slog.Int64("mirrorId", mirror.ID), slog.String("error", err.Error()))
 	}
-	mirror.Status = status
-	mirror.Progress = progress
+	mirror.Status = mirrorResp.TaskStatus
+	mirror.Progress = mirrorResp.Progress
+	mirror.LastMessage = mirrorResp.LastMessage
 	err = c.mirrorStore.Update(ctx, &mirror)
 	if err != nil {
 		slog.Error("fail to update mirror", slog.Int64("mirrorId", mirror.ID), slog.String("error", err.Error()))
 		return err
 	}
-	syncStatus := mirrorStatusAndRepoSyncStatusMapping[status]
+	syncStatus := mirrorStatusAndRepoSyncStatusMapping[mirrorResp.TaskStatus]
 	mirror.Repository.SyncStatus = syncStatus
 	_, err = c.repoStore.UpdateRepo(ctx, *mirror.Repository)
 	if err != nil {
@@ -355,65 +356,137 @@ func getAllFiles(namespace, repoName, folder string, repoType types.RepositoryTy
 	return files, nil
 }
 
-func (c *MirrorComponent) getMirrorStatusAndProgressOnPremise(ctx context.Context, mirror database.Mirror) (database.MirrorTaskStatus, int8, error) {
+func (c *MirrorComponent) getMirrorStatusAndProgressOnPremise(ctx context.Context, mirror database.Mirror) (types.MirrorResp, error) {
 	task, err := c.git.GetMirrorTaskInfo(ctx, mirror.MirrorTaskID)
 	if err != nil {
 		slog.Error("fail to get mirror task info", slog.Int64("taskId", mirror.MirrorTaskID), slog.String("error", err.Error()))
-		return database.MirrorFailed, 0, fmt.Errorf("fail to get mirror task info, %w", err)
+		return types.MirrorResp{
+			TaskStatus:  types.MirrorFailed,
+			LastMessage: "",
+			Progress:    0,
+		}, fmt.Errorf("fail to get mirror task info, %w", err)
 	}
 	if task.Status == gitserver.TaskStatusQueued {
-		return database.MirrorWaiting, 0, nil
+		return types.MirrorResp{
+			TaskStatus:  types.MirrorWaiting,
+			LastMessage: task.Message,
+			Progress:    0,
+		}, nil
 	} else if task.Status == gitserver.TaskStatusRunning {
 		progress, err := c.countMirrorProgress(ctx, mirror)
 		if err != nil {
-			return database.MirrorRunning, 0, err
+			return types.MirrorResp{
+				TaskStatus:  types.MirrorRunning,
+				LastMessage: task.Message,
+				Progress:    0,
+			}, err
 		}
-		return database.MirrorRunning, progress, nil
+		return types.MirrorResp{
+			TaskStatus:  types.MirrorRunning,
+			LastMessage: task.Message,
+			Progress:    progress,
+		}, nil
 	} else if task.Status == gitserver.TaskStatusFailed {
-		return database.MirrorFailed, 0, nil
+		return types.MirrorResp{
+			TaskStatus:  types.MirrorFailed,
+			LastMessage: task.Message,
+			Progress:    0,
+		}, nil
 	} else if task.Status == gitserver.TaskStatusFinished {
 		progress, err := c.countMirrorProgress(ctx, mirror)
 		if err != nil {
-			return database.MirrorFailed, 0, err
+			return types.MirrorResp{
+				TaskStatus:  types.MirrorFailed,
+				LastMessage: task.Message,
+				Progress:    0,
+			}, err
 		}
 		if progress == 100 {
-			return database.MirrorFinished, progress, nil
+			return types.MirrorResp{
+				TaskStatus:  types.MirrorFinished,
+				LastMessage: task.Message,
+				Progress:    progress,
+			}, nil
 		} else {
-			return database.MirrorIncomplete, progress, nil
+			return types.MirrorResp{
+				TaskStatus:  types.MirrorIncomplete,
+				LastMessage: task.Message,
+				Progress:    progress,
+			}, nil
 		}
 	} else {
-		return database.MirrorFailed, 0, nil
+		return types.MirrorResp{
+			TaskStatus:  types.MirrorFailed,
+			LastMessage: "",
+			Progress:    0,
+		}, nil
 	}
 }
 
-func (c *MirrorComponent) getMirrorStatusAndProgressSaas(ctx context.Context, mirror database.Mirror) (database.MirrorTaskStatus, int8, error) {
+func (c *MirrorComponent) getMirrorStatusAndProgressSaas(ctx context.Context, mirror database.Mirror) (types.MirrorResp, error) {
 	task, err := c.mirrorServer.GetMirrorTaskInfo(ctx, mirror.MirrorTaskID)
 	if err != nil {
 		slog.Error("fail to get mirror task info", slog.Int64("taskId", mirror.MirrorTaskID), slog.String("error", err.Error()))
-		return database.MirrorFailed, 0, fmt.Errorf("fail to get mirror task info, %w", err)
+		return types.MirrorResp{
+			TaskStatus:  types.MirrorFailed,
+			LastMessage: "",
+			Progress:    0,
+		}, fmt.Errorf("fail to get mirror task info, %w", err)
 	}
 	if task.Status == mirrorserver.TaskStatusQueued {
-		return database.MirrorWaiting, 0, nil
+		return types.MirrorResp{
+			TaskStatus:  types.MirrorWaiting,
+			LastMessage: task.Message,
+			Progress:    0,
+		}, nil
 	} else if task.Status == mirrorserver.TaskStatusRunning {
 		progress, err := c.countMirrorProgress(ctx, mirror)
 		if err != nil {
-			return database.MirrorRunning, 0, err
+			return types.MirrorResp{
+				TaskStatus:  types.MirrorRunning,
+				LastMessage: task.Message,
+				Progress:    0,
+			}, err
 		}
-		return database.MirrorRunning, progress, nil
+		return types.MirrorResp{
+			TaskStatus:  types.MirrorRunning,
+			LastMessage: task.Message,
+			Progress:    progress,
+		}, nil
 	} else if task.Status == mirrorserver.TaskStatusFailed {
-		return database.MirrorFailed, 0, nil
+		return types.MirrorResp{
+			TaskStatus:  types.MirrorFailed,
+			LastMessage: task.Message,
+			Progress:    0,
+		}, nil
 	} else if task.Status == mirrorserver.TaskStatusFinished {
 		progress, err := c.countMirrorProgress(ctx, mirror)
 		if err != nil {
-			return database.MirrorFailed, 0, err
+			return types.MirrorResp{
+				TaskStatus:  types.MirrorFailed,
+				LastMessage: task.Message,
+				Progress:    0,
+			}, err
 		}
 		if progress == 100 {
-			return database.MirrorFinished, progress, nil
+			return types.MirrorResp{
+				TaskStatus:  types.MirrorFinished,
+				LastMessage: task.Message,
+				Progress:    progress,
+			}, nil
 		} else {
-			return database.MirrorIncomplete, progress, nil
+			return types.MirrorResp{
+				TaskStatus:  types.MirrorIncomplete,
+				LastMessage: task.Message,
+				Progress:    progress,
+			}, nil
 		}
 	} else {
-		return database.MirrorFailed, 0, nil
+		return types.MirrorResp{
+			TaskStatus:  types.MirrorFailed,
+			LastMessage: "",
+			Progress:    0,
+		}, nil
 	}
 }
 

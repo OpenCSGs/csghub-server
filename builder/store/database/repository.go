@@ -54,7 +54,7 @@ type Repository struct {
 	RepositoryType types.RepositoryType       `bun:",notnull" json:"repository_type"`
 	HTTPCloneURL   string                     `bun:",nullzero" json:"http_clone_url"`
 	SSHCloneURL    string                     `bun:",nullzero" json:"ssh_clone_url"`
-	Source         types.RepositorySource     `bun:",nullzero" json:"source"`
+	Source         types.RepositorySource     `bun:",nullzero,default:'local'" json:"source"`
 	SyncStatus     types.RepositorySyncStatus `bun:",nullzero" json:"sync_status"`
 	// updated_at timestamp will be updated only if files changed
 	times
