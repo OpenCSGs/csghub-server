@@ -7744,6 +7744,15 @@ paths:
         name: repo_type
         required: true
         type: string
+      - default: 1
+        description: deploy type(0-space,1-inference,2-finetune)
+        enum:
+        - 0
+        - 1
+        - 2
+        in: query
+        name: deploy_type
+        type: integer
       - default: 50
         description: per
         in: query

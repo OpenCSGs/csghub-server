@@ -557,13 +557,13 @@ func (c *UserComponent) LikesDatasets(ctx context.Context, req *types.UserDatase
 	return resDatasets, total, nil
 }
 
-func (c *UserComponent) ListDeploys(ctx context.Context, repoType types.RepositoryType, req *types.UserRepoReq) ([]types.DeployRepo, int, error) {
+func (c *UserComponent) ListDeploys(ctx context.Context, repoType types.RepositoryType, req *types.DeployReq) ([]types.DeployRepo, int, error) {
 	user, err := c.us.FindByUsername(ctx, req.CurrentUser)
 	if err != nil {
 		newError := fmt.Errorf("failed to check for the presence of the user:%s, error:%w", req.CurrentUser, err)
 		return nil, 0, newError
 	}
-	deploys, total, err := c.deploy.ListDeployByUserID(ctx, repoType, user.ID, req.PageSize, req.Page)
+	deploys, total, err := c.deploy.ListDeployByUserID(ctx, user.ID, req)
 	if err != nil {
 		newError := fmt.Errorf("failed to get user deploys for %s with error:%w", repoType, err)
 		return nil, 0, newError

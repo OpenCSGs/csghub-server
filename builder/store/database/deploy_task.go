@@ -195,18 +195,18 @@ func (s *DeployTaskStore) DeleteDeploy(ctx context.Context, repoType types.Repos
 	return err
 }
 
-func (s *DeployTaskStore) ListDeployByUserID(ctx context.Context, repoType types.RepositoryType, userID int64, per, page int) ([]Deploy, int, error) {
+func (s *DeployTaskStore) ListDeployByUserID(ctx context.Context, userID int64, req *types.DeployReq) ([]Deploy, int, error) {
 	var result []Deploy
-	query := s.db.Operator.Core.NewSelect().Model(&result).Where("user_id = ?", userID)
-	if repoType == types.ModelRepo {
-		query = query.Where("model_id > 0 and status != ?", common.Deleted)
+	query := s.db.Operator.Core.NewSelect().Model(&result).Where("user_id = ? and type = ?", userID, req.DeployType)
+	if req.RepoType == types.ModelRepo {
+		query = query.Where("model_id > 0 and status != ? ", common.Deleted)
 	}
 	query = query.Order("id desc")
-	if repoType == types.SpaceRepo {
+	if req.RepoType == types.SpaceRepo {
 		query = query.Where("space_id > 0")
 		query = query.Limit(1)
 	}
-	query = query.Limit(per).Offset((page - 1) * per)
+	query = query.Limit(req.PageSize).Offset((req.Page - 1) * req.PageSize)
 	_, err := query.Exec(ctx, &result)
 	if err != nil {
 		return nil, 0, err

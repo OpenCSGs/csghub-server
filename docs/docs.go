@@ -7076,6 +7076,18 @@ const docTemplate = `{
                         "required": true
                     },
                     {
+                        "enum": [
+                            0,
+                            1,
+                            2
+                        ],
+                        "type": "integer",
+                        "default": 1,
+                        "description": "deploy type(0-space,1-inference,2-finetune)",
+                        "name": "deploy_type",
+                        "in": "query"
+                    },
+                    {
                         "type": "integer",
                         "default": 50,
                         "description": "per",
