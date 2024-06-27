@@ -1202,9 +1202,13 @@ definitions:
   types.RepositorySource:
     enum:
     - opencsg
+    - local
+    - huggingface
     type: string
     x-enum-varnames:
     - OpenCSGSource
+    - LocalSource
+    - HuggingfaceSource
   types.RepositorySyncStatus:
     enum:
     - pending

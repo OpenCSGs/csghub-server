@@ -19,7 +19,9 @@ const (
 	CodeRepo    RepositoryType = "code"
 	UnknownRepo RepositoryType = ""
 
-	OpenCSGSource RepositorySource = "opencsg"
+	OpenCSGSource     RepositorySource = "opencsg"
+	LocalSource       RepositorySource = "local"
+	HuggingfaceSource RepositorySource = "huggingface"
 
 	SyncStatusPending    RepositorySyncStatus = "pending"
 	SyncStatusInProgress RepositorySyncStatus = "inprogress"

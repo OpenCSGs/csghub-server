@@ -24,12 +24,12 @@ func NewSyncClientSettingComponent(config *config.Config) (*SyncClientSettingCom
 func (c *SyncClientSettingComponent) Create(ctx context.Context, req types.CreateSyncClientSettingReq) (*database.SyncClientSetting, error) {
 	exists, err := c.settingStore.SyncClientSettingExists(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("failed to check mirror token if exists, error: %w", err)
+		return nil, fmt.Errorf("failed to check sync client setting if exists, error: %w", err)
 	}
 	if exists {
 		err := c.settingStore.DeleteAll(ctx)
 		if err != nil {
-			return nil, fmt.Errorf("failed to delete existing mirror token, error: %w", err)
+			return nil, fmt.Errorf("failed to delete existing sync client setting, error: %w", err)
 		}
 	}
 	var mt database.SyncClientSetting
@@ -38,7 +38,7 @@ func (c *SyncClientSettingComponent) Create(ctx context.Context, req types.Creat
 	mt.MaxBandwidth = req.MaxBandwidth
 	res, err := c.settingStore.Create(ctx, &mt)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create mirror token, error: %w", err)
+		return nil, fmt.Errorf("failed to create sync client setting, error: %w", err)
 	}
 	return res, nil
 }
@@ -49,7 +49,7 @@ func (c *SyncClientSettingComponent) Show(ctx context.Context) (*database.SyncCl
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, nil
 		}
-		return nil, fmt.Errorf("failed to create mirror token, error: %w", err)
+		return nil, fmt.Errorf("failed to create sync client setting, error: %w", err)
 	}
 	return res, nil
 }
