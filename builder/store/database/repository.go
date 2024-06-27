@@ -13,6 +13,12 @@ import (
 	"opencsg.com/csghub-server/common/types"
 )
 
+var RepositorySourceAndPrefixMapping = map[types.RepositorySource]string{
+	types.HuggingfaceSource: types.HuggingfacePrefix,
+	types.OpenCSGSource:     types.OpenCSGPrefix,
+	types.LocalSource:       "",
+}
+
 type RepoStore struct {
 	db *DB
 }
@@ -72,6 +78,11 @@ type RepositoryTag struct {
 		for Library tags, count means how many a kind of library file (e.g. *.ONNX file) exists in the repository
 	*/
 	Count int32 `bun:",default:1" json:"count"`
+}
+
+func (r Repository) PathWithOutPrefix() string {
+	return strings.TrimPrefix(r.Path, RepositorySourceAndPrefixMapping[r.Source])
+
 }
 
 func (s *RepoStore) CreateRepoTx(ctx context.Context, tx bun.Tx, input Repository) (*Repository, error) {

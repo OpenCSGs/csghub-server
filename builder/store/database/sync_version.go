@@ -2,6 +2,8 @@ package database
 
 import (
 	"context"
+
+	"opencsg.com/csghub-server/common/types"
 )
 
 type SyncVersionStore struct {
@@ -31,6 +33,19 @@ func (s *SyncVersionStore) FindByPath(ctx context.Context, path string) (*SyncVe
 	err := s.db.Core.NewSelect().
 		Model(&syncVersion).
 		Where("repo_path = ?", path).
+		Limit(1).
+		Scan(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return &syncVersion, nil
+}
+
+func (s *SyncVersionStore) FindByRepoTypeAndPath(ctx context.Context, path string, repoType types.RepositoryType) (*SyncVersion, error) {
+	var syncVersion SyncVersion
+	err := s.db.Core.NewSelect().
+		Model(&syncVersion).
+		Where("repo_path = ? and repo_type = ?", path, repoType).
 		Limit(1).
 		Scan(ctx)
 	if err != nil {

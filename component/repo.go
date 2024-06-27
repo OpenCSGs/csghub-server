@@ -1200,7 +1200,7 @@ func (c *RepoComponent) MirrorFromSaas(ctx context.Context, namespace, name, cur
 		return nil
 	}
 	var mirror database.Mirror
-	syncVersion, err := c.syncVersion.FindByPath(ctx, fmt.Sprintf("%s/%s", namespace, name))
+	syncVersion, err := c.syncVersion.FindByRepoTypeAndPath(ctx, repo.PathWithOutPrefix(), repoType)
 	if err != nil {
 		return fmt.Errorf("failed to find sync version, error: %w", err)
 	}
