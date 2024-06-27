@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"opencsg.com/csghub-server/builder/store/database"
+	"opencsg.com/csghub-server/common/types"
 )
 
 type AccountingBillComponent struct {
@@ -17,6 +18,6 @@ func NewAccountingBill() *AccountingBillComponent {
 	return abc
 }
 
-func (a *AccountingBillComponent) ListBillsByUserIDAndDate(ctx context.Context, userUUID, startDate, endDate string, scene, per, page int) ([]map[string]interface{}, int, error) {
-	return a.abs.ListByUserIDAndDate(ctx, userUUID, startDate, endDate, scene, per, page)
+func (a *AccountingBillComponent) ListBillsByUserIDAndDate(ctx context.Context, req types.ACCT_BILLS_REQ) (database.AccountBillRes, error) {
+	return a.abs.ListByUserIDAndDate(ctx, req)
 }

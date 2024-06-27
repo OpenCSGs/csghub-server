@@ -30,7 +30,7 @@ export DB_DEBUG=1
 # cd ..
 echo $(pwd)
 
-~/go/bin/swag init -d cmd/csghub-server/cmd/start,api/router,api/handler,builder/store/database,common/types,accounting/router,accounting/handler -g server.go
+~/go/bin/swag init -d cmd/csghub-server/cmd/start,api/router,api/handler,builder/store/database,common/types -g server.go
 
 go build -v -o ./bin/csghub-server ./cmd/csghub-server
 

@@ -9,6 +9,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/uptrace/bun"
+	"opencsg.com/csghub-server/common/types"
 	commonTypes "opencsg.com/csghub-server/common/types"
 )
 
@@ -49,6 +50,11 @@ type AccountStatement struct {
 	Consumption float64   `json:"consumption"`
 }
 
+type AccountStatementRes struct {
+	Data []AccountStatement `json:"data"`
+	types.ACCT_SUMMARY
+}
+
 func (as *AccountStatementStore) Create(ctx context.Context, input AccountStatement, changeValue float64) error {
 	err := as.db.Operator.Core.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
 		if err := assertAffectedOneRow(tx.NewInsert().Model(&input).Exec(ctx)); err != nil {
@@ -87,20 +93,32 @@ func (as *AccountStatementStore) Create(ctx context.Context, input AccountStatem
 	return err
 }
 
-func (as *AccountStatementStore) ListByUserIDAndTime(ctx context.Context, req commonTypes.ACCT_STATEMENTS_REQ) ([]AccountStatement, int, error) {
-	var result []AccountStatement
-	q := as.db.Operator.Core.NewSelect().Model(&result).Where("user_uuid = ? and scene = ? and customer_id = ? and created_at >= ? and created_at <= ?", req.UserUUID, req.Scene, req.InstanceName, req.StartTime, req.EndTime)
+func (as *AccountStatementStore) ListByUserIDAndTime(ctx context.Context, req commonTypes.ACCT_STATEMENTS_REQ) (AccountStatementRes, error) {
+	var accountStatment []AccountStatement
+	q := as.db.Operator.Core.NewSelect().Model(&accountStatment).Where("user_uuid = ? and scene = ? and customer_id = ? and created_at >= ? and created_at <= ?", req.UserUUID, req.Scene, req.InstanceName, req.StartTime, req.EndTime)
 
 	count, err := q.Count(ctx)
 	if err != nil {
-		return nil, 0, err
+		return AccountStatementRes{}, err
 	}
 
-	_, err = q.Order("id DESC").Limit(req.Per).Offset((req.Page-1)*req.Per).Exec(ctx, &result)
+	var totalResult TotalResult
+	err = as.db.Operator.Core.NewSelect().With("grouped_items", q).TableExpr("grouped_items").ColumnExpr("SUM(value) AS total_value, SUM(consumption) as total_consumption").Scan(ctx, &totalResult)
 	if err != nil {
-		return nil, 0, fmt.Errorf("list all statement, error:%w", err)
+		return AccountStatementRes{}, err
 	}
-	return result, count, nil
+
+	_, err = q.Order("id DESC").Limit(req.Per).Offset((req.Page-1)*req.Per).Exec(ctx, &accountStatment)
+	if err != nil {
+		return AccountStatementRes{}, fmt.Errorf("list all statement, error:%w", err)
+	}
+	return AccountStatementRes{
+		Data: accountStatment,
+		ACCT_SUMMARY: types.ACCT_SUMMARY{
+			Total:            count,
+			TotalValue:       totalResult.TotalValue,
+			TotalConsumption: totalResult.TotalConsumption},
+	}, nil
 }
 
 func (as *AccountStatementStore) GetByEventID(ctx context.Context, eventID uuid.UUID) (AccountStatement, error) {

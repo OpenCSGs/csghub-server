@@ -7,23 +7,10 @@ import (
 	"io"
 	"net/http"
 	"net/url"
-	"time"
 
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/types"
 )
-
-type Item struct {
-	Consumption  float64   `json:"consumption"`
-	InstanceName string    `json:"instance_name"`
-	Value        float64   `json:"value"`
-	CreatedAt    time.Time `json:"created_at"`
-	Status       string    `json:"status"`
-}
-type Bills struct {
-	Total int    `json:"total"`
-	Data  []Item `json:"data"`
-}
 
 type AccountingClient struct {
 	remote    *url.URL

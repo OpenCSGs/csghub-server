@@ -53,6 +53,15 @@ type ACCT_STATEMENTS_REQ struct {
 	Page         int    `json:"page"`
 }
 
+type ACCT_BILLS_REQ struct {
+	UserUUID  string `json:"user_id"`
+	Scene     int    `json:"scene"`
+	StartDate string `json:"start_date"`
+	EndDate   string `json:"end_date"`
+	Per       int    `json:"per"`
+	Page      int    `json:"page"`
+}
+
 type ACCT_STATEMENTS_RES struct {
 	ID          int64     `json:"id"`
 	EventUUID   uuid.UUID `json:"event_uuid"`
@@ -82,4 +91,28 @@ type ACCT_QUOTA_REQ struct {
 type ACCT_QUOTA_STATEMENT_REQ struct {
 	RepoPath string `json:"repo_path"`
 	RepoType string `json:"repo_type"`
+}
+
+type ACCT_SUMMARY struct {
+	Total            int     `json:"total"`
+	TotalValue       float64 `json:"total_value"`
+	TotalConsumption float64 `json:"total_consumption"`
+}
+
+type ITEM struct {
+	Consumption  float64   `json:"consumption"`
+	InstanceName string    `json:"instance_name"`
+	Value        float64   `json:"value"`
+	CreatedAt    time.Time `json:"created_at"`
+	Status       string    `json:"status"`
+}
+
+type BILLS struct {
+	Data []ITEM `json:"data"`
+	ACCT_SUMMARY
+}
+
+type ACCT_STATEMENTS_RESULT struct {
+	Data []ACCT_STATEMENTS_RES `json:"data"`
+	ACCT_SUMMARY
 }
