@@ -73,3 +73,19 @@ type MirrorRepo struct {
 	Progress   int8                 `json:"progress"`
 	RepoType   RepositoryType       `json:"repo_type"`
 }
+
+type MirrorResp struct {
+	Progress    int8
+	LastMessage string
+	TaskStatus  MirrorTaskStatus
+}
+
+type MirrorTaskStatus string
+
+const (
+	MirrorWaiting    MirrorTaskStatus = "waiting"
+	MirrorRunning    MirrorTaskStatus = "running"
+	MirrorFinished   MirrorTaskStatus = "finished"
+	MirrorFailed     MirrorTaskStatus = "failed"
+	MirrorIncomplete MirrorTaskStatus = "incomplete"
+)
