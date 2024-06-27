@@ -549,6 +549,7 @@ func (h *UserHandler) UserPermission(ctx *gin.Context) {
 // @Produce      json
 // @Param        username path string true "username"
 // @Param        repo_type path string true "model,space" Enums(model,space)
+// @Param 		 deploy_type query int false "deploy type(0-space,1-inference,2-finetune)" Enums(0, 1, 2) default(1)
 // @Param        per query int false "per" default(50)
 // @Param        page query int false "page index" default(1)
 // @Param        current_user query string false "current user"
@@ -557,23 +558,28 @@ func (h *UserHandler) UserPermission(ctx *gin.Context) {
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
 // @Router       /user/{username}/run/{repo_type} [get]
 func (h *UserHandler) GetRunDeploys(ctx *gin.Context) {
-	respData := gin.H{
-		"message": "OK",
-		"data":    nil,
-		"total":   0,
-	}
-
-	var req types.UserRepoReq
 	currentUser := httpbase.GetCurrentUser(ctx)
 	if currentUser == "" {
-		ctx.JSON(http.StatusOK, respData)
+		httpbase.UnauthorizedError(ctx, errors.New("user not found, please login first"))
 		return
 	}
 
 	username := ctx.Param("username")
 	if currentUser != username {
 		slog.Warn("invalid user to list deploys", slog.String("currentUser", currentUser), slog.String("username", username))
-		ctx.JSON(http.StatusOK, respData)
+		httpbase.ServerError(ctx, errors.New("invalid user"))
+		return
+	}
+
+	deployTypeStr := ctx.Query("deploy_type")
+	if deployTypeStr == "" {
+		// backward compatibility for inferences
+		deployTypeStr = strconv.Itoa(types.InferenceType)
+	}
+	deployType, err := strconv.Atoi(deployTypeStr)
+	if err != nil {
+		slog.Error("Bad request deploy type format", "error", err)
+		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
 
@@ -590,16 +596,19 @@ func (h *UserHandler) GetRunDeploys(ctx *gin.Context) {
 		return
 	}
 
+	var req types.DeployReq
 	req.CurrentUser = currentUser
 	req.Page = page
 	req.PageSize = per
+	req.RepoType = repoType
+	req.DeployType = deployType
 	ds, total, err := h.c.ListDeploys(ctx, repoType, &req)
 	if err != nil {
 		slog.Error("Failed to get deploy repo list", slog.Any("error", err), slog.Any("req", req))
 		httpbase.ServerError(ctx, err)
 		return
 	}
-	respData = gin.H{
+	respData := gin.H{
 		"message": "OK",
 		"data":    ds,
 		"total":   total,
