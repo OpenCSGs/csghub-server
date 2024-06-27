@@ -1,6 +1,6 @@
 package types
 
 const (
-	OpenCSGPrefix     = "OpenCSG_"
-	HuggingfacePrefix = "Huggingface_"
+	OpenCSGPrefix     = "CSG_"
+	HuggingfacePrefix = "HF_"
 )
