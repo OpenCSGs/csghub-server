@@ -102,15 +102,11 @@ func (ch *CreditHandler) QueryStatementByUserID(ctx *gin.Context) {
 		Page:         page,
 	}
 
-	statements, total, err := ch.asc.ListStatementByUserIDAndTime(ctx, req)
+	respData, err := ch.asc.ListStatementByUserIDAndTime(ctx, req)
 	if err != nil {
 		slog.Error("fail to query statement by user", slog.Any("userid", userID), slog.Any("start_time", startTime), slog.Any("end_time", endTime), slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
 		return
-	}
-	respData := gin.H{
-		"data":  statements,
-		"total": total,
 	}
 	httpbase.OK(ctx, respData)
 }
@@ -143,15 +139,20 @@ func (ch *CreditHandler) QueryBillsByUserID(ctx *gin.Context) {
 		return
 	}
 
-	bills, total, err := ch.abc.ListBillsByUserIDAndDate(ctx, userUUID, startDate, endDate, scene, per, page)
+	req := types.ACCT_BILLS_REQ{
+		UserUUID:  userUUID,
+		Scene:     scene,
+		StartDate: startDate,
+		EndDate:   endDate,
+		Per:       per,
+		Page:      page,
+	}
+
+	respData, err := ch.abc.ListBillsByUserIDAndDate(ctx, req)
 	if err != nil {
 		slog.Error("fail to query bills by user", slog.Any("userUUID", userUUID), slog.Any("start_date", startDate), slog.Any("end_date", endDate), slog.Any("scene", scene), slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
 		return
-	}
-	respData := gin.H{
-		"data":  bills,
-		"total": total,
 	}
 	httpbase.OK(ctx, respData)
 }

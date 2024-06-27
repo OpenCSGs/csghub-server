@@ -6,25 +6,12 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
-	"time"
 
 	"opencsg.com/csghub-server/builder/accounting"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/types"
 )
-
-type Item struct {
-	Consumption  float64   `json:"consumption"`
-	InstanceName string    `json:"instance_name"`
-	Value        float64   `json:"value"`
-	CreatedAt    time.Time `json:"created_at"`
-	Status       string    `json:"status"`
-}
-type Bills struct {
-	Total int    `json:"total"`
-	Data  []Item `json:"data"`
-}
 
 type AccountingComponent struct {
 	acctClient *accounting.AccountingClient
@@ -119,9 +106,9 @@ func (ac *AccountingComponent) ListBillsByUserIDAndDate(ctx context.Context, req
 	if bills == nil || bills.Data == nil {
 		return bills, nil
 	}
-	var mergedItems []Item
+	var mergedItems []types.ITEM
 	for _, item := range bills.Data {
-		newItem := Item{
+		newItem := types.ITEM{
 			Consumption:  item.Consumption,
 			InstanceName: item.InstanceName,
 			Value:        item.Value,
@@ -133,7 +120,14 @@ func (ac *AccountingComponent) ListBillsByUserIDAndDate(ctx context.Context, req
 		}
 		mergedItems = append(mergedItems, newItem)
 	}
-	return Bills{Data: mergedItems, Total: bills.Total}, err
+	return types.BILLS{
+		Data: mergedItems,
+		ACCT_SUMMARY: types.ACCT_SUMMARY{
+			Total:            bills.Total,
+			TotalValue:       bills.TotalValue,
+			TotalConsumption: bills.TotalConsumption,
+		},
+	}, err
 }
 
 func (ac *AccountingComponent) RechargeAccountingUser(ctx context.Context, currentUser, userUUID string, req types.RECHARGE_REQ) (interface{}, error) {
@@ -165,12 +159,12 @@ func (ac *AccountingComponent) GetQuotaStatement(currentUser string, req types.A
 	return ac.acctClient.GetQuotaStatement(currentUser, req)
 }
 
-func (ac *AccountingComponent) parseBillsData(data interface{}) (*Bills, error) {
+func (ac *AccountingComponent) parseBillsData(data interface{}) (*types.BILLS, error) {
 	resByte, err := json.Marshal(data)
 	if err != nil {
 		return nil, err
 	}
-	var newData Bills
+	var newData types.BILLS
 	err = json.Unmarshal(resByte, &newData)
 	if err != nil {
 		return nil, err

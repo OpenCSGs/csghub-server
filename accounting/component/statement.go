@@ -46,14 +46,14 @@ func (a *AccountingStatementComponent) AddNewStatement(ctx context.Context, even
 	return a.asms.Create(ctx, statement, changeValue)
 }
 
-func (a *AccountingStatementComponent) ListStatementByUserIDAndTime(ctx context.Context, req types.ACCT_STATEMENTS_REQ) ([]types.ACCT_STATEMENTS_RES, int, error) {
-	statements, total, err := a.asms.ListByUserIDAndTime(ctx, req)
+func (a *AccountingStatementComponent) ListStatementByUserIDAndTime(ctx context.Context, req types.ACCT_STATEMENTS_REQ) (types.ACCT_STATEMENTS_RESULT, error) {
+	statements, err := a.asms.ListByUserIDAndTime(ctx, req)
 	if err != nil {
-		return nil, 0, err
+		return types.ACCT_STATEMENTS_RESULT{}, err
 	}
 
 	var resStatements []types.ACCT_STATEMENTS_RES
-	for _, st := range statements {
+	for _, st := range statements.Data {
 		resStatements = append(resStatements, types.ACCT_STATEMENTS_RES{
 			ID:          st.ID,
 			EventUUID:   st.EventUUID,
@@ -70,7 +70,7 @@ func (a *AccountingStatementComponent) ListStatementByUserIDAndTime(ctx context.
 		})
 	}
 
-	return resStatements, total, err
+	return types.ACCT_STATEMENTS_RESULT{Data: resStatements, ACCT_SUMMARY: statements.ACCT_SUMMARY}, err
 }
 
 func (a *AccountingStatementComponent) FindStatementByEventID(ctx context.Context, event *types.ACC_EVENT) (*database.AccountStatement, error) {
