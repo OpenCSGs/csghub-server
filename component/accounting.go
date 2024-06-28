@@ -118,6 +118,7 @@ func (ac *AccountingComponent) ListBillsByUserIDAndDate(ctx context.Context, req
 		if d != nil {
 			newItem.Status = deployStatusCodeToString(d.Status)
 			newItem.CreatedAt = d.CreatedAt
+			newItem.DeployID = d.ID
 			if d.GitPath != "" {
 				cols := strings.Split(d.GitPath, "_")
 				if len(cols) > 1 {
