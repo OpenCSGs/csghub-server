@@ -317,6 +317,21 @@ func (c *MirrorComponent) checkAndUpdateMirrorStatus(ctx context.Context, mirror
 		slog.Error("fail to update mirror", slog.Int64("mirrorId", mirror.ID), slog.String("error", err.Error()))
 		return err
 	}
+	if mirror.Repository.HTTPCloneURL == "" {
+		namespace, name := mirror.Repository.NamespaceAndName()
+		repoRes, err := c.git.GetRepo(ctx, gitserver.GetRepoReq{
+			Namespace: namespace,
+			Name:      name,
+			RepoType:  mirror.Repository.RepositoryType,
+		})
+		if err != nil {
+			slog.Error("fail to get repo detail from git server")
+		} else {
+			mirror.Repository.HTTPCloneURL = repoRes.HttpCloneURL
+			mirror.Repository.SSHCloneURL = repoRes.SshCloneURL
+			mirror.Repository.DefaultBranch = repoRes.DefaultBranch
+		}
+	}
 	syncStatus := mirrorStatusAndRepoSyncStatusMapping[mirrorResp.TaskStatus]
 	mirror.Repository.SyncStatus = syncStatus
 	_, err = c.repoStore.UpdateRepo(ctx, *mirror.Repository)

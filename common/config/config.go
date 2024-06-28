@@ -70,6 +70,7 @@ type Config struct {
 		Region          string `envconfig:"STARHUB_SERVER_S3_REGION"`
 		Endpoint        string `envconfig:"STARHUB_SERVER_S3_ENDPOINT" default:"oss-cn-beijing.aliyuncs.com"`
 		Bucket          string `envconfig:"STARHUB_SERVER_S3_BUCKET" default:"opencsg-test"`
+		EnableSSL       bool   `envconfig:"STARHUB_SERVER_S3_ENABLE_SSL" default:"true"`
 	}
 
 	SensitiveCheck struct {
@@ -78,6 +79,7 @@ type Config struct {
 		AccessKeySecret string `envconfig:"STARHUB_SERVER_SENSITIVE_CHECK_ACCESS_KEY_SECRET"`
 		Region          string `envconfig:"STARHUB_SERVER_SENSITIVE_CHECK_REGION"`
 		Endpoint        string `envconfig:"STARHUB_SERVER_SENSITIVE_CHECK_ENDPOINT" default:"oss-cn-beijing.aliyuncs.com"`
+		EnableSSL       bool   `envconfig:"STARHUB_SERVER_S3_ENABLE_SSH" default:"true"`
 	}
 
 	JWT struct {

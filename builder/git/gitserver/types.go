@@ -54,6 +54,8 @@ type DeleteRepoReq struct {
 	RepoType  types.RepositoryType `json:"repo_type"`
 }
 
+type GetRepoReq = DeleteRepoReq
+
 type GetBranchesReq struct {
 	Namespace string               `json:"namespace"`
 	Name      string               `json:"name"`
