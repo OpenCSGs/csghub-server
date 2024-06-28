@@ -157,6 +157,10 @@ func (c *ModelComponent) Index(ctx context.Context, filter *types.RepoFilter, pe
 			UpdatedAt:    repo.UpdatedAt,
 			Source:       repo.Source,
 			SyncStatus:   repo.SyncStatus,
+			Repository: types.Repository{
+				HTTPCloneURL: repo.HTTPCloneURL,
+				SSHCloneURL:  repo.SSHCloneURL,
+			},
 		})
 	}
 	return resModels, total, nil
