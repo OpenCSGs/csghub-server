@@ -4,12 +4,19 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"time"
 
 	"github.com/spf13/cobra"
 	"opencsg.com/csghub-server/builder/multisync"
+	"opencsg.com/csghub-server/builder/store/cache"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/component"
+)
+
+const (
+	resourceName   = "sync-as-client"
+	expirationTime = 1 * time.Hour
 )
 
 var cmdSyncAsClient = &cobra.Command{
@@ -41,20 +48,38 @@ var cmdSyncAsClient = &cobra.Command{
 			slog.Error("config not found in context")
 			return
 		}
-		c, err := component.NewMultiSyncComponent(config)
-		if err != nil {
-			slog.Error("failed to create recom component", "err", err)
+
+		if config.Saas {
 			return
 		}
-		syncClientSettingStore := database.NewSyncClientSettingStore()
-		setting, err := syncClientSettingStore.First(ctx)
+
+		locker, err := cache.NewCache(ctx, cache.RedisConfig{
+			Addr:     config.Redis.Endpoint,
+			Username: config.Redis.User,
+			Password: config.Redis.Password,
+		})
+
 		if err != nil {
-			slog.Error("failed to find sync client setting, error: %w", err)
+			slog.Error("failed to initialize redis", "err", err)
 			return
 		}
-		apiDomain := config.APIServer.PublicDomain
-		sc := multisync.FromOpenCSG(apiDomain, setting.Token)
-		err = c.SyncAsClient(ctx, sc)
+
+		err = locker.RunWhileLocked(ctx, resourceName, expirationTime, func() error {
+			c, err := component.NewMultiSyncComponent(config)
+			if err != nil {
+				slog.Error("failed to create multi sync component", "err", err)
+				return err
+			}
+			syncClientSettingStore := database.NewSyncClientSettingStore()
+			setting, err := syncClientSettingStore.First(ctx)
+			if err != nil {
+				slog.Error("failed to find sync client setting, error: %w", err)
+				return err
+			}
+			apiDomain := config.APIServer.PublicDomain
+			sc := multisync.FromOpenCSG(apiDomain, setting.Token)
+			return c.SyncAsClient(ctx, sc)
+		})
 		if err != nil {
 			slog.Error("failed to sync as client", "err", err)
 		}
