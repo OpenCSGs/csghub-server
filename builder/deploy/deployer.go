@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log"
 	"log/slog"
 	"net/http"
 	"strconv"
@@ -15,7 +14,7 @@ import (
 
 	"github.com/bwmarrin/snowflake"
 	"github.com/google/uuid"
-	"github.com/nats-io/nats.go"
+	"github.com/nats-io/nats.go/jetstream"
 	"opencsg.com/csghub-server/builder/deploy/common"
 	"opencsg.com/csghub-server/builder/deploy/imagebuilder"
 	"opencsg.com/csghub-server/builder/deploy/imagerunner"
@@ -54,7 +53,7 @@ type deployer struct {
 	runnerStatuscache  map[string]imagerunner.StatusResponse
 	internalRootDomain string
 	sfNode             *snowflake.Node
-	consumer           *event.EventPublisher
+	eventPub           *event.EventPublisher
 }
 
 func newDeployer(s scheduler.Scheduler, ib imagebuilder.Builder, ir imagerunner.Runner) (*deployer, error) {
@@ -72,12 +71,7 @@ func newDeployer(s scheduler.Scheduler, ib imagebuilder.Builder, ir imagerunner.
 		spaceStore:        database.NewSpaceStore(),
 		runnerStatuscache: make(map[string]imagerunner.StatusResponse),
 		sfNode:            node,
-		consumer:          event.NewEventPublisher(),
-	}
-	// Subscribe to a subject and handle incoming messages
-	_, err = d.consumer.Connector.Conn.Subscribe(d.consumer.Connector.NotifySubject, d.handleMessage)
-	if err != nil {
-		log.Fatal("Failed to Subscribe nats notify subject: ", err)
+		eventPub:          &event.DefaultEventPublisher,
 	}
 
 	go d.refreshStatus()
@@ -551,49 +545,88 @@ func (d *deployer) StartDeploy(ctx context.Context, deploy *database.Deploy) err
 
 // accounting timer
 func (d *deployer) startAccounting() {
+	d.startAccountingConsuming()
+	d.startAccountingFeeing()
+}
+
+func (d *deployer) startAccountingConsuming() {
+	for {
+		consumer, err := d.eventPub.CreateNoBalanceConsumer()
+		if err != nil {
+			slog.Error("fail to create continuous polling consumer", slog.Any("error", err))
+		} else {
+			_, err = consumer.Consume(d.startAccountingConsumerCallback)
+			if err != nil {
+				slog.Error("fail to begin consuming message", slog.Any("error", err))
+			} else {
+				break
+			}
+		}
+		time.Sleep(1 * time.Second)
+	}
+}
+
+func (d *deployer) startAccountingFeeing() {
 	for {
 		for _, svc := range d.runnerStatuscache {
-			//ignore not ready svc
-			if svc.Code != common.Running {
-				continue
-			}
-			// ignore existing space and cpu resources
-			if svc.CostPerHour == 0 {
-				continue
-			}
-			duration := float64(d.consumer.Connector.SyncInterval) / 60.0
-
-			consumerInfo := types.CONSUMER_INFO{
-				ConsumerID:    svc.ServiceName,
-				ConsumerPrice: fmt.Sprintf("%.3f", svc.CostPerHour),
-				PriceUnit:     "hour",
-				Duration:      fmt.Sprintf("%.3f", duration),
-			}
-			consumerInfoStr, err := json.Marshal(consumerInfo)
-			if err != nil {
-				slog.Error("Error marshal consumer info", slog.Any("error", err))
-				continue
-			}
-			event := types.ACC_EVENT{
-				Uuid:      uuid.New(),
-				UserUUID:  svc.UserID,
-				Value:     -(svc.CostPerHour * float64(svc.Replica) * duration),
-				ValueType: 0, // for credit
-				Scene:     int(getValidSceneType(svc.DeployType)),
-				OpUID:     0,
-				CreatedAt: time.Now(),
-				Extra:     string(consumerInfoStr),
-			}
-			str, err := json.Marshal(event)
-			if err != nil {
-				slog.Error("Error marshal event", slog.Any("error", err))
-			} else {
-				d.consumer.Publish(d.consumer.Connector.Subject, str)
-			}
-
+			d.startAccountingRequestFee(svc)
 		}
 		// accounting interval 1 min
 		time.Sleep(1 * time.Minute)
+	}
+}
+
+func (d *deployer) startAccountingConsumerCallback(msg jetstream.Msg) {
+	slog.Debug("Received a JetStream message", slog.Any("msg", string(msg.Data())))
+	err := msg.Ack()
+	if err != nil {
+		slog.Warn("Fail to do ack", slog.Any("msg", string(msg.Data())))
+	}
+}
+
+func (d *deployer) startAccountingRequestFee(svc imagerunner.StatusResponse) {
+	// ignore not ready svc
+	if svc.Code != common.Running {
+		return
+	}
+	// ignore existing space and cpu resources
+	if svc.CostPerHour <= 0 {
+		return
+	}
+	duration := float64(d.eventPub.SyncInterval) / 60.0
+
+	consumerInfo := types.CONSUMER_INFO{
+		ConsumerID:    svc.ServiceName,
+		ConsumerPrice: fmt.Sprintf("%.3f", svc.CostPerHour),
+		PriceUnit:     "hour",
+		Duration:      fmt.Sprintf("%.3f", duration),
+	}
+	consumerInfoStr, err := json.Marshal(consumerInfo)
+	if err != nil {
+		slog.Error("Error marshal consumer info", slog.Any("consumerInfo", consumerInfo), slog.Any("error", err))
+		return
+	}
+	event := types.ACC_EVENT{
+		Uuid:      uuid.New(),
+		UserUUID:  svc.UserID,
+		Value:     -(svc.CostPerHour * float64(svc.Replica) * duration),
+		ValueType: 0, // for credit
+		Scene:     int(getValidSceneType(svc.DeployType)),
+		OpUID:     0,
+		CreatedAt: time.Now(),
+		Extra:     string(consumerInfoStr),
+	}
+	str, err := json.Marshal(event)
+	if err != nil {
+		slog.Error("Error marshal event", slog.Any("event", event), slog.Any("error", err))
+		return
+	}
+
+	err = d.eventPub.PublishFeeEvent(str)
+	if err != nil {
+		slog.Error("fail to pub event", slog.Any("data", str), slog.Any("error", err))
+	} else {
+		slog.Info("pub event success", slog.Any("data", str))
 	}
 }
 
@@ -608,11 +641,4 @@ func getValidSceneType(scene int) database.SceneType {
 	default:
 		return database.SceneUnknow
 	}
-}
-
-// Add your own logic to process the received message
-func (d *deployer) handleMessage(msg *nats.Msg) {
-	// to do for no balance case
-	log.Printf("Received message: %s", string(msg.Data))
-
 }

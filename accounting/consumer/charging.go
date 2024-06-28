@@ -10,57 +10,36 @@ import (
 	"time"
 
 	"github.com/nats-io/nats.go"
+	"github.com/nats-io/nats.go/jetstream"
 	"opencsg.com/csghub-server/accounting/component"
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/types"
+	"opencsg.com/csghub-server/mq"
+)
+
+var (
+	idleDuration = 10 * time.Second
 )
 
 type Charging struct {
-	NatsURL              string
-	FeeRequestSubject    string
-	MsgFetchTimeoutInSec int
-	acctSMComp           *component.AccountingStatementComponent
-	acctUserComp         *component.AccountingUserComponent
-	acctEvtComp          *component.AccountingEventComponent
-	notify               *Notify
-	dlq                  *Dlq
-	streamCfg            *nats.StreamConfig
-	consumerConfig       *nats.ConsumerConfig
-	CH                   chan int
-	notifyTimeOut        *time.Timer
-	dlqTimeout           *time.Timer
+	sysMQ         *mq.NatsHandler
+	acctSMComp    *component.AccountingStatementComponent
+	acctUserComp  *component.AccountingUserComponent
+	acctEvtComp   *component.AccountingEventComponent
+	notify        *Notify
+	dlq           *Dlq
+	notifyTimeOut *time.Timer
+	dlqTimeout    *time.Timer
 }
 
-var (
-	eventStreamName        string = "accountingEventStream"
-	accountingConsumerName string = "accountingServerDurableConsumer"
-	idleDuration                  = 10 * time.Second
-)
-
-func NewCharging(config *config.Config) *Charging {
+func NewCharging(natHandler *mq.NatsHandler, config *config.Config) *Charging {
 	charge := &Charging{
-		NatsURL:              config.Accounting.NatsURL,
-		FeeRequestSubject:    config.Accounting.FeeRequestSubject,
-		MsgFetchTimeoutInSec: config.Accounting.MsgFetchTimeoutInSEC,
-		acctSMComp:           component.NewAccountingStatement(),
-		acctUserComp:         component.NewAccountingUser(),
-		acctEvtComp:          component.NewAccountingEvent(),
-		notify:               NewNotify(config.Accounting.FeeNotifyNoBalanceSubject),
-		dlq:                  NewDlq(),
-		streamCfg: &nats.StreamConfig{
-			Name:         eventStreamName,
-			Subjects:     []string{config.Accounting.FeeRequestSubject},
-			MaxConsumers: -1,
-			MaxMsgs:      -1,
-			MaxBytes:     -1,
-		},
-		consumerConfig: &nats.ConsumerConfig{
-			Durable:       accountingConsumerName,
-			AckPolicy:     nats.AckExplicitPolicy,
-			DeliverPolicy: nats.DeliverAllPolicy,
-			FilterSubject: config.Accounting.FeeRequestSubject,
-		},
-		CH:            make(chan int),
+		sysMQ:         natHandler,
+		acctSMComp:    component.NewAccountingStatement(),
+		acctUserComp:  component.NewAccountingUser(),
+		acctEvtComp:   component.NewAccountingEvent(),
+		notify:        NewNotify(natHandler),
+		dlq:           NewDlq(natHandler),
 		notifyTimeOut: time.NewTimer(idleDuration),
 		dlqTimeout:    time.NewTimer(idleDuration),
 	}
@@ -68,191 +47,132 @@ func NewCharging(config *config.Config) *Charging {
 }
 
 func (c *Charging) Run() {
+	go c.startCharging()
+	go c.notify.Run()
+	go c.dlq.Run()
+
+}
+
+func (c *Charging) startCharging() {
 	for {
-		nc, err := c.buildNatsConn()
-		if err != nil {
-			slog.Error("fail to connect nats", slog.Any("NatsURL", c.NatsURL), slog.Any("err", err))
-			time.Sleep(10 * time.Second)
-			continue
-		}
-		go c.begin(nc)
-		<-c.CH
-		nc.Close()
-		nc = nil
+		c.preReadMsgs()
+		c.handleReadMsgs()
 		time.Sleep(2 * idleDuration)
 	}
 }
 
-func (c *Charging) buildNatsConn() (*nats.Conn, error) {
-	nc, err := nats.Connect(c.NatsURL, nats.Timeout(2*time.Second),
-		nats.ReconnectWait(2*time.Second),
-		nats.MaxReconnects(-1))
-	return nc, err
-}
-
-func (c *Charging) begin(nc *nats.Conn) {
-	go c.notify.Run(nc)
-	go c.dlq.Run(nc)
-	c.startCharging(nc)
-}
-
-func (c *Charging) startCharging(nc *nats.Conn) {
-	// try 5 times set jetstream before re-connect nats
-	for i := 0; i < 5; i++ {
-		js, err := nc.JetStream()
+func (c *Charging) preReadMsgs() {
+	var err error = nil
+	var i int = 0
+	for {
+		i++
+		err = c.sysMQ.BuildEventStream()
 		if err != nil {
-			tip := fmt.Sprintf("fail to get jetstream for the %d time", (i + 1))
+			tip := fmt.Sprintf("fail to build event stream for the %d time", i)
 			slog.Error(tip, slog.Any("err", err))
+			time.Sleep(2 * time.Second)
 			continue
 		}
-
-		_, err = js.AddStream(c.streamCfg)
-		if err != nil {
-			tip := fmt.Sprintf("fail to add nats stream for the %d time", (i + 1))
-			slog.Warn(tip, slog.Any("streamName", eventStreamName), slog.Any("err", err))
-			_, err = js.UpdateStream(c.streamCfg)
-			if err != nil {
-				tip := fmt.Sprintf("fail to update nats stream for the %d time", (i + 1))
-				slog.Warn(tip, slog.Any("streamName", eventStreamName), slog.Any("err", err))
-				continue
-			}
-		}
-
-		_, err = js.AddConsumer(eventStreamName, c.consumerConfig)
-		if err != nil {
-			tip := fmt.Sprintf("fail to add consumer for the %d time", (i + 1))
-			slog.Error(tip, slog.Any("consumer", eventStreamName), slog.Any("err", err))
-			continue
-		}
-
-		sub, err := js.PullSubscribe(c.FeeRequestSubject, accountingConsumerName)
-		if err != nil {
-			tip := fmt.Sprintf("fail to PullSubscribe for the %d time", (i + 1))
-			slog.Error(tip, slog.Any("FeeRequestSubject", c.FeeRequestSubject), slog.Any("consumer", accountingConsumerName), slog.Any("err", err))
-			continue
-		}
-		c.handleReadMsgs(js, sub)
+		break
 	}
-	c.CH <- 1
 }
 
-func (c *Charging) handleReadMsgs(js nats.JetStreamContext, sub *nats.Subscription) {
+func (c *Charging) handleReadMsgs() {
 	failReadTime := 0
 	for {
-		// reset JetStream if read msg fail times is more than 10
 		if failReadTime >= 10 {
 			break
 		}
-		err := c.checkStreams(js)
+		err := c.sysMQ.VerifyEventStream()
 		if err != nil {
-			tip := fmt.Sprintf("fail to find streams for the %d time", (failReadTime + 1))
-			slog.Error(tip, slog.Any("subjectName", c.FeeRequestSubject), slog.Any("err", err))
+			tip := fmt.Sprintf("fail to verify stream for the %d time", (failReadTime + 1))
+			slog.Error(tip, slog.Any("err", err))
 			failReadTime++
 			continue
 		}
-		msgs, err := sub.Fetch(5, nats.MaxWait(time.Duration(c.MsgFetchTimeoutInSec)*time.Second))
+		msgs, err := c.sysMQ.FetchFeeEventMessages(5)
 		if err == nats.ErrTimeout {
 			continue
 		}
+
 		if err != nil {
-			tip := fmt.Sprintf("fail to read NextMsg for the %d time", (failReadTime + 1))
-			slog.Error(tip, slog.Any("subjectName", c.FeeRequestSubject), slog.Any("err", err))
+			tip := fmt.Sprintf("fail to fetch event messages for the %d time", (failReadTime + 1))
+			slog.Error(tip, slog.Any("err", err))
 			failReadTime++
 			continue
 		}
 		if msgs == nil {
 			tip := fmt.Sprintf("msgs is null for the %d time", (failReadTime + 1))
-			slog.Warn(tip, slog.Any("subjectName", c.FeeRequestSubject))
+			slog.Warn(tip)
 			failReadTime++
 			continue
 		}
 
-		for _, msg := range msgs {
-			c.handleRetryMsg(msg)
+		for msg := range msgs.Messages() {
+			c.handleMsgWithRetry(msg)
 		}
 
 	}
 }
 
-func (c *Charging) checkStreams(js nats.JetStreamContext) error {
-	streamNames := js.StreamNames()
-	requiredStreams := map[string]bool{
-		eventStreamName:  true,
-		notifyStreamName: true,
-		dlqStreamName:    true,
-	}
-	for s := range streamNames {
-		delete(requiredStreams, s)
-	}
-	if len(requiredStreams) < 1 {
-		return nil
-	} else {
-		keys := make([]string, 0, len(requiredStreams))
-		for k := range requiredStreams {
-			keys = append(keys, k)
-		}
-		return fmt.Errorf("stream %v lost", keys)
-	}
-}
-
-func (c *Charging) handleRetryMsg(msg *nats.Msg) {
+func (c *Charging) handleMsgWithRetry(msg jetstream.Msg) {
+	strData := string(msg.Data())
+	slog.Info("Sub received", slog.Any("msg.data", strData), slog.Any("msg.subject", msg.Subject()))
 	// A maximum of 3 attempts
 	var err error = nil
 	for j := 0; j < 3; j++ {
 		err = c.handleMsgData(msg)
-		if err != nil {
-			tip := fmt.Sprintf("error happen when handle single msg for the %d time", (j + 1))
-			slog.Error(tip, slog.Any("error", err))
-		} else {
+		if err == nil {
 			break
 		}
 	}
 
-	if err == nil {
+	if err != nil {
+		slog.Error("error happen when handle single msg with retry 3 times", slog.Any("msg.data", strData), slog.Any("error", err))
+		// move DLQ for fail to handle message
+		c.moveMsgToDLQWithReTry(msg)
+	} else {
 		// handle message success
 		err = msg.Ack()
 		if err != nil {
 			slog.Warn("fail to do msg ack for deal with message success", slog.Any("error", err))
 		}
-		return
 	}
 
-	// move DLQ for fail to handle message
-	c.reTryMoveMsgToDLQ(msg)
 }
 
-func (c *Charging) reTryMoveMsgToDLQ(msg *nats.Msg) {
+func (c *Charging) moveMsgToDLQWithReTry(msg jetstream.Msg) {
 	// A maximum of three attempts for move DLQ
 	var err error = nil
-	for i := 0; i < 3; i++ {
+	for i := 0; i < 5; i++ {
 		err = c.moveMsgToDLQ(msg)
-		if err != nil {
-			tip := fmt.Sprintf("fail to move DLQ for the %d time", (i + 1))
-			slog.Warn(tip, slog.Any("msg.data", string(msg.Data)))
-		} else {
+		if err == nil {
 			break
 		}
 	}
 
-	if err == nil {
+	if err != nil {
+		slog.Error("fail to move msg to DLQ with retry 5 times", slog.Any("error", err))
+	} else {
+		// move dlq success
 		err = msg.Ack()
 		if err != nil {
-			slog.Warn("fail to do msg ack for message handling retry 3 times", slog.Any("error", err))
+			slog.Warn("fail to do msg ack for move msg to DLQ success", slog.Any("msg.data", string(msg.Data())), slog.Any("error", err))
 		}
 	}
 }
 
-func (c *Charging) moveMsgToDLQ(msg *nats.Msg) error {
+func (c *Charging) moveMsgToDLQ(msg jetstream.Msg) error {
 	c.dlqTimeout.Reset(idleDuration)
 	select {
-	case c.dlq.CH <- msg.Data:
+	case c.dlq.CH <- msg.Data():
 		return nil
 	case <-c.dlqTimeout.C:
 		return fmt.Errorf("try to move DLQ with timeout, %v", idleDuration)
 	}
 }
 
-func (c *Charging) handleMsgData(msg *nats.Msg) error {
+func (c *Charging) handleMsgData(msg jetstream.Msg) error {
 	event, eventExtra, err := c.parseMessageData(msg)
 	if err != nil {
 		return err
@@ -283,11 +203,10 @@ func (c *Charging) handleMsgData(msg *nats.Msg) error {
 	return nil
 }
 
-func (c *Charging) parseMessageData(msg *nats.Msg) (*types.ACC_EVENT, *types.ACC_EVENT_EXTRA, error) {
-	strData := string(msg.Data)
-	slog.Info("Sub received", slog.Any("msg.data", strData), slog.Any("msg.subject", msg.Subject))
+func (c *Charging) parseMessageData(msg jetstream.Msg) (*types.ACC_EVENT, *types.ACC_EVENT_EXTRA, error) {
+	strData := string(msg.Data())
 	evt := types.ACC_EVENT{}
-	err := json.Unmarshal(msg.Data, &evt)
+	err := json.Unmarshal(msg.Data(), &evt)
 	if err != nil {
 		return nil, nil, fmt.Errorf("fail to unmarshal event, %v, %w", strData, err)
 	}
@@ -330,7 +249,7 @@ func (c *Charging) parseMessageData(msg *nats.Msg) (*types.ACC_EVENT, *types.ACC
 func (c *Charging) checkBalanceAndSendNotification(ctx context.Context, event *types.ACC_EVENT) {
 	account, err := c.acctUserComp.GetAccountingByUserID(ctx, event.UserUUID)
 	if err != nil {
-		slog.Warn("fail to query account", slog.Any("user_uuid", event.UserUUID), slog.Any("error", err))
+		slog.Warn("fail to query account before check account balance", slog.Any("user_uuid", event.UserUUID), slog.Any("error", err))
 		return
 	}
 	if account == nil {
@@ -340,12 +259,12 @@ func (c *Charging) checkBalanceAndSendNotification(ctx context.Context, event *t
 		// retry 3 times for notification
 		for i := 0; i < 3; i++ {
 			err = c.sendNotification(types.REASON_LACK_BALANCE, "insufficient funds", event)
-			if err != nil {
-				tip := fmt.Sprintf("fail to notify for the %d time", (i + 1))
-				slog.Warn(tip, slog.Any("event", event), slog.Any("error", err))
-			} else {
+			if err == nil {
 				break
 			}
+		}
+		if err != nil {
+			slog.Error("fail to notify for retry 3 times", slog.Any("event", event), slog.Any("error", err))
 		}
 	}
 }

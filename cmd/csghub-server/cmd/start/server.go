@@ -54,7 +54,10 @@ var serverCmd = &cobra.Command{
 			DSN:     cfg.Database.DSN,
 		}
 		database.InitDB(dbConfig)
-		event.InitNats(cfg)
+		err = event.InitEventPublisher(cfg)
+		if err != nil {
+			return fmt.Errorf("fail to initialize message queue, %w", err)
+		}
 		deploy.Init(deploy.DeployConfig{
 			ImageBuilderURL:         cfg.Space.BuilderEndpoint,
 			ImageRunnerURL:          cfg.Space.RunnerEndpoint,

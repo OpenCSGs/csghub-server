@@ -119,10 +119,7 @@ type Config struct {
 	}
 	// send events
 	Event struct {
-		SyncInterval            int    `envconfig:"STARHUB_SERVER_SYNC_IN_MINUTES" default:"1"`
-		FeeSendSubject          string `envconfig:"STARHUB_SERVER_FEE_SEND_SUBJECT" default:"accounting.fee.credit"`
-		FeeSendRetrySubject     string `envconfig:"STARHUB_SERVER_FEE_RETRY_SUBJECT" default:"accounting.dlq.fee"`
-		NoBalanceReceiveSubject string `envconfig:"STARHUB_SERVER_NOTIFY_NOBALANCE_SUBJECT" default:"accounting.notify.nobalance"`
+		SyncInterval int `envconfig:"STARHUB_SERVER_SYNC_IN_MINUTES" default:"1"`
 	}
 
 	Casdoor struct {
@@ -134,14 +131,17 @@ type Config struct {
 		ApplicationName  string `envconfig:"STARHUB_SERVER_CASDOOR_APPLICATION_NAME" default:"opencsg"`
 	}
 
-	Accounting struct {
-		Host                      string `envconfig:"OPENCSG_ACCOUNTING_SERVER_HOST" default:"http://localhost"`
-		Port                      int    `envconfig:"OPENCSG_ACCOUNTING_SERVER_PORT" default:"8086"`
-		NatsURL                   string `envconfig:"OPENCSG_ACCOUNTING_NATS_URL" default:"nats://account:g98dc5FA8v4J7ck90w@natsmaster:4222"`
+	Nats struct {
+		URL                       string `envconfig:"OPENCSG_ACCOUNTING_NATS_URL" default:"nats://account:g98dc5FA8v4J7ck90w@natsmaster:4222"`
 		FeeRequestSubject         string `envconfig:"OPENCSG_ACCOUNTING_FEE_EVENT_SUBJECT" default:"accounting.fee.>"`
 		FeeNotifyNoBalanceSubject string `envconfig:"OPENCSG_ACCOUNTING_NOTIFY_NOBALANCE_SUBJECT" default:"accounting.notify.nobalance"`
 		MsgFetchTimeoutInSEC      int    `envconfig:"OPENCSG_ACCOUNTING_MSG_FETCH_TIMEOUTINSEC" default:"5"`
-		AccessToken               string `envconfig:"OPENCSG_ACCOUNTING_ACCESS_TOKEN" default:""`
+		FeeSendSubject            string `envconfig:"STARHUB_SERVER_FEE_SEND_SUBJECT" default:"accounting.fee.credit"`
+	}
+
+	Accounting struct {
+		Host string `envconfig:"OPENCSG_ACCOUNTING_SERVER_HOST" default:"http://localhost"`
+		Port int    `envconfig:"OPENCSG_ACCOUNTING_SERVER_PORT" default:"8086"`
 	}
 
 	MultiSync struct {
