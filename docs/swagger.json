@@ -10498,7 +10498,7 @@
                     "type": "string"
                 },
                 "status": {
-                    "$ref": "#/definitions/database.MirrorTaskStatus"
+                    "$ref": "#/definitions/types.MirrorTaskStatus"
                 },
                 "updated_at": {
                     "type": "string"
@@ -10524,23 +10524,6 @@
                     "type": "string"
                 }
             }
-        },
-        "database.MirrorTaskStatus": {
-            "type": "string",
-            "enum": [
-                "waiting",
-                "running",
-                "finished",
-                "failed",
-                "incomplete"
-            ],
-            "x-enum-varnames": [
-                "MirrorWaiting",
-                "MirrorRunning",
-                "MirrorFinished",
-                "MirrorFailed",
-                "MirrorIncomplete"
-            ]
         },
         "database.Model": {
             "type": "object",
@@ -11883,6 +11866,23 @@
                 }
             }
         },
+        "types.MirrorTaskStatus": {
+            "type": "string",
+            "enum": [
+                "waiting",
+                "running",
+                "finished",
+                "failed",
+                "incomplete"
+            ],
+            "x-enum-varnames": [
+                "MirrorWaiting",
+                "MirrorRunning",
+                "MirrorFinished",
+                "MirrorFailed",
+                "MirrorIncomplete"
+            ]
+        },
         "types.Model": {
             "type": "object",
             "properties": {
@@ -12353,6 +12353,9 @@
                 },
                 "status": {
                     "description": "deploying, running, failed",
+                    "type": "string"
+                },
+                "svc_name": {
                     "type": "string"
                 },
                 "sync_status": {

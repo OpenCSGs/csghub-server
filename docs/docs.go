@@ -10509,7 +10509,7 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "status": {
-                    "$ref": "#/definitions/database.MirrorTaskStatus"
+                    "$ref": "#/definitions/types.MirrorTaskStatus"
                 },
                 "updated_at": {
                     "type": "string"
@@ -10535,23 +10535,6 @@ const docTemplate = `{
                     "type": "string"
                 }
             }
-        },
-        "database.MirrorTaskStatus": {
-            "type": "string",
-            "enum": [
-                "waiting",
-                "running",
-                "finished",
-                "failed",
-                "incomplete"
-            ],
-            "x-enum-varnames": [
-                "MirrorWaiting",
-                "MirrorRunning",
-                "MirrorFinished",
-                "MirrorFailed",
-                "MirrorIncomplete"
-            ]
         },
         "database.Model": {
             "type": "object",
@@ -11894,6 +11877,23 @@ const docTemplate = `{
                 }
             }
         },
+        "types.MirrorTaskStatus": {
+            "type": "string",
+            "enum": [
+                "waiting",
+                "running",
+                "finished",
+                "failed",
+                "incomplete"
+            ],
+            "x-enum-varnames": [
+                "MirrorWaiting",
+                "MirrorRunning",
+                "MirrorFinished",
+                "MirrorFailed",
+                "MirrorIncomplete"
+            ]
+        },
         "types.Model": {
             "type": "object",
             "properties": {
@@ -12364,6 +12364,9 @@ const docTemplate = `{
                 },
                 "status": {
                     "description": "deploying, running, failed",
+                    "type": "string"
+                },
+                "svc_name": {
                     "type": "string"
                 },
                 "sync_status": {
