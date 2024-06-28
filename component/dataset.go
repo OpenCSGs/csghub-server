@@ -297,6 +297,10 @@ func (c *DatasetComponent) Index(ctx context.Context, filter *types.RepoFilter, 
 			UpdatedAt:    repo.UpdatedAt,
 			Source:       repo.Source,
 			SyncStatus:   repo.SyncStatus,
+			Repository: types.Repository{
+				HTTPCloneURL: repo.HTTPCloneURL,
+				SSHCloneURL:  repo.SSHCloneURL,
+			},
 		})
 	}
 
