@@ -91,7 +91,7 @@ definitions:
       source_url:
         type: string
       status:
-        $ref: '#/definitions/database.MirrorTaskStatus'
+        $ref: '#/definitions/types.MirrorTaskStatus'
       updated_at:
         type: string
     type: object
@@ -108,20 +108,6 @@ definitions:
       updated_at:
         type: string
     type: object
-  database.MirrorTaskStatus:
-    enum:
-    - waiting
-    - running
-    - finished
-    - failed
-    - incomplete
-    type: string
-    x-enum-varnames:
-    - MirrorWaiting
-    - MirrorRunning
-    - MirrorFinished
-    - MirrorFailed
-    - MirrorIncomplete
   database.Model:
     properties:
       created_at:
@@ -1031,6 +1017,20 @@ definitions:
       sync_status:
         $ref: '#/definitions/types.RepositorySyncStatus'
     type: object
+  types.MirrorTaskStatus:
+    enum:
+    - waiting
+    - running
+    - finished
+    - failed
+    - incomplete
+    type: string
+    x-enum-varnames:
+    - MirrorWaiting
+    - MirrorRunning
+    - MirrorFinished
+    - MirrorFailed
+    - MirrorIncomplete
   types.Model:
     properties:
       created_at:
@@ -1351,6 +1351,8 @@ definitions:
         $ref: '#/definitions/types.RepositorySource'
       status:
         description: deploying, running, failed
+        type: string
+      svc_name:
         type: string
       sync_status:
         $ref: '#/definitions/types.RepositorySyncStatus'

@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"strings"
 
 	"opencsg.com/csghub-server/builder/accounting"
 	"opencsg.com/csghub-server/builder/store/database"
@@ -117,6 +118,12 @@ func (ac *AccountingComponent) ListBillsByUserIDAndDate(ctx context.Context, req
 		if d != nil {
 			newItem.Status = deployStatusCodeToString(d.Status)
 			newItem.CreatedAt = d.CreatedAt
+			if d.GitPath != "" {
+				cols := strings.Split(d.GitPath, "_")
+				if len(cols) > 1 {
+					newItem.RepoPath = cols[1]
+				}
+			}
 		}
 		mergedItems = append(mergedItems, newItem)
 	}

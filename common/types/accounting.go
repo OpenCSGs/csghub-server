@@ -115,6 +115,7 @@ type ITEM struct {
 	Value        float64   `json:"value"`
 	CreatedAt    time.Time `json:"created_at"`
 	Status       string    `json:"status"`
+	RepoPath     string    `json:"repo_path"`
 }
 
 type BILLS struct {

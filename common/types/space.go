@@ -49,6 +49,7 @@ type Space struct {
 	Source       RepositorySource     `json:"source"`
 	SyncStatus   RepositorySyncStatus `json:"sync_status"`
 	SKU          string               `json:"sku,omitempty"`
+	SvcName      string               `json:"svc_name,omitempty"`
 }
 
 type UpdateSpaceReq struct {

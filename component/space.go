@@ -163,9 +163,9 @@ func (c *SpaceComponent) Show(ctx context.Context, namespace, name, currentUser 
 	}
 
 	var endpoint string
-	srvName, status, _ := c.status(ctx, space)
-	if len(srvName) > 0 {
-		endpoint = fmt.Sprintf("%s.%s", srvName, c.publicRootDomain)
+	svcName, status, _ := c.status(ctx, space)
+	if len(svcName) > 0 {
+		endpoint = fmt.Sprintf("%s.%s", svcName, c.publicRootDomain)
 	}
 
 	likeExists, err := c.uls.IsExist(ctx, currentUser, space.Repository.ID)
@@ -207,6 +207,7 @@ func (c *SpaceComponent) Show(ctx context.Context, namespace, name, currentUser 
 		Source:        space.Repository.Source,
 		SyncStatus:    space.Repository.SyncStatus,
 		SKU:           space.SKU,
+		SvcName:       svcName,
 	}
 
 	return resModel, nil
