@@ -20,6 +20,7 @@ type GitServer interface {
 	CreateUserToken(*types.CreateUserTokenRequest) (*database.AccessToken, error)
 	DeleteUserToken(*types.DeleteUserTokenRequest) error
 
+	GetRepo(ctx context.Context, req GetRepoReq) (*CreateRepoResp, error)
 	CreateRepo(ctx context.Context, req CreateRepoReq) (*CreateRepoResp, error)
 	UpdateRepo(ctx context.Context, req UpdateRepoReq) (*CreateRepoResp, error)
 	DeleteRepo(ctx context.Context, req DeleteRepoReq) error
