@@ -63,11 +63,6 @@ func (c *SpaceComponent) Create(ctx context.Context, req types.CreateSpaceReq) (
 	req.Nickname = nickname
 	req.RepoType = types.SpaceRepo
 	req.Readme = generateReadmeData(req.License)
-	_, dbRepo, err := c.CreateRepo(ctx, req.CreateRepoReq)
-	if err != nil {
-		return nil, err
-	}
-
 	resource, err := c.srs.FindByID(ctx, req.ResourceID)
 	if err != nil {
 		return nil, err
@@ -78,6 +73,11 @@ func (c *SpaceComponent) Create(ctx context.Context, req types.CreateSpaceReq) (
 	}
 	if resource.CostPerHour != 0 && account.Balance <= 0 {
 		return nil, fmt.Errorf("balance is not enough to run GPU resources, current balance: %f", account.Balance)
+	}
+
+	_, dbRepo, err := c.CreateRepo(ctx, req.CreateRepoReq)
+	if err != nil {
+		return nil, err
 	}
 
 	dbSpace := database.Space{
