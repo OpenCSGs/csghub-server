@@ -14,6 +14,16 @@ var (
 	REASON_DUPLICATED     = 4 // duplicated charge
 )
 
+var (
+	SceneReserve        int = 0  // system reserve
+	ScenePortalCharge   int = 1  // portal charge fee
+	SceneModelInference int = 10 // model inference endpoint
+	SceneSpace          int = 11 // csghub space
+	SceneModelFinetune  int = 12 // model finetune
+	SceneStarship       int = 20 // starship
+	SceneUnknow         int = 99 // unknow
+)
+
 // generate charge event from client
 type ACC_EVENT struct {
 	Uuid      uuid.UUID `json:"uuid"`
@@ -115,4 +125,11 @@ type BILLS struct {
 type ACCT_STATEMENTS_RESULT struct {
 	Data []ACCT_STATEMENTS_RES `json:"data"`
 	ACCT_SUMMARY
+}
+
+type CONSUMER_INFO struct {
+	ConsumerID    string `json:"customer_id"`
+	ConsumerPrice string `json:"customer_price"`
+	PriceUnit     string `json:"price_unit"`
+	Duration      string `json:"customer_duration"`
 }

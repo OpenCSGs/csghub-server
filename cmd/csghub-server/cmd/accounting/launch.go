@@ -10,6 +10,7 @@ import (
 	"opencsg.com/csghub-server/api/httpbase"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/config"
+	"opencsg.com/csghub-server/mq"
 )
 
 var launchCmd = &cobra.Command{
@@ -32,8 +33,13 @@ var launchCmd = &cobra.Command{
 		}
 		database.InitDB(dbConfig)
 
-		charge := consumer.NewCharging(cfg)
-		go charge.Run()
+		mqHandler, err := mq.Init(cfg)
+		if err != nil {
+			return fmt.Errorf("fail to build message queue handler: %w", err)
+		}
+
+		charge := consumer.NewCharging(mqHandler, cfg)
+		charge.Run()
 
 		r, err := router.NewAccountRouter(cfg)
 		if err != nil {

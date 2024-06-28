@@ -105,7 +105,7 @@ func (a *AccountingStatementComponent) RechargeAccountingUser(ctx context.Contex
 		Uuid:      uuid.New(),
 		UserUUID:  userUUID,
 		Value:     req.Value,
-		ValueType: 0,
+		ValueType: int(database.ScenePortalCharge),
 		Scene:     int(database.ScenePortalCharge),
 		OpUID:     req.OpUID,
 		CreatedAt: time.Now(),

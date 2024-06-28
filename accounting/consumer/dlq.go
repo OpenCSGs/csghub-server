@@ -5,112 +5,83 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/nats-io/nats.go"
-)
-
-var (
-	dlqSubject    string = "accounting.dlq.fee"
-	dlqStreamName string = "accountingDlqStream"
+	"opencsg.com/csghub-server/mq"
 )
 
 type Dlq struct {
-	cfg     *nats.StreamConfig
+	sysMQ   *mq.NatsHandler
 	CH      chan []byte
 	timeOut *time.Timer
 }
 
-func NewDlq() *Dlq {
+func NewDlq(mqh *mq.NatsHandler) *Dlq {
 	dlq := &Dlq{
-		cfg: &nats.StreamConfig{
-			Name:         dlqStreamName,
-			Subjects:     []string{dlqSubject},
-			MaxConsumers: -1,
-			MaxMsgs:      -1,
-			MaxBytes:     -1,
-		},
+		sysMQ:   mqh,
 		CH:      make(chan []byte),
 		timeOut: time.NewTimer(idleDuration),
 	}
 	return dlq
 }
 
-func (d *Dlq) Run(nc *nats.Conn) {
+func (d *Dlq) Run() {
 	for {
-		if nc == nil || nc.IsClosed() {
-			break
-		}
-		js, err := nc.JetStream()
-		if err != nil {
-			slog.Error("fail to get dlq jetstream", slog.Any("err", err))
-			continue
-		}
-
-		_, err = js.AddStream(d.cfg)
-		if err != nil {
-			// slog.Warn("fail to add dlq nats stream", slog.Any("streamName", dlqStreamName), slog.Any("err", err))
-			_, err = js.UpdateStream(d.cfg)
-			if err != nil {
-				slog.Warn("fail to update dql nats stream", slog.Any("streamName", dlqStreamName), slog.Any("err", err))
-				continue
-			}
-		}
-		d.moveWithRetry(nc, js)
+		d.preDLQ()
+		d.moveWithRetry()
 	}
 }
 
-func (d *Dlq) moveWithRetry(nc *nats.Conn, js nats.JetStreamContext) {
+func (d *Dlq) preDLQ() {
+	var err error = nil
+	var i int = 0
 	for {
+		i++
+		err = d.sysMQ.BuildDLQStream()
+		if err != nil {
+			tip := fmt.Sprintf("fail to build DLQ stream for the %d time", i)
+			slog.Error(tip, slog.Any("err", err))
+			time.Sleep(2 * time.Second)
+			continue
+		}
+		break
+	}
+}
+
+func (d *Dlq) moveWithRetry() {
+	for {
+		err := d.sysMQ.VerifyDLQStream()
+		if err != nil {
+			slog.Error("fail to verify DLQ stream", slog.Any("error", err))
+			break
+		}
+
 		var data []byte = []byte("")
 		d.timeOut.Reset(idleDuration)
 		select {
 		case data = <-d.CH:
 		case <-d.timeOut.C:
 		}
-		if nc == nil || nc.IsClosed() {
-			break
-		}
-		err := d.checkDLQStream(js)
-		if err != nil {
-			slog.Error("fail to check DLQ stream", slog.Any("error", err))
-			break
-		}
+
 		if len(data) < 1 {
 			continue
 		}
-		err = d.retryPublishToDlq(js, data)
+		err = d.publishToDLQWithRetry(data)
 		if err != nil {
 			break
 		}
 	}
 }
 
-func (d *Dlq) checkDLQStream(js nats.JetStreamContext) error {
-	info, err := js.StreamInfo(dlqStreamName)
-	if err != nil {
-		return fmt.Errorf("fail to get stream %s info", dlqStreamName)
-	}
-	if info == nil {
-		return fmt.Errorf("stream %s lost", dlqStreamName)
-	}
-	return nil
-}
-
-func (d *Dlq) retryPublishToDlq(js nats.JetStreamContext, data []byte) error {
+func (d *Dlq) publishToDLQWithRetry(data []byte) error {
 	// max try 10 times
 	var err error = nil
 	for m := 0; m < 10; m++ {
-		err = d.publishToDlq(js, data)
-		if err != nil {
-			slog.Error("fail to move DLQ", slog.Any("subject", dlqSubject), slog.Any("data", string(data)), slog.Any("error", err))
-			continue
-		} else {
+		err = d.sysMQ.PublishDataToDLQ(data)
+		if err == nil {
 			break
 		}
 	}
-	return err
-}
-
-func (d *Dlq) publishToDlq(js nats.JetStreamContext, data []byte) error {
-	_, err := js.Publish(dlqSubject, data)
+	if err != nil {
+		slog.Error("fail to move DLQ with retry 10 times", slog.Any("data", string(data)), slog.Any("error", err))
+	}
 	return err
 }

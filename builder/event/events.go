@@ -1,36 +1,63 @@
 package event
 
 import (
-	"log/slog"
+	"fmt"
+	"time"
+
+	"github.com/nats-io/nats.go/jetstream"
+	"opencsg.com/csghub-server/common/config"
+	"opencsg.com/csghub-server/mq"
+)
+
+var (
+	CSGHubServerDurableConsumerName string = "NoBalanceConsumerForCSGHubServer"
+	DefaultEventPublisher           EventPublisher
 )
 
 type EventPublisher struct {
-	Connector *NatsConnector
+	Connector         *mq.NatsHandler
+	FeeRequestSubject string
+	RecvNotifySubject string
+	SyncInterval      int //in minutes
 }
 
-// NewEventPublisher creates a new instance of EventPublisher
-func NewEventPublisher() *EventPublisher {
-	return &EventPublisher{
-		Connector: defaultNats,
+// NewNatsConnector initializes a new connection to the NATS server
+func InitEventPublisher(cfg *config.Config) error {
+	hander, err := mq.Init(cfg)
+	if err != nil {
+		return err
 	}
+	DefaultEventPublisher = EventPublisher{
+		Connector:         hander,
+		FeeRequestSubject: cfg.Nats.FeeSendSubject,
+		RecvNotifySubject: cfg.Nats.FeeNotifyNoBalanceSubject,
+		SyncInterval:      cfg.Event.SyncInterval,
+	}
+	return nil
+}
+
+func (ec *EventPublisher) CreateNoBalanceConsumer() (jetstream.Consumer, error) {
+	return ec.Connector.BuildNotifyConsumer(CSGHubServerDurableConsumerName)
 }
 
 // Publish sends a message to the specified subject
-func (ec *EventPublisher) Publish(subject string, message []byte) error {
+func (ec *EventPublisher) PublishFeeEvent(message []byte) error {
 	var err error
-	if subject == "" {
-		subject = ec.Connector.Subject
+	for i := 0; i < 3; i++ {
+		err = ec.Connector.VerifyEventStream()
+		if err != nil {
+			continue
+		}
+		err = ec.Connector.PublishData(ec.FeeRequestSubject, message)
+		if err == nil {
+			break
+		}
+		time.Sleep(1 * time.Second)
 	}
-	err = ec.Connector.Conn.Publish(subject, message)
-	if err == nil {
-		slog.Debug("Published event", slog.Any("event", message))
-		return nil
-	}
-	slog.Error("Failed to publish event, send to retry channel", slog.Any("error", err))
-	//send to retry channel
-	err = ec.Connector.Conn.Publish(ec.Connector.RetrySubject, message)
+
 	if err != nil {
-		slog.Error("Failed to publish event to retry channel", slog.Any("error", err), slog.Any("event", message))
+		return fmt.Errorf("failed to publish event for retry 3 times, %w", err)
 	}
-	return err
+
+	return nil
 }
