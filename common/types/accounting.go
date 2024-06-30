@@ -117,6 +117,8 @@ type ITEM struct {
 	Status       string    `json:"status"`
 	RepoPath     string    `json:"repo_path"`
 	DeployID     int64     `json:"deploy_id"`
+	DeployName   string    `json:"deploy_name"`
+	DeployUser   string    `json:"deploy_user"`
 }
 
 type BILLS struct {

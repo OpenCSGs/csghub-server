@@ -119,10 +119,12 @@ func (ac *AccountingComponent) ListBillsByUserIDAndDate(ctx context.Context, req
 			newItem.Status = deployStatusCodeToString(d.Status)
 			newItem.CreatedAt = d.CreatedAt
 			newItem.DeployID = d.ID
+			newItem.DeployName = d.DeployName
+			newItem.DeployUser = req.CurrentUser
 			if d.GitPath != "" {
-				cols := strings.Split(d.GitPath, "_")
-				if len(cols) > 1 {
-					newItem.RepoPath = cols[1]
+				idx := strings.Index(d.GitPath, "_")
+				if idx > -1 && idx+1 < len(d.GitPath) {
+					newItem.RepoPath = d.GitPath[idx+1:]
 				}
 			}
 		}

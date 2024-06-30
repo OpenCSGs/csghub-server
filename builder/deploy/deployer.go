@@ -624,9 +624,9 @@ func (d *deployer) startAccountingRequestFee(svc imagerunner.StatusResponse) {
 
 	err = d.eventPub.PublishFeeEvent(str)
 	if err != nil {
-		slog.Error("fail to pub event", slog.Any("data", str), slog.Any("error", err))
+		slog.Error("fail to pub event", slog.Any("data", string(str)), slog.Any("error", err))
 	} else {
-		slog.Info("pub event success", slog.Any("data", str))
+		slog.Info("pub event success", slog.Any("data", string(str)))
 	}
 }
 
