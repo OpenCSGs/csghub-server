@@ -2,18 +2,20 @@ package imagerunner
 
 import (
 	"context"
+
+	"opencsg.com/csghub-server/common/types"
 )
 
 type Runner interface {
-	Run(context.Context, *RunRequest) (*RunResponse, error)
-	Stop(context.Context, *StopRequest) (*StopResponse, error)
-	Purge(context.Context, *PurgeRequest) (*PurgeResponse, error)
-	Status(context.Context, *StatusRequest) (*StatusResponse, error)
-	StatusAll(context.Context) (map[string]StatusResponse, error)
-	Logs(context.Context, *LogsRequest) (<-chan string, error)
-	Exist(context.Context, *CheckRequest) (*StatusResponse, error)
-	GetReplica(context.Context, *StatusRequest) (*ReplicaResponse, error)
-	InstanceLogs(context.Context, *InstanceLogsRequest) (<-chan string, error)
-	ListCluster(ctx context.Context) ([]ClusterResponse, error)
-	UpdateCluster(ctx context.Context, data interface{}) (*UpdateClusterResponse, error)
+	Run(context.Context, *types.RunRequest) (*types.RunResponse, error)
+	Stop(context.Context, *types.StopRequest) (*types.StopResponse, error)
+	Purge(context.Context, *types.PurgeRequest) (*types.PurgeResponse, error)
+	Status(context.Context, *types.StatusRequest) (*types.StatusResponse, error)
+	StatusAll(context.Context) (map[string]types.StatusResponse, error)
+	Logs(context.Context, *types.LogsRequest) (<-chan string, error)
+	Exist(context.Context, *types.CheckRequest) (*types.StatusResponse, error)
+	GetReplica(context.Context, *types.StatusRequest) (*types.ReplicaResponse, error)
+	InstanceLogs(context.Context, *types.InstanceLogsRequest) (<-chan string, error)
+	ListCluster(ctx context.Context) ([]types.ClusterResponse, error)
+	UpdateCluster(ctx context.Context, data interface{}) (*types.UpdateClusterResponse, error)
 }

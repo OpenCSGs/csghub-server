@@ -11,6 +11,8 @@ import (
 	"net/http"
 	"net/url"
 	"time"
+
+	"opencsg.com/csghub-server/common/types"
 )
 
 var _ Runner = (*RemoteRunner)(nil)
@@ -31,17 +33,17 @@ func NewRemoteRunner(remoteURL string) (Runner, error) {
 	}, nil
 }
 
-func (h *RemoteRunner) Run(ctx context.Context, req *RunRequest) (*RunResponse, error) {
+func (h *RemoteRunner) Run(ctx context.Context, req *types.RunRequest) (*types.RunResponse, error) {
 	slog.Debug("send request", slog.Any("body", req))
 	svcName := req.SvcName
-	u := fmt.Sprintf("%s/%s/run", h.remote, svcName)
+	u := fmt.Sprintf("%s/api/v1/service/%s/run", h.remote, svcName)
 	response, err := h.doRequest(http.MethodPost, u, req)
 	if err != nil {
 		return nil, err
 	}
 	defer response.Body.Close()
 
-	var resp RunResponse
+	var resp types.RunResponse
 	if err := json.NewDecoder(response.Body).Decode(&resp); err != nil {
 		return nil, err
 	}
@@ -50,34 +52,34 @@ func (h *RemoteRunner) Run(ctx context.Context, req *RunRequest) (*RunResponse, 
 	return &resp, nil
 }
 
-func (h *RemoteRunner) Stop(ctx context.Context, req *StopRequest) (*StopResponse, error) {
+func (h *RemoteRunner) Stop(ctx context.Context, req *types.StopRequest) (*types.StopResponse, error) {
 	svcName := req.SvcName
-	u := fmt.Sprintf("%s/%s/stop", h.remote, svcName)
+	u := fmt.Sprintf("%s/api/v1/service/%s/stop", h.remote, svcName)
 	response, err := h.doRequest(http.MethodPost, u, req)
 	if err != nil {
 		return nil, err
 	}
 	defer response.Body.Close()
 
-	var stopResponse StopResponse
-	if err := json.NewDecoder(response.Body).Decode(&stopResponse); err != nil {
+	var StopResponse types.StopResponse
+	if err := json.NewDecoder(response.Body).Decode(&StopResponse); err != nil {
 		return nil, err
 	}
 
-	return &stopResponse, nil
+	return &StopResponse, nil
 }
 
-func (h *RemoteRunner) Purge(ctx context.Context, req *PurgeRequest) (*PurgeResponse, error) {
+func (h *RemoteRunner) Purge(ctx context.Context, req *types.PurgeRequest) (*types.PurgeResponse, error) {
 	// u := fmt.Sprintf("%s/%s/stop", h.remote, common.UniqueSpaceAppName(req.OrgName, req.RepoName, req.ID))
 	svcName := req.SvcName
-	u := fmt.Sprintf("%s/%s/purge", h.remote, svcName)
+	u := fmt.Sprintf("%s/api/v1/service/%s/purge", h.remote, svcName)
 	response, err := h.doRequest(http.MethodDelete, u, req)
 	if err != nil {
 		return nil, err
 	}
 	defer response.Body.Close()
 
-	var purgeResponse PurgeResponse
+	var purgeResponse types.PurgeResponse
 	if err := json.NewDecoder(response.Body).Decode(&purgeResponse); err != nil {
 		return nil, err
 	}
@@ -85,9 +87,9 @@ func (h *RemoteRunner) Purge(ctx context.Context, req *PurgeRequest) (*PurgeResp
 	return &purgeResponse, nil
 }
 
-func (h *RemoteRunner) Status(ctx context.Context, req *StatusRequest) (*StatusResponse, error) {
+func (h *RemoteRunner) Status(ctx context.Context, req *types.StatusRequest) (*types.StatusResponse, error) {
 	svcName := req.SvcName
-	u := fmt.Sprintf("%s/%s/status", h.remote, svcName)
+	u := fmt.Sprintf("%s/api/v1/service/%s/status", h.remote, svcName)
 
 	response, err := h.doRequest(http.MethodGet, u, req)
 	if err != nil {
@@ -95,7 +97,7 @@ func (h *RemoteRunner) Status(ctx context.Context, req *StatusRequest) (*StatusR
 	}
 	defer response.Body.Close()
 
-	var statusResponse StatusResponse
+	var statusResponse types.StatusResponse
 	if err := json.NewDecoder(response.Body).Decode(&statusResponse); err != nil {
 		return nil, err
 	}
@@ -103,15 +105,15 @@ func (h *RemoteRunner) Status(ctx context.Context, req *StatusRequest) (*StatusR
 	return &statusResponse, nil
 }
 
-func (h *RemoteRunner) StatusAll(ctx context.Context) (map[string]StatusResponse, error) {
-	u := fmt.Sprintf("%s/status-all", h.remote)
+func (h *RemoteRunner) StatusAll(ctx context.Context) (map[string]types.StatusResponse, error) {
+	u := fmt.Sprintf("%s/api/v1/service/status-all", h.remote)
 	response, err := h.doRequest(http.MethodGet, u, nil)
 	if err != nil {
 		return nil, err
 	}
 	defer response.Body.Close()
 
-	statusAll := make(map[string]StatusResponse)
+	statusAll := make(map[string]types.StatusResponse)
 	if err := json.NewDecoder(response.Body).Decode(&statusAll); err != nil {
 		return nil, err
 	}
@@ -119,9 +121,9 @@ func (h *RemoteRunner) StatusAll(ctx context.Context) (map[string]StatusResponse
 	return statusAll, nil
 }
 
-func (h *RemoteRunner) Logs(ctx context.Context, req *LogsRequest) (<-chan string, error) {
+func (h *RemoteRunner) Logs(ctx context.Context, req *types.LogsRequest) (<-chan string, error) {
 	svcName := req.SvcName
-	u := fmt.Sprintf("%s/%s/logs", h.remote, svcName)
+	u := fmt.Sprintf("%s/api/v1/service/%s/logs", h.remote, svcName)
 	slog.Debug("logs request", slog.String("url", u), slog.String("appname", svcName))
 	rc, err := h.doSteamRequest(ctx, http.MethodGet, u, req)
 	if err != nil {
@@ -131,16 +133,16 @@ func (h *RemoteRunner) Logs(ctx context.Context, req *LogsRequest) (<-chan strin
 	return h.readToChannel(rc), nil
 }
 
-func (h *RemoteRunner) Exist(ctx context.Context, req *CheckRequest) (*StatusResponse, error) {
+func (h *RemoteRunner) Exist(ctx context.Context, req *types.CheckRequest) (*types.StatusResponse, error) {
 	svcName := req.SvcName
-	u := fmt.Sprintf("%s/%s/get", h.remote, svcName)
+	u := fmt.Sprintf("%s/api/v1/service/%s/get", h.remote, svcName)
 	response, err := h.doRequest(http.MethodGet, u, req)
 	if err != nil {
 		return nil, err
 	}
 	defer response.Body.Close()
 
-	var statusResponse StatusResponse
+	var statusResponse types.StatusResponse
 	if err := json.NewDecoder(response.Body).Decode(&statusResponse); err != nil {
 		return nil, err
 	}
@@ -148,16 +150,16 @@ func (h *RemoteRunner) Exist(ctx context.Context, req *CheckRequest) (*StatusRes
 	return &statusResponse, nil
 }
 
-func (h *RemoteRunner) GetReplica(ctx context.Context, req *StatusRequest) (*ReplicaResponse, error) {
+func (h *RemoteRunner) GetReplica(ctx context.Context, req *types.StatusRequest) (*types.ReplicaResponse, error) {
 	svcName := req.SvcName
-	u := fmt.Sprintf("%s/%s/replica", h.remote, svcName)
+	u := fmt.Sprintf("%s/api/v1/service/%s/replica", h.remote, svcName)
 	response, err := h.doRequest(http.MethodGet, u, req)
 	if err != nil {
 		return nil, err
 	}
 	defer response.Body.Close()
 
-	var resp ReplicaResponse
+	var resp types.ReplicaResponse
 	if err := json.NewDecoder(response.Body).Decode(&resp); err != nil {
 		return nil, err
 	}
@@ -249,8 +251,8 @@ func (h *RemoteRunner) doSteamRequest(ctx context.Context, method, url string, d
 }
 
 // InstanceLogs implements Runner.
-func (h *RemoteRunner) InstanceLogs(ctx context.Context, req *InstanceLogsRequest) (<-chan string, error) {
-	u := fmt.Sprintf("%s/%s/logs/%s", h.remote, req.SvcName, req.InstanceName)
+func (h *RemoteRunner) InstanceLogs(ctx context.Context, req *types.InstanceLogsRequest) (<-chan string, error) {
+	u := fmt.Sprintf("%s/api/v1/service/%s/logs/%s", h.remote, req.SvcName, req.InstanceName)
 	slog.Info("Instance logs request", slog.String("url", u), slog.String("svcname", req.SvcName))
 	rc, err := h.doSteamRequest(ctx, http.MethodGet, u, req)
 	if err != nil {
@@ -260,8 +262,8 @@ func (h *RemoteRunner) InstanceLogs(ctx context.Context, req *InstanceLogsReques
 	return h.readToChannel(rc), nil
 }
 
-func (h *RemoteRunner) ListCluster(ctx context.Context) ([]ClusterResponse, error) {
-	url := fmt.Sprintf("%s/cluster/status", h.remote)
+func (h *RemoteRunner) ListCluster(ctx context.Context) ([]types.ClusterResponse, error) {
+	url := fmt.Sprintf("%s/api/v1/cluster/status", h.remote)
 	// Send a GET request to resources runner
 	response, err := h.client.Get(url)
 	if err != nil {
@@ -269,15 +271,15 @@ func (h *RemoteRunner) ListCluster(ctx context.Context) ([]ClusterResponse, erro
 		return nil, fmt.Errorf("failed to list cluster info, %w", err)
 	}
 	defer response.Body.Close()
-	var resp []ClusterResponse
+	var resp []types.ClusterResponse
 	if err := json.NewDecoder(response.Body).Decode(&resp); err != nil {
 		return nil, err
 	}
 	return resp, nil
 }
 
-func (h *RemoteRunner) UpdateCluster(ctx context.Context, data interface{}) (*UpdateClusterResponse, error) {
-	url := fmt.Sprintf("%s/cluster", h.remote)
+func (h *RemoteRunner) UpdateCluster(ctx context.Context, data interface{}) (*types.UpdateClusterResponse, error) {
+	url := fmt.Sprintf("%s/api/v1/cluster", h.remote)
 	// Create a new HTTP client with a timeout
 	var buf io.Reader
 	if data != nil {
@@ -298,7 +300,7 @@ func (h *RemoteRunner) UpdateCluster(ctx context.Context, data interface{}) (*Up
 		return nil, fmt.Errorf("failed to update cluster info, %w", err)
 	}
 	defer response.Body.Close()
-	var resp UpdateClusterResponse
+	var resp types.UpdateClusterResponse
 	if err := json.NewDecoder(response.Body).Decode(&resp); err != nil {
 		return nil, err
 	}

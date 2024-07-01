@@ -50,7 +50,7 @@ type deployer struct {
 	store              *database.DeployTaskStore
 	spaceStore         *database.SpaceStore
 	spaceResourceStore *database.SpaceResourceStore
-	runnerStatuscache  map[string]imagerunner.StatusResponse
+	runnerStatuscache  map[string]types.StatusResponse
 	internalRootDomain string
 	sfNode             *snowflake.Node
 	eventPub           *event.EventPublisher
@@ -69,7 +69,7 @@ func newDeployer(s scheduler.Scheduler, ib imagebuilder.Builder, ir imagerunner.
 		ir:                ir,
 		store:             store,
 		spaceStore:        database.NewSpaceStore(),
-		runnerStatuscache: make(map[string]imagerunner.StatusResponse),
+		runnerStatuscache: make(map[string]types.StatusResponse),
 		sfNode:            node,
 		eventPub:          &event.DefaultEventPublisher,
 	}
@@ -237,7 +237,7 @@ func (d *deployer) Status(ctx context.Context, dr types.DeployRepo, needDetails 
 
 	if dr.ModelID > 0 {
 		targetID := dr.DeployID // support model deploy with multi-instance
-		status, err := d.ir.Status(ctx, &imagerunner.StatusRequest{
+		status, err := d.ir.Status(ctx, &types.StatusRequest{
 			ClusterID:   dr.ClusterID,
 			OrgName:     dr.Namespace,
 			RepoName:    dr.Name,
@@ -280,7 +280,7 @@ func (d *deployer) Logs(ctx context.Context, dr types.DeployRepo) (*MultiLogRead
 	if dr.SpaceID == 0 {
 		targetID = dr.DeployID // support model deploy with multi-instance
 	}
-	runLog, err := d.ir.Logs(ctx, &imagerunner.LogsRequest{
+	runLog, err := d.ir.Logs(ctx, &types.LogsRequest{
 		ID:        targetID,
 		OrgName:   dr.Namespace,
 		RepoName:  dr.Name,
@@ -300,7 +300,7 @@ func (d *deployer) Stop(ctx context.Context, dr types.DeployRepo) error {
 	if dr.SpaceID == 0 {
 		targetID = dr.DeployID // support model deploy with multi-instance
 	}
-	resp, err := d.ir.Stop(ctx, &imagerunner.StopRequest{
+	resp, err := d.ir.Stop(ctx, &types.StopRequest{
 		ID:        targetID,
 		OrgName:   dr.Namespace,
 		RepoName:  dr.Name,
@@ -318,7 +318,7 @@ func (d *deployer) Purge(ctx context.Context, dr types.DeployRepo) error {
 	if dr.SpaceID == 0 {
 		targetID = dr.DeployID // support model deploy with multi-instance
 	}
-	resp, err := d.ir.Purge(ctx, &imagerunner.PurgeRequest{
+	resp, err := d.ir.Purge(ctx, &types.PurgeRequest{
 		ID:        targetID,
 		OrgName:   dr.Namespace,
 		RepoName:  dr.Name,
@@ -361,7 +361,7 @@ func (d *deployer) Exist(ctx context.Context, dr types.DeployRepo) (bool, error)
 	if dr.SpaceID == 0 {
 		targetID = dr.DeployID // support model deploy with multi-instance
 	}
-	req := &imagerunner.CheckRequest{
+	req := &types.CheckRequest{
 		ID:        targetID,
 		OrgName:   dr.Namespace,
 		RepoName:  dr.Name,
@@ -391,7 +391,7 @@ func (d *deployer) GetReplica(ctx context.Context, dr types.DeployRepo) (int, in
 	if dr.SpaceID == 0 {
 		targetID = dr.DeployID // support model deploy with multi-instance
 	}
-	req := &imagerunner.StatusRequest{
+	req := &types.StatusRequest{
 		ID:        targetID,
 		OrgName:   dr.Namespace,
 		RepoName:  dr.Name,
@@ -413,7 +413,7 @@ func (d *deployer) InstanceLogs(ctx context.Context, dr types.DeployRepo) (*Mult
 	if dr.SpaceID == 0 {
 		targetID = dr.DeployID // support model deploy with multi-instance
 	}
-	runLog, err := d.ir.InstanceLogs(ctx, &imagerunner.InstanceLogsRequest{
+	runLog, err := d.ir.InstanceLogs(ctx, &types.InstanceLogsRequest{
 		ID:           targetID,
 		OrgName:      dr.Namespace,
 		RepoName:     dr.Name,
@@ -584,7 +584,7 @@ func (d *deployer) startAccountingConsumerCallback(msg jetstream.Msg) {
 	}
 }
 
-func (d *deployer) startAccountingRequestFee(svc imagerunner.StatusResponse) {
+func (d *deployer) startAccountingRequestFee(svc types.StatusResponse) {
 	// ignore not ready svc
 	if svc.Code != common.Running {
 		return
