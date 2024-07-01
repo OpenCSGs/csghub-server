@@ -78,7 +78,7 @@ func (t *DeployRunner) Run(ctx context.Context) error {
 		if t.task.Deploy.SpaceID == 0 {
 			targetID = t.task.Deploy.ID // support model deploy with multi-instance
 		}
-		req := &imagerunner.StatusRequest{
+		req := &types.StatusRequest{
 			ID:       targetID,
 			OrgName:  fields[0],
 			RepoName: fields[1],
@@ -209,7 +209,7 @@ func (t *DeployRunner) runtimeError(msg string) {
 	}
 }
 
-func (t *DeployRunner) makeDeployRequest() (*imagerunner.RunRequest, error) {
+func (t *DeployRunner) makeDeployRequest() (*types.RunRequest, error) {
 	token, err := t.tokenStore.FindByUID(context.Background(), t.task.Deploy.UserID)
 	if err != nil {
 		return nil, fmt.Errorf("cant get git access token:%w", err)
@@ -277,7 +277,7 @@ func (t *DeployRunner) makeDeployRequest() (*imagerunner.RunRequest, error) {
 		targetID = deploy.ID // support model deploy with multi-instance
 	}
 
-	return &imagerunner.RunRequest{
+	return &types.RunRequest{
 		ID:          targetID,
 		OrgName:     fields[0],
 		RepoName:    fields[1],
@@ -307,7 +307,7 @@ func (t *DeployRunner) cancelDeploy(ctx context.Context, orgName, repoName strin
 		// support model deploy with multi-instance
 		targetID = t.task.Deploy.ID
 	}
-	stopReq := &imagerunner.StopRequest{
+	stopReq := &types.StopRequest{
 		ID:       targetID,
 		OrgName:  orgName,
 		RepoName: repoName,

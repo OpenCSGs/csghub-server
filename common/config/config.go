@@ -93,7 +93,8 @@ type Config struct {
 	Space struct {
 		BuilderEndpoint string `envconfig:"STARHUB_SERVER_SPACE_BUILDER_ENDPOINT" default:"http://localhost:8081"`
 		// base url for space api running in k8s cluster
-		RunnerEndpoint string `envconfig:"STARHUB_SERVER_SPACE_RUNNER_ENDPOINT" default:"http://localhost:8082"`
+		RunnerEndpoint   string `envconfig:"STARHUB_SERVER_SPACE_RUNNER_ENDPOINT" default:"http://localhost:8082"`
+		RunnerServerPort int    `envconfig:"STARHUB_SERVER_SPACE_RUNNER_SERVER_PORT" default:"8082"`
 
 		// the internal root domain will be proxied to, should be internal access only
 		InternalRootDomain string `envconfig:"STARHUB_SERVER_INTERNAL_ROOT_DOMAIN" default:"internal.example.com"`

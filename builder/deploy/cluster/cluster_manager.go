@@ -18,6 +18,7 @@ import (
 	knative "knative.dev/serving/pkg/client/clientset/versioned"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/config"
+	"opencsg.com/csghub-server/common/types"
 )
 
 // Cluster holds basic information about a Kubernetes cluster
@@ -32,17 +33,6 @@ type Cluster struct {
 type ClusterPool struct {
 	Clusters     []Cluster
 	ClusterStore *database.ClusterInfoStore
-}
-
-// NodeResourceInfo struct includes details about the node's resources and region
-type NodeResourceInfo struct {
-	NodeName  string  `json:"node_name"`
-	GPUModel  string  `json:"gpu_model"`
-	TotalCPU  float64 `json:"total_cpu"`
-	UsedCPU   float64 `json:"used_cpu"`
-	TotalGPU  int64   `json:"total_gpu"`
-	UsedGPU   int64   `json:"used_gpu"`
-	GPUVendor string  `json:"gpu_vendor"`
 }
 
 // NewClusterPool initializes and returns a ClusterPool by reading kubeconfig files from $HOME/.kube directory
@@ -122,7 +112,7 @@ func (p *ClusterPool) GetClusterByID(ctx context.Context, id string) (*Cluster, 
 }
 
 // getNodeResources retrieves all node cpu and gpu info
-func GetNodeResources(clientset *kubernetes.Clientset, config *config.Config) (map[string]NodeResourceInfo, error) {
+func GetNodeResources(clientset *kubernetes.Clientset, config *config.Config) (map[string]types.NodeResourceInfo, error) {
 	nodes, err := clientset.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
 		return nil, err
@@ -133,7 +123,7 @@ func GetNodeResources(clientset *kubernetes.Clientset, config *config.Config) (m
 		return nil, err
 	}
 
-	nodeResourcesMap := make(map[string]NodeResourceInfo)
+	nodeResourcesMap := make(map[string]types.NodeResourceInfo)
 
 	for _, node := range nodes.Items {
 		totalCPU := node.Status.Capacity.Cpu().MilliValue()
@@ -148,7 +138,7 @@ func GetNodeResources(clientset *kubernetes.Clientset, config *config.Config) (m
 		if len(gpuModelVendor) > 1 {
 			gpuModel = gpuModelVendor[1]
 		}
-		nodeResourcesMap[node.Name] = NodeResourceInfo{
+		nodeResourcesMap[node.Name] = types.NodeResourceInfo{
 			NodeName:  node.Name,
 			TotalCPU:  millicoresToCores(totalCPU),
 			UsedCPU:   millicoresToCores(allocatableCPU),

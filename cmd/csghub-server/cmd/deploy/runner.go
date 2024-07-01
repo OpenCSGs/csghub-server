@@ -2,9 +2,10 @@ package deploy
 
 import (
 	"github.com/spf13/cobra"
-	"opencsg.com/csghub-server/builder/deploy/imagerunner"
+	"opencsg.com/csghub-server/api/httpbase"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/config"
+	"opencsg.com/csghub-server/servicerunner/router"
 )
 
 var startRunnerCmd = &cobra.Command{
@@ -25,11 +26,17 @@ var startRunnerCmd = &cobra.Command{
 		}
 		database.InitDB(dbConfig)
 
-		s, err := imagerunner.NewHttpServer(config)
+		s, err := router.NewHttpServer(config)
 		if err != nil {
 			return err
 		}
-		err = s.Run(8082)
-		return err
+		server := httpbase.NewGracefulServer(
+			httpbase.GraceServerOpt{
+				Port: config.Space.RunnerServerPort,
+			},
+			s,
+		)
+		server.Run()
+		return nil
 	},
 }
