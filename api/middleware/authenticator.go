@@ -47,6 +47,7 @@ func AuthSession() gin.HandlerFunc {
 		session := sessions.Default(c)
 		userName := session.Get(httpbase.CurrentUserCtxVar)
 		if userName != nil {
+			httpbase.SetAuthType(c, httpbase.AuthTypeJwt)
 			httpbase.SetCurrentUser(c, userName.(string))
 		}
 
