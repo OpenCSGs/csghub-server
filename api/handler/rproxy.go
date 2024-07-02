@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -42,30 +43,6 @@ func (r *RProxyHandler) Proxy(ctx *gin.Context) {
 	domainParts := strings.SplitN(host, ".", 2)
 	appSrvName := domainParts[0]
 
-	// user verified by cookie
-	username, exists := ctx.Get("currentUser")
-	if !exists {
-		httpbase.BadRequest(ctx, "user not found, please login first")
-		return
-	}
-
-	// spaceAppName := domainParts[0]
-	// decode space id
-	// spaceID, err := common.ParseUniqueSpaceAppName(spaceAppName)
-	// if err != nil {
-	// 	slog.Info("proxy request has invalid space ID", slog.String("srv_name", spaceAppName), slog.Any("error", err))
-	// 	ctx.Status(http.StatusNotFound)
-	// 	return
-	// }
-
-	// verify by space id get from url
-	// allow, err := r.spaceComp.AllowCallApi(ctx, spaceID, username.(string))
-	// if err != nil {
-	// 	slog.Error("failed to check user permission", "error", err)
-	// 	httpbase.ServerError(ctx, fmt.Errorf("failed to check user permission,%w", err))
-	// 	return
-	// }
-
 	deploy, err := r.repoComp.GetDeployBySvcName(ctx, appSrvName)
 	if err != nil {
 		slog.Error("failed to get deploy", slog.Any("error", err), slog.Any("appSrvName", appSrvName))
@@ -73,15 +50,21 @@ func (r *RProxyHandler) Proxy(ctx *gin.Context) {
 		return
 	}
 
+	username := httpbase.GetCurrentUser(ctx)
 	allow := false
 	err = nil
-	// verify by repo_id, user name
 	if deploy.SpaceID > 0 {
+		// user must login to visit space
+		if httpbase.GetAuthType(ctx) != httpbase.AuthTypeJwt {
+			httpbase.UnauthorizedError(ctx, errors.New("user not found in session, please access with jwt token first"))
+			return
+		}
+
 		// check space
-		allow, err = r.repoComp.AllowAccessByRepoID(ctx, deploy.RepoID, username.(string))
+		allow, err = r.repoComp.AllowAccessByRepoID(ctx, deploy.RepoID, username)
 	} else if deploy.ModelID > 0 {
 		// check model inference
-		allow, err = r.repoComp.AllowAccessEndpoint(ctx, username.(string), deploy)
+		allow, err = r.repoComp.AllowAccessEndpoint(ctx, username, deploy)
 	}
 
 	if err != nil {

@@ -46,12 +46,10 @@ func AuthSession() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		session := sessions.Default(c)
 		userName := session.Get(httpbase.CurrentUserCtxVar)
-		if userName == nil {
-			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "session not found, please access with jwt token first"})
-			return
+		if userName != nil {
+			httpbase.SetCurrentUser(c, userName.(string))
 		}
 
-		httpbase.SetCurrentUser(c, userName.(string))
 		c.Next()
 	}
 }

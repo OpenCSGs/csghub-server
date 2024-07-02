@@ -29,7 +29,10 @@ func NewRProxyRouter(config *config.Config) (*gin.Engine, error) {
 		Secure:   config.EnableHTTPS,
 	})
 	r.Use(sessions.Sessions("jwt_session", store))
+	//to access space with jwt token in query string
 	r.Use(middleware.BuildJwtSession(config.JWT.SigningKey))
+	//to access model,fintune with any kind of tokens in auth header
+	r.Use(middleware.Authenticator(config))
 
 	handler, err := handler.NewRProxyHandler(config)
 	if err != nil {
