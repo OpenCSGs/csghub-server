@@ -79,10 +79,14 @@ func (t *DeployRunner) Run(ctx context.Context) error {
 			targetID = t.task.Deploy.ID // support model deploy with multi-instance
 		}
 		req := &types.StatusRequest{
-			ID:       targetID,
-			OrgName:  fields[0],
-			RepoName: fields[1],
-			SvcName:  t.task.Deploy.SvcName,
+			ID:        targetID,
+			OrgName:   fields[0],
+			RepoName:  fields[1],
+			SvcName:   t.task.Deploy.SvcName,
+			ClusterID: t.task.Deploy.ClusterID,
+		}
+		if t.task.Deploy.Type == 1 {
+			req.NeedDetails = true
 		}
 		timeoutCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
 		resp, err := t.ir.Status(timeoutCtx, req)

@@ -328,6 +328,13 @@ func (s *K8sHander) ServiceStatus(c *gin.Context) {
 		if srvConfigReady != nil {
 			resp.Message += srvConfigReady.Message
 		}
+		// for inference case: model loading case one pod is not ready
+		for _, instance := range resp.Instances {
+			if instance.Status == string(corev1.PodRunning) {
+				resp.Code = common.Deploying
+				break
+			}
+		}
 		slog.Info("get image status success", slog.String("srv_name", srvName), slog.Any("resp", resp))
 		c.JSON(http.StatusOK, resp)
 		return

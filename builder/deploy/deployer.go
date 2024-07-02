@@ -626,7 +626,7 @@ func (d *deployer) startAccountingRequestFee(svc types.StatusResponse) {
 	if err != nil {
 		slog.Error("fail to pub event", slog.Any("data", string(str)), slog.Any("error", err))
 	} else {
-		slog.Info("pub event success", slog.Any("data", string(str)))
+		slog.Debug("pub event success", slog.Any("data", string(str)))
 	}
 }
 
