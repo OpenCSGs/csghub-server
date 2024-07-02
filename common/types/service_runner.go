@@ -63,6 +63,7 @@ type (
 		ClusterID   string `json:"cluster_id"`
 		SvcName     string `json:"svc_name"`
 		NeedDetails bool   `json:"need_details"`
+		DeployType  int    `json:"deploy_type"`
 	}
 
 	StatusResponse struct {
