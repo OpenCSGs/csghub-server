@@ -64,14 +64,15 @@ func newDeployer(s scheduler.Scheduler, ib imagebuilder.Builder, ir imagerunner.
 		return nil, err
 	}
 	d := &deployer{
-		s:                 s,
-		ib:                ib,
-		ir:                ir,
-		store:             store,
-		spaceStore:        database.NewSpaceStore(),
-		runnerStatuscache: make(map[string]types.StatusResponse),
-		sfNode:            node,
-		eventPub:          &event.DefaultEventPublisher,
+		s:                  s,
+		ib:                 ib,
+		ir:                 ir,
+		store:              store,
+		spaceStore:         database.NewSpaceStore(),
+		spaceResourceStore: database.NewSpaceResourceStore(),
+		runnerStatuscache:  make(map[string]types.StatusResponse),
+		sfNode:             node,
+		eventPub:           &event.DefaultEventPublisher,
 	}
 
 	go d.refreshStatus()
