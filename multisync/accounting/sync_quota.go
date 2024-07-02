@@ -3,7 +3,6 @@ package accounting
 import (
 	"bytes"
 	"encoding/json"
-	"fmt"
 	"net/http"
 )
 
@@ -49,6 +48,5 @@ func (c *AccountingClient) GetSyncQuota(opt *GetSyncQuotaReq) (*SyncQuota, *Resp
 		header.Add("Authorization", "Bearer "+opt.AccessToken)
 	}
 	resp, err := c.getParsedResponse("GET", "/accounting/multisync/quota", header, nil, s)
-	fmt.Println(resp)
 	return &s.Data, resp, err
 }
