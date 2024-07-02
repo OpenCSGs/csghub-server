@@ -6,9 +6,9 @@ COPY ./vllm/ /etc/csghub/
 RUN chmod +x /etc/csghub/*.sh
 
 WORKDIR /workspace/
-ENV HF_HOME=/workspace/.cache \
+ENV HUGGINGFACE_HUB_CACHE=/workspace/ \
     HF_HUB_ENABLE_HF_TRANSFER=0
 
 EXPOSE 8000
 
-ENTRYPOINT ["bash", "/etc/csghub/serve.sh""]
+ENTRYPOINT ["bash", "/etc/csghub/serve.sh"]
