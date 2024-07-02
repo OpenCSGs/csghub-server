@@ -4,7 +4,9 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"strconv"
 
+	"github.com/gin-gonic/gin"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/multisync/accounting"
@@ -59,5 +61,17 @@ func (c *MirrorProxyComponent) Serve(ctx context.Context, req *types.GetSyncQuot
 	if resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("error creating sync quota statement")
 	}
+	return nil
+}
+
+func (c *MirrorProxyComponent) LfsDownload(ctx *gin.Context, token string) error {
+	sq, _, err := c.ac.GetSyncQuota(&accounting.GetSyncQuotaReq{
+		AccessToken: token,
+	})
+	if err != nil {
+		return fmt.Errorf("error getting sync quota: %v", err)
+	}
+
+	ctx.Request.Header.Add("X-OPENCSG-Speed-Limit", strconv.FormatInt(sq.SpeedLimit, 10))
 	return nil
 }
