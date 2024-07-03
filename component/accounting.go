@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log/slog"
 	"strings"
 
 	"opencsg.com/csghub-server/builder/accounting"
@@ -58,19 +57,16 @@ func (ac *AccountingComponent) QueryBalanceByUserIDInternal(ctx context.Context,
 	}
 	resp, err := ac.acctClient.QueryBalanceByUserID(user.UUID)
 	if err != nil {
-		slog.Error("error to get user balance data", slog.Any("error", err))
-		return nil, err
+		return nil, fmt.Errorf("error to get user balance data, %w", err)
 	}
 
 	tempJSON, err := json.Marshal(resp)
 	if err != nil {
-		slog.Error("error to marshal json", slog.Any("error", err))
-		return nil, err
+		return nil, fmt.Errorf("error to marshal json, %w", err)
 	}
 	var account *database.AccountUser
 	if err := json.Unmarshal(tempJSON, &account); err != nil {
-		slog.Error("error to unmarshal json", slog.Any("error", err))
-		return nil, err
+		return nil, fmt.Errorf("error to unmarshal json, %w", err)
 	}
 	return account, nil
 }

@@ -274,6 +274,11 @@ func (c *RepoComponent) DeleteRepo(ctx context.Context, req types.DeleteRepoReq)
 		}
 	}
 
+	err = c.repo.CleanRelationsByRepoID(ctx, repo.ID)
+	if err != nil {
+		return nil, fmt.Errorf("fail to clean repo relations, %w", err)
+	}
+
 	deleteRepoReq := gitserver.DeleteRepoReq{
 		Namespace: req.Namespace,
 		Name:      req.Name,

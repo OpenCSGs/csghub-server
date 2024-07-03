@@ -477,3 +477,17 @@ func (s *RepoStore) WithMirror(ctx context.Context, per, page int) (repos []Repo
 
 	return
 }
+
+func (s *RepoStore) CleanRelationsByRepoID(ctx context.Context, repoId int64) error {
+	err := s.db.Operator.Core.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
+		if _, err := tx.Exec("delete from repositories_runtime_frameworks where repo_id=?", repoId); err != nil {
+			return err
+		}
+
+		if _, err := tx.Exec("delete from user_likes where repo_id=?", repoId); err != nil {
+			return err
+		}
+		return nil
+	})
+	return err
+}
