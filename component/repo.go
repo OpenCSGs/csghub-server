@@ -1995,17 +1995,19 @@ func (c *RepoComponent) DeployStart(ctx context.Context, repoType types.Reposito
 }
 
 func (c *RepoComponent) AllFiles(ctx context.Context, req types.GetAllFilesReq) ([]*types.File, error) {
-	read, err := c.checkCurrentUserPermission(ctx, req.CurrentUser, req.Namespace, membership.RoleRead)
-	if err != nil {
-		return nil, fmt.Errorf("failed to check permission to get all files, error: %w", err)
-	}
-
-	if !read {
-		return nil, fmt.Errorf("users do not have permission to get all files for this repo")
-	}
-	_, err = c.repo.FindByPath(ctx, req.RepoType, req.Namespace, req.Name)
+	repo, err := c.repo.FindByPath(ctx, req.RepoType, req.Namespace, req.Name)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find repo, error: %w", err)
+	}
+	if repo.Private {
+		read, err := c.checkCurrentUserPermission(ctx, req.CurrentUser, req.Namespace, membership.RoleRead)
+		if err != nil {
+			return nil, fmt.Errorf("failed to check permission to get all files, error: %w", err)
+		}
+
+		if !read {
+			return nil, fmt.Errorf("users do not have permission to get all files for this repo")
+		}
 	}
 	allFiles, err := getAllFiles(req.Namespace, req.Name, "", req.RepoType, c.git.GetRepoFileTree)
 	if err != nil {

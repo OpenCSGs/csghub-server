@@ -319,13 +319,13 @@ func (ts *TagStore) FindOrCreate(ctx context.Context, tag Tag) (*Tag, error) {
 	var resTag Tag
 	err := ts.db.Operator.Core.NewSelect().
 		Model(&resTag).
-		Where("name = ? and category = ? and built_in = ?", tag.Name, tag.Category, tag.BuiltIn).
+		Where("name = ? and category = ? and built_in = ? and scope = ?", tag.Name, tag.Category, tag.BuiltIn, tag.Scope).
 		Scan(ctx)
 	if err == nil {
 		return &resTag, nil
 	}
 	_, err = ts.db.Operator.Core.NewInsert().
-		Model(&resTag).
+		Model(&tag).
 		Exec(ctx)
 	if err != nil {
 		return nil, nil

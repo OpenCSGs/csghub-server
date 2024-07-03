@@ -215,3 +215,22 @@ func (s *ModelStore) ByID(ctx context.Context, id int64) (*Model, error) {
 	}
 	return &model, err
 }
+
+func (s *ModelStore) CreateIfNotExist(ctx context.Context, input Model) (*Model, error) {
+	err := s.db.Core.NewSelect().
+		Model(&input).
+		Where("repository_id = ?", input.ID).
+		Relation("Repository").
+		Scan(ctx)
+	if err == nil {
+		return &input, nil
+	}
+
+	res, err := s.db.Core.NewInsert().Model(&input).Exec(ctx, &input)
+	if err := assertAffectedOneRow(res, err); err != nil {
+		slog.Error("create model in db failed", slog.String("error", err.Error()))
+		return nil, fmt.Errorf("create model in db failed,error:%w", err)
+	}
+
+	return &input, nil
+}

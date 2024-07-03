@@ -507,10 +507,41 @@ func (s *RepoStore) DeleteAllFiles(ctx context.Context, repoID int64) error {
 	err := s.db.Operator.Core.NewDelete().
 		Model(&File{}).
 		Where("repository_id = ?", repoID).
-		ForceDelete().Scan(ctx)
+		Scan(ctx)
 	if err != nil {
 		return err
 	}
 
 	return nil
+}
+
+func (s *RepoStore) DeleteAllTags(ctx context.Context, repoID int64) error {
+	err := s.db.Operator.Core.NewDelete().
+		Model(&RepositoryTag{}).
+		Where("repository_id = ?", repoID).
+		Scan(ctx)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (s *RepoStore) UpdateOrCreateRepo(ctx context.Context, input Repository) (*Repository, error) {
+	input.UpdatedAt = time.Now()
+	_, err := s.db.Core.NewUpdate().
+		Model(&input).
+		Where("path = ? and repository_type = ?", input.Path, input.RepositoryType).
+		Returning("*").
+		Exec(ctx, &input)
+	if err == nil {
+		return &input, nil
+	}
+
+	res, err := s.db.Core.NewInsert().Model(&input).Exec(ctx, &input)
+	if err := assertAffectedOneRow(res, err); err != nil {
+		return nil, fmt.Errorf("create repository in tx failed,error:%w", err)
+	}
+
+	return &input, nil
 }
