@@ -219,7 +219,7 @@ func (s *ModelStore) ByID(ctx context.Context, id int64) (*Model, error) {
 func (s *ModelStore) CreateIfNotExist(ctx context.Context, input Model) (*Model, error) {
 	err := s.db.Core.NewSelect().
 		Model(&input).
-		Where("repository_id = ?", input.ID).
+		Where("repository_id = ?", input.RepositoryID).
 		Relation("Repository").
 		Scan(ctx)
 	if err == nil {

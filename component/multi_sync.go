@@ -264,10 +264,12 @@ func (c *MultiSyncComponent) createLocalDataset(ctx context.Context, m *types.Da
 		var dbFiles []database.File
 		for _, f := range files {
 			dbFiles = append(dbFiles, database.File{
+				Name:              f.Name,
 				Path:              f.Path,
-				ParentPath:        f.Path,
+				ParentPath:        common.ConvertDotToSlash(filepath.Dir(f.Path)),
 				Size:              f.Size,
 				LastCommitMessage: f.Commit.Message,
+				LastCommitDate:    f.Commit.CommitterDate,
 				RepositoryID:      newDBRepo.ID,
 			})
 		}
@@ -283,7 +285,7 @@ func (c *MultiSyncComponent) createLocalDataset(ctx context.Context, m *types.Da
 		Repository:   newDBRepo,
 		RepositoryID: newDBRepo.ID,
 	}
-	_, err = c.dataset.Create(ctx, dbDataset)
+	_, err = c.dataset.CreateIfNotExist(ctx, dbDataset)
 	if err != nil {
 		return fmt.Errorf("failed to create dataset in db, cause: %w", err)
 	}
@@ -386,10 +388,12 @@ func (c *MultiSyncComponent) createLocalModel(ctx context.Context, m *types.Mode
 		var dbFiles []database.File
 		for _, f := range files {
 			dbFiles = append(dbFiles, database.File{
+				Name:              f.Name,
 				Path:              f.Path,
-				ParentPath:        filepath.Dir(f.Path),
+				ParentPath:        common.ConvertDotToSlash(filepath.Dir(f.Path)),
 				Size:              f.Size,
 				LastCommitMessage: f.Commit.Message,
+				LastCommitDate:    f.Commit.CommitterDate,
 				RepositoryID:      newDBRepo.ID,
 			})
 		}

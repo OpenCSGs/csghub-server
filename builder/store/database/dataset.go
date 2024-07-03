@@ -188,7 +188,7 @@ func (s *DatasetStore) ListByPath(ctx context.Context, paths []string) ([]Datase
 func (s *DatasetStore) CreateIfNotExist(ctx context.Context, input Dataset) (*Dataset, error) {
 	err := s.db.Core.NewSelect().
 		Model(&input).
-		Where("repository_id = ?", input.ID).
+		Where("repository_id = ?", input.RepositoryID).
 		Relation("Repository").
 		Scan(ctx)
 	if err == nil {

@@ -2,7 +2,6 @@ package migrations
 
 import (
 	"context"
-	"time"
 
 	"github.com/uptrace/bun"
 	"opencsg.com/csghub-server/builder/store/database"
@@ -10,11 +9,12 @@ import (
 
 type File struct {
 	ID                int64                `bun:",pk,autoincrement" json:"id"`
+	Name              string               `json:"name"`
 	Path              string               `json:"path"`
 	ParentPath        string               `json:"parent_path"`
 	Size              int64                `json:"size"`
 	LastCommitMessage string               `json:"last_commit_message"`
-	LastCommitDate    time.Time            `json:"last_commit_date"`
+	LastCommitDate    string               `json:"last_commit_date"`
 	RepositoryID      int64                `json:"repository_id"`
 	Repository        *database.Repository `bun:"rel:belongs-to,join:repository_id=id" json:"repository"`
 	times
