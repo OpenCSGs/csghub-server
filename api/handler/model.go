@@ -457,7 +457,7 @@ func (h *ModelHandler) DeployDedicated(ctx *gin.Context) {
 	deployID, err := h.c.Deploy(ctx, namespace, name, currentUser, req, types.InferenceType)
 	if err != nil {
 		slog.Error("failed to deploy model as inference", slog.String("namespace", namespace),
-			slog.String("name", name), slog.Any("error", err))
+			slog.String("name", name), slog.Any("currentUser", currentUser), slog.Any("req", req), slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
 		return
 	}

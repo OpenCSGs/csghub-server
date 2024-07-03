@@ -73,11 +73,12 @@ func (s *SpaceStore) Delete(ctx context.Context, input Space) error {
 }
 
 func (s *SpaceStore) ByID(ctx context.Context, id int64) (*Space, error) {
-	space := new(Space)
-	return space, s.db.Core.NewSelect().Model(space).
-		Relation("Repository").
-		Where("space.id = ?", id).
-		Scan(ctx)
+	var space Space
+	err := s.db.Core.NewSelect().Model(&space).Relation("Repository").Where("space.id = ?", id).Scan(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return &space, err
 }
 
 // ByRepoIDs get spaces by repoIDs, only basice info, no related repo
