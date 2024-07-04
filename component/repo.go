@@ -2035,6 +2035,9 @@ func (c *RepoComponent) AllFiles(ctx context.Context, req types.GetAllFilesReq) 
 	if err != nil {
 		return nil, fmt.Errorf("failed to find repo, error: %w", err)
 	}
+	if repo == nil {
+		return nil, fmt.Errorf("failed to find repo")
+	}
 	if repo.Private {
 		read, err := c.checkCurrentUserPermission(ctx, req.CurrentUser, req.Namespace, membership.RoleRead)
 		if err != nil {
