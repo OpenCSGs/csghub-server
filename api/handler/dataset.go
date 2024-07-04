@@ -298,3 +298,42 @@ func getFilterFromContext(ctx *gin.Context, filter *types.RepoFilter) *types.Rep
 	filter.Source = ctx.Query("source")
 	return filter
 }
+
+// DatasetFiles      godoc
+// @Security     ApiKey
+// @Summary      Get all files of a dataset
+// @Tags         Dataset
+// @Accept       json
+// @Produce      json
+// @Param        namespace path string true "namespace"
+// @Param        name path string true "name"
+// @Param        current_user query string false "current user"
+// @Success      200  {object}  types.Response{data=types.File} "OK"
+// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
+// @Router       /datasets/{namespace}/{name}/all_files [get]
+func (h *DatasetHandler) AllFiles(ctx *gin.Context) {
+	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
+	if err != nil {
+		slog.Error("Bad request format", "error", err)
+		httpbase.BadRequest(ctx, err.Error())
+		return
+	}
+	var req types.GetAllFilesReq
+	req.Namespace = namespace
+	req.Name = name
+	req.RepoType = types.DatasetRepo
+	req.CurrentUser = httpbase.GetCurrentUser(ctx)
+	detail, err := h.c.AllFiles(ctx, req)
+	if err != nil {
+		if errors.Is(err, component.ErrUnauthorized) {
+			httpbase.UnauthorizedError(ctx, err)
+			return
+		}
+		slog.Error("Failed to get dataset all files", slog.Any("error", err))
+		httpbase.ServerError(ctx, err)
+		return
+	}
+
+	httpbase.OK(ctx, detail)
+}

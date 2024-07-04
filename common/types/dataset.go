@@ -29,6 +29,7 @@ type Dataset struct {
 	Private       bool                 `json:"private"`
 	User          User                 `json:"user"`
 	Tags          []RepoTag            `json:"tags"`
+	Readme        string               `json:"readme"`
 	DefaultBranch string               `json:"default_branch"`
 	CreatedAt     time.Time            `json:"created_at"`
 	UpdatedAt     time.Time            `json:"updated_at"`

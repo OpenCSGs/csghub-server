@@ -562,8 +562,17 @@ func (c *RepoComponent) LastCommit(ctx context.Context, req *types.GetCommitsReq
 
 func (c *RepoComponent) FileRaw(ctx context.Context, req *types.GetFileReq) (string, error) {
 	repo, err := c.repo.FindByPath(ctx, req.RepoType, req.Namespace, req.Name)
-	if err != nil {
+	if err != nil || repo == nil {
 		return "", fmt.Errorf("failed to find repo, error: %w", err)
+	}
+
+	if repo.Source != types.LocalSource && strings.ToLower(req.Path) == "readme.md" {
+		_, err := c.mirror.FindByRepoID(ctx, repo.ID)
+		if err != nil {
+			if errors.Is(err, sql.ErrNoRows) {
+				return repo.Readme, nil
+			}
+		}
 	}
 	if req.Ref == "" {
 		req.Ref = repo.DefaultBranch
@@ -1983,4 +1992,25 @@ func (c *RepoComponent) DeployStart(ctx context.Context, repoType types.Reposito
 	}
 
 	return err
+}
+
+func (c *RepoComponent) AllFiles(ctx context.Context, req types.GetAllFilesReq) ([]*types.File, error) {
+	read, err := c.checkCurrentUserPermission(ctx, req.CurrentUser, req.Namespace, membership.RoleRead)
+	if err != nil {
+		return nil, fmt.Errorf("failed to check permission to get all files, error: %w", err)
+	}
+
+	if !read {
+		return nil, fmt.Errorf("users do not have permission to get all files for this repo")
+	}
+	_, err = c.repo.FindByPath(ctx, req.RepoType, req.Namespace, req.Name)
+	if err != nil {
+		return nil, fmt.Errorf("failed to find repo, error: %w", err)
+	}
+	allFiles, err := getAllFiles(req.Namespace, req.Name, "", req.RepoType, c.git.GetRepoFileTree)
+	if err != nil {
+		slog.Error("fail to get all files of repository", slog.Any("repoType", req.RepoType), slog.String("namespace", req.Namespace), slog.String("name", req.Name), slog.String("error", err.Error()))
+		return nil, err
+	}
+	return allFiles, nil
 }

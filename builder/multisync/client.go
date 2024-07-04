@@ -15,6 +15,8 @@ type Client interface {
 	Latest(ctx context.Context, currentVersion int64) (types.SyncVersionResponse, error)
 	ModelInfo(ctx context.Context, v types.SyncVersion) (*types.Model, error)
 	DatasetInfo(ctx context.Context, v types.SyncVersion) (*types.Dataset, error)
+	ReadMeData(ctx context.Context, v types.SyncVersion) (string, error)
+	FileList(ctx context.Context, v types.SyncVersion) ([]types.File, error)
 }
 
 func FromOpenCSG(endpoint string, accessToken string) Client {
@@ -97,4 +99,48 @@ func (c *commonClient) DatasetInfo(ctx context.Context, v types.SyncVersion) (*t
 		return nil, fmt.Errorf("failed to decode response body as types.Dataset, cause: %w", err)
 	}
 	return &res.Data, nil
+}
+
+func (c *commonClient) ReadMeData(ctx context.Context, v types.SyncVersion) (string, error) {
+	namespace, name, _ := strings.Cut(v.RepoPath, "/")
+	url := fmt.Sprintf("%s/api/v1/%ss/%s/%s/raw/README.md", c.endpoint, v.RepoType, namespace, name)
+	req, _ := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	req.Header.Add("Authorization", "Bearer "+c.authToken)
+	resp, err := c.hc.Do(req)
+	if err != nil {
+		return "", fmt.Errorf("failed to get readme data endpoint %s, repo path:%s, cause: %w",
+			c.endpoint, v.RepoPath, err)
+	}
+	if resp.StatusCode != 200 {
+		return "", fmt.Errorf("failed to get readme data from endpoint %s, repo path:%s, status code: %d",
+			c.endpoint, v.RepoPath, resp.StatusCode)
+	}
+	var res types.ReadMeResponse
+	err = json.NewDecoder(resp.Body).Decode(&res)
+	if err != nil {
+		return "", fmt.Errorf("failed to decode response body as types.Dataset, cause: %w", err)
+	}
+	return res.Data, nil
+}
+
+func (c *commonClient) FileList(ctx context.Context, v types.SyncVersion) ([]types.File, error) {
+	namespace, name, _ := strings.Cut(v.RepoPath, "/")
+	url := fmt.Sprintf("%s/api/v1/%ss/%s/%s/all_files", c.endpoint, v.RepoType, namespace, name)
+	req, _ := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	req.Header.Add("Authorization", "Bearer "+c.authToken)
+	resp, err := c.hc.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get readme data endpoint %s, repo path:%s, cause: %w",
+			c.endpoint, v.RepoPath, err)
+	}
+	if resp.StatusCode != 200 {
+		return nil, fmt.Errorf("failed to get readme data from endpoint %s, repo path:%s, status code: %d",
+			c.endpoint, v.RepoPath, resp.StatusCode)
+	}
+	var res types.AllFilesResponse
+	err = json.NewDecoder(resp.Body).Decode(&res)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode response body as types.Dataset, cause: %w", err)
+	}
+	return res.Data, nil
 }

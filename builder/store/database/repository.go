@@ -491,3 +491,26 @@ func (s *RepoStore) CleanRelationsByRepoID(ctx context.Context, repoId int64) er
 	})
 	return err
 }
+
+func (s *RepoStore) BatchCreateRepoTags(ctx context.Context, repoTags []RepositoryTag) error {
+	result, err := s.db.Operator.Core.NewInsert().
+		Model(&repoTags).
+		Exec(ctx)
+	if err != nil {
+		return err
+	}
+
+	return assertAffectedXRows(int64(len(repoTags)), result, err)
+}
+
+func (s *RepoStore) DeleteAllFiles(ctx context.Context, repoID int64) error {
+	err := s.db.Operator.Core.NewDelete().
+		Model(&File{}).
+		Where("repository_id = ?", repoID).
+		ForceDelete().Scan(ctx)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}

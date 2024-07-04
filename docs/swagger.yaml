@@ -867,6 +867,8 @@ definitions:
         type: string
       private:
         type: boolean
+      readme:
+        type: string
       repository:
         $ref: '#/definitions/types.Repository'
       repository_id:
@@ -1057,6 +1059,8 @@ definitions:
         type: string
       private:
         type: boolean
+      readme:
+        type: string
       repository:
         $ref: '#/definitions/types.Repository'
       repository_id:
@@ -4316,6 +4320,50 @@ paths:
       summary: Update a exists dataset
       tags:
       - Dataset
+  /datasets/{namespace}/{name}/all_files:
+    get:
+      consumes:
+      - application/json
+      parameters:
+      - description: namespace
+        in: path
+        name: namespace
+        required: true
+        type: string
+      - description: name
+        in: path
+        name: name
+        required: true
+        type: string
+      - description: current user
+        in: query
+        name: current_user
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/types.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/types.File'
+              type: object
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Get all files of a dataset
+      tags:
+      - Dataset
   /datasets/{namespace}/{name}/relations:
     get:
       consumes:
@@ -5074,6 +5122,50 @@ paths:
       security:
       - ApiKey: []
       summary: Update a exists model
+      tags:
+      - Model
+  /models/{namespace}/{name}/all_files:
+    get:
+      consumes:
+      - application/json
+      parameters:
+      - description: namespace
+        in: path
+        name: namespace
+        required: true
+        type: string
+      - description: name
+        in: path
+        name: name
+        required: true
+        type: string
+      - description: current user
+        in: query
+        name: current_user
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/types.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/types.File'
+              type: object
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Get all files of a model
       tags:
       - Model
   /models/{namespace}/{name}/finetune:

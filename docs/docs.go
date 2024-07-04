@@ -1554,6 +1554,79 @@ const docTemplate = `{
                 }
             }
         },
+        "/datasets/{namespace}/{name}/all_files": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Dataset"
+                ],
+                "summary": "Get all files of a dataset",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "namespace",
+                        "name": "namespace",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "name",
+                        "name": "name",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "current user",
+                        "name": "current_user",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/types.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/types.File"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            }
+        },
         "/datasets/{namespace}/{name}/relations": {
             "get": {
                 "security": [
@@ -2782,6 +2855,79 @@ const docTemplate = `{
                         "description": "OK",
                         "schema": {
                             "$ref": "#/definitions/types.Response"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            }
+        },
+        "/models/{namespace}/{name}/all_files": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Model"
+                ],
+                "summary": "Get all files of a model",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "namespace",
+                        "name": "namespace",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "name",
+                        "name": "name",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "current user",
+                        "name": "current_user",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/types.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/types.File"
+                                        }
+                                    }
+                                }
+                            ]
                         }
                     },
                     "400": {
@@ -11652,6 +11798,9 @@ const docTemplate = `{
                 "private": {
                     "type": "boolean"
                 },
+                "readme": {
+                    "type": "string"
+                },
                 "repository": {
                     "$ref": "#/definitions/types.Repository"
                 },
@@ -11932,6 +12081,9 @@ const docTemplate = `{
                 },
                 "private": {
                     "type": "boolean"
+                },
+                "readme": {
+                    "type": "string"
                 },
                 "repository": {
                     "$ref": "#/definitions/types.Repository"
