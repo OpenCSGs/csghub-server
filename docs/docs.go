@@ -10939,6 +10939,9 @@ const docTemplate = `{
                 "created_at": {
                     "type": "string"
                 },
+                "default": {
+                    "type": "boolean"
+                },
                 "id": {
                     "type": "integer"
                 },
