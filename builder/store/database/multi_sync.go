@@ -44,3 +44,13 @@ func (s *MultiSyncStore) GetLatest(ctx context.Context) (SyncVersion, error) {
 
 	return v, err
 }
+
+func (s *MultiSyncStore) GetAfterDistinct(ctx context.Context, version int64) ([]SyncVersion, error) {
+	var vs []SyncVersion
+	err := s.db.Core.NewSelect().
+		ColumnExpr("DISTINCT ON (source_id, repo_path, repo_type) version, source_id, repo_path, repo_type, last_modified_at, change_log").
+		Model(&vs).
+		Where("version > ?", version).
+		Scan(ctx, &vs)
+	return vs, err
+}

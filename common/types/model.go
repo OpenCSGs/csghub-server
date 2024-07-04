@@ -78,6 +78,7 @@ type Model struct {
 	Private       bool       `json:"private"`
 	User          *User      `json:"user,omitempty"`
 	Tags          []RepoTag  `json:"tags,omitempty"`
+	Readme        string     `json:"readme"`
 	Repository    Repository `json:"repository"`
 	DefaultBranch string     `json:"default_branch"`
 	CreatedAt     time.Time  `json:"created_at"`

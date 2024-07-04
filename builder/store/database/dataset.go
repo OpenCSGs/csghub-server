@@ -184,3 +184,22 @@ func (s *DatasetStore) ListByPath(ctx context.Context, paths []string) ([]Datase
 	datasets = nil
 	return sortedDatasets, nil
 }
+
+func (s *DatasetStore) CreateIfNotExist(ctx context.Context, input Dataset) (*Dataset, error) {
+	err := s.db.Core.NewSelect().
+		Model(&input).
+		Where("repository_id = ?", input.RepositoryID).
+		Relation("Repository").
+		Scan(ctx)
+	if err == nil {
+		return &input, nil
+	}
+
+	res, err := s.db.Core.NewInsert().Model(&input).Exec(ctx, &input)
+	if err := assertAffectedOneRow(res, err); err != nil {
+		slog.Error("create dataset in db failed", slog.String("error", err.Error()))
+		return nil, fmt.Errorf("create dataset in db failed,error:%w", err)
+	}
+
+	return &input, nil
+}

@@ -41,3 +41,13 @@ const (
 	SyncVersionSourceOpenCSG = iota
 	SyncVersionSourceHF
 )
+
+type ReadMeResponse struct {
+	Message string `json:"msg"`
+	Data    string `json:"data"`
+}
+
+type AllFilesResponse struct {
+	Message string `json:"msg"`
+	Data    []File `json:"data"`
+}

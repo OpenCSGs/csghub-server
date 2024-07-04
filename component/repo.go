@@ -57,6 +57,7 @@ type RepoComponent struct {
 	needPurge         bool
 	syncVersion       *database.SyncVersionStore
 	syncClientSetting *database.SyncClientSettingStore
+	file              *database.FileStore
 	config            *config.Config
 }
 
@@ -73,6 +74,7 @@ func NewRepoComponent(config *config.Config) (*RepoComponent, error) {
 	c.tokenStore = database.NewAccessTokenStore()
 	c.syncVersion = database.NewSyncVersionStore()
 	c.syncClientSetting = database.NewSyncClientSettingStore()
+	c.file = database.NewFileStore()
 	var err error
 	c.git, err = git.NewGitServer(config)
 	if err != nil {
@@ -562,8 +564,17 @@ func (c *RepoComponent) LastCommit(ctx context.Context, req *types.GetCommitsReq
 
 func (c *RepoComponent) FileRaw(ctx context.Context, req *types.GetFileReq) (string, error) {
 	repo, err := c.repo.FindByPath(ctx, req.RepoType, req.Namespace, req.Name)
-	if err != nil {
+	if err != nil || repo == nil {
 		return "", fmt.Errorf("failed to find repo, error: %w", err)
+	}
+
+	if repo.Source != types.LocalSource && strings.ToLower(req.Path) == "readme.md" {
+		_, err := c.mirror.FindByRepoID(ctx, repo.ID)
+		if err != nil {
+			if errors.Is(err, sql.ErrNoRows) {
+				return repo.Readme, nil
+			}
+		}
 	}
 	if req.Ref == "" {
 		req.Ref = repo.DefaultBranch
@@ -689,6 +700,40 @@ func (c *RepoComponent) Tree(ctx context.Context, req *types.GetFileReq) ([]*typ
 	repo, err := c.repo.FindByPath(ctx, req.RepoType, req.Namespace, req.Name)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find repo, error: %w", err)
+	}
+	if repo == nil {
+		return nil, fmt.Errorf("repo does not exist, error: %w", err)
+	}
+	if repo.Source != types.LocalSource {
+		_, err := c.mirror.FindByRepoID(ctx, repo.ID)
+		if err != nil {
+			if errors.Is(err, sql.ErrNoRows) {
+				if req.Path == "" {
+					req.Path = "/"
+				}
+				files, err := c.file.FindByParentPath(ctx, repo.ID, req.Path)
+				if err != nil {
+					if errors.Is(err, sql.ErrNoRows) {
+						return []*types.File{}, nil
+					} else {
+						return nil, err
+					}
+				}
+				var resFiles []*types.File
+				for _, f := range files {
+					resFiles = append(resFiles, &types.File{
+						Name: f.Name,
+						Path: f.Path,
+						Size: f.Size,
+						Commit: types.Commit{
+							Message:       f.LastCommitMessage,
+							CommitterDate: f.LastCommitDate,
+						},
+					})
+				}
+				return resFiles, nil
+			}
+		}
 	}
 	if req.Ref == "" {
 		req.Ref = repo.DefaultBranch
@@ -1983,4 +2028,30 @@ func (c *RepoComponent) DeployStart(ctx context.Context, repoType types.Reposito
 	}
 
 	return err
+}
+
+func (c *RepoComponent) AllFiles(ctx context.Context, req types.GetAllFilesReq) ([]*types.File, error) {
+	repo, err := c.repo.FindByPath(ctx, req.RepoType, req.Namespace, req.Name)
+	if err != nil {
+		return nil, fmt.Errorf("failed to find repo, error: %w", err)
+	}
+	if repo == nil {
+		return nil, fmt.Errorf("failed to find repo")
+	}
+	if repo.Private {
+		read, err := c.checkCurrentUserPermission(ctx, req.CurrentUser, req.Namespace, membership.RoleRead)
+		if err != nil {
+			return nil, fmt.Errorf("failed to check permission to get all files, error: %w", err)
+		}
+
+		if !read {
+			return nil, fmt.Errorf("users do not have permission to get all files for this repo")
+		}
+	}
+	allFiles, err := getAllFiles(req.Namespace, req.Name, "", req.RepoType, c.git.GetRepoFileTree)
+	if err != nil {
+		slog.Error("fail to get all files of repository", slog.Any("repoType", req.RepoType), slog.String("namespace", req.Namespace), slog.String("name", req.Name), slog.String("error", err.Error()))
+		return nil, err
+	}
+	return allFiles, nil
 }

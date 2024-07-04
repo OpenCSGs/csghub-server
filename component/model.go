@@ -575,29 +575,14 @@ func (c *ModelComponent) getRelations(ctx context.Context, fromRepoID int64, cur
 
 func getFilePaths(namespace, repoName, folder string, repoType types.RepositoryType, gsTree func(ctx context.Context, req gitserver.GetRepoInfoByPathReq) ([]*types.File, error)) ([]string, error) {
 	var filePaths []string
-
-	getRepoFileTree := gitserver.GetRepoInfoByPathReq{
-		Namespace: namespace,
-		Name:      repoName,
-		Ref:       "",
-		Path:      folder,
-		RepoType:  repoType,
-	}
-	gitFiles, err := gsTree(context.Background(), getRepoFileTree)
+	allFiles, err := getAllFiles(namespace, repoName, folder, repoType, gsTree)
 	if err != nil {
-		return filePaths, fmt.Errorf("failed to get repo file tree,%w", err)
+		return nil, err
 	}
-	for _, file := range gitFiles {
-		if file.Type == "dir" {
-			subFileNames, err := getFilePaths(namespace, repoName, file.Path, repoType, gsTree)
-			if err != nil {
-				return filePaths, err
-			}
-			filePaths = append(filePaths, subFileNames...)
-		} else {
-			filePaths = append(filePaths, file.Path)
-		}
+	for _, f := range allFiles {
+		filePaths = append(filePaths, f.Path)
 	}
+
 	return filePaths, nil
 }
 
