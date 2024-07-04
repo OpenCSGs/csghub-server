@@ -328,7 +328,7 @@ func (ts *TagStore) FindOrCreate(ctx context.Context, tag Tag) (*Tag, error) {
 		Model(&tag).
 		Exec(ctx)
 	if err != nil {
-		return nil, nil
+		return nil, err
 	}
 	return &resTag, err
 }
