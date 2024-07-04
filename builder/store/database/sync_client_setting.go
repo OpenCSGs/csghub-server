@@ -17,6 +17,7 @@ type SyncClientSetting struct {
 	Token           string `bun:",notnull" json:"token"`
 	ConcurrentCount int    `bun:",nullzero" json:"concurrent_count"`
 	MaxBandwidth    int    `bun:",nullzero" json:"max_bandwidth"`
+	IsDefault       bool   `bun:"," json:"default"`
 	times
 }
 
