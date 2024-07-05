@@ -11,6 +11,7 @@ type CreateSpaceReq struct {
 	Env           string `json:"env"`
 	Secrets       string `json:"secrets"`
 	ResourceID    int64  `json:"resource_id"`
+	ClusterID     string `json:"cluster_id"`
 }
 
 // Space is the domain object for spaces

@@ -736,6 +736,8 @@ definitions:
     type: object
   types.CreateSpaceReq:
     properties:
+      cluster_id:
+        type: string
       cover_image_url:
         type: string
       default_branch:
@@ -1384,6 +1386,8 @@ definitions:
         type: number
       id:
         type: integer
+      is_available:
+        type: boolean
       name:
         type: string
       resources:
@@ -6390,6 +6394,11 @@ paths:
       consumes:
       - application/json
       description: get space resources
+      parameters:
+      - description: cluster_id
+        in: query
+        name: cluster_id
+        type: string
       produces:
       - application/json
       responses:

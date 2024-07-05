@@ -75,6 +75,9 @@ func NewModelComponent(config *config.Config) (*ModelComponent, error) {
 	c.us = database.NewUserStore()
 	c.deployer = deploy.NewDeployer()
 	c.ac, err = NewAccountingComponent(config)
+	if err != nil {
+		return nil, err
+	}
 	return c, nil
 }
 
@@ -636,19 +639,26 @@ func (c *ModelComponent) Deploy(ctx context.Context, namespace, name, currentUse
 		return -1, fmt.Errorf("cannot find resource, %w", err)
 	}
 
-	// check balance
-	account, err := c.ac.QueryBalanceByUserIDInternal(ctx, currentUser)
-	if err != nil {
-		return -1, fmt.Errorf("cannot find user balance, %w", err)
-	}
-	if resource.CostPerHour != 0 && account.Balance <= 0 {
-		return -1, fmt.Errorf("balance is not enough to run fee resources. current balance: %f", account.Balance)
+	if resource.CostPerHour > 0 {
+		// check balance
+		account, err := c.ac.QueryBalanceByUserIDInternal(ctx, currentUser)
+		if err != nil {
+			return -1, fmt.Errorf("cannot find user balance, %w", err)
+		}
+		if account.Balance <= 0 {
+			return -1, fmt.Errorf("balance is not enough to run fee resources. current balance: %f", account.Balance)
+		}
 	}
 
 	var hardware types.HardWare
 	err = json.Unmarshal([]byte(resource.Resources), &hardware)
 	if err != nil {
 		return -1, fmt.Errorf("invalid hardware setting, %w", err)
+	}
+
+	_, err = c.deployer.CheckResourceAvailable(ctx, req.ClusterID, &hardware)
+	if err != nil {
+		return -1, fmt.Errorf("fail to check resource, %w", err)
 	}
 
 	// choose image

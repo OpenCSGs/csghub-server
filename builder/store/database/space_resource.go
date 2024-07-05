@@ -18,14 +18,16 @@ type SpaceResource struct {
 	Name        string  `bun:",notnull" json:"name"`
 	Resources   string  `bun:",notnull" json:"resources"`
 	CostPerHour float64 `bun:",notnull" json:"cost_per_hour"`
+	ClusterID   string  `bun:",notnull" json:"cluster_id"`
 	times
 }
 
-func (s *SpaceResourceStore) Index(ctx context.Context) ([]SpaceResource, error) {
+func (s *SpaceResourceStore) Index(ctx context.Context, clusterId string) ([]SpaceResource, error) {
 	var result []SpaceResource
 	_, err := s.db.Operator.Core.
 		NewSelect().
 		Model(&result).
+		Where("cluster_id = ?", clusterId).
 		Exec(ctx, &result)
 	if err != nil {
 		return nil, err

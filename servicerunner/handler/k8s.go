@@ -579,7 +579,7 @@ func (s *K8sHander) GetServicePods(ctx context.Context, cluster cluster.Cluster,
 	return podNames, nil
 }
 
-func (s *K8sHander) GetClusterStatus(c *gin.Context) {
+func (s *K8sHander) GetClusterInfo(c *gin.Context) {
 	clusterRes := []types.CluserResponse{}
 	for index := range s.clusterPool.Clusters {
 		cls := s.clusterPool.Clusters[index]
@@ -587,21 +587,38 @@ func (s *K8sHander) GetClusterStatus(c *gin.Context) {
 		if !cInfo.Enable {
 			continue
 		}
-		nodes, err := cluster.GetNodeResources(cls.Client, s.env)
-		if err == nil {
-			clusterInfo := types.CluserResponse{}
-			clusterInfo.Nodes = nodes
-			clusterInfo.Region = cInfo.Region
-			clusterInfo.Zone = cInfo.Zone
-			clusterInfo.Provider = cInfo.Provider
-			clusterInfo.ClusterID = cInfo.ClusterID
-			clusterInfo.ClusterName = fmt.Sprintf("cluster%d", index)
-			clusterInfo.Nodes = nodes
-			clusterRes = append(clusterRes, clusterInfo)
-		}
+		clusterInfo := types.CluserResponse{}
+		clusterInfo.Region = cInfo.Region
+		clusterInfo.Zone = cInfo.Zone
+		clusterInfo.Provider = cInfo.Provider
+		clusterInfo.ClusterID = cInfo.ClusterID
+		clusterInfo.ClusterName = fmt.Sprintf("cluster%d", index)
+		clusterRes = append(clusterRes, clusterInfo)
 
 	}
 	c.JSON(http.StatusOK, clusterRes)
+}
+
+func (s *K8sHander) GetClusterInfoByID(c *gin.Context) {
+	clusterId := c.Params.ByName("id")
+	cInfo, _ := s.clusterPool.ClusterStore.ByClusterID(c.Request.Context(), clusterId)
+	clusterInfo := types.CluserResponse{}
+	clusterInfo.Region = cInfo.Region
+	clusterInfo.Zone = cInfo.Zone
+	clusterInfo.Provider = cInfo.Provider
+	clusterInfo.ClusterID = cInfo.ClusterID
+	client, err := s.clusterPool.GetClusterByID(c.Request.Context(), clusterId)
+	if err != nil {
+		slog.Error("fail to get cluster", slog.Any("error", err))
+		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+		return
+	}
+	nodes, err := cluster.GetNodeResources(client.Client, s.env)
+	if err == nil {
+		clusterInfo.Nodes = nodes
+	}
+
+	c.JSON(http.StatusOK, clusterInfo)
 }
 
 func (s *K8sHander) getServiceNameFromRequest(c *gin.Context) string {

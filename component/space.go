@@ -67,12 +67,24 @@ func (c *SpaceComponent) Create(ctx context.Context, req types.CreateSpaceReq) (
 	if err != nil {
 		return nil, err
 	}
-	account, err := c.ac.QueryBalanceByUserIDInternal(ctx, req.Username)
-	if err != nil {
-		return nil, fmt.Errorf("error to get user balance data,%w", err)
+	if resource.CostPerHour > 0 {
+		// check balance
+		account, err := c.ac.QueryBalanceByUserIDInternal(ctx, req.Username)
+		if err != nil {
+			return nil, fmt.Errorf("cannot find user balance, %w", err)
+		}
+		if account.Balance <= 0 {
+			return nil, fmt.Errorf("balance is not enough to run fee resources. current balance: %f", account.Balance)
+		}
 	}
-	if resource.CostPerHour != 0 && account.Balance <= 0 {
-		return nil, fmt.Errorf("balance is not enough to run GPU resources, current balance: %f", account.Balance)
+	var hardware types.HardWare
+	err = json.Unmarshal([]byte(resource.Resources), &hardware)
+	if err != nil {
+		return nil, fmt.Errorf("invalid hardware setting, %w", err)
+	}
+	_, err = c.deployer.CheckResourceAvailable(ctx, req.ClusterID, &hardware)
+	if err != nil {
+		return nil, fmt.Errorf("fail to check resource, %w", err)
 	}
 
 	_, dbRepo, err := c.CreateRepo(ctx, req.CreateRepoReq)

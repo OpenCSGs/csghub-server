@@ -4873,6 +4873,14 @@ const docTemplate = `{
                     "SpaceReource"
                 ],
                 "summary": "Get space resources",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "cluster_id",
+                        "name": "cluster_id",
+                        "in": "query"
+                    }
+                ],
                 "responses": {
                     "200": {
                         "description": "OK",
@@ -11610,6 +11618,9 @@ const docTemplate = `{
         "types.CreateSpaceReq": {
             "type": "object",
             "properties": {
+                "cluster_id": {
+                    "type": "string"
+                },
                 "cover_image_url": {
                     "type": "string"
                 },
@@ -12559,6 +12570,9 @@ const docTemplate = `{
                 },
                 "id": {
                     "type": "integer"
+                },
+                "is_available": {
+                    "type": "boolean"
                 },
                 "name": {
                     "type": "string"

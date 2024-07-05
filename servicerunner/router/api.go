@@ -36,8 +36,9 @@ func NewHttpServer(config *config.Config) (*gin.Engine, error) {
 	}
 	cluster := apiGroup.Group("/cluster")
 	{
-		cluster.GET("/status", handler.GetClusterStatus)
-		cluster.PUT("", handler.UpdateCluster)
+		cluster.GET("", handler.GetClusterInfo)
+		cluster.GET("/:id", handler.GetClusterInfoByID)
+		cluster.PUT("/:id", handler.UpdateCluster)
 	}
 
 	return r, nil

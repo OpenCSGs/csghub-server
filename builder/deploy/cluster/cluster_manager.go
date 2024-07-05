@@ -126,6 +126,8 @@ func GetNodeResources(clientset *kubernetes.Clientset, config *config.Config) (m
 	nodeResourcesMap := make(map[string]types.NodeResourceInfo)
 
 	for _, node := range nodes.Items {
+		usedMem := getMem(node.Status.Allocatable.Memory().Value())
+		totalMem := getMem(node.Status.Capacity.Memory().Value())
 		totalCPU := node.Status.Capacity.Cpu().MilliValue()
 		allocatableCPU := node.Status.Allocatable.Cpu().MilliValue()
 		totalGPU, found := node.Status.Capacity["nvidia.com/gpu"]
@@ -139,15 +141,17 @@ func GetNodeResources(clientset *kubernetes.Clientset, config *config.Config) (m
 			gpuModel = gpuModelVendor[1]
 		}
 		nodeResourcesMap[node.Name] = types.NodeResourceInfo{
-			NodeName:  node.Name,
-			TotalCPU:  millicoresToCores(totalCPU),
-			UsedCPU:   millicoresToCores(allocatableCPU),
-			GPUModel:  gpuModel,
-			GPUVendor: gpuModelVendor[0],
-			TotalGPU:  parseQuantityToInt64(totalGPU),
+			NodeName:     node.Name,
+			TotalCPU:     millicoresToCores(totalCPU),
+			UsedCPU:      millicoresToCores(allocatableCPU),
+			GPUModel:     gpuModel,
+			GPUVendor:    gpuModelVendor[0],
+			TotalGPU:     parseQuantityToInt64(totalGPU),
+			AvailableGPU: parseQuantityToInt64(totalGPU),
+			AvailableMem: (totalMem - usedMem),
+			TotalMem:     totalMem,
 		}
 	}
-
 	for _, pod := range pods.Items {
 		if pod.Spec.NodeName == "" || pod.Status.Phase == v1.PodSucceeded || pod.Status.Phase == v1.PodFailed {
 			continue
@@ -156,7 +160,7 @@ func GetNodeResources(clientset *kubernetes.Clientset, config *config.Config) (m
 		nodeResource := nodeResourcesMap[pod.Spec.NodeName]
 		for _, container := range pod.Spec.Containers {
 			if requestedGPU, hasGPU := container.Resources.Requests["nvidia.com/gpu"]; hasGPU {
-				nodeResource.UsedGPU += parseQuantityToInt64(requestedGPU)
+				nodeResource.AvailableGPU -= parseQuantityToInt64(requestedGPU)
 			}
 		}
 
@@ -164,6 +168,11 @@ func GetNodeResources(clientset *kubernetes.Clientset, config *config.Config) (m
 	}
 
 	return nodeResourcesMap, nil
+}
+
+func getMem(memByte int64) float32 {
+	memGB := float32(memByte) / (1024 * 1024 * 1024)
+	return memGB
 }
 
 func millicoresToCores(millicores int64) float64 {
