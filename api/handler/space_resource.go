@@ -32,12 +32,14 @@ type SpaceResourceHandler struct {
 // @Tags         SpaceReource
 // @Accept       json
 // @Produce      json
+// @Param        cluster_id query string false "cluster_id"
 // @Success      200  {object}  types.ResponseWithTotal{data=[]types.SpaceResource,total=int} "OK"
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
 // @Router       /space_resources [get]
 func (h *SpaceResourceHandler) Index(ctx *gin.Context) {
-	spaceResources, err := h.c.Index(ctx)
+	clusterId := ctx.Query("cluster_id")
+	spaceResources, err := h.c.Index(ctx, clusterId)
 	if err != nil {
 		slog.Error("Failed to get space resources", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)

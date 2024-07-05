@@ -4862,6 +4862,14 @@
                     "SpaceReource"
                 ],
                 "summary": "Get space resources",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "cluster_id",
+                        "name": "cluster_id",
+                        "in": "query"
+                    }
+                ],
                 "responses": {
                     "200": {
                         "description": "OK",
@@ -11599,6 +11607,9 @@
         "types.CreateSpaceReq": {
             "type": "object",
             "properties": {
+                "cluster_id": {
+                    "type": "string"
+                },
                 "cover_image_url": {
                     "type": "string"
                 },
@@ -12548,6 +12559,9 @@
                 },
                 "id": {
                     "type": "integer"
+                },
+                "is_available": {
+                    "type": "boolean"
                 },
                 "name": {
                     "type": "string"

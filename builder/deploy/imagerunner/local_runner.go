@@ -82,6 +82,10 @@ func (h *LocalRunner) ListCluster(ctx context.Context) ([]types.ClusterResponse,
 	return nil, nil
 }
 
-func (h *LocalRunner) UpdateCluster(ctx context.Context, data interface{}) (*types.UpdateClusterResponse, error) {
+func (h *LocalRunner) GetClusterById(ctx context.Context, clusterId string) (*types.ClusterResponse, error) {
+	return nil, nil
+}
+
+func (h *LocalRunner) UpdateCluster(ctx context.Context, data *types.ClusterRequest) (*types.UpdateClusterResponse, error) {
 	return nil, nil
 }

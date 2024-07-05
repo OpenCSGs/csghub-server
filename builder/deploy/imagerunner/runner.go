@@ -17,5 +17,6 @@ type Runner interface {
 	GetReplica(context.Context, *types.StatusRequest) (*types.ReplicaResponse, error)
 	InstanceLogs(context.Context, *types.InstanceLogsRequest) (<-chan string, error)
 	ListCluster(ctx context.Context) ([]types.ClusterResponse, error)
-	UpdateCluster(ctx context.Context, data interface{}) (*types.UpdateClusterResponse, error)
+	GetClusterById(ctx context.Context, clusterId string) (*types.ClusterResponse, error)
+	UpdateCluster(ctx context.Context, data *types.ClusterRequest) (*types.UpdateClusterResponse, error)
 }

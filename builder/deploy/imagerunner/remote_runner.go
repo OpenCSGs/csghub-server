@@ -263,7 +263,7 @@ func (h *RemoteRunner) InstanceLogs(ctx context.Context, req *types.InstanceLogs
 }
 
 func (h *RemoteRunner) ListCluster(ctx context.Context) ([]types.ClusterResponse, error) {
-	url := fmt.Sprintf("%s/api/v1/cluster/status", h.remote)
+	url := fmt.Sprintf("%s/api/v1/cluster", h.remote)
 	// Send a GET request to resources runner
 	response, err := h.client.Get(url)
 	if err != nil {
@@ -278,23 +278,25 @@ func (h *RemoteRunner) ListCluster(ctx context.Context) ([]types.ClusterResponse
 	return resp, nil
 }
 
-func (h *RemoteRunner) UpdateCluster(ctx context.Context, data interface{}) (*types.UpdateClusterResponse, error) {
-	url := fmt.Sprintf("%s/api/v1/cluster", h.remote)
-	// Create a new HTTP client with a timeout
-	var buf io.Reader
-	if data != nil {
-		jsonData, err := json.Marshal(data)
-		if err != nil {
-			return nil, err
-		}
-		buf = bytes.NewBuffer(jsonData)
-	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodPut, url, buf)
+func (h *RemoteRunner) GetClusterById(ctx context.Context, clusterId string) (*types.ClusterResponse, error) {
+	url := fmt.Sprintf("%s/api/v1/cluster/%s", h.remote, clusterId)
+	// Send a GET request to resources runner
+	response, err := h.doRequest(http.MethodGet, url, nil)
 	if err != nil {
-		fmt.Println("Error creating request:", err)
 		return nil, err
 	}
-	response, err := h.client.Do(req)
+	defer response.Body.Close()
+	var resp types.ClusterResponse
+	if err := json.NewDecoder(response.Body).Decode(&resp); err != nil {
+		return nil, err
+	}
+	return &resp, nil
+}
+
+func (h *RemoteRunner) UpdateCluster(ctx context.Context, data *types.ClusterRequest) (*types.UpdateClusterResponse, error) {
+	url := fmt.Sprintf("%s/api/v1/cluster/%s", h.remote, data.ClusterID)
+	// Create a new HTTP client with a timeout
+	response, err := h.doRequest(http.MethodPut, url, data)
 	if err != nil {
 		fmt.Printf("Error sending request to k8s cluster: %s\n", err)
 		return nil, fmt.Errorf("failed to update cluster info, %w", err)

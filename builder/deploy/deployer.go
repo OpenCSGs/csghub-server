@@ -35,9 +35,11 @@ type Deployer interface {
 	GetReplica(ctx context.Context, dr types.DeployRepo) (int, int, []types.Instance, error)
 	InstanceLogs(ctx context.Context, dr types.DeployRepo) (*MultiLogReader, error)
 	ListCluster(ctx context.Context) ([]types.ClusterRes, error)
-	UpdateCluster(ctx context.Context, data interface{}) (*types.UpdateClusterResponse, error)
+	GetClusterById(ctx context.Context, clusterId string) (*types.ClusterRes, error)
+	UpdateCluster(ctx context.Context, data types.ClusterRequest) (*types.UpdateClusterResponse, error)
 	UpdateDeploy(ctx context.Context, mrr types.ModelRunReq, deploy *database.Deploy, frame *database.RuntimeFramework) error
 	StartDeploy(ctx context.Context, deploy *database.Deploy) error
+	CheckResourceAvailable(ctx context.Context, clusterId string, hardWare *types.HardWare) (bool, error)
 }
 
 var _ Deployer = (*deployer)(nil)
@@ -437,31 +439,9 @@ func (d *deployer) ListCluster(ctx context.Context) ([]types.ClusterRes, error) 
 	}
 	var result []types.ClusterRes
 	for _, c := range resp {
-		availableGPUs := make(map[string]types.Resources)
-
+		resources := make([]types.NodeResourceInfo, 0)
 		for _, node := range c.Nodes {
-			if len(node.GPUVendor) == 0 {
-				continue
-			}
-			gpuModel := node.GPUModel
-			usedGPUs := node.UsedGPU
-			totalGPUs := node.TotalGPU
-
-			if gpuModel != "" && totalGPUs >= usedGPUs {
-				availableGPUs[gpuModel] = types.Resources{
-					GPUVendor:    node.GPUVendor,
-					AvailableGPU: totalGPUs - usedGPUs,
-					GPUModel:     gpuModel,
-				}
-			}
-		}
-		resources := make([]types.Resources, 0)
-		for k, v := range availableGPUs {
-			resources = append(resources, types.Resources{
-				GPUModel:     k,
-				AvailableGPU: v.AvailableGPU,
-				GPUVendor:    v.GPUVendor,
-			})
+			resources = append(resources, node)
 		}
 		result = append(result, types.ClusterRes{
 			ClusterID: c.ClusterID,
@@ -474,8 +454,27 @@ func (d *deployer) ListCluster(ctx context.Context) ([]types.ClusterRes, error) 
 	return result, err
 }
 
-func (d *deployer) UpdateCluster(ctx context.Context, data interface{}) (*types.UpdateClusterResponse, error) {
-	resp, err := d.ir.UpdateCluster(ctx, data)
+func (d *deployer) GetClusterById(ctx context.Context, clusterId string) (*types.ClusterRes, error) {
+	resp, err := d.ir.GetClusterById(ctx, clusterId)
+	if err != nil {
+		return nil, err
+	}
+	resources := make([]types.NodeResourceInfo, 0)
+	for _, node := range resp.Nodes {
+		resources = append(resources, node)
+	}
+	result := types.ClusterRes{
+		ClusterID: resp.ClusterID,
+		Region:    resp.Region,
+		Zone:      resp.Zone,
+		Provider:  resp.Provider,
+		Resources: resources,
+	}
+	return &result, err
+}
+
+func (d *deployer) UpdateCluster(ctx context.Context, data types.ClusterRequest) (*types.UpdateClusterResponse, error) {
+	resp, err := d.ir.UpdateCluster(ctx, &data)
 	return (*types.UpdateClusterResponse)(resp), err
 }
 
@@ -642,4 +641,49 @@ func getValidSceneType(scene int) database.SceneType {
 	default:
 		return database.SceneUnknow
 	}
+}
+
+func (d *deployer) CheckResourceAvailable(ctx context.Context, clusterId string, hardWare *types.HardWare) (bool, error) {
+	// backward compatibility for old api
+	if clusterId == "" {
+		clusters, err := d.ListCluster(ctx)
+		if err != nil {
+			return false, err
+		}
+		if len(clusters) == 0 {
+			return false, fmt.Errorf("can not list clusters")
+		}
+		clusterId = clusters[0].ClusterID
+	}
+	clusterResources, err := d.GetClusterById(ctx, clusterId)
+	if err != nil {
+		return false, err
+	}
+	if !CheckResource(clusterResources, hardWare) {
+		return false, fmt.Errorf("required resource is not enough")
+	}
+
+	return true, nil
+}
+
+func CheckResource(clusterResources *types.ClusterRes, hardware *types.HardWare) bool {
+	mem, err := strconv.Atoi(strings.Replace(hardware.Memory, "Gi", "", -1))
+	if err != nil {
+		slog.Error("failed to parse hardware memory ", slog.Any("error", err))
+		return false
+	}
+	for _, node := range clusterResources.Resources {
+		if float32(mem) <= node.AvailableMem {
+			if hardware.Gpu.Num == "" {
+				return true
+			} else {
+				gpu, _ := strconv.Atoi(hardware.Gpu.Num)
+				if gpu <= int(node.AvailableGPU) && hardware.Gpu.Type == node.GPUModel {
+					return true
+				}
+
+			}
+		}
+	}
+	return false
 }
