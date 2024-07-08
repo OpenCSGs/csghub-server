@@ -6,45 +6,78 @@ import (
 	"github.com/google/uuid"
 )
 
+type ACCTStatus int
+
 var (
-	REASON_SUCCESS        = 0 // charge success
-	REASON_INVALID_FORMAT = 1 // invalid event data format
-	REASON_CHARGE_FAIL    = 2 // fail to charge user fee
-	REASON_LACK_BALANCE   = 3 // balance <= 0
-	REASON_DUPLICATED     = 4 // duplicated charge
+	ACCTSuccess       ACCTStatus = 0 // charge success
+	ACCTInvalidFormat ACCTStatus = 1 // invalid event data format
+	ACCTChargeFail    ACCTStatus = 2 // fail to charge user fee
+	ACCTLackBalance   ACCTStatus = 3 // balance <= 0
+	ACCTDuplicated    ACCTStatus = 4 // duplicated charge by event uuid
+)
+
+type SKUType int
+
+var (
+	SKUReserve  SKUType = 0 // system reserve
+	SKUCSGHub   SKUType = 1 // csghub server
+	SKUStarship SKUType = 2 // starship
+)
+
+type SceneType int
+
+var (
+	SceneReserve        SceneType = 0  // system reserve
+	ScenePortalCharge   SceneType = 1  // portal charge fee
+	SceneModelInference SceneType = 10 // model inference endpoint
+	SceneSpace          SceneType = 11 // csghub space
+	SceneModelFinetune  SceneType = 12 // model finetune
+	SceneMultiSync      SceneType = 13 // multi sync
+	SceneStarship       SceneType = 20 // starship
+	SceneUnknow         SceneType = 99 // unknow
 )
 
 var (
-	SceneReserve        int = 0  // system reserve
-	ScenePortalCharge   int = 1  // portal charge fee
-	SceneModelInference int = 10 // model inference endpoint
-	SceneSpace          int = 11 // csghub space
-	SceneModelFinetune  int = 12 // model finetune
-	SceneStarship       int = 20 // starship
-	SceneUnknow         int = 99 // unknow
+	TimeDurationMinType int = 0
+	TokenNumberType     int = 1
+	QuotaNumberType     int = 2
 )
 
-// generate charge event from client
-type ACC_EVENT struct {
-	Uuid      uuid.UUID `json:"uuid"`
-	UserUUID  string    `json:"user_id"`
-	Value     float64   `json:"value"`
-	ValueType int       `json:"value_type"`
-	Scene     int       `json:"scene"`
-	OpUID     int64     `json:"op_uid"`
-	CreatedAt time.Time `json:"created_at"`
-	Extra     string    `json:"extra"`
+type ACCT_EVENT_REQ struct {
+	EventUUID    uuid.UUID `json:"event_uuid"`
+	UserUUID     string    `json:"user_uuid"`
+	Value        float64   `json:"value"`
+	Scene        SceneType `json:"scene"`
+	OpUID        string    `json:"op_uid"`
+	CustomerID   string    `json:"customer_id"`
+	EventDate    time.Time `json:"event_date"`
+	Price        float64   `json:"price"`
+	PriceUnit    string    `json:"price_unit"`
+	Consumption  float64   `json:"consumption"`
+	ValueType    int       `json:"value_type"`
+	ResourceID   string    `json:"resource_id"`
+	ResourceName string    `json:"resource_name"`
+	SkuID        int64     `json:"sku_id"`
+	RecordedAt   time.Time `json:"recorded_at"`
 }
 
-type ACC_EVENT_EXTRA struct {
-	CustomerID       string  `json:"customer_id"`
-	CustomerPrice    float64 `json:"customer_price"`
-	PriceUnit        string  `json:"price_unit"`
-	CustomerDuration float64 `json:"customer_duration"`
+// generate charge event from client
+type ACCT_EVENT struct {
+	Uuid         uuid.UUID `json:"uuid"`       // event uuid
+	UserUUID     string    `json:"user_uuid"`  // user uuid
+	Value        int64     `json:"value"`      // time duration in minutes or token number
+	ValueType    int       `json:"value_type"` // 0: credit, 1: token
+	Scene        int       `json:"scene"`
+	OpUID        string    `json:"op_uid"`        // operator uuid
+	ResourceID   string    `json:"resource_id"`   // resource id
+	ResourceName string    `json:"resource_name"` // resource name
+	CustomerID   string    `json:"customer_id"`   // customer_id will be shown in bill
+	CreatedAt    time.Time `json:"created_at"`    // time of event happen
+	Extra        string    `json:"extra"`
 }
 
 // notify response to client
-type ACC_NOTIFY struct {
+type ACCT_NOTIFY struct {
 	Uuid       uuid.UUID `json:"uuid"`
 	UserUUID   string    `json:"user_id"`
 	CreatedAt  time.Time `json:"created_at"`
@@ -54,7 +87,7 @@ type ACC_NOTIFY struct {
 
 type ACCT_STATEMENTS_REQ struct {
 	CurrentUser  string `json:"current_user"`
-	UserUUID     string `json:"user_id"`
+	UserUUID     string `json:"user_uuid"`
 	Scene        int    `json:"scene"`
 	InstanceName string `json:"instance_name"`
 	StartTime    string `json:"start_time"`
@@ -78,7 +111,7 @@ type ACCT_STATEMENTS_RES struct {
 	UserUUID    string    `json:"user_id"`
 	Value       float64   `json:"value"`
 	Scene       int       `json:"scene"`
-	OpUID       int64     `json:"op_uid"`
+	OpUID       string    `json:"op_uid"`
 	CreatedAt   time.Time `json:"created_at"`
 	CustomerID  string    `json:"instance_name"`
 	EventDate   time.Time `json:"event_date"`
@@ -89,7 +122,7 @@ type ACCT_STATEMENTS_RES struct {
 
 type RECHARGE_REQ struct {
 	Value float64 `json:"value"`
-	OpUID int64   `json:"op_uid"`
+	OpUID int     `json:"op_uid"`
 }
 
 type ACCT_QUOTA_REQ struct {
@@ -131,9 +164,32 @@ type ACCT_STATEMENTS_RESULT struct {
 	ACCT_SUMMARY
 }
 
-type CONSUMER_INFO struct {
-	ConsumerID    string `json:"customer_id"`
-	ConsumerPrice string `json:"customer_price"`
-	PriceUnit     string `json:"price_unit"`
-	Duration      string `json:"customer_duration"`
+type METERING_EVENT struct {
+	Uuid         uuid.UUID `json:"uuid"`       // event uuid
+	UserUUID     string    `json:"user_uuid"`  // user uuid
+	Value        int64     `json:"value"`      // time duration in minutes or token number
+	ValueType    int       `json:"value_type"` // 0: duration, 1: token
+	Scene        int       `json:"scene"`
+	OpUID        string    `json:"op_uid"`        // operator uuid
+	ResourceID   string    `json:"resource_id"`   // resource id
+	ResourceName string    `json:"resource_name"` // resource name
+	CustomerID   string    `json:"customer_id"`   // customer_id will be shown in bill
+	CreatedAt    time.Time `json:"created_at"`    // time of event happen
+	Extra        string    `json:"extra"`
+}
+
+type ACCT_PRICE struct {
+	SkuType    int    `json:"sku_type"`
+	SkuPrice   int64  `json:"sku_price"`
+	SkuUnit    int64  `json:"sku_unit"`
+	SkuDesc    string `json:"sku_desc"`
+	ResourceID string `json:"resource_id"`
+}
+
+type ACCT_PRICE_REQ struct {
+	SKUType    SKUType   `json:"sku_type"`
+	ResourceID string    `json:"resource_id"`
+	PriceTime  time.Time `json:"price_time"`
+	Per        int       `json:"per"`
+	Page       int       `json:"page"`
 }

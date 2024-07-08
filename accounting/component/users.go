@@ -35,7 +35,7 @@ func (a *AccountingUserComponent) GetAccountingByUserID(ctx context.Context, use
 	return account, err
 }
 
-func (a *AccountingUserComponent) AddNewAccountingUser(ctx context.Context, event *types.ACC_EVENT) error {
+func (a *AccountingUserComponent) AddNewAccountingUser(ctx context.Context, event *types.ACCT_EVENT) error {
 	statement := database.AccountUser{
 		UserUUID: event.UserUUID,
 		Balance:  0,

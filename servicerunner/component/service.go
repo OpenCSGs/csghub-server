@@ -15,6 +15,14 @@ import (
 	"opencsg.com/csghub-server/common/types"
 )
 
+var (
+	KeyDeployID    string = "deploy_id"
+	KeyDeployType  string = "deploy_type"
+	KeyUserID      string = "user_id"
+	KeyCostPerHour string = "cost_per_hour"
+	KeyDeploySKU   string = "deploy_sku"
+)
+
 type ServiceComponent struct {
 	k8sNameSpace       string
 	env                *config.Config
@@ -80,10 +88,11 @@ func (s *ServiceComponent) GenerateService(request types.SVCRequest, srvName str
 		Requests: resReq,
 	}
 
-	annotations["deploy_id"] = strconv.FormatInt(request.DeployID, 10)
-	annotations["deploy_type"] = strconv.Itoa(request.DeployType)
-	annotations["user_id"] = request.UserID
-	annotations["cost_per_hour"] = strconv.FormatFloat(request.CostPerHour, 'f', 2, 64)
+	annotations[KeyDeployID] = strconv.FormatInt(request.DeployID, 10)
+	annotations[KeyDeployType] = strconv.Itoa(request.DeployType)
+	annotations[KeyUserID] = request.UserID
+	annotations[KeyCostPerHour] = strconv.FormatFloat(request.CostPerHour, 'f', 2, 64)
+	annotations[KeyDeploySKU] = request.Sku
 
 	containerImg := path.Join(s.spaceDockerRegBase, request.ImageID)
 	if request.RepoType == string(types.ModelRepo) {

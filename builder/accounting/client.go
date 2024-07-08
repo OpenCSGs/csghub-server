@@ -77,6 +77,36 @@ func (ac *AccountingClient) GetQuotaStatement(currentUser string, req types.ACCT
 	return ac.handleResponse(ac.doRequest(http.MethodGet, subUrlPath, nil))
 }
 
+func (ac *AccountingClient) QueryPricesBySKUTypeAndResourceID(currentUser string, req types.ACCT_PRICE_REQ) (interface{}, error) {
+	subUrlPath := fmt.Sprintf("/price?current_user=%s&sku_type=%d&resource_id=%s&per=%d&page=%d", currentUser, req.SKUType, req.ResourceID, req.Per, req.Page)
+	return ac.handleResponse(ac.doRequest(http.MethodGet, subUrlPath, nil))
+}
+
+func (ac *AccountingClient) GetPriceByID(currentUser string, id int64) (interface{}, error) {
+	subUrlPath := fmt.Sprintf("/price/%d?current_user=%s", id, currentUser)
+	return ac.handleResponse(ac.doRequest(http.MethodGet, subUrlPath, nil))
+}
+
+func (ac *AccountingClient) CreatePrice(currentUser string, req types.ACCT_PRICE) (interface{}, error) {
+	subUrlPath := fmt.Sprintf("/price?current_user=%s", currentUser)
+	return ac.handleResponse(ac.doRequest(http.MethodPost, subUrlPath, req))
+}
+
+func (ac *AccountingClient) UpdatePrice(currentUser string, req types.ACCT_PRICE, id int64) (interface{}, error) {
+	subUrlPath := fmt.Sprintf("/price/%d?current_user=%s", id, currentUser)
+	return ac.handleResponse(ac.doRequest(http.MethodPut, subUrlPath, req))
+}
+
+func (ac *AccountingClient) DeletePrice(currentUser string, id int64) (interface{}, error) {
+	subUrlPath := fmt.Sprintf("/price/%d?current_user=%s", id, currentUser)
+	return ac.handleResponse(ac.doRequest(http.MethodDelete, subUrlPath, nil))
+}
+
+func (ac *AccountingClient) ListMeteringsByUserIDAndTime(req types.ACCT_STATEMENTS_REQ) (interface{}, error) {
+	subUrlPath := fmt.Sprintf("/metering/%s/statements?current_user=%s&scene=%d&instance_name=%s&start_time=%s&end_time=%s&per=%d&page=%d", req.UserUUID, req.CurrentUser, req.Scene, req.InstanceName, url.QueryEscape(req.StartTime), url.QueryEscape(req.EndTime), req.Per, req.Page)
+	return ac.handleResponse(ac.doRequest(http.MethodGet, subUrlPath, nil))
+}
+
 // Helper method to execute the actual HTTP request and read the response.
 func (ac *AccountingClient) doRequest(method, subPath string, data interface{}) (*http.Response, error) {
 	urlPath := fmt.Sprintf("%s%s%s", ac.remote, "/api/v1/accounting", subPath)

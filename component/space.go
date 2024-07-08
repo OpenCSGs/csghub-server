@@ -543,6 +543,7 @@ func (c *SpaceComponent) Deploy(ctx context.Context, namespace, name, currentUse
 		CostPerHour: s.CostPerHour,
 		Type:        types.SpaceType,
 		UserUUID:    user.UUID,
+		SKU:         s.SKU,
 	})
 }
 

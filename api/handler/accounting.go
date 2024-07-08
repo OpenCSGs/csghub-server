@@ -274,11 +274,6 @@ func (ah *AccountingHandler) RechargeByUserID(ctx *gin.Context) {
 		httpbase.BadRequest(ctx, "Bad recharge value")
 		return
 	}
-	if req.OpUID < 0 {
-		slog.Error("Bad operate user id")
-		httpbase.BadRequest(ctx, "Bad operate user id")
-		return
-	}
 	userUUID := ctx.Param("id")
 	if len(userUUID) < 1 {
 		slog.Error("Bad recharge user id")
@@ -450,4 +445,294 @@ func getSceneFromContext(ctx *gin.Context) (int, error) {
 	}
 	scene, err := strconv.Atoi(str)
 	return scene, err
+}
+
+// GetPrices     godoc
+// @Security     ApiKey
+// @Summary      List sku prices
+// @Description  List sku prices
+// @Tags         Accounting
+// @Accept       json
+// @Produce      json
+// @Param        sku_type query string true "sku_type" Enums(1, 2) default(1)
+// @Param        resource_id query string true "resource_id"
+// @Param        current_user query string true "current_user"
+// @Param        per query int false "per" default(20)
+// @Param        page query int false "per page" default(1)
+// @Success      200  {object}  types.Response{} "OK"
+// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
+// @Router       /accounting/price [get]
+func (ah *AccountingHandler) QueryPricesBySKUTypeAndResourceID(ctx *gin.Context) {
+	currentUser := httpbase.GetCurrentUser(ctx)
+	if currentUser == "" {
+		httpbase.UnauthorizedError(ctx, errors.New("user not found, please login first"))
+		return
+	}
+	skyStr := ctx.Query("sku_type")
+	skuInt, err := strconv.Atoi(skyStr)
+	if err != nil {
+		slog.Error("Bad request sku type format", "error", err)
+		httpbase.BadRequest(ctx, err.Error())
+		return
+	}
+	per, page, err := common.GetPerAndPageFromContext(ctx)
+	if err != nil {
+		slog.Error("Bad request format", "error", err)
+		httpbase.BadRequest(ctx, err.Error())
+		return
+	}
+	resID := ctx.Query("resource_id")
+	req := types.ACCT_PRICE_REQ{
+		SKUType:    types.SKUType(skuInt),
+		ResourceID: resID,
+		Per:        per,
+		Page:       page,
+	}
+	data, err := ah.ac.QueryPricesBySKUTypeAndResourceID(currentUser, req)
+	if err != nil {
+		slog.Error("fail to query prices by sku type and resource id", slog.Any("error", err), slog.Any("req", req))
+		httpbase.ServerError(ctx, err)
+		return
+	}
+
+	httpbase.OK(ctx, data)
+}
+
+// GetPrice      godoc
+// @Security     ApiKey
+// @Summary      Get price by id
+// @Description  Get price by id
+// @Tags         Accounting
+// @Accept       json
+// @Produce      json
+// @Param        id path int true "id"
+// @Param        current_user query string true "current_user"
+// @Success      200  {object}  types.Response{} "OK"
+// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
+// @Router       /accounting/price/{id} [get]
+func (ah *AccountingHandler) GetPriceByID(ctx *gin.Context) {
+	currentUser := httpbase.GetCurrentUser(ctx)
+	if currentUser == "" {
+		httpbase.UnauthorizedError(ctx, errors.New("user not found, please login first"))
+		return
+	}
+	idStr := ctx.Param("id")
+	if len(idStr) < 1 {
+		slog.Error("Bad request id format")
+		httpbase.BadRequest(ctx, "Bad request format")
+		return
+	}
+	id, err := strconv.Atoi(idStr)
+	if err != nil {
+		slog.Error("Bad request id format", "error", err)
+		httpbase.BadRequest(ctx, err.Error())
+		return
+	}
+	data, err := ah.ac.GetPriceByID(currentUser, int64(id))
+	if err != nil {
+		slog.Error("fail to query price by id", slog.Any("id", id), slog.Any("error", err))
+		httpbase.ServerError(ctx, err)
+		return
+	}
+	httpbase.OK(ctx, data)
+}
+
+// CreatePrice   godoc
+// @Security     ApiKey
+// @Summary      Add sku price
+// @Description  Add sku price
+// @Tags         Accounting
+// @Accept       json
+// @Produce      json
+// @Param        current_user query string true "current_user"
+// @Param        body body types.ACCT_PRICE true "body"
+// @Success      200  {object}  types.Response{} "OK"
+// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
+// @Router       /accounting/price [post]
+func (ah *AccountingHandler) PriceCreate(ctx *gin.Context) {
+	currentUser := httpbase.GetCurrentUser(ctx)
+	if currentUser == "" {
+		httpbase.UnauthorizedError(ctx, errors.New("user not found, please login first"))
+		return
+	}
+	var req types.ACCT_PRICE
+	err := ctx.ShouldBindJSON(&req)
+	if err != nil {
+		slog.Error("Bad price request format", "error", err)
+		httpbase.BadRequest(ctx, err.Error())
+		return
+	}
+
+	data, err := ah.ac.CreatePrice(currentUser, req)
+	if err != nil {
+		slog.Error("fail to add price", slog.Any("req", req), slog.Any("error", err))
+		httpbase.ServerError(ctx, err)
+		return
+	}
+
+	httpbase.OK(ctx, data)
+}
+
+// UpdatePrice   godoc
+// @Security     ApiKey
+// @Summary      Update sku price
+// @Description  Update sku price
+// @Tags         Accounting
+// @Accept       json
+// @Produce      json
+// @Param        id path int true "id"
+// @Param        current_user query string true "current_user"
+// @Param        body body types.ACCT_PRICE true "body"
+// @Success      200  {object}  types.Response{} "OK"
+// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
+// @Router       /accounting/price/{id} [put]
+func (ah *AccountingHandler) PriceUpdate(ctx *gin.Context) {
+	currentUser := httpbase.GetCurrentUser(ctx)
+	if currentUser == "" {
+		httpbase.UnauthorizedError(ctx, errors.New("user not found, please login first"))
+		return
+	}
+	idStr := ctx.Param("id")
+	if len(idStr) < 1 {
+		slog.Error("Bad request id format")
+		httpbase.BadRequest(ctx, "Bad request format")
+		return
+	}
+	id, err := strconv.Atoi(idStr)
+	if err != nil {
+		slog.Error("Bad request id format", "error", err)
+		httpbase.BadRequest(ctx, err.Error())
+		return
+	}
+	var req types.ACCT_PRICE
+	err = ctx.ShouldBindJSON(&req)
+	if err != nil {
+		slog.Error("Bad price request format", "error", err)
+		httpbase.BadRequest(ctx, err.Error())
+		return
+	}
+
+	data, err := ah.ac.UpdatePrice(currentUser, req, int64(id))
+	if err != nil {
+		slog.Error("fail to update price", slog.Any("req", req), slog.Any("error", err))
+		httpbase.ServerError(ctx, err)
+		return
+	}
+
+	httpbase.OK(ctx, data)
+}
+
+// DeletePrice   godoc
+// @Security     ApiKey
+// @Summary      Delete price by id
+// @Description  Delete price by id
+// @Tags         Accounting
+// @Accept       json
+// @Produce      json
+// @Param        id path int true "id"
+// @Param        current_user query string true "current_user"
+// @Success      200  {object}  types.Response{} "OK"
+// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
+// @Router       /accounting/price/{id} [delete]
+func (ah *AccountingHandler) PriceDelete(ctx *gin.Context) {
+	currentUser := httpbase.GetCurrentUser(ctx)
+	if currentUser == "" {
+		httpbase.UnauthorizedError(ctx, errors.New("user not found, please login first"))
+		return
+	}
+	idStr := ctx.Param("id")
+	if len(idStr) < 1 {
+		slog.Error("Bad request id format")
+		httpbase.BadRequest(ctx, "Bad request format")
+		return
+	}
+	id, err := strconv.Atoi(idStr)
+	if err != nil {
+		slog.Error("Bad request id format", "error", err)
+		httpbase.BadRequest(ctx, err.Error())
+		return
+	}
+	data, err := ah.ac.DeletePrice(currentUser, int64(id))
+	if err != nil {
+		slog.Error("fail to delete price by id", slog.Any("id", id), slog.Any("error", err))
+		httpbase.ServerError(ctx, err)
+		return
+	}
+	httpbase.OK(ctx, data)
+}
+
+// ListMeterings godoc
+// @Security     ApiKey
+// @Summary      List meterings by user uuid and start time and end time
+// @Description  List meterings by user uuid and start time and end time
+// @Tags         Accounting
+// @Accept       json
+// @Produce      json
+// @Param        id path string true "user uuid"
+// @Param 		 scene query int false "scene" Enums(10, 11, 12, 20) default(10)
+// @Param        instance_name query string true "instance name"
+// @Param        start_time query string true "start_time, format: '2024-06-12 08:27:22'"
+// @Param        end_time query string true "end_time, format: '2024-06-12 17:17:22'"
+// @Param        current_user query string true "current_user"
+// @Param        per query int false "per" default(20)
+// @Param        page query int false "per page" default(1)
+// @Success      200  {object}  types.Response{} "OK"
+// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
+// @Router       /accounting/metering/{id}/statements [get]
+func (ah *AccountingHandler) QueryMeteringStatementByUserID(ctx *gin.Context) {
+	currentUser := httpbase.GetCurrentUser(ctx)
+	if currentUser == "" {
+		httpbase.UnauthorizedError(ctx, errors.New("user not found, please login first"))
+		return
+	}
+	per, page, err := common.GetPerAndPageFromContext(ctx)
+	if err != nil {
+		slog.Error("Bad request format", "error", err)
+		httpbase.BadRequest(ctx, err.Error())
+		return
+	}
+	scene, err := getSceneFromContext(ctx)
+	if err != nil {
+		slog.Error("Bad request scene format", "error", err)
+		httpbase.BadRequest(ctx, err.Error())
+		return
+	}
+	userUUID := ctx.Param("id")
+	instance_name := ctx.Query("instance_name")
+	startTime := ctx.Query("start_time") // format: '2024-06-12 08:27:22'
+	endTime := ctx.Query("end_time")     // format: '2024-06-12 17:17:22'
+	if len(startTime) < 1 || len(endTime) < 1 || len(userUUID) < 1 {
+		slog.Error("Bad request format")
+		httpbase.BadRequest(ctx, "Bad request format")
+		return
+	}
+	if !validateDateTimeFormat(startTime, "2006-01-02 15:04:05") || !validateDateTimeFormat(endTime, "2006-01-02 15:04:05") {
+		slog.Error("Bad request datetime format")
+		httpbase.BadRequest(ctx, "Bad request datetime format")
+		return
+	}
+	req := types.ACCT_STATEMENTS_REQ{
+		CurrentUser:  currentUser,
+		UserUUID:     userUUID,
+		Scene:        scene,
+		InstanceName: instance_name,
+		StartTime:    startTime,
+		EndTime:      endTime,
+		Per:          per,
+		Page:         page,
+	}
+	data, err := ah.ac.ListMeteringsByUserIDAndTime(ctx, req)
+	if err != nil {
+		errTip := "fail to query meterings by user"
+		slog.Error(errTip, slog.Any("req", req), slog.Any("error", err))
+		httpbase.ServerError(ctx, errors.New(errTip))
+		return
+	}
+	httpbase.OK(ctx, data)
 }

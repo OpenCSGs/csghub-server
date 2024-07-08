@@ -5,13 +5,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
-	"strconv"
-	"strings"
 	"time"
 
 	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nats.go/jetstream"
 	"opencsg.com/csghub-server/accounting/component"
+	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/types"
 	"opencsg.com/csghub-server/mq"
@@ -26,8 +25,9 @@ type Charging struct {
 	acctSMComp    *component.AccountingStatementComponent
 	acctUserComp  *component.AccountingUserComponent
 	acctEvtComp   *component.AccountingEventComponent
+	acctPriceComp *component.AccountingPriceComponent
 	notify        *Notify
-	dlq           *Dlq
+	dlq           *FeeDlq
 	notifyTimeOut *time.Timer
 	dlqTimeout    *time.Timer
 }
@@ -38,8 +38,9 @@ func NewCharging(natHandler *mq.NatsHandler, config *config.Config) *Charging {
 		acctSMComp:    component.NewAccountingStatement(),
 		acctUserComp:  component.NewAccountingUser(),
 		acctEvtComp:   component.NewAccountingEvent(),
+		acctPriceComp: component.NewAccountingPrice(),
 		notify:        NewNotify(natHandler),
-		dlq:           NewDlq(natHandler),
+		dlq:           NewFeeDlq(natHandler),
 		notifyTimeOut: time.NewTimer(idleDuration),
 		dlqTimeout:    time.NewTimer(idleDuration),
 	}
@@ -56,7 +57,7 @@ func (c *Charging) Run() {
 func (c *Charging) startCharging() {
 	for {
 		c.preReadMsgs()
-		c.handleReadMsgs()
+		c.handleReadMsgs(10)
 		time.Sleep(2 * idleDuration)
 	}
 }
@@ -66,10 +67,10 @@ func (c *Charging) preReadMsgs() {
 	var i int = 0
 	for {
 		i++
-		err = c.sysMQ.BuildEventStream()
+		err = c.sysMQ.BuildFeeEventStream()
 		if err != nil {
 			tip := fmt.Sprintf("fail to build event stream for the %d time", i)
-			slog.Error(tip, slog.Any("err", err))
+			slog.Error(tip, slog.Any("error", err))
 			time.Sleep(2 * time.Second)
 			continue
 		}
@@ -77,16 +78,16 @@ func (c *Charging) preReadMsgs() {
 	}
 }
 
-func (c *Charging) handleReadMsgs() {
+func (c *Charging) handleReadMsgs(failedLimit int) {
 	failReadTime := 0
 	for {
-		if failReadTime >= 10 {
+		if failReadTime >= failedLimit {
 			break
 		}
-		err := c.sysMQ.VerifyEventStream()
+		err := c.sysMQ.VerifyFeeEventStream()
 		if err != nil {
 			tip := fmt.Sprintf("fail to verify stream for the %d time", (failReadTime + 1))
-			slog.Error(tip, slog.Any("err", err))
+			slog.Error(tip, slog.Any("error", err))
 			failReadTime++
 			continue
 		}
@@ -97,7 +98,7 @@ func (c *Charging) handleReadMsgs() {
 
 		if err != nil {
 			tip := fmt.Sprintf("fail to fetch event messages for the %d time", (failReadTime + 1))
-			slog.Error(tip, slog.Any("err", err))
+			slog.Error(tip, slog.Any("error", err))
 			failReadTime++
 			continue
 		}
@@ -117,7 +118,7 @@ func (c *Charging) handleReadMsgs() {
 
 func (c *Charging) handleMsgWithRetry(msg jetstream.Msg) {
 	strData := string(msg.Data())
-	slog.Info("Sub received", slog.Any("msg.data", strData), slog.Any("msg.subject", msg.Subject()))
+	slog.Debug("Fee->received", slog.Any("msg.subject", msg.Subject()), slog.Any("msg.data", strData))
 	// A maximum of 3 attempts
 	var err error = nil
 	for j := 0; j < 3; j++ {
@@ -128,38 +129,32 @@ func (c *Charging) handleMsgWithRetry(msg jetstream.Msg) {
 	}
 
 	if err != nil {
-		slog.Error("error happen when handle single msg with retry 3 times", slog.Any("msg.data", strData), slog.Any("error", err))
+		slog.Error("accounting handles a single msg with 3 retries", slog.Any("msg.data", strData), slog.Any("error", err))
 		// move DLQ for fail to handle message
-		c.moveMsgToDLQWithReTry(msg)
-	} else {
-		// handle message success
-		err = msg.Ack()
+		err = c.moveMsgToDLQWithReTry(msg, 5)
 		if err != nil {
-			slog.Warn("fail to do msg ack for deal with message success", slog.Any("error", err))
+			tip := fmt.Sprintf("failed to move fee msg to DLQ with %d retries", 5)
+			slog.Error(tip, slog.Any("msg.data", strData), slog.Any("error", err))
 		}
 	}
 
+	// The code for acknowledging the processing of a single metering message is done.
+	err = msg.Ack()
+	if err != nil {
+		slog.Warn("failed to ack after processing fee msg", slog.Any("msg.data", strData), slog.Any("error", err))
+	}
 }
 
-func (c *Charging) moveMsgToDLQWithReTry(msg jetstream.Msg) {
-	// A maximum of three attempts for move DLQ
+func (c *Charging) moveMsgToDLQWithReTry(msg jetstream.Msg, limit int) error {
+	// A maximum of five attempts for move DLQ
 	var err error = nil
-	for i := 0; i < 5; i++ {
+	for i := 0; i < limit; i++ {
 		err = c.moveMsgToDLQ(msg)
 		if err == nil {
 			break
 		}
 	}
-
-	if err != nil {
-		slog.Error("fail to move msg to DLQ with retry 5 times", slog.Any("error", err))
-	} else {
-		// move dlq success
-		err = msg.Ack()
-		if err != nil {
-			slog.Warn("fail to do msg ack for move msg to DLQ success", slog.Any("msg.data", string(msg.Data())), slog.Any("error", err))
-		}
-	}
+	return err
 }
 
 func (c *Charging) moveMsgToDLQ(msg jetstream.Msg) error {
@@ -168,34 +163,46 @@ func (c *Charging) moveMsgToDLQ(msg jetstream.Msg) error {
 	case c.dlq.CH <- msg.Data():
 		return nil
 	case <-c.dlqTimeout.C:
-		return fmt.Errorf("try to move DLQ with timeout, %v", idleDuration)
+		return fmt.Errorf("try to move fee DLQ with timeout, %v", idleDuration)
 	}
 }
 
 func (c *Charging) handleMsgData(msg jetstream.Msg) error {
-	event, eventExtra, err := c.parseMessageData(msg)
+	event, err := c.parseMessageData(msg)
 	if err != nil {
 		return err
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 	err = c.acctEvtComp.AddNewAccountingEvent(ctx, event)
 	if err != nil {
-		return fmt.Errorf("fail to record event log, %v, %w", event, err)
+		return fmt.Errorf("fail to record fee event log, %v, %w", event, err)
 	}
 	st, err := c.acctSMComp.FindStatementByEventID(ctx, event)
 	if err != nil {
-		return fmt.Errorf("fail to check event statement, %v, %w", event, err)
+		return fmt.Errorf("fail to check fee event statement, %v, %w", event, err)
 	}
 	if st != nil {
-		slog.Warn("duplicated event id", slog.Any("event", event))
+		slog.Warn("duplicated fee event id", slog.Any("event", event))
+		return nil
+	}
+	priceReq := types.ACCT_PRICE_REQ{
+		SKUType:    GetSKUTypeByScene(types.SceneType(event.Scene)),
+		ResourceID: event.ResourceID,
+		PriceTime:  event.CreatedAt,
+	}
+	ap, err := c.acctPriceComp.GetLatestByTime(ctx, priceReq)
+	if err != nil {
+		slog.Warn("did not find a valid price", slog.Any("priceReq", priceReq), slog.Any("error", err), slog.Any("event", event))
 		return nil
 	}
 	err = c.acctUserComp.CheckAccountingUser(ctx, event.UserUUID)
 	if err != nil {
 		return fmt.Errorf("fail to check user balance, %v, %w", event.UserUUID, err)
 	}
-	err = c.acctSMComp.AddNewStatement(ctx, event, eventExtra, c.getCredit(event))
+	slog.Debug("use sku price", slog.Any("price", ap), slog.Any("event", event))
+	eventReq := c.buildPriceEvent(event, ap)
+	err = c.acctSMComp.AddNewStatement(ctx, eventReq)
 	if err != nil {
 		return fmt.Errorf("fail to add statement and change balance, %v, %w", event, err)
 	}
@@ -203,50 +210,39 @@ func (c *Charging) handleMsgData(msg jetstream.Msg) error {
 	return nil
 }
 
-func (c *Charging) parseMessageData(msg jetstream.Msg) (*types.ACC_EVENT, *types.ACC_EVENT_EXTRA, error) {
-	strData := string(msg.Data())
-	evt := types.ACC_EVENT{}
-	err := json.Unmarshal(msg.Data(), &evt)
-	if err != nil {
-		return nil, nil, fmt.Errorf("fail to unmarshal event, %v, %w", strData, err)
+func (c *Charging) buildPriceEvent(event *types.ACCT_EVENT, ap *database.AccountPrice) *types.ACCT_EVENT_REQ {
+	price := float64(ap.SkuPrice) / float64(ap.SkuUnit)
+	cost := float64(ap.SkuPrice) * float64(event.Value) / float64(ap.SkuUnit)
+	return &types.ACCT_EVENT_REQ{
+		EventUUID:    event.Uuid,
+		UserUUID:     event.UserUUID,
+		Value:        (0 - cost),
+		Scene:        types.SceneType(event.Scene),
+		OpUID:        event.OpUID,
+		CustomerID:   event.CustomerID,
+		EventDate:    event.CreatedAt,
+		Price:        price,
+		PriceUnit:    fmt.Sprintf("%s/%d", fmt.Sprintf("%.2f", float64(ap.SkuPrice)/100), ap.SkuUnit),
+		Consumption:  float64(event.Value),
+		ValueType:    event.ValueType,
+		ResourceID:   event.ResourceID,
+		ResourceName: event.ResourceName,
+		SkuID:        ap.ID,
+		RecordedAt:   event.CreatedAt,
 	}
-	evtExtra := types.ACC_EVENT_EXTRA{
-		CustomerID:       "",
-		CustomerPrice:    0,
-		PriceUnit:        "",
-		CustomerDuration: 0,
-	}
-	if len(strings.TrimSpace(evt.Extra)) < 1 {
-		// extra is null
-		return &evt, &evtExtra, nil
-	}
-	var exMap map[string]string
-	err = json.Unmarshal([]byte(evt.Extra), &exMap)
-	if err != nil {
-		return nil, nil, fmt.Errorf("fail to unmarshal event extra, %v, %w", strData, err)
-	}
-	evtExtra.CustomerID = exMap["customer_id"]
-	cusPriceStr, exists := exMap["customer_price"]
-	if exists {
-		cusPriceFloat, err := strconv.ParseFloat(cusPriceStr, 64)
-		if err != nil {
-			return nil, nil, fmt.Errorf("fail to unmarshal event extra customer_price, %v, %w", strData, err)
-		}
-		evtExtra.CustomerPrice = cusPriceFloat
-	}
-	evtExtra.PriceUnit = exMap["price_unit"]
-	cusDurStr, exists := exMap["customer_duration"]
-	if exists {
-		cusDurFloat, err := strconv.ParseFloat(cusDurStr, 64)
-		if err != nil {
-			return nil, nil, fmt.Errorf("fail to unmarshal event extra customer_duration, %v, %w", strData, err)
-		}
-		evtExtra.CustomerDuration = cusDurFloat
-	}
-	return &evt, &evtExtra, nil
 }
 
-func (c *Charging) checkBalanceAndSendNotification(ctx context.Context, event *types.ACC_EVENT) {
+func (c *Charging) parseMessageData(msg jetstream.Msg) (*types.ACCT_EVENT, error) {
+	strData := string(msg.Data())
+	evt := types.ACCT_EVENT{}
+	err := json.Unmarshal(msg.Data(), &evt)
+	if err != nil {
+		return nil, fmt.Errorf("fail to unmarshal fee event, %v, %w", strData, err)
+	}
+	return &evt, nil
+}
+
+func (c *Charging) checkBalanceAndSendNotification(ctx context.Context, event *types.ACCT_EVENT) {
 	account, err := c.acctUserComp.GetAccountingByUserID(ctx, event.UserUUID)
 	if err != nil {
 		slog.Warn("fail to query account before check account balance", slog.Any("user_uuid", event.UserUUID), slog.Any("error", err))
@@ -258,7 +254,7 @@ func (c *Charging) checkBalanceAndSendNotification(ctx context.Context, event *t
 	if account.Balance <= 0 {
 		// retry 3 times for notification
 		for i := 0; i < 3; i++ {
-			err = c.sendNotification(types.REASON_LACK_BALANCE, "insufficient funds", event)
+			err = c.sendNotification(int(types.ACCTLackBalance), "insufficient funds", event)
 			if err == nil {
 				break
 			}
@@ -269,8 +265,8 @@ func (c *Charging) checkBalanceAndSendNotification(ctx context.Context, event *t
 	}
 }
 
-func (c *Charging) sendNotification(reasonCode int, reasonMsg string, event *types.ACC_EVENT) error {
-	notify := types.ACC_NOTIFY{
+func (c *Charging) sendNotification(reasonCode int, reasonMsg string, event *types.ACCT_EVENT) error {
+	notify := types.ACCT_NOTIFY{
 		CreatedAt:  time.Now(),
 		ReasonCode: reasonCode,
 		ReasonMsg:  reasonMsg,
@@ -288,10 +284,18 @@ func (c *Charging) sendNotification(reasonCode int, reasonMsg string, event *typ
 	}
 }
 
-func (c *Charging) getCredit(event *types.ACC_EVENT) float64 {
-	changeValue := event.Value
-	if event.ValueType == 1 {
-		changeValue = TokenToCredit(int64(event.Value))
+func GetSKUTypeByScene(scene types.SceneType) types.SKUType {
+	switch scene {
+	case types.SceneModelInference:
+		return types.SKUCSGHub
+	case types.SceneSpace:
+		return types.SKUCSGHub
+	case types.SceneModelFinetune:
+		return types.SKUCSGHub
+	case types.SceneMultiSync:
+		return types.SKUCSGHub
+	case types.SceneStarship:
+		return types.SKUStarship
 	}
-	return changeValue
+	return types.SKUReserve
 }

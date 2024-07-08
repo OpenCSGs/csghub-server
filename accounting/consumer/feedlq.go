@@ -8,14 +8,14 @@ import (
 	"opencsg.com/csghub-server/mq"
 )
 
-type Dlq struct {
+type FeeDlq struct {
 	sysMQ   *mq.NatsHandler
 	CH      chan []byte
 	timeOut *time.Timer
 }
 
-func NewDlq(mqh *mq.NatsHandler) *Dlq {
-	dlq := &Dlq{
+func NewFeeDlq(mqh *mq.NatsHandler) *FeeDlq {
+	dlq := &FeeDlq{
 		sysMQ:   mqh,
 		CH:      make(chan []byte),
 		timeOut: time.NewTimer(idleDuration),
@@ -23,22 +23,22 @@ func NewDlq(mqh *mq.NatsHandler) *Dlq {
 	return dlq
 }
 
-func (d *Dlq) Run() {
+func (d *FeeDlq) Run() {
 	for {
 		d.preDLQ()
 		d.moveWithRetry()
 	}
 }
 
-func (d *Dlq) preDLQ() {
+func (d *FeeDlq) preDLQ() {
 	var err error = nil
 	var i int = 0
 	for {
 		i++
 		err = d.sysMQ.BuildDLQStream()
 		if err != nil {
-			tip := fmt.Sprintf("fail to build DLQ stream for the %d time", i)
-			slog.Error(tip, slog.Any("err", err))
+			tip := fmt.Sprintf("fail to build DLQ stream in accounting for the %d time", i)
+			slog.Error(tip, slog.Any("error", err))
 			time.Sleep(2 * time.Second)
 			continue
 		}
@@ -46,7 +46,7 @@ func (d *Dlq) preDLQ() {
 	}
 }
 
-func (d *Dlq) moveWithRetry() {
+func (d *FeeDlq) moveWithRetry() {
 	for {
 		err := d.sysMQ.VerifyDLQStream()
 		if err != nil {
@@ -71,11 +71,11 @@ func (d *Dlq) moveWithRetry() {
 	}
 }
 
-func (d *Dlq) publishToDLQWithRetry(data []byte) error {
+func (d *FeeDlq) publishToDLQWithRetry(data []byte) error {
 	// max try 10 times
 	var err error = nil
 	for m := 0; m < 10; m++ {
-		err = d.sysMQ.PublishDataToDLQ(data)
+		err = d.sysMQ.PublishFeeDataToDLQ(data)
 		if err == nil {
 			break
 		}

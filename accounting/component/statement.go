@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"strconv"
 	"time"
 
 	"github.com/google/uuid"
@@ -22,28 +23,25 @@ func NewAccountingStatement() *AccountingStatementComponent {
 	return asc
 }
 
-func (a *AccountingStatementComponent) AddNewStatement(ctx context.Context, event *types.ACC_EVENT, eventExtra *types.ACC_EVENT_EXTRA, changeValue float64) error {
+func (a *AccountingStatementComponent) AddNewStatement(ctx context.Context, event *types.ACCT_EVENT_REQ) error {
 	statement := database.AccountStatement{
-		EventUUID:  event.Uuid,
-		UserUUID:   event.UserUUID,
-		Value:      event.Value,
-		Scene:      a.getValidSceneType(event.Scene),
-		OpUID:      event.OpUID,
-		CustomerID: eventExtra.CustomerID,
-		EventDate:  event.CreatedAt,
-		Price:      eventExtra.CustomerPrice,
-		PriceUnit:  eventExtra.PriceUnit,
+		EventUUID:    event.EventUUID,
+		UserUUID:     event.UserUUID,
+		Value:        event.Value,
+		Scene:        event.Scene,
+		OpUID:        event.OpUID,
+		CustomerID:   event.CustomerID,
+		EventDate:    event.RecordedAt,
+		Price:        event.Price,
+		PriceUnit:    event.PriceUnit,
+		Consumption:  event.Consumption,
+		ValueType:    event.ValueType,
+		ResourceID:   event.ResourceID,
+		ResourceName: event.ResourceName,
+		SkuID:        event.SkuID,
+		RecordedAt:   event.RecordedAt,
 	}
-	if event.Scene == int(database.SceneStarship) {
-		// starship token count
-		statement.Consumption = event.Value
-	} else if event.Scene == int(database.SceneModelInference) || event.Scene == int(database.SceneSpace) || event.Scene == int(database.SceneModelFinetune) {
-		// time duration of csghub resource
-		statement.Consumption = eventExtra.CustomerDuration
-	} else {
-		statement.Consumption = 0
-	}
-	return a.asms.Create(ctx, statement, changeValue)
+	return a.asms.Create(ctx, statement)
 }
 
 func (a *AccountingStatementComponent) ListStatementByUserIDAndTime(ctx context.Context, req types.ACCT_STATEMENTS_REQ) (types.ACCT_STATEMENTS_RESULT, error) {
@@ -73,7 +71,7 @@ func (a *AccountingStatementComponent) ListStatementByUserIDAndTime(ctx context.
 	return types.ACCT_STATEMENTS_RESULT{Data: resStatements, ACCT_SUMMARY: statements.ACCT_SUMMARY}, err
 }
 
-func (a *AccountingStatementComponent) FindStatementByEventID(ctx context.Context, event *types.ACC_EVENT) (*database.AccountStatement, error) {
+func (a *AccountingStatementComponent) FindStatementByEventID(ctx context.Context, event *types.ACCT_EVENT) (*database.AccountStatement, error) {
 	statement, err := a.asms.GetByEventID(ctx, event.Uuid)
 	if err == sql.ErrNoRows {
 		return nil, nil
@@ -81,38 +79,25 @@ func (a *AccountingStatementComponent) FindStatementByEventID(ctx context.Contex
 	return &statement, err
 }
 
-func (a *AccountingStatementComponent) getValidSceneType(scene int) database.SceneType {
-	switch scene {
-	case 0:
-		return database.SceneReserve
-	case 1:
-		return database.ScenePortalCharge
-	case 10:
-		return database.SceneModelInference
-	case 11:
-		return database.SceneSpace
-	case 12:
-		return database.SceneModelFinetune
-	case 20:
-		return database.SceneStarship
-	default:
-		return database.SceneUnknow
-	}
-}
-
 func (a *AccountingStatementComponent) RechargeAccountingUser(ctx context.Context, userUUID string, req types.RECHARGE_REQ) error {
-	event := types.ACC_EVENT{
-		Uuid:      uuid.New(),
-		UserUUID:  userUUID,
-		Value:     req.Value,
-		ValueType: int(database.ScenePortalCharge),
-		Scene:     int(database.ScenePortalCharge),
-		OpUID:     req.OpUID,
-		CreatedAt: time.Now(),
-		Extra:     "",
+	event := types.ACCT_EVENT_REQ{
+		EventUUID:    uuid.New(),
+		UserUUID:     userUUID,
+		Value:        req.Value,
+		Scene:        types.ScenePortalCharge,
+		OpUID:        strconv.Itoa(req.OpUID),
+		CustomerID:   "",
+		EventDate:    time.Now(),
+		Price:        0,
+		PriceUnit:    "",
+		Consumption:  0,
+		ValueType:    0,
+		ResourceID:   "",
+		ResourceName: "",
+		SkuID:        0,
+		RecordedAt:   time.Now(),
 	}
-	eventExtra := types.ACC_EVENT_EXTRA{}
-	err := a.AddNewStatement(ctx, &event, &eventExtra, event.Value)
+	err := a.AddNewStatement(ctx, &event)
 	if err != nil {
 		return fmt.Errorf("fail to add statement and rechange balance, %v, %w", event, err)
 	}

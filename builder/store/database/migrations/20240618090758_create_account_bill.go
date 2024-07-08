@@ -5,17 +5,16 @@ import (
 	"time"
 
 	"github.com/uptrace/bun"
-	"opencsg.com/csghub-server/builder/store/database"
 )
 
 type AccountBill struct {
-	ID          int64              `bun:",pk,autoincrement" json:"id"`
-	BillDate    time.Time          `bun:"type:date" json:"bill_date"`
-	UserID      string             `bun:",notnull" json:"user_id"`
-	Scene       database.SceneType `bun:",notnull" json:"scene"`
-	CustomerID  string             `bun:",notnull" json:"customer_id"`
-	Value       float64            `bun:",notnull" json:"value"`
-	Consumption float64            `bun:",notnull" json:"consumption"`
+	ID          int64     `bun:",pk,autoincrement" json:"id"`
+	BillDate    time.Time `bun:"type:date" json:"bill_date"`
+	UserID      string    `bun:",notnull" json:"user_id"`
+	Scene       int       `bun:",notnull" json:"scene"`
+	CustomerID  string    `bun:",notnull" json:"customer_id"`
+	Value       float64   `bun:",notnull" json:"value"`
+	Consumption float64   `bun:",notnull" json:"consumption"`
 	times
 }
 

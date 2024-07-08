@@ -512,6 +512,7 @@ func (d *deployer) UpdateDeploy(ctx context.Context, mrr types.ModelRunReq, depl
 	deploy.SecureLevel = mrr.SecureLevel
 	deploy.CostPerHour = resource.CostPerHour
 	deploy.ClusterID = mrr.ClusterID
+	deploy.SKU = strconv.FormatInt(resource.ID, 10)
 
 	// deploy.Status = common.Pending
 	// update deploy table
@@ -566,13 +567,30 @@ func (d *deployer) startAccountingConsuming() {
 	}
 }
 
+func (d *deployer) getResourceMap() map[string]string {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	resList, err := d.spaceResourceStore.FindAll(ctx)
+	resources := make(map[string]string)
+	if err != nil {
+		slog.Error("failed to get hub resource", slog.Any("error", err))
+	} else {
+		for _, res := range resList {
+			resources[strconv.FormatInt(res.ID, 10)] = res.Name
+		}
+	}
+	return resources
+}
+
 func (d *deployer) startAccountingFeeing() {
 	for {
+		resMap := d.getResourceMap()
+		slog.Debug("get resources map", slog.Any("resMap", resMap))
 		for _, svc := range d.runnerStatuscache {
-			d.startAccountingRequestFee(svc)
+			d.startAccountingRequestFee(resMap, svc)
 		}
-		// accounting interval 1 min
-		time.Sleep(1 * time.Minute)
+		// accounting interval in min, get from env config
+		time.Sleep(time.Duration(d.eventPub.SyncInterval) * time.Minute)
 	}
 }
 
@@ -580,66 +598,60 @@ func (d *deployer) startAccountingConsumerCallback(msg jetstream.Msg) {
 	slog.Debug("Received a JetStream message", slog.Any("msg", string(msg.Data())))
 	err := msg.Ack()
 	if err != nil {
-		slog.Warn("Fail to do ack", slog.Any("msg", string(msg.Data())))
+		slog.Warn("fail to ack after processing message", slog.Any("msg", string(msg.Data())))
 	}
 }
 
-func (d *deployer) startAccountingRequestFee(svc types.StatusResponse) {
+func (d *deployer) startAccountingRequestFee(resMap map[string]string, svcRes types.StatusResponse) {
 	// ignore not ready svc
-	if svc.Code != common.Running {
+	if svcRes.Code != common.Running {
 		return
 	}
-	// ignore existing space and cpu resources
-	if svc.CostPerHour <= 0 {
+	// ignore deploy without sku resource
+	if len(svcRes.DeploySku) < 1 {
 		return
 	}
-	duration := float64(d.eventPub.SyncInterval) / 60.0
-
-	consumerInfo := types.CONSUMER_INFO{
-		ConsumerID:    svc.ServiceName,
-		ConsumerPrice: fmt.Sprintf("%.3f", svc.CostPerHour),
-		PriceUnit:     "hour",
-		Duration:      fmt.Sprintf("%.3f", duration),
-	}
-	consumerInfoStr, err := json.Marshal(consumerInfo)
-	if err != nil {
-		slog.Error("Error marshal consumer info", slog.Any("consumerInfo", consumerInfo), slog.Any("error", err))
+	resName, exists := resMap[svcRes.DeploySku]
+	if !exists {
 		return
 	}
-	event := types.ACC_EVENT{
-		Uuid:      uuid.New(),
-		UserUUID:  svc.UserID,
-		Value:     -(svc.CostPerHour * float64(svc.Replica) * duration),
-		ValueType: 0, // for credit
-		Scene:     int(getValidSceneType(svc.DeployType)),
-		OpUID:     0,
-		CreatedAt: time.Now(),
-		Extra:     string(consumerInfoStr),
+	slog.Debug("metering service", slog.Any("svcRes", svcRes))
+	event := types.METERING_EVENT{
+		Uuid:         uuid.New(),
+		UserUUID:     svcRes.UserID,
+		Value:        int64(d.eventPub.SyncInterval),
+		ValueType:    types.TimeDurationMinType,
+		Scene:        int(getValidSceneType(svcRes.DeployType)),
+		OpUID:        "",
+		ResourceID:   svcRes.DeploySku,
+		ResourceName: resName,
+		CustomerID:   svcRes.ServiceName,
+		CreatedAt:    time.Now(),
+		Extra:        "",
 	}
 	str, err := json.Marshal(event)
 	if err != nil {
-		slog.Error("Error marshal event", slog.Any("event", event), slog.Any("error", err))
+		slog.Error("error marshal metering event", slog.Any("event", event), slog.Any("error", err))
 		return
 	}
-
-	err = d.eventPub.PublishFeeEvent(str)
+	err = d.eventPub.PublishMeteringEvent(str)
 	if err != nil {
-		slog.Error("fail to pub event", slog.Any("data", string(str)), slog.Any("error", err))
+		slog.Error("failed to pub metering event", slog.Any("data", string(str)), slog.Any("error", err))
 	} else {
-		slog.Debug("pub event success", slog.Any("data", string(str)))
+		slog.Debug("pub metering event success", slog.Any("data", string(str)))
 	}
 }
 
-func getValidSceneType(scene int) database.SceneType {
+func getValidSceneType(scene int) types.SceneType {
 	switch scene {
 	case 0:
-		return database.SceneSpace
+		return types.SceneSpace
 	case 1:
-		return database.SceneModelInference
+		return types.SceneModelInference
 	case 2:
-		return database.SceneModelFinetune
+		return types.SceneModelFinetune
 	default:
-		return database.SceneUnknow
+		return types.SceneUnknow
 	}
 }
 

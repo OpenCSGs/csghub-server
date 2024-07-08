@@ -34,6 +34,7 @@ type (
 		DeployType       int     `json:"deploy_type"`
 		UserID           string  `json:"user_id"`
 		CostPerHour      float64 `json:"cost_per_hour"`
+		Sku              string  `json:"sku"`
 	}
 
 	RunResponse struct {
@@ -77,6 +78,7 @@ type (
 		Replica     int        `json:"replica"`
 		DeployType  int        `json:"deploy_type"`
 		ServiceName string     `json:"service_name"`
+		DeploySku   string     `json:"deploy_sku"`
 	}
 
 	LogsRequest struct {
@@ -177,5 +179,6 @@ type (
 		DeployType  int               `json:"deploy_type"`
 		UserID      string            `json:"user_id"`
 		CostPerHour float64           `json:"cost_per_hour"`
+		Sku         string            `json:"sku"`
 	}
 )

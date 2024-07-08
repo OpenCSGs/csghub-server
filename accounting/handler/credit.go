@@ -1,13 +1,11 @@
 package handler
 
 import (
-	"fmt"
 	"log/slog"
-	"strconv"
-	"time"
 
 	"github.com/gin-gonic/gin"
 	"opencsg.com/csghub-server/accounting/component"
+	"opencsg.com/csghub-server/accounting/utils"
 	"opencsg.com/csghub-server/api/httpbase"
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/types"
@@ -71,7 +69,7 @@ func (ch *CreditHandler) QueryStatementByUserID(ctx *gin.Context) {
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
-	scene, err := getSceneFromContext(ctx)
+	scene, err := utils.GetSceneFromContext(ctx)
 	if err != nil {
 		slog.Error("Bad request scene format", "error", err)
 		httpbase.BadRequest(ctx, err.Error())
@@ -86,7 +84,7 @@ func (ch *CreditHandler) QueryStatementByUserID(ctx *gin.Context) {
 		httpbase.BadRequest(ctx, "Bad request format")
 		return
 	}
-	if !validateDateTimeFormat(startTime, "2006-01-02 15:04:05") || !validateDateTimeFormat(endTime, "2006-01-02 15:04:05") {
+	if !utils.ValidateDateTimeFormat(startTime, "2006-01-02 15:04:05") || !utils.ValidateDateTimeFormat(endTime, "2006-01-02 15:04:05") {
 		slog.Error("Bad request datetime format")
 		httpbase.BadRequest(ctx, "Bad request datetime format")
 		return
@@ -118,7 +116,7 @@ func (ch *CreditHandler) QueryBillsByUserID(ctx *gin.Context) {
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
-	scene, err := getSceneFromContext(ctx)
+	scene, err := utils.GetSceneFromContext(ctx)
 	if err != nil {
 		slog.Error("Bad request scene format", "error", err)
 		httpbase.BadRequest(ctx, err.Error())
@@ -133,7 +131,7 @@ func (ch *CreditHandler) QueryBillsByUserID(ctx *gin.Context) {
 		return
 	}
 
-	if !validateDateTimeFormat(startDate, "2006-01-02") || !validateDateTimeFormat(endDate, "2006-01-02") {
+	if !utils.ValidateDateTimeFormat(startDate, "2006-01-02") || !utils.ValidateDateTimeFormat(endDate, "2006-01-02") {
 		slog.Error("Bad request date format")
 		httpbase.BadRequest(ctx, "Bad request date format")
 		return
@@ -157,20 +155,6 @@ func (ch *CreditHandler) QueryBillsByUserID(ctx *gin.Context) {
 	httpbase.OK(ctx, respData)
 }
 
-func validateDateTimeFormat(timeStr, layout string) bool {
-	_, err := time.Parse(layout, timeStr)
-	return err == nil
-}
-
-func getSceneFromContext(ctx *gin.Context) (int, error) {
-	str := ctx.Query("scene")
-	if str == "" {
-		return 0, fmt.Errorf("bad request scene format")
-	}
-	scene, err := strconv.Atoi(str)
-	return scene, err
-}
-
 func (ch *CreditHandler) RechargeByUserID(ctx *gin.Context) {
 	var req types.RECHARGE_REQ
 	err := ctx.ShouldBindJSON(&req)
@@ -182,11 +166,6 @@ func (ch *CreditHandler) RechargeByUserID(ctx *gin.Context) {
 	if req.Value < 0 {
 		slog.Error("Bad recharge value")
 		httpbase.BadRequest(ctx, "Bad recharge value")
-		return
-	}
-	if req.OpUID < 0 {
-		slog.Error("Bad operate user id")
-		httpbase.BadRequest(ctx, "Bad operate user id")
 		return
 	}
 	userUUID := ctx.Param("id")

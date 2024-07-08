@@ -551,6 +551,18 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 			multiSyncGroup.POST("/downloads", accountingHandler.CreateQuotaStatement)
 			multiSyncGroup.GET("/download", accountingHandler.QueryQuotaStatement)
 		}
+		meterGroup := accountingGroup.Group("/metering")
+		{
+			meterGroup.GET("/:id/statements", accountingHandler.QueryMeteringStatementByUserID)
+		}
+		priceGroup := accountingGroup.Group("/price")
+		{
+			priceGroup.POST("", needAPIKey, accountingHandler.PriceCreate)
+			priceGroup.GET("/:id", needAPIKey, accountingHandler.GetPriceByID)
+			priceGroup.PUT("/:id", needAPIKey, accountingHandler.PriceUpdate)
+			priceGroup.DELETE("/:id", needAPIKey, accountingHandler.PriceDelete)
+			priceGroup.GET("", needAPIKey, accountingHandler.QueryPricesBySKUTypeAndResourceID)
+		}
 	}
 
 	recomHandler, err := handler.NewRecomHandler(config)

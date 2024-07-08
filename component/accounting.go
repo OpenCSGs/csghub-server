@@ -177,3 +177,34 @@ func (ac *AccountingComponent) parseBillsData(data interface{}) (*types.BILLS, e
 	}
 	return &newData, nil
 }
+
+func (ac *AccountingComponent) QueryPricesBySKUTypeAndResourceID(currentUser string, req types.ACCT_PRICE_REQ) (interface{}, error) {
+	return ac.acctClient.QueryPricesBySKUTypeAndResourceID(currentUser, req)
+}
+
+func (ac *AccountingComponent) GetPriceByID(currentUser string, id int64) (interface{}, error) {
+	return ac.acctClient.GetPriceByID(currentUser, id)
+}
+
+func (ac *AccountingComponent) CreatePrice(currentUser string, req types.ACCT_PRICE) (interface{}, error) {
+	return ac.acctClient.CreatePrice(currentUser, req)
+}
+
+func (ac *AccountingComponent) UpdatePrice(currentUser string, req types.ACCT_PRICE, id int64) (interface{}, error) {
+	return ac.acctClient.UpdatePrice(currentUser, req, id)
+}
+
+func (ac *AccountingComponent) DeletePrice(currentUser string, id int64) (interface{}, error) {
+	return ac.acctClient.DeletePrice(currentUser, id)
+}
+
+func (ac *AccountingComponent) ListMeteringsByUserIDAndTime(ctx context.Context, req types.ACCT_STATEMENTS_REQ) (interface{}, error) {
+	user, err := ac.user.FindByUsername(ctx, req.CurrentUser)
+	if err != nil {
+		return nil, fmt.Errorf("user does not exist, %w", err)
+	}
+	if user.UUID != req.UserUUID {
+		return nil, errors.New("invalid user")
+	}
+	return ac.acctClient.ListMeteringsByUserIDAndTime(req)
+}

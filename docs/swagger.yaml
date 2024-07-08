@@ -396,6 +396,19 @@ definitions:
     - new_role
     - old_role
     type: object
+  types.ACCT_PRICE:
+    properties:
+      resource_id:
+        type: string
+      sku_desc:
+        type: string
+      sku_price:
+        type: integer
+      sku_type:
+        type: integer
+      sku_unit:
+        type: integer
+    type: object
   types.ACCT_QUOTA_REQ:
     properties:
       repo_count_limit:
@@ -3604,6 +3617,77 @@ paths:
       summary: Get all users balance
       tags:
       - Accounting
+  /accounting/metering/{id}/statements:
+    get:
+      consumes:
+      - application/json
+      description: List meterings by user uuid and start time and end time
+      parameters:
+      - description: user uuid
+        in: path
+        name: id
+        required: true
+        type: string
+      - default: 10
+        description: scene
+        enum:
+        - 10
+        - 11
+        - 12
+        - 20
+        in: query
+        name: scene
+        type: integer
+      - description: instance name
+        in: query
+        name: instance_name
+        required: true
+        type: string
+      - description: 'start_time, format: ''2024-06-12 08:27:22'''
+        in: query
+        name: start_time
+        required: true
+        type: string
+      - description: 'end_time, format: ''2024-06-12 17:17:22'''
+        in: query
+        name: end_time
+        required: true
+        type: string
+      - description: current_user
+        in: query
+        name: current_user
+        required: true
+        type: string
+      - default: 20
+        description: per
+        in: query
+        name: per
+        type: integer
+      - default: 1
+        description: per page
+        in: query
+        name: page
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/types.Response'
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: List meterings by user uuid and start time and end time
+      tags:
+      - Accounting
   /accounting/multisync/download:
     get:
       consumes:
@@ -3743,6 +3827,209 @@ paths:
       security:
       - ApiKey: []
       summary: Add or update account quota
+      tags:
+      - Accounting
+  /accounting/price:
+    get:
+      consumes:
+      - application/json
+      description: List sku prices
+      parameters:
+      - default: "1"
+        description: sku_type
+        enum:
+        - "1"
+        - "2"
+        in: query
+        name: sku_type
+        required: true
+        type: string
+      - description: resource_id
+        in: query
+        name: resource_id
+        required: true
+        type: string
+      - description: current_user
+        in: query
+        name: current_user
+        required: true
+        type: string
+      - default: 20
+        description: per
+        in: query
+        name: per
+        type: integer
+      - default: 1
+        description: per page
+        in: query
+        name: page
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/types.Response'
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: List sku prices
+      tags:
+      - Accounting
+    post:
+      consumes:
+      - application/json
+      description: Add sku price
+      parameters:
+      - description: current_user
+        in: query
+        name: current_user
+        required: true
+        type: string
+      - description: body
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/types.ACCT_PRICE'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/types.Response'
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Add sku price
+      tags:
+      - Accounting
+  /accounting/price/{id}:
+    delete:
+      consumes:
+      - application/json
+      description: Delete price by id
+      parameters:
+      - description: id
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: current_user
+        in: query
+        name: current_user
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/types.Response'
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Delete price by id
+      tags:
+      - Accounting
+    get:
+      consumes:
+      - application/json
+      description: Get price by id
+      parameters:
+      - description: id
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: current_user
+        in: query
+        name: current_user
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/types.Response'
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Get price by id
+      tags:
+      - Accounting
+    put:
+      consumes:
+      - application/json
+      description: Update sku price
+      parameters:
+      - description: id
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: current_user
+        in: query
+        name: current_user
+        required: true
+        type: string
+      - description: body
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/types.ACCT_PRICE'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/types.Response'
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Update sku price
       tags:
       - Accounting
   /cluster:

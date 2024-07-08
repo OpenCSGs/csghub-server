@@ -3,6 +3,7 @@ package component
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"reflect"
 
@@ -21,9 +22,9 @@ func NewAccountingEvent() *AccountingEventComponent {
 	return aec
 }
 
-func (a *AccountingEventComponent) AddNewAccountingEvent(ctx context.Context, event *types.ACC_EVENT) error {
+func (a *AccountingEventComponent) AddNewAccountingEvent(ctx context.Context, event *types.ACCT_EVENT) error {
 	_, err := a.ae.GetByEventID(ctx, event.Uuid)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		body := make(map[string]string)
 		elem := reflect.ValueOf(event).Elem()
 		relType := elem.Type()
