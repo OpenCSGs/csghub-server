@@ -38,8 +38,16 @@ var launchCmd = &cobra.Command{
 			return fmt.Errorf("fail to build message queue handler: %w", err)
 		}
 
-		charge := consumer.NewCharging(mqHandler, cfg)
-		charge.Run()
+		// Do metering
+		meter := consumer.NewMetering(mqHandler, cfg)
+		meter.Run()
+
+		if cfg.Accounting.ChargingEnable {
+			// Do charging
+			slog.Debug("enable charging")
+			charge := consumer.NewCharging(mqHandler, cfg)
+			charge.Run()
+		}
 
 		r, err := router.NewAccountRouter(cfg)
 		if err != nil {

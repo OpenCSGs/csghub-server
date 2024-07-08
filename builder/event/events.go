@@ -15,10 +15,8 @@ var (
 )
 
 type EventPublisher struct {
-	Connector         *mq.NatsHandler
-	FeeRequestSubject string
-	RecvNotifySubject string
-	SyncInterval      int //in minutes
+	Connector    *mq.NatsHandler
+	SyncInterval int //in minutes
 }
 
 // NewNatsConnector initializes a new connection to the NATS server
@@ -28,27 +26,26 @@ func InitEventPublisher(cfg *config.Config) error {
 		return err
 	}
 	DefaultEventPublisher = EventPublisher{
-		Connector:         hander,
-		FeeRequestSubject: cfg.Nats.FeeSendSubject,
-		RecvNotifySubject: cfg.Nats.FeeNotifyNoBalanceSubject,
-		SyncInterval:      cfg.Event.SyncInterval,
+		Connector:    hander,
+		SyncInterval: cfg.Event.SyncInterval,
 	}
 	return nil
 }
 
 func (ec *EventPublisher) CreateNoBalanceConsumer() (jetstream.Consumer, error) {
-	return ec.Connector.BuildNotifyConsumer(CSGHubServerDurableConsumerName)
+	return ec.Connector.BuildNotifyConsumerWithName(CSGHubServerDurableConsumerName)
 }
 
-// Publish sends a message to the specified subject
-func (ec *EventPublisher) PublishFeeEvent(message []byte) error {
+// Publish a message to the specified subject
+func (ec *EventPublisher) PublishMeteringEvent(message []byte) error {
 	var err error
 	for i := 0; i < 3; i++ {
-		err = ec.Connector.VerifyEventStream()
+		err = ec.Connector.VerifyMeteringStream()
 		if err != nil {
+			time.Sleep(2 * time.Second)
 			continue
 		}
-		err = ec.Connector.PublishData(ec.FeeRequestSubject, message)
+		err = ec.Connector.PublishMeterDurationData(message)
 		if err == nil {
 			break
 		}
@@ -56,7 +53,7 @@ func (ec *EventPublisher) PublishFeeEvent(message []byte) error {
 	}
 
 	if err != nil {
-		return fmt.Errorf("failed to publish event for retry 3 times, %w", err)
+		return fmt.Errorf("failed to publish metering event for 3 retries, %w", err)
 	}
 
 	return nil

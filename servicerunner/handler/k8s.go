@@ -502,25 +502,28 @@ func (s *K8sHander) ServiceStatusAll(c *gin.Context) {
 		}
 
 		for _, srv := range services.Items {
-			deployIDStr := srv.Annotations["deploy_id"]
+			deployIDStr := srv.Annotations[component.KeyDeployID]
 			deployID, _ := strconv.ParseInt(deployIDStr, 10, 64)
-			deployTypeStr := srv.Annotations["deploy_type"]
+			deployTypeStr := srv.Annotations[component.KeyDeployType]
 			deployType, err := strconv.ParseInt(deployTypeStr, 10, 64)
 			if err != nil {
 				deployType = 0
 			}
-			costStr := srv.Annotations["cost_per_hour"]
+			costStr := srv.Annotations[component.KeyCostPerHour]
 			cost, err := strconv.ParseFloat(costStr, 32)
 			if err != nil {
 				// for old space, no charge
 				cost = 0
 			}
+			userID := srv.Annotations[component.KeyUserID]
+			deploySku := srv.Annotations[component.KeyDeploySKU]
 			status := &types.StatusResponse{
 				DeployID:    deployID,
-				UserID:      srv.Annotations["user_id"],
+				UserID:      userID,
 				CostPerHour: cost,
 				DeployType:  int(deployType),
 				ServiceName: srv.Name,
+				DeploySku:   deploySku,
 			}
 			allStatus[srv.Name] = status
 			if srv.IsFailed() {

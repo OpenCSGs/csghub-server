@@ -302,6 +302,7 @@ func (t *DeployRunner) makeDeployRequest() (*types.RunRequest, error) {
 		DeployType:  deploy.Type,
 		UserID:      deploy.UserUUID,
 		CostPerHour: deploy.CostPerHour,
+		Sku:         deploy.SKU,
 	}, nil
 }
 

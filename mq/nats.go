@@ -12,36 +12,84 @@ import (
 
 var _ MessageQueue = (*NatsHandler)(nil)
 
+type EventConfig struct {
+	StreamName   string // stream name of event
+	ConsumerName string // durable consumer name
+}
+
+type DLQEventConfig struct {
+	EventConfig
+	FeeSubjectName   string // subject of fee dlq
+	MeterSubjectName string // subject of meter dlq
+}
+
+type RequestSubject struct {
+	fee       string // fee charging subject
+	token     string // token subject
+	quota     string // quota subject
+	nobalance string // subject name for pub notification of no balance
+	duration  string // duration subject
+}
+
 var (
 	nats_connect_timeout time.Duration = 2 * time.Second  // second
 	nats_reconnect_wait  time.Duration = 10 * time.Second // second
 
-	feeEvtStreamName    string = "accountingEventStream"           // to receive fee request
-	feevEvtConsumerName string = "accountingServerDurableConsumer" // durable consumer name
+	feeCfg EventConfig = EventConfig{
+		StreamName:   "accountingEventStream", // fee request
+		ConsumerName: "accountingServerDurableConsumer",
+	}
 
-	notifyStreamName   string = "accountingNotifyStream" // to publish notify message
-	notifyConsumerName string = "accountingNotifyDurableConsumer"
+	notifyCfg EventConfig = EventConfig{
+		StreamName:   "accountingNotifyStream", // notify message
+		ConsumerName: "accountingNotifyDurableConsumer",
+	}
 
-	dlqStreamName  string = "accountingDlqStream"
-	dlqSubjectName string = "accounting.dlq.fee"
+	dlqCfg EventConfig = EventConfig{
+		StreamName:   "accountingDlqStream", // DLQ
+		ConsumerName: "accountingDlqDurableConsumer",
+	}
+
+	dlq DLQEventConfig = DLQEventConfig{
+		EventConfig:      dlqCfg,
+		FeeSubjectName:   "accounting.dlq.fee",
+		MeterSubjectName: "accounting.dlq.meter",
+	}
+
+	meterCfg EventConfig = EventConfig{
+		StreamName:   "meteringEventStream", // metering request
+		ConsumerName: "metertingServerDurableConsumer",
+	}
 )
 
 type NatsHandler struct {
 	conn *nats.Conn
 
-	feeRequestSubject      string // subject name for fee request
-	notifyNoBalanceSubject string // subject name for pub notification of no balance
-	msgFetchTimeoutInSec   int
+	msgFetchTimeoutInSec int
+	feeReqSub            RequestSubject
+	meterReqSub          RequestSubject
+	feeEvtCfg            jetstream.StreamConfig
+	feeConsumerCfg       jetstream.ConsumerConfig
+	notifyEvtCfg         jetstream.StreamConfig
+	notifyConsumerCfg    jetstream.ConsumerConfig
+	dlqEvtCfg            jetstream.StreamConfig
+	meterEvtCfg          jetstream.StreamConfig
+	meterConsumerCfg     jetstream.ConsumerConfig
 
-	feeEvtCfg         jetstream.StreamConfig
-	feeConsumerCfg    jetstream.ConsumerConfig
-	notifyEvtCfg      jetstream.StreamConfig
-	notifyConsumerCfg jetstream.ConsumerConfig
-	dlqEvtCfg         jetstream.StreamConfig
+	js       jetstream.JetStream
+	feeJsc   jetstream.Consumer
+	meterJsc jetstream.Consumer
+}
 
-	js  jetstream.JetStream
-	jss jetstream.Stream
-	jsc jetstream.Consumer
+func initStreamAndConsumerConfig(cfg EventConfig, subjectNames []string) (jetstream.StreamConfig, jetstream.ConsumerConfig) {
+	return jetstream.StreamConfig{
+			Name: cfg.StreamName, Subjects: subjectNames,
+			MaxConsumers: -1, MaxMsgs: -1, MaxBytes: -1,
+		},
+		jetstream.ConsumerConfig{
+			Name: cfg.ConsumerName, Durable: cfg.ConsumerName, FilterSubject: subjectNames[0],
+			AckPolicy: jetstream.AckExplicitPolicy, DeliverPolicy: jetstream.DeliverAllPolicy,
+		}
 }
 
 func NewNats(config *config.Config) (*NatsHandler, error) {
@@ -54,44 +102,32 @@ func NewNats(config *config.Config) (*NatsHandler, error) {
 	if err != nil {
 		return nil, err
 	}
+	feeEC, feeCC := initStreamAndConsumerConfig(feeCfg, []string{config.Nats.FeeRequestSubject})
+	notifyEC, notifyCC := initStreamAndConsumerConfig(notifyCfg, []string{config.Nats.FeeNotifyNoBalanceSubject})
+	dlqEC, _ := initStreamAndConsumerConfig(dlqCfg, []string{dlq.FeeSubjectName, dlq.MeterSubjectName})
+	meterEC, meterCC := initStreamAndConsumerConfig(meterCfg, []string{config.Nats.MeterRequestSubject})
+
 	return &NatsHandler{
-		conn: nc,
-		feeEvtCfg: jetstream.StreamConfig{
-			Name:         feeEvtStreamName,
-			Subjects:     []string{config.Nats.FeeRequestSubject},
-			MaxConsumers: -1,
-			MaxMsgs:      -1,
-			MaxBytes:     -1,
-		},
-		feeConsumerCfg: jetstream.ConsumerConfig{
-			Durable:       feevEvtConsumerName,
-			AckPolicy:     jetstream.AckExplicitPolicy,
-			DeliverPolicy: jetstream.DeliverAllPolicy,
-			FilterSubject: config.Nats.FeeRequestSubject,
-		},
-		feeRequestSubject: config.Nats.FeeRequestSubject,
-		notifyEvtCfg: jetstream.StreamConfig{
-			Name:         notifyStreamName,
-			Subjects:     []string{config.Nats.FeeNotifyNoBalanceSubject},
-			MaxConsumers: -1,
-			MaxMsgs:      -1,
-			MaxBytes:     -1,
-		},
-		notifyConsumerCfg: jetstream.ConsumerConfig{
-			Durable:       notifyConsumerName,
-			AckPolicy:     jetstream.AckExplicitPolicy,
-			DeliverPolicy: jetstream.DeliverAllPolicy,
-			FilterSubject: config.Nats.FeeRequestSubject,
-		},
-		notifyNoBalanceSubject: config.Nats.FeeNotifyNoBalanceSubject,
-		dlqEvtCfg: jetstream.StreamConfig{
-			Name:         dlqStreamName,
-			Subjects:     []string{dlqSubjectName},
-			MaxConsumers: -1,
-			MaxMsgs:      -1,
-			MaxBytes:     -1,
-		},
+		conn:                 nc,
 		msgFetchTimeoutInSec: config.Nats.MsgFetchTimeoutInSEC,
+		feeReqSub: RequestSubject{
+			fee:       config.Nats.FeeSendSubject,
+			token:     config.Nats.TokenSendSubject,
+			quota:     config.Nats.QuotaSendSubject,
+			nobalance: config.Nats.FeeNotifyNoBalanceSubject,
+		},
+		meterReqSub: RequestSubject{
+			duration: config.Nats.MeterDurationSendSubject,
+			token:    config.Nats.MeterTokenSendSubject,
+			quota:    config.Nats.MeterQuotaSendSubject,
+		},
+		feeEvtCfg:         feeEC,
+		feeConsumerCfg:    feeCC,
+		notifyEvtCfg:      notifyEC,
+		notifyConsumerCfg: notifyCC,
+		dlqEvtCfg:         dlqEC,
+		meterEvtCfg:       meterEC,
+		meterConsumerCfg:  meterCC,
 	}, nil
 }
 
@@ -108,38 +144,54 @@ func (nh *NatsHandler) GetJetStream() error {
 	return nil
 }
 
-func (nh *NatsHandler) CreateOrUpdateStream(ctx context.Context, streamName string, streamCfg jetstream.StreamConfig) error {
+func (nh *NatsHandler) CreateOrUpdateStream(ctx context.Context, streamName string, streamCfg jetstream.StreamConfig) (jetstream.Stream, error) {
 	err := nh.VerifyStreamByName(streamName)
 	if err != nil && !errors.Is(err, jetstream.ErrStreamNotFound) {
-		return err
+		return nil, err
 	}
 	jss, err := nh.js.CreateOrUpdateStream(ctx, streamCfg)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	nh.jss = jss
-	return err
+	return jss, err
 }
 
-func (nh *NatsHandler) BuildEventStream() error {
+func (nh *NatsHandler) BuildEventStreamAndConsumer(cfg EventConfig, streamCfg jetstream.StreamConfig, consumerCfg jetstream.ConsumerConfig) (jetstream.Consumer, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
 	err := nh.GetJetStream()
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	err = nh.CreateOrUpdateStream(ctx, feeEvtStreamName, nh.feeEvtCfg)
+	jss, err := nh.CreateOrUpdateStream(ctx, cfg.StreamName, streamCfg)
+	if err != nil {
+		return nil, err
+	}
+
+	jsc, err := jss.CreateOrUpdateConsumer(ctx, consumerCfg)
+	if err != nil {
+		return nil, err
+	}
+	return jsc, nil
+}
+
+func (nh *NatsHandler) BuildFeeEventStream() error {
+	jsc, err := nh.BuildEventStreamAndConsumer(feeCfg, nh.feeEvtCfg, nh.feeConsumerCfg)
 	if err != nil {
 		return err
 	}
+	nh.feeJsc = jsc
+	return nil
+}
 
-	jsc, err := nh.jss.CreateOrUpdateConsumer(ctx, nh.feeConsumerCfg)
+func (nh *NatsHandler) BuildMeterEventStream() error {
+	jsc, err := nh.BuildEventStreamAndConsumer(meterCfg, nh.meterEvtCfg, nh.meterConsumerCfg)
 	if err != nil {
 		return err
 	}
-	nh.jsc = jsc
+	nh.meterJsc = jsc
 	return nil
 }
 
@@ -150,7 +202,8 @@ func (nh *NatsHandler) BuildNotifyStream() error {
 	if err != nil {
 		return err
 	}
-	return nh.CreateOrUpdateStream(ctx, notifyStreamName, nh.notifyEvtCfg)
+	_, err = nh.CreateOrUpdateStream(ctx, notifyCfg.StreamName, nh.notifyEvtCfg)
+	return err
 }
 
 func (nh *NatsHandler) BuildDLQStream() error {
@@ -160,11 +213,17 @@ func (nh *NatsHandler) BuildDLQStream() error {
 	if err != nil {
 		return err
 	}
-	return nh.CreateOrUpdateStream(ctx, dlqStreamName, nh.dlqEvtCfg)
+	_, err = nh.CreateOrUpdateStream(ctx, dlqCfg.StreamName, nh.dlqEvtCfg)
+	return err
 }
 
 func (nh *NatsHandler) FetchFeeEventMessages(batch int) (jetstream.MessageBatch, error) {
-	msgs, err := nh.jsc.Fetch(batch, jetstream.FetchMaxWait(time.Duration(nh.msgFetchTimeoutInSec)*time.Second))
+	msgs, err := nh.feeJsc.Fetch(batch, jetstream.FetchMaxWait(time.Duration(nh.msgFetchTimeoutInSec)*time.Second))
+	return msgs, err
+}
+
+func (nh *NatsHandler) FetchMeterEventMessages(batch int) (jetstream.MessageBatch, error) {
+	msgs, err := nh.meterJsc.Fetch(batch, jetstream.FetchMaxWait(time.Duration(nh.msgFetchTimeoutInSec)*time.Second))
 	return msgs, err
 }
 
@@ -175,16 +234,20 @@ func (nh *NatsHandler) VerifyStreamByName(streamName string) error {
 	return err
 }
 
-func (nh *NatsHandler) VerifyEventStream() error {
-	return nh.VerifyStreamByName(feeEvtStreamName)
+func (nh *NatsHandler) VerifyFeeEventStream() error {
+	return nh.VerifyStreamByName(feeCfg.StreamName)
+}
+
+func (nh *NatsHandler) VerifyMeteringStream() error {
+	return nh.VerifyStreamByName(meterCfg.StreamName)
 }
 
 func (nh *NatsHandler) VerifyNotifyStream() error {
-	return nh.VerifyStreamByName(notifyStreamName)
+	return nh.VerifyStreamByName(notifyCfg.StreamName)
 }
 
 func (nh *NatsHandler) VerifyDLQStream() error {
-	return nh.VerifyStreamByName(dlqStreamName)
+	return nh.VerifyStreamByName(dlqCfg.StreamName)
 }
 
 func (nh *NatsHandler) PublishData(subject string, data []byte) error {
@@ -195,23 +258,38 @@ func (nh *NatsHandler) PublishData(subject string, data []byte) error {
 }
 
 func (nh *NatsHandler) PublishNotificationForNoBalance(data []byte) error {
-	return nh.PublishData(nh.notifyNoBalanceSubject, data)
+	return nh.PublishData(nh.feeReqSub.nobalance, data)
 }
 
-func (nh *NatsHandler) PublishDataToDLQ(data []byte) error {
-	return nh.PublishData(dlqSubjectName, data)
+func (nh *NatsHandler) PublishFeeCreditData(data []byte) error {
+	return nh.PublishData(nh.feeReqSub.fee, data)
 }
 
-func (nh *NatsHandler) BuildNotifyConsumer(consumerName string) (jetstream.Consumer, error) {
+func (nh *NatsHandler) PublishFeeTokenData(data []byte) error {
+	return nh.PublishData(nh.feeReqSub.token, data)
+}
+
+func (nh *NatsHandler) PublishFeeQuotaData(data []byte) error {
+	return nh.PublishData(nh.feeReqSub.quota, data)
+}
+
+func (nh *NatsHandler) PublishFeeDataToDLQ(data []byte) error {
+	return nh.PublishData(dlq.FeeSubjectName, data)
+}
+
+func (nh *NatsHandler) PublishMeterDataToDLQ(data []byte) error {
+	return nh.PublishData(dlq.MeterSubjectName, data)
+}
+
+func (nh *NatsHandler) PublishMeterDurationData(data []byte) error {
+	return nh.PublishData(nh.meterReqSub.duration, data)
+}
+
+func (nh *NatsHandler) BuildNotifyConsumerWithName(consumerName string) (jetstream.Consumer, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
-	consumer, err := nh.js.CreateOrUpdateConsumer(ctx, notifyStreamName,
-		jetstream.ConsumerConfig{
-			Name:          consumerName,
-			Durable:       consumerName,
-			AckPolicy:     jetstream.AckExplicitPolicy,
-			FilterSubject: nh.notifyNoBalanceSubject,
-		},
-	)
+	ec := EventConfig{StreamName: notifyCfg.StreamName, ConsumerName: consumerName}
+	_, conCfg := initStreamAndConsumerConfig(ec, []string{nh.feeReqSub.nobalance})
+	consumer, err := nh.js.CreateOrUpdateConsumer(ctx, notifyCfg.StreamName, conCfg)
 	return consumer, err
 }

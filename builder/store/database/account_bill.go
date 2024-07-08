@@ -18,13 +18,13 @@ func NewAccountBillStore() *AccountBillStore {
 }
 
 type AccountBill struct {
-	ID          int64     `bun:",pk,autoincrement" json:"id"`
-	BillDate    time.Time `bun:"type:date" json:"bill_date"`
-	UserUUID    string    `bun:",notnull" json:"user_uuid"`
-	Scene       SceneType `bun:",notnull" json:"scene"`
-	CustomerID  string    `bun:",notnull" json:"customer_id"`
-	Value       float64   `bun:",notnull" json:"value"`
-	Consumption float64   `bun:",notnull" json:"consumption"`
+	ID          int64           `bun:",pk,autoincrement" json:"id"`
+	BillDate    time.Time       `bun:"type:date" json:"bill_date"`
+	UserUUID    string          `bun:",notnull" json:"user_uuid"`
+	Scene       types.SceneType `bun:",notnull" json:"scene"`
+	CustomerID  string          `bun:",notnull" json:"customer_id"`
+	Value       float64         `bun:",notnull" json:"value"`
+	Consumption float64         `bun:",notnull" json:"consumption"`
 	times
 }
 

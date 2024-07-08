@@ -23,31 +23,24 @@ func NewAccountStatementStore() *AccountStatementStore {
 	}
 }
 
-type SceneType int
-
-var (
-	SceneReserve        SceneType = 0  // system reserve
-	ScenePortalCharge   SceneType = 1  // portal charge fee
-	SceneModelInference SceneType = 10 // model inference endpoint
-	SceneSpace          SceneType = 11 // csghub space
-	SceneModelFinetune  SceneType = 12 // model finetune
-	SceneStarship       SceneType = 20 // starship
-	SceneUnknow         SceneType = 99 // unknow
-)
-
 type AccountStatement struct {
-	ID          int64     `bun:",pk,autoincrement" json:"id"`
-	EventUUID   uuid.UUID `bun:"type:uuid,notnull" json:"event_uuid"`
-	UserUUID    string    `bun:",notnull" json:"user_uuid"`
-	Value       float64   `bun:",notnull" json:"value"`
-	Scene       SceneType `bun:",notnull" json:"scene"`
-	OpUID       int64     `bun:",nullzero" json:"op_uid"`
-	CreatedAt   time.Time `bun:",notnull,skipupdate,default:current_timestamp" json:"created_at"`
-	CustomerID  string    `json:"customer_id"`
-	EventDate   time.Time `bun:"type:date" json:"event_date"`
-	Price       float64   `json:"price"`
-	PriceUnit   string    `json:"price_unit"`
-	Consumption float64   `json:"consumption"`
+	ID           int64           `bun:",pk,autoincrement" json:"id"`
+	EventUUID    uuid.UUID       `bun:"type:uuid,notnull" json:"event_uuid"`
+	UserUUID     string          `bun:",notnull" json:"user_uuid"`
+	Value        float64         `bun:",notnull" json:"value"`
+	Scene        types.SceneType `bun:",notnull" json:"scene"`
+	OpUID        string          `bun:",nullzero" json:"op_uid"`
+	CreatedAt    time.Time       `bun:",notnull,skipupdate,default:current_timestamp" json:"created_at"`
+	CustomerID   string          `json:"customer_id"`
+	EventDate    time.Time       `bun:"type:date" json:"event_date"`
+	Price        float64         `json:"price"`
+	PriceUnit    string          `json:"price_unit"`
+	Consumption  float64         `json:"consumption"`
+	ValueType    int             `json:"value_type"`
+	ResourceID   string          `json:"resource_id"`
+	ResourceName string          `json:"resource_name"`
+	SkuID        int64           `json:"sku_id"`
+	RecordedAt   time.Time       `json:"recorded_at"`
 }
 
 type AccountStatementRes struct {
@@ -55,24 +48,24 @@ type AccountStatementRes struct {
 	types.ACCT_SUMMARY
 }
 
-func (as *AccountStatementStore) Create(ctx context.Context, input AccountStatement, changeValue float64) error {
+func (as *AccountStatementStore) Create(ctx context.Context, input AccountStatement) error {
 	err := as.db.Operator.Core.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
 		if err := assertAffectedOneRow(tx.NewInsert().Model(&input).Exec(ctx)); err != nil {
 			return err
 		}
 		runSql := "update account_users set balance=balance + ? where user_uuid=?"
-		if err := assertAffectedOneRow(tx.Exec(runSql, changeValue, input.UserUUID)); err != nil {
+		if err := assertAffectedOneRow(tx.Exec(runSql, input.Value, input.UserUUID)); err != nil {
 			return err
 		}
 
-		if input.Scene == SceneModelInference || input.Scene == SceneSpace || input.Scene == SceneModelFinetune || input.Scene == SceneStarship {
+		if input.Scene == types.SceneModelInference || input.Scene == types.SceneSpace || input.Scene == types.SceneModelFinetune || input.Scene == types.SceneStarship {
 			// calculate bill
 			bill := AccountBill{
 				BillDate:    input.EventDate,
 				UserUUID:    input.UserUUID,
 				Scene:       input.Scene,
 				CustomerID:  input.CustomerID,
-				Value:       changeValue,
+				Value:       input.Value,
 				Consumption: input.Consumption,
 			}
 			err := tx.NewSelect().Model(&bill).Where("bill_date = ? and user_uuid = ? and scene = ? and customer_id = ?", input.EventDate, input.UserUUID, input.Scene, input.CustomerID).Scan(ctx)

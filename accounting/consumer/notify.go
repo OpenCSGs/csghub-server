@@ -12,14 +12,14 @@ import (
 
 type Notify struct {
 	sysMQ   *mq.NatsHandler
-	CH      chan types.ACC_NOTIFY
+	CH      chan types.ACCT_NOTIFY
 	timeOut *time.Timer
 }
 
 func NewNotify(mqh *mq.NatsHandler) *Notify {
 	notify := &Notify{
 		sysMQ:   mqh,
-		CH:      make(chan types.ACC_NOTIFY),
+		CH:      make(chan types.ACCT_NOTIFY),
 		timeOut: time.NewTimer(idleDuration),
 	}
 	return notify
@@ -56,7 +56,7 @@ func (n *Notify) notifyWithRetry() {
 			break
 		}
 
-		var notify types.ACC_NOTIFY = types.ACC_NOTIFY{ReasonCode: -1}
+		var notify types.ACCT_NOTIFY = types.ACCT_NOTIFY{ReasonCode: -1}
 		n.timeOut.Reset(idleDuration)
 		select {
 		case notify = <-n.CH:
@@ -73,7 +73,7 @@ func (n *Notify) notifyWithRetry() {
 	}
 }
 
-func (n *Notify) publishNotificationWithRetry(notify types.ACC_NOTIFY) error {
+func (n *Notify) publishNotificationWithRetry(notify types.ACCT_NOTIFY) error {
 	// max try 5 times
 	var err error = nil
 	for m := 0; m < 5; m++ {
@@ -89,7 +89,7 @@ func (n *Notify) publishNotificationWithRetry(notify types.ACC_NOTIFY) error {
 	return err
 }
 
-func (n *Notify) publishNotification(notify types.ACC_NOTIFY) error {
+func (n *Notify) publishNotification(notify types.ACCT_NOTIFY) error {
 	str, err := json.Marshal(notify)
 	if err != nil {
 		return fmt.Errorf("fail to unmarshal for notification of lack balance, %v, %w", notify, err)

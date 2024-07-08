@@ -24,11 +24,7 @@ type SpaceResource struct {
 
 func (s *SpaceResourceStore) Index(ctx context.Context, clusterId string) ([]SpaceResource, error) {
 	var result []SpaceResource
-	_, err := s.db.Operator.Core.
-		NewSelect().
-		Model(&result).
-		Where("cluster_id = ?", clusterId).
-		Exec(ctx, &result)
+	_, err := s.db.Operator.Core.NewSelect().Model(&result).Where("cluster_id = ?", clusterId).Exec(ctx, &result)
 	if err != nil {
 		return nil, err
 	}
@@ -69,4 +65,13 @@ func (s *SpaceResourceStore) FindByName(ctx context.Context, name string) (*Spac
 	err := s.db.Core.NewSelect().Model(&res).Where("name = ?", name).Scan(ctx)
 
 	return &res, err
+}
+
+func (s *SpaceResourceStore) FindAll(ctx context.Context) ([]SpaceResource, error) {
+	var result []SpaceResource
+	_, err := s.db.Operator.Core.NewSelect().Model(&result).Exec(ctx, &result)
+	if err != nil {
+		return nil, err
+	}
+	return result, nil
 }

@@ -115,7 +115,7 @@ type Config struct {
 
 	Model struct {
 		DeployTimeoutInMin int    `envconfig:"STARHUB_SERVER_MODEL_DEPLOY_TIMEOUT_IN_MINUTES" default:"30"`
-		DownloadEndpoint   string `envconfig:"STARHUB_SERVER_MODEL_DOWNLOAD_ENDPOINT" default:"https://hub-stg./"`
+		DownloadEndpoint   string `envconfig:"STARHUB_SERVER_MODEL_DOWNLOAD_ENDPOINT" default:"https://hub-stg.opencsg.com/"`
 		DockerRegBase      string `envconfig:"STARHUB_SERVER_MODEL_DOCKER_REG_BASE" default:"opencsg-registry.cn-beijing.cr.aliyuncs.com/public/"`
 	}
 	// send events
@@ -134,15 +134,22 @@ type Config struct {
 
 	Nats struct {
 		URL                       string `envconfig:"OPENCSG_ACCOUNTING_NATS_URL" default:"nats://account:g98dc5FA8v4J7ck90w@natsmaster:4222"`
-		FeeRequestSubject         string `envconfig:"OPENCSG_ACCOUNTING_FEE_EVENT_SUBJECT" default:"accounting.fee.>"`
-		FeeNotifyNoBalanceSubject string `envconfig:"OPENCSG_ACCOUNTING_NOTIFY_NOBALANCE_SUBJECT" default:"accounting.notify.nobalance"`
 		MsgFetchTimeoutInSEC      int    `envconfig:"OPENCSG_ACCOUNTING_MSG_FETCH_TIMEOUTINSEC" default:"5"`
+		FeeNotifyNoBalanceSubject string `envconfig:"OPENCSG_ACCOUNTING_NOTIFY_NOBALANCE_SUBJECT" default:"accounting.notify.nobalance"`
+		FeeRequestSubject         string `envconfig:"OPENCSG_ACCOUNTING_FEE_EVENT_SUBJECT" default:"accounting.fee.>"`
 		FeeSendSubject            string `envconfig:"STARHUB_SERVER_FEE_SEND_SUBJECT" default:"accounting.fee.credit"`
+		TokenSendSubject          string `envconfig:"STARHUB_SERVER_TOKEN_SEND_SUBJECT" default:"accounting.fee.token"`
+		QuotaSendSubject          string `envconfig:"STARHUB_SERVER_QUOTA_SEND_SUBJECT" default:"accounting.fee.quota"`
+		MeterRequestSubject       string `envconfig:"OPENCSG_ACCOUNTING_METER_EVENT_SUBJECT" default:"accounting.metering.>"`
+		MeterDurationSendSubject  string `envconfig:"STARHUB_SERVER_METER_DURATION_SEND_SUBJECT" default:"accounting.metering.duration"`
+		MeterTokenSendSubject     string `envconfig:"STARHUB_SERVER_METER_TOKEN_SEND_SUBJECT" default:"accounting.metering.token"`
+		MeterQuotaSendSubject     string `envconfig:"STARHUB_SERVER_METER_QUOTA_SEND_SUBJECT" default:"accounting.metering.quota"`
 	}
 
 	Accounting struct {
-		Host string `envconfig:"OPENCSG_ACCOUNTING_SERVER_HOST" default:"http://localhost"`
-		Port int    `envconfig:"OPENCSG_ACCOUNTING_SERVER_PORT" default:"8086"`
+		Host           string `envconfig:"OPENCSG_ACCOUNTING_SERVER_HOST" default:"http://localhost"`
+		Port           int    `envconfig:"OPENCSG_ACCOUNTING_SERVER_PORT" default:"8086"`
+		ChargingEnable bool   `envconfig:"OPENCSG_ACCOUNTING_CHARGING_ENABLE" default:"false"`
 	}
 
 	MultiSync struct {
