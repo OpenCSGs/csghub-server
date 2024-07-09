@@ -1,13 +1,13 @@
-FROM ghcr.io/huggingface/text-generation-inference:2.0
+FROM ghcr.nju.edu.cn/huggingface/text-generation-inference:2.1.1
 RUN pip config set global.index-url https://pypi.tuna.tsinghua.edu.cn/simple 
 RUN pip install git+https://git-devops.opencsg.com/csg-hub-sdk/csghub-sdk
-COPY ./tgi/serve.sh serve.sh
-COPY ./tgi/entry.py entry.py
+COPY ./tgi/ /etc/csghub/
+RUN chmod +x /etc/csghub/*.sh
 
-RUN mkdir -p /data
-ENV HUGGINGFACE_HUB_CACHE=/data \
-    HF_HUB_ENABLE_HF_TRANSFER=0 
+WORKDIR /workspace/
+ENV HUGGINGFACE_HUB_CACHE=/workspace/ \
+    HF_HUB_ENABLE_HF_TRANSFER=0
 ENV PORT=8000
 EXPOSE 8000
 
-ENTRYPOINT ["bash", "serve.sh"]
+ENTRYPOINT ["bash", "/etc/csghub/serve.sh"]
