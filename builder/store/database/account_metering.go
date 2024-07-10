@@ -34,6 +34,7 @@ type AccountMetering struct {
 	RecordedAt   time.Time       `bun:",notnull" json:"recorded_at"`
 	Extra        string          `json:"extra"`
 	CreatedAt    time.Time       `bun:",notnull,default:current_timestamp" json:"created_at"`
+	SkuUnitType  string          `json:"sku_unit_type"`
 }
 
 func (am *AccountMeteringStore) Create(ctx context.Context, input AccountMetering) error {

@@ -11541,11 +11541,17 @@ const docTemplate = `{
                 "sku_price": {
                     "type": "integer"
                 },
+                "sku_price_currency": {
+                    "type": "string"
+                },
                 "sku_type": {
                     "type": "integer"
                 },
                 "sku_unit": {
                     "type": "integer"
+                },
+                "sku_unit_type": {
+                    "type": "string"
                 }
             }
         },

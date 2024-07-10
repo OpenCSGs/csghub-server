@@ -29,11 +29,13 @@ func (a *AccountingPriceComponent) GetPriceByID(ctx context.Context, id int64) (
 
 func (a *AccountingPriceComponent) CreatePrice(ctx context.Context, req types.ACCT_PRICE) (*database.AccountPrice, error) {
 	price := database.AccountPrice{
-		SkuType:    types.SKUType(req.SkuType),
-		SkuPrice:   req.SkuPrice,
-		SkuUnit:    req.SkuUnit,
-		SkuDesc:    req.SkuDesc,
-		ResourceID: req.ResourceID,
+		SkuType:          types.SKUType(req.SkuType),
+		SkuPrice:         req.SkuPrice,
+		SkuUnit:          req.SkuUnit,
+		SkuDesc:          req.SkuDesc,
+		ResourceID:       req.ResourceID,
+		SkuUnitType:      req.SkuUnitType,
+		SkuPriceCurrency: req.SkuPriceCurrency,
 	}
 	res, err := a.au.Create(ctx, price)
 	if err != nil {
@@ -44,12 +46,14 @@ func (a *AccountingPriceComponent) CreatePrice(ctx context.Context, req types.AC
 
 func (a *AccountingPriceComponent) UpdatePrice(ctx context.Context, req types.ACCT_PRICE, id int64) (*database.AccountPrice, error) {
 	price := database.AccountPrice{
-		ID:         id,
-		SkuType:    types.SKUType(req.SkuType),
-		SkuPrice:   req.SkuPrice,
-		SkuUnit:    req.SkuUnit,
-		SkuDesc:    req.SkuDesc,
-		ResourceID: req.ResourceID,
+		ID:               id,
+		SkuType:          types.SKUType(req.SkuType),
+		SkuPrice:         req.SkuPrice,
+		SkuUnit:          req.SkuUnit,
+		SkuDesc:          req.SkuDesc,
+		ResourceID:       req.ResourceID,
+		SkuUnitType:      req.SkuUnitType,
+		SkuPriceCurrency: req.SkuPriceCurrency,
 	}
 	res, err := a.au.Update(ctx, price)
 	if err != nil {

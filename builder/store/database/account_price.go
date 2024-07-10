@@ -18,12 +18,14 @@ func NewAccountPriceStore() *AccountPriceStore {
 }
 
 type AccountPrice struct {
-	ID         int64         `bun:",pk,autoincrement" json:"id"`
-	SkuType    types.SKUType `bun:",notnull" json:"sku_type"`
-	SkuPrice   int64         `bun:",notnull" json:"sku_price"`
-	SkuUnit    int64         `bun:",notnull" json:"sku_unit"`
-	SkuDesc    string        `bun:",notnull" json:"sku_desc"`
-	ResourceID string        `bun:",notnull" json:"resource_id"`
+	ID               int64         `bun:",pk,autoincrement" json:"id"`
+	SkuType          types.SKUType `bun:",notnull" json:"sku_type"`
+	SkuPrice         int64         `bun:",notnull" json:"sku_price"`
+	SkuUnit          int64         `bun:",notnull" json:"sku_unit"`
+	SkuDesc          string        `bun:",notnull" json:"sku_desc"`
+	ResourceID       string        `bun:",notnull" json:"resource_id"`
+	SkuUnitType      string        `json:"sku_unit_type"`
+	SkuPriceCurrency string        `json:"sku_price_currency"`
 	times
 }
 

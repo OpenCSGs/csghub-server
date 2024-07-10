@@ -3,6 +3,7 @@ package component
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"strconv"
 	"time"
@@ -25,46 +26,56 @@ func NewAccountingStatement() *AccountingStatementComponent {
 
 func (a *AccountingStatementComponent) AddNewStatement(ctx context.Context, event *types.ACCT_EVENT_REQ) error {
 	statement := database.AccountStatement{
-		EventUUID:    event.EventUUID,
-		UserUUID:     event.UserUUID,
-		Value:        event.Value,
-		Scene:        event.Scene,
-		OpUID:        event.OpUID,
-		CustomerID:   event.CustomerID,
-		EventDate:    event.RecordedAt,
-		Price:        event.Price,
-		PriceUnit:    event.PriceUnit,
-		Consumption:  event.Consumption,
-		ValueType:    event.ValueType,
-		ResourceID:   event.ResourceID,
-		ResourceName: event.ResourceName,
-		SkuID:        event.SkuID,
-		RecordedAt:   event.RecordedAt,
+		EventUUID:        event.EventUUID,
+		UserUUID:         event.UserUUID,
+		Value:            event.Value,
+		Scene:            event.Scene,
+		OpUID:            event.OpUID,
+		CustomerID:       event.CustomerID,
+		EventDate:        event.RecordedAt,
+		Price:            event.Price,
+		PriceUnit:        event.PriceUnit,
+		Consumption:      event.Consumption,
+		ValueType:        event.ValueType,
+		ResourceID:       event.ResourceID,
+		ResourceName:     event.ResourceName,
+		SkuID:            event.SkuID,
+		RecordedAt:       event.RecordedAt,
+		SkuUnit:          event.SkuUnit,
+		SkuUnitType:      event.SkuUnitType,
+		SkuPriceCurrency: event.SkuPriceCurrency,
 	}
-	return a.asms.Create(ctx, statement)
+	err := a.asms.Create(ctx, statement)
+	if err != nil {
+		return fmt.Errorf("fail to save accounting statement, %w", err)
+	}
+	return nil
 }
 
 func (a *AccountingStatementComponent) ListStatementByUserIDAndTime(ctx context.Context, req types.ACCT_STATEMENTS_REQ) (types.ACCT_STATEMENTS_RESULT, error) {
 	statements, err := a.asms.ListByUserIDAndTime(ctx, req)
 	if err != nil {
-		return types.ACCT_STATEMENTS_RESULT{}, err
+		return types.ACCT_STATEMENTS_RESULT{}, fmt.Errorf("fail to list accounting statement by user and time, %w", err)
 	}
 
 	var resStatements []types.ACCT_STATEMENTS_RES
 	for _, st := range statements.Data {
 		resStatements = append(resStatements, types.ACCT_STATEMENTS_RES{
-			ID:          st.ID,
-			EventUUID:   st.EventUUID,
-			UserUUID:    st.UserUUID,
-			Value:       st.Value,
-			Scene:       int(st.Scene),
-			OpUID:       st.OpUID,
-			CreatedAt:   st.CreatedAt,
-			CustomerID:  st.CustomerID,
-			EventDate:   st.EventDate,
-			Price:       st.Price,
-			PriceUnit:   st.PriceUnit,
-			Consumption: st.Consumption,
+			ID:               st.ID,
+			EventUUID:        st.EventUUID,
+			UserUUID:         st.UserUUID,
+			Value:            st.Value,
+			Scene:            int(st.Scene),
+			OpUID:            st.OpUID,
+			CreatedAt:        st.CreatedAt,
+			CustomerID:       st.CustomerID,
+			EventDate:        st.EventDate,
+			Price:            st.Price,
+			PriceUnit:        st.PriceUnit,
+			Consumption:      st.Consumption,
+			SkuUnit:          st.SkuUnit,
+			SkuUnitType:      st.SkuUnitType,
+			SkuPriceCurrency: st.SkuPriceCurrency,
 		})
 	}
 
@@ -73,10 +84,13 @@ func (a *AccountingStatementComponent) ListStatementByUserIDAndTime(ctx context.
 
 func (a *AccountingStatementComponent) FindStatementByEventID(ctx context.Context, event *types.ACCT_EVENT) (*database.AccountStatement, error) {
 	statement, err := a.asms.GetByEventID(ctx, event.Uuid)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil
 	}
-	return &statement, err
+	if err != nil {
+		return nil, fmt.Errorf("fail to find statement by event uuid, %w", err)
+	}
+	return &statement, nil
 }
 
 func (a *AccountingStatementComponent) RechargeAccountingUser(ctx context.Context, userUUID string, req types.RECHARGE_REQ) error {
@@ -101,5 +115,5 @@ func (a *AccountingStatementComponent) RechargeAccountingUser(ctx context.Contex
 	if err != nil {
 		return fmt.Errorf("fail to add statement and rechange balance, %v, %w", event, err)
 	}
-	return err
+	return nil
 }
