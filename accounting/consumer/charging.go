@@ -211,24 +211,25 @@ func (c *Charging) handleMsgData(msg jetstream.Msg) error {
 }
 
 func (c *Charging) buildPriceEvent(event *types.ACCT_EVENT, ap *database.AccountPrice) *types.ACCT_EVENT_REQ {
-	price := float64(ap.SkuPrice) / float64(ap.SkuUnit)
 	cost := float64(ap.SkuPrice) * float64(event.Value) / float64(ap.SkuUnit)
 	return &types.ACCT_EVENT_REQ{
-		EventUUID:    event.Uuid,
-		UserUUID:     event.UserUUID,
-		Value:        (0 - cost),
-		Scene:        types.SceneType(event.Scene),
-		OpUID:        event.OpUID,
-		CustomerID:   event.CustomerID,
-		EventDate:    event.CreatedAt,
-		Price:        price,
-		PriceUnit:    fmt.Sprintf("%s/%d", fmt.Sprintf("%.2f", float64(ap.SkuPrice)/100), ap.SkuUnit),
-		Consumption:  float64(event.Value),
-		ValueType:    event.ValueType,
-		ResourceID:   event.ResourceID,
-		ResourceName: event.ResourceName,
-		SkuID:        ap.ID,
-		RecordedAt:   event.CreatedAt,
+		EventUUID:        event.Uuid,
+		UserUUID:         event.UserUUID,
+		Value:            (0 - cost),
+		Scene:            types.SceneType(event.Scene),
+		OpUID:            event.OpUID,
+		CustomerID:       event.CustomerID,
+		EventDate:        event.CreatedAt,
+		Price:            float64(ap.SkuPrice),
+		Consumption:      float64(event.Value),
+		ValueType:        event.ValueType,
+		ResourceID:       event.ResourceID,
+		ResourceName:     event.ResourceName,
+		SkuID:            ap.ID,
+		RecordedAt:       event.CreatedAt,
+		SkuUnit:          ap.SkuUnit,
+		SkuUnitType:      ap.SkuUnitType,
+		SkuPriceCurrency: ap.SkuPriceCurrency,
 	}
 }
 

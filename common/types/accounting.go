@@ -9,6 +9,13 @@ import (
 type ACCTStatus int
 
 var (
+	UnitMinute string = "minute"
+	UnitToken  string = "token"
+	UnitRepo   string = "repository"
+	UnitByte   string = "byte"
+)
+
+var (
 	ACCTSuccess       ACCTStatus = 0 // charge success
 	ACCTInvalidFormat ACCTStatus = 1 // invalid event data format
 	ACCTChargeFail    ACCTStatus = 2 // fail to charge user fee
@@ -44,21 +51,24 @@ var (
 )
 
 type ACCT_EVENT_REQ struct {
-	EventUUID    uuid.UUID `json:"event_uuid"`
-	UserUUID     string    `json:"user_uuid"`
-	Value        float64   `json:"value"`
-	Scene        SceneType `json:"scene"`
-	OpUID        string    `json:"op_uid"`
-	CustomerID   string    `json:"customer_id"`
-	EventDate    time.Time `json:"event_date"`
-	Price        float64   `json:"price"`
-	PriceUnit    string    `json:"price_unit"`
-	Consumption  float64   `json:"consumption"`
-	ValueType    int       `json:"value_type"`
-	ResourceID   string    `json:"resource_id"`
-	ResourceName string    `json:"resource_name"`
-	SkuID        int64     `json:"sku_id"`
-	RecordedAt   time.Time `json:"recorded_at"`
+	EventUUID        uuid.UUID `json:"event_uuid"`
+	UserUUID         string    `json:"user_uuid"`
+	Value            float64   `json:"value"`
+	Scene            SceneType `json:"scene"`
+	OpUID            string    `json:"op_uid"`
+	CustomerID       string    `json:"customer_id"`
+	EventDate        time.Time `json:"event_date"`
+	Price            float64   `json:"price"`
+	PriceUnit        string    `json:"price_unit"`
+	Consumption      float64   `json:"consumption"`
+	ValueType        int       `json:"value_type"`
+	ResourceID       string    `json:"resource_id"`
+	ResourceName     string    `json:"resource_name"`
+	SkuID            int64     `json:"sku_id"`
+	RecordedAt       time.Time `json:"recorded_at"`
+	SkuUnit          int64     `json:"sku_unit"`
+	SkuUnitType      string    `json:"sku_unit_type"`
+	SkuPriceCurrency string    `json:"sku_price_currency"`
 }
 
 // generate charge event from client
@@ -106,18 +116,21 @@ type ACCT_BILLS_REQ struct {
 }
 
 type ACCT_STATEMENTS_RES struct {
-	ID          int64     `json:"id"`
-	EventUUID   uuid.UUID `json:"event_uuid"`
-	UserUUID    string    `json:"user_id"`
-	Value       float64   `json:"value"`
-	Scene       int       `json:"scene"`
-	OpUID       string    `json:"op_uid"`
-	CreatedAt   time.Time `json:"created_at"`
-	CustomerID  string    `json:"instance_name"`
-	EventDate   time.Time `json:"event_date"`
-	Price       float64   `json:"price"`
-	PriceUnit   string    `json:"price_unit"`
-	Consumption float64   `json:"consumption"`
+	ID               int64     `json:"id"`
+	EventUUID        uuid.UUID `json:"event_uuid"`
+	UserUUID         string    `json:"user_id"`
+	Value            float64   `json:"value"`
+	Scene            int       `json:"scene"`
+	OpUID            string    `json:"op_uid"`
+	CreatedAt        time.Time `json:"created_at"`
+	CustomerID       string    `json:"instance_name"`
+	EventDate        time.Time `json:"event_date"`
+	Price            float64   `json:"price"`
+	PriceUnit        string    `json:"price_unit"`
+	Consumption      float64   `json:"consumption"`
+	SkuUnit          int64     `json:"sku_unit"`
+	SkuUnitType      string    `json:"sku_unit_type"`
+	SkuPriceCurrency string    `json:"sku_price_currency"`
 }
 
 type RECHARGE_REQ struct {
@@ -179,11 +192,13 @@ type METERING_EVENT struct {
 }
 
 type ACCT_PRICE struct {
-	SkuType    int    `json:"sku_type"`
-	SkuPrice   int64  `json:"sku_price"`
-	SkuUnit    int64  `json:"sku_unit"`
-	SkuDesc    string `json:"sku_desc"`
-	ResourceID string `json:"resource_id"`
+	SkuType          int    `json:"sku_type"`
+	SkuPrice         int64  `json:"sku_price"`
+	SkuUnit          int64  `json:"sku_unit"`
+	SkuDesc          string `json:"sku_desc"`
+	ResourceID       string `json:"resource_id"`
+	SkuUnitType      string `json:"sku_unit_type"`
+	SkuPriceCurrency string `json:"sku_price_currency"`
 }
 
 type ACCT_PRICE_REQ struct {

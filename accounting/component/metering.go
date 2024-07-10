@@ -32,6 +32,7 @@ func (mc *MeteringComponent) SaveMeteringEventRecord(ctx context.Context, req *t
 		CustomerID:   req.CustomerID,
 		RecordedAt:   req.CreatedAt,
 		Extra:        req.Extra,
+		SkuUnitType:  getUnitString(req.Scene),
 	}
 	err := mc.ams.Create(ctx, am)
 	if err != nil {
@@ -46,4 +47,21 @@ func (mc *MeteringComponent) ListMeteringByUserIDAndDate(ctx context.Context, re
 		return nil, 0, fmt.Errorf("failed to list metering by UserIDAndDate, error: %w", err)
 	}
 	return meters, total, nil
+}
+
+func getUnitString(scene int) string {
+	switch types.SceneType(scene) {
+	case types.SceneModelInference:
+		return types.UnitMinute
+	case types.SceneSpace:
+		return types.UnitMinute
+	case types.SceneModelFinetune:
+		return types.UnitMinute
+	case types.SceneStarship:
+		return types.UnitToken
+	case types.SceneMultiSync:
+		return types.UnitRepo
+	default:
+		return types.UnitMinute
+	}
 }

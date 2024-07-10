@@ -85,6 +85,7 @@ func (t *BuilderRunner) Run(ctx context.Context) error {
 		if err != nil {
 			return fmt.Errorf("make build request failed: %w", err)
 		}
+		slog.Debug("make build request", slog.Any("req", req))
 		resp, err := t.ib.Build(context.Background(), req)
 		if err != nil {
 			// TODO:return retryable error
