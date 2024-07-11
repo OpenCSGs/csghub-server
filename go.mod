@@ -1,6 +1,6 @@
 module opencsg.com/csghub-server
 
-go 1.22
+go 1.21
 
 require (
 	github.com/OpenCSGs/gitea-go-sdk/gitea v0.0.0-20240618091626-54fa52f1cec6

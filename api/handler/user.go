@@ -585,7 +585,7 @@ func (h *UserHandler) GetRunDeploys(ctx *gin.Context) {
 
 	per, page, err := common.GetPerAndPageFromContext(ctx)
 	if err != nil {
-		slog.Error("Bad request format of page and per %v", err)
+		slog.Error("Bad request format of page and per", slog.Any("error", err))
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
@@ -654,7 +654,7 @@ func (h *UserHandler) GetFinetuneInstances(ctx *gin.Context) {
 
 	per, page, err := common.GetPerAndPageFromContext(ctx)
 	if err != nil {
-		slog.Error("Bad request format of page and per %v", err)
+		slog.Error("Bad request format of page and per", slog.Any("error", err))
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
@@ -669,6 +669,62 @@ func (h *UserHandler) GetFinetuneInstances(ctx *gin.Context) {
 		return
 	}
 	respData = gin.H{
+		"message": "OK",
+		"data":    ds,
+		"total":   total,
+	}
+	ctx.JSON(http.StatusOK, respData)
+}
+
+// GetServerless godoc
+// @Security     ApiKey
+// @Summary      Get serverless deploys
+// @Description  Get serverless deploys
+// @Tags         User
+// @Accept       json
+// @Produce      json
+// @Param        username path string true "username"
+// @Param        per query int false "per" default(50)
+// @Param        page query int false "page index" default(1)
+// @Param        current_user query string false "current user"
+// @Success      200  {object}  types.Response{} "OK"
+// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
+// @Router       /user/{username}/run/serverless [get]
+func (h *UserHandler) GetRunServerless(ctx *gin.Context) {
+	currentUser := httpbase.GetCurrentUser(ctx)
+	if currentUser == "" {
+		httpbase.UnauthorizedError(ctx, errors.New("user not found, please login first"))
+		return
+	}
+
+	username := ctx.Param("username")
+	if currentUser != username {
+		slog.Warn("invalid user to list serverless", slog.String("currentUser", currentUser), slog.String("username", username))
+		httpbase.ServerError(ctx, errors.New("invalid user"))
+		return
+	}
+
+	per, page, err := common.GetPerAndPageFromContext(ctx)
+	if err != nil {
+		slog.Error("Bad request format of page and per", slog.Any("error", err))
+		httpbase.BadRequest(ctx, err.Error())
+		return
+	}
+
+	var req types.DeployReq
+	req.CurrentUser = currentUser
+	req.Page = page
+	req.PageSize = per
+	req.RepoType = types.ModelRepo
+	req.DeployType = types.ServerlessType
+	ds, total, err := h.c.ListServerless(ctx, req)
+	if err != nil {
+		slog.Error("Failed to get serverless list", slog.Any("error", err), slog.Any("req", req))
+		httpbase.ServerError(ctx, err)
+		return
+	}
+	respData := gin.H{
 		"message": "OK",
 		"data":    ds,
 		"total":   total,
