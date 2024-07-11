@@ -19,4 +19,4 @@ if [ -z "$GPU_NUM" ]; then
     GPU_NUM=1
 fi
 
-text-generation-launcher --model-id "$REPO_ID" --tokenizer-config-path "$filename" --num-shard="$GPU_NUM" --port $PORT
+text-generation-launcher --model-id "$REPO_ID" --tokenizer-config-path "$filename" --num-shard="$GPU_NUM" --port $PORT --trust-remote-code
