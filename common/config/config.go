@@ -106,6 +106,11 @@ type Config struct {
 		DockerRegBase      string `envconfig:"STARHUB_SERVER_MODEL_DOCKER_REG_BASE" default:"opencsg-registry.cn-beijing.cr.aliyuncs.com/public/"`
 	}
 
+	// send events
+	Event struct {
+		SyncInterval int `envconfig:"STARHUB_SERVER_SYNC_IN_MINUTES" default:"1"`
+	}
+
 	Casdoor struct {
 		ClientID         string `envconfig:"STARHUB_SERVER_CASDOOR_CLIENT_ID" default:"client_id"`
 		ClientSecret     string `envconfig:"STARHUB_SERVER_CASDOOR_CLIENT_SECRET" default:"client_secret"`
@@ -113,6 +118,20 @@ type Config struct {
 		Certificate      string `envconfig:"STARHUB_SERVER_CASDOOR_CERTIFICATE" default:"/etc/casdoor/certificate.pem"`
 		OrganizationName string `envconfig:"STARHUB_SERVER_CASDOOR_ORGANIZATION_NAME" default:"opencsg"`
 		ApplicationName  string `envconfig:"STARHUB_SERVER_CASDOOR_APPLICATION_NAME" default:"opencsg"`
+	}
+
+	Nats struct {
+		URL                      string `envconfig:"OPENCSG_ACCOUNTING_NATS_URL" default:"nats://account:g98dc5FA8v4J7ck90w@natsmaster:4222"`
+		MsgFetchTimeoutInSEC     int    `envconfig:"OPENCSG_ACCOUNTING_MSG_FETCH_TIMEOUTINSEC" default:"5"`
+		MeterRequestSubject      string `envconfig:"OPENCSG_ACCOUNTING_METER_EVENT_SUBJECT" default:"accounting.metering.>"`
+		MeterDurationSendSubject string `envconfig:"STARHUB_SERVER_METER_DURATION_SEND_SUBJECT" default:"accounting.metering.duration"`
+		MeterTokenSendSubject    string `envconfig:"STARHUB_SERVER_METER_TOKEN_SEND_SUBJECT" default:"accounting.metering.token"`
+		MeterQuotaSendSubject    string `envconfig:"STARHUB_SERVER_METER_QUOTA_SEND_SUBJECT" default:"accounting.metering.quota"`
+	}
+
+	Accounting struct {
+		Host string `envconfig:"OPENCSG_ACCOUNTING_SERVER_HOST" default:"http://localhost"`
+		Port int    `envconfig:"OPENCSG_ACCOUNTING_SERVER_PORT" default:"8086"`
 	}
 }
 

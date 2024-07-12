@@ -25,6 +25,13 @@ type User struct {
 	Password     string        `bun:",notnull" json:"-"`
 	AccessTokens []AccessToken `bun:"rel:has-many,join:id=user_id"`
 	Namespaces   []Namespace   `bun:"rel:has-many,join:id=user_id" json:"namespace"`
+	//TODO:add unique index after migration
+	UUID string `bun:"," json:"uuid"`
+	// user registered from default login page, from casdoor, etc. Possible values:
+	//
+	// - "default"
+	// - "casdoor"
+	RegProvider string `bun:"," json:"reg_provider"`
 	times
 }
 

@@ -13,10 +13,12 @@ import (
 	"time"
 
 	"github.com/bwmarrin/snowflake"
+	"github.com/google/uuid"
 	"opencsg.com/csghub-server/builder/deploy/common"
 	"opencsg.com/csghub-server/builder/deploy/imagebuilder"
 	"opencsg.com/csghub-server/builder/deploy/imagerunner"
 	"opencsg.com/csghub-server/builder/deploy/scheduler"
+	"opencsg.com/csghub-server/builder/event"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/types"
 )
@@ -45,9 +47,11 @@ type deployer struct {
 
 	store              *database.DeployTaskStore
 	spaceStore         *database.SpaceStore
-	runnerStatuscache  map[string]imagerunner.StatusResponse
+	spaceResourceStore *database.SpaceResourceStore
+	runnerStatuscache  map[string]types.StatusResponse
 	internalRootDomain string
 	sfNode             *snowflake.Node
+	eventPub           *event.EventPublisher
 }
 
 func newDeployer(s scheduler.Scheduler, ib imagebuilder.Builder, ir imagerunner.Runner) (*deployer, error) {
@@ -58,17 +62,20 @@ func newDeployer(s scheduler.Scheduler, ib imagebuilder.Builder, ir imagerunner.
 		return nil, err
 	}
 	d := &deployer{
-		s:                 s,
-		ib:                ib,
-		ir:                ir,
-		store:             store,
-		spaceStore:        database.NewSpaceStore(),
-		runnerStatuscache: make(map[string]imagerunner.StatusResponse),
-		sfNode:            node,
+		s:                  s,
+		ib:                 ib,
+		ir:                 ir,
+		store:              store,
+		spaceStore:         database.NewSpaceStore(),
+		spaceResourceStore: database.NewSpaceResourceStore(),
+		runnerStatuscache:  make(map[string]types.StatusResponse),
+		sfNode:             node,
+		eventPub:           &event.DefaultEventPublisher,
 	}
 
 	go d.refreshStatus()
 	go d.s.Run()
+	go d.startAccounting()
 
 	return d, nil
 }
@@ -507,4 +514,90 @@ func (d *deployer) StartDeploy(ctx context.Context, deploy *database.Deploy) err
 	go d.s.Queue(runTask.ID)
 
 	return nil
+}
+
+// accounting timer
+func (d *deployer) startAccounting() {
+	d.startAccountingMetering()
+}
+
+func (d *deployer) getResourceMap() map[string]string {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	resList, err := d.spaceResourceStore.FindAll(ctx)
+	resources := make(map[string]string)
+	if err != nil {
+		slog.Error("failed to get hub resource", slog.Any("error", err))
+	} else {
+		for _, res := range resList {
+			resources[strconv.FormatInt(res.ID, 10)] = res.Name
+		}
+	}
+	return resources
+}
+
+func (d *deployer) startAccountingMetering() {
+	for {
+		resMap := d.getResourceMap()
+		slog.Debug("get resources map and runnerStatuscache", slog.Any("resMap", resMap), slog.Any("runnerStatuscache", d.runnerStatuscache))
+		for _, svc := range d.runnerStatuscache {
+			d.startAccountingRequestMeter(resMap, svc)
+		}
+		// accounting interval in min, get from env config
+		time.Sleep(time.Duration(d.eventPub.SyncInterval) * time.Minute)
+	}
+}
+
+func (d *deployer) startAccountingRequestMeter(resMap map[string]string, svcRes types.StatusResponse) {
+	// ignore not ready svc
+	if svcRes.Code != common.Running {
+		return
+	}
+	// ignore deploy without sku resource
+	if len(svcRes.DeploySku) < 1 {
+		return
+	}
+	resName, exists := resMap[svcRes.DeploySku]
+	if !exists {
+		slog.Warn("Did not find resource", slog.Any("deploy_sku", svcRes.DeploySku))
+		return
+	}
+	slog.Debug("metering service", slog.Any("svcRes", svcRes))
+	event := types.METERING_EVENT{
+		Uuid:         uuid.New(),
+		UserUUID:     svcRes.UserID,
+		Value:        int64(d.eventPub.SyncInterval),
+		ValueType:    types.TimeDurationMinType,
+		Scene:        int(getValidSceneType(svcRes.DeployType)),
+		OpUID:        "",
+		ResourceID:   svcRes.DeploySku,
+		ResourceName: resName,
+		CustomerID:   svcRes.ServiceName,
+		CreatedAt:    time.Now(),
+		Extra:        "",
+	}
+	str, err := json.Marshal(event)
+	if err != nil {
+		slog.Error("error marshal metering event", slog.Any("event", event), slog.Any("error", err))
+		return
+	}
+	err = d.eventPub.PublishMeteringEvent(str)
+	if err != nil {
+		slog.Error("failed to pub metering event", slog.Any("data", string(str)), slog.Any("error", err))
+	} else {
+		slog.Debug("pub metering event success", slog.Any("data", string(str)))
+	}
+}
+
+func getValidSceneType(scene int) types.SceneType {
+	switch scene {
+	case 0:
+		return types.SceneSpace
+	case 1:
+		return types.SceneModelInference
+	case 2:
+		return types.SceneModelFinetune
+	default:
+		return types.SceneUnknow
+	}
 }

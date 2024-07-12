@@ -67,3 +67,12 @@ func (s *SpaceResourceStore) FindByName(ctx context.Context, name string) (*Spac
 
 	return &res, err
 }
+
+func (s *SpaceResourceStore) FindAll(ctx context.Context) ([]SpaceResource, error) {
+	var result []SpaceResource
+	_, err := s.db.Operator.Core.NewSelect().Model(&result).Exec(ctx, &result)
+	if err != nil {
+		return nil, err
+	}
+	return result, nil
+}

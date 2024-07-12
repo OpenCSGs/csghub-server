@@ -451,5 +451,17 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 		runtimeFramework.GET("/:id/models", modelHandler.ListByRuntimeFrameworkID)
 	}
 
+	accountingHandler, err := handler.NewAccountingHandler(config)
+	if err != nil {
+		return nil, fmt.Errorf("error creating accounting handler setting handler:%w", err)
+	}
+	accountingGroup := apiGroup.Group("/accounting")
+	{
+		meterGroup := accountingGroup.Group("/metering")
+		{
+			meterGroup.GET("/:id/statements", accountingHandler.QueryMeteringStatementByUserID)
+		}
+	}
+
 	return r, nil
 }

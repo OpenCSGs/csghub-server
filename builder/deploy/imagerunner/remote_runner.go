@@ -11,6 +11,8 @@ import (
 	"net/http"
 	"net/url"
 	"time"
+
+	"opencsg.com/csghub-server/common/types"
 )
 
 var _ Runner = (*RemoteRunner)(nil)
@@ -88,7 +90,7 @@ func (h *RemoteRunner) Status(ctx context.Context, req *StatusRequest) (*StatusR
 	return &statusResponse, nil
 }
 
-func (h *RemoteRunner) StatusAll(ctx context.Context) (map[string]StatusResponse, error) {
+func (h *RemoteRunner) StatusAll(ctx context.Context) (map[string]types.StatusResponse, error) {
 	u := fmt.Sprintf("%s/status-all", h.remote)
 	response, err := h.doRequest(http.MethodGet, u, nil)
 	if err != nil {
@@ -96,7 +98,7 @@ func (h *RemoteRunner) StatusAll(ctx context.Context) (map[string]StatusResponse
 	}
 	defer response.Body.Close()
 
-	statusAll := make(map[string]StatusResponse)
+	statusAll := make(map[string]types.StatusResponse)
 	if err := json.NewDecoder(response.Body).Decode(&statusAll); err != nil {
 		return nil, err
 	}

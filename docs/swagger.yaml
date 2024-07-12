@@ -304,9 +304,19 @@ definitions:
         items:
           $ref: '#/definitions/database.Namespace'
         type: array
+      reg_provider:
+        description: |-
+          user registered from default login page, from casdoor, etc. Possible values:
+
+          - "default"
+          - "casdoor"
+        type: string
       updated_at:
         type: string
       username:
+        type: string
+      uuid:
+        description: TODO:add unique index after migration
         type: string
     type: object
   handler.Create.addMemberRequest:
@@ -2931,6 +2941,77 @@ paths:
       summary: Get repository file tree
       tags:
       - Repository
+  /accounting/metering/{id}/statements:
+    get:
+      consumes:
+      - application/json
+      description: List meterings by user uuid and start time and end time
+      parameters:
+      - description: user uuid
+        in: path
+        name: id
+        required: true
+        type: string
+      - default: 10
+        description: scene
+        enum:
+        - 10
+        - 11
+        - 12
+        - 20
+        in: query
+        name: scene
+        type: integer
+      - description: instance name
+        in: query
+        name: instance_name
+        required: true
+        type: string
+      - description: 'start_time, format: ''2024-06-12 08:27:22'''
+        in: query
+        name: start_time
+        required: true
+        type: string
+      - description: 'end_time, format: ''2024-06-12 17:17:22'''
+        in: query
+        name: end_time
+        required: true
+        type: string
+      - description: current_user
+        in: query
+        name: current_user
+        required: true
+        type: string
+      - default: 20
+        description: per
+        in: query
+        name: per
+        type: integer
+      - default: 1
+        description: per page
+        in: query
+        name: page
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/types.Response'
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: List meterings by user uuid and start time and end time
+      tags:
+      - Accounting
   /cluster:
     get:
       consumes:
@@ -4968,6 +5049,51 @@ paths:
       summary: update user membership
       tags:
       - Member
+  /runtime_framework/{id}/models:
+    get:
+      consumes:
+      - application/json
+      description: get visible models by runtime framework for current user
+      parameters:
+      - description: runtime framework id
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: current user
+        in: query
+        name: current_user
+        type: string
+      - default: 20
+        description: per
+        in: query
+        name: per
+        type: integer
+      - default: 1
+        description: per page
+        in: query
+        name: page
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/types.Response'
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Get Visible models by runtime framework for current user
+      tags:
+      - RuntimeFramework
   /space_resources:
     get:
       consumes:
