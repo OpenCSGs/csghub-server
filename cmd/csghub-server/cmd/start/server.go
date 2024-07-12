@@ -8,6 +8,7 @@ import (
 	"opencsg.com/csghub-server/api/httpbase"
 	"opencsg.com/csghub-server/api/router"
 	"opencsg.com/csghub-server/builder/deploy"
+	"opencsg.com/csghub-server/builder/event"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/docs"
@@ -53,6 +54,10 @@ var serverCmd = &cobra.Command{
 			DSN:     cfg.Database.DSN,
 		}
 		database.InitDB(dbConfig)
+		err = event.InitEventPublisher(cfg)
+		if err != nil {
+			return fmt.Errorf("fail to initialize message queue, %w", err)
+		}
 		deploy.Init(deploy.DeployConfig{
 			ImageBuilderURL:         cfg.Space.BuilderEndpoint,
 			ImageRunnerURL:          cfg.Space.RunnerEndpoint,

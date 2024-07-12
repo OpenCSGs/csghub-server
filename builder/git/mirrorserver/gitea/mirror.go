@@ -32,7 +32,7 @@ func (c *MirrorClient) CreateMirrorRepo(ctx context.Context, req mirrorserver.Cr
 		Issues:       false,
 		PullRequests: false,
 		Releases:     false,
-		LFS:          true,
+		LFS:          req.SyncLfs,
 	})
 	if err != nil {
 		return 0, err

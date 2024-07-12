@@ -18,6 +18,7 @@ import (
 	knative "knative.dev/serving/pkg/client/clientset/versioned"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/config"
+	"opencsg.com/csghub-server/common/types"
 )
 
 // Cluster holds basic information about a Kubernetes cluster
@@ -32,17 +33,6 @@ type Cluster struct {
 type ClusterPool struct {
 	Clusters     []Cluster
 	ClusterStore *database.ClusterInfoStore
-}
-
-// NodeResourceInfo struct includes details about the node's resources and region
-type NodeResourceInfo struct {
-	NodeName  string  `json:"node_name"`
-	GPUModel  string  `json:"gpu_model"`
-	TotalCPU  float64 `json:"total_cpu"`
-	UsedCPU   float64 `json:"used_cpu"`
-	TotalGPU  int64   `json:"total_gpu"`
-	UsedGPU   int64   `json:"used_gpu"`
-	GPUVendor string  `json:"gpu_vendor"`
 }
 
 // NewClusterPool initializes and returns a ClusterPool by reading kubeconfig files from $HOME/.kube directory
@@ -61,7 +51,7 @@ func NewClusterPool() (*ClusterPool, error) {
 		slog.Error("No kubeconfig files", slog.Any("path", kubeconfigFolderPath))
 	}
 
-	for _, kubeconfig := range kubeconfigFiles {
+	for i, kubeconfig := range kubeconfigFiles {
 		config, err := clientcmd.BuildConfigFromFlags("", kubeconfig)
 		if err != nil {
 			return nil, err
@@ -82,7 +72,7 @@ func NewClusterPool() (*ClusterPool, error) {
 			Client:        client,
 			KnativeClient: knativeClient,
 		})
-		err = pool.ClusterStore.Add(context.TODO(), id, "华中区")
+		err = pool.ClusterStore.Add(context.TODO(), id, fmt.Sprintf("region-%d", i))
 		if err != nil {
 			slog.Error("falied to add cluster info to db", "error", err)
 			return nil, fmt.Errorf("falied to add cluster info to db,%w", err)
@@ -122,7 +112,7 @@ func (p *ClusterPool) GetClusterByID(ctx context.Context, id string) (*Cluster, 
 }
 
 // getNodeResources retrieves all node cpu and gpu info
-func GetNodeResources(clientset *kubernetes.Clientset, config *config.Config) (map[string]NodeResourceInfo, error) {
+func GetNodeResources(clientset *kubernetes.Clientset, config *config.Config) (map[string]types.NodeResourceInfo, error) {
 	nodes, err := clientset.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
 		return nil, err
@@ -133,9 +123,11 @@ func GetNodeResources(clientset *kubernetes.Clientset, config *config.Config) (m
 		return nil, err
 	}
 
-	nodeResourcesMap := make(map[string]NodeResourceInfo)
+	nodeResourcesMap := make(map[string]types.NodeResourceInfo)
 
 	for _, node := range nodes.Items {
+		usedMem := getMem(node.Status.Allocatable.Memory().Value())
+		totalMem := getMem(node.Status.Capacity.Memory().Value())
 		totalCPU := node.Status.Capacity.Cpu().MilliValue()
 		allocatableCPU := node.Status.Allocatable.Cpu().MilliValue()
 		totalGPU, found := node.Status.Capacity["nvidia.com/gpu"]
@@ -148,16 +140,18 @@ func GetNodeResources(clientset *kubernetes.Clientset, config *config.Config) (m
 		if len(gpuModelVendor) > 1 {
 			gpuModel = gpuModelVendor[1]
 		}
-		nodeResourcesMap[node.Name] = NodeResourceInfo{
-			NodeName:  node.Name,
-			TotalCPU:  millicoresToCores(totalCPU),
-			UsedCPU:   millicoresToCores(allocatableCPU),
-			GPUModel:  gpuModel,
-			GPUVendor: gpuModelVendor[0],
-			TotalGPU:  parseQuantityToInt64(totalGPU),
+		nodeResourcesMap[node.Name] = types.NodeResourceInfo{
+			NodeName:     node.Name,
+			TotalCPU:     millicoresToCores(totalCPU),
+			UsedCPU:      millicoresToCores(allocatableCPU),
+			GPUModel:     gpuModel,
+			GPUVendor:    gpuModelVendor[0],
+			TotalGPU:     parseQuantityToInt64(totalGPU),
+			AvailableGPU: parseQuantityToInt64(totalGPU),
+			AvailableMem: (totalMem - usedMem),
+			TotalMem:     totalMem,
 		}
 	}
-
 	for _, pod := range pods.Items {
 		if pod.Spec.NodeName == "" || pod.Status.Phase == v1.PodSucceeded || pod.Status.Phase == v1.PodFailed {
 			continue
@@ -166,7 +160,7 @@ func GetNodeResources(clientset *kubernetes.Clientset, config *config.Config) (m
 		nodeResource := nodeResourcesMap[pod.Spec.NodeName]
 		for _, container := range pod.Spec.Containers {
 			if requestedGPU, hasGPU := container.Resources.Requests["nvidia.com/gpu"]; hasGPU {
-				nodeResource.UsedGPU += parseQuantityToInt64(requestedGPU)
+				nodeResource.AvailableGPU -= parseQuantityToInt64(requestedGPU)
 			}
 		}
 
@@ -174,6 +168,11 @@ func GetNodeResources(clientset *kubernetes.Clientset, config *config.Config) (m
 	}
 
 	return nodeResourcesMap, nil
+}
+
+func getMem(memByte int64) float32 {
+	memGB := float32(memByte) / (1024 * 1024 * 1024)
+	return memGB
 }
 
 func millicoresToCores(millicores int64) float64 {

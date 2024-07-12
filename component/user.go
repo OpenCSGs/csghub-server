@@ -114,6 +114,12 @@ func (c *UserComponent) Create(ctx context.Context, req *types.CreateUserRequest
 	namespace := &database.Namespace{
 		Path: user.Username,
 	}
+	user.UUID = req.UUID
+	if req.RegProvider == "" {
+		user.RegProvider = "default"
+	} else {
+		user.RegProvider = req.RegProvider
+	}
 	err = c.us.Create(ctx, user, namespace)
 	if err != nil {
 		newError := fmt.Errorf("failed to create user,error:%w", err)
@@ -122,15 +128,16 @@ func (c *UserComponent) Create(ctx context.Context, req *types.CreateUserRequest
 	}
 
 	//skip casdoor update if it's not a casdoor user
-	if req.CasdoorUID == "" {
+	if req.UUID == "" || user.RegProvider != "casdoor" {
 		return user, nil
 	}
+
 	ureq := &types.UpdateUserRequest{
-		Name:       req.Name,
-		Username:   req.Username,
-		Email:      req.Email,
-		Phone:      req.Phone,
-		CasdoorUID: req.CasdoorUID,
+		Name:     req.Name,
+		Username: req.Username,
+		Email:    req.Email,
+		Phone:    req.Phone,
+		UUID:     req.UUID,
 	}
 	err = c.updateCasdoorUser(ureq)
 	if err != nil {
@@ -154,6 +161,7 @@ func (c *UserComponent) Update(ctx context.Context, req *types.UpdateUserRequest
 		return nil, newError
 	}
 
+	respUser.UUID = req.UUID
 	err = c.us.Update(ctx, respUser)
 	if err != nil {
 		newError := fmt.Errorf("failed to update database user,error:%w", err)
@@ -161,7 +169,7 @@ func (c *UserComponent) Update(ctx context.Context, req *types.UpdateUserRequest
 	}
 
 	//skip casdoor update if it's not a casdoor user
-	if req.CasdoorUID == "" {
+	if req.UUID == "" || user.RegProvider != "casdoor" {
 		return respUser, nil
 	}
 	err = c.updateCasdoorUser(req)
@@ -176,7 +184,7 @@ func (c *UserComponent) Update(ctx context.Context, req *types.UpdateUserRequest
 func (c *UserComponent) updateCasdoorUser(req *types.UpdateUserRequest) error {
 	c.lazyInit()
 
-	casu, err := c.casc.GetUserByUserId(req.CasdoorUID)
+	casu, err := c.casc.GetUserByUserId(req.UUID)
 	if err != nil {
 		return fmt.Errorf("failed to get user from casdoor,error:%w", err)
 	}
@@ -549,13 +557,13 @@ func (c *UserComponent) LikesDatasets(ctx context.Context, req *types.UserDatase
 	return resDatasets, total, nil
 }
 
-func (c *UserComponent) ListDeploys(ctx context.Context, repoType types.RepositoryType, req *types.UserRepoReq) ([]types.DeployRepo, int, error) {
+func (c *UserComponent) ListDeploys(ctx context.Context, repoType types.RepositoryType, req *types.DeployReq) ([]types.DeployRepo, int, error) {
 	user, err := c.us.FindByUsername(ctx, req.CurrentUser)
 	if err != nil {
 		newError := fmt.Errorf("failed to check for the presence of the user:%s, error:%w", req.CurrentUser, err)
 		return nil, 0, newError
 	}
-	deploys, total, err := c.deploy.ListDeployByUserID(ctx, repoType, user.ID, req.PageSize, req.Page)
+	deploys, total, err := c.deploy.ListDeployByUserID(ctx, user.ID, req)
 	if err != nil {
 		newError := fmt.Errorf("failed to get user deploys for %s with error:%w", repoType, err)
 		return nil, 0, newError
@@ -584,6 +592,48 @@ func (c *UserComponent) ListDeploys(ctx context.Context, repoType types.Reposito
 			SecureLevel:      deploy.SecureLevel,
 			CreatedAt:        deploy.CreatedAt,
 			UpdatedAt:        deploy.UpdatedAt,
+			Type:             deploy.Type,
+		})
+	}
+	return resDeploys, total, nil
+}
+
+func (c *UserComponent) ListInstances(ctx context.Context, req *types.UserRepoReq) ([]types.DeployRepo, int, error) {
+	user, err := c.us.FindByUsername(ctx, req.CurrentUser)
+	if err != nil {
+		newError := fmt.Errorf("failed to check for the presence of the user:%s, error:%w", req.CurrentUser, err)
+		return nil, 0, newError
+	}
+	deploys, total, err := c.deploy.ListInstancesByUserID(ctx, user.ID, req.PageSize, req.Page)
+	if err != nil {
+		newError := fmt.Errorf("failed to get user instances error:%w", err)
+		return nil, 0, newError
+	}
+
+	var resDeploys []types.DeployRepo
+	for _, deploy := range deploys {
+		repoPath := strings.TrimPrefix(deploy.GitPath, "models_")
+		resDeploys = append(resDeploys, types.DeployRepo{
+			DeployID:         deploy.ID,
+			DeployName:       deploy.DeployName,
+			Path:             repoPath,
+			RepoID:           deploy.RepoID,
+			SvcName:          deploy.SvcName,
+			Status:           deployStatusCodeToString(deploy.Status),
+			Hardware:         deploy.Hardware,
+			Env:              deploy.Env,
+			RuntimeFramework: deploy.RuntimeFramework,
+			ImageID:          deploy.ImageID,
+			MinReplica:       deploy.MinReplica,
+			MaxReplica:       deploy.MaxReplica,
+			GitPath:          deploy.GitPath,
+			GitBranch:        deploy.GitBranch,
+			CostPerHour:      deploy.CostPerHour,
+			ClusterID:        deploy.ClusterID,
+			SecureLevel:      deploy.SecureLevel,
+			CreatedAt:        deploy.CreatedAt,
+			UpdatedAt:        deploy.UpdatedAt,
+			Type:             deploy.Type,
 		})
 	}
 	return resDeploys, total, nil

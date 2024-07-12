@@ -54,6 +54,8 @@ type DeleteRepoReq struct {
 	RepoType  types.RepositoryType `json:"repo_type"`
 }
 
+type GetRepoReq = DeleteRepoReq
+
 type GetBranchesReq struct {
 	Namespace string               `json:"namespace"`
 	Name      string               `json:"name"`
@@ -92,3 +94,41 @@ type GetRepoInfoByPathReq struct {
 }
 
 type GetRepoTagsReq = GetBranchesReq
+
+const (
+	TaskStatusQueued   TaskStatus = iota // 0 task is queued
+	TaskStatusRunning                    // 1 task is running
+	TaskStatusStopped                    // 2 task is stopped (never used)
+	TaskStatusFailed                     // 3 task is failed
+	TaskStatusFinished                   // 4 task is finished
+)
+
+type CreateMirrorRepoReq struct {
+	Namespace   string `json:"namespace"`
+	Name        string `json:"name"`
+	CloneUrl    string `json:"clone_url"`
+	Username    string `json:"username"`
+	AccessToken string `json:"access_token"`
+	Private     bool   `json:"private"`
+	Description string `json:"description"`
+	Interval    string `json:"interval"`
+	MirrorToken string `json:"mirror_token"`
+	RepoType    types.RepositoryType
+}
+
+type MirrorSyncReq struct {
+	Namespace string `json:"namespace"`
+	Name      string `json:"name"`
+	RepoType  types.RepositoryType
+}
+
+type MirrorTaskInfo struct {
+	Status    TaskStatus `json:"status"`
+	Message   string     `json:"message"`
+	RepoID    int64      `json:"repo_id"`
+	RepoName  string     `json:"repo_name"`
+	StartedAt int64      `json:"start"`
+	EndedAt   int64      `json:"end"`
+}
+
+type TaskStatus int

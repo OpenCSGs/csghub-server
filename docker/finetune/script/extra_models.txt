@@ -1,0 +1,7 @@
+register_model_group(
+    models={
+        "CSGHUB_MODEL_NAME": {
+            DownloadSource.DEFAULT: "CSGHUB_MODEL_REPO"
+        }
+    }
+)

@@ -1,8 +1,12 @@
 package types
 
-import "time"
+import (
+	"time"
+)
 
 type RepositoryType string
+type RepositorySource string
+type RepositorySyncStatus string
 
 const (
 	ResTypeKey  string = "hub-res-type"
@@ -14,6 +18,15 @@ const (
 	SpaceRepo   RepositoryType = "space"
 	CodeRepo    RepositoryType = "code"
 	UnknownRepo RepositoryType = ""
+
+	OpenCSGSource     RepositorySource = "opencsg"
+	LocalSource       RepositorySource = "local"
+	HuggingfaceSource RepositorySource = "huggingface"
+
+	SyncStatusPending    RepositorySyncStatus = "pending"
+	SyncStatusInProgress RepositorySyncStatus = "inprogress"
+	SyncStatusFailed     RepositorySyncStatus = "failed"
+	SyncStatusCompleted  RepositorySyncStatus = "completed"
 
 	EndpointPublic  int = 1 // public - anyone can access
 	EndpointPrivate int = 2 // private - access with read permission
@@ -86,7 +99,7 @@ type DeployRepo struct {
 	Endpoint         string     `json:"endpoint,omitempty"`
 	CreatedAt        time.Time  `json:"created_at,omitempty"`
 	UpdatedAt        time.Time  `json:"updated_at,omitempty"`
-	CostPerHour      int64      `json:"cost_per_hour,omitempty"`
+	CostPerHour      float64    `json:"cost_per_hour,omitempty"`
 	ClusterID        string     `json:"cluster_id,omitempty"`
 	SecureLevel      int        `json:"secure_level,omitempty"`
 	ActualReplica    int        `json:"actual_replica,omitempty"`
@@ -94,6 +107,10 @@ type DeployRepo struct {
 	Instances        []Instance `json:"instances,omitempty"`
 	InstanceName     string     `json:"instance_name,omitempty"`
 	Private          bool       `json:"private"`
+	Type             int        `json:"type,omitempty"`
+	ProxyEndpoint    string     `json:"proxy_endpoint,omitempty"`
+	UserUUID         string     `json:"user_uuid,omitempty"`
+	SKU              string     `json:"sku,omitempty"`
 }
 
 type RuntimeFrameworkReq struct {
@@ -103,6 +120,7 @@ type RuntimeFrameworkReq struct {
 	FrameCpuImage string `json:"frame_cpu_image"`
 	Enabled       int64  `json:"enabled"`
 	ContainerPort int    `json:"container_port"`
+	Type          int    `json:"type"`
 }
 
 type RuntimeFramework struct {
@@ -113,4 +131,22 @@ type RuntimeFramework struct {
 	FrameCpuImage string `json:"frame_cpu_image"`
 	Enabled       int64  `json:"enabled"`
 	ContainerPort int    `json:"container_port"`
+	Type          int    `json:"type"`
+}
+
+type RuntimeFrameworkModels struct {
+	Models []string `json:"models"`
+}
+
+type RepoFilter struct {
+	Tags     []TagReq
+	Sort     string
+	Search   string
+	Source   string
+	Username string
+}
+
+type TagReq struct {
+	Name     string `json:"name"`
+	Category string `json:"category"`
 }

@@ -10,7 +10,7 @@ func (c *Client) CreateUserToken(req *types.CreateUserTokenRequest) (token *data
 	giteaToken, _, err := c.giteaClient.CreateAccessToken(
 		gitea.CreateAccessTokenOption{
 			Username: req.Username,
-			Name:     req.Name,
+			Name:     req.TokenName,
 			Scopes:   []gitea.AccessTokenScope{"write:repository"},
 		},
 	)
@@ -21,7 +21,7 @@ func (c *Client) CreateUserToken(req *types.CreateUserTokenRequest) (token *data
 
 	token = &database.AccessToken{
 		GitID: giteaToken.ID,
-		Name:  req.Name,
+		Name:  req.TokenName,
 		Token: giteaToken.Token,
 	}
 
@@ -31,7 +31,7 @@ func (c *Client) CreateUserToken(req *types.CreateUserTokenRequest) (token *data
 func (c *Client) DeleteUserToken(req *types.DeleteUserTokenRequest) (err error) {
 	_, err = c.giteaClient.DeleteAccessToken(gitea.DeleteAccessTokenOption{
 		Username: req.Username,
-		Value:    req.Name,
+		Value:    req.TokenName,
 	})
 	return
 }

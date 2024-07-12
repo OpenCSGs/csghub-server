@@ -549,6 +549,7 @@ func (h *UserHandler) UserPermission(ctx *gin.Context) {
 // @Produce      json
 // @Param        username path string true "username"
 // @Param        repo_type path string true "model,space" Enums(model,space)
+// @Param 		 deploy_type query int false "deploy type(0-space,1-inference,2-finetune)" Enums(0, 1, 2) default(1)
 // @Param        per query int false "per" default(50)
 // @Param        page query int false "page index" default(1)
 // @Param        current_user query string false "current user"
@@ -557,6 +558,80 @@ func (h *UserHandler) UserPermission(ctx *gin.Context) {
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
 // @Router       /user/{username}/run/{repo_type} [get]
 func (h *UserHandler) GetRunDeploys(ctx *gin.Context) {
+	currentUser := httpbase.GetCurrentUser(ctx)
+	if currentUser == "" {
+		httpbase.UnauthorizedError(ctx, errors.New("user not found, please login first"))
+		return
+	}
+
+	username := ctx.Param("username")
+	if currentUser != username {
+		slog.Warn("invalid user to list deploys", slog.String("currentUser", currentUser), slog.String("username", username))
+		httpbase.ServerError(ctx, errors.New("invalid user"))
+		return
+	}
+
+	deployTypeStr := ctx.Query("deploy_type")
+	if deployTypeStr == "" {
+		// backward compatibility for inferences
+		deployTypeStr = strconv.Itoa(types.InferenceType)
+	}
+	deployType, err := strconv.Atoi(deployTypeStr)
+	if err != nil {
+		slog.Error("Bad request deploy type format", "error", err)
+		httpbase.BadRequest(ctx, err.Error())
+		return
+	}
+
+	per, page, err := common.GetPerAndPageFromContext(ctx)
+	if err != nil {
+		slog.Error("Bad request format of page and per %v", err)
+		httpbase.BadRequest(ctx, err.Error())
+		return
+	}
+	repoType := common.RepoTypeFromParam(ctx)
+	if repoType != types.ModelRepo && repoType != types.SpaceRepo {
+		slog.Error("Invalid repo type", slog.Any("repo_type", repoType))
+		httpbase.BadRequest(ctx, "Invalid repo type")
+		return
+	}
+
+	var req types.DeployReq
+	req.CurrentUser = currentUser
+	req.Page = page
+	req.PageSize = per
+	req.RepoType = repoType
+	req.DeployType = deployType
+	ds, total, err := h.c.ListDeploys(ctx, repoType, &req)
+	if err != nil {
+		slog.Error("Failed to get deploy repo list", slog.Any("error", err), slog.Any("req", req))
+		httpbase.ServerError(ctx, err)
+		return
+	}
+	respData := gin.H{
+		"message": "OK",
+		"data":    ds,
+		"total":   total,
+	}
+	ctx.JSON(http.StatusOK, respData)
+}
+
+// GetFinetuneInstances godoc
+// @Security     ApiKey
+// @Summary      Get user running notebook instances
+// @Description  Get user running notebook instances
+// @Tags         User
+// @Accept       json
+// @Produce      json
+// @Param        username path string true "username"
+// @Param        per query int false "per" default(50)
+// @Param        page query int false "page index" default(1)
+// @Param        current_user query string false "current user"
+// @Success      200  {object}  types.Response{} "OK"
+// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
+// @Router       /user/{username}/finetune/instances [get]
+func (h *UserHandler) GetFinetuneInstances(ctx *gin.Context) {
 	respData := gin.H{
 		"message": "OK",
 		"data":    nil,
@@ -583,19 +658,13 @@ func (h *UserHandler) GetRunDeploys(ctx *gin.Context) {
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
-	repoType := common.RepoTypeFromParam(ctx)
-	if repoType != types.ModelRepo && repoType != types.SpaceRepo {
-		slog.Error("Invalid repo type", slog.Any("repo_type", repoType))
-		httpbase.BadRequest(ctx, "Invalid repo type")
-		return
-	}
 
 	req.CurrentUser = currentUser
 	req.Page = page
 	req.PageSize = per
-	ds, total, err := h.c.ListDeploys(ctx, repoType, &req)
+	ds, total, err := h.c.ListInstances(ctx, &req)
 	if err != nil {
-		slog.Error("Failed to get deploy repo list", slog.Any("error", err), slog.Any("req", req))
+		slog.Error("Failed to get instance list", slog.Any("error", err), slog.Any("req", req))
 		httpbase.ServerError(ctx, err)
 		return
 	}

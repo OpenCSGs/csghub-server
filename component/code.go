@@ -130,20 +130,20 @@ func (c *CodeComponent) Create(ctx context.Context, req *types.CreateCodeReq) (*
 	return resCode, nil
 }
 
-func (c *CodeComponent) Index(ctx context.Context, username, search, sort string, tags []database.TagReq, per, page int) ([]types.Code, int, error) {
+func (c *CodeComponent) Index(ctx context.Context, filter *types.RepoFilter, per, page int) ([]types.Code, int, error) {
 	var (
 		user     database.User
 		err      error
 		resCodes []types.Code
 	)
-	if username != "" {
-		user, err = c.user.FindByUsername(ctx, username)
+	if filter.Username != "" {
+		user, err = c.user.FindByUsername(ctx, filter.Username)
 		if err != nil {
 			newError := fmt.Errorf("failed to get current user,error:%w", err)
 			return nil, 0, newError
 		}
 	}
-	repos, total, err := c.rs.PublicToUser(ctx, types.CodeRepo, user.ID, search, sort, tags, per, page)
+	repos, total, err := c.rs.PublicToUser(ctx, types.CodeRepo, user.ID, filter, per, page)
 	if err != nil {
 		newError := fmt.Errorf("failed to get public code repos,error:%w", err)
 		return nil, 0, newError
@@ -193,6 +193,8 @@ func (c *CodeComponent) Index(ctx context.Context, username, search, sort string
 			CreatedAt:    code.CreatedAt,
 			UpdatedAt:    repo.UpdatedAt,
 			Tags:         tags,
+			Source:       repo.Source,
+			SyncStatus:   repo.SyncStatus,
 		})
 	}
 
@@ -307,10 +309,12 @@ func (c *CodeComponent) Show(ctx context.Context, namespace, name, currentUser s
 			Nickname: code.Repository.User.Name,
 			Email:    code.Repository.User.Email,
 		},
-		Private:   code.Repository.Private,
-		CreatedAt: code.CreatedAt,
-		UpdatedAt: code.Repository.UpdatedAt,
-		UserLikes: likeExists,
+		Private:    code.Repository.Private,
+		CreatedAt:  code.CreatedAt,
+		UpdatedAt:  code.Repository.UpdatedAt,
+		UserLikes:  likeExists,
+		Source:     code.Repository.Source,
+		SyncStatus: code.Repository.SyncStatus,
 	}
 
 	return resCode, nil

@@ -21,11 +21,6 @@ func NewTagStore() *TagStore {
 	}
 }
 
-type TagReq struct {
-	Name     string `json:"name"`
-	Category string `json:"category"`
-}
-
 type TagScope string
 
 const (
@@ -318,4 +313,22 @@ func (ts *TagStore) UpsertRepoTags(ctx context.Context, repoID int64, oldTagIDs,
 	})
 
 	return err
+}
+
+func (ts *TagStore) FindOrCreate(ctx context.Context, tag Tag) (*Tag, error) {
+	var resTag Tag
+	err := ts.db.Operator.Core.NewSelect().
+		Model(&resTag).
+		Where("name = ? and category = ? and built_in = ? and scope = ?", tag.Name, tag.Category, tag.BuiltIn, tag.Scope).
+		Scan(ctx)
+	if err == nil {
+		return &resTag, nil
+	}
+	_, err = ts.db.Operator.Core.NewInsert().
+		Model(&tag).
+		Exec(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return &resTag, err
 }

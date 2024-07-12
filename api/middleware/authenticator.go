@@ -46,12 +46,11 @@ func AuthSession() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		session := sessions.Default(c)
 		userName := session.Get(httpbase.CurrentUserCtxVar)
-		if userName == nil {
-			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "session not found, please access with jwt token first"})
-			return
+		if userName != nil {
+			httpbase.SetAuthType(c, httpbase.AuthTypeJwt)
+			httpbase.SetCurrentUser(c, userName.(string))
 		}
 
-		httpbase.SetCurrentUser(c, userName.(string))
 		c.Next()
 	}
 }
@@ -139,10 +138,10 @@ func OnlyAPIKeyAuthenticator(config *config.Config) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		apiToken := config.APIToken
 
-		// Get Auzhorization token
+		// Get Authorization token
 		authHeader := c.Request.Header.Get("Authorization")
 
-		// Check Authorization Header formt
+		// Check Authorization Header format
 		if authHeader == "" {
 			slog.Info("missing authorization header", slog.Any("url", c.Request.URL))
 			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "missing Authorization header"})
