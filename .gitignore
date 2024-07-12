@@ -8,3 +8,12 @@ bin
 /pgdata
 minio_data
 local_only
+/jetstream
+.env
+docker-compose-leida.yml
+run_account_local.sh
+run_callback_local.sh
+run_deploy_runner_local.sh
+run_rproxy_local.sh
+run_server_local.sh
+run_server_local.sh

@@ -45,3 +45,14 @@ func (s *RecomStore) LoadOpWeights(ctx context.Context) ([]*RecomOpWeight, error
 	err := s.db.Operator.Core.NewSelect().Model(&RecomOpWeight{}).Scan(ctx, &weights)
 	return weights, err
 }
+
+func (s *RecomStore) UpsetOpWeights(ctx context.Context, repoID, weight int64) error {
+	_, err := s.db.Core.NewInsert().
+		Model(&RecomOpWeight{
+			RepositoryID: repoID,
+			Weight:       int(weight),
+		}).
+		On("CONFLICT (repository_id) DO UPDATE").
+		Exec(ctx)
+	return err
+}

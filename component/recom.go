@@ -32,16 +32,19 @@ func NewRecomComponent(cfg *config.Config) (*RecomComponent, error) {
 	}, nil
 }
 
+func (rc *RecomComponent) SetOpWeight(ctx context.Context, repoID, weight int64) error {
+	_, err := rc.repos.FindById(ctx, repoID)
+	if err != nil {
+		return fmt.Errorf("failed to find repository with id %d, err:%w", repoID, err)
+	}
+	return rc.rs.UpsetOpWeights(ctx, repoID, weight)
+}
+
 // loop through repositories and calculate the recom score of the repository
 func (rc *RecomComponent) CalculateRecomScore(ctx context.Context) {
 	weights, err := rc.loadWeights()
 	if err != nil {
 		slog.Error("Error loading weights", err)
-		return
-	}
-	opWeights, err := rc.loadOpWeights()
-	if err != nil {
-		slog.Error("Error loading operation weights", err)
 		return
 	}
 	repos, err := rc.repos.All(ctx)
@@ -51,19 +54,17 @@ func (rc *RecomComponent) CalculateRecomScore(ctx context.Context) {
 	}
 	for _, repo := range repos {
 		repoID := repo.ID
-		opWeight := opWeights[repoID]
-		score := rc.calcTotalScore(ctx, repo, weights, opWeight)
+		score := rc.calcTotalScore(ctx, repo, weights)
 		err := rc.rs.UpsertScore(ctx, repoID, score)
 		if err != nil {
 			slog.Error("Error updating recom score", slog.Int64("repo_id", repoID), slog.Float64("score", score),
 				slog.String("error", err.Error()))
 		}
 	}
-
 }
 
-func (rc *RecomComponent) calcTotalScore(ctx context.Context, repo *database.Repository, weights map[string]string, opWeight int) float64 {
-	score := float64(opWeight)
+func (rc *RecomComponent) calcTotalScore(ctx context.Context, repo *database.Repository, weights map[string]string) float64 {
+	score := float64(0)
 
 	if freshness, ok := weights["freshness"]; ok {
 		score += rc.calcFreshnessScore(repo.CreatedAt, freshness)
@@ -84,7 +85,7 @@ func (rc *RecomComponent) calcTotalScore(ctx context.Context, repo *database.Rep
 }
 
 func (rc *RecomComponent) calcFreshnessScore(createdAt time.Time, weightExp string) float64 {
-	//TODO:cache compiled script
+	// TODO:cache compiled script
 	hours := time.Since(createdAt).Hours()
 	scriptFreshness := tengo.NewScript([]byte(weightExp))
 	scriptFreshness.Add("score", 0.0)
@@ -103,7 +104,7 @@ func (rc *RecomComponent) calcFreshnessScore(createdAt time.Time, weightExp stri
 }
 
 func (rc *RecomComponent) calcDownloadsScore(downloads int64, weightExp string) float64 {
-	//TODO:cache compiled script
+	// TODO:cache compiled script
 	scriptFreshness := tengo.NewScript([]byte(weightExp))
 	scriptFreshness.Add("score", 0.0)
 	scriptFreshness.Add("downloads", 0)
@@ -122,7 +123,7 @@ func (rc *RecomComponent) calcDownloadsScore(downloads int64, weightExp string) 
 
 func (rc *RecomComponent) calcQualityScore(ctx context.Context, repo *database.Repository) (float64, error) {
 	score := 0.0
-	//get file counts from git server
+	// get file counts from git server
 	namespace, name := repo.NamespaceAndName()
 	files, err := getFilePaths(namespace, name, "", repo.RepositoryType, rc.gs.GetRepoFileTree)
 	if err != nil {

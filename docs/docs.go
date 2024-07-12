@@ -15,6 +15,110 @@ const docTemplate = `{
     "host": "{{.Host}}",
     "basePath": "{{.BasePath}}",
     "paths": {
+        "/accounting/metering/{id}/statements": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "description": "List meterings by user uuid and start time and end time",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Accounting"
+                ],
+                "summary": "List meterings by user uuid and start time and end time",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "user uuid",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "enum": [
+                            10,
+                            11,
+                            12,
+                            20
+                        ],
+                        "type": "integer",
+                        "default": 10,
+                        "description": "scene",
+                        "name": "scene",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "instance name",
+                        "name": "instance_name",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "start_time, format: '2024-06-12 08:27:22'",
+                        "name": "start_time",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "end_time, format: '2024-06-12 17:17:22'",
+                        "name": "end_time",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "current_user",
+                        "name": "current_user",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "default": 20,
+                        "description": "per",
+                        "name": "per",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "default": 1,
+                        "description": "per page",
+                        "name": "page",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/types.Response"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            }
+        },
         "/cluster": {
             "get": {
                 "security": [
@@ -114,6 +218,17 @@ const docTemplate = `{
                         "type": "string",
                         "description": "sort by",
                         "name": "sort",
+                        "in": "query"
+                    },
+                    {
+                        "enum": [
+                            "opencsg",
+                            "huggingface",
+                            "local"
+                        ],
+                        "type": "string",
+                        "description": "source",
+                        "name": "source",
                         "in": "query"
                     },
                     {
@@ -589,6 +704,17 @@ const docTemplate = `{
                         "in": "query"
                     },
                     {
+                        "enum": [
+                            "opencsg",
+                            "huggingface",
+                            "local"
+                        ],
+                        "type": "string",
+                        "description": "source",
+                        "name": "source",
+                        "in": "query"
+                    },
+                    {
                         "type": "integer",
                         "default": 20,
                         "description": "per",
@@ -909,6 +1035,79 @@ const docTemplate = `{
                         "description": "OK",
                         "schema": {
                             "$ref": "#/definitions/types.Response"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            }
+        },
+        "/datasets/{namespace}/{name}/all_files": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Dataset"
+                ],
+                "summary": "Get all files of a dataset",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "namespace",
+                        "name": "namespace",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "name",
+                        "name": "name",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "current user",
+                        "name": "current_user",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/types.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/types.File"
+                                        }
+                                    }
+                                }
+                            ]
                         }
                     },
                     "400": {
@@ -1407,6 +1606,79 @@ const docTemplate = `{
                 }
             }
         },
+        "/mirror/repos": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Mirror"
+                ],
+                "summary": "Get mirror repos",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "default": 20,
+                        "description": "per",
+                        "name": "per",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "default": 1,
+                        "description": "page",
+                        "name": "page",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/types.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/definitions/types.MirrorRepo"
+                                            }
+                                        },
+                                        "total": {
+                                            "type": "integer"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            }
+        },
         "/mirror/sources": {
             "get": {
                 "security": [
@@ -1756,6 +2028,17 @@ const docTemplate = `{
                         "in": "query"
                     },
                     {
+                        "enum": [
+                            "opencsg",
+                            "huggingface",
+                            "local"
+                        ],
+                        "type": "string",
+                        "description": "source",
+                        "name": "source",
+                        "in": "query"
+                    },
+                    {
                         "type": "integer",
                         "default": 20,
                         "description": "per",
@@ -2061,6 +2344,357 @@ const docTemplate = `{
                     {
                         "type": "string",
                         "description": "current user, the model owner",
+                        "name": "current_user",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/types.Response"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            }
+        },
+        "/models/{namespace}/{name}/all_files": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Model"
+                ],
+                "summary": "Get all files of a model",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "namespace",
+                        "name": "namespace",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "name",
+                        "name": "name",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "current user",
+                        "name": "current_user",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/types.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/types.File"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            }
+        },
+        "/models/{namespace}/{name}/finetune": {
+            "post": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Model"
+                ],
+                "summary": "create a finetune instance",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "namespace",
+                        "name": "namespace",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "name",
+                        "name": "name",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "current_user",
+                        "name": "current_user",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "description": "deploy setting of instance",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/types.InstanceRunReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            }
+        },
+        "/models/{namespace}/{name}/finetune/{id}": {
+            "delete": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "description": "delete a finetune instance",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Model"
+                ],
+                "summary": "Delete a finetune instance",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "namespace",
+                        "name": "namespace",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "name",
+                        "name": "name",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "current user",
+                        "name": "current_user",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/types.Response"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            }
+        },
+        "/models/{namespace}/{name}/finetune/{id}/start": {
+            "put": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "description": "Start a finetune instance",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Model"
+                ],
+                "summary": "Start a finetune instance",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "namespace",
+                        "name": "namespace",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "name",
+                        "name": "name",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "deploy id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "current user",
+                        "name": "current_user",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/types.Response"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            }
+        },
+        "/models/{namespace}/{name}/finetune/{id}/stop": {
+            "put": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "description": "Stop a finetune instance",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Model"
+                ],
+                "summary": "Stop a finetune instance",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "namespace",
+                        "name": "namespace",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "name",
+                        "name": "name",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "current user",
                         "name": "current_user",
                         "in": "query"
                     }
@@ -3305,6 +3939,420 @@ const docTemplate = `{
                 }
             }
         },
+        "/recom/opweight": {
+            "post": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Recommendation"
+                ],
+                "summary": "set op weight for repo recommendation",
+                "parameters": [
+                    {
+                        "description": "json request body",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handler.SetOpWeight.SetOpWeightReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/types.Response"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            }
+        },
+        "/runtime_framework": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "description": "get all runtime frameworks for current user",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "RuntimeFramework"
+                ],
+                "summary": "Get all runtime frameworks for current user",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "current user",
+                        "name": "current_user",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/types.Response"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            }
+        },
+        "/runtime_framework/models": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "description": "get visible models for all runtime frameworks for current user",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "RuntimeFramework"
+                ],
+                "summary": "Get Visible models for all runtime frameworks for current user",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "search text",
+                        "name": "search",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "sort by",
+                        "name": "sort",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "current user",
+                        "name": "current_user",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "default": 20,
+                        "description": "per",
+                        "name": "per",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "default": 1,
+                        "description": "per page",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "enum": [
+                            1,
+                            2
+                        ],
+                        "type": "integer",
+                        "default": 1,
+                        "description": "deploy_type",
+                        "name": "deploy_type",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/types.Response"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            }
+        },
+        "/runtime_framework/{id}": {
+            "post": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "description": "set model runtime frameworks",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "RuntimeFramework"
+                ],
+                "summary": "Set model runtime frameworks",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "runtime framework id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "enum": [
+                            0,
+                            1,
+                            2
+                        ],
+                        "type": "integer",
+                        "default": 1,
+                        "description": "deploy_type",
+                        "name": "deploy_type",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "current user",
+                        "name": "current_user",
+                        "in": "query"
+                    },
+                    {
+                        "description": "body",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/types.RuntimeFrameworkModels"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/types.Response"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "description": "set model runtime frameworks",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "RuntimeFramework"
+                ],
+                "summary": "Set model runtime frameworks",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "runtime framework id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "enum": [
+                            0,
+                            1,
+                            2
+                        ],
+                        "type": "integer",
+                        "default": 1,
+                        "description": "deploy_type",
+                        "name": "deploy_type",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "current user",
+                        "name": "current_user",
+                        "in": "query"
+                    },
+                    {
+                        "description": "body",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/types.RuntimeFrameworkModels"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/types.Response"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            }
+        },
+        "/runtime_framework/{id}/models": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "description": "get visible models by runtime framework for current user",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "RuntimeFramework"
+                ],
+                "summary": "Get Visible models by runtime framework for current user",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "runtime framework id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "current user",
+                        "name": "current_user",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "default": 20,
+                        "description": "per",
+                        "name": "per",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "default": 1,
+                        "description": "per page",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "enum": [
+                            0,
+                            1,
+                            2
+                        ],
+                        "type": "integer",
+                        "default": 1,
+                        "description": "deploy_type",
+                        "name": "deploy_type",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/types.Response"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            }
+        },
         "/space_resources": {
             "get": {
                 "security": [
@@ -3323,6 +4371,14 @@ const docTemplate = `{
                     "SpaceReource"
                 ],
                 "summary": "Get space resources",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "cluster_id",
+                        "name": "cluster_id",
+                        "in": "query"
+                    }
+                ],
                 "responses": {
                     "200": {
                         "description": "OK",
@@ -3848,6 +4904,17 @@ const docTemplate = `{
                         "type": "string",
                         "description": "sort by",
                         "name": "sort",
+                        "in": "query"
+                    },
+                    {
+                        "enum": [
+                            "opencsg",
+                            "huggingface",
+                            "local"
+                        ],
+                        "type": "string",
+                        "description": "source",
+                        "name": "source",
                         "in": "query"
                     },
                     {
@@ -4469,6 +5536,183 @@ const docTemplate = `{
                 }
             }
         },
+        "/sync/client_setting": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "description": "Get sync client setting",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Sync"
+                ],
+                "summary": "Get sync client setting",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/types.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/database.SyncClientSetting"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "description": "Create sync client setting or update an existing sync client setting",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Sync"
+                ],
+                "summary": "Create sync client setting or update an existing sync client setting",
+                "parameters": [
+                    {
+                        "description": "body",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/types.CreateSyncClientSettingReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/types.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/database.SyncClientSetting"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            }
+        },
+        "/sync/version/latest": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Sync"
+                ],
+                "summary": "Get latest version",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "current version",
+                        "name": "cur",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "current_user",
+                        "name": "current_user",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/types.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/types.SyncVersionResponse"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            }
+        },
         "/tags": {
             "get": {
                 "security": [
@@ -4510,6 +5754,285 @@ const docTemplate = `{
                                     }
                                 }
                             ]
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            }
+        },
+        "/token/{app}/{token_name}": {
+            "put": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Access token"
+                ],
+                "summary": "Refresh a access token for a user",
+                "parameters": [
+                    {
+                        "enum": [
+                            "git",
+                            "starship"
+                        ],
+                        "type": "string",
+                        "description": "application",
+                        "name": "app",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "token_name",
+                        "name": "token_name",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "current user, the owner",
+                        "name": "current_user",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "new expire time, in format RFC3339, like 2006-01-02T15:04:05Z07:00",
+                        "name": "expired_at",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/types.Response"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Access token"
+                ],
+                "summary": "Create access token for an special application",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "token name",
+                        "name": "token_name",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "enum": [
+                            "git",
+                            "starship"
+                        ],
+                        "type": "string",
+                        "description": "application",
+                        "name": "app",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "current user, the owner",
+                        "name": "current_user",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "description": "body",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/types.CreateUserTokenRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/types.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/database.AccessToken"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Access token"
+                ],
+                "summary": "Delete access token of a app",
+                "parameters": [
+                    {
+                        "enum": [
+                            "git",
+                            "starship"
+                        ],
+                        "type": "string",
+                        "description": "application",
+                        "name": "app",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "token_name",
+                        "name": "token_name",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "current user, the owner",
+                        "name": "current_user",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/types.Response"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            }
+        },
+        "/token/{token_value}": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Access token"
+                ],
+                "summary": "Get token and owner's detail by the token value",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "token_value",
+                        "name": "token_value",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "enum": [
+                            "git",
+                            "starship"
+                        ],
+                        "type": "string",
+                        "description": "application",
+                        "name": "app",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/types.Response"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
                         }
                     },
                     "500": {
@@ -4638,6 +6161,75 @@ const docTemplate = `{
                                     }
                                 }
                             ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            }
+        },
+        "/user/{username}/finetune/instances": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "description": "Get user running notebook instances",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "User"
+                ],
+                "summary": "Get user running notebook instances",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "username",
+                        "name": "username",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "default": 50,
+                        "description": "per",
+                        "name": "per",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "default": 1,
+                        "description": "page index",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "current user",
+                        "name": "current_user",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/types.Response"
                         }
                     },
                     "400": {
@@ -5136,6 +6728,18 @@ const docTemplate = `{
                         "required": true
                     },
                     {
+                        "enum": [
+                            0,
+                            1,
+                            2
+                        ],
+                        "type": "integer",
+                        "default": 1,
+                        "description": "deploy type(0-space,1-inference,2-finetune)",
+                        "name": "deploy_type",
+                        "in": "query"
+                    },
+                    {
                         "type": "integer",
                         "default": 50,
                         "description": "per",
@@ -5436,6 +7040,68 @@ const docTemplate = `{
             }
         },
         "/user/{username}/tokens": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Access token"
+                ],
+                "summary": "Get all access tokens for a user",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "username",
+                        "name": "username",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "current user name",
+                        "name": "current_user",
+                        "in": "query"
+                    },
+                    {
+                        "enum": [
+                            "git",
+                            "starship"
+                        ],
+                        "type": "string",
+                        "description": "application",
+                        "name": "app",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/types.Response"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            },
             "post": {
                 "security": [
                     {
@@ -5452,7 +7118,7 @@ const docTemplate = `{
                 "tags": [
                     "Access token"
                 ],
-                "summary": "Create access token for a user",
+                "summary": "[Deprecated: use POST:/token/{app}/{username} instead]",
                 "parameters": [
                     {
                         "type": "string",
@@ -5519,7 +7185,6 @@ const docTemplate = `{
                         "ApiKey": []
                     }
                 ],
-                "description": "delete access token for a user",
                 "consumes": [
                     "application/json"
                 ],
@@ -5529,7 +7194,7 @@ const docTemplate = `{
                 "tags": [
                     "Access token"
                 ],
-                "summary": "Delete access token for a user",
+                "summary": "[Deprecated: use DELETE:/token/{app}/{token_name} instead]",
                 "parameters": [
                     {
                         "type": "string",
@@ -5707,6 +7372,91 @@ const docTemplate = `{
                                     }
                                 }
                             ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            }
+        },
+        "/{repo_type}/runtime_framework": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "description": "List repo runtime framework",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Repository"
+                ],
+                "summary": "List repo runtime framework",
+                "parameters": [
+                    {
+                        "enum": [
+                            "models",
+                            "spaces"
+                        ],
+                        "type": "string",
+                        "description": "models,spaces",
+                        "name": "repo_type",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "namespace",
+                        "name": "namespace",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "name",
+                        "name": "name",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "current user",
+                        "name": "current_user",
+                        "in": "query"
+                    },
+                    {
+                        "enum": [
+                            0,
+                            1,
+                            2
+                        ],
+                        "type": "integer",
+                        "default": 1,
+                        "description": "deploy_type",
+                        "name": "deploy_type",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "string"
                         }
                     },
                     "400": {
@@ -6228,6 +7978,74 @@ const docTemplate = `{
                 }
             }
         },
+        "/{repo_type}/{namespace}/{name}/incr_downloads": {
+            "put": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Repository"
+                ],
+                "summary": "Increase repo download count by 1",
+                "parameters": [
+                    {
+                        "enum": [
+                            "models",
+                            "datasets",
+                            "codes",
+                            "spaces"
+                        ],
+                        "type": "string",
+                        "description": "models,dataset,codes or spaces",
+                        "name": "repo_type",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "repo owner name",
+                        "name": "namespace",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "repo name",
+                        "name": "name",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/types.Response"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            }
+        },
         "/{repo_type}/{namespace}/{name}/last_commit": {
             "get": {
                 "security": [
@@ -6692,6 +8510,86 @@ const docTemplate = `{
                         "description": "OK",
                         "schema": {
                             "$ref": "#/definitions/types.Response"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            }
+        },
+        "/{repo_type}/{namespace}/{name}/mirror_from_saas": {
+            "post": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Repository"
+                ],
+                "summary": "Mirror repo from OpenCSG Saas(only on-premises)",
+                "parameters": [
+                    {
+                        "enum": [
+                            "models",
+                            "datasets",
+                            "codes",
+                            "spaces"
+                        ],
+                        "type": "string",
+                        "description": "models,datasets,codes or spaces",
+                        "name": "repo_type",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "repo owner name",
+                        "name": "namespace",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "repo name",
+                        "name": "name",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/types.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/database.Mirror"
+                                        }
+                                    }
+                                }
+                            ]
                         }
                     },
                     "400": {
@@ -7552,6 +9450,18 @@ const docTemplate = `{
                         "description": "current user",
                         "name": "current_user",
                         "in": "query"
+                    },
+                    {
+                        "enum": [
+                            0,
+                            1,
+                            2
+                        ],
+                        "type": "integer",
+                        "default": 1,
+                        "description": "deploy_type",
+                        "name": "deploy_type",
+                        "in": "query"
                     }
                 ],
                 "responses": {
@@ -8113,7 +10023,18 @@ const docTemplate = `{
         "database.AccessToken": {
             "type": "object",
             "properties": {
+                "application": {
+                    "description": "example: csghub, starship",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/types.AccessTokenApp"
+                        }
+                    ]
+                },
                 "created_at": {
+                    "type": "string"
+                },
+                "expired_at": {
                     "type": "string"
                 },
                 "git_id": {
@@ -8122,7 +10043,13 @@ const docTemplate = `{
                 "id": {
                     "type": "integer"
                 },
+                "is_active": {
+                    "type": "boolean"
+                },
                 "name": {
+                    "type": "string"
+                },
+                "permission": {
                     "type": "string"
                 },
                 "token": {
@@ -8215,6 +10142,9 @@ const docTemplate = `{
                 "mirror_task_id": {
                     "type": "integer"
                 },
+                "progress": {
+                    "type": "integer"
+                },
                 "push_mirror_created": {
                     "type": "boolean"
                 },
@@ -8229,6 +10159,9 @@ const docTemplate = `{
                 },
                 "source_url": {
                     "type": "string"
+                },
+                "status": {
+                    "$ref": "#/definitions/types.MirrorTaskStatus"
                 },
                 "updated_at": {
                     "type": "string"
@@ -8286,6 +10219,9 @@ const docTemplate = `{
                 },
                 "id": {
                     "type": "integer"
+                },
+                "mirrored": {
+                    "type": "boolean"
                 },
                 "namespace_type": {
                     "$ref": "#/definitions/database.NamespaceType"
@@ -8394,6 +10330,9 @@ const docTemplate = `{
                 "likes": {
                     "type": "integer"
                 },
+                "mirror": {
+                    "$ref": "#/definitions/database.Mirror"
+                },
                 "name": {
                     "type": "string"
                 },
@@ -8413,8 +10352,14 @@ const docTemplate = `{
                 "repository_type": {
                     "$ref": "#/definitions/types.RepositoryType"
                 },
+                "source": {
+                    "$ref": "#/definitions/types.RepositorySource"
+                },
                 "ssh_clone_url": {
                     "type": "string"
+                },
+                "sync_status": {
+                    "$ref": "#/definitions/types.RepositorySyncStatus"
                 },
                 "tags": {
                     "type": "array",
@@ -8488,6 +10433,32 @@ const docTemplate = `{
                 },
                 "user_id": {
                     "type": "integer"
+                }
+            }
+        },
+        "database.SyncClientSetting": {
+            "type": "object",
+            "properties": {
+                "concurrent_count": {
+                    "type": "integer"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "default": {
+                    "type": "boolean"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "max_bandwidth": {
+                    "type": "integer"
+                },
+                "token": {
+                    "type": "string"
+                },
+                "updated_at": {
+                    "type": "string"
                 }
             }
         },
@@ -8568,10 +10539,18 @@ const docTemplate = `{
                         "$ref": "#/definitions/database.Namespace"
                     }
                 },
+                "reg_provider": {
+                    "description": "user registered from default login page, from casdoor, etc. Possible values:\n\n- \"default\"\n- \"casdoor\"",
+                    "type": "string"
+                },
                 "updated_at": {
                     "type": "string"
                 },
                 "username": {
+                    "type": "string"
+                },
+                "uuid": {
+                    "description": "TODO:add unique index after migration",
                     "type": "string"
                 }
             }
@@ -8603,6 +10582,21 @@ const docTemplate = `{
                 }
             }
         },
+        "handler.SetOpWeight.SetOpWeightReq": {
+            "type": "object",
+            "required": [
+                "repo_id",
+                "weight"
+            ],
+            "properties": {
+                "repo_id": {
+                    "type": "integer"
+                },
+                "weight": {
+                    "type": "integer"
+                }
+            }
+        },
         "handler.Update.updateMemberRequest": {
             "type": "object",
             "required": [
@@ -8623,6 +10617,21 @@ const docTemplate = `{
         },
         "types.APIInternalServerError": {
             "type": "object"
+        },
+        "types.AccessTokenApp": {
+            "type": "string",
+            "enum": [
+                "git",
+                "git",
+                "mirror",
+                "starship"
+            ],
+            "x-enum-varnames": [
+                "AccessTokenAppGit",
+                "AccessTokenAppCSGHub",
+                "AccessTokenAppMirror",
+                "AccessTokenAppStarship"
+            ]
         },
         "types.Branch": {
             "type": "object",
@@ -8676,6 +10685,12 @@ const docTemplate = `{
                 },
                 "repository_id": {
                     "type": "integer"
+                },
+                "source": {
+                    "$ref": "#/definitions/types.RepositorySource"
+                },
+                "sync_status": {
+                    "$ref": "#/definitions/types.RepositorySyncStatus"
                 },
                 "tags": {
                     "type": "array",
@@ -8982,6 +10997,9 @@ const docTemplate = `{
                 "source_url": {
                     "description": "mirror source info",
                     "type": "string"
+                },
+                "sync_lfs": {
+                    "type": "boolean"
                 }
             }
         },
@@ -9073,6 +11091,9 @@ const docTemplate = `{
         "types.CreateSpaceReq": {
             "type": "object",
             "properties": {
+                "cluster_id": {
+                    "type": "string"
+                },
                 "cover_image_url": {
                     "type": "string"
                 },
@@ -9084,9 +11105,6 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "env": {
-                    "type": "string"
-                },
-                "hardware": {
                     "type": "string"
                 },
                 "labels": {
@@ -9115,8 +11133,10 @@ const docTemplate = `{
                 "readme": {
                     "type": "string"
                 },
+                "resource_id": {
+                    "type": "integer"
+                },
                 "sdk": {
-                    "description": "Creator   string ` + "`" + `json:\"username\" example:\"creator_user_name\"` + "`" + `\nNamespace string ` + "`" + `json:\"namespace\" example:\"user_or_org_name\"` + "`" + `\nName      string ` + "`" + `json:\"name\" example:\"space_name_1\"` + "`" + `\nLicense   string ` + "`" + `json:\"license\" example:\"MIT\"` + "`" + `",
                     "type": "string",
                     "example": "1"
                 },
@@ -9135,10 +11155,14 @@ const docTemplate = `{
         "types.CreateSpaceResourceReq": {
             "type": "object",
             "required": [
+                "cost_per_hour",
                 "name",
                 "resources"
             ],
             "properties": {
+                "cost_per_hour": {
+                    "type": "number"
+                },
                 "name": {
                     "type": "string"
                 },
@@ -9162,12 +11186,26 @@ const docTemplate = `{
                 }
             }
         },
+        "types.CreateSyncClientSettingReq": {
+            "type": "object",
+            "required": [
+                "token"
+            ],
+            "properties": {
+                "concurrent_count": {
+                    "type": "integer"
+                },
+                "max_bandwidth": {
+                    "type": "integer"
+                },
+                "token": {
+                    "type": "string"
+                }
+            }
+        },
         "types.CreateUserRequest": {
             "type": "object",
             "properties": {
-                "casdoor_uid": {
-                    "type": "string"
-                },
                 "email": {
                     "type": "string"
                 },
@@ -9178,8 +11216,15 @@ const docTemplate = `{
                 "phone": {
                     "type": "string"
                 },
+                "reg_provider": {
+                    "description": "user registered from default login page, from casdoor, etc. Possible values:\n\n- \"default\"\n- \"casdoor\"",
+                    "type": "string"
+                },
                 "username": {
                     "description": "the login name",
+                    "type": "string"
+                },
+                "uuid": {
                     "type": "string"
                 }
             }
@@ -9187,10 +11232,22 @@ const docTemplate = `{
         "types.CreateUserTokenRequest": {
             "type": "object",
             "properties": {
+                "application": {
+                    "description": "default to csghub",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/types.AccessTokenApp"
+                        }
+                    ]
+                },
+                "expired_at": {
+                    "type": "string"
+                },
                 "name": {
                     "type": "string"
                 },
-                "username": {
+                "permission": {
+                    "description": "default to empty, means full permission",
                     "type": "string"
                 }
             }
@@ -9228,11 +11285,20 @@ const docTemplate = `{
                 "private": {
                     "type": "boolean"
                 },
+                "readme": {
+                    "type": "string"
+                },
                 "repository": {
                     "$ref": "#/definitions/types.Repository"
                 },
                 "repository_id": {
                     "type": "integer"
+                },
+                "source": {
+                    "$ref": "#/definitions/types.RepositorySource"
+                },
+                "sync_status": {
+                    "$ref": "#/definitions/types.RepositorySyncStatus"
                 },
                 "tags": {
                     "type": "array",
@@ -9289,10 +11355,22 @@ const docTemplate = `{
         "types.DeleteUserTokenRequest": {
             "type": "object",
             "properties": {
+                "application": {
+                    "description": "default to csghub",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/types.AccessTokenApp"
+                        }
+                    ]
+                },
+                "expired_at": {
+                    "type": "string"
+                },
                 "name": {
                     "type": "string"
                 },
-                "username": {
+                "permission": {
+                    "description": "default to empty, means full permission",
                     "type": "string"
                 }
             }
@@ -9387,6 +11465,26 @@ const docTemplate = `{
                 }
             }
         },
+        "types.InstanceRunReq": {
+            "type": "object",
+            "properties": {
+                "cluster_id": {
+                    "type": "string"
+                },
+                "deploy_name": {
+                    "type": "string"
+                },
+                "resource_id": {
+                    "type": "integer"
+                },
+                "revision": {
+                    "type": "string"
+                },
+                "runtime_framework_id": {
+                    "type": "integer"
+                }
+            }
+        },
         "types.ListByPathReq": {
             "type": "object",
             "properties": {
@@ -9397,6 +11495,40 @@ const docTemplate = `{
                     }
                 }
             }
+        },
+        "types.MirrorRepo": {
+            "type": "object",
+            "properties": {
+                "path": {
+                    "type": "string"
+                },
+                "progress": {
+                    "type": "integer"
+                },
+                "repo_type": {
+                    "$ref": "#/definitions/types.RepositoryType"
+                },
+                "sync_status": {
+                    "$ref": "#/definitions/types.RepositorySyncStatus"
+                }
+            }
+        },
+        "types.MirrorTaskStatus": {
+            "type": "string",
+            "enum": [
+                "waiting",
+                "running",
+                "finished",
+                "failed",
+                "incomplete"
+            ],
+            "x-enum-varnames": [
+                "MirrorWaiting",
+                "MirrorRunning",
+                "MirrorFinished",
+                "MirrorFailed",
+                "MirrorIncomplete"
+            ]
         },
         "types.Model": {
             "type": "object",
@@ -9412,6 +11544,12 @@ const docTemplate = `{
                 },
                 "downloads": {
                     "type": "integer"
+                },
+                "enable_finetune": {
+                    "type": "boolean"
+                },
+                "enable_inference": {
+                    "type": "boolean"
                 },
                 "id": {
                     "type": "integer"
@@ -9431,16 +11569,25 @@ const docTemplate = `{
                 "private": {
                     "type": "boolean"
                 },
+                "readme": {
+                    "type": "string"
+                },
                 "repository": {
                     "$ref": "#/definitions/types.Repository"
                 },
                 "repository_id": {
                     "type": "integer"
                 },
+                "source": {
+                    "$ref": "#/definitions/types.RepositorySource"
+                },
                 "status": {
                     "description": "url to interact with the model",
                     "type": "string",
                     "example": "RUNNING"
+                },
+                "sync_status": {
+                    "$ref": "#/definitions/types.RepositorySyncStatus"
                 },
                 "tags": {
                     "type": "array",
@@ -9520,22 +11667,19 @@ const docTemplate = `{
                 "cluster_id": {
                     "type": "string"
                 },
-                "cost_per_hour": {
-                    "type": "integer"
-                },
                 "deploy_name": {
                     "type": "string"
                 },
                 "env": {
                     "type": "string"
                 },
-                "hardware": {
-                    "type": "string"
-                },
                 "max_replica": {
                     "type": "integer"
                 },
                 "min_replica": {
+                    "type": "integer"
+                },
+                "resource_id": {
                     "type": "integer"
                 },
                 "revision": {
@@ -9634,6 +11778,34 @@ const docTemplate = `{
                 }
             }
         },
+        "types.RepositorySource": {
+            "type": "string",
+            "enum": [
+                "opencsg",
+                "local",
+                "huggingface"
+            ],
+            "x-enum-varnames": [
+                "OpenCSGSource",
+                "LocalSource",
+                "HuggingfaceSource"
+            ]
+        },
+        "types.RepositorySyncStatus": {
+            "type": "string",
+            "enum": [
+                "pending",
+                "inprogress",
+                "failed",
+                "completed"
+            ],
+            "x-enum-varnames": [
+                "SyncStatusPending",
+                "SyncStatusInProgress",
+                "SyncStatusFailed",
+                "SyncStatusCompleted"
+            ]
+        },
         "types.RepositoryType": {
             "type": "string",
             "enum": [
@@ -9695,6 +11867,20 @@ const docTemplate = `{
                 },
                 "id": {
                     "type": "integer"
+                },
+                "type": {
+                    "type": "integer"
+                }
+            }
+        },
+        "types.RuntimeFrameworkModels": {
+            "type": "object",
+            "properties": {
+                "models": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
                 }
             }
         },
@@ -9718,6 +11904,9 @@ const docTemplate = `{
                 },
                 "frame_version": {
                     "type": "string"
+                },
+                "type": {
+                    "type": "integer"
                 }
             }
         },
@@ -9795,9 +11984,21 @@ const docTemplate = `{
                 "secrets": {
                     "type": "string"
                 },
+                "sku": {
+                    "type": "string"
+                },
+                "source": {
+                    "$ref": "#/definitions/types.RepositorySource"
+                },
                 "status": {
                     "description": "deploying, running, failed",
                     "type": "string"
+                },
+                "svc_name": {
+                    "type": "string"
+                },
+                "sync_status": {
+                    "$ref": "#/definitions/types.RepositorySyncStatus"
                 },
                 "tags": {
                     "type": "array",
@@ -9826,8 +12027,14 @@ const docTemplate = `{
         "types.SpaceResource": {
             "type": "object",
             "properties": {
+                "cost_per_hour": {
+                    "type": "number"
+                },
                 "id": {
                     "type": "integer"
+                },
+                "is_available": {
+                    "type": "boolean"
                 },
                 "name": {
                     "type": "string"
@@ -9847,6 +12054,52 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "version": {
+                    "type": "string"
+                }
+            }
+        },
+        "types.SyncVersion": {
+            "type": "object",
+            "properties": {
+                "change_log": {
+                    "type": "string"
+                },
+                "last_modify_time": {
+                    "type": "string"
+                },
+                "repo_path": {
+                    "type": "string"
+                },
+                "repo_type": {
+                    "$ref": "#/definitions/types.RepositoryType"
+                },
+                "source_id": {
+                    "description": "0: opencsg, 1: HF",
+                    "type": "integer"
+                },
+                "version": {
+                    "type": "integer"
+                }
+            }
+        },
+        "types.SyncVersionResponse": {
+            "type": "object",
+            "properties": {
+                "data": {
+                    "type": "object",
+                    "properties": {
+                        "has_more": {
+                            "type": "boolean"
+                        },
+                        "versions": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/types.SyncVersion"
+                            }
+                        }
+                    }
+                },
+                "msg": {
                     "type": "string"
                 }
             }
@@ -10044,9 +12297,6 @@ const docTemplate = `{
                 "env": {
                     "type": "string"
                 },
-                "hardware": {
-                    "type": "string"
-                },
                 "labels": {
                     "type": "string",
                     "example": ""
@@ -10073,8 +12323,10 @@ const docTemplate = `{
                 "readme": {
                     "type": "string"
                 },
+                "resource_id": {
+                    "type": "integer"
+                },
                 "sdk": {
-                    "description": "Creator   string ` + "`" + `json:\"username\" example:\"creator_user_name\"` + "`" + `\nNamespace string ` + "`" + `json:\"namespace\" example:\"user_or_org_name\"` + "`" + `\nName      string ` + "`" + `json:\"name\" example:\"space_name_1\"` + "`" + `\nLicense   string ` + "`" + `json:\"license\" example:\"MIT\"` + "`" + `",
                     "type": "string",
                     "example": "1"
                 },
@@ -10093,6 +12345,9 @@ const docTemplate = `{
         "types.UpdateSpaceResourceReq": {
             "type": "object",
             "properties": {
+                "cost_per_hour": {
+                    "type": "number"
+                },
                 "name": {
                     "type": "string"
                 },
@@ -10118,9 +12373,6 @@ const docTemplate = `{
         "types.UpdateUserRequest": {
             "type": "object",
             "properties": {
-                "casdoor_uid": {
-                    "type": "string"
-                },
                 "email": {
                     "type": "string"
                 },
@@ -10133,6 +12385,9 @@ const docTemplate = `{
                 },
                 "username": {
                     "description": "the login name",
+                    "type": "string"
+                },
+                "uuid": {
                     "type": "string"
                 }
             }

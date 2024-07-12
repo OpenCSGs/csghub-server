@@ -598,6 +598,39 @@ func (h *RepoHandler) UpdateDownloads(ctx *gin.Context) {
 	httpbase.OK(ctx, nil)
 }
 
+// IncrDownloads godoc
+// @Security     ApiKey
+// @Summary      Increase repo download count by 1
+// @Tags         Repository
+// @Accept       json
+// @Produce      json
+// @Param		 repo_type path string true "models,dataset,codes or spaces" Enums(models,datasets,codes,spaces)
+// @Param		namespace path string true "repo owner name"
+// @Param		name path string true "repo name"
+// @Success      200  {object}  types.Response "OK"
+// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
+// @Router       /{repo_type}/{namespace}/{name}/incr_downloads [put]
+func (h *RepoHandler) IncrDownloads(ctx *gin.Context) {
+	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
+	if err != nil {
+		slog.Error("Bad request format", "error", err)
+		httpbase.BadRequest(ctx, err.Error())
+		return
+	}
+
+	repoType := common.RepoTypeFromContext(ctx)
+
+	err = h.c.IncrDownloads(ctx, repoType, namespace, name)
+	if err != nil {
+		slog.Error("Failed to increase repo download count", slog.String("repo_type", string(repoType)), slog.Any("error", err), slog.String("namespace", namespace), slog.String("name", name))
+		httpbase.ServerError(ctx, err)
+		return
+	}
+	slog.Info("increase repo download count succeed", slog.String("repo_type", string(repoType)), slog.String("namespace", namespace), slog.String("name", name))
+	httpbase.OK(ctx, nil)
+}
+
 func (h *RepoHandler) UploadFile(ctx *gin.Context) {
 	userName := httpbase.GetCurrentUser(ctx)
 	if userName == "" {
@@ -934,6 +967,45 @@ func (h *RepoHandler) CreateMirror(ctx *gin.Context) {
 	httpbase.OK(ctx, mirror)
 }
 
+// MirrorFromSaas godoc
+// @Security     ApiKey
+// @Summary      Mirror repo from OpenCSG Saas(only on-premises)
+// @Tags         Repository
+// @Accept       json
+// @Produce      json
+// @Param        repo_type path string true "models,datasets,codes or spaces" Enums(models,datasets,codes,spaces)
+// @Param        namespace path string true "repo owner name"
+// @Param        name path string true "repo name"
+// @Success      200  {object}  types.Response{data=database.Mirror} "OK"
+// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
+// @Router       /{repo_type}/{namespace}/{name}/mirror_from_saas [post]
+func (h *RepoHandler) MirrorFromSaas(ctx *gin.Context) {
+	currentUser := httpbase.GetCurrentUser(ctx)
+	if currentUser == "" {
+		httpbase.UnauthorizedError(ctx, errors.New("user not found, please login first"))
+		return
+	}
+	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
+	if err != nil {
+		slog.Error("Bad request format", "error", err)
+		httpbase.BadRequest(ctx, err.Error())
+		return
+	}
+	repoType := common.RepoTypeFromContext(ctx)
+	if !strings.HasPrefix(namespace, types.OpenCSGPrefix) {
+		httpbase.BadRequest(ctx, "Repo could not be mirrored")
+		return
+	}
+	err = h.c.MirrorFromSaas(ctx, namespace, name, currentUser, repoType)
+	if err != nil {
+		slog.Error("Failed to create mirror for", slog.String("repo_type", string(repoType)), slog.String("path", fmt.Sprintf("%s/%s", namespace, name)), "error", err)
+		httpbase.ServerError(ctx, err)
+		return
+	}
+	httpbase.OK(ctx, nil)
+}
+
 // GetMirror godoc
 // @Security     ApiKey
 // @Summary      Get a mirror
@@ -1075,12 +1147,24 @@ func (h *RepoHandler) DeleteMirror(ctx *gin.Context) {
 // @Param        namespace path string true "namespace"
 // @Param        name path string true "name"
 // @Param        current_user query string false "current user"
+// @Param 		 deploy_type query int false "deploy_type" Enums(0, 1, 2) default(1)
 // @Success      200  {object}  string "OK"
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
 // @Router       /{repo_type}/{namespace}/{name}/runtime_framework [get]
 func (h *RepoHandler) RuntimeFrameworkList(ctx *gin.Context) {
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
+	if err != nil {
+		slog.Error("Bad request format", "error", err)
+		httpbase.BadRequest(ctx, err.Error())
+		return
+	}
+	deployTypeStr := ctx.Query("deploy_type")
+	if deployTypeStr == "" {
+		// backward compatibility for inferences
+		deployTypeStr = strconv.Itoa(types.InferenceType)
+	}
+	deployType, err := strconv.Atoi(deployTypeStr)
 	if err != nil {
 		slog.Error("Bad request format", "error", err)
 		httpbase.BadRequest(ctx, err.Error())
@@ -1093,7 +1177,7 @@ func (h *RepoHandler) RuntimeFrameworkList(ctx *gin.Context) {
 		httpbase.BadRequest(ctx, "Bad request of repo type")
 		return
 	}
-	response, err := h.c.ListRuntimeFramework(ctx, repoType, namespace, name)
+	response, err := h.c.ListRuntimeFramework(ctx, repoType, namespace, name, deployType)
 	if err != nil {
 		slog.Error("fail to list runtime framework", slog.String("error", err.Error()))
 		httpbase.ServerError(ctx, err)
@@ -1658,4 +1742,54 @@ func (h *RepoHandler) DeployUpdate(ctx *gin.Context) {
 	}
 
 	httpbase.OK(ctx, nil)
+}
+
+// RuntimeFrameworkListWithType godoc
+// @Security     ApiKey
+// @Summary      List repo runtime framework
+// @Description  List repo runtime framework
+// @Tags         Repository
+// @Accept       json
+// @Produce      json
+// @Param        repo_type path string true "models,spaces" Enums(models,spaces)
+// @Param        namespace path string true "namespace"
+// @Param        name path string true "name"
+// @Param        current_user query string false "current user"
+// @Param 		 deploy_type query int false "deploy_type" Enums(0, 1, 2) default(1)
+// @Success      200  {object}  string "OK"
+// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
+// @Router       /{repo_type}/runtime_framework [get]
+func (h *RepoHandler) RuntimeFrameworkListWithType(ctx *gin.Context) {
+	currentUser := httpbase.GetCurrentUser(ctx)
+	if currentUser == "" {
+		httpbase.UnauthorizedError(ctx, errors.New("user not found, please login first"))
+		return
+	}
+	deployTypeStr := ctx.Query("deploy_type")
+	if deployTypeStr == "" {
+		// backward compatibility for inferences
+		deployTypeStr = strconv.Itoa(types.InferenceType)
+	}
+	deployType, err := strconv.Atoi(deployTypeStr)
+	if err != nil {
+		slog.Error("Bad request format", "error", err)
+		httpbase.BadRequest(ctx, err.Error())
+		return
+	}
+
+	repoType := common.RepoTypeFromContext(ctx)
+	if repoType == types.UnknownRepo {
+		slog.Error("Bad request of repo type")
+		httpbase.BadRequest(ctx, "Bad request of repo type")
+		return
+	}
+	response, err := h.c.ListRuntimeFrameworkWithType(ctx, deployType)
+	if err != nil {
+		slog.Error("fail to list runtime framework", slog.String("error", err.Error()))
+		httpbase.ServerError(ctx, err)
+		return
+	}
+
+	httpbase.OK(ctx, response)
 }

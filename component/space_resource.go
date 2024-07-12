@@ -2,8 +2,11 @@ package component
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
 	"log/slog"
 
+	"opencsg.com/csghub-server/builder/deploy"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/types"
@@ -12,25 +15,51 @@ import (
 func NewSpaceResourceComponent(config *config.Config) (*SpaceResourceComponent, error) {
 	c := &SpaceResourceComponent{}
 	c.srs = database.NewSpaceResourceStore()
-
+	c.deployer = deploy.NewDeployer()
 	return c, nil
 }
 
 type SpaceResourceComponent struct {
-	srs *database.SpaceResourceStore
+	srs      *database.SpaceResourceStore
+	deployer deploy.Deployer
 }
 
-func (c *SpaceResourceComponent) Index(ctx context.Context) ([]types.SpaceResource, error) {
+func (c *SpaceResourceComponent) Index(ctx context.Context, clusterId string) ([]types.SpaceResource, error) {
+	// backward compatibility for old api
+	if clusterId == "" {
+		clusters, err := c.deployer.ListCluster(ctx)
+		if err != nil {
+			return nil, err
+		}
+		if len(clusters) == 0 {
+			return nil, fmt.Errorf("can not list clusters")
+		}
+		clusterId = clusters[0].ClusterID
+	}
 	var result []types.SpaceResource
-	databaseSpaceResources, err := c.srs.Index(ctx)
+	databaseSpaceResources, err := c.srs.Index(ctx, clusterId)
+	if err != nil {
+		return nil, err
+	}
+	clusterResources, err := c.deployer.GetClusterById(ctx, clusterId)
 	if err != nil {
 		return nil, err
 	}
 	for _, r := range databaseSpaceResources {
+		var isAvailable bool
+		var hardware types.HardWare
+		err := json.Unmarshal([]byte(r.Resources), &hardware)
+		if err != nil {
+			slog.Error("invalid hardware setting", slog.Any("error", err), slog.String("hardware", r.Resources))
+		} else {
+			isAvailable = deploy.CheckResource(clusterResources, &hardware)
+		}
 		result = append(result, types.SpaceResource{
-			ID:        r.ID,
-			Name:      r.Name,
-			Resources: r.Resources,
+			ID:          r.ID,
+			Name:        r.Name,
+			Resources:   r.Resources,
+			CostPerHour: r.CostPerHour,
+			IsAvailable: isAvailable,
 		})
 	}
 
@@ -45,6 +74,7 @@ func (c *SpaceResourceComponent) Update(ctx context.Context, req *types.UpdateSp
 	}
 	sr.Name = req.Name
 	sr.Resources = req.Resources
+	sr.CostPerHour = req.CostPerHour
 
 	sr, err = c.srs.Update(ctx, *sr)
 	if err != nil {
@@ -53,9 +83,10 @@ func (c *SpaceResourceComponent) Update(ctx context.Context, req *types.UpdateSp
 	}
 
 	result := &types.SpaceResource{
-		ID:        sr.ID,
-		Name:      sr.Name,
-		Resources: sr.Resources,
+		ID:          sr.ID,
+		Name:        sr.Name,
+		Resources:   sr.Resources,
+		CostPerHour: sr.CostPerHour,
 	}
 
 	return result, nil
@@ -63,8 +94,9 @@ func (c *SpaceResourceComponent) Update(ctx context.Context, req *types.UpdateSp
 
 func (c *SpaceResourceComponent) Create(ctx context.Context, req *types.CreateSpaceResourceReq) (*types.SpaceResource, error) {
 	sr := database.SpaceResource{
-		Name:      req.Name,
-		Resources: req.Resources,
+		Name:        req.Name,
+		Resources:   req.Resources,
+		CostPerHour: req.CostPerHour,
 	}
 	res, err := c.srs.Create(ctx, sr)
 	if err != nil {
@@ -73,9 +105,10 @@ func (c *SpaceResourceComponent) Create(ctx context.Context, req *types.CreateSp
 	}
 
 	result := &types.SpaceResource{
-		ID:        res.ID,
-		Name:      res.Name,
-		Resources: res.Resources,
+		ID:          res.ID,
+		Name:        res.Name,
+		Resources:   res.Resources,
+		CostPerHour: res.CostPerHour,
 	}
 
 	return result, nil

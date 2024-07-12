@@ -24,21 +24,22 @@ type RuntimeFramework struct {
 	FrameCpuImage string `bun:",notnull" json:"frame_cpu_image"`
 	Enabled       int64  `bun:",notnull" json:"enabled"`
 	ContainerPort int    `bun:",notnull" json:"container_port"`
+	Type          int    `bun:",notnull" json:"type"` // 0-space, 1-inference, 2-finetune
 	times
 }
 
-func (rf *RuntimeFrameworksStore) List(ctx context.Context) ([]RuntimeFramework, error) {
+func (rf *RuntimeFrameworksStore) List(ctx context.Context, deployType int) ([]RuntimeFramework, error) {
 	var result []RuntimeFramework
-	_, err := rf.db.Operator.Core.NewSelect().Model(&result).Exec(ctx, &result)
+	_, err := rf.db.Operator.Core.NewSelect().Model(&result).Where("type = ?", deployType).Exec(ctx, &result)
 	if err != nil {
 		return nil, err
 	}
 	return result, nil
 }
 
-func (rf *RuntimeFrameworksStore) ListByRepoID(ctx context.Context, repoID int64) ([]RepositoriesRuntimeFramework, error) {
+func (rf *RuntimeFrameworksStore) ListByRepoID(ctx context.Context, repoID int64, deployType int) ([]RepositoriesRuntimeFramework, error) {
 	var result []RepositoriesRuntimeFramework
-	err := rf.db.Operator.Core.NewSelect().Model(&RepositoriesRuntimeFramework{}).Relation("RuntimeFramework").Where("repo_id = ?", repoID).Scan(ctx, &result)
+	err := rf.db.Operator.Core.NewSelect().Model(&RepositoriesRuntimeFramework{}).Relation("RuntimeFramework").Where("repositories_runtime_framework.type = ? and repositories_runtime_framework.repo_id = ?", deployType, repoID).Scan(ctx, &result)
 	if err != nil {
 		return nil, err
 	}
@@ -76,4 +77,13 @@ func (rf *RuntimeFrameworksStore) FindEnabledByID(ctx context.Context, id int64)
 	res.ID = id
 	_, err := rf.db.Core.NewSelect().Model(&res).WherePK().Where("enabled = 1").Exec(ctx, &res)
 	return &res, err
+}
+
+func (rf *RuntimeFrameworksStore) ListAll(ctx context.Context) ([]RuntimeFramework, error) {
+	var result []RuntimeFramework
+	_, err := rf.db.Operator.Core.NewSelect().Model(&result).Exec(ctx, &result)
+	if err != nil {
+		return nil, err
+	}
+	return result, nil
 }

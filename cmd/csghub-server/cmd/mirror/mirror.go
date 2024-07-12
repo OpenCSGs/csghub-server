@@ -7,6 +7,7 @@ import (
 func init() {
 	// add subcommands here
 	Cmd.AddCommand(createMirrorRepoFromFile)
+	Cmd.AddCommand(checkMirrorProgress)
 }
 
 var Cmd = &cobra.Command{

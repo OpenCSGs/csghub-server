@@ -78,6 +78,7 @@ type Model struct {
 	Private       bool       `json:"private"`
 	User          *User      `json:"user,omitempty"`
 	Tags          []RepoTag  `json:"tags,omitempty"`
+	Readme        string     `json:"readme"`
 	Repository    Repository `json:"repository"`
 	DefaultBranch string     `json:"default_branch"`
 	CreatedAt     time.Time  `json:"created_at"`
@@ -85,8 +86,12 @@ type Model struct {
 	// widget UI style: generation,chat
 	WidgetType ModelWidgetType `json:"widget_type" example:"generation"`
 	// url to interact with the model
-	Status    string `json:"status" example:"RUNNING"`
-	UserLikes bool   `json:"user_likes"`
+	Status          string               `json:"status" example:"RUNNING"`
+	UserLikes       bool                 `json:"user_likes"`
+	Source          RepositorySource     `json:"source"`
+	SyncStatus      RepositorySyncStatus `json:"sync_status"`
+	EnableInference bool                 `json:"enable_inference"`
+	EnableFinetune  bool                 `json:"enable_finetune"`
 }
 
 type SDKModelInfo struct {
@@ -126,13 +131,20 @@ type ModelRunReq struct {
 	DeployName         string `json:"deploy_name"`
 	ClusterID          string `json:"cluster_id"`
 	Env                string `json:"env"`
-	Hardware           string `json:"hardware"`
+	ResourceID         int64  `json:"resource_id"`
 	RuntimeFrameworkID int64  `json:"runtime_framework_id"`
 	MinReplica         int    `json:"min_replica"`
 	MaxReplica         int    `json:"max_replica"`
 	Revision           string `json:"revision"`
 	SecureLevel        int    `json:"secure_level"`
-	CostPerHour        int64  `json:"cost_per_hour"`
+}
+
+type InstanceRunReq struct {
+	DeployName         string `json:"deploy_name"`
+	ClusterID          string `json:"cluster_id"`
+	ResourceID         int64  `json:"resource_id"`
+	RuntimeFrameworkID int64  `json:"runtime_framework_id"`
+	Revision           string `json:"revision"`
 }
 
 type ModelUpdateRequest struct {
@@ -155,3 +167,9 @@ type ModelStatusEventData struct {
 	Status  string     `json:"status"`
 	Details []Instance `json:"details"`
 }
+
+const (
+	SpaceType     = 0
+	InferenceType = 1
+	FinetuneType  = 2
+)
