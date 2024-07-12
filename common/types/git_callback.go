@@ -1,5 +1,7 @@
 package types
 
+import "time"
+
 type GiteaCallbackPushReq struct {
 	Ref        string                          `json:"ref"`
 	Commits    []GiteaCallbackPushReq_Commit   `json:"commits"`
@@ -15,8 +17,11 @@ type GiteaCallbackPushReq_Commit struct {
 
 type GiteaCallbackPushReq_Repository struct {
 	FullName string `json:"full_name"`
+	Private  bool   `json:"private"`
 }
 
 type GiteaCallbackPushReq_HeadCommit struct {
-	Timestamp string `json:"timestamp"`
+	Timestamp      string    `json:"timestamp"`
+	LastModifyTime time.Time `json:"timestamp"`
+	Message        string    `json:"message"`
 }

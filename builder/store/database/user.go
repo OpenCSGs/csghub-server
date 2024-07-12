@@ -25,6 +25,13 @@ type User struct {
 	Password     string        `bun:",notnull" json:"-"`
 	AccessTokens []AccessToken `bun:"rel:has-many,join:id=user_id"`
 	Namespaces   []Namespace   `bun:"rel:has-many,join:id=user_id" json:"namespace"`
+	//TODO:add unique index after migration
+	UUID string `bun:"," json:"uuid"`
+	// user registered from default login page, from casdoor, etc. Possible values:
+	//
+	// - "default"
+	// - "casdoor"
+	RegProvider string `bun:"," json:"reg_provider"`
 	times
 }
 
@@ -95,6 +102,7 @@ func (s *UserStore) IsExist(ctx context.Context, username string) (exists bool, 
 	return
 }
 
+// FindByAccessToken retrieves user information based on the access token. The access token must be active and not expired.
 func (s *UserStore) FindByAccessToken(ctx context.Context, token string) (*User, error) {
 	var user User
 	_, err := s.db.Operator.Core.
@@ -102,11 +110,17 @@ func (s *UserStore) FindByAccessToken(ctx context.Context, token string) (*User,
 		ColumnExpr("u.*").
 		TableExpr("users AS u").
 		Join("JOIN access_tokens AS t ON u.id = t.user_id").
-		Where("t.token = ?", token).
+		Where("t.token = ? and t.is_active = true and (t.expired_at is null or t.expired_at > now()) ", token).
 		Exec(ctx, &user)
 
 	if err != nil {
 		return nil, err
 	}
 	return &user, nil
+}
+
+func (s *UserStore) FindByUUID(ctx context.Context, uuid string) (user User, err error) {
+	user.UUID = uuid
+	err = s.db.Operator.Core.NewSelect().Model(&user).Where("uuid = ?", uuid).Scan(ctx)
+	return
 }

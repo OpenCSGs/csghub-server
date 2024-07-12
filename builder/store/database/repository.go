@@ -13,6 +13,12 @@ import (
 	"opencsg.com/csghub-server/common/types"
 )
 
+var RepositorySourceAndPrefixMapping = map[types.RepositorySource]string{
+	types.HuggingfaceSource: types.HuggingfacePrefix,
+	types.OpenCSGSource:     types.OpenCSGPrefix,
+	types.LocalSource:       "",
+}
+
 type RepoStore struct {
 	db *DB
 }
@@ -37,16 +43,19 @@ type Repository struct {
 	Labels  string `bun:",nullzero" json:"labels"`
 	License string `bun:",nullzero" json:"license"`
 	// Depreated
-	Readme         string               `bun:",nullzero" json:"readme"`
-	DefaultBranch  string               `bun:",notnull" json:"default_branch"`
-	LfsFiles       []LfsFile            `bun:"rel:has-many,join:id=repository_id" json:"-"`
-	Likes          int64                `bun:",nullzero" json:"likes"`
-	DownloadCount  int64                `bun:",nullzero" json:"download_count"`
-	Downloads      []RepositoryDownload `bun:"rel:has-many,join:id=repository_id" json:"downloads"`
-	Tags           []Tag                `bun:"m2m:repository_tags,join:Repository=Tag" json:"tags"`
-	RepositoryType types.RepositoryType `bun:",notnull" json:"repository_type"`
-	HTTPCloneURL   string               `bun:",nullzero" json:"http_clone_url"`
-	SSHCloneURL    string               `bun:",nullzero" json:"ssh_clone_url"`
+	Readme         string                     `bun:",nullzero" json:"readme"`
+	DefaultBranch  string                     `bun:",notnull" json:"default_branch"`
+	LfsFiles       []LfsFile                  `bun:"rel:has-many,join:id=repository_id" json:"-"`
+	Likes          int64                      `bun:",nullzero" json:"likes"`
+	DownloadCount  int64                      `bun:",nullzero" json:"download_count"`
+	Downloads      []RepositoryDownload       `bun:"rel:has-many,join:id=repository_id" json:"downloads"`
+	Tags           []Tag                      `bun:"m2m:repository_tags,join:Repository=Tag" json:"tags"`
+	Mirror         Mirror                     `bun:"rel:has-one,join:id=repository_id" json:"mirror"`
+	RepositoryType types.RepositoryType       `bun:",notnull" json:"repository_type"`
+	HTTPCloneURL   string                     `bun:",nullzero" json:"http_clone_url"`
+	SSHCloneURL    string                     `bun:",nullzero" json:"ssh_clone_url"`
+	Source         types.RepositorySource     `bun:",nullzero,default:'local'" json:"source"`
+	SyncStatus     types.RepositorySyncStatus `bun:",nullzero" json:"sync_status"`
 	// updated_at timestamp will be updated only if files changed
 	times
 }
@@ -69,6 +78,11 @@ type RepositoryTag struct {
 		for Library tags, count means how many a kind of library file (e.g. *.ONNX file) exists in the repository
 	*/
 	Count int32 `bun:",default:1" json:"count"`
+}
+
+func (r Repository) PathWithOutPrefix() string {
+	return strings.TrimPrefix(r.Path, RepositorySourceAndPrefixMapping[r.Source])
+
 }
 
 func (s *RepoStore) CreateRepoTx(ctx context.Context, tx bun.Tx, input Repository) (*Repository, error) {
@@ -175,6 +189,12 @@ func (s *RepoStore) FindByGitPaths(ctx context.Context, paths []string, opts ...
 		Where("git_path in (?)", bun.In(paths)).
 		Scan(ctx)
 	return repos, err
+}
+
+func (s *RepoStore) Exists(ctx context.Context, repoType types.RepositoryType, namespace string, name string) (bool, error) {
+	return s.db.Operator.Core.NewSelect().Model((*Repository)(nil)).
+		Where("git_path =?", fmt.Sprintf("%ss_%s/%s", repoType, namespace, name)).
+		Exists(ctx)
 }
 
 func (s *RepoStore) All(ctx context.Context) ([]*Repository, error) {
@@ -323,7 +343,7 @@ func (s *RepoStore) SetUpdateTimeByPath(ctx context.Context, repoType types.Repo
 	return err
 }
 
-func (s *RepoStore) PublicToUser(ctx context.Context, repoType types.RepositoryType, userID int64, search, sort string, tags []TagReq, per, page int) (repos []*Repository, count int, err error) {
+func (s *RepoStore) PublicToUser(ctx context.Context, repoType types.RepositoryType, userID int64, filter *types.RepoFilter, per, page int) (repos []*Repository, count int, err error) {
 	q := s.db.Operator.Core.
 		NewSelect().
 		Column("repository.*").
@@ -333,19 +353,23 @@ func (s *RepoStore) PublicToUser(ctx context.Context, repoType types.RepositoryT
 	q.Where("repository.repository_type = ?", repoType)
 	q.Where("repository.private = ? or repository.user_id = ?", false, userID)
 
-	if search != "" {
-		search = strings.ToLower(search)
+	if filter.Source != "" {
+		q.Where("repository.source = ?", filter.Source)
+	}
+
+	if filter.Search != "" {
+		filter.Search = strings.ToLower(filter.Search)
 		q.Where(
 			"LOWER(repository.path) like ? or LOWER(repository.description) like ? or LOWER(repository.nickname) like ?",
-			fmt.Sprintf("%%%s%%", search),
-			fmt.Sprintf("%%%s%%", search),
-			fmt.Sprintf("%%%s%%", search),
+			fmt.Sprintf("%%%s%%", filter.Search),
+			fmt.Sprintf("%%%s%%", filter.Search),
+			fmt.Sprintf("%%%s%%", filter.Search),
 		)
 	}
-	if len(tags) > 0 {
+	if len(filter.Tags) > 0 {
 		q.Join("JOIN repository_tags ON repository.id = repository_tags.repository_id").
 			Join("JOIN tags ON repository_tags.tag_id = tags.id")
-		for _, tag := range tags {
+		for _, tag := range filter.Tags {
 			q.Where("tags.category = ? AND tags.name = ?", tag.Category, tag.Name)
 		}
 	}
@@ -355,12 +379,13 @@ func (s *RepoStore) PublicToUser(ctx context.Context, repoType types.RepositoryT
 		return
 	}
 
-	if sort == "trending" {
+	if filter.Sort == "trending" {
 		q.Join("Left Join recom_repo_scores on repository.id = recom_repo_scores.repository_id")
-		q.ColumnExpr(`COALESCE(recom_repo_scores.score, 0) AS popularity`)
+		q.Join("Left Join recom_op_weights on repository.id = recom_op_weights.repository_id")
+		q.ColumnExpr(`COALESCE(recom_repo_scores.score, 0)+COALESCE(recom_op_weights.weight, 0) AS popularity`)
 	}
 
-	err = q.Order(sortBy[sort]).
+	err = q.Order(sortBy[filter.Sort]).
 		Limit(per).Offset((page - 1) * per).
 		Scan(ctx)
 
@@ -386,7 +411,7 @@ func (s *RepoStore) IsMirrorRepo(ctx context.Context, repoType types.RepositoryT
 	return result.Exists, nil
 }
 
-func (s *RepoStore) ListRepoPublicToUserByRepoIDs(ctx context.Context, repoType types.RepositoryType, userID int64, per, page int, repoIDs []int64) (repos []*Repository, count int, err error) {
+func (s *RepoStore) ListRepoPublicToUserByRepoIDs(ctx context.Context, repoType types.RepositoryType, userID int64, search, sort string, per, page int, repoIDs []int64) (repos []*Repository, count int, err error) {
 	q := s.db.Operator.Core.
 		NewSelect().
 		Column("repository.*").
@@ -397,14 +422,126 @@ func (s *RepoStore) ListRepoPublicToUserByRepoIDs(ctx context.Context, repoType 
 	q.Where("repository.private = ? or repository.user_id = ?", false, userID)
 	q.Where("id in (?)", bun.In(repoIDs))
 
+	if search != "" {
+		search = strings.ToLower(search)
+		q.Where(
+			"LOWER(repository.path) like ? or LOWER(repository.description) like ? or LOWER(repository.nickname) like ?",
+			fmt.Sprintf("%%%s%%", search),
+			fmt.Sprintf("%%%s%%", search),
+			fmt.Sprintf("%%%s%%", search),
+		)
+	}
+
 	count, err = q.Count(ctx)
 	if err != nil {
 		return
 	}
 
-	err = q.Order("path").
+	orderBy := "path"
+
+	if sort != "" {
+		if sort == "trending" {
+			q.Join("Left Join recom_repo_scores on repository.id = recom_repo_scores.repository_id")
+			q.Join("Left Join recom_op_weights on repository.id = recom_op_weights.repository_id")
+			q.ColumnExpr(`COALESCE(recom_repo_scores.score, 0)+COALESCE(recom_op_weights.weight, 0) AS popularity`)
+		}
+		sortByStr, exits := sortBy[sort]
+		if exits {
+			orderBy = sortByStr
+		}
+	}
+
+	err = q.Order(orderBy).
 		Limit(per).Offset((page - 1) * per).
 		Scan(ctx)
 
 	return
+}
+
+func (s *RepoStore) WithMirror(ctx context.Context, per, page int) (repos []Repository, count int, err error) {
+	q := s.db.Operator.Core.NewSelect().
+		Model(&repos).
+		Relation("Mirror").
+		Where("mirror.id is not null")
+	count, err = q.Count(ctx)
+	if err != nil {
+		return
+	}
+	err = q.Limit(per).
+		Offset((page - 1) * per).
+		Scan(ctx)
+
+	if err != nil {
+		return
+	}
+
+	return
+}
+
+func (s *RepoStore) CleanRelationsByRepoID(ctx context.Context, repoId int64) error {
+	err := s.db.Operator.Core.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
+		if _, err := tx.Exec("delete from repositories_runtime_frameworks where repo_id=?", repoId); err != nil {
+			return err
+		}
+
+		if _, err := tx.Exec("delete from user_likes where repo_id=?", repoId); err != nil {
+			return err
+		}
+		return nil
+	})
+	return err
+}
+
+func (s *RepoStore) BatchCreateRepoTags(ctx context.Context, repoTags []RepositoryTag) error {
+	result, err := s.db.Operator.Core.NewInsert().
+		Model(&repoTags).
+		Exec(ctx)
+	if err != nil {
+		return err
+	}
+
+	return assertAffectedXRows(int64(len(repoTags)), result, err)
+}
+
+func (s *RepoStore) DeleteAllFiles(ctx context.Context, repoID int64) error {
+	err := s.db.Operator.Core.NewDelete().
+		Model(&File{}).
+		Where("repository_id = ?", repoID).
+		Scan(ctx)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (s *RepoStore) DeleteAllTags(ctx context.Context, repoID int64) error {
+	err := s.db.Operator.Core.NewDelete().
+		Model(&RepositoryTag{}).
+		Where("repository_id = ?", repoID).
+		Scan(ctx)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (s *RepoStore) UpdateOrCreateRepo(ctx context.Context, input Repository) (*Repository, error) {
+	input.UpdatedAt = time.Now()
+	_, err := s.db.Core.NewUpdate().
+		Model(&input).
+		Where("path = ? and repository_type = ?", input.Path, input.RepositoryType).
+		Returning("*").
+		Exec(ctx, &input)
+	if err == nil {
+		return &input, nil
+	}
+
+	res, err := s.db.Core.NewInsert().Model(&input).Exec(ctx, &input)
+	if err := assertAffectedOneRow(res, err); err != nil {
+		return nil, fmt.Errorf("create repository in tx failed,error:%w", err)
+	}
+
+	return &input, nil
 }

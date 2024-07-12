@@ -230,20 +230,20 @@ license: ` + license + `
 	`
 }
 
-func (c *DatasetComponent) Index(ctx context.Context, username, search, sort string, tags []database.TagReq, per, page int) ([]types.Dataset, int, error) {
+func (c *DatasetComponent) Index(ctx context.Context, filter *types.RepoFilter, per, page int) ([]types.Dataset, int, error) {
 	var (
 		user        database.User
 		err         error
 		resDatasets []types.Dataset
 	)
-	if username != "" {
-		user, err = c.user.FindByUsername(ctx, username)
+	if filter.Username != "" {
+		user, err = c.user.FindByUsername(ctx, filter.Username)
 		if err != nil {
 			newError := fmt.Errorf("failed to get current user,error:%w", err)
 			return nil, 0, newError
 		}
 	}
-	repos, total, err := c.rs.PublicToUser(ctx, types.DatasetRepo, user.ID, search, sort, tags, per, page)
+	repos, total, err := c.rs.PublicToUser(ctx, types.DatasetRepo, user.ID, filter, per, page)
 	if err != nil {
 		newError := fmt.Errorf("failed to get public dataset repos,error:%w", err)
 		return nil, 0, newError
@@ -295,6 +295,12 @@ func (c *DatasetComponent) Index(ctx context.Context, username, search, sort str
 			Tags:         tags,
 			CreatedAt:    dataset.CreatedAt,
 			UpdatedAt:    repo.UpdatedAt,
+			Source:       repo.Source,
+			SyncStatus:   repo.SyncStatus,
+			Repository: types.Repository{
+				HTTPCloneURL: repo.HTTPCloneURL,
+				SSHCloneURL:  repo.SSHCloneURL,
+			},
 		})
 	}
 
@@ -409,10 +415,12 @@ func (c *DatasetComponent) Show(ctx context.Context, namespace, name, currentUse
 			Nickname: dataset.Repository.User.Name,
 			Email:    dataset.Repository.User.Email,
 		},
-		Private:   dataset.Repository.Private,
-		CreatedAt: dataset.CreatedAt,
-		UpdatedAt: dataset.Repository.UpdatedAt,
-		UserLikes: likeExists,
+		Private:    dataset.Repository.Private,
+		CreatedAt:  dataset.CreatedAt,
+		UpdatedAt:  dataset.Repository.UpdatedAt,
+		UserLikes:  likeExists,
+		Source:     dataset.Repository.Source,
+		SyncStatus: dataset.Repository.SyncStatus,
 	}
 
 	return resDataset, nil

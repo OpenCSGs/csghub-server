@@ -70,9 +70,14 @@ func NewModelComponent(config *config.Config) (*ModelComponent, error) {
 	c.spaceComonent, _ = NewSpaceComponent(config)
 	c.ms = database.NewModelStore()
 	c.rs = database.NewRepoStore()
+	c.SS = database.NewSpaceResourceStore()
 	c.infer = inference.NewInferClient(config.Inference.ServerAddr)
 	c.us = database.NewUserStore()
 	c.deployer = deploy.NewDeployer()
+	c.ac, err = NewAccountingComponent(config)
+	if err != nil {
+		return nil, err
+	}
 	return c, nil
 }
 
@@ -81,25 +86,27 @@ type ModelComponent struct {
 	spaceComonent *SpaceComponent
 	ms            *database.ModelStore
 	rs            *database.RepoStore
+	SS            *database.SpaceResourceStore
 	infer         inference.Client
 	us            *database.UserStore
 	deployer      deploy.Deployer
+	ac            *AccountingComponent
 }
 
-func (c *ModelComponent) Index(ctx context.Context, username, search, sort string, ragReqs []database.TagReq, per, page int) ([]types.Model, int, error) {
+func (c *ModelComponent) Index(ctx context.Context, filter *types.RepoFilter, per, page int) ([]types.Model, int, error) {
 	var (
 		user      database.User
 		err       error
 		resModels []types.Model
 	)
-	if username != "" {
-		user, err = c.user.FindByUsername(ctx, username)
+	if filter.Username != "" {
+		user, err = c.user.FindByUsername(ctx, filter.Username)
 		if err != nil {
 			newError := fmt.Errorf("failed to get current user,error:%w", err)
 			return nil, 0, newError
 		}
 	}
-	repos, total, err := c.rs.PublicToUser(ctx, types.ModelRepo, user.ID, search, sort, ragReqs, per, page)
+	repos, total, err := c.rs.PublicToUser(ctx, types.ModelRepo, user.ID, filter, per, page)
 	if err != nil {
 		newError := fmt.Errorf("failed to get public model repos,error:%w", err)
 		return nil, 0, newError
@@ -151,6 +158,12 @@ func (c *ModelComponent) Index(ctx context.Context, username, search, sort strin
 			CreatedAt:    model.CreatedAt,
 			Tags:         tags,
 			UpdatedAt:    repo.UpdatedAt,
+			Source:       repo.Source,
+			SyncStatus:   repo.SyncStatus,
+			Repository: types.Repository{
+				HTTPCloneURL: repo.HTTPCloneURL,
+				SSHCloneURL:  repo.SSHCloneURL,
+			},
 		})
 	}
 	return resModels, total, nil
@@ -389,6 +402,7 @@ func (c *ModelComponent) Show(ctx context.Context, namespace, name, currentUser 
 		newError := fmt.Errorf("failed to check for the presence of the user likes,error:%w", err)
 		return nil, newError
 	}
+
 	resModel := &types.Model{
 		ID:            model.ID,
 		Name:          model.Repository.Name,
@@ -416,8 +430,17 @@ func (c *ModelComponent) Show(ctx context.Context, namespace, name, currentUser 
 		WidgetType: types.ModelWidgetTypeGeneration,
 		Status:     mi.Status,
 		UserLikes:  likeExists,
+		Source:     model.Repository.Source,
+		SyncStatus: model.Repository.SyncStatus,
 	}
-
+	inferences, _ := c.rrtfms.GetByRepoIDsAndType(ctx, model.Repository.ID, types.InferenceType)
+	if len(inferences) > 0 {
+		resModel.EnableInference = true
+	}
+	finetunes, _ := c.rrtfms.GetByRepoIDsAndType(ctx, model.Repository.ID, types.FinetuneType)
+	if len(finetunes) > 0 {
+		resModel.EnableFinetune = true
+	}
 	return resModel, nil
 }
 
@@ -555,29 +578,14 @@ func (c *ModelComponent) getRelations(ctx context.Context, fromRepoID int64, cur
 
 func getFilePaths(namespace, repoName, folder string, repoType types.RepositoryType, gsTree func(ctx context.Context, req gitserver.GetRepoInfoByPathReq) ([]*types.File, error)) ([]string, error) {
 	var filePaths []string
-
-	getRepoFileTree := gitserver.GetRepoInfoByPathReq{
-		Namespace: namespace,
-		Name:      repoName,
-		Ref:       "",
-		Path:      folder,
-		RepoType:  repoType,
-	}
-	gitFiles, err := gsTree(context.Background(), getRepoFileTree)
+	allFiles, err := getAllFiles(namespace, repoName, folder, repoType, gsTree)
 	if err != nil {
-		return filePaths, fmt.Errorf("failed to get repo file tree,%w", err)
+		return nil, err
 	}
-	for _, file := range gitFiles {
-		if file.Type == "dir" {
-			subFileNames, err := getFilePaths(namespace, repoName, file.Path, repoType, gsTree)
-			if err != nil {
-				return filePaths, err
-			}
-			filePaths = append(filePaths, subFileNames...)
-		} else {
-			filePaths = append(filePaths, file.Path)
-		}
+	for _, f := range allFiles {
+		filePaths = append(filePaths, f.Path)
 	}
+
 	return filePaths, nil
 }
 
@@ -601,23 +609,20 @@ func (c *ModelComponent) Predict(ctx context.Context, req *types.ModelPredictReq
 }
 
 // create model deploy as inference
-func (c *ModelComponent) Deploy(ctx context.Context, namespace, name, currentUser string, req types.ModelRunReq) (int64, error) {
+func (c *ModelComponent) Deploy(ctx context.Context, namespace, name, currentUser string, req types.ModelRunReq, deployType int) (int64, error) {
 	m, err := c.ms.FindByPath(ctx, namespace, name)
 	if err != nil {
-		slog.Error("can't find model", slog.Any("error", err), slog.String("namespace", namespace), slog.String("name", name))
-		return -1, err
+		return -1, fmt.Errorf("cannot find model, %w", err)
 	}
 	// found user id
 	user, err := c.us.FindByUsername(ctx, currentUser)
 	if err != nil {
-		slog.Error("can't find user for deploy model", slog.Any("error", err), slog.String("username", currentUser))
-		return -1, err
+		return -1, fmt.Errorf("cannot find user for deploy model, %w", err)
 	}
 
 	frame, err := c.rtfm.FindEnabledByID(ctx, req.RuntimeFrameworkID)
 	if err != nil {
-		slog.Error("can't find available runtime framework", slog.Any("error", err), slog.Any("frameworkID", req.RuntimeFrameworkID))
-		return -1, err
+		return -1, fmt.Errorf("cannot find available runtime framework, %w", err)
 	}
 
 	// put repo-type and namespace/name in annotation
@@ -626,29 +631,30 @@ func (c *ModelComponent) Deploy(ctx context.Context, namespace, name, currentUse
 	annotations[types.ResNameKey] = fmt.Sprintf("%s/%s", namespace, name)
 	annoStr, err := json.Marshal(annotations)
 	if err != nil {
-		slog.Error("fail to create annotations for deploy model", slog.Any("error", err), slog.String("username", currentUser))
-		return -1, err
+		return -1, fmt.Errorf("fail to create annotations for deploy model, %w", err)
+	}
+
+	resource, err := c.SS.FindByID(ctx, req.ResourceID)
+	if err != nil {
+		return -1, fmt.Errorf("cannot find resource, %w", err)
 	}
 
 	var hardware types.HardWare
-	err = json.Unmarshal([]byte(req.Hardware), &hardware)
+	err = json.Unmarshal([]byte(resource.Resources), &hardware)
 	if err != nil {
-		slog.Error("invalid hardware setting", slog.Any("error", err), slog.String("hardware", req.Hardware))
-		return -1, err
+		return -1, fmt.Errorf("invalid hardware setting, %w", err)
+	}
+
+	_, err = c.deployer.CheckResourceAvailable(ctx, req.ClusterID, &hardware)
+	if err != nil {
+		return -1, fmt.Errorf("fail to check resource, %w", err)
 	}
 
 	// choose image
 	containerImg := frame.FrameCpuImage
 	if hardware.Gpu.Num != "" {
-		gpuNum, err := strconv.Atoi(hardware.Gpu.Num)
-		if err != nil {
-			slog.Error("invalid hardware gpu setting", slog.Any("error", err), slog.String("hardware", req.Hardware))
-			return -1, err
-		}
-		if gpuNum > 0 {
-			// use gpu image
-			containerImg = frame.FrameImage
-		}
+		// use gpu image
+		containerImg = frame.FrameImage
 	}
 
 	// create deploy for model
@@ -659,7 +665,7 @@ func (c *ModelComponent) Deploy(ctx context.Context, namespace, name, currentUse
 		GitPath:          m.Repository.GitPath,
 		GitBranch:        req.Revision,
 		Env:              req.Env,
-		Hardware:         req.Hardware,
+		Hardware:         resource.Resources,
 		UserID:           user.ID,
 		ModelID:          m.ID,
 		RepoID:           m.Repository.ID,
@@ -669,13 +675,16 @@ func (c *ModelComponent) Deploy(ctx context.Context, namespace, name, currentUse
 		MinReplica:       req.MinReplica,
 		MaxReplica:       req.MaxReplica,
 		Annotation:       string(annoStr),
-		CostPerHour:      req.CostPerHour,
+		CostPerHour:      resource.CostPerHour,
 		ClusterID:        req.ClusterID,
 		SecureLevel:      req.SecureLevel,
+		Type:             deployType,
+		UserUUID:         user.UUID,
+		SKU:              strconv.FormatInt(resource.ID, 10),
 	})
 }
 
-func (c *ModelComponent) ListModelsByRuntimeFrameworkID(ctx context.Context, currentUser string, per, page int, id int64) ([]types.Model, int, error) {
+func (c *ModelComponent) ListModelsByRuntimeFrameworkID(ctx context.Context, currentUser string, per, page int, id int64, deployType int) ([]types.Model, int, error) {
 	var (
 		user      database.User
 		err       error
@@ -688,7 +697,7 @@ func (c *ModelComponent) ListModelsByRuntimeFrameworkID(ctx context.Context, cur
 		}
 	}
 
-	runtimeRepos, err := c.rrtfms.ListByRuntimeFrameworkID(ctx, id)
+	runtimeRepos, err := c.rrtfms.ListByRuntimeFrameworkID(ctx, id, deployType)
 	if err != nil {
 		return nil, 0, fmt.Errorf("failed to get repo by runtime,error:%w", err)
 	}
@@ -702,9 +711,113 @@ func (c *ModelComponent) ListModelsByRuntimeFrameworkID(ctx context.Context, cur
 		repoIDs = append(repoIDs, repo.RepoID)
 	}
 
-	repos, total, err := c.rs.ListRepoPublicToUserByRepoIDs(ctx, types.ModelRepo, user.ID, per, page, repoIDs)
+	repos, total, err := c.rs.ListRepoPublicToUserByRepoIDs(ctx, types.ModelRepo, user.ID, "", "", per, page, repoIDs)
 	if err != nil {
 		newError := fmt.Errorf("failed to get public model repos,error:%w", err)
+		return nil, 0, newError
+	}
+
+	for _, repo := range repos {
+		resModels = append(resModels, types.Model{
+			Name:         repo.Name,
+			Nickname:     repo.Nickname,
+			Description:  repo.Description,
+			Path:         repo.Path,
+			RepositoryID: repo.ID,
+			Private:      repo.Private,
+		})
+	}
+	return resModels, total, nil
+}
+
+func (c *ModelComponent) ListAllByRuntimeFramework(ctx context.Context, currentUser string) ([]database.RuntimeFramework, error) {
+	runtimes, err := c.runFrame.ListAll(ctx)
+	if err != nil {
+		newError := fmt.Errorf("failed to get public model repos,error:%w", err)
+		return nil, newError
+	}
+
+	return runtimes, nil
+}
+
+func (c *ModelComponent) SetRuntimeFrameworkModes(ctx context.Context, currentUser string, deployType int, id int64, paths []string) ([]string, error) {
+	runtimeRepos, err := c.rtfm.FindByID(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+
+	if runtimeRepos == nil {
+		return nil, fmt.Errorf("failed to get runtime framework")
+	}
+
+	models, err := c.ms.ListByPath(ctx, paths)
+	if err != nil {
+		return nil, err
+	}
+
+	var failedModels []string
+	for _, model := range models {
+		relations, err := c.rrtfms.GetByIDsAndType(ctx, id, model.Repository.ID, deployType)
+		if err != nil {
+			return nil, err
+		}
+		if relations == nil || len(relations) < 1 {
+			err = c.rrtfms.Add(ctx, id, model.Repository.ID, deployType)
+			if err != nil {
+				failedModels = append(failedModels, model.Repository.Path)
+			}
+		}
+	}
+
+	return failedModels, nil
+}
+
+func (c *ModelComponent) DeleteRuntimeFrameworkModes(ctx context.Context, currentUser string, deployType int, id int64, paths []string) ([]string, error) {
+	models, err := c.ms.ListByPath(ctx, paths)
+	if err != nil {
+		return nil, err
+	}
+
+	var failedModels []string
+	for _, model := range models {
+		err = c.rrtfms.Delete(ctx, id, model.Repository.ID, deployType)
+		if err != nil {
+			failedModels = append(failedModels, model.Repository.Path)
+		}
+	}
+
+	return failedModels, nil
+}
+
+func (c *ModelComponent) ListModelsOfRuntimeFrameworks(ctx context.Context, currentUser, search, sort string, per, page int, deployType int) ([]types.Model, int, error) {
+	var (
+		user      database.User
+		err       error
+		resModels []types.Model
+	)
+
+	user, err = c.user.FindByUsername(ctx, currentUser)
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to get current user %s, error:%w", currentUser, err)
+	}
+
+	runtimeRepos, err := c.rrtfms.ListRepoIDsByType(ctx, deployType)
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to get repo by deploy type, error:%w", err)
+	}
+
+	if runtimeRepos == nil || len(runtimeRepos) < 1 {
+		return nil, 0, nil
+	}
+
+	var repoIDs []int64
+	for _, repo := range runtimeRepos {
+		repoIDs = append(repoIDs, repo.RepoID)
+	}
+
+	repos, total, err := c.rs.ListRepoPublicToUserByRepoIDs(ctx, types.ModelRepo, user.ID, search, sort, per, page, repoIDs)
+	if err != nil {
+		newError := fmt.Errorf("failed to get public model repos, error:%w", err)
 		return nil, 0, newError
 	}
 

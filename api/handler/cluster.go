@@ -57,12 +57,13 @@ func (h *ClusterHandler) Update(ctx *gin.Context) {
 		httpbase.UnauthorizedError(ctx, errors.New("user not found, please login first"))
 		return
 	}
-	var req *types.ClusterRequest
+	var req types.ClusterRequest
 	if err := ctx.ShouldBindJSON(&req); err != nil {
 		slog.Error("Bad request format", "error", err)
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
+	req.ClusterID = ctx.Param("id")
 	result, err := h.c.Update(ctx, req)
 	if err != nil {
 		slog.Error("Failed to update cluster info", slog.Any("error", err))

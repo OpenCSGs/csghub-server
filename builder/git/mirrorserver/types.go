@@ -22,6 +22,7 @@ type CreateMirrorRepoReq struct {
 	Private     bool   `json:"private"`
 	Description string `json:"description"`
 	Interval    string `json:"interval"`
+	SyncLfs     bool   `json:"sync_lfs"`
 }
 
 type CreatePushMirrorReq struct {

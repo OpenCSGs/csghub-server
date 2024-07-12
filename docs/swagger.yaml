@@ -1,13 +1,23 @@
 definitions:
   database.AccessToken:
     properties:
+      application:
+        allOf:
+        - $ref: '#/definitions/types.AccessTokenApp'
+        description: 'example: csghub, starship'
       created_at:
+        type: string
+      expired_at:
         type: string
       git_id:
         type: integer
       id:
         type: integer
+      is_active:
+        type: boolean
       name:
+        type: string
+      permission:
         type: string
       token:
         type: string
@@ -68,6 +78,8 @@ definitions:
         type: integer
       mirror_task_id:
         type: integer
+      progress:
+        type: integer
       push_mirror_created:
         type: boolean
       repository:
@@ -78,6 +90,8 @@ definitions:
         type: string
       source_url:
         type: string
+      status:
+        $ref: '#/definitions/types.MirrorTaskStatus'
       updated_at:
         type: string
     type: object
@@ -115,6 +129,8 @@ definitions:
         type: string
       id:
         type: integer
+      mirrored:
+        type: boolean
       namespace_type:
         $ref: '#/definitions/database.NamespaceType'
       path:
@@ -187,6 +203,8 @@ definitions:
         type: string
       likes:
         type: integer
+      mirror:
+        $ref: '#/definitions/database.Mirror'
       name:
         type: string
       nickname:
@@ -200,8 +218,12 @@ definitions:
         type: string
       repository_type:
         $ref: '#/definitions/types.RepositoryType'
+      source:
+        $ref: '#/definitions/types.RepositorySource'
       ssh_clone_url:
         type: string
+      sync_status:
+        $ref: '#/definitions/types.RepositorySyncStatus'
       tags:
         items:
           $ref: '#/definitions/database.Tag'
@@ -250,6 +272,23 @@ definitions:
         $ref: '#/definitions/database.User'
       user_id:
         type: integer
+    type: object
+  database.SyncClientSetting:
+    properties:
+      concurrent_count:
+        type: integer
+      created_at:
+        type: string
+      default:
+        type: boolean
+      id:
+        type: integer
+      max_bandwidth:
+        type: integer
+      token:
+        type: string
+      updated_at:
+        type: string
     type: object
   database.Tag:
     properties:
@@ -304,9 +343,19 @@ definitions:
         items:
           $ref: '#/definitions/database.Namespace'
         type: array
+      reg_provider:
+        description: |-
+          user registered from default login page, from casdoor, etc. Possible values:
+
+          - "default"
+          - "casdoor"
+        type: string
       updated_at:
         type: string
       username:
+        type: string
+      uuid:
+        description: TODO:add unique index after migration
         type: string
     type: object
   handler.Create.addMemberRequest:
@@ -327,6 +376,16 @@ definitions:
     required:
     - role
     type: object
+  handler.SetOpWeight.SetOpWeightReq:
+    properties:
+      repo_id:
+        type: integer
+      weight:
+        type: integer
+    required:
+    - repo_id
+    - weight
+    type: object
   handler.Update.updateMemberRequest:
     properties:
       new_role:
@@ -341,6 +400,18 @@ definitions:
     type: object
   types.APIInternalServerError:
     type: object
+  types.AccessTokenApp:
+    enum:
+    - git
+    - git
+    - mirror
+    - starship
+    type: string
+    x-enum-varnames:
+    - AccessTokenAppGit
+    - AccessTokenAppCSGHub
+    - AccessTokenAppMirror
+    - AccessTokenAppStarship
   types.Branch:
     properties:
       commit:
@@ -376,6 +447,10 @@ definitions:
         $ref: '#/definitions/types.Repository'
       repository_id:
         type: integer
+      source:
+        $ref: '#/definitions/types.RepositorySource'
+      sync_status:
+        $ref: '#/definitions/types.RepositorySyncStatus'
       tags:
         items:
           $ref: '#/definitions/types.RepoTag'
@@ -575,6 +650,8 @@ definitions:
       source_url:
         description: mirror source info
         type: string
+      sync_lfs:
+        type: boolean
     required:
     - mirror_source_id
     - repo_type
@@ -643,6 +720,8 @@ definitions:
     type: object
   types.CreateSpaceReq:
     properties:
+      cluster_id:
+        type: string
       cover_image_url:
         type: string
       default_branch:
@@ -651,8 +730,6 @@ definitions:
       description:
         type: string
       env:
-        type: string
-      hardware:
         type: string
       labels:
         example: ""
@@ -673,12 +750,9 @@ definitions:
         type: boolean
       readme:
         type: string
+      resource_id:
+        type: integer
       sdk:
-        description: |-
-          Creator   string `json:"username" example:"creator_user_name"`
-          Namespace string `json:"namespace" example:"user_or_org_name"`
-          Name      string `json:"name" example:"space_name_1"`
-          License   string `json:"license" example:"MIT"`
         example: "1"
         type: string
       sdk_version:
@@ -691,11 +765,14 @@ definitions:
     type: object
   types.CreateSpaceResourceReq:
     properties:
+      cost_per_hour:
+        type: number
       name:
         type: string
       resources:
         type: string
     required:
+    - cost_per_hour
     - name
     - resources
     type: object
@@ -709,10 +786,19 @@ definitions:
     - name
     - version
     type: object
+  types.CreateSyncClientSettingReq:
+    properties:
+      concurrent_count:
+        type: integer
+      max_bandwidth:
+        type: integer
+      token:
+        type: string
+    required:
+    - token
+    type: object
   types.CreateUserRequest:
     properties:
-      casdoor_uid:
-        type: string
       email:
         type: string
       name:
@@ -720,15 +806,31 @@ definitions:
         type: string
       phone:
         type: string
+      reg_provider:
+        description: |-
+          user registered from default login page, from casdoor, etc. Possible values:
+
+          - "default"
+          - "casdoor"
+        type: string
       username:
         description: the login name
+        type: string
+      uuid:
         type: string
     type: object
   types.CreateUserTokenRequest:
     properties:
+      application:
+        allOf:
+        - $ref: '#/definitions/types.AccessTokenApp'
+        description: default to csghub
+      expired_at:
+        type: string
       name:
         type: string
-      username:
+      permission:
+        description: default to empty, means full permission
         type: string
     type: object
   types.Dataset:
@@ -753,10 +855,16 @@ definitions:
         type: string
       private:
         type: boolean
+      readme:
+        type: string
       repository:
         $ref: '#/definitions/types.Repository'
       repository_id:
         type: integer
+      source:
+        $ref: '#/definitions/types.RepositorySource'
+      sync_status:
+        $ref: '#/definitions/types.RepositorySyncStatus'
       tags:
         items:
           $ref: '#/definitions/types.RepoTag'
@@ -793,9 +901,16 @@ definitions:
     type: object
   types.DeleteUserTokenRequest:
     properties:
+      application:
+        allOf:
+        - $ref: '#/definitions/types.AccessTokenApp'
+        description: default to csghub
+      expired_at:
+        type: string
       name:
         type: string
-      username:
+      permission:
+        description: default to empty, means full permission
         type: string
     type: object
   types.EditOrgReq:
@@ -861,6 +976,19 @@ definitions:
         description: URL to browse the file
         type: string
     type: object
+  types.InstanceRunReq:
+    properties:
+      cluster_id:
+        type: string
+      deploy_name:
+        type: string
+      resource_id:
+        type: integer
+      revision:
+        type: string
+      runtime_framework_id:
+        type: integer
+    type: object
   types.ListByPathReq:
     properties:
       paths:
@@ -868,6 +996,31 @@ definitions:
           type: string
         type: array
     type: object
+  types.MirrorRepo:
+    properties:
+      path:
+        type: string
+      progress:
+        type: integer
+      repo_type:
+        $ref: '#/definitions/types.RepositoryType'
+      sync_status:
+        $ref: '#/definitions/types.RepositorySyncStatus'
+    type: object
+  types.MirrorTaskStatus:
+    enum:
+    - waiting
+    - running
+    - finished
+    - failed
+    - incomplete
+    type: string
+    x-enum-varnames:
+    - MirrorWaiting
+    - MirrorRunning
+    - MirrorFinished
+    - MirrorFailed
+    - MirrorIncomplete
   types.Model:
     properties:
       created_at:
@@ -878,6 +1031,10 @@ definitions:
         type: string
       downloads:
         type: integer
+      enable_finetune:
+        type: boolean
+      enable_inference:
+        type: boolean
       id:
         type: integer
       likes:
@@ -890,14 +1047,20 @@ definitions:
         type: string
       private:
         type: boolean
+      readme:
+        type: string
       repository:
         $ref: '#/definitions/types.Repository'
       repository_id:
         type: integer
+      source:
+        $ref: '#/definitions/types.RepositorySource'
       status:
         description: url to interact with the model
         example: RUNNING
         type: string
+      sync_status:
+        $ref: '#/definitions/types.RepositorySyncStatus'
       tags:
         items:
           $ref: '#/definitions/types.RepoTag'
@@ -948,17 +1111,15 @@ definitions:
     properties:
       cluster_id:
         type: string
-      cost_per_hour:
-        type: integer
       deploy_name:
         type: string
       env:
         type: string
-      hardware:
-        type: string
       max_replica:
         type: integer
       min_replica:
+        type: integer
+      resource_id:
         type: integer
       revision:
         type: string
@@ -1023,6 +1184,28 @@ definitions:
       ssh_clone_url:
         type: string
     type: object
+  types.RepositorySource:
+    enum:
+    - opencsg
+    - local
+    - huggingface
+    type: string
+    x-enum-varnames:
+    - OpenCSGSource
+    - LocalSource
+    - HuggingfaceSource
+  types.RepositorySyncStatus:
+    enum:
+    - pending
+    - inprogress
+    - failed
+    - completed
+    type: string
+    x-enum-varnames:
+    - SyncStatusPending
+    - SyncStatusInProgress
+    - SyncStatusFailed
+    - SyncStatusCompleted
   types.RepositoryType:
     enum:
     - model
@@ -1067,6 +1250,15 @@ definitions:
         type: string
       id:
         type: integer
+      type:
+        type: integer
+    type: object
+  types.RuntimeFrameworkModels:
+    properties:
+      models:
+        items:
+          type: string
+        type: array
     type: object
   types.RuntimeFrameworkReq:
     properties:
@@ -1082,6 +1274,8 @@ definitions:
         type: string
       frame_version:
         type: string
+      type:
+        type: integer
     type: object
   types.Space:
     properties:
@@ -1136,9 +1330,17 @@ definitions:
         type: string
       secrets:
         type: string
+      sku:
+        type: string
+      source:
+        $ref: '#/definitions/types.RepositorySource'
       status:
         description: deploying, running, failed
         type: string
+      svc_name:
+        type: string
+      sync_status:
+        $ref: '#/definitions/types.RepositorySyncStatus'
       tags:
         items:
           $ref: '#/definitions/types.RepoTag'
@@ -1157,8 +1359,12 @@ definitions:
     type: object
   types.SpaceResource:
     properties:
+      cost_per_hour:
+        type: number
       id:
         type: integer
+      is_available:
+        type: boolean
       name:
         type: string
       resources:
@@ -1171,6 +1377,36 @@ definitions:
       name:
         type: string
       version:
+        type: string
+    type: object
+  types.SyncVersion:
+    properties:
+      change_log:
+        type: string
+      last_modify_time:
+        type: string
+      repo_path:
+        type: string
+      repo_type:
+        $ref: '#/definitions/types.RepositoryType'
+      source_id:
+        description: '0: opencsg, 1: HF'
+        type: integer
+      version:
+        type: integer
+    type: object
+  types.SyncVersionResponse:
+    properties:
+      data:
+        properties:
+          has_more:
+            type: boolean
+          versions:
+            items:
+              $ref: '#/definitions/types.SyncVersion'
+            type: array
+        type: object
+      msg:
         type: string
     type: object
   types.UpdateCodeReq:
@@ -1306,8 +1542,6 @@ definitions:
         type: string
       env:
         type: string
-      hardware:
-        type: string
       labels:
         example: ""
         type: string
@@ -1327,12 +1561,9 @@ definitions:
         type: boolean
       readme:
         type: string
+      resource_id:
+        type: integer
       sdk:
-        description: |-
-          Creator   string `json:"username" example:"creator_user_name"`
-          Namespace string `json:"namespace" example:"user_or_org_name"`
-          Name      string `json:"name" example:"space_name_1"`
-          License   string `json:"license" example:"MIT"`
         example: "1"
         type: string
       sdk_version:
@@ -1345,6 +1576,8 @@ definitions:
     type: object
   types.UpdateSpaceResourceReq:
     properties:
+      cost_per_hour:
+        type: number
       name:
         type: string
       resources:
@@ -1361,8 +1594,6 @@ definitions:
     type: object
   types.UpdateUserRequest:
     properties:
-      casdoor_uid:
-        type: string
       email:
         type: string
       name:
@@ -1372,6 +1603,8 @@ definitions:
         type: string
       username:
         description: the login name
+        type: string
+      uuid:
         type: string
     type: object
   types.User:
@@ -1709,6 +1942,51 @@ paths:
       summary: 'Download a repo file [Depricated: use ''resolve'' api instead]'
       tags:
       - Repository
+  /{repo_type}/{namespace}/{name}/incr_downloads:
+    put:
+      consumes:
+      - application/json
+      parameters:
+      - description: models,dataset,codes or spaces
+        enum:
+        - models
+        - datasets
+        - codes
+        - spaces
+        in: path
+        name: repo_type
+        required: true
+        type: string
+      - description: repo owner name
+        in: path
+        name: namespace
+        required: true
+        type: string
+      - description: repo name
+        in: path
+        name: name
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/types.Response'
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Increase repo download count by 1
+      tags:
+      - Repository
   /{repo_type}/{namespace}/{name}/last_commit:
     get:
       consumes:
@@ -2015,6 +2293,56 @@ paths:
       security:
       - ApiKey: []
       summary: Triggers the mirror synchronization
+      tags:
+      - Repository
+  /{repo_type}/{namespace}/{name}/mirror_from_saas:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: models,datasets,codes or spaces
+        enum:
+        - models
+        - datasets
+        - codes
+        - spaces
+        in: path
+        name: repo_type
+        required: true
+        type: string
+      - description: repo owner name
+        in: path
+        name: namespace
+        required: true
+        type: string
+      - description: repo name
+        in: path
+        name: name
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/types.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/database.Mirror'
+              type: object
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Mirror repo from OpenCSG Saas(only on-premises)
       tags:
       - Repository
   /{repo_type}/{namespace}/{name}/raw/{file_path}:
@@ -2562,6 +2890,15 @@ paths:
         in: query
         name: current_user
         type: string
+      - default: 1
+        description: deploy_type
+        enum:
+        - 0
+        - 1
+        - 2
+        in: query
+        name: deploy_type
+        type: integer
       produces:
       - application/json
       responses:
@@ -2931,6 +3268,134 @@ paths:
       summary: Get repository file tree
       tags:
       - Repository
+  /{repo_type}/runtime_framework:
+    get:
+      consumes:
+      - application/json
+      description: List repo runtime framework
+      parameters:
+      - description: models,spaces
+        enum:
+        - models
+        - spaces
+        in: path
+        name: repo_type
+        required: true
+        type: string
+      - description: namespace
+        in: path
+        name: namespace
+        required: true
+        type: string
+      - description: name
+        in: path
+        name: name
+        required: true
+        type: string
+      - description: current user
+        in: query
+        name: current_user
+        type: string
+      - default: 1
+        description: deploy_type
+        enum:
+        - 0
+        - 1
+        - 2
+        in: query
+        name: deploy_type
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            type: string
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: List repo runtime framework
+      tags:
+      - Repository
+  /accounting/metering/{id}/statements:
+    get:
+      consumes:
+      - application/json
+      description: List meterings by user uuid and start time and end time
+      parameters:
+      - description: user uuid
+        in: path
+        name: id
+        required: true
+        type: string
+      - default: 10
+        description: scene
+        enum:
+        - 10
+        - 11
+        - 12
+        - 20
+        in: query
+        name: scene
+        type: integer
+      - description: instance name
+        in: query
+        name: instance_name
+        required: true
+        type: string
+      - description: 'start_time, format: ''2024-06-12 08:27:22'''
+        in: query
+        name: start_time
+        required: true
+        type: string
+      - description: 'end_time, format: ''2024-06-12 17:17:22'''
+        in: query
+        name: end_time
+        required: true
+        type: string
+      - description: current_user
+        in: query
+        name: current_user
+        required: true
+        type: string
+      - default: 20
+        description: per
+        in: query
+        name: per
+        type: integer
+      - default: 1
+        description: per page
+        in: query
+        name: page
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/types.Response'
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: List meterings by user uuid and start time and end time
+      tags:
+      - Accounting
   /cluster:
     get:
       consumes:
@@ -2989,6 +3454,14 @@ paths:
       - description: sort by
         in: query
         name: sort
+        type: string
+      - description: source
+        enum:
+        - opencsg
+        - huggingface
+        - local
+        in: query
+        name: source
         type: string
       - default: 20
         description: per
@@ -3282,6 +3755,14 @@ paths:
         in: query
         name: sort
         type: string
+      - description: source
+        enum:
+        - opencsg
+        - huggingface
+        - local
+        in: query
+        name: source
+        type: string
       - default: 20
         description: per
         in: query
@@ -3494,6 +3975,50 @@ paths:
       security:
       - ApiKey: []
       summary: Update a exists dataset
+      tags:
+      - Dataset
+  /datasets/{namespace}/{name}/all_files:
+    get:
+      consumes:
+      - application/json
+      parameters:
+      - description: namespace
+        in: path
+        name: namespace
+        required: true
+        type: string
+      - description: name
+        in: path
+        name: name
+        required: true
+        type: string
+      - description: current user
+        in: query
+        name: current_user
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/types.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/types.File'
+              type: object
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Get all files of a dataset
       tags:
       - Dataset
   /datasets/{namespace}/{name}/relations:
@@ -3790,6 +4315,50 @@ paths:
       summary: Create mirror repo
       tags:
       - Mirror
+  /mirror/repos:
+    get:
+      consumes:
+      - application/json
+      parameters:
+      - default: 20
+        description: per
+        in: query
+        name: per
+        type: integer
+      - default: 1
+        description: page
+        in: query
+        name: page
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/types.Response'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/types.MirrorRepo'
+                  type: array
+                total:
+                  type: integer
+              type: object
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Get mirror repos
+      tags:
+      - Mirror
   /mirror/sources:
     get:
       consumes:
@@ -3993,6 +4562,14 @@ paths:
       - description: sort by
         in: query
         name: sort
+        type: string
+      - description: source
+        enum:
+        - opencsg
+        - huggingface
+        - local
+        in: query
+        name: source
         type: string
       - default: 20
         description: per
@@ -4202,6 +4779,231 @@ paths:
       security:
       - ApiKey: []
       summary: Update a exists model
+      tags:
+      - Model
+  /models/{namespace}/{name}/all_files:
+    get:
+      consumes:
+      - application/json
+      parameters:
+      - description: namespace
+        in: path
+        name: namespace
+        required: true
+        type: string
+      - description: name
+        in: path
+        name: name
+        required: true
+        type: string
+      - description: current user
+        in: query
+        name: current_user
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/types.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/types.File'
+              type: object
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Get all files of a model
+      tags:
+      - Model
+  /models/{namespace}/{name}/finetune:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: namespace
+        in: path
+        name: namespace
+        required: true
+        type: string
+      - description: name
+        in: path
+        name: name
+        required: true
+        type: string
+      - description: current_user
+        in: query
+        name: current_user
+        required: true
+        type: string
+      - description: deploy setting of instance
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/types.InstanceRunReq'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            type: string
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: create a finetune instance
+      tags:
+      - Model
+  /models/{namespace}/{name}/finetune/{id}:
+    delete:
+      consumes:
+      - application/json
+      description: delete a finetune instance
+      parameters:
+      - description: namespace
+        in: path
+        name: namespace
+        required: true
+        type: string
+      - description: name
+        in: path
+        name: name
+        required: true
+        type: string
+      - description: id
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: current user
+        in: query
+        name: current_user
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/types.Response'
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Delete a finetune instance
+      tags:
+      - Model
+  /models/{namespace}/{name}/finetune/{id}/start:
+    put:
+      consumes:
+      - application/json
+      description: Start a finetune instance
+      parameters:
+      - description: namespace
+        in: path
+        name: namespace
+        required: true
+        type: string
+      - description: name
+        in: path
+        name: name
+        required: true
+        type: string
+      - description: deploy id
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: current user
+        in: query
+        name: current_user
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/types.Response'
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Start a finetune instance
+      tags:
+      - Model
+  /models/{namespace}/{name}/finetune/{id}/stop:
+    put:
+      consumes:
+      - application/json
+      description: Stop a finetune instance
+      parameters:
+      - description: namespace
+        in: path
+        name: namespace
+        required: true
+        type: string
+      - description: name
+        in: path
+        name: name
+        required: true
+        type: string
+      - description: id
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: current user
+        in: query
+        name: current_user
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/types.Response'
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Stop a finetune instance
       tags:
       - Model
   /models/{namespace}/{name}/predict:
@@ -4968,11 +5770,286 @@ paths:
       summary: update user membership
       tags:
       - Member
+  /recom/opweight:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: json request body
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/handler.SetOpWeight.SetOpWeightReq'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/types.Response'
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: set op weight for repo recommendation
+      tags:
+      - Recommendation
+  /runtime_framework:
+    get:
+      consumes:
+      - application/json
+      description: get all runtime frameworks for current user
+      parameters:
+      - description: current user
+        in: query
+        name: current_user
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/types.Response'
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Get all runtime frameworks for current user
+      tags:
+      - RuntimeFramework
+  /runtime_framework/{id}:
+    delete:
+      consumes:
+      - application/json
+      description: set model runtime frameworks
+      parameters:
+      - description: runtime framework id
+        in: path
+        name: id
+        required: true
+        type: integer
+      - default: 1
+        description: deploy_type
+        enum:
+        - 0
+        - 1
+        - 2
+        in: query
+        name: deploy_type
+        type: integer
+      - description: current user
+        in: query
+        name: current_user
+        type: string
+      - description: body
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/types.RuntimeFrameworkModels'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/types.Response'
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Set model runtime frameworks
+      tags:
+      - RuntimeFramework
+    post:
+      consumes:
+      - application/json
+      description: set model runtime frameworks
+      parameters:
+      - description: runtime framework id
+        in: path
+        name: id
+        required: true
+        type: integer
+      - default: 1
+        description: deploy_type
+        enum:
+        - 0
+        - 1
+        - 2
+        in: query
+        name: deploy_type
+        type: integer
+      - description: current user
+        in: query
+        name: current_user
+        type: string
+      - description: body
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/types.RuntimeFrameworkModels'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/types.Response'
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Set model runtime frameworks
+      tags:
+      - RuntimeFramework
+  /runtime_framework/{id}/models:
+    get:
+      consumes:
+      - application/json
+      description: get visible models by runtime framework for current user
+      parameters:
+      - description: runtime framework id
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: current user
+        in: query
+        name: current_user
+        type: string
+      - default: 20
+        description: per
+        in: query
+        name: per
+        type: integer
+      - default: 1
+        description: per page
+        in: query
+        name: page
+        type: integer
+      - default: 1
+        description: deploy_type
+        enum:
+        - 0
+        - 1
+        - 2
+        in: query
+        name: deploy_type
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/types.Response'
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Get Visible models by runtime framework for current user
+      tags:
+      - RuntimeFramework
+  /runtime_framework/models:
+    get:
+      consumes:
+      - application/json
+      description: get visible models for all runtime frameworks for current user
+      parameters:
+      - description: search text
+        in: query
+        name: search
+        type: string
+      - description: sort by
+        in: query
+        name: sort
+        type: string
+      - description: current user
+        in: query
+        name: current_user
+        type: string
+      - default: 20
+        description: per
+        in: query
+        name: per
+        type: integer
+      - default: 1
+        description: per page
+        in: query
+        name: page
+        type: integer
+      - default: 1
+        description: deploy_type
+        enum:
+        - 1
+        - 2
+        in: query
+        name: deploy_type
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/types.Response'
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Get Visible models for all runtime frameworks for current user
+      tags:
+      - RuntimeFramework
   /space_resources:
     get:
       consumes:
       - application/json
       description: get space resources
+      parameters:
+      - description: cluster_id
+        in: query
+        name: cluster_id
+        type: string
       produces:
       - application/json
       responses:
@@ -5293,6 +6370,14 @@ paths:
       - description: sort by
         in: query
         name: sort
+        type: string
+      - description: source
+        enum:
+        - opencsg
+        - huggingface
+        - local
+        in: query
+        name: source
         type: string
       - default: 20
         description: per
@@ -5689,6 +6774,110 @@ paths:
       summary: wake up space app
       tags:
       - Space
+  /sync/client_setting:
+    get:
+      consumes:
+      - application/json
+      description: Get sync client setting
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/types.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/database.SyncClientSetting'
+              type: object
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Get sync client setting
+      tags:
+      - Sync
+    post:
+      consumes:
+      - application/json
+      description: Create sync client setting or update an existing sync client setting
+      parameters:
+      - description: body
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/types.CreateSyncClientSettingReq'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/types.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/database.SyncClientSetting'
+              type: object
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Create sync client setting or update an existing sync client setting
+      tags:
+      - Sync
+  /sync/version/latest:
+    get:
+      parameters:
+      - description: current version
+        in: query
+        name: cur
+        required: true
+        type: string
+      - description: current_user
+        in: query
+        name: current_user
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/types.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/types.SyncVersionResponse'
+              type: object
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Get latest version
+      tags:
+      - Sync
   /tags:
     get:
       consumes:
@@ -5719,6 +6908,185 @@ paths:
       summary: Get all tags
       tags:
       - Tag
+  /token/{app}/{token_name}:
+    delete:
+      consumes:
+      - application/json
+      parameters:
+      - description: application
+        enum:
+        - git
+        - starship
+        in: path
+        name: app
+        required: true
+        type: string
+      - description: token_name
+        in: path
+        name: token_name
+        required: true
+        type: string
+      - description: current user, the owner
+        in: query
+        name: current_user
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/types.Response'
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Delete access token of a app
+      tags:
+      - Access token
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: token name
+        in: path
+        name: token_name
+        required: true
+        type: string
+      - description: application
+        enum:
+        - git
+        - starship
+        in: path
+        name: app
+        required: true
+        type: string
+      - description: current user, the owner
+        in: query
+        name: current_user
+        required: true
+        type: string
+      - description: body
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/types.CreateUserTokenRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/types.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/database.AccessToken'
+              type: object
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Create access token for an special application
+      tags:
+      - Access token
+    put:
+      consumes:
+      - application/json
+      parameters:
+      - description: application
+        enum:
+        - git
+        - starship
+        in: path
+        name: app
+        required: true
+        type: string
+      - description: token_name
+        in: path
+        name: token_name
+        required: true
+        type: string
+      - description: current user, the owner
+        in: query
+        name: current_user
+        required: true
+        type: string
+      - description: new expire time, in format RFC3339, like 2006-01-02T15:04:05Z07:00
+        in: query
+        name: expired_at
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/types.Response'
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Refresh a access token for a user
+      tags:
+      - Access token
+  /token/{token_value}:
+    get:
+      consumes:
+      - application/json
+      parameters:
+      - description: token_value
+        in: path
+        name: token_value
+        required: true
+        type: string
+      - description: application
+        enum:
+        - git
+        - starship
+        in: query
+        name: app
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/types.Response'
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Get token and owner's detail by the token value
+      tags:
+      - Access token
   /user/{username}/codes:
     get:
       consumes:
@@ -5797,6 +7165,51 @@ paths:
       security:
       - ApiKey: []
       summary: Get user datasets
+      tags:
+      - User
+  /user/{username}/finetune/instances:
+    get:
+      consumes:
+      - application/json
+      description: Get user running notebook instances
+      parameters:
+      - description: username
+        in: path
+        name: username
+        required: true
+        type: string
+      - default: 50
+        description: per
+        in: query
+        name: per
+        type: integer
+      - default: 1
+        description: page index
+        in: query
+        name: page
+        type: integer
+      - description: current user
+        in: query
+        name: current_user
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/types.Response'
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Get user running notebook instances
       tags:
       - User
   /user/{username}/likes/{repoid}:
@@ -6087,6 +7500,15 @@ paths:
         name: repo_type
         required: true
         type: string
+      - default: 1
+        description: deploy type(0-space,1-inference,2-finetune)
+        enum:
+        - 0
+        - 1
+        - 2
+        in: query
+        name: deploy_type
+        type: integer
       - default: 50
         description: per
         in: query
@@ -6278,6 +7700,46 @@ paths:
       tags:
       - SSH Key
   /user/{username}/tokens:
+    get:
+      consumes:
+      - application/json
+      parameters:
+      - description: username
+        in: path
+        name: username
+        required: true
+        type: string
+      - description: current user name
+        in: query
+        name: current_user
+        type: string
+      - description: application
+        enum:
+        - git
+        - starship
+        in: query
+        name: app
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/types.Response'
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Get all access tokens for a user
+      tags:
+      - Access token
     post:
       consumes:
       - application/json
@@ -6321,14 +7783,13 @@ paths:
             $ref: '#/definitions/types.APIInternalServerError'
       security:
       - ApiKey: []
-      summary: Create access token for a user
+      summary: '[Deprecated: use POST:/token/{app}/{username} instead]'
       tags:
       - Access token
   /user/{username}/tokens/{token_name}:
     delete:
       consumes:
       - application/json
-      description: delete access token for a user
       parameters:
       - description: username
         in: path
@@ -6368,7 +7829,7 @@ paths:
             $ref: '#/definitions/types.APIInternalServerError'
       security:
       - ApiKey: []
-      summary: Delete access token for a user
+      summary: '[Deprecated: use DELETE:/token/{app}/{token_name} instead]'
       tags:
       - Access token
   /users:

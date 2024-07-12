@@ -153,13 +153,13 @@ func (s *ModelStore) Update(ctx context.Context, input Model) (*Model, error) {
 	return &input, err
 }
 
-func (s *ModelStore) FindByPath(ctx context.Context, namespace string, repoPath string) (*Model, error) {
+func (s *ModelStore) FindByPath(ctx context.Context, namespace string, name string) (*Model, error) {
 	resModel := new(Model)
 	err := s.db.Operator.Core.
 		NewSelect().
 		Model(resModel).
 		Relation("Repository.User").
-		Where("repository.path =?", fmt.Sprintf("%s/%s", namespace, repoPath)).
+		Where("repository.path =?", fmt.Sprintf("%s/%s", namespace, name)).
 		Limit(1).
 		Scan(ctx)
 	if err != nil {
@@ -208,9 +208,29 @@ func (s *ModelStore) ListByPath(ctx context.Context, paths []string) ([]Model, e
 }
 
 func (s *ModelStore) ByID(ctx context.Context, id int64) (*Model, error) {
-	model := new(Model)
-	return model, s.db.Core.NewSelect().Model(model).
+	var model Model
+	err := s.db.Core.NewSelect().Model(&model).Relation("Repository").Where("model.id = ?", id).Scan(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return &model, err
+}
+
+func (s *ModelStore) CreateIfNotExist(ctx context.Context, input Model) (*Model, error) {
+	err := s.db.Core.NewSelect().
+		Model(&input).
+		Where("repository_id = ?", input.RepositoryID).
 		Relation("Repository").
-		Where("model.id = ?", id).
 		Scan(ctx)
+	if err == nil {
+		return &input, nil
+	}
+
+	res, err := s.db.Core.NewInsert().Model(&input).Exec(ctx, &input)
+	if err := assertAffectedOneRow(res, err); err != nil {
+		slog.Error("create model in db failed", slog.String("error", err.Error()))
+		return nil, fmt.Errorf("create model in db failed,error:%w", err)
+	}
+
+	return &input, nil
 }

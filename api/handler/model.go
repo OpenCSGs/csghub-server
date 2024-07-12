@@ -11,7 +11,6 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"opencsg.com/csghub-server/api/httpbase"
-	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/types"
 	"opencsg.com/csghub-server/common/utils/common"
@@ -46,6 +45,7 @@ type ModelHandler struct {
 // @Param        license_tag query string false "filter by license tag"
 // @Param        language_tag query string false "filter by language tag"
 // @Param        sort query string false "sort by"
+// @Param        source query string false "source" Enums(opencsg, huggingface, local)
 // @Param        per query int false "per" default(20)
 // @Param        page query int false "per page" default(1)
 // @Success      200  {object}  types.ResponseWithTotal{data=[]types.Model,total=int} "OK"
@@ -53,22 +53,31 @@ type ModelHandler struct {
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
 // @Router       /models [get]
 func (h *ModelHandler) Index(ctx *gin.Context) {
-	tagReqs := parseTagReqs(ctx)
-	username := httpbase.GetCurrentUser(ctx)
+	filter := new(types.RepoFilter)
+	filter.Tags = parseTagReqs(ctx)
+	filter.Username = httpbase.GetCurrentUser(ctx)
 	per, page, err := common.GetPerAndPageFromContext(ctx)
 	if err != nil {
 		slog.Error("Bad request format", "error", err)
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
-	search, sort := getFilterFromContext(ctx)
-	if !slices.Contains(Sorts, sort) {
+	filter = getFilterFromContext(ctx, filter)
+	if !slices.Contains(Sorts, filter.Sort) {
 		msg := fmt.Sprintf("sort parameter must be one of %v", Sorts)
 		slog.Error("Bad request format,", slog.String("error", msg))
 		ctx.JSON(http.StatusBadRequest, gin.H{"message": msg})
 		return
 	}
-	models, total, err := h.c.Index(ctx, username, search, sort, tagReqs, per, page)
+
+	if filter.Source != "" && !slices.Contains[[]string](Sources, filter.Source) {
+		msg := fmt.Sprintf("source parameter must be one of %v", Sources)
+		slog.Error("Bad request format,", slog.String("error", msg))
+		ctx.JSON(http.StatusBadRequest, gin.H{"message": msg})
+		return
+	}
+
+	models, total, err := h.c.Index(ctx, filter, per, page)
 	if err != nil {
 		slog.Error("Failed to get models", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
@@ -341,26 +350,26 @@ func (h *ModelHandler) Predict(ctx *gin.Context) {
 	httpbase.OK(ctx, resp)
 }
 
-func parseTagReqs(ctx *gin.Context) (tags []database.TagReq) {
+func parseTagReqs(ctx *gin.Context) (tags []types.TagReq) {
 	licenseTag := ctx.Query("license_tag")
 	taskTag := ctx.Query("task_tag")
 	frameworkTag := ctx.Query("framework_tag")
 	if licenseTag != "" {
-		tags = append(tags, database.TagReq{
+		tags = append(tags, types.TagReq{
 			Name:     strings.ToLower(licenseTag),
 			Category: "license",
 		})
 	}
 
 	if taskTag != "" {
-		tags = append(tags, database.TagReq{
+		tags = append(tags, types.TagReq{
 			Name:     strings.ToLower(taskTag),
 			Category: "task",
 		})
 	}
 
 	if frameworkTag != "" {
-		tags = append(tags, database.TagReq{
+		tags = append(tags, types.TagReq{
 			Name:     strings.ToLower(frameworkTag),
 			Category: "framework",
 		})
@@ -368,7 +377,7 @@ func parseTagReqs(ctx *gin.Context) (tags []database.TagReq) {
 
 	languageTag := ctx.Query("language_tag")
 	if languageTag != "" {
-		tags = append(tags, database.TagReq{
+		tags = append(tags, types.TagReq{
 			Name:     strings.ToLower(languageTag),
 			Category: "language",
 		})
@@ -376,7 +385,7 @@ func parseTagReqs(ctx *gin.Context) (tags []database.TagReq) {
 
 	industryTag := ctx.Query("industry_tag")
 	if industryTag != "" {
-		tags = append(tags, database.TagReq{
+		tags = append(tags, types.TagReq{
 			Name:     strings.ToLower(industryTag),
 			Category: "industry",
 		})
@@ -445,15 +454,90 @@ func (h *ModelHandler) DeployDedicated(ctx *gin.Context) {
 		return
 	}
 
-	deployID, err := h.c.Deploy(ctx, namespace, name, currentUser, req)
+	deployID, err := h.c.Deploy(ctx, namespace, name, currentUser, req, types.InferenceType)
 	if err != nil {
 		slog.Error("failed to deploy model as inference", slog.String("namespace", namespace),
-			slog.String("name", name), slog.Any("error", err))
-		httpbase.ServerError(ctx, errors.New("failed to deploy space"))
+			slog.String("name", name), slog.Any("currentUser", currentUser), slog.Any("req", req), slog.Any("error", err))
+		httpbase.ServerError(ctx, err)
 		return
 	}
 
 	slog.Debug("deploy model as inference created", slog.String("namespace", namespace),
+		slog.String("name", name), slog.Int64("deploy_id", deployID))
+
+	// return deploy_id
+	response := types.DeployRepo{DeployID: deployID}
+
+	httpbase.OK(ctx, response)
+}
+
+// FinetuneCreate      godoc
+// @Security     ApiKey
+// @Summary      create a finetune instance
+// @Tags         Model
+// @Accept       json
+// @Produce      json
+// @Param        namespace path string true "namespace"
+// @Param        name path string true "name"
+// @Param        current_user query string true "current_user"
+// @Param        body body types.InstanceRunReq true "deploy setting of instance"
+// @Success      200  {object}  string "OK"
+// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
+// @Router       /models/{namespace}/{name}/finetune [post]
+func (h *ModelHandler) FinetuneCreate(ctx *gin.Context) {
+	currentUser := httpbase.GetCurrentUser(ctx)
+	if currentUser == "" {
+		httpbase.UnauthorizedError(ctx, errors.New("user not found, please login first"))
+		return
+	}
+
+	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
+	if err != nil {
+		slog.Error("failed to get namespace from context", "error", err)
+		httpbase.BadRequest(ctx, err.Error())
+		return
+	}
+	allow, err := h.c.AllowAdminAccess(ctx, types.ModelRepo, namespace, name, currentUser)
+	if err != nil {
+		slog.Error("failed to check user permission", "error", err)
+		httpbase.ServerError(ctx, errors.New("failed to check user permission"))
+		return
+	}
+	if !allow {
+		slog.Info("user is not allowed to run model", slog.String("namespace", namespace),
+			slog.String("name", name), slog.Any("username", currentUser))
+		httpbase.UnauthorizedError(ctx, errors.New("user not allowed to run model"))
+		return
+	}
+
+	var req types.InstanceRunReq
+	if err := ctx.ShouldBindJSON(&req); err != nil {
+		slog.Error("Bad request format", "error", err)
+		httpbase.BadRequest(ctx, err.Error())
+		return
+	}
+
+	modelReq := &types.ModelRunReq{
+		DeployName:         req.DeployName,
+		ClusterID:          req.ClusterID,
+		ResourceID:         req.ResourceID,
+		RuntimeFrameworkID: req.RuntimeFrameworkID,
+		MinReplica:         1,
+		MaxReplica:         1,
+		SecureLevel:        2,
+		Revision:           req.Revision,
+	}
+
+	deployID, err := h.c.Deploy(ctx, namespace, name, currentUser, *modelReq, types.FinetuneType)
+	if err != nil {
+		slog.Error("failed to deploy model as notebook instance", slog.String("namespace", namespace),
+			slog.String("name", name), slog.Any("error", err))
+		httpbase.ServerError(ctx, err)
+		return
+	}
+
+	slog.Debug("deploy model as instance created", slog.String("namespace", namespace),
 		slog.String("name", name), slog.Int64("deploy_id", deployID))
 
 	// return deploy_id
@@ -478,6 +562,53 @@ func (h *ModelHandler) DeployDedicated(ctx *gin.Context) {
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
 // @Router       /models/{namespace}/{name}/run/{id} [delete]
 func (h *ModelHandler) DeployDelete(ctx *gin.Context) {
+	var (
+		id  int64
+		err error
+	)
+	currentUser := httpbase.GetCurrentUser(ctx)
+	if currentUser == "" {
+		httpbase.UnauthorizedError(ctx, errors.New("user not found, please login first"))
+		return
+	}
+	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
+	if err != nil {
+		slog.Error("Bad request format", "error", err)
+		httpbase.BadRequest(ctx, err.Error())
+		return
+	}
+	id, err = strconv.ParseInt(ctx.Param("id"), 10, 64)
+	if err != nil {
+		slog.Error("Bad request format", "error", err)
+		httpbase.BadRequest(ctx, err.Error())
+		return
+	}
+
+	err = h.c.DeleteDeploy(ctx, types.ModelRepo, namespace, name, currentUser, id)
+	if err != nil {
+		slog.Error("Failed to delete deploy", slog.Any("error", err))
+		httpbase.ServerError(ctx, err)
+		return
+	}
+	httpbase.OK(ctx, nil)
+}
+
+// FinetuneDelete  godoc
+// @Security     ApiKey
+// @Summary      Delete a finetune instance
+// @Description  delete a finetune instance
+// @Tags         Model
+// @Accept       json
+// @Produce      json
+// @Param        namespace path string true "namespace"
+// @Param        name path string true "name"
+// @Param        id path int true "id"
+// @Param        current_user query string false "current user"
+// @Success      200  {object}  types.Response{} "OK"
+// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
+// @Router       /models/{namespace}/{name}/finetune/{id} [delete]
+func (h *ModelHandler) FinetuneDelete(ctx *gin.Context) {
 	var (
 		id  int64
 		err error
@@ -614,6 +745,7 @@ func (h *ModelHandler) DeployStart(ctx *gin.Context) {
 // @Param        current_user query string false "current user"
 // @Param        per query int false "per" default(20)
 // @Param        page query int false "per page" default(1)
+// @Param 		 deploy_type query int false "deploy_type" Enums(0, 1, 2) default(1)
 // @Success      200  {object}  types.Response{} "OK"
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
@@ -622,6 +754,17 @@ func (h *ModelHandler) ListByRuntimeFrameworkID(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
 	if currentUser == "" {
 		httpbase.UnauthorizedError(ctx, errors.New("user not found, please login first"))
+		return
+	}
+	deployTypeStr := ctx.Query("deploy_type")
+	if deployTypeStr == "" {
+		// backward compatibility for inferences
+		deployTypeStr = strconv.Itoa(types.InferenceType)
+	}
+	deployType, err := strconv.Atoi(deployTypeStr)
+	if err != nil {
+		slog.Error("Bad request format", "error", err)
+		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
 	per, page, err := common.GetPerAndPageFromContext(ctx)
@@ -637,7 +780,7 @@ func (h *ModelHandler) ListByRuntimeFrameworkID(ctx *gin.Context) {
 		return
 	}
 
-	models, total, err := h.c.ListModelsByRuntimeFrameworkID(ctx, currentUser, per, page, id)
+	models, total, err := h.c.ListModelsByRuntimeFrameworkID(ctx, currentUser, per, page, id, deployType)
 	if err != nil {
 		slog.Error("Failed to get models", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
@@ -648,4 +791,344 @@ func (h *ModelHandler) ListByRuntimeFrameworkID(ctx *gin.Context) {
 		"total": total,
 	}
 	ctx.JSON(http.StatusOK, respData)
+}
+
+// FinetuneStop    godoc
+// @Security     ApiKey
+// @Summary      Stop a finetune instance
+// @Description  Stop a finetune instance
+// @Tags         Model
+// @Accept       json
+// @Produce      json
+// @Param        namespace path string true "namespace"
+// @Param        name path string true "name"
+// @Param        id path int true "id"
+// @Param        current_user query string false "current user"
+// @Success      200  {object}  types.Response{} "OK"
+// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
+// @Router       /models/{namespace}/{name}/finetune/{id}/stop [put]
+func (h *ModelHandler) FinetuneStop(ctx *gin.Context) {
+	var (
+		id  int64
+		err error
+	)
+	currentUser := httpbase.GetCurrentUser(ctx)
+	if currentUser == "" {
+		httpbase.UnauthorizedError(ctx, errors.New("user not found, please login first"))
+		return
+	}
+	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
+	if err != nil {
+		slog.Error("Bad request format", "error", err)
+		httpbase.BadRequest(ctx, err.Error())
+		return
+	}
+	id, err = strconv.ParseInt(ctx.Param("id"), 10, 64)
+	if err != nil {
+		slog.Error("Bad request format", "error", err)
+		httpbase.BadRequest(ctx, err.Error())
+		return
+	}
+
+	err = h.c.DeployStop(ctx, types.ModelRepo, namespace, name, currentUser, id)
+	if err != nil {
+		slog.Error("Failed to stop deploy", slog.Any("error", err))
+		httpbase.ServerError(ctx, err)
+		return
+	}
+	httpbase.OK(ctx, nil)
+}
+
+// FinetuneStart   godoc
+// @Security     ApiKey
+// @Summary      Start a finetune instance
+// @Description  Start a finetune instance
+// @Tags         Model
+// @Accept       json
+// @Produce      json
+// @Param        namespace path string true "namespace"
+// @Param        name path string true "name"
+// @Param        id path int true "deploy id"
+// @Param        current_user query string false "current user"
+// @Success      200  {object}  types.Response{} "OK"
+// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
+// @Router       /models/{namespace}/{name}/finetune/{id}/start [put]
+func (h *ModelHandler) FinetuneStart(ctx *gin.Context) {
+	var (
+		id  int64
+		err error
+	)
+	currentUser := httpbase.GetCurrentUser(ctx)
+	if currentUser == "" {
+		httpbase.UnauthorizedError(ctx, errors.New("user not found, please login first"))
+		return
+	}
+	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
+	if err != nil {
+		slog.Error("Bad request format", "error", err)
+		httpbase.BadRequest(ctx, err.Error())
+		return
+	}
+	id, err = strconv.ParseInt(ctx.Param("id"), 10, 64)
+	if err != nil {
+		slog.Error("Bad request format", "error", err)
+		httpbase.BadRequest(ctx, err.Error())
+		return
+	}
+
+	err = h.c.DeployStart(ctx, types.ModelRepo, namespace, name, currentUser, id)
+	if err != nil {
+		slog.Error("Failed to start deploy", slog.Any("error", err), slog.Any("repoType", types.ModelRepo), slog.String("namespace", namespace), slog.String("name", name), slog.Any("deployID", id))
+		httpbase.ServerError(ctx, err)
+		return
+	}
+	httpbase.OK(ctx, nil)
+}
+
+// GetRuntime godoc
+// @Security     ApiKey
+// @Summary      Get all runtime frameworks for current user
+// @Description  get all runtime frameworks for current user
+// @Tags         RuntimeFramework
+// @Accept       json
+// @Produce      json
+// @Param        current_user query string false "current user"
+// @Success      200  {object}  types.Response{} "OK"
+// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
+// @Router       /runtime_framework [get]
+func (h *ModelHandler) ListAllRuntimeFramework(ctx *gin.Context) {
+	currentUser := httpbase.GetCurrentUser(ctx)
+	if currentUser == "" {
+		httpbase.UnauthorizedError(ctx, errors.New("user not found, please login first"))
+		return
+	}
+
+	runtimes, err := h.c.ListAllByRuntimeFramework(ctx, currentUser)
+	if err != nil {
+		slog.Error("Failed to get runtime frameworks", slog.Any("error", err))
+		httpbase.ServerError(ctx, err)
+		return
+	}
+	respData := gin.H{
+		"data": runtimes,
+	}
+	ctx.JSON(http.StatusOK, respData)
+}
+
+// UpdateModelRuntime godoc
+// @Security     ApiKey
+// @Summary      Set model runtime frameworks
+// @Description  set model runtime frameworks
+// @Tags         RuntimeFramework
+// @Accept       json
+// @Produce      json
+// @Param        id path int true "runtime framework id"
+// @Param 		 deploy_type query int false "deploy_type" Enums(0, 1, 2) default(1)
+// @Param        current_user query string false "current user"
+// @Param        body body types.RuntimeFrameworkModels true "body"
+// @Success      200  {object}  types.Response{} "OK"
+// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
+// @Router       /runtime_framework/{id} [post]
+func (h *ModelHandler) UpdateModelRuntimeFrameworks(ctx *gin.Context) {
+	currentUser := httpbase.GetCurrentUser(ctx)
+	if currentUser == "" {
+		httpbase.UnauthorizedError(ctx, errors.New("user not found, please login first"))
+		return
+	}
+
+	var req types.RuntimeFrameworkModels
+	if err := ctx.ShouldBindJSON(&req); err != nil {
+		slog.Error("Bad request format", "error", err)
+		httpbase.BadRequest(ctx, err.Error())
+		return
+	}
+
+	id, err := strconv.ParseInt(ctx.Param("id"), 10, 64)
+	if err != nil {
+		slog.Error("Bad request format", "error", err)
+		httpbase.BadRequest(ctx, err.Error())
+		return
+	}
+
+	deployTypeStr := ctx.Query("deploy_type")
+	if deployTypeStr == "" {
+		// backward compatibility for inferences
+		deployTypeStr = strconv.Itoa(types.InferenceType)
+	}
+	deployType, err := strconv.Atoi(deployTypeStr)
+	if err != nil {
+		slog.Error("Bad request format", "error", err)
+		httpbase.BadRequest(ctx, err.Error())
+		return
+	}
+
+	slog.Info("update runtime frameworks models", slog.Any("req", req), slog.Any("runtime framework id", id), slog.Any("deployType", deployType))
+
+	list, err := h.c.SetRuntimeFrameworkModes(ctx, currentUser, deployType, id, req.Models)
+	if err != nil {
+		slog.Error("Failed to set models runtime framework", slog.Any("error", err))
+		httpbase.ServerError(ctx, err)
+		return
+	}
+
+	httpbase.OK(ctx, list)
+}
+
+// UpdateModelRuntime godoc
+// @Security     ApiKey
+// @Summary      Set model runtime frameworks
+// @Description  set model runtime frameworks
+// @Tags         RuntimeFramework
+// @Accept       json
+// @Produce      json
+// @Param        id path int true "runtime framework id"
+// @Param 		 deploy_type query int false "deploy_type" Enums(0, 1, 2) default(1)
+// @Param        current_user query string false "current user"
+// @Param        body body types.RuntimeFrameworkModels true "body"
+// @Success      200  {object}  types.Response{} "OK"
+// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
+// @Router       /runtime_framework/{id} [delete]
+func (h *ModelHandler) DeleteModelRuntimeFrameworks(ctx *gin.Context) {
+	currentUser := httpbase.GetCurrentUser(ctx)
+	if currentUser == "" {
+		httpbase.UnauthorizedError(ctx, errors.New("user not found, please login first"))
+		return
+	}
+
+	var req types.RuntimeFrameworkModels
+	if err := ctx.ShouldBindJSON(&req); err != nil {
+		slog.Error("Bad request format", "error", err)
+		httpbase.BadRequest(ctx, err.Error())
+		return
+	}
+
+	id, err := strconv.ParseInt(ctx.Param("id"), 10, 64)
+	if err != nil {
+		slog.Error("Bad request format", "error", err)
+		httpbase.BadRequest(ctx, err.Error())
+		return
+	}
+
+	deployTypeStr := ctx.Query("deploy_type")
+	if deployTypeStr == "" {
+		// backward compatibility for inferences
+		deployTypeStr = strconv.Itoa(types.InferenceType)
+	}
+	deployType, err := strconv.Atoi(deployTypeStr)
+	if err != nil {
+		slog.Error("Bad request format", "error", err)
+		httpbase.BadRequest(ctx, err.Error())
+		return
+	}
+
+	slog.Info("update runtime frameworks models", slog.Any("req", req), slog.Any("runtime framework id", id), slog.Any("deployType", deployType))
+
+	list, err := h.c.DeleteRuntimeFrameworkModes(ctx, currentUser, deployType, id, req.Models)
+	if err != nil {
+		slog.Error("Failed to set models runtime framework", slog.Any("error", err))
+		httpbase.ServerError(ctx, err)
+		return
+	}
+
+	httpbase.OK(ctx, list)
+}
+
+// GetRuntimeFrameworkModels godoc
+// @Security     ApiKey
+// @Summary      Get Visible models for all runtime frameworks for current user
+// @Description  get visible models for all runtime frameworks for current user
+// @Tags         RuntimeFramework
+// @Accept       json
+// @Produce      json
+// @Param        search query string false "search text"
+// @Param        sort query string false "sort by"
+// @Param        current_user query string false "current user"
+// @Param        per query int false "per" default(20)
+// @Param        page query int false "per page" default(1)
+// @Param     	 deploy_type query int false "deploy_type" Enums(1, 2) default(1)
+// @Success      200  {object}  types.Response{} "OK"
+// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
+// @Router       /runtime_framework/models [get]
+func (h *ModelHandler) ListModelsOfRuntimeFrameworks(ctx *gin.Context) {
+	filter := new(types.RepoFilter)
+	currentUser := httpbase.GetCurrentUser(ctx)
+	if currentUser == "" {
+		httpbase.UnauthorizedError(ctx, errors.New("user not found, please login first"))
+		return
+	}
+	filter = getFilterFromContext(ctx, filter)
+	deployTypeStr := ctx.Query("deploy_type")
+	if deployTypeStr == "" {
+		// backward compatibility for inferences
+		deployTypeStr = strconv.Itoa(types.InferenceType)
+	}
+	deployType, err := strconv.Atoi(deployTypeStr)
+	if err != nil {
+		slog.Error("Bad request deploy type format", "error", err)
+		httpbase.BadRequest(ctx, err.Error())
+		return
+	}
+	per, page, err := common.GetPerAndPageFromContext(ctx)
+	if err != nil {
+		slog.Error("Bad request per and page format", "error", err)
+		httpbase.BadRequest(ctx, err.Error())
+		return
+	}
+
+	models, total, err := h.c.ListModelsOfRuntimeFrameworks(ctx, currentUser, filter.Search, filter.Sort, per, page, deployType)
+	if err != nil {
+		slog.Error("fail to get models for all runtime frameworks", slog.Any("deployType", deployType), slog.Any("per", per), slog.Any("page", page), slog.Any("error", err))
+		httpbase.ServerError(ctx, err)
+		return
+	}
+	respData := gin.H{
+		"data":  models,
+		"total": total,
+	}
+	ctx.JSON(http.StatusOK, respData)
+}
+
+// ModelFiles      godoc
+// @Security     ApiKey
+// @Summary      Get all files of a model
+// @Tags         Model
+// @Accept       json
+// @Produce      json
+// @Param        namespace path string true "namespace"
+// @Param        name path string true "name"
+// @Param        current_user query string false "current user"
+// @Success      200  {object}  types.Response{data=types.File} "OK"
+// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
+// @Router       /models/{namespace}/{name}/all_files [get]
+func (h *ModelHandler) AllFiles(ctx *gin.Context) {
+	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
+	if err != nil {
+		slog.Error("Bad request format", "error", err)
+		httpbase.BadRequest(ctx, err.Error())
+		return
+	}
+	var req types.GetAllFilesReq
+	req.Namespace = namespace
+	req.Name = name
+	req.RepoType = types.ModelRepo
+	req.CurrentUser = httpbase.GetCurrentUser(ctx)
+	detail, err := h.c.AllFiles(ctx, req)
+	if err != nil {
+		if errors.Is(err, component.ErrUnauthorized) {
+			httpbase.UnauthorizedError(ctx, err)
+			return
+		}
+		slog.Error("Failed to get model all files", slog.Any("error", err))
+		httpbase.ServerError(ctx, err)
+		return
+	}
+
+	httpbase.OK(ctx, detail)
 }

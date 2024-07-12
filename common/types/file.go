@@ -114,3 +114,10 @@ type CreateFileParams struct {
 	Name      string `json:"name"`
 	FilePath  string `json:"file_path"`
 }
+
+type GetAllFilesReq struct {
+	Namespace   string         `json:"namespace"`
+	Name        string         `json:"name"`
+	RepoType    RepositoryType `json:"repo_type"`
+	CurrentUser string         `json:"current_user"`
+}

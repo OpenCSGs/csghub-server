@@ -2,6 +2,7 @@ package component
 
 import (
 	"context"
+	"database/sql"
 	"encoding/base64"
 	"errors"
 	"fmt"
@@ -25,33 +26,39 @@ import (
 	"opencsg.com/csghub-server/builder/store/s3"
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/types"
+	"opencsg.com/csghub-server/common/utils/common"
 )
 
 const ErrNotFoundMessage = "The target couldn't be found."
 
 type RepoComponent struct {
-	tc               *TagComponent
-	user             *database.UserStore
-	org              *database.OrgStore
-	namespace        *database.NamespaceStore
-	repo             *database.RepoStore
-	rel              *database.RepoRelationsStore
-	mirror           *database.MirrorStore
-	git              gitserver.GitServer
-	s3Client         *minio.Client
-	msc              *MemberComponent
-	lfsBucket        string
-	uls              *database.UserLikesStore
-	mirrorServer     mirrorserver.MirrorServer
-	runFrame         *database.RuntimeFrameworksStore
-	deploy           *database.DeployTaskStore
-	deployer         deploy.Deployer
-	publicRootDomain string
-	cluster          *database.ClusterInfoStore
-	mirrorSource     *database.MirrorSourceStore
-	tokenStore       *database.AccessTokenStore
-	rtfm             *database.RuntimeFrameworksStore
-	rrtfms           *database.RepositoriesRuntimeFrameworkStore
+	tc                *TagComponent
+	user              *database.UserStore
+	org               *database.OrgStore
+	namespace         *database.NamespaceStore
+	repo              *database.RepoStore
+	rel               *database.RepoRelationsStore
+	mirror            *database.MirrorStore
+	git               gitserver.GitServer
+	s3Client          *minio.Client
+	msc               *MemberComponent
+	lfsBucket         string
+	uls               *database.UserLikesStore
+	mirrorServer      mirrorserver.MirrorServer
+	runFrame          *database.RuntimeFrameworksStore
+	deploy            *database.DeployTaskStore
+	deployer          deploy.Deployer
+	publicRootDomain  string
+	cluster           *database.ClusterInfoStore
+	mirrorSource      *database.MirrorSourceStore
+	tokenStore        *database.AccessTokenStore
+	rtfm              *database.RuntimeFrameworksStore
+	rrtfms            *database.RepositoriesRuntimeFrameworkStore
+	needPurge         bool
+	syncVersion       *database.SyncVersionStore
+	syncClientSetting *database.SyncClientSettingStore
+	file              *database.FileStore
+	config            *config.Config
 }
 
 func NewRepoComponent(config *config.Config) (*RepoComponent, error) {
@@ -65,6 +72,9 @@ func NewRepoComponent(config *config.Config) (*RepoComponent, error) {
 	c.mirror = database.NewMirrorStore()
 	c.mirrorSource = database.NewMirrorSourceStore()
 	c.tokenStore = database.NewAccessTokenStore()
+	c.syncVersion = database.NewSyncVersionStore()
+	c.syncClientSetting = database.NewSyncClientSettingStore()
+	c.file = database.NewFileStore()
 	var err error
 	c.git, err = git.NewGitServer(config)
 	if err != nil {
@@ -104,6 +114,10 @@ func NewRepoComponent(config *config.Config) (*RepoComponent, error) {
 	c.cluster = database.NewClusterInfoStore()
 	c.rtfm = database.NewRuntimeFrameworksStore()
 	c.rrtfms = database.NewRepositoriesRuntimeFramework()
+	if config.Space.StorageClass != "" {
+		c.needPurge = true
+	}
+	c.config = config
 	return c, nil
 }
 
@@ -260,6 +274,11 @@ func (c *RepoComponent) DeleteRepo(ctx context.Context, req types.DeleteRepoReq)
 		if namespace.Path != user.Username {
 			return nil, errors.New("users do not have permission to delete repo in this namespace")
 		}
+	}
+
+	err = c.repo.CleanRelationsByRepoID(ctx, repo.ID)
+	if err != nil {
+		return nil, fmt.Errorf("fail to clean repo relations, %w", err)
 	}
 
 	deleteRepoReq := gitserver.DeleteRepoReq{
@@ -545,8 +564,17 @@ func (c *RepoComponent) LastCommit(ctx context.Context, req *types.GetCommitsReq
 
 func (c *RepoComponent) FileRaw(ctx context.Context, req *types.GetFileReq) (string, error) {
 	repo, err := c.repo.FindByPath(ctx, req.RepoType, req.Namespace, req.Name)
-	if err != nil {
+	if err != nil || repo == nil {
 		return "", fmt.Errorf("failed to find repo, error: %w", err)
+	}
+
+	if repo.Source != types.LocalSource && strings.ToLower(req.Path) == "readme.md" {
+		_, err := c.mirror.FindByRepoID(ctx, repo.ID)
+		if err != nil {
+			if errors.Is(err, sql.ErrNoRows) {
+				return repo.Readme, nil
+			}
+		}
 	}
 	if req.Ref == "" {
 		req.Ref = repo.DefaultBranch
@@ -623,7 +651,7 @@ func (c *RepoComponent) DownloadFile(ctx context.Context, req *types.GetFileReq,
 }
 
 func (c *RepoComponent) Branches(ctx context.Context, req *types.GetBranchesReq) ([]types.Branch, error) {
-	_, err := c.repo.FindByPath(ctx, req.RepoType, req.Namespace, req.Name)
+	repo, err := c.repo.FindByPath(ctx, req.RepoType, req.Namespace, req.Name)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find repo, error: %w", err)
 	}
@@ -636,6 +664,9 @@ func (c *RepoComponent) Branches(ctx context.Context, req *types.GetBranchesReq)
 	}
 	bs, err := c.git.GetRepoBranches(ctx, getBranchesReq)
 	if err != nil {
+		if repo.Source != types.LocalSource {
+			return []types.Branch{}, nil
+		}
 		return nil, fmt.Errorf("failed to get git %s repository branches, error: %w", req.RepoType, err)
 	}
 	return bs, nil
@@ -669,6 +700,40 @@ func (c *RepoComponent) Tree(ctx context.Context, req *types.GetFileReq) ([]*typ
 	repo, err := c.repo.FindByPath(ctx, req.RepoType, req.Namespace, req.Name)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find repo, error: %w", err)
+	}
+	if repo == nil {
+		return nil, fmt.Errorf("repo does not exist, error: %w", err)
+	}
+	if repo.Source != types.LocalSource {
+		_, err := c.mirror.FindByRepoID(ctx, repo.ID)
+		if err != nil {
+			if errors.Is(err, sql.ErrNoRows) {
+				if req.Path == "" {
+					req.Path = "/"
+				}
+				files, err := c.file.FindByParentPath(ctx, repo.ID, req.Path)
+				if err != nil {
+					if errors.Is(err, sql.ErrNoRows) {
+						return []*types.File{}, nil
+					} else {
+						return nil, err
+					}
+				}
+				var resFiles []*types.File
+				for _, f := range files {
+					resFiles = append(resFiles, &types.File{
+						Name: f.Name,
+						Path: f.Path,
+						Size: f.Size,
+						Commit: types.Commit{
+							Message:       f.LastCommitMessage,
+							CommitterDate: f.LastCommitDate,
+						},
+					})
+				}
+				return resFiles, nil
+			}
+		}
 	}
 	if req.Ref == "" {
 		req.Ref = repo.DefaultBranch
@@ -873,6 +938,7 @@ func (c *RepoComponent) SDKDownloadFile(ctx context.Context, req *types.GetFileR
 	}
 }
 
+// UpdateDownloads increase clone download count for repo by given count
 func (c *RepoComponent) UpdateDownloads(ctx context.Context, req *types.UpdateDownloadsReq) error {
 	repo, err := c.repo.FindByPath(ctx, req.RepoType, req.Namespace, req.Name)
 	if err != nil {
@@ -882,6 +948,20 @@ func (c *RepoComponent) UpdateDownloads(ctx context.Context, req *types.UpdateDo
 	err = c.repo.UpdateRepoCloneDownloads(ctx, repo, req.Date, req.CloneCount)
 	if err != nil {
 		return fmt.Errorf("failed to update %s download count, error: %w", req.RepoType, err)
+	}
+	return err
+}
+
+// IncrDownloads increase the click download count for repo by 1
+func (c *RepoComponent) IncrDownloads(ctx context.Context, repoType types.RepositoryType, namespace, name string) error {
+	repo, err := c.repo.FindByPath(ctx, repoType, namespace, name)
+	if err != nil {
+		return fmt.Errorf("failed to find %s, error: %w", repoType, err)
+	}
+
+	err = c.repo.UpdateRepoFileDownloads(ctx, repo, time.Now(), 1)
+	if err != nil {
+		return fmt.Errorf("failed to incr download count, error: %w", err)
 	}
 	return err
 }
@@ -1064,7 +1144,10 @@ func (c *RepoComponent) GetCommitWithDiff(ctx context.Context, req *types.GetCom
 }
 
 func (c *RepoComponent) CreateMirror(ctx context.Context, req types.CreateMirrorReq) (*database.Mirror, error) {
-	var mirror database.Mirror
+	var (
+		mirror database.Mirror
+		taskId int64
+	)
 	admin, err := c.checkCurrentUserPermission(ctx, req.CurrentUser, req.Namespace, membership.RoleAdmin)
 	if err != nil {
 		return nil, fmt.Errorf("failed to check permission to create mirror, error: %w", err)
@@ -1078,6 +1161,9 @@ func (c *RepoComponent) CreateMirror(ctx context.Context, req types.CreateMirror
 	if err != nil {
 		return nil, fmt.Errorf("failed to find repo, error: %w", err)
 	}
+	if repo == nil {
+		return nil, fmt.Errorf("repo not found")
+	}
 	exists, err := c.mirror.IsExist(ctx, repo.ID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find mirror, error: %w", err)
@@ -1089,7 +1175,7 @@ func (c *RepoComponent) CreateMirror(ctx context.Context, req types.CreateMirror
 	if err != nil {
 		return nil, fmt.Errorf("failed to get mirror source, err: %w, id: %d", err, req.MirrorSourceID)
 	}
-	pushAccessToken, err := c.tokenStore.FindByUsername(ctx, req.CurrentUser)
+	pushAccessToken, err := c.tokenStore.GetUserGitToken(ctx, req.CurrentUser)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find access token, error: %w", err)
 	}
@@ -1099,22 +1185,37 @@ func (c *RepoComponent) CreateMirror(ctx context.Context, req types.CreateMirror
 	mirror.Username = req.Username
 	mirror.PushUrl = repo.HTTPCloneURL
 	mirror.AccessToken = req.AccessToken
-	mirror.PushUsername = req.CurrentUser
-	mirror.PushAccessToken = pushAccessToken.Token
 	mirror.SourceRepoPath = req.SourceRepoPath
 	mirror.LocalRepoPath = fmt.Sprintf("%s_%s_%s_%s", mirrorSource.SourceName, req.RepoType, req.Namespace, req.Name)
 	mirror.RepositoryID = repo.ID
 
-	taskId, err := c.mirrorServer.CreateMirrorRepo(ctx, mirrorserver.CreateMirrorRepoReq{
-		Namespace:   "root",
-		Name:        mirror.LocalRepoPath,
-		CloneUrl:    mirror.SourceUrl,
-		Username:    mirror.Username,
-		AccessToken: mirror.AccessToken,
-		Private:     false,
-	})
-	if err != nil {
-		return nil, fmt.Errorf("failed to create pull mirror in mirror server: %v", err)
+	if c.config.Saas {
+		mirror.PushUsername = req.CurrentUser
+		mirror.PushAccessToken = pushAccessToken.Token
+		taskId, err = c.mirrorServer.CreateMirrorRepo(ctx, mirrorserver.CreateMirrorRepoReq{
+			Namespace:   "root",
+			Name:        mirror.LocalRepoPath,
+			CloneUrl:    mirror.SourceUrl,
+			Username:    mirror.Username,
+			AccessToken: mirror.AccessToken,
+			Private:     false,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("failed to create pull mirror in mirror server: %v", err)
+		}
+	} else {
+		taskId, err = c.git.CreateMirrorRepo(ctx, gitserver.CreateMirrorRepoReq{
+			Namespace:   req.Namespace,
+			Name:        req.Name,
+			CloneUrl:    mirror.SourceUrl,
+			Username:    mirror.Username,
+			AccessToken: mirror.AccessToken,
+			RepoType:    req.RepoType,
+			Private:     false,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("failed to create pull mirror in mirror server: %v", err)
+		}
 	}
 
 	mirror.MirrorTaskID = taskId
@@ -1125,6 +1226,99 @@ func (c *RepoComponent) CreateMirror(ctx context.Context, req types.CreateMirror
 	}
 
 	return reqMirror, nil
+}
+
+func (c *RepoComponent) MirrorFromSaas(ctx context.Context, namespace, name, currentUser string, repoType types.RepositoryType) error {
+	repo, err := c.repo.FindByPath(ctx, repoType, namespace, name)
+	if err != nil {
+		return fmt.Errorf("failed to find repo, error: %w", err)
+	}
+	if repo == nil {
+		return fmt.Errorf("repo not found")
+	}
+	m, err := c.mirror.FindByRepoID(ctx, repo.ID)
+	if err != nil {
+		if !errors.Is(err, sql.ErrNoRows) {
+			return fmt.Errorf("failed to find mirror, error: %w", err)
+		}
+	}
+	if m != nil {
+		err := c.mirrorFromSaasSync(ctx, repo, namespace, name, repoType)
+		if err != nil {
+			return fmt.Errorf("failed to trigger mirror sync, error: %w", err)
+		}
+		return nil
+	}
+	var mirror database.Mirror
+	syncVersion, err := c.syncVersion.FindByRepoTypeAndPath(ctx, repo.PathWithOutPrefix(), repoType)
+	if err != nil {
+		return fmt.Errorf("failed to find sync version, error: %w", err)
+	}
+	mirrorSource := &database.MirrorSource{}
+	if syncVersion.SourceID == types.SyncVersionSourceOpenCSG {
+		mirrorSource.SourceName = types.OpenCSGPrefix
+	} else if syncVersion.SourceID == types.SyncVersionSourceHF {
+		mirrorSource.SourceName = types.HuggingfacePrefix
+	}
+
+	mirrorSource.SourceName = types.OpenCSGPrefix
+	syncClientSetting, err := c.syncClientSetting.First(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to find sync client setting, error: %w", err)
+	}
+
+	sourceUrl := common.TrimPrefixCloneURLBySourceID(c.config.Mirror.URL, string(repoType), namespace, name, syncVersion.SourceID)
+	mirror.SourceUrl = sourceUrl
+	mirror.MirrorSourceID = mirrorSource.ID
+	mirror.RepositoryID = repo.ID
+	mirror.Username = currentUser
+	mirror.AccessToken = c.config.Mirror.Token
+	mirror.SourceRepoPath = fmt.Sprintf("%s/%s", namespace, name)
+
+	taskId, err := c.git.CreateMirrorRepo(ctx, gitserver.CreateMirrorRepoReq{
+		Namespace:   namespace,
+		Name:        name,
+		CloneUrl:    mirror.SourceUrl,
+		Username:    mirror.Username,
+		AccessToken: mirror.AccessToken,
+		RepoType:    repoType,
+		MirrorToken: syncClientSetting.Token,
+		Private:     false,
+	})
+	if err != nil {
+		return fmt.Errorf("failed to create pull mirror in mirror server: %v", err)
+	}
+
+	mirror.MirrorTaskID = taskId
+
+	_, err = c.mirror.Create(ctx, &mirror)
+
+	if err != nil {
+		return fmt.Errorf("failed to create mirror")
+	}
+	repo.SyncStatus = types.SyncStatusInProgress
+	_, err = c.repo.UpdateRepo(ctx, *repo)
+	if err != nil {
+		return fmt.Errorf("failed to update repo sync status")
+	}
+	return nil
+}
+
+func (c *RepoComponent) mirrorFromSaasSync(ctx context.Context, repo *database.Repository, namespace, name string, repoType types.RepositoryType) error {
+	err := c.git.MirrorSync(ctx, gitserver.MirrorSyncReq{
+		Namespace: namespace,
+		Name:      name,
+		RepoType:  repoType,
+	})
+	if err != nil {
+		return fmt.Errorf("failed to sync mirror, error: %w", err)
+	}
+	repo.SyncStatus = types.SyncStatusInProgress
+	_, err = c.repo.UpdateRepo(ctx, *repo)
+	if err != nil {
+		return fmt.Errorf("failed to update repo sync status")
+	}
+	return nil
 }
 
 func (c *RepoComponent) GetMirror(ctx context.Context, req types.GetMirrorReq) (*database.Mirror, error) {
@@ -1169,7 +1363,7 @@ func (c *RepoComponent) UpdateMirror(ctx context.Context, req types.UpdateMirror
 		return nil, fmt.Errorf("failed to get mirror source, err: %w, id: %d", err, req.MirrorSourceID)
 	}
 
-	pushAccessToken, err := c.tokenStore.FindByUsername(ctx, req.CurrentUser)
+	pushAccessToken, err := c.tokenStore.GetUserGitToken(ctx, req.CurrentUser)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find access token, error: %w", err)
 	}
@@ -1215,8 +1409,30 @@ func (c *RepoComponent) DeleteMirror(ctx context.Context, req types.DeleteMirror
 	return nil
 }
 
+// get runtime framework list with type
+func (c *RepoComponent) ListRuntimeFrameworkWithType(ctx context.Context, deployType int) ([]types.RuntimeFramework, error) {
+	frames, err := c.runFrame.List(ctx, deployType)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list runtime frameworks, error: %w", err)
+	}
+	var frameList []types.RuntimeFramework
+	for _, frame := range frames {
+		frameList = append(frameList, types.RuntimeFramework{
+			ID:            frame.ID,
+			FrameName:     frame.FrameName,
+			FrameVersion:  frame.FrameVersion,
+			FrameImage:    frame.FrameImage,
+			FrameCpuImage: frame.FrameCpuImage,
+			Enabled:       frame.Enabled,
+			ContainerPort: frame.ContainerPort,
+			Type:          frame.Type,
+		})
+	}
+	return frameList, nil
+}
+
 // get runtime framework list
-func (c *RepoComponent) ListRuntimeFramework(ctx context.Context, repoType types.RepositoryType, namespace, name string) ([]types.RuntimeFramework, error) {
+func (c *RepoComponent) ListRuntimeFramework(ctx context.Context, repoType types.RepositoryType, namespace, name string, deployType int) ([]types.RuntimeFramework, error) {
 	repo, err := c.repo.FindByPath(ctx, repoType, namespace, name)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find repo, error: %w", err)
@@ -1224,7 +1440,7 @@ func (c *RepoComponent) ListRuntimeFramework(ctx context.Context, repoType types
 	if repo == nil {
 		return nil, fmt.Errorf("repo not exist, %s %s/%s", repoType, namespace, name)
 	}
-	frames, err := c.runFrame.ListByRepoID(ctx, repo.ID)
+	frames, err := c.runFrame.ListByRepoID(ctx, repo.ID, deployType)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list runtime frameworks, error: %w", err)
 	}
@@ -1253,6 +1469,7 @@ func (c *RepoComponent) CreateRuntimeFramework(ctx context.Context, req *types.R
 		FrameCpuImage: req.FrameCpuImage,
 		Enabled:       req.Enabled,
 		ContainerPort: req.ContainerPort,
+		Type:          req.Type,
 	}
 	err := c.runFrame.Add(ctx, newFrame)
 	if err != nil {
@@ -1265,6 +1482,7 @@ func (c *RepoComponent) CreateRuntimeFramework(ctx context.Context, req *types.R
 		FrameCpuImage: req.FrameCpuImage,
 		Enabled:       req.Enabled,
 		ContainerPort: req.ContainerPort,
+		Type:          req.Type,
 	}
 	return frame, nil
 }
@@ -1278,6 +1496,7 @@ func (c *RepoComponent) UpdateRuntimeFramework(ctx context.Context, id int64, re
 		FrameCpuImage: req.FrameCpuImage,
 		Enabled:       req.Enabled,
 		ContainerPort: req.ContainerPort,
+		Type:          req.Type,
 	}
 	frame, err := c.runFrame.Update(ctx, newFrame)
 	if err != nil {
@@ -1291,6 +1510,7 @@ func (c *RepoComponent) UpdateRuntimeFramework(ctx context.Context, id int64, re
 		FrameCpuImage: frame.FrameCpuImage,
 		Enabled:       frame.Enabled,
 		ContainerPort: frame.ContainerPort,
+		Type:          req.Type,
 	}, nil
 }
 
@@ -1358,11 +1578,13 @@ func (c *RepoComponent) DeleteDeploy(ctx context.Context, repoType types.Reposit
 		Namespace: namespace,
 		Name:      name,
 		SvcName:   deploy.SvcName,
+		ClusterID: deploy.ClusterID,
 	}
-	err = c.deployer.Stop(ctx, deployRepo)
+	// purge service
+	err = c.deployer.Purge(ctx, deployRepo)
 	if err != nil {
-		// fail to stop deploy instance, maybe service is gone
-		slog.Warn("Stop deploy instance", slog.Any("error", err))
+		// fail to purge deploy instance, maybe service is gone
+		slog.Warn("purge deploy instance", slog.Any("error", err))
 	}
 
 	exist, err := c.deployer.Exist(ctx, deployRepo)
@@ -1415,6 +1637,7 @@ func (c *RepoComponent) DeployDetail(ctx context.Context, repoType types.Reposit
 		Namespace: namespace,
 		Name:      name,
 		SvcName:   deploy.SvcName,
+		ClusterID: deploy.ClusterID,
 	}
 	actualReplica, desiredReplica, instList, err := c.deployer.GetReplica(ctx, req)
 	if err != nil {
@@ -1424,6 +1647,11 @@ func (c *RepoComponent) DeployDetail(ctx context.Context, repoType types.Reposit
 	if deploy.SecureLevel == types.EndpointPublic {
 		endpointPrivate = false
 	}
+	proxyEndPoint := ""
+	if deploy.Type == types.FinetuneType {
+		proxyEndPoint = endpoint + "/proxy/7860/"
+	}
+
 	resDeploy := types.DeployRepo{
 		DeployID:         deploy.ID,
 		DeployName:       deploy.DeployName,
@@ -1448,6 +1676,8 @@ func (c *RepoComponent) DeployDetail(ctx context.Context, repoType types.Reposit
 		Instances:        instList,
 		Private:          endpointPrivate,
 		Path:             repo.Path,
+		ProxyEndpoint:    proxyEndPoint,
+		SKU:              deploy.SKU,
 	}
 
 	return &resDeploy, nil
@@ -1584,6 +1814,7 @@ func (c *RepoComponent) DeployStop(ctx context.Context, repoType types.Repositor
 		Namespace: namespace,
 		Name:      name,
 		SvcName:   deploy.SvcName,
+		ClusterID: deploy.ClusterID,
 	}
 	err = c.deployer.Stop(ctx, deployRepo)
 	if err != nil {
@@ -1748,6 +1979,7 @@ func (c *RepoComponent) DeployUpdate(ctx context.Context, repoType types.Reposit
 		Namespace: namespace,
 		Name:      name,
 		SvcName:   deploy.SvcName,
+		ClusterID: deploy.ClusterID,
 	}
 	exist, err := c.deployer.Exist(ctx, deployRepo)
 	if err != nil {
@@ -1777,6 +2009,7 @@ func (c *RepoComponent) DeployStart(ctx context.Context, repoType types.Reposito
 		Namespace: namespace,
 		Name:      name,
 		SvcName:   deploy.SvcName,
+		ClusterID: deploy.ClusterID,
 	}
 	exist, err := c.deployer.Exist(ctx, deployRepo)
 	if err != nil {
@@ -1795,4 +2028,30 @@ func (c *RepoComponent) DeployStart(ctx context.Context, repoType types.Reposito
 	}
 
 	return err
+}
+
+func (c *RepoComponent) AllFiles(ctx context.Context, req types.GetAllFilesReq) ([]*types.File, error) {
+	repo, err := c.repo.FindByPath(ctx, req.RepoType, req.Namespace, req.Name)
+	if err != nil {
+		return nil, fmt.Errorf("failed to find repo, error: %w", err)
+	}
+	if repo == nil {
+		return nil, fmt.Errorf("failed to find repo")
+	}
+	if repo.Private {
+		read, err := c.checkCurrentUserPermission(ctx, req.CurrentUser, req.Namespace, membership.RoleRead)
+		if err != nil {
+			return nil, fmt.Errorf("failed to check permission to get all files, error: %w", err)
+		}
+
+		if !read {
+			return nil, fmt.Errorf("users do not have permission to get all files for this repo")
+		}
+	}
+	allFiles, err := getAllFiles(req.Namespace, req.Name, "", req.RepoType, c.git.GetRepoFileTree)
+	if err != nil {
+		slog.Error("fail to get all files of repository", slog.Any("repoType", req.RepoType), slog.String("namespace", req.Namespace), slog.String("name", req.Name), slog.String("error", err.Error()))
+		return nil, err
+	}
+	return allFiles, nil
 }

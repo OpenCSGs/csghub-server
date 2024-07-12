@@ -20,6 +20,7 @@ type GitServer interface {
 	CreateUserToken(*types.CreateUserTokenRequest) (*database.AccessToken, error)
 	DeleteUserToken(*types.DeleteUserTokenRequest) error
 
+	GetRepo(ctx context.Context, req GetRepoReq) (*CreateRepoResp, error)
 	CreateRepo(ctx context.Context, req CreateRepoReq) (*CreateRepoResp, error)
 	UpdateRepo(ctx context.Context, req UpdateRepoReq) (*CreateRepoResp, error)
 	DeleteRepo(ctx context.Context, req DeleteRepoReq) error
@@ -46,4 +47,12 @@ type GitServer interface {
 
 	FixOrganization(req *types.CreateOrgReq, orgOwner database.User) error
 	FixUserData(ctx context.Context, userName string) error
+
+	// Mirror
+	// CreateMirrorRepo creates a mirror repository and returns a gitea task id
+	CreateMirrorRepo(ctx context.Context, req CreateMirrorRepoReq) (int64, error)
+	// GetMirrorTaskInfo returns the Gitea mirror task info
+	GetMirrorTaskInfo(ctx context.Context, taskId int64) (*MirrorTaskInfo, error)
+	// MirrorSync requests the Gitea to start mirror synchronization
+	MirrorSync(ctx context.Context, req MirrorSyncReq) error
 }

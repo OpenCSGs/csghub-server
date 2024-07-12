@@ -141,37 +141,41 @@ func (rs *FIFOScheduler) next() (Runner, error) {
 		// handle space
 		var s *database.Space
 		s, err = rs.spaceStore.ByID(ctx, deployTask.Deploy.SpaceID)
-		repo.Path = s.Repository.Path
-		repo.Name = s.Repository.Name
-		repo.Sdk = s.Sdk
-		repo.SdkVersion = s.SdkVersion
-		repo.HTTPCloneURL = s.Repository.HTTPCloneURL
-		repo.SpaceID = s.ID
-		repo.RepoID = s.Repository.ID
-		repo.UserName = s.Repository.User.Name
-		repo.DeployID = deployTask.Deploy.ID
-		repo.ModelID = 0
-		repo.RepoType = string(types.SpaceRepo)
+		if err == nil {
+			repo.Path = s.Repository.Path
+			repo.Name = s.Repository.Name
+			repo.Sdk = s.Sdk
+			repo.SdkVersion = s.SdkVersion
+			repo.HTTPCloneURL = s.Repository.HTTPCloneURL
+			repo.SpaceID = s.ID
+			repo.RepoID = s.Repository.ID
+			repo.UserName = s.Repository.User.Name
+			repo.DeployID = deployTask.Deploy.ID
+			repo.ModelID = 0
+			repo.RepoType = string(types.SpaceRepo)
+		}
 	} else if deployTask.Deploy.ModelID > 0 {
 		// handle model
 		var m *database.Model
 		m, err = rs.modelStore.ByID(ctx, deployTask.Deploy.ModelID)
-		repo.Path = m.Repository.Path
-		repo.Name = m.Repository.Name
-		repo.ModelID = m.ID
-		repo.RepoID = m.Repository.ID
-		repo.UserName = m.Repository.User.Name
-		repo.DeployID = deployTask.Deploy.ID
-		repo.SpaceID = 0
-		repo.RepoType = string(types.ModelRepo)
+		if err == nil {
+			repo.Path = m.Repository.Path
+			repo.Name = m.Repository.Name
+			repo.ModelID = m.ID
+			repo.RepoID = m.Repository.ID
+			repo.UserName = m.Repository.User.Name
+			repo.DeployID = deployTask.Deploy.ID
+			repo.SpaceID = 0
+			repo.RepoType = string(types.ModelRepo)
+		}
 	}
 
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			slog.Info("cancel deploy task as space not found", slog.Int64("deploy_task_id", deployTask.ID), slog.Int64("space_id", deployTask.Deploy.SpaceID))
+			slog.Warn("cancel deploy task as repo not found", slog.Any("deploy_task", deployTask))
 			// mark task as cancelled
 			deployTask.Status = cancelled
-			deployTask.Message = "space not found"
+			deployTask.Message = "repo not found"
 			rs.store.UpdateDeployTask(ctx, deployTask)
 		}
 		t = &sleepTask{

@@ -6,12 +6,14 @@ import (
 	"os"
 
 	"github.com/spf13/cobra"
+	"opencsg.com/csghub-server/cmd/csghub-server/cmd/accounting"
 	"opencsg.com/csghub-server/cmd/csghub-server/cmd/cron"
 	"opencsg.com/csghub-server/cmd/csghub-server/cmd/deploy"
 	"opencsg.com/csghub-server/cmd/csghub-server/cmd/logscan"
 	"opencsg.com/csghub-server/cmd/csghub-server/cmd/migration"
 	"opencsg.com/csghub-server/cmd/csghub-server/cmd/mirror"
 	"opencsg.com/csghub-server/cmd/csghub-server/cmd/start"
+	"opencsg.com/csghub-server/cmd/csghub-server/cmd/syncversion"
 	"opencsg.com/csghub-server/cmd/csghub-server/cmd/trigger"
 )
 
@@ -50,6 +52,8 @@ func init() {
 		deploy.Cmd,
 		cron.Cmd,
 		mirror.Cmd,
+		accounting.Cmd,
+		syncversion.Cmd,
 	)
 }
 

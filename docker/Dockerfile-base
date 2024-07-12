@@ -1,0 +1,13 @@
+FROM opencsg-registry.cn-beijing.cr.aliyuncs.com/public/golang:1.21.0-bullseye
+
+RUN wget https://opencsg-public-resource.oss-cn-beijing.aliyuncs.com/tools/jq-linux-amd64 -O /usr/local/bin/jq && \
+    chmod 755 /usr/local/bin/jq
+
+RUN mkdir -p ~/.duckdb/extensions/v0.9.2/linux_amd64 && \ 
+    wget https://opencsg-public-resource.oss-cn-beijing.aliyuncs.com/tools/duckdb/httpfs.duckdb_extension -O ~/.duckdb/extensions/v0.9.2/linux_amd64/httpfs.duckdb_extension && \
+    chmod 755 ~/.duckdb/extensions/v0.9.2/linux_amd64/httpfs.duckdb_extension
+
+RUN sed -i "s@/deb.debian.org@/mirrors.cloud.aliyuncs.com@g" /etc/apt/sources.list && \
+    apt-get update && apt-get install -y cron && rm -rf /var/lib/apt/lists/*
+
+# docker build -t opencsg-registry.cn-beijing.cr.aliyuncs.com/public/starhub-server:base-1.0 -f Dockerfile-base .

@@ -38,6 +38,7 @@ type GitCallbackComponent struct {
 	rs          *database.RepoStore
 	rrs         *database.RepoRelationsStore
 	mirrorStore *database.MirrorStore
+	svGen       *SyncVersionGenerator
 	// set visibility if file content is sensitive
 	setRepoVisibility bool
 }
@@ -63,6 +64,7 @@ func NewGitCallback(config *config.Config) (*GitCallbackComponent, error) {
 	if err != nil {
 		return nil, err
 	}
+	svGen := NewSyncVersionGenerator()
 	return &GitCallbackComponent{
 		config:      config,
 		gs:          gs,
@@ -75,6 +77,7 @@ func NewGitCallback(config *config.Config) (*GitCallbackComponent, error) {
 		rrs:         rrs,
 		mirrorStore: mirrorStore,
 		checker:     checker,
+		svGen:       svGen,
 	}, nil
 }
 
@@ -97,6 +100,15 @@ func (c *GitCallbackComponent) HandlePush(ctx context.Context, req *types.GiteaC
 			slog.Error("watch repo relation failed", slog.Any("error", err))
 		}
 	}()
+
+	if !req.Repository.Private {
+		go func() {
+			err := c.svGen.GenSyncVersion(req)
+			if err != nil {
+				slog.Error("generate sync version failed", slog.Any("error", err))
+			}
+		}()
+	}
 
 	commits := req.Commits
 	ref := req.Ref

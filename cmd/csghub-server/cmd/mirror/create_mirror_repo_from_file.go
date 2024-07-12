@@ -17,10 +17,14 @@ import (
 	"opencsg.com/csghub-server/component"
 )
 
-var filePath string
+var (
+	filePath string
+	lfs      bool
+)
 
 func init() {
 	createMirrorRepoFromFile.Flags().StringVar(&filePath, "file", "", "the path of the file")
+	createMirrorRepoFromFile.Flags().BoolVar(&lfs, "lfs", false, "sync lfs file")
 }
 
 var createMirrorRepoFromFile = &cobra.Command{
@@ -53,6 +57,9 @@ var createMirrorRepoFromFile = &cobra.Command{
 		config, ok := ctx.Value("config").(*config.Config)
 		if !ok {
 			slog.Error("config not found in context")
+			return
+		}
+		if !config.Saas {
 			return
 		}
 
@@ -114,6 +121,7 @@ var createMirrorRepoFromFile = &cobra.Command{
 				RepoType:          types.RepositoryType(repoType),
 				DefaultBranch:     "main",
 				SourceGitCloneUrl: sourceGitCloneUrl,
+				SyncLfs:           lfs,
 			}
 			fmt.Println(req)
 			_, err = c.CreateMirrorRepo(ctx, req)

@@ -40,9 +40,12 @@ type Deploy struct {
 	SvcName          string `json:"svc_name"`
 	Endpoint         string `json:"endpoint"`
 	// minimum unit of money for counting cost
-	CostPerHour int64  `json:"cost_per_hour"`
-	ClusterID   string `json:"cluster_id"`
-	SecureLevel int    `json:"secure_level"` // 1-public, 2-private, 3-extension in future
+	CostPerHour float64 `json:"cost_per_hour"`
+	ClusterID   string  `json:"cluster_id"`
+	SecureLevel int     `json:"secure_level"` // 1-public, 2-private, 3-extension in future
+	Type        int     `json:"type"`         // 0-space, 1-inference, 2-finetune
+	UserUUID    string  `bun:"," json:"user_uuid"`
+	SKU         string  `bun:"," json:"sku"`
 	times
 }
 
@@ -192,17 +195,34 @@ func (s *DeployTaskStore) DeleteDeploy(ctx context.Context, repoType types.Repos
 	return err
 }
 
-func (s *DeployTaskStore) ListDeployByUserID(ctx context.Context, repoType types.RepositoryType, userID int64, per, page int) ([]Deploy, int, error) {
+func (s *DeployTaskStore) ListDeployByUserID(ctx context.Context, userID int64, req *types.DeployReq) ([]Deploy, int, error) {
 	var result []Deploy
-	query := s.db.Operator.Core.NewSelect().Model(&result).Where("user_id = ?", userID)
-	if repoType == types.ModelRepo {
-		query = query.Where("model_id > 0 and status != ?", common.Deleted)
+	query := s.db.Operator.Core.NewSelect().Model(&result).Where("user_id = ? and type = ?", userID, req.DeployType)
+	if req.RepoType == types.ModelRepo {
+		query = query.Where("model_id > 0 and status != ? ", common.Deleted)
 	}
 	query = query.Order("id desc")
-	if repoType == types.SpaceRepo {
+	if req.RepoType == types.SpaceRepo {
 		query = query.Where("space_id > 0")
 		query = query.Limit(1)
 	}
+	query = query.Limit(req.PageSize).Offset((req.Page - 1) * req.PageSize)
+	_, err := query.Exec(ctx, &result)
+	if err != nil {
+		return nil, 0, err
+	}
+	total, err := query.Count(ctx)
+	if err != nil {
+		return nil, 0, err
+	}
+	return result, total, nil
+}
+
+func (s *DeployTaskStore) ListInstancesByUserID(ctx context.Context, userID int64, per, page int) ([]Deploy, int, error) {
+	var result []Deploy
+	query := s.db.Operator.Core.NewSelect().Model(&result).Where("user_id = ?", userID)
+	query = query.Where("type = ? and status != ?", types.FinetuneType, common.Deleted)
+	query = query.Order("id desc")
 	query = query.Limit(per).Offset((page - 1) * per)
 	_, err := query.Exec(ctx, &result)
 	if err != nil {

@@ -15,6 +15,7 @@ type CreateMirrorReq struct {
 	LocalRepoPath   string         `json:"local_repo_path"`
 	CurrentUser     string         `json:"current_user"`
 	RepoType        RepositoryType `json:"repo_type"`
+	SyncLfs         bool           `json:"sync_lfs"`
 }
 
 type CreateMirrorParams struct {
@@ -63,4 +64,28 @@ type CreateMirrorRepoReq struct {
 	SourceGitCloneUrl string `json:"source_url" binding:"required"`
 	Description       string `json:"description"`
 	License           string `json:"license"`
+	SyncLfs           bool   `json:"sync_lfs"`
 }
+
+type MirrorRepo struct {
+	Path       string               `json:"path"`
+	SyncStatus RepositorySyncStatus `json:"sync_status"`
+	Progress   int8                 `json:"progress"`
+	RepoType   RepositoryType       `json:"repo_type"`
+}
+
+type MirrorResp struct {
+	Progress    int8
+	LastMessage string
+	TaskStatus  MirrorTaskStatus
+}
+
+type MirrorTaskStatus string
+
+const (
+	MirrorWaiting    MirrorTaskStatus = "waiting"
+	MirrorRunning    MirrorTaskStatus = "running"
+	MirrorFinished   MirrorTaskStatus = "finished"
+	MirrorFailed     MirrorTaskStatus = "failed"
+	MirrorIncomplete MirrorTaskStatus = "incomplete"
+)
