@@ -262,7 +262,7 @@ func (d *deployer) Status(ctx context.Context, dr types.DeployRepo, needDetails 
 		}
 		return svcName, deploy.Status, nil, nil
 	}
-
+	deployStatus := rstatus.Code
 	if dr.ModelID > 0 {
 		targetID := dr.DeployID // support model deploy with multi-instance
 		status, err := d.ir.Status(ctx, &types.StatusRequest{
@@ -278,12 +278,13 @@ func (d *deployer) Status(ctx context.Context, dr types.DeployRepo, needDetails 
 			return "", common.RunTimeError, nil, fmt.Errorf("can't get deploy status, %w", err)
 		}
 		rstatus.Instances = status.Instances
+		deployStatus = status.Code
 
 	}
 	if rstatus.DeployID == 0 || rstatus.DeployID >= deploy.ID {
-		return svcName, rstatus.Code, rstatus.Instances, nil
+		return svcName, deployStatus, rstatus.Instances, nil
 	}
-	return svcName, deploy.Status, rstatus.Instances, nil
+	return svcName, deployStatus, rstatus.Instances, nil
 }
 
 func (d *deployer) Logs(ctx context.Context, dr types.DeployRepo) (*MultiLogReader, error) {
