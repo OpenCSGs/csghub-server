@@ -124,6 +124,10 @@ func (s *AccessTokenStore) FindByUID(ctx context.Context, uid int64) (token *Acc
 		Model(&tokens).
 		Relation("User").
 		Where("user_id = ?", uid).
+		Where("app = ?", "git").
+		Where("is_active = true and expired_at > ?", time.Now()).
+		Order("created_at DESC").
+		Limit(1).
 		Scan(ctx)
 	if err != nil {
 		return nil, err
