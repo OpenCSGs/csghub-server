@@ -2,6 +2,8 @@ package database
 
 import (
 	"context"
+	"database/sql"
+	"errors"
 	"fmt"
 	"time"
 
@@ -255,4 +257,31 @@ func (s *DeployTaskStore) StopDeploy(ctx context.Context, repoType types.Reposit
 	}
 	err = assertAffectedOneRow(res, err)
 	return err
+}
+
+func (s *DeployTaskStore) GetServerlessDeployByRepID(ctx context.Context, repoID int64) (*Deploy, error) {
+	deploy := &Deploy{}
+	err := s.db.Operator.Core.NewSelect().Model(deploy).Where("repo_id = ? and type = ?", repoID, types.ServerlessType).Scan(ctx, deploy)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("select serverless deploy error, %w", err)
+	}
+	return deploy, nil
+}
+
+func (s *DeployTaskStore) ListServerless(ctx context.Context, req types.DeployReq) ([]Deploy, int, error) {
+	var result []Deploy
+	query := s.db.Operator.Core.NewSelect().Model(&result).Where("type = ?", req.DeployType)
+	query = query.Limit(req.PageSize).Offset((req.Page - 1) * req.PageSize)
+	_, err := query.Exec(ctx, &result)
+	if err != nil {
+		return nil, 0, err
+	}
+	total, err := query.Count(ctx)
+	if err != nil {
+		return nil, 0, err
+	}
+	return result, total, nil
 }

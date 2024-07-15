@@ -216,7 +216,13 @@ func (h *RemoteRunner) doRequest(method, url string, data interface{}) (*http.Re
 		return nil, err
 	}
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return nil, fmt.Errorf("unexpected http status code:%d", resp.StatusCode)
+		var errData interface{}
+		err := json.NewDecoder(resp.Body).Decode(&errData)
+		if err != nil {
+			return nil, fmt.Errorf("unexpected http status: %d, error: %w", resp.StatusCode, err)
+		} else {
+			return nil, fmt.Errorf("unexpected http status: %d, error: %v", resp.StatusCode, errData)
+		}
 	}
 
 	return resp, nil

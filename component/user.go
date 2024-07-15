@@ -638,3 +638,45 @@ func (c *UserComponent) ListInstances(ctx context.Context, req *types.UserRepoRe
 	}
 	return resDeploys, total, nil
 }
+
+func (c *UserComponent) ListServerless(ctx context.Context, req types.DeployReq) ([]types.DeployRepo, int, error) {
+	_, err := c.us.FindByUsername(ctx, req.CurrentUser)
+	if err != nil {
+		newError := fmt.Errorf("failed to check for the presence of the user:%s, error:%w", req.CurrentUser, err)
+		return nil, 0, newError
+	}
+	deploys, total, err := c.deploy.ListServerless(ctx, req)
+	if err != nil {
+		newError := fmt.Errorf("failed to get user serverless for %s with error:%w", req.RepoType, err)
+		return nil, 0, newError
+	}
+
+	var resDeploys []types.DeployRepo
+	for _, deploy := range deploys {
+		repoPath := strings.TrimPrefix(deploy.GitPath, string(req.RepoType)+"s_")
+		resDeploys = append(resDeploys, types.DeployRepo{
+			DeployID:         deploy.ID,
+			DeployName:       deploy.DeployName,
+			Path:             repoPath,
+			RepoID:           deploy.RepoID,
+			SvcName:          deploy.SvcName,
+			Status:           deployStatusCodeToString(deploy.Status),
+			Hardware:         deploy.Hardware,
+			Env:              deploy.Env,
+			RuntimeFramework: deploy.RuntimeFramework,
+			ImageID:          deploy.ImageID,
+			MinReplica:       deploy.MinReplica,
+			MaxReplica:       deploy.MaxReplica,
+			GitPath:          deploy.GitPath,
+			GitBranch:        deploy.GitBranch,
+			CostPerHour:      deploy.CostPerHour,
+			ClusterID:        deploy.ClusterID,
+			SecureLevel:      deploy.SecureLevel,
+			CreatedAt:        deploy.CreatedAt,
+			UpdatedAt:        deploy.UpdatedAt,
+			Type:             deploy.Type,
+			SKU:              deploy.SKU,
+		})
+	}
+	return resDeploys, total, nil
+}

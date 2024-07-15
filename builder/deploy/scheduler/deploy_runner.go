@@ -264,10 +264,10 @@ func (t *DeployRunner) makeDeployRequest() (*types.RunRequest, error) {
 		}
 	}
 
-	if deploy.Type == types.InferenceType {
+	if deploy.Type == types.InferenceType || deploy.Type == types.ServerlessType {
 		// runtime framework port for model
 		envMap["port"] = strconv.Itoa(deploy.ContainerPort)
-		envMap["HF_ENDPOINT"] = t.modelDownloadEndpoint // "https://hub-stg.opencsg.com/hf"
+		envMap["HF_ENDPOINT"] = t.modelDownloadEndpoint // "https://hub-stg.opencsg.com/"
 	}
 
 	if deploy.Type == types.FinetuneType {
