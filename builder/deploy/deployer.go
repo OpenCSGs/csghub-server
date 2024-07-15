@@ -85,12 +85,16 @@ func newDeployer(s scheduler.Scheduler, ib imagebuilder.Builder, ir imagerunner.
 
 func (d *deployer) GenerateUniqueSvcName(dr types.DeployRepo) string {
 	uniqueSvcName := ""
-	if dr.SpaceID > 0 {
+	if dr.Type == types.SpaceType {
 		// space
 		fields := strings.Split(dr.Path, "/")
-		uniqueSvcName = common.UniqueSpaceAppName(fields[0], fields[1], dr.SpaceID)
+		uniqueSvcName = common.UniqueSpaceAppName("u", fields[0], fields[1], dr.SpaceID)
+	} else if dr.Type == types.ServerlessType {
+		// model serverless
+		fields := strings.Split(dr.Path, "/")
+		uniqueSvcName = common.UniqueSpaceAppName("s", fields[0], fields[1], dr.RepoID)
 	} else {
-		// model
+		// model inference
 		// generate unique service name from uuid when create new deploy by snowflake
 		uniqueSvcName = d.sfNode.Generate().Base36()
 	}
@@ -98,12 +102,23 @@ func (d *deployer) GenerateUniqueSvcName(dr types.DeployRepo) string {
 }
 
 func (d *deployer) serverlessDeploy(ctx context.Context, dr types.DeployRepo) (*database.Deploy, error) {
-	deploy, err := d.store.GetLatestDeployBySpaceID(ctx, dr.SpaceID)
+	var (
+		deploy *database.Deploy = nil
+		err    error            = nil
+	)
+	if dr.Type == types.SpaceType {
+		deploy, err = d.store.GetLatestDeployBySpaceID(ctx, dr.SpaceID)
+	} else {
+		deploy, err = d.store.GetServerlessDeployByRepID(ctx, dr.RepoID)
+	}
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
 	if err != nil {
-		return nil, fmt.Errorf("fail to found the latest deploy for spaceID %v, %w", dr.SpaceID, err)
+		return nil, fmt.Errorf("fail to find space or serverless deploy, spaceid:%v, repoid:%v, %w", dr.SpaceID, dr.RepoID, err)
+	}
+	if deploy == nil {
+		return nil, nil
 	}
 	deploy.UserUUID = dr.UserUUID
 	deploy.SKU = dr.SKU
@@ -154,7 +169,7 @@ func (d *deployer) dedicatedDeploy(ctx context.Context, dr types.DeployRepo) (*d
 func (d *deployer) buildDeploy(ctx context.Context, dr types.DeployRepo) (*database.Deploy, error) {
 	var deploy *database.Deploy = nil
 	var err error = nil
-	if dr.SpaceID > 0 {
+	if dr.Type == types.SpaceType || dr.Type == types.ServerlessType {
 		// space case: SpaceID>0 and ModelID=0, reuse latest deploy of spaces
 		deploy, err = d.serverlessDeploy(ctx, dr)
 		if err != nil {
@@ -531,7 +546,7 @@ func (d *deployer) StartDeploy(ctx context.Context, deploy *database.Deploy) err
 		return fmt.Errorf("failed to update deploy, %w", err)
 	}
 
-	// create run model as inference task
+	// start model as inference/serverless task
 	runTask := &database.DeployTask{
 		DeployID: deploy.ID,
 		TaskType: 1,

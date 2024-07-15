@@ -1566,17 +1566,17 @@ func (c *RepoComponent) ListDeploy(ctx context.Context, repoType types.Repositor
 	return resDeploys, nil
 }
 
-func (c *RepoComponent) DeleteDeploy(ctx context.Context, repoType types.RepositoryType, namespace, name, currentUser string, deployID int64) error {
-	user, repo, deploy, err := c.checkDeployPermission(ctx, repoType, namespace, name, currentUser, deployID)
+func (c *RepoComponent) DeleteDeploy(ctx context.Context, delReq types.DeployActReq) error {
+	user, repo, deploy, err := c.checkDeployPermissionForUser(ctx, delReq)
 	if err != nil {
 		return err
 	}
 	// delete service
 	deployRepo := types.DeployRepo{
 		SpaceID:   0,
-		DeployID:  deployID,
-		Namespace: namespace,
-		Name:      name,
+		DeployID:  delReq.DeployID,
+		Namespace: delReq.Namespace,
+		Name:      delReq.Name,
 		SvcName:   deploy.SvcName,
 		ClusterID: deploy.ClusterID,
 	}
@@ -1599,7 +1599,7 @@ func (c *RepoComponent) DeleteDeploy(ctx context.Context, repoType types.Reposit
 	}
 
 	// update database deploy
-	err = c.deploy.DeleteDeploy(ctx, types.RepositoryType(repoType), repo.ID, user.ID, deployID)
+	err = c.deploy.DeleteDeploy(ctx, types.RepositoryType(delReq.RepoType), repo.ID, user.ID, delReq.DeployID)
 	if err != nil {
 		return fmt.Errorf("fail to remove deploy instance, %w", err)
 	}
@@ -1607,8 +1607,17 @@ func (c *RepoComponent) DeleteDeploy(ctx context.Context, repoType types.Reposit
 	return err
 }
 
-func (c *RepoComponent) DeployDetail(ctx context.Context, repoType types.RepositoryType, namespace, name, currentUser string, deployID int64) (*types.DeployRepo, error) {
-	_, repo, deploy, err := c.checkDeployPermission(ctx, repoType, namespace, name, currentUser, deployID)
+func (c *RepoComponent) DeployDetail(ctx context.Context, detailReq types.DeployActReq) (*types.DeployRepo, error) {
+	var (
+		repo   *database.Repository = nil
+		deploy *database.Deploy     = nil
+		err    error                = nil
+	)
+	if detailReq.DeployType == types.ServerlessType {
+		_, repo, deploy, err = c.checkDeployPermissionForServerless(ctx, detailReq)
+	} else {
+		_, repo, deploy, err = c.checkDeployPermissionForUser(ctx, detailReq)
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -1619,7 +1628,7 @@ func (c *RepoComponent) DeployDetail(ctx context.Context, repoType types.Reposit
 		zone := ""
 		provider := ""
 		if err != nil {
-			slog.Warn("Get cluster with error: %v", err)
+			slog.Warn("Get cluster with error", slog.Any("error", err))
 		} else {
 			zone = cls.Zone
 			provider = cls.Provider
@@ -1634,14 +1643,14 @@ func (c *RepoComponent) DeployDetail(ctx context.Context, repoType types.Reposit
 		DeployID:  deploy.ID,
 		SpaceID:   deploy.SpaceID,
 		ModelID:   deploy.ModelID,
-		Namespace: namespace,
-		Name:      name,
+		Namespace: detailReq.Namespace,
+		Name:      detailReq.Name,
 		SvcName:   deploy.SvcName,
 		ClusterID: deploy.ClusterID,
 	}
 	actualReplica, desiredReplica, instList, err := c.deployer.GetReplica(ctx, req)
 	if err != nil {
-		slog.Warn("fail to get deploy replica", slog.Any("repotype", repoType), slog.Any("req", req), slog.Any("error", err))
+		slog.Warn("fail to get deploy replica", slog.Any("repotype", detailReq.RepoType), slog.Any("req", req), slog.Any("error", err))
 	}
 	endpointPrivate := true
 	if deploy.SecureLevel == types.EndpointPublic {
@@ -1729,8 +1738,17 @@ func deployStatusCodeToString(code int) string {
 	return txt
 }
 
-func (c *RepoComponent) DeployInstanceLogs(ctx context.Context, repoType types.RepositoryType, namespace, name, currentUser string, deployID int64, instance string) (*deploy.MultiLogReader, error) {
-	_, _, deploy, err := c.checkDeployPermission(ctx, repoType, namespace, name, currentUser, deployID)
+func (c *RepoComponent) DeployInstanceLogs(ctx context.Context, logReq types.DeployActReq) (*deploy.MultiLogReader, error) {
+	var (
+		deploy *database.Deploy = nil
+		err    error            = nil
+	)
+	if logReq.DeployType == types.ServerlessType {
+		_, _, deploy, err = c.checkDeployPermissionForServerless(ctx, logReq)
+	} else {
+		_, _, deploy, err = c.checkDeployPermissionForUser(ctx, logReq)
+	}
+
 	if err != nil {
 		return nil, err
 	}
@@ -1738,11 +1756,11 @@ func (c *RepoComponent) DeployInstanceLogs(ctx context.Context, repoType types.R
 		DeployID:     deploy.ID,
 		SpaceID:      deploy.SpaceID,
 		ModelID:      deploy.ModelID,
-		Namespace:    namespace,
-		Name:         name,
+		Namespace:    logReq.Namespace,
+		Name:         logReq.Name,
 		ClusterID:    deploy.ClusterID,
 		SvcName:      deploy.SvcName,
-		InstanceName: instance,
+		InstanceName: logReq.InstanceName,
 	})
 }
 
@@ -1765,27 +1783,31 @@ func (c *RepoComponent) AllowAccessEndpoint(ctx context.Context, currentUser str
 		// public endpoint
 		return true, nil
 	}
-	return c.checkAccessDeploy(ctx, deploy.RepoID, currentUser, deploy)
+	return c.checkAccessDeployForUser(ctx, deploy.RepoID, currentUser, deploy)
 }
 
 // check access deploy permission
-func (c *RepoComponent) AllowAccessDeploy(ctx context.Context, repoType types.RepositoryType, namespace, name, currentUser string, deployID int64) (bool, error) {
-	repo, err := c.repo.FindByPath(ctx, repoType, namespace, name)
+func (c *RepoComponent) AllowAccessDeploy(ctx context.Context, req types.DeployActReq) (bool, error) {
+	repo, err := c.repo.FindByPath(ctx, req.RepoType, req.Namespace, req.Name)
 	if err != nil {
 		return false, fmt.Errorf("failed to find repo, error: %w", err)
 	}
-	deploy, err := c.deploy.GetDeployByID(ctx, deployID)
+	deploy, err := c.deploy.GetDeployByID(ctx, req.DeployID)
 	if err != nil {
 		return false, err
 	}
 	if deploy == nil {
-		return false, fmt.Errorf("ail to get deploy by ID: %v", deployID)
+		return false, fmt.Errorf("ail to get deploy by ID: %v", req.DeployID)
 	}
-	return c.checkAccessDeploy(ctx, repo.ID, currentUser, deploy)
+	if req.DeployType == types.ServerlessType {
+		return c.checkAccessDeployForServerless(repo.ID, deploy)
+	} else {
+		return c.checkAccessDeployForUser(ctx, repo.ID, req.CurrentUser, deploy)
+	}
 }
 
 // common check function for apiserver and rproxy
-func (c *RepoComponent) checkAccessDeploy(ctx context.Context, repoID int64, currentUser string, deploy *database.Deploy) (bool, error) {
+func (c *RepoComponent) checkAccessDeployForUser(ctx context.Context, repoID int64, currentUser string, deploy *database.Deploy) (bool, error) {
 	user, err := c.user.FindByUsername(ctx, currentUser)
 	if err != nil {
 		return false, errors.New("user does not exist")
@@ -1801,25 +1823,43 @@ func (c *RepoComponent) checkAccessDeploy(ctx context.Context, repoID int64, cur
 	return true, nil
 }
 
-func (c *RepoComponent) DeployStop(ctx context.Context, repoType types.RepositoryType, namespace, name, currentUser string, deployID int64) error {
-	user, repo, deploy, err := c.checkDeployPermission(ctx, repoType, namespace, name, currentUser, deployID)
+func (c *RepoComponent) checkAccessDeployForServerless(repoID int64, deploy *database.Deploy) (bool, error) {
+	if deploy.RepoID != repoID {
+		// deny access for invalid repo
+		return false, errors.New("invalid deploy found")
+	}
+	return true, nil
+}
+
+func (c *RepoComponent) DeployStop(ctx context.Context, stopReq types.DeployActReq) error {
+	var (
+		user   *database.User       = nil
+		repo   *database.Repository = nil
+		deploy *database.Deploy     = nil
+		err    error                = nil
+	)
+	if stopReq.DeployType == types.ServerlessType {
+		user, repo, deploy, err = c.checkDeployPermissionForServerless(ctx, stopReq)
+	} else {
+		user, repo, deploy, err = c.checkDeployPermissionForUser(ctx, stopReq)
+	}
 	if err != nil {
-		return err
+		return fmt.Errorf("fail to check permission for stop deploy, %w", err)
 	}
 	// delete service
 	deployRepo := types.DeployRepo{
-		DeployID:  deployID,
+		DeployID:  stopReq.DeployID,
 		SpaceID:   deploy.SpaceID,
 		ModelID:   deploy.ModelID,
-		Namespace: namespace,
-		Name:      name,
+		Namespace: stopReq.Namespace,
+		Name:      stopReq.Name,
 		SvcName:   deploy.SvcName,
 		ClusterID: deploy.ClusterID,
 	}
 	err = c.deployer.Stop(ctx, deployRepo)
 	if err != nil {
 		// fail to stop deploy instance, maybe service is gone
-		slog.Warn("stop deploy instance with error", slog.Any("error", err), slog.Any("namespace", namespace), slog.Any("name", name), slog.Any("deployID", deployID))
+		slog.Warn("stop deploy instance with error", slog.Any("error", err), slog.Any("stopReq", stopReq))
 	}
 
 	exist, err := c.deployer.Exist(ctx, deployRepo)
@@ -1834,7 +1874,7 @@ func (c *RepoComponent) DeployStop(ctx context.Context, repoType types.Repositor
 	}
 
 	// update database deploy to stopped
-	err = c.deploy.StopDeploy(ctx, types.RepositoryType(repoType), repo.ID, user.ID, deployID)
+	err = c.deploy.StopDeploy(ctx, stopReq.RepoType, repo.ID, user.ID, stopReq.DeployID)
 	if err != nil {
 		return fmt.Errorf("fail to stop deploy instance, %w", err)
 	}
@@ -1927,24 +1967,24 @@ func (c *RepoComponent) SyncMirror(ctx context.Context, repoType types.Repositor
 	return nil
 }
 
-func (c *RepoComponent) checkDeployPermission(ctx context.Context, repoType types.RepositoryType, namespace, name, currentUser string, deployID int64) (*database.User, *database.Repository, *database.Deploy, error) {
-	user, err := c.user.FindByUsername(ctx, currentUser)
+func (c *RepoComponent) checkDeployPermissionForUser(ctx context.Context, deployReq types.DeployActReq) (*database.User, *database.Repository, *database.Deploy, error) {
+	user, err := c.user.FindByUsername(ctx, deployReq.CurrentUser)
 	if err != nil {
 		return nil, nil, nil, errors.New("user does not exist")
 	}
-	repo, err := c.repo.FindByPath(ctx, repoType, namespace, name)
+	repo, err := c.repo.FindByPath(ctx, deployReq.RepoType, deployReq.Namespace, deployReq.Name)
 	if err != nil {
-		return nil, nil, nil, fmt.Errorf("fail to get repository %v %s/%s, %w", repoType, namespace, name, err)
+		return nil, nil, nil, fmt.Errorf("fail to get repository %v %s/%s, %w", deployReq.RepoType, deployReq.Namespace, deployReq.Name, err)
 	}
 	if repo == nil {
-		return nil, nil, nil, fmt.Errorf("do not found repository %s/%s", namespace, name)
+		return nil, nil, nil, fmt.Errorf("do not found repository %s/%s", deployReq.Namespace, deployReq.Name)
 	}
-	deploy, err := c.deploy.GetDeployByID(ctx, deployID)
+	deploy, err := c.deploy.GetDeployByID(ctx, deployReq.DeployID)
 	if err != nil {
-		return nil, nil, nil, fmt.Errorf("fail to get user deploy %v, %w", deployID, err)
+		return nil, nil, nil, fmt.Errorf("fail to get user deploy %v, %w", deployReq.DeployID, err)
 	}
 	if deploy == nil {
-		return nil, nil, nil, fmt.Errorf("do not found user deploy %v", deployID)
+		return nil, nil, nil, fmt.Errorf("do not found user deploy %v", deployReq.DeployID)
 	}
 	if deploy.UserID != user.ID {
 		return nil, nil, nil, errors.New("deploy was not created by user")
@@ -1955,10 +1995,50 @@ func (c *RepoComponent) checkDeployPermission(ctx context.Context, repoType type
 	return &user, repo, deploy, nil
 }
 
-func (c *RepoComponent) DeployUpdate(ctx context.Context, repoType types.RepositoryType, namespace, name, currentUser string, deployID int64, req types.ModelRunReq) error {
-	_, _, deploy, err := c.checkDeployPermission(ctx, repoType, namespace, name, currentUser, deployID)
+func (c *RepoComponent) checkDeployPermissionForServerless(ctx context.Context, deployReq types.DeployActReq) (*database.User, *database.Repository, *database.Deploy, error) {
+	user, err := c.user.FindByUsername(ctx, deployReq.CurrentUser)
 	if err != nil {
-		return err
+		return nil, nil, nil, fmt.Errorf("user does not exist, %w", err)
+	}
+	isAdmin, err := c.isAdminRole(user)
+	if err != nil {
+		return nil, nil, nil, fmt.Errorf("fail to check user role, %w", err)
+	}
+	if !isAdmin {
+		return nil, nil, nil, fmt.Errorf("do not allowed for user, %w", err)
+	}
+	repo, err := c.repo.FindByPath(ctx, deployReq.RepoType, deployReq.Namespace, deployReq.Name)
+	if err != nil {
+		return nil, nil, nil, fmt.Errorf("fail to get repository %v %s/%s, %w", deployReq.RepoType, deployReq.Namespace, deployReq.Name, err)
+	}
+	if repo == nil {
+		return nil, nil, nil, fmt.Errorf("do not found repository %s/%s", deployReq.Namespace, deployReq.Name)
+	}
+	deploy, err := c.deploy.GetDeployByID(ctx, deployReq.DeployID)
+	if err != nil {
+		return nil, nil, nil, fmt.Errorf("fail to get serverless deploy:%v, %w", deployReq.DeployID, err)
+	}
+	if deploy == nil {
+		return nil, nil, nil, fmt.Errorf("do not found serverless deploy %v", deployReq.DeployID)
+	}
+	if deploy.RepoID != repo.ID {
+		return nil, nil, nil, errors.New("found incorrect repo")
+	}
+	return &user, repo, deploy, nil
+}
+
+func (c *RepoComponent) DeployUpdate(ctx context.Context, updateReq types.DeployActReq, req types.ModelRunReq) error {
+	var (
+		deploy *database.Deploy = nil
+		err    error            = nil
+	)
+	if updateReq.DeployType == types.ServerlessType {
+		_, _, deploy, err = c.checkDeployPermissionForServerless(ctx, updateReq)
+	} else {
+		_, _, deploy, err = c.checkDeployPermissionForUser(ctx, updateReq)
+	}
+	if err != nil {
+		return fmt.Errorf("fail to check permission for update deploy, %w", err)
 	}
 
 	frame, err := c.rtfm.FindEnabledByID(ctx, req.RuntimeFrameworkID)
@@ -1973,11 +2053,11 @@ func (c *RepoComponent) DeployUpdate(ctx context.Context, repoType types.Reposit
 
 	// check service
 	deployRepo := types.DeployRepo{
-		DeployID:  deployID,
+		DeployID:  updateReq.DeployID,
 		SpaceID:   deploy.SpaceID,
 		ModelID:   deploy.ModelID,
-		Namespace: namespace,
-		Name:      name,
+		Namespace: updateReq.Namespace,
+		Name:      updateReq.Name,
 		SvcName:   deploy.SvcName,
 		ClusterID: deploy.ClusterID,
 	}
@@ -1996,18 +2076,27 @@ func (c *RepoComponent) DeployUpdate(ctx context.Context, repoType types.Reposit
 	return err
 }
 
-func (c *RepoComponent) DeployStart(ctx context.Context, repoType types.RepositoryType, namespace, name, currentUser string, deployID int64) error {
-	_, _, deploy, err := c.checkDeployPermission(ctx, repoType, namespace, name, currentUser, deployID)
+func (c *RepoComponent) DeployStart(ctx context.Context, startReq types.DeployActReq) error {
+	var (
+		deploy *database.Deploy = nil
+		err    error            = nil
+	)
+	if startReq.DeployType == types.ServerlessType {
+		_, _, deploy, err = c.checkDeployPermissionForServerless(ctx, startReq)
+	} else {
+		_, _, deploy, err = c.checkDeployPermissionForUser(ctx, startReq)
+	}
+
 	if err != nil {
-		return err
+		return fmt.Errorf("fail to check permission for start deploy, %w", err)
 	}
 	// check service
 	deployRepo := types.DeployRepo{
-		DeployID:  deployID,
+		DeployID:  startReq.DeployID,
 		SpaceID:   deploy.SpaceID,
 		ModelID:   deploy.ModelID,
-		Namespace: namespace,
-		Name:      name,
+		Namespace: startReq.Namespace,
+		Name:      startReq.Name,
 		SvcName:   deploy.SvcName,
 		ClusterID: deploy.ClusterID,
 	}
@@ -2054,4 +2143,10 @@ func (c *RepoComponent) AllFiles(ctx context.Context, req types.GetAllFilesReq) 
 		return nil, err
 	}
 	return allFiles, nil
+}
+
+func (c *RepoComponent) isAdminRole(user database.User) (bool, error) {
+	slog.Debug("Check if user is admin", slog.Any("user", user))
+	// todo: check user role and return if is admin
+	return true, nil
 }

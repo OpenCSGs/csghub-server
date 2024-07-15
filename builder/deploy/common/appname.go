@@ -6,27 +6,27 @@ import (
 )
 
 // UniqueSpaceAppName generates a unique app name for space deployment
-func UniqueSpaceAppName(namespace, name string, spaceID int64) string {
-	encodedSpaceID := NumberToString(spaceID)
+func UniqueSpaceAppName(prefix, namespace, name string, spaceID int64) string {
+	encodedSpaceID := numberToString(spaceID)
 	// max length of uniqueAppName is 63
 	avaiMaxLen := 63 - len(encodedSpaceID) - 3
 	nameSpaceAndName := fmt.Sprintf("%s-%s", namespace, name)
 	if len(nameSpaceAndName) > avaiMaxLen {
 		nameSpaceAndName = nameSpaceAndName[:avaiMaxLen]
 	}
-	uniqueAppName := fmt.Sprintf("u-%s-%s", nameSpaceAndName, encodedSpaceID)
+	uniqueAppName := fmt.Sprintf("%s-%s-%s", prefix, nameSpaceAndName, encodedSpaceID)
 	return strings.ToLower(strings.ReplaceAll(strings.ReplaceAll(uniqueAppName, "_", "-"), ".", "-"))
 }
 
-func ParseUniqueSpaceAppName(spaceAppName string) (spaceID int64, err error) {
+func parseUniqueSpaceAppName(spaceAppName string) (spaceID int64, err error) {
 	nameParts := strings.Split(spaceAppName, "-")
 	spaceIDStr := nameParts[len(nameParts)-1]
 	// decode space id
-	return StringToNumber(spaceIDStr)
+	return stringToNumber(spaceIDStr)
 }
 
 // NumberToString encodes a number into a shorter string representation without padding
-func NumberToString(num int64) string {
+func numberToString(num int64) string {
 	alphabet := "0123456789abcdefghijklmnopqrstuvwxyz"
 	var encodedBuilder strings.Builder
 	base := int64(len(alphabet))
@@ -48,7 +48,7 @@ func NumberToString(num int64) string {
 }
 
 // StringToNumber decodes a string back into the original number without padding
-func StringToNumber(encoded string) (int64, error) {
+func stringToNumber(encoded string) (int64, error) {
 	alphabet := "0123456789abcdefghijklmnopqrstuvwxyz"
 	alphabetMap := make(map[rune]int64)
 	for i, c := range alphabet {
