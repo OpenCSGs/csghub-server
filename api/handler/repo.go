@@ -1384,17 +1384,21 @@ func (h *RepoHandler) DeployDetail(ctx *gin.Context) {
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
-	allow, err := h.c.AllowAccessDeploy(ctx, repoType, namespace, name, currentUser, deployID)
-	if err != nil {
-		slog.Error("failed to check user permission", "error", err)
-		httpbase.ServerError(ctx, errors.New("failed to check user permission"))
-		return
+
+	detailReq := types.DeployActReq{
+		RepoType:    repoType,
+		Namespace:   namespace,
+		Name:        name,
+		CurrentUser: currentUser,
+		DeployID:    deployID,
 	}
-	if !allow {
-		slog.Info("user not allowed to query deploy detail", slog.String("namespace", namespace),
-			slog.String("name", name), slog.Any("username", currentUser), slog.Any("deploy_id", deployID))
+	if repoType == types.SpaceRepo {
+		detailReq.DeployType = types.SpaceType
+	} else if repoType == types.ModelRepo {
+		detailReq.DeployType = types.InferenceType
 	}
-	response, err := h.c.DeployDetail(ctx, repoType, namespace, name, currentUser, deployID)
+
+	response, err := h.c.DeployDetail(ctx, detailReq)
 	if err != nil {
 		slog.Error("fail to deploy detail", slog.String("error", err.Error()), slog.Any("repotype", repoType), slog.Any("namespace", namespace), slog.Any("name", name), slog.Any("deploy id", deployID))
 		httpbase.ServerError(ctx, err)
@@ -1449,8 +1453,18 @@ func (h *RepoHandler) DeployInstanceLogs(ctx *gin.Context) {
 	ctx.Writer.Header().Set("Connection", "keep-alive")
 	ctx.Writer.Header().Set("Transfer-Encoding", "chunked")
 
+	logReq := types.DeployActReq{
+		RepoType:     repoType,
+		Namespace:    namespace,
+		Name:         name,
+		CurrentUser:  currentUser,
+		DeployID:     deployID,
+		DeployType:   types.InferenceType,
+		InstanceName: instance,
+	}
+
 	// user http request context instead of gin context, so that server knows the life cycle of the request
-	logReader, err := h.c.DeployInstanceLogs(ctx.Request.Context(), repoType, namespace, name, currentUser, deployID, instance)
+	logReader, err := h.c.DeployInstanceLogs(ctx.Request.Context(), logReq)
 	if err != nil {
 		httpbase.ServerError(ctx, err)
 		return
@@ -1555,7 +1569,16 @@ func (h *RepoHandler) DeployStatus(ctx *gin.Context) {
 		return
 	}
 
-	allow, err := h.c.AllowAccessDeploy(ctx, repoType, namespace, name, currentUser, deployID)
+	statusReq := types.DeployActReq{
+		RepoType:    repoType,
+		Namespace:   namespace,
+		Name:        name,
+		CurrentUser: currentUser,
+		DeployID:    deployID,
+		DeployType:  types.InferenceType,
+	}
+
+	allow, err := h.c.AllowAccessDeploy(ctx, statusReq)
 	if err != nil {
 		slog.Error("failed to check user permission", "error", err)
 		httpbase.ServerError(ctx, errors.New("failed to check user permission"))
@@ -1733,8 +1756,15 @@ func (h *RepoHandler) DeployUpdate(ctx *gin.Context) {
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
-
-	err = h.c.DeployUpdate(ctx, repoType, namespace, name, currentUser, deployID, req)
+	updateReq := types.DeployActReq{
+		RepoType:    repoType,
+		Namespace:   namespace,
+		Name:        name,
+		CurrentUser: currentUser,
+		DeployID:    deployID,
+		DeployType:  types.InferenceType,
+	}
+	err = h.c.DeployUpdate(ctx, updateReq, req)
 	if err != nil {
 		slog.Error("failed to update deploy", slog.String("namespace", namespace), slog.String("name", name), slog.Any("username", currentUser), slog.Int64("deploy_id", deployID), slog.Any("error", err))
 		httpbase.ServerError(ctx, fmt.Errorf("failed to update deploy, %w", err))
@@ -1751,7 +1781,7 @@ func (h *RepoHandler) DeployUpdate(ctx *gin.Context) {
 // @Tags         Repository
 // @Accept       json
 // @Produce      json
-// @Param        repo_type path string true "models,spaces" Enums(models,spaces)
+// @Param        repo_type path string true "models" Enums(models)
 // @Param        namespace path string true "namespace"
 // @Param        name path string true "name"
 // @Param        current_user query string false "current user"
@@ -1759,7 +1789,7 @@ func (h *RepoHandler) DeployUpdate(ctx *gin.Context) {
 // @Success      200  {object}  string "OK"
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
-// @Router       /{repo_type}/runtime_framework [get]
+// @Router       /models/runtime_framework [get]
 func (h *RepoHandler) RuntimeFrameworkListWithType(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
 	if currentUser == "" {
@@ -1792,4 +1822,306 @@ func (h *RepoHandler) RuntimeFrameworkListWithType(ctx *gin.Context) {
 	}
 
 	httpbase.OK(ctx, response)
+}
+
+// serverlessDetail  godoc
+// @Security     ApiKey
+// @Summary      Get repo serverless detail
+// @Description  Get repo serverless detail
+// @Tags         Model
+// @Accept       json
+// @Produce      json
+// @Param        namespace path string true "namespace"
+// @Param        name path string true "name"
+// @Param        id path string true "id"
+// @Param        current_user query string false "current user"
+// @Success      200  {object}  string "OK"
+// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
+// @Router       /models/{namespace}/{name}/serverless/{id} [get]
+func (h *RepoHandler) ServerlessDetail(ctx *gin.Context) {
+	currentUser := httpbase.GetCurrentUser(ctx)
+	if currentUser == "" {
+		httpbase.UnauthorizedError(ctx, errors.New("user not found, please login first"))
+		return
+	}
+	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
+	if err != nil {
+		slog.Error("Bad request format", "error", err)
+		httpbase.BadRequest(ctx, err.Error())
+		return
+	}
+	deployID, err := strconv.ParseInt(ctx.Param("id"), 10, 64)
+	if err != nil {
+		slog.Error("Bad request format", "error", err)
+		httpbase.BadRequest(ctx, err.Error())
+		return
+	}
+
+	detailReq := types.DeployActReq{
+		RepoType:    types.ModelRepo,
+		Namespace:   namespace,
+		Name:        name,
+		CurrentUser: currentUser,
+		DeployID:    deployID,
+		DeployType:  types.ServerlessType,
+	}
+
+	response, err := h.c.DeployDetail(ctx, detailReq)
+	if err != nil {
+		slog.Error("fail to serverless detail", slog.String("error", err.Error()), slog.Any("namespace", namespace), slog.Any("name", name), slog.Any("deploy id", deployID))
+		httpbase.ServerError(ctx, err)
+		return
+	}
+
+	httpbase.OK(ctx, response)
+}
+
+// GetServerlessLogs   godoc
+// @Security     ApiKey
+// @Summary      get serverless logs
+// @Tags         Model
+// @Accept       json
+// @Produce      json
+// @Param        repo_type path string true "models" Enums(models)
+// @Param        namespace path string true "namespace"
+// @Param        name path string true "name"
+// @Param        id path string true "id"
+// @Param        instance path string true "instance"
+// @Param        current_user query string true "current_user"
+// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
+// @Router       /models/{namespace}/{name}/serverless/{id}/logs/{instance} [get]
+func (h *RepoHandler) ServerlessLogs(ctx *gin.Context) {
+	if ctx.Query("test") == "true" {
+		h.testLogs(ctx)
+		return
+	}
+	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
+	if err != nil {
+		slog.Error("failed to get namespace and name from context", "error", err)
+		httpbase.BadRequest(ctx, err.Error())
+		return
+	}
+
+	currentUser := httpbase.GetCurrentUser(ctx)
+	repoType := common.RepoTypeFromContext(ctx)
+	deployID, err := strconv.ParseInt(ctx.Param("id"), 10, 64)
+	if err != nil {
+		slog.Error("Bad request format", "error", err)
+		httpbase.BadRequest(ctx, err.Error())
+		return
+	}
+	instance := ctx.Param("instance")
+	if len(instance) < 1 {
+		httpbase.UnauthorizedError(ctx, errors.New("fail to get deploy instance"))
+		return
+	}
+	ctx.Writer.Header().Set("Content-Type", "text/event-stream")
+	ctx.Writer.Header().Set("Cache-Control", "no-cache")
+	ctx.Writer.Header().Set("Connection", "keep-alive")
+	ctx.Writer.Header().Set("Transfer-Encoding", "chunked")
+
+	logReq := types.DeployActReq{
+		RepoType:     repoType,
+		Namespace:    namespace,
+		Name:         name,
+		CurrentUser:  currentUser,
+		DeployID:     deployID,
+		DeployType:   types.ServerlessType,
+		InstanceName: instance,
+	}
+
+	// user http request context instead of gin context, so that server knows the life cycle of the request
+	logReader, err := h.c.DeployInstanceLogs(ctx.Request.Context(), logReq)
+	if err != nil {
+		httpbase.ServerError(ctx, err)
+		return
+	}
+
+	if logReader.RunLog() == nil {
+		httpbase.ServerError(ctx, errors.New("don't find any deploy instance log"))
+		return
+	}
+
+	// to quickly respond the http request
+	ctx.Writer.WriteHeader(http.StatusOK)
+	ctx.Writer.Flush()
+
+	for {
+		select {
+		case <-ctx.Request.Context().Done():
+			slog.Info("repo handler logs request context done", slog.Any("error", ctx.Request.Context().Err()))
+			return
+		case data, ok := <-logReader.RunLog():
+			if ok {
+				ctx.SSEvent("Container", string(data))
+				ctx.Writer.Flush()
+			}
+		}
+	}
+}
+
+// GetServerlessStatus   godoc
+// @Security     JWT token
+// @Summary      get serverless status
+// @Tags         Model
+// @Accept       json
+// @Produce      json
+// @Param        namespace path string true "namespace"
+// @Param        name path string true "name"
+// @Param        id path string true "deploy id"
+// @Param        current_user query string true "current_user"
+// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
+// @Router       /models/{namespace}/{name}/serverless/{id}/status [get]
+func (h *RepoHandler) ServerlessStatus(ctx *gin.Context) {
+	if ctx.Query("test") == "true" {
+		h.testStatus(ctx)
+		return
+	}
+
+	currentUser := httpbase.GetCurrentUser(ctx)
+	if currentUser == "" {
+		httpbase.UnauthorizedError(ctx, errors.New("user not found, please login first"))
+		return
+	}
+
+	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
+	if err != nil {
+		slog.Error("failed to get namespace from context", "error", err)
+		httpbase.BadRequest(ctx, err.Error())
+		return
+	}
+
+	deployID, err := strconv.ParseInt(ctx.Param("id"), 10, 64)
+	if err != nil {
+		slog.Error("Bad request format", "error", err)
+		httpbase.BadRequest(ctx, err.Error())
+		return
+	}
+
+	statusReq := types.DeployActReq{
+		RepoType:    types.ModelRepo,
+		Namespace:   namespace,
+		Name:        name,
+		CurrentUser: currentUser,
+		DeployID:    deployID,
+		DeployType:  types.ServerlessType,
+	}
+
+	allow, err := h.c.AllowAccessDeploy(ctx, statusReq)
+	if err != nil {
+		slog.Error("failed to check user permission", "error", err)
+		httpbase.ServerError(ctx, errors.New("failed to check user permission"))
+		return
+	}
+
+	if !allow {
+		slog.Info("user not allowed to query deploy status", slog.String("namespace", namespace),
+			slog.String("name", name), slog.Any("username", currentUser), slog.Any("deploy_id", deployID))
+	}
+
+	ctx.Writer.Header().Set("Content-Type", "text/event-stream")
+	ctx.Writer.Header().Set("Cache-Control", "no-cache")
+	ctx.Writer.Header().Set("Connection", "keep-alive")
+	ctx.Writer.Header().Set("Transfer-Encoding", "chunked")
+
+	ctx.Writer.WriteHeader(http.StatusOK)
+	ctx.Writer.Flush()
+
+	for {
+		select {
+		case <-ctx.Request.Context().Done():
+			slog.Info("deploy handler status request context done", slog.Any("error", ctx.Request.Context().Err()))
+			return
+		default:
+			time.Sleep(time.Second * 5)
+			// user http request context instead of gin context, so that server knows the life cycle of the request
+			_, status, instances, err := h.c.DeployStatus(ctx.Request.Context(), types.ModelRepo, namespace, name, deployID)
+			if err != nil {
+				slog.Error("failed to get deploy status", slog.Any("error", err), slog.String("namespace", namespace),
+					slog.String("name", name), slog.Any("deploy_id", deployID))
+				ctx.SSEvent("error", err.Error())
+			} else {
+				eventData := &types.ModelStatusEventData{
+					Status:  status,
+					Details: instances,
+				}
+				ctx.SSEvent("status", eventData)
+
+			}
+			ctx.Writer.Flush()
+		}
+	}
+}
+
+// ServerlessUpdate  godoc
+// @Security     ApiKey
+// @Summary      Update serverless parameters
+// @Tags         Model
+// @Accept       json
+// @Produce      json
+// @Param        namespace path string true "namespace"
+// @Param        name path string true "name"
+// @Param        id path string true "deploy id"
+// @Param        current_user query string true "current_user"
+// @Param        body body types.ModelRunReq true "deploy setting of inference"
+// @Success      200  {object}  types.Response{} "OK"
+// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
+// @Router       /models/{namespace}/{name}/serverless/{id} [put]
+func (h *RepoHandler) ServerlessUpdate(ctx *gin.Context) {
+	currentUser := httpbase.GetCurrentUser(ctx)
+	if currentUser == "" {
+		httpbase.UnauthorizedError(ctx, errors.New("user not found, please login first"))
+		return
+	}
+
+	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
+	if err != nil {
+		slog.Error("failed to get namespace and name from context", "error", err)
+		httpbase.BadRequest(ctx, err.Error())
+		return
+	}
+
+	var req types.ModelRunReq
+	if err := ctx.ShouldBindJSON(&req); err != nil {
+		slog.Error("Bad request format", "error", err, slog.Any("request.body", ctx.Request.Body))
+		httpbase.BadRequest(ctx, err.Error())
+		return
+	}
+
+	if req.Revision == "" {
+		req.Revision = "main" // default repo branch
+	}
+
+	if req.MinReplica < 0 || req.MaxReplica < 0 || req.MinReplica > req.MaxReplica {
+		slog.Error("Bad request setting for replica", slog.Any("MinReplica", req.MinReplica), slog.Any("MaxReplica", req.MaxReplica))
+		httpbase.BadRequest(ctx, "Bad request setting for replica")
+		return
+	}
+
+	deployID, err := strconv.ParseInt(ctx.Param("id"), 10, 64)
+	if err != nil {
+		slog.Error("Bad request format", slog.Any("error", err), slog.Any("id", ctx.Param("id")))
+		httpbase.BadRequest(ctx, err.Error())
+		return
+	}
+	updateReq := types.DeployActReq{
+		RepoType:    types.ModelRepo,
+		Namespace:   namespace,
+		Name:        name,
+		CurrentUser: currentUser,
+		DeployID:    deployID,
+		DeployType:  types.ServerlessType,
+	}
+	err = h.c.DeployUpdate(ctx, updateReq, req)
+	if err != nil {
+		slog.Error("failed to update serverless", slog.String("namespace", namespace), slog.String("name", name), slog.Any("username", currentUser), slog.Int64("deploy_id", deployID), slog.Any("error", err))
+		httpbase.ServerError(ctx, fmt.Errorf("failed to update serverless, %w", err))
+		return
+	}
+
+	httpbase.OK(ctx, nil)
 }

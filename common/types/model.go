@@ -169,7 +169,18 @@ type ModelStatusEventData struct {
 }
 
 const (
-	SpaceType     = 0
-	InferenceType = 1
-	FinetuneType  = 2
+	SpaceType      = iota // space
+	InferenceType  = 1    // inference endpoint
+	FinetuneType   = 2    // finetune
+	ServerlessType = 3    // serverless
 )
+
+type DeployActReq struct {
+	RepoType     RepositoryType `json:"repo_type"`
+	Namespace    string         `json:"namespace"`
+	Name         string         `json:"name"`
+	CurrentUser  string         `json:"current_user"`
+	DeployID     int64          `json:"deploy_id"`
+	DeployType   int            `json:"deploy_type"`
+	InstanceName string         `json:"instance_name"`
+}

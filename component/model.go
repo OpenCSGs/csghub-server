@@ -608,14 +608,24 @@ func (c *ModelComponent) Predict(ctx context.Context, req *types.ModelPredictReq
 	return resp, nil
 }
 
-// create model deploy as inference
-func (c *ModelComponent) Deploy(ctx context.Context, namespace, name, currentUser string, req types.ModelRunReq, deployType int) (int64, error) {
-	m, err := c.ms.FindByPath(ctx, namespace, name)
+// create model deploy as inference/serverless
+func (c *ModelComponent) Deploy(ctx context.Context, deployReq types.DeployActReq, req types.ModelRunReq) (int64, error) {
+	m, err := c.ms.FindByPath(ctx, deployReq.Namespace, deployReq.Name)
 	if err != nil {
 		return -1, fmt.Errorf("cannot find model, %w", err)
 	}
+	if deployReq.DeployType == types.ServerlessType {
+		// only one service deploy was allowed
+		d, err := c.deploy.GetServerlessDeployByRepID(ctx, m.Repository.ID)
+		if err != nil {
+			return -1, fmt.Errorf("fail to get deploy, %w", err)
+		}
+		if d != nil {
+			return d.ID, nil
+		}
+	}
 	// found user id
-	user, err := c.us.FindByUsername(ctx, currentUser)
+	user, err := c.us.FindByUsername(ctx, deployReq.CurrentUser)
 	if err != nil {
 		return -1, fmt.Errorf("cannot find user for deploy model, %w", err)
 	}
@@ -628,7 +638,7 @@ func (c *ModelComponent) Deploy(ctx context.Context, namespace, name, currentUse
 	// put repo-type and namespace/name in annotation
 	annotations := make(map[string]string)
 	annotations[types.ResTypeKey] = string(types.ModelRepo)
-	annotations[types.ResNameKey] = fmt.Sprintf("%s/%s", namespace, name)
+	annotations[types.ResNameKey] = fmt.Sprintf("%s/%s", deployReq.Namespace, deployReq.Name)
 	annoStr, err := json.Marshal(annotations)
 	if err != nil {
 		return -1, fmt.Errorf("fail to create annotations for deploy model, %w", err)
@@ -678,7 +688,7 @@ func (c *ModelComponent) Deploy(ctx context.Context, namespace, name, currentUse
 		CostPerHour:      resource.CostPerHour,
 		ClusterID:        req.ClusterID,
 		SecureLevel:      req.SecureLevel,
-		Type:             deployType,
+		Type:             deployReq.DeployType,
 		UserUUID:         user.UUID,
 		SKU:              strconv.FormatInt(resource.ID, 10),
 	})
