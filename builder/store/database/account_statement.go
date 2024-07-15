@@ -56,7 +56,7 @@ func (as *AccountStatementStore) Create(ctx context.Context, input AccountStatem
 			return fmt.Errorf("insert statement, error:%w", err)
 		}
 		runSql := "update account_users set balance=balance + ? where user_uuid=?"
-		if err := assertAffectedOneRow(tx.Exec(runSql, (input.Value / 100), input.UserUUID)); err != nil {
+		if err := assertAffectedOneRow(tx.Exec(runSql, input.Value, input.UserUUID)); err != nil {
 			return fmt.Errorf("update balance, error:%w", err)
 		}
 
