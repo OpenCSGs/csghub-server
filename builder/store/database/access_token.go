@@ -125,7 +125,7 @@ func (s *AccessTokenStore) FindByUID(ctx context.Context, uid int64) (token *Acc
 		Relation("User").
 		Where("user_id = ?", uid).
 		Where("app = ?", "git").
-		Where("is_active = true and expired_at > ?", time.Now()).
+		Where("is_active = true and (expired_at is null or expired_at > ?)", time.Now()).
 		Order("created_at DESC").
 		Limit(1).
 		Scan(ctx)
@@ -147,7 +147,7 @@ func (s *AccessTokenStore) GetUserGitToken(ctx context.Context, username string)
 		Join("JOIN users AS u ON u.id = access_token.user_id").
 		Where("u.username = ?", username).
 		Where("access_token.app = ?", "git").
-		Where("is_active = true and access_token.expired_at > ?", time.Now()).
+		Where("is_active = true and (access_token.expired_at is null or access_token.expired_at > ?)", time.Now()).
 		Order("created_at DESC").
 		Limit(1).
 		Scan(ctx)
