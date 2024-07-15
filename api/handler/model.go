@@ -1254,6 +1254,7 @@ func (h *ModelHandler) DeployServerless(ctx *gin.Context) {
 		DeployType:  types.ServerlessType,
 	}
 
+	req.SecureLevel = 1 // public for serverless
 	deployID, err := h.c.Deploy(ctx, deployReq, req)
 	if err != nil {
 		slog.Error("failed to deploy model as serverless", slog.String("namespace", namespace),

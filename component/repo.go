@@ -1998,7 +1998,14 @@ func (c *RepoComponent) checkDeployPermissionForUser(ctx context.Context, deploy
 func (c *RepoComponent) checkDeployPermissionForServerless(ctx context.Context, deployReq types.DeployActReq) (*database.User, *database.Repository, *database.Deploy, error) {
 	user, err := c.user.FindByUsername(ctx, deployReq.CurrentUser)
 	if err != nil {
-		return nil, nil, nil, errors.New("user does not exist")
+		return nil, nil, nil, fmt.Errorf("user does not exist, %w", err)
+	}
+	isAdmin, err := c.isAdminRole(user)
+	if err != nil {
+		return nil, nil, nil, fmt.Errorf("fail to check user role, %w", err)
+	}
+	if !isAdmin {
+		return nil, nil, nil, fmt.Errorf("do not allowed for user, %w", err)
 	}
 	repo, err := c.repo.FindByPath(ctx, deployReq.RepoType, deployReq.Namespace, deployReq.Name)
 	if err != nil {
@@ -2136,4 +2143,10 @@ func (c *RepoComponent) AllFiles(ctx context.Context, req types.GetAllFilesReq) 
 		return nil, err
 	}
 	return allFiles, nil
+}
+
+func (c *RepoComponent) isAdminRole(user database.User) (bool, error) {
+	slog.Debug("Check if user is admin", slog.Any("user", user))
+	// todo: check user role and return if is admin
+	return true, nil
 }

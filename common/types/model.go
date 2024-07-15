@@ -169,10 +169,10 @@ type ModelStatusEventData struct {
 }
 
 const (
-	SpaceType      = 0 // space
-	InferenceType  = 1 // inference endpoint
-	FinetuneType   = 2 // finetune
-	ServerlessType = 3 // serverless
+	SpaceType      = iota // space
+	InferenceType  = 1    // inference endpoint
+	FinetuneType   = 2    // finetune
+	ServerlessType = 3    // serverless
 )
 
 type DeployActReq struct {
