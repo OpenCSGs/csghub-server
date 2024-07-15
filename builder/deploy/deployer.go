@@ -85,7 +85,7 @@ func newDeployer(s scheduler.Scheduler, ib imagebuilder.Builder, ir imagerunner.
 
 func (d *deployer) GenerateUniqueSvcName(dr types.DeployRepo) string {
 	uniqueSvcName := ""
-	if dr.Type == types.InferenceType {
+	if dr.Type == types.SpaceType {
 		// space
 		fields := strings.Split(dr.Path, "/")
 		uniqueSvcName = common.UniqueSpaceAppName("u", fields[0], fields[1], dr.SpaceID)
@@ -169,7 +169,7 @@ func (d *deployer) dedicatedDeploy(ctx context.Context, dr types.DeployRepo) (*d
 func (d *deployer) buildDeploy(ctx context.Context, dr types.DeployRepo) (*database.Deploy, error) {
 	var deploy *database.Deploy = nil
 	var err error = nil
-	if dr.Type == types.InferenceType || dr.Type == types.ServerlessType {
+	if dr.Type == types.SpaceType || dr.Type == types.ServerlessType {
 		// space case: SpaceID>0 and ModelID=0, reuse latest deploy of spaces
 		deploy, err = d.serverlessDeploy(ctx, dr)
 		if err != nil {
