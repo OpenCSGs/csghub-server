@@ -453,8 +453,13 @@ func (h *ModelHandler) DeployDedicated(ctx *gin.Context) {
 		httpbase.BadRequest(ctx, "Bad request setting for replica")
 		return
 	}
-
-	deployID, err := h.c.Deploy(ctx, namespace, name, currentUser, req, types.InferenceType)
+	epReq := types.DeployActReq{
+		Namespace:   namespace,
+		Name:        name,
+		CurrentUser: currentUser,
+		DeployType:  types.InferenceType,
+	}
+	deployID, err := h.c.Deploy(ctx, epReq, req)
 	if err != nil {
 		slog.Error("failed to deploy model as inference", slog.String("namespace", namespace),
 			slog.String("name", name), slog.Any("currentUser", currentUser), slog.Any("req", req), slog.Any("error", err))
@@ -529,7 +534,14 @@ func (h *ModelHandler) FinetuneCreate(ctx *gin.Context) {
 		Revision:           req.Revision,
 	}
 
-	deployID, err := h.c.Deploy(ctx, namespace, name, currentUser, *modelReq, types.FinetuneType)
+	ftReq := types.DeployActReq{
+		Namespace:   namespace,
+		Name:        name,
+		CurrentUser: currentUser,
+		DeployType:  types.FinetuneType,
+	}
+
+	deployID, err := h.c.Deploy(ctx, ftReq, *modelReq)
 	if err != nil {
 		slog.Error("failed to deploy model as notebook instance", slog.String("namespace", namespace),
 			slog.String("name", name), slog.Any("error", err))
@@ -583,8 +595,15 @@ func (h *ModelHandler) DeployDelete(ctx *gin.Context) {
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
-
-	err = h.c.DeleteDeploy(ctx, types.ModelRepo, namespace, name, currentUser, id)
+	delReq := types.DeployActReq{
+		RepoType:    types.ModelRepo,
+		Namespace:   namespace,
+		Name:        name,
+		CurrentUser: currentUser,
+		DeployID:    id,
+		DeployType:  types.InferenceType,
+	}
+	err = h.c.DeleteDeploy(ctx, delReq)
 	if err != nil {
 		slog.Error("Failed to delete deploy", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
@@ -631,7 +650,15 @@ func (h *ModelHandler) FinetuneDelete(ctx *gin.Context) {
 		return
 	}
 
-	err = h.c.DeleteDeploy(ctx, types.ModelRepo, namespace, name, currentUser, id)
+	delReq := types.DeployActReq{
+		RepoType:    types.ModelRepo,
+		Namespace:   namespace,
+		Name:        name,
+		CurrentUser: currentUser,
+		DeployID:    id,
+		DeployType:  types.FinetuneType,
+	}
+	err = h.c.DeleteDeploy(ctx, delReq)
 	if err != nil {
 		slog.Error("Failed to delete deploy", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
@@ -677,8 +704,15 @@ func (h *ModelHandler) DeployStop(ctx *gin.Context) {
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
-
-	err = h.c.DeployStop(ctx, types.ModelRepo, namespace, name, currentUser, id)
+	stopReq := types.DeployActReq{
+		RepoType:    types.ModelRepo,
+		Namespace:   namespace,
+		Name:        name,
+		CurrentUser: currentUser,
+		DeployID:    id,
+		DeployType:  types.InferenceType,
+	}
+	err = h.c.DeployStop(ctx, stopReq)
 	if err != nil {
 		slog.Error("Failed to stop deploy", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
@@ -725,7 +759,16 @@ func (h *ModelHandler) DeployStart(ctx *gin.Context) {
 		return
 	}
 
-	err = h.c.DeployStart(ctx, types.ModelRepo, namespace, name, currentUser, id)
+	startReq := types.DeployActReq{
+		RepoType:    types.ModelRepo,
+		Namespace:   namespace,
+		Name:        name,
+		CurrentUser: currentUser,
+		DeployID:    id,
+		DeployType:  types.InferenceType,
+	}
+
+	err = h.c.DeployStart(ctx, startReq)
 	if err != nil {
 		slog.Error("Failed to start deploy", slog.Any("error", err), slog.Any("repoType", types.ModelRepo), slog.String("namespace", namespace), slog.String("name", name), slog.Any("deployID", id))
 		httpbase.ServerError(ctx, err)
@@ -830,8 +873,15 @@ func (h *ModelHandler) FinetuneStop(ctx *gin.Context) {
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
-
-	err = h.c.DeployStop(ctx, types.ModelRepo, namespace, name, currentUser, id)
+	stopReq := types.DeployActReq{
+		RepoType:    types.ModelRepo,
+		Namespace:   namespace,
+		Name:        name,
+		CurrentUser: currentUser,
+		DeployID:    id,
+		DeployType:  types.FinetuneType,
+	}
+	err = h.c.DeployStop(ctx, stopReq)
 	if err != nil {
 		slog.Error("Failed to stop deploy", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
@@ -877,8 +927,15 @@ func (h *ModelHandler) FinetuneStart(ctx *gin.Context) {
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
-
-	err = h.c.DeployStart(ctx, types.ModelRepo, namespace, name, currentUser, id)
+	startReq := types.DeployActReq{
+		RepoType:    types.ModelRepo,
+		Namespace:   namespace,
+		Name:        name,
+		CurrentUser: currentUser,
+		DeployID:    id,
+		DeployType:  types.FinetuneType,
+	}
+	err = h.c.DeployStart(ctx, startReq)
 	if err != nil {
 		slog.Error("Failed to start deploy", slog.Any("error", err), slog.Any("repoType", types.ModelRepo), slog.String("namespace", namespace), slog.String("name", name), slog.Any("deployID", id))
 		httpbase.ServerError(ctx, err)
@@ -1131,4 +1188,198 @@ func (h *ModelHandler) AllFiles(ctx *gin.Context) {
 	}
 
 	httpbase.OK(ctx, detail)
+}
+
+// ModelServerless  godoc
+// @Security     ApiKey
+// @Summary      run model as serverless service
+// @Tags         Model
+// @Accept       json
+// @Produce      json
+// @Param        namespace path string true "namespace"
+// @Param        name path string true "name"
+// @Param        current_user query string true "current_user"
+// @Param        body body types.ModelRunReq true "deploy setting of serverless"
+// @Success      200  {object}  string "OK"
+// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
+// @Router       /models/{namespace}/{name}/serverless [post]
+func (h *ModelHandler) DeployServerless(ctx *gin.Context) {
+	currentUser := httpbase.GetCurrentUser(ctx)
+	if currentUser == "" {
+		httpbase.UnauthorizedError(ctx, errors.New("user not found, please login first"))
+		return
+	}
+
+	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
+	if err != nil {
+		slog.Error("failed to get namespace from context", "error", err)
+		httpbase.BadRequest(ctx, err.Error())
+		return
+	}
+	allow, err := h.c.AllowAdminAccess(ctx, types.ModelRepo, namespace, name, currentUser)
+	if err != nil {
+		slog.Error("failed to check user permission", "error", err)
+		httpbase.ServerError(ctx, errors.New("failed to check user permission"))
+		return
+	}
+	if !allow {
+		slog.Info("user not allowed to run model", slog.String("namespace", namespace),
+			slog.String("name", name), slog.Any("username", currentUser))
+		httpbase.UnauthorizedError(ctx, errors.New("user not allowed to run model"))
+		return
+	}
+
+	var req types.ModelRunReq
+	if err := ctx.ShouldBindJSON(&req); err != nil {
+		slog.Error("Bad request format", "error", err)
+		httpbase.BadRequest(ctx, err.Error())
+		return
+	}
+
+	if req.Revision == "" {
+		req.Revision = "main" // default repo branch
+	}
+
+	if req.MinReplica < 0 || req.MaxReplica < 0 || req.MinReplica > req.MaxReplica {
+		slog.Error("Bad request setting for replica", slog.Any("MinReplica", req.MinReplica), slog.Any("MaxReplica", req.MaxReplica))
+		httpbase.BadRequest(ctx, "Bad request setting for replica")
+		return
+	}
+
+	deployReq := types.DeployActReq{
+		Namespace:   namespace,
+		Name:        name,
+		CurrentUser: currentUser,
+		DeployType:  types.ServerlessType,
+	}
+
+	req.SecureLevel = 1 // public for serverless
+	deployID, err := h.c.Deploy(ctx, deployReq, req)
+	if err != nil {
+		slog.Error("failed to deploy model as serverless", slog.String("namespace", namespace),
+			slog.String("name", name), slog.Any("currentUser", currentUser), slog.Any("req", req), slog.Any("error", err))
+		httpbase.ServerError(ctx, err)
+		return
+	}
+
+	slog.Debug("deploy model as serverless created", slog.String("namespace", namespace),
+		slog.String("name", name), slog.Int64("deploy_id", deployID))
+
+	// return deploy_id
+	response := types.DeployRepo{DeployID: deployID}
+
+	httpbase.OK(ctx, response)
+}
+
+// StartServerless   godoc
+// @Security     ApiKey
+// @Summary      Start a model serverless
+// @Description  Start a model serverless
+// @Tags         Model
+// @Accept       json
+// @Produce      json
+// @Param        namespace path string true "namespace"
+// @Param        name path string true "name"
+// @Param        id path int true "deploy id"
+// @Param        current_user query string false "current user"
+// @Success      200  {object}  types.Response{} "OK"
+// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
+// @Router       /models/{namespace}/{name}/serverless/{id}/start [put]
+func (h *ModelHandler) ServerlessStart(ctx *gin.Context) {
+	var (
+		id  int64
+		err error
+	)
+	currentUser := httpbase.GetCurrentUser(ctx)
+	if currentUser == "" {
+		httpbase.UnauthorizedError(ctx, errors.New("user not found, please login first"))
+		return
+	}
+	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
+	if err != nil {
+		slog.Error("Bad request format", "error", err)
+		httpbase.BadRequest(ctx, err.Error())
+		return
+	}
+	id, err = strconv.ParseInt(ctx.Param("id"), 10, 64)
+	if err != nil {
+		slog.Error("Bad request format", "error", err)
+		httpbase.BadRequest(ctx, err.Error())
+		return
+	}
+
+	startReq := types.DeployActReq{
+		RepoType:    types.ModelRepo,
+		Namespace:   namespace,
+		Name:        name,
+		CurrentUser: currentUser,
+		DeployID:    id,
+		DeployType:  types.ServerlessType,
+	}
+
+	err = h.c.DeployStart(ctx, startReq)
+	if err != nil {
+		slog.Error("Failed to start deploy", slog.Any("error", err), slog.Any("repoType", types.ModelRepo), slog.String("namespace", namespace), slog.String("name", name), slog.Any("deployID", id))
+		httpbase.ServerError(ctx, err)
+		return
+	}
+	httpbase.OK(ctx, nil)
+}
+
+// StopServerless    godoc
+// @Security     ApiKey
+// @Summary      Stop a model serverless
+// @Description  Stop a model serverless
+// @Tags         Model
+// @Accept       json
+// @Produce      json
+// @Param        namespace path string true "namespace"
+// @Param        name path string true "name"
+// @Param        id path int true "id"
+// @Param        current_user query string false "current user"
+// @Success      200  {object}  types.Response{} "OK"
+// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
+// @Router       /models/{namespace}/{name}/serverless/{id}/stop [put]
+func (h *ModelHandler) ServerlessStop(ctx *gin.Context) {
+	var (
+		id  int64
+		err error
+	)
+	currentUser := httpbase.GetCurrentUser(ctx)
+	if currentUser == "" {
+		httpbase.UnauthorizedError(ctx, errors.New("user not found, please login first"))
+		return
+	}
+	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
+	if err != nil {
+		slog.Error("Bad request format", "error", err)
+		httpbase.BadRequest(ctx, err.Error())
+		return
+	}
+	id, err = strconv.ParseInt(ctx.Param("id"), 10, 64)
+	if err != nil {
+		slog.Error("Bad request format", "error", err)
+		httpbase.BadRequest(ctx, err.Error())
+		return
+	}
+
+	stopReq := types.DeployActReq{
+		RepoType:    types.ModelRepo,
+		Namespace:   namespace,
+		Name:        name,
+		CurrentUser: currentUser,
+		DeployID:    id,
+		DeployType:  types.ServerlessType,
+	}
+
+	err = h.c.DeployStop(ctx, stopReq)
+	if err != nil {
+		slog.Error("Failed to stop deploy", slog.Any("error", err))
+		httpbase.ServerError(ctx, err)
+		return
+	}
+	httpbase.OK(ctx, nil)
 }

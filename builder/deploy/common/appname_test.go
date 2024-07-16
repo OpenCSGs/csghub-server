@@ -10,7 +10,7 @@ func TestUniqueSpaceAppName(t *testing.T) {
 	spaceName := "leasdfaida_tesdfsdfsdfst-spaasdasdascasdfasfase"
 	spaceID := int64(123456)
 
-	spaceAppName := UniqueSpaceAppName(namespace, spaceName, spaceID)
+	spaceAppName := UniqueSpaceAppName("u", namespace, spaceName, spaceID)
 
 	if len(spaceAppName) > 63 {
 		t.Fatal("space app name is too long")
@@ -20,7 +20,7 @@ func TestUniqueSpaceAppName(t *testing.T) {
 		t.Fatal("space app name wrong")
 	}
 
-	spaceID, err := ParseUniqueSpaceAppName(spaceAppName)
+	spaceID, err := parseUniqueSpaceAppName(spaceAppName)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -32,7 +32,7 @@ func TestUniqueSpaceAppName(t *testing.T) {
 	host := "u-leida-test-20240327-leida-test-space-1.space-stg.opencsg.com"
 	domainParts := strings.SplitN(host, ".", 2)
 	spaceAppName = domainParts[0]
-	spaceID, err = ParseUniqueSpaceAppName(spaceAppName)
+	spaceID, err = parseUniqueSpaceAppName(spaceAppName)
 	if err != nil {
 		t.Fatal(err)
 	}
