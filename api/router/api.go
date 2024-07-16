@@ -120,12 +120,11 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 	}
 
 	spaceResource := apiGroup.Group("space_resources")
-	spaceResource.Use(needAPIKey)
 	{
 		spaceResource.GET("", spaceResourceHandler.Index)
-		spaceResource.POST("", spaceResourceHandler.Create)
-		spaceResource.PUT("/:id", spaceResourceHandler.Update)
-		spaceResource.DELETE("/:id", spaceResourceHandler.Delete)
+		spaceResource.POST("", needAPIKey, spaceResourceHandler.Create)
+		spaceResource.PUT("/:id", needAPIKey, spaceResourceHandler.Update)
+		spaceResource.DELETE("/:id", needAPIKey, spaceResourceHandler.Delete)
 	}
 
 	spaceSdkHandler, err := handler.NewSpaceSdkHandler(config)
@@ -134,12 +133,11 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 	}
 
 	spaceSdk := apiGroup.Group("space_sdks")
-	spaceResource.Use(needAPIKey)
 	{
 		spaceSdk.GET("", spaceSdkHandler.Index)
-		spaceSdk.POST("", spaceSdkHandler.Create)
-		spaceSdk.PUT("/:id", spaceSdkHandler.Update)
-		spaceSdk.DELETE("/:id", spaceSdkHandler.Delete)
+		spaceSdk.POST("", needAPIKey, spaceSdkHandler.Create)
+		spaceSdk.PUT("/:id", needAPIKey, spaceSdkHandler.Update)
+		spaceSdk.DELETE("/:id", needAPIKey, spaceSdkHandler.Delete)
 	}
 
 	acHandler, err := handler.NewAccessTokenHandler(config)
@@ -262,7 +260,7 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 	cluster := apiGroup.Group("/cluster")
 	{
 		cluster.GET("", clusterHandler.Index)
-		cluster.PUT("/:id", clusterHandler.Update)
+		cluster.PUT("/:id", needAPIKey, clusterHandler.Update)
 	}
 
 	eventHandler, err := handler.NewEventHandler()
@@ -276,8 +274,8 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 	{
 		runtimeFramework.GET("/:id/models", modelHandler.ListByRuntimeFrameworkID)
 		runtimeFramework.GET("", modelHandler.ListAllRuntimeFramework)
-		runtimeFramework.POST("/:id", modelHandler.UpdateModelRuntimeFrameworks)
-		runtimeFramework.DELETE("/:id", modelHandler.DeleteModelRuntimeFrameworks)
+		runtimeFramework.POST("/:id", needAPIKey, modelHandler.UpdateModelRuntimeFrameworks)
+		runtimeFramework.DELETE("/:id", needAPIKey, modelHandler.DeleteModelRuntimeFrameworks)
 		runtimeFramework.GET("/models", modelHandler.ListModelsOfRuntimeFrameworks)
 	}
 	syncHandler, err := handler.NewSyncHandler(config)
@@ -372,9 +370,9 @@ func createModelRoutes(config *config.Config, apiGroup *gin.RouterGroup, needAPI
 
 		// runtime framework
 		modelsGroup.GET("/:namespace/:name/runtime_framework", middleware.RepoType(types.ModelRepo), repoCommonHandler.RuntimeFrameworkList)
-		modelsGroup.POST("/:namespace/:name/runtime_framework", middleware.RepoType(types.ModelRepo), repoCommonHandler.RuntimeFrameworkCreate)
-		modelsGroup.PUT("/:namespace/:name/runtime_framework/:id", middleware.RepoType(types.ModelRepo), repoCommonHandler.RuntimeFrameworkUpdate)
-		modelsGroup.DELETE("/:namespace/:name/runtime_framework/:id", middleware.RepoType(types.ModelRepo), repoCommonHandler.RuntimeFrameworkDelete)
+		modelsGroup.POST("/:namespace/:name/runtime_framework", needAPIKey, middleware.RepoType(types.ModelRepo), repoCommonHandler.RuntimeFrameworkCreate)
+		modelsGroup.PUT("/:namespace/:name/runtime_framework/:id", needAPIKey, middleware.RepoType(types.ModelRepo), repoCommonHandler.RuntimeFrameworkUpdate)
+		modelsGroup.DELETE("/:namespace/:name/runtime_framework/:id", needAPIKey, middleware.RepoType(types.ModelRepo), repoCommonHandler.RuntimeFrameworkDelete)
 		// list model inference
 		modelsGroup.GET("/:namespace/:name/run", middleware.RepoType(types.ModelRepo), repoCommonHandler.DeployList)
 		// deploy model as inference
@@ -540,11 +538,6 @@ func createSpaceRoutes(config *config.Config, apiGroup *gin.RouterGroup, spaceHa
 		if !config.Saas {
 			spaces.POST("/:namespace/:name/mirror_from_saas", middleware.RepoType(types.SpaceRepo), repoCommonHandler.MirrorFromSaas)
 		}
-
-		spaces.GET("/:namespace/:name/runtime_framework", middleware.RepoType(types.SpaceRepo), repoCommonHandler.RuntimeFrameworkList)
-		spaces.POST("/:namespace/:name/runtime_framework", middleware.RepoType(types.SpaceRepo), repoCommonHandler.RuntimeFrameworkCreate)
-		spaces.PUT("/:namespace/:name/runtime_framework/:id", middleware.RepoType(types.SpaceRepo), repoCommonHandler.RuntimeFrameworkUpdate)
-		spaces.DELETE("/:namespace/:name/runtime_framework/:id", middleware.RepoType(types.SpaceRepo), repoCommonHandler.RuntimeFrameworkDelete)
 		spaces.GET("/:namespace/:name/run", middleware.RepoType(types.SpaceRepo), repoCommonHandler.DeployList)
 		spaces.GET("/:namespace/:name/run/:id", middleware.RepoType(types.SpaceRepo), repoCommonHandler.DeployDetail)
 		spaces.GET("/:namespace/:name/run/:id/status", middleware.RepoType(types.SpaceRepo), repoCommonHandler.DeployStatus)
