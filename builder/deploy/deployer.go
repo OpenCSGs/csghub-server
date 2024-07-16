@@ -601,16 +601,21 @@ func (d *deployer) startAccountingRequestMeter(resMap map[string]string, svcRes 
 	}
 	resName, exists := resMap[svcRes.DeploySku]
 	if !exists {
-		slog.Warn("Did not find resource", slog.Any("deploy_sku", svcRes.DeploySku))
+		slog.Warn("Did not find resource for metering", slog.Any("deploy_sku", svcRes.DeploySku))
 		return
 	}
 	slog.Debug("metering service", slog.Any("svcRes", svcRes))
+	sceneType := getValidSceneType(svcRes.DeployType)
+	if sceneType == types.SceneUnknow {
+		slog.Error("invalid deploy type of service for metering", slog.Any("svcRes", svcRes))
+		return
+	}
 	event := types.METERING_EVENT{
 		Uuid:         uuid.New(),
 		UserUUID:     svcRes.UserID,
 		Value:        int64(d.eventPub.SyncInterval),
 		ValueType:    types.TimeDurationMinType,
-		Scene:        int(getValidSceneType(svcRes.DeployType)),
+		Scene:        int(sceneType),
 		OpUID:        "",
 		ResourceID:   svcRes.DeploySku,
 		ResourceName: resName,
@@ -631,14 +636,16 @@ func (d *deployer) startAccountingRequestMeter(resMap map[string]string, svcRes 
 	}
 }
 
-func getValidSceneType(scene int) types.SceneType {
-	switch scene {
-	case 0:
+func getValidSceneType(deployType int) types.SceneType {
+	switch deployType {
+	case types.SpaceType:
 		return types.SceneSpace
-	case 1:
+	case types.InferenceType:
 		return types.SceneModelInference
-	case 2:
+	case types.FinetuneType:
 		return types.SceneModelFinetune
+	case types.ServerlessType:
+		return types.SceneModelInference
 	default:
 		return types.SceneUnknow
 	}
