@@ -50,7 +50,7 @@ docker-compose -f docker-compose.yml up -d
 - [x] Model/Dataset AutoTag: Supports custom metadata and automatic extraction of model/dataset tags. 
 - [x] S3 Protocol Support: Supports S3 (MinIO) storage protocol, providing higher reliability and storage cost-effectiveness.
 - [ ] Model format convert: Conversion of mainstream model formats.
-- [ ] Model oneclick deploy: Supports integration with OpenCSG llm-inference, one-click to start model inference.
+- [x] Model oneclick deploy: Supports integration with OpenCSG llm-inference, one-click to start model inference.
 
 ## License
 We use the Apache 2.0 license, the content of which is detailed in the `LICENSE` file.
