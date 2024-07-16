@@ -43,13 +43,13 @@ docker compose -f docker-compose.yml up -d
 - 按需开启内容审核，选择任意第三方内容审核服务
 
 ## 技术规划
-- 支持更多Git Server: 目前内置了对gitea的支持，未来计划实现对主流Git仓库的支持
-- 支持Git LFS: Git LFS支持超大文件， 支持git命令操作和Web UI在线下载
-- 数据集在线预览: 数据集预览，支持LFS格式数据集的Top20/TopN加载预览
-- 模型和数据集自动打标签:：支持自定义元数据和自动化提取模型/数据集标签
-- S3协议兼容: 支持S3(MinIO)存储协议，更高的可靠性和存储性价比
-- 模型格式转换: 主流模型格式转化
-- 模型一键部署: 支持与OpenCSG llm-inference集成， 一键启动模型推理
+- [ ] 支持更多Git Server: 目前内置了对gitea的支持，未来计划实现对主流Git仓库的支持
+- [x] 支持Git LFS: Git LFS支持超大文件， 支持git命令操作和Web UI在线下载
+- [x] 数据集在线预览: 数据集预览，支持LFS格式数据集的Top20/TopN加载预览
+- [x] 模型和数据集自动打标签:：支持自定义元数据和自动化提取模型/数据集标签
+- [x] S3协议兼容: 支持S3(MinIO)存储协议，更高的可靠性和存储性价比
+- [ ] 模型格式转换: 主流模型格式转化
+- [x] 模型一键部署: 支持与OpenCSG llm-inference集成， 一键启动模型推理
 
 ## License
 我们使用Apache 2.0协议，协议内容详见`LICENSE`文件。
