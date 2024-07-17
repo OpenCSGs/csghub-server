@@ -570,3 +570,7 @@ func (s *RepoStore) UpdateLicenseByTag(ctx context.Context, repoID int64) error 
 	}
 	return nil
 }
+
+func (s *RepoStore) CountByRepoType(ctx context.Context, repoType types.RepositoryType) (int, error) {
+	return s.db.Core.NewSelect().Model(&Repository{}).Where("repository_type = ?", repoType).Count(ctx)
+}
