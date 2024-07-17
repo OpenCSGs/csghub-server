@@ -408,6 +408,7 @@ func (c *MultiSyncComponent) createLocalModel(ctx context.Context, m *types.Mode
 	dbModel := database.Model{
 		Repository:   newDBRepo,
 		RepositoryID: newDBRepo.ID,
+		BaseModel:    m.BaseModel,
 	}
 	_, err = c.model.CreateIfNotExist(ctx, dbModel)
 	if err != nil {

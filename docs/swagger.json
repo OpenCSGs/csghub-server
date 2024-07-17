@@ -11662,6 +11662,9 @@
         "database.Model": {
             "type": "object",
             "properties": {
+                "base_model": {
+                    "type": "string"
+                },
                 "created_at": {
                     "type": "string"
                 },
@@ -12542,6 +12545,9 @@
         "types.CreateModelReq": {
             "type": "object",
             "properties": {
+                "base_model": {
+                    "type": "string"
+                },
                 "default_branch": {
                     "type": "string",
                     "example": "main"
@@ -13055,6 +13061,9 @@
         "types.Model": {
             "type": "object",
             "properties": {
+                "base_model": {
+                    "type": "string"
+                },
                 "created_at": {
                     "type": "string"
                 },
@@ -13779,6 +13788,9 @@
         "types.UpdateModelReq": {
             "type": "object",
             "properties": {
+                "base_model": {
+                    "type": "string"
+                },
                 "default_branch": {
                     "type": "string",
                     "example": "main"

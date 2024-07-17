@@ -110,6 +110,8 @@ definitions:
     type: object
   database.Model:
     properties:
+      base_model:
+        type: string
       created_at:
         type: string
       id:
@@ -703,6 +705,8 @@ definitions:
     type: object
   types.CreateModelReq:
     properties:
+      base_model:
+        type: string
       default_branch:
         example: main
         type: string
@@ -1056,6 +1060,8 @@ definitions:
     - MirrorIncomplete
   types.Model:
     properties:
+      base_model:
+        type: string
       created_at:
         type: string
       default_branch:
@@ -1546,6 +1552,8 @@ definitions:
     type: object
   types.UpdateModelReq:
     properties:
+      base_model:
+        type: string
       default_branch:
         example: main
         type: string

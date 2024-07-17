@@ -214,6 +214,7 @@ func (c *ModelComponent) Create(ctx context.Context, req *types.CreateModelReq) 
 	dbModel := database.Model{
 		Repository:   dbRepo,
 		RepositoryID: dbRepo.ID,
+		BaseModel:    req.BaseModel,
 	}
 
 	model, err := c.ms.Create(ctx, dbModel)
@@ -287,6 +288,7 @@ func (c *ModelComponent) Create(ctx context.Context, req *types.CreateModelReq) 
 		Tags:      tags,
 		CreatedAt: model.CreatedAt,
 		UpdatedAt: model.UpdatedAt,
+		BaseModel: model.BaseModel,
 	}
 
 	return resModel, nil
@@ -318,6 +320,7 @@ func (c *ModelComponent) Update(ctx context.Context, req *types.UpdateModelReq) 
 	if err != nil {
 		return nil, fmt.Errorf("failed to find model, error: %w", err)
 	}
+	model.BaseModel = req.BaseModel
 
 	model, err = c.ms.Update(ctx, *model)
 	if err != nil {
@@ -335,6 +338,7 @@ func (c *ModelComponent) Update(ctx context.Context, req *types.UpdateModelReq) 
 		Private:      dbRepo.Private,
 		CreatedAt:    model.CreatedAt,
 		UpdatedAt:    model.UpdatedAt,
+		BaseModel:    model.BaseModel,
 	}
 
 	return resModel, nil
@@ -432,6 +436,7 @@ func (c *ModelComponent) Show(ctx context.Context, namespace, name, currentUser 
 		UserLikes:  likeExists,
 		Source:     model.Repository.Source,
 		SyncStatus: model.Repository.SyncStatus,
+		BaseModel:  model.BaseModel,
 	}
 	inferences, _ := c.rrtfms.GetByRepoIDsAndType(ctx, model.Repository.ID, types.InferenceType)
 	if len(inferences) > 0 {

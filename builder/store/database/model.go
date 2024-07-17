@@ -25,6 +25,7 @@ type Model struct {
 	RepositoryID  int64       `bun:",notnull" json:"repository_id"`
 	Repository    *Repository `bun:"rel:belongs-to,join:repository_id=id" json:"repository"`
 	LastUpdatedAt time.Time   `bun:",notnull" json:"last_updated_at"`
+	BaseModel     string      `bun:"," json:"base_model"`
 	times
 }
 
