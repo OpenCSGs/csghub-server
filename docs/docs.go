@@ -11673,6 +11673,9 @@ const docTemplate = `{
         "database.Model": {
             "type": "object",
             "properties": {
+                "base_model": {
+                    "type": "string"
+                },
                 "created_at": {
                     "type": "string"
                 },
@@ -12553,6 +12556,9 @@ const docTemplate = `{
         "types.CreateModelReq": {
             "type": "object",
             "properties": {
+                "base_model": {
+                    "type": "string"
+                },
                 "default_branch": {
                     "type": "string",
                     "example": "main"
@@ -13066,6 +13072,9 @@ const docTemplate = `{
         "types.Model": {
             "type": "object",
             "properties": {
+                "base_model": {
+                    "type": "string"
+                },
                 "created_at": {
                     "type": "string"
                 },
@@ -13790,6 +13799,9 @@ const docTemplate = `{
         "types.UpdateModelReq": {
             "type": "object",
             "properties": {
+                "base_model": {
+                    "type": "string"
+                },
                 "default_branch": {
                     "type": "string",
                     "example": "main"

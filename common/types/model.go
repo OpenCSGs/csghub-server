@@ -9,12 +9,11 @@ type RepoBranchCommit struct {
 }
 
 type CreateModelReq struct {
+	BaseModel string `json:"base_model"`
 	CreateRepoReq
 }
 
-type UpdateModelReq struct {
-	CreateRepoReq
-}
+type UpdateModelReq = CreateModelReq
 
 type UpdateDownloadsReq struct {
 	Namespace  string `json:"namespace"`
@@ -92,6 +91,7 @@ type Model struct {
 	SyncStatus      RepositorySyncStatus `json:"sync_status"`
 	EnableInference bool                 `json:"enable_inference"`
 	EnableFinetune  bool                 `json:"enable_finetune"`
+	BaseModel       string               `json:"base_model"`
 }
 
 type SDKModelInfo struct {
