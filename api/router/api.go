@@ -315,6 +315,14 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 		recomGroup.POST("opweight", needAPIKey, recomHandler.SetOpWeight)
 	}
 
+	// telemetry
+	telemetryHandler, err := handler.NewTelemetryHandler()
+	if err != nil {
+		return nil, fmt.Errorf("error creating telemetry handler:%w", err)
+	}
+	teleGroup := apiGroup.Group("/telemetry")
+	teleGroup.POST("/usage", telemetryHandler.Usage)
+
 	return r, nil
 }
 

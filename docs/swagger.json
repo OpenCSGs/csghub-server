@@ -6335,6 +6335,57 @@
                 }
             }
         },
+        "/telemetry/usage": {
+            "post": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "description": "Submit usage data for a client, including CPU and memory usage",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Telemetry"
+                ],
+                "summary": "Submit usage data for a client",
+                "parameters": [
+                    {
+                        "description": "body",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/telemetry.Usage"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/types.Response"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            }
+        },
         "/token/{app}/{token_name}": {
             "put": {
                 "security": [
@@ -11162,6 +11213,135 @@
                     "type": "string"
                 },
                 "old_role": {
+                    "type": "string"
+                }
+            }
+        },
+        "telemetry.Counts": {
+            "type": "object",
+            "properties": {
+                "codes": {
+                    "type": "integer"
+                },
+                "datasets": {
+                    "type": "integer"
+                },
+                "models": {
+                    "type": "integer"
+                },
+                "spaces": {
+                    "type": "integer"
+                },
+                "total_repos": {
+                    "type": "integer"
+                }
+            }
+        },
+        "telemetry.Licensee": {
+            "type": "object",
+            "properties": {
+                "Company": {
+                    "type": "string"
+                },
+                "Email": {
+                    "type": "string"
+                },
+                "Name": {
+                    "type": "string"
+                }
+            }
+        },
+        "telemetry.Settings": {
+            "type": "object",
+            "properties": {
+                "collected_data_categories": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "gitaly_apdex": {
+                    "type": "number"
+                },
+                "ldap_encrypted_secrets_enabled": {
+                    "type": "boolean"
+                },
+                "operating_system": {
+                    "type": "string"
+                },
+                "service_ping_features_enabled": {
+                    "type": "boolean"
+                },
+                "smtp_encrypted_secrets_enabled": {
+                    "type": "boolean"
+                },
+                "snowplow_configured_to_gitlab_collector": {
+                    "type": "boolean"
+                },
+                "snowplow_enabled": {
+                    "type": "boolean"
+                }
+            }
+        },
+        "telemetry.Usage": {
+            "type": "object",
+            "properties": {
+                "active_user_count": {
+                    "type": "integer"
+                },
+                "counts": {
+                    "$ref": "#/definitions/telemetry.Counts"
+                },
+                "edition": {
+                    "type": "string"
+                },
+                "historical_max_users": {
+                    "type": "integer"
+                },
+                "hostname": {
+                    "type": "string"
+                },
+                "installation_type": {
+                    "type": "string"
+                },
+                "license_add_ons": {
+                    "type": "object",
+                    "additionalProperties": true
+                },
+                "license_billable_users": {
+                    "type": "integer"
+                },
+                "license_expires_at": {
+                    "type": "string"
+                },
+                "license_id": {
+                    "type": "integer"
+                },
+                "license_md5": {
+                    "type": "string"
+                },
+                "license_plan": {
+                    "type": "string"
+                },
+                "license_starts_at": {
+                    "type": "string"
+                },
+                "license_user_count": {
+                    "type": "integer"
+                },
+                "licensee": {
+                    "$ref": "#/definitions/telemetry.Licensee"
+                },
+                "recorded_at": {
+                    "type": "string"
+                },
+                "settings": {
+                    "$ref": "#/definitions/telemetry.Settings"
+                },
+                "uuid": {
+                    "type": "string"
+                },
+                "version": {
                     "type": "string"
                 }
             }
