@@ -396,6 +396,91 @@ definitions:
     - new_role
     - old_role
     type: object
+  telemetry.Counts:
+    properties:
+      codes:
+        type: integer
+      datasets:
+        type: integer
+      models:
+        type: integer
+      spaces:
+        type: integer
+      total_repos:
+        type: integer
+    type: object
+  telemetry.Licensee:
+    properties:
+      Company:
+        type: string
+      Email:
+        type: string
+      Name:
+        type: string
+    type: object
+  telemetry.Settings:
+    properties:
+      collected_data_categories:
+        items:
+          type: string
+        type: array
+      gitaly_apdex:
+        type: number
+      ldap_encrypted_secrets_enabled:
+        type: boolean
+      operating_system:
+        type: string
+      service_ping_features_enabled:
+        type: boolean
+      smtp_encrypted_secrets_enabled:
+        type: boolean
+      snowplow_configured_to_gitlab_collector:
+        type: boolean
+      snowplow_enabled:
+        type: boolean
+    type: object
+  telemetry.Usage:
+    properties:
+      active_user_count:
+        type: integer
+      counts:
+        $ref: '#/definitions/telemetry.Counts'
+      edition:
+        type: string
+      historical_max_users:
+        type: integer
+      hostname:
+        type: string
+      installation_type:
+        type: string
+      license_add_ons:
+        additionalProperties: true
+        type: object
+      license_billable_users:
+        type: integer
+      license_expires_at:
+        type: string
+      license_id:
+        type: integer
+      license_md5:
+        type: string
+      license_plan:
+        type: string
+      license_starts_at:
+        type: string
+      license_user_count:
+        type: integer
+      licensee:
+        $ref: '#/definitions/telemetry.Licensee'
+      recorded_at:
+        type: string
+      settings:
+        $ref: '#/definitions/telemetry.Settings'
+      uuid:
+        type: string
+      version:
+        type: string
+    type: object
   types.APIBadRequest:
     type: object
   types.APIInternalServerError:
@@ -7232,6 +7317,38 @@ paths:
       summary: Get all tags
       tags:
       - Tag
+  /telemetry/usage:
+    post:
+      consumes:
+      - application/json
+      description: Submit usage data for a client, including CPU and memory usage
+      parameters:
+      - description: body
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/telemetry.Usage'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/types.Response'
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Submit usage data for a client
+      tags:
+      - Telemetry
   /token/{app}/{token_name}:
     delete:
       consumes:
