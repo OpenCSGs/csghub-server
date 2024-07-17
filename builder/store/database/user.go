@@ -124,3 +124,10 @@ func (s *UserStore) FindByUUID(ctx context.Context, uuid string) (user User, err
 	err = s.db.Operator.Core.NewSelect().Model(&user).Where("uuid = ?", uuid).Scan(ctx)
 	return
 }
+
+func (s *UserStore) GetActiveUserCount(ctx context.Context) (int, error) {
+	return s.db.Operator.Core.
+		NewSelect().
+		Model(&User{}).
+		Count(ctx)
+}
