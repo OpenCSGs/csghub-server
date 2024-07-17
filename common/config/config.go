@@ -116,7 +116,7 @@ type Config struct {
 
 	Model struct {
 		DeployTimeoutInMin int    `envconfig:"STARHUB_SERVER_MODEL_DEPLOY_TIMEOUT_IN_MINUTES" default:"30"`
-		DownloadEndpoint   string `envconfig:"STARHUB_SERVER_MODEL_DOWNLOAD_ENDPOINT" default:"https://hub-stg.opencsg.com/"`
+		DownloadEndpoint   string `envconfig:"STARHUB_SERVER_MODEL_DOWNLOAD_ENDPOINT" default:"https://hub.opencsg.com/"`
 		DockerRegBase      string `envconfig:"STARHUB_SERVER_MODEL_DOCKER_REG_BASE" default:"opencsg-registry.cn-beijing.cr.aliyuncs.com/public/"`
 	}
 	// send events
@@ -149,6 +149,11 @@ type Config struct {
 
 	MultiSync struct {
 		// Enabled bool `envconfig:"STARHUB_SERVER_MULTI_SYNC_ENABLED" default:"false"`
+	}
+
+	Telemetry struct {
+		Enable    bool   `envconfig:"STARHUB_SERVER_TELEMETRY_ENABLE" default:"true"`
+		ReportURL string `envconfig:"STARHUB_SERVER_TELEMETRY_URL" default:"http://hub.opencsg.com/api/v1/telemetry"`
 	}
 }
 

@@ -64,7 +64,7 @@ var checkMirrorProgress = &cobra.Command{
 			return
 		}
 
-		err = locker.RunWhileLocked(ctx, resourceName, expirationTime, func() error {
+		err = locker.RunWhileLocked(ctx, resourceName, expirationTime, func(ctx context.Context) error {
 			c, err := component.NewMirrorComponent(config)
 			if err != nil {
 				slog.Error("failed to create mirror component", "err", err)

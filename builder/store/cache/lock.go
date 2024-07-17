@@ -21,17 +21,17 @@ var (
 // If the lock is not acquirable, this method returns ErrResourceAlreadyLocked immediately.
 //
 // Ref: https://redis.io/docs/manual/patterns/distributed-locks/#correct-implementation-with-a-single-instance
-func (c *Cache) RunWhileLocked(ctx context.Context, resourceName string, expiration time.Duration, fn func() error) (err error) {
+func (c *Cache) RunWhileLocked(ctx context.Context, resourceName string, expiration time.Duration, fn func(ctx context.Context) error) (err error) {
 	return c.lockAndRun(ctx, resourceName, expiration, false, fn)
 }
 
 // WaitLockToRun wait for the lock to be acquirable and locks the resource, runs user provided callback and finally release the lock.
 // If ctx is canceled or timed out during the waiting, this method returns the error of the ctx.
-func (c *Cache) WaitLockToRun(ctx context.Context, resourceName string, expiration time.Duration, fn func() error) (err error) {
+func (c *Cache) WaitLockToRun(ctx context.Context, resourceName string, expiration time.Duration, fn func(ctx context.Context) error) (err error) {
 	return c.lockAndRun(ctx, resourceName, expiration, true, fn)
 }
 
-func (c *Cache) lockAndRun(ctx context.Context, resourceName string, expiration time.Duration, waitUntilAvailable bool, fn func() error) (err error) {
+func (c *Cache) lockAndRun(ctx context.Context, resourceName string, expiration time.Duration, waitUntilAvailable bool, fn func(ctx context.Context) error) (err error) {
 	randomStr, err := c.acquireLock(ctx, resourceName, expiration, waitUntilAvailable)
 	if err != nil {
 		err = fmt.Errorf("acquiring lock: %w", err)
@@ -53,7 +53,7 @@ func (c *Cache) lockAndRun(ctx context.Context, resourceName string, expiration 
 		err = fmt.Errorf("releasing lock: %w", releasingErr)
 	}()
 
-	err = fn()
+	err = fn(ctx)
 	return
 }
 
