@@ -545,3 +545,7 @@ func (s *RepoStore) UpdateOrCreateRepo(ctx context.Context, input Repository) (*
 
 	return &input, nil
 }
+
+func (s *RepoStore) CountByRepoType(ctx context.Context, repoType types.RepositoryType) (int, error) {
+	return s.db.Core.NewSelect().Model(&Repository{}).Where("repository_type = ?", repoType).Count(ctx)
+}
