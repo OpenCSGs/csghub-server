@@ -2,6 +2,7 @@ package component
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -25,6 +26,7 @@ func NewUserComponent(config *config.Config) (*UserComponent, error) {
 	c.cs = database.NewCodeStore()
 	c.ss = database.NewSpaceStore()
 	c.ns = database.NewNamespaceStore()
+	c.cos = database.NewCollectionStore()
 	var err error
 	c.spaceComponent, err = NewSpaceComponent(config)
 	if err != nil {
@@ -74,6 +76,7 @@ type UserComponent struct {
 	casConfig      *casdoorsdk.AuthConfig
 	once           *sync.Once
 	deploy         *database.DeployTaskStore
+	cos            *database.CollectionStore
 }
 
 func (c *UserComponent) lazyInit() {
@@ -436,6 +439,102 @@ func (c *UserComponent) AddLikes(ctx context.Context, req *types.UserLikesReques
 	}
 
 	err = c.uls.Add(ctx, user.ID, req.Repo_id)
+	return err
+}
+
+// user likes collection
+func (c *UserComponent) LikesCollection(ctx context.Context, req *types.UserSpacesReq) ([]types.Collection, int, error) {
+	user, err := c.us.FindByUsername(ctx, req.CurrentUser)
+	if err != nil {
+		newError := fmt.Errorf("failed to check for the presence of the user, error:%w", err)
+		return nil, 0, newError
+	}
+	collections, total, err := c.cos.ByUserLikes(ctx, user.ID, req.PageSize, req.Page)
+	if err != nil {
+		newError := fmt.Errorf("failed to get collections by username,%w", err)
+		return nil, 0, newError
+	}
+
+	var newCollection []types.Collection
+	temporaryVariable, _ := json.Marshal(collections)
+	err = json.Unmarshal(temporaryVariable, &newCollection)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	return newCollection, total, nil
+}
+
+// UserCollections get collections of owner or visible to current user
+func (c *UserComponent) Collections(ctx context.Context, req *types.UserCollectionReq) ([]types.Collection, int, error) {
+	userExists, err := c.us.IsExist(ctx, req.Owner)
+	if err != nil {
+		newError := fmt.Errorf("failed to check for the presence of the user,error:%w", err)
+		slog.Error(newError.Error())
+		return nil, 0, newError
+	}
+
+	if !userExists {
+		return nil, 0, errors.New("user not exists")
+	}
+
+	if req.CurrentUser != "" {
+		cuserExists, err := c.us.IsExist(ctx, req.CurrentUser)
+		if err != nil {
+			newError := fmt.Errorf("failed to check for the presence of current user,error:%w", err)
+			slog.Error(newError.Error())
+			return nil, 0, newError
+		}
+
+		if !cuserExists {
+			return nil, 0, errors.New("current user not exists")
+		}
+	}
+
+	onlyPublic := req.Owner != req.CurrentUser
+	collections, total, err := c.cos.ByUsername(ctx, req.Owner, req.PageSize, req.Page, onlyPublic)
+	if err != nil {
+		newError := fmt.Errorf("failed to get collections by username,%w", err)
+		return nil, 0, newError
+	}
+
+	var newCollection []types.Collection
+	temporaryVariable, _ := json.Marshal(collections)
+	err = json.Unmarshal(temporaryVariable, &newCollection)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	return newCollection, total, nil
+}
+
+func (c *UserComponent) LikeCollection(ctx context.Context, req *types.UserLikesRequest) error {
+	user, err := c.us.FindByUsername(ctx, req.CurrentUser)
+	if err != nil {
+		newError := fmt.Errorf("failed to check for the presence of the user, error:%w", err)
+		return newError
+	}
+
+	collection, err := c.cos.FindById(ctx, req.Collection_id)
+	if err != nil {
+		return fmt.Errorf("failed to get likes collection by id, error: %w", err)
+	}
+
+	if collection.Private && collection.UserID != user.ID {
+		return fmt.Errorf("no permission to like this collection for user:%s", req.CurrentUser)
+	}
+
+	err = c.uls.LikeCollection(ctx, user.ID, req.Collection_id)
+	return err
+}
+
+func (c *UserComponent) UnLikeCollection(ctx context.Context, req *types.UserLikesRequest) error {
+	user, err := c.us.FindByUsername(ctx, req.CurrentUser)
+	if err != nil {
+		newError := fmt.Errorf("failed to check for the presence of the user,error:%w", err)
+		return newError
+	}
+	err = c.uls.UnLikeCollection(ctx, user.ID, req.Collection_id)
 	return err
 }
 

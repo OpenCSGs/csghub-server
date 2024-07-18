@@ -114,7 +114,7 @@ func NewDB(ctx context.Context, config DBConfig) (db *DB, err error) {
 	}
 
 	db.BunDB.RegisterModel((*RepositoryTag)(nil))
-
+	db.BunDB.RegisterModel((*CollectionRepository)(nil))
 	return
 }
 

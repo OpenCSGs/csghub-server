@@ -43,6 +43,35 @@ definitions:
       updated_at:
         type: string
     type: object
+  database.Collection:
+    properties:
+      created_at:
+        type: string
+      description:
+        type: string
+      id:
+        type: integer
+      likes:
+        type: integer
+      name:
+        type: string
+      nickname:
+        type: string
+      private:
+        type: boolean
+      repositories:
+        items:
+          $ref: '#/definitions/database.Repository'
+        type: array
+      theme:
+        type: string
+      updated_at:
+        type: string
+      user_id:
+        type: integer
+      username:
+        type: string
+    type: object
   database.Dataset:
     properties:
       created_at:
@@ -497,6 +526,64 @@ definitions:
       user_likes:
         type: boolean
     type: object
+  types.Collection:
+    properties:
+      created_at:
+        type: string
+      description:
+        type: string
+      id:
+        type: integer
+      likes:
+        type: integer
+      name:
+        type: string
+      nickname:
+        type: string
+      private:
+        type: boolean
+      repositories:
+        items:
+          $ref: '#/definitions/types.CollectionRepository'
+        type: array
+      theme:
+        type: string
+      updated_at:
+        type: string
+      username:
+        type: string
+    type: object
+  types.CollectionRepository:
+    properties:
+      created_at:
+        type: string
+      description:
+        type: string
+      download_count:
+        type: integer
+      id:
+        type: integer
+      likes:
+        type: integer
+      name:
+        type: string
+      nickname:
+        type: string
+      path:
+        type: string
+      private:
+        type: boolean
+      repository_type:
+        $ref: '#/definitions/types.RepositoryType'
+      tags:
+        items:
+          $ref: '#/definitions/types.RepoTag'
+        type: array
+      updated_at:
+        type: string
+      user_id:
+        type: integer
+    type: object
   types.Commit:
     properties:
       author_email:
@@ -592,6 +679,22 @@ definitions:
       private:
         type: boolean
       readme:
+        type: string
+    type: object
+  types.CreateCollectionReq:
+    properties:
+      description:
+        type: string
+      name:
+        example: collection1
+        type: string
+      nickname:
+        example: collection nick name
+        type: string
+      private:
+        type: boolean
+      theme:
+        example: '#fff000'
         type: string
     type: object
   types.CreateDatasetReq:
@@ -1481,6 +1584,13 @@ definitions:
         type: boolean
       readme:
         type: string
+    type: object
+  types.UpdateCollectionReposReq:
+    properties:
+      repo_ids:
+        items:
+          type: integer
+        type: array
     type: object
   types.UpdateDatasetReq:
     properties:
@@ -4312,6 +4422,286 @@ paths:
       summary: Get code related assets
       tags:
       - Code
+  /collections:
+    get:
+      consumes:
+      - application/json
+      description: get all collections
+      parameters:
+      - description: search text
+        in: query
+        name: search
+        type: string
+      - default: '"trending"'
+        description: sort by
+        in: query
+        name: sort
+        type: string
+      - default: 50
+        description: per
+        in: query
+        name: per
+        type: integer
+      - default: 1
+        description: per page
+        in: query
+        name: page
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/types.ResponseWithTotal'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/types.Collection'
+                  type: array
+                total:
+                  type: integer
+              type: object
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: get all collections
+      tags:
+      - Collection
+    post:
+      consumes:
+      - application/json
+      description: create a collection
+      parameters:
+      - description: body
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/types.CreateCollectionReq'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/types.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/types.Collection'
+              type: object
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: create a collection
+      tags:
+      - Collection
+  /collections/{id}:
+    delete:
+      consumes:
+      - application/json
+      description: delete a exists collection
+      parameters:
+      - description: id
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/types.Response'
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Delete a exists collection
+      tags:
+      - Collection
+    get:
+      consumes:
+      - application/json
+      description: get a collection detail
+      parameters:
+      - description: id
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/types.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/types.Collection'
+              type: object
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: get a collection detail
+      tags:
+      - Collection
+    put:
+      consumes:
+      - application/json
+      description: update a collection
+      parameters:
+      - description: body
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/types.CreateCollectionReq'
+      - description: id
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/types.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/types.Collection'
+              type: object
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: update a collection
+      tags:
+      - Collection
+  /collections/{id}/repos:
+    delete:
+      consumes:
+      - application/json
+      description: remove repos from a collection
+      parameters:
+      - description: body
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/types.UpdateCollectionReposReq'
+      - description: id
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/types.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/types.Collection'
+              type: object
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: remove repos from a collection
+      tags:
+      - Collection
+    post:
+      consumes:
+      - application/json
+      description: Add repos to a collection
+      parameters:
+      - description: body
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/types.UpdateCollectionReposReq'
+      - description: id
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/types.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/database.Collection'
+              type: object
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Add repos to a collection
+      tags:
+      - Collection
   /datasets:
     get:
       consumes:
@@ -8099,6 +8489,45 @@ paths:
       summary: Get user codes
       tags:
       - User
+  /user/{username}/collections:
+    get:
+      consumes:
+      - application/json
+      parameters:
+      - description: username
+        in: path
+        name: username
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/types.ResponseWithTotal'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/types.Collection'
+                  type: array
+                total:
+                  type: integer
+              type: object
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Get user's collections
+      tags:
+      - User
   /user/{username}/datasets:
     get:
       consumes:
@@ -8292,6 +8721,114 @@ paths:
       security:
       - ApiKey: []
       summary: Get user likes codes
+      tags:
+      - User
+  /user/{username}/likes/collections:
+    get:
+      consumes:
+      - application/json
+      parameters:
+      - description: username
+        in: path
+        name: username
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/types.ResponseWithTotal'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/types.Collection'
+                  type: array
+                total:
+                  type: integer
+              type: object
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Get user likes collections
+      tags:
+      - User
+  /user/{username}/likes/collections/{id}:
+    delete:
+      consumes:
+      - application/json
+      parameters:
+      - description: username
+        in: path
+        name: username
+        required: true
+        type: string
+      - description: collection id
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/types.Response'
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: delete collection likes
+      tags:
+      - User
+    put:
+      consumes:
+      - application/json
+      parameters:
+      - description: username
+        in: path
+        name: username
+        required: true
+        type: string
+      - description: collection id
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/types.Response'
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Add collection likes
       tags:
       - User
   /user/{username}/likes/datasets:
