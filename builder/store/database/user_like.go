@@ -17,9 +17,10 @@ func NewUserLikesStore() *UserLikesStore {
 }
 
 type UserLike struct {
-	ID     int64 `bun:",pk,autoincrement" json:"id"`
-	UserID int64 `bun:",notnull" json:"user_id"`
-	RepoID int64 `bun:",notnull" json:"repo_id"`
+	ID           int64 `bun:",pk,autoincrement" json:"id"`
+	UserID       int64 `bun:",notnull" json:"user_id"`
+	RepoID       int64 `bun:",notnull" json:"repo_id"`
+	CollectionID int64 `bun:",notnull" json:"collection_id"`
 }
 
 func (r *UserLikesStore) Add(ctx context.Context, userId, repoId int64) error {
@@ -33,6 +34,39 @@ func (r *UserLikesStore) Add(ctx context.Context, userId, repoId int64) error {
 		}
 
 		if err := assertAffectedOneRow(tx.Exec("update repositories set likes=COALESCE(likes, 0)+1 where id=?", repoId)); err != nil {
+			return err
+		}
+		return nil
+	})
+	return err
+}
+
+func (r *UserLikesStore) LikeCollection(ctx context.Context, userId, collectionId int64) error {
+	err := r.db.Operator.Core.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
+		userLikes := &UserLike{
+			UserID:       userId,
+			CollectionID: collectionId,
+		}
+		if err := assertAffectedOneRow(tx.NewInsert().Model(userLikes).Exec(ctx)); err != nil {
+			return err
+		}
+
+		if err := assertAffectedOneRow(tx.Exec("update collections set likes=COALESCE(likes, 0)+1 where id=?", collectionId)); err != nil {
+			return err
+		}
+		return nil
+	})
+	return err
+}
+
+func (r *UserLikesStore) UnLikeCollection(ctx context.Context, userId, collectionId int64) error {
+	err := r.db.Operator.Core.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
+		var userLikes UserLike
+		if err := assertAffectedOneRow(r.db.Core.NewDelete().Model(&userLikes).Where("user_id = ? and collection_id = ?", userId, collectionId).Exec(ctx)); err != nil {
+			return err
+		}
+
+		if err := assertAffectedOneRow(tx.Exec("update collections set likes=COALESCE(likes, 1)-1 where id=?", collectionId)); err != nil {
 			return err
 		}
 		return nil
