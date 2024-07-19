@@ -298,6 +298,157 @@ func (h *UserHandler) LikesAdd(ctx *gin.Context) {
 	httpbase.OK(ctx, nil)
 }
 
+// GetLikesCollections godoc
+// @Security     ApiKey
+// @Summary      Get user likes collections
+// @Tags         User
+// @Accept       json
+// @Produce      json
+// @Param        username path string true "username"
+// @Success      200  {object}  types.ResponseWithTotal{data=[]types.Collection,total=int} "OK"
+// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
+// @Router       /user/{username}/likes/collections [get]
+func (h *UserHandler) LikesCollections(ctx *gin.Context) {
+	currentUser := httpbase.GetCurrentUser(ctx)
+	if currentUser == "" {
+		httpbase.UnauthorizedError(ctx, errors.New("user not found, please login first"))
+		return
+	}
+	var req types.UserCollectionReq
+	per, page, err := common.GetPerAndPageFromContext(ctx)
+	if err != nil {
+		slog.Error("Bad request format of page and per", "error", err)
+		httpbase.BadRequest(ctx, err.Error())
+		return
+	}
+
+	req.Owner = ctx.Param("username")
+	req.CurrentUser = httpbase.GetCurrentUser(ctx)
+	req.Page = page
+	req.PageSize = per
+	ms, total, err := h.c.LikesCollection(ctx, &req)
+	if err != nil {
+		slog.Error("Failed to get user collections", slog.Any("error", err))
+		httpbase.ServerError(ctx, err)
+		return
+	}
+
+	respData := gin.H{
+		"data":  ms,
+		"total": total,
+	}
+
+	ctx.JSON(http.StatusOK, respData)
+}
+
+// GetUserCollections godoc
+// @Security     ApiKey
+// @Summary      Get user's collections
+// @Tags         User
+// @Accept       json
+// @Produce      json
+// @Param        username path string true "username"
+// @Success      200  {object}  types.ResponseWithTotal{data=[]types.Collection,total=int} "OK"
+// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
+// @Router       /user/{username}/collections [get]
+func (h *UserHandler) UserCollections(ctx *gin.Context) {
+	var req types.UserCollectionReq
+	per, page, err := common.GetPerAndPageFromContext(ctx)
+	if err != nil {
+		slog.Error("Bad request format of page and per", "error", err)
+		httpbase.BadRequest(ctx, err.Error())
+		return
+	}
+
+	req.Owner = ctx.Param("username")
+	req.CurrentUser = httpbase.GetCurrentUser(ctx)
+	req.Page = page
+	req.PageSize = per
+	ms, total, err := h.c.Collections(ctx, &req)
+	if err != nil {
+		slog.Error("Failed to get user collections", slog.Any("error", err))
+		httpbase.ServerError(ctx, err)
+		return
+	}
+
+	respData := gin.H{
+		"data":  ms,
+		"total": total,
+	}
+
+	ctx.JSON(http.StatusOK, respData)
+}
+
+// AddCollectionLikes  godoc
+// @Security     ApiKey
+// @Summary      Add collection likes
+// @Tags         User
+// @Accept       json
+// @Produce      json
+// @Param        username path string true "username"
+// @Param        id path string true "collection id"
+// @Success      200  {object}  types.Response{} "OK"
+// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
+// @Router       /user/{username}/likes/collections/{id} [put]
+func (h *UserHandler) LikeCollection(ctx *gin.Context) {
+	currentUser := httpbase.GetCurrentUser(ctx)
+	if currentUser == "" {
+		httpbase.UnauthorizedError(ctx, errors.New("user not found, please login first"))
+		return
+	}
+	var req types.UserLikesRequest
+	req.CurrentUser = currentUser
+	collection_id, err := strconv.ParseInt(ctx.Param("id"), 10, 64)
+	if err != nil {
+		httpbase.ServerError(ctx, err)
+		return
+	}
+	req.Collection_id = collection_id
+	err = h.c.LikeCollection(ctx, &req)
+	if err != nil {
+		httpbase.ServerError(ctx, err)
+		return
+	}
+	httpbase.OK(ctx, nil)
+}
+
+// DeleteCollectionLikes  godoc
+// @Security     ApiKey
+// @Summary      delete collection likes
+// @Tags         User
+// @Accept       json
+// @Produce      json
+// @Param        username path string true "username"
+// @Param        id path string true "collection id"
+// @Success      200  {object}  types.Response{} "OK"
+// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
+// @Router       /user/{username}/likes/collections/{id} [delete]
+func (h *UserHandler) UnLikeCollection(ctx *gin.Context) {
+	currentUser := httpbase.GetCurrentUser(ctx)
+	if currentUser == "" {
+		httpbase.UnauthorizedError(ctx, errors.New("user not found, please login first"))
+		return
+	}
+	var req types.UserLikesRequest
+	req.CurrentUser = currentUser
+	collection_id, err := strconv.ParseInt(ctx.Param("id"), 10, 64)
+	if err != nil {
+		httpbase.ServerError(ctx, err)
+		return
+	}
+	req.Collection_id = collection_id
+	err = h.c.UnLikeCollection(ctx, &req)
+	if err != nil {
+		httpbase.ServerError(ctx, err)
+		return
+	}
+	httpbase.OK(ctx, nil)
+}
+
 // DeleteUserlikes  godoc
 // @Security     ApiKey
 // @Summary      Delete user likes

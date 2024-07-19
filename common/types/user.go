@@ -69,6 +69,7 @@ type (
 	UserModelsReq          = UserDatasetsReq
 	UserCodesReq           = UserDatasetsReq
 	UserSpacesReq          = UserDatasetsReq
+	UserCollectionReq      = UserDatasetsReq
 	DeleteUserTokenRequest = CreateUserTokenRequest
 )
 
@@ -84,9 +85,10 @@ type User struct {
 }
 
 type UserLikesRequest struct {
-	Username    string `json:"username"`
-	Repo_id     int64  `json:"repo_id"`
-	CurrentUser string `json:"current_user"`
+	Username      string `json:"username"`
+	Repo_id       int64  `json:"repo_id"`
+	Collection_id int64  `json:"collection_id"`
+	CurrentUser   string `json:"current_user"`
 }
 
 /* for HF compitable apis  */

@@ -252,6 +252,22 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 
 	}
 
+	collectionHandler, err := handler.NewCollectionHandler()
+	if err != nil {
+		return nil, fmt.Errorf("error creating collection handler:%w", err)
+	}
+	collections := apiGroup.Group("/collections")
+	{
+		// list all collection
+		collections.GET("", collectionHandler.Index)
+		collections.POST("", collectionHandler.Create)
+		collections.GET("/:id", collectionHandler.GetCollection)
+		collections.PUT("/:id", collectionHandler.UpdateCollection)
+		collections.DELETE("/:id", collectionHandler.DeleteCollection)
+		collections.POST("/:id/repos", collectionHandler.AddRepoToCollection)
+		collections.DELETE("/:id/repos", collectionHandler.RemoveRepoFromCollection)
+	}
+
 	// cluster infos
 	clusterHandler, err := handler.NewClusterHandler(config)
 	if err != nil {
@@ -571,6 +587,11 @@ func createUserRoutes(apiGroup *gin.RouterGroup, needAPIKey gin.HandlerFunc, use
 	apiGroup.GET("/user/:username/likes/datasets", userHandler.LikesDatasets)
 	apiGroup.GET("/user/:username/run/:repo_type", userHandler.GetRunDeploys)
 	apiGroup.GET("/user/:username/finetune/instances", userHandler.GetFinetuneInstances)
+	// User collection
+	apiGroup.GET("/user/:username/collections", userHandler.UserCollections)
+	apiGroup.GET("/user/:username/likes/collections", userHandler.LikesCollections)
+	apiGroup.PUT("/user/:username/likes/collections/:id", userHandler.LikeCollection)
+	apiGroup.DELETE("/user/:username/likes/collections/:id", userHandler.UnLikeCollection)
 	// user owned tokens
 	apiGroup.GET("/user/:username/tokens", acHandler.GetUserTokens)
 	// serverless list
