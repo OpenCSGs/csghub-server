@@ -6815,7 +6815,6 @@ const docTemplate = `{
                         "ApiKey": []
                     }
                 ],
-                "description": "Submit usage data for a client, including CPU and memory usage",
                 "consumes": [
                     "application/json"
                 ],
@@ -6825,7 +6824,7 @@ const docTemplate = `{
                 "tags": [
                     "Telemetry"
                 ],
-                "summary": "Submit usage data for a client",
+                "summary": "Submit telemetry data for a client",
                 "parameters": [
                     {
                         "description": "body",
