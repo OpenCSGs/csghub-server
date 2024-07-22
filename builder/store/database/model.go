@@ -37,6 +37,19 @@ func (s *ModelStore) ByRepoIDs(ctx context.Context, repoIDs []int64) (models []M
 	return
 }
 
+func (s *ModelStore) ByRepoID(ctx context.Context, repoID int64) (*Model, error) {
+	var m Model
+	err := s.db.Core.NewSelect().
+		Model(&m).
+		Where("repository_id = ?", repoID).
+		Scan(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to find model by id, repository id: %d,error: %w", repoID, err)
+	}
+
+	return &m, nil
+}
+
 func (s *ModelStore) ByUsername(ctx context.Context, username string, per, page int, onlyPublic bool) (models []Model, total int, err error) {
 	query := s.db.Operator.Core.
 		NewSelect().

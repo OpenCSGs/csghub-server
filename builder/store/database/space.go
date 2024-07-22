@@ -91,6 +91,15 @@ func (s *SpaceStore) ByRepoIDs(ctx context.Context, repoIDs []int64) (spaces []S
 	return
 }
 
+func (s *SpaceStore) ByRepoID(ctx context.Context, repoID int64) (*Space, error) {
+	var space Space
+	err := s.db.Core.NewSelect().Model(&space).Where("repository_id = ?", repoID).Scan(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to find space by id, repository id: %d,error: %w", repoID, err)
+	}
+	return &space, err
+}
+
 func (s *SpaceStore) ByUsername(ctx context.Context, username string, per, page int, onlyPublic bool) (spaces []Space, total int, err error) {
 	query := s.db.Operator.Core.
 		NewSelect().

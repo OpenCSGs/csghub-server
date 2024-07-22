@@ -217,21 +217,19 @@ func (c *SpaceComponent) Show(ctx context.Context, namespace, name, currentUser 
 
 func (c *SpaceComponent) Update(ctx context.Context, req *types.UpdateSpaceReq) (*types.Space, error) {
 	req.RepoType = types.SpaceRepo
-	_, err := c.UpdateRepo(ctx, req.CreateRepoReq)
+	dbRepo, err := c.UpdateRepo(ctx, req.UpdateRepoReq)
 	if err != nil {
 		return nil, err
 	}
 
-	space, err := c.ss.FindByPath(ctx, req.Namespace, req.Name)
+	space, err := c.ss.ByRepoID(ctx, dbRepo.ID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find space, error: %w", err)
 	}
-	resource, err := c.srs.FindByID(ctx, req.ResourceID)
+	err = c.mergeUpdateSpaceRequest(ctx, space, req)
 	if err != nil {
-		slog.Error("error finding space resource", slog.Any("error", err))
-		return nil, err
+		return nil, fmt.Errorf("failed to merge update space request, error: %w", err)
 	}
-	space = mergeUpdateSpaceRequest(space, req, resource)
 
 	err = c.ss.Update(ctx, *space)
 	if err != nil {
@@ -240,8 +238,8 @@ func (c *SpaceComponent) Update(ctx context.Context, req *types.UpdateSpaceReq) 
 
 	resDataset := &types.Space{
 		ID:            space.ID,
-		Name:          space.Repository.Name,
-		Path:          space.Repository.Path,
+		Name:          dbRepo.Name,
+		Path:          dbRepo.Path,
 		Sdk:           space.Sdk,
 		SdkVersion:    space.SdkVersion,
 		Template:      space.Template,
@@ -249,10 +247,9 @@ func (c *SpaceComponent) Update(ctx context.Context, req *types.UpdateSpaceReq) 
 		Hardware:      space.Hardware,
 		Secrets:       space.Secrets,
 		CoverImageUrl: space.CoverImageUrl,
-		License:       space.Repository.License,
-		Private:       space.Repository.Private,
-		Creator:       space.Repository.User.Username,
-		CreatedAt:     space.Repository.CreatedAt,
+		License:       dbRepo.License,
+		Private:       dbRepo.Private,
+		CreatedAt:     dbRepo.CreatedAt,
 	}
 
 	return resDataset, nil
@@ -675,29 +672,37 @@ func (c *SpaceComponent) hasEntryFile(ctx context.Context, namespace, name, entr
 	return false
 }
 
-func mergeUpdateSpaceRequest(space *database.Space, req *types.UpdateSpaceReq, resource *database.SpaceResource) *database.Space {
+func (c *SpaceComponent) mergeUpdateSpaceRequest(ctx context.Context, space *database.Space, req *types.UpdateSpaceReq) error {
 	// Do not update column value if request body do not have it
-	if req.Sdk != "" {
-		space.Sdk = req.Sdk
+	if req.Sdk != nil {
+		space.Sdk = *req.Sdk
 	}
-	if req.SdkVersion != "" {
-		space.SdkVersion = req.SdkVersion
+	if req.SdkVersion != nil {
+		space.SdkVersion = *req.SdkVersion
 	}
-	if req.Env != "" {
-		space.Env = req.Env
+	if req.Env != nil {
+		space.Env = *req.Env
 	}
-	space.Hardware = resource.Resources
-	space.CostPerHour = resource.CostPerHour
-	if req.Secrets != "" {
-		space.Secrets = req.Secrets
+	if req.Secrets != nil {
+		space.Secrets = *req.Secrets
 	}
-	if req.Template != "" {
-		space.Template = req.Template
+	if req.Template != nil {
+		space.Template = *req.Template
 	}
-	if req.CoverImageUrl != "" {
-		space.CoverImageUrl = req.CoverImageUrl
+	if req.CoverImageUrl != nil {
+		space.CoverImageUrl = *req.CoverImageUrl
 	}
-	return space
+
+	if req.ResourceID != nil {
+		resource, err := c.srs.FindByID(ctx, *req.ResourceID)
+		if err != nil {
+			return fmt.Errorf("can't find space resource by id, resource id:%d, error:%w", *req.ResourceID, err)
+		}
+		space.Hardware = resource.Resources
+		space.CostPerHour = resource.CostPerHour
+	}
+
+	return nil
 }
 
 const (

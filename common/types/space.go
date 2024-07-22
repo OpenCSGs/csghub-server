@@ -54,12 +54,12 @@ type Space struct {
 }
 
 type UpdateSpaceReq struct {
-	CreateRepoReq
-	Sdk           string `json:"sdk" example:"1"`
-	SdkVersion    string `json:"sdk_version" example:"v0.1"`
-	CoverImageUrl string `json:"cover_image_url"`
-	Template      string `json:"template"`
-	Env           string `json:"env"`
-	ResourceID    int64  `json:"resource_id"`
-	Secrets       string `json:"secrets"`
+	UpdateRepoReq
+	Sdk           *string `json:"sdk" example:"1"`
+	SdkVersion    *string `json:"sdk_version" example:"v0.1"`
+	CoverImageUrl *string `json:"cover_image_url"`
+	Template      *string `json:"template"`
+	Env           *string `json:"env"`
+	ResourceID    *int64  `json:"resource_id"`
+	Secrets       *string `json:"secrets"`
 }

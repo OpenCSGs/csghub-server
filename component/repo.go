@@ -187,7 +187,7 @@ func (c *RepoComponent) CreateRepo(ctx context.Context, req types.CreateRepoReq)
 	return gitRepo, newDBRepo, nil
 }
 
-func (c *RepoComponent) UpdateRepo(ctx context.Context, req types.CreateRepoReq) (*database.Repository, error) {
+func (c *RepoComponent) UpdateRepo(ctx context.Context, req types.UpdateRepoReq) (*database.Repository, error) {
 	repo, err := c.repo.Find(ctx, req.Namespace, string(req.RepoType), req.Name)
 	if err != nil {
 		return nil, errors.New("repository does not exist")
@@ -217,25 +217,30 @@ func (c *RepoComponent) UpdateRepo(ctx context.Context, req types.CreateRepoReq)
 		}
 	}
 
+	if req.Nickname != nil {
+		repo.Nickname = *req.Nickname
+	}
+	if req.Description != nil {
+		repo.Description = *req.Description
+	}
+	if req.Private != nil {
+		repo.Private = *req.Private
+	}
+
 	gitRepoReq := gitserver.UpdateRepoReq{
 		Namespace:     req.Namespace,
 		Name:          req.Name,
-		Nickname:      req.Nickname,
-		Description:   req.Description,
-		DefaultBranch: req.DefaultBranch,
-		Private:       req.Private,
+		Nickname:      repo.Nickname,
+		Description:   repo.Description,
+		DefaultBranch: repo.DefaultBranch,
+		Private:       repo.Private,
 		RepoType:      req.RepoType,
 	}
-	gitRepo, err := c.git.UpdateRepo(ctx, gitRepoReq)
+	_, err = c.git.UpdateRepo(ctx, gitRepoReq)
 	if err != nil {
 		slog.Error("fail to update repo in git ", slog.Any("req", req), slog.String("error", err.Error()))
 		return nil, fmt.Errorf("fail to update repo in git, error: %w", err)
 	}
-
-	repo.Description = gitRepo.Description
-	repo.Private = gitRepo.Private
-	repo.DefaultBranch = gitRepo.DefaultBranch
-	repo.Nickname = req.Nickname
 
 	resRepo, err := c.repo.UpdateRepo(ctx, *repo)
 	if err != nil {

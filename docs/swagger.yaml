@@ -1599,30 +1599,14 @@ definitions:
     type: object
   types.UpdateCodeReq:
     properties:
-      default_branch:
-        example: main
-        type: string
       description:
-        type: string
-      labels:
-        example: ""
-        type: string
-      license:
-        example: MIT
-        type: string
-      name:
-        example: model_name_1
-        type: string
-      namespace:
-        example: user_or_org_name
         type: string
       nickname:
         example: model display name
         type: string
       private:
+        example: false
         type: boolean
-      readme:
-        type: string
     type: object
   types.UpdateCollectionReposReq:
     properties:
@@ -1633,30 +1617,14 @@ definitions:
     type: object
   types.UpdateDatasetReq:
     properties:
-      default_branch:
-        example: main
-        type: string
       description:
-        type: string
-      labels:
-        example: ""
-        type: string
-      license:
-        example: MIT
-        type: string
-      name:
-        example: model_name_1
-        type: string
-      namespace:
-        example: user_or_org_name
         type: string
       nickname:
         example: model display name
         type: string
       private:
+        example: false
         type: boolean
-      readme:
-        type: string
     type: object
   types.UpdateFileReq:
     properties:
@@ -1701,61 +1669,29 @@ definitions:
     type: object
   types.UpdateModelReq:
     properties:
-      default_branch:
-        example: main
-        type: string
       description:
-        type: string
-      labels:
-        example: ""
-        type: string
-      license:
-        example: MIT
-        type: string
-      name:
-        example: model_name_1
-        type: string
-      namespace:
-        example: user_or_org_name
         type: string
       nickname:
         example: model display name
         type: string
       private:
+        example: false
         type: boolean
-      readme:
-        type: string
     type: object
   types.UpdateSpaceReq:
     properties:
       cover_image_url:
         type: string
-      default_branch:
-        example: main
-        type: string
       description:
         type: string
       env:
-        type: string
-      labels:
-        example: ""
-        type: string
-      license:
-        example: MIT
-        type: string
-      name:
-        example: model_name_1
-        type: string
-      namespace:
-        example: user_or_org_name
         type: string
       nickname:
         example: model display name
         type: string
       private:
+        example: false
         type: boolean
-      readme:
-        type: string
       resource_id:
         type: integer
       sdk:

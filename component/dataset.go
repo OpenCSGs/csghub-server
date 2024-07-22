@@ -309,16 +309,17 @@ func (c *DatasetComponent) Index(ctx context.Context, filter *types.RepoFilter, 
 
 func (c *DatasetComponent) Update(ctx context.Context, req *types.UpdateDatasetReq) (*types.Dataset, error) {
 	req.RepoType = types.DatasetRepo
-	dbRepo, err := c.UpdateRepo(ctx, req.CreateRepoReq)
+	dbRepo, err := c.UpdateRepo(ctx, req.UpdateRepoReq)
 	if err != nil {
 		return nil, err
 	}
 
-	dataset, err := c.ds.FindByPath(ctx, req.Namespace, req.Name)
+	dataset, err := c.ds.ByRepoID(ctx, dbRepo.ID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find dataset, error: %w", err)
 	}
 
+	// update times of dateset
 	err = c.ds.Update(ctx, *dataset)
 	if err != nil {
 		return nil, fmt.Errorf("failed to update database dataset, error: %w", err)

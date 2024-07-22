@@ -34,6 +34,20 @@ func (s *CodeStore) ByRepoIDs(ctx context.Context, repoIDs []int64) (codes []Cod
 	return
 }
 
+func (s *CodeStore) ByRepoID(ctx context.Context, repoID int64) (*Code, error) {
+	var code Code
+	err := s.db.Operator.Core.NewSelect().
+		Model(&code).
+		Where("repository_id = ?", repoID).
+		Scan(ctx)
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to select code, error: %w", err)
+	}
+
+	return &code, nil
+}
+
 func (s *CodeStore) ByUsername(ctx context.Context, username string, per, page int, onlyPublic bool) (codes []Code, total int, err error) {
 	query := s.db.Operator.Core.
 		NewSelect().
