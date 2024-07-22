@@ -36,4 +36,5 @@ type Dataset struct {
 	UserLikes     bool                 `json:"user_likes"`
 	Source        RepositorySource     `json:"source"`
 	SyncStatus    RepositorySyncStatus `json:"sync_status"`
+	License       string               `json:"license"`
 }

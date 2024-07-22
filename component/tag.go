@@ -9,6 +9,7 @@ import (
 	"opencsg.com/csghub-server/builder/sensitive"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/config"
+	"opencsg.com/csghub-server/common/types"
 	"opencsg.com/csghub-server/component/tagparser"
 )
 
@@ -31,19 +32,25 @@ func (tc *TagComponent) AllTags(ctx context.Context) ([]database.Tag, error) {
 	return tc.ts.AllTags(ctx)
 }
 
-func (c *TagComponent) ClearMetaTags(ctx context.Context, namespace, name string) error {
-	_, err := c.ts.SetMetaTags(ctx, namespace, name, nil)
+func (c *TagComponent) ClearMetaTags(ctx context.Context, repoType types.RepositoryType, namespace, name string) error {
+
+	_, err := c.ts.SetMetaTags(ctx, repoType, namespace, name, nil)
 	return err
 }
 
 func (c *TagComponent) UpdateMetaTags(ctx context.Context, tagScope database.TagScope, namespace, name, content string) ([]*database.RepositoryTag, error) {
-	var tp tagparser.TagProcessor
+	var (
+		tp       tagparser.TagProcessor
+		repoType types.RepositoryType
+	)
 	// TODO:load from cache
 
 	if tagScope == database.DatasetTagScope {
 		tp = tagparser.NewDatasetTagProcessor(c.ts)
+		repoType = types.DatasetRepo
 	} else if tagScope == database.ModelTagScope {
 		tp = tagparser.NewModelTagProcessor(c.ts)
+		repoType = types.ModelRepo
 	} else {
 		// skip tag process for code and space now
 		return nil, nil
@@ -68,13 +75,25 @@ func (c *TagComponent) UpdateMetaTags(ctx context.Context, tagScope database.Tag
 		slog.Error("Failed to save tags", slog.Any("error", err))
 		return nil, fmt.Errorf("failed to save tags, cause: %w", err)
 	}
+
+	repo, err := c.rs.FindByPath(ctx, repoType, namespace, name)
+	if err != nil {
+		slog.Error("failed to find repo", slog.Any("error", err))
+		return nil, fmt.Errorf("failed to find repo, cause: %w", err)
+	}
+
 	metaTags := append(tagsMatched, tagToCreate...)
 	var repoTags []*database.RepositoryTag
-	repoTags, err = c.ts.SetMetaTags(ctx, namespace, name, metaTags)
+	repoTags, err = c.ts.SetMetaTags(ctx, repoType, namespace, name, metaTags)
 	if err != nil {
 		slog.Error("failed to set dataset's tags", slog.String("namespace", namespace),
 			slog.String("name", name), slog.Any("error", err))
 		return nil, fmt.Errorf("failed to set dataset's tags, cause: %w", err)
+	}
+
+	err = c.rs.UpdateLicenseByTag(ctx, repo.ID)
+	if err != nil {
+		slog.Error("failed to update repo license tags", slog.Any("error", err))
 	}
 
 	return repoTags, nil

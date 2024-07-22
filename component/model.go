@@ -160,6 +160,7 @@ func (c *ModelComponent) Index(ctx context.Context, filter *types.RepoFilter, pe
 			UpdatedAt:    repo.UpdatedAt,
 			Source:       repo.Source,
 			SyncStatus:   repo.SyncStatus,
+			License:      repo.License,
 			Repository: types.Repository{
 				HTTPCloneURL: repo.HTTPCloneURL,
 				SSHCloneURL:  repo.SSHCloneURL,
@@ -289,6 +290,7 @@ func (c *ModelComponent) Create(ctx context.Context, req *types.CreateModelReq) 
 		CreatedAt: model.CreatedAt,
 		UpdatedAt: model.UpdatedAt,
 		BaseModel: model.BaseModel,
+		License:   model.Repository.License,
 	}
 
 	return resModel, nil
@@ -437,6 +439,7 @@ func (c *ModelComponent) Show(ctx context.Context, namespace, name, currentUser 
 		Source:     model.Repository.Source,
 		SyncStatus: model.Repository.SyncStatus,
 		BaseModel:  model.BaseModel,
+		License:    model.Repository.License,
 	}
 	inferences, _ := c.rrtfms.GetByRepoIDsAndType(ctx, model.Repository.ID, types.InferenceType)
 	if len(inferences) > 0 {

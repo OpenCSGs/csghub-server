@@ -545,3 +545,28 @@ func (s *RepoStore) UpdateOrCreateRepo(ctx context.Context, input Repository) (*
 
 	return &input, nil
 }
+
+func (s *RepoStore) UpdateLicenseByTag(ctx context.Context, repoID int64) error {
+	var tag Tag
+	err := s.db.Core.NewSelect().
+		Model(&tag).
+		Join("join repository_tags on tag.id = repository_tags.tag_id").
+		Join("join repositories on repositories.id = repository_tags.repository_id").
+		Where("repository_tags.repository_id = ? and tag.category = ?", repoID, "license").
+		Scan(ctx)
+	if err != nil {
+		return err
+	}
+	if tag.Name != "" {
+		repo, err := s.FindById(ctx, repoID)
+		if err != nil {
+			return err
+		}
+		repo.License = tag.Name
+		_, err = s.UpdateRepo(ctx, *repo)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}

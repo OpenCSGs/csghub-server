@@ -211,7 +211,8 @@ func (c *GitCallbackComponent) removeFiles(ctx context.Context, repoType, namesp
 		if fileName == ReadmeFileName {
 			// use empty content to clear all the meta tags
 			const content string = ""
-			err := c.tc.ClearMetaTags(ctx, namespace, repoName)
+			adjustedRepoType := types.RepositoryType(strings.TrimSuffix(repoType, "s"))
+			err := c.tc.ClearMetaTags(ctx, adjustedRepoType, namespace, repoName)
 			if err != nil {
 				slog.Error("failed to clear meta tags", slog.String("content", content),
 					slog.String("repo", path.Join(namespace, repoName)), slog.String("ref", ref),

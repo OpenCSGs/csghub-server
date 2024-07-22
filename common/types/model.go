@@ -92,6 +92,7 @@ type Model struct {
 	EnableInference bool                 `json:"enable_inference"`
 	EnableFinetune  bool                 `json:"enable_finetune"`
 	BaseModel       string               `json:"base_model"`
+	License         string               `json:"license"`
 }
 
 type SDKModelInfo struct {
