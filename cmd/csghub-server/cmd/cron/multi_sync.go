@@ -64,7 +64,7 @@ var cmdSyncAsClient = &cobra.Command{
 			return
 		}
 
-		err = locker.RunWhileLocked(ctx, resourceName, expirationTime, func() error {
+		err = locker.RunWhileLocked(ctx, resourceName, expirationTime, func(ctx context.Context) error {
 			c, err := component.NewMultiSyncComponent(config)
 			if err != nil {
 				slog.Error("failed to create multi sync component", "err", err)

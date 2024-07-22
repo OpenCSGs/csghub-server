@@ -9,6 +9,7 @@ func init() {
 	Cmd.AddCommand(cmdCalcRecomScore)
 	Cmd.AddCommand(cmdCreatePushMirror)
 	Cmd.AddCommand(cmdSyncAsClient)
+	Cmd.AddCommand(cmdGenTelemetry)
 }
 
 var Cmd = &cobra.Command{
