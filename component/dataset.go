@@ -297,6 +297,7 @@ func (c *DatasetComponent) Index(ctx context.Context, filter *types.RepoFilter, 
 			UpdatedAt:    repo.UpdatedAt,
 			Source:       repo.Source,
 			SyncStatus:   repo.SyncStatus,
+			License:      repo.License,
 			Repository: types.Repository{
 				HTTPCloneURL: repo.HTTPCloneURL,
 				SSHCloneURL:  repo.SSHCloneURL,
@@ -421,6 +422,7 @@ func (c *DatasetComponent) Show(ctx context.Context, namespace, name, currentUse
 		UserLikes:  likeExists,
 		Source:     dataset.Repository.Source,
 		SyncStatus: dataset.Repository.SyncStatus,
+		License:    dataset.Repository.License,
 	}
 
 	return resDataset, nil

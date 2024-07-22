@@ -195,6 +195,7 @@ func (c *CodeComponent) Index(ctx context.Context, filter *types.RepoFilter, per
 			Tags:         tags,
 			Source:       repo.Source,
 			SyncStatus:   repo.SyncStatus,
+			License:      repo.License,
 		})
 	}
 
@@ -315,6 +316,7 @@ func (c *CodeComponent) Show(ctx context.Context, namespace, name, currentUser s
 		UserLikes:  likeExists,
 		Source:     code.Repository.Source,
 		SyncStatus: code.Repository.SyncStatus,
+		License:    code.Repository.License,
 	}
 
 	return resCode, nil
