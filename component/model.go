@@ -309,12 +309,12 @@ func buildCreateFileReq(p *types.CreateFileParams, repoType types.RepositoryType
 
 func (c *ModelComponent) Update(ctx context.Context, req *types.UpdateModelReq) (*types.Model, error) {
 	req.RepoType = types.ModelRepo
-	dbRepo, err := c.UpdateRepo(ctx, req.CreateRepoReq)
+	dbRepo, err := c.UpdateRepo(ctx, req.UpdateRepoReq)
 	if err != nil {
 		return nil, err
 	}
 
-	model, err := c.ms.FindByPath(ctx, req.Namespace, req.Name)
+	model, err := c.ms.ByRepoID(ctx, dbRepo.ID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find model, error: %w", err)
 	}
