@@ -13,7 +13,7 @@ type CreateDatasetReq struct {
 }
 
 type UpdateDatasetReq struct {
-	CreateRepoReq
+	UpdateRepoReq
 }
 
 type Dataset struct {

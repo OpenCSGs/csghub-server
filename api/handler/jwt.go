@@ -53,7 +53,7 @@ func (h *JWTHandler) Create(ctx *gin.Context) {
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 	ss, err := token.SignedString(h.SigningKey)
 	if err != nil {
-		slog.Error("failed to generate JWT token: %v", err)
+		slog.Error("failed to generate JWT token", "error", err)
 		httpbase.ServerError(ctx, err)
 		return
 	}

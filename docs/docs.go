@@ -13708,38 +13708,16 @@ const docTemplate = `{
         "types.UpdateCodeReq": {
             "type": "object",
             "properties": {
-                "default_branch": {
-                    "type": "string",
-                    "example": "main"
-                },
                 "description": {
                     "type": "string"
-                },
-                "labels": {
-                    "type": "string",
-                    "example": ""
-                },
-                "license": {
-                    "type": "string",
-                    "example": "MIT"
-                },
-                "name": {
-                    "type": "string",
-                    "example": "model_name_1"
-                },
-                "namespace": {
-                    "type": "string",
-                    "example": "user_or_org_name"
                 },
                 "nickname": {
                     "type": "string",
                     "example": "model display name"
                 },
                 "private": {
-                    "type": "boolean"
-                },
-                "readme": {
-                    "type": "string"
+                    "type": "boolean",
+                    "example": false
                 }
             }
         },
@@ -13757,38 +13735,16 @@ const docTemplate = `{
         "types.UpdateDatasetReq": {
             "type": "object",
             "properties": {
-                "default_branch": {
-                    "type": "string",
-                    "example": "main"
-                },
                 "description": {
                     "type": "string"
-                },
-                "labels": {
-                    "type": "string",
-                    "example": ""
-                },
-                "license": {
-                    "type": "string",
-                    "example": "MIT"
-                },
-                "name": {
-                    "type": "string",
-                    "example": "model_name_1"
-                },
-                "namespace": {
-                    "type": "string",
-                    "example": "user_or_org_name"
                 },
                 "nickname": {
                     "type": "string",
                     "example": "model display name"
                 },
                 "private": {
-                    "type": "boolean"
-                },
-                "readme": {
-                    "type": "string"
+                    "type": "boolean",
+                    "example": false
                 }
             }
         },
@@ -13858,38 +13814,16 @@ const docTemplate = `{
         "types.UpdateModelReq": {
             "type": "object",
             "properties": {
-                "default_branch": {
-                    "type": "string",
-                    "example": "main"
-                },
                 "description": {
                     "type": "string"
-                },
-                "labels": {
-                    "type": "string",
-                    "example": ""
-                },
-                "license": {
-                    "type": "string",
-                    "example": "MIT"
-                },
-                "name": {
-                    "type": "string",
-                    "example": "model_name_1"
-                },
-                "namespace": {
-                    "type": "string",
-                    "example": "user_or_org_name"
                 },
                 "nickname": {
                     "type": "string",
                     "example": "model display name"
                 },
                 "private": {
-                    "type": "boolean"
-                },
-                "readme": {
-                    "type": "string"
+                    "type": "boolean",
+                    "example": false
                 }
             }
         },
@@ -13899,41 +13833,19 @@ const docTemplate = `{
                 "cover_image_url": {
                     "type": "string"
                 },
-                "default_branch": {
-                    "type": "string",
-                    "example": "main"
-                },
                 "description": {
                     "type": "string"
                 },
                 "env": {
                     "type": "string"
                 },
-                "labels": {
-                    "type": "string",
-                    "example": ""
-                },
-                "license": {
-                    "type": "string",
-                    "example": "MIT"
-                },
-                "name": {
-                    "type": "string",
-                    "example": "model_name_1"
-                },
-                "namespace": {
-                    "type": "string",
-                    "example": "user_or_org_name"
-                },
                 "nickname": {
                     "type": "string",
                     "example": "model display name"
                 },
                 "private": {
-                    "type": "boolean"
-                },
-                "readme": {
-                    "type": "string"
+                    "type": "boolean",
+                    "example": false
                 },
                 "resource_id": {
                     "type": "integer"
