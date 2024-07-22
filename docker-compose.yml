@@ -2,7 +2,7 @@ version: "3.8"
 
 services:
   postgres:
-    image: "gradescope/postgresql-multiple-databases"
+    image: "gradescope/postgresql-multiple-databases:14.4"
     environment:
       POSTGRES_USER: "postgres"
       POSTGRES_PASSWORD: "postgres"
