@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+
+	"github.com/uptrace/bun"
 )
 
 type RuntimeFrameworksStore struct {
@@ -90,6 +92,15 @@ func (rf *RuntimeFrameworksStore) ListAll(ctx context.Context) ([]RuntimeFramewo
 	_, err := rf.db.Operator.Core.NewSelect().Model(&result).Exec(ctx, &result)
 	if err != nil {
 		return nil, err
+	}
+	return result, nil
+}
+
+func (rf *RuntimeFrameworksStore) ListByIDs(ctx context.Context, ids []int64) ([]RuntimeFramework, error) {
+	var result []RuntimeFramework
+	_, err := rf.db.Operator.Core.NewSelect().Model(&result).Where("id in (?)", bun.In(ids)).Exec(ctx, &result)
+	if err != nil {
+		return nil, fmt.Errorf("query runtimes failed, %w", err)
 	}
 	return result, nil
 }

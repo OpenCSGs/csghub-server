@@ -587,6 +587,36 @@ func (s *RepoStore) CountByRepoType(ctx context.Context, repoType types.Reposito
 	return s.db.Core.NewSelect().Model(&Repository{}).Where("repository_type = ?", repoType).Count(ctx)
 }
 
+func (s *RepoStore) GetRepoWithoutRuntimeByID(ctx context.Context, rfID int64, paths []string) ([]Repository, error) {
+	var res []Repository
+	q := s.db.Operator.Core.NewSelect().Model(&res)
+	if len(paths) > 0 {
+		q.Where("path in (?)", bun.In(paths))
+	}
+	err := q.Where("repository_type = ?", types.ModelRepo).
+		Where("id not in (select repo_id from repositories_runtime_frameworks where runtime_framework_id = ?)", rfID).
+		Scan(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("select repos without runtime failed, %w", err)
+	}
+	return res, nil
+}
+
+func (s *RepoStore) GetRepoWithRuntimeByID(ctx context.Context, rfID int64, paths []string) ([]Repository, error) {
+	var res []Repository
+	q := s.db.Operator.Core.NewSelect().Model(&res)
+	if len(paths) > 0 {
+		q.Where("path in (?)", bun.In(paths))
+	}
+	err := q.Where("repository_type = ?", types.ModelRepo).
+		Where("id in (select repo_id from repositories_runtime_frameworks where runtime_framework_id = ?)", rfID).
+		Scan(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("select repos with runtime failed, %w", err)
+	}
+	return res, nil
+}
+
 func (s *RepoStore) FindWithBatch(ctx context.Context, batchSize, batch int) ([]Repository, error) {
 	var res []Repository
 	err := s.db.Operator.Core.NewSelect().
