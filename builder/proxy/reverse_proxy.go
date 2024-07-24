@@ -37,11 +37,15 @@ func (rp *ReverseProxy) ServeHTTP(w http.ResponseWriter, r *http.Request, api st
 		// 	fmt.Println(string(data))
 		// }
 	}
-	// for debug
-	// proxy.ModifyResponse = func(r *http.Response) error {
-	// 	data, err := httputil.DumpResponse(r, true)
-	// 	fmt.Println(string(data))
-	// 	return nil
-	// }
+	proxy.ModifyResponse = func(r *http.Response) error {
+		// data, err := httputil.DumpResponse(r, true)
+		// fmt.Println(string(data))
+		// remove duplicated header
+		r.Header.Del("Access-Control-Allow-Credentials")
+		r.Header.Del("Access-Control-Allow-Headers")
+		r.Header.Del("Access-Control-Allow-Methods")
+		r.Header.Del("Access-Control-Allow-Origin")
+		return nil
+	}
 	proxy.ServeHTTP(w, r)
 }
