@@ -28,6 +28,7 @@ func Log() gin.HandlerFunc {
 			slog.String("current_user", httpbase.GetCurrentUser(ctx)),
 			slog.Any("auth_type", httpbase.GetAuthType(ctx)),
 			slog.String("url", ctx.Request.URL.RequestURI()),
+			slog.Any("response.header", ctx.Writer.Header()),
 		)
 	}
 }
