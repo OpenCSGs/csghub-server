@@ -1383,3 +1383,35 @@ func (h *ModelHandler) ServerlessStop(ctx *gin.Context) {
 	}
 	httpbase.OK(ctx, nil)
 }
+
+// GetServerless godoc
+// @Security     JWT token
+// @Summary      get model serverless
+// @Tags         Model
+// @Accept       json
+// @Produce      json
+// @Param        namespace path string true "namespace"
+// @Param        name path string true "name"
+// @Success      200  {object}  string "OK"
+// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
+// @Router       /models/{namespace}/{name}/serverless [get]
+func (h *ModelHandler) GetDeployServerless(ctx *gin.Context) {
+	currentUser := httpbase.GetCurrentUser(ctx)
+	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
+	if err != nil {
+		slog.Error("failed to get namespace from context", "error", err)
+		httpbase.BadRequest(ctx, err.Error())
+		return
+	}
+
+	response, err := h.c.GetServerless(ctx, namespace, name, currentUser)
+	if err != nil {
+		slog.Error("failed to get model serverless endpoint", slog.String("namespace", namespace),
+			slog.String("name", name), slog.Any("currentUser", currentUser), slog.Any("error", err))
+		httpbase.ServerError(ctx, err)
+		return
+	}
+
+	httpbase.OK(ctx, response)
+}

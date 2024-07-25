@@ -10,6 +10,7 @@ import (
 	"strconv"
 
 	"opencsg.com/csghub-server/builder/deploy"
+	deployStatus "opencsg.com/csghub-server/builder/deploy/common"
 	"opencsg.com/csghub-server/builder/git/gitserver"
 	"opencsg.com/csghub-server/builder/git/membership"
 	"opencsg.com/csghub-server/builder/inference"
@@ -442,6 +443,61 @@ func (c *ModelComponent) Show(ctx context.Context, namespace, name, currentUser 
 		resModel.EnableFinetune = true
 	}
 	return resModel, nil
+}
+
+func (c *ModelComponent) GetServerless(ctx context.Context, namespace, name, currentUser string) (*types.DeployRepo, error) {
+	model, err := c.ms.FindByPath(ctx, namespace, name)
+	if err != nil {
+		return nil, fmt.Errorf("failed to find model, error: %w", err)
+	}
+	allow, _ := c.AllowReadAccessRepo(ctx, model.Repository, currentUser)
+	if !allow {
+		return nil, ErrUnauthorized
+	}
+	deploy, err := c.deploy.GetServerlessDeployByRepID(ctx, model.Repository.ID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get serverless deployment, error: %w", err)
+	}
+	if deploy == nil {
+		return nil, fmt.Errorf("do not find serverless deployment")
+	}
+	var endpoint string
+	if len(deploy.SvcName) > 0 && deploy.Status == deployStatus.Running {
+		cls, err := c.cluster.ByClusterID(ctx, deploy.ClusterID)
+		zone := ""
+		provider := ""
+		if err != nil {
+			return nil, fmt.Errorf("get cluster with error: %w", err)
+		} else {
+			zone = cls.Zone
+			provider = cls.Provider
+		}
+		regionDomain := ""
+		if len(zone) > 0 && len(provider) > 0 {
+			regionDomain = fmt.Sprintf(".%s.%s", zone, provider)
+		}
+		endpoint = fmt.Sprintf("%s%s.%s", deploy.SvcName, regionDomain, c.publicRootDomain)
+	}
+
+	resDeploy := types.DeployRepo{
+		DeployID:         deploy.ID,
+		DeployName:       deploy.DeployName,
+		RepoID:           deploy.RepoID,
+		SvcName:          deploy.SvcName,
+		Status:           deployStatusCodeToString(deploy.Status),
+		Hardware:         deploy.Hardware,
+		Env:              deploy.Env,
+		RuntimeFramework: deploy.RuntimeFramework,
+		MinReplica:       deploy.MinReplica,
+		MaxReplica:       deploy.MaxReplica,
+		GitBranch:        deploy.GitBranch,
+		ClusterID:        deploy.ClusterID,
+		SecureLevel:      deploy.SecureLevel,
+		CreatedAt:        deploy.CreatedAt,
+		UpdatedAt:        deploy.UpdatedAt,
+		ProxyEndpoint:    endpoint,
+	}
+	return &resDeploy, nil
 }
 
 func (c *ModelComponent) SDKModelInfo(ctx context.Context, namespace, name, ref, currentUser string) (*types.SDKModelInfo, error) {
