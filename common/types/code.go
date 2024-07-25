@@ -13,7 +13,7 @@ type CreateCodeReq struct {
 }
 
 type UpdateCodeReq struct {
-	CreateRepoReq
+	UpdateRepoReq
 }
 
 type Code struct {
