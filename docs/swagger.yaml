@@ -5646,11 +5646,6 @@ paths:
         name: name
         required: true
         type: string
-      - description: current_user
-        in: query
-        name: current_user
-        required: true
-        type: string
       produces:
       - application/json
       responses:
@@ -5667,7 +5662,7 @@ paths:
           schema:
             $ref: '#/definitions/types.APIInternalServerError'
       security:
-      - ApiKey: []
+      - JWT token: []
       summary: get model serverless
       tags:
       - Model

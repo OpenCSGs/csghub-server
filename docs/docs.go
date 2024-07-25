@@ -3693,7 +3693,7 @@ const docTemplate = `{
             "get": {
                 "security": [
                     {
-                        "ApiKey": []
+                        "JWT token": []
                     }
                 ],
                 "consumes": [
@@ -3719,13 +3719,6 @@ const docTemplate = `{
                         "description": "name",
                         "name": "name",
                         "in": "path",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "current_user",
-                        "name": "current_user",
-                        "in": "query",
                         "required": true
                     }
                 ],
