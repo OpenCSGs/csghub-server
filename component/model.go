@@ -446,7 +446,6 @@ func (c *ModelComponent) Show(ctx context.Context, namespace, name, currentUser 
 }
 
 func (c *ModelComponent) GetServerless(ctx context.Context, namespace, name, currentUser string) (*types.DeployRepo, error) {
-	var endpoint string
 	model, err := c.ms.FindByPath(ctx, namespace, name)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find model, error: %w", err)
@@ -455,25 +454,31 @@ func (c *ModelComponent) GetServerless(ctx context.Context, namespace, name, cur
 	if !allow {
 		return nil, ErrUnauthorized
 	}
-	deploy, _ := c.deploy.GetServerlessDeployByRepID(ctx, model.Repository.ID)
-	if deploy != nil {
-		if len(deploy.SvcName) > 0 && deploy.Status == deployStatus.Running {
-			cls, err := c.cluster.ByClusterID(ctx, deploy.ClusterID)
-			zone := ""
-			provider := ""
-			if err != nil {
-				return nil, fmt.Errorf("get cluster with error: %w", err)
-			} else {
-				zone = cls.Zone
-				provider = cls.Provider
-			}
-			regionDomain := ""
-			if len(zone) > 0 && len(provider) > 0 {
-				regionDomain = fmt.Sprintf(".%s.%s", zone, provider)
-			}
-			endpoint = fmt.Sprintf("%s%s.%s", deploy.SvcName, regionDomain, c.publicRootDomain)
-		}
+	deploy, err := c.deploy.GetServerlessDeployByRepID(ctx, model.Repository.ID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get serverless deployment, error: %w", err)
 	}
+	if deploy == nil {
+		return nil, fmt.Errorf("do not find serverless deployment")
+	}
+	var endpoint string
+	if len(deploy.SvcName) > 0 && deploy.Status == deployStatus.Running {
+		cls, err := c.cluster.ByClusterID(ctx, deploy.ClusterID)
+		zone := ""
+		provider := ""
+		if err != nil {
+			return nil, fmt.Errorf("get cluster with error: %w", err)
+		} else {
+			zone = cls.Zone
+			provider = cls.Provider
+		}
+		regionDomain := ""
+		if len(zone) > 0 && len(provider) > 0 {
+			regionDomain = fmt.Sprintf(".%s.%s", zone, provider)
+		}
+		endpoint = fmt.Sprintf("%s%s.%s", deploy.SvcName, regionDomain, c.publicRootDomain)
+	}
+
 	resDeploy := types.DeployRepo{
 		DeployID:         deploy.ID,
 		DeployName:       deploy.DeployName,
