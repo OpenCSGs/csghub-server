@@ -89,18 +89,16 @@ func (s *MirrorStore) FindWithMapping(ctx context.Context, repoType types.Reposi
 		err = s.db.Operator.Core.NewSelect().
 			Model(&mirror).
 			Relation("Repository").
-			Join("JOIN repositories AS r ON mirror.repository_id = r.id ").
 			Where("mirror.source_repo_path=?", fmt.Sprintf("%s/%s", namespace, name)).
-			Where("r.repository_type=?", repoType).
+			Where("repository.repository_type=?", repoType).
 			Scan(ctx)
 	} else {
 		// auto mapping
 		err = s.db.Operator.Core.NewSelect().
 			Model(&mirror).
 			Relation("Repository").
-			Join("JOIN repositories AS r ON mirror.repository_id = r.id ").
-			Where("r.git_path=? OR mirror.source_repo_path=?", fmt.Sprintf("%ss_%s/%s", repoType, namespace, name), fmt.Sprintf("%s/%s", namespace, name)).
-			Where("r.repository_type=?", repoType).
+			Where("repository.git_path=? OR mirror.source_repo_path=?", fmt.Sprintf("%ss_%s/%s", repoType, namespace, name), fmt.Sprintf("%s/%s", namespace, name)).
+			Where("repository.repository_type=?", repoType).
 			Scan(ctx)
 	}
 	if err != nil {
