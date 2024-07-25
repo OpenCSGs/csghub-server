@@ -380,15 +380,6 @@ func (c *ModelComponent) Show(ctx context.Context, namespace, name, currentUser 
 		return nil, ErrUnauthorized
 	}
 
-	// get model running status
-	var mid inference.ModelID
-	mid.Owner = namespace
-	mid.Name = name
-	mi, err := c.infer.GetModelInfo(mid)
-	if err != nil {
-		slog.Error("failed to get model info", slog.Any("id", mid), slog.Any("error", err))
-	}
-
 	for _, tag := range model.Repository.Tags {
 		tags = append(tags, types.RepoTag{
 			Name:      tag.Name,
@@ -432,7 +423,6 @@ func (c *ModelComponent) Show(ctx context.Context, namespace, name, currentUser 
 		UpdatedAt: model.Repository.UpdatedAt,
 		// TODO:default to ModelWidgetTypeGeneration, need to config later
 		WidgetType: types.ModelWidgetTypeGeneration,
-		Status:     mi.Status,
 		UserLikes:  likeExists,
 		Source:     model.Repository.Source,
 		SyncStatus: model.Repository.SyncStatus,
