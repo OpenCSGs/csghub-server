@@ -13,7 +13,17 @@ type CreateModelReq struct {
 }
 
 type UpdateModelReq struct {
-	CreateRepoReq
+	UpdateRepoReq
+}
+
+type UpdateRepoReq struct {
+	Username    string         `json:"-"`
+	Namespace   string         `json:"-"`
+	Name        string         `json:"-"`
+	RepoType    RepositoryType `json:"-"`
+	Nickname    *string        `json:"nickname" example:"model display name"`
+	Description *string        `json:"description"`
+	Private     *bool          `json:"private" example:"false"`
 }
 
 type UpdateDownloadsReq struct {

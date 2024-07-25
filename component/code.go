@@ -203,19 +203,20 @@ func (c *CodeComponent) Index(ctx context.Context, filter *types.RepoFilter, per
 
 func (c *CodeComponent) Update(ctx context.Context, req *types.UpdateCodeReq) (*types.Code, error) {
 	req.RepoType = types.CodeRepo
-	dbRepo, err := c.UpdateRepo(ctx, req.CreateRepoReq)
+	dbRepo, err := c.UpdateRepo(ctx, req.UpdateRepoReq)
 	if err != nil {
 		return nil, err
 	}
 
-	code, err := c.cs.FindByPath(ctx, req.Namespace, req.Name)
+	code, err := c.cs.ByRepoID(ctx, dbRepo.ID)
 	if err != nil {
-		return nil, fmt.Errorf("failed to find code, error: %w", err)
+		return nil, fmt.Errorf("failed to find code repo, error: %w", err)
 	}
 
+	//update times of code
 	err = c.cs.Update(ctx, *code)
 	if err != nil {
-		return nil, fmt.Errorf("failed to update database code, error: %w", err)
+		return nil, fmt.Errorf("failed to update database code repo, error: %w", err)
 	}
 
 	resCode := &types.Code{

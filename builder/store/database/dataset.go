@@ -41,6 +41,19 @@ func (s *DatasetStore) ByRepoIDs(ctx context.Context, repoIDs []int64) (datasets
 	return
 }
 
+func (s *DatasetStore) ByRepoID(ctx context.Context, repoID int64) (*Dataset, error) {
+	var dataset Dataset
+	err := s.db.Operator.Core.NewSelect().
+		Model(&dataset).
+		Where("repository_id = ?", repoID).
+		Scan(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to select dataset by repository id: %d, error: %w", repoID, err)
+	}
+
+	return &dataset, nil
+}
+
 func (s *DatasetStore) ByUsername(ctx context.Context, username string, per, page int, onlyPublic bool) (datasets []Dataset, total int, err error) {
 	query := s.db.Operator.Core.
 		NewSelect().
