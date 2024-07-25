@@ -70,7 +70,7 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 		hfAPIGroup := hfGroup.Group("/api")
 		{
 			// compitable with HF model info api, used for sdk like this:  huggingface_hub.model_info(repo_id, revision)
-			hfAPIGroup.GET("/models/:namespace/:name/revision/:ref", middleware.RepoMapping(types.DatasetRepo), modelHandler.SDKModelInfo)
+			hfAPIGroup.GET("/models/:namespace/:name/revision/:ref", middleware.RepoMapping(types.ModelRepo), modelHandler.SDKModelInfo)
 			// compitable with HF dataset info api, used for sdk like this: huggingface_hub.dataset_info(repo_id, revision)
 			hfAPIGroup.GET("/datasets/:namespace/:name/revision/:ref", middleware.RepoMapping(types.DatasetRepo), repoCommonHandler.SDKListFiles)
 			hfAPIGroup.GET("/whoami-v2", userHandler.UserPermission)

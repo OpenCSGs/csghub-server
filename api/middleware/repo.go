@@ -37,6 +37,7 @@ func RepoMapping(repo_type types.RepositoryType) gin.HandlerFunc {
 			//set the real namespace, the name was unchange
 			slog.Info("namespace changed: ", "namespace", repo_id[0])
 			ctx.Set("namespace_mapped", repo_id[0])
+			ctx.Set("name_mapped", repo_id[1])
 			ctx.Next()
 			return
 		}
