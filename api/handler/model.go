@@ -1385,7 +1385,6 @@ func (h *ModelHandler) ServerlessStop(ctx *gin.Context) {
 }
 
 // GetServerless godoc
-// @Security     ApiKey
 // @Summary      get model serverless
 // @Tags         Model
 // @Accept       json
