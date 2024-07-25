@@ -3680,6 +3680,59 @@ const docTemplate = `{
             }
         },
         "/models/{namespace}/{name}/serverless": {
+            "get": {
+                "security": [
+                    {
+                        "JWT token": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Model"
+                ],
+                "summary": "get model serverless",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "namespace",
+                        "name": "namespace",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "name",
+                        "name": "name",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            },
             "post": {
                 "security": [
                     {
