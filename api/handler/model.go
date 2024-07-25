@@ -1385,6 +1385,7 @@ func (h *ModelHandler) ServerlessStop(ctx *gin.Context) {
 }
 
 // GetServerless godoc
+// @Security     JWT token
 // @Summary      get model serverless
 // @Tags         Model
 // @Accept       json
