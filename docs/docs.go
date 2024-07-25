@@ -644,11 +644,6 @@ const docTemplate = `{
         },
         "/collections": {
             "get": {
-                "security": [
-                    {
-                        "ApiKey": []
-                    }
-                ],
                 "description": "get all collections",
                 "consumes": [
                     "application/json"
@@ -731,7 +726,7 @@ const docTemplate = `{
             "post": {
                 "security": [
                     {
-                        "ApiKey": []
+                        "JWT token": []
                     }
                 ],
                 "description": "create a collection",
@@ -792,11 +787,6 @@ const docTemplate = `{
         },
         "/collections/{id}": {
             "get": {
-                "security": [
-                    {
-                        "ApiKey": []
-                    }
-                ],
                 "description": "get a collection detail",
                 "consumes": [
                     "application/json"
@@ -853,7 +843,7 @@ const docTemplate = `{
             "put": {
                 "security": [
                     {
-                        "ApiKey": []
+                        "JWT token": []
                     }
                 ],
                 "description": "update a collection",
@@ -921,7 +911,7 @@ const docTemplate = `{
             "delete": {
                 "security": [
                     {
-                        "ApiKey": []
+                        "JWT token": []
                     }
                 ],
                 "description": "delete a exists collection",
@@ -970,7 +960,7 @@ const docTemplate = `{
             "post": {
                 "security": [
                     {
-                        "ApiKey": []
+                        "JWT token": []
                     }
                 ],
                 "description": "Add repos to a collection",
@@ -1038,7 +1028,7 @@ const docTemplate = `{
             "delete": {
                 "security": [
                     {
-                        "ApiKey": []
+                        "JWT token": []
                     }
                 ],
                 "description": "remove repos from a collection",

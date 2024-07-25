@@ -12,8 +12,12 @@ import (
 func GetNamespaceAndNameFromContext(ctx *gin.Context) (namespace string, name string, err error) {
 	namespace = ctx.Param("namespace")
 	name = ctx.Param("name")
+	namespace_mapped := ctx.GetString("namespace_mapped")
+	if namespace_mapped != "" {
+		namespace = namespace_mapped
+	}
 	if namespace == "" || name == "" {
-		err = errors.New("Invalid namespace or name")
+		err = errors.New("invalid namespace or name")
 		return
 	}
 	return

@@ -792,7 +792,7 @@ func (c *RepoComponent) UploadFile(ctx context.Context, req *types.CreateFileReq
 func (c *RepoComponent) SDKListFiles(ctx context.Context, repoType types.RepositoryType, namespace, name, userName string) (*types.SDKFiles, error) {
 	var sdkFiles []types.SDKFile
 	repo, err := c.repo.FindByPath(ctx, repoType, namespace, name)
-	if err != nil {
+	if err != nil || repo == nil {
 		return nil, ErrNotFound
 	}
 
