@@ -80,6 +80,33 @@ func (s *MirrorStore) FindByRepoPath(ctx context.Context, repoType types.Reposit
 	return &mirror, nil
 }
 
+func (s *MirrorStore) FindWithMapping(ctx context.Context, repoType types.RepositoryType, namespace, name string, mapping types.Mapping) (*Mirror, error) {
+	var mirror Mirror
+	var err error
+	if mapping == types.CSGHubMapping {
+		return s.FindByRepoPath(ctx, repoType, namespace, name)
+	} else if mapping == types.HFMapping {
+		err = s.db.Operator.Core.NewSelect().
+			Model(&mirror).
+			Relation("Repository").
+			Where("mirror.source_repo_path=?", fmt.Sprintf("%s/%s", namespace, name)).
+			Where("repository.repository_type=?", repoType).
+			Scan(ctx)
+	} else {
+		// auto mapping
+		err = s.db.Operator.Core.NewSelect().
+			Model(&mirror).
+			Relation("Repository").
+			Where("repository.git_path=? OR mirror.source_repo_path=?", fmt.Sprintf("%ss_%s/%s", repoType, namespace, name), fmt.Sprintf("%s/%s", namespace, name)).
+			Where("repository.repository_type=?", repoType).
+			Scan(ctx)
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &mirror, nil
+}
+
 func (s *MirrorStore) Create(ctx context.Context, mirror *Mirror) (*Mirror, error) {
 	err := s.db.Operator.Core.NewInsert().
 		Model(mirror).

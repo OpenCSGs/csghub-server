@@ -3844,8 +3844,6 @@ paths:
           description: Internal server error
           schema:
             $ref: '#/definitions/types.APIInternalServerError'
-      security:
-      - ApiKey: []
       summary: get all collections
       tags:
       - Collection
@@ -3881,7 +3879,7 @@ paths:
           schema:
             $ref: '#/definitions/types.APIInternalServerError'
       security:
-      - ApiKey: []
+      - JWT token: []
       summary: create a collection
       tags:
       - Collection
@@ -3912,7 +3910,7 @@ paths:
           schema:
             $ref: '#/definitions/types.APIInternalServerError'
       security:
-      - ApiKey: []
+      - JWT token: []
       summary: Delete a exists collection
       tags:
       - Collection
@@ -3946,8 +3944,6 @@ paths:
           description: Internal server error
           schema:
             $ref: '#/definitions/types.APIInternalServerError'
-      security:
-      - ApiKey: []
       summary: get a collection detail
       tags:
       - Collection
@@ -3988,7 +3984,7 @@ paths:
           schema:
             $ref: '#/definitions/types.APIInternalServerError'
       security:
-      - ApiKey: []
+      - JWT token: []
       summary: update a collection
       tags:
       - Collection
@@ -4030,7 +4026,7 @@ paths:
           schema:
             $ref: '#/definitions/types.APIInternalServerError'
       security:
-      - ApiKey: []
+      - JWT token: []
       summary: remove repos from a collection
       tags:
       - Collection
@@ -4071,7 +4067,7 @@ paths:
           schema:
             $ref: '#/definitions/types.APIInternalServerError'
       security:
-      - ApiKey: []
+      - JWT token: []
       summary: Add repos to a collection
       tags:
       - Collection
