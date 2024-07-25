@@ -10,6 +10,7 @@ import (
 	"strconv"
 
 	"opencsg.com/csghub-server/builder/deploy"
+	deployStatus "opencsg.com/csghub-server/builder/deploy/common"
 	"opencsg.com/csghub-server/builder/git/gitserver"
 	"opencsg.com/csghub-server/builder/git/membership"
 	"opencsg.com/csghub-server/builder/inference"
@@ -441,7 +442,33 @@ func (c *ModelComponent) Show(ctx context.Context, namespace, name, currentUser 
 	if len(finetunes) > 0 {
 		resModel.EnableFinetune = true
 	}
+	// get model serverless endpoint for inference widget
+	resModel.ServerlessEndpoint = c.getServerlessEndpoint(ctx, model.Repository.ID)
 	return resModel, nil
+}
+
+func (c *ModelComponent) getServerlessEndpoint(ctx context.Context, repoID int64) string {
+	var endpoint string
+	deploy, _ := c.deploy.GetServerlessDeployByRepID(ctx, repoID)
+	if deploy != nil {
+		if len(deploy.SvcName) > 0 && deploy.Status == deployStatus.Running {
+			cls, err := c.cluster.ByClusterID(ctx, deploy.ClusterID)
+			zone := ""
+			provider := ""
+			if err != nil {
+				slog.Warn("Get cluster with error", slog.Any("error", err))
+			} else {
+				zone = cls.Zone
+				provider = cls.Provider
+			}
+			regionDomain := ""
+			if len(zone) > 0 && len(provider) > 0 {
+				regionDomain = fmt.Sprintf(".%s.%s", zone, provider)
+			}
+			endpoint = fmt.Sprintf("%s%s.%s", deploy.SvcName, regionDomain, c.publicRootDomain)
+		}
+	}
+	return endpoint
 }
 
 func (c *ModelComponent) SDKModelInfo(ctx context.Context, namespace, name, ref, currentUser string) (*types.SDKModelInfo, error) {

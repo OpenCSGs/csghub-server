@@ -13179,6 +13179,9 @@ const docTemplate = `{
                 "repository_id": {
                     "type": "integer"
                 },
+                "serverless_endpoint": {
+                    "type": "string"
+                },
                 "source": {
                     "$ref": "#/definitions/types.RepositorySource"
                 },
