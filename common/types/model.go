@@ -96,13 +96,12 @@ type Model struct {
 	// widget UI style: generation,chat
 	WidgetType ModelWidgetType `json:"widget_type" example:"generation"`
 	// url to interact with the model
-	Status             string               `json:"status" example:"RUNNING"`
-	UserLikes          bool                 `json:"user_likes"`
-	Source             RepositorySource     `json:"source"`
-	SyncStatus         RepositorySyncStatus `json:"sync_status"`
-	EnableInference    bool                 `json:"enable_inference"`
-	EnableFinetune     bool                 `json:"enable_finetune"`
-	ServerlessEndpoint string               `json:"serverless_endpoint"`
+	Status          string               `json:"status" example:"RUNNING"`
+	UserLikes       bool                 `json:"user_likes"`
+	Source          RepositorySource     `json:"source"`
+	SyncStatus      RepositorySyncStatus `json:"sync_status"`
+	EnableInference bool                 `json:"enable_inference"`
+	EnableFinetune  bool                 `json:"enable_finetune"`
 }
 
 type SDKModelInfo struct {

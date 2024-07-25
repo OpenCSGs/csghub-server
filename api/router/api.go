@@ -423,6 +423,7 @@ func createModelRoutes(config *config.Config, apiGroup *gin.RouterGroup, needAPI
 		modelsGroup.DELETE("/:namespace/:name/finetune/:id", middleware.RepoType(types.ModelRepo), modelHandler.FinetuneDelete)
 
 		// deploy model as serverless
+		modelsGroup.GET("/:namespace/:name/serverless", middleware.RepoType(types.ModelRepo), modelHandler.GetDeployServerless)
 		modelsGroup.POST("/:namespace/:name/serverless", needAPIKey, middleware.RepoType(types.ModelRepo), modelHandler.DeployServerless)
 		modelsGroup.PUT("/:namespace/:name/serverless/:id/start", needAPIKey, middleware.RepoType(types.ModelRepo), modelHandler.ServerlessStart)
 		modelsGroup.PUT("/:namespace/:name/serverless/:id/stop", needAPIKey, middleware.RepoType(types.ModelRepo), modelHandler.ServerlessStop)

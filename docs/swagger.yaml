@@ -1241,8 +1241,6 @@ definitions:
         $ref: '#/definitions/types.Repository'
       repository_id:
         type: integer
-      serverless_endpoint:
-        type: string
       source:
         $ref: '#/definitions/types.RepositorySource'
       status:
@@ -5634,6 +5632,45 @@ paths:
       tags:
       - Model
   /models/{namespace}/{name}/serverless:
+    get:
+      consumes:
+      - application/json
+      parameters:
+      - description: namespace
+        in: path
+        name: namespace
+        required: true
+        type: string
+      - description: name
+        in: path
+        name: name
+        required: true
+        type: string
+      - description: current_user
+        in: query
+        name: current_user
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            type: string
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: get model serverless
+      tags:
+      - Model
     post:
       consumes:
       - application/json
