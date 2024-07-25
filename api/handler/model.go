@@ -1392,7 +1392,6 @@ func (h *ModelHandler) ServerlessStop(ctx *gin.Context) {
 // @Produce      json
 // @Param        namespace path string true "namespace"
 // @Param        name path string true "name"
-// @Param        current_user query string true "current_user"
 // @Success      200  {object}  string "OK"
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
