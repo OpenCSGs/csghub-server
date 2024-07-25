@@ -30,7 +30,6 @@ type CollectionHandler struct {
 }
 
 // GetCollections godoc
-// @Security     ApiKey
 // @Summary      get all collections
 // @Description  get all collections
 // @Tags         Collection
@@ -74,7 +73,7 @@ func (c *CollectionHandler) Index(ctx *gin.Context) {
 }
 
 // CreateCollection godoc
-// @Security     ApiKey
+// @Security     JWT token
 // @Summary      create a collection
 // @Description  create a collection
 // @Tags         Collection
@@ -111,7 +110,6 @@ func (c *CollectionHandler) Create(ctx *gin.Context) {
 }
 
 // GetCollection godoc
-// @Security     ApiKey
 // @Summary      get a collection detail
 // @Description  get a collection detail
 // @Tags         Collection
@@ -144,7 +142,7 @@ func (c *CollectionHandler) GetCollection(ctx *gin.Context) {
 }
 
 // UpdateCollection godoc
-// @Security     ApiKey
+// @Security     JWT token
 // @Summary      update a collection
 // @Description  update a collection
 // @Tags         Collection
@@ -192,7 +190,7 @@ func (c *CollectionHandler) UpdateCollection(ctx *gin.Context) {
 }
 
 // DeleteCollection godoc
-// @Security     ApiKey
+// @Security     JWT token
 // @Summary      Delete a exists collection
 // @Description  delete a exists collection
 // @Tags         Collection
@@ -227,7 +225,7 @@ func (c *CollectionHandler) DeleteCollection(ctx *gin.Context) {
 }
 
 // AddRepoToCollection godoc
-// @Security     ApiKey
+// @Security     JWT token
 // @Summary      Add repos to a collection
 // @Description  Add repos to a collection
 // @Tags         Collection
@@ -274,7 +272,7 @@ func (c *CollectionHandler) AddRepoToCollection(ctx *gin.Context) {
 }
 
 // RemoveRepoFromCollection godoc
-// @Security     ApiKey
+// @Security     JWT token
 // @Summary      remove repos from a collection
 // @Description  remove repos from a collection
 // @Tags         Collection

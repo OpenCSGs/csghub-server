@@ -89,3 +89,11 @@ const (
 	MirrorFailed     MirrorTaskStatus = "failed"
 	MirrorIncomplete MirrorTaskStatus = "incomplete"
 )
+
+type Mapping string
+
+const (
+	AutoMapping   Mapping = "auto"
+	HFMapping     Mapping = "hf"
+	CSGHubMapping Mapping = "csghub"
+)

@@ -54,19 +54,25 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 		return nil, fmt.Errorf("error creating dataset handler:%w", err)
 	}
 
+	// Mirror
+	mirrorHandler, err := handler.NewMirrorHandler(config)
+	if err != nil {
+		return nil, fmt.Errorf("error creating mirror controller:%w", err)
+	}
+
 	// Huggingface SDK routes
 	hfGroup := r.Group("/hf")
 	{
-		hfGroup.GET("/:namespace/:name/resolve/:branch/*file_path", middleware.RepoType(types.ModelRepo), repoCommonHandler.SDKDownload)
-		hfGroup.HEAD("/:namespace/:name/resolve/:branch/*file_path", middleware.RepoType(types.ModelRepo), repoCommonHandler.HeadSDKDownload)
-		hfGroup.GET("/datasets/:namespace/:name/resolve/:branch/*file_path", middleware.RepoType(types.DatasetRepo), repoCommonHandler.SDKDownload)
-		hfGroup.HEAD("/datasets/:namespace/:name/resolve/:branch/*file_path", middleware.RepoType(types.DatasetRepo), repoCommonHandler.HeadSDKDownload)
+		hfGroup.GET("/:namespace/:name/resolve/:branch/*file_path", middleware.RepoMapping(types.ModelRepo), repoCommonHandler.SDKDownload)
+		hfGroup.HEAD("/:namespace/:name/resolve/:branch/*file_path", middleware.RepoMapping(types.ModelRepo), repoCommonHandler.HeadSDKDownload)
+		hfGroup.GET("/datasets/:namespace/:name/resolve/:branch/*file_path", middleware.RepoMapping(types.DatasetRepo), repoCommonHandler.SDKDownload)
+		hfGroup.HEAD("/datasets/:namespace/:name/resolve/:branch/*file_path", middleware.RepoMapping(types.DatasetRepo), repoCommonHandler.HeadSDKDownload)
 		hfAPIGroup := hfGroup.Group("/api")
 		{
 			// compitable with HF model info api, used for sdk like this:  huggingface_hub.model_info(repo_id, revision)
-			hfAPIGroup.GET("/models/:namespace/:name/revision/:ref", modelHandler.SDKModelInfo)
+			hfAPIGroup.GET("/models/:namespace/:name/revision/:ref", middleware.RepoMapping(types.DatasetRepo), modelHandler.SDKModelInfo)
 			// compitable with HF dataset info api, used for sdk like this: huggingface_hub.dataset_info(repo_id, revision)
-			hfAPIGroup.GET("/datasets/:namespace/:name/revision/:ref", middleware.RepoType(types.DatasetRepo), repoCommonHandler.SDKListFiles)
+			hfAPIGroup.GET("/datasets/:namespace/:name/revision/:ref", middleware.RepoMapping(types.DatasetRepo), repoCommonHandler.SDKListFiles)
 			hfAPIGroup.GET("/whoami-v2", userHandler.UserPermission)
 		}
 	}
@@ -231,12 +237,6 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 	msHandler, err := handler.NewMirrorSourceHandler(config)
 	if err != nil {
 		return nil, fmt.Errorf("error creating mirror source controller:%w", err)
-	}
-
-	// Mirror
-	mirrorHandler, err := handler.NewMirrorHandler(config)
-	if err != nil {
-		return nil, fmt.Errorf("error creating mirror controller:%w", err)
 	}
 
 	mirror := apiGroup.Group("/mirror")
