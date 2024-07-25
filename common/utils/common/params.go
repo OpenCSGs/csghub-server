@@ -16,6 +16,10 @@ func GetNamespaceAndNameFromContext(ctx *gin.Context) (namespace string, name st
 	if namespace_mapped != "" {
 		namespace = namespace_mapped
 	}
+	name_mapped := ctx.GetString("name_mapped")
+	if name_mapped != "" {
+		name = name_mapped
+	}
 	if namespace == "" || name == "" {
 		err = errors.New("invalid namespace or name")
 		return
