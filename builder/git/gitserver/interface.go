@@ -15,8 +15,10 @@ const (
 )
 
 type GitServer interface {
-	CreateUser(*types.CreateUserRequest) (*database.User, error)
+	CreateUser(CreateUserRequest) (*CreateUserResponse, error)
+	// Depricated, will be removed in next version
 	UpdateUser(*types.UpdateUserRequest, *database.User) (*database.User, error)
+	UpdateUserV2(UpdateUserRequest) error
 	CreateUserToken(*types.CreateUserTokenRequest) (*database.AccessToken, error)
 	DeleteUserToken(*types.DeleteUserTokenRequest) error
 

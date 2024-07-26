@@ -282,7 +282,7 @@ func (c *ModelComponent) Create(ctx context.Context, req *types.CreateModelReq) 
 		Private: model.Repository.Private,
 		User: &types.User{
 			Username: user.Username,
-			Nickname: user.Name,
+			Nickname: user.NickName,
 			Email:    user.Email,
 		},
 		Tags:      tags,
@@ -422,7 +422,7 @@ func (c *ModelComponent) Show(ctx context.Context, namespace, name, currentUser 
 		Tags:    tags,
 		User: &types.User{
 			Username: model.Repository.User.Username,
-			Nickname: model.Repository.User.Name,
+			Nickname: model.Repository.User.NickName,
 			Email:    model.Repository.User.Email,
 		},
 		CreatedAt: model.CreatedAt,

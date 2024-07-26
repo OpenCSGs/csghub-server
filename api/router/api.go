@@ -95,7 +95,6 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 
 	// Model routes
 	createModelRoutes(config, apiGroup, needAPIKey, modelHandler, repoCommonHandler)
-
 	// Dataset routes
 	createDatasetRoutes(config, apiGroup, dsHandler, repoCommonHandler)
 
@@ -146,26 +145,22 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 		spaceSdk.DELETE("/:id", needAPIKey, spaceSdkHandler.Delete)
 	}
 
-	acHandler, err := handler.NewAccessTokenHandler(config)
+	userProxyHandler, err := handler.NewInternalServiceProxyHandler(fmt.Sprintf("%s:%d", config.User.Host, config.User.Port))
 	if err != nil {
-		return nil, fmt.Errorf("error creating user controller:%w", err)
+		return nil, fmt.Errorf("error creating user proxy handler:%w", err)
 	}
 
-	createUserRoutes(apiGroup, needAPIKey, userHandler, acHandler)
+	createUserRoutes(apiGroup, needAPIKey, userProxyHandler, userHandler)
 
 	tokenGroup := apiGroup.Group("token")
 	{
-		tokenGroup.POST("/:app/:token_name", acHandler.CreateAppToken)
-		tokenGroup.PUT("/:app/:token_name", acHandler.Refresh)
-		tokenGroup.DELETE("/:app/:token_name", acHandler.DeleteAppToken)
+		tokenGroup.POST("/:app/:token_name", userProxyHandler.ProxyToApi("/api/v1/token/%s/%s", "app", "token_name"))
+		tokenGroup.PUT("/:app/:token_name", userProxyHandler.ProxyToApi("/api/v1/token/%s/%s", "app", "token_name"))
+		tokenGroup.DELETE("/:app/:token_name", userProxyHandler.ProxyToApi("/api/v1/token/%s/%s", "app", "token_name"))
 		// check token info
-		tokenGroup.GET("/:token_value", needAPIKey, acHandler.Get)
+		tokenGroup.GET("/:token_value", needAPIKey, userProxyHandler.ProxyToApi("/api/v1/token/%s", "token_value"))
 	}
-	// Depreated:
-	{
-		apiGroup.POST("/user/:username/tokens", acHandler.Create)
-		apiGroup.DELETE("/user/:username/tokens/:token_name", acHandler.Delete)
-	}
+
 	sshKeyHandler, err := handler.NewSSHKeyHandler(config)
 	if err != nil {
 		return nil, fmt.Errorf("error creating user controller:%w", err)
@@ -175,33 +170,26 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 		apiGroup.POST("/user/:username/ssh_keys", sshKeyHandler.Create)
 		apiGroup.DELETE("/user/:username/ssh_key/:name", sshKeyHandler.Delete)
 	}
-	// Organization
-	orgHandler, err := handler.NewOrganizationHandler(config)
-	if err != nil {
-		return nil, fmt.Errorf("error creating user controller:%w", err)
-	}
+
 	{
-		apiGroup.GET("/organizations", orgHandler.Index)
-		apiGroup.POST("/organizations", orgHandler.Create)
-		apiGroup.PUT("/organizations/:name", orgHandler.Update)
-		apiGroup.DELETE("/organizations/:name", orgHandler.Delete)
+		apiGroup.GET("/organizations", userProxyHandler.Proxy)
+		apiGroup.POST("/organizations", userProxyHandler.Proxy)
+		apiGroup.GET("/organization/:namespace", userProxyHandler.ProxyToApi("/api/v1/organization/%s", "namespace"))
+		apiGroup.PUT("/organization/:namespace", userProxyHandler.ProxyToApi("/api/v1/organization/%s", "namespace"))
+		apiGroup.DELETE("/organization/:namespace", userProxyHandler.ProxyToApi("/api/v1/organization/%s", "namespace"))
 		// Organization models
-		apiGroup.GET("/organization/:namespace/models", orgHandler.Models)
+		apiGroup.GET("/organization/:namespace/models", userProxyHandler.ProxyToApi("/api/v1/organization/%s/models", "namespace"))
 		// Organization datasets
-		apiGroup.GET("/organization/:namespace/datasets", orgHandler.Datasets)
-		apiGroup.GET("/organization/:namespace/codes", orgHandler.Codes)
-		apiGroup.GET("/organization/:namespace/spaces", orgHandler.Spaces)
+		apiGroup.GET("/organization/:namespace/datasets", userProxyHandler.ProxyToApi("/api/v1/organization/%s/datasets", "namespace"))
+		apiGroup.GET("/organization/:namespace/codes", userProxyHandler.ProxyToApi("/api/v1/organization/%s/codes", "namespace"))
+		apiGroup.GET("/organization/:namespace/spaces", userProxyHandler.ProxyToApi("/api/v1/organization/%s/spaces", "namespace"))
 	}
-	// Member
-	memberCtrl, err := handler.NewMemberHandler(config)
-	if err != nil {
-		return nil, fmt.Errorf("error creating user controller:%w", err)
-	}
+
 	{
-		apiGroup.GET("/organizations/:name/members", memberCtrl.Index)
-		apiGroup.POST("/organizations/:name/members", memberCtrl.Create)
-		apiGroup.PUT("/organizations/:name/members/:username", memberCtrl.Update)
-		apiGroup.DELETE("/organizations/:name/members/:username", memberCtrl.Delete)
+		apiGroup.GET("/organization/:namespace/members", userProxyHandler.ProxyToApi("/api/v1/organization/%s/members", "namespace"))
+		apiGroup.POST("/organization/:namespace/members", userProxyHandler.ProxyToApi("/api/v1/organization/%s/members", "namespace"))
+		apiGroup.PUT("/organization/:namespace/members/:username", userProxyHandler.ProxyToApi("/api/v1/organization/%s/members/%s", "namespace", "username"))
+		apiGroup.DELETE("/organization/:namespace/members/:username", userProxyHandler.ProxyToApi("/api/v1/organization/%s/members/%s", "namespace", "username"))
 	}
 	// Tag
 	tagCtrl, err := handler.NewTagHandler(config)
@@ -214,11 +202,8 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 	// apiGroup.DELETE("/tag", tagCtrl.DeleteTag)
 
 	// JWT token
-	jwtCtrl, err := handler.NewJWTHandler(config)
-	if err != nil {
-		return nil, fmt.Errorf("error creating jwt token controller:%w", err)
-	}
-	apiGroup.POST("/jwt/token", needAPIKey, jwtCtrl.Create)
+	apiGroup.POST("/jwt/token", needAPIKey, userProxyHandler.Proxy)
+	apiGroup.GET("/jwt/:token", needAPIKey, userProxyHandler.ProxyToApi("/api/v1/jwt/%s", "token"))
 
 	// callback
 	callbackCtrl, err := callback.NewGitCallbackHandler(config)
@@ -226,6 +211,7 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 		return nil, fmt.Errorf("error creating callback controller:%w", err)
 	}
 	apiGroup.POST("/callback/git", callbackCtrl.Handle)
+	apiGroup.GET("/callback/casdoor", userProxyHandler.Proxy)
 	// Sensive check
 	if config.SensitiveCheck.Enable {
 		sensitiveCtrl := handler.NewSensitiveHandler(config)
@@ -570,31 +556,46 @@ func createSpaceRoutes(config *config.Config, apiGroup *gin.RouterGroup, spaceHa
 	}
 }
 
-func createUserRoutes(apiGroup *gin.RouterGroup, needAPIKey gin.HandlerFunc, userHandler *handler.UserHandler, acHandler *handler.AccessTokenHandler) {
-	apiGroup.POST("/users", userHandler.Create)
-	apiGroup.PUT("/users/:username", userHandler.Update)
-	// User models
-	apiGroup.GET("/user/:username/models", userHandler.Models)
-	// User datasets
-	apiGroup.GET("/user/:username/datasets", userHandler.Datasets)
-	apiGroup.GET("/user/:username/codes", userHandler.Codes)
-	apiGroup.GET("/user/:username/spaces", userHandler.Spaces)
-	// User likes
-	apiGroup.PUT("/user/:username/likes/:repo_id", userHandler.LikesAdd)
-	apiGroup.DELETE("/user/:username/likes/:repo_id", userHandler.LikesDelete)
-	apiGroup.GET("/user/:username/likes/spaces", userHandler.LikesSpaces)
-	apiGroup.GET("/user/:username/likes/codes", userHandler.LikesCodes)
-	apiGroup.GET("/user/:username/likes/models", userHandler.LikesModels)
-	apiGroup.GET("/user/:username/likes/datasets", userHandler.LikesDatasets)
-	apiGroup.GET("/user/:username/run/:repo_type", userHandler.GetRunDeploys)
-	apiGroup.GET("/user/:username/finetune/instances", userHandler.GetFinetuneInstances)
+func createUserRoutes(apiGroup *gin.RouterGroup, needAPIKey gin.HandlerFunc, userProxyHandler *handler.InternalServiceProxyHandler, userHandler *handler.UserHandler) {
+	// depricated
+	{
+		apiGroup.POST("/users", userProxyHandler.ProxyToApi("/api/v1/user"))
+		apiGroup.PUT("/users/:username", userProxyHandler.ProxyToApi("/api/v1/user/%v", "username"))
+	}
+
+	{
+		apiGroup.POST("/user", userProxyHandler.Proxy)
+		apiGroup.GET("/user/:username", userProxyHandler.Proxy)
+		apiGroup.PUT("/user/:username", userProxyHandler.Proxy)
+		apiGroup.DELETE("/user/:username", userProxyHandler.Proxy)
+	}
+
+	{
+		// User models
+		apiGroup.GET("/user/:username/models", userHandler.Models)
+		// User datasets
+		apiGroup.GET("/user/:username/datasets", userHandler.Datasets)
+		apiGroup.GET("/user/:username/codes", userHandler.Codes)
+		apiGroup.GET("/user/:username/spaces", userHandler.Spaces)
+		// User likes
+		apiGroup.PUT("/user/:username/likes/:repo_id", userHandler.LikesAdd)
+		apiGroup.DELETE("/user/:username/likes/:repo_id", userHandler.LikesDelete)
+		apiGroup.GET("/user/:username/likes/spaces", userHandler.LikesSpaces)
+		apiGroup.GET("/user/:username/likes/codes", userHandler.LikesCodes)
+		apiGroup.GET("/user/:username/likes/models", userHandler.LikesModels)
+		apiGroup.GET("/user/:username/likes/datasets", userHandler.LikesDatasets)
+		apiGroup.GET("/user/:username/run/:repo_type", userHandler.GetRunDeploys)
+		apiGroup.GET("/user/:username/finetune/instances", userHandler.GetFinetuneInstances)
+	}
+
 	// User collection
 	apiGroup.GET("/user/:username/collections", userHandler.UserCollections)
 	apiGroup.GET("/user/:username/likes/collections", userHandler.LikesCollections)
 	apiGroup.PUT("/user/:username/likes/collections/:id", userHandler.LikeCollection)
 	apiGroup.DELETE("/user/:username/likes/collections/:id", userHandler.UnLikeCollection)
 	// user owned tokens
-	apiGroup.GET("/user/:username/tokens", acHandler.GetUserTokens)
+	apiGroup.GET("/user/:username/tokens", userProxyHandler.ProxyToApi("/api/v1/user/%s/tokens", "username"))
+
 	// serverless list
 	apiGroup.GET("/user/:username/run/serverless", needAPIKey, userHandler.GetRunServerless)
 }

@@ -55,7 +55,7 @@ func (c *OrganizationComponent) FixOrgData(ctx context.Context, org *database.Or
 	user := org.User
 	req := new(types.CreateOrgReq)
 	req.Name = org.Name
-	req.FullName = org.FullName
+	req.Nickname = org.Nickname
 	req.Username = org.User.Username
 	req.Description = org.Description
 	err := c.gs.FixOrganization(req, *user)
@@ -72,7 +72,7 @@ func (c *OrganizationComponent) FixOrgData(ctx context.Context, org *database.Or
 	return org, err
 }
 
-func (c *OrganizationComponent) Create(ctx context.Context, req *types.CreateOrgReq) (*database.Organization, error) {
+func (c *OrganizationComponent) Create(ctx context.Context, req *types.CreateOrgReq) (*types.Organization, error) {
 	user, err := c.us.FindByUsername(ctx, req.Username)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find user, error: %w", err)
@@ -86,34 +86,78 @@ func (c *OrganizationComponent) Create(ctx context.Context, req *types.CreateOrg
 		return nil, errors.New("the name already exists")
 	}
 
-	org, err := c.gs.CreateOrganization(req, user)
+	dbOrg, err := c.gs.CreateOrganization(req, user)
 	if err != nil {
 		return nil, fmt.Errorf("failed create git organization, error: %w", err)
 	}
+	dbOrg.Homepage = req.Homepage
+	dbOrg.Logo = req.Logo
+	dbOrg.OrgType = req.OrgType
+	dbOrg.Verified = req.Verified
 	namespace := &database.Namespace{
-		Path:   org.Name,
+		Path:   dbOrg.Name,
 		UserID: user.ID,
 	}
-	err = c.os.Create(ctx, org, namespace)
+	err = c.os.Create(ctx, dbOrg, namespace)
 	if err != nil {
 		return nil, fmt.Errorf("failed create database organization, error: %w", err)
 	}
 	// need to create roles for a new org before adding members
-	err = c.msc.InitRoles(ctx, org)
+	err = c.msc.InitRoles(ctx, dbOrg)
 	if err != nil {
 		return nil, fmt.Errorf("failed init roles for organization, error: %w", err)
 	}
 	// org creator defaults to be admin role
-	err = c.msc.SetAdmin(ctx, org, &user)
+	err = c.msc.SetAdmin(ctx, dbOrg, &user)
+	if err != nil {
+		return nil, fmt.Errorf("failed set admin role for organization, error: %w", err)
+	}
+
+	org := &types.Organization{
+		Name:     dbOrg.Name,
+		Nickname: dbOrg.Nickname,
+		Homepage: dbOrg.Homepage,
+		Logo:     dbOrg.Logo,
+		OrgType:  dbOrg.OrgType,
+		Verified: dbOrg.Verified,
+	}
 	return org, err
 }
 
-func (c *OrganizationComponent) Index(ctx context.Context, username string) ([]database.Organization, error) {
-	orgs, err := c.os.Index(ctx, username)
+func (c *OrganizationComponent) Index(ctx context.Context, username string) ([]types.Organization, error) {
+	dborgs, err := c.os.Index(ctx, username)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get organizations, error: %w", err)
 	}
+	var orgs []types.Organization
+	for _, dborg := range dborgs {
+		org := types.Organization{
+			Name:     dborg.Name,
+			Nickname: dborg.Nickname,
+			Homepage: dborg.Homepage,
+			Logo:     dborg.Logo,
+			OrgType:  dborg.OrgType,
+			Verified: dborg.Verified,
+		}
+		orgs = append(orgs, org)
+	}
 	return orgs, nil
+}
+
+func (c *OrganizationComponent) Get(ctx context.Context, orgName string) (*types.Organization, error) {
+	dborg, err := c.os.FindByPath(ctx, orgName)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get organizations by name, error: %w", err)
+	}
+	org := &types.Organization{
+		Name:     dborg.Name,
+		Nickname: dborg.Nickname,
+		Homepage: dborg.Homepage,
+		Logo:     dborg.Logo,
+		OrgType:  dborg.OrgType,
+		Verified: dborg.Verified,
+	}
+	return org, nil
 }
 
 func (c *OrganizationComponent) Delete(ctx context.Context, req *types.DeleteOrgReq) error {
@@ -155,6 +199,10 @@ func (c *OrganizationComponent) Update(ctx context.Context, req *types.EditOrgRe
 	if err != nil {
 		return nil, fmt.Errorf("failed to update git organization, error: %w", err)
 	}
+	nOrg.Logo = req.Logo
+	nOrg.Homepage = req.Homepage
+	nOrg.Verified = req.Verified
+	nOrg.OrgType = req.OrgType
 	err = c.os.Update(ctx, nOrg)
 	if err != nil {
 		return nil, fmt.Errorf("failed to update database organization, error: %w", err)

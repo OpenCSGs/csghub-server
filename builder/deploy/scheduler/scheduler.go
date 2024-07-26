@@ -149,7 +149,7 @@ func (rs *FIFOScheduler) next() (Runner, error) {
 			repo.HTTPCloneURL = s.Repository.HTTPCloneURL
 			repo.SpaceID = s.ID
 			repo.RepoID = s.Repository.ID
-			repo.UserName = s.Repository.User.Name
+			repo.UserName = s.Repository.User.Username
 			repo.DeployID = deployTask.Deploy.ID
 			repo.ModelID = 0
 			repo.RepoType = string(types.SpaceRepo)
@@ -163,7 +163,7 @@ func (rs *FIFOScheduler) next() (Runner, error) {
 			repo.Name = m.Repository.Name
 			repo.ModelID = m.ID
 			repo.RepoID = m.Repository.ID
-			repo.UserName = m.Repository.User.Name
+			repo.UserName = m.Repository.User.Username
 			repo.DeployID = deployTask.Deploy.ID
 			repo.SpaceID = 0
 			repo.RepoType = string(types.ModelRepo)

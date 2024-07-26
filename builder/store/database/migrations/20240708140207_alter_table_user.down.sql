@@ -1,0 +1,20 @@
+SET statement_timeout = 0;
+
+--bun:split
+
+BEGIN;
+
+ALTER TABLE users DROP COLUMN IF EXISTS gender;
+ALTER TABLE users DROP COLUMN IF EXISTS role_mask;
+ALTER TABLE users DROP COLUMN IF EXISTS phone;
+ALTER TABLE users DROP COLUMN IF EXISTS phone_verified;
+ALTER TABLE users DROP COLUMN IF EXISTS email_verified;
+ALTER TABLE users DROP COLUMN IF EXISTS last_login_at;
+ALTER TABLE users DROP COLUMN IF EXISTS avatar;
+ALTER TABLE users DROP COLUMN IF EXISTS company_verified;
+ALTER TABLE users DROP COLUMN IF EXISTS password_hash;
+ALTER TABLE users DROP COLUMN IF EXISTS homepage;
+ALTER TABLE users DROP COLUMN IF EXISTS bio;
+
+COMMIT;
+

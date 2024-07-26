@@ -27,8 +27,10 @@ func (rp *ReverseProxy) ServeHTTP(w http.ResponseWriter, r *http.Request, api st
 		req.Host = rp.target.Host
 		req.URL.Host = rp.target.Host
 		req.URL.Scheme = rp.target.Scheme
-		// change url to space api
-		req.URL.Path = api
+		if len(api) > 0 {
+			// change url to given api
+			req.URL.Path = api
+		}
 
 		// debug only
 		// {

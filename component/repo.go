@@ -22,6 +22,7 @@ import (
 	"opencsg.com/csghub-server/builder/git/gitserver"
 	"opencsg.com/csghub-server/builder/git/membership"
 	"opencsg.com/csghub-server/builder/git/mirrorserver"
+	"opencsg.com/csghub-server/builder/rpc"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/builder/store/s3"
 	"opencsg.com/csghub-server/common/config"
@@ -41,7 +42,7 @@ type RepoComponent struct {
 	mirror            *database.MirrorStore
 	git               gitserver.GitServer
 	s3Client          *minio.Client
-	msc               *MemberComponent
+	userSvcClient     rpc.UserSvcClien
 	lfsBucket         string
 	uls               *database.UserLikesStore
 	mirrorServer      mirrorserver.MirrorServer
@@ -101,7 +102,8 @@ func NewRepoComponent(config *config.Config) (*RepoComponent, error) {
 		return nil, newError
 	}
 	c.lfsBucket = config.S3.Bucket
-	c.msc, err = NewMemberComponent(config)
+	c.userSvcClient = rpc.NewUserSvcHttpClient(fmt.Sprintf("%s:%d", config.User.Host, config.User.Port),
+		rpc.AuthWithApiKey(config.APIToken))
 	if err != nil {
 		newError := fmt.Errorf("fail to create membership component,error:%w", err)
 		slog.Error(newError.Error())
@@ -130,6 +132,10 @@ func (c *RepoComponent) CreateRepo(ctx context.Context, req types.CreateRepoReq)
 	user, err := c.user.FindByUsername(ctx, req.Username)
 	if err != nil {
 		return nil, nil, errors.New("user does not exist")
+	}
+
+	if user.Email == "" {
+		return nil, nil, fmt.Errorf("please set your email first")
 	}
 
 	if namespace.NamespaceType == database.OrgNamespace {
@@ -1071,7 +1077,7 @@ func (c *RepoComponent) checkCurrentUserPermission(ctx context.Context, userName
 	if ns.NamespaceType == "user" {
 		return userName == namespace, nil
 	} else {
-		r, err := c.msc.GetMemberRole(ctx, namespace, userName)
+		r, err := c.userSvcClient.GetMemberRole(ctx, namespace, userName)
 		if err != nil {
 			return false, err
 		}

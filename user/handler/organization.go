@@ -10,7 +10,7 @@ import (
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/types"
 	"opencsg.com/csghub-server/common/utils/common"
-	"opencsg.com/csghub-server/component"
+	"opencsg.com/csghub-server/user/component"
 )
 
 func NewOrganizationHandler(config *config.Config) (*OrganizationHandler, error) {
@@ -36,16 +36,12 @@ type OrganizationHandler struct {
 // @Produce      json
 // @Param        current_user query string false "the op user"
 // @param        body body types.CreateOrgReq true "body"
-// @Success      200  {object}  types.Response{data=database.Organization} "OK"
+// @Success      200  {object}  types.Response{data=types.Organization} "OK"
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
 // @Router       /organizations [post]
 func (h *OrganizationHandler) Create(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
-	if currentUser == "" {
-		httpbase.UnauthorizedError(ctx, errors.New("user not found, please login first"))
-		return
-	}
 	var req types.CreateOrgReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {
 		slog.Error("Bad request format", "error", err)
@@ -64,6 +60,35 @@ func (h *OrganizationHandler) Create(ctx *gin.Context) {
 	httpbase.OK(ctx, org)
 }
 
+// GetOrganization godoc
+// @Security     ApiKey
+// @Summary      Get organization info
+// @Tags         Organization
+// @Accept       json
+// @Produce      json
+// @Param        current_user query string false "the op user"
+// @param        namespace path string true "namespace"
+// @Success      200  {object}  types.Response{data=types.Organization} "OK"
+// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
+// @Router       /organization/{namespace} [get]
+func (h *OrganizationHandler) Get(ctx *gin.Context) {
+	orgName := ctx.Param("namespace")
+	if len(orgName) == 0 {
+		httpbase.BadRequest(ctx, "organization name is empty")
+		return
+	}
+	org, err := h.c.Get(ctx, orgName)
+	if err != nil {
+		slog.Error("Failed to get organization", slog.Any("error", err), slog.String("org_path", orgName))
+		httpbase.ServerError(ctx, err)
+		return
+	}
+
+	slog.Info("Get organization succeed", slog.String("org_path", org.Name))
+	httpbase.OK(ctx, org)
+}
+
 // GetOrganizations godoc
 // @Security     ApiKey
 // @Summary      Get organizations
@@ -71,7 +96,7 @@ func (h *OrganizationHandler) Create(ctx *gin.Context) {
 // @Tags         Organization
 // @Accept       json
 // @Produce      json
-// @Success      200  {object}  types.ResponseWithTotal{data=[]database.Organization,total=int} "OK"
+// @Success      200  {object}  types.Response{data=[]types.Organization} "OK"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
 // @Router       /organizations [get]
 func (h *OrganizationHandler) Index(ctx *gin.Context) {
@@ -94,12 +119,12 @@ func (h *OrganizationHandler) Index(ctx *gin.Context) {
 // @Tags         Organization
 // @Accept       json
 // @Produce      json
-// @Param        name path string true "name"
+// @Param        namespace path string true "namespace"
 // @Param        current_user query string false "the op user"
 // @Param        body body types.DeleteOrgReq true "body"
 // @Success      200  {object}  types.Response{} "OK"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
-// @Router       /organizations/{name} [delete]
+// @Router       /organizations/{namespace} [delete]
 func (h *OrganizationHandler) Delete(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
 	if currentUser == "" {
@@ -113,7 +138,7 @@ func (h *OrganizationHandler) Delete(ctx *gin.Context) {
 		return
 	}
 	req.CurrentUser = currentUser
-	req.Name = ctx.Param("name")
+	req.Name = ctx.Param("namespace")
 	err := h.c.Delete(ctx, &req)
 	if err != nil {
 		slog.Error("Failed to delete organizations", slog.Any("error", err))
@@ -132,13 +157,13 @@ func (h *OrganizationHandler) Delete(ctx *gin.Context) {
 // @Tags         Organization
 // @Accept       json
 // @Produce      json
-// @Param        name path string true "name"
+// @Param        namespace path string true "namespace"
 // @Param        current_user query string false "the op user"
 // @Param        body body types.EditOrgReq true "body"
 // @Success      200  {object}  types.Response{data=database.Organization} "OK"
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
-// @Router       /organizations/{name} [put]
+// @Router       /organizations/{namespace} [put]
 func (h *OrganizationHandler) Update(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
 	if currentUser == "" {
@@ -152,7 +177,7 @@ func (h *OrganizationHandler) Update(ctx *gin.Context) {
 		return
 	}
 	req.CurrentUser = currentUser
-	req.Name = ctx.Param("name")
+	req.Name = ctx.Param("namespace")
 	org, err := h.c.Update(ctx, &req)
 	if err != nil {
 		slog.Error("Failed to update organizations", slog.Any("error", err))
@@ -160,7 +185,7 @@ func (h *OrganizationHandler) Update(ctx *gin.Context) {
 		return
 	}
 
-	slog.Info("Update organizations succeed", slog.String("org_name", org.FullName))
+	slog.Info("Update organizations succeed", slog.String("org_name", org.Nickname))
 	httpbase.OK(ctx, org)
 }
 

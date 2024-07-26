@@ -2,6 +2,32 @@ package gitserver
 
 import "opencsg.com/csghub-server/common/types"
 
+type CreateUserRequest struct {
+	// Display name of the user
+	Nickname string `json:"name"`
+	// the login name
+	Username string `json:"username"`
+	Email    string `json:"email"`
+}
+
+type CreateUserResponse struct {
+	// Display name of the user
+	NickName string `json:"name"`
+	// the login name
+	Username string `json:"username"`
+	Email    string `json:"email"`
+	GitID    int64  `json:"git_id"`
+	Password string `json:"-"`
+}
+
+type UpdateUserRequest struct {
+	// Display name of the user
+	Nickname *string `json:"name"`
+	// the login name
+	Username string  `json:"username"`
+	Email    *string `json:"email"`
+}
+
 type CreateRepoReq struct {
 	Username      string               `json:"username" example:"creator_user_name"`
 	Namespace     string               `json:"namespace" example:"user_or_org_name"`

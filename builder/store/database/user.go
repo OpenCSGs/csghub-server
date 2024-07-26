@@ -2,6 +2,7 @@ package database
 
 import (
 	"context"
+	"strings"
 
 	"github.com/uptrace/bun"
 )
@@ -17,22 +18,63 @@ func NewUserStore() *UserStore {
 }
 
 type User struct {
-	ID           int64         `bun:",pk,autoincrement" json:"id"`
-	GitID        int64         `bun:",notnull" json:"git_id"`
-	Name         string        `bun:",notnull" json:"name"`
-	Username     string        `bun:",notnull,unique" json:"username"`
-	Email        string        `bun:",notnull,unique" json:"email"`
+	ID       int64  `bun:",pk,autoincrement" json:"id"`
+	GitID    int64  `bun:",notnull" json:"git_id"`
+	NickName string `bun:"column:name,notnull" json:"name"`
+	Username string `bun:",notnull,unique" json:"username"`
+	Email    string `bun:",notnull,unique" json:"email"`
+	//git password
 	Password     string        `bun:",notnull" json:"-"`
 	AccessTokens []AccessToken `bun:"rel:has-many,join:id=user_id"`
 	Namespaces   []Namespace   `bun:"rel:has-many,join:id=user_id" json:"namespace"`
-	//TODO:add unique index after migration
+	// TODO:add unique index after migration
 	UUID string `bun:"," json:"uuid"`
 	// user registered from default login page, from casdoor, etc. Possible values:
 	//
 	// - "default"
 	// - "casdoor"
-	RegProvider string `bun:"," json:"reg_provider"`
+	RegProvider     string `bun:"," json:"reg_provider"`
+	Gender          string `bun:"," json:"gender"`
+	RoleMask        string `bun:"," json:"role_mask"`
+	Phone           string `bun:"," json:"phone"`
+	PhoneVerified   bool   `bun:"," json:"phone_verified"`
+	EmailVerified   bool   `bun:"," json:"email_verified"`
+	LastLoginAt     string `bun:"," json:"last_login_at"`
+	Avatar          string `bun:"," json:"avatar"`
+	CompanyVerified bool   `bun:"," json:"company_verified"`
+	//password for user registered without casdoor
+	PasswordHash string `bun:"," json:"password_hash"`
+	Homepage     string `bun:"," json:"homepage"`
+	Bio          string `bun:"," json:"bio"`
+
+	// WechatID     string `bun:"," json:"wechat_id"`
+	// GithubID     string `bun:"," json:"github_id"`
+	// GitlabID     string `bun:"," json:"gitlab_id"`
+	// SessionIP    string `bun:"," json:"session_ip"`
+	// Nickname        string `bun:"," json:"nickname"`
+	// GitToken        string `bun:"," json:"git_token"`
+	// StarhubSynced   bool   `bun:"," json:"starhub_synced"`
+	// GitTokenName string `bun:"," json:"git_token_name"`
+
 	times
+}
+
+func (u *User) Roles() []string {
+	if len(u.RoleMask) == 0 {
+		return []string{}
+	}
+	return strings.Split(u.RoleMask, ",")
+}
+
+// CanAdmin checks if the user has admin or super_user roles.
+//
+// It returns a boolean indicating whether the user has admin or super_user roles.
+func (u *User) CanAdmin() bool {
+	return strings.Contains(u.RoleMask, "admin") || strings.Contains(u.RoleMask, "super_user")
+}
+
+func (u *User) SetRoles(roles []string) {
+	u.RoleMask = strings.Join(roles, ",")
 }
 
 func (s *UserStore) Index(ctx context.Context) (users []User, err error) {
@@ -65,15 +107,6 @@ func (s *UserStore) Update(ctx context.Context, user *User) (err error) {
 	return
 }
 
-func (s *UserStore) UpdateByUsername(ctx context.Context, u *User) (err error) {
-	err = assertAffectedOneRow(s.db.Operator.Core.NewUpdate().
-		Model(u).
-		Where("username = ?", u.Username).
-		Exec(ctx),
-	)
-	return
-}
-
 func (s *UserStore) Create(ctx context.Context, user *User, namespace *Namespace) (err error) {
 	err = s.db.Operator.Core.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
 		if err = assertAffectedOneRow(tx.NewInsert().Model(user).Exec(ctx)); err != nil {
@@ -90,16 +123,11 @@ func (s *UserStore) Create(ctx context.Context, user *User, namespace *Namespace
 }
 
 func (s *UserStore) IsExist(ctx context.Context, username string) (exists bool, err error) {
-	var user User
-	exists, err = s.db.Operator.Core.
+	return s.db.Operator.Core.
 		NewSelect().
-		Model(&user).
+		Model((*User)(nil)).
 		Where("username =?", username).
 		Exists(ctx)
-	if err != nil {
-		return
-	}
-	return
 }
 
 // FindByAccessToken retrieves user information based on the access token. The access token must be active and not expired.
@@ -112,7 +140,6 @@ func (s *UserStore) FindByAccessToken(ctx context.Context, token string) (*User,
 		Join("JOIN access_tokens AS t ON u.id = t.user_id").
 		Where("t.token = ? and t.is_active = true and (t.expired_at is null or t.expired_at > now()) ", token).
 		Exec(ctx, &user)
-
 	if err != nil {
 		return nil, err
 	}

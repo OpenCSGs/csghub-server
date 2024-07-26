@@ -119,7 +119,7 @@ func (c *CodeComponent) Create(ctx context.Context, req *types.CreateCodeReq) (*
 		Private: code.Repository.Private,
 		User: types.User{
 			Username: dbRepo.User.Username,
-			Nickname: dbRepo.User.Name,
+			Nickname: dbRepo.User.NickName,
 			Email:    dbRepo.User.Email,
 		},
 		Tags:      tags,
@@ -307,7 +307,7 @@ func (c *CodeComponent) Show(ctx context.Context, namespace, name, currentUser s
 		Tags: tags,
 		User: types.User{
 			Username: code.Repository.User.Username,
-			Nickname: code.Repository.User.Name,
+			Nickname: code.Repository.User.NickName,
 			Email:    code.Repository.User.Email,
 		},
 		Private:    code.Repository.Private,
