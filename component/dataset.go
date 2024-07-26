@@ -211,7 +211,7 @@ func (c *DatasetComponent) Create(ctx context.Context, req *types.CreateDatasetR
 		Private: dataset.Repository.Private,
 		User: types.User{
 			Username: user.Username,
-			Nickname: user.Name,
+			Nickname: user.NickName,
 			Email:    user.Email,
 		},
 		Tags:      tags,
@@ -413,7 +413,7 @@ func (c *DatasetComponent) Show(ctx context.Context, namespace, name, currentUse
 		Tags: tags,
 		User: types.User{
 			Username: dataset.Repository.User.Username,
-			Nickname: dataset.Repository.User.Name,
+			Nickname: dataset.Repository.User.NickName,
 			Email:    dataset.Repository.User.Email,
 		},
 		Private:    dataset.Repository.Private,

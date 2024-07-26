@@ -15,6 +15,7 @@ import (
 	"opencsg.com/csghub-server/cmd/csghub-server/cmd/start"
 	"opencsg.com/csghub-server/cmd/csghub-server/cmd/syncversion"
 	"opencsg.com/csghub-server/cmd/csghub-server/cmd/trigger"
+	"opencsg.com/csghub-server/cmd/csghub-server/cmd/user"
 )
 
 var (
@@ -54,6 +55,7 @@ func init() {
 		mirror.Cmd,
 		accounting.Cmd,
 		syncversion.Cmd,
+		user.Cmd,
 	)
 }
 

@@ -7,7 +7,7 @@ type CreateUserRequest struct {
 	Name string `json:"name"`
 	// the login name
 	Username string `json:"username"`
-	Email    string `json:"email"`
+	Email    string `json:"email" binding:"email"`
 	Phone    string `json:"phone"`
 	UUID     string `json:"uuid"`
 	// user registered from default login page, from casdoor, etc. Possible values:
@@ -19,12 +19,17 @@ type CreateUserRequest struct {
 
 type UpdateUserRequest struct {
 	// Display name of the user
-	Name string `json:"name"`
+	Nickname *string `json:"name,omitempty"`
 	// the login name
-	Username string `json:"username"`
-	Email    string `json:"email"`
-	Phone    string `json:"phone"`
-	UUID     string `json:"uuid"`
+	Username string  `json:"-"`
+	Email    *string `json:"email,omitempty" binding:"omitnil,email"`
+	Phone    *string `json:"phone,omitempty"`
+	UUID     *string `json:"uuid,omitempty"`
+	// should be updated by admin
+	Roles    *[]string `json:"roles,omitempty" example:"[super_user, admin, personal_user]"`
+	Avatar   *string   `json:"avatar,omitempty"`
+	Homepage *string   `json:"homepage,omitempty"`
+	Bio      *string   `json:"bio,omitempty"`
 }
 
 type UpdateUserResp struct {
@@ -79,9 +84,17 @@ type PageOpts struct {
 }
 
 type User struct {
-	Username string `json:"username"`
-	Nickname string `json:"nickname"`
-	Email    string `json:"email"`
+	Username    string         `json:"username"`
+	Nickname    string         `json:"nickname"`
+	Phone       string         `json:"phone"`
+	Email       string         `json:"email"`
+	UUID        string         `json:"uuid"`
+	Avatar      string         `json:"avatar,omitempty"`
+	Bio         string         `json:"bio,omitempty"`
+	Homepage    string         `json:"homepage,omitempty"`
+	Roles       []string       `json:"roles,omitempty"`
+	LastLoginAt string         `json:"last_login_at,omitempty"`
+	Orgs        []Organization `json:"orgs,omitempty"`
 }
 
 type UserLikesRequest struct {

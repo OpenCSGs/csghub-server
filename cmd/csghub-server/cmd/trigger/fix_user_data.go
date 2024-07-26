@@ -9,7 +9,7 @@ import (
 	"github.com/spf13/cobra"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/config"
-	"opencsg.com/csghub-server/component"
+	"opencsg.com/csghub-server/user/component"
 )
 
 var fixUserDataCmd = &cobra.Command{

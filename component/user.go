@@ -7,9 +7,7 @@ import (
 	"fmt"
 	"log/slog"
 	"strings"
-	"sync"
 
-	"github.com/casdoor/casdoor-go-sdk/casdoorsdk"
 	"opencsg.com/csghub-server/builder/deploy"
 	"opencsg.com/csghub-server/builder/git"
 	"opencsg.com/csghub-server/builder/git/gitserver"
@@ -46,15 +44,6 @@ func NewUserComponent(config *config.Config) (*UserComponent, error) {
 	c.deployer = deploy.NewDeployer()
 	c.uls = database.NewUserLikesStore()
 	c.repo = database.NewRepoStore()
-	c.once = new(sync.Once)
-	c.casConfig = &casdoorsdk.AuthConfig{
-		Endpoint:         config.Casdoor.Endpoint,
-		ClientId:         config.Casdoor.ClientID,
-		ClientSecret:     config.Casdoor.ClientSecret,
-		Certificate:      config.Casdoor.Certificate,
-		OrganizationName: config.Casdoor.OrganizationName,
-		ApplicationName:  config.Casdoor.ApplicationName,
-	}
 	c.deploy = database.NewDeployTaskStore()
 	return c, nil
 }
@@ -72,149 +61,8 @@ type UserComponent struct {
 	deployer       deploy.Deployer
 	uls            *database.UserLikesStore
 	repo           *database.RepoStore
-	casc           *casdoorsdk.Client
-	casConfig      *casdoorsdk.AuthConfig
-	once           *sync.Once
 	deploy         *database.DeployTaskStore
 	cos            *database.CollectionStore
-}
-
-func (c *UserComponent) lazyInit() {
-	c.once.Do(func() {
-		c.casc = casdoorsdk.NewClientWithConf(c.casConfig)
-	})
-}
-
-func (c *UserComponent) Create(ctx context.Context, req *types.CreateUserRequest) (*database.User, error) {
-	nsExists, err := c.ns.Exists(ctx, req.Username)
-	if err != nil {
-		newError := fmt.Errorf("failed to check for the presence of the namespace,error:%w", err)
-		slog.Error(newError.Error())
-		return nil, newError
-	}
-
-	if nsExists {
-		return nil, errors.New("namespace already exists")
-	}
-
-	userExists, err := c.us.IsExist(ctx, req.Username)
-	if err != nil {
-		newError := fmt.Errorf("failed to check for the presence of the user,error:%w", err)
-		slog.Error(newError.Error())
-		return nil, newError
-	}
-
-	if userExists {
-		return nil, errors.New("user already exists")
-	}
-	user, err := c.gs.CreateUser(req)
-	if err != nil {
-		newError := fmt.Errorf("failed to create gitserver user,error:%w", err)
-		slog.Error(newError.Error())
-		return nil, newError
-	}
-
-	namespace := &database.Namespace{
-		Path: user.Username,
-	}
-	user.UUID = req.UUID
-	if req.RegProvider == "" {
-		user.RegProvider = "default"
-	} else {
-		user.RegProvider = req.RegProvider
-	}
-	err = c.us.Create(ctx, user, namespace)
-	if err != nil {
-		newError := fmt.Errorf("failed to create user,error:%w", err)
-		slog.Error(newError.Error())
-		return nil, newError
-	}
-
-	//skip casdoor update if it's not a casdoor user
-	if req.UUID == "" || user.RegProvider != "casdoor" {
-		return user, nil
-	}
-
-	ureq := &types.UpdateUserRequest{
-		Name:     req.Name,
-		Username: req.Username,
-		Email:    req.Email,
-		Phone:    req.Phone,
-		UUID:     req.UUID,
-	}
-	err = c.updateCasdoorUser(ureq)
-	if err != nil {
-		newError := fmt.Errorf("failed to update casdoor user,error:%w", err)
-		return nil, newError
-	}
-
-	return user, nil
-}
-
-func (c *UserComponent) Update(ctx context.Context, req *types.UpdateUserRequest) (*database.User, error) {
-	user, err := c.us.FindByUsername(ctx, req.Username)
-	if err != nil {
-		newError := fmt.Errorf("failed to find user by name in db,error:%w", err)
-		return nil, newError
-	}
-
-	respUser, err := c.gs.UpdateUser(req, &user)
-	if err != nil {
-		newError := fmt.Errorf("failed to update git user,error:%w", err)
-		return nil, newError
-	}
-
-	respUser.UUID = req.UUID
-	err = c.us.Update(ctx, respUser)
-	if err != nil {
-		newError := fmt.Errorf("failed to update database user,error:%w", err)
-		return nil, newError
-	}
-
-	//skip casdoor update if it's not a casdoor user
-	if req.UUID == "" || user.RegProvider != "casdoor" {
-		return respUser, nil
-	}
-	err = c.updateCasdoorUser(req)
-	if err != nil {
-		newError := fmt.Errorf("failed to update casdoor user,error:%w", err)
-		return nil, newError
-	}
-
-	return respUser, nil
-}
-
-func (c *UserComponent) updateCasdoorUser(req *types.UpdateUserRequest) error {
-	c.lazyInit()
-
-	casu, err := c.casc.GetUserByUserId(req.UUID)
-	if err != nil {
-		return fmt.Errorf("failed to get user from casdoor,error:%w", err)
-	}
-	if casu == nil {
-		return fmt.Errorf("user not exists in casdoor")
-	}
-	var cols []string
-	if req.Email != "" {
-		casu.Email = req.Email
-		cols = append(cols, "email")
-	}
-	if req.Phone != "" {
-		casu.Phone = req.Phone
-		cols = append(cols, "phone")
-	}
-
-	if len(cols) == 0 {
-		return nil
-	}
-
-	//casdoor update user api don't allow empty display name, so we set it but not update it
-	if casu.DisplayName == "" {
-		casu.DisplayName = casu.Name
-	}
-
-	_, err = c.casc.UpdateUserForColumns(casu, cols)
-	return err
 }
 
 func (c *UserComponent) Datasets(ctx context.Context, req *types.UserDatasetsReq) ([]types.Dataset, int, error) {
@@ -402,15 +250,6 @@ func (c *UserComponent) Spaces(ctx context.Context, req *types.UserSpacesReq) ([
 	}
 
 	return c.spaceComponent.UserSpaces(ctx, req)
-}
-
-func (c *UserComponent) FixUserData(ctx context.Context, userName string) error {
-	err := c.gs.FixUserData(ctx, userName)
-	if err != nil {
-		return err
-	}
-
-	return nil
 }
 
 func (c *UserComponent) AddLikes(ctx context.Context, req *types.UserLikesRequest) error {

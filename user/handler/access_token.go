@@ -9,7 +9,7 @@ import (
 	"opencsg.com/csghub-server/api/httpbase"
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/types"
-	"opencsg.com/csghub-server/component"
+	"opencsg.com/csghub-server/user/component"
 )
 
 func NewAccessTokenHandler(config *config.Config) (*AccessTokenHandler, error) {
