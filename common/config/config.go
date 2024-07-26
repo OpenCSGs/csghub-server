@@ -85,6 +85,7 @@ type Config struct {
 
 	JWT struct {
 		SigningKey string `envconfig:"STARHUB_JWT_SIGNING_KEY" default:"signing-key"`
+		ValidHour  int    `envconfig:"STARHUB_JWT_VALIDATE_HOUR" default:"24"`
 	}
 
 	Inference struct {
@@ -145,6 +146,12 @@ type Config struct {
 	Accounting struct {
 		Host string `envconfig:"OPENCSG_ACCOUNTING_SERVER_HOST" default:"http://localhost"`
 		Port int    `envconfig:"OPENCSG_ACCOUNTING_SERVER_PORT" default:"8086"`
+	}
+
+	User struct {
+		Host                     string `envconfig:"OPENCSG_USER_SERVER_HOST" default:"http://localhost"`
+		Port                     int    `envconfig:"OPENCSG_USER_SERVER_PORT" default:"8087"`
+		SigninSuccessRedirectURL string `envconfig:"OPENCSG_USER_SERVER_SIGNIN_SUCCESS_REDIRECT_URL" default:"http://localhost:3000/server/callback"`
 	}
 
 	MultiSync struct {

@@ -10,7 +10,7 @@ import (
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/types"
-	"opencsg.com/csghub-server/component"
+	"opencsg.com/csghub-server/user/component"
 )
 
 var fixOrgDataCmd = &cobra.Command{
@@ -40,7 +40,7 @@ var fixOrgDataCmd = &cobra.Command{
 		for _, org := range orgs {
 			req := new(types.CreateOrgReq)
 			req.Name = org.Name
-			req.FullName = org.FullName
+			req.Nickname = org.Nickname
 			req.Username = org.User.Username
 			req.Description = org.Description
 

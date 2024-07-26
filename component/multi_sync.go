@@ -417,21 +417,31 @@ func (c *MultiSyncComponent) createLocalModel(ctx context.Context, m *types.Mode
 }
 
 func (c *MultiSyncComponent) createUser(ctx context.Context, req types.CreateUserRequest) (database.User, error) {
-	user, err := c.git.CreateUser(&req)
+	gsUserReq := gitserver.CreateUserRequest{
+		Nickname: req.Name,
+		Username: req.Username,
+		Email:    req.Email,
+	}
+	gsUserResp, err := c.git.CreateUser(gsUserReq)
 	if err != nil {
 		newError := fmt.Errorf("failed to create gitserver user,error:%w", err)
-		slog.Error(newError.Error())
 		return database.User{}, newError
 	}
 
 	namespace := &database.Namespace{
-		Path:     user.Username,
+		Path:     req.Username,
 		Mirrored: true,
+	}
+	user := &database.User{
+		NickName: req.Name,
+		Username: req.Username,
+		Email:    req.Email,
+		GitID:    gsUserResp.GitID,
+		Password: gsUserResp.Password,
 	}
 	err = c.user.Create(ctx, user, namespace)
 	if err != nil {
 		newError := fmt.Errorf("failed to create user,error:%w", err)
-		slog.Error(newError.Error())
 		return database.User{}, newError
 	}
 

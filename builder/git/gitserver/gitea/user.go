@@ -8,12 +8,13 @@ import (
 	"math/big"
 
 	"github.com/OpenCSGs/gitea-go-sdk/gitea"
+	"opencsg.com/csghub-server/builder/git/gitserver"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/types"
 	"opencsg.com/csghub-server/common/utils/common"
 )
 
-func (c *Client) CreateUser(u *types.CreateUserRequest) (user *database.User, err error) {
+func (c *Client) CreateUser(u gitserver.CreateUserRequest) (user *gitserver.CreateUserResponse, err error) {
 	password, err := generateRandomPassword(12)
 	if err != nil {
 		return
@@ -21,7 +22,7 @@ func (c *Client) CreateUser(u *types.CreateUserRequest) (user *database.User, er
 
 	giteaUser, _, err := c.giteaClient.AdminCreateUser(
 		gitea.CreateUserOption{
-			FullName:           u.Name,
+			FullName:           u.Nickname,
 			Username:           u.Username,
 			Email:              u.Email,
 			Password:           password,
@@ -41,11 +42,11 @@ func (c *Client) CreateUser(u *types.CreateUserRequest) (user *database.User, er
 	}
 
 	password = calculateSHA1(password)
-	user = &database.User{
+	user = &gitserver.CreateUserResponse{
 		Email:    giteaUser.Email,
 		GitID:    giteaUser.ID,
 		Username: giteaUser.UserName,
-		Name:     giteaUser.FullName,
+		NickName: giteaUser.FullName,
 		Password: password,
 	}
 
@@ -57,14 +58,38 @@ func (c *Client) UpdateUser(u *types.UpdateUserRequest, user *database.User) (*d
 		u.Username,
 		gitea.EditUserOption{
 			LoginName: u.Username,
-			FullName:  gitea.OptionalString(u.Name),
-			Email:     gitea.OptionalString(u.Email),
+			FullName:  u.Nickname,
+			Email:     u.Email,
 		},
 	)
 
-	user.Name = u.Name
-	user.Email = u.Email
+	user.NickName = *u.Nickname
+	user.Email = *u.Email
 	return user, err
+}
+
+func (c *Client) UpdateUserV2(u gitserver.UpdateUserRequest) error {
+	//nothing to update
+	if u.Nickname == nil && u.Email == nil {
+		return nil
+	}
+
+	opt := gitea.EditUserOption{
+		LoginName: u.Username,
+	}
+	if u.Nickname != nil {
+		opt.FullName = u.Nickname
+	}
+
+	if u.Email != nil {
+		opt.Email = u.Email
+	}
+	_, err := c.giteaClient.AdminEditUser(
+		u.Username,
+		opt,
+	)
+
+	return err
 }
 
 // Random password generator

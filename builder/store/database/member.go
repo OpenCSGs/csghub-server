@@ -1,6 +1,9 @@
 package database
 
-import "context"
+import (
+	"context"
+	"fmt"
+)
 
 type MemberStore struct {
 	db *DB
@@ -55,4 +58,23 @@ func (s *MemberStore) UserMembers(ctx context.Context, userID int64) ([]Member, 
 	var members []Member
 	err := s.db.Core.NewSelect().Model((*Member)(nil)).Where("user_id=?", userID).Scan(ctx, &members)
 	return members, err
+}
+
+func (s *MemberStore) OrganizationMembers(ctx context.Context, orgID int64, pageSize, page int) ([]Member, int, error) {
+	var members []Member
+	var total int
+	q := s.db.Core.NewSelect().Model((*Member)(nil)).
+		Relation("User").
+		Where("organization_id=?", orgID).
+		Limit(pageSize).
+		Offset((page - 1) * pageSize)
+	err := q.Scan(ctx, &members)
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to find org members,caused by:%w", err)
+	}
+	total, err = q.Count(ctx)
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to count org members,caused by:%w", err)
+	}
+	return members, total, nil
 }

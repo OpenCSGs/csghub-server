@@ -1015,6 +1015,7 @@ func (h *RepoHandler) MirrorFromSaas(ctx *gin.Context) {
 // @Param        repo_type path string true "models,datasets,codes or spaces" Enums(models,datasets,codes,spaces)
 // @Param        namespace path string true "repo owner name"
 // @Param        name path string true "repo name"
+// @Param        current_user query string true "current_user"
 // @Success      200  {object}  types.Response{data=database.Mirror} "OK"
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"

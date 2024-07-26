@@ -193,7 +193,7 @@ func (c *SpaceComponent) Show(ctx context.Context, namespace, name, currentUser 
 		Tags:    tags,
 		User: &types.User{
 			Username: space.Repository.User.Username,
-			Nickname: space.Repository.User.Name,
+			Nickname: space.Repository.User.NickName,
 			Email:    space.Repository.User.Email,
 		},
 		CreatedAt:     space.CreatedAt,

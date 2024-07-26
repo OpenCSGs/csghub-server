@@ -21,7 +21,7 @@ func (c *Client) FixOrganization(req *types.CreateOrgReq, user database.User) er
 			gitea.CreateOrgOption{
 				Name:        orgName,
 				Description: req.Description,
-				FullName:    req.FullName,
+				FullName:    req.Nickname,
 			},
 		)
 		if err != nil {
@@ -44,7 +44,7 @@ func (c *Client) CreateOrganization(req *types.CreateOrgReq, user database.User)
 			gitea.CreateOrgOption{
 				Name:        orgName,
 				Description: req.Description,
-				FullName:    req.FullName,
+				FullName:    req.Nickname,
 			},
 		)
 		if err != nil {
@@ -55,7 +55,7 @@ func (c *Client) CreateOrganization(req *types.CreateOrgReq, user database.User)
 
 	org = &database.Organization{
 		Name:        req.Name,
-		FullName:    req.FullName,
+		Nickname:    req.Nickname,
 		Description: req.Description,
 		User:        &user,
 		UserID:      user.ID,
@@ -83,7 +83,7 @@ func (c *Client) UpdateOrganization(req *types.EditOrgReq, originOrg *database.O
 		_, err = c.giteaClient.EditOrg(
 			orgName,
 			gitea.EditOrgOption{
-				FullName:    req.FullName,
+				FullName:    req.Nickname,
 				Description: req.Description,
 			},
 		)
@@ -92,7 +92,7 @@ func (c *Client) UpdateOrganization(req *types.EditOrgReq, originOrg *database.O
 		}
 	}
 
-	originOrg.FullName = req.FullName
+	originOrg.Nickname = req.Nickname
 	originOrg.Description = req.Description
 
 	return originOrg, nil
