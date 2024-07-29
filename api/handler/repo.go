@@ -1740,9 +1740,10 @@ func (h *RepoHandler) DeployUpdate(ctx *gin.Context) {
 	}
 
 	if req.MinReplica != nil && req.MaxReplica != nil {
-		if *req.MinReplica < 0 || *req.MaxReplica < 0 || *req.MinReplica > *req.MaxReplica {
-			slog.Error("Bad request setting for replica", slog.Any("MinReplica", req.MinReplica), slog.Any("MaxReplica", req.MaxReplica))
-			httpbase.BadRequest(ctx, "Bad request setting for replica")
+		err = Validate.Struct(req)
+		if err != nil {
+			slog.Error("Bad request setting for deploy", slog.Any("req", *req), slog.Any("err", err))
+			httpbase.BadRequest(ctx, "Bad request setting for deploy")
 			return
 		}
 	}
@@ -2091,9 +2092,10 @@ func (h *RepoHandler) ServerlessUpdate(ctx *gin.Context) {
 	}
 
 	if req.MinReplica != nil && req.MaxReplica != nil {
-		if *req.MinReplica < 0 || *req.MaxReplica < 0 || *req.MinReplica > *req.MaxReplica {
-			slog.Error("Bad request setting for replica", slog.Any("MinReplica", req.MinReplica), slog.Any("MaxReplica", req.MaxReplica))
-			httpbase.BadRequest(ctx, "Bad request setting for replica")
+		err = Validate.Struct(req)
+		if err != nil {
+			slog.Error("Bad request setting for serverless", slog.Any("req", *req), slog.Any("err", err))
+			httpbase.BadRequest(ctx, "Bad request setting for serverless")
 			return
 		}
 	}

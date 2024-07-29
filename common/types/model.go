@@ -201,8 +201,8 @@ type DeployUpdateReq struct {
 	Env                *string `json:"env"`
 	ResourceID         *int64  `json:"resource_id"`
 	RuntimeFrameworkID *int64  `json:"runtime_framework_id"`
-	MinReplica         *int    `json:"min_replica"`
-	MaxReplica         *int    `json:"max_replica"`
+	MinReplica         *int    `json:"min_replica" validate:"validateMinMaxReplica"`
+	MaxReplica         *int    `json:"max_replica" validate:"validateMinMaxReplica"`
 	Revision           *string `json:"revision"`
 	SecureLevel        *int    `json:"secure_level"`
 }
