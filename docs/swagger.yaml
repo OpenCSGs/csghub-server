@@ -1110,8 +1110,10 @@ definitions:
       env:
         type: string
       max_replica:
+        minimum: 1
         type: integer
       min_replica:
+        minimum: 1
         type: integer
       resource_id:
         type: integer

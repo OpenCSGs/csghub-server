@@ -13032,10 +13032,12 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "max_replica": {
-                    "type": "integer"
+                    "type": "integer",
+                    "minimum": 1
                 },
                 "min_replica": {
-                    "type": "integer"
+                    "type": "integer",
+                    "minimum": 1
                 },
                 "resource_id": {
                     "type": "integer"
