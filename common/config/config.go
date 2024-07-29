@@ -150,7 +150,7 @@ type Config struct {
 
 	User struct {
 		Host                     string `envconfig:"OPENCSG_USER_SERVER_HOST" default:"http://localhost"`
-		Port                     int    `envconfig:"OPENCSG_USER_SERVER_PORT" default:"8087"`
+		Port                     int    `envconfig:"OPENCSG_USER_SERVER_PORT" default:"8088"`
 		SigninSuccessRedirectURL string `envconfig:"OPENCSG_USER_SERVER_SIGNIN_SUCCESS_REDIRECT_URL" default:"http://localhost:3000/server/callback"`
 	}
 
