@@ -97,6 +97,9 @@ services:
       OPENCSG_ACCOUNTING_NATS_URL: nats://natsadmin:vf3jv9SsJBdv3n02n8Kxbvjf@natsmaster:4222
       OPENCSG_ACCOUNTING_SERVER_HOST: http://account_server
       OPENCSG_ACCOUNTING_SERVER_PORT: 8086
+      OPENCSG_USER_SERVER_HOST: http://user_server
+      OPENCSG_USER_SERVER_PORT: 8088
+
     ports:
       - "8080:8080"
     networks:
@@ -140,6 +143,38 @@ services:
     ports:
       - "8086:8086"
     restart: always
+  
+  user_server:
+    image: "opencsg/csghub-server"
+    entrypoint:
+      - /starhub-bin/starhub
+      - user
+      - launch
+    depends_on:
+      - postgres
+      - gitea
+    environment:
+      STARHUB_SERVER_API_TOKEN: $STARHUB_SERVER_API_TOKEN
+      STARHUB_DATABASE_DSN: postgresql://postgres:postgres@postgres:5432/starhub_server?sslmode=disable
+      STARHUB_DATABASE_TIMEZONE: Asia/Shanghai
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: starhub_server
+      STARHUB_SERVER_GITSERVER_HOST: http://gitea:3001
+      STARHUB_SERVER_GITSERVER_USERNAME: root
+      STARHUB_SERVER_GITSERVER_PASSWORD: password123
+      STARHUB_SERVER_CASDOOR_CLIENT_ID: $STARHUB_SERVER_CASDOOR_CLIENT_ID
+      STARHUB_SERVER_CASDOOR_CLIENT_SECRET: $STARHUB_SERVER_CASDOOR_CLIENT_SECRET
+      STARHUB_SERVER_CASDOOR_ENDPOINT: $STARHUB_SERVER_CASDOOR_ENDPOINT 
+      STARHUB_SERVER_CASDOOR_CERTIFICATE: /starhub-bin/casdoor/token_jwt_key.pem
+      STARHUB_SERVER_CASDOOR_ORGANIZATION_NAME: OpenCSG
+      STARHUB_SERVER_CASDOOR_APPLICATION_NAME: Portal
+      OPENCSG_USER_SERVER_PORT: 8088
+      OPENCSG_USER_SERVER_SIGNIN_SUCCESS_REDIRECT_URL: $OPENCSG_USER_SERVER_SIGNIN_SUCCESS_REDIRECT_URL
+    ports:
+      - "8088:8088"
+    volumes:
+      - ./casdoor:/starhub-bin/casdoor:r
 
 networks:
   my_network:
