@@ -547,19 +547,15 @@ func (d *deployer) UpdateDeploy(ctx context.Context, dur *types.DeployUpdateReq,
 	}
 
 	if dur.MinReplica != nil {
-		if dur.MaxReplica == nil && *dur.MinReplica > deploy.MaxReplica {
-			return fmt.Errorf("invalid min replica %d", *dur.MinReplica)
-		} else {
-			deploy.MinReplica = *dur.MinReplica
-		}
+		deploy.MinReplica = *dur.MinReplica
 	}
 
 	if dur.MaxReplica != nil {
-		if dur.MinReplica == nil && *dur.MaxReplica < deploy.MinReplica {
-			return fmt.Errorf("invalid max replica %d", *dur.MaxReplica)
-		} else {
-			deploy.MaxReplica = *dur.MaxReplica
-		}
+		deploy.MaxReplica = *dur.MaxReplica
+	}
+
+	if deploy.MaxReplica < deploy.MinReplica {
+		return fmt.Errorf("invalid min/max replica %d/%d", deploy.MinReplica, deploy.MaxReplica)
 	}
 
 	if dur.Revision != nil {
