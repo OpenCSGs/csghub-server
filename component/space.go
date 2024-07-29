@@ -250,6 +250,7 @@ func (c *SpaceComponent) Update(ctx context.Context, req *types.UpdateSpaceReq) 
 		License:       dbRepo.License,
 		Private:       dbRepo.Private,
 		CreatedAt:     dbRepo.CreatedAt,
+		SKU:           space.SKU,
 	}
 
 	return resDataset, nil
@@ -700,6 +701,7 @@ func (c *SpaceComponent) mergeUpdateSpaceRequest(ctx context.Context, space *dat
 		}
 		space.Hardware = resource.Resources
 		space.CostPerHour = resource.CostPerHour
+		space.SKU = strconv.FormatInt(resource.ID, 10)
 	}
 
 	return nil

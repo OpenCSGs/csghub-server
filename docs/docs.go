@@ -3917,12 +3917,12 @@ const docTemplate = `{
                         "required": true
                     },
                     {
-                        "description": "deploy setting of inference",
+                        "description": "deploy setting of Serverless",
                         "name": "body",
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/types.ModelRunReq"
+                            "$ref": "#/definitions/types.DeployUpdateReq"
                         }
                     }
                 ],
@@ -10580,7 +10580,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/types.ModelRunReq"
+                            "$ref": "#/definitions/types.DeployUpdateReq"
                         }
                     }
                 ],
@@ -13016,6 +13016,38 @@ const docTemplate = `{
                 "permission": {
                     "description": "default to empty, means full permission",
                     "type": "string"
+                }
+            }
+        },
+        "types.DeployUpdateReq": {
+            "type": "object",
+            "properties": {
+                "cluster_id": {
+                    "type": "string"
+                },
+                "deploy_name": {
+                    "type": "string"
+                },
+                "env": {
+                    "type": "string"
+                },
+                "max_replica": {
+                    "type": "integer"
+                },
+                "min_replica": {
+                    "type": "integer"
+                },
+                "resource_id": {
+                    "type": "integer"
+                },
+                "revision": {
+                    "type": "string"
+                },
+                "runtime_framework_id": {
+                    "type": "integer"
+                },
+                "secure_level": {
+                    "type": "integer"
                 }
             }
         },

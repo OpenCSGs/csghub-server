@@ -2032,7 +2032,7 @@ func (c *RepoComponent) checkDeployPermissionForServerless(ctx context.Context, 
 	return &user, repo, deploy, nil
 }
 
-func (c *RepoComponent) DeployUpdate(ctx context.Context, updateReq types.DeployActReq, req types.ModelRunReq) error {
+func (c *RepoComponent) DeployUpdate(ctx context.Context, updateReq types.DeployActReq, req *types.DeployUpdateReq) error {
 	var (
 		deploy *database.Deploy = nil
 		err    error            = nil
@@ -2046,14 +2046,11 @@ func (c *RepoComponent) DeployUpdate(ctx context.Context, updateReq types.Deploy
 		return fmt.Errorf("fail to check permission for update deploy, %w", err)
 	}
 
-	frame, err := c.rtfm.FindEnabledByID(ctx, req.RuntimeFrameworkID)
-	if err != nil || frame == nil {
-		return fmt.Errorf("can't find available runtime framework %v, %w", req.RuntimeFrameworkID, err)
-	}
-
-	_, err = c.cluster.ByClusterID(ctx, req.ClusterID)
-	if err != nil {
-		return fmt.Errorf("invalid cluster %v, %w", req.ClusterID, err)
+	if req.ClusterID != nil {
+		_, err = c.cluster.ByClusterID(ctx, *req.ClusterID)
+		if err != nil {
+			return fmt.Errorf("invalid cluster %v, %w", *req.ClusterID, err)
+		}
 	}
 
 	// check service
@@ -2077,7 +2074,7 @@ func (c *RepoComponent) DeployUpdate(ctx context.Context, updateReq types.Deploy
 	}
 
 	// update inference service and keep deploy_id and svc_name unchanged
-	err = c.deployer.UpdateDeploy(ctx, req, deploy, frame)
+	err = c.deployer.UpdateDeploy(ctx, req, deploy)
 	return err
 }
 
