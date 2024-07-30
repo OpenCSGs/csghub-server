@@ -263,28 +263,43 @@ func (c *UserComponent) CanAdmin(ctx context.Context, username string) (bool, er
 	return user.CanAdmin(), nil
 }
 
-func (c *UserComponent) Get(ctx context.Context, username string) (types.User, error) {
-	dbuser, err := c.us.FindByUsername(ctx, username)
+func (c *UserComponent) Get(ctx context.Context, userName, visitorName string) (*types.User, error) {
+	var onlyBasicInfo bool
+	if userName != visitorName {
+		canAdmin, err := c.CanAdmin(ctx, visitorName)
+		if err != nil {
+			return nil, fmt.Errorf("failed to check visitor user permission, visitor: %s, error: %w", visitorName, err)
+		}
+
+		if !canAdmin {
+			onlyBasicInfo = true
+		}
+	}
+
+	dbuser, err := c.us.FindByUsername(ctx, userName)
 	if err != nil {
 		newError := fmt.Errorf("failed to find user by name in db,error:%w", err)
-		return types.User{}, newError
+		return nil, newError
 	}
 
 	u := types.User{
 		Username: dbuser.Username,
-		Email:    dbuser.Email,
-		UUID:     dbuser.UUID,
 		Nickname: dbuser.NickName,
 		Avatar:   dbuser.Avatar,
-		Bio:      dbuser.Bio,
-		Homepage: dbuser.Homepage,
-		Phone:    dbuser.Phone,
-		Roles:    dbuser.Roles(),
+	}
+
+	if !onlyBasicInfo {
+		u.Email = dbuser.Email
+		u.UUID = dbuser.UUID
+		u.Bio = dbuser.Bio
+		u.Homepage = dbuser.Homepage
+		u.Phone = dbuser.Phone
+		u.Roles = dbuser.Roles()
 	}
 
 	dborgs, err := c.os.Index(ctx, dbuser.Username)
 	if err != nil {
-		return types.User{}, fmt.Errorf("failed to get orgs for user %s,error:%w", dbuser.Username, err)
+		return nil, fmt.Errorf("failed to get orgs for user %s,error:%w", dbuser.Username, err)
 	}
 
 	if len(dborgs) > 0 {
@@ -300,7 +315,7 @@ func (c *UserComponent) Get(ctx context.Context, username string) (types.User, e
 		}
 	}
 
-	return u, nil
+	return &u, nil
 }
 
 func (c *UserComponent) Signin(ctx context.Context, code, state string) (*types.JWTClaims, string, error) {
