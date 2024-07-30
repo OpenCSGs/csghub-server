@@ -36,7 +36,7 @@ type Deployer interface {
 	ListCluster(ctx context.Context) ([]types.ClusterRes, error)
 	GetClusterById(ctx context.Context, clusterId string) (*types.ClusterRes, error)
 	UpdateCluster(ctx context.Context, data types.ClusterRequest) (*types.UpdateClusterResponse, error)
-	UpdateDeploy(ctx context.Context, mrr types.ModelRunReq, deploy *database.Deploy, frame *database.RuntimeFramework) error
+	UpdateDeploy(ctx context.Context, dur *types.DeployUpdateReq, deploy *database.Deploy) error
 	StartDeploy(ctx context.Context, deploy *database.Deploy) error
 	CheckResourceAvailable(ctx context.Context, clusterId string, hardWare *types.HardWare) (bool, error)
 }
@@ -55,6 +55,7 @@ type deployer struct {
 	internalRootDomain string
 	sfNode             *snowflake.Node
 	eventPub           *event.EventPublisher
+	rtfm               *database.RuntimeFrameworksStore
 }
 
 func newDeployer(s scheduler.Scheduler, ib imagebuilder.Builder, ir imagerunner.Runner) (*deployer, error) {
@@ -74,6 +75,7 @@ func newDeployer(s scheduler.Scheduler, ib imagebuilder.Builder, ir imagerunner.
 		runnerStatuscache:  make(map[string]types.StatusResponse),
 		sfNode:             node,
 		eventPub:           &event.DefaultEventPublisher,
+		rtfm:               database.NewRuntimeFrameworksStore(),
 	}
 
 	go d.refreshStatus()
@@ -493,42 +495,80 @@ func (d *deployer) UpdateCluster(ctx context.Context, data types.ClusterRequest)
 }
 
 // UpdateDeploy implements Deployer.
-func (d *deployer) UpdateDeploy(ctx context.Context, mrr types.ModelRunReq, deploy *database.Deploy, frame *database.RuntimeFramework) error {
-	resource, err := d.spaceResourceStore.FindByID(ctx, mrr.ResourceID)
-	if err != nil {
-		slog.Error("error finding space resource", slog.Any("error", err))
-		return err
+func (d *deployer) UpdateDeploy(ctx context.Context, dur *types.DeployUpdateReq, deploy *database.Deploy) error {
+	var (
+		frame    *database.RuntimeFramework = nil
+		resource *database.SpaceResource    = nil
+		hardware *types.HardWare            = nil
+		err      error                      = nil
+	)
+
+	if dur.RuntimeFrameworkID != nil {
+		frame, err = d.rtfm.FindEnabledByID(ctx, *dur.RuntimeFrameworkID)
+		if err != nil || frame == nil {
+			return fmt.Errorf("can't find available runtime framework %v, %w", *dur.RuntimeFrameworkID, err)
+		}
 	}
 
-	var hardware types.HardWare
-	err = json.Unmarshal([]byte(resource.Resources), &hardware)
-	if err != nil {
-		slog.Error("invalid hardware setting", slog.Any("error", err), slog.String("hardware", resource.Resources))
-		return err
+	if dur.ResourceID != nil {
+		resource, err = d.spaceResourceStore.FindByID(ctx, *dur.ResourceID)
+		if err != nil {
+			return fmt.Errorf("error finding space resource %d, %w", *dur.ResourceID, err)
+		}
+		var err = json.Unmarshal([]byte(resource.Resources), &hardware)
+		if err != nil {
+			return fmt.Errorf("invalid resource hardware setting, %w", err)
+		}
 	}
 
-	// choose image
-	containerImg := frame.FrameCpuImage
-	if hardware.Gpu.Num != "" {
-		// use gpu image
-		containerImg = frame.FrameImage
+	if dur.DeployName != nil {
+		deploy.DeployName = *dur.DeployName
+	}
+	if dur.Env != nil {
+		deploy.Env = *dur.Env
 	}
 
-	deploy.DeployName = mrr.DeployName
-	deploy.Env = mrr.Env
-	deploy.RuntimeFramework = frame.FrameName
-	deploy.ImageID = containerImg
-	deploy.ContainerPort = frame.ContainerPort
-	deploy.Hardware = resource.Resources
-	deploy.MinReplica = mrr.MinReplica
-	deploy.MaxReplica = mrr.MaxReplica
-	deploy.GitBranch = mrr.Revision
-	deploy.SecureLevel = mrr.SecureLevel
-	deploy.CostPerHour = resource.CostPerHour
-	deploy.ClusterID = mrr.ClusterID
-	deploy.SKU = strconv.FormatInt(resource.ID, 10)
+	if resource != nil {
+		deploy.Hardware = resource.Resources
+		deploy.CostPerHour = resource.CostPerHour
+		deploy.SKU = strconv.FormatInt(resource.ID, 10)
+	}
 
-	// deploy.Status = common.Pending
+	if frame != nil {
+		// choose image
+		containerImg := frame.FrameCpuImage
+		if hardware != nil && hardware.Gpu.Num != "" {
+			// use gpu image
+			containerImg = frame.FrameImage
+		}
+		deploy.ImageID = containerImg
+		deploy.RuntimeFramework = frame.FrameName
+		deploy.ContainerPort = frame.ContainerPort
+	}
+
+	if dur.MinReplica != nil {
+		deploy.MinReplica = *dur.MinReplica
+	}
+
+	if dur.MaxReplica != nil {
+		deploy.MaxReplica = *dur.MaxReplica
+	}
+
+	if deploy.MaxReplica < deploy.MinReplica {
+		return fmt.Errorf("invalid min/max replica %d/%d", deploy.MinReplica, deploy.MaxReplica)
+	}
+
+	if dur.Revision != nil {
+		deploy.GitBranch = *dur.Revision
+	}
+
+	if dur.SecureLevel != nil {
+		deploy.SecureLevel = *dur.SecureLevel
+	}
+	if dur.ClusterID != nil {
+		deploy.ClusterID = *dur.ClusterID
+	}
+
 	// update deploy table
 	err = d.store.UpdateDeploy(ctx, deploy)
 	if err != nil {

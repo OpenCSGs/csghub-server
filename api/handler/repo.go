@@ -1702,7 +1702,7 @@ func (h *RepoHandler) testStatus(ctx *gin.Context) {
 // @Param        name path string true "name"
 // @Param        id path string true "deploy id"
 // @Param        current_user query string true "current_user"
-// @Param        body body types.ModelRunReq true "deploy setting of inference"
+// @Param        body body types.DeployUpdateReq true "deploy setting of inference"
 // @Success      200  {object}  types.Response{} "OK"
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
@@ -1733,21 +1733,20 @@ func (h *RepoHandler) DeployUpdate(ctx *gin.Context) {
 		return
 	}
 
-	var req types.ModelRunReq
+	var req *types.DeployUpdateReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {
 		slog.Error("Bad request format", "error", err, slog.Any("request.body", ctx.Request.Body))
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
 
-	if req.Revision == "" {
-		req.Revision = "main" // default repo branch
-	}
-
-	if req.MinReplica < 0 || req.MaxReplica < 0 || req.MinReplica > req.MaxReplica {
-		slog.Error("Bad request setting for replica", slog.Any("MinReplica", req.MinReplica), slog.Any("MaxReplica", req.MaxReplica))
-		httpbase.BadRequest(ctx, "Bad request setting for replica")
-		return
+	if req.MinReplica != nil && req.MaxReplica != nil {
+		err = Validate.Struct(req)
+		if err != nil {
+			slog.Error("Bad request setting for deploy", slog.Any("req", *req), slog.Any("err", err))
+			httpbase.BadRequest(ctx, fmt.Sprintf("Bad request setting for deploy, %v", err))
+			return
+		}
 	}
 
 	repoType := common.RepoTypeFromContext(ctx)
@@ -2067,7 +2066,7 @@ func (h *RepoHandler) ServerlessStatus(ctx *gin.Context) {
 // @Param        name path string true "name"
 // @Param        id path string true "deploy id"
 // @Param        current_user query string true "current_user"
-// @Param        body body types.ModelRunReq true "deploy setting of inference"
+// @Param        body body types.DeployUpdateReq true "deploy setting of Serverless"
 // @Success      200  {object}  types.Response{} "OK"
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
@@ -2086,21 +2085,20 @@ func (h *RepoHandler) ServerlessUpdate(ctx *gin.Context) {
 		return
 	}
 
-	var req types.ModelRunReq
+	var req *types.DeployUpdateReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {
 		slog.Error("Bad request format", "error", err, slog.Any("request.body", ctx.Request.Body))
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
 
-	if req.Revision == "" {
-		req.Revision = "main" // default repo branch
-	}
-
-	if req.MinReplica < 0 || req.MaxReplica < 0 || req.MinReplica > req.MaxReplica {
-		slog.Error("Bad request setting for replica", slog.Any("MinReplica", req.MinReplica), slog.Any("MaxReplica", req.MaxReplica))
-		httpbase.BadRequest(ctx, "Bad request setting for replica")
-		return
+	if req.MinReplica != nil && req.MaxReplica != nil {
+		err = Validate.Struct(req)
+		if err != nil {
+			slog.Error("Bad request setting for serverless", slog.Any("req", *req), slog.Any("err", err))
+			httpbase.BadRequest(ctx, fmt.Sprintf("Bad request setting for serverless, %v", err))
+			return
+		}
 	}
 
 	deployID, err := strconv.ParseInt(ctx.Param("id"), 10, 64)
