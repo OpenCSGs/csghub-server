@@ -32,9 +32,8 @@ func (c *JwtComponent) GenerateToken(ctx context.Context, req types.CreateJWTReq
 	}
 	expireAt := jwt.NewNumericDate(time.Now().Add(c.ValidTime))
 	claims = &types.JWTClaims{
-		UUID:          u.UUID,
-		CurrentUser:   req.CurrentUser,
-		Organizations: req.Organizations,
+		UUID:        u.UUID,
+		CurrentUser: u.Username,
 		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: expireAt,
 			Issuer:    "OpenCSG",
@@ -50,10 +49,30 @@ func (c *JwtComponent) GenerateToken(ctx context.Context, req types.CreateJWTReq
 	return claims, signed, nil
 }
 
-func (c *JwtComponent) ParseToken(ctx context.Context, token string) (claims *types.JWTClaims, err error) {
-	claims = &types.JWTClaims{}
-	_, err = jwt.ParseWithClaims(token, claims, func(token *jwt.Token) (interface{}, error) {
-		return c.SigningKey, nil
-	}, jwt.WithIssuer("OpenCSG"))
-	return claims, err
+func (c *JwtComponent) ParseToken(ctx context.Context, token string) (user *types.User, err error) {
+	claims := &types.JWTClaims{}
+	_, err = jwt.ParseWithClaims(token, claims,
+		func(token *jwt.Token) (interface{}, error) {
+			return c.SigningKey, nil
+		},
+		jwt.WithIssuer("OpenCSG"),
+	)
+
+	if err != nil {
+		return nil, fmt.Errorf("parse jwt token failed: %w", err)
+	}
+
+	dbu, err := c.us.FindByUsername(ctx, claims.CurrentUser)
+	if err != nil {
+		return nil, fmt.Errorf("failed to find user by name '%s', %w", claims.CurrentUser, err)
+	}
+
+	// create new user object
+	u := &types.User{
+		UUID:     dbu.UUID,
+		Username: dbu.Username,
+		Email:    dbu.Email,
+		Roles:    dbu.Roles(),
+	}
+	return u, nil
 }

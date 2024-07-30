@@ -1068,6 +1068,41 @@ func (c *RepoComponent) AllowAdminAccess(ctx context.Context, repoType types.Rep
 	return c.checkCurrentUserPermission(ctx, username, namespace, membership.RoleAdmin)
 }
 
+func (c *RepoComponent) getUserRepoPermission(ctx context.Context, userName string, repo *database.Repository) (*types.UserRepoPermission, error) {
+	namespace, _ := repo.NamespaceAndName()
+	ns, err := c.namespace.FindByPath(ctx, namespace)
+	if err != nil {
+		return nil, fmt.Errorf("failed to find namespace '%s' when get user repo permission, error: %w", namespace, err)
+	}
+
+	if ns.NamespaceType == "user" {
+		//owner has full permission
+		if userName == namespace {
+			return &types.UserRepoPermission{
+				CanRead:  true,
+				CanWrite: true,
+				CanAdmin: true,
+			}, nil
+		} else {
+			//other user has read permission to pubic repo
+			return &types.UserRepoPermission{
+				CanRead: !repo.Private, CanWrite: false, CanAdmin: false,
+			}, nil
+		}
+	} else {
+		r, err := c.userSvcClient.GetMemberRole(ctx, namespace, userName)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get user '%s' member role of org '%s' when get user repo permission, error: %w", userName, namespace, err)
+		}
+
+		return &types.UserRepoPermission{
+			CanRead:  r.CanRead(),
+			CanWrite: r.CanWrite(),
+			CanAdmin: r.CanAdmin(),
+		}, nil
+	}
+}
+
 func (c *RepoComponent) checkCurrentUserPermission(ctx context.Context, userName string, namespace string, role membership.Role) (bool, error) {
 	ns, err := c.namespace.FindByPath(ctx, namespace)
 	if err != nil {

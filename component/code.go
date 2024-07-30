@@ -267,8 +267,11 @@ func (c *CodeComponent) Show(ctx context.Context, namespace, name, currentUser s
 		return nil, fmt.Errorf("failed to find code, error: %w", err)
 	}
 
-	allow, _ := c.AllowReadAccessRepo(ctx, code.Repository, currentUser)
-	if !allow {
+	permission, err := c.getUserRepoPermission(ctx, currentUser, code.Repository)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get user repo permission, error: %w", err)
+	}
+	if !permission.CanRead {
 		return nil, ErrUnauthorized
 	}
 
@@ -316,6 +319,8 @@ func (c *CodeComponent) Show(ctx context.Context, namespace, name, currentUser s
 		UserLikes:  likeExists,
 		Source:     code.Repository.Source,
 		SyncStatus: code.Repository.SyncStatus,
+		CanWrite:   permission.CanWrite,
+		CanManage:  permission.CanAdmin,
 	}
 
 	return resCode, nil

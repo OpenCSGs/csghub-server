@@ -51,6 +51,8 @@ type Space struct {
 	SyncStatus   RepositorySyncStatus `json:"sync_status"`
 	SKU          string               `json:"sku,omitempty"`
 	SvcName      string               `json:"svc_name,omitempty"`
+	CanWrite     bool                 `json:"can_write"`
+	CanManage    bool                 `json:"can_manage"`
 }
 
 type UpdateSpaceReq struct {

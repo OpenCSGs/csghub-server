@@ -134,3 +134,9 @@ const (
 	AccessTokenAppMirror   AccessTokenApp = "mirror"
 	AccessTokenAppStarship AccessTokenApp = "starship"
 )
+
+type UserRepoPermission struct {
+	CanRead  bool `json:"can_read"`
+	CanWrite bool `json:"can_write"`
+	CanAdmin bool `json:"can_admin"`
+}
