@@ -159,8 +159,11 @@ func (c *SpaceComponent) Show(ctx context.Context, namespace, name, currentUser 
 		return nil, fmt.Errorf("failed to find space, error: %w", err)
 	}
 
-	allow, _ := c.AllowReadAccessRepo(ctx, space.Repository, currentUser)
-	if !allow {
+	permission, err := c.getUserRepoPermission(ctx, currentUser, space.Repository)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get user repo permission, error: %w", err)
+	}
+	if !permission.CanRead {
 		return nil, ErrUnauthorized
 	}
 
@@ -210,6 +213,8 @@ func (c *SpaceComponent) Show(ctx context.Context, namespace, name, currentUser 
 		SyncStatus:    space.Repository.SyncStatus,
 		SKU:           space.SKU,
 		SvcName:       svcName,
+		CanWrite:      permission.CanWrite,
+		CanManage:     permission.CanAdmin,
 	}
 
 	return resModel, nil

@@ -372,8 +372,11 @@ func (c *ModelComponent) Show(ctx context.Context, namespace, name, currentUser 
 		return nil, fmt.Errorf("failed to find model, error: %w", err)
 	}
 
-	allow, _ := c.AllowReadAccessRepo(ctx, model.Repository, currentUser)
-	if !allow {
+	permission, err := c.getUserRepoPermission(ctx, currentUser, model.Repository)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get user repo permission, error: %w", err)
+	}
+	if !permission.CanRead {
 		return nil, ErrUnauthorized
 	}
 
@@ -433,6 +436,8 @@ func (c *ModelComponent) Show(ctx context.Context, namespace, name, currentUser 
 		UserLikes:  likeExists,
 		Source:     model.Repository.Source,
 		SyncStatus: model.Repository.SyncStatus,
+		CanWrite:   permission.CanWrite,
+		CanManage:  permission.CanAdmin,
 	}
 	inferences, _ := c.rrtfms.GetByRepoIDsAndType(ctx, model.Repository.ID, types.InferenceType)
 	if len(inferences) > 0 {

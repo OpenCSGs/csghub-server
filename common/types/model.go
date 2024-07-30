@@ -102,6 +102,8 @@ type Model struct {
 	SyncStatus      RepositorySyncStatus `json:"sync_status"`
 	EnableInference bool                 `json:"enable_inference"`
 	EnableFinetune  bool                 `json:"enable_finetune"`
+	CanWrite        bool                 `json:"can_write"`
+	CanManage       bool                 `json:"can_manage"`
 }
 
 type SDKModelInfo struct {

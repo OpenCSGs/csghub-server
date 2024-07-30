@@ -7,9 +7,9 @@ import (
 )
 
 type CreateJWTReq struct {
-	UUID          string   `json:"uuid"`
+	UUID          string   `json:"-"`
 	CurrentUser   string   `json:"current_user" binding:"required"`
-	Organizations []string `json:"organizations"`
+	Organizations []string `json:"-"`
 }
 
 type CreateJWTResp struct {
@@ -18,8 +18,7 @@ type CreateJWTResp struct {
 }
 
 type JWTClaims struct {
-	UUID          string   `json:"uuid"`
-	CurrentUser   string   `json:"current_user"`
-	Organizations []string `json:"organizations"`
+	UUID        string `json:"uuid"`
+	CurrentUser string `json:"current_user"`
 	jwt.RegisteredClaims
 }

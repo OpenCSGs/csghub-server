@@ -373,8 +373,11 @@ func (c *DatasetComponent) Show(ctx context.Context, namespace, name, currentUse
 		return nil, fmt.Errorf("failed to find dataset, error: %w", err)
 	}
 
-	allow, _ := c.AllowReadAccessRepo(ctx, dataset.Repository, currentUser)
-	if !allow {
+	permission, err := c.getUserRepoPermission(ctx, currentUser, dataset.Repository)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get user repo permission, error: %w", err)
+	}
+	if !permission.CanRead {
 		return nil, ErrUnauthorized
 	}
 
@@ -422,6 +425,8 @@ func (c *DatasetComponent) Show(ctx context.Context, namespace, name, currentUse
 		UserLikes:  likeExists,
 		Source:     dataset.Repository.Source,
 		SyncStatus: dataset.Repository.SyncStatus,
+		CanWrite:   permission.CanWrite,
+		CanManage:  permission.CanAdmin,
 	}
 
 	return resDataset, nil

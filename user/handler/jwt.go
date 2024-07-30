@@ -69,16 +69,11 @@ func (h *JWTHandler) Create(ctx *gin.Context) {
 // @Router       /jwt/{token} [get]
 func (h *JWTHandler) Verify(ctx *gin.Context) {
 	token := ctx.Param("token")
-	claims, err := h.c.ParseToken(ctx.Request.Context(), token)
+	user, err := h.c.ParseToken(ctx.Request.Context(), token)
 	if err != nil {
 		slog.Error("failed to verify JWT token", slog.Any("error", err), slog.String("token", token))
 		httpbase.ServerError(ctx, fmt.Errorf("failed to verify JWT token '%s': %w", token, err))
 		return
-	}
-
-	user := types.User{
-		UUID:     claims.UUID,
-		Username: claims.CurrentUser,
 	}
 
 	httpbase.OK(ctx, user)
