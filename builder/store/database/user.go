@@ -22,7 +22,7 @@ type User struct {
 	GitID    int64  `bun:",notnull" json:"git_id"`
 	NickName string `bun:"column:name,notnull" json:"name"`
 	Username string `bun:",notnull,unique" json:"username"`
-	Email    string `bun:",notnull,unique" json:"email"`
+	Email    string `bun:",nullzero,unique" json:"email"`
 	//git password
 	Password     string        `bun:",notnull" json:"-"`
 	AccessTokens []AccessToken `bun:"rel:has-many,join:id=user_id"`
