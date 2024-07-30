@@ -509,7 +509,7 @@ func (c *UserComponent) ListDeploys(ctx context.Context, repoType types.Reposito
 
 	var resDeploys []types.DeployRepo
 	for _, deploy := range deploys {
-		repoPath := strings.TrimPrefix(deploy.GitPath, string(repoType)+"_")
+		repoPath := strings.TrimPrefix(deploy.GitPath, string(repoType)+"s_")
 		resDeploys = append(resDeploys, types.DeployRepo{
 			DeployID:         deploy.ID,
 			DeployName:       deploy.DeployName,
