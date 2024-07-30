@@ -1743,7 +1743,7 @@ func (h *RepoHandler) DeployUpdate(ctx *gin.Context) {
 		err = Validate.Struct(req)
 		if err != nil {
 			slog.Error("Bad request setting for deploy", slog.Any("req", *req), slog.Any("err", err))
-			httpbase.BadRequest(ctx, "Bad request setting for deploy")
+			httpbase.BadRequest(ctx, fmt.Sprintf("Bad request setting for deploy, %v", err))
 			return
 		}
 	}
@@ -2095,7 +2095,7 @@ func (h *RepoHandler) ServerlessUpdate(ctx *gin.Context) {
 		err = Validate.Struct(req)
 		if err != nil {
 			slog.Error("Bad request setting for serverless", slog.Any("req", *req), slog.Any("err", err))
-			httpbase.BadRequest(ctx, "Bad request setting for serverless")
+			httpbase.BadRequest(ctx, fmt.Sprintf("Bad request setting for serverless, %v", err))
 			return
 		}
 	}
