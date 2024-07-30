@@ -86,9 +86,9 @@ type PageOpts struct {
 type User struct {
 	Username    string         `json:"username"`
 	Nickname    string         `json:"nickname"`
-	Phone       string         `json:"phone"`
-	Email       string         `json:"email"`
-	UUID        string         `json:"uuid"`
+	Phone       string         `json:"phone,omitempty"`
+	Email       string         `json:"email,omitempty"`
+	UUID        string         `json:"uuid,omitempty"`
 	Avatar      string         `json:"avatar,omitempty"`
 	Bio         string         `json:"bio,omitempty"`
 	Homepage    string         `json:"homepage,omitempty"`

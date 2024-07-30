@@ -133,7 +133,7 @@ func (h *UserHandler) Delete(ctx *gin.Context) {
 
 // GetUser godoc
 // @Security     ApiKey
-// @Summary      Get user info
+// @Summary      Get user info. Admin and the user self can see full info, other users can only see basic info.
 // @Tags         User
 // @Accept       json
 // @Produce      json
@@ -144,22 +144,9 @@ func (h *UserHandler) Delete(ctx *gin.Context) {
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
 // @Router       /user/{username} [get]
 func (h *UserHandler) Get(ctx *gin.Context) {
-	currentUser := httpbase.GetCurrentUser(ctx)
+	visitorName := httpbase.GetCurrentUser(ctx)
 	userName := ctx.Param("username")
-	if userName != currentUser {
-		canAdmin, err := h.c.CanAdmin(ctx, currentUser)
-		if err != nil {
-			slog.Error("Failed to check user permission", slog.Any("error", err), slog.String("current_user", currentUser))
-			httpbase.ServerError(ctx, fmt.Errorf("failed to check user permission, current_user: %s, error: %w", currentUser, err))
-			return
-		}
-
-		if !canAdmin {
-			httpbase.UnauthorizedError(ctx, fmt.Errorf("'%s' dont have permission to view user info", currentUser))
-			return
-		}
-	}
-	user, err := h.c.Get(ctx, userName)
+	user, err := h.c.Get(ctx, userName, visitorName)
 	if err != nil {
 		slog.Error("Failed to get user", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
