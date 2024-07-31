@@ -76,6 +76,7 @@ func (c *Client) DeleteOrganization(name string) (err error) {
 	return
 }
 
+// TODO:remove param `originOrg`
 func (c *Client) UpdateOrganization(req *types.EditOrgReq, originOrg *database.Organization) (org *database.Organization, err error) {
 	orgNames := c.getTargetOrgs(req.Name)
 
@@ -83,17 +84,14 @@ func (c *Client) UpdateOrganization(req *types.EditOrgReq, originOrg *database.O
 		_, err = c.giteaClient.EditOrg(
 			orgName,
 			gitea.EditOrgOption{
-				FullName:    req.Nickname,
-				Description: req.Description,
+				FullName:    *req.Nickname,
+				Description: *req.Description,
 			},
 		)
 		if err != nil {
 			return
 		}
 	}
-
-	originOrg.Nickname = req.Nickname
-	originOrg.Description = req.Description
 
 	return originOrg, nil
 }
