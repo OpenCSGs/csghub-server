@@ -15,16 +15,16 @@ type CreateOrgReq struct {
 
 type EditOrgReq struct {
 	// Display name
-	Nickname    string `json:"nickname" example:"org display name"`
-	Description string `json:"description" example:"org description"`
+	Nickname    *string `json:"nickname" example:"org display name"`
+	Description *string `json:"description" example:"org description"`
 	// TODO:rename json field name to 'name", need to negotiate with Portal engineer
 	// Org unique identifier
-	Name        string `json:"-"`
-	Homepage    string `json:"homepage,omitempty" example:"https://www.example.com"`
-	Logo        string `json:"logo,omitempty" example:"https://www.example.com/logo.png"`
-	Verified    bool   `json:"verified" example:"false"`
-	OrgType     string `json:"org_type" example:"company or school etc"`
-	CurrentUser string `json:"-"`
+	Name        string  `json:"-"`
+	Homepage    *string `json:"homepage,omitempty" example:"https://www.example.com"`
+	Logo        *string `json:"logo,omitempty" example:"https://www.example.com/logo.png"`
+	Verified    *bool   `json:"verified" example:"false"`
+	OrgType     *string `json:"org_type" example:"company or school etc"`
+	CurrentUser string  `json:"-"`
 }
 
 type DeleteOrgReq struct {

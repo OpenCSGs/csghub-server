@@ -195,19 +195,40 @@ func (c *OrganizationComponent) Update(ctx context.Context, req *types.EditOrgRe
 	if err != nil {
 		return nil, fmt.Errorf("organization does not exists, error: %w", err)
 	}
-	nOrg, err := c.gs.UpdateOrganization(req, &org)
-	if err != nil {
-		return nil, fmt.Errorf("failed to update git organization, error: %w", err)
+
+	if req.Nickname != nil {
+		org.Nickname = *req.Nickname
 	}
-	nOrg.Logo = req.Logo
-	nOrg.Homepage = req.Homepage
-	nOrg.Verified = req.Verified
-	nOrg.OrgType = req.OrgType
-	err = c.os.Update(ctx, nOrg)
+	if req.Logo != nil {
+		org.Logo = *req.Logo
+	}
+	if req.Homepage != nil {
+		org.Homepage = *req.Homepage
+	}
+	if req.Verified != nil {
+		org.Verified = *req.Verified
+	}
+	if req.OrgType != nil {
+		org.OrgType = *req.OrgType
+	}
+	err = c.os.Update(ctx, &org)
 	if err != nil {
 		return nil, fmt.Errorf("failed to update database organization, error: %w", err)
 	}
-	return nOrg, err
+
+	//skip update git server
+	if req.Nickname == nil && req.Description == nil {
+		return &org, nil
+	}
+	var gitEditReq types.EditOrgReq
+	gitEditReq.Name = org.Name
+	gitEditReq.Nickname = &org.Nickname
+	gitEditReq.Description = &org.Description
+	_, err = c.gs.UpdateOrganization(&gitEditReq, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to update git organization, error: %w", err)
+	}
+	return &org, err
 }
 
 func (c *OrganizationComponent) Models(ctx context.Context, req *types.OrgModelsReq) ([]types.Model, int, error) {
