@@ -265,7 +265,10 @@ func (c *UserComponent) CanAdmin(ctx context.Context, username string) (bool, er
 
 func (c *UserComponent) Get(ctx context.Context, userName, visitorName string) (*types.User, error) {
 	var onlyBasicInfo bool
-	if userName != visitorName {
+	//allow anonymous user to get basic info
+	if visitorName == "" {
+		onlyBasicInfo = true
+	} else if userName != visitorName {
 		canAdmin, err := c.CanAdmin(ctx, visitorName)
 		if err != nil {
 			return nil, fmt.Errorf("failed to check visitor user permission, visitor: %s, error: %w", visitorName, err)
