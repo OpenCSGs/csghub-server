@@ -124,7 +124,7 @@ func (h *OrganizationHandler) Index(ctx *gin.Context) {
 // @Param        body body types.DeleteOrgReq true "body"
 // @Success      200  {object}  types.Response{} "OK"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
-// @Router       /organizations/{namespace} [delete]
+// @Router       /organization/{namespace} [delete]
 func (h *OrganizationHandler) Delete(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
 	if currentUser == "" {
@@ -163,7 +163,7 @@ func (h *OrganizationHandler) Delete(ctx *gin.Context) {
 // @Success      200  {object}  types.Response{data=database.Organization} "OK"
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
-// @Router       /organizations/{namespace} [put]
+// @Router       /organization/{namespace} [put]
 func (h *OrganizationHandler) Update(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
 	if currentUser == "" {
