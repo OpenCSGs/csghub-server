@@ -51,6 +51,8 @@ func NewRouter(config *config.Config) (*gin.Engine, error) {
 	{
 		//casdoor
 		apiV1Group.GET("/callback/casdoor", userHandler.Casdoor)
+		//user
+		userGroup.GET("/:username", userHandler.Get)
 		// org and members
 		apiV1Group.GET("/organizations", orgHandler.Index)
 		apiV1Group.GET("/organization/:namespace", orgHandler.Get)
@@ -74,7 +76,6 @@ func NewRouter(config *config.Config) (*gin.Engine, error) {
 	// routers for users
 	{
 		// userGroup.POST("", userHandler.Create)
-		userGroup.GET("/:username", mustLogin(), userHandler.Get)
 		// user self or admin
 		userGroup.PUT("/:username", mustLogin(), userHandler.Update)
 		//TODO:
