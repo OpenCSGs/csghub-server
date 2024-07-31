@@ -1613,7 +1613,7 @@ func (c *RepoComponent) ListDeploy(ctx context.Context, repoType types.Repositor
 }
 
 func (c *RepoComponent) DeleteDeploy(ctx context.Context, delReq types.DeployActReq) error {
-	user, repo, deploy, err := c.checkDeployPermissionForUser(ctx, delReq)
+	user, deploy, err := c.checkDeployPermissionForUser(ctx, delReq)
 	if err != nil {
 		return err
 	}
@@ -1645,7 +1645,7 @@ func (c *RepoComponent) DeleteDeploy(ctx context.Context, delReq types.DeployAct
 	}
 
 	// update database deploy
-	err = c.deploy.DeleteDeploy(ctx, types.RepositoryType(delReq.RepoType), repo.ID, user.ID, delReq.DeployID)
+	err = c.deploy.DeleteDeploy(ctx, types.RepositoryType(delReq.RepoType), deploy.RepoID, user.ID, delReq.DeployID)
 	if err != nil {
 		return fmt.Errorf("fail to remove deploy instance, %w", err)
 	}
@@ -1655,14 +1655,13 @@ func (c *RepoComponent) DeleteDeploy(ctx context.Context, delReq types.DeployAct
 
 func (c *RepoComponent) DeployDetail(ctx context.Context, detailReq types.DeployActReq) (*types.DeployRepo, error) {
 	var (
-		repo   *database.Repository = nil
-		deploy *database.Deploy     = nil
-		err    error                = nil
+		deploy *database.Deploy = nil
+		err    error            = nil
 	)
 	if detailReq.DeployType == types.ServerlessType {
-		_, repo, deploy, err = c.checkDeployPermissionForServerless(ctx, detailReq)
+		_, deploy, err = c.checkDeployPermissionForServerless(ctx, detailReq)
 	} else {
-		_, repo, deploy, err = c.checkDeployPermissionForUser(ctx, detailReq)
+		_, deploy, err = c.checkDeployPermissionForUser(ctx, detailReq)
 	}
 	if err != nil {
 		return nil, err
@@ -1706,7 +1705,7 @@ func (c *RepoComponent) DeployDetail(ctx context.Context, detailReq types.Deploy
 	if deploy.Type == types.FinetuneType {
 		proxyEndPoint = endpoint + "/proxy/7860/"
 	}
-
+	repoPath := strings.TrimPrefix(deploy.GitPath, string(detailReq.RepoType)+"s_")
 	resDeploy := types.DeployRepo{
 		DeployID:         deploy.ID,
 		DeployName:       deploy.DeployName,
@@ -1730,7 +1729,7 @@ func (c *RepoComponent) DeployDetail(ctx context.Context, detailReq types.Deploy
 		DesiredReplica:   desiredReplica,
 		Instances:        instList,
 		Private:          endpointPrivate,
-		Path:             repo.Path,
+		Path:             repoPath,
 		ProxyEndpoint:    proxyEndPoint,
 		SKU:              deploy.SKU,
 	}
@@ -1790,9 +1789,9 @@ func (c *RepoComponent) DeployInstanceLogs(ctx context.Context, logReq types.Dep
 		err    error            = nil
 	)
 	if logReq.DeployType == types.ServerlessType {
-		_, _, deploy, err = c.checkDeployPermissionForServerless(ctx, logReq)
+		_, deploy, err = c.checkDeployPermissionForServerless(ctx, logReq)
 	} else {
-		_, _, deploy, err = c.checkDeployPermissionForUser(ctx, logReq)
+		_, deploy, err = c.checkDeployPermissionForUser(ctx, logReq)
 	}
 
 	if err != nil {
@@ -1879,15 +1878,14 @@ func (c *RepoComponent) checkAccessDeployForServerless(repoID int64, deploy *dat
 
 func (c *RepoComponent) DeployStop(ctx context.Context, stopReq types.DeployActReq) error {
 	var (
-		user   *database.User       = nil
-		repo   *database.Repository = nil
-		deploy *database.Deploy     = nil
-		err    error                = nil
+		user   *database.User   = nil
+		deploy *database.Deploy = nil
+		err    error            = nil
 	)
 	if stopReq.DeployType == types.ServerlessType {
-		user, repo, deploy, err = c.checkDeployPermissionForServerless(ctx, stopReq)
+		user, deploy, err = c.checkDeployPermissionForServerless(ctx, stopReq)
 	} else {
-		user, repo, deploy, err = c.checkDeployPermissionForUser(ctx, stopReq)
+		user, deploy, err = c.checkDeployPermissionForUser(ctx, stopReq)
 	}
 	if err != nil {
 		return fmt.Errorf("fail to check permission for stop deploy, %w", err)
@@ -1920,7 +1918,7 @@ func (c *RepoComponent) DeployStop(ctx context.Context, stopReq types.DeployActR
 	}
 
 	// update database deploy to stopped
-	err = c.deploy.StopDeploy(ctx, stopReq.RepoType, repo.ID, user.ID, stopReq.DeployID)
+	err = c.deploy.StopDeploy(ctx, stopReq.RepoType, deploy.RepoID, user.ID, stopReq.DeployID)
 	if err != nil {
 		return fmt.Errorf("fail to stop deploy instance, %w", err)
 	}
@@ -2013,64 +2011,44 @@ func (c *RepoComponent) SyncMirror(ctx context.Context, repoType types.Repositor
 	return nil
 }
 
-func (c *RepoComponent) checkDeployPermissionForUser(ctx context.Context, deployReq types.DeployActReq) (*database.User, *database.Repository, *database.Deploy, error) {
+func (c *RepoComponent) checkDeployPermissionForUser(ctx context.Context, deployReq types.DeployActReq) (*database.User, *database.Deploy, error) {
 	user, err := c.user.FindByUsername(ctx, deployReq.CurrentUser)
 	if err != nil {
-		return nil, nil, nil, &types.PermissionError{Message: "user does not exist"}
-	}
-	repo, err := c.repo.FindByPath(ctx, deployReq.RepoType, deployReq.Namespace, deployReq.Name)
-	if err != nil {
-		return nil, nil, nil, fmt.Errorf("fail to get repository %v %s/%s, %w", deployReq.RepoType, deployReq.Namespace, deployReq.Name, err)
-	}
-	if repo == nil {
-		return nil, nil, nil, fmt.Errorf("do not found repository %s/%s", deployReq.Namespace, deployReq.Name)
+		return nil, nil, &types.PermissionError{Message: "user does not exist"}
 	}
 	deploy, err := c.deploy.GetDeployByID(ctx, deployReq.DeployID)
 	if err != nil {
-		return nil, nil, nil, fmt.Errorf("fail to get user deploy %v, %w", deployReq.DeployID, err)
+		return nil, nil, fmt.Errorf("fail to get user deploy %v, %w", deployReq.DeployID, err)
 	}
 	if deploy == nil {
-		return nil, nil, nil, fmt.Errorf("do not found user deploy %v", deployReq.DeployID)
+		return nil, nil, fmt.Errorf("do not found user deploy %v", deployReq.DeployID)
 	}
 	if deploy.UserID != user.ID {
-		return nil, nil, nil, &types.PermissionError{Message: "deploy was not created by user"}
+		return nil, nil, &types.PermissionError{Message: "deploy was not created by user"}
 	}
-	if deploy.RepoID != repo.ID {
-		return nil, nil, nil, errors.New("found incorrect repo")
-	}
-	return &user, repo, deploy, nil
+	return &user, deploy, nil
 }
 
-func (c *RepoComponent) checkDeployPermissionForServerless(ctx context.Context, deployReq types.DeployActReq) (*database.User, *database.Repository, *database.Deploy, error) {
+func (c *RepoComponent) checkDeployPermissionForServerless(ctx context.Context, deployReq types.DeployActReq) (*database.User, *database.Deploy, error) {
 	user, err := c.user.FindByUsername(ctx, deployReq.CurrentUser)
 	if err != nil {
-		return nil, nil, nil, fmt.Errorf("user does not exist, %w", err)
+		return nil, nil, fmt.Errorf("user does not exist, %w", err)
 	}
 	isAdmin, err := c.isAdminRole(user)
 	if err != nil {
-		return nil, nil, nil, fmt.Errorf("fail to check user role, %w", err)
+		return nil, nil, fmt.Errorf("fail to check user role, %w", err)
 	}
 	if !isAdmin {
-		return nil, nil, nil, fmt.Errorf("do not allowed for user, %w", err)
-	}
-	repo, err := c.repo.FindByPath(ctx, deployReq.RepoType, deployReq.Namespace, deployReq.Name)
-	if err != nil {
-		return nil, nil, nil, fmt.Errorf("fail to get repository %v %s/%s, %w", deployReq.RepoType, deployReq.Namespace, deployReq.Name, err)
-	}
-	if repo == nil {
-		return nil, nil, nil, fmt.Errorf("do not found repository %s/%s", deployReq.Namespace, deployReq.Name)
+		return nil, nil, fmt.Errorf("do not allowed for user, %w", err)
 	}
 	deploy, err := c.deploy.GetDeployByID(ctx, deployReq.DeployID)
 	if err != nil {
-		return nil, nil, nil, fmt.Errorf("fail to get serverless deploy:%v, %w", deployReq.DeployID, err)
+		return nil, nil, fmt.Errorf("fail to get serverless deploy:%v, %w", deployReq.DeployID, err)
 	}
 	if deploy == nil {
-		return nil, nil, nil, fmt.Errorf("do not found serverless deploy %v", deployReq.DeployID)
+		return nil, nil, fmt.Errorf("do not found serverless deploy %v", deployReq.DeployID)
 	}
-	if deploy.RepoID != repo.ID {
-		return nil, nil, nil, errors.New("found incorrect repo")
-	}
-	return &user, repo, deploy, nil
+	return &user, deploy, nil
 }
 
 func (c *RepoComponent) DeployUpdate(ctx context.Context, updateReq types.DeployActReq, req *types.DeployUpdateReq) error {
@@ -2079,9 +2057,9 @@ func (c *RepoComponent) DeployUpdate(ctx context.Context, updateReq types.Deploy
 		err    error            = nil
 	)
 	if updateReq.DeployType == types.ServerlessType {
-		_, _, deploy, err = c.checkDeployPermissionForServerless(ctx, updateReq)
+		_, deploy, err = c.checkDeployPermissionForServerless(ctx, updateReq)
 	} else {
-		_, _, deploy, err = c.checkDeployPermissionForUser(ctx, updateReq)
+		_, deploy, err = c.checkDeployPermissionForUser(ctx, updateReq)
 	}
 	if err != nil {
 		return fmt.Errorf("fail to check permission for update deploy, %w", err)
@@ -2125,9 +2103,9 @@ func (c *RepoComponent) DeployStart(ctx context.Context, startReq types.DeployAc
 		err    error            = nil
 	)
 	if startReq.DeployType == types.ServerlessType {
-		_, _, deploy, err = c.checkDeployPermissionForServerless(ctx, startReq)
+		_, deploy, err = c.checkDeployPermissionForServerless(ctx, startReq)
 	} else {
-		_, _, deploy, err = c.checkDeployPermissionForUser(ctx, startReq)
+		_, deploy, err = c.checkDeployPermissionForUser(ctx, startReq)
 	}
 
 	if err != nil {
