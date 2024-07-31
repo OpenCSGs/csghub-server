@@ -1364,6 +1364,7 @@ func (h *RepoHandler) DeployList(ctx *gin.Context) {
 // @Param        current_user query string false "current user"
 // @Success      200  {object}  string "OK"
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      401  {object}  types.APIUnauthorized "Permission denied"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
 // @Router       /{repo_type}/{namespace}/{name}/run/{id} [get]
 func (h *RepoHandler) DeployDetail(ctx *gin.Context) {
@@ -1402,7 +1403,12 @@ func (h *RepoHandler) DeployDetail(ctx *gin.Context) {
 	response, err := h.c.DeployDetail(ctx, detailReq)
 	if err != nil {
 		slog.Error("fail to deploy detail", slog.String("error", err.Error()), slog.Any("repotype", repoType), slog.Any("namespace", namespace), slog.Any("name", name), slog.Any("deploy id", deployID))
-		httpbase.ServerError(ctx, err)
+		var pErr *types.PermissionError
+		if errors.As(err, &pErr) {
+			httpbase.UnauthorizedError(ctx, err)
+		} else {
+			httpbase.ServerError(ctx, err)
+		}
 		return
 	}
 
@@ -1422,6 +1428,7 @@ func (h *RepoHandler) DeployDetail(ctx *gin.Context) {
 // @Param        instance path string true "instance"
 // @Param        current_user query string true "current_user"
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      401  {object}  types.APIUnauthorized "Permission denied"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
 // @Router       /{repo_type}/{namespace}/{name}/run/{id}/logs/{instance} [get]
 func (h *RepoHandler) DeployInstanceLogs(ctx *gin.Context) {
@@ -1467,7 +1474,12 @@ func (h *RepoHandler) DeployInstanceLogs(ctx *gin.Context) {
 	// user http request context instead of gin context, so that server knows the life cycle of the request
 	logReader, err := h.c.DeployInstanceLogs(ctx.Request.Context(), logReq)
 	if err != nil {
-		httpbase.ServerError(ctx, err)
+		var pErr *types.PermissionError
+		if errors.As(err, &pErr) {
+			httpbase.UnauthorizedError(ctx, err)
+		} else {
+			httpbase.ServerError(ctx, err)
+		}
 		return
 	}
 
@@ -1541,6 +1553,7 @@ func getSourceRepoPathFromSourceUrl(sourceUrl string) (string, error) {
 // @Param        id path string true "deploy id"
 // @Param        current_user query string true "current_user"
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      401  {object}  types.APIUnauthorized "Permission denied"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
 // @Router       /{repo_type}/{namespace}/{name}/run/{id}/status [get]
 func (h *RepoHandler) DeployStatus(ctx *gin.Context) {
@@ -1582,7 +1595,12 @@ func (h *RepoHandler) DeployStatus(ctx *gin.Context) {
 	allow, err := h.c.AllowAccessDeploy(ctx, statusReq)
 	if err != nil {
 		slog.Error("failed to check user permission", "error", err)
-		httpbase.ServerError(ctx, errors.New("failed to check user permission"))
+		var pErr *types.PermissionError
+		if errors.As(err, &pErr) {
+			httpbase.UnauthorizedError(ctx, err)
+		} else {
+			httpbase.ServerError(ctx, err)
+		}
 		return
 	}
 

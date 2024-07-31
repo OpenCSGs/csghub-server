@@ -1860,7 +1860,7 @@ func (c *RepoComponent) checkAccessDeployForUser(ctx context.Context, repoID int
 	}
 	if deploy.UserID != user.ID {
 		// deny access due to deploy was not created by
-		return false, errors.New("deploy was not created by user")
+		return false, &types.PermissionError{Message: "deploy was not created by user"}
 	}
 	if deploy.RepoID != repoID {
 		// deny access for invalid repo
@@ -2016,7 +2016,7 @@ func (c *RepoComponent) SyncMirror(ctx context.Context, repoType types.Repositor
 func (c *RepoComponent) checkDeployPermissionForUser(ctx context.Context, deployReq types.DeployActReq) (*database.User, *database.Repository, *database.Deploy, error) {
 	user, err := c.user.FindByUsername(ctx, deployReq.CurrentUser)
 	if err != nil {
-		return nil, nil, nil, errors.New("user does not exist")
+		return nil, nil, nil, &types.PermissionError{Message: "user does not exist"}
 	}
 	repo, err := c.repo.FindByPath(ctx, deployReq.RepoType, deployReq.Namespace, deployReq.Name)
 	if err != nil {
@@ -2033,7 +2033,7 @@ func (c *RepoComponent) checkDeployPermissionForUser(ctx context.Context, deploy
 		return nil, nil, nil, fmt.Errorf("do not found user deploy %v", deployReq.DeployID)
 	}
 	if deploy.UserID != user.ID {
-		return nil, nil, nil, errors.New("deploy was not created by user")
+		return nil, nil, nil, &types.PermissionError{Message: "deploy was not created by user"}
 	}
 	if deploy.RepoID != repo.ID {
 		return nil, nil, nil, errors.New("found incorrect repo")
