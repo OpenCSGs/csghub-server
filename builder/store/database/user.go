@@ -2,6 +2,7 @@ package database
 
 import (
 	"context"
+	"fmt"
 	"strings"
 
 	"github.com/uptrace/bun"
@@ -46,6 +47,8 @@ type User struct {
 	PasswordHash string `bun:"," json:"password_hash"`
 	Homepage     string `bun:"," json:"homepage"`
 	Bio          string `bun:"," json:"bio"`
+	// allow user to change username once
+	CanChangeUserName bool `bun:"can_change_user_name" json:"can_change_username"`
 
 	// WechatID     string `bun:"," json:"wechat_id"`
 	// GithubID     string `bun:"," json:"github_id"`
@@ -107,6 +110,30 @@ func (s *UserStore) Update(ctx context.Context, user *User) (err error) {
 	return
 }
 
+func (s *UserStore) ChangeUserName(ctx context.Context, username string, newUsername string) (err error) {
+	return s.db.Operator.Core.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
+		if err = assertAffectedOneRow(tx.NewUpdate().Model((*Namespace)(nil)).
+			Set("path = ?", newUsername).
+			Set("updated_at = now()").
+			Where("path = ?", username).
+			Exec(ctx)); err != nil {
+			return fmt.Errorf("failed to change namespace from '%s' to '%s' in db, error:%w", username, newUsername, err)
+		}
+
+		err = assertAffectedOneRow(tx.NewUpdate().
+			Model((*User)(nil)).
+			Where("username = ?", username).
+			Set("username = ?", newUsername).
+			Set("can_change_user_name = false").
+			Set("updated_at = now()").
+			Exec(ctx))
+		if err != nil {
+			return fmt.Errorf("failed to change username from '%s' to '%s' in db, error:%w", username, newUsername, err)
+		}
+		return nil
+	})
+}
+
 func (s *UserStore) Create(ctx context.Context, user *User, namespace *Namespace) (err error) {
 	err = s.db.Operator.Core.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
 		if err = assertAffectedOneRow(tx.NewInsert().Model(user).Exec(ctx)); err != nil {
@@ -127,6 +154,14 @@ func (s *UserStore) IsExist(ctx context.Context, username string) (exists bool, 
 		NewSelect().
 		Model((*User)(nil)).
 		Where("username =?", username).
+		Exists(ctx)
+}
+
+func (s *UserStore) IsExistByUUID(ctx context.Context, uuid string) (exists bool, err error) {
+	return s.db.Operator.Core.
+		NewSelect().
+		Model((*User)(nil)).
+		Where("uuid =?", uuid).
 		Exists(ctx)
 }
 

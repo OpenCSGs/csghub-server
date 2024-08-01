@@ -26,9 +26,9 @@ func NewJwtComponent(signKey string, validHour int) *JwtComponent {
 
 // GenerateToken generate a jwt token, and return the token and signed string
 func (c *JwtComponent) GenerateToken(ctx context.Context, req types.CreateJWTReq) (claims *types.JWTClaims, signed string, err error) {
-	u, err := c.us.FindByUsername(ctx, req.CurrentUser)
+	u, err := c.us.FindByUUID(ctx, req.UUID)
 	if err != nil {
-		return nil, "", fmt.Errorf("failed to find user, %w", err)
+		return nil, "", fmt.Errorf("failed to find user by uuid '%s',error: %w", req.UUID, err)
 	}
 	expireAt := jwt.NewNumericDate(time.Now().Add(c.ValidTime))
 	claims = &types.JWTClaims{
@@ -69,10 +69,11 @@ func (c *JwtComponent) ParseToken(ctx context.Context, token string) (user *type
 
 	// create new user object
 	u := &types.User{
-		UUID:     dbu.UUID,
-		Username: dbu.Username,
-		Email:    dbu.Email,
-		Roles:    dbu.Roles(),
+		UUID:              dbu.UUID,
+		Username:          dbu.Username,
+		Email:             dbu.Email,
+		Roles:             dbu.Roles(),
+		CanChangeUserName: dbu.CanChangeUserName,
 	}
 	return u, nil
 }

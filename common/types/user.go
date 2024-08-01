@@ -30,6 +30,9 @@ type UpdateUserRequest struct {
 	Avatar   *string   `json:"avatar,omitempty"`
 	Homepage *string   `json:"homepage,omitempty"`
 	Bio      *string   `json:"bio,omitempty"`
+
+	//if use want to change username, this should be the only field to send in request body
+	NewUserName *string `json:"new_username,omitempty"`
 }
 
 type UpdateUserResp struct {
@@ -84,17 +87,18 @@ type PageOpts struct {
 }
 
 type User struct {
-	Username    string         `json:"username"`
-	Nickname    string         `json:"nickname"`
-	Phone       string         `json:"phone,omitempty"`
-	Email       string         `json:"email,omitempty"`
-	UUID        string         `json:"uuid,omitempty"`
-	Avatar      string         `json:"avatar,omitempty"`
-	Bio         string         `json:"bio,omitempty"`
-	Homepage    string         `json:"homepage,omitempty"`
-	Roles       []string       `json:"roles,omitempty"`
-	LastLoginAt string         `json:"last_login_at,omitempty"`
-	Orgs        []Organization `json:"orgs,omitempty"`
+	Username          string         `json:"username"`
+	Nickname          string         `json:"nickname"`
+	Phone             string         `json:"phone,omitempty"`
+	Email             string         `json:"email,omitempty"`
+	UUID              string         `json:"uuid,omitempty"`
+	Avatar            string         `json:"avatar,omitempty"`
+	Bio               string         `json:"bio,omitempty"`
+	Homepage          string         `json:"homepage,omitempty"`
+	Roles             []string       `json:"roles,omitempty"`
+	LastLoginAt       string         `json:"last_login_at,omitempty"`
+	Orgs              []Organization `json:"orgs,omitempty"`
+	CanChangeUserName bool           `json:"can_change_username"`
 }
 
 type UserLikesRequest struct {

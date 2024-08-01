@@ -71,7 +71,7 @@ func NewUserHandler(config *config.Config) (*UserHandler, error) {
 
 // UpdateUser godoc
 // @Security     ApiKey
-// @Summary      Update user
+// @Summary      Update user. If change user name, should only send 'new_username' in the request body.
 // @Description  update user
 // @Tags         User
 // @Accept       json
@@ -94,7 +94,13 @@ func (h *UserHandler) Update(ctx *gin.Context) {
 
 	userName := ctx.Param("username")
 	req.Username = userName
-	err := h.c.Update(ctx, req, currentUser)
+
+	var err error
+	if req.NewUserName != nil {
+		err = h.c.ChangeUserName(ctx, req.Username, *req.NewUserName, currentUser)
+	} else {
+		err = h.c.Update(ctx, req, currentUser)
+	}
 	if err != nil {
 		slog.Error("Failed to update user", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
