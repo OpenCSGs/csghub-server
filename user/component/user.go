@@ -2,11 +2,14 @@ package component
 
 import (
 	"context"
+	"database/sql"
+	"errors"
 	"fmt"
 	"log/slog"
 	"os"
 	"sync"
 
+	"github.com/bwmarrin/snowflake"
 	"github.com/casdoor/casdoor-go-sdk/casdoorsdk"
 	"opencsg.com/csghub-server/builder/git"
 	"opencsg.com/csghub-server/builder/git/gitserver"
@@ -25,6 +28,7 @@ type UserComponent struct {
 	casc      *casdoorsdk.Client
 	casConfig *casdoorsdk.AuthConfig
 	once      *sync.Once
+	sfnode    *snowflake.Node
 }
 
 func NewUserComponent(config *config.Config) (*UserComponent, error) {
@@ -64,14 +68,33 @@ func (c *UserComponent) createFromPortalRegistry(ctx context.Context, req types.
 }
 
 func (c *UserComponent) createFromCasdoorUser(ctx context.Context, cu casdoorsdk.User) (*database.User, error) {
-	var gsUserResp *gitserver.CreateUserResponse
-	var err error
+	var (
+		gsUserResp        *gitserver.CreateUserResponse
+		err               error
+		userName          string
+		email             string
+		canChangeUserName bool
+	)
+	//wechat user need to change username later
+	if cu.WeChat != "" {
+		userName, err = c.genUniqueName()
+		if err != nil {
+			return nil, fmt.Errorf("failed to generate unique user name,error:%w", err)
+		}
+		canChangeUserName = true
+		//set email to "", make sure not to create git user
+		email = ""
+	} else {
+		userName = cu.Name
+		canChangeUserName = false
+		email = cu.Email
+	}
 	//skip creating git user if email is empty, it will be created later when user set email
-	if cu.Email != "" {
+	if email != "" {
 		gsUserReq := gitserver.CreateUserRequest{
-			Nickname: cu.Name,
-			Username: cu.Name,
-			Email:    cu.Email,
+			Nickname: userName,
+			Username: userName,
+			Email:    email,
 		}
 		gsUserResp, err = c.gs.CreateUser(gsUserReq)
 		if err != nil {
@@ -81,11 +104,11 @@ func (c *UserComponent) createFromCasdoorUser(ctx context.Context, cu casdoorsdk
 	}
 
 	namespace := &database.Namespace{
-		Path: cu.Name,
+		Path: userName,
 	}
 	user := &database.User{
-		Username:    cu.Name,
-		NickName:    cu.Name,
+		Username:    userName,
+		NickName:    userName,
 		UUID:        cu.Id,
 		RegProvider: "casdoor",
 		Gender:      cu.Gender,
@@ -97,8 +120,9 @@ func (c *UserComponent) createFromCasdoorUser(ctx context.Context, cu casdoorsdk
 		Avatar:          cu.Avatar,
 		CompanyVerified: false,
 		// PasswordHash:    cu.Password,
-		Homepage: cu.Homepage,
-		Bio:      cu.Bio,
+		Homepage:          cu.Homepage,
+		Bio:               cu.Bio,
+		CanChangeUserName: canChangeUserName,
 	}
 	if gsUserResp != nil {
 		user.GitID = gsUserResp.GitID
@@ -112,6 +136,51 @@ func (c *UserComponent) createFromCasdoorUser(ctx context.Context, cu casdoorsdk
 	}
 
 	return user, nil
+}
+
+func (c *UserComponent) ChangeUserName(ctx context.Context, oldUserName, newUserName, opUser string) error {
+	if oldUserName != opUser {
+		return fmt.Errorf("user name can only be changed by user self, user: '%s', op user: '%s'", oldUserName, opUser)
+	}
+
+	user, err := c.us.FindByUsername(ctx, oldUserName)
+	if err != nil {
+		return fmt.Errorf("failed to find user by old name in db,error:%w", err)
+	}
+
+	if !user.CanChangeUserName {
+		return fmt.Errorf("user name can not be changed")
+	}
+
+	newUser, err := c.us.FindByUsername(ctx, newUserName)
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
+		return fmt.Errorf("failed to find user by new name in db,error:%w", err)
+	}
+	if newUser.ID > 0 {
+		return fmt.Errorf("user name '%s' already exists", newUserName)
+	}
+
+	err = c.us.ChangeUserName(ctx, oldUserName, newUserName)
+	if err != nil {
+		return fmt.Errorf("failed to change user name in db,error:%w", err)
+	}
+
+	//skip casdoor update if it's not a casdoor user
+	if user.UUID == "" || user.RegProvider != "casdoor" {
+		return nil
+	}
+
+	c.lazyInit()
+
+	err = c.updateCasdoorUser(&types.UpdateUserRequest{
+		UUID:        &user.UUID,
+		NewUserName: &newUserName,
+	})
+	if err != nil {
+		newError := fmt.Errorf("failed to update casdoor user, uuid:'%s',error:%w", user.UUID, err)
+		return newError
+	}
+	return nil
 }
 
 func (c *UserComponent) Update(ctx context.Context, req *types.UpdateUserRequest, opUser string) error {
@@ -203,6 +272,11 @@ func (c *UserComponent) upsertGitUser(username string, nickname *string, oldEmai
 func (c *UserComponent) setChangedProps(user *database.User, req *types.UpdateUserRequest) {
 	if req.Email != nil {
 		user.Email = *req.Email
+		if user.CanChangeUserName {
+			user.CanChangeUserName = false
+			slog.Info("use set email, disallow to change user name later (can_change_user_name=false)",
+				slog.String("username", user.Username), slog.String("email", user.Email))
+		}
 	}
 	if req.UUID != nil {
 		user.UUID = *req.UUID
@@ -334,7 +408,7 @@ func (c *UserComponent) Signin(ctx context.Context, code, state string) (*types.
 	}
 
 	cu := claims.User
-	exists, err := c.us.IsExist(ctx, cu.Name)
+	exists, err := c.us.IsExistByUUID(ctx, cu.Id)
 	if err != nil {
 		return nil, "", fmt.Errorf("failed to check user existance by name in db,error:%w", err)
 	}
@@ -355,6 +429,16 @@ func (c *UserComponent) Signin(ctx context.Context, code, state string) (*types.
 	}
 
 	return hubToken, signed, nil
+}
+
+func (c *UserComponent) genUniqueName() (string, error) {
+	c.lazyInit()
+
+	if c.sfnode == nil {
+		return "", fmt.Errorf("user component sfnode is nil")
+	}
+	id := c.sfnode.Generate().Base36()
+	return "user_" + id, nil
 }
 
 func (c *UserComponent) updateCasdoorUser(req *types.UpdateUserRequest) error {
@@ -392,7 +476,12 @@ func (c *UserComponent) updateCasdoorUser(req *types.UpdateUserRequest) error {
 
 func (c *UserComponent) lazyInit() {
 	c.once.Do(func() {
+		var err error
 		c.casc = casdoorsdk.NewClientWithConf(c.casConfig)
+		c.sfnode, err = snowflake.NewNode(1)
+		if err != nil {
+			slog.Error("failed to create snowflake node", "error", err)
+		}
 	})
 }
 

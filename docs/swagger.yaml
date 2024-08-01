@@ -336,6 +336,9 @@ definitions:
         type: string
       bio:
         type: string
+      can_change_username:
+        description: allow user to change username once
+        type: boolean
       company_verified:
         type: boolean
       created_at:
@@ -1655,12 +1658,44 @@ definitions:
       version:
         type: string
     type: object
+  types.UpdateUserRequest:
+    properties:
+      avatar:
+        type: string
+      bio:
+        type: string
+      email:
+        type: string
+      homepage:
+        type: string
+      name:
+        description: Display name of the user
+        type: string
+      new_username:
+        description: if use want to change username
+        type: string
+      phone:
+        type: string
+      roles:
+        description: should be updated by admin
+        example:
+        - '[super_user'
+        - ' admin'
+        - ' personal_user]'
+        items:
+          type: string
+        type: array
+      uuid:
+        type: string
+    type: object
   types.User:
     properties:
       avatar:
         type: string
       bio:
         type: string
+      can_change_username:
+        type: boolean
       email:
         type: string
       homepage:
@@ -7752,6 +7787,308 @@ paths:
       summary: Submit telemetry data for a client
       tags:
       - Telemetry
+  /token/{app}/{token_name}:
+    delete:
+      consumes:
+      - application/json
+      parameters:
+      - description: application
+        enum:
+        - git
+        - starship
+        in: path
+        name: app
+        required: true
+        type: string
+      - description: token_name
+        in: path
+        name: token_name
+        required: true
+        type: string
+      - description: current user, the owner
+        in: query
+        name: current_user
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/types.Response'
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Delete access token of a app
+      tags:
+      - Access token
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: token name
+        in: path
+        name: token_name
+        required: true
+        type: string
+      - description: application
+        enum:
+        - git
+        - starship
+        in: path
+        name: app
+        required: true
+        type: string
+      - description: current user, the owner
+        in: query
+        name: current_user
+        required: true
+        type: string
+      - description: body
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/types.CreateUserTokenRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/types.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/database.AccessToken'
+              type: object
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Create access token for an special application
+      tags:
+      - Access token
+    put:
+      consumes:
+      - application/json
+      parameters:
+      - description: application
+        enum:
+        - git
+        - starship
+        in: path
+        name: app
+        required: true
+        type: string
+      - description: token_name
+        in: path
+        name: token_name
+        required: true
+        type: string
+      - description: current user, the owner
+        in: query
+        name: current_user
+        required: true
+        type: string
+      - description: new expire time, in format RFC3339, like 2006-01-02T15:04:05Z07:00
+        in: query
+        name: expired_at
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/types.Response'
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Refresh a access token for a user
+      tags:
+      - Access token
+  /token/{token_value}:
+    get:
+      consumes:
+      - application/json
+      parameters:
+      - description: token_value
+        in: path
+        name: token_value
+        required: true
+        type: string
+      - description: application
+        enum:
+        - git
+        - starship
+        in: query
+        name: app
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/types.Response'
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Get token and owner's detail by the token value
+      tags:
+      - Access token
+  /user/{username}:
+    delete:
+      consumes:
+      - application/json
+      parameters:
+      - description: username
+        in: path
+        name: username
+        required: true
+        type: string
+      - description: current user
+        in: query
+        name: current_user
+        required: true
+        type: string
+      - description: body
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/types.UpdateUserRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/types.Response'
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Delete user
+      tags:
+      - User
+    get:
+      consumes:
+      - application/json
+      parameters:
+      - description: username
+        in: path
+        name: username
+        required: true
+        type: string
+      - description: current user
+        in: query
+        name: current_user
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/types.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/types.User'
+              type: object
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Get user info. Admin and the user self can see full info, other users
+        can only see basic info.
+      tags:
+      - User
+    put:
+      consumes:
+      - application/json
+      description: update user
+      parameters:
+      - description: username
+        in: path
+        name: username
+        required: true
+        type: string
+      - description: current user
+        in: query
+        name: current_user
+        required: true
+        type: string
+      - description: body
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/types.UpdateUserRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/types.Response'
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Update user. If change user name, should only send 'new_username' in
+        the request body.
+      tags:
+      - User
   /user/{username}/codes:
     get:
       consumes:
