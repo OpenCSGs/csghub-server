@@ -14,3 +14,5 @@ type ResponseWithTotal struct {
 type APIInternalServerError struct{}
 
 type APIBadRequest struct{}
+
+type APIUnauthorized struct{}

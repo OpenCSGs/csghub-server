@@ -424,7 +424,7 @@ func (h *ModelHandler) DeployDedicated(ctx *gin.Context) {
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
-	allow, err := h.c.AllowAdminAccess(ctx, types.ModelRepo, namespace, name, currentUser)
+	allow, err := h.c.AllowReadAccess(ctx, types.ModelRepo, namespace, name, currentUser)
 	if err != nil {
 		slog.Error("failed to check user permission", "error", err)
 		httpbase.ServerError(ctx, errors.New("failed to check user permission"))
@@ -1215,18 +1215,6 @@ func (h *ModelHandler) DeployServerless(ctx *gin.Context) {
 	if err != nil {
 		slog.Error("failed to get namespace from context", "error", err)
 		httpbase.BadRequest(ctx, err.Error())
-		return
-	}
-	allow, err := h.c.AllowAdminAccess(ctx, types.ModelRepo, namespace, name, currentUser)
-	if err != nil {
-		slog.Error("failed to check user permission", "error", err)
-		httpbase.ServerError(ctx, errors.New("failed to check user permission"))
-		return
-	}
-	if !allow {
-		slog.Info("user not allowed to run model", slog.String("namespace", namespace),
-			slog.String("name", name), slog.Any("username", currentUser))
-		httpbase.UnauthorizedError(ctx, errors.New("user not allowed to run model"))
 		return
 	}
 

@@ -150,3 +150,23 @@ type TagReq struct {
 	Name     string `json:"name"`
 	Category string `json:"category"`
 }
+
+type RuntimeArchitecture struct {
+	Architectures []string `json:"architectures"`
+}
+
+type ScanReq struct {
+	FrameID   int64
+	FrameType int
+	ArchMap   map[string]string
+	Models    []string
+}
+
+type PermissionError struct {
+	Message string
+}
+
+// Add the Error() method to PermissionError.
+func (e *PermissionError) Error() string {
+	return e.Message // Return the message field as the error description.
+}
