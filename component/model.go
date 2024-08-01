@@ -464,7 +464,7 @@ func (c *ModelComponent) GetServerless(ctx context.Context, namespace, name, cur
 		return nil, fmt.Errorf("failed to get serverless deployment, error: %w", err)
 	}
 	if deploy == nil {
-		return nil, fmt.Errorf("do not find serverless deployment")
+		return nil, nil
 	}
 	var endpoint string
 	if len(deploy.SvcName) > 0 && deploy.Status == deployStatus.Running {
