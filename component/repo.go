@@ -1069,6 +1069,11 @@ func (c *RepoComponent) AllowAdminAccess(ctx context.Context, repoType types.Rep
 }
 
 func (c *RepoComponent) getUserRepoPermission(ctx context.Context, userName string, repo *database.Repository) (*types.UserRepoPermission, error) {
+	if userName == "" {
+		//anonymous user only has read permission to public repo
+		return &types.UserRepoPermission{CanRead: !repo.Private, CanWrite: false, CanAdmin: false}, nil
+	}
+
 	namespace, _ := repo.NamespaceAndName()
 	ns, err := c.namespace.FindByPath(ctx, namespace)
 	if err != nil {
