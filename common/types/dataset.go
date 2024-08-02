@@ -38,4 +38,5 @@ type Dataset struct {
 	SyncStatus    RepositorySyncStatus `json:"sync_status"`
 	CanWrite      bool                 `json:"can_write"`
 	CanManage     bool                 `json:"can_manage"`
+	Namespace     *Namespace           `json:"namespace"`
 }

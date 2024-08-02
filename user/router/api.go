@@ -35,6 +35,11 @@ func NewRouter(config *config.Config) (*gin.Engine, error) {
 	if err != nil {
 		return nil, fmt.Errorf("error creating user controller:%w", err)
 	}
+	//namespace
+	nsCtrl, err := handler.NewNamespaceHandler(config)
+	if err != nil {
+		return nil, fmt.Errorf("error creating namespace controller:%w", err)
+	}
 
 	apiV1Group := r.Group("/api/v1")
 	jwtGroup := apiV1Group.Group("/jwt")
@@ -63,6 +68,8 @@ func NewRouter(config *config.Config) (*gin.Engine, error) {
 	{
 		//organization
 		apiV1Group.GET("/organization/:namespace/members/:username", needAPIKey, memberCtrl.GetMemberRole)
+		//namespace
+		apiV1Group.GET("/namespace/:path", needAPIKey, nsCtrl.GetInfo)
 		//jwt
 		jwtGroup.POST("/token", needAPIKey, jwtHandler.Create)
 		jwtGroup.GET("/:token", needAPIKey, jwtHandler.Verify)

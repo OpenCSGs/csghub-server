@@ -380,6 +380,11 @@ func (c *ModelComponent) Show(ctx context.Context, namespace, name, currentUser 
 		return nil, ErrUnauthorized
 	}
 
+	ns, err := c.getNameSpaceInfo(ctx, namespace)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get namespace info for model, error: %w", err)
+	}
+
 	for _, tag := range model.Repository.Tags {
 		tags = append(tags, types.RepoTag{
 			Name:      tag.Name,
@@ -428,6 +433,7 @@ func (c *ModelComponent) Show(ctx context.Context, namespace, name, currentUser 
 		SyncStatus: model.Repository.SyncStatus,
 		CanWrite:   permission.CanWrite,
 		CanManage:  permission.CanAdmin,
+		Namespace:  ns,
 	}
 	inferences, _ := c.rrtfms.GetByRepoIDsAndType(ctx, model.Repository.ID, types.InferenceType)
 	if len(inferences) > 0 {

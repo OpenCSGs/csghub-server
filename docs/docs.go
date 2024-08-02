@@ -4179,6 +4179,68 @@ const docTemplate = `{
                 }
             }
         },
+        "/namespace/{path}": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "description": "get namespace info",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Namespace",
+                    "InternalOnly"
+                ],
+                "summary": "Get namespace info [Internal Only].",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "namespace",
+                        "name": "path",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/types.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/types.Namespace"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            }
+        },
         "/organization/{namespace}": {
             "get": {
                 "security": [
@@ -12190,6 +12252,9 @@ const docTemplate = `{
                 "name": {
                     "type": "string"
                 },
+                "namespace": {
+                    "$ref": "#/definitions/types.Namespace"
+                },
                 "nickname": {
                     "type": "string"
                 },
@@ -12816,6 +12881,9 @@ const docTemplate = `{
                 "name": {
                     "type": "string"
                 },
+                "namespace": {
+                    "$ref": "#/definitions/types.Namespace"
+                },
                 "nickname": {
                     "type": "string"
                 },
@@ -13100,6 +13168,9 @@ const docTemplate = `{
                 "name": {
                     "type": "string"
                 },
+                "namespace": {
+                    "$ref": "#/definitions/types.Namespace"
+                },
                 "nickname": {
                     "type": "string"
                 },
@@ -13243,6 +13314,21 @@ const docTemplate = `{
                 "ModelWidgetTypeGeneration",
                 "ModelWidgetTypeChat"
             ]
+        },
+        "types.Namespace": {
+            "type": "object",
+            "properties": {
+                "avatar": {
+                    "type": "string"
+                },
+                "path": {
+                    "type": "string"
+                },
+                "type": {
+                    "description": "namespace types like 'user' for normal user, and 'school', 'company' for orgs etc.",
+                    "type": "string"
+                }
+            }
         },
         "types.Organization": {
             "type": "object",
@@ -13522,8 +13608,7 @@ const docTemplate = `{
                     "example": "space_name_1"
                 },
                 "namespace": {
-                    "type": "string",
-                    "example": "user_or_org_name"
+                    "$ref": "#/definitions/types.Namespace"
                 },
                 "nickname": {
                     "type": "string",
@@ -13883,7 +13968,7 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "new_username": {
-                    "description": "if use want to change username",
+                    "description": "if use want to change username, this should be the only field to send in request body",
                     "type": "string"
                 },
                 "phone": {

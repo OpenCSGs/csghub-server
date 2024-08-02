@@ -42,7 +42,7 @@ type RepoComponent struct {
 	mirror            *database.MirrorStore
 	git               gitserver.GitServer
 	s3Client          *minio.Client
-	userSvcClient     rpc.UserSvcClien
+	userSvcClient     rpc.UserSvcClient
 	lfsBucket         string
 	uls               *database.UserLikesStore
 	mirrorServer      mirrorserver.MirrorServer
@@ -2182,4 +2182,17 @@ func (c *RepoComponent) AllFiles(ctx context.Context, req types.GetAllFilesReq) 
 func (c *RepoComponent) isAdminRole(user database.User) bool {
 	slog.Debug("Check if user is admin", slog.Any("user", user))
 	return user.CanAdmin()
+}
+
+func (c *RepoComponent) getNameSpaceInfo(ctx context.Context, path string) (*types.Namespace, error) {
+	nsResp, err := c.userSvcClient.GetNameSpaceInfo(ctx, path)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get namespace infor from user service, path: %s, error: %w", path, err)
+	}
+	ns := &types.Namespace{
+		Path:   nsResp.Path,
+		Avatar: nsResp.Avatar,
+		Type:   nsResp.Type,
+	}
+	return ns, nil
 }

@@ -529,6 +529,8 @@ definitions:
         type: integer
       name:
         type: string
+      namespace:
+        $ref: '#/definitions/types.Namespace'
       nickname:
         type: string
       path:
@@ -951,6 +953,8 @@ definitions:
         type: integer
       name:
         type: string
+      namespace:
+        $ref: '#/definitions/types.Namespace'
       nickname:
         type: string
       path:
@@ -1144,6 +1148,8 @@ definitions:
         type: integer
       name:
         type: string
+      namespace:
+        $ref: '#/definitions/types.Namespace'
       nickname:
         type: string
       path:
@@ -1239,6 +1245,17 @@ definitions:
     x-enum-varnames:
     - ModelWidgetTypeGeneration
     - ModelWidgetTypeChat
+  types.Namespace:
+    properties:
+      avatar:
+        type: string
+      path:
+        type: string
+      type:
+        description: namespace types like 'user' for normal user, and 'school', 'company'
+          for orgs etc.
+        type: string
+    type: object
   types.Organization:
     properties:
       homepage:
@@ -1430,8 +1447,7 @@ definitions:
         example: space_name_1
         type: string
       namespace:
-        example: user_or_org_name
-        type: string
+        $ref: '#/definitions/types.Namespace'
       nickname:
         example: ""
         type: string
@@ -1672,7 +1688,8 @@ definitions:
         description: Display name of the user
         type: string
       new_username:
-        description: if use want to change username
+        description: if use want to change username, this should be the only field
+          to send in request body
         type: string
       phone:
         type: string
@@ -6000,6 +6017,43 @@ paths:
       summary: List repo runtime framework
       tags:
       - Repository
+  /namespace/{path}:
+    get:
+      consumes:
+      - application/json
+      description: get namespace info
+      parameters:
+      - description: namespace
+        in: path
+        name: path
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/types.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/types.Namespace'
+              type: object
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Get namespace info [Internal Only].
+      tags:
+      - Namespace
+      - InternalOnly
   /organization/{name}/members/{username}:
     get:
       consumes:

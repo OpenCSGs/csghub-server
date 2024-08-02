@@ -275,6 +275,11 @@ func (c *CodeComponent) Show(ctx context.Context, namespace, name, currentUser s
 		return nil, ErrUnauthorized
 	}
 
+	ns, err := c.getNameSpaceInfo(ctx, namespace)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get namespace info for code, error: %w", err)
+	}
+
 	for _, tag := range code.Repository.Tags {
 		tags = append(tags, types.RepoTag{
 			Name:      tag.Name,
@@ -321,6 +326,7 @@ func (c *CodeComponent) Show(ctx context.Context, namespace, name, currentUser s
 		SyncStatus: code.Repository.SyncStatus,
 		CanWrite:   permission.CanWrite,
 		CanManage:  permission.CanAdmin,
+		Namespace:  ns,
 	}
 
 	return resCode, nil
