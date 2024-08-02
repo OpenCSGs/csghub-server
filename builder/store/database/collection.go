@@ -3,6 +3,7 @@ package database
 import (
 	"context"
 	"fmt"
+	"slices"
 	"strings"
 
 	"github.com/uptrace/bun"
@@ -120,16 +121,6 @@ func (cs *CollectionStore) QueryByTrending(ctx context.Context, filter *types.Co
 	return cs.GetCollectionsByIDs(ctx, collections, ids, total)
 }
 
-// generate a method to get collection id from rankedRepos
-func (cs *CollectionStore) GetCollectionID(rankedRepos []RankedRepository, repoId int64) int64 {
-	for _, rr := range rankedRepos {
-		if rr.RepositoryID == repoId {
-			return rr.CollectionID
-		}
-	}
-	return -1
-}
-
 func (cs *CollectionStore) CreateCollection(ctx context.Context, collection Collection) (*Collection, error) {
 	res, err := cs.db.Core.NewInsert().Model(&collection).Exec(ctx, &collection)
 	if err := assertAffectedOneRow(res, err); err != nil {
@@ -220,9 +211,11 @@ func (cs *CollectionStore) GetCollectionsByIDs(ctx context.Context, collections 
 		return nil, 0, err
 	}
 
-	repo_ids := make([]interface{}, 0)
+	repo_ids := make([]int64, 0)
 	for _, rr := range rankedRepos {
-		repo_ids = append(repo_ids, rr.RepositoryID)
+		if !slices.Contains(repo_ids, rr.RepositoryID) {
+			repo_ids = append(repo_ids, rr.RepositoryID)
+		}
 	}
 	var repositories []Repository
 	err = cs.db.Operator.Core.NewSelect().
@@ -237,14 +230,25 @@ func (cs *CollectionStore) GetCollectionsByIDs(ctx context.Context, collections 
 	if err != nil {
 		return nil, 0, err
 	}
+	collectionMaps := getCollectionMaps(rankedRepos, repositories)
 	for i, collection := range collections {
-		for _, repo := range repositories {
-			if collection.ID == cs.GetCollectionID(rankedRepos, repo.ID) {
-				collections[i].Repositories = append(collections[i].Repositories, repo)
-			}
-		}
+		collections[i].Repositories = collectionMaps[collection.ID]
 	}
+
 	return collections, total, nil
+}
+
+// return collection maps from rankedRepos and repositories
+func getCollectionMaps(rankedRepos []RankedRepository, repositories []Repository) (collections map[int64][]Repository) {
+	collections = make(map[int64][]Repository)
+	repoMap := make(map[int64]Repository)
+	for _, repo := range repositories {
+		repoMap[repo.ID] = repo
+	}
+	for _, rr := range rankedRepos {
+		collections[rr.CollectionID] = append(collections[rr.CollectionID], repoMap[rr.RepositoryID])
+	}
+	return
 }
 
 func (cs *CollectionStore) FindById(ctx context.Context, id int64) (collection Collection, err error) {
