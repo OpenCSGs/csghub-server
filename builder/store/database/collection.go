@@ -3,6 +3,7 @@ package database
 import (
 	"context"
 	"fmt"
+	"slices"
 	"strings"
 
 	"github.com/uptrace/bun"
@@ -41,6 +42,12 @@ type CollectionRepository struct {
 	Repository   *Repository `bun:"rel:belongs-to,join:repository_id=id"`
 }
 
+type RankedRepository struct {
+	CollectionID int64 `bun:"collection_id"`
+	RepositoryID int64 `bun:"repository_id"`
+	RN           int   `bun:"rn"` // Rank
+}
+
 var Fields = []string{"id", "download_count", "likes", "path", "private", "repository_type", "updated_at", "created_at", "user_id", "name", "nickname", "description"}
 
 // query collections in the database
@@ -51,13 +58,6 @@ func (cs *CollectionStore) GetCollections(ctx context.Context, filter *types.Col
 	query := cs.db.Operator.Core.
 		NewSelect().
 		Model(&collections).
-		Relation("Repositories.Tags", func(q *bun.SelectQuery) *bun.SelectQuery {
-			return q.Where("category = ?", "task")
-		}).
-		Relation("Repositories", func(q *bun.SelectQuery) *bun.SelectQuery {
-			q.Column(Fields...).OrderExpr("updated_at DESC").Limit(3)
-			return q
-		}).
 		Where("private =  ?", false)
 	if filter.Search != "" {
 		filter.Search = strings.ToLower(filter.Search)
@@ -75,7 +75,12 @@ func (cs *CollectionStore) GetCollections(ctx context.Context, filter *types.Col
 	if err != nil {
 		return
 	}
-	return
+
+	ids := make([]interface{}, 0)
+	for _, collection := range collections {
+		ids = append(ids, collection.ID)
+	}
+	return cs.GetCollectionsByIDs(ctx, collections, ids, total)
 }
 
 // query collections in the database
@@ -112,24 +117,8 @@ func (cs *CollectionStore) QueryByTrending(ctx context.Context, filter *types.Co
 	for _, collection := range collections {
 		ids = append(ids, collection.ID)
 	}
-	err = cs.db.Operator.Core.
-		NewSelect().
-		Model(&collections).
-		Relation("Repositories.Tags", func(q *bun.SelectQuery) *bun.SelectQuery {
-			return q.Where("category = ?", "task")
-		}).
-		Relation("Repositories", func(q *bun.SelectQuery) *bun.SelectQuery {
-			q.Column(Fields...).OrderExpr("updated_at DESC").Limit(3)
-			return q
-		}).
-		OrderExpr("array_position(ARRAY[?]::int[], id::int)", ids...).
-		Where("id IN (?)", bun.In(ids)).Scan(ctx)
 
-	if err != nil {
-		return nil, 0, err
-	}
-
-	return collections, total, nil
+	return cs.GetCollectionsByIDs(ctx, collections, ids, total)
 }
 
 func (cs *CollectionStore) CreateCollection(ctx context.Context, collection Collection) (*Collection, error) {
@@ -180,13 +169,6 @@ func (cs *CollectionStore) ByUserLikes(ctx context.Context, userID int64, per, p
 	query := cs.db.Operator.Core.
 		NewSelect().
 		Model(&collections).
-		Relation("Repositories.Tags", func(q *bun.SelectQuery) *bun.SelectQuery {
-			return q.Where("category = ?", "task")
-		}).
-		Relation("Repositories", func(q *bun.SelectQuery) *bun.SelectQuery {
-			q.Column(Fields...).OrderExpr("updated_at DESC").Limit(3)
-			return q
-		}).
 		Where("collection.id in (select collection_id from user_likes where user_id=?)", userID)
 
 	query = query.Order("collection.created_at DESC").
@@ -200,6 +182,71 @@ func (cs *CollectionStore) ByUserLikes(ctx context.Context, userID int64, per, p
 	total, err = query.Count(ctx)
 	if err != nil {
 		return
+	}
+	ids := make([]interface{}, 0)
+	for _, collection := range collections {
+		ids = append(ids, collection.ID)
+	}
+
+	return cs.GetCollectionsByIDs(ctx, collections, ids, total)
+}
+
+// get collections by ids
+func (cs *CollectionStore) GetCollectionsByIDs(ctx context.Context, collections []Collection, ids []interface{}, total int) ([]Collection, int, error) {
+	subQuery := cs.db.Operator.Core.NewSelect().
+		Column("cr.collection_id").
+		ColumnExpr("repository.id as repository_id").
+		ColumnExpr("ROW_NUMBER() OVER (PARTITION BY cr.collection_id ORDER BY repository.updated_at DESC) AS rn").
+		TableExpr("repositories AS repository").
+		Join("JOIN collection_repositories AS cr ON repository.id = cr.repository_id")
+
+	var rankedRepos []RankedRepository
+	err := cs.db.Operator.Core.NewSelect().
+		With("rn_repositories", subQuery).
+		TableExpr("rn_repositories").
+		Where("rn <= ?", 3).
+		Where("collection_id IN (?)", bun.In(ids)).
+		Scan(ctx, &rankedRepos)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	repo_ids := make([]int64, 0)
+	for _, rr := range rankedRepos {
+		if !slices.Contains(repo_ids, rr.RepositoryID) {
+			repo_ids = append(repo_ids, rr.RepositoryID)
+		}
+	}
+	var repositories []Repository
+	err = cs.db.Operator.Core.NewSelect().
+		Model(&repositories).
+		Column(Fields...).
+		Relation("Tags", func(q *bun.SelectQuery) *bun.SelectQuery {
+			return q.Where("category = ?", "task")
+		}).
+		Where("repository.id IN (?)", bun.In(repo_ids)).
+		Order("updated_at DESC").
+		Scan(ctx)
+	if err != nil {
+		return nil, 0, err
+	}
+	collectionMaps := getCollectionMaps(rankedRepos, repositories)
+	for i, collection := range collections {
+		collections[i].Repositories = collectionMaps[collection.ID]
+	}
+
+	return collections, total, nil
+}
+
+// return collection maps from rankedRepos and repositories
+func getCollectionMaps(rankedRepos []RankedRepository, repositories []Repository) (collections map[int64][]Repository) {
+	collections = make(map[int64][]Repository)
+	repoMap := make(map[int64]Repository)
+	for _, repo := range repositories {
+		repoMap[repo.ID] = repo
+	}
+	for _, rr := range rankedRepos {
+		collections[rr.CollectionID] = append(collections[rr.CollectionID], repoMap[rr.RepositoryID])
 	}
 	return
 }
