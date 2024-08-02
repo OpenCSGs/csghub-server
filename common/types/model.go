@@ -104,6 +104,7 @@ type Model struct {
 	EnableFinetune  bool                 `json:"enable_finetune"`
 	CanWrite        bool                 `json:"can_write"`
 	CanManage       bool                 `json:"can_manage"`
+	Namespace       *Namespace           `json:"namespace"`
 }
 
 type SDKModelInfo struct {

@@ -381,6 +381,11 @@ func (c *DatasetComponent) Show(ctx context.Context, namespace, name, currentUse
 		return nil, ErrUnauthorized
 	}
 
+	ns, err := c.getNameSpaceInfo(ctx, namespace)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get namespace info for dataset, error: %w", err)
+	}
+
 	for _, tag := range dataset.Repository.Tags {
 		tags = append(tags, types.RepoTag{
 			Name:      tag.Name,
@@ -427,6 +432,7 @@ func (c *DatasetComponent) Show(ctx context.Context, namespace, name, currentUse
 		SyncStatus: dataset.Repository.SyncStatus,
 		CanWrite:   permission.CanWrite,
 		CanManage:  permission.CanAdmin,
+		Namespace:  ns,
 	}
 
 	return resDataset, nil
