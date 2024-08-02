@@ -18,7 +18,6 @@ type CreateSpaceReq struct {
 type Space struct {
 	ID            int64       `json:"id,omitempty"`
 	Creator       string      `json:"username,omitempty" example:"creator_user_name"`
-	Namespace     string      `json:"namespace,omitempty" example:"user_or_org_name"`
 	Name          string      `json:"name,omitempty" example:"space_name_1"`
 	Nickname      string      `json:"nickname,omitempty" example:""`
 	Description   string      `json:"description,omitempty" example:""`
@@ -53,6 +52,7 @@ type Space struct {
 	SvcName      string               `json:"svc_name,omitempty"`
 	CanWrite     bool                 `json:"can_write"`
 	CanManage    bool                 `json:"can_manage"`
+	Namespace    *Namespace           `json:"namespace"`
 }
 
 type UpdateSpaceReq struct {

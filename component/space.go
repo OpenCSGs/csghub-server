@@ -161,7 +161,6 @@ func (c *SpaceComponent) Create(ctx context.Context, req types.CreateSpaceReq) (
 
 	space := &types.Space{
 		Creator:       req.Username,
-		Namespace:     req.Namespace,
 		License:       req.License,
 		Path:          dbRepo.Path,
 		Name:          req.Name,
@@ -192,6 +191,11 @@ func (c *SpaceComponent) Show(ctx context.Context, namespace, name, currentUser 
 	}
 	if !permission.CanRead {
 		return nil, ErrUnauthorized
+	}
+
+	ns, err := c.getNameSpaceInfo(ctx, namespace)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get namespace info for model, error: %w", err)
 	}
 
 	var endpoint string
@@ -242,6 +246,7 @@ func (c *SpaceComponent) Show(ctx context.Context, namespace, name, currentUser 
 		SvcName:       svcName,
 		CanWrite:      permission.CanWrite,
 		CanManage:     permission.CanAdmin,
+		Namespace:     ns,
 	}
 
 	return resModel, nil
