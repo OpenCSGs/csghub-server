@@ -69,7 +69,7 @@ func (c *CollectionHandler) Index(ctx *gin.Context) {
 		"total": total,
 	}
 
-	httpbase.OK(ctx, respData)
+	ctx.JSON(http.StatusOK, respData)
 }
 
 // CreateCollection godoc
@@ -103,10 +103,7 @@ func (c *CollectionHandler) Create(ctx *gin.Context) {
 		httpbase.ServerError(ctx, err)
 		return
 	}
-	respData := gin.H{
-		"data": collection,
-	}
-	httpbase.OK(ctx, respData)
+	httpbase.OK(ctx, collection)
 }
 
 // GetCollection godoc
@@ -134,11 +131,7 @@ func (c *CollectionHandler) GetCollection(ctx *gin.Context) {
 		return
 	}
 
-	respData := gin.H{
-		"data": collection,
-	}
-
-	httpbase.OK(ctx, respData)
+	httpbase.OK(ctx, collection)
 }
 
 // UpdateCollection godoc
@@ -182,11 +175,8 @@ func (c *CollectionHandler) UpdateCollection(ctx *gin.Context) {
 		httpbase.ServerError(ctx, err)
 		return
 	}
-	respData := gin.H{
-		"data": collection,
-	}
 
-	httpbase.OK(ctx, respData)
+	httpbase.OK(ctx, collection)
 }
 
 // DeleteCollection godoc
@@ -264,11 +254,7 @@ func (c *CollectionHandler) AddRepoToCollection(ctx *gin.Context) {
 		httpbase.ServerError(ctx, err)
 		return
 	}
-	respData := gin.H{
-		"msg": "success",
-	}
-
-	httpbase.OK(ctx, respData)
+	httpbase.OK(ctx, nil)
 }
 
 // RemoveRepoFromCollection godoc
@@ -312,11 +298,7 @@ func (c *CollectionHandler) RemoveRepoFromCollection(ctx *gin.Context) {
 		return
 	}
 
-	respData := gin.H{
-		"msg": "success",
-	}
-
-	httpbase.OK(ctx, respData)
+	httpbase.OK(ctx, nil)
 }
 
 func getCollectionFilter(ctx *gin.Context, filter *types.CollectionFilter) *types.CollectionFilter {
