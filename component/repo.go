@@ -1101,7 +1101,7 @@ func (c *RepoComponent) getUserRepoPermission(ctx context.Context, userName stri
 		}
 
 		return &types.UserRepoPermission{
-			CanRead:  r.CanRead(),
+			CanRead:  r.CanRead() || !repo.Private,
 			CanWrite: r.CanWrite(),
 			CanAdmin: r.CanAdmin(),
 		}, nil
