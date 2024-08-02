@@ -330,7 +330,7 @@ func (s *K8sHander) ServiceStatus(c *gin.Context) {
 		}
 		// for inference case: model loading case one pod is not ready
 		for _, instance := range resp.Instances {
-			if instance.Status == string(corev1.PodRunning) {
+			if instance.Status == string(corev1.PodRunning) || instance.Status == string(corev1.PodPending) {
 				resp.Code = common.Deploying
 				break
 			}
