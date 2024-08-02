@@ -8,6 +8,7 @@ import (
 
 	"opencsg.com/csghub-server/builder/git"
 	"opencsg.com/csghub-server/builder/git/gitserver"
+	"opencsg.com/csghub-server/builder/git/membership"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/types"
@@ -233,12 +234,16 @@ func (c *OrganizationComponent) Update(ctx context.Context, req *types.EditOrgRe
 
 func (c *OrganizationComponent) Models(ctx context.Context, req *types.OrgModelsReq) ([]types.Model, int, error) {
 	var resModels []types.Model
-	r, err := c.msc.GetMemberRole(ctx, req.Namespace, req.CurrentUser)
-	// log error, and treat user as unkown role in org
-	if err != nil {
-		slog.Error("faild to get member role",
-			slog.String("org", req.Namespace), slog.String("user", req.CurrentUser),
-			slog.String("error", err.Error()))
+	var err error
+	r := membership.RoleUnkown
+	if req.CurrentUser != "" {
+		r, err = c.msc.GetMemberRole(ctx, req.Namespace, req.CurrentUser)
+		// log error, and treat user as unkown role in org
+		if err != nil {
+			slog.Error("faild to get member role",
+				slog.String("org", req.Namespace), slog.String("user", req.CurrentUser),
+				slog.String("error", err.Error()))
+		}
 	}
 	onlyPublic := !r.CanRead()
 	ms, total, err := c.ms.ByOrgPath(ctx, req.Namespace, req.PageSize, req.Page, onlyPublic)
@@ -269,12 +274,16 @@ func (c *OrganizationComponent) Models(ctx context.Context, req *types.OrgModels
 
 func (c *OrganizationComponent) Datasets(ctx context.Context, req *types.OrgDatasetsReq) ([]types.Dataset, int, error) {
 	var resDatasets []types.Dataset
-	r, err := c.msc.GetMemberRole(ctx, req.Namespace, req.CurrentUser)
-	// log error, and treat user as unkown role in org
-	if err != nil {
-		slog.Error("faild to get member role",
-			slog.String("org", req.Namespace), slog.String("user", req.CurrentUser),
-			slog.String("error", err.Error()))
+	var err error
+	r := membership.RoleUnkown
+	if req.CurrentUser != "" {
+		r, err = c.msc.GetMemberRole(ctx, req.Namespace, req.CurrentUser)
+		// log error, and treat user as unkown role in org
+		if err != nil {
+			slog.Error("faild to get member role",
+				slog.String("org", req.Namespace), slog.String("user", req.CurrentUser),
+				slog.String("error", err.Error()))
+		}
 	}
 	onlyPublic := !r.CanRead()
 	datasets, total, err := c.ds.ByOrgPath(ctx, req.Namespace, req.PageSize, req.Page, onlyPublic)
@@ -305,12 +314,16 @@ func (c *OrganizationComponent) Datasets(ctx context.Context, req *types.OrgData
 
 func (c *OrganizationComponent) Codes(ctx context.Context, req *types.OrgCodesReq) ([]types.Code, int, error) {
 	var resCodes []types.Code
-	r, err := c.msc.GetMemberRole(ctx, req.Namespace, req.CurrentUser)
-	// log error, and treat user as unkown role in org
-	if err != nil {
-		slog.Error("faild to get member role",
-			slog.String("org", req.Namespace), slog.String("user", req.CurrentUser),
-			slog.String("error", err.Error()))
+	var err error
+	r := membership.RoleUnkown
+	if req.CurrentUser != "" {
+		r, err = c.msc.GetMemberRole(ctx, req.Namespace, req.CurrentUser)
+		// log error, and treat user as unkown role in org
+		if err != nil {
+			slog.Error("faild to get member role",
+				slog.String("org", req.Namespace), slog.String("user", req.CurrentUser),
+				slog.String("error", err.Error()))
+		}
 	}
 	onlyPublic := !r.CanRead()
 	codes, total, err := c.cs.ByOrgPath(ctx, req.Namespace, req.PageSize, req.Page, onlyPublic)
@@ -341,12 +354,16 @@ func (c *OrganizationComponent) Codes(ctx context.Context, req *types.OrgCodesRe
 
 func (c *OrganizationComponent) Spaces(ctx context.Context, req *types.OrgSpacesReq) ([]types.Space, int, error) {
 	var resSpaces []types.Space
-	r, err := c.msc.GetMemberRole(ctx, req.Namespace, req.CurrentUser)
-	// log error, and treat user as unkown role in org
-	if err != nil {
-		slog.Error("faild to get member role",
-			slog.String("org", req.Namespace), slog.String("user", req.CurrentUser),
-			slog.String("error", err.Error()))
+	var err error
+	r := membership.RoleUnkown
+	if req.CurrentUser != "" {
+		r, err = c.msc.GetMemberRole(ctx, req.Namespace, req.CurrentUser)
+		// log error, and treat user as unkown role in org
+		if err != nil {
+			slog.Error("faild to get member role",
+				slog.String("org", req.Namespace), slog.String("user", req.CurrentUser),
+				slog.String("error", err.Error()))
+		}
 	}
 	onlyPublic := !r.CanRead()
 	spaces, total, err := c.ss.ByOrgPath(ctx, req.Namespace, req.PageSize, req.Page, onlyPublic)
