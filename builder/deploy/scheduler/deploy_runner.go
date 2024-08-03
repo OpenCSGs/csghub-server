@@ -85,7 +85,7 @@ func (t *DeployRunner) Run(ctx context.Context) error {
 			SvcName:   t.task.Deploy.SvcName,
 			ClusterID: t.task.Deploy.ClusterID,
 		}
-		if t.task.Deploy.Type == 1 {
+		if t.task.Deploy.Type == 1 || t.task.Deploy.Type == 3 {
 			req.NeedDetails = true
 		}
 		timeoutCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
