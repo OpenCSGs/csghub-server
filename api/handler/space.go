@@ -22,12 +22,14 @@ func NewSpaceHandler(config *config.Config) (*SpaceHandler, error) {
 		return nil, err
 	}
 	return &SpaceHandler{
-		c: sc,
+		c:  sc,
+		sc: component.NewSensitiveComponent(config),
 	}, nil
 }
 
 type SpaceHandler struct {
-	c *component.SpaceComponent
+	c  *component.SpaceComponent
+	sc component.SensitiveChecker
 }
 
 // GetAllSpaces   godoc
@@ -149,6 +151,12 @@ func (h *SpaceHandler) Create(ctx *gin.Context) {
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
+	_, err := h.sc.CheckRequest(ctx, &req)
+	if err != nil {
+		slog.Error("failed to check sensitive request", slog.Any("error", err))
+		httpbase.BadRequest(ctx, fmt.Errorf("sensitive check failed: %w", err).Error())
+		return
+	}
 	req.Username = currentUser
 
 	space, err := h.c.Create(ctx, req)
@@ -186,6 +194,12 @@ func (h *SpaceHandler) Update(ctx *gin.Context) {
 	if err := ctx.ShouldBindJSON(&req); err != nil {
 		slog.Error("Bad request format", "error", err)
 		httpbase.BadRequest(ctx, err.Error())
+		return
+	}
+	_, err := h.sc.CheckRequest(ctx, req)
+	if err != nil {
+		slog.Error("failed to check sensitive request", slog.Any("error", err))
+		httpbase.BadRequest(ctx, fmt.Errorf("sensitive check failed: %w", err).Error())
 		return
 	}
 	req.Username = currentUser

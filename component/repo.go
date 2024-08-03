@@ -104,11 +104,6 @@ func NewRepoComponent(config *config.Config) (*RepoComponent, error) {
 	c.lfsBucket = config.S3.Bucket
 	c.userSvcClient = rpc.NewUserSvcHttpClient(fmt.Sprintf("%s:%d", config.User.Host, config.User.Port),
 		rpc.AuthWithApiKey(config.APIToken))
-	if err != nil {
-		newError := fmt.Errorf("fail to create membership component,error:%w", err)
-		slog.Error(newError.Error())
-		return nil, newError
-	}
 	c.runFrame = database.NewRuntimeFrameworksStore()
 	c.deploy = database.NewDeployTaskStore()
 	c.deployer = deploy.NewDeployer()
@@ -223,12 +218,6 @@ func (c *RepoComponent) UpdateRepo(ctx context.Context, req types.UpdateRepoReq)
 		}
 	}
 
-	if req.Nickname != nil {
-		repo.Nickname = *req.Nickname
-	}
-	if req.Description != nil {
-		repo.Description = *req.Description
-	}
 	if req.Private != nil {
 		repo.Private = *req.Private
 	}

@@ -2,6 +2,7 @@ package handler
 
 import (
 	"errors"
+	"fmt"
 	"log/slog"
 	"net/http"
 
@@ -10,6 +11,7 @@ import (
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/types"
 	"opencsg.com/csghub-server/common/utils/common"
+	apicomponent "opencsg.com/csghub-server/component"
 	"opencsg.com/csghub-server/user/component"
 )
 
@@ -19,12 +21,14 @@ func NewOrganizationHandler(config *config.Config) (*OrganizationHandler, error)
 		return nil, err
 	}
 	return &OrganizationHandler{
-		c: oc,
+		c:  oc,
+		sc: apicomponent.NewSensitiveComponent(config),
 	}, nil
 }
 
 type OrganizationHandler struct {
-	c *component.OrganizationComponent
+	c  *component.OrganizationComponent
+	sc apicomponent.SensitiveChecker
 }
 
 // CreateOrganization godoc
@@ -48,6 +52,14 @@ func (h *OrganizationHandler) Create(ctx *gin.Context) {
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
+	var err error
+	_, err = h.sc.CheckRequest(ctx, &req)
+	if err != nil {
+		slog.Error("failed to check sensitive request", slog.Any("error", err))
+		httpbase.BadRequest(ctx, fmt.Errorf("sensitive check failed: %w", err).Error())
+		return
+	}
+
 	req.Username = currentUser
 	org, err := h.c.Create(ctx, &req)
 	if err != nil {
@@ -174,6 +186,13 @@ func (h *OrganizationHandler) Update(ctx *gin.Context) {
 	if err := ctx.ShouldBindJSON(&req); err != nil {
 		slog.Error("Bad request format", "error", err)
 		httpbase.BadRequest(ctx, err.Error())
+		return
+	}
+	var err error
+	_, err = h.sc.CheckRequest(ctx, &req)
+	if err != nil {
+		slog.Error("failed to check sensitive request", slog.Any("error", err))
+		httpbase.BadRequest(ctx, fmt.Errorf("sensitive check failed: %w", err).Error())
 		return
 	}
 	req.CurrentUser = currentUser
