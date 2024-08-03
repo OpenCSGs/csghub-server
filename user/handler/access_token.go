@@ -2,6 +2,7 @@ package handler
 
 import (
 	"errors"
+	"fmt"
 	"log/slog"
 	"time"
 
@@ -9,6 +10,7 @@ import (
 	"opencsg.com/csghub-server/api/httpbase"
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/types"
+	apicomponent "opencsg.com/csghub-server/component"
 	"opencsg.com/csghub-server/user/component"
 )
 
@@ -18,12 +20,14 @@ func NewAccessTokenHandler(config *config.Config) (*AccessTokenHandler, error) {
 		return nil, err
 	}
 	return &AccessTokenHandler{
-		c: ac,
+		c:  ac,
+		sc: apicomponent.NewSensitiveComponent(config),
 	}, nil
 }
 
 type AccessTokenHandler struct {
-	c *component.AccessTokenComponent
+	c  *component.AccessTokenComponent
+	sc apicomponent.SensitiveChecker
 }
 
 // CreateAccessToken godoc
@@ -50,6 +54,13 @@ func (h *AccessTokenHandler) Create(ctx *gin.Context) {
 	if err := ctx.ShouldBindJSON(&req); err != nil {
 		slog.Error("Bad request format", "error", err)
 		httpbase.BadRequest(ctx, err.Error())
+		return
+	}
+	var err error
+	_, err = h.sc.CheckRequest(ctx, &req)
+	if err != nil {
+		slog.Error("failed to check sensitive request", slog.Any("error", err))
+		httpbase.BadRequest(ctx, fmt.Errorf("sensitive check failed: %w", err).Error())
 		return
 	}
 	if req.Application == "" {
@@ -96,6 +107,13 @@ func (h *AccessTokenHandler) CreateAppToken(ctx *gin.Context) {
 	if err := ctx.ShouldBindJSON(&req); err != nil {
 		slog.Error("Bad request format", "error", err)
 		httpbase.BadRequest(ctx, err.Error())
+		return
+	}
+	var err error
+	_, err = h.sc.CheckRequest(ctx, &req)
+	if err != nil {
+		slog.Error("failed to check sensitive request", slog.Any("error", err))
+		httpbase.BadRequest(ctx, fmt.Errorf("sensitive check failed: %w", err).Error())
 		return
 	}
 

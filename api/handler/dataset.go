@@ -24,12 +24,14 @@ func NewDatasetHandler(config *config.Config) (*DatasetHandler, error) {
 		return nil, err
 	}
 	return &DatasetHandler{
-		c: tc,
+		c:  tc,
+		sc: component.NewSensitiveComponent(config),
 	}, nil
 }
 
 type DatasetHandler struct {
-	c *component.DatasetComponent
+	c  *component.DatasetComponent
+	sc component.SensitiveChecker
 }
 
 // CreateDataset   godoc
@@ -55,6 +57,12 @@ func (h *DatasetHandler) Create(ctx *gin.Context) {
 	if err := ctx.ShouldBindJSON(&req); err != nil {
 		slog.Error("Bad request format", "error", err)
 		httpbase.BadRequest(ctx, err.Error())
+		return
+	}
+	_, err := h.sc.CheckRequest(ctx, req)
+	if err != nil {
+		slog.Error("failed to check sensitive request", slog.Any("error", err))
+		httpbase.BadRequest(ctx, fmt.Errorf("sensitive check failed: %w", err).Error())
 		return
 	}
 	req.Username = currentUser
@@ -157,6 +165,13 @@ func (h *DatasetHandler) Update(ctx *gin.Context) {
 	if err := ctx.ShouldBindJSON(&req); err != nil {
 		slog.Error("Bad request format", "error", err)
 		httpbase.BadRequest(ctx, err.Error())
+		return
+	}
+
+	_, err := h.sc.CheckRequest(ctx, req)
+	if err != nil {
+		slog.Error("failed to check sensitive request", slog.Any("error", err))
+		httpbase.BadRequest(ctx, fmt.Errorf("sensitive check failed: %w", err).Error())
 		return
 	}
 	req.Username = currentUser

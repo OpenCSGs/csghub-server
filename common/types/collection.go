@@ -53,6 +53,18 @@ type CreateCollectionReq struct {
 	Private     bool   `json:"private"`
 }
 
+func (c *CreateCollectionReq) SensName() string {
+	return c.Name
+}
+
+func (c *CreateCollectionReq) SensNickName() string {
+	return c.Nickname
+}
+
+func (c *CreateCollectionReq) SensDescription() string {
+	return c.Description
+}
+
 type CollectionFilter struct {
 	Sort   string
 	Search string

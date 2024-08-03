@@ -35,6 +35,27 @@ type UpdateUserRequest struct {
 	NewUserName *string `json:"new_username,omitempty"`
 }
 
+func (u *UpdateUserRequest) SensName() string {
+	if u.NewUserName != nil {
+		return *u.NewUserName
+	}
+	return ""
+}
+
+func (u *UpdateUserRequest) SensNickName() string {
+	if u.Nickname != nil {
+		return *u.Nickname
+	}
+	return ""
+}
+
+func (u *UpdateUserRequest) SensDescription() string {
+	if u.Bio != nil {
+		return *u.Bio
+	}
+	return ""
+}
+
 type UpdateUserResp struct {
 	Username string `json:"username"`
 	Email    string `json:"email"`
@@ -48,6 +69,18 @@ type CreateUserTokenRequest struct {
 	// default to empty, means full permission
 	Permission string    `json:"permission,omitempty"`
 	ExpiredAt  time.Time `json:"expired_at"`
+}
+
+func (c *CreateUserTokenRequest) SensName() string {
+	return c.TokenName
+}
+
+func (c *CreateUserTokenRequest) SensNickName() string {
+	return ""
+}
+
+func (c *CreateUserTokenRequest) SensDescription() string {
+	return ""
 }
 
 type CheckAccessTokenReq struct {

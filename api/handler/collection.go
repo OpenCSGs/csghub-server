@@ -10,23 +10,26 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"opencsg.com/csghub-server/api/httpbase"
+	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/types"
 	"opencsg.com/csghub-server/common/utils/common"
 	"opencsg.com/csghub-server/component"
 )
 
-func NewCollectionHandler() (*CollectionHandler, error) {
+func NewCollectionHandler(cfg *config.Config) (*CollectionHandler, error) {
 	cc, err := component.NewCollectionComponent()
 	if err != nil {
 		return nil, err
 	}
 	return &CollectionHandler{
 		cc: cc,
+		sc: component.NewSensitiveComponent(cfg),
 	}, nil
 }
 
 type CollectionHandler struct {
 	cc *component.CollectionComponent
+	sc component.SensitiveChecker
 }
 
 // GetCollections godoc
@@ -96,8 +99,16 @@ func (c *CollectionHandler) Create(ctx *gin.Context) {
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
+
+	_, err := c.sc.CheckRequest(ctx, req)
+	if err != nil {
+		slog.Error("failed to check sensitive request", slog.Any("error", err))
+		httpbase.BadRequest(ctx, fmt.Errorf("sensitive check failed: %w", err).Error())
+		return
+	}
+
 	req.Username = currentUser
-	var collection, err = c.cc.CreateCollection(ctx, *req)
+	collection, err := c.cc.CreateCollection(ctx, *req)
 	if err != nil {
 		slog.Error("Failed to create collection", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
@@ -157,6 +168,13 @@ func (c *CollectionHandler) UpdateCollection(ctx *gin.Context) {
 	if err := ctx.ShouldBindJSON(&req); err != nil {
 		slog.Error("Bad request format", "error", err)
 		httpbase.BadRequest(ctx, err.Error())
+		return
+	}
+
+	_, err := c.sc.CheckRequest(ctx, req)
+	if err != nil {
+		slog.Error("failed to check sensitive request", slog.Any("error", err))
+		httpbase.BadRequest(ctx, fmt.Errorf("sensitive check failed: %w", err).Error())
 		return
 	}
 

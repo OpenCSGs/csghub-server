@@ -21,12 +21,14 @@ func NewCodeHandler(config *config.Config) (*CodeHandler, error) {
 		return nil, err
 	}
 	return &CodeHandler{
-		c: tc,
+		c:  tc,
+		sc: component.NewSensitiveComponent(config),
 	}, nil
 }
 
 type CodeHandler struct {
-	c *component.CodeComponent
+	c  *component.CodeComponent
+	sc component.SensitiveChecker
 }
 
 // CreateCode   godoc
@@ -52,6 +54,13 @@ func (h *CodeHandler) Create(ctx *gin.Context) {
 	if err := ctx.ShouldBindJSON(&req); err != nil {
 		slog.Error("Bad request format", "error", err)
 		httpbase.BadRequest(ctx, err.Error())
+		return
+	}
+
+	_, err := h.sc.CheckRequest(ctx, req)
+	if err != nil {
+		slog.Error("failed to check sensitive request", slog.Any("error", err))
+		httpbase.BadRequest(ctx, fmt.Errorf("sensitive check failed: %w", err).Error())
 		return
 	}
 	req.Username = currentUser
@@ -154,6 +163,13 @@ func (h *CodeHandler) Update(ctx *gin.Context) {
 	if err := ctx.ShouldBindJSON(&req); err != nil {
 		slog.Error("Bad request format", "error", err)
 		httpbase.BadRequest(ctx, err.Error())
+		return
+	}
+
+	_, err := h.sc.CheckRequest(ctx, req)
+	if err != nil {
+		slog.Error("failed to check sensitive request", slog.Any("error", err))
+		httpbase.BadRequest(ctx, fmt.Errorf("sensitive check failed: %w", err).Error())
 		return
 	}
 	req.Username = currentUser

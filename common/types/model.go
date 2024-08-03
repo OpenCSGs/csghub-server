@@ -26,6 +26,28 @@ type UpdateRepoReq struct {
 	Private     *bool          `json:"private" example:"false"`
 }
 
+// make sure UpdateModelReq implements SensitiveRequest interface
+var _ SensitiveRequest = (*UpdateRepoReq)(nil)
+
+func (c *UpdateRepoReq) SensName() string {
+	//dont need to check as name can not change
+	return ""
+}
+
+func (c *UpdateRepoReq) SensNickName() string {
+	if c.Nickname == nil {
+		return ""
+	}
+	return *c.Nickname
+}
+
+func (c *UpdateRepoReq) SensDescription() string {
+	if c.Description == nil {
+		return ""
+	}
+	return *c.Description
+}
+
 type UpdateDownloadsReq struct {
 	Namespace  string `json:"namespace"`
 	Name       string `json:"name"`
@@ -60,6 +82,19 @@ type CreateRepoReq struct {
 	Readme        string         `json:"readme"`
 	DefaultBranch string         `json:"default_branch" example:"main"`
 	RepoType      RepositoryType `json:"-"`
+}
+
+// make sure CreateRepoReq implements SensitiveRequest
+var _ SensitiveRequest = (*CreateRepoReq)(nil)
+
+func (c *CreateRepoReq) SensName() string {
+	return c.Name
+}
+func (c *CreateRepoReq) SensNickName() string {
+	return c.Nickname
+}
+func (c *CreateRepoReq) SensDescription() string {
+	return c.Description
 }
 
 type DeleteRepoReq struct {
@@ -152,12 +187,36 @@ type ModelRunReq struct {
 	SecureLevel        int    `json:"secure_level"`
 }
 
+func (c *ModelRunReq) SensName() string {
+	return c.DeployName
+}
+
+func (c *ModelRunReq) SensNickName() string {
+	return ""
+}
+
+func (c *ModelRunReq) SensDescription() string {
+	return ""
+}
+
 type InstanceRunReq struct {
 	DeployName         string `json:"deploy_name"`
 	ClusterID          string `json:"cluster_id"`
 	ResourceID         int64  `json:"resource_id"`
 	RuntimeFrameworkID int64  `json:"runtime_framework_id"`
 	Revision           string `json:"revision"`
+}
+
+func (c *InstanceRunReq) SensName() string {
+	return c.DeployName
+}
+
+func (c *InstanceRunReq) SensNickName() string {
+	return ""
+}
+
+func (c *InstanceRunReq) SensDescription() string {
+	return ""
 }
 
 type ModelUpdateRequest struct {

@@ -10,11 +10,13 @@ import (
 	"opencsg.com/csghub-server/api/httpbase"
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/types"
+	apicomponent "opencsg.com/csghub-server/component"
 	"opencsg.com/csghub-server/user/component"
 )
 
 type UserHandler struct {
 	c                        *component.UserComponent
+	sc                       apicomponent.SensitiveChecker
 	publicDomain             string
 	EnableHTTPS              bool
 	signinSuccessRedirectURL string
@@ -27,6 +29,7 @@ func NewUserHandler(config *config.Config) (*UserHandler, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to create user component: %w", err)
 	}
+	h.sc = apicomponent.NewSensitiveComponent(config)
 	domainParsedUrl, err := url.Parse(config.APIServer.PublicDomain)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse public domain '%s': %w", config.APIServer.PublicDomain, err)
@@ -92,10 +95,17 @@ func (h *UserHandler) Update(ctx *gin.Context) {
 		return
 	}
 
+	var err error
+	_, err = h.sc.CheckRequest(ctx, req)
+	if err != nil {
+		slog.Error("failed to check sensitive request", slog.Any("error", err))
+		httpbase.BadRequest(ctx, fmt.Errorf("sensitive check failed: %w", err).Error())
+		return
+	}
+
 	userName := ctx.Param("username")
 	req.Username = userName
 
-	var err error
 	if req.NewUserName != nil {
 		err = h.c.ChangeUserName(ctx, req.Username, *req.NewUserName, currentUser)
 	} else {
