@@ -13,6 +13,18 @@ type CreateOrgReq struct {
 	OrgType     string `json:"org_type" example:"company or school etc"`
 }
 
+func (c *CreateOrgReq) SensName() string {
+	return c.Name
+}
+
+func (c *CreateOrgReq) SensNickName() string {
+	return c.Nickname
+}
+
+func (c *CreateOrgReq) SensDescription() string {
+	return c.Description
+}
+
 type EditOrgReq struct {
 	// Display name
 	Nickname    *string `json:"nickname" example:"org display name"`
@@ -25,6 +37,25 @@ type EditOrgReq struct {
 	Verified    *bool   `json:"verified" example:"false"`
 	OrgType     *string `json:"org_type" example:"company or school etc"`
 	CurrentUser string  `json:"-"`
+}
+
+func (e *EditOrgReq) SensName() string {
+	//skip check as name can not change
+	return ""
+}
+
+func (e *EditOrgReq) SensNickName() string {
+	if e.Nickname == nil {
+		return ""
+	}
+	return *e.Nickname
+}
+
+func (e *EditOrgReq) SensDescription() string {
+	if e.Description == nil {
+		return ""
+	}
+	return *e.Description
 }
 
 type DeleteOrgReq struct {

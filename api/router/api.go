@@ -238,7 +238,7 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 
 	}
 
-	collectionHandler, err := handler.NewCollectionHandler()
+	collectionHandler, err := handler.NewCollectionHandler(config)
 	if err != nil {
 		return nil, fmt.Errorf("error creating collection handler:%w", err)
 	}
