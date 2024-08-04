@@ -17,3 +17,7 @@ func (c *CreateSSHKeyRequest) SensNickName() string {
 func (c *CreateSSHKeyRequest) SensDescription() string {
 	return ""
 }
+
+func (c *CreateSSHKeyRequest) SensHomepage() string {
+	return ""
+}

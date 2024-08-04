@@ -4,6 +4,7 @@ type SensitiveRequest interface {
 	SensName() string
 	SensNickName() string
 	SensDescription() string
+	SensHomepage() string
 }
 
 var _ SensitiveRequest = (*UpdateRepoReq)(nil)

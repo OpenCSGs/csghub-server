@@ -65,6 +65,10 @@ func (c *CreateCollectionReq) SensDescription() string {
 	return c.Description
 }
 
+func (c *CreateCollectionReq) SensHomepage() string {
+	return ""
+}
+
 type CollectionFilter struct {
 	Sort   string
 	Search string
