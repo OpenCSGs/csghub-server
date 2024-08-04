@@ -201,7 +201,7 @@ func (h *MemberHandler) Delete(ctx *gin.Context) {
 // @Success      200  {object}  string "OK"
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
-// @Router       /organization/{name}/members/{username} [get]
+// @Router       /organization/{namespace}/members/{username} [get]
 func (h *MemberHandler) GetMemberRole(ctx *gin.Context) {
 	org := ctx.Param("namespace")
 	userName := ctx.Param("username")
