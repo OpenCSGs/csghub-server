@@ -89,6 +89,17 @@ func (cc *SensitiveComponent) CheckRequest(ctx context.Context, req types.Sensit
 			return false, errors.New("found sensitive words in description")
 		}
 	}
+	if req.SensHomepage() != "" {
+		pass, err := cc.checker.PassTextCheck(ctx, sensitive.ScenarioChatDetection, req.SensHomepage())
+		if err != nil {
+			slog.Error("fail to check homepage sensitivity", slog.String("homepage", req.SensHomepage()), slog.Any("error", err))
+			return false, fmt.Errorf("fail to check homepage sensitivity, error: %w", err)
+		}
+		if !pass {
+			slog.Error("found sensitive words in homepage", slog.String("homepage", req.SensHomepage()))
+			return false, errors.New("found sensitive words in homepage")
+		}
+	}
 
 	return true, nil
 }

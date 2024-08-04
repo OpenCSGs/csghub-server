@@ -56,6 +56,13 @@ func (u *UpdateUserRequest) SensDescription() string {
 	return ""
 }
 
+func (u *UpdateUserRequest) SensHomepage() string {
+	if u.Homepage != nil {
+		return *u.Homepage
+	}
+	return ""
+}
+
 type UpdateUserResp struct {
 	Username string `json:"username"`
 	Email    string `json:"email"`
@@ -80,6 +87,10 @@ func (c *CreateUserTokenRequest) SensNickName() string {
 }
 
 func (c *CreateUserTokenRequest) SensDescription() string {
+	return ""
+}
+
+func (c *CreateUserTokenRequest) SensHomepage() string {
 	return ""
 }
 

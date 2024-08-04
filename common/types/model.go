@@ -48,6 +48,10 @@ func (c *UpdateRepoReq) SensDescription() string {
 	return *c.Description
 }
 
+func (c *UpdateRepoReq) SensHomepage() string {
+	return ""
+}
+
 type UpdateDownloadsReq struct {
 	Namespace  string `json:"namespace"`
 	Name       string `json:"name"`
@@ -95,6 +99,10 @@ func (c *CreateRepoReq) SensNickName() string {
 }
 func (c *CreateRepoReq) SensDescription() string {
 	return c.Description
+}
+
+func (c *CreateRepoReq) SensHomepage() string {
+	return ""
 }
 
 type DeleteRepoReq struct {
@@ -199,6 +207,10 @@ func (c *ModelRunReq) SensDescription() string {
 	return ""
 }
 
+func (c *ModelRunReq) SensHomepage() string {
+	return ""
+}
+
 type InstanceRunReq struct {
 	DeployName         string `json:"deploy_name"`
 	ClusterID          string `json:"cluster_id"`
@@ -216,6 +228,10 @@ func (c *InstanceRunReq) SensNickName() string {
 }
 
 func (c *InstanceRunReq) SensDescription() string {
+	return ""
+}
+
+func (c *InstanceRunReq) SensHomepage() string {
 	return ""
 }
 

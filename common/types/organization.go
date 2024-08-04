@@ -25,6 +25,10 @@ func (c *CreateOrgReq) SensDescription() string {
 	return c.Description
 }
 
+func (c *CreateOrgReq) SensHomepage() string {
+	return c.Homepage
+}
+
 type EditOrgReq struct {
 	// Display name
 	Nickname    *string `json:"nickname" example:"org display name"`
@@ -56,6 +60,13 @@ func (e *EditOrgReq) SensDescription() string {
 		return ""
 	}
 	return *e.Description
+}
+
+func (e *EditOrgReq) SensHomepage() string {
+	if e.Homepage == nil {
+		return ""
+	}
+	return *e.Homepage
 }
 
 type DeleteOrgReq struct {
