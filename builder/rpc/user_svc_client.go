@@ -27,7 +27,7 @@ func NewUserSvcHttpClient(endpoint string, opts ...RequestOption) UserSvcClient 
 
 func (c *UserSvcHttpClient) GetMemberRole(ctx context.Context, orgName, userName string) (membership.Role, error) {
 	// write code to call user service api "/api/v1/organization/{orgName}/members/{userName}"
-	url := fmt.Sprintf("/api/v1/organization/%s/members/%s", orgName, userName)
+	url := fmt.Sprintf("/api/v1/organization/%s/members/%s?current_user=%s", orgName, userName, userName)
 	var r httpbase.R
 	r.Data = membership.RoleUnkown
 	err := c.hc.Get(ctx, url, &r)

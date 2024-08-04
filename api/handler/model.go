@@ -101,6 +101,7 @@ func (h *ModelHandler) Index(ctx *gin.Context) {
 // @Tags         Model
 // @Accept       json
 // @Produce      json
+// @Param        current_user query string false "current user"
 // @Param        body body types.CreateModelReq true "body"
 // @Success      200  {object}  types.Response{data=database.Model} "OK"
 // @Failure      400  {object}  types.APIBadRequest "Bad request"

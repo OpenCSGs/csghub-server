@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"net/url"
 )
 
 func NewHttpClient(endpoint string, opts ...RequestOption) *HttpClient {
@@ -23,10 +22,7 @@ type HttpClient struct {
 }
 
 func (c *HttpClient) Get(ctx context.Context, path string, outObj interface{}) error {
-	path, err := url.JoinPath(c.endpoint, path)
-	if err != nil {
-		return fmt.Errorf("failed to join path: %w", err)
-	}
+	path = fmt.Sprintf("%s%s", c.endpoint, path)
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, path, nil)
 	if err != nil {
 		return fmt.Errorf("failed to create request: %w", err)

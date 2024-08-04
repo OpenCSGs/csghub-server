@@ -36,7 +36,7 @@ var fixOrgDataCmd = &cobra.Command{
 		orgComponent, _ := component.NewOrganizationComponent(cfg)
 
 		// get all organizations
-		orgs, err = os.Index(ctx, "")
+		orgs, err = os.GetUserOwnOrgs(ctx, "")
 		for _, org := range orgs {
 			req := new(types.CreateOrgReq)
 			req.Name = org.Name

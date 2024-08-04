@@ -126,7 +126,7 @@ func (c *OrganizationComponent) Create(ctx context.Context, req *types.CreateOrg
 }
 
 func (c *OrganizationComponent) Index(ctx context.Context, username string) ([]types.Organization, error) {
-	dborgs, err := c.os.Index(ctx, username)
+	dborgs, err := c.os.GetUserOwnOrgs(ctx, username)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get organizations, error: %w", err)
 	}

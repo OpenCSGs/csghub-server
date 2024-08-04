@@ -2,7 +2,9 @@ package component
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"log/slog"
 
 	"opencsg.com/csghub-server/builder/sensitive"
 	"opencsg.com/csghub-server/common/config"
@@ -57,28 +59,34 @@ func (cc *SensitiveComponent) CheckRequest(ctx context.Context, req types.Sensit
 	if req.SensName() != "" {
 		pass, err := cc.checker.PassTextCheck(ctx, sensitive.ScenarioNicknameDetection, req.SensName())
 		if err != nil {
-			return false, fmt.Errorf("fail to check name sensitivity, name: %s, error: %w", req.SensName(), err)
+			slog.Error("fail to check name sensitivity", slog.String("name", req.SensName()), slog.Any("error", err))
+			return false, fmt.Errorf("fail to check name sensitivity, error: %w", err)
 		}
 		if !pass {
-			return false, fmt.Errorf("found sensitive words in name: %s", req.SensName())
+			slog.Error("found sensitive words in name", slog.String("name", req.SensName()))
+			return false, fmt.Errorf("found sensitive words in name")
 		}
 	}
 	if req.SensNickName() != "" {
 		pass, err := cc.checker.PassTextCheck(ctx, sensitive.ScenarioNicknameDetection, req.SensNickName())
 		if err != nil {
-			return false, fmt.Errorf("fail to check nick name sensitivity, name: %s, error: %w", req.SensNickName(), err)
+			slog.Error("fail to check nick name sensitivity", slog.String("nick_name", req.SensNickName()), slog.Any("error", err))
+			return false, fmt.Errorf("fail to check nick name sensitivity, error: %w", err)
 		}
 		if !pass {
-			return false, fmt.Errorf("found sensitive words in nick name: %s", req.SensNickName())
+			slog.Error("found sensitive words in nick name", slog.String("nick_name", req.SensNickName()))
+			return false, fmt.Errorf("found sensitive words in nick name")
 		}
 	}
 	if req.SensDescription() != "" {
 		pass, err := cc.checker.PassTextCheck(ctx, sensitive.ScenarioCommentDetection, req.SensDescription())
 		if err != nil {
-			return false, fmt.Errorf("fail to check description sensitivity, description: %s, error: %w", req.SensDescription(), err)
+			slog.Error("fail to check description sensitivity", slog.String("description", req.SensDescription()), slog.Any("error", err))
+			return false, fmt.Errorf("fail to check description sensitivity, error: %w", err)
 		}
 		if !pass {
-			return false, fmt.Errorf("found sensitive words in description: %s", req.SensDescription())
+			slog.Error("found sensitive words in description", slog.String("description", req.SensDescription()))
+			return false, errors.New("found sensitive words in description")
 		}
 	}
 
