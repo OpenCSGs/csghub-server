@@ -72,7 +72,6 @@ func NewRouter(config *config.Config) (*gin.Engine, error) {
 	//internal only
 	{
 		//organization
-		apiV1Group.GET("/organization/:namespace/members/:username", needAPIKey, memberCtrl.GetMemberRole)
 		//namespace
 		apiV1Group.GET("/namespace/:path", needAPIKey, nsCtrl.GetInfo)
 		//jwt
@@ -104,6 +103,7 @@ func NewRouter(config *config.Config) (*gin.Engine, error) {
 	}
 	// routers for members
 	{
+		apiV1Group.GET("/organization/:namespace/members/:username", userMatch, memberCtrl.GetMemberRole)
 		apiV1Group.POST("/organization/:namespace/members", memberCtrl.Create)
 		apiV1Group.PUT("/organization/:namespace/members/:username", memberCtrl.Update)
 		apiV1Group.DELETE("/organization/:namespace/members/:username", memberCtrl.Delete)

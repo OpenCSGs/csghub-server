@@ -48,7 +48,7 @@ func (s *OrgStore) Create(ctx context.Context, org *Organization, namepace *Name
 	return
 }
 
-func (s *OrgStore) Index(ctx context.Context, username string) (orgs []Organization, err error) {
+func (s *OrgStore) GetUserOwnOrgs(ctx context.Context, username string) (orgs []Organization, err error) {
 	query := s.db.Operator.Core.
 		NewSelect().
 		Model(&orgs).
@@ -113,5 +113,15 @@ func (s *OrgStore) Exists(ctx context.Context, path string) (exists bool, err er
 	if err != nil {
 		return
 	}
+	return
+}
+
+func (s *OrgStore) GetUserBelongOrgs(ctx context.Context, userID int64) (orgs []Organization, err error) {
+	err = s.db.Operator.Core.
+		NewSelect().
+		Model(&orgs).
+		Join("join members on members.organization_id = organization.id").
+		Where("members.user_id = ?", userID).
+		Scan(ctx, &orgs)
 	return
 }

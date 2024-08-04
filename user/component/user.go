@@ -374,7 +374,7 @@ func (c *UserComponent) Get(ctx context.Context, userName, visitorName string) (
 		u.Roles = dbuser.Roles()
 	}
 
-	dborgs, err := c.os.Index(ctx, dbuser.Username)
+	dborgs, err := c.os.GetUserBelongOrgs(ctx, dbuser.ID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get orgs for user %s,error:%w", dbuser.Username, err)
 	}

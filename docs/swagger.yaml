@@ -4940,6 +4940,10 @@ paths:
       - application/json
       description: create a new model
       parameters:
+      - description: current user
+        in: query
+        name: current_user
+        type: string
       - description: body
         in: body
         name: body
@@ -6054,45 +6058,6 @@ paths:
       tags:
       - Namespace
       - InternalOnly
-  /organization/{name}/members/{username}:
-    get:
-      consumes:
-      - application/json
-      parameters:
-      - description: org name
-        in: path
-        name: namespace
-        required: true
-        type: string
-      - description: user name
-        in: path
-        name: username
-        required: true
-        type: string
-      - description: the op user
-        in: query
-        name: current_user
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            type: string
-        "400":
-          description: Bad request
-          schema:
-            $ref: '#/definitions/types.APIBadRequest'
-        "500":
-          description: Internal server error
-          schema:
-            $ref: '#/definitions/types.APIInternalServerError'
-      security:
-      - ApiKey: []
-      summary: Get user's role in an org
-      tags:
-      - Member
   /organization/{namespace}:
     delete:
       consumes:
@@ -6453,6 +6418,44 @@ paths:
       security:
       - ApiKey: []
       summary: Remove membership between org and user
+      tags:
+      - Member
+    get:
+      consumes:
+      - application/json
+      parameters:
+      - description: org name
+        in: path
+        name: namespace
+        required: true
+        type: string
+      - description: user name
+        in: path
+        name: username
+        required: true
+        type: string
+      - description: the op user
+        in: query
+        name: current_user
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            type: string
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Get user's role in an org
       tags:
       - Member
     put:
