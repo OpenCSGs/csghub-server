@@ -410,13 +410,13 @@ func createModelRoutes(config *config.Config, apiGroup *gin.RouterGroup, needAPI
 
 		// deploy model as serverless
 		modelsGroup.GET("/:namespace/:name/serverless", middleware.RepoType(types.ModelRepo), modelHandler.GetDeployServerless)
-		modelsGroup.POST("/:namespace/:name/serverless", needAPIKey, middleware.RepoType(types.ModelRepo), modelHandler.DeployServerless)
-		modelsGroup.PUT("/:namespace/:name/serverless/:id/start", needAPIKey, middleware.RepoType(types.ModelRepo), modelHandler.ServerlessStart)
-		modelsGroup.PUT("/:namespace/:name/serverless/:id/stop", needAPIKey, middleware.RepoType(types.ModelRepo), modelHandler.ServerlessStop)
-		modelsGroup.GET("/:namespace/:name/serverless/:id", needAPIKey, middleware.RepoType(types.ModelRepo), repoCommonHandler.ServerlessDetail)
-		modelsGroup.GET("/:namespace/:name/serverless/:id/status", needAPIKey, middleware.RepoType(types.ModelRepo), repoCommonHandler.ServerlessStatus)
-		modelsGroup.GET("/:namespace/:name/serverless/:id/logs/:instance", needAPIKey, middleware.RepoType(types.ModelRepo), repoCommonHandler.ServerlessLogs)
-		modelsGroup.PUT("/:namespace/:name/serverless/:id", needAPIKey, middleware.RepoType(types.ModelRepo), repoCommonHandler.ServerlessUpdate)
+		modelsGroup.POST("/:namespace/:name/serverless", middleware.RepoType(types.ModelRepo), modelHandler.DeployServerless)
+		modelsGroup.PUT("/:namespace/:name/serverless/:id/start", middleware.RepoType(types.ModelRepo), modelHandler.ServerlessStart)
+		modelsGroup.PUT("/:namespace/:name/serverless/:id/stop", middleware.RepoType(types.ModelRepo), modelHandler.ServerlessStop)
+		modelsGroup.GET("/:namespace/:name/serverless/:id", middleware.RepoType(types.ModelRepo), repoCommonHandler.ServerlessDetail)
+		modelsGroup.GET("/:namespace/:name/serverless/:id/status", middleware.RepoType(types.ModelRepo), repoCommonHandler.ServerlessStatus)
+		modelsGroup.GET("/:namespace/:name/serverless/:id/logs/:instance", middleware.RepoType(types.ModelRepo), repoCommonHandler.ServerlessLogs)
+		modelsGroup.PUT("/:namespace/:name/serverless/:id", middleware.RepoType(types.ModelRepo), repoCommonHandler.ServerlessUpdate)
 	}
 }
 
