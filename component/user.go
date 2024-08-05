@@ -578,10 +578,14 @@ func (c *UserComponent) ListInstances(ctx context.Context, req *types.UserRepoRe
 }
 
 func (c *UserComponent) ListServerless(ctx context.Context, req types.DeployReq) ([]types.DeployRepo, int, error) {
-	_, err := c.us.FindByUsername(ctx, req.CurrentUser)
+	user, err := c.us.FindByUsername(ctx, req.CurrentUser)
 	if err != nil {
 		newError := fmt.Errorf("failed to check for the presence of the user:%s, error:%w", req.CurrentUser, err)
 		return nil, 0, newError
+	}
+	isAdmin := c.repoComponent.isAdminRole(user)
+	if !isAdmin {
+		return nil, 0, fmt.Errorf("user %s does not have admin privileges", req.CurrentUser)
 	}
 	deploys, total, err := c.deploy.ListServerless(ctx, req)
 	if err != nil {

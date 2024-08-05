@@ -1837,15 +1837,18 @@ func (c *RepoComponent) AllowAccessDeploy(ctx context.Context, req types.DeployA
 	if err != nil {
 		return false, fmt.Errorf("failed to find repo, error: %w", err)
 	}
+	if repo == nil {
+		return false, fmt.Errorf("failed to find %s repo %s/%s", req.RepoType, req.Namespace, req.Name)
+	}
 	deploy, err := c.deploy.GetDeployByID(ctx, req.DeployID)
 	if err != nil {
 		return false, err
 	}
 	if deploy == nil {
-		return false, fmt.Errorf("ail to get deploy by ID: %v", req.DeployID)
+		return false, fmt.Errorf("fail to get deploy by ID: %v", req.DeployID)
 	}
 	if req.DeployType == types.ServerlessType {
-		return c.checkAccessDeployForServerless(repo.ID, deploy)
+		return c.checkAccessDeployForServerless(ctx, repo.ID, req.CurrentUser, deploy)
 	} else {
 		return c.checkAccessDeployForUser(ctx, repo.ID, req.CurrentUser, deploy)
 	}
@@ -1868,7 +1871,15 @@ func (c *RepoComponent) checkAccessDeployForUser(ctx context.Context, repoID int
 	return true, nil
 }
 
-func (c *RepoComponent) checkAccessDeployForServerless(repoID int64, deploy *database.Deploy) (bool, error) {
+func (c *RepoComponent) checkAccessDeployForServerless(ctx context.Context, repoID int64, currentUser string, deploy *database.Deploy) (bool, error) {
+	user, err := c.user.FindByUsername(ctx, currentUser)
+	if err != nil {
+		return false, fmt.Errorf("user %s does not exist", currentUser)
+	}
+	isAdmin := c.isAdminRole(user)
+	if !isAdmin {
+		return false, errors.New("need admin permission to see Serverless deploy instances")
+	}
 	if deploy.RepoID != repoID {
 		// deny access for invalid repo
 		return false, errors.New("invalid deploy found")
@@ -2034,12 +2045,9 @@ func (c *RepoComponent) checkDeployPermissionForServerless(ctx context.Context, 
 	if err != nil {
 		return nil, nil, fmt.Errorf("user does not exist, %w", err)
 	}
-	isAdmin, err := c.isAdminRole(user)
-	if err != nil {
-		return nil, nil, fmt.Errorf("fail to check user role, %w", err)
-	}
+	isAdmin := c.isAdminRole(user)
 	if !isAdmin {
-		return nil, nil, fmt.Errorf("do not allowed for user, %w", err)
+		return nil, nil, fmt.Errorf("need admin permission for Serverless deploy")
 	}
 	deploy, err := c.deploy.GetDeployByID(ctx, deployReq.DeployID)
 	if err != nil {
@@ -2166,8 +2174,7 @@ func (c *RepoComponent) AllFiles(ctx context.Context, req types.GetAllFilesReq) 
 	return allFiles, nil
 }
 
-func (c *RepoComponent) isAdminRole(user database.User) (bool, error) {
+func (c *RepoComponent) isAdminRole(user database.User) bool {
 	slog.Debug("Check if user is admin", slog.Any("user", user))
-	// todo: check user role and return if is admin
-	return true, nil
+	return user.CanAdmin()
 }

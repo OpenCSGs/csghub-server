@@ -1444,6 +1444,10 @@ func (h *RepoHandler) DeployInstanceLogs(ctx *gin.Context) {
 	}
 
 	currentUser := httpbase.GetCurrentUser(ctx)
+	if currentUser == "" {
+		httpbase.UnauthorizedError(ctx, errors.New("user not found, please login first"))
+		return
+	}
 	repoType := common.RepoTypeFromContext(ctx)
 	deployID, err := strconv.ParseInt(ctx.Param("id"), 10, 64)
 	if err != nil {
@@ -1478,6 +1482,7 @@ func (h *RepoHandler) DeployInstanceLogs(ctx *gin.Context) {
 		if errors.As(err, &pErr) {
 			httpbase.UnauthorizedError(ctx, err)
 		} else {
+			slog.Error("Failed to get deploy instance logs", slog.Any("logReq", logReq), slog.Any("error", err))
 			httpbase.ServerError(ctx, err)
 		}
 		return
@@ -1923,6 +1928,10 @@ func (h *RepoHandler) ServerlessLogs(ctx *gin.Context) {
 	}
 
 	currentUser := httpbase.GetCurrentUser(ctx)
+	if currentUser == "" {
+		httpbase.UnauthorizedError(ctx, errors.New("user not found, please login first"))
+		return
+	}
 	repoType := common.RepoTypeFromContext(ctx)
 	deployID, err := strconv.ParseInt(ctx.Param("id"), 10, 64)
 	if err != nil {
@@ -1953,7 +1962,13 @@ func (h *RepoHandler) ServerlessLogs(ctx *gin.Context) {
 	// user http request context instead of gin context, so that server knows the life cycle of the request
 	logReader, err := h.c.DeployInstanceLogs(ctx.Request.Context(), logReq)
 	if err != nil {
-		httpbase.ServerError(ctx, err)
+		var pErr *types.PermissionError
+		if errors.As(err, &pErr) {
+			httpbase.UnauthorizedError(ctx, err)
+		} else {
+			slog.Error("Failed to get deploy instance logs", slog.Any("logReq", logReq), slog.Any("error", err))
+			httpbase.ServerError(ctx, err)
+		}
 		return
 	}
 
@@ -2030,8 +2045,8 @@ func (h *RepoHandler) ServerlessStatus(ctx *gin.Context) {
 
 	allow, err := h.c.AllowAccessDeploy(ctx, statusReq)
 	if err != nil {
-		slog.Error("failed to check user permission", "error", err)
-		httpbase.ServerError(ctx, errors.New("failed to check user permission"))
+		slog.Error("failed to check user permission", slog.Any("error", err))
+		httpbase.ServerError(ctx, fmt.Errorf("failed to check user permission, %w", err))
 		return
 	}
 

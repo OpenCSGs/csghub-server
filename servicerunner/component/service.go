@@ -3,6 +3,7 @@ package component
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"path"
 	"strconv"
 
@@ -165,34 +166,12 @@ func (s *ServiceComponent) GetServicePodsWithStatus(ctx context.Context, cluster
 		podInstances = append(podInstances,
 			types.Instance{
 				Name:   pod.Name,
-				Status: s.GetPodStatus(pod.Status.ContainerStatuses),
+				Status: string(pod.Status.Phase),
 			},
 		)
+		slog.Debug("pod", slog.Any("pod.Name", pod.Name), slog.Any("pod.Status.Phase", pod.Status.Phase))
 	}
-
 	return podInstances, nil
-}
-
-func (s *ServiceComponent) GetPodStatus(containerStatuses []corev1.ContainerStatus) string {
-	// get knative user-container status
-	status := string(corev1.PodFailed)
-	for _, container := range containerStatuses {
-		if container.Name == "user-container" {
-			if container.Ready && container.State.Running != nil {
-				status = string(corev1.PodRunning)
-				return status
-			}
-			if !container.Ready && container.State.Waiting != nil {
-				status = container.State.Waiting.Reason
-				return status
-			}
-			if !container.Ready && container.State.Terminated != nil {
-				status = container.State.Terminated.Reason
-				return status
-			}
-		}
-	}
-	return status
 }
 
 func (s *ServiceComponent) GenerateResources(hardware types.HardWare) (map[corev1.ResourceName]resource.Quantity, map[string]string) {
