@@ -126,10 +126,8 @@ func GetNodeResources(clientset *kubernetes.Clientset, config *config.Config) (m
 	nodeResourcesMap := make(map[string]types.NodeResourceInfo)
 
 	for _, node := range nodes.Items {
-		usedMem := getMem(node.Status.Allocatable.Memory().Value())
 		totalMem := getMem(node.Status.Capacity.Memory().Value())
 		totalCPU := node.Status.Capacity.Cpu().MilliValue()
-		allocatableCPU := node.Status.Allocatable.Cpu().MilliValue()
 		totalGPU, found := node.Status.Capacity["nvidia.com/gpu"]
 		if !found {
 			totalGPU = resource.Quantity{}
@@ -143,12 +141,12 @@ func GetNodeResources(clientset *kubernetes.Clientset, config *config.Config) (m
 		nodeResourcesMap[node.Name] = types.NodeResourceInfo{
 			NodeName:     node.Name,
 			TotalCPU:     millicoresToCores(totalCPU),
-			UsedCPU:      millicoresToCores(allocatableCPU),
+			AvailableCPU: millicoresToCores(totalCPU),
 			GPUModel:     gpuModel,
 			GPUVendor:    gpuModelVendor[0],
 			TotalGPU:     parseQuantityToInt64(totalGPU),
 			AvailableGPU: parseQuantityToInt64(totalGPU),
-			AvailableMem: (totalMem - usedMem),
+			AvailableMem: totalMem,
 			TotalMem:     totalMem,
 		}
 	}
@@ -161,6 +159,12 @@ func GetNodeResources(clientset *kubernetes.Clientset, config *config.Config) (m
 		for _, container := range pod.Spec.Containers {
 			if requestedGPU, hasGPU := container.Resources.Requests["nvidia.com/gpu"]; hasGPU {
 				nodeResource.AvailableGPU -= parseQuantityToInt64(requestedGPU)
+			}
+			if memoryRequest, hasMemory := container.Resources.Requests[v1.ResourceMemory]; hasMemory {
+				nodeResource.AvailableMem -= getMem(parseQuantityToInt64(memoryRequest))
+			}
+			if cpuRequest, hasCPU := container.Resources.Requests[v1.ResourceCPU]; hasCPU {
+				nodeResource.AvailableCPU -= millicoresToCores(parseQuantityToInt64(cpuRequest))
 			}
 		}
 
