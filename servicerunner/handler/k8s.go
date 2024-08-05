@@ -335,7 +335,7 @@ func (s *K8sHander) ServiceStatus(c *gin.Context) {
 				break
 			}
 		}
-		slog.Info("get image status success", slog.String("srv_name", srvName), slog.Any("resp", resp))
+		slog.Info("service status is failed", slog.String("srv_name", srvName), slog.Any("resp", resp))
 		c.JSON(http.StatusOK, resp)
 		return
 	}
@@ -343,14 +343,14 @@ func (s *K8sHander) ServiceStatus(c *gin.Context) {
 	if srv.IsReady() {
 		podNames, err := s.GetServicePods(c.Request.Context(), *cluster, srvName, s.k8sNameSpace, 1)
 		if err != nil {
-			slog.Error("get image status failed, cantnot get pods info", slog.String("srv_name", srvName), slog.Any("error", err))
+			slog.Error("get image status failed, can not get pods info", slog.String("srv_name", srvName), slog.Any("error", err))
 			c.JSON(http.StatusInternalServerError, gin.H{"code": 0, "message": "unkown service status, failed to get pods"})
 			return
 		}
 		if len(podNames) == 0 {
 			resp.Code = common.Sleeping
 			resp.Message = "service sleeping, no running pods"
-			slog.Info("get image status success", slog.String("srv_name", srvName), slog.Any("resp", resp))
+			slog.Debug("get image status success", slog.String("srv_name", srvName), slog.Any("resp", resp))
 			c.JSON(http.StatusOK, resp)
 			return
 		}
@@ -358,11 +358,11 @@ func (s *K8sHander) ServiceStatus(c *gin.Context) {
 		resp.Code = common.Running
 		resp.Message = "service running"
 		if srv.Status.URL != nil {
-			slog.Info("knative endpoint", slog.Any("svc name", srvName), slog.Any("url", srv.Status.URL.URL().String()))
+			slog.Debug("knative endpoint", slog.Any("svc name", srvName), slog.Any("url", srv.Status.URL.URL().String()))
 			resp.Endpoint = srv.Status.URL.URL().String()
 		}
 
-		slog.Info("get image status success", slog.String("srv_name", srvName), slog.Any("resp", resp))
+		slog.Debug("service status is ready", slog.String("srv_name", srvName), slog.Any("resp", resp))
 		c.JSON(http.StatusOK, resp)
 		return
 	}
@@ -370,7 +370,7 @@ func (s *K8sHander) ServiceStatus(c *gin.Context) {
 	// default to deploying status
 	resp.Code = common.Deploying
 	resp.Message = "service is not ready or failed"
-	slog.Info("get image status success, service is not ready or failed", slog.String("srv_name", srvName), slog.Any("resp", resp))
+	slog.Info("get service status success, service is not ready or failed", slog.String("srv_name", srvName), slog.Any("resp", resp))
 	c.JSON(http.StatusOK, resp)
 }
 

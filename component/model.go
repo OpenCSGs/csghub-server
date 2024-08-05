@@ -691,6 +691,14 @@ func (c *ModelComponent) Deploy(ctx context.Context, deployReq types.DeployActRe
 		return -1, fmt.Errorf("cannot find user for deploy model, %w", err)
 	}
 
+	if deployReq.DeployType == types.ServerlessType {
+		// Check if the user is an admin
+		isAdmin := c.isAdminRole(user)
+		if !isAdmin {
+			return -1, fmt.Errorf("need admin permission for Serverless deploy")
+		}
+	}
+
 	frame, err := c.rtfm.FindEnabledByID(ctx, req.RuntimeFrameworkID)
 	if err != nil {
 		return -1, fmt.Errorf("cannot find available runtime framework, %w", err)

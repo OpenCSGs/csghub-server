@@ -119,7 +119,7 @@ func (t *DeployRunner) Run(ctx context.Context) error {
 			// wait before next check
 			time.Sleep(10 * time.Second)
 		case common.DeployFailed:
-			slog.Info("image deploy failed", slog.String("repo_name", t.repo.Name), slog.Any("deplopy_task_id", t.task.ID))
+			slog.Error("image deploy failed", slog.String("repo_name", t.repo.Name), slog.Any("deplopy_task_id", t.task.ID), slog.Any("resp", resp))
 			t.deployFailed(resp.Message)
 
 			return fmt.Errorf("deploy failed, resp msg:%s", resp.Message)
