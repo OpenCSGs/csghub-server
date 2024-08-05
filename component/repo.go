@@ -221,6 +221,12 @@ func (c *RepoComponent) UpdateRepo(ctx context.Context, req types.UpdateRepoReq)
 	if req.Private != nil {
 		repo.Private = *req.Private
 	}
+	if req.Nickname != nil {
+		repo.Nickname = *req.Nickname
+	}
+	if req.Description != nil {
+		repo.Description = *req.Description
+	}
 
 	gitRepoReq := gitserver.UpdateRepoReq{
 		Namespace:     req.Namespace,
