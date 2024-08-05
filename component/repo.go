@@ -1837,6 +1837,9 @@ func (c *RepoComponent) AllowAccessDeploy(ctx context.Context, req types.DeployA
 	if err != nil {
 		return false, fmt.Errorf("failed to find repo, error: %w", err)
 	}
+	if repo == nil {
+		return false, fmt.Errorf("failed to find %s repo %s/%s", req.RepoType, req.Namespace, req.Name)
+	}
 	deploy, err := c.deploy.GetDeployByID(ctx, req.DeployID)
 	if err != nil {
 		return false, err
