@@ -124,7 +124,8 @@ func (d *deployer) serverlessDeploy(ctx context.Context, dr types.DeployRepo) (*
 	}
 	deploy.UserUUID = dr.UserUUID
 	deploy.SKU = dr.SKU
-	deploy.ImageID = ""
+	// dr.ImageID is not null for nginx space, otherwise it's ""
+	deploy.ImageID = dr.ImageID
 	err = d.store.UpdateDeploy(ctx, deploy)
 	if err != nil {
 		return nil, fmt.Errorf("fail reset deploy image, %w", err)

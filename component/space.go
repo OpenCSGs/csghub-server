@@ -19,6 +19,14 @@ import (
 
 const spaceGitattributesContent = modelGitattributesContent
 
+var (
+	streamlitConfigContent = `[server]
+enableCORS = false
+enableXsrfProtection = false
+`
+	streamlitConfig = ".streamlit/config.toml"
+)
+
 func NewSpaceComponent(config *config.Config) (*SpaceComponent, error) {
 	c := &SpaceComponent{}
 	c.ss = database.NewSpaceStore()
@@ -130,6 +138,25 @@ func (c *SpaceComponent) Create(ctx context.Context, req types.CreateSpaceReq) (
 	}, types.SpaceRepo))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create .gitattributes file, cause: %w", err)
+	}
+
+	if req.Sdk == scheduler.STREAMLIT.Name {
+		// create .streamlit/config.toml for support cors
+		fileReq := types.CreateFileParams{
+			Username:  dbRepo.User.Username,
+			Email:     dbRepo.User.Email,
+			Message:   initCommitMessage,
+			Branch:    req.DefaultBranch,
+			Content:   streamlitConfigContent,
+			NewBranch: req.DefaultBranch,
+			Namespace: req.Namespace,
+			Name:      req.Name,
+			FilePath:  streamlitConfig,
+		}
+		err = c.git.CreateRepoFile(buildCreateFileReq(&fileReq, types.SpaceRepo))
+		if err != nil {
+			return nil, fmt.Errorf("failed to create .streamlit/config.toml file, cause: %w", err)
+		}
 	}
 
 	space := &types.Space{

@@ -370,7 +370,7 @@ func (h *SpaceHandler) Stop(ctx *gin.Context) {
 		return
 	}
 
-	slog.Info("stop space sucess", slog.String("namespace", namespace),
+	slog.Info("stop space success", slog.String("namespace", namespace),
 		slog.String("name", name))
 	httpbase.OK(ctx, nil)
 }
