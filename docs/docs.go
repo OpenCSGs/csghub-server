@@ -5682,6 +5682,18 @@ const docTemplate = `{
                         "description": "cluster_id",
                         "name": "cluster_id",
                         "in": "query"
+                    },
+                    {
+                        "enum": [
+                            0,
+                            1,
+                            2
+                        ],
+                        "type": "integer",
+                        "default": 1,
+                        "description": "deploy type(0-space,1-inference,2-finetune)",
+                        "name": "deploy_type",
+                        "in": "query"
                     }
                 ],
                 "responses": {
@@ -12807,11 +12819,15 @@ const docTemplate = `{
         "types.CreateSpaceResourceReq": {
             "type": "object",
             "required": [
+                "cluster_id",
                 "cost_per_hour",
                 "name",
                 "resources"
             ],
             "properties": {
+                "cluster_id": {
+                    "type": "string"
+                },
                 "cost_per_hour": {
                     "type": "number"
                 },

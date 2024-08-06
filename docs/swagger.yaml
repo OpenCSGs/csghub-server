@@ -901,6 +901,8 @@ definitions:
     type: object
   types.CreateSpaceResourceReq:
     properties:
+      cluster_id:
+        type: string
       cost_per_hour:
         type: number
       name:
@@ -908,6 +910,7 @@ definitions:
       resources:
         type: string
     required:
+    - cluster_id
     - cost_per_hour
     - name
     - resources
@@ -6955,6 +6958,15 @@ paths:
         in: query
         name: cluster_id
         type: string
+      - default: 1
+        description: deploy type(0-space,1-inference,2-finetune)
+        enum:
+        - 0
+        - 1
+        - 2
+        in: query
+        name: deploy_type
+        type: integer
       produces:
       - application/json
       responses:

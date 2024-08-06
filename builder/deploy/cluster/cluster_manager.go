@@ -164,7 +164,7 @@ func GetNodeResources(clientset *kubernetes.Clientset, config *config.Config) (m
 				nodeResource.AvailableMem -= getMem(parseQuantityToInt64(memoryRequest))
 			}
 			if cpuRequest, hasCPU := container.Resources.Requests[v1.ResourceCPU]; hasCPU {
-				nodeResource.AvailableCPU -= millicoresToCores(parseQuantityToInt64(cpuRequest))
+				nodeResource.AvailableCPU -= millicoresToCores(cpuRequest.MilliValue())
 			}
 		}
 
