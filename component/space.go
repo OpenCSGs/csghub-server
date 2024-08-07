@@ -543,10 +543,14 @@ func (c *SpaceComponent) Deploy(ctx context.Context, namespace, name, currentUse
 	}
 
 	containerImg := ""
+	slog.Info("get space for deploy", slog.Any("space", s), slog.Any("NGINX", scheduler.NGINX))
+	slog.Info("compare space sdk", slog.Any("s.Sdk", s.Sdk), slog.Any("scheduler.NGINX.Name", scheduler.NGINX.Name))
 	if s.Sdk == scheduler.NGINX.Name {
+		slog.Warn("space use nginx pre-define image", slog.Any("namespace", namespace), slog.Any("name", name), slog.Any("scheduler.NGINX.Image", scheduler.NGINX.Image))
 		// Use default image for nginx space
 		containerImg = scheduler.NGINX.Image
 	}
+	slog.Info("run space with container image", slog.Any("namespace", namespace), slog.Any("name", name), slog.Any("containerImg", containerImg))
 
 	// create deploy for space
 	return c.deployer.Deploy(ctx, types.DeployRepo{
