@@ -560,6 +560,10 @@ definitions:
     type: object
   types.Collection:
     properties:
+      can_manage:
+        type: boolean
+      can_write:
+        type: boolean
       created_at:
         type: string
       description:

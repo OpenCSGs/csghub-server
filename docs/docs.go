@@ -12400,6 +12400,12 @@ const docTemplate = `{
         "types.Collection": {
             "type": "object",
             "properties": {
+                "can_manage": {
+                    "type": "boolean"
+                },
+                "can_write": {
+                    "type": "boolean"
+                },
                 "created_at": {
                     "type": "string"
                 },

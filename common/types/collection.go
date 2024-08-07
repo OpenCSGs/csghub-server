@@ -17,6 +17,8 @@ type Collection struct {
 	UpdatedAt    time.Time              `json:"updated_at"`
 	Likes        int64                  `json:"likes"`
 	UserLikes    bool                   `json:"user_likes"`
+	CanWrite     bool                   `json:"can_write"`
+	CanManage    bool                   `json:"can_manage"`
 }
 
 type CollectionRepository struct {

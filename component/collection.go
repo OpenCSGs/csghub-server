@@ -93,6 +93,8 @@ func (cc *CollectionComponent) GetCollection(ctx context.Context, currentUser st
 		return nil, newError
 	}
 	newCollection.UserLikes = likeExists
+	newCollection.CanWrite = permission.CanWrite
+	newCollection.CanManage = permission.CanAdmin
 	return &newCollection, nil
 }
 
