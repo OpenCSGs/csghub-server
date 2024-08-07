@@ -1755,6 +1755,7 @@ func deployStatusCodeToString(code int) string {
 	// DeployStartUp      = 21
 	// DeployRunning      = 22
 	// DeployRunTimeError = 23
+	// DeployStopped      = 26
 	// DeployRunDeleted   = 27 // end user trigger delete action for deploy
 
 	// simplified status for frontend show

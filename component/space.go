@@ -607,12 +607,21 @@ func (c *SpaceComponent) Stop(ctx context.Context, namespace, name string) error
 		return fmt.Errorf("can't get space deployment")
 	}
 
-	return c.deployer.Stop(ctx, types.DeployRepo{
+	err = c.deployer.Stop(ctx, types.DeployRepo{
 		SpaceID:   s.ID,
 		Namespace: namespace,
 		Name:      name,
 		SvcName:   deploy.SvcName,
 	})
+	if err != nil {
+		return fmt.Errorf("can't stop space service deploy for service '%s', %w", deploy.SvcName, err)
+	}
+
+	err = c.deploy.StopDeploy(ctx, types.SpaceRepo, deploy.RepoID, deploy.UserID, deploy.ID)
+	if err != nil {
+		return fmt.Errorf("fail to update space deploy status to stopped for deploy ID '%d', %w", deploy.ID, err)
+	}
+	return nil
 }
 
 // FixHasEntryFile checks whether git repo has entry point file and update space's HasAppFile property in db
@@ -649,7 +658,7 @@ func (c *SpaceComponent) status(ctx context.Context, s *database.Space) (string,
 		Namespace: namespace,
 		Name:      name,
 		SvcName:   deploy.SvcName,
-	}, false)
+	}, true)
 	if err != nil {
 		slog.Error("error happen when get space status", slog.Any("error", err), slog.String("path", s.Repository.Path))
 		return "", SpaceStatusStopped, err
