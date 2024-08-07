@@ -79,14 +79,12 @@ func (t *DeployRunner) Run(ctx context.Context) error {
 			targetID = t.task.Deploy.ID // support model deploy with multi-instance
 		}
 		req := &types.StatusRequest{
-			ID:        targetID,
-			OrgName:   fields[0],
-			RepoName:  fields[1],
-			SvcName:   t.task.Deploy.SvcName,
-			ClusterID: t.task.Deploy.ClusterID,
-		}
-		if t.task.Deploy.Type == 1 || t.task.Deploy.Type == 3 {
-			req.NeedDetails = true
+			ID:          targetID,
+			OrgName:     fields[0],
+			RepoName:    fields[1],
+			SvcName:     t.task.Deploy.SvcName,
+			ClusterID:   t.task.Deploy.ClusterID,
+			NeedDetails: true, // check status of both knative and its pods
 		}
 		timeoutCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
 		resp, err := t.ir.Status(timeoutCtx, req)
