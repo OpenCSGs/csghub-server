@@ -60,22 +60,12 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 		return nil, fmt.Errorf("error creating mirror controller:%w", err)
 	}
 
-	// Huggingface SDK routes
-	hfGroup := r.Group("/hf")
-	{
-		hfGroup.GET("/:namespace/:name/resolve/:branch/*file_path", middleware.RepoMapping(types.ModelRepo), repoCommonHandler.SDKDownload)
-		hfGroup.HEAD("/:namespace/:name/resolve/:branch/*file_path", middleware.RepoMapping(types.ModelRepo), repoCommonHandler.HeadSDKDownload)
-		hfGroup.GET("/datasets/:namespace/:name/resolve/:branch/*file_path", middleware.RepoMapping(types.DatasetRepo), repoCommonHandler.SDKDownload)
-		hfGroup.HEAD("/datasets/:namespace/:name/resolve/:branch/*file_path", middleware.RepoMapping(types.DatasetRepo), repoCommonHandler.HeadSDKDownload)
-		hfAPIGroup := hfGroup.Group("/api")
-		{
-			// compitable with HF model info api, used for sdk like this:  huggingface_hub.model_info(repo_id, revision)
-			hfAPIGroup.GET("/models/:namespace/:name/revision/:ref", middleware.RepoMapping(types.ModelRepo), modelHandler.SDKModelInfo)
-			// compitable with HF dataset info api, used for sdk like this: huggingface_hub.dataset_info(repo_id, revision)
-			hfAPIGroup.GET("/datasets/:namespace/:name/revision/:ref", middleware.RepoMapping(types.DatasetRepo), repoCommonHandler.SDKListFiles)
-			hfAPIGroup.GET("/whoami-v2", userHandler.UserPermission)
-		}
+	hfdsHandler, err := handler.NewHFDatasetHandler(config)
+	if err != nil {
+		return nil, fmt.Errorf("error creating HF dataset handler: %w", err)
 	}
+
+	createHFRoutes(r, hfdsHandler, repoCommonHandler, modelHandler, userHandler)
 
 	apiGroup := r.Group("/api/v1")
 	// TODO:use middleware to handle common response
@@ -600,4 +590,58 @@ func createUserRoutes(apiGroup *gin.RouterGroup, needAPIKey gin.HandlerFunc, use
 
 	// serverless list
 	apiGroup.GET("/user/:username/run/serverless", needAPIKey, userHandler.GetRunServerless)
+}
+
+func createRuntimeFrameworkRoutes(apiGroup *gin.RouterGroup, needAPIKey gin.HandlerFunc, modelHandler *handler.ModelHandler) {
+	runtimeFramework := apiGroup.Group("/runtime_framework")
+	{
+		runtimeFramework.GET("/:id/models", modelHandler.ListByRuntimeFrameworkID)
+		runtimeFramework.GET("", modelHandler.ListAllRuntimeFramework)
+		runtimeFramework.POST("/:id", needAPIKey, modelHandler.UpdateModelRuntimeFrameworks)
+		runtimeFramework.DELETE("/:id", needAPIKey, modelHandler.DeleteModelRuntimeFrameworks)
+		runtimeFramework.GET("/models", modelHandler.ListModelsOfRuntimeFrameworks)
+	}
+}
+
+func createAccountRoutes(apiGroup *gin.RouterGroup, needAPIKey gin.HandlerFunc, accountingHandler *handler.AccountingHandler) {
+	accountingGroup := apiGroup.Group("/accounting")
+	{
+		meterGroup := accountingGroup.Group("/metering")
+		{
+			meterGroup.GET("/:id/statements", accountingHandler.QueryMeteringStatementByUserID)
+		}
+	}
+}
+
+func createHFRoutes(r *gin.Engine, hfdsHandler *handler.HFDatasetHandler, repoCommonHandler *handler.RepoHandler, modelHandler *handler.ModelHandler, userHandler *handler.UserHandler) {
+	// Huggingface SDK routes
+	hfGroup := r.Group("/hf")
+	{
+		hfGroup.GET("/:namespace/:name/resolve/:branch/*file_path", middleware.RepoMapping(types.ModelRepo), repoCommonHandler.SDKDownload)
+		hfGroup.HEAD("/:namespace/:name/resolve/:branch/*file_path", middleware.RepoMapping(types.ModelRepo), repoCommonHandler.HeadSDKDownload)
+		hfGroup.GET("/datasets/:namespace/:name/resolve/:branch/*file_path", middleware.RepoMapping(types.DatasetRepo), repoCommonHandler.SDKDownload)
+		hfGroup.HEAD("/datasets/:namespace/:name/resolve/:branch/*file_path", middleware.RepoMapping(types.DatasetRepo), repoCommonHandler.HeadSDKDownload)
+		hfAPIGroup := hfGroup.Group("/api")
+		{
+			// compitable with HF model info api, used for sdk like this:  huggingface_hub.model_info(repo_id, revision)
+			hfAPIGroup.GET("/models/:namespace/:name/revision/:ref", middleware.RepoMapping(types.ModelRepo), modelHandler.SDKModelInfo)
+			// compitable with HF dataset info api, used for sdk like this: huggingface_hub.dataset_info(repo_id, revision)
+			hfAPIGroup.GET("/datasets/:namespace/:name/revision/:ref", middleware.RepoMapping(types.DatasetRepo), repoCommonHandler.SDKListFiles)
+			hfAPIGroup.GET("/whoami-v2", userHandler.UserPermission)
+		}
+	}
+
+	// HF dataset sdk router
+	hfdsMetaGroup := r.Group("/api/datasets")
+	{
+		// hf dataset routes
+		hfdsMetaGroup.GET("/:namespace/:name", hfdsHandler.DatasetMetaInfo)
+		hfdsMetaGroup.GET("/:namespace/:name/revision/:ref", hfdsHandler.DatasetMetaInfo)
+		hfdsMetaGroup.POST("/:namespace/:name/paths-info/:ref", hfdsHandler.DatasetPathsInfo)
+		hfdsMetaGroup.GET("/:namespace/:name/tree/:ref/*path_in_repo", hfdsHandler.DatasetTree)
+	}
+	hfdsFileGroup := r.Group("/datasets")
+	{
+		hfdsFileGroup.GET("/:namespace/:name/resolve/:ref/*file_path", middleware.RepoMapping(types.DatasetRepo), repoCommonHandler.SDKDownload)
+	}
 }
