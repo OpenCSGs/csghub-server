@@ -82,9 +82,10 @@ type OrgDatasetsReq struct {
 }
 
 type (
-	OrgModelsReq = OrgDatasetsReq
-	OrgCodesReq  = OrgDatasetsReq
-	OrgSpacesReq = OrgDatasetsReq
+	OrgModelsReq      = OrgDatasetsReq
+	OrgCodesReq       = OrgDatasetsReq
+	OrgSpacesReq      = OrgDatasetsReq
+	OrgCollectionsReq = OrgDatasetsReq
 )
 
 type Organization struct {

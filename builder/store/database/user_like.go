@@ -99,3 +99,14 @@ func (r *UserLikesStore) IsExist(ctx context.Context, username string, repoId in
 		Exists(ctx)
 	return
 }
+
+func (r *UserLikesStore) IsExistCollection(ctx context.Context, username string, collectionId int64) (exists bool, err error) {
+	var userLike UserLike
+	exists, err = r.db.Operator.Core.
+		NewSelect().
+		Model(&userLike).
+		Join("JOIN users ON users.id = user_like.user_id").
+		Where("user_like.collection_id = ? and users.username = ?", collectionId, username).
+		Exists(ctx)
+	return
+}

@@ -16,4 +16,4 @@ run_callback_local.sh
 run_deploy_runner_local.sh
 run_rproxy_local.sh
 run_server_local.sh
-run_server_local.sh
+run_user_local.sh
