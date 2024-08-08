@@ -30,7 +30,11 @@ import (
 	"opencsg.com/csghub-server/common/utils/common"
 )
 
-const ErrNotFoundMessage = "The target couldn't be found."
+const (
+	ErrNotFoundMessage   = "The target couldn't be found."
+	ErrGetContentsOrList = "GetContentsOrList"
+	AdminSecret          = "gnuRYKce"
+)
 
 type RepoComponent struct {
 	tc                *TagComponent
@@ -880,7 +884,8 @@ func (c *RepoComponent) HeadDownloadFile(ctx context.Context, req *types.GetFile
 	}
 	file, err := c.git.GetRepoFileContents(ctx, getFileContentReq)
 	if err != nil {
-		if err.Error() == ErrNotFoundMessage {
+		slog.Info("err.Error()", slog.Any("err.Error()", err.Error()))
+		if err.Error() == ErrNotFoundMessage || err.Error() == ErrGetContentsOrList {
 			return nil, ErrNotFound
 		}
 		return nil, fmt.Errorf("failed to download git %s repository file, error: %w", req.RepoType, err)
@@ -926,7 +931,7 @@ func (c *RepoComponent) SDKDownloadFile(ctx context.Context, req *types.GetFileR
 		}
 		signedUrl, err := c.s3Client.PresignedGetObject(ctx, c.lfsBucket, objectKey, ossFileExpireSeconds, reqParams)
 		if err != nil {
-			if err.Error() == ErrNotFoundMessage {
+			if err.Error() == ErrNotFoundMessage || err.Error() == ErrGetContentsOrList {
 				return nil, 0, downloadUrl, ErrNotFound
 			}
 			return nil, 0, downloadUrl, err

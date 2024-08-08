@@ -104,6 +104,10 @@ func (c *Client) GetRepoFileContents(ctx context.Context, req gitserver.GetRepoI
 	namespace := common.WithPrefix(req.Namespace, repoPrefixByType(req.RepoType))
 	file, err := c.getFileContents(namespace, req.Name, req.Ref, req.Path)
 	if err != nil {
+		if err.Error() == "GetContentsOrList" {
+			// not found message of gitea
+			return nil, err
+		}
 		return nil, errors.New("failed to get repo file contents")
 	}
 	commit, _, err := c.giteaClient.GetSingleCommit(namespace, req.Name, file.LastCommitSHA, gitea.SpeedUpOtions{
@@ -329,8 +333,7 @@ func (c *Client) getFileContents(owner, repo, ref, path string) (*types.File, er
 	*/
 	fileContent, _, err := c.giteaClient.GetContents(owner, repo, ref, path)
 	if err != nil {
-		slog.Error("Failed to get contents from gitea", slog.Any("error", err), slog.String("owner", owner), slog.String("repo", repo),
-			slog.String("ref", ref), slog.String("path", path))
+		slog.Error("Failed to get contents from gitea", slog.Any("error", err), slog.String("owner", owner), slog.String("repo", repo), slog.String("ref", ref), slog.String("path", path))
 		return nil, err
 	}
 	if fileContent.Content != nil {

@@ -619,30 +619,29 @@ func createHFRoutes(r *gin.Engine, hfdsHandler *handler.HFDatasetHandler, repoCo
 	{
 		hfGroup.GET("/:namespace/:name/resolve/:branch/*file_path", middleware.RepoMapping(types.ModelRepo), repoCommonHandler.SDKDownload)
 		hfGroup.HEAD("/:namespace/:name/resolve/:branch/*file_path", middleware.RepoMapping(types.ModelRepo), repoCommonHandler.HeadSDKDownload)
-		hfGroup.GET("/datasets/:namespace/:name/resolve/:branch/*file_path", middleware.RepoMapping(types.DatasetRepo), repoCommonHandler.SDKDownload)
-		hfGroup.HEAD("/datasets/:namespace/:name/resolve/:branch/*file_path", middleware.RepoMapping(types.DatasetRepo), repoCommonHandler.HeadSDKDownload)
+		hfdsFileGroup := hfGroup.Group("/datasets")
+		{
+			hfdsFileGroup.GET("/:namespace/:name/resolve/:branch/*file_path", middleware.RepoMapping(types.DatasetRepo), repoCommonHandler.SDKDownload)
+			hfdsFileGroup.HEAD("/:namespace/:name/resolve/:branch/*file_path", middleware.RepoMapping(types.DatasetRepo), repoCommonHandler.HeadSDKDownload)
+		}
 		hfAPIGroup := hfGroup.Group("/api")
 		{
-			// compitable with HF model info api, used for sdk like this:  huggingface_hub.model_info(repo_id, revision)
-			hfAPIGroup.GET("/models/:namespace/:name/revision/:ref", middleware.RepoMapping(types.ModelRepo), modelHandler.SDKModelInfo)
-			// compitable with HF dataset info api, used for sdk like this: huggingface_hub.dataset_info(repo_id, revision)
-			hfAPIGroup.GET("/datasets/:namespace/:name/revision/:ref", middleware.RepoMapping(types.DatasetRepo), repoCommonHandler.SDKListFiles)
 			hfAPIGroup.GET("/whoami-v2", userHandler.UserPermission)
+			hfModelAPIGroup := hfAPIGroup.Group("/models")
+			{
+				// compitable with HF model info api, used for sdk like this:  huggingface_hub.model_info(repo_id, revision)
+				hfModelAPIGroup.GET("/:namespace/:name/revision/:ref", middleware.RepoMapping(types.ModelRepo), modelHandler.SDKModelInfo)
+			}
+			hfDSAPIGroup := hfAPIGroup.Group("/datasets")
+			{
+				// compitable with HF dataset info api, used for sdk like this: huggingface_hub.dataset_info(repo_id, revision)
+				hfDSAPIGroup.GET("/:namespace/:name/revision/:ref", middleware.RepoMapping(types.DatasetRepo), repoCommonHandler.SDKListFiles)
+				hfDSAPIGroup.GET("/:namespace/:name", hfdsHandler.DatasetMetaInfo)
+				hfDSAPIGroup.POST("/:namespace/:name/paths-info/:ref", hfdsHandler.DatasetPathsInfo)
+				hfDSAPIGroup.GET("/:namespace/:name/tree/:ref/*path_in_repo", hfdsHandler.DatasetTree)
+				hfDSAPIGroup.GET("/:namespace/:name/resolve/:ref/.huggingface.yaml", hfdsHandler.HandleHFYaml)
+			}
 		}
 	}
 
-	// HF dataset sdk router
-	hfdsMetaGroup := r.Group("/api/datasets")
-	{
-		// hf dataset routes
-		hfdsMetaGroup.GET("/:namespace/:name", hfdsHandler.DatasetMetaInfo)
-		hfdsMetaGroup.GET("/:namespace/:name/revision/:ref", hfdsHandler.DatasetMetaInfo)
-		hfdsMetaGroup.POST("/:namespace/:name/paths-info/:ref", hfdsHandler.DatasetPathsInfo)
-		hfdsMetaGroup.GET("/:namespace/:name/tree/:ref/*path_in_repo", hfdsHandler.DatasetTree)
-		hfdsMetaGroup.GET("/:namespace/:name/resolve/:ref/.huggingface.yaml", hfdsHandler.HandleHFYaml)
-	}
-	hfdsFileGroup := r.Group("/datasets")
-	{
-		hfdsFileGroup.GET("/:namespace/:name/resolve/:ref/*file_path", middleware.RepoMapping(types.DatasetRepo), repoCommonHandler.SDKDownload)
-	}
 }
