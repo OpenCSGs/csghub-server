@@ -183,6 +183,7 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 		apiGroup.GET("/organization/:namespace/datasets", userProxyHandler.ProxyToApi("/api/v1/organization/%s/datasets", "namespace"))
 		apiGroup.GET("/organization/:namespace/codes", userProxyHandler.ProxyToApi("/api/v1/organization/%s/codes", "namespace"))
 		apiGroup.GET("/organization/:namespace/spaces", userProxyHandler.ProxyToApi("/api/v1/organization/%s/spaces", "namespace"))
+		apiGroup.GET("/organization/:namespace/collections", userProxyHandler.ProxyToApi("/api/v1/organization/%s/collections", "namespace"))
 	}
 
 	{

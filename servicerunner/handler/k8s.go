@@ -497,8 +497,8 @@ func (s *K8sHander) ServiceStatusAll(c *gin.Context) {
 			List(c.Request.Context(), metav1.ListOptions{})
 		if err != nil {
 			slog.Error("get image status all failed, cannot get service infos", slog.Any("error", err))
-			c.Status(http.StatusInternalServerError)
-			return
+			//continue to next in multi cluster
+			continue
 		}
 
 		for _, srv := range services.Items {

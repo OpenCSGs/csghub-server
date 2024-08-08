@@ -55,6 +55,8 @@ definitions:
         type: integer
       name:
         type: string
+      namespace:
+        type: string
       nickname:
         type: string
       private:
@@ -558,6 +560,10 @@ definitions:
     type: object
   types.Collection:
     properties:
+      can_manage:
+        type: boolean
+      can_write:
+        type: boolean
       created_at:
         type: string
       description:
@@ -580,6 +586,8 @@ definitions:
         type: string
       updated_at:
         type: string
+      user_likes:
+        type: boolean
       username:
         type: string
     type: object
@@ -717,6 +725,9 @@ definitions:
         type: string
       name:
         example: collection1
+        type: string
+      namespace:
+        example: user_or_org_name
         type: string
       nickname:
         example: collection nick name
@@ -901,6 +912,8 @@ definitions:
     type: object
   types.CreateSpaceResourceReq:
     properties:
+      cluster_id:
+        type: string
       cost_per_hour:
         type: number
       name:
@@ -908,6 +921,7 @@ definitions:
       resources:
         type: string
     required:
+    - cluster_id
     - cost_per_hour
     - name
     - resources
@@ -6230,6 +6244,58 @@ paths:
       summary: Get organization codes
       tags:
       - Organization
+  /organization/{namespace}/collections:
+    get:
+      consumes:
+      - application/json
+      parameters:
+      - description: org name
+        in: path
+        name: namespace
+        required: true
+        type: string
+      - description: current user name
+        in: query
+        name: current_user
+        required: true
+        type: string
+      - description: page size
+        in: query
+        name: per
+        type: integer
+      - description: current page number
+        in: query
+        name: page
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/types.ResponseWithTotal'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/types.Collection'
+                  type: array
+                total:
+                  type: integer
+              type: object
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Get organization Collections
+      tags:
+      - Organization
   /organization/{namespace}/datasets:
     get:
       consumes:
@@ -6955,6 +7021,15 @@ paths:
         in: query
         name: cluster_id
         type: string
+      - default: 1
+        description: deploy type(0-space,1-inference,2-finetune)
+        enum:
+        - 0
+        - 1
+        - 2
+        in: query
+        name: deploy_type
+        type: integer
       produces:
       - application/json
       responses:

@@ -2,6 +2,7 @@ package component
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -23,6 +24,7 @@ func NewOrganizationComponent(config *config.Config) (*OrganizationComponent, er
 	c.ms = database.NewModelStore()
 	c.cs = database.NewCodeStore()
 	c.ss = database.NewSpaceStore()
+	c.cos = database.NewCollectionStore()
 	var err error
 	c.gs, err = git.NewGitServer(config)
 	if err != nil {
@@ -40,14 +42,15 @@ func NewOrganizationComponent(config *config.Config) (*OrganizationComponent, er
 }
 
 type OrganizationComponent struct {
-	os *database.OrgStore
-	ns *database.NamespaceStore
-	us *database.UserStore
-	ds *database.DatasetStore
-	ms *database.ModelStore
-	cs *database.CodeStore
-	ss *database.SpaceStore
-	gs gitserver.GitServer
+	os  *database.OrgStore
+	ns  *database.NamespaceStore
+	us  *database.UserStore
+	ds  *database.DatasetStore
+	ms  *database.ModelStore
+	cs  *database.CodeStore
+	ss  *database.SpaceStore
+	gs  gitserver.GitServer
+	cos *database.CollectionStore
 
 	msc *MemberComponent
 }
@@ -390,4 +393,30 @@ func (c *OrganizationComponent) Spaces(ctx context.Context, req *types.OrgSpaces
 	}
 
 	return resSpaces, total, nil
+}
+func (c *OrganizationComponent) Collections(ctx context.Context, req *types.OrgCollectionsReq) ([]types.Collection, int, error) {
+	var err error
+	r := membership.RoleUnkown
+	if req.CurrentUser != "" {
+		r, err = c.msc.GetMemberRole(ctx, req.Namespace, req.CurrentUser)
+		// log error, and treat user as unkown role in org
+		if err != nil {
+			slog.Error("faild to get member role",
+				slog.String("org", req.Namespace), slog.String("user", req.CurrentUser),
+				slog.String("error", err.Error()))
+		}
+	}
+	onlyPublic := !r.CanRead()
+	collections, total, err := c.cos.ByUserOrgs(ctx, req.Namespace, req.PageSize, req.Page, onlyPublic)
+	if err != nil {
+		return nil, 0, err
+	}
+	var newCollection []types.Collection
+	temporaryVariable, _ := json.Marshal(collections)
+	err = json.Unmarshal(temporaryVariable, &newCollection)
+	if err != nil {
+		return nil, 0, err
+	}
+	return newCollection, total, nil
+
 }

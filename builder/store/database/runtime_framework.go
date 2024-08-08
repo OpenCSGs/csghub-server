@@ -79,6 +79,12 @@ func (rf *RuntimeFrameworksStore) FindEnabledByID(ctx context.Context, id int64)
 	return &res, err
 }
 
+func (rf *RuntimeFrameworksStore) FindEnabledByName(ctx context.Context, name string) (*RuntimeFramework, error) {
+	var res RuntimeFramework
+	_, err := rf.db.Core.NewSelect().Model(&res).Where("frame_name = ?", name).Where("enabled = 1").Exec(ctx, &res)
+	return &res, err
+}
+
 func (rf *RuntimeFrameworksStore) ListAll(ctx context.Context) ([]RuntimeFramework, error) {
 	var result []RuntimeFramework
 	_, err := rf.db.Operator.Core.NewSelect().Model(&result).Exec(ctx, &result)

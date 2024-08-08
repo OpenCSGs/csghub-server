@@ -14,7 +14,7 @@ docker push xxx
 ## latest images
 ```
 #for vllm image
-opencsg-registry.cn-beijing.cr.aliyuncs.com/public/vllm-local:2.3
+opencsg-registry.cn-beijing.cr.aliyuncs.com/public/vllm-local:2.7
 #for vllm cpu only
 opencsg-registry.cn-beijing.cr.aliyuncs.com/public/vllm-cpu:2.3
 #for tgi image
@@ -22,7 +22,7 @@ opencsg-registry.cn-beijing.cr.aliyuncs.com/public/tgi-local:1.6
 ```
 ## Run image locally
 ```
-docker run -d -v llm:/data   -e ACCESS_TOKEN=c6d57fb71b835d05bd402d2e2ef144bb6e22d27c  -e REPO_ID="xzgan001/csg-wukong-1B" -e HF_ENDPOINT=https://hub-stg.opencsg.com/hf --gpus device=1  opencsg-registry.cn-beijing.cr.aliyuncs.com/public/vllm-local:2.1
+docker run -d -e ACCESS_TOKEN=9a5f8d256720e960cf573bb09dafa90328c0a477  -e REPO_ID="xzgan001/csg-wukong-1B" -e HF_ENDPOINT=https://hub-stg.opencsg.com/ --gpus device=1  opencsg-registry.cn-beijing.cr.aliyuncs.com/public/vllm-local:2.7
 
 docker run -d -v llm:/data -e ACCESS_TOKEN=xxx  -e REPO_ID="xzgan001/csg-wukong-1B"  -e HF_ENDPOINT=https://hub-stg.opencsg.com/hf --gpus device=7  opencsg-registry.cn-beijing.cr.aliyuncs.com/public/tgi-local:1.6
 

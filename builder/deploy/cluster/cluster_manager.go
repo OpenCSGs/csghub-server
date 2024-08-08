@@ -126,30 +126,36 @@ func GetNodeResources(clientset *kubernetes.Clientset, config *config.Config) (m
 	nodeResourcesMap := make(map[string]types.NodeResourceInfo)
 
 	for _, node := range nodes.Items {
-		usedMem := getMem(node.Status.Allocatable.Memory().Value())
-		totalMem := getMem(node.Status.Capacity.Memory().Value())
+		memCapacity := node.Status.Capacity["memory"]
+		memQuantity, ok := memCapacity.AsInt64()
+		if !ok {
+			slog.Error("falied to get node memory", "node", node.Name, "error", err)
+			continue
+		}
+		totalMem := getMem(memQuantity)
 		totalCPU := node.Status.Capacity.Cpu().MilliValue()
-		allocatableCPU := node.Status.Allocatable.Cpu().MilliValue()
-		totalGPU, found := node.Status.Capacity["nvidia.com/gpu"]
-		if !found {
-			totalGPU = resource.Quantity{}
+		totalGPU := resource.Quantity{}
+		xpuCapacityLabel, xpuTypeLabel := getXPULabel(node, config)
+		if xpuCapacityLabel != "" {
+			totalGPU = node.Status.Capacity[v1.ResourceName(xpuCapacityLabel)]
 		}
 
-		gpuModelVendor := strings.Split(node.Labels[config.Space.GPUModelLabel], "-")
+		gpuModelVendor := strings.Split(node.Labels[xpuTypeLabel], "-")
 		gpuModel := ""
 		if len(gpuModelVendor) > 1 {
 			gpuModel = gpuModelVendor[1]
 		}
 		nodeResourcesMap[node.Name] = types.NodeResourceInfo{
-			NodeName:     node.Name,
-			TotalCPU:     millicoresToCores(totalCPU),
-			UsedCPU:      millicoresToCores(allocatableCPU),
-			GPUModel:     gpuModel,
-			GPUVendor:    gpuModelVendor[0],
-			TotalGPU:     parseQuantityToInt64(totalGPU),
-			AvailableGPU: parseQuantityToInt64(totalGPU),
-			AvailableMem: (totalMem - usedMem),
-			TotalMem:     totalMem,
+			NodeName:         node.Name,
+			TotalCPU:         millicoresToCores(totalCPU),
+			AvailableCPU:     millicoresToCores(totalCPU),
+			GPUModel:         gpuModel,
+			GPUVendor:        gpuModelVendor[0],
+			TotalGPU:         parseQuantityToInt64(totalGPU),
+			AvailableGPU:     parseQuantityToInt64(totalGPU),
+			AvailableMem:     totalMem,
+			TotalMem:         totalMem,
+			XPUCapacityLabel: xpuCapacityLabel,
 		}
 	}
 	for _, pod := range pods.Items {
@@ -159,8 +165,14 @@ func GetNodeResources(clientset *kubernetes.Clientset, config *config.Config) (m
 
 		nodeResource := nodeResourcesMap[pod.Spec.NodeName]
 		for _, container := range pod.Spec.Containers {
-			if requestedGPU, hasGPU := container.Resources.Requests["nvidia.com/gpu"]; hasGPU {
+			if requestedGPU, hasGPU := container.Resources.Requests[v1.ResourceName(nodeResource.XPUCapacityLabel)]; hasGPU {
 				nodeResource.AvailableGPU -= parseQuantityToInt64(requestedGPU)
+			}
+			if memoryRequest, hasMemory := container.Resources.Requests[v1.ResourceMemory]; hasMemory {
+				nodeResource.AvailableMem -= getMem(parseQuantityToInt64(memoryRequest))
+			}
+			if cpuRequest, hasCPU := container.Resources.Requests[v1.ResourceCPU]; hasCPU {
+				nodeResource.AvailableCPU -= millicoresToCores(cpuRequest.MilliValue())
 			}
 		}
 
@@ -168,6 +180,26 @@ func GetNodeResources(clientset *kubernetes.Clientset, config *config.Config) (m
 	}
 
 	return nodeResourcesMap, nil
+}
+
+func getXPULabel(node v1.Node, config *config.Config) (string, string) {
+	if _, found := node.Labels[config.Space.GPUModelLabel]; found {
+		//for default clsuter
+		return "nvidia.com/gpu", config.Space.GPUModelLabel
+	}
+	if _, found := node.Labels["kubemore_xpu_type"]; found {
+		//for huawei gpu
+		return "huawei.com/Ascend910", "kubemore_xpu_type"
+	}
+	if _, found := node.Labels["kubemore_xpu_type"]; found {
+		//for huawei gpu
+		return "huawei.com/Ascend910", "kubemore_xpu_type"
+	}
+	if _, found := node.Labels["accelerator/huawei-npu"]; found {
+		//for huawei gpu
+		return "huawei.com/Ascend910", "accelerator/huawei-npu"
+	}
+	return "", ""
 }
 
 func getMem(memByte int64) float32 {

@@ -22,6 +22,7 @@ func NewCollectionStore() *CollectionStore {
 
 type Collection struct {
 	ID           int64        `bun:",pk,autoincrement" json:"id"`
+	Namespace    string       `bun:",notnull" json:"namespace"`
 	Username     string       `bun:",notnull" json:"username"`
 	UserID       int64        `bun:",notnull" json:"user_id"`
 	Name         string       `bun:",notnull" json:"name"`
@@ -170,6 +171,36 @@ func (cs *CollectionStore) ByUserLikes(ctx context.Context, userID int64, per, p
 		NewSelect().
 		Model(&collections).
 		Where("collection.id in (select collection_id from user_likes where user_id=?)", userID)
+
+	query = query.Order("collection.created_at DESC").
+		Limit(per).
+		Offset((page - 1) * per)
+
+	err = query.Scan(ctx)
+	if err != nil {
+		return
+	}
+	total, err = query.Count(ctx)
+	if err != nil {
+		return
+	}
+	ids := make([]interface{}, 0)
+	for _, collection := range collections {
+		ids = append(ids, collection.ID)
+	}
+
+	return cs.GetCollectionsByIDs(ctx, collections, ids, total)
+}
+
+func (cs *CollectionStore) ByUserOrgs(ctx context.Context, namespace string, per, page int, onlyPublic bool) (collections []Collection, total int, err error) {
+	query := cs.db.Operator.Core.
+		NewSelect().
+		Model(&collections).
+		Where("collection.namespace = ?", namespace)
+
+	if onlyPublic {
+		query = query.Where("collection.private = ?", false)
+	}
 
 	query = query.Order("collection.created_at DESC").
 		Limit(per).

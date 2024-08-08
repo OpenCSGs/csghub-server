@@ -60,6 +60,8 @@ type RepoComponent struct {
 	syncClientSetting *database.SyncClientSettingStore
 	file              *database.FileStore
 	config            *config.Config
+	ac                *AccountingComponent
+	srs               *database.SpaceResourceStore
 }
 
 func NewRepoComponent(config *config.Config) (*RepoComponent, error) {
@@ -114,6 +116,11 @@ func NewRepoComponent(config *config.Config) (*RepoComponent, error) {
 	if config.Space.StorageClass != "" {
 		c.needPurge = true
 	}
+	c.ac, err = NewAccountingComponent(config)
+	if err != nil {
+		return nil, err
+	}
+	c.srs = database.NewSpaceResourceStore()
 	c.config = config
 	return c, nil
 }
@@ -2072,6 +2079,15 @@ func (c *RepoComponent) DeployUpdate(ctx context.Context, updateReq types.Deploy
 	if err != nil {
 		return fmt.Errorf("fail to check permission for update deploy, %w", err)
 	}
+	// check user balance if resource changed
+	if req.ResourceID != nil {
+		frame, err := c.rtfm.FindEnabledByName(ctx, deploy.RuntimeFramework)
+		if err != nil {
+			return fmt.Errorf("cannot find available runtime framework, %w", err)
+		}
+		//update runtime image once user changed cpu to gpu
+		req.RuntimeFrameworkID = &frame.ID
+	}
 
 	if req.ClusterID != nil {
 		_, err = c.cluster.ByClusterID(ctx, *req.ClusterID)
@@ -2117,7 +2133,7 @@ func (c *RepoComponent) DeployStart(ctx context.Context, startReq types.DeployAc
 	}
 
 	if err != nil {
-		return fmt.Errorf("fail to check permission for start deploy, %w", err)
+		return fmt.Errorf("failed to check permission for start deploy, %w", err)
 	}
 	// check service
 	deployRepo := types.DeployRepo{
