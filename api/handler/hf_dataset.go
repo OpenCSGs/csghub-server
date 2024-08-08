@@ -125,3 +125,12 @@ func (h *HFDatasetHandler) DatasetTree(ctx *gin.Context) {
 	}
 	ctx.PureJSON(http.StatusOK, tree)
 }
+
+func (h *HFDatasetHandler) HandleHFYaml(ctx *gin.Context) {
+	// request file: /api/datasets/haihui/ds1/resolve/7e6d54428819cb0f004fcc04e77a003a42c219b1/.huggingface.yaml
+	// HF return: {"error":"Sorry, we can't find the page you are looking for."}
+	response := types.HFErrorRes{
+		Error: "Sorry, we can't find the page you are looking for.",
+	}
+	ctx.PureJSON(http.StatusOK, response)
+}

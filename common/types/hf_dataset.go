@@ -42,3 +42,7 @@ type HFDSPathInfo struct {
 	LastCommit interface{} `json:"last_commit,omitempty"`
 	Security   interface{} `json:"security,omitempty"`
 }
+
+type HFErrorRes struct {
+	Error string `json:"error"`
+}

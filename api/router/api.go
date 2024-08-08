@@ -639,6 +639,7 @@ func createHFRoutes(r *gin.Engine, hfdsHandler *handler.HFDatasetHandler, repoCo
 		hfdsMetaGroup.GET("/:namespace/:name/revision/:ref", hfdsHandler.DatasetMetaInfo)
 		hfdsMetaGroup.POST("/:namespace/:name/paths-info/:ref", hfdsHandler.DatasetPathsInfo)
 		hfdsMetaGroup.GET("/:namespace/:name/tree/:ref/*path_in_repo", hfdsHandler.DatasetTree)
+		hfdsMetaGroup.GET("/:namespace/:name/resolve/:ref/.huggingface.yaml", hfdsHandler.HandleHFYaml)
 	}
 	hfdsFileGroup := r.Group("/datasets")
 	{
