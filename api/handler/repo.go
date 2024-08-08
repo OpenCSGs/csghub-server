@@ -775,18 +775,18 @@ func (h *RepoHandler) HeadSDKDownload(ctx *gin.Context) {
 	file, err := h.c.HeadDownloadFile(ctx, req, currentUser)
 	if err != nil {
 		if errors.Is(err, component.ErrUnauthorized) {
-			slog.Error("permission denied when accessing repo", slog.String("repo_type", string(req.RepoType)), slog.Any("path", fmt.Sprintf("%s/%s", namespace, name)))
+			slog.Error("permission denied when accessing repo head", slog.String("repo_type", string(req.RepoType)), slog.Any("path", fmt.Sprintf("%s/%s", namespace, name)))
 			httpbase.UnauthorizedError(ctx, err)
 			return
 		}
 
 		if errors.Is(err, component.ErrNotFound) {
-			slog.Error("repo not found", slog.String("repo_type", string(common.RepoTypeFromContext(ctx))), slog.Any("path", fmt.Sprintf("%s/%s", namespace, name)))
+			slog.Error("repo not found head", slog.String("repo_type", string(common.RepoTypeFromContext(ctx))), slog.Any("path", fmt.Sprintf("%s/%s", namespace, name)))
 			httpbase.NotFoundError(ctx, err)
 			return
 		}
 
-		slog.Error("Failed to download repo file", slog.String("repo_type", string(req.RepoType)), slog.Any("error", err))
+		slog.Error("Failed to download repo file head", slog.String("repo_type", string(req.RepoType)), slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
 		return
 	}

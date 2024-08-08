@@ -108,6 +108,7 @@ func (d *deployer) serverlessDeploy(ctx context.Context, dr types.DeployRepo) (*
 		deploy *database.Deploy = nil
 		err    error            = nil
 	)
+	slog.Info("do deployer.serverlessDeploy check type", slog.Any("dr.Type", dr.Type))
 	if dr.Type == types.SpaceType {
 		deploy, err = d.store.GetLatestDeployBySpaceID(ctx, dr.SpaceID)
 	} else {
@@ -126,11 +127,12 @@ func (d *deployer) serverlessDeploy(ctx context.Context, dr types.DeployRepo) (*
 	deploy.SKU = dr.SKU
 	// dr.ImageID is not null for nginx space, otherwise it's ""
 	deploy.ImageID = dr.ImageID
+	slog.Info("do deployer.serverlessDeploy", slog.Any("dr", dr), slog.Any("deploy", deploy))
 	err = d.store.UpdateDeploy(ctx, deploy)
 	if err != nil {
 		return nil, fmt.Errorf("fail reset deploy image, %w", err)
 	}
-
+	slog.Info("return deployer.serverlessDeploy", slog.Any("dr", dr), slog.Any("deploy", deploy))
 	return deploy, nil
 }
 
@@ -172,6 +174,7 @@ func (d *deployer) dedicatedDeploy(ctx context.Context, dr types.DeployRepo) (*d
 func (d *deployer) buildDeploy(ctx context.Context, dr types.DeployRepo) (*database.Deploy, error) {
 	var deploy *database.Deploy = nil
 	var err error = nil
+	slog.Info("do deployer.buildDeploy check type", slog.Any("dr.Type", dr.Type))
 	if dr.Type == types.SpaceType || dr.Type == types.ServerlessType {
 		// space case: SpaceID>0 and ModelID=0, reuse latest deploy of spaces
 		deploy, err = d.serverlessDeploy(ctx, dr)
@@ -179,7 +182,7 @@ func (d *deployer) buildDeploy(ctx context.Context, dr types.DeployRepo) (*datab
 			return nil, fmt.Errorf("fail to check serverless deploy for spaceID %v, %w", dr.SpaceID, err)
 		}
 	}
-
+	slog.Info("do deployer.buildDeploy", slog.Any("dr", dr), slog.Any("deploy", deploy))
 	if deploy == nil {
 		// create new deploy for model inference and no latest deploy of space
 		deploy, err = d.dedicatedDeploy(ctx, dr)
@@ -188,21 +191,27 @@ func (d *deployer) buildDeploy(ctx context.Context, dr types.DeployRepo) (*datab
 	if err != nil {
 		return nil, err
 	}
+	slog.Info("return deployer.buildDeploy", slog.Any("dr", dr), slog.Any("deploy", deploy))
 	return deploy, nil
 }
 
 func (d *deployer) Deploy(ctx context.Context, dr types.DeployRepo) (int64, error) {
 	deploy, err := d.buildDeploy(ctx, dr)
+	slog.Info("do deployer.Deploy", slog.Any("dr", dr), slog.Any("deploy", deploy))
 	if err != nil || deploy == nil {
 		return -1, fmt.Errorf("failed to create deploy in db, %w", err)
 	}
 	// skip build step for model as inference
 	bldTaskStatus := 0
 	bldTaskMsg := ""
-	if len(strings.Trim(deploy.ImageID, " ")) > 0 {
+
+	imgStrLen := len(strings.Trim(deploy.ImageID, " "))
+	slog.Info("do deployer.Deploy check image", slog.Any("deploy.ImageID", deploy.ImageID), slog.Any("imgStrLen", imgStrLen))
+	if imgStrLen > 0 {
 		bldTaskStatus = scheduler.BuildSkip
 		bldTaskMsg = "Skip"
 	}
+	slog.Info("create build task", slog.Any("bldTaskStatus", bldTaskStatus), slog.Any("bldTaskMsg", bldTaskMsg))
 	buildTask := &database.DeployTask{
 		DeployID: deploy.ID,
 		TaskType: 0,

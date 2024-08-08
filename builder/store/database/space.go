@@ -6,6 +6,7 @@ import (
 	"log/slog"
 
 	"github.com/uptrace/bun"
+	"opencsg.com/csghub-server/common/types"
 )
 
 type SpaceStore struct {
@@ -55,7 +56,7 @@ func (s *SpaceStore) FindByPath(ctx context.Context, namespace, name string) (*S
 		NewSelect().
 		Model(resSpace).
 		Relation("Repository.User").
-		Where("repository.path =?", fmt.Sprintf("%s/%s", namespace, name)).
+		Where("repository.path = ? and repository.repository_type = ?", fmt.Sprintf("%s/%s", namespace, name), types.SpaceRepo).
 		Scan(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find space: %w", err)
