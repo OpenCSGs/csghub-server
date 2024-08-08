@@ -33,15 +33,27 @@ type SpaceResourceHandler struct {
 // @Accept       json
 // @Produce      json
 // @Param        cluster_id query string false "cluster_id"
+// @Param 		 deploy_type query int false "deploy type(0-space,1-inference,2-finetune)" Enums(0, 1, 2) default(1)
 // @Success      200  {object}  types.ResponseWithTotal{data=[]types.SpaceResource,total=int} "OK"
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
 // @Router       /space_resources [get]
 func (h *SpaceResourceHandler) Index(ctx *gin.Context) {
 	clusterId := ctx.Query("cluster_id")
-	spaceResources, err := h.c.Index(ctx, clusterId)
+	deployTypeStr := ctx.Query("deploy_type")
+	if deployTypeStr == "" {
+		// backward compatibility for inferences
+		deployTypeStr = strconv.Itoa(types.InferenceType)
+	}
+	deployType, err := strconv.Atoi(deployTypeStr)
 	if err != nil {
-		slog.Error("Failed to get space resources", slog.Any("error", err))
+		slog.Error("Bad request format", "error", err)
+		httpbase.BadRequest(ctx, err.Error())
+		return
+	}
+	spaceResources, err := h.c.Index(ctx, clusterId, deployType)
+	if err != nil {
+		slog.Error("Failed to get space resources", slog.String("cluster_id", clusterId), slog.String("deploy_type", deployTypeStr), slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
 		return
 	}

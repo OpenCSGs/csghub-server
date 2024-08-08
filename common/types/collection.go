@@ -16,6 +16,9 @@ type Collection struct {
 	CreatedAt    time.Time              `json:"created_at"`
 	UpdatedAt    time.Time              `json:"updated_at"`
 	Likes        int64                  `json:"likes"`
+	UserLikes    bool                   `json:"user_likes"`
+	CanWrite     bool                   `json:"can_write"`
+	CanManage    bool                   `json:"can_manage"`
 }
 
 type CollectionRepository struct {
@@ -46,6 +49,7 @@ type CreateCollectionReq struct {
 	UserUUID    string `json:"-"`
 	UserID      int64  `json:"-"`
 	ID          int64  `json:"-"`
+	Namespace   string `json:"namespace" example:"user_or_org_name"`
 	Theme       string `json:"theme" example:"#fff000"`
 	Name        string `json:"name" example:"collection1"`
 	Nickname    string `json:"nickname" example:"collection nick name"`

@@ -17,7 +17,7 @@ import (
 )
 
 func NewCollectionHandler(cfg *config.Config) (*CollectionHandler, error) {
-	cc, err := component.NewCollectionComponent()
+	cc, err := component.NewCollectionComponent(cfg)
 	if err != nil {
 		return nil, err
 	}
@@ -135,7 +135,8 @@ func (c *CollectionHandler) GetCollection(ctx *gin.Context) {
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
-	collection, err := c.cc.GetCollection(ctx, id)
+	currentUser := httpbase.GetCurrentUser(ctx)
+	collection, err := c.cc.GetCollection(ctx, currentUser, id)
 	if err != nil {
 		slog.Error("Failed to create space", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)

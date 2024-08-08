@@ -25,15 +25,16 @@ type ClusterRes struct {
 }
 
 type NodeResourceInfo struct {
-	NodeName     string  `json:"node_name"`
-	GPUModel     string  `json:"gpu_model"`
-	TotalCPU     float64 `json:"total_cpu"`
-	UsedCPU      float64 `json:"used_cpu"`
-	TotalGPU     int64   `json:"total_gpu"`
-	AvailableGPU int64   `json:"available_gpu"`
-	GPUVendor    string  `json:"gpu_vendor"`
-	TotalMem     float32 `json:"total_mem"`     //in GB
-	AvailableMem float32 `json:"available_mem"` //in GB
+	NodeName         string  `json:"node_name"`
+	GPUModel         string  `json:"gpu_model"`
+	TotalCPU         float64 `json:"total_cpu"`
+	AvailableCPU     float64 `json:"available_cpu"`
+	TotalGPU         int64   `json:"total_gpu"`
+	AvailableGPU     int64   `json:"available_gpu"`
+	GPUVendor        string  `json:"gpu_vendor"`
+	TotalMem         float32 `json:"total_mem"`     //in GB
+	AvailableMem     float32 `json:"available_mem"` //in GB
+	XPUCapacityLabel string  `json:"xpu_capacity_label"`
 }
 
 type UpdateClusterResponse struct {

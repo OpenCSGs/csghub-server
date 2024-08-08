@@ -24,7 +24,7 @@ type SpaceResource struct {
 
 func (s *SpaceResourceStore) Index(ctx context.Context, clusterId string) ([]SpaceResource, error) {
 	var result []SpaceResource
-	_, err := s.db.Operator.Core.NewSelect().Model(&result).Where("cluster_id = ?", clusterId).Exec(ctx, &result)
+	_, err := s.db.Operator.Core.NewSelect().Model(&result).Where("cluster_id = ?", clusterId).Order("name asc").Exec(ctx, &result)
 	if err != nil {
 		return nil, err
 	}

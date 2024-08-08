@@ -24,7 +24,7 @@ type SpaceResourceComponent struct {
 	deployer deploy.Deployer
 }
 
-func (c *SpaceResourceComponent) Index(ctx context.Context, clusterId string) ([]types.SpaceResource, error) {
+func (c *SpaceResourceComponent) Index(ctx context.Context, clusterId string, deployType int) ([]types.SpaceResource, error) {
 	// backward compatibility for old api
 	if clusterId == "" {
 		clusters, err := c.deployer.ListCluster(ctx)
@@ -53,6 +53,11 @@ func (c *SpaceResourceComponent) Index(ctx context.Context, clusterId string) ([
 			slog.Error("invalid hardware setting", slog.Any("error", err), slog.String("hardware", r.Resources))
 		} else {
 			isAvailable = deploy.CheckResource(clusterResources, &hardware)
+		}
+		if deployType == types.FinetuneType {
+			if hardware.Gpu.Num == "" {
+				continue
+			}
 		}
 		result = append(result, types.SpaceResource{
 			ID:          r.ID,
@@ -97,6 +102,7 @@ func (c *SpaceResourceComponent) Create(ctx context.Context, req *types.CreateSp
 		Name:        req.Name,
 		Resources:   req.Resources,
 		CostPerHour: req.CostPerHour,
+		ClusterID:   req.ClusterID,
 	}
 	res, err := c.srs.Create(ctx, sr)
 	if err != nil {

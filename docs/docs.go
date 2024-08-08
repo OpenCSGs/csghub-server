@@ -4528,6 +4528,91 @@ const docTemplate = `{
                 }
             }
         },
+        "/organization/{namespace}/collections": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Organization"
+                ],
+                "summary": "Get organization Collections",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "org name",
+                        "name": "namespace",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "current user name",
+                        "name": "current_user",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "page size",
+                        "name": "per",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "current page number",
+                        "name": "page",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/types.ResponseWithTotal"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/definitions/types.Collection"
+                                            }
+                                        },
+                                        "total": {
+                                            "type": "integer"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            }
+        },
         "/organization/{namespace}/datasets": {
             "get": {
                 "security": [
@@ -5681,6 +5766,18 @@ const docTemplate = `{
                         "type": "string",
                         "description": "cluster_id",
                         "name": "cluster_id",
+                        "in": "query"
+                    },
+                    {
+                        "enum": [
+                            0,
+                            1,
+                            2
+                        ],
+                        "type": "integer",
+                        "default": 1,
+                        "description": "deploy type(0-space,1-inference,2-finetune)",
+                        "name": "deploy_type",
                         "in": "query"
                     }
                 ],
@@ -11553,6 +11650,9 @@ const docTemplate = `{
                 "name": {
                     "type": "string"
                 },
+                "namespace": {
+                    "type": "string"
+                },
                 "nickname": {
                     "type": "string"
                 },
@@ -12300,6 +12400,12 @@ const docTemplate = `{
         "types.Collection": {
             "type": "object",
             "properties": {
+                "can_manage": {
+                    "type": "boolean"
+                },
+                "can_write": {
+                    "type": "boolean"
+                },
                 "created_at": {
                     "type": "string"
                 },
@@ -12332,6 +12438,9 @@ const docTemplate = `{
                 },
                 "updated_at": {
                     "type": "string"
+                },
+                "user_likes": {
+                    "type": "boolean"
                 },
                 "username": {
                     "type": "string"
@@ -12539,6 +12648,10 @@ const docTemplate = `{
                 "name": {
                     "type": "string",
                     "example": "collection1"
+                },
+                "namespace": {
+                    "type": "string",
+                    "example": "user_or_org_name"
                 },
                 "nickname": {
                     "type": "string",
@@ -12807,11 +12920,15 @@ const docTemplate = `{
         "types.CreateSpaceResourceReq": {
             "type": "object",
             "required": [
+                "cluster_id",
                 "cost_per_hour",
                 "name",
                 "resources"
             ],
             "properties": {
+                "cluster_id": {
+                    "type": "string"
+                },
                 "cost_per_hour": {
                     "type": "number"
                 },
