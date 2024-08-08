@@ -543,10 +543,14 @@ func (c *SpaceComponent) Deploy(ctx context.Context, namespace, name, currentUse
 	}
 
 	containerImg := ""
+	slog.Info("get space for deploy", slog.Any("space", s), slog.Any("NGINX", scheduler.NGINX))
+	slog.Info("compare space sdk", slog.Any("s.Sdk", s.Sdk), slog.Any("scheduler.NGINX.Name", scheduler.NGINX.Name))
 	if s.Sdk == scheduler.NGINX.Name {
+		slog.Warn("space use nginx pre-define image", slog.Any("namespace", namespace), slog.Any("name", name), slog.Any("scheduler.NGINX.Image", scheduler.NGINX.Image))
 		// Use default image for nginx space
 		containerImg = scheduler.NGINX.Image
 	}
+	slog.Info("run space with container image", slog.Any("namespace", namespace), slog.Any("name", name), slog.Any("containerImg", containerImg))
 
 	// create deploy for space
 	return c.deployer.Deploy(ctx, types.DeployRepo{
@@ -607,12 +611,21 @@ func (c *SpaceComponent) Stop(ctx context.Context, namespace, name string) error
 		return fmt.Errorf("can't get space deployment")
 	}
 
-	return c.deployer.Stop(ctx, types.DeployRepo{
+	err = c.deployer.Stop(ctx, types.DeployRepo{
 		SpaceID:   s.ID,
 		Namespace: namespace,
 		Name:      name,
 		SvcName:   deploy.SvcName,
 	})
+	if err != nil {
+		return fmt.Errorf("can't stop space service deploy for service '%s', %w", deploy.SvcName, err)
+	}
+
+	err = c.deploy.StopDeploy(ctx, types.SpaceRepo, deploy.RepoID, deploy.UserID, deploy.ID)
+	if err != nil {
+		return fmt.Errorf("fail to update space deploy status to stopped for deploy ID '%d', %w", deploy.ID, err)
+	}
+	return nil
 }
 
 // FixHasEntryFile checks whether git repo has entry point file and update space's HasAppFile property in db
@@ -649,7 +662,7 @@ func (c *SpaceComponent) status(ctx context.Context, s *database.Space) (string,
 		Namespace: namespace,
 		Name:      name,
 		SvcName:   deploy.SvcName,
-	}, false)
+	}, true)
 	if err != nil {
 		slog.Error("error happen when get space status", slog.Any("error", err), slog.String("path", s.Repository.Path))
 		return "", SpaceStatusStopped, err
