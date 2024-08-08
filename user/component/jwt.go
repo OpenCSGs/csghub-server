@@ -30,6 +30,9 @@ func (c *JwtComponent) GenerateToken(ctx context.Context, req types.CreateJWTReq
 	if err != nil {
 		return nil, "", fmt.Errorf("failed to find user by uuid '%s',error: %w", req.UUID, err)
 	}
+	if u.Username != req.CurrentUser {
+		return nil, "", fmt.Errorf("user uuid '%s' does not match current user '%s'", req.UUID, req.CurrentUser)
+	}
 	expireAt := jwt.NewNumericDate(time.Now().Add(c.ValidTime))
 	claims = &types.JWTClaims{
 		UUID:        u.UUID,

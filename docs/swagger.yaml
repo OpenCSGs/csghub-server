@@ -778,6 +778,23 @@ definitions:
     type: object
   types.CreateFileResp:
     type: object
+  types.CreateJWTReq:
+    properties:
+      current_user:
+        type: string
+      uuid:
+        type: string
+    required:
+    - current_user
+    - uuid
+    type: object
+  types.CreateJWTResp:
+    properties:
+      expire_at:
+        type: string
+      token:
+        type: string
+    type: object
   types.CreateMirrorParams:
     properties:
       mirror_source_id:

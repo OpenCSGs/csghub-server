@@ -11098,6 +11098,32 @@
         "types.CreateFileResp": {
             "type": "object"
         },
+        "types.CreateJWTReq": {
+            "type": "object",
+            "required": [
+                "current_user",
+                "uuid"
+            ],
+            "properties": {
+                "current_user": {
+                    "type": "string"
+                },
+                "uuid": {
+                    "type": "string"
+                }
+            }
+        },
+        "types.CreateJWTResp": {
+            "type": "object",
+            "properties": {
+                "expire_at": {
+                    "type": "string"
+                },
+                "token": {
+                    "type": "string"
+                }
+            }
+        },
         "types.CreateMirrorParams": {
             "type": "object",
             "properties": {
