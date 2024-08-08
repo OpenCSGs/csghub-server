@@ -264,14 +264,8 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 	event := apiGroup.Group("/events")
 	event.POST("", eventHandler.Create)
 
-	runtimeFramework := apiGroup.Group("/runtime_framework")
-	{
-		runtimeFramework.GET("/:id/models", modelHandler.ListByRuntimeFrameworkID)
-		runtimeFramework.GET("", modelHandler.ListAllRuntimeFramework)
-		runtimeFramework.POST("/:id", needAPIKey, modelHandler.UpdateModelRuntimeFrameworks)
-		runtimeFramework.DELETE("/:id", needAPIKey, modelHandler.DeleteModelRuntimeFrameworks)
-		runtimeFramework.GET("/models", modelHandler.ListModelsOfRuntimeFrameworks)
-	}
+	createRuntimeFrameworkRoutes(apiGroup, needAPIKey, modelHandler)
+
 	syncHandler, err := handler.NewSyncHandler(config)
 	if err != nil {
 		return nil, fmt.Errorf("error creating sync handler:%w", err)
@@ -292,13 +286,8 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 	if err != nil {
 		return nil, fmt.Errorf("error creating accounting handler setting handler:%w", err)
 	}
-	accountingGroup := apiGroup.Group("/accounting")
-	{
-		meterGroup := accountingGroup.Group("/metering")
-		{
-			meterGroup.GET("/:id/statements", accountingHandler.QueryMeteringStatementByUserID)
-		}
-	}
+
+	createAccountRoutes(apiGroup, needAPIKey, accountingHandler)
 
 	recomHandler, err := handler.NewRecomHandler(config)
 	if err != nil {
