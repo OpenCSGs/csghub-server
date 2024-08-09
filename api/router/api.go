@@ -606,11 +606,11 @@ func createHFRoutes(r *gin.Engine, hfdsHandler *handler.HFDatasetHandler, repoCo
 	// Huggingface SDK routes
 	hfGroup := r.Group("/hf")
 	{
-		hfGroup.GET("/:namespace/:name/resolve/:branch/*file_path", middleware.RepoMapping(types.ModelRepo), repoCommonHandler.SDKDownload)
+		hfGroup.GET("/:namespace/:name/resolve/:branch/*file_path", middleware.RepoMapping(types.ModelRepo), repoCommonHandler.ModelSDKDownload)
 		hfGroup.HEAD("/:namespace/:name/resolve/:branch/*file_path", middleware.RepoMapping(types.ModelRepo), repoCommonHandler.HeadSDKDownload)
 		hfdsFileGroup := hfGroup.Group("/datasets")
 		{
-			hfdsFileGroup.GET("/:namespace/:name/resolve/:branch/*file_path", middleware.RepoMapping(types.DatasetRepo), repoCommonHandler.SDKDownload)
+			hfdsFileGroup.GET("/:namespace/:name/resolve/:branch/*file_path", middleware.RepoMapping(types.DatasetRepo), repoCommonHandler.DataSetSDKDownload)
 			hfdsFileGroup.HEAD("/:namespace/:name/resolve/:branch/*file_path", middleware.RepoMapping(types.DatasetRepo), repoCommonHandler.HeadSDKDownload)
 		}
 		hfAPIGroup := hfGroup.Group("/api")
