@@ -134,10 +134,10 @@ func GetNodeResources(clientset *kubernetes.Clientset, config *config.Config) (m
 		}
 		totalMem := getMem(memQuantity)
 		totalCPU := node.Status.Capacity.Cpu().MilliValue()
-		totalGPU := resource.Quantity{}
+		totalXPU := resource.Quantity{}
 		xpuCapacityLabel, xpuTypeLabel := getXPULabel(node, config)
 		if xpuCapacityLabel != "" {
-			totalGPU = node.Status.Capacity[v1.ResourceName(xpuCapacityLabel)]
+			totalXPU = node.Status.Capacity[v1.ResourceName(xpuCapacityLabel)]
 		}
 
 		gpuModelVendor := strings.Split(node.Labels[xpuTypeLabel], "-")
@@ -149,10 +149,10 @@ func GetNodeResources(clientset *kubernetes.Clientset, config *config.Config) (m
 			NodeName:         node.Name,
 			TotalCPU:         millicoresToCores(totalCPU),
 			AvailableCPU:     millicoresToCores(totalCPU),
-			GPUModel:         gpuModel,
+			XPUModel:         gpuModel,
 			GPUVendor:        gpuModelVendor[0],
-			TotalGPU:         parseQuantityToInt64(totalGPU),
-			AvailableGPU:     parseQuantityToInt64(totalGPU),
+			TotalXPU:         parseQuantityToInt64(totalXPU),
+			AvailableXPU:     parseQuantityToInt64(totalXPU),
 			AvailableMem:     totalMem,
 			TotalMem:         totalMem,
 			XPUCapacityLabel: xpuCapacityLabel,
@@ -166,7 +166,7 @@ func GetNodeResources(clientset *kubernetes.Clientset, config *config.Config) (m
 		nodeResource := nodeResourcesMap[pod.Spec.NodeName]
 		for _, container := range pod.Spec.Containers {
 			if requestedGPU, hasGPU := container.Resources.Requests[v1.ResourceName(nodeResource.XPUCapacityLabel)]; hasGPU {
-				nodeResource.AvailableGPU -= parseQuantityToInt64(requestedGPU)
+				nodeResource.AvailableXPU -= parseQuantityToInt64(requestedGPU)
 			}
 			if memoryRequest, hasMemory := container.Resources.Requests[v1.ResourceMemory]; hasMemory {
 				nodeResource.AvailableMem -= getMem(parseQuantityToInt64(memoryRequest))

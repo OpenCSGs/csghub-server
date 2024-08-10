@@ -247,6 +247,9 @@ func (t *DeployRunner) makeDeployRequest() (*types.RunRequest, error) {
 	envMap["ACCESS_TOKEN"] = token.Token
 	envMap["REPO_ID"] = t.repo.Path       // "namespace/name"
 	envMap["REVISION"] = deploy.GitBranch // branch
+	if hardware.Gpu.Num != "" {
+		envMap["GPU_NUM"] = hardware.Gpu.Num
+	}
 
 	if deploy.SpaceID > 0 {
 		// sdk port for space

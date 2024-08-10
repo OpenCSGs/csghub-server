@@ -732,9 +732,7 @@ func CheckResource(clusterResources *types.ClusterRes, hardware *types.HardWare)
 	}
 	for _, node := range clusterResources.Resources {
 		if float32(mem) <= node.AvailableMem {
-			if hardware.Gpu.Num == "" {
-				return true
-			} else {
+			if hardware.Gpu.Num != "" {
 				gpu, err := strconv.Atoi(hardware.Gpu.Num)
 				if err != nil {
 					slog.Error("failed to parse hardware gpu ", slog.Any("error", err))
@@ -746,10 +744,11 @@ func CheckResource(clusterResources *types.ClusterRes, hardware *types.HardWare)
 					return false
 
 				}
-				if gpu <= int(node.AvailableGPU) && hardware.Gpu.Type == node.GPUModel && cpu <= int(node.AvailableCPU) {
+				if gpu <= int(node.AvailableXPU) && hardware.Gpu.Type == node.XPUModel && cpu <= int(node.AvailableCPU) {
 					return true
 				}
-
+			} else {
+				return true
 			}
 		}
 	}
