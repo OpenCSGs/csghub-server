@@ -727,12 +727,8 @@ func (h *RepoHandler) SDKListFiles(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, files)
 }
 
-func (h *RepoHandler) ModelSDKDownload(ctx *gin.Context) {
+func (h *RepoHandler) SDKDownload(ctx *gin.Context) {
 	h.handleDownload(ctx, false)
-}
-
-func (h *RepoHandler) DataSetSDKDownload(ctx *gin.Context) {
-	h.handleDownload(ctx, true)
 }
 
 // DownloadRepoFile godoc
