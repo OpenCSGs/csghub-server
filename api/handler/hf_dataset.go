@@ -1,7 +1,6 @@
 package handler
 
 import (
-	"errors"
 	"log/slog"
 	"net/http"
 	"net/url"
@@ -26,35 +25,6 @@ func NewHFDatasetHandler(config *config.Config) (*HFDatasetHandler, error) {
 
 type HFDatasetHandler struct {
 	dc *component.HFDatasetComponent
-}
-
-func (h *HFDatasetHandler) DatasetMetaInfo(ctx *gin.Context) {
-	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
-	if err != nil {
-		slog.Error("Bad request format for dataset meta", "error", err)
-		httpbase.BadRequest(ctx, err.Error())
-		return
-	}
-	ref := ctx.Param("ref")
-	currentUser := httpbase.GetCurrentUser(ctx)
-	req := types.HFDatasetReq{
-		Namespace:   namespace,
-		Name:        name,
-		Ref:         ref,
-		CurrentUser: currentUser,
-	}
-	meta, err := h.dc.GetDatasetMeta(ctx, req)
-	if err != nil {
-		if errors.Is(err, component.ErrUnauthorized) {
-			httpbase.UnauthorizedError(ctx, err)
-			return
-		}
-		slog.Error("fail to get dataset meta", slog.Any("req", req), slog.Any("error", err))
-		httpbase.ServerError(ctx, err)
-		return
-	}
-
-	ctx.PureJSON(http.StatusOK, meta)
 }
 
 func (h *HFDatasetHandler) DatasetPathsInfo(ctx *gin.Context) {
