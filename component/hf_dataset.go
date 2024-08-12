@@ -32,62 +32,6 @@ type HFDatasetComponent struct {
 	rs *database.RepoStore
 }
 
-func (h *HFDatasetComponent) GetDatasetMeta(ctx context.Context, req types.HFDatasetReq) (*types.HFDatasetMeta, error) {
-	ds, err := h.ds.FindByPath(ctx, req.Namespace, req.Name)
-	if err != nil {
-		return nil, fmt.Errorf("failed to find dataset, error: %w", err)
-	}
-
-	allow, err := h.AllowReadAccessRepo(ctx, ds.Repository, req.CurrentUser)
-	if err != nil {
-		return nil, fmt.Errorf("failed to check dataset permission, error: %w", err)
-	}
-	if !allow {
-		return nil, ErrUnauthorized
-	}
-
-	var tags []string
-	for _, tag := range ds.Repository.Tags {
-		tags = append(tags, tag.Name)
-	}
-
-	filePaths, err := getFilePaths(req.Namespace, req.Name, "", types.DatasetRepo, h.git.GetRepoFileTree)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get all %s %s/%s files, error: %w", types.DatasetRepo, req.Namespace, req.Name, err)
-	}
-
-	var sdkFiles []types.SDKFile
-	for _, filePath := range filePaths {
-		sdkFiles = append(sdkFiles, types.SDKFile{Filename: filePath})
-	}
-
-	lastCommit, err := h.LastCommit(ctx, &types.GetCommitsReq{
-		Namespace: req.Namespace,
-		Name:      req.Name,
-		Ref:       req.Ref,
-		RepoType:  types.DatasetRepo,
-	})
-	if err != nil {
-		return nil, fmt.Errorf("failed to get latest commit, error: %w", err)
-	}
-	meta := types.HFDatasetMeta{
-		ID:           ds.Repository.Path,
-		Author:       ds.Repository.User.Username,
-		Sha:          lastCommit.ID,
-		Private:      ds.Repository.Private,
-		Disabled:     false,
-		Gated:        nil,
-		Downloads:    int(ds.Repository.DownloadCount),
-		Likes:        int(ds.Repository.Likes),
-		Tags:         tags,
-		Siblings:     sdkFiles,
-		CreatedAt:    ds.Repository.CreatedAt,
-		LastModified: ds.Repository.UpdatedAt,
-	}
-
-	return &meta, nil
-}
-
 func convertFilePathFromRoute(path string) string {
 	return strings.TrimLeft(path, "/")
 }

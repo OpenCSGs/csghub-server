@@ -884,7 +884,7 @@ func (c *RepoComponent) HeadDownloadFile(ctx context.Context, req *types.GetFile
 	}
 	file, err := c.git.GetRepoFileContents(ctx, getFileContentReq)
 	if err != nil {
-		slog.Info("err.Error()", slog.Any("err.Error()", err.Error()))
+		slog.Error("err.Error()", slog.Any("err.Error()", err.Error()))
 		if err.Error() == ErrNotFoundMessage || err.Error() == ErrGetContentsOrList {
 			return nil, ErrNotFound
 		}

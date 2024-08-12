@@ -625,7 +625,7 @@ func createHFRoutes(r *gin.Engine, hfdsHandler *handler.HFDatasetHandler, repoCo
 			{
 				// compitable with HF dataset info api, used for sdk like this: huggingface_hub.dataset_info(repo_id, revision)
 				hfDSAPIGroup.GET("/:namespace/:name/revision/:ref", middleware.RepoMapping(types.DatasetRepo), repoCommonHandler.SDKListFiles)
-				hfDSAPIGroup.GET("/:namespace/:name", hfdsHandler.DatasetMetaInfo)
+				hfDSAPIGroup.GET("/:namespace/:name", middleware.RepoMapping(types.DatasetRepo), repoCommonHandler.SDKListFiles)
 				hfDSAPIGroup.POST("/:namespace/:name/paths-info/:ref", hfdsHandler.DatasetPathsInfo)
 				hfDSAPIGroup.GET("/:namespace/:name/tree/:ref/*path_in_repo", hfdsHandler.DatasetTree)
 				hfDSAPIGroup.GET("/:namespace/:name/resolve/:ref/.huggingface.yaml", hfdsHandler.HandleHFYaml)
