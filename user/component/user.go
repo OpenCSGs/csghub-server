@@ -419,10 +419,14 @@ func (c *UserComponent) Signin(ctx context.Context, code, state string) (*types.
 			return nil, "", fmt.Errorf("failed to create user,error:%w", err)
 		}
 	}
-
+	// get user from db for username, as casdoor may have different username
+	dbu, err := c.us.FindByUUID(ctx, cu.Id)
+	if err != nil {
+		return nil, "", fmt.Errorf("failed to find user by uuid in db, uuid:%s, error:%w", cu.Id, err)
+	}
 	hubToken, signed, err := c.jwtc.GenerateToken(ctx, types.CreateJWTReq{
-		UUID:        cu.Id,
-		CurrentUser: cu.Name,
+		UUID:        dbu.UUID,
+		CurrentUser: dbu.Username,
 	})
 	if err != nil {
 		return nil, "", fmt.Errorf("failed to generate jwt token,error:%w", err)
