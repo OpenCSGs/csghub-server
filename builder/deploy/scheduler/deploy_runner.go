@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"net/url"
 	"strconv"
 	"strings"
 	"time"
@@ -272,7 +273,7 @@ func (t *DeployRunner) makeDeployRequest() (*types.RunRequest, error) {
 
 	if deploy.Type == types.FinetuneType {
 		envMap["port"] = strconv.Itoa(deploy.ContainerPort)
-		envMap["HF_ENDPOINT"] = t.modelDownloadEndpoint + "/hf"
+		envMap["HF_ENDPOINT"], _ = url.JoinPath(t.modelDownloadEndpoint, "hf")
 		envMap["HF_TOKEN"] = token.Token
 	}
 

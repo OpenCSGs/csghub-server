@@ -15,6 +15,7 @@ type ClusterRequest struct {
 	Zone          string `json:"zone"`     //cn-beijing
 	Provider      string `json:"provider"` //ali
 	Enable        bool   `json:"enable"`
+	StorageClass  string `json:"storage_class"`
 }
 type ClusterRes struct {
 	ClusterID string             `json:"cluster_id"`

@@ -27,6 +27,7 @@ type Cluster struct {
 	ConfigPath    string                // Path to the kubeconfig file
 	Client        *kubernetes.Clientset // Kubernetes client
 	KnativeClient *knative.Clientset    // Knative client
+	StorageClass  string
 }
 
 // ClusterPool is a resource pool of cluster information
@@ -99,12 +100,15 @@ func (p *ClusterPool) GetCluster() (*Cluster, error) {
 // GetClusterByID retrieves a cluster from the pool given its unique ID
 func (p *ClusterPool) GetClusterByID(ctx context.Context, id string) (*Cluster, error) {
 	cfId := "config"
+	storageClass := ""
 	if len(id) != 0 {
 		cInfo, _ := p.ClusterStore.ByClusterID(ctx, id)
 		cfId = cInfo.ClusterConfig
+		storageClass = cInfo.StorageClass
 	}
 	for _, Cluster := range p.Clusters {
 		if Cluster.ID == cfId {
+			Cluster.StorageClass = storageClass
 			return &Cluster, nil
 		}
 	}

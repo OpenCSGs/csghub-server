@@ -237,7 +237,7 @@ func (s *ServiceComponent) NewPersistentVolumeClaim(name string, ctx context.Con
 					corev1.ResourceStorage: storage,
 				},
 			},
-			StorageClassName: &s.env.Space.StorageClass,
+			StorageClassName: &cluster.StorageClass,
 		},
 	}
 	_, err = cluster.Client.CoreV1().PersistentVolumeClaims(s.k8sNameSpace).Create(ctx, &pvc, metav1.CreateOptions{})

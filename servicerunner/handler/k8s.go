@@ -80,7 +80,9 @@ func (s *K8sHander) RunService(c *gin.Context) {
 		return
 	}
 	// add pvc if possible
-	if s.env.Space.StorageClass != "" && request.DeployType != types.SpaceType {
+	// space image was built from user's code, model cache dir is hard to control
+	// so no PV cache for space case so far
+	if cluster.StorageClass != "" && request.DeployType != types.SpaceType {
 		err = s.s.NewPersistentVolumeClaim(srvName, c, *cluster, request.Hardware)
 		if err != nil {
 			slog.Error("Failed to create persist volume", "error", err)
@@ -827,11 +829,13 @@ func (s *K8sHander) PurgeService(c *gin.Context) {
 	}
 
 	// 2 clean up pvc
-	err = cluster.Client.CoreV1().PersistentVolumeClaims(s.k8sNameSpace).Delete(c, srvName, metav1.DeleteOptions{})
-	if err != nil {
-		slog.Error("fail to delete pvc", slog.Any("error", err))
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "fail to delete pvc"})
-		return
+	if cluster.StorageClass != "" {
+		err = cluster.Client.CoreV1().PersistentVolumeClaims(s.k8sNameSpace).Delete(c, srvName, metav1.DeleteOptions{})
+		if err != nil {
+			slog.Error("fail to delete pvc", slog.Any("error", err))
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "fail to delete pvc"})
+			return
+		}
 	}
 	slog.Info("service deleted, PVC deleted.", slog.String("srv_name", srvName))
 	resp.Code = 0
