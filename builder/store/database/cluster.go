@@ -22,6 +22,7 @@ func NewClusterInfoStore() *ClusterInfoStore {
 type ClusterInfo struct {
 	ClusterID     string `bun:",pk" json:"cluster_id"`
 	ClusterConfig string `bun:",notnull" json:"cluster_config"`
+	StorageClass  string `bun:",notnull" json:"storage_class"`
 	Region        string `bun:",notnull" json:"region"`
 	Zone          string `bun:",notnull" json:"zone"`     //cn-beijing
 	Provider      string `bun:",notnull" json:"provider"` //ali
