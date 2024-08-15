@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"net/url"
 	"strconv"
 	"strings"
 	"time"
@@ -247,6 +248,9 @@ func (t *DeployRunner) makeDeployRequest() (*types.RunRequest, error) {
 	envMap["ACCESS_TOKEN"] = token.Token
 	envMap["REPO_ID"] = t.repo.Path       // "namespace/name"
 	envMap["REVISION"] = deploy.GitBranch // branch
+	if hardware.Gpu.Num != "" {
+		envMap["GPU_NUM"] = hardware.Gpu.Num
+	}
 
 	if deploy.SpaceID > 0 {
 		// sdk port for space
@@ -269,7 +273,7 @@ func (t *DeployRunner) makeDeployRequest() (*types.RunRequest, error) {
 
 	if deploy.Type == types.FinetuneType {
 		envMap["port"] = strconv.Itoa(deploy.ContainerPort)
-		envMap["HF_ENDPOINT"] = t.modelDownloadEndpoint + "/hf"
+		envMap["HF_ENDPOINT"], _ = url.JoinPath(t.modelDownloadEndpoint, "hf")
 		envMap["HF_TOKEN"] = token.Token
 	}
 

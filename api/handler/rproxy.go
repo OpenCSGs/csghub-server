@@ -76,6 +76,10 @@ func (r *RProxyHandler) Proxy(ctx *gin.Context) {
 	if allow {
 		apiname := ctx.Param("api")
 		target := fmt.Sprintf("http://%s.%s", appSrvName, r.SpaceRootDomain)
+		if deploy.Endpoint != "" {
+			//support multi-cluster
+			target = deploy.Endpoint
+		}
 		rp, _ := proxy.NewReverseProxy(target)
 		rp.ServeHTTP(ctx.Writer, ctx.Request, apiname)
 	} else {

@@ -33,7 +33,7 @@ RUN pip install --no-cache-dir jupyterlab numpy==1.26.4 \
     jupyter-server-proxy==4.2.0 
 # Create a working directory
 WORKDIR /etc/csghub
-RUN git clone https://github.com/hiyouga/LLaMA-Factory.git --branch v0.8.1 --single-branch
+RUN git clone https://github.com/hiyouga/LLaMA-Factory.git --branch v0.8.3 --single-branch
 RUN cd LLaMA-Factory && pip install --no-cache-dir -e ".[metrics,deepspeed]"
 # setup supervisord
 RUN mkdir -p /var/log/supervisord
@@ -47,6 +47,8 @@ RUN mkdir -p /root/.jupyter/lab/user-settings/@jupyterlab/apputils-extension && 
 	    echo '{"theme":"JupyterLab Dark"}' > /root/.jupyter/lab/user-settings/@jupyterlab/apputils-extension/themes.jupyterlab-settings && \
 	    mkdir -p /root/.jupyter/lab/user-settings/@jupyterlab/notebook-extension && \
 	    echo '{"codeCellConfig":{"lineNumbers":true }}' >   /root/.jupyter/lab/user-settings/@jupyterlab/notebook-extension/tracker.jupyterlab-settings
+#fix gradio proxy issue
+RUN pip uninstall gradio && pip install https://git-devops.opencsg.com/opensource/gradio/-/raw/3a207a08755b4820541915e9ea63e6abc1b4b424/gradio-4.41.0-py3-none-any.whl
 # Create a working directory
 WORKDIR /workspace/
 ENTRYPOINT ["/usr/bin/supervisord", "-c", "/etc/supervisor/conf.d/supervisord.conf"]

@@ -59,7 +59,6 @@ type RepoComponent struct {
 	tokenStore        *database.AccessTokenStore
 	rtfm              *database.RuntimeFrameworksStore
 	rrtfms            *database.RepositoriesRuntimeFrameworkStore
-	needPurge         bool
 	syncVersion       *database.SyncVersionStore
 	syncClientSetting *database.SyncClientSettingStore
 	file              *database.FileStore
@@ -117,9 +116,6 @@ func NewRepoComponent(config *config.Config) (*RepoComponent, error) {
 	c.cluster = database.NewClusterInfoStore()
 	c.rtfm = database.NewRuntimeFrameworksStore()
 	c.rrtfms = database.NewRepositoriesRuntimeFramework()
-	if config.Space.StorageClass != "" {
-		c.needPurge = true
-	}
 	c.ac, err = NewAccountingComponent(config)
 	if err != nil {
 		return nil, err
