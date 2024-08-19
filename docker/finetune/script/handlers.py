@@ -375,7 +375,7 @@ class ProxyHandler(WebSocketHandlerMixin, JupyterHandler):
     async def _proxy_progressive(self, host, port, proxied_path, body):
         # Proxy in progressive flush mode, whenever chunks are received. Potentially slower but get results quicker for voila
 
-        client = httpclient.AsyncHTTPClient()
+        client = httpclient.AsyncHTTPClient(force_instance=True)
 
         # Set up handlers so we can progressively flush result
 
@@ -416,7 +416,8 @@ class ProxyHandler(WebSocketHandlerMixin, JupyterHandler):
                                         header_callback=header_callback)
 
         # no timeout for stream api
-        req.request_timeout = 0
+        req.request_timeout = 7200
+        req.connect_timeout = 600
 
         try:
             response = await client.fetch(req, raise_error=False)
@@ -453,7 +454,7 @@ class ProxyHandler(WebSocketHandlerMixin, JupyterHandler):
                 force_instance=True, resolver=UnixResolver(self.unix_socket)
             )
         else:
-            client = httpclient.AsyncHTTPClient()
+            client = httpclient.AsyncHTTPClient(force_instance=True)
 
         req = self._build_proxy_request(host, port, proxied_path, body)
 
