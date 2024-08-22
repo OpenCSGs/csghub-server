@@ -115,11 +115,25 @@ func (cc *CollectionComponent) GetCollection(ctx context.Context, currentUser st
 		newError := fmt.Errorf("failed to check for the presence of the user likes,error:%w", err)
 		return nil, newError
 	}
+	if !permission.CanWrite {
+		newCollection.Repositories = cc.GetPublicRepos(newCollection)
+	}
 	newCollection.UserLikes = likeExists
 	newCollection.CanWrite = permission.CanWrite
 	newCollection.CanManage = permission.CanAdmin
 	newCollection.Avatar = avatar
 	return &newCollection, nil
+}
+
+// get non private repositories of the collection
+func (cc *CollectionComponent) GetPublicRepos(collection types.Collection) []types.CollectionRepository {
+	var filtered []types.CollectionRepository
+	for _, repo := range collection.Repositories {
+		if !repo.Private {
+			filtered = append(filtered, repo)
+		}
+	}
+	return filtered
 }
 
 func (cc *CollectionComponent) UpdateCollection(ctx context.Context, input types.CreateCollectionReq) (*database.Collection, error) {
