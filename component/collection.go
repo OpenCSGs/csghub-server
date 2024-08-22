@@ -36,7 +36,7 @@ type CollectionComponent struct {
 }
 
 func (cc *CollectionComponent) GetCollections(ctx context.Context, filter *types.CollectionFilter, per, page int) ([]types.Collection, int, error) {
-	collections, total, err := cc.cs.GetCollections(ctx, filter, per, page)
+	collections, total, err := cc.cs.GetCollections(ctx, filter, per, page, true)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -66,6 +66,11 @@ func (cc *CollectionComponent) CreateCollection(ctx context.Context, input types
 		Private:     input.Private,
 		Theme:       input.Theme,
 	}
+	//for org case, no need user name
+	if input.Namespace != "" {
+		collection.Username = ""
+	}
+
 	return cc.cs.CreateCollection(ctx, collection)
 }
 

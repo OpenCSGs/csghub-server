@@ -7,6 +7,7 @@ var CollectionSorts = []string{"trending", "recently_update", "most_favorite"}
 type Collection struct {
 	ID           int64                  `json:"id"`
 	Username     string                 `json:"username"`
+	Namespace    string                 `json:"namespace"`
 	Theme        string                 `json:"theme"`
 	Name         string                 `json:"name"`
 	Nickname     string                 `json:"nickname"`
