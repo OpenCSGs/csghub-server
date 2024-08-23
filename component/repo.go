@@ -989,6 +989,20 @@ func (c *RepoComponent) FileInfo(ctx context.Context, req *types.GetFileReq) (*t
 		req.Ref = repo.DefaultBranch
 	}
 
+	if repo.Source != types.LocalSource && strings.ToLower(req.Path) == "readme.md" {
+		_, err := c.mirror.FindByRepoID(ctx, repo.ID)
+		if err != nil {
+			if errors.Is(err, sql.ErrNoRows) {
+				content := base64.StdEncoding.EncodeToString([]byte(repo.Readme))
+				return &types.File{
+					Name:    "readme.md",
+					Path:    "readme.md",
+					Content: content,
+				}, nil
+			}
+		}
+	}
+
 	getFileContentReq := gitserver.GetRepoInfoByPathReq{
 		Namespace: req.Namespace,
 		Name:      req.Name,

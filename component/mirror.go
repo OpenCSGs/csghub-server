@@ -15,6 +15,7 @@ import (
 	"opencsg.com/csghub-server/builder/store/s3"
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/types"
+	"opencsg.com/csghub-server/common/utils/common"
 )
 
 type MirrorComponent struct {
@@ -32,6 +33,7 @@ type MirrorComponent struct {
 	s3Client          *minio.Client
 	lfsBucket         string
 	saas              bool
+	config            *config.Config
 }
 
 func NewMirrorComponent(config *config.Config) (*MirrorComponent, error) {
@@ -69,6 +71,7 @@ func NewMirrorComponent(config *config.Config) (*MirrorComponent, error) {
 	c.mirrorSourceStore = database.NewMirrorSourceStore()
 	c.namespaceStore = database.NewNamespaceStore()
 	c.saas = config.Saas
+	c.config = config
 	return c, nil
 }
 
@@ -327,7 +330,8 @@ func (c *MirrorComponent) checkAndUpdateMirrorStatus(ctx context.Context, mirror
 		if err != nil {
 			slog.Error("fail to get repo detail from git server")
 		} else {
-			mirror.Repository.HTTPCloneURL = repoRes.HttpCloneURL
+			httpCloneURL := common.PortalCloneUrl(repoRes.HttpCloneURL, mirror.Repository.RepositoryType, c.config.GitServer.URL, c.config.Frontend.URL)
+			mirror.Repository.HTTPCloneURL = httpCloneURL
 			mirror.Repository.SSHCloneURL = repoRes.SshCloneURL
 			mirror.Repository.DefaultBranch = repoRes.DefaultBranch
 		}
