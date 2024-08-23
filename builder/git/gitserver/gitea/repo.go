@@ -46,7 +46,7 @@ func (c *Client) CreateRepo(ctx context.Context, req gitserver.CreateRepoReq) (*
 		RepoType:      req.RepoType,
 		GitPath:       giteaRepo.FullName,
 		SshCloneURL:   giteaRepo.SSHURL,
-		HttpCloneURL:  portalCloneUrl(giteaRepo.CloneURL, req.RepoType, c.config.GitServer.URL, c.config.Frontend.URL),
+		HttpCloneURL:  common.PortalCloneUrl(giteaRepo.CloneURL, req.RepoType, c.config.GitServer.URL, c.config.Frontend.URL),
 		Private:       req.Private,
 	}
 
@@ -104,7 +104,7 @@ func (c *Client) GetRepo(ctx context.Context, req gitserver.GetRepoReq) (*gitser
 		RepoType:      req.RepoType,
 		GitPath:       giteaRepo.FullName,
 		SshCloneURL:   giteaRepo.SSHURL,
-		HttpCloneURL:  portalCloneUrl(giteaRepo.CloneURL, req.RepoType, c.config.GitServer.URL, c.config.Frontend.URL),
+		HttpCloneURL:  common.PortalCloneUrl(giteaRepo.CloneURL, req.RepoType, c.config.GitServer.URL, c.config.Frontend.URL),
 		Private:       giteaRepo.Private,
 	}
 
