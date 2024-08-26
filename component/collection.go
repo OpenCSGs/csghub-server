@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"strconv"
+	"strings"
 	"time"
 
 	"opencsg.com/csghub-server/builder/rpc"
@@ -22,12 +23,17 @@ func NewCollectionComponent(config *config.Config) (*CollectionComponent, error)
 	cc.uls = database.NewUserLikesStore()
 	cc.userSvcClient = rpc.NewUserSvcHttpClient(fmt.Sprintf("%s:%d", config.User.Host, config.User.Port),
 		rpc.AuthWithApiKey(config.APIToken))
+	spaceComponent, err := NewSpaceComponent(config)
+	if err != nil {
+		return nil, err
+	}
+	cc.spaceComponent = spaceComponent
 	return cc, nil
 }
 
 type CollectionComponent struct {
-	cs             *database.CollectionStore
 	os             *database.OrgStore
+	cs             *database.CollectionStore
 	rs             *database.RepoStore
 	us             *database.UserStore
 	uls            *database.UserLikesStore
@@ -117,6 +123,13 @@ func (cc *CollectionComponent) GetCollection(ctx context.Context, currentUser st
 	}
 	if !permission.CanWrite {
 		newCollection.Repositories = cc.GetPublicRepos(newCollection)
+	}
+	for i, repo := range newCollection.Repositories {
+		if repo.RepositoryType == types.SpaceRepo && strings.Contains(repo.Path, "/") {
+			namespace, name := repo.NamespaceAndName()
+			_, status, _ := cc.spaceComponent.Status(ctx, namespace, name)
+			newCollection.Repositories[i].Status = status
+		}
 	}
 	newCollection.UserLikes = likeExists
 	newCollection.CanWrite = permission.CanWrite
