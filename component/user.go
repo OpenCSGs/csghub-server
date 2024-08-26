@@ -510,6 +510,19 @@ func (c *UserComponent) ListDeploys(ctx context.Context, repoType types.Reposito
 	var resDeploys []types.DeployRepo
 	for _, deploy := range deploys {
 		repoPath := strings.TrimPrefix(deploy.GitPath, string(repoType)+"s_")
+		var hardware types.HardWare
+		json.Unmarshal([]byte(deploy.Hardware), &hardware)
+		resourceType := ""
+		if hardware.Gpu.Num != "" {
+			resourceType = hardware.Gpu.Type
+		} else {
+			resourceType = hardware.Cpu.Type
+		}
+		tag := ""
+		tags, _ := c.repo.TagsWithCategory(ctx, deploy.RepoID, "task")
+		if len(tags) > 0 {
+			tag = tags[0].Name
+		}
 		resDeploys = append(resDeploys, types.DeployRepo{
 			DeployID:         deploy.ID,
 			DeployName:       deploy.DeployName,
@@ -530,6 +543,8 @@ func (c *UserComponent) ListDeploys(ctx context.Context, repoType types.Reposito
 			CreatedAt:        deploy.CreatedAt,
 			UpdatedAt:        deploy.UpdatedAt,
 			Type:             deploy.Type,
+			ResourceType:     resourceType,
+			RepoTag:          tag,
 		})
 	}
 	return resDeploys, total, nil

@@ -110,6 +110,8 @@ type DeployRepo struct {
 	ProxyEndpoint    string     `json:"proxy_endpoint,omitempty"`
 	UserUUID         string     `json:"user_uuid,omitempty"`
 	SKU              string     `json:"sku,omitempty"`
+	ResourceType     string     `json:"resource_type,omitempty"`
+	RepoTag          string     `json:"repo_tag,omitempty"`
 }
 
 type RuntimeFrameworkReq struct {

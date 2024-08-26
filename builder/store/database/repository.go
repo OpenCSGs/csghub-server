@@ -318,6 +318,17 @@ func (s *RepoStore) Tags(ctx context.Context, repoID int64) (tags []Tag, err err
 	err = query.Scan(ctx, &tags)
 	return
 }
+func (s *RepoStore) TagsWithCategory(ctx context.Context, repoID int64, category string) (tags []Tag, err error) {
+	query := s.db.Operator.Core.NewSelect().
+		ColumnExpr("tags.*").
+		Model(&RepositoryTag{}).
+		Join("JOIN tags ON repository_tag.tag_id = tags.id").
+		Where("repository_tag.repository_id = ?", repoID).
+		Where("repository_tag.count > 0").
+		Where("tags.category = ?", category)
+	err = query.Scan(ctx, &tags)
+	return
+}
 
 // TagIDs get tag ids by repo id, if category is not empty, return only tags of the category
 func (s *RepoStore) TagIDs(ctx context.Context, repoID int64, category string) (tagIDs []int64, err error) {
