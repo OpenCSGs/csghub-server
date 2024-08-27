@@ -9,6 +9,7 @@ import (
 	"slices"
 
 	"github.com/uptrace/bun"
+	"opencsg.com/csghub-server/common/types"
 )
 
 type TagStore struct {
@@ -180,12 +181,12 @@ func (ts *TagStore) UpsertTags(ctx context.Context, tagScope TagScope, categoryT
 }
 
 // SetMetaTags will delete existing tags and create new ones
-func (ts *TagStore) SetMetaTags(ctx context.Context, namespace, name string, tags []*Tag) (repoTags []*RepositoryTag, err error) {
+func (ts *TagStore) SetMetaTags(ctx context.Context, repoType types.RepositoryType, namespace, name string, tags []*Tag) (repoTags []*RepositoryTag, err error) {
 	repo := new(Repository)
 	err = ts.db.Operator.Core.NewSelect().Model(repo).
 		Column("id").
 		Relation("Tags").
-		Where("path =?", fmt.Sprintf("%v/%v", namespace, name)).
+		Where("git_path =?", fmt.Sprintf("%ss_%v/%v", string(repoType), namespace, name)).
 		Scan(ctx)
 	if err != nil {
 		return repoTags, fmt.Errorf("failed to find repository, path:%v/%v,error:%w", namespace, name, err)
@@ -226,12 +227,12 @@ func (ts *TagStore) SetMetaTags(ctx context.Context, namespace, name string, tag
 	return repoTags, err
 }
 
-func (ts *TagStore) SetLibraryTag(ctx context.Context, namespace, name string, newTag, oldTag *Tag) (err error) {
+func (ts *TagStore) SetLibraryTag(ctx context.Context, repoType types.RepositoryType, namespace, name string, newTag, oldTag *Tag) (err error) {
 	slog.Debug("set library tag", slog.Any("newTag", newTag), slog.Any("oldTag", oldTag))
 	repo := new(Repository)
 	err = ts.db.Operator.Core.NewSelect().Model(repo).
 		Column("id").
-		Where("path =?", fmt.Sprintf("%v/%v", namespace, name)).
+		Where("git_path =?", fmt.Sprintf("%ss_%v/%v", string(repoType), namespace, name)).
 		Scan(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to find repository, path:%v/%v,error:%w", namespace, name, err)

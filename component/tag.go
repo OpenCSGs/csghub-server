@@ -9,6 +9,7 @@ import (
 	"opencsg.com/csghub-server/builder/sensitive"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/config"
+	"opencsg.com/csghub-server/common/types"
 	"opencsg.com/csghub-server/component/tagparser"
 )
 
@@ -31,19 +32,24 @@ func (tc *TagComponent) AllTags(ctx context.Context) ([]database.Tag, error) {
 	return tc.ts.AllTags(ctx)
 }
 
-func (c *TagComponent) ClearMetaTags(ctx context.Context, namespace, name string) error {
-	_, err := c.ts.SetMetaTags(ctx, namespace, name, nil)
+func (c *TagComponent) ClearMetaTags(ctx context.Context, repoType types.RepositoryType, namespace, name string) error {
+	_, err := c.ts.SetMetaTags(ctx, repoType, namespace, name, nil)
 	return err
 }
 
 func (c *TagComponent) UpdateMetaTags(ctx context.Context, tagScope database.TagScope, namespace, name, content string) ([]*database.RepositoryTag, error) {
-	var tp tagparser.TagProcessor
+	var (
+		tp       tagparser.TagProcessor
+		repoType types.RepositoryType
+	)
 	// TODO:load from cache
 
 	if tagScope == database.DatasetTagScope {
 		tp = tagparser.NewDatasetTagProcessor(c.ts)
+		repoType = types.DatasetRepo
 	} else if tagScope == database.ModelTagScope {
 		tp = tagparser.NewModelTagProcessor(c.ts)
+		repoType = types.ModelRepo
 	} else {
 		// skip tag process for code and space now
 		return nil, nil
@@ -70,7 +76,7 @@ func (c *TagComponent) UpdateMetaTags(ctx context.Context, tagScope database.Tag
 	}
 	metaTags := append(tagsMatched, tagToCreate...)
 	var repoTags []*database.RepositoryTag
-	repoTags, err = c.ts.SetMetaTags(ctx, namespace, name, metaTags)
+	repoTags, err = c.ts.SetMetaTags(ctx, repoType, namespace, name, metaTags)
 	if err != nil {
 		slog.Error("failed to set dataset's tags", slog.String("namespace", namespace),
 			slog.String("name", name), slog.Any("error", err))
@@ -85,13 +91,16 @@ func (c *TagComponent) UpdateLibraryTags(ctx context.Context, tagScope database.
 	newLibTagName := tagparser.LibraryTag(newFilePath)
 	// TODO:load from cache
 	var (
-		allTags []*database.Tag
-		err     error
+		allTags  []*database.Tag
+		err      error
+		repoType types.RepositoryType
 	)
 	if tagScope == database.DatasetTagScope {
 		allTags, err = c.ts.AllDatasetTags(ctx)
+		repoType = types.DatasetRepo
 	} else if tagScope == database.ModelTagScope {
 		allTags, err = c.ts.AllModelTags(ctx)
+		repoType = types.ModelRepo
 	} else {
 		return nil
 	}
@@ -110,7 +119,7 @@ func (c *TagComponent) UpdateLibraryTags(ctx context.Context, tagScope database.
 			oldLibTag = t
 		}
 	}
-	err = c.ts.SetLibraryTag(ctx, namespace, name, newLibTag, oldLibTag)
+	err = c.ts.SetLibraryTag(ctx, repoType, namespace, name, newLibTag, oldLibTag)
 	if err != nil {
 		slog.Error("failed to set dataset's tags", slog.String("namespace", namespace),
 			slog.String("name", name), slog.Any("error", err))
