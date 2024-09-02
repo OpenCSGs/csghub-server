@@ -19,6 +19,7 @@ type Collection struct {
 	UserLikes    bool                   `json:"user_likes"`
 	CanWrite     bool                   `json:"can_write"`
 	CanManage    bool                   `json:"can_manage"`
+	Avatar       string                 `json:"avatar"`
 }
 
 type CollectionRepository struct {

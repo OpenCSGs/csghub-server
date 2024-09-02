@@ -18,6 +18,7 @@ func NewCollectionComponent(config *config.Config) (*CollectionComponent, error)
 	cc.cs = database.NewCollectionStore()
 	cc.rs = database.NewRepoStore()
 	cc.us = database.NewUserStore()
+	cc.os = database.NewOrgStore()
 	cc.uls = database.NewUserLikesStore()
 	cc.userSvcClient = rpc.NewUserSvcHttpClient(fmt.Sprintf("%s:%d", config.User.Host, config.User.Port),
 		rpc.AuthWithApiKey(config.APIToken))
@@ -25,11 +26,13 @@ func NewCollectionComponent(config *config.Config) (*CollectionComponent, error)
 }
 
 type CollectionComponent struct {
-	cs            *database.CollectionStore
-	rs            *database.RepoStore
-	us            *database.UserStore
-	uls           *database.UserLikesStore
-	userSvcClient rpc.UserSvcClient
+	cs             *database.CollectionStore
+	os             *database.OrgStore
+	rs             *database.RepoStore
+	us             *database.UserStore
+	uls            *database.UserLikesStore
+	userSvcClient  rpc.UserSvcClient
+	spaceComponent *SpaceComponent
 }
 
 func (cc *CollectionComponent) GetCollections(ctx context.Context, filter *types.CollectionFilter, per, page int) ([]types.Collection, int, error) {
@@ -71,6 +74,21 @@ func (cc *CollectionComponent) GetCollection(ctx context.Context, currentUser st
 	if err != nil {
 		return nil, err
 	}
+	// find by user name
+	avatar := ""
+	if collection.Username != "" {
+		user, err := cc.us.FindByUsername(ctx, collection.Username)
+		if err != nil {
+			return nil, fmt.Errorf("cannot find user for collection, %w", err)
+		}
+		avatar = user.Avatar
+	} else if collection.Namespace != "" {
+		org, err := cc.os.FindByPath(ctx, collection.Namespace)
+		if err != nil {
+			return nil, fmt.Errorf("fail to get org info, path: %s, error: %w", collection.Namespace, err)
+		}
+		avatar = org.Logo
+	}
 
 	permission, err := cc.getUserCollectionPermission(ctx, currentUser, collection)
 	if err != nil {
@@ -95,6 +113,7 @@ func (cc *CollectionComponent) GetCollection(ctx context.Context, currentUser st
 	newCollection.UserLikes = likeExists
 	newCollection.CanWrite = permission.CanWrite
 	newCollection.CanManage = permission.CanAdmin
+	newCollection.Avatar = avatar
 	return &newCollection, nil
 }
 
