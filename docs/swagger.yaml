@@ -1,4 +1,107 @@
 definitions:
+  component.CreateCommentRequest:
+    properties:
+      commentable_id:
+        type: integer
+      commentable_type:
+        type: string
+      content:
+        type: string
+    required:
+    - content
+    type: object
+  component.CreateCommentResponse:
+    properties:
+      commentable_id:
+        type: integer
+      commentable_type:
+        type: string
+      created_at:
+        type: string
+      id:
+        type: integer
+      user:
+        $ref: '#/definitions/component.DiscussionResponse_User'
+    type: object
+  component.CreateDiscussionResponse:
+    properties:
+      comment_count:
+        description: |-
+          DiscussionableID   int64     `json:"discussionable_id"`
+          DiscussionableType string    `json:"discussionable_type"`
+        type: integer
+      created_at:
+        type: string
+      id:
+        type: integer
+      title:
+        type: string
+      user:
+        $ref: '#/definitions/component.DiscussionResponse_User'
+    type: object
+  component.CreateRepoDiscussionRequest:
+    properties:
+      title:
+        type: string
+    required:
+    - title
+    type: object
+  component.DiscussionResponse_Comment:
+    properties:
+      content:
+        type: string
+      created_at:
+        type: string
+      id:
+        type: integer
+      user:
+        $ref: '#/definitions/component.DiscussionResponse_User'
+    type: object
+  component.DiscussionResponse_User:
+    properties:
+      avatar:
+        type: string
+      id:
+        type: integer
+      name:
+        type: string
+    type: object
+  component.ListRepoDiscussionResponse:
+    properties:
+      discussions:
+        items:
+          $ref: '#/definitions/component.CreateDiscussionResponse'
+        type: array
+    type: object
+  component.ShowDiscussionResponse:
+    properties:
+      comment_count:
+        type: integer
+      comments:
+        items:
+          $ref: '#/definitions/component.DiscussionResponse_Comment'
+        type: array
+      id:
+        type: integer
+      title:
+        type: string
+      user:
+        $ref: '#/definitions/component.DiscussionResponse_User'
+    type: object
+  component.UpdateCommentRequest:
+    properties:
+      content:
+        type: string
+    required:
+    - content
+    type: object
+  component.UpdateDiscussionRequest:
+    properties:
+      title:
+        type: string
+    required:
+    - title
+    type: object
   database.AccessToken:
     properties:
       application:
@@ -2263,6 +2366,122 @@ paths:
       summary: Get all commits of repository
       tags:
       - Repository
+  /{repo_type}/{namespace}/{name}/discussions:
+    get:
+      consumes:
+      - application/json
+      description: list repo discussions
+      parameters:
+      - description: current user
+        in: query
+        name: current_user
+        type: string
+      - description: repository type
+        enum:
+        - models
+        - datasets
+        - codes
+        - spaces
+        in: query
+        name: repo_type
+        required: true
+        type: string
+      - description: namespace
+        in: query
+        name: namespace
+        required: true
+        type: string
+      - description: name
+        in: query
+        name: name
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/types.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/component.ListRepoDiscussionResponse'
+              type: object
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: List repo discussions
+      tags:
+      - Discussion
+    post:
+      consumes:
+      - application/json
+      description: create a new repo discussion
+      parameters:
+      - description: current user, the owner
+        in: query
+        name: current_user
+        required: true
+        type: string
+      - description: repository type
+        enum:
+        - models
+        - datasets
+        - codes
+        - spaces
+        in: query
+        name: repo_type
+        required: true
+        type: string
+      - description: namespace
+        in: query
+        name: namespace
+        required: true
+        type: string
+      - description: name
+        in: query
+        name: name
+        required: true
+        type: string
+      - description: body
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/component.CreateRepoDiscussionRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/types.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/component.CreateDiscussionResponse'
+              type: object
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Create a new repo discussion
+      tags:
+      - Discussion
   /{repo_type}/{namespace}/{name}/download/{file_path}:
     get:
       consumes:
@@ -4370,6 +4589,83 @@ paths:
       summary: Add repos to a collection
       tags:
       - Collection
+  /comments/{id}:
+    delete:
+      consumes:
+      - application/json
+      description: delete a comment by id
+      parameters:
+      - description: the comment id
+        in: query
+        name: id
+        required: true
+        type: string
+      - description: current user, the owner of the comment
+        in: query
+        name: current_user
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/types.Response'
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Delete a comment by id
+      tags:
+      - Discussion
+    put:
+      consumes:
+      - application/json
+      description: update a comment content by id
+      parameters:
+      - description: the comment id
+        in: query
+        name: id
+        required: true
+        type: string
+      - description: current user, the owner of the comment
+        in: query
+        name: current_user
+        required: true
+        type: string
+      - description: body
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/component.UpdateCommentRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/types.Response'
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Update a comment content by id
+      tags:
+      - Discussion
   /datasets:
     get:
       consumes:
@@ -4755,6 +5051,155 @@ paths:
       summary: Get the demo data of the dataset
       tags:
       - Dataset
+  /discussions/{id}:
+    delete:
+      consumes:
+      - application/json
+      description: delete a discussion
+      parameters:
+      - description: the discussion id
+        in: query
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/types.Response'
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Delete a discussion
+      tags:
+      - Discussion
+    get:
+      consumes:
+      - application/json
+      description: show a discussion
+      parameters:
+      - description: the discussion id
+        in: query
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/types.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/component.ShowDiscussionResponse'
+              type: object
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Show a discussion and its comments
+      tags:
+      - Discussion
+    put:
+      consumes:
+      - application/json
+      description: update a discussion
+      parameters:
+      - description: the discussion id
+        in: query
+        name: id
+        required: true
+        type: string
+      - description: current user, the owner
+        in: query
+        name: current_user
+        required: true
+        type: string
+      - description: body
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/component.UpdateDiscussionRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/types.Response'
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Update a discussion
+      tags:
+      - Discussion
+  /discussions/{id}/comments:
+    post:
+      consumes:
+      - application/json
+      description: create a new discussion comment
+      parameters:
+      - description: the discussion id
+        in: query
+        name: id
+        required: true
+        type: string
+      - description: body
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/component.CreateCommentRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/types.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/component.CreateCommentResponse'
+              type: object
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Create a new discussion comment
+      tags:
+      - Discussion
   /events:
     post:
       consumes:
