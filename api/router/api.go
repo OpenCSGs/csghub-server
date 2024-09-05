@@ -359,6 +359,12 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 		internalGroup.POST("/post_receive", needGitlabShellJWTToken, internalHandler.PostReceive)
 	}
 
+	discussionHandler, err := handler.NewDiscussionHandler()
+	if err != nil {
+		return nil, fmt.Errorf("error creating discussion handler:%w", err)
+	}
+	createDiscussionRoutes(apiGroup, needAPIKey, discussionHandler)
+
 	return r, nil
 }
 
@@ -686,4 +692,15 @@ func createHFRoutes(r *gin.Engine, hfdsHandler *handler.HFDatasetHandler, repoCo
 		}
 	}
 
+}
+
+func createDiscussionRoutes(apiGroup *gin.RouterGroup, needAPIKey gin.HandlerFunc, discussionHandler *handler.DiscussionHandler) {
+	apiGroup.POST("/:repo_type/:namespace/:name/discussions", discussionHandler.CreateRepoDiscussion)
+	apiGroup.GET("/:repo_type/:namespace/:name/discussions", discussionHandler.ListRepoDiscussions)
+	apiGroup.GET("/discussions/:id", discussionHandler.ShowDiscussion)
+	apiGroup.PUT("/discussions/:id", discussionHandler.UpdateDiscussion)
+	apiGroup.DELETE("/discussions/:id", discussionHandler.DeleteDiscussion)
+	apiGroup.POST("/discussions/:id/comments", discussionHandler.CreateDiscussionComment)
+	apiGroup.PUT("/discussions/:id/comments/:comment_id", discussionHandler.UpdateComment)
+	apiGroup.DELETE("/discussions/:id/comments/:comment_id", discussionHandler.DeleteComment)
 }
