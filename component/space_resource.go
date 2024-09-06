@@ -63,7 +63,6 @@ func (c *SpaceResourceComponent) Index(ctx context.Context, clusterId string, de
 			ID:          r.ID,
 			Name:        r.Name,
 			Resources:   r.Resources,
-			CostPerHour: r.CostPerHour,
 			IsAvailable: isAvailable,
 		})
 	}
@@ -79,7 +78,6 @@ func (c *SpaceResourceComponent) Update(ctx context.Context, req *types.UpdateSp
 	}
 	sr.Name = req.Name
 	sr.Resources = req.Resources
-	sr.CostPerHour = req.CostPerHour
 
 	sr, err = c.srs.Update(ctx, *sr)
 	if err != nil {
@@ -88,10 +86,9 @@ func (c *SpaceResourceComponent) Update(ctx context.Context, req *types.UpdateSp
 	}
 
 	result := &types.SpaceResource{
-		ID:          sr.ID,
-		Name:        sr.Name,
-		Resources:   sr.Resources,
-		CostPerHour: sr.CostPerHour,
+		ID:        sr.ID,
+		Name:      sr.Name,
+		Resources: sr.Resources,
 	}
 
 	return result, nil
@@ -99,10 +96,9 @@ func (c *SpaceResourceComponent) Update(ctx context.Context, req *types.UpdateSp
 
 func (c *SpaceResourceComponent) Create(ctx context.Context, req *types.CreateSpaceResourceReq) (*types.SpaceResource, error) {
 	sr := database.SpaceResource{
-		Name:        req.Name,
-		Resources:   req.Resources,
-		CostPerHour: req.CostPerHour,
-		ClusterID:   req.ClusterID,
+		Name:      req.Name,
+		Resources: req.Resources,
+		ClusterID: req.ClusterID,
 	}
 	res, err := c.srs.Create(ctx, sr)
 	if err != nil {
@@ -111,10 +107,9 @@ func (c *SpaceResourceComponent) Create(ctx context.Context, req *types.CreateSp
 	}
 
 	result := &types.SpaceResource{
-		ID:          res.ID,
-		Name:        res.Name,
-		Resources:   res.Resources,
-		CostPerHour: res.CostPerHour,
+		ID:        res.ID,
+		Name:      res.Name,
+		Resources: res.Resources,
 	}
 
 	return result, nil

@@ -14,14 +14,13 @@ type Space struct {
 	Sdk        string `bun:",notnull" json:"sdk"`
 	SdkVersion string `bun:",notnull" json:"sdk_version"`
 	// PythonVersion string `bun:",notnull" json:"python_version"`
-	Template      string  `bun:",notnull" json:"template"`
-	CoverImageUrl string  `bun:"" json:"cover_image_url"`
-	Env           string  `bun:",notnull" json:"env"`
-	Hardware      string  `bun:",notnull" json:"hardware"`
-	Secrets       string  `bun:",notnull" json:"secrets"`
-	CostPerHour   float64 `bun:",notnull" json:"cost_per_hour"`
-	HasAppFile    bool    `bun:"," json:"has_app_file"`
-	SKU           string  `bun:"," json:"sku"`
+	Template      string `bun:",notnull" json:"template"`
+	CoverImageUrl string `bun:"" json:"cover_image_url"`
+	Env           string `bun:",notnull" json:"env"`
+	Hardware      string `bun:",notnull" json:"hardware"`
+	Secrets       string `bun:",notnull" json:"secrets"`
+	HasAppFile    bool   `bun:"," json:"has_app_file"`
+	SKU           string `bun:"," json:"sku"`
 	times
 }
 

@@ -730,7 +730,6 @@ func (c *ModelComponent) Deploy(ctx context.Context, deployReq types.DeployActRe
 		MinReplica:       req.MinReplica,
 		MaxReplica:       req.MaxReplica,
 		Annotation:       string(annoStr),
-		CostPerHour:      resource.CostPerHour,
 		ClusterID:        req.ClusterID,
 		SecureLevel:      req.SecureLevel,
 		Type:             deployReq.DeployType,

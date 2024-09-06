@@ -98,7 +98,6 @@ func (c *SpaceComponent) Create(ctx context.Context, req types.CreateSpaceReq) (
 		Env:           req.Env,
 		Hardware:      resource.Resources,
 		Secrets:       req.Secrets,
-		CostPerHour:   resource.CostPerHour,
 		SKU:           strconv.FormatInt(resource.ID, 10),
 	}
 
@@ -554,25 +553,24 @@ func (c *SpaceComponent) Deploy(ctx context.Context, namespace, name, currentUse
 
 	// create deploy for space
 	return c.deployer.Deploy(ctx, types.DeployRepo{
-		SpaceID:     s.ID,
-		Path:        s.Repository.Path,
-		GitPath:     s.Repository.GitPath,
-		GitBranch:   s.Repository.DefaultBranch,
-		Sdk:         s.Sdk,
-		SdkVersion:  s.SdkVersion,
-		Template:    s.Template,
-		Env:         s.Env,
-		Hardware:    s.Hardware,
-		Secret:      s.Secrets,
-		RepoID:      s.Repository.ID,
-		ModelID:     0,
-		UserID:      user.ID,
-		Annotation:  string(annoStr),
-		ImageID:     containerImg,
-		CostPerHour: s.CostPerHour,
-		Type:        types.SpaceType,
-		UserUUID:    user.UUID,
-		SKU:         s.SKU,
+		SpaceID:    s.ID,
+		Path:       s.Repository.Path,
+		GitPath:    s.Repository.GitPath,
+		GitBranch:  s.Repository.DefaultBranch,
+		Sdk:        s.Sdk,
+		SdkVersion: s.SdkVersion,
+		Template:   s.Template,
+		Env:        s.Env,
+		Hardware:   s.Hardware,
+		Secret:     s.Secrets,
+		RepoID:     s.Repository.ID,
+		ModelID:    0,
+		UserID:     user.ID,
+		Annotation: string(annoStr),
+		ImageID:    containerImg,
+		Type:       types.SpaceType,
+		UserUUID:   user.UUID,
+		SKU:        s.SKU,
 	})
 }
 
@@ -750,7 +748,6 @@ func (c *SpaceComponent) mergeUpdateSpaceRequest(ctx context.Context, space *dat
 			return fmt.Errorf("can't find space resource by id, resource id:%d, error:%w", *req.ResourceID, err)
 		}
 		space.Hardware = resource.Resources
-		space.CostPerHour = resource.CostPerHour
 		space.SKU = strconv.FormatInt(resource.ID, 10)
 	}
 

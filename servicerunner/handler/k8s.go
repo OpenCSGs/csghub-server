@@ -320,10 +320,7 @@ func (s *K8sHander) ServiceStatus(c *gin.Context) {
 	}
 	deployIDStr := srv.Annotations["deploy_id"]
 	deployID, _ := strconv.ParseInt(deployIDStr, 10, 64)
-	costStr := srv.Annotations["cost_per_hour"]
-	cost, _ := strconv.ParseFloat(costStr, 32)
 	resp.DeployID = deployID
-	resp.CostPerHour = cost
 	resp.UserID = srv.Annotations["user_id"]
 
 	// retrive pod list and status
@@ -527,18 +524,11 @@ func (s *K8sHander) ServiceStatusAll(c *gin.Context) {
 			if err != nil {
 				deployType = 0
 			}
-			costStr := srv.Annotations[component.KeyCostPerHour]
-			cost, err := strconv.ParseFloat(costStr, 32)
-			if err != nil {
-				// for old space, no charge
-				cost = 0
-			}
 			userID := srv.Annotations[component.KeyUserID]
 			deploySku := srv.Annotations[component.KeyDeploySKU]
 			status := &types.StatusResponse{
 				DeployID:    deployID,
 				UserID:      userID,
-				CostPerHour: cost,
 				DeployType:  int(deployType),
 				ServiceName: srv.Name,
 				DeploySku:   deploySku,

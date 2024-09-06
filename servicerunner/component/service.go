@@ -17,11 +17,10 @@ import (
 )
 
 var (
-	KeyDeployID    string = "deploy_id"
-	KeyDeployType  string = "deploy_type"
-	KeyUserID      string = "user_id"
-	KeyCostPerHour string = "cost_per_hour"
-	KeyDeploySKU   string = "deploy_sku"
+	KeyDeployID   string = "deploy_id"
+	KeyDeployType string = "deploy_type"
+	KeyUserID     string = "user_id"
+	KeyDeploySKU  string = "deploy_sku"
 )
 
 type ServiceComponent struct {
@@ -92,7 +91,6 @@ func (s *ServiceComponent) GenerateService(request types.SVCRequest, srvName str
 	annotations[KeyDeployID] = strconv.FormatInt(request.DeployID, 10)
 	annotations[KeyDeployType] = strconv.Itoa(request.DeployType)
 	annotations[KeyUserID] = request.UserID
-	annotations[KeyCostPerHour] = strconv.FormatFloat(request.CostPerHour, 'f', 2, 64)
 	annotations[KeyDeploySKU] = request.Sku
 
 	containerImg := path.Join(s.spaceDockerRegBase, request.ImageID)
