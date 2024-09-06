@@ -35,6 +35,7 @@ type Dataset struct {
 func (s *DatasetStore) ByRepoIDs(ctx context.Context, repoIDs []int64) (datasets []Dataset, err error) {
 	err = s.db.Operator.Core.NewSelect().
 		Model(&datasets).
+		Relation("Repository").
 		Where("repository_id in (?)", bun.In(repoIDs)).
 		Scan(ctx)
 

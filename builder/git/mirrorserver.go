@@ -9,7 +9,7 @@ import (
 )
 
 func NewMirrorServer(config *config.Config) (mirrorserver.MirrorServer, error) {
-	if !config.MirrorServer.Enable && !config.Saas {
+	if !config.MirrorServer.Enable {
 		return nil, nil
 	}
 	if config.MirrorServer.Type == "gitea" {

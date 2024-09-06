@@ -138,15 +138,10 @@ func (h *OrganizationHandler) Index(ctx *gin.Context) {
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
 // @Router       /organization/{namespace} [delete]
 func (h *OrganizationHandler) Delete(ctx *gin.Context) {
+	var req types.DeleteOrgReq
 	currentUser := httpbase.GetCurrentUser(ctx)
 	if currentUser == "" {
 		httpbase.UnauthorizedError(ctx, errors.New("user not found, please login first"))
-		return
-	}
-	var req types.DeleteOrgReq
-	if err := ctx.ShouldBindJSON(&req); err != nil {
-		slog.Error("Bad request format", "error", err)
-		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
 	req.CurrentUser = currentUser

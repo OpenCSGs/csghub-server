@@ -56,7 +56,7 @@ type RepoHandler struct {
 func (h *RepoHandler) CreateFile(ctx *gin.Context) {
 	userName := httpbase.GetCurrentUser(ctx)
 	if userName == "" {
-		httpbase.UnauthorizedError(ctx, errors.New("user not found, please login first"))
+		httpbase.UnauthorizedError(ctx, component.ErrUserNotFound)
 		return
 	}
 	var req *types.CreateFileReq
@@ -75,10 +75,11 @@ func (h *RepoHandler) CreateFile(ctx *gin.Context) {
 	}
 	filePath := ctx.Param("file_path")
 	filePath = convertFilePathFromRoute(filePath)
-	req.NameSpace = namespace
+	req.Namespace = namespace
 	req.Name = name
 	req.FilePath = filePath
 	req.RepoType = common.RepoTypeFromContext(ctx)
+	req.CurrentUser = userName
 
 	resp, err := h.c.CreateFile(ctx, req)
 	if err != nil {
@@ -109,7 +110,7 @@ func (h *RepoHandler) CreateFile(ctx *gin.Context) {
 func (h *RepoHandler) UpdateFile(ctx *gin.Context) {
 	userName := httpbase.GetCurrentUser(ctx)
 	if userName == "" {
-		httpbase.UnauthorizedError(ctx, errors.New("user not found, please login first"))
+		httpbase.UnauthorizedError(ctx, component.ErrUserNotFound)
 		return
 	}
 	var req *types.UpdateFileReq
@@ -129,10 +130,11 @@ func (h *RepoHandler) UpdateFile(ctx *gin.Context) {
 
 	filePath := ctx.Param("file_path")
 	filePath = convertFilePathFromRoute(filePath)
-	req.NameSpace = namespace
+	req.Namespace = namespace
 	req.Name = name
 	req.FilePath = filePath
 	req.RepoType = common.RepoTypeFromContext(ctx)
+	req.CurrentUser = userName
 
 	resp, err := h.c.UpdateFile(ctx, req)
 	if err != nil {
@@ -174,14 +176,16 @@ func (h *RepoHandler) Commits(ctx *gin.Context) {
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
+	currentUser := httpbase.GetCurrentUser(ctx)
 	ref := ctx.Query("ref")
 	req := &types.GetCommitsReq{
-		Namespace: namespace,
-		Name:      name,
-		Ref:       ref,
-		Per:       per,
-		Page:      page,
-		RepoType:  common.RepoTypeFromContext(ctx),
+		Namespace:   namespace,
+		Name:        name,
+		Ref:         ref,
+		Per:         per,
+		Page:        page,
+		RepoType:    common.RepoTypeFromContext(ctx),
+		CurrentUser: currentUser,
 	}
 	commits, pageOpt, err := h.c.Commits(ctx, req)
 	if err != nil {
@@ -221,12 +225,14 @@ func (h *RepoHandler) LastCommit(ctx *gin.Context) {
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
+	currentUser := httpbase.GetCurrentUser(ctx)
 	ref := ctx.Query("ref")
 	req := &types.GetCommitsReq{
-		Namespace: namespace,
-		Name:      name,
-		Ref:       ref,
-		RepoType:  common.RepoTypeFromContext(ctx),
+		Namespace:   namespace,
+		Name:        name,
+		Ref:         ref,
+		RepoType:    common.RepoTypeFromContext(ctx),
+		CurrentUser: currentUser,
 	}
 	commit, err := h.c.LastCommit(ctx, req)
 	if err != nil {
@@ -262,14 +268,16 @@ func (h *RepoHandler) FileRaw(ctx *gin.Context) {
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
+	currentUser := httpbase.GetCurrentUser(ctx)
 	filePath := ctx.Param("file_path")
 	filePath = convertFilePathFromRoute(filePath)
 	req := &types.GetFileReq{
-		Namespace: namespace,
-		Name:      name,
-		Path:      filePath,
-		Ref:       ctx.Query("ref"),
-		RepoType:  common.RepoTypeFromContext(ctx),
+		Namespace:   namespace,
+		Name:        name,
+		Path:        filePath,
+		Ref:         ctx.Query("ref"),
+		RepoType:    common.RepoTypeFromContext(ctx),
+		CurrentUser: currentUser,
 	}
 	raw, err := h.c.FileRaw(ctx, req)
 	if err != nil {
@@ -305,14 +313,16 @@ func (h *RepoHandler) FileInfo(ctx *gin.Context) {
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
+	currentUser := httpbase.GetCurrentUser(ctx)
 	filePath := ctx.Param("file_path")
 	filePath = convertFilePathFromRoute(filePath)
 	req := &types.GetFileReq{
-		Namespace: namespace,
-		Name:      name,
-		Path:      filePath,
-		Ref:       ctx.Query("ref"),
-		RepoType:  common.RepoTypeFromContext(ctx),
+		Namespace:   namespace,
+		Name:        name,
+		Path:        filePath,
+		Ref:         ctx.Query("ref"),
+		RepoType:    common.RepoTypeFromContext(ctx),
+		CurrentUser: currentUser,
 	}
 	file, err := h.c.FileInfo(ctx, req)
 	if err != nil {
@@ -353,13 +363,14 @@ func (h *RepoHandler) DownloadFile(ctx *gin.Context) {
 	filePath := ctx.Param("file_path")
 	filePath = convertFilePathFromRoute(filePath)
 	req := &types.GetFileReq{
-		Namespace: namespace,
-		Name:      name,
-		Path:      filePath,
-		Ref:       ctx.Query("ref"),
-		Lfs:       false,
-		SaveAs:    ctx.Query("save_as"),
-		RepoType:  common.RepoTypeFromContext(ctx),
+		Namespace:   namespace,
+		Name:        name,
+		Path:        filePath,
+		Ref:         ctx.Query("ref"),
+		Lfs:         false,
+		SaveAs:      ctx.Query("save_as"),
+		RepoType:    common.RepoTypeFromContext(ctx),
+		CurrentUser: currentUser,
 	}
 	if ctx.Query("lfs") != "" {
 		req.Lfs, err = strconv.ParseBool(ctx.Query("lfs"))
@@ -421,12 +432,14 @@ func (h *RepoHandler) Branches(ctx *gin.Context) {
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
+	currentUser := httpbase.GetCurrentUser(ctx)
 	req := &types.GetBranchesReq{
-		Namespace: namespace,
-		Name:      name,
-		Per:       per,
-		Page:      page,
-		RepoType:  common.RepoTypeFromContext(ctx),
+		Namespace:   namespace,
+		Name:        name,
+		Per:         per,
+		Page:        page,
+		RepoType:    common.RepoTypeFromContext(ctx),
+		CurrentUser: currentUser,
 	}
 	branches, err := h.c.Branches(ctx, req)
 	if err != nil {
@@ -460,10 +473,12 @@ func (h *RepoHandler) Tags(ctx *gin.Context) {
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
+	currentUser := httpbase.GetCurrentUser(ctx)
 	req := &types.GetTagsReq{
-		Namespace: namespace,
-		Name:      name,
-		RepoType:  common.RepoTypeFromContext(ctx),
+		Namespace:   namespace,
+		Name:        name,
+		RepoType:    common.RepoTypeFromContext(ctx),
+		CurrentUser: currentUser,
 	}
 	tags, err := h.c.Tags(ctx, req)
 	if err != nil {
@@ -511,7 +526,7 @@ func (h *RepoHandler) UpdateTags(ctx *gin.Context) {
 	}
 	category := ctx.Param("category")
 	repoType := common.RepoTypeFromContext(ctx)
-	err = h.c.UpdateTags(ctx, namespace, name, repoType, category, tags)
+	err = h.c.UpdateTags(ctx, namespace, name, repoType, category, currentUser, tags)
 	if err != nil {
 		slog.Error("Failed to update tags", slog.String("error", err.Error()), slog.String("category", category), slog.String("repo_type", string(repoType)),
 			slog.String("namespace", namespace), slog.String("name", name))
@@ -544,12 +559,14 @@ func (h *RepoHandler) Tree(ctx *gin.Context) {
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
+	currentUser := httpbase.GetCurrentUser(ctx)
 	req := &types.GetFileReq{
-		Namespace: namespace,
-		Name:      name,
-		Path:      ctx.Query("path"),
-		Ref:       ctx.Query("ref"),
-		RepoType:  common.RepoTypeFromContext(ctx),
+		Namespace:   namespace,
+		Name:        name,
+		Path:        ctx.Query("path"),
+		Ref:         ctx.Query("ref"),
+		RepoType:    common.RepoTypeFromContext(ctx),
+		CurrentUser: currentUser,
 	}
 	tree, err := h.c.Tree(ctx, req)
 	if err != nil {
@@ -634,7 +651,7 @@ func (h *RepoHandler) IncrDownloads(ctx *gin.Context) {
 func (h *RepoHandler) UploadFile(ctx *gin.Context) {
 	userName := httpbase.GetCurrentUser(ctx)
 	if userName == "" {
-		httpbase.UnauthorizedError(ctx, errors.New("user not found, please login first"))
+		httpbase.UnauthorizedError(ctx, component.ErrUserNotFound)
 		return
 	}
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
@@ -664,26 +681,28 @@ func (h *RepoHandler) UploadFile(ctx *gin.Context) {
 		}
 
 		buf.Reset()
-		w := base64.NewEncoder(base64.StdEncoding, &buf)
-		_, err = io.Copy(w, openedFile)
-		w.Close()
-		openedFile.Close()
+		_, err = io.Copy(&buf, openedFile)
 		if err != nil {
 			slog.Info("Error encodeing uploaded file", "error", err, slog.String("file_name", file.Filename))
 			httpbase.BadRequest(ctx, err.Error())
 			return
 		}
+		originalBytes := buf.Bytes()
+		base64Content := base64.StdEncoding.EncodeToString(originalBytes)
+		openedFile.Close()
 		filePath := paths[idx]
 
 		upload := &types.CreateFileReq{
-			Username:  userName,
-			NameSpace: namespace,
-			Name:      name,
-			FilePath:  filePath,
-			Content:   buf.String(),
-			RepoType:  common.RepoTypeFromContext(ctx),
-			Message:   message,
-			Branch:    branch,
+			Username:        userName,
+			Namespace:       namespace,
+			Name:            name,
+			FilePath:        filePath,
+			Content:         base64Content,
+			RepoType:        common.RepoTypeFromContext(ctx),
+			Message:         message,
+			Branch:          branch,
+			OriginalContent: originalBytes,
+			CurrentUser:     userName,
 		}
 		err = h.c.UploadFile(ctx, upload)
 		if err != nil {
@@ -897,12 +916,14 @@ func (h *RepoHandler) CommitWithDiff(ctx *gin.Context) {
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
+	currentUser := httpbase.GetCurrentUser(ctx)
 	commitID := ctx.Param("commit_id")
 	req := &types.GetCommitsReq{
-		Namespace: namespace,
-		Name:      name,
-		Ref:       commitID,
-		RepoType:  common.RepoTypeFromContext(ctx),
+		Namespace:   namespace,
+		Name:        name,
+		Ref:         commitID,
+		RepoType:    common.RepoTypeFromContext(ctx),
+		CurrentUser: currentUser,
 	}
 	commit, err := h.c.GetCommitWithDiff(ctx, req)
 	if err != nil {
@@ -933,7 +954,7 @@ func (h *RepoHandler) CreateMirror(ctx *gin.Context) {
 	var mirrorReq types.CreateMirrorReq
 	currentUser := httpbase.GetCurrentUser(ctx)
 	if currentUser == "" {
-		httpbase.UnauthorizedError(ctx, errors.New("user not found, please login first"))
+		httpbase.UnauthorizedError(ctx, component.ErrUserNotFound)
 		return
 	}
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
@@ -983,7 +1004,7 @@ func (h *RepoHandler) CreateMirror(ctx *gin.Context) {
 func (h *RepoHandler) MirrorFromSaas(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
 	if currentUser == "" {
-		httpbase.UnauthorizedError(ctx, errors.New("user not found, please login first"))
+		httpbase.UnauthorizedError(ctx, component.ErrUserNotFound)
 		return
 	}
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
@@ -1024,7 +1045,7 @@ func (h *RepoHandler) GetMirror(ctx *gin.Context) {
 	var mirrorReq types.GetMirrorReq
 	currentUser := httpbase.GetCurrentUser(ctx)
 	if currentUser == "" {
-		httpbase.UnauthorizedError(ctx, errors.New("user not found, please login first"))
+		httpbase.UnauthorizedError(ctx, component.ErrUserNotFound)
 		return
 	}
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
@@ -1064,7 +1085,7 @@ func (h *RepoHandler) UpdateMirror(ctx *gin.Context) {
 	var mirrorReq types.UpdateMirrorReq
 	currentUser := httpbase.GetCurrentUser(ctx)
 	if currentUser == "" {
-		httpbase.UnauthorizedError(ctx, errors.New("user not found, please login first"))
+		httpbase.UnauthorizedError(ctx, component.ErrUserNotFound)
 		return
 	}
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
@@ -1115,7 +1136,7 @@ func (h *RepoHandler) DeleteMirror(ctx *gin.Context) {
 	var mirrorReq types.DeleteMirrorReq
 	currentUser := httpbase.GetCurrentUser(ctx)
 	if currentUser == "" {
-		httpbase.UnauthorizedError(ctx, errors.New("user not found, please login first"))
+		httpbase.UnauthorizedError(ctx, component.ErrUserNotFound)
 		return
 	}
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
@@ -1330,7 +1351,7 @@ func (h *RepoHandler) RuntimeFrameworkDelete(ctx *gin.Context) {
 func (h *RepoHandler) DeployList(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
 	if currentUser == "" {
-		httpbase.UnauthorizedError(ctx, errors.New("user not found, please login first"))
+		httpbase.UnauthorizedError(ctx, component.ErrUserNotFound)
 		return
 	}
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
@@ -1370,7 +1391,7 @@ func (h *RepoHandler) DeployList(ctx *gin.Context) {
 func (h *RepoHandler) DeployDetail(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
 	if currentUser == "" {
-		httpbase.UnauthorizedError(ctx, errors.New("user not found, please login first"))
+		httpbase.UnauthorizedError(ctx, component.ErrUserNotFound)
 		return
 	}
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
@@ -1445,7 +1466,7 @@ func (h *RepoHandler) DeployInstanceLogs(ctx *gin.Context) {
 
 	currentUser := httpbase.GetCurrentUser(ctx)
 	if currentUser == "" {
-		httpbase.UnauthorizedError(ctx, errors.New("user not found, please login first"))
+		httpbase.UnauthorizedError(ctx, component.ErrUserNotFound)
 		return
 	}
 	repoType := common.RepoTypeFromContext(ctx)
@@ -1569,7 +1590,7 @@ func (h *RepoHandler) DeployStatus(ctx *gin.Context) {
 
 	currentUser := httpbase.GetCurrentUser(ctx)
 	if currentUser == "" {
-		httpbase.UnauthorizedError(ctx, errors.New("user not found, please login first"))
+		httpbase.UnauthorizedError(ctx, component.ErrUserNotFound)
 		return
 	}
 
@@ -1671,7 +1692,7 @@ func (h *RepoHandler) SyncMirror(ctx *gin.Context) {
 	}
 	currentUser := httpbase.GetCurrentUser(ctx)
 	if currentUser == "" {
-		httpbase.UnauthorizedError(ctx, errors.New("user not found, please login first"))
+		httpbase.UnauthorizedError(ctx, component.ErrUserNotFound)
 		return
 	}
 	err = h.c.SyncMirror(ctx, repoType, namespace, name, currentUser)
@@ -1733,7 +1754,7 @@ func (h *RepoHandler) testStatus(ctx *gin.Context) {
 func (h *RepoHandler) DeployUpdate(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
 	if currentUser == "" {
-		httpbase.UnauthorizedError(ctx, errors.New("user not found, please login first"))
+		httpbase.UnauthorizedError(ctx, component.ErrUserNotFound)
 		return
 	}
 
@@ -1816,7 +1837,7 @@ func (h *RepoHandler) DeployUpdate(ctx *gin.Context) {
 func (h *RepoHandler) RuntimeFrameworkListWithType(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
 	if currentUser == "" {
-		httpbase.UnauthorizedError(ctx, errors.New("user not found, please login first"))
+		httpbase.UnauthorizedError(ctx, component.ErrUserNotFound)
 		return
 	}
 	deployTypeStr := ctx.Query("deploy_type")
@@ -1865,7 +1886,7 @@ func (h *RepoHandler) RuntimeFrameworkListWithType(ctx *gin.Context) {
 func (h *RepoHandler) ServerlessDetail(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
 	if currentUser == "" {
-		httpbase.UnauthorizedError(ctx, errors.New("user not found, please login first"))
+		httpbase.UnauthorizedError(ctx, component.ErrUserNotFound)
 		return
 	}
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
@@ -1929,7 +1950,7 @@ func (h *RepoHandler) ServerlessLogs(ctx *gin.Context) {
 
 	currentUser := httpbase.GetCurrentUser(ctx)
 	if currentUser == "" {
-		httpbase.UnauthorizedError(ctx, errors.New("user not found, please login first"))
+		httpbase.UnauthorizedError(ctx, component.ErrUserNotFound)
 		return
 	}
 	repoType := common.RepoTypeFromContext(ctx)
@@ -2016,7 +2037,7 @@ func (h *RepoHandler) ServerlessStatus(ctx *gin.Context) {
 
 	currentUser := httpbase.GetCurrentUser(ctx)
 	if currentUser == "" {
-		httpbase.UnauthorizedError(ctx, errors.New("user not found, please login first"))
+		httpbase.UnauthorizedError(ctx, component.ErrUserNotFound)
 		return
 	}
 
@@ -2107,7 +2128,7 @@ func (h *RepoHandler) ServerlessStatus(ctx *gin.Context) {
 func (h *RepoHandler) ServerlessUpdate(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
 	if currentUser == "" {
-		httpbase.UnauthorizedError(ctx, errors.New("user not found, please login first"))
+		httpbase.UnauthorizedError(ctx, component.ErrUserNotFound)
 		return
 	}
 

@@ -44,6 +44,12 @@ func (h *MirrorSourceHandler) Create(ctx *gin.Context) {
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
+	currentUser := httpbase.GetCurrentUser(ctx)
+	if currentUser == "" {
+		httpbase.UnauthorizedError(ctx, component.ErrUserNotFound)
+		return
+	}
+	msReq.CurrentUser = currentUser
 	ms, err := h.c.Create(ctx, msReq)
 	if err != nil {
 		slog.Error("Failed to create mirror source", "error", err)
@@ -64,7 +70,12 @@ func (h *MirrorSourceHandler) Create(ctx *gin.Context) {
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
 // @Router       /mirror/sources [get]
 func (h *MirrorSourceHandler) Index(ctx *gin.Context) {
-	ms, err := h.c.Index(ctx)
+	currentUser := httpbase.GetCurrentUser(ctx)
+	if currentUser == "" {
+		httpbase.UnauthorizedError(ctx, component.ErrUserNotFound)
+		return
+	}
+	ms, err := h.c.Index(ctx, currentUser)
 	if err != nil {
 		slog.Error("Failed to get mirror sources", "error", err)
 		httpbase.ServerError(ctx, err)
@@ -107,6 +118,12 @@ func (h *MirrorSourceHandler) Update(ctx *gin.Context) {
 		return
 	}
 	msReq.ID = msId
+	currentUser := httpbase.GetCurrentUser(ctx)
+	if currentUser == "" {
+		httpbase.UnauthorizedError(ctx, component.ErrUserNotFound)
+		return
+	}
+	msReq.CurrentUser = currentUser
 	ms, err := h.c.Update(ctx, msReq)
 	if err != nil {
 		slog.Error("Failed to get mirror sources", "error", err)
@@ -142,7 +159,12 @@ func (h *MirrorSourceHandler) Get(ctx *gin.Context) {
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
-	ms, err := h.c.Get(ctx, msId)
+	currentUser := httpbase.GetCurrentUser(ctx)
+	if currentUser == "" {
+		httpbase.UnauthorizedError(ctx, component.ErrUserNotFound)
+		return
+	}
+	ms, err := h.c.Get(ctx, msId, currentUser)
 	if err != nil {
 		slog.Error("Failed to get mirror source", "error", err)
 		httpbase.ServerError(ctx, err)
@@ -177,7 +199,12 @@ func (h *MirrorSourceHandler) Delete(ctx *gin.Context) {
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
-	err = h.c.Delete(ctx, msId)
+	currentUser := httpbase.GetCurrentUser(ctx)
+	if currentUser == "" {
+		httpbase.UnauthorizedError(ctx, component.ErrUserNotFound)
+		return
+	}
+	err = h.c.Delete(ctx, msId, currentUser)
 	if err != nil {
 		slog.Error("Failed to delete mirror source", "error", err)
 		httpbase.ServerError(ctx, err)

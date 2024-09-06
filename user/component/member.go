@@ -21,16 +21,20 @@ type MemberComponent struct {
 	userStore     *database.UserStore
 	gitServer     gitserver.GitServer
 	gitMemberShip membership.GitMemerShip
+	config        *config.Config
 }
 
 func NewMemberComponent(config *config.Config) (*MemberComponent, error) {
+	var gms membership.GitMemerShip
 	gs, err := git.NewGitServer(config)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create git server:%w", err)
 	}
-	gms, err := git.NewMemberShip(*config)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create git membership:%w", err)
+	if config.GitServer.Type == "gitea" {
+		gms, err = git.NewMemberShip(*config)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create git membership:%w", err)
+		}
 	}
 	return &MemberComponent{
 		memberStore:   database.NewMemberStore(),
@@ -38,6 +42,7 @@ func NewMemberComponent(config *config.Config) (*MemberComponent, error) {
 		userStore:     database.NewUserStore(),
 		gitServer:     gs,
 		gitMemberShip: gms,
+		config:        config,
 	}, nil
 }
 
@@ -86,8 +91,12 @@ func (c *MemberComponent) OrgMembers(ctx context.Context, orgName, currentUser s
 }
 
 func (c *MemberComponent) InitRoles(ctx context.Context, org *database.Organization) error {
-	return c.gitMemberShip.AddRoles(ctx, org.Name,
-		[]membership.Role{membership.RoleAdmin, membership.RoleRead, membership.RoleWrite})
+	if c.config.GitServer.Type == "gitea" {
+		return c.gitMemberShip.AddRoles(ctx, org.Name,
+			[]membership.Role{membership.RoleAdmin, membership.RoleRead, membership.RoleWrite})
+	} else {
+		return nil
+	}
 }
 
 func (c *MemberComponent) SetAdmin(ctx context.Context, org *database.Organization, user *database.User) error {
@@ -99,7 +108,11 @@ func (c *MemberComponent) SetAdmin(ctx context.Context, org *database.Organizati
 		err = fmt.Errorf("failed to create member,caused by:%w", err)
 		return err
 	}
-	return c.gitMemberShip.AddMember(ctx, org.Name, user.Username, membership.RoleAdmin)
+	if c.config.GitServer.Type == "gitea" {
+		return c.gitMemberShip.AddMember(ctx, org.Name, user.Username, membership.RoleAdmin)
+	} else {
+		return nil
+	}
 }
 
 func (c *MemberComponent) ChangeMemberRole(ctx context.Context, orgName, userName, operatorName, oldRole, newRole string) error {
@@ -180,9 +193,11 @@ func (c *MemberComponent) AddMembers(ctx context.Context, orgName string, users 
 			err = fmt.Errorf("failed to create db member, org:%s, user:%s,caused by:%w", orgName, userName, err)
 			return err
 		}
-		err = c.gitMemberShip.AddMember(ctx, orgName, userName, c.toGitRole(role))
-		if err != nil {
-			return fmt.Errorf("failed to add git member, org:%s, user:%s caused by:%w", orgName, userName, err)
+		if c.config.GitServer.Type == "gitea" {
+			err = c.gitMemberShip.AddMember(ctx, orgName, userName, c.toGitRole(role))
+			if err != nil {
+				return fmt.Errorf("failed to add git member, org:%s, user:%s caused by:%w", orgName, userName, err)
+			}
 		}
 	}
 
@@ -236,7 +251,11 @@ func (c *MemberComponent) Delete(ctx context.Context, orgName, userName, operato
 		err = fmt.Errorf("failed to delete member,caused by:%w", err)
 		return err
 	}
-	return c.gitMemberShip.RemoveMember(ctx, orgName, userName, c.toGitRole(role))
+	if c.config.GitServer.Type == "gitea" {
+		return c.gitMemberShip.RemoveMember(ctx, orgName, userName, c.toGitRole(role))
+	} else {
+		return nil
+	}
 }
 
 func (c *MemberComponent) allowAddMember(u *database.Member) bool {

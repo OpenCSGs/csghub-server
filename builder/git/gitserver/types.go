@@ -1,6 +1,10 @@
 package gitserver
 
-import "opencsg.com/csghub-server/common/types"
+import (
+	"net/http"
+
+	"opencsg.com/csghub-server/common/types"
+)
 
 type CreateUserRequest struct {
 	// Display name of the user
@@ -105,6 +109,16 @@ type GetRepoLastCommitReq struct {
 	RepoType  types.RepositoryType `json:"repo_type"`
 }
 
+type GetDiffBetweenTwoCommitsReq struct {
+	Namespace     string               `json:"namespace"`
+	Name          string               `json:"name"`
+	Ref           string               `json:"ref"`
+	RepoType      types.RepositoryType `json:"repo_type"`
+	LeftCommitId  string               `json:"left_commit_id"`
+	RightCommitId string               `json:"right_commit_id"`
+	Private       bool                 `json:"private"`
+}
+
 type RepoBasicReq struct {
 	Namespace string               `json:"namespace"`
 	Name      string               `json:"name"`
@@ -116,6 +130,14 @@ type GetRepoInfoByPathReq struct {
 	Name      string               `json:"name"`
 	Ref       string               `json:"ref"`
 	Path      string               `json:"path"`
+	RepoType  types.RepositoryType `json:"repo_type"`
+	File      bool                 `json:"file"`
+}
+
+type GetRepoAllFilesReq struct {
+	Namespace string               `json:"namespace"`
+	Name      string               `json:"name"`
+	Ref       string               `json:"ref"`
 	RepoType  types.RepositoryType `json:"repo_type"`
 }
 
@@ -143,9 +165,12 @@ type CreateMirrorRepoReq struct {
 }
 
 type MirrorSyncReq struct {
-	Namespace string `json:"namespace"`
-	Name      string `json:"name"`
-	RepoType  types.RepositoryType
+	Namespace   string `json:"namespace"`
+	Name        string `json:"name"`
+	RepoType    types.RepositoryType
+	CloneUrl    string `json:"clone_url"`
+	Username    string `json:"username"`
+	AccessToken string `json:"access_token"`
 }
 
 type MirrorTaskInfo struct {
@@ -158,3 +183,24 @@ type MirrorTaskInfo struct {
 }
 
 type TaskStatus int
+
+type InfoRefsReq struct {
+	Namespace   string               `json:"namespace"`
+	Name        string               `json:"name"`
+	RepoType    types.RepositoryType `json:"repo_type"`
+	Rpc         string               `json:"rpc"`
+	GitProtocol string               `json:"git_protocol"`
+}
+
+type UploadPackReq struct {
+	Namespace   string               `json:"namespace"`
+	Name        string               `json:"name"`
+	RepoType    types.RepositoryType `json:"repo_type"`
+	GitProtocol string               `json:"git_protocol"`
+	Request     *http.Request        `json:"reader"`
+	Writer      http.ResponseWriter  `json:"writer"`
+	UserId      int64                `json:"user_id"`
+	Username    string               `json:"username"`
+}
+
+type ReceivePackReq = UploadPackReq

@@ -181,6 +181,22 @@ func (s *UserStore) FindByAccessToken(ctx context.Context, token string) (*User,
 	return &user, nil
 }
 
+func (s *UserStore) FindByGitAccessToken(ctx context.Context, token string) (*User, error) {
+	var user User
+	_, err := s.db.Operator.Core.
+		NewSelect().
+		ColumnExpr("u.*").
+		TableExpr("users AS u").
+		Join("JOIN access_tokens AS t ON u.id = t.user_id").
+		Where("t.token = ? and t.is_active = true and (t.expired_at is null or t.expired_at > now()) and app = 'git'", token).
+		Exec(ctx, &user)
+
+	if err != nil {
+		return nil, err
+	}
+	return &user, nil
+}
+
 func (s *UserStore) FindByUUID(ctx context.Context, uuid string) (user User, err error) {
 	user.UUID = uuid
 	err = s.db.Operator.Core.NewSelect().Model(&user).Where("uuid = ?", uuid).Scan(ctx)

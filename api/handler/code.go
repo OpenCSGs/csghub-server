@@ -47,7 +47,7 @@ type CodeHandler struct {
 func (h *CodeHandler) Create(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
 	if currentUser == "" {
-		httpbase.UnauthorizedError(ctx, errors.New("user not found, please login first"))
+		httpbase.UnauthorizedError(ctx, component.ErrUserNotFound)
 		return
 	}
 	var req *types.CreateCodeReq
@@ -156,7 +156,7 @@ func (h *CodeHandler) Index(ctx *gin.Context) {
 func (h *CodeHandler) Update(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
 	if currentUser == "" {
-		httpbase.UnauthorizedError(ctx, errors.New("user not found, please login first"))
+		httpbase.UnauthorizedError(ctx, component.ErrUserNotFound)
 		return
 	}
 	var req *types.UpdateCodeReq
@@ -211,7 +211,7 @@ func (h *CodeHandler) Update(ctx *gin.Context) {
 func (h *CodeHandler) Delete(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
 	if currentUser == "" {
-		httpbase.UnauthorizedError(ctx, errors.New("user not found, please login first"))
+		httpbase.UnauthorizedError(ctx, component.ErrUserNotFound)
 		return
 	}
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
