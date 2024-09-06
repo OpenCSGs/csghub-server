@@ -230,6 +230,27 @@ func (c *DiscussionComponent) DeleteComment(ctx context.Context, currentUser str
 	return nil
 }
 
+func (c *DiscussionComponent) ListDiscussionComments(ctx context.Context, discussionID int64) ([]*DiscussionResponse_Comment, error) {
+	comments, err := c.ds.FindDiscussionComments(ctx, discussionID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to find discussion comments by discussion id '%d': %w", discussionID, err)
+	}
+	resp := make([]*DiscussionResponse_Comment, 0, len(comments))
+	for _, comment := range comments {
+		resp = append(resp, &DiscussionResponse_Comment{
+			ID:      comment.ID,
+			Content: comment.Content,
+			User: &DiscussionResponse_User{
+				ID:       comment.User.ID,
+				Username: comment.User.Username,
+				Avatar:   comment.User.Avatar,
+			},
+			CreatedAt: comment.CreatedAt,
+		})
+	}
+	return resp, nil
+}
+
 //--- request and response ---//
 
 type CreateRepoDiscussionRequest struct {

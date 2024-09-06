@@ -700,6 +700,7 @@ func createDiscussionRoutes(apiGroup *gin.RouterGroup, needAPIKey gin.HandlerFun
 	apiGroup.PUT("/discussions/:id", discussionHandler.UpdateDiscussion)
 	apiGroup.DELETE("/discussions/:id", discussionHandler.DeleteDiscussion)
 	apiGroup.POST("/discussions/:id/comments", discussionHandler.CreateDiscussionComment)
+	apiGroup.GET("/discussions/:id/comments", discussionHandler.ListDiscussionComments)
 	apiGroup.PUT("/discussions/:id/comments/:comment_id", discussionHandler.UpdateComment)
 	apiGroup.DELETE("/discussions/:id/comments/:comment_id", discussionHandler.DeleteComment)
 }

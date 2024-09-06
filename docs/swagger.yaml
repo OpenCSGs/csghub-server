@@ -2096,12 +2096,12 @@ paths:
         - datasets
         - codes
         - spaces
-        in: query
+        in: path
         name: repo_type
         required: true
         type: string
       - description: namespace
-        in: query
+        in: path
         name: namespace
         required: true
         type: string
@@ -2151,17 +2151,17 @@ paths:
         - datasets
         - codes
         - spaces
-        in: query
+        in: path
         name: repo_type
         required: true
         type: string
       - description: namespace
-        in: query
+        in: path
         name: namespace
         required: true
         type: string
       - description: name
-        in: query
+        in: path
         name: name
         required: true
         type: string
@@ -4285,7 +4285,7 @@ paths:
       description: delete a comment by id
       parameters:
       - description: the comment id
-        in: query
+        in: path
         name: id
         required: true
         type: string
@@ -4320,7 +4320,7 @@ paths:
       description: update a comment content by id
       parameters:
       - description: the comment id
-        in: query
+        in: path
         name: id
         required: true
         type: string
@@ -4747,8 +4747,13 @@ paths:
       description: delete a discussion
       parameters:
       - description: the discussion id
-        in: query
+        in: path
         name: id
+        required: true
+        type: string
+      - description: current user, the owner of the discussion
+        in: query
+        name: current_user
         required: true
         type: string
       produces:
@@ -4777,7 +4782,7 @@ paths:
       description: show a discussion
       parameters:
       - description: the discussion id
-        in: query
+        in: path
         name: id
         required: true
         type: string
@@ -4812,7 +4817,7 @@ paths:
       description: update a discussion
       parameters:
       - description: the discussion id
-        in: query
+        in: path
         name: id
         required: true
         type: string
@@ -4848,13 +4853,50 @@ paths:
       tags:
       - Discussion
   /discussions/{id}/comments:
+    get:
+      consumes:
+      - application/json
+      description: list discussion comments
+      parameters:
+      - description: the discussion id
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/types.Response'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/component.DiscussionResponse_Comment'
+                  type: array
+              type: object
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: List discussion comments
+      tags:
+      - Discussion
     post:
       consumes:
       - application/json
       description: create a new discussion comment
       parameters:
       - description: the discussion id
-        in: query
+        in: path
         name: id
         required: true
         type: string
