@@ -32,9 +32,9 @@ func NewDiscussionHandler() (*DiscussionHandler, error) {
 // @Accept       json
 // @Produce      json
 // @Param        current_user query string true "current user, the owner"
-// @Param        repo_type query string true "repository type" Enums(models,datasets,codes,spaces)
-// @Param        namespace query string true "namespace"
-// @Param        name query string true "name"
+// @Param        repo_type path string true "repository type" Enums(models,datasets,codes,spaces)
+// @Param        namespace path string true "namespace"
+// @Param        name path string true "name"
 // @Param        body body component.CreateRepoDiscussionRequest true "body"
 // @Success      200  {object}  types.Response{data=component.CreateDiscussionResponse} "OK"
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
@@ -79,7 +79,7 @@ func (h *DiscussionHandler) CreateRepoDiscussion(ctx *gin.Context) {
 // @Tags         Discussion
 // @Accept       json
 // @Produce      json
-// @Param        id query string true "the discussion id"
+// @Param        id path string true "the discussion id"
 // @Param        current_user query string true "current user, the owner"
 // @Param        body body component.UpdateDiscussionRequest true "body"
 // @Success      200  {object}  types.Response "OK"
@@ -87,6 +87,11 @@ func (h *DiscussionHandler) CreateRepoDiscussion(ctx *gin.Context) {
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
 // @Router       /discussions/{id} [put]
 func (h *DiscussionHandler) UpdateDiscussion(ctx *gin.Context) {
+	currentUser := httpbase.GetCurrentUser(ctx)
+	if currentUser == "" {
+		httpbase.UnauthorizedError(ctx, component.ErrUserNotFound)
+		return
+	}
 	id := ctx.Param("id")
 	idInt, err := strconv.ParseInt(id, 10, 64)
 	if err != nil {
@@ -99,6 +104,7 @@ func (h *DiscussionHandler) UpdateDiscussion(ctx *gin.Context) {
 		return
 	}
 	req.ID = idInt
+	req.CurrentUser = currentUser
 	err = h.c.UpdateDiscussion(ctx, req)
 	if err != nil {
 		slog.Error("Failed to update discussion", "error", err, "request", req)
@@ -116,7 +122,7 @@ func (h *DiscussionHandler) UpdateDiscussion(ctx *gin.Context) {
 // @Tags         Discussion
 // @Accept       json
 // @Produce      json
-// @Param        id query string true "the discussion id"
+// @Param        id path string true "the discussion id"
 // @Param        current_user query string true "current user, the owner of the discussion"
 // @Success      200  {object}  types.Response "OK"
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
@@ -151,7 +157,7 @@ func (h *DiscussionHandler) DeleteDiscussion(ctx *gin.Context) {
 // @Tags         Discussion
 // @Accept       json
 // @Produce      json
-// @Param        id query string true "the discussion id"
+// @Param        id path string true "the discussion id"
 // @Success      200  {object}  types.Response{data=component.ShowDiscussionResponse} "OK"
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
@@ -181,8 +187,8 @@ func (h *DiscussionHandler) ShowDiscussion(ctx *gin.Context) {
 // @Accept       json
 // @Produce      json
 // @Param        current_user query string false "current user"
-// @Param        repo_type query string true "repository type" Enums(models,datasets,codes,spaces)
-// @Param        namespace query string true "namespace"
+// @Param        repo_type path string true "repository type" Enums(models,datasets,codes,spaces)
+// @Param        namespace path string true "namespace"
 // @Param        name query string true "name"
 // @Success      200  {object}  types.Response{data=component.ListRepoDiscussionResponse} "OK"
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
@@ -218,7 +224,7 @@ func (h *DiscussionHandler) ListRepoDiscussions(ctx *gin.Context) {
 // @Tags         Discussion
 // @Accept       json
 // @Produce      json
-// @Param        id query string true "the discussion id"
+// @Param        id path string true "the discussion id"
 // @Param        body body component.CreateCommentRequest true "body"
 // @Success      200  {object}  types.Response{data=component.CreateCommentResponse} "OK"
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
@@ -261,7 +267,7 @@ func (h *DiscussionHandler) CreateDiscussionComment(ctx *gin.Context) {
 // @Tags         Discussion
 // @Accept       json
 // @Produce      json
-// @Param        id query string true "the comment id"
+// @Param        id path string true "the comment id"
 // @Param        current_user query string true "current user, the owner of the comment"
 // @Param        body body component.UpdateCommentRequest true "body"
 // @Success      200  {object}  types.Response "OK"
@@ -303,7 +309,7 @@ func (h *DiscussionHandler) UpdateComment(ctx *gin.Context) {
 // @Tags         Discussion
 // @Accept       json
 // @Produce      json
-// @Param        id query string true "the comment id"
+// @Param        id path string true "the comment id"
 // @Param        current_user query string true "current user, the owner of the comment"
 // @Success      200  {object}  types.Response "OK"
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
@@ -328,6 +334,33 @@ func (h *DiscussionHandler) DeleteComment(ctx *gin.Context) {
 		return
 	}
 	httpbase.OK(ctx, nil)
+}
+
+// ListDiscussionComments godoc
+// @Security     ApiKey
+// @Summary      List discussion comments
+// @Description  list discussion comments
+// @Tags         Discussion
+// @Accept       json
+// @Produce      json
+// @Param        id path string true "the discussion id"
+// @Success      200  {object}  types.Response{data=[]component.DiscussionResponse_Comment} "OK"
+// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
+// @Router       /discussions/{id}/comments [get]
+func (h *DiscussionHandler) ListDiscussionComments(ctx *gin.Context) {
+	id := ctx.Param("id")
+	idInt, err := strconv.ParseInt(id, 10, 64)
+	if err != nil {
+		httpbase.BadRequest(ctx, fmt.Errorf("invalid discussion id: %w", err).Error())
+	}
+	comments, err := h.c.ListDiscussionComments(ctx, idInt)
+	if err != nil {
+		slog.Error("Failed to list discussion comments", "error", err, "id", id)
+		httpbase.ServerError(ctx, fmt.Errorf("failed to list discussion comments: %w", err))
+		return
+	}
+	httpbase.OK(ctx, comments)
 }
 
 func (h *DiscussionHandler) getRepoType(ctx *gin.Context) types.RepositoryType {
