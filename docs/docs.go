@@ -1157,7 +1157,7 @@ const docTemplate = `{
                         "type": "string",
                         "description": "the comment id",
                         "name": "id",
-                        "in": "query",
+                        "in": "path",
                         "required": true
                     },
                     {
@@ -1220,7 +1220,7 @@ const docTemplate = `{
                         "type": "string",
                         "description": "the comment id",
                         "name": "id",
-                        "in": "query",
+                        "in": "path",
                         "required": true
                     },
                     {
@@ -1895,7 +1895,7 @@ const docTemplate = `{
                         "type": "string",
                         "description": "the discussion id",
                         "name": "id",
-                        "in": "query",
+                        "in": "path",
                         "required": true
                     }
                 ],
@@ -1954,7 +1954,7 @@ const docTemplate = `{
                         "type": "string",
                         "description": "the discussion id",
                         "name": "id",
-                        "in": "query",
+                        "in": "path",
                         "required": true
                     },
                     {
@@ -2017,6 +2017,13 @@ const docTemplate = `{
                         "type": "string",
                         "description": "the discussion id",
                         "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "current user, the owner of the discussion",
+                        "name": "current_user",
                         "in": "query",
                         "required": true
                     }
@@ -2044,6 +2051,68 @@ const docTemplate = `{
             }
         },
         "/discussions/{id}/comments": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "description": "list discussion comments",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Discussion"
+                ],
+                "summary": "List discussion comments",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "the discussion id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/types.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/definitions/component.DiscussionResponse_Comment"
+                                            }
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            },
             "post": {
                 "security": [
                     {
@@ -2066,7 +2135,7 @@ const docTemplate = `{
                         "type": "string",
                         "description": "the discussion id",
                         "name": "id",
-                        "in": "query",
+                        "in": "path",
                         "required": true
                     },
                     {
@@ -10207,14 +10276,14 @@ const docTemplate = `{
                         "type": "string",
                         "description": "repository type",
                         "name": "repo_type",
-                        "in": "query",
+                        "in": "path",
                         "required": true
                     },
                     {
                         "type": "string",
                         "description": "namespace",
                         "name": "namespace",
-                        "in": "query",
+                        "in": "path",
                         "required": true
                     },
                     {
@@ -10293,21 +10362,21 @@ const docTemplate = `{
                         "type": "string",
                         "description": "repository type",
                         "name": "repo_type",
-                        "in": "query",
+                        "in": "path",
                         "required": true
                     },
                     {
                         "type": "string",
                         "description": "namespace",
                         "name": "namespace",
-                        "in": "query",
+                        "in": "path",
                         "required": true
                     },
                     {
                         "type": "string",
                         "description": "name",
                         "name": "name",
-                        "in": "query",
+                        "in": "path",
                         "required": true
                     },
                     {
