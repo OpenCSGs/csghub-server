@@ -53,6 +53,11 @@ var checkMirrorProgress = &cobra.Command{
 			slog.Error("config not found in context")
 			return
 		}
+
+		if config.GitServer.Type != "gitea" {
+			return
+		}
+
 		locker, err := cache.NewCache(ctx, cache.RedisConfig{
 			Addr:     config.Redis.Endpoint,
 			Username: config.Redis.User,

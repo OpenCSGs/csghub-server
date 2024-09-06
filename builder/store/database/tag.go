@@ -186,7 +186,7 @@ func (ts *TagStore) SetMetaTags(ctx context.Context, repoType types.RepositoryTy
 	err = ts.db.Operator.Core.NewSelect().Model(repo).
 		Column("id").
 		Relation("Tags").
-		Where("git_path =?", fmt.Sprintf("%ss_%v/%v", string(repoType), namespace, name)).
+		Where("LOWER(git_path) = LOWER(?)", fmt.Sprintf("%ss_%v/%v", string(repoType), namespace, name)).
 		Scan(ctx)
 	if err != nil {
 		return repoTags, fmt.Errorf("failed to find repository, path:%v/%v,error:%w", namespace, name, err)
@@ -232,7 +232,7 @@ func (ts *TagStore) SetLibraryTag(ctx context.Context, repoType types.Repository
 	repo := new(Repository)
 	err = ts.db.Operator.Core.NewSelect().Model(repo).
 		Column("id").
-		Where("git_path =?", fmt.Sprintf("%ss_%v/%v", string(repoType), namespace, name)).
+		Where("LOWER(git_path) = LOWER(?)", fmt.Sprintf("%ss_%v/%v", string(repoType), namespace, name)).
 		Scan(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to find repository, path:%v/%v,error:%w", namespace, name, err)

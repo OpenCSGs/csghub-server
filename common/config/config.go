@@ -12,7 +12,8 @@ type Config struct {
 
 	APIServer struct {
 		Port         int    `envconfig:"STARHUB_SERVER_SERVER_PORT" default:"8080"`
-		PublicDomain string `envconfig:"STARHUB_SERVER_PUBLIC_DOMAIN" default:"localhost:8080"`
+		PublicDomain string `envconfig:"STARHUB_SERVER_PUBLIC_DOMAIN" default:"http://localhost:8080"`
+		SSHDomain    string `envconfig:"STARHUB_SERVER_SSH_DOMAIN" default:"ssh://git@localhost:2222"`
 	}
 
 	Mirror struct {
@@ -42,12 +43,20 @@ type Config struct {
 	}
 
 	GitServer struct {
-		URL       string `envconfig:"STARHUB_SERVER_GITSERVER_URL"    default:"http://localhost:3000"`
-		Type      string `envconfig:"STARHUB_SERVER_GITSERVER_TYPE"    default:"gitea"`
-		Host      string `envconfig:"STARHUB_SERVER_GITSERVER_HOST"       default:"http://localhost:3000"`
-		SecretKey string `envconfig:"STARHUB_SERVER_GITSERVER_SECRET_KEY" default:"619c849c49e03754454ccd4cda79a209ce0b30b3"`
-		Username  string `envconfig:"STARHUB_SERVER_GITSERVER_USERNAME" default:"root"`
-		Password  string `envconfig:"STARHUB_SERVER_GITSERVER_PASSWORD" default:"password123"`
+		URL        string `envconfig:"STARHUB_SERVER_GITSERVER_URL"    default:"http://localhost:3000"`
+		Type       string `envconfig:"STARHUB_SERVER_GITSERVER_TYPE"    default:"gitea"`
+		Host       string `envconfig:"STARHUB_SERVER_GITSERVER_HOST"       default:"http://localhost:3000"`
+		SecretKey  string `envconfig:"STARHUB_SERVER_GITSERVER_SECRET_KEY" default:"619c849c49e03754454ccd4cda79a209ce0b30b3"`
+		Username   string `envconfig:"STARHUB_SERVER_GITSERVER_USERNAME" default:"root"`
+		Password   string `envconfig:"STARHUB_SERVER_GITSERVER_PASSWORD" default:"password123"`
+		TimtoutSEC int    `envconfig:"STARHUB_SERVER_GITSERVER_TIMEOUT_SEC" default:"5"`
+	}
+
+	GitalyServer struct {
+		Address   string `envconfig:"STARHUB_SERVER_GITALY_SERVER_SOCKET" default:"tcp://localhost:9999"`
+		Storge    string `envconfig:"STARHUB_SERVER_GITALY_STORGE" default:"default"`
+		Token     string `envconfig:"STARHUB_SERVER_GITALY_TOKEN" default:"abc123secret"`
+		JWTSecret string `envconfig:"STARHUB_SERVER_GITALY_JWT_SECRET" default:"signing-key"`
 	}
 
 	MirrorServer struct {

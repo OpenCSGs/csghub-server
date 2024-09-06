@@ -74,6 +74,13 @@ func (c *TagComponent) UpdateMetaTags(ctx context.Context, tagScope database.Tag
 		slog.Error("Failed to save tags", slog.Any("error", err))
 		return nil, fmt.Errorf("failed to save tags, cause: %w", err)
 	}
+
+	repo, err := c.rs.FindByPath(ctx, repoType, namespace, name)
+	if err != nil {
+		slog.Error("failed to find repo", slog.Any("error", err))
+		return nil, fmt.Errorf("failed to find repo, cause: %w", err)
+	}
+
 	metaTags := append(tagsMatched, tagToCreate...)
 	var repoTags []*database.RepositoryTag
 	repoTags, err = c.ts.SetMetaTags(ctx, repoType, namespace, name, metaTags)
@@ -81,6 +88,11 @@ func (c *TagComponent) UpdateMetaTags(ctx context.Context, tagScope database.Tag
 		slog.Error("failed to set dataset's tags", slog.String("namespace", namespace),
 			slog.String("name", name), slog.Any("error", err))
 		return nil, fmt.Errorf("failed to set dataset's tags, cause: %w", err)
+	}
+
+	err = c.rs.UpdateLicenseByTag(ctx, repo.ID)
+	if err != nil {
+		slog.Error("failed to update repo license tags", slog.Any("error", err))
 	}
 
 	return repoTags, nil

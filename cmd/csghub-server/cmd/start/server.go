@@ -9,6 +9,7 @@ import (
 	"opencsg.com/csghub-server/api/router"
 	"opencsg.com/csghub-server/builder/deploy"
 	"opencsg.com/csghub-server/builder/event"
+	"opencsg.com/csghub-server/builder/mirror"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/docs"
@@ -77,6 +78,18 @@ var serverCmd = &cobra.Command{
 			},
 			r,
 		)
+
+		// Initialize mirror service
+		mirrorService, err := mirror.NewMirrorService(cfg, 5)
+		if err != nil {
+			return fmt.Errorf("failed to init mirror service: %w", err)
+		}
+
+		if cfg.MirrorServer.Enable {
+			mirrorService.EnqueueMirrorTasks()
+			go mirrorService.Start()
+		}
+
 		server.Run()
 
 		return nil

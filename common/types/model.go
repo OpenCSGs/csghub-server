@@ -9,10 +9,12 @@ type RepoBranchCommit struct {
 }
 
 type CreateModelReq struct {
+	BaseModel string `json:"base_model"`
 	CreateRepoReq
 }
 
 type UpdateModelReq struct {
+	BaseModel *string `json:"base_model"`
 	UpdateRepoReq
 }
 
@@ -145,6 +147,8 @@ type Model struct {
 	SyncStatus      RepositorySyncStatus `json:"sync_status"`
 	EnableInference bool                 `json:"enable_inference"`
 	EnableFinetune  bool                 `json:"enable_finetune"`
+	BaseModel       string               `json:"base_model"`
+	License         string               `json:"license"`
 	CanWrite        bool                 `json:"can_write"`
 	CanManage       bool                 `json:"can_manage"`
 	Namespace       *Namespace           `json:"namespace"`

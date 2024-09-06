@@ -25,16 +25,6 @@ func (c *Client) GetRepoFileTree(ctx context.Context, req gitserver.GetRepoInfoB
 	return c.getRepoDir(namespace, req.Name, req.Ref, req.Path)
 }
 
-func (c *Client) GetModelFileTree(namespace, name, ref, path string) (tree []*types.File, err error) {
-	namespace = common.WithPrefix(namespace, ModelOrgPrefix)
-	return c.getRepoDir(namespace, name, ref, path)
-}
-
-func (c *Client) GetDatasetFileTree(namespace, name, ref, path string) (tree []*types.File, err error) {
-	namespace = common.WithPrefix(namespace, DatasetOrgPrefix)
-	return c.getRepoDir(namespace, name, ref, path)
-}
-
 func (c *Client) getRepoDir(namespace, name, ref, path string) (files []*types.File, err error) {
 	giteaEntries, _, err := c.giteaClient.GetDir(namespace, name, ref, path)
 	if err != nil {
@@ -134,7 +124,7 @@ func (c *Client) GetRepoFileContents(ctx context.Context, req gitserver.GetRepoI
 }
 
 func (c *Client) CreateRepoFile(req *types.CreateFileReq) (err error) {
-	namespace := common.WithPrefix(req.NameSpace, repoPrefixByType(req.RepoType))
+	namespace := common.WithPrefix(req.Namespace, repoPrefixByType(req.RepoType))
 	_, _, err = c.giteaClient.CreateFile(namespace, req.Name, req.FilePath, gitea.CreateFileOptions{
 		FileOptions: gitea.FileOptions{
 			Message:       req.Message,
@@ -159,7 +149,7 @@ func (c *Client) CreateRepoFile(req *types.CreateFileReq) (err error) {
 }
 
 func (c *Client) UpdateRepoFile(req *types.UpdateFileReq) (err error) {
-	namespace := common.WithPrefix(req.NameSpace, repoPrefixByType(req.RepoType))
+	namespace := common.WithPrefix(req.Namespace, repoPrefixByType(req.RepoType))
 	_, _, err = c.giteaClient.UpdateFile(namespace, req.Name, req.FilePath, gitea.UpdateFileOptions{
 		FileOptions: gitea.FileOptions{
 			Message:       req.Message,
@@ -183,127 +173,6 @@ func (c *Client) UpdateRepoFile(req *types.UpdateFileReq) (err error) {
 		FromPath: req.OriginPath,
 	})
 	return
-}
-
-func (c *Client) GetDatasetFileRaw(namespace, name, ref, path string) (string, error) {
-	namespace = common.WithPrefix(namespace, DatasetOrgPrefix)
-	giteaFileData, _, err := c.giteaClient.GetFile(namespace, name, ref, path)
-	if err != nil {
-		return "", err
-	}
-	return string(giteaFileData), nil
-}
-
-func (c *Client) GetDatasetFileReader(namespace, name, ref, path string) (io.ReadCloser, error) {
-	namespace = common.WithPrefix(namespace, DatasetOrgPrefix)
-	entries, _, err := c.giteaClient.GetDir(namespace, name, ref, path)
-	if err != nil {
-		return nil, err
-	}
-	if entries[0].Size > NonLFSFileSizeLimit {
-		return nil, errors.New("file is larger than 10MB")
-	}
-	giteaFileReader, _, err := c.giteaClient.GetFileReader(namespace, name, ref, path)
-	if err != nil {
-		return nil, err
-	}
-	return giteaFileReader, nil
-}
-
-func (c *Client) GetDatasetLfsFileRaw(namespace, repoName, ref, filePath string) (io.ReadCloser, error) {
-	namespace = common.WithPrefix(namespace, DatasetOrgPrefix)
-	r, _, err := c.giteaClient.GetFileReader(namespace, repoName, ref, filePath, true)
-	return r, err
-}
-
-func (c *Client) GetModelFileRaw(namespace, name, ref, path string) (data string, err error) {
-	namespace = common.WithPrefix(namespace, ModelOrgPrefix)
-	giteaFileData, _, err := c.giteaClient.GetFile(namespace, name, ref, path)
-	if err != nil {
-		return
-	}
-	data = string(giteaFileData)
-	return
-}
-
-func (c *Client) GetModelFileReader(namespace, name, ref, path string) (giteaFileReader io.ReadCloser, err error) {
-	namespace = common.WithPrefix(namespace, ModelOrgPrefix)
-	entries, _, err := c.giteaClient.GetDir(namespace, name, ref, path)
-	if err != nil {
-		return
-	}
-	if entries[0].Size > NonLFSFileSizeLimit {
-		return nil, errors.New("file is larger than 10MB")
-	}
-	giteaFileReader, _, err = c.giteaClient.GetFileReader(namespace, name, ref, path)
-	if err != nil {
-		return
-	}
-	return
-}
-
-func (c *Client) GetModelLfsFileRaw(namespace, repoName, ref, filePath string) (io.ReadCloser, error) {
-	namespace = common.WithPrefix(namespace, ModelOrgPrefix)
-	r, _, err := c.giteaClient.GetFileReader(namespace, repoName, ref, filePath, true)
-	return r, err
-}
-
-func (c *Client) GetDatasetFileContents(namespace, repo, ref, path string) (*types.File, error) {
-	owner := common.WithPrefix(namespace, DatasetOrgPrefix)
-	file, err := c.getFileContents(owner, repo, ref, path)
-	if err != nil {
-		return nil, errors.New("failed to get dataset file contents")
-	}
-	commit, _, err := c.giteaClient.GetSingleCommit(owner, repo, file.LastCommitSHA, gitea.SpeedUpOtions{
-		DisableStat:         true,
-		DisableVerification: true,
-		DisableFiles:        true,
-	})
-	if err != nil {
-		return nil, errors.New("failed to get dataset file last commit")
-	}
-
-	file.Commit = types.Commit{
-		ID:             commit.SHA,
-		CommitterName:  commit.RepoCommit.Committer.Name,
-		CommitterEmail: commit.RepoCommit.Committer.Email,
-		CommitterDate:  commit.RepoCommit.Committer.Date,
-		CreatedAt:      commit.Created.Format("2024-02-26T15:05:35+08:00"),
-		Message:        commit.RepoCommit.Message,
-		AuthorName:     commit.RepoCommit.Author.Name,
-		AuthorEmail:    commit.RepoCommit.Author.Email,
-		AuthoredDate:   commit.RepoCommit.Author.Date,
-	}
-	return file, nil
-}
-
-func (c *Client) GetModelFileContents(namespace, repo, ref, path string) (*types.File, error) {
-	owner := common.WithPrefix(namespace, ModelOrgPrefix)
-	file, err := c.getFileContents(owner, repo, ref, path)
-	if err != nil {
-		return nil, errors.New("failed to get model file contents")
-	}
-	commit, _, err := c.giteaClient.GetSingleCommit(owner, repo, file.LastCommitSHA, gitea.SpeedUpOtions{
-		DisableStat:         true,
-		DisableVerification: true,
-		DisableFiles:        true,
-	})
-	if err != nil {
-		return nil, errors.New("failed to get model file last commit")
-	}
-
-	file.Commit = types.Commit{
-		ID:             commit.SHA,
-		CommitterName:  commit.RepoCommit.Committer.Name,
-		CommitterEmail: commit.RepoCommit.Committer.Email,
-		CommitterDate:  commit.RepoCommit.Committer.Date,
-		CreatedAt:      commit.Created.Format("2024-02-26T15:05:35+08:00"),
-		Message:        commit.RepoCommit.Message,
-		AuthorName:     commit.RepoCommit.Author.Name,
-		AuthorEmail:    commit.RepoCommit.Author.Email,
-		AuthoredDate:   commit.RepoCommit.Author.Date,
-	}
-	return file, nil
 }
 
 func (c *Client) getFileContents(owner, repo, ref, path string) (*types.File, error) {
@@ -367,106 +236,10 @@ func (c *Client) getFileContents(owner, repo, ref, path string) (*types.File, er
 	return f, nil
 }
 
-func (c *Client) CreateModelFile(req *types.CreateFileReq) (err error) {
-	namespace := common.WithPrefix(req.NameSpace, ModelOrgPrefix)
-	_, _, err = c.giteaClient.CreateFile(namespace, req.Name, req.FilePath, gitea.CreateFileOptions{
-		FileOptions: gitea.FileOptions{
-			Message:       req.Message,
-			BranchName:    req.Branch,
-			NewBranchName: req.NewBranch,
-			Author: gitea.Identity{
-				Name:  req.Username,
-				Email: req.Email,
-			},
-			Committer: gitea.Identity{
-				Name:  req.Username,
-				Email: req.Email,
-			},
-			Dates: gitea.CommitDateOptions{
-				Author:    time.Now(),
-				Committer: time.Now(),
-			},
-		},
-		Content: req.Content,
-	})
-	return
+func (c *Client) GetRepoAllFiles(ctx context.Context, req gitserver.GetRepoAllFilesReq) ([]*types.File, error) {
+	return nil, nil
 }
 
-func (c *Client) UpdateModelFile(req *types.UpdateFileReq) (err error) {
-	namespace := common.WithPrefix(req.NameSpace, ModelOrgPrefix)
-	_, _, err = c.giteaClient.UpdateFile(namespace, req.Name, req.FilePath, gitea.UpdateFileOptions{
-		FileOptions: gitea.FileOptions{
-			Message:       req.Message,
-			BranchName:    req.Branch,
-			NewBranchName: req.NewBranch,
-			Author: gitea.Identity{
-				Name:  req.Username,
-				Email: req.Email,
-			},
-			Committer: gitea.Identity{
-				Name:  req.Username,
-				Email: req.Email,
-			},
-			Dates: gitea.CommitDateOptions{
-				Author:    time.Now(),
-				Committer: time.Now(),
-			},
-		},
-		SHA:      req.SHA,
-		Content:  req.Content,
-		FromPath: req.OriginPath,
-	})
-	return
-}
-
-func (c *Client) CreateDatasetFile(req *types.CreateFileReq) (err error) {
-	namespace := common.WithPrefix(req.NameSpace, DatasetOrgPrefix)
-	_, _, err = c.giteaClient.CreateFile(namespace, req.Name, req.FilePath, gitea.CreateFileOptions{
-		FileOptions: gitea.FileOptions{
-			Message:       req.Message,
-			BranchName:    req.Branch,
-			NewBranchName: req.NewBranch,
-			Author: gitea.Identity{
-				Name:  req.Username,
-				Email: req.Email,
-			},
-			Committer: gitea.Identity{
-				Name:  req.Username,
-				Email: req.Email,
-			},
-			Dates: gitea.CommitDateOptions{
-				Author:    time.Now(),
-				Committer: time.Now(),
-			},
-		},
-		Content: req.Content,
-	})
-	return
-}
-
-func (c *Client) UpdateDatasetFile(req *types.UpdateFileReq) (err error) {
-	namespace := common.WithPrefix(req.NameSpace, DatasetOrgPrefix)
-	_, _, err = c.giteaClient.UpdateFile(namespace, req.Name, req.FilePath, gitea.UpdateFileOptions{
-		FileOptions: gitea.FileOptions{
-			Message:       req.Message,
-			BranchName:    req.Branch,
-			NewBranchName: req.NewBranch,
-			Author: gitea.Identity{
-				Name:  req.Username,
-				Email: req.Email,
-			},
-			Committer: gitea.Identity{
-				Name:  req.Username,
-				Email: req.Email,
-			},
-			Dates: gitea.CommitDateOptions{
-				Author:    time.Now(),
-				Committer: time.Now(),
-			},
-		},
-		SHA:      req.SHA,
-		Content:  req.Content,
-		FromPath: req.OriginPath,
-	})
-	return
+func (c *Client) GetRepoAllLfsPointers(ctx context.Context, req gitserver.GetRepoAllFilesReq) ([]*types.LFSPointer, error) {
+	return nil, nil
 }

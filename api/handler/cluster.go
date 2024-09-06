@@ -1,7 +1,6 @@
 package handler
 
 import (
-	"errors"
 	"log/slog"
 
 	"github.com/gin-gonic/gin"
@@ -39,7 +38,7 @@ type ClusterHandler struct {
 func (h *ClusterHandler) Index(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
 	if currentUser == "" {
-		httpbase.UnauthorizedError(ctx, errors.New("user not found, please login first"))
+		httpbase.UnauthorizedError(ctx, component.ErrUserNotFound)
 		return
 	}
 	clusters, err := h.c.Index(ctx)
@@ -54,7 +53,7 @@ func (h *ClusterHandler) Index(ctx *gin.Context) {
 func (h *ClusterHandler) Update(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
 	if currentUser == "" {
-		httpbase.UnauthorizedError(ctx, errors.New("user not found, please login first"))
+		httpbase.UnauthorizedError(ctx, component.ErrUserNotFound)
 		return
 	}
 	var req types.ClusterRequest

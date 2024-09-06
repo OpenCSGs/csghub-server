@@ -208,7 +208,7 @@ func (h *UserHandler) Spaces(ctx *gin.Context) {
 func (h *UserHandler) LikesAdd(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
 	if currentUser == "" {
-		httpbase.UnauthorizedError(ctx, errors.New("user not found, please login first"))
+		httpbase.UnauthorizedError(ctx, component.ErrUserNotFound)
 		return
 	}
 	var req types.UserLikesRequest
@@ -242,7 +242,7 @@ func (h *UserHandler) LikesAdd(ctx *gin.Context) {
 func (h *UserHandler) LikesCollections(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
 	if currentUser == "" {
-		httpbase.UnauthorizedError(ctx, errors.New("user not found, please login first"))
+		httpbase.UnauthorizedError(ctx, component.ErrUserNotFound)
 		return
 	}
 	var req types.UserCollectionReq
@@ -326,7 +326,7 @@ func (h *UserHandler) UserCollections(ctx *gin.Context) {
 func (h *UserHandler) LikeCollection(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
 	if currentUser == "" {
-		httpbase.UnauthorizedError(ctx, errors.New("user not found, please login first"))
+		httpbase.UnauthorizedError(ctx, component.ErrUserNotFound)
 		return
 	}
 	var req types.UserLikesRequest
@@ -360,7 +360,7 @@ func (h *UserHandler) LikeCollection(ctx *gin.Context) {
 func (h *UserHandler) UnLikeCollection(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
 	if currentUser == "" {
-		httpbase.UnauthorizedError(ctx, errors.New("user not found, please login first"))
+		httpbase.UnauthorizedError(ctx, component.ErrUserNotFound)
 		return
 	}
 	var req types.UserLikesRequest
@@ -395,7 +395,7 @@ func (h *UserHandler) UnLikeCollection(ctx *gin.Context) {
 func (h *UserHandler) LikesDelete(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
 	if currentUser == "" {
-		httpbase.UnauthorizedError(ctx, errors.New("user not found, please login first"))
+		httpbase.UnauthorizedError(ctx, component.ErrUserNotFound)
 		return
 	}
 	var req types.UserLikesRequest
@@ -430,7 +430,7 @@ func (h *UserHandler) LikesDelete(ctx *gin.Context) {
 func (h *UserHandler) LikesSpaces(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
 	if currentUser == "" {
-		httpbase.UnauthorizedError(ctx, errors.New("user not found, please login first"))
+		httpbase.UnauthorizedError(ctx, component.ErrUserNotFound)
 		return
 	}
 	var req types.UserSpacesReq
@@ -477,7 +477,7 @@ func (h *UserHandler) LikesSpaces(ctx *gin.Context) {
 func (h *UserHandler) LikesCodes(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
 	if currentUser == "" {
-		httpbase.UnauthorizedError(ctx, errors.New("user not found, please login first"))
+		httpbase.UnauthorizedError(ctx, component.ErrUserNotFound)
 		return
 	}
 	var req types.UserDatasetsReq
@@ -524,7 +524,7 @@ func (h *UserHandler) LikesCodes(ctx *gin.Context) {
 func (h *UserHandler) LikesModels(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
 	if currentUser == "" {
-		httpbase.UnauthorizedError(ctx, errors.New("user not found, please login first"))
+		httpbase.UnauthorizedError(ctx, component.ErrUserNotFound)
 		return
 	}
 	var req types.UserDatasetsReq
@@ -571,7 +571,7 @@ func (h *UserHandler) LikesModels(ctx *gin.Context) {
 func (h *UserHandler) LikesDatasets(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
 	if currentUser == "" {
-		httpbase.UnauthorizedError(ctx, errors.New("user not found, please login first"))
+		httpbase.UnauthorizedError(ctx, component.ErrUserNotFound)
 		return
 	}
 	var req types.UserDatasetsReq
@@ -605,7 +605,7 @@ func (h *UserHandler) LikesDatasets(ctx *gin.Context) {
 func (h *UserHandler) UserPermission(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
 	if currentUser == "" {
-		httpbase.UnauthorizedError(ctx, errors.New("user not found, please login first"))
+		httpbase.UnauthorizedError(ctx, component.ErrUserNotFound)
 		return
 	}
 	response := types.WhoamiResponse{
@@ -641,7 +641,7 @@ func (h *UserHandler) UserPermission(ctx *gin.Context) {
 func (h *UserHandler) GetRunDeploys(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
 	if currentUser == "" {
-		httpbase.UnauthorizedError(ctx, errors.New("user not found, please login first"))
+		httpbase.UnauthorizedError(ctx, component.ErrUserNotFound)
 		return
 	}
 
@@ -775,7 +775,7 @@ func (h *UserHandler) GetFinetuneInstances(ctx *gin.Context) {
 func (h *UserHandler) GetRunServerless(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
 	if currentUser == "" {
-		httpbase.UnauthorizedError(ctx, errors.New("user not found, please login first"))
+		httpbase.UnauthorizedError(ctx, component.ErrUserNotFound)
 		return
 	}
 

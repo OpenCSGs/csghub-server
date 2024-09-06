@@ -35,6 +35,7 @@ type Code struct {
 	UserLikes     bool                 `json:"user_likes"`
 	Source        RepositorySource     `json:"source"`
 	SyncStatus    RepositorySyncStatus `json:"sync_status"`
+	License       string               `json:"license"`
 	CanWrite      bool                 `json:"can_write"`
 	CanManage     bool                 `json:"can_manage"`
 	Namespace     *Namespace           `json:"namespace"`

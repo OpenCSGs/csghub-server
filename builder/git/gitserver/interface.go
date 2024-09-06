@@ -4,7 +4,6 @@ import (
 	"context"
 	"io"
 
-	"github.com/OpenCSGs/gitea-go-sdk/gitea"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/types"
 )
@@ -29,7 +28,7 @@ type GitServer interface {
 	GetRepoBranches(ctx context.Context, req GetBranchesReq) ([]types.Branch, error)
 	GetRepoCommits(ctx context.Context, req GetRepoCommitsReq) ([]types.Commit, *types.RepoPageOpts, error)
 	GetRepoLastCommit(ctx context.Context, req GetRepoLastCommitReq) (*types.Commit, error)
-	GetSingleCommit(ctx context.Context, req GetRepoLastCommitReq) (*gitea.Commit, error)
+	GetSingleCommit(ctx context.Context, req GetRepoLastCommitReq) (*types.CommitResponse, error)
 	GetCommitDiff(ctx context.Context, req GetRepoLastCommitReq) ([]byte, error)
 	GetRepoFileTree(ctx context.Context, req GetRepoInfoByPathReq) ([]*types.File, error)
 	GetRepoFileRaw(ctx context.Context, req GetRepoInfoByPathReq) (string, error)
@@ -38,6 +37,9 @@ type GitServer interface {
 	GetRepoFileContents(ctx context.Context, req GetRepoInfoByPathReq) (*types.File, error)
 	CreateRepoFile(req *types.CreateFileReq) (err error)
 	UpdateRepoFile(req *types.UpdateFileReq) (err error)
+	GetRepoAllFiles(ctx context.Context, req GetRepoAllFilesReq) ([]*types.File, error)
+	GetRepoAllLfsPointers(ctx context.Context, req GetRepoAllFilesReq) ([]*types.LFSPointer, error)
+	GetDiffBetweenTwoCommits(ctx context.Context, req GetDiffBetweenTwoCommitsReq) (*types.GiteaCallbackPushReq, error)
 
 	CreateSSHKey(*types.CreateSSHKeyRequest) (*database.SSHKey, error)
 	// ListSSHKeys(string, int, int) ([]*database.SSHKey, error)
@@ -57,4 +59,11 @@ type GitServer interface {
 	GetMirrorTaskInfo(ctx context.Context, taskId int64) (*MirrorTaskInfo, error)
 	// MirrorSync requests the Gitea to start mirror synchronization
 	MirrorSync(ctx context.Context, req MirrorSyncReq) error
+
+	// For gitaly smart http methods
+	InfoRefsResponse(ctx context.Context, req InfoRefsReq) (io.Reader, error)
+	// Handle git clone or fetch request
+	UploadPack(ctx context.Context, req UploadPackReq) error
+	// Handle git push request
+	ReceivePack(ctx context.Context, req ReceivePackReq) error
 }

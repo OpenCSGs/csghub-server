@@ -9,6 +9,7 @@ import (
 	"opencsg.com/csghub-server/cmd/csghub-server/cmd/accounting"
 	"opencsg.com/csghub-server/cmd/csghub-server/cmd/cron"
 	"opencsg.com/csghub-server/cmd/csghub-server/cmd/deploy"
+	"opencsg.com/csghub-server/cmd/csghub-server/cmd/git"
 	"opencsg.com/csghub-server/cmd/csghub-server/cmd/logscan"
 	"opencsg.com/csghub-server/cmd/csghub-server/cmd/migration"
 	"opencsg.com/csghub-server/cmd/csghub-server/cmd/mirror"
@@ -56,6 +57,7 @@ func init() {
 		accounting.Cmd,
 		syncversion.Cmd,
 		user.Cmd,
+		git.Cmd,
 	)
 }
 

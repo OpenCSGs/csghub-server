@@ -7,6 +7,7 @@ import (
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/types"
+	"opencsg.com/csghub-server/common/utils/common"
 )
 
 const codeGitattributesContent = modelGitattributesContent
@@ -39,6 +40,10 @@ func (c *CodeComponent) Create(ctx context.Context, req *types.CreateCodeReq) (*
 		nickname = req.Nickname
 	} else {
 		nickname = req.Name
+	}
+
+	if req.DefaultBranch == "" {
+		req.DefaultBranch = "main"
 	}
 
 	req.RepoType = types.CodeRepo
@@ -112,11 +117,8 @@ func (c *CodeComponent) Create(ctx context.Context, req *types.CreateCodeReq) (*
 		Downloads:    code.Repository.DownloadCount,
 		Path:         code.Repository.Path,
 		RepositoryID: code.RepositoryID,
-		Repository: types.Repository{
-			HTTPCloneURL: code.Repository.HTTPCloneURL,
-			SSHCloneURL:  code.Repository.SSHCloneURL,
-		},
-		Private: code.Repository.Private,
+		Repository:   common.BuildCloneInfo(c.config, code.Repository),
+		Private:      code.Repository.Private,
 		User: types.User{
 			Username: dbRepo.User.Username,
 			Nickname: dbRepo.User.NickName,
@@ -195,6 +197,7 @@ func (c *CodeComponent) Index(ctx context.Context, filter *types.RepoFilter, per
 			Tags:         tags,
 			Source:       repo.Source,
 			SyncStatus:   repo.SyncStatus,
+			License:      repo.License,
 		})
 	}
 
@@ -308,11 +311,8 @@ func (c *CodeComponent) Show(ctx context.Context, namespace, name, currentUser s
 		Path:          code.Repository.Path,
 		RepositoryID:  code.Repository.ID,
 		DefaultBranch: code.Repository.DefaultBranch,
-		Repository: types.Repository{
-			HTTPCloneURL: code.Repository.HTTPCloneURL,
-			SSHCloneURL:  code.Repository.SSHCloneURL,
-		},
-		Tags: tags,
+		Repository:    common.BuildCloneInfo(c.config, code.Repository),
+		Tags:          tags,
 		User: types.User{
 			Username: code.Repository.User.Username,
 			Nickname: code.Repository.User.NickName,
@@ -324,6 +324,7 @@ func (c *CodeComponent) Show(ctx context.Context, namespace, name, currentUser s
 		UserLikes:  likeExists,
 		Source:     code.Repository.Source,
 		SyncStatus: code.Repository.SyncStatus,
+		License:    code.Repository.License,
 		CanWrite:   permission.CanWrite,
 		CanManage:  permission.CanAdmin,
 		Namespace:  ns,

@@ -1,0 +1,140 @@
+version: "3.8"
+
+services:
+  postgres:
+    image: "gradescope/postgresql-multiple-databases"
+    environment:
+      POSTGRES_USER: "postgres"
+      POSTGRES_PASSWORD: "postgres"
+      POSTGRES_MULTIPLE_DATABASES: "starhub_server,gitea,mirror"
+    ports:
+      - "5433:5432"
+    volumes:
+      - ./pgdata:/var/lib/postgresql/data
+    networks:
+      - my_network
+
+  minio:
+    image: "bitnami/minio"
+    environment:
+      MINIO_ROOT_USER: "minio-root-user-User-123"
+      MINIO_ROOT_PASSWORD: "minio-root-password-User-123"
+      MINIO_SCHEME: "http"
+      MINIO_DEFAULT_BUCKETS: opencsg-server-lfs:public,opencsg-portal-storage:public
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - ./minio_data:/bitnami/minio/data
+    networks:
+      - my_network
+    
+  gitaly:
+    environment:
+      - GITALY_CONFIG_FILE=/home/gitaly.config.toml
+    image: opencsg-registry.cn-beijing.cr.aliyuncs.com/opencsg_public/gitaly:v16.4.6
+    command:
+      ["bash", "-c", "mkdir -p /home/git/repositories && rm -rf /srv/gitlab-shell/hooks/* && touch /srv/gitlab-shell/.gitlab_shell_secret && exec /usr/bin/env GITALY_CONFIG_FILE=/home/gitaly.config.toml /scripts/process-wrapper"]
+    ports:
+      - '8075:8075'
+    volumes:
+      - ./data/gitaly/git/repositories:/home/git/repositories
+      - ./data/gitaly/git/hooks:/home/git/hooks
+      - ./data/gitaly/gitaly.config.toml:/home/gitaly.config.toml
+    networks:
+      - my_network
+
+  starhub_server:
+    image: "opencsg/csghub-server"
+    depends_on:
+      - postgres
+      - gitaly
+      - gitlab-shell
+    environment:
+      STARHUB_DATABASE_DSN: postgresql://postgres:postgres@postgres:5432/starhub_server?sslmode=disable
+      STARHUB_DATABASE_TIMEZONE: Asia/Shanghai
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: starhub_server
+      GITEA_USERNAME: root
+      GITEA_PASSWORD: password123
+      GIN_MODE: release
+      STARHUB_SERVER_GITALY_SERVER_SOCKET: $STARHUB_SERVER_GITALY_SERVER_SOCKET
+      STARHUB_SERVER_GITALY_STORGE: $STARHUB_SERVER_GITALY_STORGE
+      STARHUB_SERVER_GITALY_TOKEN: $STARHUB_SERVER_GITALY_TOKEN
+      STARHUB_SERVER_API_TOKEN: $STARHUB_SERVER_API_TOKEN
+      STARHUB_SERVER_S3_ACCESS_KEY_ID: $STARHUB_SERVER_S3_ACCESS_KEY_ID
+      STARHUB_SERVER_S3_ACCESS_KEY_SECRET: $STARHUB_SERVER_S3_ACCESS_KEY_SECRET
+      STARHUB_SERVER_S3_REGION: $STARHUB_SERVER_S3_REGION
+      STARHUB_SERVER_S3_BUCKET: $STARHUB_SERVER_S3_BUCKET
+      STARHUB_SERVER_ENABLE_SWAGGER: $STARHUB_SERVER_ENABLE_SWAGGER
+      STARHUB_SERVER_INFERENCE_SERVER_ADDR: $STARHUB_SERVER_INFERENCE_SERVER_ADDR
+      OPENCSG_ACCOUNTING_NATS_URL: nats://natsadmin:vf3jv9SsJBdv3n02n8Kxbvjf@natsmaster:4222
+      OPENCSG_ACCOUNTING_SERVER_HOST: http://account_server
+      OPENCSG_ACCOUNTING_SERVER_PORT: 8086
+    ports:
+      - "8080:8080"
+    networks:
+      - my_network
+
+  gitlab-shell:
+    environment:
+      SSH_DAEMON: gitlab-sshd
+    image: opencsg-registry.cn-beijing.cr.aliyuncs.com/opencsg_public/gitlab-shell:v16.4.6
+    command:
+      ["bash", "-c", "exec /usr/bin/env SSH_DAEMON=gitlab-sshd /scripts/process-wrapper"]
+    ports:
+      - '2223:2222'
+    volumes:
+      - ./data/gitlab-shell/config/config.yml:/srv/gitlab-shell/config.yml
+      - ./data/gitlab-shell/config/.gitlab_shell_secret:/srv/gitlab-shell/.gitlab_shell_secret
+      - ./data/gitlab-shell/config/keys:/srv/gitlab-shell/keys
+      - ./data/gitlab-shell/log:/srv/gitlab-shell/logs/prd.log
+    networks:
+      - my_network
+
+  natsmaster:
+    image: "nats:2.10.16"
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 1G
+        reservations:
+          cpus: '1'
+          memory: 1G
+    ports:
+      - "4222:4222"
+      - "6222:6222"
+      - "8222:8222"
+    volumes:
+      - ./nats-server.conf:/nats-server.conf
+      - ./jetstream:/data/jetstream
+    restart: always
+
+  account_server:
+    image: "opencsg/csghub-server"
+    entrypoint:
+      - /starhub-bin/starhub
+      - accounting
+      - launch
+    depends_on:
+      - postgres
+      - natsmaster
+    environment:
+      STARHUB_SERVER_API_TOKEN: $STARHUB_SERVER_API_TOKEN
+      STARHUB_DATABASE_DSN: postgresql://postgres:postgres@postgres:5432/starhub_server?sslmode=disable
+      OPENCSG_ACCOUNTING_SERVER_PORT: 8086
+      OPENCSG_ACCOUNTING_NATS_URL: nats://natsadmin:vf3jv9SsJBdv3n02n8Kxbvjf@natsmaster:4222
+      OPENCSG_ACCOUNTING_FEE_EVENT_SUBJECT: "accounting.fee.>"
+      OPENCSG_ACCOUNTING_NOTIFY_NOBALANCE_SUBJECT: "accounting.notify.nobalance"
+      OPENCSG_ACCOUNTING_MSG_FETCH_TIMEOUTINSEC: 5
+      GIN_MODE: release
+    ports:
+      - "8086:8086"
+    restart: always
+
+networks:
+  my_network:
+    driver: bridge
+

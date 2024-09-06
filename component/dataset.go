@@ -10,6 +10,7 @@ import (
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/types"
+	"opencsg.com/csghub-server/common/utils/common"
 )
 
 const datasetGitattributesContent = `*.7z filter=lfs diff=lfs merge=lfs -text
@@ -112,18 +113,19 @@ func (c *DatasetComponent) Create(ctx context.Context, req *types.CreateDatasetR
 	if err != nil {
 		return nil, errors.New("user does not exist")
 	}
-
-	if namespace.NamespaceType == database.OrgNamespace {
-		canWrite, err := c.checkCurrentUserPermission(ctx, req.Username, req.Namespace, membership.RoleWrite)
-		if err != nil {
-			return nil, err
-		}
-		if !canWrite {
-			return nil, errors.New("users do not have permission to create datasets in this organization")
-		}
-	} else {
-		if namespace.Path != user.Username {
-			return nil, errors.New("users do not have permission to create datasets in this namespace")
+	if !user.CanAdmin() {
+		if namespace.NamespaceType == database.OrgNamespace {
+			canWrite, err := c.checkCurrentUserPermission(ctx, req.Username, req.Namespace, membership.RoleWrite)
+			if err != nil {
+				return nil, err
+			}
+			if !canWrite {
+				return nil, errors.New("users do not have permission to create datasets in this organization")
+			}
+		} else {
+			if namespace.Path != user.Username {
+				return nil, errors.New("users do not have permission to create datasets in this namespace")
+			}
 		}
 	}
 
@@ -131,6 +133,10 @@ func (c *DatasetComponent) Create(ctx context.Context, req *types.CreateDatasetR
 		nickname = req.Nickname
 	} else {
 		nickname = req.Name
+	}
+
+	if req.DefaultBranch == "" {
+		req.DefaultBranch = "main"
 	}
 
 	req.RepoType = types.DatasetRepo
@@ -204,11 +210,8 @@ func (c *DatasetComponent) Create(ctx context.Context, req *types.CreateDatasetR
 		Downloads:    dataset.Repository.DownloadCount,
 		Path:         dataset.Repository.Path,
 		RepositoryID: dataset.RepositoryID,
-		Repository: types.Repository{
-			HTTPCloneURL: dataset.Repository.HTTPCloneURL,
-			SSHCloneURL:  dataset.Repository.SSHCloneURL,
-		},
-		Private: dataset.Repository.Private,
+		Repository:   common.BuildCloneInfo(c.config, dataset.Repository),
+		Private:      dataset.Repository.Private,
 		User: types.User{
 			Username: user.Username,
 			Nickname: user.NickName,
@@ -297,10 +300,8 @@ func (c *DatasetComponent) Index(ctx context.Context, filter *types.RepoFilter, 
 			UpdatedAt:    repo.UpdatedAt,
 			Source:       repo.Source,
 			SyncStatus:   repo.SyncStatus,
-			Repository: types.Repository{
-				HTTPCloneURL: repo.HTTPCloneURL,
-				SSHCloneURL:  repo.SSHCloneURL,
-			},
+			License:      repo.License,
+			Repository:   common.BuildCloneInfo(c.config, dataset.Repository),
 		})
 	}
 
@@ -414,11 +415,8 @@ func (c *DatasetComponent) Show(ctx context.Context, namespace, name, currentUse
 		Path:          dataset.Repository.Path,
 		RepositoryID:  dataset.Repository.ID,
 		DefaultBranch: dataset.Repository.DefaultBranch,
-		Repository: types.Repository{
-			HTTPCloneURL: dataset.Repository.HTTPCloneURL,
-			SSHCloneURL:  dataset.Repository.SSHCloneURL,
-		},
-		Tags: tags,
+		Repository:    common.BuildCloneInfo(c.config, dataset.Repository),
+		Tags:          tags,
 		User: types.User{
 			Username: dataset.Repository.User.Username,
 			Nickname: dataset.Repository.User.NickName,
@@ -430,6 +428,7 @@ func (c *DatasetComponent) Show(ctx context.Context, namespace, name, currentUse
 		UserLikes:  likeExists,
 		Source:     dataset.Repository.Source,
 		SyncStatus: dataset.Repository.SyncStatus,
+		License:    dataset.Repository.License,
 		CanWrite:   permission.CanWrite,
 		CanManage:  permission.CanAdmin,
 		Namespace:  ns,

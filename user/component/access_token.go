@@ -2,6 +2,7 @@ package component
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"strings"
@@ -14,6 +15,8 @@ import (
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/types"
 )
+
+var ErrUserNotFound = errors.New("user not found, please login first")
 
 func NewAccessTokenComponent(config *config.Config) (*AccessTokenComponent, error) {
 	c := &AccessTokenComponent{}
@@ -52,9 +55,21 @@ func (c *AccessTokenComponent) Create(ctx context.Context, req *types.CreateUser
 	var token *database.AccessToken
 	// csghub token is shared with git server
 	if req.Application == types.AccessTokenAppGit {
-		token, err = c.gs.CreateUserToken(req)
-		if err != nil {
-			return nil, fmt.Errorf("fail to create git user access token,error:%w", err)
+		if c.gs != nil {
+			token, err = c.gs.CreateUserToken(req)
+			if err != nil {
+				return nil, fmt.Errorf("fail to create git user access token,error:%w", err)
+			}
+		} else {
+			tokenContent := c.genUnique()
+			token = &database.AccessToken{
+				Name:        req.TokenName,
+				Token:       tokenContent,
+				UserID:      user.ID,
+				Application: req.Application,
+				Permission:  req.Permission,
+				IsActive:    true,
+			}
 		}
 		token.UserID = user.ID
 		token.Application = req.Application

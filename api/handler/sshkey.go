@@ -55,6 +55,13 @@ func (h *SSHKeyHandler) Create(ctx *gin.Context) {
 		httpbase.BadRequest(ctx, fmt.Errorf("sensitive check failed: %w", err).Error())
 		return
 	}
+	currentUser := httpbase.GetCurrentUser(ctx)
+	if currentUser == "" {
+		httpbase.UnauthorizedError(ctx, component.ErrUserNotFound)
+		return
+	}
+
+	req.Username = currentUser
 
 	req.Username = ctx.Param("username")
 	sk, err := h.c.Create(ctx, &req)

@@ -47,7 +47,7 @@ type AccessTokenHandler struct {
 func (h *AccessTokenHandler) Create(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
 	if currentUser == "" {
-		httpbase.UnauthorizedError(ctx, errors.New("user not found, please login first"))
+		httpbase.UnauthorizedError(ctx, component.ErrUserNotFound)
 		return
 	}
 	var req types.CreateUserTokenRequest
@@ -100,7 +100,7 @@ func (h *AccessTokenHandler) Create(ctx *gin.Context) {
 func (h *AccessTokenHandler) CreateAppToken(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
 	if currentUser == "" {
-		httpbase.UnauthorizedError(ctx, errors.New("user not found, please login first"))
+		httpbase.UnauthorizedError(ctx, component.ErrUserNotFound)
 		return
 	}
 	var req types.CreateUserTokenRequest
@@ -148,7 +148,7 @@ func (h *AccessTokenHandler) CreateAppToken(ctx *gin.Context) {
 func (h *AccessTokenHandler) Delete(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
 	if currentUser == "" {
-		httpbase.UnauthorizedError(ctx, errors.New("user not found, please login first"))
+		httpbase.UnauthorizedError(ctx, component.ErrUserNotFound)
 		return
 	}
 	var req types.DeleteUserTokenRequest
@@ -186,7 +186,7 @@ func (h *AccessTokenHandler) Delete(ctx *gin.Context) {
 func (h *AccessTokenHandler) DeleteAppToken(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
 	if currentUser == "" {
-		httpbase.UnauthorizedError(ctx, errors.New("user not found, please login first"))
+		httpbase.UnauthorizedError(ctx, component.ErrUserNotFound)
 		return
 	}
 	app := ctx.Param("app")
@@ -224,7 +224,7 @@ func (h *AccessTokenHandler) DeleteAppToken(ctx *gin.Context) {
 func (h *AccessTokenHandler) Refresh(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
 	if currentUser == "" {
-		httpbase.UnauthorizedError(ctx, errors.New("user not found, please login first"))
+		httpbase.UnauthorizedError(ctx, component.ErrUserNotFound)
 		return
 	}
 	app := ctx.Param("app")
@@ -269,7 +269,7 @@ func (h *AccessTokenHandler) Get(ctx *gin.Context) {
 	/*
 		currentUser := httpbase.GetCurrentUser(ctx)
 		if currentUser == "" {
-			httpbase.UnauthorizedError(ctx, errors.New("user not found, please login first"))
+			httpbase.UnauthorizedError(ctx, component.ErrUserNotFound)
 			return
 		}
 	*/
@@ -302,7 +302,7 @@ func (h *AccessTokenHandler) Get(ctx *gin.Context) {
 func (h *AccessTokenHandler) GetUserTokens(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
 	if currentUser == "" {
-		httpbase.UnauthorizedError(ctx, errors.New("user not found, please login first"))
+		httpbase.UnauthorizedError(ctx, component.ErrUserNotFound)
 		return
 	}
 	app := ctx.Query("app")
