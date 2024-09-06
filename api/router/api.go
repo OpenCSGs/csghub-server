@@ -27,6 +27,39 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 	}))
 	r.Use(gin.Recovery())
 	r.Use(middleware.Log())
+	gitHTTPHandler, err := handler.NewGitHTTPHandler(config)
+	if err != nil {
+		return nil, fmt.Errorf("error creating git http handler:%w", err)
+	}
+	gitHTTP := r.Group("/:repo_type/:namespace/:name")
+	gitHTTP.Use(middleware.GitHTTPParamMiddleware())
+	gitHTTP.Use(middleware.GetCurrentUserFromHeader())
+	{
+		gitHTTP.GET("/info/refs", gitHTTPHandler.InfoRefs)
+		gitHTTP.POST("/git-upload-pack", middleware.ContentEncoding(), gitHTTPHandler.GitUploadPack)
+		gitHTTP.POST("/git-receive-pack", middleware.ContentEncoding(), gitHTTPHandler.GitReceivePack)
+		lfsGroup := gitHTTP.Group("/info/lfs")
+		{
+			objectsGroup := lfsGroup.Group("/objects")
+			{
+				objectsGroup.POST("/batch", gitHTTPHandler.LfsBatch)
+				objectsGroup.PUT("/:oid/:size", gitHTTPHandler.LfsUpload)
+				lfsGroup.GET("/:oid", gitHTTPHandler.LfsDownload)
+			}
+			lfsGroup.POST("/verify", gitHTTPHandler.LfsVerify)
+
+			locksGroup := lfsGroup.Group("/locks")
+			{
+				locksGroup.GET("", gitHTTPHandler.ListLocks)
+				locksGroup.POST("", gitHTTPHandler.CreateLock)
+				locksGroup.POST("/verify", gitHTTPHandler.VerifyLock)
+				locksGroup.POST("/:lid/unlock", gitHTTPHandler.UnLock)
+			}
+
+		}
+
+	}
+
 	r.Use(middleware.Authenticator(config))
 
 	needAPIKey := middleware.OnlyAPIKeyAuthenticator(config)
@@ -217,6 +250,7 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 		return nil, fmt.Errorf("error creating mirror source controller:%w", err)
 	}
 
+	apiGroup.GET("/mirrors", mirrorHandler.Index)
 	mirror := apiGroup.Group("/mirror")
 	mirror.Use(needAPIKey)
 	{
@@ -305,6 +339,24 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 	}
 	teleGroup := apiGroup.Group("/telemetry")
 	teleGroup.POST("/usage", telemetryHandler.Usage)
+
+	// internal API for gitaly to check request permissions
+	internalHandler, err := handler.NewInternalHandler(config)
+	if err != nil {
+		return nil, fmt.Errorf("error creating internalHandler,%w", err)
+	}
+	needGitlabShellJWTToken := middleware.CheckGitlabShellJWTToken(config)
+	r.GET("/api/v4/internal/authorized_keys", needGitlabShellJWTToken, internalHandler.GetAuthorizedKeys)
+	r.POST("/api/v4/internal/allowed", needGitlabShellJWTToken, internalHandler.SSHAllowed)
+	r.POST("/api/v4/internal/pre_receive", needGitlabShellJWTToken, internalHandler.PreReceive)
+	r.POST("api/v4/internal/lfs_authenticate", needGitlabShellJWTToken, internalHandler.LfsAuthenticate)
+	r.POST("/api/v4/internal/post_receive", needGitlabShellJWTToken, internalHandler.PostReceive)
+	internalGroup := apiGroup.Group("/internal")
+	{
+		internalGroup.POST("/allowed", needGitlabShellJWTToken, internalHandler.Allowed)
+		internalGroup.POST("/pre_receive", needGitlabShellJWTToken, internalHandler.PreReceive)
+		internalGroup.POST("/post_receive", needGitlabShellJWTToken, internalHandler.PostReceive)
+	}
 
 	return r, nil
 }

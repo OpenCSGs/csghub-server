@@ -2,6 +2,7 @@ package gitea
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"strconv"
 
@@ -102,7 +103,7 @@ func (c *Client) GetCommitDiff(ctx context.Context, req gitserver.GetRepoLastCom
 	return data, err
 }
 
-func (c *Client) GetSingleCommit(ctx context.Context, req gitserver.GetRepoLastCommitReq) (*gitea.Commit, error) {
+func (c *Client) GetSingleCommit(ctx context.Context, req gitserver.GetRepoLastCommitReq) (*types.CommitResponse, error) {
 	namespace := common.WithPrefix(req.Namespace, repoPrefixByType(req.RepoType))
 	commit, response, err := c.giteaClient.GetSingleCommit(
 		namespace,
@@ -117,5 +118,53 @@ func (c *Client) GetSingleCommit(ctx context.Context, req gitserver.GetRepoLastC
 	if err != nil {
 		slog.Error("Fail to get single commit", slog.Any("user", namespace), slog.Any("repo", req.Name), slog.Any("commit id", req.Ref), slog.Any("response", response))
 	}
-	return commit, err
+
+	diff, err := c.GetCommitDiff(ctx, req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get git %s repository %s commit id '%s' diff, error: %w", req.RepoType, req.Name, req.Ref, err)
+	}
+
+	commitFiles := []string{}
+	if commit.Files != nil {
+		for _, file := range commit.Files {
+			commitFiles = append(commitFiles, file.Filename)
+		}
+	}
+	commitParents := []*types.CommitMeta{}
+	if commit.Parents != nil {
+		for _, parent := range commit.Parents {
+			commitParents = append(commitParents, &types.CommitMeta{
+				SHA: parent.SHA,
+			})
+		}
+	}
+	commitStats := &types.CommitStats{}
+	if commit.Stats != nil {
+		commitStats.Total = commit.Stats.Total
+		commitStats.Additions = commit.Stats.Additions
+		commitStats.Deletions = commit.Stats.Deletions
+	}
+
+	commitResponse := &types.CommitResponse{
+		Commit: &types.Commit{
+			ID:             commit.SHA,
+			AuthorName:     commit.RepoCommit.Author.Name,
+			AuthorEmail:    commit.RepoCommit.Author.Email,
+			AuthoredDate:   commit.RepoCommit.Author.Date,
+			CommitterName:  commit.RepoCommit.Committer.Name,
+			CommitterEmail: commit.RepoCommit.Committer.Email,
+			CommitterDate:  commit.RepoCommit.Committer.Date,
+			Message:        commit.RepoCommit.Message,
+			CreatedAt:      commit.CommitMeta.Created.Format("2006-01-02 15:04:05"),
+		},
+		Files:   commitFiles,
+		Parents: commitParents,
+		Diff:    diff,
+		Stats:   commitStats,
+	}
+	return commitResponse, err
+}
+
+func (c *Client) GetDiffBetweenTwoCommits(ctx context.Context, req gitserver.GetDiffBetweenTwoCommitsReq) (*types.GiteaCallbackPushReq, error) {
+	return nil, nil
 }

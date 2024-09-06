@@ -50,7 +50,7 @@ type DatasetHandler struct {
 func (h *DatasetHandler) Create(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
 	if currentUser == "" {
-		httpbase.UnauthorizedError(ctx, errors.New("user not found, please login first"))
+		httpbase.UnauthorizedError(ctx, component.ErrUserNotFound)
 		return
 	}
 	var req *types.CreateDatasetReq
@@ -158,7 +158,7 @@ func (h *DatasetHandler) Index(ctx *gin.Context) {
 func (h *DatasetHandler) Update(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
 	if currentUser == "" {
-		httpbase.UnauthorizedError(ctx, errors.New("user not found, please login first"))
+		httpbase.UnauthorizedError(ctx, component.ErrUserNotFound)
 		return
 	}
 	var req *types.UpdateDatasetReq
@@ -213,7 +213,7 @@ func (h *DatasetHandler) Update(ctx *gin.Context) {
 func (h *DatasetHandler) Delete(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
 	if currentUser == "" {
-		httpbase.UnauthorizedError(ctx, errors.New("user not found, please login first"))
+		httpbase.UnauthorizedError(ctx, component.ErrUserNotFound)
 		return
 	}
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)

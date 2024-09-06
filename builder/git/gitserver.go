@@ -4,6 +4,7 @@ import (
 	"errors"
 
 	"opencsg.com/csghub-server/builder/git/gitserver"
+	"opencsg.com/csghub-server/builder/git/gitserver/gitaly"
 	"opencsg.com/csghub-server/builder/git/gitserver/gitea"
 	"opencsg.com/csghub-server/common/config"
 )
@@ -11,6 +12,9 @@ import (
 func NewGitServer(config *config.Config) (gitserver.GitServer, error) {
 	if config.GitServer.Type == "gitea" {
 		gitServer, err := gitea.NewClient(config)
+		return gitServer, err
+	} else if config.GitServer.Type == "gitaly" {
+		gitServer, err := gitaly.NewClient(config)
 		return gitServer, err
 	}
 

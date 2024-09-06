@@ -3,7 +3,6 @@ package component
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"log/slog"
 	"strconv"
@@ -15,6 +14,7 @@ import (
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/types"
+	"opencsg.com/csghub-server/common/utils/common"
 )
 
 const spaceGitattributesContent = modelGitattributesContent
@@ -67,6 +67,9 @@ func (c *SpaceComponent) Create(ctx context.Context, req types.CreateSpaceReq) (
 		nickname = req.Nickname
 	} else {
 		nickname = req.Name
+	}
+	if req.DefaultBranch == "" {
+		req.DefaultBranch = "main"
 	}
 	req.Nickname = nickname
 	req.RepoType = types.SpaceRepo
@@ -209,6 +212,7 @@ func (c *SpaceComponent) Show(ctx context.Context, namespace, name, currentUser 
 		newError := fmt.Errorf("failed to check for the presence of the user likes,error:%w", err)
 		return nil, newError
 	}
+	repository := common.BuildCloneInfo(c.config, space.Repository)
 
 	resModel := &types.Space{
 		ID:            space.ID,
@@ -219,12 +223,9 @@ func (c *SpaceComponent) Show(ctx context.Context, namespace, name, currentUser 
 		Path:          space.Repository.Path,
 		License:       space.Repository.License,
 		DefaultBranch: space.Repository.DefaultBranch,
-		Repository: &types.Repository{
-			HTTPCloneURL: space.Repository.HTTPCloneURL,
-			SSHCloneURL:  space.Repository.SSHCloneURL,
-		},
-		Private: space.Repository.Private,
-		Tags:    tags,
+		Repository:    &repository,
+		Private:       space.Repository.Private,
+		Tags:          tags,
 		User: &types.User{
 			Username: space.Repository.User.Username,
 			Nickname: space.Repository.User.NickName,
@@ -481,7 +482,7 @@ func (c *SpaceComponent) ListByPath(ctx context.Context, paths []string) ([]*typ
 
 func (c *SpaceComponent) AllowCallApi(ctx context.Context, spaceID int64, username string) (bool, error) {
 	if username == "" {
-		return false, errors.New("user not found, please login first")
+		return false, ErrUserNotFound
 	}
 	s, err := c.ss.ByID(ctx, spaceID)
 	if err != nil {

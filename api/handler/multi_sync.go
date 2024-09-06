@@ -1,7 +1,6 @@
 package handler
 
 import (
-	"errors"
 	"fmt"
 	"strconv"
 
@@ -40,7 +39,7 @@ func NewSyncHandler(config *config.Config) (*SyncHandler, error) {
 func (h *SyncHandler) Latest(c *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(c)
 	if currentUser == "" {
-		httpbase.UnauthorizedError(c, errors.New("user not found, please login first"))
+		httpbase.UnauthorizedError(c, component.ErrUserNotFound)
 		return
 	}
 

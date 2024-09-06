@@ -15,12 +15,13 @@ func NewSSHKeyStore() *SSHKeyStore {
 }
 
 type SSHKey struct {
-	ID      int64  `bun:",pk,autoincrement" json:"id"`
-	GitID   int64  `bun:",notnull" json:"git_id"`
-	Name    string `bun:",notnull" json:"name"`
-	Content string `bun:",notnull" json:"content"`
-	UserID  int64  `bun:",notnull" json:"user_id"`
-	User    *User  `bun:"rel:belongs-to,join:user_id=id" json:"user"`
+	ID                int64  `bun:",pk,autoincrement" json:"id"`
+	GitID             int64  `bun:",notnull" json:"git_id"`
+	Name              string `bun:",notnull" json:"name"`
+	Content           string `bun:",notnull" json:"content"`
+	UserID            int64  `bun:",notnull" json:"user_id"`
+	User              *User  `bun:"rel:belongs-to,join:user_id=id" json:"user"`
+	FingerprintSHA256 string `bun:"," json:"fingerprint_sha256"`
 	times
 }
 
@@ -38,8 +39,7 @@ func (s *SSHKeyStore) Index(ctx context.Context, username string, per, page int)
 	return
 }
 
-func (s *SSHKeyStore) Create(ctx context.Context, sshKey *SSHKey, user User) (*SSHKey, error) {
-	sshKey.UserID = user.ID
+func (s *SSHKeyStore) Create(ctx context.Context, sshKey *SSHKey) (*SSHKey, error) {
 	err := s.db.Operator.Core.
 		NewInsert().
 		Model(sshKey).
@@ -48,16 +48,26 @@ func (s *SSHKeyStore) Create(ctx context.Context, sshKey *SSHKey, user User) (*S
 	return sshKey, err
 }
 
-func (s *SSHKeyStore) FindByID(ctx context.Context, id int) (sshKey *SSHKey, err error) {
-	var sshKeys []SSHKey
-	err = s.db.Operator.Core.
+func (s *SSHKeyStore) FindByID(ctx context.Context, id int64) (*SSHKey, error) {
+	var sshKey SSHKey
+	err := s.db.Operator.Core.
 		NewSelect().
-		Model(&sshKeys).
+		Model(&sshKey).
 		Relation("User").
 		Where("ssh_key.id = ?", id).
 		Scan(ctx)
-	sshKey = &sshKeys[0]
-	return
+	return &sshKey, err
+}
+
+func (s *SSHKeyStore) FindByFingerpringSHA256(ctx context.Context, fingerprint string) (*SSHKey, error) {
+	var sshKey SSHKey
+	err := s.db.Operator.Core.
+		NewSelect().
+		Model(&sshKey).
+		Relation("User").
+		Where("ssh_key.fingerprint_sha256 = ?", fingerprint).
+		Scan(ctx)
+	return &sshKey, err
 }
 
 func (s *SSHKeyStore) Delete(ctx context.Context, gid int64) (err error) {
@@ -90,6 +100,26 @@ func (s *SSHKeyStore) FindByUsernameAndName(ctx context.Context, username, keyNa
 		Join("JOIN users AS u ON u.id = ssh_key.user_id").
 		Where("u.username = ?", username).
 		Where("ssh_key.name = ?", keyName).
+		Scan(ctx)
+	return sshKey, err
+}
+
+func (s *SSHKeyStore) FindByKeyContent(ctx context.Context, key string) (*SSHKey, error) {
+	sshKey := new(SSHKey)
+	err := s.db.Operator.Core.
+		NewSelect().
+		Model(sshKey).
+		Where("content = ?", key).
+		Scan(ctx)
+	return sshKey, err
+}
+
+func (s *SSHKeyStore) FindByNameAndUserID(ctx context.Context, name string, userID int64) (*SSHKey, error) {
+	sshKey := new(SSHKey)
+	err := s.db.Operator.Core.
+		NewSelect().
+		Model(sshKey).
+		Where("name = ? and user_id = ?", name, userID).
 		Scan(ctx)
 	return sshKey, err
 }

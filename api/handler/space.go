@@ -142,7 +142,7 @@ func (h *SpaceHandler) Show(ctx *gin.Context) {
 func (h *SpaceHandler) Create(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
 	if currentUser == "" {
-		httpbase.UnauthorizedError(ctx, errors.New("user not found, please login first"))
+		httpbase.UnauthorizedError(ctx, component.ErrUserNotFound)
 		return
 	}
 	var req types.CreateSpaceReq
@@ -187,7 +187,7 @@ func (h *SpaceHandler) Create(ctx *gin.Context) {
 func (h *SpaceHandler) Update(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
 	if currentUser == "" {
-		httpbase.UnauthorizedError(ctx, errors.New("user not found, please login first"))
+		httpbase.UnauthorizedError(ctx, component.ErrUserNotFound)
 		return
 	}
 	var req *types.UpdateSpaceReq
@@ -241,7 +241,7 @@ func (h *SpaceHandler) Update(ctx *gin.Context) {
 func (h *SpaceHandler) Delete(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
 	if currentUser == "" {
-		httpbase.UnauthorizedError(ctx, errors.New("user not found, please login first"))
+		httpbase.UnauthorizedError(ctx, component.ErrUserNotFound)
 		return
 	}
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
@@ -276,7 +276,7 @@ func (h *SpaceHandler) Delete(ctx *gin.Context) {
 func (h *SpaceHandler) Run(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
 	if currentUser == "" {
-		httpbase.UnauthorizedError(ctx, errors.New("user not found, please login first"))
+		httpbase.UnauthorizedError(ctx, component.ErrUserNotFound)
 		return
 	}
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
@@ -354,7 +354,7 @@ func (h *SpaceHandler) Wakeup(ctx *gin.Context) {
 func (h *SpaceHandler) Stop(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
 	if currentUser == "" {
-		httpbase.UnauthorizedError(ctx, errors.New("user not found, please login first"))
+		httpbase.UnauthorizedError(ctx, component.ErrUserNotFound)
 		return
 	}
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)

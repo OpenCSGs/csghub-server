@@ -43,6 +43,11 @@ var cmdCreatePushMirror = &cobra.Command{
 		if !config.Saas {
 			return
 		}
+
+		if config.GitServer.Type != "gitea" {
+			return
+		}
+
 		c, err := component.NewMirrorComponent(config)
 		if err != nil {
 			slog.Error("failed to create mirror component", "err", err)

@@ -10,6 +10,7 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"time"
 
 	"github.com/OpenCSGs/gitea-go-sdk/gitea"
 	"opencsg.com/csghub-server/builder/git/gitserver"
@@ -36,15 +37,17 @@ type TokenResponse struct {
 }
 
 func NewClient(config *config.Config) (client *Client, err error) {
-	ctx := context.Background()
-	token, err := findOrCreateAccessToken(ctx, config)
+	httpClient := &http.Client{
+		Timeout: time.Duration(config.GitServer.TimtoutSEC) * time.Second,
+	}
+	token, err := findOrCreateAccessToken(context.Background(), config)
 	if err != nil {
 		slog.Error("Failed to find or create token", slog.String("error: ", err.Error()))
 		return nil, err
 	}
 	giteaClient, err := gitea.NewClient(
 		config.GitServer.Host,
-		gitea.SetContext(ctx),
+		gitea.SetHTTPClient(httpClient),
 		gitea.SetToken(token.Token),
 		gitea.SetBasicAuth(config.GitServer.Username, config.GitServer.Password),
 	)

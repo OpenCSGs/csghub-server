@@ -16,6 +16,7 @@ import (
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/types"
+	"opencsg.com/csghub-server/common/utils/common"
 )
 
 const modelGitattributesContent = `*.7z filter=lfs diff=lfs merge=lfs -text
@@ -160,10 +161,8 @@ func (c *ModelComponent) Index(ctx context.Context, filter *types.RepoFilter, pe
 			UpdatedAt:    repo.UpdatedAt,
 			Source:       repo.Source,
 			SyncStatus:   repo.SyncStatus,
-			Repository: types.Repository{
-				HTTPCloneURL: repo.HTTPCloneURL,
-				SSHCloneURL:  repo.SSHCloneURL,
-			},
+			License:      repo.License,
+			Repository:   common.BuildCloneInfo(c.config, model.Repository),
 		})
 	}
 	return resModels, total, nil
@@ -184,6 +183,10 @@ func (c *ModelComponent) Create(ctx context.Context, req *types.CreateModelReq) 
 	} else {
 		nickname = req.Name
 	}
+
+	if req.DefaultBranch == "" {
+		req.DefaultBranch = "main"
+	}
 	req.Nickname = nickname
 	req.RepoType = types.ModelRepo
 	req.Readme = generateReadmeData(req.License)
@@ -195,6 +198,7 @@ func (c *ModelComponent) Create(ctx context.Context, req *types.CreateModelReq) 
 	dbModel := database.Model{
 		Repository:   dbRepo,
 		RepositoryID: dbRepo.ID,
+		BaseModel:    req.BaseModel,
 	}
 
 	model, err := c.ms.Create(ctx, dbModel)
@@ -255,11 +259,8 @@ func (c *ModelComponent) Create(ctx context.Context, req *types.CreateModelReq) 
 		Downloads:    model.Repository.DownloadCount,
 		Path:         model.Repository.Path,
 		RepositoryID: model.RepositoryID,
-		Repository: types.Repository{
-			HTTPCloneURL: model.Repository.HTTPCloneURL,
-			SSHCloneURL:  model.Repository.SSHCloneURL,
-		},
-		Private: model.Repository.Private,
+		Repository:   common.BuildCloneInfo(c.config, model.Repository),
+		Private:      model.Repository.Private,
 		User: &types.User{
 			Username: user.Username,
 			Nickname: user.NickName,
@@ -268,6 +269,8 @@ func (c *ModelComponent) Create(ctx context.Context, req *types.CreateModelReq) 
 		Tags:      tags,
 		CreatedAt: model.CreatedAt,
 		UpdatedAt: model.UpdatedAt,
+		BaseModel: model.BaseModel,
+		License:   model.Repository.License,
 	}
 
 	return resModel, nil
@@ -281,7 +284,7 @@ func buildCreateFileReq(p *types.CreateFileParams, repoType types.RepositoryType
 		Branch:    p.Branch,
 		Content:   base64.StdEncoding.EncodeToString([]byte(p.Content)),
 		NewBranch: p.Branch,
-		NameSpace: p.Namespace,
+		Namespace: p.Namespace,
 		Name:      p.Name,
 		FilePath:  p.FilePath,
 		RepoType:  repoType,
@@ -300,6 +303,9 @@ func (c *ModelComponent) Update(ctx context.Context, req *types.UpdateModelReq) 
 		return nil, fmt.Errorf("failed to find model, error: %w", err)
 	}
 
+	if req.BaseModel != nil {
+		model.BaseModel = *req.BaseModel
+	}
 	model, err = c.ms.Update(ctx, *model)
 	if err != nil {
 		return nil, fmt.Errorf("failed to update database model, error: %w", err)
@@ -316,6 +322,7 @@ func (c *ModelComponent) Update(ctx context.Context, req *types.UpdateModelReq) 
 		Private:      dbRepo.Private,
 		CreatedAt:    model.CreatedAt,
 		UpdatedAt:    model.UpdatedAt,
+		BaseModel:    model.BaseModel,
 	}
 
 	return resModel, nil
@@ -393,12 +400,9 @@ func (c *ModelComponent) Show(ctx context.Context, namespace, name, currentUser 
 		Path:          model.Repository.Path,
 		RepositoryID:  model.Repository.ID,
 		DefaultBranch: model.Repository.DefaultBranch,
-		Repository: types.Repository{
-			HTTPCloneURL: model.Repository.HTTPCloneURL,
-			SSHCloneURL:  model.Repository.SSHCloneURL,
-		},
-		Private: model.Repository.Private,
-		Tags:    tags,
+		Repository:    common.BuildCloneInfo(c.config, model.Repository),
+		Private:       model.Repository.Private,
+		Tags:          tags,
 		User: &types.User{
 			Username: model.Repository.User.Username,
 			Nickname: model.Repository.User.NickName,
@@ -411,9 +415,12 @@ func (c *ModelComponent) Show(ctx context.Context, namespace, name, currentUser 
 		UserLikes:  likeExists,
 		Source:     model.Repository.Source,
 		SyncStatus: model.Repository.SyncStatus,
-		CanWrite:   permission.CanWrite,
-		CanManage:  permission.CanAdmin,
-		Namespace:  ns,
+		BaseModel:  model.BaseModel,
+		License:    model.Repository.License,
+
+		CanWrite:  permission.CanWrite,
+		CanManage: permission.CanAdmin,
+		Namespace: ns,
 	}
 	inferences, _ := c.rrtfms.GetByRepoIDsAndType(ctx, model.Repository.ID, types.InferenceType)
 	if len(inferences) > 0 {
@@ -513,12 +520,21 @@ func (c *ModelComponent) SDKModelInfo(ctx context.Context, namespace, name, ref,
 	for _, filePath := range filePaths {
 		sdkFiles = append(sdkFiles, types.SDKFile{Filename: filePath})
 	}
-	lastCommit, _ := c.LastCommit(ctx, &types.GetCommitsReq{
+
+	if ref == "" {
+		ref = model.Repository.DefaultBranch
+	}
+	getLastCommitReq := gitserver.GetRepoLastCommitReq{
 		Namespace: namespace,
 		Name:      name,
 		Ref:       ref,
 		RepoType:  types.ModelRepo,
-	})
+	}
+	lastCommit, err := c.git.GetRepoLastCommit(ctx, getLastCommitReq)
+	if err != nil {
+		slog.Error("failed to get last commit", slog.String("namespace", namespace), slog.String("name", name), slog.String("ref", ref), slog.Any("error", err))
+		return nil, fmt.Errorf("failed to get last commit, error: %w", err)
+	}
 
 	relatedRepos, _ := c.relatedRepos(ctx, model.RepositoryID, currentUser)
 	relatedSpaces := relatedRepos[types.SpaceRepo]

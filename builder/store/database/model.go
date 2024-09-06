@@ -25,12 +25,14 @@ type Model struct {
 	RepositoryID  int64       `bun:",notnull" json:"repository_id"`
 	Repository    *Repository `bun:"rel:belongs-to,join:repository_id=id" json:"repository"`
 	LastUpdatedAt time.Time   `bun:",notnull" json:"last_updated_at"`
+	BaseModel     string      `bun:"," json:"base_model"`
 	times
 }
 
 func (s *ModelStore) ByRepoIDs(ctx context.Context, repoIDs []int64) (models []Model, err error) {
 	err = s.db.Operator.Core.NewSelect().
 		Model(&models).
+		Relation("Repository").
 		Where("repository_id in (?)", bun.In(repoIDs)).
 		Scan(ctx)
 

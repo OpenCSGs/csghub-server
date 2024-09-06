@@ -91,10 +91,6 @@ var gitCallbackCmd = &cobra.Command{
 					slog.Error("fail to find repository, skip", slog.String("repo", rp), slog.Any("error", err))
 					continue
 				}
-				if repo == nil {
-					slog.Error("repo not found, skip", slog.String("repo", rp))
-					continue
-				}
 				repos = append(repos, repo)
 			}
 		} else {

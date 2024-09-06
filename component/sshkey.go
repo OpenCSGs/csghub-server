@@ -2,6 +2,8 @@ package component
 
 import (
 	"context"
+	"database/sql"
+	"errors"
 	"fmt"
 	"log/slog"
 
@@ -10,6 +12,7 @@ import (
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/types"
+	"opencsg.com/csghub-server/common/utils/common"
 )
 
 func NewSSHKeyComponent(config *config.Config) (*SSHKeyComponent, error) {
@@ -37,11 +40,41 @@ func (c *SSHKeyComponent) Create(ctx context.Context, req *types.CreateSSHKeyReq
 	if err != nil {
 		return nil, fmt.Errorf("failed to find user,error:%w", err)
 	}
+	nameExistsKey, err := c.ss.FindByNameAndUserID(ctx, req.Name, user.ID)
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
+		return nil, fmt.Errorf("failed to find if ssh key exists,error:%w", err)
+	}
+	if nameExistsKey.ID != 0 {
+		return nil, fmt.Errorf("ssh key name already exists")
+	}
+
+	contentExistsKey, err := c.ss.FindByKeyContent(ctx, req.Content)
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
+		return nil, fmt.Errorf("failed to find if ssh key exists,error:%w", err)
+	}
+	if contentExistsKey.ID != 0 {
+		return nil, fmt.Errorf("ssh key already exists")
+	}
+
 	sk, err := c.gs.CreateSSHKey(req)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create git SSH key,error:%w", err)
 	}
-	resSk, err := c.ss.Create(ctx, sk, user)
+	fingerprint, err := common.CalculateSSHKeyFingerprint(req.Content)
+	if err != nil {
+		return nil, fmt.Errorf("failed to calculate ssh key fingerprint,error:%w", err)
+	}
+	if sk == nil {
+		sk = &database.SSHKey{
+			GitID:   0,
+			Name:    req.Name,
+			Content: req.Content,
+			UserID:  user.ID,
+		}
+	}
+	sk.UserID = user.ID
+	sk.FingerprintSHA256 = fingerprint
+	resSk, err := c.ss.Create(ctx, sk)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create database SSH key,error:%w", err)
 	}

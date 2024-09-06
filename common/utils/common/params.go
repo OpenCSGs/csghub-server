@@ -1,11 +1,16 @@
 package common
 
 import (
+	"crypto/sha256"
+	"encoding/base64"
 	"errors"
+	"fmt"
 	"log/slog"
 	"strconv"
+	"strings"
 
 	"github.com/gin-gonic/gin"
+	"golang.org/x/crypto/ssh"
 	"opencsg.com/csghub-server/common/types"
 )
 
@@ -64,4 +69,25 @@ func RepoTypeFromParam(ctx *gin.Context) types.RepositoryType {
 	rawRp := ctx.Param("repo_type")
 	slog.Debug("get repo type from parameters", "repo_type", rawRp)
 	return types.RepositoryType(rawRp)
+}
+
+func CalculateSSHKeyFingerprint(key string) (string, error) {
+	parsedKey, _, _, _, err := ssh.ParseAuthorizedKey([]byte(key))
+	if err != nil {
+		return "", err
+	}
+	fingerPrint := ssh.FingerprintSHA256(parsedKey)
+	fingerPrint = strings.Split(fingerPrint, ":")[1]
+	return fingerPrint, nil
+}
+
+func CalculateAuthorizedSSHKeyFingerprint(key string) (string, error) {
+	decodedKey, err := base64.RawStdEncoding.DecodeString(key)
+	if err != nil {
+		return "", fmt.Errorf("base64 decode error: %w", err)
+	}
+
+	hash := sha256.Sum256(decodedKey)
+	base64Hash := base64.RawStdEncoding.EncodeToString(hash[:])
+	return base64Hash, nil
 }

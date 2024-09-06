@@ -121,7 +121,7 @@ func (s *RepoStore) Find(ctx context.Context, owner, repoType, repoName string) 
 	err = s.db.Operator.Core.
 		NewSelect().
 		Model(repo).
-		Where("git_path =?", fmt.Sprintf("%ss_%s/%s", repoType, owner, repoName)).
+		Where("LOWER(git_path) = LOWER(?)", fmt.Sprintf("%ss_%s/%s", repoType, owner, repoName)).
 		Limit(1).
 		Scan(ctx)
 	return repo, err
@@ -156,13 +156,10 @@ func (s *RepoStore) FindByPath(ctx context.Context, repoType types.RepositoryTyp
 	err := s.db.Operator.Core.
 		NewSelect().
 		Model(resRepo).
-		Where("git_path =?", fmt.Sprintf("%ss_%s/%s", repoType, namespace, name)).
+		Where("LOWER(git_path) = LOWER(?)", fmt.Sprintf("%ss_%s/%s", repoType, namespace, name)).
 		Limit(1).
 		Scan(ctx)
 	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return nil, nil
-		}
 		return nil, err
 	}
 	return resRepo, err
@@ -173,7 +170,7 @@ func (s *RepoStore) FindByGitPath(ctx context.Context, path string) (*Repository
 	err := s.db.Operator.Core.
 		NewSelect().
 		Model(resRepo).
-		Where("git_path =?", path).
+		Where("LOWER(git_path) = LOWER(?)", path).
 		Scan(ctx)
 	return resRepo, err
 }
@@ -193,7 +190,7 @@ func (s *RepoStore) FindByGitPaths(ctx context.Context, paths []string, opts ...
 
 func (s *RepoStore) Exists(ctx context.Context, repoType types.RepositoryType, namespace string, name string) (bool, error) {
 	return s.db.Operator.Core.NewSelect().Model((*Repository)(nil)).
-		Where("git_path =?", fmt.Sprintf("%ss_%s/%s", repoType, namespace, name)).
+		Where("LOWER(git_path) = LOWER(?)", fmt.Sprintf("%ss_%s/%s", repoType, namespace, name)).
 		Exists(ctx)
 }
 
@@ -319,6 +316,18 @@ func (s *RepoStore) Tags(ctx context.Context, repoID int64) (tags []Tag, err err
 	return
 }
 
+func (s *RepoStore) TagsWithCategory(ctx context.Context, repoID int64, category string) (tags []Tag, err error) {
+	query := s.db.Operator.Core.NewSelect().
+		ColumnExpr("tags.*").
+		Model(&RepositoryTag{}).
+		Join("JOIN tags ON repository_tag.tag_id = tags.id").
+		Where("repository_tag.repository_id = ?", repoID).
+		Where("repository_tag.count > 0").
+		Where("tags.category = ?", category)
+	err = query.Scan(ctx, &tags)
+	return
+}
+
 // TagIDs get tag ids by repo id, if category is not empty, return only tags of the category
 func (s *RepoStore) TagIDs(ctx context.Context, repoID int64, category string) (tagIDs []int64, err error) {
 	query := s.db.Operator.Core.NewSelect().
@@ -338,7 +347,7 @@ func (s *RepoStore) SetUpdateTimeByPath(ctx context.Context, repoType types.Repo
 	repo.UpdatedAt = update
 	_, err := s.db.Operator.Core.NewUpdate().Model(repo).
 		Column("updated_at").
-		Where("git_path =?", fmt.Sprintf("%ss_%s/%s", repoType, namespace, name)).
+		Where("LOWER(git_path) = LOWER(?)", fmt.Sprintf("%ss_%s/%s", repoType, namespace, name)).
 		Exec(ctx)
 	return err
 }
@@ -397,13 +406,12 @@ func (s *RepoStore) IsMirrorRepo(ctx context.Context, repoType types.RepositoryT
 		Exists bool `bun:"exists"`
 	}
 
-	query := s.db.Operator.Core.NewSelect().
+	err := s.db.Operator.Core.NewSelect().
 		ColumnExpr("EXISTS(SELECT 1 FROM mirrors WHERE mirrors.repository_id = repositories.id) AS exists").
 		Table("repositories").
-		Where("repositories.git_path = ?", fmt.Sprintf("%ss_%s/%s", repoType, namespace, name)).
-		Limit(1)
-
-	err := query.Scan(ctx, &result)
+		Where("LOWER(repositories.git_path) = LOWER(?)", fmt.Sprintf("%ss_%s/%s", repoType, namespace, name)).
+		Limit(1).
+		Scan(ctx, &result)
 	if err != nil {
 		return false, err
 	}
@@ -546,6 +554,42 @@ func (s *RepoStore) UpdateOrCreateRepo(ctx context.Context, input Repository) (*
 	return &input, nil
 }
 
+func (s *RepoStore) UpdateLicenseByTag(ctx context.Context, repoID int64) error {
+	var tag Tag
+	err := s.db.Core.NewSelect().
+		Model(&tag).
+		Join("join repository_tags on tag.id = repository_tags.tag_id").
+		Join("join repositories on repositories.id = repository_tags.repository_id").
+		Where("repository_tags.repository_id = ? and tag.category = ?", repoID, "license").
+		Scan(ctx)
+	if err != nil {
+		return err
+	}
+	if tag.Name != "" {
+		repo, err := s.FindById(ctx, repoID)
+		if err != nil {
+			return err
+		}
+		repo.License = tag.Name
+		_, err = s.UpdateRepo(ctx, *repo)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func (s *RepoStore) CountByRepoType(ctx context.Context, repoType types.RepositoryType) (int, error) {
 	return s.db.Core.NewSelect().Model(&Repository{}).Where("repository_type = ?", repoType).Count(ctx)
+}
+
+func (s *RepoStore) FindWithBatch(ctx context.Context, batchSize, batch int) ([]Repository, error) {
+	var res []Repository
+	err := s.db.Operator.Core.NewSelect().
+		Model(&res).
+		Order("id desc").
+		Limit(batchSize).
+		Offset(batchSize * batch).
+		Scan(ctx)
+	return res, err
 }
