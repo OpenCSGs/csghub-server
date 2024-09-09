@@ -10211,6 +10211,45 @@ paths:
       summary: '[Deprecated: use DELETE:/token/{app}/{token_name} instead]'
       tags:
       - Access token
+  /users:
+    get:
+      consumes:
+      - application/json
+      parameters:
+      - description: search
+        in: query
+        name: search
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/types.Response'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/types.User'
+                  type: array
+                total:
+                  type: integer
+              type: object
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Get users info. Only Admin
+      tags:
+      - User
 securityDefinitions:
   ApiKey:
     description: Bearer token

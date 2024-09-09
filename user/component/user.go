@@ -404,6 +404,47 @@ func (c *UserComponent) Get(ctx context.Context, userName, visitorName string) (
 	return &u, nil
 }
 
+func (c *UserComponent) Index(ctx context.Context, visitorName, search string, per, page int) ([]*types.User, int, error) {
+	var (
+		respUsers     []*types.User
+		onlyBasicInfo bool
+	)
+	canAdmin, err := c.CanAdmin(ctx, visitorName)
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to check visitor user permission, visitor: %s, error: %w", visitorName, err)
+	}
+	if !canAdmin {
+		onlyBasicInfo = true
+	}
+
+	dbusers, count, err := c.us.IndexWithSearch(ctx, search, per, page)
+	if err != nil {
+		newError := fmt.Errorf("failed to find user by name in db,error:%w", err)
+		return nil, count, newError
+	}
+
+	for _, dbuser := range dbusers {
+		user := &types.User{
+			Username: dbuser.Username,
+			Nickname: dbuser.NickName,
+			Avatar:   dbuser.Avatar,
+		}
+
+		if !onlyBasicInfo {
+			user.Email = dbuser.Email
+			user.UUID = dbuser.UUID
+			user.Bio = dbuser.Bio
+			user.Homepage = dbuser.Homepage
+			user.Phone = dbuser.Phone
+			user.Roles = dbuser.Roles()
+		}
+
+		respUsers = append(respUsers, user)
+	}
+
+	return respUsers, count, nil
+}
+
 func (c *UserComponent) Signin(ctx context.Context, code, state string) (*types.JWTClaims, string, error) {
 	c.lazyInit()
 

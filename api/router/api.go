@@ -229,6 +229,7 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 	// JWT token
 	apiGroup.POST("/jwt/token", needAPIKey, userProxyHandler.Proxy)
 	apiGroup.GET("/jwt/:token", needAPIKey, userProxyHandler.ProxyToApi("/api/v1/jwt/%s", "token"))
+	apiGroup.GET("/users", userProxyHandler.Proxy)
 
 	// callback
 	callbackCtrl, err := callback.NewGitCallbackHandler(config)
