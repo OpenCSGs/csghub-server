@@ -31,9 +31,10 @@ type DeployRunner struct {
 	deployStartTime       time.Time
 	deployTimeout         *DeployTimeout
 	modelDownloadEndpoint string
+	publicDomain          string
 }
 
-func NewDeployRunner(ir imagerunner.Runner, r *RepoInfo, t *database.DeployTask, dto *DeployTimeout, mdep string) Runner {
+func NewDeployRunner(ir imagerunner.Runner, r *RepoInfo, t *database.DeployTask, dto *DeployTimeout, mdep, publicDomain string) Runner {
 	return &DeployRunner{
 		repo:                  r,
 		task:                  t,
@@ -43,6 +44,7 @@ func NewDeployRunner(ir imagerunner.Runner, r *RepoInfo, t *database.DeployTask,
 		deployTimeout:         dto,
 		tokenStore:            database.NewAccessTokenStore(),
 		modelDownloadEndpoint: mdep,
+		publicDomain:          publicDomain,
 	}
 }
 
@@ -275,6 +277,17 @@ func (t *DeployRunner) makeDeployRequest() (*types.RunRequest, error) {
 		envMap["port"] = strconv.Itoa(deploy.ContainerPort)
 		envMap["HF_ENDPOINT"], _ = url.JoinPath(t.modelDownloadEndpoint, "hf")
 		envMap["HF_TOKEN"] = token.Token
+	}
+
+	if t.publicDomain == "" {
+		if deploy.Type == types.FinetuneType {
+			envMap["CONTEXT_PATH"] = "/endpoint/" + deploy.SvcName
+		}
+		if deploy.Type == types.SpaceType {
+			envMap["GRADIO_ROOT_PATH"] = "/endpoint/" + deploy.SvcName
+			envMap["STREAMLIT_SERVER_BASEURLPATH"] = "/endpoint/" + deploy.SvcName
+		}
+
 	}
 
 	targetID := deploy.SpaceID

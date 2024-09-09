@@ -78,11 +78,6 @@ func (h *ClusterHandler) GetClusterById(ctx *gin.Context) {
 }
 
 func (h *ClusterHandler) Update(ctx *gin.Context) {
-	currentUser := httpbase.GetCurrentUser(ctx)
-	if currentUser == "" {
-		httpbase.UnauthorizedError(ctx, component.ErrUserNotFound)
-		return
-	}
 	var req types.ClusterRequest
 	if err := ctx.ShouldBindJSON(&req); err != nil {
 		slog.Error("Bad request format", "error", err)
