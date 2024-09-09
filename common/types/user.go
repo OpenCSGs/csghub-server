@@ -143,7 +143,7 @@ type User struct {
 	Roles             []string       `json:"roles,omitempty"`
 	LastLoginAt       string         `json:"last_login_at,omitempty"`
 	Orgs              []Organization `json:"orgs,omitempty"`
-	CanChangeUserName bool           `json:"can_change_username"`
+	CanChangeUserName bool           `json:"can_change_username,omitempty"`
 }
 
 type UserLikesRequest struct {

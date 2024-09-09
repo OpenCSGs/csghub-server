@@ -94,6 +94,8 @@ func NewRouter(config *config.Config) (*gin.Engine, error) {
 		// userGroup.DELETE("/:username", userMatch, userHandler.Delete)
 		// get user's all tokens
 		userGroup.GET("/:username/tokens", userMatch, acHandler.GetUserTokens)
+		// get user list
+		apiV1Group.GET("/users", mustLogin(), userHandler.Index)
 
 	}
 	// routers for organizations
