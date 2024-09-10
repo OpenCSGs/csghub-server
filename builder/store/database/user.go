@@ -197,10 +197,13 @@ func (s *UserStore) FindByGitAccessToken(ctx context.Context, token string) (*Us
 	return &user, nil
 }
 
-func (s *UserStore) FindByUUID(ctx context.Context, uuid string) (user User, err error) {
-	user.UUID = uuid
-	err = s.db.Operator.Core.NewSelect().Model(&user).Where("uuid = ?", uuid).Scan(ctx)
-	return
+func (s *UserStore) FindByUUID(ctx context.Context, uuid string) (*User, error) {
+	var user User
+	err := s.db.Operator.Core.NewSelect().Model(&user).Where("uuid = ?", uuid).Scan(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return &user, nil
 }
 
 func (s *UserStore) GetActiveUserCount(ctx context.Context) (int, error) {
