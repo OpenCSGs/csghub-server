@@ -14,11 +14,10 @@ func NewSpaceResourceStore() *SpaceResourceStore {
 }
 
 type SpaceResource struct {
-	ID          int64   `bun:",pk,autoincrement" json:"id"`
-	Name        string  `bun:",notnull" json:"name"`
-	Resources   string  `bun:",notnull" json:"resources"`
-	CostPerHour float64 `bun:",notnull" json:"cost_per_hour"`
-	ClusterID   string  `bun:",notnull" json:"cluster_id"`
+	ID        int64  `bun:",pk,autoincrement" json:"id"`
+	Name      string `bun:",notnull" json:"name"`
+	Resources string `bun:",notnull" json:"resources"`
+	ClusterID string `bun:",notnull" json:"cluster_id"`
 	times
 }
 

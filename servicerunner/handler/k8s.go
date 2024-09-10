@@ -79,6 +79,24 @@ func (s *K8sHander) RunService(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
+	volumes := []corev1.Volume{}
+	volumeMounts := []corev1.VolumeMount{}
+	if request.DeployType != types.SpaceType {
+		// dshm volume for multi-gpu share memory
+		volumes = append(volumes, corev1.Volume{
+			Name: "dshm",
+			VolumeSource: corev1.VolumeSource{
+				EmptyDir: &corev1.EmptyDirVolumeSource{
+					Medium: corev1.StorageMediumMemory,
+				},
+			},
+		})
+
+		volumeMounts = append(volumeMounts, corev1.VolumeMount{
+			Name:      "dshm",
+			MountPath: "/dev/shm",
+		})
+	}
 	// add pvc if possible
 	// space image was built from user's code, model cache dir is hard to control
 	// so no PV cache for space case so far
@@ -89,24 +107,22 @@ func (s *K8sHander) RunService(c *gin.Context) {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create persist volume"})
 			return
 		}
-		service.Spec.Template.Spec.Volumes = []corev1.Volume{
-			{
-				Name: "nas-pvc",
-				VolumeSource: corev1.VolumeSource{
-					PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
-						ClaimName: srvName,
-					},
+		volumes = append(volumes, corev1.Volume{
+			Name: "nas-pvc",
+			VolumeSource: corev1.VolumeSource{
+				PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
+					ClaimName: srvName,
 				},
 			},
-		}
+		})
 
-		service.Spec.Template.Spec.Containers[0].VolumeMounts = []corev1.VolumeMount{
-			{
-				Name:      "nas-pvc",
-				MountPath: "/workspace",
-			},
-		}
+		volumeMounts = append(volumeMounts, corev1.VolumeMount{
+			Name:      "nas-pvc",
+			MountPath: "/workspace",
+		})
 	}
+	service.Spec.Template.Spec.Volumes = volumes
+	service.Spec.Template.Spec.Containers[0].VolumeMounts = volumeMounts
 
 	slog.Debug("ksvc", slog.Any("knative service", service))
 
@@ -304,10 +320,7 @@ func (s *K8sHander) ServiceStatus(c *gin.Context) {
 	}
 	deployIDStr := srv.Annotations["deploy_id"]
 	deployID, _ := strconv.ParseInt(deployIDStr, 10, 64)
-	costStr := srv.Annotations["cost_per_hour"]
-	cost, _ := strconv.ParseFloat(costStr, 32)
 	resp.DeployID = deployID
-	resp.CostPerHour = cost
 	resp.UserID = srv.Annotations["user_id"]
 
 	// retrive pod list and status
@@ -511,18 +524,11 @@ func (s *K8sHander) ServiceStatusAll(c *gin.Context) {
 			if err != nil {
 				deployType = 0
 			}
-			costStr := srv.Annotations[component.KeyCostPerHour]
-			cost, err := strconv.ParseFloat(costStr, 32)
-			if err != nil {
-				// for old space, no charge
-				cost = 0
-			}
 			userID := srv.Annotations[component.KeyUserID]
 			deploySku := srv.Annotations[component.KeyDeploySKU]
 			status := &types.StatusResponse{
 				DeployID:    deployID,
 				UserID:      userID,
-				CostPerHour: cost,
 				DeployType:  int(deployType),
 				ServiceName: srv.Name,
 				DeploySku:   deploySku,

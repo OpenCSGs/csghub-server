@@ -159,7 +159,6 @@ func (d *deployer) dedicatedDeploy(ctx context.Context, dr types.DeployRepo) (*d
 		Annotation:       dr.Annotation,
 		MinReplica:       dr.MinReplica,
 		MaxReplica:       dr.MaxReplica,
-		CostPerHour:      dr.CostPerHour,
 		ClusterID:        dr.ClusterID,
 		SecureLevel:      dr.SecureLevel,
 		SvcName:          uniqueSvcName,
@@ -540,7 +539,6 @@ func (d *deployer) UpdateDeploy(ctx context.Context, dur *types.DeployUpdateReq,
 
 	if resource != nil {
 		deploy.Hardware = resource.Resources
-		deploy.CostPerHour = resource.CostPerHour
 		deploy.SKU = strconv.FormatInt(resource.ID, 10)
 	}
 

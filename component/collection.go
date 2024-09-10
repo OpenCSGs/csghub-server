@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"strconv"
+	"strings"
 	"time"
 
 	"opencsg.com/csghub-server/builder/rpc"
@@ -18,22 +19,30 @@ func NewCollectionComponent(config *config.Config) (*CollectionComponent, error)
 	cc.cs = database.NewCollectionStore()
 	cc.rs = database.NewRepoStore()
 	cc.us = database.NewUserStore()
+	cc.os = database.NewOrgStore()
 	cc.uls = database.NewUserLikesStore()
 	cc.userSvcClient = rpc.NewUserSvcHttpClient(fmt.Sprintf("%s:%d", config.User.Host, config.User.Port),
 		rpc.AuthWithApiKey(config.APIToken))
+	spaceComponent, err := NewSpaceComponent(config)
+	if err != nil {
+		return nil, err
+	}
+	cc.spaceComponent = spaceComponent
 	return cc, nil
 }
 
 type CollectionComponent struct {
-	cs            *database.CollectionStore
-	rs            *database.RepoStore
-	us            *database.UserStore
-	uls           *database.UserLikesStore
-	userSvcClient rpc.UserSvcClient
+	os             *database.OrgStore
+	cs             *database.CollectionStore
+	rs             *database.RepoStore
+	us             *database.UserStore
+	uls            *database.UserLikesStore
+	userSvcClient  rpc.UserSvcClient
+	spaceComponent *SpaceComponent
 }
 
 func (cc *CollectionComponent) GetCollections(ctx context.Context, filter *types.CollectionFilter, per, page int) ([]types.Collection, int, error) {
-	collections, total, err := cc.cs.GetCollections(ctx, filter, per, page)
+	collections, total, err := cc.cs.GetCollections(ctx, filter, per, page, true)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -63,6 +72,11 @@ func (cc *CollectionComponent) CreateCollection(ctx context.Context, input types
 		Private:     input.Private,
 		Theme:       input.Theme,
 	}
+	//for org case, no need user name
+	if input.Namespace != "" {
+		collection.Username = ""
+	}
+
 	return cc.cs.CreateCollection(ctx, collection)
 }
 
@@ -70,6 +84,21 @@ func (cc *CollectionComponent) GetCollection(ctx context.Context, currentUser st
 	collection, err := cc.cs.GetCollection(ctx, id)
 	if err != nil {
 		return nil, err
+	}
+	// find by user name
+	avatar := ""
+	if collection.Username != "" {
+		user, err := cc.us.FindByUsername(ctx, collection.Username)
+		if err != nil {
+			return nil, fmt.Errorf("cannot find user for collection, %w", err)
+		}
+		avatar = user.Avatar
+	} else if collection.Namespace != "" {
+		org, err := cc.os.FindByPath(ctx, collection.Namespace)
+		if err != nil {
+			return nil, fmt.Errorf("fail to get org info, path: %s, error: %w", collection.Namespace, err)
+		}
+		avatar = org.Logo
 	}
 
 	permission, err := cc.getUserCollectionPermission(ctx, currentUser, collection)
@@ -92,10 +121,32 @@ func (cc *CollectionComponent) GetCollection(ctx context.Context, currentUser st
 		newError := fmt.Errorf("failed to check for the presence of the user likes,error:%w", err)
 		return nil, newError
 	}
+	if !permission.CanWrite {
+		newCollection.Repositories = cc.GetPublicRepos(newCollection)
+	}
+	for i, repo := range newCollection.Repositories {
+		if repo.RepositoryType == types.SpaceRepo && strings.Contains(repo.Path, "/") {
+			namespace, name := repo.NamespaceAndName()
+			_, status, _ := cc.spaceComponent.Status(ctx, namespace, name)
+			newCollection.Repositories[i].Status = status
+		}
+	}
 	newCollection.UserLikes = likeExists
 	newCollection.CanWrite = permission.CanWrite
 	newCollection.CanManage = permission.CanAdmin
+	newCollection.Avatar = avatar
 	return &newCollection, nil
+}
+
+// get non private repositories of the collection
+func (cc *CollectionComponent) GetPublicRepos(collection types.Collection) []types.CollectionRepository {
+	var filtered []types.CollectionRepository
+	for _, repo := range collection.Repositories {
+		if !repo.Private {
+			filtered = append(filtered, repo)
+		}
+	}
+	return filtered
 }
 
 func (cc *CollectionComponent) UpdateCollection(ctx context.Context, input types.CreateCollectionReq) (*database.Collection, error) {

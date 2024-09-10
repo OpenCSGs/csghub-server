@@ -10785,6 +10785,9 @@ const docTemplate = `{
         "types.Collection": {
             "type": "object",
             "properties": {
+                "avatar": {
+                    "type": "string"
+                },
                 "can_manage": {
                     "type": "boolean"
                 },
@@ -10804,6 +10807,9 @@ const docTemplate = `{
                     "type": "integer"
                 },
                 "name": {
+                    "type": "string"
+                },
+                "namespace": {
                     "type": "string"
                 },
                 "nickname": {
@@ -10864,6 +10870,9 @@ const docTemplate = `{
                 },
                 "repository_type": {
                     "$ref": "#/definitions/types.RepositoryType"
+                },
+                "status": {
+                    "type": "string"
                 },
                 "tags": {
                     "type": "array",
@@ -11109,32 +11118,6 @@ const docTemplate = `{
         "types.CreateFileResp": {
             "type": "object"
         },
-        "types.CreateJWTReq": {
-            "type": "object",
-            "required": [
-                "current_user",
-                "uuid"
-            ],
-            "properties": {
-                "current_user": {
-                    "type": "string"
-                },
-                "uuid": {
-                    "type": "string"
-                }
-            }
-        },
-        "types.CreateJWTResp": {
-            "type": "object",
-            "properties": {
-                "expire_at": {
-                    "type": "string"
-                },
-                "token": {
-                    "type": "string"
-                }
-            }
-        },
         "types.CreateMirrorParams": {
             "type": "object",
             "properties": {
@@ -11332,16 +11315,12 @@ const docTemplate = `{
             "type": "object",
             "required": [
                 "cluster_id",
-                "cost_per_hour",
                 "name",
                 "resources"
             ],
             "properties": {
                 "cluster_id": {
                     "type": "string"
-                },
-                "cost_per_hour": {
-                    "type": "number"
                 },
                 "name": {
                     "type": "string"
@@ -12214,9 +12193,6 @@ const docTemplate = `{
         "types.SpaceResource": {
             "type": "object",
             "properties": {
-                "cost_per_hour": {
-                    "type": "number"
-                },
                 "id": {
                     "type": "integer"
                 },
@@ -12455,9 +12431,6 @@ const docTemplate = `{
         "types.UpdateSpaceResourceReq": {
             "type": "object",
             "properties": {
-                "cost_per_hour": {
-                    "type": "number"
-                },
                 "name": {
                     "type": "string"
                 },
