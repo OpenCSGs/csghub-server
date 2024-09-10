@@ -618,6 +618,7 @@ func (s *K8sHander) GetClusterInfoByID(c *gin.Context) {
 	clusterInfo.Zone = cInfo.Zone
 	clusterInfo.Provider = cInfo.Provider
 	clusterInfo.ClusterID = cInfo.ClusterID
+	clusterInfo.StorageClass = cInfo.StorageClass
 	client, err := s.clusterPool.GetClusterByID(c.Request.Context(), clusterId)
 	if err != nil {
 		slog.Error("fail to get cluster", slog.Any("error", err))

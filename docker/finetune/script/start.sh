@@ -26,5 +26,5 @@ if [ ! -f "/workspace/.csghub_init" ]; then
 fi 
 
 
-
+export GRADIO_ROOT_PATH="${CONTEXT_PATH}/proxy/7860"
 CUDA_VISIBLE_DEVICES=0 llamafactory-cli webui

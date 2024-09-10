@@ -39,13 +39,11 @@ func NewRProxyHandler(config *config.Config) (*RProxyHandler, error) {
 
 func (r *RProxyHandler) Proxy(ctx *gin.Context) {
 	slog.Debug("http request", slog.Any("request", ctx.Request.URL), slog.Any("header", ctx.Request.Header))
-	host := ctx.Request.Host
-	domainParts := strings.SplitN(host, ".", 2)
-	appSrvName := domainParts[0]
+	appSrvName := r.GetSrvName(ctx)
 
 	deploy, err := r.repoComp.GetDeployBySvcName(ctx, appSrvName)
 	if err != nil {
-		slog.Error("failed to get deploy", slog.Any("error", err), slog.Any("appSrvName", appSrvName))
+		slog.Error("failed to get deploy in rproxy", slog.Any("error", err), slog.Any("appSrvName", appSrvName))
 		httpbase.ServerError(ctx, fmt.Errorf("failed to get deploy, %w", err))
 		return
 	}
@@ -81,9 +79,32 @@ func (r *RProxyHandler) Proxy(ctx *gin.Context) {
 			target = deploy.Endpoint
 		}
 		rp, _ := proxy.NewReverseProxy(target)
+		if deploy.Type == 1 || deploy.Type == 3 {
+			//for infernece,no need context path
+			contextPath := fmt.Sprintf("/%s/%s", "endpoint", appSrvName)
+			apiname = strings.TrimPrefix(apiname, contextPath)
+		}
 		rp.ServeHTTP(ctx.Writer, ctx.Request, apiname)
 	} else {
 		slog.Warn("user not allowed to call endpoint api", slog.String("srv_name", appSrvName), slog.Any("user_name", username), slog.Any("deployID", deploy.ID))
 		ctx.Status(http.StatusForbidden)
 	}
+}
+
+// get service name based on request
+func (r *RProxyHandler) GetSrvName(ctx *gin.Context) string {
+	URI := ctx.Request.RequestURI
+	host := ctx.Request.Host
+	//check if request is from internal endpoint
+	if strings.HasPrefix(URI, "/endpoint/") {
+		//for case: http://127.0.0.1:8080/endpoint/dx1jpfny9hq8
+		parts := strings.SplitN(ctx.Request.URL.Path, "/", 5)
+		return parts[2]
+	} else {
+		// for case: https://dx1jpfny9hq8.cn-beijing.aliyun.space.opencsg.com
+		domainParts := strings.SplitN(host, ".", 2)
+		appSrvName := domainParts[0]
+		return appSrvName
+	}
+
 }

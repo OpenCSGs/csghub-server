@@ -59,6 +59,7 @@ type RepoComponent struct {
 	deploy             *database.DeployTaskStore
 	deployer           deploy.Deployer
 	publicRootDomain   string
+	serverBaseUrl      string
 	cluster            *database.ClusterInfoStore
 	mirrorSource       *database.MirrorSourceStore
 	tokenStore         *database.AccessTokenStore
@@ -120,6 +121,7 @@ func NewRepoComponent(config *config.Config) (*RepoComponent, error) {
 	c.deploy = database.NewDeployTaskStore()
 	c.deployer = deploy.NewDeployer()
 	c.publicRootDomain = config.Space.PublicRootDomain
+	c.serverBaseUrl = config.APIServer.PublicDomain
 	c.cluster = database.NewClusterInfoStore()
 	c.rtfm = database.NewRuntimeFrameworksStore()
 	c.rrtfms = database.NewRepositoriesRuntimeFramework()
@@ -1849,24 +1851,9 @@ func (c *RepoComponent) DeployDetail(ctx context.Context, detailReq types.Deploy
 	if err != nil {
 		return nil, err
 	}
-	var endpoint string
-	if len(deploy.SvcName) > 0 && deploy.Status == deployStatus.Running {
-		// todo: zone.provider.endpoint to support multi-zone, multi-provider
-		cls, err := c.cluster.ByClusterID(ctx, deploy.ClusterID)
-		zone := ""
-		provider := ""
-		if err != nil {
-			slog.Warn("Get cluster with error", slog.Any("error", err))
-		} else {
-			zone = cls.Zone
-			provider = cls.Provider
-		}
-		regionDomain := ""
-		if len(zone) > 0 && len(provider) > 0 {
-			regionDomain = fmt.Sprintf(".%s.%s", zone, provider)
-		}
-		endpoint = fmt.Sprintf("%s%s.%s", deploy.SvcName, regionDomain, c.publicRootDomain)
-	}
+
+	endpoint := c.generateEndpoint(ctx, deploy)
+
 	req := types.DeployRepo{
 		DeployID:  deploy.ID,
 		SpaceID:   deploy.SpaceID,
@@ -1917,6 +1904,37 @@ func (c *RepoComponent) DeployDetail(ctx context.Context, detailReq types.Deploy
 	}
 
 	return &resDeploy, nil
+}
+
+// generate endpoint
+func (c *RepoComponent) generateEndpoint(ctx context.Context, deploy *database.Deploy) string {
+	var endpoint string
+	if len(deploy.SvcName) > 0 && deploy.Status == deployStatus.Running {
+		// todo: zone.provider.endpoint to support multi-zone, multi-provider
+		cls, err := c.cluster.ByClusterID(ctx, deploy.ClusterID)
+		zone := ""
+		provider := ""
+		if err != nil {
+			slog.Warn("Get cluster with error", slog.Any("error", err))
+		} else {
+			zone = cls.Zone
+			provider = cls.Provider
+		}
+		regionDomain := ""
+		if len(zone) > 0 && len(provider) > 0 {
+			regionDomain = fmt.Sprintf(".%s.%s", zone, provider)
+		}
+		if c.publicRootDomain == "" {
+			endpoint, _ = url.JoinPath(c.serverBaseUrl, "endpoint", deploy.SvcName)
+			endpoint = strings.Replace(endpoint, "http://", "", 1)
+			endpoint = strings.Replace(endpoint, "https://", "", 1)
+		} else {
+			endpoint = fmt.Sprintf("%s%s.%s", deploy.SvcName, regionDomain, c.publicRootDomain)
+		}
+
+	}
+
+	return endpoint
 }
 
 func deployStatusCodeToString(code int) string {

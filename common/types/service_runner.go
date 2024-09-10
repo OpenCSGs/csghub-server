@@ -101,12 +101,13 @@ type (
 	}
 
 	CluserResponse struct {
-		ClusterID   string                      `json:"cluster_id"`
-		ClusterName string                      `json:"cluster_name"`
-		Region      string                      `json:"region"`
-		Nodes       map[string]NodeResourceInfo `json:"nodes"`
-		Zone        string                      `json:"zone"`
-		Provider    string                      `json:"provider"`
+		ClusterID    string                      `json:"cluster_id"`
+		ClusterName  string                      `json:"cluster_name"`
+		Region       string                      `json:"region"`
+		Nodes        map[string]NodeResourceInfo `json:"nodes"`
+		Zone         string                      `json:"zone"`
+		Provider     string                      `json:"provider"`
+		StorageClass string                      `json:"storage_class"`
 	}
 
 	CluserRequest struct {
@@ -116,6 +117,7 @@ type (
 		Zone          string `json:"zone"`     //cn-beijing
 		Provider      string `json:"provider"` //ali
 		Enable        bool   `json:"enable"`
+		StorageClass  string `json:"storage_class"`
 	}
 
 	ReplicaResponse struct {
