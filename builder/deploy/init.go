@@ -26,7 +26,7 @@ func Init(c DeployConfig) error {
 	}
 
 	fifoScheduler = scheduler.NewFIFOScheduler(ib, ir, c.SpaceDeployTimeoutInMin, c.ModelDeployTimeoutInMin, c.ModelDownloadEndpoint, c.PublicRootDomain)
-	deployer, err := newDeployer(fifoScheduler, ib, ir, c)
+	deployer, err := newDeployer(fifoScheduler, ib, ir)
 	if err != nil {
 		return fmt.Errorf("failed to create deployer:%w", err)
 	}
