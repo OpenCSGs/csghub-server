@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"os"
 	"sync"
+	"time"
 
 	"github.com/bwmarrin/snowflake"
 	"github.com/casdoor/casdoor-go-sdk/casdoorsdk"
@@ -415,16 +416,26 @@ func (c *UserComponent) Signin(ctx context.Context, code, state string) (*types.
 		return nil, "", fmt.Errorf("failed to check user existance by name in db,error:%w", err)
 	}
 
+	var dbu *database.User
 	if !exists {
-		_, err = c.createFromCasdoorUser(ctx, cu)
+		dbu, err = c.createFromCasdoorUser(ctx, cu)
 		if err != nil {
 			return nil, "", fmt.Errorf("failed to create user,error:%w", err)
 		}
-	}
-	// get user from db for username, as casdoor may have different username
-	dbu, err := c.us.FindByUUID(ctx, cu.Id)
-	if err != nil {
-		return nil, "", fmt.Errorf("failed to find user by uuid in db, uuid:%s, error:%w", cu.Id, err)
+	} else {
+		// get user from db for username, as casdoor may have different username
+		dbu, err = c.us.FindByUUID(ctx, cu.Id)
+		if err != nil {
+			return nil, "", fmt.Errorf("failed to find user by uuid in db, uuid:%s, error:%w", cu.Id, err)
+		}
+		// update user login time asynchronously
+		go func() {
+			dbu.LastLoginAt = time.Now().Format("2006-01-02 15:04:05")
+			err := c.us.Update(ctx, dbu)
+			if err != nil {
+				slog.Error("failed to update user login time", "error", err, "username", dbu.Username)
+			}
+		}()
 	}
 	hubToken, signed, err := c.jwtc.GenerateToken(ctx, types.CreateJWTReq{
 		UUID:        dbu.UUID,
