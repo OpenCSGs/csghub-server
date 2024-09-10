@@ -3501,6 +3501,31 @@ paths:
       summary: Get cluster list
       tags:
       - Cluster
+  /cluster/{id}:
+    get:
+      consumes:
+      - application/json
+      description: Get cluster by id
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/types.Response'
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Get cluster by id
+      tags:
+      - Cluster
   /codes:
     get:
       consumes:

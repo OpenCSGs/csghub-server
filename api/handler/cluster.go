@@ -50,6 +50,33 @@ func (h *ClusterHandler) Index(ctx *gin.Context) {
 	httpbase.OK(ctx, clusters)
 }
 
+// GetClusterById   godoc
+// @Security     ApiKey
+// @Summary      Get cluster by id
+// @Description  Get cluster by id
+// @Tags         Cluster
+// @Accept       json
+// @Produce      json
+// @Success      200  {object}  types.Response{} "OK"
+// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
+// @Router       /cluster/{id} [get]
+func (h *ClusterHandler) GetClusterById(ctx *gin.Context) {
+	currentUser := httpbase.GetCurrentUser(ctx)
+	if currentUser == "" {
+		httpbase.UnauthorizedError(ctx, component.ErrUserNotFound)
+		return
+	}
+	id := ctx.Param("id")
+	cluster, err := h.c.GetClusterById(ctx, id)
+	if err != nil {
+		slog.Error("Failed to get cluster", slog.Any("error", err))
+		httpbase.ServerError(ctx, err)
+		return
+	}
+	httpbase.OK(ctx, cluster)
+}
+
 func (h *ClusterHandler) Update(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
 	if currentUser == "" {

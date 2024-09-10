@@ -112,6 +112,14 @@ func (s *ServiceComponent) GenerateService(request types.SVCRequest, srvName str
 		templateAnnotations["autoscaling.knative.dev/min-scale"] = strconv.Itoa(request.MinReplica)
 		templateAnnotations["autoscaling.knative.dev/max-scale"] = strconv.Itoa(request.MaxReplica)
 	}
+	initialDelaySeconds := 10
+	periodSeconds := 10
+	failureThreshold := 3
+	if request.DeployType == types.InferenceType {
+		initialDelaySeconds = s.env.Space.ReadnessDelaySeconds
+		periodSeconds = s.env.Space.ReadnessPeriodSeconds
+		failureThreshold = s.env.Space.ReadnessFailureThreshold
+	}
 
 	service := &v1.Service{
 		ObjectMeta: metav1.ObjectMeta{
@@ -135,6 +143,11 @@ func (s *ServiceComponent) GenerateService(request types.SVCRequest, srvName str
 								Ports:     exposePorts,
 								Resources: resources,
 								Env:       environments,
+								ReadinessProbe: &corev1.Probe{
+									InitialDelaySeconds: int32(initialDelaySeconds),
+									PeriodSeconds:       int32(periodSeconds),
+									FailureThreshold:    int32(failureThreshold),
+								},
 							}},
 							ImagePullSecrets: []corev1.LocalObjectReference{
 								{

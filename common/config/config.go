@@ -119,7 +119,10 @@ type Config struct {
 		SessionSecretKey   string `envconfig:"STARHUB_SERVER_SPACE_SESSION_SECRET_KEY" default:"secret"`
 		DeployTimeoutInMin int    `envconfig:"STARHUB_SERVER_SPACE_DEPLOY_TIMEOUT_IN_MINUTES" default:"30"`
 		// gpu model label
-		GPUModelLabel string `envconfig:"STARHUB_SERVER_GPU_MODEL_LABEL" default:"aliyun.accelerator/nvidia_name"`
+		GPUModelLabel            string `envconfig:"STARHUB_SERVER_GPU_MODEL_LABEL" default:"aliyun.accelerator/nvidia_name"`
+		ReadnessDelaySeconds     int    `envconfig:"STARHUB_SERVER_READNESS_DELAY_SECONDS" default:"120"`
+		ReadnessPeriodSeconds    int    `envconfig:"STARHUB_SERVER_READNESS_PERIOD_SECONDS" default:"10"`
+		ReadnessFailureThreshold int    `envconfig:"STARHUB_SERVER_READNESS_FAILURE_THRESHOLD" default:"3"`
 	}
 
 	Model struct {

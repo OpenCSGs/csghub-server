@@ -18,11 +18,12 @@ type ClusterRequest struct {
 	StorageClass  string `json:"storage_class"`
 }
 type ClusterRes struct {
-	ClusterID string             `json:"cluster_id"`
-	Region    string             `json:"region"`
-	Zone      string             `json:"zone"`     //cn-beijing
-	Provider  string             `json:"provider"` //ali
-	Resources []NodeResourceInfo `json:"resources"`
+	ClusterID    string             `json:"cluster_id"`
+	Region       string             `json:"region"`
+	Zone         string             `json:"zone"`     //cn-beijing
+	Provider     string             `json:"provider"` //ali
+	Resources    []NodeResourceInfo `json:"resources"`
+	StorageClass string             `json:"storage_class"`
 }
 
 type NodeResourceInfo struct {
