@@ -37,9 +37,10 @@ type FIFOScheduler struct {
 	spaceDeployTimeoutInMin int
 	modelDeployTimeoutInMin int
 	modelDownloadEndpoint   string
+	PublicRootDomain        string
 }
 
-func NewFIFOScheduler(ib imagebuilder.Builder, ir imagerunner.Runner, sdt, mdt int, mdep string) Scheduler {
+func NewFIFOScheduler(ib imagebuilder.Builder, ir imagerunner.Runner, sdt, mdt int, mdep, prd string) Scheduler {
 	s := &FIFOScheduler{}
 	// TODO:allow config
 	s.timeout = 30 * time.Minute
@@ -57,6 +58,7 @@ func NewFIFOScheduler(ib imagebuilder.Builder, ir imagerunner.Runner, sdt, mdt i
 	s.spaceDeployTimeoutInMin = sdt
 	s.modelDeployTimeoutInMin = mdt
 	s.modelDownloadEndpoint = mdep
+	s.PublicRootDomain = prd
 	return s
 }
 
@@ -195,6 +197,7 @@ func (rs *FIFOScheduler) next() (Runner, error) {
 				deployModelTimeoutInMin: rs.modelDeployTimeoutInMin,
 			},
 			rs.modelDownloadEndpoint,
+			rs.PublicRootDomain,
 		)
 	}
 

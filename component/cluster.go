@@ -23,6 +23,10 @@ func (c *ClusterComponent) Index(ctx context.Context) ([]types.ClusterRes, error
 	return c.deployer.ListCluster(ctx)
 }
 
+func (c *ClusterComponent) GetClusterById(ctx context.Context, clusterId string) (*types.ClusterRes, error) {
+	return c.deployer.GetClusterById(ctx, clusterId)
+}
+
 func (c *ClusterComponent) Update(ctx context.Context, data types.ClusterRequest) (*types.UpdateClusterResponse, error) {
 	return c.deployer.UpdateCluster(ctx, data)
 }

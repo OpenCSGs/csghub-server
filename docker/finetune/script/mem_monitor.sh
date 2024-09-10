@@ -8,7 +8,8 @@ while true; do
 
   if test -f "/sys/fs/cgroup/memory/memory.limit_in_bytes"; then
     max_memory=$(cat /sys/fs/cgroup/memory/memory.limit_in_bytes)
-    current_memory=$(cat /sys/fs/cgroup/memory/memory.usage_in_bytes)
+    MEMORY_STAT_PATH="/sys/fs/cgroup/memory/memory.stat"
+    current_memory=$(awk '$1 == "rss" {print $2}' $MEMORY_STAT_PATH)
   fi
   
   if [ "${max_memory}" == "max" ]; then
@@ -27,5 +28,5 @@ while true; do
     echo "Process with PID $pid killed due to memory exceeding the limit."
   fi
 
-  sleep 6
+  sleep 10
 done

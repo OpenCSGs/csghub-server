@@ -288,6 +288,7 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 	cluster := apiGroup.Group("/cluster")
 	{
 		cluster.GET("", clusterHandler.Index)
+		cluster.GET("/:id", clusterHandler.GetClusterById)
 		cluster.PUT("/:id", needAPIKey, clusterHandler.Update)
 	}
 
