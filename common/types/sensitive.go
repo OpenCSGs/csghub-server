@@ -17,3 +17,14 @@ var _ SensitiveRequest = (*UpdateUserRequest)(nil)
 var _ SensitiveRequest = (*CreateOrgReq)(nil)
 var _ SensitiveRequest = (*EditOrgReq)(nil)
 var _ SensitiveRequest = (*CreateUserTokenRequest)(nil)
+
+type SensitiveRequestV2 interface {
+	GetSensitiveFields() []SensitiveField
+}
+
+type SensitiveField struct {
+	Name  string
+	Value func() string
+	// like nickname, chat, comment, etc. See sensitive.Scenario for more details.
+	Scenario string
+}

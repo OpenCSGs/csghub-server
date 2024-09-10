@@ -365,7 +365,7 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 		internalGroup.POST("/post_receive", needGitlabShellJWTToken, internalHandler.PostReceive)
 	}
 
-	discussionHandler, err := handler.NewDiscussionHandler()
+	discussionHandler, err := handler.NewDiscussionHandler(config)
 	if err != nil {
 		return nil, fmt.Errorf("error creating discussion handler:%w", err)
 	}
