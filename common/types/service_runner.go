@@ -25,16 +25,15 @@ type (
 		Env        map[string]string `json:"env,omitempty"`        // runtime env variables
 		Annotation map[string]string `json:"annotation,omitempty"` // resource annotations
 
-		RuntimeFramework string  `json:"runtime_framework"` // runtime framework of image, TGI/vllm/Pipeline/Deepspeed/LLamacpp
-		ImageID          string  `json:"image_id"`          // container_image
-		DeployID         int64   `json:"deploy_id"`
-		Accesstoken      string  `json:"access_token"`
-		ClusterID        string  `json:"cluster_id"`
-		SvcName          string  `json:"svc_name"`
-		DeployType       int     `json:"deploy_type"`
-		UserID           string  `json:"user_id"`
-		CostPerHour      float64 `json:"cost_per_hour"`
-		Sku              string  `json:"sku"`
+		RuntimeFramework string `json:"runtime_framework"` // runtime framework of image, TGI/vllm/Pipeline/Deepspeed/LLamacpp
+		ImageID          string `json:"image_id"`          // container_image
+		DeployID         int64  `json:"deploy_id"`
+		Accesstoken      string `json:"access_token"`
+		ClusterID        string `json:"cluster_id"`
+		SvcName          string `json:"svc_name"`
+		DeployType       int    `json:"deploy_type"`
+		UserID           string `json:"user_id"`
+		Sku              string `json:"sku"`
 	}
 
 	RunResponse struct {
@@ -70,7 +69,6 @@ type (
 	StatusResponse struct {
 		DeployID    int64      `json:"deploy_id"`
 		UserID      string     `json:"user_id"`
-		CostPerHour float64    `json:"cost_per_hour"`
 		Code        int        `json:"code"`
 		Message     string     `json:"message"`
 		Endpoint    string     `json:"url"`
@@ -167,18 +165,17 @@ type (
 		KnativeClient *knative.Clientset    // Knative client
 	}
 	SVCRequest struct {
-		ImageID     string            `json:"image_id" binding:"required"`
-		Hardware    HardWare          `json:"hardware,omitempty"`
-		Env         map[string]string `json:"env,omitempty"`
-		Annotation  map[string]string `json:"annotation,omitempty"`
-		DeployID    int64             `json:"deploy_id" binding:"required"`
-		RepoType    string            `json:"repo_type"`
-		MinReplica  int               `json:"min_replica"`
-		MaxReplica  int               `json:"max_replica"`
-		ClusterID   string            `json:"cluster_id"`
-		DeployType  int               `json:"deploy_type"`
-		UserID      string            `json:"user_id"`
-		CostPerHour float64           `json:"cost_per_hour"`
-		Sku         string            `json:"sku"`
+		ImageID    string            `json:"image_id" binding:"required"`
+		Hardware   HardWare          `json:"hardware,omitempty"`
+		Env        map[string]string `json:"env,omitempty"`
+		Annotation map[string]string `json:"annotation,omitempty"`
+		DeployID   int64             `json:"deploy_id" binding:"required"`
+		RepoType   string            `json:"repo_type"`
+		MinReplica int               `json:"min_replica"`
+		MaxReplica int               `json:"max_replica"`
+		ClusterID  string            `json:"cluster_id"`
+		DeployType int               `json:"deploy_type"`
+		UserID     string            `json:"user_id"`
+		Sku        string            `json:"sku"`
 	}
 )

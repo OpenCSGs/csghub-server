@@ -52,7 +52,7 @@ type RankedRepository struct {
 var Fields = []string{"id", "download_count", "likes", "path", "private", "repository_type", "updated_at", "created_at", "user_id", "name", "nickname", "description"}
 
 // query collections in the database
-func (cs *CollectionStore) GetCollections(ctx context.Context, filter *types.CollectionFilter, per, page int) (collections []Collection, total int, err error) {
+func (cs *CollectionStore) GetCollections(ctx context.Context, filter *types.CollectionFilter, per, page int, showPrivate bool) (collections []Collection, total int, err error) {
 	if filter.Sort == "trending" {
 		return cs.QueryByTrending(ctx, filter, per, page)
 	}
@@ -81,7 +81,7 @@ func (cs *CollectionStore) GetCollections(ctx context.Context, filter *types.Col
 	for _, collection := range collections {
 		ids = append(ids, collection.ID)
 	}
-	return cs.GetCollectionsByIDs(ctx, collections, ids, total)
+	return cs.GetCollectionsByIDs(ctx, collections, ids, total, true)
 }
 
 // query collections in the database
@@ -119,7 +119,7 @@ func (cs *CollectionStore) QueryByTrending(ctx context.Context, filter *types.Co
 		ids = append(ids, collection.ID)
 	}
 
-	return cs.GetCollectionsByIDs(ctx, collections, ids, total)
+	return cs.GetCollectionsByIDs(ctx, collections, ids, total, true)
 }
 
 func (cs *CollectionStore) CreateCollection(ctx context.Context, collection Collection) (*Collection, error) {
@@ -189,7 +189,7 @@ func (cs *CollectionStore) ByUserLikes(ctx context.Context, userID int64, per, p
 		ids = append(ids, collection.ID)
 	}
 
-	return cs.GetCollectionsByIDs(ctx, collections, ids, total)
+	return cs.GetCollectionsByIDs(ctx, collections, ids, total, true)
 }
 
 func (cs *CollectionStore) ByUserOrgs(ctx context.Context, namespace string, per, page int, onlyPublic bool) (collections []Collection, total int, err error) {
@@ -219,17 +219,20 @@ func (cs *CollectionStore) ByUserOrgs(ctx context.Context, namespace string, per
 		ids = append(ids, collection.ID)
 	}
 
-	return cs.GetCollectionsByIDs(ctx, collections, ids, total)
+	return cs.GetCollectionsByIDs(ctx, collections, ids, total, false)
 }
 
 // get collections by ids
-func (cs *CollectionStore) GetCollectionsByIDs(ctx context.Context, collections []Collection, ids []interface{}, total int) ([]Collection, int, error) {
+func (cs *CollectionStore) GetCollectionsByIDs(ctx context.Context, collections []Collection, ids []interface{}, total int, onlyPublic bool) ([]Collection, int, error) {
 	subQuery := cs.db.Operator.Core.NewSelect().
 		Column("cr.collection_id").
 		ColumnExpr("repository.id as repository_id").
 		ColumnExpr("ROW_NUMBER() OVER (PARTITION BY cr.collection_id ORDER BY repository.updated_at DESC) AS rn").
-		TableExpr("repositories AS repository").
-		Join("JOIN collection_repositories AS cr ON repository.id = cr.repository_id")
+		TableExpr("repositories AS repository")
+	if onlyPublic {
+		subQuery.Where("repository.private = ?", false)
+	}
+	subQuery.Join("JOIN collection_repositories AS cr ON repository.id = cr.repository_id")
 
 	var rankedRepos []RankedRepository
 	err := cs.db.Operator.Core.NewSelect().

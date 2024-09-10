@@ -10774,6 +10774,9 @@
         "types.Collection": {
             "type": "object",
             "properties": {
+                "avatar": {
+                    "type": "string"
+                },
                 "can_manage": {
                     "type": "boolean"
                 },
@@ -10793,6 +10796,9 @@
                     "type": "integer"
                 },
                 "name": {
+                    "type": "string"
+                },
+                "namespace": {
                     "type": "string"
                 },
                 "nickname": {
@@ -10853,6 +10859,9 @@
                 },
                 "repository_type": {
                     "$ref": "#/definitions/types.RepositoryType"
+                },
+                "status": {
+                    "type": "string"
                 },
                 "tags": {
                     "type": "array",
@@ -11098,32 +11107,6 @@
         "types.CreateFileResp": {
             "type": "object"
         },
-        "types.CreateJWTReq": {
-            "type": "object",
-            "required": [
-                "current_user",
-                "uuid"
-            ],
-            "properties": {
-                "current_user": {
-                    "type": "string"
-                },
-                "uuid": {
-                    "type": "string"
-                }
-            }
-        },
-        "types.CreateJWTResp": {
-            "type": "object",
-            "properties": {
-                "expire_at": {
-                    "type": "string"
-                },
-                "token": {
-                    "type": "string"
-                }
-            }
-        },
         "types.CreateMirrorParams": {
             "type": "object",
             "properties": {
@@ -11321,16 +11304,12 @@
             "type": "object",
             "required": [
                 "cluster_id",
-                "cost_per_hour",
                 "name",
                 "resources"
             ],
             "properties": {
                 "cluster_id": {
                     "type": "string"
-                },
-                "cost_per_hour": {
-                    "type": "number"
                 },
                 "name": {
                     "type": "string"
@@ -12203,9 +12182,6 @@
         "types.SpaceResource": {
             "type": "object",
             "properties": {
-                "cost_per_hour": {
-                    "type": "number"
-                },
                 "id": {
                     "type": "integer"
                 },
@@ -12444,9 +12420,6 @@
         "types.UpdateSpaceResourceReq": {
             "type": "object",
             "properties": {
-                "cost_per_hour": {
-                    "type": "number"
-                },
                 "name": {
                     "type": "string"
                 },

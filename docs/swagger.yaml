@@ -560,6 +560,8 @@ definitions:
     type: object
   types.Collection:
     properties:
+      avatar:
+        type: string
       can_manage:
         type: boolean
       can_write:
@@ -573,6 +575,8 @@ definitions:
       likes:
         type: integer
       name:
+        type: string
+      namespace:
         type: string
       nickname:
         type: string
@@ -613,6 +617,8 @@ definitions:
         type: boolean
       repository_type:
         $ref: '#/definitions/types.RepositoryType'
+      status:
+        type: string
       tags:
         items:
           $ref: '#/definitions/types.RepoTag'
@@ -778,23 +784,6 @@ definitions:
     type: object
   types.CreateFileResp:
     type: object
-  types.CreateJWTReq:
-    properties:
-      current_user:
-        type: string
-      uuid:
-        type: string
-    required:
-    - current_user
-    - uuid
-    type: object
-  types.CreateJWTResp:
-    properties:
-      expire_at:
-        type: string
-      token:
-        type: string
-    type: object
   types.CreateMirrorParams:
     properties:
       mirror_source_id:
@@ -931,15 +920,12 @@ definitions:
     properties:
       cluster_id:
         type: string
-      cost_per_hour:
-        type: number
       name:
         type: string
       resources:
         type: string
     required:
     - cluster_id
-    - cost_per_hour
     - name
     - resources
     type: object
@@ -1529,8 +1515,6 @@ definitions:
     type: object
   types.SpaceResource:
     properties:
-      cost_per_hour:
-        type: number
       id:
         type: integer
       is_available:
@@ -1689,8 +1673,6 @@ definitions:
     type: object
   types.UpdateSpaceResourceReq:
     properties:
-      cost_per_hour:
-        type: number
       name:
         type: string
       resources:
