@@ -70,7 +70,7 @@ func (s *K8sHander) RunService(c *gin.Context) {
 	// check if the ksvc exists
 	_, err = cluster.KnativeClient.ServingV1().Services(s.k8sNameSpace).Get(c.Request.Context(), srvName, metav1.GetOptions{})
 	if err == nil {
-		cluster.KnativeClient.ServingV1().Services(s.k8sNameSpace).Delete(c, srvName, *metav1.NewDeleteOptions(0))
+		s.removeServiceForcely(c, cluster, srvName)
 		slog.Info("service already exists,delete it first", slog.String("srv_name", srvName), slog.Any("image_id", request.ImageID))
 	}
 	service, err := s.s.GenerateService(*request, srvName)
@@ -185,8 +185,7 @@ func (s *K8sHander) StopService(c *gin.Context) {
 		c.JSON(http.StatusOK, resp)
 		return
 	}
-
-	err = cluster.KnativeClient.ServingV1().Services(s.k8sNameSpace).Delete(c, srvName, *metav1.NewDeleteOptions(0))
+	err = s.removeServiceForcely(c, cluster, srvName)
 	if err != nil {
 		slog.Error("stop image failed, cannot delete service ", slog.String("srv_name", srvName), slog.Any("error", err),
 			slog.String("srv_name", srvName))
@@ -200,6 +199,31 @@ func (s *K8sHander) StopService(c *gin.Context) {
 	resp.Code = 0
 	resp.Message = "service deleted"
 	c.JSON(http.StatusOK, resp)
+}
+
+func (s *K8sHander) removeServiceForcely(c *gin.Context, cluster *cluster.Cluster, svcName string) error {
+	err := cluster.KnativeClient.ServingV1().Services(s.k8sNameSpace).Delete(context.Background(), svcName, *metav1.NewDeleteOptions(0))
+	if err != nil {
+		return err
+	}
+	podNames, _ := s.GetServicePods(c.Request.Context(), *cluster, svcName, s.k8sNameSpace, -1)
+	if podNames == nil {
+		return nil
+	}
+	gracePeriodSeconds := int64(0)
+	deletePolicy := metav1.DeletePropagationForeground
+	deleteOptions := metav1.DeleteOptions{
+		GracePeriodSeconds: &gracePeriodSeconds,
+		PropagationPolicy:  &deletePolicy,
+	}
+
+	for _, podName := range podNames {
+		errForce := cluster.Client.CoreV1().Pods(s.k8sNameSpace).Delete(c.Request.Context(), podName, deleteOptions)
+		if errForce != nil {
+			slog.Error("removeServiceForcely failed to delete pod", slog.String("pod_name", podName), slog.Any("error", errForce))
+		}
+	}
+	return nil
 }
 
 func (s *K8sHander) UpdateService(c *gin.Context) {
@@ -824,7 +848,7 @@ func (s *K8sHander) PurgeService(c *gin.Context) {
 			slog.String("srv_name", srvName))
 	} else {
 		// 1 delete service
-		err = cluster.KnativeClient.ServingV1().Services(s.k8sNameSpace).Delete(c, srvName, *metav1.NewDeleteOptions(0))
+		err = s.removeServiceForcely(c, cluster, srvName)
 		if err != nil {
 			slog.Error("failed to delete service ", slog.String("srv_name", srvName), slog.Any("error", err),
 				slog.String("srv_name", srvName))
