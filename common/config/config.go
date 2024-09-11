@@ -80,7 +80,7 @@ type Config struct {
 		Region          string `envconfig:"STARHUB_SERVER_S3_REGION"`
 		Endpoint        string `envconfig:"STARHUB_SERVER_S3_ENDPOINT" default:"oss-cn-beijing.aliyuncs.com"`
 		Bucket          string `envconfig:"STARHUB_SERVER_S3_BUCKET" default:"opencsg-test"`
-		EnableSSL       bool   `envconfig:"STARHUB_SERVER_S3_ENABLE_SSL" default:"true"`
+		EnableSSL       bool   `envconfig:"STARHUB_SERVER_S3_ENABLE_SSL" default:"false"`
 	}
 
 	SensitiveCheck struct {
