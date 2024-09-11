@@ -80,7 +80,7 @@ type Config struct {
 		Region          string `envconfig:"STARHUB_SERVER_S3_REGION"`
 		Endpoint        string `envconfig:"STARHUB_SERVER_S3_ENDPOINT" default:"oss-cn-beijing.aliyuncs.com"`
 		Bucket          string `envconfig:"STARHUB_SERVER_S3_BUCKET" default:"opencsg-test"`
-		EnableSSL       bool   `envconfig:"STARHUB_SERVER_S3_ENABLE_SSL" default:"true"`
+		EnableSSL       bool   `envconfig:"STARHUB_SERVER_S3_ENABLE_SSL" default:"false"`
 	}
 
 	SensitiveCheck struct {
@@ -126,7 +126,7 @@ type Config struct {
 	}
 
 	Model struct {
-		DeployTimeoutInMin int    `envconfig:"STARHUB_SERVER_MODEL_DEPLOY_TIMEOUT_IN_MINUTES" default:"30"`
+		DeployTimeoutInMin int    `envconfig:"STARHUB_SERVER_MODEL_DEPLOY_TIMEOUT_IN_MINUTES" default:"60"`
 		DownloadEndpoint   string `envconfig:"STARHUB_SERVER_MODEL_DOWNLOAD_ENDPOINT" default:"https://hub.opencsg.com"`
 		DockerRegBase      string `envconfig:"STARHUB_SERVER_MODEL_DOCKER_REG_BASE" default:"opencsg-registry.cn-beijing.cr.aliyuncs.com/public/"`
 	}
