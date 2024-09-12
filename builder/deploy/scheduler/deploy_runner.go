@@ -271,6 +271,7 @@ func (t *DeployRunner) makeDeployRequest() (*types.RunRequest, error) {
 		// runtime framework port for model
 		envMap["port"] = strconv.Itoa(deploy.ContainerPort)
 		envMap["HF_ENDPOINT"] = t.modelDownloadEndpoint // "https://hub-stg.opencsg.com/"
+		envMap["HF_HUB_OFFLINE"] = "1"
 	}
 
 	if deploy.Type == types.FinetuneType {

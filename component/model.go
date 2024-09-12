@@ -890,15 +890,20 @@ func (c *ModelComponent) ListModelsOfRuntimeFrameworks(ctx context.Context, curr
 		newError := fmt.Errorf("failed to get public model repos, error:%w", err)
 		return nil, 0, newError
 	}
+	// define EnableInference
+	enableInference := deployType == types.InferenceType
+	enableFinetune := deployType == types.FinetuneType
 
 	for _, repo := range repos {
 		resModels = append(resModels, types.Model{
-			Name:         repo.Name,
-			Nickname:     repo.Nickname,
-			Description:  repo.Description,
-			Path:         repo.Path,
-			RepositoryID: repo.ID,
-			Private:      repo.Private,
+			Name:            repo.Name,
+			Nickname:        repo.Nickname,
+			Description:     repo.Description,
+			Path:            repo.Path,
+			RepositoryID:    repo.ID,
+			Private:         repo.Private,
+			EnableInference: enableInference,
+			EnableFinetune:  enableFinetune,
 		})
 	}
 	return resModels, total, nil
