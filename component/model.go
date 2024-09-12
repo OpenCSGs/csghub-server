@@ -10,7 +10,6 @@ import (
 	"strconv"
 
 	"opencsg.com/csghub-server/builder/deploy"
-	deployStatus "opencsg.com/csghub-server/builder/deploy/common"
 	"opencsg.com/csghub-server/builder/git/gitserver"
 	"opencsg.com/csghub-server/builder/inference"
 	"opencsg.com/csghub-server/builder/store/database"
@@ -449,23 +448,7 @@ func (c *ModelComponent) GetServerless(ctx context.Context, namespace, name, cur
 	if deploy == nil {
 		return nil, nil
 	}
-	var endpoint string
-	if len(deploy.SvcName) > 0 && deploy.Status == deployStatus.Running {
-		cls, err := c.cluster.ByClusterID(ctx, deploy.ClusterID)
-		zone := ""
-		provider := ""
-		if err != nil {
-			return nil, fmt.Errorf("get cluster with error: %w", err)
-		} else {
-			zone = cls.Zone
-			provider = cls.Provider
-		}
-		regionDomain := ""
-		if len(zone) > 0 && len(provider) > 0 {
-			regionDomain = fmt.Sprintf(".%s.%s", zone, provider)
-		}
-		endpoint = fmt.Sprintf("%s%s.%s", deploy.SvcName, regionDomain, c.publicRootDomain)
-	}
+	endpoint, _ := c.generateEndpoint(ctx, deploy)
 
 	resDeploy := types.DeployRepo{
 		DeployID:         deploy.ID,
