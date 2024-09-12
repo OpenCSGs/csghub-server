@@ -509,6 +509,12 @@ func (c *UserComponent) ListDeploys(ctx context.Context, repoType types.Reposito
 
 	var resDeploys []types.DeployRepo
 	for _, deploy := range deploys {
+		d := &database.Deploy{
+			SvcName:   deploy.SvcName,
+			ClusterID: deploy.ClusterID,
+			Status:    deploy.Status,
+		}
+		endpoint, _ := c.repoComponent.generateEndpoint(ctx, d)
 		repoPath := strings.TrimPrefix(deploy.GitPath, string(repoType)+"s_")
 		var hardware types.HardWare
 		json.Unmarshal([]byte(deploy.Hardware), &hardware)
@@ -545,6 +551,7 @@ func (c *UserComponent) ListDeploys(ctx context.Context, repoType types.Reposito
 			Type:             deploy.Type,
 			ResourceType:     resourceType,
 			RepoTag:          tag,
+			Endpoint:         endpoint,
 		})
 	}
 	return resDeploys, total, nil

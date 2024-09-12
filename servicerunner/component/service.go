@@ -109,6 +109,7 @@ func (s *ServiceComponent) GenerateService(request types.SVCRequest, srvName str
 		templateAnnotations["autoscaling.knative.dev/target-utilization-percentage"] = "90"
 		templateAnnotations["autoscaling.knative.dev/min-scale"] = strconv.Itoa(request.MinReplica)
 		templateAnnotations["autoscaling.knative.dev/max-scale"] = strconv.Itoa(request.MaxReplica)
+		templateAnnotations["serving.knative.dev/progress-deadline"] = fmt.Sprintf("%dm", s.env.Model.DeployTimeoutInMin)
 	}
 	initialDelaySeconds := 10
 	periodSeconds := 10

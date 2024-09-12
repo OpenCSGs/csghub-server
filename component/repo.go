@@ -1852,7 +1852,7 @@ func (c *RepoComponent) DeployDetail(ctx context.Context, detailReq types.Deploy
 		return nil, err
 	}
 
-	endpoint := c.generateEndpoint(ctx, deploy)
+	endpoint, _ := c.generateEndpoint(ctx, deploy)
 
 	req := types.DeployRepo{
 		DeployID:  deploy.ID,
@@ -1907,13 +1907,13 @@ func (c *RepoComponent) DeployDetail(ctx context.Context, detailReq types.Deploy
 }
 
 // generate endpoint
-func (c *RepoComponent) generateEndpoint(ctx context.Context, deploy *database.Deploy) string {
+func (c *RepoComponent) generateEndpoint(ctx context.Context, deploy *database.Deploy) (string, string) {
 	var endpoint string
+	provider := ""
 	if len(deploy.SvcName) > 0 && deploy.Status == deployStatus.Running {
 		// todo: zone.provider.endpoint to support multi-zone, multi-provider
 		cls, err := c.cluster.ByClusterID(ctx, deploy.ClusterID)
 		zone := ""
-		provider := ""
 		if err != nil {
 			slog.Warn("Get cluster with error", slog.Any("error", err))
 		} else {
@@ -1934,7 +1934,7 @@ func (c *RepoComponent) generateEndpoint(ctx context.Context, deploy *database.D
 
 	}
 
-	return endpoint
+	return endpoint, provider
 }
 
 func deployStatusCodeToString(code int) string {

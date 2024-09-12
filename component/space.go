@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"net/url"
 	"strconv"
 	"strings"
 
@@ -203,7 +204,13 @@ func (c *SpaceComponent) Show(ctx context.Context, namespace, name, currentUser 
 	var endpoint string
 	svcName, status, _ := c.status(ctx, space)
 	if len(svcName) > 0 {
-		endpoint = fmt.Sprintf("%s.%s", svcName, c.publicRootDomain)
+		if c.publicRootDomain == "" {
+			endpoint, _ = url.JoinPath(c.serverBaseUrl, "endpoint", svcName)
+			endpoint = strings.Replace(endpoint, "http://", "", 1)
+			endpoint = strings.Replace(endpoint, "https://", "", 1)
+		} else {
+			endpoint = fmt.Sprintf("%s.%s", svcName, c.publicRootDomain)
+		}
 	}
 
 	likeExists, err := c.uls.IsExist(ctx, currentUser, space.Repository.ID)
