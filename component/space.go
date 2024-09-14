@@ -205,7 +205,13 @@ func (c *SpaceComponent) Show(ctx context.Context, namespace, name, currentUser 
 	svcName, status, _ := c.status(ctx, space)
 	if len(svcName) > 0 {
 		if c.publicRootDomain == "" {
-			endpoint, _ = url.JoinPath(c.serverBaseUrl, "endpoint", svcName)
+			if space.Sdk == scheduler.STREAMLIT.Name || space.Sdk == scheduler.GRADIO.Name {
+				// if endpoint not ends with /, fastapi based app (gradio and streamlit) will redirect with http 307
+				// see issue: https://stackoverflow.com/questions/70351360/keep-getting-307-temporary-redirect-before-returning-status-200-hosted-on-fast
+				endpoint, _ = url.JoinPath(c.serverBaseUrl, "endpoint", svcName, "/")
+			} else {
+				endpoint, _ = url.JoinPath(c.serverBaseUrl, "endpoint", svcName)
+			}
 			endpoint = strings.Replace(endpoint, "http://", "", 1)
 			endpoint = strings.Replace(endpoint, "https://", "", 1)
 		} else {
