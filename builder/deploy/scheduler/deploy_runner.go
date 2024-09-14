@@ -286,7 +286,7 @@ func (t *DeployRunner) makeDeployRequest() (*types.RunRequest, error) {
 		}
 		if deploy.Type == types.SpaceType {
 			envMap["GRADIO_ROOT_PATH"] = "/endpoint/" + deploy.SvcName
-			envMap["STREAMLIT_SERVER_BASEURLPATH"] = "/endpoint/" + deploy.SvcName
+			envMap["STREAMLIT_SERVER_BASE_URL_PATH"] = "/endpoint/" + deploy.SvcName
 		}
 
 	}
