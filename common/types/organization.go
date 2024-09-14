@@ -96,6 +96,7 @@ type Organization struct {
 	Logo     string `json:"logo,omitempty"`
 	OrgType  string `json:"org_type,omitempty"`
 	Verified bool   `json:"verified"`
+	UserID   int64  `json:"user_id,omitempty"`
 }
 
 type Member struct {

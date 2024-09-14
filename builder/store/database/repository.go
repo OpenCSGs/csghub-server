@@ -352,7 +352,7 @@ func (s *RepoStore) SetUpdateTimeByPath(ctx context.Context, repoType types.Repo
 	return err
 }
 
-func (s *RepoStore) PublicToUser(ctx context.Context, repoType types.RepositoryType, userID int64, filter *types.RepoFilter, per, page int) (repos []*Repository, count int, err error) {
+func (s *RepoStore) PublicToUser(ctx context.Context, repoType types.RepositoryType, userIDs []int64, filter *types.RepoFilter, per, page int) (repos []*Repository, count int, err error) {
 	q := s.db.Operator.Core.
 		NewSelect().
 		Column("repository.*").
@@ -360,7 +360,11 @@ func (s *RepoStore) PublicToUser(ctx context.Context, repoType types.RepositoryT
 		Relation("Tags")
 
 	q.Where("repository.repository_type = ?", repoType)
-	q.Where("repository.private = ? or repository.user_id = ?", false, userID)
+	if len(userIDs) > 0 {
+		q.Where("repository.private = ? or repository.user_id in (?)", false, bun.In(userIDs))
+	} else {
+		q.Where("repository.private = ?", false)
+	}
 
 	if filter.Source != "" {
 		q.Where("repository.source = ?", filter.Source)

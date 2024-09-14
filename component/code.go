@@ -134,18 +134,10 @@ func (c *CodeComponent) Create(ctx context.Context, req *types.CreateCodeReq) (*
 
 func (c *CodeComponent) Index(ctx context.Context, filter *types.RepoFilter, per, page int) ([]types.Code, int, error) {
 	var (
-		user     database.User
 		err      error
 		resCodes []types.Code
 	)
-	if filter.Username != "" {
-		user, err = c.user.FindByUsername(ctx, filter.Username)
-		if err != nil {
-			newError := fmt.Errorf("failed to get current user,error:%w", err)
-			return nil, 0, newError
-		}
-	}
-	repos, total, err := c.rs.PublicToUser(ctx, types.CodeRepo, user.ID, filter, per, page)
+	repos, total, err := c.PublicToUser(ctx, types.CodeRepo, filter.Username, filter, per, page)
 	if err != nil {
 		newError := fmt.Errorf("failed to get public code repos,error:%w", err)
 		return nil, 0, newError
