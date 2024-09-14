@@ -131,6 +131,7 @@ type PageOpts struct {
 }
 
 type User struct {
+	ID                int64          `json:"id,omitempty"`
 	Username          string         `json:"username"`
 	Nickname          string         `json:"nickname"`
 	Phone             string         `json:"phone,omitempty"`

@@ -235,18 +235,10 @@ license: ` + license + `
 
 func (c *DatasetComponent) Index(ctx context.Context, filter *types.RepoFilter, per, page int) ([]types.Dataset, int, error) {
 	var (
-		user        database.User
 		err         error
 		resDatasets []types.Dataset
 	)
-	if filter.Username != "" {
-		user, err = c.user.FindByUsername(ctx, filter.Username)
-		if err != nil {
-			newError := fmt.Errorf("failed to get current user,error:%w", err)
-			return nil, 0, newError
-		}
-	}
-	repos, total, err := c.rs.PublicToUser(ctx, types.DatasetRepo, user.ID, filter, per, page)
+	repos, total, err := c.PublicToUser(ctx, types.DatasetRepo, filter.Username, filter, per, page)
 	if err != nil {
 		newError := fmt.Errorf("failed to get public dataset repos,error:%w", err)
 		return nil, 0, newError

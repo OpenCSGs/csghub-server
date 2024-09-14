@@ -95,18 +95,10 @@ type ModelComponent struct {
 
 func (c *ModelComponent) Index(ctx context.Context, filter *types.RepoFilter, per, page int) ([]types.Model, int, error) {
 	var (
-		user      database.User
 		err       error
 		resModels []types.Model
 	)
-	if filter.Username != "" {
-		user, err = c.user.FindByUsername(ctx, filter.Username)
-		if err != nil {
-			newError := fmt.Errorf("failed to get current user,error:%w", err)
-			return nil, 0, newError
-		}
-	}
-	repos, total, err := c.rs.PublicToUser(ctx, types.ModelRepo, user.ID, filter, per, page)
+	repos, total, err := c.PublicToUser(ctx, types.ModelRepo, filter.Username, filter, per, page)
 	if err != nil {
 		newError := fmt.Errorf("failed to get public model repos,error:%w", err)
 		return nil, 0, newError

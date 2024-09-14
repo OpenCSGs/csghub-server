@@ -11,6 +11,7 @@ import (
 type UserSvcClient interface {
 	GetMemberRole(ctx context.Context, orgName, userName string) (membership.Role, error)
 	GetNameSpaceInfo(ctx context.Context, path string) (*Namespace, error)
+	GetUserInfo(ctx context.Context, userName, visitorName string) (*User, error)
 }
 
 //go:generate mockgen -destination=mocks/client.go -package=mocks . Client
@@ -53,4 +54,16 @@ func (c *UserSvcHttpClient) GetNameSpaceInfo(ctx context.Context, path string) (
 	}
 
 	return r.Data.(*Namespace), nil
+}
+
+func (c *UserSvcHttpClient) GetUserInfo(ctx context.Context, userName, visitorName string) (*User, error) {
+	url := fmt.Sprintf("/api/v1/user/%s", userName)
+	var r httpbase.R
+	r.Data = &User{}
+	err := c.hc.Get(ctx, url, &r)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get user '%s' info: %w", userName, err)
+	}
+
+	return r.Data.(*User), nil
 }
