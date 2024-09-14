@@ -366,6 +366,7 @@ func (c *UserComponent) Get(ctx context.Context, userName, visitorName string) (
 	}
 
 	if !onlyBasicInfo {
+		u.ID = dbuser.ID
 		u.Email = dbuser.Email
 		u.UUID = dbuser.UUID
 		u.Bio = dbuser.Bio
@@ -388,6 +389,7 @@ func (c *UserComponent) Get(ctx context.Context, userName, visitorName string) (
 				Logo:     org.Logo,
 				OrgType:  org.OrgType,
 				Verified: org.Verified,
+				UserID:   org.UserID,
 			})
 		}
 	}

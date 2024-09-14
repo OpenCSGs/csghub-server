@@ -332,6 +332,30 @@ func (c *RepoComponent) DeleteRepo(ctx context.Context, req types.DeleteRepoReq)
 	return repo, nil
 }
 
+// PublicToUser gets visible repos of the given user and user's orgs
+func (c *RepoComponent) PublicToUser(ctx context.Context, repoType types.RepositoryType, userName string, filter *types.RepoFilter, per, page int) (repos []*database.Repository, count int, err error) {
+	var repoOwnerIDs []int64
+	if len(userName) > 0 {
+		// get user orgs from user service
+		user, err := c.userSvcClient.GetUserInfo(ctx, userName, userName)
+		if err != nil {
+			return nil, 0, fmt.Errorf("failed to get user info, error: %w", err)
+		}
+
+		repoOwnerIDs = append(repoOwnerIDs, user.ID)
+		//get user's orgs
+		for _, org := range user.Orgs {
+			repoOwnerIDs = append(repoOwnerIDs, org.UserID)
+		}
+	}
+	repos, count, err = c.tc.rs.PublicToUser(ctx, repoType, repoOwnerIDs, filter, per, page)
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to get user public repos, error: %w", err)
+	}
+
+	return repos, count, nil
+}
+
 // relatedRepos gets all repos related to the given repo, and return them by repo type
 func (c *RepoComponent) relatedRepos(ctx context.Context, repoID int64, currentUser string) (map[types.RepositoryType][]*database.Repository, error) {
 	fromRelations, err := c.rel.From(ctx, repoID)
