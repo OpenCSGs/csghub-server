@@ -43,7 +43,7 @@ docker compose -f docker-compose.yml up -d
 - 按需开启内容审核，选择任意第三方内容审核服务
 
 ## 技术规划
-- [ ] 支持更多Git Server: 目前内置了对gitea的支持，未来计划实现对主流Git仓库的支持
+- [x] 支持更多Git Server: 目前内置了对gitea的支持，未来计划实现对主流Git仓库的支持
 - [x] 支持Git LFS: Git LFS支持超大文件， 支持git命令操作和Web UI在线下载
 - [x] 数据集在线预览: 数据集预览，支持LFS格式数据集的Top20/TopN加载预览
 - [x] 模型和数据集自动打标签:：支持自定义元数据和自动化提取模型/数据集标签
