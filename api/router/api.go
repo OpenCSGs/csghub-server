@@ -371,6 +371,12 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 	}
 	createDiscussionRoutes(apiGroup, needAPIKey, discussionHandler)
 
+	// prompt
+	promptHandler, err := handler.NewPromptHandler(config)
+	if err != nil {
+		return nil, fmt.Errorf("error creating prompt handler,%w", err)
+	}
+	createPromptRoutes(apiGroup, promptHandler)
 	return r, nil
 }
 
@@ -715,4 +721,24 @@ func createDiscussionRoutes(apiGroup *gin.RouterGroup, needAPIKey gin.HandlerFun
 	apiGroup.GET("/discussions/:id/comments", discussionHandler.ListDiscussionComments)
 	apiGroup.PUT("/discussions/:id/comments/:comment_id", discussionHandler.UpdateComment)
 	apiGroup.DELETE("/discussions/:id/comments/:comment_id", discussionHandler.DeleteComment)
+}
+
+func createPromptRoutes(apiGroup *gin.RouterGroup, promptHandler *handler.PromptHandler) {
+	promptGrp := apiGroup.Group("/prompts")
+	{
+		promptGrp.GET("", promptHandler.Index)
+		promptGrp.GET("/:namespace/:name", promptHandler.ListPrompt)
+		promptGrp.GET("/:namespace/:name/*file_path", promptHandler.GetPrompt)
+		conversationGrp := promptGrp.Group("/conversations")
+		{
+			conversationGrp.POST("", promptHandler.NewConversation)
+			conversationGrp.GET("", promptHandler.ListConversation)
+			conversationGrp.GET("/:id", promptHandler.GetConversation)
+			conversationGrp.POST("/:id", promptHandler.SubmitMessage)
+			conversationGrp.PUT("/:id", promptHandler.UpdateConversation)
+			conversationGrp.DELETE("/:id", promptHandler.RemoveConversation)
+			conversationGrp.PUT("/:id/message/:msgid/like", promptHandler.LikeMessage)
+			conversationGrp.PUT("/:id/message/:msgid/hate", promptHandler.HateMessage)
+		}
+	}
 }

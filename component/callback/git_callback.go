@@ -46,6 +46,8 @@ type GitCallbackComponent struct {
 	ts          *database.TagStore
 	// set visibility if file content is sensitive
 	setRepoVisibility bool
+	pp                *component.PromptComponent
+	maxPromptFS       int64
 }
 
 // new CallbackComponent
@@ -78,6 +80,7 @@ func NewGitCallback(config *config.Config) (*GitCallbackComponent, error) {
 	}
 	rfs := database.NewRuntimeFrameworksStore()
 	ts := database.NewTagStore()
+	pp, err := component.NewPromptComponent(config)
 	if err != nil {
 		return nil, err
 	}
@@ -99,6 +102,8 @@ func NewGitCallback(config *config.Config) (*GitCallbackComponent, error) {
 		ras:         ras,
 		rfs:         rfs,
 		ts:          ts,
+		pp:          pp,
+		maxPromptFS: config.Dataset.PromptMaxJsonlFileSize,
 	}, nil
 }
 
@@ -222,12 +227,13 @@ func (c *GitCallbackComponent) modifyFiles(ctx context.Context, repoType, namesp
 		// should be only one README.md
 		return c.updateMetaTags(ctx, repoType, namespace, repoName, ref, content)
 	}
+	c.setPromptDatasetType(ctx, repoType, namespace, repoName, ref, fileNames)
 	return nil
 }
 
 func (c *GitCallbackComponent) removeFiles(ctx context.Context, repoType, namespace, repoName, ref string, fileNames []string) error {
 	// handle removed files
-	// delete tagss
+	// delete tags
 	for _, fileName := range fileNames {
 		slog.Debug("remove file", slog.String("file", fileName))
 		// update model runtime
@@ -267,6 +273,7 @@ func (c *GitCallbackComponent) removeFiles(ctx context.Context, repoType, namesp
 			}
 		}
 	}
+	c.removePromptDatasetType(ctx, repoType, namespace, repoName, ref, fileNames)
 	return nil
 }
 
@@ -322,6 +329,7 @@ func (c *GitCallbackComponent) addFiles(ctx context.Context, repoType, namespace
 			}
 		}
 	}
+	c.setPromptDatasetType(ctx, repoType, namespace, repoName, ref, fileNames)
 	return nil
 }
 
@@ -545,4 +553,103 @@ func (c *GitCallbackComponent) updateModelRuntimeFrameworks(ctx context.Context,
 		}
 	}
 
+}
+
+func (c *GitCallbackComponent) setPromptDatasetType(ctx context.Context, repoType, namespace, repoName, ref string, fileNames []string) {
+	slog.Debug("setPromptDatasetType", slog.Any("fileNames", fileNames), slog.Any("repoType", repoType), slog.Any("ref", ref))
+	if len(fileNames) < 1 {
+		return
+	}
+	repoType = strings.TrimRight(repoType, "s")
+	if repoType != string(types.DatasetRepo) || ref != ("refs/heads/"+component.MainBranch) {
+		return
+	}
+	for _, fileName := range fileNames {
+		if !strings.HasSuffix(strings.ToLower(fileName), ".jsonl") {
+			continue
+		}
+		getFileReq := gitserver.GetRepoInfoByPathReq{
+			Namespace: namespace,
+			Name:      repoName,
+			Ref:       component.MainBranch,
+			Path:      fileName,
+			RepoType:  types.DatasetRepo,
+		}
+		files, err := c.gs.GetRepoFileTree(ctx, getFileReq)
+		if err != nil {
+			slog.Warn("fail to get file object for prompt", slog.Any("getFileReq", getFileReq), slog.Any("error", err))
+			continue
+		}
+		if files == nil || len(files) < 1 {
+			slog.Warn("did not find file object for prompt", slog.Any("getFileReq", getFileReq), slog.Any("error", err))
+			continue
+		}
+		if files[0].Lfs || files[0].Size > c.maxPromptFS {
+			continue
+		}
+		_, err = c.pp.ParseJsonFile(ctx, getFileReq)
+		if err != nil {
+			slog.Warn("file is not prompt format jsonl", slog.Any("getFileReq", getFileReq), slog.Any("error", err))
+			continue
+		}
+		repo, err := c.rs.FindByPath(ctx, types.DatasetRepo, namespace, repoName)
+		if err != nil || repo == nil {
+			slog.Error("fail to query repo for git callback", slog.Any("namespace", namespace), slog.Any("repoName", repoName), slog.Any("error", err))
+			continue
+		}
+		err = c.ds.SetPromptType(ctx, repo.ID)
+		if err != nil {
+			slog.Error("fail to set prompt type for git callback", slog.Any("repo id", repo.ID), slog.Any("error", err))
+		} else {
+			return
+		}
+	}
+}
+
+func (c *GitCallbackComponent) removePromptDatasetType(ctx context.Context, repoType, namespace, repoName, ref string, fileNames []string) {
+	slog.Debug("removePromptDatasetType", slog.Any("fileNames", fileNames), slog.Any("repoType", repoType), slog.Any("ref", ref))
+	if len(fileNames) < 1 {
+		return
+	}
+	repoType = strings.TrimRight(repoType, "s")
+	if repoType != string(types.DatasetRepo) || ref != ("refs/heads/"+component.MainBranch) {
+		return
+	}
+	tree, err := component.GetFilePathObjects(namespace, repoName, "", types.DatasetRepo, c.gs.GetRepoFileTree)
+	if err != nil || tree == nil {
+		slog.Error("failed to get repo file tree for remove prompt type, ", slog.Any("namespace", namespace), slog.Any("repoName", repoName), slog.Any("error", err))
+		return
+	}
+
+	for _, file := range tree {
+		if file.Lfs || file.Size > c.maxPromptFS {
+			continue
+		}
+		if !strings.HasSuffix(strings.ToLower(file.Path), ".jsonl") {
+			continue
+		}
+		getFileReq := gitserver.GetRepoInfoByPathReq{
+			Namespace: namespace,
+			Name:      repoName,
+			Ref:       component.MainBranch,
+			Path:      file.Path,
+			RepoType:  types.DatasetRepo,
+		}
+		_, err = c.pp.ParseJsonFile(ctx, getFileReq)
+		if err != nil {
+			slog.Warn("file is not prompt format jsonl", slog.Any("getFileReq", getFileReq), slog.Any("error", err))
+		} else {
+			return
+		}
+	}
+
+	repo, err := c.rs.FindByPath(ctx, types.DatasetRepo, namespace, repoName)
+	if err != nil || repo == nil {
+		slog.Error("fail to query repo for git callback", slog.Any("namespace", namespace), slog.Any("repoName", repoName), slog.Any("error", err))
+		return
+	}
+	err = c.ds.SetNormalDatasetType(ctx, repo.ID)
+	if err != nil {
+		slog.Error("fail to set dataset non-prompt type for git callback", slog.Any("repo id", repo.ID), slog.Any("error", err))
+	}
 }

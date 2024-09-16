@@ -4,6 +4,13 @@ import (
 	"time"
 )
 
+type DatasetType int
+
+const (
+	DatasetNormal DatasetType = 1
+	DatasetPrompt DatasetType = 2
+)
+
 type DatasetTagCommit struct {
 	ID string `json:"id"`
 }
@@ -40,4 +47,5 @@ type Dataset struct {
 	CanWrite      bool                 `json:"can_write"`
 	CanManage     bool                 `json:"can_manage"`
 	Namespace     *Namespace           `json:"namespace"`
+	Type          int                  `json:"type"`
 }

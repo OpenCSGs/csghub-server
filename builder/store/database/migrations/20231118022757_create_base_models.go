@@ -8,6 +8,17 @@ import (
 	"opencsg.com/csghub-server/builder/store/database"
 )
 
+type Tag struct {
+	ID       int64    `bun:",pk,autoincrement" json:"id"`
+	Name     string   `bun:",notnull" json:"name" yaml:"name"`
+	Category string   `bun:",notnull" json:"category" yaml:"category"`
+	Group    string   `bun:",notnull" json:"group" yaml:"group"`
+	Scope    TagScope `bun:",notnull" json:"scope" yaml:"scope"`
+	BuiltIn  bool     `bun:",notnull" json:"built_in" yaml:"built_in"`
+	ShowName string   `bun:"" json:"show_name" yaml:"show_name"`
+	times
+}
+
 type User struct {
 	ID           int64                  `bun:",pk,autoincrement" json:"id"`
 	GitID        int64                  `bun:",notnull" json:"git_id"`
@@ -61,7 +72,7 @@ var baseModelTables = []any{
 	database.RepositoryTag{},
 	database.Repository{},
 	database.Namespace{},
-	database.Tag{},
+	Tag{},
 	database.TagCategory{},
 	Model{},
 	Dataset{},

@@ -189,6 +189,9 @@ definitions:
         $ref: '#/definitions/database.Repository'
       repository_id:
         type: integer
+      type:
+        description: 1-normal, 2-prompt
+        type: integer
       updated_at:
         type: string
     type: object
@@ -874,6 +877,28 @@ definitions:
       total:
         type: integer
     type: object
+  types.Conversation:
+    properties:
+      message:
+        type: string
+      temperature:
+        type: number
+      uuid:
+        type: string
+    required:
+    - message
+    - uuid
+    type: object
+  types.ConversationTitle:
+    properties:
+      title:
+        type: string
+      uuid:
+        type: string
+    required:
+    - title
+    - uuid
+    type: object
   types.CreateCodeReq:
     properties:
       default_branch:
@@ -1242,6 +1267,8 @@ definitions:
         items:
           $ref: '#/definitions/types.RepoTag'
         type: array
+      type:
+        type: integer
       updated_at:
         type: string
       user:
@@ -7660,6 +7687,398 @@ paths:
       summary: Create a new organization
       tags:
       - Organization
+  /prompts:
+    get:
+      consumes:
+      - application/json
+      description: get visiable Prompt repos for current user
+      parameters:
+      - description: current user
+        in: query
+        name: current_user
+        type: string
+      - description: search text
+        in: query
+        name: search
+        type: string
+      - description: filter by task tag
+        in: query
+        name: task_tag
+        type: string
+      - description: filter by framework tag
+        in: query
+        name: framework_tag
+        type: string
+      - description: filter by license tag
+        in: query
+        name: license_tag
+        type: string
+      - description: filter by language tag
+        in: query
+        name: language_tag
+        type: string
+      - description: sort by
+        in: query
+        name: sort
+        type: string
+      - description: source
+        enum:
+        - opencsg
+        - huggingface
+        - local
+        in: query
+        name: source
+        type: string
+      - default: 20
+        description: per
+        in: query
+        name: per
+        type: integer
+      - default: 1
+        description: per page
+        in: query
+        name: page
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/types.ResponseWithTotal'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/types.Dataset'
+                  type: array
+                total:
+                  type: integer
+              type: object
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Get Visiable Prompt repos for current user
+      tags:
+      - Prompt
+  /prompts/{namespace}/{name}:
+    get:
+      consumes:
+      - application/json
+      description: List prompts
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/types.Response'
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: List prompts
+      tags:
+      - Prompt
+  /prompts/{namespace}/{name}/{file_path}:
+    get:
+      consumes:
+      - application/json
+      description: Get prompts by file
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/types.Response'
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Get prompts by file
+      tags:
+      - Prompt
+  /prompts/conversations:
+    get:
+      consumes:
+      - application/json
+      description: List conversations of user
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/types.Response'
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: List conversations of user
+      tags:
+      - Prompt
+    post:
+      consumes:
+      - application/json
+      description: Create new conversation
+      parameters:
+      - description: body
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/types.Conversation'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/types.Response'
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Create new conversation
+      tags:
+      - Prompt
+  /prompts/conversations/{id}:
+    delete:
+      consumes:
+      - application/json
+      description: Delete a conversation
+      parameters:
+      - description: conversation uuid
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/types.Response'
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Delete a conversation
+      tags:
+      - Prompt
+    get:
+      consumes:
+      - application/json
+      description: Get a conversation by uuid
+      parameters:
+      - description: conversation uuid
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/types.Response'
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Get a conversation by uuid
+      tags:
+      - Prompt
+    post:
+      consumes:
+      - application/json
+      description: Submit a conversation message
+      parameters:
+      - description: conversation uuid
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: body
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/types.Conversation'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/types.Response'
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Submit a conversation message
+      tags:
+      - Prompt
+    put:
+      consumes:
+      - application/json
+      description: Update a conversation title
+      parameters:
+      - description: conversation uuid
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: body
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/types.ConversationTitle'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/types.Response'
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Update a conversation title
+      tags:
+      - Prompt
+  /prompts/conversations/{id}/message/{msgid}/hate:
+    put:
+      consumes:
+      - application/json
+      description: Hate a conversation message
+      parameters:
+      - description: conversation uuid
+        in: path
+        name: uuid
+        required: true
+        type: string
+      - description: message id
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/types.Response'
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Hate a conversation message
+      tags:
+      - Prompt
+  /prompts/conversations/{id}/message/{msgid}/like:
+    put:
+      consumes:
+      - application/json
+      description: Like a conversation message
+      parameters:
+      - description: conversation uuid
+        in: path
+        name: uuid
+        required: true
+        type: string
+      - description: message id
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/types.Response'
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Like a conversation message
+      tags:
+      - Prompt
   /recom/opweight:
     post:
       consumes:

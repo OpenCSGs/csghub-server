@@ -76,7 +76,7 @@ func (ts *TagStore) AllTagsByScope(ctx context.Context, scope TagScope) ([]*Tag,
 func (ts *TagStore) AllTagsByScopeAndCategory(ctx context.Context, scope TagScope, category string) ([]*Tag, error) {
 	var tags []*Tag
 	err := ts.db.Operator.Core.NewSelect().Model(&tags).
-		Where("scope =? and category = ?", scope, category).
+		Where("scope = ? and category = ?", scope, category).
 		Scan(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to select tags by scope,cause: %w", err)

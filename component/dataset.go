@@ -234,6 +234,14 @@ license: ` + license + `
 }
 
 func (c *DatasetComponent) Index(ctx context.Context, filter *types.RepoFilter, per, page int) ([]types.Dataset, int, error) {
+	return c.commonIndex(ctx, filter, per, page, false)
+}
+
+func (c *DatasetComponent) IndexPrompt(ctx context.Context, filter *types.RepoFilter, per, page int) ([]types.Dataset, int, error) {
+	return c.commonIndex(ctx, filter, per, page, true)
+}
+
+func (c *DatasetComponent) commonIndex(ctx context.Context, filter *types.RepoFilter, per, page int, onlyPromptType bool) ([]types.Dataset, int, error) {
 	var (
 		err         error
 		resDatasets []types.Dataset
@@ -247,7 +255,7 @@ func (c *DatasetComponent) Index(ctx context.Context, filter *types.RepoFilter, 
 	for _, repo := range repos {
 		repoIDs = append(repoIDs, repo.ID)
 	}
-	datasets, err := c.ds.ByRepoIDs(ctx, repoIDs)
+	datasets, err := c.ds.ByRepoIDs(ctx, repoIDs, onlyPromptType)
 	if err != nil {
 		newError := fmt.Errorf("failed to get datasets by repo ids,error:%w", err)
 		return nil, 0, newError
@@ -294,6 +302,7 @@ func (c *DatasetComponent) Index(ctx context.Context, filter *types.RepoFilter, 
 			SyncStatus:   repo.SyncStatus,
 			License:      repo.License,
 			Repository:   common.BuildCloneInfo(c.config, dataset.Repository),
+			Type:         dataset.Type,
 		})
 	}
 

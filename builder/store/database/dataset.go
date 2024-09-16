@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/uptrace/bun"
+	"opencsg.com/csghub-server/common/types"
 )
 
 var sortBy = map[string]string{
@@ -30,15 +31,18 @@ type Dataset struct {
 	Repository    *Repository `bun:"rel:belongs-to,join:repository_id=id" json:"repository"`
 	LastUpdatedAt time.Time   `bun:",notnull" json:"last_updated_at"`
 	times
+	Type int `bun:",notnull" json:"type"` // 1-normal, 2-prompt
 }
 
-func (s *DatasetStore) ByRepoIDs(ctx context.Context, repoIDs []int64) (datasets []Dataset, err error) {
-	err = s.db.Operator.Core.NewSelect().
+func (s *DatasetStore) ByRepoIDs(ctx context.Context, repoIDs []int64, onlyPromptType bool) (datasets []Dataset, err error) {
+	q := s.db.Operator.Core.NewSelect().
 		Model(&datasets).
 		Relation("Repository").
-		Where("repository_id in (?)", bun.In(repoIDs)).
-		Scan(ctx)
-
+		Where("repository_id in (?)", bun.In(repoIDs))
+	if onlyPromptType {
+		q.Where("type = ?", types.DatasetPrompt)
+	}
+	err = q.Scan(ctx)
 	return
 }
 
@@ -216,4 +220,21 @@ func (s *DatasetStore) CreateIfNotExist(ctx context.Context, input Dataset) (*Da
 	}
 
 	return &input, nil
+}
+
+func (s *DatasetStore) SetPromptType(ctx context.Context, repoID int64) error {
+	return s.updatePromptType(repoID, int(types.DatasetPrompt))
+}
+
+func (s *DatasetStore) SetNormalDatasetType(ctx context.Context, repoID int64) error {
+	return s.updatePromptType(repoID, int(types.DatasetNormal))
+}
+
+func (s *DatasetStore) updatePromptType(repoID int64, typeValue int) error {
+	res, err := s.db.BunDB.Exec("update datasets set type=? where repository_id = ?", typeValue, repoID)
+	if err != nil {
+		return fmt.Errorf("update prompt type, %w", err)
+	}
+	err = assertAffectedOneRow(res, err)
+	return err
 }

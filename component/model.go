@@ -612,6 +612,14 @@ func (c *ModelComponent) getRelations(ctx context.Context, fromRepoID int64, cur
 	return rels, nil
 }
 
+func GetFilePathObjects(namespace, repoName, folder string, repoType types.RepositoryType, ref string, gsTree func(ctx context.Context, req gitserver.GetRepoInfoByPathReq) ([]*types.File, error)) ([]*types.File, error) {
+	allFiles, err := getAllFiles(namespace, repoName, folder, repoType, ref, gsTree)
+	if err != nil {
+		return nil, err
+	}
+	return allFiles, nil
+}
+
 func getFilePaths(namespace, repoName, folder string, repoType types.RepositoryType, ref string, gsTree func(ctx context.Context, req gitserver.GetRepoInfoByPathReq) ([]*types.File, error)) ([]string, error) {
 	var filePaths []string
 	allFiles, err := getAllFiles(namespace, repoName, folder, repoType, ref, gsTree)
