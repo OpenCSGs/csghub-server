@@ -44,7 +44,7 @@ docker-compose -f docker-compose.yml up -d
 - Enable content moderation on demand, and choose any third-party content moderation service.
 
 ## Roadmap
-- [ ] Support more Git Servers: Currently supports Gitea, and plans to support mainstream Git repositories in the future.
+- [x] Support more Git Servers: Currently supports Gitea, and plans to support mainstream Git repositories in the future.
 - [x] Git LFS: Git LFS supports large files, and supports Git command operations and online download through the Web UI. 
 - [x] DataSet online viewer: Data set preview, supports the Top20/TopN loading preview of LFS format data sets. 
 - [x] Model/Dataset AutoTag: Supports custom metadata and automatic extraction of model/dataset tags. 
