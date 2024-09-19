@@ -36,14 +36,14 @@ func LibraryTag(filePath string) string {
 }
 
 func isPytorch(filename string) bool {
-	return strings.HasPrefix(filename, "pytorch_model") && strings.HasSuffix(filename, ".bin")
+	return (strings.HasPrefix(filename, "pytorch_model") && strings.HasSuffix(filename, ".bin")) || strings.HasSuffix(filename, ".pt")
 }
 
 func isTensorflow(filename string) bool {
 	return strings.HasPrefix(filename, "tf_model") && strings.HasSuffix(filename, ".h5")
 }
 func isSafetensors(filename string) bool {
-	return strings.HasPrefix(filename, "model") && strings.HasSuffix(filename, ".safetensors")
+	return strings.HasSuffix(filename, ".safetensors")
 }
 func isJAX(filename string) bool {
 	return strings.HasPrefix(filename, "flax_model") && strings.HasSuffix(filename, ".msgpack")

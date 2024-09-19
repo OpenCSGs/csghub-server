@@ -2,6 +2,7 @@ package gitaly
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"math"
@@ -142,7 +143,7 @@ func (c *Client) GetSingleCommit(ctx context.Context, req gitserver.GetRepoLastC
 	if err != nil {
 		return nil, err
 	}
-	if commitResp != nil {
+	if commitResp != nil && commitResp.Commit != nil {
 		commit = types.Commit{
 			ID:             string(commitResp.Commit.Id),
 			CommitterName:  string(commitResp.Commit.Committer.Name),
@@ -160,6 +161,8 @@ func (c *Client) GetSingleCommit(ctx context.Context, req gitserver.GetRepoLastC
 			})
 		}
 
+	} else {
+		return nil, errors.New("commit not found")
 	}
 	result = types.CommitResponse{
 		Commit:  &commit,

@@ -14,6 +14,7 @@ func TestLibraryTag(t *testing.T) {
 		{name: "case insensitive", args: args{filePath: "Pytorch_model.Bin"}, want: "pytorch"},
 
 		{name: "pytorch", args: args{filePath: "pytorch_model.bin"}, want: "pytorch"},
+		{name: "pytorch", args: args{filePath: "model.pt"}, want: "pytorch"},
 		{name: "pytorch", args: args{filePath: "pytorch_model_001.bin"}, want: "pytorch"},
 		{name: "not pytorch", args: args{filePath: "1-pytorch_model_001.bin"}, want: ""},
 		{name: "not pytorch", args: args{filePath: "pytorch_model-bin"}, want: ""},
@@ -25,8 +26,9 @@ func TestLibraryTag(t *testing.T) {
 
 		{name: "safetensors", args: args{filePath: "model.safetensors"}, want: "safetensors"},
 		{name: "safetensors", args: args{filePath: "model_001.safetensors"}, want: "safetensors"},
-		{name: "not safetensors", args: args{filePath: "1-model.safetensors"}, want: ""},
-		{name: "not safetensors", args: args{filePath: "model-safetensors"}, want: ""},
+		{name: "safetensors", args: args{filePath: "adpter_model.safetensors"}, want: "safetensors"},
+		{name: "not safetensors", args: args{filePath: "1-test.safeten"}, want: ""},
+		{name: "not safetensors", args: args{filePath: "test-safetensors"}, want: ""},
 
 		{name: "flax_model", args: args{filePath: "flax_model.msgpack"}, want: "jax"},
 		{name: "flax_model", args: args{filePath: "flax_model-001.msgpack"}, want: "jax"},
