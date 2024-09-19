@@ -76,7 +76,7 @@ var cmdSyncAsClient = &cobra.Command{
 				slog.Error("failed to find sync client setting, error: %w", err)
 				return err
 			}
-			apiDomain := config.APIServer.PublicDomain
+			apiDomain := config.MultiSync.SaasAPIDomain
 			sc := multisync.FromOpenCSG(apiDomain, setting.Token)
 			return c.SyncAsClient(ctx, sc)
 		})
