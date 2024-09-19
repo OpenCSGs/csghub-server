@@ -1509,7 +1509,7 @@ func (c *RepoComponent) MirrorFromSaas(ctx context.Context, namespace, name, cur
 		return fmt.Errorf("failed to find sync client setting, error: %w", err)
 	}
 
-	sourceUrl := common.TrimPrefixCloneURLBySourceID(c.config.Mirror.URL, string(repoType), namespace, name, syncVersion.SourceID)
+	sourceUrl := common.TrimPrefixCloneURLBySourceID(c.config.MultiSync.SaasSyncDomain, string(repoType), namespace, name, syncVersion.SourceID)
 	mirror.SourceUrl = sourceUrl
 	mirror.MirrorSourceID = mirrorSource.ID
 	mirror.RepositoryID = repo.ID
