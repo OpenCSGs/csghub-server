@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"path"
 	"strconv"
+	"strings"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -42,7 +43,7 @@ func NewServiceComponent(config *config.Config, k8sNameSpace string) *ServiceCom
 	return sc
 }
 
-func (s *ServiceComponent) GenerateService(request types.SVCRequest, srvName string) (*v1.Service, error) {
+func (s *ServiceComponent) GenerateService(ctx context.Context, cluster cluster.Cluster, request types.SVCRequest, srvName string) (*v1.Service, error) {
 	annotations := request.Annotation
 
 	environments := []corev1.EnvVar{}
@@ -93,10 +94,16 @@ func (s *ServiceComponent) GenerateService(request types.SVCRequest, srvName str
 	annotations[KeyUserID] = request.UserID
 	annotations[KeyDeploySKU] = request.Sku
 
-	containerImg := path.Join(s.spaceDockerRegBase, request.ImageID)
-	if request.RepoType == string(types.ModelRepo) {
-		// choose registry
-		containerImg = path.Join(s.modelDockerRegBase, request.ImageID)
+	containerImg := request.ImageID
+	// add prefix if image is not full path
+	if !strings.Contains(containerImg, "/") {
+		if request.RepoType == string(types.ModelRepo) {
+			// choose registry
+			containerImg = path.Join(s.modelDockerRegBase, request.ImageID)
+		} else if request.RepoType == string(types.SpaceRepo) {
+			// choose registry
+			containerImg = path.Join(s.spaceDockerRegBase, request.ImageID)
+		}
 	}
 
 	templateAnnotations := make(map[string]string)
@@ -118,6 +125,12 @@ func (s *ServiceComponent) GenerateService(request types.SVCRequest, srvName str
 		initialDelaySeconds = s.env.Space.ReadnessDelaySeconds
 		periodSeconds = s.env.Space.ReadnessPeriodSeconds
 		failureThreshold = s.env.Space.ReadnessFailureThreshold
+	}
+
+	imagePullSecrets := []corev1.LocalObjectReference{
+		{
+			Name: s.imagePullSecret,
+		},
 	}
 
 	service := &v1.Service{
@@ -148,11 +161,7 @@ func (s *ServiceComponent) GenerateService(request types.SVCRequest, srvName str
 									FailureThreshold:    int32(failureThreshold),
 								},
 							}},
-							ImagePullSecrets: []corev1.LocalObjectReference{
-								{
-									Name: s.imagePullSecret,
-								},
-							},
+							ImagePullSecrets: imagePullSecrets,
 						},
 					},
 				},

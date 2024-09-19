@@ -148,11 +148,13 @@ type (
 	}
 
 	PurgeRequest struct {
-		ID        int64  `json:"id"`
-		OrgName   string `json:"org_name"`
-		RepoName  string `json:"repo_name"`
-		ClusterID string `json:"cluster_id"`
-		SvcName   string `json:"svc_name"`
+		ID         int64  `json:"id"`
+		OrgName    string `json:"org_name"`
+		RepoName   string `json:"repo_name"`
+		ClusterID  string `json:"cluster_id"`
+		SvcName    string `json:"svc_name"`
+		DeployType int    `json:"deploy_type"`
+		UserID     string `json:"user_id"`
 	}
 
 	PurgeResponse struct {

@@ -348,11 +348,13 @@ func (d *deployer) Purge(ctx context.Context, dr types.DeployRepo) error {
 		targetID = dr.DeployID // support model deploy with multi-instance
 	}
 	resp, err := d.ir.Purge(ctx, &types.PurgeRequest{
-		ID:        targetID,
-		OrgName:   dr.Namespace,
-		RepoName:  dr.Name,
-		SvcName:   dr.SvcName,
-		ClusterID: dr.ClusterID,
+		ID:         targetID,
+		OrgName:    dr.Namespace,
+		RepoName:   dr.Name,
+		SvcName:    dr.SvcName,
+		ClusterID:  dr.ClusterID,
+		DeployType: dr.Type,
+		UserID:     dr.UserUUID,
 	})
 	if err != nil {
 		slog.Error("deployer stop deploy", slog.Any("runner_resp", resp), slog.Int64("space_id", dr.SpaceID), slog.Any("deploy_id", dr.DeployID), slog.Any("error", err))
