@@ -133,6 +133,19 @@ func (s *ServiceComponent) GenerateService(ctx context.Context, cluster cluster.
 		},
 	}
 
+	// handle nim engine
+	if strings.Contains(containerImg, "nvcr.io/nim/") {
+		imagePullSecrets = append(imagePullSecrets, corev1.LocalObjectReference{
+			Name: s.env.Model.NimDockerSecretName,
+		})
+		ngc_api_key, err := s.GetNimSecret(ctx, cluster)
+		if err != nil {
+			return nil, fmt.Errorf("can not find secret %s in %s namespace , error: %w", s.env.Model.NimNGCSecretName, s.k8sNameSpace, err)
+		}
+		environments = append(environments, corev1.EnvVar{Name: "NGC_API_KEY", Value: ngc_api_key})
+		environments = append(environments, corev1.EnvVar{Name: "NIM_CACHE_PATH", Value: "/workspace"})
+	}
+
 	service := &v1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        srvName,
@@ -169,6 +182,16 @@ func (s *ServiceComponent) GenerateService(ctx context.Context, cluster cluster.
 		},
 	}
 	return service, nil
+}
+
+// get secret from k8s
+// notes: admin should create nim secret "ngc-secret" and "nvidia-nim-secrets" in related namespace before deploy
+func (s *ServiceComponent) GetNimSecret(ctx context.Context, cluster cluster.Cluster) (string, error) {
+	secret, err := cluster.Client.CoreV1().Secrets(s.k8sNameSpace).Get(ctx, s.env.Model.NimNGCSecretName, metav1.GetOptions{})
+	if err != nil {
+		return "", err
+	}
+	return string(secret.Data["NGC_API_KEY"]), nil
 }
 
 func (s *ServiceComponent) GetServicePodsWithStatus(ctx context.Context, cluster cluster.Cluster, srvName string, namespace string) ([]types.Instance, error) {
