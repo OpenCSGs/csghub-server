@@ -73,7 +73,7 @@ func (s *K8sHander) RunService(c *gin.Context) {
 		s.removeServiceForcely(c, cluster, srvName)
 		slog.Info("service already exists,delete it first", slog.String("srv_name", srvName), slog.Any("image_id", request.ImageID))
 	}
-	service, err := s.s.GenerateService(*request, srvName)
+	service, err := s.s.GenerateService(c, *cluster, *request, srvName)
 	if err != nil {
 		slog.Error("fail to generate service ", slog.Any("error", err), slog.Any("req", request))
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -97,11 +97,15 @@ func (s *K8sHander) RunService(c *gin.Context) {
 			MountPath: "/dev/shm",
 		})
 	}
+	pvcName := srvName
+	if request.DeployType == types.InferenceType {
+		pvcName = request.UserID
+	}
 	// add pvc if possible
 	// space image was built from user's code, model cache dir is hard to control
 	// so no PV cache for space case so far
 	if cluster.StorageClass != "" && request.DeployType != types.SpaceType {
-		err = s.s.NewPersistentVolumeClaim(srvName, c, *cluster, request.Hardware)
+		err = s.s.NewPersistentVolumeClaim(pvcName, c, *cluster, request.Hardware)
 		if err != nil {
 			slog.Error("Failed to create persist volume", "error", err)
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create persist volume"})
@@ -111,7 +115,7 @@ func (s *K8sHander) RunService(c *gin.Context) {
 			Name: "nas-pvc",
 			VolumeSource: corev1.VolumeSource{
 				PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
-					ClaimName: srvName,
+					ClaimName: pvcName,
 				},
 			},
 		})
@@ -860,15 +864,16 @@ func (s *K8sHander) PurgeService(c *gin.Context) {
 	}
 
 	// 2 clean up pvc
-	if cluster.StorageClass != "" {
+	if cluster.StorageClass != "" && request.DeployType == types.FinetuneType {
 		err = cluster.Client.CoreV1().PersistentVolumeClaims(s.k8sNameSpace).Delete(c, srvName, metav1.DeleteOptions{})
 		if err != nil {
 			slog.Error("fail to delete pvc", slog.Any("error", err))
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "fail to delete pvc"})
 			return
 		}
+		slog.Info("persistent volume claims deleted.", slog.String("srv_name", srvName))
 	}
-	slog.Info("service deleted, PVC deleted.", slog.String("srv_name", srvName))
+	slog.Info("service deleted.", slog.String("srv_name", srvName))
 	resp.Code = 0
 	resp.Message = "succeed to clean up service"
 	c.JSON(http.StatusOK, resp)
