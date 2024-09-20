@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"path"
 	"strconv"
+	"strings"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -42,7 +43,7 @@ func NewServiceComponent(config *config.Config, k8sNameSpace string) *ServiceCom
 	return sc
 }
 
-func (s *ServiceComponent) GenerateService(request types.SVCRequest, srvName string) (*v1.Service, error) {
+func (s *ServiceComponent) GenerateService(ctx context.Context, cluster cluster.Cluster, request types.SVCRequest, srvName string) (*v1.Service, error) {
 	annotations := request.Annotation
 
 	environments := []corev1.EnvVar{}
@@ -93,10 +94,16 @@ func (s *ServiceComponent) GenerateService(request types.SVCRequest, srvName str
 	annotations[KeyUserID] = request.UserID
 	annotations[KeyDeploySKU] = request.Sku
 
-	containerImg := path.Join(s.spaceDockerRegBase, request.ImageID)
-	if request.RepoType == string(types.ModelRepo) {
-		// choose registry
-		containerImg = path.Join(s.modelDockerRegBase, request.ImageID)
+	containerImg := request.ImageID
+	// add prefix if image is not full path
+	if !strings.Contains(containerImg, "/") {
+		if request.RepoType == string(types.ModelRepo) {
+			// choose registry
+			containerImg = path.Join(s.modelDockerRegBase, request.ImageID)
+		} else if request.RepoType == string(types.SpaceRepo) {
+			// choose registry
+			containerImg = path.Join(s.spaceDockerRegBase, request.ImageID)
+		}
 	}
 
 	templateAnnotations := make(map[string]string)
@@ -118,6 +125,25 @@ func (s *ServiceComponent) GenerateService(request types.SVCRequest, srvName str
 		initialDelaySeconds = s.env.Space.ReadnessDelaySeconds
 		periodSeconds = s.env.Space.ReadnessPeriodSeconds
 		failureThreshold = s.env.Space.ReadnessFailureThreshold
+	}
+
+	imagePullSecrets := []corev1.LocalObjectReference{
+		{
+			Name: s.imagePullSecret,
+		},
+	}
+
+	// handle nim engine
+	if strings.Contains(containerImg, "nvcr.io/nim/") {
+		imagePullSecrets = append(imagePullSecrets, corev1.LocalObjectReference{
+			Name: s.env.Model.NimDockerSecretName,
+		})
+		ngc_api_key, err := s.GetNimSecret(ctx, cluster)
+		if err != nil {
+			return nil, fmt.Errorf("can not find secret %s in %s namespace , error: %w", s.env.Model.NimNGCSecretName, s.k8sNameSpace, err)
+		}
+		environments = append(environments, corev1.EnvVar{Name: "NGC_API_KEY", Value: ngc_api_key})
+		environments = append(environments, corev1.EnvVar{Name: "NIM_CACHE_PATH", Value: "/workspace"})
 	}
 
 	service := &v1.Service{
@@ -148,11 +174,7 @@ func (s *ServiceComponent) GenerateService(request types.SVCRequest, srvName str
 									FailureThreshold:    int32(failureThreshold),
 								},
 							}},
-							ImagePullSecrets: []corev1.LocalObjectReference{
-								{
-									Name: s.imagePullSecret,
-								},
-							},
+							ImagePullSecrets: imagePullSecrets,
 						},
 					},
 				},
@@ -160,6 +182,16 @@ func (s *ServiceComponent) GenerateService(request types.SVCRequest, srvName str
 		},
 	}
 	return service, nil
+}
+
+// get secret from k8s
+// notes: admin should create nim secret "ngc-secret" and "nvidia-nim-secrets" in related namespace before deploy
+func (s *ServiceComponent) GetNimSecret(ctx context.Context, cluster cluster.Cluster) (string, error) {
+	secret, err := cluster.Client.CoreV1().Secrets(s.k8sNameSpace).Get(ctx, s.env.Model.NimNGCSecretName, metav1.GetOptions{})
+	if err != nil {
+		return "", err
+	}
+	return string(secret.Data["NGC_API_KEY"]), nil
 }
 
 func (s *ServiceComponent) GetServicePodsWithStatus(ctx context.Context, cluster cluster.Cluster, srvName string, namespace string) ([]types.Instance, error) {
