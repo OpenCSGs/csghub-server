@@ -137,7 +137,7 @@ func (c *CodeComponent) Index(ctx context.Context, filter *types.RepoFilter, per
 		err      error
 		resCodes []types.Code
 	)
-	repos, total, err := c.PublicToUser(ctx, types.CodeRepo, filter.Username, filter, per, page)
+	repos, total, err := c.PublicToUser(ctx, types.CodeRepo, filter.Username, filter, per, page, false)
 	if err != nil {
 		newError := fmt.Errorf("failed to get public code repos,error:%w", err)
 		return nil, 0, newError

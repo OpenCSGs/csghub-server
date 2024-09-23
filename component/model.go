@@ -106,7 +106,7 @@ func (c *ModelComponent) Index(ctx context.Context, filter *types.RepoFilter, pe
 		err       error
 		resModels []types.Model
 	)
-	repos, total, err := c.PublicToUser(ctx, types.ModelRepo, filter.Username, filter, per, page)
+	repos, total, err := c.PublicToUser(ctx, types.ModelRepo, filter.Username, filter, per, page, false)
 	if err != nil {
 		newError := fmt.Errorf("failed to get public model repos,error:%w", err)
 		return nil, 0, newError

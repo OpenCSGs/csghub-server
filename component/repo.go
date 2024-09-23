@@ -339,7 +339,7 @@ func (c *RepoComponent) DeleteRepo(ctx context.Context, req types.DeleteRepoReq)
 }
 
 // PublicToUser gets visible repos of the given user and user's orgs
-func (c *RepoComponent) PublicToUser(ctx context.Context, repoType types.RepositoryType, userName string, filter *types.RepoFilter, per, page int) (repos []*database.Repository, count int, err error) {
+func (c *RepoComponent) PublicToUser(ctx context.Context, repoType types.RepositoryType, userName string, filter *types.RepoFilter, per, page int, onlyPromptTypeDataset bool) (repos []*database.Repository, count int, err error) {
 	var repoOwnerIDs []int64
 	if len(userName) > 0 {
 		// get user orgs from user service
@@ -354,7 +354,7 @@ func (c *RepoComponent) PublicToUser(ctx context.Context, repoType types.Reposit
 			repoOwnerIDs = append(repoOwnerIDs, org.UserID)
 		}
 	}
-	repos, count, err = c.tc.rs.PublicToUser(ctx, repoType, repoOwnerIDs, filter, per, page)
+	repos, count, err = c.tc.rs.PublicToUser(ctx, repoType, repoOwnerIDs, filter, per, page, onlyPromptTypeDataset)
 	if err != nil {
 		return nil, 0, fmt.Errorf("failed to get user public repos, error: %w", err)
 	}

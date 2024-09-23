@@ -246,7 +246,7 @@ func (c *DatasetComponent) commonIndex(ctx context.Context, filter *types.RepoFi
 		err         error
 		resDatasets []types.Dataset
 	)
-	repos, total, err := c.PublicToUser(ctx, types.DatasetRepo, filter.Username, filter, per, page)
+	repos, total, err := c.PublicToUser(ctx, types.DatasetRepo, filter.Username, filter, per, page, onlyPromptType)
 	if err != nil {
 		newError := fmt.Errorf("failed to get public dataset repos,error:%w", err)
 		return nil, 0, newError
