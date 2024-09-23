@@ -45,11 +45,13 @@ type MirrorComponent struct {
 func NewMirrorComponent(config *config.Config) (*MirrorComponent, error) {
 	var err error
 	c := &MirrorComponent{}
-	c.mirrorServer, err = git.NewMirrorServer(config)
-	if err != nil {
-		newError := fmt.Errorf("fail to create git mirror server,error:%w", err)
-		slog.Error(newError.Error())
-		return nil, newError
+	if config.GitServer.Type == types.GitServerTypeGitea {
+		c.mirrorServer, err = git.NewMirrorServer(config)
+		if err != nil {
+			newError := fmt.Errorf("fail to create git mirror server,error:%w", err)
+			slog.Error(newError.Error())
+			return nil, newError
+		}
 	}
 	c.mq, err = queue.GetPriorityQueueInstance()
 	if err != nil {
