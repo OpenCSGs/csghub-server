@@ -18,5 +18,7 @@ func NewMirrorServer(config *config.Config) (mirrorserver.MirrorServer, error) {
 		return mirrorServer, err
 	}
 
+	//TODO: implement gitaly based mirrorserver
+
 	return nil, errors.New("undefined mirror server type")
 }
