@@ -225,11 +225,23 @@ func (s *MirrorStore) Finished(ctx context.Context) ([]Mirror, error) {
 	return mirrors, nil
 }
 
-func (s *MirrorStore) ToSync(ctx context.Context) ([]Mirror, error) {
+func (s *MirrorStore) ToSyncRepo(ctx context.Context) ([]Mirror, error) {
 	var mirrors []Mirror
 	err := s.db.Operator.Core.NewSelect().
 		Model(&mirrors).
-		Where("next_execution_timestamp < ?", time.Now()).
+		Where("next_execution_timestamp < ? or status in (?,?,?)", time.Now(), types.MirrorIncomplete, types.MirrorFailed, types.MirrorWaiting).
+		Scan(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return mirrors, nil
+}
+
+func (s *MirrorStore) ToSyncLfs(ctx context.Context) ([]Mirror, error) {
+	var mirrors []Mirror
+	err := s.db.Operator.Core.NewSelect().
+		Model(&mirrors).
+		Where("next_execution_timestamp < ? or status = ?", time.Now(), types.MirrorRepoSynced).
 		Scan(ctx)
 	if err != nil {
 		return nil, err

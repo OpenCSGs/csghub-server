@@ -13,12 +13,12 @@ import (
 	"opencsg.com/csghub-server/builder/git"
 	"opencsg.com/csghub-server/builder/git/gitserver"
 	"opencsg.com/csghub-server/builder/git/mirrorserver"
-	"opencsg.com/csghub-server/builder/mirror/queue"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/builder/store/s3"
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/types"
 	"opencsg.com/csghub-server/common/utils/common"
+	"opencsg.com/csghub-server/mirror/queue"
 )
 
 type MirrorComponent struct {
@@ -39,6 +39,7 @@ type MirrorComponent struct {
 	lfsMetaObjectStore *database.LfsMetaObjectStore
 	userStore          *database.UserStore
 	config             *config.Config
+	mq                 *queue.PriorityQueue
 }
 
 func NewMirrorComponent(config *config.Config) (*MirrorComponent, error) {
@@ -49,6 +50,10 @@ func NewMirrorComponent(config *config.Config) (*MirrorComponent, error) {
 		newError := fmt.Errorf("fail to create git mirror server,error:%w", err)
 		slog.Error(newError.Error())
 		return nil, newError
+	}
+	c.mq, err = queue.GetPriorityQueueInstance()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get priority queue: %v", err)
 	}
 	c.repoComp, err = NewRepoComponent(config)
 	if err != nil {
@@ -254,8 +259,8 @@ func (c *MirrorComponent) CreateMirrorRepo(ctx context.Context, req types.Create
 		return nil, fmt.Errorf("failed to create mirror")
 	}
 
-	if c.config.GitServer.Type == "gitaly" {
-		queue.GetPriorityQueueInstance().Push(&queue.MirrorTask{
+	if c.config.GitServer.Type == types.GitServerTypeGitaly {
+		c.mq.PushRepoMirror(&queue.MirrorTask{
 			MirrorID: reqMirror.ID,
 			Priority: queue.PriorityMap[reqMirror.Priority],
 		})

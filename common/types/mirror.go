@@ -90,6 +90,7 @@ type MirrorTaskStatus string
 const (
 	MirrorWaiting    MirrorTaskStatus = "waiting"
 	MirrorRunning    MirrorTaskStatus = "running"
+	MirrorRepoSynced MirrorTaskStatus = "repo_synced"
 	MirrorFinished   MirrorTaskStatus = "finished"
 	MirrorFailed     MirrorTaskStatus = "failed"
 	MirrorIncomplete MirrorTaskStatus = "incomplete"
@@ -106,9 +107,9 @@ const (
 type MirrorPriority int
 
 const (
-	HighMirrorPriority   MirrorPriority = 2
-	MediumMirrorPriority MirrorPriority = 1
-	LowMirrorPriority    MirrorPriority = 0
+	HighMirrorPriority   MirrorPriority = 3
+	MediumMirrorPriority MirrorPriority = 2
+	LowMirrorPriority    MirrorPriority = 1
 )
 
 type Mirror struct {

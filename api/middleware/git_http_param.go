@@ -84,7 +84,7 @@ func GetCurrentUserFromHeader() gin.HandlerFunc {
 	userStore := database.NewUserStore()
 	return func(c *gin.Context) {
 		authHeader := c.Request.Header.Get("Authorization")
-		if authHeader != "" {
+		if authHeader != "" && !strings.HasPrefix(authHeader, "X-OPENCSG-Sync-Token") {
 			authHeader = strings.TrimPrefix(authHeader, "Basic ")
 			authInfo, err := base64.StdEncoding.DecodeString(authHeader)
 			if err != nil {
