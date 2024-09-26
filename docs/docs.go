@@ -6302,6 +6302,167 @@ const docTemplate = `{
                 }
             }
         },
+        "/runtime_framework/{id}/architecture": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "description": "get runtime framework architectures",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "RuntimeFramework"
+                ],
+                "summary": "Get runtime framework architectures",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "runtime framework id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/types.Response"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            },
+            "put": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "description": "set runtime framework architectures",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "RuntimeFramework"
+                ],
+                "summary": "Set runtime framework architectures",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "runtime framework id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "body",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/types.RuntimeArchitecture"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/types.Response"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "description": "Delete runtime framework architectures",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "RuntimeFramework"
+                ],
+                "summary": "Delete runtime framework architectures",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "runtime framework id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "body",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/types.RuntimeArchitecture"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/types.Response"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            }
+        },
         "/runtime_framework/{id}/models": {
             "get": {
                 "security": [
@@ -6359,6 +6520,75 @@ const docTemplate = `{
                         "description": "deploy_type",
                         "name": "deploy_type",
                         "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/types.Response"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            }
+        },
+        "/runtime_framework/{id}/scan": {
+            "post": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "description": "Scan runtime architecture",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "RuntimeFramework"
+                ],
+                "summary": "Scan runtime architecture",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "runtime framework id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "enum": [
+                            0,
+                            1,
+                            2
+                        ],
+                        "type": "integer",
+                        "description": "scan_type(0:all models, 1:new models, 2:old models)",
+                        "name": "scan_type",
+                        "in": "query"
+                    },
+                    {
+                        "description": "body",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/types.RuntimeFrameworkModels"
+                        }
                     }
                 ],
                 "responses": {
@@ -14043,6 +14273,32 @@ const docTemplate = `{
         "types.CreateFileResp": {
             "type": "object"
         },
+        "types.CreateJWTReq": {
+            "type": "object",
+            "required": [
+                "current_user",
+                "uuid"
+            ],
+            "properties": {
+                "current_user": {
+                    "type": "string"
+                },
+                "uuid": {
+                    "type": "string"
+                }
+            }
+        },
+        "types.CreateJWTResp": {
+            "type": "object",
+            "properties": {
+                "expire_at": {
+                    "type": "string"
+                },
+                "token": {
+                    "type": "string"
+                }
+            }
+        },
         "types.CreateMirrorParams": {
             "type": "object",
             "properties": {
@@ -15010,6 +15266,9 @@ const docTemplate = `{
                     "description": "unique name of the organization",
                     "type": "string"
                 },
+                "user_id": {
+                    "type": "integer"
+                },
                 "verified": {
                     "type": "boolean"
                 }
@@ -15166,6 +15425,17 @@ const docTemplate = `{
                 },
                 "total": {
                     "type": "integer"
+                }
+            }
+        },
+        "types.RuntimeArchitecture": {
+            "type": "object",
+            "properties": {
+                "architectures": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
                 }
             }
         },
@@ -15693,6 +15963,9 @@ const docTemplate = `{
                 },
                 "homepage": {
                     "type": "string"
+                },
+                "id": {
+                    "type": "integer"
                 },
                 "last_login_at": {
                     "type": "string"

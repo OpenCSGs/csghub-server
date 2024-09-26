@@ -299,7 +299,12 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 	event := apiGroup.Group("/events")
 	event.POST("", eventHandler.Create)
 
-	createRuntimeFrameworkRoutes(apiGroup, needAPIKey, modelHandler)
+	runtimeArchHandler, err := handler.NewRuntimeArchitectureHandler(config)
+	if err != nil {
+		return nil, fmt.Errorf("error creating runtime framework architecture handler:%w", err)
+	}
+
+	createRuntimeFrameworkRoutes(apiGroup, needAPIKey, modelHandler, runtimeArchHandler)
 
 	syncHandler, err := handler.NewSyncHandler(config)
 	if err != nil {
@@ -640,7 +645,7 @@ func createUserRoutes(apiGroup *gin.RouterGroup, needAPIKey gin.HandlerFunc, use
 	apiGroup.GET("/user/:username/run/serverless", needAPIKey, userHandler.GetRunServerless)
 }
 
-func createRuntimeFrameworkRoutes(apiGroup *gin.RouterGroup, needAPIKey gin.HandlerFunc, modelHandler *handler.ModelHandler) {
+func createRuntimeFrameworkRoutes(apiGroup *gin.RouterGroup, needAPIKey gin.HandlerFunc, modelHandler *handler.ModelHandler, runtimeArchHandler *handler.RuntimeArchitectureHandler) {
 	runtimeFramework := apiGroup.Group("/runtime_framework")
 	{
 		runtimeFramework.GET("/:id/models", modelHandler.ListByRuntimeFrameworkID)
@@ -648,6 +653,11 @@ func createRuntimeFrameworkRoutes(apiGroup *gin.RouterGroup, needAPIKey gin.Hand
 		runtimeFramework.POST("/:id", needAPIKey, modelHandler.UpdateModelRuntimeFrameworks)
 		runtimeFramework.DELETE("/:id", needAPIKey, modelHandler.DeleteModelRuntimeFrameworks)
 		runtimeFramework.GET("/models", modelHandler.ListModelsOfRuntimeFrameworks)
+
+		runtimeFramework.GET("/:id/architecture", needAPIKey, runtimeArchHandler.ListByRuntimeFrameworkID)
+		runtimeFramework.PUT("/:id/architecture", needAPIKey, runtimeArchHandler.UpdateArchitecture)
+		runtimeFramework.DELETE("/:id/architecture", needAPIKey, runtimeArchHandler.DeleteArchitecture)
+		runtimeFramework.POST("/:id/scan", needAPIKey, runtimeArchHandler.ScanArchitecture)
 	}
 }
 
@@ -691,7 +701,6 @@ func createHFRoutes(r *gin.Engine, hfdsHandler *handler.HFDatasetHandler, repoCo
 			}
 		}
 	}
-
 }
 
 func createDiscussionRoutes(apiGroup *gin.RouterGroup, needAPIKey gin.HandlerFunc, discussionHandler *handler.DiscussionHandler) {
