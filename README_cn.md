@@ -1,4 +1,4 @@
-*[English](README_en.md) ∙ [简体中文](README_cn.md)*
+*[English](README_en.md) ∙ [简体中文](README_cn.md) ∙ [日本語](README_ja.md)*
 
 CSGHub Server是开源、可信的大模型资产管理平台[CSGHub](https://github.com/OpenCSGs/CSGHub/)的服务端部分开源项目，提供基于REST API的模型、数据集等大模型资产管理功能。
 
@@ -43,7 +43,7 @@ docker compose -f docker-compose.yml up -d
 - 按需开启内容审核，选择任意第三方内容审核服务
 
 ## 技术规划
-- [ ] 支持更多Git Server: 目前内置了对gitea的支持，未来计划实现对主流Git仓库的支持
+- [x] 支持更多Git Server: 目前内置了对gitea的支持，未来计划实现对主流Git仓库的支持
 - [x] 支持Git LFS: Git LFS支持超大文件， 支持git命令操作和Web UI在线下载
 - [x] 数据集在线预览: 数据集预览，支持LFS格式数据集的Top20/TopN加载预览
 - [x] 模型和数据集自动打标签:：支持自定义元数据和自动化提取模型/数据集标签

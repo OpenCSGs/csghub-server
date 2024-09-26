@@ -1,4 +1,4 @@
-*[English](README_en.md) ∙ [简体中文](README_cn.md)*
+*[English](README_en.md) ∙ [简体中文](README_cn.md) ∙ [日本語](README_ja.md)*
 
 `CSGHub Server` is a part of the open source and reliable large model assets management platform - [CSGHub](https://github.com/OpenCSGs/CSGHub/). It focuses on management of models、datasets and other LLM assets through REST API。
 
@@ -44,7 +44,7 @@ docker-compose -f docker-compose.yml up -d
 - Enable content moderation on demand, and choose any third-party content moderation service.
 
 ## Roadmap
-- [ ] Support more Git Servers: Currently supports Gitea, and plans to support mainstream Git repositories in the future.
+- [x] Support more Git Servers: Currently supports Gitea, and plans to support mainstream Git repositories in the future.
 - [x] Git LFS: Git LFS supports large files, and supports Git command operations and online download through the Web UI. 
 - [x] DataSet online viewer: Data set preview, supports the Top20/TopN loading preview of LFS format data sets. 
 - [x] Model/Dataset AutoTag: Supports custom metadata and automatic extraction of model/dataset tags. 

@@ -39,6 +39,10 @@ type GitCallbackComponent struct {
 	rrs         *database.RepoRelationsStore
 	mirrorStore *database.MirrorStore
 	svGen       *SyncVersionGenerator
+	rrf         *database.RepositoriesRuntimeFrameworkStore
+	rac         *component.RuntimeArchitectureComponent
+	ras         *database.RuntimeArchitecturesStore
+	rfs         *database.RuntimeFrameworksStore
 	// set visibility if file content is sensitive
 	setRepoVisibility bool
 }
@@ -61,10 +65,17 @@ func NewGitCallback(config *config.Config) (*GitCallbackComponent, error) {
 	mirrorStore := database.NewMirrorStore()
 	checker := component.NewSensitiveComponent(config)
 	sc, err := component.NewSpaceComponent(config)
+	ras := database.NewRuntimeArchitecturesStore()
 	if err != nil {
 		return nil, err
 	}
 	svGen := NewSyncVersionGenerator()
+	rrf := database.NewRepositoriesRuntimeFramework()
+	rac, err := component.NewRuntimeArchitectureComponent(config)
+	if err != nil {
+		return nil, err
+	}
+	rfs := database.NewRuntimeFrameworksStore()
 	return &GitCallbackComponent{
 		config:      config,
 		gs:          gs,
@@ -78,6 +89,10 @@ func NewGitCallback(config *config.Config) (*GitCallbackComponent, error) {
 		mirrorStore: mirrorStore,
 		checker:     checker,
 		svGen:       svGen,
+		rrf:         rrf,
+		rac:         rac,
+		ras:         ras,
+		rfs:         rfs,
 	}, nil
 }
 
@@ -172,6 +187,8 @@ func (c *GitCallbackComponent) HandlePush(ctx context.Context, req *types.GiteaC
 func (c *GitCallbackComponent) modifyFiles(ctx context.Context, repoType, namespace, repoName, ref string, fileNames []string) error {
 	for _, fileName := range fileNames {
 		slog.Debug("modify file", slog.String("file", fileName))
+		// update model runtime
+		c.updateModelRuntimeFrameworks(ctx, repoType, namespace, repoName, ref, fileName, false)
 		// only care about readme file under root directory
 		if fileName != ReadmeFileName {
 			continue
@@ -207,6 +224,8 @@ func (c *GitCallbackComponent) removeFiles(ctx context.Context, repoType, namesp
 	// delete tagss
 	for _, fileName := range fileNames {
 		slog.Debug("remove file", slog.String("file", fileName))
+		// update model runtime
+		c.updateModelRuntimeFrameworks(ctx, repoType, namespace, repoName, ref, fileName, true)
 		// only care about readme file under root directory
 		if fileName == ReadmeFileName {
 			// use empty content to clear all the meta tags
@@ -248,6 +267,8 @@ func (c *GitCallbackComponent) removeFiles(ctx context.Context, repoType, namesp
 func (c *GitCallbackComponent) addFiles(ctx context.Context, repoType, namespace, repoName, ref string, fileNames []string) error {
 	for _, fileName := range fileNames {
 		slog.Debug("add file", slog.String("file", fileName))
+		// update model runtime
+		c.updateModelRuntimeFrameworks(ctx, repoType, namespace, repoName, ref, fileName, false)
 		// only care about readme file under root directory
 		if fileName == ReadmeFileName {
 			content, err := c.getFileRaw(repoType, namespace, repoName, ref, fileName)
@@ -419,4 +440,91 @@ func (c *GitCallbackComponent) setPrivate(ctx context.Context, repoType, namespa
 		slog.String("repo", repoName))
 
 	return err
+}
+
+func (c *GitCallbackComponent) updateModelRuntimeFrameworks(ctx context.Context, repoType, namespace, repoName, ref, fileName string, deleteAction bool) {
+	slog.Debug("update model relation for git callback", slog.Any("namespace", namespace), slog.Any("repoName", repoName), slog.Any("repoType", repoType), slog.Any("fileName", fileName), slog.Any("branch", ref))
+	// must be model repo and config.json
+	if repoType != ModelRepoType || fileName != component.ConfigFileName || ref != ("refs/heads/"+component.MainBranch) {
+		return
+	}
+	repo, err := c.rs.FindByPath(ctx, types.ModelRepo, namespace, repoName)
+	if err != nil || repo == nil {
+		slog.Warn("fail to query repo for git callback", slog.Any("namespace", namespace), slog.Any("repoName", repoName), slog.Any("error", err))
+		return
+	}
+	// delete event
+	if deleteAction {
+		err := c.rrf.DeleteByRepoID(ctx, repo.ID)
+		if err != nil {
+			slog.Warn("fail to remove repo runtimes for git callback", slog.Any("namespace", namespace), slog.Any("repoName", repoName), slog.Any("repoid", repo.ID), slog.Any("error", err))
+		}
+		return
+	}
+	arch, err := c.rac.GetArchitectureFromConfig(ctx, namespace, repoName)
+	if err != nil {
+		slog.Warn("fail to get config.json content for git callback", slog.Any("namespace", namespace), slog.Any("repoName", repoName), slog.Any("error", err))
+		return
+	}
+	slog.Debug("get arch for git callback", slog.Any("namespace", namespace), slog.Any("repoName", repoName), slog.Any("arch", arch))
+	runtimes, err := c.ras.ListByRArchName(ctx, arch)
+	if err != nil {
+		slog.Warn("fail to get runtime ids by arch for git callback", slog.Any("arch", arch), slog.Any("error", err))
+		return
+	}
+	slog.Debug("get runtimes by arch for git callback", slog.Any("namespace", namespace), slog.Any("repoName", repoName), slog.Any("arch", arch), slog.Any("runtimes", runtimes))
+	var frameIDs []int64
+	for _, runtime := range runtimes {
+		frameIDs = append(frameIDs, runtime.RuntimeFrameworkID)
+	}
+	slog.Debug("get new frame ids for git callback", slog.Any("namespace", namespace), slog.Any("repoName", repoName), slog.Any("frameIDs", frameIDs))
+	newFrames, err := c.rfs.ListByIDs(ctx, frameIDs)
+	if err != nil {
+		slog.Warn("fail to get runtime frameworks for git callback", slog.Any("arch", arch), slog.Any("error", err))
+		return
+	}
+	slog.Debug("get new frames by arch for git callback", slog.Any("namespace", namespace), slog.Any("repoName", repoName), slog.Any("newFrames", newFrames))
+	var newFrameMap map[string]string = make(map[string]string)
+	for _, frame := range newFrames {
+		newFrameMap[string(frame.ID)] = string(frame.ID)
+	}
+	slog.Debug("get new frame map by arch for git callback", slog.Any("namespace", namespace), slog.Any("repoName", repoName), slog.Any("newFrameMap", newFrameMap))
+	oldRepoRuntimes, err := c.rrf.GetByRepoIDs(ctx, repo.ID)
+	if err != nil {
+		slog.Warn("fail to get repo runtimes for git callback", slog.Any("repo.ID", repo.ID), slog.Any("error", err))
+		return
+	}
+	slog.Debug("get old frames by arch for git callback", slog.Any("namespace", namespace), slog.Any("repoName", repoName), slog.Any("oldRepoRuntimes", oldRepoRuntimes))
+	var oldFrameMap map[string]string = make(map[string]string)
+	// get map
+	for _, runtime := range oldRepoRuntimes {
+		oldFrameMap[string(runtime.RuntimeFrameworkID)] = string(runtime.RuntimeFrameworkID)
+	}
+	slog.Debug("get old frame map by arch for git callback", slog.Any("namespace", namespace), slog.Any("repoName", repoName), slog.Any("oldFrameMap", oldFrameMap))
+	// remove incorrect relation
+	for _, old := range oldRepoRuntimes {
+		// check if it need remove
+		_, exist := newFrameMap[string(old.RuntimeFrameworkID)]
+		if !exist {
+			// remove incorrect relations
+			err := c.rrf.Delete(ctx, old.RuntimeFrameworkID, repo.ID, old.Type)
+			if err != nil {
+				slog.Warn("fail to delete old repo runtimes for git callback", slog.Any("repo.ID", repo.ID), slog.Any("runtime framework id", old.RuntimeFrameworkID), slog.Any("error", err))
+			}
+		}
+	}
+
+	// add new relation
+	for _, new := range newFrames {
+		// check if it need add
+		_, exist := oldFrameMap[string(new.ID)]
+		if !exist {
+			// add new relations
+			err := c.rrf.Add(ctx, new.ID, repo.ID, new.Type)
+			if err != nil {
+				slog.Warn("fail to add new repo runtimes for git callback", slog.Any("repo.ID", repo.ID), slog.Any("runtime framework id", new.ID), slog.Any("error", err))
+			}
+		}
+	}
+
 }

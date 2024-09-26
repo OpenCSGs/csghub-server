@@ -25,13 +25,13 @@ import (
 	"opencsg.com/csghub-server/builder/git/gitserver"
 	"opencsg.com/csghub-server/builder/git/membership"
 	"opencsg.com/csghub-server/builder/git/mirrorserver"
-	"opencsg.com/csghub-server/builder/mirror/queue"
 	"opencsg.com/csghub-server/builder/rpc"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/builder/store/s3"
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/types"
 	"opencsg.com/csghub-server/common/utils/common"
+	"opencsg.com/csghub-server/mirror/queue"
 )
 
 const (
@@ -73,6 +73,7 @@ type RepoComponent struct {
 	srs                *database.SpaceResourceStore
 	lfsMetaObjectStore *database.LfsMetaObjectStore
 	recom              *database.RecomStore
+	mq                 *queue.PriorityQueue
 }
 
 func NewRepoComponent(config *config.Config) (*RepoComponent, error) {
@@ -96,6 +97,11 @@ func NewRepoComponent(config *config.Config) (*RepoComponent, error) {
 		slog.Error(newError.Error())
 		return nil, newError
 	}
+	mq, err := queue.GetPriorityQueueInstance()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get priority queue: %v", err)
+	}
+	c.mq = mq
 	c.mirrorServer, err = git.NewMirrorServer(config)
 	if err != nil {
 		newError := fmt.Errorf("fail to create git mirror server,error:%w", err)
@@ -458,7 +464,7 @@ func (c *RepoComponent) CreateFile(ctx context.Context, req *types.CreateFileReq
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	if c.config.GitServer.Type == "gitaly" {
+	if c.config.GitServer.Type == types.GitServerTypeGitaly {
 		useLfs, req = c.checkIfShouldUseLfs(ctx, req)
 	}
 
@@ -570,7 +576,7 @@ func (c *RepoComponent) UpdateFile(ctx context.Context, req *types.UpdateFileReq
 		return nil, fmt.Errorf("fail to check namespace, cause: %w", err)
 	}
 
-	if c.config.GitServer.Type == "gitaly" {
+	if c.config.GitServer.Type == types.GitServerTypeGitaly {
 		useLfs, req = c.checkIfShouldUseLfsUpdate(ctx, req)
 	}
 
@@ -941,6 +947,7 @@ func (c *RepoComponent) Tree(ctx context.Context, req *types.GetFileReq) ([]*typ
 		Path:      req.Path,
 		RepoType:  req.RepoType,
 	}
+	getRepoFileTree.Ref = repo.DefaultBranch
 	tree, err := c.git.GetRepoFileTree(ctx, getRepoFileTree)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get git %s repository file tree, error: %w", req.RepoType, err)
@@ -1420,7 +1427,7 @@ func (c *RepoComponent) CreateMirror(ctx context.Context, req types.CreateMirror
 	mirror.RepositoryID = repo.ID
 
 	if c.config.Saas {
-		if c.config.GitServer.Type == "gitea" {
+		if c.config.GitServer.Type == types.GitServerTypeGitea {
 			mirror.PushUsername = req.CurrentUser
 			mirror.PushAccessToken = pushAccessToken.Token
 			taskId, err = c.mirrorServer.CreateMirrorRepo(ctx, mirrorserver.CreateMirrorRepoReq{
@@ -1436,7 +1443,7 @@ func (c *RepoComponent) CreateMirror(ctx context.Context, req types.CreateMirror
 			}
 		}
 	} else {
-		if c.config.GitServer.Type == "gitea" {
+		if c.config.GitServer.Type == types.GitServerTypeGitea {
 			err = c.git.MirrorSync(ctx, gitserver.MirrorSyncReq{
 				Namespace:   req.Namespace,
 				Name:        req.Name,
@@ -1458,10 +1465,11 @@ func (c *RepoComponent) CreateMirror(ctx context.Context, req types.CreateMirror
 		return nil, fmt.Errorf("failed to create mirror")
 	}
 
-	if c.config.GitServer.Type == "gitaly" {
-		queue.GetPriorityQueueInstance().Push(&queue.MirrorTask{
-			MirrorID: reqMirror.ID,
-			Priority: queue.PriorityMap[reqMirror.Priority],
+	if c.config.GitServer.Type == types.GitServerTypeGitaly {
+		c.mq.PushRepoMirror(&queue.MirrorTask{
+			MirrorID:  reqMirror.ID,
+			Priority:  queue.PriorityMap[reqMirror.Priority],
+			CreatedAt: mirror.CreatedAt.Unix(),
 		})
 		reqMirror.Status = types.MirrorWaiting
 		err = c.mirror.Update(ctx, reqMirror)
@@ -1485,7 +1493,7 @@ func (c *RepoComponent) MirrorFromSaas(ctx context.Context, namespace, name, cur
 		}
 	}
 	if m != nil {
-		err := c.mirrorFromSaasSync(ctx, repo, namespace, name, repoType)
+		err := c.mirrorFromSaasSync(ctx, m, namespace, name, repoType)
 		if err != nil {
 			return fmt.Errorf("failed to trigger mirror sync, error: %w", err)
 		}
@@ -1521,8 +1529,6 @@ func (c *RepoComponent) MirrorFromSaas(ctx context.Context, namespace, name, cur
 		Namespace:   namespace,
 		Name:        name,
 		CloneUrl:    mirror.SourceUrl,
-		Username:    mirror.Username,
-		AccessToken: mirror.AccessToken,
 		RepoType:    repoType,
 		MirrorToken: syncClientSetting.Token,
 		Private:     false,
@@ -1538,6 +1544,16 @@ func (c *RepoComponent) MirrorFromSaas(ctx context.Context, namespace, name, cur
 	if err != nil {
 		return fmt.Errorf("failed to create mirror")
 	}
+
+	if c.config.GitServer.Type == types.GitServerTypeGitaly {
+		c.mq.PushRepoMirror(&queue.MirrorTask{
+			MirrorID:    mirror.ID,
+			Priority:    queue.Priority(mirror.Priority),
+			CreatedAt:   mirror.CreatedAt.Unix(),
+			MirrorToken: syncClientSetting.Token,
+		})
+	}
+
 	repo.SyncStatus = types.SyncStatusInProgress
 	_, err = c.repo.UpdateRepo(ctx, *repo)
 	if err != nil {
@@ -1546,36 +1562,30 @@ func (c *RepoComponent) MirrorFromSaas(ctx context.Context, namespace, name, cur
 	return nil
 }
 
-func (c *RepoComponent) mirrorFromSaasSync(ctx context.Context, repo *database.Repository, namespace, name string, repoType types.RepositoryType) error {
+func (c *RepoComponent) mirrorFromSaasSync(ctx context.Context, mirror *database.Mirror, namespace, name string, repoType types.RepositoryType) error {
 	var err error
-	if c.config.GitServer.Type == "gitea" {
+	syncClientSetting, err := c.syncClientSetting.First(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to find sync client setting, error: %w", err)
+	}
+	if c.config.GitServer.Type == types.GitServerTypeGitea {
 		err = c.git.MirrorSync(ctx, gitserver.MirrorSyncReq{
-			Namespace: namespace,
-			Name:      name,
-			RepoType:  repoType,
+			Namespace:   namespace,
+			Name:        name,
+			RepoType:    repoType,
+			MirrorToken: syncClientSetting.Token,
 		})
 		if err != nil {
 			return fmt.Errorf("failed to sync mirror, error: %w", err)
 		}
-	} else if c.config.GitServer.Type == "gitaly" {
-		mirror, err := c.mirror.FindByRepoID(ctx, repo.ID)
-		if err != nil {
-			return fmt.Errorf("failed to find mirror, error: %w", err)
-		}
-		queue.GetPriorityQueueInstance().Push(&queue.MirrorTask{
-			MirrorID: mirror.ID,
-			Priority: queue.PriorityMap[mirror.Priority],
-		})
-		mirror.Status = types.MirrorWaiting
-		err = c.mirror.Update(ctx, mirror)
-		if err != nil {
-			return fmt.Errorf("failed to update mirror status: %v", err)
-		}
 	}
-	repo.SyncStatus = types.SyncStatusInProgress
-	_, err = c.repo.UpdateRepo(ctx, *repo)
-	if err != nil {
-		return fmt.Errorf("failed to update repo sync status")
+	if c.config.GitServer.Type == types.GitServerTypeGitaly {
+		c.mq.PushRepoMirror(&queue.MirrorTask{
+			MirrorID:    mirror.ID,
+			Priority:    queue.Priority(mirror.Priority),
+			CreatedAt:   mirror.CreatedAt.Unix(),
+			MirrorToken: syncClientSetting.Token,
+		})
 	}
 	return nil
 }
@@ -2238,7 +2248,7 @@ func (c *RepoComponent) SyncMirror(ctx context.Context, repoType types.Repositor
 		return fmt.Errorf("failed to find mirror, error: %w", err)
 	}
 	mirror.Priority = types.HighMirrorPriority
-	if c.config.GitServer.Type == "gitea" {
+	if c.config.GitServer.Type == types.GitServerTypeGitea {
 		err = c.mirrorServer.MirrorSync(ctx, mirrorserver.MirrorSyncReq{
 			Namespace: "root",
 			Name:      mirror.LocalRepoPath,
@@ -2246,10 +2256,11 @@ func (c *RepoComponent) SyncMirror(ctx context.Context, repoType types.Repositor
 		if err != nil {
 			return fmt.Errorf("failed to sync mirror, error: %w", err)
 		}
-	} else if c.config.GitServer.Type == "gitaly" {
-		queue.GetPriorityQueueInstance().Push(&queue.MirrorTask{
-			MirrorID: mirror.ID,
-			Priority: queue.PriorityMap[mirror.Priority],
+	} else if c.config.GitServer.Type == types.GitServerTypeGitaly {
+		c.mq.PushRepoMirror(&queue.MirrorTask{
+			MirrorID:  mirror.ID,
+			Priority:  queue.PriorityMap[mirror.Priority],
+			CreatedAt: mirror.CreatedAt.Unix(),
 		})
 		mirror.Status = types.MirrorWaiting
 		err = c.mirror.Update(ctx, mirror)

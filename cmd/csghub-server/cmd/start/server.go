@@ -9,10 +9,11 @@ import (
 	"opencsg.com/csghub-server/api/router"
 	"opencsg.com/csghub-server/builder/deploy"
 	"opencsg.com/csghub-server/builder/event"
-	"opencsg.com/csghub-server/builder/mirror"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/config"
+	"opencsg.com/csghub-server/common/types"
 	"opencsg.com/csghub-server/docs"
+	"opencsg.com/csghub-server/mirror"
 )
 
 var enableSwagger bool
@@ -81,14 +82,13 @@ var serverCmd = &cobra.Command{
 		)
 
 		// Initialize mirror service
-		mirrorService, err := mirror.NewMirrorService(cfg, 5)
+		mirrorService, err := mirror.NewMirrorPriorityQueue(cfg)
 		if err != nil {
 			return fmt.Errorf("failed to init mirror service: %w", err)
 		}
 
-		if cfg.MirrorServer.Enable {
+		if cfg.MirrorServer.Enable && cfg.GitServer.Type == types.GitServerTypeGitaly {
 			mirrorService.EnqueueMirrorTasks()
-			go mirrorService.Start()
 		}
 
 		server.Run()
