@@ -109,6 +109,7 @@ func (c *UserComponent) createFromCasdoorUser(ctx context.Context, cu casdoorsdk
 	user := &database.User{
 		Username:    userName,
 		NickName:    userName,
+		Email:       email,
 		UUID:        cu.Id,
 		RegProvider: "casdoor",
 		Gender:      cu.Gender,
@@ -126,7 +127,6 @@ func (c *UserComponent) createFromCasdoorUser(ctx context.Context, cu casdoorsdk
 	}
 	if gsUserResp != nil {
 		user.GitID = gsUserResp.GitID
-		user.Email = gsUserResp.Email
 		user.Password = gsUserResp.Password
 	}
 	err = c.us.Create(ctx, user, namespace)
