@@ -252,7 +252,6 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 
 	apiGroup.GET("/mirrors", mirrorHandler.Index)
 	mirror := apiGroup.Group("/mirror")
-	mirror.Use(needAPIKey)
 	{
 		mirror.GET("/sources", msHandler.Index)
 		mirror.POST("/sources", msHandler.Create)
