@@ -8,7 +8,6 @@ func init() {
 	// add subcommands here
 	Cmd.AddCommand(cmdCalcRecomScore)
 	Cmd.AddCommand(cmdCreatePushMirror)
-	Cmd.AddCommand(cmdSyncAsClient)
 	Cmd.AddCommand(cmdGenTelemetry)
 }
 

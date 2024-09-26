@@ -8,6 +8,7 @@ import (
 	"github.com/spf13/cobra"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/config"
+	"opencsg.com/csghub-server/common/types"
 	"opencsg.com/csghub-server/component"
 )
 
@@ -44,7 +45,7 @@ var cmdCreatePushMirror = &cobra.Command{
 			return
 		}
 
-		if config.GitServer.Type != "gitea" {
+		if config.GitServer.Type != types.GitServerTypeGitea {
 			return
 		}
 

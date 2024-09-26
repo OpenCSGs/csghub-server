@@ -21,6 +21,7 @@ type Config struct {
 		Token            string `envconfig:"STARHUB_SERVER_MIRROR_Token" default:""`
 		Port             int    `envconfig:"STARHUB_SERVER_MIRROR_PORT" default:"8085"`
 		SessionSecretKey string `envconfig:"STARHUB_SERVER_MIRROR_SESSION_SECRET_KEY" default:"mirror"`
+		WorkerNumber     int    `envconfig:"STARHUB_SERVER_MIRROR_WORKER_NUMBER" default:"5"`
 	}
 
 	DocsHost string `envconfig:"STARHUB_SERVER_SERVER_DOCS_HOST" default:"http://localhost:6636"`
@@ -167,7 +168,7 @@ type Config struct {
 	MultiSync struct {
 		SaasAPIDomain  string `envconfig:"OPENCSG_SAAS_API_DOMAIN" default:"https://hub.opencsg.com"`
 		SaasSyncDomain string `envconfig:"OPENCSG_SAAS_SYNC_DOMAIN" default:"https://sync.opencsg.com"`
-		// Enabled bool `envconfig:"STARHUB_SERVER_MULTI_SYNC_ENABLED" default:"false"`
+		Enabled        bool   `envconfig:"STARHUB_SERVER_MULTI_SYNC_ENABLED" default:"false"`
 	}
 
 	Telemetry struct {

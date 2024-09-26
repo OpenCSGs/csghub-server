@@ -50,3 +50,12 @@ end`
 func (c *Cache) FlushAll(ctx context.Context) error {
 	return c.core.FlushAll(ctx).Err()
 }
+
+func (c *Cache) ZAdd(ctx context.Context, key string, z redis.Z) error {
+	_, err := c.core.ZAdd(ctx, key, z).Result()
+	return err
+}
+
+func (c *Cache) ZPopMax(ctx context.Context, key string, count int64) ([]redis.Z, error) {
+	return c.core.ZPopMax(ctx, key, count).Result()
+}
