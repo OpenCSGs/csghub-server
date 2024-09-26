@@ -12,6 +12,7 @@ import (
 
 	"github.com/bwmarrin/snowflake"
 	"github.com/casdoor/casdoor-go-sdk/casdoorsdk"
+	"github.com/google/uuid"
 	"opencsg.com/csghub-server/builder/git"
 	"opencsg.com/csghub-server/builder/git/gitserver"
 	"opencsg.com/csghub-server/builder/store/database"
@@ -20,11 +21,12 @@ import (
 )
 
 type UserComponent struct {
-	us   *database.UserStore
-	os   *database.OrgStore
-	ns   *database.NamespaceStore
-	gs   gitserver.GitServer
-	jwtc *JwtComponent
+	us     *database.UserStore
+	os     *database.OrgStore
+	ns     *database.NamespaceStore
+	gs     gitserver.GitServer
+	jwtc   *JwtComponent
+	tokenc *AccessTokenComponent
 
 	casc      *casdoorsdk.Client
 	casConfig *casdoorsdk.AuthConfig
@@ -39,6 +41,10 @@ func NewUserComponent(config *config.Config) (*UserComponent, error) {
 	c.os = database.NewOrgStore()
 	c.ns = database.NewNamespaceStore()
 	c.jwtc = NewJwtComponent(config.JWT.SigningKey, config.JWT.ValidHour)
+	c.tokenc, err = NewAccessTokenComponent(config)
+	if err != nil {
+		return nil, fmt.Errorf("fail to create access token component, error: %w", err)
+	}
 	c.gs, err = git.NewGitServer(config)
 	if err != nil {
 		newError := fmt.Errorf("failed to create git server,error:%w", err)
@@ -422,6 +428,19 @@ func (c *UserComponent) Signin(ctx context.Context, code, state string) (*types.
 		if err != nil {
 			return nil, "", fmt.Errorf("failed to create user,error:%w", err)
 		}
+		// auto create git access token for the new user
+		go func(username string) {
+			ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
+			defer cancel()
+			_, err := c.tokenc.Create(ctx, &types.CreateUserTokenRequest{
+				Username:    username,
+				TokenName:   uuid.NewString(),
+				Application: types.AccessTokenAppGit,
+			})
+			if err != nil {
+				slog.Error("failed to create git user access token", "error", err, "username", dbu.Username)
+			}
+		}(dbu.Username)
 	} else {
 		// get user from db for username, as casdoor may have different username
 		dbu, err = c.us.FindByUUID(ctx, cu.Id)
