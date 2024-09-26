@@ -1,4 +1,4 @@
-package cron
+package sync
 
 import (
 	"context"
@@ -50,6 +50,10 @@ var cmdSyncAsClient = &cobra.Command{
 		}
 
 		if config.Saas {
+			return
+		}
+
+		if !config.MultiSync.Enabled {
 			return
 		}
 

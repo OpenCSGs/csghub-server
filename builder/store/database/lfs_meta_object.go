@@ -38,6 +38,18 @@ func (s *LfsMetaObjectStore) FindByOID(ctx context.Context, RepoId int64, Oid st
 	return &lfsMetaObject, nil
 }
 
+func (s *LfsMetaObjectStore) FindByRepoID(ctx context.Context, repoID int64) ([]LfsMetaObject, error) {
+	var lfsMetaObjects []LfsMetaObject
+	err := s.db.Operator.Core.NewSelect().
+		Model(&lfsMetaObjects).
+		Where("repository_id=?", repoID).
+		Scan(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return lfsMetaObjects, nil
+}
+
 func (s *LfsMetaObjectStore) Create(ctx context.Context, lfsObj LfsMetaObject) (*LfsMetaObject, error) {
 	err := s.db.Operator.Core.NewInsert().
 		Model(&lfsObj).
@@ -74,4 +86,13 @@ func (s *LfsMetaObjectStore) UpdateOrCreate(ctx context.Context, input LfsMetaOb
 	}
 
 	return &input, nil
+}
+
+func (s *LfsMetaObjectStore) BulkUpdateOrCreate(ctx context.Context, input []LfsMetaObject) error {
+	_, err := s.db.Core.NewInsert().
+		Model(&input).
+		On("CONFLICT (oid, repository_id) DO UPDATE").
+		Set("size = EXCLUDED.size, updated_at = EXCLUDED.updated_at, existing = EXCLUDED.existing").
+		Exec(ctx)
+	return err
 }

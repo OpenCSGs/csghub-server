@@ -79,5 +79,19 @@ func (c *Client) DeleteRepo(ctx context.Context, req gitserver.DeleteRepoReq) er
 }
 
 func (c *Client) GetRepo(ctx context.Context, req gitserver.GetRepoReq) (*gitserver.CreateRepoResp, error) {
-	return nil, nil
+	repoType := fmt.Sprintf("%ss", string(req.RepoType))
+	ctx, cancel := context.WithTimeout(ctx, timeoutTime)
+	defer cancel()
+	gitalyReq := &gitalypb.FindDefaultBranchNameRequest{
+		Repository: &gitalypb.Repository{
+			StorageName:  c.config.GitalyServer.Storge,
+			RelativePath: BuildRelativePath(repoType, req.Namespace, req.Name),
+		},
+	}
+	resp, err := c.refClient.FindDefaultBranchName(ctx, gitalyReq)
+	if err != nil {
+		return nil, err
+	}
+
+	return &gitserver.CreateRepoResp{DefaultBranch: string(resp.Name)}, nil
 }
