@@ -171,6 +171,7 @@ type MirrorSyncReq struct {
 	CloneUrl    string `json:"clone_url"`
 	Username    string `json:"username"`
 	AccessToken string `json:"access_token"`
+	MirrorToken string `json:"mirror_token"`
 }
 
 type MirrorTaskInfo struct {

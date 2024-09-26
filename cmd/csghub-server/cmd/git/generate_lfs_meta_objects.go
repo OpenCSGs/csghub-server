@@ -49,7 +49,7 @@ var generateLfsMetaObjectsCmd = &cobra.Command{
 			return
 		}
 
-		if config.GitServer.Type == "gitea" {
+		if config.GitServer.Type == types.GitServerTypeGitea {
 			return
 		}
 

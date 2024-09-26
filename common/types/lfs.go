@@ -90,8 +90,15 @@ type LFSBatchResponse struct {
 }
 
 type LFSBatchRequest struct {
-	Operation string           `json:"operation"`
-	Objects   []LFSBatchObject `json:"objects"`
+	Operation string            `json:"operation"`
+	Objects   []LFSBatchObject  `json:"objects"`
+	Ref       LFSBatchObjectRef `json:"ref"`
+	Transfers []string          `json:"transfers,omitempty"`
+	HashAlog  string            `json:"hash_alog,omitempty"`
+}
+
+type LFSBatchObjectRef struct {
+	Name string `json:"name"`
 }
 
 type LFSBatchObject struct {
