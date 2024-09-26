@@ -30,7 +30,7 @@ func NewMemberComponent(config *config.Config) (*MemberComponent, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to create git server:%w", err)
 	}
-	if config.GitServer.Type == "gitea" {
+	if config.GitServer.Type == types.GitServerTypeGitea {
 		gms, err = git.NewMemberShip(*config)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create git membership:%w", err)
@@ -91,7 +91,7 @@ func (c *MemberComponent) OrgMembers(ctx context.Context, orgName, currentUser s
 }
 
 func (c *MemberComponent) InitRoles(ctx context.Context, org *database.Organization) error {
-	if c.config.GitServer.Type == "gitea" {
+	if c.config.GitServer.Type == types.GitServerTypeGitea {
 		return c.gitMemberShip.AddRoles(ctx, org.Name,
 			[]membership.Role{membership.RoleAdmin, membership.RoleRead, membership.RoleWrite})
 	} else {
@@ -108,7 +108,7 @@ func (c *MemberComponent) SetAdmin(ctx context.Context, org *database.Organizati
 		err = fmt.Errorf("failed to create member,caused by:%w", err)
 		return err
 	}
-	if c.config.GitServer.Type == "gitea" {
+	if c.config.GitServer.Type == types.GitServerTypeGitea {
 		return c.gitMemberShip.AddMember(ctx, org.Name, user.Username, membership.RoleAdmin)
 	} else {
 		return nil
@@ -193,7 +193,7 @@ func (c *MemberComponent) AddMembers(ctx context.Context, orgName string, users 
 			err = fmt.Errorf("failed to create db member, org:%s, user:%s,caused by:%w", orgName, userName, err)
 			return err
 		}
-		if c.config.GitServer.Type == "gitea" {
+		if c.config.GitServer.Type == types.GitServerTypeGitea {
 			err = c.gitMemberShip.AddMember(ctx, orgName, userName, c.toGitRole(role))
 			if err != nil {
 				return fmt.Errorf("failed to add git member, org:%s, user:%s caused by:%w", orgName, userName, err)
@@ -251,7 +251,7 @@ func (c *MemberComponent) Delete(ctx context.Context, orgName, userName, operato
 		err = fmt.Errorf("failed to delete member,caused by:%w", err)
 		return err
 	}
-	if c.config.GitServer.Type == "gitea" {
+	if c.config.GitServer.Type == types.GitServerTypeGitea {
 		return c.gitMemberShip.RemoveMember(ctx, orgName, userName, c.toGitRole(role))
 	} else {
 		return nil

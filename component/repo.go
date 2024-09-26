@@ -1427,7 +1427,7 @@ func (c *RepoComponent) CreateMirror(ctx context.Context, req types.CreateMirror
 	mirror.RepositoryID = repo.ID
 
 	if c.config.Saas {
-		if c.config.GitServer.Type == "gitea" {
+		if c.config.GitServer.Type == types.GitServerTypeGitea {
 			mirror.PushUsername = req.CurrentUser
 			mirror.PushAccessToken = pushAccessToken.Token
 			taskId, err = c.mirrorServer.CreateMirrorRepo(ctx, mirrorserver.CreateMirrorRepoReq{
@@ -1443,7 +1443,7 @@ func (c *RepoComponent) CreateMirror(ctx context.Context, req types.CreateMirror
 			}
 		}
 	} else {
-		if c.config.GitServer.Type == "gitea" {
+		if c.config.GitServer.Type == types.GitServerTypeGitea {
 			err = c.git.MirrorSync(ctx, gitserver.MirrorSyncReq{
 				Namespace:   req.Namespace,
 				Name:        req.Name,
@@ -2248,7 +2248,7 @@ func (c *RepoComponent) SyncMirror(ctx context.Context, repoType types.Repositor
 		return fmt.Errorf("failed to find mirror, error: %w", err)
 	}
 	mirror.Priority = types.HighMirrorPriority
-	if c.config.GitServer.Type == "gitea" {
+	if c.config.GitServer.Type == types.GitServerTypeGitea {
 		err = c.mirrorServer.MirrorSync(ctx, mirrorserver.MirrorSyncReq{
 			Namespace: "root",
 			Name:      mirror.LocalRepoPath,

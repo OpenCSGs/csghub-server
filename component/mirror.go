@@ -236,7 +236,7 @@ func (c *MirrorComponent) CreateMirrorRepo(ctx context.Context, req types.Create
 	mirror.SourceRepoPath = fmt.Sprintf("%s/%s", req.SourceNamespace, req.SourceName)
 	mirror.Priority = types.HighMirrorPriority
 	var taskId int64
-	if c.config.GitServer.Type == "gitea" {
+	if c.config.GitServer.Type == types.GitServerTypeGitea {
 		taskId, err = c.mirrorServer.CreateMirrorRepo(ctx, mirrorserver.CreateMirrorRepoReq{
 			Namespace: "root",
 			Name:      mirror.LocalRepoPath,

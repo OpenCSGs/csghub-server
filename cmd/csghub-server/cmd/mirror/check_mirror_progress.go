@@ -10,6 +10,7 @@ import (
 	"opencsg.com/csghub-server/builder/store/cache"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/config"
+	"opencsg.com/csghub-server/common/types"
 	"opencsg.com/csghub-server/component"
 )
 
@@ -54,7 +55,7 @@ var checkMirrorProgress = &cobra.Command{
 			return
 		}
 
-		if config.GitServer.Type != "gitea" {
+		if config.GitServer.Type != types.GitServerTypeGitea {
 			return
 		}
 
