@@ -2,6 +2,7 @@ package database
 
 import (
 	"context"
+	"fmt"
 )
 
 type RepositoriesRuntimeFrameworkStore struct {
@@ -53,6 +54,14 @@ func (m *RepositoriesRuntimeFrameworkStore) Delete(ctx context.Context, runtimeF
 	return err
 }
 
+func (m *RepositoriesRuntimeFrameworkStore) DeleteByRepoID(ctx context.Context, repoID int64) error {
+	_, err := m.db.Operator.Core.NewDelete().Model((*RepositoriesRuntimeFramework)(nil)).Where("repo_id = ?", repoID).Exec(ctx)
+	if err != nil {
+		return fmt.Errorf("delete repo runtime failed, %w", err)
+	}
+	return nil
+}
+
 func (m *RepositoriesRuntimeFrameworkStore) GetByIDsAndType(ctx context.Context, runtimeFrameworkID, repoID int64, deployType int) ([]RepositoriesRuntimeFramework, error) {
 	var result []RepositoriesRuntimeFramework
 	_, err := m.db.Operator.Core.NewSelect().Model(&result).Where("type = ? and repo_id=? and runtime_framework_id = ?", deployType, repoID, runtimeFrameworkID).Exec(ctx, &result)
@@ -69,4 +78,13 @@ func (m *RepositoriesRuntimeFrameworkStore) GetByRepoIDsAndType(ctx context.Cont
 	var result []RepositoriesRuntimeFramework
 	_, err := m.db.Operator.Core.NewSelect().Model(&result).Where("type = ? and repo_id=?", deployType, repoID).Exec(ctx, &result)
 	return result, err
+}
+
+func (m *RepositoriesRuntimeFrameworkStore) GetByRepoIDs(ctx context.Context, repoID int64) ([]RepositoriesRuntimeFramework, error) {
+	var result []RepositoriesRuntimeFramework
+	_, err := m.db.Operator.Core.NewSelect().Model(&result).Where("repo_id=?", repoID).Exec(ctx, &result)
+	if err != nil {
+		return nil, fmt.Errorf("get runtime by repoid failed, %w", err)
+	}
+	return result, nil
 }

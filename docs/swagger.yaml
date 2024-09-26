@@ -969,6 +969,23 @@ definitions:
     type: object
   types.CreateFileResp:
     type: object
+  types.CreateJWTReq:
+    properties:
+      current_user:
+        type: string
+      uuid:
+        type: string
+    required:
+    - current_user
+    - uuid
+    type: object
+  types.CreateJWTResp:
+    properties:
+      expire_at:
+        type: string
+      token:
+        type: string
+    type: object
   types.CreateMirrorParams:
     properties:
       mirror_source_id:
@@ -1624,6 +1641,8 @@ definitions:
       path:
         description: unique name of the organization
         type: string
+      user_id:
+        type: integer
       verified:
         type: boolean
     type: object
@@ -1733,6 +1752,13 @@ definitions:
         type: string
       total:
         type: integer
+    type: object
+  types.RuntimeArchitecture:
+    properties:
+      architectures:
+        items:
+          type: string
+        type: array
     type: object
   types.RuntimeFramework:
     properties:
@@ -2088,6 +2114,8 @@ definitions:
         type: string
       homepage:
         type: string
+      id:
+        type: integer
       last_login_at:
         type: string
       nickname:
@@ -7772,6 +7800,109 @@ paths:
       summary: Set model runtime frameworks
       tags:
       - RuntimeFramework
+  /runtime_framework/{id}/architecture:
+    delete:
+      consumes:
+      - application/json
+      description: Delete runtime framework architectures
+      parameters:
+      - description: runtime framework id
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: body
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/types.RuntimeArchitecture'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/types.Response'
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Delete runtime framework architectures
+      tags:
+      - RuntimeFramework
+    get:
+      consumes:
+      - application/json
+      description: get runtime framework architectures
+      parameters:
+      - description: runtime framework id
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/types.Response'
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Get runtime framework architectures
+      tags:
+      - RuntimeFramework
+    put:
+      consumes:
+      - application/json
+      description: set runtime framework architectures
+      parameters:
+      - description: runtime framework id
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: body
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/types.RuntimeArchitecture'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/types.Response'
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Set runtime framework architectures
+      tags:
+      - RuntimeFramework
   /runtime_framework/{id}/models:
     get:
       consumes:
@@ -7824,6 +7955,51 @@ paths:
       security:
       - ApiKey: []
       summary: Get Visible models by runtime framework for current user
+      tags:
+      - RuntimeFramework
+  /runtime_framework/{id}/scan:
+    post:
+      consumes:
+      - application/json
+      description: Scan runtime architecture
+      parameters:
+      - description: runtime framework id
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: scan_type(0:all models, 1:new models, 2:old models)
+        enum:
+        - 0
+        - 1
+        - 2
+        in: query
+        name: scan_type
+        type: integer
+      - description: body
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/types.RuntimeFrameworkModels'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/types.Response'
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Scan runtime architecture
       tags:
       - RuntimeFramework
   /runtime_framework/models:
