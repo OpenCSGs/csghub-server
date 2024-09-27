@@ -38,6 +38,7 @@ func (s *DatasetStore) ByRepoIDs(ctx context.Context, repoIDs []int64, onlyPromp
 	q := s.db.Operator.Core.NewSelect().
 		Model(&datasets).
 		Relation("Repository").
+		Relation("Repository.User").
 		Where("repository_id in (?)", bun.In(repoIDs))
 	if onlyPromptType {
 		q.Where("type = ?", types.DatasetPrompt)

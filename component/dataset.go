@@ -303,6 +303,9 @@ func (c *DatasetComponent) commonIndex(ctx context.Context, filter *types.RepoFi
 			License:      repo.License,
 			Repository:   common.BuildCloneInfo(c.config, dataset.Repository),
 			Type:         dataset.Type,
+			UserNickName: dataset.Repository.User.NickName,
+			Username:     dataset.Repository.User.Username,
+			UserAvatar:   dataset.Repository.User.Avatar,
 		})
 	}
 

@@ -1275,6 +1275,12 @@ definitions:
         $ref: '#/definitions/types.User'
       user_likes:
         type: boolean
+      user_nickname:
+        type: string
+      user_vatar:
+        type: string
+      username:
+        type: string
     type: object
   types.DatasetResp:
     properties:
