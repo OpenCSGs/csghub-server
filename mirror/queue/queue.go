@@ -65,12 +65,12 @@ func (mq *MirrorQueue) Push(t *MirrorTask) {
 }
 
 func (mq *MirrorQueue) Pop() *MirrorTask {
-	r, _ := mq.redis.ZPopMax(context.Background(), mq.QueueName, 1)
-	if len(r) == 0 {
+	r, err := mq.redis.BZPopMax(context.Background(), mq.QueueName)
+	if err != nil {
 		return nil
 	}
 	var task MirrorTask
-	json.Unmarshal([]byte(r[0].Member.(string)), &task)
+	json.Unmarshal([]byte(r.Member.(string)), &task)
 	return &task
 }
 
