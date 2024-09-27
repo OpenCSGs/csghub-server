@@ -2,6 +2,7 @@ package handler
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -116,6 +117,18 @@ func (h *PromptHandler) ListPrompt(ctx *gin.Context) {
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
+
+	detail, err := h.c.Show(ctx, namespace, name, currentUser)
+	if err != nil {
+		if errors.Is(err, component.ErrUnauthorized) {
+			httpbase.UnauthorizedError(ctx, err)
+			return
+		}
+		slog.Error("Failed to get prompt dataset detail", slog.Any("error", err))
+		httpbase.ServerError(ctx, err)
+		return
+	}
+
 	req := types.PromptReq{
 		Namespace:   namespace,
 		Name:        name,
@@ -125,8 +138,14 @@ func (h *PromptHandler) ListPrompt(ctx *gin.Context) {
 	if err != nil {
 		slog.Error("Failed to list prompts of repo", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
+		return
 	}
-	httpbase.OK(ctx, data)
+
+	respData := gin.H{
+		"detail":  detail,
+		"prompts": data,
+	}
+	httpbase.OK(ctx, respData)
 }
 
 // GetPrompt     godoc
@@ -164,6 +183,7 @@ func (h *PromptHandler) GetPrompt(ctx *gin.Context) {
 	if err != nil {
 		slog.Error("Failed to list prompts of repo", slog.Any("req", req), slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
+		return
 	}
 	httpbase.OK(ctx, data)
 }

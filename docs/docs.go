@@ -15421,15 +15421,6 @@ const docTemplate = `{
                 },
                 "user_likes": {
                     "type": "boolean"
-                },
-                "user_nickname": {
-                    "type": "string"
-                },
-                "user_vatar": {
-                    "type": "string"
-                },
-                "username": {
-                    "type": "string"
                 }
             }
         },

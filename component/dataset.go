@@ -303,9 +303,12 @@ func (c *DatasetComponent) commonIndex(ctx context.Context, filter *types.RepoFi
 			License:      repo.License,
 			Repository:   common.BuildCloneInfo(c.config, dataset.Repository),
 			Type:         dataset.Type,
-			UserNickName: dataset.Repository.User.NickName,
-			Username:     dataset.Repository.User.Username,
-			UserAvatar:   dataset.Repository.User.Avatar,
+			User: types.User{
+				Username: dataset.Repository.User.Username,
+				Nickname: dataset.Repository.User.NickName,
+				Email:    dataset.Repository.User.Email,
+				Avatar:   dataset.Repository.User.Avatar,
+			},
 		})
 	}
 
@@ -425,6 +428,7 @@ func (c *DatasetComponent) Show(ctx context.Context, namespace, name, currentUse
 			Username: dataset.Repository.User.Username,
 			Nickname: dataset.Repository.User.NickName,
 			Email:    dataset.Repository.User.Email,
+			Avatar:   dataset.Repository.User.Avatar,
 		},
 		Private:    dataset.Repository.Private,
 		CreatedAt:  dataset.CreatedAt,

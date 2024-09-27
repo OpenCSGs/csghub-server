@@ -48,7 +48,4 @@ type Dataset struct {
 	CanManage     bool                 `json:"can_manage"`
 	Namespace     *Namespace           `json:"namespace"`
 	Type          int                  `json:"type"`
-	UserNickName  string               `json:"user_nickname"`
-	Username      string               `json:"username"`
-	UserAvatar    string               `json:"user_avatar"`
 }
