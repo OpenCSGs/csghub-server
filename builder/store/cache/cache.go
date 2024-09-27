@@ -3,6 +3,7 @@ package cache
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/redis/go-redis/v9"
 )
@@ -56,6 +57,6 @@ func (c *Cache) ZAdd(ctx context.Context, key string, z redis.Z) error {
 	return err
 }
 
-func (c *Cache) ZPopMax(ctx context.Context, key string, count int64) ([]redis.Z, error) {
-	return c.core.ZPopMax(ctx, key, count).Result()
+func (c *Cache) BZPopMax(ctx context.Context, key string) (*redis.ZWithKey, error) {
+	return c.core.BZPopMax(ctx, time.Second*10, key).Result()
 }
