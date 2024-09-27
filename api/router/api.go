@@ -689,6 +689,7 @@ func createHFRoutes(r *gin.Engine, hfdsHandler *handler.HFDatasetHandler, repoCo
 			{
 				// compitable with HF model info api, used for sdk like this:  huggingface_hub.model_info(repo_id, revision)
 				hfModelAPIGroup.GET("/:namespace/:name/revision/:ref", middleware.RepoMapping(types.ModelRepo), modelHandler.SDKModelInfo)
+				hfModelAPIGroup.GET("/:namespace/:name", middleware.RepoMapping(types.ModelRepo), modelHandler.SDKModelInfo)
 			}
 			hfDSAPIGroup := hfAPIGroup.Group("/datasets")
 			{
