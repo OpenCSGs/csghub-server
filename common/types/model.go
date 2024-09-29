@@ -119,6 +119,7 @@ type Relations struct {
 	Datasets []*Dataset `json:"datasets,omitempty"`
 	Codes    []*Code    `json:"codes,omitempty"`
 	Spaces   []*Space   `json:"spaces,omitempty"`
+	Prompts  []*Dataset `json:"prompts,omitempty"`
 }
 
 type Model struct {

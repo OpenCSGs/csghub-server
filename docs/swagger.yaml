@@ -1698,6 +1698,10 @@ definitions:
         items:
           $ref: '#/definitions/types.Model'
         type: array
+      prompts:
+        items:
+          $ref: '#/definitions/types.Dataset'
+        type: array
       spaces:
         items:
           $ref: '#/definitions/types.Space'
@@ -7793,11 +7797,22 @@ paths:
       summary: List prompts
       tags:
       - Prompt
-  /prompts/{namespace}/{name}/{file_path}:
+  /prompts/{namespace}/{name}/prompt/view/{file_path}:
     get:
       consumes:
       - application/json
       description: Get prompts by file
+      parameters:
+      - description: namespace
+        in: path
+        name: namespace
+        required: true
+        type: string
+      - description: name
+        in: path
+        name: name
+        required: true
+        type: string
       produces:
       - application/json
       responses:
@@ -7816,6 +7831,50 @@ paths:
       security:
       - ApiKey: []
       summary: Get prompts by file
+      tags:
+      - Prompt
+  /prompts/{namespace}/{name}/relations:
+    get:
+      consumes:
+      - application/json
+      parameters:
+      - description: namespace
+        in: path
+        name: namespace
+        required: true
+        type: string
+      - description: name
+        in: path
+        name: name
+        required: true
+        type: string
+      - description: current user
+        in: query
+        name: current_user
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/types.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/types.Relations'
+              type: object
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Get prompt related assets
       tags:
       - Prompt
   /prompts/conversations:

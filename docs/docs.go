@@ -6557,7 +6557,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/prompts/{namespace}/{name}/{file_path}": {
+        "/prompts/{namespace}/{name}/prompt/view/{file_path}": {
             "get": {
                 "security": [
                     {
@@ -6575,11 +6575,100 @@ const docTemplate = `{
                     "Prompt"
                 ],
                 "summary": "Get prompts by file",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "namespace",
+                        "name": "namespace",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "name",
+                        "name": "name",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
                 "responses": {
                     "200": {
                         "description": "OK",
                         "schema": {
                             "$ref": "#/definitions/types.Response"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            }
+        },
+        "/prompts/{namespace}/{name}/relations": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Prompt"
+                ],
+                "summary": "Get prompt related assets",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "namespace",
+                        "name": "namespace",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "name",
+                        "name": "name",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "current user",
+                        "name": "current_user",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/types.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/types.Relations"
+                                        }
+                                    }
+                                }
+                            ]
                         }
                     },
                     "400": {
@@ -16046,6 +16135,12 @@ const docTemplate = `{
                     "type": "array",
                     "items": {
                         "$ref": "#/definitions/types.Model"
+                    }
+                },
+                "prompts": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/types.Dataset"
                     }
                 },
                 "spaces": {

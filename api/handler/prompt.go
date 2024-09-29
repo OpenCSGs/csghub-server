@@ -105,6 +105,8 @@ func (h *PromptHandler) Index(ctx *gin.Context) {
 // @Tags         Prompt
 // @Accept       json
 // @Produce      json
+// @Param	     namespace path  string  true  "namespace"
+// @Param		 name path  string  true  "name"
 // @Success      200  {object}  types.Response{} "OK"
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
@@ -155,10 +157,12 @@ func (h *PromptHandler) ListPrompt(ctx *gin.Context) {
 // @Tags         Prompt
 // @Accept       json
 // @Produce      json
+// @Param	     namespace path  string  true  "namespace"
+// @Param		 name path  string  true  "name"
 // @Success      200  {object}  types.Response{} "OK"
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
-// @Router       /prompts/{namespace}/{name}/{file_path} [get]
+// @Router       /prompts/{namespace}/{name}/prompt/view/{file_path} [get]
 func (h *PromptHandler) GetPrompt(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
@@ -574,4 +578,39 @@ func (h *PromptHandler) HateMessage(ctx *gin.Context) {
 		return
 	}
 	httpbase.OK(ctx, nil)
+}
+
+// PromptRelations      godoc
+// @Security     ApiKey
+// @Summary      Get prompt related assets
+// @Tags         Prompt
+// @Accept       json
+// @Produce      json
+// @Param        namespace path string true "namespace"
+// @Param        name path string true "name"
+// @Param        current_user query string false "current user"
+// @Success      200  {object}  types.Response{data=types.Relations} "OK"
+// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
+// @Router       /prompts/{namespace}/{name}/relations [get]
+func (h *PromptHandler) Relations(ctx *gin.Context) {
+	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
+	if err != nil {
+		slog.Error("Bad request format", "error", err)
+		httpbase.BadRequest(ctx, err.Error())
+		return
+	}
+	currentUser := httpbase.GetCurrentUser(ctx)
+	detail, err := h.c.Relations(ctx, namespace, name, currentUser)
+	if err != nil {
+		if errors.Is(err, component.ErrUnauthorized) {
+			httpbase.UnauthorizedError(ctx, err)
+			return
+		}
+		slog.Error("Failed to get prompt relations", slog.Any("error", err))
+		httpbase.ServerError(ctx, err)
+		return
+	}
+
+	httpbase.OK(ctx, detail)
 }

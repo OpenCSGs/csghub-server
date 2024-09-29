@@ -80,6 +80,7 @@ func NewModelComponent(config *config.Config) (*ModelComponent, error) {
 		return nil, err
 	}
 	c.ac, err = NewAccountingComponent(config)
+	c.ds = database.NewDatasetStore()
 	if err != nil {
 		return nil, err
 	}
@@ -576,6 +577,21 @@ func (c *ModelComponent) getRelations(ctx context.Context, fromRepoID int64, cur
 	rels := new(types.Relations)
 	datasetRepos := res[types.DatasetRepo]
 	for _, repo := range datasetRepos {
+		dataset, err := c.ds.ByRepoID(ctx, repo.ID)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get dataset by repo id %d, error:  %w", repo.ID, err)
+		}
+		if dataset.Type == int(types.DatasetPrompt) {
+			rels.Prompts = append(rels.Prompts, &types.Dataset{
+				Path:        repo.Path,
+				Name:        repo.Name,
+				Nickname:    repo.Nickname,
+				Description: repo.Description,
+				UpdatedAt:   repo.UpdatedAt,
+				Private:     repo.Private,
+				Downloads:   repo.DownloadCount,
+			})
+		}
 		rels.Datasets = append(rels.Datasets, &types.Dataset{
 			Path:        repo.Path,
 			Name:        repo.Name,

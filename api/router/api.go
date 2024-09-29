@@ -728,7 +728,8 @@ func createPromptRoutes(apiGroup *gin.RouterGroup, promptHandler *handler.Prompt
 	{
 		promptGrp.GET("", promptHandler.Index)
 		promptGrp.GET("/:namespace/:name", promptHandler.ListPrompt)
-		promptGrp.GET("/:namespace/:name/*file_path", promptHandler.GetPrompt)
+		promptGrp.GET("/:namespace/:name/relations", promptHandler.Relations)
+		promptGrp.GET("/:namespace/:name/prompt/view/*file_path", promptHandler.GetPrompt)
 		conversationGrp := promptGrp.Group("/conversations")
 		{
 			conversationGrp.POST("", promptHandler.NewConversation)

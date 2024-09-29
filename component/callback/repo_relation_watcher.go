@@ -41,7 +41,7 @@ func WatchRepoRelation(req *types.GiteaCallbackPushReq, ss *database.RepoStore,
 	fullNamespace, repoName := splits[0], splits[1]
 	repoType, namespace, _ := strings.Cut(fullNamespace, "_")
 
-	if repoType == CodeRepoType || repoType == DatasetRepoType {
+	if repoType == CodeRepoType {
 		return watcher
 	}
 
@@ -106,7 +106,8 @@ func (w *repoRelationWatcher) toRepoIDsFromReadme(namespace, repoName, repoType,
 			paths = append(paths, fmt.Sprintf("%s%s", "codes_", codeItem))
 		}
 	}
-	if repoType == SpaceRepoType {
+
+	if repoType == SpaceRepoType || repoType == DatasetRepoType {
 		modelItems := meta["models"]
 		if len(modelItems) == 0 {
 			return toRepoIDs, nil
@@ -154,13 +155,20 @@ func (w *repoRelationWatcher) regenerate(namespace, repoName, repoType, ref stri
 					return fmt.Errorf("failed to find model repo,%w", err)
 				}
 				fromRepoID = fromRepo.ID
-
 			}
 
 			if repoType == SpaceRepoType {
 				fromRepo, err := w.rs.FindByPath(ctx, types.SpaceRepo, namespace, repoName)
 				if err != nil {
 					return fmt.Errorf("failed to find space repo,%w", err)
+				}
+				fromRepoID = fromRepo.ID
+			}
+
+			if repoType == DatasetRepoType {
+				fromRepo, err := w.rs.FindByPath(ctx, types.DatasetRepo, namespace, repoName)
+				if err != nil {
+					return fmt.Errorf("failed to find dataset repo,%w", err)
 				}
 				fromRepoID = fromRepo.ID
 			}
