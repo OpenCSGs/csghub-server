@@ -43,10 +43,12 @@ type ModelHandler struct {
 // @Produce      json
 // @Param        current_user query string false "current user"
 // @Param        search query string false "search text"
-// @Param        task_tag query string false "filter by task tag"
-// @Param        framework_tag query string false "filter by framework tag"
-// @Param        license_tag query string false "filter by license tag"
-// @Param        language_tag query string false "filter by language tag"
+// @Param        task_tag query string false "filter by task tag, deprecated"
+// @Param        framework_tag query string false "filter by framework tag, deprecated"
+// @Param        license_tag query string false "filter by license tag, deprecated"
+// @Param        language_tag query string false "filter by language tag, deprecated"
+// @Param        tag_category query string false "filter by tag category"
+// @Param        tag_name query string false "filter by tag name"
 // @Param        sort query string false "sort by"
 // @Param        source query string false "source" Enums(opencsg, huggingface, local)
 // @Param        per query int false "per" default(20)
@@ -369,6 +371,18 @@ func (h *ModelHandler) Predict(ctx *gin.Context) {
 }
 
 func parseTagReqs(ctx *gin.Context) (tags []types.TagReq) {
+	tagCategories := ctx.QueryArray("tag_category")
+	tagNames := ctx.QueryArray("tag_name")
+	if len(tagCategories) > 0 && len(tagCategories) == len(tagNames) {
+		for i, category := range tagCategories {
+			tags = append(tags, types.TagReq{
+				Name:     tagNames[i],
+				Category: category,
+			})
+		}
+		return
+	}
+
 	licenseTag := ctx.Query("license_tag")
 	taskTag := ctx.Query("task_tag")
 	frameworkTag := ctx.Query("framework_tag")

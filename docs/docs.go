@@ -3041,26 +3041,45 @@ const docTemplate = `{
                     },
                     {
                         "type": "string",
-                        "description": "filter by task tag",
+                        "description": "filter by task tag, deprecated",
                         "name": "task_tag",
                         "in": "query"
                     },
                     {
                         "type": "string",
-                        "description": "filter by framework tag",
+                        "description": "filter by framework tag, deprecated",
                         "name": "framework_tag",
                         "in": "query"
                     },
                     {
                         "type": "string",
-                        "description": "filter by license tag",
+                        "description": "filter by license tag, deprecated",
                         "name": "license_tag",
                         "in": "query"
                     },
                     {
                         "type": "string",
-                        "description": "filter by language tag",
+                        "description": "filter by language tag, deprecated",
                         "name": "language_tag",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "filter by tag category",
+                        "name": "tag_category",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "filter by tag name",
+                        "name": "tag_name",
+                        "in": "query"
+                    },
+                    {
+                        "type": "boolean",
+                        "default": false,
+                        "description": "need op weight",
+                        "name": "need_op_weight",
                         "in": "query"
                     },
                     {

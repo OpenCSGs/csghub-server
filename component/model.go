@@ -74,6 +74,11 @@ func NewModelComponent(config *config.Config) (*ModelComponent, error) {
 	c.infer = inference.NewInferClient(config.Inference.ServerAddr)
 	c.us = database.NewUserStore()
 	c.deployer = deploy.NewDeployer()
+	c.ts = database.NewTagStore()
+	c.rac, err = NewRuntimeArchitectureComponent(config)
+	if err != nil {
+		return nil, err
+	}
 	c.ac, err = NewAccountingComponent(config)
 	if err != nil {
 		return nil, err
@@ -91,6 +96,9 @@ type ModelComponent struct {
 	us            *database.UserStore
 	deployer      deploy.Deployer
 	ac            *AccountingComponent
+	ts            *database.TagStore
+	rac           *RuntimeArchitectureComponent
+	ds            *database.DatasetStore
 }
 
 func (c *ModelComponent) Index(ctx context.Context, filter *types.RepoFilter, per, page int) ([]types.Model, int, error) {
@@ -800,6 +808,8 @@ func (c *ModelComponent) SetRuntimeFrameworkModes(ctx context.Context, currentUs
 		return nil, err
 	}
 
+	runtime_framework_tags, _ := c.ts.GetTagsByScopeAndCategories(ctx, "model", []string{"runtime_framework", "resource"})
+
 	var failedModels []string
 	for _, model := range models {
 		relations, err := c.rrtfms.GetByIDsAndType(ctx, id, model.Repository.ID, deployType)
@@ -810,6 +820,15 @@ func (c *ModelComponent) SetRuntimeFrameworkModes(ctx context.Context, currentUs
 			err = c.rrtfms.Add(ctx, id, model.Repository.ID, deployType)
 			if err != nil {
 				failedModels = append(failedModels, model.Repository.Path)
+			}
+			_, modelName := model.Repository.NamespaceAndName()
+			err = c.rac.AddRuntimeFrameworkTag(ctx, runtime_framework_tags, model.Repository.ID, id)
+			if err != nil {
+				return nil, err
+			}
+			err = c.rac.AddResourceTag(ctx, runtime_framework_tags, modelName, model.Repository.ID)
+			if err != nil {
+				return nil, err
 			}
 		}
 	}
