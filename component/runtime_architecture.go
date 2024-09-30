@@ -191,7 +191,7 @@ func (c *RuntimeArchitectureComponent) scanNewModels(ctx context.Context, req ty
 func (c *RuntimeArchitectureComponent) IsSupportedModelResource(ctx context.Context, modelName string, rf *database.RuntimeFramework, id int64) (bool, error) {
 	trimModel := strings.Replace(strings.ToLower(modelName), "meta-", "", 1)
 	rm, err := c.rms.CheckModelNameNotInRFRepo(ctx, trimModel, id)
-	if err != nil {
+	if err != nil || rm == nil {
 		return false, err
 	}
 	image := strings.ToLower(rf.FrameImage)

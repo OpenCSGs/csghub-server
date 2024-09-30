@@ -1031,12 +1031,6 @@ func (h *ModelHandler) ListAllRuntimeFramework(ctx *gin.Context) {
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
 // @Router       /runtime_framework/{id} [post]
 func (h *ModelHandler) UpdateModelRuntimeFrameworks(ctx *gin.Context) {
-	currentUser := httpbase.GetCurrentUser(ctx)
-	if currentUser == "" {
-		httpbase.UnauthorizedError(ctx, component.ErrUserNotFound)
-		return
-	}
-
 	var req types.RuntimeFrameworkModels
 	if err := ctx.ShouldBindJSON(&req); err != nil {
 		slog.Error("Bad request format", "error", err)
@@ -1065,7 +1059,7 @@ func (h *ModelHandler) UpdateModelRuntimeFrameworks(ctx *gin.Context) {
 
 	slog.Info("update runtime frameworks models", slog.Any("req", req), slog.Any("runtime framework id", id), slog.Any("deployType", deployType))
 
-	list, err := h.c.SetRuntimeFrameworkModes(ctx, currentUser, deployType, id, req.Models)
+	list, err := h.c.SetRuntimeFrameworkModes(ctx, deployType, id, req.Models)
 	if err != nil {
 		slog.Error("Failed to set models runtime framework", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
@@ -1075,7 +1069,7 @@ func (h *ModelHandler) UpdateModelRuntimeFrameworks(ctx *gin.Context) {
 	httpbase.OK(ctx, list)
 }
 
-// UpdateModelRuntime godoc
+// DeleteModelRuntime godoc
 // @Security     ApiKey
 // @Summary      Set model runtime frameworks
 // @Description  set model runtime frameworks
@@ -1084,19 +1078,12 @@ func (h *ModelHandler) UpdateModelRuntimeFrameworks(ctx *gin.Context) {
 // @Produce      json
 // @Param        id path int true "runtime framework id"
 // @Param 		 deploy_type query int false "deploy_type" Enums(0, 1, 2) default(1)
-// @Param        current_user query string false "current user"
 // @Param        body body types.RuntimeFrameworkModels true "body"
 // @Success      200  {object}  types.Response{} "OK"
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
 // @Router       /runtime_framework/{id} [delete]
 func (h *ModelHandler) DeleteModelRuntimeFrameworks(ctx *gin.Context) {
-	currentUser := httpbase.GetCurrentUser(ctx)
-	if currentUser == "" {
-		httpbase.UnauthorizedError(ctx, component.ErrUserNotFound)
-		return
-	}
-
 	var req types.RuntimeFrameworkModels
 	if err := ctx.ShouldBindJSON(&req); err != nil {
 		slog.Error("Bad request format", "error", err)
@@ -1125,7 +1112,7 @@ func (h *ModelHandler) DeleteModelRuntimeFrameworks(ctx *gin.Context) {
 
 	slog.Info("update runtime frameworks models", slog.Any("req", req), slog.Any("runtime framework id", id), slog.Any("deployType", deployType))
 
-	list, err := h.c.DeleteRuntimeFrameworkModes(ctx, currentUser, deployType, id, req.Models)
+	list, err := h.c.DeleteRuntimeFrameworkModes(ctx, deployType, id, req.Models)
 	if err != nil {
 		slog.Error("Failed to set models runtime framework", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)

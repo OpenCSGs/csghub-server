@@ -793,7 +793,7 @@ func (c *ModelComponent) ListAllByRuntimeFramework(ctx context.Context, currentU
 	return runtimes, nil
 }
 
-func (c *ModelComponent) SetRuntimeFrameworkModes(ctx context.Context, currentUser string, deployType int, id int64, paths []string) ([]string, error) {
+func (c *ModelComponent) SetRuntimeFrameworkModes(ctx context.Context, deployType int, id int64, paths []string) ([]string, error) {
 	runtimeRepos, err := c.rtfm.FindByID(ctx, id)
 	if err != nil {
 		return nil, err
@@ -836,7 +836,7 @@ func (c *ModelComponent) SetRuntimeFrameworkModes(ctx context.Context, currentUs
 	return failedModels, nil
 }
 
-func (c *ModelComponent) DeleteRuntimeFrameworkModes(ctx context.Context, currentUser string, deployType int, id int64, paths []string) ([]string, error) {
+func (c *ModelComponent) DeleteRuntimeFrameworkModes(ctx context.Context, deployType int, id int64, paths []string) ([]string, error) {
 	models, err := c.ms.ListByPath(ctx, paths)
 	if err != nil {
 		return nil, err
