@@ -43,6 +43,7 @@ type GitCallbackComponent struct {
 	rac         *component.RuntimeArchitectureComponent
 	ras         *database.RuntimeArchitecturesStore
 	rfs         *database.RuntimeFrameworksStore
+	ts          *database.TagStore
 	// set visibility if file content is sensitive
 	setRepoVisibility bool
 }
@@ -76,6 +77,10 @@ func NewGitCallback(config *config.Config) (*GitCallbackComponent, error) {
 		return nil, err
 	}
 	rfs := database.NewRuntimeFrameworksStore()
+	ts := database.NewTagStore()
+	if err != nil {
+		return nil, err
+	}
 	return &GitCallbackComponent{
 		config:      config,
 		gs:          gs,
@@ -93,6 +98,7 @@ func NewGitCallback(config *config.Config) (*GitCallbackComponent, error) {
 		rac:         rac,
 		ras:         ras,
 		rfs:         rfs,
+		ts:          ts,
 	}, nil
 }
 
@@ -467,7 +473,12 @@ func (c *GitCallbackComponent) updateModelRuntimeFrameworks(ctx context.Context,
 		return
 	}
 	slog.Debug("get arch for git callback", slog.Any("namespace", namespace), slog.Any("repoName", repoName), slog.Any("arch", arch))
-	runtimes, err := c.ras.ListByRArchName(ctx, arch)
+	//add resource tag, like ascend
+	runtime_framework_tags, _ := c.ts.GetTagsByScopeAndCategories(ctx, "model", []string{"runtime_framework", "resource"})
+	fields := strings.Split(repo.Path, "/")
+	c.rac.AddResourceTag(ctx, runtime_framework_tags, fields[1], repo.ID)
+	runtimes, err := c.ras.ListByRArchNameAndModel(ctx, arch, fields[1])
+	// to do check resource models
 	if err != nil {
 		slog.Warn("fail to get runtime ids by arch for git callback", slog.Any("arch", arch), slog.Any("error", err))
 		return
@@ -511,6 +522,8 @@ func (c *GitCallbackComponent) updateModelRuntimeFrameworks(ctx context.Context,
 			if err != nil {
 				slog.Warn("fail to delete old repo runtimes for git callback", slog.Any("repo.ID", repo.ID), slog.Any("runtime framework id", old.RuntimeFrameworkID), slog.Any("error", err))
 			}
+			// remove runtime framework tags
+			c.rac.RemoveRuntimeFrameworkTag(ctx, runtime_framework_tags, repo.ID, old.RuntimeFrameworkID)
 		}
 	}
 
@@ -523,6 +536,11 @@ func (c *GitCallbackComponent) updateModelRuntimeFrameworks(ctx context.Context,
 			err := c.rrf.Add(ctx, new.ID, repo.ID, new.Type)
 			if err != nil {
 				slog.Warn("fail to add new repo runtimes for git callback", slog.Any("repo.ID", repo.ID), slog.Any("runtime framework id", new.ID), slog.Any("error", err))
+			}
+			// add runtime framework and resource tags
+			err = c.rac.AddRuntimeFrameworkTag(ctx, runtime_framework_tags, repo.ID, new.ID)
+			if err != nil {
+				slog.Warn("fail to add runtime framework tag for git callback", slog.Any("repo.ID", repo.ID), slog.Any("runtime framework id", new.ID), slog.Any("error", err))
 			}
 		}
 	}

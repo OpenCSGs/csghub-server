@@ -3041,26 +3041,38 @@ const docTemplate = `{
                     },
                     {
                         "type": "string",
-                        "description": "filter by task tag",
+                        "description": "filter by task tag, deprecated",
                         "name": "task_tag",
                         "in": "query"
                     },
                     {
                         "type": "string",
-                        "description": "filter by framework tag",
+                        "description": "filter by framework tag, deprecated",
                         "name": "framework_tag",
                         "in": "query"
                     },
                     {
                         "type": "string",
-                        "description": "filter by license tag",
+                        "description": "filter by license tag, deprecated",
                         "name": "license_tag",
                         "in": "query"
                     },
                     {
                         "type": "string",
-                        "description": "filter by language tag",
+                        "description": "filter by language tag, deprecated",
                         "name": "language_tag",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "filter by tag category",
+                        "name": "tag_category",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "filter by tag name",
+                        "name": "tag_name",
                         "in": "query"
                     },
                     {
@@ -6262,12 +6274,6 @@ const docTemplate = `{
                         "default": 1,
                         "description": "deploy_type",
                         "name": "deploy_type",
-                        "in": "query"
-                    },
-                    {
-                        "type": "string",
-                        "description": "current user",
-                        "name": "current_user",
                         "in": "query"
                     },
                     {
@@ -14991,9 +14997,9 @@ const docTemplate = `{
         "types.MirrorPriority": {
             "type": "integer",
             "enum": [
+                3,
                 2,
-                1,
-                0
+                1
             ],
             "x-enum-varnames": [
                 "HighMirrorPriority",
@@ -15031,6 +15037,7 @@ const docTemplate = `{
             "enum": [
                 "waiting",
                 "running",
+                "repo_synced",
                 "finished",
                 "failed",
                 "incomplete"
@@ -15038,6 +15045,7 @@ const docTemplate = `{
             "x-enum-varnames": [
                 "MirrorWaiting",
                 "MirrorRunning",
+                "MirrorRepoSynced",
                 "MirrorFinished",
                 "MirrorFailed",
                 "MirrorIncomplete"
