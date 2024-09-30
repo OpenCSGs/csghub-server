@@ -84,6 +84,17 @@ func (ts *TagStore) AllTagsByScopeAndCategory(ctx context.Context, scope TagScop
 	return tags, nil
 }
 
+func (ts *TagStore) GetTagsByScopeAndCategories(ctx context.Context, scope TagScope, categories []string) ([]*Tag, error) {
+	var tags []*Tag
+	err := ts.db.Operator.Core.NewSelect().Model(&tags).
+		Where("scope = ? and category in (?)", scope, bun.In(categories)).
+		Scan(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to select tags by scope,cause: %w", err)
+	}
+	return tags, nil
+}
+
 func (ts *TagStore) AllModelTags(ctx context.Context) ([]*Tag, error) {
 	return ts.AllTagsByScope(ctx, ModelTagScope)
 }
@@ -311,6 +322,21 @@ func (ts *TagStore) UpsertRepoTags(ctx context.Context, repoID int64, oldTagIDs,
 			}
 		}
 		return nil
+	})
+
+	return err
+}
+
+func (ts *TagStore) RemoveRepoTags(ctx context.Context, repoID int64, tagIDs []int64) (err error) {
+	if len(tagIDs) == 0 {
+		return nil
+	}
+	err = ts.db.Operator.Core.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
+		_, err = tx.NewDelete().
+			Model(&RepositoryTag{}).
+			Where("repository_id =? and tag_id in (?)", repoID, bun.In(tagIDs)).
+			Exec(ctx)
+		return err
 	})
 
 	return err

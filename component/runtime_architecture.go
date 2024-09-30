@@ -23,11 +23,17 @@ var (
 type RuntimeArchitectureComponent struct {
 	r   *RepoComponent
 	ras *database.RuntimeArchitecturesStore
+	rfs *database.RuntimeFrameworksStore
+	ts  *database.TagStore
+	rms *database.ResourceModelStore
 }
 
 func NewRuntimeArchitectureComponent(config *config.Config) (*RuntimeArchitectureComponent, error) {
 	c := &RuntimeArchitectureComponent{}
+	c.rfs = database.NewRuntimeFrameworksStore()
 	c.ras = database.NewRuntimeArchitecturesStore()
+	c.ts = database.NewTagStore()
+	c.rms = database.NewResourceModelStore()
 	repo, err := NewRepoComponent(config)
 	if err != nil {
 		return nil, fmt.Errorf("fail to create repo component, %w", err)
@@ -140,9 +146,14 @@ func (c *RuntimeArchitectureComponent) scanNewModels(ctx context.Context, req ty
 	if repos == nil {
 		return nil
 	}
+	runtime_framework, err := c.rfs.FindByID(ctx, req.FrameID)
+	if err != nil {
+		return fmt.Errorf("failed to get runtime framework by ID, %w", err)
+	}
+	runtime_framework_tags, _ := c.ts.GetTagsByScopeAndCategories(ctx, "model", []string{"runtime_framework", "resource"})
 	for _, repo := range repos {
-		fields := strings.Split(repo.Path, "/")
-		arch, err := c.GetArchitectureFromConfig(ctx, fields[0], fields[1])
+		namespace, name := repo.NamespaceAndName()
+		arch, err := c.GetArchitectureFromConfig(ctx, namespace, name)
 		if err != nil {
 			slog.Warn("did not to get arch for create relation", slog.Any("ConfigFileName", ConfigFileName), slog.Any("repo", repo.Path), slog.Any("error", err))
 			continue
@@ -150,16 +161,55 @@ func (c *RuntimeArchitectureComponent) scanNewModels(ctx context.Context, req ty
 		if len(arch) < 1 {
 			continue
 		}
+		// check if model is in resource model table but not in runtime framework repo
+		isSupportedRM, err := c.IsSupportedModelResource(ctx, name, runtime_framework, repo.ID)
+		if err != nil {
+			slog.Debug("fail to check model name in runtime framework repo", slog.Any("repo", repo.Path), slog.Any("error", err))
+		}
 		_, exist := req.ArchMap[arch]
-		if !exist {
+		if !exist && !isSupportedRM {
 			continue
 		}
 		err = c.r.rrtfms.Add(ctx, req.FrameID, repo.ID, req.FrameType)
 		if err != nil {
 			slog.Warn("fail to create relation", slog.Any("repo", repo.Path), slog.Any("frameid", req.FrameID), slog.Any("error", err))
 		}
+		// add runtime framework and resource tag to model
+		err = c.AddRuntimeFrameworkTag(ctx, runtime_framework_tags, repo.ID, req.FrameID)
+		if err != nil {
+			slog.Warn("fail to add runtime framework tag", slog.Any("repo", repo.Path), slog.Any("frameid", req.FrameID), slog.Any("error", err))
+		}
+		err = c.AddResourceTag(ctx, runtime_framework_tags, name, repo.ID)
+		if err != nil {
+			slog.Warn("fail to add resource tag", slog.Any("repo", repo.Path), slog.Any("frameid", req.FrameID), slog.Any("error", err))
+		}
 	}
 	return nil
+}
+
+// check if it's supported model resource by name
+func (c *RuntimeArchitectureComponent) IsSupportedModelResource(ctx context.Context, modelName string, rf *database.RuntimeFramework, id int64) (bool, error) {
+	trimModel := strings.Replace(strings.ToLower(modelName), "meta-", "", 1)
+	rm, err := c.rms.CheckModelNameNotInRFRepo(ctx, trimModel, id)
+	if err != nil || rm == nil {
+		return false, err
+	}
+	image := strings.ToLower(rf.FrameImage)
+	if strings.Contains(image, "/") {
+		parts := strings.Split(image, "/")
+		image = parts[len(parts)-1]
+	}
+
+	if strings.Contains(image, rm.EngineName) {
+		return true, nil
+	}
+	// special handling for nim models
+	nimImage := strings.ReplaceAll(image, "-", "")
+	nimMatchModel := strings.ReplaceAll(trimModel, "-", "")
+	if strings.Contains(nimImage, nimMatchModel) {
+		return true, nil
+	}
+	return false, nil
 }
 
 func (c *RuntimeArchitectureComponent) scanExistModels(ctx context.Context, req types.ScanReq) error {
@@ -226,4 +276,54 @@ func (c *RuntimeArchitectureComponent) getConfigContent(ctx context.Context, nam
 		return "", fmt.Errorf("get RepoFileRaw for relation, %w", err)
 	}
 	return content, nil
+}
+
+// remove runtime_framework tag from model
+func (c *RuntimeArchitectureComponent) RemoveRuntimeFrameworkTag(ctx context.Context, rftags []*database.Tag, repoId, rfId int64) {
+	rfw, _ := c.rfs.FindByID(ctx, rfId)
+	for _, tag := range rftags {
+		if strings.Contains(rfw.FrameImage, tag.Name) {
+			err := c.ts.RemoveRepoTags(ctx, repoId, []int64{tag.ID})
+			if err != nil {
+				slog.Warn("fail to remove runtime_framework tag from model repo", slog.Any("repoId", repoId), slog.Any("runtime_framework_id", rfId), slog.Any("error", err))
+			}
+		}
+	}
+}
+
+// add runtime_framework tag to model
+func (c *RuntimeArchitectureComponent) AddRuntimeFrameworkTag(ctx context.Context, rftags []*database.Tag, repoId, rfId int64) error {
+	rfw, err := c.rfs.FindByID(ctx, rfId)
+	if err != nil {
+		return err
+	}
+	for _, tag := range rftags {
+		if strings.Contains(rfw.FrameImage, tag.Name) {
+			err := c.ts.UpsertRepoTags(ctx, repoId, []int64{}, []int64{tag.ID})
+			if err != nil {
+				slog.Warn("fail to add runtime_framework tag to model repo", slog.Any("repoId", repoId), slog.Any("runtime_framework_id", rfId), slog.Any("error", err))
+			}
+		}
+	}
+	return nil
+}
+
+// add resource tag to model
+func (c *RuntimeArchitectureComponent) AddResourceTag(ctx context.Context, rstags []*database.Tag, modelname string, repoId int64) error {
+	rms, err := c.rms.FindByModelName(ctx, modelname)
+	if err != nil {
+		return err
+	}
+	for _, rm := range rms {
+		for _, tag := range rstags {
+			if strings.Contains(rm.ResourceName, tag.Name) {
+				err := c.ts.UpsertRepoTags(ctx, repoId, []int64{}, []int64{tag.ID})
+				if err != nil {
+					slog.Warn("fail to add resource tag to model repo", slog.Any("repoId", repoId), slog.Any("error", err))
+				}
+			}
+		}
+
+	}
+	return nil
 }

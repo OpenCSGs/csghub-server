@@ -1454,9 +1454,9 @@ definitions:
     type: object
   types.MirrorPriority:
     enum:
+    - 3
     - 2
     - 1
-    - 0
     type: integer
     x-enum-varnames:
     - HighMirrorPriority
@@ -1482,6 +1482,7 @@ definitions:
     enum:
     - waiting
     - running
+    - repo_synced
     - finished
     - failed
     - incomplete
@@ -1489,6 +1490,7 @@ definitions:
     x-enum-varnames:
     - MirrorWaiting
     - MirrorRunning
+    - MirrorRepoSynced
     - MirrorFinished
     - MirrorFailed
     - MirrorIncomplete
@@ -5781,21 +5783,29 @@ paths:
         in: query
         name: search
         type: string
-      - description: filter by task tag
+      - description: filter by task tag, deprecated
         in: query
         name: task_tag
         type: string
-      - description: filter by framework tag
+      - description: filter by framework tag, deprecated
         in: query
         name: framework_tag
         type: string
-      - description: filter by license tag
+      - description: filter by license tag, deprecated
         in: query
         name: license_tag
         type: string
-      - description: filter by language tag
+      - description: filter by language tag, deprecated
         in: query
         name: language_tag
+        type: string
+      - description: filter by tag category
+        in: query
+        name: tag_category
+        type: string
+      - description: filter by tag name
+        in: query
+        name: tag_name
         type: string
       - description: sort by
         in: query
@@ -7721,10 +7731,6 @@ paths:
         in: query
         name: deploy_type
         type: integer
-      - description: current user
-        in: query
-        name: current_user
-        type: string
       - description: body
         in: body
         name: body
