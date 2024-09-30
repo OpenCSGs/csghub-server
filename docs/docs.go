@@ -3076,13 +3076,6 @@ const docTemplate = `{
                         "in": "query"
                     },
                     {
-                        "type": "boolean",
-                        "default": false,
-                        "description": "need op weight",
-                        "name": "need_op_weight",
-                        "in": "query"
-                    },
-                    {
                         "type": "string",
                         "description": "sort by",
                         "name": "sort",
@@ -6281,12 +6274,6 @@ const docTemplate = `{
                         "default": 1,
                         "description": "deploy_type",
                         "name": "deploy_type",
-                        "in": "query"
-                    },
-                    {
-                        "type": "string",
-                        "description": "current user",
-                        "name": "current_user",
                         "in": "query"
                     },
                     {
@@ -15010,9 +14997,9 @@ const docTemplate = `{
         "types.MirrorPriority": {
             "type": "integer",
             "enum": [
+                3,
                 2,
-                1,
-                0
+                1
             ],
             "x-enum-varnames": [
                 "HighMirrorPriority",
@@ -15050,6 +15037,7 @@ const docTemplate = `{
             "enum": [
                 "waiting",
                 "running",
+                "repo_synced",
                 "finished",
                 "failed",
                 "incomplete"
@@ -15057,6 +15045,7 @@ const docTemplate = `{
             "x-enum-varnames": [
                 "MirrorWaiting",
                 "MirrorRunning",
+                "MirrorRepoSynced",
                 "MirrorFinished",
                 "MirrorFailed",
                 "MirrorIncomplete"
