@@ -360,7 +360,7 @@ func (h *PromptHandler) SubmitMessage(ctx *gin.Context) {
 				Uuid:    uuid,
 				Message: generatedText,
 			}
-			err = h.pc.SaveGeneratedText(ctx, res)
+			_, err = h.pc.SaveGeneratedText(ctx, res)
 			if err != nil {
 				slog.Error("fail to save generated message for request cancel", slog.Any("res", res), slog.Any("error", err))
 				httpbase.ServerError(ctx, err)
@@ -390,11 +390,13 @@ func (h *PromptHandler) SubmitMessage(ctx *gin.Context) {
 					Uuid:    uuid,
 					Message: generatedText,
 				}
-				err = h.pc.SaveGeneratedText(ctx, res)
+				msg, err := h.pc.SaveGeneratedText(ctx, res)
 				if err != nil {
 					slog.Error("fail to save generated message for stream close", slog.Any("res", res), slog.Any("error", err))
 					httpbase.ServerError(ctx, err)
 				}
+				ctx.SSEvent("data", fmt.Sprintf("{\"msg_id\": %d}", msg.ID))
+				ctx.Writer.Flush()
 				return
 			}
 		}

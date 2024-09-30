@@ -44,12 +44,12 @@ func (p *PromptConversationStore) CreateConversation(ctx context.Context, conver
 	return err
 }
 
-func (p *PromptConversationStore) SaveConversationMessage(ctx context.Context, message PromptConversationMessage) error {
+func (p *PromptConversationStore) SaveConversationMessage(ctx context.Context, message PromptConversationMessage) (*PromptConversationMessage, error) {
 	res, err := p.db.Core.NewInsert().Model(&message).Exec(ctx, &message)
 	if err := assertAffectedOneRow(res, err); err != nil {
-		return fmt.Errorf("insert message, %v, error:%w", message, err)
+		return nil, fmt.Errorf("insert message, %v, error:%w", message, err)
 	}
-	return nil
+	return &message, nil
 }
 
 func (p *PromptConversationStore) UpdateConversation(ctx context.Context, conversation PromptConversation) error {

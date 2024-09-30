@@ -208,7 +208,7 @@ func (c *PromptComponent) SubmitMessage(ctx context.Context, req types.Conversat
 		Role:           UserRole,
 		Content:        req.Message,
 	}
-	err = c.pc.SaveConversationMessage(ctx, reqMsg)
+	_, err = c.pc.SaveConversationMessage(ctx, reqMsg)
 	if err != nil {
 		return nil, fmt.Errorf("save user prompt input error: %w", err)
 	}
@@ -258,17 +258,17 @@ func (c *PromptComponent) SubmitMessage(ctx context.Context, req types.Conversat
 	return ch, nil
 }
 
-func (c *PromptComponent) SaveGeneratedText(ctx context.Context, req types.Conversation) error {
+func (c *PromptComponent) SaveGeneratedText(ctx context.Context, req types.Conversation) (*database.PromptConversationMessage, error) {
 	respMsg := database.PromptConversationMessage{
 		ConversationID: req.Uuid,
 		Role:           AssistantRole,
 		Content:        req.Message,
 	}
-	err := c.pc.SaveConversationMessage(ctx, respMsg)
+	msg, err := c.pc.SaveConversationMessage(ctx, respMsg)
 	if err != nil {
-		return fmt.Errorf("save system generated response error: %w", err)
+		return nil, fmt.Errorf("save system generated response error: %w", err)
 	}
-	return nil
+	return msg, nil
 }
 
 func (c *PromptComponent) RemoveConversation(ctx context.Context, req types.ConversationReq) error {
