@@ -135,6 +135,12 @@ func (w *LocalMirrorWoker) SyncRepo(ctx context.Context, task queue.MirrorTask) 
 		RepoType:  mirror.Repository.RepositoryType,
 	})
 	if err != nil {
+		mirror.Status = types.MirrorFailed
+		mirror.LastMessage = fmt.Sprintf("failed to get repo detail:%s", err.Error())
+		err = w.mirrorStore.Update(ctx, mirror)
+		if err != nil {
+			return fmt.Errorf("failed to update mirror status: %w", err)
+		}
 		return fmt.Errorf("failed to get repo default branch: %w", err)
 	}
 	parts := strings.Split(string(resp.DefaultBranch), "/")

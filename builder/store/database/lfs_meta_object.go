@@ -89,6 +89,9 @@ func (s *LfsMetaObjectStore) UpdateOrCreate(ctx context.Context, input LfsMetaOb
 }
 
 func (s *LfsMetaObjectStore) BulkUpdateOrCreate(ctx context.Context, input []LfsMetaObject) error {
+	if len(input) == 0 {
+		return nil
+	}
 	_, err := s.db.Core.NewInsert().
 		Model(&input).
 		On("CONFLICT (oid, repository_id) DO UPDATE").
