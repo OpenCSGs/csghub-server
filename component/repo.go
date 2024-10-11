@@ -947,7 +947,6 @@ func (c *RepoComponent) Tree(ctx context.Context, req *types.GetFileReq) ([]*typ
 		Path:      req.Path,
 		RepoType:  req.RepoType,
 	}
-	getRepoFileTree.Ref = repo.DefaultBranch
 	tree, err := c.git.GetRepoFileTree(ctx, getRepoFileTree)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get git %s repository file tree, error: %w", req.RepoType, err)
