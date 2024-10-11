@@ -133,6 +133,7 @@ type GetAllFilesReq struct {
 	Name        string         `json:"name"`
 	RepoType    RepositoryType `json:"repo_type"`
 	CurrentUser string         `json:"current_user"`
+	Ref         string         `json:"ref"`
 }
 
 type LFSPointer struct {

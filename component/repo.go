@@ -993,7 +993,7 @@ func (c *RepoComponent) UploadFile(ctx context.Context, req *types.CreateFileReq
 	return err
 }
 
-func (c *RepoComponent) SDKListFiles(ctx context.Context, repoType types.RepositoryType, namespace, name, userName string) (*types.SDKFiles, error) {
+func (c *RepoComponent) SDKListFiles(ctx context.Context, repoType types.RepositoryType, namespace, name, ref, userName string) (*types.SDKFiles, error) {
 	var sdkFiles []types.SDKFile
 	repo, err := c.repo.FindByPath(ctx, repoType, namespace, name)
 	if err != nil || repo == nil {
@@ -1008,7 +1008,11 @@ func (c *RepoComponent) SDKListFiles(ctx context.Context, repoType types.Reposit
 		return nil, ErrUnauthorized
 	}
 
-	filePaths, err := getFilePaths(namespace, name, "", repoType, c.git.GetRepoFileTree)
+	if ref == "" {
+		ref = repo.DefaultBranch
+	}
+
+	filePaths, err := getFilePaths(namespace, name, "", repoType, ref, c.git.GetRepoFileTree)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get all %s files, error: %w", repoType, err)
 	}
@@ -2424,7 +2428,7 @@ func (c *RepoComponent) AllFiles(ctx context.Context, req types.GetAllFilesReq) 
 			return nil, fmt.Errorf("users do not have permission to get all files for this repo")
 		}
 	}
-	allFiles, err := getAllFiles(req.Namespace, req.Name, "", req.RepoType, c.git.GetRepoFileTree)
+	allFiles, err := getAllFiles(req.Namespace, req.Name, "", req.RepoType, req.Ref, c.git.GetRepoFileTree)
 	if err != nil {
 		slog.Error("fail to get all files of repository", slog.Any("repoType", req.RepoType), slog.String("namespace", req.Namespace), slog.String("name", req.Name), slog.String("error", err.Error()))
 		return nil, err

@@ -339,6 +339,7 @@ func (h *DatasetHandler) AllFiles(ctx *gin.Context) {
 	req.Name = name
 	req.RepoType = types.DatasetRepo
 	req.CurrentUser = httpbase.GetCurrentUser(ctx)
+	req.Ref = ""
 	detail, err := h.c.AllFiles(ctx, req)
 	if err != nil {
 		if errors.Is(err, component.ErrUnauthorized) {
