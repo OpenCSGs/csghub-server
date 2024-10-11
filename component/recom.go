@@ -125,7 +125,7 @@ func (rc *RecomComponent) calcQualityScore(ctx context.Context, repo *database.R
 	score := 0.0
 	// get file counts from git server
 	namespace, name := repo.NamespaceAndName()
-	files, err := getFilePaths(namespace, name, "", repo.RepositoryType, rc.gs.GetRepoFileTree)
+	files, err := getFilePaths(namespace, name, "", repo.RepositoryType, "", rc.gs.GetRepoFileTree)
 	if err != nil {
 		return 0, fmt.Errorf("failed to get repo file tree,%w", err)
 	}

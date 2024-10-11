@@ -725,8 +725,8 @@ func (h *RepoHandler) SDKListFiles(ctx *gin.Context) {
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
-
-	files, err := h.c.SDKListFiles(ctx, common.RepoTypeFromContext(ctx), namespace, name, currentUser)
+	ref := ctx.Param("ref")
+	files, err := h.c.SDKListFiles(ctx, common.RepoTypeFromContext(ctx), namespace, name, ref, currentUser)
 	if err != nil {
 		if errors.Is(err, component.ErrUnauthorized) {
 			slog.Error("permission denied when accessing repo", slog.String("repo_type", string(common.RepoTypeFromContext(ctx))), slog.Any("path", fmt.Sprintf("%s/%s", namespace, name)))
