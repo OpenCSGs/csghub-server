@@ -1,30 +1,38 @@
-# CSGHUB finetune images
+# CSGHUB Finetune Images Building
 
-## base image
-https://docs.nvidia.com/deeplearning/frameworks/support-matrix/index.html
-https://catalog.ngc.nvidia.com/orgs/nvidia/containers/pytorch/tags
+## Base Images
+- https://docs.nvidia.com/deeplearning/frameworks/support-matrix/index.html
+- https://catalog.ngc.nvidia.com/orgs/nvidia/containers/pytorch/tags
 
-## build images
+## Login Container Registry
 ```bash
-docker build -f Dockerfile.llamafactory .
+OPENCSG_ACR="opencsg-registry.cn-beijing.cr.aliyuncs.com"
+OPENCSG_ACR_USERNAME=""
+OPENCSG_ACR_PASSWORD=""
+echo "$OPENCSG_ACR_PASSWORD" | docker login $OPENCSG_ACR -u $OPENCSG_ACR_USERNAME --password-stdin
 ```
 
-## push images
+## Build Multi-Platform Images
+```bash
+export BUILDX_NO_DEFAULT_ATTESTATIONS=1
+export IMAGE_TAG=1.21-cuda12.1-devel-ubuntu22.04-py310-torch2.1.2
+docker buildx build --platform linux/amd64,linux/arm64 \
+  -t ${OPENCSG_ACR}/public/llama-factory:${IMAGE_TAG} \
+  -t ${OPENCSG_ACR}/public/llama-factory:latest \
+  -f Dockerfile.llamafactory \
+  --push .
 ```
-docker login opencsg-registry.cn-beijing.cr.aliyuncs.com
-docker push xxx
-```
-## latest images
-```
-#for llama-factory image
-opencsg-registry.cn-beijing.cr.aliyuncs.com/public/llama-factory:1.20-cuda12.1-devel-ubuntu22.04-py310-torch2.1.2
-```
-## Run image locally
-```
+*Note: The above command will create `linux/amd64` and `linux/arm64` images with the tags `${IMAGE_TAG}` and `latest` at the same time.*
 
-docker run -d -e ACCESS_TOKEN=xxx -e REPO_ID="OpenCSG/csg-wukong-1B"  -e HF_ENDPOINT=https://hub.opencsg.com/hf  opencsg-registry.cn-beijing.cr.aliyuncs.com/public/llama-factory:1.20-cuda12.1-devel-ubuntu22.04-py310-torch2.1.2
-
+## Run Finetune Image Locally
+```bash
+docker run -d \
+  -e ACCESS_TOKEN=xxx \
+  -e REPO_ID="OpenCSG/csg-wukong-1B" \
+  -e HF_ENDPOINT=https://opencsg.com/hf \
+  -p 8000:8000 \
+  ${OPENCSG_ACR}/public/llama-factory:${IMAGE_TAG}
 ```
-Note: HF_ENDPOINT should be use the real csghub address
+*Note: HF_ENDPOINT should be use the real csghub address.*
 
 
