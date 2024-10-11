@@ -494,7 +494,7 @@ func (c *ModelComponent) SDKModelInfo(ctx context.Context, namespace, name, ref,
 		}
 	}
 
-	filePaths, err := getFilePaths(namespace, name, "", types.ModelRepo, c.git.GetRepoFileTree)
+	filePaths, err := getFilePaths(namespace, name, "", types.ModelRepo, ref, c.git.GetRepoFileTree)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get all %s files, error: %w", types.ModelRepo, err)
 	}
@@ -612,9 +612,9 @@ func (c *ModelComponent) getRelations(ctx context.Context, fromRepoID int64, cur
 	return rels, nil
 }
 
-func getFilePaths(namespace, repoName, folder string, repoType types.RepositoryType, gsTree func(ctx context.Context, req gitserver.GetRepoInfoByPathReq) ([]*types.File, error)) ([]string, error) {
+func getFilePaths(namespace, repoName, folder string, repoType types.RepositoryType, ref string, gsTree func(ctx context.Context, req gitserver.GetRepoInfoByPathReq) ([]*types.File, error)) ([]string, error) {
 	var filePaths []string
-	allFiles, err := getAllFiles(namespace, repoName, folder, repoType, gsTree)
+	allFiles, err := getAllFiles(namespace, repoName, folder, repoType, ref, gsTree)
 	if err != nil {
 		return nil, err
 	}
