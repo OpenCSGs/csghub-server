@@ -24,6 +24,7 @@ type MinioLFSSyncWorker struct {
 	tasks              chan queue.MirrorTask
 	wg                 sync.WaitGroup
 	mirrorStore        *database.MirrorStore
+	repoStore          *database.RepoStore
 	lfsMetaObjectStore *database.LfsMetaObjectStore
 	s3Client           *minio.Client
 	config             *config.Config
@@ -41,6 +42,7 @@ func NewMinioLFSSyncWorker(config *config.Config, numWorkers int) (*MinioLFSSync
 		return nil, newError
 	}
 	w.mirrorStore = database.NewMirrorStore()
+	w.repoStore = database.NewRepoStore()
 	w.lfsMetaObjectStore = database.NewLfsMetaObjectStore()
 	w.config = config
 	mq, err := queue.GetPriorityQueueInstance()
@@ -83,21 +85,37 @@ func (w *MinioLFSSyncWorker) worker(id int) {
 	for {
 		task := <-w.tasks
 		ctx := context.Background()
-		err := w.SyncLfs(ctx, id, task.MirrorID)
+		mirror, err := w.mirrorStore.FindByID(ctx, task.MirrorID)
 		if err != nil {
+			slog.Error("fail to get mirror", slog.Int("workerId", id), slog.String("error", err.Error()))
+			continue
+		}
+		repo, err := w.repoStore.FindById(ctx, mirror.RepositoryID)
+		if err != nil {
+			slog.Error("fail to get repository", slog.Int("workerId", id), slog.String("error", err.Error()))
+			continue
+		}
+		err = w.SyncLfs(ctx, id, mirror)
+		if err != nil {
+			repo.SyncStatus = types.SyncStatusFailed
+			_, repoErr := w.repoStore.UpdateRepo(ctx, *repo)
+			if repoErr != nil {
+				slog.Error("fail to update repo sync status to failed: %w", slog.Any("error", err))
+			}
 			slog.Error("fail to sync lfs", slog.Int("workerId", id), slog.String("error", err.Error()))
 			continue
+		}
+
+		repo.SyncStatus = types.SyncStatusCompleted
+		_, err = w.repoStore.UpdateRepo(ctx, *repo)
+		if err != nil {
+			slog.Error("fail to update repo sync status to complete: %w", slog.Any("error", err))
 		}
 	}
 }
 
-func (w *MinioLFSSyncWorker) SyncLfs(ctx context.Context, workerId int, mirrorID int64) error {
+func (w *MinioLFSSyncWorker) SyncLfs(ctx context.Context, workerId int, mirror *database.Mirror) error {
 	var pointers []*types.Pointer
-	mirror, err := w.mirrorStore.FindByID(ctx, mirrorID)
-	if err != nil {
-		slog.Error("fail to get mirror", slog.Int("workerId", workerId), slog.String("error", err.Error()))
-		return fmt.Errorf("fail to get mirror: %w", err)
-	}
 	lfsMetaObjects, err := w.lfsMetaObjectStore.FindByRepoID(ctx, mirror.Repository.ID)
 	if err != nil {
 		slog.Error("fail to get lfs meta objects", slog.Int("workerId", workerId), slog.String("error", err.Error()))
