@@ -141,13 +141,14 @@ func (w *LocalMirrorWoker) SyncRepo(ctx context.Context, task queue.MirrorTask) 
 	branch := parts[len(parts)-1]
 
 	mirror.Repository.DefaultBranch = branch
+	mirror.Repository.SyncStatus = types.SyncStatusInProgress
 	_, err = w.repoStore.UpdateRepo(ctx, *mirror.Repository)
 	if err != nil {
-		return fmt.Errorf("failed to update repo: %w", err)
+		return fmt.Errorf("failed to update repo sync status to in progress: %w", err)
 	}
 	slog.Info("Update repo default branch successfully", slog.Any("repo_type", mirror.Repository.RepositoryType), slog.Any("namespace", namespace), slog.Any("name", name))
 	slog.Info("Start to sync lfs files", "repo_type", mirror.Repository.RepositoryType, "namespace", namespace, "name", name)
-	err = w.generateLfsMetaObjects(ctx, mirror)
+	lfsFileCount, err := w.generateLfsMetaObjects(ctx, mirror)
 	if err != nil {
 		mirror.Status = types.MirrorIncomplete
 		mirror.LastMessage = err.Error()
@@ -155,24 +156,35 @@ func (w *LocalMirrorWoker) SyncRepo(ctx context.Context, task queue.MirrorTask) 
 		if err != nil {
 			return fmt.Errorf("failed to update mirror: %w", err)
 		}
+
+		mirror.Repository.SyncStatus = types.SyncStatusFailed
+		_, err = w.repoStore.UpdateRepo(ctx, *mirror.Repository)
+		if err != nil {
+			return fmt.Errorf("failed to update repo sync status to failed: %w", err)
+		}
 		return fmt.Errorf("failed to sync lfs files: %v", err)
 	}
-	mirror.Status = types.MirrorRepoSynced
+	if lfsFileCount > 0 {
+		mirror.Status = types.MirrorRepoSynced
+		w.mq.PushLfsMirror(&queue.MirrorTask{
+			MirrorID:    mirror.ID,
+			Priority:    queue.Priority(mirror.Priority),
+			CreatedAt:   mirror.CreatedAt.Unix(),
+			MirrorToken: task.MirrorToken,
+		})
+	} else {
+		mirror.Status = types.MirrorFinished
+	}
+
 	err = w.mirrorStore.Update(ctx, mirror)
 	if err != nil {
 		return fmt.Errorf("failed to update mirror: %w", err)
 	}
-	w.mq.PushLfsMirror(&queue.MirrorTask{
-		MirrorID:    mirror.ID,
-		Priority:    queue.Priority(mirror.Priority),
-		CreatedAt:   mirror.CreatedAt.Unix(),
-		MirrorToken: task.MirrorToken,
-	})
 
 	return nil
 }
 
-func (c *LocalMirrorWoker) generateLfsMetaObjects(ctx context.Context, mirror *database.Mirror) error {
+func (c *LocalMirrorWoker) generateLfsMetaObjects(ctx context.Context, mirror *database.Mirror) (int, error) {
 	var lfsMetaObjects []database.LfsMetaObject
 	namespace := strings.Split(mirror.Repository.Path, "/")[0]
 	name := strings.Split(mirror.Repository.Path, "/")[1]
@@ -182,12 +194,12 @@ func (c *LocalMirrorWoker) generateLfsMetaObjects(ctx context.Context, mirror *d
 		RepoType:  mirror.Repository.RepositoryType,
 	})
 	if err != nil {
-		return fmt.Errorf("failed to get repo branches: %v", err)
+		return 0, fmt.Errorf("failed to get repo branches: %v", err)
 	}
 	for _, branch := range branches {
 		lfsPointers, err := c.getAllLfsPointersByRef(ctx, mirror.Repository.RepositoryType, namespace, name, branch.Name)
 		if err != nil {
-			return fmt.Errorf("failed to get all lfs pointers: %v", err)
+			return 0, fmt.Errorf("failed to get all lfs pointers: %v", err)
 		}
 		for _, lfsPointer := range lfsPointers {
 			lfsMetaObjects = append(lfsMetaObjects, database.LfsMetaObject{
@@ -200,12 +212,14 @@ func (c *LocalMirrorWoker) generateLfsMetaObjects(ctx context.Context, mirror *d
 	}
 	lfsMetaObjects = removeDuplicateLfsMetaObject(lfsMetaObjects)
 
-	err = c.lfsMetaObjectStore.BulkUpdateOrCreate(ctx, lfsMetaObjects)
-	if err != nil {
-		return fmt.Errorf("failed to bulk update or create lfs meta objects: %v", err)
+	if len(lfsMetaObjects) > 0 {
+		err = c.lfsMetaObjectStore.BulkUpdateOrCreate(ctx, lfsMetaObjects)
+		if err != nil {
+			return 0, fmt.Errorf("failed to bulk update or create lfs meta objects: %v", err)
+		}
 	}
 
-	return nil
+	return len(lfsMetaObjects), nil
 }
 
 func (c *LocalMirrorWoker) getAllLfsPointersByRef(ctx context.Context, RepoType types.RepositoryType, namespace, name, ref string) ([]*types.LFSPointer, error) {
