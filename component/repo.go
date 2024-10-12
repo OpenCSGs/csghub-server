@@ -1552,12 +1552,14 @@ func (c *RepoComponent) MirrorFromSaas(ctx context.Context, namespace, name, cur
 			CreatedAt:   mirror.CreatedAt.Unix(),
 			MirrorToken: syncClientSetting.Token,
 		})
+		repo.SyncStatus = types.SyncStatusPending
+	} else {
+		repo.SyncStatus = types.SyncStatusInProgress
 	}
 
-	repo.SyncStatus = types.SyncStatusInProgress
 	_, err = c.repo.UpdateRepo(ctx, *repo)
 	if err != nil {
-		return fmt.Errorf("failed to update repo sync status")
+		return fmt.Errorf("failed to update repo sync status: %w", err)
 	}
 	return nil
 }
@@ -1567,6 +1569,11 @@ func (c *RepoComponent) mirrorFromSaasSync(ctx context.Context, mirror *database
 	syncClientSetting, err := c.syncClientSetting.First(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to find sync client setting, error: %w", err)
+	}
+
+	repo, err := c.repo.FindById(ctx, mirror.RepositoryID)
+	if err != nil {
+		return fmt.Errorf("failed to find repo, error: %w", err)
 	}
 	if c.config.GitServer.Type == types.GitServerTypeGitea {
 		err = c.git.MirrorSync(ctx, gitserver.MirrorSyncReq{
@@ -1578,6 +1585,7 @@ func (c *RepoComponent) mirrorFromSaasSync(ctx context.Context, mirror *database
 		if err != nil {
 			return fmt.Errorf("failed to sync mirror, error: %w", err)
 		}
+		repo.SyncStatus = types.SyncStatusInProgress
 	}
 	if c.config.GitServer.Type == types.GitServerTypeGitaly {
 		c.mq.PushRepoMirror(&queue.MirrorTask{
@@ -1586,6 +1594,12 @@ func (c *RepoComponent) mirrorFromSaasSync(ctx context.Context, mirror *database
 			CreatedAt:   mirror.CreatedAt.Unix(),
 			MirrorToken: syncClientSetting.Token,
 		})
+		repo.SyncStatus = types.SyncStatusPending
+	}
+
+	_, err = c.repo.UpdateRepo(ctx, *repo)
+	if err != nil {
+		return fmt.Errorf("failed to update repo sync status: %w", err)
 	}
 	return nil
 }

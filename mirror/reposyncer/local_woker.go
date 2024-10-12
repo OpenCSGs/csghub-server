@@ -141,9 +141,10 @@ func (w *LocalMirrorWoker) SyncRepo(ctx context.Context, task queue.MirrorTask) 
 	branch := parts[len(parts)-1]
 
 	mirror.Repository.DefaultBranch = branch
+	mirror.Repository.SyncStatus = types.SyncStatusInProgress
 	_, err = w.repoStore.UpdateRepo(ctx, *mirror.Repository)
 	if err != nil {
-		return fmt.Errorf("failed to update repo: %w", err)
+		return fmt.Errorf("failed to update repo sync status to in progress: %w", err)
 	}
 	slog.Info("Update repo default branch successfully", slog.Any("repo_type", mirror.Repository.RepositoryType), slog.Any("namespace", namespace), slog.Any("name", name))
 	slog.Info("Start to sync lfs files", "repo_type", mirror.Repository.RepositoryType, "namespace", namespace, "name", name)
@@ -154,6 +155,11 @@ func (w *LocalMirrorWoker) SyncRepo(ctx context.Context, task queue.MirrorTask) 
 		err = w.mirrorStore.Update(ctx, mirror)
 		if err != nil {
 			return fmt.Errorf("failed to update mirror: %w", err)
+		}
+		mirror.Repository.SyncStatus = types.SyncStatusFailed
+		_, err = w.repoStore.UpdateRepo(ctx, *mirror.Repository)
+		if err != nil {
+			return fmt.Errorf("failed to update repo sync status to failed: %w", err)
 		}
 		return fmt.Errorf("failed to sync lfs files: %v", err)
 	}

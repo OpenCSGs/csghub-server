@@ -24,6 +24,7 @@ type MinioLFSSyncWorker struct {
 	tasks              chan queue.MirrorTask
 	wg                 sync.WaitGroup
 	mirrorStore        *database.MirrorStore
+	repoStore          *database.RepoStore
 	lfsMetaObjectStore *database.LfsMetaObjectStore
 	s3Client           *minio.Client
 	config             *config.Config
@@ -41,6 +42,7 @@ func NewMinioLFSSyncWorker(config *config.Config, numWorkers int) (*MinioLFSSync
 		return nil, newError
 	}
 	w.mirrorStore = database.NewMirrorStore()
+	w.repoStore = database.NewRepoStore()
 	w.lfsMetaObjectStore = database.NewLfsMetaObjectStore()
 	w.config = config
 	mq, err := queue.GetPriorityQueueInstance()
@@ -98,6 +100,11 @@ func (w *MinioLFSSyncWorker) SyncLfs(ctx context.Context, workerId int, mirrorID
 		slog.Error("fail to get mirror", slog.Int("workerId", workerId), slog.String("error", err.Error()))
 		return fmt.Errorf("fail to get mirror: %w", err)
 	}
+	repo, err := w.repoStore.FindById(ctx, mirror.RepositoryID)
+	if err != nil {
+		slog.Error("fail to get repository", slog.Int("workerId", workerId), slog.String("error", err.Error()))
+		return fmt.Errorf("fail to get repository: %w", err)
+	}
 	lfsMetaObjects, err := w.lfsMetaObjectStore.FindByRepoID(ctx, mirror.Repository.ID)
 	if err != nil {
 		slog.Error("fail to get lfs meta objects", slog.Int("workerId", workerId), slog.String("error", err.Error()))
@@ -112,11 +119,27 @@ func (w *MinioLFSSyncWorker) SyncLfs(ctx context.Context, workerId int, mirrorID
 
 	pointers, err = w.GetLFSDownloadURLs(ctx, mirror, pointers)
 	if err != nil {
+		repo.SyncStatus = types.SyncStatusFailed
+		_, err = w.repoStore.UpdateRepo(ctx, *repo)
+		if err != nil {
+			slog.Error("fail to update repo sync status to failed", slog.Int("workerId", workerId), slog.String("error", err.Error()))
+		}
 		return fmt.Errorf("fail to get LFS download URL: %w", err)
 	}
 	err = w.DownloadAndUploadLFSFiles(ctx, mirror, pointers)
 	if err != nil {
+		repo.SyncStatus = types.SyncStatusFailed
+		_, err = w.repoStore.UpdateRepo(ctx, *repo)
+		if err != nil {
+			slog.Error("fail to update repo sync status to failed", slog.Int("workerId", workerId), slog.String("error", err.Error()))
+		}
 		return fmt.Errorf("fail to download and upload LFS files: %w", err)
+	}
+
+	repo.SyncStatus = types.SyncStatusCompleted
+	_, err = w.repoStore.UpdateRepo(ctx, *repo)
+	if err != nil {
+		return fmt.Errorf("fail to update repo sync status to complete: %w", err)
 	}
 	return nil
 }
