@@ -144,7 +144,7 @@ func (d *deployer) dedicatedDeploy(ctx context.Context, dr types.DeployRepo) (*d
 	deploy := &database.Deploy{
 		DeployName:       dr.DeployName,
 		SpaceID:          dr.SpaceID,
-		GitPath:          dr.GitPath,
+		GitPath:          dr.Path,
 		GitBranch:        dr.GitBranch,
 		Secret:           dr.Secret,
 		Template:         dr.Template,
