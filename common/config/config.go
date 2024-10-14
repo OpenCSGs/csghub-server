@@ -81,7 +81,7 @@ type Config struct {
 		Region          string `envconfig:"STARHUB_SERVER_S3_REGION"`
 		Endpoint        string `envconfig:"STARHUB_SERVER_S3_ENDPOINT" default:"localhost:9000"`
 		//for better performance of LFS downloading from s3. (can ignore if S3.Endpoint is alreay an internal domain or ip address)
-		InternalEndpoint string `envconfig:"STARHUB_SERVER_S3_INTERNAL_ENDPOINT" default:"localhost:9000"`
+		InternalEndpoint string `envconfig:"STARHUB_SERVER_S3_INTERNAL_ENDPOINT" default:""`
 		Bucket           string `envconfig:"STARHUB_SERVER_S3_BUCKET" default:"opencsg-test"`
 		EnableSSL        bool   `envconfig:"STARHUB_SERVER_S3_ENABLE_SSL" default:"false"`
 	}
