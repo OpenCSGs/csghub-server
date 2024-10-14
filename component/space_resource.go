@@ -59,11 +59,17 @@ func (c *SpaceResourceComponent) Index(ctx context.Context, clusterId string, de
 				continue
 			}
 		}
+		resourceType := types.ResourceTypeCPU
+		if hardware.Gpu.Num != "" {
+			resourceType = types.ResourceTypeGPU
+		}
+
 		result = append(result, types.SpaceResource{
 			ID:          r.ID,
 			Name:        r.Name,
 			Resources:   r.Resources,
 			IsAvailable: isAvailable,
+			Type:        resourceType,
 		})
 	}
 
