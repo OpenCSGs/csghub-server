@@ -50,7 +50,7 @@ type RepoComponent struct {
 	rel                *database.RepoRelationsStore
 	mirror             *database.MirrorStore
 	git                gitserver.GitServer
-	s3Client           *minio.Client
+	s3Client           *s3.Client
 	userSvcClient      rpc.UserSvcClient
 	lfsBucket          string
 	uls                *database.UserLikesStore
