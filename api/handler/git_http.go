@@ -175,6 +175,11 @@ func (h *GitHTTPHandler) LfsBatch(ctx *gin.Context) {
 		return
 	}
 
+	s3Internal := ctx.GetHeader("X-OPENCSG-S3-Internal")
+	if s3Internal == "true" {
+		ctx.Set("X-OPENCSG-S3-Internal", true)
+	}
+
 	objectResponse, err := h.c.BuildObjectResponse(ctx, batchRequest, isUpload)
 	if err != nil {
 		if errors.Is(err, component.ErrUnauthorized) {
@@ -234,6 +239,11 @@ func (h *GitHTTPHandler) LfsDownload(ctx *gin.Context) {
 	downloadRequest.RepoType = types.RepositoryType(ctx.GetString("repo_type"))
 	downloadRequest.CurrentUser = httpbase.GetCurrentUser(ctx)
 	downloadRequest.SaveAs = ctx.Query("save_as")
+
+	s3Internal := ctx.GetHeader("X-OPENCSG-S3-Internal")
+	if s3Internal == "true" {
+		ctx.Set("X-OPENCSG-S3-Internal", true)
+	}
 
 	url, err := h.c.LfsDownload(ctx, downloadRequest)
 	if err != nil {

@@ -26,7 +26,7 @@ type MinioLFSSyncWorker struct {
 	mirrorStore        *database.MirrorStore
 	repoStore          *database.RepoStore
 	lfsMetaObjectStore *database.LfsMetaObjectStore
-	s3Client           *minio.Client
+	s3Client           *s3.Client
 	config             *config.Config
 	numWorkers         int
 }
