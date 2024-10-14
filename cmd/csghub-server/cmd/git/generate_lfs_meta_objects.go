@@ -94,7 +94,7 @@ var generateLfsMetaObjectsCmd = &cobra.Command{
 	},
 }
 
-func fetchAllPointersForRepo(config *config.Config, gitServer gitserver.GitServer, s3Client *minio.Client, lfsMetaObjectStore *database.LfsMetaObjectStore, repo database.Repository) error {
+func fetchAllPointersForRepo(config *config.Config, gitServer gitserver.GitServer, s3Client *s3.Client, lfsMetaObjectStore *database.LfsMetaObjectStore, repo database.Repository) error {
 	namespace := strings.Split(repo.Path, "/")[0]
 	name := strings.Split(repo.Path, "/")[1]
 	ref := repo.DefaultBranch
@@ -124,7 +124,7 @@ func fetchAllPointersForRepo(config *config.Config, gitServer gitserver.GitServe
 	return nil
 }
 
-func checkAndUpdateLfsMetaObjects(config *config.Config, s3Client *minio.Client, lfsMetaObjectStore *database.LfsMetaObjectStore, repo database.Repository, pointer *types.Pointer) {
+func checkAndUpdateLfsMetaObjects(config *config.Config, s3Client *s3.Client, lfsMetaObjectStore *database.LfsMetaObjectStore, repo database.Repository, pointer *types.Pointer) {
 	var exists bool
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancel()

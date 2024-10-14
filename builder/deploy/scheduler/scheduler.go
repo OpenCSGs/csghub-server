@@ -8,12 +8,13 @@ import (
 	"sync"
 	"time"
 
+	"opencsg.com/csghub-server/builder/deploy/common"
 	"opencsg.com/csghub-server/builder/deploy/imagebuilder"
 	"opencsg.com/csghub-server/builder/deploy/imagerunner"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/types"
-	"opencsg.com/csghub-server/common/utils/common"
+	utilcommon "opencsg.com/csghub-server/common/utils/common"
 )
 
 type Scheduler interface {
@@ -35,15 +36,12 @@ type FIFOScheduler struct {
 	ib                  imagebuilder.Builder
 	ir                  imagerunner.Runner
 
-	nextLock                *sync.Mutex
-	spaceDeployTimeoutInMin int
-	modelDeployTimeoutInMin int
-	modelDownloadEndpoint   string
-	PublicRootDomain        string
-	config                  *config.Config
+	nextLock  *sync.Mutex
+	deployCfg common.DeployConfig
+	config    *config.Config
 }
 
-func NewFIFOScheduler(ib imagebuilder.Builder, ir imagerunner.Runner, sdt, mdt int, mdep, prd string) Scheduler {
+func NewFIFOScheduler(ib imagebuilder.Builder, ir imagerunner.Runner, confg common.DeployConfig) Scheduler {
 	s := &FIFOScheduler{}
 	// TODO:allow config
 	s.timeout = 30 * time.Minute
@@ -58,10 +56,8 @@ func NewFIFOScheduler(ib imagebuilder.Builder, ir imagerunner.Runner, sdt, mdt i
 	s.ib = ib
 	s.ir = ir
 	s.nextLock = &sync.Mutex{}
-	s.spaceDeployTimeoutInMin = sdt
-	s.modelDeployTimeoutInMin = mdt
-	s.modelDownloadEndpoint = mdep
-	s.PublicRootDomain = prd
+	s.deployCfg = confg
+	//TODO: avoid load config, use config from params
 	s.config, _ = config.LoadConfig()
 	return s
 }
@@ -148,7 +144,7 @@ func (rs *FIFOScheduler) next() (Runner, error) {
 		var s *database.Space
 		s, err = rs.spaceStore.ByID(ctx, deployTask.Deploy.SpaceID)
 		if err == nil {
-			repoCloneInfo := common.BuildCloneInfo(rs.config, s.Repository)
+			repoCloneInfo := utilcommon.BuildCloneInfo(rs.config, s.Repository)
 			repo.Path = s.Repository.Path
 			repo.Name = s.Repository.Name
 			repo.Sdk = s.Sdk
@@ -196,14 +192,7 @@ func (rs *FIFOScheduler) next() (Runner, error) {
 	if deployTask.TaskType == 0 {
 		t = NewBuidRunner(rs.ib, &repo, deployTask)
 	} else {
-		t = NewDeployRunner(rs.ir, &repo, deployTask,
-			&DeployTimeout{
-				deploySpaceTimeoutInMin: rs.spaceDeployTimeoutInMin,
-				deployModelTimeoutInMin: rs.modelDeployTimeoutInMin,
-			},
-			rs.modelDownloadEndpoint,
-			rs.PublicRootDomain,
-		)
+		t = NewDeployRunner(rs.ir, &repo, deployTask, rs.deployCfg)
 	}
 
 	rs.last = deployTask

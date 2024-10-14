@@ -27,7 +27,7 @@ type MirrorComponent struct {
 	saas               bool
 	repoComp           *RepoComponent
 	git                gitserver.GitServer
-	s3Client           *minio.Client
+	s3Client           *s3.Client
 	lfsBucket          string
 	modelStore         *database.ModelStore
 	datasetStore       *database.DatasetStore
