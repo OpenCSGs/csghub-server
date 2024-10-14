@@ -8,6 +8,7 @@ import (
 	"opencsg.com/csghub-server/api/httpbase"
 	"opencsg.com/csghub-server/api/router"
 	"opencsg.com/csghub-server/builder/deploy"
+	"opencsg.com/csghub-server/builder/deploy/common"
 	"opencsg.com/csghub-server/builder/event"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/config"
@@ -60,7 +61,8 @@ var serverCmd = &cobra.Command{
 		if err != nil {
 			return fmt.Errorf("fail to initialize message queue, %w", err)
 		}
-		deploy.Init(deploy.DeployConfig{
+		s3Internal := len(cfg.S3.InternalEndpoint) > 0
+		deploy.Init(common.DeployConfig{
 			ImageBuilderURL:         cfg.Space.BuilderEndpoint,
 			ImageRunnerURL:          cfg.Space.RunnerEndpoint,
 			MonitorInterval:         10 * time.Second,
@@ -69,6 +71,7 @@ var serverCmd = &cobra.Command{
 			ModelDeployTimeoutInMin: cfg.Model.DeployTimeoutInMin,
 			ModelDownloadEndpoint:   cfg.Model.DownloadEndpoint,
 			PublicRootDomain:        cfg.Space.PublicRootDomain,
+			S3Internal:              s3Internal,
 		})
 		r, err := router.NewRouter(cfg, enableSwagger)
 		if err != nil {

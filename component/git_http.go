@@ -28,7 +28,7 @@ import (
 type GitHTTPComponent struct {
 	git                gitserver.GitServer
 	config             *config.Config
-	s3Client           *minio.Client
+	s3Client           *s3.Client
 	lfsMetaObjectStore *database.LfsMetaObjectStore
 	lfsLockStore       *database.LfsLockStore
 	repo               *database.RepoStore
@@ -719,4 +719,3 @@ func buildLFSLockList(lfsLocks []database.LfsLock) *types.LFSLockList {
 		Locks: locks,
 	}
 }
-

@@ -16,36 +16,28 @@ import (
 	"opencsg.com/csghub-server/common/types"
 )
 
-type DeployTimeout struct {
-	deploySpaceTimeoutInMin int
-	deployModelTimeoutInMin int
-}
-
 // DeployRunner defines a k8s image running task
 type DeployRunner struct {
-	repo                  *RepoInfo
-	task                  *database.DeployTask
-	ir                    imagerunner.Runner
-	store                 *database.DeployTaskStore
-	tokenStore            *database.AccessTokenStore
-	deployStartTime       time.Time
-	deployTimeout         *DeployTimeout
-	modelDownloadEndpoint string
-	publicDomain          string
+	repo            *RepoInfo
+	task            *database.DeployTask
+	ir              imagerunner.Runner
+	store           *database.DeployTaskStore
+	tokenStore      *database.AccessTokenStore
+	deployStartTime time.Time
+	deployCfg       common.DeployConfig
 }
 
-func NewDeployRunner(ir imagerunner.Runner, r *RepoInfo, t *database.DeployTask, dto *DeployTimeout, mdep, publicDomain string) Runner {
+func NewDeployRunner(ir imagerunner.Runner, r *RepoInfo, t *database.DeployTask, deployCfg common.DeployConfig) Runner {
 	return &DeployRunner{
-		repo:                  r,
-		task:                  t,
-		ir:                    ir,
-		store:                 database.NewDeployTaskStore(),
-		deployStartTime:       time.Now(),
-		deployTimeout:         dto,
-		tokenStore:            database.NewAccessTokenStore(),
-		modelDownloadEndpoint: mdep,
-		publicDomain:          publicDomain,
+		repo:            r,
+		task:            t,
+		ir:              ir,
+		store:           database.NewDeployTaskStore(),
+		deployStartTime: time.Now(),
+		tokenStore:      database.NewAccessTokenStore(),
+		deployCfg:       deployCfg,
 	}
+
 }
 
 // Run call k8s image runner service to run a docker image
@@ -107,9 +99,9 @@ func (t *DeployRunner) Run(ctx context.Context) error {
 		switch resp.Code {
 		case common.Deploying:
 			duration := time.Since(t.deployStartTime).Minutes()
-			limitTime := t.deployTimeout.deploySpaceTimeoutInMin
+			limitTime := t.deployCfg.SpaceDeployTimeoutInMin
 			if t.task.Deploy.SpaceID == 0 && t.task.Deploy.ModelID > 0 {
-				limitTime = t.deployTimeout.deployModelTimeoutInMin
+				limitTime = t.deployCfg.ModelDeployTimeoutInMin
 			}
 			if duration >= float64(limitTime) {
 				// space or model deploy duration is greater than timeout defined in env (default is 30 mins)
@@ -246,6 +238,7 @@ func (t *DeployRunner) makeDeployRequest() (*types.RunRequest, error) {
 	}
 
 	// for space and models
+	envMap["S3_INTERNAL"] = fmt.Sprintf("%v", t.deployCfg.S3Internal)
 	envMap["HTTPCloneURL"] = t.getHttpCloneURLWithToken(t.repo.HTTPCloneURL, token.Token)
 	envMap["ACCESS_TOKEN"] = token.Token
 	envMap["REPO_ID"] = t.repo.Path       // "namespace/name"
@@ -270,17 +263,17 @@ func (t *DeployRunner) makeDeployRequest() (*types.RunRequest, error) {
 	if deploy.Type == types.InferenceType || deploy.Type == types.ServerlessType {
 		// runtime framework port for model
 		envMap["port"] = strconv.Itoa(deploy.ContainerPort)
-		envMap["HF_ENDPOINT"] = t.modelDownloadEndpoint // "https://hub-stg.opencsg.com/"
+		envMap["HF_ENDPOINT"] = t.deployCfg.ModelDownloadEndpoint // "https://hub-stg.opencsg.com/"
 		envMap["HF_HUB_OFFLINE"] = "1"
 	}
 
 	if deploy.Type == types.FinetuneType {
 		envMap["port"] = strconv.Itoa(deploy.ContainerPort)
-		envMap["HF_ENDPOINT"], _ = url.JoinPath(t.modelDownloadEndpoint, "hf")
+		envMap["HF_ENDPOINT"], _ = url.JoinPath(t.deployCfg.ModelDownloadEndpoint, "hf")
 		envMap["HF_TOKEN"] = token.Token
 	}
 
-	if t.publicDomain == "" {
+	if t.deployCfg.PublicRootDomain == "" {
 		if deploy.Type == types.FinetuneType {
 			envMap["CONTEXT_PATH"] = "/endpoint/" + deploy.SvcName
 		}
