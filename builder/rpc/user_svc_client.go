@@ -57,7 +57,7 @@ func (c *UserSvcHttpClient) GetNameSpaceInfo(ctx context.Context, path string) (
 }
 
 func (c *UserSvcHttpClient) GetUserInfo(ctx context.Context, userName, visitorName string) (*User, error) {
-	url := fmt.Sprintf("/api/v1/user/%s", userName)
+	url := fmt.Sprintf("/api/v1/user/%s?current_user=%s", userName, visitorName)
 	var r httpbase.R
 	r.Data = &User{}
 	err := c.hc.Get(ctx, url, &r)
