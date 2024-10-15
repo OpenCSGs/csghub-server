@@ -1,4 +1,4 @@
-FROM registry.cn-beijing.aliyuncs.com/opencsg/nginx:latest
+FROM opencsg-registry.cn-beijing.cr.aliyuncs.com/opencsg_public/nginx:latest
 
 WORKDIR /usr/share/nginx/html
 COPY ./nginx/serve.sh serve.sh
