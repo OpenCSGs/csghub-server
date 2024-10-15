@@ -8392,7 +8392,7 @@ const docTemplate = `{
                 "parameters": [
                     {
                         "type": "string",
-                        "description": "username",
+                        "description": "username or uuid, defined by the query string 'type'",
                         "name": "username",
                         "in": "path",
                         "required": true
@@ -8401,8 +8401,17 @@ const docTemplate = `{
                         "type": "string",
                         "description": "current user",
                         "name": "current_user",
-                        "in": "query",
-                        "required": true
+                        "in": "query"
+                    },
+                    {
+                        "enum": [
+                            "username",
+                            "uuid"
+                        ],
+                        "type": "string",
+                        "description": "path param is usernam or uuid, default to username",
+                        "name": "type",
+                        "in": "query"
                     }
                 ],
                 "responses": {
@@ -15415,6 +15424,17 @@ const docTemplate = `{
                 "UnknownRepo"
             ]
         },
+        "types.ResourceType": {
+            "type": "string",
+            "enum": [
+                "cpu",
+                "gpu"
+            ],
+            "x-enum-varnames": [
+                "ResourceTypeCPU",
+                "ResourceTypeGPU"
+            ]
+        },
         "types.Response": {
             "type": "object",
             "properties": {
@@ -15646,6 +15666,9 @@ const docTemplate = `{
                 },
                 "resources": {
                     "type": "string"
+                },
+                "type": {
+                    "$ref": "#/definitions/types.ResourceType"
                 }
             }
         },
