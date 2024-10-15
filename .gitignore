@@ -18,3 +18,4 @@ run_rproxy_local.sh
 run_server_local.sh
 run_user_local.sh
 cmd/csghub-server/__debug_*
+*/*/_api_test/

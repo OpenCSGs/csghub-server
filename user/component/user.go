@@ -344,7 +344,18 @@ func (c *UserComponent) CanAdmin(ctx context.Context, username string) (bool, er
 	return user.CanAdmin(), nil
 }
 
-func (c *UserComponent) Get(ctx context.Context, userName, visitorName string) (*types.User, error) {
+func (c *UserComponent) Get(ctx context.Context, userNameOrUUID, visitorName string, useUUID bool) (*types.User, error) {
+	var dbuser = new(database.User)
+	var err error
+	if useUUID {
+		dbuser, err = c.us.FindByUUID(ctx, userNameOrUUID)
+	} else {
+		*dbuser, err = c.us.FindByUsername(ctx, userNameOrUUID)
+	}
+	if err != nil {
+		return nil, fmt.Errorf("failed to find user by name or uuid  '%s' in db,error:%w", userNameOrUUID, err)
+	}
+	userName := dbuser.Username
 	var onlyBasicInfo bool
 	//allow anonymous user to get basic info
 	if visitorName == "" {
@@ -358,12 +369,6 @@ func (c *UserComponent) Get(ctx context.Context, userName, visitorName string) (
 		if !canAdmin {
 			onlyBasicInfo = true
 		}
-	}
-
-	dbuser, err := c.us.FindByUsername(ctx, userName)
-	if err != nil {
-		newError := fmt.Errorf("failed to find user by name in db,error:%w", err)
-		return nil, newError
 	}
 
 	u := types.User{

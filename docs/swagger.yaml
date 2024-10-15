@@ -1741,6 +1741,14 @@ definitions:
     - SpaceRepo
     - CodeRepo
     - UnknownRepo
+  types.ResourceType:
+    enum:
+    - cpu
+    - gpu
+    type: string
+    x-enum-varnames:
+    - ResourceTypeCPU
+    - ResourceTypeGPU
   types.Response:
     properties:
       data: {}
@@ -1898,6 +1906,8 @@ definitions:
         type: string
       resources:
         type: string
+      type:
+        $ref: '#/definitions/types.ResourceType'
     type: object
   types.SpaceSdk:
     properties:
@@ -9196,7 +9206,7 @@ paths:
       consumes:
       - application/json
       parameters:
-      - description: username
+      - description: username or uuid, defined by the query string 'type'
         in: path
         name: username
         required: true
@@ -9204,7 +9214,13 @@ paths:
       - description: current user
         in: query
         name: current_user
-        required: true
+        type: string
+      - description: path param is usernam or uuid, default to username
+        enum:
+        - username
+        - uuid
+        in: query
+        name: type
         type: string
       produces:
       - application/json
