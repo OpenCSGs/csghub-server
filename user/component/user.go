@@ -503,8 +503,7 @@ func (c *UserComponent) Signin(ctx context.Context, code, state string) (*types.
 		}()
 	}
 	hubToken, signed, err := c.jwtc.GenerateToken(ctx, types.CreateJWTReq{
-		UUID:        dbu.UUID,
-		CurrentUser: dbu.Username,
+		UUID: dbu.UUID,
 	})
 	if err != nil {
 		return nil, "", fmt.Errorf("failed to generate jwt token,error:%w", err)

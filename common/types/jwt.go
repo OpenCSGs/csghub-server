@@ -8,7 +8,6 @@ import (
 
 type CreateJWTReq struct {
 	UUID          string   `json:"uuid" binding:"required"`
-	CurrentUser   string   `json:"current_user" binding:"required"`
 	Organizations []string `json:"-"`
 }
 
