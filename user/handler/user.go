@@ -162,9 +162,16 @@ func (h *UserHandler) Delete(ctx *gin.Context) {
 // @Router       /user/{username} [get]
 func (h *UserHandler) Get(ctx *gin.Context) {
 	visitorName := httpbase.GetCurrentUser(ctx)
+	authType := httpbase.GetAuthType(ctx)
 	userNameOrUUID := ctx.Param("username")
 	useUUID := ctx.Query("type") == "uuid"
-	user, err := h.c.Get(ctx, userNameOrUUID, visitorName, useUUID)
+	var user *types.User
+	var err error
+	if authType == httpbase.AuthTypeApiKey {
+		user, err = h.c.GetInternal(ctx, userNameOrUUID, useUUID)
+	} else {
+		user, err = h.c.Get(ctx, userNameOrUUID, visitorName, useUUID)
+	}
 	if err != nil {
 		slog.Error("Failed to get user", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)

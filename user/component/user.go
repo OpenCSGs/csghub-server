@@ -344,6 +344,23 @@ func (c *UserComponent) CanAdmin(ctx context.Context, username string) (bool, er
 	return user.CanAdmin(), nil
 }
 
+// GetInternal get *full* user info by username or uuid
+//
+// should only be called by other *internal* services
+func (c *UserComponent) GetInternal(ctx context.Context, userNameOrUUID string, useUUID bool) (*types.User, error) {
+	var dbuser = new(database.User)
+	var err error
+	if useUUID {
+		dbuser, err = c.us.FindByUUID(ctx, userNameOrUUID)
+	} else {
+		*dbuser, err = c.us.FindByUsername(ctx, userNameOrUUID)
+	}
+	if err != nil {
+		return nil, fmt.Errorf("failed to find user by name or uuid  '%s' in db,error:%w", userNameOrUUID, err)
+	}
+	return c.buildUserInfo(ctx, dbuser, false)
+}
+
 func (c *UserComponent) Get(ctx context.Context, userNameOrUUID, visitorName string, useUUID bool) (*types.User, error) {
 	var dbuser = new(database.User)
 	var err error
@@ -371,6 +388,10 @@ func (c *UserComponent) Get(ctx context.Context, userNameOrUUID, visitorName str
 		}
 	}
 
+	return c.buildUserInfo(ctx, dbuser, onlyBasicInfo)
+}
+
+func (c *UserComponent) buildUserInfo(ctx context.Context, dbuser *database.User, onlyBasicInfo bool) (*types.User, error) {
 	u := types.User{
 		Username: dbuser.Username,
 		Nickname: dbuser.NickName,
