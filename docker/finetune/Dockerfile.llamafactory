@@ -49,7 +49,7 @@ RUN mkdir -p /var/log/supervisord && \
 
 # Fix gradio proxy issue
 RUN pip uninstall -y gradio && \
-    pip install --no-cache-dir https://git-devops.opencsg.com/opensource/gradio/-/raw/3a207a08755b4820541915e9ea63e6abc1b4b424/gradio-4.41.0-py3-none-any.whl
+    pip install --no-cache-dir https://opencsg-public-resource.oss-cn-beijing.aliyuncs.com/csghub/gradio/gradio-4.41.0-py3-none-any.whl
 
 # Create a working directory
 WORKDIR /workspace/
