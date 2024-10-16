@@ -356,7 +356,7 @@ func (c *UserComponent) GetInternal(ctx context.Context, userNameOrUUID string, 
 		*dbuser, err = c.us.FindByUsername(ctx, userNameOrUUID)
 	}
 	if err != nil {
-		return nil, fmt.Errorf("failed to find user by name or uuid  '%s' in db,error:%w", userNameOrUUID, err)
+		return nil, fmt.Errorf("failed to find user by name or uuid '%s' in db,error:%w", userNameOrUUID, err)
 	}
 	return c.buildUserInfo(ctx, dbuser, false)
 }
