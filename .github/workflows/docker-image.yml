@@ -8,8 +8,6 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-    env:
-      BUILDX_NO_DEFAULT_ATTESTATIONS: 1
 
     steps:
     - name: Checkout repository
@@ -48,5 +46,6 @@ jobs:
         context: .
         file: ./docker/Dockerfile
         push: true
+        provenance: false
         tags: ${{ steps.meta.outputs.tags }}
         platforms: linux/amd64,linux/arm64
