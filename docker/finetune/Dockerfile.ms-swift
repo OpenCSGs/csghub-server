@@ -1,0 +1,60 @@
+# pull from devel image instead of base
+FROM nvidia/cuda:12.1.1-devel-ubuntu22.04
+# Set bash as the default shell
+ENV SHELL=/bin/bash \
+    JUPYTERHUB_SERVICE_PREFIX=/proxy/ \
+    GRADIO_ROOT_PATH=/proxy/7860/ \
+    TZ=Asia/Shanghai \
+    NCCL_IB_DISABLE=1 NCCL_P2P_DISABLE=1 \
+    HF_HOME=/workspace/.cache \
+    DEBIAN_FRONTEND=noninteractive
+
+# Build with some basic utilities
+RUN apt-get update && apt-get install -y \
+    python3-pip apt-utils \
+    wget curl vim \
+    git git-lfs \
+    supervisor \
+    unzip
+# set timezone
+ARG DEBIAN_FRONTEND=noninteractive
+RUN apt-get install -y tzdata \
+    && ln -snf /usr/share/zoneinfo/$TZ /etc/localtime \
+    && echo $TZ > /etc/timezone \
+    && dpkg-reconfigure -f noninteractive tzdata
+
+# alias python='python3'
+RUN ln -s /usr/bin/python3 /usr/bin/python
+RUN pip config set global.index-url https://pypi.tuna.tsinghua.edu.cn/simple
+
+# Install the appropriate torch version 
+#RUN pip install torch==2.1.2 torchvision==0.16.2 torchaudio==2.1.2 --index-url https://download.pytorch.org/whl/cu121
+RUN pip install --no-cache-dir jupyterlab numpy==1.26.4 \
+    torch==2.4.0 torchvision==0.19.0 torchaudio==2.4.0 \
+    jupyter-server-proxy==4.4.0 deepspeed \
+    gradio-client==1.4.0
+#because this library is update frequently, we use new line
+RUN pip install --no-cache-dir vllm==v0.6.3.post1
+# Create a working directory
+WORKDIR /etc/csghub
+#RUN git clone https://github.com/modelscope/ms-swift.git --branch v2.5.0 --single-branch
+RUN git clone https://gitee.com/xzgan/ms-swift.git --branch v2.5.0 --single-branch
+RUN cd ms-swift && pip install --no-cache-dir -e ".[llm]"
+# setup supervisord
+RUN mkdir -p /var/log/supervisord
+COPY swift/supervisord.conf /etc/supervisor/conf.d/supervisord.conf
+COPY swift/jupyter_notebook_config.py /root/.jupyter/jupyter_notebook_config.py
+COPY swift/ /etc/csghub/
+RUN chmod +x /etc/csghub/*.sh
+#use dark mode
+RUN mkdir -p /root/.jupyter/lab/user-settings/@jupyterlab/apputils-extension && \
+	    echo '{"theme":"JupyterLab Dark"}' > /root/.jupyter/lab/user-settings/@jupyterlab/apputils-extension/themes.jupyterlab-settings && \
+	    mkdir -p /root/.jupyter/lab/user-settings/@jupyterlab/notebook-extension && \
+	    echo '{"codeCellConfig":{"lineNumbers":true }}' >   /root/.jupyter/lab/user-settings/@jupyterlab/notebook-extension/tracker.jupyterlab-settings
+#fix gradio proxy issue
+RUN pip uninstall -y gradio && pip install https://opencsg-public-resource.oss-cn-beijing.aliyuncs.com/csghub/gradio/gradio-5.1.0-py3-none-any.whl
+
+# Create a working directory
+WORKDIR /workspace/
+ENTRYPOINT ["/usr/bin/supervisord", "-c", "/etc/supervisor/conf.d/supervisord.conf"]
+EXPOSE 8000
