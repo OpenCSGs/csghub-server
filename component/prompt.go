@@ -1141,27 +1141,29 @@ type UpdatePromptReq struct {
 var _ types.SensitiveRequestV2 = (*Prompt)(nil)
 
 func (req *Prompt) GetSensitiveFields() []types.SensitiveField {
-	return []types.SensitiveField{
-		{
-			Name: "title",
-			Value: func() string {
-				return req.Title
-			},
-			Scenario: string(sensitive.ScenarioCommentDetection),
+	var fields []types.SensitiveField
+	fields = append(fields, types.SensitiveField{
+		Name: "title",
+		Value: func() string {
+			return req.Title
 		},
-		{
-			Name: "content",
-			Value: func() string {
-				return req.Content
-			},
-			Scenario: string(sensitive.ScenarioCommentDetection),
+		Scenario: string(sensitive.ScenarioCommentDetection),
+	})
+	fields = append(fields, types.SensitiveField{
+		Name: "content",
+		Value: func() string {
+			return req.Content
 		},
-		{
+		Scenario: string(sensitive.ScenarioCommentDetection),
+	})
+	if len(req.Source) > 0 {
+		fields = append(fields, types.SensitiveField{
 			Name: "source",
 			Value: func() string {
 				return req.Source
 			},
 			Scenario: string(sensitive.ScenarioCommentDetection),
-		},
+		})
 	}
+	return fields
 }
