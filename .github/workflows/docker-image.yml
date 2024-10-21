@@ -5,6 +5,10 @@ on:
     tags:
       - 'v*'
 
+  # Scheduled build at 2:00 AM（UTC +8） every day
+  schedule:
+    - cron: "0 18 * * *"
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -32,13 +36,14 @@ jobs:
         password: ${{ secrets.ACR_PASSWORD }}
         registry: ${{ secrets.ACR_REGISTRY }}
 
-    - name: Extract Docker metadata (tags, labels)
-      id: meta
-      uses: docker/metadata-action@v5
-      with:
-        images: |
-          opencsg/csghub-server
-          ${{ secrets.ACR_REGISTRY }}/opencsg_public/csghub_server
+    - name: Set Docker image tag
+      id: tag
+      run: |
+          if [ "${{ github.event_name }}" == "schedule" ]; then
+            echo "TAGS=opencsg/csghub-server:latest,${{ secrets.ACR_REGISTRY }}/opencsg_public/csghub_server:latest" >> $GITHUB_ENV
+          else
+            echo "TAGS=opencsg/csghub-server:latest,opencsg/csghub-server:${GITHUB_REF_NAME},${{ secrets.ACR_REGISTRY }}/opencsg_public/csghub_server:latest,${{ secrets.ACR_REGISTRY }}/opencsg_public/csghub_server:${GITHUB_REF_NAME}" >> $GITHUB_ENV
+          fi
           
     - name: Build and push Docker image
       uses: docker/build-push-action@v6
@@ -47,5 +52,5 @@ jobs:
         file: ./docker/Dockerfile
         push: true
         provenance: false
-        tags: ${{ steps.meta.outputs.tags }}
+        tags: ${{ env.TAGS }}
         platforms: linux/amd64,linux/arm64
