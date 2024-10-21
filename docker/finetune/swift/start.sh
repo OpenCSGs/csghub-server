@@ -14,14 +14,15 @@ sed -i "s|'\([^']*/$MODEL_NAME',\)|'$REPO_ID',|g" $model_path
 #use csghub variable 
 sed -i "s|USE_HF|USE_CSGHUB_DATASET|" /etc/csghub/ms-swift/swift/llm/utils/dataset.py
 sed -i "s|USE_HF|USE_CSGHUB_MODEL|" $argument_path
-sed -i "s|USE_HF|USE_CSGHUB_MODEL|" $model_path
+sed -i "s|USE_HF'|USE_CSGHUB_MODEL'|" $model_path
+sed -i "s|USE_HF_TRANSFER|USE_CSGHUB_TRANSFER|" $model_path
 sed -i "s|USE_HF|USE_CSGHUB_MODEL|" /etc/csghub/ms-swift/swift/trainers/push_to_ms.py
-
+#change deploy port
+sed -i "s|8000|9000|" /etc/csghub/ms-swift/swift/ui/llm_infer/generate.py
 
 template_path="/etc/csghub/ms-swift/swift/llm/utils/template.py"
 model_ui_path="/etc/csghub/ms-swift/swift/ui/llm_train/model.py"
-hf_model_id=`grep -E "hf_model_id='.*\/$MODEL_NAME'" model.py | awk -F"'" '{print $2}'`
-
+hf_model_id=`grep -E "hf_model_id='.*\/$MODEL_NAME'" $model_path | awk -F"'" '{print $2}'`
 #find model type and template type
 types=`awk -v model_id="${hf_model_id}" '
 BEGIN {RS=")"; FS="\n"}
@@ -46,6 +47,8 @@ IFS=',' read -ra item_types <<< $types
 model_type=${item_types[0]}
 template_type=${item_types[1]}
 if [ "x${model_type}" != "x" ]; then
+    #replace HF ID
+    sed -i "s|hf_model_id='$hf_model_id'|hf_model_id='$REPO_ID'|g" $model_path
     model_type_name=`awk -v search="$model_type =" -F"'" '$0 ~ search {print $2}' $model_path`
     template_type_name=`awk -v search=" $template_type =" -F"'" '$0 ~ search {print $2}' $template_path`
     # set default model type for csghub
@@ -62,7 +65,7 @@ if [ "x${model_type}" != "x" ]; then
     grep -q "elem_id='model_id_or_path',value=" $model_ui_path
     if [ $? -ne 0 ]; then
         sed -i "s|elem_id='model_id_or_path'|elem_id='model_id_or_path',value='${REPO_ID}'|" $model_ui_path
-        sed -i "s|default='AUTO'|default=None|1" $argument_path
+        sed -i "0,/default='AUTO'/s/default='AUTO'/default=None/" $argument_path
     fi
 fi
 
@@ -73,8 +76,8 @@ export GRADIO_ROOT_PATH="${CONTEXT_PATH}/proxy/7860"
 ascend_env=/usr/local/Ascend/ascend-toolkit/set_env.sh
 if [ -f "$ascend_env" ]; then
     source $ascend_env
-    ASCEND_VISIBLE_DEVICES=0 SWIFT_UI_LANG=en swift web-ui
+    USE_CSGHUB_TRANSFER=1 SWIFT_UI_LANG=en swift web-ui
 else
-    CUDA_VISIBLE_DEVICES=0 SWIFT_UI_LANG=en swift web-ui
+    USE_CSGHUB_TRANSFER=1 SWIFT_UI_LANG=en swift web-ui
 fi
 
