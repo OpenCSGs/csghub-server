@@ -41,24 +41,24 @@ func WatchRepoRelation(req *types.GiteaCallbackPushReq, ss *database.RepoStore,
 	fullNamespace, repoName := splits[0], splits[1]
 	repoType, namespace, _ := strings.Cut(fullNamespace, "_")
 
-	if repoType == CodeRepoType {
+	if repoType == fmt.Sprintf("%ss", types.CodeRepo) {
 		return watcher
 	}
 
 	commits := req.Commits
 	ref := req.Ref
 	for _, commit := range commits {
-		if slices.Contains(commit.Modified, ReadmeFileName) {
+		if slices.Contains(commit.Modified, types.ReadmeFileName) {
 			watcher.readmeStatus = "modified"
 			continue
 		}
-		if slices.Contains(commit.Added, ReadmeFileName) {
+		if slices.Contains(commit.Added, types.ReadmeFileName) {
 			if watcher.readmeStatus != "modified" {
 				watcher.readmeStatus = "added"
 			}
 			continue
 		}
-		if slices.Contains(commit.Removed, ReadmeFileName) {
+		if slices.Contains(commit.Removed, types.ReadmeFileName) {
 			watcher.readmeStatus = "removed"
 			continue
 		}
@@ -88,7 +88,7 @@ func (w *repoRelationWatcher) toRepoIDsFromReadme(namespace, repoName, repoType,
 	var toRepoIDs []int64
 	var paths []string
 
-	readme, err = w.getFileRaw(repoType, namespace, repoName, ref, ReadmeFileName)
+	readme, err = w.getFileRaw(repoType, namespace, repoName, ref, types.ReadmeFileName)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get readme file,%w", err)
 	}
@@ -96,7 +96,7 @@ func (w *repoRelationWatcher) toRepoIDsFromReadme(namespace, repoName, repoType,
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse readme file meta,%w", err)
 	}
-	if repoType == ModelRepoType {
+	if repoType == fmt.Sprintf("%ss", types.ModelRepo) {
 		datasetItems := meta["datasets"]
 		codeItems := meta["codes"]
 		for _, datasetItem := range datasetItems {
@@ -107,7 +107,7 @@ func (w *repoRelationWatcher) toRepoIDsFromReadme(namespace, repoName, repoType,
 		}
 	}
 
-	if repoType == SpaceRepoType || repoType == DatasetRepoType {
+	if repoType == fmt.Sprintf("%ss", types.SpaceRepo) || repoType == fmt.Sprintf("%ss", types.DatasetRepo) || repoType == fmt.Sprintf("%ss", types.PromptRepo) {
 		modelItems := meta["models"]
 		if len(modelItems) == 0 {
 			return toRepoIDs, nil
@@ -149,7 +149,7 @@ func (w *repoRelationWatcher) regenerate(namespace, repoName, repoType, ref stri
 			ctx, cancel := context.WithTimeout(context.Background(), 1*time.Minute)
 			defer cancel()
 
-			if repoType == ModelRepoType {
+			if repoType == fmt.Sprintf("%ss", types.ModelRepo) {
 				fromRepo, err := w.rs.FindByPath(ctx, types.ModelRepo, namespace, repoName)
 				if err != nil {
 					return fmt.Errorf("failed to find model repo,%w", err)
@@ -157,7 +157,7 @@ func (w *repoRelationWatcher) regenerate(namespace, repoName, repoType, ref stri
 				fromRepoID = fromRepo.ID
 			}
 
-			if repoType == SpaceRepoType {
+			if repoType == fmt.Sprintf("%ss", types.SpaceRepo) {
 				fromRepo, err := w.rs.FindByPath(ctx, types.SpaceRepo, namespace, repoName)
 				if err != nil {
 					return fmt.Errorf("failed to find space repo,%w", err)
@@ -165,10 +165,18 @@ func (w *repoRelationWatcher) regenerate(namespace, repoName, repoType, ref stri
 				fromRepoID = fromRepo.ID
 			}
 
-			if repoType == DatasetRepoType {
+			if repoType == fmt.Sprintf("%ss", types.DatasetRepo) {
 				fromRepo, err := w.rs.FindByPath(ctx, types.DatasetRepo, namespace, repoName)
 				if err != nil {
 					return fmt.Errorf("failed to find dataset repo,%w", err)
+				}
+				fromRepoID = fromRepo.ID
+			}
+
+			if repoType == fmt.Sprintf("%ss", types.PromptRepo) {
+				fromRepo, err := w.rs.FindByPath(ctx, types.PromptRepo, namespace, repoName)
+				if err != nil {
+					return fmt.Errorf("failed to find prompt repo,%w", err)
 				}
 				fromRepoID = fromRepo.ID
 			}

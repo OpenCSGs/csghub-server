@@ -13,6 +13,10 @@ import (
 	"opencsg.com/csghub-server/common/types"
 )
 
+var (
+	REPOCARD_FILENAME = "README.md"
+)
+
 type ViewParquetFileReq struct {
 	Namespace string `json:"namespace"`
 	RepoName  string `json:"name"`

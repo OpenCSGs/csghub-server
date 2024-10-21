@@ -17,14 +17,6 @@ import (
 	"opencsg.com/csghub-server/component"
 )
 
-const (
-	DatasetRepoType = "datasets"
-	ModelRepoType   = "models"
-	CodeRepoType    = "codes"
-	SpaceRepoType   = "spaces"
-	ReadmeFileName  = "README.md"
-)
-
 // define GitCallbackComponent struct
 type GitCallbackComponent struct {
 	config      *config.Config
@@ -201,7 +193,7 @@ func (c *GitCallbackComponent) modifyFiles(ctx context.Context, repoType, namesp
 		// update model runtime
 		c.updateModelRuntimeFrameworks(ctx, repoType, namespace, repoName, ref, fileName, false)
 		// only care about readme file under root directory
-		if fileName != ReadmeFileName {
+		if fileName != types.ReadmeFileName {
 			continue
 		}
 
@@ -227,7 +219,6 @@ func (c *GitCallbackComponent) modifyFiles(ctx context.Context, repoType, namesp
 		// should be only one README.md
 		return c.updateMetaTags(ctx, repoType, namespace, repoName, ref, content)
 	}
-	c.setPromptDatasetType(ctx, repoType, namespace, repoName, ref, fileNames)
 	return nil
 }
 
@@ -239,7 +230,7 @@ func (c *GitCallbackComponent) removeFiles(ctx context.Context, repoType, namesp
 		// update model runtime
 		c.updateModelRuntimeFrameworks(ctx, repoType, namespace, repoName, ref, fileName, true)
 		// only care about readme file under root directory
-		if fileName == ReadmeFileName {
+		if fileName == types.ReadmeFileName {
 			// use empty content to clear all the meta tags
 			const content string = ""
 			adjustedRepoType := types.RepositoryType(strings.TrimSuffix(repoType, "s"))
@@ -253,10 +244,12 @@ func (c *GitCallbackComponent) removeFiles(ctx context.Context, repoType, namesp
 		} else {
 			var tagScope database.TagScope
 			switch repoType {
-			case DatasetRepoType:
+			case fmt.Sprintf("%ss", types.DatasetRepo):
 				tagScope = database.DatasetTagScope
-			case ModelRepoType:
+			case fmt.Sprintf("%ss", types.ModelRepo):
 				tagScope = database.ModelTagScope
+			case fmt.Sprintf("%ss", types.PromptRepo):
+				tagScope = database.PromptTagScope
 			default:
 				return nil
 				// case CodeRepoType:
@@ -273,7 +266,6 @@ func (c *GitCallbackComponent) removeFiles(ctx context.Context, repoType, namesp
 			}
 		}
 	}
-	c.removePromptDatasetType(ctx, repoType, namespace, repoName, ref, fileNames)
 	return nil
 }
 
@@ -283,7 +275,7 @@ func (c *GitCallbackComponent) addFiles(ctx context.Context, repoType, namespace
 		// update model runtime
 		c.updateModelRuntimeFrameworks(ctx, repoType, namespace, repoName, ref, fileName, false)
 		// only care about readme file under root directory
-		if fileName == ReadmeFileName {
+		if fileName == types.ReadmeFileName {
 			content, err := c.getFileRaw(repoType, namespace, repoName, ref, fileName)
 			if err != nil {
 				return err
@@ -309,10 +301,12 @@ func (c *GitCallbackComponent) addFiles(ctx context.Context, repoType, namespace
 		} else {
 			var tagScope database.TagScope
 			switch repoType {
-			case DatasetRepoType:
+			case fmt.Sprintf("%ss", types.DatasetRepo):
 				tagScope = database.DatasetTagScope
-			case ModelRepoType:
+			case fmt.Sprintf("%ss", types.ModelRepo):
 				tagScope = database.ModelTagScope
+			case fmt.Sprintf("%ss", types.PromptRepo):
+				tagScope = database.PromptTagScope
 			default:
 				return nil
 				// case CodeRepoType:
@@ -329,7 +323,6 @@ func (c *GitCallbackComponent) addFiles(ctx context.Context, repoType, namespace
 			}
 		}
 	}
-	c.setPromptDatasetType(ctx, repoType, namespace, repoName, ref, fileNames)
 	return nil
 }
 
@@ -339,10 +332,12 @@ func (c *GitCallbackComponent) updateMetaTags(ctx context.Context, repoType, nam
 		tagScope database.TagScope
 	)
 	switch repoType {
-	case DatasetRepoType:
+	case fmt.Sprintf("%ss", types.DatasetRepo):
 		tagScope = database.DatasetTagScope
-	case ModelRepoType:
+	case fmt.Sprintf("%ss", types.ModelRepo):
 		tagScope = database.ModelTagScope
+	case fmt.Sprintf("%ss", types.PromptRepo):
+		tagScope = database.PromptTagScope
 	default:
 		return nil
 		// TODO: support code and space
@@ -412,7 +407,7 @@ func (c *GitCallbackComponent) setPrivate(ctx context.Context, repoType, namespa
 	var err error
 	var dataset *database.Dataset
 	var model *database.Model
-	if repoType == DatasetRepoType {
+	if repoType == fmt.Sprintf("%ss", types.DatasetRepo) {
 		dataset, err = c.ds.FindByPath(ctx, namespace, repoName)
 		if err != nil {
 			slog.Error("Failed to find dataset", slog.String("namespace", namespace), slog.String("name", repoName))
@@ -459,7 +454,7 @@ func (c *GitCallbackComponent) setPrivate(ctx context.Context, repoType, namespa
 func (c *GitCallbackComponent) updateModelRuntimeFrameworks(ctx context.Context, repoType, namespace, repoName, ref, fileName string, deleteAction bool) {
 	slog.Debug("update model relation for git callback", slog.Any("namespace", namespace), slog.Any("repoName", repoName), slog.Any("repoType", repoType), slog.Any("fileName", fileName), slog.Any("branch", ref))
 	// must be model repo and config.json
-	if repoType != ModelRepoType || fileName != component.ConfigFileName || ref != ("refs/heads/"+component.MainBranch) {
+	if repoType != fmt.Sprintf("%ss", types.ModelRepo) || fileName != component.ConfigFileName || ref != ("refs/heads/"+component.MainBranch) {
 		return
 	}
 	repo, err := c.rs.FindByPath(ctx, types.ModelRepo, namespace, repoName)
@@ -553,104 +548,4 @@ func (c *GitCallbackComponent) updateModelRuntimeFrameworks(ctx context.Context,
 		}
 	}
 
-}
-
-func (c *GitCallbackComponent) setPromptDatasetType(ctx context.Context, repoType, namespace, repoName, ref string, fileNames []string) {
-	slog.Debug("setPromptDatasetType", slog.Any("fileNames", fileNames), slog.Any("repoType", repoType), slog.Any("ref", ref))
-	if len(fileNames) < 1 {
-		return
-	}
-	repoType = strings.TrimRight(repoType, "s")
-	if repoType != string(types.DatasetRepo) || ref != ("refs/heads/"+component.MainBranch) {
-		return
-	}
-	for _, fileName := range fileNames {
-		if !strings.HasSuffix(strings.ToLower(fileName), ".jsonl") {
-			continue
-		}
-		getFileReq := gitserver.GetRepoInfoByPathReq{
-			Namespace: namespace,
-			Name:      repoName,
-			Ref:       component.MainBranch,
-			Path:      fileName,
-			RepoType:  types.DatasetRepo,
-			File:      true,
-		}
-		files, err := c.gs.GetRepoFileTree(ctx, getFileReq)
-		if err != nil {
-			slog.Warn("fail to get file object for prompt", slog.Any("getFileReq", getFileReq), slog.Any("error", err))
-			continue
-		}
-		if files == nil || len(files) < 1 {
-			slog.Warn("did not find file object for prompt", slog.Any("getFileReq", getFileReq), slog.Any("error", err))
-			continue
-		}
-		if files[0].Lfs || files[0].Size > c.maxPromptFS {
-			continue
-		}
-		_, err = c.pp.ParseJsonFile(ctx, getFileReq)
-		if err != nil {
-			slog.Warn("file is not prompt format jsonl", slog.Any("getFileReq", getFileReq), slog.Any("error", err))
-			continue
-		}
-		repo, err := c.rs.FindByPath(ctx, types.DatasetRepo, namespace, repoName)
-		if err != nil || repo == nil {
-			slog.Error("fail to query repo for git callback", slog.Any("namespace", namespace), slog.Any("repoName", repoName), slog.Any("error", err))
-			continue
-		}
-		err = c.ds.SetPromptType(ctx, repo.ID)
-		if err != nil {
-			slog.Error("fail to set prompt type for git callback", slog.Any("repo id", repo.ID), slog.Any("error", err))
-		} else {
-			return
-		}
-	}
-}
-
-func (c *GitCallbackComponent) removePromptDatasetType(ctx context.Context, repoType, namespace, repoName, ref string, fileNames []string) {
-	slog.Debug("removePromptDatasetType", slog.Any("fileNames", fileNames), slog.Any("repoType", repoType), slog.Any("ref", ref))
-	if len(fileNames) < 1 {
-		return
-	}
-	repoType = strings.TrimRight(repoType, "s")
-	if repoType != string(types.DatasetRepo) || ref != ("refs/heads/"+component.MainBranch) {
-		return
-	}
-	tree, err := component.GetFilePathObjects(namespace, repoName, "", types.DatasetRepo, ref, c.gs.GetRepoFileTree)
-	if err != nil || tree == nil {
-		slog.Error("failed to get repo file tree for remove prompt type, ", slog.Any("namespace", namespace), slog.Any("repoName", repoName), slog.Any("error", err))
-		return
-	}
-
-	for _, file := range tree {
-		if file.Lfs || file.Size > c.maxPromptFS {
-			continue
-		}
-		if !strings.HasSuffix(strings.ToLower(file.Path), ".jsonl") {
-			continue
-		}
-		getFileReq := gitserver.GetRepoInfoByPathReq{
-			Namespace: namespace,
-			Name:      repoName,
-			Ref:       component.MainBranch,
-			Path:      file.Path,
-			RepoType:  types.DatasetRepo,
-		}
-		_, err = c.pp.ParseJsonFile(ctx, getFileReq)
-		if err != nil {
-			slog.Warn("file is not prompt format jsonl", slog.Any("getFileReq", getFileReq), slog.Any("error", err))
-		} else {
-			return
-		}
-	}
-
-	repo, err := c.rs.FindByPath(ctx, types.DatasetRepo, namespace, repoName)
-	if err != nil || repo == nil {
-		slog.Error("fail to query repo for git callback", slog.Any("namespace", namespace), slog.Any("repoName", repoName), slog.Any("error", err))
-		return
-	}
-	err = c.ds.SetNormalDatasetType(ctx, repo.ID)
-	if err != nil {
-		slog.Error("fail to set dataset non-prompt type for git callback", slog.Any("repo id", repo.ID), slog.Any("error", err))
-	}
 }

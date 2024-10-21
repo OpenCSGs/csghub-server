@@ -50,6 +50,9 @@ func (c *TagComponent) UpdateMetaTags(ctx context.Context, tagScope database.Tag
 	} else if tagScope == database.ModelTagScope {
 		tp = tagparser.NewModelTagProcessor(c.ts)
 		repoType = types.ModelRepo
+	} else if tagScope == database.PromptTagScope {
+		tp = tagparser.NewPromptTagProcessor(c.ts)
+		repoType = types.PromptRepo
 	} else {
 		// skip tag process for code and space now
 		return nil, nil
@@ -113,6 +116,9 @@ func (c *TagComponent) UpdateLibraryTags(ctx context.Context, tagScope database.
 	} else if tagScope == database.ModelTagScope {
 		allTags, err = c.ts.AllModelTags(ctx)
 		repoType = types.ModelRepo
+	} else if tagScope == database.PromptTagScope {
+		allTags, err = c.ts.AllPromptTags(ctx)
+		repoType = types.PromptRepo
 	} else {
 		return nil
 	}
@@ -133,7 +139,7 @@ func (c *TagComponent) UpdateLibraryTags(ctx context.Context, tagScope database.
 	}
 	err = c.ts.SetLibraryTag(ctx, repoType, namespace, name, newLibTag, oldLibTag)
 	if err != nil {
-		slog.Error("failed to set dataset's tags", slog.String("namespace", namespace),
+		slog.Error("failed to set %s's tags", string(repoType), slog.String("namespace", namespace),
 			slog.String("name", name), slog.Any("error", err))
 		return fmt.Errorf("failed to set Library tags, cause: %w", err)
 	}

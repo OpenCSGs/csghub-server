@@ -70,7 +70,7 @@ func (c *SpaceComponent) Create(ctx context.Context, req types.CreateSpaceReq) (
 		nickname = req.Name
 	}
 	if req.DefaultBranch == "" {
-		req.DefaultBranch = "main"
+		req.DefaultBranch = types.MainBranch
 	}
 	req.Nickname = nickname
 	req.RepoType = types.SpaceRepo
@@ -311,7 +311,7 @@ func (c *SpaceComponent) Index(ctx context.Context, filter *types.RepoFilter, pe
 		resSpaces []types.Space
 		err       error
 	)
-	repos, total, err := c.PublicToUser(ctx, types.SpaceRepo, filter.Username, filter, per, page, false)
+	repos, total, err := c.PublicToUser(ctx, types.SpaceRepo, filter.Username, filter, per, page)
 	if err != nil {
 		newError := fmt.Errorf("failed to get public space repos,error:%w", err)
 		return nil, 0, newError

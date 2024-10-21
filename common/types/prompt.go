@@ -1,24 +1,12 @@
 package types
 
+import "time"
+
 type PromptReq struct {
 	Namespace   string `json:"namespace"`
 	Name        string `json:"name"`
 	CurrentUser string `json:"current_user"`
 	Path        string `json:"path"`
-}
-
-type Prompt struct {
-	Title     string   `json:"title"`
-	Content   string   `json:"content"`
-	Language  string   `json:"language"`
-	Tags      []string `json:"tags"`
-	Type      string   `json:"type"` // "text|image|video|audio"
-	Source    string   `json:"source"`
-	Author    string   `json:"author"`
-	Time      string   `json:"time"`
-	Copyright string   `json:"copyright"`
-	Feedback  []string `json:"feedback"`
-	FilePath  string   `json:"file_path"`
 }
 
 type Conversation struct {
@@ -78,4 +66,38 @@ type LLMChoice struct {
 
 type LLMDelta struct {
 	Content string `json:"content"`
+}
+
+type CreatePromptRepoReq struct {
+	CreateRepoReq
+}
+
+type UpdatePromptRepoReq struct {
+	UpdateRepoReq
+}
+
+type PromptRes struct {
+	ID            int64                `json:"id,omitempty"`
+	Name          string               `json:"name"`
+	Nickname      string               `json:"nickname"`
+	Description   string               `json:"description"`
+	Likes         int64                `json:"likes"`
+	Downloads     int64                `json:"downloads"`
+	Path          string               `json:"path"`
+	RepositoryID  int64                `json:"repository_id"`
+	Repository    Repository           `json:"repository"`
+	Private       bool                 `json:"private"`
+	User          User                 `json:"user"`
+	Tags          []RepoTag            `json:"tags"`
+	Readme        string               `json:"readme"`
+	DefaultBranch string               `json:"default_branch"`
+	CreatedAt     time.Time            `json:"created_at"`
+	UpdatedAt     time.Time            `json:"updated_at"`
+	UserLikes     bool                 `json:"user_likes"`
+	Source        RepositorySource     `json:"source"`
+	SyncStatus    RepositorySyncStatus `json:"sync_status"`
+	License       string               `json:"license"`
+	CanWrite      bool                 `json:"can_write"`
+	CanManage     bool                 `json:"can_manage"`
+	Namespace     *Namespace           `json:"namespace"`
 }

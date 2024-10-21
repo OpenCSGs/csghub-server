@@ -43,7 +43,7 @@ func (c *CodeComponent) Create(ctx context.Context, req *types.CreateCodeReq) (*
 	}
 
 	if req.DefaultBranch == "" {
-		req.DefaultBranch = "main"
+		req.DefaultBranch = types.MainBranch
 	}
 
 	req.RepoType = types.CodeRepo
@@ -137,7 +137,7 @@ func (c *CodeComponent) Index(ctx context.Context, filter *types.RepoFilter, per
 		err      error
 		resCodes []types.Code
 	)
-	repos, total, err := c.PublicToUser(ctx, types.CodeRepo, filter.Username, filter, per, page, false)
+	repos, total, err := c.PublicToUser(ctx, types.CodeRepo, filter.Username, filter, per, page)
 	if err != nil {
 		newError := fmt.Errorf("failed to get public code repos,error:%w", err)
 		return nil, 0, newError

@@ -107,7 +107,7 @@ func (c *ModelComponent) Index(ctx context.Context, filter *types.RepoFilter, pe
 		err       error
 		resModels []types.Model
 	)
-	repos, total, err := c.PublicToUser(ctx, types.ModelRepo, filter.Username, filter, per, page, false)
+	repos, total, err := c.PublicToUser(ctx, types.ModelRepo, filter.Username, filter, per, page)
 	if err != nil {
 		newError := fmt.Errorf("failed to get public model repos,error:%w", err)
 		return nil, 0, newError
@@ -185,7 +185,7 @@ func (c *ModelComponent) Create(ctx context.Context, req *types.CreateModelReq) 
 	}
 
 	if req.DefaultBranch == "" {
-		req.DefaultBranch = "main"
+		req.DefaultBranch = types.MainBranch
 	}
 	req.Nickname = nickname
 	req.RepoType = types.ModelRepo
@@ -569,6 +569,177 @@ func (c *ModelComponent) Relations(ctx context.Context, namespace, name, current
 	return c.getRelations(ctx, model.RepositoryID, currentUser)
 }
 
+func (c *ModelComponent) SetRelationDatasets(ctx context.Context, req types.RelationDatasets) error {
+	user, err := c.user.FindByUsername(ctx, req.CurrentUser)
+	if err != nil {
+		return fmt.Errorf("user does not exist, %w", err)
+	}
+
+	if !user.CanAdmin() {
+		return fmt.Errorf("only admin is allowed to set dataset for model")
+	}
+
+	_, err = c.repo.FindByPath(ctx, types.ModelRepo, req.Namespace, req.Name)
+	if err != nil {
+		return fmt.Errorf("failed to find model, error: %w", err)
+	}
+
+	getFileContentReq := gitserver.GetRepoInfoByPathReq{
+		Namespace: req.Namespace,
+		Name:      req.Name,
+		Ref:       types.MainBranch,
+		Path:      REPOCARD_FILENAME,
+		RepoType:  types.ModelRepo,
+	}
+
+	metaMap, splits, err := GetMetaMapFromReadMe(c.git, getFileContentReq)
+	if err != nil {
+		return fmt.Errorf("failed parse meta from readme, cause: %w", err)
+	}
+	metaMap["datasets"] = req.Datasets
+	output, err := GetOutputForReadme(metaMap, splits)
+	if err != nil {
+		return fmt.Errorf("failed generate output for readme, cause: %w", err)
+	}
+
+	var readmeReq types.UpdateFileReq
+	readmeReq.Branch = types.MainBranch
+	readmeReq.Message = "update dataset tags"
+	readmeReq.FilePath = REPOCARD_FILENAME
+	readmeReq.RepoType = types.ModelRepo
+	readmeReq.Namespace = req.Namespace
+	readmeReq.Name = req.Name
+	readmeReq.Username = req.CurrentUser
+	readmeReq.Email = user.Email
+	readmeReq.Content = base64.StdEncoding.EncodeToString([]byte(output))
+
+	err = c.git.UpdateRepoFile(&readmeReq)
+	if err != nil {
+		return fmt.Errorf("failed to set dataset tag to %s file, cause: %w", readmeReq.FilePath, err)
+	}
+
+	return nil
+}
+
+func (c *ModelComponent) AddRelationDataset(ctx context.Context, req types.RelationDataset) error {
+	user, err := c.user.FindByUsername(ctx, req.CurrentUser)
+	if err != nil {
+		return fmt.Errorf("user does not exist, %w", err)
+	}
+
+	if !user.CanAdmin() {
+		return fmt.Errorf("only admin was allowed to set dataset for model")
+	}
+
+	_, err = c.repo.FindByPath(ctx, types.ModelRepo, req.Namespace, req.Name)
+	if err != nil {
+		return fmt.Errorf("failed to find model, error: %w", err)
+	}
+
+	getFileContentReq := gitserver.GetRepoInfoByPathReq{
+		Namespace: req.Namespace,
+		Name:      req.Name,
+		Ref:       "main",
+		Path:      REPOCARD_FILENAME,
+		RepoType:  types.ModelRepo,
+	}
+	metaMap, splits, err := GetMetaMapFromReadMe(c.git, getFileContentReq)
+	if err != nil {
+		return fmt.Errorf("failed parse meta from readme, cause: %w", err)
+	}
+	datasets, ok := metaMap["datasets"]
+	if !ok {
+		datasets = []string{req.Dataset}
+	} else {
+		datasets = append(datasets.([]interface{}), req.Dataset)
+	}
+	metaMap["datasets"] = datasets
+	output, err := GetOutputForReadme(metaMap, splits)
+	if err != nil {
+		return fmt.Errorf("failed generate output for readme, cause: %w", err)
+	}
+
+	var readmeReq types.UpdateFileReq
+	readmeReq.Branch = "main"
+	readmeReq.Message = "add relation dataset"
+	readmeReq.FilePath = REPOCARD_FILENAME
+	readmeReq.RepoType = types.ModelRepo
+	readmeReq.Namespace = req.Namespace
+	readmeReq.Name = req.Name
+	readmeReq.Username = req.CurrentUser
+	readmeReq.Email = user.Email
+	readmeReq.Content = base64.StdEncoding.EncodeToString([]byte(output))
+
+	err = c.git.UpdateRepoFile(&readmeReq)
+	if err != nil {
+		return fmt.Errorf("failed to add dataset tag to %s file, cause: %w", readmeReq.FilePath, err)
+	}
+
+	return nil
+}
+
+func (c *ModelComponent) DelRelationDataset(ctx context.Context, req types.RelationDataset) error {
+	user, err := c.user.FindByUsername(ctx, req.CurrentUser)
+	if err != nil {
+		return fmt.Errorf("user does not exist, %w", err)
+	}
+
+	if !user.CanAdmin() {
+		return fmt.Errorf("only admin was allowed to delete dataset for model")
+	}
+
+	_, err = c.repo.FindByPath(ctx, types.ModelRepo, req.Namespace, req.Name)
+	if err != nil {
+		return fmt.Errorf("failed to find model, error: %w", err)
+	}
+
+	getFileContentReq := gitserver.GetRepoInfoByPathReq{
+		Namespace: req.Namespace,
+		Name:      req.Name,
+		Ref:       "main",
+		Path:      REPOCARD_FILENAME,
+		RepoType:  types.ModelRepo,
+	}
+	metaMap, splits, err := GetMetaMapFromReadMe(c.git, getFileContentReq)
+	if err != nil {
+		return fmt.Errorf("failed parse meta from readme, cause: %w", err)
+	}
+	datasets, ok := metaMap["datasets"]
+	if !ok {
+		return nil
+	} else {
+		var newDatasets []string
+		for _, v := range datasets.([]interface{}) {
+			if v.(string) != req.Dataset {
+				newDatasets = append(newDatasets, v.(string))
+			}
+		}
+		metaMap["datasets"] = newDatasets
+	}
+	output, err := GetOutputForReadme(metaMap, splits)
+	if err != nil {
+		return fmt.Errorf("failed generate output for readme, cause: %w", err)
+	}
+
+	var readmeReq types.UpdateFileReq
+	readmeReq.Branch = "main"
+	readmeReq.Message = "delete relation dataset"
+	readmeReq.FilePath = REPOCARD_FILENAME
+	readmeReq.RepoType = types.ModelRepo
+	readmeReq.Namespace = req.Namespace
+	readmeReq.Name = req.Name
+	readmeReq.Username = req.CurrentUser
+	readmeReq.Email = user.Email
+	readmeReq.Content = base64.StdEncoding.EncodeToString([]byte(output))
+
+	err = c.git.UpdateRepoFile(&readmeReq)
+	if err != nil {
+		return fmt.Errorf("failed to delete dataset tag to %s file, cause: %w", readmeReq.FilePath, err)
+	}
+
+	return nil
+}
+
 func (c *ModelComponent) getRelations(ctx context.Context, fromRepoID int64, currentUser string) (*types.Relations, error) {
 	res, err := c.relatedRepos(ctx, fromRepoID, currentUser)
 	if err != nil {
@@ -577,21 +748,6 @@ func (c *ModelComponent) getRelations(ctx context.Context, fromRepoID int64, cur
 	rels := new(types.Relations)
 	datasetRepos := res[types.DatasetRepo]
 	for _, repo := range datasetRepos {
-		dataset, err := c.ds.ByRepoID(ctx, repo.ID)
-		if err != nil {
-			return nil, fmt.Errorf("failed to get dataset by repo id %d, error:  %w", repo.ID, err)
-		}
-		if dataset.Type == int(types.DatasetPrompt) {
-			rels.Prompts = append(rels.Prompts, &types.Dataset{
-				Path:        repo.Path,
-				Name:        repo.Name,
-				Nickname:    repo.Nickname,
-				Description: repo.Description,
-				UpdatedAt:   repo.UpdatedAt,
-				Private:     repo.Private,
-				Downloads:   repo.DownloadCount,
-			})
-		}
 		rels.Datasets = append(rels.Datasets, &types.Dataset{
 			Path:        repo.Path,
 			Name:        repo.Name,
@@ -625,6 +781,18 @@ func (c *ModelComponent) getRelations(ctx context.Context, fromRepoID int64, cur
 	}
 	rels.Spaces = spaces
 
+	promptRepos := res[types.PromptRepo]
+	for _, repo := range promptRepos {
+		rels.Prompts = append(rels.Prompts, &types.PromptRes{
+			Path:        repo.Path,
+			Name:        repo.Name,
+			Nickname:    repo.Nickname,
+			Description: repo.Description,
+			UpdatedAt:   repo.UpdatedAt,
+			Private:     repo.Private,
+			Downloads:   repo.DownloadCount,
+		})
+	}
 	return rels, nil
 }
 

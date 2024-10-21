@@ -17,6 +17,7 @@ const (
 	DatasetRepo RepositoryType = "dataset"
 	SpaceRepo   RepositoryType = "space"
 	CodeRepo    RepositoryType = "code"
+	PromptRepo  RepositoryType = "prompt"
 	UnknownRepo RepositoryType = ""
 
 	OpenCSGSource     RepositorySource = "opencsg"
@@ -30,6 +31,11 @@ const (
 
 	EndpointPublic  int = 1 // public - anyone can access
 	EndpointPrivate int = 2 // private - access with read permission
+
+	MainBranch string = "main"
+
+	ReadmeFileName        = "README.md"
+	GitAttributesFileName = ".gitattributes"
 )
 
 type RepoRequest struct {

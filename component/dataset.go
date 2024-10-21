@@ -234,19 +234,15 @@ license: ` + license + `
 }
 
 func (c *DatasetComponent) Index(ctx context.Context, filter *types.RepoFilter, per, page int) ([]types.Dataset, int, error) {
-	return c.commonIndex(ctx, filter, per, page, false)
+	return c.commonIndex(ctx, filter, per, page)
 }
 
-func (c *DatasetComponent) IndexPrompt(ctx context.Context, filter *types.RepoFilter, per, page int) ([]types.Dataset, int, error) {
-	return c.commonIndex(ctx, filter, per, page, true)
-}
-
-func (c *DatasetComponent) commonIndex(ctx context.Context, filter *types.RepoFilter, per, page int, onlyPromptType bool) ([]types.Dataset, int, error) {
+func (c *DatasetComponent) commonIndex(ctx context.Context, filter *types.RepoFilter, per, page int) ([]types.Dataset, int, error) {
 	var (
 		err         error
 		resDatasets []types.Dataset
 	)
-	repos, total, err := c.PublicToUser(ctx, types.DatasetRepo, filter.Username, filter, per, page, onlyPromptType)
+	repos, total, err := c.PublicToUser(ctx, types.DatasetRepo, filter.Username, filter, per, page)
 	if err != nil {
 		newError := fmt.Errorf("failed to get public dataset repos,error:%w", err)
 		return nil, 0, newError
@@ -255,7 +251,7 @@ func (c *DatasetComponent) commonIndex(ctx context.Context, filter *types.RepoFi
 	for _, repo := range repos {
 		repoIDs = append(repoIDs, repo.ID)
 	}
-	datasets, err := c.ds.ByRepoIDs(ctx, repoIDs, onlyPromptType)
+	datasets, err := c.ds.ByRepoIDs(ctx, repoIDs)
 	if err != nil {
 		newError := fmt.Errorf("failed to get datasets by repo ids,error:%w", err)
 		return nil, 0, newError
@@ -302,7 +298,6 @@ func (c *DatasetComponent) commonIndex(ctx context.Context, filter *types.RepoFi
 			SyncStatus:   repo.SyncStatus,
 			License:      repo.License,
 			Repository:   common.BuildCloneInfo(c.config, dataset.Repository),
-			Type:         dataset.Type,
 			User: types.User{
 				Username: dataset.Repository.User.Username,
 				Nickname: dataset.Repository.User.NickName,

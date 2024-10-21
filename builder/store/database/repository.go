@@ -355,7 +355,7 @@ func (s *RepoStore) SetUpdateTimeByPath(ctx context.Context, repoType types.Repo
 	return err
 }
 
-func (s *RepoStore) PublicToUser(ctx context.Context, repoType types.RepositoryType, userIDs []int64, filter *types.RepoFilter, per, page int, onlyPromptTypeDataset bool) (repos []*Repository, count int, err error) {
+func (s *RepoStore) PublicToUser(ctx context.Context, repoType types.RepositoryType, userIDs []int64, filter *types.RepoFilter, per, page int) (repos []*Repository, count int, err error) {
 	q := s.db.Operator.Core.
 		NewSelect().
 		Column("repository.*").
@@ -388,11 +388,6 @@ func (s *RepoStore) PublicToUser(ctx context.Context, repoType types.RepositoryT
 		for _, tag := range filter.Tags {
 			q.Where("tags.category = ? AND tags.name = ?", tag.Category, tag.Name)
 		}
-	}
-
-	if repoType == types.DatasetRepo && onlyPromptTypeDataset {
-		q.Join("JOIN datasets on repository.id = datasets.repository_id")
-		q.Where("datasets.type = ?", types.DatasetPrompt)
 	}
 
 	count, err = q.Count(ctx)
