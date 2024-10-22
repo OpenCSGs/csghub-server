@@ -172,7 +172,7 @@ type Config struct {
 	MultiSync struct {
 		SaasAPIDomain  string `envconfig:"OPENCSG_SAAS_API_DOMAIN" default:"https://hub.opencsg.com"`
 		SaasSyncDomain string `envconfig:"OPENCSG_SAAS_SYNC_DOMAIN" default:"https://sync.opencsg.com"`
-		Enabled        bool   `envconfig:"STARHUB_SERVER_MULTI_SYNC_ENABLED" default:"false"`
+		Enabled        bool   `envconfig:"STARHUB_SERVER_MULTI_SYNC_ENABLED" default:"true"`
 	}
 
 	Telemetry struct {
