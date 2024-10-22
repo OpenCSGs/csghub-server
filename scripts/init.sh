@@ -125,7 +125,7 @@ if [ "$STARHUB_SERVER_SAAS" == "false" ]; then
         echo "Sync as client job already exists"
     else
         echo "Creating cron job for sync saas sync verions..."
-        read_and_set_cron "STARHUB_SERVER_CRON_SYNC_AS_CLIENT" "0 * * * *"
+        read_and_set_cron "STARHUB_SERVER_CRON_SYNC_AS_CLIENT" "0/10 * * * *"
         (crontab -l ;echo "$cron STARHUB_SERVER_PUBLIC_DOMAIN=$STARHUB_SERVER_PUBLIC_DOMAIN STARHUB_DATABASE_DSN=$STARHUB_DATABASE_DSN STARHUB_SERVER_GITSERVER_HOST=$STARHUB_SERVER_GITSERVER_HOST STARHUB_SERVER_GITSERVER_USERNAME=$STARHUB_SERVER_GITSERVER_USERNAME STARHUB_SERVER_GITSERVER_PASSWORD=$STARHUB_SERVER_GITSERVER_PASSWORD STARHUB_SERVER_REDIS_ENDPOINT=$STARHUB_SERVER_REDIS_ENDPOINT STARHUB_SERVER_REDIS_USER=$STARHUB_SERVER_REDIS_USER STARHUB_SERVER_REDIS_PASSWORD=$STARHUB_SERVER_REDIS_PASSWORD /starhub-bin/starhub sync sync-as-client >> /starhub-bin/cron-sync-as-client.log 2>&1") | crontab -
     fi
 else
@@ -141,6 +141,9 @@ echo "Migration init"
 /starhub-bin/starhub migration init
 echo "Migration migrate"
 /starhub-bin/starhub migration migrate
+
+echo "Trigger multisync once in background"
+nohup /starhub-bin/starhub sync sync-as-client >> /starhub-bin/cron-sync-as-client.log 2>&1 &
+
 echo "Start server..."
 /starhub-bin/starhub start server
-
