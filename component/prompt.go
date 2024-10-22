@@ -138,14 +138,14 @@ func (c *PromptComponent) ListPrompt(ctx context.Context, req types.PromptReq) (
 func (c *PromptComponent) GetPrompt(ctx context.Context, req types.PromptReq) (*PromptOutput, error) {
 	r, err := c.repo.FindByPath(ctx, types.PromptRepo, req.Namespace, req.Name)
 	if err != nil {
-		return nil, fmt.Errorf("failed to find prompt dataset, error: %w", err)
+		return nil, fmt.Errorf("failed to find prompt repo, error: %w", err)
 	}
 
-	allow, err := c.AllowReadAccessRepo(ctx, r, req.CurrentUser)
+	permission, err := c.getUserRepoPermission(ctx, req.CurrentUser, r)
 	if err != nil {
-		return nil, fmt.Errorf("failed to check prompt permission, error: %w", err)
+		return nil, fmt.Errorf("failed to get user repo permission, error: %w", err)
 	}
-	if !allow {
+	if !permission.CanRead {
 		return nil, ErrUnauthorized
 	}
 
@@ -158,8 +158,10 @@ func (c *PromptComponent) GetPrompt(ctx context.Context, req types.PromptReq) (*
 	}
 	p, err := c.ParseJsonFile(ctx, getFileContentReq)
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse jsonl file %s, error: %w", req.Path, err)
+		return nil, fmt.Errorf("failed to parse jsonl %s, error: %w", req.Path, err)
 	}
+	p.CanWrite = permission.CanWrite
+	p.CanManage = permission.CanAdmin
 	return p, nil
 }
 
@@ -1127,7 +1129,9 @@ type Prompt struct {
 
 type PromptOutput struct {
 	Prompt
-	FilePath string `json:"file_path"`
+	FilePath  string `json:"file_path"`
+	CanWrite  bool   `json:"can_write"`
+	CanManage bool   `json:"can_manage"`
 }
 
 type CreatePromptReq struct {

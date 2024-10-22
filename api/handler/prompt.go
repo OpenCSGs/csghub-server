@@ -172,8 +172,8 @@ func (h *PromptHandler) GetPrompt(ctx *gin.Context) {
 	}
 	filePath := ctx.Param("file_path")
 	if filePath == "" {
-		slog.Error("Bad request file path format", "error", err)
-		httpbase.BadRequest(ctx, "Bad request file path format")
+		slog.Error("Bad request format", "error", err)
+		httpbase.BadRequest(ctx, "Bad request format")
 		return
 	}
 	req := types.PromptReq{
@@ -184,7 +184,7 @@ func (h *PromptHandler) GetPrompt(ctx *gin.Context) {
 	}
 	data, err := h.pc.GetPrompt(ctx, req)
 	if err != nil {
-		slog.Error("Failed to list prompts of repo", slog.Any("req", req), slog.Any("error", err))
+		slog.Error("Failed to get prompt of repo", slog.Any("req", req), slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
 		return
 	}
