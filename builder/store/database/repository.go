@@ -176,6 +176,9 @@ func (s *RepoStore) FindByGitPath(ctx context.Context, path string) (*Repository
 }
 
 func (s *RepoStore) FindByGitPaths(ctx context.Context, paths []string, opts ...SelectOption) ([]*Repository, error) {
+	for i := range paths {
+		paths[i] = strings.ToLower(paths[i])
+	}
 	repos := make([]*Repository, 0)
 	q := s.db.Operator.Core.
 		NewSelect()
@@ -183,7 +186,7 @@ func (s *RepoStore) FindByGitPaths(ctx context.Context, paths []string, opts ...
 		opt.Appply(q)
 	}
 	err := q.Model(&repos).
-		Where("git_path in (?)", bun.In(paths)).
+		Where("LOWER(git_path) in (?)", bun.In(paths)).
 		Scan(ctx)
 	return repos, err
 }
