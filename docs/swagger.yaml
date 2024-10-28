@@ -302,6 +302,8 @@ definitions:
         type: string
       id:
         type: integer
+      industry:
+        type: string
       logo:
         type: string
       name:
@@ -481,6 +483,19 @@ definitions:
         type: array
       avatar:
         type: string
+      balance:
+        type: integer
+      bilibili:
+        description: |-
+          WechatID     string `bun:"," json:"wechat_id"`
+          GithubID     string `bun:"," json:"github_id"`
+          GitlabID     string `bun:"," json:"gitlab_id"`
+          SessionIP    string `bun:"," json:"session_ip"`
+          Nickname        string `bun:"," json:"nickname"`
+          GitToken        string `bun:"," json:"git_token"`
+          StarhubSynced   bool   `bun:"," json:"starhub_synced"`
+          GitTokenName string `bun:"," json:"git_token_name"`
+        type: string
       bio:
         type: string
       can_change_username:
@@ -532,6 +547,8 @@ definitions:
         type: string
       uuid:
         description: TODO:add unique index after migration
+        type: string
+      weibo:
         type: string
     type: object
   handler.Create.addMemberRequest:
@@ -1078,6 +1095,8 @@ definitions:
       homepage:
         example: https://www.example.com
         type: string
+      industry:
+        type: string
       logo:
         example: https://www.example.com/logo.png
         type: string
@@ -1454,9 +1473,9 @@ definitions:
     type: object
   types.MirrorPriority:
     enum:
+    - 3
     - 2
     - 1
-    - 0
     type: integer
     x-enum-varnames:
     - HighMirrorPriority
@@ -1482,6 +1501,7 @@ definitions:
     enum:
     - waiting
     - running
+    - repo_synced
     - finished
     - failed
     - incomplete
@@ -1489,6 +1509,7 @@ definitions:
     x-enum-varnames:
     - MirrorWaiting
     - MirrorRunning
+    - MirrorRepoSynced
     - MirrorFinished
     - MirrorFailed
     - MirrorIncomplete
@@ -2075,6 +2096,10 @@ definitions:
     properties:
       avatar:
         type: string
+      balance:
+        type: integer
+      bilibili:
+        type: string
       bio:
         type: string
       email:
@@ -2101,10 +2126,16 @@ definitions:
         type: array
       uuid:
         type: string
+      weibo:
+        type: string
     type: object
   types.User:
     properties:
       avatar:
+        type: string
+      balance:
+        type: integer
+      bilibili:
         type: string
       bio:
         type: string
@@ -2133,6 +2164,8 @@ definitions:
       username:
         type: string
       uuid:
+        type: string
+      weibo:
         type: string
     type: object
 info:

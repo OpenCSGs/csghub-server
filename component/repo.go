@@ -28,6 +28,7 @@ import (
 	"opencsg.com/csghub-server/builder/rpc"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/builder/store/s3"
+	"opencsg.com/csghub-server/builder/userservice"
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/types"
 	"opencsg.com/csghub-server/common/utils/common"
@@ -74,6 +75,7 @@ type RepoComponent struct {
 	lfsMetaObjectStore *database.LfsMetaObjectStore
 	recom              *database.RecomStore
 	mq                 *queue.PriorityQueue
+	userClient         *userservice.UserServiceClient
 }
 
 func NewRepoComponent(config *config.Config) (*RepoComponent, error) {
@@ -139,6 +141,11 @@ func NewRepoComponent(config *config.Config) (*RepoComponent, error) {
 	c.lfsMetaObjectStore = database.NewLfsMetaObjectStore()
 	c.recom = database.NewRecomStore()
 	c.config = config
+	c.userClient, err = userservice.NewUserServiceClient(config)
+	if err != nil {
+		newError := fmt.Errorf("fail to create user service client ,error:%w", err)
+		return nil, newError
+	}
 	return c, nil
 }
 
@@ -2563,4 +2570,12 @@ size %d
 	}
 
 	return &pointer, encodingContent
+}
+
+func (c *RepoComponent) AddUserBalance(req types.UpdateBalanceRequest) error {
+	_, err := c.userClient.AddBalance(req)
+	if err != nil {
+		return fmt.Errorf("fail to call add user balace service, error: %w", err)
+	}
+	return nil
 }

@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/uptrace/bun"
+	"opencsg.com/csghub-server/common/types"
 )
 
 type OrgStore struct {
@@ -31,6 +32,7 @@ type Organization struct {
 	User        *User      `bun:"rel:belongs-to,join:user_id=id" json:"user"`
 	NamespaceID int64      `bun:",notnull" json:"namespace_id"`
 	Namespace   *Namespace `bun:"rel:has-one,join:namespace_id=id" json:"namespace"`
+	Industry    string     `bun:"" json:"industry"`
 	times
 }
 
@@ -48,11 +50,21 @@ func (s *OrgStore) Create(ctx context.Context, org *Organization, namepace *Name
 	return
 }
 
-func (s *OrgStore) GetUserOwnOrgs(ctx context.Context, username string) (orgs []Organization, err error) {
+func (s *OrgStore) GetUserOwnOrgs(ctx context.Context, username string, req types.SearchOrgReq) (orgs []Organization, err error) {
 	query := s.db.Operator.Core.
 		NewSelect().
 		Model(&orgs).
 		Relation("User")
+	if req.OrgType != "" {
+		query = query.Where("organization.org_type = ?", req.OrgType)
+	}
+	if req.Industry != "" {
+		query = query.Where("organization.industry = ?", req.Industry)
+	}
+	if req.Search != "" {
+		query = query.Where("(organization.name ILIKE ? OR organization.description ILIKE ?)", "%"+req.Search+"%", "%"+req.Search+"%")
+	}
+
 	if username != "" {
 		query = query.
 			Join("JOIN users AS u ON u.id = organization.user_id").

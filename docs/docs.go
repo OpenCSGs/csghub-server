@@ -13286,6 +13286,9 @@ const docTemplate = `{
                 "id": {
                     "type": "integer"
                 },
+                "industry": {
+                    "type": "string"
+                },
                 "logo": {
                     "type": "string"
                 },
@@ -13553,6 +13556,13 @@ const docTemplate = `{
                 "avatar": {
                     "type": "string"
                 },
+                "balance": {
+                    "type": "integer"
+                },
+                "bilibili": {
+                    "description": "WechatID     string ` + "`" + `bun:\",\" json:\"wechat_id\"` + "`" + `\nGithubID     string ` + "`" + `bun:\",\" json:\"github_id\"` + "`" + `\nGitlabID     string ` + "`" + `bun:\",\" json:\"gitlab_id\"` + "`" + `\nSessionIP    string ` + "`" + `bun:\",\" json:\"session_ip\"` + "`" + `\nNickname        string ` + "`" + `bun:\",\" json:\"nickname\"` + "`" + `\nGitToken        string ` + "`" + `bun:\",\" json:\"git_token\"` + "`" + `\nStarhubSynced   bool   ` + "`" + `bun:\",\" json:\"starhub_synced\"` + "`" + `\nGitTokenName string ` + "`" + `bun:\",\" json:\"git_token_name\"` + "`" + `",
+                    "type": "string"
+                },
                 "bio": {
                     "type": "string"
                 },
@@ -13621,6 +13631,9 @@ const docTemplate = `{
                 },
                 "uuid": {
                     "description": "TODO:add unique index after migration",
+                    "type": "string"
+                },
+                "weibo": {
                     "type": "string"
                 }
             }
@@ -14434,6 +14447,9 @@ const docTemplate = `{
                     "type": "string",
                     "example": "https://www.example.com"
                 },
+                "industry": {
+                    "type": "string"
+                },
                 "logo": {
                     "type": "string",
                     "example": "https://www.example.com/logo.png"
@@ -14991,9 +15007,9 @@ const docTemplate = `{
         "types.MirrorPriority": {
             "type": "integer",
             "enum": [
+                3,
                 2,
-                1,
-                0
+                1
             ],
             "x-enum-varnames": [
                 "HighMirrorPriority",
@@ -15031,6 +15047,7 @@ const docTemplate = `{
             "enum": [
                 "waiting",
                 "running",
+                "repo_synced",
                 "finished",
                 "failed",
                 "incomplete"
@@ -15038,6 +15055,7 @@ const docTemplate = `{
             "x-enum-varnames": [
                 "MirrorWaiting",
                 "MirrorRunning",
+                "MirrorRepoSynced",
                 "MirrorFinished",
                 "MirrorFailed",
                 "MirrorIncomplete"
@@ -15909,6 +15927,12 @@ const docTemplate = `{
                 "avatar": {
                     "type": "string"
                 },
+                "balance": {
+                    "type": "integer"
+                },
+                "bilibili": {
+                    "type": "string"
+                },
                 "bio": {
                     "type": "string"
                 },
@@ -15943,6 +15967,9 @@ const docTemplate = `{
                 },
                 "uuid": {
                     "type": "string"
+                },
+                "weibo": {
+                    "type": "string"
                 }
             }
         },
@@ -15950,6 +15977,12 @@ const docTemplate = `{
             "type": "object",
             "properties": {
                 "avatar": {
+                    "type": "string"
+                },
+                "balance": {
+                    "type": "integer"
+                },
+                "bilibili": {
                     "type": "string"
                 },
                 "bio": {
@@ -15992,6 +16025,9 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "uuid": {
+                    "type": "string"
+                },
+                "weibo": {
                     "type": "string"
                 }
             }

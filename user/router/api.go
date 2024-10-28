@@ -90,6 +90,7 @@ func NewRouter(config *config.Config) (*gin.Engine, error) {
 		// userGroup.POST("", userHandler.Create)
 		// user self or admin
 		userGroup.PUT("/:username", mustLogin(), userHandler.Update)
+		userGroup.PUT("/:username/balance", mustLogin(), userHandler.UpdateBalance)
 		//TODO:
 		// userGroup.DELETE("/:username", userMatch, userHandler.Delete)
 		// get user's all tokens

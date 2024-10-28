@@ -11,6 +11,7 @@ type CreateOrgReq struct {
 	Logo        string `json:"logo,omitempty" example:"https://www.example.com/logo.png"`
 	Verified    bool   `json:"verified" example:"false"`
 	OrgType     string `json:"org_type" example:"company or school etc"`
+	Industry    string `json:"industry"`
 }
 
 func (c *CreateOrgReq) SensName() string {
@@ -41,6 +42,7 @@ type EditOrgReq struct {
 	Verified    *bool   `json:"verified" example:"false"`
 	OrgType     *string `json:"org_type" example:"company or school etc"`
 	CurrentUser string  `json:"-"`
+	Industry    *string `json:"industry"`
 }
 
 func (e *EditOrgReq) SensName() string {
@@ -106,4 +108,10 @@ type Member struct {
 	Avatar      string `json:"avatar,omitempty"`
 	Role        string `json:"role,omitempty"`
 	LastLoginAt string `json:"last_login_at,omitempty"`
+}
+
+type SearchOrgReq struct {
+	OrgType  string `json:"org_type"`
+	Industry string `json:"industry"`
+	Search   string `json:"search"`
 }

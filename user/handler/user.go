@@ -121,6 +121,31 @@ func (h *UserHandler) Update(ctx *gin.Context) {
 	httpbase.OK(ctx, nil)
 }
 
+func (h *UserHandler) UpdateBalance(ctx *gin.Context) {
+	currentUser := httpbase.GetCurrentUser(ctx)
+	var req *types.UpdateBalanceRequest
+	if err := ctx.ShouldBindJSON(&req); err != nil {
+		slog.Error("Bad request format", "error", err)
+		httpbase.BadRequest(ctx, err.Error())
+		return
+	}
+
+	userName := ctx.Param("username")
+	req.VisitorName = userName
+	req.CurrentUser = currentUser
+
+	_, err := h.c.AddBalance(ctx, req)
+
+	if err != nil {
+		slog.Error("Failed to update user", slog.Any("error", err))
+		httpbase.ServerError(ctx, err)
+		return
+	}
+
+	slog.Info("Update user succeed", slog.String("user", req.VisitorName))
+	httpbase.OK(ctx, nil)
+}
+
 // DeleteUser godoc
 // @Security     ApiKey
 // @Summary      Delete user

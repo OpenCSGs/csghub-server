@@ -102,6 +102,7 @@ func (c *OrganizationComponent) Create(ctx context.Context, req *types.CreateOrg
 		Path:   dbOrg.Name,
 		UserID: user.ID,
 	}
+	dbOrg.Industry = req.Industry
 	err = c.os.Create(ctx, dbOrg, namespace)
 	if err != nil {
 		return nil, fmt.Errorf("failed create database organization, error: %w", err)
@@ -128,8 +129,8 @@ func (c *OrganizationComponent) Create(ctx context.Context, req *types.CreateOrg
 	return org, err
 }
 
-func (c *OrganizationComponent) Index(ctx context.Context, username string) ([]types.Organization, error) {
-	dborgs, err := c.os.GetUserOwnOrgs(ctx, username)
+func (c *OrganizationComponent) Index(ctx context.Context, username string, req types.SearchOrgReq) ([]types.Organization, error) {
+	dborgs, err := c.os.GetUserOwnOrgs(ctx, username, req)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get organizations, error: %w", err)
 	}
@@ -214,6 +215,9 @@ func (c *OrganizationComponent) Update(ctx context.Context, req *types.EditOrgRe
 	}
 	if req.OrgType != nil {
 		org.OrgType = *req.OrgType
+	}
+	if req.Industry != nil {
+		org.Industry = *req.Industry
 	}
 	err = c.os.Update(ctx, &org)
 	if err != nil {

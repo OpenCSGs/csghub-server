@@ -197,6 +197,16 @@ func (c *ModelComponent) Create(ctx context.Context, req *types.CreateModelReq) 
 		return nil, fmt.Errorf("failed to create database model, cause: %w", err)
 	}
 
+	err = c.AddUserBalance(types.UpdateBalanceRequest{
+		Balance:     50,
+		VisitorName: req.Username,
+		CurrentUser: req.Username,
+	})
+
+	if err != nil {
+		slog.Warn("fail to add user balance for create model repo", slog.Any("error", err))
+	}
+
 	// Create README.md file
 	err = c.git.CreateRepoFile(buildCreateFileReq(&types.CreateFileParams{
 		Username:  user.Username,

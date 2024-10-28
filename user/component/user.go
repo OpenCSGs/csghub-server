@@ -306,6 +306,12 @@ func (c *UserComponent) setChangedProps(user *database.User, req *types.UpdateUs
 	if req.Roles != nil {
 		user.SetRoles(*req.Roles)
 	}
+	if req.Bilibili != nil {
+		user.Bilibili = *req.Bilibili
+	}
+	if req.Weibo != nil {
+		user.Weibo = *req.Weibo
+	}
 }
 
 func (c *UserComponent) Delete(ctx context.Context, username string) error {
@@ -380,6 +386,9 @@ func (c *UserComponent) Get(ctx context.Context, userName, visitorName string) (
 		u.Homepage = dbuser.Homepage
 		u.Phone = dbuser.Phone
 		u.Roles = dbuser.Roles()
+		u.Bilibili = dbuser.Bilibili
+		u.Weibo = dbuser.Weibo
+		u.Balance = dbuser.Balance
 	}
 
 	dborgs, err := c.os.GetUserBelongOrgs(ctx, dbuser.ID)
@@ -528,4 +537,28 @@ func (c *UserComponent) FixUserData(ctx context.Context, userName string) error 
 	}
 
 	return nil
+}
+
+func (c *UserComponent) AddBalance(ctx context.Context, req *types.UpdateBalanceRequest) (*database.User, error) {
+	if req.CurrentUser != req.VisitorName {
+		canAdmin, err := c.CanAdmin(ctx, req.CurrentUser)
+		if err != nil {
+			return nil, fmt.Errorf("failed to check user permission, visitor: %s, error: %w", req.CurrentUser, err)
+		}
+		if !canAdmin {
+			return nil, fmt.Errorf("only admin was allowed to add user %s balance", req.CurrentUser)
+		}
+	}
+
+	user, err := c.us.FindByUsername(ctx, req.VisitorName)
+	if err != nil {
+		return nil, fmt.Errorf("failed to find user by username: %s", req.VisitorName)
+	}
+
+	err = c.us.AddBalance(ctx, user, req.Balance)
+	if err != nil {
+		return nil, err
+	}
+
+	return &user, nil
 }

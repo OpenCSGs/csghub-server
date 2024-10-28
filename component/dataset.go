@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"time"
 
 	"opencsg.com/csghub-server/builder/git/membership"
@@ -155,6 +156,16 @@ func (c *DatasetComponent) Create(ctx context.Context, req *types.CreateDatasetR
 	dataset, err := c.ds.Create(ctx, dbDataset)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create database dataset, cause: %w", err)
+	}
+
+	err = c.AddUserBalance(types.UpdateBalanceRequest{
+		Balance:     50,
+		VisitorName: req.Username,
+		CurrentUser: req.Username,
+	})
+
+	if err != nil {
+		slog.Warn("fail to add user balance for create dataset repo", slog.Any("error", err))
 	}
 
 	// Create README.md file

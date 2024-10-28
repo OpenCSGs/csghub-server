@@ -58,6 +58,9 @@ type User struct {
 	// GitToken        string `bun:"," json:"git_token"`
 	// StarhubSynced   bool   `bun:"," json:"starhub_synced"`
 	// GitTokenName string `bun:"," json:"git_token_name"`
+	Bilibili string `bun:"," json:"bilibili"`
+	Weibo    string `bun:"," json:"weibo"`
+	Balance  int    `bun:"," json:"balance"`
 
 	times
 }
@@ -211,4 +214,13 @@ func (s *UserStore) GetActiveUserCount(ctx context.Context) (int, error) {
 		NewSelect().
 		Model(&User{}).
 		Count(ctx)
+}
+
+func (s *UserStore) AddBalance(ctx context.Context, user User, value int) error {
+	user.Balance += value
+	_, err := s.db.Operator.Core.NewUpdate().Model(&user).Column("balance").WherePK().Exec(ctx)
+	if err != nil {
+		return err
+	}
+	return nil
 }
