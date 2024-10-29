@@ -632,6 +632,7 @@ func createUserRoutes(apiGroup *gin.RouterGroup, needAPIKey gin.HandlerFunc, use
 		apiGroup.GET("/user/:username/datasets", userHandler.Datasets)
 		apiGroup.GET("/user/:username/codes", userHandler.Codes)
 		apiGroup.GET("/user/:username/spaces", userHandler.Spaces)
+		apiGroup.GET("/user/:username/prompts", userHandler.Prompts)
 		// User likes
 		apiGroup.PUT("/user/:username/likes/:repo_id", userHandler.LikesAdd)
 		apiGroup.DELETE("/user/:username/likes/:repo_id", userHandler.LikesDelete)

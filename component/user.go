@@ -45,6 +45,11 @@ func NewUserComponent(config *config.Config) (*UserComponent, error) {
 	c.uls = database.NewUserLikesStore()
 	c.repo = database.NewRepoStore()
 	c.deploy = database.NewDeployTaskStore()
+	c.ac, err = NewAccountingComponent(config)
+	if err != nil {
+		return nil, err
+	}
+	c.pt = database.NewPromptStore()
 	return c, nil
 }
 
@@ -63,6 +68,10 @@ type UserComponent struct {
 	repo           *database.RepoStore
 	deploy         *database.DeployTaskStore
 	cos            *database.CollectionStore
+	ac             *AccountingComponent
+	srs            *database.SpaceResourceStore
+	// urs            *database.UserResourcesStore
+	pt *database.PromptStore
 }
 
 func (c *UserComponent) Datasets(ctx context.Context, req *types.UserDatasetsReq) ([]types.Dataset, int, error) {
@@ -640,4 +649,226 @@ func (c *UserComponent) ListServerless(ctx context.Context, req types.DeployReq)
 		})
 	}
 	return resDeploys, total, nil
+}
+
+// func (c *UserComponent) CreateUserResource(ctx context.Context, req types.CreateUserResourceReq) error {
+// 	user, err := c.us.FindByUsername(ctx, req.Username)
+// 	if err != nil {
+// 		newError := fmt.Errorf("failed to check for the presence of the user,error:%w", err)
+// 		return newError
+// 	}
+// 	var orderReq types.AcctOrderCreateReq
+// 	orderReq.OrderDetails = req.OrderDetails
+// 	orderReq.OrderUUID = uuid.New()
+// 	orderReq.UserUUID = user.UUID
+// 	urs, err := c.generateUserResource(ctx, req.Username, orderReq)
+// 	if err != nil {
+// 		return err
+// 	}
+// 	for _, ur := range urs {
+// 		err = c.urs.AddUserResources(ctx, &ur)
+// 		if err != nil {
+// 			return err
+// 		}
+// 	}
+// 	return nil
+// }
+
+// func (c *UserComponent) DeleteUserResource(ctx context.Context, username string, orderDetailId int64) error {
+// 	user, err := c.us.FindByUsername(ctx, username)
+// 	if err != nil {
+// 		newError := fmt.Errorf("failed to check for the presence of the user,error:%w", err)
+// 		return newError
+// 	}
+// 	err = c.urs.DeleteUserResourcesByOrderDetailId(ctx, user.UUID, orderDetailId)
+// 	if err != nil {
+// 		return fmt.Errorf("failed to delete user resource, error:%w", err)
+// 	}
+// 	return nil
+// }
+
+// // generate user resource
+// func (c *UserComponent) generateUserResource(ctx context.Context, username string, req types.AcctOrderCreateReq) ([]database.UserResources, error) {
+// 	//check resource available
+// 	for _, v := range req.OrderDetails {
+// 		resourceId, _ := strconv.ParseInt(v.ResourceID, 10, 64)
+// 		sp, err := c.srs.FindByID(ctx, resourceId)
+// 		if err != nil {
+// 			return nil, err
+// 		}
+// 		var hardware types.HardWare
+// 		err = json.Unmarshal([]byte(sp.Resources), &hardware)
+// 		if err != nil {
+// 			return nil, err
+// 		}
+// 		_, err = c.deployer.CheckResourceAvailable(ctx, sp.ClusterID, 0, &hardware)
+// 		if err != nil {
+// 			return nil, fmt.Errorf("failed to create order, %w", err)
+// 		}
+// 	}
+// 	// to do get order details
+// 	order, err := c.ac.CreateOrder(username, req)
+// 	if err != nil {
+// 		return nil, fmt.Errorf("failed to create order for user %s, order id: %s, error:%w", username, req.OrderUUID, err)
+// 	}
+// 	var urs []database.UserResources
+// 	for _, v := range order.Details {
+// 		resourceId, _ := strconv.ParseInt(v.ResourceID, 10, 64)
+// 		sp, err := c.srs.FindByID(ctx, resourceId)
+// 		if err != nil {
+// 			return nil, err
+// 		}
+// 		var hardware types.HardWare
+// 		err = json.Unmarshal([]byte(sp.Resources), &hardware)
+// 		if err != nil {
+// 			return nil, err
+// 		}
+// 		var xpu_num = 0
+// 		if hardware.Gpu.Num != "" {
+// 			xpu_num, err = strconv.Atoi(hardware.Gpu.Num)
+// 		} else if hardware.Npu.Num != "" {
+// 			xpu_num, err = strconv.Atoi(hardware.Npu.Num)
+// 		}
+// 		if err != nil {
+// 			return nil, err
+// 		}
+// 		_, err = c.deployer.CheckResourceAvailable(ctx, sp.ClusterID, 0, &hardware)
+// 		if err != nil {
+// 			return nil, fmt.Errorf("failed to check resource, %w", err)
+// 		}
+// 		var ur = database.UserResources{}
+// 		ur.UserUID = order.UserUUID
+// 		ur.OrderId = order.OrderUUID
+// 		ur.OrderDetailId = v.ID
+// 		ur.ResourceId = resourceId
+// 		ur.StartTime = v.BeginTime
+// 		ur.EndTime = v.EndTime
+// 		ur.XPUNum = xpu_num
+// 		ur.PayMode = v.SkuUnitType
+// 		ur.Price = math.Abs(v.Amount)
+// 		urs = append(urs, ur)
+// 	}
+// 	return urs, nil
+// }
+
+// // GetUserResource
+// func (c *UserComponent) GetUserResource(ctx context.Context, req types.GetUserResourceReq) ([]types.UserResourcesResp, int, error) {
+// 	user, err := c.us.FindByUsername(ctx, req.CurrentUser)
+// 	if err != nil {
+// 		newError := fmt.Errorf("failed to check for the presence of the user,error:%w", err)
+// 		return nil, 0, newError
+// 	}
+// 	var urs []types.UserResourcesResp
+// 	data, total, err := c.urs.GetUserResourcesByUserUID(ctx, req.PageSize, req.Page, user.UUID)
+// 	if err != nil {
+// 		return nil, 0, err
+// 	}
+// 	for _, v := range data {
+// 		deployName := "-"
+// 		repoPath := ""
+// 		deployType := types.UnknownType
+// 		if v.Deploy != nil {
+// 			deployName = v.Deploy.DeployName
+// 			repoPath = strings.TrimPrefix(v.Deploy.GitPath, "models_")
+// 			repoPath = strings.TrimPrefix(repoPath, "spaces_")
+// 			deployType = v.Deploy.Type
+// 		}
+// 		resource := ""
+// 		resourceType := ""
+// 		if v.SpaceResource != nil {
+// 			var hardware types.HardWare
+// 			json.Unmarshal([]byte(v.SpaceResource.Resources), &hardware)
+// 			resource = hardware.Cpu.Num + "vCPU·" + hardware.Memory
+// 			if hardware.Gpu.Num != "" {
+// 				resourceType = hardware.Gpu.Type
+// 				resource += "·" + hardware.Gpu.Num + "GPU"
+// 			} else if hardware.Npu.Num != "" {
+// 				resourceType = hardware.Npu.Type
+// 				resource += "·" + hardware.Npu.Num + "NPU"
+// 			} else {
+// 				resourceType = hardware.Cpu.Type
+// 			}
+// 		}
+// 		urs = append(urs, types.UserResourcesResp{
+// 			ID:            v.ID,
+// 			OrderId:       v.OrderId,
+// 			OrderDetailId: v.OrderDetailId,
+// 			ResourceId:    v.ResourceId,
+// 			CreatedAt:     v.CreatedAt,
+// 			StartTime:     v.StartTime,
+// 			EndTime:       v.EndTime,
+// 			XPUNum:        v.XPUNum,
+// 			PayMode:       v.PayMode,
+// 			Price:         v.Price,
+// 			DeployName:    deployName,
+// 			DeployID:      v.DeployId,
+// 			RepoPath:      repoPath,
+// 			Resource:      resource,
+// 			ResourceType:  resourceType,
+// 			DeployType:    deployType,
+// 		})
+// 	}
+// 	return urs, total, nil
+// }
+
+func (c *UserComponent) GetUserByName(ctx context.Context, userName string) (*database.User, error) {
+	user, err := c.us.FindByUsername(ctx, userName)
+	if err != nil {
+		return nil, fmt.Errorf("failed to check for the presence of the user %s,error:%w", userName, err)
+	}
+	return &user, nil
+}
+
+func (c *UserComponent) Prompts(ctx context.Context, req *types.UserPromptsReq) ([]types.PromptRes, int, error) {
+	var resPrompts []types.PromptRes
+	userExists, err := c.us.IsExist(ctx, req.Owner)
+	if err != nil {
+		newError := fmt.Errorf("failed to check for the presence of the user,error:%w", err)
+		slog.Error(newError.Error())
+		return nil, 0, newError
+	}
+
+	if !userExists {
+		return nil, 0, errors.New("user not exists")
+	}
+
+	if req.CurrentUser != "" {
+		cuserExists, err := c.us.IsExist(ctx, req.CurrentUser)
+		if err != nil {
+			newError := fmt.Errorf("failed to check for the presence of current user,error:%w", err)
+			slog.Error(newError.Error())
+			return nil, 0, newError
+		}
+
+		if !cuserExists {
+			return nil, 0, errors.New("current user not exists")
+		}
+	}
+
+	onlyPublic := req.Owner != req.CurrentUser
+	ds, total, err := c.pt.ByUsername(ctx, req.Owner, req.PageSize, req.Page, onlyPublic)
+	if err != nil {
+		newError := fmt.Errorf("failed to get user prompts,error:%w", err)
+		slog.Error(newError.Error())
+		return nil, 0, newError
+	}
+
+	for _, data := range ds {
+
+		resPrompts = append(resPrompts, types.PromptRes{
+			ID:           data.ID,
+			Name:         data.Repository.Name,
+			Nickname:     data.Repository.Nickname,
+			Description:  data.Repository.Description,
+			Likes:        data.Repository.Likes,
+			Downloads:    data.Repository.DownloadCount,
+			Path:         data.Repository.Path,
+			RepositoryID: data.RepositoryID,
+			Private:      data.Repository.Private,
+			CreatedAt:    data.CreatedAt,
+			UpdatedAt:    data.Repository.UpdatedAt,
+		})
+	}
+
+	return resPrompts, total, nil
 }

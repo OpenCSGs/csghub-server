@@ -87,3 +87,28 @@ func (s *PromptStore) Delete(ctx context.Context, input Prompt) error {
 	}
 	return nil
 }
+
+func (s *PromptStore) ByUsername(ctx context.Context, username string, per, page int, onlyPublic bool) (prompts []Prompt, total int, err error) {
+	query := s.db.Operator.Core.
+		NewSelect().
+		Model(&prompts).
+		Relation("Repository.User").
+		Where("username = ?", username)
+
+	if onlyPublic {
+		query = query.Where("repository.private = ?", false)
+	}
+	query = query.Order("prompt.created_at DESC").
+		Limit(per).
+		Offset((page - 1) * per)
+
+	err = query.Scan(ctx)
+	if err != nil {
+		return
+	}
+	total, err = query.Count(ctx)
+	if err != nil {
+		return
+	}
+	return
+}
