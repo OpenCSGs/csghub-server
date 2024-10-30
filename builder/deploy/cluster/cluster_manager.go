@@ -188,8 +188,12 @@ func GetNodeResources(clientset *kubernetes.Clientset, config *config.Config) (m
 
 func getXPULabel(node v1.Node, config *config.Config) (string, string) {
 	if _, found := node.Labels[config.Space.GPUModelLabel]; found {
-		//for default clsuter
+		//for default cluster
 		return "nvidia.com/gpu", config.Space.GPUModelLabel
+	}
+	if _, found := node.Labels["nvidia.com/nvidia_name"]; found {
+		//for k3s cluster
+		return "nvidia.com/gpu", "nvidia.com/nvidia_name"
 	}
 	if _, found := node.Labels["kubemore_xpu_type"]; found {
 		//for huawei gpu

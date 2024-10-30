@@ -1,8 +1,8 @@
-FROM ghcr.io/huggingface/text-generation-inference:2.0
+FROM ghcr.io/huggingface/text-generation-inference:2.4.0
 RUN pip config set global.index-url https://pypi.tuna.tsinghua.edu.cn/simple 
-RUN pip install --no-cache-dir csghub-sdk==0.3.1
-COPY ./tgi/serve.sh serve.sh
-COPY ./tgi/entry.py entry.py
+RUN pip install --no-cache-dir csghub-sdk==0.4.3
+COPY ./tgi/ /etc/csghub/
+RUN chmod +x /etc/csghub/*.sh
 
 RUN mkdir -p /data
 ENV HUGGINGFACE_HUB_CACHE=/data \

@@ -1,6 +1,6 @@
-FROM vllm/vllm-openai:v0.4.2
+FROM vllm/vllm-openai:v0.6.3.post1
 RUN pip config set global.index-url https://pypi.tuna.tsinghua.edu.cn/simple
-RUN pip install --no-cache-dir csghub-sdk==0.3.1 ray
+RUN pip install --no-cache-dir csghub-sdk==0.4.3 ray
 COPY ./vllm/ /etc/csghub/
 RUN chmod +x /etc/csghub/*.sh
 
