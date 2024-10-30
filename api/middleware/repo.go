@@ -25,6 +25,7 @@ func RepoMapping(repo_type types.RepositoryType) gin.HandlerFunc {
 		common.SetRepoTypeContext(ctx, repo_type)
 		namespace := ctx.Param("namespace")
 		name := ctx.Param("name")
+		branch := ctx.Param("branch")
 		mapping := GetMapping(ctx)
 		if mapping == types.CSGHubMapping {
 			ctx.Next()
@@ -38,6 +39,10 @@ func RepoMapping(repo_type types.RepositoryType) gin.HandlerFunc {
 			slog.Info("namespace changed: ", "namespace", repo_id[0])
 			ctx.Set("namespace_mapped", repo_id[0])
 			ctx.Set("name_mapped", repo_id[1])
+			// for modelscope, the default branch is master, we should mapp it to real branch
+			if (branch == "main" || branch == "master") && mirror.Repository.DefaultBranch != branch {
+				ctx.Set("branch_mapped", mirror.Repository.DefaultBranch)
+			}
 			ctx.Next()
 			return
 		}
