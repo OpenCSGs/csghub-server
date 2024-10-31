@@ -429,14 +429,13 @@ func (c *repoComponentImpl) PublicToUser(ctx context.Context, repoType types.Rep
 			return nil, 0, fmt.Errorf("failed to get user info, error: %w", err)
 		}
 
-		for _, role := range user.Roles {
-			if role == "admin" || role == "super_user" {
-				isAdmin = true
-				break
-			}
+		dbUser := &database.User{
+			RoleMask: strings.Join(user.Roles, ","),
 		}
 
-		if !isAdmin {
+		isAdmin = dbUser.CanAdmin()
+
+		if !dbUser.CanAdmin() {
 			repoOwnerIDs = append(repoOwnerIDs, user.ID)
 			//get user's orgs
 			for _, org := range user.Orgs {
