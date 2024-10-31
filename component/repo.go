@@ -1031,7 +1031,7 @@ func (c *RepoComponent) SDKListFiles(ctx context.Context, repoType types.Reposit
 	}, nil
 }
 
-func (c *RepoComponent) IsLfs(ctx context.Context, req *types.GetFileReq) (bool, error) {
+func (c *RepoComponent) IsLfs(ctx context.Context, req *types.GetFileReq) (bool, int64, error) {
 	getFileRawReq := gitserver.GetRepoInfoByPathReq{
 		Namespace: req.Namespace,
 		Name:      req.Name,
@@ -1042,13 +1042,13 @@ func (c *RepoComponent) IsLfs(ctx context.Context, req *types.GetFileReq) (bool,
 	content, err := c.git.GetRepoFileRaw(ctx, getFileRawReq)
 	if err != nil {
 		if err.Error() == ErrNotFoundMessage {
-			return false, ErrNotFound
+			return false, -1, ErrNotFound
 		}
 		slog.Error("failed to get %s file raw", string(req.RepoType), slog.String("namespace", req.Namespace), slog.String("name", req.Name), slog.String("path", req.Path))
-		return false, err
+		return false, -1, err
 	}
 
-	return strings.HasPrefix(content, LFSPrefix), nil
+	return strings.HasPrefix(content, LFSPrefix), int64(len(content)), nil
 }
 
 func (c *RepoComponent) HeadDownloadFile(ctx context.Context, req *types.GetFileReq, userName string) (*types.File, error) {
