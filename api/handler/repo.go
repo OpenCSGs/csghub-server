@@ -825,8 +825,17 @@ func (h *RepoHandler) HeadSDKDownload(ctx *gin.Context) {
 
 func (h *RepoHandler) handleDownload(ctx *gin.Context, isResolve bool) {
 	currentUser := httpbase.GetCurrentUser(ctx)
-	var branch string
-	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
+	var (
+		namespace     string
+		name          string
+		branch        string
+		reader        io.ReadCloser
+		size          int64
+		url           string
+		contentLength int64
+		err           error
+	)
+	namespace, name, err = common.GetNamespaceAndNameFromContext(ctx)
 	if err != nil {
 		slog.Error("Bad request format", "error", err)
 		httpbase.BadRequest(ctx, err.Error())
@@ -856,7 +865,7 @@ func (h *RepoHandler) handleDownload(ctx *gin.Context, isResolve bool) {
 		RepoType:  common.RepoTypeFromContext(ctx),
 	}
 	// TODO:move the check into SDKDownloadFile, and can return the file content as we get all the content before check lfs pointer
-	lfs, err := h.c.IsLfs(ctx, req)
+	lfs, contentLength, err := h.c.IsLfs(ctx, req)
 	if err != nil {
 		if errors.Is(err, component.ErrNotFound) {
 			slog.Error("repo not found", slog.String("repo_type", string(common.RepoTypeFromContext(ctx))), slog.Any("path", fmt.Sprintf("%s/%s", namespace, name)))
@@ -869,34 +878,40 @@ func (h *RepoHandler) handleDownload(ctx *gin.Context, isResolve bool) {
 		return
 	}
 	req.Lfs = lfs
-	reader, size, url, err := h.c.SDKDownloadFile(ctx, req, currentUser)
-	if err != nil {
-		if errors.Is(err, component.ErrUnauthorized) {
-			slog.Error("permission denied when accessing repo", slog.String("repo_type", string(req.RepoType)), slog.Any("path", fmt.Sprintf("%s/%s", namespace, name)))
-			httpbase.UnauthorizedError(ctx, err)
+
+	if contentLength > 0 {
+		// file content is not empty, download it directly
+		reader, size, url, err = h.c.SDKDownloadFile(ctx, req, currentUser)
+		if err != nil {
+			if errors.Is(err, component.ErrUnauthorized) {
+				slog.Error("permission denied when accessing repo", slog.String("repo_type", string(req.RepoType)), slog.Any("path", fmt.Sprintf("%s/%s", namespace, name)))
+				httpbase.UnauthorizedError(ctx, err)
+				return
+			}
+
+			if errors.Is(err, component.ErrNotFound) {
+				slog.Error("repo not found", slog.String("repo_type", string(common.RepoTypeFromContext(ctx))), slog.Any("path", fmt.Sprintf("%s/%s", namespace, name)))
+				httpbase.NotFoundError(ctx, err)
+				return
+			}
+
+			slog.Error("Failed to download repo file", slog.String("repo_type", string(req.RepoType)), slog.Any("error", err))
+			httpbase.ServerError(ctx, err)
 			return
 		}
-
-		if errors.Is(err, component.ErrNotFound) {
-			slog.Error("repo not found", slog.String("repo_type", string(common.RepoTypeFromContext(ctx))), slog.Any("path", fmt.Sprintf("%s/%s", namespace, name)))
-			httpbase.NotFoundError(ctx, err)
-			return
-		}
-
-		slog.Error("Failed to download repo file", slog.String("repo_type", string(req.RepoType)), slog.Any("error", err))
-		httpbase.ServerError(ctx, err)
-		return
 	}
 
 	if req.Lfs {
 		ctx.Redirect(http.StatusMovedPermanently, url)
 	} else {
-		slog.Info("Download repo file succeed", slog.String("repo_type", string(req.RepoType)), slog.String("name", name), slog.String("path", req.Path), slog.String("ref", req.Ref))
+		slog.Info("Download repo file succeed", slog.String("repo_type", string(req.RepoType)), slog.String("name", name), slog.String("path", req.Path), slog.String("ref", req.Ref), slog.Any("Content-Length", size))
 		fileName := path.Base(req.Path)
 		ctx.Header("Content-Type", "application/octet-stream")
 		ctx.Header("Content-Disposition", `attachment; filename="`+fileName+`"`)
 		ctx.Header("Content-Length", strconv.FormatInt(size, 10))
-		_, err = io.Copy(ctx.Writer, reader)
+		if contentLength > 0 {
+			_, err = io.Copy(ctx.Writer, reader)
+		}
 		if err != nil {
 			slog.Error("Failed to download repo file", slog.String("repo_type", string(req.RepoType)), slog.Any("error", err))
 			httpbase.ServerError(ctx, err)
