@@ -44,7 +44,7 @@ type RepoStore interface {
 	// TagIDs get tag ids by repo id, if category is not empty, return only tags of the category
 	TagIDs(ctx context.Context, repoID int64, category string) (tagIDs []int64, err error)
 	SetUpdateTimeByPath(ctx context.Context, repoType types.RepositoryType, namespace, name string, update time.Time) error
-	PublicToUser(ctx context.Context, repoType types.RepositoryType, userIDs []int64, filter *types.RepoFilter, per, page int) (repos []*Repository, count int, err error)
+	PublicToUser(ctx context.Context, repoType types.RepositoryType, userIDs []int64, filter *types.RepoFilter, per, page int, isAdmin bool) (repos []*Repository, count int, err error)
 	IsMirrorRepo(ctx context.Context, repoType types.RepositoryType, namespace, name string) (bool, error)
 	ListRepoPublicToUserByRepoIDs(ctx context.Context, repoType types.RepositoryType, userID int64, search, sort string, per, page int, repoIDs []int64) (repos []*Repository, count int, err error)
 	WithMirror(ctx context.Context, per, page int) (repos []Repository, count int, err error)
@@ -402,7 +402,7 @@ func (s *repoStoreImpl) SetUpdateTimeByPath(ctx context.Context, repoType types.
 	return err
 }
 
-func (s *repoStoreImpl) PublicToUser(ctx context.Context, repoType types.RepositoryType, userIDs []int64, filter *types.RepoFilter, per, page int) (repos []*Repository, count int, err error) {
+func (s *repoStoreImpl) PublicToUser(ctx context.Context, repoType types.RepositoryType, userIDs []int64, filter *types.RepoFilter, per, page int, isAdmin bool) (repos []*Repository, count int, err error) {
 	q := s.db.Operator.Core.
 		NewSelect().
 		Column("repository.*").
@@ -410,10 +410,13 @@ func (s *repoStoreImpl) PublicToUser(ctx context.Context, repoType types.Reposit
 		Relation("Tags")
 
 	q.Where("repository.repository_type = ?", repoType)
-	if len(userIDs) > 0 {
-		q.Where("repository.private = ? or repository.user_id in (?)", false, bun.In(userIDs))
-	} else {
-		q.Where("repository.private = ?", false)
+
+	if !isAdmin {
+		if len(userIDs) > 0 {
+			q.Where("repository.private = ? or repository.user_id in (?)", false, bun.In(userIDs))
+		} else {
+			q.Where("repository.private = ?", false)
+		}
 	}
 
 	if filter.Source != "" {
