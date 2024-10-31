@@ -420,6 +420,8 @@ func (c *repoComponentImpl) DeleteRepo(ctx context.Context, req types.DeleteRepo
 // PublicToUser gets visible repos of the given user and user's orgs
 func (c *repoComponentImpl) PublicToUser(ctx context.Context, repoType types.RepositoryType, userName string, filter *types.RepoFilter, per, page int) (repos []*database.Repository, count int, err error) {
 	var repoOwnerIDs []int64
+	var isAdmin bool
+
 	if len(userName) > 0 {
 		// get user orgs from user service
 		user, err := c.userSvcClient.GetUserInfo(ctx, userName, userName)
@@ -427,13 +429,22 @@ func (c *repoComponentImpl) PublicToUser(ctx context.Context, repoType types.Rep
 			return nil, 0, fmt.Errorf("failed to get user info, error: %w", err)
 		}
 
-		repoOwnerIDs = append(repoOwnerIDs, user.ID)
-		//get user's orgs
-		for _, org := range user.Orgs {
-			repoOwnerIDs = append(repoOwnerIDs, org.UserID)
+		for _, role := range user.Roles {
+			if role == "admin" || role == "super_user" {
+				isAdmin = true
+				break
+			}
+		}
+
+		if !isAdmin {
+			repoOwnerIDs = append(repoOwnerIDs, user.ID)
+			//get user's orgs
+			for _, org := range user.Orgs {
+				repoOwnerIDs = append(repoOwnerIDs, org.UserID)
+			}
 		}
 	}
-	repos, count, err = c.repoStore.PublicToUser(ctx, repoType, repoOwnerIDs, filter, per, page)
+	repos, count, err = c.repoStore.PublicToUser(ctx, repoType, repoOwnerIDs, filter, per, page, isAdmin)
 	if err != nil {
 		return nil, 0, fmt.Errorf("failed to get user public repos, error: %w", err)
 	}
@@ -1454,6 +1465,14 @@ func (c *repoComponentImpl) GetUserRepoPermission(ctx context.Context, userName 
 	if userName == "" {
 		//anonymous user only has read permission to public repo
 		return &types.UserRepoPermission{CanRead: !repo.Private, CanWrite: false, CanAdmin: false}, nil
+	}
+
+	user, err := c.user.FindByUsername(ctx, userName)
+	if err != nil {
+		return nil, fmt.Errorf("failed to find user '%s' when get user repo permission, error: %w", userName, err)
+	}
+	if user.CanAdmin() {
+		return &types.UserRepoPermission{CanRead: true, CanWrite: true, CanAdmin: true}, nil
 	}
 
 	namespace, _ := repo.NamespaceAndName()
