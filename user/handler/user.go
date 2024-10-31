@@ -154,23 +154,25 @@ func (h *UserHandler) Delete(ctx *gin.Context) {
 // @Tags         User
 // @Accept       json
 // @Produce      json
-// @Param        username path string true "username"
-// @Param        current_user  query  string true "current user"
+// @Param        username path string true "username or uuid, defined by the query string 'type'"
+// @Param        current_user  query  string false "current user"
+// @Param 		 type query string false "path param is usernam or uuid, default to username" Enums(username, uuid)
 // @Success      200  {object}  types.Response{data=types.User} "OK"
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
 // @Router       /user/{username} [get]
 func (h *UserHandler) Get(ctx *gin.Context) {
 	visitorName := httpbase.GetCurrentUser(ctx)
-	userName := ctx.Param("username")
-	user, err := h.c.Get(ctx, userName, visitorName)
+	userNameOrUUID := ctx.Param("username")
+	useUUID := ctx.Query("type") == "uuid"
+	user, err := h.c.Get(ctx, userNameOrUUID, visitorName, useUUID)
 	if err != nil {
 		slog.Error("Failed to get user", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
 		return
 	}
 
-	slog.Info("Get user succeed", slog.String("userName", userName))
+	slog.Info("Get user succeed", slog.String("userName", userNameOrUUID))
 	httpbase.OK(ctx, user)
 }
 
