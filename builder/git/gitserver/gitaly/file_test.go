@@ -21,9 +21,9 @@ import (
 )
 
 const (
-	// The context timeout is 5 second,
-	// 200 should be a reasonable number. Can cnage there value
-	// based on gitaly performance.
+	// The context timeout is set to 5 seconds.
+	// A value of 200 should be reasonable, but it can be adjusted
+	// based on Gitaly performance.
 	SHOW_COMMIT_FILE_COUNT_LIMIT = 200
 	GET_REPO_FILE_TREE_TIMEOUT   = 5 * time.Second
 )
