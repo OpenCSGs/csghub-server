@@ -20,6 +20,18 @@ import (
 	"opencsg.com/csghub-server/common/types"
 )
 
+const (
+	// The context timeout is 5 second,
+	// 200 should be a reasonable number. Can cnage there value
+	// based on gitaly performance.
+	SHOW_COMMIT_FILE_COUNT_LIMIT = 200
+	GET_REPO_FILE_TREE_TIMEOUT   = 5 * time.Second
+)
+
+// This method returns three parameters instead of two, as in v1.
+// The first and last parameters are the same as in v1, while the middle parameter (withCommits bool) is new.
+// If the input path contains many files, the commits will be skipped and not included
+// in the response files; in this case, withCommits will be false.
 func (c *Client) GetRepoFileTreeV2(ctx context.Context, req gitserver.GetRepoInfoByPathReq) ([]*types.File, bool, error) {
 
 	withCommit := false
@@ -35,10 +47,14 @@ func (c *Client) GetRepoFileTreeV2(ctx context.Context, req gitserver.GetRepoInf
 		req.Ref = "main"
 	}
 
-	// first get the last commit for tree,
-	// this will be the snapshot because we will call gitaly API
-	// 3 times and repo might change duraing 3 calls if use
-	// something like main as the ref.
+	if req.Path == "/" {
+		req.Path = "."
+	}
+
+	// Retrieve the last commit for the tree.
+	// This commit will serve as the snapshot, as we will be calling the Gitaly API
+	// three times. The repository might change during these calls, so use a real commit
+	// should be better than a reference name like "main".
 	resp, err := c.commitClient.LastCommitForPath(ctx, &gitalypb.LastCommitForPathRequest{
 		Repository: repository,
 		Revision:   []byte(req.Ref),
@@ -49,7 +65,7 @@ func (c *Client) GetRepoFileTreeV2(ctx context.Context, req gitserver.GetRepoInf
 	req.Ref = resp.Commit.Id
 
 	var files []*types.File
-	ctx, cancel := context.WithTimeout(ctx, time.Second*3)
+	ctx, cancel := context.WithTimeout(ctx, GET_REPO_FILE_TREE_TIMEOUT)
 	defer cancel()
 
 	// get all files first
@@ -60,6 +76,7 @@ func (c *Client) GetRepoFileTreeV2(ctx context.Context, req gitserver.GetRepoInf
 		PaginationParams: &gitalypb.PaginationParameter{
 			Limit: 1000,
 		},
+		Sort: gitalypb.GetTreeEntriesRequest_TREES_FIRST,
 	})
 	if err != nil {
 		return nil, withCommit, err
@@ -98,11 +115,8 @@ func (c *Client) GetRepoFileTreeV2(ctx context.Context, req gitserver.GetRepoInf
 		}
 	}
 
-	if len(files) <= 1000 {
-		// Get last commit for tree. Even though this is a
-		// streaming request, gitaly actually first retrive all commits
-		// then start sending, which means when first item received from stram,
-		// all data are already prepared.
+	if len(files) <= SHOW_COMMIT_FILE_COUNT_LIMIT {
+
 		req := &gitalypb.ListLastCommitsForTreeRequest{
 			Repository: repository,
 			Revision:   req.Ref,
@@ -114,22 +128,19 @@ func (c *Client) GetRepoFileTreeV2(ctx context.Context, req gitserver.GetRepoInf
 		if err != nil {
 			return nil, withCommit, err
 		}
-		wc := 0
 		for {
 			commitResp, err := commitStream.Recv()
 			if err != nil {
 				if err == io.EOF {
+					// only set withCommit to true when the request is fully done.
 					withCommit = true
-					fmt.Println("==== total wc", wc)
 					break
 				}
 			}
 			if commitResp == nil {
 				return nil, withCommit, errors.New("bad request")
 			}
-			wc++
 			commits := commitResp.Commits
-			fmt.Println("rcc", len(commits))
 			if len(commits) > 0 {
 				for _, r := range commits {
 					f, ok := pathFileMap[string(r.PathBytes)]
@@ -153,13 +164,13 @@ func (c *Client) GetRepoFileTreeV2(ctx context.Context, req gitserver.GetRepoInf
 		}
 	}
 
+	// Get blobs with file size
 	listBlobsReq := &gitalypb.GetBlobsRequest{
 		Repository:    repository,
 		RevisionPaths: revisionPaths,
 		Limit:         1024,
 	}
 
-	// Get blobs with file size
 	listBlobsStream, err := c.blobClient.GetBlobs(ctx, listBlobsReq)
 	if err != nil {
 		return nil, withCommit, err
@@ -246,21 +257,89 @@ func newTestClient() (*Client, error) {
 	}, nil
 }
 
+// Please note that this is not a true unit test; its sole purpose is to demonstrate and test the current draft PR locally.
+// The test repository is: https://opencsg.com/datasets/AIWizards/dronescapes/files/main/
+// This test should be replaced with a complete unit test for production code.
 func TestFileTree(t *testing.T) {
 	client, err := newTestClient()
 	if err != nil {
 		t.Fatal(err)
 	}
-	files, err := client.GetRepoFileTree(context.TODO(), gitserver.GetRepoInfoByPathReq{
-		Namespace: "",
-		Name:      "dronescapes",
-		Ref:       "main",
-		Path:      "data/semisupervised_set/depth_dpt/part0",
-	})
-	if err != nil {
-		t.Fatal(err)
+
+	// small dir, v1 and v2 should be same
+	for _, ref := range []string{"main", "450f959b4e29efaad2d9e0ef90330dd80201f8bb"} {
+		for _, path := range []string{"", "dronescapes_reader"} {
+
+			t.Run(ref+":"+path, func(t *testing.T) {
+				v1Files, err := client.GetRepoFileTree(context.TODO(), gitserver.GetRepoInfoByPathReq{
+					Namespace: "",
+					Name:      "dronescapes",
+					Ref:       ref,
+					Path:      path,
+				})
+				if err != nil {
+					t.Fatal(err)
+				}
+
+				v2Files, withCommits, err := client.GetRepoFileTreeV2(context.TODO(), gitserver.GetRepoInfoByPathReq{
+					Namespace: "",
+					Name:      "dronescapes",
+					Ref:       ref,
+					Path:      path,
+				})
+				if err != nil {
+					t.Fatal(err)
+				}
+				if !withCommits {
+					t.Fatal("with commits is false")
+				}
+				if len(v1Files) != len(v2Files) {
+					t.Fatal("file count not equal")
+				}
+
+				for i := 0; i < len(v1Files); i++ {
+					if *v1Files[i] != *v2Files[i] {
+						fmt.Println(v1Files[i])
+						fmt.Println(v2Files[i])
+						t.Fatal("file not equal")
+					}
+				}
+
+			})
+
+		}
 	}
-	fmt.Println("fetch all commits success")
-	fmt.Println(len(files))
-	t.FailNow()
+
+	// large dir, v1 err and v2 no commits info
+	t.Run("large", func(t *testing.T) {
+		_, err := client.GetRepoFileTree(context.TODO(), gitserver.GetRepoInfoByPathReq{
+			Namespace: "",
+			Name:      "dronescapes",
+			Ref:       "main",
+			Path:      "data/semisupervised_set/depth_dpt/part0",
+		})
+		if err == nil {
+			t.Fatal("v1 should return error")
+		}
+
+		v2Files, withCommits, err := client.GetRepoFileTreeV2(context.TODO(), gitserver.GetRepoInfoByPathReq{
+			Namespace: "",
+			Name:      "dronescapes",
+			Ref:       "main",
+			Path:      "data/semisupervised_set/depth_dpt/part0",
+		})
+		if withCommits {
+			t.Fatal("commits should be skipped for large dir")
+		}
+
+		if len(v2Files) != 1000 {
+			t.Fatal("should return 1000 files")
+		}
+
+		for _, f := range v2Files {
+			if f.Commit.ID != "" {
+				t.Fatal("v2 file commit should be empty")
+			}
+		}
+	})
 }
