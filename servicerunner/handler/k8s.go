@@ -214,7 +214,8 @@ func (s *K8sHander) removeServiceForcely(c *gin.Context, cluster *cluster.Cluste
 	if podNames == nil {
 		return nil
 	}
-	gracePeriodSeconds := int64(0)
+	//before k8s 1.31, kill pod does not kill the process immediately, instead we still need wait for the process to exit. more details see: https://github.com/kubernetes/kubernetes/issues/120449
+	gracePeriodSeconds := int64(10)
 	deletePolicy := metav1.DeletePropagationForeground
 	deleteOptions := metav1.DeleteOptions{
 		GracePeriodSeconds: &gracePeriodSeconds,
