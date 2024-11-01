@@ -2,6 +2,7 @@ package start
 
 import (
 	"fmt"
+	"net/url"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -39,10 +40,14 @@ var serverCmd = &cobra.Command{
 			//	@in                         header
 			//	@name                       Authorization
 			//	@description                Bearer token
+			publicDomain, err := url.Parse(cfg.APIServer.PublicDomain)
+			if err != nil {
+				return fmt.Errorf("failed to parse api server public domain: %v", err)
+			}
 			docs.SwaggerInfo.Title = "CSGHub Server API"
 			docs.SwaggerInfo.Description = "CSGHub Server API."
 			docs.SwaggerInfo.Version = "1.0"
-			docs.SwaggerInfo.Host = cfg.APIServer.PublicDomain
+			docs.SwaggerInfo.Host = publicDomain.Host
 			docs.SwaggerInfo.BasePath = "/api/v1"
 			docs.SwaggerInfo.Schemes = []string{"http", "https"}
 		}
