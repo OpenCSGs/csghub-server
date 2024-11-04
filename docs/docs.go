@@ -14357,13 +14357,9 @@ const docTemplate = `{
         "types.CreateJWTReq": {
             "type": "object",
             "required": [
-                "current_user",
                 "uuid"
             ],
             "properties": {
-                "current_user": {
-                    "type": "string"
-                },
                 "uuid": {
                     "type": "string"
                 }

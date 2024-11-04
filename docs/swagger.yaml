@@ -971,12 +971,9 @@ definitions:
     type: object
   types.CreateJWTReq:
     properties:
-      current_user:
-        type: string
       uuid:
         type: string
     required:
-    - current_user
     - uuid
     type: object
   types.CreateJWTResp:

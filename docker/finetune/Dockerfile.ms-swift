@@ -33,13 +33,13 @@ RUN pip install --no-cache-dir jupyterlab numpy==1.26.4 \
     torch==2.4.0 torchvision==0.19.0 torchaudio==2.4.0 \
     jupyter-server-proxy==4.4.0 deepspeed \
     gradio-client==1.4.0
-#because this library is update frequently, we use new line
-RUN pip install --no-cache-dir vllm==v0.6.3.post1 evalscope==0.5.5
 # Create a working directory
 WORKDIR /etc/csghub
 #RUN git clone https://github.com/modelscope/ms-swift.git --branch v2.5.0 --single-branch
 RUN git clone https://gitee.com/xzgan/ms-swift.git --branch v2.5.0 --single-branch
 RUN cd ms-swift && pip install --no-cache-dir -e ".[llm]"
+#because this library is update frequently, we use new line
+RUN pip install --no-cache-dir vllm==v0.6.3.post1 transformers==4.45.2 timm==1.0.11 evalscope==0.5.5
 # setup supervisord
 RUN mkdir -p /var/log/supervisord
 COPY swift/supervisord.conf /etc/supervisor/conf.d/supervisord.conf

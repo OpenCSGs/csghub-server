@@ -1,2 +1,23 @@
-{% for message in messages %}{{'<|im_start|>' + message['role'] + '\n' + message['content']}}{% if (loop.last and add_generation_prompt) or not loop.last %}{{ '<|im_end|>' + '\n'}}{% endif %}{% endfor %}
-{% if add_generation_prompt and messages[-1]['role'] != 'assistant' %}{{ '<|im_start|>assistant\n' }}{% endif %}
+{%- if messages[0]['role'] == 'system' -%}
+    {%- set system_message = messages[0]['content'] -%}
+    {%- set messages = messages[1:] -%}
+{%- else -%}
+    {% set system_message = '' -%}
+{%- endif -%}
+
+{{ bos_token + system_message }}
+{%- for message in messages -%}
+    {%- if (message['role'] == 'user') != (loop.index0 % 2 == 0) -%}
+        {{ raise_exception('Conversation roles must alternate user/assistant/user/assistant/...') }}
+    {%- endif -%}
+
+    {%- if message['role'] == 'user' -%}
+        {{ 'USER: ' + message['content'] + '\n' }}
+    {%- elif message['role'] == 'assistant' -%}
+        {{ 'ASSISTANT: ' + message['content'] + eos_token + '\n' }}
+    {%- endif -%}
+{%- endfor -%}
+
+{%- if add_generation_prompt -%}
+    {{ 'ASSISTANT:' }}
+{% endif %}

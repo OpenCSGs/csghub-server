@@ -26,6 +26,9 @@ func RepoMapping(repo_type types.RepositoryType) gin.HandlerFunc {
 		namespace := ctx.Param("namespace")
 		name := ctx.Param("name")
 		branch := ctx.Param("branch")
+		if branch == "" {
+			branch = ctx.Param("ref")
+		}
 		mapping := GetMapping(ctx)
 		if mapping == types.CSGHubMapping {
 			ctx.Next()

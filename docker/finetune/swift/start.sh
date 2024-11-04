@@ -28,6 +28,12 @@ types=`awk -v model_id="${hf_model_id}" '
 BEGIN {RS=")"; FS="\n"}
 /@register_model/ {
     for(i=1; i<=NF; i++) {
+        #reset variable in first line
+        if(i==1) {
+            modelType = "";
+            templateType = "";
+            lowerTransformers = "";
+        }
         if($i ~ /ModelType\./) {
             split($i, arrModelType, ".");
             modelType = arrModelType[2];
@@ -36,8 +42,11 @@ BEGIN {RS=")"; FS="\n"}
             split($i, arrTemplateType, ".");
             templateType = arrTemplateType[2];
         }
+        if($i ~ /transformers</) {
+            lowerTransformers = "yes";
+        }
         if($i ~ /hf_model_id/ && index($0, "hf_model_id='\''" model_id "'\''")) {
-            print modelType templateType;
+            print modelType templateType lowerTransformers;
             break;
         }
     }
@@ -46,6 +55,7 @@ BEGIN {RS=")"; FS="\n"}
 IFS=',' read -ra item_types <<< $types
 model_type=${item_types[0]}
 template_type=${item_types[1]}
+lower_transformers=${item_types[2]}
 if [ "x${model_type}" != "x" ]; then
     #replace HF ID
     sed -i "s|hf_model_id='$hf_model_id'|hf_model_id='$REPO_ID'|g" $model_path
@@ -66,6 +76,10 @@ if [ "x${model_type}" != "x" ]; then
     if [ $? -ne 0 ]; then
         sed -i "s|elem_id='model_id_or_path'|elem_id='model_id_or_path',value='${REPO_ID}'|" $model_ui_path
         sed -i "0,/default='AUTO'/s/default='AUTO'/default=None/" $argument_path
+    fi
+    # set required transformers
+    if [ "x${lower_transformers}" = "xyes" ]; then
+        pip install transformers==4.33.3
     fi
 fi
 
