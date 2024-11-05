@@ -99,28 +99,19 @@ func (w *MinioLFSSyncWorker) worker(id int) {
 		err = w.SyncLfs(ctx, id, mirror)
 		if err != nil {
 			repo.SyncStatus = types.SyncStatusFailed
-			_, repoErr := w.repoStore.UpdateRepo(ctx, *repo)
-			if repoErr != nil {
-				slog.Error("fail to update repo sync status to failed: %w", slog.Any("error", err))
-			}
 			mirror.LastMessage = err.Error()
-			mirrorErr := w.mirrorStore.Update(ctx, mirror)
-			if mirrorErr != nil {
-				slog.Error("fail to update mirror last message", slog.Int("workerId", id), slog.Any("error", err))
+			err = w.mirrorStore.UpdateMirrorAndRepository(ctx, mirror, repo)
+			if err != nil {
+				slog.Error("fail to update mirror and repository", slog.Int("workerId", id), slog.Any("error", err))
 			}
 			slog.Error("fail to sync lfs", slog.Int("workerId", id), slog.String("error", err.Error()))
 			continue
 		}
-
 		repo.SyncStatus = types.SyncStatusCompleted
-		_, err = w.repoStore.UpdateRepo(ctx, *repo)
-		if err != nil {
-			slog.Error("fail to update repo sync status to complete: %w", slog.Any("error", err))
-		}
 		mirror.LastUpdatedAt = time.Now()
-		err = w.mirrorStore.Update(ctx, mirror)
+		err = w.mirrorStore.UpdateMirrorAndRepository(ctx, mirror, repo)
 		if err != nil {
-			slog.Error("fail to update mirror last updated at", slog.Int("workerId", id), slog.Any("error", err))
+			slog.Error("fail to update mirror and repository", slog.Int("workerId", id), slog.Any("error", err))
 		}
 		slog.Info("sync lfs completed", slog.Int("workerId", id))
 	}

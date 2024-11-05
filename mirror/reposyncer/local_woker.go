@@ -165,15 +165,10 @@ func (w *LocalMirrorWoker) SyncRepo(ctx context.Context, task queue.MirrorTask) 
 	if err != nil {
 		mirror.Status = types.MirrorIncomplete
 		mirror.LastMessage = err.Error()
-		err = w.mirrorStore.Update(ctx, mirror)
-		if err != nil {
-			return fmt.Errorf("failed to update mirror: %w", err)
-		}
-
 		mirror.Repository.SyncStatus = types.SyncStatusFailed
-		_, err = w.repoStore.UpdateRepo(ctx, *mirror.Repository)
+		err = w.mirrorStore.UpdateMirrorAndRepository(ctx, mirror, mirror.Repository)
 		if err != nil {
-			return fmt.Errorf("failed to update repo sync status to failed: %w", err)
+			return fmt.Errorf("failed to update mirror and repository: %w", err)
 		}
 		return fmt.Errorf("failed to sync lfs files: %v", err)
 	}
