@@ -7,6 +7,7 @@ import (
 func init() {
 	// add subcommands here
 	Cmd.AddCommand(cmdSyncAsClient)
+	Cmd.AddCommand(cmdFixDefaultBranch)
 }
 
 var Cmd = &cobra.Command{

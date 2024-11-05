@@ -630,3 +630,15 @@ func (s *RepoStore) FindWithBatch(ctx context.Context, batchSize, batch int) ([]
 		Scan(ctx)
 	return res, err
 }
+
+func (s *RepoStore) FindByRepoSourceWithBatch(ctx context.Context, repoSource types.RepositorySource, batchSize, batch int) ([]Repository, error) {
+	var res []Repository
+	err := s.db.Operator.Core.NewSelect().
+		Model(&res).
+		Where("source = ?", repoSource).
+		Order("id desc").
+		Limit(batchSize).
+		Offset(batchSize * batch).
+		Scan(ctx)
+	return res, err
+}
