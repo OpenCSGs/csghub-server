@@ -574,6 +574,7 @@ func (c *GitCallbackComponent) setPromptDatasetType(ctx context.Context, repoTyp
 			Ref:       component.MainBranch,
 			Path:      fileName,
 			RepoType:  types.DatasetRepo,
+			File:      true,
 		}
 		files, err := c.gs.GetRepoFileTree(ctx, getFileReq)
 		if err != nil {
@@ -615,7 +616,7 @@ func (c *GitCallbackComponent) removePromptDatasetType(ctx context.Context, repo
 	if repoType != string(types.DatasetRepo) || ref != ("refs/heads/"+component.MainBranch) {
 		return
 	}
-	tree, err := component.GetFilePathObjects(namespace, repoName, "", types.DatasetRepo, c.gs.GetRepoFileTree)
+	tree, err := component.GetFilePathObjects(namespace, repoName, "", types.DatasetRepo, ref, c.gs.GetRepoFileTree)
 	if err != nil || tree == nil {
 		slog.Error("failed to get repo file tree for remove prompt type, ", slog.Any("namespace", namespace), slog.Any("repoName", repoName), slog.Any("error", err))
 		return

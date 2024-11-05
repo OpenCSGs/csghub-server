@@ -71,7 +71,7 @@ func (c *PromptComponent) ListPrompt(ctx context.Context, req types.PromptReq) (
 		return nil, ErrUnauthorized
 	}
 
-	tree, err := GetFilePathObjects(req.Namespace, req.Name, "", types.DatasetRepo, c.git.GetRepoFileTree)
+	tree, err := GetFilePathObjects(req.Namespace, req.Name, "", types.DatasetRepo, "", c.git.GetRepoFileTree)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get repo file tree, error: %w", err)
 	}
