@@ -995,12 +995,9 @@ definitions:
     type: object
   types.CreateJWTReq:
     properties:
-      current_user:
-        type: string
       uuid:
         type: string
     required:
-    - current_user
     - uuid
     type: object
   types.CreateJWTResp:
@@ -1122,8 +1119,6 @@ definitions:
     type: object
   types.CreatePromptRepoReq:
     properties:
-      admin:
-        type: string
       default_branch:
         example: main
         type: string
@@ -1710,8 +1705,6 @@ definitions:
       size:
         type: integer
     type: object
-<<<<<<< HEAD
-=======
   types.PromptRes:
     properties:
       can_manage:
@@ -1763,13 +1756,6 @@ definitions:
       user_likes:
         type: boolean
     type: object
-  types.RECHARGE_REQ:
-    properties:
-      op_uid:
-        type: integer
-      value:
-        type: number
-    type: object
   types.RelationDataset:
     properties:
       dataset:
@@ -1794,7 +1780,6 @@ definitions:
           type: string
         type: array
     type: object
->>>>>>> 5d44118e (Build a prompt-type repo for promptset v2)
   types.Relations:
     properties:
       codes:
@@ -8113,6 +8098,17 @@ paths:
       consumes:
       - application/json
       description: List prompts
+      parameters:
+      - description: namespace
+        in: path
+        name: namespace
+        required: true
+        type: string
+      - description: name
+        in: path
+        name: name
+        required: true
+        type: string
       produces:
       - application/json
       responses:
@@ -11115,6 +11111,47 @@ paths:
       security:
       - ApiKey: []
       summary: Get user models
+      tags:
+      - User
+  /user/{username}/prompts:
+    get:
+      consumes:
+      - application/json
+      description: get user prompts
+      parameters:
+      - description: username
+        in: path
+        name: username
+        required: true
+        type: string
+      - default: 20
+        description: per
+        in: query
+        name: per
+        type: integer
+      - default: 1
+        description: per page
+        in: query
+        name: page
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/types.Response'
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Get user prompts
       tags:
       - User
   /user/{username}/run/{repo_type}:
