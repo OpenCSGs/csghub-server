@@ -52,47 +52,54 @@ var cmdFixDefaultBranch = &cobra.Command{
 		}
 
 		repoStore := database.NewRepoStore()
-		repositories, err := repoStore.FindByRepoSource(ctx, types.OpenCSGSource)
-		if err != nil {
-			slog.Error("failed to find repositories from OpenCSG, error: %w", err)
-			return
-		}
-		if len(repositories) == 0 {
-			slog.Info("no repositories found from OpenCSG")
-			return
-		}
-		syncClientSettingStore := database.NewSyncClientSettingStore()
-		setting, err := syncClientSettingStore.First(ctx)
-		if err != nil {
-			slog.Error("failed to find sync client setting, error: %w", err)
-			return
-		}
-		apiDomain := config.MultiSync.SaasAPIDomain
-		sc := multisync.FromOpenCSG(apiDomain, setting.Token)
-		for _, repository := range repositories {
-			var defaultBranch string
-			repoPath := strings.TrimPrefix(repository.Path, types.OpenCSGPrefix)
-			if repository.RepositoryType == types.ModelRepo {
-				modelInfo, err := sc.ModelInfo(ctx, types.SyncVersion{RepoPath: repoPath})
-				if err != nil {
-					slog.Error("failed to get model info from OpenCSG Saas", slog.String("repo_path", repoPath), slog.Any("error", err))
-					continue
-				}
-				defaultBranch = modelInfo.DefaultBranch
-			} else if repository.RepositoryType == types.DatasetRepo {
-				datasetInfo, err := sc.DatasetInfo(ctx, types.SyncVersion{RepoPath: repoPath})
-				if err != nil {
-					slog.Error("failed to get dataset info from OpenCSG Saas", slog.String("repo_path", repoPath), slog.Any("error", err))
-					continue
-				}
-				defaultBranch = datasetInfo.DefaultBranch
-			}
-			repository.DefaultBranch = defaultBranch
-			_, err = repoStore.UpdateRepo(ctx, repository)
+		var (
+			batch     = 0
+			batchSize = 1000
+		)
+		for {
+			repositories, err := repoStore.FindByRepoSourceWithBatch(ctx, types.OpenCSGSource, batchSize, batch)
 			if err != nil {
-				slog.Error("failed to update repository", slog.String("repo_path", repoPath), slog.Any("error", err))
-				continue
+				slog.Error("failed to find repositories from OpenCSG, error: %w", err)
+				return
 			}
+			if len(repositories) == 0 {
+				slog.Info("no more repositories found from OpenCSG, quit")
+				return
+			}
+			syncClientSettingStore := database.NewSyncClientSettingStore()
+			setting, err := syncClientSettingStore.First(ctx)
+			if err != nil {
+				slog.Error("failed to find sync client setting, error: %w", err)
+				return
+			}
+			apiDomain := config.MultiSync.SaasAPIDomain
+			sc := multisync.FromOpenCSG(apiDomain, setting.Token)
+			for _, repository := range repositories {
+				var defaultBranch string
+				repoPath := strings.TrimPrefix(repository.Path, types.OpenCSGPrefix)
+				if repository.RepositoryType == types.ModelRepo {
+					modelInfo, err := sc.ModelInfo(ctx, types.SyncVersion{RepoPath: repoPath})
+					if err != nil {
+						slog.Error("failed to get model info from OpenCSG Saas", slog.String("repo_path", repoPath), slog.Any("error", err))
+						continue
+					}
+					defaultBranch = modelInfo.DefaultBranch
+				} else if repository.RepositoryType == types.DatasetRepo {
+					datasetInfo, err := sc.DatasetInfo(ctx, types.SyncVersion{RepoPath: repoPath})
+					if err != nil {
+						slog.Error("failed to get dataset info from OpenCSG Saas", slog.String("repo_path", repoPath), slog.Any("error", err))
+						continue
+					}
+					defaultBranch = datasetInfo.DefaultBranch
+				}
+				repository.DefaultBranch = defaultBranch
+				_, err = repoStore.UpdateRepo(ctx, repository)
+				if err != nil {
+					slog.Error("failed to update repository", slog.String("repo_path", repoPath), slog.Any("error", err))
+					continue
+				}
+			}
+			batch += 1
 		}
 	},
 }
