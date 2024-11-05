@@ -271,6 +271,7 @@ func (t *DeployRunner) makeDeployRequest() (*types.RunRequest, error) {
 		envMap["port"] = strconv.Itoa(deploy.ContainerPort)
 		envMap["HF_ENDPOINT"], _ = url.JoinPath(t.deployCfg.ModelDownloadEndpoint, "hf")
 		envMap["HF_TOKEN"] = token.Token
+		envMap["USE_CSGHUB_MODEL"] = "1"
 	}
 
 	if t.deployCfg.PublicRootDomain == "" {

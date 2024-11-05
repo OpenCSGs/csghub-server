@@ -731,6 +731,10 @@ func (h *RepoHandler) SDKListFiles(ctx *gin.Context) {
 		return
 	}
 	ref := ctx.Param("ref")
+	mappedBranch := ctx.Param("branch_mapped")
+	if mappedBranch != "" {
+		ref = mappedBranch
+	}
 	files, err := h.c.SDKListFiles(ctx, common.RepoTypeFromContext(ctx), namespace, name, ref, currentUser)
 	if err != nil {
 		if errors.Is(err, component.ErrUnauthorized) {
@@ -786,6 +790,10 @@ func (h *RepoHandler) HeadSDKDownload(ctx *gin.Context) {
 	filePath := ctx.Param("file_path")
 	filePath = convertFilePathFromRoute(filePath)
 	branch := ctx.Param("branch")
+	mappedBranch := ctx.Param("branch_mapped")
+	if mappedBranch != "" {
+		branch = mappedBranch
+	}
 	req := &types.GetFileReq{
 		Namespace: namespace,
 		Name:      name,
@@ -855,6 +863,10 @@ func (h *RepoHandler) handleDownload(ctx *gin.Context, isResolve bool) {
 		ctx.Set("X-OPENCSG-S3-Internal", true)
 	}
 
+	mappedBranch := ctx.Param("branch_mapped")
+	if mappedBranch != "" {
+		branch = mappedBranch
+	}
 	req := &types.GetFileReq{
 		Namespace: namespace,
 		Name:      name,
