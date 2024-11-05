@@ -277,6 +277,10 @@ func (h *ModelHandler) SDKModelInfo(ctx *gin.Context) {
 		return
 	}
 	ref := ctx.Param("ref")
+	mappedBranch := ctx.Param("branch_mapped")
+	if mappedBranch != "" {
+		ref = mappedBranch
+	}
 	currentUser := httpbase.GetCurrentUser(ctx)
 	modelInfo, err := h.c.SDKModelInfo(ctx, namespace, name, ref, currentUser)
 	if err != nil {

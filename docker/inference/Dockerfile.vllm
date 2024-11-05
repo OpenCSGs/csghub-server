@@ -1,6 +1,9 @@
-FROM vllm/vllm-openai:v0.4.2
+FROM vllm/vllm-openai:v0.6.3.post1
 RUN pip config set global.index-url https://pypi.tuna.tsinghua.edu.cn/simple
-RUN pip install --no-cache-dir csghub-sdk==0.3.1 ray
+RUN pip install --no-cache-dir csghub-sdk==0.4.3 ray supervisor
+RUN apt-get update && apt-get install -y supervisor
+RUN mkdir -p /var/log/supervisord
+COPY ./supervisord.conf /etc/supervisor/conf.d/supervisord.conf
 COPY ./vllm/ /etc/csghub/
 RUN chmod +x /etc/csghub/*.sh
 
@@ -10,4 +13,4 @@ ENV HUGGINGFACE_HUB_CACHE=/workspace/ \
 
 EXPOSE 8000
 
-ENTRYPOINT ["bash", "/etc/csghub/serve.sh"]
+ENTRYPOINT ["/usr/bin/supervisord", "-c", "/etc/supervisor/conf.d/supervisord.conf"]

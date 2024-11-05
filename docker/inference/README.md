@@ -61,6 +61,16 @@ docker run -d \
 ```
 *Note: HF_ENDPOINT should be use the real csghub address.*
 
+## inference image name, version and cuda version
+| Image Name | Version | CUDA Version |
+| --- | --- | --- |
+| vllm | 2.8 | 12.1 |
+| vllm | 3.0 | 12.4 |
+| vllm-cpu | 2.4 | -|
+| tgi | 2.2 | 12.1 |
+| tgi | 3.0 | 12.4 |
+
+
 ## API to Call Inference
 ```
 curl -H "Content-type: application/json" -X POST -d '{

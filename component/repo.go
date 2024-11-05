@@ -1959,16 +1959,16 @@ func (c *RepoComponent) DeployDetail(ctx context.Context, detailReq types.Deploy
 func (c *RepoComponent) generateEndpoint(ctx context.Context, deploy *database.Deploy) (string, string) {
 	var endpoint string
 	provider := ""
+	cls, err := c.cluster.ByClusterID(ctx, deploy.ClusterID)
+	zone := ""
+	if err != nil {
+		slog.Warn("Get cluster with error", slog.Any("error", err))
+	} else {
+		zone = cls.Zone
+		provider = cls.Provider
+	}
 	if len(deploy.SvcName) > 0 && deploy.Status == deployStatus.Running {
 		// todo: zone.provider.endpoint to support multi-zone, multi-provider
-		cls, err := c.cluster.ByClusterID(ctx, deploy.ClusterID)
-		zone := ""
-		if err != nil {
-			slog.Warn("Get cluster with error", slog.Any("error", err))
-		} else {
-			zone = cls.Zone
-			provider = cls.Provider
-		}
 		regionDomain := ""
 		if len(zone) > 0 && len(provider) > 0 {
 			regionDomain = fmt.Sprintf(".%s.%s", zone, provider)

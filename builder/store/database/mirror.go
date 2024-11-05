@@ -56,6 +56,15 @@ func (s *MirrorStore) IsExist(ctx context.Context, repoID int64) (exists bool, e
 		Exists(ctx)
 	return
 }
+func (s *MirrorStore) IsRepoExist(ctx context.Context, repoType types.RepositoryType, namespace, name string) (exists bool, err error) {
+	var repo Repository
+	exists, err = s.db.Operator.Core.
+		NewSelect().
+		Model(&repo).
+		Where("git_path=?", fmt.Sprintf("%ss_%s/%s", repoType, namespace, name)).
+		Exists(ctx)
+	return
+}
 
 func (s *MirrorStore) FindByRepoID(ctx context.Context, repoID int64) (*Mirror, error) {
 	var mirror Mirror
@@ -109,10 +118,16 @@ func (s *MirrorStore) FindWithMapping(ctx context.Context, repoType types.Reposi
 			Scan(ctx)
 	} else {
 		// auto mapping
+		//fix some repo id has mirror but it's not public,for example: https://opencsg.com/models/Qwen/Qwen_Qwen2-7B-Instruct
+		exist, _ := s.IsRepoExist(ctx, repoType, namespace, name)
+		if exist {
+			// no need mapping if repo id already exists in reporitory
+			return nil, fmt.Errorf("repo already exists, no need mapping")
+		}
 		err = s.db.Operator.Core.NewSelect().
 			Model(&mirror).
 			Relation("Repository").
-			Where("LOWER(repository.git_path) = LOWER(?) OR mirror.source_repo_path=?", fmt.Sprintf("%ss_%s/%s", repoType, namespace, name), fmt.Sprintf("%s/%s", namespace, name)).
+			Where("mirror.source_repo_path=?", fmt.Sprintf("%s/%s", namespace, name)).
 			Where("repository.repository_type=?", repoType).
 			Scan(ctx)
 	}
