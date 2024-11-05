@@ -630,3 +630,12 @@ func (s *RepoStore) FindWithBatch(ctx context.Context, batchSize, batch int) ([]
 		Scan(ctx)
 	return res, err
 }
+
+func (s *RepoStore) FindByRepoSource(ctx context.Context, repoSource types.RepositorySource) ([]Repository, error) {
+	var res []Repository
+	err := s.db.Operator.Core.NewSelect().
+		Model(&res).
+		Where("source = ?", repoSource).
+		Scan(ctx)
+	return res, err
+}
