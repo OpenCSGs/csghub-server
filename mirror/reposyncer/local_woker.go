@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 
 	"opencsg.com/csghub-server/builder/git"
 	"opencsg.com/csghub-server/builder/git/gitserver"
@@ -125,6 +126,12 @@ func (w *LocalMirrorWoker) SyncRepo(ctx context.Context, task queue.MirrorTask) 
 	err = w.git.MirrorSync(ctx, req)
 
 	if err != nil {
+		mirror.Status = types.MirrorFailed
+		mirror.LastMessage = fmt.Sprintf("failed mirror remote repo in git server:%s", err.Error())
+		err = w.mirrorStore.Update(ctx, mirror)
+		if err != nil {
+			return fmt.Errorf("failed to update mirror: %w", err)
+		}
 		return fmt.Errorf("failed mirror remote repo in git server: %v", err)
 	}
 	slog.Info("Mirror remote repo in git server successfully", "repo_type", mirror.Repository.RepositoryType, "namespace", namespace, "name", name)
@@ -181,7 +188,8 @@ func (w *LocalMirrorWoker) SyncRepo(ctx context.Context, task queue.MirrorTask) 
 	} else {
 		mirror.Status = types.MirrorFinished
 	}
-
+	// Update mirror last updated at
+	mirror.LastUpdatedAt = time.Now()
 	err = w.mirrorStore.Update(ctx, mirror)
 	if err != nil {
 		return fmt.Errorf("failed to update mirror: %w", err)

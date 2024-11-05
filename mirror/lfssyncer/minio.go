@@ -10,6 +10,7 @@ import (
 	"net/url"
 	"path/filepath"
 	"sync"
+	"time"
 
 	"github.com/minio/minio-go/v7"
 	"opencsg.com/csghub-server/builder/store/database"
@@ -102,6 +103,11 @@ func (w *MinioLFSSyncWorker) worker(id int) {
 			if repoErr != nil {
 				slog.Error("fail to update repo sync status to failed: %w", slog.Any("error", err))
 			}
+			mirror.LastMessage = err.Error()
+			mirrorErr := w.mirrorStore.Update(ctx, mirror)
+			if mirrorErr != nil {
+				slog.Error("fail to update mirror last message", slog.Int("workerId", id), slog.Any("error", err))
+			}
 			slog.Error("fail to sync lfs", slog.Int("workerId", id), slog.String("error", err.Error()))
 			continue
 		}
@@ -111,6 +117,12 @@ func (w *MinioLFSSyncWorker) worker(id int) {
 		if err != nil {
 			slog.Error("fail to update repo sync status to complete: %w", slog.Any("error", err))
 		}
+		mirror.LastUpdatedAt = time.Now()
+		err = w.mirrorStore.Update(ctx, mirror)
+		if err != nil {
+			slog.Error("fail to update mirror last updated at", slog.Int("workerId", id), slog.Any("error", err))
+		}
+		slog.Info("sync lfs completed", slog.Int("workerId", id))
 	}
 }
 

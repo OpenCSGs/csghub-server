@@ -142,17 +142,18 @@ type Model struct {
 	// widget UI style: generation,chat
 	WidgetType ModelWidgetType `json:"widget_type" example:"generation"`
 	// url to interact with the model
-	Status          string               `json:"status" example:"RUNNING"`
-	UserLikes       bool                 `json:"user_likes"`
-	Source          RepositorySource     `json:"source"`
-	SyncStatus      RepositorySyncStatus `json:"sync_status"`
-	EnableInference bool                 `json:"enable_inference"`
-	EnableFinetune  bool                 `json:"enable_finetune"`
-	BaseModel       string               `json:"base_model"`
-	License         string               `json:"license"`
-	CanWrite        bool                 `json:"can_write"`
-	CanManage       bool                 `json:"can_manage"`
-	Namespace       *Namespace           `json:"namespace"`
+	Status              string               `json:"status" example:"RUNNING"`
+	UserLikes           bool                 `json:"user_likes"`
+	Source              RepositorySource     `json:"source"`
+	SyncStatus          RepositorySyncStatus `json:"sync_status"`
+	EnableInference     bool                 `json:"enable_inference"`
+	EnableFinetune      bool                 `json:"enable_finetune"`
+	BaseModel           string               `json:"base_model"`
+	License             string               `json:"license"`
+	CanWrite            bool                 `json:"can_write"`
+	CanManage           bool                 `json:"can_manage"`
+	Namespace           *Namespace           `json:"namespace"`
+	MirrorLastUpdatedAt time.Time            `json:"mirror_last_updated_at"`
 }
 
 type SDKModelInfo struct {
