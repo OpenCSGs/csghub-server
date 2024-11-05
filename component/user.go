@@ -45,6 +45,11 @@ func NewUserComponent(config *config.Config) (*UserComponent, error) {
 	c.uls = database.NewUserLikesStore()
 	c.repo = database.NewRepoStore()
 	c.deploy = database.NewDeployTaskStore()
+	c.ac, err = NewAccountingComponent(config)
+	if err != nil {
+		return nil, err
+	}
+	c.pt = database.NewPromptStore()
 	return c, nil
 }
 
@@ -63,6 +68,10 @@ type UserComponent struct {
 	repo           *database.RepoStore
 	deploy         *database.DeployTaskStore
 	cos            *database.CollectionStore
+	ac             *AccountingComponent
+	srs            *database.SpaceResourceStore
+	// urs            *database.UserResourcesStore
+	pt *database.PromptStore
 }
 
 func (c *UserComponent) Datasets(ctx context.Context, req *types.UserDatasetsReq) ([]types.Dataset, int, error) {
@@ -640,4 +649,66 @@ func (c *UserComponent) ListServerless(ctx context.Context, req types.DeployReq)
 		})
 	}
 	return resDeploys, total, nil
+}
+
+func (c *UserComponent) GetUserByName(ctx context.Context, userName string) (*database.User, error) {
+	user, err := c.us.FindByUsername(ctx, userName)
+	if err != nil {
+		return nil, fmt.Errorf("failed to check for the presence of the user %s,error:%w", userName, err)
+	}
+	return &user, nil
+}
+
+func (c *UserComponent) Prompts(ctx context.Context, req *types.UserPromptsReq) ([]types.PromptRes, int, error) {
+	var resPrompts []types.PromptRes
+	userExists, err := c.us.IsExist(ctx, req.Owner)
+	if err != nil {
+		newError := fmt.Errorf("failed to check for the presence of the user,error:%w", err)
+		slog.Error(newError.Error())
+		return nil, 0, newError
+	}
+
+	if !userExists {
+		return nil, 0, errors.New("user not exists")
+	}
+
+	if req.CurrentUser != "" {
+		cuserExists, err := c.us.IsExist(ctx, req.CurrentUser)
+		if err != nil {
+			newError := fmt.Errorf("failed to check for the presence of current user,error:%w", err)
+			slog.Error(newError.Error())
+			return nil, 0, newError
+		}
+
+		if !cuserExists {
+			return nil, 0, errors.New("current user not exists")
+		}
+	}
+
+	onlyPublic := req.Owner != req.CurrentUser
+	ds, total, err := c.pt.ByUsername(ctx, req.Owner, req.PageSize, req.Page, onlyPublic)
+	if err != nil {
+		newError := fmt.Errorf("failed to get user prompts,error:%w", err)
+		slog.Error(newError.Error())
+		return nil, 0, newError
+	}
+
+	for _, data := range ds {
+
+		resPrompts = append(resPrompts, types.PromptRes{
+			ID:           data.ID,
+			Name:         data.Repository.Name,
+			Nickname:     data.Repository.Nickname,
+			Description:  data.Repository.Description,
+			Likes:        data.Repository.Likes,
+			Downloads:    data.Repository.DownloadCount,
+			Path:         data.Repository.Path,
+			RepositoryID: data.RepositoryID,
+			Private:      data.Repository.Private,
+			CreatedAt:    data.CreatedAt,
+			UpdatedAt:    data.Repository.UpdatedAt,
+		})
+	}
+
+	return resPrompts, total, nil
 }

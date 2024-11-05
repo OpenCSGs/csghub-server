@@ -19,5 +19,4 @@ run_server_local.sh
 run_user_local.sh
 cmd/csghub-server/__debug_*
 run_dataviewer_local.sh
-
 */*/_api_test/

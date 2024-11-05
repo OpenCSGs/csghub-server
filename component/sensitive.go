@@ -15,6 +15,7 @@ type SensitiveChecker interface {
 	CheckText(ctx context.Context, scenario, text string) (bool, error)
 	CheckImage(ctx context.Context, scenario, ossBucketName, ossObjectName string) (bool, error)
 	CheckRequest(ctx context.Context, req types.SensitiveRequest) (bool, error)
+	CheckRequestV2(ctx context.Context, req types.SensitiveRequestV2) (bool, error)
 }
 
 type SensitiveComponent struct {
@@ -104,6 +105,22 @@ func (cc *SensitiveComponent) CheckRequest(ctx context.Context, req types.Sensit
 	return true, nil
 }
 
+func (cc *SensitiveComponent) CheckRequestV2(ctx context.Context, req types.SensitiveRequestV2) (bool, error) {
+	fields := req.GetSensitiveFields()
+	for _, field := range fields {
+		pass, err := cc.checker.PassTextCheck(ctx, sensitive.Scenario(field.Scenario), field.Value())
+		if err != nil {
+			slog.Error("fail to check request sensitivity", slog.String("field", field.Name), slog.Any("error", err))
+			return false, fmt.Errorf("fail to check '%s' sensitivity, error: %w", field.Name, err)
+		}
+		if !pass {
+			slog.Error("found sensitive words in request", slog.String("field", field.Name))
+			return false, errors.New("found sensitive words in field: " + field.Name)
+		}
+	}
+	return true, nil
+}
+
 func (c NopSensitiveComponent) CheckText(ctx context.Context, scenario, text string) (bool, error) {
 	return true, nil
 }
@@ -113,5 +130,9 @@ func (c NopSensitiveComponent) CheckImage(ctx context.Context, scenario, ossBuck
 }
 
 func (c NopSensitiveComponent) CheckRequest(ctx context.Context, req types.SensitiveRequest) (bool, error) {
+	return true, nil
+}
+
+func (c NopSensitiveComponent) CheckRequestV2(ctx context.Context, req types.SensitiveRequestV2) (bool, error) {
 	return true, nil
 }

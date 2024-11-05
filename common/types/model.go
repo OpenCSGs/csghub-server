@@ -115,10 +115,11 @@ type DeleteRepoReq struct {
 }
 
 type Relations struct {
-	Models   []*Model   `json:"models,omitempty"`
-	Datasets []*Dataset `json:"datasets,omitempty"`
-	Codes    []*Code    `json:"codes,omitempty"`
-	Spaces   []*Space   `json:"spaces,omitempty"`
+	Models   []*Model     `json:"models,omitempty"`
+	Datasets []*Dataset   `json:"datasets,omitempty"`
+	Codes    []*Code      `json:"codes,omitempty"`
+	Spaces   []*Space     `json:"spaces,omitempty"`
+	Prompts  []*PromptRes `json:"prompts,omitempty"`
 }
 
 type Model struct {
@@ -287,4 +288,32 @@ type DeployUpdateReq struct {
 	MaxReplica         *int    `json:"max_replica" validate:"min=1,gtefield=MinReplica"`
 	Revision           *string `json:"revision"`
 	SecureLevel        *int    `json:"secure_level"`
+}
+
+type RelationModels struct {
+	Models      []string `json:"models"`
+	Namespace   string   `json:"-"`
+	Name        string   `json:"-"`
+	CurrentUser string   `json:"-"`
+}
+
+type RelationDatasets struct {
+	Datasets    []string `json:"datasets"`
+	Namespace   string   `json:"-"`
+	Name        string   `json:"-"`
+	CurrentUser string   `json:"-"`
+}
+
+type RelationModel struct {
+	Model       string `json:"model"`
+	Namespace   string `json:"-"`
+	Name        string `json:"-"`
+	CurrentUser string `json:"-"`
+}
+
+type RelationDataset struct {
+	Dataset     string `json:"dataset"`
+	Namespace   string `json:"-"`
+	Name        string `json:"-"`
+	CurrentUser string `json:"-"`
 }

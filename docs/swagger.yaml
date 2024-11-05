@@ -183,8 +183,6 @@ definitions:
         type: string
       id:
         type: integer
-      last_updated_at:
-        type: string
       repository:
         $ref: '#/definitions/database.Repository'
       repository_id:
@@ -467,12 +465,14 @@ definitions:
     - dataset
     - code
     - space
+    - prompt
     type: string
     x-enum-varnames:
     - ModelTagScope
     - DatasetTagScope
     - CodeTagScope
     - SpaceTagScope
+    - PromptTagScope
   database.User:
     properties:
       accessTokens:
@@ -874,6 +874,28 @@ definitions:
       total:
         type: integer
     type: object
+  types.Conversation:
+    properties:
+      message:
+        type: string
+      temperature:
+        type: number
+      uuid:
+        type: string
+    required:
+    - message
+    - uuid
+    type: object
+  types.ConversationTitle:
+    properties:
+      title:
+        type: string
+      uuid:
+        type: string
+    required:
+    - title
+    - uuid
+    type: object
   types.CreateCodeReq:
     properties:
       default_branch:
@@ -946,6 +968,8 @@ definitions:
         type: boolean
       readme:
         type: string
+      type:
+        type: integer
     type: object
   types.CreateFileReq:
     properties:
@@ -1092,6 +1116,33 @@ definitions:
       verified:
         example: false
         type: boolean
+    type: object
+  types.CreatePromptRepoReq:
+    properties:
+      default_branch:
+        example: main
+        type: string
+      description:
+        type: string
+      labels:
+        example: ""
+        type: string
+      license:
+        example: MIT
+        type: string
+      name:
+        example: model_name_1
+        type: string
+      namespace:
+        example: user_or_org_name
+        type: string
+      nickname:
+        example: model display name
+        type: string
+      private:
+        type: boolean
+      readme:
+        type: string
     type: object
   types.CreateSSHKeyRequest:
     properties:
@@ -1654,6 +1705,81 @@ definitions:
       size:
         type: integer
     type: object
+  types.PromptRes:
+    properties:
+      can_manage:
+        type: boolean
+      can_write:
+        type: boolean
+      created_at:
+        type: string
+      default_branch:
+        type: string
+      description:
+        type: string
+      downloads:
+        type: integer
+      id:
+        type: integer
+      license:
+        type: string
+      likes:
+        type: integer
+      name:
+        type: string
+      namespace:
+        $ref: '#/definitions/types.Namespace'
+      nickname:
+        type: string
+      path:
+        type: string
+      private:
+        type: boolean
+      readme:
+        type: string
+      repository:
+        $ref: '#/definitions/types.Repository'
+      repository_id:
+        type: integer
+      source:
+        $ref: '#/definitions/types.RepositorySource'
+      sync_status:
+        $ref: '#/definitions/types.RepositorySyncStatus'
+      tags:
+        items:
+          $ref: '#/definitions/types.RepoTag'
+        type: array
+      updated_at:
+        type: string
+      user:
+        $ref: '#/definitions/types.User'
+      user_likes:
+        type: boolean
+    type: object
+  types.RelationDataset:
+    properties:
+      dataset:
+        type: string
+    type: object
+  types.RelationDatasets:
+    properties:
+      datasets:
+        items:
+          type: string
+        type: array
+    type: object
+  types.RelationModel:
+    properties:
+      model:
+        type: string
+    type: object
+  types.RelationModels:
+    properties:
+      models:
+        items:
+          type: string
+        type: array
+    type: object
   types.Relations:
     properties:
       codes:
@@ -1667,6 +1793,10 @@ definitions:
       models:
         items:
           $ref: '#/definitions/types.Model'
+        type: array
+      prompts:
+        items:
+          $ref: '#/definitions/types.PromptRes'
         type: array
       spaces:
         items:
@@ -1730,6 +1860,7 @@ definitions:
     - dataset
     - space
     - code
+    - prompt
     - ""
     type: string
     x-enum-varnames:
@@ -1737,6 +1868,7 @@ definitions:
     - DatasetRepo
     - SpaceRepo
     - CodeRepo
+    - PromptRepo
     - UnknownRepo
   types.ResourceType:
     enum:
@@ -2028,6 +2160,17 @@ definitions:
     properties:
       base_model:
         type: string
+      description:
+        type: string
+      nickname:
+        example: model display name
+        type: string
+      private:
+        example: false
+        type: boolean
+    type: object
+  types.UpdatePromptRepoReq:
+    properties:
       description:
         type: string
       nickname:
@@ -6355,6 +6498,144 @@ paths:
       summary: Get model related assets
       tags:
       - Model
+    put:
+      consumes:
+      - application/json
+      parameters:
+      - description: namespace
+        in: path
+        name: namespace
+        required: true
+        type: string
+      - description: name
+        in: path
+        name: name
+        required: true
+        type: string
+      - description: current user
+        in: query
+        name: current_user
+        type: string
+      - description: set dataset relation
+        in: body
+        name: req
+        required: true
+        schema:
+          $ref: '#/definitions/types.RelationDatasets'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/types.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/types.Relations'
+              type: object
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Set dataset relation for model
+      tags:
+      - Model
+  /models/{namespace}/{name}/relations/dataset:
+    delete:
+      consumes:
+      - application/json
+      parameters:
+      - description: namespace
+        in: path
+        name: namespace
+        required: true
+        type: string
+      - description: name
+        in: path
+        name: name
+        required: true
+        type: string
+      - description: current user
+        in: query
+        name: current_user
+        type: string
+      - description: delelet dataset relation
+        in: body
+        name: req
+        required: true
+        schema:
+          $ref: '#/definitions/types.RelationDataset'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/types.Response'
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: delete dataset relation for model
+      tags:
+      - Model
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: namespace
+        in: path
+        name: namespace
+        required: true
+        type: string
+      - description: name
+        in: path
+        name: name
+        required: true
+        type: string
+      - description: current user
+        in: query
+        name: current_user
+        type: string
+      - description: add dataset relation
+        in: body
+        name: req
+        required: true
+        schema:
+          $ref: '#/definitions/types.RelationDataset'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/types.Response'
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: add dataset relation for model
+      tags:
+      - Model
   /models/{namespace}/{name}/run:
     post:
       consumes:
@@ -7657,6 +7938,1010 @@ paths:
       summary: Create a new organization
       tags:
       - Organization
+  /prompts:
+    get:
+      consumes:
+      - application/json
+      description: get visiable Prompt repos for current user
+      parameters:
+      - description: current user
+        in: query
+        name: current_user
+        type: string
+      - description: search text
+        in: query
+        name: search
+        type: string
+      - description: filter by task tag
+        in: query
+        name: task_tag
+        type: string
+      - description: filter by framework tag
+        in: query
+        name: framework_tag
+        type: string
+      - description: filter by license tag
+        in: query
+        name: license_tag
+        type: string
+      - description: filter by language tag
+        in: query
+        name: language_tag
+        type: string
+      - description: sort by
+        in: query
+        name: sort
+        type: string
+      - description: source
+        enum:
+        - opencsg
+        - huggingface
+        - local
+        in: query
+        name: source
+        type: string
+      - default: 20
+        description: per
+        in: query
+        name: per
+        type: integer
+      - default: 1
+        description: per page
+        in: query
+        name: page
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/types.ResponseWithTotal'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/types.PromptRes'
+                  type: array
+                total:
+                  type: integer
+              type: object
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Get Visiable Prompt repos for current user
+      tags:
+      - Prompt
+    post:
+      consumes:
+      - application/json
+      description: create a new prompt repo
+      parameters:
+      - description: current user, the owner
+        in: query
+        name: current_user
+        type: string
+      - description: body
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/types.CreatePromptRepoReq'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/types.Response'
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Create a new prompt repo
+      tags:
+      - Prompt
+  /prompts/{namespace}/{name}:
+    delete:
+      consumes:
+      - application/json
+      description: delete a exists prompt repo
+      parameters:
+      - description: namespace
+        in: path
+        name: namespace
+        required: true
+        type: string
+      - description: name
+        in: path
+        name: name
+        required: true
+        type: string
+      - description: current user, the owner
+        in: query
+        name: current_user
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/types.Response'
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Delete a exists prompt repo
+      tags:
+      - Prompt
+    get:
+      consumes:
+      - application/json
+      description: List prompts
+      parameters:
+      - description: namespace
+        in: path
+        name: namespace
+        required: true
+        type: string
+      - description: name
+        in: path
+        name: name
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/types.Response'
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: List prompts
+      tags:
+      - Prompt
+    put:
+      consumes:
+      - application/json
+      description: update a exists prompt repo
+      parameters:
+      - description: namespace
+        in: path
+        name: namespace
+        required: true
+        type: string
+      - description: name
+        in: path
+        name: name
+        required: true
+        type: string
+      - description: current user, the owner
+        in: query
+        name: current_user
+        type: string
+      - description: body
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/types.UpdatePromptRepoReq'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/types.Response'
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Update a exists prompt repo
+      tags:
+      - Prompt
+  /prompts/{namespace}/{name}/branches:
+    get:
+      consumes:
+      - application/json
+      parameters:
+      - description: repo owner name
+        in: path
+        name: namespace
+        required: true
+        type: string
+      - description: repo name
+        in: path
+        name: name
+        required: true
+        type: string
+      - description: branch or tag
+        in: query
+        name: ref
+        required: true
+        type: string
+      - description: current user name
+        in: query
+        name: current_user
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/types.ResponseWithTotal'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/types.Branch'
+                  type: array
+              type: object
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Get the branches of prompt repository
+      tags:
+      - Prompt
+  /prompts/{namespace}/{name}/prompt/file:
+    post:
+      consumes:
+      - application/json
+      description: Create prompt in repo
+      parameters:
+      - description: namespace
+        in: path
+        name: namespace
+        required: true
+        type: string
+      - description: name
+        in: path
+        name: name
+        required: true
+        type: string
+      - description: current user name
+        in: query
+        name: current_user
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/types.Response'
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Create prompt in repo
+      tags:
+      - Prompt
+  /prompts/{namespace}/{name}/prompt/file/{file_path}:
+    delete:
+      consumes:
+      - application/json
+      description: Delete prompt in repo
+      parameters:
+      - description: namespace
+        in: path
+        name: namespace
+        required: true
+        type: string
+      - description: name
+        in: path
+        name: name
+        required: true
+        type: string
+      - description: the file relative path
+        in: path
+        name: file_path
+        required: true
+        type: string
+      - description: current user name
+        in: query
+        name: current_user
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/types.Response'
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Delete prompt in repo
+      tags:
+      - Prompt
+    put:
+      consumes:
+      - application/json
+      description: Update prompt in repo
+      parameters:
+      - description: namespace
+        in: path
+        name: namespace
+        required: true
+        type: string
+      - description: name
+        in: path
+        name: name
+        required: true
+        type: string
+      - description: the file relative path
+        in: path
+        name: file_path
+        required: true
+        type: string
+      - description: current user name
+        in: query
+        name: current_user
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/types.Response'
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Update prompt in repo
+      tags:
+      - Prompt
+  /prompts/{namespace}/{name}/prompt/view/{file_path}:
+    get:
+      consumes:
+      - application/json
+      description: Get prompts by file
+      parameters:
+      - description: namespace
+        in: path
+        name: namespace
+        required: true
+        type: string
+      - description: name
+        in: path
+        name: name
+        required: true
+        type: string
+      - description: the file relative path
+        in: path
+        name: file_path
+        required: true
+        type: string
+      - description: current user name
+        in: query
+        name: current_user
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/types.Response'
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Get prompts by file
+      tags:
+      - Prompt
+  /prompts/{namespace}/{name}/relations:
+    get:
+      consumes:
+      - application/json
+      parameters:
+      - description: namespace
+        in: path
+        name: namespace
+        required: true
+        type: string
+      - description: name
+        in: path
+        name: name
+        required: true
+        type: string
+      - description: current user
+        in: query
+        name: current_user
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/types.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/types.Relations'
+              type: object
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Get prompt related assets
+      tags:
+      - Prompt
+    put:
+      consumes:
+      - application/json
+      parameters:
+      - description: namespace
+        in: path
+        name: namespace
+        required: true
+        type: string
+      - description: name
+        in: path
+        name: name
+        required: true
+        type: string
+      - description: current user
+        in: query
+        name: current_user
+        type: string
+      - description: set model relation
+        in: body
+        name: req
+        required: true
+        schema:
+          $ref: '#/definitions/types.RelationModels'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/types.Response'
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Set model relation for prompt
+      tags:
+      - Prompt
+  /prompts/{namespace}/{name}/relations/model:
+    delete:
+      consumes:
+      - application/json
+      parameters:
+      - description: namespace
+        in: path
+        name: namespace
+        required: true
+        type: string
+      - description: name
+        in: path
+        name: name
+        required: true
+        type: string
+      - description: current user
+        in: query
+        name: current_user
+        type: string
+      - description: delelet model relation
+        in: body
+        name: req
+        required: true
+        schema:
+          $ref: '#/definitions/types.RelationModel'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/types.Response'
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: delete model relation for prompt
+      tags:
+      - Prompt
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: namespace
+        in: path
+        name: namespace
+        required: true
+        type: string
+      - description: name
+        in: path
+        name: name
+        required: true
+        type: string
+      - description: current user
+        in: query
+        name: current_user
+        type: string
+      - description: add model relation
+        in: body
+        name: req
+        required: true
+        schema:
+          $ref: '#/definitions/types.RelationModel'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/types.Response'
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: add model relation for prompt
+      tags:
+      - Prompt
+  /prompts/{namespace}/{name}/tags:
+    get:
+      consumes:
+      - application/json
+      parameters:
+      - description: repo owner name
+        in: path
+        name: namespace
+        required: true
+        type: string
+      - description: repo name
+        in: path
+        name: name
+        required: true
+        type: string
+      - description: current user name
+        in: query
+        name: current_user
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/types.ResponseWithTotal'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/database.Tag'
+                  type: array
+              type: object
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Get the tags of prompt repository
+      tags:
+      - Prompt
+  /prompts/{namespace}/{name}/tags/{category}:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: repo owner name
+        in: path
+        name: namespace
+        required: true
+        type: string
+      - description: repo name
+        in: path
+        name: name
+        required: true
+        type: string
+      - description: current user name
+        in: query
+        name: current_user
+        required: true
+        type: string
+      - description: tag category
+        enum:
+        - task
+        - license
+        - framework
+        - language
+        - industry
+        in: path
+        name: category
+        required: true
+        type: string
+      - description: tag names in array
+        in: body
+        name: tags
+        required: true
+        schema:
+          items:
+            type: string
+          type: array
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/types.Response'
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: update the tags of a certain category
+      tags:
+      - Prompt
+  /prompts/conversations:
+    get:
+      consumes:
+      - application/json
+      description: List conversations of user
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/types.Response'
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: List conversations of user
+      tags:
+      - Prompt
+    post:
+      consumes:
+      - application/json
+      description: Create new conversation
+      parameters:
+      - description: body
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/types.Conversation'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/types.Response'
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Create new conversation
+      tags:
+      - Prompt
+  /prompts/conversations/{id}:
+    delete:
+      consumes:
+      - application/json
+      description: Delete a conversation
+      parameters:
+      - description: conversation uuid
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/types.Response'
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Delete a conversation
+      tags:
+      - Prompt
+    get:
+      consumes:
+      - application/json
+      description: Get a conversation by uuid
+      parameters:
+      - description: conversation uuid
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/types.Response'
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Get a conversation by uuid
+      tags:
+      - Prompt
+    post:
+      consumes:
+      - application/json
+      description: Submit a conversation message
+      parameters:
+      - description: conversation uuid
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: body
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/types.Conversation'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/types.Response'
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Submit a conversation message
+      tags:
+      - Prompt
+    put:
+      consumes:
+      - application/json
+      description: Update a conversation title
+      parameters:
+      - description: conversation uuid
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: body
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/types.ConversationTitle'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/types.Response'
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Update a conversation title
+      tags:
+      - Prompt
+  /prompts/conversations/{id}/message/{msgid}/hate:
+    put:
+      consumes:
+      - application/json
+      description: Hate a conversation message
+      parameters:
+      - description: conversation uuid
+        in: path
+        name: uuid
+        required: true
+        type: string
+      - description: message id
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/types.Response'
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Hate a conversation message
+      tags:
+      - Prompt
+  /prompts/conversations/{id}/message/{msgid}/like:
+    put:
+      consumes:
+      - application/json
+      description: Like a conversation message
+      parameters:
+      - description: conversation uuid
+        in: path
+        name: uuid
+        required: true
+        type: string
+      - description: message id
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/types.Response'
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Like a conversation message
+      tags:
+      - Prompt
   /recom/opweight:
     post:
       consumes:
@@ -9826,6 +11111,47 @@ paths:
       security:
       - ApiKey: []
       summary: Get user models
+      tags:
+      - User
+  /user/{username}/prompts:
+    get:
+      consumes:
+      - application/json
+      description: get user prompts
+      parameters:
+      - description: username
+        in: path
+        name: username
+        required: true
+        type: string
+      - default: 20
+        description: per
+        in: query
+        name: per
+        type: integer
+      - default: 1
+        description: per page
+        in: query
+        name: page
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/types.Response'
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Get user prompts
       tags:
       - User
   /user/{username}/run/{repo_type}:

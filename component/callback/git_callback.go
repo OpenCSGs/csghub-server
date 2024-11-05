@@ -17,14 +17,6 @@ import (
 	"opencsg.com/csghub-server/component"
 )
 
-const (
-	DatasetRepoType = "datasets"
-	ModelRepoType   = "models"
-	CodeRepoType    = "codes"
-	SpaceRepoType   = "spaces"
-	ReadmeFileName  = "README.md"
-)
-
 // define GitCallbackComponent struct
 type GitCallbackComponent struct {
 	config      *config.Config
@@ -46,6 +38,8 @@ type GitCallbackComponent struct {
 	ts          *database.TagStore
 	// set visibility if file content is sensitive
 	setRepoVisibility bool
+	pp                *component.PromptComponent
+	maxPromptFS       int64
 }
 
 // new CallbackComponent
@@ -78,6 +72,7 @@ func NewGitCallback(config *config.Config) (*GitCallbackComponent, error) {
 	}
 	rfs := database.NewRuntimeFrameworksStore()
 	ts := database.NewTagStore()
+	pp, err := component.NewPromptComponent(config)
 	if err != nil {
 		return nil, err
 	}
@@ -99,6 +94,8 @@ func NewGitCallback(config *config.Config) (*GitCallbackComponent, error) {
 		ras:         ras,
 		rfs:         rfs,
 		ts:          ts,
+		pp:          pp,
+		maxPromptFS: config.Dataset.PromptMaxJsonlFileSize,
 	}, nil
 }
 
@@ -196,7 +193,7 @@ func (c *GitCallbackComponent) modifyFiles(ctx context.Context, repoType, namesp
 		// update model runtime
 		c.updateModelRuntimeFrameworks(ctx, repoType, namespace, repoName, ref, fileName, false)
 		// only care about readme file under root directory
-		if fileName != ReadmeFileName {
+		if fileName != types.ReadmeFileName {
 			continue
 		}
 
@@ -227,13 +224,13 @@ func (c *GitCallbackComponent) modifyFiles(ctx context.Context, repoType, namesp
 
 func (c *GitCallbackComponent) removeFiles(ctx context.Context, repoType, namespace, repoName, ref string, fileNames []string) error {
 	// handle removed files
-	// delete tagss
+	// delete tags
 	for _, fileName := range fileNames {
 		slog.Debug("remove file", slog.String("file", fileName))
 		// update model runtime
 		c.updateModelRuntimeFrameworks(ctx, repoType, namespace, repoName, ref, fileName, true)
 		// only care about readme file under root directory
-		if fileName == ReadmeFileName {
+		if fileName == types.ReadmeFileName {
 			// use empty content to clear all the meta tags
 			const content string = ""
 			adjustedRepoType := types.RepositoryType(strings.TrimSuffix(repoType, "s"))
@@ -247,10 +244,12 @@ func (c *GitCallbackComponent) removeFiles(ctx context.Context, repoType, namesp
 		} else {
 			var tagScope database.TagScope
 			switch repoType {
-			case DatasetRepoType:
+			case fmt.Sprintf("%ss", types.DatasetRepo):
 				tagScope = database.DatasetTagScope
-			case ModelRepoType:
+			case fmt.Sprintf("%ss", types.ModelRepo):
 				tagScope = database.ModelTagScope
+			case fmt.Sprintf("%ss", types.PromptRepo):
+				tagScope = database.PromptTagScope
 			default:
 				return nil
 				// case CodeRepoType:
@@ -276,7 +275,7 @@ func (c *GitCallbackComponent) addFiles(ctx context.Context, repoType, namespace
 		// update model runtime
 		c.updateModelRuntimeFrameworks(ctx, repoType, namespace, repoName, ref, fileName, false)
 		// only care about readme file under root directory
-		if fileName == ReadmeFileName {
+		if fileName == types.ReadmeFileName {
 			content, err := c.getFileRaw(repoType, namespace, repoName, ref, fileName)
 			if err != nil {
 				return err
@@ -302,10 +301,12 @@ func (c *GitCallbackComponent) addFiles(ctx context.Context, repoType, namespace
 		} else {
 			var tagScope database.TagScope
 			switch repoType {
-			case DatasetRepoType:
+			case fmt.Sprintf("%ss", types.DatasetRepo):
 				tagScope = database.DatasetTagScope
-			case ModelRepoType:
+			case fmt.Sprintf("%ss", types.ModelRepo):
 				tagScope = database.ModelTagScope
+			case fmt.Sprintf("%ss", types.PromptRepo):
+				tagScope = database.PromptTagScope
 			default:
 				return nil
 				// case CodeRepoType:
@@ -331,10 +332,12 @@ func (c *GitCallbackComponent) updateMetaTags(ctx context.Context, repoType, nam
 		tagScope database.TagScope
 	)
 	switch repoType {
-	case DatasetRepoType:
+	case fmt.Sprintf("%ss", types.DatasetRepo):
 		tagScope = database.DatasetTagScope
-	case ModelRepoType:
+	case fmt.Sprintf("%ss", types.ModelRepo):
 		tagScope = database.ModelTagScope
+	case fmt.Sprintf("%ss", types.PromptRepo):
+		tagScope = database.PromptTagScope
 	default:
 		return nil
 		// TODO: support code and space
@@ -404,7 +407,7 @@ func (c *GitCallbackComponent) setPrivate(ctx context.Context, repoType, namespa
 	var err error
 	var dataset *database.Dataset
 	var model *database.Model
-	if repoType == DatasetRepoType {
+	if repoType == fmt.Sprintf("%ss", types.DatasetRepo) {
 		dataset, err = c.ds.FindByPath(ctx, namespace, repoName)
 		if err != nil {
 			slog.Error("Failed to find dataset", slog.String("namespace", namespace), slog.String("name", repoName))
@@ -451,7 +454,7 @@ func (c *GitCallbackComponent) setPrivate(ctx context.Context, repoType, namespa
 func (c *GitCallbackComponent) updateModelRuntimeFrameworks(ctx context.Context, repoType, namespace, repoName, ref, fileName string, deleteAction bool) {
 	slog.Debug("update model relation for git callback", slog.Any("namespace", namespace), slog.Any("repoName", repoName), slog.Any("repoType", repoType), slog.Any("fileName", fileName), slog.Any("branch", ref))
 	// must be model repo and config.json
-	if repoType != ModelRepoType || fileName != component.ConfigFileName || ref != ("refs/heads/"+component.MainBranch) {
+	if repoType != fmt.Sprintf("%ss", types.ModelRepo) || fileName != component.ConfigFileName || ref != ("refs/heads/"+component.MainBranch) {
 		return
 	}
 	repo, err := c.rs.FindByPath(ctx, types.ModelRepo, namespace, repoName)

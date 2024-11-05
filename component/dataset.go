@@ -234,6 +234,10 @@ license: ` + license + `
 }
 
 func (c *DatasetComponent) Index(ctx context.Context, filter *types.RepoFilter, per, page int) ([]types.Dataset, int, error) {
+	return c.commonIndex(ctx, filter, per, page)
+}
+
+func (c *DatasetComponent) commonIndex(ctx context.Context, filter *types.RepoFilter, per, page int) ([]types.Dataset, int, error) {
 	var (
 		err         error
 		resDatasets []types.Dataset
@@ -294,6 +298,12 @@ func (c *DatasetComponent) Index(ctx context.Context, filter *types.RepoFilter, 
 			SyncStatus:   repo.SyncStatus,
 			License:      repo.License,
 			Repository:   common.BuildCloneInfo(c.config, dataset.Repository),
+			User: types.User{
+				Username: dataset.Repository.User.Username,
+				Nickname: dataset.Repository.User.NickName,
+				Email:    dataset.Repository.User.Email,
+				Avatar:   dataset.Repository.User.Avatar,
+			},
 		})
 	}
 
@@ -413,6 +423,7 @@ func (c *DatasetComponent) Show(ctx context.Context, namespace, name, currentUse
 			Username: dataset.Repository.User.Username,
 			Nickname: dataset.Repository.User.NickName,
 			Email:    dataset.Repository.User.Email,
+			Avatar:   dataset.Repository.User.Avatar,
 		},
 		Private:    dataset.Repository.Private,
 		CreatedAt:  dataset.CreatedAt,

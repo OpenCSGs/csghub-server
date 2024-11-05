@@ -173,7 +173,7 @@ func (c *RepoComponent) CreateRepo(ctx context.Context, req types.CreateRepoReq)
 		}
 	}
 	if req.DefaultBranch == "" {
-		req.DefaultBranch = "main"
+		req.DefaultBranch = types.MainBranch
 	}
 
 	gitRepoReq := gitserver.CreateRepoReq{
@@ -528,7 +528,6 @@ func (c *RepoComponent) createReadmeFile(ctx context.Context, req *types.CreateF
 
 func (c *RepoComponent) createLibraryFile(ctx context.Context, req *types.CreateFileReq) error {
 	var err error
-
 	err = c.tc.UpdateLibraryTags(ctx, getTagScopeByRepoType(req.RepoType), req.Namespace, req.Name, "", req.FilePath)
 	if err != nil {
 		slog.Error(fmt.Sprintf("failed to set %s's tags", req.RepoType), slog.String("namespace", req.Namespace),
@@ -630,17 +629,89 @@ func (c *RepoComponent) UpdateFile(ctx context.Context, req *types.UpdateFileReq
 	return resp, nil
 }
 
+func (c *RepoComponent) DeleteFile(ctx context.Context, req *types.DeleteFileReq) (*types.DeleteFileResp, error) {
+	slog.Debug("delete file get request", slog.String("namespace", req.Namespace), slog.String("filePath", req.FilePath),
+		slog.String("origin_path", req.OriginPath))
+
+	var (
+		err  error
+		user database.User
+	)
+	repo, err := c.repo.FindByPath(ctx, req.RepoType, req.Namespace, req.Name)
+	if err != nil {
+		return nil, fmt.Errorf("failed to find repo, error: %w", err)
+	}
+
+	permission, err := c.getUserRepoPermission(ctx, req.CurrentUser, repo)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get user repo permission, error: %w", err)
+	}
+	if !permission.CanWrite {
+		return nil, ErrUnauthorized
+	}
+
+	user, err = c.user.FindByUsername(ctx, req.Username)
+	if err != nil {
+		return nil, fmt.Errorf("fail to check user, cause: %w", err)
+	}
+	req.Email = user.Email
+
+	_, err = c.namespace.FindByPath(ctx, req.Namespace)
+	if err != nil {
+		return nil, fmt.Errorf("fail to check namespace, cause: %w", err)
+	}
+
+	err = c.git.DeleteRepoFile(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to delete %s file, cause: %w", req.RepoType, err)
+	}
+
+	// TODO:check sensitive content of file
+	fileName := filepath.Base(req.FilePath)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	if fileName == "README.md" {
+		slog.Debug("file is readme", slog.String("content", req.Content))
+		err = c.deleteReadmeFile(ctx, req)
+	} else {
+		slog.Debug("file is not readme", slog.String("filePath", req.FilePath), slog.String("originPath", req.OriginPath))
+		err = c.deleteLibraryFile(ctx, req)
+	}
+
+	if err != nil {
+		slog.Error("failed to delete file", slog.String("file", req.FilePath), slog.Any("error", err), slog.String("namespace", req.Namespace), slog.String("name", req.Name))
+	}
+
+	err = c.repo.SetUpdateTimeByPath(ctx, req.RepoType, req.Namespace, req.Name, time.Now())
+	if err != nil {
+		slog.Error("failed to set repo update time", slog.Any("error", err), slog.String("repo_type", string(req.RepoType)), slog.String("namespace", req.Namespace), slog.String("name", req.Name))
+	}
+
+	resp := new(types.DeleteFileResp)
+	return resp, nil
+}
+
 func (c *RepoComponent) updateLibraryFile(ctx context.Context, req *types.UpdateFileReq) error {
+	err := c.changeLibraryFile(ctx, req.FilePath, req.OriginPath, req.Namespace, req.Name, req.RepoType)
+	return err
+}
+
+func (c *RepoComponent) deleteLibraryFile(ctx context.Context, req *types.DeleteFileReq) error {
+	err := c.changeLibraryFile(ctx, req.FilePath, req.OriginPath, req.Namespace, req.Name, req.RepoType)
+	return err
+}
+
+func (c *RepoComponent) changeLibraryFile(ctx context.Context, filePath, originPath, namespace, name string, repoType types.RepositoryType) error {
 	var err error
 
-	isFileRenamed := req.FilePath != req.OriginPath
+	isFileRenamed := filePath != originPath
 	// need to handle tag change only if file renamed
 	if isFileRenamed {
-		err = c.tc.UpdateLibraryTags(ctx, getTagScopeByRepoType(req.RepoType), req.Namespace, req.Name, req.OriginPath, req.FilePath)
+		err = c.tc.UpdateLibraryTags(ctx, getTagScopeByRepoType(repoType), namespace, name, originPath, filePath)
 		if err != nil {
-			slog.Error(fmt.Sprintf("failed to set %s's tags", req.RepoType), slog.String("namespace", req.Namespace),
-				slog.String("name", req.Name), slog.Any("error", err))
-			return fmt.Errorf("failed to set %s's tags, cause: %w", req.RepoType, err)
+			slog.Error(fmt.Sprintf("failed to set %s's tags", repoType), slog.String("namespace", namespace),
+				slog.String("name", name), slog.Any("error", err))
+			return fmt.Errorf("failed to set %s's tags, cause: %w", repoType, err)
 		}
 	}
 
@@ -649,14 +720,27 @@ func (c *RepoComponent) updateLibraryFile(ctx context.Context, req *types.Update
 
 func (c *RepoComponent) updateReadmeFile(ctx context.Context, req *types.UpdateFileReq) error {
 	slog.Debug("file is readme", slog.String("content", req.Content))
-	var err error
+	err := c.changeReadmeFile(ctx, req.Content, req.Namespace, req.Name, req.RepoType)
+	if err != nil {
+		return fmt.Errorf("failed to update meta tags for update readme, cause: %w", err)
+	}
+	return err
+}
 
-	contentDecoded, _ := base64.RawStdEncoding.DecodeString(req.Content)
-	_, err = c.tc.UpdateMetaTags(ctx, getTagScopeByRepoType(req.RepoType), req.Namespace, req.Name, string(contentDecoded))
+func (c *RepoComponent) deleteReadmeFile(ctx context.Context, req *types.DeleteFileReq) error {
+	err := c.changeReadmeFile(ctx, req.Content, req.Namespace, req.Name, req.RepoType)
+	if err != nil {
+		return fmt.Errorf("failed to update meta tags for delete readme, cause: %w", err)
+	}
+	return err
+}
+
+func (c *RepoComponent) changeReadmeFile(ctx context.Context, content, namespace, name string, repoType types.RepositoryType) error {
+	contentDecoded, _ := base64.RawStdEncoding.DecodeString(content)
+	_, err := c.tc.UpdateMetaTags(ctx, getTagScopeByRepoType(repoType), namespace, name, string(contentDecoded))
 	if err != nil {
 		return fmt.Errorf("failed to update meta tags, cause: %w", err)
 	}
-
 	return err
 }
 
@@ -1231,6 +1315,8 @@ func getTagScopeByRepoType(repoType types.RepositoryType) database.TagScope {
 		return database.CodeTagScope
 	case types.SpaceRepo:
 		return database.SpaceTagScope
+	case types.PromptRepo:
+		return database.PromptTagScope
 	default:
 		panic("convert repo type to tag scope failed, unknown repo type:" + repoType)
 	}

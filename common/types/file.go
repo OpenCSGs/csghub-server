@@ -62,6 +62,28 @@ type UpdateFileReq struct {
 	CurrentUser string `json:"-"`
 }
 
+type DeleteFileReq struct {
+	//will use login username, ignore username from http request body
+	Username   string `json:"-"`
+	Email      string `json:"-"`
+	Message    string `json:"message"`
+	Branch     string `json:"branch"`
+	Content    string `json:"content"`
+	NewBranch  string `json:"new_branch"`
+	OriginPath string `json:"origin_path"`
+
+	// Use for lfs file
+	OriginalContent []byte   `json:"original_content"`
+	Pointer         *Pointer `json:"pointer"`
+
+	Namespace string `json:"-"`
+	Name      string `json:"-"`
+	// new file path, it will be different from OriginPath if file renamed
+	FilePath    string `json:"-"`
+	RepoType    RepositoryType
+	CurrentUser string `json:"-"`
+}
+
 type GetCommitsReq struct {
 	Namespace   string `json:"namespace"`
 	Name        string `json:"name"`
@@ -101,6 +123,7 @@ type GetTagsReq struct {
 
 // currently update and create fiel share the same response
 type UpdateFileResp CreateFileResp
+type DeleteFileResp CreateFileResp
 
 type SDKFiles struct {
 	SHA       string    `json:"sha"`

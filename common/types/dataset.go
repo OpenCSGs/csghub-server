@@ -10,6 +10,7 @@ type DatasetTagCommit struct {
 
 type CreateDatasetReq struct {
 	CreateRepoReq
+	Type int `json:"type"`
 }
 
 type UpdateDatasetReq struct {

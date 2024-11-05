@@ -37,6 +37,7 @@ type GitServer interface {
 	GetRepoFileContents(ctx context.Context, req GetRepoInfoByPathReq) (*types.File, error)
 	CreateRepoFile(req *types.CreateFileReq) (err error)
 	UpdateRepoFile(req *types.UpdateFileReq) (err error)
+	DeleteRepoFile(req *types.DeleteFileReq) (err error)
 	GetRepoAllFiles(ctx context.Context, req GetRepoAllFilesReq) ([]*types.File, error)
 	GetRepoAllLfsPointers(ctx context.Context, req GetRepoAllFilesReq) ([]*types.LFSPointer, error)
 	GetDiffBetweenTwoCommits(ctx context.Context, req GetDiffBetweenTwoCommitsReq) (*types.GiteaCallbackPushReq, error)

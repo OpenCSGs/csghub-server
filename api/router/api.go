@@ -365,12 +365,18 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 		internalGroup.POST("/post_receive", needGitlabShellJWTToken, internalHandler.PostReceive)
 	}
 
-	discussionHandler, err := handler.NewDiscussionHandler()
+	discussionHandler, err := handler.NewDiscussionHandler(config)
 	if err != nil {
 		return nil, fmt.Errorf("error creating discussion handler:%w", err)
 	}
 	createDiscussionRoutes(apiGroup, needAPIKey, discussionHandler)
 
+	// prompt
+	promptHandler, err := handler.NewPromptHandler(config)
+	if err != nil {
+		return nil, fmt.Errorf("error creating prompt handler,%w", err)
+	}
+	createPromptRoutes(apiGroup, promptHandler)
 	return r, nil
 }
 
@@ -385,6 +391,9 @@ func createModelRoutes(config *config.Config, apiGroup *gin.RouterGroup, needAPI
 		modelsGroup.GET("/:namespace/:name", modelHandler.Show)
 		modelsGroup.GET("/:namespace/:name/all_files", modelHandler.AllFiles)
 		modelsGroup.GET("/:namespace/:name/relations", modelHandler.Relations)
+		modelsGroup.PUT("/:namespace/:name/relations", modelHandler.SetRelations)
+		modelsGroup.POST("/:namespace/:name/relations/dataset", modelHandler.AddDatasetRelation)
+		modelsGroup.DELETE("/:namespace/:name/relations/dataset", modelHandler.DelDatasetRelation)
 		modelsGroup.GET("/:namespace/:name/branches", middleware.RepoType(types.ModelRepo), repoCommonHandler.Branches)
 		modelsGroup.GET("/:namespace/:name/tags", middleware.RepoType(types.ModelRepo), repoCommonHandler.Tags)
 		// update tags of a certain category
@@ -623,6 +632,7 @@ func createUserRoutes(apiGroup *gin.RouterGroup, needAPIKey gin.HandlerFunc, use
 		apiGroup.GET("/user/:username/datasets", userHandler.Datasets)
 		apiGroup.GET("/user/:username/codes", userHandler.Codes)
 		apiGroup.GET("/user/:username/spaces", userHandler.Spaces)
+		apiGroup.GET("/user/:username/prompts", userHandler.Prompts)
 		// User likes
 		apiGroup.PUT("/user/:username/likes/:repo_id", userHandler.LikesAdd)
 		apiGroup.DELETE("/user/:username/likes/:repo_id", userHandler.LikesDelete)
@@ -715,4 +725,41 @@ func createDiscussionRoutes(apiGroup *gin.RouterGroup, needAPIKey gin.HandlerFun
 	apiGroup.GET("/discussions/:id/comments", discussionHandler.ListDiscussionComments)
 	apiGroup.PUT("/discussions/:id/comments/:comment_id", discussionHandler.UpdateComment)
 	apiGroup.DELETE("/discussions/:id/comments/:comment_id", discussionHandler.DeleteComment)
+}
+
+func createPromptRoutes(apiGroup *gin.RouterGroup, promptHandler *handler.PromptHandler) {
+	promptGrp := apiGroup.Group("/prompts")
+	{
+		promptGrp.GET("", promptHandler.Index)
+		promptGrp.GET("/:namespace/:name", promptHandler.ListPrompt)
+		promptGrp.GET("/:namespace/:name/relations", promptHandler.Relations)
+		promptGrp.GET("/:namespace/:name/prompt/view/*file_path", promptHandler.GetPrompt)
+		promptGrp.POST("/:namespace/:name/prompt/record", promptHandler.CreatePrompt)
+		promptGrp.PUT("/:namespace/:name/prompt/record/*file_path", promptHandler.UpdatePrompt)
+		promptGrp.DELETE("/:namespace/:name/prompt/record/*file_path", promptHandler.DeletePrompt)
+
+		promptGrp.PUT("/:namespace/:name/relations", promptHandler.SetRelations)
+		promptGrp.POST("/:namespace/:name/relations/model", promptHandler.AddModelRelation)
+		promptGrp.DELETE("/:namespace/:name/relations/model", promptHandler.DelModelRelation)
+		conversationGrp := promptGrp.Group("/conversations")
+		{
+			conversationGrp.POST("", promptHandler.NewConversation)
+			conversationGrp.GET("", promptHandler.ListConversation)
+			conversationGrp.GET("/:id", promptHandler.GetConversation)
+			conversationGrp.POST("/:id", promptHandler.SubmitMessage)
+			conversationGrp.PUT("/:id", promptHandler.UpdateConversation)
+			conversationGrp.DELETE("/:id", promptHandler.RemoveConversation)
+			conversationGrp.PUT("/:id/message/:msgid/like", promptHandler.LikeMessage)
+			conversationGrp.PUT("/:id/message/:msgid/hate", promptHandler.HateMessage)
+		}
+
+		promptGrp.POST("", promptHandler.Create)
+		promptGrp.PUT("/:namespace/:name", promptHandler.Update)
+		promptGrp.DELETE("/:namespace/:name", promptHandler.Delete)
+
+		promptGrp.GET("/:namespace/:name/branches", promptHandler.Branches)
+		promptGrp.GET("/:namespace/:name/tags", promptHandler.Tags)
+		promptGrp.POST("/:namespace/:name/tags/:category", promptHandler.UpdateTags)
+		promptGrp.POST("/:namespace/:name/update_downloads", promptHandler.UpdateDownloads)
+	}
 }
