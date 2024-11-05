@@ -29,6 +29,7 @@ const (
 	DatasetTagScope TagScope = "dataset"
 	CodeTagScope    TagScope = "code"
 	SpaceTagScope   TagScope = "space"
+	PromptTagScope  TagScope = "prompt"
 )
 
 const defaultTagGroup = ""
@@ -76,7 +77,7 @@ func (ts *TagStore) AllTagsByScope(ctx context.Context, scope TagScope) ([]*Tag,
 func (ts *TagStore) AllTagsByScopeAndCategory(ctx context.Context, scope TagScope, category string) ([]*Tag, error) {
 	var tags []*Tag
 	err := ts.db.Operator.Core.NewSelect().Model(&tags).
-		Where("scope =? and category = ?", scope, category).
+		Where("scope = ? and category = ?", scope, category).
 		Scan(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to select tags by scope,cause: %w", err)
@@ -99,6 +100,10 @@ func (ts *TagStore) AllModelTags(ctx context.Context) ([]*Tag, error) {
 	return ts.AllTagsByScope(ctx, ModelTagScope)
 }
 
+func (ts *TagStore) AllPromptTags(ctx context.Context) ([]*Tag, error) {
+	return ts.AllTagsByScope(ctx, PromptTagScope)
+}
+
 func (ts *TagStore) AllDatasetTags(ctx context.Context) ([]*Tag, error) {
 	return ts.AllTagsByScope(ctx, DatasetTagScope)
 }
@@ -113,6 +118,10 @@ func (ts *TagStore) AllSpaceTags(ctx context.Context) ([]*Tag, error) {
 
 func (ts *TagStore) AllModelCategories(ctx context.Context) ([]TagCategory, error) {
 	return ts.allCategories(ctx, ModelTagScope)
+}
+
+func (ts *TagStore) AllPromptCategories(ctx context.Context) ([]TagCategory, error) {
+	return ts.allCategories(ctx, PromptTagScope)
 }
 
 func (ts *TagStore) AllDatasetCategories(ctx context.Context) ([]TagCategory, error) {

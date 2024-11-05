@@ -16,6 +16,10 @@ type ModelTagStore interface {
 	AllModelTags(ctx context.Context) ([]*database.Tag, error)
 }
 
+type PromptTagStore interface {
+	AllPromptTags(ctx context.Context) ([]*database.Tag, error)
+}
+
 type TagProcessor interface {
 	ProcessReadme(ctx context.Context, content string) (tagsMatched, tagsNew []*database.Tag, err error)
 	ProcessFramework(ctx context.Context, fileName string) (*database.Tag, error)
@@ -40,6 +44,13 @@ func NewModelTagProcessor(ts ModelTagStore) TagProcessor {
 	p := new(tagProcessor)
 	p.existingTags = ts.AllModelTags
 	p.tagScope = database.ModelTagScope
+	return p
+}
+
+func NewPromptTagProcessor(ts PromptTagStore) TagProcessor {
+	p := new(tagProcessor)
+	p.existingTags = ts.AllPromptTags
+	p.tagScope = database.PromptTagScope
 	return p
 }
 

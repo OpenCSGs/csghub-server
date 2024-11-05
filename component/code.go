@@ -43,7 +43,7 @@ func (c *CodeComponent) Create(ctx context.Context, req *types.CreateCodeReq) (*
 	}
 
 	if req.DefaultBranch == "" {
-		req.DefaultBranch = "main"
+		req.DefaultBranch = types.MainBranch
 	}
 
 	req.RepoType = types.CodeRepo

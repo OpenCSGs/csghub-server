@@ -331,6 +331,147 @@ func (h *ModelHandler) Relations(ctx *gin.Context) {
 	httpbase.OK(ctx, detail)
 }
 
+// SetRelation   godoc
+// @Security     ApiKey
+// @Summary      Set dataset relation for model
+// @Tags         Model
+// @Accept       json
+// @Produce      json
+// @Param        namespace path string true "namespace"
+// @Param        name path string true "name"
+// @Param        current_user query string false "current user"
+// @Param        req body types.RelationDatasets true  "set dataset relation"
+// @Success      200  {object}  types.Response{data=types.Relations} "OK"
+// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
+// @Router       /models/{namespace}/{name}/relations [put]
+func (h *ModelHandler) SetRelations(ctx *gin.Context) {
+	currentUser := httpbase.GetCurrentUser(ctx)
+	if currentUser == "" {
+		httpbase.UnauthorizedError(ctx, component.ErrUserNotFound)
+		return
+	}
+	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
+	if err != nil {
+		slog.Error("Bad request format", "error", err)
+		httpbase.BadRequest(ctx, err.Error())
+		return
+	}
+
+	var req types.RelationDatasets
+	err = ctx.ShouldBindJSON(&req)
+	if err != nil {
+		slog.Error("Bad request format", "error", err)
+		httpbase.BadRequest(ctx, err.Error())
+		return
+	}
+	req.Namespace = namespace
+	req.Name = name
+	req.CurrentUser = currentUser
+
+	err = h.c.SetRelationDatasets(ctx, req)
+	if err != nil {
+		slog.Error("Failed to set datasets for model", slog.Any("req", req), slog.Any("error", err))
+		httpbase.ServerError(ctx, err)
+		return
+	}
+	httpbase.OK(ctx, nil)
+}
+
+// AddDatasetRelation   godoc
+// @Security     ApiKey
+// @Summary      add dataset relation for model
+// @Tags         Model
+// @Accept       json
+// @Produce      json
+// @Param        namespace path string true "namespace"
+// @Param        name path string true "name"
+// @Param        current_user query string false "current user"
+// @Param        req body types.RelationDataset true  "add dataset relation"
+// @Success      200  {object}  types.Response{} "OK"
+// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
+// @Router       /models/{namespace}/{name}/relations/dataset [post]
+func (h *ModelHandler) AddDatasetRelation(ctx *gin.Context) {
+	currentUser := httpbase.GetCurrentUser(ctx)
+	if currentUser == "" {
+		httpbase.UnauthorizedError(ctx, component.ErrUserNotFound)
+		return
+	}
+	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
+	if err != nil {
+		slog.Error("Bad request format", "error", err)
+		httpbase.BadRequest(ctx, err.Error())
+		return
+	}
+
+	var req types.RelationDataset
+	err = ctx.ShouldBindJSON(&req)
+	if err != nil {
+		slog.Error("Bad request format", "error", err)
+		httpbase.BadRequest(ctx, err.Error())
+		return
+	}
+	req.Namespace = namespace
+	req.Name = name
+	req.CurrentUser = currentUser
+
+	err = h.c.AddRelationDataset(ctx, req)
+	if err != nil {
+		slog.Error("Failed to add dataset for model", slog.Any("error", err))
+		httpbase.ServerError(ctx, err)
+		return
+	}
+	httpbase.OK(ctx, nil)
+}
+
+// DeleteDatasetRelation  godoc
+// @Security     ApiKey
+// @Summary      delete dataset relation for model
+// @Tags         Model
+// @Accept       json
+// @Produce      json
+// @Param        namespace path string true "namespace"
+// @Param        name path string true "name"
+// @Param        current_user query string false "current user"
+// @Param        req body types.RelationDataset true  "delelet dataset relation"
+// @Success      200  {object}  types.Response{} "OK"
+// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
+// @Router       /models/{namespace}/{name}/relations/dataset [delete]
+func (h *ModelHandler) DelDatasetRelation(ctx *gin.Context) {
+	currentUser := httpbase.GetCurrentUser(ctx)
+	if currentUser == "" {
+		httpbase.UnauthorizedError(ctx, component.ErrUserNotFound)
+		return
+	}
+	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
+	if err != nil {
+		slog.Error("Bad request format", "error", err)
+		httpbase.BadRequest(ctx, err.Error())
+		return
+	}
+
+	var req types.RelationDataset
+	err = ctx.ShouldBindJSON(&req)
+	if err != nil {
+		slog.Error("Bad request format", "error", err)
+		httpbase.BadRequest(ctx, err.Error())
+		return
+	}
+	req.Namespace = namespace
+	req.Name = name
+	req.CurrentUser = currentUser
+
+	err = h.c.DelRelationDataset(ctx, req)
+	if err != nil {
+		slog.Error("Failed to delete dataset for model", slog.Any("error", err))
+		httpbase.ServerError(ctx, err)
+		return
+	}
+	httpbase.OK(ctx, nil)
+}
+
 // Predict godoc
 // @Security     ApiKey
 // @Summary      Invoke model prediction

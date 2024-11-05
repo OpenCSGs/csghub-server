@@ -179,6 +179,14 @@ type Config struct {
 		Enable    bool   `envconfig:"STARHUB_SERVER_TELEMETRY_ENABLE" default:"true"`
 		ReportURL string `envconfig:"STARHUB_SERVER_TELEMETRY_URL" default:"http://hub.opencsg.com/api/v1/telemetry"`
 	}
+
+	AutoClean struct {
+		Instance bool `envconfig:"OPENCSG_AUTO_CLEANUP_INSTANCE_ENABLE" default:"false"`
+	}
+
+	Dataset struct {
+		PromptMaxJsonlFileSize int64 `envconfig:"OPENCSG_PROMPT_MAX_JSONL_FILESIZE_BYTES" default:"1048576"` // 1MB
+	}
 }
 
 func LoadConfig() (cfg *Config, err error) {

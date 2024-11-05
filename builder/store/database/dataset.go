@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
-	"time"
 
 	"github.com/uptrace/bun"
 )
@@ -25,20 +24,19 @@ func NewDatasetStore() *DatasetStore {
 }
 
 type Dataset struct {
-	ID            int64       `bun:",pk,autoincrement" json:"id"`
-	RepositoryID  int64       `bun:",notnull" json:"repository_id"`
-	Repository    *Repository `bun:"rel:belongs-to,join:repository_id=id" json:"repository"`
-	LastUpdatedAt time.Time   `bun:",notnull" json:"last_updated_at"`
+	ID           int64       `bun:",pk,autoincrement" json:"id"`
+	RepositoryID int64       `bun:",notnull" json:"repository_id"`
+	Repository   *Repository `bun:"rel:belongs-to,join:repository_id=id" json:"repository"`
 	times
 }
 
 func (s *DatasetStore) ByRepoIDs(ctx context.Context, repoIDs []int64) (datasets []Dataset, err error) {
-	err = s.db.Operator.Core.NewSelect().
+	q := s.db.Operator.Core.NewSelect().
 		Model(&datasets).
 		Relation("Repository").
-		Where("repository_id in (?)", bun.In(repoIDs)).
-		Scan(ctx)
-
+		Relation("Repository.User").
+		Where("repository_id in (?)", bun.In(repoIDs))
+	err = q.Scan(ctx)
 	return
 }
 

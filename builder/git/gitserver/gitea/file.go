@@ -175,6 +175,10 @@ func (c *Client) UpdateRepoFile(req *types.UpdateFileReq) (err error) {
 	return
 }
 
+func (c *Client) DeleteRepoFile(req *types.DeleteFileReq) (err error) {
+	return nil
+}
+
 func (c *Client) getFileContents(owner, repo, ref, path string) (*types.File, error) {
 	var content string
 	/* Example file content from gitea

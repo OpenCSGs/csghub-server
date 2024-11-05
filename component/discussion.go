@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"time"
 
+	"opencsg.com/csghub-server/builder/sensitive"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/types"
 )
@@ -261,6 +262,20 @@ type CreateRepoDiscussionRequest struct {
 	CurrentUser string               `json:"-"`
 }
 
+// CreateRepoDiscussionRequest implements types.SensitiveRequestV2
+var _ types.SensitiveRequestV2 = (*CreateRepoDiscussionRequest)(nil)
+
+func (req *CreateRepoDiscussionRequest) GetSensitiveFields() []types.SensitiveField {
+	return []types.SensitiveField{
+		{
+			Name: "title",
+			Value: func() string {
+				return req.Title
+			},
+		},
+	}
+}
+
 type CreateDiscussionResponse struct {
 	ID    int64                    `json:"id"`
 	User  *DiscussionResponse_User `json:"user"`
@@ -282,6 +297,21 @@ type UpdateDiscussionRequest struct {
 	ID          int64  `json:"-"`
 	Title       string `json:"title" binding:"required"`
 	CurrentUser string `json:"-"`
+}
+
+// UpdateDiscussionRequest implements types.SensitiveRequestV2
+var _ types.SensitiveRequestV2 = (*UpdateDiscussionRequest)(nil)
+
+func (req *UpdateDiscussionRequest) GetSensitiveFields() []types.SensitiveField {
+	return []types.SensitiveField{
+		{
+			Name: "title",
+			Value: func() string {
+				return req.Title
+			},
+			Scenario: string(sensitive.ScenarioCommentDetection),
+		},
+	}
 }
 
 type ShowDiscussionResponse struct {
@@ -317,6 +347,21 @@ type CreateCommentRequest struct {
 	CurrentUser     string `json:"-"`
 }
 
+// CreateCommentRequest implements types.SensitiveRequestV2
+var _ types.SensitiveRequestV2 = (*CreateCommentRequest)(nil)
+
+func (req *CreateCommentRequest) GetSensitiveFields() []types.SensitiveField {
+	return []types.SensitiveField{
+		{
+			Name: "content",
+			Value: func() string {
+				return req.Content
+			},
+			Scenario: string(sensitive.ScenarioCommentDetection),
+		},
+	}
+}
+
 type CreateCommentResponse struct {
 	ID              int64                    `json:"id"`
 	CommentableID   int64                    `json:"commentable_id"`
@@ -328,4 +373,19 @@ type CreateCommentResponse struct {
 type UpdateCommentRequest struct {
 	ID      int64  `json:"-"`
 	Content string `json:"content" binding:"required"`
+}
+
+// UpdateCommentRequest implements types.SensitiveRequestV2
+var _ types.SensitiveRequestV2 = (*UpdateCommentRequest)(nil)
+
+func (req *UpdateCommentRequest) GetSensitiveFields() []types.SensitiveField {
+	return []types.SensitiveField{
+		{
+			Name: "content",
+			Value: func() string {
+				return req.Content
+			},
+			Scenario: string(sensitive.ScenarioCommentDetection),
+		},
+	}
 }

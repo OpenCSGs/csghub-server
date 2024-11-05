@@ -123,6 +123,7 @@ type (
 	UserSpacesReq          = UserDatasetsReq
 	UserCollectionReq      = UserDatasetsReq
 	DeleteUserTokenRequest = CreateUserTokenRequest
+	UserPromptsReq         = UserDatasetsReq
 )
 
 type PageOpts struct {

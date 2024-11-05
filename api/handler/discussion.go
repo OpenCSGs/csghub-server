@@ -8,19 +8,23 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"opencsg.com/csghub-server/api/httpbase"
+	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/types"
 	"opencsg.com/csghub-server/common/utils/common"
 	"opencsg.com/csghub-server/component"
 )
 
 type DiscussionHandler struct {
-	c *component.DiscussionComponent
+	c  *component.DiscussionComponent
+	sc component.SensitiveChecker
 }
 
-func NewDiscussionHandler() (*DiscussionHandler, error) {
+func NewDiscussionHandler(cfg *config.Config) (*DiscussionHandler, error) {
 	c := component.NewDiscussionComponent()
+	sc := component.NewSensitiveComponent(cfg)
 	return &DiscussionHandler{
-		c: c,
+		c:  c,
+		sc: sc,
 	}, nil
 }
 
@@ -59,6 +63,14 @@ func (h *DiscussionHandler) CreateRepoDiscussion(ctx *gin.Context) {
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
+
+	_, err = h.sc.CheckRequestV2(ctx, &req)
+	if err != nil {
+		slog.Error("failed to check sensitive request", slog.Any("error", err))
+		httpbase.BadRequest(ctx, fmt.Errorf("sensitive check failed: %w", err).Error())
+		return
+	}
+
 	req.CurrentUser = currentUser
 	req.RepoType = types.RepositoryType(repoType)
 	req.Namespace = namespace
@@ -103,6 +115,13 @@ func (h *DiscussionHandler) UpdateDiscussion(ctx *gin.Context) {
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
+	_, err = h.sc.CheckRequestV2(ctx, &req)
+	if err != nil {
+		slog.Error("failed to check sensitive request", slog.Any("error", err))
+		httpbase.BadRequest(ctx, fmt.Errorf("sensitive check failed: %w", err).Error())
+		return
+	}
+
 	req.ID = idInt
 	req.CurrentUser = currentUser
 	err = h.c.UpdateDiscussion(ctx, req)
@@ -248,6 +267,13 @@ func (h *DiscussionHandler) CreateDiscussionComment(ctx *gin.Context) {
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
+	_, err = h.sc.CheckRequestV2(ctx, &req)
+	if err != nil {
+		slog.Error("failed to check sensitive request", slog.Any("error", err))
+		httpbase.BadRequest(ctx, fmt.Errorf("sensitive check failed: %w", err).Error())
+		return
+	}
+
 	req.CommentableID = idInt
 	req.CurrentUser = currentUser
 
@@ -290,6 +316,12 @@ func (h *DiscussionHandler) UpdateComment(ctx *gin.Context) {
 	var req component.UpdateCommentRequest
 	if err := ctx.ShouldBindJSON(&req); err != nil {
 		httpbase.BadRequest(ctx, err.Error())
+		return
+	}
+	_, err = h.sc.CheckRequestV2(ctx, &req)
+	if err != nil {
+		slog.Error("failed to check sensitive request", slog.Any("error", err))
+		httpbase.BadRequest(ctx, fmt.Errorf("sensitive check failed: %w", err).Error())
 		return
 	}
 

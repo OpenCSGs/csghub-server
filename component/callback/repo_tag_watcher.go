@@ -22,15 +22,15 @@ func WatchRepoTag(req *types.GiteaCallbackPushReq) Watcher {
 	fullNamespace, repoName := splits[0], splits[1]
 	repoType, namespace, _ := strings.Cut(fullNamespace, "_")
 	for _, commit := range commits {
-		if slices.Contains(commit.Modified, ReadmeFileName) {
+		if slices.Contains(commit.Modified, types.ReadmeFileName) {
 			watcher.modify(namespace, repoName, repoType, ref)
 			continue
 		}
-		if slices.Contains(commit.Added, ReadmeFileName) {
+		if slices.Contains(commit.Added, types.ReadmeFileName) {
 			watcher.add(namespace, repoName, repoType, ref)
 			continue
 		}
-		if slices.Contains(commit.Removed, ReadmeFileName) {
+		if slices.Contains(commit.Removed, types.ReadmeFileName) {
 			watcher.del(namespace, repoName, repoType, ref)
 			continue
 		}

@@ -70,7 +70,7 @@ func (c *SpaceComponent) Create(ctx context.Context, req types.CreateSpaceReq) (
 		nickname = req.Name
 	}
 	if req.DefaultBranch == "" {
-		req.DefaultBranch = "main"
+		req.DefaultBranch = types.MainBranch
 	}
 	req.Nickname = nickname
 	req.RepoType = types.SpaceRepo

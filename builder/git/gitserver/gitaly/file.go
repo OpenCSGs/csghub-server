@@ -292,6 +292,73 @@ func (c *Client) UpdateRepoFile(req *types.UpdateFileReq) (err error) {
 	return err
 }
 
+func (c *Client) DeleteRepoFile(req *types.DeleteFileReq) (err error) {
+	ctx := context.Background()
+	repoType := fmt.Sprintf("%ss", string(req.RepoType))
+	conn, err := grpc.NewClient(
+		c.config.GitalyServer.Address,
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
+	)
+	if err != nil {
+		return err
+	}
+	defer conn.Close()
+	ctx, cancel := context.WithTimeout(ctx, timeoutTime)
+	defer cancel()
+	userCommitFilesClient, err := c.operationClient.UserCommitFiles(ctx)
+	if err != nil {
+		return err
+	}
+	repository := &gitalypb.Repository{
+		StorageName:  c.config.GitalyServer.Storge,
+		RelativePath: BuildRelativePath(repoType, req.Namespace, req.Name),
+		GlRepository: filepath.Join(repoType, req.Namespace, req.Name),
+	}
+	actions := []*gitalypb.UserCommitFilesRequest{
+		{
+			UserCommitFilesRequestPayload: &gitalypb.UserCommitFilesRequest_Header{
+				Header: &gitalypb.UserCommitFilesRequestHeader{
+					Repository: repository,
+					User: &gitalypb.User{
+						GlId:       "user-1",
+						Name:       []byte(req.Name),
+						GlUsername: req.Username,
+						Email:      []byte(req.Email),
+					},
+					BranchName:        []byte(req.Branch),
+					CommitMessage:     []byte(req.Message),
+					CommitAuthorName:  []byte(req.Name),
+					CommitAuthorEmail: []byte(req.Email),
+					StartBranchName:   []byte(req.Branch),
+					StartRepository:   repository,
+					Timestamp:         timestamppb.New(time.Now()),
+				},
+			},
+		},
+		{
+			UserCommitFilesRequestPayload: &gitalypb.UserCommitFilesRequest_Action{
+				Action: &gitalypb.UserCommitFilesAction{
+					UserCommitFilesActionPayload: &gitalypb.UserCommitFilesAction_Header{
+						Header: &gitalypb.UserCommitFilesActionHeader{
+							Action:        gitalypb.UserCommitFilesActionHeader_DELETE,
+							Base64Content: true,
+							FilePath:      []byte(req.FilePath),
+						},
+					},
+				},
+			},
+		},
+	}
+	userCommitFilesClient.Send(actions[0])
+	userCommitFilesClient.Send(actions[1])
+	_, err = userCommitFilesClient.CloseAndRecv()
+	if err != nil {
+		return err
+	}
+
+	return err
+}
+
 func (c *Client) GetRepoFileTree(ctx context.Context, req gitserver.GetRepoInfoByPathReq) ([]*types.File, error) {
 	var files []*types.File
 	repoType := fmt.Sprintf("%ss", string(req.RepoType))
