@@ -364,6 +364,8 @@ definitions:
         type: string
       repository_type:
         $ref: '#/definitions/types.RepositoryType'
+      sensitive_check_status:
+        $ref: '#/definitions/types.SensitiveCheckStatus'
       source:
         $ref: '#/definitions/types.RepositorySource'
       ssh_clone_url:
@@ -1942,6 +1944,26 @@ definitions:
       type:
         type: integer
     type: object
+  types.SensitiveCheckStatus:
+    enum:
+    - -1
+    - 0
+    - 1
+    - 2
+    - 3
+    type: integer
+    x-enum-comments:
+      SensitiveCheckException: error happen
+      SensitiveCheckFail: sensitive content detected
+      SensitiveCheckPass: pass
+      SensitiveCheckPending: default
+      SensitiveCheckSkip: skip
+    x-enum-varnames:
+    - SensitiveCheckFail
+    - SensitiveCheckPending
+    - SensitiveCheckPass
+    - SensitiveCheckSkip
+    - SensitiveCheckException
   types.Space:
     properties:
       can_manage:

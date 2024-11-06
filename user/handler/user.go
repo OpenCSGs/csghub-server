@@ -17,7 +17,7 @@ import (
 
 type UserHandler struct {
 	c                        *component.UserComponent
-	sc                       apicomponent.SensitiveChecker
+	sc                       *apicomponent.SensitiveComponent
 	publicDomain             string
 	EnableHTTPS              bool
 	signinSuccessRedirectURL string
@@ -30,7 +30,11 @@ func NewUserHandler(config *config.Config) (*UserHandler, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to create user component: %w", err)
 	}
-	h.sc = apicomponent.NewSensitiveComponent(config)
+	sc, err := apicomponent.NewSensitiveComponent(config)
+	if err != nil {
+		return nil, fmt.Errorf("error creating sensitive component:%w", err)
+	}
+	h.sc = sc
 	domainParsedUrl, err := url.Parse(config.APIServer.PublicDomain)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse public domain '%s': %w", config.APIServer.PublicDomain, err)
@@ -97,7 +101,7 @@ func (h *UserHandler) Update(ctx *gin.Context) {
 	}
 
 	var err error
-	_, err = h.sc.CheckRequest(ctx, req)
+	_, err = h.sc.CheckRequestV2(ctx, req)
 	if err != nil {
 		slog.Error("failed to check sensitive request", slog.Any("error", err))
 		httpbase.BadRequest(ctx, fmt.Errorf("sensitive check failed: %w", err).Error())

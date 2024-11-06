@@ -13,6 +13,7 @@ import (
 	"opencsg.com/csghub-server/cmd/csghub-server/cmd/logscan"
 	"opencsg.com/csghub-server/cmd/csghub-server/cmd/migration"
 	"opencsg.com/csghub-server/cmd/csghub-server/cmd/mirror"
+	"opencsg.com/csghub-server/cmd/csghub-server/cmd/moderation"
 	"opencsg.com/csghub-server/cmd/csghub-server/cmd/start"
 	"opencsg.com/csghub-server/cmd/csghub-server/cmd/sync"
 	"opencsg.com/csghub-server/cmd/csghub-server/cmd/trigger"
@@ -58,6 +59,7 @@ func init() {
 		sync.Cmd,
 		user.Cmd,
 		git.Cmd,
+		moderation.Cmd,
 	)
 }
 

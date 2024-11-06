@@ -187,6 +187,22 @@ type Config struct {
 	Dataset struct {
 		PromptMaxJsonlFileSize int64 `envconfig:"OPENCSG_PROMPT_MAX_JSONL_FILESIZE_BYTES" default:"1048576"` // 1MB
 	}
+
+	Dataflow struct {
+		Host string `envconfig:"OPENCSG_DATAFLOW_SERVER_HOST" default:"http://127.0.0.1"`
+		Port int    `envconfig:"OPENCSG_DATAFLOW_SERVER_PORT" default:"8000"`
+	}
+
+	Moderation struct {
+		Host string `envconfig:"OPENCSG_MODERATION_SERVER_HOST" default:"http://localhost"`
+		Port int    `envconfig:"OPENCSG_MODERATION_SERVER_PORT" default:"8089"`
+		// comma splitted, and base64 encoded
+		EncodedSensitiveWords string `envconfig:"OPENCSG_MODERATION_SERVER_ENCODED_SENSITIVE_WORDS" default:"5Lmg6L+R5bmzLHhpamlucGluZw=="`
+	}
+
+	WorkFLow struct {
+		Endpoint string `envconfig:"OPENCSG_WORKFLOW_SERVER_ENDPOINT" default:"localhost:7233"`
+	}
 }
 
 func LoadConfig() (cfg *Config, err error) {

@@ -17,19 +17,23 @@ import (
 )
 
 func NewSpaceHandler(config *config.Config) (*SpaceHandler, error) {
-	sc, err := component.NewSpaceComponent(config)
+	c, err := component.NewSpaceComponent(config)
 	if err != nil {
 		return nil, err
 	}
+	ssc, err := component.NewSensitiveComponent(config)
+	if err != nil {
+		return nil, fmt.Errorf("error creating sensitive component:%w", err)
+	}
 	return &SpaceHandler{
-		c:  sc,
-		sc: component.NewSensitiveComponent(config),
+		c:   c,
+		ssc: ssc,
 	}, nil
 }
 
 type SpaceHandler struct {
-	c  *component.SpaceComponent
-	sc component.SensitiveChecker
+	c   *component.SpaceComponent
+	ssc *component.SensitiveComponent
 }
 
 // GetAllSpaces   godoc
@@ -151,7 +155,7 @@ func (h *SpaceHandler) Create(ctx *gin.Context) {
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
-	_, err := h.sc.CheckRequest(ctx, &req)
+	_, err := h.ssc.CheckRequestV2(ctx, &req)
 	if err != nil {
 		slog.Error("failed to check sensitive request", slog.Any("error", err))
 		httpbase.BadRequest(ctx, fmt.Errorf("sensitive check failed: %w", err).Error())
@@ -196,7 +200,7 @@ func (h *SpaceHandler) Update(ctx *gin.Context) {
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
-	_, err := h.sc.CheckRequest(ctx, req)
+	_, err := h.ssc.CheckRequestV2(ctx, req)
 	if err != nil {
 		slog.Error("failed to check sensitive request", slog.Any("error", err))
 		httpbase.BadRequest(ctx, fmt.Errorf("sensitive check failed: %w", err).Error())

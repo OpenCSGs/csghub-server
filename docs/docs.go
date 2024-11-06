@@ -15309,6 +15309,9 @@ const docTemplate = `{
                 "repository_type": {
                     "$ref": "#/definitions/types.RepositoryType"
                 },
+                "sensitive_check_status": {
+                    "$ref": "#/definitions/types.SensitiveCheckStatus"
+                },
                 "source": {
                     "$ref": "#/definitions/types.RepositorySource"
                 },
@@ -17640,6 +17643,30 @@ const docTemplate = `{
                     "type": "integer"
                 }
             }
+        },
+        "types.SensitiveCheckStatus": {
+            "type": "integer",
+            "enum": [
+                -1,
+                0,
+                1,
+                2,
+                3
+            ],
+            "x-enum-comments": {
+                "SensitiveCheckException": "error happen",
+                "SensitiveCheckFail": "sensitive content detected",
+                "SensitiveCheckPass": "pass",
+                "SensitiveCheckPending": "default",
+                "SensitiveCheckSkip": "skip"
+            },
+            "x-enum-varnames": [
+                "SensitiveCheckFail",
+                "SensitiveCheckPending",
+                "SensitiveCheckPass",
+                "SensitiveCheckSkip",
+                "SensitiveCheckException"
+            ]
         },
         "types.Space": {
             "type": "object",

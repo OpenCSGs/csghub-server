@@ -35,32 +35,50 @@ type UpdateUserRequest struct {
 	NewUserName *string `json:"new_username,omitempty"`
 }
 
-func (u *UpdateUserRequest) SensName() string {
+var _ SensitiveRequestV2 = (*UpdateUserRequest)(nil)
+
+func (u *UpdateUserRequest) GetSensitiveFields() []SensitiveField {
+	var fields []SensitiveField
 	if u.NewUserName != nil {
-		return *u.NewUserName
+		fields = append(fields, SensitiveField{
+			Name: "new_username",
+			Value: func() string {
+				return *u.NewUserName
+			},
+			Scenario: "nickname_detection",
+		})
 	}
-	return ""
-}
 
-func (u *UpdateUserRequest) SensNickName() string {
 	if u.Nickname != nil {
-		return *u.Nickname
+		fields = append(fields, SensitiveField{
+			Name: "nickname",
+			Value: func() string {
+				return *u.Nickname
+			},
+			Scenario: "nickname_detection",
+		})
 	}
-	return ""
-}
 
-func (u *UpdateUserRequest) SensDescription() string {
 	if u.Bio != nil {
-		return *u.Bio
+		fields = append(fields, SensitiveField{
+			Name: "bio",
+			Value: func() string {
+				return *u.Bio
+			},
+			Scenario: "comment_detection",
+		})
 	}
-	return ""
-}
 
-func (u *UpdateUserRequest) SensHomepage() string {
 	if u.Homepage != nil {
-		return *u.Homepage
+		fields = append(fields, SensitiveField{
+			Name: "homepage",
+			Value: func() string {
+				return *u.Homepage
+			},
+			Scenario: "chat_detection",
+		})
 	}
-	return ""
+	return fields
 }
 
 type UpdateUserResp struct {
@@ -78,20 +96,19 @@ type CreateUserTokenRequest struct {
 	ExpiredAt  time.Time `json:"expired_at"`
 }
 
-func (c *CreateUserTokenRequest) SensName() string {
-	return c.TokenName
-}
+// CreateUserTokenRequest implements SensitiveRequestV2
+var _ SensitiveRequestV2 = (*CreateUserTokenRequest)(nil)
 
-func (c *CreateUserTokenRequest) SensNickName() string {
-	return ""
-}
-
-func (c *CreateUserTokenRequest) SensDescription() string {
-	return ""
-}
-
-func (c *CreateUserTokenRequest) SensHomepage() string {
-	return ""
+func (c *CreateUserTokenRequest) GetSensitiveFields() []SensitiveField {
+	return []SensitiveField{
+		{
+			Name: "name",
+			Value: func() string {
+				return c.TokenName
+			},
+			Scenario: "nickname_detection",
+		},
+	}
 }
 
 type CheckAccessTokenReq struct {

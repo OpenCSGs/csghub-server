@@ -21,15 +21,19 @@ func NewCollectionHandler(cfg *config.Config) (*CollectionHandler, error) {
 	if err != nil {
 		return nil, err
 	}
+	sc, err := component.NewSensitiveComponent(cfg)
+	if err != nil {
+		return nil, fmt.Errorf("error creating sensitive component:%w", err)
+	}
 	return &CollectionHandler{
 		cc: cc,
-		sc: component.NewSensitiveComponent(cfg),
+		sc: sc,
 	}, nil
 }
 
 type CollectionHandler struct {
 	cc *component.CollectionComponent
-	sc component.SensitiveChecker
+	sc *component.SensitiveComponent
 }
 
 // GetCollections godoc
@@ -100,7 +104,7 @@ func (c *CollectionHandler) Create(ctx *gin.Context) {
 		return
 	}
 
-	_, err := c.sc.CheckRequest(ctx, req)
+	_, err := c.sc.CheckRequestV2(ctx, req)
 	if err != nil {
 		slog.Error("failed to check sensitive request", slog.Any("error", err))
 		httpbase.BadRequest(ctx, fmt.Errorf("sensitive check failed: %w", err).Error())
@@ -172,7 +176,7 @@ func (c *CollectionHandler) UpdateCollection(ctx *gin.Context) {
 		return
 	}
 
-	_, err := c.sc.CheckRequest(ctx, req)
+	_, err := c.sc.CheckRequestV2(ctx, req)
 	if err != nil {
 		slog.Error("failed to check sensitive request", slog.Any("error", err))
 		httpbase.BadRequest(ctx, fmt.Errorf("sensitive check failed: %w", err).Error())

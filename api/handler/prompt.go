@@ -21,7 +21,7 @@ import (
 
 type PromptHandler struct {
 	pc *component.PromptComponent
-	sc component.SensitiveChecker
+	sc *component.SensitiveComponent
 }
 
 func NewPromptHandler(cfg *config.Config) (*PromptHandler, error) {
@@ -29,9 +29,13 @@ func NewPromptHandler(cfg *config.Config) (*PromptHandler, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to create PromptComponent: %w", err)
 	}
+	sc, err := component.NewSensitiveComponent(cfg)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create SensitiveComponent: %w", err)
+	}
 	return &PromptHandler{
 		pc: promptComp,
-		sc: component.NewSensitiveComponent(cfg),
+		sc: sc,
 	}, nil
 }
 
@@ -949,7 +953,7 @@ func (h *PromptHandler) Create(ctx *gin.Context) {
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
-	_, err := h.sc.CheckRequest(ctx, req)
+	_, err := h.sc.CheckRequestV2(ctx, req)
 	if err != nil {
 		slog.Error("failed to check sensitive request", slog.Any("error", err))
 		httpbase.BadRequest(ctx, fmt.Errorf("sensitive check failed: %w", err).Error())
@@ -998,7 +1002,7 @@ func (h *PromptHandler) Update(ctx *gin.Context) {
 		return
 	}
 
-	_, err := h.sc.CheckRequest(ctx, req)
+	_, err := h.sc.CheckRequestV2(ctx, req)
 	if err != nil {
 		slog.Error("failed to check sensitive request", slog.Any("error", err))
 		httpbase.BadRequest(ctx, fmt.Errorf("sensitive check failed: %w", err).Error())

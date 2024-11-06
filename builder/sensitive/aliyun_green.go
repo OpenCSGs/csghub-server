@@ -66,13 +66,11 @@ func NewAliyunGreenChecker(config *config.Config) *AliyunGreenChecker {
 }
 
 // passLargeTextCheck splits large text into smaller `largeTextSize` bytes chunks and check them in batch
-func (c *AliyunGreenChecker) passLargeTextCheck(ctx context.Context, text string) (bool, error) {
+func (c *AliyunGreenChecker) passLargeTextCheck(ctx context.Context, text string) (*CheckResult, error) {
 	if len(text) > 100*largeTextSize {
-		return false, fmt.Errorf("text length can't be greater than 100*%d", largeTextSize)
+		return nil, fmt.Errorf("text length can't be greater than 100*%d", largeTextSize)
 	}
-	//指定检测对象，JSON数组中的每个元素是一个检测任务结构体。最多支持100个元素，即每次提交100条内容进行检测。如果您的业务需要更大的并发量，请联系客户经理申请并发扩容
 	tasks := c.splitTasks(text)
-	// scenes：检测场景，唯一取值：antispam。
 	content, _ := json.Marshal(
 		map[string]interface{}{
 			"scenes": [...]string{"antispam"},
@@ -85,13 +83,13 @@ func (c *AliyunGreenChecker) passLargeTextCheck(ctx context.Context, text string
 	textScanResponse, err := c.c.TextScan(textScanRequest)
 	if err != nil {
 		slog.Error("Failed to call TextScan", slog.Any("error", err))
-		return false, err
+		return nil, err
 	}
 	data := textScanResponse.GetHttpContentBytes()
 	resp := new(TextScanResponse)
 	err = json.Unmarshal(data, resp)
 	if err != nil {
-		return false, fmt.Errorf("error unmarshalling scan response: %w", err)
+		return nil, fmt.Errorf("error unmarshalling scan response: %w", err)
 	}
 	for _, data := range resp.Data {
 		for _, result := range data.Results {
@@ -100,20 +98,23 @@ func (c *AliyunGreenChecker) passLargeTextCheck(ctx context.Context, text string
 				continue
 			}
 
+			if result.Rate < 0.8 {
+				continue
+			}
+
 			if result.Suggestion == "block" {
 				slog.Info("block content", slog.String("content", common.TruncString(data.Content, 128)), slog.String("taskId", data.TaskId),
 					slog.String("aliyun_request_id", resp.RequestID))
 
-				return false, nil
+				return &CheckResult{IsSensitive: true, Reason: result.Label}, nil
 			}
 		}
 	}
 
-	slog.Info("large text check pass", slog.String("text", common.TruncString(text, 128)), slog.Int("size", len(text)))
-	return true, nil
+	return &CheckResult{IsSensitive: false}, nil
 }
 
-func (c *AliyunGreenChecker) PassTextCheck(ctx context.Context, scenario Scenario, text string) (bool, error) {
+func (c *AliyunGreenChecker) PassTextCheck(ctx context.Context, scenario Scenario, text string) (*CheckResult, error) {
 	if len(text) > smallTextSize {
 		slog.Info("switch to large text check", slog.String("scenario", string(scenario)), slog.Int("size", len(text)))
 		return c.passLargeTextCheck(ctx, text)
@@ -127,17 +128,17 @@ func (c *AliyunGreenChecker) PassTextCheck(ctx context.Context, scenario Scenari
 	resp, err := c.cip.TextModeration(textModerationRequest)
 	if err != nil {
 		slog.Error("fail to call aliyun TextModeration", slog.String("content", text), slog.Any("error", err))
-		return false, err
+		return nil, err
 	}
 
 	if *resp.StatusCode != http.StatusOK || *resp.Body.Code != 200 {
 		slog.Error("aliyun TextModeration return code not 200", slog.String("content", text),
 			slog.String("resp", resp.GoString()))
-		return false, errors.New(*resp.Body.Message)
+		return nil, errors.New(*resp.Body.Message)
 	}
 
 	if len(*resp.Body.Data.Labels) == 0 {
-		return true, nil
+		return &CheckResult{IsSensitive: false}, nil
 	}
 
 	labelStr := *resp.Body.Data.Labels
@@ -149,10 +150,10 @@ func (c *AliyunGreenChecker) PassTextCheck(ctx context.Context, scenario Scenari
 
 		slog.Info("sensitive content detected", slog.String("content", text),
 			slog.String("label", label), slog.String("aliyun_request_id", *resp.Body.RequestId))
-		return false, nil
+		return &CheckResult{IsSensitive: true, Reason: *resp.Body.Data.Reason}, nil
 	}
 
-	return true, nil
+	return &CheckResult{IsSensitive: false}, nil
 }
 
 func (*AliyunGreenChecker) splitTasks(text string) []map[string]string {
@@ -168,7 +169,7 @@ func (*AliyunGreenChecker) splitTasks(text string) []map[string]string {
 	return tasks
 }
 
-func (c *AliyunGreenChecker) PassImageCheck(ctx context.Context, scenario Scenario, ossBucketName, ossObjectName string) (bool, error) {
+func (c *AliyunGreenChecker) PassImageCheck(ctx context.Context, scenario Scenario, ossBucketName, ossObjectName string) (*CheckResult, error) {
 	serviceParameters, _ := json.Marshal(
 		map[string]interface{}{
 			"ossRegionId": tea.StringValue(c.cip.RegionId),
@@ -186,7 +187,7 @@ func (c *AliyunGreenChecker) PassImageCheck(ctx context.Context, scenario Scenar
 	if err != nil {
 		slog.Error("fail to call aliyun ImageModeration", slog.String("ossBucketName", ossBucketName),
 			slog.String("ossObjectName", ossObjectName), slog.Any("error", err))
-		return false, err
+		return nil, err
 	}
 	slog.Debug("aliyun ImageModeration return", slog.String("resp", resp.GoString()))
 
@@ -194,13 +195,13 @@ func (c *AliyunGreenChecker) PassImageCheck(ctx context.Context, scenario Scenar
 		slog.Error("aliyun ImageModeration return code not 200", slog.String("ossBucketName", ossBucketName),
 			slog.String("ossObjectName", ossObjectName),
 			slog.String("resp", resp.GoString()))
-		return false, errors.New(tea.StringValue(resp.Body.Msg))
+		return nil, errors.New(tea.StringValue(resp.Body.Msg))
 	}
 
 	result := resp.Body.Data.Result
 	//pass check
 	if len(result) == 0 && tea.StringValue(result[0].Label) == "nonLabel" {
-		return true, nil
+		return &CheckResult{IsSensitive: false}, nil
 	}
 
 	labelMap := make(map[string]float32)
@@ -212,11 +213,16 @@ func (c *AliyunGreenChecker) PassImageCheck(ctx context.Context, scenario Scenar
 	}
 	//pass check
 	if len(labelMap) == 0 {
-		return true, nil
+		return &CheckResult{IsSensitive: false}, nil
 	}
 
 	slog.Info("sensitive image detected", slog.String("scenario", string(scenario)), slog.String("ossBucketName", ossBucketName),
 		slog.String("ossObjectName", ossObjectName), slog.Any("labels", labelMap), slog.String("aliyun_request_id", *resp.Body.RequestId))
-	//TODO:return the labels if need in future
-	return false, nil
+	// get all the labels in labelMap and join them with ","
+	labels := []string{}
+	for label := range labelMap {
+		labels = append(labels, label)
+	}
+	labelStr := strings.Join(labels, ",")
+	return &CheckResult{IsSensitive: true, Reason: labelStr}, nil
 }

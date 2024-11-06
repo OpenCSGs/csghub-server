@@ -13,20 +13,32 @@ type CreateOrgReq struct {
 	OrgType     string `json:"org_type" example:"company or school etc"`
 }
 
-func (c *CreateOrgReq) SensName() string {
-	return c.Name
-}
+// CreateOrgReq implements SensitiveRequestV2
+var _ SensitiveRequestV2 = (*CreateOrgReq)(nil)
 
-func (c *CreateOrgReq) SensNickName() string {
-	return c.Nickname
-}
-
-func (c *CreateOrgReq) SensDescription() string {
-	return c.Description
-}
-
-func (c *CreateOrgReq) SensHomepage() string {
-	return c.Homepage
+func (c *CreateOrgReq) GetSensitiveFields() []SensitiveField {
+	return []SensitiveField{
+		{
+			Name:     "name",
+			Value:    func() string { return c.Name },
+			Scenario: "nickname_detection",
+		},
+		{
+			Name:     "nickname",
+			Value:    func() string { return c.Nickname },
+			Scenario: "nickname_detection",
+		},
+		{
+			Name:     "description",
+			Value:    func() string { return c.Description },
+			Scenario: "comment_detection",
+		},
+		{
+			Name:     "homepage",
+			Value:    func() string { return c.Homepage },
+			Scenario: "chat_detection",
+		},
+	}
 }
 
 type EditOrgReq struct {
@@ -43,30 +55,39 @@ type EditOrgReq struct {
 	CurrentUser string  `json:"-"`
 }
 
-func (e *EditOrgReq) SensName() string {
-	//skip check as name can not change
-	return ""
-}
+// EditOrgReq implements SensitiveRequestV2
+var _ SensitiveRequestV2 = (*EditOrgReq)(nil)
 
-func (e *EditOrgReq) SensNickName() string {
-	if e.Nickname == nil {
-		return ""
+func (e *EditOrgReq) GetSensitiveFields() []SensitiveField {
+	var fields []SensitiveField
+	if e.Nickname != nil {
+		fields = append(fields, SensitiveField{
+			Name: "nickname",
+			Value: func() string {
+				return *e.Nickname
+			},
+			Scenario: "nickname_detection",
+		})
 	}
-	return *e.Nickname
-}
-
-func (e *EditOrgReq) SensDescription() string {
-	if e.Description == nil {
-		return ""
+	if e.Description != nil {
+		fields = append(fields, SensitiveField{
+			Name: "description",
+			Value: func() string {
+				return *e.Description
+			},
+			Scenario: "comment_detection",
+		})
 	}
-	return *e.Description
-}
-
-func (e *EditOrgReq) SensHomepage() string {
-	if e.Homepage == nil {
-		return ""
+	if e.Homepage != nil {
+		fields = append(fields, SensitiveField{
+			Name: "homepage",
+			Value: func() string {
+				return *e.Homepage
+			},
+			Scenario: "chat_detection",
+		})
 	}
-	return *e.Homepage
+	return fields
 }
 
 type DeleteOrgReq struct {
