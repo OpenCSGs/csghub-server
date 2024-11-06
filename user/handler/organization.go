@@ -20,15 +20,19 @@ func NewOrganizationHandler(config *config.Config) (*OrganizationHandler, error)
 	if err != nil {
 		return nil, err
 	}
+	sc, err := apicomponent.NewSensitiveComponent(config)
+	if err != nil {
+		return nil, fmt.Errorf("error creating sensitive component:%w", err)
+	}
 	return &OrganizationHandler{
 		c:  oc,
-		sc: apicomponent.NewSensitiveComponent(config),
+		sc: sc,
 	}, nil
 }
 
 type OrganizationHandler struct {
 	c  *component.OrganizationComponent
-	sc apicomponent.SensitiveChecker
+	sc *apicomponent.SensitiveComponent
 }
 
 // CreateOrganization godoc
@@ -53,7 +57,7 @@ func (h *OrganizationHandler) Create(ctx *gin.Context) {
 		return
 	}
 	var err error
-	_, err = h.sc.CheckRequest(ctx, &req)
+	_, err = h.sc.CheckRequestV2(ctx, &req)
 	if err != nil {
 		slog.Error("failed to check sensitive request", slog.Any("error", err))
 		httpbase.BadRequest(ctx, fmt.Errorf("sensitive check failed: %w", err).Error())
@@ -184,7 +188,7 @@ func (h *OrganizationHandler) Update(ctx *gin.Context) {
 		return
 	}
 	var err error
-	_, err = h.sc.CheckRequest(ctx, &req)
+	_, err = h.sc.CheckRequestV2(ctx, &req)
 	if err != nil {
 		slog.Error("failed to check sensitive request", slog.Any("error", err))
 		httpbase.BadRequest(ctx, fmt.Errorf("sensitive check failed: %w", err).Error())

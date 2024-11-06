@@ -1,0 +1,38 @@
+### health check
+GET http://localhost:8089/api/v1/healthz HTTP/1.1
+
+### check whole repo sensitivity
+POST http://localhost:8089/api/v1/repo
+
+{
+    "repo_type":"dataset",
+    "namespace":"user_name_1",
+    "name":"test-dataset-leida2"
+}
+
+### check whole repo sensitivity
+POST http://localhost:8089/api/v1/repo
+
+{
+    "repo_type":"dataset",
+    "namespace":"user_name_1",
+    "name":"dataset_name_1"
+}
+
+### check text sensitivity
+POST http://localhost:8089/api/v1/text
+
+{
+    "scenario":"nickname_detection",
+    "text":"-共产党"
+}
+
+### check text sensitivity
+POST http://localhost:8089/api/v1/text
+
+{
+    "scenario":"chat_detection",
+    "text":"-共产党"
+}
+
+### "text":"ebicqyxasgycioysunfoqmrabmdltdapjeiegdlnwpdmloiuigepqhwusbavsktswxjgvzjanguocbrnbboajocpvwreztghlwlljefjbgcbqjofrhhcgpnbufmcxfclebicqyxasgycioysunfoqmrabmdltdapjeiegdlnwpdmloiuigepqhwusbavsktswxjgvzjanguocbrnbboajocpvwreztghlwlljefjbgcbqjofrhhcgpnbufmcxfclebicqyxasgycioysunfoqmrabmdltdapjeiegdlnwpdmloiuigepqhwusbavsktswxjgvzjanguocbrnbboajocpvwreztghlwlljefjbgcbqjofrhhcgpnbufmcxfclebicqyxasgycioysunfoqmrabmdltdapjeiegdlnwpdmloiuigepqhwusbavsktswxjgvzjanguocbrnbboajocpvwreztghlwlljefjbgcbqjofrhhcgpnbufmcxfcl-共产党"

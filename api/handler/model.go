@@ -22,7 +22,10 @@ func NewModelHandler(config *config.Config) (*ModelHandler, error) {
 	if err != nil {
 		return nil, err
 	}
-	sc := component.NewSensitiveComponent(config)
+	sc, err := component.NewSensitiveComponent(config)
+	if err != nil {
+		return nil, fmt.Errorf("error creating sensitive component:%w", err)
+	}
 	return &ModelHandler{
 		c:  uc,
 		sc: sc,
@@ -31,7 +34,7 @@ func NewModelHandler(config *config.Config) (*ModelHandler, error) {
 
 type ModelHandler struct {
 	c  *component.ModelComponent
-	sc component.SensitiveChecker
+	sc *component.SensitiveComponent
 }
 
 // GetVisiableModels godoc
@@ -123,7 +126,7 @@ func (h *ModelHandler) Create(ctx *gin.Context) {
 	}
 	req.Username = currentUser
 
-	_, err := h.sc.CheckRequest(ctx, req)
+	_, err := h.sc.CheckRequestV2(ctx, req)
 	if err != nil {
 		slog.Error("failed to check sensitive request", slog.Any("error", err))
 		httpbase.BadRequest(ctx, fmt.Errorf("sensitive check failed: %w", err).Error())
@@ -168,7 +171,7 @@ func (h *ModelHandler) Update(ctx *gin.Context) {
 		return
 	}
 
-	_, err := h.sc.CheckRequest(ctx, req)
+	_, err := h.sc.CheckRequestV2(ctx, req)
 	if err != nil {
 		slog.Error("failed to check sensitive request", slog.Any("error", err))
 		httpbase.BadRequest(ctx, fmt.Errorf("sensitive check failed: %w", err).Error())
@@ -631,7 +634,7 @@ func (h *ModelHandler) DeployDedicated(ctx *gin.Context) {
 		return
 	}
 
-	_, err = h.sc.CheckRequest(ctx, &req)
+	_, err = h.sc.CheckRequestV2(ctx, &req)
 	if err != nil {
 		slog.Error("failed to check sensitive request", slog.Any("error", err))
 		httpbase.BadRequest(ctx, fmt.Errorf("sensitive check failed: %w", err).Error())

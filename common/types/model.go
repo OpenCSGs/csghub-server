@@ -29,29 +29,29 @@ type UpdateRepoReq struct {
 }
 
 // make sure UpdateModelReq implements SensitiveRequest interface
-var _ SensitiveRequest = (*UpdateRepoReq)(nil)
+var _ SensitiveRequestV2 = (*UpdateRepoReq)(nil)
 
-func (c *UpdateRepoReq) SensName() string {
-	//dont need to check as name can not change
-	return ""
-}
-
-func (c *UpdateRepoReq) SensNickName() string {
-	if c.Nickname == nil {
-		return ""
+func (c *UpdateRepoReq) GetSensitiveFields() []SensitiveField {
+	var fields []SensitiveField
+	if c.Nickname != nil {
+		fields = append(fields, SensitiveField{
+			Name: "nickname",
+			Value: func() string {
+				return *c.Nickname
+			},
+			Scenario: "nickname_detection",
+		})
 	}
-	return *c.Nickname
-}
-
-func (c *UpdateRepoReq) SensDescription() string {
-	if c.Description == nil {
-		return ""
+	if c.Description != nil {
+		fields = append(fields, SensitiveField{
+			Name: "description",
+			Value: func() string {
+				return *c.Description
+			},
+			Scenario: "comment_detection",
+		})
 	}
-	return *c.Description
-}
-
-func (c *UpdateRepoReq) SensHomepage() string {
-	return ""
+	return fields
 }
 
 type UpdateDownloadsReq struct {
@@ -91,20 +91,32 @@ type CreateRepoReq struct {
 }
 
 // make sure CreateRepoReq implements SensitiveRequest
-var _ SensitiveRequest = (*CreateRepoReq)(nil)
+var _ SensitiveRequestV2 = (*CreateRepoReq)(nil)
 
-func (c *CreateRepoReq) SensName() string {
-	return c.Name
-}
-func (c *CreateRepoReq) SensNickName() string {
-	return c.Nickname
-}
-func (c *CreateRepoReq) SensDescription() string {
-	return c.Description
-}
-
-func (c *CreateRepoReq) SensHomepage() string {
-	return ""
+func (c *CreateRepoReq) GetSensitiveFields() []SensitiveField {
+	return []SensitiveField{
+		{
+			Name: "description",
+			Value: func() string {
+				return c.Description
+			},
+			Scenario: "comment_detection",
+		},
+		{
+			Name: "name",
+			Value: func() string {
+				return c.Name
+			},
+			Scenario: "nickname_detection",
+		},
+		{
+			Name: "nickname",
+			Value: func() string {
+				return c.Nickname
+			},
+			Scenario: "nickname_detection",
+		},
+	}
 }
 
 type DeleteRepoReq struct {
@@ -200,20 +212,18 @@ type ModelRunReq struct {
 	SecureLevel        int    `json:"secure_level"`
 }
 
-func (c *ModelRunReq) SensName() string {
-	return c.DeployName
-}
+var _ SensitiveRequestV2 = (*ModelRunReq)(nil)
 
-func (c *ModelRunReq) SensNickName() string {
-	return ""
-}
-
-func (c *ModelRunReq) SensDescription() string {
-	return ""
-}
-
-func (c *ModelRunReq) SensHomepage() string {
-	return ""
+func (c *ModelRunReq) GetSensitiveFields() []SensitiveField {
+	return []SensitiveField{
+		{
+			Name: "deploy_name",
+			Value: func() string {
+				return c.DeployName
+			},
+			Scenario: "nickname_detection",
+		},
+	}
 }
 
 type InstanceRunReq struct {
@@ -224,20 +234,18 @@ type InstanceRunReq struct {
 	Revision           string `json:"revision"`
 }
 
-func (c *InstanceRunReq) SensName() string {
-	return c.DeployName
-}
+var _ SensitiveRequestV2 = (*InstanceRunReq)(nil)
 
-func (c *InstanceRunReq) SensNickName() string {
-	return ""
-}
-
-func (c *InstanceRunReq) SensDescription() string {
-	return ""
-}
-
-func (c *InstanceRunReq) SensHomepage() string {
-	return ""
+func (c *InstanceRunReq) GetSensitiveFields() []SensitiveField {
+	return []SensitiveField{
+		{
+			Name: "deploy_name",
+			Value: func() string {
+				return c.DeployName
+			},
+			Scenario: "nickname_detection",
+		},
+	}
 }
 
 type ModelUpdateRequest struct {

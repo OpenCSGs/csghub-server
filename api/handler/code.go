@@ -20,15 +20,19 @@ func NewCodeHandler(config *config.Config) (*CodeHandler, error) {
 	if err != nil {
 		return nil, err
 	}
+	sc, err := component.NewSensitiveComponent(config)
+	if err != nil {
+		return nil, fmt.Errorf("error creating sensitive component:%w", err)
+	}
 	return &CodeHandler{
 		c:  tc,
-		sc: component.NewSensitiveComponent(config),
+		sc: sc,
 	}, nil
 }
 
 type CodeHandler struct {
 	c  *component.CodeComponent
-	sc component.SensitiveChecker
+	sc *component.SensitiveComponent
 }
 
 // CreateCode   godoc
@@ -57,7 +61,7 @@ func (h *CodeHandler) Create(ctx *gin.Context) {
 		return
 	}
 
-	_, err := h.sc.CheckRequest(ctx, req)
+	_, err := h.sc.CheckRequestV2(ctx, req)
 	if err != nil {
 		slog.Error("failed to check sensitive request", slog.Any("error", err))
 		httpbase.BadRequest(ctx, fmt.Errorf("sensitive check failed: %w", err).Error())
@@ -166,7 +170,7 @@ func (h *CodeHandler) Update(ctx *gin.Context) {
 		return
 	}
 
-	_, err := h.sc.CheckRequest(ctx, req)
+	_, err := h.sc.CheckRequestV2(ctx, req)
 	if err != nil {
 		slog.Error("failed to check sensitive request", slog.Any("error", err))
 		httpbase.BadRequest(ctx, fmt.Errorf("sensitive check failed: %w", err).Error())

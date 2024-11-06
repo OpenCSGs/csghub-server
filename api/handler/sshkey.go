@@ -17,15 +17,19 @@ func NewSSHKeyHandler(config *config.Config) (*SSHKeyHandler, error) {
 	if err != nil {
 		return nil, err
 	}
+	sc, err := component.NewSensitiveComponent(config)
+	if err != nil {
+		return nil, fmt.Errorf("error creating sensitive component:%w", err)
+	}
 	return &SSHKeyHandler{
 		c:  oc,
-		sc: component.NewSensitiveComponent(config),
+		sc: sc,
 	}, nil
 }
 
 type SSHKeyHandler struct {
 	c  *component.SSHKeyComponent
-	sc component.SensitiveChecker
+	sc *component.SensitiveComponent
 }
 
 // CreateUserSSHKey godoc
@@ -49,7 +53,7 @@ func (h *SSHKeyHandler) Create(ctx *gin.Context) {
 		return
 	}
 
-	_, err := h.sc.CheckRequest(ctx, &req)
+	_, err := h.sc.CheckRequestV2(ctx, &req)
 	if err != nil {
 		slog.Error("failed to check sensitive request", slog.Any("error", err))
 		httpbase.BadRequest(ctx, fmt.Errorf("sensitive check failed: %w", err).Error())

@@ -47,6 +47,7 @@ type RepoComponent struct {
 	org                *database.OrgStore
 	namespace          *database.NamespaceStore
 	repo               *database.RepoStore
+	repoFile           *database.RepoFileStore
 	rel                *database.RepoRelationsStore
 	mirror             *database.MirrorStore
 	git                gitserver.GitServer
@@ -82,6 +83,7 @@ func NewRepoComponent(config *config.Config) (*RepoComponent, error) {
 	c.user = database.NewUserStore()
 	c.org = database.NewOrgStore()
 	c.repo = database.NewRepoStore()
+	c.repoFile = database.NewRepoFileStore()
 	c.rel = database.NewRepoRelationsStore()
 	c.uls = database.NewUserLikesStore()
 	c.mirror = database.NewMirrorStore()

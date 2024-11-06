@@ -6,133 +6,70 @@ import (
 	"fmt"
 	"log/slog"
 
-	"opencsg.com/csghub-server/builder/sensitive"
+	"opencsg.com/csghub-server/builder/rpc"
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/types"
 )
 
-type SensitiveChecker interface {
-	CheckText(ctx context.Context, scenario, text string) (bool, error)
-	CheckImage(ctx context.Context, scenario, ossBucketName, ossObjectName string) (bool, error)
-	CheckRequest(ctx context.Context, req types.SensitiveRequest) (bool, error)
-	CheckRequestV2(ctx context.Context, req types.SensitiveRequestV2) (bool, error)
-}
-
 type SensitiveComponent struct {
-	checker sensitive.SensitiveChecker
+	checker rpc.ModerationSvcClient
+	enable  bool
 }
 
-type NopSensitiveComponent struct{}
+func NewSensitiveComponent(cfg *config.Config) (*SensitiveComponent, error) {
+	c := &SensitiveComponent{}
+	c.enable = cfg.SensitiveCheck.Enable
 
-func NewSensitiveComponent(cfg *config.Config) SensitiveChecker {
-	if cfg.SensitiveCheck.Enable {
-		return &SensitiveComponent{
-			checker: sensitive.NewAliyunGreenChecker(cfg),
-		}
-	} else {
-		return &NopSensitiveComponent{}
+	if c.enable {
+		c.checker = rpc.NewModerationSvcHttpClient(fmt.Sprintf("%s:%d", cfg.Moderation.Host, cfg.Moderation.Port))
 	}
+	return c, nil
 }
 
 func (c SensitiveComponent) CheckText(ctx context.Context, scenario, text string) (bool, error) {
-	var (
-		s  sensitive.Scenario
-		ok bool
-	)
-	if s, ok = s.FromString(scenario); !ok {
-		return false, fmt.Errorf("invalid scenario: %s", scenario)
+	if !c.enable {
+		return true, nil
 	}
-	return c.checker.PassTextCheck(ctx, s, text)
+
+	result, err := c.checker.PassTextCheck(ctx, scenario, text)
+	if err != nil {
+		return false, err
+	}
+
+	return !result.IsSensitive, nil
 }
 
 func (c SensitiveComponent) CheckImage(ctx context.Context, scenario, ossBucketName, ossObjectName string) (bool, error) {
-	var (
-		s  sensitive.Scenario
-		ok bool
-	)
-	if s, ok = s.FromString(scenario); !ok {
-		return false, fmt.Errorf("invalid scenario: %s", scenario)
+	if !c.enable {
+		return true, nil
 	}
-	return c.checker.PassImageCheck(ctx, s, ossBucketName, ossObjectName)
+
+	result, err := c.checker.PassImageCheck(ctx, scenario, ossBucketName, ossObjectName)
+	if err != nil {
+		return false, err
+	}
+	return !result.IsSensitive, nil
 }
 
-func (cc *SensitiveComponent) CheckRequest(ctx context.Context, req types.SensitiveRequest) (bool, error) {
-	if req.SensName() != "" {
-		pass, err := cc.checker.PassTextCheck(ctx, sensitive.ScenarioNicknameDetection, req.SensName())
-		if err != nil {
-			slog.Error("fail to check name sensitivity", slog.String("name", req.SensName()), slog.Any("error", err))
-			return false, fmt.Errorf("fail to check name sensitivity, error: %w", err)
-		}
-		if !pass {
-			slog.Error("found sensitive words in name", slog.String("name", req.SensName()))
-			return false, fmt.Errorf("found sensitive words in name")
-		}
-	}
-	if req.SensNickName() != "" {
-		pass, err := cc.checker.PassTextCheck(ctx, sensitive.ScenarioNicknameDetection, req.SensNickName())
-		if err != nil {
-			slog.Error("fail to check nick name sensitivity", slog.String("nick_name", req.SensNickName()), slog.Any("error", err))
-			return false, fmt.Errorf("fail to check nick name sensitivity, error: %w", err)
-		}
-		if !pass {
-			slog.Error("found sensitive words in nick name", slog.String("nick_name", req.SensNickName()))
-			return false, fmt.Errorf("found sensitive words in nick name")
-		}
-	}
-	if req.SensDescription() != "" {
-		pass, err := cc.checker.PassTextCheck(ctx, sensitive.ScenarioCommentDetection, req.SensDescription())
-		if err != nil {
-			slog.Error("fail to check description sensitivity", slog.String("description", req.SensDescription()), slog.Any("error", err))
-			return false, fmt.Errorf("fail to check description sensitivity, error: %w", err)
-		}
-		if !pass {
-			slog.Error("found sensitive words in description", slog.String("description", req.SensDescription()))
-			return false, errors.New("found sensitive words in description")
-		}
-	}
-	if req.SensHomepage() != "" {
-		pass, err := cc.checker.PassTextCheck(ctx, sensitive.ScenarioChatDetection, req.SensHomepage())
-		if err != nil {
-			slog.Error("fail to check homepage sensitivity", slog.String("homepage", req.SensHomepage()), slog.Any("error", err))
-			return false, fmt.Errorf("fail to check homepage sensitivity, error: %w", err)
-		}
-		if !pass {
-			slog.Error("found sensitive words in homepage", slog.String("homepage", req.SensHomepage()))
-			return false, errors.New("found sensitive words in homepage")
-		}
+func (c SensitiveComponent) CheckRequestV2(ctx context.Context, req types.SensitiveRequestV2) (bool, error) {
+	if !c.enable {
+		return true, nil
 	}
 
-	return true, nil
-}
-
-func (cc *SensitiveComponent) CheckRequestV2(ctx context.Context, req types.SensitiveRequestV2) (bool, error) {
 	fields := req.GetSensitiveFields()
 	for _, field := range fields {
-		pass, err := cc.checker.PassTextCheck(ctx, sensitive.Scenario(field.Scenario), field.Value())
+		if len(field.Value()) == 0 {
+			continue
+		}
+		result, err := c.checker.PassTextCheck(ctx, field.Scenario, field.Value())
 		if err != nil {
 			slog.Error("fail to check request sensitivity", slog.String("field", field.Name), slog.Any("error", err))
 			return false, fmt.Errorf("fail to check '%s' sensitivity, error: %w", field.Name, err)
 		}
-		if !pass {
+		if result.IsSensitive {
 			slog.Error("found sensitive words in request", slog.String("field", field.Name))
 			return false, errors.New("found sensitive words in field: " + field.Name)
 		}
 	}
-	return true, nil
-}
-
-func (c NopSensitiveComponent) CheckText(ctx context.Context, scenario, text string) (bool, error) {
-	return true, nil
-}
-
-func (c NopSensitiveComponent) CheckImage(ctx context.Context, scenario, ossBucketName, ossObjectName string) (bool, error) {
-	return true, nil
-}
-
-func (c NopSensitiveComponent) CheckRequest(ctx context.Context, req types.SensitiveRequest) (bool, error) {
-	return true, nil
-}
-
-func (c NopSensitiveComponent) CheckRequestV2(ctx context.Context, req types.SensitiveRequestV2) (bool, error) {
 	return true, nil
 }

@@ -6,18 +6,16 @@ type CreateSSHKeyRequest struct {
 	Content  string `json:"content"`
 }
 
-func (c *CreateSSHKeyRequest) SensName() string {
-	return c.Name
-}
+var _ SensitiveRequestV2 = (*CreateSSHKeyRequest)(nil)
 
-func (c *CreateSSHKeyRequest) SensNickName() string {
-	return ""
-}
-
-func (c *CreateSSHKeyRequest) SensDescription() string {
-	return ""
-}
-
-func (c *CreateSSHKeyRequest) SensHomepage() string {
-	return ""
+func (c *CreateSSHKeyRequest) GetSensitiveFields() []SensitiveField {
+	return []SensitiveField{
+		{
+			Name: "name",
+			Value: func() string {
+				return c.Content
+			},
+			Scenario: "nickname_detection",
+		},
+	}
 }

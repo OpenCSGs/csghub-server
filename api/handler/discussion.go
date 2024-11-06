@@ -16,12 +16,15 @@ import (
 
 type DiscussionHandler struct {
 	c  *component.DiscussionComponent
-	sc component.SensitiveChecker
+	sc *component.SensitiveComponent
 }
 
 func NewDiscussionHandler(cfg *config.Config) (*DiscussionHandler, error) {
 	c := component.NewDiscussionComponent()
-	sc := component.NewSensitiveComponent(cfg)
+	sc, err := component.NewSensitiveComponent(cfg)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create sensitive component: %w", err)
+	}
 	return &DiscussionHandler{
 		c:  c,
 		sc: sc,

@@ -63,20 +63,31 @@ type CreateCollectionReq struct {
 	Private     bool   `json:"private"`
 }
 
-func (c *CreateCollectionReq) SensName() string {
-	return c.Name
-}
-
-func (c *CreateCollectionReq) SensNickName() string {
-	return c.Nickname
-}
-
-func (c *CreateCollectionReq) SensDescription() string {
-	return c.Description
-}
-
-func (c *CreateCollectionReq) SensHomepage() string {
-	return ""
+// CreateCollectionReq implements SensitiveRequestV2
+func (c *CreateCollectionReq) GetSensitiveFields() []SensitiveField {
+	return []SensitiveField{
+		{
+			Name: "name",
+			Value: func() string {
+				return c.Name
+			},
+			Scenario: "nickname_detection",
+		},
+		{
+			Name: "nickname",
+			Value: func() string {
+				return c.Nickname
+			},
+			Scenario: "nickname_detection",
+		},
+		{
+			Name: "description",
+			Value: func() string {
+				return c.Description
+			},
+			Scenario: "comment_detection",
+		},
+	}
 }
 
 // NamespaceAndName returns namespace and name by parsing repository path

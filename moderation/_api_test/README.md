@@ -1,0 +1,1 @@
+install [`REST Client`](https://marketplace.visualstudio.com/items?itemName=humao.rest-client) plugin to run the test in `VSCode`

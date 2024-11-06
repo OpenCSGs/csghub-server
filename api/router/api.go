@@ -240,7 +240,10 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 	apiGroup.GET("/callback/casdoor", userProxyHandler.Proxy)
 	// Sensive check
 	if config.SensitiveCheck.Enable {
-		sensitiveCtrl := handler.NewSensitiveHandler(config)
+		sensitiveCtrl, err := handler.NewSensitiveHandler(config)
+		if err != nil {
+			return nil, fmt.Errorf("error creating sensitive handler:%w", err)
+		}
 		apiGroup.POST("/sensitive/text", sensitiveCtrl.Text)
 		apiGroup.POST("/sensitive/image", sensitiveCtrl.Image)
 	}

@@ -7,6 +7,7 @@ import (
 type RepositoryType string
 type RepositorySource string
 type RepositorySyncStatus string
+type SensitiveCheckStatus int
 
 const (
 	ResTypeKey  string = "hub-res-type"
@@ -28,6 +29,12 @@ const (
 	SyncStatusInProgress RepositorySyncStatus = "inprogress"
 	SyncStatusFailed     RepositorySyncStatus = "failed"
 	SyncStatusCompleted  RepositorySyncStatus = "completed"
+
+	SensitiveCheckFail      SensitiveCheckStatus = -1 //sensitive content detected
+	SensitiveCheckPending   SensitiveCheckStatus = 0  //default
+	SensitiveCheckPass      SensitiveCheckStatus = 1  //pass
+	SensitiveCheckSkip      SensitiveCheckStatus = 2  //skip
+	SensitiveCheckException SensitiveCheckStatus = 3  //error happen
 
 	EndpointPublic  int = 1 // public - anyone can access
 	EndpointPrivate int = 2 // private - access with read permission
