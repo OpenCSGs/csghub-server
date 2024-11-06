@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"fmt"
 	"log/slog"
 
 	"github.com/gin-gonic/gin"
@@ -10,13 +11,17 @@ import (
 )
 
 type SensitiveHandler struct {
-	c component.SensitiveChecker
+	c *component.SensitiveComponent
 }
 
-func NewSensitiveHandler(cfg *config.Config) *SensitiveHandler {
-	return &SensitiveHandler{
-		c: component.NewSensitiveComponent(cfg),
+func NewSensitiveHandler(cfg *config.Config) (*SensitiveHandler, error) {
+	sc, err := component.NewSensitiveComponent(cfg)
+	if err != nil {
+		return nil, fmt.Errorf("error creating sensitive component:%w", err)
 	}
+	return &SensitiveHandler{
+		c: sc,
+	}, nil
 }
 
 func (h *SensitiveHandler) Text(ctx *gin.Context) {

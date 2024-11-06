@@ -35,6 +35,11 @@ func (s Scenario) FromString(scenario string) (Scenario, bool) {
 }
 
 type SensitiveChecker interface {
-	PassTextCheck(ctx context.Context, scenario Scenario, text string) (bool, error)
-	PassImageCheck(ctx context.Context, scenario Scenario, ossBucketName, ossObjectName string) (bool, error)
+	PassTextCheck(ctx context.Context, scenario Scenario, text string) (*CheckResult, error)
+	PassImageCheck(ctx context.Context, scenario Scenario, ossBucketName, ossObjectName string) (*CheckResult, error)
+}
+
+type CheckResult struct {
+	IsSensitive bool   `json:"is_sensitive"`
+	Reason      string `json:"reason"`
 }

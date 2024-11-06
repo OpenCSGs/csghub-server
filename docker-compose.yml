@@ -70,7 +70,7 @@ services:
       - my_network
 
   starhub_server:
-    image: "opencsg/csghub-server"
+    image: "opencsg-registry.cn-beijing.cr.aliyuncs.com/opencsg_public/csghub_server:latest"
     depends_on:
       - postgres
       - gitea
@@ -125,7 +125,7 @@ services:
     restart: always
 
   account_server:
-    image: "opencsg/csghub-server"
+    image: "opencsg-registry.cn-beijing.cr.aliyuncs.com/opencsg_public/csghub_server:latest"
     entrypoint:
       - /starhub-bin/starhub
       - accounting

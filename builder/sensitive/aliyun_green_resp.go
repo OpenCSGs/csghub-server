@@ -1,6 +1,6 @@
 package sensitive
 
-type TextScanResponseDataItemRusult struct {
+type TextScanResponseDataItemResult struct {
 	Scene string `json:"scene"`
 	Label string `json:"label"`
 	//0~100
@@ -12,7 +12,7 @@ type TextScanResponseDataItem struct {
 	Code    int                              `json:"code"`
 	Msg     string                           `json:"msg"`
 	Content string                           `json:"content"`
-	Results []TextScanResponseDataItemRusult `json:"results"`
+	Results []TextScanResponseDataItemResult `json:"results"`
 	TaskId  string                           `json:"task_id"`
 }
 

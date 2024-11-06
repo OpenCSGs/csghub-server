@@ -14,6 +14,7 @@ func NewFileStore() *FileStore {
 	}
 }
 
+// File represents a file in a repository, *only used by multi-sync client*
 type File struct {
 	ID                int64       `bun:",pk,autoincrement" json:"id"`
 	Name              string      `json:"name"`

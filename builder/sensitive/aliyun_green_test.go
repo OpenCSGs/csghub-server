@@ -52,15 +52,15 @@ func Test_passLargeTextCheck(t *testing.T) {
 		},
 	)
 
-	success, err := c.passLargeTextCheck(context.Background(), string(content))
+	result, err := c.passLargeTextCheck(context.Background(), string(content))
 
 	if err != nil {
 		t.Log(err.Error())
 		t.FailNow()
 	}
 
-	if !success {
-		t.Log("success", success)
+	if result.IsSensitive {
+		t.Log("success", result)
 		t.FailNow()
 	}
 }
@@ -74,11 +74,11 @@ func Test_PassTextCheck(t *testing.T) {
 	cfg.SensitiveCheck.Enable = true
 	c := NewAliyunGreenChecker(cfg)
 	content := "http://github.com/repo"
-	pass, err := c.PassTextCheck(context.Background(), ScenarioCommentDetection, content)
+	result, err := c.PassTextCheck(context.Background(), ScenarioCommentDetection, content)
 	if err != nil {
 		t.Fail()
 	}
-	if !pass {
+	if result.IsSensitive {
 		t.Log("fail")
 		t.FailNow()
 	}

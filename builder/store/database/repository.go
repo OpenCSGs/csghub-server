@@ -43,19 +43,20 @@ type Repository struct {
 	Labels  string `bun:",nullzero" json:"labels"`
 	License string `bun:",nullzero" json:"license"`
 	// Depreated
-	Readme         string                     `bun:",nullzero" json:"readme"`
-	DefaultBranch  string                     `bun:",notnull" json:"default_branch"`
-	LfsFiles       []LfsFile                  `bun:"rel:has-many,join:id=repository_id" json:"-"`
-	Likes          int64                      `bun:",nullzero" json:"likes"`
-	DownloadCount  int64                      `bun:",nullzero" json:"download_count"`
-	Downloads      []RepositoryDownload       `bun:"rel:has-many,join:id=repository_id" json:"downloads"`
-	Tags           []Tag                      `bun:"m2m:repository_tags,join:Repository=Tag" json:"tags"`
-	Mirror         Mirror                     `bun:"rel:has-one,join:id=repository_id" json:"mirror"`
-	RepositoryType types.RepositoryType       `bun:",notnull" json:"repository_type"`
-	HTTPCloneURL   string                     `bun:",nullzero" json:"http_clone_url"`
-	SSHCloneURL    string                     `bun:",nullzero" json:"ssh_clone_url"`
-	Source         types.RepositorySource     `bun:",nullzero,default:'local'" json:"source"`
-	SyncStatus     types.RepositorySyncStatus `bun:",nullzero" json:"sync_status"`
+	Readme               string                     `bun:",nullzero" json:"readme"`
+	DefaultBranch        string                     `bun:",notnull" json:"default_branch"`
+	LfsFiles             []LfsFile                  `bun:"rel:has-many,join:id=repository_id" json:"-"`
+	Likes                int64                      `bun:",nullzero" json:"likes"`
+	DownloadCount        int64                      `bun:",nullzero" json:"download_count"`
+	Downloads            []RepositoryDownload       `bun:"rel:has-many,join:id=repository_id" json:"downloads"`
+	Tags                 []Tag                      `bun:"m2m:repository_tags,join:Repository=Tag" json:"tags"`
+	Mirror               Mirror                     `bun:"rel:has-one,join:id=repository_id" json:"mirror"`
+	RepositoryType       types.RepositoryType       `bun:",notnull" json:"repository_type"`
+	HTTPCloneURL         string                     `bun:",nullzero" json:"http_clone_url"`
+	SSHCloneURL          string                     `bun:",nullzero" json:"ssh_clone_url"`
+	Source               types.RepositorySource     `bun:",nullzero,default:'local'" json:"source"`
+	SyncStatus           types.RepositorySyncStatus `bun:",nullzero" json:"sync_status"`
+	SensitiveCheckStatus types.SensitiveCheckStatus `bun:",default:0" json:"sensitive_check_status"`
 	// updated_at timestamp will be updated only if files changed
 	times
 }
@@ -616,6 +617,22 @@ func (s *RepoStore) GetRepoWithRuntimeByID(ctx context.Context, rfID int64, path
 		Scan(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("select repos with runtime failed, %w", err)
+	}
+	return res, nil
+}
+
+func (s *RepoStore) BatchGet(ctx context.Context, repoType types.RepositoryType, lastRepoID int64, batch int) ([]Repository, error) {
+	var res []Repository
+	q := s.db.Operator.Core.NewSelect().Model(&res)
+	if lastRepoID > 0 {
+		q.Where("id > ?", lastRepoID)
+	}
+	err := q.Where("repository_type = ? and sensitive_check_status = ?", repoType, types.SensitiveCheckPending).
+		Order("id ASC").
+		Limit(batch).
+		Scan(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("select repos failed, last_repo_id: %d, batch: %d, %w", lastRepoID, batch, err)
 	}
 	return res, nil
 }

@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"slices"
 
+	"opencsg.com/csghub-server/builder/rpc"
 	"opencsg.com/csghub-server/builder/sensitive"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/config"
@@ -17,14 +18,16 @@ func NewTagComponent(config *config.Config) (*TagComponent, error) {
 	tc := &TagComponent{}
 	tc.ts = database.NewTagStore()
 	tc.rs = database.NewRepoStore()
-	tc.sensitiveChecker = NewSensitiveComponent(config)
+	if config.SensitiveCheck.Enable {
+		tc.sensitiveChecker = rpc.NewModerationSvcHttpClient(fmt.Sprintf("%s:%d", config.Moderation.Host, config.Moderation.Port))
+	}
 	return tc, nil
 }
 
 type TagComponent struct {
 	ts               *database.TagStore
 	rs               *database.RepoStore
-	sensitiveChecker SensitiveChecker
+	sensitiveChecker rpc.ModerationSvcClient
 }
 
 func (tc *TagComponent) AllTags(ctx context.Context) ([]database.Tag, error) {
@@ -67,8 +70,12 @@ func (c *TagComponent) UpdateMetaTags(ctx context.Context, tagScope database.Tag
 		// TODO:do tag name sensitive checking in batch
 		// remove sensitive tags by checking tag name of tag to create
 		tagToCreate = slices.DeleteFunc(tagToCreate, func(t *database.Tag) bool {
-			pass, _ := c.sensitiveChecker.CheckText(ctx, string(sensitive.ScenarioNicknameDetection), t.Name)
-			return !pass
+			result, err := c.sensitiveChecker.PassTextCheck(ctx, string(sensitive.ScenarioNicknameDetection), t.Name)
+			if err != nil {
+				slog.Error("Failed to check tag name sensitivity", slog.String("tag_name", t.Name), slog.Any("error", err))
+				return true
+			}
+			return result.IsSensitive
 		})
 	}
 

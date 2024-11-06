@@ -86,7 +86,11 @@ func NewDatasetComponent(config *config.Config) (*DatasetComponent, error) {
 	var err error
 	c.RepoComponent, err = NewRepoComponent(config)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to create repo component, error: %w", err)
+	}
+	c.sc, err = NewSensitiveComponent(config)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create sensitive component, error: %w", err)
 	}
 	return c, nil
 }
@@ -96,6 +100,7 @@ type DatasetComponent struct {
 	ts *database.TagStore
 	ds *database.DatasetStore
 	rs *database.RepoStore
+	sc *SensitiveComponent
 }
 
 func (c *DatasetComponent) Create(ctx context.Context, req *types.CreateDatasetReq) (*types.Dataset, error) {
@@ -257,7 +262,7 @@ func (c *DatasetComponent) commonIndex(ctx context.Context, filter *types.RepoFi
 		return nil, 0, newError
 	}
 
-	//loop through repos to keep the repos in sort order
+	// loop through repos to keep the repos in sort order
 	for _, repo := range repos {
 		var dataset *database.Dataset
 		for _, d := range datasets {

@@ -11,6 +11,7 @@ import (
 
 	"opencsg.com/csghub-server/builder/git"
 	"opencsg.com/csghub-server/builder/git/gitserver"
+	"opencsg.com/csghub-server/builder/rpc"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/types"
@@ -19,23 +20,23 @@ import (
 
 // define GitCallbackComponent struct
 type GitCallbackComponent struct {
-	config      *config.Config
-	gs          gitserver.GitServer
-	tc          *component.TagComponent
-	checker     component.SensitiveChecker
-	ms          *database.ModelStore
-	ds          *database.DatasetStore
-	sc          *component.SpaceComponent
-	ss          *database.SpaceStore
-	rs          *database.RepoStore
-	rrs         *database.RepoRelationsStore
-	mirrorStore *database.MirrorStore
-	svGen       *SyncVersionGenerator
-	rrf         *database.RepositoriesRuntimeFrameworkStore
-	rac         *component.RuntimeArchitectureComponent
-	ras         *database.RuntimeArchitecturesStore
-	rfs         *database.RuntimeFrameworksStore
-	ts          *database.TagStore
+	config       *config.Config
+	gs           gitserver.GitServer
+	tc           *component.TagComponent
+	modSvcClient rpc.ModerationSvcClient
+	ms           *database.ModelStore
+	ds           *database.DatasetStore
+	sc           *component.SpaceComponent
+	ss           *database.SpaceStore
+	rs           *database.RepoStore
+	rrs          *database.RepoRelationsStore
+	mirrorStore  *database.MirrorStore
+	svGen        *SyncVersionGenerator
+	rrf          *database.RepositoriesRuntimeFrameworkStore
+	rac          *component.RuntimeArchitectureComponent
+	ras          *database.RuntimeArchitecturesStore
+	rfs          *database.RuntimeFrameworksStore
+	ts           *database.TagStore
 	// set visibility if file content is sensitive
 	setRepoVisibility bool
 	pp                *component.PromptComponent
@@ -58,7 +59,6 @@ func NewGitCallback(config *config.Config) (*GitCallbackComponent, error) {
 	rs := database.NewRepoStore()
 	rrs := database.NewRepoRelationsStore()
 	mirrorStore := database.NewMirrorStore()
-	checker := component.NewSensitiveComponent(config)
 	sc, err := component.NewSpaceComponent(config)
 	ras := database.NewRuntimeArchitecturesStore()
 	if err != nil {
@@ -76,26 +76,30 @@ func NewGitCallback(config *config.Config) (*GitCallbackComponent, error) {
 	if err != nil {
 		return nil, err
 	}
+	var modSvcClient rpc.ModerationSvcClient
+	if config.SensitiveCheck.Enable {
+		modSvcClient = rpc.NewModerationSvcHttpClient(fmt.Sprintf("%s:%d", config.Moderation.Host, config.Moderation.Port))
+	}
 	return &GitCallbackComponent{
-		config:      config,
-		gs:          gs,
-		tc:          tc,
-		ms:          ms,
-		ds:          ds,
-		ss:          ss,
-		sc:          sc,
-		rs:          rs,
-		rrs:         rrs,
-		mirrorStore: mirrorStore,
-		checker:     checker,
-		svGen:       svGen,
-		rrf:         rrf,
-		rac:         rac,
-		ras:         ras,
-		rfs:         rfs,
-		ts:          ts,
-		pp:          pp,
-		maxPromptFS: config.Dataset.PromptMaxJsonlFileSize,
+		config:       config,
+		gs:           gs,
+		tc:           tc,
+		ms:           ms,
+		ds:           ds,
+		ss:           ss,
+		sc:           sc,
+		rs:           rs,
+		rrs:          rrs,
+		mirrorStore:  mirrorStore,
+		modSvcClient: modSvcClient,
+		svGen:        svGen,
+		rrf:          rrf,
+		rac:          rac,
+		ras:          ras,
+		rfs:          rfs,
+		pp:           pp,
+		ts:           ts,
+		maxPromptFS:  config.Dataset.PromptMaxJsonlFileSize,
 	}, nil
 }
 
@@ -134,11 +138,11 @@ func (c *GitCallbackComponent) HandlePush(ctx context.Context, req *types.GiteaC
 	splits := strings.Split(req.Repository.FullName, "/")
 	fullNamespace, repoName := splits[0], splits[1]
 	repoType, namespace, _ := strings.Cut(fullNamespace, "_")
+	adjustedRepoType := types.RepositoryType(strings.TrimRight(repoType, "s"))
 
 	go func() {
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
-		adjustedRepoType := types.RepositoryType(strings.TrimRight(repoType, "s"))
 
 		isMirrorRepo, err := c.rs.IsMirrorRepo(ctx, adjustedRepoType, namespace, repoName)
 		if err != nil {
@@ -183,6 +187,14 @@ func (c *GitCallbackComponent) HandlePush(ctx context.Context, req *types.GiteaC
 		return err
 	}
 
+	if c.modSvcClient != nil {
+		err = c.modSvcClient.SubmitRepoCheck(ctx, adjustedRepoType, namespace, repoName)
+	}
+	if err != nil {
+		slog.Error("fail to submit repo sensitive check", slog.Any("error", err), slog.Any("repo_type", adjustedRepoType), slog.String("namespace", namespace), slog.String("name", repoName))
+		return err
+	}
+
 	return nil
 }
 
@@ -200,21 +212,6 @@ func (c *GitCallbackComponent) modifyFiles(ctx context.Context, repoType, namesp
 		content, err := c.getFileRaw(repoType, namespace, repoName, ref, fileName)
 		if err != nil {
 			return err
-		}
-		if c.setRepoVisibility {
-			go func(content string) {
-				ok, err := c.checkFileContent(ctx, repoType, namespace, repoName, content)
-				if err != nil {
-					slog.Error("callback check file failed", slog.String("repo", path.Join(namespace, repoName)), slog.String("file", fileName),
-						slog.String("error", err.Error()))
-					return
-				}
-				if !ok {
-					err := fmt.Errorf("sensitie context detected. Set %s %s/%s to private", repoType, namespace, repoName)
-					slog.Error(err.Error())
-					return
-				}
-			}(content)
 		}
 		// should be only one README.md
 		return c.updateMetaTags(ctx, repoType, namespace, repoName, ref, content)
@@ -279,20 +276,6 @@ func (c *GitCallbackComponent) addFiles(ctx context.Context, repoType, namespace
 			content, err := c.getFileRaw(repoType, namespace, repoName, ref, fileName)
 			if err != nil {
 				return err
-			}
-			if c.setRepoVisibility {
-				go func(content string) {
-					ok, err := c.checkFileContent(ctx, repoType, namespace, repoName, content)
-					if err != nil {
-						slog.Error("callback check file failed", slog.String("file", fileName), slog.String("error", err.Error()))
-						return
-					}
-					if !ok {
-						err := fmt.Errorf("sensitie contest detected. Set %s %s/%s to private", repoType, namespace, repoName)
-						slog.Error(err.Error())
-						return
-					}
-				}(content)
 			}
 			err = c.updateMetaTags(ctx, repoType, namespace, repoName, ref, content)
 			if err != nil {
@@ -381,74 +364,6 @@ func (c *GitCallbackComponent) getFileRaw(repoType, namespace, repoName, ref, fi
 		slog.String("file", fileName), slog.String("repo", repoName), slog.String("ref", ref))
 
 	return content, nil
-}
-
-func (c *GitCallbackComponent) checkFileContent(ctx context.Context, repoType, namespace, repoName, content string) (bool, error) {
-	ok, err := c.checkText(ctx, content)
-	if err != nil {
-		return ok, err
-	}
-
-	if !ok {
-		slog.Info("sensitive content detected, set repo to private", slog.String("repo", path.Join(namespace, repoName)))
-		err := c.setPrivate(ctx, repoType, namespace, repoName)
-		if err != nil {
-			return ok, err
-		}
-	}
-	return ok, nil
-}
-
-func (c *GitCallbackComponent) checkText(ctx context.Context, content string) (bool, error) {
-	return c.checker.CheckText(ctx, "comment_detection", content)
-}
-
-func (c *GitCallbackComponent) setPrivate(ctx context.Context, repoType, namespace, repoName string) error {
-	var err error
-	var dataset *database.Dataset
-	var model *database.Model
-	if repoType == fmt.Sprintf("%ss", types.DatasetRepo) {
-		dataset, err = c.ds.FindByPath(ctx, namespace, repoName)
-		if err != nil {
-			slog.Error("Failed to find dataset", slog.String("namespace", namespace), slog.String("name", repoName))
-			return fmt.Errorf("failed to find dataset, error: %w", err)
-		}
-		_, err = c.gs.UpdateRepo(ctx, gitserver.UpdateRepoReq{
-			Name:          dataset.Repository.Name,
-			Description:   dataset.Repository.Description,
-			Private:       true,
-			DefaultBranch: dataset.Repository.DefaultBranch,
-		})
-		if err != nil {
-			return fmt.Errorf("failed to update git server dataset to private, error: %w", err)
-		}
-		err = c.ds.Update(ctx, *dataset)
-		if err != nil {
-			return fmt.Errorf("failed to update database dataset to private, error: %w", err)
-		}
-	} else {
-		model, err = c.ms.FindByPath(ctx, namespace, repoName)
-		if err != nil {
-			return fmt.Errorf("failed to find model by path, error: %w", err)
-		}
-		_, err = c.gs.UpdateRepo(ctx, gitserver.UpdateRepoReq{
-			Name:          model.Repository.Name,
-			Description:   model.Repository.Description,
-			Private:       true,
-			DefaultBranch: model.Repository.DefaultBranch,
-		})
-		if err != nil {
-			return fmt.Errorf("failed to update git server model to private, error: %w", err)
-		}
-		_, err = c.ms.Update(ctx, *model)
-		if err != nil {
-			return fmt.Errorf("failed to update database model to private, error: %w", err)
-		}
-	}
-	slog.Info("set repository to private successed.", slog.String("repoType", repoType), slog.String("namespace", namespace),
-		slog.String("repo", repoName))
-
-	return err
 }
 
 func (c *GitCallbackComponent) updateModelRuntimeFrameworks(ctx context.Context, repoType, namespace, repoName, ref, fileName string, deleteAction bool) {
