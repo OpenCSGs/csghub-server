@@ -39,6 +39,8 @@ jobs:
         images: |
           opencsg/csghub-server
           ${{ secrets.ACR_REGISTRY }}/opencsg_public/csghub_server
+        tags: |
+          type=semver,pattern={{raw}}
           
     - name: Build and push Docker image
       uses: docker/build-push-action@v6
