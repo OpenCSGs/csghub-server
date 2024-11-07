@@ -16643,6 +16643,9 @@ const docTemplate = `{
                 "likes": {
                     "type": "integer"
                 },
+                "mirror_last_updated_at": {
+                    "type": "string"
+                },
                 "name": {
                     "type": "string"
                 },
@@ -17086,6 +17089,9 @@ const docTemplate = `{
                 },
                 "likes": {
                     "type": "integer"
+                },
+                "mirror_last_updated_at": {
+                    "type": "string"
                 },
                 "name": {
                     "type": "string"

@@ -174,6 +174,7 @@ func (s *ModelStore) FindByPath(ctx context.Context, namespace string, name stri
 		NewSelect().
 		Model(resModel).
 		Relation("Repository.User").
+		Relation("Repository.Mirror").
 		Where("repository.path =?", fmt.Sprintf("%s/%s", namespace, name)).
 		Limit(1).
 		Scan(ctx)
