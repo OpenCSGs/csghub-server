@@ -128,9 +128,9 @@ func (w *LocalMirrorWoker) SyncRepo(ctx context.Context, task queue.MirrorTask) 
 	if err != nil {
 		mirror.Status = types.MirrorFailed
 		mirror.LastMessage = fmt.Sprintf("failed mirror remote repo in git server:%s", err.Error())
-		err = w.mirrorStore.Update(ctx, mirror)
-		if err != nil {
-			return fmt.Errorf("failed to update mirror: %w", err)
+		updateErr := w.mirrorStore.Update(ctx, mirror)
+		if updateErr != nil {
+			return fmt.Errorf("failed to update mirror: %w", updateErr)
 		}
 		return fmt.Errorf("failed mirror remote repo in git server: %v", err)
 	}
