@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/uptrace/bun"
 	"opencsg.com/csghub-server/common/types"
 )
 
@@ -282,4 +283,19 @@ func (s *MirrorStore) IndexWithPagination(ctx context.Context, per, page int) (m
 	}
 
 	return
+}
+
+func (s *MirrorStore) UpdateMirrorAndRepository(ctx context.Context, mirror *Mirror, repo *Repository) error {
+	err := s.db.Operator.Core.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
+		_, err := tx.NewUpdate().Model(mirror).WherePK().Exec(ctx)
+		if err != nil {
+			return fmt.Errorf("failed to update mirror: %v", err)
+		}
+		_, err = tx.NewUpdate().Model(repo).WherePK().Exec(ctx)
+		if err != nil {
+			return fmt.Errorf("failed to update repository: %v", err)
+		}
+		return nil
+	})
+	return err
 }
