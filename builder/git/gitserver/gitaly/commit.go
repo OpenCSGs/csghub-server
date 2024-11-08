@@ -96,7 +96,7 @@ func (c *Client) GetRepoLastCommit(ctx context.Context, req gitserver.GetRepoLas
 	if err != nil {
 		return nil, err
 	}
-	if resp != nil {
+	if resp != nil && resp.Commit != nil {
 		commit = types.Commit{
 			ID:             string(resp.Commit.Id),
 			CommitterName:  string(resp.Commit.Committer.Name),
