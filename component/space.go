@@ -12,6 +12,7 @@ import (
 	"opencsg.com/csghub-server/builder/deploy"
 	"opencsg.com/csghub-server/builder/deploy/scheduler"
 	"opencsg.com/csghub-server/builder/git/gitserver"
+	"opencsg.com/csghub-server/builder/git/membership"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/types"
@@ -375,6 +376,48 @@ func (c *SpaceComponent) Index(ctx context.Context, filter *types.RepoFilter, pe
 			SyncStatus:    repo.SyncStatus,
 		})
 	}
+	return resSpaces, total, nil
+}
+
+func (c *SpaceComponent) OrgSpaces(ctx context.Context, req *types.OrgSpacesReq) ([]types.Space, int, error) {
+	var resSpaces []types.Space
+	var err error
+	r := membership.RoleUnkown
+	if req.CurrentUser != "" {
+		r, err = c.userSvcClient.GetMemberRole(ctx, req.Namespace, req.CurrentUser)
+		// log error, and treat user as unkown role in org
+		if err != nil {
+			slog.Error("faild to get member role",
+				slog.String("org", req.Namespace), slog.String("user", req.CurrentUser),
+				slog.String("error", err.Error()))
+		}
+	}
+	onlyPublic := !r.CanRead()
+	spaces, total, err := c.ss.ByOrgPath(ctx, req.Namespace, req.PageSize, req.Page, onlyPublic)
+	if err != nil {
+		newError := fmt.Errorf("failed to get org spaces,error:%w", err)
+		slog.Error(newError.Error())
+		return nil, 0, newError
+	}
+
+	for _, data := range spaces {
+		_, status, _ := c.status(ctx, &data)
+		resSpaces = append(resSpaces, types.Space{
+			ID:            data.ID,
+			Name:          data.Repository.Name,
+			Nickname:      data.Repository.Nickname,
+			Description:   data.Repository.Description,
+			Likes:         data.Repository.Likes,
+			Path:          data.Repository.Path,
+			Private:       data.Repository.Private,
+			CreatedAt:     data.CreatedAt,
+			UpdatedAt:     data.Repository.UpdatedAt,
+			RepositoryID:  data.Repository.ID,
+			CoverImageUrl: data.CoverImageUrl,
+			Status:        status,
+		})
+	}
+
 	return resSpaces, total, nil
 }
 

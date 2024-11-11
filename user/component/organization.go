@@ -2,14 +2,12 @@ package component
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
 
 	"opencsg.com/csghub-server/builder/git"
 	"opencsg.com/csghub-server/builder/git/gitserver"
-	"opencsg.com/csghub-server/builder/git/membership"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/types"
@@ -20,11 +18,6 @@ func NewOrganizationComponent(config *config.Config) (*OrganizationComponent, er
 	c.os = database.NewOrgStore()
 	c.ns = database.NewNamespaceStore()
 	c.us = database.NewUserStore()
-	c.ds = database.NewDatasetStore()
-	c.ms = database.NewModelStore()
-	c.cs = database.NewCodeStore()
-	c.ss = database.NewSpaceStore()
-	c.cos = database.NewCollectionStore()
 	var err error
 	c.gs, err = git.NewGitServer(config)
 	if err != nil {
@@ -42,15 +35,10 @@ func NewOrganizationComponent(config *config.Config) (*OrganizationComponent, er
 }
 
 type OrganizationComponent struct {
-	os  *database.OrgStore
-	ns  *database.NamespaceStore
-	us  *database.UserStore
-	ds  *database.DatasetStore
-	ms  *database.ModelStore
-	cs  *database.CodeStore
-	ss  *database.SpaceStore
-	gs  gitserver.GitServer
-	cos *database.CollectionStore
+	os *database.OrgStore
+	ns *database.NamespaceStore
+	us *database.UserStore
+	gs gitserver.GitServer
 
 	msc *MemberComponent
 }
@@ -233,190 +221,4 @@ func (c *OrganizationComponent) Update(ctx context.Context, req *types.EditOrgRe
 		return nil, fmt.Errorf("failed to update git organization, error: %w", err)
 	}
 	return &org, err
-}
-
-func (c *OrganizationComponent) Models(ctx context.Context, req *types.OrgModelsReq) ([]types.Model, int, error) {
-	var resModels []types.Model
-	var err error
-	r := membership.RoleUnkown
-	if req.CurrentUser != "" {
-		r, err = c.msc.GetMemberRole(ctx, req.Namespace, req.CurrentUser)
-		// log error, and treat user as unkown role in org
-		if err != nil {
-			slog.Error("faild to get member role",
-				slog.String("org", req.Namespace), slog.String("user", req.CurrentUser),
-				slog.String("error", err.Error()))
-		}
-	}
-	onlyPublic := !r.CanRead()
-	ms, total, err := c.ms.ByOrgPath(ctx, req.Namespace, req.PageSize, req.Page, onlyPublic)
-	if err != nil {
-		newError := fmt.Errorf("failed to get user datasets,error:%w", err)
-		slog.Error(newError.Error())
-		return nil, 0, newError
-	}
-
-	for _, data := range ms {
-		resModels = append(resModels, types.Model{
-			ID:           data.ID,
-			Name:         data.Repository.Name,
-			Nickname:     data.Repository.Nickname,
-			Description:  data.Repository.Description,
-			Likes:        data.Repository.Likes,
-			Downloads:    data.Repository.DownloadCount,
-			Path:         data.Repository.Path,
-			RepositoryID: data.RepositoryID,
-			Private:      data.Repository.Private,
-			CreatedAt:    data.CreatedAt,
-			UpdatedAt:    data.Repository.UpdatedAt,
-		})
-	}
-
-	return resModels, total, nil
-}
-
-func (c *OrganizationComponent) Datasets(ctx context.Context, req *types.OrgDatasetsReq) ([]types.Dataset, int, error) {
-	var resDatasets []types.Dataset
-	var err error
-	r := membership.RoleUnkown
-	if req.CurrentUser != "" {
-		r, err = c.msc.GetMemberRole(ctx, req.Namespace, req.CurrentUser)
-		// log error, and treat user as unkown role in org
-		if err != nil {
-			slog.Error("faild to get member role",
-				slog.String("org", req.Namespace), slog.String("user", req.CurrentUser),
-				slog.String("error", err.Error()))
-		}
-	}
-	onlyPublic := !r.CanRead()
-	datasets, total, err := c.ds.ByOrgPath(ctx, req.Namespace, req.PageSize, req.Page, onlyPublic)
-	if err != nil {
-		newError := fmt.Errorf("failed to get user datasets,error:%w", err)
-		slog.Error(newError.Error())
-		return nil, 0, newError
-	}
-
-	for _, data := range datasets {
-		resDatasets = append(resDatasets, types.Dataset{
-			ID:           data.ID,
-			Name:         data.Repository.Name,
-			Nickname:     data.Repository.Nickname,
-			Description:  data.Repository.Description,
-			Likes:        data.Repository.Likes,
-			Downloads:    data.Repository.DownloadCount,
-			Path:         data.Repository.Path,
-			RepositoryID: data.RepositoryID,
-			Private:      data.Repository.Private,
-			CreatedAt:    data.CreatedAt,
-			UpdatedAt:    data.Repository.UpdatedAt,
-		})
-	}
-
-	return resDatasets, total, nil
-}
-
-func (c *OrganizationComponent) Codes(ctx context.Context, req *types.OrgCodesReq) ([]types.Code, int, error) {
-	var resCodes []types.Code
-	var err error
-	r := membership.RoleUnkown
-	if req.CurrentUser != "" {
-		r, err = c.msc.GetMemberRole(ctx, req.Namespace, req.CurrentUser)
-		// log error, and treat user as unkown role in org
-		if err != nil {
-			slog.Error("faild to get member role",
-				slog.String("org", req.Namespace), slog.String("user", req.CurrentUser),
-				slog.String("error", err.Error()))
-		}
-	}
-	onlyPublic := !r.CanRead()
-	codes, total, err := c.cs.ByOrgPath(ctx, req.Namespace, req.PageSize, req.Page, onlyPublic)
-	if err != nil {
-		newError := fmt.Errorf("failed to get org codes,error:%w", err)
-		slog.Error(newError.Error())
-		return nil, 0, newError
-	}
-
-	for _, data := range codes {
-		resCodes = append(resCodes, types.Code{
-			ID:           data.ID,
-			Name:         data.Repository.Name,
-			Nickname:     data.Repository.Nickname,
-			Description:  data.Repository.Description,
-			Likes:        data.Repository.Likes,
-			Downloads:    data.Repository.DownloadCount,
-			Path:         data.Repository.Path,
-			RepositoryID: data.RepositoryID,
-			Private:      data.Repository.Private,
-			CreatedAt:    data.CreatedAt,
-			UpdatedAt:    data.Repository.UpdatedAt,
-		})
-	}
-
-	return resCodes, total, nil
-}
-
-func (c *OrganizationComponent) Spaces(ctx context.Context, req *types.OrgSpacesReq) ([]types.Space, int, error) {
-	var resSpaces []types.Space
-	var err error
-	r := membership.RoleUnkown
-	if req.CurrentUser != "" {
-		r, err = c.msc.GetMemberRole(ctx, req.Namespace, req.CurrentUser)
-		// log error, and treat user as unkown role in org
-		if err != nil {
-			slog.Error("faild to get member role",
-				slog.String("org", req.Namespace), slog.String("user", req.CurrentUser),
-				slog.String("error", err.Error()))
-		}
-	}
-	onlyPublic := !r.CanRead()
-	spaces, total, err := c.ss.ByOrgPath(ctx, req.Namespace, req.PageSize, req.Page, onlyPublic)
-	if err != nil {
-		newError := fmt.Errorf("failed to get org spaces,error:%w", err)
-		slog.Error(newError.Error())
-		return nil, 0, newError
-	}
-
-	for _, data := range spaces {
-		resSpaces = append(resSpaces, types.Space{
-			ID:            data.ID,
-			Name:          data.Repository.Name,
-			Nickname:      data.Repository.Nickname,
-			Description:   data.Repository.Description,
-			Likes:         data.Repository.Likes,
-			Path:          data.Repository.Path,
-			Private:       data.Repository.Private,
-			CreatedAt:     data.CreatedAt,
-			UpdatedAt:     data.Repository.UpdatedAt,
-			RepositoryID:  data.Repository.ID,
-			CoverImageUrl: data.CoverImageUrl,
-		})
-	}
-
-	return resSpaces, total, nil
-}
-func (c *OrganizationComponent) Collections(ctx context.Context, req *types.OrgCollectionsReq) ([]types.Collection, int, error) {
-	var err error
-	r := membership.RoleUnkown
-	if req.CurrentUser != "" {
-		r, err = c.msc.GetMemberRole(ctx, req.Namespace, req.CurrentUser)
-		// log error, and treat user as unkown role in org
-		if err != nil {
-			slog.Error("faild to get member role",
-				slog.String("org", req.Namespace), slog.String("user", req.CurrentUser),
-				slog.String("error", err.Error()))
-		}
-	}
-	onlyPublic := !r.CanRead()
-	collections, total, err := c.cos.ByUserOrgs(ctx, req.Namespace, req.PageSize, req.Page, onlyPublic)
-	if err != nil {
-		return nil, 0, err
-	}
-	var newCollection []types.Collection
-	temporaryVariable, _ := json.Marshal(collections)
-	err = json.Unmarshal(temporaryVariable, &newCollection)
-	if err != nil {
-		return nil, 0, err
-	}
-	return newCollection, total, nil
-
 }

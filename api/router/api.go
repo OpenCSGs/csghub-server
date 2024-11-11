@@ -73,6 +73,10 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 	if err != nil {
 		return nil, fmt.Errorf("error creating user controller:%w", err)
 	}
+	orgHandler, err := handler.NewOrganizationHandler(config)
+	if err != nil {
+		return nil, fmt.Errorf("error creating organization controller:%w", err)
+	}
 
 	repoCommonHandler, err := handler.NewRepoHandler(config)
 	if err != nil {
@@ -200,13 +204,12 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 		apiGroup.GET("/organization/:namespace", userProxyHandler.ProxyToApi("/api/v1/organization/%s", "namespace"))
 		apiGroup.PUT("/organization/:namespace", userProxyHandler.ProxyToApi("/api/v1/organization/%s", "namespace"))
 		apiGroup.DELETE("/organization/:namespace", userProxyHandler.ProxyToApi("/api/v1/organization/%s", "namespace"))
-		// Organization models
-		apiGroup.GET("/organization/:namespace/models", userProxyHandler.ProxyToApi("/api/v1/organization/%s/models", "namespace"))
-		// Organization datasets
-		apiGroup.GET("/organization/:namespace/datasets", userProxyHandler.ProxyToApi("/api/v1/organization/%s/datasets", "namespace"))
-		apiGroup.GET("/organization/:namespace/codes", userProxyHandler.ProxyToApi("/api/v1/organization/%s/codes", "namespace"))
-		apiGroup.GET("/organization/:namespace/spaces", userProxyHandler.ProxyToApi("/api/v1/organization/%s/spaces", "namespace"))
-		apiGroup.GET("/organization/:namespace/collections", userProxyHandler.ProxyToApi("/api/v1/organization/%s/collections", "namespace"))
+		// Organization assets
+		apiGroup.GET("/organization/:namespace/models", orgHandler.Models)
+		apiGroup.GET("/organization/:namespace/datasets", orgHandler.Datasets)
+		apiGroup.GET("/organization/:namespace/codes", orgHandler.Codes)
+		apiGroup.GET("/organization/:namespace/spaces", orgHandler.Spaces)
+		apiGroup.GET("/organization/:namespace/collections", orgHandler.Collections)
 	}
 
 	{
