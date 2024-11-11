@@ -11,6 +11,7 @@ import (
 
 	"opencsg.com/csghub-server/builder/deploy"
 	"opencsg.com/csghub-server/builder/git/gitserver"
+	"opencsg.com/csghub-server/builder/git/membership"
 	"opencsg.com/csghub-server/builder/inference"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/config"
@@ -1097,5 +1098,45 @@ func (c *ModelComponent) ListModelsOfRuntimeFrameworks(ctx context.Context, curr
 			EnableFinetune:  enableFinetune,
 		})
 	}
+	return resModels, total, nil
+}
+
+func (c *ModelComponent) OrgModels(ctx context.Context, req *types.OrgModelsReq) ([]types.Model, int, error) {
+	var resModels []types.Model
+	var err error
+	r := membership.RoleUnkown
+	if req.CurrentUser != "" {
+		r, err = c.userSvcClient.GetMemberRole(ctx, req.Namespace, req.CurrentUser)
+		// log error, and treat user as unkown role in org
+		if err != nil {
+			slog.Error("faild to get member role",
+				slog.String("org", req.Namespace), slog.String("user", req.CurrentUser),
+				slog.String("error", err.Error()))
+		}
+	}
+	onlyPublic := !r.CanRead()
+	ms, total, err := c.ms.ByOrgPath(ctx, req.Namespace, req.PageSize, req.Page, onlyPublic)
+	if err != nil {
+		newError := fmt.Errorf("failed to get user datasets,error:%w", err)
+		slog.Error(newError.Error())
+		return nil, 0, newError
+	}
+
+	for _, data := range ms {
+		resModels = append(resModels, types.Model{
+			ID:           data.ID,
+			Name:         data.Repository.Name,
+			Nickname:     data.Repository.Nickname,
+			Description:  data.Repository.Description,
+			Likes:        data.Repository.Likes,
+			Downloads:    data.Repository.DownloadCount,
+			Path:         data.Repository.Path,
+			RepositoryID: data.RepositoryID,
+			Private:      data.Repository.Private,
+			CreatedAt:    data.CreatedAt,
+			UpdatedAt:    data.Repository.UpdatedAt,
+		})
+	}
+
 	return resModels, total, nil
 }

@@ -4,10 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"strconv"
 	"strings"
 	"time"
 
+	"opencsg.com/csghub-server/builder/git/membership"
 	"opencsg.com/csghub-server/builder/rpc"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/config"
@@ -260,4 +262,31 @@ func (cc *CollectionComponent) getUserCollectionPermission(ctx context.Context, 
 			CanAdmin: r.CanAdmin(),
 		}, nil
 	}
+}
+
+func (c *CollectionComponent) OrgCollections(ctx context.Context, req *types.OrgCollectionsReq) ([]types.Collection, int, error) {
+	var err error
+	r := membership.RoleUnkown
+	if req.CurrentUser != "" {
+		r, err = c.userSvcClient.GetMemberRole(ctx, req.Namespace, req.CurrentUser)
+		// log error, and treat user as unkown role in org
+		if err != nil {
+			slog.Error("faild to get member role",
+				slog.String("org", req.Namespace), slog.String("user", req.CurrentUser),
+				slog.String("error", err.Error()))
+		}
+	}
+	onlyPublic := !r.CanRead()
+	collections, total, err := c.cs.ByUserOrgs(ctx, req.Namespace, req.PageSize, req.Page, onlyPublic)
+	if err != nil {
+		return nil, 0, err
+	}
+	var newCollection []types.Collection
+	temporaryVariable, _ := json.Marshal(collections)
+	err = json.Unmarshal(temporaryVariable, &newCollection)
+	if err != nil {
+		return nil, 0, err
+	}
+	return newCollection, total, nil
+
 }

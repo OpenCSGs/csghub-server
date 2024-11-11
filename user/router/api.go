@@ -62,12 +62,6 @@ func NewRouter(config *config.Config) (*gin.Engine, error) {
 		apiV1Group.GET("/organizations", orgHandler.Index)
 		apiV1Group.GET("/organization/:namespace", orgHandler.Get)
 		apiV1Group.GET("/organization/:namespace/members", memberCtrl.OrgMembers)
-		// Organization assets
-		apiV1Group.GET("/organization/:namespace/models", orgHandler.Models)
-		apiV1Group.GET("/organization/:namespace/datasets", orgHandler.Datasets)
-		apiV1Group.GET("/organization/:namespace/codes", orgHandler.Codes)
-		apiV1Group.GET("/organization/:namespace/spaces", orgHandler.Spaces)
-		apiV1Group.GET("/organization/:namespace/collections", orgHandler.Collections)
 	}
 
 	//internal only
