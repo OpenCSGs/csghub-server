@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 
 	"opencsg.com/csghub-server/builder/git"
 	"opencsg.com/csghub-server/builder/git/gitserver"
@@ -168,7 +169,7 @@ func (w *LocalMirrorWoker) SyncRepo(ctx context.Context, task queue.MirrorTask) 
 		if err != nil {
 			return fmt.Errorf("failed to update repo sync status to failed: %w", err)
 		}
-		return fmt.Errorf("failed to sync lfs files: %v", err)
+		return fmt.Errorf("failed to generate lfs meta objects: %v", err)
 	}
 	if lfsFileCount > 0 {
 		mirror.Status = types.MirrorRepoSynced
@@ -180,7 +181,14 @@ func (w *LocalMirrorWoker) SyncRepo(ctx context.Context, task queue.MirrorTask) 
 		})
 	} else {
 		mirror.Status = types.MirrorFinished
+		mirror.Repository.SyncStatus = types.SyncStatusCompleted
+		_, err = w.repoStore.UpdateRepo(ctx, *mirror.Repository)
+		if err != nil {
+			return fmt.Errorf("failed to update repo sync status to completed: %w", err)
+		}
 	}
+	// Update mirror last updated at
+	mirror.LastUpdatedAt = time.Now()
 
 	err = w.mirrorStore.Update(ctx, mirror)
 	if err != nil {

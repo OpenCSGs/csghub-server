@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/url"
 	"path/filepath"
+	"strings"
 	"sync"
 
 	"github.com/minio/minio-go/v7"
@@ -24,10 +25,10 @@ type MinioLFSSyncWorker struct {
 	tasks              chan queue.MirrorTask
 	wg                 sync.WaitGroup
 	mirrorStore        *database.MirrorStore
-	repoStore          *database.RepoStore
 	lfsMetaObjectStore *database.LfsMetaObjectStore
 	s3Client           *s3.Client
 	config             *config.Config
+	repoStore          *database.RepoStore
 	numWorkers         int
 }
 
@@ -140,7 +141,10 @@ func (w *MinioLFSSyncWorker) SyncLfs(ctx context.Context, workerId int, mirror *
 }
 
 func (w *MinioLFSSyncWorker) GetLFSDownloadURLs(ctx context.Context, mirror *database.Mirror, pointers []*types.Pointer) ([]*types.Pointer, error) {
-	var resPointers []*types.Pointer
+	var (
+		resPointers []*types.Pointer
+		lfsAPIURL   string
+	)
 	requestPayload := types.LFSBatchRequest{
 		Operation: "download",
 	}
@@ -154,7 +158,11 @@ func (w *MinioLFSSyncWorker) GetLFSDownloadURLs(ctx context.Context, mirror *dat
 	requestPayload.HashAlog = "sha256"
 	requestPayload.Transfers = []string{"lfs-standalone-file", "basic", "bash"}
 
-	lfsAPIURL := mirror.SourceUrl + "/info/lfs/objects/batch"
+	if strings.HasSuffix(mirror.SourceUrl, ".git") {
+		lfsAPIURL = mirror.SourceUrl + "/info/lfs/objects/batch"
+	} else {
+		lfsAPIURL = mirror.SourceUrl + ".git/info/lfs/objects/batch"
+	}
 
 	payload, err := json.Marshal(requestPayload)
 	if err != nil {
