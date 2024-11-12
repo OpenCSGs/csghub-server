@@ -484,7 +484,7 @@ func (c *ModelComponent) SDKModelInfo(ctx context.Context, namespace, name, ref,
 		return nil, ErrUnauthorized
 	}
 
-	var pipelineTag, libraryTag string
+	var pipelineTag, libraryTag, sha string
 	var tags []string
 	for _, tag := range model.Repository.Tags {
 		tags = append(tags, tag.Name)
@@ -528,10 +528,14 @@ func (c *ModelComponent) SDKModelInfo(ctx context.Context, namespace, name, ref,
 		spaceNames[idx] = s.Name
 	}
 
+	if lastCommit != nil {
+		sha = lastCommit.ID
+	}
+
 	resModel := &types.SDKModelInfo{
 		ID:               model.Repository.Path,
 		Author:           model.Repository.User.Username,
-		Sha:              lastCommit.ID,
+		Sha:              sha,
 		CreatedAt:        model.Repository.CreatedAt,
 		LastModified:     model.Repository.UpdatedAt,
 		Private:          model.Repository.Private,
