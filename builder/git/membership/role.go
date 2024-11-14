@@ -3,14 +3,14 @@ package membership
 type Role string
 
 const (
-	RoleUnkown Role = ""
-	RoleRead   Role = "read"
-	RoleWrite  Role = "write"
-	RoleAdmin  Role = "admin"
+	RoleUnknown Role = ""
+	RoleRead    Role = "read"
+	RoleWrite   Role = "write"
+	RoleAdmin   Role = "admin"
 )
 
 func (r Role) CanRead() bool {
-	return r != RoleUnkown
+	return r != RoleUnknown
 }
 
 func (r Role) CanWrite() bool {

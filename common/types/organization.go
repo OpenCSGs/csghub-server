@@ -107,6 +107,7 @@ type (
 	OrgCodesReq       = OrgDatasetsReq
 	OrgSpacesReq      = OrgDatasetsReq
 	OrgCollectionsReq = OrgDatasetsReq
+	OrgPromptsReq     = OrgDatasetsReq
 )
 
 type Organization struct {

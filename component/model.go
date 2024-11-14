@@ -1104,7 +1104,7 @@ func (c *ModelComponent) ListModelsOfRuntimeFrameworks(ctx context.Context, curr
 func (c *ModelComponent) OrgModels(ctx context.Context, req *types.OrgModelsReq) ([]types.Model, int, error) {
 	var resModels []types.Model
 	var err error
-	r := membership.RoleUnkown
+	r := membership.RoleUnknown
 	if req.CurrentUser != "" {
 		r, err = c.userSvcClient.GetMemberRole(ctx, req.Namespace, req.CurrentUser)
 		// log error, and treat user as unkown role in org
