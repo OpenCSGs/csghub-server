@@ -18,11 +18,13 @@ import (
 	"opencsg.com/csghub-server/cmd/csghub-server/cmd/sync"
 	"opencsg.com/csghub-server/cmd/csghub-server/cmd/trigger"
 	"opencsg.com/csghub-server/cmd/csghub-server/cmd/user"
+	"opencsg.com/csghub-server/common/config"
 )
 
 var (
-	logLevel  string
-	logFormat string
+	logLevel   string
+	logFormat  string
+	configFile string
 )
 
 var RootCmd = &cobra.Command{
@@ -41,10 +43,12 @@ func init() {
 
 	RootCmd.PersistentFlags().StringVarP(&logLevel, "log-level", "l", "info", "set log level to debug, info, warn, error or fatal (case-insensitive). default is INFO")
 	RootCmd.PersistentFlags().StringVarP(&logFormat, "log-format", "f", "json", "set log format to json or text. default is json")
+	RootCmd.PersistentFlags().StringVarP(&configFile, "config", "", "", "set config file path.")
 	RootCmd.DisableAutoGenTag = true
 
 	cobra.OnInitialize(func() {
 		setupLog(logLevel, logFormat)
+		config.SetConfigFile(configFile)
 	})
 
 	RootCmd.AddCommand(

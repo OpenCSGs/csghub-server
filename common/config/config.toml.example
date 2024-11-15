@@ -1,17 +1,9 @@
-[saas]
-enabled = false
-
-[instance]
-id = ""
-
-[swagger]
-enabled = false
-
-[api]
-token = "0c11e6e4f2054444374ba3f0b70de4145935a7312289d404814cd5907c6aa93cc65cd35dbf94e04c13a3dedbf51f1694de84240c8acb7238b54a2c3ac8e87c59"
-
-[https]
-enabled = false
+saas = false
+instance_id = ""
+enable_swagger = false
+enable_https = false
+api_token = "f3a7b9c1d6e5f8e2a1b5d4f9e6a2b8d7c3a4e2b1d9f6e7a8d2c5a7b4c1e3f5b8a1d4f9b7d6e2f8a5d3b1e7f9c6a8b2d1e4f7d5b6e9f2a4b3c8e1d7f995hd82hf"
+docs_host = "http://localhost:6636"
 
 [api_server]
 port = 8080
@@ -24,9 +16,6 @@ token = ""
 port = 8085
 session_secret_key = "mirror"
 worker_number = 5
-
-[docs_host]
-url = "http://localhost:6636"
 
 [database]
 driver = "pg"
@@ -54,12 +43,12 @@ timeout_sec = 5
 
 [gitaly_server]
 address = "tcp://localhost:9999"
-storage = "default"
+storge = "default"
 token = "abc123secret"
 jwt_secret = "signing-key"
 
 [mirror_server]
-enabled = true
+enable = false
 url = "http://localhost:3001"
 type = "gitea"
 host = "http://localhost:3001"
@@ -81,7 +70,7 @@ bucket = "opencsg-test"
 enable_ssl = false
 
 [sensitive_check]
-enabled = false
+enable = false
 access_key_id = ""
 access_key_secret = ""
 region = ""
@@ -107,9 +96,9 @@ rproxy_server_port = 8083
 session_secret_key = "secret"
 deploy_timeout_in_min = 30
 gpu_model_label = "aliyun.accelerator/nvidia_name"
-readiness_delay_seconds = 120
-readiness_period_seconds = 10
-readiness_failure_threshold = 3
+readness_delay_seconds = 120
+readness_period_seconds = 10
+readness_failure_threshold = 3
 
 [model]
 deploy_timeout_in_min = 60
@@ -152,7 +141,7 @@ saas_sync_domain = "https://sync.opencsg.com"
 enabled = true
 
 [telemetry]
-enabled = true
+enable = true
 report_url = "http://hub.opencsg.com/api/v1/telemetry"
 
 [auto_clean]

@@ -16,7 +16,8 @@ type Config struct {
 	EnableSwagger bool   `env:"STARHUB_SERVER_ENABLE_SWAGGER, default=false"`
 	APIToken      string `env:"STARHUB_SERVER_API_TOKEN, default=0c11e6e4f2054444374ba3f0b70de4145935a7312289d404814cd5907c6aa93cc65cd35dbf94e04c13a3dedbf51f1694de84240c8acb7238b54a2c3ac8e87c59"`
 	// enable if you want to acess csghub through https, especially for space rproxy
-	EnableHTTPS bool `env:"STARHUB_SERVER_ENABLE_HTTPS, default=false"`
+	EnableHTTPS bool   `env:"STARHUB_SERVER_ENABLE_HTTPS, default=false"`
+	DocsHost    string `env:"STARHUB_SERVER_SERVER_DOCS_HOST, default=http://localhost:6636"`
 
 	APIServer struct {
 		Port         int    `env:"STARHUB_SERVER_SERVER_PORT, default=8080"`
@@ -31,8 +32,6 @@ type Config struct {
 		SessionSecretKey string `env:"STARHUB_SERVER_MIRROR_SESSION_SECRET_KEY, default=mirror"`
 		WorkerNumber     int    `env:"STARHUB_SERVER_MIRROR_WORKER_NUMBER, default=5"`
 	}
-
-	DocsHost string `env:"STARHUB_SERVER_SERVER_DOCS_HOST, default=http://localhost:6636"`
 
 	Database struct {
 		Driver   string `env:"STARHUB_DATABASE_DRIVER, default=pg"`
@@ -69,7 +68,7 @@ type Config struct {
 	}
 
 	MirrorServer struct {
-		Enable    bool   `env:"STARHUB_SERVER_MIRRORSERVER_ENABLE, default=true"`
+		Enable    bool   `env:"STARHUB_SERVER_MIRRORSERVER_ENABLE, default=false"`
 		URL       string `env:"STARHUB_SERVER_MIRRORSERVER_URL, default=http://localhost:3001"`
 		Type      string `env:"STARHUB_SERVER_MIRRORSERVER_TYPE, default=gitea"`
 		Host      string `env:"STARHUB_SERVER_MIRRORSERVER_HOST, default=http://localhost:3001"`
