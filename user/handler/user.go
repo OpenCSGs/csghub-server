@@ -1,18 +1,22 @@
 package handler
 
 import (
+	"context"
 	"fmt"
 	"log/slog"
 	"net/http"
 	"net/url"
 
 	"github.com/gin-gonic/gin"
+	"go.temporal.io/sdk/client"
 	"opencsg.com/csghub-server/api/httpbase"
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/types"
 	"opencsg.com/csghub-server/common/utils/common"
 	apicomponent "opencsg.com/csghub-server/component"
 	"opencsg.com/csghub-server/user/component"
+	"opencsg.com/csghub-server/user/workflow"
+	workflowCommon "opencsg.com/csghub-server/user/workflow/common"
 )
 
 type UserHandler struct {
@@ -21,6 +25,7 @@ type UserHandler struct {
 	publicDomain             string
 	EnableHTTPS              bool
 	signinSuccessRedirectURL string
+	config                   *config.Config
 }
 
 func NewUserHandler(config *config.Config) (*UserHandler, error) {
@@ -42,6 +47,7 @@ func NewUserHandler(config *config.Config) (*UserHandler, error) {
 	h.publicDomain = domainParsedUrl.Hostname()
 	h.EnableHTTPS = config.EnableHTTPS
 	h.signinSuccessRedirectURL = config.User.SigninSuccessRedirectURL
+	h.config = config
 	return h, err
 }
 
@@ -140,15 +146,71 @@ func (h *UserHandler) Update(ctx *gin.Context) {
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
 // @Router       /user/{username} [delete]
 func (h *UserHandler) Delete(ctx *gin.Context) {
+	operator := httpbase.GetCurrentUser(ctx)
 	userName := ctx.Param("username")
-	err := h.c.Delete(ctx, userName)
-	if err != nil {
-		slog.Error("Failed to update user", slog.Any("error", err))
-		httpbase.ServerError(ctx, err)
+
+	// Check if operator can delete user
+	isServerErr, err := h.c.CheckOperatorAndUser(ctx, operator, userName)
+	if err != nil && isServerErr {
+		httpbase.ServerError(ctx, fmt.Errorf("user cannot be deleted: %w", err))
+		return
+	}
+	if err != nil && !isServerErr {
+		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
 
-	slog.Info("Update user succeed", slog.String("userName", userName))
+	// Check if user has organizations
+	hasOrgs, err := h.c.CheckIfUserHasOrgs(ctx, userName)
+	if err != nil {
+		httpbase.ServerError(ctx, fmt.Errorf("failed to check if user has organzitions, error: %w", err))
+		return
+	}
+	if hasOrgs {
+		httpbase.BadRequest(ctx, "users who own organizations cannot be deleted")
+		return
+	}
+	// Check if user has running or building deployments
+	hasDeployments, err := h.c.CheckIffUserHasRunningOrBuildingDeployments(ctx, userName)
+	if err != nil {
+		httpbase.ServerError(ctx, fmt.Errorf("failed to check if user has deployments, error: %w", err))
+		return
+	}
+	if hasDeployments {
+		httpbase.BadRequest(ctx, "users who own deployments cannot be deleted")
+		return
+	}
+
+	// Check if user has bills, Saas only
+	hasBills, err := h.c.CheckIfUserHasBills(ctx, userName)
+	if err != nil {
+		httpbase.ServerError(ctx, fmt.Errorf("failed to check if user has bills, error: %w", err))
+		return
+	}
+	if hasBills {
+		httpbase.BadRequest(ctx, "users who own bills cannot be deleted")
+		return
+	}
+
+	//start workflow to delete user
+	workflowClient := workflow.GetWorkflowClient()
+	workflowOptions := client.StartWorkflowOptions{
+		TaskQueue: workflow.WorkflowUserDeletionQueueName,
+	}
+
+	we, err := workflowClient.ExecuteWorkflow(context.Background(), workflowOptions, workflow.UserDeletionWorkflow,
+		workflowCommon.User{
+			Username: userName,
+			Operator: operator,
+		},
+		h.config,
+	)
+	if err != nil {
+		httpbase.ServerError(ctx, fmt.Errorf("failed to start user deletion workflow, error: %w", err))
+		return
+	}
+
+	slog.Info("start user deletion workflow", slog.String("workflow_id", we.GetID()), slog.String("userName", userName), slog.String("operator", operator))
 	httpbase.OK(ctx, nil)
 }
 

@@ -3,7 +3,6 @@ package gitaly
 import (
 	"context"
 	"fmt"
-	"net/url"
 	"strings"
 	"time"
 
@@ -31,15 +30,6 @@ func (c *Client) CreateRepo(ctx context.Context, req gitserver.CreateRepoReq) (*
 		return nil, err
 	}
 
-	sshCloneURL, err := url.JoinPath(c.config.APIServer.SSHDomain, repoType, req.Namespace, req.Name)
-	if err != nil {
-		return nil, err
-	}
-	httpCloneURL, err := url.JoinPath(c.config.APIServer.PublicDomain, repoType, req.Namespace, req.Name)
-	if err != nil {
-		return nil, err
-	}
-
 	return &gitserver.CreateRepoResp{
 		Username:      req.Username,
 		Namespace:     req.Namespace,
@@ -50,8 +40,6 @@ func (c *Client) CreateRepo(ctx context.Context, req gitserver.CreateRepoReq) (*
 		DefaultBranch: req.DefaultBranch,
 		RepoType:      req.RepoType,
 		GitPath:       strings.TrimSuffix(BuildRelativePath(repoType, req.Namespace, req.Name), ".git"),
-		SshCloneURL:   sshCloneURL + ".git",
-		HttpCloneURL:  httpCloneURL + ".git",
 		Private:       req.Private,
 	}, nil
 }

@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/uptrace/bun"
 	"opencsg.com/csghub-server/builder/deploy/common"
 	"opencsg.com/csghub-server/common/types"
 )
@@ -282,4 +283,14 @@ func (s *DeployTaskStore) ListServerless(ctx context.Context, req types.DeployRe
 		return nil, 0, err
 	}
 	return result, total, nil
+}
+
+func (s *DeployTaskStore) ListAllDeployments(ctx context.Context, userID int64) ([]Deploy, error) {
+	var result []Deploy
+	err := s.db.Operator.Core.NewSelect().
+		Model(&result).
+		Where("user_id = ? and status IN (?)", userID, bun.In([]int64{common.Running, common.Deploying, common.Building})).
+		Scan(ctx)
+
+	return result, err
 }

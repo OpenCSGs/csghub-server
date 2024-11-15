@@ -9,8 +9,11 @@ import (
 	"sync"
 	"time"
 
+	"go.temporal.io/sdk/client"
+	"opencsg.com/csghub-server/api/workflow"
 	"opencsg.com/csghub-server/builder/git"
 	"opencsg.com/csghub-server/builder/git/gitserver"
+	"opencsg.com/csghub-server/builder/git/gitserver/gitaly"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/types"
@@ -195,6 +198,49 @@ func (w *LocalMirrorWoker) SyncRepo(ctx context.Context, task queue.MirrorTask) 
 	if err != nil {
 		return fmt.Errorf("failed to update mirror: %w", err)
 	}
+
+	// Trigger git callback
+
+	// Get repo last commit
+	commit, err := w.git.GetRepoLastCommit(ctx, gitserver.GetRepoLastCommitReq{
+		Namespace: namespace,
+		Name:      name,
+		RepoType:  mirror.Repository.RepositoryType,
+		Ref:       branch,
+	})
+	if err != nil {
+		return fmt.Errorf("failed to get repo last commit: %w", err)
+	}
+
+	callback, err := w.git.GetDiffBetweenTwoCommits(ctx, gitserver.GetDiffBetweenTwoCommitsReq{
+		Namespace:     namespace,
+		Name:          name,
+		RepoType:      mirror.Repository.RepositoryType,
+		Ref:           branch,
+		LeftCommitId:  gitaly.SHA1EmptyTreeID,
+		RightCommitId: commit.ID,
+		Private:       mirror.Repository.Private,
+	})
+	if err != nil {
+		return fmt.Errorf("failed to get diff between two commits: %w", err)
+	}
+	callback.Ref = branch
+
+	//start workflow to handle push request
+	workflowClient := workflow.GetWorkflowClient()
+	workflowOptions := client.StartWorkflowOptions{
+		TaskQueue: workflow.HandlePushQueueName,
+	}
+
+	we, err := workflowClient.ExecuteWorkflow(ctx, workflowOptions, workflow.HandlePushWorkflow,
+		callback,
+		w.config,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to handle git push callback: %w", err)
+	}
+
+	slog.Info("start handle push workflow", slog.String("workflow_id", we.GetID()), slog.Any("req", callback))
 
 	return nil
 }

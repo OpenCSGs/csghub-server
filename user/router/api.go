@@ -85,7 +85,7 @@ func NewRouter(config *config.Config) (*gin.Engine, error) {
 		// user self or admin
 		userGroup.PUT("/:username", mustLogin(), userHandler.Update)
 		//TODO:
-		// userGroup.DELETE("/:username", userMatch, userHandler.Delete)
+		userGroup.DELETE("/:username", userHandler.Delete)
 		// get user's all tokens
 		userGroup.GET("/:username/tokens", userMatch, acHandler.GetUserTokens)
 		// get user list

@@ -7,8 +7,11 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
+	"go.temporal.io/sdk/client"
+	"opencsg.com/csghub-server/api/workflow"
 	"opencsg.com/csghub-server/builder/git/gitserver"
 	"opencsg.com/csghub-server/builder/store/database"
+	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/types"
 	"opencsg.com/csghub-server/component/callback"
 )
@@ -33,6 +36,15 @@ var gitCallbackCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		var err error
 		var repos []*database.Repository
+		config, err := config.LoadConfig()
+		if err != nil {
+			return fmt.Errorf("failed to load config: %w", err)
+		}
+		err = workflow.StartWorker(config)
+		if err != nil {
+			slog.Error("failed to start worker", slog.Any("error", err))
+			return fmt.Errorf("failed to start worker: %w", err)
+		}
 		if len(repoPaths) > 0 {
 			for _, rp := range repoPaths {
 				parts := strings.Split(rp, "/")
@@ -73,7 +85,22 @@ var gitCallbackCmd = &cobra.Command{
 			req.Repository.FullName = repo.GitPath
 			req.Commits = append(req.Commits, types.GiteaCallbackPushReq_Commit{})
 			req.Commits[0].Added = append(req.Commits[0].Added, filePaths...)
-			err = callbackComponent.HandlePush(context.Background(), req)
+			//start workflow to handle push request
+			workflowClient := workflow.GetWorkflowClient()
+			workflowOptions := client.StartWorkflowOptions{
+				TaskQueue: workflow.HandlePushQueueName,
+			}
+
+			we, err := workflowClient.ExecuteWorkflow(context.Background(), workflowOptions, workflow.HandlePushWorkflow,
+				req,
+				config,
+			)
+			if err != nil {
+				slog.Error("failed to handle git push callback", slog.String("repo", repo.Path), slog.Any("error", err))
+				return err
+			}
+
+			slog.Info("start handle push workflow", slog.String("workflow_id", we.GetID()), slog.String("run_id", we.GetRunID()), slog.Any("req", &req))
 			slog.Info("trigger complete", slog.String("repo", repo.Path), slog.String("type", string(repo.RepositoryType)), slog.Any("error", err))
 		}
 		return nil
