@@ -1,0 +1,4 @@
+instance_id = "bar"
+
+[api_server]
+port = 4321

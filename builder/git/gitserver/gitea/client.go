@@ -38,7 +38,7 @@ type TokenResponse struct {
 
 func NewClient(config *config.Config) (client *Client, err error) {
 	httpClient := &http.Client{
-		Timeout: time.Duration(config.GitServer.TimtoutSEC) * time.Second,
+		Timeout: time.Duration(config.GitServer.TimeoutSEC) * time.Second,
 	}
 	token, err := findOrCreateAccessToken(context.Background(), config)
 	if err != nil {

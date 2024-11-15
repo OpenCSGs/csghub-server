@@ -1,0 +1,163 @@
+saas = false
+instance_id = ""
+enable_swagger = false
+enable_https = false
+api_token = "f3a7b9c1d6e5f8e2a1b5d4f9e6a2b8d7c3a4e2b1d9f6e7a8d2c5a7b4c1e3f5b8a1d4f9b7d6e2f8a5d3b1e7f9c6a8b2d1e4f7d5b6e9f2a4b3c8e1d7f995hd82hf"
+docs_host = "http://localhost:6636"
+
+[api_server]
+port = 8080
+public_domain = "http://localhost:8080"
+ssh_domain = "git@localhost:2222"
+
+[mirror]
+url = "http://localhost:8085"
+token = ""
+port = 8085
+session_secret_key = "mirror"
+worker_number = 5
+
+[database]
+driver = "pg"
+dsn = "postgresql://postgres:postgres@localhost:5432/starhub_server?sslmode=disable"
+timezone = "Asia/Shanghai"
+
+[redis]
+endpoint = "localhost:6379"
+max_retries = 3
+min_idle_connections = 0
+user = ""
+password = ""
+sentinel_mode = false
+sentinel_master = ""
+sentinel_endpoint = ""
+
+[git_server]
+url = "http://localhost:3000"
+type = "gitea"
+host = "http://localhost:3000"
+secret_key = "619c849c49e03754454ccd4cda79a209ce0b30b3"
+username = "root"
+password = "password123"
+timeout_sec = 5
+
+[gitaly_server]
+address = "tcp://localhost:9999"
+storge = "default"
+token = "abc123secret"
+jwt_secret = "signing-key"
+
+[mirror_server]
+enable = false
+url = "http://localhost:3001"
+type = "gitea"
+host = "http://localhost:3001"
+secret_key = "619c849c49e03754454ccd4cda79a209ce0b30b3"
+username = "root"
+password = "password123"
+
+[frontend]
+url = "https://opencsg.com"
+
+[s3]
+ssl = false
+access_key_id = ""
+access_key_secret = ""
+region = ""
+endpoint = "localhost:9000"
+internal_endpoint = ""
+bucket = "opencsg-test"
+enable_ssl = false
+
+[sensitive_check]
+enable = false
+access_key_id = ""
+access_key_secret = ""
+region = ""
+endpoint = "oss-cn-beijing.aliyuncs.com"
+enable_ssl = true
+
+[jwt]
+signing_key = "signing-key"
+valid_hour = 24
+
+[inference]
+server_addr = "http://localhost:8000"
+
+[space]
+builder_endpoint = "http://localhost:8081"
+runner_endpoint = "http://localhost:8082"
+runner_server_port = 8082
+internal_root_domain = "internal.example.com"
+public_root_domain = "public.example.com"
+docker_reg_base = "registry.cn-beijing.aliyuncs.com/opencsg_public/"
+image_pull_secret = "opencsg-pull-secret"
+rproxy_server_port = 8083
+session_secret_key = "secret"
+deploy_timeout_in_min = 30
+gpu_model_label = "aliyun.accelerator/nvidia_name"
+readness_delay_seconds = 120
+readness_period_seconds = 10
+readness_failure_threshold = 3
+
+[model]
+deploy_timeout_in_min = 60
+download_endpoint = "https://hub.opencsg.com"
+docker_reg_base = "opencsg-registry.cn-beijing.cr.aliyuncs.com/public/"
+nim_docker_secret_name = "ngc-secret"
+nim_ngc_secret_name = "nvidia-nim-secrets"
+
+[event]
+sync_interval = 1
+
+[casdoor]
+client_id = "client_id"
+client_secret = "client_secret"
+endpoint = "http://localhost:80"
+certificate = "/etc/casdoor/certificate.pem"
+organization_name = "opencsg"
+application_name = "opencsg"
+
+[nats]
+url = "nats://account:g98dc5FA8v4J7ck90w@natsmaster:4222"
+msg_fetch_timeout_in_sec = 5
+meter_request_subject = "accounting.metering.>"
+meter_duration_send_subject = "accounting.metering.duration"
+meter_token_send_subject = "accounting.metering.token"
+meter_quota_send_subject = "accounting.metering.quota"
+
+[accounting]
+host = "http://localhost"
+port = 8086
+
+[user]
+host = "http://localhost"
+port = 8088
+signin_success_redirect_url = "http://localhost:3000/server/callback"
+
+[multi_sync]
+saas_api_domain = "https://hub.opencsg.com"
+saas_sync_domain = "https://sync.opencsg.com"
+enabled = true
+
+[telemetry]
+enable = true
+report_url = "http://hub.opencsg.com/api/v1/telemetry"
+
+[auto_clean]
+instance = false
+
+[dataset]
+prompt_max_jsonl_file_size = 1048576
+
+[dataflow]
+host = "http://127.0.0.1"
+port = 8000
+
+[moderation]
+host = "http://localhost"
+port = 8089
+encoded_sensitive_words = "5Lmg6L+R5bmzLHhpamlucGluZw=="
+
+[workflow]
+endpoint = "localhost:7233"
