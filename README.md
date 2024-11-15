@@ -32,6 +32,18 @@ curl -L https://raw.githubusercontent.com/OpenCSGs/csghub-server/main/docker-com
 docker-compose -f docker-compose.yml up -d
 ```
 
+## Start CSGHub Server Services Locally
+
+CSGHub supports TOML format for config files. When starting any service from the command line, you can specify the config file with the `--config` option:
+
+```
+go run cmd/csghub-server/main.go start server --config local.toml
+go run cmd/csghub-server/main.go deploy runner --config local.toml
+...
+```
+
+We provide an [example config file](common/config/config.toml.example), you can rename it, modify as needed and use. All available configurations are defined in [this Go file](common/config/config.go). The TOML configuration uses snake_case naming convention, and names automatically map to corresponding struct field names.
+
 ## Technical Architecture
 <div align=center>
   <img src="docs/csghub_server-arch.png" alt="csghub-server architecture" width="800px">
