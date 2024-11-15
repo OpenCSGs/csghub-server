@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"strings"
 	"sync"
 	"time"
 
@@ -20,10 +21,16 @@ import (
 	"opencsg.com/csghub-server/common/types"
 )
 
+const GitalyRepoNotFoundErr = "rpc error: code = NotFound desc = repository does not exist"
+
 type UserComponent struct {
-	us     *database.UserStore
-	os     *database.OrgStore
-	ns     *database.NamespaceStore
+	us   *database.UserStore
+	os   *database.OrgStore
+	ns   *database.NamespaceStore
+	repo *database.RepoStore
+	ds   *database.DeployTaskStore
+	ams  *database.AccountMeteringStore
+
 	gs     gitserver.GitServer
 	jwtc   *JwtComponent
 	tokenc *AccessTokenComponent
@@ -32,6 +39,7 @@ type UserComponent struct {
 	casConfig *casdoorsdk.AuthConfig
 	once      *sync.Once
 	sfnode    *snowflake.Node
+	config    *config.Config
 }
 
 func NewUserComponent(config *config.Config) (*UserComponent, error) {
@@ -40,6 +48,9 @@ func NewUserComponent(config *config.Config) (*UserComponent, error) {
 	c.us = database.NewUserStore()
 	c.os = database.NewOrgStore()
 	c.ns = database.NewNamespaceStore()
+	c.repo = database.NewRepoStore()
+	c.ds = database.NewDeployTaskStore()
+	c.ams = database.NewAccountMeteringStore()
 	c.jwtc = NewJwtComponent(config.JWT.SigningKey, config.JWT.ValidHour)
 	c.tokenc, err = NewAccessTokenComponent(config)
 	if err != nil {
@@ -64,7 +75,7 @@ func NewUserComponent(config *config.Config) (*UserComponent, error) {
 		OrganizationName: config.Casdoor.OrganizationName,
 		ApplicationName:  config.Casdoor.ApplicationName,
 	}
-
+	c.config = config
 	return c, nil
 }
 
@@ -308,21 +319,50 @@ func (c *UserComponent) setChangedProps(user *database.User, req *types.UpdateUs
 	}
 }
 
-func (c *UserComponent) Delete(ctx context.Context, username string) error {
+func (c *UserComponent) Delete(ctx context.Context, operator, username string) error {
 	user, err := c.us.FindByUsername(ctx, username)
 	if err != nil {
 		newError := fmt.Errorf("failed to find user by name in db,error:%w", err)
 		return newError
 	}
-	// TODO:delete user from git server
-	slog.Debug("delete user from git server", slog.String("username", user.Username))
+	slog.Debug("delete user from git server", slog.String("operator", operator), slog.String("username", user.Username))
 
-	// TODO:delete user from db
-	// err = c.us.Delete(ctx, user)
+	if c.config.GitServer.Type == types.GitServerTypeGitea {
+		// gitea gitserver does not support delete user, you could create a pr to our repo to fix it
+	}
+
+	if c.config.GitServer.Type == types.GitServerTypeGitaly {
+		repos, err := c.repo.ByUser(ctx, user.ID)
+		if err != nil {
+			slog.Error("failed to find all repos for user", slog.String("username", user.Username), slog.Any("error", err))
+			return fmt.Errorf("failed to find all repos for user: %v", err)
+		}
+
+		for _, repo := range repos {
+			namespaceAndName := strings.Split(repo.Path, "/")
+			err := c.gs.DeleteRepo(ctx, gitserver.DeleteRepoReq{
+				Namespace: namespaceAndName[0],
+				Name:      namespaceAndName[1],
+				RepoType:  repo.RepositoryType,
+			})
+			if err != nil && err.Error() != GitalyRepoNotFoundErr {
+				slog.Error("failed to delete user repos in git server", slog.String("username", user.Username), slog.String("repo_path", repo.Path), slog.Any("error", err))
+				return fmt.Errorf("failed to delete user repos in git server: %v", err)
+			}
+		}
+	}
+	// delete user from db
+	err = c.us.DeleteUserAndRelations(ctx, user)
+	if err != nil {
+		return fmt.Errorf("failed to delete user and user relations: %v", err)
+	}
 
 	// delete user from casdoor
-	casUser := &casdoorsdk.User{}
-	_, err = c.casc.DeleteUser(casUser)
+	if user.UUID != "" {
+		casUser := &casdoorsdk.User{Id: user.UUID}
+		_, err = c.casc.DeleteUser(casUser)
+		return fmt.Errorf("failed to delete user in casdoor: %v", err)
+	}
 	return err
 }
 
@@ -389,6 +429,73 @@ func (c *UserComponent) Get(ctx context.Context, userNameOrUUID, visitorName str
 	}
 
 	return c.buildUserInfo(ctx, dbuser, onlyBasicInfo)
+}
+
+func (c *UserComponent) CheckOperatorAndUser(ctx context.Context, operator, username string) (bool, error) {
+	opUser, err := c.us.FindByUsername(ctx, operator)
+	if err != nil {
+		newError := fmt.Errorf("failed to find operator by name in db,error:%w", err)
+		return true, newError
+	}
+
+	user, err := c.us.FindByUsername(ctx, username)
+	if err != nil {
+		newError := fmt.Errorf("failed to find user by name in db,error:%w", err)
+		return true, newError
+	}
+	if !opUser.CanAdmin() {
+		return false, errors.New("only admin user or the user can delete the user")
+	}
+
+	if user.CanAdmin() {
+		return false, errors.New("admin user can not be deleted")
+	}
+	return false, nil
+}
+
+func (c *UserComponent) CheckIfUserHasOrgs(ctx context.Context, userName string) (bool, error) {
+	var (
+		err  error
+		orgs []database.Organization
+	)
+	if orgs, err = c.os.GetUserOwnOrgs(ctx, userName); err != nil {
+		return false, fmt.Errorf("failed to find orgs by username in db,error:%w", err)
+	}
+	if len(orgs) == 0 {
+		return false, nil
+	}
+	return true, nil
+}
+
+func (c *UserComponent) CheckIffUserHasRunningOrBuildingDeployments(ctx context.Context, userName string) (bool, error) {
+	user, err := c.us.FindByUsername(ctx, userName)
+	if err != nil {
+		return false, fmt.Errorf("failed to find user by username in db, error: %v", err)
+	}
+	deploys, err := c.ds.ListAllDeployments(ctx, user.ID)
+	if err != nil {
+		return false, fmt.Errorf("failed to list all deployments for user %s in db, error:  %v", userName, err)
+	}
+	if len(deploys) > 0 {
+		return true, nil
+	}
+	return false, nil
+}
+
+func (c *UserComponent) CheckIfUserHasBills(ctx context.Context, userName string) (bool, error) {
+	user, err := c.us.FindByUsername(ctx, userName)
+	if err != nil {
+		return false, fmt.Errorf("failed to find user by username in db, error: %v", err)
+	}
+	ams, err := c.ams.ListAllByUserUUID(ctx, user.UUID)
+	if err != nil {
+		return false, fmt.Errorf("failed to list all account meterings for user %s in db, error: %w", userName, err)
+	}
+	if len(ams) > 0 {
+		return true, nil
+	}
+
+	return false, nil
 }
 
 func (c *UserComponent) buildUserInfo(ctx context.Context, dbuser *database.User, onlyBasicInfo bool) (*types.User, error) {

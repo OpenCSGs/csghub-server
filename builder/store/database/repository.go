@@ -659,3 +659,9 @@ func (s *RepoStore) FindByRepoSourceWithBatch(ctx context.Context, repoSource ty
 		Scan(ctx)
 	return res, err
 }
+
+func (s *RepoStore) ByUser(ctx context.Context, userID int64) ([]Repository, error) {
+	var repos []Repository
+	err := s.db.Operator.Core.NewSelect().Model(&repos).Where("user_id = ?", userID).Scan(ctx)
+	return repos, err
+}

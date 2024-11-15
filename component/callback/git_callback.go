@@ -31,7 +31,6 @@ type GitCallbackComponent struct {
 	rs           *database.RepoStore
 	rrs          *database.RepoRelationsStore
 	mirrorStore  *database.MirrorStore
-	svGen        *SyncVersionGenerator
 	rrf          *database.RepositoriesRuntimeFrameworkStore
 	rac          *component.RuntimeArchitectureComponent
 	ras          *database.RuntimeArchitecturesStore
@@ -64,7 +63,6 @@ func NewGitCallback(config *config.Config) (*GitCallbackComponent, error) {
 	if err != nil {
 		return nil, err
 	}
-	svGen := NewSyncVersionGenerator()
 	rrf := database.NewRepositoriesRuntimeFramework()
 	rac, err := component.NewRuntimeArchitectureComponent(config)
 	if err != nil {
@@ -92,7 +90,6 @@ func NewGitCallback(config *config.Config) (*GitCallbackComponent, error) {
 		rrs:          rrs,
 		mirrorStore:  mirrorStore,
 		modSvcClient: modSvcClient,
-		svGen:        svGen,
 		rrf:          rrf,
 		rac:          rac,
 		ras:          ras,
@@ -108,72 +105,77 @@ func (c *GitCallbackComponent) SetRepoVisibility(yes bool) {
 	c.setRepoVisibility = yes
 }
 
-func (c *GitCallbackComponent) HandlePush(ctx context.Context, req *types.GiteaCallbackPushReq) error {
-	go func() {
-		err := WatchSpaceChange(req, c.ss, c.sc).Run()
-		if err != nil {
-			slog.Error("watch space change failed", slog.Any("error", err))
-		}
-	}()
-
-	go func() {
-		err := WatchRepoRelation(req, c.rs, c.rrs, c.gs).Run()
-		if err != nil {
-			slog.Error("watch repo relation failed", slog.Any("error", err))
-		}
-	}()
-
-	if !req.Repository.Private {
-		go func() {
-			err := c.svGen.GenSyncVersion(req)
-			if err != nil {
-				slog.Error("generate sync version failed", slog.Any("error", err))
-			}
-		}()
+func (c *GitCallbackComponent) WatchSpaceChange(ctx context.Context, req *types.GiteaCallbackPushReq) error {
+	err := WatchSpaceChange(req, c.ss, c.sc).Run()
+	if err != nil {
+		slog.Error("watch space change failed", slog.Any("error", err))
+		return err
 	}
+	return nil
+}
 
+func (c *GitCallbackComponent) WatchRepoRelation(ctx context.Context, req *types.GiteaCallbackPushReq) error {
+	err := WatchRepoRelation(req, c.rs, c.rrs, c.gs).Run()
+	if err != nil {
+		slog.Error("watch repo relation failed", slog.Any("error", err))
+		return err
+	}
+	return nil
+}
+
+func (c *GitCallbackComponent) SetRepoUpdateTime(ctx context.Context, req *types.GiteaCallbackPushReq) error {
+	// split req.Repository.FullName by '/'
+	splits := strings.Split(req.Repository.FullName, "/")
+	fullNamespace, repoName := splits[0], splits[1]
+	repoType, namespace, _ := strings.Cut(fullNamespace, "_")
+	adjustedRepoType := types.RepositoryType(strings.TrimRight(repoType, "s"))
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+
+	isMirrorRepo, err := c.rs.IsMirrorRepo(ctx, adjustedRepoType, namespace, repoName)
+	if err != nil {
+		slog.Error("failed to check if a mirror repo", slog.Any("error", err), slog.String("repo_type", string(adjustedRepoType)), slog.String("namespace", namespace), slog.String("name", repoName))
+		return err
+	}
+	if isMirrorRepo {
+		updated, err := time.Parse(time.RFC3339, req.HeadCommit.Timestamp)
+		if err != nil {
+			slog.Error("Error parsing time:", slog.Any("error", err), slog.String("timestamp", req.HeadCommit.Timestamp))
+			return err
+		}
+		err = c.rs.SetUpdateTimeByPath(ctx, adjustedRepoType, namespace, repoName, updated)
+		if err != nil {
+			slog.Error("failed to set repo update time", slog.Any("error", err), slog.String("repo_type", string(adjustedRepoType)), slog.String("namespace", namespace), slog.String("name", repoName))
+			return err
+		}
+		mirror, err := c.mirrorStore.FindByRepoPath(ctx, adjustedRepoType, namespace, repoName)
+		if err != nil {
+			slog.Error("failed to find repo mirror", slog.Any("error", err), slog.String("repo_type", string(adjustedRepoType)), slog.String("namespace", namespace), slog.String("name", repoName))
+			return err
+		}
+		mirror.LastUpdatedAt = time.Now()
+		err = c.mirrorStore.Update(ctx, mirror)
+		if err != nil {
+			slog.Error("failed to update repo mirror last_updated_at", slog.Any("error", err), slog.String("repo_type", string(adjustedRepoType)), slog.String("namespace", namespace), slog.String("name", repoName))
+			return err
+		}
+	} else {
+		err := c.rs.SetUpdateTimeByPath(ctx, adjustedRepoType, namespace, repoName, time.Now())
+		if err != nil {
+			slog.Error("failed to set repo update time", slog.Any("error", err), slog.String("repo_type", string(adjustedRepoType)), slog.String("namespace", namespace), slog.String("name", repoName))
+			return err
+		}
+	}
+	return nil
+}
+
+func (c *GitCallbackComponent) UpdateRepoInfos(ctx context.Context, req *types.GiteaCallbackPushReq) error {
 	commits := req.Commits
 	ref := req.Ref
 	// split req.Repository.FullName by '/'
 	splits := strings.Split(req.Repository.FullName, "/")
 	fullNamespace, repoName := splits[0], splits[1]
 	repoType, namespace, _ := strings.Cut(fullNamespace, "_")
-	adjustedRepoType := types.RepositoryType(strings.TrimRight(repoType, "s"))
-
-	go func() {
-		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-		defer cancel()
-
-		isMirrorRepo, err := c.rs.IsMirrorRepo(ctx, adjustedRepoType, namespace, repoName)
-		if err != nil {
-			slog.Error("failed to check if a mirror repo", slog.Any("error", err), slog.String("repo_type", string(adjustedRepoType)), slog.String("namespace", namespace), slog.String("name", repoName))
-		}
-		if isMirrorRepo {
-			updated, err := time.Parse(time.RFC3339, req.HeadCommit.Timestamp)
-			if err != nil {
-				slog.Error("Error parsing time:", slog.Any("error", err), slog.String("timestamp", req.HeadCommit.Timestamp))
-				return
-			}
-			err = c.rs.SetUpdateTimeByPath(ctx, adjustedRepoType, namespace, repoName, updated)
-			if err != nil {
-				slog.Error("failed to set repo update time", slog.Any("error", err), slog.String("repo_type", string(adjustedRepoType)), slog.String("namespace", namespace), slog.String("name", repoName))
-			}
-			mirror, err := c.mirrorStore.FindByRepoPath(ctx, adjustedRepoType, namespace, repoName)
-			if err != nil {
-				slog.Error("failed to find repo mirror", slog.Any("error", err), slog.String("repo_type", string(adjustedRepoType)), slog.String("namespace", namespace), slog.String("name", repoName))
-			}
-			mirror.LastUpdatedAt = time.Now()
-			err = c.mirrorStore.Update(ctx, mirror)
-			if err != nil {
-				slog.Error("failed to update repo mirror last_updated_at", slog.Any("error", err), slog.String("repo_type", string(adjustedRepoType)), slog.String("namespace", namespace), slog.String("name", repoName))
-			}
-		} else {
-			err := c.rs.SetUpdateTimeByPath(ctx, adjustedRepoType, namespace, repoName, time.Now())
-			if err != nil {
-				slog.Error("failed to set repo update time", slog.Any("error", err), slog.String("repo_type", string(adjustedRepoType)), slog.String("namespace", namespace), slog.String("name", repoName))
-			}
-		}
-	}()
 
 	var err error
 	for _, commit := range commits {
@@ -182,11 +184,17 @@ func (c *GitCallbackComponent) HandlePush(ctx context.Context, req *types.GiteaC
 		err = errors.Join(err, c.addFiles(ctx, repoType, namespace, repoName, ref, commit.Added))
 	}
 
-	if err != nil {
-		slog.Error("git callback push has error", slog.Any("error", err))
-		return err
-	}
+	return err
+}
 
+func (c *GitCallbackComponent) SensitiveCheck(ctx context.Context, req *types.GiteaCallbackPushReq) error {
+	// split req.Repository.FullName by '/'
+	splits := strings.Split(req.Repository.FullName, "/")
+	fullNamespace, repoName := splits[0], splits[1]
+	repoType, namespace, _ := strings.Cut(fullNamespace, "_")
+	adjustedRepoType := types.RepositoryType(strings.TrimRight(repoType, "s"))
+
+	var err error
 	if c.modSvcClient != nil {
 		err = c.modSvcClient.SubmitRepoCheck(ctx, adjustedRepoType, namespace, repoName)
 	}
@@ -194,7 +202,6 @@ func (c *GitCallbackComponent) HandlePush(ctx context.Context, req *types.GiteaC
 		slog.Error("fail to submit repo sensitive check", slog.Any("error", err), slog.Any("repo_type", adjustedRepoType), slog.String("namespace", namespace), slog.String("name", repoName))
 		return err
 	}
-
 	return nil
 }
 

@@ -60,3 +60,12 @@ func (am *AccountMeteringStore) ListByUserIDAndTime(ctx context.Context, req com
 	}
 	return accountMeters, count, nil
 }
+
+func (am *AccountMeteringStore) ListAllByUserUUID(ctx context.Context, userUUID string) ([]AccountMetering, error) {
+	var accountMeters []AccountMetering
+	err := am.db.Operator.Core.NewSelect().Model(&accountMeters).Where("user_uuid = ?", userUUID).Scan(ctx, &accountMeters)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list all meters by user uuid: %w", err)
+	}
+	return accountMeters, nil
+}

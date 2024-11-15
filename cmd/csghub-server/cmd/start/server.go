@@ -8,6 +8,7 @@ import (
 	"github.com/spf13/cobra"
 	"opencsg.com/csghub-server/api/httpbase"
 	"opencsg.com/csghub-server/api/router"
+	"opencsg.com/csghub-server/api/workflow"
 	"opencsg.com/csghub-server/builder/deploy"
 	"opencsg.com/csghub-server/builder/deploy/common"
 	"opencsg.com/csghub-server/builder/event"
@@ -82,6 +83,10 @@ var serverCmd = &cobra.Command{
 		if err != nil {
 			return fmt.Errorf("failed to init router: %w", err)
 		}
+		err = workflow.StartWorker(cfg)
+		if err != nil {
+			return fmt.Errorf("failed to start worker:  %w", err)
+		}
 		server := httpbase.NewGracefulServer(
 			httpbase.GraceServerOpt{
 				Port: cfg.APIServer.Port,
@@ -100,6 +105,7 @@ var serverCmd = &cobra.Command{
 		}
 
 		server.Run()
+		workflow.StopWorker()
 
 		return nil
 	},

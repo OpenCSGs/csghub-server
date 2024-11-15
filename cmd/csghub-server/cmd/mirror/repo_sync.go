@@ -1,7 +1,10 @@
 package mirror
 
 import (
+	"fmt"
+
 	"github.com/spf13/cobra"
+	"opencsg.com/csghub-server/api/workflow"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/mirror"
@@ -27,8 +30,13 @@ var repoSyncCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
+		err = workflow.StartWorker(cfg)
+		if err != nil {
+			return fmt.Errorf("failed to start worker:  %w", err)
+		}
 
 		repoSYncer.Run()
+		workflow.StopWorker()
 
 		return nil
 	},
