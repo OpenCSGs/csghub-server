@@ -1171,3 +1171,43 @@ func (req *Prompt) GetSensitiveFields() []types.SensitiveField {
 	}
 	return fields
 }
+
+func (c *PromptComponent) OrgPrompts(ctx context.Context, req *types.OrgPromptsReq) ([]types.PromptRes, int, error) {
+	var resPrompts []types.PromptRes
+	var err error
+	r := membership.RoleUnknown
+	if req.CurrentUser != "" {
+		r, err = c.userSvcClient.GetMemberRole(ctx, req.Namespace, req.CurrentUser)
+		// log error, and treat user as unkown role in org
+		if err != nil {
+			slog.Error("faild to get member role",
+				slog.String("org", req.Namespace), slog.String("user", req.CurrentUser),
+				slog.String("error", err.Error()))
+		}
+	}
+	onlyPublic := !r.CanRead()
+	prompts, total, err := c.pt.ByOrgPath(ctx, req.Namespace, req.PageSize, req.Page, onlyPublic)
+	if err != nil {
+		newError := fmt.Errorf("failed to get user prompts,error:%w", err)
+		slog.Error(newError.Error())
+		return nil, 0, newError
+	}
+
+	for _, data := range prompts {
+		resPrompts = append(resPrompts, types.PromptRes{
+			ID:           data.ID,
+			Name:         data.Repository.Name,
+			Nickname:     data.Repository.Nickname,
+			Description:  data.Repository.Description,
+			Likes:        data.Repository.Likes,
+			Downloads:    data.Repository.DownloadCount,
+			Path:         data.Repository.Path,
+			RepositoryID: data.RepositoryID,
+			Private:      data.Repository.Private,
+			CreatedAt:    data.CreatedAt,
+			UpdatedAt:    data.Repository.UpdatedAt,
+		})
+	}
+
+	return resPrompts, total, nil
+}

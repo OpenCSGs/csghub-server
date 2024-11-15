@@ -30,15 +30,15 @@ func (c *UserSvcHttpClient) GetMemberRole(ctx context.Context, orgName, userName
 	// write code to call user service api "/api/v1/organization/{orgName}/members/{userName}"
 	url := fmt.Sprintf("/api/v1/organization/%s/members/%s?current_user=%s", orgName, userName, userName)
 	var r httpbase.R
-	r.Data = membership.RoleUnkown
+	r.Data = membership.RoleUnknown
 	err := c.hc.Get(ctx, url, &r)
 	if err != nil {
-		return membership.RoleUnkown, fmt.Errorf("failed to get member role: %w", err)
+		return membership.RoleUnknown, fmt.Errorf("failed to get member role: %w", err)
 	}
 
 	role, ok := r.Data.(string)
 	if !ok {
-		return membership.RoleUnkown, fmt.Errorf("failed to convert r.Data '%v' to membership.Role", r.Data)
+		return membership.RoleUnknown, fmt.Errorf("failed to convert r.Data '%v' to membership.Role", r.Data)
 	}
 	return membership.Role(role), nil
 }

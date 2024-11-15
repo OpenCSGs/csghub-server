@@ -33,12 +33,17 @@ func NewOrganizationHandler(config *config.Config) (*OrganizationHandler, error)
 	if err != nil {
 		return nil, err
 	}
+	pc, err := component.NewPromptComponent(config)
+	if err != nil {
+		return nil, err
+	}
 	return &OrganizationHandler{
 		sc:   sc,
 		cc:   cc,
 		mc:   mc,
 		dsc:  dsc,
 		colc: colc,
+		pc:   pc,
 	}, nil
 }
 
@@ -48,6 +53,7 @@ type OrganizationHandler struct {
 	mc   *component.ModelComponent
 	dsc  *component.DatasetComponent
 	colc *component.CollectionComponent
+	pc   *component.PromptComponent
 }
 
 // GetOrganizationModels godoc
@@ -265,6 +271,49 @@ func (h *OrganizationHandler) Collections(ctx *gin.Context) {
 	respData := gin.H{
 		"message": "OK",
 		"data":    datasets,
+		"total":   total,
+	}
+	ctx.JSON(http.StatusOK, respData)
+}
+
+// GetOrganizationPrompts godoc
+// @Security     ApiKey
+// @Summary      Get organization prompts
+// @Description  get organization prompts
+// @Tags         Organization
+// @Accept       json
+// @Produce      json
+// @Param        namespace path string true "org name"
+// @Param        current_user query string true "current user name"
+// @Param        per query int false "page size"
+// @Param        page query int false "current page number"
+// @Success      200  {object}  types.ResponseWithTotal{data=[]types.PromptRes,total=int} "OK"
+// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
+// @Router       /organization/{namespace}/prompts [get]
+func (h *OrganizationHandler) Prompts(ctx *gin.Context) {
+	var req types.OrgPromptsReq
+	req.Namespace = ctx.Param("namespace")
+	req.CurrentUser = httpbase.GetCurrentUser(ctx)
+
+	per, page, err := common.GetPerAndPageFromContext(ctx)
+	if err != nil {
+		slog.Error("Bad request format", "error", err)
+		httpbase.BadRequest(ctx, err.Error())
+		return
+	}
+	req.Page = page
+	req.PageSize = per
+	prompts, total, err := h.pc.OrgPrompts(ctx, &req)
+	if err != nil {
+		slog.Error("Failed to get org prompts", slog.Any("error", err))
+		httpbase.ServerError(ctx, err)
+		return
+	}
+
+	respData := gin.H{
+		"message": "OK",
+		"data":    prompts,
 		"total":   total,
 	}
 	ctx.JSON(http.StatusOK, respData)

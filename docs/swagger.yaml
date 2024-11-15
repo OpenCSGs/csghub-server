@@ -7844,6 +7844,59 @@ paths:
       summary: Get organization models
       tags:
       - Organization
+  /organization/{namespace}/prompts:
+    get:
+      consumes:
+      - application/json
+      description: get organization prompts
+      parameters:
+      - description: org name
+        in: path
+        name: namespace
+        required: true
+        type: string
+      - description: current user name
+        in: query
+        name: current_user
+        required: true
+        type: string
+      - description: page size
+        in: query
+        name: per
+        type: integer
+      - description: current page number
+        in: query
+        name: page
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/types.ResponseWithTotal'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/types.PromptRes'
+                  type: array
+                total:
+                  type: integer
+              type: object
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Get organization prompts
+      tags:
+      - Organization
   /organization/{namespace}/spaces:
     get:
       consumes:

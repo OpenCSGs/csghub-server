@@ -136,18 +136,18 @@ func (c *MemberComponent) GetMemberRole(ctx context.Context, orgName, userName s
 	)
 	org, err = c.orgStore.FindByPath(ctx, orgName)
 	if err != nil {
-		return membership.RoleUnkown, fmt.Errorf("failed to find org,caused by:%w", err)
+		return membership.RoleUnknown, fmt.Errorf("failed to find org,caused by:%w", err)
 	}
 	user, err = c.userStore.FindByUsername(ctx, userName)
 	if err != nil {
-		return membership.RoleUnkown, fmt.Errorf("failed to find user,caused by:%w", err)
+		return membership.RoleUnknown, fmt.Errorf("failed to find user,caused by:%w", err)
 	}
 	m, err := c.memberStore.Find(ctx, org.ID, user.ID)
 	if err != nil && !errors.Is(err, sql.ErrNoRows) {
-		return membership.RoleUnkown, fmt.Errorf("failed to check memberhsip existance,caused by:%w", err)
+		return membership.RoleUnknown, fmt.Errorf("failed to check memberhsip existance,caused by:%w", err)
 	}
 	if m == nil {
-		return membership.RoleUnkown, nil
+		return membership.RoleUnknown, nil
 	}
 	return c.toGitRole(m.Role), nil
 }
@@ -272,6 +272,6 @@ func (c *MemberComponent) toGitRole(role string) membership.Role {
 	case "read":
 		return membership.RoleRead
 	default:
-		return membership.RoleUnkown
+		return membership.RoleUnknown
 	}
 }
