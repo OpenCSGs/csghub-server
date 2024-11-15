@@ -22,6 +22,6 @@ type GiteaCallbackPushReq_Repository struct {
 
 type GiteaCallbackPushReq_HeadCommit struct {
 	Timestamp      string    `json:"timestamp"`
-	LastModifyTime time.Time `json:"timestamp"`
+	LastModifyTime time.Time `json:"last_modify_time"`
 	Message        string    `json:"message"`
 }

@@ -89,7 +89,7 @@ func (c *RepoFileComponent) createRepoFileRecords(ctx context.Context, repo data
 	getRepoFileTree := gitserver.GetRepoInfoByPathReq{
 		Namespace: namespace,
 		Name:      name,
-		Ref:       "",
+		Ref:       repo.DefaultBranch,
 		Path:      folder,
 		RepoType:  repo.RepositoryType,
 	}

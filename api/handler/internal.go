@@ -6,11 +6,12 @@ import (
 	"strings"
 
 	"github.com/gin-gonic/gin"
+	"go.temporal.io/sdk/client"
 	"opencsg.com/csghub-server/api/httpbase"
+	"opencsg.com/csghub-server/api/workflow"
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/types"
 	"opencsg.com/csghub-server/component"
-	callback "opencsg.com/csghub-server/component/callback"
 )
 
 func NewInternalHandler(config *config.Config) (*InternalHandler, error) {
@@ -18,20 +19,15 @@ func NewInternalHandler(config *config.Config) (*InternalHandler, error) {
 	if err != nil {
 		return nil, err
 	}
-	cbc, err := callback.NewGitCallback(config)
-	if err != nil {
-		return nil, err
-	}
-	cbc.SetRepoVisibility(true)
 	return &InternalHandler{
-		c:   uc,
-		cbc: cbc,
+		c:      uc,
+		config: config,
 	}, nil
 }
 
 type InternalHandler struct {
-	c   *component.InternalComponent
-	cbc *callback.GitCallbackComponent
+	c      *component.InternalComponent
+	config *config.Config
 }
 
 // TODO: add prmission check
@@ -139,12 +135,22 @@ func (h *InternalHandler) PostReceive(ctx *gin.Context) {
 		return
 	}
 	callback.Ref = originalRef
-	err = h.cbc.HandlePush(ctx, callback)
+	//start workflow to handle push request
+	workflowClient := workflow.GetWorkflowClient()
+	workflowOptions := client.StartWorkflowOptions{
+		TaskQueue: workflow.HandlePushQueueName,
+	}
+
+	we, err := workflowClient.ExecuteWorkflow(ctx, workflowOptions, workflow.HandlePushWorkflow,
+		callback,
+		h.config,
+	)
 	if err != nil {
 		slog.Error("failed to handle git push callback", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
 		return
 	}
+	slog.Info("start handle push workflow", slog.String("workflow_id", we.GetID()), slog.Any("req", callback))
 
 	ctx.PureJSON(http.StatusOK, gin.H{
 		"reference_counter_decreased": true,

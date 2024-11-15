@@ -9,6 +9,7 @@ import (
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/user/router"
+	"opencsg.com/csghub-server/user/workflow"
 )
 
 var cmdLaunch = &cobra.Command{
@@ -31,6 +32,11 @@ var cmdLaunch = &cobra.Command{
 		}
 		database.InitDB(dbConfig)
 
+		err = workflow.StartWorker(cfg)
+		if err != nil {
+			return fmt.Errorf("failed to start user workflow worker: %w", err)
+		}
+
 		r, err := router.NewRouter(cfg)
 		if err != nil {
 			return fmt.Errorf("failed to init router: %w", err)
@@ -43,6 +49,8 @@ var cmdLaunch = &cobra.Command{
 			r,
 		)
 		server.Run()
+
+		workflow.StopWorker()
 
 		return nil
 	},

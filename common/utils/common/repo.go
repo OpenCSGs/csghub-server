@@ -57,11 +57,16 @@ func repoPrefixByType(repoType types.RepositoryType) string {
 
 func BuildCloneInfo(config *config.Config, repository *database.Repository) types.Repository {
 	return types.Repository{
-		HTTPCloneURL: buildCloneURL(config.APIServer.PublicDomain, repository.RepositoryType, repository.Path),
-		SSHCloneURL:  buildCloneURL(config.APIServer.SSHDomain, repository.RepositoryType, repository.Path),
+		HTTPCloneURL: buildHTTPCloneURL(config.APIServer.PublicDomain, repository.RepositoryType, repository.Path),
+		SSHCloneURL:  buildSSHCloneURL(config.APIServer.SSHDomain, repository.RepositoryType, repository.Path),
 	}
 }
 
-func buildCloneURL(domain string, repoType types.RepositoryType, path string) string {
+func buildHTTPCloneURL(domain string, repoType types.RepositoryType, path string) string {
 	return fmt.Sprintf("%s/%ss/%s.git", strings.TrimSuffix(domain, "/"), repoType, path)
+}
+
+func buildSSHCloneURL(domain string, repoType types.RepositoryType, path string) string {
+	sshDomainWithoutPrefix := strings.TrimPrefix(domain, "ssh://")
+	return fmt.Sprintf("%s:%ss/%s.git", strings.TrimSuffix(sshDomainWithoutPrefix, "/"), repoType, path)
 }

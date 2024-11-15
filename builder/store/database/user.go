@@ -231,3 +231,84 @@ func (s *UserStore) GetActiveUserCount(ctx context.Context) (int, error) {
 		Model(&User{}).
 		Count(ctx)
 }
+
+func (s *UserStore) DeleteUserAndRelations(ctx context.Context, input User) (err error) {
+	exists, err := s.IsExist(ctx, input.Username)
+	if err != nil {
+		return fmt.Errorf("error checking if user exists: %v", err)
+	}
+	if !exists {
+		return fmt.Errorf("user does not exist")
+	}
+
+	err = s.db.Operator.Core.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
+		// Delete user
+		if err = assertAffectedOneRow(tx.NewDelete().Model(&input).Where("id = ?", input.ID).Exec(ctx)); err != nil {
+			return fmt.Errorf("failed to delete user %d: %v", input.ID, err)
+		}
+		// Get user's repository_ids
+		var repoIDs []int64
+		if err := s.db.Operator.Core.NewSelect().Column("id").Model(&Repository{}).Where("user_id = ?", input.ID).Scan(ctx, &repoIDs); err != nil {
+			return fmt.Errorf("failed to get user repo ids: %v", err)
+		}
+		// Delete user's model
+		if _, err := tx.NewDelete().Model(&Model{}).Where("repository_id IN (?)", bun.In(repoIDs)).Exec(ctx); err != nil {
+			return fmt.Errorf("failed to delete user models for user ID %d: %v", input.ID, err)
+		}
+		// Delete user's dataset
+		if _, err := tx.NewDelete().Model(&Dataset{}).Where("repository_id IN (?)", bun.In(repoIDs)).Exec(ctx); err != nil {
+			return fmt.Errorf("failed to delete user datasets for user ID %d: %v", input.ID, err)
+		}
+		// Delete user's code
+		if _, err := tx.NewDelete().Model(&Code{}).Where("repository_id IN (?)", bun.In(repoIDs)).Exec(ctx); err != nil {
+			return fmt.Errorf("failed to delete user codes for user ID %d: %v", input.ID, err)
+		}
+		// Delete user's space
+		if _, err := tx.NewDelete().Model(&Space{}).Where("repository_id IN (?)", bun.In(repoIDs)).Exec(ctx); err != nil {
+			return fmt.Errorf("failed to delete user spaces for user ID %d: %v", input.ID, err)
+		}
+		// Delete user's namespace
+		if _, err := tx.NewDelete().Model(&Namespace{}).Where("user_id = ?", input.ID).Exec(ctx); err != nil {
+			return fmt.Errorf("failed to delete user namespace for user ID %d:  %v", input.ID, err)
+		}
+		// Delete user's prompts
+		if _, err := tx.NewDelete().Model(&Prompt{}).Where("repository_id IN  (?)", bun.In(repoIDs)).Exec(ctx); err != nil {
+			return fmt.Errorf("failed to delete user prompts for user ID  %d:  %v", input.ID, err)
+		}
+		// Delete user's repositories runtime frameworks
+		if _, err := tx.NewDelete().Model(&RepositoriesRuntimeFramework{}).Where("repo_id IN (?)", bun.In(repoIDs)).Exec(ctx); err != nil {
+			return fmt.Errorf("failed to delete user repositories runtime frameworks for user ID %d:  %v", input.ID, err)
+		}
+		// Delete user's repo
+		if _, err = tx.NewDelete().Model(&Repository{}).Where("user_id = ?", input.ID).Exec(ctx); err != nil {
+			return fmt.Errorf("failed to delete user repos for user ID %d: %v", input.ID, err)
+		}
+		// Delete user's access token
+		if _, err := tx.NewDelete().Model(&AccessToken{}).Where("user_id = ?", input.ID).Exec(ctx); err != nil {
+			return fmt.Errorf("failed to delete user access tokens for user ID %d: %v", input.ID, err)
+		}
+		// Delete user's organization
+		if _, err := tx.NewDelete().Model(&Organization{}).Where("user_id = ?", input.ID).Exec(ctx); err != nil {
+			return fmt.Errorf("failed to delete user organizations for user ID %d: %v", input.ID, err)
+		}
+		// Delete user's member
+		if _, err := tx.NewDelete().Model(&Member{}).Where("user_id = ?", input.ID).Exec(ctx); err != nil {
+			return fmt.Errorf("failed to delete user members for user ID %d: %v", input.ID, err)
+		}
+		// Delete user's ssh keys
+		if _, err := tx.NewDelete().Model(&SSHKey{}).Where("user_id = ?", input.ID).Exec(ctx); err != nil {
+			return fmt.Errorf("failed to delete user ssh keys for user ID %d: %v", input.ID, err)
+		}
+		// Delete user's user likes
+		if _, err := tx.NewDelete().Model(&UserLike{}).Where("user_id = ?", input.ID).Exec(ctx); err != nil {
+			return fmt.Errorf("failed to delete user likes for user ID %d: %v", input.ID, err)
+		}
+		// Delete user's prompt conversations
+		if _, err := tx.NewDelete().Model(&PromptConversation{}).Where("user_id = ?", input.ID).Exec(ctx); err != nil {
+			return fmt.Errorf("failed to delete user prompt conversations for user ID %d:  %v", input.ID, err)
+		}
+
+		return nil
+	})
+	return
+}
