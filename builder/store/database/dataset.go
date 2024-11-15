@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"time"
 
 	"github.com/uptrace/bun"
 )
@@ -24,9 +25,10 @@ func NewDatasetStore() *DatasetStore {
 }
 
 type Dataset struct {
-	ID           int64       `bun:",pk,autoincrement" json:"id"`
-	RepositoryID int64       `bun:",notnull" json:"repository_id"`
-	Repository   *Repository `bun:"rel:belongs-to,join:repository_id=id" json:"repository"`
+	ID            int64       `bun:",pk,autoincrement" json:"id"`
+	RepositoryID  int64       `bun:",notnull" json:"repository_id"`
+	Repository    *Repository `bun:"rel:belongs-to,join:repository_id=id" json:"repository"`
+	LastUpdatedAt time.Time   `bun:",notnull" json:"last_updated_at"`
 	times
 }
 
@@ -129,6 +131,7 @@ func (s *DatasetStore) ByOrgPath(ctx context.Context, namespace string, per, pag
 }
 
 func (s *DatasetStore) Create(ctx context.Context, input Dataset) (*Dataset, error) {
+	input.LastUpdatedAt = time.Now()
 	res, err := s.db.Core.NewInsert().Model(&input).Exec(ctx, &input)
 	if err := assertAffectedOneRow(res, err); err != nil {
 		slog.Error("create dataset in db failed", slog.String("error", err.Error()))
@@ -139,6 +142,7 @@ func (s *DatasetStore) Create(ctx context.Context, input Dataset) (*Dataset, err
 }
 
 func (s *DatasetStore) Update(ctx context.Context, input Dataset) (err error) {
+	input.LastUpdatedAt = time.Now()
 	_, err = s.db.Core.NewUpdate().Model(&input).WherePK().Exec(ctx)
 	return
 }
@@ -208,6 +212,7 @@ func (s *DatasetStore) CreateIfNotExist(ctx context.Context, input Dataset) (*Da
 		return &input, nil
 	}
 
+	input.LastUpdatedAt = time.Now()
 	res, err := s.db.Core.NewInsert().Model(&input).Exec(ctx, &input)
 	if err := assertAffectedOneRow(res, err); err != nil {
 		slog.Error("create dataset in db failed", slog.String("error", err.Error()))
