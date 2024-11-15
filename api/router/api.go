@@ -210,6 +210,7 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 		apiGroup.GET("/organization/:namespace/codes", orgHandler.Codes)
 		apiGroup.GET("/organization/:namespace/spaces", orgHandler.Spaces)
 		apiGroup.GET("/organization/:namespace/collections", orgHandler.Collections)
+		apiGroup.GET("/organization/:namespace/prompts", orgHandler.Prompts)
 	}
 
 	{

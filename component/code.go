@@ -366,7 +366,7 @@ func (c *CodeComponent) getRelations(ctx context.Context, repoID int64, currentU
 func (c *CodeComponent) OrgCodes(ctx context.Context, req *types.OrgCodesReq) ([]types.Code, int, error) {
 	var resCodes []types.Code
 	var err error
-	r := membership.RoleUnkown
+	r := membership.RoleUnknown
 	if req.CurrentUser != "" {
 		r, err = c.userSvcClient.GetMemberRole(ctx, req.Namespace, req.CurrentUser)
 		// log error, and treat user as unkown role in org

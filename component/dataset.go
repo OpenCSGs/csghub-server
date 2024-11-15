@@ -486,7 +486,7 @@ func (c *DatasetComponent) getRelations(ctx context.Context, repoID int64, curre
 func (c *DatasetComponent) OrgDatasets(ctx context.Context, req *types.OrgDatasetsReq) ([]types.Dataset, int, error) {
 	var resDatasets []types.Dataset
 	var err error
-	r := membership.RoleUnkown
+	r := membership.RoleUnknown
 	if req.CurrentUser != "" {
 		r, err = c.userSvcClient.GetMemberRole(ctx, req.Namespace, req.CurrentUser)
 		// log error, and treat user as unkown role in org

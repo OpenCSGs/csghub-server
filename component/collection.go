@@ -266,7 +266,7 @@ func (cc *CollectionComponent) getUserCollectionPermission(ctx context.Context, 
 
 func (c *CollectionComponent) OrgCollections(ctx context.Context, req *types.OrgCollectionsReq) ([]types.Collection, int, error) {
 	var err error
-	r := membership.RoleUnkown
+	r := membership.RoleUnknown
 	if req.CurrentUser != "" {
 		r, err = c.userSvcClient.GetMemberRole(ctx, req.Namespace, req.CurrentUser)
 		// log error, and treat user as unkown role in org

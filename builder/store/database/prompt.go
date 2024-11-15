@@ -112,3 +112,29 @@ func (s *PromptStore) ByUsername(ctx context.Context, username string, per, page
 	}
 	return
 }
+
+func (s *PromptStore) ByOrgPath(ctx context.Context, namespace string, per, page int, onlyPublic bool) (prompts []Prompt, total int, err error) {
+	query := s.db.Operator.Core.
+		NewSelect().
+		Model(&prompts).
+		Relation("Repository.Tags").
+		Relation("Repository.User").
+		Where("repository.path like ?", fmt.Sprintf("%s/%%", namespace))
+
+	if onlyPublic {
+		query = query.Where("repository.private = ?", false)
+	}
+	query = query.Order("prompt.created_at DESC").
+		Limit(per).
+		Offset((page - 1) * per)
+
+	err = query.Scan(ctx, &prompts)
+	if err != nil {
+		return
+	}
+	total, err = query.Count(ctx)
+	if err != nil {
+		return
+	}
+	return
+}
