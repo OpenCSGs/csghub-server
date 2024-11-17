@@ -196,6 +196,56 @@ services:
     restart: always
     networks:
       - my_network
+
+  mirror-repo-sync:
+    image: "opencsg-registry.cn-beijing.cr.aliyuncs.com/opencsg_public/csghub_server:latest"
+    entrypoint:
+      - /starhub-bin/starhub
+      - mirror
+      - repo-sync
+    depends_on:
+      - redis
+      - gitaly
+      - postgres
+    environment:
+      STARHUB_DATABASE_DSN: postgresql://postgres:postgres@postgres:5432/starhub_server?sslmode=disable
+      STARHUB_DATABASE_TIMEZONE: Asia/Shanghai
+      STARHUB_SERVER_REDIS_ENDPOINT: redis:6379
+      STARHUB_SERVER_GITSERVER_TYPE: gitaly
+      STARHUB_SERVER_GITALY_SERVER_SOCKET: tcp://gitaly:8075
+      STARHUB_SERVER_GITALY_STORGE: default
+      STARHUB_SERVER_GITALY_TOKEN: abc123secret
+      STARHUB_SERVER_GITALY_JWT_SECRET: signing-key
+      # workflow
+      OPENCSG_WORKFLOW_SERVER_ENDPOINT: temporal:7233
+    restart: always
+    networks:
+      - my_network
+
+  mirror-lfs-sync:
+    image: "opencsg-registry.cn-beijing.cr.aliyuncs.com/opencsg_public/csghub_server:latest"
+    entrypoint:
+      - /starhub-bin/starhub
+      - mirror
+      - lfs-sync
+    depends_on:
+      - redis
+      - postgres
+    environment:
+      STARHUB_DATABASE_DSN: postgresql://postgres:postgres@postgres:5432/starhub_server?sslmode=disable
+      STARHUB_DATABASE_TIMEZONE: Asia/Shanghai
+      STARHUB_SERVER_REDIS_ENDPOINT: redis:6379
+      STARHUB_SERVER_MIRROR_REMOTE: false
+      STARHUB_SERVER_S3_ACCESS_KEY_ID: admin
+      STARHUB_SERVER_S3_ACCESS_KEY_SECRET: Password_123
+      STARHUB_SERVER_S3_ENDPOINT: localhost:9000
+      STARHUB_SERVER_S3_INTERNAL_ENDPOINT: localhost:9000
+      STARHUB_SERVER_S3_BUCKET: opencsg-server-lfs
+      STARHUB_SERVER_S3_REGION: cn-beijing
+      STARHUB_SERVER_S3_ENABLE_SSL: false
+    restart: always
+    networks:
+      - my_network
   
   moderation_server:
     image: "opencsg-registry.cn-beijing.cr.aliyuncs.com/opencsg_public/csghub_server:latest"
