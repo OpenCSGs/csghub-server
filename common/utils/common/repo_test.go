@@ -197,6 +197,30 @@ func TestBuildCloneInfo(t *testing.T) {
 				SSHCloneURL:  "ssh://git@opencsg.com:2222/models/abc/def.git",
 			},
 		},
+		{
+			name: "Test BuildCloneInfo when SSHDomain is IPv6 with ssh:// prefix and port",
+			args: args{
+				config: &config.Config{
+					APIServer: struct {
+						Port         int    `env:"STARHUB_SERVER_SERVER_PORT, default=8080"`
+						PublicDomain string `env:"STARHUB_SERVER_PUBLIC_DOMAIN, default=http://localhost:8080"`
+						SSHDomain    string `env:"STARHUB_SERVER_SSH_DOMAIN, default=git@localhost:2222"`
+					}{
+						Port:         8080,
+						PublicDomain: "https://opencsg.com",
+						SSHDomain:    "ssh://[2001:db8::8a2e:370:7334]:2222",
+					},
+				},
+				repository: &database.Repository{
+					RepositoryType: types.ModelRepo,
+					Path:           "abc/def",
+				},
+			},
+			want: types.Repository{
+				HTTPCloneURL: "https://opencsg.com/models/abc/def.git",
+				SSHCloneURL:  "ssh://[2001:db8::8a2e:370:7334]:2222/models/abc/def.git",
+			},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
