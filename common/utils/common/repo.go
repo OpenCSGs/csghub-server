@@ -2,6 +2,7 @@ package common
 
 import (
 	"fmt"
+	"net/url"
 	"strings"
 
 	"opencsg.com/csghub-server/builder/store/database"
@@ -67,11 +68,15 @@ func buildHTTPCloneURL(domain string, repoType types.RepositoryType, path string
 }
 
 func buildSSHCloneURL(domain string, repoType types.RepositoryType, path string) string {
+	parsedURL, err := url.Parse(domain)
+	if err != nil {
+		return ""
+	}
 	sshDomainWithoutPrefix := strings.TrimPrefix(domain, "ssh://")
-	hasPort := strings.Contains(sshDomainWithoutPrefix, ":")
-	if hasPort {
-		return fmt.Sprintf("ssh://%s/%ss/%s.git", strings.TrimSuffix(sshDomainWithoutPrefix, "/"), repoType, path)
-	} else {
+
+	if parsedURL.Port() == "" {
 		return fmt.Sprintf("%s:%ss/%s.git", strings.TrimSuffix(sshDomainWithoutPrefix, "/"), repoType, path)
+	} else {
+		return fmt.Sprintf("ssh://%s/%ss/%s.git", strings.TrimSuffix(sshDomainWithoutPrefix, "/"), repoType, path)
 	}
 }
