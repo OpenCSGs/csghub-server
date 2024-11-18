@@ -68,5 +68,10 @@ func buildHTTPCloneURL(domain string, repoType types.RepositoryType, path string
 
 func buildSSHCloneURL(domain string, repoType types.RepositoryType, path string) string {
 	sshDomainWithoutPrefix := strings.TrimPrefix(domain, "ssh://")
-	return fmt.Sprintf("%s:%ss/%s.git", strings.TrimSuffix(sshDomainWithoutPrefix, "/"), repoType, path)
+	hasPort := strings.Contains(sshDomainWithoutPrefix, ":")
+	if hasPort {
+		return fmt.Sprintf("ssh://%s/%ss/%s.git", strings.TrimSuffix(sshDomainWithoutPrefix, "/"), repoType, path)
+	} else {
+		return fmt.Sprintf("%s:%ss/%s.git", strings.TrimSuffix(sshDomainWithoutPrefix, "/"), repoType, path)
+	}
 }
