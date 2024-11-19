@@ -1113,10 +1113,6 @@ func (c *repoComponentImpl) Tree(ctx context.Context, req *types.GetFileReq) ([]
 }
 
 func (c *repoComponentImpl) UploadFile(ctx context.Context, req *types.CreateFileReq) error {
-	parentPath := filepath.Dir(req.FilePath)
-	if parentPath == "." {
-		parentPath = "/"
-	}
 	f, err := c.git.GetRepoFileContents(ctx, gitserver.GetRepoInfoByPathReq{
 		Namespace: req.Namespace,
 		Name:      req.Name,
