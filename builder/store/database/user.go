@@ -8,10 +8,6 @@ import (
 	"github.com/uptrace/bun"
 )
 
-type userStoreImpl struct {
-	db *DB
-}
-
 type UserStore interface {
 	Index(ctx context.Context) (users []User, err error)
 	IndexWithSearch(ctx context.Context, search string, per, page int) (users []User, count int, err error)
@@ -26,8 +22,13 @@ type UserStore interface {
 	FindByAccessToken(ctx context.Context, token string) (*User, error)
 	FindByGitAccessToken(ctx context.Context, token string) (*User, error)
 	FindByUUID(ctx context.Context, uuid string) (*User, error)
-	GetActiveUserCount(ctx context.Context) (int, error)
 	DeleteUserAndRelations(ctx context.Context, input User) (err error)
+	CountUsers(ctx context.Context) (int, error)
+}
+
+// Implement the UserStore interface in UserStoreImpl
+type userStoreImpl struct {
+	db *DB
 }
 
 func NewUserStore() UserStore {
@@ -249,13 +250,6 @@ func (s *userStoreImpl) FindByUUID(ctx context.Context, uuid string) (*User, err
 	return &user, nil
 }
 
-func (s *userStoreImpl) GetActiveUserCount(ctx context.Context) (int, error) {
-	return s.db.Operator.Core.
-		NewSelect().
-		Model(&User{}).
-		Count(ctx)
-}
-
 func (s *userStoreImpl) DeleteUserAndRelations(ctx context.Context, input User) (err error) {
 	exists, err := s.IsExist(ctx, input.Username)
 	if err != nil {
@@ -335,4 +329,14 @@ func (s *userStoreImpl) DeleteUserAndRelations(ctx context.Context, input User) 
 		return nil
 	})
 	return
+}
+
+func (s *userStoreImpl) CountUsers(ctx context.Context) (int, error) {
+	var users []User
+	q := s.db.Operator.Core.NewSelect().Model(&users)
+	count, err := q.Count(ctx)
+	if err != nil {
+		return 0, fmt.Errorf("failed to count users: %w", err)
+	}
+	return count, nil
 }
