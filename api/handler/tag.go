@@ -21,7 +21,7 @@ func NewTagHandler(config *config.Config) (*TagsHandler, error) {
 }
 
 type TagsHandler struct {
-	tc *component.TagComponent
+	tc component.TagComponent
 }
 
 // GetAllTags godoc

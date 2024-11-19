@@ -23,7 +23,7 @@ func NewMirrorSourceHandler(config *config.Config) (*MirrorSourceHandler, error)
 }
 
 type MirrorSourceHandler struct {
-	c *component.MirrorSourceComponent
+	c component.MirrorSourceComponent
 }
 
 // CreateMirrorSource godoc

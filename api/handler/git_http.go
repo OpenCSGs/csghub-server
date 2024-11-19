@@ -30,7 +30,7 @@ func NewGitHTTPHandler(config *config.Config) (*GitHTTPHandler, error) {
 }
 
 type GitHTTPHandler struct {
-	c *component.GitHTTPComponent
+	c component.GitHTTPComponent
 }
 
 func (h *GitHTTPHandler) InfoRefs(ctx *gin.Context) {

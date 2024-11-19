@@ -11,13 +11,19 @@ import (
 	"opencsg.com/csghub-server/common/types"
 )
 
-type SensitiveComponent struct {
+type sensitiveComponentImpl struct {
 	checker rpc.ModerationSvcClient
 	enable  bool
 }
 
-func NewSensitiveComponent(cfg *config.Config) (*SensitiveComponent, error) {
-	c := &SensitiveComponent{}
+type SensitiveComponent interface {
+	CheckText(ctx context.Context, scenario, text string) (bool, error)
+	CheckImage(ctx context.Context, scenario, ossBucketName, ossObjectName string) (bool, error)
+	CheckRequestV2(ctx context.Context, req types.SensitiveRequestV2) (bool, error)
+}
+
+func NewSensitiveComponent(cfg *config.Config) (SensitiveComponent, error) {
+	c := &sensitiveComponentImpl{}
 	c.enable = cfg.SensitiveCheck.Enable
 
 	if c.enable {
@@ -26,7 +32,7 @@ func NewSensitiveComponent(cfg *config.Config) (*SensitiveComponent, error) {
 	return c, nil
 }
 
-func (c SensitiveComponent) CheckText(ctx context.Context, scenario, text string) (bool, error) {
+func (c *sensitiveComponentImpl) CheckText(ctx context.Context, scenario, text string) (bool, error) {
 	if !c.enable {
 		return true, nil
 	}
@@ -39,7 +45,7 @@ func (c SensitiveComponent) CheckText(ctx context.Context, scenario, text string
 	return !result.IsSensitive, nil
 }
 
-func (c SensitiveComponent) CheckImage(ctx context.Context, scenario, ossBucketName, ossObjectName string) (bool, error) {
+func (c *sensitiveComponentImpl) CheckImage(ctx context.Context, scenario, ossBucketName, ossObjectName string) (bool, error) {
 	if !c.enable {
 		return true, nil
 	}
@@ -51,7 +57,7 @@ func (c SensitiveComponent) CheckImage(ctx context.Context, scenario, ossBucketN
 	return !result.IsSensitive, nil
 }
 
-func (c SensitiveComponent) CheckRequestV2(ctx context.Context, req types.SensitiveRequestV2) (bool, error) {
+func (c *sensitiveComponentImpl) CheckRequestV2(ctx context.Context, req types.SensitiveRequestV2) (bool, error) {
 	if !c.enable {
 		return true, nil
 	}

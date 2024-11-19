@@ -16,7 +16,7 @@ import (
 
 var logPath string
 var (
-	repoStore *database.RepoStore
+	repoStore database.RepoStore
 )
 
 func init() {

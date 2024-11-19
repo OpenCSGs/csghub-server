@@ -8,12 +8,30 @@ import (
 	"github.com/uptrace/bun"
 )
 
-type UserStore struct {
+type userStoreImpl struct {
 	db *DB
 }
 
-func NewUserStore() *UserStore {
-	return &UserStore{
+type UserStore interface {
+	Index(ctx context.Context) (users []User, err error)
+	IndexWithSearch(ctx context.Context, search string, per, page int) (users []User, count int, err error)
+	FindByUsername(ctx context.Context, username string) (user User, err error)
+	FindByID(ctx context.Context, id int) (user User, err error)
+	Update(ctx context.Context, user *User) (err error)
+	ChangeUserName(ctx context.Context, username string, newUsername string) (err error)
+	Create(ctx context.Context, user *User, namespace *Namespace) (err error)
+	IsExist(ctx context.Context, username string) (exists bool, err error)
+	IsExistByUUID(ctx context.Context, uuid string) (exists bool, err error)
+	// FindByAccessToken retrieves user information based on the access token. The access token must be active and not expired.
+	FindByAccessToken(ctx context.Context, token string) (*User, error)
+	FindByGitAccessToken(ctx context.Context, token string) (*User, error)
+	FindByUUID(ctx context.Context, uuid string) (*User, error)
+	GetActiveUserCount(ctx context.Context) (int, error)
+	DeleteUserAndRelations(ctx context.Context, input User) (err error)
+}
+
+func NewUserStore() UserStore {
+	return &userStoreImpl{
 		db: defaultDB,
 	}
 }
@@ -80,7 +98,7 @@ func (u *User) SetRoles(roles []string) {
 	u.RoleMask = strings.Join(roles, ",")
 }
 
-func (s *UserStore) Index(ctx context.Context) (users []User, err error) {
+func (s *userStoreImpl) Index(ctx context.Context) (users []User, err error) {
 	err = s.db.Operator.Core.NewSelect().Model(&users).Scan(ctx, &users)
 	if err != nil {
 		return
@@ -88,7 +106,7 @@ func (s *UserStore) Index(ctx context.Context) (users []User, err error) {
 	return
 }
 
-func (s *UserStore) IndexWithSearch(ctx context.Context, search string, per, page int) (users []User, count int, err error) {
+func (s *userStoreImpl) IndexWithSearch(ctx context.Context, search string, per, page int) (users []User, count int, err error) {
 	search = strings.ToLower(search)
 	query := s.db.Operator.Core.NewSelect().
 		Model(&users)
@@ -107,19 +125,19 @@ func (s *UserStore) IndexWithSearch(ctx context.Context, search string, per, pag
 	return
 }
 
-func (s *UserStore) FindByUsername(ctx context.Context, username string) (user User, err error) {
+func (s *userStoreImpl) FindByUsername(ctx context.Context, username string) (user User, err error) {
 	user.Username = username
 	err = s.db.Operator.Core.NewSelect().Model(&user).Where("username = ?", username).Scan(ctx)
 	return
 }
 
-func (s *UserStore) FindByID(ctx context.Context, id int) (user User, err error) {
+func (s *userStoreImpl) FindByID(ctx context.Context, id int) (user User, err error) {
 	user.ID = int64(id)
 	err = s.db.Operator.Core.NewSelect().Model(&user).WherePK().Scan(ctx)
 	return
 }
 
-func (s *UserStore) Update(ctx context.Context, user *User) (err error) {
+func (s *userStoreImpl) Update(ctx context.Context, user *User) (err error) {
 	err = assertAffectedOneRow(s.db.Operator.Core.NewUpdate().
 		Model(user).
 		WherePK().
@@ -129,7 +147,7 @@ func (s *UserStore) Update(ctx context.Context, user *User) (err error) {
 	return
 }
 
-func (s *UserStore) ChangeUserName(ctx context.Context, username string, newUsername string) (err error) {
+func (s *userStoreImpl) ChangeUserName(ctx context.Context, username string, newUsername string) (err error) {
 	return s.db.Operator.Core.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
 		if err = assertAffectedOneRow(tx.NewUpdate().Model((*Namespace)(nil)).
 			Set("path = ?", newUsername).
@@ -153,7 +171,7 @@ func (s *UserStore) ChangeUserName(ctx context.Context, username string, newUser
 	})
 }
 
-func (s *UserStore) Create(ctx context.Context, user *User, namespace *Namespace) (err error) {
+func (s *userStoreImpl) Create(ctx context.Context, user *User, namespace *Namespace) (err error) {
 	err = s.db.Operator.Core.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
 		if err = assertAffectedOneRow(tx.NewInsert().Model(user).Exec(ctx)); err != nil {
 			return err
@@ -168,7 +186,7 @@ func (s *UserStore) Create(ctx context.Context, user *User, namespace *Namespace
 	return
 }
 
-func (s *UserStore) IsExist(ctx context.Context, username string) (exists bool, err error) {
+func (s *userStoreImpl) IsExist(ctx context.Context, username string) (exists bool, err error) {
 	return s.db.Operator.Core.
 		NewSelect().
 		Model((*User)(nil)).
@@ -176,7 +194,7 @@ func (s *UserStore) IsExist(ctx context.Context, username string) (exists bool, 
 		Exists(ctx)
 }
 
-func (s *UserStore) IsExistByUUID(ctx context.Context, uuid string) (exists bool, err error) {
+func (s *userStoreImpl) IsExistByUUID(ctx context.Context, uuid string) (exists bool, err error) {
 	return s.db.Operator.Core.
 		NewSelect().
 		Model((*User)(nil)).
@@ -185,7 +203,7 @@ func (s *UserStore) IsExistByUUID(ctx context.Context, uuid string) (exists bool
 }
 
 // FindByAccessToken retrieves user information based on the access token. The access token must be active and not expired.
-func (s *UserStore) FindByAccessToken(ctx context.Context, token string) (*User, error) {
+func (s *userStoreImpl) FindByAccessToken(ctx context.Context, token string) (*User, error) {
 	var user User
 	_, err := s.db.Operator.Core.
 		NewSelect().
@@ -200,7 +218,7 @@ func (s *UserStore) FindByAccessToken(ctx context.Context, token string) (*User,
 	return &user, nil
 }
 
-func (s *UserStore) FindByGitAccessToken(ctx context.Context, token string) (*User, error) {
+func (s *userStoreImpl) FindByGitAccessToken(ctx context.Context, token string) (*User, error) {
 	var user User
 	_, err := s.db.Operator.Core.
 		NewSelect().
@@ -216,7 +234,7 @@ func (s *UserStore) FindByGitAccessToken(ctx context.Context, token string) (*Us
 	return &user, nil
 }
 
-func (s *UserStore) FindByUUID(ctx context.Context, uuid string) (*User, error) {
+func (s *userStoreImpl) FindByUUID(ctx context.Context, uuid string) (*User, error) {
 	var user User
 	err := s.db.Operator.Core.NewSelect().Model(&user).Where("uuid = ?", uuid).Scan(ctx)
 	if err != nil {
@@ -225,14 +243,14 @@ func (s *UserStore) FindByUUID(ctx context.Context, uuid string) (*User, error) 
 	return &user, nil
 }
 
-func (s *UserStore) GetActiveUserCount(ctx context.Context) (int, error) {
+func (s *userStoreImpl) GetActiveUserCount(ctx context.Context) (int, error) {
 	return s.db.Operator.Core.
 		NewSelect().
 		Model(&User{}).
 		Count(ctx)
 }
 
-func (s *UserStore) DeleteUserAndRelations(ctx context.Context, input User) (err error) {
+func (s *userStoreImpl) DeleteUserAndRelations(ctx context.Context, input User) (err error) {
 	exists, err := s.IsExist(ctx, input.Username)
 	if err != nil {
 		return fmt.Errorf("error checking if user exists: %v", err)

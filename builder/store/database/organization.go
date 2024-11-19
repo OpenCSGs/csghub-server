@@ -6,12 +6,22 @@ import (
 	"github.com/uptrace/bun"
 )
 
-type OrgStore struct {
+type orgStoreImpl struct {
 	db *DB
 }
 
-func NewOrgStore() *OrgStore {
-	return &OrgStore{
+type OrgStore interface {
+	Create(ctx context.Context, org *Organization, namepace *Namespace) (err error)
+	GetUserOwnOrgs(ctx context.Context, username string) (orgs []Organization, err error)
+	Update(ctx context.Context, org *Organization) (err error)
+	Delete(ctx context.Context, path string) (err error)
+	FindByPath(ctx context.Context, path string) (org Organization, err error)
+	Exists(ctx context.Context, path string) (exists bool, err error)
+	GetUserBelongOrgs(ctx context.Context, userID int64) (orgs []Organization, err error)
+}
+
+func NewOrgStore() OrgStore {
+	return &orgStoreImpl{
 		db: defaultDB,
 	}
 }
@@ -34,7 +44,7 @@ type Organization struct {
 	times
 }
 
-func (s *OrgStore) Create(ctx context.Context, org *Organization, namepace *Namespace) (err error) {
+func (s *orgStoreImpl) Create(ctx context.Context, org *Organization, namepace *Namespace) (err error) {
 	err = s.db.Operator.Core.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
 		if err = assertAffectedOneRow(tx.NewInsert().Model(org).Exec(ctx)); err != nil {
 			return err
@@ -48,7 +58,7 @@ func (s *OrgStore) Create(ctx context.Context, org *Organization, namepace *Name
 	return
 }
 
-func (s *OrgStore) GetUserOwnOrgs(ctx context.Context, username string) (orgs []Organization, err error) {
+func (s *orgStoreImpl) GetUserOwnOrgs(ctx context.Context, username string) (orgs []Organization, err error) {
 	query := s.db.Operator.Core.
 		NewSelect().
 		Model(&orgs).
@@ -63,7 +73,7 @@ func (s *OrgStore) GetUserOwnOrgs(ctx context.Context, username string) (orgs []
 	return
 }
 
-func (s *OrgStore) Update(ctx context.Context, org *Organization) (err error) {
+func (s *orgStoreImpl) Update(ctx context.Context, org *Organization) (err error) {
 	err = assertAffectedOneRow(s.db.Operator.Core.
 		NewUpdate().
 		Model(org).
@@ -72,7 +82,7 @@ func (s *OrgStore) Update(ctx context.Context, org *Organization) (err error) {
 	return
 }
 
-func (s *OrgStore) Delete(ctx context.Context, path string) (err error) {
+func (s *orgStoreImpl) Delete(ctx context.Context, path string) (err error) {
 	err = s.db.Operator.Core.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
 		if err = assertAffectedOneRow(
 			tx.NewDelete().
@@ -93,7 +103,7 @@ func (s *OrgStore) Delete(ctx context.Context, path string) (err error) {
 	return
 }
 
-func (s *OrgStore) FindByPath(ctx context.Context, path string) (org Organization, err error) {
+func (s *orgStoreImpl) FindByPath(ctx context.Context, path string) (org Organization, err error) {
 	org.Nickname = path
 	err = s.db.Operator.Core.
 		NewSelect().
@@ -103,7 +113,7 @@ func (s *OrgStore) FindByPath(ctx context.Context, path string) (org Organizatio
 	return
 }
 
-func (s *OrgStore) Exists(ctx context.Context, path string) (exists bool, err error) {
+func (s *orgStoreImpl) Exists(ctx context.Context, path string) (exists bool, err error) {
 	var org Organization
 	exists, err = s.db.Operator.Core.
 		NewSelect().
@@ -116,7 +126,7 @@ func (s *OrgStore) Exists(ctx context.Context, path string) (exists bool, err er
 	return
 }
 
-func (s *OrgStore) GetUserBelongOrgs(ctx context.Context, userID int64) (orgs []Organization, err error) {
+func (s *orgStoreImpl) GetUserBelongOrgs(ctx context.Context, userID int64) (orgs []Organization, err error) {
 	err = s.db.Operator.Core.
 		NewSelect().
 		Model(&orgs).

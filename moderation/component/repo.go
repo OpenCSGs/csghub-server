@@ -16,16 +16,22 @@ import (
 	"opencsg.com/csghub-server/moderation/checker"
 )
 
-type RepoComponent struct {
+type repoComponentImpl struct {
 	checker sensitive.SensitiveChecker
-	rs      *database.RepoStore
-	rfs     *database.RepoFileStore
-	rfcs    *database.RepoFileCheckStore
+	rs      database.RepoStore
+	rfs     database.RepoFileStore
+	rfcs    database.RepoFileCheckStore
 	git     gitserver.GitServer
 }
 
-func NewRepoComponent(cfg *config.Config) (*RepoComponent, error) {
-	c := &RepoComponent{checker: sensitive.NewAliyunGreenChecker(cfg)}
+type RepoComponent interface {
+	UpdateRepoSensitiveCheckStatus(ctx context.Context, repoType types.RepositoryType, namespace string, name string, status types.SensitiveCheckStatus) error
+	CheckRepoFiles(ctx context.Context, repoType types.RepositoryType, namespace string, name string, options CheckOption) error
+	CheckRequestV2(ctx context.Context, req types.SensitiveRequestV2) (bool, error)
+}
+
+func NewRepoComponent(cfg *config.Config) (RepoComponent, error) {
+	c := &repoComponentImpl{checker: sensitive.NewAliyunGreenChecker(cfg)}
 	gs, err := git.NewGitServer(cfg)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create git server for sensitive component: %w", err)
@@ -47,7 +53,7 @@ type CheckOption struct {
 	// MaxConcurrent  int
 }
 
-func (c *RepoComponent) UpdateRepoSensitiveCheckStatus(ctx context.Context, repoType types.RepositoryType, namespace string, name string, status types.SensitiveCheckStatus) error {
+func (c *repoComponentImpl) UpdateRepoSensitiveCheckStatus(ctx context.Context, repoType types.RepositoryType, namespace string, name string, status types.SensitiveCheckStatus) error {
 	repo, err := c.rs.FindByPath(ctx, repoType, namespace, name)
 	if err != nil {
 		return fmt.Errorf("failed to get repo, error: %w", err)
@@ -58,7 +64,7 @@ func (c *RepoComponent) UpdateRepoSensitiveCheckStatus(ctx context.Context, repo
 	return err
 }
 
-func (c *RepoComponent) CheckRepoFiles(ctx context.Context, repoType types.RepositoryType, namespace string, name string, options CheckOption) error {
+func (c *repoComponentImpl) CheckRepoFiles(ctx context.Context, repoType types.RepositoryType, namespace string, name string, options CheckOption) error {
 	if options.BatchSize == 0 {
 		options.BatchSize = 10
 	}
@@ -96,7 +102,7 @@ func (c *RepoComponent) CheckRepoFiles(ctx context.Context, repoType types.Repos
 	return nil
 }
 
-func (c *RepoComponent) processFile(ctx context.Context, file *database.RepositoryFile) {
+func (c *repoComponentImpl) processFile(ctx context.Context, file *database.RepositoryFile) {
 	reader := NewRepoFileContentReader(file, c.git)
 	checker := checker.GetFileChecker(file.FileType, file.Path, file.LfsRelativePath)
 	status, msg := checker.Run(reader)
@@ -108,7 +114,7 @@ func (c *RepoComponent) processFile(ctx context.Context, file *database.Reposito
 	c.saveCheckResult(ctx, file, status, msg)
 }
 
-func (c *RepoComponent) saveCheckResult(ctx context.Context, file *database.RepositoryFile, status types.SensitiveCheckStatus, msg string) error {
+func (c *repoComponentImpl) saveCheckResult(ctx context.Context, file *database.RepositoryFile, status types.SensitiveCheckStatus, msg string) error {
 	fcr := &database.RepositoryFileCheck{
 		RepoFileID: file.ID,
 		Status:     status,
@@ -141,7 +147,7 @@ func (c *RepoComponent) saveCheckResult(ctx context.Context, file *database.Repo
 	return err
 }
 
-func (cc *RepoComponent) CheckRequestV2(ctx context.Context, req types.SensitiveRequestV2) (bool, error) {
+func (cc *repoComponentImpl) CheckRequestV2(ctx context.Context, req types.SensitiveRequestV2) (bool, error) {
 	fields := req.GetSensitiveFields()
 	for _, field := range fields {
 		pass, err := cc.checker.PassTextCheck(ctx, sensitive.Scenario(field.Scenario), field.Value())

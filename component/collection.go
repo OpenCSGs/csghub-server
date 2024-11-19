@@ -16,8 +16,21 @@ import (
 	"opencsg.com/csghub-server/common/types"
 )
 
-func NewCollectionComponent(config *config.Config) (*CollectionComponent, error) {
-	cc := &CollectionComponent{}
+type CollectionComponent interface {
+	GetCollections(ctx context.Context, filter *types.CollectionFilter, per, page int) ([]types.Collection, int, error)
+	CreateCollection(ctx context.Context, input types.CreateCollectionReq) (*database.Collection, error)
+	GetCollection(ctx context.Context, currentUser string, id int64) (*types.Collection, error)
+	// get non private repositories of the collection
+	GetPublicRepos(collection types.Collection) []types.CollectionRepository
+	UpdateCollection(ctx context.Context, input types.CreateCollectionReq) (*database.Collection, error)
+	DeleteCollection(ctx context.Context, id int64, userName string) error
+	AddReposToCollection(ctx context.Context, req types.UpdateCollectionReposReq) error
+	RemoveReposFromCollection(ctx context.Context, req types.UpdateCollectionReposReq) error
+	OrgCollections(ctx context.Context, req *types.OrgCollectionsReq) ([]types.Collection, int, error)
+}
+
+func NewCollectionComponent(config *config.Config) (CollectionComponent, error) {
+	cc := &collectionComponentImpl{}
 	cc.cs = database.NewCollectionStore()
 	cc.rs = database.NewRepoStore()
 	cc.us = database.NewUserStore()
@@ -33,17 +46,17 @@ func NewCollectionComponent(config *config.Config) (*CollectionComponent, error)
 	return cc, nil
 }
 
-type CollectionComponent struct {
-	os             *database.OrgStore
-	cs             *database.CollectionStore
-	rs             *database.RepoStore
-	us             *database.UserStore
-	uls            *database.UserLikesStore
+type collectionComponentImpl struct {
+	os             database.OrgStore
+	cs             database.CollectionStore
+	rs             database.RepoStore
+	us             database.UserStore
+	uls            database.UserLikesStore
 	userSvcClient  rpc.UserSvcClient
-	spaceComponent *SpaceComponent
+	spaceComponent SpaceComponent
 }
 
-func (cc *CollectionComponent) GetCollections(ctx context.Context, filter *types.CollectionFilter, per, page int) ([]types.Collection, int, error) {
+func (cc *collectionComponentImpl) GetCollections(ctx context.Context, filter *types.CollectionFilter, per, page int) ([]types.Collection, int, error) {
 	collections, total, err := cc.cs.GetCollections(ctx, filter, per, page, true)
 	if err != nil {
 		return nil, 0, err
@@ -58,7 +71,7 @@ func (cc *CollectionComponent) GetCollections(ctx context.Context, filter *types
 
 }
 
-func (cc *CollectionComponent) CreateCollection(ctx context.Context, input types.CreateCollectionReq) (*database.Collection, error) {
+func (cc *collectionComponentImpl) CreateCollection(ctx context.Context, input types.CreateCollectionReq) (*database.Collection, error) {
 	// find by user name
 	user, err := cc.us.FindByUsername(ctx, input.Username)
 	if err != nil {
@@ -82,7 +95,7 @@ func (cc *CollectionComponent) CreateCollection(ctx context.Context, input types
 	return cc.cs.CreateCollection(ctx, collection)
 }
 
-func (cc *CollectionComponent) GetCollection(ctx context.Context, currentUser string, id int64) (*types.Collection, error) {
+func (cc *collectionComponentImpl) GetCollection(ctx context.Context, currentUser string, id int64) (*types.Collection, error) {
 	collection, err := cc.cs.GetCollection(ctx, id)
 	if err != nil {
 		return nil, err
@@ -141,7 +154,7 @@ func (cc *CollectionComponent) GetCollection(ctx context.Context, currentUser st
 }
 
 // get non private repositories of the collection
-func (cc *CollectionComponent) GetPublicRepos(collection types.Collection) []types.CollectionRepository {
+func (cc *collectionComponentImpl) GetPublicRepos(collection types.Collection) []types.CollectionRepository {
 	var filtered []types.CollectionRepository
 	for _, repo := range collection.Repositories {
 		if !repo.Private {
@@ -151,7 +164,7 @@ func (cc *CollectionComponent) GetPublicRepos(collection types.Collection) []typ
 	return filtered
 }
 
-func (cc *CollectionComponent) UpdateCollection(ctx context.Context, input types.CreateCollectionReq) (*database.Collection, error) {
+func (cc *collectionComponentImpl) UpdateCollection(ctx context.Context, input types.CreateCollectionReq) (*database.Collection, error) {
 	collection, err := cc.cs.GetCollection(ctx, input.ID)
 	if err != nil {
 		return nil, fmt.Errorf("cannot find collection to update, %w", err)
@@ -165,7 +178,7 @@ func (cc *CollectionComponent) UpdateCollection(ctx context.Context, input types
 	return cc.cs.UpdateCollection(ctx, *collection)
 }
 
-func (cc *CollectionComponent) DeleteCollection(ctx context.Context, id int64, userName string) error {
+func (cc *collectionComponentImpl) DeleteCollection(ctx context.Context, id int64, userName string) error {
 	// find by user name
 	user, err := cc.us.FindByUsername(ctx, userName)
 	if err != nil {
@@ -174,7 +187,7 @@ func (cc *CollectionComponent) DeleteCollection(ctx context.Context, id int64, u
 	return cc.cs.DeleteCollection(ctx, id, user.ID)
 }
 
-func (cc *CollectionComponent) AddReposToCollection(ctx context.Context, req types.UpdateCollectionReposReq) error {
+func (cc *collectionComponentImpl) AddReposToCollection(ctx context.Context, req types.UpdateCollectionReposReq) error {
 	// find by user name
 	user, err := cc.us.FindByUsername(ctx, req.Username)
 	if err != nil {
@@ -197,7 +210,7 @@ func (cc *CollectionComponent) AddReposToCollection(ctx context.Context, req typ
 	return cc.cs.AddCollectionRepos(ctx, collectionRepos)
 }
 
-func (cc *CollectionComponent) RemoveReposFromCollection(ctx context.Context, req types.UpdateCollectionReposReq) error {
+func (cc *collectionComponentImpl) RemoveReposFromCollection(ctx context.Context, req types.UpdateCollectionReposReq) error {
 	// find by user name
 	user, err := cc.us.FindByUsername(ctx, req.Username)
 	if err != nil {
@@ -220,7 +233,7 @@ func (cc *CollectionComponent) RemoveReposFromCollection(ctx context.Context, re
 	return cc.cs.RemoveCollectionRepos(ctx, collectionRepos)
 }
 
-func (cc *CollectionComponent) getUserCollectionPermission(ctx context.Context, userName string, collection *database.Collection) (*types.UserRepoPermission, error) {
+func (cc *collectionComponentImpl) getUserCollectionPermission(ctx context.Context, userName string, collection *database.Collection) (*types.UserRepoPermission, error) {
 	if userName == "" {
 		//anonymous user only has read permission to public repo
 		return &types.UserRepoPermission{CanRead: !collection.Private, CanWrite: false, CanAdmin: false}, nil
@@ -264,7 +277,7 @@ func (cc *CollectionComponent) getUserCollectionPermission(ctx context.Context, 
 	}
 }
 
-func (c *CollectionComponent) OrgCollections(ctx context.Context, req *types.OrgCollectionsReq) ([]types.Collection, int, error) {
+func (c *collectionComponentImpl) OrgCollections(ctx context.Context, req *types.OrgCollectionsReq) ([]types.Collection, int, error) {
 	var err error
 	r := membership.RoleUnknown
 	if req.CurrentUser != "" {

@@ -5,7 +5,7 @@ import (
 	"fmt"
 )
 
-type PromptPrefixStore struct {
+type promptPrefixStoreImpl struct {
 	db *DB
 }
 
@@ -15,11 +15,15 @@ type PromptPrefix struct {
 	EN string `bun:",notnull" json:"en"`
 }
 
-func NewPromptPrefixStore() *PromptPrefixStore {
-	return &PromptPrefixStore{db: defaultDB}
+type PromptPrefixStore interface {
+	Get(ctx context.Context) (*PromptPrefix, error)
 }
 
-func (p *PromptPrefixStore) Get(ctx context.Context) (*PromptPrefix, error) {
+func NewPromptPrefixStore() PromptPrefixStore {
+	return &promptPrefixStoreImpl{db: defaultDB}
+}
+
+func (p *promptPrefixStoreImpl) Get(ctx context.Context) (*PromptPrefix, error) {
 	var prefix PromptPrefix
 	err := p.db.Operator.Core.NewSelect().Model(&prefix).Order("id desc").Limit(1).Scan(ctx)
 	if err != nil {

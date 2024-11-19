@@ -10,19 +10,27 @@ import (
 	"opencsg.com/csghub-server/common/types"
 )
 
-type MirrorSourceComponent struct {
-	msStore   *database.MirrorSourceStore
-	userStore *database.UserStore
+type mirrorSourceComponentImpl struct {
+	msStore   database.MirrorSourceStore
+	userStore database.UserStore
 }
 
-func NewMirrorSourceComponent(config *config.Config) (*MirrorSourceComponent, error) {
-	return &MirrorSourceComponent{
+type MirrorSourceComponent interface {
+	Create(ctx context.Context, req types.CreateMirrorSourceReq) (*database.MirrorSource, error)
+	Get(ctx context.Context, id int64, currentUser string) (*database.MirrorSource, error)
+	Index(ctx context.Context, currentUser string) ([]database.MirrorSource, error)
+	Update(ctx context.Context, req types.UpdateMirrorSourceReq) (*database.MirrorSource, error)
+	Delete(ctx context.Context, id int64, currentUser string) error
+}
+
+func NewMirrorSourceComponent(config *config.Config) (MirrorSourceComponent, error) {
+	return &mirrorSourceComponentImpl{
 		msStore:   database.NewMirrorSourceStore(),
 		userStore: database.NewUserStore(),
 	}, nil
 }
 
-func (c *MirrorSourceComponent) Create(ctx context.Context, req types.CreateMirrorSourceReq) (*database.MirrorSource, error) {
+func (c *mirrorSourceComponentImpl) Create(ctx context.Context, req types.CreateMirrorSourceReq) (*database.MirrorSource, error) {
 	var ms database.MirrorSource
 	user, err := c.userStore.FindByUsername(ctx, req.CurrentUser)
 	if err != nil {
@@ -40,7 +48,7 @@ func (c *MirrorSourceComponent) Create(ctx context.Context, req types.CreateMirr
 	return res, nil
 }
 
-func (c *MirrorSourceComponent) Get(ctx context.Context, id int64, currentUser string) (*database.MirrorSource, error) {
+func (c *mirrorSourceComponentImpl) Get(ctx context.Context, id int64, currentUser string) (*database.MirrorSource, error) {
 	user, err := c.userStore.FindByUsername(ctx, currentUser)
 	if err != nil {
 		return nil, errors.New("user does not exist")
@@ -55,7 +63,7 @@ func (c *MirrorSourceComponent) Get(ctx context.Context, id int64, currentUser s
 	return ms, nil
 }
 
-func (c *MirrorSourceComponent) Index(ctx context.Context, currentUser string) ([]database.MirrorSource, error) {
+func (c *mirrorSourceComponentImpl) Index(ctx context.Context, currentUser string) ([]database.MirrorSource, error) {
 	user, err := c.userStore.FindByUsername(ctx, currentUser)
 	if err != nil {
 		return nil, errors.New("user does not exist")
@@ -69,7 +77,7 @@ func (c *MirrorSourceComponent) Index(ctx context.Context, currentUser string) (
 	}
 	return ms, nil
 }
-func (c *MirrorSourceComponent) Update(ctx context.Context, req types.UpdateMirrorSourceReq) (*database.MirrorSource, error) {
+func (c *mirrorSourceComponentImpl) Update(ctx context.Context, req types.UpdateMirrorSourceReq) (*database.MirrorSource, error) {
 	var ms database.MirrorSource
 	user, err := c.userStore.FindByUsername(ctx, req.CurrentUser)
 	if err != nil {
@@ -88,7 +96,7 @@ func (c *MirrorSourceComponent) Update(ctx context.Context, req types.UpdateMirr
 	return &ms, nil
 }
 
-func (c *MirrorSourceComponent) Delete(ctx context.Context, id int64, currentUser string) error {
+func (c *mirrorSourceComponentImpl) Delete(ctx context.Context, id int64, currentUser string) error {
 	user, err := c.userStore.FindByUsername(ctx, currentUser)
 	if err != nil {
 		return errors.New("user does not exist")

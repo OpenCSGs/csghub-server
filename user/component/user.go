@@ -23,17 +23,17 @@ import (
 
 const GitalyRepoNotFoundErr = "rpc error: code = NotFound desc = repository does not exist"
 
-type UserComponent struct {
-	us   *database.UserStore
-	os   *database.OrgStore
-	ns   *database.NamespaceStore
-	repo *database.RepoStore
-	ds   *database.DeployTaskStore
-	ams  *database.AccountMeteringStore
+type userComponentImpl struct {
+	us   database.UserStore
+	os   database.OrgStore
+	ns   database.NamespaceStore
+	repo database.RepoStore
+	ds   database.DeployTaskStore
+	ams  database.AccountMeteringStore
 
 	gs     gitserver.GitServer
-	jwtc   *JwtComponent
-	tokenc *AccessTokenComponent
+	jwtc   JwtComponent
+	tokenc AccessTokenComponent
 
 	casc      *casdoorsdk.Client
 	casConfig *casdoorsdk.AuthConfig
@@ -42,9 +42,37 @@ type UserComponent struct {
 	config    *config.Config
 }
 
-func NewUserComponent(config *config.Config) (*UserComponent, error) {
+type UserComponent interface {
+	ChangeUserName(ctx context.Context, oldUserName, newUserName, opUser string) error
+	Update(ctx context.Context, req *types.UpdateUserRequest, opUser string) error
+	Delete(ctx context.Context, operator, username string) error
+	// CanAdmin checks if a user has admin privileges.
+	//
+	// Parameters:
+	// - ctx: The context.Context object for the function.
+	// - username: The username of the user to check.
+	//
+	// Returns:
+	// - bool: True if the user has admin privileges, false otherwise.
+	// - error: An error if the user cannot be found in the database.
+	CanAdmin(ctx context.Context, username string) (bool, error)
+	// GetInternal get *full* user info by username or uuid
+	//
+	// should only be called by other *internal* services
+	GetInternal(ctx context.Context, userNameOrUUID string, useUUID bool) (*types.User, error)
+	Get(ctx context.Context, userNameOrUUID, visitorName string, useUUID bool) (*types.User, error)
+	CheckOperatorAndUser(ctx context.Context, operator, username string) (bool, error)
+	CheckIfUserHasOrgs(ctx context.Context, userName string) (bool, error)
+	CheckIffUserHasRunningOrBuildingDeployments(ctx context.Context, userName string) (bool, error)
+	CheckIfUserHasBills(ctx context.Context, userName string) (bool, error)
+	Index(ctx context.Context, visitorName, search string, per, page int) ([]*types.User, int, error)
+	Signin(ctx context.Context, code, state string) (*types.JWTClaims, string, error)
+	FixUserData(ctx context.Context, userName string) error
+}
+
+func NewUserComponent(config *config.Config) (UserComponent, error) {
 	var err error
-	c := &UserComponent{}
+	c := &userComponentImpl{}
 	c.us = database.NewUserStore()
 	c.os = database.NewOrgStore()
 	c.ns = database.NewNamespaceStore()
@@ -80,12 +108,12 @@ func NewUserComponent(config *config.Config) (*UserComponent, error) {
 }
 
 // This function creates a user when user register from portal, without casdoor
-func (c *UserComponent) createFromPortalRegistry(ctx context.Context, req types.CreateUserRequest) (*database.User, error) {
+func (c *userComponentImpl) createFromPortalRegistry(ctx context.Context, req types.CreateUserRequest) (*database.User, error) {
 	// Panic if the function has not been implemented
 	panic("implement me later")
 }
 
-func (c *UserComponent) createFromCasdoorUser(ctx context.Context, cu casdoorsdk.User) (*database.User, error) {
+func (c *userComponentImpl) createFromCasdoorUser(ctx context.Context, cu casdoorsdk.User) (*database.User, error) {
 	var (
 		gsUserResp        *gitserver.CreateUserResponse
 		err               error
@@ -156,7 +184,7 @@ func (c *UserComponent) createFromCasdoorUser(ctx context.Context, cu casdoorsdk
 	return user, nil
 }
 
-func (c *UserComponent) ChangeUserName(ctx context.Context, oldUserName, newUserName, opUser string) error {
+func (c *userComponentImpl) ChangeUserName(ctx context.Context, oldUserName, newUserName, opUser string) error {
 	if oldUserName != opUser {
 		return fmt.Errorf("user name can only be changed by user self, user: '%s', op user: '%s'", oldUserName, opUser)
 	}
@@ -201,7 +229,7 @@ func (c *UserComponent) ChangeUserName(ctx context.Context, oldUserName, newUser
 	return nil
 }
 
-func (c *UserComponent) Update(ctx context.Context, req *types.UpdateUserRequest, opUser string) error {
+func (c *userComponentImpl) Update(ctx context.Context, req *types.UpdateUserRequest, opUser string) error {
 	c.lazyInit()
 
 	user, err := c.us.FindByUsername(ctx, req.Username)
@@ -254,7 +282,7 @@ func (c *UserComponent) Update(ctx context.Context, req *types.UpdateUserRequest
 
 // user registery with wechat does not have email, so git user is not created after signin
 // when user set email, a git user needs to be created
-func (c *UserComponent) upsertGitUser(username string, nickname *string, oldEmail, newEmail string) error {
+func (c *userComponentImpl) upsertGitUser(username string, nickname *string, oldEmail, newEmail string) error {
 	var err error
 	if nickname == nil {
 		nickname = &username
@@ -287,7 +315,7 @@ func (c *UserComponent) upsertGitUser(username string, nickname *string, oldEmai
 	return nil
 }
 
-func (c *UserComponent) setChangedProps(user *database.User, req *types.UpdateUserRequest) {
+func (c *userComponentImpl) setChangedProps(user *database.User, req *types.UpdateUserRequest) {
 	if req.Email != nil {
 		user.Email = *req.Email
 		if user.CanChangeUserName {
@@ -319,7 +347,7 @@ func (c *UserComponent) setChangedProps(user *database.User, req *types.UpdateUs
 	}
 }
 
-func (c *UserComponent) Delete(ctx context.Context, operator, username string) error {
+func (c *userComponentImpl) Delete(ctx context.Context, operator, username string) error {
 	user, err := c.us.FindByUsername(ctx, username)
 	if err != nil {
 		newError := fmt.Errorf("failed to find user by name in db,error:%w", err)
@@ -375,7 +403,7 @@ func (c *UserComponent) Delete(ctx context.Context, operator, username string) e
 // Returns:
 // - bool: True if the user has admin privileges, false otherwise.
 // - error: An error if the user cannot be found in the database.
-func (c *UserComponent) CanAdmin(ctx context.Context, username string) (bool, error) {
+func (c *userComponentImpl) CanAdmin(ctx context.Context, username string) (bool, error) {
 	user, err := c.us.FindByUsername(ctx, username)
 	if err != nil {
 		newError := fmt.Errorf("failed to find user by name '%s' in db,error:%w", username, err)
@@ -387,7 +415,7 @@ func (c *UserComponent) CanAdmin(ctx context.Context, username string) (bool, er
 // GetInternal get *full* user info by username or uuid
 //
 // should only be called by other *internal* services
-func (c *UserComponent) GetInternal(ctx context.Context, userNameOrUUID string, useUUID bool) (*types.User, error) {
+func (c *userComponentImpl) GetInternal(ctx context.Context, userNameOrUUID string, useUUID bool) (*types.User, error) {
 	var dbuser = new(database.User)
 	var err error
 	if useUUID {
@@ -401,7 +429,7 @@ func (c *UserComponent) GetInternal(ctx context.Context, userNameOrUUID string, 
 	return c.buildUserInfo(ctx, dbuser, false)
 }
 
-func (c *UserComponent) Get(ctx context.Context, userNameOrUUID, visitorName string, useUUID bool) (*types.User, error) {
+func (c *userComponentImpl) Get(ctx context.Context, userNameOrUUID, visitorName string, useUUID bool) (*types.User, error) {
 	var dbuser = new(database.User)
 	var err error
 	if useUUID {
@@ -431,7 +459,7 @@ func (c *UserComponent) Get(ctx context.Context, userNameOrUUID, visitorName str
 	return c.buildUserInfo(ctx, dbuser, onlyBasicInfo)
 }
 
-func (c *UserComponent) CheckOperatorAndUser(ctx context.Context, operator, username string) (bool, error) {
+func (c *userComponentImpl) CheckOperatorAndUser(ctx context.Context, operator, username string) (bool, error) {
 	opUser, err := c.us.FindByUsername(ctx, operator)
 	if err != nil {
 		newError := fmt.Errorf("failed to find operator by name in db,error:%w", err)
@@ -453,7 +481,7 @@ func (c *UserComponent) CheckOperatorAndUser(ctx context.Context, operator, user
 	return false, nil
 }
 
-func (c *UserComponent) CheckIfUserHasOrgs(ctx context.Context, userName string) (bool, error) {
+func (c *userComponentImpl) CheckIfUserHasOrgs(ctx context.Context, userName string) (bool, error) {
 	var (
 		err  error
 		orgs []database.Organization
@@ -467,7 +495,7 @@ func (c *UserComponent) CheckIfUserHasOrgs(ctx context.Context, userName string)
 	return true, nil
 }
 
-func (c *UserComponent) CheckIffUserHasRunningOrBuildingDeployments(ctx context.Context, userName string) (bool, error) {
+func (c *userComponentImpl) CheckIffUserHasRunningOrBuildingDeployments(ctx context.Context, userName string) (bool, error) {
 	user, err := c.us.FindByUsername(ctx, userName)
 	if err != nil {
 		return false, fmt.Errorf("failed to find user by username in db, error: %v", err)
@@ -482,7 +510,7 @@ func (c *UserComponent) CheckIffUserHasRunningOrBuildingDeployments(ctx context.
 	return false, nil
 }
 
-func (c *UserComponent) CheckIfUserHasBills(ctx context.Context, userName string) (bool, error) {
+func (c *userComponentImpl) CheckIfUserHasBills(ctx context.Context, userName string) (bool, error) {
 	user, err := c.us.FindByUsername(ctx, userName)
 	if err != nil {
 		return false, fmt.Errorf("failed to find user by username in db, error: %v", err)
@@ -498,7 +526,7 @@ func (c *UserComponent) CheckIfUserHasBills(ctx context.Context, userName string
 	return false, nil
 }
 
-func (c *UserComponent) buildUserInfo(ctx context.Context, dbuser *database.User, onlyBasicInfo bool) (*types.User, error) {
+func (c *userComponentImpl) buildUserInfo(ctx context.Context, dbuser *database.User, onlyBasicInfo bool) (*types.User, error) {
 	u := types.User{
 		Username: dbuser.Username,
 		Nickname: dbuser.NickName,
@@ -537,7 +565,7 @@ func (c *UserComponent) buildUserInfo(ctx context.Context, dbuser *database.User
 	return &u, nil
 }
 
-func (c *UserComponent) Index(ctx context.Context, visitorName, search string, per, page int) ([]*types.User, int, error) {
+func (c *userComponentImpl) Index(ctx context.Context, visitorName, search string, per, page int) ([]*types.User, int, error) {
 	var (
 		respUsers     []*types.User
 		onlyBasicInfo bool
@@ -578,7 +606,7 @@ func (c *UserComponent) Index(ctx context.Context, visitorName, search string, p
 	return respUsers, count, nil
 }
 
-func (c *UserComponent) Signin(ctx context.Context, code, state string) (*types.JWTClaims, string, error) {
+func (c *userComponentImpl) Signin(ctx context.Context, code, state string) (*types.JWTClaims, string, error) {
 	c.lazyInit()
 
 	casToken, err := c.casc.GetOAuthToken(code, state)
@@ -640,7 +668,7 @@ func (c *UserComponent) Signin(ctx context.Context, code, state string) (*types.
 	return hubToken, signed, nil
 }
 
-func (c *UserComponent) genUniqueName() (string, error) {
+func (c *userComponentImpl) genUniqueName() (string, error) {
 	c.lazyInit()
 
 	if c.sfnode == nil {
@@ -650,7 +678,7 @@ func (c *UserComponent) genUniqueName() (string, error) {
 	return "user_" + id, nil
 }
 
-func (c *UserComponent) updateCasdoorUser(req *types.UpdateUserRequest) error {
+func (c *userComponentImpl) updateCasdoorUser(req *types.UpdateUserRequest) error {
 	c.lazyInit()
 
 	casu, err := c.casc.GetUserByUserId(*req.UUID)
@@ -683,7 +711,7 @@ func (c *UserComponent) updateCasdoorUser(req *types.UpdateUserRequest) error {
 	return err
 }
 
-func (c *UserComponent) lazyInit() {
+func (c *userComponentImpl) lazyInit() {
 	c.once.Do(func() {
 		var err error
 		c.casc = casdoorsdk.NewClientWithConf(c.casConfig)
@@ -694,7 +722,7 @@ func (c *UserComponent) lazyInit() {
 	})
 }
 
-func (c *UserComponent) FixUserData(ctx context.Context, userName string) error {
+func (c *userComponentImpl) FixUserData(ctx context.Context, userName string) error {
 	err := c.gs.FixUserData(ctx, userName)
 	if err != nil {
 		return err

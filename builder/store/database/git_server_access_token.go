@@ -2,12 +2,18 @@ package database
 
 import "context"
 
-type GitServerAccessTokenStore struct {
+type gitServerAccessTokenStoreImpl struct {
 	db *DB
 }
 
-func NewGitServerAccessTokenStore() *GitServerAccessTokenStore {
-	return &GitServerAccessTokenStore{
+type GitServerAccessTokenStore interface {
+	Create(ctx context.Context, gToken *GitServerAccessToken) (*GitServerAccessToken, error)
+	Index(ctx context.Context) ([]GitServerAccessToken, error)
+	FindByType(ctx context.Context, serverType string) ([]GitServerAccessToken, error)
+}
+
+func NewGitServerAccessTokenStore() GitServerAccessTokenStore {
+	return &gitServerAccessTokenStoreImpl{
 		db: defaultDB,
 	}
 }
@@ -26,7 +32,7 @@ type GitServerAccessToken struct {
 	times
 }
 
-func (s *GitServerAccessTokenStore) Create(ctx context.Context, gToken *GitServerAccessToken) (*GitServerAccessToken, error) {
+func (s *gitServerAccessTokenStoreImpl) Create(ctx context.Context, gToken *GitServerAccessToken) (*GitServerAccessToken, error) {
 	err := s.db.Operator.Core.NewInsert().
 		Model(gToken).
 		Scan(ctx)
@@ -36,7 +42,7 @@ func (s *GitServerAccessTokenStore) Create(ctx context.Context, gToken *GitServe
 	return gToken, nil
 }
 
-func (s *GitServerAccessTokenStore) Index(ctx context.Context) ([]GitServerAccessToken, error) {
+func (s *gitServerAccessTokenStoreImpl) Index(ctx context.Context) ([]GitServerAccessToken, error) {
 	var gTokens []GitServerAccessToken
 	err := s.db.Operator.Core.NewSelect().
 		Model(&gTokens).
@@ -47,7 +53,7 @@ func (s *GitServerAccessTokenStore) Index(ctx context.Context) ([]GitServerAcces
 	return gTokens, nil
 }
 
-func (s *GitServerAccessTokenStore) FindByType(ctx context.Context, serverType string) ([]GitServerAccessToken, error) {
+func (s *gitServerAccessTokenStoreImpl) FindByType(ctx context.Context, serverType string) ([]GitServerAccessToken, error) {
 	var gTokens []GitServerAccessToken
 	err := s.db.Operator.Core.NewSelect().
 		Model(&gTokens).

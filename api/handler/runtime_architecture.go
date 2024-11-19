@@ -29,8 +29,8 @@ func NewRuntimeArchitectureHandler(config *config.Config) (*RuntimeArchitectureH
 }
 
 type RuntimeArchitectureHandler struct {
-	rc  *component.RepoComponent
-	rac *component.RuntimeArchitectureComponent
+	rc  component.RepoComponent
+	rac component.RuntimeArchitectureComponent
 }
 
 // GetArchitectures godoc

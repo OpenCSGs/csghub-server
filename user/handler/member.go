@@ -13,7 +13,7 @@ import (
 )
 
 type MemberHandler struct {
-	c *component.MemberComponent
+	c component.MemberComponent
 }
 
 func NewMemberHandler(config *config.Config) (*MemberHandler, error) {

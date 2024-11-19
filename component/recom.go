@@ -13,26 +13,33 @@ import (
 	"opencsg.com/csghub-server/common/config"
 )
 
-type RecomComponent struct {
-	rs    *database.RecomStore
-	repos *database.RepoStore
+type recomComponentImpl struct {
+	rs    database.RecomStore
+	repos database.RepoStore
 	gs    gitserver.GitServer
 }
 
-func NewRecomComponent(cfg *config.Config) (*RecomComponent, error) {
+type RecomComponent interface {
+	SetOpWeight(ctx context.Context, repoID, weight int64) error
+	// loop through repositories and calculate the recom score of the repository
+	CalculateRecomScore(ctx context.Context)
+	CalcTotalScore(ctx context.Context, repo *database.Repository, weights map[string]string) float64
+}
+
+func NewRecomComponent(cfg *config.Config) (RecomComponent, error) {
 	gs, err := git.NewGitServer(cfg)
 	if err != nil {
 		return nil, fmt.Errorf("failed to init git server,%w", err)
 	}
 
-	return &RecomComponent{
+	return &recomComponentImpl{
 		rs:    database.NewRecomStore(),
 		repos: database.NewRepoStore(),
 		gs:    gs,
 	}, nil
 }
 
-func (rc *RecomComponent) SetOpWeight(ctx context.Context, repoID, weight int64) error {
+func (rc *recomComponentImpl) SetOpWeight(ctx context.Context, repoID, weight int64) error {
 	_, err := rc.repos.FindById(ctx, repoID)
 	if err != nil {
 		return fmt.Errorf("failed to find repository with id %d, err:%w", repoID, err)
@@ -41,7 +48,7 @@ func (rc *RecomComponent) SetOpWeight(ctx context.Context, repoID, weight int64)
 }
 
 // loop through repositories and calculate the recom score of the repository
-func (rc *RecomComponent) CalculateRecomScore(ctx context.Context) {
+func (rc *recomComponentImpl) CalculateRecomScore(ctx context.Context) {
 	weights, err := rc.loadWeights()
 	if err != nil {
 		slog.Error("Error loading weights", err)
@@ -54,7 +61,7 @@ func (rc *RecomComponent) CalculateRecomScore(ctx context.Context) {
 	}
 	for _, repo := range repos {
 		repoID := repo.ID
-		score := rc.calcTotalScore(ctx, repo, weights)
+		score := rc.CalcTotalScore(ctx, repo, weights)
 		err := rc.rs.UpsertScore(ctx, repoID, score)
 		if err != nil {
 			slog.Error("Error updating recom score", slog.Int64("repo_id", repoID), slog.Float64("score", score),
@@ -63,7 +70,7 @@ func (rc *RecomComponent) CalculateRecomScore(ctx context.Context) {
 	}
 }
 
-func (rc *RecomComponent) calcTotalScore(ctx context.Context, repo *database.Repository, weights map[string]string) float64 {
+func (rc *recomComponentImpl) CalcTotalScore(ctx context.Context, repo *database.Repository, weights map[string]string) float64 {
 	score := float64(0)
 
 	if freshness, ok := weights["freshness"]; ok {
@@ -84,7 +91,7 @@ func (rc *RecomComponent) calcTotalScore(ctx context.Context, repo *database.Rep
 	return score
 }
 
-func (rc *RecomComponent) calcFreshnessScore(createdAt time.Time, weightExp string) float64 {
+func (rc *recomComponentImpl) calcFreshnessScore(createdAt time.Time, weightExp string) float64 {
 	// TODO:cache compiled script
 	hours := time.Since(createdAt).Hours()
 	scriptFreshness := tengo.NewScript([]byte(weightExp))
@@ -103,7 +110,7 @@ func (rc *RecomComponent) calcFreshnessScore(createdAt time.Time, weightExp stri
 	return sc.Get("score").Float()
 }
 
-func (rc *RecomComponent) calcDownloadsScore(downloads int64, weightExp string) float64 {
+func (rc *recomComponentImpl) calcDownloadsScore(downloads int64, weightExp string) float64 {
 	// TODO:cache compiled script
 	scriptFreshness := tengo.NewScript([]byte(weightExp))
 	scriptFreshness.Add("score", 0.0)
@@ -121,7 +128,7 @@ func (rc *RecomComponent) calcDownloadsScore(downloads int64, weightExp string) 
 	return sc.Get("score").Float()
 }
 
-func (rc *RecomComponent) calcQualityScore(ctx context.Context, repo *database.Repository) (float64, error) {
+func (rc *recomComponentImpl) calcQualityScore(ctx context.Context, repo *database.Repository) (float64, error) {
 	score := 0.0
 	// get file counts from git server
 	namespace, name := repo.NamespaceAndName()
@@ -148,7 +155,7 @@ func (rc *RecomComponent) calcQualityScore(ctx context.Context, repo *database.R
 	return score, nil
 }
 
-func (rc *RecomComponent) loadWeights() (map[string]string, error) {
+func (rc *recomComponentImpl) loadWeights() (map[string]string, error) {
 	ctx := context.Background()
 	items, err := rc.rs.LoadWeights(ctx)
 	if err != nil {
@@ -162,7 +169,7 @@ func (rc *RecomComponent) loadWeights() (map[string]string, error) {
 	return weights, nil
 }
 
-func (rc *RecomComponent) loadOpWeights() (map[int64]int, error) {
+func (rc *recomComponentImpl) loadOpWeights() (map[int64]int, error) {
 	ctx := context.Background()
 	items, err := rc.rs.LoadOpWeights(ctx)
 	if err != nil {

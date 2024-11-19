@@ -21,30 +21,39 @@ import (
 	"opencsg.com/csghub-server/mirror/queue"
 )
 
-type MirrorComponent struct {
-	tokenStore         *database.GitServerAccessTokenStore
+type mirrorComponentImpl struct {
+	tokenStore         database.GitServerAccessTokenStore
 	mirrorServer       mirrorserver.MirrorServer
 	saas               bool
-	repoComp           *RepoComponent
+	repoComp           RepoComponent
 	git                gitserver.GitServer
 	s3Client           *s3.Client
 	lfsBucket          string
-	modelStore         *database.ModelStore
-	datasetStore       *database.DatasetStore
-	codeStore          *database.CodeStore
-	repoStore          *database.RepoStore
-	mirrorStore        *database.MirrorStore
-	mirrorSourceStore  *database.MirrorSourceStore
-	namespaceStore     *database.NamespaceStore
-	lfsMetaObjectStore *database.LfsMetaObjectStore
-	userStore          *database.UserStore
+	modelStore         database.ModelStore
+	datasetStore       database.DatasetStore
+	codeStore          database.CodeStore
+	repoStore          database.RepoStore
+	mirrorStore        database.MirrorStore
+	mirrorSourceStore  database.MirrorSourceStore
+	namespaceStore     database.NamespaceStore
+	lfsMetaObjectStore database.LfsMetaObjectStore
+	userStore          database.UserStore
 	config             *config.Config
 	mq                 *queue.PriorityQueue
 }
 
-func NewMirrorComponent(config *config.Config) (*MirrorComponent, error) {
+type MirrorComponent interface {
+	CreatePushMirrorForFinishedMirrorTask(ctx context.Context) error
+	// CreateMirrorRepo often called by the crawler server to create new repo which will then be mirrored from other sources
+	CreateMirrorRepo(ctx context.Context, req types.CreateMirrorRepoReq) (*database.Mirror, error)
+	CheckMirrorProgress(ctx context.Context) error
+	Repos(ctx context.Context, currentUser string, per, page int) ([]types.MirrorRepo, int, error)
+	Index(ctx context.Context, currentUser string, per, page int) ([]types.Mirror, int, error)
+}
+
+func NewMirrorComponent(config *config.Config) (MirrorComponent, error) {
 	var err error
-	c := &MirrorComponent{}
+	c := &mirrorComponentImpl{}
 	if config.GitServer.Type == types.GitServerTypeGitea {
 		c.mirrorServer, err = git.NewMirrorServer(config)
 		if err != nil {
@@ -89,7 +98,7 @@ func NewMirrorComponent(config *config.Config) (*MirrorComponent, error) {
 	return c, nil
 }
 
-func (c *MirrorComponent) CreatePushMirrorForFinishedMirrorTask(ctx context.Context) error {
+func (c *mirrorComponentImpl) CreatePushMirrorForFinishedMirrorTask(ctx context.Context) error {
 	mirrors, err := c.mirrorStore.NoPushMirror(ctx)
 	if err != nil {
 		return fmt.Errorf("fail to find all mirrors, %w", err)
@@ -127,7 +136,7 @@ func (c *MirrorComponent) CreatePushMirrorForFinishedMirrorTask(ctx context.Cont
 }
 
 // CreateMirrorRepo often called by the crawler server to create new repo which will then be mirrored from other sources
-func (c *MirrorComponent) CreateMirrorRepo(ctx context.Context, req types.CreateMirrorRepoReq) (*database.Mirror, error) {
+func (c *mirrorComponentImpl) CreateMirrorRepo(ctx context.Context, req types.CreateMirrorRepoReq) (*database.Mirror, error) {
 	var username string
 	namespace := c.mapNamespaceAndName(req.SourceNamespace)
 	name := req.SourceName
@@ -276,7 +285,7 @@ func (c *MirrorComponent) CreateMirrorRepo(ctx context.Context, req types.Create
 	return reqMirror, nil
 }
 
-func (m *MirrorComponent) mapNamespaceAndName(sourceNamespace string) string {
+func (m *mirrorComponentImpl) mapNamespaceAndName(sourceNamespace string) string {
 	namespace := sourceNamespace
 	if ns, found := mirrorOrganizationMap[sourceNamespace]; found {
 		namespace = ns
@@ -288,7 +297,7 @@ func (m *MirrorComponent) mapNamespaceAndName(sourceNamespace string) string {
 	return namespace
 }
 
-func (c *MirrorComponent) CheckMirrorProgress(ctx context.Context) error {
+func (c *mirrorComponentImpl) CheckMirrorProgress(ctx context.Context) error {
 	mirrors, err := c.mirrorStore.Unfinished(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to get unfinished mirrors: %v", err)
@@ -333,7 +342,7 @@ var mirrorStatusAndRepoSyncStatusMapping = map[types.MirrorTaskStatus]types.Repo
 	types.MirrorIncomplete: types.SyncStatusFailed,
 }
 
-func (c *MirrorComponent) checkAndUpdateMirrorStatus(ctx context.Context, mirror database.Mirror) error {
+func (c *mirrorComponentImpl) checkAndUpdateMirrorStatus(ctx context.Context, mirror database.Mirror) error {
 	var statusAndProgressFunc func(ctx context.Context, mirror database.Mirror) (types.MirrorResp, error)
 	if mirror.Repository == nil {
 		return nil
@@ -409,7 +418,7 @@ func getAllFiles(namespace, repoName, folder string, repoType types.RepositoryTy
 	return files, nil
 }
 
-func (c *MirrorComponent) getMirrorStatusAndProgressOnPremise(ctx context.Context, mirror database.Mirror) (types.MirrorResp, error) {
+func (c *mirrorComponentImpl) getMirrorStatusAndProgressOnPremise(ctx context.Context, mirror database.Mirror) (types.MirrorResp, error) {
 	task, err := c.git.GetMirrorTaskInfo(ctx, mirror.MirrorTaskID)
 	if err != nil {
 		slog.Error("fail to get mirror task info", slog.Int64("taskId", mirror.MirrorTaskID), slog.String("error", err.Error()))
@@ -476,7 +485,7 @@ func (c *MirrorComponent) getMirrorStatusAndProgressOnPremise(ctx context.Contex
 	}
 }
 
-func (c *MirrorComponent) getMirrorStatusAndProgressSaas(ctx context.Context, mirror database.Mirror) (types.MirrorResp, error) {
+func (c *mirrorComponentImpl) getMirrorStatusAndProgressSaas(ctx context.Context, mirror database.Mirror) (types.MirrorResp, error) {
 	task, err := c.mirrorServer.GetMirrorTaskInfo(ctx, mirror.MirrorTaskID)
 	if err != nil {
 		slog.Error("fail to get mirror task info", slog.Int64("taskId", mirror.MirrorTaskID), slog.String("error", err.Error()))
@@ -543,7 +552,7 @@ func (c *MirrorComponent) getMirrorStatusAndProgressSaas(ctx context.Context, mi
 	}
 }
 
-func (c *MirrorComponent) countMirrorProgress(ctx context.Context, mirror database.Mirror) (int8, error) {
+func (c *mirrorComponentImpl) countMirrorProgress(ctx context.Context, mirror database.Mirror) (int8, error) {
 	var (
 		lfsFiles          []*types.File
 		finishedFileCount int
@@ -586,7 +595,7 @@ func (c *MirrorComponent) countMirrorProgress(ctx context.Context, mirror databa
 	return int8(progress), nil
 }
 
-func (c *MirrorComponent) Repos(ctx context.Context, currentUser string, per, page int) ([]types.MirrorRepo, int, error) {
+func (c *mirrorComponentImpl) Repos(ctx context.Context, currentUser string, per, page int) ([]types.MirrorRepo, int, error) {
 	var mirrorRepos []types.MirrorRepo
 	user, err := c.userStore.FindByUsername(ctx, currentUser)
 	if err != nil {
@@ -610,7 +619,7 @@ func (c *MirrorComponent) Repos(ctx context.Context, currentUser string, per, pa
 	return mirrorRepos, total, nil
 }
 
-func (c *MirrorComponent) Index(ctx context.Context, currentUser string, per, page int) ([]types.Mirror, int, error) {
+func (c *mirrorComponentImpl) Index(ctx context.Context, currentUser string, per, page int) ([]types.Mirror, int, error) {
 	var mirrorsResp []types.Mirror
 	user, err := c.userStore.FindByUsername(ctx, currentUser)
 	if err != nil {

@@ -11,25 +11,29 @@ import (
 	"opencsg.com/csghub-server/common/types"
 )
 
-type AccountingComponent struct {
+type accountingComponentImpl struct {
 	acctClient *accounting.AccountingClient
-	user       *database.UserStore
-	deploy     *database.DeployTaskStore
+	user       database.UserStore
+	deploy     database.DeployTaskStore
 }
 
-func NewAccountingComponent(config *config.Config) (*AccountingComponent, error) {
+type AccountingComponent interface {
+	ListMeteringsByUserIDAndTime(ctx context.Context, req types.ACCT_STATEMENTS_REQ) (interface{}, error)
+}
+
+func NewAccountingComponent(config *config.Config) (AccountingComponent, error) {
 	c, err := accounting.NewAccountingClient(config)
 	if err != nil {
 		return nil, err
 	}
-	return &AccountingComponent{
+	return &accountingComponentImpl{
 		acctClient: c,
 		user:       database.NewUserStore(),
 		deploy:     database.NewDeployTaskStore(),
 	}, nil
 }
 
-func (ac *AccountingComponent) ListMeteringsByUserIDAndTime(ctx context.Context, req types.ACCT_STATEMENTS_REQ) (interface{}, error) {
+func (ac *accountingComponentImpl) ListMeteringsByUserIDAndTime(ctx context.Context, req types.ACCT_STATEMENTS_REQ) (interface{}, error) {
 	user, err := ac.user.FindByUsername(ctx, req.CurrentUser)
 	if err != nil {
 		return nil, fmt.Errorf("user does not exist, %w", err)

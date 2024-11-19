@@ -16,8 +16,32 @@ import (
 	"opencsg.com/csghub-server/common/types"
 )
 
-func NewUserComponent(config *config.Config) (*UserComponent, error) {
-	c := &UserComponent{}
+type UserComponent interface {
+	Datasets(ctx context.Context, req *types.UserDatasetsReq) ([]types.Dataset, int, error)
+	Models(ctx context.Context, req *types.UserModelsReq) ([]types.Model, int, error)
+	Codes(ctx context.Context, req *types.UserModelsReq) ([]types.Code, int, error)
+	Spaces(ctx context.Context, req *types.UserSpacesReq) ([]types.Space, int, error)
+	AddLikes(ctx context.Context, req *types.UserLikesRequest) error
+	// user likes collection
+	LikesCollection(ctx context.Context, req *types.UserSpacesReq) ([]types.Collection, int, error)
+	// UserCollections get collections of owner or visible to current user
+	Collections(ctx context.Context, req *types.UserCollectionReq) ([]types.Collection, int, error)
+	LikeCollection(ctx context.Context, req *types.UserLikesRequest) error
+	UnLikeCollection(ctx context.Context, req *types.UserLikesRequest) error
+	DeleteLikes(ctx context.Context, req *types.UserLikesRequest) error
+	LikesSpaces(ctx context.Context, req *types.UserSpacesReq) ([]types.Space, int, error)
+	LikesCodes(ctx context.Context, req *types.UserModelsReq) ([]types.Code, int, error)
+	LikesModels(ctx context.Context, req *types.UserModelsReq) ([]types.Model, int, error)
+	LikesDatasets(ctx context.Context, req *types.UserDatasetsReq) ([]types.Dataset, int, error)
+	ListDeploys(ctx context.Context, repoType types.RepositoryType, req *types.DeployReq) ([]types.DeployRepo, int, error)
+	ListInstances(ctx context.Context, req *types.UserRepoReq) ([]types.DeployRepo, int, error)
+	ListServerless(ctx context.Context, req types.DeployReq) ([]types.DeployRepo, int, error)
+	GetUserByName(ctx context.Context, userName string) (*database.User, error)
+	Prompts(ctx context.Context, req *types.UserPromptsReq) ([]types.PromptRes, int, error)
+}
+
+func NewUserComponent(config *config.Config) (UserComponent, error) {
+	c := &userComponentImpl{}
 	c.ms = database.NewModelStore()
 	c.us = database.NewUserStore()
 	c.ds = database.NewDatasetStore()
@@ -36,7 +60,7 @@ func NewUserComponent(config *config.Config) (*UserComponent, error) {
 		newError := fmt.Errorf("failed to create git server,error:%w", err)
 		return nil, newError
 	}
-	c.repoComponent, err = NewRepoComponent(config)
+	c.repoComponent, err = NewRepoComponentImpl(config)
 	if err != nil {
 		newError := fmt.Errorf("failed to create repo component,error:%w", err)
 		return nil, newError
@@ -53,28 +77,28 @@ func NewUserComponent(config *config.Config) (*UserComponent, error) {
 	return c, nil
 }
 
-type UserComponent struct {
-	us             *database.UserStore
-	ms             *database.ModelStore
-	ds             *database.DatasetStore
-	cs             *database.CodeStore
-	ss             *database.SpaceStore
-	ns             *database.NamespaceStore
+type userComponentImpl struct {
+	us             database.UserStore
+	ms             database.ModelStore
+	ds             database.DatasetStore
+	cs             database.CodeStore
+	ss             database.SpaceStore
+	ns             database.NamespaceStore
 	gs             gitserver.GitServer
-	spaceComponent *SpaceComponent
-	repoComponent  *RepoComponent
+	spaceComponent SpaceComponent
+	repoComponent  *repoComponentImpl
 	deployer       deploy.Deployer
-	uls            *database.UserLikesStore
-	repo           *database.RepoStore
-	deploy         *database.DeployTaskStore
-	cos            *database.CollectionStore
-	ac             *AccountingComponent
-	srs            *database.SpaceResourceStore
+	uls            database.UserLikesStore
+	repo           database.RepoStore
+	deploy         database.DeployTaskStore
+	cos            database.CollectionStore
+	ac             AccountingComponent
+	srs            database.SpaceResourceStore
 	// urs            *database.UserResourcesStore
-	pt *database.PromptStore
+	pt database.PromptStore
 }
 
-func (c *UserComponent) Datasets(ctx context.Context, req *types.UserDatasetsReq) ([]types.Dataset, int, error) {
+func (c *userComponentImpl) Datasets(ctx context.Context, req *types.UserDatasetsReq) ([]types.Dataset, int, error) {
 	var resDatasets []types.Dataset
 	userExists, err := c.us.IsExist(ctx, req.Owner)
 	if err != nil {
@@ -127,7 +151,7 @@ func (c *UserComponent) Datasets(ctx context.Context, req *types.UserDatasetsReq
 	return resDatasets, total, nil
 }
 
-func (c *UserComponent) Models(ctx context.Context, req *types.UserModelsReq) ([]types.Model, int, error) {
+func (c *userComponentImpl) Models(ctx context.Context, req *types.UserModelsReq) ([]types.Model, int, error) {
 	var resModels []types.Model
 	userExists, err := c.us.IsExist(ctx, req.Owner)
 	if err != nil {
@@ -180,7 +204,7 @@ func (c *UserComponent) Models(ctx context.Context, req *types.UserModelsReq) ([
 	return resModels, total, nil
 }
 
-func (c *UserComponent) Codes(ctx context.Context, req *types.UserModelsReq) ([]types.Code, int, error) {
+func (c *userComponentImpl) Codes(ctx context.Context, req *types.UserModelsReq) ([]types.Code, int, error) {
 	var resCodes []types.Code
 	userExists, err := c.us.IsExist(ctx, req.Owner)
 	if err != nil {
@@ -233,7 +257,7 @@ func (c *UserComponent) Codes(ctx context.Context, req *types.UserModelsReq) ([]
 	return resCodes, total, nil
 }
 
-func (c *UserComponent) Spaces(ctx context.Context, req *types.UserSpacesReq) ([]types.Space, int, error) {
+func (c *userComponentImpl) Spaces(ctx context.Context, req *types.UserSpacesReq) ([]types.Space, int, error) {
 	userExists, err := c.us.IsExist(ctx, req.Owner)
 	if err != nil {
 		newError := fmt.Errorf("failed to check for the presence of the user,error:%w", err)
@@ -261,7 +285,7 @@ func (c *UserComponent) Spaces(ctx context.Context, req *types.UserSpacesReq) ([
 	return c.spaceComponent.UserSpaces(ctx, req)
 }
 
-func (c *UserComponent) AddLikes(ctx context.Context, req *types.UserLikesRequest) error {
+func (c *userComponentImpl) AddLikes(ctx context.Context, req *types.UserLikesRequest) error {
 	user, err := c.us.FindByUsername(ctx, req.CurrentUser)
 	if err != nil {
 		newError := fmt.Errorf("failed to check for the presence of the user, error:%w", err)
@@ -291,7 +315,7 @@ func (c *UserComponent) AddLikes(ctx context.Context, req *types.UserLikesReques
 }
 
 // user likes collection
-func (c *UserComponent) LikesCollection(ctx context.Context, req *types.UserSpacesReq) ([]types.Collection, int, error) {
+func (c *userComponentImpl) LikesCollection(ctx context.Context, req *types.UserSpacesReq) ([]types.Collection, int, error) {
 	user, err := c.us.FindByUsername(ctx, req.CurrentUser)
 	if err != nil {
 		newError := fmt.Errorf("failed to check for the presence of the user, error:%w", err)
@@ -314,7 +338,7 @@ func (c *UserComponent) LikesCollection(ctx context.Context, req *types.UserSpac
 }
 
 // UserCollections get collections of owner or visible to current user
-func (c *UserComponent) Collections(ctx context.Context, req *types.UserCollectionReq) ([]types.Collection, int, error) {
+func (c *userComponentImpl) Collections(ctx context.Context, req *types.UserCollectionReq) ([]types.Collection, int, error) {
 	userExists, err := c.us.IsExist(ctx, req.Owner)
 	if err != nil {
 		newError := fmt.Errorf("failed to check for the presence of the user,error:%w", err)
@@ -356,7 +380,7 @@ func (c *UserComponent) Collections(ctx context.Context, req *types.UserCollecti
 	return newCollection, total, nil
 }
 
-func (c *UserComponent) LikeCollection(ctx context.Context, req *types.UserLikesRequest) error {
+func (c *userComponentImpl) LikeCollection(ctx context.Context, req *types.UserLikesRequest) error {
 	user, err := c.us.FindByUsername(ctx, req.CurrentUser)
 	if err != nil {
 		newError := fmt.Errorf("failed to check for the presence of the user, error:%w", err)
@@ -376,7 +400,7 @@ func (c *UserComponent) LikeCollection(ctx context.Context, req *types.UserLikes
 	return err
 }
 
-func (c *UserComponent) UnLikeCollection(ctx context.Context, req *types.UserLikesRequest) error {
+func (c *userComponentImpl) UnLikeCollection(ctx context.Context, req *types.UserLikesRequest) error {
 	user, err := c.us.FindByUsername(ctx, req.CurrentUser)
 	if err != nil {
 		newError := fmt.Errorf("failed to check for the presence of the user,error:%w", err)
@@ -386,7 +410,7 @@ func (c *UserComponent) UnLikeCollection(ctx context.Context, req *types.UserLik
 	return err
 }
 
-func (c *UserComponent) DeleteLikes(ctx context.Context, req *types.UserLikesRequest) error {
+func (c *userComponentImpl) DeleteLikes(ctx context.Context, req *types.UserLikesRequest) error {
 	user, err := c.us.FindByUsername(ctx, req.CurrentUser)
 	if err != nil {
 		newError := fmt.Errorf("failed to check for the presence of the user,error:%w", err)
@@ -396,7 +420,7 @@ func (c *UserComponent) DeleteLikes(ctx context.Context, req *types.UserLikesReq
 	return err
 }
 
-func (c *UserComponent) LikesSpaces(ctx context.Context, req *types.UserSpacesReq) ([]types.Space, int, error) {
+func (c *userComponentImpl) LikesSpaces(ctx context.Context, req *types.UserSpacesReq) ([]types.Space, int, error) {
 	user, err := c.us.FindByUsername(ctx, req.CurrentUser)
 	if err != nil {
 		newError := fmt.Errorf("failed to check for the presence of the user, error:%w", err)
@@ -405,7 +429,7 @@ func (c *UserComponent) LikesSpaces(ctx context.Context, req *types.UserSpacesRe
 	return c.spaceComponent.UserLikesSpaces(ctx, req, user.ID)
 }
 
-func (c *UserComponent) LikesCodes(ctx context.Context, req *types.UserModelsReq) ([]types.Code, int, error) {
+func (c *userComponentImpl) LikesCodes(ctx context.Context, req *types.UserModelsReq) ([]types.Code, int, error) {
 	var resCodes []types.Code
 	user, err := c.us.FindByUsername(ctx, req.CurrentUser)
 	if err != nil {
@@ -438,7 +462,7 @@ func (c *UserComponent) LikesCodes(ctx context.Context, req *types.UserModelsReq
 	return resCodes, total, nil
 }
 
-func (c *UserComponent) LikesModels(ctx context.Context, req *types.UserModelsReq) ([]types.Model, int, error) {
+func (c *userComponentImpl) LikesModels(ctx context.Context, req *types.UserModelsReq) ([]types.Model, int, error) {
 	var resModels []types.Model
 	user, err := c.us.FindByUsername(ctx, req.CurrentUser)
 	if err != nil {
@@ -471,7 +495,7 @@ func (c *UserComponent) LikesModels(ctx context.Context, req *types.UserModelsRe
 	return resModels, total, nil
 }
 
-func (c *UserComponent) LikesDatasets(ctx context.Context, req *types.UserDatasetsReq) ([]types.Dataset, int, error) {
+func (c *userComponentImpl) LikesDatasets(ctx context.Context, req *types.UserDatasetsReq) ([]types.Dataset, int, error) {
 	var resDatasets []types.Dataset
 	user, err := c.us.FindByUsername(ctx, req.CurrentUser)
 	if err != nil {
@@ -504,7 +528,7 @@ func (c *UserComponent) LikesDatasets(ctx context.Context, req *types.UserDatase
 	return resDatasets, total, nil
 }
 
-func (c *UserComponent) ListDeploys(ctx context.Context, repoType types.RepositoryType, req *types.DeployReq) ([]types.DeployRepo, int, error) {
+func (c *userComponentImpl) ListDeploys(ctx context.Context, repoType types.RepositoryType, req *types.DeployReq) ([]types.DeployRepo, int, error) {
 	user, err := c.us.FindByUsername(ctx, req.CurrentUser)
 	if err != nil {
 		newError := fmt.Errorf("failed to check for the presence of the user:%s, error:%w", req.CurrentUser, err)
@@ -566,7 +590,7 @@ func (c *UserComponent) ListDeploys(ctx context.Context, repoType types.Reposito
 	return resDeploys, total, nil
 }
 
-func (c *UserComponent) ListInstances(ctx context.Context, req *types.UserRepoReq) ([]types.DeployRepo, int, error) {
+func (c *userComponentImpl) ListInstances(ctx context.Context, req *types.UserRepoReq) ([]types.DeployRepo, int, error) {
 	user, err := c.us.FindByUsername(ctx, req.CurrentUser)
 	if err != nil {
 		newError := fmt.Errorf("failed to check for the presence of the user:%s, error:%w", req.CurrentUser, err)
@@ -606,7 +630,7 @@ func (c *UserComponent) ListInstances(ctx context.Context, req *types.UserRepoRe
 	return resDeploys, total, nil
 }
 
-func (c *UserComponent) ListServerless(ctx context.Context, req types.DeployReq) ([]types.DeployRepo, int, error) {
+func (c *userComponentImpl) ListServerless(ctx context.Context, req types.DeployReq) ([]types.DeployRepo, int, error) {
 	user, err := c.us.FindByUsername(ctx, req.CurrentUser)
 	if err != nil {
 		newError := fmt.Errorf("failed to check for the presence of the user:%s, error:%w", req.CurrentUser, err)
@@ -651,7 +675,7 @@ func (c *UserComponent) ListServerless(ctx context.Context, req types.DeployReq)
 	return resDeploys, total, nil
 }
 
-func (c *UserComponent) GetUserByName(ctx context.Context, userName string) (*database.User, error) {
+func (c *userComponentImpl) GetUserByName(ctx context.Context, userName string) (*database.User, error) {
 	user, err := c.us.FindByUsername(ctx, userName)
 	if err != nil {
 		return nil, fmt.Errorf("failed to check for the presence of the user %s,error:%w", userName, err)
@@ -659,7 +683,7 @@ func (c *UserComponent) GetUserByName(ctx context.Context, userName string) (*da
 	return &user, nil
 }
 
-func (c *UserComponent) Prompts(ctx context.Context, req *types.UserPromptsReq) ([]types.PromptRes, int, error) {
+func (c *userComponentImpl) Prompts(ctx context.Context, req *types.UserPromptsReq) ([]types.PromptRes, int, error) {
 	var resPrompts []types.PromptRes
 	userExists, err := c.us.IsExist(ctx, req.Owner)
 	if err != nil {

@@ -28,8 +28,8 @@ func NewSSHKeyHandler(config *config.Config) (*SSHKeyHandler, error) {
 }
 
 type SSHKeyHandler struct {
-	c  *component.SSHKeyComponent
-	sc *component.SensitiveComponent
+	c  component.SSHKeyComponent
+	sc component.SensitiveComponent
 }
 
 // CreateUserSSHKey godoc

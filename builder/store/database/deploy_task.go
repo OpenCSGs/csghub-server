@@ -61,41 +61,66 @@ type DeployTask struct {
 	times
 }
 
-type DeployTaskStore struct {
+type deployTaskStoreImpl struct {
 	db *DB
 }
 
-func NewDeployTaskStore() *DeployTaskStore {
-	return &DeployTaskStore{db: defaultDB}
+type DeployTaskStore interface {
+	CreateDeploy(ctx context.Context, deploy *Deploy) error
+	UpdateDeploy(ctx context.Context, deploy *Deploy) error
+	GetLatestDeployBySpaceID(ctx context.Context, spaceID int64) (*Deploy, error)
+	CreateDeployTask(ctx context.Context, deployTask *DeployTask) error
+	UpdateDeployTask(ctx context.Context, deployTask *DeployTask) error
+	GetDeployTask(ctx context.Context, id int64) (*DeployTask, error)
+	GetDeployTasksOfDeploy(ctx context.Context, deployID int64) ([]*DeployTask, error)
+	// GetNewTaskAfter return the first task of the next deploy
+	GetNewTaskAfter(ctx context.Context, currentDeployTaskID int64) (*DeployTask, error)
+	// GetNewTaskFirst returns the first task which has  not end
+	GetNewTaskFirst(ctx context.Context) (*DeployTask, error)
+	UpdateInTx(ctx context.Context, deployColumns, deployTaskColumns []string, deploy *Deploy, deployTasks ...*DeployTask) error
+	ListDeploy(ctx context.Context, repoType types.RepositoryType, repoID, userID int64) ([]Deploy, error)
+	DeleteDeploy(ctx context.Context, repoType types.RepositoryType, repoID, userID int64, deployID int64) error
+	ListDeployByUserID(ctx context.Context, userID int64, req *types.DeployReq) ([]Deploy, int, error)
+	ListInstancesByUserID(ctx context.Context, userID int64, per, page int) ([]Deploy, int, error)
+	GetDeployByID(ctx context.Context, deployID int64) (*Deploy, error)
+	GetDeployBySvcName(ctx context.Context, svcName string) (*Deploy, error)
+	StopDeploy(ctx context.Context, repoType types.RepositoryType, repoID, userID int64, deployID int64) error
+	GetServerlessDeployByRepID(ctx context.Context, repoID int64) (*Deploy, error)
+	ListServerless(ctx context.Context, req types.DeployReq) ([]Deploy, int, error)
+	ListAllDeployments(ctx context.Context, userID int64) ([]Deploy, error)
 }
 
-func (s *DeployTaskStore) CreateDeploy(ctx context.Context, deploy *Deploy) error {
+func NewDeployTaskStore() DeployTaskStore {
+	return &deployTaskStoreImpl{db: defaultDB}
+}
+
+func (s *deployTaskStoreImpl) CreateDeploy(ctx context.Context, deploy *Deploy) error {
 	_, err := s.db.Core.NewInsert().Model(deploy).Exec(ctx, deploy)
 	return err
 }
 
-func (s *DeployTaskStore) UpdateDeploy(ctx context.Context, deploy *Deploy) error {
+func (s *deployTaskStoreImpl) UpdateDeploy(ctx context.Context, deploy *Deploy) error {
 	_, err := s.db.Core.NewUpdate().Model(deploy).WherePK().Exec(ctx)
 	return err
 }
 
-func (s *DeployTaskStore) GetLatestDeployBySpaceID(ctx context.Context, spaceID int64) (*Deploy, error) {
+func (s *deployTaskStoreImpl) GetLatestDeployBySpaceID(ctx context.Context, spaceID int64) (*Deploy, error) {
 	deploy := &Deploy{}
 	err := s.db.Core.NewSelect().Model(deploy).Where("space_id = ?", spaceID).Order("created_at DESC").Limit(1).Scan(ctx, deploy)
 	return deploy, err
 }
 
-func (s *DeployTaskStore) CreateDeployTask(ctx context.Context, deployTask *DeployTask) error {
+func (s *deployTaskStoreImpl) CreateDeployTask(ctx context.Context, deployTask *DeployTask) error {
 	_, err := s.db.Core.NewInsert().Model(deployTask).Exec(ctx, deployTask)
 	return err
 }
 
-func (s *DeployTaskStore) UpdateDeployTask(ctx context.Context, deployTask *DeployTask) error {
+func (s *deployTaskStoreImpl) UpdateDeployTask(ctx context.Context, deployTask *DeployTask) error {
 	_, err := s.db.Core.NewUpdate().Model(deployTask).WherePK().Exec(ctx)
 	return err
 }
 
-func (s *DeployTaskStore) GetDeployTask(ctx context.Context, id int64) (*DeployTask, error) {
+func (s *deployTaskStoreImpl) GetDeployTask(ctx context.Context, id int64) (*DeployTask, error) {
 	deployTask := &DeployTask{}
 	err := s.db.Core.NewSelect().Model(deployTask).Where("deploy_task.id = ?", id).
 		Relation("Deploy").
@@ -104,14 +129,14 @@ func (s *DeployTaskStore) GetDeployTask(ctx context.Context, id int64) (*DeployT
 	return deployTask, err
 }
 
-func (s *DeployTaskStore) GetDeployTasksOfDeploy(ctx context.Context, deployID int64) ([]*DeployTask, error) {
+func (s *deployTaskStoreImpl) GetDeployTasksOfDeploy(ctx context.Context, deployID int64) ([]*DeployTask, error) {
 	var deployTasks []*DeployTask
 	err := s.db.Core.NewSelect().Model((*DeployTask)(nil)).Where("deploy_id = ?", deployID).Scan(ctx, &deployTasks)
 	return deployTasks, err
 }
 
 // GetNewTaskAfter return the first task of the next deploy
-func (s *DeployTaskStore) GetNewTaskAfter(ctx context.Context, currentDeployTaskID int64) (*DeployTask, error) {
+func (s *deployTaskStoreImpl) GetNewTaskAfter(ctx context.Context, currentDeployTaskID int64) (*DeployTask, error) {
 	deployTask := &DeployTask{}
 	err := s.db.Core.NewSelect().Model(deployTask).Relation("Deploy").
 		Where("deploy_task.id > ? ", currentDeployTaskID).
@@ -123,7 +148,7 @@ func (s *DeployTaskStore) GetNewTaskAfter(ctx context.Context, currentDeployTask
 }
 
 // GetNewTaskFirst returns the first task which has  not end
-func (s *DeployTaskStore) GetNewTaskFirst(ctx context.Context) (*DeployTask, error) {
+func (s *deployTaskStoreImpl) GetNewTaskFirst(ctx context.Context) (*DeployTask, error) {
 	deployTask := &DeployTask{}
 	err := s.db.Core.NewSelect().Model(deployTask).Relation("Deploy").
 		Where("(task_type = 0 and deploy_task.status in (0,1)) or (task_type = 1 and deploy_task.status in (0,1,3))").
@@ -133,7 +158,7 @@ func (s *DeployTaskStore) GetNewTaskFirst(ctx context.Context) (*DeployTask, err
 	return deployTask, err
 }
 
-func (s *DeployTaskStore) UpdateInTx(ctx context.Context, deployColumns, deployTaskColumns []string, deploy *Deploy, deployTasks ...*DeployTask) error {
+func (s *deployTaskStoreImpl) UpdateInTx(ctx context.Context, deployColumns, deployTaskColumns []string, deploy *Deploy, deployTasks ...*DeployTask) error {
 	tx, err := s.db.Core.BeginTx(ctx, nil)
 	if err != nil {
 		return fmt.Errorf("failed to begin transaction,%w", err)
@@ -169,7 +194,7 @@ func (s *DeployTaskStore) UpdateInTx(ctx context.Context, deployColumns, deployT
 	return tx.Commit()
 }
 
-func (s *DeployTaskStore) ListDeploy(ctx context.Context, repoType types.RepositoryType, repoID, userID int64) ([]Deploy, error) {
+func (s *deployTaskStoreImpl) ListDeploy(ctx context.Context, repoType types.RepositoryType, repoID, userID int64) ([]Deploy, error) {
 	var result []Deploy
 	query := s.db.Operator.Core.NewSelect().Model(&result).Where("user_id = ? and repo_id = ?", userID, repoID)
 	if repoType == types.ModelRepo {
@@ -186,7 +211,7 @@ func (s *DeployTaskStore) ListDeploy(ctx context.Context, repoType types.Reposit
 	return result, nil
 }
 
-func (s *DeployTaskStore) DeleteDeploy(ctx context.Context, repoType types.RepositoryType, repoID, userID int64, deployID int64) error {
+func (s *deployTaskStoreImpl) DeleteDeploy(ctx context.Context, repoType types.RepositoryType, repoID, userID int64, deployID int64) error {
 	// only delete the deploy of specific repo was triggered by current login user
 	res, err := s.db.BunDB.Exec("Update deploys set status = ? where id = ? and repo_id = ? and user_id = ?", common.Deleted, deployID, repoID, userID)
 	if err != nil {
@@ -196,7 +221,7 @@ func (s *DeployTaskStore) DeleteDeploy(ctx context.Context, repoType types.Repos
 	return err
 }
 
-func (s *DeployTaskStore) ListDeployByUserID(ctx context.Context, userID int64, req *types.DeployReq) ([]Deploy, int, error) {
+func (s *deployTaskStoreImpl) ListDeployByUserID(ctx context.Context, userID int64, req *types.DeployReq) ([]Deploy, int, error) {
 	var result []Deploy
 	query := s.db.Operator.Core.NewSelect().Model(&result).Where("user_id = ? and type = ?", userID, req.DeployType)
 	if req.RepoType == types.ModelRepo {
@@ -219,7 +244,7 @@ func (s *DeployTaskStore) ListDeployByUserID(ctx context.Context, userID int64, 
 	return result, total, nil
 }
 
-func (s *DeployTaskStore) ListInstancesByUserID(ctx context.Context, userID int64, per, page int) ([]Deploy, int, error) {
+func (s *deployTaskStoreImpl) ListInstancesByUserID(ctx context.Context, userID int64, per, page int) ([]Deploy, int, error) {
 	var result []Deploy
 	query := s.db.Operator.Core.NewSelect().Model(&result).Where("user_id = ?", userID)
 	query = query.Where("type = ? and status != ?", types.FinetuneType, common.Deleted)
@@ -236,19 +261,19 @@ func (s *DeployTaskStore) ListInstancesByUserID(ctx context.Context, userID int6
 	return result, total, nil
 }
 
-func (s *DeployTaskStore) GetDeployByID(ctx context.Context, deployID int64) (*Deploy, error) {
+func (s *deployTaskStoreImpl) GetDeployByID(ctx context.Context, deployID int64) (*Deploy, error) {
 	deploy := &Deploy{}
 	err := s.db.Operator.Core.NewSelect().Model(deploy).Where("id = ?", deployID).Scan(ctx, deploy)
 	return deploy, err
 }
 
-func (s *DeployTaskStore) GetDeployBySvcName(ctx context.Context, svcName string) (*Deploy, error) {
+func (s *deployTaskStoreImpl) GetDeployBySvcName(ctx context.Context, svcName string) (*Deploy, error) {
 	deploy := &Deploy{}
 	err := s.db.Operator.Core.NewSelect().Model(deploy).Where("svc_name = ?", svcName).Scan(ctx, deploy)
 	return deploy, err
 }
 
-func (s *DeployTaskStore) StopDeploy(ctx context.Context, repoType types.RepositoryType, repoID, userID int64, deployID int64) error {
+func (s *deployTaskStoreImpl) StopDeploy(ctx context.Context, repoType types.RepositoryType, repoID, userID int64, deployID int64) error {
 	// only stop the deploy of specific repo was triggered by current login user
 	res, err := s.db.BunDB.Exec("Update deploys set status=?,updated_at=current_timestamp where id = ? and repo_id = ? and user_id = ?", common.Stopped, deployID, repoID, userID)
 	if err != nil {
@@ -258,7 +283,7 @@ func (s *DeployTaskStore) StopDeploy(ctx context.Context, repoType types.Reposit
 	return err
 }
 
-func (s *DeployTaskStore) GetServerlessDeployByRepID(ctx context.Context, repoID int64) (*Deploy, error) {
+func (s *deployTaskStoreImpl) GetServerlessDeployByRepID(ctx context.Context, repoID int64) (*Deploy, error) {
 	deploy := &Deploy{}
 	err := s.db.Operator.Core.NewSelect().Model(deploy).Where("repo_id = ? and type = ?", repoID, types.ServerlessType).Scan(ctx, deploy)
 	if errors.Is(err, sql.ErrNoRows) {
@@ -270,7 +295,7 @@ func (s *DeployTaskStore) GetServerlessDeployByRepID(ctx context.Context, repoID
 	return deploy, nil
 }
 
-func (s *DeployTaskStore) ListServerless(ctx context.Context, req types.DeployReq) ([]Deploy, int, error) {
+func (s *deployTaskStoreImpl) ListServerless(ctx context.Context, req types.DeployReq) ([]Deploy, int, error) {
 	var result []Deploy
 	query := s.db.Operator.Core.NewSelect().Model(&result).Where("type = ?", req.DeployType)
 	query = query.Limit(req.PageSize).Offset((req.Page - 1) * req.PageSize)
@@ -285,7 +310,7 @@ func (s *DeployTaskStore) ListServerless(ctx context.Context, req types.DeployRe
 	return result, total, nil
 }
 
-func (s *DeployTaskStore) ListAllDeployments(ctx context.Context, userID int64) ([]Deploy, error) {
+func (s *deployTaskStoreImpl) ListAllDeployments(ctx context.Context, userID int64) ([]Deploy, error) {
 	var result []Deploy
 	err := s.db.Operator.Core.NewSelect().
 		Model(&result).

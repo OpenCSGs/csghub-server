@@ -8,12 +8,25 @@ import (
 	"github.com/uptrace/bun"
 )
 
-type RuntimeFrameworksStore struct {
+type runtimeFrameworksStoreImpl struct {
 	db *DB
 }
 
-func NewRuntimeFrameworksStore() *RuntimeFrameworksStore {
-	return &RuntimeFrameworksStore{
+type RuntimeFrameworksStore interface {
+	List(ctx context.Context, deployType int) ([]RuntimeFramework, error)
+	ListByRepoID(ctx context.Context, repoID int64, deployType int) ([]RepositoriesRuntimeFramework, error)
+	FindByID(ctx context.Context, id int64) (*RuntimeFramework, error)
+	Add(ctx context.Context, frame RuntimeFramework) error
+	Update(ctx context.Context, frame RuntimeFramework) (*RuntimeFramework, error)
+	Delete(ctx context.Context, frame RuntimeFramework) error
+	FindEnabledByID(ctx context.Context, id int64) (*RuntimeFramework, error)
+	FindEnabledByName(ctx context.Context, name string) (*RuntimeFramework, error)
+	ListAll(ctx context.Context) ([]RuntimeFramework, error)
+	ListByIDs(ctx context.Context, ids []int64) ([]RuntimeFramework, error)
+}
+
+func NewRuntimeFrameworksStore() RuntimeFrameworksStore {
+	return &runtimeFrameworksStoreImpl{
 		db: defaultDB,
 	}
 }
@@ -30,7 +43,7 @@ type RuntimeFramework struct {
 	times
 }
 
-func (rf *RuntimeFrameworksStore) List(ctx context.Context, deployType int) ([]RuntimeFramework, error) {
+func (rf *runtimeFrameworksStoreImpl) List(ctx context.Context, deployType int) ([]RuntimeFramework, error) {
 	var result []RuntimeFramework
 	_, err := rf.db.Operator.Core.NewSelect().Model(&result).Where("type = ?", deployType).Exec(ctx, &result)
 	if err != nil {
@@ -39,7 +52,7 @@ func (rf *RuntimeFrameworksStore) List(ctx context.Context, deployType int) ([]R
 	return result, nil
 }
 
-func (rf *RuntimeFrameworksStore) ListByRepoID(ctx context.Context, repoID int64, deployType int) ([]RepositoriesRuntimeFramework, error) {
+func (rf *runtimeFrameworksStoreImpl) ListByRepoID(ctx context.Context, repoID int64, deployType int) ([]RepositoriesRuntimeFramework, error) {
 	var result []RepositoriesRuntimeFramework
 	err := rf.db.Operator.Core.NewSelect().Model(&RepositoriesRuntimeFramework{}).Relation("RuntimeFramework").Where("repositories_runtime_framework.type = ? and repositories_runtime_framework.repo_id = ?", deployType, repoID).Scan(ctx, &result)
 	if err != nil {
@@ -48,14 +61,14 @@ func (rf *RuntimeFrameworksStore) ListByRepoID(ctx context.Context, repoID int64
 	return result, err
 }
 
-func (rf *RuntimeFrameworksStore) FindByID(ctx context.Context, id int64) (*RuntimeFramework, error) {
+func (rf *runtimeFrameworksStoreImpl) FindByID(ctx context.Context, id int64) (*RuntimeFramework, error) {
 	var res RuntimeFramework
 	res.ID = id
 	_, err := rf.db.Core.NewSelect().Model(&res).WherePK().Exec(ctx, &res)
 	return &res, err
 }
 
-func (rf *RuntimeFrameworksStore) Add(ctx context.Context, frame RuntimeFramework) error {
+func (rf *runtimeFrameworksStoreImpl) Add(ctx context.Context, frame RuntimeFramework) error {
 	res, err := rf.db.Core.NewInsert().Model(&frame).Exec(ctx, &frame)
 	if err := assertAffectedOneRow(res, err); err != nil {
 		slog.Error("create runtime framework in db failed", slog.String("error", err.Error()))
@@ -64,30 +77,30 @@ func (rf *RuntimeFrameworksStore) Add(ctx context.Context, frame RuntimeFramewor
 	return nil
 }
 
-func (rf *RuntimeFrameworksStore) Update(ctx context.Context, frame RuntimeFramework) (*RuntimeFramework, error) {
+func (rf *runtimeFrameworksStoreImpl) Update(ctx context.Context, frame RuntimeFramework) (*RuntimeFramework, error) {
 	_, err := rf.db.Core.NewUpdate().Model(&frame).WherePK().Exec(ctx)
 	return &frame, err
 }
 
-func (rf *RuntimeFrameworksStore) Delete(ctx context.Context, frame RuntimeFramework) error {
+func (rf *runtimeFrameworksStoreImpl) Delete(ctx context.Context, frame RuntimeFramework) error {
 	_, err := rf.db.Core.NewDelete().Model(&frame).WherePK().Exec(ctx)
 	return err
 }
 
-func (rf *RuntimeFrameworksStore) FindEnabledByID(ctx context.Context, id int64) (*RuntimeFramework, error) {
+func (rf *runtimeFrameworksStoreImpl) FindEnabledByID(ctx context.Context, id int64) (*RuntimeFramework, error) {
 	var res RuntimeFramework
 	res.ID = id
 	_, err := rf.db.Core.NewSelect().Model(&res).WherePK().Where("enabled = 1").Exec(ctx, &res)
 	return &res, err
 }
 
-func (rf *RuntimeFrameworksStore) FindEnabledByName(ctx context.Context, name string) (*RuntimeFramework, error) {
+func (rf *runtimeFrameworksStoreImpl) FindEnabledByName(ctx context.Context, name string) (*RuntimeFramework, error) {
 	var res RuntimeFramework
 	_, err := rf.db.Core.NewSelect().Model(&res).Where("frame_name = ?", name).Where("enabled = 1").Exec(ctx, &res)
 	return &res, err
 }
 
-func (rf *RuntimeFrameworksStore) ListAll(ctx context.Context) ([]RuntimeFramework, error) {
+func (rf *runtimeFrameworksStoreImpl) ListAll(ctx context.Context) ([]RuntimeFramework, error) {
 	var result []RuntimeFramework
 	_, err := rf.db.Operator.Core.NewSelect().Model(&result).Exec(ctx, &result)
 	if err != nil {
@@ -96,7 +109,7 @@ func (rf *RuntimeFrameworksStore) ListAll(ctx context.Context) ([]RuntimeFramewo
 	return result, nil
 }
 
-func (rf *RuntimeFrameworksStore) ListByIDs(ctx context.Context, ids []int64) ([]RuntimeFramework, error) {
+func (rf *runtimeFrameworksStoreImpl) ListByIDs(ctx context.Context, ids []int64) ([]RuntimeFramework, error) {
 	var result []RuntimeFramework
 	_, err := rf.db.Operator.Core.NewSelect().Model(&result).Where("id in (?)", bun.In(ids)).Exec(ctx, &result)
 	if err != nil {

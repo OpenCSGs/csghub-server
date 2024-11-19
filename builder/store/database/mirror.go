@@ -9,12 +9,34 @@ import (
 	"opencsg.com/csghub-server/common/types"
 )
 
-type MirrorStore struct {
+type mirrorStoreImpl struct {
 	db *DB
 }
 
-func NewMirrorStore() *MirrorStore {
-	return &MirrorStore{
+type MirrorStore interface {
+	IsExist(ctx context.Context, repoID int64) (exists bool, err error)
+	IsRepoExist(ctx context.Context, repoType types.RepositoryType, namespace, name string) (exists bool, err error)
+	FindByRepoID(ctx context.Context, repoID int64) (*Mirror, error)
+	FindByID(ctx context.Context, ID int64) (*Mirror, error)
+	FindByRepoPath(ctx context.Context, repoType types.RepositoryType, namespace, name string) (*Mirror, error)
+	FindWithMapping(ctx context.Context, repoType types.RepositoryType, namespace, name string, mapping types.Mapping) (*Mirror, error)
+	Create(ctx context.Context, mirror *Mirror) (*Mirror, error)
+	WithPagination(ctx context.Context) ([]Mirror, error)
+	WithPaginationWithRepository(ctx context.Context) ([]Mirror, error)
+	NoPushMirror(ctx context.Context) ([]Mirror, error)
+	PushedMirror(ctx context.Context) ([]Mirror, error)
+	Update(ctx context.Context, mirror *Mirror) (err error)
+	Delete(ctx context.Context, mirror *Mirror) (err error)
+	Unfinished(ctx context.Context) ([]Mirror, error)
+	Finished(ctx context.Context) ([]Mirror, error)
+	ToSyncRepo(ctx context.Context) ([]Mirror, error)
+	ToSyncLfs(ctx context.Context) ([]Mirror, error)
+	IndexWithPagination(ctx context.Context, per, page int) (mirrors []Mirror, count int, err error)
+	UpdateMirrorAndRepository(ctx context.Context, mirror *Mirror, repo *Repository) error
+}
+
+func NewMirrorStore() MirrorStore {
+	return &mirrorStoreImpl{
 		db: defaultDB,
 	}
 }
@@ -48,7 +70,7 @@ type Mirror struct {
 	times
 }
 
-func (s *MirrorStore) IsExist(ctx context.Context, repoID int64) (exists bool, err error) {
+func (s *mirrorStoreImpl) IsExist(ctx context.Context, repoID int64) (exists bool, err error) {
 	var mirror Mirror
 	exists, err = s.db.Operator.Core.
 		NewSelect().
@@ -57,7 +79,7 @@ func (s *MirrorStore) IsExist(ctx context.Context, repoID int64) (exists bool, e
 		Exists(ctx)
 	return
 }
-func (s *MirrorStore) IsRepoExist(ctx context.Context, repoType types.RepositoryType, namespace, name string) (exists bool, err error) {
+func (s *mirrorStoreImpl) IsRepoExist(ctx context.Context, repoType types.RepositoryType, namespace, name string) (exists bool, err error) {
 	var repo Repository
 	exists, err = s.db.Operator.Core.
 		NewSelect().
@@ -67,7 +89,7 @@ func (s *MirrorStore) IsRepoExist(ctx context.Context, repoType types.Repository
 	return
 }
 
-func (s *MirrorStore) FindByRepoID(ctx context.Context, repoID int64) (*Mirror, error) {
+func (s *mirrorStoreImpl) FindByRepoID(ctx context.Context, repoID int64) (*Mirror, error) {
 	var mirror Mirror
 	err := s.db.Operator.Core.NewSelect().
 		Model(&mirror).
@@ -79,7 +101,7 @@ func (s *MirrorStore) FindByRepoID(ctx context.Context, repoID int64) (*Mirror, 
 	return &mirror, nil
 }
 
-func (s *MirrorStore) FindByID(ctx context.Context, ID int64) (*Mirror, error) {
+func (s *mirrorStoreImpl) FindByID(ctx context.Context, ID int64) (*Mirror, error) {
 	var mirror Mirror
 	err := s.db.Operator.Core.NewSelect().
 		Model(&mirror).
@@ -92,7 +114,7 @@ func (s *MirrorStore) FindByID(ctx context.Context, ID int64) (*Mirror, error) {
 	return &mirror, nil
 }
 
-func (s *MirrorStore) FindByRepoPath(ctx context.Context, repoType types.RepositoryType, namespace, name string) (*Mirror, error) {
+func (s *mirrorStoreImpl) FindByRepoPath(ctx context.Context, repoType types.RepositoryType, namespace, name string) (*Mirror, error) {
 	var mirror Mirror
 	err := s.db.Operator.Core.NewSelect().
 		Model(&mirror).
@@ -105,7 +127,7 @@ func (s *MirrorStore) FindByRepoPath(ctx context.Context, repoType types.Reposit
 	return &mirror, nil
 }
 
-func (s *MirrorStore) FindWithMapping(ctx context.Context, repoType types.RepositoryType, namespace, name string, mapping types.Mapping) (*Mirror, error) {
+func (s *mirrorStoreImpl) FindWithMapping(ctx context.Context, repoType types.RepositoryType, namespace, name string, mapping types.Mapping) (*Mirror, error) {
 	var mirror Mirror
 	var err error
 	if mapping == types.CSGHubMapping {
@@ -138,7 +160,7 @@ func (s *MirrorStore) FindWithMapping(ctx context.Context, repoType types.Reposi
 	return &mirror, nil
 }
 
-func (s *MirrorStore) Create(ctx context.Context, mirror *Mirror) (*Mirror, error) {
+func (s *mirrorStoreImpl) Create(ctx context.Context, mirror *Mirror) (*Mirror, error) {
 	err := s.db.Operator.Core.NewInsert().
 		Model(mirror).
 		Scan(ctx)
@@ -148,7 +170,7 @@ func (s *MirrorStore) Create(ctx context.Context, mirror *Mirror) (*Mirror, erro
 	return mirror, nil
 }
 
-func (s *MirrorStore) WithPagination(ctx context.Context) ([]Mirror, error) {
+func (s *mirrorStoreImpl) WithPagination(ctx context.Context) ([]Mirror, error) {
 	var mirrors []Mirror
 	err := s.db.Operator.Core.NewSelect().
 		Model(&mirrors).
@@ -159,7 +181,7 @@ func (s *MirrorStore) WithPagination(ctx context.Context) ([]Mirror, error) {
 	return mirrors, nil
 }
 
-func (s *MirrorStore) WithPaginationWithRepository(ctx context.Context) ([]Mirror, error) {
+func (s *mirrorStoreImpl) WithPaginationWithRepository(ctx context.Context) ([]Mirror, error) {
 	var mirrors []Mirror
 	err := s.db.Operator.Core.NewSelect().
 		Model(&mirrors).
@@ -171,7 +193,7 @@ func (s *MirrorStore) WithPaginationWithRepository(ctx context.Context) ([]Mirro
 	return mirrors, nil
 }
 
-func (s *MirrorStore) NoPushMirror(ctx context.Context) ([]Mirror, error) {
+func (s *mirrorStoreImpl) NoPushMirror(ctx context.Context) ([]Mirror, error) {
 	var mirrors []Mirror
 	err := s.db.Operator.Core.NewSelect().
 		Model(&mirrors).
@@ -183,7 +205,7 @@ func (s *MirrorStore) NoPushMirror(ctx context.Context) ([]Mirror, error) {
 	return mirrors, nil
 }
 
-func (s *MirrorStore) PushedMirror(ctx context.Context) ([]Mirror, error) {
+func (s *mirrorStoreImpl) PushedMirror(ctx context.Context) ([]Mirror, error) {
 	var mirrors []Mirror
 	err := s.db.Operator.Core.NewSelect().
 		Model(&mirrors).
@@ -196,7 +218,7 @@ func (s *MirrorStore) PushedMirror(ctx context.Context) ([]Mirror, error) {
 	return mirrors, nil
 }
 
-func (s *MirrorStore) Update(ctx context.Context, mirror *Mirror) (err error) {
+func (s *mirrorStoreImpl) Update(ctx context.Context, mirror *Mirror) (err error) {
 	err = assertAffectedOneRow(s.db.Operator.Core.NewUpdate().
 		Model(mirror).
 		WherePK().
@@ -206,7 +228,7 @@ func (s *MirrorStore) Update(ctx context.Context, mirror *Mirror) (err error) {
 	return
 }
 
-func (s *MirrorStore) Delete(ctx context.Context, mirror *Mirror) (err error) {
+func (s *mirrorStoreImpl) Delete(ctx context.Context, mirror *Mirror) (err error) {
 	_, err = s.db.Operator.Core.
 		NewDelete().
 		Model(mirror).
@@ -215,7 +237,7 @@ func (s *MirrorStore) Delete(ctx context.Context, mirror *Mirror) (err error) {
 	return
 }
 
-func (s *MirrorStore) Unfinished(ctx context.Context) ([]Mirror, error) {
+func (s *mirrorStoreImpl) Unfinished(ctx context.Context) ([]Mirror, error) {
 	var mirrors []Mirror
 	err := s.db.Operator.Core.NewSelect().
 		Model(&mirrors).
@@ -228,7 +250,7 @@ func (s *MirrorStore) Unfinished(ctx context.Context) ([]Mirror, error) {
 	return mirrors, nil
 }
 
-func (s *MirrorStore) Finished(ctx context.Context) ([]Mirror, error) {
+func (s *mirrorStoreImpl) Finished(ctx context.Context) ([]Mirror, error) {
 	var mirrors []Mirror
 	err := s.db.Operator.Core.NewSelect().
 		Model(&mirrors).
@@ -241,7 +263,7 @@ func (s *MirrorStore) Finished(ctx context.Context) ([]Mirror, error) {
 	return mirrors, nil
 }
 
-func (s *MirrorStore) ToSyncRepo(ctx context.Context) ([]Mirror, error) {
+func (s *mirrorStoreImpl) ToSyncRepo(ctx context.Context) ([]Mirror, error) {
 	var mirrors []Mirror
 	err := s.db.Operator.Core.NewSelect().
 		Model(&mirrors).
@@ -253,7 +275,7 @@ func (s *MirrorStore) ToSyncRepo(ctx context.Context) ([]Mirror, error) {
 	return mirrors, nil
 }
 
-func (s *MirrorStore) ToSyncLfs(ctx context.Context) ([]Mirror, error) {
+func (s *mirrorStoreImpl) ToSyncLfs(ctx context.Context) ([]Mirror, error) {
 	var mirrors []Mirror
 	err := s.db.Operator.Core.NewSelect().
 		Model(&mirrors).
@@ -265,7 +287,7 @@ func (s *MirrorStore) ToSyncLfs(ctx context.Context) ([]Mirror, error) {
 	return mirrors, nil
 }
 
-func (s *MirrorStore) IndexWithPagination(ctx context.Context, per, page int) (mirrors []Mirror, count int, err error) {
+func (s *mirrorStoreImpl) IndexWithPagination(ctx context.Context, per, page int) (mirrors []Mirror, count int, err error) {
 	q := s.db.Operator.Core.NewSelect().
 		Model(&mirrors).
 		Relation("Repository").
@@ -285,7 +307,7 @@ func (s *MirrorStore) IndexWithPagination(ctx context.Context, per, page int) (m
 	return
 }
 
-func (s *MirrorStore) UpdateMirrorAndRepository(ctx context.Context, mirror *Mirror, repo *Repository) error {
+func (s *mirrorStoreImpl) UpdateMirrorAndRepository(ctx context.Context, mirror *Mirror, repo *Repository) error {
 	err := s.db.Operator.Core.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
 		_, err := tx.NewUpdate().Model(mirror).WherePK().Exec(ctx)
 		if err != nil {

@@ -17,15 +17,15 @@ import (
 
 type repoRelationWatcher struct {
 	ops []func() error
-	rs  *database.RepoStore
-	rrs *database.RepoRelationsStore
+	rs  database.RepoStore
+	rrs database.RepoRelationsStore
 	gs  gitserver.GitServer
 
 	readmeStatus string
 }
 
-func WatchRepoRelation(req *types.GiteaCallbackPushReq, ss *database.RepoStore,
-	rrs *database.RepoRelationsStore,
+func WatchRepoRelation(req *types.GiteaCallbackPushReq, ss database.RepoStore,
+	rrs database.RepoRelationsStore,
 	gs gitserver.GitServer) Watcher {
 	watcher := new(repoRelationWatcher)
 	watcher.rs = ss

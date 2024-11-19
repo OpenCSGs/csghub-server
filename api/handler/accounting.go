@@ -16,7 +16,7 @@ import (
 )
 
 type AccountingHandler struct {
-	ac       *component.AccountingComponent
+	ac       component.AccountingComponent
 	apiToken string
 }
 

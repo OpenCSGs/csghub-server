@@ -10,12 +10,29 @@ import (
 	"opencsg.com/csghub-server/common/types"
 )
 
-type ModelStore struct {
+type modelStoreImpl struct {
 	db *DB
 }
 
-func NewModelStore() *ModelStore {
-	return &ModelStore{
+type ModelStore interface {
+	ByRepoIDs(ctx context.Context, repoIDs []int64) (models []Model, err error)
+	ByRepoID(ctx context.Context, repoID int64) (*Model, error)
+	ByUsername(ctx context.Context, username string, per, page int, onlyPublic bool) (models []Model, total int, err error)
+	UserLikesModels(ctx context.Context, userID int64, per, page int) (models []Model, total int, err error)
+	ByOrgPath(ctx context.Context, namespace string, per, page int, onlyPublic bool) (models []Model, total int, err error)
+	Count(ctx context.Context) (count int, err error)
+	PublicCount(ctx context.Context) (count int, err error)
+	Create(ctx context.Context, input Model) (*Model, error)
+	Update(ctx context.Context, input Model) (*Model, error)
+	FindByPath(ctx context.Context, namespace string, name string) (*Model, error)
+	Delete(ctx context.Context, input Model) error
+	ListByPath(ctx context.Context, paths []string) ([]Model, error)
+	ByID(ctx context.Context, id int64) (*Model, error)
+	CreateIfNotExist(ctx context.Context, input Model) (*Model, error)
+}
+
+func NewModelStore() ModelStore {
+	return &modelStoreImpl{
 		db: defaultDB,
 	}
 }
@@ -29,7 +46,7 @@ type Model struct {
 	times
 }
 
-func (s *ModelStore) ByRepoIDs(ctx context.Context, repoIDs []int64) (models []Model, err error) {
+func (s *modelStoreImpl) ByRepoIDs(ctx context.Context, repoIDs []int64) (models []Model, err error) {
 	err = s.db.Operator.Core.NewSelect().
 		Model(&models).
 		Relation("Repository").
@@ -39,7 +56,7 @@ func (s *ModelStore) ByRepoIDs(ctx context.Context, repoIDs []int64) (models []M
 	return
 }
 
-func (s *ModelStore) ByRepoID(ctx context.Context, repoID int64) (*Model, error) {
+func (s *modelStoreImpl) ByRepoID(ctx context.Context, repoID int64) (*Model, error) {
 	var m Model
 	err := s.db.Core.NewSelect().
 		Model(&m).
@@ -52,7 +69,7 @@ func (s *ModelStore) ByRepoID(ctx context.Context, repoID int64) (*Model, error)
 	return &m, nil
 }
 
-func (s *ModelStore) ByUsername(ctx context.Context, username string, per, page int, onlyPublic bool) (models []Model, total int, err error) {
+func (s *modelStoreImpl) ByUsername(ctx context.Context, username string, per, page int, onlyPublic bool) (models []Model, total int, err error) {
 	query := s.db.Operator.Core.
 		NewSelect().
 		Model(&models).
@@ -78,7 +95,7 @@ func (s *ModelStore) ByUsername(ctx context.Context, username string, per, page 
 	return
 }
 
-func (s *ModelStore) UserLikesModels(ctx context.Context, userID int64, per, page int) (models []Model, total int, err error) {
+func (s *modelStoreImpl) UserLikesModels(ctx context.Context, userID int64, per, page int) (models []Model, total int, err error) {
 	query := s.db.Operator.Core.
 		NewSelect().
 		Model(&models).
@@ -101,7 +118,7 @@ func (s *ModelStore) UserLikesModels(ctx context.Context, userID int64, per, pag
 	return
 }
 
-func (s *ModelStore) ByOrgPath(ctx context.Context, namespace string, per, page int, onlyPublic bool) (models []Model, total int, err error) {
+func (s *modelStoreImpl) ByOrgPath(ctx context.Context, namespace string, per, page int, onlyPublic bool) (models []Model, total int, err error) {
 	query := s.db.Operator.Core.
 		NewSelect().
 		Model(&models).
@@ -127,7 +144,7 @@ func (s *ModelStore) ByOrgPath(ctx context.Context, namespace string, per, page 
 	return
 }
 
-func (s *ModelStore) Count(ctx context.Context) (count int, err error) {
+func (s *modelStoreImpl) Count(ctx context.Context) (count int, err error) {
 	count, err = s.db.Operator.Core.
 		NewSelect().
 		Model(&Repository{}).
@@ -139,7 +156,7 @@ func (s *ModelStore) Count(ctx context.Context) (count int, err error) {
 	return
 }
 
-func (s *ModelStore) PublicCount(ctx context.Context) (count int, err error) {
+func (s *modelStoreImpl) PublicCount(ctx context.Context) (count int, err error) {
 	count, err = s.db.Operator.Core.
 		NewSelect().
 		Model(&Repository{}).
@@ -152,7 +169,7 @@ func (s *ModelStore) PublicCount(ctx context.Context) (count int, err error) {
 	return
 }
 
-func (s *ModelStore) Create(ctx context.Context, input Model) (*Model, error) {
+func (s *modelStoreImpl) Create(ctx context.Context, input Model) (*Model, error) {
 	res, err := s.db.Core.NewInsert().Model(&input).Exec(ctx, &input)
 	if err := assertAffectedOneRow(res, err); err != nil {
 		slog.Error("create model in db failed", slog.String("error", err.Error()))
@@ -162,13 +179,13 @@ func (s *ModelStore) Create(ctx context.Context, input Model) (*Model, error) {
 	return &input, nil
 }
 
-func (s *ModelStore) Update(ctx context.Context, input Model) (*Model, error) {
+func (s *modelStoreImpl) Update(ctx context.Context, input Model) (*Model, error) {
 	_, err := s.db.Core.NewUpdate().Model(&input).WherePK().Exec(ctx)
 
 	return &input, err
 }
 
-func (s *ModelStore) FindByPath(ctx context.Context, namespace string, name string) (*Model, error) {
+func (s *modelStoreImpl) FindByPath(ctx context.Context, namespace string, name string) (*Model, error) {
 	resModel := new(Model)
 	err := s.db.Operator.Core.
 		NewSelect().
@@ -191,7 +208,7 @@ func (s *ModelStore) FindByPath(ctx context.Context, namespace string, name stri
 	return resModel, err
 }
 
-func (s *ModelStore) Delete(ctx context.Context, input Model) error {
+func (s *modelStoreImpl) Delete(ctx context.Context, input Model) error {
 	res, err := s.db.Operator.Core.NewDelete().Model(&input).WherePK().Exec(ctx)
 	if err := assertAffectedOneRow(res, err); err != nil {
 		return fmt.Errorf("delete model in tx failed,error:%w", err)
@@ -199,7 +216,7 @@ func (s *ModelStore) Delete(ctx context.Context, input Model) error {
 	return nil
 }
 
-func (s *ModelStore) ListByPath(ctx context.Context, paths []string) ([]Model, error) {
+func (s *modelStoreImpl) ListByPath(ctx context.Context, paths []string) ([]Model, error) {
 	var models []Model
 	err := s.db.Operator.Core.
 		NewSelect().
@@ -223,7 +240,7 @@ func (s *ModelStore) ListByPath(ctx context.Context, paths []string) ([]Model, e
 	return sortedModels, nil
 }
 
-func (s *ModelStore) ByID(ctx context.Context, id int64) (*Model, error) {
+func (s *modelStoreImpl) ByID(ctx context.Context, id int64) (*Model, error) {
 	var model Model
 	err := s.db.Core.NewSelect().Model(&model).Relation("Repository").Where("model.id = ?", id).Scan(ctx)
 	if err != nil {
@@ -232,7 +249,7 @@ func (s *ModelStore) ByID(ctx context.Context, id int64) (*Model, error) {
 	return &model, err
 }
 
-func (s *ModelStore) CreateIfNotExist(ctx context.Context, input Model) (*Model, error) {
+func (s *modelStoreImpl) CreateIfNotExist(ctx context.Context, input Model) (*Model, error) {
 	err := s.db.Core.NewSelect().
 		Model(&input).
 		Where("repository_id = ?", input.RepositoryID).

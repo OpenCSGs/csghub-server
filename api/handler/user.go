@@ -25,7 +25,7 @@ func NewUserHandler(config *config.Config) (*UserHandler, error) {
 }
 
 type UserHandler struct {
-	c *component.UserComponent
+	c component.UserComponent
 }
 
 // GetUserDatasets godoc

@@ -8,25 +8,31 @@ import (
 	"opencsg.com/csghub-server/common/types"
 )
 
-func NewClusterComponent(config *config.Config) (*ClusterComponent, error) {
-	c := &ClusterComponent{}
+type ClusterComponent interface {
+	Index(ctx context.Context) ([]types.ClusterRes, error)
+	GetClusterById(ctx context.Context, clusterId string) (*types.ClusterRes, error)
+	Update(ctx context.Context, data types.ClusterRequest) (*types.UpdateClusterResponse, error)
+}
+
+func NewClusterComponent(config *config.Config) (ClusterComponent, error) {
+	c := &clusterComponentImpl{}
 	c.deployer = deploy.NewDeployer()
 
 	return c, nil
 }
 
-type ClusterComponent struct {
+type clusterComponentImpl struct {
 	deployer deploy.Deployer
 }
 
-func (c *ClusterComponent) Index(ctx context.Context) ([]types.ClusterRes, error) {
+func (c *clusterComponentImpl) Index(ctx context.Context) ([]types.ClusterRes, error) {
 	return c.deployer.ListCluster(ctx)
 }
 
-func (c *ClusterComponent) GetClusterById(ctx context.Context, clusterId string) (*types.ClusterRes, error) {
+func (c *clusterComponentImpl) GetClusterById(ctx context.Context, clusterId string) (*types.ClusterRes, error) {
 	return c.deployer.GetClusterById(ctx, clusterId)
 }
 
-func (c *ClusterComponent) Update(ctx context.Context, data types.ClusterRequest) (*types.UpdateClusterResponse, error) {
+func (c *clusterComponentImpl) Update(ctx context.Context, data types.ClusterRequest) (*types.UpdateClusterResponse, error) {
 	return c.deployer.UpdateCluster(ctx, data)
 }

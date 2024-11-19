@@ -17,7 +17,7 @@ import (
 
 type Metering struct {
 	sysMQ     *mq.NatsHandler
-	meterComp *component.MeteringComponent
+	meterComp component.MeteringComponent
 }
 
 func NewMetering(natHandler *mq.NatsHandler, config *config.Config) *Metering {

@@ -12,7 +12,7 @@ import (
 )
 
 type DatasetViewerHandler struct {
-	c *component.DatasetViewerComponent
+	c component.DatasetViewerComponent
 }
 
 func NewDatasetViewerHandler(cfg *config.Config) (*DatasetViewerHandler, error) {

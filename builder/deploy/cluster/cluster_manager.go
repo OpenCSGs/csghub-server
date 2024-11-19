@@ -33,7 +33,7 @@ type Cluster struct {
 // ClusterPool is a resource pool of cluster information
 type ClusterPool struct {
 	Clusters     []Cluster
-	ClusterStore *database.ClusterInfoStore
+	ClusterStore database.ClusterInfoStore
 }
 
 // NewClusterPool initializes and returns a ClusterPool by reading kubeconfig files from $HOME/.kube directory
