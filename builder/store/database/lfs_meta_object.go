@@ -6,12 +6,21 @@ import (
 	"time"
 )
 
-type LfsMetaObjectStore struct {
+type lfsMetaObjectStoreImpl struct {
 	db *DB
 }
 
-func NewLfsMetaObjectStore() *LfsMetaObjectStore {
-	return &LfsMetaObjectStore{
+type LfsMetaObjectStore interface {
+	FindByOID(ctx context.Context, RepoId int64, Oid string) (*LfsMetaObject, error)
+	FindByRepoID(ctx context.Context, repoID int64) ([]LfsMetaObject, error)
+	Create(ctx context.Context, lfsObj LfsMetaObject) (*LfsMetaObject, error)
+	RemoveByOid(ctx context.Context, oid string, repoID int64) error
+	UpdateOrCreate(ctx context.Context, input LfsMetaObject) (*LfsMetaObject, error)
+	BulkUpdateOrCreate(ctx context.Context, input []LfsMetaObject) error
+}
+
+func NewLfsMetaObjectStore() LfsMetaObjectStore {
+	return &lfsMetaObjectStoreImpl{
 		db: defaultDB,
 	}
 }
@@ -26,7 +35,7 @@ type LfsMetaObject struct {
 	times
 }
 
-func (s *LfsMetaObjectStore) FindByOID(ctx context.Context, RepoId int64, Oid string) (*LfsMetaObject, error) {
+func (s *lfsMetaObjectStoreImpl) FindByOID(ctx context.Context, RepoId int64, Oid string) (*LfsMetaObject, error) {
 	var lfsMetaObject LfsMetaObject
 	err := s.db.Operator.Core.NewSelect().
 		Model(&lfsMetaObject).
@@ -38,7 +47,7 @@ func (s *LfsMetaObjectStore) FindByOID(ctx context.Context, RepoId int64, Oid st
 	return &lfsMetaObject, nil
 }
 
-func (s *LfsMetaObjectStore) FindByRepoID(ctx context.Context, repoID int64) ([]LfsMetaObject, error) {
+func (s *lfsMetaObjectStoreImpl) FindByRepoID(ctx context.Context, repoID int64) ([]LfsMetaObject, error) {
 	var lfsMetaObjects []LfsMetaObject
 	err := s.db.Operator.Core.NewSelect().
 		Model(&lfsMetaObjects).
@@ -50,7 +59,7 @@ func (s *LfsMetaObjectStore) FindByRepoID(ctx context.Context, repoID int64) ([]
 	return lfsMetaObjects, nil
 }
 
-func (s *LfsMetaObjectStore) Create(ctx context.Context, lfsObj LfsMetaObject) (*LfsMetaObject, error) {
+func (s *lfsMetaObjectStoreImpl) Create(ctx context.Context, lfsObj LfsMetaObject) (*LfsMetaObject, error) {
 	err := s.db.Operator.Core.NewInsert().
 		Model(&lfsObj).
 		Scan(ctx)
@@ -60,7 +69,7 @@ func (s *LfsMetaObjectStore) Create(ctx context.Context, lfsObj LfsMetaObject) (
 	return &lfsObj, nil
 }
 
-func (s *LfsMetaObjectStore) RemoveByOid(ctx context.Context, oid string, repoID int64) error {
+func (s *lfsMetaObjectStoreImpl) RemoveByOid(ctx context.Context, oid string, repoID int64) error {
 	err := s.db.Operator.Core.NewDelete().
 		Model(&LfsMetaObject{}).
 		Where("oid = ? and repository_id= ?", oid, repoID).
@@ -69,7 +78,7 @@ func (s *LfsMetaObjectStore) RemoveByOid(ctx context.Context, oid string, repoID
 	return err
 }
 
-func (s *LfsMetaObjectStore) UpdateOrCreate(ctx context.Context, input LfsMetaObject) (*LfsMetaObject, error) {
+func (s *lfsMetaObjectStoreImpl) UpdateOrCreate(ctx context.Context, input LfsMetaObject) (*LfsMetaObject, error) {
 	input.UpdatedAt = time.Now()
 	_, err := s.db.Core.NewUpdate().
 		Model(&input).
@@ -88,7 +97,7 @@ func (s *LfsMetaObjectStore) UpdateOrCreate(ctx context.Context, input LfsMetaOb
 	return &input, nil
 }
 
-func (s *LfsMetaObjectStore) BulkUpdateOrCreate(ctx context.Context, input []LfsMetaObject) error {
+func (s *lfsMetaObjectStoreImpl) BulkUpdateOrCreate(ctx context.Context, input []LfsMetaObject) error {
 	if len(input) == 0 {
 		return nil
 	}

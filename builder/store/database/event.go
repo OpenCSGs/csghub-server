@@ -2,22 +2,28 @@ package database
 
 import "context"
 
-type EventStore struct {
+type eventStoreImpl struct {
 	db *DB
 }
 
-func NewEventStore() *EventStore {
-	return &EventStore{
+type EventStore interface {
+	Save(ctx context.Context, event Event) error
+	// batch insert
+	BatchSave(ctx context.Context, events []Event) error
+}
+
+func NewEventStore() EventStore {
+	return &eventStoreImpl{
 		db: defaultDB,
 	}
 }
 
-func (s *EventStore) Save(ctx context.Context, event Event) error {
+func (s *eventStoreImpl) Save(ctx context.Context, event Event) error {
 	return assertAffectedOneRow(s.db.Core.NewInsert().Model(&event).Exec(ctx))
 }
 
 // batch insert
-func (s *EventStore) BatchSave(ctx context.Context, events []Event) error {
+func (s *eventStoreImpl) BatchSave(ctx context.Context, events []Event) error {
 	result, err := s.db.Core.NewInsert().Model(&events).Exec(ctx)
 	return assertAffectedXRows(int64(len(events)), result, err)
 }

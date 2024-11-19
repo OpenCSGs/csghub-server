@@ -14,15 +14,26 @@ type Prompt struct {
 	times
 }
 
-type PromptStore struct {
+type promptStoreImpl struct {
 	db *DB
 }
 
-func NewPromptStore() *PromptStore {
-	return &PromptStore{db: defaultDB}
+type PromptStore interface {
+	Create(ctx context.Context, input Prompt) (*Prompt, error)
+	ByRepoIDs(ctx context.Context, repoIDs []int64) (prompts []Prompt, err error)
+	ByRepoID(ctx context.Context, repoID int64) (*Prompt, error)
+	Update(ctx context.Context, input Prompt) (err error)
+	FindByPath(ctx context.Context, namespace string, repoPath string) (*Prompt, error)
+	Delete(ctx context.Context, input Prompt) error
+	ByUsername(ctx context.Context, username string, per, page int, onlyPublic bool) (prompts []Prompt, total int, err error)
+	ByOrgPath(ctx context.Context, namespace string, per, page int, onlyPublic bool) (prompts []Prompt, total int, err error)
 }
 
-func (s *PromptStore) Create(ctx context.Context, input Prompt) (*Prompt, error) {
+func NewPromptStore() PromptStore {
+	return &promptStoreImpl{db: defaultDB}
+}
+
+func (s *promptStoreImpl) Create(ctx context.Context, input Prompt) (*Prompt, error) {
 	res, err := s.db.Core.NewInsert().Model(&input).Exec(ctx, &input)
 	if err := assertAffectedOneRow(res, err); err != nil {
 		return nil, fmt.Errorf("create prompt in db failed,error:%w", err)
@@ -31,7 +42,7 @@ func (s *PromptStore) Create(ctx context.Context, input Prompt) (*Prompt, error)
 	return &input, nil
 }
 
-func (s *PromptStore) ByRepoIDs(ctx context.Context, repoIDs []int64) (prompts []Prompt, err error) {
+func (s *promptStoreImpl) ByRepoIDs(ctx context.Context, repoIDs []int64) (prompts []Prompt, err error) {
 	q := s.db.Operator.Core.NewSelect().
 		Model(&prompts).
 		Relation("Repository").
@@ -41,7 +52,7 @@ func (s *PromptStore) ByRepoIDs(ctx context.Context, repoIDs []int64) (prompts [
 	return
 }
 
-func (s *PromptStore) ByRepoID(ctx context.Context, repoID int64) (*Prompt, error) {
+func (s *promptStoreImpl) ByRepoID(ctx context.Context, repoID int64) (*Prompt, error) {
 	var prompt Prompt
 	err := s.db.Operator.Core.NewSelect().
 		Model(&prompt).
@@ -54,12 +65,12 @@ func (s *PromptStore) ByRepoID(ctx context.Context, repoID int64) (*Prompt, erro
 	return &prompt, nil
 }
 
-func (s *PromptStore) Update(ctx context.Context, input Prompt) (err error) {
+func (s *promptStoreImpl) Update(ctx context.Context, input Prompt) (err error) {
 	_, err = s.db.Core.NewUpdate().Model(&input).WherePK().Exec(ctx)
 	return
 }
 
-func (s *PromptStore) FindByPath(ctx context.Context, namespace string, repoPath string) (*Prompt, error) {
+func (s *promptStoreImpl) FindByPath(ctx context.Context, namespace string, repoPath string) (*Prompt, error) {
 	resPrompt := new(Prompt)
 	err := s.db.Operator.Core.
 		NewSelect().
@@ -80,7 +91,7 @@ func (s *PromptStore) FindByPath(ctx context.Context, namespace string, repoPath
 	return resPrompt, err
 }
 
-func (s *PromptStore) Delete(ctx context.Context, input Prompt) error {
+func (s *promptStoreImpl) Delete(ctx context.Context, input Prompt) error {
 	res, err := s.db.Operator.Core.NewDelete().Model(&input).WherePK().Exec(ctx)
 	if err := assertAffectedOneRow(res, err); err != nil {
 		return fmt.Errorf("delete prompt failed,error:%w", err)
@@ -88,7 +99,7 @@ func (s *PromptStore) Delete(ctx context.Context, input Prompt) error {
 	return nil
 }
 
-func (s *PromptStore) ByUsername(ctx context.Context, username string, per, page int, onlyPublic bool) (prompts []Prompt, total int, err error) {
+func (s *promptStoreImpl) ByUsername(ctx context.Context, username string, per, page int, onlyPublic bool) (prompts []Prompt, total int, err error) {
 	query := s.db.Operator.Core.
 		NewSelect().
 		Model(&prompts).
@@ -113,7 +124,7 @@ func (s *PromptStore) ByUsername(ctx context.Context, username string, per, page
 	return
 }
 
-func (s *PromptStore) ByOrgPath(ctx context.Context, namespace string, per, page int, onlyPublic bool) (prompts []Prompt, total int, err error) {
+func (s *promptStoreImpl) ByOrgPath(ctx context.Context, namespace string, per, page int, onlyPublic bool) (prompts []Prompt, total int, err error) {
 	query := s.db.Operator.Core.
 		NewSelect().
 		Model(&prompts).

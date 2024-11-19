@@ -33,17 +33,30 @@ const (
 	DiscussionableTypeCollection = "collection"
 )
 
-type DiscussionStore struct {
+type discussionStoreImpl struct {
 	db *DB
 }
 
-func NewDiscussionStore() *DiscussionStore {
-	return &DiscussionStore{
+type DiscussionStore interface {
+	Create(ctx context.Context, discussion Discussion) (*Discussion, error)
+	FindByID(ctx context.Context, id int64) (*Discussion, error)
+	FindByDiscussionableID(ctx context.Context, discussionableType string, discussionableID int64) ([]Discussion, error)
+	UpdateByID(ctx context.Context, id int64, title string) error
+	DeleteByID(ctx context.Context, id int64) error
+	FindDiscussionComments(ctx context.Context, discussionID int64) ([]Comment, error)
+	CreateComment(ctx context.Context, comment Comment) (*Comment, error)
+	UpdateComment(ctx context.Context, id int64, content string) error
+	FindCommentByID(ctx context.Context, id int64) (*Comment, error)
+	DeleteComment(ctx context.Context, id int64) error
+}
+
+func NewDiscussionStore() DiscussionStore {
+	return &discussionStoreImpl{
 		db: defaultDB,
 	}
 }
 
-func (s *DiscussionStore) Create(ctx context.Context, discussion Discussion) (*Discussion, error) {
+func (s *discussionStoreImpl) Create(ctx context.Context, discussion Discussion) (*Discussion, error) {
 	_, err := s.db.Core.NewInsert().Model(&discussion).Exec(ctx)
 	if err != nil {
 		return nil, err
@@ -51,7 +64,7 @@ func (s *DiscussionStore) Create(ctx context.Context, discussion Discussion) (*D
 	return &discussion, nil
 }
 
-func (s *DiscussionStore) FindByID(ctx context.Context, id int64) (*Discussion, error) {
+func (s *discussionStoreImpl) FindByID(ctx context.Context, id int64) (*Discussion, error) {
 	discussion := Discussion{}
 	err := s.db.Core.NewSelect().Model(&discussion).
 		Where("discussion.id = ?", id).
@@ -63,7 +76,7 @@ func (s *DiscussionStore) FindByID(ctx context.Context, id int64) (*Discussion, 
 	return &discussion, nil
 }
 
-func (s *DiscussionStore) FindByDiscussionableID(ctx context.Context, discussionableType string, discussionableID int64) ([]Discussion, error) {
+func (s *discussionStoreImpl) FindByDiscussionableID(ctx context.Context, discussionableType string, discussionableID int64) ([]Discussion, error) {
 	discussions := []Discussion{}
 	err := s.db.Core.NewSelect().Model(&discussions).
 		Where("discussionable_type = ? AND discussionable_id = ?", discussionableType, discussionableID).
@@ -75,7 +88,7 @@ func (s *DiscussionStore) FindByDiscussionableID(ctx context.Context, discussion
 	return discussions, nil
 }
 
-func (s *DiscussionStore) UpdateByID(ctx context.Context, id int64, title string) error {
+func (s *discussionStoreImpl) UpdateByID(ctx context.Context, id int64, title string) error {
 	_, err := s.db.Core.NewUpdate().Model(&Discussion{}).Set("title = ?", title).Where("id = ?", id).Exec(ctx)
 	if err != nil {
 		return err
@@ -83,7 +96,7 @@ func (s *DiscussionStore) UpdateByID(ctx context.Context, id int64, title string
 	return nil
 }
 
-func (s *DiscussionStore) DeleteByID(ctx context.Context, id int64) error {
+func (s *discussionStoreImpl) DeleteByID(ctx context.Context, id int64) error {
 	_, err := s.db.Core.NewDelete().Model(&Discussion{}).Where("id = ?", id).Exec(ctx)
 	if err != nil {
 		return err
@@ -91,7 +104,7 @@ func (s *DiscussionStore) DeleteByID(ctx context.Context, id int64) error {
 	return nil
 }
 
-func (s *DiscussionStore) FindDiscussionComments(ctx context.Context, discussionID int64) ([]Comment, error) {
+func (s *discussionStoreImpl) FindDiscussionComments(ctx context.Context, discussionID int64) ([]Comment, error) {
 	comments := []Comment{}
 	err := s.db.Core.NewSelect().Model(&comments).
 		Relation("User").
@@ -103,7 +116,7 @@ func (s *DiscussionStore) FindDiscussionComments(ctx context.Context, discussion
 	return comments, nil
 }
 
-func (s *DiscussionStore) CreateComment(ctx context.Context, comment Comment) (*Comment, error) {
+func (s *discussionStoreImpl) CreateComment(ctx context.Context, comment Comment) (*Comment, error) {
 	_, err := s.db.Core.NewInsert().Model(&comment).Exec(ctx)
 	if err != nil {
 		return nil, err
@@ -111,7 +124,7 @@ func (s *DiscussionStore) CreateComment(ctx context.Context, comment Comment) (*
 	return &comment, nil
 }
 
-func (s *DiscussionStore) UpdateComment(ctx context.Context, id int64, content string) error {
+func (s *discussionStoreImpl) UpdateComment(ctx context.Context, id int64, content string) error {
 	_, err := s.db.Core.NewUpdate().Model(&Comment{}).Set("content = ?", content).Where("id = ?", id).Exec(ctx)
 	if err != nil {
 		return err
@@ -119,7 +132,7 @@ func (s *DiscussionStore) UpdateComment(ctx context.Context, id int64, content s
 	return nil
 }
 
-func (s *DiscussionStore) FindCommentByID(ctx context.Context, id int64) (*Comment, error) {
+func (s *discussionStoreImpl) FindCommentByID(ctx context.Context, id int64) (*Comment, error) {
 	comment := Comment{}
 	err := s.db.Core.NewSelect().Model(&comment).
 		Where("comment.id = ?", id).
@@ -131,7 +144,7 @@ func (s *DiscussionStore) FindCommentByID(ctx context.Context, id int64) (*Comme
 	return &comment, nil
 }
 
-func (s *DiscussionStore) DeleteComment(ctx context.Context, id int64) error {
+func (s *discussionStoreImpl) DeleteComment(ctx context.Context, id int64) error {
 	_, err := s.db.Core.NewDelete().Model(&Comment{}).Where("id = ?", id).Exec(ctx)
 	if err != nil {
 		return err

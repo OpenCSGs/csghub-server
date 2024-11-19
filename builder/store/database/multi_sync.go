@@ -5,17 +5,26 @@ import (
 	"fmt"
 )
 
-type MultiSyncStore struct {
+type multiSyncStoreImpl struct {
 	db *DB
 }
 
-func NewMultiSyncStore() *MultiSyncStore {
-	return &MultiSyncStore{
+type MultiSyncStore interface {
+	Create(ctx context.Context, v SyncVersion) (*SyncVersion, error)
+	// GetAfter get N records after version in ASC order
+	GetAfter(ctx context.Context, version, limit int64) ([]SyncVersion, error)
+	// GetLatest get max sync version
+	GetLatest(ctx context.Context) (SyncVersion, error)
+	GetAfterDistinct(ctx context.Context, version int64) ([]SyncVersion, error)
+}
+
+func NewMultiSyncStore() MultiSyncStore {
+	return &multiSyncStoreImpl{
 		db: defaultDB,
 	}
 }
 
-func (s *MultiSyncStore) Create(ctx context.Context, v SyncVersion) (*SyncVersion, error) {
+func (s *multiSyncStoreImpl) Create(ctx context.Context, v SyncVersion) (*SyncVersion, error) {
 	res, err := s.db.Core.NewInsert().Model(&v).Exec(ctx, &v)
 	if err := assertAffectedOneRow(res, err); err != nil {
 		return nil, fmt.Errorf("create sync version in db failed,error:%w", err)
@@ -25,7 +34,7 @@ func (s *MultiSyncStore) Create(ctx context.Context, v SyncVersion) (*SyncVersio
 }
 
 // GetAfter get N records after version in ASC order
-func (s *MultiSyncStore) GetAfter(ctx context.Context, version, limit int64) ([]SyncVersion, error) {
+func (s *multiSyncStoreImpl) GetAfter(ctx context.Context, version, limit int64) ([]SyncVersion, error) {
 	var vs []SyncVersion
 	err := s.db.Core.NewSelect().Model(&vs).Where("version > ?", version).
 		Order("version asc").
@@ -35,7 +44,7 @@ func (s *MultiSyncStore) GetAfter(ctx context.Context, version, limit int64) ([]
 }
 
 // GetLatest get max sync version
-func (s *MultiSyncStore) GetLatest(ctx context.Context) (SyncVersion, error) {
+func (s *multiSyncStoreImpl) GetLatest(ctx context.Context) (SyncVersion, error) {
 	var v SyncVersion
 	err := s.db.Core.NewSelect().Model(&v).
 		Order("version desc").
@@ -45,7 +54,7 @@ func (s *MultiSyncStore) GetLatest(ctx context.Context) (SyncVersion, error) {
 	return v, err
 }
 
-func (s *MultiSyncStore) GetAfterDistinct(ctx context.Context, version int64) ([]SyncVersion, error) {
+func (s *multiSyncStoreImpl) GetAfterDistinct(ctx context.Context, version int64) ([]SyncVersion, error) {
 	var vs []SyncVersion
 	err := s.db.Core.NewSelect().
 		ColumnExpr("DISTINCT ON (source_id, repo_path, repo_type) version, source_id, repo_path, repo_type, last_modified_at, change_log").

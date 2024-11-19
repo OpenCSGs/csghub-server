@@ -8,12 +8,22 @@ import (
 	"strings"
 )
 
-type RuntimeArchitecturesStore struct {
+type runtimeArchitecturesStoreImpl struct {
 	db *DB
 }
 
-func NewRuntimeArchitecturesStore() *RuntimeArchitecturesStore {
-	return &RuntimeArchitecturesStore{
+type RuntimeArchitecturesStore interface {
+	ListByRuntimeFrameworkID(ctx context.Context, id int64) ([]RuntimeArchitecture, error)
+	Add(ctx context.Context, arch RuntimeArchitecture) error
+	DeleteByRuntimeIDAndArchName(ctx context.Context, id int64, archName string) error
+	FindByRuntimeIDAndArchName(ctx context.Context, id int64, archName string) (*RuntimeArchitecture, error)
+	ListByRArchName(ctx context.Context, archName string) ([]RuntimeArchitecture, error)
+	ListByRArchNameAndModel(ctx context.Context, archName, modelName string) ([]RuntimeArchitecture, error)
+	GetRuntimeByModelName(ctx context.Context, archName, modelName string) ([]RuntimeArchitecture, error)
+}
+
+func NewRuntimeArchitecturesStore() RuntimeArchitecturesStore {
+	return &runtimeArchitecturesStoreImpl{
 		db: defaultDB,
 	}
 }
@@ -24,7 +34,7 @@ type RuntimeArchitecture struct {
 	ArchitectureName   string `bun:",notnull" json:"architecture_name"`
 }
 
-func (ra *RuntimeArchitecturesStore) ListByRuntimeFrameworkID(ctx context.Context, id int64) ([]RuntimeArchitecture, error) {
+func (ra *runtimeArchitecturesStoreImpl) ListByRuntimeFrameworkID(ctx context.Context, id int64) ([]RuntimeArchitecture, error) {
 	var result []RuntimeArchitecture
 	_, err := ra.db.Operator.Core.NewSelect().Model(&result).Where("runtime_framework_id = ?", id).Exec(ctx, &result)
 	if err != nil {
@@ -33,7 +43,7 @@ func (ra *RuntimeArchitecturesStore) ListByRuntimeFrameworkID(ctx context.Contex
 	return result, nil
 }
 
-func (ra *RuntimeArchitecturesStore) Add(ctx context.Context, arch RuntimeArchitecture) error {
+func (ra *runtimeArchitecturesStoreImpl) Add(ctx context.Context, arch RuntimeArchitecture) error {
 	res, err := ra.db.Core.NewInsert().Model(&arch).Exec(ctx, &arch)
 	if err := assertAffectedOneRow(res, err); err != nil {
 		return fmt.Errorf("creating runtime architecture in the db failed,error:%w", err)
@@ -41,7 +51,7 @@ func (ra *RuntimeArchitecturesStore) Add(ctx context.Context, arch RuntimeArchit
 	return nil
 }
 
-func (ra *RuntimeArchitecturesStore) DeleteByRuntimeIDAndArchName(ctx context.Context, id int64, archName string) error {
+func (ra *runtimeArchitecturesStoreImpl) DeleteByRuntimeIDAndArchName(ctx context.Context, id int64, archName string) error {
 	var arch RuntimeArchitecture
 	_, err := ra.db.Core.NewDelete().Model(&arch).Where("runtime_framework_id = ? and architecture_name = ?", id, archName).Exec(ctx)
 	if err != nil {
@@ -50,7 +60,7 @@ func (ra *RuntimeArchitecturesStore) DeleteByRuntimeIDAndArchName(ctx context.Co
 	return nil
 }
 
-func (ra *RuntimeArchitecturesStore) FindByRuntimeIDAndArchName(ctx context.Context, id int64, archName string) (*RuntimeArchitecture, error) {
+func (ra *runtimeArchitecturesStoreImpl) FindByRuntimeIDAndArchName(ctx context.Context, id int64, archName string) (*RuntimeArchitecture, error) {
 	var arch RuntimeArchitecture
 	_, err := ra.db.Core.NewSelect().Model(&arch).Where("runtime_framework_id = ? and architecture_name = ?", id, archName).Exec(ctx, &arch)
 	if errors.Is(err, sql.ErrNoRows) {
@@ -62,7 +72,7 @@ func (ra *RuntimeArchitecturesStore) FindByRuntimeIDAndArchName(ctx context.Cont
 	return &arch, nil
 }
 
-func (ra *RuntimeArchitecturesStore) ListByRArchName(ctx context.Context, archName string) ([]RuntimeArchitecture, error) {
+func (ra *runtimeArchitecturesStoreImpl) ListByRArchName(ctx context.Context, archName string) ([]RuntimeArchitecture, error) {
 	var result []RuntimeArchitecture
 	_, err := ra.db.Operator.Core.NewSelect().Model(&result).Where("architecture_name = ?", archName).Exec(ctx, &result)
 	if err != nil {
@@ -71,7 +81,7 @@ func (ra *RuntimeArchitecturesStore) ListByRArchName(ctx context.Context, archNa
 	return result, nil
 }
 
-func (ra *RuntimeArchitecturesStore) ListByRArchNameAndModel(ctx context.Context, archName, modelName string) ([]RuntimeArchitecture, error) {
+func (ra *runtimeArchitecturesStoreImpl) ListByRArchNameAndModel(ctx context.Context, archName, modelName string) ([]RuntimeArchitecture, error) {
 	var result []RuntimeArchitecture
 	_, err := ra.db.Operator.Core.NewSelect().Model(&result).Where("architecture_name = ?", archName).Exec(ctx, &result)
 	if err != nil {
@@ -116,7 +126,7 @@ Meta-Llama-3-8B-Instruct --> llama3-8b-instruct
 Llama-2-13b-chat --> llama-2-13b-chat
 */
 
-func (ra *RuntimeArchitecturesStore) GetRuntimeByModelName(ctx context.Context, archName, modelName string) ([]RuntimeArchitecture, error) {
+func (ra *runtimeArchitecturesStoreImpl) GetRuntimeByModelName(ctx context.Context, archName, modelName string) ([]RuntimeArchitecture, error) {
 	var result []RuntimeArchitecture
 	var resModel []ResourceModel
 	err := ra.db.Core.NewSelect().Model(&resModel).Where("LOWER(model_name) like ? and engine_name != ?", fmt.Sprintf("%%%s%%", strings.ToLower(modelName)), "nim").Scan(ctx)

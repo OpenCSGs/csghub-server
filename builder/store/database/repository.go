@@ -19,12 +19,52 @@ var RepositorySourceAndPrefixMapping = map[types.RepositorySource]string{
 	types.LocalSource:       "",
 }
 
-type RepoStore struct {
+type repoStoreImpl struct {
 	db *DB
 }
 
-func NewRepoStore() *RepoStore {
-	return &RepoStore{
+type RepoStore interface {
+	CreateRepoTx(ctx context.Context, tx bun.Tx, input Repository) (*Repository, error)
+	CreateRepo(ctx context.Context, input Repository) (*Repository, error)
+	UpdateRepo(ctx context.Context, input Repository) (*Repository, error)
+	DeleteRepo(ctx context.Context, input Repository) error
+	Find(ctx context.Context, owner, repoType, repoName string) (*Repository, error)
+	FindById(ctx context.Context, id int64) (*Repository, error)
+	FindByIds(ctx context.Context, ids []int64, opts ...SelectOption) ([]*Repository, error)
+	FindByPath(ctx context.Context, repoType types.RepositoryType, namespace, name string) (*Repository, error)
+	FindByGitPath(ctx context.Context, path string) (*Repository, error)
+	FindByGitPaths(ctx context.Context, paths []string, opts ...SelectOption) ([]*Repository, error)
+	Exists(ctx context.Context, repoType types.RepositoryType, namespace string, name string) (bool, error)
+	All(ctx context.Context) ([]*Repository, error)
+	UpdateRepoFileDownloads(ctx context.Context, repo *Repository, date time.Time, clickDownloadCount int64) (err error)
+	UpdateRepoCloneDownloads(ctx context.Context, repo *Repository, date time.Time, cloneCount int64) (err error)
+	UpdateDownloads(ctx context.Context, repo *Repository) error
+	Tags(ctx context.Context, repoID int64) (tags []Tag, err error)
+	TagsWithCategory(ctx context.Context, repoID int64, category string) (tags []Tag, err error)
+	// TagIDs get tag ids by repo id, if category is not empty, return only tags of the category
+	TagIDs(ctx context.Context, repoID int64, category string) (tagIDs []int64, err error)
+	SetUpdateTimeByPath(ctx context.Context, repoType types.RepositoryType, namespace, name string, update time.Time) error
+	PublicToUser(ctx context.Context, repoType types.RepositoryType, userIDs []int64, filter *types.RepoFilter, per, page int) (repos []*Repository, count int, err error)
+	IsMirrorRepo(ctx context.Context, repoType types.RepositoryType, namespace, name string) (bool, error)
+	ListRepoPublicToUserByRepoIDs(ctx context.Context, repoType types.RepositoryType, userID int64, search, sort string, per, page int, repoIDs []int64) (repos []*Repository, count int, err error)
+	WithMirror(ctx context.Context, per, page int) (repos []Repository, count int, err error)
+	CleanRelationsByRepoID(ctx context.Context, repoId int64) error
+	BatchCreateRepoTags(ctx context.Context, repoTags []RepositoryTag) error
+	DeleteAllFiles(ctx context.Context, repoID int64) error
+	DeleteAllTags(ctx context.Context, repoID int64) error
+	UpdateOrCreateRepo(ctx context.Context, input Repository) (*Repository, error)
+	UpdateLicenseByTag(ctx context.Context, repoID int64) error
+	CountByRepoType(ctx context.Context, repoType types.RepositoryType) (int, error)
+	GetRepoWithoutRuntimeByID(ctx context.Context, rfID int64, paths []string) ([]Repository, error)
+	GetRepoWithRuntimeByID(ctx context.Context, rfID int64, paths []string) ([]Repository, error)
+	BatchGet(ctx context.Context, repoType types.RepositoryType, lastRepoID int64, batch int) ([]Repository, error)
+	FindWithBatch(ctx context.Context, batchSize, batch int) ([]Repository, error)
+	FindByRepoSourceWithBatch(ctx context.Context, repoSource types.RepositorySource, batchSize, batch int) ([]Repository, error)
+	ByUser(ctx context.Context, userID int64) ([]Repository, error)
+}
+
+func NewRepoStore() RepoStore {
+	return &repoStoreImpl{
 		db: defaultDB,
 	}
 }
@@ -86,7 +126,7 @@ func (r Repository) PathWithOutPrefix() string {
 
 }
 
-func (s *RepoStore) CreateRepoTx(ctx context.Context, tx bun.Tx, input Repository) (*Repository, error) {
+func (s *repoStoreImpl) CreateRepoTx(ctx context.Context, tx bun.Tx, input Repository) (*Repository, error) {
 	res, err := tx.NewInsert().Model(&input).Exec(ctx)
 	if err := assertAffectedOneRow(res, err); err != nil {
 		return nil, fmt.Errorf("create repository in tx failed,error:%w", err)
@@ -95,7 +135,7 @@ func (s *RepoStore) CreateRepoTx(ctx context.Context, tx bun.Tx, input Repositor
 	return &input, nil
 }
 
-func (s *RepoStore) CreateRepo(ctx context.Context, input Repository) (*Repository, error) {
+func (s *repoStoreImpl) CreateRepo(ctx context.Context, input Repository) (*Repository, error) {
 	res, err := s.db.Core.NewInsert().Model(&input).Exec(ctx, &input)
 	if err := assertAffectedOneRow(res, err); err != nil {
 		return nil, fmt.Errorf("create repository in tx failed,error:%w", err)
@@ -104,19 +144,19 @@ func (s *RepoStore) CreateRepo(ctx context.Context, input Repository) (*Reposito
 	return &input, nil
 }
 
-func (s *RepoStore) UpdateRepo(ctx context.Context, input Repository) (*Repository, error) {
+func (s *repoStoreImpl) UpdateRepo(ctx context.Context, input Repository) (*Repository, error) {
 	_, err := s.db.Core.NewUpdate().Model(&input).WherePK().Exec(ctx)
 
 	return &input, err
 }
 
-func (s *RepoStore) DeleteRepo(ctx context.Context, input Repository) error {
+func (s *repoStoreImpl) DeleteRepo(ctx context.Context, input Repository) error {
 	_, err := s.db.Core.NewDelete().Model(&input).WherePK().Exec(ctx)
 
 	return err
 }
 
-func (s *RepoStore) Find(ctx context.Context, owner, repoType, repoName string) (*Repository, error) {
+func (s *repoStoreImpl) Find(ctx context.Context, owner, repoType, repoName string) (*Repository, error) {
 	var err error
 	repo := &Repository{}
 	err = s.db.Operator.Core.
@@ -128,7 +168,7 @@ func (s *RepoStore) Find(ctx context.Context, owner, repoType, repoName string) 
 	return repo, err
 }
 
-func (s *RepoStore) FindById(ctx context.Context, id int64) (*Repository, error) {
+func (s *repoStoreImpl) FindById(ctx context.Context, id int64) (*Repository, error) {
 	resRepo := new(Repository)
 	err := s.db.Operator.Core.
 		NewSelect().
@@ -138,7 +178,7 @@ func (s *RepoStore) FindById(ctx context.Context, id int64) (*Repository, error)
 	return resRepo, err
 }
 
-func (s *RepoStore) FindByIds(ctx context.Context, ids []int64, opts ...SelectOption) ([]*Repository, error) {
+func (s *repoStoreImpl) FindByIds(ctx context.Context, ids []int64, opts ...SelectOption) ([]*Repository, error) {
 	repos := make([]*Repository, 0)
 	q := s.db.Operator.Core.
 		NewSelect()
@@ -152,7 +192,7 @@ func (s *RepoStore) FindByIds(ctx context.Context, ids []int64, opts ...SelectOp
 	return repos, err
 }
 
-func (s *RepoStore) FindByPath(ctx context.Context, repoType types.RepositoryType, namespace, name string) (*Repository, error) {
+func (s *repoStoreImpl) FindByPath(ctx context.Context, repoType types.RepositoryType, namespace, name string) (*Repository, error) {
 	resRepo := new(Repository)
 	err := s.db.Operator.Core.
 		NewSelect().
@@ -166,7 +206,7 @@ func (s *RepoStore) FindByPath(ctx context.Context, repoType types.RepositoryTyp
 	return resRepo, err
 }
 
-func (s *RepoStore) FindByGitPath(ctx context.Context, path string) (*Repository, error) {
+func (s *repoStoreImpl) FindByGitPath(ctx context.Context, path string) (*Repository, error) {
 	resRepo := new(Repository)
 	err := s.db.Operator.Core.
 		NewSelect().
@@ -176,7 +216,7 @@ func (s *RepoStore) FindByGitPath(ctx context.Context, path string) (*Repository
 	return resRepo, err
 }
 
-func (s *RepoStore) FindByGitPaths(ctx context.Context, paths []string, opts ...SelectOption) ([]*Repository, error) {
+func (s *repoStoreImpl) FindByGitPaths(ctx context.Context, paths []string, opts ...SelectOption) ([]*Repository, error) {
 	for i := range paths {
 		paths[i] = strings.ToLower(paths[i])
 	}
@@ -192,13 +232,13 @@ func (s *RepoStore) FindByGitPaths(ctx context.Context, paths []string, opts ...
 	return repos, err
 }
 
-func (s *RepoStore) Exists(ctx context.Context, repoType types.RepositoryType, namespace string, name string) (bool, error) {
+func (s *repoStoreImpl) Exists(ctx context.Context, repoType types.RepositoryType, namespace string, name string) (bool, error) {
 	return s.db.Operator.Core.NewSelect().Model((*Repository)(nil)).
 		Where("LOWER(git_path) = LOWER(?)", fmt.Sprintf("%ss_%s/%s", repoType, namespace, name)).
 		Exists(ctx)
 }
 
-func (s *RepoStore) All(ctx context.Context) ([]*Repository, error) {
+func (s *repoStoreImpl) All(ctx context.Context) ([]*Repository, error) {
 	repos := make([]*Repository, 0)
 	err := s.db.Operator.Core.
 		NewSelect().
@@ -207,7 +247,7 @@ func (s *RepoStore) All(ctx context.Context) ([]*Repository, error) {
 	return repos, err
 }
 
-func (s *RepoStore) UpdateRepoFileDownloads(ctx context.Context, repo *Repository, date time.Time, clickDownloadCount int64) (err error) {
+func (s *repoStoreImpl) UpdateRepoFileDownloads(ctx context.Context, repo *Repository, date time.Time, clickDownloadCount int64) (err error) {
 	rd := new(RepositoryDownload)
 	err = s.db.Operator.Core.NewSelect().
 		Model(rd).
@@ -247,7 +287,7 @@ func (s *RepoStore) UpdateRepoFileDownloads(ctx context.Context, repo *Repositor
 	return
 }
 
-func (s *RepoStore) UpdateRepoCloneDownloads(ctx context.Context, repo *Repository, date time.Time, cloneCount int64) (err error) {
+func (s *repoStoreImpl) UpdateRepoCloneDownloads(ctx context.Context, repo *Repository, date time.Time, cloneCount int64) (err error) {
 	rd := new(RepositoryDownload)
 	err = s.db.Operator.Core.NewSelect().
 		Model(rd).
@@ -287,7 +327,7 @@ func (s *RepoStore) UpdateRepoCloneDownloads(ctx context.Context, repo *Reposito
 	return
 }
 
-func (s *RepoStore) UpdateDownloads(ctx context.Context, repo *Repository) error {
+func (s *repoStoreImpl) UpdateDownloads(ctx context.Context, repo *Repository) error {
 	var downloadCount int64
 	err := s.db.Operator.Core.NewSelect().
 		ColumnExpr("(SUM(clone_count)+SUM(click_download_count)) AS total_count").
@@ -309,7 +349,7 @@ func (s *RepoStore) UpdateDownloads(ctx context.Context, repo *Repository) error
 	return nil
 }
 
-func (s *RepoStore) Tags(ctx context.Context, repoID int64) (tags []Tag, err error) {
+func (s *repoStoreImpl) Tags(ctx context.Context, repoID int64) (tags []Tag, err error) {
 	query := s.db.Operator.Core.NewSelect().
 		ColumnExpr("tags.*").
 		Model(&RepositoryTag{}).
@@ -320,7 +360,7 @@ func (s *RepoStore) Tags(ctx context.Context, repoID int64) (tags []Tag, err err
 	return
 }
 
-func (s *RepoStore) TagsWithCategory(ctx context.Context, repoID int64, category string) (tags []Tag, err error) {
+func (s *repoStoreImpl) TagsWithCategory(ctx context.Context, repoID int64, category string) (tags []Tag, err error) {
 	query := s.db.Operator.Core.NewSelect().
 		ColumnExpr("tags.*").
 		Model(&RepositoryTag{}).
@@ -333,7 +373,7 @@ func (s *RepoStore) TagsWithCategory(ctx context.Context, repoID int64, category
 }
 
 // TagIDs get tag ids by repo id, if category is not empty, return only tags of the category
-func (s *RepoStore) TagIDs(ctx context.Context, repoID int64, category string) (tagIDs []int64, err error) {
+func (s *repoStoreImpl) TagIDs(ctx context.Context, repoID int64, category string) (tagIDs []int64, err error) {
 	query := s.db.Operator.Core.NewSelect().
 		Model(&RepositoryTag{}).
 		Join("JOIN tags ON repository_tag.tag_id = tags.id").
@@ -346,7 +386,7 @@ func (s *RepoStore) TagIDs(ctx context.Context, repoID int64, category string) (
 	return tagIDs, err
 }
 
-func (s *RepoStore) SetUpdateTimeByPath(ctx context.Context, repoType types.RepositoryType, namespace, name string, update time.Time) error {
+func (s *repoStoreImpl) SetUpdateTimeByPath(ctx context.Context, repoType types.RepositoryType, namespace, name string, update time.Time) error {
 	repo := new(Repository)
 	repo.UpdatedAt = update
 	_, err := s.db.Operator.Core.NewUpdate().Model(repo).
@@ -356,7 +396,7 @@ func (s *RepoStore) SetUpdateTimeByPath(ctx context.Context, repoType types.Repo
 	return err
 }
 
-func (s *RepoStore) PublicToUser(ctx context.Context, repoType types.RepositoryType, userIDs []int64, filter *types.RepoFilter, per, page int) (repos []*Repository, count int, err error) {
+func (s *repoStoreImpl) PublicToUser(ctx context.Context, repoType types.RepositoryType, userIDs []int64, filter *types.RepoFilter, per, page int) (repos []*Repository, count int, err error) {
 	q := s.db.Operator.Core.
 		NewSelect().
 		Column("repository.*").
@@ -409,7 +449,7 @@ func (s *RepoStore) PublicToUser(ctx context.Context, repoType types.RepositoryT
 	return
 }
 
-func (s *RepoStore) IsMirrorRepo(ctx context.Context, repoType types.RepositoryType, namespace, name string) (bool, error) {
+func (s *repoStoreImpl) IsMirrorRepo(ctx context.Context, repoType types.RepositoryType, namespace, name string) (bool, error) {
 	var result struct {
 		Exists bool `bun:"exists"`
 	}
@@ -427,7 +467,7 @@ func (s *RepoStore) IsMirrorRepo(ctx context.Context, repoType types.RepositoryT
 	return result.Exists, nil
 }
 
-func (s *RepoStore) ListRepoPublicToUserByRepoIDs(ctx context.Context, repoType types.RepositoryType, userID int64, search, sort string, per, page int, repoIDs []int64) (repos []*Repository, count int, err error) {
+func (s *repoStoreImpl) ListRepoPublicToUserByRepoIDs(ctx context.Context, repoType types.RepositoryType, userID int64, search, sort string, per, page int, repoIDs []int64) (repos []*Repository, count int, err error) {
 	q := s.db.Operator.Core.
 		NewSelect().
 		Column("repository.*").
@@ -474,7 +514,7 @@ func (s *RepoStore) ListRepoPublicToUserByRepoIDs(ctx context.Context, repoType 
 	return
 }
 
-func (s *RepoStore) WithMirror(ctx context.Context, per, page int) (repos []Repository, count int, err error) {
+func (s *repoStoreImpl) WithMirror(ctx context.Context, per, page int) (repos []Repository, count int, err error) {
 	q := s.db.Operator.Core.NewSelect().
 		Model(&repos).
 		Relation("Mirror").
@@ -494,7 +534,7 @@ func (s *RepoStore) WithMirror(ctx context.Context, per, page int) (repos []Repo
 	return
 }
 
-func (s *RepoStore) CleanRelationsByRepoID(ctx context.Context, repoId int64) error {
+func (s *repoStoreImpl) CleanRelationsByRepoID(ctx context.Context, repoId int64) error {
 	err := s.db.Operator.Core.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
 		if _, err := tx.Exec("delete from repositories_runtime_frameworks where repo_id=?", repoId); err != nil {
 			return err
@@ -508,7 +548,7 @@ func (s *RepoStore) CleanRelationsByRepoID(ctx context.Context, repoId int64) er
 	return err
 }
 
-func (s *RepoStore) BatchCreateRepoTags(ctx context.Context, repoTags []RepositoryTag) error {
+func (s *repoStoreImpl) BatchCreateRepoTags(ctx context.Context, repoTags []RepositoryTag) error {
 	result, err := s.db.Operator.Core.NewInsert().
 		Model(&repoTags).
 		Exec(ctx)
@@ -519,7 +559,7 @@ func (s *RepoStore) BatchCreateRepoTags(ctx context.Context, repoTags []Reposito
 	return assertAffectedXRows(int64(len(repoTags)), result, err)
 }
 
-func (s *RepoStore) DeleteAllFiles(ctx context.Context, repoID int64) error {
+func (s *repoStoreImpl) DeleteAllFiles(ctx context.Context, repoID int64) error {
 	err := s.db.Operator.Core.NewDelete().
 		Model(&File{}).
 		Where("repository_id = ?", repoID).
@@ -531,7 +571,7 @@ func (s *RepoStore) DeleteAllFiles(ctx context.Context, repoID int64) error {
 	return nil
 }
 
-func (s *RepoStore) DeleteAllTags(ctx context.Context, repoID int64) error {
+func (s *repoStoreImpl) DeleteAllTags(ctx context.Context, repoID int64) error {
 	err := s.db.Operator.Core.NewDelete().
 		Model(&RepositoryTag{}).
 		Where("repository_id = ?", repoID).
@@ -543,7 +583,7 @@ func (s *RepoStore) DeleteAllTags(ctx context.Context, repoID int64) error {
 	return nil
 }
 
-func (s *RepoStore) UpdateOrCreateRepo(ctx context.Context, input Repository) (*Repository, error) {
+func (s *repoStoreImpl) UpdateOrCreateRepo(ctx context.Context, input Repository) (*Repository, error) {
 	input.UpdatedAt = time.Now()
 	_, err := s.db.Core.NewUpdate().
 		Model(&input).
@@ -562,7 +602,7 @@ func (s *RepoStore) UpdateOrCreateRepo(ctx context.Context, input Repository) (*
 	return &input, nil
 }
 
-func (s *RepoStore) UpdateLicenseByTag(ctx context.Context, repoID int64) error {
+func (s *repoStoreImpl) UpdateLicenseByTag(ctx context.Context, repoID int64) error {
 	var tag Tag
 	err := s.db.Core.NewSelect().
 		Model(&tag).
@@ -587,11 +627,11 @@ func (s *RepoStore) UpdateLicenseByTag(ctx context.Context, repoID int64) error 
 	return nil
 }
 
-func (s *RepoStore) CountByRepoType(ctx context.Context, repoType types.RepositoryType) (int, error) {
+func (s *repoStoreImpl) CountByRepoType(ctx context.Context, repoType types.RepositoryType) (int, error) {
 	return s.db.Core.NewSelect().Model(&Repository{}).Where("repository_type = ?", repoType).Count(ctx)
 }
 
-func (s *RepoStore) GetRepoWithoutRuntimeByID(ctx context.Context, rfID int64, paths []string) ([]Repository, error) {
+func (s *repoStoreImpl) GetRepoWithoutRuntimeByID(ctx context.Context, rfID int64, paths []string) ([]Repository, error) {
 	var res []Repository
 	q := s.db.Operator.Core.NewSelect().Model(&res)
 	if len(paths) > 0 {
@@ -606,7 +646,7 @@ func (s *RepoStore) GetRepoWithoutRuntimeByID(ctx context.Context, rfID int64, p
 	return res, nil
 }
 
-func (s *RepoStore) GetRepoWithRuntimeByID(ctx context.Context, rfID int64, paths []string) ([]Repository, error) {
+func (s *repoStoreImpl) GetRepoWithRuntimeByID(ctx context.Context, rfID int64, paths []string) ([]Repository, error) {
 	var res []Repository
 	q := s.db.Operator.Core.NewSelect().Model(&res)
 	if len(paths) > 0 {
@@ -621,7 +661,7 @@ func (s *RepoStore) GetRepoWithRuntimeByID(ctx context.Context, rfID int64, path
 	return res, nil
 }
 
-func (s *RepoStore) BatchGet(ctx context.Context, repoType types.RepositoryType, lastRepoID int64, batch int) ([]Repository, error) {
+func (s *repoStoreImpl) BatchGet(ctx context.Context, repoType types.RepositoryType, lastRepoID int64, batch int) ([]Repository, error) {
 	var res []Repository
 	q := s.db.Operator.Core.NewSelect().Model(&res)
 	if lastRepoID > 0 {
@@ -637,7 +677,7 @@ func (s *RepoStore) BatchGet(ctx context.Context, repoType types.RepositoryType,
 	return res, nil
 }
 
-func (s *RepoStore) FindWithBatch(ctx context.Context, batchSize, batch int) ([]Repository, error) {
+func (s *repoStoreImpl) FindWithBatch(ctx context.Context, batchSize, batch int) ([]Repository, error) {
 	var res []Repository
 	err := s.db.Operator.Core.NewSelect().
 		Model(&res).
@@ -648,7 +688,7 @@ func (s *RepoStore) FindWithBatch(ctx context.Context, batchSize, batch int) ([]
 	return res, err
 }
 
-func (s *RepoStore) FindByRepoSourceWithBatch(ctx context.Context, repoSource types.RepositorySource, batchSize, batch int) ([]Repository, error) {
+func (s *repoStoreImpl) FindByRepoSourceWithBatch(ctx context.Context, repoSource types.RepositorySource, batchSize, batch int) ([]Repository, error) {
 	var res []Repository
 	err := s.db.Operator.Core.NewSelect().
 		Model(&res).
@@ -660,7 +700,7 @@ func (s *RepoStore) FindByRepoSourceWithBatch(ctx context.Context, repoSource ty
 	return res, err
 }
 
-func (s *RepoStore) ByUser(ctx context.Context, userID int64) ([]Repository, error) {
+func (s *repoStoreImpl) ByUser(ctx context.Context, userID int64) ([]Repository, error) {
 	var repos []Repository
 	err := s.db.Operator.Core.NewSelect().Model(&repos).Where("user_id = ?", userID).Scan(ctx)
 	return repos, err

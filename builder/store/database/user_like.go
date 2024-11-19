@@ -6,12 +6,21 @@ import (
 	"github.com/uptrace/bun"
 )
 
-type UserLikesStore struct {
+type userLikesStoreImpl struct {
 	db *DB
 }
 
-func NewUserLikesStore() *UserLikesStore {
-	return &UserLikesStore{
+type UserLikesStore interface {
+	Add(ctx context.Context, userId, repoId int64) error
+	LikeCollection(ctx context.Context, userId, collectionId int64) error
+	UnLikeCollection(ctx context.Context, userId, collectionId int64) error
+	Delete(ctx context.Context, userId, repoId int64) error
+	IsExist(ctx context.Context, username string, repoId int64) (exists bool, err error)
+	IsExistCollection(ctx context.Context, username string, collectionId int64) (exists bool, err error)
+}
+
+func NewUserLikesStore() UserLikesStore {
+	return &userLikesStoreImpl{
 		db: defaultDB,
 	}
 }
@@ -23,7 +32,7 @@ type UserLike struct {
 	CollectionID int64 `bun:",notnull" json:"collection_id"`
 }
 
-func (r *UserLikesStore) Add(ctx context.Context, userId, repoId int64) error {
+func (r *userLikesStoreImpl) Add(ctx context.Context, userId, repoId int64) error {
 	err := r.db.Operator.Core.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
 		userLikes := &UserLike{
 			UserID: userId,
@@ -41,7 +50,7 @@ func (r *UserLikesStore) Add(ctx context.Context, userId, repoId int64) error {
 	return err
 }
 
-func (r *UserLikesStore) LikeCollection(ctx context.Context, userId, collectionId int64) error {
+func (r *userLikesStoreImpl) LikeCollection(ctx context.Context, userId, collectionId int64) error {
 	err := r.db.Operator.Core.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
 		userLikes := &UserLike{
 			UserID:       userId,
@@ -59,7 +68,7 @@ func (r *UserLikesStore) LikeCollection(ctx context.Context, userId, collectionI
 	return err
 }
 
-func (r *UserLikesStore) UnLikeCollection(ctx context.Context, userId, collectionId int64) error {
+func (r *userLikesStoreImpl) UnLikeCollection(ctx context.Context, userId, collectionId int64) error {
 	err := r.db.Operator.Core.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
 		var userLikes UserLike
 		if err := assertAffectedOneRow(r.db.Core.NewDelete().Model(&userLikes).Where("user_id = ? and collection_id = ?", userId, collectionId).Exec(ctx)); err != nil {
@@ -74,7 +83,7 @@ func (r *UserLikesStore) UnLikeCollection(ctx context.Context, userId, collectio
 	return err
 }
 
-func (r *UserLikesStore) Delete(ctx context.Context, userId, repoId int64) error {
+func (r *userLikesStoreImpl) Delete(ctx context.Context, userId, repoId int64) error {
 	err := r.db.Operator.Core.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
 		var userLikes UserLike
 		if err := assertAffectedOneRow(r.db.Core.NewDelete().Model(&userLikes).Where("user_id = ? and repo_id = ?", userId, repoId).Exec(ctx)); err != nil {
@@ -89,7 +98,7 @@ func (r *UserLikesStore) Delete(ctx context.Context, userId, repoId int64) error
 	return err
 }
 
-func (r *UserLikesStore) IsExist(ctx context.Context, username string, repoId int64) (exists bool, err error) {
+func (r *userLikesStoreImpl) IsExist(ctx context.Context, username string, repoId int64) (exists bool, err error) {
 	var userLike UserLike
 	exists, err = r.db.Operator.Core.
 		NewSelect().
@@ -100,7 +109,7 @@ func (r *UserLikesStore) IsExist(ctx context.Context, username string, repoId in
 	return
 }
 
-func (r *UserLikesStore) IsExistCollection(ctx context.Context, username string, collectionId int64) (exists bool, err error) {
+func (r *userLikesStoreImpl) IsExistCollection(ctx context.Context, username string, collectionId int64) (exists bool, err error) {
 	var userLike UserLike
 	exists, err = r.db.Operator.Core.
 		NewSelect().

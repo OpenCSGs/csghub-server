@@ -4,12 +4,19 @@ import (
 	"context"
 )
 
-type ResourceModelStore struct {
+type resourceModelStoreImpl struct {
 	db *DB
 }
 
-func NewResourceModelStore() *ResourceModelStore {
-	return &ResourceModelStore{db: defaultDB}
+type ResourceModelStore interface {
+	// find multi Resource model by model name with fuzzy matching, parameter modelName like model_name in db
+	FindByModelName(ctx context.Context, modelName string) ([]*ResourceModel, error)
+	// find model by name which is in resource model table but not in runtime framework repo
+	CheckModelNameNotInRFRepo(ctx context.Context, modelName string, repoId int64) (*ResourceModel, error)
+}
+
+func NewResourceModelStore() ResourceModelStore {
+	return &resourceModelStoreImpl{db: defaultDB}
 }
 
 type ResourceModel struct {
@@ -22,14 +29,14 @@ type ResourceModel struct {
 }
 
 // find multi Resource model by model name with fuzzy matching, parameter modelName like model_name in db
-func (s *ResourceModelStore) FindByModelName(ctx context.Context, modelName string) ([]*ResourceModel, error) {
+func (s *resourceModelStoreImpl) FindByModelName(ctx context.Context, modelName string) ([]*ResourceModel, error) {
 	var models []*ResourceModel
 	err := s.db.Core.NewSelect().Model(&models).Where("model_name LIKE ?", "%"+modelName+"%").Scan(ctx)
 	return models, err
 }
 
 // find model by name which is in resource model table but not in runtime framework repo
-func (s *ResourceModelStore) CheckModelNameNotInRFRepo(ctx context.Context, modelName string, repoId int64) (*ResourceModel, error) {
+func (s *resourceModelStoreImpl) CheckModelNameNotInRFRepo(ctx context.Context, modelName string, repoId int64) (*ResourceModel, error) {
 	var rm ResourceModel
 	_, err := s.db.Core.NewSelect().Model(&rm).
 		Where("LOWER(model_name) LIKE ?", "%"+modelName+"%").

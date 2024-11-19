@@ -9,12 +9,20 @@ import (
 	"github.com/uptrace/bun"
 )
 
-type ClusterInfoStore struct {
+type clusterInfoStoreImpl struct {
 	db *DB
 }
 
-func NewClusterInfoStore() *ClusterInfoStore {
-	return &ClusterInfoStore{
+type ClusterInfoStore interface {
+	Add(ctx context.Context, clusterConfig string, region string) error
+	Update(ctx context.Context, clusterInfo ClusterInfo) error
+	ByClusterID(ctx context.Context, clusterId string) (clusterInfo ClusterInfo, err error)
+	ByClusterConfig(ctx context.Context, clusterConfig string) (clusterInfo ClusterInfo, err error)
+	List(ctx context.Context) ([]ClusterInfo, error)
+}
+
+func NewClusterInfoStore() ClusterInfoStore {
+	return &clusterInfoStoreImpl{
 		db: defaultDB,
 	}
 }
@@ -29,7 +37,7 @@ type ClusterInfo struct {
 	Enable        bool   `bun:",notnull" json:"enable"`
 }
 
-func (r *ClusterInfoStore) Add(ctx context.Context, clusterConfig string, region string) error {
+func (r *clusterInfoStoreImpl) Add(ctx context.Context, clusterConfig string, region string) error {
 	err := r.db.Operator.Core.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
 		cluster := &ClusterInfo{
 			ClusterID:     uuid.New().String(),
@@ -47,7 +55,7 @@ func (r *ClusterInfoStore) Add(ctx context.Context, clusterConfig string, region
 	return err
 }
 
-func (r *ClusterInfoStore) Update(ctx context.Context, clusterInfo ClusterInfo) error {
+func (r *clusterInfoStoreImpl) Update(ctx context.Context, clusterInfo ClusterInfo) error {
 	err := r.db.Operator.Core.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
 		_, err := r.ByClusterConfig(ctx, clusterInfo.ClusterConfig)
 		if err == nil {
@@ -58,19 +66,19 @@ func (r *ClusterInfoStore) Update(ctx context.Context, clusterInfo ClusterInfo) 
 	return err
 }
 
-func (s *ClusterInfoStore) ByClusterID(ctx context.Context, clusterId string) (clusterInfo ClusterInfo, err error) {
+func (s *clusterInfoStoreImpl) ByClusterID(ctx context.Context, clusterId string) (clusterInfo ClusterInfo, err error) {
 	clusterInfo.ClusterID = clusterId
 	err = s.db.Operator.Core.NewSelect().Model(&clusterInfo).Where("cluster_id = ?", clusterId).Scan(ctx)
 	return
 }
 
-func (s *ClusterInfoStore) ByClusterConfig(ctx context.Context, clusterConfig string) (clusterInfo ClusterInfo, err error) {
+func (s *clusterInfoStoreImpl) ByClusterConfig(ctx context.Context, clusterConfig string) (clusterInfo ClusterInfo, err error) {
 	clusterInfo.ClusterConfig = clusterConfig
 	err = s.db.Operator.Core.NewSelect().Model(&clusterInfo).Where("cluster_config = ?", clusterConfig).Scan(ctx)
 	return
 }
 
-func (s *ClusterInfoStore) List(ctx context.Context) ([]ClusterInfo, error) {
+func (s *clusterInfoStoreImpl) List(ctx context.Context) ([]ClusterInfo, error) {
 	var result []ClusterInfo
 	_, err := s.db.Operator.Core.NewSelect().Model(&result).Order("region").Exec(ctx, &result)
 	if err != nil {

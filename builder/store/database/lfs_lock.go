@@ -4,12 +4,20 @@ import (
 	"context"
 )
 
-type LfsLockStore struct {
+type lfsLockStoreImpl struct {
 	db *DB
 }
 
-func NewLfsLockStore() *LfsLockStore {
-	return &LfsLockStore{
+type LfsLockStore interface {
+	FindByID(ctx context.Context, ID int64) (*LfsLock, error)
+	FindByPath(ctx context.Context, RepoId int64, path string) (*LfsLock, error)
+	FindByRepoID(ctx context.Context, RepoId int64, page, per int) ([]LfsLock, error)
+	Create(ctx context.Context, lfsLock LfsLock) (*LfsLock, error)
+	RemoveByID(ctx context.Context, ID int64) error
+}
+
+func NewLfsLockStore() LfsLockStore {
+	return &lfsLockStoreImpl{
 		db: defaultDB,
 	}
 }
@@ -24,7 +32,7 @@ type LfsLock struct {
 	times
 }
 
-func (s *LfsLockStore) FindByID(ctx context.Context, ID int64) (*LfsLock, error) {
+func (s *lfsLockStoreImpl) FindByID(ctx context.Context, ID int64) (*LfsLock, error) {
 	var lfsLock LfsLock
 	err := s.db.Operator.Core.NewSelect().
 		Model(&lfsLock).
@@ -37,7 +45,7 @@ func (s *LfsLockStore) FindByID(ctx context.Context, ID int64) (*LfsLock, error)
 	return &lfsLock, nil
 }
 
-func (s *LfsLockStore) FindByPath(ctx context.Context, RepoId int64, path string) (*LfsLock, error) {
+func (s *lfsLockStoreImpl) FindByPath(ctx context.Context, RepoId int64, path string) (*LfsLock, error) {
 	var lfsLock LfsLock
 	err := s.db.Operator.Core.NewSelect().
 		Model(&lfsLock).
@@ -50,7 +58,7 @@ func (s *LfsLockStore) FindByPath(ctx context.Context, RepoId int64, path string
 	return &lfsLock, nil
 }
 
-func (s *LfsLockStore) FindByRepoID(ctx context.Context, RepoId int64, page, per int) ([]LfsLock, error) {
+func (s *lfsLockStoreImpl) FindByRepoID(ctx context.Context, RepoId int64, page, per int) ([]LfsLock, error) {
 	var lfsLocks []LfsLock
 	query := s.db.Operator.Core.NewSelect().
 		Model(&lfsLocks).
@@ -67,7 +75,7 @@ func (s *LfsLockStore) FindByRepoID(ctx context.Context, RepoId int64, page, per
 	return lfsLocks, nil
 }
 
-func (s *LfsLockStore) Create(ctx context.Context, lfsLock LfsLock) (*LfsLock, error) {
+func (s *lfsLockStoreImpl) Create(ctx context.Context, lfsLock LfsLock) (*LfsLock, error) {
 	err := s.db.Operator.Core.NewInsert().
 		Model(&lfsLock).
 		Scan(ctx)
@@ -77,7 +85,7 @@ func (s *LfsLockStore) Create(ctx context.Context, lfsLock LfsLock) (*LfsLock, e
 	return &lfsLock, nil
 }
 
-func (s *LfsLockStore) RemoveByID(ctx context.Context, ID int64) error {
+func (s *lfsLockStoreImpl) RemoveByID(ctx context.Context, ID int64) error {
 	_, err := s.db.Operator.Core.NewDelete().
 		Model(&LfsLock{}).
 		Where("id = ?", ID).

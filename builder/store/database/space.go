@@ -9,21 +9,38 @@ import (
 	"opencsg.com/csghub-server/common/types"
 )
 
-type SpaceStore struct {
+type spaceStoreImpl struct {
 	db *DB
 }
 
-func NewSpaceStore() *SpaceStore {
-	return &SpaceStore{
+type SpaceStore interface {
+	BeginTx(ctx context.Context) (bun.Tx, error)
+	CreateTx(ctx context.Context, tx bun.Tx, input Space) (*Space, error)
+	Create(ctx context.Context, input Space) (*Space, error)
+	Update(ctx context.Context, input Space) (err error)
+	FindByPath(ctx context.Context, namespace, name string) (*Space, error)
+	Delete(ctx context.Context, input Space) error
+	ByID(ctx context.Context, id int64) (*Space, error)
+	// ByRepoIDs get spaces by repoIDs, only basice info, no related repo
+	ByRepoIDs(ctx context.Context, repoIDs []int64) (spaces []Space, err error)
+	ByRepoID(ctx context.Context, repoID int64) (*Space, error)
+	ByUsername(ctx context.Context, username string, per, page int, onlyPublic bool) (spaces []Space, total int, err error)
+	ByUserLikes(ctx context.Context, userID int64, per, page int) (spaces []Space, total int, err error)
+	ByOrgPath(ctx context.Context, namespace string, per, page int, onlyPublic bool) (spaces []Space, total int, err error)
+	ListByPath(ctx context.Context, paths []string) ([]Space, error)
+}
+
+func NewSpaceStore() SpaceStore {
+	return &spaceStoreImpl{
 		db: defaultDB,
 	}
 }
 
-func (s *SpaceStore) BeginTx(ctx context.Context) (bun.Tx, error) {
+func (s *spaceStoreImpl) BeginTx(ctx context.Context) (bun.Tx, error) {
 	return s.db.Core.BeginTx(ctx, nil)
 }
 
-func (s *SpaceStore) CreateTx(ctx context.Context, tx bun.Tx, input Space) (*Space, error) {
+func (s *spaceStoreImpl) CreateTx(ctx context.Context, tx bun.Tx, input Space) (*Space, error) {
 	res, err := tx.NewInsert().Model(&input).Exec(ctx)
 	if err := assertAffectedOneRow(res, err); err != nil {
 		slog.Error("create space in tx failed", slog.String("error", err.Error()))
@@ -34,7 +51,7 @@ func (s *SpaceStore) CreateTx(ctx context.Context, tx bun.Tx, input Space) (*Spa
 	return &input, nil
 }
 
-func (s *SpaceStore) Create(ctx context.Context, input Space) (*Space, error) {
+func (s *spaceStoreImpl) Create(ctx context.Context, input Space) (*Space, error) {
 	res, err := s.db.Core.NewInsert().Model(&input).Exec(ctx)
 	if err := assertAffectedOneRow(res, err); err != nil {
 		slog.Error("create space in db failed", slog.String("error", err.Error()))
@@ -45,12 +62,12 @@ func (s *SpaceStore) Create(ctx context.Context, input Space) (*Space, error) {
 	return &input, nil
 }
 
-func (s *SpaceStore) Update(ctx context.Context, input Space) (err error) {
+func (s *spaceStoreImpl) Update(ctx context.Context, input Space) (err error) {
 	_, err = s.db.Core.NewUpdate().Model(&input).WherePK().Exec(ctx)
 	return
 }
 
-func (s *SpaceStore) FindByPath(ctx context.Context, namespace, name string) (*Space, error) {
+func (s *spaceStoreImpl) FindByPath(ctx context.Context, namespace, name string) (*Space, error) {
 	resSpace := new(Space)
 	err := s.db.Operator.Core.
 		NewSelect().
@@ -65,7 +82,7 @@ func (s *SpaceStore) FindByPath(ctx context.Context, namespace, name string) (*S
 	return resSpace, err
 }
 
-func (s *SpaceStore) Delete(ctx context.Context, input Space) error {
+func (s *spaceStoreImpl) Delete(ctx context.Context, input Space) error {
 	res, err := s.db.Operator.Core.NewDelete().Model(&input).WherePK().Exec(ctx)
 	if err := assertAffectedOneRow(res, err); err != nil {
 		return fmt.Errorf("delete space in tx failed,error:%w", err)
@@ -73,7 +90,7 @@ func (s *SpaceStore) Delete(ctx context.Context, input Space) error {
 	return nil
 }
 
-func (s *SpaceStore) ByID(ctx context.Context, id int64) (*Space, error) {
+func (s *spaceStoreImpl) ByID(ctx context.Context, id int64) (*Space, error) {
 	var space Space
 	err := s.db.Core.NewSelect().Model(&space).Relation("Repository").Where("space.id = ?", id).Scan(ctx)
 	if err != nil {
@@ -83,7 +100,7 @@ func (s *SpaceStore) ByID(ctx context.Context, id int64) (*Space, error) {
 }
 
 // ByRepoIDs get spaces by repoIDs, only basice info, no related repo
-func (s *SpaceStore) ByRepoIDs(ctx context.Context, repoIDs []int64) (spaces []Space, err error) {
+func (s *spaceStoreImpl) ByRepoIDs(ctx context.Context, repoIDs []int64) (spaces []Space, err error) {
 	err = s.db.Operator.Core.NewSelect().
 		Model(&spaces).
 		Where("repository_id in (?)", bun.In(repoIDs)).
@@ -92,7 +109,7 @@ func (s *SpaceStore) ByRepoIDs(ctx context.Context, repoIDs []int64) (spaces []S
 	return
 }
 
-func (s *SpaceStore) ByRepoID(ctx context.Context, repoID int64) (*Space, error) {
+func (s *spaceStoreImpl) ByRepoID(ctx context.Context, repoID int64) (*Space, error) {
 	var space Space
 	err := s.db.Core.NewSelect().Model(&space).Where("repository_id = ?", repoID).Scan(ctx)
 	if err != nil {
@@ -101,7 +118,7 @@ func (s *SpaceStore) ByRepoID(ctx context.Context, repoID int64) (*Space, error)
 	return &space, err
 }
 
-func (s *SpaceStore) ByUsername(ctx context.Context, username string, per, page int, onlyPublic bool) (spaces []Space, total int, err error) {
+func (s *spaceStoreImpl) ByUsername(ctx context.Context, username string, per, page int, onlyPublic bool) (spaces []Space, total int, err error) {
 	query := s.db.Operator.Core.
 		NewSelect().
 		Model(&spaces).
@@ -126,7 +143,7 @@ func (s *SpaceStore) ByUsername(ctx context.Context, username string, per, page 
 	return
 }
 
-func (s *SpaceStore) ByUserLikes(ctx context.Context, userID int64, per, page int) (spaces []Space, total int, err error) {
+func (s *spaceStoreImpl) ByUserLikes(ctx context.Context, userID int64, per, page int) (spaces []Space, total int, err error) {
 	query := s.db.Operator.Core.
 		NewSelect().
 		Model(&spaces).
@@ -148,7 +165,7 @@ func (s *SpaceStore) ByUserLikes(ctx context.Context, userID int64, per, page in
 	return
 }
 
-func (s *SpaceStore) ByOrgPath(ctx context.Context, namespace string, per, page int, onlyPublic bool) (spaces []Space, total int, err error) {
+func (s *spaceStoreImpl) ByOrgPath(ctx context.Context, namespace string, per, page int, onlyPublic bool) (spaces []Space, total int, err error) {
 	query := s.db.Operator.Core.
 		NewSelect().
 		Model(&spaces).
@@ -174,7 +191,7 @@ func (s *SpaceStore) ByOrgPath(ctx context.Context, namespace string, per, page 
 	return
 }
 
-func (s *SpaceStore) ListByPath(ctx context.Context, paths []string) ([]Space, error) {
+func (s *spaceStoreImpl) ListByPath(ctx context.Context, paths []string) ([]Space, error) {
 	var spaces []Space
 	err := s.db.Operator.Core.
 		NewSelect().
