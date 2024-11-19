@@ -57,9 +57,8 @@ func stringToNumber(encoded string) (int64, error) {
 
 	var num int64
 	base := int64(len(alphabet))
-	encodedRunes := []rune(encoded)
 
-	for _, r := range encodedRunes {
+	for _, r := range encoded {
 		num = num*base + alphabetMap[r]
 	}
 

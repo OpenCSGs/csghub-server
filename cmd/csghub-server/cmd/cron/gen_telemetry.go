@@ -110,7 +110,10 @@ func genTelemetry(config *config.Config) func(ctx context.Context) error {
 		}
 		if resp.StatusCode != http.StatusOK {
 			var respData bytes.Buffer
-			io.Copy(&respData, resp.Body)
+			_, err = io.Copy(&respData, resp.Body)
+			if err != nil {
+				return fmt.Errorf("io copy failed %w", err)
+			}
 			return fmt.Errorf("telemetry api returns error,url:%s, status:%d, body:%s", teleUrl, resp.StatusCode, respData.String())
 		}
 		return nil

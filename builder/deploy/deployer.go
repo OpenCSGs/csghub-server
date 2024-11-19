@@ -79,7 +79,7 @@ func newDeployer(s scheduler.Scheduler, ib imagebuilder.Builder, ir imagerunner.
 	}
 
 	go d.refreshStatus()
-	go d.s.Run()
+	go func() { _ = d.s.Run() }()
 	go d.startAccounting()
 
 	return d, nil
@@ -105,8 +105,8 @@ func (d *deployer) GenerateUniqueSvcName(dr types.DeployRepo) string {
 
 func (d *deployer) serverlessDeploy(ctx context.Context, dr types.DeployRepo) (*database.Deploy, error) {
 	var (
-		deploy *database.Deploy = nil
-		err    error            = nil
+		deploy *database.Deploy
+		err    error
 	)
 	slog.Info("do deployer.serverlessDeploy check type", slog.Any("dr.Type", dr.Type))
 	if dr.Type == types.SpaceType {
@@ -217,14 +217,20 @@ func (d *deployer) Deploy(ctx context.Context, dr types.DeployRepo) (int64, erro
 		Status:   bldTaskStatus,
 		Message:  bldTaskMsg,
 	}
-	d.store.CreateDeployTask(ctx, buildTask)
+	err = d.store.CreateDeployTask(ctx, buildTask)
+	if err != nil {
+		return -1, err
+	}
 	runTask := &database.DeployTask{
 		DeployID: deploy.ID,
 		TaskType: 1,
 	}
-	d.store.CreateDeployTask(ctx, runTask)
+	err = d.store.CreateDeployTask(ctx, runTask)
+	if err != nil {
+		return -1, err
+	}
 
-	go d.s.Queue(buildTask.ID)
+	go func() { _ = d.s.Queue(buildTask.ID) }()
 
 	return deploy.ID, nil
 }
@@ -509,10 +515,10 @@ func (d *deployer) UpdateCluster(ctx context.Context, data types.ClusterRequest)
 // UpdateDeploy implements Deployer.
 func (d *deployer) UpdateDeploy(ctx context.Context, dur *types.DeployUpdateReq, deploy *database.Deploy) error {
 	var (
-		frame    *database.RuntimeFramework = nil
-		resource *database.SpaceResource    = nil
-		hardware *types.HardWare            = nil
-		err      error                      = nil
+		frame    *database.RuntimeFramework
+		resource *database.SpaceResource
+		hardware *types.HardWare
+		err      error
 	)
 
 	if dur.RuntimeFrameworkID != nil {
@@ -602,9 +608,12 @@ func (d *deployer) StartDeploy(ctx context.Context, deploy *database.Deploy) err
 		DeployID: deploy.ID,
 		TaskType: 1,
 	}
-	d.store.CreateDeployTask(ctx, runTask)
+	err = d.store.CreateDeployTask(ctx, runTask)
+	if err != nil {
+		return err
+	}
 
-	go d.s.Queue(runTask.ID)
+	go func() { _ = d.s.Queue(runTask.ID) }()
 
 	return nil
 }

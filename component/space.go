@@ -585,7 +585,7 @@ func (c *spaceComponentImpl) Delete(ctx context.Context, namespace, name, curren
 	}
 
 	// stop any running space instance
-	go c.Stop(ctx, namespace, name)
+	go func() { _ = c.Stop(ctx, namespace, name) }()
 
 	return nil
 }
@@ -703,7 +703,9 @@ func (c *spaceComponentImpl) FixHasEntryFile(ctx context.Context, s *database.Sp
 	hasAppFile := c.HasEntryFile(ctx, s)
 	if s.HasAppFile != hasAppFile {
 		s.HasAppFile = hasAppFile
-		c.ss.Update(ctx, *s)
+		if er := c.ss.Update(ctx, *s); er != nil {
+			slog.Error("update space failed", "error", er)
+		}
 	}
 
 	return s

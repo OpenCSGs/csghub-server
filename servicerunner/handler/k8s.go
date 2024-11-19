@@ -70,7 +70,11 @@ func (s *K8sHander) RunService(c *gin.Context) {
 	// check if the ksvc exists
 	_, err = cluster.KnativeClient.ServingV1().Services(s.k8sNameSpace).Get(c.Request.Context(), srvName, metav1.GetOptions{})
 	if err == nil {
-		s.removeServiceForcely(c, cluster, srvName)
+		err = s.removeServiceForcely(c, cluster, srvName)
+		if err != nil {
+			slog.Error("fail to remove service", slog.Any("error", err), slog.Any("req", request))
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		}
 		slog.Info("service already exists,delete it first", slog.String("srv_name", srvName), slog.Any("image_id", request.ImageID))
 	}
 	service, err := s.s.GenerateService(c, *cluster, *request, srvName)
@@ -500,7 +504,10 @@ func (s *K8sHander) GetLogsByPod(c *gin.Context, cluster cluster.Cluster, podNam
 		for _, condition := range pod.Status.Conditions {
 			if condition.Type == "PodScheduled" && condition.Status == "False" {
 				message := fmt.Sprintf("Pod is pending due to reason: %s, message: %s", condition.Reason, condition.Message)
-				c.Writer.Write([]byte(message))
+				_, err = c.Writer.Write([]byte(message))
+				if err != nil {
+					slog.Error("write data failed", "error", err)
+				}
 				c.Writer.Flush()
 				c.JSON(http.StatusBadRequest, gin.H{"error": message})
 				return
@@ -524,7 +531,10 @@ func (s *K8sHander) GetLogsByPod(c *gin.Context, cluster cluster.Cluster, podNam
 			}
 
 			if n > 0 {
-				c.Writer.Write(buf[:n])
+				_, err = c.Writer.Write(buf[:n])
+				if err != nil {
+					slog.Error("write data failed", "error", err)
+				}
 				c.Writer.Flush()
 				slog.Info("send pod logs", slog.String("srv_name", srvName), slog.String("srv_name", srvName), slog.Int("len", n), slog.String("log", string(buf[:n])))
 			}

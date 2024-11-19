@@ -174,7 +174,12 @@ func (r *RuntimeArchitectureHandler) ScanArchitecture(ctx *gin.Context) {
 	}
 
 	var req types.RuntimeFrameworkModels
-	ctx.ShouldBindJSON(&req)
+	err = ctx.ShouldBindJSON(&req)
+	if err != nil {
+		slog.Error("Failed to bind json", slog.Any("error", err))
+		httpbase.ServerError(ctx, err)
+		return
+	}
 
 	err = r.rac.ScanArchitecture(ctx, id, scanType, req.Models)
 	if err != nil {

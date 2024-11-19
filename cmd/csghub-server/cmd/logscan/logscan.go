@@ -92,11 +92,7 @@ var initCmd = &cobra.Command{
 					projectCount[date][repoType] = make(map[string]int64)
 				}
 
-				if _, ok := projectCount[date][repoType][repoPath]; ok {
-					projectCount[date][repoType][repoPath]++
-				} else {
-					projectCount[date][repoType][repoPath] = 1
-				}
+				projectCount[date][repoType][repoPath]++
 			}
 			sshMatches := sshPattern.FindStringSubmatch(line)
 			if len(sshMatches) == 4 {
@@ -111,11 +107,7 @@ var initCmd = &cobra.Command{
 					projectCount[date][repoType] = make(map[string]int64)
 				}
 
-				if _, ok := projectCount[date][repoType][repoPath]; ok {
-					projectCount[date][repoType][repoPath]++
-				} else {
-					projectCount[date][repoType][repoPath] = 1
-				}
+				projectCount[date][repoType][repoPath]++
 			}
 		}
 

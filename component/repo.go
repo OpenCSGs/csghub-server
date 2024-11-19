@@ -2049,8 +2049,8 @@ func (c *repoComponentImpl) DeleteDeploy(ctx context.Context, delReq types.Deplo
 
 func (c *repoComponentImpl) DeployDetail(ctx context.Context, detailReq types.DeployActReq) (*types.DeployRepo, error) {
 	var (
-		deploy *database.Deploy = nil
-		err    error            = nil
+		deploy *database.Deploy
+		err    error
 	)
 	if detailReq.DeployType == types.ServerlessType {
 		_, deploy, err = c.checkDeployPermissionForServerless(ctx, detailReq)
@@ -2195,8 +2195,8 @@ func deployStatusCodeToString(code int) string {
 
 func (c *repoComponentImpl) DeployInstanceLogs(ctx context.Context, logReq types.DeployActReq) (*deploy.MultiLogReader, error) {
 	var (
-		deploy *database.Deploy = nil
-		err    error            = nil
+		deploy *database.Deploy
+		err    error
 	)
 	if logReq.DeployType == types.ServerlessType {
 		_, deploy, err = c.checkDeployPermissionForServerless(ctx, logReq)
@@ -2299,9 +2299,9 @@ func (c *repoComponentImpl) checkAccessDeployForServerless(ctx context.Context, 
 
 func (c *repoComponentImpl) DeployStop(ctx context.Context, stopReq types.DeployActReq) error {
 	var (
-		user   *database.User   = nil
-		deploy *database.Deploy = nil
-		err    error            = nil
+		user   *database.User
+		deploy *database.Deploy
+		err    error
 	)
 	if stopReq.DeployType == types.ServerlessType {
 		user, deploy, err = c.checkDeployPermissionForServerless(ctx, stopReq)
@@ -2486,8 +2486,8 @@ func (c *repoComponentImpl) checkDeployPermissionForServerless(ctx context.Conte
 
 func (c *repoComponentImpl) DeployUpdate(ctx context.Context, updateReq types.DeployActReq, req *types.DeployUpdateReq) error {
 	var (
-		deploy *database.Deploy = nil
-		err    error            = nil
+		deploy *database.Deploy
+		err    error
 	)
 	if updateReq.DeployType == types.ServerlessType {
 		_, deploy, err = c.checkDeployPermissionForServerless(ctx, updateReq)
@@ -2541,8 +2541,8 @@ func (c *repoComponentImpl) DeployUpdate(ctx context.Context, updateReq types.De
 
 func (c *repoComponentImpl) DeployStart(ctx context.Context, startReq types.DeployActReq) error {
 	var (
-		deploy *database.Deploy = nil
-		err    error            = nil
+		deploy *database.Deploy
+		err    error
 	)
 	if startReq.DeployType == types.ServerlessType {
 		_, deploy, err = c.checkDeployPermissionForServerless(ctx, startReq)

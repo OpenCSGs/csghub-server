@@ -51,7 +51,7 @@ type TaskStatus int
 
 type GetRepoInfoReq struct {
 	Namespace string `json:"namespace"`
-	Name      string `json:name"`
+	Name      string `json:"name"`
 }
 
 type RepoInfo struct {

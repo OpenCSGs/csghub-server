@@ -68,7 +68,7 @@ var serverCmd = &cobra.Command{
 			return fmt.Errorf("fail to initialize message queue, %w", err)
 		}
 		s3Internal := len(cfg.S3.InternalEndpoint) > 0
-		deploy.Init(common.DeployConfig{
+		err = deploy.Init(common.DeployConfig{
 			ImageBuilderURL:         cfg.Space.BuilderEndpoint,
 			ImageRunnerURL:          cfg.Space.RunnerEndpoint,
 			MonitorInterval:         10 * time.Second,
@@ -79,6 +79,9 @@ var serverCmd = &cobra.Command{
 			PublicRootDomain:        cfg.Space.PublicRootDomain,
 			S3Internal:              s3Internal,
 		})
+		if err != nil {
+			return fmt.Errorf("failed to init deploy: %w", err)
+		}
 		r, err := router.NewRouter(cfg, enableSwagger)
 		if err != nil {
 			return fmt.Errorf("failed to init router: %w", err)

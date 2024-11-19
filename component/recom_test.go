@@ -61,14 +61,14 @@ if hours <= 48{
 }
 `
 
-const expDownloads = `
-if downloads <= 10{
-    score = downloads * (10 / 10)
-}else if downloads <= 100{
-    score = 10 + (downloads - 10) * (40.0 / 90.0)
-}else if downloads <= 1000{
-    score = 50 + (downloads - 100) * (40.0 / 900.0)
-}else{
-    score = 90 + 10 * (1 - (1 / (downloads / 1000.0)))
-}
-`
+// const expDownloads = `
+// if downloads <= 10{
+//     score = downloads * (10 / 10)
+// }else if downloads <= 100{
+//     score = 10 + (downloads - 10) * (40.0 / 90.0)
+// }else if downloads <= 1000{
+//     score = 50 + (downloads - 100) * (40.0 / 900.0)
+// }else{
+//     score = 90 + 10 * (1 - (1 / (downloads / 1000.0)))
+// }
+// `

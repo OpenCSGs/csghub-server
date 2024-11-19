@@ -111,7 +111,10 @@ func (c *repoComponentImpl) processFile(ctx context.Context, file *database.Repo
 			slog.String("err", msg))
 	}
 
-	c.saveCheckResult(ctx, file, status, msg)
+	err := c.saveCheckResult(ctx, file, status, msg)
+	if err != nil {
+		slog.Error("save check result failed", "error", err)
+	}
 }
 
 func (c *repoComponentImpl) saveCheckResult(ctx context.Context, file *database.RepositoryFile, status types.SensitiveCheckStatus, msg string) error {

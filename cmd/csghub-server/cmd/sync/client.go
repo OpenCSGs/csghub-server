@@ -77,7 +77,7 @@ var cmdSyncAsClient = &cobra.Command{
 			syncClientSettingStore := database.NewSyncClientSettingStore()
 			setting, err := syncClientSettingStore.First(ctx)
 			if err != nil {
-				slog.Error("failed to find sync client setting, error: %w", err)
+				slog.Error("failed to find sync client setting", "error", err)
 				return err
 			}
 			apiDomain := config.MultiSync.SaasAPIDomain

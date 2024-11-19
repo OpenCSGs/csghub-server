@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
-	"os"
 	"path"
 	"strings"
 	"time"
@@ -131,19 +130,19 @@ func checkAndUpdateLfsMetaObjects(config *config.Config, s3Client *s3.Client, lf
 	objectKey := path.Join("lfs", pointer.RelativePath())
 	_, err := s3Client.StatObject(ctx, config.S3.Bucket, objectKey, minio.StatObjectOptions{})
 	if err != nil {
-		if os.IsNotExist(err) {
-			exists = false
-		}
 		slog.Error("failed to check if lfs file exists", slog.String("oid", objectKey), slog.Any("error", err))
 		exists = false
 	} else {
 		exists = true
 	}
 	slog.Info("lfs file exists", slog.Bool("exists", exists))
-	lfsMetaObjectStore.UpdateOrCreate(ctx, database.LfsMetaObject{
+	_, err = lfsMetaObjectStore.UpdateOrCreate(ctx, database.LfsMetaObject{
 		Oid:          pointer.Oid,
 		Size:         pointer.Size,
 		RepositoryID: repo.ID,
 		Existing:     exists,
 	})
+	if err != nil {
+		slog.Error("lfsMetaObjectStore UpdateOrCreate failed", "error", err)
+	}
 }

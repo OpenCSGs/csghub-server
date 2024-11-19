@@ -81,8 +81,6 @@ func (c *multiSyncComponentImpl) SyncAsClient(ctx context.Context, sc multisync.
 	if err != nil {
 		if err != sql.ErrNoRows {
 			return fmt.Errorf("failed to get latest sync version from db: %w", err)
-		} else {
-			currentVersion = 0
 		}
 	}
 

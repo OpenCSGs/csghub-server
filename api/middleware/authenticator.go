@@ -35,7 +35,12 @@ func BuildJwtSession(jwtSignKey string) gin.HandlerFunc {
 		}
 
 		sessions.Default(c).Set(httpbase.CurrentUserCtxVar, claims.CurrentUser)
-		sessions.Default(c).Save()
+		err = sessions.Default(c).Save()
+		if err != nil {
+			slog.Debug("fail to save session", slog.Any("error", err))
+			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
+			return
+		}
 
 		c.Next()
 	}

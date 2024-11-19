@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"log/slog"
 	"time"
 
 	"github.com/uptrace/bun"
@@ -171,7 +172,9 @@ func (s *deployTaskStoreImpl) UpdateInTx(ctx context.Context, deployColumns, dep
 			Column(deployColumns...).
 			WherePK().Exec(ctx)
 		if err != nil {
-			tx.Rollback()
+			if ree := tx.Rollback(); ree != nil {
+				slog.Error("rollback failed", "error", err)
+			}
 			return fmt.Errorf("failed to update deploy,%w", err)
 		}
 	}
@@ -187,7 +190,9 @@ func (s *deployTaskStoreImpl) UpdateInTx(ctx context.Context, deployColumns, dep
 		Bulk().
 		Exec(ctx)
 	if err != nil {
-		tx.Rollback()
+		if ree := tx.Rollback(); ree != nil {
+			slog.Error("rollback failed", "error", err)
+		}
 		return fmt.Errorf("failed to update deploy tasks in tx,%w", err)
 	}
 

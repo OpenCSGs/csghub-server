@@ -59,7 +59,7 @@ var cmdFixDefaultBranch = &cobra.Command{
 		for {
 			repositories, err := repoStore.FindByRepoSourceWithBatch(ctx, types.OpenCSGSource, batchSize, batch)
 			if err != nil {
-				slog.Error("failed to find repositories from OpenCSG, error: %w", err)
+				slog.Error("failed to find repositories from OpenCSG", "error", err)
 				return
 			}
 			if len(repositories) == 0 {
@@ -69,7 +69,7 @@ var cmdFixDefaultBranch = &cobra.Command{
 			syncClientSettingStore := database.NewSyncClientSettingStore()
 			setting, err := syncClientSettingStore.First(ctx)
 			if err != nil {
-				slog.Error("failed to find sync client setting, error: %w", err)
+				slog.Error("failed to find sync client setting", "error", err)
 				return
 			}
 			apiDomain := config.MultiSync.SaasAPIDomain

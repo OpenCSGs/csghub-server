@@ -38,7 +38,9 @@ func WatchSpaceChange(req *types.GiteaCallbackPushReq, ss database.SpaceStore, s
 func (w *spaceDeployWatcher) Run() error {
 	var err error
 	for _, op := range w.ops {
-		errors.Join(err, op())
+		if e := errors.Join(err, op()); e != nil {
+			return e
+		}
 	}
 	return err
 }

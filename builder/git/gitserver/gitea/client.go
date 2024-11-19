@@ -109,13 +109,13 @@ func generateAccessTokenFromGitea(config *config.Config) (string, error) {
 	}
 	jsonData, err := json.Marshal(data)
 	if err != nil {
-		slog.Error("Error encoding JSON data:", err)
+		slog.Error("Error encoding JSON data:", "error", err)
 		return "", err
 	}
 
 	req, err := http.NewRequest("POST", giteaUrl, bytes.NewBuffer(jsonData))
 	if err != nil {
-		slog.Error("Error creating request:", err)
+		slog.Error("Error creating request:", "error", err)
 		return "", err
 	}
 
@@ -126,21 +126,21 @@ func generateAccessTokenFromGitea(config *config.Config) (string, error) {
 	client := http.Client{}
 	resp, err := client.Do(req)
 	if err != nil {
-		slog.Error("Error sending request:", err)
+		slog.Error("Error sending request:", "error", err)
 		return "", err
 	}
 	defer resp.Body.Close()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		slog.Error("Error reading response body:", err)
+		slog.Error("Error reading response body:", "error", err)
 		return "", err
 	}
 
 	var tokenResponse TokenResponse
 	err = json.Unmarshal(body, &tokenResponse)
 	if err != nil {
-		slog.Error("Error decoding JSON response:", err)
+		slog.Error("Error decoding JSON response:", "error", err)
 		return "", err
 	}
 
