@@ -33,6 +33,10 @@ func NewPromptStore() PromptStore {
 	return &promptStoreImpl{db: defaultDB}
 }
 
+func NewPromptStoreWithDB(db *DB) PromptStore {
+	return &promptStoreImpl{db: db}
+}
+
 func (s *promptStoreImpl) Create(ctx context.Context, input Prompt) (*Prompt, error) {
 	res, err := s.db.Core.NewInsert().Model(&input).Exec(ctx, &input)
 	if err := assertAffectedOneRow(res, err); err != nil {
