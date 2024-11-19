@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
-	"slices"
 
 	"github.com/uptrace/bun"
 	"opencsg.com/csghub-server/common/types"
@@ -34,7 +33,6 @@ type TagStore interface {
 	AllSpaceCategories(ctx context.Context) ([]TagCategory, error)
 	CreateTag(ctx context.Context, category, name, group string, scope TagScope) (Tag, error)
 	SaveTags(ctx context.Context, tags []*Tag) error
-	UpsertTags(ctx context.Context, tagScope TagScope, categoryTagMap map[string][]string) ([]Tag, error)
 	// SetMetaTags will delete existing tags and create new ones
 	SetMetaTags(ctx context.Context, repoType types.RepositoryType, namespace, name string, tags []*Tag) (repoTags []*RepositoryTag, err error)
 	SetLibraryTag(ctx context.Context, repoType types.RepositoryType, namespace, name string, newTag, oldTag *Tag) (err error)
@@ -204,35 +202,6 @@ func (ts *tagStoreImpl) SaveTags(ctx context.Context, tags []*Tag) error {
 	return nil
 }
 
-func (ts *tagStoreImpl) UpsertTags(ctx context.Context, tagScope TagScope, categoryTagMap map[string][]string) ([]Tag, error) {
-	var tags []Tag
-	for category, tagNames := range categoryTagMap {
-		ctags := make([]Tag, 0)
-		err := ts.db.Operator.Core.NewSelect().Model(&ctags).
-			Where("caregory = ? and scope = ?", category, tagScope).
-			Scan(ctx)
-		if err != nil {
-			slog.Error("Failed to select tags", slog.String("category", category),
-				slog.Any("scope", tagScope), slog.Any("error", err.Error()))
-			return nil, fmt.Errorf("failed to select tags, cause: %w", err)
-		}
-		tags = append(tags, ctags...)
-		for _, tagName := range tagNames {
-			if !slices.ContainsFunc(tags, func(t Tag) bool { return t.Name == tagName }) {
-				newTag, err := ts.CreateTag(ctx, category, tagName, defaultTagGroup, tagScope)
-				if err != nil {
-					slog.Error("Failed to create new tag", slog.String("category", category), slog.String("tagName", tagName),
-						slog.Any("scope", tagScope), slog.Any("error", err.Error))
-					return nil, fmt.Errorf("failed to create new tag, cause: %w", err)
-				}
-				tags = append(tags, newTag)
-			}
-		}
-	}
-
-	return tags, nil
-}
-
 // SetMetaTags will delete existing tags and create new ones
 func (ts *tagStoreImpl) SetMetaTags(ctx context.Context, repoType types.RepositoryType, namespace, name string, tags []*Tag) (repoTags []*RepositoryTag, err error) {
 	repo := new(Repository)
@@ -376,13 +345,10 @@ func (ts *tagStoreImpl) RemoveRepoTags(ctx context.Context, repoID int64, tagIDs
 	if len(tagIDs) == 0 {
 		return nil
 	}
-	err = ts.db.Operator.Core.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
-		_, err = tx.NewDelete().
-			Model(&RepositoryTag{}).
-			Where("repository_id =? and tag_id in (?)", repoID, bun.In(tagIDs)).
-			Exec(ctx)
-		return err
-	})
+	_, err = ts.db.Operator.Core.NewDelete().
+		Model(&RepositoryTag{}).
+		Where("repository_id =? and tag_id in (?)", repoID, bun.In(tagIDs)).
+		Exec(ctx)
 
 	return err
 }
@@ -402,5 +368,5 @@ func (ts *tagStoreImpl) FindOrCreate(ctx context.Context, tag Tag) (*Tag, error)
 	if err != nil {
 		return nil, err
 	}
-	return &resTag, err
+	return &tag, err
 }
