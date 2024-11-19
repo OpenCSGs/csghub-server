@@ -13,7 +13,7 @@ import (
 	"opencsg.com/csghub-server/common/types"
 )
 
-func TestTag_FindOrCreate(t *testing.T) {
+func TestTagStore_FindOrCreate(t *testing.T) {
 	db := tests.InitTestDB()
 	defer db.Close()
 
@@ -41,7 +41,7 @@ func TestTag_FindOrCreate(t *testing.T) {
 }
 
 // TestAllTags tests the AllTags method
-func TestAllTags(t *testing.T) {
+func TestTagStore_AllTags(t *testing.T) {
 	db := tests.InitTestDB()
 	defer db.Close()
 
@@ -84,7 +84,7 @@ func TestAllTags(t *testing.T) {
 }
 
 // TestAllTagsByScope tests the AllTagsByScope method
-func TestAllTagsByScope(t *testing.T) {
+func TestTagStore_AllTagsByScope(t *testing.T) {
 	db := tests.InitTestDB()
 	defer db.Close()
 
@@ -105,7 +105,7 @@ func TestAllTagsByScope(t *testing.T) {
 }
 
 // TestAllTagsByScopeAndCategory tests the AllTagsByScopeAndCategory method
-func TestAllTagsByScopeAndCategory(t *testing.T) {
+func TestTagStore_AllTagsByScopeAndCategory(t *testing.T) {
 	db := tests.InitTestDB()
 	defer db.Close()
 
@@ -125,7 +125,7 @@ func TestAllTagsByScopeAndCategory(t *testing.T) {
 }
 
 // TestGetTagsByScopeAndCategories tests the GetTagsByScopeAndCategories method
-func TestGetTagsByScopeAndCategories(t *testing.T) {
+func TestTagStore_GetTagsByScopeAndCategories(t *testing.T) {
 	db := tests.InitTestDB()
 	defer db.Close()
 
@@ -146,7 +146,7 @@ func TestGetTagsByScopeAndCategories(t *testing.T) {
 }
 
 // TestAllModelTags tests the AllModelTags method
-func TestAllModelTags(t *testing.T) {
+func TestTagStore_AllModelTags(t *testing.T) {
 	db := tests.InitTestDB()
 	defer db.Close()
 
@@ -175,7 +175,7 @@ func TestAllModelTags(t *testing.T) {
 }
 
 // TestAllPromptTags tests the AllPromptTags method
-func TestAllPromptTags(t *testing.T) {
+func TestTagStore_AllPromptTags(t *testing.T) {
 	db := tests.InitTestDB()
 	defer db.Close()
 
@@ -204,7 +204,7 @@ func TestAllPromptTags(t *testing.T) {
 }
 
 // TestAllDatasetTags tests the AllDatasetTags method
-func TestAllDatasetTags(t *testing.T) {
+func TestTagStore_AllDatasetTags(t *testing.T) {
 	db := tests.InitTestDB()
 	defer db.Close()
 
@@ -233,7 +233,7 @@ func TestAllDatasetTags(t *testing.T) {
 }
 
 // TestAllCodeTags tests the AllCodeTags method
-func TestAllCodeTags(t *testing.T) {
+func TestTagStore_AllCodeTags(t *testing.T) {
 	db := tests.InitTestDB()
 	defer db.Close()
 
@@ -262,7 +262,7 @@ func TestAllCodeTags(t *testing.T) {
 }
 
 // TestAllSpaceTags tests the AllSpaceTags method
-func TestAllSpaceTags(t *testing.T) {
+func TestTagStore_AllSpaceTags(t *testing.T) {
 	db := tests.InitTestDB()
 	defer db.Close()
 
@@ -291,7 +291,7 @@ func TestAllSpaceTags(t *testing.T) {
 }
 
 // TestAllModelCategories tests the AllModelCategories method
-func TestAllModelCategories(t *testing.T) {
+func TestTagStore_AllModelCategories(t *testing.T) {
 	db := tests.InitTestDB()
 	defer db.Close()
 
@@ -327,7 +327,7 @@ func TestAllModelCategories(t *testing.T) {
 }
 
 // TestAllPromptCategories tests the AllPromptCategories method
-func TestAllPromptCategories(t *testing.T) {
+func TestTagStore_AllPromptCategories(t *testing.T) {
 	db := tests.InitTestDB()
 	defer db.Close()
 
@@ -363,7 +363,7 @@ func TestAllPromptCategories(t *testing.T) {
 }
 
 // TestAllDatasetCategories tests the AllDatasetCategories method
-func TestAllDatasetCategories(t *testing.T) {
+func TestTagStore_AllDatasetCategories(t *testing.T) {
 	db := tests.InitTestDB()
 	defer db.Close()
 
@@ -399,7 +399,7 @@ func TestAllDatasetCategories(t *testing.T) {
 }
 
 // TestAllCodeCategories tests the AllCodeCategories method
-func TestAllCodeCategories(t *testing.T) {
+func TestTagStore_AllCodeCategories(t *testing.T) {
 	db := tests.InitTestDB()
 	defer db.Close()
 
@@ -435,7 +435,7 @@ func TestAllCodeCategories(t *testing.T) {
 }
 
 // TestAllSpaceCategories tests the AllSpaceCategories method
-func TestAllSpaceCategories(t *testing.T) {
+func TestTagStore_AllSpaceCategories(t *testing.T) {
 	db := tests.InitTestDB()
 	defer db.Close()
 
@@ -471,7 +471,7 @@ func TestAllSpaceCategories(t *testing.T) {
 }
 
 // TestCreateTag tests the CreateTag method
-func TestCreateTag(t *testing.T) {
+func TestTagStore_CreateTag(t *testing.T) {
 	db := tests.InitTestDB()
 	defer db.Close()
 
@@ -486,7 +486,7 @@ func TestCreateTag(t *testing.T) {
 }
 
 // TestSetMetaTags tests the SetMetaTags method
-func TestSetMetaTags(t *testing.T) {
+func TestTagStore_SetMetaTags(t *testing.T) {
 	db := tests.InitTestDB()
 	defer db.Close()
 
@@ -539,7 +539,7 @@ func TestSetMetaTags(t *testing.T) {
 }
 
 // TestSetLibraryTag tests the SetLibraryTag method
-func TestSetLibraryTag(t *testing.T) {
+func TestTagStore_SetLibraryTag(t *testing.T) {
 	db := tests.InitTestDB()
 	defer db.Close()
 
@@ -579,7 +579,7 @@ func TestSetLibraryTag(t *testing.T) {
 }
 
 // TestUpsertRepoTags tests the UpsertRepoTags method
-func TestUpsertRepoTags(t *testing.T) {
+func TestTagStore_UpsertRepoTags(t *testing.T) {
 	db := tests.InitTestDB()
 	defer db.Close()
 
@@ -626,7 +626,7 @@ func TestUpsertRepoTags(t *testing.T) {
 }
 
 // TestRemoveRepoTags tests the RemoveRepoTags method
-func TestRemoveRepoTags(t *testing.T) {
+func TestTagStore_RemoveRepoTags(t *testing.T) {
 	db := tests.InitTestDB()
 	defer db.Close()
 
