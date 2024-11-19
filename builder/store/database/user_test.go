@@ -5,7 +5,9 @@ import (
 	"fmt"
 	"reflect"
 	"testing"
+	"time"
 
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/tests"
@@ -110,7 +112,8 @@ func TestUserStore_SetRoles(t *testing.T) {
 func TestUserStore_IndexWithSearch(t *testing.T) {
 	db := tests.InitTestDB()
 	defer db.Close()
-	ctx := context.TODO()
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
 
 	userStore := database.NewUserStoreWithDB(db)
 	err := userStore.Create(ctx, &database.User{
@@ -164,12 +167,15 @@ func TestUserStore_IndexWithSearch(t *testing.T) {
 func TestUserStore_CreateUser(t *testing.T) {
 	db := tests.InitTestDB()
 	defer db.Close()
-	ctx := context.TODO()
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
 
 	us := database.NewUserStoreWithDB(db)
+	uuid := uuid.New().String()
 	err := us.Create(ctx, &database.User{
 		GitID:    3321,
 		Username: "u-foo",
+		UUID:     uuid,
 	}, &database.Namespace{Path: "u-foo"})
 	require.Nil(t, err)
 
@@ -177,12 +183,25 @@ func TestUserStore_CreateUser(t *testing.T) {
 	require.Nil(t, err)
 	require.Equal(t, 3321, int(user.GitID))
 	require.Equal(t, "u-foo", user.Username)
+
+	userByUuid, err := us.FindByUUID(ctx, uuid)
+	require.Empty(t, err)
+	require.Equal(t, uuid, userByUuid.UUID)
+
+	yes, err := us.IsExist(ctx, "u-foo")
+	require.Nil(t, err)
+	require.True(t, yes)
+
+	yes, err = us.IsExistByUUID(ctx, uuid)
+	require.Nil(t, err)
+	require.True(t, yes)
 }
 
 func TestUserStore_ChangeUserName(t *testing.T) {
 	db := tests.InitTestDB()
 	defer db.Close()
-	ctx := context.TODO()
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
 
 	us := database.NewUserStoreWithDB(db)
 	err := us.Create(ctx, &database.User{
@@ -197,4 +216,63 @@ func TestUserStore_ChangeUserName(t *testing.T) {
 	user, err := us.FindByUsername(ctx, "u-bar")
 	require.Nil(t, err)
 	require.Equal(t, "u-bar", user.Username)
+}
+
+func TestUserStore_FindByAccessToken(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	us := database.NewUserStoreWithDB(db)
+	user1 := &database.User{
+		GitID:    3321,
+		Username: "u-foo",
+	}
+	err := us.Create(ctx, user1, &database.Namespace{Path: "u-foo"})
+	require.Nil(t, err)
+
+	//create access token for user u-foo
+	at := &database.AccessToken{
+		GitID:       1,
+		Name:        "test_token",
+		Token:       "token_" + uuid.NewString(),
+		UserID:      user1.ID,
+		Application: "git",
+		Permission:  "",
+		IsActive:    true,
+		ExpiredAt:   time.Now().Add(time.Hour * 24),
+	}
+	_, err = db.Core.NewInsert().Model(at).Exec(ctx)
+	require.Nil(t, err)
+
+	user, err := us.FindByAccessToken(ctx, at.Token)
+	require.Empty(t, err)
+	require.Equal(t, "u-foo", user.Username)
+}
+
+func TestUserStore_CountUsers(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	_, err := db.Core.NewDelete().Model(&database.User{}).Where("1=1").Exec(ctx)
+	require.Nil(t, err)
+
+	us := database.NewUserStoreWithDB(db)
+	err = us.Create(ctx, &database.User{
+		GitID:    3321,
+		Username: "u-foo",
+	}, &database.Namespace{Path: "u-foo"})
+	require.Nil(t, err)
+	err = us.Create(ctx, &database.User{
+		GitID:    3321,
+		Username: "u-foo-2",
+	}, &database.Namespace{Path: "u-foo-2"})
+	require.Nil(t, err)
+
+	count, err := us.CountUsers(ctx)
+	require.Nil(t, err)
+	require.Equal(t, 2, count)
 }
