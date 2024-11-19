@@ -1,0 +1,9 @@
+linters-settings:
+  staticcheck:
+    checks: ["all", "-SA1029"]
+  whitespace:
+    multi-if: true
+    multi-func: true
+  govet:
+    disable:
+      - composites

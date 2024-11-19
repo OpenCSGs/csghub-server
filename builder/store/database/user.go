@@ -36,6 +36,12 @@ func NewUserStore() UserStore {
 	}
 }
 
+func NewUserStoreWithDB(db *DB) UserStore {
+	return &userStoreImpl{
+		db: db,
+	}
+}
+
 type User struct {
 	ID       int64  `bun:",pk,autoincrement" json:"id"`
 	GitID    int64  `bun:",notnull" json:"git_id"`
