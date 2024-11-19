@@ -49,6 +49,12 @@ func NewTagStore() TagStore {
 	}
 }
 
+func NewTagStoreWithDB(db *DB) TagStore {
+	return &tagStoreImpl{
+		db: db,
+	}
+}
+
 type TagScope string
 
 const (

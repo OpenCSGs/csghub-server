@@ -69,6 +69,12 @@ func NewRepoStore() RepoStore {
 	}
 }
 
+func NewRepoStoreWithDB(db *DB) RepoStore {
+	return &repoStoreImpl{
+		db: db,
+	}
+}
+
 type Repository struct {
 	ID          int64  `bun:",pk,autoincrement" json:"id"`
 	UserID      int64  `bun:",notnull" json:"user_id"`
