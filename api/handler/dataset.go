@@ -27,15 +27,22 @@ func NewDatasetHandler(config *config.Config) (*DatasetHandler, error) {
 	if err != nil {
 		return nil, fmt.Errorf("error creating sensitive component:%w", err)
 	}
+	repo, err := component.NewRepoComponent(config)
+	if err != nil {
+		return nil, fmt.Errorf("error creating repo component:%w", err)
+	}
+
 	return &DatasetHandler{
-		c:  tc,
-		sc: sc,
+		c:    tc,
+		sc:   sc,
+		repo: repo,
 	}, nil
 }
 
 type DatasetHandler struct {
-	c  *component.DatasetComponent
-	sc *component.SensitiveComponent
+	c    component.DatasetComponent
+	sc   component.SensitiveComponent
+	repo component.RepoComponent
 }
 
 // CreateDataset   godoc
@@ -344,7 +351,7 @@ func (h *DatasetHandler) AllFiles(ctx *gin.Context) {
 	req.RepoType = types.DatasetRepo
 	req.CurrentUser = httpbase.GetCurrentUser(ctx)
 	req.Ref = ""
-	detail, err := h.c.AllFiles(ctx, req)
+	detail, err := h.repo.AllFiles(ctx, req)
 	if err != nil {
 		if errors.Is(err, component.ErrUnauthorized) {
 			httpbase.UnauthorizedError(ctx, err)

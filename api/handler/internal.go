@@ -26,7 +26,7 @@ func NewInternalHandler(config *config.Config) (*InternalHandler, error) {
 }
 
 type InternalHandler struct {
-	c      *component.InternalComponent
+	c      component.InternalComponent
 	config *config.Config
 }
 

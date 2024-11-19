@@ -29,14 +29,37 @@ enableXsrfProtection = false
 	streamlitConfig = ".streamlit/config.toml"
 )
 
-func NewSpaceComponent(config *config.Config) (*SpaceComponent, error) {
-	c := &SpaceComponent{}
+type SpaceComponent interface {
+	Create(ctx context.Context, req types.CreateSpaceReq) (*types.Space, error)
+	Show(ctx context.Context, namespace, name, currentUser string) (*types.Space, error)
+	Update(ctx context.Context, req *types.UpdateSpaceReq) (*types.Space, error)
+	Index(ctx context.Context, filter *types.RepoFilter, per, page int) ([]types.Space, int, error)
+	OrgSpaces(ctx context.Context, req *types.OrgSpacesReq) ([]types.Space, int, error)
+	// UserSpaces get spaces of owner and visible to current user
+	UserSpaces(ctx context.Context, req *types.UserSpacesReq) ([]types.Space, int, error)
+	UserLikesSpaces(ctx context.Context, req *types.UserSpacesReq, userID int64) ([]types.Space, int, error)
+	ListByPath(ctx context.Context, paths []string) ([]*types.Space, error)
+	AllowCallApi(ctx context.Context, spaceID int64, username string) (bool, error)
+	Delete(ctx context.Context, namespace, name, currentUser string) error
+	Deploy(ctx context.Context, namespace, name, currentUser string) (int64, error)
+	Wakeup(ctx context.Context, namespace, name string) error
+	Stop(ctx context.Context, namespace, name string) error
+	// FixHasEntryFile checks whether git repo has entry point file and update space's HasAppFile property in db
+	FixHasEntryFile(ctx context.Context, s *database.Space) *database.Space
+	Status(ctx context.Context, namespace, name string) (string, string, error)
+	Logs(ctx context.Context, namespace, name string) (*deploy.MultiLogReader, error)
+	// HasEntryFile checks whether space repo has entry point file to run with
+	HasEntryFile(ctx context.Context, space *database.Space) bool
+}
+
+func NewSpaceComponent(config *config.Config) (SpaceComponent, error) {
+	c := &spaceComponentImpl{}
 	c.ss = database.NewSpaceStore()
 	var err error
 	c.sss = database.NewSpaceSdkStore()
 	c.srs = database.NewSpaceResourceStore()
 	c.rs = database.NewRepoStore()
-	c.RepoComponent, err = NewRepoComponent(config)
+	c.repoComponentImpl, err = NewRepoComponentImpl(config)
 	if err != nil {
 		return nil, err
 	}
@@ -51,19 +74,19 @@ func NewSpaceComponent(config *config.Config) (*SpaceComponent, error) {
 	return c, nil
 }
 
-type SpaceComponent struct {
-	*RepoComponent
-	ss               *database.SpaceStore
-	sss              *database.SpaceSdkStore
-	srs              *database.SpaceResourceStore
-	rs               *database.RepoStore
-	us               *database.UserStore
+type spaceComponentImpl struct {
+	*repoComponentImpl
+	ss               database.SpaceStore
+	sss              database.SpaceSdkStore
+	srs              database.SpaceResourceStore
+	rs               database.RepoStore
+	us               database.UserStore
 	deployer         deploy.Deployer
 	publicRootDomain string
-	ac               *AccountingComponent
+	ac               AccountingComponent
 }
 
-func (c *SpaceComponent) Create(ctx context.Context, req types.CreateSpaceReq) (*types.Space, error) {
+func (c *spaceComponentImpl) Create(ctx context.Context, req types.CreateSpaceReq) (*types.Space, error) {
 	var nickname string
 	if req.Nickname != "" {
 		nickname = req.Nickname
@@ -182,7 +205,7 @@ func (c *SpaceComponent) Create(ctx context.Context, req types.CreateSpaceReq) (
 	return space, nil
 }
 
-func (c *SpaceComponent) Show(ctx context.Context, namespace, name, currentUser string) (*types.Space, error) {
+func (c *spaceComponentImpl) Show(ctx context.Context, namespace, name, currentUser string) (*types.Space, error) {
 	var tags []types.RepoTag
 	space, err := c.ss.FindByPath(ctx, namespace, name)
 	if err != nil {
@@ -266,7 +289,7 @@ func (c *SpaceComponent) Show(ctx context.Context, namespace, name, currentUser 
 	return resModel, nil
 }
 
-func (c *SpaceComponent) Update(ctx context.Context, req *types.UpdateSpaceReq) (*types.Space, error) {
+func (c *spaceComponentImpl) Update(ctx context.Context, req *types.UpdateSpaceReq) (*types.Space, error) {
 	req.RepoType = types.SpaceRepo
 	dbRepo, err := c.UpdateRepo(ctx, req.UpdateRepoReq)
 	if err != nil {
@@ -307,7 +330,7 @@ func (c *SpaceComponent) Update(ctx context.Context, req *types.UpdateSpaceReq) 
 	return resDataset, nil
 }
 
-func (c *SpaceComponent) Index(ctx context.Context, filter *types.RepoFilter, per, page int) ([]types.Space, int, error) {
+func (c *spaceComponentImpl) Index(ctx context.Context, filter *types.RepoFilter, per, page int) ([]types.Space, int, error) {
 	var (
 		resSpaces []types.Space
 		err       error
@@ -379,7 +402,7 @@ func (c *SpaceComponent) Index(ctx context.Context, filter *types.RepoFilter, pe
 	return resSpaces, total, nil
 }
 
-func (c *SpaceComponent) OrgSpaces(ctx context.Context, req *types.OrgSpacesReq) ([]types.Space, int, error) {
+func (c *spaceComponentImpl) OrgSpaces(ctx context.Context, req *types.OrgSpacesReq) ([]types.Space, int, error) {
 	var resSpaces []types.Space
 	var err error
 	r := membership.RoleUnknown
@@ -422,7 +445,7 @@ func (c *SpaceComponent) OrgSpaces(ctx context.Context, req *types.OrgSpacesReq)
 }
 
 // UserSpaces get spaces of owner and visible to current user
-func (c *SpaceComponent) UserSpaces(ctx context.Context, req *types.UserSpacesReq) ([]types.Space, int, error) {
+func (c *spaceComponentImpl) UserSpaces(ctx context.Context, req *types.UserSpacesReq) ([]types.Space, int, error) {
 	onlyPublic := req.Owner != req.CurrentUser
 	ms, total, err := c.ss.ByUsername(ctx, req.Owner, req.PageSize, req.Page, onlyPublic)
 	if err != nil {
@@ -453,7 +476,7 @@ func (c *SpaceComponent) UserSpaces(ctx context.Context, req *types.UserSpacesRe
 	return resSpaces, total, nil
 }
 
-func (c *SpaceComponent) UserLikesSpaces(ctx context.Context, req *types.UserSpacesReq, userID int64) ([]types.Space, int, error) {
+func (c *spaceComponentImpl) UserLikesSpaces(ctx context.Context, req *types.UserSpacesReq, userID int64) ([]types.Space, int, error) {
 	ms, total, err := c.ss.ByUserLikes(ctx, userID, req.PageSize, req.Page)
 	if err != nil {
 		newError := fmt.Errorf("failed to get spaces by username,%w", err)
@@ -482,7 +505,7 @@ func (c *SpaceComponent) UserLikesSpaces(ctx context.Context, req *types.UserSpa
 	return resSpaces, total, nil
 }
 
-func (c *SpaceComponent) ListByPath(ctx context.Context, paths []string) ([]*types.Space, error) {
+func (c *spaceComponentImpl) ListByPath(ctx context.Context, paths []string) ([]*types.Space, error) {
 	var spaces []*types.Space
 
 	spacesData, err := c.ss.ListByPath(ctx, paths)
@@ -527,7 +550,7 @@ func (c *SpaceComponent) ListByPath(ctx context.Context, paths []string) ([]*typ
 	return spaces, nil
 }
 
-func (c *SpaceComponent) AllowCallApi(ctx context.Context, spaceID int64, username string) (bool, error) {
+func (c *spaceComponentImpl) AllowCallApi(ctx context.Context, spaceID int64, username string) (bool, error) {
 	if username == "" {
 		return false, ErrUserNotFound
 	}
@@ -539,7 +562,7 @@ func (c *SpaceComponent) AllowCallApi(ctx context.Context, spaceID int64, userna
 	return c.AllowReadAccess(ctx, s.Repository.RepositoryType, fields[0], fields[1], username)
 }
 
-func (c *SpaceComponent) Delete(ctx context.Context, namespace, name, currentUser string) error {
+func (c *spaceComponentImpl) Delete(ctx context.Context, namespace, name, currentUser string) error {
 	space, err := c.ss.FindByPath(ctx, namespace, name)
 	if err != nil {
 		return fmt.Errorf("failed to find space, error: %w", err)
@@ -567,7 +590,7 @@ func (c *SpaceComponent) Delete(ctx context.Context, namespace, name, currentUse
 	return nil
 }
 
-func (c *SpaceComponent) Deploy(ctx context.Context, namespace, name, currentUser string) (int64, error) {
+func (c *spaceComponentImpl) Deploy(ctx context.Context, namespace, name, currentUser string) (int64, error) {
 	s, err := c.ss.FindByPath(ctx, namespace, name)
 	if err != nil {
 		slog.Error("can't deploy space", slog.Any("error", err), slog.String("namespace", namespace), slog.String("name", name))
@@ -623,7 +646,7 @@ func (c *SpaceComponent) Deploy(ctx context.Context, namespace, name, currentUse
 	})
 }
 
-func (c *SpaceComponent) Wakeup(ctx context.Context, namespace, name string) error {
+func (c *spaceComponentImpl) Wakeup(ctx context.Context, namespace, name string) error {
 	s, err := c.ss.FindByPath(ctx, namespace, name)
 	if err != nil {
 		slog.Error("can't wakeup space", slog.Any("error", err), slog.String("namespace", namespace), slog.String("name", name))
@@ -642,7 +665,7 @@ func (c *SpaceComponent) Wakeup(ctx context.Context, namespace, name string) err
 	})
 }
 
-func (c *SpaceComponent) Stop(ctx context.Context, namespace, name string) error {
+func (c *spaceComponentImpl) Stop(ctx context.Context, namespace, name string) error {
 	s, err := c.ss.FindByPath(ctx, namespace, name)
 	if err != nil {
 		slog.Error("can't stop space", slog.Any("error", err), slog.String("namespace", namespace), slog.String("name", name))
@@ -676,7 +699,7 @@ func (c *SpaceComponent) Stop(ctx context.Context, namespace, name string) error
 }
 
 // FixHasEntryFile checks whether git repo has entry point file and update space's HasAppFile property in db
-func (c *SpaceComponent) FixHasEntryFile(ctx context.Context, s *database.Space) *database.Space {
+func (c *spaceComponentImpl) FixHasEntryFile(ctx context.Context, s *database.Space) *database.Space {
 	hasAppFile := c.HasEntryFile(ctx, s)
 	if s.HasAppFile != hasAppFile {
 		s.HasAppFile = hasAppFile
@@ -686,7 +709,7 @@ func (c *SpaceComponent) FixHasEntryFile(ctx context.Context, s *database.Space)
 	return s
 }
 
-func (c *SpaceComponent) status(ctx context.Context, s *database.Space) (string, string, error) {
+func (c *spaceComponentImpl) status(ctx context.Context, s *database.Space) (string, string, error) {
 	if !s.HasAppFile {
 		if s.Sdk == scheduler.NGINX.Name {
 			return "", SpaceStatusNoNGINXConf, nil
@@ -717,7 +740,7 @@ func (c *SpaceComponent) status(ctx context.Context, s *database.Space) (string,
 	return srvName, deployStatusCodeToString(code), nil
 }
 
-func (c *SpaceComponent) Status(ctx context.Context, namespace, name string) (string, string, error) {
+func (c *spaceComponentImpl) Status(ctx context.Context, namespace, name string) (string, string, error) {
 	s, err := c.ss.FindByPath(ctx, namespace, name)
 	if err != nil {
 		return "", SpaceStatusStopped, fmt.Errorf("can't find space by path:%w", err)
@@ -725,7 +748,7 @@ func (c *SpaceComponent) Status(ctx context.Context, namespace, name string) (st
 	return c.status(ctx, s)
 }
 
-func (c *SpaceComponent) Logs(ctx context.Context, namespace, name string) (*deploy.MultiLogReader, error) {
+func (c *spaceComponentImpl) Logs(ctx context.Context, namespace, name string) (*deploy.MultiLogReader, error) {
 	s, err := c.ss.FindByPath(ctx, namespace, name)
 	if err != nil {
 		return nil, fmt.Errorf("can't find space by path:%w", err)
@@ -738,7 +761,7 @@ func (c *SpaceComponent) Logs(ctx context.Context, namespace, name string) (*dep
 }
 
 // HasEntryFile checks whether space repo has entry point file to run with
-func (c *SpaceComponent) HasEntryFile(ctx context.Context, space *database.Space) bool {
+func (c *spaceComponentImpl) HasEntryFile(ctx context.Context, space *database.Space) bool {
 	namespace, name := space.Repository.NamespaceAndName()
 	entryFile := "app.py"
 	if space.Sdk == scheduler.NGINX.Name {
@@ -748,7 +771,7 @@ func (c *SpaceComponent) HasEntryFile(ctx context.Context, space *database.Space
 	return c.hasEntryFile(ctx, namespace, name, entryFile)
 }
 
-func (c *SpaceComponent) hasEntryFile(ctx context.Context, namespace, name, entryFile string) bool {
+func (c *spaceComponentImpl) hasEntryFile(ctx context.Context, namespace, name, entryFile string) bool {
 	var req gitserver.GetRepoInfoByPathReq
 	req.Namespace = namespace
 	req.Name = name
@@ -770,7 +793,7 @@ func (c *SpaceComponent) hasEntryFile(ctx context.Context, namespace, name, entr
 	return false
 }
 
-func (c *SpaceComponent) mergeUpdateSpaceRequest(ctx context.Context, space *database.Space, req *types.UpdateSpaceReq) error {
+func (c *spaceComponentImpl) mergeUpdateSpaceRequest(ctx context.Context, space *database.Space, req *types.UpdateSpaceReq) error {
 	// Do not update column value if request body do not have it
 	if req.Sdk != nil {
 		space.Sdk = *req.Sdk

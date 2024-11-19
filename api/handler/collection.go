@@ -32,8 +32,8 @@ func NewCollectionHandler(cfg *config.Config) (*CollectionHandler, error) {
 }
 
 type CollectionHandler struct {
-	cc *component.CollectionComponent
-	sc *component.SensitiveComponent
+	cc component.CollectionComponent
+	sc component.SensitiveComponent
 }
 
 // GetCollections godoc

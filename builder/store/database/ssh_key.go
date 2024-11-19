@@ -4,12 +4,24 @@ import (
 	"context"
 )
 
-type SSHKeyStore struct {
+type sSHKeyStoreImpl struct {
 	db *DB
 }
 
-func NewSSHKeyStore() *SSHKeyStore {
-	return &SSHKeyStore{
+type SSHKeyStore interface {
+	Index(ctx context.Context, username string, per, page int) (sshKeys []SSHKey, err error)
+	Create(ctx context.Context, sshKey *SSHKey) (*SSHKey, error)
+	FindByID(ctx context.Context, id int64) (*SSHKey, error)
+	FindByFingerpringSHA256(ctx context.Context, fingerprint string) (*SSHKey, error)
+	Delete(ctx context.Context, gid int64) (err error)
+	IsExist(ctx context.Context, username, keyName string) (exists bool, err error)
+	FindByUsernameAndName(ctx context.Context, username, keyName string) (sshKey SSHKey, err error)
+	FindByKeyContent(ctx context.Context, key string) (*SSHKey, error)
+	FindByNameAndUserID(ctx context.Context, name string, userID int64) (*SSHKey, error)
+}
+
+func NewSSHKeyStore() SSHKeyStore {
+	return &sSHKeyStoreImpl{
 		db: defaultDB,
 	}
 }
@@ -25,7 +37,7 @@ type SSHKey struct {
 	times
 }
 
-func (s *SSHKeyStore) Index(ctx context.Context, username string, per, page int) (sshKeys []SSHKey, err error) {
+func (s *sSHKeyStoreImpl) Index(ctx context.Context, username string, per, page int) (sshKeys []SSHKey, err error) {
 	err = s.db.Operator.Core.
 		NewSelect().
 		Model(&sshKeys).
@@ -39,7 +51,7 @@ func (s *SSHKeyStore) Index(ctx context.Context, username string, per, page int)
 	return
 }
 
-func (s *SSHKeyStore) Create(ctx context.Context, sshKey *SSHKey) (*SSHKey, error) {
+func (s *sSHKeyStoreImpl) Create(ctx context.Context, sshKey *SSHKey) (*SSHKey, error) {
 	err := s.db.Operator.Core.
 		NewInsert().
 		Model(sshKey).
@@ -48,7 +60,7 @@ func (s *SSHKeyStore) Create(ctx context.Context, sshKey *SSHKey) (*SSHKey, erro
 	return sshKey, err
 }
 
-func (s *SSHKeyStore) FindByID(ctx context.Context, id int64) (*SSHKey, error) {
+func (s *sSHKeyStoreImpl) FindByID(ctx context.Context, id int64) (*SSHKey, error) {
 	var sshKey SSHKey
 	err := s.db.Operator.Core.
 		NewSelect().
@@ -59,7 +71,7 @@ func (s *SSHKeyStore) FindByID(ctx context.Context, id int64) (*SSHKey, error) {
 	return &sshKey, err
 }
 
-func (s *SSHKeyStore) FindByFingerpringSHA256(ctx context.Context, fingerprint string) (*SSHKey, error) {
+func (s *sSHKeyStoreImpl) FindByFingerpringSHA256(ctx context.Context, fingerprint string) (*SSHKey, error) {
 	var sshKey SSHKey
 	err := s.db.Operator.Core.
 		NewSelect().
@@ -70,7 +82,7 @@ func (s *SSHKeyStore) FindByFingerpringSHA256(ctx context.Context, fingerprint s
 	return &sshKey, err
 }
 
-func (s *SSHKeyStore) Delete(ctx context.Context, gid int64) (err error) {
+func (s *sSHKeyStoreImpl) Delete(ctx context.Context, gid int64) (err error) {
 	var sshKey SSHKey
 	_, err = s.db.Operator.Core.
 		NewDelete().
@@ -80,7 +92,7 @@ func (s *SSHKeyStore) Delete(ctx context.Context, gid int64) (err error) {
 	return
 }
 
-func (s *SSHKeyStore) IsExist(ctx context.Context, username, keyName string) (exists bool, err error) {
+func (s *sSHKeyStoreImpl) IsExist(ctx context.Context, username, keyName string) (exists bool, err error) {
 	var sshKey SSHKey
 	exists, err = s.db.Operator.Core.
 		NewSelect().
@@ -92,7 +104,7 @@ func (s *SSHKeyStore) IsExist(ctx context.Context, username, keyName string) (ex
 	return
 }
 
-func (s *SSHKeyStore) FindByUsernameAndName(ctx context.Context, username, keyName string) (sshKey SSHKey, err error) {
+func (s *sSHKeyStoreImpl) FindByUsernameAndName(ctx context.Context, username, keyName string) (sshKey SSHKey, err error) {
 	sshKey.Name = keyName
 	err = s.db.Operator.Core.
 		NewSelect().
@@ -104,7 +116,7 @@ func (s *SSHKeyStore) FindByUsernameAndName(ctx context.Context, username, keyNa
 	return sshKey, err
 }
 
-func (s *SSHKeyStore) FindByKeyContent(ctx context.Context, key string) (*SSHKey, error) {
+func (s *sSHKeyStoreImpl) FindByKeyContent(ctx context.Context, key string) (*SSHKey, error) {
 	sshKey := new(SSHKey)
 	err := s.db.Operator.Core.
 		NewSelect().
@@ -114,7 +126,7 @@ func (s *SSHKeyStore) FindByKeyContent(ctx context.Context, key string) (*SSHKey
 	return sshKey, err
 }
 
-func (s *SSHKeyStore) FindByNameAndUserID(ctx context.Context, name string, userID int64) (*SSHKey, error) {
+func (s *sSHKeyStoreImpl) FindByNameAndUserID(ctx context.Context, name string, userID int64) (*SSHKey, error) {
 	sshKey := new(SSHKey)
 	err := s.db.Operator.Core.
 		NewSelect().

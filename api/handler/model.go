@@ -26,15 +26,22 @@ func NewModelHandler(config *config.Config) (*ModelHandler, error) {
 	if err != nil {
 		return nil, fmt.Errorf("error creating sensitive component:%w", err)
 	}
+	repo, err := component.NewRepoComponent(config)
+	if err != nil {
+		return nil, fmt.Errorf("error creating repo component:%w", err)
+	}
+
 	return &ModelHandler{
-		c:  uc,
-		sc: sc,
+		c:    uc,
+		sc:   sc,
+		repo: repo,
 	}, nil
 }
 
 type ModelHandler struct {
-	c  *component.ModelComponent
-	sc *component.SensitiveComponent
+	c    component.ModelComponent
+	sc   component.SensitiveComponent
+	repo component.RepoComponent
 }
 
 // GetVisiableModels godoc
@@ -604,7 +611,7 @@ func (h *ModelHandler) DeployDedicated(ctx *gin.Context) {
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
-	allow, err := h.c.AllowReadAccess(ctx, types.ModelRepo, namespace, name, currentUser)
+	allow, err := h.repo.AllowReadAccess(ctx, types.ModelRepo, namespace, name, currentUser)
 	if err != nil {
 		slog.Error("failed to check user permission", "error", err)
 		httpbase.ServerError(ctx, errors.New("failed to check user permission"))
@@ -691,7 +698,7 @@ func (h *ModelHandler) FinetuneCreate(ctx *gin.Context) {
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
-	allow, err := h.c.AllowAdminAccess(ctx, types.ModelRepo, namespace, name, currentUser)
+	allow, err := h.repo.AllowAdminAccess(ctx, types.ModelRepo, namespace, name, currentUser)
 	if err != nil {
 		slog.Error("failed to check user permission", "error", err)
 		httpbase.ServerError(ctx, errors.New("failed to check user permission"))
@@ -791,7 +798,7 @@ func (h *ModelHandler) DeployDelete(ctx *gin.Context) {
 		DeployID:    id,
 		DeployType:  types.InferenceType,
 	}
-	err = h.c.DeleteDeploy(ctx, delReq)
+	err = h.repo.DeleteDeploy(ctx, delReq)
 	if err != nil {
 		slog.Error("Failed to delete deploy", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
@@ -846,7 +853,7 @@ func (h *ModelHandler) FinetuneDelete(ctx *gin.Context) {
 		DeployID:    id,
 		DeployType:  types.FinetuneType,
 	}
-	err = h.c.DeleteDeploy(ctx, delReq)
+	err = h.repo.DeleteDeploy(ctx, delReq)
 	if err != nil {
 		slog.Error("Failed to delete deploy", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
@@ -900,7 +907,7 @@ func (h *ModelHandler) DeployStop(ctx *gin.Context) {
 		DeployID:    id,
 		DeployType:  types.InferenceType,
 	}
-	err = h.c.DeployStop(ctx, stopReq)
+	err = h.repo.DeployStop(ctx, stopReq)
 	if err != nil {
 		slog.Error("Failed to stop deploy", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
@@ -956,7 +963,7 @@ func (h *ModelHandler) DeployStart(ctx *gin.Context) {
 		DeployType:  types.InferenceType,
 	}
 
-	err = h.c.DeployStart(ctx, startReq)
+	err = h.repo.DeployStart(ctx, startReq)
 	if err != nil {
 		slog.Error("Failed to start deploy", slog.Any("error", err), slog.Any("repoType", types.ModelRepo), slog.String("namespace", namespace), slog.String("name", name), slog.Any("deployID", id))
 		httpbase.ServerError(ctx, err)
@@ -1069,7 +1076,7 @@ func (h *ModelHandler) FinetuneStop(ctx *gin.Context) {
 		DeployID:    id,
 		DeployType:  types.FinetuneType,
 	}
-	err = h.c.DeployStop(ctx, stopReq)
+	err = h.repo.DeployStop(ctx, stopReq)
 	if err != nil {
 		slog.Error("Failed to stop deploy", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
@@ -1123,7 +1130,7 @@ func (h *ModelHandler) FinetuneStart(ctx *gin.Context) {
 		DeployID:    id,
 		DeployType:  types.FinetuneType,
 	}
-	err = h.c.DeployStart(ctx, startReq)
+	err = h.repo.DeployStart(ctx, startReq)
 	if err != nil {
 		slog.Error("Failed to start deploy", slog.Any("error", err), slog.Any("repoType", types.ModelRepo), slog.String("namespace", namespace), slog.String("name", name), slog.Any("deployID", id))
 		httpbase.ServerError(ctx, err)
@@ -1351,7 +1358,7 @@ func (h *ModelHandler) AllFiles(ctx *gin.Context) {
 	req.Name = name
 	req.RepoType = types.ModelRepo
 	req.CurrentUser = httpbase.GetCurrentUser(ctx)
-	detail, err := h.c.AllFiles(ctx, req)
+	detail, err := h.repo.AllFiles(ctx, req)
 	if err != nil {
 		if errors.Is(err, component.ErrUnauthorized) {
 			httpbase.UnauthorizedError(ctx, err)
@@ -1482,7 +1489,7 @@ func (h *ModelHandler) ServerlessStart(ctx *gin.Context) {
 		DeployType:  types.ServerlessType,
 	}
 
-	err = h.c.DeployStart(ctx, startReq)
+	err = h.repo.DeployStart(ctx, startReq)
 	if err != nil {
 		slog.Error("Failed to start deploy", slog.Any("error", err), slog.Any("repoType", types.ModelRepo), slog.String("namespace", namespace), slog.String("name", name), slog.Any("deployID", id))
 		httpbase.ServerError(ctx, err)
@@ -1538,7 +1545,7 @@ func (h *ModelHandler) ServerlessStop(ctx *gin.Context) {
 		DeployType:  types.ServerlessType,
 	}
 
-	err = h.c.DeployStop(ctx, stopReq)
+	err = h.repo.DeployStop(ctx, stopReq)
 	if err != nil {
 		slog.Error("Failed to stop deploy", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)

@@ -20,8 +20,8 @@ import (
 )
 
 type UserHandler struct {
-	c                        *component.UserComponent
-	sc                       *apicomponent.SensitiveComponent
+	c                        component.UserComponent
+	sc                       apicomponent.SensitiveComponent
 	publicDomain             string
 	EnableHTTPS              bool
 	signinSuccessRedirectURL string

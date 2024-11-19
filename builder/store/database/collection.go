@@ -10,12 +10,31 @@ import (
 	"opencsg.com/csghub-server/common/types"
 )
 
-type CollectionStore struct {
+type collectionStoreImpl struct {
 	db *DB
 }
 
-func NewCollectionStore() *CollectionStore {
-	return &CollectionStore{
+type CollectionStore interface {
+	// query collections in the database
+	GetCollections(ctx context.Context, filter *types.CollectionFilter, per, page int, showPrivate bool) (collections []Collection, total int, err error)
+	// query collections in the database
+	QueryByTrending(ctx context.Context, filter *types.CollectionFilter, per, page int) (collections []Collection, total int, err error)
+	CreateCollection(ctx context.Context, collection Collection) (*Collection, error)
+	DeleteCollection(ctx context.Context, id int64, uid int64) error
+	UpdateCollection(ctx context.Context, collection Collection) (*Collection, error)
+	GetCollection(ctx context.Context, id int64) (*Collection, error)
+	ByUserLikes(ctx context.Context, userID int64, per, page int) (collections []Collection, total int, err error)
+	ByUserOrgs(ctx context.Context, namespace string, per, page int, onlyPublic bool) (collections []Collection, total int, err error)
+	// get collections by ids
+	GetCollectionsByIDs(ctx context.Context, collections []Collection, ids []interface{}, total int, onlyPublic bool) ([]Collection, int, error)
+	FindById(ctx context.Context, id int64) (collection Collection, err error)
+	AddCollectionRepos(ctx context.Context, crs []CollectionRepository) error
+	RemoveCollectionRepos(ctx context.Context, crs []CollectionRepository) error
+	ByUsername(ctx context.Context, username string, per, page int, onlyPublic bool) (collections []Collection, total int, err error)
+}
+
+func NewCollectionStore() CollectionStore {
+	return &collectionStoreImpl{
 		db: defaultDB,
 	}
 }
@@ -52,7 +71,7 @@ type RankedRepository struct {
 var Fields = []string{"id", "download_count", "likes", "path", "private", "repository_type", "updated_at", "created_at", "user_id", "name", "nickname", "description"}
 
 // query collections in the database
-func (cs *CollectionStore) GetCollections(ctx context.Context, filter *types.CollectionFilter, per, page int, showPrivate bool) (collections []Collection, total int, err error) {
+func (cs *collectionStoreImpl) GetCollections(ctx context.Context, filter *types.CollectionFilter, per, page int, showPrivate bool) (collections []Collection, total int, err error) {
 	if filter.Sort == "trending" {
 		return cs.QueryByTrending(ctx, filter, per, page)
 	}
@@ -85,7 +104,7 @@ func (cs *CollectionStore) GetCollections(ctx context.Context, filter *types.Col
 }
 
 // query collections in the database
-func (cs *CollectionStore) QueryByTrending(ctx context.Context, filter *types.CollectionFilter, per, page int) (collections []Collection, total int, err error) {
+func (cs *collectionStoreImpl) QueryByTrending(ctx context.Context, filter *types.CollectionFilter, per, page int) (collections []Collection, total int, err error) {
 	query := cs.db.Operator.Core.NewSelect().
 		Model(&collections).
 		Column("collection.*").
@@ -122,7 +141,7 @@ func (cs *CollectionStore) QueryByTrending(ctx context.Context, filter *types.Co
 	return cs.GetCollectionsByIDs(ctx, collections, ids, total, true)
 }
 
-func (cs *CollectionStore) CreateCollection(ctx context.Context, collection Collection) (*Collection, error) {
+func (cs *collectionStoreImpl) CreateCollection(ctx context.Context, collection Collection) (*Collection, error) {
 	res, err := cs.db.Core.NewInsert().Model(&collection).Exec(ctx, &collection)
 	if err := assertAffectedOneRow(res, err); err != nil {
 		return nil, fmt.Errorf("failed to create collection in db, error:%w", err)
@@ -131,7 +150,7 @@ func (cs *CollectionStore) CreateCollection(ctx context.Context, collection Coll
 	return &collection, nil
 }
 
-func (cs *CollectionStore) DeleteCollection(ctx context.Context, id int64, uid int64) error {
+func (cs *collectionStoreImpl) DeleteCollection(ctx context.Context, id int64, uid int64) error {
 	var collection Collection
 	res, err := cs.db.Operator.Core.NewDelete().Model(&collection).Where("id =?", id).Where("user_id =?", uid).Exec(ctx)
 	if err := assertAffectedOneRow(res, err); err != nil {
@@ -140,13 +159,13 @@ func (cs *CollectionStore) DeleteCollection(ctx context.Context, id int64, uid i
 	return nil
 }
 
-func (cs *CollectionStore) UpdateCollection(ctx context.Context, collection Collection) (*Collection, error) {
+func (cs *collectionStoreImpl) UpdateCollection(ctx context.Context, collection Collection) (*Collection, error) {
 
 	_, err := cs.db.Core.NewUpdate().Model(&collection).WherePK().Exec(ctx)
 	return &collection, err
 }
 
-func (cs *CollectionStore) GetCollection(ctx context.Context, id int64) (*Collection, error) {
+func (cs *collectionStoreImpl) GetCollection(ctx context.Context, id int64) (*Collection, error) {
 	collection := new(Collection)
 	err := cs.db.Operator.Core.
 		NewSelect().
@@ -166,7 +185,7 @@ func (cs *CollectionStore) GetCollection(ctx context.Context, id int64) (*Collec
 	return collection, err
 }
 
-func (cs *CollectionStore) ByUserLikes(ctx context.Context, userID int64, per, page int) (collections []Collection, total int, err error) {
+func (cs *collectionStoreImpl) ByUserLikes(ctx context.Context, userID int64, per, page int) (collections []Collection, total int, err error) {
 	query := cs.db.Operator.Core.
 		NewSelect().
 		Model(&collections).
@@ -192,7 +211,7 @@ func (cs *CollectionStore) ByUserLikes(ctx context.Context, userID int64, per, p
 	return cs.GetCollectionsByIDs(ctx, collections, ids, total, true)
 }
 
-func (cs *CollectionStore) ByUserOrgs(ctx context.Context, namespace string, per, page int, onlyPublic bool) (collections []Collection, total int, err error) {
+func (cs *collectionStoreImpl) ByUserOrgs(ctx context.Context, namespace string, per, page int, onlyPublic bool) (collections []Collection, total int, err error) {
 	query := cs.db.Operator.Core.
 		NewSelect().
 		Model(&collections).
@@ -223,7 +242,7 @@ func (cs *CollectionStore) ByUserOrgs(ctx context.Context, namespace string, per
 }
 
 // get collections by ids
-func (cs *CollectionStore) GetCollectionsByIDs(ctx context.Context, collections []Collection, ids []interface{}, total int, onlyPublic bool) ([]Collection, int, error) {
+func (cs *collectionStoreImpl) GetCollectionsByIDs(ctx context.Context, collections []Collection, ids []interface{}, total int, onlyPublic bool) ([]Collection, int, error) {
 	subQuery := cs.db.Operator.Core.NewSelect().
 		Column("cr.collection_id").
 		ColumnExpr("repository.id as repository_id").
@@ -285,7 +304,7 @@ func getCollectionMaps(rankedRepos []RankedRepository, repositories []Repository
 	return
 }
 
-func (cs *CollectionStore) FindById(ctx context.Context, id int64) (collection Collection, err error) {
+func (cs *collectionStoreImpl) FindById(ctx context.Context, id int64) (collection Collection, err error) {
 	q := cs.db.Operator.Core.
 		NewSelect()
 	err = q.
@@ -295,7 +314,7 @@ func (cs *CollectionStore) FindById(ctx context.Context, id int64) (collection C
 	return
 }
 
-func (cs *CollectionStore) AddCollectionRepos(ctx context.Context, crs []CollectionRepository) error {
+func (cs *collectionStoreImpl) AddCollectionRepos(ctx context.Context, crs []CollectionRepository) error {
 
 	result, err := cs.db.Core.NewInsert().Model(&crs).Exec(ctx)
 	if err != nil {
@@ -305,7 +324,7 @@ func (cs *CollectionStore) AddCollectionRepos(ctx context.Context, crs []Collect
 	return assertAffectedXRows(int64(len(crs)), result, err)
 }
 
-func (cs *CollectionStore) RemoveCollectionRepos(ctx context.Context, crs []CollectionRepository) error {
+func (cs *collectionStoreImpl) RemoveCollectionRepos(ctx context.Context, crs []CollectionRepository) error {
 	for _, cr := range crs {
 		_, err := cs.db.Core.NewDelete().
 			Model((*CollectionRepository)(nil)).
@@ -318,7 +337,7 @@ func (cs *CollectionStore) RemoveCollectionRepos(ctx context.Context, crs []Coll
 	return nil
 }
 
-func (cs *CollectionStore) ByUsername(ctx context.Context, username string, per, page int, onlyPublic bool) (collections []Collection, total int, err error) {
+func (cs *collectionStoreImpl) ByUsername(ctx context.Context, username string, per, page int, onlyPublic bool) (collections []Collection, total int, err error) {
 	query := cs.db.Operator.Core.
 		NewSelect().
 		Model(&collections).

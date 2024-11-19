@@ -8,7 +8,7 @@ import (
 )
 
 type NamespaceHandler struct {
-	c *component.NamespaceComponent
+	c component.NamespaceComponent
 }
 
 func NewNamespaceHandler(config *config.Config) (*NamespaceHandler, error) {

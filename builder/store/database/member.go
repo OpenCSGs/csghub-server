@@ -5,12 +5,20 @@ import (
 	"fmt"
 )
 
-type MemberStore struct {
+type memberStoreImpl struct {
 	db *DB
 }
 
-func NewMemberStore() *MemberStore {
-	return &MemberStore{
+type MemberStore interface {
+	Find(ctx context.Context, orgID, userID int64) (*Member, error)
+	Add(ctx context.Context, orgID, userID int64, role string) error
+	Delete(ctx context.Context, orgID, userID int64, role string) error
+	UserMembers(ctx context.Context, userID int64) ([]Member, error)
+	OrganizationMembers(ctx context.Context, orgID int64, pageSize, page int) ([]Member, int, error)
+}
+
+func NewMemberStore() MemberStore {
+	return &memberStoreImpl{
 		db: defaultDB,
 	}
 }
@@ -26,7 +34,7 @@ type Member struct {
 	times
 }
 
-func (s *MemberStore) Find(ctx context.Context, orgID, userID int64) (*Member, error) {
+func (s *memberStoreImpl) Find(ctx context.Context, orgID, userID int64) (*Member, error) {
 	var member Member
 	err := s.db.Core.NewSelect().Model(&member).Where("organization_id = ? AND user_id = ?", orgID, userID).Scan(ctx)
 	if err != nil {
@@ -35,7 +43,7 @@ func (s *MemberStore) Find(ctx context.Context, orgID, userID int64) (*Member, e
 	return &member, nil
 }
 
-func (s *MemberStore) Add(ctx context.Context, orgID, userID int64, role string) error {
+func (s *memberStoreImpl) Add(ctx context.Context, orgID, userID int64, role string) error {
 	member := &Member{
 		OrganizationID: orgID,
 		UserID:         userID,
@@ -48,19 +56,19 @@ func (s *MemberStore) Add(ctx context.Context, orgID, userID int64, role string)
 	return assertAffectedOneRow(result, err)
 }
 
-func (s *MemberStore) Delete(ctx context.Context, orgID, userID int64, role string) error {
+func (s *memberStoreImpl) Delete(ctx context.Context, orgID, userID int64, role string) error {
 	var member Member
 	_, err := s.db.Core.NewDelete().Model(&member).Where("organization_id=? and user_id=? and role=?", orgID, userID, role).Exec(ctx)
 	return err
 }
 
-func (s *MemberStore) UserMembers(ctx context.Context, userID int64) ([]Member, error) {
+func (s *memberStoreImpl) UserMembers(ctx context.Context, userID int64) ([]Member, error) {
 	var members []Member
 	err := s.db.Core.NewSelect().Model((*Member)(nil)).Where("user_id=?", userID).Scan(ctx, &members)
 	return members, err
 }
 
-func (s *MemberStore) OrganizationMembers(ctx context.Context, orgID int64, pageSize, page int) ([]Member, int, error) {
+func (s *memberStoreImpl) OrganizationMembers(ctx context.Context, orgID int64, pageSize, page int) ([]Member, int, error) {
 	var members []Member
 	var total int
 	q := s.db.Core.NewSelect().Model((*Member)(nil)).

@@ -23,7 +23,7 @@ func NewMirrorHandler(config *config.Config) (*MirrorHandler, error) {
 }
 
 type MirrorHandler struct {
-	mc *component.MirrorComponent
+	mc component.MirrorComponent
 }
 
 // CreateMirrorRepo godoc

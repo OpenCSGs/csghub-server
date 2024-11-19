@@ -11,17 +11,22 @@ import (
 	"opencsg.com/csghub-server/common/types"
 )
 
-type SyncClientSettingComponent struct {
-	settingStore *database.SyncClientSettingStore
+type syncClientSettingComponentImpl struct {
+	settingStore database.SyncClientSettingStore
 }
 
-func NewSyncClientSettingComponent(config *config.Config) (*SyncClientSettingComponent, error) {
-	return &SyncClientSettingComponent{
+type SyncClientSettingComponent interface {
+	Create(ctx context.Context, req types.CreateSyncClientSettingReq) (*database.SyncClientSetting, error)
+	Show(ctx context.Context) (*database.SyncClientSetting, error)
+}
+
+func NewSyncClientSettingComponent(config *config.Config) (SyncClientSettingComponent, error) {
+	return &syncClientSettingComponentImpl{
 		settingStore: database.NewSyncClientSettingStore(),
 	}, nil
 }
 
-func (c *SyncClientSettingComponent) Create(ctx context.Context, req types.CreateSyncClientSettingReq) (*database.SyncClientSetting, error) {
+func (c *syncClientSettingComponentImpl) Create(ctx context.Context, req types.CreateSyncClientSettingReq) (*database.SyncClientSetting, error) {
 	exists, err := c.settingStore.SyncClientSettingExists(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to check sync client setting if exists, error: %w", err)
@@ -43,7 +48,7 @@ func (c *SyncClientSettingComponent) Create(ctx context.Context, req types.Creat
 	return res, nil
 }
 
-func (c *SyncClientSettingComponent) Show(ctx context.Context) (*database.SyncClientSetting, error) {
+func (c *syncClientSettingComponentImpl) Show(ctx context.Context) (*database.SyncClientSetting, error) {
 	res, err := c.settingStore.First(ctx)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {

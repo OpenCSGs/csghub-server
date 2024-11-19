@@ -9,18 +9,25 @@ import (
 	"opencsg.com/csghub-server/common/types"
 )
 
-func NewSpaceSdkComponent(config *config.Config) (*SpaceSdkComponent, error) {
-	c := &SpaceSdkComponent{}
+type SpaceSdkComponent interface {
+	Index(ctx context.Context) ([]types.SpaceSdk, error)
+	Update(ctx context.Context, req *types.UpdateSpaceSdkReq) (*types.SpaceSdk, error)
+	Create(ctx context.Context, req *types.CreateSpaceSdkReq) (*types.SpaceSdk, error)
+	Delete(ctx context.Context, id int64) error
+}
+
+func NewSpaceSdkComponent(config *config.Config) (SpaceSdkComponent, error) {
+	c := &spaceSdkComponentImpl{}
 	c.sss = database.NewSpaceSdkStore()
 
 	return c, nil
 }
 
-type SpaceSdkComponent struct {
-	sss *database.SpaceSdkStore
+type spaceSdkComponentImpl struct {
+	sss database.SpaceSdkStore
 }
 
-func (c *SpaceSdkComponent) Index(ctx context.Context) ([]types.SpaceSdk, error) {
+func (c *spaceSdkComponentImpl) Index(ctx context.Context) ([]types.SpaceSdk, error) {
 	var result []types.SpaceSdk
 	databaseSpaceSdks, err := c.sss.Index(ctx)
 	if err != nil {
@@ -37,7 +44,7 @@ func (c *SpaceSdkComponent) Index(ctx context.Context) ([]types.SpaceSdk, error)
 	return result, nil
 }
 
-func (c *SpaceSdkComponent) Update(ctx context.Context, req *types.UpdateSpaceSdkReq) (*types.SpaceSdk, error) {
+func (c *spaceSdkComponentImpl) Update(ctx context.Context, req *types.UpdateSpaceSdkReq) (*types.SpaceSdk, error) {
 	ss, err := c.sss.FindByID(ctx, req.ID)
 	if err != nil {
 		slog.Error("error getting space sdk", slog.Any("error", err))
@@ -61,7 +68,7 @@ func (c *SpaceSdkComponent) Update(ctx context.Context, req *types.UpdateSpaceSd
 	return result, nil
 }
 
-func (c *SpaceSdkComponent) Create(ctx context.Context, req *types.CreateSpaceSdkReq) (*types.SpaceSdk, error) {
+func (c *spaceSdkComponentImpl) Create(ctx context.Context, req *types.CreateSpaceSdkReq) (*types.SpaceSdk, error) {
 	ss := database.SpaceSdk{
 		Name:    req.Name,
 		Version: req.Version,
@@ -81,7 +88,7 @@ func (c *SpaceSdkComponent) Create(ctx context.Context, req *types.CreateSpaceSd
 	return result, nil
 }
 
-func (c *SpaceSdkComponent) Delete(ctx context.Context, id int64) error {
+func (c *spaceSdkComponentImpl) Delete(ctx context.Context, id int64) error {
 	ss, err := c.sss.FindByID(ctx, id)
 	if err != nil {
 		slog.Error("error finding space sdk", slog.Any("error", err))

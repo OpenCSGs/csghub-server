@@ -13,8 +13,17 @@ import (
 	"opencsg.com/csghub-server/common/types"
 )
 
-func NewOrganizationComponent(config *config.Config) (*OrganizationComponent, error) {
-	c := &OrganizationComponent{}
+type OrganizationComponent interface {
+	FixOrgData(ctx context.Context, org *database.Organization) (*database.Organization, error)
+	Create(ctx context.Context, req *types.CreateOrgReq) (*types.Organization, error)
+	Index(ctx context.Context, username string) ([]types.Organization, error)
+	Get(ctx context.Context, orgName string) (*types.Organization, error)
+	Delete(ctx context.Context, req *types.DeleteOrgReq) error
+	Update(ctx context.Context, req *types.EditOrgReq) (*database.Organization, error)
+}
+
+func NewOrganizationComponent(config *config.Config) (OrganizationComponent, error) {
+	c := &organizationComponentImpl{}
 	c.os = database.NewOrgStore()
 	c.ns = database.NewNamespaceStore()
 	c.us = database.NewUserStore()
@@ -34,16 +43,16 @@ func NewOrganizationComponent(config *config.Config) (*OrganizationComponent, er
 	return c, nil
 }
 
-type OrganizationComponent struct {
-	os *database.OrgStore
-	ns *database.NamespaceStore
-	us *database.UserStore
+type organizationComponentImpl struct {
+	os database.OrgStore
+	ns database.NamespaceStore
+	us database.UserStore
 	gs gitserver.GitServer
 
-	msc *MemberComponent
+	msc MemberComponent
 }
 
-func (c *OrganizationComponent) FixOrgData(ctx context.Context, org *database.Organization) (*database.Organization, error) {
+func (c *organizationComponentImpl) FixOrgData(ctx context.Context, org *database.Organization) (*database.Organization, error) {
 	user := org.User
 	req := new(types.CreateOrgReq)
 	req.Name = org.Name
@@ -64,7 +73,7 @@ func (c *OrganizationComponent) FixOrgData(ctx context.Context, org *database.Or
 	return org, err
 }
 
-func (c *OrganizationComponent) Create(ctx context.Context, req *types.CreateOrgReq) (*types.Organization, error) {
+func (c *organizationComponentImpl) Create(ctx context.Context, req *types.CreateOrgReq) (*types.Organization, error) {
 	user, err := c.us.FindByUsername(ctx, req.Username)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find user, error: %w", err)
@@ -116,7 +125,7 @@ func (c *OrganizationComponent) Create(ctx context.Context, req *types.CreateOrg
 	return org, err
 }
 
-func (c *OrganizationComponent) Index(ctx context.Context, username string) ([]types.Organization, error) {
+func (c *organizationComponentImpl) Index(ctx context.Context, username string) ([]types.Organization, error) {
 	dborgs, err := c.os.GetUserOwnOrgs(ctx, username)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get organizations, error: %w", err)
@@ -136,7 +145,7 @@ func (c *OrganizationComponent) Index(ctx context.Context, username string) ([]t
 	return orgs, nil
 }
 
-func (c *OrganizationComponent) Get(ctx context.Context, orgName string) (*types.Organization, error) {
+func (c *organizationComponentImpl) Get(ctx context.Context, orgName string) (*types.Organization, error) {
 	dborg, err := c.os.FindByPath(ctx, orgName)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get organizations by name, error: %w", err)
@@ -152,7 +161,7 @@ func (c *OrganizationComponent) Get(ctx context.Context, orgName string) (*types
 	return org, nil
 }
 
-func (c *OrganizationComponent) Delete(ctx context.Context, req *types.DeleteOrgReq) error {
+func (c *organizationComponentImpl) Delete(ctx context.Context, req *types.DeleteOrgReq) error {
 	r, err := c.msc.GetMemberRole(ctx, req.Name, req.CurrentUser)
 	if err != nil {
 		slog.Error("faild to get member role",
@@ -173,7 +182,7 @@ func (c *OrganizationComponent) Delete(ctx context.Context, req *types.DeleteOrg
 	return nil
 }
 
-func (c *OrganizationComponent) Update(ctx context.Context, req *types.EditOrgReq) (*database.Organization, error) {
+func (c *organizationComponentImpl) Update(ctx context.Context, req *types.EditOrgReq) (*database.Organization, error) {
 	r, err := c.msc.GetMemberRole(ctx, req.Name, req.CurrentUser)
 	if err != nil {
 		slog.Error("faild to get member role",

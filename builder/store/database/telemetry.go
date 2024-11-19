@@ -27,16 +27,20 @@ type Telemetry struct {
 	Counts               interface{}            `bun:"type:jsonb" json:"counts,omitempty"`
 }
 
-type TelemetryStore struct {
+type telemetryStoreImpl struct {
 	db *DB
 }
 
-func NewTelemetryStore() *TelemetryStore {
-	return &TelemetryStore{
+type TelemetryStore interface {
+	Save(ctx context.Context, telemetry *Telemetry) error
+}
+
+func NewTelemetryStore() TelemetryStore {
+	return &telemetryStoreImpl{
 		db: defaultDB,
 	}
 }
 
-func (s *TelemetryStore) Save(ctx context.Context, telemetry *Telemetry) error {
+func (s *telemetryStoreImpl) Save(ctx context.Context, telemetry *Telemetry) error {
 	return assertAffectedOneRow(s.db.Core.NewInsert().Model(telemetry).Exec(ctx))
 }

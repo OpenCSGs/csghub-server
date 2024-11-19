@@ -31,8 +31,8 @@ func NewCodeHandler(config *config.Config) (*CodeHandler, error) {
 }
 
 type CodeHandler struct {
-	c  *component.CodeComponent
-	sc *component.SensitiveComponent
+	c  component.CodeComponent
+	sc component.SensitiveComponent
 }
 
 // CreateCode   godoc

@@ -16,20 +16,28 @@ import (
 	"opencsg.com/csghub-server/common/utils/common"
 )
 
-type InternalComponent struct {
+type internalComponentImpl struct {
 	config      *config.Config
-	sshKeyStore *database.SSHKeyStore
-	repoStore   *database.RepoStore
-	*RepoComponent
+	sshKeyStore database.SSHKeyStore
+	repoStore   database.RepoStore
+	*repoComponentImpl
 }
 
-func NewInternalComponent(config *config.Config) (*InternalComponent, error) {
+type InternalComponent interface {
+	Allowed(ctx context.Context) (bool, error)
+	SSHAllowed(ctx context.Context, req types.SSHAllowedReq) (*types.SSHAllowedResp, error)
+	GetAuthorizedKeys(ctx context.Context, key string) (*database.SSHKey, error)
+	GetCommitDiff(ctx context.Context, req types.GetDiffBetweenTwoCommitsReq) (*types.GiteaCallbackPushReq, error)
+	LfsAuthenticate(ctx context.Context, req types.LfsAuthenticateReq) (*types.LfsAuthenticateResp, error)
+}
+
+func NewInternalComponent(config *config.Config) (InternalComponent, error) {
 	var err error
-	c := &InternalComponent{}
+	c := &internalComponentImpl{}
 	c.config = config
 	c.sshKeyStore = database.NewSSHKeyStore()
 	c.repoStore = database.NewRepoStore()
-	c.RepoComponent, err = NewRepoComponent(config)
+	c.repoComponentImpl, err = NewRepoComponentImpl(config)
 	c.tokenStore = database.NewAccessTokenStore()
 	if err != nil {
 		return nil, err
@@ -37,11 +45,11 @@ func NewInternalComponent(config *config.Config) (*InternalComponent, error) {
 	return c, nil
 }
 
-func (c *InternalComponent) Allowed(ctx context.Context) (bool, error) {
+func (c *internalComponentImpl) Allowed(ctx context.Context) (bool, error) {
 	return true, nil
 }
 
-func (c *InternalComponent) SSHAllowed(ctx context.Context, req types.SSHAllowedReq) (*types.SSHAllowedResp, error) {
+func (c *internalComponentImpl) SSHAllowed(ctx context.Context, req types.SSHAllowedReq) (*types.SSHAllowedResp, error) {
 	namespace, err := c.namespace.FindByPath(ctx, req.Namespace)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find namespace %s: %v", req.Namespace, err)
@@ -105,7 +113,7 @@ func (c *InternalComponent) SSHAllowed(ctx context.Context, req types.SSHAllowed
 	}, nil
 }
 
-func (c *InternalComponent) GetAuthorizedKeys(ctx context.Context, key string) (*database.SSHKey, error) {
+func (c *internalComponentImpl) GetAuthorizedKeys(ctx context.Context, key string) (*database.SSHKey, error) {
 	fingerprint, err := common.CalculateAuthorizedSSHKeyFingerprint(key)
 	if err != nil {
 		return nil, fmt.Errorf("failed to calculate authorized keys fingerprint, error: %v", err)
@@ -117,7 +125,7 @@ func (c *InternalComponent) GetAuthorizedKeys(ctx context.Context, key string) (
 	return sshKey, nil
 }
 
-func (c *InternalComponent) GetCommitDiff(ctx context.Context, req types.GetDiffBetweenTwoCommitsReq) (*types.GiteaCallbackPushReq, error) {
+func (c *internalComponentImpl) GetCommitDiff(ctx context.Context, req types.GetDiffBetweenTwoCommitsReq) (*types.GiteaCallbackPushReq, error) {
 	repo, err := c.repoStore.FindByPath(ctx, req.RepoType, req.Namespace, req.Name)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find repo, err: %v", err)
@@ -140,7 +148,7 @@ func (c *InternalComponent) GetCommitDiff(ctx context.Context, req types.GetDiff
 	return diffs, nil
 }
 
-func (c *InternalComponent) LfsAuthenticate(ctx context.Context, req types.LfsAuthenticateReq) (*types.LfsAuthenticateResp, error) {
+func (c *internalComponentImpl) LfsAuthenticate(ctx context.Context, req types.LfsAuthenticateReq) (*types.LfsAuthenticateResp, error) {
 	repo, err := c.repoStore.FindByPath(ctx, req.RepoType, req.Namespace, req.Name)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find repo, err: %v", err)
@@ -176,4 +184,3 @@ func (c *InternalComponent) LfsAuthenticate(ctx context.Context, req types.LfsAu
 		RepoPath: c.config.APIServer.PublicDomain + "/" + filepath.Join(repoType, req.Namespace, req.Name+".git"),
 	}, nil
 }
-

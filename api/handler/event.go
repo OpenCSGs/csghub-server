@@ -11,7 +11,7 @@ import (
 )
 
 type EventHandler struct {
-	ec *component.EventComponent
+	ec component.EventComponent
 }
 
 func NewEventHandler() (*EventHandler, error) {

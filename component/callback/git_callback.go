@@ -22,23 +22,23 @@ import (
 type GitCallbackComponent struct {
 	config       *config.Config
 	gs           gitserver.GitServer
-	tc           *component.TagComponent
+	tc           component.TagComponent
 	modSvcClient rpc.ModerationSvcClient
-	ms           *database.ModelStore
-	ds           *database.DatasetStore
-	sc           *component.SpaceComponent
-	ss           *database.SpaceStore
-	rs           *database.RepoStore
-	rrs          *database.RepoRelationsStore
-	mirrorStore  *database.MirrorStore
+	ms           database.ModelStore
+	ds           database.DatasetStore
+	sc           component.SpaceComponent
+	ss           database.SpaceStore
+	rs           database.RepoStore
+	rrs          database.RepoRelationsStore
+	mirrorStore  database.MirrorStore
 	rrf          *database.RepositoriesRuntimeFrameworkStore
-	rac          *component.RuntimeArchitectureComponent
-	ras          *database.RuntimeArchitecturesStore
-	rfs          *database.RuntimeFrameworksStore
-	ts           *database.TagStore
+	rac          component.RuntimeArchitectureComponent
+	ras          database.RuntimeArchitecturesStore
+	rfs          database.RuntimeFrameworksStore
+	ts           database.TagStore
 	// set visibility if file content is sensitive
 	setRepoVisibility bool
-	pp                *component.PromptComponent
+	pp                component.PromptComponent
 	maxPromptFS       int64
 }
 

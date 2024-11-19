@@ -14,10 +14,20 @@ import (
 
 const codeGitattributesContent = modelGitattributesContent
 
-func NewCodeComponent(config *config.Config) (*CodeComponent, error) {
-	c := &CodeComponent{}
+type CodeComponent interface {
+	Create(ctx context.Context, req *types.CreateCodeReq) (*types.Code, error)
+	Index(ctx context.Context, filter *types.RepoFilter, per, page int) ([]types.Code, int, error)
+	Update(ctx context.Context, req *types.UpdateCodeReq) (*types.Code, error)
+	Delete(ctx context.Context, namespace, name, currentUser string) error
+	Show(ctx context.Context, namespace, name, currentUser string) (*types.Code, error)
+	Relations(ctx context.Context, namespace, name, currentUser string) (*types.Relations, error)
+	OrgCodes(ctx context.Context, req *types.OrgCodesReq) ([]types.Code, int, error)
+}
+
+func NewCodeComponent(config *config.Config) (CodeComponent, error) {
+	c := &codeComponentImpl{}
 	var err error
-	c.RepoComponent, err = NewRepoComponent(config)
+	c.repoComponentImpl, err = NewRepoComponentImpl(config)
 	if err != nil {
 		return nil, err
 	}
@@ -26,13 +36,13 @@ func NewCodeComponent(config *config.Config) (*CodeComponent, error) {
 	return c, nil
 }
 
-type CodeComponent struct {
-	*RepoComponent
-	cs *database.CodeStore
-	rs *database.RepoStore
+type codeComponentImpl struct {
+	*repoComponentImpl
+	cs database.CodeStore
+	rs database.RepoStore
 }
 
-func (c *CodeComponent) Create(ctx context.Context, req *types.CreateCodeReq) (*types.Code, error) {
+func (c *codeComponentImpl) Create(ctx context.Context, req *types.CreateCodeReq) (*types.Code, error) {
 	var (
 		nickname string
 		tags     []types.RepoTag
@@ -134,7 +144,7 @@ func (c *CodeComponent) Create(ctx context.Context, req *types.CreateCodeReq) (*
 	return resCode, nil
 }
 
-func (c *CodeComponent) Index(ctx context.Context, filter *types.RepoFilter, per, page int) ([]types.Code, int, error) {
+func (c *codeComponentImpl) Index(ctx context.Context, filter *types.RepoFilter, per, page int) ([]types.Code, int, error) {
 	var (
 		err      error
 		resCodes []types.Code
@@ -198,7 +208,7 @@ func (c *CodeComponent) Index(ctx context.Context, filter *types.RepoFilter, per
 	return resCodes, total, nil
 }
 
-func (c *CodeComponent) Update(ctx context.Context, req *types.UpdateCodeReq) (*types.Code, error) {
+func (c *codeComponentImpl) Update(ctx context.Context, req *types.UpdateCodeReq) (*types.Code, error) {
 	req.RepoType = types.CodeRepo
 	dbRepo, err := c.UpdateRepo(ctx, req.UpdateRepoReq)
 	if err != nil {
@@ -233,7 +243,7 @@ func (c *CodeComponent) Update(ctx context.Context, req *types.UpdateCodeReq) (*
 	return resCode, nil
 }
 
-func (c *CodeComponent) Delete(ctx context.Context, namespace, name, currentUser string) error {
+func (c *codeComponentImpl) Delete(ctx context.Context, namespace, name, currentUser string) error {
 	code, err := c.cs.FindByPath(ctx, namespace, name)
 	if err != nil {
 		return fmt.Errorf("failed to find code, error: %w", err)
@@ -257,7 +267,7 @@ func (c *CodeComponent) Delete(ctx context.Context, namespace, name, currentUser
 	return nil
 }
 
-func (c *CodeComponent) Show(ctx context.Context, namespace, name, currentUser string) (*types.Code, error) {
+func (c *codeComponentImpl) Show(ctx context.Context, namespace, name, currentUser string) (*types.Code, error) {
 	var tags []types.RepoTag
 	code, err := c.cs.FindByPath(ctx, namespace, name)
 	if err != nil {
@@ -327,7 +337,7 @@ func (c *CodeComponent) Show(ctx context.Context, namespace, name, currentUser s
 	return resCode, nil
 }
 
-func (c *CodeComponent) Relations(ctx context.Context, namespace, name, currentUser string) (*types.Relations, error) {
+func (c *codeComponentImpl) Relations(ctx context.Context, namespace, name, currentUser string) (*types.Relations, error) {
 	code, err := c.cs.FindByPath(ctx, namespace, name)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find code repo, error: %w", err)
@@ -341,7 +351,7 @@ func (c *CodeComponent) Relations(ctx context.Context, namespace, name, currentU
 	return c.getRelations(ctx, code.RepositoryID, currentUser)
 }
 
-func (c *CodeComponent) getRelations(ctx context.Context, repoID int64, currentUser string) (*types.Relations, error) {
+func (c *codeComponentImpl) getRelations(ctx context.Context, repoID int64, currentUser string) (*types.Relations, error) {
 	res, err := c.relatedRepos(ctx, repoID, currentUser)
 	if err != nil {
 		return nil, err
@@ -363,7 +373,7 @@ func (c *CodeComponent) getRelations(ctx context.Context, repoID int64, currentU
 	return rels, nil
 }
 
-func (c *CodeComponent) OrgCodes(ctx context.Context, req *types.OrgCodesReq) ([]types.Code, int, error) {
+func (c *codeComponentImpl) OrgCodes(ctx context.Context, req *types.OrgCodesReq) ([]types.Code, int, error) {
 	var resCodes []types.Code
 	var err error
 	r := membership.RoleUnknown

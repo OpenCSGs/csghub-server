@@ -9,12 +9,25 @@ import (
 	"github.com/uptrace/bun"
 )
 
-type CodeStore struct {
+type codeStoreImpl struct {
 	db *DB
 }
 
-func NewCodeStore() *CodeStore {
-	return &CodeStore{db: defaultDB}
+type CodeStore interface {
+	ByRepoIDs(ctx context.Context, repoIDs []int64) (codes []Code, err error)
+	ByRepoID(ctx context.Context, repoID int64) (*Code, error)
+	ByUsername(ctx context.Context, username string, per, page int, onlyPublic bool) (codes []Code, total int, err error)
+	UserLikesCodes(ctx context.Context, userID int64, per, page int) (codes []Code, total int, err error)
+	ByOrgPath(ctx context.Context, namespace string, per, page int, onlyPublic bool) (codes []Code, total int, err error)
+	Create(ctx context.Context, input Code) (*Code, error)
+	Update(ctx context.Context, input Code) (err error)
+	FindByPath(ctx context.Context, namespace string, repoPath string) (code *Code, err error)
+	Delete(ctx context.Context, input Code) error
+	ListByPath(ctx context.Context, paths []string) ([]Code, error)
+}
+
+func NewCodeStore() CodeStore {
+	return &codeStoreImpl{db: defaultDB}
 }
 
 type Code struct {
@@ -25,7 +38,7 @@ type Code struct {
 	times
 }
 
-func (s *CodeStore) ByRepoIDs(ctx context.Context, repoIDs []int64) (codes []Code, err error) {
+func (s *codeStoreImpl) ByRepoIDs(ctx context.Context, repoIDs []int64) (codes []Code, err error) {
 	err = s.db.Operator.Core.NewSelect().
 		Model(&codes).
 		Where("repository_id in (?)", bun.In(repoIDs)).
@@ -34,7 +47,7 @@ func (s *CodeStore) ByRepoIDs(ctx context.Context, repoIDs []int64) (codes []Cod
 	return
 }
 
-func (s *CodeStore) ByRepoID(ctx context.Context, repoID int64) (*Code, error) {
+func (s *codeStoreImpl) ByRepoID(ctx context.Context, repoID int64) (*Code, error) {
 	var code Code
 	err := s.db.Operator.Core.NewSelect().
 		Model(&code).
@@ -48,7 +61,7 @@ func (s *CodeStore) ByRepoID(ctx context.Context, repoID int64) (*Code, error) {
 	return &code, nil
 }
 
-func (s *CodeStore) ByUsername(ctx context.Context, username string, per, page int, onlyPublic bool) (codes []Code, total int, err error) {
+func (s *codeStoreImpl) ByUsername(ctx context.Context, username string, per, page int, onlyPublic bool) (codes []Code, total int, err error) {
 	query := s.db.Operator.Core.
 		NewSelect().
 		Model(&codes).
@@ -74,7 +87,7 @@ func (s *CodeStore) ByUsername(ctx context.Context, username string, per, page i
 	return
 }
 
-func (s *CodeStore) UserLikesCodes(ctx context.Context, userID int64, per, page int) (codes []Code, total int, err error) {
+func (s *codeStoreImpl) UserLikesCodes(ctx context.Context, userID int64, per, page int) (codes []Code, total int, err error) {
 	query := s.db.Operator.Core.
 		NewSelect().
 		Model(&codes).
@@ -97,7 +110,7 @@ func (s *CodeStore) UserLikesCodes(ctx context.Context, userID int64, per, page 
 	return
 }
 
-func (s *CodeStore) ByOrgPath(ctx context.Context, namespace string, per, page int, onlyPublic bool) (codes []Code, total int, err error) {
+func (s *codeStoreImpl) ByOrgPath(ctx context.Context, namespace string, per, page int, onlyPublic bool) (codes []Code, total int, err error) {
 	query := s.db.Operator.Core.
 		NewSelect().
 		Model(&codes).
@@ -123,7 +136,7 @@ func (s *CodeStore) ByOrgPath(ctx context.Context, namespace string, per, page i
 	return
 }
 
-func (s *CodeStore) Create(ctx context.Context, input Code) (*Code, error) {
+func (s *codeStoreImpl) Create(ctx context.Context, input Code) (*Code, error) {
 	res, err := s.db.Core.NewInsert().Model(&input).Exec(ctx, &input)
 	if err := assertAffectedOneRow(res, err); err != nil {
 		slog.Error("create code in db failed", slog.String("error", err.Error()))
@@ -133,12 +146,12 @@ func (s *CodeStore) Create(ctx context.Context, input Code) (*Code, error) {
 	return &input, nil
 }
 
-func (s *CodeStore) Update(ctx context.Context, input Code) (err error) {
+func (s *codeStoreImpl) Update(ctx context.Context, input Code) (err error) {
 	_, err = s.db.Core.NewUpdate().Model(&input).WherePK().Exec(ctx)
 	return
 }
 
-func (s *CodeStore) FindByPath(ctx context.Context, namespace string, repoPath string) (code *Code, err error) {
+func (s *codeStoreImpl) FindByPath(ctx context.Context, namespace string, repoPath string) (code *Code, err error) {
 	resCode := new(Code)
 	err = s.db.Operator.Core.
 		NewSelect().
@@ -159,7 +172,7 @@ func (s *CodeStore) FindByPath(ctx context.Context, namespace string, repoPath s
 	return resCode, err
 }
 
-func (s *CodeStore) Delete(ctx context.Context, input Code) error {
+func (s *codeStoreImpl) Delete(ctx context.Context, input Code) error {
 	res, err := s.db.Operator.Core.NewDelete().Model(&input).WherePK().Exec(ctx)
 	if err := assertAffectedOneRow(res, err); err != nil {
 		return fmt.Errorf("delete code in tx failed,error:%w", err)
@@ -167,7 +180,7 @@ func (s *CodeStore) Delete(ctx context.Context, input Code) error {
 	return nil
 }
 
-func (s *CodeStore) ListByPath(ctx context.Context, paths []string) ([]Code, error) {
+func (s *codeStoreImpl) ListByPath(ctx context.Context, paths []string) ([]Code, error) {
 	var codes []Code
 	err := s.db.Operator.Core.
 		NewSelect().

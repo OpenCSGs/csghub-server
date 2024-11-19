@@ -22,7 +22,7 @@ func NewSpaceResourceHandler(config *config.Config) (*SpaceResourceHandler, erro
 }
 
 type SpaceResourceHandler struct {
-	c *component.SpaceResourceComponent
+	c component.SpaceResourceComponent
 }
 
 // GetSpaceResources godoc

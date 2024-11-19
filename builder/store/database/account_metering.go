@@ -10,12 +10,18 @@ import (
 	commonTypes "opencsg.com/csghub-server/common/types"
 )
 
-type AccountMeteringStore struct {
+type accountMeteringStoreImpl struct {
 	db *DB
 }
 
-func NewAccountMeteringStore() *AccountMeteringStore {
-	return &AccountMeteringStore{
+type AccountMeteringStore interface {
+	Create(ctx context.Context, input AccountMetering) error
+	ListByUserIDAndTime(ctx context.Context, req commonTypes.ACCT_STATEMENTS_REQ) ([]AccountMetering, int, error)
+	ListAllByUserUUID(ctx context.Context, userUUID string) ([]AccountMetering, error)
+}
+
+func NewAccountMeteringStore() AccountMeteringStore {
+	return &accountMeteringStoreImpl{
 		db: defaultDB,
 	}
 }
@@ -37,7 +43,7 @@ type AccountMetering struct {
 	SkuUnitType  string          `json:"sku_unit_type"`
 }
 
-func (am *AccountMeteringStore) Create(ctx context.Context, input AccountMetering) error {
+func (am *accountMeteringStoreImpl) Create(ctx context.Context, input AccountMetering) error {
 	res, err := am.db.Core.NewInsert().Model(&input).Exec(ctx, &input)
 	if err := assertAffectedOneRow(res, err); err != nil {
 		return fmt.Errorf("failed to save metering event, error: %w", err)
@@ -45,7 +51,7 @@ func (am *AccountMeteringStore) Create(ctx context.Context, input AccountMeterin
 	return nil
 }
 
-func (am *AccountMeteringStore) ListByUserIDAndTime(ctx context.Context, req commonTypes.ACCT_STATEMENTS_REQ) ([]AccountMetering, int, error) {
+func (am *accountMeteringStoreImpl) ListByUserIDAndTime(ctx context.Context, req commonTypes.ACCT_STATEMENTS_REQ) ([]AccountMetering, int, error) {
 	var accountMeters []AccountMetering
 	q := am.db.Operator.Core.NewSelect().Model(&accountMeters).Where("user_uuid = ? and scene = ? and customer_id = ? and recorded_at >= ? and recorded_at <= ?", req.UserUUID, req.Scene, req.InstanceName, req.StartTime, req.EndTime)
 
@@ -61,7 +67,7 @@ func (am *AccountMeteringStore) ListByUserIDAndTime(ctx context.Context, req com
 	return accountMeters, count, nil
 }
 
-func (am *AccountMeteringStore) ListAllByUserUUID(ctx context.Context, userUUID string) ([]AccountMetering, error) {
+func (am *accountMeteringStoreImpl) ListAllByUserUUID(ctx context.Context, userUUID string) ([]AccountMetering, error) {
 	var accountMeters []AccountMetering
 	err := am.db.Operator.Core.NewSelect().Model(&accountMeters).Where("user_uuid = ?", userUUID).Scan(ctx, &accountMeters)
 	if err != nil {

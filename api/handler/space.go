@@ -25,15 +25,22 @@ func NewSpaceHandler(config *config.Config) (*SpaceHandler, error) {
 	if err != nil {
 		return nil, fmt.Errorf("error creating sensitive component:%w", err)
 	}
+	repo, err := component.NewRepoComponent(config)
+	if err != nil {
+		return nil, fmt.Errorf("error creating repo component:%w", err)
+	}
+
 	return &SpaceHandler{
-		c:   c,
-		ssc: ssc,
+		c:    c,
+		ssc:  ssc,
+		repo: repo,
 	}, nil
 }
 
 type SpaceHandler struct {
-	c   *component.SpaceComponent
-	ssc *component.SensitiveComponent
+	c    component.SpaceComponent
+	ssc  component.SensitiveComponent
+	repo component.RepoComponent
 }
 
 // GetAllSpaces   godoc
@@ -289,7 +296,7 @@ func (h *SpaceHandler) Run(ctx *gin.Context) {
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
-	allow, err := h.c.AllowAdminAccess(ctx, types.SpaceRepo, namespace, name, currentUser)
+	allow, err := h.repo.AllowAdminAccess(ctx, types.SpaceRepo, namespace, name, currentUser)
 	if err != nil {
 		slog.Error("failed to check user permission", "error", err)
 		httpbase.ServerError(ctx, errors.New("failed to check user permission"))
@@ -367,7 +374,7 @@ func (h *SpaceHandler) Stop(ctx *gin.Context) {
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
-	allow, err := h.c.AllowAdminAccess(ctx, types.SpaceRepo, namespace, name, currentUser)
+	allow, err := h.repo.AllowAdminAccess(ctx, types.SpaceRepo, namespace, name, currentUser)
 	if err != nil {
 		slog.Error("failed to check user permission", "error", err)
 		httpbase.ServerError(ctx, errors.New("failed to check user permission"))
@@ -419,7 +426,7 @@ func (h *SpaceHandler) Status(ctx *gin.Context) {
 	}
 
 	currentUser := httpbase.GetCurrentUser(ctx)
-	allow, err := h.c.AllowReadAccess(ctx, types.SpaceRepo, namespace, name, currentUser)
+	allow, err := h.repo.AllowReadAccess(ctx, types.SpaceRepo, namespace, name, currentUser)
 	if err != nil {
 		slog.Error("failed to check user permission", "error", err)
 		httpbase.ServerError(ctx, errors.New("failed to check user permission"))
@@ -516,7 +523,7 @@ func (h *SpaceHandler) Logs(ctx *gin.Context) {
 	}
 
 	currentUser := httpbase.GetCurrentUser(ctx)
-	allow, err := h.c.AllowReadAccess(ctx, types.SpaceRepo, namespace, name, currentUser)
+	allow, err := h.repo.AllowReadAccess(ctx, types.SpaceRepo, namespace, name, currentUser)
 	if err != nil {
 		slog.Error("failed to check user permission", "error", err)
 		httpbase.ServerError(ctx, errors.New("failed to check user permission"))

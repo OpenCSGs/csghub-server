@@ -16,8 +16,8 @@ import (
 
 type RProxyHandler struct {
 	SpaceRootDomain string
-	spaceComp       *component.SpaceComponent
-	repoComp        *component.RepoComponent
+	spaceComp       component.SpaceComponent
+	repoComp        component.RepoComponent
 }
 
 func NewRProxyHandler(config *config.Config) (*RProxyHandler, error) {

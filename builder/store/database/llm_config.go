@@ -5,7 +5,7 @@ import (
 	"fmt"
 )
 
-type LLMConfigStore struct {
+type lLMConfigStoreImpl struct {
 	db *DB
 }
 
@@ -19,11 +19,15 @@ type LLMConfig struct {
 	times
 }
 
-func NewLLMConfigStore() *LLMConfigStore {
-	return &LLMConfigStore{db: defaultDB}
+type LLMConfigStore interface {
+	GetOptimization(ctx context.Context) (*LLMConfig, error)
 }
 
-func (s *LLMConfigStore) GetOptimization(ctx context.Context) (*LLMConfig, error) {
+func NewLLMConfigStore() LLMConfigStore {
+	return &lLMConfigStoreImpl{db: defaultDB}
+}
+
+func (s *lLMConfigStoreImpl) GetOptimization(ctx context.Context) (*LLMConfig, error) {
 	var config LLMConfig
 	err := s.db.Operator.Core.NewSelect().Model(&config).Where("type = 1 and enabled = true").Limit(1).Scan(ctx)
 	if err != nil {

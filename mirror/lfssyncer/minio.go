@@ -25,11 +25,11 @@ type MinioLFSSyncWorker struct {
 	mq                 *queue.PriorityQueue
 	tasks              chan queue.MirrorTask
 	wg                 sync.WaitGroup
-	mirrorStore        *database.MirrorStore
-	lfsMetaObjectStore *database.LfsMetaObjectStore
+	mirrorStore        database.MirrorStore
+	lfsMetaObjectStore database.LfsMetaObjectStore
 	s3Client           *s3.Client
 	config             *config.Config
-	repoStore          *database.RepoStore
+	repoStore          database.RepoStore
 	numWorkers         int
 }
 

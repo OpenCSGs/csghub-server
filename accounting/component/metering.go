@@ -8,18 +8,23 @@ import (
 	"opencsg.com/csghub-server/common/types"
 )
 
-type MeteringComponent struct {
-	ams *database.AccountMeteringStore
+type meteringComponentImpl struct {
+	ams database.AccountMeteringStore
 }
 
-func NewMeteringComponent() *MeteringComponent {
-	ams := &MeteringComponent{
+type MeteringComponent interface {
+	SaveMeteringEventRecord(ctx context.Context, req *types.METERING_EVENT) error
+	ListMeteringByUserIDAndDate(ctx context.Context, req types.ACCT_STATEMENTS_REQ) ([]database.AccountMetering, int, error)
+}
+
+func NewMeteringComponent() MeteringComponent {
+	ams := &meteringComponentImpl{
 		ams: database.NewAccountMeteringStore(),
 	}
 	return ams
 }
 
-func (mc *MeteringComponent) SaveMeteringEventRecord(ctx context.Context, req *types.METERING_EVENT) error {
+func (mc *meteringComponentImpl) SaveMeteringEventRecord(ctx context.Context, req *types.METERING_EVENT) error {
 	am := database.AccountMetering{
 		EventUUID:    req.Uuid,
 		UserUUID:     req.UserUUID,
@@ -41,7 +46,7 @@ func (mc *MeteringComponent) SaveMeteringEventRecord(ctx context.Context, req *t
 	return nil
 }
 
-func (mc *MeteringComponent) ListMeteringByUserIDAndDate(ctx context.Context, req types.ACCT_STATEMENTS_REQ) ([]database.AccountMetering, int, error) {
+func (mc *meteringComponentImpl) ListMeteringByUserIDAndDate(ctx context.Context, req types.ACCT_STATEMENTS_REQ) ([]database.AccountMetering, int, error) {
 	meters, total, err := mc.ams.ListByUserIDAndTime(ctx, req)
 	if err != nil {
 		return nil, 0, fmt.Errorf("failed to list metering by UserIDAndDate, error: %w", err)

@@ -24,7 +24,7 @@ func NewHFDatasetHandler(config *config.Config) (*HFDatasetHandler, error) {
 }
 
 type HFDatasetHandler struct {
-	dc *component.HFDatasetComponent
+	dc component.HFDatasetComponent
 }
 
 func (h *HFDatasetHandler) DatasetPathsInfo(ctx *gin.Context) {

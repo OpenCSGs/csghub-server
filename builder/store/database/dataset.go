@@ -16,12 +16,26 @@ var sortBy = map[string]string{
 	"most_favorite":   "likes DESC NULLS LAST",
 }
 
-type DatasetStore struct {
+type datasetStoreImpl struct {
 	db *DB
 }
 
-func NewDatasetStore() *DatasetStore {
-	return &DatasetStore{db: defaultDB}
+type DatasetStore interface {
+	ByRepoIDs(ctx context.Context, repoIDs []int64) (datasets []Dataset, err error)
+	ByRepoID(ctx context.Context, repoID int64) (*Dataset, error)
+	ByUsername(ctx context.Context, username string, per, page int, onlyPublic bool) (datasets []Dataset, total int, err error)
+	UserLikesDatasets(ctx context.Context, userID int64, per, page int) (datasets []Dataset, total int, err error)
+	ByOrgPath(ctx context.Context, namespace string, per, page int, onlyPublic bool) (datasets []Dataset, total int, err error)
+	Create(ctx context.Context, input Dataset) (*Dataset, error)
+	Update(ctx context.Context, input Dataset) (err error)
+	FindByPath(ctx context.Context, namespace string, repoPath string) (dataset *Dataset, err error)
+	Delete(ctx context.Context, input Dataset) error
+	ListByPath(ctx context.Context, paths []string) ([]Dataset, error)
+	CreateIfNotExist(ctx context.Context, input Dataset) (*Dataset, error)
+}
+
+func NewDatasetStore() DatasetStore {
+	return &datasetStoreImpl{db: defaultDB}
 }
 
 type Dataset struct {
@@ -32,7 +46,7 @@ type Dataset struct {
 	times
 }
 
-func (s *DatasetStore) ByRepoIDs(ctx context.Context, repoIDs []int64) (datasets []Dataset, err error) {
+func (s *datasetStoreImpl) ByRepoIDs(ctx context.Context, repoIDs []int64) (datasets []Dataset, err error) {
 	q := s.db.Operator.Core.NewSelect().
 		Model(&datasets).
 		Relation("Repository").
@@ -42,7 +56,7 @@ func (s *DatasetStore) ByRepoIDs(ctx context.Context, repoIDs []int64) (datasets
 	return
 }
 
-func (s *DatasetStore) ByRepoID(ctx context.Context, repoID int64) (*Dataset, error) {
+func (s *datasetStoreImpl) ByRepoID(ctx context.Context, repoID int64) (*Dataset, error) {
 	var dataset Dataset
 	err := s.db.Operator.Core.NewSelect().
 		Model(&dataset).
@@ -55,7 +69,7 @@ func (s *DatasetStore) ByRepoID(ctx context.Context, repoID int64) (*Dataset, er
 	return &dataset, nil
 }
 
-func (s *DatasetStore) ByUsername(ctx context.Context, username string, per, page int, onlyPublic bool) (datasets []Dataset, total int, err error) {
+func (s *datasetStoreImpl) ByUsername(ctx context.Context, username string, per, page int, onlyPublic bool) (datasets []Dataset, total int, err error) {
 	query := s.db.Operator.Core.
 		NewSelect().
 		Model(&datasets).
@@ -81,7 +95,7 @@ func (s *DatasetStore) ByUsername(ctx context.Context, username string, per, pag
 	return
 }
 
-func (s *DatasetStore) UserLikesDatasets(ctx context.Context, userID int64, per, page int) (datasets []Dataset, total int, err error) {
+func (s *datasetStoreImpl) UserLikesDatasets(ctx context.Context, userID int64, per, page int) (datasets []Dataset, total int, err error) {
 	query := s.db.Operator.Core.
 		NewSelect().
 		Model(&datasets).
@@ -104,7 +118,7 @@ func (s *DatasetStore) UserLikesDatasets(ctx context.Context, userID int64, per,
 	return
 }
 
-func (s *DatasetStore) ByOrgPath(ctx context.Context, namespace string, per, page int, onlyPublic bool) (datasets []Dataset, total int, err error) {
+func (s *datasetStoreImpl) ByOrgPath(ctx context.Context, namespace string, per, page int, onlyPublic bool) (datasets []Dataset, total int, err error) {
 	query := s.db.Operator.Core.
 		NewSelect().
 		Model(&datasets).
@@ -130,7 +144,7 @@ func (s *DatasetStore) ByOrgPath(ctx context.Context, namespace string, per, pag
 	return
 }
 
-func (s *DatasetStore) Create(ctx context.Context, input Dataset) (*Dataset, error) {
+func (s *datasetStoreImpl) Create(ctx context.Context, input Dataset) (*Dataset, error) {
 	input.LastUpdatedAt = time.Now()
 	res, err := s.db.Core.NewInsert().Model(&input).Exec(ctx, &input)
 	if err := assertAffectedOneRow(res, err); err != nil {
@@ -141,13 +155,13 @@ func (s *DatasetStore) Create(ctx context.Context, input Dataset) (*Dataset, err
 	return &input, nil
 }
 
-func (s *DatasetStore) Update(ctx context.Context, input Dataset) (err error) {
+func (s *datasetStoreImpl) Update(ctx context.Context, input Dataset) (err error) {
 	input.LastUpdatedAt = time.Now()
 	_, err = s.db.Core.NewUpdate().Model(&input).WherePK().Exec(ctx)
 	return
 }
 
-func (s *DatasetStore) FindByPath(ctx context.Context, namespace string, repoPath string) (dataset *Dataset, err error) {
+func (s *datasetStoreImpl) FindByPath(ctx context.Context, namespace string, repoPath string) (dataset *Dataset, err error) {
 	resDataset := new(Dataset)
 	err = s.db.Operator.Core.
 		NewSelect().
@@ -169,7 +183,7 @@ func (s *DatasetStore) FindByPath(ctx context.Context, namespace string, repoPat
 	return resDataset, err
 }
 
-func (s *DatasetStore) Delete(ctx context.Context, input Dataset) error {
+func (s *datasetStoreImpl) Delete(ctx context.Context, input Dataset) error {
 	res, err := s.db.Operator.Core.NewDelete().Model(&input).WherePK().Exec(ctx)
 	if err := assertAffectedOneRow(res, err); err != nil {
 		return fmt.Errorf("delete dataset in tx failed,error:%w", err)
@@ -177,7 +191,7 @@ func (s *DatasetStore) Delete(ctx context.Context, input Dataset) error {
 	return nil
 }
 
-func (s *DatasetStore) ListByPath(ctx context.Context, paths []string) ([]Dataset, error) {
+func (s *datasetStoreImpl) ListByPath(ctx context.Context, paths []string) ([]Dataset, error) {
 	var datasets []Dataset
 	err := s.db.Operator.Core.
 		NewSelect().
@@ -202,7 +216,7 @@ func (s *DatasetStore) ListByPath(ctx context.Context, paths []string) ([]Datase
 	return sortedDatasets, nil
 }
 
-func (s *DatasetStore) CreateIfNotExist(ctx context.Context, input Dataset) (*Dataset, error) {
+func (s *datasetStoreImpl) CreateIfNotExist(ctx context.Context, input Dataset) (*Dataset, error) {
 	err := s.db.Core.NewSelect().
 		Model(&input).
 		Where("repository_id = ?", input.RepositoryID).

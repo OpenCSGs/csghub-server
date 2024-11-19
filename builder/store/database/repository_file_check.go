@@ -18,22 +18,27 @@ type RepositoryFileCheck struct {
 	TaskID string `bun:",nullzero" json:"task_id"`
 }
 
-type RepoFileCheckStore struct {
+type repoFileCheckStoreImpl struct {
 	db *DB
 }
 
-func NewRepoFileCheckStore() *RepoFileCheckStore {
-	return &RepoFileCheckStore{
+type RepoFileCheckStore interface {
+	Create(ctx context.Context, history RepositoryFileCheck) error
+	Upsert(ctx context.Context, history RepositoryFileCheck) error
+}
+
+func NewRepoFileCheckStore() RepoFileCheckStore {
+	return &repoFileCheckStoreImpl{
 		db: defaultDB,
 	}
 }
 
-func (s *RepoFileCheckStore) Create(ctx context.Context, history RepositoryFileCheck) error {
+func (s *repoFileCheckStoreImpl) Create(ctx context.Context, history RepositoryFileCheck) error {
 	_, err := s.db.Operator.Core.NewInsert().Model(&history).Exec(ctx)
 	return err
 }
 
-func (s *RepoFileCheckStore) Upsert(ctx context.Context, history RepositoryFileCheck) error {
+func (s *repoFileCheckStoreImpl) Upsert(ctx context.Context, history RepositoryFileCheck) error {
 	_, err := s.db.Operator.Core.NewInsert().Model(&history).
 		On("CONFLICT (repo_file_id) DO UPDATE").
 		Exec(ctx)

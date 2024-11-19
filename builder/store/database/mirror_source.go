@@ -6,12 +6,21 @@ import (
 	"strings"
 )
 
-type MirrorSourceStore struct {
+type mirrorSourceStoreImpl struct {
 	db *DB
 }
 
-func NewMirrorSourceStore() *MirrorSourceStore {
-	return &MirrorSourceStore{
+type MirrorSourceStore interface {
+	Create(ctx context.Context, mirrorSource *MirrorSource) (*MirrorSource, error)
+	Index(ctx context.Context) ([]MirrorSource, error)
+	Get(ctx context.Context, id int64) (*MirrorSource, error)
+	FindByName(ctx context.Context, name string) (*MirrorSource, error)
+	Update(ctx context.Context, mirrorSource *MirrorSource) (err error)
+	Delete(ctx context.Context, mirrorSource *MirrorSource) (err error)
+}
+
+func NewMirrorSourceStore() MirrorSourceStore {
+	return &mirrorSourceStoreImpl{
 		db: defaultDB,
 	}
 }
@@ -24,7 +33,7 @@ type MirrorSource struct {
 	times
 }
 
-func (s *MirrorSourceStore) Create(ctx context.Context, mirrorSource *MirrorSource) (*MirrorSource, error) {
+func (s *mirrorSourceStoreImpl) Create(ctx context.Context, mirrorSource *MirrorSource) (*MirrorSource, error) {
 	err := s.db.Operator.Core.NewInsert().
 		Model(mirrorSource).
 		Scan(ctx)
@@ -34,7 +43,7 @@ func (s *MirrorSourceStore) Create(ctx context.Context, mirrorSource *MirrorSour
 	return mirrorSource, nil
 }
 
-func (s *MirrorSourceStore) Index(ctx context.Context) ([]MirrorSource, error) {
+func (s *mirrorSourceStoreImpl) Index(ctx context.Context) ([]MirrorSource, error) {
 	var mirrorSources []MirrorSource
 	err := s.db.Operator.Core.NewSelect().
 		Model(&mirrorSources).
@@ -45,7 +54,7 @@ func (s *MirrorSourceStore) Index(ctx context.Context) ([]MirrorSource, error) {
 	return mirrorSources, nil
 }
 
-func (s *MirrorSourceStore) Get(ctx context.Context, id int64) (*MirrorSource, error) {
+func (s *mirrorSourceStoreImpl) Get(ctx context.Context, id int64) (*MirrorSource, error) {
 	var mirrorSource MirrorSource
 	err := s.db.Operator.Core.NewSelect().
 		Model(&mirrorSource).
@@ -57,7 +66,7 @@ func (s *MirrorSourceStore) Get(ctx context.Context, id int64) (*MirrorSource, e
 	return &mirrorSource, nil
 }
 
-func (s *MirrorSourceStore) FindByName(ctx context.Context, name string) (*MirrorSource, error) {
+func (s *mirrorSourceStoreImpl) FindByName(ctx context.Context, name string) (*MirrorSource, error) {
 	var mirrorSource MirrorSource
 	err := s.db.Operator.Core.NewSelect().
 		Model(&mirrorSource).
@@ -69,7 +78,7 @@ func (s *MirrorSourceStore) FindByName(ctx context.Context, name string) (*Mirro
 	return &mirrorSource, nil
 }
 
-func (s *MirrorSourceStore) Update(ctx context.Context, mirrorSource *MirrorSource) (err error) {
+func (s *mirrorSourceStoreImpl) Update(ctx context.Context, mirrorSource *MirrorSource) (err error) {
 	err = assertAffectedOneRow(s.db.Operator.Core.NewUpdate().
 		Model(mirrorSource).
 		WherePK().
@@ -79,7 +88,7 @@ func (s *MirrorSourceStore) Update(ctx context.Context, mirrorSource *MirrorSour
 	return
 }
 
-func (s *MirrorSourceStore) Delete(ctx context.Context, mirrorSource *MirrorSource) (err error) {
+func (s *mirrorSourceStoreImpl) Delete(ctx context.Context, mirrorSource *MirrorSource) (err error) {
 	_, err = s.db.Operator.Core.
 		NewDelete().
 		Model(mirrorSource).

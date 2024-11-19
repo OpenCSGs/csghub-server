@@ -4,12 +4,17 @@ import (
 	"context"
 )
 
-type FileStore struct {
+type fileStoreImpl struct {
 	db *DB
 }
 
-func NewFileStore() *FileStore {
-	return &FileStore{
+type FileStore interface {
+	FindByParentPath(ctx context.Context, repoID int64, path string) ([]File, error)
+	BatchCreate(ctx context.Context, files []File) error
+}
+
+func NewFileStore() FileStore {
+	return &fileStoreImpl{
 		db: defaultDB,
 	}
 }
@@ -28,7 +33,7 @@ type File struct {
 	times
 }
 
-func (s *FileStore) FindByParentPath(ctx context.Context, repoID int64, path string) ([]File, error) {
+func (s *fileStoreImpl) FindByParentPath(ctx context.Context, repoID int64, path string) ([]File, error) {
 	var files []File
 	err := s.db.Operator.Core.NewSelect().
 		Model(&files).
@@ -40,7 +45,7 @@ func (s *FileStore) FindByParentPath(ctx context.Context, repoID int64, path str
 	return files, nil
 }
 
-func (s *FileStore) BatchCreate(ctx context.Context, files []File) error {
+func (s *fileStoreImpl) BatchCreate(ctx context.Context, files []File) error {
 	result, err := s.db.Operator.Core.NewInsert().
 		Model(&files).
 		Exec(ctx)

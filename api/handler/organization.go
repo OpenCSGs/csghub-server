@@ -48,12 +48,12 @@ func NewOrganizationHandler(config *config.Config) (*OrganizationHandler, error)
 }
 
 type OrganizationHandler struct {
-	sc   *component.SpaceComponent
-	cc   *component.CodeComponent
-	mc   *component.ModelComponent
-	dsc  *component.DatasetComponent
-	colc *component.CollectionComponent
-	pc   *component.PromptComponent
+	sc   component.SpaceComponent
+	cc   component.CodeComponent
+	mc   component.ModelComponent
+	dsc  component.DatasetComponent
+	colc component.CollectionComponent
+	pc   component.PromptComponent
 }
 
 // GetOrganizationModels godoc

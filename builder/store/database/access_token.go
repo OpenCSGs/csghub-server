@@ -11,12 +11,26 @@ import (
 	"opencsg.com/csghub-server/common/types"
 )
 
-type AccessTokenStore struct {
+type accessTokenStoreImpl struct {
 	db *DB
 }
 
-func NewAccessTokenStore() *AccessTokenStore {
-	return &AccessTokenStore{
+type AccessTokenStore interface {
+	Create(ctx context.Context, token *AccessToken) (err error)
+	// Refresh will disable existing access token, and then generate new one
+	Refresh(ctx context.Context, token *AccessToken, newTokenValue string, newExpiredAt time.Time) (*AccessToken, error)
+	FindByID(ctx context.Context, id int64) (token *AccessToken, err error)
+	Delete(ctx context.Context, username, tkName, app string) (err error)
+	IsExist(ctx context.Context, username, tkName, app string) (exists bool, err error)
+	FindByUID(ctx context.Context, uid int64) (token *AccessToken, err error)
+	GetUserGitToken(ctx context.Context, username string) (*AccessToken, error)
+	FindByToken(ctx context.Context, tokenValue, app string) (*AccessToken, error)
+	FindByTokenName(ctx context.Context, username, tokenName, app string) (*AccessToken, error)
+	FindByUser(ctx context.Context, username, app string) ([]AccessToken, error)
+}
+
+func NewAccessTokenStore() AccessTokenStore {
+	return &accessTokenStoreImpl{
 		db: defaultDB,
 	}
 }
@@ -36,13 +50,13 @@ type AccessToken struct {
 	times
 }
 
-func (s *AccessTokenStore) Create(ctx context.Context, token *AccessToken) (err error) {
+func (s *accessTokenStoreImpl) Create(ctx context.Context, token *AccessToken) (err error) {
 	err = s.db.Operator.Core.NewInsert().Model(token).Scan(ctx)
 	return
 }
 
 // Refresh will disable existing access token, and then generate new one
-func (s *AccessTokenStore) Refresh(ctx context.Context, token *AccessToken, newTokenValue string, newExpiredAt time.Time) (*AccessToken, error) {
+func (s *accessTokenStoreImpl) Refresh(ctx context.Context, token *AccessToken, newTokenValue string, newExpiredAt time.Time) (*AccessToken, error) {
 	var newToken *AccessToken
 	err := s.db.Core.RunInTx(ctx, &sql.TxOptions{}, func(ctx context.Context, tx bun.Tx) error {
 		_, err := tx.NewUpdate().Model(token).
@@ -80,7 +94,7 @@ func (s *AccessTokenStore) Refresh(ctx context.Context, token *AccessToken, newT
 	return newToken, err
 }
 
-func (s *AccessTokenStore) FindByID(ctx context.Context, id int64) (token *AccessToken, err error) {
+func (s *accessTokenStoreImpl) FindByID(ctx context.Context, id int64) (token *AccessToken, err error) {
 	var tokens []AccessToken
 	err = s.db.Operator.Core.
 		NewSelect().
@@ -92,7 +106,7 @@ func (s *AccessTokenStore) FindByID(ctx context.Context, id int64) (token *Acces
 	return
 }
 
-func (s *AccessTokenStore) Delete(ctx context.Context, username, tkName, app string) (err error) {
+func (s *accessTokenStoreImpl) Delete(ctx context.Context, username, tkName, app string) (err error) {
 	var token AccessToken
 	_, err = s.db.Operator.Core.
 		NewDelete().
@@ -105,7 +119,7 @@ func (s *AccessTokenStore) Delete(ctx context.Context, username, tkName, app str
 	return
 }
 
-func (s *AccessTokenStore) IsExist(ctx context.Context, username, tkName, app string) (exists bool, err error) {
+func (s *accessTokenStoreImpl) IsExist(ctx context.Context, username, tkName, app string) (exists bool, err error) {
 	var token AccessToken
 	exists, err = s.db.Operator.Core.
 		NewSelect().
@@ -117,7 +131,7 @@ func (s *AccessTokenStore) IsExist(ctx context.Context, username, tkName, app st
 	return
 }
 
-func (s *AccessTokenStore) FindByUID(ctx context.Context, uid int64) (token *AccessToken, err error) {
+func (s *accessTokenStoreImpl) FindByUID(ctx context.Context, uid int64) (token *AccessToken, err error) {
 	var tokens []AccessToken
 	err = s.db.Operator.Core.
 		NewSelect().
@@ -139,7 +153,7 @@ func (s *AccessTokenStore) FindByUID(ctx context.Context, uid int64) (token *Acc
 	return
 }
 
-func (s *AccessTokenStore) GetUserGitToken(ctx context.Context, username string) (*AccessToken, error) {
+func (s *accessTokenStoreImpl) GetUserGitToken(ctx context.Context, username string) (*AccessToken, error) {
 	var token AccessToken
 	err := s.db.Operator.Core.
 		NewSelect().
@@ -157,7 +171,7 @@ func (s *AccessTokenStore) GetUserGitToken(ctx context.Context, username string)
 	return &token, nil
 }
 
-func (s *AccessTokenStore) FindByToken(ctx context.Context, tokenValue, app string) (*AccessToken, error) {
+func (s *accessTokenStoreImpl) FindByToken(ctx context.Context, tokenValue, app string) (*AccessToken, error) {
 	var token AccessToken
 	q := s.db.Operator.Core.
 		NewSelect().
@@ -174,7 +188,7 @@ func (s *AccessTokenStore) FindByToken(ctx context.Context, tokenValue, app stri
 	return &token, nil
 }
 
-func (s *AccessTokenStore) FindByTokenName(ctx context.Context, username, tokenName, app string) (*AccessToken, error) {
+func (s *accessTokenStoreImpl) FindByTokenName(ctx context.Context, username, tokenName, app string) (*AccessToken, error) {
 	var token AccessToken
 	q := s.db.Operator.Core.
 		NewSelect().
@@ -188,7 +202,7 @@ func (s *AccessTokenStore) FindByTokenName(ctx context.Context, username, tokenN
 	return &token, nil
 }
 
-func (s *AccessTokenStore) FindByUser(ctx context.Context, username, app string) ([]AccessToken, error) {
+func (s *accessTokenStoreImpl) FindByUser(ctx context.Context, username, app string) ([]AccessToken, error) {
 	var tokens []AccessToken
 	q := s.db.Operator.Core.
 		NewSelect().

@@ -12,12 +12,39 @@ import (
 	"opencsg.com/csghub-server/common/types"
 )
 
-type TagStore struct {
+type tagStoreImpl struct {
 	db *DB
 }
 
-func NewTagStore() *TagStore {
-	return &TagStore{
+type TagStore interface {
+	// Alltags returns all tags in the database
+	AllTags(ctx context.Context) ([]Tag, error)
+	AllTagsByScope(ctx context.Context, scope TagScope) ([]*Tag, error)
+	AllTagsByScopeAndCategory(ctx context.Context, scope TagScope, category string) ([]*Tag, error)
+	GetTagsByScopeAndCategories(ctx context.Context, scope TagScope, categories []string) ([]*Tag, error)
+	AllModelTags(ctx context.Context) ([]*Tag, error)
+	AllPromptTags(ctx context.Context) ([]*Tag, error)
+	AllDatasetTags(ctx context.Context) ([]*Tag, error)
+	AllCodeTags(ctx context.Context) ([]*Tag, error)
+	AllSpaceTags(ctx context.Context) ([]*Tag, error)
+	AllModelCategories(ctx context.Context) ([]TagCategory, error)
+	AllPromptCategories(ctx context.Context) ([]TagCategory, error)
+	AllDatasetCategories(ctx context.Context) ([]TagCategory, error)
+	AllCodeCategories(ctx context.Context) ([]TagCategory, error)
+	AllSpaceCategories(ctx context.Context) ([]TagCategory, error)
+	CreateTag(ctx context.Context, category, name, group string, scope TagScope) (Tag, error)
+	SaveTags(ctx context.Context, tags []*Tag) error
+	UpsertTags(ctx context.Context, tagScope TagScope, categoryTagMap map[string][]string) ([]Tag, error)
+	// SetMetaTags will delete existing tags and create new ones
+	SetMetaTags(ctx context.Context, repoType types.RepositoryType, namespace, name string, tags []*Tag) (repoTags []*RepositoryTag, err error)
+	SetLibraryTag(ctx context.Context, repoType types.RepositoryType, namespace, name string, newTag, oldTag *Tag) (err error)
+	UpsertRepoTags(ctx context.Context, repoID int64, oldTagIDs, newTagIDs []int64) (err error)
+	RemoveRepoTags(ctx context.Context, repoID int64, tagIDs []int64) (err error)
+	FindOrCreate(ctx context.Context, tag Tag) (*Tag, error)
+}
+
+func NewTagStore() TagStore {
+	return &tagStoreImpl{
 		db: defaultDB,
 	}
 }
@@ -53,7 +80,7 @@ type TagCategory struct {
 }
 
 // Alltags returns all tags in the database
-func (ts *TagStore) AllTags(ctx context.Context) ([]Tag, error) {
+func (ts *tagStoreImpl) AllTags(ctx context.Context) ([]Tag, error) {
 	var tags []Tag
 	err := ts.db.Operator.Core.NewSelect().Model(&Tag{}).Scan(ctx, &tags)
 	if err != nil {
@@ -63,7 +90,7 @@ func (ts *TagStore) AllTags(ctx context.Context) ([]Tag, error) {
 	return tags, nil
 }
 
-func (ts *TagStore) AllTagsByScope(ctx context.Context, scope TagScope) ([]*Tag, error) {
+func (ts *tagStoreImpl) AllTagsByScope(ctx context.Context, scope TagScope) ([]*Tag, error) {
 	var tags []*Tag
 	err := ts.db.Operator.Core.NewSelect().Model(&tags).
 		Where("scope =?", scope).
@@ -74,7 +101,7 @@ func (ts *TagStore) AllTagsByScope(ctx context.Context, scope TagScope) ([]*Tag,
 	return tags, nil
 }
 
-func (ts *TagStore) AllTagsByScopeAndCategory(ctx context.Context, scope TagScope, category string) ([]*Tag, error) {
+func (ts *tagStoreImpl) AllTagsByScopeAndCategory(ctx context.Context, scope TagScope, category string) ([]*Tag, error) {
 	var tags []*Tag
 	err := ts.db.Operator.Core.NewSelect().Model(&tags).
 		Where("scope = ? and category = ?", scope, category).
@@ -85,7 +112,7 @@ func (ts *TagStore) AllTagsByScopeAndCategory(ctx context.Context, scope TagScop
 	return tags, nil
 }
 
-func (ts *TagStore) GetTagsByScopeAndCategories(ctx context.Context, scope TagScope, categories []string) ([]*Tag, error) {
+func (ts *tagStoreImpl) GetTagsByScopeAndCategories(ctx context.Context, scope TagScope, categories []string) ([]*Tag, error) {
 	var tags []*Tag
 	err := ts.db.Operator.Core.NewSelect().Model(&tags).
 		Where("scope = ? and category in (?)", scope, bun.In(categories)).
@@ -96,47 +123,47 @@ func (ts *TagStore) GetTagsByScopeAndCategories(ctx context.Context, scope TagSc
 	return tags, nil
 }
 
-func (ts *TagStore) AllModelTags(ctx context.Context) ([]*Tag, error) {
+func (ts *tagStoreImpl) AllModelTags(ctx context.Context) ([]*Tag, error) {
 	return ts.AllTagsByScope(ctx, ModelTagScope)
 }
 
-func (ts *TagStore) AllPromptTags(ctx context.Context) ([]*Tag, error) {
+func (ts *tagStoreImpl) AllPromptTags(ctx context.Context) ([]*Tag, error) {
 	return ts.AllTagsByScope(ctx, PromptTagScope)
 }
 
-func (ts *TagStore) AllDatasetTags(ctx context.Context) ([]*Tag, error) {
+func (ts *tagStoreImpl) AllDatasetTags(ctx context.Context) ([]*Tag, error) {
 	return ts.AllTagsByScope(ctx, DatasetTagScope)
 }
 
-func (ts *TagStore) AllCodeTags(ctx context.Context) ([]*Tag, error) {
+func (ts *tagStoreImpl) AllCodeTags(ctx context.Context) ([]*Tag, error) {
 	return ts.AllTagsByScope(ctx, CodeTagScope)
 }
 
-func (ts *TagStore) AllSpaceTags(ctx context.Context) ([]*Tag, error) {
+func (ts *tagStoreImpl) AllSpaceTags(ctx context.Context) ([]*Tag, error) {
 	return ts.AllTagsByScope(ctx, SpaceTagScope)
 }
 
-func (ts *TagStore) AllModelCategories(ctx context.Context) ([]TagCategory, error) {
+func (ts *tagStoreImpl) AllModelCategories(ctx context.Context) ([]TagCategory, error) {
 	return ts.allCategories(ctx, ModelTagScope)
 }
 
-func (ts *TagStore) AllPromptCategories(ctx context.Context) ([]TagCategory, error) {
+func (ts *tagStoreImpl) AllPromptCategories(ctx context.Context) ([]TagCategory, error) {
 	return ts.allCategories(ctx, PromptTagScope)
 }
 
-func (ts *TagStore) AllDatasetCategories(ctx context.Context) ([]TagCategory, error) {
+func (ts *tagStoreImpl) AllDatasetCategories(ctx context.Context) ([]TagCategory, error) {
 	return ts.allCategories(ctx, DatasetTagScope)
 }
 
-func (ts *TagStore) AllCodeCategories(ctx context.Context) ([]TagCategory, error) {
+func (ts *tagStoreImpl) AllCodeCategories(ctx context.Context) ([]TagCategory, error) {
 	return ts.allCategories(ctx, CodeTagScope)
 }
 
-func (ts *TagStore) AllSpaceCategories(ctx context.Context) ([]TagCategory, error) {
+func (ts *tagStoreImpl) AllSpaceCategories(ctx context.Context) ([]TagCategory, error) {
 	return ts.allCategories(ctx, SpaceTagScope)
 }
 
-func (ts *TagStore) allCategories(ctx context.Context, scope TagScope) ([]TagCategory, error) {
+func (ts *tagStoreImpl) allCategories(ctx context.Context, scope TagScope) ([]TagCategory, error) {
 	var tags []TagCategory
 	err := ts.db.Operator.Core.NewSelect().Model(&TagCategory{}).
 		Where("scope = ?", scope).
@@ -148,7 +175,7 @@ func (ts *TagStore) allCategories(ctx context.Context, scope TagScope) ([]TagCat
 	return tags, nil
 }
 
-func (ts *TagStore) CreateTag(ctx context.Context, category, name, group string, scope TagScope) (Tag, error) {
+func (ts *tagStoreImpl) CreateTag(ctx context.Context, category, name, group string, scope TagScope) (Tag, error) {
 	tag := Tag{
 		Name:     name,
 		Category: category,
@@ -159,7 +186,7 @@ func (ts *TagStore) CreateTag(ctx context.Context, category, name, group string,
 	return tag, err
 }
 
-func (ts *TagStore) SaveTags(ctx context.Context, tags []*Tag) error {
+func (ts *tagStoreImpl) SaveTags(ctx context.Context, tags []*Tag) error {
 	if len(tags) == 0 {
 		return nil
 	}
@@ -171,7 +198,7 @@ func (ts *TagStore) SaveTags(ctx context.Context, tags []*Tag) error {
 	return nil
 }
 
-func (ts *TagStore) UpsertTags(ctx context.Context, tagScope TagScope, categoryTagMap map[string][]string) ([]Tag, error) {
+func (ts *tagStoreImpl) UpsertTags(ctx context.Context, tagScope TagScope, categoryTagMap map[string][]string) ([]Tag, error) {
 	var tags []Tag
 	for category, tagNames := range categoryTagMap {
 		ctags := make([]Tag, 0)
@@ -201,7 +228,7 @@ func (ts *TagStore) UpsertTags(ctx context.Context, tagScope TagScope, categoryT
 }
 
 // SetMetaTags will delete existing tags and create new ones
-func (ts *TagStore) SetMetaTags(ctx context.Context, repoType types.RepositoryType, namespace, name string, tags []*Tag) (repoTags []*RepositoryTag, err error) {
+func (ts *tagStoreImpl) SetMetaTags(ctx context.Context, repoType types.RepositoryType, namespace, name string, tags []*Tag) (repoTags []*RepositoryTag, err error) {
 	repo := new(Repository)
 	err = ts.db.Operator.Core.NewSelect().Model(repo).
 		Column("id").
@@ -247,7 +274,7 @@ func (ts *TagStore) SetMetaTags(ctx context.Context, repoType types.RepositoryTy
 	return repoTags, err
 }
 
-func (ts *TagStore) SetLibraryTag(ctx context.Context, repoType types.RepositoryType, namespace, name string, newTag, oldTag *Tag) (err error) {
+func (ts *tagStoreImpl) SetLibraryTag(ctx context.Context, repoType types.RepositoryType, namespace, name string, newTag, oldTag *Tag) (err error) {
 	slog.Debug("set library tag", slog.Any("newTag", newTag), slog.Any("oldTag", oldTag))
 	repo := new(Repository)
 	err = ts.db.Operator.Core.NewSelect().Model(repo).
@@ -298,7 +325,7 @@ func (ts *TagStore) SetLibraryTag(ctx context.Context, repoType types.Repository
 	return err
 }
 
-func (ts *TagStore) UpsertRepoTags(ctx context.Context, repoID int64, oldTagIDs, newTagIDs []int64) (err error) {
+func (ts *tagStoreImpl) UpsertRepoTags(ctx context.Context, repoID int64, oldTagIDs, newTagIDs []int64) (err error) {
 	err = ts.db.Operator.Core.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
 		var err error
 		if len(oldTagIDs) > 0 {
@@ -336,7 +363,7 @@ func (ts *TagStore) UpsertRepoTags(ctx context.Context, repoID int64, oldTagIDs,
 	return err
 }
 
-func (ts *TagStore) RemoveRepoTags(ctx context.Context, repoID int64, tagIDs []int64) (err error) {
+func (ts *tagStoreImpl) RemoveRepoTags(ctx context.Context, repoID int64, tagIDs []int64) (err error) {
 	if len(tagIDs) == 0 {
 		return nil
 	}
@@ -351,7 +378,7 @@ func (ts *TagStore) RemoveRepoTags(ctx context.Context, repoID int64, tagIDs []i
 	return err
 }
 
-func (ts *TagStore) FindOrCreate(ctx context.Context, tag Tag) (*Tag, error) {
+func (ts *tagStoreImpl) FindOrCreate(ctx context.Context, tag Tag) (*Tag, error) {
 	var resTag Tag
 	err := ts.db.Operator.Core.NewSelect().
 		Model(&resTag).

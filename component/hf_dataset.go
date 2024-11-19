@@ -12,31 +12,36 @@ import (
 	"opencsg.com/csghub-server/common/types"
 )
 
-func NewHFDatasetComponent(config *config.Config) (*HFDatasetComponent, error) {
-	c := &HFDatasetComponent{}
+type HFDatasetComponent interface {
+	GetPathsInfo(ctx context.Context, req types.PathReq) ([]types.HFDSPathInfo, error)
+	GetDatasetTree(ctx context.Context, req types.PathReq) ([]types.HFDSPathInfo, error)
+}
+
+func NewHFDatasetComponent(config *config.Config) (HFDatasetComponent, error) {
+	c := &hFDatasetComponentImpl{}
 	c.ts = database.NewTagStore()
 	c.ds = database.NewDatasetStore()
 	c.rs = database.NewRepoStore()
 	var err error
-	c.RepoComponent, err = NewRepoComponent(config)
+	c.repoComponentImpl, err = NewRepoComponentImpl(config)
 	if err != nil {
 		return nil, err
 	}
 	return c, nil
 }
 
-type HFDatasetComponent struct {
-	*RepoComponent
-	ts *database.TagStore
-	ds *database.DatasetStore
-	rs *database.RepoStore
+type hFDatasetComponentImpl struct {
+	*repoComponentImpl
+	ts database.TagStore
+	ds database.DatasetStore
+	rs database.RepoStore
 }
 
 func convertFilePathFromRoute(path string) string {
 	return strings.TrimLeft(path, "/")
 }
 
-func (h *HFDatasetComponent) GetPathsInfo(ctx context.Context, req types.PathReq) ([]types.HFDSPathInfo, error) {
+func (h *hFDatasetComponentImpl) GetPathsInfo(ctx context.Context, req types.PathReq) ([]types.HFDSPathInfo, error) {
 	ds, err := h.ds.FindByPath(ctx, req.Namespace, req.Name)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find dataset, error: %w", err)
@@ -75,7 +80,7 @@ func (h *HFDatasetComponent) GetPathsInfo(ctx context.Context, req types.PathReq
 	return paths, nil
 }
 
-func (h *HFDatasetComponent) GetDatasetTree(ctx context.Context, req types.PathReq) ([]types.HFDSPathInfo, error) {
+func (h *hFDatasetComponentImpl) GetDatasetTree(ctx context.Context, req types.PathReq) ([]types.HFDSPathInfo, error) {
 	ds, err := h.ds.FindByPath(ctx, req.Namespace, req.Name)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find dataset tree, error: %w", err)

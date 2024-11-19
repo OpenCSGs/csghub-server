@@ -61,10 +61,33 @@ saved_model/**/* filter=lfs diff=lfs merge=lfs -text
 `
 const LFSPrefix = "version https://git-lfs.github.com/spec/v1"
 
-func NewModelComponent(config *config.Config) (*ModelComponent, error) {
-	c := &ModelComponent{}
+type ModelComponent interface {
+	Index(ctx context.Context, filter *types.RepoFilter, per, page int) ([]types.Model, int, error)
+	Create(ctx context.Context, req *types.CreateModelReq) (*types.Model, error)
+	Update(ctx context.Context, req *types.UpdateModelReq) (*types.Model, error)
+	Delete(ctx context.Context, namespace, name, currentUser string) error
+	Show(ctx context.Context, namespace, name, currentUser string) (*types.Model, error)
+	GetServerless(ctx context.Context, namespace, name, currentUser string) (*types.DeployRepo, error)
+	SDKModelInfo(ctx context.Context, namespace, name, ref, currentUser string) (*types.SDKModelInfo, error)
+	Relations(ctx context.Context, namespace, name, currentUser string) (*types.Relations, error)
+	SetRelationDatasets(ctx context.Context, req types.RelationDatasets) error
+	AddRelationDataset(ctx context.Context, req types.RelationDataset) error
+	DelRelationDataset(ctx context.Context, req types.RelationDataset) error
+	Predict(ctx context.Context, req *types.ModelPredictReq) (*types.ModelPredictResp, error)
+	// create model deploy as inference/serverless
+	Deploy(ctx context.Context, deployReq types.DeployActReq, req types.ModelRunReq) (int64, error)
+	ListModelsByRuntimeFrameworkID(ctx context.Context, currentUser string, per, page int, id int64, deployType int) ([]types.Model, int, error)
+	ListAllByRuntimeFramework(ctx context.Context, currentUser string) ([]database.RuntimeFramework, error)
+	SetRuntimeFrameworkModes(ctx context.Context, deployType int, id int64, paths []string) ([]string, error)
+	DeleteRuntimeFrameworkModes(ctx context.Context, deployType int, id int64, paths []string) ([]string, error)
+	ListModelsOfRuntimeFrameworks(ctx context.Context, currentUser, search, sort string, per, page int, deployType int) ([]types.Model, int, error)
+	OrgModels(ctx context.Context, req *types.OrgModelsReq) ([]types.Model, int, error)
+}
+
+func NewModelComponent(config *config.Config) (ModelComponent, error) {
+	c := &modelComponentImpl{}
 	var err error
-	c.RepoComponent, err = NewRepoComponent(config)
+	c.repoComponentImpl, err = NewRepoComponentImpl(config)
 	if err != nil {
 		return nil, err
 	}
@@ -88,22 +111,22 @@ func NewModelComponent(config *config.Config) (*ModelComponent, error) {
 	return c, nil
 }
 
-type ModelComponent struct {
-	*RepoComponent
-	spaceComonent *SpaceComponent
-	ms            *database.ModelStore
-	rs            *database.RepoStore
-	SS            *database.SpaceResourceStore
+type modelComponentImpl struct {
+	*repoComponentImpl
+	spaceComonent SpaceComponent
+	ms            database.ModelStore
+	rs            database.RepoStore
+	SS            database.SpaceResourceStore
 	infer         inference.Client
-	us            *database.UserStore
+	us            database.UserStore
 	deployer      deploy.Deployer
-	ac            *AccountingComponent
-	ts            *database.TagStore
-	rac           *RuntimeArchitectureComponent
-	ds            *database.DatasetStore
+	ac            AccountingComponent
+	ts            database.TagStore
+	rac           RuntimeArchitectureComponent
+	ds            database.DatasetStore
 }
 
-func (c *ModelComponent) Index(ctx context.Context, filter *types.RepoFilter, per, page int) ([]types.Model, int, error) {
+func (c *modelComponentImpl) Index(ctx context.Context, filter *types.RepoFilter, per, page int) ([]types.Model, int, error) {
 	var (
 		err       error
 		resModels []types.Model
@@ -169,7 +192,7 @@ func (c *ModelComponent) Index(ctx context.Context, filter *types.RepoFilter, pe
 	return resModels, total, nil
 }
 
-func (c *ModelComponent) Create(ctx context.Context, req *types.CreateModelReq) (*types.Model, error) {
+func (c *modelComponentImpl) Create(ctx context.Context, req *types.CreateModelReq) (*types.Model, error) {
 	var (
 		nickname string
 		tags     []types.RepoTag
@@ -292,7 +315,7 @@ func buildCreateFileReq(p *types.CreateFileParams, repoType types.RepositoryType
 	}
 }
 
-func (c *ModelComponent) Update(ctx context.Context, req *types.UpdateModelReq) (*types.Model, error) {
+func (c *modelComponentImpl) Update(ctx context.Context, req *types.UpdateModelReq) (*types.Model, error) {
 	req.RepoType = types.ModelRepo
 	dbRepo, err := c.UpdateRepo(ctx, req.UpdateRepoReq)
 	if err != nil {
@@ -329,7 +352,7 @@ func (c *ModelComponent) Update(ctx context.Context, req *types.UpdateModelReq) 
 	return resModel, nil
 }
 
-func (c *ModelComponent) Delete(ctx context.Context, namespace, name, currentUser string) error {
+func (c *modelComponentImpl) Delete(ctx context.Context, namespace, name, currentUser string) error {
 	model, err := c.ms.FindByPath(ctx, namespace, name)
 	if err != nil {
 		return fmt.Errorf("failed to find model, error: %w", err)
@@ -353,7 +376,7 @@ func (c *ModelComponent) Delete(ctx context.Context, namespace, name, currentUse
 	return nil
 }
 
-func (c *ModelComponent) Show(ctx context.Context, namespace, name, currentUser string) (*types.Model, error) {
+func (c *modelComponentImpl) Show(ctx context.Context, namespace, name, currentUser string) (*types.Model, error) {
 	var tags []types.RepoTag
 	model, err := c.ms.FindByPath(ctx, namespace, name)
 	if err != nil {
@@ -435,7 +458,7 @@ func (c *ModelComponent) Show(ctx context.Context, namespace, name, currentUser 
 	return resModel, nil
 }
 
-func (c *ModelComponent) GetServerless(ctx context.Context, namespace, name, currentUser string) (*types.DeployRepo, error) {
+func (c *modelComponentImpl) GetServerless(ctx context.Context, namespace, name, currentUser string) (*types.DeployRepo, error) {
 	model, err := c.ms.FindByPath(ctx, namespace, name)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find model, error: %w", err)
@@ -474,7 +497,7 @@ func (c *ModelComponent) GetServerless(ctx context.Context, namespace, name, cur
 	return &resDeploy, nil
 }
 
-func (c *ModelComponent) SDKModelInfo(ctx context.Context, namespace, name, ref, currentUser string) (*types.SDKModelInfo, error) {
+func (c *modelComponentImpl) SDKModelInfo(ctx context.Context, namespace, name, ref, currentUser string) (*types.SDKModelInfo, error) {
 	model, err := c.ms.FindByPath(ctx, namespace, name)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find model, error: %w", err)
@@ -561,7 +584,7 @@ func (c *ModelComponent) SDKModelInfo(ctx context.Context, namespace, name, ref,
 	return resModel, nil
 }
 
-func (c *ModelComponent) Relations(ctx context.Context, namespace, name, currentUser string) (*types.Relations, error) {
+func (c *modelComponentImpl) Relations(ctx context.Context, namespace, name, currentUser string) (*types.Relations, error) {
 	model, err := c.ms.FindByPath(ctx, namespace, name)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find model, error: %w", err)
@@ -575,7 +598,7 @@ func (c *ModelComponent) Relations(ctx context.Context, namespace, name, current
 	return c.getRelations(ctx, model.RepositoryID, currentUser)
 }
 
-func (c *ModelComponent) SetRelationDatasets(ctx context.Context, req types.RelationDatasets) error {
+func (c *modelComponentImpl) SetRelationDatasets(ctx context.Context, req types.RelationDatasets) error {
 	user, err := c.user.FindByUsername(ctx, req.CurrentUser)
 	if err != nil {
 		return fmt.Errorf("user does not exist, %w", err)
@@ -627,7 +650,7 @@ func (c *ModelComponent) SetRelationDatasets(ctx context.Context, req types.Rela
 	return nil
 }
 
-func (c *ModelComponent) AddRelationDataset(ctx context.Context, req types.RelationDataset) error {
+func (c *modelComponentImpl) AddRelationDataset(ctx context.Context, req types.RelationDataset) error {
 	user, err := c.user.FindByUsername(ctx, req.CurrentUser)
 	if err != nil {
 		return fmt.Errorf("user does not exist, %w", err)
@@ -684,7 +707,7 @@ func (c *ModelComponent) AddRelationDataset(ctx context.Context, req types.Relat
 	return nil
 }
 
-func (c *ModelComponent) DelRelationDataset(ctx context.Context, req types.RelationDataset) error {
+func (c *modelComponentImpl) DelRelationDataset(ctx context.Context, req types.RelationDataset) error {
 	user, err := c.user.FindByUsername(ctx, req.CurrentUser)
 	if err != nil {
 		return fmt.Errorf("user does not exist, %w", err)
@@ -746,7 +769,7 @@ func (c *ModelComponent) DelRelationDataset(ctx context.Context, req types.Relat
 	return nil
 }
 
-func (c *ModelComponent) getRelations(ctx context.Context, fromRepoID int64, currentUser string) (*types.Relations, error) {
+func (c *modelComponentImpl) getRelations(ctx context.Context, fromRepoID int64, currentUser string) (*types.Relations, error) {
 	res, err := c.relatedRepos(ctx, fromRepoID, currentUser)
 	if err != nil {
 		return nil, err
@@ -823,7 +846,7 @@ func getFilePaths(namespace, repoName, folder string, repoType types.RepositoryT
 	return filePaths, nil
 }
 
-func (c *ModelComponent) Predict(ctx context.Context, req *types.ModelPredictReq) (*types.ModelPredictResp, error) {
+func (c *modelComponentImpl) Predict(ctx context.Context, req *types.ModelPredictReq) (*types.ModelPredictResp, error) {
 	mid := inference.ModelID{
 		Owner: req.Namespace,
 		Name:  req.Name,
@@ -843,7 +866,7 @@ func (c *ModelComponent) Predict(ctx context.Context, req *types.ModelPredictReq
 }
 
 // create model deploy as inference/serverless
-func (c *ModelComponent) Deploy(ctx context.Context, deployReq types.DeployActReq, req types.ModelRunReq) (int64, error) {
+func (c *modelComponentImpl) Deploy(ctx context.Context, deployReq types.DeployActReq, req types.ModelRunReq) (int64, error) {
 	m, err := c.ms.FindByPath(ctx, deployReq.Namespace, deployReq.Name)
 	if err != nil {
 		return -1, fmt.Errorf("cannot find model, %w", err)
@@ -935,7 +958,7 @@ func (c *ModelComponent) Deploy(ctx context.Context, deployReq types.DeployActRe
 	})
 }
 
-func (c *ModelComponent) ListModelsByRuntimeFrameworkID(ctx context.Context, currentUser string, per, page int, id int64, deployType int) ([]types.Model, int, error) {
+func (c *modelComponentImpl) ListModelsByRuntimeFrameworkID(ctx context.Context, currentUser string, per, page int, id int64, deployType int) ([]types.Model, int, error) {
 	var (
 		user      database.User
 		err       error
@@ -981,7 +1004,7 @@ func (c *ModelComponent) ListModelsByRuntimeFrameworkID(ctx context.Context, cur
 	return resModels, total, nil
 }
 
-func (c *ModelComponent) ListAllByRuntimeFramework(ctx context.Context, currentUser string) ([]database.RuntimeFramework, error) {
+func (c *modelComponentImpl) ListAllByRuntimeFramework(ctx context.Context, currentUser string) ([]database.RuntimeFramework, error) {
 	runtimes, err := c.runFrame.ListAll(ctx)
 	if err != nil {
 		newError := fmt.Errorf("failed to get public model repos,error:%w", err)
@@ -991,7 +1014,7 @@ func (c *ModelComponent) ListAllByRuntimeFramework(ctx context.Context, currentU
 	return runtimes, nil
 }
 
-func (c *ModelComponent) SetRuntimeFrameworkModes(ctx context.Context, deployType int, id int64, paths []string) ([]string, error) {
+func (c *modelComponentImpl) SetRuntimeFrameworkModes(ctx context.Context, deployType int, id int64, paths []string) ([]string, error) {
 	runtimeRepos, err := c.rtfm.FindByID(ctx, id)
 	if err != nil {
 		return nil, err
@@ -1034,7 +1057,7 @@ func (c *ModelComponent) SetRuntimeFrameworkModes(ctx context.Context, deployTyp
 	return failedModels, nil
 }
 
-func (c *ModelComponent) DeleteRuntimeFrameworkModes(ctx context.Context, deployType int, id int64, paths []string) ([]string, error) {
+func (c *modelComponentImpl) DeleteRuntimeFrameworkModes(ctx context.Context, deployType int, id int64, paths []string) ([]string, error) {
 	models, err := c.ms.ListByPath(ctx, paths)
 	if err != nil {
 		return nil, err
@@ -1051,7 +1074,7 @@ func (c *ModelComponent) DeleteRuntimeFrameworkModes(ctx context.Context, deploy
 	return failedModels, nil
 }
 
-func (c *ModelComponent) ListModelsOfRuntimeFrameworks(ctx context.Context, currentUser, search, sort string, per, page int, deployType int) ([]types.Model, int, error) {
+func (c *modelComponentImpl) ListModelsOfRuntimeFrameworks(ctx context.Context, currentUser, search, sort string, per, page int, deployType int) ([]types.Model, int, error) {
 	var (
 		user      database.User
 		err       error
@@ -1101,7 +1124,7 @@ func (c *ModelComponent) ListModelsOfRuntimeFrameworks(ctx context.Context, curr
 	return resModels, total, nil
 }
 
-func (c *ModelComponent) OrgModels(ctx context.Context, req *types.OrgModelsReq) ([]types.Model, int, error) {
+func (c *modelComponentImpl) OrgModels(ctx context.Context, req *types.OrgModelsReq) ([]types.Model, int, error) {
 	var resModels []types.Model
 	var err error
 	r := membership.RoleUnknown

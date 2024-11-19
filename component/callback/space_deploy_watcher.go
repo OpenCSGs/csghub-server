@@ -14,11 +14,11 @@ import (
 
 type spaceDeployWatcher struct {
 	ops []func() error
-	ss  *database.SpaceStore
-	sc  *component.SpaceComponent
+	ss  database.SpaceStore
+	sc  component.SpaceComponent
 }
 
-func WatchSpaceChange(req *types.GiteaCallbackPushReq, ss *database.SpaceStore, sc *component.SpaceComponent) Watcher {
+func WatchSpaceChange(req *types.GiteaCallbackPushReq, ss database.SpaceStore, sc component.SpaceComponent) Watcher {
 	watcher := new(spaceDeployWatcher)
 	watcher.ss = ss
 	watcher.sc = sc

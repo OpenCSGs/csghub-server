@@ -22,7 +22,7 @@ func NewSpaceSdkHandler(config *config.Config) (*SpaceSdkHandler, error) {
 }
 
 type SpaceSdkHandler struct {
-	c *component.SpaceSdkComponent
+	c component.SpaceSdkComponent
 }
 
 // GetSpaceSdks godoc

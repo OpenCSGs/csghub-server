@@ -11,21 +11,26 @@ import (
 	"opencsg.com/csghub-server/common/types/telemetry"
 )
 
-type TelemetryComponent struct {
+type telemetryComponentImpl struct {
 	// Add telemetry related fields and methods here
-	ts *database.TelemetryStore
-	us *database.UserStore
-	rs *database.RepoStore
+	ts database.TelemetryStore
+	us database.UserStore
+	rs database.RepoStore
 }
 
-func NewTelemetryComponent() (*TelemetryComponent, error) {
+type TelemetryComponent interface {
+	SaveUsageData(ctx context.Context, usage telemetry.Usage) error
+	GenUsageData(ctx context.Context) (telemetry.Usage, error)
+}
+
+func NewTelemetryComponent() (TelemetryComponent, error) {
 	ts := database.NewTelemetryStore()
 	us := database.NewUserStore()
 	rs := database.NewRepoStore()
-	return &TelemetryComponent{ts: ts, us: us, rs: rs}, nil
+	return &telemetryComponentImpl{ts: ts, us: us, rs: rs}, nil
 }
 
-func (tc *TelemetryComponent) SaveUsageData(ctx context.Context, usage telemetry.Usage) error {
+func (tc *telemetryComponentImpl) SaveUsageData(ctx context.Context, usage telemetry.Usage) error {
 	t := database.Telemetry{
 		UUID:                 usage.UUID,
 		RecordedAt:           usage.RecordedAt,
@@ -55,7 +60,7 @@ func (tc *TelemetryComponent) SaveUsageData(ctx context.Context, usage telemetry
 	return nil
 }
 
-func (tc *TelemetryComponent) GenUsageData(ctx context.Context) (telemetry.Usage, error) {
+func (tc *telemetryComponentImpl) GenUsageData(ctx context.Context) (telemetry.Usage, error) {
 	var usage telemetry.Usage
 
 	uuid, err := uuid.NewV7()
@@ -99,11 +104,11 @@ func (tc *TelemetryComponent) GenUsageData(ctx context.Context) (telemetry.Usage
 	return usage, nil
 }
 
-func (tc *TelemetryComponent) getUserCnt(ctx context.Context) (int, error) {
+func (tc *telemetryComponentImpl) getUserCnt(ctx context.Context) (int, error) {
 	return tc.us.GetActiveUserCount(ctx)
 }
 
-func (tc *TelemetryComponent) getCounts(ctx context.Context) (telemetry.Counts, error) {
+func (tc *telemetryComponentImpl) getCounts(ctx context.Context) (telemetry.Counts, error) {
 	var counts telemetry.Counts
 	modelCnt, err := tc.rs.CountByRepoType(ctx, types.ModelRepo)
 	if err != nil {

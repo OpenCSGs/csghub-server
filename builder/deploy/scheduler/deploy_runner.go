@@ -21,8 +21,8 @@ type DeployRunner struct {
 	repo            *RepoInfo
 	task            *database.DeployTask
 	ir              imagerunner.Runner
-	store           *database.DeployTaskStore
-	tokenStore      *database.AccessTokenStore
+	store           database.DeployTaskStore
+	tokenStore      database.AccessTokenStore
 	deployStartTime time.Time
 	deployCfg       common.DeployConfig
 }

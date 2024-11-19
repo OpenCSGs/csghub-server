@@ -11,7 +11,7 @@ import (
 )
 
 type SyncClientSettingHandler struct {
-	c *component.SyncClientSettingComponent
+	c component.SyncClientSettingComponent
 }
 
 func NewSyncClientSettingHandler(config *config.Config) (*SyncClientSettingHandler, error) {

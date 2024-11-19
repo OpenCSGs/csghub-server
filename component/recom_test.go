@@ -23,7 +23,7 @@ func TestCalculateRecomScore(t *testing.T) {
 	weights1 := map[string]string{
 		"freshness": expFreshness,
 	}
-	score1 := rc.calcTotalScore(ctx, repo1, weights1)
+	score1 := rc.CalcTotalScore(ctx, repo1, weights1)
 	if score1 > 100 || score1 < 98 {
 		t.Errorf("Expected score1 should in range [98,100], got: %f", score1)
 	}
@@ -34,7 +34,7 @@ func TestCalculateRecomScore(t *testing.T) {
 	weights2 := map[string]string{
 		"freshness": expFreshness,
 	}
-	score2 := rc.calcTotalScore(ctx, repo2, weights2)
+	score2 := rc.CalcTotalScore(ctx, repo2, weights2)
 	if score2 > 98.0 || score2 < 60.0 {
 		t.Errorf("Expected score1 should in range [60,98), got: %f", score2)
 	}
@@ -45,7 +45,7 @@ func TestCalculateRecomScore(t *testing.T) {
 	weights3 := map[string]string{
 		"freshness": expFreshness,
 	}
-	score3 := rc.calcTotalScore(ctx, repo3, weights3)
+	score3 := rc.CalcTotalScore(ctx, repo3, weights3)
 	if score3 < 0 || score3 > 60 {
 		t.Errorf("Expected score1 should in range [0,60), got: %f", score2)
 	}

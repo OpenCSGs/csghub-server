@@ -15,8 +15,14 @@ import (
 	"opencsg.com/csghub-server/common/utils/common"
 )
 
-func NewSSHKeyComponent(config *config.Config) (*SSHKeyComponent, error) {
-	c := &SSHKeyComponent{}
+type SSHKeyComponent interface {
+	Create(ctx context.Context, req *types.CreateSSHKeyRequest) (*database.SSHKey, error)
+	Index(ctx context.Context, username string, per, page int) ([]database.SSHKey, error)
+	Delete(ctx context.Context, username, name string) error
+}
+
+func NewSSHKeyComponent(config *config.Config) (SSHKeyComponent, error) {
+	c := &sSHKeyComponentImpl{}
 	c.ss = database.NewSSHKeyStore()
 	c.us = database.NewUserStore()
 	var err error
@@ -29,13 +35,13 @@ func NewSSHKeyComponent(config *config.Config) (*SSHKeyComponent, error) {
 	return c, nil
 }
 
-type SSHKeyComponent struct {
-	ss *database.SSHKeyStore
-	us *database.UserStore
+type sSHKeyComponentImpl struct {
+	ss database.SSHKeyStore
+	us database.UserStore
 	gs gitserver.GitServer
 }
 
-func (c *SSHKeyComponent) Create(ctx context.Context, req *types.CreateSSHKeyRequest) (*database.SSHKey, error) {
+func (c *sSHKeyComponentImpl) Create(ctx context.Context, req *types.CreateSSHKeyRequest) (*database.SSHKey, error) {
 	user, err := c.us.FindByUsername(ctx, req.Username)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find user,error:%w", err)
@@ -81,7 +87,7 @@ func (c *SSHKeyComponent) Create(ctx context.Context, req *types.CreateSSHKeyReq
 	return resSk, nil
 }
 
-func (c *SSHKeyComponent) Index(ctx context.Context, username string, per, page int) ([]database.SSHKey, error) {
+func (c *sSHKeyComponentImpl) Index(ctx context.Context, username string, per, page int) ([]database.SSHKey, error) {
 	sks, err := c.ss.Index(ctx, username, per, page)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get database SSH keys,error:%w", err)
@@ -89,7 +95,7 @@ func (c *SSHKeyComponent) Index(ctx context.Context, username string, per, page 
 	return sks, nil
 }
 
-func (c *SSHKeyComponent) Delete(ctx context.Context, username, name string) error {
+func (c *sSHKeyComponentImpl) Delete(ctx context.Context, username, name string) error {
 	sshKey, err := c.ss.FindByUsernameAndName(ctx, username, name)
 	if err != nil {
 		return fmt.Errorf("failed to get database SSH keys,error:%w", err)

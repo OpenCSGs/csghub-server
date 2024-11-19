@@ -19,25 +19,30 @@ import (
 	"opencsg.com/csghub-server/common/utils/common"
 )
 
-type MultiSyncComponent struct {
-	s            *database.MultiSyncStore
-	repo         *database.RepoStore
-	model        *database.ModelStore
-	dataset      *database.DatasetStore
-	namespace    *database.NamespaceStore
-	user         *database.UserStore
-	versionStore *database.SyncVersionStore
-	tag          *database.TagStore
-	file         *database.FileStore
+type multiSyncComponentImpl struct {
+	s            database.MultiSyncStore
+	repo         database.RepoStore
+	model        database.ModelStore
+	dataset      database.DatasetStore
+	namespace    database.NamespaceStore
+	user         database.UserStore
+	versionStore database.SyncVersionStore
+	tag          database.TagStore
+	file         database.FileStore
 	git          gitserver.GitServer
 }
 
-func NewMultiSyncComponent(config *config.Config) (*MultiSyncComponent, error) {
+type MultiSyncComponent interface {
+	More(ctx context.Context, cur int64, limit int64) ([]types.SyncVersion, error)
+	SyncAsClient(ctx context.Context, sc multisync.Client) error
+}
+
+func NewMultiSyncComponent(config *config.Config) (MultiSyncComponent, error) {
 	git, err := git.NewGitServer(config)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create git server: %w", err)
 	}
-	return &MultiSyncComponent{
+	return &multiSyncComponentImpl{
 		s:            database.NewMultiSyncStore(),
 		repo:         database.NewRepoStore(),
 		model:        database.NewModelStore(),
@@ -51,7 +56,7 @@ func NewMultiSyncComponent(config *config.Config) (*MultiSyncComponent, error) {
 	}, nil
 }
 
-func (c *MultiSyncComponent) More(ctx context.Context, cur int64, limit int64) ([]types.SyncVersion, error) {
+func (c *multiSyncComponentImpl) More(ctx context.Context, cur int64, limit int64) ([]types.SyncVersion, error) {
 	dbVersions, err := c.s.GetAfter(ctx, cur, limit)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get sync versions after %d from db: %w", cur, err)
@@ -70,7 +75,7 @@ func (c *MultiSyncComponent) More(ctx context.Context, cur int64, limit int64) (
 	return versions, nil
 }
 
-func (c *MultiSyncComponent) SyncAsClient(ctx context.Context, sc multisync.Client) error {
+func (c *multiSyncComponentImpl) SyncAsClient(ctx context.Context, sc multisync.Client) error {
 	var currentVersion int64
 	v, err := c.s.GetLatest(ctx)
 	if err != nil {
@@ -166,7 +171,7 @@ func (c *MultiSyncComponent) SyncAsClient(ctx context.Context, sc multisync.Clie
 	return nil
 }
 
-func (c *MultiSyncComponent) createLocalDataset(ctx context.Context, m *types.Dataset, s types.SyncVersion, sc multisync.Client) error {
+func (c *multiSyncComponentImpl) createLocalDataset(ctx context.Context, m *types.Dataset, s types.SyncVersion, sc multisync.Client) error {
 	namespace, name, _ := strings.Cut(m.Path, "/")
 	//add prefix to avoid namespace conflict
 	namespace = common.AddPrefixBySourceID(s.SourceID, namespace)
@@ -292,7 +297,7 @@ func (c *MultiSyncComponent) createLocalDataset(ctx context.Context, m *types.Da
 	return nil
 
 }
-func (c *MultiSyncComponent) createLocalModel(ctx context.Context, m *types.Model, s types.SyncVersion, sc multisync.Client) error {
+func (c *multiSyncComponentImpl) createLocalModel(ctx context.Context, m *types.Model, s types.SyncVersion, sc multisync.Client) error {
 	namespace, name, _ := strings.Cut(m.Path, "/")
 	//add prefix to avoid namespace conflict
 	namespace = common.AddPrefixBySourceID(s.SourceID, namespace)
@@ -417,7 +422,7 @@ func (c *MultiSyncComponent) createLocalModel(ctx context.Context, m *types.Mode
 	return nil
 }
 
-func (c *MultiSyncComponent) createUser(ctx context.Context, req types.CreateUserRequest) (database.User, error) {
+func (c *multiSyncComponentImpl) createUser(ctx context.Context, req types.CreateUserRequest) (database.User, error) {
 	gsUserReq := gitserver.CreateUserRequest{
 		Nickname: req.Name,
 		Username: req.Username,
@@ -449,11 +454,11 @@ func (c *MultiSyncComponent) createUser(ctx context.Context, req types.CreateUse
 	return *user, err
 }
 
-func (c *MultiSyncComponent) getUser(ctx context.Context, userName string) (database.User, error) {
+func (c *multiSyncComponentImpl) getUser(ctx context.Context, userName string) (database.User, error) {
 	return c.user.FindByUsername(ctx, userName)
 }
 
-func (c *MultiSyncComponent) createLocalSyncVersion(ctx context.Context, v types.SyncVersion) error {
+func (c *multiSyncComponentImpl) createLocalSyncVersion(ctx context.Context, v types.SyncVersion) error {
 	syncVersion := database.SyncVersion{
 		Version:        v.Version,
 		SourceID:       v.SourceID,

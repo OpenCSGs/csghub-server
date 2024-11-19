@@ -79,13 +79,23 @@ const (
 	gitattributesFileName = ".gitattributes"
 )
 
-func NewDatasetComponent(config *config.Config) (*DatasetComponent, error) {
-	c := &DatasetComponent{}
+type DatasetComponent interface {
+	Create(ctx context.Context, req *types.CreateDatasetReq) (*types.Dataset, error)
+	Index(ctx context.Context, filter *types.RepoFilter, per, page int) ([]types.Dataset, int, error)
+	Update(ctx context.Context, req *types.UpdateDatasetReq) (*types.Dataset, error)
+	Delete(ctx context.Context, namespace, name, currentUser string) error
+	Show(ctx context.Context, namespace, name, currentUser string) (*types.Dataset, error)
+	Relations(ctx context.Context, namespace, name, currentUser string) (*types.Relations, error)
+	OrgDatasets(ctx context.Context, req *types.OrgDatasetsReq) ([]types.Dataset, int, error)
+}
+
+func NewDatasetComponent(config *config.Config) (DatasetComponent, error) {
+	c := &datasetComponentImpl{}
 	c.ts = database.NewTagStore()
 	c.ds = database.NewDatasetStore()
 	c.rs = database.NewRepoStore()
 	var err error
-	c.RepoComponent, err = NewRepoComponent(config)
+	c.repoComponentImpl, err = NewRepoComponentImpl(config)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create repo component, error: %w", err)
 	}
@@ -96,15 +106,15 @@ func NewDatasetComponent(config *config.Config) (*DatasetComponent, error) {
 	return c, nil
 }
 
-type DatasetComponent struct {
-	*RepoComponent
-	ts *database.TagStore
-	ds *database.DatasetStore
-	rs *database.RepoStore
-	sc *SensitiveComponent
+type datasetComponentImpl struct {
+	*repoComponentImpl
+	ts database.TagStore
+	ds database.DatasetStore
+	rs database.RepoStore
+	sc SensitiveComponent
 }
 
-func (c *DatasetComponent) Create(ctx context.Context, req *types.CreateDatasetReq) (*types.Dataset, error) {
+func (c *datasetComponentImpl) Create(ctx context.Context, req *types.CreateDatasetReq) (*types.Dataset, error) {
 	var (
 		nickname string
 		tags     []types.RepoTag
@@ -239,11 +249,11 @@ license: ` + license + `
 	`
 }
 
-func (c *DatasetComponent) Index(ctx context.Context, filter *types.RepoFilter, per, page int) ([]types.Dataset, int, error) {
+func (c *datasetComponentImpl) Index(ctx context.Context, filter *types.RepoFilter, per, page int) ([]types.Dataset, int, error) {
 	return c.commonIndex(ctx, filter, per, page)
 }
 
-func (c *DatasetComponent) commonIndex(ctx context.Context, filter *types.RepoFilter, per, page int) ([]types.Dataset, int, error) {
+func (c *datasetComponentImpl) commonIndex(ctx context.Context, filter *types.RepoFilter, per, page int) ([]types.Dataset, int, error) {
 	var (
 		err         error
 		resDatasets []types.Dataset
@@ -316,7 +326,7 @@ func (c *DatasetComponent) commonIndex(ctx context.Context, filter *types.RepoFi
 	return resDatasets, total, nil
 }
 
-func (c *DatasetComponent) Update(ctx context.Context, req *types.UpdateDatasetReq) (*types.Dataset, error) {
+func (c *datasetComponentImpl) Update(ctx context.Context, req *types.UpdateDatasetReq) (*types.Dataset, error) {
 	req.RepoType = types.DatasetRepo
 	dbRepo, err := c.UpdateRepo(ctx, req.UpdateRepoReq)
 	if err != nil {
@@ -351,7 +361,7 @@ func (c *DatasetComponent) Update(ctx context.Context, req *types.UpdateDatasetR
 	return resDataset, nil
 }
 
-func (c *DatasetComponent) Delete(ctx context.Context, namespace, name, currentUser string) error {
+func (c *datasetComponentImpl) Delete(ctx context.Context, namespace, name, currentUser string) error {
 	dataset, err := c.ds.FindByPath(ctx, namespace, name)
 	if err != nil {
 		return fmt.Errorf("failed to find dataset, error: %w", err)
@@ -375,7 +385,7 @@ func (c *DatasetComponent) Delete(ctx context.Context, namespace, name, currentU
 	return nil
 }
 
-func (c *DatasetComponent) Show(ctx context.Context, namespace, name, currentUser string) (*types.Dataset, error) {
+func (c *datasetComponentImpl) Show(ctx context.Context, namespace, name, currentUser string) (*types.Dataset, error) {
 	var tags []types.RepoTag
 	dataset, err := c.ds.FindByPath(ctx, namespace, name)
 	if err != nil {
@@ -447,7 +457,7 @@ func (c *DatasetComponent) Show(ctx context.Context, namespace, name, currentUse
 	return resDataset, nil
 }
 
-func (c *DatasetComponent) Relations(ctx context.Context, namespace, name, currentUser string) (*types.Relations, error) {
+func (c *datasetComponentImpl) Relations(ctx context.Context, namespace, name, currentUser string) (*types.Relations, error) {
 	dataset, err := c.ds.FindByPath(ctx, namespace, name)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find dataset repo, error: %w", err)
@@ -461,7 +471,7 @@ func (c *DatasetComponent) Relations(ctx context.Context, namespace, name, curre
 	return c.getRelations(ctx, dataset.RepositoryID, currentUser)
 }
 
-func (c *DatasetComponent) getRelations(ctx context.Context, repoID int64, currentUser string) (*types.Relations, error) {
+func (c *datasetComponentImpl) getRelations(ctx context.Context, repoID int64, currentUser string) (*types.Relations, error) {
 	res, err := c.relatedRepos(ctx, repoID, currentUser)
 	if err != nil {
 		return nil, err
@@ -483,7 +493,7 @@ func (c *DatasetComponent) getRelations(ctx context.Context, repoID int64, curre
 	return rels, nil
 }
 
-func (c *DatasetComponent) OrgDatasets(ctx context.Context, req *types.OrgDatasetsReq) ([]types.Dataset, int, error) {
+func (c *datasetComponentImpl) OrgDatasets(ctx context.Context, req *types.OrgDatasetsReq) ([]types.Dataset, int, error) {
 	var resDatasets []types.Dataset
 	var err error
 	r := membership.RoleUnknown
