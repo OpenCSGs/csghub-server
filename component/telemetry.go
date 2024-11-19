@@ -105,7 +105,7 @@ func (tc *telemetryComponentImpl) GenUsageData(ctx context.Context) (telemetry.U
 }
 
 func (tc *telemetryComponentImpl) getUserCnt(ctx context.Context) (int, error) {
-	return tc.us.GetActiveUserCount(ctx)
+	return tc.us.CountUsers(ctx)
 }
 
 func (tc *telemetryComponentImpl) getCounts(ctx context.Context) (telemetry.Counts, error) {
