@@ -15,16 +15,28 @@ import (
 	"opencsg.com/csghub-server/common/types"
 )
 
-type MemberComponent struct {
-	memberStore   *database.MemberStore
-	orgStore      *database.OrgStore
-	userStore     *database.UserStore
+type memberComponentImpl struct {
+	memberStore   database.MemberStore
+	orgStore      database.OrgStore
+	userStore     database.UserStore
 	gitServer     gitserver.GitServer
 	gitMemberShip membership.GitMemerShip
 	config        *config.Config
 }
 
-func NewMemberComponent(config *config.Config) (*MemberComponent, error) {
+type MemberComponent interface {
+	OrgMembers(ctx context.Context, orgName, currentUser string, pageSize, page int) ([]types.Member, int, error)
+	InitRoles(ctx context.Context, org *database.Organization) error
+	SetAdmin(ctx context.Context, org *database.Organization, user *database.User) error
+	ChangeMemberRole(ctx context.Context, orgName, userName, operatorName, oldRole, newRole string) error
+	GetMemberRole(ctx context.Context, orgName, userName string) (membership.Role, error)
+	AddMembers(ctx context.Context, orgName string, users []string, operatorName string, role string) error
+	AddMember(ctx context.Context, orgName, userName, operatorName string, role string) error
+	Update(ctx context.Context) (org *database.Member, err error)
+	Delete(ctx context.Context, orgName, userName, operatorName string, role string) error
+}
+
+func NewMemberComponent(config *config.Config) (MemberComponent, error) {
 	var gms membership.GitMemerShip
 	gs, err := git.NewGitServer(config)
 	if err != nil {
@@ -36,7 +48,7 @@ func NewMemberComponent(config *config.Config) (*MemberComponent, error) {
 			return nil, fmt.Errorf("failed to create git membership:%w", err)
 		}
 	}
-	return &MemberComponent{
+	return &memberComponentImpl{
 		memberStore:   database.NewMemberStore(),
 		orgStore:      database.NewOrgStore(),
 		userStore:     database.NewUserStore(),
@@ -46,7 +58,7 @@ func NewMemberComponent(config *config.Config) (*MemberComponent, error) {
 	}, nil
 }
 
-func (c *MemberComponent) OrgMembers(ctx context.Context, orgName, currentUser string, pageSize, page int) ([]types.Member, int, error) {
+func (c *memberComponentImpl) OrgMembers(ctx context.Context, orgName, currentUser string, pageSize, page int) ([]types.Member, int, error) {
 	var (
 		org  database.Organization
 		user database.User
@@ -90,7 +102,7 @@ func (c *MemberComponent) OrgMembers(ctx context.Context, orgName, currentUser s
 	return members, total, nil
 }
 
-func (c *MemberComponent) InitRoles(ctx context.Context, org *database.Organization) error {
+func (c *memberComponentImpl) InitRoles(ctx context.Context, org *database.Organization) error {
 	if c.config.GitServer.Type == types.GitServerTypeGitea {
 		return c.gitMemberShip.AddRoles(ctx, org.Name,
 			[]membership.Role{membership.RoleAdmin, membership.RoleRead, membership.RoleWrite})
@@ -99,7 +111,7 @@ func (c *MemberComponent) InitRoles(ctx context.Context, org *database.Organizat
 	}
 }
 
-func (c *MemberComponent) SetAdmin(ctx context.Context, org *database.Organization, user *database.User) error {
+func (c *memberComponentImpl) SetAdmin(ctx context.Context, org *database.Organization, user *database.User) error {
 	var (
 		err error
 	)
@@ -115,7 +127,7 @@ func (c *MemberComponent) SetAdmin(ctx context.Context, org *database.Organizati
 	}
 }
 
-func (c *MemberComponent) ChangeMemberRole(ctx context.Context, orgName, userName, operatorName, oldRole, newRole string) error {
+func (c *memberComponentImpl) ChangeMemberRole(ctx context.Context, orgName, userName, operatorName, oldRole, newRole string) error {
 	err := c.Delete(ctx, orgName, userName, operatorName, oldRole)
 	if err != nil {
 		return fmt.Errorf("failed to delete old role,error:%w", err)
@@ -128,7 +140,7 @@ func (c *MemberComponent) ChangeMemberRole(ctx context.Context, orgName, userNam
 	return nil
 }
 
-func (c *MemberComponent) GetMemberRole(ctx context.Context, orgName, userName string) (membership.Role, error) {
+func (c *memberComponentImpl) GetMemberRole(ctx context.Context, orgName, userName string) (membership.Role, error) {
 	var (
 		org  database.Organization
 		user database.User
@@ -152,7 +164,7 @@ func (c *MemberComponent) GetMemberRole(ctx context.Context, orgName, userName s
 	return c.toGitRole(m.Role), nil
 }
 
-func (c *MemberComponent) AddMembers(ctx context.Context, orgName string, users []string, operatorName string, role string) error {
+func (c *memberComponentImpl) AddMembers(ctx context.Context, orgName string, users []string, operatorName string, role string) error {
 	var (
 		org  database.Organization
 		op   database.User
@@ -204,15 +216,15 @@ func (c *MemberComponent) AddMembers(ctx context.Context, orgName string, users 
 	return nil
 }
 
-func (c *MemberComponent) AddMember(ctx context.Context, orgName, userName, operatorName string, role string) error {
+func (c *memberComponentImpl) AddMember(ctx context.Context, orgName, userName, operatorName string, role string) error {
 	return c.AddMembers(ctx, orgName, []string{userName}, operatorName, role)
 }
 
-func (c *MemberComponent) Update(ctx context.Context) (org *database.Member, err error) {
+func (c *memberComponentImpl) Update(ctx context.Context) (org *database.Member, err error) {
 	return
 }
 
-func (c *MemberComponent) Delete(ctx context.Context, orgName, userName, operatorName string, role string) error {
+func (c *memberComponentImpl) Delete(ctx context.Context, orgName, userName, operatorName string, role string) error {
 	var (
 		org  database.Organization
 		op   database.User
@@ -258,12 +270,12 @@ func (c *MemberComponent) Delete(ctx context.Context, orgName, userName, operato
 	}
 }
 
-func (c *MemberComponent) allowAddMember(u *database.Member) bool {
+func (c *memberComponentImpl) allowAddMember(u *database.Member) bool {
 	//TODO: check more roles
 	return u != nil && u.Role == string(membership.RoleAdmin)
 }
 
-func (c *MemberComponent) toGitRole(role string) membership.Role {
+func (c *memberComponentImpl) toGitRole(role string) membership.Role {
 	switch role {
 	case "admin":
 		return membership.RoleAdmin

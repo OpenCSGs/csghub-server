@@ -27,8 +27,8 @@ func NewListHandler(config *config.Config) (*ListHandler, error) {
 }
 
 type ListHandler struct {
-	c  *component.ListComponent
-	sc *component.SpaceComponent
+	c  component.ListComponent
+	sc component.SpaceComponent
 }
 
 // ListTrendingModels   godoc

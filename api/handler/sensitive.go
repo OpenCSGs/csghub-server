@@ -11,7 +11,7 @@ import (
 )
 
 type SensitiveHandler struct {
-	c *component.SensitiveComponent
+	c component.SensitiveComponent
 }
 
 func NewSensitiveHandler(cfg *config.Config) (*SensitiveHandler, error) {

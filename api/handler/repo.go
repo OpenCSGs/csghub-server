@@ -34,7 +34,7 @@ func NewRepoHandler(config *config.Config) (*RepoHandler, error) {
 }
 
 type RepoHandler struct {
-	c *component.RepoComponent
+	c component.RepoComponent
 }
 
 // CreateRepoFile godoc

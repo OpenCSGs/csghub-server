@@ -9,21 +9,26 @@ import (
 	"opencsg.com/csghub-server/common/types"
 )
 
-func NewListComponent(config *config.Config) (*ListComponent, error) {
-	c := &ListComponent{}
+type ListComponent interface {
+	ListModelsByPath(ctx context.Context, req *types.ListByPathReq) ([]*types.ModelResp, error)
+	ListDatasetsByPath(ctx context.Context, req *types.ListByPathReq) ([]*types.DatasetResp, error)
+}
+
+func NewListComponent(config *config.Config) (ListComponent, error) {
+	c := &listComponentImpl{}
 	c.ds = database.NewDatasetStore()
 	c.ms = database.NewModelStore()
 	c.ss = database.NewSpaceStore()
 	return c, nil
 }
 
-type ListComponent struct {
-	ms *database.ModelStore
-	ds *database.DatasetStore
-	ss *database.SpaceStore
+type listComponentImpl struct {
+	ms database.ModelStore
+	ds database.DatasetStore
+	ss database.SpaceStore
 }
 
-func (c *ListComponent) ListModelsByPath(ctx context.Context, req *types.ListByPathReq) ([]*types.ModelResp, error) {
+func (c *listComponentImpl) ListModelsByPath(ctx context.Context, req *types.ListByPathReq) ([]*types.ModelResp, error) {
 	var modelResp []*types.ModelResp
 
 	models, err := c.ms.ListByPath(ctx, req.Paths)
@@ -59,7 +64,7 @@ func (c *ListComponent) ListModelsByPath(ctx context.Context, req *types.ListByP
 	return modelResp, nil
 }
 
-func (c *ListComponent) ListDatasetsByPath(ctx context.Context, req *types.ListByPathReq) ([]*types.DatasetResp, error) {
+func (c *listComponentImpl) ListDatasetsByPath(ctx context.Context, req *types.ListByPathReq) ([]*types.DatasetResp, error) {
 	var datasetResp []*types.DatasetResp
 
 	datasets, err := c.ds.ListByPath(ctx, req.Paths)

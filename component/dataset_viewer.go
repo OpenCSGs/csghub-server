@@ -28,26 +28,30 @@ type ViewParquetFileResp struct {
 	Columns []string        `json:"columns"`
 	Rows    [][]interface{} `json:"rows"`
 }
-type DatasetViewerComponent struct {
+type datasetViewerComponentImpl struct {
 	gs      gitserver.GitServer
 	preader parquet.Reader
 	once    *sync.Once
 	cfg     *config.Config
 }
 
-func NewDatasetViewerComponent(cfg *config.Config) (*DatasetViewerComponent, error) {
+type DatasetViewerComponent interface {
+	ViewParquetFile(ctx context.Context, req *ViewParquetFileReq) (*ViewParquetFileResp, error)
+}
+
+func NewDatasetViewerComponent(cfg *config.Config) (DatasetViewerComponent, error) {
 	gs, err := git.NewGitServer(cfg)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create git server,cause:%w", err)
 	}
-	return &DatasetViewerComponent{
+	return &datasetViewerComponentImpl{
 		gs:   gs,
 		once: new(sync.Once),
 		cfg:  cfg,
 	}, nil
 }
 
-func (c *DatasetViewerComponent) lazyInit() {
+func (c *datasetViewerComponentImpl) lazyInit() {
 	c.once.Do(func() {
 		r, err := parquet.NewS3Reader(c.cfg)
 		if err != nil {
@@ -57,7 +61,7 @@ func (c *DatasetViewerComponent) lazyInit() {
 	})
 }
 
-func (c *DatasetViewerComponent) ViewParquetFile(ctx context.Context, req *ViewParquetFileReq) (*ViewParquetFileResp, error) {
+func (c *datasetViewerComponentImpl) ViewParquetFile(ctx context.Context, req *ViewParquetFileReq) (*ViewParquetFileResp, error) {
 	c.lazyInit()
 
 	objName, err := c.getParquetObject(req)
@@ -83,7 +87,7 @@ func (c *DatasetViewerComponent) ViewParquetFile(ctx context.Context, req *ViewP
 	return resp, nil
 }
 
-func (c *DatasetViewerComponent) getParquetObject(req *ViewParquetFileReq) (string, error) {
+func (c *datasetViewerComponentImpl) getParquetObject(req *ViewParquetFileReq) (string, error) {
 	getFileContentReq := gitserver.GetRepoInfoByPathReq{
 		Namespace: req.Namespace,
 		Name:      req.RepoName,

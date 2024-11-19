@@ -12,19 +12,26 @@ import (
 	"opencsg.com/csghub-server/common/types"
 )
 
-func NewSpaceResourceComponent(config *config.Config) (*SpaceResourceComponent, error) {
-	c := &SpaceResourceComponent{}
+type SpaceResourceComponent interface {
+	Index(ctx context.Context, clusterId string, deployType int) ([]types.SpaceResource, error)
+	Update(ctx context.Context, req *types.UpdateSpaceResourceReq) (*types.SpaceResource, error)
+	Create(ctx context.Context, req *types.CreateSpaceResourceReq) (*types.SpaceResource, error)
+	Delete(ctx context.Context, id int64) error
+}
+
+func NewSpaceResourceComponent(config *config.Config) (SpaceResourceComponent, error) {
+	c := &spaceResourceComponentImpl{}
 	c.srs = database.NewSpaceResourceStore()
 	c.deployer = deploy.NewDeployer()
 	return c, nil
 }
 
-type SpaceResourceComponent struct {
-	srs      *database.SpaceResourceStore
+type spaceResourceComponentImpl struct {
+	srs      database.SpaceResourceStore
 	deployer deploy.Deployer
 }
 
-func (c *SpaceResourceComponent) Index(ctx context.Context, clusterId string, deployType int) ([]types.SpaceResource, error) {
+func (c *spaceResourceComponentImpl) Index(ctx context.Context, clusterId string, deployType int) ([]types.SpaceResource, error) {
 	// backward compatibility for old api
 	if clusterId == "" {
 		clusters, err := c.deployer.ListCluster(ctx)
@@ -76,7 +83,7 @@ func (c *SpaceResourceComponent) Index(ctx context.Context, clusterId string, de
 	return result, nil
 }
 
-func (c *SpaceResourceComponent) Update(ctx context.Context, req *types.UpdateSpaceResourceReq) (*types.SpaceResource, error) {
+func (c *spaceResourceComponentImpl) Update(ctx context.Context, req *types.UpdateSpaceResourceReq) (*types.SpaceResource, error) {
 	sr, err := c.srs.FindByID(ctx, req.ID)
 	if err != nil {
 		slog.Error("error getting space resource", slog.Any("error", err))
@@ -100,7 +107,7 @@ func (c *SpaceResourceComponent) Update(ctx context.Context, req *types.UpdateSp
 	return result, nil
 }
 
-func (c *SpaceResourceComponent) Create(ctx context.Context, req *types.CreateSpaceResourceReq) (*types.SpaceResource, error) {
+func (c *spaceResourceComponentImpl) Create(ctx context.Context, req *types.CreateSpaceResourceReq) (*types.SpaceResource, error) {
 	sr := database.SpaceResource{
 		Name:      req.Name,
 		Resources: req.Resources,
@@ -121,7 +128,7 @@ func (c *SpaceResourceComponent) Create(ctx context.Context, req *types.CreateSp
 	return result, nil
 }
 
-func (c *SpaceResourceComponent) Delete(ctx context.Context, id int64) error {
+func (c *spaceResourceComponentImpl) Delete(ctx context.Context, id int64) error {
 	sr, err := c.srs.FindByID(ctx, id)
 	if err != nil {
 		slog.Error("error finding space resource", slog.Any("error", err))

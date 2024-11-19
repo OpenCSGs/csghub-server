@@ -15,8 +15,8 @@ import (
 )
 
 type DiscussionHandler struct {
-	c  *component.DiscussionComponent
-	sc *component.SensitiveComponent
+	c  component.DiscussionComponent
+	sc component.SensitiveComponent
 }
 
 func NewDiscussionHandler(cfg *config.Config) (*DiscussionHandler, error) {

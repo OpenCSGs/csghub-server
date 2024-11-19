@@ -15,8 +15,16 @@ import (
 	"opencsg.com/csghub-server/common/types"
 )
 
-func NewAccessTokenComponent(config *config.Config) (*AccessTokenComponent, error) {
-	c := &AccessTokenComponent{}
+type AccessTokenComponent interface {
+	Create(ctx context.Context, req *types.CreateUserTokenRequest) (*database.AccessToken, error)
+	Delete(ctx context.Context, req *types.DeleteUserTokenRequest) error
+	Check(ctx context.Context, req *types.CheckAccessTokenReq) (types.CheckAccessTokenResp, error)
+	GetTokens(ctx context.Context, username, app string) ([]types.CheckAccessTokenResp, error)
+	RefreshToken(ctx context.Context, userName, tokenName, app string, newExpiredAt time.Time) (types.CheckAccessTokenResp, error)
+}
+
+func NewAccessTokenComponent(config *config.Config) (AccessTokenComponent, error) {
+	c := &accessTokenComponentImpl{}
 	c.ts = database.NewAccessTokenStore()
 	c.us = database.NewUserStore()
 	var err error
@@ -29,13 +37,13 @@ func NewAccessTokenComponent(config *config.Config) (*AccessTokenComponent, erro
 	return c, nil
 }
 
-type AccessTokenComponent struct {
-	ts *database.AccessTokenStore
-	us *database.UserStore
+type accessTokenComponentImpl struct {
+	ts database.AccessTokenStore
+	us database.UserStore
 	gs gitserver.GitServer
 }
 
-func (c *AccessTokenComponent) Create(ctx context.Context, req *types.CreateUserTokenRequest) (*database.AccessToken, error) {
+func (c *accessTokenComponentImpl) Create(ctx context.Context, req *types.CreateUserTokenRequest) (*database.AccessToken, error) {
 	user, err := c.us.FindByUsername(ctx, req.Username)
 	if err != nil {
 		return nil, fmt.Errorf("fail to find user,error:%w", err)
@@ -81,12 +89,12 @@ func (c *AccessTokenComponent) Create(ctx context.Context, req *types.CreateUser
 	return token, nil
 }
 
-func (c *AccessTokenComponent) genUnique() string {
+func (c *accessTokenComponentImpl) genUnique() string {
 	// TODO:change
 	return strings.ReplaceAll(uuid.NewString(), "-", "")
 }
 
-func (c *AccessTokenComponent) Delete(ctx context.Context, req *types.DeleteUserTokenRequest) error {
+func (c *accessTokenComponentImpl) Delete(ctx context.Context, req *types.DeleteUserTokenRequest) error {
 	ue, err := c.us.IsExist(ctx, req.Username)
 	if !ue {
 		return fmt.Errorf("user does not exists,error:%w", err)
@@ -110,7 +118,7 @@ func (c *AccessTokenComponent) Delete(ctx context.Context, req *types.DeleteUser
 	return nil
 }
 
-func (c *AccessTokenComponent) Check(ctx context.Context, req *types.CheckAccessTokenReq) (types.CheckAccessTokenResp, error) {
+func (c *accessTokenComponentImpl) Check(ctx context.Context, req *types.CheckAccessTokenReq) (types.CheckAccessTokenResp, error) {
 	var resp types.CheckAccessTokenResp
 	t, err := c.ts.FindByToken(ctx, req.Token, req.Application)
 	if err != nil {
@@ -127,7 +135,7 @@ func (c *AccessTokenComponent) Check(ctx context.Context, req *types.CheckAccess
 	return resp, nil
 }
 
-func (c *AccessTokenComponent) GetTokens(ctx context.Context, username, app string) ([]types.CheckAccessTokenResp, error) {
+func (c *accessTokenComponentImpl) GetTokens(ctx context.Context, username, app string) ([]types.CheckAccessTokenResp, error) {
 	var resps []types.CheckAccessTokenResp
 	tokens, err := c.ts.FindByUser(ctx, username, app)
 	if err != nil {
@@ -149,7 +157,7 @@ func (c *AccessTokenComponent) GetTokens(ctx context.Context, username, app stri
 	return resps, nil
 }
 
-func (c *AccessTokenComponent) RefreshToken(ctx context.Context, userName, tokenName, app string, newExpiredAt time.Time) (types.CheckAccessTokenResp, error) {
+func (c *accessTokenComponentImpl) RefreshToken(ctx context.Context, userName, tokenName, app string, newExpiredAt time.Time) (types.CheckAccessTokenResp, error) {
 	var resp types.CheckAccessTokenResp
 	t, err := c.ts.FindByTokenName(ctx, userName, tokenName, app)
 	if err != nil {

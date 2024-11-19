@@ -18,7 +18,7 @@ func NewJWTHandler(config *config.Config) (*JWTHandler, error) {
 }
 
 type JWTHandler struct {
-	c *component.JwtComponent
+	c component.JwtComponent
 }
 
 // CreateJWTToken   godoc

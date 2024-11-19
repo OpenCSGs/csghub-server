@@ -20,21 +20,37 @@ var (
 	ScanLock       sync.Mutex
 )
 
-type RuntimeArchitectureComponent struct {
-	r   *RepoComponent
-	ras *database.RuntimeArchitecturesStore
-	rfs *database.RuntimeFrameworksStore
-	ts  *database.TagStore
-	rms *database.ResourceModelStore
+type runtimeArchitectureComponentImpl struct {
+	r   *repoComponentImpl
+	ras database.RuntimeArchitecturesStore
+	rfs database.RuntimeFrameworksStore
+	ts  database.TagStore
+	rms database.ResourceModelStore
 }
 
-func NewRuntimeArchitectureComponent(config *config.Config) (*RuntimeArchitectureComponent, error) {
-	c := &RuntimeArchitectureComponent{}
+type RuntimeArchitectureComponent interface {
+	ListByRuntimeFrameworkID(ctx context.Context, id int64) ([]database.RuntimeArchitecture, error)
+	SetArchitectures(ctx context.Context, id int64, architectures []string) ([]string, error)
+	DeleteArchitectures(ctx context.Context, id int64, architectures []string) ([]string, error)
+	ScanArchitecture(ctx context.Context, id int64, scanType int, models []string) error
+	// check if it's supported model resource by name
+	IsSupportedModelResource(ctx context.Context, modelName string, rf *database.RuntimeFramework, id int64) (bool, error)
+	GetArchitectureFromConfig(ctx context.Context, namespace, name string) (string, error)
+	// remove runtime_framework tag from model
+	RemoveRuntimeFrameworkTag(ctx context.Context, rftags []*database.Tag, repoId, rfId int64)
+	// add runtime_framework tag to model
+	AddRuntimeFrameworkTag(ctx context.Context, rftags []*database.Tag, repoId, rfId int64) error
+	// add resource tag to model
+	AddResourceTag(ctx context.Context, rstags []*database.Tag, modelname string, repoId int64) error
+}
+
+func NewRuntimeArchitectureComponent(config *config.Config) (RuntimeArchitectureComponent, error) {
+	c := &runtimeArchitectureComponentImpl{}
 	c.rfs = database.NewRuntimeFrameworksStore()
 	c.ras = database.NewRuntimeArchitecturesStore()
 	c.ts = database.NewTagStore()
 	c.rms = database.NewResourceModelStore()
-	repo, err := NewRepoComponent(config)
+	repo, err := NewRepoComponentImpl(config)
 	if err != nil {
 		return nil, fmt.Errorf("fail to create repo component, %w", err)
 	}
@@ -42,7 +58,7 @@ func NewRuntimeArchitectureComponent(config *config.Config) (*RuntimeArchitectur
 	return c, nil
 }
 
-func (c *RuntimeArchitectureComponent) ListByRuntimeFrameworkID(ctx context.Context, id int64) ([]database.RuntimeArchitecture, error) {
+func (c *runtimeArchitectureComponentImpl) ListByRuntimeFrameworkID(ctx context.Context, id int64) ([]database.RuntimeArchitecture, error) {
 	archs, err := c.ras.ListByRuntimeFrameworkID(ctx, id)
 	if err != nil {
 		return nil, fmt.Errorf("list runtime arch failed, %w", err)
@@ -50,7 +66,7 @@ func (c *RuntimeArchitectureComponent) ListByRuntimeFrameworkID(ctx context.Cont
 	return archs, nil
 }
 
-func (c *RuntimeArchitectureComponent) SetArchitectures(ctx context.Context, id int64, architectures []string) ([]string, error) {
+func (c *runtimeArchitectureComponentImpl) SetArchitectures(ctx context.Context, id int64, architectures []string) ([]string, error) {
 	_, err := c.r.rtfm.FindByID(ctx, id)
 	if err != nil {
 		return nil, fmt.Errorf("invalid runtime framework id, %w", err)
@@ -71,7 +87,7 @@ func (c *RuntimeArchitectureComponent) SetArchitectures(ctx context.Context, id 
 	return failedArchs, nil
 }
 
-func (c *RuntimeArchitectureComponent) DeleteArchitectures(ctx context.Context, id int64, architectures []string) ([]string, error) {
+func (c *runtimeArchitectureComponentImpl) DeleteArchitectures(ctx context.Context, id int64, architectures []string) ([]string, error) {
 	_, err := c.r.rtfm.FindByID(ctx, id)
 	if err != nil {
 		return nil, fmt.Errorf("invalid runtime framework id, %w", err)
@@ -89,7 +105,7 @@ func (c *RuntimeArchitectureComponent) DeleteArchitectures(ctx context.Context, 
 	return failedDeletes, nil
 }
 
-func (c *RuntimeArchitectureComponent) ScanArchitecture(ctx context.Context, id int64, scanType int, models []string) error {
+func (c *runtimeArchitectureComponentImpl) ScanArchitecture(ctx context.Context, id int64, scanType int, models []string) error {
 	frame, err := c.r.rtfm.FindByID(ctx, id)
 	if err != nil {
 		return fmt.Errorf("invalid runtime framework id, %w", err)
@@ -138,7 +154,7 @@ func (c *RuntimeArchitectureComponent) ScanArchitecture(ctx context.Context, id 
 	return nil
 }
 
-func (c *RuntimeArchitectureComponent) scanNewModels(ctx context.Context, req types.ScanReq) error {
+func (c *runtimeArchitectureComponentImpl) scanNewModels(ctx context.Context, req types.ScanReq) error {
 	repos, err := c.r.repo.GetRepoWithoutRuntimeByID(ctx, req.FrameID, req.Models)
 	if err != nil {
 		return fmt.Errorf("failed to get repos without runtime by ID, %w", err)
@@ -188,7 +204,7 @@ func (c *RuntimeArchitectureComponent) scanNewModels(ctx context.Context, req ty
 }
 
 // check if it's supported model resource by name
-func (c *RuntimeArchitectureComponent) IsSupportedModelResource(ctx context.Context, modelName string, rf *database.RuntimeFramework, id int64) (bool, error) {
+func (c *runtimeArchitectureComponentImpl) IsSupportedModelResource(ctx context.Context, modelName string, rf *database.RuntimeFramework, id int64) (bool, error) {
 	trimModel := strings.Replace(strings.ToLower(modelName), "meta-", "", 1)
 	rm, err := c.rms.CheckModelNameNotInRFRepo(ctx, trimModel, id)
 	if err != nil || rm == nil {
@@ -212,7 +228,7 @@ func (c *RuntimeArchitectureComponent) IsSupportedModelResource(ctx context.Cont
 	return false, nil
 }
 
-func (c *RuntimeArchitectureComponent) scanExistModels(ctx context.Context, req types.ScanReq) error {
+func (c *runtimeArchitectureComponentImpl) scanExistModels(ctx context.Context, req types.ScanReq) error {
 	repos, err := c.r.repo.GetRepoWithRuntimeByID(ctx, req.FrameID, req.Models)
 	if err != nil {
 		return fmt.Errorf("fail to get repos with runtime by ID, %w", err)
@@ -242,7 +258,7 @@ func (c *RuntimeArchitectureComponent) scanExistModels(ctx context.Context, req 
 	return nil
 }
 
-func (c *RuntimeArchitectureComponent) GetArchitectureFromConfig(ctx context.Context, namespace, name string) (string, error) {
+func (c *runtimeArchitectureComponentImpl) GetArchitectureFromConfig(ctx context.Context, namespace, name string) (string, error) {
 	content, err := c.getConfigContent(ctx, namespace, name)
 	if err != nil {
 		return "", fmt.Errorf("fail to read config.json for relation, %w", err)
@@ -264,7 +280,7 @@ func (c *RuntimeArchitectureComponent) GetArchitectureFromConfig(ctx context.Con
 	return config.Architectures[0], nil
 }
 
-func (c *RuntimeArchitectureComponent) getConfigContent(ctx context.Context, namespace, name string) (string, error) {
+func (c *runtimeArchitectureComponentImpl) getConfigContent(ctx context.Context, namespace, name string) (string, error) {
 	content, err := c.r.git.GetRepoFileRaw(ctx, gitserver.GetRepoInfoByPathReq{
 		Namespace: namespace,
 		Name:      name,
@@ -279,7 +295,7 @@ func (c *RuntimeArchitectureComponent) getConfigContent(ctx context.Context, nam
 }
 
 // remove runtime_framework tag from model
-func (c *RuntimeArchitectureComponent) RemoveRuntimeFrameworkTag(ctx context.Context, rftags []*database.Tag, repoId, rfId int64) {
+func (c *runtimeArchitectureComponentImpl) RemoveRuntimeFrameworkTag(ctx context.Context, rftags []*database.Tag, repoId, rfId int64) {
 	rfw, _ := c.rfs.FindByID(ctx, rfId)
 	for _, tag := range rftags {
 		if strings.Contains(rfw.FrameImage, tag.Name) {
@@ -292,7 +308,7 @@ func (c *RuntimeArchitectureComponent) RemoveRuntimeFrameworkTag(ctx context.Con
 }
 
 // add runtime_framework tag to model
-func (c *RuntimeArchitectureComponent) AddRuntimeFrameworkTag(ctx context.Context, rftags []*database.Tag, repoId, rfId int64) error {
+func (c *runtimeArchitectureComponentImpl) AddRuntimeFrameworkTag(ctx context.Context, rftags []*database.Tag, repoId, rfId int64) error {
 	rfw, err := c.rfs.FindByID(ctx, rfId)
 	if err != nil {
 		return err
@@ -309,7 +325,7 @@ func (c *RuntimeArchitectureComponent) AddRuntimeFrameworkTag(ctx context.Contex
 }
 
 // add resource tag to model
-func (c *RuntimeArchitectureComponent) AddResourceTag(ctx context.Context, rstags []*database.Tag, modelname string, repoId int64) error {
+func (c *runtimeArchitectureComponentImpl) AddResourceTag(ctx context.Context, rstags []*database.Tag, modelname string, repoId int64) error {
 	rms, err := c.rms.FindByModelName(ctx, modelname)
 	if err != nil {
 		return err

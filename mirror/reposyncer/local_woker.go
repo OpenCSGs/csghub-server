@@ -26,9 +26,9 @@ type LocalMirrorWoker struct {
 	numWorkers         int
 	wg                 sync.WaitGroup
 	saas               bool
-	mirrorStore        *database.MirrorStore
-	lfsMetaObjectStore *database.LfsMetaObjectStore
-	repoStore          *database.RepoStore
+	mirrorStore        database.MirrorStore
+	lfsMetaObjectStore database.LfsMetaObjectStore
+	repoStore          database.RepoStore
 	git                gitserver.GitServer
 	config             *config.Config
 }

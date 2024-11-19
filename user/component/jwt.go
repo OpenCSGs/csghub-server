@@ -10,14 +10,20 @@ import (
 	"opencsg.com/csghub-server/common/types"
 )
 
-type JwtComponent struct {
+type jwtComponentImpl struct {
 	SigningKey []byte
 	ValidTime  time.Duration
-	us         *database.UserStore
+	us         database.UserStore
 }
 
-func NewJwtComponent(signKey string, validHour int) *JwtComponent {
-	return &JwtComponent{
+type JwtComponent interface {
+	// GenerateToken generate a jwt token, and return the token and signed string
+	GenerateToken(ctx context.Context, req types.CreateJWTReq) (claims *types.JWTClaims, signed string, err error)
+	ParseToken(ctx context.Context, token string) (user *types.User, err error)
+}
+
+func NewJwtComponent(signKey string, validHour int) JwtComponent {
+	return &jwtComponentImpl{
 		SigningKey: []byte(signKey),
 		ValidTime:  time.Duration(validHour) * time.Hour,
 		us:         database.NewUserStore(),
@@ -25,7 +31,7 @@ func NewJwtComponent(signKey string, validHour int) *JwtComponent {
 }
 
 // GenerateToken generate a jwt token, and return the token and signed string
-func (c *JwtComponent) GenerateToken(ctx context.Context, req types.CreateJWTReq) (claims *types.JWTClaims, signed string, err error) {
+func (c *jwtComponentImpl) GenerateToken(ctx context.Context, req types.CreateJWTReq) (claims *types.JWTClaims, signed string, err error) {
 	u, err := c.us.FindByUUID(ctx, req.UUID)
 	if err != nil {
 		return nil, "", fmt.Errorf("failed to find user by uuid '%s',error: %w", req.UUID, err)
@@ -49,7 +55,7 @@ func (c *JwtComponent) GenerateToken(ctx context.Context, req types.CreateJWTReq
 	return claims, signed, nil
 }
 
-func (c *JwtComponent) ParseToken(ctx context.Context, token string) (user *types.User, err error) {
+func (c *jwtComponentImpl) ParseToken(ctx context.Context, token string) (user *types.User, err error) {
 	claims := &types.JWTClaims{}
 	_, err = jwt.ParseWithClaims(token, claims,
 		func(token *jwt.Token) (interface{}, error) {

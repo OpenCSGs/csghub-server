@@ -16,7 +16,7 @@ import (
 )
 
 type RepoHandler struct {
-	rc     *component.RepoComponent
+	rc     component.RepoComponent
 	config *config.Config
 }
 

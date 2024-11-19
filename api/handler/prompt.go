@@ -20,8 +20,9 @@ import (
 )
 
 type PromptHandler struct {
-	pc *component.PromptComponent
-	sc *component.SensitiveComponent
+	pc   component.PromptComponent
+	sc   component.SensitiveComponent
+	repo component.RepoComponent
 }
 
 func NewPromptHandler(cfg *config.Config) (*PromptHandler, error) {
@@ -33,9 +34,15 @@ func NewPromptHandler(cfg *config.Config) (*PromptHandler, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to create SensitiveComponent: %w", err)
 	}
+	repo, err := component.NewRepoComponent(cfg)
+	if err != nil {
+		return nil, fmt.Errorf("error creating repo component:%w", err)
+	}
+
 	return &PromptHandler{
-		pc: promptComp,
-		sc: sc,
+		pc:   promptComp,
+		sc:   sc,
+		repo: repo,
 	}, nil
 }
 
@@ -1100,7 +1107,7 @@ func (h *PromptHandler) Branches(ctx *gin.Context) {
 		RepoType:    types.PromptRepo,
 		CurrentUser: currentUser,
 	}
-	branches, err := h.pc.Branches(ctx, req)
+	branches, err := h.repo.Branches(ctx, req)
 	if err != nil {
 		slog.Error("Failed to get prompt repo branches", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
@@ -1137,7 +1144,7 @@ func (h *PromptHandler) Tags(ctx *gin.Context) {
 		RepoType:    types.PromptRepo,
 		CurrentUser: currentUser,
 	}
-	tags, err := h.pc.Tags(ctx, req)
+	tags, err := h.repo.Tags(ctx, req)
 	if err != nil {
 		slog.Error("Failed to get prompt repo tags", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
@@ -1180,7 +1187,7 @@ func (h *PromptHandler) UpdateTags(ctx *gin.Context) {
 	}
 	category := ctx.Param("category")
 
-	err = h.pc.UpdateTags(ctx, namespace, name, types.PromptRepo, category, currentUser, tags)
+	err = h.repo.UpdateTags(ctx, namespace, name, types.PromptRepo, category, currentUser, tags)
 	if err != nil {
 		slog.Error("Failed to update tags", slog.String("error", err.Error()), slog.String("category", category), slog.String("namespace", namespace), slog.String("name", name))
 		httpbase.ServerError(ctx, err)
@@ -1216,7 +1223,7 @@ func (h *PromptHandler) UpdateDownloads(ctx *gin.Context) {
 	}
 	req.Date = date
 
-	err = h.pc.UpdateDownloads(ctx, req)
+	err = h.repo.UpdateDownloads(ctx, req)
 	if err != nil {
 		slog.Error("Failed to update repo download count", slog.Any("error", err), slog.String("namespace", namespace), slog.String("name", name), slog.Time("date", date), slog.Int64("clone_count", req.CloneCount))
 		httpbase.ServerError(ctx, err)

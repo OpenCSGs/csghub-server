@@ -29,8 +29,8 @@ func NewOrganizationHandler(config *config.Config) (*OrganizationHandler, error)
 }
 
 type OrganizationHandler struct {
-	c  *component.OrganizationComponent
-	sc *apicomponent.SensitiveComponent
+	c  component.OrganizationComponent
+	sc apicomponent.SensitiveComponent
 }
 
 // CreateOrganization godoc

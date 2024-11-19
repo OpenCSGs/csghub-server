@@ -25,18 +25,32 @@ import (
 	"opencsg.com/csghub-server/common/types"
 )
 
-type GitHTTPComponent struct {
+type gitHTTPComponentImpl struct {
 	git                gitserver.GitServer
 	config             *config.Config
 	s3Client           *s3.Client
-	lfsMetaObjectStore *database.LfsMetaObjectStore
-	lfsLockStore       *database.LfsLockStore
-	repo               *database.RepoStore
-	*RepoComponent
+	lfsMetaObjectStore database.LfsMetaObjectStore
+	lfsLockStore       database.LfsLockStore
+	repo               database.RepoStore
+	*repoComponentImpl
 }
 
-func NewGitHTTPComponent(config *config.Config) (*GitHTTPComponent, error) {
-	c := &GitHTTPComponent{}
+type GitHTTPComponent interface {
+	InfoRefs(ctx context.Context, req types.InfoRefsReq) (io.Reader, error)
+	GitUploadPack(ctx context.Context, req types.GitUploadPackReq) error
+	GitReceivePack(ctx context.Context, req types.GitReceivePackReq) error
+	BuildObjectResponse(ctx context.Context, req types.BatchRequest, isUpload bool) (*types.BatchResponse, error)
+	LfsUpload(ctx context.Context, body io.ReadCloser, req types.UploadRequest) error
+	LfsVerify(ctx context.Context, req types.VerifyRequest, p types.Pointer) error
+	CreateLock(ctx context.Context, req types.LfsLockReq) (*database.LfsLock, error)
+	ListLocks(ctx context.Context, req types.ListLFSLockReq) (*types.LFSLockList, error)
+	UnLock(ctx context.Context, req types.UnlockLFSReq) (*database.LfsLock, error)
+	VerifyLock(ctx context.Context, req types.VerifyLFSLockReq) (*types.LFSLockListVerify, error)
+	LfsDownload(ctx context.Context, req types.DownloadRequest) (*url.URL, error)
+}
+
+func NewGitHTTPComponent(config *config.Config) (GitHTTPComponent, error) {
+	c := &gitHTTPComponentImpl{}
 	c.config = config
 	var err error
 	c.git, err = git.NewGitServer(config)
@@ -54,14 +68,14 @@ func NewGitHTTPComponent(config *config.Config) (*GitHTTPComponent, error) {
 	c.lfsMetaObjectStore = database.NewLfsMetaObjectStore()
 	c.repo = database.NewRepoStore()
 	c.lfsLockStore = database.NewLfsLockStore()
-	c.RepoComponent, err = NewRepoComponent(config)
+	c.repoComponentImpl, err = NewRepoComponentImpl(config)
 	if err != nil {
 		return nil, err
 	}
 	return c, nil
 }
 
-func (c *GitHTTPComponent) InfoRefs(ctx context.Context, req types.InfoRefsReq) (io.Reader, error) {
+func (c *gitHTTPComponentImpl) InfoRefs(ctx context.Context, req types.InfoRefsReq) (io.Reader, error) {
 	repo, err := c.repo.FindByPath(ctx, req.RepoType, req.Namespace, req.Name)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find repo, error: %w", err)
@@ -98,7 +112,7 @@ func (c *GitHTTPComponent) InfoRefs(ctx context.Context, req types.InfoRefsReq) 
 	return reader, err
 }
 
-func (c *GitHTTPComponent) GitUploadPack(ctx context.Context, req types.GitUploadPackReq) error {
+func (c *gitHTTPComponentImpl) GitUploadPack(ctx context.Context, req types.GitUploadPackReq) error {
 	repo, err := c.repo.FindByPath(ctx, req.RepoType, req.Namespace, req.Name)
 	if err != nil {
 		return fmt.Errorf("failed to find repo, error: %w", err)
@@ -125,7 +139,7 @@ func (c *GitHTTPComponent) GitUploadPack(ctx context.Context, req types.GitUploa
 	return err
 }
 
-func (c *GitHTTPComponent) GitReceivePack(ctx context.Context, req types.GitReceivePackReq) error {
+func (c *gitHTTPComponentImpl) GitReceivePack(ctx context.Context, req types.GitReceivePackReq) error {
 	_, err := c.repo.FindByPath(ctx, req.RepoType, req.Namespace, req.Name)
 	if err != nil {
 		return fmt.Errorf("failed to find repo, error: %w", err)
@@ -157,7 +171,7 @@ func (c *GitHTTPComponent) GitReceivePack(ctx context.Context, req types.GitRece
 	return err
 }
 
-func (c *GitHTTPComponent) BuildObjectResponse(ctx context.Context, req types.BatchRequest, isUpload bool) (*types.BatchResponse, error) {
+func (c *gitHTTPComponentImpl) BuildObjectResponse(ctx context.Context, req types.BatchRequest, isUpload bool) (*types.BatchResponse, error) {
 	var (
 		respObjects []*types.ObjectResponse
 		exists      bool
@@ -251,7 +265,7 @@ func (c *GitHTTPComponent) BuildObjectResponse(ctx context.Context, req types.Ba
 	return respobj, nil
 }
 
-func (c *GitHTTPComponent) buildObjectResponse(ctx context.Context, req types.BatchRequest, pointer types.Pointer, download, upload bool, err *types.ObjectError) *types.ObjectResponse {
+func (c *gitHTTPComponentImpl) buildObjectResponse(ctx context.Context, req types.BatchRequest, pointer types.Pointer, download, upload bool, err *types.ObjectError) *types.ObjectResponse {
 	rep := &types.ObjectResponse{Pointer: pointer}
 	if err != nil {
 		rep.Error = err
@@ -294,7 +308,7 @@ func (c *GitHTTPComponent) buildObjectResponse(ctx context.Context, req types.Ba
 	return rep
 }
 
-func (c *GitHTTPComponent) LfsUpload(ctx context.Context, body io.ReadCloser, req types.UploadRequest) error {
+func (c *gitHTTPComponentImpl) LfsUpload(ctx context.Context, body io.ReadCloser, req types.UploadRequest) error {
 	var exists bool
 	repo, err := c.repo.FindByPath(ctx, req.RepoType, req.Namespace, req.Name)
 	if err != nil {
@@ -402,7 +416,7 @@ func (c *GitHTTPComponent) LfsUpload(ctx context.Context, body io.ReadCloser, re
 	return nil
 }
 
-func (c *GitHTTPComponent) LfsVerify(ctx context.Context, req types.VerifyRequest, p types.Pointer) error {
+func (c *gitHTTPComponentImpl) LfsVerify(ctx context.Context, req types.VerifyRequest, p types.Pointer) error {
 	repo, err := c.repo.FindByPath(ctx, req.RepoType, req.Namespace, req.Name)
 	if err != nil {
 		return fmt.Errorf("failed to find repo, error: %w", err)
@@ -436,7 +450,7 @@ func (c *GitHTTPComponent) LfsVerify(ctx context.Context, req types.VerifyReques
 	return nil
 }
 
-func (c *GitHTTPComponent) CreateLock(ctx context.Context, req types.LfsLockReq) (*database.LfsLock, error) {
+func (c *gitHTTPComponentImpl) CreateLock(ctx context.Context, req types.LfsLockReq) (*database.LfsLock, error) {
 	var (
 		lock *database.LfsLock
 	)
@@ -480,7 +494,7 @@ func (c *GitHTTPComponent) CreateLock(ctx context.Context, req types.LfsLockReq)
 	return lock, ErrAlreadyExists
 }
 
-func (c *GitHTTPComponent) ListLocks(ctx context.Context, req types.ListLFSLockReq) (*types.LFSLockList, error) {
+func (c *gitHTTPComponentImpl) ListLocks(ctx context.Context, req types.ListLFSLockReq) (*types.LFSLockList, error) {
 	repo, err := c.repo.FindByPath(ctx, req.RepoType, req.Namespace, req.Name)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find repo, error: %w", err)
@@ -541,7 +555,7 @@ func (c *GitHTTPComponent) ListLocks(ctx context.Context, req types.ListLFSLockR
 	return res, nil
 }
 
-func (c *GitHTTPComponent) UnLock(ctx context.Context, req types.UnlockLFSReq) (*database.LfsLock, error) {
+func (c *gitHTTPComponentImpl) UnLock(ctx context.Context, req types.UnlockLFSReq) (*database.LfsLock, error) {
 	var (
 		lock *database.LfsLock
 		err  error
@@ -585,7 +599,7 @@ func (c *GitHTTPComponent) UnLock(ctx context.Context, req types.UnlockLFSReq) (
 	return lock, nil
 }
 
-func (c *GitHTTPComponent) VerifyLock(ctx context.Context, req types.VerifyLFSLockReq) (*types.LFSLockListVerify, error) {
+func (c *gitHTTPComponentImpl) VerifyLock(ctx context.Context, req types.VerifyLFSLockReq) (*types.LFSLockListVerify, error) {
 	var (
 		ourLocks   []*types.LFSLock
 		theirLocks []*types.LFSLock
@@ -643,7 +657,7 @@ func (c *GitHTTPComponent) VerifyLock(ctx context.Context, req types.VerifyLFSLo
 	return &res, nil
 }
 
-func (c *GitHTTPComponent) LfsDownload(ctx context.Context, req types.DownloadRequest) (*url.URL, error) {
+func (c *gitHTTPComponentImpl) LfsDownload(ctx context.Context, req types.DownloadRequest) (*url.URL, error) {
 	pointer := types.Pointer{Oid: req.Oid}
 	repo, err := c.repo.FindByPath(ctx, req.RepoType, req.Namespace, req.Name)
 	if err != nil {
@@ -676,15 +690,15 @@ func (c *GitHTTPComponent) LfsDownload(ctx context.Context, req types.DownloadRe
 	return signedUrl, nil
 }
 
-func (c *GitHTTPComponent) buildDownloadLink(req types.BatchRequest, pointer types.Pointer) string {
+func (c *gitHTTPComponentImpl) buildDownloadLink(req types.BatchRequest, pointer types.Pointer) string {
 	return c.config.APIServer.PublicDomain + "/" + path.Join(fmt.Sprintf("%ss", req.RepoType), url.PathEscape(req.Namespace), url.PathEscape(req.Name+".git"), "info/lfs/objects", url.PathEscape(pointer.Oid))
 }
 
-// func (c *GitHTTPComponent) buildUploadLink(req types.BatchRequest, pointer types.Pointer) string {
+// func (c *gitHTTPComponentImpl) buildUploadLink(req types.BatchRequest, pointer types.Pointer) string {
 // 	return c.config.APIServer.PublicDomain + "/" + path.Join(fmt.Sprintf("%ss", req.RepoType), url.PathEscape(req.Namespace), url.PathEscape(req.Name+".git"), "info/lfs/objects", url.PathEscape(pointer.Oid), strconv.FormatInt(pointer.Size, 10))
 // }
 
-func (c *GitHTTPComponent) buildUploadLink(req types.BatchRequest, pointer types.Pointer) string {
+func (c *gitHTTPComponentImpl) buildUploadLink(req types.BatchRequest, pointer types.Pointer) string {
 	objectKey := path.Join("lfs", pointer.RelativePath())
 	u, err := c.s3Client.PresignedPutObject(context.Background(), c.config.S3.Bucket, objectKey, time.Hour*24)
 	if err != nil {
@@ -693,7 +707,7 @@ func (c *GitHTTPComponent) buildUploadLink(req types.BatchRequest, pointer types
 	return u.String()
 }
 
-func (c *GitHTTPComponent) buildVerifyLink(req types.BatchRequest) string {
+func (c *gitHTTPComponentImpl) buildVerifyLink(req types.BatchRequest) string {
 	return c.config.APIServer.PublicDomain + "/" + path.Join(fmt.Sprintf("%ss", req.RepoType), url.PathEscape(req.Namespace), url.PathEscape(req.Name+".git"), "info/lfs/verify")
 }
 

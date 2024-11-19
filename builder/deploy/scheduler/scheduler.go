@@ -29,10 +29,10 @@ type FIFOScheduler struct {
 	tasks chan Runner
 	last  *database.DeployTask
 
-	store               *database.DeployTaskStore
-	spaceStore          *database.SpaceStore
-	modelStore          *database.ModelStore
-	spaceResourcesStore *database.SpaceResourceStore
+	store               database.DeployTaskStore
+	spaceStore          database.SpaceStore
+	modelStore          database.ModelStore
+	spaceResourcesStore database.SpaceResourceStore
 	ib                  imagebuilder.Builder
 	ir                  imagerunner.Runner
 

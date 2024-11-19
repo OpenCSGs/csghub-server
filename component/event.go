@@ -7,18 +7,23 @@ import (
 	"opencsg.com/csghub-server/common/types"
 )
 
-type EventComponent struct {
-	es *database.EventStore
+type eventComponentImpl struct {
+	es database.EventStore
 }
 
 // NewEventComponent creates a new EventComponent
-func NewEventComponent() *EventComponent {
-	return &EventComponent{
+
+type EventComponent interface {
+	NewEvents(ctx context.Context, events []types.Event) error
+}
+
+func NewEventComponent() EventComponent {
+	return &eventComponentImpl{
 		es: database.NewEventStore(),
 	}
 }
 
-func (ec *EventComponent) NewEvents(ctx context.Context, events []types.Event) error {
+func (ec *eventComponentImpl) NewEvents(ctx context.Context, events []types.Event) error {
 	var dbevents []database.Event
 	for _, e := range events {
 		dbevents = append(dbevents, database.Event{

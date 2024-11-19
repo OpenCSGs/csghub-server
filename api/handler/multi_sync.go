@@ -12,7 +12,7 @@ import (
 )
 
 type SyncHandler struct {
-	c *component.MultiSyncComponent
+	c component.MultiSyncComponent
 }
 
 func NewSyncHandler(config *config.Config) (*SyncHandler, error) {

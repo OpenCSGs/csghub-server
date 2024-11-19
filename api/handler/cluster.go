@@ -21,7 +21,7 @@ func NewClusterHandler(config *config.Config) (*ClusterHandler, error) {
 }
 
 type ClusterHandler struct {
-	c *component.ClusterComponent
+	c component.ClusterComponent
 }
 
 // Getclusters   godoc

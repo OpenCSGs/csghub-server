@@ -12,7 +12,7 @@ import (
 )
 
 type TelemetryHandler struct {
-	c *component.TelemetryComponent
+	c component.TelemetryComponent
 }
 
 func NewTelemetryHandler() (*TelemetryHandler, error) {

@@ -11,20 +11,32 @@ import (
 	"opencsg.com/csghub-server/common/types"
 )
 
-type DiscussionComponent struct {
-	ds *database.DiscussionStore
-	rs *database.RepoStore
-	us *database.UserStore
+type discussionComponentImpl struct {
+	ds database.DiscussionStore
+	rs database.RepoStore
+	us database.UserStore
 }
 
-func NewDiscussionComponent() *DiscussionComponent {
+type DiscussionComponent interface {
+	CreateRepoDiscussion(ctx context.Context, req CreateRepoDiscussionRequest) (*CreateDiscussionResponse, error)
+	GetDiscussion(ctx context.Context, id int64) (*ShowDiscussionResponse, error)
+	UpdateDiscussion(ctx context.Context, req UpdateDiscussionRequest) error
+	DeleteDiscussion(ctx context.Context, currentUser string, id int64) error
+	ListRepoDiscussions(ctx context.Context, req ListRepoDiscussionRequest) (*ListRepoDiscussionResponse, error)
+	CreateDiscussionComment(ctx context.Context, req CreateCommentRequest) (*CreateCommentResponse, error)
+	UpdateComment(ctx context.Context, currentUser string, id int64, content string) error
+	DeleteComment(ctx context.Context, currentUser string, id int64) error
+	ListDiscussionComments(ctx context.Context, discussionID int64) ([]*DiscussionResponse_Comment, error)
+}
+
+func NewDiscussionComponent() DiscussionComponent {
 	ds := database.NewDiscussionStore()
 	rs := database.NewRepoStore()
 	us := database.NewUserStore()
-	return &DiscussionComponent{ds: ds, rs: rs, us: us}
+	return &discussionComponentImpl{ds: ds, rs: rs, us: us}
 }
 
-func (c *DiscussionComponent) CreateRepoDiscussion(ctx context.Context, req CreateRepoDiscussionRequest) (*CreateDiscussionResponse, error) {
+func (c *discussionComponentImpl) CreateRepoDiscussion(ctx context.Context, req CreateRepoDiscussionRequest) (*CreateDiscussionResponse, error) {
 	//TODO:check if the user can access the repo
 
 	//get repo by namespace and name
@@ -59,7 +71,7 @@ func (c *DiscussionComponent) CreateRepoDiscussion(ctx context.Context, req Crea
 	return resp, nil
 }
 
-func (c *DiscussionComponent) GetDiscussion(ctx context.Context, id int64) (*ShowDiscussionResponse, error) {
+func (c *discussionComponentImpl) GetDiscussion(ctx context.Context, id int64) (*ShowDiscussionResponse, error) {
 	discussion, err := c.ds.FindByID(ctx, id)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find discussion by id '%d': %w", id, err)
@@ -91,7 +103,7 @@ func (c *DiscussionComponent) GetDiscussion(ctx context.Context, id int64) (*Sho
 	return resp, nil
 }
 
-func (c *DiscussionComponent) UpdateDiscussion(ctx context.Context, req UpdateDiscussionRequest) error {
+func (c *discussionComponentImpl) UpdateDiscussion(ctx context.Context, req UpdateDiscussionRequest) error {
 	//check if the user is the owner of the discussion
 	user, err := c.us.FindByUsername(ctx, req.CurrentUser)
 	if err != nil {
@@ -111,7 +123,7 @@ func (c *DiscussionComponent) UpdateDiscussion(ctx context.Context, req UpdateDi
 	return nil
 }
 
-func (c *DiscussionComponent) DeleteDiscussion(ctx context.Context, currentUser string, id int64) error {
+func (c *discussionComponentImpl) DeleteDiscussion(ctx context.Context, currentUser string, id int64) error {
 	discussion, err := c.ds.FindByID(ctx, id)
 	if err != nil {
 		return fmt.Errorf("failed to find discussion by id '%d': %w", id, err)
@@ -126,7 +138,7 @@ func (c *DiscussionComponent) DeleteDiscussion(ctx context.Context, currentUser 
 	return nil
 }
 
-func (c *DiscussionComponent) ListRepoDiscussions(ctx context.Context, req ListRepoDiscussionRequest) (*ListRepoDiscussionResponse, error) {
+func (c *discussionComponentImpl) ListRepoDiscussions(ctx context.Context, req ListRepoDiscussionRequest) (*ListRepoDiscussionResponse, error) {
 	//TODO:check if the user can access the repo
 	repo, err := c.rs.FindByPath(ctx, req.RepoType, req.Namespace, req.Name)
 	if err != nil {
@@ -153,7 +165,7 @@ func (c *DiscussionComponent) ListRepoDiscussions(ctx context.Context, req ListR
 	return resp, nil
 }
 
-func (c *DiscussionComponent) CreateDiscussionComment(ctx context.Context, req CreateCommentRequest) (*CreateCommentResponse, error) {
+func (c *discussionComponentImpl) CreateDiscussionComment(ctx context.Context, req CreateCommentRequest) (*CreateCommentResponse, error) {
 	req.CommentableType = database.CommentableTypeDiscussion
 	// get discussion by  id
 	_, err := c.ds.FindByID(ctx, req.CommentableID)
@@ -189,7 +201,7 @@ func (c *DiscussionComponent) CreateDiscussionComment(ctx context.Context, req C
 	}, nil
 }
 
-func (c *DiscussionComponent) UpdateComment(ctx context.Context, currentUser string, id int64, content string) error {
+func (c *discussionComponentImpl) UpdateComment(ctx context.Context, currentUser string, id int64, content string) error {
 	user, err := c.us.FindByUsername(ctx, currentUser)
 	if err != nil {
 		return fmt.Errorf("failed to find user by username '%s': %w", currentUser, err)
@@ -210,7 +222,7 @@ func (c *DiscussionComponent) UpdateComment(ctx context.Context, currentUser str
 	return nil
 }
 
-func (c *DiscussionComponent) DeleteComment(ctx context.Context, currentUser string, id int64) error {
+func (c *discussionComponentImpl) DeleteComment(ctx context.Context, currentUser string, id int64) error {
 	user, err := c.us.FindByUsername(ctx, currentUser)
 	if err != nil {
 		return fmt.Errorf("failed to find user by username '%s': %w", currentUser, err)
@@ -231,7 +243,7 @@ func (c *DiscussionComponent) DeleteComment(ctx context.Context, currentUser str
 	return nil
 }
 
-func (c *DiscussionComponent) ListDiscussionComments(ctx context.Context, discussionID int64) ([]*DiscussionResponse_Comment, error) {
+func (c *discussionComponentImpl) ListDiscussionComments(ctx context.Context, discussionID int64) ([]*DiscussionResponse_Comment, error) {
 	comments, err := c.ds.FindDiscussionComments(ctx, discussionID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find discussion comments by discussion id '%d': %w", discussionID, err)

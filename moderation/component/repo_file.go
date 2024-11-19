@@ -13,14 +13,20 @@ import (
 	"opencsg.com/csghub-server/common/types"
 )
 
-type RepoFileComponent struct {
-	rfs *database.RepoFileStore
-	rs  *database.RepoStore
+type repoFileComponentImpl struct {
+	rfs database.RepoFileStore
+	rs  database.RepoStore
 	gs  gitserver.GitServer
 }
 
-func NewRepoFileComponent(conf *config.Config) (*RepoFileComponent, error) {
-	c := &RepoFileComponent{
+type RepoFileComponent interface {
+	GenRepoFileRecords(ctx context.Context, repoType types.RepositoryType, namespace, name string) error
+	GenRepoFileRecordsBatch(ctx context.Context, repoType types.RepositoryType, lastRepoID int64, concurrency int) error
+	DetectRepoSensitiveCheckStatus(ctx context.Context, repoType types.RepositoryType, namespace, name string) error
+}
+
+func NewRepoFileComponent(conf *config.Config) (RepoFileComponent, error) {
+	c := &repoFileComponentImpl{
 		rfs: database.NewRepoFileStore(),
 		rs:  database.NewRepoStore(),
 	}
@@ -32,7 +38,7 @@ func NewRepoFileComponent(conf *config.Config) (*RepoFileComponent, error) {
 	c.gs = gs
 	return c, nil
 }
-func (c *RepoFileComponent) GenRepoFileRecords(ctx context.Context, repoType types.RepositoryType, namespace, name string) error {
+func (c *repoFileComponentImpl) GenRepoFileRecords(ctx context.Context, repoType types.RepositoryType, namespace, name string) error {
 	repo, err := c.rs.FindByPath(ctx, repoType, namespace, name)
 	if err != nil {
 		return fmt.Errorf("failed to find repo, error: %w", err)
@@ -40,7 +46,7 @@ func (c *RepoFileComponent) GenRepoFileRecords(ctx context.Context, repoType typ
 	return c.createRepoFileRecords(ctx, *repo, "", c.gs.GetRepoFileTree)
 }
 
-func (c *RepoFileComponent) GenRepoFileRecordsBatch(ctx context.Context, repoType types.RepositoryType, lastRepoID int64, concurrency int) error {
+func (c *repoFileComponentImpl) GenRepoFileRecordsBatch(ctx context.Context, repoType types.RepositoryType, lastRepoID int64, concurrency int) error {
 	tokens := make(chan struct{}, concurrency)
 	for i := 0; i < concurrency; i++ {
 		tokens <- struct{}{}
@@ -82,7 +88,7 @@ func (c *RepoFileComponent) GenRepoFileRecordsBatch(ctx context.Context, repoTyp
 	return nil
 }
 
-func (c *RepoFileComponent) createRepoFileRecords(ctx context.Context, repo database.Repository, folder string, gsTree func(ctx context.Context, req gitserver.GetRepoInfoByPathReq) ([]*types.File, error)) error {
+func (c *repoFileComponentImpl) createRepoFileRecords(ctx context.Context, repo database.Repository, folder string, gsTree func(ctx context.Context, req gitserver.GetRepoInfoByPathReq) ([]*types.File, error)) error {
 	namespace, name := repo.NamespaceAndName()
 	var files []*types.File
 
@@ -141,7 +147,7 @@ func (c *RepoFileComponent) createRepoFileRecords(ctx context.Context, repo data
 	return nil
 }
 
-func (c *RepoFileComponent) DetectRepoSensitiveCheckStatus(ctx context.Context, repoType types.RepositoryType, namespace, name string) error {
+func (c *repoFileComponentImpl) DetectRepoSensitiveCheckStatus(ctx context.Context, repoType types.RepositoryType, namespace, name string) error {
 	repo, err := c.rs.FindByPath(ctx, repoType, namespace, name)
 	if err != nil {
 		return fmt.Errorf("failed to find repo, error: %w", err)

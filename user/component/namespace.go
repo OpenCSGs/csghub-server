@@ -9,19 +9,23 @@ import (
 	"opencsg.com/csghub-server/common/types"
 )
 
-type NamespaceComponent struct {
-	ns *database.NamespaceStore
-	os *database.OrgStore
+type namespaceComponentImpl struct {
+	ns database.NamespaceStore
+	os database.OrgStore
 }
 
-func NewNamespaceComponent(config *config.Config) (*NamespaceComponent, error) {
-	return &NamespaceComponent{
+type NamespaceComponent interface {
+	GetInfo(ctx context.Context, path string) (*types.Namespace, error)
+}
+
+func NewNamespaceComponent(config *config.Config) (NamespaceComponent, error) {
+	return &namespaceComponentImpl{
 		ns: database.NewNamespaceStore(),
 		os: database.NewOrgStore(),
 	}, nil
 }
 
-func (c *NamespaceComponent) GetInfo(ctx context.Context, path string) (*types.Namespace, error) {
+func (c *namespaceComponentImpl) GetInfo(ctx context.Context, path string) (*types.Namespace, error) {
 	dbns, err := c.ns.FindByPath(ctx, path)
 	ns := &types.Namespace{
 		Path: dbns.Path,

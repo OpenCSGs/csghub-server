@@ -14,8 +14,16 @@ import (
 	"opencsg.com/csghub-server/component/tagparser"
 )
 
-func NewTagComponent(config *config.Config) (*TagComponent, error) {
-	tc := &TagComponent{}
+type TagComponent interface {
+	AllTags(ctx context.Context) ([]database.Tag, error)
+	ClearMetaTags(ctx context.Context, repoType types.RepositoryType, namespace, name string) error
+	UpdateMetaTags(ctx context.Context, tagScope database.TagScope, namespace, name, content string) ([]*database.RepositoryTag, error)
+	UpdateLibraryTags(ctx context.Context, tagScope database.TagScope, namespace, name, oldFilePath, newFilePath string) error
+	UpdateRepoTagsByCategory(ctx context.Context, tagScope database.TagScope, repoID int64, category string, tagNames []string) error
+}
+
+func NewTagComponent(config *config.Config) (TagComponent, error) {
+	tc := &tagComponentImpl{}
 	tc.ts = database.NewTagStore()
 	tc.rs = database.NewRepoStore()
 	if config.SensitiveCheck.Enable {
@@ -24,23 +32,23 @@ func NewTagComponent(config *config.Config) (*TagComponent, error) {
 	return tc, nil
 }
 
-type TagComponent struct {
-	ts               *database.TagStore
-	rs               *database.RepoStore
+type tagComponentImpl struct {
+	ts               database.TagStore
+	rs               database.RepoStore
 	sensitiveChecker rpc.ModerationSvcClient
 }
 
-func (tc *TagComponent) AllTags(ctx context.Context) ([]database.Tag, error) {
+func (tc *tagComponentImpl) AllTags(ctx context.Context) ([]database.Tag, error) {
 	// TODO: query cache for tags at first
 	return tc.ts.AllTags(ctx)
 }
 
-func (c *TagComponent) ClearMetaTags(ctx context.Context, repoType types.RepositoryType, namespace, name string) error {
+func (c *tagComponentImpl) ClearMetaTags(ctx context.Context, repoType types.RepositoryType, namespace, name string) error {
 	_, err := c.ts.SetMetaTags(ctx, repoType, namespace, name, nil)
 	return err
 }
 
-func (c *TagComponent) UpdateMetaTags(ctx context.Context, tagScope database.TagScope, namespace, name, content string) ([]*database.RepositoryTag, error) {
+func (c *tagComponentImpl) UpdateMetaTags(ctx context.Context, tagScope database.TagScope, namespace, name, content string) ([]*database.RepositoryTag, error) {
 	var (
 		tp       tagparser.TagProcessor
 		repoType types.RepositoryType
@@ -108,7 +116,7 @@ func (c *TagComponent) UpdateMetaTags(ctx context.Context, tagScope database.Tag
 	return repoTags, nil
 }
 
-func (c *TagComponent) UpdateLibraryTags(ctx context.Context, tagScope database.TagScope, namespace, name, oldFilePath, newFilePath string) error {
+func (c *tagComponentImpl) UpdateLibraryTags(ctx context.Context, tagScope database.TagScope, namespace, name, oldFilePath, newFilePath string) error {
 	oldLibTagName := tagparser.LibraryTag(oldFilePath)
 	newLibTagName := tagparser.LibraryTag(newFilePath)
 	// TODO:load from cache
@@ -153,7 +161,7 @@ func (c *TagComponent) UpdateLibraryTags(ctx context.Context, tagScope database.
 	return nil
 }
 
-func (c *TagComponent) UpdateRepoTagsByCategory(ctx context.Context, tagScope database.TagScope, repoID int64, category string, tagNames []string) error {
+func (c *tagComponentImpl) UpdateRepoTagsByCategory(ctx context.Context, tagScope database.TagScope, repoID int64, category string, tagNames []string) error {
 	allTags, err := c.ts.AllTagsByScopeAndCategory(ctx, tagScope, category)
 	if err != nil {
 		return fmt.Errorf("failed to get all tags of scope `%s`, error: %w", tagScope, err)

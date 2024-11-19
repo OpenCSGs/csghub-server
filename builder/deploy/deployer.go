@@ -48,14 +48,14 @@ type deployer struct {
 	ib imagebuilder.Builder
 	ir imagerunner.Runner
 
-	store              *database.DeployTaskStore
-	spaceStore         *database.SpaceStore
-	spaceResourceStore *database.SpaceResourceStore
+	store              database.DeployTaskStore
+	spaceStore         database.SpaceStore
+	spaceResourceStore database.SpaceResourceStore
 	runnerStatuscache  map[string]types.StatusResponse
 	internalRootDomain string
 	sfNode             *snowflake.Node
 	eventPub           *event.EventPublisher
-	rtfm               *database.RuntimeFrameworksStore
+	rtfm               database.RuntimeFrameworksStore
 }
 
 func newDeployer(s scheduler.Scheduler, ib imagebuilder.Builder, ir imagerunner.Runner) (*deployer, error) {

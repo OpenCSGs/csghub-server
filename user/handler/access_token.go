@@ -30,8 +30,8 @@ func NewAccessTokenHandler(config *config.Config) (*AccessTokenHandler, error) {
 }
 
 type AccessTokenHandler struct {
-	c  *component.AccessTokenComponent
-	sc *apicomponent.SensitiveComponent
+	c  component.AccessTokenComponent
+	sc apicomponent.SensitiveComponent
 }
 
 // CreateAccessToken godoc

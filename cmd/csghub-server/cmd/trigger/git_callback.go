@@ -18,7 +18,7 @@ import (
 
 var (
 	callbackComponent *callback.GitCallbackComponent
-	rs                *database.RepoStore
+	rs                database.RepoStore
 	gs                gitserver.GitServer
 
 	repoPaths []string

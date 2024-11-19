@@ -18,7 +18,7 @@ func NewMeteringHandler() (*MeteringHandler, error) {
 }
 
 type MeteringHandler struct {
-	amc *component.MeteringComponent
+	amc component.MeteringComponent
 }
 
 func (mh *MeteringHandler) QueryMeteringStatementByUserID(ctx *gin.Context) {

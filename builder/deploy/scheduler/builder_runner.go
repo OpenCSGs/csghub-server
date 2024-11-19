@@ -18,8 +18,8 @@ type BuilderRunner struct {
 	repo        *RepoInfo
 	task        *database.DeployTask
 	ib          imagebuilder.Builder
-	deployStore *database.DeployTaskStore
-	tokenStore  *database.AccessTokenStore
+	deployStore database.DeployTaskStore
+	tokenStore  database.AccessTokenStore
 }
 
 func NewBuidRunner(b imagebuilder.Builder, r *RepoInfo, t *database.DeployTask) Runner {

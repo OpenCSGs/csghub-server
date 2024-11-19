@@ -12,7 +12,7 @@ import (
 
 // RecomHandler handles requests for repo recommendation
 type RecomHandler struct {
-	c *component.RecomComponent
+	c component.RecomComponent
 }
 
 func NewRecomHandler(cfg *config.Config) (*RecomHandler, error) {
