@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"log/slog"
 	"strconv"
 
 	gitalyclient "gitlab.com/gitlab-org/gitaly/v16/client"
@@ -130,8 +131,9 @@ func (c *Client) ReceivePack(ctx context.Context, req gitserver.ReceivePackReq) 
 			return stream.Send(&gitalypb.PostReceivePackRequest{Data: data})
 		})
 		_, err := io.Copy(sw, req.Request.Body)
-		if err == nil {
-			err = stream.CloseSend()
+		errClose := stream.CloseSend()
+		if errClose != nil {
+			slog.Error("closeSend stream failed", slog.Any("error", errClose))
 		}
 		errC <- err
 	}()

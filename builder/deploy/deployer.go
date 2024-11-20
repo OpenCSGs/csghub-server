@@ -79,7 +79,12 @@ func newDeployer(s scheduler.Scheduler, ib imagebuilder.Builder, ir imagerunner.
 	}
 
 	go d.refreshStatus()
-	go func() { _ = d.s.Run() }()
+	go func() {
+		err = d.s.Run()
+		if err != nil {
+			slog.Error("run scheduler failed", slog.Any("error", err))
+		}
+	}()
 	go d.startAccounting()
 
 	return d, nil
@@ -219,7 +224,7 @@ func (d *deployer) Deploy(ctx context.Context, dr types.DeployRepo) (int64, erro
 	}
 	err = d.store.CreateDeployTask(ctx, buildTask)
 	if err != nil {
-		return -1, err
+		return -1, fmt.Errorf("failed to create deploy task: %w", err)
 	}
 	runTask := &database.DeployTask{
 		DeployID: deploy.ID,
@@ -227,10 +232,14 @@ func (d *deployer) Deploy(ctx context.Context, dr types.DeployRepo) (int64, erro
 	}
 	err = d.store.CreateDeployTask(ctx, runTask)
 	if err != nil {
-		return -1, err
+		return -1, fmt.Errorf("failed to create deploy task: %w", err)
 	}
 
-	go func() { _ = d.s.Queue(buildTask.ID) }()
+	go func() {
+		if err := d.s.Queue(buildTask.ID); err != nil {
+			slog.Error("failed to queue task", slog.Any("error", err))
+		}
+	}()
 
 	return deploy.ID, nil
 }
@@ -610,7 +619,7 @@ func (d *deployer) StartDeploy(ctx context.Context, deploy *database.Deploy) err
 	}
 	err = d.store.CreateDeployTask(ctx, runTask)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to create deploy task: %w", err)
 	}
 
 	go func() { _ = d.s.Queue(runTask.ID) }()

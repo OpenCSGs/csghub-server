@@ -177,7 +177,7 @@ func (r *RuntimeArchitectureHandler) ScanArchitecture(ctx *gin.Context) {
 	err = ctx.ShouldBindJSON(&req)
 	if err != nil {
 		slog.Error("Failed to bind json", slog.Any("error", err))
-		httpbase.ServerError(ctx, err)
+		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
 

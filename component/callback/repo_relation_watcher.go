@@ -77,9 +77,7 @@ func WatchRepoRelation(req *types.GiteaCallbackPushReq, ss database.RepoStore,
 func (w *repoRelationWatcher) Run() error {
 	var err error
 	for _, op := range w.ops {
-		if e := errors.Join(err, op()); e != nil {
-			return e
-		}
+		err = errors.Join(err, op())
 	}
 	return err
 }
