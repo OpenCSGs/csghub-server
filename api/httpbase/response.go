@@ -40,13 +40,21 @@ func ServerError(c *gin.Context, err error) {
 	})
 }
 
-// UnauthorizedError responds with a JSON-formatted error message.
+// UnauthorizedError if the client is not authenticated or the authentication is invalid.
+// Like user not login, for example.
 //
-// Example:
+// Response Example:
 //
 //	UnauthorizedError(c, errors.New("permission denied"))
 func UnauthorizedError(c *gin.Context, err error) {
 	c.PureJSON(http.StatusUnauthorized, R{
+		Msg: err.Error(),
+	})
+}
+
+// ForbiddenError if the client is authenticated but does not have enough permissions.
+func ForbiddenError(c *gin.Context, err error) {
+	c.PureJSON(http.StatusForbidden, R{
 		Msg: err.Error(),
 	})
 }

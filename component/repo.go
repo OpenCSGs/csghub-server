@@ -866,7 +866,7 @@ func (c *repoComponentImpl) LastCommit(ctx context.Context, req *types.GetCommit
 		return nil, fmt.Errorf("failed to get user repo permission, error: %w", err)
 	}
 	if !permission.CanRead {
-		return nil, ErrUnauthorized
+		return nil, ErrForbidden
 	}
 
 	if req.Ref == "" {
