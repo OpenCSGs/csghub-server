@@ -40,7 +40,6 @@ func TestTagStore_FindOrCreate(t *testing.T) {
 	require.Equal(t, newTag.ID, existingTag.ID)
 }
 
-// TestAllTags tests the AllTags method
 func TestTagStore_AllTags(t *testing.T) {
 	db := tests.InitTestDB()
 	defer db.Close()
@@ -58,29 +57,45 @@ func TestTagStore_AllTags(t *testing.T) {
 	require.Empty(t, err)
 	require.Equal(t, 0, len(tags))
 
-	var newTags []*database.Tag
-	newTags = append(newTags, &database.Tag{
-		Name:     "tag_" + uuid.NewString(),
-		Category: "task",
-		Group:    "",
-		Scope:    database.ModelTagScope,
-		BuiltIn:  true,
-		ShowName: "tag one",
-	})
-	newTags = append(newTags, &database.Tag{
-		Name:     "tag_" + uuid.NewString(),
-		Category: "task",
-		Group:    "",
-		Scope:    database.ModelTagScope,
-		BuiltIn:  true,
-		ShowName: "tag one",
-	})
-	err = ts.SaveTags(ctx, newTags)
+	modelTag, err := ts.CreateTag(ctx, "task", "tag_"+uuid.New().String(), "Group One", database.ModelTagScope)
+	require.Empty(t, err)
+	datasetTag, err := ts.CreateTag(ctx, "library", "tag_"+uuid.New().String(), "Group One", database.DatasetTagScope)
+	require.Empty(t, err)
+	codeTag, err := ts.CreateTag(ctx, "task", "tag_"+uuid.New().String(), "Group One", database.CodeTagScope)
+	require.Empty(t, err)
+	promptTag, err := ts.CreateTag(ctx, "library", "tag_"+uuid.New().String(), "Group One", database.PromptTagScope)
+	require.Empty(t, err)
+	spaceTag, err := ts.CreateTag(ctx, "library", "tag_"+uuid.New().String(), "Group One", database.SpaceTagScope)
 	require.Empty(t, err)
 
 	tags, err = ts.AllTags(ctx)
 	require.Empty(t, err)
-	require.Equal(t, 2, len(tags))
+	require.Equal(t, 5, len(tags))
+
+	modelTags, err := ts.AllModelTags(ctx)
+	require.Empty(t, err)
+	require.Equal(t, 1, len(modelTags))
+	require.Equal(t, modelTag.Name, modelTags[0].Name)
+
+	datasetTags, err := ts.AllDatasetTags(ctx)
+	require.Empty(t, err)
+	require.Equal(t, 1, len(datasetTags))
+	require.Equal(t, datasetTag.Name, datasetTags[0].Name)
+
+	codeTags, err := ts.AllCodeTags(ctx)
+	require.Empty(t, err)
+	require.Equal(t, 1, len(codeTags))
+	require.Equal(t, codeTag.Name, codeTags[0].Name)
+
+	promptTags, err := ts.AllPromptTags(ctx)
+	require.Empty(t, err)
+	require.Equal(t, 1, len(promptTags))
+	require.Equal(t, promptTag.Name, promptTags[0].Name)
+
+	spaceTags, err := ts.AllSpaceTags(ctx)
+	require.Empty(t, err)
+	require.Equal(t, 1, len(spaceTags))
+	require.Equal(t, spaceTag.Name, spaceTags[0].Name)
 }
 
 // TestAllTagsByScope tests the AllTagsByScope method
@@ -143,151 +158,6 @@ func TestTagStore_GetTagsByScopeAndCategories(t *testing.T) {
 	tags, err := ts.GetTagsByScopeAndCategories(ctx, "test_scope", []string{"task", "library"})
 	require.Empty(t, err)
 	require.Len(t, tags, 2)
-}
-
-// TestAllModelTags tests the AllModelTags method
-func TestTagStore_AllModelTags(t *testing.T) {
-	db := tests.InitTestDB()
-	defer db.Close()
-
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer cancel()
-
-	var err error
-	//clear all existing data
-	_, err = db.Core.NewDelete().Model(&database.Tag{}).Where("1=1").Exec(ctx)
-	require.Empty(t, err)
-
-	ts := database.NewTagStoreWithDB(db)
-	tags, err := ts.AllModelTags(ctx)
-	require.Empty(t, err)
-	require.Len(t, tags, 0)
-
-	_, err = ts.CreateTag(ctx, "task", "tag_"+uuid.New().String(), "Group One", database.ModelTagScope)
-	require.Empty(t, err)
-	_, err = ts.CreateTag(ctx, "library", "tag_"+uuid.New().String(), "Group One", database.DatasetTagScope)
-	require.Empty(t, err)
-
-	tags, err = ts.AllModelTags(ctx)
-	require.Empty(t, err)
-	require.Len(t, tags, 1)
-
-}
-
-// TestAllPromptTags tests the AllPromptTags method
-func TestTagStore_AllPromptTags(t *testing.T) {
-	db := tests.InitTestDB()
-	defer db.Close()
-
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer cancel()
-
-	var err error
-	//clear all existing data
-	_, err = db.Core.NewDelete().Model(&database.Tag{}).Where("1=1").Exec(ctx)
-	require.Empty(t, err)
-
-	ts := database.NewTagStoreWithDB(db)
-	tags, err := ts.AllPromptTags(ctx)
-	require.Empty(t, err)
-	require.Len(t, tags, 0)
-
-	_, err = ts.CreateTag(ctx, "task", "tag_"+uuid.New().String(), "Group One", database.PromptTagScope)
-	require.Empty(t, err)
-	_, err = ts.CreateTag(ctx, "library", "tag_"+uuid.New().String(), "Group One", database.DatasetTagScope)
-	require.Empty(t, err)
-
-	tags, err = ts.AllPromptTags(ctx)
-	require.Empty(t, err)
-	require.Len(t, tags, 1)
-
-}
-
-// TestAllDatasetTags tests the AllDatasetTags method
-func TestTagStore_AllDatasetTags(t *testing.T) {
-	db := tests.InitTestDB()
-	defer db.Close()
-
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer cancel()
-
-	var err error
-	//clear all existing data
-	_, err = db.Core.NewDelete().Model(&database.Tag{}).Where("1=1").Exec(ctx)
-	require.Empty(t, err)
-
-	ts := database.NewTagStoreWithDB(db)
-	tags, err := ts.AllDatasetTags(ctx)
-	require.Empty(t, err)
-	require.Len(t, tags, 0)
-
-	_, err = ts.CreateTag(ctx, "task", "tag_"+uuid.New().String(), "Group One", database.PromptTagScope)
-	require.Empty(t, err)
-	_, err = ts.CreateTag(ctx, "library", "tag_"+uuid.New().String(), "Group One", database.DatasetTagScope)
-	require.Empty(t, err)
-
-	tags, err = ts.AllDatasetTags(ctx)
-	require.Empty(t, err)
-	require.Len(t, tags, 1)
-
-}
-
-// TestAllCodeTags tests the AllCodeTags method
-func TestTagStore_AllCodeTags(t *testing.T) {
-	db := tests.InitTestDB()
-	defer db.Close()
-
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer cancel()
-
-	var err error
-	//clear all existing data
-	_, err = db.Core.NewDelete().Model(&database.Tag{}).Where("1=1").Exec(ctx)
-	require.Empty(t, err)
-
-	ts := database.NewTagStoreWithDB(db)
-	tags, err := ts.AllCodeTags(ctx)
-	require.Empty(t, err)
-	require.Len(t, tags, 0)
-
-	_, err = ts.CreateTag(ctx, "task", "tag_"+uuid.New().String(), "Group One", database.CodeTagScope)
-	require.Empty(t, err)
-	_, err = ts.CreateTag(ctx, "library", "tag_"+uuid.New().String(), "Group One", database.DatasetTagScope)
-	require.Empty(t, err)
-
-	tags, err = ts.AllCodeTags(ctx)
-	require.Empty(t, err)
-	require.Len(t, tags, 1)
-
-}
-
-// TestAllSpaceTags tests the AllSpaceTags method
-func TestTagStore_AllSpaceTags(t *testing.T) {
-	db := tests.InitTestDB()
-	defer db.Close()
-
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer cancel()
-
-	var err error
-	//clear all existing data
-	_, err = db.Core.NewDelete().Model(&database.Tag{}).Where("1=1").Exec(ctx)
-	require.Empty(t, err)
-
-	ts := database.NewTagStoreWithDB(db)
-	tags, err := ts.AllSpaceTags(ctx)
-	require.Empty(t, err)
-	require.Len(t, tags, 0)
-
-	_, err = ts.CreateTag(ctx, "task", "tag_"+uuid.New().String(), "Group One", database.SpaceTagScope)
-	require.Empty(t, err)
-	_, err = ts.CreateTag(ctx, "library", "tag_"+uuid.New().String(), "Group One", database.DatasetTagScope)
-	require.Empty(t, err)
-
-	tags, err = ts.AllSpaceTags(ctx)
-	require.Empty(t, err)
-	require.Len(t, tags, 1)
-
 }
 
 // TestAllModelCategories tests the AllModelCategories method
