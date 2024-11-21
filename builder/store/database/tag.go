@@ -63,8 +63,6 @@ const (
 	PromptTagScope  TagScope = "prompt"
 )
 
-const defaultTagGroup = ""
-
 type Tag struct {
 	ID       int64    `bun:",pk,autoincrement" json:"id"`
 	Name     string   `bun:",notnull" json:"name" yaml:"name"`
