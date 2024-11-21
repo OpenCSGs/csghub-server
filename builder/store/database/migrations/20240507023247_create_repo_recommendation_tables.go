@@ -11,7 +11,7 @@ import (
 
 func init() {
 	Migrations.MustRegister(func(ctx context.Context, db *bun.DB) error {
-		dropTables(ctx, db, database.RecomOpWeight{}, database.RecomRepoScore{}, database.RecomWeight{})
+		_ = dropTables(ctx, db, database.RecomOpWeight{}, database.RecomRepoScore{}, database.RecomWeight{})
 		err := createTables(ctx, db, database.RecomOpWeight{}, database.RecomRepoScore{}, database.RecomWeight{})
 		if err != nil {
 			return err

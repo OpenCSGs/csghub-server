@@ -192,9 +192,6 @@ func (c *gitHTTPComponentImpl) BuildObjectResponse(ctx context.Context, req type
 		objectKey := path.Join("lfs", obj.RelativePath())
 		_, err := c.s3Client.StatObject(ctx, c.config.S3.Bucket, objectKey, minio.StatObjectOptions{})
 		if err != nil {
-			if os.IsNotExist(err) {
-				exists = false
-			}
 			slog.Error("failed to check if lfs file exists", slog.String("oid", objectKey), slog.Any("error", err))
 			exists = false
 		} else {
@@ -346,7 +343,7 @@ func (c *gitHTTPComponentImpl) LfsUpload(ctx context.Context, body io.ReadCloser
 				hash := sha256.New()
 				written, err := io.Copy(hash, body)
 				if err != nil {
-					slog.Error("Error creating hash. Error: %v", err)
+					slog.Error("Error creating hash. Error", "error", err)
 					return err
 				}
 

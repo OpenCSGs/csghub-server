@@ -1599,10 +1599,8 @@ func getSourceRepoPathFromSourceUrl(sourceUrl string) (string, error) {
 	// Remove leading and trailing slashes
 	path := strings.Trim(parsedURL.Path, "/")
 
-	// Remove ".git" suffix if present
-	if strings.HasSuffix(path, ".git") {
-		path = strings.TrimSuffix(path, ".git")
-	}
+	// Remove ".git" suffix
+	path = strings.TrimSuffix(path, ".git")
 
 	return path, nil
 }

@@ -286,7 +286,7 @@ func (c *mirrorComponentImpl) CreateMirrorRepo(ctx context.Context, req types.Cr
 }
 
 func (m *mirrorComponentImpl) mapNamespaceAndName(sourceNamespace string) string {
-	namespace := sourceNamespace
+	var namespace string
 	if ns, found := mirrorOrganizationMap[sourceNamespace]; found {
 		namespace = ns
 	} else {

@@ -76,7 +76,7 @@ func InitTestDB() *database.DB {
 	}
 
 	// switch to project root, so migrations can work correctly
-	os.Chdir("../../../")
+	_ = os.Chdir("../../../")
 	bdb, err := newBun(ctx, database.DBConfig{
 		Dialect: database.DialectPostgres,
 		DSN:     dsn + "sslmode=disable",

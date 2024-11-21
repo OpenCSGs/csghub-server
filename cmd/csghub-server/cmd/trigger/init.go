@@ -7,7 +7,6 @@ import (
 	"opencsg.com/csghub-server/builder/git"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/config"
-	"opencsg.com/csghub-server/component/callback"
 )
 
 func init() {
@@ -40,10 +39,6 @@ var Cmd = &cobra.Command{
 		}
 		rs = database.NewRepoStore()
 		gs, err = git.NewGitServer(config)
-		if err != nil {
-			return
-		}
-		callbackComponent, err = callback.NewGitCallback(config)
 		if err != nil {
 			return
 		}

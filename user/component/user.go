@@ -107,11 +107,11 @@ func NewUserComponent(config *config.Config) (UserComponent, error) {
 	return c, nil
 }
 
-// This function creates a user when user register from portal, without casdoor
-func (c *userComponentImpl) createFromPortalRegistry(ctx context.Context, req types.CreateUserRequest) (*database.User, error) {
-	// Panic if the function has not been implemented
-	panic("implement me later")
-}
+// // This function creates a user when user register from portal, without casdoor
+// func (c *userComponentImpl) createFromPortalRegistry(ctx context.Context, req types.CreateUserRequest) (*database.User, error) {
+// 	// Panic if the function has not been implemented
+// 	panic("implement me later")
+// }
 
 func (c *userComponentImpl) createFromCasdoorUser(ctx context.Context, cu casdoorsdk.User) (*database.User, error) {
 	var (
@@ -355,9 +355,9 @@ func (c *userComponentImpl) Delete(ctx context.Context, operator, username strin
 	}
 	slog.Debug("delete user from git server", slog.String("operator", operator), slog.String("username", user.Username))
 
-	if c.config.GitServer.Type == types.GitServerTypeGitea {
-		// gitea gitserver does not support delete user, you could create a pr to our repo to fix it
-	}
+	// if c.config.GitServer.Type == types.GitServerTypeGitea {
+	// 	// gitea gitserver does not support delete user, you could create a pr to our repo to fix it
+	// }
 
 	if c.config.GitServer.Type == types.GitServerTypeGitaly {
 		repos, err := c.repo.ByUser(ctx, user.ID)

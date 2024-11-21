@@ -41,7 +41,7 @@ func (m *Metering) startMetering() {
 }
 
 func (m *Metering) preReadMsgs() {
-	var err error = nil
+	var err error
 	var i int = 0
 	for {
 		i++

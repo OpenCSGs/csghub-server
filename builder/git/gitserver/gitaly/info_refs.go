@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"log/slog"
 	"strconv"
-	"time"
 
 	gitalyclient "gitlab.com/gitlab-org/gitaly/v16/client"
 	gitalypb "gitlab.com/gitlab-org/gitaly/v16/proto/go/gitalypb"
@@ -13,9 +13,9 @@ import (
 	"opencsg.com/csghub-server/builder/git/gitserver"
 )
 
-var (
-	uploadPackTimeout = 10 * time.Minute
-)
+// var (
+// 	uploadPackTimeout = 10 * time.Minute
+// )
 
 func (c *Client) InfoRefsResponse(ctx context.Context, req gitserver.InfoRefsReq) (io.Reader, error) {
 	repoType := fmt.Sprintf("%ss", string(req.RepoType))
@@ -131,7 +131,10 @@ func (c *Client) ReceivePack(ctx context.Context, req gitserver.ReceivePackReq) 
 			return stream.Send(&gitalypb.PostReceivePackRequest{Data: data})
 		})
 		_, err := io.Copy(sw, req.Request.Body)
-		stream.CloseSend()
+		errClose := stream.CloseSend()
+		if errClose != nil {
+			slog.Error("closeSend stream failed", slog.Any("error", errClose))
+		}
 		errC <- err
 	}()
 

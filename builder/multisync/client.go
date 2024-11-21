@@ -45,7 +45,7 @@ func (c *commonClient) Latest(ctx context.Context, currentVersion int64) (types.
 
 	if resp.StatusCode != http.StatusOK {
 		var data bytes.Buffer
-		data.ReadFrom(resp.Body)
+		_, _ = data.ReadFrom(resp.Body)
 		return types.SyncVersionResponse{}, fmt.Errorf("failed to get latest version from endpoint %s, param cur:%d, status code: %d, body: %s",
 			c.endpoint, currentVersion, resp.StatusCode, data.String())
 	}

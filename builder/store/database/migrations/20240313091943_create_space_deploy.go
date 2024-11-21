@@ -26,7 +26,7 @@ type Deploy struct {
 
 func init() {
 	Migrations.MustRegister(func(ctx context.Context, db *bun.DB) error {
-		dropTables(ctx, db, database.Space{})
+		_ = dropTables(ctx, db, database.Space{})
 		return createTables(ctx, db, database.Space{}, Deploy{}, database.DeployTask{})
 	}, func(ctx context.Context, db *bun.DB) error {
 		return dropTables(ctx, db, Deploy{}, database.DeployTask{})

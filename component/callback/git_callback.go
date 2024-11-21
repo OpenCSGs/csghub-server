@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 	"path"
+	"strconv"
 	"strings"
 	"time"
 
@@ -401,7 +402,11 @@ func (c *GitCallbackComponent) updateModelRuntimeFrameworks(ctx context.Context,
 	//add resource tag, like ascend
 	runtime_framework_tags, _ := c.ts.GetTagsByScopeAndCategories(ctx, "model", []string{"runtime_framework", "resource"})
 	fields := strings.Split(repo.Path, "/")
-	c.rac.AddResourceTag(ctx, runtime_framework_tags, fields[1], repo.ID)
+	err = c.rac.AddResourceTag(ctx, runtime_framework_tags, fields[1], repo.ID)
+	if err != nil {
+		slog.Warn("fail to add resource tag", slog.Any("error", err))
+		return
+	}
 	runtimes, err := c.ras.ListByRArchNameAndModel(ctx, arch, fields[1])
 	// to do check resource models
 	if err != nil {
@@ -420,9 +425,9 @@ func (c *GitCallbackComponent) updateModelRuntimeFrameworks(ctx context.Context,
 		return
 	}
 	slog.Debug("get new frames by arch for git callback", slog.Any("namespace", namespace), slog.Any("repoName", repoName), slog.Any("newFrames", newFrames))
-	var newFrameMap map[string]string = make(map[string]string)
+	var newFrameMap = make(map[string]string)
 	for _, frame := range newFrames {
-		newFrameMap[string(frame.ID)] = string(frame.ID)
+		newFrameMap[strconv.FormatInt(frame.ID, 10)] = strconv.FormatInt(frame.ID, 10)
 	}
 	slog.Debug("get new frame map by arch for git callback", slog.Any("namespace", namespace), slog.Any("repoName", repoName), slog.Any("newFrameMap", newFrameMap))
 	oldRepoRuntimes, err := c.rrf.GetByRepoIDs(ctx, repo.ID)
@@ -431,16 +436,16 @@ func (c *GitCallbackComponent) updateModelRuntimeFrameworks(ctx context.Context,
 		return
 	}
 	slog.Debug("get old frames by arch for git callback", slog.Any("namespace", namespace), slog.Any("repoName", repoName), slog.Any("oldRepoRuntimes", oldRepoRuntimes))
-	var oldFrameMap map[string]string = make(map[string]string)
+	var oldFrameMap = make(map[string]string)
 	// get map
 	for _, runtime := range oldRepoRuntimes {
-		oldFrameMap[string(runtime.RuntimeFrameworkID)] = string(runtime.RuntimeFrameworkID)
+		oldFrameMap[strconv.FormatInt(runtime.RuntimeFrameworkID, 10)] = strconv.FormatInt(runtime.RuntimeFrameworkID, 10)
 	}
 	slog.Debug("get old frame map by arch for git callback", slog.Any("namespace", namespace), slog.Any("repoName", repoName), slog.Any("oldFrameMap", oldFrameMap))
 	// remove incorrect relation
 	for _, old := range oldRepoRuntimes {
 		// check if it need remove
-		_, exist := newFrameMap[string(old.RuntimeFrameworkID)]
+		_, exist := newFrameMap[strconv.FormatInt(old.RuntimeFrameworkID, 10)]
 		if !exist {
 			// remove incorrect relations
 			err := c.rrf.Delete(ctx, old.RuntimeFrameworkID, repo.ID, old.Type)
@@ -455,7 +460,7 @@ func (c *GitCallbackComponent) updateModelRuntimeFrameworks(ctx context.Context,
 	// add new relation
 	for _, new := range newFrames {
 		// check if it need add
-		_, exist := oldFrameMap[string(new.ID)]
+		_, exist := oldFrameMap[strconv.FormatInt(new.ID, 10)]
 		if !exist {
 			// add new relations
 			err := c.rrf.Add(ctx, new.ID, repo.ID, new.Type)

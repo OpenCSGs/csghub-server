@@ -88,7 +88,7 @@ func (rs *FIFOScheduler) Run() error {
 				rs.failDeployFollowingTasks(t.WatchID(), err.Error())
 			}
 
-			rs.next()
+			_, _ = rs.next()
 		}(t)
 	}
 
@@ -97,9 +97,9 @@ func (rs *FIFOScheduler) Run() error {
 
 func (rs *FIFOScheduler) Queue(deployTaskID int64) error {
 	// simply trigger next task
-	rs.next()
+	_, err := rs.next()
 
-	return nil
+	return err
 }
 
 // run next task
@@ -179,7 +179,10 @@ func (rs *FIFOScheduler) next() (Runner, error) {
 			// mark task as cancelled
 			deployTask.Status = cancelled
 			deployTask.Message = "repo not found"
-			rs.store.UpdateDeployTask(ctx, deployTask)
+			err = rs.store.UpdateDeployTask(ctx, deployTask)
+			if err != nil {
+				slog.Error("update deploy task failed", "error", err)
+			}
 		}
 		t = &sleepTask{
 			du: 5 * time.Second,

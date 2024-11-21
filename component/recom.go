@@ -51,12 +51,12 @@ func (rc *recomComponentImpl) SetOpWeight(ctx context.Context, repoID, weight in
 func (rc *recomComponentImpl) CalculateRecomScore(ctx context.Context) {
 	weights, err := rc.loadWeights()
 	if err != nil {
-		slog.Error("Error loading weights", err)
+		slog.Error("Error loading weights", "error", err)
 		return
 	}
 	repos, err := rc.repos.All(ctx)
 	if err != nil {
-		slog.Error("Error fetching repositories", err)
+		slog.Error("Error fetching repositories", "error", err)
 		return
 	}
 	for _, repo := range repos {
@@ -95,13 +95,13 @@ func (rc *recomComponentImpl) calcFreshnessScore(createdAt time.Time, weightExp 
 	// TODO:cache compiled script
 	hours := time.Since(createdAt).Hours()
 	scriptFreshness := tengo.NewScript([]byte(weightExp))
-	scriptFreshness.Add("score", 0.0)
-	scriptFreshness.Add("hours", 0)
+	_ = scriptFreshness.Add("score", 0.0)
+	_ = scriptFreshness.Add("hours", 0)
 	sc, err := scriptFreshness.Compile()
 	if err != nil {
 		panic(err)
 	}
-	sc.Set("hours", hours)
+	_ = sc.Set("hours", hours)
 	err = sc.Run()
 	if err != nil {
 		panic(err)
@@ -113,13 +113,13 @@ func (rc *recomComponentImpl) calcFreshnessScore(createdAt time.Time, weightExp 
 func (rc *recomComponentImpl) calcDownloadsScore(downloads int64, weightExp string) float64 {
 	// TODO:cache compiled script
 	scriptFreshness := tengo.NewScript([]byte(weightExp))
-	scriptFreshness.Add("score", 0.0)
-	scriptFreshness.Add("downloads", 0)
+	_ = scriptFreshness.Add("score", 0.0)
+	_ = scriptFreshness.Add("downloads", 0)
 	sc, err := scriptFreshness.Compile()
 	if err != nil {
 		panic(err)
 	}
-	sc.Set("downloads", downloads)
+	_ = sc.Set("downloads", downloads)
 	err = sc.Run()
 	if err != nil {
 		panic(err)
@@ -169,16 +169,16 @@ func (rc *recomComponentImpl) loadWeights() (map[string]string, error) {
 	return weights, nil
 }
 
-func (rc *recomComponentImpl) loadOpWeights() (map[int64]int, error) {
-	ctx := context.Background()
-	items, err := rc.rs.LoadOpWeights(ctx)
-	if err != nil {
-		return nil, err
-	}
+// func (rc *recomComponentImpl) loadOpWeights() (map[int64]int, error) {
+// 	ctx := context.Background()
+// 	items, err := rc.rs.LoadOpWeights(ctx)
+// 	if err != nil {
+// 		return nil, err
+// 	}
 
-	weights := make(map[int64]int)
-	for _, item := range items {
-		weights[item.RepositoryID] = item.Weight
-	}
-	return weights, nil
-}
+// 	weights := make(map[int64]int)
+// 	for _, item := range items {
+// 		weights[item.RepositoryID] = item.Weight
+// 	}
+// 	return weights, nil
+// }

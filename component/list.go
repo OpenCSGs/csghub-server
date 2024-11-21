@@ -33,7 +33,7 @@ func (c *listComponentImpl) ListModelsByPath(ctx context.Context, req *types.Lis
 
 	models, err := c.ms.ListByPath(ctx, req.Paths)
 	if err != nil {
-		slog.Error("error listing models by path: %v", err, slog.Any("paths", req.Paths))
+		slog.Error("error listing models by path", "error", err, slog.Any("paths", req.Paths))
 		return nil, err
 	}
 	for _, model := range models {
@@ -69,7 +69,7 @@ func (c *listComponentImpl) ListDatasetsByPath(ctx context.Context, req *types.L
 
 	datasets, err := c.ds.ListByPath(ctx, req.Paths)
 	if err != nil {
-		slog.Error("error listing datasets by path: %v", err, slog.Any("paths", req.Paths))
+		slog.Error("error listing datasets by path", "error", err, slog.Any("paths", req.Paths))
 		return nil, err
 	}
 	for _, dataset := range datasets {

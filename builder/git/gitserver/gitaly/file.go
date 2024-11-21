@@ -204,9 +204,18 @@ func (c *Client) CreateRepoFile(req *types.CreateFileReq) (err error) {
 			},
 		},
 	}
-	userCommitFilesClient.Send(actions[0])
-	userCommitFilesClient.Send(actions[1])
-	userCommitFilesClient.Send(actions[2])
+	err = userCommitFilesClient.Send(actions[0])
+	if err != nil {
+		return err
+	}
+	err = userCommitFilesClient.Send(actions[1])
+	if err != nil {
+		return err
+	}
+	err = userCommitFilesClient.Send(actions[2])
+	if err != nil {
+		return err
+	}
 	_, err = userCommitFilesClient.CloseAndRecv()
 	if err != nil {
 		return err
@@ -281,9 +290,18 @@ func (c *Client) UpdateRepoFile(req *types.UpdateFileReq) (err error) {
 			},
 		},
 	}
-	userCommitFilesClient.Send(actions[0])
-	userCommitFilesClient.Send(actions[1])
-	userCommitFilesClient.Send(actions[2])
+	err = userCommitFilesClient.Send(actions[0])
+	if err != nil {
+		return err
+	}
+	err = userCommitFilesClient.Send(actions[1])
+	if err != nil {
+		return err
+	}
+	err = userCommitFilesClient.Send(actions[2])
+	if err != nil {
+		return err
+	}
 	_, err = userCommitFilesClient.CloseAndRecv()
 	if err != nil {
 		return err
@@ -349,8 +367,14 @@ func (c *Client) DeleteRepoFile(req *types.DeleteFileReq) (err error) {
 			},
 		},
 	}
-	userCommitFilesClient.Send(actions[0])
-	userCommitFilesClient.Send(actions[1])
+	err = userCommitFilesClient.Send(actions[0])
+	if err != nil {
+		return err
+	}
+	err = userCommitFilesClient.Send(actions[1])
+	if err != nil {
+		return err
+	}
 	_, err = userCommitFilesClient.CloseAndRecv()
 	if err != nil {
 		return err

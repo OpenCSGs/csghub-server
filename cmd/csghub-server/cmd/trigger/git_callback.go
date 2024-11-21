@@ -13,13 +13,12 @@ import (
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/types"
-	"opencsg.com/csghub-server/component/callback"
 )
 
 var (
-	callbackComponent *callback.GitCallbackComponent
-	rs                database.RepoStore
-	gs                gitserver.GitServer
+	// callbackComponent *callback.GitCallbackComponent
+	rs database.RepoStore
+	gs gitserver.GitServer
 
 	repoPaths []string
 )
