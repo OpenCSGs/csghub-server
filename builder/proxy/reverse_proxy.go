@@ -8,7 +8,6 @@ import (
 
 type ReverseProxy struct {
 	target *url.URL
-	proxy  *httputil.ReverseProxy
 }
 
 func NewReverseProxy(target string) (*ReverseProxy, error) {

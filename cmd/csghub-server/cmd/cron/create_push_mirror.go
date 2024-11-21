@@ -54,6 +54,10 @@ var cmdCreatePushMirror = &cobra.Command{
 			slog.Error("failed to create mirror component", "err", err)
 			return
 		}
-		c.CreatePushMirrorForFinishedMirrorTask(cmd.Context())
+		err = c.CreatePushMirrorForFinishedMirrorTask(cmd.Context())
+		if err != nil {
+			slog.Error("failed to create push mirror task", "err", err)
+			return
+		}
 	},
 }

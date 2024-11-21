@@ -3,6 +3,7 @@ package database
 import (
 	"context"
 	"fmt"
+	"log/slog"
 )
 
 type repoRelationsStoreImpl struct {
@@ -66,7 +67,9 @@ func (r *repoRelationsStoreImpl) Override(ctx context.Context, from int64, to ..
 	}
 	_, err = tx.NewDelete().Model((*RepoRelation)(nil)).Where("from_repo_id = ?", from).Exec(ctx)
 	if err != nil {
-		tx.Rollback()
+		if er := tx.Rollback(); er != nil {
+			slog.Error("rollback failed", "error", er)
+		}
 		return fmt.Errorf("failed to delete existing relations: %w", err)
 	}
 
@@ -74,7 +77,9 @@ func (r *repoRelationsStoreImpl) Override(ctx context.Context, from int64, to ..
 		_, err = tx.NewInsert().Model(&relations).
 			Exec(ctx)
 		if err != nil {
-			tx.Rollback()
+			if er := tx.Rollback(); er != nil {
+				slog.Error("tx rollback failed", "error", er)
+			}
 			return fmt.Errorf("failed to insert relations: %w", err)
 		}
 	}

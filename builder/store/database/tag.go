@@ -254,10 +254,13 @@ func (ts *tagStoreImpl) SetMetaTags(ctx context.Context, repoType types.Reposito
 	// select all repo tags which are not Library tags
 	err = ts.db.Operator.Core.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
 		// remove all tags of the repository not belongs to category "Library", and then add new tags
-		tx.NewDelete().
+		_, err := tx.NewDelete().
 			Model(&RepositoryTag{}).
 			Where("repository_id =? and tag_id in (?)", repo.ID, bun.In(metaTagIds)).
 			Exec(ctx)
+		if err != nil {
+			return err
+		}
 		// no new tags to insert
 		if len(tags) == 0 {
 			return nil
@@ -270,7 +273,7 @@ func (ts *tagStoreImpl) SetMetaTags(ctx context.Context, repoType types.Reposito
 			repoTags = append(repoTags, repoTag)
 		}
 		// batch insert
-		_, err := tx.NewInsert().Model(&repoTags).Exec(ctx)
+		_, err = tx.NewInsert().Model(&repoTags).Exec(ctx)
 		if err != nil {
 			return fmt.Errorf("failed to batch insert repository meta tags, path:%v/%v,error:%w", namespace, name, err)
 		}

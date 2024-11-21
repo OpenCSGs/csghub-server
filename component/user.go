@@ -93,7 +93,7 @@ type userComponentImpl struct {
 	deploy         database.DeployTaskStore
 	cos            database.CollectionStore
 	ac             AccountingComponent
-	srs            database.SpaceResourceStore
+	// srs            database.SpaceResourceStore
 	// urs            *database.UserResourcesStore
 	pt database.PromptStore
 }
@@ -550,7 +550,7 @@ func (c *userComponentImpl) ListDeploys(ctx context.Context, repoType types.Repo
 		endpoint, _ := c.repoComponent.generateEndpoint(ctx, d)
 		repoPath := strings.TrimPrefix(deploy.GitPath, string(repoType)+"s_")
 		var hardware types.HardWare
-		json.Unmarshal([]byte(deploy.Hardware), &hardware)
+		_ = json.Unmarshal([]byte(deploy.Hardware), &hardware)
 		resourceType := ""
 		if hardware.Gpu.Num != "" {
 			resourceType = hardware.Gpu.Type

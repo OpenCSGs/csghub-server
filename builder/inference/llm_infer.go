@@ -168,7 +168,10 @@ func (c *llmInferClient) GetModelInfo(id ModelID) (ModelInfo, error) {
 
 func (c *llmInferClient) CallPredict(url string, req *PredictRequest) (*PredictResponse, error) {
 	var body bytes.Buffer
-	json.NewEncoder(&body).Encode(req)
+	err := json.NewEncoder(&body).Encode(req)
+	if err != nil {
+		return nil, err
+	}
 	resp, err := c.hc.Post(url, "application/json", &body)
 	if err != nil {
 		return nil, fmt.Errorf("failed to send http request,error: %w", err)

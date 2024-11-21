@@ -58,7 +58,7 @@ func (mq *MirrorQueue) Push(t *MirrorTask) {
 	if t.CreatedAt == 0 {
 		t.CreatedAt = time.Now().Unix()
 	}
-	mq.redis.ZAdd(context.Background(), mq.QueueName, redis.Z{
+	_ = mq.redis.ZAdd(context.Background(), mq.QueueName, redis.Z{
 		Score:  float64(t.CreatedAt) * float64(t.Priority),
 		Member: t,
 	})
@@ -70,7 +70,7 @@ func (mq *MirrorQueue) Pop() *MirrorTask {
 		return nil
 	}
 	var task MirrorTask
-	json.Unmarshal([]byte(r.Member.(string)), &task)
+	_ = json.Unmarshal([]byte(r.Member.(string)), &task)
 	return &task
 }
 
