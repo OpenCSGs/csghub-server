@@ -398,12 +398,12 @@ func TestTagStore_SetMetaTags(t *testing.T) {
 		BuiltIn:  true,
 		ShowName: "",
 	})
-	repoTags, err := ts.SetMetaTags(ctx, types.ModelRepo, userName, repoName, tags)
+	_, err = ts.SetMetaTags(ctx, types.ModelRepo, userName, repoName, tags)
 	// should report err as framework tag is not allowed
 	require.NotEmpty(t, err)
 
 	tags = tags[:1]
-	repoTags, err = ts.SetMetaTags(ctx, types.ModelRepo, userName, repoName, tags)
+	repoTags, err := ts.SetMetaTags(ctx, types.ModelRepo, userName, repoName, tags)
 	require.Empty(t, err)
 	require.Len(t, repoTags, 1)
 }
@@ -528,7 +528,8 @@ func TestTagStore_RemoveRepoTags(t *testing.T) {
 	require.Empty(t, err)
 	require.NotNil(t, repo)
 	// set repo tags
-	ts.UpsertRepoTags(ctx, repo.ID, []int64{}, []int64{tag1.ID, tag2.ID})
+	err = ts.UpsertRepoTags(ctx, repo.ID, []int64{}, []int64{tag1.ID, tag2.ID})
+	require.Empty(t, err)
 
 	removeTagIds := make([]int64, 0, 1)
 	removeTagIds = append(removeTagIds, tag2.ID)
