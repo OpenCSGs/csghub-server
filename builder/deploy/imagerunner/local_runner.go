@@ -102,3 +102,7 @@ func (h *LocalRunner) ListWorkFlows(ctx context.Context, username string, per, p
 func (h *LocalRunner) DeleteWorkFlow(ctx context.Context, req types.ArgoWorkFlowDeleteReq) (*httpbase.R, error) {
 	return nil, nil
 }
+
+func (h *LocalRunner) GetWorkFlow(ctx context.Context, req types.EvaluationGetReq) (*types.ArgoWorkFlowRes, error) {
+	return nil, nil
+}

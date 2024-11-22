@@ -126,7 +126,7 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 		return nil, fmt.Errorf("error creatring evaluation handler: %v", err)
 	}
 
-	createEvaluationRoutes(config, apiGroup, evaluationHandler)
+	createEvaluationRoutes(apiGroup, evaluationHandler)
 
 	// Model routes
 	createModelRoutes(config, apiGroup, needAPIKey, modelHandler, repoCommonHandler)
@@ -388,12 +388,13 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 	return r, nil
 }
 
-func createEvaluationRoutes(config *config.Config, apiGroup *gin.RouterGroup, evaluationHandler *handler.EvaluationHandler) {
+func createEvaluationRoutes(apiGroup *gin.RouterGroup, evaluationHandler *handler.EvaluationHandler) {
 	// Models routes
 	evaluationsGroup := apiGroup.Group("/evaluations")
 	{
 		evaluationsGroup.POST("", evaluationHandler.RunEvaluation)
 		evaluationsGroup.DELETE("/:id", evaluationHandler.DeleteEvaluation)
+		evaluationsGroup.GET("/:id", evaluationHandler.GetEvaluation)
 	}
 }
 

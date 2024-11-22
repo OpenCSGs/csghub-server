@@ -365,3 +365,18 @@ func (h *RemoteRunner) DeleteWorkFlow(ctx context.Context, req types.ArgoWorkFlo
 	}
 	return &res, nil
 }
+
+func (h *RemoteRunner) GetWorkFlow(ctx context.Context, req types.ArgoWorkFlowDeleteReq) (*types.ArgoWorkFlowRes, error) {
+	url := fmt.Sprintf("%s/api/v1/workflows/%d", h.remote, req.ID)
+	response, err := h.doRequest(http.MethodGet, url, req)
+	if err != nil {
+		return nil, err
+	}
+	defer response.Body.Close()
+
+	var res types.ArgoWorkFlowRes
+	if err := json.NewDecoder(response.Body).Decode(&res); err != nil {
+		return nil, err
+	}
+	return &res, nil
+}

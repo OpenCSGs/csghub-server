@@ -2,6 +2,7 @@ package callback
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -399,16 +400,17 @@ func (c *GitCallbackComponent) updateDatasetTags(ctx context.Context, namespace,
 	// check if it's evaluation dataset
 	evalDataset, err := c.dt.FindByRepo(ctx, string(types.EvaluationCategory), repoName, string(types.DatasetRepo))
 	if err != nil {
-		if errors.Is(err, component.ErrNotFound) {
-			// no need add tag
-			return
+		if errors.Is(err, sql.ErrNoRows) {
+			slog.Debug("not an evaluation dataset, ignore it", slog.Any("repo id", repo.Path))
+		} else {
+			slog.Error("failed to query evaluation dataset", slog.Any("repo id", repo.Path), slog.Any("error", err))
 		}
-		slog.Warn("fail to query dataset tag in git callback", slog.Any("namespace", namespace), slog.Any("repoName", repoName), slog.Any("error", err))
+		return
 	}
 	tagIds := []int64{}
 	tagIds = append(tagIds, evalDataset.Tag.ID)
 	if evalDataset.RuntimeFramework != "" {
-		rTag, _ := c.ts.FindTag(ctx, evalDataset.RuntimeFramework, string(types.DatasetRepo), evalDataset.Category)
+		rTag, _ := c.ts.FindTag(ctx, evalDataset.RuntimeFramework, string(types.DatasetRepo), "runtime_framework")
 		if rTag != nil {
 			tagIds = append(tagIds, rTag.ID)
 		}
