@@ -581,6 +581,10 @@ func (h *RepoHandler) Tree(ctx *gin.Context) {
 	}
 	tree, err := h.c.Tree(ctx, req)
 	if err != nil {
+		if errors.Is(err, component.ErrForbidden) {
+			httpbase.ForbiddenError(ctx, err)
+			return
+		}
 		slog.Error("Failed to get repo file tree", slog.String("repo_type", string(req.RepoType)), slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
 		return
