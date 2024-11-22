@@ -75,6 +75,42 @@ func (h *EvaluationHandler) RunEvaluation(ctx *gin.Context) {
 	httpbase.OK(ctx, evaluation)
 }
 
+// get evaluation  godoc
+// @Security     ApiKey
+// @Summary      get model evaluation
+// @Tags         Evaluation
+// @Accept       json
+// @Produce      json
+// @Param        id path string true "id"
+// @Success      200  {object}  types.Evaluation "OK"
+// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
+// @Router       /evaluations/{id} [get]
+func (h *EvaluationHandler) GetEvaluation(ctx *gin.Context) {
+	currentUser := httpbase.GetCurrentUser(ctx)
+	if currentUser == "" {
+		httpbase.UnauthorizedError(ctx, errors.New("user not found, please login first"))
+		return
+	}
+	id, err := strconv.ParseInt(ctx.Param("id"), 10, 64)
+	if err != nil {
+		slog.Error("Bad request format", "error", err)
+		httpbase.BadRequest(ctx, err.Error())
+		return
+	}
+	var req = &types.EvaluationGetReq{}
+	req.ID = id
+	req.Username = currentUser
+	evaluation, err := h.c.GetEvaluation(ctx, *req)
+	if err != nil {
+		slog.Error("Failed to get evaluation job", slog.Any("error", err))
+		httpbase.ServerError(ctx, err)
+		return
+	}
+	httpbase.OK(ctx, evaluation)
+
+}
+
 // deleteEvaluation  godoc
 // @Security     ApiKey
 // @Summary      delete model evaluation

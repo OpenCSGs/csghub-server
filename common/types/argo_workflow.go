@@ -118,8 +118,37 @@ type ArgoWorkFlowRes struct {
 	FailuresURL string                 `json:"failures_url"`
 }
 
+type RepoTags struct {
+	RepoId string    `json:"repo_id"`
+	Tags   []RepoTag `json:"tags"`
+}
+
+type EvaluationRes struct {
+	ID          int64                  `json:"id"`
+	RepoIds     []string               `json:"repo_ids"`
+	RepoType    string                 `json:"repo_type,omitempty"`
+	Username    string                 `json:"username"`
+	TaskName    string                 `json:"task_name"`
+	TaskId      string                 `json:"task_id"`
+	TaskType    TaskType               `json:"task_type"`
+	TaskDesc    string                 `json:"task_desc"`
+	Datasets    []RepoTags             `json:"datasets,omitempty"`
+	ResourceId  int64                  `json:"resource_id,omitempty"`
+	Status      v1alpha1.WorkflowPhase `json:"status"`
+	Reason      string                 `json:"reason,omitempty"`
+	Image       string                 `bun:",notnull" json:"image"`
+	SubmitTime  time.Time              `json:"submit_time"`
+	StartTime   time.Time              `json:"start_time,omitempty"`
+	EndTime     time.Time              `json:"end_time,omitempty"`
+	ResultURL   string                 `json:"result_url"`
+	DownloadURL string                 `json:"download_url"`
+	FailuresURL string                 `json:"failures_url"`
+}
+
 type (
-	EvaluationDelReq = ArgoWorkFlowDeleteReq
+	EvaluationDelReq   = ArgoWorkFlowDeleteReq
+	EvaluationGetReq   = ArgoWorkFlowDeleteReq
+	ArgoWorkFlowGetReq = ArgoWorkFlowDeleteReq
 )
 
 type ArgoWorkFlowDeleteReq struct {

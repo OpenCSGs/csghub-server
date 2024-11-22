@@ -16,6 +16,7 @@ type evaluationComponentImpl struct {
 	deployer   deploy.Deployer
 	us         database.UserStore
 	ms         database.ModelStore
+	ds         database.DatasetStore
 	ss         database.SpaceResourceStore
 	tokenStore database.AccessTokenStore
 	rtfm       database.RuntimeFrameworksStore
@@ -26,6 +27,7 @@ type evaluationComponentImpl struct {
 type EvaluationComponent interface {
 	// Create argo workflow
 	CreateEvaluation(ctx context.Context, req *types.EvaluationReq) (*types.ArgoWorkFlowRes, error)
+	GetEvaluation(ctx context.Context, req types.EvaluationGetReq) (*types.EvaluationRes, error)
 	DeleteEvaluation(ctx context.Context, req types.ArgoWorkFlowDeleteReq) error
 }
 
@@ -35,6 +37,7 @@ func NewEvaluationComponent(config *config.Config) (EvaluationComponent, error) 
 	c.us = database.NewUserStore()
 	c.ms = database.NewModelStore()
 	c.ss = database.NewSpaceResourceStore()
+	c.ds = database.NewDatasetStore()
 	c.tokenStore = database.NewAccessTokenStore()
 	c.rtfm = database.NewRuntimeFrameworksStore()
 	c.config = config
@@ -102,4 +105,58 @@ func (c *evaluationComponentImpl) CreateEvaluation(ctx context.Context, req *typ
 
 func (c *evaluationComponentImpl) DeleteEvaluation(ctx context.Context, req types.ArgoWorkFlowDeleteReq) error {
 	return c.deployer.DeleteEvaluation(ctx, req)
+}
+
+// get evaluation result
+func (c *argoWFSComponentImpl) GetEvaluation(ctx context.Context, req types.EvaluationGetReq) (*types.EvaluationRes, error) {
+	wf, err := c.deployer.GetEvaluation(ctx, req)
+	if err != nil {
+		return nil, fmt.Errorf("fail to get evaluation result, %w", err)
+	}
+	datasets, err := c.ds.ListByPath(ctx, wf.Datasets)
+	if err != nil {
+		return nil, fmt.Errorf("fail to get datasets for evaluation, %w", err)
+	}
+	var repoTags []types.RepoTags
+	for _, ds := range datasets {
+		var tags []types.RepoTag
+		for _, tag := range ds.Repository.Tags {
+			tags = append(tags, types.RepoTag{
+				Name:      tag.Name,
+				Category:  tag.Category,
+				Group:     tag.Group,
+				BuiltIn:   tag.BuiltIn,
+				ShowName:  tag.ShowName,
+				CreatedAt: tag.CreatedAt,
+				UpdatedAt: tag.UpdatedAt,
+			})
+		}
+		var dsRepoTags = types.RepoTags{
+			RepoId: ds.Repository.Path,
+			Tags:   tags,
+		}
+		repoTags = append(repoTags, dsRepoTags)
+	}
+	var res = &types.EvaluationRes{
+		ID:          wf.ID,
+		RepoIds:     wf.RepoIds,
+		RepoType:    wf.RepoType,
+		Username:    wf.Username,
+		TaskName:    wf.TaskName,
+		TaskId:      wf.TaskId,
+		TaskType:    wf.TaskType,
+		TaskDesc:    wf.TaskDesc,
+		ResourceId:  wf.ResourceId,
+		Status:      wf.Status,
+		Reason:      wf.Reason,
+		Datasets:    repoTags,
+		Image:       wf.Image,
+		SubmitTime:  wf.SubmitTime,
+		StartTime:   wf.StartTime,
+		EndTime:     wf.EndTime,
+		ResultURL:   wf.ResultURL,
+		DownloadURL: wf.DownloadURL,
+		FailuresURL: wf.FailuresURL,
+	}
+	return res, nil
 }

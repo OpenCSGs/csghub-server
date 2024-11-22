@@ -108,3 +108,46 @@ func (a *ArgoHandler) DeleteWorkflow(ctx *gin.Context) {
 	slog.Info("Deleted argo workflow successfully", slog.String("id", id))
 	httpbase.OK(ctx, nil)
 }
+
+func (a *ArgoHandler) GetWorkflow(ctx *gin.Context) {
+	id := ctx.Param("id")
+	var req = &types.ArgoWorkFlowGetReq{}
+	err := ctx.BindJSON(req)
+	if err != nil {
+		slog.Error("bad request format", "error", err)
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	idInt64, err := strconv.ParseInt(id, 10, 64)
+	if err != nil {
+		slog.Error("fail to convert id to int64", slog.Any("error", err), slog.Any("id", id))
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	wf, err := a.wfc.GetWorkflow(ctx, idInt64, req.Username)
+	if err != nil {
+		slog.Error("fail to get workflow", slog.Any("error", err))
+		ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	res := types.ArgoWorkFlowRes{
+		ID:          wf.ID,
+		Username:    wf.Username,
+		TaskName:    wf.TaskName,
+		Image:       wf.Image,
+		TaskId:      wf.TaskId,
+		TaskType:    wf.TaskType,
+		TaskDesc:    wf.TaskDesc,
+		RepoIds:     wf.RepoIds,
+		RepoType:    wf.RepoType,
+		SubmitTime:  wf.SubmitTime,
+		StartTime:   wf.StartTime,
+		EndTime:     wf.EndTime,
+		Datasets:    wf.Datasets,
+		ResultURL:   wf.ResultURL,
+		DownloadURL: wf.DownloadURL,
+		FailuresURL: wf.FailuresURL,
+		Status:      wf.Status,
+	}
+	ctx.JSON(http.StatusOK, res)
+}

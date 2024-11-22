@@ -58,6 +58,7 @@ func NewHttpServer(config *config.Config) (*gin.Engine, error) {
 		workflows.POST("", argoHandler.CreateWorkflow)
 		workflows.GET("", argoHandler.ListWorkflows)
 		workflows.DELETE("/:id", argoHandler.DeleteWorkflow)
+		workflows.GET("/:id", argoHandler.GetWorkflow)
 	}
 
 	return r, nil

@@ -42,6 +42,7 @@ type Deployer interface {
 	SubmitEvaluation(ctx context.Context, req types.EvaluationReq) (*types.ArgoWorkFlowRes, error)
 	ListEvaluations(context.Context, string, int, int) (*types.ArgoWorkFlowListRes, error)
 	DeleteEvaluation(ctx context.Context, req types.ArgoWorkFlowDeleteReq) error
+	GetEvaluation(ctx context.Context, req types.EvaluationGetReq) (*types.ArgoWorkFlowRes, error)
 }
 
 var _ Deployer = (*deployer)(nil)
@@ -833,4 +834,12 @@ func (d *deployer) DeleteEvaluation(ctx context.Context, req types.ArgoWorkFlowD
 		return err
 	}
 	return nil
+}
+
+func (d *deployer) GetEvaluation(ctx context.Context, req types.EvaluationGetReq) (*types.ArgoWorkFlowRes, error) {
+	wf, err := d.ir.GetWorkFlow(ctx, req)
+	if err != nil {
+		return nil, err
+	}
+	return wf, err
 }

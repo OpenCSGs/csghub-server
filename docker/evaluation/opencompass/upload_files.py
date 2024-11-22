@@ -133,7 +133,7 @@ def json_to_summary(jsonPath, tasks):
         item_new = item.copy()
         if item_new["dataset"] in keywords:
             keys = list(item_new.keys())
-            model_name = item_new[keys[-1]]
+            model_name = keys[-1]
             item_new['id'] = len(summary_data) + 1
             summary_data.append(item_new)
     column.append(
