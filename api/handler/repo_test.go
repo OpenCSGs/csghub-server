@@ -75,3 +75,58 @@ func TestRepoHandler_LastCommit(t *testing.T) {
 		require.Equal(t, commit.ID, r.Data.ID)
 	})
 }
+
+func TestRepoHandler_Tree(t *testing.T) {
+	t.Run("forbidden", func(t *testing.T) {
+		comp := mockcomponent.NewMockRepoComponent(t)
+		h := &RepoHandler{comp}
+
+		response := httptest.NewRecorder()
+		ginc, _ := gin.CreateTestContext(response)
+		ginc.AddParam("namespace", "user_name_1")
+		ginc.AddParam("name", "repo_name_1")
+
+		//user does not have permission to access repo
+		comp.EXPECT().Tree(mock.Anything, mock.Anything).Return(nil, component.ErrForbidden).Once()
+		h.Tree(ginc)
+		require.Equal(t, http.StatusForbidden, response.Code)
+	})
+
+	t.Run("server error", func(t *testing.T) {
+		comp := mockcomponent.NewMockRepoComponent(t)
+		h := &RepoHandler{comp}
+
+		response := httptest.NewRecorder()
+		ginc, _ := gin.CreateTestContext(response)
+		ginc.AddParam("namespace", "user_name_1")
+		ginc.AddParam("name", "repo_name_1")
+
+		comp.EXPECT().Tree(mock.Anything, mock.Anything).Return(nil, errors.New("custome error")).Once()
+		h.Tree(ginc)
+		require.Equal(t, http.StatusInternalServerError, response.Code)
+	})
+
+	t.Run("success", func(t *testing.T) {
+		comp := mockcomponent.NewMockRepoComponent(t)
+		h := &RepoHandler{comp}
+
+		response := httptest.NewRecorder()
+		ginc, _ := gin.CreateTestContext(response)
+		ginc.AddParam("namespace", "user_name_1")
+		ginc.AddParam("name", "repo_name_1")
+
+		var tree []*types.File
+		comp.EXPECT().Tree(mock.Anything, mock.Anything).Return(tree, nil).Once()
+		h.Tree(ginc)
+		require.Equal(t, http.StatusOK, response.Code)
+
+		var r = struct {
+			Code int           `json:"code,omitempty"`
+			Msg  string        `json:"msg"`
+			Data []*types.File `json:"data,omitempty"`
+		}{}
+		err := json.Unmarshal(response.Body.Bytes(), &r)
+		require.Empty(t, err)
+		require.Equal(t, tree, r.Data)
+	})
+}
