@@ -32,7 +32,6 @@ type MemberComponent interface {
 	GetMemberRole(ctx context.Context, orgName, userName string) (membership.Role, error)
 	AddMembers(ctx context.Context, orgName string, users []string, operatorName string, role string) error
 	AddMember(ctx context.Context, orgName, userName, operatorName string, role string) error
-	Update(ctx context.Context) (org *database.Member, err error)
 	Delete(ctx context.Context, orgName, userName, operatorName string, role string) error
 }
 
@@ -218,10 +217,6 @@ func (c *memberComponentImpl) AddMembers(ctx context.Context, orgName string, us
 
 func (c *memberComponentImpl) AddMember(ctx context.Context, orgName, userName, operatorName string, role string) error {
 	return c.AddMembers(ctx, orgName, []string{userName}, operatorName, role)
-}
-
-func (c *memberComponentImpl) Update(ctx context.Context) (org *database.Member, err error) {
-	return
 }
 
 func (c *memberComponentImpl) Delete(ctx context.Context, orgName, userName, operatorName string, role string) error {
