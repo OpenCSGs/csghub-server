@@ -449,64 +449,6 @@ func (_c *MockMemberComponent_SetAdmin_Call) RunAndReturn(run func(context.Conte
 	return _c
 }
 
-// Update provides a mock function with given fields: ctx
-func (_m *MockMemberComponent) Update(ctx context.Context) (*database.Member, error) {
-	ret := _m.Called(ctx)
-
-	if len(ret) == 0 {
-		panic("no return value specified for Update")
-	}
-
-	var r0 *database.Member
-	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context) (*database.Member, error)); ok {
-		return rf(ctx)
-	}
-	if rf, ok := ret.Get(0).(func(context.Context) *database.Member); ok {
-		r0 = rf(ctx)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*database.Member)
-		}
-	}
-
-	if rf, ok := ret.Get(1).(func(context.Context) error); ok {
-		r1 = rf(ctx)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
-// MockMemberComponent_Update_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'Update'
-type MockMemberComponent_Update_Call struct {
-	*mock.Call
-}
-
-// Update is a helper method to define mock.On call
-//   - ctx context.Context
-func (_e *MockMemberComponent_Expecter) Update(ctx interface{}) *MockMemberComponent_Update_Call {
-	return &MockMemberComponent_Update_Call{Call: _e.mock.On("Update", ctx)}
-}
-
-func (_c *MockMemberComponent_Update_Call) Run(run func(ctx context.Context)) *MockMemberComponent_Update_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context))
-	})
-	return _c
-}
-
-func (_c *MockMemberComponent_Update_Call) Return(org *database.Member, err error) *MockMemberComponent_Update_Call {
-	_c.Call.Return(org, err)
-	return _c
-}
-
-func (_c *MockMemberComponent_Update_Call) RunAndReturn(run func(context.Context) (*database.Member, error)) *MockMemberComponent_Update_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
 // NewMockMemberComponent creates a new instance of MockMemberComponent. It also registers a testing interface on the mock and a cleanup function to assert the mocks expectations.
 // The first argument is typically a *testing.T value.
 func NewMockMemberComponent(t interface {
