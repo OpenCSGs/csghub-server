@@ -1399,6 +1399,51 @@ definitions:
       task_name:
         type: string
     type: object
+  types.EvaluationRes:
+    properties:
+      datasets:
+        items:
+          $ref: '#/definitions/types.RepoTags'
+        type: array
+      download_url:
+        type: string
+      end_time:
+        type: string
+      failures_url:
+        type: string
+      id:
+        type: integer
+      image:
+        type: string
+      reason:
+        type: string
+      repo_ids:
+        items:
+          type: string
+        type: array
+      repo_type:
+        type: string
+      resource_id:
+        type: integer
+      result_url:
+        type: string
+      start_time:
+        type: string
+      status:
+        type: string
+      submit_time:
+        type: string
+      task_desc:
+        type: string
+      task_id:
+        type: string
+      task_name:
+        type: string
+      task_type:
+        $ref: '#/definitions/types.TaskType'
+      username:
+        type: string
+    type: object
   types.Event:
     properties:
       c_id:
@@ -1849,6 +1894,15 @@ definitions:
       updated_at:
         type: string
     type: object
+  types.RepoTags:
+    properties:
+      repo_id:
+        type: string
+      tags:
+        items:
+          $ref: '#/definitions/types.RepoTag'
+        type: array
+    type: object
   types.Repository:
     properties:
       http_clone_url:
@@ -2121,6 +2175,18 @@ definitions:
       msg:
         type: string
     type: object
+  types.TaskType:
+    enum:
+    - evaluation
+    - training
+    - comparison
+    - leaderboard
+    type: string
+    x-enum-varnames:
+    - TaskTypeEvaluation
+    - TaskTypeTraining
+    - TaskTypeComparison
+    - TaskTypeLeaderBoard
   types.UpdateCodeReq:
     properties:
       description:
@@ -5536,6 +5602,35 @@ paths:
       security:
       - ApiKey: []
       summary: delete model evaluation
+      tags:
+      - Evaluation
+    get:
+      consumes:
+      - application/json
+      parameters:
+      - description: id
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/types.EvaluationRes'
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: get model evaluation
       tags:
       - Evaluation
   /events:

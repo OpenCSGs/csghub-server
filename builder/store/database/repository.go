@@ -430,11 +430,14 @@ func (s *repoStoreImpl) PublicToUser(ctx context.Context, repoType types.Reposit
 		)
 	}
 	if len(filter.Tags) > 0 {
-		q.Join("JOIN repository_tags ON repository.id = repository_tags.repository_id").
-			Join("JOIN tags ON repository_tags.tag_id = tags.id")
-		for _, tag := range filter.Tags {
-			q.Where("tags.category = ? AND tags.name = ?", tag.Category, tag.Name)
+		for i, tag := range filter.Tags {
+			var asRepoTag = fmt.Sprintf("%s%d", "rt", i)
+			var asTag = fmt.Sprintf("%s%d", "ts", i)
+			q.Join(fmt.Sprintf("JOIN repository_tags AS %s ON repository.id = %s.repository_id", asRepoTag, asRepoTag)).
+				Join(fmt.Sprintf("JOIN tags AS %s ON %s.tag_id = %s.id", asTag, asRepoTag, asTag))
+			q.Where(fmt.Sprintf("%s.category = ? AND %s.name = ?", asTag, asTag), tag.Category, tag.Name)
 		}
+
 	}
 
 	count, err = q.Count(ctx)

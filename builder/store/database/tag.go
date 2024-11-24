@@ -220,8 +220,13 @@ func (ts *tagStoreImpl) SetMetaTags(ctx context.Context, repoType types.Reposito
 	}
 
 	var metaTagIds []int64
+	exCategories := map[string]bool{
+		"framework":         true,
+		"runtime_framework": true,
+		"evaluation":        true,
+	}
 	for _, tag := range repo.Tags {
-		if tag.Category != "framework" {
+		if !exCategories[tag.Category] {
 			metaTagIds = append(metaTagIds, tag.ID)
 		}
 	}

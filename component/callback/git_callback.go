@@ -418,7 +418,6 @@ func (c *GitCallbackComponent) updateDatasetTags(ctx context.Context, namespace,
 
 	err = c.ts.UpsertRepoTags(ctx, repo.ID, []int64{}, tagIds)
 	if err != nil {
-		slog.Warn("fail to add dataset tag to model repo", slog.Any("repoId", repo.ID), slog.Any("tag id", evalDataset.Tag.ID), slog.Any("error", err))
 		slog.Warn("fail to add dataset tag", slog.Any("repoId", repo.ID), slog.Any("tag id", tagIds), slog.Any("error", err))
 	}
 
