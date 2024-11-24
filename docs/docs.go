@@ -2247,6 +2247,52 @@ const docTemplate = `{
             }
         },
         "/evaluations/{id}": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Evaluation"
+                ],
+                "summary": "get model evaluation",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/types.EvaluationRes"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            },
             "delete": {
                 "security": [
                     {
@@ -17119,6 +17165,74 @@ const docTemplate = `{
                 }
             }
         },
+        "types.EvaluationRes": {
+            "type": "object",
+            "properties": {
+                "datasets": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/types.RepoTags"
+                    }
+                },
+                "download_url": {
+                    "type": "string"
+                },
+                "end_time": {
+                    "type": "string"
+                },
+                "failures_url": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "image": {
+                    "type": "string"
+                },
+                "reason": {
+                    "type": "string"
+                },
+                "repo_ids": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "repo_type": {
+                    "type": "string"
+                },
+                "resource_id": {
+                    "type": "integer"
+                },
+                "result_url": {
+                    "type": "string"
+                },
+                "start_time": {
+                    "type": "string"
+                },
+                "status": {
+                    "type": "string"
+                },
+                "submit_time": {
+                    "type": "string"
+                },
+                "task_desc": {
+                    "type": "string"
+                },
+                "task_id": {
+                    "type": "string"
+                },
+                "task_name": {
+                    "type": "string"
+                },
+                "task_type": {
+                    "$ref": "#/definitions/types.TaskType"
+                },
+                "username": {
+                    "type": "string"
+                }
+            }
+        },
         "types.Event": {
             "type": "object",
             "properties": {
@@ -17790,6 +17904,20 @@ const docTemplate = `{
                 }
             }
         },
+        "types.RepoTags": {
+            "type": "object",
+            "properties": {
+                "repo_id": {
+                    "type": "string"
+                },
+                "tags": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/types.RepoTag"
+                    }
+                }
+            }
+        },
         "types.Repository": {
             "type": "object",
             "properties": {
@@ -18179,6 +18307,21 @@ const docTemplate = `{
                     "type": "string"
                 }
             }
+        },
+        "types.TaskType": {
+            "type": "string",
+            "enum": [
+                "evaluation",
+                "training",
+                "comparison",
+                "leaderboard"
+            ],
+            "x-enum-varnames": [
+                "TaskTypeEvaluation",
+                "TaskTypeTraining",
+                "TaskTypeComparison",
+                "TaskTypeLeaderBoard"
+            ]
         },
         "types.UpdateCodeReq": {
             "type": "object",

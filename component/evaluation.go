@@ -147,7 +147,7 @@ func (c *argoWFSComponentImpl) GetEvaluation(ctx context.Context, req types.Eval
 		TaskType:    wf.TaskType,
 		TaskDesc:    wf.TaskDesc,
 		ResourceId:  wf.ResourceId,
-		Status:      wf.Status,
+		Status:      string(wf.Status),
 		Reason:      wf.Reason,
 		Datasets:    repoTags,
 		Image:       wf.Image,

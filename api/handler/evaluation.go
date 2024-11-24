@@ -82,7 +82,7 @@ func (h *EvaluationHandler) RunEvaluation(ctx *gin.Context) {
 // @Accept       json
 // @Produce      json
 // @Param        id path string true "id"
-// @Success      200  {object}  types.Evaluation "OK"
+// @Success      200  {object}  types.EvaluationRes "OK"
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
 // @Router       /evaluations/{id} [get]
