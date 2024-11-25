@@ -29,6 +29,10 @@ type AccessTokenStore interface {
 	FindByUser(ctx context.Context, username, app string) ([]AccessToken, error)
 }
 
+func NewAccessTokenStoreWithDB(db *DB) AccessTokenStore {
+	return &accessTokenStoreImpl{db: db}
+}
+
 func NewAccessTokenStore() AccessTokenStore {
 	return &accessTokenStoreImpl{
 		db: defaultDB,
@@ -94,16 +98,15 @@ func (s *accessTokenStoreImpl) Refresh(ctx context.Context, token *AccessToken, 
 	return newToken, err
 }
 
-func (s *accessTokenStoreImpl) FindByID(ctx context.Context, id int64) (token *AccessToken, err error) {
-	var tokens []AccessToken
-	err = s.db.Operator.Core.
+func (s *accessTokenStoreImpl) FindByID(ctx context.Context, id int64) (*AccessToken, error) {
+	var token AccessToken
+	err := s.db.Operator.Core.
 		NewSelect().
-		Model(&tokens).
+		Model(&token).
 		Relation("User").
 		Where("access_token.id = ?", id).
 		Scan(ctx)
-	token = &tokens[0]
-	return
+	return &token, err
 }
 
 func (s *accessTokenStoreImpl) Delete(ctx context.Context, username, tkName, app string) (err error) {

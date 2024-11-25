@@ -16,13 +16,19 @@ type accountMeteringStoreImpl struct {
 
 type AccountMeteringStore interface {
 	Create(ctx context.Context, input AccountMetering) error
-	ListByUserIDAndTime(ctx context.Context, req commonTypes.ACCT_STATEMENTS_REQ) ([]AccountMetering, int, error)
+	ListByUserIDAndTime(ctx context.Context, req types.ACCT_STATEMENTS_REQ) ([]AccountMetering, int, error)
 	ListAllByUserUUID(ctx context.Context, userUUID string) ([]AccountMetering, error)
 }
 
 func NewAccountMeteringStore() AccountMeteringStore {
 	return &accountMeteringStoreImpl{
 		db: defaultDB,
+	}
+}
+
+func NewAccountMeteringStoreWithDB(db *DB) AccountMeteringStore {
+	return &accountMeteringStoreImpl{
+		db: db,
 	}
 }
 

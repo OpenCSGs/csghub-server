@@ -38,6 +38,10 @@ func NewDatasetStore() DatasetStore {
 	return &datasetStoreImpl{db: defaultDB}
 }
 
+func NewDatasetStoreWithDB(db *DB) DatasetStore {
+	return &datasetStoreImpl{db: db}
+}
+
 type Dataset struct {
 	ID            int64       `bun:",pk,autoincrement" json:"id"`
 	RepositoryID  int64       `bun:",notnull" json:"repository_id"`
@@ -191,14 +195,16 @@ func (s *datasetStoreImpl) Delete(ctx context.Context, input Dataset) error {
 	return nil
 }
 
-func (s *datasetStoreImpl) ListByPath(ctx context.Context, paths []string) ([]Dataset, error) {
-	var datasets []Dataset
-	err := s.db.Operator.Core.
+func (s *datasetStoreImpl) ListByPath(ctx context.Context, paths []string) (datasets []Dataset, err error) {
+	err = s.db.Operator.Core.
 		NewSelect().
-		Model(&Dataset{}).
+		Model(&datasets).
 		Relation("Repository").
+		Relation("Repository.Tags", func(q *bun.SelectQuery) *bun.SelectQuery {
+			return q.Where("category = ?", "evaluation")
+		}).
 		Where("path IN (?)", bun.In(paths)).
-		Scan(ctx, &datasets)
+		Scan(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find models by path,error: %w", err)
 	}

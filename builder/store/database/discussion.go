@@ -56,6 +56,12 @@ func NewDiscussionStore() DiscussionStore {
 	}
 }
 
+func NewDiscussionStoreWithDB(db *DB) DiscussionStore {
+	return &discussionStoreImpl{
+		db: db,
+	}
+}
+
 func (s *discussionStoreImpl) Create(ctx context.Context, discussion Discussion) (*Discussion, error) {
 	_, err := s.db.Core.NewInsert().Model(&discussion).Exec(ctx)
 	if err != nil {

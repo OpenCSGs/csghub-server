@@ -39,6 +39,12 @@ func NewCollectionStore() CollectionStore {
 	}
 }
 
+func NewCollectionStoreWithDB(db *DB) CollectionStore {
+	return &collectionStoreImpl{
+		db: db,
+	}
+}
+
 type Collection struct {
 	ID           int64        `bun:",pk,autoincrement" json:"id"`
 	Namespace    string       `bun:",notnull" json:"namespace"`
