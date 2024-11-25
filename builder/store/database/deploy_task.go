@@ -95,6 +95,10 @@ func NewDeployTaskStore() DeployTaskStore {
 	return &deployTaskStoreImpl{db: defaultDB}
 }
 
+func NewDeployTaskStoreWithDB(db *DB) DeployTaskStore {
+	return &deployTaskStoreImpl{db: db}
+}
+
 func (s *deployTaskStoreImpl) CreateDeploy(ctx context.Context, deploy *Deploy) error {
 	_, err := s.db.Core.NewInsert().Model(deploy).Exec(ctx, deploy)
 	return err

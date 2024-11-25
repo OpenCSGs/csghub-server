@@ -27,6 +27,12 @@ func NewClusterInfoStore() ClusterInfoStore {
 	}
 }
 
+func NewClusterInfoStoreWithDB(db *DB) ClusterInfoStore {
+	return &clusterInfoStoreImpl{
+		db: db,
+	}
+}
+
 type ClusterInfo struct {
 	ClusterID     string `bun:",pk" json:"cluster_id"`
 	ClusterConfig string `bun:",notnull" json:"cluster_config"`

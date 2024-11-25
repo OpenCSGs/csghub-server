@@ -131,7 +131,7 @@ func (c *datasetComponentImpl) Create(ctx context.Context, req *types.CreateData
 	}
 	if !user.CanAdmin() {
 		if namespace.NamespaceType == database.OrgNamespace {
-			canWrite, err := c.checkCurrentUserPermission(ctx, req.Username, req.Namespace, membership.RoleWrite)
+			canWrite, err := c.CheckCurrentUserPermission(ctx, req.Username, req.Namespace, membership.RoleWrite)
 			if err != nil {
 				return nil, err
 			}
@@ -392,7 +392,7 @@ func (c *datasetComponentImpl) Show(ctx context.Context, namespace, name, curren
 		return nil, fmt.Errorf("failed to find dataset, error: %w", err)
 	}
 
-	permission, err := c.getUserRepoPermission(ctx, currentUser, dataset.Repository)
+	permission, err := c.GetUserRepoPermission(ctx, currentUser, dataset.Repository)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get user repo permission, error: %w", err)
 	}
@@ -400,7 +400,7 @@ func (c *datasetComponentImpl) Show(ctx context.Context, namespace, name, curren
 		return nil, ErrUnauthorized
 	}
 
-	ns, err := c.getNameSpaceInfo(ctx, namespace)
+	ns, err := c.GetNameSpaceInfo(ctx, namespace)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get namespace info for dataset, error: %w", err)
 	}
@@ -472,7 +472,7 @@ func (c *datasetComponentImpl) Relations(ctx context.Context, namespace, name, c
 }
 
 func (c *datasetComponentImpl) getRelations(ctx context.Context, repoID int64, currentUser string) (*types.Relations, error) {
-	res, err := c.relatedRepos(ctx, repoID, currentUser)
+	res, err := c.RelatedRepos(ctx, repoID, currentUser)
 	if err != nil {
 		return nil, err
 	}

@@ -5,20 +5,32 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/mock"
+	gsmock "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/git/gitserver"
+	"opencsg.com/csghub-server/builder/git/gitserver"
 	"opencsg.com/csghub-server/builder/store/database"
-	"opencsg.com/csghub-server/common/config"
+	"opencsg.com/csghub-server/common/tests"
 )
 
-func TestCalculateRecomScore(t *testing.T) {
-	cfg := &config.Config{}
-	rc, err := NewRecomComponent(cfg)
-	if err != nil {
-		t.Fatal(err)
+func NewTestRecomComponent(stores *tests.MockStores, gitServer gitserver.GitServer) *recomComponentImpl {
+	return &recomComponentImpl{
+		repos: stores.Repo,
+		gs:    gitServer,
 	}
-	ctx := context.Background()
+}
+
+func TestRecomComponent_CalculateTotalScore(t *testing.T) {
+	gitServer := gsmock.NewMockGitServer(t)
+	rc := &recomComponentImpl{gs: gitServer}
+	ctx := context.TODO()
+
+	gitServer.EXPECT().GetRepoFileTree(mock.Anything, gitserver.GetRepoInfoByPathReq{
+		Namespace: "foo",
+		Name:      "bar",
+	}).Return(nil, nil)
 
 	// Test case 1: repository created 24 hours ago
-	repo1 := &database.Repository{}
+	repo1 := &database.Repository{Path: "foo/bar"}
 	repo1.CreatedAt = time.Now().Add(-24 * time.Hour)
 	weights1 := map[string]string{
 		"freshness": expFreshness,
@@ -29,7 +41,7 @@ func TestCalculateRecomScore(t *testing.T) {
 	}
 
 	// Test case 2: repository created 48 hours ago
-	repo2 := &database.Repository{}
+	repo2 := &database.Repository{Path: "foo/bar"}
 	repo2.CreatedAt = time.Now().Add(-50 * time.Hour)
 	weights2 := map[string]string{
 		"freshness": expFreshness,
@@ -40,7 +52,7 @@ func TestCalculateRecomScore(t *testing.T) {
 	}
 
 	// Test case 3: repository created 168 hours ago
-	repo3 := &database.Repository{}
+	repo3 := &database.Repository{Path: "foo/bar"}
 	repo3.CreatedAt = time.Now().Add(-168 * time.Hour)
 	weights3 := map[string]string{
 		"freshness": expFreshness,

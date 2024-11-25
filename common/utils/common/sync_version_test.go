@@ -18,8 +18,8 @@ func TestAddPrefixBySourceID(t *testing.T) {
 		ChangeLog:      "test log",
 	}
 	str := AddPrefixBySourceID(s.SourceID, "test")
-	if str != "OpenCSG_test" {
-		t.Errorf("Expected str should be 'OpenCSG_test' but got %s", str)
+	if str != "CSG_test" {
+		t.Errorf("Expected str should be 'CSG_test' but got %s", str)
 	}
 
 	s1 := &database.SyncVersion{
@@ -31,8 +31,8 @@ func TestAddPrefixBySourceID(t *testing.T) {
 		ChangeLog:      "test log",
 	}
 	str1 := AddPrefixBySourceID(s1.SourceID, "test")
-	if str1 != "Huggingface_test" {
-		t.Errorf("Expected str should be 'Huggingface_test' but got %s", str)
+	if str1 != "HF_test" {
+		t.Errorf("Expected str should be 'HF_test' but got %s", str1)
 	}
 }
 
@@ -48,7 +48,7 @@ func TestTrimPrefixCloneURLBySourceID(t *testing.T) {
 	cloneURL := TrimPrefixCloneURLBySourceID(
 		"https://opencsg.com",
 		"model",
-		"OpenCSG_namespace",
+		"CSG_namespace",
 		"name",
 		s.SourceID,
 	)
@@ -67,7 +67,7 @@ func TestTrimPrefixCloneURLBySourceID(t *testing.T) {
 	cloneURL1 := TrimPrefixCloneURLBySourceID(
 		"https://opencsg.com",
 		"model",
-		"Huggingface_namespace",
+		"HF_namespace",
 		"name",
 		s1.SourceID,
 	)

@@ -30,6 +30,10 @@ func NewCodeStore() CodeStore {
 	return &codeStoreImpl{db: defaultDB}
 }
 
+func NewCodeStoreWithDB(db *DB) CodeStore {
+	return &codeStoreImpl{db: db}
+}
+
 type Code struct {
 	ID            int64       `bun:",pk,autoincrement" json:"id"`
 	RepositoryID  int64       `bun:",notnull" json:"repository_id"`

@@ -12,6 +12,12 @@ type GitServerAccessTokenStore interface {
 	FindByType(ctx context.Context, serverType string) ([]GitServerAccessToken, error)
 }
 
+func NewGitServerAccessTokenStoreWithDB(db *DB) GitServerAccessTokenStore {
+	return &gitServerAccessTokenStoreImpl{
+		db: db,
+	}
+}
+
 func NewGitServerAccessTokenStore() GitServerAccessTokenStore {
 	return &gitServerAccessTokenStoreImpl{
 		db: defaultDB,

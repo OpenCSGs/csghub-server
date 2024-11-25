@@ -212,7 +212,7 @@ func (c *spaceComponentImpl) Show(ctx context.Context, namespace, name, currentU
 		return nil, fmt.Errorf("failed to find space, error: %w", err)
 	}
 
-	permission, err := c.getUserRepoPermission(ctx, currentUser, space.Repository)
+	permission, err := c.GetUserRepoPermission(ctx, currentUser, space.Repository)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get user repo permission, error: %w", err)
 	}
@@ -220,7 +220,7 @@ func (c *spaceComponentImpl) Show(ctx context.Context, namespace, name, currentU
 		return nil, ErrUnauthorized
 	}
 
-	ns, err := c.getNameSpaceInfo(ctx, namespace)
+	ns, err := c.GetNameSpaceInfo(ctx, namespace)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get namespace info for model, error: %w", err)
 	}
