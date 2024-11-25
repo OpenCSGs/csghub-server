@@ -5,11 +5,8 @@ package database
 import (
 	context "context"
 
-	bun "github.com/uptrace/bun"
-
-	database "opencsg.com/csghub-server/builder/store/database"
-
 	mock "github.com/stretchr/testify/mock"
+	database "opencsg.com/csghub-server/builder/store/database"
 
 	time "time"
 
@@ -413,66 +410,6 @@ func (_c *MockRepoStore_CreateRepo_Call) Return(_a0 *database.Repository, _a1 er
 }
 
 func (_c *MockRepoStore_CreateRepo_Call) RunAndReturn(run func(context.Context, database.Repository) (*database.Repository, error)) *MockRepoStore_CreateRepo_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
-// CreateRepoTx provides a mock function with given fields: ctx, tx, input
-func (_m *MockRepoStore) CreateRepoTx(ctx context.Context, tx bun.Tx, input database.Repository) (*database.Repository, error) {
-	ret := _m.Called(ctx, tx, input)
-
-	if len(ret) == 0 {
-		panic("no return value specified for CreateRepoTx")
-	}
-
-	var r0 *database.Repository
-	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, bun.Tx, database.Repository) (*database.Repository, error)); ok {
-		return rf(ctx, tx, input)
-	}
-	if rf, ok := ret.Get(0).(func(context.Context, bun.Tx, database.Repository) *database.Repository); ok {
-		r0 = rf(ctx, tx, input)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*database.Repository)
-		}
-	}
-
-	if rf, ok := ret.Get(1).(func(context.Context, bun.Tx, database.Repository) error); ok {
-		r1 = rf(ctx, tx, input)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
-// MockRepoStore_CreateRepoTx_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'CreateRepoTx'
-type MockRepoStore_CreateRepoTx_Call struct {
-	*mock.Call
-}
-
-// CreateRepoTx is a helper method to define mock.On call
-//   - ctx context.Context
-//   - tx bun.Tx
-//   - input database.Repository
-func (_e *MockRepoStore_Expecter) CreateRepoTx(ctx interface{}, tx interface{}, input interface{}) *MockRepoStore_CreateRepoTx_Call {
-	return &MockRepoStore_CreateRepoTx_Call{Call: _e.mock.On("CreateRepoTx", ctx, tx, input)}
-}
-
-func (_c *MockRepoStore_CreateRepoTx_Call) Run(run func(ctx context.Context, tx bun.Tx, input database.Repository)) *MockRepoStore_CreateRepoTx_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(bun.Tx), args[2].(database.Repository))
-	})
-	return _c
-}
-
-func (_c *MockRepoStore_CreateRepoTx_Call) Return(_a0 *database.Repository, _a1 error) *MockRepoStore_CreateRepoTx_Call {
-	_c.Call.Return(_a0, _a1)
-	return _c
-}
-
-func (_c *MockRepoStore_CreateRepoTx_Call) RunAndReturn(run func(context.Context, bun.Tx, database.Repository) (*database.Repository, error)) *MockRepoStore_CreateRepoTx_Call {
 	_c.Call.Return(run)
 	return _c
 }
