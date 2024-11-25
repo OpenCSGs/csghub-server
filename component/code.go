@@ -274,7 +274,7 @@ func (c *codeComponentImpl) Show(ctx context.Context, namespace, name, currentUs
 		return nil, fmt.Errorf("failed to find code, error: %w", err)
 	}
 
-	permission, err := c.getUserRepoPermission(ctx, currentUser, code.Repository)
+	permission, err := c.GetUserRepoPermission(ctx, currentUser, code.Repository)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get user repo permission, error: %w", err)
 	}
@@ -282,7 +282,7 @@ func (c *codeComponentImpl) Show(ctx context.Context, namespace, name, currentUs
 		return nil, ErrUnauthorized
 	}
 
-	ns, err := c.getNameSpaceInfo(ctx, namespace)
+	ns, err := c.GetNameSpaceInfo(ctx, namespace)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get namespace info for code, error: %w", err)
 	}
@@ -352,7 +352,7 @@ func (c *codeComponentImpl) Relations(ctx context.Context, namespace, name, curr
 }
 
 func (c *codeComponentImpl) getRelations(ctx context.Context, repoID int64, currentUser string) (*types.Relations, error) {
-	res, err := c.relatedRepos(ctx, repoID, currentUser)
+	res, err := c.RelatedRepos(ctx, repoID, currentUser)
 	if err != nil {
 		return nil, err
 	}

@@ -13,6 +13,12 @@ type FileStore interface {
 	BatchCreate(ctx context.Context, files []File) error
 }
 
+func NewFileStoreWithDB(db *DB) FileStore {
+	return &fileStoreImpl{
+		db: db,
+	}
+}
+
 func NewFileStore() FileStore {
 	return &fileStoreImpl{
 		db: defaultDB,

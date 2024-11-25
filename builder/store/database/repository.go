@@ -566,10 +566,10 @@ func (s *repoStoreImpl) BatchCreateRepoTags(ctx context.Context, repoTags []Repo
 }
 
 func (s *repoStoreImpl) DeleteAllFiles(ctx context.Context, repoID int64) error {
-	err := s.db.Operator.Core.NewDelete().
+	_, err := s.db.Operator.Core.NewDelete().
 		Model(&File{}).
 		Where("repository_id = ?", repoID).
-		Scan(ctx)
+		Exec(ctx)
 	if err != nil {
 		return err
 	}
@@ -578,10 +578,10 @@ func (s *repoStoreImpl) DeleteAllFiles(ctx context.Context, repoID int64) error 
 }
 
 func (s *repoStoreImpl) DeleteAllTags(ctx context.Context, repoID int64) error {
-	err := s.db.Operator.Core.NewDelete().
+	_, err := s.db.Operator.Core.NewDelete().
 		Model(&RepositoryTag{}).
 		Where("repository_id = ?", repoID).
-		Scan(ctx)
+		Exec(ctx)
 	if err != nil {
 		return err
 	}

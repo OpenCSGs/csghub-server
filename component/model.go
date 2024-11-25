@@ -383,7 +383,7 @@ func (c *modelComponentImpl) Show(ctx context.Context, namespace, name, currentU
 		return nil, fmt.Errorf("failed to find model, error: %w", err)
 	}
 
-	permission, err := c.getUserRepoPermission(ctx, currentUser, model.Repository)
+	permission, err := c.GetUserRepoPermission(ctx, currentUser, model.Repository)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get user repo permission, error: %w", err)
 	}
@@ -391,7 +391,7 @@ func (c *modelComponentImpl) Show(ctx context.Context, namespace, name, currentU
 		return nil, ErrUnauthorized
 	}
 
-	ns, err := c.getNameSpaceInfo(ctx, namespace)
+	ns, err := c.GetNameSpaceInfo(ctx, namespace)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get namespace info for model, error: %w", err)
 	}
@@ -545,7 +545,7 @@ func (c *modelComponentImpl) SDKModelInfo(ctx context.Context, namespace, name, 
 		return nil, fmt.Errorf("failed to get last commit, error: %w", err)
 	}
 
-	relatedRepos, _ := c.relatedRepos(ctx, model.RepositoryID, currentUser)
+	relatedRepos, _ := c.RelatedRepos(ctx, model.RepositoryID, currentUser)
 	relatedSpaces := relatedRepos[types.SpaceRepo]
 	spaceNames := make([]string, len(relatedSpaces))
 	for idx, s := range relatedSpaces {
@@ -770,7 +770,7 @@ func (c *modelComponentImpl) DelRelationDataset(ctx context.Context, req types.R
 }
 
 func (c *modelComponentImpl) getRelations(ctx context.Context, fromRepoID int64, currentUser string) (*types.Relations, error) {
-	res, err := c.relatedRepos(ctx, fromRepoID, currentUser)
+	res, err := c.RelatedRepos(ctx, fromRepoID, currentUser)
 	if err != nil {
 		return nil, err
 	}
