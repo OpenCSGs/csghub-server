@@ -41,7 +41,7 @@ jobs:
       run: |
           if [ "${{ github.event_name }}" == "schedule" ] && [ "${{ github.ref }}" == "refs/heads/main" ]; then
             echo "TAGS=opencsg/csghub-server:latest,${{ secrets.ACR_REGISTRY }}/opencsg_public/csghub_server:latest" >> $GITHUB_ENV
-          else
+          elif [ "${{ github.event_name }}" == "push" ]; then
             echo "TAGS=opencsg/csghub-server:${GITHUB_REF_NAME},${{ secrets.ACR_REGISTRY }}/opencsg_public/csghub_server:${GITHUB_REF_NAME}" >> $GITHUB_ENV
           fi
           
