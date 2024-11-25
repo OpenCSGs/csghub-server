@@ -19,12 +19,14 @@ require (
 	github.com/gin-gonic/gin v1.9.1
 	github.com/golang-jwt/jwt/v5 v5.2.1
 	github.com/golang/gddo v0.0.0-20210115222349-20d68f94ee1f
+	github.com/jarcoal/httpmock v1.3.1
 	github.com/marcboeker/go-duckdb v1.5.6
 	github.com/minio/minio-go/v7 v7.0.66
 	github.com/minio/sha256-simd v1.0.1
 	github.com/naoina/toml v0.1.1
 	github.com/redis/go-redis/v9 v9.3.0
 	github.com/sethvargo/go-envconfig v1.1.0
+	github.com/spf13/cast v1.1.0
 	github.com/spf13/cobra v1.8.0
 	github.com/stretchr/testify v1.9.0
 	github.com/swaggo/files v1.0.1

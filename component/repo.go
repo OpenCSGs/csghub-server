@@ -139,6 +139,10 @@ type RepoComponent interface {
 	DeployUpdate(ctx context.Context, updateReq types.DeployActReq, req *types.DeployUpdateReq) error
 	DeployStart(ctx context.Context, startReq types.DeployActReq) error
 	AllFiles(ctx context.Context, req types.GetAllFilesReq) ([]*types.File, error)
+	GetUserRepoPermission(ctx context.Context, userName string, repo *database.Repository) (*types.UserRepoPermission, error)
+	CheckCurrentUserPermission(ctx context.Context, userName string, namespace string, role membership.Role) (bool, error)
+	GetNameSpaceInfo(ctx context.Context, path string) (*types.Namespace, error)
+	RelatedRepos(ctx context.Context, repoID int64, currentUser string) (map[types.RepositoryType][]*database.Repository, error)
 }
 
 func NewRepoComponentImpl(config *config.Config) (*repoComponentImpl, error) {
@@ -233,7 +237,7 @@ func (c *repoComponentImpl) CreateRepo(ctx context.Context, req types.CreateRepo
 
 	if !user.CanAdmin() {
 		if namespace.NamespaceType == database.OrgNamespace {
-			canWrite, err := c.checkCurrentUserPermission(ctx, req.Username, req.Namespace, membership.RoleWrite)
+			canWrite, err := c.CheckCurrentUserPermission(ctx, req.Username, req.Namespace, membership.RoleWrite)
 			if err != nil {
 				return nil, nil, err
 			}
@@ -309,7 +313,7 @@ func (c *repoComponentImpl) UpdateRepo(ctx context.Context, req types.UpdateRepo
 
 	if !user.CanAdmin() {
 		if namespace.NamespaceType == database.OrgNamespace {
-			canWrite, err := c.checkCurrentUserPermission(ctx, req.Username, req.Namespace, membership.RoleWrite)
+			canWrite, err := c.CheckCurrentUserPermission(ctx, req.Username, req.Namespace, membership.RoleWrite)
 			if err != nil {
 				return nil, err
 			}
@@ -374,7 +378,7 @@ func (c *repoComponentImpl) DeleteRepo(ctx context.Context, req types.DeleteRepo
 	}
 
 	if namespace.NamespaceType == database.OrgNamespace {
-		canWrite, err := c.checkCurrentUserPermission(ctx, req.Username, req.Namespace, membership.RoleAdmin)
+		canWrite, err := c.CheckCurrentUserPermission(ctx, req.Username, req.Namespace, membership.RoleAdmin)
 		if err != nil {
 			return nil, err
 		}
@@ -436,8 +440,8 @@ func (c *repoComponentImpl) PublicToUser(ctx context.Context, repoType types.Rep
 	return repos, count, nil
 }
 
-// relatedRepos gets all repos related to the given repo, and return them by repo type
-func (c *repoComponentImpl) relatedRepos(ctx context.Context, repoID int64, currentUser string) (map[types.RepositoryType][]*database.Repository, error) {
+// RelatedRepos gets all repos related to the given repo, and return them by repo type
+func (c *repoComponentImpl) RelatedRepos(ctx context.Context, repoID int64, currentUser string) (map[types.RepositoryType][]*database.Repository, error) {
 	fromRelations, err := c.rel.From(ctx, repoID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get repo relation from, error: %w", err)
@@ -467,17 +471,17 @@ func (c *repoComponentImpl) relatedRepos(ctx context.Context, repoID int64, curr
 	opts = append(opts, database.Columns("id", "repository_type", "path", "user_id", "private", "name",
 		"nickname", "description", "download_count", "updated_at"))
 
-	relatedRepos, err := c.repo.FindByIds(ctx, relatedRepoIDs, opts...)
+	RelatedRepos, err := c.repo.FindByIds(ctx, relatedRepoIDs, opts...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get relation to repositories by ids, error: %w", err)
 	}
 
-	relatedRepos, err = c.visiableToUser(ctx, relatedRepos, currentUser)
+	RelatedRepos, err = c.visiableToUser(ctx, RelatedRepos, currentUser)
 	if err != nil {
 		return nil, fmt.Errorf("failed to check related repositories visiable to user:%s, %w", currentUser, err)
 	}
 	res := make(map[types.RepositoryType][]*database.Repository)
-	for _, repo := range relatedRepos {
+	for _, repo := range RelatedRepos {
 		res[repo.RepositoryType] = append(res[repo.RepositoryType], repo)
 	}
 	return res, nil
@@ -491,7 +495,7 @@ func (c *repoComponentImpl) visiableToUser(ctx context.Context, repos []*databas
 				continue
 			}
 			namespace, _ := repo.NamespaceAndName()
-			canRead, err := c.checkCurrentUserPermission(ctx, currentUser, namespace, membership.RoleRead)
+			canRead, err := c.CheckCurrentUserPermission(ctx, currentUser, namespace, membership.RoleRead)
 			if err != nil {
 				return nil, err
 			}
@@ -517,7 +521,7 @@ func (c *repoComponentImpl) CreateFile(ctx context.Context, req *types.CreateFil
 		return nil, fmt.Errorf("failed to find repo, error: %w", err)
 	}
 
-	permission, err := c.getUserRepoPermission(ctx, req.CurrentUser, repo)
+	permission, err := c.GetUserRepoPermission(ctx, req.CurrentUser, repo)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get user repo permission, error: %w", err)
 	}
@@ -630,7 +634,7 @@ func (c *repoComponentImpl) UpdateFile(ctx context.Context, req *types.UpdateFil
 		return nil, fmt.Errorf("failed to find repo, error: %w", err)
 	}
 
-	permission, err := c.getUserRepoPermission(ctx, req.CurrentUser, repo)
+	permission, err := c.GetUserRepoPermission(ctx, req.CurrentUser, repo)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get user repo permission, error: %w", err)
 	}
@@ -716,7 +720,7 @@ func (c *repoComponentImpl) DeleteFile(ctx context.Context, req *types.DeleteFil
 		return nil, fmt.Errorf("failed to find repo, error: %w", err)
 	}
 
-	permission, err := c.getUserRepoPermission(ctx, req.CurrentUser, repo)
+	permission, err := c.GetUserRepoPermission(ctx, req.CurrentUser, repo)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get user repo permission, error: %w", err)
 	}
@@ -824,7 +828,7 @@ func (c *repoComponentImpl) Commits(ctx context.Context, req *types.GetCommitsRe
 		return nil, nil, fmt.Errorf("failed to find repo, error: %w", err)
 	}
 
-	permission, err := c.getUserRepoPermission(ctx, req.CurrentUser, repo)
+	permission, err := c.GetUserRepoPermission(ctx, req.CurrentUser, repo)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to get user repo permission, error: %w", err)
 	}
@@ -856,7 +860,7 @@ func (c *repoComponentImpl) LastCommit(ctx context.Context, req *types.GetCommit
 		return nil, fmt.Errorf("failed to find repo, error: %w", err)
 	}
 
-	permission, err := c.getUserRepoPermission(ctx, req.CurrentUser, repo)
+	permission, err := c.GetUserRepoPermission(ctx, req.CurrentUser, repo)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get user repo permission, error: %w", err)
 	}
@@ -886,7 +890,7 @@ func (c *repoComponentImpl) FileRaw(ctx context.Context, req *types.GetFileReq) 
 		return "", fmt.Errorf("failed to find repo, error: %w", err)
 	}
 
-	permission, err := c.getUserRepoPermission(ctx, req.CurrentUser, repo)
+	permission, err := c.GetUserRepoPermission(ctx, req.CurrentUser, repo)
 	if err != nil {
 		return "", fmt.Errorf("failed to get user repo permission, error: %w", err)
 	}
@@ -930,7 +934,7 @@ func (c *repoComponentImpl) DownloadFile(ctx context.Context, req *types.GetFile
 		return nil, 0, "", fmt.Errorf("failed to find repo, error: %w", err)
 	}
 
-	permission, err := c.getUserRepoPermission(ctx, req.CurrentUser, repo)
+	permission, err := c.GetUserRepoPermission(ctx, req.CurrentUser, repo)
 	if err != nil {
 		return nil, 0, "", fmt.Errorf("failed to get user repo permission, error: %w", err)
 	}
@@ -980,7 +984,7 @@ func (c *repoComponentImpl) Branches(ctx context.Context, req *types.GetBranches
 		return nil, fmt.Errorf("failed to find repo, error: %w", err)
 	}
 
-	permission, err := c.getUserRepoPermission(ctx, req.CurrentUser, repo)
+	permission, err := c.GetUserRepoPermission(ctx, req.CurrentUser, repo)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get user repo permission, error: %w", err)
 	}
@@ -1011,7 +1015,7 @@ func (c *repoComponentImpl) Tags(ctx context.Context, req *types.GetTagsReq) ([]
 		return nil, fmt.Errorf("failed to find %s, error: %w", req.RepoType, err)
 	}
 
-	permission, err := c.getUserRepoPermission(ctx, req.CurrentUser, repo)
+	permission, err := c.GetUserRepoPermission(ctx, req.CurrentUser, repo)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get user repo permission, error: %w", err)
 	}
@@ -1032,7 +1036,7 @@ func (c *repoComponentImpl) UpdateTags(ctx context.Context, namespace, name stri
 		return fmt.Errorf("failed to find repo, error: %w", err)
 	}
 
-	permission, err := c.getUserRepoPermission(ctx, currentUser, repo)
+	permission, err := c.GetUserRepoPermission(ctx, currentUser, repo)
 	if err != nil {
 		return fmt.Errorf("failed to get user repo permission, error: %w", err)
 	}
@@ -1056,7 +1060,7 @@ func (c *repoComponentImpl) Tree(ctx context.Context, req *types.GetFileReq) ([]
 		return nil, fmt.Errorf("repo does not exist, error: %w", err)
 	}
 
-	permission, err := c.getUserRepoPermission(ctx, req.CurrentUser, repo)
+	permission, err := c.GetUserRepoPermission(ctx, req.CurrentUser, repo)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get user repo permission, error: %w", err)
 	}
@@ -1335,7 +1339,7 @@ func (c *repoComponentImpl) FileInfo(ctx context.Context, req *types.GetFileReq)
 		return nil, fmt.Errorf("failed to find repo, error: %w", err)
 	}
 
-	permission, err := c.getUserRepoPermission(ctx, req.CurrentUser, repo)
+	permission, err := c.GetUserRepoPermission(ctx, req.CurrentUser, repo)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get user repo permission, error: %w", err)
 	}
@@ -1402,7 +1406,7 @@ func (c *repoComponentImpl) AllowReadAccessRepo(ctx context.Context, repo *datab
 	}
 
 	namespace, _ := repo.NamespaceAndName()
-	return c.checkCurrentUserPermission(ctx, username, namespace, membership.RoleRead)
+	return c.CheckCurrentUserPermission(ctx, username, namespace, membership.RoleRead)
 }
 
 func (c *repoComponentImpl) AllowReadAccess(ctx context.Context, repoType types.RepositoryType, namespace, name, username string) (bool, error) {
@@ -1426,7 +1430,7 @@ func (c *repoComponentImpl) AllowWriteAccess(ctx context.Context, repoType types
 		return false, ErrUserNotFound
 	}
 
-	return c.checkCurrentUserPermission(ctx, username, namespace, membership.RoleWrite)
+	return c.CheckCurrentUserPermission(ctx, username, namespace, membership.RoleWrite)
 }
 
 func (c *repoComponentImpl) AllowAdminAccess(ctx context.Context, repoType types.RepositoryType, namespace, name, username string) (bool, error) {
@@ -1442,10 +1446,10 @@ func (c *repoComponentImpl) AllowAdminAccess(ctx context.Context, repoType types
 		return false, ErrUserNotFound
 	}
 
-	return c.checkCurrentUserPermission(ctx, username, namespace, membership.RoleAdmin)
+	return c.CheckCurrentUserPermission(ctx, username, namespace, membership.RoleAdmin)
 }
 
-func (c *repoComponentImpl) getUserRepoPermission(ctx context.Context, userName string, repo *database.Repository) (*types.UserRepoPermission, error) {
+func (c *repoComponentImpl) GetUserRepoPermission(ctx context.Context, userName string, repo *database.Repository) (*types.UserRepoPermission, error) {
 	if userName == "" {
 		//anonymous user only has read permission to public repo
 		return &types.UserRepoPermission{CanRead: !repo.Private, CanWrite: false, CanAdmin: false}, nil
@@ -1485,7 +1489,7 @@ func (c *repoComponentImpl) getUserRepoPermission(ctx context.Context, userName 
 	}
 }
 
-func (c *repoComponentImpl) checkCurrentUserPermission(ctx context.Context, userName string, namespace string, role membership.Role) (bool, error) {
+func (c *repoComponentImpl) CheckCurrentUserPermission(ctx context.Context, userName string, namespace string, role membership.Role) (bool, error) {
 	ns, err := c.namespace.FindByPath(ctx, namespace)
 	if err != nil {
 		return false, err
@@ -1521,7 +1525,7 @@ func (c *repoComponentImpl) GetCommitWithDiff(ctx context.Context, req *types.Ge
 		return nil, fmt.Errorf("failed to find repo, error: %w", err)
 	}
 
-	permission, err := c.getUserRepoPermission(ctx, req.CurrentUser, repo)
+	permission, err := c.GetUserRepoPermission(ctx, req.CurrentUser, repo)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get user repo permission, error: %w", err)
 	}
@@ -1547,7 +1551,7 @@ func (c *repoComponentImpl) CreateMirror(ctx context.Context, req types.CreateMi
 		mirror database.Mirror
 		taskId int64
 	)
-	admin, err := c.checkCurrentUserPermission(ctx, req.CurrentUser, req.Namespace, membership.RoleAdmin)
+	admin, err := c.CheckCurrentUserPermission(ctx, req.CurrentUser, req.Namespace, membership.RoleAdmin)
 	if err != nil {
 		return nil, fmt.Errorf("failed to check permission to create mirror, error: %w", err)
 	}
@@ -1762,7 +1766,7 @@ func (c *repoComponentImpl) mirrorFromSaasSync(ctx context.Context, mirror *data
 }
 
 func (c *repoComponentImpl) GetMirror(ctx context.Context, req types.GetMirrorReq) (*database.Mirror, error) {
-	admin, err := c.checkCurrentUserPermission(ctx, req.CurrentUser, req.Namespace, membership.RoleAdmin)
+	admin, err := c.CheckCurrentUserPermission(ctx, req.CurrentUser, req.Namespace, membership.RoleAdmin)
 	if err != nil {
 		return nil, fmt.Errorf("failed to check permission to create mirror, error: %w", err)
 	}
@@ -1782,7 +1786,7 @@ func (c *repoComponentImpl) GetMirror(ctx context.Context, req types.GetMirrorRe
 }
 
 func (c *repoComponentImpl) UpdateMirror(ctx context.Context, req types.UpdateMirrorReq) (*database.Mirror, error) {
-	admin, err := c.checkCurrentUserPermission(ctx, req.CurrentUser, req.Namespace, membership.RoleAdmin)
+	admin, err := c.CheckCurrentUserPermission(ctx, req.CurrentUser, req.Namespace, membership.RoleAdmin)
 	if err != nil {
 		return nil, fmt.Errorf("failed to check permission to create mirror, error: %w", err)
 	}
@@ -1826,7 +1830,7 @@ func (c *repoComponentImpl) UpdateMirror(ctx context.Context, req types.UpdateMi
 }
 
 func (c *repoComponentImpl) DeleteMirror(ctx context.Context, req types.DeleteMirrorReq) error {
-	admin, err := c.checkCurrentUserPermission(ctx, req.CurrentUser, req.Namespace, membership.RoleAdmin)
+	admin, err := c.CheckCurrentUserPermission(ctx, req.CurrentUser, req.Namespace, membership.RoleAdmin)
 	if err != nil {
 		return fmt.Errorf("failed to check permission to create mirror, error: %w", err)
 	}
@@ -2402,7 +2406,7 @@ func (c *repoComponentImpl) GetDeployBySvcName(ctx context.Context, svcName stri
 }
 
 func (c *repoComponentImpl) SyncMirror(ctx context.Context, repoType types.RepositoryType, namespace, name, currentUser string) error {
-	admin, err := c.checkCurrentUserPermission(ctx, currentUser, namespace, membership.RoleAdmin)
+	admin, err := c.CheckCurrentUserPermission(ctx, currentUser, namespace, membership.RoleAdmin)
 	if err != nil {
 		return fmt.Errorf("failed to check permission to create mirror, error: %w", err)
 	}
@@ -2587,7 +2591,7 @@ func (c *repoComponentImpl) AllFiles(ctx context.Context, req types.GetAllFilesR
 		return nil, fmt.Errorf("failed to find repo")
 	}
 	if repo.Private {
-		read, err := c.checkCurrentUserPermission(ctx, req.CurrentUser, req.Namespace, membership.RoleRead)
+		read, err := c.CheckCurrentUserPermission(ctx, req.CurrentUser, req.Namespace, membership.RoleRead)
 		if err != nil {
 			return nil, fmt.Errorf("failed to check permission to get all files, error: %w", err)
 		}
@@ -2609,7 +2613,7 @@ func (c *repoComponentImpl) isAdminRole(user database.User) bool {
 	return user.CanAdmin()
 }
 
-func (c *repoComponentImpl) getNameSpaceInfo(ctx context.Context, path string) (*types.Namespace, error) {
+func (c *repoComponentImpl) GetNameSpaceInfo(ctx context.Context, path string) (*types.Namespace, error) {
 	nsResp, err := c.userSvcClient.GetNameSpaceInfo(ctx, path)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get namespace infor from user service, path: %s, error: %w", path, err)

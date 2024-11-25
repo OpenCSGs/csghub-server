@@ -16,6 +16,7 @@ import (
 	"opencsg.com/csghub-server/builder/git/gitserver"
 	"opencsg.com/csghub-server/builder/git/membership"
 	"opencsg.com/csghub-server/builder/llm"
+	"opencsg.com/csghub-server/builder/rpc"
 	"opencsg.com/csghub-server/builder/sensitive"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/config"
@@ -30,15 +31,20 @@ var (
 )
 
 type promptComponentImpl struct {
-	gs   gitserver.GitServer
-	user database.UserStore
-	pc   database.PromptConversationStore
-	pp   database.PromptPrefixStore
-	lc   database.LLMConfigStore
-	pt   database.PromptStore
-	llm  *llm.Client
-	*repoComponentImpl
-	maxPromptFS int64
+	config            *config.Config
+	userStore         database.UserStore
+	userLikeStore     database.UserLikesStore
+	userSvcClient     rpc.UserSvcClient
+	promptConvStore   database.PromptConversationStore
+	promptPrefixStore database.PromptPrefixStore
+	llmConfigStore    database.LLMConfigStore
+	promptStore       database.PromptStore
+	repoStore         database.RepoStore
+	repoComponent     RepoComponent
+	gitServer         gitserver.GitServer
+	namespaceStore    database.NamespaceStore
+	llmClient         *llm.Client
+	maxPromptFS       int64
 }
 
 type PromptComponent interface {
@@ -78,35 +84,42 @@ func NewPromptComponent(cfg *config.Config) (PromptComponent, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to create git server,cause:%w", err)
 	}
+	usc := rpc.NewUserSvcHttpClient(fmt.Sprintf("%s:%d", cfg.User.Host, cfg.User.Port),
+		rpc.AuthWithApiKey(cfg.APIToken))
 	return &promptComponentImpl{
-		gs:                gs,
-		user:              database.NewUserStore(),
-		pc:                database.NewPromptConversationStore(),
-		pp:                database.NewPromptPrefixStore(),
-		lc:                database.NewLLMConfigStore(),
-		pt:                database.NewPromptStore(),
-		llm:               llm.NewClient(),
-		repoComponentImpl: r,
+		userStore:         database.NewUserStore(),
+		userLikeStore:     database.NewUserLikesStore(),
+		userSvcClient:     usc,
+		promptConvStore:   database.NewPromptConversationStore(),
+		promptPrefixStore: database.NewPromptPrefixStore(),
+		llmConfigStore:    database.NewLLMConfigStore(),
+		promptStore:       database.NewPromptStore(),
+		llmClient:         llm.NewClient(),
+		repoStore:         database.NewRepoStore(),
+		repoComponent:     r,
+		gitServer:         gs,
 		maxPromptFS:       cfg.Dataset.PromptMaxJsonlFileSize,
 	}, nil
 }
 
 func (c *promptComponentImpl) ListPrompt(ctx context.Context, req types.PromptReq) ([]PromptOutput, error) {
-	r, err := c.repo.FindByPath(ctx, types.PromptRepo, req.Namespace, req.Name)
+	r, err := c.repoStore.FindByPath(ctx, types.PromptRepo, req.Namespace, req.Name)
 	if err != nil {
-		return nil, fmt.Errorf("failed to find dataset, error: %w", err)
+		return nil, fmt.Errorf("failed to find prompt set, error: %w", err)
 	}
 
-	allow, err := c.AllowReadAccessRepo(ctx, r, req.CurrentUser)
+	slog.Debug("ListPrompt check user permission begin")
+	allow, err := c.repoComponent.AllowReadAccessRepo(ctx, r, req.CurrentUser)
+	slog.Debug("ListPrompt check user permission end")
 	if err != nil {
-		return nil, fmt.Errorf("failed to check dataset permission, error: %w", err)
+		return nil, fmt.Errorf("failed to check prompt set permission, error: %w", err)
 	}
 	if !allow {
 		return nil, ErrUnauthorized
 	}
 
 	slog.Debug("ListPrompt get repo file tree begin")
-	tree, err := GetFilePathObjects(req.Namespace, req.Name, "", types.PromptRepo, "", c.git.GetRepoFileTree)
+	tree, err := GetFilePathObjects(req.Namespace, req.Name, "", types.PromptRepo, "", c.gitServer.GetRepoFileTree)
 	slog.Debug("ListPrompt get repo file tree end")
 	if err != nil {
 		return nil, fmt.Errorf("failed to get repo file tree, error: %w", err)
@@ -160,16 +173,15 @@ func (c *promptComponentImpl) ListPrompt(ctx context.Context, req types.PromptRe
 	<-done
 
 	return prompts, nil
-
 }
 
 func (c *promptComponentImpl) GetPrompt(ctx context.Context, req types.PromptReq) (*PromptOutput, error) {
-	r, err := c.repo.FindByPath(ctx, types.PromptRepo, req.Namespace, req.Name)
+	r, err := c.repoStore.FindByPath(ctx, types.PromptRepo, req.Namespace, req.Name)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find prompt repo, error: %w", err)
 	}
 
-	permission, err := c.getUserRepoPermission(ctx, req.CurrentUser, r)
+	permission, err := c.repoComponent.GetUserRepoPermission(ctx, req.CurrentUser, r)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get user repo permission, error: %w", err)
 	}
@@ -194,7 +206,7 @@ func (c *promptComponentImpl) GetPrompt(ctx context.Context, req types.PromptReq
 }
 
 func (c *promptComponentImpl) ParseJsonFile(ctx context.Context, req gitserver.GetRepoInfoByPathReq) (*PromptOutput, error) {
-	f, err := c.gs.GetRepoFileContents(ctx, req)
+	f, err := c.gitServer.GetRepoFileContents(ctx, req)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get %s contents, cause:%w", req.Path, err)
 	}
@@ -246,7 +258,7 @@ func (c *promptComponentImpl) CreatePrompt(ctx context.Context, req types.Prompt
 		Email:       u.Email,
 		Message:     fmt.Sprintf("create prompt %s", req.Path),
 	}
-	_, err = c.CreateFile(ctx, &fileReq)
+	_, err = c.repoComponent.CreateFile(ctx, &fileReq)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create prompt file %s, cause: %w", req.Path, err)
 	}
@@ -283,7 +295,7 @@ func (c *promptComponentImpl) UpdatePrompt(ctx context.Context, req types.Prompt
 		Email:       u.Email,
 		Message:     fmt.Sprintf("update prompt %s", req.Path),
 	}
-	_, err = c.UpdateFile(ctx, &fileReq)
+	_, err = c.repoComponent.UpdateFile(ctx, &fileReq)
 	if err != nil {
 		return nil, fmt.Errorf("failed to update prompt file %s, cause: %w", req.Path, err)
 	}
@@ -313,7 +325,7 @@ func (c *promptComponentImpl) DeletePrompt(ctx context.Context, req types.Prompt
 		OriginPath:  "",
 	}
 
-	_, err = c.DeleteFile(ctx, &fileReq)
+	_, err = c.repoComponent.DeleteFile(ctx, &fileReq)
 	if err != nil {
 		return fmt.Errorf("failed to delete prompt %s, cause: %w", req.Path, err)
 	}
@@ -328,7 +340,7 @@ func (c *promptComponentImpl) checkFileExist(ctx context.Context, req types.Prom
 		Path:      req.Path,
 		RepoType:  types.PromptRepo,
 	}
-	_, err := c.git.GetRepoFileRaw(ctx, getFileRawReq)
+	_, err := c.gitServer.GetRepoFileRaw(ctx, getFileRawReq)
 	if err != nil {
 		return false, fmt.Errorf("failed to get prompt repository %s/%s file %s raw, error: %w", req.Namespace, req.Name, req.Path, err)
 	}
@@ -336,19 +348,19 @@ func (c *promptComponentImpl) checkFileExist(ctx context.Context, req types.Prom
 }
 
 func (c *promptComponentImpl) checkPromptRepoPermission(ctx context.Context, req types.PromptReq) (*database.User, error) {
-	namespace, err := c.namespace.FindByPath(ctx, req.Namespace)
+	namespace, err := c.namespaceStore.FindByPath(ctx, req.Namespace)
 	if err != nil {
 		return nil, errors.New("namespace does not exist")
 	}
 
-	user, err := c.user.FindByUsername(ctx, req.CurrentUser)
+	user, err := c.userStore.FindByUsername(ctx, req.CurrentUser)
 	if err != nil {
 		return nil, errors.New("user does not exist")
 	}
 
 	if !user.CanAdmin() {
 		if namespace.NamespaceType == database.OrgNamespace {
-			canWrite, err := c.checkCurrentUserPermission(ctx, req.CurrentUser, req.Namespace, membership.RoleWrite)
+			canWrite, err := c.repoComponent.CheckCurrentUserPermission(ctx, req.CurrentUser, req.Namespace, membership.RoleWrite)
 			if err != nil {
 				return nil, err
 			}
@@ -365,7 +377,7 @@ func (c *promptComponentImpl) checkPromptRepoPermission(ctx context.Context, req
 }
 
 func (c *promptComponentImpl) NewConversation(ctx context.Context, req types.ConversationTitleReq) (*database.PromptConversation, error) {
-	user, err := c.user.FindByUsername(ctx, req.CurrentUser)
+	user, err := c.userStore.FindByUsername(ctx, req.CurrentUser)
 	if err != nil {
 		return nil, errors.New("user does not exist")
 	}
@@ -375,7 +387,7 @@ func (c *promptComponentImpl) NewConversation(ctx context.Context, req types.Con
 		Title:          req.Title,
 	}
 
-	err = c.pc.CreateConversation(ctx, conversation)
+	err = c.promptConvStore.CreateConversation(ctx, conversation)
 	if err != nil {
 		return nil, fmt.Errorf("new conversation error: %w", err)
 	}
@@ -384,11 +396,11 @@ func (c *promptComponentImpl) NewConversation(ctx context.Context, req types.Con
 }
 
 func (c *promptComponentImpl) ListConversationsByUserID(ctx context.Context, currentUser string) ([]database.PromptConversation, error) {
-	user, err := c.user.FindByUsername(ctx, currentUser)
+	user, err := c.userStore.FindByUsername(ctx, currentUser)
 	if err != nil {
 		return nil, errors.New("user does not exist")
 	}
-	conversations, err := c.pc.FindConversationsByUserID(ctx, user.ID)
+	conversations, err := c.promptConvStore.FindConversationsByUserID(ctx, user.ID)
 	if err != nil {
 		return nil, fmt.Errorf("find conversations by user %s error: %w", currentUser, err)
 	}
@@ -396,11 +408,11 @@ func (c *promptComponentImpl) ListConversationsByUserID(ctx context.Context, cur
 }
 
 func (c *promptComponentImpl) GetConversation(ctx context.Context, req types.ConversationReq) (*database.PromptConversation, error) {
-	user, err := c.user.FindByUsername(ctx, req.CurrentUser)
+	user, err := c.userStore.FindByUsername(ctx, req.CurrentUser)
 	if err != nil {
 		return nil, errors.New("user does not exist")
 	}
-	conversation, err := c.pc.GetConversationByID(ctx, user.ID, req.Uuid, true)
+	conversation, err := c.promptConvStore.GetConversationByID(ctx, user.ID, req.Uuid, true)
 	if err != nil {
 		return nil, fmt.Errorf("get conversation by id %s error: %w", req.Uuid, err)
 	}
@@ -408,12 +420,12 @@ func (c *promptComponentImpl) GetConversation(ctx context.Context, req types.Con
 }
 
 func (c *promptComponentImpl) SubmitMessage(ctx context.Context, req types.ConversationReq) (<-chan string, error) {
-	user, err := c.user.FindByUsername(ctx, req.CurrentUser)
+	user, err := c.userStore.FindByUsername(ctx, req.CurrentUser)
 	if err != nil {
 		return nil, errors.New("user does not exist")
 	}
 
-	_, err = c.pc.GetConversationByID(ctx, user.ID, req.Uuid, false)
+	_, err = c.promptConvStore.GetConversationByID(ctx, user.ID, req.Uuid, false)
 	if err != nil {
 		return nil, fmt.Errorf("invalid conversation by uuid %s error: %w", req.Uuid, err)
 	}
@@ -423,12 +435,12 @@ func (c *promptComponentImpl) SubmitMessage(ctx context.Context, req types.Conve
 		Role:           UserRole,
 		Content:        req.Message,
 	}
-	_, err = c.pc.SaveConversationMessage(ctx, reqMsg)
+	_, err = c.promptConvStore.SaveConversationMessage(ctx, reqMsg)
 	if err != nil {
 		return nil, fmt.Errorf("save user prompt input error: %w", err)
 	}
 
-	llmConfig, err := c.lc.GetOptimization(ctx)
+	llmConfig, err := c.llmConfigStore.GetOptimization(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("get llm config error: %w", err)
 	}
@@ -440,7 +452,7 @@ func (c *promptComponentImpl) SubmitMessage(ctx context.Context, req types.Conve
 	}
 
 	promptPrefix := ""
-	prefix, err := c.pp.Get(ctx)
+	prefix, err := c.promptPrefixStore.Get(ctx)
 	if err != nil {
 		slog.Warn("fail to find prompt prefix", slog.Any("err", err))
 	} else {
@@ -466,7 +478,7 @@ func (c *promptComponentImpl) SubmitMessage(ctx context.Context, req types.Conve
 	}
 
 	slog.Debug("llm request", slog.Any("reqData", reqData))
-	ch, err := c.llm.Chat(ctx, llmConfig.ApiEndpoint, headers, reqData)
+	ch, err := c.llmClient.Chat(ctx, llmConfig.ApiEndpoint, headers, reqData)
 	if err != nil {
 		return nil, fmt.Errorf("call llm error: %w", err)
 	}
@@ -479,7 +491,7 @@ func (c *promptComponentImpl) SaveGeneratedText(ctx context.Context, req types.C
 		Role:           AssistantRole,
 		Content:        req.Message,
 	}
-	msg, err := c.pc.SaveConversationMessage(ctx, respMsg)
+	msg, err := c.promptConvStore.SaveConversationMessage(ctx, respMsg)
 	if err != nil {
 		return nil, fmt.Errorf("save system generated response error: %w", err)
 	}
@@ -487,12 +499,12 @@ func (c *promptComponentImpl) SaveGeneratedText(ctx context.Context, req types.C
 }
 
 func (c *promptComponentImpl) RemoveConversation(ctx context.Context, req types.ConversationReq) error {
-	user, err := c.user.FindByUsername(ctx, req.CurrentUser)
+	user, err := c.userStore.FindByUsername(ctx, req.CurrentUser)
 	if err != nil {
 		return errors.New("user does not exist")
 	}
 
-	err = c.pc.DeleteConversationsByID(ctx, user.ID, req.Uuid)
+	err = c.promptConvStore.DeleteConversationsByID(ctx, user.ID, req.Uuid)
 	if err != nil {
 		return fmt.Errorf("remove conversation error: %w", err)
 	}
@@ -500,12 +512,12 @@ func (c *promptComponentImpl) RemoveConversation(ctx context.Context, req types.
 }
 
 func (c *promptComponentImpl) UpdateConversation(ctx context.Context, req types.ConversationTitleReq) (*database.PromptConversation, error) {
-	user, err := c.user.FindByUsername(ctx, req.CurrentUser)
+	user, err := c.userStore.FindByUsername(ctx, req.CurrentUser)
 	if err != nil {
 		return nil, errors.New("user does not exist")
 	}
 
-	err = c.pc.UpdateConversation(ctx, database.PromptConversation{
+	err = c.promptConvStore.UpdateConversation(ctx, database.PromptConversation{
 		UserID:         user.ID,
 		ConversationID: req.Uuid,
 		Title:          req.Title,
@@ -514,7 +526,7 @@ func (c *promptComponentImpl) UpdateConversation(ctx context.Context, req types.
 		return nil, fmt.Errorf("update conversation title error: %w", err)
 	}
 
-	resp, err := c.pc.GetConversationByID(ctx, user.ID, req.Uuid, false)
+	resp, err := c.promptConvStore.GetConversationByID(ctx, user.ID, req.Uuid, false)
 	if err != nil {
 		return nil, fmt.Errorf("invalid conversation by uuid %s error: %w", req.Uuid, err)
 	}
@@ -522,15 +534,15 @@ func (c *promptComponentImpl) UpdateConversation(ctx context.Context, req types.
 }
 
 func (c *promptComponentImpl) LikeConversationMessage(ctx context.Context, req types.ConversationMessageReq) error {
-	user, err := c.user.FindByUsername(ctx, req.CurrentUser)
+	user, err := c.userStore.FindByUsername(ctx, req.CurrentUser)
 	if err != nil {
 		return errors.New("user does not exist")
 	}
-	_, err = c.pc.GetConversationByID(ctx, user.ID, req.Uuid, false)
+	_, err = c.promptConvStore.GetConversationByID(ctx, user.ID, req.Uuid, false)
 	if err != nil {
 		return fmt.Errorf("invalid conversation by uuid %s error: %w", req.Uuid, err)
 	}
-	err = c.pc.LikeMessageByID(ctx, req.Id)
+	err = c.promptConvStore.LikeMessageByID(ctx, req.Id)
 	if err != nil {
 		return fmt.Errorf("update like message by id %d error: %w", req.Id, err)
 	}
@@ -538,15 +550,15 @@ func (c *promptComponentImpl) LikeConversationMessage(ctx context.Context, req t
 }
 
 func (c *promptComponentImpl) HateConversationMessage(ctx context.Context, req types.ConversationMessageReq) error {
-	user, err := c.user.FindByUsername(ctx, req.CurrentUser)
+	user, err := c.userStore.FindByUsername(ctx, req.CurrentUser)
 	if err != nil {
 		return errors.New("user does not exist")
 	}
-	_, err = c.pc.GetConversationByID(ctx, user.ID, req.Uuid, false)
+	_, err = c.promptConvStore.GetConversationByID(ctx, user.ID, req.Uuid, false)
 	if err != nil {
 		return fmt.Errorf("invalid conversation by uuid %s error: %w", req.Uuid, err)
 	}
-	err = c.pc.HateMessageByID(ctx, req.Id)
+	err = c.promptConvStore.HateMessageByID(ctx, req.Id)
 	if err != nil {
 		return fmt.Errorf("update hate message by id %d error: %w", req.Id, err)
 	}
@@ -559,18 +571,23 @@ func isChinese(s string) bool {
 }
 
 func (c *promptComponentImpl) SetRelationModels(ctx context.Context, req types.RelationModels) error {
-	user, err := c.user.FindByUsername(ctx, req.CurrentUser)
+	user, err := c.userStore.FindByUsername(ctx, req.CurrentUser)
 	if err != nil {
 		return fmt.Errorf("user does not exist, %w", err)
 	}
 
-	if !user.CanAdmin() {
-		return fmt.Errorf("only admin was allowed to set models for prompt")
+	repo, err := c.repoStore.FindByPath(ctx, types.PromptRepo, req.Namespace, req.Name)
+	if err != nil {
+		return fmt.Errorf("failed to find prompt, error: %w", err)
 	}
 
-	_, err = c.repo.FindByPath(ctx, types.PromptRepo, req.Namespace, req.Name)
+	permission, err := c.repoComponent.GetUserRepoPermission(ctx, req.CurrentUser, repo)
 	if err != nil {
-		return fmt.Errorf("failed to find prompt dataset, error: %w", err)
+		return fmt.Errorf("failed to get user repo permission, error: %w", err)
+	}
+
+	if !permission.CanWrite {
+		return fmt.Errorf("user %s do not allow to set relation models", req.CurrentUser)
 	}
 
 	getFileContentReq := gitserver.GetRepoInfoByPathReq{
@@ -580,7 +597,7 @@ func (c *promptComponentImpl) SetRelationModels(ctx context.Context, req types.R
 		Path:      REPOCARD_FILENAME,
 		RepoType:  types.PromptRepo,
 	}
-	metaMap, splits, err := GetMetaMapFromReadMe(c.gs, getFileContentReq)
+	metaMap, splits, err := GetMetaMapFromReadMe(c.gitServer, getFileContentReq)
 	if err != nil {
 		return fmt.Errorf("failed parse meta from readme, cause: %w", err)
 	}
@@ -601,7 +618,7 @@ func (c *promptComponentImpl) SetRelationModels(ctx context.Context, req types.R
 	readmeReq.Email = user.Email
 	readmeReq.Content = base64.StdEncoding.EncodeToString([]byte(output))
 
-	err = c.git.UpdateRepoFile(&readmeReq)
+	err = c.gitServer.UpdateRepoFile(&readmeReq)
 	if err != nil {
 		return fmt.Errorf("failed to set models tag to %s file, cause: %w", readmeReq.FilePath, err)
 	}
@@ -657,7 +674,7 @@ func GetOutputForReadme(metaMap map[string]any, splits []string) (string, error)
 }
 
 func (c *promptComponentImpl) AddRelationModel(ctx context.Context, req types.RelationModel) error {
-	user, err := c.user.FindByUsername(ctx, req.CurrentUser)
+	user, err := c.userStore.FindByUsername(ctx, req.CurrentUser)
 	if err != nil {
 		return fmt.Errorf("user does not exist, %w", err)
 	}
@@ -666,7 +683,7 @@ func (c *promptComponentImpl) AddRelationModel(ctx context.Context, req types.Re
 		return fmt.Errorf("only admin was allowed to set models for prompt")
 	}
 
-	_, err = c.repo.FindByPath(ctx, types.PromptRepo, req.Namespace, req.Name)
+	_, err = c.repoStore.FindByPath(ctx, types.PromptRepo, req.Namespace, req.Name)
 	if err != nil {
 		return fmt.Errorf("failed to find prompt dataset, error: %w", err)
 	}
@@ -678,7 +695,7 @@ func (c *promptComponentImpl) AddRelationModel(ctx context.Context, req types.Re
 		Path:      REPOCARD_FILENAME,
 		RepoType:  types.PromptRepo,
 	}
-	metaMap, splits, err := GetMetaMapFromReadMe(c.gs, getFileContentReq)
+	metaMap, splits, err := GetMetaMapFromReadMe(c.gitServer, getFileContentReq)
 	if err != nil {
 		return fmt.Errorf("failed parse meta from readme, cause: %w", err)
 	}
@@ -705,7 +722,7 @@ func (c *promptComponentImpl) AddRelationModel(ctx context.Context, req types.Re
 	readmeReq.Email = user.Email
 	readmeReq.Content = base64.StdEncoding.EncodeToString([]byte(output))
 
-	err = c.git.UpdateRepoFile(&readmeReq)
+	err = c.gitServer.UpdateRepoFile(&readmeReq)
 	if err != nil {
 		return fmt.Errorf("failed to add model tag to %s file, cause: %w", readmeReq.FilePath, err)
 	}
@@ -714,7 +731,7 @@ func (c *promptComponentImpl) AddRelationModel(ctx context.Context, req types.Re
 }
 
 func (c *promptComponentImpl) DelRelationModel(ctx context.Context, req types.RelationModel) error {
-	user, err := c.user.FindByUsername(ctx, req.CurrentUser)
+	user, err := c.userStore.FindByUsername(ctx, req.CurrentUser)
 	if err != nil {
 		return fmt.Errorf("user does not exist, %w", err)
 	}
@@ -723,7 +740,7 @@ func (c *promptComponentImpl) DelRelationModel(ctx context.Context, req types.Re
 		return fmt.Errorf("only admin was allowed to delete model for prompt")
 	}
 
-	_, err = c.repo.FindByPath(ctx, types.PromptRepo, req.Namespace, req.Name)
+	_, err = c.repoStore.FindByPath(ctx, types.PromptRepo, req.Namespace, req.Name)
 	if err != nil {
 		return fmt.Errorf("failed to find prompt, error: %w", err)
 	}
@@ -735,7 +752,7 @@ func (c *promptComponentImpl) DelRelationModel(ctx context.Context, req types.Re
 		Path:      REPOCARD_FILENAME,
 		RepoType:  types.PromptRepo,
 	}
-	metaMap, splits, err := GetMetaMapFromReadMe(c.git, getFileContentReq)
+	metaMap, splits, err := GetMetaMapFromReadMe(c.gitServer, getFileContentReq)
 	if err != nil {
 		return fmt.Errorf("failed parse meta from readme, cause: %w", err)
 	}
@@ -767,7 +784,7 @@ func (c *promptComponentImpl) DelRelationModel(ctx context.Context, req types.Re
 	readmeReq.Email = user.Email
 	readmeReq.Content = base64.StdEncoding.EncodeToString([]byte(output))
 
-	err = c.git.UpdateRepoFile(&readmeReq)
+	err = c.gitServer.UpdateRepoFile(&readmeReq)
 	if err != nil {
 		return fmt.Errorf("failed to delete model tag to %s file, cause: %w", readmeReq.FilePath, err)
 	}
@@ -781,18 +798,18 @@ func (c *promptComponentImpl) CreatePromptRepo(ctx context.Context, req *types.C
 		tags     []types.RepoTag
 	)
 
-	namespace, err := c.namespace.FindByPath(ctx, req.Namespace)
+	namespace, err := c.namespaceStore.FindByPath(ctx, req.Namespace)
 	if err != nil {
 		return nil, errors.New("namespace does not exist")
 	}
 
-	user, err := c.user.FindByUsername(ctx, req.Username)
+	user, err := c.userStore.FindByUsername(ctx, req.Username)
 	if err != nil {
 		return nil, errors.New("user does not exist")
 	}
 	if !user.CanAdmin() {
 		if namespace.NamespaceType == database.OrgNamespace {
-			canWrite, err := c.checkCurrentUserPermission(ctx, req.Username, req.Namespace, membership.RoleWrite)
+			canWrite, err := c.repoComponent.CheckCurrentUserPermission(ctx, req.Username, req.Namespace, membership.RoleWrite)
 			if err != nil {
 				return nil, err
 			}
@@ -819,7 +836,7 @@ func (c *promptComponentImpl) CreatePromptRepo(ctx context.Context, req *types.C
 	req.RepoType = types.PromptRepo
 	req.Readme = generateReadmeData(req.License)
 	req.Nickname = nickname
-	_, dbRepo, err := c.CreateRepo(ctx, req.CreateRepoReq)
+	_, dbRepo, err := c.repoComponent.CreateRepo(ctx, req.CreateRepoReq)
 	if err != nil {
 		return nil, err
 	}
@@ -829,13 +846,13 @@ func (c *promptComponentImpl) CreatePromptRepo(ctx context.Context, req *types.C
 		RepositoryID: dbRepo.ID,
 	}
 
-	prompt, err := c.pt.Create(ctx, dbPrompt)
+	prompt, err := c.promptStore.Create(ctx, dbPrompt)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create database prompt, cause: %w", err)
 	}
 
 	// Create README.md file
-	err = c.git.CreateRepoFile(buildCreateFileReq(&types.CreateFileParams{
+	err = c.gitServer.CreateRepoFile(buildCreateFileReq(&types.CreateFileParams{
 		Username:  user.Username,
 		Email:     user.Email,
 		Message:   initCommitMessage,
@@ -851,7 +868,7 @@ func (c *promptComponentImpl) CreatePromptRepo(ctx context.Context, req *types.C
 	}
 
 	// Create .gitattributes file
-	err = c.git.CreateRepoFile(buildCreateFileReq(&types.CreateFileParams{
+	err = c.gitServer.CreateRepoFile(buildCreateFileReq(&types.CreateFileParams{
 		Username:  user.Username,
 		Email:     user.Email,
 		Message:   initCommitMessage,
@@ -907,7 +924,7 @@ func (c *promptComponentImpl) IndexPromptRepo(ctx context.Context, filter *types
 		err        error
 		resPrompts []types.PromptRes
 	)
-	repos, total, err := c.PublicToUser(ctx, types.PromptRepo, filter.Username, filter, per, page)
+	repos, total, err := c.repoComponent.PublicToUser(ctx, types.PromptRepo, filter.Username, filter, per, page)
 	if err != nil {
 		newError := fmt.Errorf("failed to get public prompt repos,error:%w", err)
 		return nil, 0, newError
@@ -916,7 +933,7 @@ func (c *promptComponentImpl) IndexPromptRepo(ctx context.Context, filter *types
 	for _, repo := range repos {
 		repoIDs = append(repoIDs, repo.ID)
 	}
-	prompts, err := c.pt.ByRepoIDs(ctx, repoIDs)
+	prompts, err := c.promptStore.ByRepoIDs(ctx, repoIDs)
 	if err != nil {
 		newError := fmt.Errorf("failed to get prompts by repo ids,error:%w", err)
 		return nil, 0, newError
@@ -978,18 +995,18 @@ func (c *promptComponentImpl) IndexPromptRepo(ctx context.Context, filter *types
 
 func (c *promptComponentImpl) UpdatePromptRepo(ctx context.Context, req *types.UpdatePromptRepoReq) (*types.PromptRes, error) {
 	req.RepoType = types.PromptRepo
-	dbRepo, err := c.UpdateRepo(ctx, req.UpdateRepoReq)
+	dbRepo, err := c.repoComponent.UpdateRepo(ctx, req.UpdateRepoReq)
 	if err != nil {
 		return nil, err
 	}
 
-	prompt, err := c.pt.ByRepoID(ctx, dbRepo.ID)
+	prompt, err := c.promptStore.ByRepoID(ctx, dbRepo.ID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find prompt, error: %w", err)
 	}
 
 	// update times of prompt repo
-	err = c.pt.Update(ctx, *prompt)
+	err = c.promptStore.Update(ctx, *prompt)
 	if err != nil {
 		return nil, fmt.Errorf("failed to update prompt, error: %w", err)
 	}
@@ -1012,7 +1029,7 @@ func (c *promptComponentImpl) UpdatePromptRepo(ctx context.Context, req *types.U
 }
 
 func (c *promptComponentImpl) RemoveRepo(ctx context.Context, namespace, name, currentUser string) error {
-	prompt, err := c.pt.FindByPath(ctx, namespace, name)
+	prompt, err := c.promptStore.FindByPath(ctx, namespace, name)
 	if err != nil {
 		return fmt.Errorf("failed to find prompt, error: %w", err)
 	}
@@ -1023,12 +1040,12 @@ func (c *promptComponentImpl) RemoveRepo(ctx context.Context, namespace, name, c
 		Name:      name,
 		RepoType:  types.PromptRepo,
 	}
-	_, err = c.DeleteRepo(ctx, deleteDatabaseRepoReq)
+	_, err = c.repoComponent.DeleteRepo(ctx, deleteDatabaseRepoReq)
 	if err != nil {
 		return fmt.Errorf("failed to delete repo of prompt, error: %w", err)
 	}
 
-	err = c.pt.Delete(ctx, *prompt)
+	err = c.promptStore.Delete(ctx, *prompt)
 	if err != nil {
 		return fmt.Errorf("failed to delete database prompt, error: %w", err)
 	}
@@ -1037,12 +1054,12 @@ func (c *promptComponentImpl) RemoveRepo(ctx context.Context, namespace, name, c
 
 func (c *promptComponentImpl) Show(ctx context.Context, namespace, name, currentUser string) (*types.PromptRes, error) {
 	var tags []types.RepoTag
-	prompt, err := c.pt.FindByPath(ctx, namespace, name)
+	prompt, err := c.promptStore.FindByPath(ctx, namespace, name)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find prompt, error: %w", err)
 	}
 
-	permission, err := c.getUserRepoPermission(ctx, currentUser, prompt.Repository)
+	permission, err := c.repoComponent.GetUserRepoPermission(ctx, currentUser, prompt.Repository)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get user repo permission, error: %w", err)
 	}
@@ -1050,7 +1067,7 @@ func (c *promptComponentImpl) Show(ctx context.Context, namespace, name, current
 		return nil, ErrUnauthorized
 	}
 
-	ns, err := c.getNameSpaceInfo(ctx, namespace)
+	ns, err := c.repoComponent.GetNameSpaceInfo(ctx, namespace)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get namespace info for prompt, error: %w", err)
 	}
@@ -1067,7 +1084,7 @@ func (c *promptComponentImpl) Show(ctx context.Context, namespace, name, current
 		})
 	}
 
-	likeExists, err := c.uls.IsExist(ctx, currentUser, prompt.Repository.ID)
+	likeExists, err := c.userLikeStore.IsExist(ctx, currentUser, prompt.Repository.ID)
 	if err != nil {
 		newError := fmt.Errorf("failed to check for the presence of the user likes,error:%w", err)
 		return nil, newError
@@ -1107,12 +1124,12 @@ func (c *promptComponentImpl) Show(ctx context.Context, namespace, name, current
 }
 
 func (c *promptComponentImpl) Relations(ctx context.Context, namespace, name, currentUser string) (*types.Relations, error) {
-	prompt, err := c.pt.FindByPath(ctx, namespace, name)
+	prompt, err := c.promptStore.FindByPath(ctx, namespace, name)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find prompt repo, error: %w", err)
 	}
 
-	allow, _ := c.AllowReadAccessRepo(ctx, prompt.Repository, currentUser)
+	allow, _ := c.repoComponent.AllowReadAccessRepo(ctx, prompt.Repository, currentUser)
 	if !allow {
 		return nil, ErrUnauthorized
 	}
@@ -1121,7 +1138,7 @@ func (c *promptComponentImpl) Relations(ctx context.Context, namespace, name, cu
 }
 
 func (c *promptComponentImpl) getRelations(ctx context.Context, repoID int64, currentUser string) (*types.Relations, error) {
-	res, err := c.relatedRepos(ctx, repoID, currentUser)
+	res, err := c.repoComponent.RelatedRepos(ctx, repoID, currentUser)
 	if err != nil {
 		return nil, err
 	}
@@ -1214,7 +1231,7 @@ func (c *promptComponentImpl) OrgPrompts(ctx context.Context, req *types.OrgProm
 		}
 	}
 	onlyPublic := !r.CanRead()
-	prompts, total, err := c.pt.ByOrgPath(ctx, req.Namespace, req.PageSize, req.Page, onlyPublic)
+	prompts, total, err := c.promptStore.ByOrgPath(ctx, req.Namespace, req.PageSize, req.Page, onlyPublic)
 	if err != nil {
 		newError := fmt.Errorf("failed to get user prompts,error:%w", err)
 		slog.Error(newError.Error())

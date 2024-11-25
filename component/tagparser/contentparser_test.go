@@ -1,8 +1,9 @@
 package tagparser
 
 import (
-	"slices"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 const readme = `
@@ -20,7 +21,7 @@ pretty_name: SkyPile-150B
 size_categories:
 - 100B<n<1T
 ---
-# SkyPile-150B 
+# SkyPile-150B
 
 ## Dataset Summary
 SkyPile-150B is a comprehensive, large-scale Chinese dataset specifically designed for the pre-training of large language models. It is derived from a broad array of publicly accessible Chinese Internet web pages. Rigorous filtering, extensive deduplication, and thorough sensitive data filtering have been employed to ensure its quality. Furthermore, we have utilized advanced tools such as fastText and BERT to filter out low-quality data.
@@ -47,7 +48,7 @@ size_categories:
 - 100B<n<1T
 `
 
-func TestMetaText(t *testing.T) {
+func TestTagParser_MetaText(t *testing.T) {
 	testMeta := metaText(readme)
 	if testMeta != actualMeta {
 		t.Errorf("expected %s, got %s", actualMeta, testMeta)
@@ -55,34 +56,24 @@ func TestMetaText(t *testing.T) {
 	}
 }
 
-func TestMetaTags(t *testing.T) {
+func TestTagParser_MetaTags(t *testing.T) {
 	metaTags, err := MetaTags(readme)
-	if err != nil {
-		t.Error(err)
-		t.FailNow()
-	}
-	if len(metaTags) != 4 {
-		t.Errorf("expected 4 tags, got %d", len(metaTags))
-		t.Fail()
-	}
-	if len(metaTags["task"]) != 4 || !slices.Equal(metaTags["task"], []string{"text-generation", "llm", "casual-lm", "language-modeling"}) {
-		t.Error("wrong task_categories", len(metaTags["task"]), metaTags["task"])
-		t.Fail()
-	}
-	if len(metaTags["language"]) != 1 || metaTags["language"][0] != "zh" {
-		t.Error("wrong language")
-		t.Fail()
-	}
-	if len(metaTags["tags"]) != 0 {
-		t.Errorf("wrong tags, got:%v", metaTags["tags"])
-		t.Fail()
-	}
-	if len(metaTags["pretty_name"]) != 1 || metaTags["pretty_name"][0] != "SkyPile-150B" {
-		t.Error("wrong pretty_name")
-		t.Fail()
-	}
-	if len(metaTags["size"]) != 1 || metaTags["size"][0] != "100B<n<1T" {
-		t.Error("wrong size_categories")
-		t.Fail()
-	}
+	require.Nil(t, err)
+	require.Equal(t, 4, len(metaTags["task"]))
+	require.ElementsMatch(
+		t, []string{"text-generation", "llm", "casual-lm", "language-modeling"}, metaTags["task"],
+	)
+	require.Equal(t, 1, len(metaTags["language"]))
+	require.ElementsMatch(
+		t, []string{"zh"}, metaTags["language"],
+	)
+	require.Equal(t, 0, len(metaTags["tags"]))
+	require.Equal(t, 1, len(metaTags["pretty_name"]))
+	require.ElementsMatch(
+		t, []string{"SkyPile-150B"}, metaTags["pretty_name"],
+	)
+	require.Equal(t, 1, len(metaTags["size"]))
+	require.ElementsMatch(
+		t, []string{"100B<n<1T"}, metaTags["size"],
+	)
 }

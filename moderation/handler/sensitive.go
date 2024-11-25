@@ -15,7 +15,7 @@ type SensitiveHandler struct {
 
 func NewSensitiveHandler(cfg *config.Config) (*SensitiveHandler, error) {
 	return &SensitiveHandler{
-		c: sensitive.NewAliyunGreenChecker(cfg),
+		c: sensitive.NewAliyunGreenCheckerFromConfig(cfg),
 	}, nil
 }
 

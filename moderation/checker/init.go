@@ -17,7 +17,7 @@ func Init(config *config.Config) {
 		panic("SensitiveCheck is not enable")
 	}
 	//init aliyun green checker
-	contentChecker = sensitive.NewAliyunGreenChecker(config)
+	contentChecker = sensitive.NewAliyunGreenCheckerFromConfig(config)
 	//init local word checker
 	localWordChecker = NewDFA()
 

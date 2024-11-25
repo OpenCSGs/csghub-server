@@ -18,23 +18,75 @@ import (
 	"opencsg.com/csghub-server/common/utils/common"
 )
 
+type GreenClient interface {
+	TextScan(request *green.TextScanRequest) (response *TextScanResponse, err error)
+}
+
+type greenClientImpl struct {
+	green *green.Client
+}
+
+func (c *greenClientImpl) TextScan(request *green.TextScanRequest) (response *TextScanResponse, err error) {
+	textScanResponse, err := c.green.TextScan(request)
+	if err != nil {
+		slog.Error("Failed to call TextScan", slog.Any("error", err))
+		return nil, err
+	}
+	data := textScanResponse.GetHttpContentBytes()
+	resp := new(TextScanResponse)
+	err = json.Unmarshal(data, resp)
+	if err != nil {
+		return nil, fmt.Errorf("error unmarshalling scan response: %w", err)
+	}
+	return resp, nil
+}
+
+type Green2022Client interface {
+	GetRegionId() string
+	TextModeration(request *green20220302.TextModerationRequest) (_result *green20220302.TextModerationResponse, _err error)
+	ImageModeration(request *green20220302.ImageModerationRequest) (_result *green20220302.ImageModerationResponse, _err error)
+}
+
+type green2022ClientImpl struct {
+	green *green20220302.Client
+}
+
+func (c *green2022ClientImpl) GetRegionId() string {
+	return tea.StringValue(c.green.RegionId)
+}
+
+func (c *green2022ClientImpl) TextModeration(request *green20220302.TextModerationRequest) (_result *green20220302.TextModerationResponse, _err error) {
+	return c.green.TextModeration(request)
+}
+
+func (c *green2022ClientImpl) ImageModeration(request *green20220302.ImageModerationRequest) (_result *green20220302.ImageModerationResponse, _err error) {
+	return c.green.ImageModeration(request)
+}
+
 /*
 AliyunGreenChecker implements SensitiveChecker by calling Aliyun green sdk
 */
 type AliyunGreenChecker struct {
 	//improved client
-	cip *green20220302.Client
+	green2022 Green2022Client
 	//normal client
-	c *green.Client
+	green GreenClient
+}
+
+func NewAliyunChecker(green GreenClient, green2022 Green2022Client) *AliyunGreenChecker {
+	return &AliyunGreenChecker{
+		green:     green,
+		green2022: green2022,
+	}
 }
 
 var _ SensitiveChecker = (*AliyunGreenChecker)(nil)
 
 const smallTextSize = 500
-const largeTextSize = 9000
+const LargeTextSize = 9000
 
-// NewAliyunGreenChecker creates a new AliyunGreenChecker
-func NewAliyunGreenChecker(config *config.Config) *AliyunGreenChecker {
+// NewAliyunGreenCheckerFromConfig creates a new AliyunGreenChecker
+func NewAliyunGreenCheckerFromConfig(config *config.Config) *AliyunGreenChecker {
 	accessKeyID := config.SensitiveCheck.AccessKeyID
 	accessKeySecret := config.SensitiveCheck.AccessKeySecret
 	region := config.SensitiveCheck.Region
@@ -60,17 +112,17 @@ func NewAliyunGreenChecker(config *config.Config) *AliyunGreenChecker {
 	}
 
 	return &AliyunGreenChecker{
-		cip,
-		c,
+		&green2022ClientImpl{green: cip},
+		&greenClientImpl{green: c},
 	}
 }
 
 // passLargeTextCheck splits large text into smaller `largeTextSize` bytes chunks and check them in batch
-func (c *AliyunGreenChecker) passLargeTextCheck(ctx context.Context, text string) (*CheckResult, error) {
-	if len(text) > 100*largeTextSize {
-		return nil, fmt.Errorf("text length can't be greater than 100*%d", largeTextSize)
+func (c *AliyunGreenChecker) PassLargeTextCheck(ctx context.Context, text string) (*CheckResult, error) {
+	if len(text) > 100*LargeTextSize {
+		return nil, fmt.Errorf("text length can't be greater than 100*%d", LargeTextSize)
 	}
-	tasks := c.splitTasks(text)
+	tasks := c.SplitTasks(text)
 	content, _ := json.Marshal(
 		map[string]interface{}{
 			"scenes": [...]string{"antispam"},
@@ -80,16 +132,10 @@ func (c *AliyunGreenChecker) passLargeTextCheck(ctx context.Context, text string
 
 	textScanRequest := green.CreateTextScanRequest()
 	textScanRequest.SetContent(content)
-	textScanResponse, err := c.c.TextScan(textScanRequest)
+	resp, err := c.green.TextScan(textScanRequest)
 	if err != nil {
 		slog.Error("Failed to call TextScan", slog.Any("error", err))
 		return nil, err
-	}
-	data := textScanResponse.GetHttpContentBytes()
-	resp := new(TextScanResponse)
-	err = json.Unmarshal(data, resp)
-	if err != nil {
-		return nil, fmt.Errorf("error unmarshalling scan response: %w", err)
 	}
 	for _, data := range resp.Data {
 		for _, result := range data.Results {
@@ -117,7 +163,7 @@ func (c *AliyunGreenChecker) passLargeTextCheck(ctx context.Context, text string
 func (c *AliyunGreenChecker) PassTextCheck(ctx context.Context, scenario Scenario, text string) (*CheckResult, error) {
 	if len(text) > smallTextSize {
 		slog.Info("switch to large text check", slog.String("scenario", string(scenario)), slog.Int("size", len(text)))
-		return c.passLargeTextCheck(ctx, text)
+		return c.PassLargeTextCheck(ctx, text)
 	}
 	task := map[string]string{"content": text}
 	serviceParameters, _ := json.Marshal(task)
@@ -125,7 +171,7 @@ func (c *AliyunGreenChecker) PassTextCheck(ctx context.Context, scenario Scenari
 		Service:           tea.String(string(scenario)),
 		ServiceParameters: tea.String(string(serviceParameters)),
 	}
-	resp, err := c.cip.TextModeration(textModerationRequest)
+	resp, err := c.green2022.TextModeration(textModerationRequest)
 	if err != nil {
 		slog.Error("fail to call aliyun TextModeration", slog.String("content", text), slog.Any("error", err))
 		return nil, err
@@ -156,12 +202,12 @@ func (c *AliyunGreenChecker) PassTextCheck(ctx context.Context, scenario Scenari
 	return &CheckResult{IsSensitive: false}, nil
 }
 
-func (*AliyunGreenChecker) splitTasks(text string) []map[string]string {
+func (*AliyunGreenChecker) SplitTasks(text string) []map[string]string {
 	var tasks []map[string]string
 	var i int
-	for i+largeTextSize < len(text) {
-		tasks = append(tasks, map[string]string{"content": text[i : i+largeTextSize]})
-		i += largeTextSize
+	for i+LargeTextSize < len(text) {
+		tasks = append(tasks, map[string]string{"content": text[i : i+LargeTextSize]})
+		i += LargeTextSize
 	}
 	if i <= len(text) {
 		tasks = append(tasks, map[string]string{"content": text[i:]})
@@ -172,7 +218,7 @@ func (*AliyunGreenChecker) splitTasks(text string) []map[string]string {
 func (c *AliyunGreenChecker) PassImageCheck(ctx context.Context, scenario Scenario, ossBucketName, ossObjectName string) (*CheckResult, error) {
 	serviceParameters, _ := json.Marshal(
 		map[string]interface{}{
-			"ossRegionId": tea.StringValue(c.cip.RegionId),
+			"ossRegionId": c.green2022.GetRegionId(),
 			//for example: my-image-bucket
 			"ossBucketName": ossBucketName,
 			//for example: image/001.jpg
@@ -183,7 +229,7 @@ func (c *AliyunGreenChecker) PassImageCheck(ctx context.Context, scenario Scenar
 		Service:           tea.String(string(scenario)),
 		ServiceParameters: tea.String(string(serviceParameters)),
 	}
-	resp, err := c.cip.ImageModeration(imageModerationRequest)
+	resp, err := c.green2022.ImageModeration(imageModerationRequest)
 	if err != nil {
 		slog.Error("fail to call aliyun ImageModeration", slog.String("ossBucketName", ossBucketName),
 			slog.String("ossObjectName", ossObjectName), slog.Any("error", err))
