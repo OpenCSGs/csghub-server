@@ -28,6 +28,12 @@ func NewRuntimeArchitecturesStore() RuntimeArchitecturesStore {
 	}
 }
 
+func NewRuntimeArchitecturesStoreWithDB(db *DB) RuntimeArchitecturesStore {
+	return &runtimeArchitecturesStoreImpl{
+		db: db,
+	}
+}
+
 type RuntimeArchitecture struct {
 	ID                 int64  `bun:",pk,autoincrement" json:"id"`
 	RuntimeFrameworkID int64  `bun:",notnull" json:"runtime_framework_id"`
