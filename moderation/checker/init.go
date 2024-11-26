@@ -24,6 +24,22 @@ func Init(config *config.Config) {
 	localWordChecker.BuildDFA(getSensitiveWordList(config.Moderation.EncodedSensitiveWords))
 }
 
+// InitWithContentChecker supports custom sensitive checker, this func mostly used in unit test
+func InitWithContentChecker(config *config.Config, checker sensitive.SensitiveChecker) {
+	if !config.SensitiveCheck.Enable {
+		panic("SensitiveCheck is not enable")
+	}
+
+	if checker == nil {
+		panic("param checker can not be nil")
+	}
+	contentChecker = checker
+	//init local word checker
+	localWordChecker = NewDFA()
+
+	localWordChecker.BuildDFA(getSensitiveWordList(config.Moderation.EncodedSensitiveWords))
+}
+
 func getSensitiveWordList(encodedWords string) []string {
 	r := base64.NewDecoder(base64.StdEncoding, strings.NewReader(encodedWords))
 	s := bufio.NewScanner(r)
