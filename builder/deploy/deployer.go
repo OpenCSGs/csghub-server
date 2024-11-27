@@ -132,12 +132,12 @@ func (d *deployer) serverlessDeploy(ctx context.Context, dr types.DeployRepo) (*
 	deploy.SKU = dr.SKU
 	// dr.ImageID is not null for nginx space, otherwise it's ""
 	deploy.ImageID = dr.ImageID
-	slog.Info("do deployer.serverlessDeploy", slog.Any("dr", dr), slog.Any("deploy", deploy))
+	slog.Debug("do deployer.serverlessDeploy", slog.Any("dr", dr), slog.Any("deploy", deploy))
 	err = d.store.UpdateDeploy(ctx, deploy)
 	if err != nil {
 		return nil, fmt.Errorf("fail reset deploy image, %w", err)
 	}
-	slog.Info("return deployer.serverlessDeploy", slog.Any("dr", dr), slog.Any("deploy", deploy))
+	slog.Debug("return deployer.serverlessDeploy", slog.Any("dr", dr), slog.Any("deploy", deploy))
 	return deploy, nil
 }
 
@@ -542,9 +542,16 @@ func (d *deployer) UpdateDeploy(ctx context.Context, dur *types.DeployUpdateReq,
 		if err != nil {
 			return fmt.Errorf("error finding space resource %d, %w", *dur.ResourceID, err)
 		}
-		var err = json.Unmarshal([]byte(resource.Resources), &hardware)
+		err = json.Unmarshal([]byte(resource.Resources), &hardware)
 		if err != nil {
 			return fmt.Errorf("invalid resource hardware setting, %w", err)
+		}
+		deploy.Hardware = resource.Resources
+		deploy.SKU = strconv.FormatInt(resource.ID, 10)
+	} else {
+		err = json.Unmarshal([]byte(deploy.Hardware), &hardware)
+		if err != nil {
+			return fmt.Errorf("invalid deploy hardware setting, %w", err)
 		}
 	}
 
@@ -553,11 +560,6 @@ func (d *deployer) UpdateDeploy(ctx context.Context, dur *types.DeployUpdateReq,
 	}
 	if dur.Env != nil {
 		deploy.Env = *dur.Env
-	}
-
-	if resource != nil {
-		deploy.Hardware = resource.Resources
-		deploy.SKU = strconv.FormatInt(resource.ID, 10)
 	}
 
 	if frame != nil {
@@ -670,7 +672,7 @@ func (d *deployer) startAccountingRequestMeter(resMap map[string]string, svcRes 
 	}
 	resName, exists := resMap[svcRes.DeploySku]
 	if !exists {
-		slog.Warn("Did not find resource for metering", slog.Any("deploy_sku", svcRes.DeploySku))
+		slog.Warn("Did not find space resource by id for metering", slog.Any("id", svcRes.DeploySku), slog.Any("deploy_id", svcRes.DeployID), slog.Any("svc_name", svcRes.ServiceName))
 		return
 	}
 	slog.Debug("metering service", slog.Any("svcRes", svcRes))

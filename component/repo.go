@@ -2526,7 +2526,7 @@ func (c *repoComponentImpl) DeployUpdate(ctx context.Context, updateReq types.De
 	}
 	exist, err := c.deployer.Exist(ctx, deployRepo)
 	if err != nil {
-		return err
+		return fmt.Errorf("check deploy exists, err: %w", err)
 	}
 
 	if exist {
