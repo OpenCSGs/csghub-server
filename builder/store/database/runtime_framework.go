@@ -31,6 +31,12 @@ func NewRuntimeFrameworksStore() RuntimeFrameworksStore {
 	}
 }
 
+func NewRuntimeFrameworksStoreWithDB(db *DB) RuntimeFrameworksStore {
+	return &runtimeFrameworksStoreImpl{
+		db: db,
+	}
+}
+
 type RuntimeFramework struct {
 	ID            int64  `bun:",pk,autoincrement" json:"id"`
 	FrameName     string `bun:",notnull" json:"frame_name"`

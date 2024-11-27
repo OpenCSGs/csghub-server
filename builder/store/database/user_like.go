@@ -25,6 +25,12 @@ func NewUserLikesStore() UserLikesStore {
 	}
 }
 
+func NewUserLikesStoreWithDB(db *DB) UserLikesStore {
+	return &userLikesStoreImpl{
+		db: db,
+	}
+}
+
 type UserLike struct {
 	ID           int64 `bun:",pk,autoincrement" json:"id"`
 	UserID       int64 `bun:",notnull" json:"user_id"`
