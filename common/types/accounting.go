@@ -31,6 +31,7 @@ var (
 	SceneSpace          SceneType = 11 // csghub space
 	SceneModelFinetune  SceneType = 12 // model finetune
 	SceneMultiSync      SceneType = 13 // multi sync
+	SceneEvaluation     SceneType = 14 // model evaluation
 	SceneStarship       SceneType = 20 // starship
 	SceneUnknow         SceneType = 99 // unknow
 )

@@ -1,16 +1,19 @@
 package deploy
 
 import (
+	"fmt"
+
 	"github.com/spf13/cobra"
 	"opencsg.com/csghub-server/api/httpbase"
+	"opencsg.com/csghub-server/builder/event"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/config"
-	"opencsg.com/csghub-server/servicerunner/router"
+	"opencsg.com/csghub-server/runner/router"
 )
 
 var startRunnerCmd = &cobra.Command{
 	Use:   "runner",
-	Short: "start space runner service",
+	Short: "start runner service",
 	PersistentPreRunE: func(cmd *cobra.Command, args []string) (err error) {
 		return
 	},
@@ -25,7 +28,10 @@ var startRunnerCmd = &cobra.Command{
 			DSN:     config.Database.DSN,
 		}
 		database.InitDB(dbConfig)
-
+		err = event.InitEventPublisher(config)
+		if err != nil {
+			return fmt.Errorf("fail to initialize message queue, %w", err)
+		}
 		s, err := router.NewHttpServer(config)
 		if err != nil {
 			return err

@@ -38,9 +38,12 @@ type tagComponentImpl struct {
 	sensitiveChecker rpc.ModerationSvcClient
 }
 
-func (tc *tagComponentImpl) AllTags(ctx context.Context) ([]database.Tag, error) {
+func (c *tagComponentImpl) AllTags(ctx context.Context) ([]database.Tag, error) {
 	// TODO: query cache for tags at first
-	return tc.ts.AllTags(ctx)
+	return c.ts.AllTags(ctx)
+}
+func (c *tagComponentImpl) AllTagsByScopeAndCategory(ctx context.Context, scope string, category string) ([]*database.Tag, error) {
+	return c.ts.AllTagsByScopeAndCategory(ctx, database.TagScope(scope), category)
 }
 
 func (c *tagComponentImpl) ClearMetaTags(ctx context.Context, repoType types.RepositoryType, namespace, name string) error {

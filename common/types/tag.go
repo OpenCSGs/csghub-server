@@ -11,3 +11,14 @@ type RepoTag struct {
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
 }
+
+type TagCategory string
+
+const (
+	TaskCategory       TagCategory = "task"
+	LicenseCategory    TagCategory = "license"
+	FrameworkCategory  TagCategory = "framework"
+	SizeCategory       TagCategory = "size"
+	LanguageCategory   TagCategory = "language"
+	EvaluationCategory TagCategory = "evaluation"
+)

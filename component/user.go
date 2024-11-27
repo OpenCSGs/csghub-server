@@ -74,6 +74,8 @@ func NewUserComponent(config *config.Config) (UserComponent, error) {
 		return nil, err
 	}
 	c.promptStore = database.NewPromptStore()
+	c.promptStore = database.NewPromptStore()
+	c.wfs = database.NewArgoWorkFlowStore()
 	return c, nil
 }
 
@@ -96,6 +98,7 @@ type userComponentImpl struct {
 	// srs            database.SpaceResourceStore
 	// urs            *database.UserResourcesStore
 	promptStore database.PromptStore
+	wfs         *database.ArgoWorkFlowStore
 }
 
 func (c *userComponentImpl) Datasets(ctx context.Context, req *types.UserDatasetsReq) ([]types.Dataset, int, error) {
@@ -735,4 +738,21 @@ func (c *userComponentImpl) Prompts(ctx context.Context, req *types.UserPromptsR
 	}
 
 	return resPrompts, total, nil
+}
+
+func (c *userComponentImpl) Evaluations(ctx context.Context, req *types.UserEvaluationReq) ([]types.ArgoWorkFlowRes, int, error) {
+
+	_, err := c.userStore.FindByUsername(ctx, req.CurrentUser)
+	if err != nil {
+		newError := fmt.Errorf("failed to check for the presence of the user, error:%w", err)
+		return nil, 0, newError
+	}
+
+	res, err := c.deployer.ListEvaluations(ctx, req.CurrentUser, req.PageSize, req.Page)
+	if err != nil {
+		newError := fmt.Errorf("failed to get user evaluations,error:%w", err)
+		slog.Error(newError.Error())
+		return nil, 0, newError
+	}
+	return res.List, res.Total, nil
 }

@@ -38,7 +38,10 @@ type Deployer interface {
 	UpdateCluster(ctx context.Context, data types.ClusterRequest) (*types.UpdateClusterResponse, error)
 	UpdateDeploy(ctx context.Context, dur *types.DeployUpdateReq, deploy *database.Deploy) error
 	StartDeploy(ctx context.Context, deploy *database.Deploy) error
-	CheckResourceAvailable(ctx context.Context, clusterId string, hardWare *types.HardWare) (bool, error)
+	CheckResourceAvailable(ctx context.Context, clusterId string, orderDetailID int64, hardWare *types.HardWare) (bool, error)
+	SubmitEvaluation(ctx context.Context, req types.EvaluationReq) (*types.ArgoWorkFlowRes, error)
+	ListEvaluations(context.Context, string, int, int) (*types.ArgoWorkFlowListRes, error)
+	DeleteEvaluation(ctx context.Context, req types.ArgoWorkFlowDeleteReq) error
 }
 
 var _ Deployer = (*deployer)(nil)
@@ -774,4 +777,60 @@ func CheckResource(clusterResources *types.ClusterRes, hardware *types.HardWare)
 		}
 	}
 	return false
+}
+
+// SubmitEvaluation
+func (d *deployer) SubmitEvaluation(ctx context.Context, req types.EvaluationReq) (*types.ArgoWorkFlowRes, error) {
+	env := make(map[string]string)
+	env["REVISION"] = "main"
+	env["MODEL_ID"] = req.ModelId
+	env["DATASET_IDS"] = strings.Join(req.Datasets, ",")
+	env["REVISION"] = "main"
+	env["ACCESS_TOKEN"] = req.Token
+	env["HF_ENDPOINT"] = req.DownloadEndpoint
+
+	if req.Hardware.Gpu.Num != "" {
+		env["GPU_NUM"] = req.Hardware.Gpu.Num
+	}
+	templates := []types.ArgoFlowTemplate{}
+	templates = append(templates, types.ArgoFlowTemplate{
+		Name:     "evaluation",
+		Env:      env,
+		HardWare: req.Hardware,
+		Image:    req.Image,
+	},
+	)
+	uniqueFlowName := d.sfNode.Generate().Base36()
+	flowReq := &types.ArgoWorkFlowReq{
+		TaskName:     req.TaskName,
+		TaskId:       uniqueFlowName,
+		TaskType:     req.TaskType,
+		TaskDesc:     req.TaskDesc,
+		Image:        req.Image,
+		Datasets:     req.Datasets,
+		Username:     req.Username,
+		UserUUID:     req.UserUUID,
+		RepoIds:      []string{req.ModelId},
+		Entrypoint:   "evaluation",
+		ClusterID:    req.ClusterID,
+		Templates:    templates,
+		RepoType:     req.RepoType,
+		ResourceId:   req.ResourceId,
+		ResourceName: req.ResourceName,
+	}
+	if req.ResourceId == 0 {
+		flowReq.ShareMode = true
+	}
+	return d.ir.SubmitWorkFlow(ctx, flowReq)
+}
+func (d *deployer) ListEvaluations(ctx context.Context, username string, per int, page int) (*types.ArgoWorkFlowListRes, error) {
+	return d.ir.ListWorkFlows(ctx, username, per, page)
+}
+
+func (d *deployer) DeleteEvaluation(ctx context.Context, req types.ArgoWorkFlowDeleteReq) error {
+	_, err := d.ir.DeleteWorkFlow(ctx, req)
+	if err != nil {
+		return err
+	}
+	return nil
 }

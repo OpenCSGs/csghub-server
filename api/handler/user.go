@@ -854,3 +854,49 @@ func (h *UserHandler) Prompts(ctx *gin.Context) {
 	}
 	ctx.JSON(http.StatusOK, respData)
 }
+
+// GetUserEvaluations godoc
+// @Security     ApiKey
+// @Summary      Get user evaluations
+// @Description  get user evaluations
+// @Tags         User
+// @Accept       json
+// @Produce      json
+// @Param        username path string true "username"
+// @Param        per query int false "per" default(20)
+// @Param        page query int false "per page" default(1)
+// @Success      200  {object}  types.Response{} "OK"
+// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
+// @Router       /user/{username}/evaluations [get]
+func (h *UserHandler) GetEvaluations(ctx *gin.Context) {
+	currentUser := httpbase.GetCurrentUser(ctx)
+	if currentUser == "" {
+		httpbase.UnauthorizedError(ctx, errors.New("user not found, please login first"))
+		return
+	}
+	var req types.UserEvaluationReq
+	per, page, err := common.GetPerAndPageFromContext(ctx)
+	if err != nil {
+		slog.Error("Bad request format of page and per", "error", err)
+		httpbase.BadRequest(ctx, err.Error())
+		return
+	}
+
+	req.Owner = ctx.Param("username")
+	req.CurrentUser = httpbase.GetCurrentUser(ctx)
+	req.Page = page
+	req.PageSize = per
+	ds, total, err := h.c.Evaluations(ctx, &req)
+	if err != nil {
+		slog.Error("Failed to get user evaluations", slog.Any("error", err))
+		httpbase.ServerError(ctx, err)
+		return
+	}
+
+	respData := gin.H{
+		"data":  ds,
+		"total": total,
+	}
+	ctx.JSON(http.StatusOK, respData)
+}

@@ -39,6 +39,7 @@ type TagStore interface {
 	UpsertRepoTags(ctx context.Context, repoID int64, oldTagIDs, newTagIDs []int64) (err error)
 	RemoveRepoTags(ctx context.Context, repoID int64, tagIDs []int64) (err error)
 	FindOrCreate(ctx context.Context, tag Tag) (*Tag, error)
+	FindTag(ctx context.Context, name, scope, category string) (*Tag, error)
 }
 
 func NewTagStore() TagStore {
@@ -105,9 +106,15 @@ func (ts *tagStoreImpl) AllTagsByScope(ctx context.Context, scope TagScope) ([]*
 
 func (ts *tagStoreImpl) AllTagsByScopeAndCategory(ctx context.Context, scope TagScope, category string) ([]*Tag, error) {
 	var tags []*Tag
-	err := ts.db.Operator.Core.NewSelect().Model(&tags).
-		Where("scope = ? and category = ?", scope, category).
-		Scan(ctx)
+	query := ts.db.Operator.Core.NewSelect().Model(&tags)
+	if scope != "" {
+		query.Where("scope = ?", scope)
+	}
+	if category != "" {
+		query.Where("category = ?", category)
+	}
+
+	err := query.Scan(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to select tags by scope,cause: %w", err)
 	}
@@ -367,4 +374,17 @@ func (ts *tagStoreImpl) FindOrCreate(ctx context.Context, tag Tag) (*Tag, error)
 		return nil, err
 	}
 	return &tag, err
+}
+
+// find tag by name
+func (ts *tagStoreImpl) FindTag(ctx context.Context, name, scope, category string) (*Tag, error) {
+	var tag Tag
+	err := ts.db.Operator.Core.NewSelect().
+		Model(&tag).
+		Where("name = ? and scope = ? and category = ?", name, scope, category).
+		Scan(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return &tag, nil
 }

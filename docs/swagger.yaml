@@ -263,8 +263,6 @@ definitions:
     type: object
   database.Namespace:
     properties:
-      created_at:
-        type: string
       id:
         type: integer
       mirrored:
@@ -272,8 +270,6 @@ definitions:
       namespace_type:
         $ref: '#/definitions/database.NamespaceType'
       path:
-        type: string
-      updated_at:
         type: string
       user:
         $ref: '#/definitions/database.User'
@@ -1383,6 +1379,26 @@ definitions:
         example: false
         type: boolean
     type: object
+  types.EvaluationReq:
+    properties:
+      datasets:
+        items:
+          type: string
+        type: array
+      model_id:
+        type: string
+      resource_id:
+        type: integer
+      runtime_framework_id:
+        description: ArgoWorkFlow framework
+        type: integer
+      share_mode:
+        type: boolean
+      task_desc:
+        type: string
+      task_name:
+        type: string
+    type: object
   types.Event:
     properties:
       c_id:
@@ -1562,6 +1578,8 @@ definitions:
         type: string
       downloads:
         type: integer
+      enable_evaluation:
+        type: boolean
       enable_finetune:
         type: boolean
       enable_inference:
@@ -3726,6 +3744,7 @@ paths:
         - 0
         - 1
         - 2
+        - 4
         in: query
         name: deploy_type
         type: integer
@@ -5448,6 +5467,77 @@ paths:
       summary: Create a new discussion comment
       tags:
       - Discussion
+  /evaluations:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: namespace
+        in: path
+        name: namespace
+        required: true
+        type: string
+      - description: name
+        in: path
+        name: name
+        required: true
+        type: string
+      - description: body setting of evaluation
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/types.EvaluationReq'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            type: string
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: run model evaluation
+      tags:
+      - Evaluation
+  /evaluations/{id}:
+    delete:
+      consumes:
+      - application/json
+      parameters:
+      - description: id
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            type: string
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: delete model evaluation
+      tags:
+      - Evaluation
   /events:
     post:
       consumes:
@@ -10287,6 +10377,18 @@ paths:
       consumes:
       - application/json
       description: get all tags
+      parameters:
+      - description: category name
+        in: query
+        name: category
+        type: string
+      - description: scope name
+        enum:
+        - model
+        - dataset
+        in: query
+        name: scope
+        type: string
       produces:
       - application/json
       responses:
@@ -10768,6 +10870,47 @@ paths:
       security:
       - ApiKey: []
       summary: Get user datasets
+      tags:
+      - User
+  /user/{username}/evaluations:
+    get:
+      consumes:
+      - application/json
+      description: get user evaluations
+      parameters:
+      - description: username
+        in: path
+        name: username
+        required: true
+        type: string
+      - default: 20
+        description: per
+        in: query
+        name: per
+        type: integer
+      - default: 1
+        description: per page
+        in: query
+        name: page
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/types.Response'
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Get user evaluations
       tags:
       - User
   /user/{username}/finetune/instances:

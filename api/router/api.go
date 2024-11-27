@@ -120,8 +120,17 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 		apiGroup.POST("/list/spaces_by_path", cache.CacheByRequestURI(memoryStore, 1*time.Minute), listHandler.ListSpacesByPath)
 	}
 
+	//evaluation handler
+	evaluationHandler, err := handler.NewEvaluationHandler(config)
+	if err != nil {
+		return nil, fmt.Errorf("error creatring evaluation handler: %v", err)
+	}
+
+	createEvaluationRoutes(config, apiGroup, evaluationHandler)
+
 	// Model routes
 	createModelRoutes(config, apiGroup, needAPIKey, modelHandler, repoCommonHandler)
+
 	// Dataset routes
 	createDatasetRoutes(config, apiGroup, dsHandler, repoCommonHandler)
 
@@ -131,13 +140,6 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 	}
 	// Code routes
 	createCodeRoutes(config, apiGroup, codeHandler, repoCommonHandler)
-
-	// Dataset viewer
-	dsViewerHandler, err := handler.NewDatasetViewerHandler(config)
-	if err != nil {
-		return nil, fmt.Errorf("error creating dataset viewer handler:%w", err)
-	}
-	apiGroup.GET("/datasets/:namespace/:name/viewer/*file_path", dsViewerHandler.View)
 
 	spaceHandler, err := handler.NewSpaceHandler(config)
 	if err != nil {
@@ -384,6 +386,15 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 	}
 	createPromptRoutes(apiGroup, promptHandler)
 	return r, nil
+}
+
+func createEvaluationRoutes(config *config.Config, apiGroup *gin.RouterGroup, evaluationHandler *handler.EvaluationHandler) {
+	// Models routes
+	evaluationsGroup := apiGroup.Group("/evaluations")
+	{
+		evaluationsGroup.POST("", evaluationHandler.RunEvaluation)
+		evaluationsGroup.DELETE("/:id", evaluationHandler.DeleteEvaluation)
+	}
 }
 
 func createModelRoutes(config *config.Config, apiGroup *gin.RouterGroup, needAPIKey gin.HandlerFunc, modelHandler *handler.ModelHandler, repoCommonHandler *handler.RepoHandler) {
@@ -648,6 +659,8 @@ func createUserRoutes(apiGroup *gin.RouterGroup, needAPIKey gin.HandlerFunc, use
 		apiGroup.GET("/user/:username/likes/datasets", userHandler.LikesDatasets)
 		apiGroup.GET("/user/:username/run/:repo_type", userHandler.GetRunDeploys)
 		apiGroup.GET("/user/:username/finetune/instances", userHandler.GetFinetuneInstances)
+		// User evaluations
+		apiGroup.GET("/user/:username/evaluations", userHandler.GetEvaluations)
 	}
 
 	// User collection
