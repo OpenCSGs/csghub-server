@@ -19,6 +19,12 @@ func NewSyncClientSettingStore() SyncClientSettingStore {
 	}
 }
 
+func NewSyncClientSettingStoreWithDB(db *DB) SyncClientSettingStore {
+	return &syncClientSettingStoreImpl{
+		db: db,
+	}
+}
+
 type SyncClientSetting struct {
 	ID              int64  `bun:",pk,autoincrement" json:"id"`
 	Token           string `bun:",notnull" json:"token"`

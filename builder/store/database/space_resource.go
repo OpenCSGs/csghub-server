@@ -23,6 +23,10 @@ func NewSpaceResourceStore() SpaceResourceStore {
 	return &spaceResourceStoreImpl{db: defaultDB}
 }
 
+func NewSpaceResourceStoreWithDB(db *DB) SpaceResourceStore {
+	return &spaceResourceStoreImpl{db: db}
+}
+
 type SpaceResource struct {
 	ID        int64  `bun:",pk,autoincrement" json:"id"`
 	Name      string `bun:",notnull" json:"name"`

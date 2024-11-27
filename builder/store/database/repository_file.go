@@ -39,6 +39,12 @@ func NewRepoFileStore() RepoFileStore {
 	}
 }
 
+func NewRepoFileStoreWithDB(db *DB) RepoFileStore {
+	return &repoFileStoreImpl{
+		db: db,
+	}
+}
+
 func (s *repoFileStoreImpl) Create(ctx context.Context, file *RepositoryFile) error {
 	_, err := s.db.Operator.Core.NewInsert().Model(file).Exec(ctx)
 	return err

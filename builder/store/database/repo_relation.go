@@ -29,6 +29,12 @@ func NewRepoRelationsStore() RepoRelationsStore {
 	}
 }
 
+func NewRepoRelationsStoreWithDB(db *DB) RepoRelationsStore {
+	return &repoRelationsStoreImpl{
+		db: db,
+	}
+}
+
 type RepoRelation struct {
 	ID         int64 `bun:",pk,autoincrement" json:"id"`
 	FromRepoID int64 `bun:",notnull" json:"from_repo_id"`

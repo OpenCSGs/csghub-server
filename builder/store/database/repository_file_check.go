@@ -33,6 +33,12 @@ func NewRepoFileCheckStore() RepoFileCheckStore {
 	}
 }
 
+func NewRepoFileCheckStoreWithDB(db *DB) RepoFileCheckStore {
+	return &repoFileCheckStoreImpl{
+		db: db,
+	}
+}
+
 func (s *repoFileCheckStoreImpl) Create(ctx context.Context, history RepositoryFileCheck) error {
 	_, err := s.db.Operator.Core.NewInsert().Model(&history).Exec(ctx)
 	return err

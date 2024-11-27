@@ -22,6 +22,12 @@ func NewLfsLockStore() LfsLockStore {
 	}
 }
 
+func NewLfsLockStoreWithDB(db *DB) LfsLockStore {
+	return &lfsLockStoreImpl{
+		db: db,
+	}
+}
+
 type LfsLock struct {
 	ID           int64      `bun:",pk,autoincrement" json:"id"`
 	RepositoryID int64      `bun:",notnull" json:"repository_id"`
@@ -37,7 +43,7 @@ func (s *lfsLockStoreImpl) FindByID(ctx context.Context, ID int64) (*LfsLock, er
 	err := s.db.Operator.Core.NewSelect().
 		Model(&lfsLock).
 		Relation("User").
-		Where("id = ?", ID).
+		Where("lfs_lock.id = ?", ID).
 		Scan(ctx)
 	if err != nil {
 		return nil, err

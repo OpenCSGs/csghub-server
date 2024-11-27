@@ -21,6 +21,10 @@ func NewSpaceSdkStore() SpaceSdkStore {
 	return &spaceSdkStoreImpl{db: defaultDB}
 }
 
+func NewSpaceSdkStoreWithDB(db *DB) SpaceSdkStore {
+	return &spaceSdkStoreImpl{db: db}
+}
+
 type SpaceSdk struct {
 	ID      int64  `bun:",pk,autoincrement" json:"id"`
 	Name    string `bun:",notnull" json:"name"`

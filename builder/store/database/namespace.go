@@ -4,17 +4,22 @@ import (
 	"context"
 )
 
-type namespaceStoreImpl struct {
+// Define the NamespaceStore interface
+type NamespaceStore interface {
+	FindByPath(ctx context.Context, path string) (Namespace, error)
+	Exists(ctx context.Context, path string) (bool, error)
+}
+
+type NamespaceStoreImpl struct {
 	db *DB
 }
 
-type NamespaceStore interface {
-	FindByPath(ctx context.Context, path string) (namespace Namespace, err error)
-	Exists(ctx context.Context, path string) (exists bool, err error)
+func NewNamespaceStore() NamespaceStore {
+	return &NamespaceStoreImpl{db: defaultDB}
 }
 
-func NewNamespaceStore() NamespaceStore {
-	return &namespaceStoreImpl{db: defaultDB}
+func NewNamespaceStoreWithDB(db *DB) NamespaceStore {
+	return &NamespaceStoreImpl{db: db}
 }
 
 type NamespaceType string
@@ -34,13 +39,13 @@ type Namespace struct {
 	times
 }
 
-func (s *namespaceStoreImpl) FindByPath(ctx context.Context, path string) (namespace Namespace, err error) {
+func (s *NamespaceStoreImpl) FindByPath(ctx context.Context, path string) (namespace Namespace, err error) {
 	namespace.Path = path
 	err = s.db.Operator.Core.NewSelect().Model(&namespace).Relation("User").Where("path = ?", path).Scan(ctx)
 	return
 }
 
-func (s *namespaceStoreImpl) Exists(ctx context.Context, path string) (exists bool, err error) {
+func (s *NamespaceStoreImpl) Exists(ctx context.Context, path string) (exists bool, err error) {
 	var namespace Namespace
 	return s.db.Operator.Core.
 		NewSelect().

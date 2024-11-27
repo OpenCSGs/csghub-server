@@ -65,7 +65,7 @@ type repoComponentImpl struct {
 	mirrorSource       database.MirrorSourceStore
 	tokenStore         database.AccessTokenStore
 	rtfm               database.RuntimeFrameworksStore
-	rrtfms             *database.RepositoriesRuntimeFrameworkStore
+	rrtfms             database.RepositoriesRuntimeFrameworkStore
 	syncVersion        database.SyncVersionStore
 	syncClientSetting  database.SyncClientSettingStore
 	file               database.FileStore
