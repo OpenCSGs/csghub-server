@@ -26,7 +26,7 @@ require (
 	github.com/naoina/toml v0.1.1
 	github.com/redis/go-redis/v9 v9.3.0
 	github.com/sethvargo/go-envconfig v1.1.0
-	github.com/spf13/cast v1.1.0
+	github.com/spf13/cast v1.5.1
 	github.com/spf13/cobra v1.8.0
 	github.com/stretchr/testify v1.9.0
 	github.com/swaggo/files v1.0.1
@@ -86,7 +86,9 @@ require (
 	github.com/googleapis/gax-go/v2 v2.12.2 // indirect
 	github.com/grpc-ecosystem/go-grpc-middleware v1.4.0 // indirect
 	github.com/grpc-ecosystem/go-grpc-middleware/v2 v2.0.0 // indirect
+	github.com/grpc-ecosystem/grpc-gateway v1.16.0 // indirect
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.22.0 // indirect
+	github.com/hashicorp/golang-lru/v2 v2.0.7 // indirect
 	github.com/hashicorp/yamux v0.1.2-0.20220728231024-8f49b6f63f18 // indirect
 	github.com/lightstep/lightstep-tracer-common/golang/gogo v0.0.0-20210210170715-a8dfcb80d3a7 // indirect
 	github.com/lightstep/lightstep-tracer-go v0.25.0 // indirect
@@ -101,6 +103,7 @@ require (
 	github.com/naoina/go-stringutil v0.1.0 // indirect
 	github.com/nats-io/nkeys v0.4.7 // indirect
 	github.com/nats-io/nuid v1.0.1 // indirect
+	github.com/ncruces/go-strftime v0.1.9 // indirect
 	github.com/nexus-rpc/sdk-go v0.0.11 // indirect
 	github.com/oklog/ulid/v2 v2.0.2 // indirect
 	github.com/opencontainers/image-spec v1.1.0 // indirect
@@ -141,6 +144,7 @@ require (
 	google.golang.org/genproto/googleapis/api v0.0.0-20240827150818-7e3bb234dfed // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20240827150818-7e3bb234dfed // indirect
 	gopkg.in/DataDog/dd-trace-go.v1 v1.32.0 // indirect
+	modernc.org/gc/v3 v3.0.0-20240107210532-573471604cb6 // indirect
 )
 
 require (
@@ -153,6 +157,7 @@ require (
 	github.com/alibabacloud-go/tea-utils/v2 v2.0.4 // indirect
 	github.com/alibabacloud-go/tea-xml v1.1.3 // indirect
 	github.com/aliyun/credentials-go v1.3.2 // indirect
+	github.com/argoproj/argo-workflows/v3 v3.5.12
 	github.com/blendle/zapdriver v1.3.1 // indirect
 	github.com/bwmarrin/snowflake v0.3.0
 	github.com/bytedance/sonic v1.11.2 // indirect
@@ -185,7 +190,7 @@ require (
 	github.com/golang/protobuf v1.5.4 // indirect
 	github.com/google/gnostic-models v0.6.8 // indirect
 	github.com/google/go-cmp v0.6.0 // indirect
-	github.com/google/go-containerregistry v0.13.0 // indirect
+	github.com/google/go-containerregistry v0.16.1 // indirect
 	github.com/google/gofuzz v1.2.0 // indirect
 	github.com/google/uuid v1.6.0
 	github.com/gorilla/context v1.1.1 // indirect
@@ -199,7 +204,6 @@ require (
 	github.com/jmespath/go-jmespath v0.4.0 // indirect
 	github.com/josharian/intern v1.0.0 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
-	github.com/kballard/go-shellquote v0.0.0-20180428030007-95032a82bc51 // indirect
 	github.com/klauspost/compress v1.17.4 // indirect
 	github.com/klauspost/cpuid/v2 v2.2.7 // indirect
 	github.com/leodido/go-urn v1.4.0 // indirect
@@ -231,14 +235,13 @@ require (
 	go.uber.org/multierr v1.11.0 // indirect
 	go.uber.org/zap v1.26.0 // indirect
 	golang.org/x/arch v0.7.0 // indirect
-	golang.org/x/crypto v0.26.0
-	golang.org/x/mod v0.17.0 // indirect
+	golang.org/x/crypto v0.27.0
 	golang.org/x/net v0.28.0 // indirect
 	golang.org/x/oauth2 v0.22.0 // indirect
 	golang.org/x/sync v0.8.0 // indirect
-	golang.org/x/sys v0.24.0 // indirect
-	golang.org/x/term v0.23.0 // indirect
-	golang.org/x/text v0.17.0 // indirect
+	golang.org/x/sys v0.25.0 // indirect
+	golang.org/x/term v0.24.0 // indirect
+	golang.org/x/text v0.18.0 // indirect
 	golang.org/x/time v0.5.0 // indirect
 	golang.org/x/tools v0.21.1-0.20240508182429-e35e4ccd0d2d // indirect
 	gomodules.xyz/jsonpatch/v2 v2.4.0 // indirect
@@ -247,18 +250,14 @@ require (
 	gopkg.in/ini.v1 v1.67.0 // indirect
 	k8s.io/klog/v2 v2.130.1 // indirect
 	k8s.io/kube-openapi v0.0.0-20240228011516-70dd3763d340 // indirect
-	k8s.io/utils v0.0.0-20240711033017-18e509b52bc8 // indirect
+	k8s.io/utils v0.0.0-20240711033017-18e509b52bc8
 	knative.dev/networking v0.0.0-20240116081125-ce0738abf051 // indirect
 	knative.dev/pkg v0.0.0-20240116073220-b488e7be5902 // indirect
-	lukechampine.com/uint128 v1.3.0 // indirect
 	mellium.im/sasl v0.3.1 // indirect
-	modernc.org/cc/v3 v3.41.0 // indirect
-	modernc.org/ccgo/v3 v3.16.15 // indirect
-	modernc.org/libc v1.24.1 // indirect
+	modernc.org/libc v1.41.0 // indirect
 	modernc.org/mathutil v1.6.0 // indirect
-	modernc.org/memory v1.7.1 // indirect
-	modernc.org/opt v0.1.3 // indirect
-	modernc.org/sqlite v1.25.0 // indirect
+	modernc.org/memory v1.7.2 // indirect
+	modernc.org/sqlite v1.29.1 // indirect
 	modernc.org/strutil v1.2.0 // indirect
 	modernc.org/token v1.1.0 // indirect
 	sigs.k8s.io/json v0.0.0-20221116044647-bc3834ca7abd // indirect

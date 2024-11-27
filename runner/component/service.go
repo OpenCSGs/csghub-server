@@ -49,7 +49,7 @@ func (s *ServiceComponent) GenerateService(ctx context.Context, cluster cluster.
 	environments := []corev1.EnvVar{}
 	appPort := 0
 	hardware := request.Hardware
-	resReq, nodeSelector := s.GenerateResources(hardware)
+	resReq, nodeSelector := GenerateResources(hardware)
 	var err error
 
 	if request.Env != nil {
@@ -218,7 +218,7 @@ func (s *ServiceComponent) GetServicePodsWithStatus(ctx context.Context, cluster
 	return podInstances, nil
 }
 
-func (s *ServiceComponent) GenerateResources(hardware types.HardWare) (map[corev1.ResourceName]resource.Quantity, map[string]string) {
+func GenerateResources(hardware types.HardWare) (map[corev1.ResourceName]resource.Quantity, map[string]string) {
 	nodeSelector := make(map[string]string)
 	resReq := make(map[corev1.ResourceName]resource.Quantity)
 

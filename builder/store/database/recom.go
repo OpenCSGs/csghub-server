@@ -22,6 +22,12 @@ func NewRecomStore() RecomStore {
 	}
 }
 
+func NewRecomStoreWithDB(db *DB) RecomStore {
+	return &recomStoreImpl{
+		db: db,
+	}
+}
+
 // Index returns repos in descend order of score.
 func (s *recomStoreImpl) Index(ctx context.Context, page, pageSize int) ([]*RecomRepoScore, error) {
 	items := make([]*RecomRepoScore, 0)

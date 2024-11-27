@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/argoproj/argo-workflows/v3/pkg/client/clientset/versioned"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -27,6 +28,7 @@ type Cluster struct {
 	ConfigPath    string                // Path to the kubeconfig file
 	Client        *kubernetes.Clientset // Kubernetes client
 	KnativeClient *knative.Clientset    // Knative client
+	ArgoClient    *versioned.Clientset  // Argo client
 	StorageClass  string
 }
 
@@ -61,6 +63,10 @@ func NewClusterPool() (*ClusterPool, error) {
 		if err != nil {
 			return nil, err
 		}
+		argoClient, err := versioned.NewForConfig(config)
+		if err != nil {
+			return nil, err
+		}
 		knativeClient, err := knative.NewForConfig(config)
 		if err != nil {
 			slog.Error("falied to create knative client", "error", err)
@@ -72,6 +78,7 @@ func NewClusterPool() (*ClusterPool, error) {
 			ConfigPath:    kubeconfig,
 			Client:        client,
 			KnativeClient: knativeClient,
+			ArgoClient:    argoClient,
 		})
 		err = pool.ClusterStore.Add(context.TODO(), id, fmt.Sprintf("region-%d", i))
 		if err != nil {

@@ -31,13 +31,16 @@ type TagsHandler struct {
 // @Tags         Tag
 // @Accept       json
 // @Produce      json
+// @Param		 category query string false "category name"
+// @Param		 scope query string false "scope name" Enums(model, dataset)
 // @Success      200  {object}  types.ResponseWithTotal{data=[]database.Tag,total=int} "tags"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
 // @Router       /tags [get]
 func (t *TagsHandler) AllTags(ctx *gin.Context) {
 	//TODO:validate inputs
-
-	tags, err := t.tc.AllTags(ctx)
+	category := ctx.Query("category")
+	scope := ctx.Query("scope")
+	tags, err := t.tc.AllTagsByScopeAndCategory(ctx, scope, category)
 	if err != nil {
 		slog.Error("Failed to load tags", "error", err)
 		httpbase.ServerError(ctx, err)

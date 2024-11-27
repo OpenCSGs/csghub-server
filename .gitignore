@@ -24,3 +24,5 @@ local.toml
 .data
 /data
 */*/_api_test/
+redis/dump.rdb
+run_server_local.sh

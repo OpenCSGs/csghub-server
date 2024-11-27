@@ -14,8 +14,8 @@ type spaceStoreImpl struct {
 }
 
 type SpaceStore interface {
-	BeginTx(ctx context.Context) (bun.Tx, error)
-	CreateTx(ctx context.Context, tx bun.Tx, input Space) (*Space, error)
+	// BeginTx(ctx context.Context) (bun.Tx, error)
+	// CreateTx(ctx context.Context, tx bun.Tx, input Space) (*Space, error)
 	Create(ctx context.Context, input Space) (*Space, error)
 	Update(ctx context.Context, input Space) (err error)
 	FindByPath(ctx context.Context, namespace, name string) (*Space, error)
@@ -36,20 +36,26 @@ func NewSpaceStore() SpaceStore {
 	}
 }
 
-func (s *spaceStoreImpl) BeginTx(ctx context.Context) (bun.Tx, error) {
-	return s.db.Core.BeginTx(ctx, nil)
-}
-
-func (s *spaceStoreImpl) CreateTx(ctx context.Context, tx bun.Tx, input Space) (*Space, error) {
-	res, err := tx.NewInsert().Model(&input).Exec(ctx)
-	if err := assertAffectedOneRow(res, err); err != nil {
-		slog.Error("create space in tx failed", slog.String("error", err.Error()))
-		return nil, fmt.Errorf("create space in tx failed,error:%w", err)
+func NewSpaceStoreWithDB(db *DB) SpaceStore {
+	return &spaceStoreImpl{
+		db: db,
 	}
-
-	input.ID, _ = res.LastInsertId()
-	return &input, nil
 }
+
+// func (s *spaceStoreImpl) BeginTx(ctx context.Context) (bun.Tx, error) {
+// 	return s.db.Core.BeginTx(ctx, nil)
+// }
+
+// func (s *spaceStoreImpl) CreateTx(ctx context.Context, tx bun.Tx, input Space) (*Space, error) {
+// 	res, err := tx.NewInsert().Model(&input).Exec(ctx)
+// 	if err := assertAffectedOneRow(res, err); err != nil {
+// 		slog.Error("create space in tx failed", slog.String("error", err.Error()))
+// 		return nil, fmt.Errorf("create space in tx failed,error:%w", err)
+// 	}
+
+// 	input.ID, _ = res.LastInsertId()
+// 	return &input, nil
+// }
 
 func (s *spaceStoreImpl) Create(ctx context.Context, input Space) (*Space, error) {
 	res, err := s.db.Core.NewInsert().Model(&input).Exec(ctx)

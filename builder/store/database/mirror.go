@@ -41,6 +41,12 @@ func NewMirrorStore() MirrorStore {
 	}
 }
 
+func NewMirrorStoreWithDB(db *DB) MirrorStore {
+	return &mirrorStoreImpl{
+		db: db,
+	}
+}
+
 type Mirror struct {
 	ID             int64        `bun:",pk,autoincrement" json:"id"`
 	Interval       string       `bun:",notnull" json:"interval"`
@@ -185,7 +191,7 @@ func (s *mirrorStoreImpl) WithPaginationWithRepository(ctx context.Context) ([]M
 	var mirrors []Mirror
 	err := s.db.Operator.Core.NewSelect().
 		Model(&mirrors).
-		Relation("Repositoy").
+		Relation("Repository").
 		Scan(ctx)
 	if err != nil {
 		return nil, err
