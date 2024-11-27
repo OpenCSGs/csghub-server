@@ -23,6 +23,10 @@ func NewPromptPrefixStore() PromptPrefixStore {
 	return &promptPrefixStoreImpl{db: defaultDB}
 }
 
+func NewPromptPrefixStoreWithDB(db *DB) PromptPrefixStore {
+	return &promptPrefixStoreImpl{db: db}
+}
+
 func (p *promptPrefixStoreImpl) Get(ctx context.Context) (*PromptPrefix, error) {
 	var prefix PromptPrefix
 	err := p.db.Operator.Core.NewSelect().Model(&prefix).Order("id desc").Limit(1).Scan(ctx)

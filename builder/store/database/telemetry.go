@@ -41,6 +41,12 @@ func NewTelemetryStore() TelemetryStore {
 	}
 }
 
+func NewTelemetryStoreWithDB(db *DB) TelemetryStore {
+	return &telemetryStoreImpl{
+		db: db,
+	}
+}
+
 func (s *telemetryStoreImpl) Save(ctx context.Context, telemetry *Telemetry) error {
 	return assertAffectedOneRow(s.db.Core.NewInsert().Model(telemetry).Exec(ctx))
 }

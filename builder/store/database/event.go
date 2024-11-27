@@ -18,6 +18,12 @@ func NewEventStore() EventStore {
 	}
 }
 
+func NewEventStoreWithDB(db *DB) EventStore {
+	return &eventStoreImpl{
+		db: db,
+	}
+}
+
 func (s *eventStoreImpl) Save(ctx context.Context, event Event) error {
 	return assertAffectedOneRow(s.db.Core.NewInsert().Model(&event).Exec(ctx))
 }

@@ -24,8 +24,14 @@ func NewMultiSyncStore() MultiSyncStore {
 	}
 }
 
+func NewMultiSyncStoreWithDB(db *DB) MultiSyncStore {
+	return &multiSyncStoreImpl{
+		db: db,
+	}
+}
+
 func (s *multiSyncStoreImpl) Create(ctx context.Context, v SyncVersion) (*SyncVersion, error) {
-	res, err := s.db.Core.NewInsert().Model(&v).Exec(ctx, &v)
+	res, err := s.db.Core.NewInsert().Model(&v).Exec(ctx)
 	if err := assertAffectedOneRow(res, err); err != nil {
 		return nil, fmt.Errorf("create sync version in db failed,error:%w", err)
 	}

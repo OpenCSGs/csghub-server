@@ -32,7 +32,7 @@ type GitCallbackComponent struct {
 	rs           database.RepoStore
 	rrs          database.RepoRelationsStore
 	mirrorStore  database.MirrorStore
-	rrf          *database.RepositoriesRuntimeFrameworkStore
+	rrf          database.RepositoriesRuntimeFrameworkStore
 	rac          component.RuntimeArchitectureComponent
 	ras          database.RuntimeArchitecturesStore
 	rfs          database.RuntimeFrameworksStore

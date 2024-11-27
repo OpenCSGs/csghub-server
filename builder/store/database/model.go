@@ -37,6 +37,12 @@ func NewModelStore() ModelStore {
 	}
 }
 
+func NewModelStoreWithDB(db *DB) ModelStore {
+	return &modelStoreImpl{
+		db: db,
+	}
+}
+
 type Model struct {
 	ID            int64       `bun:",pk,autoincrement" json:"id"`
 	RepositoryID  int64       `bun:",notnull" json:"repository_id"`

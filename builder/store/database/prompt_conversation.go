@@ -45,6 +45,10 @@ func NewPromptConversationStore() PromptConversationStore {
 	return &promptConversationStoreImpl{db: defaultDB}
 }
 
+func NewPromptConversationStoreWithDB(db *DB) PromptConversationStore {
+	return &promptConversationStoreImpl{db: db}
+}
+
 func (p *promptConversationStoreImpl) CreateConversation(ctx context.Context, conversation PromptConversation) error {
 	err := p.db.Operator.Core.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
 		if err := assertAffectedOneRow(tx.NewInsert().Model(&conversation).Exec(ctx)); err != nil {

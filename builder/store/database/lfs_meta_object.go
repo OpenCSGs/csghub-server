@@ -25,6 +25,12 @@ func NewLfsMetaObjectStore() LfsMetaObjectStore {
 	}
 }
 
+func NewLfsMetaObjectStoreWithDB(db *DB) LfsMetaObjectStore {
+	return &lfsMetaObjectStoreImpl{
+		db: db,
+	}
+}
+
 type LfsMetaObject struct {
 	ID           int64      `bun:",pk,autoincrement" json:"user_id"`
 	Oid          string     `bun:",notnull" json:"oid"`
@@ -70,10 +76,10 @@ func (s *lfsMetaObjectStoreImpl) Create(ctx context.Context, lfsObj LfsMetaObjec
 }
 
 func (s *lfsMetaObjectStoreImpl) RemoveByOid(ctx context.Context, oid string, repoID int64) error {
-	err := s.db.Operator.Core.NewDelete().
+	_, err := s.db.Operator.Core.NewDelete().
 		Model(&LfsMetaObject{}).
 		Where("oid = ? and repository_id= ?", oid, repoID).
-		Scan(ctx)
+		Exec(ctx)
 
 	return err
 }

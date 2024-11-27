@@ -19,6 +19,10 @@ func NewResourceModelStore() ResourceModelStore {
 	return &resourceModelStoreImpl{db: defaultDB}
 }
 
+func NewResourceModelStoreWithDB(db *DB) ResourceModelStore {
+	return &resourceModelStoreImpl{db: db}
+}
+
 type ResourceModel struct {
 	ID           int64  `bun:",pk,autoincrement" json:"id"`
 	ResourceName string `bun:",notnull" json:"resource_name"`

@@ -26,6 +26,12 @@ func NewOrgStore() OrgStore {
 	}
 }
 
+func NewOrgStoreWithDB(db *DB) OrgStore {
+	return &orgStoreImpl{
+		db: db,
+	}
+}
+
 type Organization struct {
 	ID       int64  `bun:",pk,autoincrement" json:"id"`
 	Nickname string `bun:"name,notnull" json:"name"`

@@ -29,12 +29,12 @@ type PromptStore interface {
 	ByOrgPath(ctx context.Context, namespace string, per, page int, onlyPublic bool) (prompts []Prompt, total int, err error)
 }
 
-func NewPromptStore() PromptStore {
-	return &promptStoreImpl{db: defaultDB}
-}
-
 func NewPromptStoreWithDB(db *DB) PromptStore {
 	return &promptStoreImpl{db: db}
+}
+
+func NewPromptStore() PromptStore {
+	return &promptStoreImpl{db: defaultDB}
 }
 
 func (s *promptStoreImpl) Create(ctx context.Context, input Prompt) (*Prompt, error) {
@@ -121,6 +121,7 @@ func (s *promptStoreImpl) ByUsername(ctx context.Context, username string, per, 
 	if err != nil {
 		return
 	}
+
 	total, err = query.Count(ctx)
 	if err != nil {
 		return

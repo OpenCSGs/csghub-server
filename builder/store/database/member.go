@@ -23,6 +23,12 @@ func NewMemberStore() MemberStore {
 	}
 }
 
+func NewMemberStoreWithDB(db *DB) MemberStore {
+	return &memberStoreImpl{
+		db: db,
+	}
+}
+
 // Member is the relationship between a user and an organization.
 type Member struct {
 	ID             int64         `bun:",pk,autoincrement" json:"id"`

@@ -25,6 +25,12 @@ func NewMirrorSourceStore() MirrorSourceStore {
 	}
 }
 
+func NewMirrorSourceStoreWithDB(db *DB) MirrorSourceStore {
+	return &mirrorSourceStoreImpl{
+		db: db,
+	}
+}
+
 type MirrorSource struct {
 	ID         int64  `bun:",pk,autoincrement" json:"id"`
 	SourceName string `bun:",notnull,unique" json:"source_name"`
