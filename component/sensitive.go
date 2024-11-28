@@ -13,7 +13,6 @@ import (
 
 type sensitiveComponentImpl struct {
 	checker rpc.ModerationSvcClient
-	enable  bool
 }
 
 type SensitiveComponent interface {
@@ -23,20 +22,16 @@ type SensitiveComponent interface {
 }
 
 func NewSensitiveComponent(cfg *config.Config) (SensitiveComponent, error) {
-	c := &sensitiveComponentImpl{}
-	c.enable = cfg.SensitiveCheck.Enable
-
-	if c.enable {
-		c.checker = rpc.NewModerationSvcHttpClient(fmt.Sprintf("%s:%d", cfg.Moderation.Host, cfg.Moderation.Port))
+	if !cfg.SensitiveCheck.Enable {
+		return &sensitiveComponentNoOpImpl{}, nil
 	}
+
+	c := &sensitiveComponentImpl{}
+	c.checker = rpc.NewModerationSvcHttpClient(fmt.Sprintf("%s:%d", cfg.Moderation.Host, cfg.Moderation.Port))
 	return c, nil
 }
 
-func (c *sensitiveComponentImpl) CheckText(ctx context.Context, scenario, text string) (bool, error) {
-	if !c.enable {
-		return true, nil
-	}
-
+func (c sensitiveComponentImpl) CheckText(ctx context.Context, scenario, text string) (bool, error) {
 	result, err := c.checker.PassTextCheck(ctx, scenario, text)
 	if err != nil {
 		return false, err
@@ -45,11 +40,7 @@ func (c *sensitiveComponentImpl) CheckText(ctx context.Context, scenario, text s
 	return !result.IsSensitive, nil
 }
 
-func (c *sensitiveComponentImpl) CheckImage(ctx context.Context, scenario, ossBucketName, ossObjectName string) (bool, error) {
-	if !c.enable {
-		return true, nil
-	}
-
+func (c sensitiveComponentImpl) CheckImage(ctx context.Context, scenario, ossBucketName, ossObjectName string) (bool, error) {
 	result, err := c.checker.PassImageCheck(ctx, scenario, ossBucketName, ossObjectName)
 	if err != nil {
 		return false, err
@@ -57,11 +48,7 @@ func (c *sensitiveComponentImpl) CheckImage(ctx context.Context, scenario, ossBu
 	return !result.IsSensitive, nil
 }
 
-func (c *sensitiveComponentImpl) CheckRequestV2(ctx context.Context, req types.SensitiveRequestV2) (bool, error) {
-	if !c.enable {
-		return true, nil
-	}
-
+func (c sensitiveComponentImpl) CheckRequestV2(ctx context.Context, req types.SensitiveRequestV2) (bool, error) {
 	fields := req.GetSensitiveFields()
 	for _, field := range fields {
 		if len(field.Value()) == 0 {
@@ -77,5 +64,23 @@ func (c *sensitiveComponentImpl) CheckRequestV2(ctx context.Context, req types.S
 			return false, errors.New("found sensitive words in field: " + field.Name)
 		}
 	}
+	return true, nil
+}
+
+// sensitiveComponentNoOpImpl this implementation provides a "no-op" (no operation) version of the SensitiveComponent interface,
+// where all methods simply return a "not sensitive" result without performing any actual checks.
+type sensitiveComponentNoOpImpl struct {
+}
+
+func (c *sensitiveComponentNoOpImpl) CheckText(ctx context.Context, scenario, text string) (bool, error) {
+	return true, nil
+}
+
+func (c *sensitiveComponentNoOpImpl) CheckImage(ctx context.Context, scenario, ossBucketName, ossObjectName string) (bool, error) {
+	return true, nil
+}
+
+// implements SensitiveComponent
+func (c *sensitiveComponentNoOpImpl) CheckRequestV2(ctx context.Context, req types.SensitiveRequestV2) (bool, error) {
 	return true, nil
 }
