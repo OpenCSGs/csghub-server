@@ -83,14 +83,15 @@ func newDeployer(s scheduler.Scheduler, ib imagebuilder.Builder, ir imagerunner.
 	}
 
 	go d.refreshStatus()
-	go func() {
-		err = d.s.Run()
-		if err != nil {
-			slog.Error("run scheduler failed", slog.Any("error", err))
-		}
-	}()
-	go d.startAccounting()
-
+	if d.c.IsMasterHost {
+		go func() {
+			err = d.s.Run()
+			if err != nil {
+				slog.Error("run scheduler failed", slog.Any("error", err))
+			}
+		}()
+		go d.startAccounting()
+	}
 	return d, nil
 }
 

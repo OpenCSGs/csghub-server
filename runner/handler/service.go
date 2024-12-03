@@ -531,7 +531,7 @@ func (s *K8sHandler) GetLogsByPod(c *gin.Context, cluster cluster.Cluster, podNa
 					slog.Error("write data failed", "error", err)
 				}
 				c.Writer.Flush()
-				slog.Info("send pod logs", slog.String("srv_name", srvName), slog.String("srv_name", srvName), slog.Int("len", n), slog.String("log", string(buf[:n])))
+				slog.Info("send pod logs", slog.String("srv_name", srvName), slog.String("srv_name", srvName), slog.Int("len", n))
 			}
 		}
 
@@ -628,8 +628,9 @@ func (s *K8sHandler) GetClusterInfo(c *gin.Context) {
 	clusterRes := []types.CluserResponse{}
 	for index := range s.clusterPool.Clusters {
 		cls := s.clusterPool.Clusters[index]
-		cInfo, _ := s.clusterPool.ClusterStore.ByClusterConfig(c.Request.Context(), cls.ID)
-		if !cInfo.Enable {
+		cInfo, err := s.clusterPool.ClusterStore.ByClusterConfig(c.Request.Context(), cls.ID)
+		if err != nil {
+			slog.Error("get cluster info failed", slog.Any("error", err))
 			continue
 		}
 		clusterInfo := types.CluserResponse{}
@@ -792,9 +793,6 @@ func (s *K8sHandler) GetReplica(c *gin.Context) {
 	}
 
 	// revision exist
-	deployIDStr := srv.Annotations[types.ResDeployID]
-	deployID, _ := strconv.ParseInt(deployIDStr, 10, 64)
-	resp.DeployID = deployID
 	resp.Code = 1
 	resp.Message = srvName
 	resp.ActualReplica = int(*revision.Status.ActualReplicas)

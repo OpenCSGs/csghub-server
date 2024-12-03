@@ -6,8 +6,7 @@ RUN pip config set global.index-url https://pypi.tuna.tsinghua.edu.cn/simple \
     csghub-sdk==0.4.4 minio oss2
 RUN pip install --no-cache-dir vllm==0.6.3.post1 openpyxl
 COPY ./opencompass/ /etc/csghub/
-RUN mkdir -p /var/log/supervisord && \
-    ln -s /usr/bin/python3 /usr/bin/python &&\
+RUN ln -s /usr/bin/python3 /usr/bin/python &&\
     chmod +x /etc/csghub/*.sh
 WORKDIR /workspace/
 ENV HUGGINGFACE_HUB_CACHE=/workspace/ \

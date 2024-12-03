@@ -2,7 +2,9 @@ package component
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 
@@ -13,20 +15,21 @@ import (
 )
 
 type evaluationComponentImpl struct {
-	deployer   deploy.Deployer
-	us         database.UserStore
-	ms         database.ModelStore
-	ds         database.DatasetStore
-	ss         database.SpaceResourceStore
-	tokenStore database.AccessTokenStore
-	rtfm       database.RuntimeFrameworksStore
-	config     *config.Config
-	ac         AccountingComponent
+	deployer           deploy.Deployer
+	userStore          database.UserStore
+	modelStore         database.ModelStore
+	datasetStore       database.DatasetStore
+	mirrorStore        database.MirrorStore
+	spaceResourceStore database.SpaceResourceStore
+	tokenStore         database.AccessTokenStore
+	rtfm               database.RuntimeFrameworksStore
+	config             *config.Config
+	ac                 AccountingComponent
 }
 
 type EvaluationComponent interface {
 	// Create argo workflow
-	CreateEvaluation(ctx context.Context, req *types.EvaluationReq) (*types.ArgoWorkFlowRes, error)
+	CreateEvaluation(ctx context.Context, req types.EvaluationReq) (*types.ArgoWorkFlowRes, error)
 	GetEvaluation(ctx context.Context, req types.EvaluationGetReq) (*types.EvaluationRes, error)
 	DeleteEvaluation(ctx context.Context, req types.ArgoWorkFlowDeleteReq) error
 }
@@ -34,10 +37,11 @@ type EvaluationComponent interface {
 func NewEvaluationComponent(config *config.Config) (EvaluationComponent, error) {
 	c := &evaluationComponentImpl{}
 	c.deployer = deploy.NewDeployer()
-	c.us = database.NewUserStore()
-	c.ms = database.NewModelStore()
-	c.ss = database.NewSpaceResourceStore()
-	c.ds = database.NewDatasetStore()
+	c.userStore = database.NewUserStore()
+	c.modelStore = database.NewModelStore()
+	c.spaceResourceStore = database.NewSpaceResourceStore()
+	c.datasetStore = database.NewDatasetStore()
+	c.mirrorStore = database.NewMirrorStore()
 	c.tokenStore = database.NewAccessTokenStore()
 	c.rtfm = database.NewRuntimeFrameworksStore()
 	c.config = config
@@ -50,25 +54,30 @@ func NewEvaluationComponent(config *config.Config) (EvaluationComponent, error) 
 }
 
 // Create argo workflow
-func (c *evaluationComponentImpl) CreateEvaluation(ctx context.Context, req *types.EvaluationReq) (*types.ArgoWorkFlowRes, error) {
-	user, err := c.us.FindByUsername(ctx, req.Username)
+func (c *evaluationComponentImpl) CreateEvaluation(ctx context.Context, req types.EvaluationReq) (*types.ArgoWorkFlowRes, error) {
+	user, err := c.userStore.FindByUsername(ctx, req.Username)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get current user %s, error:%w", req.Username, err)
 	}
 	result := strings.Split(req.ModelId, "/")
-	_, err = c.ms.FindByPath(ctx, result[0], result[1])
+	_, err = c.modelStore.FindByPath(ctx, result[0], result[1])
 	if err != nil {
 		return nil, fmt.Errorf("cannot find model, %w", err)
 	}
 
-	token, err := c.tokenStore.FindByUID(context.Background(), user.ID)
+	token, err := c.tokenStore.FindByUID(ctx, user.ID)
 	if err != nil {
 		return nil, fmt.Errorf("cant get git access token:%w", err)
 	}
+	mirrorRepos, err := c.GenerateMirrorRepoIds(ctx, req.Datasets)
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate mirror repo ids, %w", err)
+	}
+	req.Datasets = mirrorRepos
 	req.Token = token.Token
 	var hardware types.HardWare
 	if req.ResourceId != 0 {
-		resource, err := c.ss.FindByID(ctx, req.ResourceId)
+		resource, err := c.spaceResourceStore.FindByID(ctx, req.ResourceId)
 		if err != nil {
 			return nil, fmt.Errorf("cannot find resource, %w", err)
 		}
@@ -85,7 +94,7 @@ func (c *evaluationComponentImpl) CreateEvaluation(ctx context.Context, req *typ
 		// for share mode
 		hardware.Gpu.Num = c.config.Argo.QuotaGPUNumber
 		hardware.Gpu.ResourceName = "nvidia.com/gpu"
-		hardware.Cpu.Num = "12"
+		hardware.Cpu.Num = "8"
 		hardware.Memory = "32Gi"
 	}
 	frame, err := c.rtfm.FindEnabledByID(ctx, req.RuntimeFrameworkId)
@@ -100,7 +109,27 @@ func (c *evaluationComponentImpl) CreateEvaluation(ctx context.Context, req *typ
 	req.RepoType = string(types.ModelRepo)
 	req.TaskType = types.TaskTypeEvaluation
 	req.DownloadEndpoint = c.config.Model.DownloadEndpoint
-	return c.deployer.SubmitEvaluation(ctx, *req)
+	return c.deployer.SubmitEvaluation(ctx, req)
+}
+
+// generate mirror repo ids
+func (c *evaluationComponentImpl) GenerateMirrorRepoIds(ctx context.Context, datasets []string) ([]string, error) {
+	var mirrorRepos []string
+	for _, ds := range datasets {
+		namespace := strings.Split(ds, "/")[0]
+		name := strings.Split(ds, "/")[1]
+		mirrorRepo, err := c.mirrorStore.FindByRepoPath(ctx, types.DatasetRepo, namespace, name)
+		if err != nil {
+			if errors.Is(err, sql.ErrNoRows) {
+				//no mirror, will use csghub repo
+				mirrorRepos = append(mirrorRepos, ds)
+				continue
+			}
+			return nil, fmt.Errorf("fail to get mirror repo, %w", err)
+		}
+		mirrorRepos = append(mirrorRepos, mirrorRepo.SourceRepoPath)
+	}
+	return mirrorRepos, nil
 }
 
 func (c *evaluationComponentImpl) DeleteEvaluation(ctx context.Context, req types.ArgoWorkFlowDeleteReq) error {
@@ -108,12 +137,12 @@ func (c *evaluationComponentImpl) DeleteEvaluation(ctx context.Context, req type
 }
 
 // get evaluation result
-func (c *argoWFSComponentImpl) GetEvaluation(ctx context.Context, req types.EvaluationGetReq) (*types.EvaluationRes, error) {
+func (c *evaluationComponentImpl) GetEvaluation(ctx context.Context, req types.EvaluationGetReq) (*types.EvaluationRes, error) {
 	wf, err := c.deployer.GetEvaluation(ctx, req)
 	if err != nil {
 		return nil, fmt.Errorf("fail to get evaluation result, %w", err)
 	}
-	datasets, err := c.ds.ListByPath(ctx, wf.Datasets)
+	datasets, err := c.datasetStore.ListByPath(ctx, wf.Datasets)
 	if err != nil {
 		return nil, fmt.Errorf("fail to get datasets for evaluation, %w", err)
 	}
