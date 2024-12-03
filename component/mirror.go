@@ -332,6 +332,7 @@ var mirrorOrganizationMap = map[string]string{
 	"openbmb":        "OpenBMB",
 	"netease-youdao": "Netease-youdao",
 	"ByteDance":      "ByteDance",
+	"opencompass":    "opencompass",
 }
 
 var mirrorStatusAndRepoSyncStatusMapping = map[types.MirrorTaskStatus]types.RepositorySyncStatus{

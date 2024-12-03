@@ -1,0 +1,17 @@
+FROM nvidia/cuda:12.4.1-devel-ubuntu22.04
+RUN apt-get update && apt-get -y install git python3.10 python3-pip dumb-init \
+    && apt-get clean && rm -rf /var/lib/apt/lists/*
+RUN pip install --upgrade pip && pip config set global.index-url https://pypi.tuna.tsinghua.edu.cn/simple \
+    && pip install --no-cache-dir accelerate transformers==4.46.3 \
+    minio oss2 langdetect huggingface_hub openpyxl
+WORKDIR /workspace/
+RUN git clone --depth 1 https://gitee.com/xzgan/lm-evaluation-harness.git --branch v0.4.6 --single-branch && \
+    cd lm-evaluation-harness && pip install setuptools --upgrade --no-cache-dir -e \
+     ".[ifeval,math,multilingual,sentencepiece]"
+COPY ./lm-evaluation-harness/ /etc/csghub/
+RUN ln -s /usr/bin/python3 /usr/bin/python &&\
+    chmod +x /etc/csghub/*.sh
+ENV HUGGINGFACE_HUB_CACHE=/workspace/ \
+    HF_HUB_ENABLE_HF_TRANSFER=0
+ENTRYPOINT [ "/usr/bin/dumb-init", "--" ]
+CMD ["/etc/csghub/start.sh"]

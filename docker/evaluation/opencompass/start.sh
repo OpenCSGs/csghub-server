@@ -8,6 +8,12 @@ insert_string=$(cat << 'EOF'
 EOF
 )
 repo_tokenizer_config="/workspace/$MODEL_ID/tokenizer_config.json"
+# check if repo_tokenizer_config exists
+if [ ! -f "$repo_tokenizer_config" ]; then
+    echo "the model is invalid."
+    exit 1
+fi
+
 # fix some model does not contain chat_template
 if ! grep -q "chat_template" "$repo_tokenizer_config"; then
     filename="/tmp/tokenizer_config.json"
@@ -60,8 +66,18 @@ if [ -z "$GPU_NUM" ]; then
 fi
 #LimitedMaxToken is gpu_num multiplied by 4096
 LimitedMaxToken=$(($GPU_NUM * 4096))
+# avoid GPU OOM
+repo_config="/workspace/$MODEL_ID/config.json"
+sed -i "s/\"max_position_embeddings\": [0-9]*/\"max_position_embeddings\": $LimitedMaxToken/" $repo_config
 
-opencompass --datasets $dataset_tasks --work-dir /workspace/output  --hf-type chat --hf-path /workspace/$MODEL_ID -a vllm --max-out-len 100 --max-seq-len $LimitedMaxToken --batch-size 8 --hf-num-gpus $GPU_NUM --max-num-workers $GPU_NUM 
+opencompass --datasets $dataset_tasks --work-dir /workspace/output  --hf-type chat --hf-path /workspace/$MODEL_ID -a vllm --max-out-len 100 --max-seq-len $LimitedMaxToken --batch-size 8 --hf-num-gpus $GPU_NUM --max-num-workers $GPU_NUM
+
+if [ $? -eq 0 ]; then
+    echo "Evaluation completed successfully."
+else
+    echo "Evaluation failed."
+    exit 1
+fi
 
 # upload result to mino server
 output_dir=`ls -dt /workspace/output/* |head -n 1`

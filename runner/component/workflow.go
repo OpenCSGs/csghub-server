@@ -332,6 +332,9 @@ func (wc *workFlowComponentImpl) RunWorkflowsInformer(clusterPool *cluster.Clust
 }
 
 func (wc *workFlowComponentImpl) StartAcctRequestFee(wf database.ArgoWorkflow) {
+	if !wc.config.IsMasterHost {
+		return
+	}
 	if wf.ResourceId == 0 {
 		return
 	}

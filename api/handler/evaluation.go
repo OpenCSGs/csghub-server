@@ -14,7 +14,7 @@ import (
 )
 
 func NewEvaluationHandler(config *config.Config) (*EvaluationHandler, error) {
-	wkf, err := component.NewArgoWFSComponent(config)
+	wkf, err := component.NewEvaluationComponent(config)
 	if err != nil {
 		return nil, err
 	}
@@ -29,8 +29,8 @@ func NewEvaluationHandler(config *config.Config) (*EvaluationHandler, error) {
 }
 
 type EvaluationHandler struct {
-	c  *component.ArgoWFSComponent
-	sc *component.SensitiveComponent
+	c  component.EvaluationComponent
+	sc component.SensitiveComponent
 }
 
 // create evaluation  godoc
@@ -66,7 +66,7 @@ func (h *EvaluationHandler) RunEvaluation(ctx *gin.Context) {
 		return
 	}
 	req.Username = currentUser
-	evaluation, err := h.c.CreateEvaluation(ctx, &req)
+	evaluation, err := h.c.CreateEvaluation(ctx, req)
 	if err != nil {
 		slog.Error("Failed to create evaluation job", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
