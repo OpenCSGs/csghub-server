@@ -27,19 +27,19 @@ type GitCallbackComponent struct {
 	gs           gitserver.GitServer
 	tc           component.TagComponent
 	modSvcClient rpc.ModerationSvcClient
-	ms           *database.ModelStore
-	ds           *database.DatasetStore
-	sc           *component.SpaceComponent
-	ss           *database.SpaceStore
-	rs           *database.RepoStore
-	rrs          *database.RepoRelationsStore
-	mirrorStore  *database.MirrorStore
-	rrf          *database.RepositoriesRuntimeFrameworkStore
-	rac          *component.RuntimeArchitectureComponent
-	ras          *database.RuntimeArchitecturesStore
-	rfs          *database.RuntimeFrameworksStore
-	ts           *database.TagStore
-	dt           *database.TagRuleStore
+	ms           database.ModelStore
+	ds           database.DatasetStore
+	sc           component.SpaceComponent
+	ss           database.SpaceStore
+	rs           database.RepoStore
+	rrs          database.RepoRelationsStore
+	mirrorStore  database.MirrorStore
+	rrf          database.RepositoriesRuntimeFrameworkStore
+	rac          component.RuntimeArchitectureComponent
+	ras          database.RuntimeArchitecturesStore
+	rfs          database.RuntimeFrameworksStore
+	ts           database.TagStore
+	dt           database.TagRuleStore
 	// set visibility if file content is sensitive
 	setRepoVisibility bool
 	pp                component.PromptComponent

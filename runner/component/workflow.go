@@ -45,7 +45,6 @@ type WorkFlowComponent interface {
 	DeleteWorkflowInargo(ctx context.Context, delete *v1alpha1.Workflow) error
 	FindWorkFlowById(ctx context.Context, id int64) (database.ArgoWorkflow, error)
 	RunWorkflowsInformer(clusterPool *cluster.ClusterPool, config *config.Config)
-	StartAcctRequestFee(wf database.ArgoWorkflow)
 }
 
 func NewWorkFlowComponent(config *config.Config, clusterPool *cluster.ClusterPool) WorkFlowComponent {

@@ -38,6 +38,7 @@ type UserComponent interface {
 	ListServerless(ctx context.Context, req types.DeployReq) ([]types.DeployRepo, int, error)
 	GetUserByName(ctx context.Context, userName string) (*database.User, error)
 	Prompts(ctx context.Context, req *types.UserPromptsReq) ([]types.PromptRes, int, error)
+	Evaluations(ctx context.Context, req *types.UserEvaluationReq) ([]types.ArgoWorkFlowRes, int, error)
 }
 
 func NewUserComponent(config *config.Config) (UserComponent, error) {
@@ -89,15 +90,14 @@ type userComponentImpl struct {
 	spaceComponent SpaceComponent
 	repoComponent  *repoComponentImpl
 	deployer       deploy.Deployer
-	uls            *database.UserLikesStore
-	repo           *database.RepoStore
-	deploy         *database.DeployTaskStore
-	cos            *database.CollectionStore
-	ac             *AccountingComponent
-	srs            *database.SpaceResourceStore
-	urs            *database.UserResourcesStore
-	pt             *database.PromptStore
-	wfs            *database.ArgoWorkFlowStore
+	uls            database.UserLikesStore
+	repo           database.RepoStore
+	deploy         database.DeployTaskStore
+	cos            database.CollectionStore
+	ac             AccountingComponent
+	srs            database.SpaceResourceStore
+	pt             database.PromptStore
+	wfs            database.ArgoWorkFlowStore
 }
 
 func (c *userComponentImpl) Datasets(ctx context.Context, req *types.UserDatasetsReq) ([]types.Dataset, int, error) {
@@ -739,7 +739,7 @@ func (c *userComponentImpl) Prompts(ctx context.Context, req *types.UserPromptsR
 	return resPrompts, total, nil
 }
 
-func (c *UserComponent) Evaluations(ctx context.Context, req *types.UserEvaluationReq) ([]types.ArgoWorkFlowRes, int, error) {
+func (c *userComponentImpl) Evaluations(ctx context.Context, req *types.UserEvaluationReq) ([]types.ArgoWorkFlowRes, int, error) {
 
 	_, err := c.us.FindByUsername(ctx, req.CurrentUser)
 	if err != nil {
