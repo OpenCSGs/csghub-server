@@ -138,7 +138,7 @@ func (t *BuilderRunner) Run(ctx context.Context) error {
 func (t *BuilderRunner) buildInProgress() {
 	t.task.Status = buildInProgress
 	t.task.Message = "build in progress"
-	// change to buidling status
+	// change to building status
 	t.task.Deploy.Status = common.Building
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
@@ -150,7 +150,7 @@ func (t *BuilderRunner) buildInProgress() {
 func (t *BuilderRunner) buildSuccess(resp imagebuilder.StatusResponse) {
 	t.task.Status = buildSucceed
 	t.task.Message = "build succeeded"
-	// change to buidling status
+	// change to building status
 	t.task.Deploy.Status = common.BuildSuccess
 	t.task.Deploy.ImageID = resp.ImageID
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -163,7 +163,7 @@ func (t *BuilderRunner) buildSuccess(resp imagebuilder.StatusResponse) {
 func (t *BuilderRunner) buildFailed() {
 	t.task.Status = buildFailed
 	t.task.Message = "build failed"
-	// change to buidling status
+	// change to building status
 	t.task.Deploy.Status = common.BuildFailed
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()

@@ -42,39 +42,38 @@ const (
 )
 
 type repoComponentImpl struct {
-	tc                 TagComponent
-	user               database.UserStore
-	org                database.OrgStore
-	namespace          database.NamespaceStore
-	repo               database.RepoStore
-	repoFile           database.RepoFileStore
-	rel                database.RepoRelationsStore
-	mirror             database.MirrorStore
-	git                gitserver.GitServer
-	s3Client           *s3.Client
-	userSvcClient      rpc.UserSvcClient
-	lfsBucket          string
-	uls                database.UserLikesStore
-	mirrorServer       mirrorserver.MirrorServer
-	runFrame           database.RuntimeFrameworksStore
-	deploy             database.DeployTaskStore
-	deployer           deploy.Deployer
-	publicRootDomain   string
-	serverBaseUrl      string
-	cluster            database.ClusterInfoStore
-	mirrorSource       database.MirrorSourceStore
-	tokenStore         database.AccessTokenStore
-	rtfm               database.RuntimeFrameworksStore
-	rrtfms             database.RepositoriesRuntimeFrameworkStore
-	syncVersion        database.SyncVersionStore
-	syncClientSetting  database.SyncClientSettingStore
-	file               database.FileStore
-	config             *config.Config
-	ac                 AccountingComponent
-	srs                database.SpaceResourceStore
-	lfsMetaObjectStore database.LfsMetaObjectStore
-	recom              database.RecomStore
-	mq                 *queue.PriorityQueue
+	tagComponent              TagComponent
+	userStore                 database.UserStore
+	orgStore                  database.OrgStore
+	namespaceStore            database.NamespaceStore
+	repoStore                 database.RepoStore
+	repoFileStore             database.RepoFileStore
+	repoRelationsStore        database.RepoRelationsStore
+	mirrorStore               database.MirrorStore
+	git                       gitserver.GitServer
+	s3Client                  s3.Client
+	userSvcClient             rpc.UserSvcClient
+	lfsBucket                 string
+	userLikesStore            database.UserLikesStore
+	mirrorServer              mirrorserver.MirrorServer
+	runtimeFrameworksStore    database.RuntimeFrameworksStore
+	deployTaskStore           database.DeployTaskStore
+	deployer                  deploy.Deployer
+	publicRootDomain          string
+	serverBaseUrl             string
+	cluster                   database.ClusterInfoStore
+	mirrorSourceStore         database.MirrorSourceStore
+	tokenStore                database.AccessTokenStore
+	repoRuntimeFrameworkStore database.RepositoriesRuntimeFrameworkStore
+	syncVersionStore          database.SyncVersionStore
+	syncClientSettingStore    database.SyncClientSettingStore
+	fileStore                 database.FileStore
+	config                    *config.Config
+	accountingComponent       AccountingComponent
+	spaceResourceStore        database.SpaceResourceStore
+	lfsMetaObjectStore        database.LfsMetaObjectStore
+	recomStore                database.RecomStore
+	mq                        queue.PriorityQueue
 }
 
 type RepoComponent interface {
@@ -143,6 +142,9 @@ type RepoComponent interface {
 	CheckCurrentUserPermission(ctx context.Context, userName string, namespace string, role membership.Role) (bool, error)
 	GetNameSpaceInfo(ctx context.Context, path string) (*types.Namespace, error)
 	RelatedRepos(ctx context.Context, repoID int64, currentUser string) (map[types.RepositoryType][]*database.Repository, error)
+	VisiableToUser(ctx context.Context, repos []*database.Repository, currentUser string) ([]*database.Repository, error)
+	GenerateEndpoint(ctx context.Context, deploy *database.Deploy) (string, string)
+	IsAdminRole(user database.User) bool
 }
 
 func NewRepoComponentImpl(config *config.Config) (*repoComponentImpl, error) {
@@ -155,19 +157,19 @@ func NewRepoComponentImpl(config *config.Config) (*repoComponentImpl, error) {
 
 func NewRepoComponent(config *config.Config) (RepoComponent, error) {
 	c := &repoComponentImpl{}
-	c.namespace = database.NewNamespaceStore()
-	c.user = database.NewUserStore()
-	c.org = database.NewOrgStore()
-	c.repo = database.NewRepoStore()
-	c.repoFile = database.NewRepoFileStore()
-	c.rel = database.NewRepoRelationsStore()
-	c.uls = database.NewUserLikesStore()
-	c.mirror = database.NewMirrorStore()
-	c.mirrorSource = database.NewMirrorSourceStore()
+	c.namespaceStore = database.NewNamespaceStore()
+	c.userStore = database.NewUserStore()
+	c.orgStore = database.NewOrgStore()
+	c.repoStore = database.NewRepoStore()
+	c.repoFileStore = database.NewRepoFileStore()
+	c.repoRelationsStore = database.NewRepoRelationsStore()
+	c.userLikesStore = database.NewUserLikesStore()
+	c.mirrorStore = database.NewMirrorStore()
+	c.mirrorSourceStore = database.NewMirrorSourceStore()
 	c.tokenStore = database.NewAccessTokenStore()
-	c.syncVersion = database.NewSyncVersionStore()
-	c.syncClientSetting = database.NewSyncClientSettingStore()
-	c.file = database.NewFileStore()
+	c.syncVersionStore = database.NewSyncVersionStore()
+	c.syncClientSettingStore = database.NewSyncClientSettingStore()
+	c.fileStore = database.NewFileStore()
 	var err error
 	c.git, err = git.NewGitServer(config)
 	if err != nil {
@@ -186,7 +188,7 @@ func NewRepoComponent(config *config.Config) (RepoComponent, error) {
 		slog.Error(newError.Error())
 		return nil, newError
 	}
-	c.tc, err = NewTagComponent(config)
+	c.tagComponent, err = NewTagComponent(config)
 	if err != nil {
 		newError := fmt.Errorf("fail to create tag component,error:%w", err)
 		slog.Error(newError.Error())
@@ -201,32 +203,31 @@ func NewRepoComponent(config *config.Config) (RepoComponent, error) {
 	c.lfsBucket = config.S3.Bucket
 	c.userSvcClient = rpc.NewUserSvcHttpClient(fmt.Sprintf("%s:%d", config.User.Host, config.User.Port),
 		rpc.AuthWithApiKey(config.APIToken))
-	c.runFrame = database.NewRuntimeFrameworksStore()
-	c.deploy = database.NewDeployTaskStore()
+	c.runtimeFrameworksStore = database.NewRuntimeFrameworksStore()
+	c.deployTaskStore = database.NewDeployTaskStore()
 	c.deployer = deploy.NewDeployer()
 	c.publicRootDomain = config.Space.PublicRootDomain
 	c.serverBaseUrl = config.APIServer.PublicDomain
 	c.cluster = database.NewClusterInfoStore()
-	c.rtfm = database.NewRuntimeFrameworksStore()
-	c.rrtfms = database.NewRepositoriesRuntimeFramework()
-	c.ac, err = NewAccountingComponent(config)
+	c.repoRuntimeFrameworkStore = database.NewRepositoriesRuntimeFramework()
+	c.accountingComponent, err = NewAccountingComponent(config)
 	if err != nil {
 		return nil, err
 	}
-	c.srs = database.NewSpaceResourceStore()
+	c.spaceResourceStore = database.NewSpaceResourceStore()
 	c.lfsMetaObjectStore = database.NewLfsMetaObjectStore()
-	c.recom = database.NewRecomStore()
+	c.recomStore = database.NewRecomStore()
 	c.config = config
 	return c, nil
 }
 
 func (c *repoComponentImpl) CreateRepo(ctx context.Context, req types.CreateRepoReq) (*gitserver.CreateRepoResp, *database.Repository, error) {
-	namespace, err := c.namespace.FindByPath(ctx, req.Namespace)
+	namespace, err := c.namespaceStore.FindByPath(ctx, req.Namespace)
 	if err != nil {
 		return nil, nil, errors.New("namespace does not exist")
 	}
 
-	user, err := c.user.FindByUsername(ctx, req.Username)
+	user, err := c.userStore.FindByUsername(ctx, req.Username)
 	if err != nil {
 		return nil, nil, errors.New("user does not exist")
 	}
@@ -286,7 +287,7 @@ func (c *repoComponentImpl) CreateRepo(ctx context.Context, req types.CreateRepo
 		HTTPCloneURL:   gitRepo.HttpCloneURL,
 		SSHCloneURL:    gitRepo.SshCloneURL,
 	}
-	newDBRepo, err := c.repo.CreateRepo(ctx, dbRepo)
+	newDBRepo, err := c.repoStore.CreateRepo(ctx, dbRepo)
 	if err != nil {
 		return nil, nil, fmt.Errorf("fail to create database repo, error: %w", err)
 	}
@@ -296,17 +297,17 @@ func (c *repoComponentImpl) CreateRepo(ctx context.Context, req types.CreateRepo
 }
 
 func (c *repoComponentImpl) UpdateRepo(ctx context.Context, req types.UpdateRepoReq) (*database.Repository, error) {
-	repo, err := c.repo.Find(ctx, req.Namespace, string(req.RepoType), req.Name)
+	repo, err := c.repoStore.Find(ctx, req.Namespace, string(req.RepoType), req.Name)
 	if err != nil {
 		return nil, errors.New("repository does not exist")
 	}
 
-	namespace, err := c.namespace.FindByPath(ctx, req.Namespace)
+	namespace, err := c.namespaceStore.FindByPath(ctx, req.Namespace)
 	if err != nil {
 		return nil, errors.New("namespace does not exist")
 	}
 
-	user, err := c.user.FindByUsername(ctx, req.Username)
+	user, err := c.userStore.FindByUsername(ctx, req.Username)
 	if err != nil {
 		return nil, errors.New("user does not exist")
 	}
@@ -352,7 +353,7 @@ func (c *repoComponentImpl) UpdateRepo(ctx context.Context, req types.UpdateRepo
 		return nil, fmt.Errorf("fail to update repo in git, error: %w", err)
 	}
 
-	resRepo, err := c.repo.UpdateRepo(ctx, *repo)
+	resRepo, err := c.repoStore.UpdateRepo(ctx, *repo)
 	if err != nil {
 		slog.Error("fail to update repo in git ", slog.Any("req", req), slog.String("error", err.Error()))
 		return nil, fmt.Errorf("fail to update repo in database, error: %w", err)
@@ -362,17 +363,17 @@ func (c *repoComponentImpl) UpdateRepo(ctx context.Context, req types.UpdateRepo
 }
 
 func (c *repoComponentImpl) DeleteRepo(ctx context.Context, req types.DeleteRepoReq) (*database.Repository, error) {
-	repo, err := c.repo.Find(ctx, req.Namespace, string(req.RepoType), req.Name)
+	repo, err := c.repoStore.Find(ctx, req.Namespace, string(req.RepoType), req.Name)
 	if err != nil {
 		return nil, errors.New("repository does not exist")
 	}
 
-	namespace, err := c.namespace.FindByPath(ctx, req.Namespace)
+	namespace, err := c.namespaceStore.FindByPath(ctx, req.Namespace)
 	if err != nil {
 		return nil, errors.New("namespace does not exist")
 	}
 
-	user, err := c.user.FindByUsername(ctx, req.Username)
+	user, err := c.userStore.FindByUsername(ctx, req.Username)
 	if err != nil {
 		return nil, errors.New("user does not exist")
 	}
@@ -391,7 +392,7 @@ func (c *repoComponentImpl) DeleteRepo(ctx context.Context, req types.DeleteRepo
 		}
 	}
 
-	err = c.repo.CleanRelationsByRepoID(ctx, repo.ID)
+	err = c.repoStore.CleanRelationsByRepoID(ctx, repo.ID)
 	if err != nil {
 		return nil, fmt.Errorf("fail to clean repo relations, %w", err)
 	}
@@ -407,7 +408,7 @@ func (c *repoComponentImpl) DeleteRepo(ctx context.Context, req types.DeleteRepo
 		return nil, fmt.Errorf("fail to delete repo in git, error: %w", err)
 	}
 
-	err = c.repo.DeleteRepo(ctx, *repo)
+	err = c.repoStore.DeleteRepo(ctx, *repo)
 	if err != nil {
 		slog.Error("fail to delete repo in git ", slog.Any("req", req), slog.String("error", err.Error()))
 		return nil, fmt.Errorf("fail to delete repo in database, error: %w", err)
@@ -432,7 +433,7 @@ func (c *repoComponentImpl) PublicToUser(ctx context.Context, repoType types.Rep
 			repoOwnerIDs = append(repoOwnerIDs, org.UserID)
 		}
 	}
-	repos, count, err = c.repo.PublicToUser(ctx, repoType, repoOwnerIDs, filter, per, page)
+	repos, count, err = c.repoStore.PublicToUser(ctx, repoType, repoOwnerIDs, filter, per, page)
 	if err != nil {
 		return nil, 0, fmt.Errorf("failed to get user public repos, error: %w", err)
 	}
@@ -442,7 +443,7 @@ func (c *repoComponentImpl) PublicToUser(ctx context.Context, repoType types.Rep
 
 // RelatedRepos gets all repos related to the given repo, and return them by repo type
 func (c *repoComponentImpl) RelatedRepos(ctx context.Context, repoID int64, currentUser string) (map[types.RepositoryType][]*database.Repository, error) {
-	fromRelations, err := c.rel.From(ctx, repoID)
+	fromRelations, err := c.repoRelationsStore.From(ctx, repoID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get repo relation from, error: %w", err)
 	}
@@ -451,7 +452,7 @@ func (c *repoComponentImpl) RelatedRepos(ctx context.Context, repoID int64, curr
 		toRepoIDs = append(toRepoIDs, rel.ToRepoID)
 	}
 
-	toRelations, err := c.rel.To(ctx, repoID)
+	toRelations, err := c.repoRelationsStore.To(ctx, repoID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get repo relation to, error: %w", err)
 	}
@@ -471,12 +472,12 @@ func (c *repoComponentImpl) RelatedRepos(ctx context.Context, repoID int64, curr
 	opts = append(opts, database.Columns("id", "repository_type", "path", "user_id", "private", "name",
 		"nickname", "description", "download_count", "updated_at"))
 
-	RelatedRepos, err := c.repo.FindByIds(ctx, relatedRepoIDs, opts...)
+	RelatedRepos, err := c.repoStore.FindByIds(ctx, relatedRepoIDs, opts...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get relation to repositories by ids, error: %w", err)
 	}
 
-	RelatedRepos, err = c.visiableToUser(ctx, RelatedRepos, currentUser)
+	RelatedRepos, err = c.VisiableToUser(ctx, RelatedRepos, currentUser)
 	if err != nil {
 		return nil, fmt.Errorf("failed to check related repositories visiable to user:%s, %w", currentUser, err)
 	}
@@ -487,7 +488,7 @@ func (c *repoComponentImpl) RelatedRepos(ctx context.Context, repoID int64, curr
 	return res, nil
 }
 
-func (c *repoComponentImpl) visiableToUser(ctx context.Context, repos []*database.Repository, currentUser string) ([]*database.Repository, error) {
+func (c *repoComponentImpl) VisiableToUser(ctx context.Context, repos []*database.Repository, currentUser string) ([]*database.Repository, error) {
 	var res []*database.Repository
 	for _, repo := range repos {
 		if repo.Private {
@@ -516,7 +517,7 @@ func (c *repoComponentImpl) CreateFile(ctx context.Context, req *types.CreateFil
 		user   database.User
 		useLfs bool
 	)
-	repo, err := c.repo.FindByPath(ctx, req.RepoType, req.Namespace, req.Name)
+	repo, err := c.repoStore.FindByPath(ctx, req.RepoType, req.Namespace, req.Name)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find repo, error: %w", err)
 	}
@@ -529,13 +530,13 @@ func (c *repoComponentImpl) CreateFile(ctx context.Context, req *types.CreateFil
 		return nil, ErrUnauthorized
 	}
 
-	user, err = c.user.FindByUsername(ctx, req.Username)
+	user, err = c.userStore.FindByUsername(ctx, req.Username)
 	if err != nil {
 		return nil, fmt.Errorf("fail to check user, cause: %w", err)
 	}
 	req.Email = user.Email
 
-	_, err = c.namespace.FindByPath(ctx, req.Namespace)
+	_, err = c.namespaceStore.FindByPath(ctx, req.Namespace)
 	if err != nil {
 		return nil, fmt.Errorf("fail to check namespace, cause: %w", err)
 	}
@@ -579,7 +580,7 @@ func (c *repoComponentImpl) CreateFile(ctx context.Context, req *types.CreateFil
 		}
 	}
 
-	err = c.repo.SetUpdateTimeByPath(ctx, req.RepoType, req.Namespace, req.Name, time.Now())
+	err = c.repoStore.SetUpdateTimeByPath(ctx, req.RepoType, req.Namespace, req.Name, time.Now())
 	if err != nil {
 		slog.Error("failed to set repo update time", slog.Any("error", err), slog.String("repo_type", string(req.RepoType)), slog.String("namespace", req.Namespace), slog.String("name", req.Name))
 	}
@@ -591,7 +592,7 @@ func (c *repoComponentImpl) CreateFile(ctx context.Context, req *types.CreateFil
 func (c *repoComponentImpl) createReadmeFile(ctx context.Context, req *types.CreateFileReq) error {
 	var err error
 	contentDecoded, _ := base64.RawStdEncoding.DecodeString(req.Content)
-	_, err = c.tc.UpdateMetaTags(ctx, getTagScopeByRepoType(req.RepoType), req.Namespace, req.Name, string(contentDecoded))
+	_, err = c.tagComponent.UpdateMetaTags(ctx, getTagScopeByRepoType(req.RepoType), req.Namespace, req.Name, string(contentDecoded))
 	if err != nil {
 		return fmt.Errorf("failed to update meta tags, cause: %w", err)
 	}
@@ -606,7 +607,7 @@ func (c *repoComponentImpl) createReadmeFile(ctx context.Context, req *types.Cre
 
 func (c *repoComponentImpl) createLibraryFile(ctx context.Context, req *types.CreateFileReq) error {
 	var err error
-	err = c.tc.UpdateLibraryTags(ctx, getTagScopeByRepoType(req.RepoType), req.Namespace, req.Name, "", req.FilePath)
+	err = c.tagComponent.UpdateLibraryTags(ctx, getTagScopeByRepoType(req.RepoType), req.Namespace, req.Name, "", req.FilePath)
 	if err != nil {
 		slog.Error(fmt.Sprintf("failed to set %s's tags", req.RepoType), slog.String("namespace", req.Namespace),
 			slog.String("name", req.Name), slog.Any("error", err))
@@ -629,7 +630,7 @@ func (c *repoComponentImpl) UpdateFile(ctx context.Context, req *types.UpdateFil
 		user   database.User
 		useLfs bool
 	)
-	repo, err := c.repo.FindByPath(ctx, req.RepoType, req.Namespace, req.Name)
+	repo, err := c.repoStore.FindByPath(ctx, req.RepoType, req.Namespace, req.Name)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find repo, error: %w", err)
 	}
@@ -642,13 +643,13 @@ func (c *repoComponentImpl) UpdateFile(ctx context.Context, req *types.UpdateFil
 		return nil, ErrUnauthorized
 	}
 
-	user, err = c.user.FindByUsername(ctx, req.Username)
+	user, err = c.userStore.FindByUsername(ctx, req.Username)
 	if err != nil {
 		return nil, fmt.Errorf("fail to check user, cause: %w", err)
 	}
 	req.Email = user.Email
 
-	_, err = c.namespace.FindByPath(ctx, req.Namespace)
+	_, err = c.namespaceStore.FindByPath(ctx, req.Namespace)
 	if err != nil {
 		return nil, fmt.Errorf("fail to check namespace, cause: %w", err)
 	}
@@ -698,7 +699,7 @@ func (c *repoComponentImpl) UpdateFile(ctx context.Context, req *types.UpdateFil
 		}
 	}
 
-	err = c.repo.SetUpdateTimeByPath(ctx, req.RepoType, req.Namespace, req.Name, time.Now())
+	err = c.repoStore.SetUpdateTimeByPath(ctx, req.RepoType, req.Namespace, req.Name, time.Now())
 	if err != nil {
 		slog.Error("failed to set repo update time", slog.Any("error", err), slog.String("repo_type", string(req.RepoType)), slog.String("namespace", req.Namespace), slog.String("name", req.Name))
 	}
@@ -715,7 +716,7 @@ func (c *repoComponentImpl) DeleteFile(ctx context.Context, req *types.DeleteFil
 		err  error
 		user database.User
 	)
-	repo, err := c.repo.FindByPath(ctx, req.RepoType, req.Namespace, req.Name)
+	repo, err := c.repoStore.FindByPath(ctx, req.RepoType, req.Namespace, req.Name)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find repo, error: %w", err)
 	}
@@ -728,13 +729,13 @@ func (c *repoComponentImpl) DeleteFile(ctx context.Context, req *types.DeleteFil
 		return nil, ErrUnauthorized
 	}
 
-	user, err = c.user.FindByUsername(ctx, req.Username)
+	user, err = c.userStore.FindByUsername(ctx, req.Username)
 	if err != nil {
 		return nil, fmt.Errorf("fail to check user, cause: %w", err)
 	}
 	req.Email = user.Email
 
-	_, err = c.namespace.FindByPath(ctx, req.Namespace)
+	_, err = c.namespaceStore.FindByPath(ctx, req.Namespace)
 	if err != nil {
 		return nil, fmt.Errorf("fail to check namespace, cause: %w", err)
 	}
@@ -760,7 +761,7 @@ func (c *repoComponentImpl) DeleteFile(ctx context.Context, req *types.DeleteFil
 		slog.Error("failed to delete file", slog.String("file", req.FilePath), slog.Any("error", err), slog.String("namespace", req.Namespace), slog.String("name", req.Name))
 	}
 
-	err = c.repo.SetUpdateTimeByPath(ctx, req.RepoType, req.Namespace, req.Name, time.Now())
+	err = c.repoStore.SetUpdateTimeByPath(ctx, req.RepoType, req.Namespace, req.Name, time.Now())
 	if err != nil {
 		slog.Error("failed to set repo update time", slog.Any("error", err), slog.String("repo_type", string(req.RepoType)), slog.String("namespace", req.Namespace), slog.String("name", req.Name))
 	}
@@ -785,7 +786,7 @@ func (c *repoComponentImpl) changeLibraryFile(ctx context.Context, filePath, ori
 	isFileRenamed := filePath != originPath
 	// need to handle tag change only if file renamed
 	if isFileRenamed {
-		err = c.tc.UpdateLibraryTags(ctx, getTagScopeByRepoType(repoType), namespace, name, originPath, filePath)
+		err = c.tagComponent.UpdateLibraryTags(ctx, getTagScopeByRepoType(repoType), namespace, name, originPath, filePath)
 		if err != nil {
 			slog.Error(fmt.Sprintf("failed to set %s's tags", repoType), slog.String("namespace", namespace),
 				slog.String("name", name), slog.Any("error", err))
@@ -815,7 +816,7 @@ func (c *repoComponentImpl) deleteReadmeFile(ctx context.Context, req *types.Del
 
 func (c *repoComponentImpl) changeReadmeFile(ctx context.Context, content, namespace, name string, repoType types.RepositoryType) error {
 	contentDecoded, _ := base64.RawStdEncoding.DecodeString(content)
-	_, err := c.tc.UpdateMetaTags(ctx, getTagScopeByRepoType(repoType), namespace, name, string(contentDecoded))
+	_, err := c.tagComponent.UpdateMetaTags(ctx, getTagScopeByRepoType(repoType), namespace, name, string(contentDecoded))
 	if err != nil {
 		return fmt.Errorf("failed to update meta tags, cause: %w", err)
 	}
@@ -823,7 +824,7 @@ func (c *repoComponentImpl) changeReadmeFile(ctx context.Context, content, names
 }
 
 func (c *repoComponentImpl) Commits(ctx context.Context, req *types.GetCommitsReq) ([]types.Commit, *types.RepoPageOpts, error) {
-	repo, err := c.repo.FindByPath(ctx, req.RepoType, req.Namespace, req.Name)
+	repo, err := c.repoStore.FindByPath(ctx, req.RepoType, req.Namespace, req.Name)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to find repo, error: %w", err)
 	}
@@ -855,7 +856,7 @@ func (c *repoComponentImpl) Commits(ctx context.Context, req *types.GetCommitsRe
 }
 
 func (c *repoComponentImpl) LastCommit(ctx context.Context, req *types.GetCommitsReq) (*types.Commit, error) {
-	repo, err := c.repo.FindByPath(ctx, req.RepoType, req.Namespace, req.Name)
+	repo, err := c.repoStore.FindByPath(ctx, req.RepoType, req.Namespace, req.Name)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find repo, error: %w", err)
 	}
@@ -885,7 +886,7 @@ func (c *repoComponentImpl) LastCommit(ctx context.Context, req *types.GetCommit
 }
 
 func (c *repoComponentImpl) FileRaw(ctx context.Context, req *types.GetFileReq) (string, error) {
-	repo, err := c.repo.FindByPath(ctx, req.RepoType, req.Namespace, req.Name)
+	repo, err := c.repoStore.FindByPath(ctx, req.RepoType, req.Namespace, req.Name)
 	if err != nil || repo == nil {
 		return "", fmt.Errorf("failed to find repo, error: %w", err)
 	}
@@ -899,7 +900,7 @@ func (c *repoComponentImpl) FileRaw(ctx context.Context, req *types.GetFileReq) 
 	}
 
 	if repo.Source != types.LocalSource && strings.ToLower(req.Path) == "readme.md" {
-		_, err := c.mirror.FindByRepoID(ctx, repo.ID)
+		_, err := c.mirrorStore.FindByRepoID(ctx, repo.ID)
 		if err != nil {
 			if errors.Is(err, sql.ErrNoRows) {
 				return repo.Readme, nil
@@ -929,7 +930,7 @@ func (c *repoComponentImpl) DownloadFile(ctx context.Context, req *types.GetFile
 		downloadUrl string
 		size        int64
 	)
-	repo, err := c.repo.FindByPath(ctx, req.RepoType, req.Namespace, req.Name)
+	repo, err := c.repoStore.FindByPath(ctx, req.RepoType, req.Namespace, req.Name)
 	if err != nil {
 		return nil, 0, "", fmt.Errorf("failed to find repo, error: %w", err)
 	}
@@ -942,7 +943,7 @@ func (c *repoComponentImpl) DownloadFile(ctx context.Context, req *types.GetFile
 		return nil, 0, "", ErrUnauthorized
 	}
 
-	err = c.repo.UpdateRepoFileDownloads(ctx, repo, time.Now(), 1)
+	err = c.repoStore.UpdateRepoFileDownloads(ctx, repo, time.Now(), 1)
 	if err != nil {
 		return nil, 0, "", fmt.Errorf("failed to update %s file download count, error: %w", req.RepoType, err)
 	}
@@ -979,7 +980,7 @@ func (c *repoComponentImpl) DownloadFile(ctx context.Context, req *types.GetFile
 }
 
 func (c *repoComponentImpl) Branches(ctx context.Context, req *types.GetBranchesReq) ([]types.Branch, error) {
-	repo, err := c.repo.FindByPath(ctx, req.RepoType, req.Namespace, req.Name)
+	repo, err := c.repoStore.FindByPath(ctx, req.RepoType, req.Namespace, req.Name)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find repo, error: %w", err)
 	}
@@ -1010,7 +1011,7 @@ func (c *repoComponentImpl) Branches(ctx context.Context, req *types.GetBranches
 }
 
 func (c *repoComponentImpl) Tags(ctx context.Context, req *types.GetTagsReq) ([]database.Tag, error) {
-	repo, err := c.repo.FindByPath(ctx, req.RepoType, req.Namespace, req.Name)
+	repo, err := c.repoStore.FindByPath(ctx, req.RepoType, req.Namespace, req.Name)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find %s, error: %w", req.RepoType, err)
 	}
@@ -1023,7 +1024,7 @@ func (c *repoComponentImpl) Tags(ctx context.Context, req *types.GetTagsReq) ([]
 		return nil, ErrUnauthorized
 	}
 
-	tags, err := c.repo.Tags(ctx, repo.ID)
+	tags, err := c.repoStore.Tags(ctx, repo.ID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get %s tags, error: %w", req.RepoType, err)
 	}
@@ -1031,7 +1032,7 @@ func (c *repoComponentImpl) Tags(ctx context.Context, req *types.GetTagsReq) ([]
 }
 
 func (c *repoComponentImpl) UpdateTags(ctx context.Context, namespace, name string, repoType types.RepositoryType, category, currentUser string, tags []string) error {
-	repo, err := c.repo.FindByPath(ctx, repoType, namespace, name)
+	repo, err := c.repoStore.FindByPath(ctx, repoType, namespace, name)
 	if err != nil {
 		return fmt.Errorf("failed to find repo, error: %w", err)
 	}
@@ -1045,13 +1046,13 @@ func (c *repoComponentImpl) UpdateTags(ctx context.Context, namespace, name stri
 	}
 
 	tagScope := getTagScopeByRepoType(repoType)
-	err = c.tc.UpdateRepoTagsByCategory(ctx, tagScope, repo.ID, category, tags)
+	err = c.tagComponent.UpdateRepoTagsByCategory(ctx, tagScope, repo.ID, category, tags)
 
 	return err
 }
 
 func (c *repoComponentImpl) Tree(ctx context.Context, req *types.GetFileReq) ([]*types.File, error) {
-	repo, err := c.repo.FindByPath(ctx, req.RepoType, req.Namespace, req.Name)
+	repo, err := c.repoStore.FindByPath(ctx, req.RepoType, req.Namespace, req.Name)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find repo, error: %w", err)
 	}
@@ -1069,13 +1070,13 @@ func (c *repoComponentImpl) Tree(ctx context.Context, req *types.GetFileReq) ([]
 	}
 
 	if repo.Source != types.LocalSource {
-		_, err := c.mirror.FindByRepoID(ctx, repo.ID)
+		_, err := c.mirrorStore.FindByRepoID(ctx, repo.ID)
 		if err != nil {
 			if errors.Is(err, sql.ErrNoRows) {
 				if req.Path == "" {
 					req.Path = "/"
 				}
-				files, err := c.file.FindByParentPath(ctx, repo.ID, req.Path)
+				files, err := c.fileStore.FindByParentPath(ctx, repo.ID, req.Path)
 				if err != nil {
 					if errors.Is(err, sql.ErrNoRows) {
 						return []*types.File{}, nil
@@ -1153,7 +1154,7 @@ func (c *repoComponentImpl) UploadFile(ctx context.Context, req *types.CreateFil
 
 func (c *repoComponentImpl) SDKListFiles(ctx context.Context, repoType types.RepositoryType, namespace, name, ref, userName string) (*types.SDKFiles, error) {
 	var sdkFiles []types.SDKFile
-	repo, err := c.repo.FindByPath(ctx, repoType, namespace, name)
+	repo, err := c.repoStore.FindByPath(ctx, repoType, namespace, name)
 	if err != nil || repo == nil {
 		return nil, ErrNotFound
 	}
@@ -1210,7 +1211,7 @@ func (c *repoComponentImpl) IsLfs(ctx context.Context, req *types.GetFileReq) (b
 }
 
 func (c *repoComponentImpl) HeadDownloadFile(ctx context.Context, req *types.GetFileReq, userName string) (*types.File, error) {
-	repo, err := c.repo.FindByPath(ctx, req.RepoType, req.Namespace, req.Name)
+	repo, err := c.repoStore.FindByPath(ctx, req.RepoType, req.Namespace, req.Name)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find repo, error: %w", err)
 	}
@@ -1244,7 +1245,7 @@ func (c *repoComponentImpl) HeadDownloadFile(ctx context.Context, req *types.Get
 
 func (c *repoComponentImpl) SDKDownloadFile(ctx context.Context, req *types.GetFileReq, userName string) (io.ReadCloser, int64, string, error) {
 	var downloadUrl string
-	repo, err := c.repo.FindByPath(ctx, req.RepoType, req.Namespace, req.Name)
+	repo, err := c.repoStore.FindByPath(ctx, req.RepoType, req.Namespace, req.Name)
 	if err != nil {
 		return nil, 0, "", fmt.Errorf("failed to find repo, error: %w", err)
 	}
@@ -1307,12 +1308,12 @@ func (c *repoComponentImpl) SDKDownloadFile(ctx context.Context, req *types.GetF
 
 // UpdateDownloads increase clone download count for repo by given count
 func (c *repoComponentImpl) UpdateDownloads(ctx context.Context, req *types.UpdateDownloadsReq) error {
-	repo, err := c.repo.FindByPath(ctx, req.RepoType, req.Namespace, req.Name)
+	repo, err := c.repoStore.FindByPath(ctx, req.RepoType, req.Namespace, req.Name)
 	if err != nil {
 		return fmt.Errorf("failed to find %s, error: %w", req.RepoType, err)
 	}
 
-	err = c.repo.UpdateRepoCloneDownloads(ctx, repo, req.Date, req.CloneCount)
+	err = c.repoStore.UpdateRepoCloneDownloads(ctx, repo, req.Date, req.CloneCount)
 	if err != nil {
 		return fmt.Errorf("failed to update %s download count, error: %w", req.RepoType, err)
 	}
@@ -1321,12 +1322,12 @@ func (c *repoComponentImpl) UpdateDownloads(ctx context.Context, req *types.Upda
 
 // IncrDownloads increase the click download count for repo by 1
 func (c *repoComponentImpl) IncrDownloads(ctx context.Context, repoType types.RepositoryType, namespace, name string) error {
-	repo, err := c.repo.FindByPath(ctx, repoType, namespace, name)
+	repo, err := c.repoStore.FindByPath(ctx, repoType, namespace, name)
 	if err != nil {
 		return fmt.Errorf("failed to find %s, error: %w", repoType, err)
 	}
 
-	err = c.repo.UpdateRepoFileDownloads(ctx, repo, time.Now(), 1)
+	err = c.repoStore.UpdateRepoFileDownloads(ctx, repo, time.Now(), 1)
 	if err != nil {
 		return fmt.Errorf("failed to incr download count, error: %w", err)
 	}
@@ -1334,7 +1335,7 @@ func (c *repoComponentImpl) IncrDownloads(ctx context.Context, repoType types.Re
 }
 
 func (c *repoComponentImpl) FileInfo(ctx context.Context, req *types.GetFileReq) (*types.File, error) {
-	repo, err := c.repo.FindByPath(ctx, req.RepoType, req.Namespace, req.Name)
+	repo, err := c.repoStore.FindByPath(ctx, req.RepoType, req.Namespace, req.Name)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find repo, error: %w", err)
 	}
@@ -1352,7 +1353,7 @@ func (c *repoComponentImpl) FileInfo(ctx context.Context, req *types.GetFileReq)
 	}
 
 	if repo.Source != types.LocalSource && strings.ToLower(req.Path) == "readme.md" {
-		_, err := c.mirror.FindByRepoID(ctx, repo.ID)
+		_, err := c.mirrorStore.FindByRepoID(ctx, repo.ID)
 		if err != nil {
 			if errors.Is(err, sql.ErrNoRows) {
 				content := base64.StdEncoding.EncodeToString([]byte(repo.Readme))
@@ -1410,7 +1411,7 @@ func (c *repoComponentImpl) AllowReadAccessRepo(ctx context.Context, repo *datab
 }
 
 func (c *repoComponentImpl) AllowReadAccess(ctx context.Context, repoType types.RepositoryType, namespace, name, username string) (bool, error) {
-	repo, err := c.repo.FindByPath(ctx, repoType, namespace, name)
+	repo, err := c.repoStore.FindByPath(ctx, repoType, namespace, name)
 	if err != nil {
 		return false, fmt.Errorf("failed to find repo, error: %w", err)
 	}
@@ -1418,7 +1419,7 @@ func (c *repoComponentImpl) AllowReadAccess(ctx context.Context, repoType types.
 }
 
 func (c *repoComponentImpl) AllowWriteAccess(ctx context.Context, repoType types.RepositoryType, namespace, name, username string) (bool, error) {
-	repo, err := c.repo.FindByPath(ctx, repoType, namespace, name)
+	repo, err := c.repoStore.FindByPath(ctx, repoType, namespace, name)
 	if err != nil {
 		return false, fmt.Errorf("failed to find repo, error: %w", err)
 	}
@@ -1434,7 +1435,7 @@ func (c *repoComponentImpl) AllowWriteAccess(ctx context.Context, repoType types
 }
 
 func (c *repoComponentImpl) AllowAdminAccess(ctx context.Context, repoType types.RepositoryType, namespace, name, username string) (bool, error) {
-	repo, err := c.repo.FindByPath(ctx, repoType, namespace, name)
+	repo, err := c.repoStore.FindByPath(ctx, repoType, namespace, name)
 	if err != nil {
 		return false, fmt.Errorf("failed to find repo, error: %w", err)
 	}
@@ -1456,7 +1457,7 @@ func (c *repoComponentImpl) GetUserRepoPermission(ctx context.Context, userName 
 	}
 
 	namespace, _ := repo.NamespaceAndName()
-	ns, err := c.namespace.FindByPath(ctx, namespace)
+	ns, err := c.namespaceStore.FindByPath(ctx, namespace)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find namespace '%s' when get user repo permission, error: %w", namespace, err)
 	}
@@ -1490,7 +1491,7 @@ func (c *repoComponentImpl) GetUserRepoPermission(ctx context.Context, userName 
 }
 
 func (c *repoComponentImpl) CheckCurrentUserPermission(ctx context.Context, userName string, namespace string, role membership.Role) (bool, error) {
-	ns, err := c.namespace.FindByPath(ctx, namespace)
+	ns, err := c.namespaceStore.FindByPath(ctx, namespace)
 	if err != nil {
 		return false, err
 	}
@@ -1520,7 +1521,7 @@ func (c *repoComponentImpl) GetCommitWithDiff(ctx context.Context, req *types.Ge
 	if req.Ref == "" {
 		return nil, fmt.Errorf("failed to find request commit id")
 	}
-	repo, err := c.repo.FindByPath(ctx, req.RepoType, req.Namespace, req.Name)
+	repo, err := c.repoStore.FindByPath(ctx, req.RepoType, req.Namespace, req.Name)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find repo, error: %w", err)
 	}
@@ -1560,18 +1561,18 @@ func (c *repoComponentImpl) CreateMirror(ctx context.Context, req types.CreateMi
 		return nil, fmt.Errorf("users do not have permission to create mirror for this repo")
 	}
 
-	repo, err := c.repo.FindByPath(ctx, req.RepoType, req.Namespace, req.Name)
+	repo, err := c.repoStore.FindByPath(ctx, req.RepoType, req.Namespace, req.Name)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find repo, error: %w", err)
 	}
-	exists, err := c.mirror.IsExist(ctx, repo.ID)
+	exists, err := c.mirrorStore.IsExist(ctx, repo.ID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find mirror, error: %w", err)
 	}
 	if exists {
 		return nil, fmt.Errorf("mirror already exists")
 	}
-	mirrorSource, err := c.mirrorSource.Get(ctx, req.MirrorSourceID)
+	mirrorSource, err := c.mirrorSourceStore.Get(ctx, req.MirrorSourceID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get mirror source, err: %w, id: %d", err, req.MirrorSourceID)
 	}
@@ -1623,7 +1624,7 @@ func (c *repoComponentImpl) CreateMirror(ctx context.Context, req types.CreateMi
 
 	mirror.MirrorTaskID = taskId
 
-	reqMirror, err := c.mirror.Create(ctx, &mirror)
+	reqMirror, err := c.mirrorStore.Create(ctx, &mirror)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create mirror")
 	}
@@ -1635,7 +1636,7 @@ func (c *repoComponentImpl) CreateMirror(ctx context.Context, req types.CreateMi
 			CreatedAt: mirror.CreatedAt.Unix(),
 		})
 		reqMirror.Status = types.MirrorWaiting
-		err = c.mirror.Update(ctx, reqMirror)
+		err = c.mirrorStore.Update(ctx, reqMirror)
 		if err != nil {
 			return nil, fmt.Errorf("failed to update mirror status: %v", err)
 		}
@@ -1645,11 +1646,11 @@ func (c *repoComponentImpl) CreateMirror(ctx context.Context, req types.CreateMi
 }
 
 func (c *repoComponentImpl) MirrorFromSaas(ctx context.Context, namespace, name, currentUser string, repoType types.RepositoryType) error {
-	repo, err := c.repo.FindByPath(ctx, repoType, namespace, name)
+	repo, err := c.repoStore.FindByPath(ctx, repoType, namespace, name)
 	if err != nil {
 		return fmt.Errorf("failed to find repo, error: %w", err)
 	}
-	m, err := c.mirror.FindByRepoID(ctx, repo.ID)
+	m, err := c.mirrorStore.FindByRepoID(ctx, repo.ID)
 	if err != nil {
 		if !errors.Is(err, sql.ErrNoRows) {
 			return fmt.Errorf("failed to find mirror, error: %w", err)
@@ -1663,7 +1664,7 @@ func (c *repoComponentImpl) MirrorFromSaas(ctx context.Context, namespace, name,
 		return nil
 	}
 	var mirror database.Mirror
-	syncVersion, err := c.syncVersion.FindByRepoTypeAndPath(ctx, repo.PathWithOutPrefix(), repoType)
+	syncVersion, err := c.syncVersionStore.FindByRepoTypeAndPath(ctx, repo.PathWithOutPrefix(), repoType)
 	if err != nil {
 		return fmt.Errorf("failed to find sync version, error: %w", err)
 	}
@@ -1675,7 +1676,7 @@ func (c *repoComponentImpl) MirrorFromSaas(ctx context.Context, namespace, name,
 	}
 
 	mirrorSource.SourceName = types.OpenCSGPrefix
-	syncClientSetting, err := c.syncClientSetting.First(ctx)
+	syncClientSetting, err := c.syncClientSettingStore.First(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to find sync client setting, error: %w", err)
 	}
@@ -1702,7 +1703,7 @@ func (c *repoComponentImpl) MirrorFromSaas(ctx context.Context, namespace, name,
 
 	mirror.MirrorTaskID = taskId
 
-	_, err = c.mirror.Create(ctx, &mirror)
+	_, err = c.mirrorStore.Create(ctx, &mirror)
 
 	if err != nil {
 		return fmt.Errorf("failed to create mirror")
@@ -1720,7 +1721,7 @@ func (c *repoComponentImpl) MirrorFromSaas(ctx context.Context, namespace, name,
 		repo.SyncStatus = types.SyncStatusInProgress
 	}
 
-	_, err = c.repo.UpdateRepo(ctx, *repo)
+	_, err = c.repoStore.UpdateRepo(ctx, *repo)
 	if err != nil {
 		return fmt.Errorf("failed to update repo sync status: %w", err)
 	}
@@ -1729,11 +1730,11 @@ func (c *repoComponentImpl) MirrorFromSaas(ctx context.Context, namespace, name,
 
 func (c *repoComponentImpl) mirrorFromSaasSync(ctx context.Context, mirror *database.Mirror, namespace, name string, repoType types.RepositoryType) error {
 	var err error
-	syncClientSetting, err := c.syncClientSetting.First(ctx)
+	syncClientSetting, err := c.syncClientSettingStore.First(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to find sync client setting, error: %w", err)
 	}
-	repo, err := c.repo.FindById(ctx, mirror.RepositoryID)
+	repo, err := c.repoStore.FindById(ctx, mirror.RepositoryID)
 	if err != nil {
 		return fmt.Errorf("failed to find repo, error: %w", err)
 	}
@@ -1758,7 +1759,7 @@ func (c *repoComponentImpl) mirrorFromSaasSync(ctx context.Context, mirror *data
 		repo.SyncStatus = types.SyncStatusPending
 	}
 
-	_, err = c.repo.UpdateRepo(ctx, *repo)
+	_, err = c.repoStore.UpdateRepo(ctx, *repo)
 	if err != nil {
 		return fmt.Errorf("failed to update repo sync status: %w", err)
 	}
@@ -1774,11 +1775,11 @@ func (c *repoComponentImpl) GetMirror(ctx context.Context, req types.GetMirrorRe
 	if !admin {
 		return nil, fmt.Errorf("users do not have permission to get mirror for this repo")
 	}
-	repo, err := c.repo.FindByPath(ctx, req.RepoType, req.Namespace, req.Name)
+	repo, err := c.repoStore.FindByPath(ctx, req.RepoType, req.Namespace, req.Name)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find repo, error: %w", err)
 	}
-	mirror, err := c.mirror.FindByRepoID(ctx, repo.ID)
+	mirror, err := c.mirrorStore.FindByRepoID(ctx, repo.ID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find mirror, error: %w", err)
 	}
@@ -1794,15 +1795,15 @@ func (c *repoComponentImpl) UpdateMirror(ctx context.Context, req types.UpdateMi
 	if !admin {
 		return nil, fmt.Errorf("users do not have permission to update mirror for this repo")
 	}
-	repo, err := c.repo.FindByPath(ctx, req.RepoType, req.Namespace, req.Name)
+	repo, err := c.repoStore.FindByPath(ctx, req.RepoType, req.Namespace, req.Name)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find repo, error: %w", err)
 	}
-	mirror, err := c.mirror.FindByRepoID(ctx, repo.ID)
+	mirror, err := c.mirrorStore.FindByRepoID(ctx, repo.ID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find mirror, error: %w", err)
 	}
-	mirrorSource, err := c.mirrorSource.Get(ctx, req.MirrorSourceID)
+	mirrorSource, err := c.mirrorSourceStore.Get(ctx, req.MirrorSourceID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get mirror source, err: %w, id: %d", err, req.MirrorSourceID)
 	}
@@ -1822,7 +1823,7 @@ func (c *repoComponentImpl) UpdateMirror(ctx context.Context, req types.UpdateMi
 	mirror.PushAccessToken = pushAccessToken.Token
 	mirror.SourceRepoPath = req.SourceRepoPath
 	mirror.LocalRepoPath = fmt.Sprintf("%s_%s_%s_%s", mirrorSource.SourceName, req.RepoType, req.Namespace, req.Name)
-	err = c.mirror.Update(ctx, mirror)
+	err = c.mirrorStore.Update(ctx, mirror)
 	if err != nil {
 		return nil, fmt.Errorf("failed to update mirror, error: %w", err)
 	}
@@ -1838,15 +1839,15 @@ func (c *repoComponentImpl) DeleteMirror(ctx context.Context, req types.DeleteMi
 	if !admin {
 		return fmt.Errorf("users do not have permission to delete mirror for this repo")
 	}
-	repo, err := c.repo.FindByPath(ctx, req.RepoType, req.Namespace, req.Name)
+	repo, err := c.repoStore.FindByPath(ctx, req.RepoType, req.Namespace, req.Name)
 	if err != nil {
 		return fmt.Errorf("failed to find repo, error: %w", err)
 	}
-	mirror, err := c.mirror.FindByRepoID(ctx, repo.ID)
+	mirror, err := c.mirrorStore.FindByRepoID(ctx, repo.ID)
 	if err != nil {
 		return fmt.Errorf("failed to find mirror, error: %w", err)
 	}
-	err = c.mirror.Delete(ctx, mirror)
+	err = c.mirrorStore.Delete(ctx, mirror)
 	if err != nil {
 		return fmt.Errorf("failed to delete mirror, error: %w", err)
 	}
@@ -1855,7 +1856,7 @@ func (c *repoComponentImpl) DeleteMirror(ctx context.Context, req types.DeleteMi
 
 // get runtime framework list with type
 func (c *repoComponentImpl) ListRuntimeFrameworkWithType(ctx context.Context, deployType int) ([]types.RuntimeFramework, error) {
-	frames, err := c.runFrame.List(ctx, deployType)
+	frames, err := c.runtimeFrameworksStore.List(ctx, deployType)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list runtime frameworks, error: %w", err)
 	}
@@ -1877,11 +1878,11 @@ func (c *repoComponentImpl) ListRuntimeFrameworkWithType(ctx context.Context, de
 
 // get runtime framework list
 func (c *repoComponentImpl) ListRuntimeFramework(ctx context.Context, repoType types.RepositoryType, namespace, name string, deployType int) ([]types.RuntimeFramework, error) {
-	repo, err := c.repo.FindByPath(ctx, repoType, namespace, name)
+	repo, err := c.repoStore.FindByPath(ctx, repoType, namespace, name)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find repo, error: %w", err)
 	}
-	frames, err := c.runFrame.ListByRepoID(ctx, repo.ID, deployType)
+	frames, err := c.runtimeFrameworksStore.ListByRepoID(ctx, repo.ID, deployType)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list runtime frameworks, error: %w", err)
 	}
@@ -1912,7 +1913,7 @@ func (c *repoComponentImpl) CreateRuntimeFramework(ctx context.Context, req *typ
 		ContainerPort: req.ContainerPort,
 		Type:          req.Type,
 	}
-	err := c.runFrame.Add(ctx, newFrame)
+	err := c.runtimeFrameworksStore.Add(ctx, newFrame)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create runtime framework, error: %w", err)
 	}
@@ -1939,7 +1940,7 @@ func (c *repoComponentImpl) UpdateRuntimeFramework(ctx context.Context, id int64
 		ContainerPort: req.ContainerPort,
 		Type:          req.Type,
 	}
-	frame, err := c.runFrame.Update(ctx, newFrame)
+	frame, err := c.runtimeFrameworksStore.Update(ctx, newFrame)
 	if err != nil {
 		return nil, fmt.Errorf("failed to update runtime frameworks, error: %w", err)
 	}
@@ -1956,20 +1957,20 @@ func (c *repoComponentImpl) UpdateRuntimeFramework(ctx context.Context, id int64
 }
 
 func (c *repoComponentImpl) DeleteRuntimeFramework(ctx context.Context, id int64) error {
-	frame, err := c.runFrame.FindByID(ctx, id)
+	frame, err := c.runtimeFrameworksStore.FindByID(ctx, id)
 	if err != nil {
 		return fmt.Errorf("failed to find runtime frameworks, error: %w", err)
 	}
-	err = c.runFrame.Delete(ctx, *frame)
+	err = c.runtimeFrameworksStore.Delete(ctx, *frame)
 	return err
 }
 
 func (c *repoComponentImpl) ListDeploy(ctx context.Context, repoType types.RepositoryType, namespace, name, currentUser string) ([]types.DeployRepo, error) {
-	user, err := c.user.FindByUsername(ctx, currentUser)
+	user, err := c.userStore.FindByUsername(ctx, currentUser)
 	if err != nil {
 		return nil, errors.New("user does not exist")
 	}
-	repo, err := c.repo.FindByPath(ctx, repoType, namespace, name)
+	repo, err := c.repoStore.FindByPath(ctx, repoType, namespace, name)
 	if err != nil {
 		slog.Error("Failed to query deploy", slog.Any("error", err), slog.Any("repotype", repoType), slog.Any("namespace", namespace), slog.Any("name", name))
 		return nil, errors.New("invalid repository for query parameters")
@@ -1978,7 +1979,7 @@ func (c *repoComponentImpl) ListDeploy(ctx context.Context, repoType types.Repos
 		slog.Error("nothing found for deploys", slog.Any("repotype", repoType), slog.Any("namespace", namespace), slog.Any("name", name))
 		return nil, errors.New("nothing found for deploys")
 	}
-	deploys, err := c.deploy.ListDeploy(ctx, repoType, repo.ID, user.ID)
+	deploys, err := c.deployTaskStore.ListDeploy(ctx, repoType, repo.ID, user.ID)
 	if err != nil {
 		return nil, errors.New("fail to list user deploys")
 	}
@@ -2039,7 +2040,7 @@ func (c *repoComponentImpl) DeleteDeploy(ctx context.Context, delReq types.Deplo
 	}
 
 	// update database deploy
-	err = c.deploy.DeleteDeploy(ctx, types.RepositoryType(delReq.RepoType), deploy.RepoID, user.ID, delReq.DeployID)
+	err = c.deployTaskStore.DeleteDeploy(ctx, types.RepositoryType(delReq.RepoType), deploy.RepoID, user.ID, delReq.DeployID)
 	if err != nil {
 		return fmt.Errorf("fail to remove deploy instance, %w", err)
 	}
@@ -2061,7 +2062,7 @@ func (c *repoComponentImpl) DeployDetail(ctx context.Context, detailReq types.De
 		return nil, err
 	}
 
-	endpoint, _ := c.generateEndpoint(ctx, deploy)
+	endpoint, _ := c.GenerateEndpoint(ctx, deploy)
 
 	req := types.DeployRepo{
 		DeployID:  deploy.ID,
@@ -2116,7 +2117,7 @@ func (c *repoComponentImpl) DeployDetail(ctx context.Context, detailReq types.De
 }
 
 // generate endpoint
-func (c *repoComponentImpl) generateEndpoint(ctx context.Context, deploy *database.Deploy) (string, string) {
+func (c *repoComponentImpl) GenerateEndpoint(ctx context.Context, deploy *database.Deploy) (string, string) {
 	var endpoint string
 	provider := ""
 	cls, err := c.cluster.ByClusterID(ctx, deploy.ClusterID)
@@ -2221,7 +2222,7 @@ func (c *repoComponentImpl) DeployInstanceLogs(ctx context.Context, logReq types
 
 // check access repo permission by repo id
 func (c *repoComponentImpl) AllowAccessByRepoID(ctx context.Context, repoID int64, username string) (bool, error) {
-	r, err := c.repo.FindById(ctx, repoID)
+	r, err := c.repoStore.FindById(ctx, repoID)
 	if err != nil {
 		return false, fmt.Errorf("failed to get repository by repo_id: %d, %w", repoID, err)
 	}
@@ -2243,14 +2244,14 @@ func (c *repoComponentImpl) AllowAccessEndpoint(ctx context.Context, currentUser
 
 // check access deploy permission
 func (c *repoComponentImpl) AllowAccessDeploy(ctx context.Context, req types.DeployActReq) (bool, error) {
-	repo, err := c.repo.FindByPath(ctx, req.RepoType, req.Namespace, req.Name)
+	repo, err := c.repoStore.FindByPath(ctx, req.RepoType, req.Namespace, req.Name)
 	if err != nil {
 		return false, fmt.Errorf("failed to find repo, error: %w", err)
 	}
 	if repo == nil {
 		return false, fmt.Errorf("failed to find %s repo %s/%s", req.RepoType, req.Namespace, req.Name)
 	}
-	deploy, err := c.deploy.GetDeployByID(ctx, req.DeployID)
+	deploy, err := c.deployTaskStore.GetDeployByID(ctx, req.DeployID)
 	if err != nil {
 		return false, err
 	}
@@ -2266,7 +2267,7 @@ func (c *repoComponentImpl) AllowAccessDeploy(ctx context.Context, req types.Dep
 
 // common check function for apiserver and rproxy
 func (c *repoComponentImpl) checkAccessDeployForUser(ctx context.Context, repoID int64, currentUser string, deploy *database.Deploy) (bool, error) {
-	user, err := c.user.FindByUsername(ctx, currentUser)
+	user, err := c.userStore.FindByUsername(ctx, currentUser)
 	if err != nil {
 		return false, errors.New("user does not exist")
 	}
@@ -2282,11 +2283,11 @@ func (c *repoComponentImpl) checkAccessDeployForUser(ctx context.Context, repoID
 }
 
 func (c *repoComponentImpl) checkAccessDeployForServerless(ctx context.Context, repoID int64, currentUser string, deploy *database.Deploy) (bool, error) {
-	user, err := c.user.FindByUsername(ctx, currentUser)
+	user, err := c.userStore.FindByUsername(ctx, currentUser)
 	if err != nil {
 		return false, fmt.Errorf("user %s does not exist", currentUser)
 	}
-	isAdmin := c.isAdminRole(user)
+	isAdmin := c.IsAdminRole(user)
 	if !isAdmin {
 		return false, errors.New("need admin permission to see Serverless deploy instances")
 	}
@@ -2339,7 +2340,7 @@ func (c *repoComponentImpl) DeployStop(ctx context.Context, stopReq types.Deploy
 	}
 
 	// update database deploy to stopped
-	err = c.deploy.StopDeploy(ctx, stopReq.RepoType, deploy.RepoID, user.ID, stopReq.DeployID)
+	err = c.deployTaskStore.StopDeploy(ctx, stopReq.RepoType, deploy.RepoID, user.ID, stopReq.DeployID)
 	if err != nil {
 		return fmt.Errorf("fail to stop deploy instance, %w", err)
 	}
@@ -2348,15 +2349,15 @@ func (c *repoComponentImpl) DeployStop(ctx context.Context, stopReq types.Deploy
 }
 
 func (c *repoComponentImpl) AllowReadAccessByDeployID(ctx context.Context, repoType types.RepositoryType, namespace, name, currentUser string, deployID int64) (bool, error) {
-	user, err := c.user.FindByUsername(ctx, currentUser)
+	user, err := c.userStore.FindByUsername(ctx, currentUser)
 	if err != nil {
 		return false, errors.New("user does not exist")
 	}
-	repo, err := c.repo.FindByPath(ctx, repoType, namespace, name)
+	repo, err := c.repoStore.FindByPath(ctx, repoType, namespace, name)
 	if err != nil {
 		return false, fmt.Errorf("failed to find repo, error: %w", err)
 	}
-	deploy, err := c.deploy.GetDeployByID(ctx, deployID)
+	deploy, err := c.deployTaskStore.GetDeployByID(ctx, deployID)
 	if err != nil {
 		return false, err
 	}
@@ -2373,7 +2374,7 @@ func (c *repoComponentImpl) AllowReadAccessByDeployID(ctx context.Context, repoT
 }
 
 func (c *repoComponentImpl) DeployStatus(ctx context.Context, repoType types.RepositoryType, namespace, name string, deployID int64) (string, string, []types.Instance, error) {
-	deploy, err := c.deploy.GetDeployByID(ctx, deployID)
+	deploy, err := c.deployTaskStore.GetDeployByID(ctx, deployID)
 	if err != nil {
 		return "", SpaceStatusStopped, nil, err
 	}
@@ -2395,7 +2396,7 @@ func (c *repoComponentImpl) DeployStatus(ctx context.Context, repoType types.Rep
 }
 
 func (c *repoComponentImpl) GetDeployBySvcName(ctx context.Context, svcName string) (*database.Deploy, error) {
-	d, err := c.deploy.GetDeployBySvcName(ctx, svcName)
+	d, err := c.deployTaskStore.GetDeployBySvcName(ctx, svcName)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get deploy by svc name:%s, %w", svcName, err)
 	}
@@ -2414,11 +2415,11 @@ func (c *repoComponentImpl) SyncMirror(ctx context.Context, repoType types.Repos
 	if !admin {
 		return fmt.Errorf("users do not have permission to delete mirror for this repo")
 	}
-	repo, err := c.repo.FindByPath(ctx, repoType, namespace, name)
+	repo, err := c.repoStore.FindByPath(ctx, repoType, namespace, name)
 	if err != nil {
 		return fmt.Errorf("failed to find repo, error: %w", err)
 	}
-	mirror, err := c.mirror.FindByRepoID(ctx, repo.ID)
+	mirror, err := c.mirrorStore.FindByRepoID(ctx, repo.ID)
 	if err != nil {
 		return fmt.Errorf("failed to find mirror, error: %w", err)
 	}
@@ -2438,7 +2439,7 @@ func (c *repoComponentImpl) SyncMirror(ctx context.Context, repoType types.Repos
 			CreatedAt: mirror.CreatedAt.Unix(),
 		})
 		mirror.Status = types.MirrorWaiting
-		err = c.mirror.Update(ctx, mirror)
+		err = c.mirrorStore.Update(ctx, mirror)
 		if err != nil {
 			return fmt.Errorf("failed to update mirror status: %v", err)
 		}
@@ -2448,11 +2449,11 @@ func (c *repoComponentImpl) SyncMirror(ctx context.Context, repoType types.Repos
 }
 
 func (c *repoComponentImpl) checkDeployPermissionForUser(ctx context.Context, deployReq types.DeployActReq) (*database.User, *database.Deploy, error) {
-	user, err := c.user.FindByUsername(ctx, deployReq.CurrentUser)
+	user, err := c.userStore.FindByUsername(ctx, deployReq.CurrentUser)
 	if err != nil {
 		return nil, nil, &types.PermissionError{Message: "user does not exist"}
 	}
-	deploy, err := c.deploy.GetDeployByID(ctx, deployReq.DeployID)
+	deploy, err := c.deployTaskStore.GetDeployByID(ctx, deployReq.DeployID)
 	if err != nil {
 		return nil, nil, fmt.Errorf("fail to get user deploy %v, %w", deployReq.DeployID, err)
 	}
@@ -2466,15 +2467,15 @@ func (c *repoComponentImpl) checkDeployPermissionForUser(ctx context.Context, de
 }
 
 func (c *repoComponentImpl) checkDeployPermissionForServerless(ctx context.Context, deployReq types.DeployActReq) (*database.User, *database.Deploy, error) {
-	user, err := c.user.FindByUsername(ctx, deployReq.CurrentUser)
+	user, err := c.userStore.FindByUsername(ctx, deployReq.CurrentUser)
 	if err != nil {
 		return nil, nil, fmt.Errorf("user does not exist, %w", err)
 	}
-	isAdmin := c.isAdminRole(user)
+	isAdmin := c.IsAdminRole(user)
 	if !isAdmin {
 		return nil, nil, fmt.Errorf("need admin permission for Serverless deploy")
 	}
-	deploy, err := c.deploy.GetDeployByID(ctx, deployReq.DeployID)
+	deploy, err := c.deployTaskStore.GetDeployByID(ctx, deployReq.DeployID)
 	if err != nil {
 		return nil, nil, fmt.Errorf("fail to get serverless deploy:%v, %w", deployReq.DeployID, err)
 	}
@@ -2499,7 +2500,7 @@ func (c *repoComponentImpl) DeployUpdate(ctx context.Context, updateReq types.De
 	}
 	// check user balance if resource changed
 	if req.ResourceID != nil {
-		frame, err := c.rtfm.FindEnabledByName(ctx, deploy.RuntimeFramework)
+		frame, err := c.runtimeFrameworksStore.FindEnabledByName(ctx, deploy.RuntimeFramework)
 		if err != nil {
 			return fmt.Errorf("cannot find available runtime framework, %w", err)
 		}
@@ -2583,7 +2584,7 @@ func (c *repoComponentImpl) DeployStart(ctx context.Context, startReq types.Depl
 }
 
 func (c *repoComponentImpl) AllFiles(ctx context.Context, req types.GetAllFilesReq) ([]*types.File, error) {
-	repo, err := c.repo.FindByPath(ctx, req.RepoType, req.Namespace, req.Name)
+	repo, err := c.repoStore.FindByPath(ctx, req.RepoType, req.Namespace, req.Name)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find repo, error: %w", err)
 	}
@@ -2608,7 +2609,7 @@ func (c *repoComponentImpl) AllFiles(ctx context.Context, req types.GetAllFilesR
 	return allFiles, nil
 }
 
-func (c *repoComponentImpl) isAdminRole(user database.User) bool {
+func (c *repoComponentImpl) IsAdminRole(user database.User) bool {
 	slog.Debug("Check if user is admin", slog.Any("user", user))
 	return user.CanAdmin()
 }

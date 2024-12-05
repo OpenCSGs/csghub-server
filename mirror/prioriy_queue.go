@@ -12,7 +12,7 @@ import (
 )
 
 type MirrorPriorityQueue struct {
-	mq         *queue.PriorityQueue
+	mq         queue.PriorityQueue
 	tasks      chan queue.MirrorTask
 	numWorkers int
 }

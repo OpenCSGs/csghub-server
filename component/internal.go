@@ -50,7 +50,7 @@ func (c *internalComponentImpl) Allowed(ctx context.Context) (bool, error) {
 }
 
 func (c *internalComponentImpl) SSHAllowed(ctx context.Context, req types.SSHAllowedReq) (*types.SSHAllowedResp, error) {
-	namespace, err := c.namespace.FindByPath(ctx, req.Namespace)
+	namespace, err := c.namespaceStore.FindByPath(ctx, req.Namespace)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find namespace %s: %v", req.Namespace, err)
 	}

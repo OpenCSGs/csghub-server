@@ -14,47 +14,15 @@ import (
 	"github.com/spf13/cast"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
-	gsmock "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/git/gitserver"
-	urpc_mock "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/rpc"
-	component_mock "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/component"
 	"opencsg.com/csghub-server/builder/git/gitserver"
 	"opencsg.com/csghub-server/builder/git/membership"
-	"opencsg.com/csghub-server/builder/llm"
-	"opencsg.com/csghub-server/builder/rpc"
 	"opencsg.com/csghub-server/builder/store/database"
-	"opencsg.com/csghub-server/common/config"
-	"opencsg.com/csghub-server/common/tests"
 	"opencsg.com/csghub-server/common/types"
 )
 
-func NewTestPromptComponent(stores *tests.MockStores, rpcUser rpc.UserSvcClient, gitServer gitserver.GitServer) *promptComponentImpl {
-	cfg := &config.Config{}
-	cfg.APIServer.PublicDomain = "https://foo.com"
-	cfg.APIServer.SSHDomain = "ssh://test@127.0.0.1"
-	return &promptComponentImpl{
-		userStore:         stores.User,
-		userLikeStore:     stores.UserLikes,
-		promptConvStore:   stores.PromptConversation,
-		promptPrefixStore: stores.PromptPrefix,
-		llmConfigStore:    stores.LLMConfig,
-		promptStore:       stores.Prompt,
-		namespaceStore:    stores.Namespace,
-		userSvcClient:     rpcUser,
-		gitServer:         gitServer,
-		repoStore:         stores.Repo,
-		llmClient:         llm.NewClient(),
-		config:            cfg,
-	}
-}
-
 func TestPromptComponent_CheckPermission(t *testing.T) {
-	stores := tests.NewMockStores(t)
-	gitServer := gsmock.NewMockGitServer(t)
-	rpcUser := urpc_mock.NewMockUserSvcClient(t)
-	pc := NewTestPromptComponent(stores, rpcUser, gitServer)
-	mockedRepoComponent := component_mock.NewMockRepoComponent(t)
-	pc.repoComponent = mockedRepoComponent
 	ctx := context.TODO()
+	pc := initializeTestPromptComponent(ctx, t)
 
 	req := types.PromptReq{
 		Path:        "p",
@@ -63,101 +31,96 @@ func TestPromptComponent_CheckPermission(t *testing.T) {
 		CurrentUser: "foo",
 	}
 
-	stores.NamespaceMock().EXPECT().FindByPath(ctx, "ns").Return(database.Namespace{}, errors.New("")).Once()
+	pc.mocks.stores.NamespaceMock().EXPECT().FindByPath(ctx, "ns").Return(database.Namespace{}, errors.New("")).Once()
 	_, err := pc.checkPromptRepoPermission(ctx, req)
 	require.Contains(t, err.Error(), "namespace does not exist")
 
-	stores.NamespaceMock().EXPECT().FindByPath(ctx, "ns").Return(database.Namespace{}, nil).Once()
-	stores.UserMock().EXPECT().FindByUsername(ctx, "foo").Return(database.User{}, errors.New("")).Once()
+	pc.mocks.stores.NamespaceMock().EXPECT().FindByPath(ctx, "ns").Return(database.Namespace{}, nil).Once()
+	pc.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "foo").Return(database.User{}, errors.New("")).Once()
 	_, err = pc.checkPromptRepoPermission(ctx, req)
 	require.Contains(t, err.Error(), "user does not exist")
 
-	stores.NamespaceMock().EXPECT().FindByPath(ctx, "ns").Return(database.Namespace{
+	pc.mocks.stores.NamespaceMock().EXPECT().FindByPath(ctx, "ns").Return(database.Namespace{
 		NamespaceType: database.UserNamespace,
 		Path:          "zzz",
 	}, nil).Once()
-	stores.UserMock().EXPECT().FindByUsername(ctx, "foo").Return(database.User{
+	pc.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "foo").Return(database.User{
 		RoleMask: "foo",
 		Username: "zzz",
 	}, nil).Once()
 	_, err = pc.checkPromptRepoPermission(ctx, req)
 	require.Nil(t, err)
 
-	stores.NamespaceMock().EXPECT().FindByPath(ctx, "ns").Return(database.Namespace{
+	pc.mocks.stores.NamespaceMock().EXPECT().FindByPath(ctx, "ns").Return(database.Namespace{
 		NamespaceType: database.UserNamespace,
 		Path:          "uuu",
 	}, nil).Once()
-	stores.UserMock().EXPECT().FindByUsername(ctx, "foo").Return(database.User{
+	pc.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "foo").Return(database.User{
 		RoleMask: "foo",
 		Username: "vvv",
 	}, nil).Once()
 	_, err = pc.checkPromptRepoPermission(ctx, req)
 	require.Contains(t, err.Error(), "user do not have permission")
 
-	stores.NamespaceMock().EXPECT().FindByPath(ctx, "ns").Return(database.Namespace{
+	pc.mocks.stores.NamespaceMock().EXPECT().FindByPath(ctx, "ns").Return(database.Namespace{
 		NamespaceType: database.UserNamespace,
 		Path:          "uuu",
 	}, nil).Once()
-	stores.UserMock().EXPECT().FindByUsername(ctx, "foo").Return(database.User{
+	pc.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "foo").Return(database.User{
 		RoleMask: "foo",
 		Username: "uuu",
 	}, nil).Once()
 	_, err = pc.checkPromptRepoPermission(ctx, req)
 	require.Nil(t, err)
 
-	stores.NamespaceMock().EXPECT().FindByPath(ctx, "ns").Return(database.Namespace{
+	pc.mocks.stores.NamespaceMock().EXPECT().FindByPath(ctx, "ns").Return(database.Namespace{
 		NamespaceType: database.OrgNamespace,
 	}, nil).Once()
-	stores.UserMock().EXPECT().FindByUsername(ctx, "foo").Return(database.User{
+	pc.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "foo").Return(database.User{
 		RoleMask: "super-admin",
 	}, nil).Once()
 	_, err = pc.checkPromptRepoPermission(ctx, req)
 	require.Nil(t, err)
 
 	// no write role
-	stores.NamespaceMock().EXPECT().FindByPath(ctx, "ns").Return(database.Namespace{
+	pc.mocks.stores.NamespaceMock().EXPECT().FindByPath(ctx, "ns").Return(database.Namespace{
 		NamespaceType: database.OrgNamespace,
 	}, nil).Once()
-	stores.UserMock().EXPECT().FindByUsername(ctx, "foo").Return(database.User{
+	pc.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "foo").Return(database.User{
 		RoleMask: "person",
 	}, nil).Once()
-	mockedRepoComponent.EXPECT().CheckCurrentUserPermission(ctx, "foo", "ns", membership.RoleWrite).Return(false, nil).Once()
+	pc.mocks.components.repo.EXPECT().CheckCurrentUserPermission(ctx, "foo", "ns", membership.RoleWrite).Return(false, nil).Once()
 	_, err = pc.checkPromptRepoPermission(ctx, req)
 	require.Contains(t, err.Error(), "user do not have permission")
 
 	// has write role
-	stores.NamespaceMock().EXPECT().FindByPath(ctx, "ns").Return(database.Namespace{
+	pc.mocks.stores.NamespaceMock().EXPECT().FindByPath(ctx, "ns").Return(database.Namespace{
 		NamespaceType: database.OrgNamespace,
 	}, nil).Once()
-	stores.UserMock().EXPECT().FindByUsername(ctx, "foo").Return(database.User{
+	pc.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "foo").Return(database.User{
 		RoleMask: "person",
 	}, nil).Once()
-	mockedRepoComponent.EXPECT().CheckCurrentUserPermission(ctx, "foo", "ns", membership.RoleWrite).Return(true, nil).Once()
+	pc.mocks.components.repo.EXPECT().CheckCurrentUserPermission(ctx, "foo", "ns", membership.RoleWrite).Return(true, nil).Once()
 	_, err = pc.checkPromptRepoPermission(ctx, req)
 	require.Nil(t, err)
 }
 
 func TestPromptComponent_CreatePrompt(t *testing.T) {
-	stores := tests.NewMockStores(t)
-	gitServer := gsmock.NewMockGitServer(t)
-	rpcUser := urpc_mock.NewMockUserSvcClient(t)
-	pc := NewTestPromptComponent(stores, rpcUser, gitServer)
-	mockedRepoComponent := component_mock.NewMockRepoComponent(t)
-	pc.repoComponent = mockedRepoComponent
 	ctx := context.TODO()
+	pc := initializeTestPromptComponent(ctx, t)
 
 	for _, exist := range []bool{true, false} {
 		t.Run(fmt.Sprintf("file exist: %v", exist), func(t *testing.T) {
 
-			stores.NamespaceMock().EXPECT().FindByPath(ctx, "ns").Return(database.Namespace{
+			pc.mocks.stores.NamespaceMock().EXPECT().FindByPath(ctx, "ns").Return(database.Namespace{
 				NamespaceType: database.OrgNamespace,
 			}, nil).Once()
-			stores.UserMock().EXPECT().FindByUsername(ctx, "foo").Return(database.User{
+			pc.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "foo").Return(database.User{
 				RoleMask: "foo-admin",
 				Email:    "foo@bar.com",
 			}, nil).Once()
 			if exist {
-				gitServer.EXPECT().GetRepoFileRaw(ctx, gitserver.GetRepoInfoByPathReq{
+				pc.mocks.gitServer.EXPECT().GetRepoFileRaw(ctx, gitserver.GetRepoInfoByPathReq{
 					Namespace: "ns",
 					Name:      "n",
 					Ref:       types.MainBranch,
@@ -176,7 +139,7 @@ func TestPromptComponent_CreatePrompt(t *testing.T) {
 				require.NotNil(t, err)
 				return
 			} else {
-				gitServer.EXPECT().GetRepoFileRaw(ctx, gitserver.GetRepoInfoByPathReq{
+				pc.mocks.gitServer.EXPECT().GetRepoFileRaw(ctx, gitserver.GetRepoInfoByPathReq{
 					Namespace: "ns",
 					Name:      "n",
 					Ref:       types.MainBranch,
@@ -185,7 +148,7 @@ func TestPromptComponent_CreatePrompt(t *testing.T) {
 				}).Return("", errors.New("")).Once()
 			}
 
-			mockedRepoComponent.EXPECT().CreateFile(ctx, &types.CreateFileReq{
+			pc.mocks.components.repo.EXPECT().CreateFile(ctx, &types.CreateFileReq{
 				Namespace:   "ns",
 				Name:        "n",
 				Branch:      types.MainBranch,
@@ -214,26 +177,21 @@ func TestPromptComponent_CreatePrompt(t *testing.T) {
 }
 
 func TestPromptComponent_UpdatePrompt(t *testing.T) {
-	stores := tests.NewMockStores(t)
-	gitServer := gsmock.NewMockGitServer(t)
-	rpcUser := urpc_mock.NewMockUserSvcClient(t)
-	pc := NewTestPromptComponent(stores, rpcUser, gitServer)
-	mockedRepoComponent := component_mock.NewMockRepoComponent(t)
-	pc.repoComponent = mockedRepoComponent
 	ctx := context.TODO()
+	pc := initializeTestPromptComponent(ctx, t)
 
 	for _, exist := range []bool{true, false} {
 		t.Run(fmt.Sprintf("file exist: %v", exist), func(t *testing.T) {
 
-			stores.NamespaceMock().EXPECT().FindByPath(ctx, "ns").Return(database.Namespace{
+			pc.mocks.stores.NamespaceMock().EXPECT().FindByPath(ctx, "ns").Return(database.Namespace{
 				NamespaceType: database.OrgNamespace,
 			}, nil).Once()
-			stores.UserMock().EXPECT().FindByUsername(ctx, "foo").Return(database.User{
+			pc.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "foo").Return(database.User{
 				RoleMask: "foo-admin",
 				Email:    "foo@bar.com",
 			}, nil).Once()
 			if !exist {
-				gitServer.EXPECT().GetRepoFileRaw(ctx, gitserver.GetRepoInfoByPathReq{
+				pc.mocks.gitServer.EXPECT().GetRepoFileRaw(ctx, gitserver.GetRepoInfoByPathReq{
 					Namespace: "ns",
 					Name:      "n",
 					Ref:       types.MainBranch,
@@ -252,7 +210,7 @@ func TestPromptComponent_UpdatePrompt(t *testing.T) {
 				require.NotNil(t, err)
 				return
 			} else {
-				gitServer.EXPECT().GetRepoFileRaw(ctx, gitserver.GetRepoInfoByPathReq{
+				pc.mocks.gitServer.EXPECT().GetRepoFileRaw(ctx, gitserver.GetRepoInfoByPathReq{
 					Namespace: "ns",
 					Name:      "n",
 					Ref:       types.MainBranch,
@@ -261,7 +219,7 @@ func TestPromptComponent_UpdatePrompt(t *testing.T) {
 				}).Return("", nil).Once()
 			}
 
-			mockedRepoComponent.EXPECT().UpdateFile(ctx, &types.UpdateFileReq{
+			pc.mocks.components.repo.EXPECT().UpdateFile(ctx, &types.UpdateFileReq{
 				Namespace:   "ns",
 				Name:        "n",
 				Branch:      types.MainBranch,
@@ -290,23 +248,18 @@ func TestPromptComponent_UpdatePrompt(t *testing.T) {
 }
 
 func TestPromptComponent_DeletePrompt(t *testing.T) {
-	stores := tests.NewMockStores(t)
-	gitServer := gsmock.NewMockGitServer(t)
-	rpcUser := urpc_mock.NewMockUserSvcClient(t)
-	pc := NewTestPromptComponent(stores, rpcUser, gitServer)
-	mockedRepoComponent := component_mock.NewMockRepoComponent(t)
-	pc.repoComponent = mockedRepoComponent
 	ctx := context.TODO()
+	pc := initializeTestPromptComponent(ctx, t)
 
-	stores.NamespaceMock().EXPECT().FindByPath(ctx, "ns").Return(database.Namespace{
+	pc.mocks.stores.NamespaceMock().EXPECT().FindByPath(ctx, "ns").Return(database.Namespace{
 		NamespaceType: database.OrgNamespace,
 	}, nil).Once()
-	stores.UserMock().EXPECT().FindByUsername(ctx, "foo").Return(database.User{
+	pc.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "foo").Return(database.User{
 		RoleMask: "foo-admin",
 		Email:    "foo@bar.com",
 	}, nil).Once()
 
-	mockedRepoComponent.EXPECT().DeleteFile(ctx, &types.DeleteFileReq{
+	pc.mocks.components.repo.EXPECT().DeleteFile(ctx, &types.DeleteFileReq{
 		Namespace:   "ns",
 		Name:        "n",
 		Branch:      types.MainBranch,
@@ -330,19 +283,14 @@ func TestPromptComponent_DeletePrompt(t *testing.T) {
 }
 
 func TestPromptComponent_ListPrompt(t *testing.T) {
-	stores := tests.NewMockStores(t)
-	gitServer := gsmock.NewMockGitServer(t)
-	rpcUser := urpc_mock.NewMockUserSvcClient(t)
-	pc := NewTestPromptComponent(stores, rpcUser, gitServer)
-	mockedRepoComponent := component_mock.NewMockRepoComponent(t)
-	pc.repoComponent = mockedRepoComponent
 	ctx := context.TODO()
+	pc := initializeTestPromptComponent(ctx, t)
 
 	repo := &database.Repository{}
-	stores.RepoMock().EXPECT().FindByPath(ctx, types.PromptRepo, "ns", "n").Return(repo, nil).Once()
-	mockedRepoComponent.EXPECT().AllowReadAccessRepo(ctx, repo, "foo").Return(true, nil).Once()
+	pc.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, types.PromptRepo, "ns", "n").Return(repo, nil).Once()
+	pc.mocks.components.repo.EXPECT().AllowReadAccessRepo(ctx, repo, "foo").Return(true, nil).Once()
 
-	gitServer.EXPECT().GetRepoFileTree(context.Background(), gitserver.GetRepoInfoByPathReq{
+	pc.mocks.gitServer.EXPECT().GetRepoFileTree(context.Background(), gitserver.GetRepoInfoByPathReq{
 		Namespace: "ns",
 		Name:      "n",
 		RepoType:  types.PromptRepo,
@@ -354,7 +302,7 @@ func TestPromptComponent_ListPrompt(t *testing.T) {
 	}, nil)
 
 	for _, name := range []string{"foo.jsonl", "bar.jsonl"} {
-		gitServer.EXPECT().GetRepoFileContents(ctx, gitserver.GetRepoInfoByPathReq{
+		pc.mocks.gitServer.EXPECT().GetRepoFileContents(ctx, gitserver.GetRepoInfoByPathReq{
 			Namespace: "ns",
 			Name:      "n",
 			Ref:       "main",
@@ -383,21 +331,16 @@ func TestPromptComponent_ListPrompt(t *testing.T) {
 }
 
 func TestPromptComponent_GetPrompt(t *testing.T) {
-	stores := tests.NewMockStores(t)
-	gitServer := gsmock.NewMockGitServer(t)
-	rpcUser := urpc_mock.NewMockUserSvcClient(t)
-	pc := NewTestPromptComponent(stores, rpcUser, gitServer)
-	mockedRepoComponent := component_mock.NewMockRepoComponent(t)
-	pc.repoComponent = mockedRepoComponent
 	ctx := context.TODO()
+	pc := initializeTestPromptComponent(ctx, t)
 
 	repo := &database.Repository{}
-	stores.RepoMock().EXPECT().FindByPath(ctx, types.PromptRepo, "ns", "n").Return(repo, nil).Once()
-	mockedRepoComponent.EXPECT().GetUserRepoPermission(ctx, "foo", repo).Return(&types.UserRepoPermission{
+	pc.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, types.PromptRepo, "ns", "n").Return(repo, nil).Once()
+	pc.mocks.components.repo.EXPECT().GetUserRepoPermission(ctx, "foo", repo).Return(&types.UserRepoPermission{
 		CanRead: true,
 	}, nil).Once()
 
-	gitServer.EXPECT().GetRepoFileContents(ctx, gitserver.GetRepoInfoByPathReq{
+	pc.mocks.gitServer.EXPECT().GetRepoFileContents(ctx, gitserver.GetRepoInfoByPathReq{
 		Namespace: "ns",
 		Name:      "n",
 		Ref:       "main",
@@ -419,12 +362,11 @@ func TestPromptComponent_GetPrompt(t *testing.T) {
 }
 
 func TestPromptComponent_NewConversation(t *testing.T) {
-	stores := tests.NewMockStores(t)
-	pc := NewTestPromptComponent(stores, nil, nil)
 	ctx := context.TODO()
+	pc := initializeTestPromptComponent(ctx, t)
 
-	stores.UserMock().EXPECT().FindByUsername(ctx, "foo").Return(database.User{ID: 123}, nil).Once()
-	stores.PromptConversationMock().EXPECT().CreateConversation(ctx, database.PromptConversation{
+	pc.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "foo").Return(database.User{ID: 123}, nil).Once()
+	pc.mocks.stores.PromptConversationMock().EXPECT().CreateConversation(ctx, database.PromptConversation{
 		UserID:         123,
 		ConversationID: "zzz",
 		Title:          "test",
@@ -443,16 +385,15 @@ func TestPromptComponent_NewConversation(t *testing.T) {
 }
 
 func TestPromptComponent_ListConversationByUserID(t *testing.T) {
-	stores := tests.NewMockStores(t)
-	pc := NewTestPromptComponent(stores, nil, nil)
 	ctx := context.TODO()
+	pc := initializeTestPromptComponent(ctx, t)
 
-	stores.UserMock().EXPECT().FindByUsername(ctx, "foo").Return(database.User{ID: 123}, nil).Once()
+	pc.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "foo").Return(database.User{ID: 123}, nil).Once()
 	mockedResults := []database.PromptConversation{
 		{Title: "foo"},
 		{Title: "bar"},
 	}
-	stores.PromptConversationMock().EXPECT().FindConversationsByUserID(ctx, int64(123)).Return(mockedResults, nil).Once()
+	pc.mocks.stores.PromptConversationMock().EXPECT().FindConversationsByUserID(ctx, int64(123)).Return(mockedResults, nil).Once()
 
 	results, err := pc.ListConversationsByUserID(ctx, "foo")
 	require.Nil(t, err)
@@ -461,13 +402,12 @@ func TestPromptComponent_ListConversationByUserID(t *testing.T) {
 }
 
 func TestPromptComponent_GetConversation(t *testing.T) {
-	stores := tests.NewMockStores(t)
-	pc := NewTestPromptComponent(stores, nil, nil)
 	ctx := context.TODO()
+	pc := initializeTestPromptComponent(ctx, t)
 
-	stores.UserMock().EXPECT().FindByUsername(ctx, "foo").Return(database.User{ID: 123}, nil).Once()
+	pc.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "foo").Return(database.User{ID: 123}, nil).Once()
 	mocked := &database.PromptConversation{}
-	stores.PromptConversationMock().EXPECT().GetConversationByID(ctx, int64(123), "uuid", true).Return(mocked, nil).Once()
+	pc.mocks.stores.PromptConversationMock().EXPECT().GetConversationByID(ctx, int64(123), "uuid", true).Return(mocked, nil).Once()
 
 	cv, err := pc.GetConversation(ctx, types.ConversationReq{
 		CurrentUser: "foo",
@@ -481,32 +421,31 @@ func TestPromptComponent_GetConversation(t *testing.T) {
 }
 
 func TestPromptComponent_SubmitMessage(t *testing.T) {
-	stores := tests.NewMockStores(t)
-	pc := NewTestPromptComponent(stores, nil, nil)
 	ctx := context.TODO()
+	pc := initializeTestPromptComponent(ctx, t)
 
 	for _, lang := range []string{"en", "zh"} {
 		t.Run(lang, func(t *testing.T) {
 
-			stores.UserMock().EXPECT().FindByUsername(ctx, "foo").Return(database.User{ID: 123}, nil).Once()
-			stores.PromptConversationMock().EXPECT().GetConversationByID(ctx, int64(123), "uuid", false).Return(&database.PromptConversation{}, nil).Once()
+			pc.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "foo").Return(database.User{ID: 123}, nil).Once()
+			pc.mocks.stores.PromptConversationMock().EXPECT().GetConversationByID(ctx, int64(123), "uuid", false).Return(&database.PromptConversation{}, nil).Once()
 
 			content := "go"
 			if lang == "zh" {
 				content = "围棋"
 			}
-			stores.PromptConversationMock().EXPECT().SaveConversationMessage(
+			pc.mocks.stores.PromptConversationMock().EXPECT().SaveConversationMessage(
 				ctx, database.PromptConversationMessage{
 					ConversationID: "uuid",
 					Role:           UserRole,
 					Content:        content,
 				},
 			).Return(&database.PromptConversationMessage{}, nil)
-			stores.LLMConfigMock().EXPECT().GetOptimization(ctx).Return(&database.LLMConfig{
+			pc.mocks.stores.LLMConfigMock().EXPECT().GetOptimization(ctx).Return(&database.LLMConfig{
 				ApiEndpoint: "https://llm.com",
 				AuthHeader:  `{"token": "foobar"}`,
 			}, nil).Once()
-			stores.PromptPrefixMock().EXPECT().Get(ctx).Return(&database.PromptPrefix{
+			pc.mocks.stores.PromptPrefixMock().EXPECT().Get(ctx).Return(&database.PromptPrefix{
 				ZH: "use Chinese",
 				EN: "use English",
 			}, nil).Once()
@@ -556,12 +495,11 @@ func TestPromptComponent_SubmitMessage(t *testing.T) {
 }
 
 func TestPromptComponent_SaveGeneratedText(t *testing.T) {
-	stores := tests.NewMockStores(t)
-	pc := NewTestPromptComponent(stores, nil, nil)
 	ctx := context.TODO()
+	pc := initializeTestPromptComponent(ctx, t)
 
 	mocked := &database.PromptConversationMessage{}
-	stores.PromptConversationMock().EXPECT().SaveConversationMessage(ctx, database.PromptConversationMessage{
+	pc.mocks.stores.PromptConversationMock().EXPECT().SaveConversationMessage(ctx, database.PromptConversationMessage{
 		ConversationID: "uuid",
 		Role:           AssistantRole,
 		Content:        "m",
@@ -577,12 +515,11 @@ func TestPromptComponent_SaveGeneratedText(t *testing.T) {
 }
 
 func TestPromptComponent_RemoveConversation(t *testing.T) {
-	stores := tests.NewMockStores(t)
-	pc := NewTestPromptComponent(stores, nil, nil)
 	ctx := context.TODO()
+	pc := initializeTestPromptComponent(ctx, t)
 
-	stores.UserMock().EXPECT().FindByUsername(ctx, "foo").Return(database.User{ID: 123}, nil).Once()
-	stores.PromptConversationMock().EXPECT().DeleteConversationsByID(ctx, int64(123), "uuid").Return(nil).Once()
+	pc.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "foo").Return(database.User{ID: 123}, nil).Once()
+	pc.mocks.stores.PromptConversationMock().EXPECT().DeleteConversationsByID(ctx, int64(123), "uuid").Return(nil).Once()
 
 	err := pc.RemoveConversation(ctx, types.ConversationReq{
 		CurrentUser: "foo",
@@ -594,18 +531,17 @@ func TestPromptComponent_RemoveConversation(t *testing.T) {
 }
 
 func TestPromptComponent_UpdateConversation(t *testing.T) {
-	stores := tests.NewMockStores(t)
-	pc := NewTestPromptComponent(stores, nil, nil)
 	ctx := context.TODO()
+	pc := initializeTestPromptComponent(ctx, t)
 
-	stores.UserMock().EXPECT().FindByUsername(ctx, "foo").Return(database.User{ID: 123}, nil).Once()
-	stores.PromptConversationMock().EXPECT().UpdateConversation(ctx, database.PromptConversation{
+	pc.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "foo").Return(database.User{ID: 123}, nil).Once()
+	pc.mocks.stores.PromptConversationMock().EXPECT().UpdateConversation(ctx, database.PromptConversation{
 		UserID:         123,
 		ConversationID: "uuid",
 		Title:          "title",
 	}).Return(nil).Once()
 	mocked := &database.PromptConversation{}
-	stores.PromptConversationMock().EXPECT().GetConversationByID(ctx, int64(123), "uuid", false).Return(mocked, nil)
+	pc.mocks.stores.PromptConversationMock().EXPECT().GetConversationByID(ctx, int64(123), "uuid", false).Return(mocked, nil)
 
 	cv, err := pc.UpdateConversation(ctx, types.ConversationTitleReq{
 		CurrentUser: "foo",
@@ -619,13 +555,12 @@ func TestPromptComponent_UpdateConversation(t *testing.T) {
 }
 
 func TestPromptComponent_LikeConversationMessage(t *testing.T) {
-	stores := tests.NewMockStores(t)
-	pc := NewTestPromptComponent(stores, nil, nil)
 	ctx := context.TODO()
+	pc := initializeTestPromptComponent(ctx, t)
 
-	stores.UserMock().EXPECT().FindByUsername(ctx, "foo").Return(database.User{ID: 123}, nil).Once()
-	stores.PromptConversationMock().EXPECT().GetConversationByID(ctx, int64(123), "uuid", false).Return(&database.PromptConversation{}, nil).Once()
-	stores.PromptConversationMock().EXPECT().LikeMessageByID(ctx, int64(123)).Return(nil).Once()
+	pc.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "foo").Return(database.User{ID: 123}, nil).Once()
+	pc.mocks.stores.PromptConversationMock().EXPECT().GetConversationByID(ctx, int64(123), "uuid", false).Return(&database.PromptConversation{}, nil).Once()
+	pc.mocks.stores.PromptConversationMock().EXPECT().LikeMessageByID(ctx, int64(123)).Return(nil).Once()
 
 	err := pc.LikeConversationMessage(ctx, types.ConversationMessageReq{
 		Uuid:        "uuid",
@@ -636,13 +571,12 @@ func TestPromptComponent_LikeConversationMessage(t *testing.T) {
 }
 
 func TestPromptComponent_HateConversationMessage(t *testing.T) {
-	stores := tests.NewMockStores(t)
-	pc := NewTestPromptComponent(stores, nil, nil)
 	ctx := context.TODO()
+	pc := initializeTestPromptComponent(ctx, t)
 
-	stores.UserMock().EXPECT().FindByUsername(ctx, "foo").Return(database.User{ID: 123}, nil).Once()
-	stores.PromptConversationMock().EXPECT().GetConversationByID(ctx, int64(123), "uuid", false).Return(&database.PromptConversation{}, nil).Once()
-	stores.PromptConversationMock().EXPECT().HateMessageByID(ctx, int64(123)).Return(nil).Once()
+	pc.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "foo").Return(database.User{ID: 123}, nil).Once()
+	pc.mocks.stores.PromptConversationMock().EXPECT().GetConversationByID(ctx, int64(123), "uuid", false).Return(&database.PromptConversation{}, nil).Once()
+	pc.mocks.stores.PromptConversationMock().EXPECT().HateMessageByID(ctx, int64(123)).Return(nil).Once()
 
 	err := pc.HateConversationMessage(ctx, types.ConversationMessageReq{
 		Uuid:        "uuid",
@@ -653,23 +587,19 @@ func TestPromptComponent_HateConversationMessage(t *testing.T) {
 }
 
 func TestPromptComponent_SetRelationModels(t *testing.T) {
-	stores := tests.NewMockStores(t)
-	gitServer := gsmock.NewMockGitServer(t)
-	pc := NewTestPromptComponent(stores, nil, gitServer)
-	mockedRepoComponent := component_mock.NewMockRepoComponent(t)
-	pc.repoComponent = mockedRepoComponent
 	ctx := context.TODO()
+	pc := initializeTestPromptComponent(ctx, t)
 
-	stores.UserMock().EXPECT().FindByUsername(ctx, "foo").Return(database.User{
+	pc.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "foo").Return(database.User{
 		ID:    123,
 		Email: "foo@bar.com",
 	}, nil).Once()
 	repo := &database.Repository{}
-	stores.RepoMock().EXPECT().FindByPath(ctx, types.PromptRepo, "ns", "n").Return(repo, nil).Once()
-	mockedRepoComponent.EXPECT().GetUserRepoPermission(ctx, "foo", repo).Return(&types.UserRepoPermission{
+	pc.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, types.PromptRepo, "ns", "n").Return(repo, nil).Once()
+	pc.mocks.components.repo.EXPECT().GetUserRepoPermission(ctx, "foo", repo).Return(&types.UserRepoPermission{
 		CanWrite: true,
 	}, nil).Once()
-	gitServer.EXPECT().GetRepoFileContents(mock.Anything, gitserver.GetRepoInfoByPathReq{
+	pc.mocks.gitServer.EXPECT().GetRepoFileContents(mock.Anything, gitserver.GetRepoInfoByPathReq{
 		Namespace: "ns",
 		Name:      "n",
 		Ref:       "main",
@@ -678,7 +608,7 @@ func TestPromptComponent_SetRelationModels(t *testing.T) {
 	}).Return(&types.File{
 		Content: "LS0tCiB0aXRsZTogImFpIg==",
 	}, nil).Once()
-	gitServer.EXPECT().UpdateRepoFile(&types.UpdateFileReq{
+	pc.mocks.gitServer.EXPECT().UpdateRepoFile(&types.UpdateFileReq{
 		Branch:    types.MainBranch,
 		Message:   "update model relation tags",
 		FilePath:  REPOCARD_FILENAME,
@@ -701,21 +631,17 @@ func TestPromptComponent_SetRelationModels(t *testing.T) {
 }
 
 func TestPromptComponent_AddRelationModel(t *testing.T) {
-	stores := tests.NewMockStores(t)
-	gitServer := gsmock.NewMockGitServer(t)
-	pc := NewTestPromptComponent(stores, nil, gitServer)
-	mockedRepoComponent := component_mock.NewMockRepoComponent(t)
-	pc.repoComponent = mockedRepoComponent
 	ctx := context.TODO()
+	pc := initializeTestPromptComponent(ctx, t)
 
-	stores.UserMock().EXPECT().FindByUsername(ctx, "foo").Return(database.User{
+	pc.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "foo").Return(database.User{
 		ID:       123,
 		Email:    "foo@bar.com",
 		RoleMask: "foo-admin",
 	}, nil).Once()
 	repo := &database.Repository{}
-	stores.RepoMock().EXPECT().FindByPath(ctx, types.PromptRepo, "ns", "n").Return(repo, nil).Once()
-	gitServer.EXPECT().GetRepoFileContents(mock.Anything, gitserver.GetRepoInfoByPathReq{
+	pc.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, types.PromptRepo, "ns", "n").Return(repo, nil).Once()
+	pc.mocks.gitServer.EXPECT().GetRepoFileContents(mock.Anything, gitserver.GetRepoInfoByPathReq{
 		Namespace: "ns",
 		Name:      "n",
 		Ref:       "main",
@@ -724,7 +650,7 @@ func TestPromptComponent_AddRelationModel(t *testing.T) {
 	}).Return(&types.File{
 		Content: "LS0tCiB0aXRsZTogImFpIg==",
 	}, nil).Once()
-	gitServer.EXPECT().UpdateRepoFile(&types.UpdateFileReq{
+	pc.mocks.gitServer.EXPECT().UpdateRepoFile(&types.UpdateFileReq{
 		Branch:    types.MainBranch,
 		Message:   "add relation model",
 		FilePath:  REPOCARD_FILENAME,
@@ -747,21 +673,17 @@ func TestPromptComponent_AddRelationModel(t *testing.T) {
 }
 
 func TestPromptComponent_DelRelationModel(t *testing.T) {
-	stores := tests.NewMockStores(t)
-	gitServer := gsmock.NewMockGitServer(t)
-	pc := NewTestPromptComponent(stores, nil, gitServer)
-	mockedRepoComponent := component_mock.NewMockRepoComponent(t)
-	pc.repoComponent = mockedRepoComponent
 	ctx := context.TODO()
+	pc := initializeTestPromptComponent(ctx, t)
 
-	stores.UserMock().EXPECT().FindByUsername(ctx, "foo").Return(database.User{
+	pc.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "foo").Return(database.User{
 		ID:       123,
 		Email:    "foo@bar.com",
 		RoleMask: "foo-admin",
 	}, nil).Once()
 	repo := &database.Repository{}
-	stores.RepoMock().EXPECT().FindByPath(ctx, types.PromptRepo, "ns", "n").Return(repo, nil).Once()
-	gitServer.EXPECT().GetRepoFileContents(mock.Anything, gitserver.GetRepoInfoByPathReq{
+	pc.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, types.PromptRepo, "ns", "n").Return(repo, nil).Once()
+	pc.mocks.gitServer.EXPECT().GetRepoFileContents(mock.Anything, gitserver.GetRepoInfoByPathReq{
 		Namespace: "ns",
 		Name:      "n",
 		Ref:       "main",
@@ -770,7 +692,7 @@ func TestPromptComponent_DelRelationModel(t *testing.T) {
 	}).Return(&types.File{
 		Content: "LS0tCm1vZGVsczoKICAgIC0gbWEKdGl0bGU6IGFpCgotLS0=",
 	}, nil).Once()
-	gitServer.EXPECT().UpdateRepoFile(&types.UpdateFileReq{
+	pc.mocks.gitServer.EXPECT().UpdateRepoFile(&types.UpdateFileReq{
 		Branch:    types.MainBranch,
 		Message:   "delete relation model",
 		FilePath:  REPOCARD_FILENAME,
@@ -793,14 +715,10 @@ func TestPromptComponent_DelRelationModel(t *testing.T) {
 }
 
 func TestPromptComponent_CreatePromptRepo(t *testing.T) {
-	stores := tests.NewMockStores(t)
-	gitServer := gsmock.NewMockGitServer(t)
-	pc := NewTestPromptComponent(stores, nil, gitServer)
-	mockedRepoComponent := component_mock.NewMockRepoComponent(t)
-	pc.repoComponent = mockedRepoComponent
 	ctx := context.TODO()
+	pc := initializeTestPromptComponent(ctx, t)
 
-	stores.UserMock().EXPECT().FindByUsername(ctx, "foo").Return(database.User{
+	pc.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "foo").Return(database.User{
 		ID:       123,
 		Email:    "foo@bar.com",
 		RoleMask: "foo-admin",
@@ -817,14 +735,14 @@ func TestPromptComponent_CreatePromptRepo(t *testing.T) {
 		DefaultBranch: "main",
 		RepoType:      types.PromptRepo,
 	}
-	stores.NamespaceMock().EXPECT().FindByPath(ctx, "ns").Return(database.Namespace{}, nil).Once()
+	pc.mocks.stores.NamespaceMock().EXPECT().FindByPath(ctx, "ns").Return(database.Namespace{}, nil).Once()
 	dbRepo := &database.Repository{}
-	mockedRepoComponent.EXPECT().CreateRepo(ctx, req).Return(&gitserver.CreateRepoResp{}, dbRepo, nil)
+	pc.mocks.components.repo.EXPECT().CreateRepo(ctx, req).Return(&gitserver.CreateRepoResp{}, dbRepo, nil)
 	dbPrompt := database.Prompt{
 		Repository:   dbRepo,
 		RepositoryID: dbRepo.ID,
 	}
-	stores.PromptMock().EXPECT().Create(ctx, dbPrompt).Return(&database.Prompt{
+	pc.mocks.stores.PromptMock().EXPECT().Create(ctx, dbPrompt).Return(&database.Prompt{
 		Repository: &database.Repository{
 			Name: "r1",
 			Tags: []database.Tag{
@@ -834,7 +752,7 @@ func TestPromptComponent_CreatePromptRepo(t *testing.T) {
 		},
 	}, nil)
 	// create readme
-	gitServer.EXPECT().CreateRepoFile(&types.CreateFileReq{
+	pc.mocks.gitServer.EXPECT().CreateRepoFile(&types.CreateFileReq{
 		Email:     "foo@bar.com",
 		Message:   "initial commit",
 		Branch:    "main",
@@ -846,7 +764,7 @@ func TestPromptComponent_CreatePromptRepo(t *testing.T) {
 		RepoType:  types.PromptRepo,
 	}).Return(nil).Once()
 	// create .gitattributes
-	gitServer.EXPECT().CreateRepoFile(&types.CreateFileReq{
+	pc.mocks.gitServer.EXPECT().CreateRepoFile(&types.CreateFileReq{
 		Email:     "foo@bar.com",
 		Message:   "initial commit",
 		Branch:    "main",
@@ -886,19 +804,15 @@ func TestPromptComponent_CreatePromptRepo(t *testing.T) {
 }
 
 func TestPromptComponent_IndexPromptRepo(t *testing.T) {
-	stores := tests.NewMockStores(t)
-	gitServer := gsmock.NewMockGitServer(t)
-	pc := NewTestPromptComponent(stores, nil, gitServer)
-	mockedRepoComponent := component_mock.NewMockRepoComponent(t)
-	pc.repoComponent = mockedRepoComponent
 	ctx := context.TODO()
+	pc := initializeTestPromptComponent(ctx, t)
 
 	filter := &types.RepoFilter{Username: "foo"}
-	mockedRepoComponent.EXPECT().PublicToUser(ctx, types.PromptRepo, "foo", filter, 1, 1).Return([]*database.Repository{
+	pc.mocks.components.repo.EXPECT().PublicToUser(ctx, types.PromptRepo, "foo", filter, 1, 1).Return([]*database.Repository{
 		{ID: 1, Name: "rp1"}, {ID: 2, Name: "rp2"},
 		{ID: 3, Name: "rp3", Tags: []database.Tag{{Name: "t1"}, {Name: "t2"}}},
 	}, 30, nil).Once()
-	stores.PromptMock().EXPECT().ByRepoIDs(ctx, []int64{1, 2, 3}).Return([]database.Prompt{
+	pc.mocks.stores.PromptMock().EXPECT().ByRepoIDs(ctx, []int64{1, 2, 3}).Return([]database.Prompt{
 		{ID: 6, RepositoryID: 2, Repository: &database.Repository{}},
 		{ID: 5, RepositoryID: 1, Repository: &database.Repository{}},
 		{ID: 4, RepositoryID: 3, Repository: &database.Repository{}},
@@ -932,20 +846,17 @@ func TestPromptComponent_IndexPromptRepo(t *testing.T) {
 }
 
 func TestPromptComponent_UpdatePromptRepo(t *testing.T) {
-	stores := tests.NewMockStores(t)
-	pc := NewTestPromptComponent(stores, nil, nil)
-	mockedRepoComponent := component_mock.NewMockRepoComponent(t)
-	pc.repoComponent = mockedRepoComponent
 	ctx := context.TODO()
+	pc := initializeTestPromptComponent(ctx, t)
 
 	req := &types.UpdatePromptRepoReq{
 		UpdateRepoReq: types.UpdateRepoReq{RepoType: types.PromptRepo},
 	}
 	mockedRepo := &database.Repository{Name: "rp1", ID: 123}
-	mockedRepoComponent.EXPECT().UpdateRepo(ctx, req.UpdateRepoReq).Return(mockedRepo, nil).Once()
+	pc.mocks.components.repo.EXPECT().UpdateRepo(ctx, req.UpdateRepoReq).Return(mockedRepo, nil).Once()
 	mockedPrompt := &database.Prompt{ID: 3}
-	stores.PromptMock().EXPECT().ByRepoID(ctx, int64(123)).Return(mockedPrompt, nil).Once()
-	stores.PromptMock().EXPECT().Update(ctx, *mockedPrompt).Return(nil).Once()
+	pc.mocks.stores.PromptMock().EXPECT().ByRepoID(ctx, int64(123)).Return(mockedPrompt, nil).Once()
+	pc.mocks.stores.PromptMock().EXPECT().Update(ctx, *mockedPrompt).Return(nil).Once()
 
 	res, err := pc.UpdatePromptRepo(ctx, req)
 	require.Nil(t, err)
@@ -958,21 +869,18 @@ func TestPromptComponent_UpdatePromptRepo(t *testing.T) {
 }
 
 func TestPromptComponent_RemovetRepo(t *testing.T) {
-	stores := tests.NewMockStores(t)
-	pc := NewTestPromptComponent(stores, nil, nil)
-	mockedRepoComponent := component_mock.NewMockRepoComponent(t)
-	pc.repoComponent = mockedRepoComponent
 	ctx := context.TODO()
+	pc := initializeTestPromptComponent(ctx, t)
 
 	mockedPrompt := &database.Prompt{}
-	stores.PromptMock().EXPECT().FindByPath(ctx, "ns", "n").Return(mockedPrompt, nil).Once()
-	mockedRepoComponent.EXPECT().DeleteRepo(ctx, types.DeleteRepoReq{
+	pc.mocks.stores.PromptMock().EXPECT().FindByPath(ctx, "ns", "n").Return(mockedPrompt, nil).Once()
+	pc.mocks.components.repo.EXPECT().DeleteRepo(ctx, types.DeleteRepoReq{
 		Username:  "foo",
 		Namespace: "ns",
 		Name:      "n",
 		RepoType:  types.PromptRepo,
 	}).Return(nil, nil).Once()
-	stores.PromptMock().EXPECT().Delete(ctx, *mockedPrompt).Return(nil).Once()
+	pc.mocks.stores.PromptMock().EXPECT().Delete(ctx, *mockedPrompt).Return(nil).Once()
 
 	err := pc.RemoveRepo(ctx, "ns", "n", "foo")
 	require.Nil(t, err)
@@ -980,11 +888,8 @@ func TestPromptComponent_RemovetRepo(t *testing.T) {
 }
 
 func TestPromptComponent_Show(t *testing.T) {
-	stores := tests.NewMockStores(t)
-	pc := NewTestPromptComponent(stores, nil, nil)
-	mockedRepoComponent := component_mock.NewMockRepoComponent(t)
-	pc.repoComponent = mockedRepoComponent
 	ctx := context.TODO()
+	pc := initializeTestPromptComponent(ctx, t)
 
 	mockedPrompt := &database.Prompt{
 		Repository: &database.Repository{
@@ -992,12 +897,12 @@ func TestPromptComponent_Show(t *testing.T) {
 			Tags: []database.Tag{{Name: "t1"}},
 		},
 	}
-	stores.PromptMock().EXPECT().FindByPath(ctx, "ns", "n").Return(mockedPrompt, nil).Once()
-	mockedRepoComponent.EXPECT().GetUserRepoPermission(ctx, "foo", mockedPrompt.Repository).Return(&types.UserRepoPermission{
+	pc.mocks.stores.PromptMock().EXPECT().FindByPath(ctx, "ns", "n").Return(mockedPrompt, nil).Once()
+	pc.mocks.components.repo.EXPECT().GetUserRepoPermission(ctx, "foo", mockedPrompt.Repository).Return(&types.UserRepoPermission{
 		CanRead: true,
 	}, nil).Once()
-	mockedRepoComponent.EXPECT().GetNameSpaceInfo(ctx, "ns").Return(&types.Namespace{}, nil).Once()
-	stores.UserLikesMock().EXPECT().IsExist(ctx, "foo", int64(123)).Return(true, nil).Once()
+	pc.mocks.components.repo.EXPECT().GetNameSpaceInfo(ctx, "ns").Return(&types.Namespace{}, nil).Once()
+	pc.mocks.stores.UserLikesMock().EXPECT().IsExist(ctx, "foo", int64(123)).Return(true, nil).Once()
 
 	res, err := pc.Show(ctx, "ns", "n", "foo")
 	require.Nil(t, err)
@@ -1015,11 +920,8 @@ func TestPromptComponent_Show(t *testing.T) {
 }
 
 func TestPromptComponent_Relations(t *testing.T) {
-	stores := tests.NewMockStores(t)
-	pc := NewTestPromptComponent(stores, nil, nil)
-	mockedRepoComponent := component_mock.NewMockRepoComponent(t)
-	pc.repoComponent = mockedRepoComponent
 	ctx := context.TODO()
+	pc := initializeTestPromptComponent(ctx, t)
 
 	mockedPrompt := &database.Prompt{
 		RepositoryID: 123,
@@ -1028,9 +930,9 @@ func TestPromptComponent_Relations(t *testing.T) {
 			Tags: []database.Tag{{Name: "t1"}},
 		},
 	}
-	stores.PromptMock().EXPECT().FindByPath(ctx, "ns", "n").Return(mockedPrompt, nil).Once()
-	mockedRepoComponent.EXPECT().AllowReadAccessRepo(ctx, mockedPrompt.Repository, "foo").Return(true, nil).Once()
-	mockedRepoComponent.EXPECT().RelatedRepos(ctx, int64(123), "foo").Return(
+	pc.mocks.stores.PromptMock().EXPECT().FindByPath(ctx, "ns", "n").Return(mockedPrompt, nil).Once()
+	pc.mocks.components.repo.EXPECT().AllowReadAccessRepo(ctx, mockedPrompt.Repository, "foo").Return(true, nil).Once()
+	pc.mocks.components.repo.EXPECT().RelatedRepos(ctx, int64(123), "foo").Return(
 		map[types.RepositoryType][]*database.Repository{
 			types.ModelRepo: {
 				{ID: 1, Name: "r1"},
@@ -1055,12 +957,8 @@ func TestPromptComponent_Relations(t *testing.T) {
 }
 
 func TestPromptComponent_OrgPrompts(t *testing.T) {
-	stores := tests.NewMockStores(t)
-	rpcUser := urpc_mock.NewMockUserSvcClient(t)
-	pc := NewTestPromptComponent(stores, rpcUser, nil)
-	mockedRepoComponent := component_mock.NewMockRepoComponent(t)
-	pc.repoComponent = mockedRepoComponent
 	ctx := context.TODO()
+	pc := initializeTestPromptComponent(ctx, t)
 
 	cases := []struct {
 		role       membership.Role
@@ -1072,8 +970,8 @@ func TestPromptComponent_OrgPrompts(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(string(c.role), func(t *testing.T) {
-			rpcUser.EXPECT().GetMemberRole(ctx, "ns", "foo").Return(c.role, nil).Once()
-			stores.PromptMock().EXPECT().ByOrgPath(ctx, "ns", 1, 1, c.publicOnly).Return([]database.Prompt{
+			pc.mocks.userSvcClient.EXPECT().GetMemberRole(ctx, "ns", "foo").Return(c.role, nil).Once()
+			pc.mocks.stores.PromptMock().EXPECT().ByOrgPath(ctx, "ns", 1, 1, c.publicOnly).Return([]database.Prompt{
 				{ID: 1, Repository: &database.Repository{Name: "r1"}},
 				{ID: 2, Repository: &database.Repository{Name: "r2"}},
 				{ID: 3, Repository: &database.Repository{Name: "r3"}},

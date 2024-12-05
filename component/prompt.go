@@ -87,6 +87,7 @@ func NewPromptComponent(cfg *config.Config) (PromptComponent, error) {
 	usc := rpc.NewUserSvcHttpClient(fmt.Sprintf("%s:%d", cfg.User.Host, cfg.User.Port),
 		rpc.AuthWithApiKey(cfg.APIToken))
 	return &promptComponentImpl{
+		config:            cfg,
 		userStore:         database.NewUserStore(),
 		userLikeStore:     database.NewUserLikesStore(),
 		userSvcClient:     usc,
@@ -99,6 +100,7 @@ func NewPromptComponent(cfg *config.Config) (PromptComponent, error) {
 		repoComponent:     r,
 		gitServer:         gs,
 		maxPromptFS:       cfg.Dataset.PromptMaxJsonlFileSize,
+		namespaceStore:    database.NewNamespaceStore(),
 	}, nil
 }
 
@@ -1223,7 +1225,7 @@ func (c *promptComponentImpl) OrgPrompts(ctx context.Context, req *types.OrgProm
 	r := membership.RoleUnknown
 	if req.CurrentUser != "" {
 		r, err = c.userSvcClient.GetMemberRole(ctx, req.Namespace, req.CurrentUser)
-		// log error, and treat user as unkown role in org
+		// log error, and treat user as unknown role in org
 		if err != nil {
 			slog.Error("faild to get member role",
 				slog.String("org", req.Namespace), slog.String("user", req.CurrentUser),

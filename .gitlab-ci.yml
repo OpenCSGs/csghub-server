@@ -1,60 +1,134 @@
-default:
-  image: docker:latest
-
 stages:
+  - lint
   - test
   - build
   - deploy
 
 variables:
-  IMAGE_NAME: "csghub-server"
-  IMAGE_TAG: "latest"
   SAST_IMAGE_SUFFIX: '-fips'
-  DOCKER_HOST: tcp://docker:2375
+  DOCKER_HOST: "tcp://docker:2375"
   DOCKER_TLS_CERTDIR: ""
+  GOLANGCI_LINT_CACHE: ${CI_PROJECT_DIR}/.golangci-lint
+  GOMODCACHE: ${CI_PROJECT_DIR}/.cache/go-mod
+  GOCACHE: ${CI_PROJECT_DIR}/.cache/go-build
+  TESTCONTAINERS_HUB_IMAGE_NAME_PREFIX: opencsg-registry.cn-beijing.cr.aliyuncs.com/opencsg_public
+  TESTCONTAINERS_RYUK_DISABLED: true
+
+cache:
+  paths:
+  - .golangci-lint/
+  - .cache/
 
 include:
   - template: Jobs/Secret-Detection.gitlab-ci.yml
 
-test:
-  stage: test
-  image: golang:1.21.0
+.before_script: &pre
+  image: docker:27.3
+  stage: build
+  services:
+    - name: docker:27.3-dind
+      command: [ "--feature=containerd-snapshotter", "--experimental" ]
+  variables:
+    BUILDX_NO_DEFAULT_ATTESTATIONS: 1
+  before_script:
+    - echo "$CI_REGISTRY_PASSWORD" | docker login -u $CI_REGISTRY_USER $CI_REGISTRY --password-stdin
+    - docker run --privileged --rm opencsg-registry.cn-beijing.cr.aliyuncs.com/opencsg_public/tonistiigi/binfmt --install all
+
+lint:
+  image: opencsg-registry.cn-beijing.cr.aliyuncs.com/opencsg_public/golangci/golangci-lint:v1.62.0
+  stage: lint
+  interruptible: true
+  needs: []
   script:
     - go env -w GO111MODULE=on
     - go env -w GOPROXY=https://goproxy.cn,direct
-    - go build -o starhub ./cmd/csghub-server
-  except:
-    - main
+    - golangci-lint run --timeout=10m
 
-build_server_image:commit:
-  image: docker:24.0.6
+test:
+  stage: test
+  interruptible: true
+  image: $CI_REGISTRY_IMAGE/docker-golang:1.21.0
+  needs: []
+  services:
+    - name: docker:27.3-dind
+  script:
+    - go env -w GO111MODULE=on
+    - go env -w GOPROXY=https://goproxy.cn,direct
+    - go test -coverprofile=coverage.out ./...
+    - go tool cover -html=coverage.out -o coverage.html
+  artifacts:
+    paths:
+      - coverage.out
+      - coverage.html
+    expire_in: 1 week
+
+build:stg:amd64:
+  image: docker:27.3
   stage: build
   services:
-    - docker:24.0.6-dind
-  variables:
-    IMAGE_TAG: "$CI_REGISTRY_IMAGE:$CI_COMMIT_SHORT_SHA"
-    LATEST_IMAGE_TAG: "$CI_REGISTRY_IMAGE:latest"
+    - docker:27.3-dind
   script:
-    - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
-    - docker build -t $IMAGE_TAG -f docker/Dockerfile .
-    - docker tag $IMAGE_TAG  $LATEST_IMAGE_TAG
-    - docker push $IMAGE_TAG
-    - docker push $LATEST_IMAGE_TAG
+    - echo "$CI_REGISTRY_PASSWORD" | docker login -u $CI_REGISTRY_USER $CI_REGISTRY --password-stdin
+    - docker build -t ${CI_REGISTRY_IMAGE}:${CI_COMMIT_SHORT_SHA}  -t ${CI_REGISTRY_IMAGE}:latest   -f docker/Dockerfile .
+    - docker push ${CI_REGISTRY_IMAGE}:${CI_COMMIT_SHORT_SHA}
+    - docker push ${CI_REGISTRY_IMAGE}:latest
   rules:
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH && $CI_COMMIT_BRANCH == $CI_COMMIT_REF_NAME # when commit to main branch
-   
 
-build_server_image:tag:
-  image: docker:24.0.6
+
+.build:stg:arm64:
+  <<: *pre
+  script:
+    - |
+        docker buildx build --platform linux/arm64 \
+          -t ${CI_REGISTRY_IMAGE}:${CI_COMMIT_SHORT_SHA} \
+          -t ${CI_REGISTRY_IMAGE}:latest \
+          -f docker/Dockerfile \
+          --push .
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH && $CI_COMMIT_BRANCH == $CI_COMMIT_REF_NAME # when commit to main branch
+
+
+build:prod:amd64:
+  image: docker:27.3
   stage: build
   services:
-    - docker:24.0.6-dind
-  only:
-    refs:
-      - tags
-  variables:
-    IMAGE_TAG: "$CI_REGISTRY_IMAGE:$CI_COMMIT_TAG"
+    - docker:27.3-dind
   script:
-    - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
-    - docker build -t $IMAGE_TAG -f docker/Dockerfile .
-    - docker push $IMAGE_TAG
+    - echo "$CI_REGISTRY_PASSWORD" | docker login -u $CI_REGISTRY_USER $CI_REGISTRY --password-stdin
+    - docker build -t ${CI_REGISTRY_IMAGE}:${CI_COMMIT_TAG}  -t ${CI_REGISTRY_IMAGE}:latest   -f docker/Dockerfile .
+    - docker push ${CI_REGISTRY_IMAGE}:${CI_COMMIT_TAG}
+    - docker push ${CI_REGISTRY_IMAGE}:latest
+  rules:
+    - if: $CI_COMMIT_TAG
+
+.build:prod:arm64:
+  <<: *pre
+  script:
+    - |
+        docker buildx build --platform linux/arm64 \
+          -t ${CI_REGISTRY_IMAGE}:${CI_COMMIT_TAG} \
+          -t ${CI_REGISTRY_IMAGE}:latest \
+          -f docker/Dockerfile \
+          --push .
+  rules:
+    - if: $CI_COMMIT_TAG
+
+# trigger starhub-deploy project(only works for x86_64 arch)
+trigger_deploy_stg:
+  stage: deploy
+  needs: ['build:stg:amd64']
+  image: alpine:3.14
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH && $CI_COMMIT_BRANCH == $CI_COMMIT_REF_NAME
+  script:
+  - |-
+    sed -i 's/dl-cdn.alpinelinux.org/mirrors.aliyun.com/g' /etc/apk/repositories
+    apk add --no-cache curl
+    curl --fail-with-body \
+    --request POST \
+    --form "token=${STARHUB_DEPLOY_TRIGGER_TOKEN}" \
+    --form ref=main \
+    --form "variables[starhub_tag]=${CI_COMMIT_SHORT_SHA}" \
+    --form "variables[ENV_NAME]=stg" \
+    https://git-devops.opencsg.com/api/v4/projects/58/trigger/pipeline

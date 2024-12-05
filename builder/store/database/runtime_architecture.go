@@ -61,7 +61,7 @@ func (ra *runtimeArchitecturesStoreImpl) DeleteByRuntimeIDAndArchName(ctx contex
 	var arch RuntimeArchitecture
 	_, err := ra.db.Core.NewDelete().Model(&arch).Where("runtime_framework_id = ? and architecture_name = ?", id, archName).Exec(ctx)
 	if err != nil {
-		return fmt.Errorf("deleteing runtime architecture in the db failed, error:%w", err)
+		return fmt.Errorf("deleting runtime architecture in the db failed, error:%w", err)
 	}
 	return nil
 }

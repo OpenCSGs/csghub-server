@@ -7,7 +7,7 @@ import (
 
 // test for useInternalClient
 func Test_useInternalClient(t *testing.T) {
-	c := &Client{}
+	c := &minioClient{}
 	ctx := context.Background()
 	if c.useInternalClient(ctx) != false {
 		t.Errorf("should not use internal s3 client if context not defined")

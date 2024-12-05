@@ -120,12 +120,12 @@ func (c *datasetComponentImpl) Create(ctx context.Context, req *types.CreateData
 		tags     []types.RepoTag
 	)
 
-	namespace, err := c.namespace.FindByPath(ctx, req.Namespace)
+	namespace, err := c.namespaceStore.FindByPath(ctx, req.Namespace)
 	if err != nil {
 		return nil, errors.New("namespace does not exist")
 	}
 
-	user, err := c.user.FindByUsername(ctx, req.Username)
+	user, err := c.userStore.FindByUsername(ctx, req.Username)
 	if err != nil {
 		return nil, errors.New("user does not exist")
 	}
@@ -417,7 +417,7 @@ func (c *datasetComponentImpl) Show(ctx context.Context, namespace, name, curren
 		})
 	}
 
-	likeExists, err := c.uls.IsExist(ctx, currentUser, dataset.Repository.ID)
+	likeExists, err := c.userLikesStore.IsExist(ctx, currentUser, dataset.Repository.ID)
 	if err != nil {
 		newError := fmt.Errorf("failed to check for the presence of the user likes,error:%w", err)
 		return nil, newError
@@ -499,7 +499,7 @@ func (c *datasetComponentImpl) OrgDatasets(ctx context.Context, req *types.OrgDa
 	r := membership.RoleUnknown
 	if req.CurrentUser != "" {
 		r, err = c.userSvcClient.GetMemberRole(ctx, req.Namespace, req.CurrentUser)
-		// log error, and treat user as unkown role in org
+		// log error, and treat user as unknown role in org
 		if err != nil {
 			slog.Error("faild to get member role",
 				slog.String("org", req.Namespace), slog.String("user", req.CurrentUser),

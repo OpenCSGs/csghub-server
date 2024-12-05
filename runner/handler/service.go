@@ -351,7 +351,7 @@ func (s *K8sHandler) ServiceStatus(c *gin.Context) {
 	resp.DeployID = deployID
 	resp.UserID = srv.Annotations["user_id"]
 
-	// retrive pod list and status
+	// retrieve pod list and status
 	if request.NeedDetails {
 		instList, err := s.s.GetServicePodsWithStatus(c.Request.Context(), *cluster, srvName, s.k8sNameSpace)
 		if err != nil {
@@ -387,7 +387,7 @@ func (s *K8sHandler) ServiceStatus(c *gin.Context) {
 		podNames, err := s.GetServicePods(c.Request.Context(), *cluster, srvName, s.k8sNameSpace, 1)
 		if err != nil {
 			slog.Error("get image status failed, can not get pods info", slog.String("srv_name", srvName), slog.Any("error", err))
-			c.JSON(http.StatusInternalServerError, gin.H{"code": 0, "message": "unkown service status, failed to get pods"})
+			c.JSON(http.StatusInternalServerError, gin.H{"code": 0, "message": "unknown service status, failed to get pods"})
 			return
 		}
 		if len(podNames) == 0 {

@@ -282,7 +282,7 @@ func (c *collectionComponentImpl) OrgCollections(ctx context.Context, req *types
 	r := membership.RoleUnknown
 	if req.CurrentUser != "" {
 		r, err = c.userSvcClient.GetMemberRole(ctx, req.Namespace, req.CurrentUser)
-		// log error, and treat user as unkown role in org
+		// log error, and treat user as unknown role in org
 		if err != nil {
 			slog.Error("faild to get member role",
 				slog.String("org", req.Namespace), slog.String("user", req.CurrentUser),

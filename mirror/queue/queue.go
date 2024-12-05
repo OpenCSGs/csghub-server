@@ -74,19 +74,26 @@ func (mq *MirrorQueue) Pop() *MirrorTask {
 	return &task
 }
 
-type PriorityQueue struct {
+type PriorityQueue interface {
+	PushRepoMirror(mt *MirrorTask)
+	PopRepoMirror() *MirrorTask
+	PushLfsMirror(mt *MirrorTask)
+	PopLfsMirror() *MirrorTask
+}
+
+type priorityQueueImpl struct {
 	RepoMirrorQueue MirrorQueue
 	LfsMirrorQueue  MirrorQueue
 }
 
 var (
-	instance *PriorityQueue
+	instance PriorityQueue
 	once     sync.Once
 	err      error
 	c        *config.Config
 )
 
-func NewPriorityQueue(ctx context.Context, config *config.Config) (*PriorityQueue, error) {
+func NewPriorityQueue(ctx context.Context, config *config.Config) (PriorityQueue, error) {
 	redis, err := cache.NewCache(ctx, cache.RedisConfig{
 		Addr:     config.Redis.Endpoint,
 		Username: config.Redis.User,
@@ -95,7 +102,7 @@ func NewPriorityQueue(ctx context.Context, config *config.Config) (*PriorityQueu
 	if err != nil {
 		return nil, fmt.Errorf("initializing redis: %w", err)
 	}
-	mq := &PriorityQueue{
+	mq := &priorityQueueImpl{
 		RepoMirrorQueue: MirrorQueue{
 			redis:     redis,
 			QueueName: repoQueueName,
@@ -108,23 +115,23 @@ func NewPriorityQueue(ctx context.Context, config *config.Config) (*PriorityQueu
 	return mq, nil
 }
 
-func (pq *PriorityQueue) PushRepoMirror(mt *MirrorTask) {
+func (pq *priorityQueueImpl) PushRepoMirror(mt *MirrorTask) {
 	pq.RepoMirrorQueue.Push(mt)
 }
 
-func (pq *PriorityQueue) PopRepoMirror() *MirrorTask {
+func (pq *priorityQueueImpl) PopRepoMirror() *MirrorTask {
 	return pq.RepoMirrorQueue.Pop()
 }
 
-func (pq *PriorityQueue) PushLfsMirror(mt *MirrorTask) {
+func (pq *priorityQueueImpl) PushLfsMirror(mt *MirrorTask) {
 	pq.LfsMirrorQueue.Push(mt)
 }
 
-func (pq *PriorityQueue) PopLfsMirror() *MirrorTask {
+func (pq *priorityQueueImpl) PopLfsMirror() *MirrorTask {
 	return pq.LfsMirrorQueue.Pop()
 }
 
-func GetPriorityQueueInstance() (*PriorityQueue, error) {
+func GetPriorityQueueInstance() (PriorityQueue, error) {
 	once.Do(func() {
 		c, err = config.LoadConfig()
 		instance, err = NewPriorityQueue(context.Background(), c)

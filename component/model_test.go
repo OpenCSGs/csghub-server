@@ -4,96 +4,673 @@ import (
 	"context"
 	"testing"
 
+	"github.com/alibabacloud-go/tea/tea"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
-	gsmock "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/git/gitserver"
 	"opencsg.com/csghub-server/builder/git/gitserver"
+	"opencsg.com/csghub-server/builder/git/membership"
+	"opencsg.com/csghub-server/builder/inference"
 	"opencsg.com/csghub-server/builder/store/database"
-	"opencsg.com/csghub-server/common/tests"
 	"opencsg.com/csghub-server/common/types"
 )
 
-func NewTestModelComponent(stores *tests.MockStores, git gitserver.GitServer) (ModelComponent, error) {
-	c := &modelComponentImpl{}
-	c.ms = stores.Model
-	c.rs = stores.Repo
-	c.SS = stores.SpaceResource
-	c.us = stores.User
-	c.ts = stores.Tag
-	c.ds = stores.Dataset
-	c.repoComponentImpl = &repoComponentImpl{
-		git:  git,
-		user: stores.User,
-		repo: stores.Repo,
-	}
-	return c, nil
-}
+// func TestModelComponent_Index(t *testing.T) {
+// 	ctx := context.TODO()
+// 	mc := initializeTestModelComponent(ctx, t)
 
-func TestModelComponent_SetRelationDatasetsAndPrompts(t *testing.T) {
+// 	filter := &types.RepoFilter{Username: "user"}
+// 	mc.mocks.components.repo.EXPECT().PublicToUser(ctx, types.ModelRepo, "user", filter, 10, 1).Return(
+// 		[]*database.Repository{
+// 			{ID: 1, Name: "r1", Tags: []database.Tag{{Name: "t1"}}},
+// 			{ID: 2, Name: "r2", Tags: []database.Tag{{Name: "t2"}}},
+// 		}, 100, nil,
+// 	)
+
+// 	mc.mocks.stores.ModelMock().EXPECT().ByRepoIDs(ctx, []int64{1, 2}).Return([]database.Model{
+// 		{RepositoryID: 1, ID: 11, Repository: &database.Repository{}},
+// 		{RepositoryID: 2, ID: 12, Repository: &database.Repository{}},
+// 	}, nil)
+
+// 	data, total, err := mc.Index(ctx, filter, 10, 1)
+// 	require.Nil(t, err)
+// 	require.Equal(t, 100, total)
+
+// 	require.Equal(t, []*types.Model{
+// 		{
+// 			ID: 11, Name: "r1", Tags: []types.RepoTag{{Name: "t1"}}, RepositoryID: 1,
+// 			Repository: types.Repository{
+// 				HTTPCloneURL: "https://foo.com/s/.git",
+// 				SSHCloneURL:  "test@127.0.0.1:s/.git",
+// 			},
+// 		},
+// 		{
+// 			ID: 12, Name: "r2", Tags: []types.RepoTag{{Name: "t2"}}, RepositoryID: 2,
+// 			Repository: types.Repository{
+// 				HTTPCloneURL: "https://foo.com/s/.git",
+// 				SSHCloneURL:  "test@127.0.0.1:s/.git",
+// 			},
+// 		},
+// 	}, data)
+
+// }
+
+func TestModelComponent_Create(t *testing.T) {
 	ctx := context.TODO()
+	mc := initializeTestModelComponent(ctx, t)
 
-	stores := tests.NewMockStores(t)
-	gitServer := gsmock.NewMockGitServer(t)
-	model, err := NewTestModelComponent(stores, gitServer)
-	require.Nil(t, err)
-
-	stores.UserMock().EXPECT().FindByUsername(ctx, "foo").Return(database.User{
+	user := database.User{
+		Username: "user",
 		Email:    "foo@bar.com",
-		RoleMask: "foo",
-	}, nil).Once()
-	err = model.SetRelationDatasets(ctx, types.RelationDatasets{
-		Namespace:   "ns",
-		Name:        "n",
-		CurrentUser: "foo",
-	})
-	require.NotNil(t, err)
-	require.Contains(t, err.Error(), "only admin")
+	}
+	mc.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "user").Return(user, nil)
 
-	stores.UserMock().EXPECT().FindByUsername(ctx, "foo").Return(database.User{
-		Email:    "foo@bar.com",
-		RoleMask: "foo-admin",
-	}, nil).Once()
+	dbrepo := &database.Repository{
+		ID:      321,
+		User:    user,
+		Tags:    []database.Tag{{Name: "t1"}},
+		Name:    "n",
+		License: "MIT",
+	}
+	mc.mocks.components.repo.EXPECT().CreateRepo(ctx, types.CreateRepoReq{
+		DefaultBranch: "main",
+		Readme:        generateReadmeData("MIT"),
+		License:       "MIT",
+		Namespace:     "ns",
+		Name:          "n",
+		Nickname:      "n",
+		RepoType:      types.ModelRepo,
+		Username:      "user",
+	}).Return(nil, dbrepo, nil)
 
-	stores.RepoMock().EXPECT().FindByPath(ctx, types.ModelRepo, "ns", "n").Return(&database.Repository{}, nil).Once()
-	// ---
-	// foo: "foo"
-	// bar: "bar"
-	gitServer.EXPECT().GetRepoFileContents(mock.Anything, gitserver.GetRepoInfoByPathReq{
+	mc.mocks.stores.ModelMock().EXPECT().Create(ctx, database.Model{
+		Repository:   dbrepo,
+		RepositoryID: dbrepo.ID,
+		BaseModel:    "base",
+	}).Return(&database.Model{
+		Repository: dbrepo,
+	}, nil)
+	mc.mocks.gitServer.EXPECT().CreateRepoFile(buildCreateFileReq(&types.CreateFileParams{
+		Username:  "user",
+		Email:     "foo@bar.com",
+		Message:   initCommitMessage,
+		Branch:    "main",
+		Content:   generateReadmeData("MIT"),
+		NewBranch: "main",
 		Namespace: "ns",
 		Name:      "n",
-		Ref:       types.MainBranch,
+		FilePath:  readmeFileName,
+	}, types.ModelRepo)).Return(nil)
+	mc.mocks.gitServer.EXPECT().CreateRepoFile(buildCreateFileReq(&types.CreateFileParams{
+		Username:  "user",
+		Email:     "foo@bar.com",
+		Message:   initCommitMessage,
+		Branch:    "main",
+		Content:   spaceGitattributesContent,
+		NewBranch: "main",
+		Namespace: "ns",
+		Name:      "n",
+		FilePath:  gitattributesFileName,
+	}, types.ModelRepo)).Return(nil)
+
+	model, err := mc.Create(ctx, &types.CreateModelReq{
+		BaseModel: "base",
+		CreateRepoReq: types.CreateRepoReq{
+			DefaultBranch: "main",
+			Readme:        "readme",
+			Namespace:     "ns",
+			Name:          "n",
+			License:       "MIT",
+			Username:      "user",
+		},
+	})
+	require.Nil(t, err)
+
+	require.Equal(t, &types.Model{
+		License: "MIT",
+		Name:    "n",
+		User: &types.User{
+			Username: "user",
+			Email:    "foo@bar.com",
+		},
+		Tags: []types.RepoTag{{Name: "t1"}},
+		Repository: types.Repository{
+			HTTPCloneURL: "https://foo.com/s/.git",
+			SSHCloneURL:  "test@127.0.0.1:s/.git",
+		},
+	}, model)
+
+}
+
+func TestModelComponent_Update(t *testing.T) {
+	ctx := context.TODO()
+	mc := initializeTestModelComponent(ctx, t)
+
+	req := &types.UpdateModelReq{
+		BaseModel:     tea.String("base2"),
+		UpdateRepoReq: types.UpdateRepoReq{RepoType: types.ModelRepo},
+	}
+	mc.mocks.components.repo.EXPECT().UpdateRepo(ctx, req.UpdateRepoReq).Return(&database.Repository{
+		Name: "n",
+		ID:   1,
+	}, nil)
+	mc.mocks.stores.ModelMock().EXPECT().ByRepoID(ctx, int64(1)).Return(&database.Model{
+		ID:        2,
+		BaseModel: "base",
+	}, nil)
+
+	mc.mocks.stores.ModelMock().EXPECT().Update(ctx, database.Model{
+		ID:        2,
+		BaseModel: "base2",
+	}).Return(&database.Model{
+		ID:        2,
+		BaseModel: "base2",
+	}, nil)
+
+	m, err := mc.Update(ctx, req)
+	require.Nil(t, err)
+	require.Equal(t, &types.Model{
+		ID:           2,
+		BaseModel:    "base2",
+		Name:         "n",
+		RepositoryID: 1,
+	}, m)
+}
+
+func TestModelComponent_Delete(t *testing.T) {
+	ctx := context.TODO()
+	mc := initializeTestModelComponent(ctx, t)
+
+	mc.mocks.stores.ModelMock().EXPECT().FindByPath(ctx, "ns", "n").Return(&database.Model{ID: 1}, nil)
+	mc.mocks.components.repo.EXPECT().DeleteRepo(ctx, types.DeleteRepoReq{
+		Username:  "user",
+		Namespace: "ns",
+		Name:      "n",
+		RepoType:  types.ModelRepo,
+	}).Return(nil, nil)
+	mc.mocks.stores.ModelMock().EXPECT().Delete(ctx, database.Model{ID: 1}).Return(nil)
+
+	err := mc.Delete(ctx, "ns", "n", "user")
+	require.Nil(t, err)
+
+}
+
+func TestModelComponent_Show(t *testing.T) {
+	ctx := context.TODO()
+	mc := initializeTestModelComponent(ctx, t)
+
+	mc.mocks.stores.ModelMock().EXPECT().FindByPath(ctx, "ns", "n").Return(&database.Model{
+		ID:           1,
+		RepositoryID: 123,
+		Repository:   &database.Repository{ID: 123, Name: "n", Path: "foo/bar"},
+	}, nil)
+	mc.mocks.components.repo.EXPECT().GetUserRepoPermission(ctx, "user", &database.Repository{
+		ID:   123,
+		Name: "n",
+		Path: "foo/bar",
+	}).Return(
+		&types.UserRepoPermission{CanRead: true, CanAdmin: true}, nil,
+	)
+	mc.mocks.components.repo.EXPECT().GetNameSpaceInfo(ctx, "ns").Return(&types.Namespace{Path: "ns"}, nil)
+
+	mc.mocks.stores.UserLikesMock().EXPECT().IsExist(ctx, "user", int64(123)).Return(true, nil)
+	mc.mocks.stores.RepoRuntimeFrameworkMock().EXPECT().GetByRepoIDsAndType(
+		ctx, int64(123), mock.Anything,
+	).Return([]database.RepositoriesRuntimeFramework{{}}, nil)
+
+	model, err := mc.Show(ctx, "ns", "n", "user")
+	require.Nil(t, err)
+	require.Equal(t, &types.Model{
+		ID:           1,
+		Name:         "n",
+		Namespace:    &types.Namespace{Path: "ns"},
+		UserLikes:    true,
+		RepositoryID: 123,
+		CanManage:    true,
+		User:         &types.User{},
+		Path:         "foo/bar",
+		Repository: types.Repository{
+			HTTPCloneURL: "https://foo.com/s/foo/bar.git",
+			SSHCloneURL:  "test@127.0.0.1:s/foo/bar.git",
+		},
+		EnableInference: true,
+		EnableFinetune:  true,
+		WidgetType:      types.ModelWidgetTypeGeneration,
+	}, model)
+}
+
+func TestModelComponent_GetServerless(t *testing.T) {
+	ctx := context.TODO()
+	mc := initializeTestModelComponent(ctx, t)
+
+	mc.mocks.stores.ModelMock().EXPECT().FindByPath(ctx, "ns", "n").Return(&database.Model{
+		ID:           1,
+		RepositoryID: 123,
+		Repository:   &database.Repository{ID: 123, Name: "n"},
+	}, nil)
+
+	mc.mocks.components.repo.EXPECT().AllowReadAccessRepo(
+		ctx, &database.Repository{ID: 123, Name: "n"}, "user",
+	).Return(true, nil)
+
+	deploy := &database.Deploy{ID: 1}
+	mc.mocks.stores.DeployTaskMock().EXPECT().GetServerlessDeployByRepID(ctx, int64(123)).Return(
+		deploy, nil,
+	)
+
+	mc.mocks.components.repo.EXPECT().GenerateEndpoint(ctx, deploy).Return("ep", "")
+
+	dr, err := mc.GetServerless(ctx, "ns", "n", "user")
+	require.Nil(t, err)
+	require.Equal(t, &types.DeployRepo{
+		DeployID:      1,
+		ProxyEndpoint: "ep",
+		Status:        "Stopped",
+	}, dr)
+
+}
+
+func TestModelComponent_SDKModelInfo(t *testing.T) {
+	ctx := context.TODO()
+	mc := initializeTestModelComponent(ctx, t)
+
+	repo := &database.Repository{
+		ID: 123, Name: "n", Path: "p/p",
+		User: database.User{Username: "user"},
+		Tags: []database.Tag{{Name: "t1"}},
+	}
+	mc.mocks.stores.ModelMock().EXPECT().FindByPath(ctx, "ns", "n").Return(&database.Model{
+		ID:           1,
+		RepositoryID: 123,
+		Repository:   repo}, nil)
+	mc.mocks.components.repo.EXPECT().AllowReadAccessRepo(
+		ctx, repo, "user",
+	).Return(true, nil)
+	mc.mocks.gitServer.EXPECT().GetRepoLastCommit(ctx, gitserver.GetRepoLastCommitReq{
+		Namespace: "ns",
+		Name:      "n",
+		Ref:       "main",
+		RepoType:  types.ModelRepo,
+	}).Return(&types.Commit{ID: "zzz"}, nil)
+	file := types.File{Path: "file1.txt", Type: "file", Size: 100, SHA: "sha1"}
+	repoFiles := []*types.File{&file}
+	mc.mocks.gitServer.EXPECT().GetRepoFileTree(mock.Anything, mock.Anything).Return(repoFiles, nil)
+	mc.mocks.components.repo.EXPECT().RelatedRepos(ctx, int64(123), "user").Return(
+		map[types.RepositoryType][]*database.Repository{
+			types.SpaceRepo: {
+				{Name: "sp"},
+			},
+		}, nil,
+	)
+
+	info, err := mc.SDKModelInfo(ctx, "ns", "n", "main", "user")
+	require.Nil(t, err)
+	require.Equal(t, &types.SDKModelInfo{
+		ID:       "p/p",
+		Spaces:   []string{"sp"},
+		Author:   "user",
+		Sha:      "zzz",
+		Siblings: []types.SDKFile{{Filename: "file1.txt"}},
+		Tags:     []string{"t1"},
+	}, info)
+
+}
+
+func TestModelComponent_Relations(t *testing.T) {
+	ctx := context.TODO()
+	mc := initializeTestModelComponent(ctx, t)
+
+	repo := &database.Repository{}
+	mc.mocks.stores.ModelMock().EXPECT().FindByPath(ctx, "ns", "n").Return(&database.Model{
+		RepositoryID: 123,
+		Repository:   repo,
+	}, nil)
+	mc.mocks.components.repo.EXPECT().AllowReadAccessRepo(ctx, repo, "user").Return(true, nil)
+	mc.mocks.components.repo.EXPECT().RelatedRepos(ctx, int64(123), "user").Return(
+		map[types.RepositoryType][]*database.Repository{
+			types.DatasetRepo: {{Name: "d1"}},
+			types.CodeRepo:    {{Name: "c1"}},
+			types.PromptRepo:  {{Name: "p1"}},
+			types.SpaceRepo:   {{Path: "sp"}},
+		}, nil,
+	)
+	mc.mocks.components.space.EXPECT().ListByPath(ctx, []string{"sp"}).Return([]*types.Space{
+		{Name: "s1"},
+	}, nil)
+
+	rels, err := mc.Relations(ctx, "ns", "n", "user")
+	require.Nil(t, err)
+	require.Equal(t, &types.Relations{
+		Datasets: []*types.Dataset{{Name: "d1"}},
+		Codes:    []*types.Code{{Name: "c1"}},
+		Prompts:  []*types.PromptRes{{Name: "p1"}},
+		Spaces:   []*types.Space{{Name: "s1"}},
+	}, rels)
+}
+
+func TestModelComponent_SetRelationDatasets(t *testing.T) {
+	ctx := context.TODO()
+	mc := initializeTestModelComponent(ctx, t)
+
+	mc.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "user").Return(database.User{
+		RoleMask: "admin",
+	}, nil)
+	mc.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, types.ModelRepo, "ns", "n").Return(
+		&database.Repository{}, nil,
+	)
+	mc.mocks.gitServer.EXPECT().GetRepoFileContents(mock.Anything, gitserver.GetRepoInfoByPathReq{
+		Namespace: "ns",
+		Name:      "n",
+		Ref:       "main",
+		Path:      REPOCARD_FILENAME,
+		RepoType:  types.ModelRepo,
+	}).Return(&types.File{}, nil)
+	mc.mocks.gitServer.EXPECT().UpdateRepoFile(&types.UpdateFileReq{
+		Username:  "user",
+		Message:   "update dataset tags",
+		Branch:    "main",
+		Content:   "LS0tCmRhdGFzZXRzOgogICAgLSBkMQoKLS0tCg==",
+		Namespace: "ns",
+		Name:      "n",
+		FilePath:  "README.md",
+		RepoType:  types.ModelRepo,
+	}).Return(nil)
+	err := mc.SetRelationDatasets(ctx, types.RelationDatasets{
+		Datasets:    []string{"d1"},
+		Namespace:   "ns",
+		Name:        "n",
+		CurrentUser: "user",
+	})
+	require.Nil(t, err)
+}
+
+func TestModelComponent_AddRelationDataset(t *testing.T) {
+	ctx := context.TODO()
+	mc := initializeTestModelComponent(ctx, t)
+
+	mc.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "user").Return(database.User{
+		RoleMask: "admin",
+	}, nil)
+	mc.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, types.ModelRepo, "ns", "n").Return(
+		&database.Repository{}, nil,
+	)
+	mc.mocks.gitServer.EXPECT().GetRepoFileContents(mock.Anything, gitserver.GetRepoInfoByPathReq{
+		Namespace: "ns",
+		Name:      "n",
+		Ref:       "main",
+		Path:      REPOCARD_FILENAME,
+		RepoType:  types.ModelRepo,
+	}).Return(&types.File{}, nil)
+	mc.mocks.gitServer.EXPECT().UpdateRepoFile(&types.UpdateFileReq{
+		Username:  "user",
+		Message:   "add relation dataset",
+		Branch:    "main",
+		Content:   "LS0tCmRhdGFzZXRzOgogICAgLSBkMQoKLS0tCg==",
+		Namespace: "ns",
+		Name:      "n",
+		FilePath:  "README.md",
+		RepoType:  types.ModelRepo,
+	}).Return(nil)
+	err := mc.AddRelationDataset(ctx, types.RelationDataset{
+		Dataset:     "d1",
+		Namespace:   "ns",
+		Name:        "n",
+		CurrentUser: "user",
+	})
+	require.Nil(t, err)
+}
+
+func TestModelComponent_DeleteRelationDataset(t *testing.T) {
+	ctx := context.TODO()
+	mc := initializeTestModelComponent(ctx, t)
+
+	mc.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "user").Return(database.User{
+		RoleMask: "admin",
+	}, nil)
+	mc.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, types.ModelRepo, "ns", "n").Return(
+		&database.Repository{}, nil,
+	)
+	mc.mocks.gitServer.EXPECT().GetRepoFileContents(mock.Anything, gitserver.GetRepoInfoByPathReq{
+		Namespace: "ns",
+		Name:      "n",
+		Ref:       "main",
 		Path:      REPOCARD_FILENAME,
 		RepoType:  types.ModelRepo,
 	}).Return(&types.File{
-		Content: "LS0tCiBmb286ICJmb28iCiBiYXI6ICJiYXIi",
-	}, nil).Once()
-
-	// ---
-	// bar: bar
-	// datasets:
-	//     - a
-	//     - b
-	// foo: foo
-
-	// ---
-	gitServer.EXPECT().UpdateRepoFile(&types.UpdateFileReq{
-		Branch:    types.MainBranch,
-		Message:   "update dataset tags",
-		FilePath:  REPOCARD_FILENAME,
-		RepoType:  types.ModelRepo,
+		Content: "LS0tCiBkYXRhc2V0czoKICAgLSBkczE=",
+	}, nil)
+	mc.mocks.gitServer.EXPECT().UpdateRepoFile(&types.UpdateFileReq{
+		Username:  "user",
+		Message:   "delete relation dataset",
+		Branch:    "main",
+		Content:   "LS0tCmRhdGFzZXRzOgogICAgLSBkczEKCi0tLQ==",
 		Namespace: "ns",
 		Name:      "n",
-		Username:  "foo",
-		Email:     "foo@bar.com",
-		Content:   "LS0tCmJhcjogYmFyCmRhdGFzZXRzOgogICAgLSBhCiAgICAtIGIKZm9vOiBmb28KCi0tLQ==",
-	}).Return(nil).Once()
-
-	err = model.SetRelationDatasets(ctx, types.RelationDatasets{
+		FilePath:  "README.md",
+		RepoType:  types.ModelRepo,
+	}).Return(nil)
+	err := mc.DelRelationDataset(ctx, types.RelationDataset{
+		Dataset:     "d1",
 		Namespace:   "ns",
 		Name:        "n",
-		CurrentUser: "foo",
-		Datasets:    []string{"a", "b"},
+		CurrentUser: "user",
 	})
 	require.Nil(t, err)
+}
+
+func TestModelComponent_Predict(t *testing.T) {
+	ctx := context.TODO()
+	mc := initializeTestModelComponent(ctx, t)
+
+	mc.mocks.inferenceClient.EXPECT().Predict(inference.ModelID{
+		Owner: "ns",
+		Name:  "n",
+	}, &inference.PredictRequest{
+		Prompt: "foo",
+	}).Return(&inference.PredictResponse{
+		GeneratedText: "abcd",
+	}, nil)
+
+	resp, err := mc.Predict(ctx, &types.ModelPredictReq{
+		Namespace:   "ns",
+		Name:        "n",
+		Input:       "foo",
+		CurrentUser: "user",
+	})
+	require.Nil(t, err)
+	require.Equal(t, &types.ModelPredictResp{
+		Content: "abcd",
+	}, resp)
+
+}
+
+// func TestModelComponent_Deploy(t *testing.T) {
+// 	ctx := context.TODO()
+// 	mc := initializeTestModelComponent(ctx, t)
+
+// 	mc.mocks.stores.ModelMock().EXPECT().FindByPath(ctx, "ns", "n").Return(&database.Model{
+// 		RepositoryID: int64(123),
+// 		Repository: &database.Repository{
+// 			ID:   1,
+// 			Path: "foo",
+// 		},
+// 	}, nil)
+// 	mc.mocks.stores.DeployTaskMock().EXPECT().GetServerlessDeployByRepID(ctx, int64(1)).Return(
+// 		nil, nil,
+// 	)
+// 	mc.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "user").Return(database.User{
+// 		RoleMask: "admin",
+// 	}, nil)
+// 	mc.mocks.stores.RuntimeFrameworkMock().EXPECT().FindEnabledByID(ctx, int64(11)).Return(
+// 		&database.RuntimeFramework{}, nil,
+// 	)
+// 	mc.mocks.components.repo.EXPECT().IsAdminRole(database.User{
+// 		RoleMask: "admin",
+// 	}).Return(true)
+// 	mc.mocks.stores.SpaceResourceMock().EXPECT().FindByID(ctx, int64(123)).Return(
+// 		&database.SpaceResource{
+// 			ID:        123,
+// 			Resources: `{"memory": "foo"}`,
+// 		}, nil,
+// 	)
+
+// 	mc.mocks.deployer.EXPECT().CheckResourceAvailable(ctx, int64(0), &types.HardWare{
+// 		Memory: "foo",
+// 	}).Return(true, nil)
+// 	mc.mocks.deployer.EXPECT().Deploy(ctx, types.DeployRepo{
+// 		DeployName: "dp",
+// 		Path:       "foo",
+// 		Hardware:   "{\"memory\": \"foo\"}",
+// 		Annotation: "{\"hub-res-name\":\"ns/n\",\"hub-res-type\":\"model\"}",
+// 		ClusterID:  "cluster",
+// 		RepoID:     1,
+// 		SKU:        "123",
+// 		Type:       types.ServerlessType,
+// 	}).Return(111, nil)
+
+// 	id, err := mc.Deploy(ctx, types.DeployActReq{
+// 		Namespace:   "ns",
+// 		Name:        "n",
+// 		CurrentUser: "user",
+// 		DeployType:  types.ServerlessType,
+// 	}, types.ModelRunReq{
+// 		RuntimeFrameworkID: 11,
+// 		ResourceID:         123,
+// 		ClusterID:          "cluster",
+// 		DeployName:         "dp",
+// 	})
+// 	require.Nil(t, err)
+// 	require.Equal(t, int64(111), id)
+
+// }
+
+func TestModelComponent_ListModelsByRuntimeFrameworkID(t *testing.T) {
+	ctx := context.TODO()
+	mc := initializeTestModelComponent(ctx, t)
+
+	mc.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "user").Return(database.User{ID: 1}, nil)
+	mc.mocks.stores.RepoRuntimeFrameworkMock().EXPECT().ListByRuntimeFrameworkID(ctx, int64(123), 1).Return(
+		[]database.RepositoriesRuntimeFramework{
+			{RepoID: 1}, {RepoID: 2},
+		}, nil,
+	)
+	mc.mocks.stores.RepoMock().EXPECT().ListRepoPublicToUserByRepoIDs(ctx, types.ModelRepo, int64(1), "", "", 10, 1, []int64{1, 2}).Return([]*database.Repository{
+		{ID: 1, Name: "r1"},
+	}, 100, nil)
+
+	models, total, err := mc.ListModelsByRuntimeFrameworkID(ctx, "user", 10, 1, 123, 1)
+	require.Nil(t, err)
+	require.Equal(t, 100, total)
+	require.Equal(t, []types.Model{
+		{Name: "r1", RepositoryID: 1},
+	}, models)
+
+}
+
+func TestModelComponent_SetRuntimeFrameworkModes(t *testing.T) {
+	ctx := context.TODO()
+	mc := initializeTestModelComponent(ctx, t)
+
+	mc.mocks.stores.RuntimeFrameworkMock().EXPECT().FindByID(ctx, int64(1)).Return(
+		&database.RuntimeFramework{}, nil,
+	)
+	mc.mocks.stores.ModelMock().EXPECT().ListByPath(ctx, []string{"a", "b"}).Return(
+		[]database.Model{
+			{RepositoryID: 1, Repository: &database.Repository{ID: 1, Path: "m1/foo"}},
+			{RepositoryID: 2, Repository: &database.Repository{ID: 2, Path: "m2/foo"}},
+		}, nil,
+	)
+	rftags := []*database.Tag{{Name: "t1"}, {Name: "t2"}}
+	mc.mocks.stores.TagMock().EXPECT().GetTagsByScopeAndCategories(
+		ctx, database.TagScope("model"), []string{"runtime_framework", "resource"},
+	).Return(rftags, nil)
+
+	mc.mocks.stores.RepoRuntimeFrameworkMock().EXPECT().GetByIDsAndType(
+		ctx, int64(1), int64(1), 1,
+	).Return([]database.RepositoriesRuntimeFramework{}, nil)
+	mc.mocks.stores.RepoRuntimeFrameworkMock().EXPECT().GetByIDsAndType(
+		ctx, int64(1), int64(2), 1,
+	).Return([]database.RepositoriesRuntimeFramework{{}}, nil)
+
+	mc.mocks.stores.RepoRuntimeFrameworkMock().EXPECT().Add(ctx, int64(1), int64(1), 1).Return(nil)
+	mc.mocks.components.runtimeArchitecture.EXPECT().AddRuntimeFrameworkTag(
+		ctx, rftags, int64(1), int64(1),
+	).Return(nil)
+	mc.mocks.components.runtimeArchitecture.EXPECT().AddResourceTag(ctx, rftags, "foo", int64(1)).Return(nil)
+	f, err := mc.SetRuntimeFrameworkModes(ctx, 1, 1, []string{"a", "b"})
+	require.Nil(t, err)
+	require.Empty(t, f)
+
+}
+
+func TestModelComponent_DeleteRuntimeFrameworkModes(t *testing.T) {
+	ctx := context.TODO()
+	mc := initializeTestModelComponent(ctx, t)
+
+	mc.mocks.stores.ModelMock().EXPECT().ListByPath(ctx, []string{"a", "b"}).Return(
+		[]database.Model{
+			{RepositoryID: 1, Repository: &database.Repository{ID: 1, Path: "m1/foo"}},
+			{RepositoryID: 2, Repository: &database.Repository{ID: 2, Path: "m2/foo"}},
+		}, nil,
+	)
+
+	mc.mocks.stores.RepoRuntimeFrameworkMock().EXPECT().Delete(ctx, int64(123), int64(1), 1).Return(nil)
+	mc.mocks.stores.RepoRuntimeFrameworkMock().EXPECT().Delete(ctx, int64(123), int64(2), 1).Return(nil)
+
+	f, err := mc.DeleteRuntimeFrameworkModes(ctx, 1, 123, []string{"a", "b"})
+	require.Nil(t, err)
+	require.Empty(t, f)
+}
+
+func TestModelComponent_ListModelsOfRuntimeFrameworks(t *testing.T) {
+	ctx := context.TODO()
+	mc := initializeTestModelComponent(ctx, t)
+
+	mc.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "user").Return(database.User{ID: 1}, nil)
+	mc.mocks.stores.RepoRuntimeFrameworkMock().EXPECT().ListRepoIDsByType(ctx, 1).Return(
+		[]database.RepositoriesRuntimeFramework{
+			{RepoID: 123},
+		}, nil,
+	)
+	mc.mocks.stores.RepoMock().EXPECT().ListRepoPublicToUserByRepoIDs(ctx, types.ModelRepo, int64(1), "s", "ss", 10, 1, []int64{123}).Return([]*database.Repository{
+		{Name: "r1", Path: "foo"},
+	}, 100, nil)
+	data, total, err := mc.ListModelsOfRuntimeFrameworks(ctx, "user", "s", "ss", 10, 1, 1)
+	require.Nil(t, err)
+	require.Equal(t, 100, total)
+	require.Equal(t, []types.Model{
+		{
+			Name:            "r1",
+			Path:            "foo",
+			EnableInference: true,
+		},
+	}, data)
+
+}
+
+func TestModelComponent_OrgModels(t *testing.T) {
+	ctx := context.TODO()
+	mc := initializeTestModelComponent(ctx, t)
+
+	mc.mocks.userSvcClient.EXPECT().GetMemberRole(ctx, "ns", "user").Return(membership.RoleAdmin, nil)
+	mc.mocks.stores.ModelMock().EXPECT().ByOrgPath(ctx, "ns", 10, 1, false).Return([]database.Model{
+		{RepositoryID: 1, Repository: &database.Repository{ID: 1, Path: "foo", Name: "r1"}},
+	}, 100, nil)
+	data, total, err := mc.OrgModels(ctx, &types.OrgModelsReq{
+		Namespace:   "ns",
+		CurrentUser: "user",
+		PageOpts: types.PageOpts{
+			Page:     1,
+			PageSize: 10,
+		},
+	})
+	require.Nil(t, err)
+	require.Equal(t, 100, total)
+	require.Equal(t, []types.Model{
+		{
+			Name:         "r1",
+			Path:         "foo",
+			RepositoryID: 1,
+		},
+	}, data)
 
 }
