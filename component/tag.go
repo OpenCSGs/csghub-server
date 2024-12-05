@@ -15,6 +15,7 @@ import (
 )
 
 type TagComponent interface {
+	AllTagsByScopeAndCategory(ctx context.Context, scope string, category string) ([]*database.Tag, error)
 	AllTags(ctx context.Context) ([]database.Tag, error)
 	ClearMetaTags(ctx context.Context, repoType types.RepositoryType, namespace, name string) error
 	UpdateMetaTags(ctx context.Context, tagScope database.TagScope, namespace, name, content string) ([]*database.RepositoryTag, error)

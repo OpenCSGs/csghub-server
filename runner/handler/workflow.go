@@ -19,7 +19,7 @@ type ArgoHandler struct {
 	workflowNameSpace  string
 	modelDockerRegBase string
 	config             *config.Config
-	wfc                *component.WorkFlowComponent
+	wfc                component.WorkFlowComponent
 }
 
 func NewArgoHandler(config *config.Config, clusterPool *cluster.ClusterPool) (*ArgoHandler, error) {

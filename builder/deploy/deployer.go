@@ -38,7 +38,7 @@ type Deployer interface {
 	UpdateCluster(ctx context.Context, data types.ClusterRequest) (*types.UpdateClusterResponse, error)
 	UpdateDeploy(ctx context.Context, dur *types.DeployUpdateReq, deploy *database.Deploy) error
 	StartDeploy(ctx context.Context, deploy *database.Deploy) error
-	CheckResourceAvailable(ctx context.Context, clusterId string, orderDetailID int64, hardWare *types.HardWare) (bool, error)
+	CheckResourceAvailable(ctx context.Context, clusterId string, hardWare *types.HardWare) (bool, error)
 	SubmitEvaluation(ctx context.Context, req types.EvaluationReq) (*types.ArgoWorkFlowRes, error)
 	ListEvaluations(context.Context, string, int, int) (*types.ArgoWorkFlowListRes, error)
 	DeleteEvaluation(ctx context.Context, req types.ArgoWorkFlowDeleteReq) error
@@ -83,15 +83,13 @@ func newDeployer(s scheduler.Scheduler, ib imagebuilder.Builder, ir imagerunner.
 	}
 
 	go d.refreshStatus()
-	if d.c.IsMasterHost {
-		go func() {
-			err = d.s.Run()
-			if err != nil {
-				slog.Error("run scheduler failed", slog.Any("error", err))
-			}
-		}()
-		go d.startAccounting()
-	}
+	go func() {
+		err = d.s.Run()
+		if err != nil {
+			slog.Error("run scheduler failed", slog.Any("error", err))
+		}
+	}()
+	go d.startAccounting()
 	return d, nil
 }
 

@@ -9,13 +9,30 @@ import (
 	"opencsg.com/csghub-server/common/types"
 )
 
-type ArgoWorkFlowStore struct {
+type argoWorkFlowStoreImpl struct {
 	db *DB
 }
 
-func NewArgoWorkFlowStore() *ArgoWorkFlowStore {
-	return &ArgoWorkFlowStore{
+type ArgoWorkFlowStore interface {
+	FindByID(ctx context.Context, id int64) (WorkFlow ArgoWorkflow, err error)
+	FindByTaskID(ctx context.Context, id string) (WorkFlow ArgoWorkflow, err error)
+	FindByUsername(ctx context.Context, username string, per, page int) (WorkFlows []ArgoWorkflow, total int, err error)
+	CreateWorkFlow(ctx context.Context, workFlow ArgoWorkflow) (*ArgoWorkflow, error)
+	// mainly for update status
+	UpdateWorkFlow(ctx context.Context, workFlow ArgoWorkflow) (*ArgoWorkflow, error)
+	// delete workflow by id
+	DeleteWorkFlow(ctx context.Context, id int64) error
+}
+
+func NewArgoWorkFlowStore() ArgoWorkFlowStore {
+	return &argoWorkFlowStoreImpl{
 		db: defaultDB,
+	}
+}
+
+func NewArgoWorkFlowStoreWithDB(db *DB) ArgoWorkFlowStore {
+	return &argoWorkFlowStoreImpl{
+		db: db,
 	}
 }
 
@@ -45,7 +62,7 @@ type ArgoWorkflow struct {
 	FailuresURL  string                 `bun:"," json:"failures_url"`
 }
 
-func (s *ArgoWorkFlowStore) FindByID(ctx context.Context, id int64) (WorkFlow ArgoWorkflow, err error) {
+func (s *argoWorkFlowStoreImpl) FindByID(ctx context.Context, id int64) (WorkFlow ArgoWorkflow, err error) {
 	err = s.db.Operator.Core.NewSelect().Model(&WorkFlow).Where("id = ?", id).Scan(ctx, &WorkFlow)
 	if err != nil {
 		return
@@ -53,7 +70,7 @@ func (s *ArgoWorkFlowStore) FindByID(ctx context.Context, id int64) (WorkFlow Ar
 	return
 }
 
-func (s *ArgoWorkFlowStore) FindByTaskID(ctx context.Context, id string) (WorkFlow ArgoWorkflow, err error) {
+func (s *argoWorkFlowStoreImpl) FindByTaskID(ctx context.Context, id string) (WorkFlow ArgoWorkflow, err error) {
 	err = s.db.Operator.Core.NewSelect().Model(&WorkFlow).Where("task_id = ?", id).Scan(ctx, &WorkFlow)
 	if err != nil {
 		return
@@ -61,7 +78,7 @@ func (s *ArgoWorkFlowStore) FindByTaskID(ctx context.Context, id string) (WorkFl
 	return
 }
 
-func (s *ArgoWorkFlowStore) FindByUsername(ctx context.Context, username string, per, page int) (WorkFlows []ArgoWorkflow, total int, err error) {
+func (s *argoWorkFlowStoreImpl) FindByUsername(ctx context.Context, username string, per, page int) (WorkFlows []ArgoWorkflow, total int, err error) {
 	query := s.db.Operator.Core.
 		NewSelect().
 		Model(&WorkFlows).
@@ -82,7 +99,7 @@ func (s *ArgoWorkFlowStore) FindByUsername(ctx context.Context, username string,
 	return
 }
 
-func (s *ArgoWorkFlowStore) CreateWorkFlow(ctx context.Context, workFlow ArgoWorkflow) (*ArgoWorkflow, error) {
+func (s *argoWorkFlowStoreImpl) CreateWorkFlow(ctx context.Context, workFlow ArgoWorkflow) (*ArgoWorkflow, error) {
 	res, err := s.db.Core.NewInsert().Model(&workFlow).Exec(ctx, &workFlow)
 	if err := assertAffectedOneRow(res, err); err != nil {
 		return nil, fmt.Errorf("failed to save WorkFlow in db, error:%w", err)
@@ -92,13 +109,13 @@ func (s *ArgoWorkFlowStore) CreateWorkFlow(ctx context.Context, workFlow ArgoWor
 }
 
 // mainly for update status
-func (s *ArgoWorkFlowStore) UpdateWorkFlow(ctx context.Context, workFlow ArgoWorkflow) (*ArgoWorkflow, error) {
+func (s *argoWorkFlowStoreImpl) UpdateWorkFlow(ctx context.Context, workFlow ArgoWorkflow) (*ArgoWorkflow, error) {
 	_, err := s.db.Core.NewUpdate().Model(&workFlow).WherePK().Exec(ctx)
 	return &workFlow, err
 }
 
 // delete workflow by id
-func (s *ArgoWorkFlowStore) DeleteWorkFlow(ctx context.Context, id int64) error {
+func (s *argoWorkFlowStoreImpl) DeleteWorkFlow(ctx context.Context, id int64) error {
 	_, err := s.db.Core.NewDelete().Model(&ArgoWorkflow{}).Where("id = ?", id).Exec(ctx)
 	return err
 }
