@@ -22,12 +22,12 @@ import (
 )
 
 type MinioLFSSyncWorker struct {
-	mq                 *queue.PriorityQueue
+	mq                 queue.PriorityQueue
 	tasks              chan queue.MirrorTask
 	wg                 sync.WaitGroup
 	mirrorStore        database.MirrorStore
 	lfsMetaObjectStore database.LfsMetaObjectStore
-	s3Client           *s3.Client
+	s3Client           s3.Client
 	config             *config.Config
 	repoStore          database.RepoStore
 	numWorkers         int
@@ -269,7 +269,7 @@ func (w *MinioLFSSyncWorker) DownloadAndUploadLFSFile(ctx context.Context, mirro
 
 	req, err := http.NewRequest("GET", pointer.DownloadURL, nil)
 	if err != nil {
-		return fmt.Errorf("failed to create downlaod request: %w", err)
+		return fmt.Errorf("failed to create download request: %w", err)
 	}
 
 	parsedURL, err := url.Parse(pointer.DownloadURL)

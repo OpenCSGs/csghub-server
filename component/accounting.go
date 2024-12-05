@@ -12,9 +12,9 @@ import (
 )
 
 type accountingComponentImpl struct {
-	acctClient *accounting.AccountingClient
-	user       database.UserStore
-	deploy     database.DeployTaskStore
+	acctountingClient accounting.AccountingClient
+	userStore         database.UserStore
+	deployTaskStore   database.DeployTaskStore
 }
 
 type AccountingComponent interface {
@@ -27,19 +27,19 @@ func NewAccountingComponent(config *config.Config) (AccountingComponent, error) 
 		return nil, err
 	}
 	return &accountingComponentImpl{
-		acctClient: c,
-		user:       database.NewUserStore(),
-		deploy:     database.NewDeployTaskStore(),
+		acctountingClient: c,
+		userStore:         database.NewUserStore(),
+		deployTaskStore:   database.NewDeployTaskStore(),
 	}, nil
 }
 
 func (ac *accountingComponentImpl) ListMeteringsByUserIDAndTime(ctx context.Context, req types.ACCT_STATEMENTS_REQ) (interface{}, error) {
-	user, err := ac.user.FindByUsername(ctx, req.CurrentUser)
+	user, err := ac.userStore.FindByUsername(ctx, req.CurrentUser)
 	if err != nil {
 		return nil, fmt.Errorf("user does not exist, %w", err)
 	}
 	if user.UUID != req.UserUUID {
 		return nil, errors.New("invalid user")
 	}
-	return ac.acctClient.ListMeteringsByUserIDAndTime(req)
+	return ac.acctountingClient.ListMeteringsByUserIDAndTime(req)
 }

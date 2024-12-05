@@ -86,7 +86,7 @@ func (c *Client) addMember(ctx context.Context, org, member string, role members
 		}
 		return err
 	}
-	// unkown server error happend
+	// unknown server error happened
 	slog.ErrorContext(ctx, "fail to get team member from gitea", slog.Any("err", err))
 	return err
 }

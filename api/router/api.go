@@ -704,13 +704,13 @@ func createHFRoutes(r *gin.Engine, hfdsHandler *handler.HFDatasetHandler, repoCo
 			hfAPIGroup.GET("/whoami-v2", userHandler.UserPermission)
 			hfModelAPIGroup := hfAPIGroup.Group("/models")
 			{
-				// compitable with HF model info api, used for sdk like this:  huggingface_hub.model_info(repo_id, revision)
+				// compatible with HF model info api, used for sdk like this:  huggingface_hub.model_info(repo_id, revision)
 				hfModelAPIGroup.GET("/:namespace/:name/revision/:ref", middleware.RepoMapping(types.ModelRepo), modelHandler.SDKModelInfo)
 				hfModelAPIGroup.GET("/:namespace/:name", middleware.RepoMapping(types.ModelRepo), modelHandler.SDKModelInfo)
 			}
 			hfDSAPIGroup := hfAPIGroup.Group("/datasets")
 			{
-				// compitable with HF dataset info api, used for sdk like this: huggingface_hub.dataset_info(repo_id, revision)
+				// compatible with HF dataset info api, used for sdk like this: huggingface_hub.dataset_info(repo_id, revision)
 				hfDSAPIGroup.GET("/:namespace/:name/revision/:ref", middleware.RepoMapping(types.DatasetRepo), repoCommonHandler.SDKListFiles)
 				hfDSAPIGroup.GET("/:namespace/:name", middleware.RepoMapping(types.DatasetRepo), repoCommonHandler.SDKListFiles)
 				hfDSAPIGroup.POST("/:namespace/:name/paths-info/:ref", hfdsHandler.DatasetPathsInfo)

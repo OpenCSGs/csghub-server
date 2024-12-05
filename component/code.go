@@ -299,7 +299,7 @@ func (c *codeComponentImpl) Show(ctx context.Context, namespace, name, currentUs
 		})
 	}
 
-	likeExists, err := c.uls.IsExist(ctx, currentUser, code.Repository.ID)
+	likeExists, err := c.userLikesStore.IsExist(ctx, currentUser, code.Repository.ID)
 	if err != nil {
 		newError := fmt.Errorf("failed to check for the presence of the user likes,error:%w", err)
 		return nil, newError
@@ -379,7 +379,7 @@ func (c *codeComponentImpl) OrgCodes(ctx context.Context, req *types.OrgCodesReq
 	r := membership.RoleUnknown
 	if req.CurrentUser != "" {
 		r, err = c.userSvcClient.GetMemberRole(ctx, req.Namespace, req.CurrentUser)
-		// log error, and treat user as unkown role in org
+		// log error, and treat user as unknown role in org
 		if err != nil {
 			slog.Error("faild to get member role",
 				slog.String("org", req.Namespace), slog.String("user", req.CurrentUser),

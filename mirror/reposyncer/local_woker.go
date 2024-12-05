@@ -21,7 +21,7 @@ import (
 )
 
 type LocalMirrorWoker struct {
-	mq                 *queue.PriorityQueue
+	mq                 queue.PriorityQueue
 	tasks              chan queue.MirrorTask
 	numWorkers         int
 	wg                 sync.WaitGroup

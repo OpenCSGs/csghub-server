@@ -28,7 +28,7 @@ import (
 type gitHTTPComponentImpl struct {
 	git                gitserver.GitServer
 	config             *config.Config
-	s3Client           *s3.Client
+	s3Client           s3.Client
 	lfsMetaObjectStore database.LfsMetaObjectStore
 	lfsLockStore       database.LfsLockStore
 	repo               database.RepoStore
@@ -145,7 +145,7 @@ func (c *gitHTTPComponentImpl) GitReceivePack(ctx context.Context, req types.Git
 		return fmt.Errorf("failed to find repo, error: %w", err)
 	}
 
-	user, err := c.user.FindByUsername(ctx, req.CurrentUser)
+	user, err := c.userStore.FindByUsername(ctx, req.CurrentUser)
 	if err != nil {
 		return ErrUnauthorized
 	}
@@ -456,7 +456,7 @@ func (c *gitHTTPComponentImpl) CreateLock(ctx context.Context, req types.LfsLock
 		return nil, fmt.Errorf("failed to find repo, error: %w", err)
 	}
 
-	user, err := c.user.FindByUsername(ctx, req.CurrentUser)
+	user, err := c.userStore.FindByUsername(ctx, req.CurrentUser)
 	if err != nil {
 		return nil, ErrUnauthorized
 	}
@@ -497,7 +497,7 @@ func (c *gitHTTPComponentImpl) ListLocks(ctx context.Context, req types.ListLFSL
 		return nil, fmt.Errorf("failed to find repo, error: %w", err)
 	}
 
-	_, err = c.user.FindByUsername(ctx, req.CurrentUser)
+	_, err = c.userStore.FindByUsername(ctx, req.CurrentUser)
 	if err != nil {
 		return nil, ErrUnauthorized
 	}
@@ -562,7 +562,7 @@ func (c *gitHTTPComponentImpl) UnLock(ctx context.Context, req types.UnlockLFSRe
 		return nil, fmt.Errorf("failed to find repo, error: %w", err)
 	}
 
-	user, err := c.user.FindByUsername(ctx, req.CurrentUser)
+	user, err := c.userStore.FindByUsername(ctx, req.CurrentUser)
 	if err != nil {
 		return nil, ErrUnauthorized
 	}
@@ -607,7 +607,7 @@ func (c *gitHTTPComponentImpl) VerifyLock(ctx context.Context, req types.VerifyL
 		return nil, fmt.Errorf("failed to find repo, error: %w", err)
 	}
 
-	user, err := c.user.FindByUsername(ctx, req.CurrentUser)
+	user, err := c.userStore.FindByUsername(ctx, req.CurrentUser)
 	if err != nil {
 		return nil, ErrUnauthorized
 	}

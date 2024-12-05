@@ -1,53 +1,43 @@
 with-expecter: true
 dir: "_mocks/{{.PackagePath}}"
+# new from v2.49.0, for more detail please refer to:
+# https://github.com/vektra/mockery/commit/13fc60740a1eab3fc705fcc131a4b9a6eacfd0fe#diff-4bc8f03915f15ecf2cb9965592fcf933bb06986003613b5633a8dea7962c31a9R40
+resolve-type-alias: false
 packages:
     opencsg.com/csghub-server/component:
         config:
         interfaces:
             RepoComponent:
+            TagComponent:
+            AccountingComponent:
+            SpaceComponent:
+            RuntimeArchitectureComponent:
     opencsg.com/csghub-server/user/component:
         config:
         interfaces:
             MemberComponent:
     opencsg.com/csghub-server/builder/store/database:
         config:
-        interfaces:
-            UserStore:
-            NamespaceStore:
-            LicenseStore:
-            MirrorStore:
-            RepoStore:
-            OrgStore:
-            MemberStore:
-            ModelStore:
-            SpaceResourceStore:
-            TagStore:
-            DatasetStore:
-            PromptConversationStore:
-            PromptPrefixStore:
-            LLMConfigStore:
-            PromptStore:
-            UserLikesStore:
-            AccountStatementStore:
-            AccountOrderStore:
-            AccountPriceStore:
-            AccountBillStore:
-            AccountEventStore:
-            AccountMeteringStore:
-            AccountPresentStore:
+          all: True
     opencsg.com/csghub-server/builder/rpc:
         config:
         interfaces:
             UserSvcClient:
+            ModerationSvcClient:
     opencsg.com/csghub-server/builder/sensitive:
         config:
         interfaces:
             GreenClient:
             Green2022Client:
+            SensitiveChecker:
     opencsg.com/csghub-server/builder/git/gitserver:
         config:
         interfaces:
             GitServer:
+    opencsg.com/csghub-server/builder/git/mirrorserver:
+        config:
+        interfaces:
+            MirrorServer:
     opencsg.com/csghub-server/builder/git/membership:
         config:
         interfaces:
@@ -60,3 +50,39 @@ packages:
         config:
         interfaces:
             Cache:
+    opencsg.com/csghub-server/common/types:
+        config:
+        interfaces:
+            SensitiveRequestV2:
+    opencsg.com/csghub-server/mq:
+        config:
+        interfaces:
+            MessageQueue:            
+    opencsg.com/csghub-server/builder/store/s3:
+        config:
+        interfaces:
+            Client:
+    opencsg.com/csghub-server/mirror/queue:
+        config:
+        interfaces:
+            PriorityQueue:
+    opencsg.com/csghub-server/builder/deploy:
+        config:
+        interfaces:
+            Deployer:
+    opencsg.com/csghub-server/builder/inference:
+        config:
+        interfaces:
+            Client:
+    opencsg.com/csghub-server/accounting/component:
+        config:
+        interfaces:
+            AccountingUserComponent:
+            AccountingStatementComponent:
+            AccountingBillComponent:
+            AccountingPresentComponent:
+    opencsg.com/csghub-server/builder/accounting:
+        config:
+        interfaces:
+            AccountingClient:
+            

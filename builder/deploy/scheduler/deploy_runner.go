@@ -145,7 +145,7 @@ func (t *DeployRunner) WatchID() int64 { return t.task.ID }
 func (t *DeployRunner) deployInProgress(svcName string) {
 	t.task.Status = deploying
 	t.task.Message = "deploy in progress"
-	// change to buidling status
+	// change to building status
 	t.task.Deploy.Status = common.Deploying
 	if len(svcName) > 0 {
 		t.task.Deploy.SvcName = svcName
@@ -160,7 +160,7 @@ func (t *DeployRunner) deployInProgress(svcName string) {
 func (t *DeployRunner) deploySuccess() {
 	t.task.Status = deployStartUp
 	t.task.Message = "deploy succeeded, wati for startup"
-	// change to buidling status
+	// change to building status
 	t.task.Deploy.Status = common.Startup
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
@@ -172,7 +172,7 @@ func (t *DeployRunner) deploySuccess() {
 func (t *DeployRunner) deployFailed(msg string) {
 	t.task.Status = deployFailed
 	t.task.Message = msg
-	// change to buidling status
+	// change to building status
 	t.task.Deploy.Status = common.DeployFailed
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
@@ -184,7 +184,7 @@ func (t *DeployRunner) deployFailed(msg string) {
 func (t *DeployRunner) running(endpoint string) {
 	t.task.Status = deployRunning
 	t.task.Message = "running"
-	// change to buidling status
+	// change to building status
 	t.task.Deploy.Status = common.Running
 	t.task.Deploy.Endpoint = endpoint
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -197,7 +197,7 @@ func (t *DeployRunner) running(endpoint string) {
 func (t *DeployRunner) runtimeError(msg string) {
 	t.task.Status = deployRunTimeError
 	t.task.Message = msg
-	// change to buidling status
+	// change to building status
 	t.task.Deploy.Status = common.RunTimeError
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()

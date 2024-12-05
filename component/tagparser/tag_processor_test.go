@@ -80,7 +80,7 @@ func Test_processTags(t *testing.T) {
 	categoryTagMap := make(map[string][]string)
 	categoryTagMap[categoryNameTask] = append(categoryTagMap[categoryNameTask], "finance", "code", "mit") //should create an "task" tag "mit"
 	categoryTagMap[categoryNameLicense] = append(categoryTagMap[categoryNameLicense], "mit")              //should match this one
-	categoryTagMap["Unkown"] = append(categoryTagMap["Unknown"], "mit")                                   //should igore this one
+	categoryTagMap["Unknown"] = append(categoryTagMap["Unknown"], "mit")                                   //should igore this one
 
 	tagsMatched, tagsToCreate := p.processTags(existingCategoryTagMap, categoryTagMap)
 	if len(tagsMatched) != 3 {

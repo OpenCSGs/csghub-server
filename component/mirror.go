@@ -27,7 +27,7 @@ type mirrorComponentImpl struct {
 	saas               bool
 	repoComp           RepoComponent
 	git                gitserver.GitServer
-	s3Client           *s3.Client
+	s3Client           s3.Client
 	lfsBucket          string
 	modelStore         database.ModelStore
 	datasetStore       database.DatasetStore
@@ -39,7 +39,7 @@ type mirrorComponentImpl struct {
 	lfsMetaObjectStore database.LfsMetaObjectStore
 	userStore          database.UserStore
 	config             *config.Config
-	mq                 *queue.PriorityQueue
+	mq                 queue.PriorityQueue
 }
 
 type MirrorComponent interface {
@@ -149,13 +149,13 @@ func (c *mirrorComponentImpl) CreateMirrorRepo(ctx context.Context, req types.Cr
 	}
 	repo, err := c.repoStore.FindByPath(ctx, req.RepoType, namespace, name)
 	if err != nil && !errors.Is(err, sql.ErrNoRows) {
-		return nil, fmt.Errorf("failed to check repo existance, error: %w", err)
+		return nil, fmt.Errorf("failed to check repo existence, error: %w", err)
 	}
 	if repo != nil {
 		name = fmt.Sprintf("%s_%s", req.SourceNamespace, req.SourceName)
 		repo, err = c.repoStore.FindByPath(ctx, req.RepoType, namespace, name)
 		if err != nil && !errors.Is(err, sql.ErrNoRows) {
-			return nil, fmt.Errorf("failed to check repo existance, error: %w", err)
+			return nil, fmt.Errorf("failed to check repo existence, error: %w", err)
 		}
 		if repo != nil {
 			return nil, fmt.Errorf("repo already exists,repo type:%s, source namespace: %s, source name: %s, target namespace: %s, target name: %s",

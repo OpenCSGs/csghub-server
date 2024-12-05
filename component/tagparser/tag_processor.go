@@ -94,7 +94,7 @@ func (p *tagProcessor) processTags(existingCategoryTagMap map[string]map[string]
 					Name:     tagName,
 					Category: category,
 					Scope:    p.tagScope,
-					BuiltIn:  false, // new tag is absolutly not built-in
+					BuiltIn:  false, // new tag is absolutely not built-in
 					Group:    "",    // keep empty
 				})
 			} else {

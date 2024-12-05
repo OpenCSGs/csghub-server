@@ -102,6 +102,7 @@ func (c *llmInferClient) ListServing() (map[uint64]ModelInfo, error) {
 		slog.Error("fail to call list serving api", slog.Any("err", err))
 		return c.modelInfos, fmt.Errorf("fail to call list serving api,%w", err)
 	}
+	defer resp.Body.Close()
 	llmInfos := make(map[string]LlmModelInfo)
 	err = json.NewDecoder(resp.Body).Decode(&llmInfos)
 	if err != nil {

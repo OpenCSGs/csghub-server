@@ -34,7 +34,7 @@ type RuntimeArchitectureComponent interface {
 	DeleteArchitectures(ctx context.Context, id int64, architectures []string) ([]string, error)
 	ScanArchitecture(ctx context.Context, id int64, scanType int, models []string) error
 	// check if it's supported model resource by name
-	IsSupportedModelResource(ctx context.Context, modelName string, rf *database.RuntimeFramework, id int64) (bool, error)
+	IsSupportedModelResource(ctx context.Context, modelName string, rfm *database.RuntimeFramework, id int64) (bool, error)
 	GetArchitectureFromConfig(ctx context.Context, namespace, name string) (string, error)
 	// remove runtime_framework tag from model
 	RemoveRuntimeFrameworkTag(ctx context.Context, rftags []*database.Tag, repoId, rfId int64)
@@ -67,7 +67,7 @@ func (c *runtimeArchitectureComponentImpl) ListByRuntimeFrameworkID(ctx context.
 }
 
 func (c *runtimeArchitectureComponentImpl) SetArchitectures(ctx context.Context, id int64, architectures []string) ([]string, error) {
-	_, err := c.r.rtfm.FindByID(ctx, id)
+	_, err := c.r.runtimeFrameworksStore.FindByID(ctx, id)
 	if err != nil {
 		return nil, fmt.Errorf("invalid runtime framework id, %w", err)
 	}
@@ -88,7 +88,7 @@ func (c *runtimeArchitectureComponentImpl) SetArchitectures(ctx context.Context,
 }
 
 func (c *runtimeArchitectureComponentImpl) DeleteArchitectures(ctx context.Context, id int64, architectures []string) ([]string, error) {
-	_, err := c.r.rtfm.FindByID(ctx, id)
+	_, err := c.r.runtimeFrameworksStore.FindByID(ctx, id)
 	if err != nil {
 		return nil, fmt.Errorf("invalid runtime framework id, %w", err)
 	}
@@ -106,7 +106,7 @@ func (c *runtimeArchitectureComponentImpl) DeleteArchitectures(ctx context.Conte
 }
 
 func (c *runtimeArchitectureComponentImpl) ScanArchitecture(ctx context.Context, id int64, scanType int, models []string) error {
-	frame, err := c.r.rtfm.FindByID(ctx, id)
+	frame, err := c.r.runtimeFrameworksStore.FindByID(ctx, id)
 	if err != nil {
 		return fmt.Errorf("invalid runtime framework id, %w", err)
 	}
@@ -155,7 +155,7 @@ func (c *runtimeArchitectureComponentImpl) ScanArchitecture(ctx context.Context,
 }
 
 func (c *runtimeArchitectureComponentImpl) scanNewModels(ctx context.Context, req types.ScanReq) error {
-	repos, err := c.r.repo.GetRepoWithoutRuntimeByID(ctx, req.FrameID, req.Models)
+	repos, err := c.r.repoStore.GetRepoWithoutRuntimeByID(ctx, req.FrameID, req.Models)
 	if err != nil {
 		return fmt.Errorf("failed to get repos without runtime by ID, %w", err)
 	}
@@ -186,7 +186,7 @@ func (c *runtimeArchitectureComponentImpl) scanNewModels(ctx context.Context, re
 		if !exist && !isSupportedRM {
 			continue
 		}
-		err = c.r.rrtfms.Add(ctx, req.FrameID, repo.ID, req.FrameType)
+		err = c.r.repoRuntimeFrameworkStore.Add(ctx, req.FrameID, repo.ID, req.FrameType)
 		if err != nil {
 			slog.Warn("fail to create relation", slog.Any("repo", repo.Path), slog.Any("frameid", req.FrameID), slog.Any("error", err))
 		}
@@ -229,7 +229,7 @@ func (c *runtimeArchitectureComponentImpl) IsSupportedModelResource(ctx context.
 }
 
 func (c *runtimeArchitectureComponentImpl) scanExistModels(ctx context.Context, req types.ScanReq) error {
-	repos, err := c.r.repo.GetRepoWithRuntimeByID(ctx, req.FrameID, req.Models)
+	repos, err := c.r.repoStore.GetRepoWithRuntimeByID(ctx, req.FrameID, req.Models)
 	if err != nil {
 		return fmt.Errorf("fail to get repos with runtime by ID, %w", err)
 	}
@@ -250,7 +250,7 @@ func (c *runtimeArchitectureComponentImpl) scanExistModels(ctx context.Context, 
 		if exist {
 			continue
 		}
-		err = c.r.rrtfms.Delete(ctx, req.FrameID, repo.ID, req.FrameType)
+		err = c.r.repoRuntimeFrameworkStore.Delete(ctx, req.FrameID, repo.ID, req.FrameType)
 		if err != nil {
 			slog.Warn("fail to remove relation", slog.Any("repo", repo.Path), slog.Any("frameid", req.FrameID), slog.Any("error", err))
 		}
