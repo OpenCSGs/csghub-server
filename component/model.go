@@ -476,7 +476,7 @@ func (c *modelComponentImpl) Show(ctx context.Context, namespace, name, currentU
 	if len(finetunes) > 0 {
 		resModel.EnableFinetune = true
 	}
-	evaluations, _ := c.rrtfms.GetByRepoIDsAndType(ctx, model.Repository.ID, types.EvaluationType)
+	evaluations, _ := c.repoRuntimeFrameworkStore.GetByRepoIDsAndType(ctx, model.Repository.ID, types.EvaluationType)
 	if len(evaluations) > 0 {
 		resModel.EnableEvaluation = true
 	}

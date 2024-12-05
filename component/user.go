@@ -106,12 +106,8 @@ type userComponentImpl struct {
 	spaceStore          database.SpaceStore
 	namespaceStore      database.NamespaceStore
 	gitServer           gitserver.GitServer
-	spaceComponent      SpaceComponent
-	repoComponent       RepoComponent
-	deployer            deploy.Deployer
 	userLikeStore       database.UserLikesStore
 	repoStore           database.RepoStore
-	deploy              database.DeployTaskStore
 	collectionStore     database.CollectionStore
 	accountingComponent AccountingComponent
 	// srs            database.SpaceResourceStore
