@@ -10,9 +10,11 @@ import (
 	"strconv"
 
 	"opencsg.com/csghub-server/builder/deploy"
+	"opencsg.com/csghub-server/builder/git"
 	"opencsg.com/csghub-server/builder/git/gitserver"
 	"opencsg.com/csghub-server/builder/git/membership"
 	"opencsg.com/csghub-server/builder/inference"
+	"opencsg.com/csghub-server/builder/rpc"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/types"
@@ -85,45 +87,64 @@ type ModelComponent interface {
 }
 
 func NewModelComponent(config *config.Config) (ModelComponent, error) {
-	c := &modelComponentImpl{}
+	c := &modelComponentImpl{config: config}
 	var err error
-	c.repoComponentImpl, err = NewRepoComponentImpl(config)
+	c.repoComponent, err = NewRepoComponent(config)
 	if err != nil {
 		return nil, err
 	}
-	c.spaceComonent, _ = NewSpaceComponent(config)
-	c.ms = database.NewModelStore()
-	c.rs = database.NewRepoStore()
-	c.SS = database.NewSpaceResourceStore()
-	c.infer = inference.NewInferClient(config.Inference.ServerAddr)
-	c.us = database.NewUserStore()
+	c.spaceComponent, _ = NewSpaceComponent(config)
+	c.modelStore = database.NewModelStore()
+	c.repoStore = database.NewRepoStore()
+	c.spaceResourceStore = database.NewSpaceResourceStore()
+	c.inferClient = inference.NewInferClient(config.Inference.ServerAddr)
+	c.userStore = database.NewUserStore()
+	c.userLikesStore = database.NewUserLikesStore()
 	c.deployer = deploy.NewDeployer()
-	c.ts = database.NewTagStore()
-	c.rac, err = NewRuntimeArchitectureComponent(config)
+	c.tagStore = database.NewTagStore()
+	c.runtimeArchComponent, err = NewRuntimeArchitectureComponent(config)
 	if err != nil {
 		return nil, err
 	}
-	c.ac, err = NewAccountingComponent(config)
-	c.ds = database.NewDatasetStore()
+	c.accountingComponent, err = NewAccountingComponent(config)
 	if err != nil {
 		return nil, err
 	}
+	c.datasetStore = database.NewDatasetStore()
+	c.repoRuntimeFrameworkStore = database.NewRepositoriesRuntimeFramework()
+	c.runtimeFrameworksStore = database.NewRuntimeFrameworksStore()
+	c.deployTaskStore = database.NewDeployTaskStore()
+	c.gitServer, err = git.NewGitServer(config)
+	if err != nil {
+		return nil, err
+	}
+	c.userSvcClient = rpc.NewUserSvcHttpClient(fmt.Sprintf("%s:%d", config.User.Host, config.User.Port),
+		rpc.AuthWithApiKey(config.APIToken))
+	c.recomStore = database.NewRecomStore()
 	return c, nil
 }
 
 type modelComponentImpl struct {
-	*repoComponentImpl
-	spaceComonent SpaceComponent
-	ms            database.ModelStore
-	rs            database.RepoStore
-	SS            database.SpaceResourceStore
-	infer         inference.Client
-	us            database.UserStore
-	deployer      deploy.Deployer
-	ac            AccountingComponent
-	ts            database.TagStore
-	rac           RuntimeArchitectureComponent
-	ds            database.DatasetStore
+	config                    *config.Config
+	repoComponent             RepoComponent
+	spaceComponent            SpaceComponent
+	modelStore                database.ModelStore
+	repoStore                 database.RepoStore
+	spaceResourceStore        database.SpaceResourceStore
+	inferClient               inference.Client
+	userStore                 database.UserStore
+	deployer                  deploy.Deployer
+	accountingComponent       AccountingComponent
+	tagStore                  database.TagStore
+	runtimeArchComponent      RuntimeArchitectureComponent
+	datasetStore              database.DatasetStore
+	recomStore                database.RecomStore
+	gitServer                 gitserver.GitServer
+	userLikesStore            database.UserLikesStore
+	repoRuntimeFrameworkStore database.RepositoriesRuntimeFrameworkStore
+	deployTaskStore           database.DeployTaskStore
+	runtimeFrameworksStore    database.RuntimeFrameworksStore
+	userSvcClient             rpc.UserSvcClient
 }
 
 func (c *modelComponentImpl) Index(ctx context.Context, filter *types.RepoFilter, per, page int) ([]types.Model, int, error) {
@@ -131,7 +152,7 @@ func (c *modelComponentImpl) Index(ctx context.Context, filter *types.RepoFilter
 		err       error
 		resModels []types.Model
 	)
-	repos, total, err := c.PublicToUser(ctx, types.ModelRepo, filter.Username, filter, per, page)
+	repos, total, err := c.repoComponent.PublicToUser(ctx, types.ModelRepo, filter.Username, filter, per, page)
 	if err != nil {
 		newError := fmt.Errorf("failed to get public model repos,error:%w", err)
 		return nil, 0, newError
@@ -140,7 +161,7 @@ func (c *modelComponentImpl) Index(ctx context.Context, filter *types.RepoFilter
 	for _, repo := range repos {
 		repoIDs = append(repoIDs, repo.ID)
 	}
-	models, err := c.ms.ByRepoIDs(ctx, repoIDs)
+	models, err := c.modelStore.ByRepoIDs(ctx, repoIDs)
 	if err != nil {
 		newError := fmt.Errorf("failed to get models by repo ids,error:%w", err)
 		return nil, 0, newError
@@ -197,7 +218,7 @@ func (c *modelComponentImpl) Create(ctx context.Context, req *types.CreateModelR
 		nickname string
 		tags     []types.RepoTag
 	)
-	user, err := c.user.FindByUsername(ctx, req.Username)
+	user, err := c.userStore.FindByUsername(ctx, req.Username)
 	if err != nil {
 		return nil, errors.New("user does not exist")
 	}
@@ -214,7 +235,7 @@ func (c *modelComponentImpl) Create(ctx context.Context, req *types.CreateModelR
 	req.Nickname = nickname
 	req.RepoType = types.ModelRepo
 	req.Readme = generateReadmeData(req.License)
-	_, dbRepo, err := c.CreateRepo(ctx, req.CreateRepoReq)
+	_, dbRepo, err := c.repoComponent.CreateRepo(ctx, req.CreateRepoReq)
 	if err != nil {
 		return nil, err
 	}
@@ -225,13 +246,13 @@ func (c *modelComponentImpl) Create(ctx context.Context, req *types.CreateModelR
 		BaseModel:    req.BaseModel,
 	}
 
-	model, err := c.ms.Create(ctx, dbModel)
+	model, err := c.modelStore.Create(ctx, dbModel)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create database model, cause: %w", err)
 	}
 
 	// Create README.md file
-	err = c.git.CreateRepoFile(buildCreateFileReq(&types.CreateFileParams{
+	err = c.gitServer.CreateRepoFile(buildCreateFileReq(&types.CreateFileParams{
 		Username:  user.Username,
 		Email:     user.Email,
 		Message:   initCommitMessage,
@@ -247,7 +268,7 @@ func (c *modelComponentImpl) Create(ctx context.Context, req *types.CreateModelR
 	}
 
 	// Create .gitattributes file
-	err = c.git.CreateRepoFile(buildCreateFileReq(&types.CreateFileParams{
+	err = c.gitServer.CreateRepoFile(buildCreateFileReq(&types.CreateFileParams{
 		Username:  user.Username,
 		Email:     user.Email,
 		Message:   initCommitMessage,
@@ -317,12 +338,12 @@ func buildCreateFileReq(p *types.CreateFileParams, repoType types.RepositoryType
 
 func (c *modelComponentImpl) Update(ctx context.Context, req *types.UpdateModelReq) (*types.Model, error) {
 	req.RepoType = types.ModelRepo
-	dbRepo, err := c.UpdateRepo(ctx, req.UpdateRepoReq)
+	dbRepo, err := c.repoComponent.UpdateRepo(ctx, req.UpdateRepoReq)
 	if err != nil {
 		return nil, err
 	}
 
-	model, err := c.ms.ByRepoID(ctx, dbRepo.ID)
+	model, err := c.modelStore.ByRepoID(ctx, dbRepo.ID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find model, error: %w", err)
 	}
@@ -330,7 +351,7 @@ func (c *modelComponentImpl) Update(ctx context.Context, req *types.UpdateModelR
 	if req.BaseModel != nil {
 		model.BaseModel = *req.BaseModel
 	}
-	model, err = c.ms.Update(ctx, *model)
+	model, err = c.modelStore.Update(ctx, *model)
 	if err != nil {
 		return nil, fmt.Errorf("failed to update database model, error: %w", err)
 	}
@@ -353,7 +374,7 @@ func (c *modelComponentImpl) Update(ctx context.Context, req *types.UpdateModelR
 }
 
 func (c *modelComponentImpl) Delete(ctx context.Context, namespace, name, currentUser string) error {
-	model, err := c.ms.FindByPath(ctx, namespace, name)
+	model, err := c.modelStore.FindByPath(ctx, namespace, name)
 	if err != nil {
 		return fmt.Errorf("failed to find model, error: %w", err)
 	}
@@ -364,12 +385,12 @@ func (c *modelComponentImpl) Delete(ctx context.Context, namespace, name, curren
 		Name:      name,
 		RepoType:  types.ModelRepo,
 	}
-	_, err = c.DeleteRepo(ctx, deleteDatabaseRepoReq)
+	_, err = c.repoComponent.DeleteRepo(ctx, deleteDatabaseRepoReq)
 	if err != nil {
 		return fmt.Errorf("failed to delete repo of model, error: %w", err)
 	}
 
-	err = c.ms.Delete(ctx, *model)
+	err = c.modelStore.Delete(ctx, *model)
 	if err != nil {
 		return fmt.Errorf("failed to delete database model, error: %w", err)
 	}
@@ -378,12 +399,12 @@ func (c *modelComponentImpl) Delete(ctx context.Context, namespace, name, curren
 
 func (c *modelComponentImpl) Show(ctx context.Context, namespace, name, currentUser string) (*types.Model, error) {
 	var tags []types.RepoTag
-	model, err := c.ms.FindByPath(ctx, namespace, name)
+	model, err := c.modelStore.FindByPath(ctx, namespace, name)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find model, error: %w", err)
 	}
 
-	permission, err := c.GetUserRepoPermission(ctx, currentUser, model.Repository)
+	permission, err := c.repoComponent.GetUserRepoPermission(ctx, currentUser, model.Repository)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get user repo permission, error: %w", err)
 	}
@@ -391,7 +412,7 @@ func (c *modelComponentImpl) Show(ctx context.Context, namespace, name, currentU
 		return nil, ErrUnauthorized
 	}
 
-	ns, err := c.GetNameSpaceInfo(ctx, namespace)
+	ns, err := c.repoComponent.GetNameSpaceInfo(ctx, namespace)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get namespace info for model, error: %w", err)
 	}
@@ -408,7 +429,7 @@ func (c *modelComponentImpl) Show(ctx context.Context, namespace, name, currentU
 		})
 	}
 
-	likeExists, err := c.uls.IsExist(ctx, currentUser, model.Repository.ID)
+	likeExists, err := c.userLikesStore.IsExist(ctx, currentUser, model.Repository.ID)
 	if err != nil {
 		newError := fmt.Errorf("failed to check for the presence of the user likes,error:%w", err)
 		return nil, newError
@@ -447,11 +468,11 @@ func (c *modelComponentImpl) Show(ctx context.Context, namespace, name, currentU
 		CanManage: permission.CanAdmin,
 		Namespace: ns,
 	}
-	inferences, _ := c.rrtfms.GetByRepoIDsAndType(ctx, model.Repository.ID, types.InferenceType)
+	inferences, _ := c.repoRuntimeFrameworkStore.GetByRepoIDsAndType(ctx, model.Repository.ID, types.InferenceType)
 	if len(inferences) > 0 {
 		resModel.EnableInference = true
 	}
-	finetunes, _ := c.rrtfms.GetByRepoIDsAndType(ctx, model.Repository.ID, types.FinetuneType)
+	finetunes, _ := c.repoRuntimeFrameworkStore.GetByRepoIDsAndType(ctx, model.Repository.ID, types.FinetuneType)
 	if len(finetunes) > 0 {
 		resModel.EnableFinetune = true
 	}
@@ -459,22 +480,22 @@ func (c *modelComponentImpl) Show(ctx context.Context, namespace, name, currentU
 }
 
 func (c *modelComponentImpl) GetServerless(ctx context.Context, namespace, name, currentUser string) (*types.DeployRepo, error) {
-	model, err := c.ms.FindByPath(ctx, namespace, name)
+	model, err := c.modelStore.FindByPath(ctx, namespace, name)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find model, error: %w", err)
 	}
-	allow, _ := c.AllowReadAccessRepo(ctx, model.Repository, currentUser)
+	allow, _ := c.repoComponent.AllowReadAccessRepo(ctx, model.Repository, currentUser)
 	if !allow {
 		return nil, ErrUnauthorized
 	}
-	deploy, err := c.deploy.GetServerlessDeployByRepID(ctx, model.Repository.ID)
+	deploy, err := c.deployTaskStore.GetServerlessDeployByRepID(ctx, model.Repository.ID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get serverless deployment, error: %w", err)
 	}
 	if deploy == nil {
 		return nil, nil
 	}
-	endpoint, _ := c.generateEndpoint(ctx, deploy)
+	endpoint, _ := c.repoComponent.GenerateEndpoint(ctx, deploy)
 
 	resDeploy := types.DeployRepo{
 		DeployID:         deploy.ID,
@@ -498,12 +519,12 @@ func (c *modelComponentImpl) GetServerless(ctx context.Context, namespace, name,
 }
 
 func (c *modelComponentImpl) SDKModelInfo(ctx context.Context, namespace, name, ref, currentUser string) (*types.SDKModelInfo, error) {
-	model, err := c.ms.FindByPath(ctx, namespace, name)
+	model, err := c.modelStore.FindByPath(ctx, namespace, name)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find model, error: %w", err)
 	}
 
-	allow, _ := c.AllowReadAccessRepo(ctx, model.Repository, currentUser)
+	allow, _ := c.repoComponent.AllowReadAccessRepo(ctx, model.Repository, currentUser)
 	if !allow {
 		return nil, ErrUnauthorized
 	}
@@ -520,7 +541,7 @@ func (c *modelComponentImpl) SDKModelInfo(ctx context.Context, namespace, name, 
 		}
 	}
 
-	filePaths, err := getFilePaths(namespace, name, "", types.ModelRepo, ref, c.git.GetRepoFileTree)
+	filePaths, err := getFilePaths(namespace, name, "", types.ModelRepo, ref, c.gitServer.GetRepoFileTree)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get all %s files, error: %w", types.ModelRepo, err)
 	}
@@ -539,13 +560,13 @@ func (c *modelComponentImpl) SDKModelInfo(ctx context.Context, namespace, name, 
 		Ref:       ref,
 		RepoType:  types.ModelRepo,
 	}
-	lastCommit, err := c.git.GetRepoLastCommit(ctx, getLastCommitReq)
+	lastCommit, err := c.gitServer.GetRepoLastCommit(ctx, getLastCommitReq)
 	if err != nil {
 		slog.Error("failed to get last commit", slog.String("namespace", namespace), slog.String("name", name), slog.String("ref", ref), slog.Any("error", err))
 		return nil, fmt.Errorf("failed to get last commit, error: %w", err)
 	}
 
-	relatedRepos, _ := c.RelatedRepos(ctx, model.RepositoryID, currentUser)
+	relatedRepos, _ := c.repoComponent.RelatedRepos(ctx, model.RepositoryID, currentUser)
 	relatedSpaces := relatedRepos[types.SpaceRepo]
 	spaceNames := make([]string, len(relatedSpaces))
 	for idx, s := range relatedSpaces {
@@ -585,12 +606,12 @@ func (c *modelComponentImpl) SDKModelInfo(ctx context.Context, namespace, name, 
 }
 
 func (c *modelComponentImpl) Relations(ctx context.Context, namespace, name, currentUser string) (*types.Relations, error) {
-	model, err := c.ms.FindByPath(ctx, namespace, name)
+	model, err := c.modelStore.FindByPath(ctx, namespace, name)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find model, error: %w", err)
 	}
 
-	allow, _ := c.AllowReadAccessRepo(ctx, model.Repository, currentUser)
+	allow, _ := c.repoComponent.AllowReadAccessRepo(ctx, model.Repository, currentUser)
 	if !allow {
 		return nil, ErrUnauthorized
 	}
@@ -599,7 +620,7 @@ func (c *modelComponentImpl) Relations(ctx context.Context, namespace, name, cur
 }
 
 func (c *modelComponentImpl) SetRelationDatasets(ctx context.Context, req types.RelationDatasets) error {
-	user, err := c.user.FindByUsername(ctx, req.CurrentUser)
+	user, err := c.userStore.FindByUsername(ctx, req.CurrentUser)
 	if err != nil {
 		return fmt.Errorf("user does not exist, %w", err)
 	}
@@ -608,7 +629,7 @@ func (c *modelComponentImpl) SetRelationDatasets(ctx context.Context, req types.
 		return fmt.Errorf("only admin is allowed to set dataset for model")
 	}
 
-	_, err = c.repo.FindByPath(ctx, types.ModelRepo, req.Namespace, req.Name)
+	_, err = c.repoStore.FindByPath(ctx, types.ModelRepo, req.Namespace, req.Name)
 	if err != nil {
 		return fmt.Errorf("failed to find model, error: %w", err)
 	}
@@ -621,7 +642,7 @@ func (c *modelComponentImpl) SetRelationDatasets(ctx context.Context, req types.
 		RepoType:  types.ModelRepo,
 	}
 
-	metaMap, splits, err := GetMetaMapFromReadMe(c.git, getFileContentReq)
+	metaMap, splits, err := GetMetaMapFromReadMe(c.gitServer, getFileContentReq)
 	if err != nil {
 		return fmt.Errorf("failed parse meta from readme, cause: %w", err)
 	}
@@ -642,7 +663,7 @@ func (c *modelComponentImpl) SetRelationDatasets(ctx context.Context, req types.
 	readmeReq.Email = user.Email
 	readmeReq.Content = base64.StdEncoding.EncodeToString([]byte(output))
 
-	err = c.git.UpdateRepoFile(&readmeReq)
+	err = c.gitServer.UpdateRepoFile(&readmeReq)
 	if err != nil {
 		return fmt.Errorf("failed to set dataset tag to %s file, cause: %w", readmeReq.FilePath, err)
 	}
@@ -651,7 +672,7 @@ func (c *modelComponentImpl) SetRelationDatasets(ctx context.Context, req types.
 }
 
 func (c *modelComponentImpl) AddRelationDataset(ctx context.Context, req types.RelationDataset) error {
-	user, err := c.user.FindByUsername(ctx, req.CurrentUser)
+	user, err := c.userStore.FindByUsername(ctx, req.CurrentUser)
 	if err != nil {
 		return fmt.Errorf("user does not exist, %w", err)
 	}
@@ -660,7 +681,7 @@ func (c *modelComponentImpl) AddRelationDataset(ctx context.Context, req types.R
 		return fmt.Errorf("only admin was allowed to set dataset for model")
 	}
 
-	_, err = c.repo.FindByPath(ctx, types.ModelRepo, req.Namespace, req.Name)
+	_, err = c.repoStore.FindByPath(ctx, types.ModelRepo, req.Namespace, req.Name)
 	if err != nil {
 		return fmt.Errorf("failed to find model, error: %w", err)
 	}
@@ -672,7 +693,7 @@ func (c *modelComponentImpl) AddRelationDataset(ctx context.Context, req types.R
 		Path:      REPOCARD_FILENAME,
 		RepoType:  types.ModelRepo,
 	}
-	metaMap, splits, err := GetMetaMapFromReadMe(c.git, getFileContentReq)
+	metaMap, splits, err := GetMetaMapFromReadMe(c.gitServer, getFileContentReq)
 	if err != nil {
 		return fmt.Errorf("failed parse meta from readme, cause: %w", err)
 	}
@@ -699,7 +720,7 @@ func (c *modelComponentImpl) AddRelationDataset(ctx context.Context, req types.R
 	readmeReq.Email = user.Email
 	readmeReq.Content = base64.StdEncoding.EncodeToString([]byte(output))
 
-	err = c.git.UpdateRepoFile(&readmeReq)
+	err = c.gitServer.UpdateRepoFile(&readmeReq)
 	if err != nil {
 		return fmt.Errorf("failed to add dataset tag to %s file, cause: %w", readmeReq.FilePath, err)
 	}
@@ -708,7 +729,7 @@ func (c *modelComponentImpl) AddRelationDataset(ctx context.Context, req types.R
 }
 
 func (c *modelComponentImpl) DelRelationDataset(ctx context.Context, req types.RelationDataset) error {
-	user, err := c.user.FindByUsername(ctx, req.CurrentUser)
+	user, err := c.userStore.FindByUsername(ctx, req.CurrentUser)
 	if err != nil {
 		return fmt.Errorf("user does not exist, %w", err)
 	}
@@ -717,7 +738,7 @@ func (c *modelComponentImpl) DelRelationDataset(ctx context.Context, req types.R
 		return fmt.Errorf("only admin was allowed to delete dataset for model")
 	}
 
-	_, err = c.repo.FindByPath(ctx, types.ModelRepo, req.Namespace, req.Name)
+	_, err = c.repoStore.FindByPath(ctx, types.ModelRepo, req.Namespace, req.Name)
 	if err != nil {
 		return fmt.Errorf("failed to find model, error: %w", err)
 	}
@@ -729,7 +750,7 @@ func (c *modelComponentImpl) DelRelationDataset(ctx context.Context, req types.R
 		Path:      REPOCARD_FILENAME,
 		RepoType:  types.ModelRepo,
 	}
-	metaMap, splits, err := GetMetaMapFromReadMe(c.git, getFileContentReq)
+	metaMap, splits, err := GetMetaMapFromReadMe(c.gitServer, getFileContentReq)
 	if err != nil {
 		return fmt.Errorf("failed parse meta from readme, cause: %w", err)
 	}
@@ -761,7 +782,8 @@ func (c *modelComponentImpl) DelRelationDataset(ctx context.Context, req types.R
 	readmeReq.Email = user.Email
 	readmeReq.Content = base64.StdEncoding.EncodeToString([]byte(output))
 
-	err = c.git.UpdateRepoFile(&readmeReq)
+	fmt.Println("===== zzzzz")
+	err = c.gitServer.UpdateRepoFile(&readmeReq)
 	if err != nil {
 		return fmt.Errorf("failed to delete dataset tag to %s file, cause: %w", readmeReq.FilePath, err)
 	}
@@ -770,7 +792,7 @@ func (c *modelComponentImpl) DelRelationDataset(ctx context.Context, req types.R
 }
 
 func (c *modelComponentImpl) getRelations(ctx context.Context, fromRepoID int64, currentUser string) (*types.Relations, error) {
-	res, err := c.RelatedRepos(ctx, fromRepoID, currentUser)
+	res, err := c.repoComponent.RelatedRepos(ctx, fromRepoID, currentUser)
 	if err != nil {
 		return nil, err
 	}
@@ -804,7 +826,7 @@ func (c *modelComponentImpl) getRelations(ctx context.Context, fromRepoID int64,
 	for _, repo := range spaceRepos {
 		spacePaths = append(spacePaths, repo.Path)
 	}
-	spaces, err := c.spaceComonent.ListByPath(ctx, spacePaths)
+	spaces, err := c.spaceComponent.ListByPath(ctx, spacePaths)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get space info by paths, error: %w", err)
 	}
@@ -854,7 +876,7 @@ func (c *modelComponentImpl) Predict(ctx context.Context, req *types.ModelPredic
 	inferReq := &inference.PredictRequest{
 		Prompt: req.Input,
 	}
-	inferResp, err := c.infer.Predict(mid, inferReq)
+	inferResp, err := c.inferClient.Predict(mid, inferReq)
 	if err != nil {
 		slog.Error("failed to predict", slog.Any("req", *inferReq), slog.Any("model", mid), slog.String("error", err.Error()))
 		return nil, err
@@ -867,13 +889,13 @@ func (c *modelComponentImpl) Predict(ctx context.Context, req *types.ModelPredic
 
 // create model deploy as inference/serverless
 func (c *modelComponentImpl) Deploy(ctx context.Context, deployReq types.DeployActReq, req types.ModelRunReq) (int64, error) {
-	m, err := c.ms.FindByPath(ctx, deployReq.Namespace, deployReq.Name)
+	m, err := c.modelStore.FindByPath(ctx, deployReq.Namespace, deployReq.Name)
 	if err != nil {
 		return -1, fmt.Errorf("cannot find model, %w", err)
 	}
 	if deployReq.DeployType == types.ServerlessType {
 		// only one service deploy was allowed
-		d, err := c.deploy.GetServerlessDeployByRepID(ctx, m.Repository.ID)
+		d, err := c.deployTaskStore.GetServerlessDeployByRepID(ctx, m.Repository.ID)
 		if err != nil {
 			return -1, fmt.Errorf("fail to get deploy, %w", err)
 		}
@@ -882,20 +904,20 @@ func (c *modelComponentImpl) Deploy(ctx context.Context, deployReq types.DeployA
 		}
 	}
 	// found user id
-	user, err := c.us.FindByUsername(ctx, deployReq.CurrentUser)
+	user, err := c.userStore.FindByUsername(ctx, deployReq.CurrentUser)
 	if err != nil {
 		return -1, fmt.Errorf("cannot find user for deploy model, %w", err)
 	}
 
 	if deployReq.DeployType == types.ServerlessType {
 		// Check if the user is an admin
-		isAdmin := c.isAdminRole(user)
+		isAdmin := c.repoComponent.IsAdminRole(user)
 		if !isAdmin {
 			return -1, fmt.Errorf("need admin permission for Serverless deploy")
 		}
 	}
 
-	frame, err := c.rtfm.FindEnabledByID(ctx, req.RuntimeFrameworkID)
+	frame, err := c.runtimeFrameworksStore.FindEnabledByID(ctx, req.RuntimeFrameworkID)
 	if err != nil {
 		return -1, fmt.Errorf("cannot find available runtime framework, %w", err)
 	}
@@ -909,7 +931,7 @@ func (c *modelComponentImpl) Deploy(ctx context.Context, deployReq types.DeployA
 		return -1, fmt.Errorf("fail to create annotations for deploy model, %w", err)
 	}
 
-	resource, err := c.SS.FindByID(ctx, req.ResourceID)
+	resource, err := c.spaceResourceStore.FindByID(ctx, req.ResourceID)
 	if err != nil {
 		return -1, fmt.Errorf("cannot find resource, %w", err)
 	}
@@ -965,13 +987,13 @@ func (c *modelComponentImpl) ListModelsByRuntimeFrameworkID(ctx context.Context,
 		resModels []types.Model
 	)
 	if currentUser != "" {
-		user, err = c.user.FindByUsername(ctx, currentUser)
+		user, err = c.userStore.FindByUsername(ctx, currentUser)
 		if err != nil {
 			return nil, 0, fmt.Errorf("failed to get current user,error:%w", err)
 		}
 	}
 
-	runtimeRepos, err := c.rrtfms.ListByRuntimeFrameworkID(ctx, id, deployType)
+	runtimeRepos, err := c.repoRuntimeFrameworkStore.ListByRuntimeFrameworkID(ctx, id, deployType)
 	if err != nil {
 		return nil, 0, fmt.Errorf("failed to get repo by runtime,error:%w", err)
 	}
@@ -985,7 +1007,7 @@ func (c *modelComponentImpl) ListModelsByRuntimeFrameworkID(ctx context.Context,
 		repoIDs = append(repoIDs, repo.RepoID)
 	}
 
-	repos, total, err := c.rs.ListRepoPublicToUserByRepoIDs(ctx, types.ModelRepo, user.ID, "", "", per, page, repoIDs)
+	repos, total, err := c.repoStore.ListRepoPublicToUserByRepoIDs(ctx, types.ModelRepo, user.ID, "", "", per, page, repoIDs)
 	if err != nil {
 		newError := fmt.Errorf("failed to get public model repos,error:%w", err)
 		return nil, 0, newError
@@ -1005,7 +1027,7 @@ func (c *modelComponentImpl) ListModelsByRuntimeFrameworkID(ctx context.Context,
 }
 
 func (c *modelComponentImpl) ListAllByRuntimeFramework(ctx context.Context, currentUser string) ([]database.RuntimeFramework, error) {
-	runtimes, err := c.runFrame.ListAll(ctx)
+	runtimes, err := c.runtimeFrameworksStore.ListAll(ctx)
 	if err != nil {
 		newError := fmt.Errorf("failed to get public model repos,error:%w", err)
 		return nil, newError
@@ -1015,7 +1037,7 @@ func (c *modelComponentImpl) ListAllByRuntimeFramework(ctx context.Context, curr
 }
 
 func (c *modelComponentImpl) SetRuntimeFrameworkModes(ctx context.Context, deployType int, id int64, paths []string) ([]string, error) {
-	runtimeRepos, err := c.rtfm.FindByID(ctx, id)
+	runtimeRepos, err := c.runtimeFrameworksStore.FindByID(ctx, id)
 	if err != nil {
 		return nil, err
 	}
@@ -1024,30 +1046,30 @@ func (c *modelComponentImpl) SetRuntimeFrameworkModes(ctx context.Context, deplo
 		return nil, fmt.Errorf("failed to get runtime framework")
 	}
 
-	models, err := c.ms.ListByPath(ctx, paths)
+	models, err := c.modelStore.ListByPath(ctx, paths)
 	if err != nil {
 		return nil, err
 	}
 
-	runtime_framework_tags, _ := c.ts.GetTagsByScopeAndCategories(ctx, "model", []string{"runtime_framework", "resource"})
+	runtime_framework_tags, _ := c.tagStore.GetTagsByScopeAndCategories(ctx, "model", []string{"runtime_framework", "resource"})
 
 	var failedModels []string
 	for _, model := range models {
-		relations, err := c.rrtfms.GetByIDsAndType(ctx, id, model.Repository.ID, deployType)
+		relations, err := c.repoRuntimeFrameworkStore.GetByIDsAndType(ctx, id, model.Repository.ID, deployType)
 		if err != nil {
 			return nil, err
 		}
 		if relations == nil || len(relations) < 1 {
-			err = c.rrtfms.Add(ctx, id, model.Repository.ID, deployType)
+			err = c.repoRuntimeFrameworkStore.Add(ctx, id, model.Repository.ID, deployType)
 			if err != nil {
 				failedModels = append(failedModels, model.Repository.Path)
 			}
 			_, modelName := model.Repository.NamespaceAndName()
-			err = c.rac.AddRuntimeFrameworkTag(ctx, runtime_framework_tags, model.Repository.ID, id)
+			err = c.runtimeArchComponent.AddRuntimeFrameworkTag(ctx, runtime_framework_tags, model.Repository.ID, id)
 			if err != nil {
 				return nil, err
 			}
-			err = c.rac.AddResourceTag(ctx, runtime_framework_tags, modelName, model.Repository.ID)
+			err = c.runtimeArchComponent.AddResourceTag(ctx, runtime_framework_tags, modelName, model.Repository.ID)
 			if err != nil {
 				return nil, err
 			}
@@ -1058,14 +1080,14 @@ func (c *modelComponentImpl) SetRuntimeFrameworkModes(ctx context.Context, deplo
 }
 
 func (c *modelComponentImpl) DeleteRuntimeFrameworkModes(ctx context.Context, deployType int, id int64, paths []string) ([]string, error) {
-	models, err := c.ms.ListByPath(ctx, paths)
+	models, err := c.modelStore.ListByPath(ctx, paths)
 	if err != nil {
 		return nil, err
 	}
 
 	var failedModels []string
 	for _, model := range models {
-		err = c.rrtfms.Delete(ctx, id, model.Repository.ID, deployType)
+		err = c.repoRuntimeFrameworkStore.Delete(ctx, id, model.Repository.ID, deployType)
 		if err != nil {
 			failedModels = append(failedModels, model.Repository.Path)
 		}
@@ -1081,12 +1103,12 @@ func (c *modelComponentImpl) ListModelsOfRuntimeFrameworks(ctx context.Context, 
 		resModels []types.Model
 	)
 
-	user, err = c.user.FindByUsername(ctx, currentUser)
+	user, err = c.userStore.FindByUsername(ctx, currentUser)
 	if err != nil {
 		return nil, 0, fmt.Errorf("failed to get current user %s, error:%w", currentUser, err)
 	}
 
-	runtimeRepos, err := c.rrtfms.ListRepoIDsByType(ctx, deployType)
+	runtimeRepos, err := c.repoRuntimeFrameworkStore.ListRepoIDsByType(ctx, deployType)
 	if err != nil {
 		return nil, 0, fmt.Errorf("failed to get repo by deploy type, error:%w", err)
 	}
@@ -1100,7 +1122,7 @@ func (c *modelComponentImpl) ListModelsOfRuntimeFrameworks(ctx context.Context, 
 		repoIDs = append(repoIDs, repo.RepoID)
 	}
 
-	repos, total, err := c.rs.ListRepoPublicToUserByRepoIDs(ctx, types.ModelRepo, user.ID, search, sort, per, page, repoIDs)
+	repos, total, err := c.repoStore.ListRepoPublicToUserByRepoIDs(ctx, types.ModelRepo, user.ID, search, sort, per, page, repoIDs)
 	if err != nil {
 		newError := fmt.Errorf("failed to get public model repos, error:%w", err)
 		return nil, 0, newError
@@ -1130,7 +1152,7 @@ func (c *modelComponentImpl) OrgModels(ctx context.Context, req *types.OrgModels
 	r := membership.RoleUnknown
 	if req.CurrentUser != "" {
 		r, err = c.userSvcClient.GetMemberRole(ctx, req.Namespace, req.CurrentUser)
-		// log error, and treat user as unkown role in org
+		// log error, and treat user as unknown role in org
 		if err != nil {
 			slog.Error("faild to get member role",
 				slog.String("org", req.Namespace), slog.String("user", req.CurrentUser),
@@ -1138,7 +1160,7 @@ func (c *modelComponentImpl) OrgModels(ctx context.Context, req *types.OrgModels
 		}
 	}
 	onlyPublic := !r.CanRead()
-	ms, total, err := c.ms.ByOrgPath(ctx, req.Namespace, req.PageSize, req.Page, onlyPublic)
+	ms, total, err := c.modelStore.ByOrgPath(ctx, req.Namespace, req.PageSize, req.Page, onlyPublic)
 	if err != nil {
 		newError := fmt.Errorf("failed to get user datasets,error:%w", err)
 		slog.Error(newError.Error())

@@ -108,6 +108,7 @@ func genTelemetry(config *config.Config) func(ctx context.Context) error {
 		if err != nil {
 			return fmt.Errorf("failed to report usage data, %w", err)
 		}
+		defer resp.Body.Close()
 		if resp.StatusCode != http.StatusOK {
 			var respData bytes.Buffer
 			_, err = io.Copy(&respData, resp.Body)

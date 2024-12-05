@@ -3,6 +3,7 @@ package s3
 import (
 	"context"
 	"fmt"
+	"io"
 	"log/slog"
 	"net/url"
 	"time"
@@ -12,8 +13,8 @@ import (
 	"opencsg.com/csghub-server/common/config"
 )
 
-func NewMinio(cfg *config.Config) (*Client, error) {
-	minioClient, err := minio.New(cfg.S3.Endpoint, &minio.Options{
+func NewMinio(cfg *config.Config) (Client, error) {
+	mClient, err := minio.New(cfg.S3.Endpoint, &minio.Options{
 		Creds:        credentials.NewStaticV4(cfg.S3.AccessKeyID, cfg.S3.AccessKeySecret, ""),
 		Secure:       cfg.S3.EnableSSL,
 		BucketLookup: minio.BucketLookupAuto,
@@ -22,8 +23,8 @@ func NewMinio(cfg *config.Config) (*Client, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to init s3 client, error:%w", err)
 	}
-	client := &Client{
-		Client: minioClient,
+	client := &minioClient{
+		Client: mClient,
 	}
 	if len(cfg.S3.InternalEndpoint) > 0 {
 		minioClientInternal, err := minio.New(cfg.S3.InternalEndpoint, &minio.Options{
@@ -40,13 +41,23 @@ func NewMinio(cfg *config.Config) (*Client, error) {
 	return client, nil
 }
 
-type Client struct {
+type Client interface {
+	PresignedGetObject(ctx context.Context, bucketName, objectName string, expires time.Duration, reqParams url.Values) (*url.URL, error)
+	PutObject(ctx context.Context, bucketName, objectName string, reader io.Reader, objectSize int64,
+		opts minio.PutObjectOptions,
+	) (info minio.UploadInfo, err error)
+	StatObject(ctx context.Context, bucketName, objectName string, opts minio.StatObjectOptions) (minio.ObjectInfo, error)
+	RemoveObject(ctx context.Context, bucketName, objectName string, opts minio.RemoveObjectOptions) error
+	PresignedPutObject(ctx context.Context, bucketName, objectName string, expires time.Duration) (u *url.URL, err error)
+}
+
+type minioClient struct {
 	*minio.Client
 	internalClient *minio.Client
 }
 
 // PresignedGetObject is a wrapper around minio.Client.PresignedGetObject that adds some extra customization.
-func (c *Client) PresignedGetObject(ctx context.Context, bucketName, objectName string, expires time.Duration, reqParams url.Values) (*url.URL, error) {
+func (c *minioClient) PresignedGetObject(ctx context.Context, bucketName, objectName string, expires time.Duration, reqParams url.Values) (*url.URL, error) {
 	if c.useInternalClient(ctx) && c.internalClient != nil {
 		slog.Info("use internal s3 client for presigned get object", slog.String("bucket_name", bucketName), slog.String("object_name", objectName))
 		return c.internalClient.PresignedGetObject(ctx, bucketName, objectName, expires, reqParams)
@@ -54,7 +65,7 @@ func (c *Client) PresignedGetObject(ctx context.Context, bucketName, objectName 
 	return c.Client.PresignedGetObject(ctx, bucketName, objectName, expires, reqParams)
 }
 
-func (c *Client) useInternalClient(ctx context.Context) bool {
+func (c *minioClient) useInternalClient(ctx context.Context) bool {
 	v, success := ctx.Value("X-OPENCSG-S3-Internal").(bool)
 	if !success {
 		return false

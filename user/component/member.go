@@ -156,7 +156,7 @@ func (c *memberComponentImpl) GetMemberRole(ctx context.Context, orgName, userNa
 	}
 	m, err := c.memberStore.Find(ctx, org.ID, user.ID)
 	if err != nil && !errors.Is(err, sql.ErrNoRows) {
-		return membership.RoleUnknown, fmt.Errorf("failed to check memberhsip existance,caused by:%w", err)
+		return membership.RoleUnknown, fmt.Errorf("failed to check memberhsip existence,caused by:%w", err)
 	}
 	if m == nil {
 		return membership.RoleUnknown, nil
@@ -194,7 +194,7 @@ func (c *memberComponentImpl) AddMembers(ctx context.Context, orgName string, us
 		}
 		m, err := c.memberStore.Find(ctx, org.ID, user.ID)
 		if err != nil && !errors.Is(err, sql.ErrNoRows) {
-			return fmt.Errorf("failed to check memberhsip existance, user:%s,caused by:%w", userName, err)
+			return fmt.Errorf("failed to check memberhsip existence, user:%s,caused by:%w", userName, err)
 		}
 		//skip existing member
 		if m != nil {
@@ -252,7 +252,7 @@ func (c *memberComponentImpl) Delete(ctx context.Context, orgName, userName, ope
 	}
 	m, err := c.memberStore.Find(ctx, org.ID, user.ID)
 	if err != nil && !errors.Is(err, sql.ErrNoRows) {
-		return fmt.Errorf("failed to check memberhsip existance,caused by:%w", err)
+		return fmt.Errorf("failed to check memberhsip existence,caused by:%w", err)
 	}
 	//skip if not a member
 	if m == nil {

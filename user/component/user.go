@@ -280,7 +280,7 @@ func (c *userComponentImpl) Update(ctx context.Context, req *types.UpdateUserReq
 	return nil
 }
 
-// user registery with wechat does not have email, so git user is not created after signin
+// user registry with wechat does not have email, so git user is not created after signin
 // when user set email, a git user needs to be created
 func (c *userComponentImpl) upsertGitUser(username string, nickname *string, oldEmail, newEmail string) error {
 	var err error
@@ -621,7 +621,7 @@ func (c *userComponentImpl) Signin(ctx context.Context, code, state string) (*ty
 	cu := claims.User
 	exists, err := c.us.IsExistByUUID(ctx, cu.Id)
 	if err != nil {
-		return nil, "", fmt.Errorf("failed to check user existance by name in db,error:%w", err)
+		return nil, "", fmt.Errorf("failed to check user existence by name in db,error:%w", err)
 	}
 
 	var dbu *database.User

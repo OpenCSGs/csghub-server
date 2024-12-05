@@ -53,7 +53,7 @@ func assertAffectedXRows(X int64, result sql.Result, err error) error {
 
 	affected, err := result.RowsAffected()
 	if err != nil {
-		err = fmt.Errorf("retriving affected row count: %w", err)
+		err = fmt.Errorf("retrieving affected row count: %w", err)
 		return err
 	}
 	if affected != X {

@@ -1,9 +1,19 @@
+linters:
+  disable-all: true
+  enable:
+    - errcheck
+    - gosimple
+    - govet
+    - ineffassign
+    - staticcheck
+    - unused
+
+    - misspell
+    - bodyclose
+
 linters-settings:
   staticcheck:
     checks: ["all", "-SA1029"]
-  whitespace:
-    multi-if: true
-    multi-func: true
   govet:
     disable:
       - composites

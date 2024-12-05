@@ -19,6 +19,7 @@ require (
 	github.com/gin-gonic/gin v1.9.1
 	github.com/golang-jwt/jwt/v5 v5.2.1
 	github.com/golang/gddo v0.0.0-20210115222349-20d68f94ee1f
+	github.com/google/wire v0.6.0
 	github.com/jarcoal/httpmock v1.3.1
 	github.com/marcboeker/go-duckdb v1.5.6
 	github.com/minio/minio-go/v7 v7.0.66

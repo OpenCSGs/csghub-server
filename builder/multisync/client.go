@@ -42,6 +42,7 @@ func (c *commonClient) Latest(ctx context.Context, currentVersion int64) (types.
 		return types.SyncVersionResponse{}, fmt.Errorf("failed to get latest version from endpoint %s, param cur:%d, cause: %w",
 			c.endpoint, currentVersion, err)
 	}
+	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
 		var data bytes.Buffer
@@ -67,6 +68,7 @@ func (c *commonClient) ModelInfo(ctx context.Context, v types.SyncVersion) (*typ
 		return nil, fmt.Errorf("failed to get model info from endpoint %s, repo path:%s, cause: %w",
 			c.endpoint, v.RepoPath, err)
 	}
+	defer resp.Body.Close()
 	if resp.StatusCode != 200 {
 		return nil, fmt.Errorf("failed to get model info from endpoint %s, repo path:%s, status code: %d",
 			c.endpoint, v.RepoPath, resp.StatusCode)
@@ -89,6 +91,7 @@ func (c *commonClient) DatasetInfo(ctx context.Context, v types.SyncVersion) (*t
 		return nil, fmt.Errorf("failed to get dataset info from endpoint %s, repo path:%s, cause: %w",
 			c.endpoint, v.RepoPath, err)
 	}
+	defer resp.Body.Close()
 	if resp.StatusCode != 200 {
 		return nil, fmt.Errorf("failed to get dataset info from endpoint %s, repo path:%s, status code: %d",
 			c.endpoint, v.RepoPath, resp.StatusCode)
@@ -111,6 +114,7 @@ func (c *commonClient) ReadMeData(ctx context.Context, v types.SyncVersion) (str
 		return "", fmt.Errorf("failed to get readme data endpoint %s, repo path:%s, cause: %w",
 			c.endpoint, v.RepoPath, err)
 	}
+	defer resp.Body.Close()
 	if resp.StatusCode != 200 {
 		return "", fmt.Errorf("failed to get readme data from endpoint %s, repo path:%s, status code: %d",
 			c.endpoint, v.RepoPath, resp.StatusCode)
@@ -133,6 +137,7 @@ func (c *commonClient) FileList(ctx context.Context, v types.SyncVersion) ([]typ
 		return nil, fmt.Errorf("failed to get readme data endpoint %s, repo path:%s, cause: %w",
 			c.endpoint, v.RepoPath, err)
 	}
+	defer resp.Body.Close()
 	if resp.StatusCode != 200 {
 		return nil, fmt.Errorf("failed to get readme data from endpoint %s, repo path:%s, status code: %d",
 			c.endpoint, v.RepoPath, resp.StatusCode)

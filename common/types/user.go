@@ -171,7 +171,7 @@ type UserLikesRequest struct {
 	CurrentUser   string `json:"current_user"`
 }
 
-/* for HF compitable apis  */
+/* for HF compatible apis  */
 type WhoamiResponse struct {
 	Name  string `json:"name"`
 	Email string `json:"email"`
