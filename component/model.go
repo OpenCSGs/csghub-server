@@ -782,7 +782,6 @@ func (c *modelComponentImpl) DelRelationDataset(ctx context.Context, req types.R
 	readmeReq.Email = user.Email
 	readmeReq.Content = base64.StdEncoding.EncodeToString([]byte(output))
 
-	fmt.Println("===== zzzzz")
 	err = c.gitServer.UpdateRepoFile(&readmeReq)
 	if err != nil {
 		return fmt.Errorf("failed to delete dataset tag to %s file, cause: %w", readmeReq.FilePath, err)
