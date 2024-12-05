@@ -900,6 +900,67 @@ func (_c *MockTagStore_FindOrCreate_Call) RunAndReturn(run func(context.Context,
 	return _c
 }
 
+// FindTag provides a mock function with given fields: ctx, name, scope, category
+func (_m *MockTagStore) FindTag(ctx context.Context, name string, scope string, category string) (*database.Tag, error) {
+	ret := _m.Called(ctx, name, scope, category)
+
+	if len(ret) == 0 {
+		panic("no return value specified for FindTag")
+	}
+
+	var r0 *database.Tag
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, string) (*database.Tag, error)); ok {
+		return rf(ctx, name, scope, category)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, string) *database.Tag); ok {
+		r0 = rf(ctx, name, scope, category)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*database.Tag)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string, string, string) error); ok {
+		r1 = rf(ctx, name, scope, category)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockTagStore_FindTag_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'FindTag'
+type MockTagStore_FindTag_Call struct {
+	*mock.Call
+}
+
+// FindTag is a helper method to define mock.On call
+//   - ctx context.Context
+//   - name string
+//   - scope string
+//   - category string
+func (_e *MockTagStore_Expecter) FindTag(ctx interface{}, name interface{}, scope interface{}, category interface{}) *MockTagStore_FindTag_Call {
+	return &MockTagStore_FindTag_Call{Call: _e.mock.On("FindTag", ctx, name, scope, category)}
+}
+
+func (_c *MockTagStore_FindTag_Call) Run(run func(ctx context.Context, name string, scope string, category string)) *MockTagStore_FindTag_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(string), args[2].(string), args[3].(string))
+	})
+	return _c
+}
+
+func (_c *MockTagStore_FindTag_Call) Return(_a0 *database.Tag, _a1 error) *MockTagStore_FindTag_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockTagStore_FindTag_Call) RunAndReturn(run func(context.Context, string, string, string) (*database.Tag, error)) *MockTagStore_FindTag_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // GetTagsByScopeAndCategories provides a mock function with given fields: ctx, scope, categories
 func (_m *MockTagStore) GetTagsByScopeAndCategories(ctx context.Context, scope database.TagScope, categories []string) ([]*database.Tag, error) {
 	ret := _m.Called(ctx, scope, categories)

@@ -67,6 +67,7 @@ var serverCmd = &cobra.Command{
 		if err != nil {
 			return fmt.Errorf("fail to initialize message queue, %w", err)
 		}
+		s3Internal := len(cfg.S3.InternalEndpoint) > 0
 		err = deploy.Init(common.DeployConfig{
 			ImageBuilderURL:         cfg.Space.BuilderEndpoint,
 			ImageRunnerURL:          cfg.Space.RunnerEndpoint,
@@ -76,6 +77,7 @@ var serverCmd = &cobra.Command{
 			ModelDeployTimeoutInMin: cfg.Model.DeployTimeoutInMin,
 			ModelDownloadEndpoint:   cfg.Model.DownloadEndpoint,
 			PublicRootDomain:        cfg.Space.PublicRootDomain,
+			S3Internal:              s3Internal,
 			IsMasterHost:            cfg.IsMasterHost,
 		})
 		if err != nil {

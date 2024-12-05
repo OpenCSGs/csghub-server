@@ -84,6 +84,53 @@ func (_c *MockDeployer_CheckResourceAvailable_Call) RunAndReturn(run func(contex
 	return _c
 }
 
+// DeleteEvaluation provides a mock function with given fields: ctx, req
+func (_m *MockDeployer) DeleteEvaluation(ctx context.Context, req types.ArgoWorkFlowDeleteReq) error {
+	ret := _m.Called(ctx, req)
+
+	if len(ret) == 0 {
+		panic("no return value specified for DeleteEvaluation")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, types.ArgoWorkFlowDeleteReq) error); ok {
+		r0 = rf(ctx, req)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// MockDeployer_DeleteEvaluation_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'DeleteEvaluation'
+type MockDeployer_DeleteEvaluation_Call struct {
+	*mock.Call
+}
+
+// DeleteEvaluation is a helper method to define mock.On call
+//   - ctx context.Context
+//   - req types.ArgoWorkFlowDeleteReq
+func (_e *MockDeployer_Expecter) DeleteEvaluation(ctx interface{}, req interface{}) *MockDeployer_DeleteEvaluation_Call {
+	return &MockDeployer_DeleteEvaluation_Call{Call: _e.mock.On("DeleteEvaluation", ctx, req)}
+}
+
+func (_c *MockDeployer_DeleteEvaluation_Call) Run(run func(ctx context.Context, req types.ArgoWorkFlowDeleteReq)) *MockDeployer_DeleteEvaluation_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(types.ArgoWorkFlowDeleteReq))
+	})
+	return _c
+}
+
+func (_c *MockDeployer_DeleteEvaluation_Call) Return(_a0 error) *MockDeployer_DeleteEvaluation_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockDeployer_DeleteEvaluation_Call) RunAndReturn(run func(context.Context, types.ArgoWorkFlowDeleteReq) error) *MockDeployer_DeleteEvaluation_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // Deploy provides a mock function with given fields: ctx, dr
 func (_m *MockDeployer) Deploy(ctx context.Context, dr types.DeployRepo) (int64, error) {
 	ret := _m.Called(ctx, dr)
@@ -253,6 +300,65 @@ func (_c *MockDeployer_GetClusterById_Call) Return(_a0 *types.ClusterRes, _a1 er
 }
 
 func (_c *MockDeployer_GetClusterById_Call) RunAndReturn(run func(context.Context, string) (*types.ClusterRes, error)) *MockDeployer_GetClusterById_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// GetEvaluation provides a mock function with given fields: ctx, req
+func (_m *MockDeployer) GetEvaluation(ctx context.Context, req types.EvaluationGetReq) (*types.ArgoWorkFlowRes, error) {
+	ret := _m.Called(ctx, req)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetEvaluation")
+	}
+
+	var r0 *types.ArgoWorkFlowRes
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, types.EvaluationGetReq) (*types.ArgoWorkFlowRes, error)); ok {
+		return rf(ctx, req)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, types.EvaluationGetReq) *types.ArgoWorkFlowRes); ok {
+		r0 = rf(ctx, req)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*types.ArgoWorkFlowRes)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, types.EvaluationGetReq) error); ok {
+		r1 = rf(ctx, req)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockDeployer_GetEvaluation_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetEvaluation'
+type MockDeployer_GetEvaluation_Call struct {
+	*mock.Call
+}
+
+// GetEvaluation is a helper method to define mock.On call
+//   - ctx context.Context
+//   - req types.EvaluationGetReq
+func (_e *MockDeployer_Expecter) GetEvaluation(ctx interface{}, req interface{}) *MockDeployer_GetEvaluation_Call {
+	return &MockDeployer_GetEvaluation_Call{Call: _e.mock.On("GetEvaluation", ctx, req)}
+}
+
+func (_c *MockDeployer_GetEvaluation_Call) Run(run func(ctx context.Context, req types.EvaluationGetReq)) *MockDeployer_GetEvaluation_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(types.EvaluationGetReq))
+	})
+	return _c
+}
+
+func (_c *MockDeployer_GetEvaluation_Call) Return(_a0 *types.ArgoWorkFlowRes, _a1 error) *MockDeployer_GetEvaluation_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockDeployer_GetEvaluation_Call) RunAndReturn(run func(context.Context, types.EvaluationGetReq) (*types.ArgoWorkFlowRes, error)) *MockDeployer_GetEvaluation_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -443,6 +549,67 @@ func (_c *MockDeployer_ListCluster_Call) Return(_a0 []types.ClusterRes, _a1 erro
 }
 
 func (_c *MockDeployer_ListCluster_Call) RunAndReturn(run func(context.Context) ([]types.ClusterRes, error)) *MockDeployer_ListCluster_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// ListEvaluations provides a mock function with given fields: _a0, _a1, _a2, _a3
+func (_m *MockDeployer) ListEvaluations(_a0 context.Context, _a1 string, _a2 int, _a3 int) (*types.ArgoWorkFlowListRes, error) {
+	ret := _m.Called(_a0, _a1, _a2, _a3)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ListEvaluations")
+	}
+
+	var r0 *types.ArgoWorkFlowListRes
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, int, int) (*types.ArgoWorkFlowListRes, error)); ok {
+		return rf(_a0, _a1, _a2, _a3)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string, int, int) *types.ArgoWorkFlowListRes); ok {
+		r0 = rf(_a0, _a1, _a2, _a3)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*types.ArgoWorkFlowListRes)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string, int, int) error); ok {
+		r1 = rf(_a0, _a1, _a2, _a3)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockDeployer_ListEvaluations_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ListEvaluations'
+type MockDeployer_ListEvaluations_Call struct {
+	*mock.Call
+}
+
+// ListEvaluations is a helper method to define mock.On call
+//   - _a0 context.Context
+//   - _a1 string
+//   - _a2 int
+//   - _a3 int
+func (_e *MockDeployer_Expecter) ListEvaluations(_a0 interface{}, _a1 interface{}, _a2 interface{}, _a3 interface{}) *MockDeployer_ListEvaluations_Call {
+	return &MockDeployer_ListEvaluations_Call{Call: _e.mock.On("ListEvaluations", _a0, _a1, _a2, _a3)}
+}
+
+func (_c *MockDeployer_ListEvaluations_Call) Run(run func(_a0 context.Context, _a1 string, _a2 int, _a3 int)) *MockDeployer_ListEvaluations_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(string), args[2].(int), args[3].(int))
+	})
+	return _c
+}
+
+func (_c *MockDeployer_ListEvaluations_Call) Return(_a0 *types.ArgoWorkFlowListRes, _a1 error) *MockDeployer_ListEvaluations_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockDeployer_ListEvaluations_Call) RunAndReturn(run func(context.Context, string, int, int) (*types.ArgoWorkFlowListRes, error)) *MockDeployer_ListEvaluations_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -717,6 +884,65 @@ func (_c *MockDeployer_Stop_Call) Return(err error) *MockDeployer_Stop_Call {
 }
 
 func (_c *MockDeployer_Stop_Call) RunAndReturn(run func(context.Context, types.DeployRepo) error) *MockDeployer_Stop_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// SubmitEvaluation provides a mock function with given fields: ctx, req
+func (_m *MockDeployer) SubmitEvaluation(ctx context.Context, req types.EvaluationReq) (*types.ArgoWorkFlowRes, error) {
+	ret := _m.Called(ctx, req)
+
+	if len(ret) == 0 {
+		panic("no return value specified for SubmitEvaluation")
+	}
+
+	var r0 *types.ArgoWorkFlowRes
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, types.EvaluationReq) (*types.ArgoWorkFlowRes, error)); ok {
+		return rf(ctx, req)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, types.EvaluationReq) *types.ArgoWorkFlowRes); ok {
+		r0 = rf(ctx, req)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*types.ArgoWorkFlowRes)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, types.EvaluationReq) error); ok {
+		r1 = rf(ctx, req)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockDeployer_SubmitEvaluation_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SubmitEvaluation'
+type MockDeployer_SubmitEvaluation_Call struct {
+	*mock.Call
+}
+
+// SubmitEvaluation is a helper method to define mock.On call
+//   - ctx context.Context
+//   - req types.EvaluationReq
+func (_e *MockDeployer_Expecter) SubmitEvaluation(ctx interface{}, req interface{}) *MockDeployer_SubmitEvaluation_Call {
+	return &MockDeployer_SubmitEvaluation_Call{Call: _e.mock.On("SubmitEvaluation", ctx, req)}
+}
+
+func (_c *MockDeployer_SubmitEvaluation_Call) Run(run func(ctx context.Context, req types.EvaluationReq)) *MockDeployer_SubmitEvaluation_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(types.EvaluationReq))
+	})
+	return _c
+}
+
+func (_c *MockDeployer_SubmitEvaluation_Call) Return(_a0 *types.ArgoWorkFlowRes, _a1 error) *MockDeployer_SubmitEvaluation_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockDeployer_SubmitEvaluation_Call) RunAndReturn(run func(context.Context, types.EvaluationReq) (*types.ArgoWorkFlowRes, error)) *MockDeployer_SubmitEvaluation_Call {
 	_c.Call.Return(run)
 	return _c
 }

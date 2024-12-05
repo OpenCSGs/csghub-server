@@ -16,11 +16,8 @@ type Config struct {
 	EnableSwagger bool   `env:"STARHUB_SERVER_ENABLE_SWAGGER, default=false"`
 	APIToken      string `env:"STARHUB_SERVER_API_TOKEN, default=0c11e6e4f2054444374ba3f0b70de4145935a7312289d404814cd5907c6aa93cc65cd35dbf94e04c13a3dedbf51f1694de84240c8acb7238b54a2c3ac8e87c59"`
 	// enable if you want to acess csghub through https, especially for space rproxy
-	EnableHTTPS bool `env:"STARHUB_SERVER_ENABLE_HTTPS, default=false"`
-	//the api key to call lbs service, like tencent map or gaode map
-	LBSServiceKey string `env:"STARHUB_SERVER_LBS_SERVICE_KEY, default=123456"`
-	//the cdn domain for different city
-	CityToCdnDomain map[string]string `env:"STARHUB_SERVER_CITY_TO_CDN_DOMAIN, default="`
+	EnableHTTPS bool   `env:"STARHUB_SERVER_ENABLE_HTTPS, default=false"`
+	DocsHost    string `env:"STARHUB_SERVER_SERVER_DOCS_HOST, default=http://localhost:6636"`
 	//the master host
 	IsMasterHost bool `env:"STARHUB_SERVER_IS_MASTER_HOST, default=true"`
 

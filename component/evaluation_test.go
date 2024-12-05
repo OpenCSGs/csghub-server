@@ -3,7 +3,6 @@ package component
 import (
 	"context"
 	"encoding/json"
-	"strconv"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -125,22 +124,11 @@ func TestEvaluationComponent_CreateEvaluation(t *testing.T) {
 			ID:         1,
 			FrameImage: "lm-evaluation-harness:0.4.6",
 		}, nil)
-		ac.EXPECT().QueryBalanceByUserIDInternal(ctx, "test").Return(&database.AccountUser{
-			Balance: 123.4,
-		}, nil)
 		resource, err := json.Marshal(req2.Hardware)
 		require.Nil(t, err)
 		stores.SpaceResourceMock().EXPECT().FindByID(ctx, int64(1)).Return(&database.SpaceResource{
 			ID:        1,
 			Resources: string(resource),
-		}, nil)
-		ac.EXPECT().QueryPricesBySKUType("", types.AcctPriceListReq{
-			SkuType:    types.SKUCSGHub,
-			SkuKind:    strconv.Itoa(int(types.SKUPayAsYouGo)),
-			ResourceID: strconv.FormatInt(int64(1), 10),
-		}).Return(&database.PriceResp{
-			Total:  100,
-			Prices: []database.AccountPrice{{SkuPrice: 10}},
 		}, nil)
 		deployerMock.EXPECT().SubmitEvaluation(ctx, req2).Return(&types.ArgoWorkFlowRes{
 			ID:       1,

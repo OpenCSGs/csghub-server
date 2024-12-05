@@ -82,6 +82,66 @@ func (_c *MockTagComponent_AllTags_Call) RunAndReturn(run func(context.Context) 
 	return _c
 }
 
+// AllTagsByScopeAndCategory provides a mock function with given fields: ctx, scope, category
+func (_m *MockTagComponent) AllTagsByScopeAndCategory(ctx context.Context, scope string, category string) ([]*database.Tag, error) {
+	ret := _m.Called(ctx, scope, category)
+
+	if len(ret) == 0 {
+		panic("no return value specified for AllTagsByScopeAndCategory")
+	}
+
+	var r0 []*database.Tag
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, string) ([]*database.Tag, error)); ok {
+		return rf(ctx, scope, category)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string, string) []*database.Tag); ok {
+		r0 = rf(ctx, scope, category)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]*database.Tag)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string, string) error); ok {
+		r1 = rf(ctx, scope, category)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockTagComponent_AllTagsByScopeAndCategory_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'AllTagsByScopeAndCategory'
+type MockTagComponent_AllTagsByScopeAndCategory_Call struct {
+	*mock.Call
+}
+
+// AllTagsByScopeAndCategory is a helper method to define mock.On call
+//   - ctx context.Context
+//   - scope string
+//   - category string
+func (_e *MockTagComponent_Expecter) AllTagsByScopeAndCategory(ctx interface{}, scope interface{}, category interface{}) *MockTagComponent_AllTagsByScopeAndCategory_Call {
+	return &MockTagComponent_AllTagsByScopeAndCategory_Call{Call: _e.mock.On("AllTagsByScopeAndCategory", ctx, scope, category)}
+}
+
+func (_c *MockTagComponent_AllTagsByScopeAndCategory_Call) Run(run func(ctx context.Context, scope string, category string)) *MockTagComponent_AllTagsByScopeAndCategory_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(string), args[2].(string))
+	})
+	return _c
+}
+
+func (_c *MockTagComponent_AllTagsByScopeAndCategory_Call) Return(_a0 []*database.Tag, _a1 error) *MockTagComponent_AllTagsByScopeAndCategory_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockTagComponent_AllTagsByScopeAndCategory_Call) RunAndReturn(run func(context.Context, string, string) ([]*database.Tag, error)) *MockTagComponent_AllTagsByScopeAndCategory_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // ClearMetaTags provides a mock function with given fields: ctx, repoType, namespace, name
 func (_m *MockTagComponent) ClearMetaTags(ctx context.Context, repoType types.RepositoryType, namespace string, name string) error {
 	ret := _m.Called(ctx, repoType, namespace, name)
