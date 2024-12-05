@@ -37,8 +37,10 @@ func (d *DFA) BuildDFA(words []string) {
 
 // ContainsSensitiveWord checks if the input text contains any sensitive words
 func (d *DFA) ContainsSensitiveWord(text string) bool {
+	runes := []rune(text)
 	current := d.root
-	for _, char := range text {
+	for i := 0; i < len(runes); i++ {
+		char := runes[i]
 		if isIgnoredCharacter(char) {
 			continue
 		}
@@ -49,6 +51,12 @@ func (d *DFA) ContainsSensitiveWord(text string) bool {
 			}
 		} else {
 			current = d.root // Reset to the root state
+			if i > 0 {
+				// Check if the current character is the start of a new sensitive word
+				if next, exists := current.transitions[char]; exists {
+					current = next
+				}
+			}
 		}
 	}
 	return false
