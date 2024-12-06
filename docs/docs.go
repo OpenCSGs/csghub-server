@@ -15363,6 +15363,9 @@ const docTemplate = `{
                 "id": {
                     "type": "integer"
                 },
+                "last_updated_at": {
+                    "type": "string"
+                },
                 "repository": {
                     "$ref": "#/definitions/database.Repository"
                 },
@@ -15485,6 +15488,9 @@ const docTemplate = `{
         "database.Namespace": {
             "type": "object",
             "properties": {
+                "created_at": {
+                    "type": "string"
+                },
                 "id": {
                     "type": "integer"
                 },
@@ -15495,6 +15501,9 @@ const docTemplate = `{
                     "$ref": "#/definitions/database.NamespaceType"
                 },
                 "path": {
+                    "type": "string"
+                },
+                "updated_at": {
                     "type": "string"
                 },
                 "user": {
@@ -17532,11 +17541,17 @@ const docTemplate = `{
                 "readme": {
                     "type": "string"
                 },
+                "recom_op_weight": {
+                    "type": "integer"
+                },
                 "repository": {
                     "$ref": "#/definitions/types.Repository"
                 },
                 "repository_id": {
                     "type": "integer"
+                },
+                "sensitive_check_status": {
+                    "type": "string"
                 },
                 "source": {
                     "$ref": "#/definitions/types.RepositorySource"
