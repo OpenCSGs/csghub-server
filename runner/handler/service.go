@@ -21,10 +21,10 @@ import (
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/types"
-	"opencsg.com/csghub-server/servicerunner/component"
+	"opencsg.com/csghub-server/runner/component"
 )
 
-type K8sHander struct {
+type K8sHandler struct {
 	clusterPool        *cluster.ClusterPool
 	k8sNameSpace       string
 	modelDockerRegBase string
@@ -32,15 +32,10 @@ type K8sHander struct {
 	s                  *component.ServiceComponent
 }
 
-func NewK8sHander(config *config.Config) (*K8sHander, error) {
-	clusterPool, err := cluster.NewClusterPool()
-	if err != nil {
-		slog.Error("falied to build kubeconfig", "error", err)
-		return nil, fmt.Errorf("failed to build kubeconfig,%w", err)
-	}
+func NewK8sHandler(config *config.Config, clusterPool *cluster.ClusterPool) (*K8sHandler, error) {
 	domainParts := strings.SplitN(config.Space.InternalRootDomain, ".", 2)
 	serviceComponent := component.NewServiceComponent(config, domainParts[0])
-	return &K8sHander{
+	return &K8sHandler{
 		k8sNameSpace:       domainParts[0],
 		clusterPool:        clusterPool,
 		env:                config,
@@ -49,7 +44,7 @@ func NewK8sHander(config *config.Config) (*K8sHander, error) {
 	}, nil
 }
 
-func (s *K8sHander) RunService(c *gin.Context) {
+func (s *K8sHandler) RunService(c *gin.Context) {
 	request := &types.SVCRequest{}
 	err := c.BindJSON(&request)
 	if err != nil {
@@ -148,7 +143,7 @@ func (s *K8sHander) RunService(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "Service created successfully"})
 }
 
-func (s *K8sHander) StopService(c *gin.Context) {
+func (s *K8sHandler) StopService(c *gin.Context) {
 	var resp types.StopResponse
 	var request = &types.StopRequest{}
 	err := c.BindJSON(request)
@@ -209,7 +204,7 @@ func (s *K8sHander) StopService(c *gin.Context) {
 	c.JSON(http.StatusOK, resp)
 }
 
-func (s *K8sHander) removeServiceForcely(c *gin.Context, cluster *cluster.Cluster, svcName string) error {
+func (s *K8sHandler) removeServiceForcely(c *gin.Context, cluster *cluster.Cluster, svcName string) error {
 	err := cluster.KnativeClient.ServingV1().Services(s.k8sNameSpace).Delete(context.Background(), svcName, *metav1.NewDeleteOptions(0))
 	if err != nil {
 		return err
@@ -235,7 +230,7 @@ func (s *K8sHander) removeServiceForcely(c *gin.Context, cluster *cluster.Cluste
 	return nil
 }
 
-func (s *K8sHander) UpdateService(c *gin.Context) {
+func (s *K8sHandler) UpdateService(c *gin.Context) {
 	var resp types.ModelUpdateResponse
 	var request = &types.ModelUpdateRequest{}
 	err := c.BindJSON(request)
@@ -294,7 +289,7 @@ func (s *K8sHander) UpdateService(c *gin.Context) {
 	}
 	// Update CPU and Memory requests and limits
 	hardware := request.Hardware
-	resReq, _ := s.s.GenerateResources(hardware)
+	resReq, _ := component.GenerateResources(hardware)
 	resources := corev1.ResourceRequirements{
 		Limits:   resReq,
 		Requests: resReq,
@@ -320,7 +315,7 @@ func (s *K8sHander) UpdateService(c *gin.Context) {
 	c.JSON(http.StatusOK, resp)
 }
 
-func (s *K8sHander) ServiceStatus(c *gin.Context) {
+func (s *K8sHandler) ServiceStatus(c *gin.Context) {
 	var resp types.StatusResponse
 
 	var request = &types.StatusRequest{}
@@ -422,7 +417,7 @@ func (s *K8sHander) ServiceStatus(c *gin.Context) {
 	c.JSON(http.StatusOK, resp)
 }
 
-func (s *K8sHander) ServiceLogs(c *gin.Context) {
+func (s *K8sHandler) ServiceLogs(c *gin.Context) {
 	var request = &types.LogsRequest{}
 	err := c.BindJSON(request)
 
@@ -452,7 +447,7 @@ func (s *K8sHander) ServiceLogs(c *gin.Context) {
 	s.GetLogsByPod(c, *cluster, podNames[0], srvName)
 }
 
-func (s *K8sHander) ServiceLogsByPod(c *gin.Context) {
+func (s *K8sHandler) ServiceLogsByPod(c *gin.Context) {
 	var request = &types.ServiceRequest{}
 	err := c.BindJSON(request)
 
@@ -472,7 +467,7 @@ func (s *K8sHander) ServiceLogsByPod(c *gin.Context) {
 	s.GetLogsByPod(c, *cluster, podName, srvName)
 }
 
-func (s *K8sHander) GetLogsByPod(c *gin.Context, cluster cluster.Cluster, podName string, srvName string) {
+func (s *K8sHandler) GetLogsByPod(c *gin.Context, cluster cluster.Cluster, podName string, srvName string) {
 
 	logs := cluster.Client.CoreV1().Pods(s.k8sNameSpace).GetLogs(podName, &corev1.PodLogOptions{
 		Container: "user-container",
@@ -536,14 +531,14 @@ func (s *K8sHander) GetLogsByPod(c *gin.Context, cluster cluster.Cluster, podNam
 					slog.Error("write data failed", "error", err)
 				}
 				c.Writer.Flush()
-				slog.Info("send pod logs", slog.String("srv_name", srvName), slog.String("srv_name", srvName), slog.Int("len", n), slog.String("log", string(buf[:n])))
+				slog.Info("send pod logs", slog.String("srv_name", srvName), slog.String("srv_name", srvName), slog.Int("len", n))
 			}
 		}
 
 	}
 }
 
-func (s *K8sHander) ServiceStatusAll(c *gin.Context) {
+func (s *K8sHandler) ServiceStatusAll(c *gin.Context) {
 	allStatus := make(map[string]*types.StatusResponse)
 	for index := range s.clusterPool.Clusters {
 		cluster := s.clusterPool.Clusters[index]
@@ -603,7 +598,7 @@ func (s *K8sHander) ServiceStatusAll(c *gin.Context) {
 	c.JSON(http.StatusOK, allStatus)
 }
 
-func (s *K8sHander) GetServicePods(ctx context.Context, cluster cluster.Cluster, srvName string, namespace string, limit int64) ([]string, error) {
+func (s *K8sHandler) GetServicePods(ctx context.Context, cluster cluster.Cluster, srvName string, namespace string, limit int64) ([]string, error) {
 	labelSelector := fmt.Sprintf("serving.knative.dev/service=%s", srvName)
 	// Get the list of Pods based on the label selector
 	opts := metav1.ListOptions{
@@ -629,12 +624,13 @@ func (s *K8sHander) GetServicePods(ctx context.Context, cluster cluster.Cluster,
 	return podNames, nil
 }
 
-func (s *K8sHander) GetClusterInfo(c *gin.Context) {
+func (s *K8sHandler) GetClusterInfo(c *gin.Context) {
 	clusterRes := []types.CluserResponse{}
 	for index := range s.clusterPool.Clusters {
 		cls := s.clusterPool.Clusters[index]
-		cInfo, _ := s.clusterPool.ClusterStore.ByClusterConfig(c.Request.Context(), cls.ID)
-		if !cInfo.Enable {
+		cInfo, err := s.clusterPool.ClusterStore.ByClusterConfig(c.Request.Context(), cls.ID)
+		if err != nil {
+			slog.Error("get cluster info failed", slog.Any("error", err))
 			continue
 		}
 		clusterInfo := types.CluserResponse{}
@@ -649,7 +645,7 @@ func (s *K8sHander) GetClusterInfo(c *gin.Context) {
 	c.JSON(http.StatusOK, clusterRes)
 }
 
-func (s *K8sHander) GetClusterInfoByID(c *gin.Context) {
+func (s *K8sHandler) GetClusterInfoByID(c *gin.Context) {
 	clusterId := c.Params.ByName("id")
 	cInfo, _ := s.clusterPool.ClusterStore.ByClusterID(c.Request.Context(), clusterId)
 	clusterInfo := types.CluserResponse{}
@@ -672,15 +668,15 @@ func (s *K8sHander) GetClusterInfoByID(c *gin.Context) {
 	c.JSON(http.StatusOK, clusterInfo)
 }
 
-func (s *K8sHander) getServiceNameFromRequest(c *gin.Context) string {
+func (s *K8sHandler) getServiceNameFromRequest(c *gin.Context) string {
 	return c.Params.ByName("service")
 }
 
-func (s *K8sHander) getPodNameFromRequest(c *gin.Context) string {
+func (s *K8sHandler) getPodNameFromRequest(c *gin.Context) string {
 	return c.Params.ByName("pod_name")
 }
 
-func (s *K8sHander) GetServiceByName(c *gin.Context) {
+func (s *K8sHandler) GetServiceByName(c *gin.Context) {
 	var resp types.StatusResponse
 	var request = &types.CheckRequest{}
 	err := c.BindJSON(request)
@@ -740,7 +736,7 @@ func (s *K8sHander) GetServiceByName(c *gin.Context) {
 	c.JSON(http.StatusOK, resp)
 }
 
-func (s *K8sHander) GetReplica(c *gin.Context) {
+func (s *K8sHandler) GetReplica(c *gin.Context) {
 	var resp types.ReplicaResponse
 	var request = &types.StatusRequest{}
 	err := c.BindJSON(request)
@@ -797,9 +793,6 @@ func (s *K8sHander) GetReplica(c *gin.Context) {
 	}
 
 	// revision exist
-	deployIDStr := srv.Annotations[types.ResDeployID]
-	deployID, _ := strconv.ParseInt(deployIDStr, 10, 64)
-	resp.DeployID = deployID
 	resp.Code = 1
 	resp.Message = srvName
 	resp.ActualReplica = int(*revision.Status.ActualReplicas)
@@ -808,7 +801,7 @@ func (s *K8sHander) GetReplica(c *gin.Context) {
 	c.JSON(http.StatusOK, resp)
 }
 
-func (s *K8sHander) UpdateCluster(c *gin.Context) {
+func (s *K8sHandler) UpdateCluster(c *gin.Context) {
 	var resp types.UpdateClusterResponse
 	var request = &database.ClusterInfo{}
 	err := c.BindJSON(request)
@@ -832,7 +825,7 @@ func (s *K8sHander) UpdateCluster(c *gin.Context) {
 	c.JSON(http.StatusOK, resp)
 }
 
-func (s *K8sHander) PurgeService(c *gin.Context) {
+func (s *K8sHandler) PurgeService(c *gin.Context) {
 	var resp types.PurgeResponse
 	var request = &types.PurgeRequest{}
 	err := c.BindJSON(request)
@@ -890,7 +883,7 @@ func (s *K8sHander) PurgeService(c *gin.Context) {
 	c.JSON(http.StatusOK, resp)
 }
 
-func (s *K8sHander) GetServiceInfo(c *gin.Context) {
+func (s *K8sHandler) GetServiceInfo(c *gin.Context) {
 	var resp types.ServiceInfoResponse
 	var request = &types.ServiceRequest{}
 	err := c.BindJSON(request)

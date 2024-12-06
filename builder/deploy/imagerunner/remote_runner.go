@@ -12,6 +12,7 @@ import (
 	"net/url"
 	"time"
 
+	"opencsg.com/csghub-server/api/httpbase"
 	"opencsg.com/csghub-server/common/types"
 )
 
@@ -314,4 +315,69 @@ func (h *RemoteRunner) UpdateCluster(ctx context.Context, data *types.ClusterReq
 	}
 
 	return &resp, nil
+}
+
+// submit argo workflow
+func (h *RemoteRunner) SubmitWorkFlow(ctx context.Context, req *types.ArgoWorkFlowReq) (*types.ArgoWorkFlowRes, error) {
+	url := fmt.Sprintf("%s/api/v1/workflows", h.remote)
+	// Create a new HTTP client with a timeout
+	response, err := h.doRequest(http.MethodPost, url, req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to submit evaluation job, %w", err)
+	}
+	defer response.Body.Close()
+
+	var res types.ArgoWorkFlowRes
+	if err := json.NewDecoder(response.Body).Decode(&res); err != nil {
+		return nil, err
+	}
+	return &res, nil
+}
+
+// list workflows
+func (h *RemoteRunner) ListWorkFlows(ctx context.Context, username string, per, page int) (*types.ArgoWorkFlowListRes, error) {
+	url := fmt.Sprintf("%s/api/v1/workflows?username=%s&per=%d&page=%d", h.remote, username, per, page)
+	// Create a new HTTP client with a timeout
+	response, err := h.doRequest(http.MethodGet, url, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list evaluation jobs, %w", err)
+	}
+	defer response.Body.Close()
+	var res types.ArgoWorkFlowListRes
+	if err := json.NewDecoder(response.Body).Decode(&res); err != nil {
+		return nil, err
+	}
+	return &res, nil
+}
+
+// delete workflow
+func (h *RemoteRunner) DeleteWorkFlow(ctx context.Context, req types.ArgoWorkFlowDeleteReq) (*httpbase.R, error) {
+	url := fmt.Sprintf("%s/api/v1/workflows/%d", h.remote, req.ID)
+	// Create a new HTTP client with a timeout
+	response, err := h.doRequest(http.MethodDelete, url, req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to delete evaluation job, %w", err)
+	}
+	defer response.Body.Close()
+	var res httpbase.R
+	err = json.NewDecoder(response.Body).Decode(&res)
+	if err != nil {
+		return nil, err
+	}
+	return &res, nil
+}
+
+func (h *RemoteRunner) GetWorkFlow(ctx context.Context, req types.ArgoWorkFlowDeleteReq) (*types.ArgoWorkFlowRes, error) {
+	url := fmt.Sprintf("%s/api/v1/workflows/%d", h.remote, req.ID)
+	response, err := h.doRequest(http.MethodGet, url, req)
+	if err != nil {
+		return nil, err
+	}
+	defer response.Body.Close()
+
+	var res types.ArgoWorkFlowRes
+	if err := json.NewDecoder(response.Body).Decode(&res); err != nil {
+		return nil, err
+	}
+	return &res, nil
 }

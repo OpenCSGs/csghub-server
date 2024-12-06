@@ -2,10 +2,12 @@ package callback
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"fmt"
 	"log/slog"
 	"path"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -37,6 +39,7 @@ type GitCallbackComponent struct {
 	ras          database.RuntimeArchitecturesStore
 	rfs          database.RuntimeFrameworksStore
 	ts           database.TagStore
+	dt           database.TagRuleStore
 	// set visibility if file content is sensitive
 	setRepoVisibility bool
 	pp                component.PromptComponent
@@ -79,6 +82,7 @@ func NewGitCallback(config *config.Config) (*GitCallbackComponent, error) {
 	if config.SensitiveCheck.Enable {
 		modSvcClient = rpc.NewModerationSvcHttpClient(fmt.Sprintf("%s:%d", config.Moderation.Host, config.Moderation.Port))
 	}
+	dt := database.NewTagRuleStore()
 	return &GitCallbackComponent{
 		config:       config,
 		gs:           gs,
@@ -97,6 +101,7 @@ func NewGitCallback(config *config.Config) (*GitCallbackComponent, error) {
 		rfs:          rfs,
 		pp:           pp,
 		ts:           ts,
+		dt:           dt,
 		maxPromptFS:  config.Dataset.PromptMaxJsonlFileSize,
 	}, nil
 }
@@ -211,7 +216,7 @@ func (c *GitCallbackComponent) modifyFiles(ctx context.Context, repoType, namesp
 	for _, fileName := range fileNames {
 		slog.Debug("modify file", slog.String("file", fileName))
 		// update model runtime
-		c.updateModelRuntimeFrameworks(ctx, repoType, namespace, repoName, ref, fileName, false)
+		c.updateRepoRelations(ctx, repoType, namespace, repoName, ref, fileName, false, fileNames)
 		// only care about readme file under root directory
 		if fileName != types.ReadmeFileName {
 			continue
@@ -233,7 +238,7 @@ func (c *GitCallbackComponent) removeFiles(ctx context.Context, repoType, namesp
 	for _, fileName := range fileNames {
 		slog.Debug("remove file", slog.String("file", fileName))
 		// update model runtime
-		c.updateModelRuntimeFrameworks(ctx, repoType, namespace, repoName, ref, fileName, true)
+		c.updateRepoRelations(ctx, repoType, namespace, repoName, ref, fileName, true, fileNames)
 		// only care about readme file under root directory
 		if fileName == types.ReadmeFileName {
 			// use empty content to clear all the meta tags
@@ -278,7 +283,7 @@ func (c *GitCallbackComponent) addFiles(ctx context.Context, repoType, namespace
 	for _, fileName := range fileNames {
 		slog.Debug("add file", slog.String("file", fileName))
 		// update model runtime
-		c.updateModelRuntimeFrameworks(ctx, repoType, namespace, repoName, ref, fileName, false)
+		c.updateRepoRelations(ctx, repoType, namespace, repoName, ref, fileName, false, fileNames)
 		// only care about readme file under root directory
 		if fileName == types.ReadmeFileName {
 			content, err := c.getFileRaw(repoType, namespace, repoName, ref, fileName)
@@ -374,10 +379,73 @@ func (c *GitCallbackComponent) getFileRaw(repoType, namespace, repoName, ref, fi
 	return content, nil
 }
 
-func (c *GitCallbackComponent) updateModelRuntimeFrameworks(ctx context.Context, repoType, namespace, repoName, ref, fileName string, deleteAction bool) {
+// update repo relations
+func (c *GitCallbackComponent) updateRepoRelations(ctx context.Context, repoType, namespace, repoName, ref, fileName string, deleteAction bool, fileNames []string) {
 	slog.Debug("update model relation for git callback", slog.Any("namespace", namespace), slog.Any("repoName", repoName), slog.Any("repoType", repoType), slog.Any("fileName", fileName), slog.Any("branch", ref))
+	if repoType == fmt.Sprintf("%ss", types.ModelRepo) {
+		c.updateModelRuntimeFrameworks(ctx, repoType, namespace, repoName, ref, fileName, deleteAction)
+	}
+	if repoType == fmt.Sprintf("%ss", types.DatasetRepo) {
+		c.updateDatasetTags(ctx, namespace, repoName, fileNames)
+	}
+}
+
+// update dataset tags for evaluation
+func (c *GitCallbackComponent) updateDatasetTags(ctx context.Context, namespace, repoName string, fileNames []string) {
+	// script dataset repo was not supported so far
+	scriptName := fmt.Sprintf("%s.py", repoName)
+	if slices.Contains(fileNames, scriptName) {
+		return
+	}
+	repo, err := c.rs.FindByPath(ctx, types.DatasetRepo, namespace, repoName)
+	if err != nil || repo == nil {
+		slog.Warn("fail to query repo for in callback", slog.Any("namespace", namespace), slog.Any("repoName", repoName), slog.Any("error", err))
+		return
+	}
+	// check if it's evaluation dataset
+	evalDataset, err := c.dt.FindByRepo(ctx, string(types.EvaluationCategory), namespace, repoName, string(types.DatasetRepo))
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			// check if it's a mirror repo
+			mirror, err := c.mirrorStore.FindByRepoPath(ctx, types.DatasetRepo, namespace, repoName)
+			if err != nil || mirror == nil {
+				slog.Debug("fail to query mirror dataset for in callback", slog.Any("namespace", namespace), slog.Any("repoName", repoName), slog.Any("error", err))
+				return
+			}
+			namespace := strings.Split(mirror.SourceRepoPath, "/")[0]
+			name := strings.Split(mirror.SourceRepoPath, "/")[1]
+			// use mirror namespace and name to find dataset
+			evalDataset, err = c.dt.FindByRepo(ctx, string(types.EvaluationCategory), namespace, name, string(types.DatasetRepo))
+			if err != nil {
+				slog.Debug("not an evaluation dataset, ignore it", slog.Any("repo id", repo.Path))
+				return
+			}
+		} else {
+			slog.Error("failed to query evaluation dataset", slog.Any("repo id", repo.Path), slog.Any("error", err))
+			return
+		}
+
+	}
+	tagIds := []int64{}
+	tagIds = append(tagIds, evalDataset.Tag.ID)
+	if evalDataset.RuntimeFramework != "" {
+		rTag, _ := c.ts.FindTag(ctx, evalDataset.RuntimeFramework, string(types.DatasetRepo), "runtime_framework")
+		if rTag != nil {
+			tagIds = append(tagIds, rTag.ID)
+		}
+	}
+
+	err = c.ts.UpsertRepoTags(ctx, repo.ID, []int64{}, tagIds)
+	if err != nil {
+		slog.Warn("fail to add dataset tag", slog.Any("repoId", repo.ID), slog.Any("tag id", tagIds), slog.Any("error", err))
+	}
+
+}
+
+// update model runtime frameworks
+func (c *GitCallbackComponent) updateModelRuntimeFrameworks(ctx context.Context, repoType, namespace, repoName, ref, fileName string, deleteAction bool) {
 	// must be model repo and config.json
-	if repoType != fmt.Sprintf("%ss", types.ModelRepo) || fileName != component.ConfigFileName || ref != ("refs/heads/"+component.MainBranch) {
+	if repoType != fmt.Sprintf("%ss", types.ModelRepo) || fileName != component.ConfigFileName || (ref != ("refs/heads/"+component.MainBranch) && ref != ("refs/heads/"+component.MasterBranch)) {
 		return
 	}
 	repo, err := c.rs.FindByPath(ctx, types.ModelRepo, namespace, repoName)

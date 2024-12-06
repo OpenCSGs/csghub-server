@@ -16,6 +16,7 @@ import (
 
 var (
 	MainBranch     string = "main"
+	MasterBranch   string = "master"
 	ConfigFileName string = "config.json"
 	ScanLock       sync.Mutex
 )

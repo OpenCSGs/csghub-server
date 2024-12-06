@@ -3,6 +3,7 @@ package imagerunner
 import (
 	"context"
 
+	"opencsg.com/csghub-server/api/httpbase"
 	"opencsg.com/csghub-server/builder/deploy/common"
 	"opencsg.com/csghub-server/common/types"
 )
@@ -87,5 +88,21 @@ func (h *LocalRunner) GetClusterById(ctx context.Context, clusterId string) (*ty
 }
 
 func (h *LocalRunner) UpdateCluster(ctx context.Context, data *types.ClusterRequest) (*types.UpdateClusterResponse, error) {
+	return nil, nil
+}
+
+func (h *LocalRunner) SubmitWorkFlow(ctx context.Context, req *types.ArgoWorkFlowReq) (*types.ArgoWorkFlowRes, error) {
+	return nil, nil
+}
+
+func (h *LocalRunner) ListWorkFlows(ctx context.Context, username string, per, page int) (*types.ArgoWorkFlowListRes, error) {
+	return nil, nil
+}
+
+func (h *LocalRunner) DeleteWorkFlow(ctx context.Context, req types.ArgoWorkFlowDeleteReq) (*httpbase.R, error) {
+	return nil, nil
+}
+
+func (h *LocalRunner) GetWorkFlow(ctx context.Context, req types.EvaluationGetReq) (*types.ArgoWorkFlowRes, error) {
 	return nil, nil
 }

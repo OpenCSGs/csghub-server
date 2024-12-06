@@ -18,6 +18,8 @@ type Config struct {
 	// enable if you want to acess csghub through https, especially for space rproxy
 	EnableHTTPS bool   `env:"STARHUB_SERVER_ENABLE_HTTPS, default=false"`
 	DocsHost    string `env:"STARHUB_SERVER_SERVER_DOCS_HOST, default=http://localhost:6636"`
+	//the master host
+	IsMasterHost bool `env:"STARHUB_SERVER_IS_MASTER_HOST, default=true"`
 
 	APIServer struct {
 		Port         int    `env:"STARHUB_SERVER_SERVER_PORT, default=8080"`
@@ -209,6 +211,18 @@ type Config struct {
 
 	WorkFLow struct {
 		Endpoint string `env:"OPENCSG_WORKFLOW_SERVER_ENDPOINT, default=localhost:7233"`
+	}
+
+	Argo struct {
+		Namespace string `env:"STARHUB_SERVER_ARGO_NAMESPACE, default=workflows"`
+		// NamespaceQuota is used to create evaluation with free of charge
+		QuotaNamespace string `env:"STARHUB_SERVER_ARGO_QUOTA_NAMESPACE, default=workflows-quota"`
+		QuotaGPUNumber string `env:"STARHUB_SERVER_ARGO_QUOTA_GPU_NUMBER, default=1"`
+		//job will be deleted after JobTTL seconds once the jobs was done
+		JobTTL             int    `env:"STARHUB_SERVER_ARGO_TTL, default=120"`
+		ServiceAccountName string `env:"STARHUB_SERVER_ARGO_SERVICE_ACCOUNT, default=executor"`
+		// S3PublicBucket is used to store public files, should set bucket same with portal
+		S3PublicBucket string `env:"STARHUB_SERVER_ARGO_S3_PUBLIC_BUCKET"`
 	}
 }
 

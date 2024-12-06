@@ -232,9 +232,10 @@ func TestModelComponent_Show(t *testing.T) {
 			HTTPCloneURL: "https://foo.com/s/foo/bar.git",
 			SSHCloneURL:  "test@127.0.0.1:s/foo/bar.git",
 		},
-		EnableInference: true,
-		EnableFinetune:  true,
-		WidgetType:      types.ModelWidgetTypeGeneration,
+		EnableInference:  true,
+		EnableFinetune:   true,
+		EnableEvaluation: true,
+		WidgetType:       types.ModelWidgetTypeGeneration,
 	}, model)
 }
 
@@ -571,25 +572,22 @@ func TestModelComponent_SetRuntimeFrameworkModes(t *testing.T) {
 	mc := initializeTestModelComponent(ctx, t)
 
 	mc.mocks.stores.RuntimeFrameworkMock().EXPECT().FindByID(ctx, int64(1)).Return(
-		&database.RuntimeFramework{}, nil,
+		&database.RuntimeFramework{
+			ID: 1,
+		}, nil,
 	)
 	mc.mocks.stores.ModelMock().EXPECT().ListByPath(ctx, []string{"a", "b"}).Return(
 		[]database.Model{
 			{RepositoryID: 1, Repository: &database.Repository{ID: 1, Path: "m1/foo"}},
-			{RepositoryID: 2, Repository: &database.Repository{ID: 2, Path: "m2/foo"}},
 		}, nil,
 	)
 	rftags := []*database.Tag{{Name: "t1"}, {Name: "t2"}}
 	mc.mocks.stores.TagMock().EXPECT().GetTagsByScopeAndCategories(
 		ctx, database.TagScope("model"), []string{"runtime_framework", "resource"},
 	).Return(rftags, nil)
-
 	mc.mocks.stores.RepoRuntimeFrameworkMock().EXPECT().GetByIDsAndType(
 		ctx, int64(1), int64(1), 1,
-	).Return([]database.RepositoriesRuntimeFramework{}, nil)
-	mc.mocks.stores.RepoRuntimeFrameworkMock().EXPECT().GetByIDsAndType(
-		ctx, int64(1), int64(2), 1,
-	).Return([]database.RepositoriesRuntimeFramework{{}}, nil)
+	).Return(nil, nil)
 
 	mc.mocks.stores.RepoRuntimeFrameworkMock().EXPECT().Add(ctx, int64(1), int64(1), 1).Return(nil)
 	mc.mocks.components.runtimeArchitecture.EXPECT().AddRuntimeFrameworkTag(

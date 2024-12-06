@@ -476,6 +476,10 @@ func (c *modelComponentImpl) Show(ctx context.Context, namespace, name, currentU
 	if len(finetunes) > 0 {
 		resModel.EnableFinetune = true
 	}
+	evaluations, _ := c.repoRuntimeFrameworkStore.GetByRepoIDsAndType(ctx, model.Repository.ID, types.EvaluationType)
+	if len(evaluations) > 0 {
+		resModel.EnableEvaluation = true
+	}
 	return resModel, nil
 }
 
@@ -1129,17 +1133,19 @@ func (c *modelComponentImpl) ListModelsOfRuntimeFrameworks(ctx context.Context, 
 	// define EnableInference
 	enableInference := deployType == types.InferenceType
 	enableFinetune := deployType == types.FinetuneType
+	enableEvaluation := deployType == types.EvaluationType
 
 	for _, repo := range repos {
 		resModels = append(resModels, types.Model{
-			Name:            repo.Name,
-			Nickname:        repo.Nickname,
-			Description:     repo.Description,
-			Path:            repo.Path,
-			RepositoryID:    repo.ID,
-			Private:         repo.Private,
-			EnableInference: enableInference,
-			EnableFinetune:  enableFinetune,
+			Name:             repo.Name,
+			Nickname:         repo.Nickname,
+			Description:      repo.Description,
+			Path:             repo.Path,
+			RepositoryID:     repo.ID,
+			Private:          repo.Private,
+			EnableInference:  enableInference,
+			EnableFinetune:   enableFinetune,
+			EnableEvaluation: enableEvaluation,
 		})
 	}
 	return resModels, total, nil

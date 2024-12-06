@@ -78,6 +78,7 @@ var serverCmd = &cobra.Command{
 			ModelDownloadEndpoint:   cfg.Model.DownloadEndpoint,
 			PublicRootDomain:        cfg.Space.PublicRootDomain,
 			S3Internal:              s3Internal,
+			IsMasterHost:            cfg.IsMasterHost,
 		})
 		if err != nil {
 			return fmt.Errorf("failed to init deploy: %w", err)

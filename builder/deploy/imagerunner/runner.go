@@ -3,6 +3,7 @@ package imagerunner
 import (
 	"context"
 
+	"opencsg.com/csghub-server/api/httpbase"
 	"opencsg.com/csghub-server/common/types"
 )
 
@@ -19,4 +20,8 @@ type Runner interface {
 	ListCluster(ctx context.Context) ([]types.ClusterResponse, error)
 	GetClusterById(ctx context.Context, clusterId string) (*types.ClusterResponse, error)
 	UpdateCluster(ctx context.Context, data *types.ClusterRequest) (*types.UpdateClusterResponse, error)
+	SubmitWorkFlow(context.Context, *types.ArgoWorkFlowReq) (*types.ArgoWorkFlowRes, error)
+	ListWorkFlows(context.Context, string, int, int) (*types.ArgoWorkFlowListRes, error)
+	DeleteWorkFlow(context.Context, types.ArgoWorkFlowDeleteReq) (*httpbase.R, error)
+	GetWorkFlow(context.Context, types.ArgoWorkFlowDeleteReq) (*types.ArgoWorkFlowRes, error)
 }

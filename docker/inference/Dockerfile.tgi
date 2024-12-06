@@ -1,9 +1,7 @@
 FROM ghcr.io/huggingface/text-generation-inference:2.4.0
 RUN pip config set global.index-url https://pypi.tuna.tsinghua.edu.cn/simple 
-RUN pip install --no-cache-dir csghub-sdk==0.4.3 supervisor
-RUN apt-get update && apt-get install -y supervisor
-RUN mkdir -p /var/log/supervisord
-COPY ./supervisord.conf /etc/supervisor/conf.d/supervisord.conf
+RUN pip install --no-cache-dir csghub-sdk==0.4.5
+RUN apt-get update && apt-get install -y dumb-init && apt-get clean && rm -rf /var/lib/apt/lists/*
 COPY ./tgi/ /etc/csghub/
 RUN chmod +x /etc/csghub/*.sh
 
@@ -12,5 +10,5 @@ ENV HUGGINGFACE_HUB_CACHE=/data \
     HF_HUB_ENABLE_HF_TRANSFER=0 
 ENV PORT=8000
 EXPOSE 8000
-
-ENTRYPOINT ["/usr/bin/supervisord", "-c", "/etc/supervisor/conf.d/supervisord.conf"]
+ENTRYPOINT [ "/usr/bin/dumb-init", "--" ]
+CMD ["/etc/csghub/serve.sh"]

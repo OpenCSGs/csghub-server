@@ -99,9 +99,10 @@ const (
 type Mapping string
 
 const (
-	AutoMapping   Mapping = "auto"
-	HFMapping     Mapping = "hf"
-	CSGHubMapping Mapping = "csghub"
+	AutoMapping       Mapping = "auto"
+	HFMapping         Mapping = "hf"
+	CSGHubMapping     Mapping = "csghub"
+	ModelScopeMapping Mapping = "ms"
 )
 
 type MirrorPriority int
