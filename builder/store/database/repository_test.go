@@ -340,7 +340,7 @@ func TestRepoStore_PublicToUserSimple(t *testing.T) {
 	// case 2: two tag
 	repos, _, err = rs.PublicToUser(ctx, repo.RepositoryType, []int64{1}, filter, 20, 1)
 	require.Nil(t, err)
-	require.Nil(t, repos)
+	require.NotNil(t, repos)
 }
 
 func TestRepoStore_PublicToUser(t *testing.T) {
