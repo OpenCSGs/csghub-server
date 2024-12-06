@@ -1,4 +1,4 @@
-# CSGHUB Nginx Images Building
+# LLM evalution docker image
 
 ## Login Container Registry
 ```bash
@@ -59,7 +59,7 @@ docker run \
   ${OPENCSG_ACR}/public/lm-evaluation-harness:${IMAGE_TAG}
 ```
 
-## inference image name, version and cuda version
+## evaluation image name, version and cuda version
 | Latest Image | Version | CUDA Version |
 | --- | --- | --- |
 | opencompass | 0.3.5 | 12.4 |
