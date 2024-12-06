@@ -89,4 +89,7 @@ packages:
         config:
         interfaces:
             AccountingClient:
-            
+    opencsg.com/csghub-server/builder/parquet:
+        config:
+        interfaces:
+            Reader:

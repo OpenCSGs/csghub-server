@@ -14,6 +14,7 @@ import (
 	"opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/git/gitserver"
 	"opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/git/mirrorserver"
 	"opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/inference"
+	"opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/parquet"
 	"opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/rpc"
 	"opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/store/s3"
 	"opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/component"
@@ -50,6 +51,7 @@ func initializeTestRepoComponent(ctx context.Context, t interface {
 	}
 	inferenceMockClient := inference.NewMockClient(t)
 	mockAccountingClient := accounting.NewMockAccountingClient(t)
+	mockReader := parquet.NewMockReader(t)
 	mocks := &Mocks{
 		stores:           mockStores,
 		components:       componentMockedComponents,
@@ -61,6 +63,7 @@ func initializeTestRepoComponent(ctx context.Context, t interface {
 		deployer:         mockDeployer,
 		inferenceClient:  inferenceMockClient,
 		accountingClient: mockAccountingClient,
+		preader:          mockReader,
 	}
 	componentTestRepoWithMocks := &testRepoWithMocks{
 		repoComponentImpl: componentRepoComponentImpl,
@@ -96,6 +99,7 @@ func initializeTestPromptComponent(ctx context.Context, t interface {
 	mockDeployer := deploy.NewMockDeployer(t)
 	inferenceMockClient := inference.NewMockClient(t)
 	mockAccountingClient := accounting.NewMockAccountingClient(t)
+	mockReader := parquet.NewMockReader(t)
 	mocks := &Mocks{
 		stores:           mockStores,
 		components:       componentMockedComponents,
@@ -107,6 +111,7 @@ func initializeTestPromptComponent(ctx context.Context, t interface {
 		deployer:         mockDeployer,
 		inferenceClient:  inferenceMockClient,
 		accountingClient: mockAccountingClient,
+		preader:          mockReader,
 	}
 	componentTestPromptWithMocks := &testPromptWithMocks{
 		promptComponentImpl: componentPromptComponentImpl,
@@ -141,6 +146,7 @@ func initializeTestUserComponent(ctx context.Context, t interface {
 	mockPriorityQueue := queue.NewMockPriorityQueue(t)
 	inferenceMockClient := inference.NewMockClient(t)
 	mockAccountingClient := accounting.NewMockAccountingClient(t)
+	mockReader := parquet.NewMockReader(t)
 	mocks := &Mocks{
 		stores:           mockStores,
 		components:       componentMockedComponents,
@@ -152,6 +158,7 @@ func initializeTestUserComponent(ctx context.Context, t interface {
 		deployer:         mockDeployer,
 		inferenceClient:  inferenceMockClient,
 		accountingClient: mockAccountingClient,
+		preader:          mockReader,
 	}
 	componentTestUserWithMocks := &testUserWithMocks{
 		userComponentImpl: componentUserComponentImpl,
@@ -187,6 +194,7 @@ func initializeTestSpaceComponent(ctx context.Context, t interface {
 	mockPriorityQueue := queue.NewMockPriorityQueue(t)
 	inferenceMockClient := inference.NewMockClient(t)
 	mockAccountingClient := accounting.NewMockAccountingClient(t)
+	mockReader := parquet.NewMockReader(t)
 	mocks := &Mocks{
 		stores:           mockStores,
 		components:       componentMockedComponents,
@@ -198,6 +206,7 @@ func initializeTestSpaceComponent(ctx context.Context, t interface {
 		deployer:         mockDeployer,
 		inferenceClient:  inferenceMockClient,
 		accountingClient: mockAccountingClient,
+		preader:          mockReader,
 	}
 	componentTestSpaceWithMocks := &testSpaceWithMocks{
 		spaceComponentImpl: componentSpaceComponentImpl,
@@ -233,6 +242,7 @@ func initializeTestModelComponent(ctx context.Context, t interface {
 	mockMirrorServer := mirrorserver.NewMockMirrorServer(t)
 	mockPriorityQueue := queue.NewMockPriorityQueue(t)
 	mockAccountingClient := accounting.NewMockAccountingClient(t)
+	mockReader := parquet.NewMockReader(t)
 	mocks := &Mocks{
 		stores:           mockStores,
 		components:       componentMockedComponents,
@@ -244,6 +254,7 @@ func initializeTestModelComponent(ctx context.Context, t interface {
 		deployer:         mockDeployer,
 		inferenceClient:  mockClient,
 		accountingClient: mockAccountingClient,
+		preader:          mockReader,
 	}
 	componentTestModelWithMocks := &testModelWithMocks{
 		modelComponentImpl: componentModelComponentImpl,
@@ -278,6 +289,7 @@ func initializeTestAccountingComponent(ctx context.Context, t interface {
 	mockPriorityQueue := queue.NewMockPriorityQueue(t)
 	mockDeployer := deploy.NewMockDeployer(t)
 	inferenceMockClient := inference.NewMockClient(t)
+	mockReader := parquet.NewMockReader(t)
 	mocks := &Mocks{
 		stores:           mockStores,
 		components:       componentMockedComponents,
@@ -289,12 +301,109 @@ func initializeTestAccountingComponent(ctx context.Context, t interface {
 		deployer:         mockDeployer,
 		inferenceClient:  inferenceMockClient,
 		accountingClient: mockAccountingClient,
+		preader:          mockReader,
 	}
 	componentTestAccountingWithMocks := &testAccountingWithMocks{
 		accountingComponentImpl: componentAccountingComponentImpl,
 		mocks:                   mocks,
 	}
 	return componentTestAccountingWithMocks
+}
+
+func initializeTestDatasetViewerComponent(ctx context.Context, t interface {
+	Cleanup(func())
+	mock.TestingT
+}) *testDatasetViewerWithMocks {
+	mockStores := tests.NewMockStores(t)
+	config := ProvideTestConfig()
+	mockRepoComponent := component.NewMockRepoComponent(t)
+	mockGitServer := gitserver.NewMockGitServer(t)
+	mockReader := parquet.NewMockReader(t)
+	componentDatasetViewerComponentImpl := NewTestDatasetViewerComponent(mockStores, config, mockRepoComponent, mockGitServer, mockReader)
+	mockAccountingComponent := component.NewMockAccountingComponent(t)
+	mockTagComponent := component.NewMockTagComponent(t)
+	mockSpaceComponent := component.NewMockSpaceComponent(t)
+	mockRuntimeArchitectureComponent := component.NewMockRuntimeArchitectureComponent(t)
+	componentMockedComponents := &mockedComponents{
+		accounting:          mockAccountingComponent,
+		repo:                mockRepoComponent,
+		tag:                 mockTagComponent,
+		space:               mockSpaceComponent,
+		runtimeArchitecture: mockRuntimeArchitectureComponent,
+	}
+	mockUserSvcClient := rpc.NewMockUserSvcClient(t)
+	mockClient := s3.NewMockClient(t)
+	mockMirrorServer := mirrorserver.NewMockMirrorServer(t)
+	mockPriorityQueue := queue.NewMockPriorityQueue(t)
+	mockDeployer := deploy.NewMockDeployer(t)
+	inferenceMockClient := inference.NewMockClient(t)
+	mockAccountingClient := accounting.NewMockAccountingClient(t)
+	mocks := &Mocks{
+		stores:           mockStores,
+		components:       componentMockedComponents,
+		gitServer:        mockGitServer,
+		userSvcClient:    mockUserSvcClient,
+		s3Client:         mockClient,
+		mirrorServer:     mockMirrorServer,
+		mirrorQueue:      mockPriorityQueue,
+		deployer:         mockDeployer,
+		inferenceClient:  inferenceMockClient,
+		accountingClient: mockAccountingClient,
+		preader:          mockReader,
+	}
+	componentTestDatasetViewerWithMocks := &testDatasetViewerWithMocks{
+		datasetViewerComponentImpl: componentDatasetViewerComponentImpl,
+		mocks:                      mocks,
+	}
+	return componentTestDatasetViewerWithMocks
+}
+
+func initializeTestGitHTTPComponent(ctx context.Context, t interface {
+	Cleanup(func())
+	mock.TestingT
+}) *testGitHTTPWithMocks {
+	config := ProvideTestConfig()
+	mockStores := tests.NewMockStores(t)
+	mockRepoComponent := component.NewMockRepoComponent(t)
+	mockGitServer := gitserver.NewMockGitServer(t)
+	mockClient := s3.NewMockClient(t)
+	componentGitHTTPComponentImpl := NewTestGitHTTPComponent(config, mockStores, mockRepoComponent, mockGitServer, mockClient)
+	mockAccountingComponent := component.NewMockAccountingComponent(t)
+	mockTagComponent := component.NewMockTagComponent(t)
+	mockSpaceComponent := component.NewMockSpaceComponent(t)
+	mockRuntimeArchitectureComponent := component.NewMockRuntimeArchitectureComponent(t)
+	componentMockedComponents := &mockedComponents{
+		accounting:          mockAccountingComponent,
+		repo:                mockRepoComponent,
+		tag:                 mockTagComponent,
+		space:               mockSpaceComponent,
+		runtimeArchitecture: mockRuntimeArchitectureComponent,
+	}
+	mockUserSvcClient := rpc.NewMockUserSvcClient(t)
+	mockMirrorServer := mirrorserver.NewMockMirrorServer(t)
+	mockPriorityQueue := queue.NewMockPriorityQueue(t)
+	mockDeployer := deploy.NewMockDeployer(t)
+	inferenceMockClient := inference.NewMockClient(t)
+	mockAccountingClient := accounting.NewMockAccountingClient(t)
+	mockReader := parquet.NewMockReader(t)
+	mocks := &Mocks{
+		stores:           mockStores,
+		components:       componentMockedComponents,
+		gitServer:        mockGitServer,
+		userSvcClient:    mockUserSvcClient,
+		s3Client:         mockClient,
+		mirrorServer:     mockMirrorServer,
+		mirrorQueue:      mockPriorityQueue,
+		deployer:         mockDeployer,
+		inferenceClient:  inferenceMockClient,
+		accountingClient: mockAccountingClient,
+		preader:          mockReader,
+	}
+	componentTestGitHTTPWithMocks := &testGitHTTPWithMocks{
+		gitHTTPComponentImpl: componentGitHTTPComponentImpl,
+		mocks:                mocks,
+	}
+	return componentTestGitHTTPWithMocks
 }
 
 // wire.go:
@@ -326,5 +435,15 @@ type testModelWithMocks struct {
 
 type testAccountingWithMocks struct {
 	*accountingComponentImpl
+	mocks *Mocks
+}
+
+type testDatasetViewerWithMocks struct {
+	*datasetViewerComponentImpl
+	mocks *Mocks
+}
+
+type testGitHTTPWithMocks struct {
+	*gitHTTPComponentImpl
 	mocks *Mocks
 }

@@ -105,3 +105,35 @@ func initializeTestAccountingComponent(ctx context.Context, t interface {
 	)
 	return &testAccountingWithMocks{}
 }
+
+type testDatasetViewerWithMocks struct {
+	*datasetViewerComponentImpl
+	mocks *Mocks
+}
+
+func initializeTestDatasetViewerComponent(ctx context.Context, t interface {
+	Cleanup(func())
+	mock.TestingT
+}) *testDatasetViewerWithMocks {
+	wire.Build(
+		MockSuperSet, DatasetViewerComponentSet,
+		wire.Struct(new(testDatasetViewerWithMocks), "*"),
+	)
+	return &testDatasetViewerWithMocks{}
+}
+
+type testGitHTTPWithMocks struct {
+	*gitHTTPComponentImpl
+	mocks *Mocks
+}
+
+func initializeTestGitHTTPComponent(ctx context.Context, t interface {
+	Cleanup(func())
+	mock.TestingT
+}) *testGitHTTPWithMocks {
+	wire.Build(
+		MockSuperSet, GitHTTPComponentSet,
+		wire.Struct(new(testGitHTTPWithMocks), "*"),
+	)
+	return &testGitHTTPWithMocks{}
+}

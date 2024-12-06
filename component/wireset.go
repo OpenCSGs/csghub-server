@@ -7,6 +7,7 @@ import (
 	mock_git "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/git/gitserver"
 	mock_mirror "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/git/mirrorserver"
 	mock_inference "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/inference"
+	mock_preader "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/parquet"
 	mock_rpc "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/rpc"
 	mock_s3 "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/store/s3"
 	mock_component "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/component"
@@ -17,6 +18,7 @@ import (
 	"opencsg.com/csghub-server/builder/git/mirrorserver"
 	"opencsg.com/csghub-server/builder/inference"
 	"opencsg.com/csghub-server/builder/llm"
+	"opencsg.com/csghub-server/builder/parquet"
 	"opencsg.com/csghub-server/builder/rpc"
 	"opencsg.com/csghub-server/builder/store/s3"
 	"opencsg.com/csghub-server/common/config"
@@ -89,6 +91,11 @@ var MockedAccountingClientSet = wire.NewSet(
 	wire.Bind(new(accounting.AccountingClient), new(*mock_accounting.MockAccountingClient)),
 )
 
+var MockedParquetReaderSet = wire.NewSet(
+	mock_preader.NewMockReader,
+	wire.Bind(new(parquet.Reader), new(*mock_preader.MockReader)),
+)
+
 type Mocks struct {
 	stores           *tests.MockStores
 	components       *mockedComponents
@@ -100,6 +107,7 @@ type Mocks struct {
 	deployer         *mock_deploy.MockDeployer
 	inferenceClient  *mock_inference.MockClient
 	accountingClient *mock_accounting.MockAccountingClient
+	preader          *mock_preader.MockReader
 }
 
 var AllMockSet = wire.NewSet(
@@ -115,6 +123,7 @@ var MockSuperSet = wire.NewSet(
 	MockedComponentSet, AllMockSet, MockedStoreSet, MockedGitServerSet, MockedUserSvcSet,
 	MockedS3Set, MockedDeployerSet, ProvideTestConfig, MockedMirrorServerSet,
 	MockedMirrorQueueSet, MockedInferenceClientSet, MockedAccountingClientSet,
+	MockedParquetReaderSet,
 )
 
 func NewTestRepoComponent(config *config.Config, stores *tests.MockStores, rpcUser rpc.UserSvcClient, gitServer gitserver.GitServer, tagComponent TagComponent, s3Client s3.Client, deployer deploy.Deployer, accountingComponent AccountingComponent, mq queue.PriorityQueue, mirrorServer mirrorserver.MirrorServer) *repoComponentImpl {
@@ -276,3 +285,35 @@ func NewTestAccountingComponent(stores *tests.MockStores, accountingClient accou
 }
 
 var AccountingComponentSet = wire.NewSet(NewTestAccountingComponent)
+
+func NewTestDatasetViewerComponent(stores *tests.MockStores, cfg *config.Config, repoComponent RepoComponent, gitServer gitserver.GitServer, preader parquet.Reader) *datasetViewerComponentImpl {
+	return &datasetViewerComponentImpl{
+		cfg:     cfg,
+		preader: preader,
+	}
+}
+
+var DatasetViewerComponentSet = wire.NewSet(NewTestDatasetViewerComponent)
+
+func NewTestGitHTTPComponent(
+	config *config.Config,
+	stores *tests.MockStores,
+	repoComponent RepoComponent,
+	gitServer gitserver.GitServer,
+	s3Client s3.Client,
+) *gitHTTPComponentImpl {
+	config.APIServer.PublicDomain = "https://foo.com"
+	config.APIServer.SSHDomain = "ssh://test@127.0.0.1"
+	return &gitHTTPComponentImpl{
+		config:             config,
+		repoComponent:      repoComponent,
+		repoStore:          stores.Repo,
+		userStore:          stores.User,
+		gitServer:          gitServer,
+		s3Client:           s3Client,
+		lfsMetaObjectStore: stores.LfsMetaObject,
+		lfsLockStore:       stores.LfsLock,
+	}
+}
+
+var GitHTTPComponentSet = wire.NewSet(NewTestGitHTTPComponent)

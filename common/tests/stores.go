@@ -21,6 +21,7 @@ type MockStores struct {
 	Prompt               database.PromptStore
 	Namespace            database.NamespaceStore
 	LfsMetaObject        database.LfsMetaObjectStore
+	LfsLock              database.LfsLockStore
 	Mirror               database.MirrorStore
 	MirrorSource         database.MirrorSourceStore
 	AccessToken          database.AccessTokenStore
@@ -56,6 +57,7 @@ func NewMockStores(t interface {
 		Prompt:               mockdb.NewMockPromptStore(t),
 		Namespace:            mockdb.NewMockNamespaceStore(t),
 		LfsMetaObject:        mockdb.NewMockLfsMetaObjectStore(t),
+		LfsLock:              mockdb.NewMockLfsLockStore(t),
 		Mirror:               mockdb.NewMockMirrorStore(t),
 		MirrorSource:         mockdb.NewMockMirrorSourceStore(t),
 		AccessToken:          mockdb.NewMockAccessTokenStore(t),
@@ -127,6 +129,10 @@ func (s *MockStores) NamespaceMock() *mockdb.MockNamespaceStore {
 
 func (s *MockStores) LfsMetaObjectMock() *mockdb.MockLfsMetaObjectStore {
 	return s.LfsMetaObject.(*mockdb.MockLfsMetaObjectStore)
+}
+
+func (s *MockStores) LfsLockMock() *mockdb.MockLfsLockStore {
+	return s.LfsLock.(*mockdb.MockLfsLockStore)
 }
 
 func (s *MockStores) MirrorMock() *mockdb.MockMirrorStore {
