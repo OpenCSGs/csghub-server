@@ -91,6 +91,17 @@ var serverCmd = &cobra.Command{
 		if err != nil {
 			return fmt.Errorf("failed to start worker:  %w", err)
 		}
+
+		err = workflow.RegisterCronJobs(cfg)
+		if err != nil {
+			return fmt.Errorf("failed to register cron jobs:  %w", err)
+		}
+
+		err = workflow.StartCronWorker(cfg)
+		if err != nil {
+			return fmt.Errorf("failed to start cron worker:  %w", err)
+		}
+
 		server := httpbase.NewGracefulServer(
 			httpbase.GraceServerOpt{
 				Port: cfg.APIServer.Port,
