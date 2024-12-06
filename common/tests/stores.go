@@ -42,13 +42,13 @@ func NewMockStores(t interface {
 	mock.TestingT
 }) *MockStores {
 	return &MockStores{
-		User:          mockdb.NewMockUserStore(t),
-		UserLikes:     mockdb.NewMockUserLikesStore(t),
-		Repo:          mockdb.NewMockRepoStore(t),
-		RepoRelation:  mockdb.NewMockRepoRelationsStore(t),
-		Model:         mockdb.NewMockModelStore(t),
-		SpaceResource: mockdb.NewMockSpaceResourceStore(t),
-		//Tag:                  mockdb.NewMockTagStore(t),
+		User:                 mockdb.NewMockUserStore(t),
+		UserLikes:            mockdb.NewMockUserLikesStore(t),
+		Repo:                 mockdb.NewMockRepoStore(t),
+		RepoRelation:         mockdb.NewMockRepoRelationsStore(t),
+		Model:                mockdb.NewMockModelStore(t),
+		SpaceResource:        mockdb.NewMockSpaceResourceStore(t),
+		Tag:                  mockdb.NewMockTagStore(t),
 		Dataset:              mockdb.NewMockDatasetStore(t),
 		PromptConversation:   mockdb.NewMockPromptConversationStore(t),
 		PromptPrefix:         mockdb.NewMockPromptPrefixStore(t),
