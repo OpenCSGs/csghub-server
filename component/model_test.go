@@ -232,9 +232,10 @@ func TestModelComponent_Show(t *testing.T) {
 			HTTPCloneURL: "https://foo.com/s/foo/bar.git",
 			SSHCloneURL:  "test@127.0.0.1:s/foo/bar.git",
 		},
-		EnableInference: true,
-		EnableFinetune:  true,
-		WidgetType:      types.ModelWidgetTypeGeneration,
+		EnableInference:  true,
+		EnableFinetune:   true,
+		EnableEvaluation: true,
+		WidgetType:       types.ModelWidgetTypeGeneration,
 	}, model)
 }
 

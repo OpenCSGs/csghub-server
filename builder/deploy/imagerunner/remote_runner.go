@@ -342,6 +342,7 @@ func (h *RemoteRunner) ListWorkFlows(ctx context.Context, username string, per, 
 	if err != nil {
 		return nil, fmt.Errorf("failed to list evaluation jobs, %w", err)
 	}
+	defer response.Body.Close()
 	var res types.ArgoWorkFlowListRes
 	if err := json.NewDecoder(response.Body).Decode(&res); err != nil {
 		return nil, err
