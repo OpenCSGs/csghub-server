@@ -5,7 +5,7 @@ RUN pip install --upgrade pip && pip config set global.index-url https://pypi.tu
     && pip install --no-cache-dir accelerate transformers==4.46.3 \
     minio oss2 langdetect huggingface_hub openpyxl
 WORKDIR /workspace/
-RUN git clone --depth 1 https://gitee.com/xzgan/lm-evaluation-harness.git --branch v0.4.6 --single-branch && \
+RUN git clone --depth 1 https://github.com/EleutherAI/lm-evaluation-harness.git --branch v0.4.6 --single-branch && \
     cd lm-evaluation-harness && pip install setuptools --upgrade --no-cache-dir -e \
      ".[ifeval,math,multilingual,sentencepiece]"
 COPY ./lm-evaluation-harness/ /etc/csghub/
