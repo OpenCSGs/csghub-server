@@ -284,6 +284,7 @@ func (req *CreateRepoDiscussionRequest) GetSensitiveFields() []types.SensitiveFi
 			Value: func() string {
 				return req.Title
 			},
+			Scenario: string(sensitive.ScenarioCommentDetection),
 		},
 	}
 }
