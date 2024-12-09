@@ -36,6 +36,10 @@ type MockStores struct {
 	SpaceSdk             database.SpaceSdkStore
 	Recom                database.RecomStore
 	RepoRuntimeFramework database.RepositoriesRuntimeFrameworkStore
+	Discussion           database.DiscussionStore
+	RuntimeArch          database.RuntimeArchitecturesStore
+	ResourceModel        database.ResourceModelStore
+	GitServerAccessToken database.GitServerAccessTokenStore
 }
 
 func NewMockStores(t interface {
@@ -72,6 +76,10 @@ func NewMockStores(t interface {
 		SpaceSdk:             mockdb.NewMockSpaceSdkStore(t),
 		Recom:                mockdb.NewMockRecomStore(t),
 		RepoRuntimeFramework: mockdb.NewMockRepositoriesRuntimeFrameworkStore(t),
+		Discussion:           mockdb.NewMockDiscussionStore(t),
+		RuntimeArch:          mockdb.NewMockRuntimeArchitecturesStore(t),
+		ResourceModel:        mockdb.NewMockResourceModelStore(t),
+		GitServerAccessToken: mockdb.NewMockGitServerAccessTokenStore(t),
 	}
 }
 
@@ -189,4 +197,20 @@ func (s *MockStores) RecomMock() *mockdb.MockRecomStore {
 
 func (s *MockStores) RepoRuntimeFrameworkMock() *mockdb.MockRepositoriesRuntimeFrameworkStore {
 	return s.RepoRuntimeFramework.(*mockdb.MockRepositoriesRuntimeFrameworkStore)
+}
+
+func (s *MockStores) DiscussionMock() *mockdb.MockDiscussionStore {
+	return s.Discussion.(*mockdb.MockDiscussionStore)
+}
+
+func (s *MockStores) RuntimeArchMock() *mockdb.MockRuntimeArchitecturesStore {
+	return s.RuntimeArch.(*mockdb.MockRuntimeArchitecturesStore)
+}
+
+func (s *MockStores) ResourceModelMock() *mockdb.MockResourceModelStore {
+	return s.ResourceModel.(*mockdb.MockResourceModelStore)
+}
+
+func (s *MockStores) GitServerAccessTokenMock() *mockdb.MockGitServerAccessTokenStore {
+	return s.GitServerAccessToken.(*mockdb.MockGitServerAccessTokenStore)
 }

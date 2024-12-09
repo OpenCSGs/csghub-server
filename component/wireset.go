@@ -317,3 +317,52 @@ func NewTestGitHTTPComponent(
 }
 
 var GitHTTPComponentSet = wire.NewSet(NewTestGitHTTPComponent)
+
+func NewTestDiscussionComponent(
+	stores *tests.MockStores,
+) *discussionComponentImpl {
+	return &discussionComponentImpl{
+		repoStore:       stores.Repo,
+		userStore:       stores.User,
+		discussionStore: stores.Discussion,
+	}
+}
+
+var DiscussionComponentSet = wire.NewSet(NewTestDiscussionComponent)
+
+func NewTestRuntimeArchitectureComponent(stores *tests.MockStores, repoComponent RepoComponent, gitServer gitserver.GitServer) *runtimeArchitectureComponentImpl {
+	return &runtimeArchitectureComponentImpl{
+		repoComponent:             repoComponent,
+		repoStore:                 stores.Repo,
+		repoRuntimeFrameworkStore: stores.RepoRuntimeFramework,
+		runtimeFrameworksStore:    stores.RuntimeFramework,
+		runtimeArchStore:          stores.RuntimeArch,
+		resouceModelStore:         stores.ResourceModel,
+		tagStore:                  stores.Tag,
+		gitServer:                 gitServer,
+	}
+}
+
+var RuntimeArchComponentSet = wire.NewSet(NewTestRuntimeArchitectureComponent)
+
+func NewTestMirrorComponent(config *config.Config, stores *tests.MockStores, mirrorServer mirrorserver.MirrorServer, repoComponent RepoComponent, gitServer gitserver.GitServer, s3Client s3.Client, mq queue.PriorityQueue) *mirrorComponentImpl {
+	return &mirrorComponentImpl{
+		tokenStore:        stores.GitServerAccessToken,
+		mirrorServer:      mirrorServer,
+		repoComp:          repoComponent,
+		git:               gitServer,
+		s3Client:          s3Client,
+		modelStore:        stores.Model,
+		datasetStore:      stores.Dataset,
+		codeStore:         stores.Code,
+		repoStore:         stores.Repo,
+		mirrorStore:       stores.Mirror,
+		mirrorSourceStore: stores.MirrorSource,
+		namespaceStore:    stores.Namespace,
+		userStore:         stores.User,
+		config:            config,
+		mq:                mq,
+	}
+}
+
+var MirrorComponentSet = wire.NewSet(NewTestMirrorComponent)

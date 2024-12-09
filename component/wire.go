@@ -137,3 +137,51 @@ func initializeTestGitHTTPComponent(ctx context.Context, t interface {
 	)
 	return &testGitHTTPWithMocks{}
 }
+
+type testDiscussionWithMocks struct {
+	*discussionComponentImpl
+	mocks *Mocks
+}
+
+func initializeTestDiscussionComponent(ctx context.Context, t interface {
+	Cleanup(func())
+	mock.TestingT
+}) *testDiscussionWithMocks {
+	wire.Build(
+		MockSuperSet, DiscussionComponentSet,
+		wire.Struct(new(testDiscussionWithMocks), "*"),
+	)
+	return &testDiscussionWithMocks{}
+}
+
+type testRuntimeArchWithMocks struct {
+	*runtimeArchitectureComponentImpl
+	mocks *Mocks
+}
+
+func initializeTestRuntimeArchComponent(ctx context.Context, t interface {
+	Cleanup(func())
+	mock.TestingT
+}) *testRuntimeArchWithMocks {
+	wire.Build(
+		MockSuperSet, RuntimeArchComponentSet,
+		wire.Struct(new(testRuntimeArchWithMocks), "*"),
+	)
+	return &testRuntimeArchWithMocks{}
+}
+
+type testMirrorWithMocks struct {
+	*mirrorComponentImpl
+	mocks *Mocks
+}
+
+func initializeTestMirrorComponent(ctx context.Context, t interface {
+	Cleanup(func())
+	mock.TestingT
+}) *testMirrorWithMocks {
+	wire.Build(
+		MockSuperSet, MirrorComponentSet,
+		wire.Struct(new(testMirrorWithMocks), "*"),
+	)
+	return &testMirrorWithMocks{}
+}
