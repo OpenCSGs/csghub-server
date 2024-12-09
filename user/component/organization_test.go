@@ -56,11 +56,11 @@ func TestOrganizationComponent_Create(t *testing.T) {
 	}
 
 	c := &organizationComponentImpl{
-		us:  mockUserStore,
-		ns:  mockNamespaceStore,
-		gs:  mockGitServer,
-		os:  mockOrgStore,
-		msc: mockMemberComponent,
+		userStore: mockUserStore,
+		nsStore:   mockNamespaceStore,
+		gs:        mockGitServer,
+		orgStore:  mockOrgStore,
+		msc:       mockMemberComponent,
 	}
 	org, err := c.Create(context.Background(), req)
 	require.NoError(t, err)
@@ -88,14 +88,23 @@ func TestOrganizationComponent_Index(t *testing.T) {
 		Verified: false,
 	})
 	mockOrgStore := mockdb.NewMockOrgStore(t)
-	mockOrgStore.EXPECT().GetUserOwnOrgs(mock.Anything, "user1").Return(dbOrgs, nil).Once()
+	mockOrgStore.EXPECT().GetUserOwnOrgs(mock.Anything, "user1").Return(dbOrgs, len(dbOrgs), nil).Once()
+
+	mockUserStore := mockdb.NewMockUserStore(t)
+	mockUserStore.EXPECT().FindByUsername(mock.Anything, "user1").Return(database.User{
+		Username: "user1",
+		RoleMask: "",
+	}, nil)
 
 	c := &organizationComponentImpl{
-		os: mockOrgStore,
+		orgStore:  mockOrgStore,
+		userStore: mockUserStore,
 	}
-	expectedOrgs, err := c.Index(context.Background(), "user1")
+	expectedOrgs, total, err := c.Index(context.Background(), "user1", "", 10, 0)
+
 	require.NoError(t, err)
 	require.Len(t, expectedOrgs, 2)
+	require.Equal(t, 2, total)
 	require.Condition(t, func() bool {
 
 		for i := 0; i < len(expectedOrgs); i++ {

@@ -2,6 +2,8 @@ package database
 
 import (
 	"context"
+	"fmt"
+	"strings"
 
 	"github.com/uptrace/bun"
 )
@@ -12,12 +14,13 @@ type orgStoreImpl struct {
 
 type OrgStore interface {
 	Create(ctx context.Context, org *Organization, namepace *Namespace) (err error)
-	GetUserOwnOrgs(ctx context.Context, username string) (orgs []Organization, err error)
+	GetUserOwnOrgs(ctx context.Context, username string) (orgs []Organization, total int, err error)
 	Update(ctx context.Context, org *Organization) (err error)
 	Delete(ctx context.Context, path string) (err error)
 	FindByPath(ctx context.Context, path string) (org Organization, err error)
 	Exists(ctx context.Context, path string) (exists bool, err error)
 	GetUserBelongOrgs(ctx context.Context, userID int64) (orgs []Organization, err error)
+	Search(ctx context.Context, search string, per, page int) (orgs []Organization, total int, err error)
 }
 
 func NewOrgStore() OrgStore {
@@ -64,7 +67,7 @@ func (s *orgStoreImpl) Create(ctx context.Context, org *Organization, namepace *
 	return
 }
 
-func (s *orgStoreImpl) GetUserOwnOrgs(ctx context.Context, username string) (orgs []Organization, err error) {
+func (s *orgStoreImpl) GetUserOwnOrgs(ctx context.Context, username string) (orgs []Organization, total int, err error) {
 	query := s.db.Operator.Core.
 		NewSelect().
 		Model(&orgs).
@@ -76,6 +79,7 @@ func (s *orgStoreImpl) GetUserOwnOrgs(ctx context.Context, username string) (org
 	}
 
 	err = query.Scan(ctx, &orgs)
+	total = len(orgs)
 	return
 }
 
@@ -139,5 +143,24 @@ func (s *orgStoreImpl) GetUserBelongOrgs(ctx context.Context, userID int64) (org
 		Join("join members on members.organization_id = organization.id").
 		Where("members.user_id = ?", userID).
 		Scan(ctx, &orgs)
+	return
+}
+
+func (s *orgStoreImpl) Search(ctx context.Context, search string, per int, page int) (orgs []Organization, total int, err error) {
+	search = strings.ToLower(search)
+	query := s.db.Operator.Core.NewSelect().
+		Model(&orgs)
+	if search != "" {
+		query.Where("LOWER(name) like ? OR LOWER(path) like ?", fmt.Sprintf("%%%s%%", search), fmt.Sprintf("%%%s%%", search))
+	}
+	total, err = query.Count(ctx)
+	if err != nil {
+		return
+	}
+	query.Order("id asc").Limit(per).Offset((page - 1) * per)
+	err = query.Scan(ctx, &orgs)
+	if err != nil {
+		return
+	}
 	return
 }

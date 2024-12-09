@@ -16,7 +16,7 @@ import (
 type OrganizationComponent interface {
 	FixOrgData(ctx context.Context, org *database.Organization) (*database.Organization, error)
 	Create(ctx context.Context, req *types.CreateOrgReq) (*types.Organization, error)
-	Index(ctx context.Context, username string) ([]types.Organization, error)
+	Index(ctx context.Context, username, search string, per, page int) ([]types.Organization, int, error)
 	Get(ctx context.Context, orgName string) (*types.Organization, error)
 	Delete(ctx context.Context, req *types.DeleteOrgReq) error
 	Update(ctx context.Context, req *types.EditOrgReq) (*database.Organization, error)
@@ -24,9 +24,9 @@ type OrganizationComponent interface {
 
 func NewOrganizationComponent(config *config.Config) (OrganizationComponent, error) {
 	c := &organizationComponentImpl{}
-	c.os = database.NewOrgStore()
-	c.ns = database.NewNamespaceStore()
-	c.us = database.NewUserStore()
+	c.orgStore = database.NewOrgStore()
+	c.nsStore = database.NewNamespaceStore()
+	c.userStore = database.NewUserStore()
 	var err error
 	c.gs, err = git.NewGitServer(config)
 	if err != nil {
@@ -44,10 +44,10 @@ func NewOrganizationComponent(config *config.Config) (OrganizationComponent, err
 }
 
 type organizationComponentImpl struct {
-	os database.OrgStore
-	ns database.NamespaceStore
-	us database.UserStore
-	gs gitserver.GitServer
+	orgStore  database.OrgStore
+	nsStore   database.NamespaceStore
+	userStore database.UserStore
+	gs        gitserver.GitServer
 
 	msc MemberComponent
 }
@@ -74,12 +74,12 @@ func (c *organizationComponentImpl) FixOrgData(ctx context.Context, org *databas
 }
 
 func (c *organizationComponentImpl) Create(ctx context.Context, req *types.CreateOrgReq) (*types.Organization, error) {
-	user, err := c.us.FindByUsername(ctx, req.Username)
+	user, err := c.userStore.FindByUsername(ctx, req.Username)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find user, error: %w", err)
 	}
 
-	es, err := c.ns.Exists(ctx, req.Name)
+	es, err := c.nsStore.Exists(ctx, req.Name)
 	if err != nil {
 		return nil, err
 	}
@@ -99,7 +99,7 @@ func (c *organizationComponentImpl) Create(ctx context.Context, req *types.Creat
 		Path:   dbOrg.Name,
 		UserID: user.ID,
 	}
-	err = c.os.Create(ctx, dbOrg, namespace)
+	err = c.orgStore.Create(ctx, dbOrg, namespace)
 	if err != nil {
 		return nil, fmt.Errorf("failed create database organization, error: %w", err)
 	}
@@ -125,10 +125,27 @@ func (c *organizationComponentImpl) Create(ctx context.Context, req *types.Creat
 	return org, err
 }
 
-func (c *organizationComponentImpl) Index(ctx context.Context, username string) ([]types.Organization, error) {
-	dborgs, err := c.os.GetUserOwnOrgs(ctx, username)
+func (c *organizationComponentImpl) Index(ctx context.Context, username, search string, per, page int) ([]types.Organization, int, error) {
+	var (
+		err    error
+		total  int
+		u      database.User
+		dborgs []database.Organization
+	)
+	u, err = c.userStore.FindByUsername(ctx, username)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get organizations, error: %w", err)
+		return nil, 0, fmt.Errorf("failed to find user, error: %w", err)
+	}
+	if u.CanAdmin() {
+		dborgs, total, err = c.orgStore.Search(ctx, search, per, page)
+		if err != nil {
+			return nil, 0, fmt.Errorf("failed to get organizations for admin user, error: %w", err)
+		}
+	} else {
+		dborgs, total, err = c.orgStore.GetUserOwnOrgs(ctx, username)
+		if err != nil {
+			return nil, 0, fmt.Errorf("failed to get organizations for owner, error: %w", err)
+		}
 	}
 	var orgs []types.Organization
 	for _, dborg := range dborgs {
@@ -142,11 +159,11 @@ func (c *organizationComponentImpl) Index(ctx context.Context, username string) 
 		}
 		orgs = append(orgs, org)
 	}
-	return orgs, nil
+	return orgs, total, nil
 }
 
 func (c *organizationComponentImpl) Get(ctx context.Context, orgName string) (*types.Organization, error) {
-	dborg, err := c.os.FindByPath(ctx, orgName)
+	dborg, err := c.orgStore.FindByPath(ctx, orgName)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get organizations by name, error: %w", err)
 	}
@@ -175,7 +192,7 @@ func (c *organizationComponentImpl) Delete(ctx context.Context, req *types.Delet
 	if err != nil {
 		return fmt.Errorf("failed to delete git organizations, error: %w", err)
 	}
-	err = c.os.Delete(ctx, req.Name)
+	err = c.orgStore.Delete(ctx, req.Name)
 	if err != nil {
 		return fmt.Errorf("failed to delete database organizations, error: %w", err)
 	}
@@ -192,7 +209,7 @@ func (c *organizationComponentImpl) Update(ctx context.Context, req *types.EditO
 	if !r.CanAdmin() {
 		return nil, fmt.Errorf("current user does not have permission to edit the organization, current user: %s", req.CurrentUser)
 	}
-	org, err := c.os.FindByPath(ctx, req.Name)
+	org, err := c.orgStore.FindByPath(ctx, req.Name)
 	if err != nil {
 		return nil, fmt.Errorf("organization does not exists, error: %w", err)
 	}
@@ -212,7 +229,7 @@ func (c *organizationComponentImpl) Update(ctx context.Context, req *types.EditO
 	if req.OrgType != nil {
 		org.OrgType = *req.OrgType
 	}
-	err = c.os.Update(ctx, &org)
+	err = c.orgStore.Update(ctx, &org)
 	if err != nil {
 		return nil, fmt.Errorf("failed to update database organization, error: %w", err)
 	}
