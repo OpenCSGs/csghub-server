@@ -72,69 +72,6 @@ if [ "$STARHUB_SERVER_GITSERVER_TYPE" = "gitea" ]; then
     fi
 fi
 
-
-# Create cron job
-cron=""
-read_and_set_cron() {
-    env_variable=$1
-    default_value=$2
-    
-    cron=${!env_variable}
-
-    if [[ -z $cron ]]; then
-        cron=$default_value
-    fi
-}
-
-current_cron_jobs=$(crontab -l 2>/dev/null)
-
-if echo "$current_cron_jobs" | grep -qF "starhub logscan gitea"; then
-    echo "Gitea log scan job already exists"
-else
-    echo "Creating cron job for gitea logscan..."
-    read_and_set_cron "STARHUB_SERVER_CRON_LOGSCAN" "0 23 * * *"
-    (crontab -l ;echo "$cron STARHUB_DATABASE_DSN=$STARHUB_DATABASE_DSN /starhub-bin/starhub logscan gitea --path /starhub-bin/logs/gitea.log >> /starhub-bin/cron.log 2>&1") | crontab -
-fi
-
-if echo "$current_cron_jobs" | grep -qF "calc-recom-score"; then
-    echo "Calculate score job already exists"
-else
-    echo "Creating cron job for repository recommendation score calculation..."
-    read_and_set_cron "STARHUB_SERVER_CRON_CALC_RECOM_SCORE" "0 1 * * *"
-    (crontab -l ;echo "$cron STARHUB_DATABASE_DSN=$STARHUB_DATABASE_DSN STARHUB_SERVER_GITSERVER_HOST=$STARHUB_SERVER_GITSERVER_HOST STARHUB_SERVER_GITSERVER_USERNAME=$STARHUB_SERVER_GITSERVER_USERNAME STARHUB_SERVER_GITSERVER_PASSWORD=$STARHUB_SERVER_GITSERVER_PASSWORD /starhub-bin/starhub cron calc-recom-score >> /starhub-bin/cron-calc-recom-score.log 2>&1") | crontab -
-fi
-
-if echo "$current_cron_jobs" | grep -qF "create-push-mirror"; then
-    echo "Create push mirror job already exists"
-else
-    echo "Creating cron job for push mirror creation..."
-    read_and_set_cron "STARHUB_SERVER_CRON_PUSH_MIRROR" "*/10 * * * *"
-    (crontab -l ;echo "$cron STARHUB_DATABASE_DSN=$STARHUB_DATABASE_DSN STARHUB_SERVER_GITSERVER_HOST=$STARHUB_SERVER_GITSERVER_HOST STARHUB_SERVER_GITSERVER_USERNAME=$STARHUB_SERVER_GITSERVER_USERNAME STARHUB_SERVER_GITSERVER_PASSWORD=$STARHUB_SERVER_GITSERVER_PASSWORD STARHUB_SERVER_MIRRORSERVER_HOST=$STARHUB_SERVER_MIRRORSERVER_HOST STARHUB_SERVER_MIRRORSERVER_USERNAME=$STARHUB_SERVER_MIRRORSERVER_USERNAME STARHUB_SERVER_MIRRORSERVER_PASSWORD=$STARHUB_SERVER_MIRRORSERVER_PASSWORD /starhub-bin/starhub cron create-push-mirror >> /starhub-bin/create-push-mirror.log 2>&1") | crontab -
-fi
-
-if echo "$current_cron_jobs" | grep -qF "check-mirror-progress"; then
-    echo "Check mirror progress job already exists"
-else
-    echo "Creating cron job for update mirror status and progress..."
-    read_and_set_cron "STARHUB_SERVER_CRON_PUSH_MIRROR" "*/5 * * * *"
-    (crontab -l ;echo "$cron STARHUB_SERVER_GITSERVER_URL=$STARHUB_SERVER_GITSERVER_URL STARHUB_SERVER_FRONTEND_URL=$STARHUB_SERVER_FRONTEND_URL STARHUB_DATABASE_DSN=$STARHUB_DATABASE_DSN STARHUB_SERVER_GITSERVER_HOST=$STARHUB_SERVER_GITSERVER_HOST STARHUB_SERVER_GITSERVER_USERNAME=$STARHUB_SERVER_GITSERVER_USERNAME STARHUB_SERVER_GITSERVER_PASSWORD=$STARHUB_SERVER_GITSERVER_PASSWORD STARHUB_SERVER_MIRRORSERVER_HOST=$STARHUB_SERVER_MIRRORSERVER_HOST STARHUB_SERVER_MIRRORSERVER_USERNAME=$STARHUB_SERVER_MIRRORSERVER_USERNAME STARHUB_SERVER_MIRRORSERVER_PASSWORD=$STARHUB_SERVER_MIRRORSERVER_PASSWORD STARHUB_SERVER_REDIS_ENDPOINT=$STARHUB_SERVER_REDIS_ENDPOINT STARHUB_SERVER_REDIS_USER=$STARHUB_SERVER_REDIS_USER STARHUB_SERVER_REDIS_PASSWORD=$STARHUB_SERVER_REDIS_PASSWORD /starhub-bin/starhub mirror check-mirror-progress >> /starhub-bin/check-mirror-progress.log 2>&1") | crontab -
-fi
-
-if [ "$STARHUB_SERVER_SAAS" == "false" ]; then
-    if echo "$current_cron_jobs" | grep -qF "sync-as-client"; then
-        echo "Sync as client job already exists"
-    else
-        echo "Creating cron job for sync saas sync verions..."
-        read_and_set_cron "STARHUB_SERVER_CRON_SYNC_AS_CLIENT" "*/10 * * * *"
-        (crontab -l ;echo "$cron STARHUB_SERVER_REDIS_ENDPOINT=$STARHUB_SERVER_REDIS_ENDPOINT STARHUB_SERVER_REDIS_USER=$STARHUB_SERVER_REDIS_USER STARHUB_SERVER_REDIS_PASSWORD=$STARHUB_SERVER_REDIS_PASSWORD STARHUB_DATABASE_DSN=$STARHUB_DATABASE_DSN STARHUB_SERVER_GITSERVER_TYPE=$STARHUB_SERVER_GITSERVER_TYPE STARHUB_SERVER_GITALY_TOKEN=$STARHUB_SERVER_GITALY_TOKEN STARHUB_SERVER_GITALY_SERVER_SOCKET=$STARHUB_SERVER_GITALY_SERVER_SOCKET STARHUB_SERVER_GITSERVER_HOST=$STARHUB_SERVER_GITSERVER_HOST STARHUB_SERVER_GITSERVER_USERNAME=$STARHUB_SERVER_GITSERVER_USERNAME STARHUB_SERVER_GITSERVER_PASSWORD=$STARHUB_SERVER_GITSERVER_PASSWORD  /starhub-bin/starhub sync sync-as-client >> /starhub-bin/cron-sync-as-client.log 2>&1") | crontab -
-    fi
-else
-    echo "Saas does not need sync-as-client cron job"
-fi
-# Reload cron server
-service cron restart
-echo "Done."
-
 echo "Database setup..."
 
 echo "Migration init"

@@ -242,7 +242,7 @@ func (c *multiSyncComponentImpl) createLocalDataset(ctx context.Context, m *type
 		}
 
 		err = c.repo.DeleteAllTags(ctx, newDBRepo.ID)
-		if err != nil {
+		if err != nil && err != sql.ErrNoRows {
 			slog.Error("failed to delete database tag", slog.Any("error", err))
 		}
 
@@ -253,14 +253,14 @@ func (c *multiSyncComponentImpl) createLocalDataset(ctx context.Context, m *type
 	}
 
 	err = c.repo.DeleteAllFiles(ctx, newDBRepo.ID)
-	if err != nil {
+	if err != nil && err != sql.ErrNoRows {
 		slog.Error("failed to delete database files", slog.Any("error", err))
 	}
 
 	ctxGetFileList, cancel := context.WithTimeout(ctx, 5*time.Second)
 	files, err := sc.FileList(ctxGetFileList, s)
 	cancel()
-	if err != nil {
+	if err != nil && err != sql.ErrNoRows {
 		slog.Error("failed to get all files of repo", slog.Any("sync_version", s), slog.Any("error", err))
 	}
 	if len(files) > 0 {
@@ -367,7 +367,7 @@ func (c *multiSyncComponentImpl) createLocalModel(ctx context.Context, m *types.
 			})
 		}
 		err = c.repo.DeleteAllTags(ctx, newDBRepo.ID)
-		if err != nil {
+		if err != nil && err != sql.ErrNoRows {
 			slog.Error("failed to delete database tag", slog.Any("error", err))
 		}
 		err = c.repo.BatchCreateRepoTags(ctx, repoTags)
@@ -377,14 +377,14 @@ func (c *multiSyncComponentImpl) createLocalModel(ctx context.Context, m *types.
 	}
 
 	err = c.repo.DeleteAllFiles(ctx, newDBRepo.ID)
-	if err != nil {
+	if err != nil && err != sql.ErrNoRows {
 		slog.Error("failed to delete all files for repo", slog.Any("error", err))
 	}
 
 	ctxGetFileList, cancel := context.WithTimeout(ctx, 5*time.Second)
 	files, err := sc.FileList(ctxGetFileList, s)
 	cancel()
-	if err != nil {
+	if err != nil && err != sql.ErrNoRows {
 		slog.Error("failed to get all files of repo", slog.Any("sync_version", s), slog.Any("error", err))
 	}
 	if len(files) > 0 {

@@ -224,6 +224,11 @@ type Config struct {
 		// S3PublicBucket is used to store public files, should set bucket same with portal
 		S3PublicBucket string `env:"STARHUB_SERVER_ARGO_S3_PUBLIC_BUCKET"`
 	}
+
+	CronJob struct {
+		SyncAsClientCronExpression   string `env:"STARHUB_SERVER_CRON_JOB_SYNC_AS_CLIENT_CRON_EXPRESSION, default=0 * * * *"`
+		CalcRecomScoreCronExpression string `env:"STARHUB_SERVER_CRON_JOB_CLAC_RECOM_SCORE_CRON_EXPRESSION, default=0 1 * * *"`
+	}
 }
 
 func SetConfigFile(file string) {

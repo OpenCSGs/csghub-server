@@ -161,3 +161,7 @@ encoded_sensitive_words = "5Lmg6L+R5bmzLHhpamlucGluZw=="
 
 [workflow]
 endpoint = "localhost:7233"
+
+[cron_job]
+sync_as_client_cron_expression = "0 * * * *"
+calc_recom_score_cron_expression = "0 1 * * *"
