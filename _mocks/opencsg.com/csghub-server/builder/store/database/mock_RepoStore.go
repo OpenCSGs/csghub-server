@@ -1437,9 +1437,9 @@ func (_c *MockRepoStore_ListRepoPublicToUserByRepoIDs_Call) RunAndReturn(run fun
 	return _c
 }
 
-// PublicToUser provides a mock function with given fields: ctx, repoType, userIDs, filter, per, page, isAdmin
-func (_m *MockRepoStore) PublicToUser(ctx context.Context, repoType types.RepositoryType, userIDs []int64, filter *types.RepoFilter, per int, page int, isAdmin bool) ([]*database.Repository, int, error) {
-	ret := _m.Called(ctx, repoType, userIDs, filter, per, page, isAdmin)
+// PublicToUser provides a mock function with given fields: ctx, repoType, userIDs, filter, per, page
+func (_m *MockRepoStore) PublicToUser(ctx context.Context, repoType types.RepositoryType, userIDs []int64, filter *types.RepoFilter, per int, page int) ([]*database.Repository, int, error) {
+	ret := _m.Called(ctx, repoType, userIDs, filter, per, page)
 
 	if len(ret) == 0 {
 		panic("no return value specified for PublicToUser")
@@ -1448,25 +1448,25 @@ func (_m *MockRepoStore) PublicToUser(ctx context.Context, repoType types.Reposi
 	var r0 []*database.Repository
 	var r1 int
 	var r2 error
-	if rf, ok := ret.Get(0).(func(context.Context, types.RepositoryType, []int64, *types.RepoFilter, int, int, bool) ([]*database.Repository, int, error)); ok {
-		return rf(ctx, repoType, userIDs, filter, per, page, isAdmin)
+	if rf, ok := ret.Get(0).(func(context.Context, types.RepositoryType, []int64, *types.RepoFilter, int, int) ([]*database.Repository, int, error)); ok {
+		return rf(ctx, repoType, userIDs, filter, per, page)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, types.RepositoryType, []int64, *types.RepoFilter, int, int, bool) []*database.Repository); ok {
-		r0 = rf(ctx, repoType, userIDs, filter, per, page, isAdmin)
+	if rf, ok := ret.Get(0).(func(context.Context, types.RepositoryType, []int64, *types.RepoFilter, int, int) []*database.Repository); ok {
+		r0 = rf(ctx, repoType, userIDs, filter, per, page)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).([]*database.Repository)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, types.RepositoryType, []int64, *types.RepoFilter, int, int, bool) int); ok {
-		r1 = rf(ctx, repoType, userIDs, filter, per, page, isAdmin)
+	if rf, ok := ret.Get(1).(func(context.Context, types.RepositoryType, []int64, *types.RepoFilter, int, int) int); ok {
+		r1 = rf(ctx, repoType, userIDs, filter, per, page)
 	} else {
 		r1 = ret.Get(1).(int)
 	}
 
-	if rf, ok := ret.Get(2).(func(context.Context, types.RepositoryType, []int64, *types.RepoFilter, int, int, bool) error); ok {
-		r2 = rf(ctx, repoType, userIDs, filter, per, page, isAdmin)
+	if rf, ok := ret.Get(2).(func(context.Context, types.RepositoryType, []int64, *types.RepoFilter, int, int) error); ok {
+		r2 = rf(ctx, repoType, userIDs, filter, per, page)
 	} else {
 		r2 = ret.Error(2)
 	}
@@ -1486,14 +1486,13 @@ type MockRepoStore_PublicToUser_Call struct {
 //   - filter *types.RepoFilter
 //   - per int
 //   - page int
-//   - isAdmin bool
-func (_e *MockRepoStore_Expecter) PublicToUser(ctx interface{}, repoType interface{}, userIDs interface{}, filter interface{}, per interface{}, page interface{}, isAdmin interface{}) *MockRepoStore_PublicToUser_Call {
-	return &MockRepoStore_PublicToUser_Call{Call: _e.mock.On("PublicToUser", ctx, repoType, userIDs, filter, per, page, isAdmin)}
+func (_e *MockRepoStore_Expecter) PublicToUser(ctx interface{}, repoType interface{}, userIDs interface{}, filter interface{}, per interface{}, page interface{}) *MockRepoStore_PublicToUser_Call {
+	return &MockRepoStore_PublicToUser_Call{Call: _e.mock.On("PublicToUser", ctx, repoType, userIDs, filter, per, page)}
 }
 
-func (_c *MockRepoStore_PublicToUser_Call) Run(run func(ctx context.Context, repoType types.RepositoryType, userIDs []int64, filter *types.RepoFilter, per int, page int, isAdmin bool)) *MockRepoStore_PublicToUser_Call {
+func (_c *MockRepoStore_PublicToUser_Call) Run(run func(ctx context.Context, repoType types.RepositoryType, userIDs []int64, filter *types.RepoFilter, per int, page int)) *MockRepoStore_PublicToUser_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(types.RepositoryType), args[2].([]int64), args[3].(*types.RepoFilter), args[4].(int), args[5].(int), args[6].(bool))
+		run(args[0].(context.Context), args[1].(types.RepositoryType), args[2].([]int64), args[3].(*types.RepoFilter), args[4].(int), args[5].(int))
 	})
 	return _c
 }
@@ -1503,7 +1502,7 @@ func (_c *MockRepoStore_PublicToUser_Call) Return(repos []*database.Repository, 
 	return _c
 }
 
-func (_c *MockRepoStore_PublicToUser_Call) RunAndReturn(run func(context.Context, types.RepositoryType, []int64, *types.RepoFilter, int, int, bool) ([]*database.Repository, int, error)) *MockRepoStore_PublicToUser_Call {
+func (_c *MockRepoStore_PublicToUser_Call) RunAndReturn(run func(context.Context, types.RepositoryType, []int64, *types.RepoFilter, int, int) ([]*database.Repository, int, error)) *MockRepoStore_PublicToUser_Call {
 	_c.Call.Return(run)
 	return _c
 }
