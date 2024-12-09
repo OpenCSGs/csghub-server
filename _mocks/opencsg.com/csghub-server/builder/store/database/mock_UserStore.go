@@ -339,6 +339,63 @@ func (_c *MockUserStore_FindByGitAccessToken_Call) RunAndReturn(run func(context
 	return _c
 }
 
+// FindByID provides a mock function with given fields: ctx, id
+func (_m *MockUserStore) FindByID(ctx context.Context, id int) (database.User, error) {
+	ret := _m.Called(ctx, id)
+
+	if len(ret) == 0 {
+		panic("no return value specified for FindByID")
+	}
+
+	var r0 database.User
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, int) (database.User, error)); ok {
+		return rf(ctx, id)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, int) database.User); ok {
+		r0 = rf(ctx, id)
+	} else {
+		r0 = ret.Get(0).(database.User)
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, int) error); ok {
+		r1 = rf(ctx, id)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockUserStore_FindByID_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'FindByID'
+type MockUserStore_FindByID_Call struct {
+	*mock.Call
+}
+
+// FindByID is a helper method to define mock.On call
+//   - ctx context.Context
+//   - id int
+func (_e *MockUserStore_Expecter) FindByID(ctx interface{}, id interface{}) *MockUserStore_FindByID_Call {
+	return &MockUserStore_FindByID_Call{Call: _e.mock.On("FindByID", ctx, id)}
+}
+
+func (_c *MockUserStore_FindByID_Call) Run(run func(ctx context.Context, id int)) *MockUserStore_FindByID_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(int))
+	})
+	return _c
+}
+
+func (_c *MockUserStore_FindByID_Call) Return(user database.User, err error) *MockUserStore_FindByID_Call {
+	_c.Call.Return(user, err)
+	return _c
+}
+
+func (_c *MockUserStore_FindByID_Call) RunAndReturn(run func(context.Context, int) (database.User, error)) *MockUserStore_FindByID_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // FindByUUID provides a mock function with given fields: ctx, uuid
 func (_m *MockUserStore) FindByUUID(ctx context.Context, uuid string) (*database.User, error) {
 	ret := _m.Called(ctx, uuid)
