@@ -1493,7 +1493,15 @@ func (c *repoComponentImpl) GetUserRepoPermission(ctx context.Context, userName 
 func (c *repoComponentImpl) CheckCurrentUserPermission(ctx context.Context, userName string, namespace string, role membership.Role) (bool, error) {
 	ns, err := c.namespaceStore.FindByPath(ctx, namespace)
 	if err != nil {
-		return false, err
+		return false, fmt.Errorf("fail to find namespace '%s', err:%w", namespace, err)
+	}
+
+	u, err := c.userStore.FindByUsername(ctx, userName)
+	if err != nil {
+		return false, fmt.Errorf("fail to find user '%s', err:%w", userName, err)
+	}
+	if u.CanAdmin() {
+		return true, nil
 	}
 
 	if ns.NamespaceType == "user" {
