@@ -16,6 +16,7 @@ packages:
             AccountingComponent:
             SpaceComponent:
             RuntimeArchitectureComponent:
+            SensitiveComponent:
     opencsg.com/csghub-server/user/component:
         config:
         interfaces:

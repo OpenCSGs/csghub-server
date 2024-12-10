@@ -40,6 +40,7 @@ type MockStores struct {
 	RuntimeArch          database.RuntimeArchitecturesStore
 	ResourceModel        database.ResourceModelStore
 	GitServerAccessToken database.GitServerAccessTokenStore
+	Org                  database.OrgStore
 }
 
 func NewMockStores(t interface {
@@ -80,6 +81,7 @@ func NewMockStores(t interface {
 		RuntimeArch:          mockdb.NewMockRuntimeArchitecturesStore(t),
 		ResourceModel:        mockdb.NewMockResourceModelStore(t),
 		GitServerAccessToken: mockdb.NewMockGitServerAccessTokenStore(t),
+		Org:                  mockdb.NewMockOrgStore(t),
 	}
 }
 
@@ -213,4 +215,8 @@ func (s *MockStores) ResourceModelMock() *mockdb.MockResourceModelStore {
 
 func (s *MockStores) GitServerAccessTokenMock() *mockdb.MockGitServerAccessTokenStore {
 	return s.GitServerAccessToken.(*mockdb.MockGitServerAccessTokenStore)
+}
+
+func (s *MockStores) OrgMock() *mockdb.MockOrgStore {
+	return s.Org.(*mockdb.MockOrgStore)
 }

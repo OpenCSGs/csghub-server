@@ -185,3 +185,35 @@ func initializeTestMirrorComponent(ctx context.Context, t interface {
 	)
 	return &testMirrorWithMocks{}
 }
+
+type testCollectionWithMocks struct {
+	*collectionComponentImpl
+	mocks *Mocks
+}
+
+func initializeTestCollectionComponent(ctx context.Context, t interface {
+	Cleanup(func())
+	mock.TestingT
+}) *testCollectionWithMocks {
+	wire.Build(
+		MockSuperSet, CollectionComponentSet,
+		wire.Struct(new(testCollectionWithMocks), "*"),
+	)
+	return &testCollectionWithMocks{}
+}
+
+type testDatasetWithMocks struct {
+	*datasetComponentImpl
+	mocks *Mocks
+}
+
+func initializeTestDatasetComponent(ctx context.Context, t interface {
+	Cleanup(func())
+	mock.TestingT
+}) *testDatasetWithMocks {
+	wire.Build(
+		MockSuperSet, DatasetComponentSet,
+		wire.Struct(new(testDatasetWithMocks), "*"),
+	)
+	return &testDatasetWithMocks{}
+}

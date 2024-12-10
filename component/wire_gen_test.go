@@ -42,12 +42,14 @@ func initializeTestRepoComponent(ctx context.Context, t interface {
 	mockRepoComponent := component.NewMockRepoComponent(t)
 	mockSpaceComponent := component.NewMockSpaceComponent(t)
 	mockRuntimeArchitectureComponent := component.NewMockRuntimeArchitectureComponent(t)
+	mockSensitiveComponent := component.NewMockSensitiveComponent(t)
 	componentMockedComponents := &mockedComponents{
 		accounting:          mockAccountingComponent,
 		repo:                mockRepoComponent,
 		tag:                 mockTagComponent,
 		space:               mockSpaceComponent,
 		runtimeArchitecture: mockRuntimeArchitectureComponent,
+		sensitive:           mockSensitiveComponent,
 	}
 	inferenceMockClient := inference.NewMockClient(t)
 	mockAccountingClient := accounting.NewMockAccountingClient(t)
@@ -86,12 +88,14 @@ func initializeTestPromptComponent(ctx context.Context, t interface {
 	mockTagComponent := component.NewMockTagComponent(t)
 	mockSpaceComponent := component.NewMockSpaceComponent(t)
 	mockRuntimeArchitectureComponent := component.NewMockRuntimeArchitectureComponent(t)
+	mockSensitiveComponent := component.NewMockSensitiveComponent(t)
 	componentMockedComponents := &mockedComponents{
 		accounting:          mockAccountingComponent,
 		repo:                mockRepoComponent,
 		tag:                 mockTagComponent,
 		space:               mockSpaceComponent,
 		runtimeArchitecture: mockRuntimeArchitectureComponent,
+		sensitive:           mockSensitiveComponent,
 	}
 	mockClient := s3.NewMockClient(t)
 	mockMirrorServer := mirrorserver.NewMockMirrorServer(t)
@@ -133,12 +137,14 @@ func initializeTestUserComponent(ctx context.Context, t interface {
 	componentUserComponentImpl := NewTestUserComponent(mockStores, mockGitServer, mockSpaceComponent, mockRepoComponent, mockDeployer, mockAccountingComponent)
 	mockTagComponent := component.NewMockTagComponent(t)
 	mockRuntimeArchitectureComponent := component.NewMockRuntimeArchitectureComponent(t)
+	mockSensitiveComponent := component.NewMockSensitiveComponent(t)
 	componentMockedComponents := &mockedComponents{
 		accounting:          mockAccountingComponent,
 		repo:                mockRepoComponent,
 		tag:                 mockTagComponent,
 		space:               mockSpaceComponent,
 		runtimeArchitecture: mockRuntimeArchitectureComponent,
+		sensitive:           mockSensitiveComponent,
 	}
 	mockUserSvcClient := rpc.NewMockUserSvcClient(t)
 	mockClient := s3.NewMockClient(t)
@@ -182,12 +188,14 @@ func initializeTestSpaceComponent(ctx context.Context, t interface {
 	mockTagComponent := component.NewMockTagComponent(t)
 	mockSpaceComponent := component.NewMockSpaceComponent(t)
 	mockRuntimeArchitectureComponent := component.NewMockRuntimeArchitectureComponent(t)
+	mockSensitiveComponent := component.NewMockSensitiveComponent(t)
 	componentMockedComponents := &mockedComponents{
 		accounting:          mockAccountingComponent,
 		repo:                mockRepoComponent,
 		tag:                 mockTagComponent,
 		space:               mockSpaceComponent,
 		runtimeArchitecture: mockRuntimeArchitectureComponent,
+		sensitive:           mockSensitiveComponent,
 	}
 	mockClient := s3.NewMockClient(t)
 	mockMirrorServer := mirrorserver.NewMockMirrorServer(t)
@@ -231,12 +239,14 @@ func initializeTestModelComponent(ctx context.Context, t interface {
 	mockUserSvcClient := rpc.NewMockUserSvcClient(t)
 	componentModelComponentImpl := NewTestModelComponent(config, mockStores, mockRepoComponent, mockSpaceComponent, mockClient, mockDeployer, mockAccountingComponent, mockRuntimeArchitectureComponent, mockGitServer, mockUserSvcClient)
 	mockTagComponent := component.NewMockTagComponent(t)
+	mockSensitiveComponent := component.NewMockSensitiveComponent(t)
 	componentMockedComponents := &mockedComponents{
 		accounting:          mockAccountingComponent,
 		repo:                mockRepoComponent,
 		tag:                 mockTagComponent,
 		space:               mockSpaceComponent,
 		runtimeArchitecture: mockRuntimeArchitectureComponent,
+		sensitive:           mockSensitiveComponent,
 	}
 	s3MockClient := s3.NewMockClient(t)
 	mockMirrorServer := mirrorserver.NewMockMirrorServer(t)
@@ -275,12 +285,14 @@ func initializeTestAccountingComponent(ctx context.Context, t interface {
 	mockTagComponent := component.NewMockTagComponent(t)
 	mockSpaceComponent := component.NewMockSpaceComponent(t)
 	mockRuntimeArchitectureComponent := component.NewMockRuntimeArchitectureComponent(t)
+	mockSensitiveComponent := component.NewMockSensitiveComponent(t)
 	componentMockedComponents := &mockedComponents{
 		accounting:          mockAccountingComponent,
 		repo:                mockRepoComponent,
 		tag:                 mockTagComponent,
 		space:               mockSpaceComponent,
 		runtimeArchitecture: mockRuntimeArchitectureComponent,
+		sensitive:           mockSensitiveComponent,
 	}
 	mockGitServer := gitserver.NewMockGitServer(t)
 	mockUserSvcClient := rpc.NewMockUserSvcClient(t)
@@ -324,12 +336,14 @@ func initializeTestDatasetViewerComponent(ctx context.Context, t interface {
 	mockTagComponent := component.NewMockTagComponent(t)
 	mockSpaceComponent := component.NewMockSpaceComponent(t)
 	mockRuntimeArchitectureComponent := component.NewMockRuntimeArchitectureComponent(t)
+	mockSensitiveComponent := component.NewMockSensitiveComponent(t)
 	componentMockedComponents := &mockedComponents{
 		accounting:          mockAccountingComponent,
 		repo:                mockRepoComponent,
 		tag:                 mockTagComponent,
 		space:               mockSpaceComponent,
 		runtimeArchitecture: mockRuntimeArchitectureComponent,
+		sensitive:           mockSensitiveComponent,
 	}
 	mockUserSvcClient := rpc.NewMockUserSvcClient(t)
 	mockClient := s3.NewMockClient(t)
@@ -372,12 +386,14 @@ func initializeTestGitHTTPComponent(ctx context.Context, t interface {
 	mockTagComponent := component.NewMockTagComponent(t)
 	mockSpaceComponent := component.NewMockSpaceComponent(t)
 	mockRuntimeArchitectureComponent := component.NewMockRuntimeArchitectureComponent(t)
+	mockSensitiveComponent := component.NewMockSensitiveComponent(t)
 	componentMockedComponents := &mockedComponents{
 		accounting:          mockAccountingComponent,
 		repo:                mockRepoComponent,
 		tag:                 mockTagComponent,
 		space:               mockSpaceComponent,
 		runtimeArchitecture: mockRuntimeArchitectureComponent,
+		sensitive:           mockSensitiveComponent,
 	}
 	mockUserSvcClient := rpc.NewMockUserSvcClient(t)
 	mockMirrorServer := mirrorserver.NewMockMirrorServer(t)
@@ -417,12 +433,14 @@ func initializeTestDiscussionComponent(ctx context.Context, t interface {
 	mockTagComponent := component.NewMockTagComponent(t)
 	mockSpaceComponent := component.NewMockSpaceComponent(t)
 	mockRuntimeArchitectureComponent := component.NewMockRuntimeArchitectureComponent(t)
+	mockSensitiveComponent := component.NewMockSensitiveComponent(t)
 	componentMockedComponents := &mockedComponents{
 		accounting:          mockAccountingComponent,
 		repo:                mockRepoComponent,
 		tag:                 mockTagComponent,
 		space:               mockSpaceComponent,
 		runtimeArchitecture: mockRuntimeArchitectureComponent,
+		sensitive:           mockSensitiveComponent,
 	}
 	mockGitServer := gitserver.NewMockGitServer(t)
 	mockUserSvcClient := rpc.NewMockUserSvcClient(t)
@@ -465,12 +483,14 @@ func initializeTestRuntimeArchComponent(ctx context.Context, t interface {
 	mockTagComponent := component.NewMockTagComponent(t)
 	mockSpaceComponent := component.NewMockSpaceComponent(t)
 	mockRuntimeArchitectureComponent := component.NewMockRuntimeArchitectureComponent(t)
+	mockSensitiveComponent := component.NewMockSensitiveComponent(t)
 	componentMockedComponents := &mockedComponents{
 		accounting:          mockAccountingComponent,
 		repo:                mockRepoComponent,
 		tag:                 mockTagComponent,
 		space:               mockSpaceComponent,
 		runtimeArchitecture: mockRuntimeArchitectureComponent,
+		sensitive:           mockSensitiveComponent,
 	}
 	mockUserSvcClient := rpc.NewMockUserSvcClient(t)
 	mockClient := s3.NewMockClient(t)
@@ -516,12 +536,14 @@ func initializeTestMirrorComponent(ctx context.Context, t interface {
 	mockTagComponent := component.NewMockTagComponent(t)
 	mockSpaceComponent := component.NewMockSpaceComponent(t)
 	mockRuntimeArchitectureComponent := component.NewMockRuntimeArchitectureComponent(t)
+	mockSensitiveComponent := component.NewMockSensitiveComponent(t)
 	componentMockedComponents := &mockedComponents{
 		accounting:          mockAccountingComponent,
 		repo:                mockRepoComponent,
 		tag:                 mockTagComponent,
 		space:               mockSpaceComponent,
 		runtimeArchitecture: mockRuntimeArchitectureComponent,
+		sensitive:           mockSensitiveComponent,
 	}
 	mockUserSvcClient := rpc.NewMockUserSvcClient(t)
 	mockDeployer := deploy.NewMockDeployer(t)
@@ -546,6 +568,105 @@ func initializeTestMirrorComponent(ctx context.Context, t interface {
 		mocks:               mocks,
 	}
 	return componentTestMirrorWithMocks
+}
+
+func initializeTestCollectionComponent(ctx context.Context, t interface {
+	Cleanup(func())
+	mock.TestingT
+}) *testCollectionWithMocks {
+	mockStores := tests.NewMockStores(t)
+	mockUserSvcClient := rpc.NewMockUserSvcClient(t)
+	mockSpaceComponent := component.NewMockSpaceComponent(t)
+	componentCollectionComponentImpl := NewTestCollectionComponent(mockStores, mockUserSvcClient, mockSpaceComponent)
+	mockAccountingComponent := component.NewMockAccountingComponent(t)
+	mockRepoComponent := component.NewMockRepoComponent(t)
+	mockTagComponent := component.NewMockTagComponent(t)
+	mockRuntimeArchitectureComponent := component.NewMockRuntimeArchitectureComponent(t)
+	mockSensitiveComponent := component.NewMockSensitiveComponent(t)
+	componentMockedComponents := &mockedComponents{
+		accounting:          mockAccountingComponent,
+		repo:                mockRepoComponent,
+		tag:                 mockTagComponent,
+		space:               mockSpaceComponent,
+		runtimeArchitecture: mockRuntimeArchitectureComponent,
+		sensitive:           mockSensitiveComponent,
+	}
+	mockGitServer := gitserver.NewMockGitServer(t)
+	mockClient := s3.NewMockClient(t)
+	mockMirrorServer := mirrorserver.NewMockMirrorServer(t)
+	mockPriorityQueue := queue.NewMockPriorityQueue(t)
+	mockDeployer := deploy.NewMockDeployer(t)
+	inferenceMockClient := inference.NewMockClient(t)
+	mockAccountingClient := accounting.NewMockAccountingClient(t)
+	mockReader := parquet.NewMockReader(t)
+	mocks := &Mocks{
+		stores:           mockStores,
+		components:       componentMockedComponents,
+		gitServer:        mockGitServer,
+		userSvcClient:    mockUserSvcClient,
+		s3Client:         mockClient,
+		mirrorServer:     mockMirrorServer,
+		mirrorQueue:      mockPriorityQueue,
+		deployer:         mockDeployer,
+		inferenceClient:  inferenceMockClient,
+		accountingClient: mockAccountingClient,
+		preader:          mockReader,
+	}
+	componentTestCollectionWithMocks := &testCollectionWithMocks{
+		collectionComponentImpl: componentCollectionComponentImpl,
+		mocks:                   mocks,
+	}
+	return componentTestCollectionWithMocks
+}
+
+func initializeTestDatasetComponent(ctx context.Context, t interface {
+	Cleanup(func())
+	mock.TestingT
+}) *testDatasetWithMocks {
+	config := ProvideTestConfig()
+	mockStores := tests.NewMockStores(t)
+	mockRepoComponent := component.NewMockRepoComponent(t)
+	mockUserSvcClient := rpc.NewMockUserSvcClient(t)
+	mockSensitiveComponent := component.NewMockSensitiveComponent(t)
+	mockGitServer := gitserver.NewMockGitServer(t)
+	componentDatasetComponentImpl := NewTestDatasetComponent(config, mockStores, mockRepoComponent, mockUserSvcClient, mockSensitiveComponent, mockGitServer)
+	mockAccountingComponent := component.NewMockAccountingComponent(t)
+	mockTagComponent := component.NewMockTagComponent(t)
+	mockSpaceComponent := component.NewMockSpaceComponent(t)
+	mockRuntimeArchitectureComponent := component.NewMockRuntimeArchitectureComponent(t)
+	componentMockedComponents := &mockedComponents{
+		accounting:          mockAccountingComponent,
+		repo:                mockRepoComponent,
+		tag:                 mockTagComponent,
+		space:               mockSpaceComponent,
+		runtimeArchitecture: mockRuntimeArchitectureComponent,
+		sensitive:           mockSensitiveComponent,
+	}
+	mockClient := s3.NewMockClient(t)
+	mockMirrorServer := mirrorserver.NewMockMirrorServer(t)
+	mockPriorityQueue := queue.NewMockPriorityQueue(t)
+	mockDeployer := deploy.NewMockDeployer(t)
+	inferenceMockClient := inference.NewMockClient(t)
+	mockAccountingClient := accounting.NewMockAccountingClient(t)
+	mockReader := parquet.NewMockReader(t)
+	mocks := &Mocks{
+		stores:           mockStores,
+		components:       componentMockedComponents,
+		gitServer:        mockGitServer,
+		userSvcClient:    mockUserSvcClient,
+		s3Client:         mockClient,
+		mirrorServer:     mockMirrorServer,
+		mirrorQueue:      mockPriorityQueue,
+		deployer:         mockDeployer,
+		inferenceClient:  inferenceMockClient,
+		accountingClient: mockAccountingClient,
+		preader:          mockReader,
+	}
+	componentTestDatasetWithMocks := &testDatasetWithMocks{
+		datasetComponentImpl: componentDatasetComponentImpl,
+		mocks:                mocks,
+	}
+	return componentTestDatasetWithMocks
 }
 
 // wire.go:
@@ -602,5 +723,15 @@ type testRuntimeArchWithMocks struct {
 
 type testMirrorWithMocks struct {
 	*mirrorComponentImpl
+	mocks *Mocks
+}
+
+type testCollectionWithMocks struct {
+	*collectionComponentImpl
+	mocks *Mocks
+}
+
+type testDatasetWithMocks struct {
+	*datasetComponentImpl
 	mocks *Mocks
 }

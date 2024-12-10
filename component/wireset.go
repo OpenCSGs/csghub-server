@@ -32,6 +32,7 @@ type mockedComponents struct {
 	tag                 *mock_component.MockTagComponent
 	space               *mock_component.MockSpaceComponent
 	runtimeArchitecture *mock_component.MockRuntimeArchitectureComponent
+	sensitive           *mock_component.MockSensitiveComponent
 }
 
 var MockedStoreSet = wire.NewSet(
@@ -49,6 +50,8 @@ var MockedComponentSet = wire.NewSet(
 	wire.Bind(new(SpaceComponent), new(*mock_component.MockSpaceComponent)),
 	mock_component.NewMockRuntimeArchitectureComponent,
 	wire.Bind(new(RuntimeArchitectureComponent), new(*mock_component.MockRuntimeArchitectureComponent)),
+	mock_component.NewMockSensitiveComponent,
+	wire.Bind(new(SensitiveComponent), new(*mock_component.MockSensitiveComponent)),
 )
 
 var MockedGitServerSet = wire.NewSet(
@@ -366,3 +369,35 @@ func NewTestMirrorComponent(config *config.Config, stores *tests.MockStores, mir
 }
 
 var MirrorComponentSet = wire.NewSet(NewTestMirrorComponent)
+
+func NewTestCollectionComponent(stores *tests.MockStores, userSvcClient rpc.UserSvcClient, spaceComponent SpaceComponent) *collectionComponentImpl {
+	return &collectionComponentImpl{
+		collectionStore: stores.Collection,
+		orgStore:        stores.Org,
+		repoStore:       stores.Repo,
+		userStore:       stores.User,
+		userLikesStore:  stores.UserLikes,
+		userSvcClient:   userSvcClient,
+		spaceComponent:  spaceComponent,
+	}
+}
+
+var CollectionComponentSet = wire.NewSet(NewTestCollectionComponent)
+
+func NewTestDatasetComponent(config *config.Config, stores *tests.MockStores, repoComponent RepoComponent, userSvcClient rpc.UserSvcClient, sensitiveComponent SensitiveComponent, gitServer gitserver.GitServer) *datasetComponentImpl {
+	return &datasetComponentImpl{
+		config:             config,
+		repoComponent:      repoComponent,
+		tagStore:           stores.Tag,
+		datasetStore:       stores.Dataset,
+		repoStore:          stores.Repo,
+		namespaceStore:     stores.Namespace,
+		userStore:          stores.User,
+		sensitiveComponent: sensitiveComponent,
+		gitServer:          gitServer,
+		userLikesStore:     stores.UserLikes,
+		userSvcClient:      userSvcClient,
+	}
+}
+
+var DatasetComponentSet = wire.NewSet(NewTestDatasetComponent)
