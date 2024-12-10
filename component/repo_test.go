@@ -18,6 +18,7 @@ import (
 	"opencsg.com/csghub-server/builder/git/gitserver"
 	"opencsg.com/csghub-server/builder/git/membership"
 	"opencsg.com/csghub-server/builder/git/mirrorserver"
+	"opencsg.com/csghub-server/builder/rpc"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/tests"
 	"opencsg.com/csghub-server/common/types"
@@ -196,30 +197,30 @@ func TestRepoComponent_DeleteRepo(t *testing.T) {
 
 }
 
-// func TestRepoComponent_PublicToUser(t *testing.T) {
-// 	ctx := context.TODO()
-// 	repo := initializeTestRepoComponent(ctx, t)
+func TestRepoComponent_PublicToUser(t *testing.T) {
+	ctx := context.TODO()
+	repo := initializeTestRepoComponent(ctx, t)
 
-// 	repo.mocks.userSvcClient.EXPECT().GetUserInfo(ctx, "user", "user").Return(&rpc.User{
-// 		ID:    1,
-// 		Roles: []string{"a", "b"},
-// 		Orgs: []rpc.Organization{
-// 			{UserID: 2},
-// 			{UserID: 3},
-// 		},
-// 	}, nil)
+	repo.mocks.userSvcClient.EXPECT().GetUserInfo(ctx, "user", "user").Return(&rpc.User{
+		ID:    1,
+		Roles: []string{"a", "b"},
+		Orgs: []rpc.Organization{
+			{UserID: 2},
+			{UserID: 3},
+		},
+	}, nil)
 
-// 	filter := &types.RepoFilter{}
-// 	mrepos := []*database.Repository{
-// 		{Name: "foo"},
-// 	}
-// 	repo.mocks.stores.RepoMock().EXPECT().PublicToUser(ctx, types.ModelRepo, []int64{1, 2, 3}, filter, 10, 1, false).Return(mrepos, 100, nil)
+	filter := &types.RepoFilter{}
+	mrepos := []*database.Repository{
+		{Name: "foo"},
+	}
+	repo.mocks.stores.RepoMock().EXPECT().PublicToUser(ctx, types.ModelRepo, []int64{1, 2, 3}, filter, 10, 1, false).Return(mrepos, 100, nil)
 
-// 	repos, count, err := repo.PublicToUser(ctx, types.ModelRepo, "user", &types.RepoFilter{}, 10, 1)
-// 	require.Equal(t, mrepos, repos)
-// 	require.Equal(t, 100, count)
-// 	require.Nil(t, err)
-// }
+	repos, count, err := repo.PublicToUser(ctx, types.ModelRepo, "user", &types.RepoFilter{}, 10, 1)
+	require.Equal(t, mrepos, repos)
+	require.Equal(t, 100, count)
+	require.Nil(t, err)
+}
 
 func mockUserRepoAdminPermission(ctx context.Context, stores *tests.MockStores, userName string) {
 	stores.UserMock().EXPECT().FindByUsername(ctx, userName).Return(database.User{
