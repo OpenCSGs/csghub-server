@@ -364,7 +364,7 @@ func TestRepoStore_PublicToUser(t *testing.T) {
 		},
 		{
 			admin: true, repoType: types.CodeRepo,
-			expected: []string{"rp1", "rp2", "rp4", "rp5", "rp6"},
+			expected: []string{"rp1", "rp2", "rp3", "rp4", "rp5", "rp6"},
 		},
 		{
 			admin: false, repoType: types.CodeRepo, search: "rp4",
