@@ -1429,12 +1429,9 @@ func (c *repoComponentImpl) AllowReadAccess(ctx context.Context, repoType types.
 }
 
 func (c *repoComponentImpl) AllowWriteAccess(ctx context.Context, repoType types.RepositoryType, namespace, name, username string) (bool, error) {
-	repo, err := c.repoStore.FindByPath(ctx, repoType, namespace, name)
+	_, err := c.repoStore.FindByPath(ctx, repoType, namespace, name)
 	if err != nil {
 		return false, fmt.Errorf("failed to find repo, error: %w", err)
-	}
-	if !repo.Private {
-		return true, nil
 	}
 
 	if username == "" {
@@ -1445,12 +1442,9 @@ func (c *repoComponentImpl) AllowWriteAccess(ctx context.Context, repoType types
 }
 
 func (c *repoComponentImpl) AllowAdminAccess(ctx context.Context, repoType types.RepositoryType, namespace, name, username string) (bool, error) {
-	repo, err := c.repoStore.FindByPath(ctx, repoType, namespace, name)
+	_, err := c.repoStore.FindByPath(ctx, repoType, namespace, name)
 	if err != nil {
 		return false, fmt.Errorf("failed to find repo, error: %w", err)
-	}
-	if !repo.Private {
-		return true, nil
 	}
 
 	if username == "" {
