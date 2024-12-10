@@ -325,7 +325,7 @@ func TestRepoStore_PublicToUserSimple(t *testing.T) {
 		Sort: "recently_update",
 	}
 	// case 1: one tag
-	repos, _, err := rs.PublicToUser(ctx, repo.RepositoryType, []int64{1}, filter, 20, 1)
+	repos, _, err := rs.PublicToUser(ctx, repo.RepositoryType, []int64{1}, filter, 20, 1, false)
 	require.Nil(t, err)
 	require.NotNil(t, repos)
 
@@ -338,7 +338,7 @@ func TestRepoStore_PublicToUserSimple(t *testing.T) {
 		Sort: "recently_update",
 	}
 	// case 2: two tag
-	repos, _, err = rs.PublicToUser(ctx, repo.RepositoryType, []int64{1}, filter, 20, 1)
+	repos, _, err = rs.PublicToUser(ctx, repo.RepositoryType, []int64{1}, filter, 20, 1, false)
 	require.Nil(t, err)
 	require.NotNil(t, repos)
 }
@@ -444,7 +444,7 @@ func TestRepoStore_PublicToUser(t *testing.T) {
 				Sort:   c.sort,
 				Search: c.search,
 				Source: c.source,
-			}, 10, 1)
+			}, 10, 1, c.admin)
 			require.Nil(t, err)
 			names := []string{}
 			for _, r := range rs {
