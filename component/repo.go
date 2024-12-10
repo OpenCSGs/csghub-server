@@ -1466,7 +1466,7 @@ func (c *repoComponentImpl) GetUserRepoPermission(ctx context.Context, userName 
 		return &types.UserRepoPermission{CanRead: !repo.Private, CanWrite: false, CanAdmin: false}, nil
 	}
 
-	user, err := c.user.FindByUsername(ctx, userName)
+	user, err := c.userStore.FindByUsername(ctx, userName)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find user '%s' when get user repo permission, error: %w", userName, err)
 	}
