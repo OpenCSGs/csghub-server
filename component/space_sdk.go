@@ -18,18 +18,18 @@ type SpaceSdkComponent interface {
 
 func NewSpaceSdkComponent(config *config.Config) (SpaceSdkComponent, error) {
 	c := &spaceSdkComponentImpl{}
-	c.sss = database.NewSpaceSdkStore()
+	c.spaceSdkStore = database.NewSpaceSdkStore()
 
 	return c, nil
 }
 
 type spaceSdkComponentImpl struct {
-	sss database.SpaceSdkStore
+	spaceSdkStore database.SpaceSdkStore
 }
 
 func (c *spaceSdkComponentImpl) Index(ctx context.Context) ([]types.SpaceSdk, error) {
 	var result []types.SpaceSdk
-	databaseSpaceSdks, err := c.sss.Index(ctx)
+	databaseSpaceSdks, err := c.spaceSdkStore.Index(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -45,7 +45,7 @@ func (c *spaceSdkComponentImpl) Index(ctx context.Context) ([]types.SpaceSdk, er
 }
 
 func (c *spaceSdkComponentImpl) Update(ctx context.Context, req *types.UpdateSpaceSdkReq) (*types.SpaceSdk, error) {
-	ss, err := c.sss.FindByID(ctx, req.ID)
+	ss, err := c.spaceSdkStore.FindByID(ctx, req.ID)
 	if err != nil {
 		slog.Error("error getting space sdk", slog.Any("error", err))
 		return nil, err
@@ -53,7 +53,7 @@ func (c *spaceSdkComponentImpl) Update(ctx context.Context, req *types.UpdateSpa
 	ss.Name = req.Name
 	ss.Version = req.Version
 
-	ss, err = c.sss.Update(ctx, *ss)
+	ss, err = c.spaceSdkStore.Update(ctx, *ss)
 	if err != nil {
 		slog.Error("error getting space sdk", slog.Any("error", err))
 		return nil, err
@@ -73,7 +73,7 @@ func (c *spaceSdkComponentImpl) Create(ctx context.Context, req *types.CreateSpa
 		Name:    req.Name,
 		Version: req.Version,
 	}
-	res, err := c.sss.Create(ctx, ss)
+	res, err := c.spaceSdkStore.Create(ctx, ss)
 	if err != nil {
 		slog.Error("error creating space sdk", slog.Any("error", err))
 		return nil, err
@@ -89,13 +89,13 @@ func (c *spaceSdkComponentImpl) Create(ctx context.Context, req *types.CreateSpa
 }
 
 func (c *spaceSdkComponentImpl) Delete(ctx context.Context, id int64) error {
-	ss, err := c.sss.FindByID(ctx, id)
+	ss, err := c.spaceSdkStore.FindByID(ctx, id)
 	if err != nil {
 		slog.Error("error finding space sdk", slog.Any("error", err))
 		return err
 	}
 
-	err = c.sss.Delete(ctx, *ss)
+	err = c.spaceSdkStore.Delete(ctx, *ss)
 	if err != nil {
 		slog.Error("error deleting space sdk", slog.Any("error", err))
 		return err

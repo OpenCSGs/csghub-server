@@ -13,7 +13,6 @@ import (
 	"opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/deploy"
 	"opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/git/gitserver"
 	"opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/git/mirrorserver"
-	"opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/inference"
 	"opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/parquet"
 	"opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/rpc"
 	"opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/store/s3"
@@ -51,9 +50,9 @@ func initializeTestRepoComponent(ctx context.Context, t interface {
 		runtimeArchitecture: mockRuntimeArchitectureComponent,
 		sensitive:           mockSensitiveComponent,
 	}
-	inferenceMockClient := inference.NewMockClient(t)
 	mockAccountingClient := accounting.NewMockAccountingClient(t)
 	mockReader := parquet.NewMockReader(t)
+	mockModerationSvcClient := rpc.NewMockModerationSvcClient(t)
 	mocks := &Mocks{
 		stores:           mockStores,
 		components:       componentMockedComponents,
@@ -63,9 +62,9 @@ func initializeTestRepoComponent(ctx context.Context, t interface {
 		mirrorServer:     mockMirrorServer,
 		mirrorQueue:      mockPriorityQueue,
 		deployer:         mockDeployer,
-		inferenceClient:  inferenceMockClient,
 		accountingClient: mockAccountingClient,
 		preader:          mockReader,
+		moderationClient: mockModerationSvcClient,
 	}
 	componentTestRepoWithMocks := &testRepoWithMocks{
 		repoComponentImpl: componentRepoComponentImpl,
@@ -101,9 +100,9 @@ func initializeTestPromptComponent(ctx context.Context, t interface {
 	mockMirrorServer := mirrorserver.NewMockMirrorServer(t)
 	mockPriorityQueue := queue.NewMockPriorityQueue(t)
 	mockDeployer := deploy.NewMockDeployer(t)
-	inferenceMockClient := inference.NewMockClient(t)
 	mockAccountingClient := accounting.NewMockAccountingClient(t)
 	mockReader := parquet.NewMockReader(t)
+	mockModerationSvcClient := rpc.NewMockModerationSvcClient(t)
 	mocks := &Mocks{
 		stores:           mockStores,
 		components:       componentMockedComponents,
@@ -113,9 +112,9 @@ func initializeTestPromptComponent(ctx context.Context, t interface {
 		mirrorServer:     mockMirrorServer,
 		mirrorQueue:      mockPriorityQueue,
 		deployer:         mockDeployer,
-		inferenceClient:  inferenceMockClient,
 		accountingClient: mockAccountingClient,
 		preader:          mockReader,
+		moderationClient: mockModerationSvcClient,
 	}
 	componentTestPromptWithMocks := &testPromptWithMocks{
 		promptComponentImpl: componentPromptComponentImpl,
@@ -150,9 +149,9 @@ func initializeTestUserComponent(ctx context.Context, t interface {
 	mockClient := s3.NewMockClient(t)
 	mockMirrorServer := mirrorserver.NewMockMirrorServer(t)
 	mockPriorityQueue := queue.NewMockPriorityQueue(t)
-	inferenceMockClient := inference.NewMockClient(t)
 	mockAccountingClient := accounting.NewMockAccountingClient(t)
 	mockReader := parquet.NewMockReader(t)
+	mockModerationSvcClient := rpc.NewMockModerationSvcClient(t)
 	mocks := &Mocks{
 		stores:           mockStores,
 		components:       componentMockedComponents,
@@ -162,9 +161,9 @@ func initializeTestUserComponent(ctx context.Context, t interface {
 		mirrorServer:     mockMirrorServer,
 		mirrorQueue:      mockPriorityQueue,
 		deployer:         mockDeployer,
-		inferenceClient:  inferenceMockClient,
 		accountingClient: mockAccountingClient,
 		preader:          mockReader,
+		moderationClient: mockModerationSvcClient,
 	}
 	componentTestUserWithMocks := &testUserWithMocks{
 		userComponentImpl: componentUserComponentImpl,
@@ -200,9 +199,9 @@ func initializeTestSpaceComponent(ctx context.Context, t interface {
 	mockClient := s3.NewMockClient(t)
 	mockMirrorServer := mirrorserver.NewMockMirrorServer(t)
 	mockPriorityQueue := queue.NewMockPriorityQueue(t)
-	inferenceMockClient := inference.NewMockClient(t)
 	mockAccountingClient := accounting.NewMockAccountingClient(t)
 	mockReader := parquet.NewMockReader(t)
+	mockModerationSvcClient := rpc.NewMockModerationSvcClient(t)
 	mocks := &Mocks{
 		stores:           mockStores,
 		components:       componentMockedComponents,
@@ -212,9 +211,9 @@ func initializeTestSpaceComponent(ctx context.Context, t interface {
 		mirrorServer:     mockMirrorServer,
 		mirrorQueue:      mockPriorityQueue,
 		deployer:         mockDeployer,
-		inferenceClient:  inferenceMockClient,
 		accountingClient: mockAccountingClient,
 		preader:          mockReader,
+		moderationClient: mockModerationSvcClient,
 	}
 	componentTestSpaceWithMocks := &testSpaceWithMocks{
 		spaceComponentImpl: componentSpaceComponentImpl,
@@ -231,13 +230,12 @@ func initializeTestModelComponent(ctx context.Context, t interface {
 	mockStores := tests.NewMockStores(t)
 	mockRepoComponent := component.NewMockRepoComponent(t)
 	mockSpaceComponent := component.NewMockSpaceComponent(t)
-	mockClient := inference.NewMockClient(t)
 	mockDeployer := deploy.NewMockDeployer(t)
 	mockAccountingComponent := component.NewMockAccountingComponent(t)
 	mockRuntimeArchitectureComponent := component.NewMockRuntimeArchitectureComponent(t)
 	mockGitServer := gitserver.NewMockGitServer(t)
 	mockUserSvcClient := rpc.NewMockUserSvcClient(t)
-	componentModelComponentImpl := NewTestModelComponent(config, mockStores, mockRepoComponent, mockSpaceComponent, mockClient, mockDeployer, mockAccountingComponent, mockRuntimeArchitectureComponent, mockGitServer, mockUserSvcClient)
+	componentModelComponentImpl := NewTestModelComponent(config, mockStores, mockRepoComponent, mockSpaceComponent, mockDeployer, mockAccountingComponent, mockRuntimeArchitectureComponent, mockGitServer, mockUserSvcClient)
 	mockTagComponent := component.NewMockTagComponent(t)
 	mockSensitiveComponent := component.NewMockSensitiveComponent(t)
 	componentMockedComponents := &mockedComponents{
@@ -248,23 +246,24 @@ func initializeTestModelComponent(ctx context.Context, t interface {
 		runtimeArchitecture: mockRuntimeArchitectureComponent,
 		sensitive:           mockSensitiveComponent,
 	}
-	s3MockClient := s3.NewMockClient(t)
+	mockClient := s3.NewMockClient(t)
 	mockMirrorServer := mirrorserver.NewMockMirrorServer(t)
 	mockPriorityQueue := queue.NewMockPriorityQueue(t)
 	mockAccountingClient := accounting.NewMockAccountingClient(t)
 	mockReader := parquet.NewMockReader(t)
+	mockModerationSvcClient := rpc.NewMockModerationSvcClient(t)
 	mocks := &Mocks{
 		stores:           mockStores,
 		components:       componentMockedComponents,
 		gitServer:        mockGitServer,
 		userSvcClient:    mockUserSvcClient,
-		s3Client:         s3MockClient,
+		s3Client:         mockClient,
 		mirrorServer:     mockMirrorServer,
 		mirrorQueue:      mockPriorityQueue,
 		deployer:         mockDeployer,
-		inferenceClient:  mockClient,
 		accountingClient: mockAccountingClient,
 		preader:          mockReader,
+		moderationClient: mockModerationSvcClient,
 	}
 	componentTestModelWithMocks := &testModelWithMocks{
 		modelComponentImpl: componentModelComponentImpl,
@@ -300,8 +299,8 @@ func initializeTestAccountingComponent(ctx context.Context, t interface {
 	mockMirrorServer := mirrorserver.NewMockMirrorServer(t)
 	mockPriorityQueue := queue.NewMockPriorityQueue(t)
 	mockDeployer := deploy.NewMockDeployer(t)
-	inferenceMockClient := inference.NewMockClient(t)
 	mockReader := parquet.NewMockReader(t)
+	mockModerationSvcClient := rpc.NewMockModerationSvcClient(t)
 	mocks := &Mocks{
 		stores:           mockStores,
 		components:       componentMockedComponents,
@@ -311,9 +310,9 @@ func initializeTestAccountingComponent(ctx context.Context, t interface {
 		mirrorServer:     mockMirrorServer,
 		mirrorQueue:      mockPriorityQueue,
 		deployer:         mockDeployer,
-		inferenceClient:  inferenceMockClient,
 		accountingClient: mockAccountingClient,
 		preader:          mockReader,
+		moderationClient: mockModerationSvcClient,
 	}
 	componentTestAccountingWithMocks := &testAccountingWithMocks{
 		accountingComponentImpl: componentAccountingComponentImpl,
@@ -350,8 +349,8 @@ func initializeTestDatasetViewerComponent(ctx context.Context, t interface {
 	mockMirrorServer := mirrorserver.NewMockMirrorServer(t)
 	mockPriorityQueue := queue.NewMockPriorityQueue(t)
 	mockDeployer := deploy.NewMockDeployer(t)
-	inferenceMockClient := inference.NewMockClient(t)
 	mockAccountingClient := accounting.NewMockAccountingClient(t)
+	mockModerationSvcClient := rpc.NewMockModerationSvcClient(t)
 	mocks := &Mocks{
 		stores:           mockStores,
 		components:       componentMockedComponents,
@@ -361,9 +360,9 @@ func initializeTestDatasetViewerComponent(ctx context.Context, t interface {
 		mirrorServer:     mockMirrorServer,
 		mirrorQueue:      mockPriorityQueue,
 		deployer:         mockDeployer,
-		inferenceClient:  inferenceMockClient,
 		accountingClient: mockAccountingClient,
 		preader:          mockReader,
+		moderationClient: mockModerationSvcClient,
 	}
 	componentTestDatasetViewerWithMocks := &testDatasetViewerWithMocks{
 		datasetViewerComponentImpl: componentDatasetViewerComponentImpl,
@@ -399,9 +398,9 @@ func initializeTestGitHTTPComponent(ctx context.Context, t interface {
 	mockMirrorServer := mirrorserver.NewMockMirrorServer(t)
 	mockPriorityQueue := queue.NewMockPriorityQueue(t)
 	mockDeployer := deploy.NewMockDeployer(t)
-	inferenceMockClient := inference.NewMockClient(t)
 	mockAccountingClient := accounting.NewMockAccountingClient(t)
 	mockReader := parquet.NewMockReader(t)
+	mockModerationSvcClient := rpc.NewMockModerationSvcClient(t)
 	mocks := &Mocks{
 		stores:           mockStores,
 		components:       componentMockedComponents,
@@ -411,9 +410,9 @@ func initializeTestGitHTTPComponent(ctx context.Context, t interface {
 		mirrorServer:     mockMirrorServer,
 		mirrorQueue:      mockPriorityQueue,
 		deployer:         mockDeployer,
-		inferenceClient:  inferenceMockClient,
 		accountingClient: mockAccountingClient,
 		preader:          mockReader,
+		moderationClient: mockModerationSvcClient,
 	}
 	componentTestGitHTTPWithMocks := &testGitHTTPWithMocks{
 		gitHTTPComponentImpl: componentGitHTTPComponentImpl,
@@ -448,9 +447,9 @@ func initializeTestDiscussionComponent(ctx context.Context, t interface {
 	mockMirrorServer := mirrorserver.NewMockMirrorServer(t)
 	mockPriorityQueue := queue.NewMockPriorityQueue(t)
 	mockDeployer := deploy.NewMockDeployer(t)
-	inferenceMockClient := inference.NewMockClient(t)
 	mockAccountingClient := accounting.NewMockAccountingClient(t)
 	mockReader := parquet.NewMockReader(t)
+	mockModerationSvcClient := rpc.NewMockModerationSvcClient(t)
 	mocks := &Mocks{
 		stores:           mockStores,
 		components:       componentMockedComponents,
@@ -460,9 +459,9 @@ func initializeTestDiscussionComponent(ctx context.Context, t interface {
 		mirrorServer:     mockMirrorServer,
 		mirrorQueue:      mockPriorityQueue,
 		deployer:         mockDeployer,
-		inferenceClient:  inferenceMockClient,
 		accountingClient: mockAccountingClient,
 		preader:          mockReader,
+		moderationClient: mockModerationSvcClient,
 	}
 	componentTestDiscussionWithMocks := &testDiscussionWithMocks{
 		discussionComponentImpl: componentDiscussionComponentImpl,
@@ -497,9 +496,9 @@ func initializeTestRuntimeArchComponent(ctx context.Context, t interface {
 	mockMirrorServer := mirrorserver.NewMockMirrorServer(t)
 	mockPriorityQueue := queue.NewMockPriorityQueue(t)
 	mockDeployer := deploy.NewMockDeployer(t)
-	inferenceMockClient := inference.NewMockClient(t)
 	mockAccountingClient := accounting.NewMockAccountingClient(t)
 	mockReader := parquet.NewMockReader(t)
+	mockModerationSvcClient := rpc.NewMockModerationSvcClient(t)
 	mocks := &Mocks{
 		stores:           mockStores,
 		components:       componentMockedComponents,
@@ -509,9 +508,9 @@ func initializeTestRuntimeArchComponent(ctx context.Context, t interface {
 		mirrorServer:     mockMirrorServer,
 		mirrorQueue:      mockPriorityQueue,
 		deployer:         mockDeployer,
-		inferenceClient:  inferenceMockClient,
 		accountingClient: mockAccountingClient,
 		preader:          mockReader,
+		moderationClient: mockModerationSvcClient,
 	}
 	componentTestRuntimeArchWithMocks := &testRuntimeArchWithMocks{
 		runtimeArchitectureComponentImpl: componentRuntimeArchitectureComponentImpl,
@@ -547,9 +546,9 @@ func initializeTestMirrorComponent(ctx context.Context, t interface {
 	}
 	mockUserSvcClient := rpc.NewMockUserSvcClient(t)
 	mockDeployer := deploy.NewMockDeployer(t)
-	inferenceMockClient := inference.NewMockClient(t)
 	mockAccountingClient := accounting.NewMockAccountingClient(t)
 	mockReader := parquet.NewMockReader(t)
+	mockModerationSvcClient := rpc.NewMockModerationSvcClient(t)
 	mocks := &Mocks{
 		stores:           mockStores,
 		components:       componentMockedComponents,
@@ -559,9 +558,9 @@ func initializeTestMirrorComponent(ctx context.Context, t interface {
 		mirrorServer:     mockMirrorServer,
 		mirrorQueue:      mockPriorityQueue,
 		deployer:         mockDeployer,
-		inferenceClient:  inferenceMockClient,
 		accountingClient: mockAccountingClient,
 		preader:          mockReader,
+		moderationClient: mockModerationSvcClient,
 	}
 	componentTestMirrorWithMocks := &testMirrorWithMocks{
 		mirrorComponentImpl: componentMirrorComponentImpl,
@@ -596,9 +595,9 @@ func initializeTestCollectionComponent(ctx context.Context, t interface {
 	mockMirrorServer := mirrorserver.NewMockMirrorServer(t)
 	mockPriorityQueue := queue.NewMockPriorityQueue(t)
 	mockDeployer := deploy.NewMockDeployer(t)
-	inferenceMockClient := inference.NewMockClient(t)
 	mockAccountingClient := accounting.NewMockAccountingClient(t)
 	mockReader := parquet.NewMockReader(t)
+	mockModerationSvcClient := rpc.NewMockModerationSvcClient(t)
 	mocks := &Mocks{
 		stores:           mockStores,
 		components:       componentMockedComponents,
@@ -608,9 +607,9 @@ func initializeTestCollectionComponent(ctx context.Context, t interface {
 		mirrorServer:     mockMirrorServer,
 		mirrorQueue:      mockPriorityQueue,
 		deployer:         mockDeployer,
-		inferenceClient:  inferenceMockClient,
 		accountingClient: mockAccountingClient,
 		preader:          mockReader,
+		moderationClient: mockModerationSvcClient,
 	}
 	componentTestCollectionWithMocks := &testCollectionWithMocks{
 		collectionComponentImpl: componentCollectionComponentImpl,
@@ -646,9 +645,9 @@ func initializeTestDatasetComponent(ctx context.Context, t interface {
 	mockMirrorServer := mirrorserver.NewMockMirrorServer(t)
 	mockPriorityQueue := queue.NewMockPriorityQueue(t)
 	mockDeployer := deploy.NewMockDeployer(t)
-	inferenceMockClient := inference.NewMockClient(t)
 	mockAccountingClient := accounting.NewMockAccountingClient(t)
 	mockReader := parquet.NewMockReader(t)
+	mockModerationSvcClient := rpc.NewMockModerationSvcClient(t)
 	mocks := &Mocks{
 		stores:           mockStores,
 		components:       componentMockedComponents,
@@ -658,9 +657,9 @@ func initializeTestDatasetComponent(ctx context.Context, t interface {
 		mirrorServer:     mockMirrorServer,
 		mirrorQueue:      mockPriorityQueue,
 		deployer:         mockDeployer,
-		inferenceClient:  inferenceMockClient,
 		accountingClient: mockAccountingClient,
 		preader:          mockReader,
+		moderationClient: mockModerationSvcClient,
 	}
 	componentTestDatasetWithMocks := &testDatasetWithMocks{
 		datasetComponentImpl: componentDatasetComponentImpl,
@@ -696,9 +695,9 @@ func initializeTestCodeComponent(ctx context.Context, t interface {
 	mockMirrorServer := mirrorserver.NewMockMirrorServer(t)
 	mockPriorityQueue := queue.NewMockPriorityQueue(t)
 	mockDeployer := deploy.NewMockDeployer(t)
-	inferenceMockClient := inference.NewMockClient(t)
 	mockAccountingClient := accounting.NewMockAccountingClient(t)
 	mockReader := parquet.NewMockReader(t)
+	mockModerationSvcClient := rpc.NewMockModerationSvcClient(t)
 	mocks := &Mocks{
 		stores:           mockStores,
 		components:       componentMockedComponents,
@@ -708,9 +707,9 @@ func initializeTestCodeComponent(ctx context.Context, t interface {
 		mirrorServer:     mockMirrorServer,
 		mirrorQueue:      mockPriorityQueue,
 		deployer:         mockDeployer,
-		inferenceClient:  inferenceMockClient,
 		accountingClient: mockAccountingClient,
 		preader:          mockReader,
+		moderationClient: mockModerationSvcClient,
 	}
 	componentTestCodeWithMocks := &testCodeWithMocks{
 		codeComponentImpl: componentCodeComponentImpl,
@@ -746,7 +745,207 @@ func initializeTestMultiSyncComponent(ctx context.Context, t interface {
 	mockMirrorServer := mirrorserver.NewMockMirrorServer(t)
 	mockPriorityQueue := queue.NewMockPriorityQueue(t)
 	mockDeployer := deploy.NewMockDeployer(t)
-	inferenceMockClient := inference.NewMockClient(t)
+	mockAccountingClient := accounting.NewMockAccountingClient(t)
+	mockReader := parquet.NewMockReader(t)
+	mockModerationSvcClient := rpc.NewMockModerationSvcClient(t)
+	mocks := &Mocks{
+		stores:           mockStores,
+		components:       componentMockedComponents,
+		gitServer:        mockGitServer,
+		userSvcClient:    mockUserSvcClient,
+		s3Client:         mockClient,
+		mirrorServer:     mockMirrorServer,
+		mirrorQueue:      mockPriorityQueue,
+		deployer:         mockDeployer,
+		accountingClient: mockAccountingClient,
+		preader:          mockReader,
+		moderationClient: mockModerationSvcClient,
+	}
+	componentTestMultiSyncWithMocks := &testMultiSyncWithMocks{
+		multiSyncComponentImpl: componentMultiSyncComponentImpl,
+		mocks:                  mocks,
+	}
+	return componentTestMultiSyncWithMocks
+}
+
+func initializeTestInternalComponent(ctx context.Context, t interface {
+	Cleanup(func())
+	mock.TestingT
+}) *testInternalWithMocks {
+	config := ProvideTestConfig()
+	mockStores := tests.NewMockStores(t)
+	mockRepoComponent := component.NewMockRepoComponent(t)
+	mockGitServer := gitserver.NewMockGitServer(t)
+	componentInternalComponentImpl := NewTestInternalComponent(config, mockStores, mockRepoComponent, mockGitServer)
+	mockAccountingComponent := component.NewMockAccountingComponent(t)
+	mockTagComponent := component.NewMockTagComponent(t)
+	mockSpaceComponent := component.NewMockSpaceComponent(t)
+	mockRuntimeArchitectureComponent := component.NewMockRuntimeArchitectureComponent(t)
+	mockSensitiveComponent := component.NewMockSensitiveComponent(t)
+	componentMockedComponents := &mockedComponents{
+		accounting:          mockAccountingComponent,
+		repo:                mockRepoComponent,
+		tag:                 mockTagComponent,
+		space:               mockSpaceComponent,
+		runtimeArchitecture: mockRuntimeArchitectureComponent,
+		sensitive:           mockSensitiveComponent,
+	}
+	mockUserSvcClient := rpc.NewMockUserSvcClient(t)
+	mockClient := s3.NewMockClient(t)
+	mockMirrorServer := mirrorserver.NewMockMirrorServer(t)
+	mockPriorityQueue := queue.NewMockPriorityQueue(t)
+	mockDeployer := deploy.NewMockDeployer(t)
+	mockAccountingClient := accounting.NewMockAccountingClient(t)
+	mockReader := parquet.NewMockReader(t)
+	mockModerationSvcClient := rpc.NewMockModerationSvcClient(t)
+	mocks := &Mocks{
+		stores:           mockStores,
+		components:       componentMockedComponents,
+		gitServer:        mockGitServer,
+		userSvcClient:    mockUserSvcClient,
+		s3Client:         mockClient,
+		mirrorServer:     mockMirrorServer,
+		mirrorQueue:      mockPriorityQueue,
+		deployer:         mockDeployer,
+		accountingClient: mockAccountingClient,
+		preader:          mockReader,
+		moderationClient: mockModerationSvcClient,
+	}
+	componentTestInternalWithMocks := &testInternalWithMocks{
+		internalComponentImpl: componentInternalComponentImpl,
+		mocks:                 mocks,
+	}
+	return componentTestInternalWithMocks
+}
+
+func initializeTestMirrorSourceComponent(ctx context.Context, t interface {
+	Cleanup(func())
+	mock.TestingT
+}) *testMirrorSourceWithMocks {
+	config := ProvideTestConfig()
+	mockStores := tests.NewMockStores(t)
+	componentMirrorSourceComponentImpl := NewTestMirrorSourceComponent(config, mockStores)
+	mockAccountingComponent := component.NewMockAccountingComponent(t)
+	mockRepoComponent := component.NewMockRepoComponent(t)
+	mockTagComponent := component.NewMockTagComponent(t)
+	mockSpaceComponent := component.NewMockSpaceComponent(t)
+	mockRuntimeArchitectureComponent := component.NewMockRuntimeArchitectureComponent(t)
+	mockSensitiveComponent := component.NewMockSensitiveComponent(t)
+	componentMockedComponents := &mockedComponents{
+		accounting:          mockAccountingComponent,
+		repo:                mockRepoComponent,
+		tag:                 mockTagComponent,
+		space:               mockSpaceComponent,
+		runtimeArchitecture: mockRuntimeArchitectureComponent,
+		sensitive:           mockSensitiveComponent,
+	}
+	mockGitServer := gitserver.NewMockGitServer(t)
+	mockUserSvcClient := rpc.NewMockUserSvcClient(t)
+	mockClient := s3.NewMockClient(t)
+	mockMirrorServer := mirrorserver.NewMockMirrorServer(t)
+	mockPriorityQueue := queue.NewMockPriorityQueue(t)
+	mockDeployer := deploy.NewMockDeployer(t)
+	mockAccountingClient := accounting.NewMockAccountingClient(t)
+	mockReader := parquet.NewMockReader(t)
+	mockModerationSvcClient := rpc.NewMockModerationSvcClient(t)
+	mocks := &Mocks{
+		stores:           mockStores,
+		components:       componentMockedComponents,
+		gitServer:        mockGitServer,
+		userSvcClient:    mockUserSvcClient,
+		s3Client:         mockClient,
+		mirrorServer:     mockMirrorServer,
+		mirrorQueue:      mockPriorityQueue,
+		deployer:         mockDeployer,
+		accountingClient: mockAccountingClient,
+		preader:          mockReader,
+		moderationClient: mockModerationSvcClient,
+	}
+	componentTestMirrorSourceWithMocks := &testMirrorSourceWithMocks{
+		mirrorSourceComponentImpl: componentMirrorSourceComponentImpl,
+		mocks:                     mocks,
+	}
+	return componentTestMirrorSourceWithMocks
+}
+
+func initializeTestSpaceResourceComponent(ctx context.Context, t interface {
+	Cleanup(func())
+	mock.TestingT
+}) *testSpaceResourceWithMocks {
+	config := ProvideTestConfig()
+	mockStores := tests.NewMockStores(t)
+	mockDeployer := deploy.NewMockDeployer(t)
+	mockAccountingComponent := component.NewMockAccountingComponent(t)
+	componentSpaceResourceComponentImpl := NewTestSpaceResourceComponent(config, mockStores, mockDeployer, mockAccountingComponent)
+	mockRepoComponent := component.NewMockRepoComponent(t)
+	mockTagComponent := component.NewMockTagComponent(t)
+	mockSpaceComponent := component.NewMockSpaceComponent(t)
+	mockRuntimeArchitectureComponent := component.NewMockRuntimeArchitectureComponent(t)
+	mockSensitiveComponent := component.NewMockSensitiveComponent(t)
+	componentMockedComponents := &mockedComponents{
+		accounting:          mockAccountingComponent,
+		repo:                mockRepoComponent,
+		tag:                 mockTagComponent,
+		space:               mockSpaceComponent,
+		runtimeArchitecture: mockRuntimeArchitectureComponent,
+		sensitive:           mockSensitiveComponent,
+	}
+	mockGitServer := gitserver.NewMockGitServer(t)
+	mockUserSvcClient := rpc.NewMockUserSvcClient(t)
+	mockClient := s3.NewMockClient(t)
+	mockMirrorServer := mirrorserver.NewMockMirrorServer(t)
+	mockPriorityQueue := queue.NewMockPriorityQueue(t)
+	mockAccountingClient := accounting.NewMockAccountingClient(t)
+	mockReader := parquet.NewMockReader(t)
+	mockModerationSvcClient := rpc.NewMockModerationSvcClient(t)
+	mocks := &Mocks{
+		stores:           mockStores,
+		components:       componentMockedComponents,
+		gitServer:        mockGitServer,
+		userSvcClient:    mockUserSvcClient,
+		s3Client:         mockClient,
+		mirrorServer:     mockMirrorServer,
+		mirrorQueue:      mockPriorityQueue,
+		deployer:         mockDeployer,
+		accountingClient: mockAccountingClient,
+		preader:          mockReader,
+		moderationClient: mockModerationSvcClient,
+	}
+	componentTestSpaceResourceWithMocks := &testSpaceResourceWithMocks{
+		spaceResourceComponentImpl: componentSpaceResourceComponentImpl,
+		mocks:                      mocks,
+	}
+	return componentTestSpaceResourceWithMocks
+}
+
+func initializeTestTagComponent(ctx context.Context, t interface {
+	Cleanup(func())
+	mock.TestingT
+}) *testTagWithMocks {
+	config := ProvideTestConfig()
+	mockStores := tests.NewMockStores(t)
+	mockModerationSvcClient := rpc.NewMockModerationSvcClient(t)
+	componentTagComponentImpl := NewTestTagComponent(config, mockStores, mockModerationSvcClient)
+	mockAccountingComponent := component.NewMockAccountingComponent(t)
+	mockRepoComponent := component.NewMockRepoComponent(t)
+	mockTagComponent := component.NewMockTagComponent(t)
+	mockSpaceComponent := component.NewMockSpaceComponent(t)
+	mockRuntimeArchitectureComponent := component.NewMockRuntimeArchitectureComponent(t)
+	mockSensitiveComponent := component.NewMockSensitiveComponent(t)
+	componentMockedComponents := &mockedComponents{
+		accounting:          mockAccountingComponent,
+		repo:                mockRepoComponent,
+		tag:                 mockTagComponent,
+		space:               mockSpaceComponent,
+		runtimeArchitecture: mockRuntimeArchitectureComponent,
+		sensitive:           mockSensitiveComponent,
+	}
+	mockGitServer := gitserver.NewMockGitServer(t)
+	mockUserSvcClient := rpc.NewMockUserSvcClient(t)
+	mockClient := s3.NewMockClient(t)
+	mockMirrorServer := mirrorserver.NewMockMirrorServer(t)
+	mockPriorityQueue := queue.NewMockPriorityQueue(t)
+	mockDeployer := deploy.NewMockDeployer(t)
 	mockAccountingClient := accounting.NewMockAccountingClient(t)
 	mockReader := parquet.NewMockReader(t)
 	mocks := &Mocks{
@@ -758,15 +957,115 @@ func initializeTestMultiSyncComponent(ctx context.Context, t interface {
 		mirrorServer:     mockMirrorServer,
 		mirrorQueue:      mockPriorityQueue,
 		deployer:         mockDeployer,
-		inferenceClient:  inferenceMockClient,
 		accountingClient: mockAccountingClient,
 		preader:          mockReader,
+		moderationClient: mockModerationSvcClient,
 	}
-	componentTestMultiSyncWithMocks := &testMultiSyncWithMocks{
-		multiSyncComponentImpl: componentMultiSyncComponentImpl,
-		mocks:                  mocks,
+	componentTestTagWithMocks := &testTagWithMocks{
+		tagComponentImpl: componentTagComponentImpl,
+		mocks:            mocks,
 	}
-	return componentTestMultiSyncWithMocks
+	return componentTestTagWithMocks
+}
+
+func initializeTestRecomComponent(ctx context.Context, t interface {
+	Cleanup(func())
+	mock.TestingT
+}) *testRecomWithMocks {
+	config := ProvideTestConfig()
+	mockStores := tests.NewMockStores(t)
+	mockGitServer := gitserver.NewMockGitServer(t)
+	componentRecomComponentImpl := NewTestRecomComponent(config, mockStores, mockGitServer)
+	mockAccountingComponent := component.NewMockAccountingComponent(t)
+	mockRepoComponent := component.NewMockRepoComponent(t)
+	mockTagComponent := component.NewMockTagComponent(t)
+	mockSpaceComponent := component.NewMockSpaceComponent(t)
+	mockRuntimeArchitectureComponent := component.NewMockRuntimeArchitectureComponent(t)
+	mockSensitiveComponent := component.NewMockSensitiveComponent(t)
+	componentMockedComponents := &mockedComponents{
+		accounting:          mockAccountingComponent,
+		repo:                mockRepoComponent,
+		tag:                 mockTagComponent,
+		space:               mockSpaceComponent,
+		runtimeArchitecture: mockRuntimeArchitectureComponent,
+		sensitive:           mockSensitiveComponent,
+	}
+	mockUserSvcClient := rpc.NewMockUserSvcClient(t)
+	mockClient := s3.NewMockClient(t)
+	mockMirrorServer := mirrorserver.NewMockMirrorServer(t)
+	mockPriorityQueue := queue.NewMockPriorityQueue(t)
+	mockDeployer := deploy.NewMockDeployer(t)
+	mockAccountingClient := accounting.NewMockAccountingClient(t)
+	mockReader := parquet.NewMockReader(t)
+	mockModerationSvcClient := rpc.NewMockModerationSvcClient(t)
+	mocks := &Mocks{
+		stores:           mockStores,
+		components:       componentMockedComponents,
+		gitServer:        mockGitServer,
+		userSvcClient:    mockUserSvcClient,
+		s3Client:         mockClient,
+		mirrorServer:     mockMirrorServer,
+		mirrorQueue:      mockPriorityQueue,
+		deployer:         mockDeployer,
+		accountingClient: mockAccountingClient,
+		preader:          mockReader,
+		moderationClient: mockModerationSvcClient,
+	}
+	componentTestRecomWithMocks := &testRecomWithMocks{
+		recomComponentImpl: componentRecomComponentImpl,
+		mocks:              mocks,
+	}
+	return componentTestRecomWithMocks
+}
+
+func initializeTestSpaceSdkComponent(ctx context.Context, t interface {
+	Cleanup(func())
+	mock.TestingT
+}) *testSpaceSdkWithMocks {
+	config := ProvideTestConfig()
+	mockStores := tests.NewMockStores(t)
+	componentSpaceSdkComponentImpl := NewTestSpaceSdkComponent(config, mockStores)
+	mockAccountingComponent := component.NewMockAccountingComponent(t)
+	mockRepoComponent := component.NewMockRepoComponent(t)
+	mockTagComponent := component.NewMockTagComponent(t)
+	mockSpaceComponent := component.NewMockSpaceComponent(t)
+	mockRuntimeArchitectureComponent := component.NewMockRuntimeArchitectureComponent(t)
+	mockSensitiveComponent := component.NewMockSensitiveComponent(t)
+	componentMockedComponents := &mockedComponents{
+		accounting:          mockAccountingComponent,
+		repo:                mockRepoComponent,
+		tag:                 mockTagComponent,
+		space:               mockSpaceComponent,
+		runtimeArchitecture: mockRuntimeArchitectureComponent,
+		sensitive:           mockSensitiveComponent,
+	}
+	mockGitServer := gitserver.NewMockGitServer(t)
+	mockUserSvcClient := rpc.NewMockUserSvcClient(t)
+	mockClient := s3.NewMockClient(t)
+	mockMirrorServer := mirrorserver.NewMockMirrorServer(t)
+	mockPriorityQueue := queue.NewMockPriorityQueue(t)
+	mockDeployer := deploy.NewMockDeployer(t)
+	mockAccountingClient := accounting.NewMockAccountingClient(t)
+	mockReader := parquet.NewMockReader(t)
+	mockModerationSvcClient := rpc.NewMockModerationSvcClient(t)
+	mocks := &Mocks{
+		stores:           mockStores,
+		components:       componentMockedComponents,
+		gitServer:        mockGitServer,
+		userSvcClient:    mockUserSvcClient,
+		s3Client:         mockClient,
+		mirrorServer:     mockMirrorServer,
+		mirrorQueue:      mockPriorityQueue,
+		deployer:         mockDeployer,
+		accountingClient: mockAccountingClient,
+		preader:          mockReader,
+		moderationClient: mockModerationSvcClient,
+	}
+	componentTestSpaceSdkWithMocks := &testSpaceSdkWithMocks{
+		spaceSdkComponentImpl: componentSpaceSdkComponentImpl,
+		mocks:                 mocks,
+	}
+	return componentTestSpaceSdkWithMocks
 }
 
 // wire.go:
@@ -843,5 +1142,35 @@ type testCodeWithMocks struct {
 
 type testMultiSyncWithMocks struct {
 	*multiSyncComponentImpl
+	mocks *Mocks
+}
+
+type testInternalWithMocks struct {
+	*internalComponentImpl
+	mocks *Mocks
+}
+
+type testMirrorSourceWithMocks struct {
+	*mirrorSourceComponentImpl
+	mocks *Mocks
+}
+
+type testSpaceResourceWithMocks struct {
+	*spaceResourceComponentImpl
+	mocks *Mocks
+}
+
+type testTagWithMocks struct {
+	*tagComponentImpl
+	mocks *Mocks
+}
+
+type testRecomWithMocks struct {
+	*recomComponentImpl
+	mocks *Mocks
+}
+
+type testSpaceSdkWithMocks struct {
+	*spaceSdkComponentImpl
 	mocks *Mocks
 }

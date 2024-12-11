@@ -249,3 +249,99 @@ func initializeTestMultiSyncComponent(ctx context.Context, t interface {
 	)
 	return &testMultiSyncWithMocks{}
 }
+
+type testInternalWithMocks struct {
+	*internalComponentImpl
+	mocks *Mocks
+}
+
+func initializeTestInternalComponent(ctx context.Context, t interface {
+	Cleanup(func())
+	mock.TestingT
+}) *testInternalWithMocks {
+	wire.Build(
+		MockSuperSet, InternalComponentSet,
+		wire.Struct(new(testInternalWithMocks), "*"),
+	)
+	return &testInternalWithMocks{}
+}
+
+type testMirrorSourceWithMocks struct {
+	*mirrorSourceComponentImpl
+	mocks *Mocks
+}
+
+func initializeTestMirrorSourceComponent(ctx context.Context, t interface {
+	Cleanup(func())
+	mock.TestingT
+}) *testMirrorSourceWithMocks {
+	wire.Build(
+		MockSuperSet, MirrorSourceComponentSet,
+		wire.Struct(new(testMirrorSourceWithMocks), "*"),
+	)
+	return &testMirrorSourceWithMocks{}
+}
+
+type testSpaceResourceWithMocks struct {
+	*spaceResourceComponentImpl
+	mocks *Mocks
+}
+
+func initializeTestSpaceResourceComponent(ctx context.Context, t interface {
+	Cleanup(func())
+	mock.TestingT
+}) *testSpaceResourceWithMocks {
+	wire.Build(
+		MockSuperSet, SpaceResourceComponentSet,
+		wire.Struct(new(testSpaceResourceWithMocks), "*"),
+	)
+	return &testSpaceResourceWithMocks{}
+}
+
+type testTagWithMocks struct {
+	*tagComponentImpl
+	mocks *Mocks
+}
+
+func initializeTestTagComponent(ctx context.Context, t interface {
+	Cleanup(func())
+	mock.TestingT
+}) *testTagWithMocks {
+	wire.Build(
+		MockSuperSet, TagComponentSet,
+		wire.Struct(new(testTagWithMocks), "*"),
+	)
+	return &testTagWithMocks{}
+}
+
+type testRecomWithMocks struct {
+	*recomComponentImpl
+	mocks *Mocks
+}
+
+func initializeTestRecomComponent(ctx context.Context, t interface {
+	Cleanup(func())
+	mock.TestingT
+}) *testRecomWithMocks {
+	wire.Build(
+		MockSuperSet, RecomComponentSet,
+		wire.Struct(new(testRecomWithMocks), "*"),
+	)
+	return &testRecomWithMocks{}
+}
+
+type testSpaceSdkWithMocks struct {
+	*spaceSdkComponentImpl
+	mocks *Mocks
+}
+
+func initializeTestSpaceSdkComponent(ctx context.Context, t interface {
+	Cleanup(func())
+	mock.TestingT
+}) *testSpaceSdkWithMocks {
+	wire.Build(
+		MockSuperSet, SpaceSdkComponentSet,
+		wire.Struct(new(testSpaceSdkWithMocks), "*"),
+	)
+	return &testSpaceSdkWithMocks{}
+}

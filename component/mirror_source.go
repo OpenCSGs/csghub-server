@@ -11,8 +11,8 @@ import (
 )
 
 type mirrorSourceComponentImpl struct {
-	msStore   database.MirrorSourceStore
-	userStore database.UserStore
+	mirrorSourceStore database.MirrorSourceStore
+	userStore         database.UserStore
 }
 
 type MirrorSourceComponent interface {
@@ -25,8 +25,8 @@ type MirrorSourceComponent interface {
 
 func NewMirrorSourceComponent(config *config.Config) (MirrorSourceComponent, error) {
 	return &mirrorSourceComponentImpl{
-		msStore:   database.NewMirrorSourceStore(),
-		userStore: database.NewUserStore(),
+		mirrorSourceStore: database.NewMirrorSourceStore(),
+		userStore:         database.NewUserStore(),
 	}, nil
 }
 
@@ -41,7 +41,7 @@ func (c *mirrorSourceComponentImpl) Create(ctx context.Context, req types.Create
 	}
 	ms.SourceName = req.SourceName
 	ms.InfoAPIUrl = req.InfoAPiUrl
-	res, err := c.msStore.Create(ctx, &ms)
+	res, err := c.mirrorSourceStore.Create(ctx, &ms)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create mirror source, error: %w", err)
 	}
@@ -56,7 +56,7 @@ func (c *mirrorSourceComponentImpl) Get(ctx context.Context, id int64, currentUs
 	if !user.CanAdmin() {
 		return nil, errors.New("user does not have admin permission")
 	}
-	ms, err := c.msStore.Get(ctx, id)
+	ms, err := c.mirrorSourceStore.Get(ctx, id)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get mirror source, error: %w", err)
 	}
@@ -71,7 +71,7 @@ func (c *mirrorSourceComponentImpl) Index(ctx context.Context, currentUser strin
 	if !user.CanAdmin() {
 		return nil, errors.New("user does not have admin permission")
 	}
-	ms, err := c.msStore.Index(ctx)
+	ms, err := c.mirrorSourceStore.Index(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get mirror source, error: %w", err)
 	}
@@ -89,7 +89,7 @@ func (c *mirrorSourceComponentImpl) Update(ctx context.Context, req types.Update
 	ms.ID = req.ID
 	ms.SourceName = req.SourceName
 	ms.InfoAPIUrl = req.InfoAPiUrl
-	err = c.msStore.Update(ctx, &ms)
+	err = c.mirrorSourceStore.Update(ctx, &ms)
 	if err != nil {
 		return nil, fmt.Errorf("failed to update mirror source, error: %w", err)
 	}
@@ -104,11 +104,11 @@ func (c *mirrorSourceComponentImpl) Delete(ctx context.Context, id int64, curren
 	if !user.CanAdmin() {
 		return errors.New("user does not have admin permission")
 	}
-	ms, err := c.msStore.Get(ctx, id)
+	ms, err := c.mirrorSourceStore.Get(ctx, id)
 	if err != nil {
 		return fmt.Errorf("failed to find mirror source, error: %w", err)
 	}
-	err = c.msStore.Delete(ctx, ms)
+	err = c.mirrorSourceStore.Delete(ctx, ms)
 	if err != nil {
 		return fmt.Errorf("failed to delete mirror source, error: %w", err)
 	}

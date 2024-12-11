@@ -43,6 +43,7 @@ type MockStores struct {
 	Org                  database.OrgStore
 	MultiSync            database.MultiSyncStore
 	File                 database.FileStore
+	SSH                  database.SSHKeyStore
 }
 
 func NewMockStores(t interface {
@@ -86,6 +87,7 @@ func NewMockStores(t interface {
 		Org:                  mockdb.NewMockOrgStore(t),
 		MultiSync:            mockdb.NewMockMultiSyncStore(t),
 		File:                 mockdb.NewMockFileStore(t),
+		SSH:                  mockdb.NewMockSSHKeyStore(t),
 	}
 }
 
@@ -231,4 +233,8 @@ func (s *MockStores) MultiSyncMock() *mockdb.MockMultiSyncStore {
 
 func (s *MockStores) FileMock() *mockdb.MockFileStore {
 	return s.File.(*mockdb.MockFileStore)
+}
+
+func (s *MockStores) SSHMock() *mockdb.MockSSHKeyStore {
+	return s.SSH.(*mockdb.MockSSHKeyStore)
 }

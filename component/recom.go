@@ -14,9 +14,9 @@ import (
 )
 
 type recomComponentImpl struct {
-	rs    database.RecomStore
-	repos database.RepoStore
-	gs    gitserver.GitServer
+	recomStore database.RecomStore
+	repoStore  database.RepoStore
+	gitServer  gitserver.GitServer
 }
 
 type RecomComponent interface {
@@ -33,18 +33,18 @@ func NewRecomComponent(cfg *config.Config) (RecomComponent, error) {
 	}
 
 	return &recomComponentImpl{
-		rs:    database.NewRecomStore(),
-		repos: database.NewRepoStore(),
-		gs:    gs,
+		recomStore: database.NewRecomStore(),
+		repoStore:  database.NewRepoStore(),
+		gitServer:  gs,
 	}, nil
 }
 
 func (rc *recomComponentImpl) SetOpWeight(ctx context.Context, repoID, weight int64) error {
-	_, err := rc.repos.FindById(ctx, repoID)
+	_, err := rc.repoStore.FindById(ctx, repoID)
 	if err != nil {
 		return fmt.Errorf("failed to find repository with id %d, err:%w", repoID, err)
 	}
-	return rc.rs.UpsetOpWeights(ctx, repoID, weight)
+	return rc.recomStore.UpsetOpWeights(ctx, repoID, weight)
 }
 
 // loop through repositories and calculate the recom score of the repository
@@ -54,7 +54,7 @@ func (rc *recomComponentImpl) CalculateRecomScore(ctx context.Context) {
 		slog.Error("Error loading weights", "error", err)
 		return
 	}
-	repos, err := rc.repos.All(ctx)
+	repos, err := rc.repoStore.All(ctx)
 	if err != nil {
 		slog.Error("Error fetching repositories", "error", err)
 		return
@@ -62,7 +62,7 @@ func (rc *recomComponentImpl) CalculateRecomScore(ctx context.Context) {
 	for _, repo := range repos {
 		repoID := repo.ID
 		score := rc.CalcTotalScore(ctx, repo, weights)
-		err := rc.rs.UpsertScore(ctx, repoID, score)
+		err := rc.recomStore.UpsertScore(ctx, repoID, score)
 		if err != nil {
 			slog.Error("Error updating recom score", slog.Int64("repo_id", repoID), slog.Float64("score", score),
 				slog.String("error", err.Error()))
@@ -132,7 +132,7 @@ func (rc *recomComponentImpl) calcQualityScore(ctx context.Context, repo *databa
 	score := 0.0
 	// get file counts from git server
 	namespace, name := repo.NamespaceAndName()
-	files, err := getFilePaths(namespace, name, "", repo.RepositoryType, "", rc.gs.GetRepoFileTree)
+	files, err := getFilePaths(namespace, name, "", repo.RepositoryType, "", rc.gitServer.GetRepoFileTree)
 	if err != nil {
 		return 0, fmt.Errorf("failed to get repo file tree,%w", err)
 	}
@@ -157,7 +157,7 @@ func (rc *recomComponentImpl) calcQualityScore(ctx context.Context, repo *databa
 
 func (rc *recomComponentImpl) loadWeights() (map[string]string, error) {
 	ctx := context.Background()
-	items, err := rc.rs.LoadWeights(ctx)
+	items, err := rc.recomStore.LoadWeights(ctx)
 	if err != nil {
 		return nil, err
 	}
