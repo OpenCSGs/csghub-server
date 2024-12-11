@@ -109,10 +109,6 @@ type Config struct {
 		ValidHour  int    `env:"STARHUB_JWT_VALIDATE_HOUR, default=24"`
 	}
 
-	Inference struct {
-		ServerAddr string `env:"STARHUB_SERVER_INFERENCE_SERVER_ADDR, default=http://localhost:8000"`
-	}
-
 	Space struct {
 		BuilderEndpoint string `env:"STARHUB_SERVER_SPACE_BUILDER_ENDPOINT, default=http://localhost:8081"`
 		// base url for space api running in k8s cluster

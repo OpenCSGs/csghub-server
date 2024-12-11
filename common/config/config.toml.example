@@ -81,9 +81,6 @@ enable_ssl = true
 signing_key = "signing-key"
 valid_hour = 24
 
-[inference]
-server_addr = "http://localhost:8000"
-
 [space]
 builder_endpoint = "http://localhost:8081"
 runner_endpoint = "http://localhost:8082"
