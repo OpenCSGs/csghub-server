@@ -11,8 +11,10 @@ import (
 
 const HandlePushQueueName = "workflow_handle_push_queue"
 
-var wfWorker worker.Worker
-var wfClient client.Client
+var (
+	wfWorker worker.Worker
+	wfClient client.Client
+)
 
 func StartWorker(config *config.Config) error {
 	var err error
