@@ -25,6 +25,7 @@ search_path_with_most_term() {
     echo $max_count_path
     return 0
 }
+export HF_ENDPOINT="$HF_ENDPOINT/hf"
 #download datasets
 if [ ! -z "$DATASET_IDS" ]; then
     echo "Downloading datasets..."
@@ -44,8 +45,6 @@ if [ $? -ne 0 ]; then
     exit 1
 fi
 
-export HF_ENDPOINT="$HF_ENDPOINT/hf"
-
 tasks=""
 task_dir="/workspace/lm-evaluation-harness/lm_eval/tasks"
 IFS=',' read -r -a dataset_repos <<< "$DATASET_IDS"
@@ -53,12 +52,16 @@ if [ -z "$NUM_FEW_SHOT" ]; then
     NUM_FEW_SHOT=0
 fi
 script_dts_array=("allenai/winogrande" "facebook/anli" "aps/super_glue" "Rowan/hellaswag" "nyu-mll/blimp" "EdinburghNLP/orange_sum" "facebook/xnli" "nyu-mll/glue" "openai/gsm8k" "cimec/lambada" "allenai/math_qa" "openlifescienceai/medmcqa" "google-research-datasets/nq_open" "allenai/openbookqa" "google-research-datasets/paws-x" "ybisk/piqa" "community-datasets/qa4mre" "allenai/sciq" "allenai/social_i_qa" "LSDSem/story_cloze" "allenai/swag" "IWSLT/iwslt2017" "wmt/wmt14" "wmt/wmt16","mandarjoshi/trivia_qa" "truthfulqa/truthful_qa" "Stanford/web_questions" "ErnestSDavis/winograd_wsc" "cambridgeltl/xcopa" "google/xquad")
+script_dts_multi_config_array=("allenai/winogrande")
 for repo in "${dataset_repos[@]}"; do
     repo_name="${repo#*/}"
     if [[ " ${script_dts_array[@]} " =~ " ${repo} " ]]; then
         #need replace with real path
         echo "replace script repo with namespace repo"
-        find . -type f -exec sed -i "s|dataset_path: $repo_name|dataset_path: $repo|g" {} +
+        find $task_dir -type f -exec sed -i "s|dataset_path: $repo_name|dataset_path: $repo|g" {} +
+        if [[ " ${script_dts_multi_config_array[@]} " =~ " ${repo} " ]]; then
+            grep -rl "dataset_path: $repo" "$task_dir" | xargs sed -i "s|dataset_name: .*|dataset_name: null|g"
+        fi
     fi
     # search full id to cover mirror repo id
     mapfile -t yaml_files < <(grep -Rl -E "(dataset_path: ${repo}($|\s))" $task_dir)

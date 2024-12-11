@@ -51,6 +51,7 @@ func TestMirrorStore_CRUD(t *testing.T) {
 		RepositoryType: types.ModelRepo,
 		GitPath:        "models_ns/n",
 		Name:           "repo",
+		Path:           "ns/n",
 	}
 	err = db.Core.NewInsert().Model(repo).Scan(ctx, repo)
 	require.Nil(t, err)

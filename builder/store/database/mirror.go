@@ -90,7 +90,8 @@ func (s *mirrorStoreImpl) IsRepoExist(ctx context.Context, repoType types.Reposi
 	exists, err = s.db.Operator.Core.
 		NewSelect().
 		Model(&repo).
-		Where("git_path=?", fmt.Sprintf("%ss_%s/%s", repoType, namespace, name)).
+		Where("path=?", fmt.Sprintf("%s/%s", namespace, name)).
+		Where("repository_type=?", repoType).
 		Exists(ctx)
 	return
 }
