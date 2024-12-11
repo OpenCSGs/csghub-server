@@ -669,6 +669,110 @@ func initializeTestDatasetComponent(ctx context.Context, t interface {
 	return componentTestDatasetWithMocks
 }
 
+func initializeTestCodeComponent(ctx context.Context, t interface {
+	Cleanup(func())
+	mock.TestingT
+}) *testCodeWithMocks {
+	config := ProvideTestConfig()
+	mockStores := tests.NewMockStores(t)
+	mockRepoComponent := component.NewMockRepoComponent(t)
+	mockUserSvcClient := rpc.NewMockUserSvcClient(t)
+	mockGitServer := gitserver.NewMockGitServer(t)
+	componentCodeComponentImpl := NewTestCodeComponent(config, mockStores, mockRepoComponent, mockUserSvcClient, mockGitServer)
+	mockAccountingComponent := component.NewMockAccountingComponent(t)
+	mockTagComponent := component.NewMockTagComponent(t)
+	mockSpaceComponent := component.NewMockSpaceComponent(t)
+	mockRuntimeArchitectureComponent := component.NewMockRuntimeArchitectureComponent(t)
+	mockSensitiveComponent := component.NewMockSensitiveComponent(t)
+	componentMockedComponents := &mockedComponents{
+		accounting:          mockAccountingComponent,
+		repo:                mockRepoComponent,
+		tag:                 mockTagComponent,
+		space:               mockSpaceComponent,
+		runtimeArchitecture: mockRuntimeArchitectureComponent,
+		sensitive:           mockSensitiveComponent,
+	}
+	mockClient := s3.NewMockClient(t)
+	mockMirrorServer := mirrorserver.NewMockMirrorServer(t)
+	mockPriorityQueue := queue.NewMockPriorityQueue(t)
+	mockDeployer := deploy.NewMockDeployer(t)
+	mockCache := cache.NewMockCache(t)
+	inferenceMockClient := inference.NewMockClient(t)
+	mockAccountingClient := accounting.NewMockAccountingClient(t)
+	mockReader := parquet.NewMockReader(t)
+	mocks := &Mocks{
+		stores:           mockStores,
+		components:       componentMockedComponents,
+		gitServer:        mockGitServer,
+		userSvcClient:    mockUserSvcClient,
+		s3Client:         mockClient,
+		mirrorServer:     mockMirrorServer,
+		mirrorQueue:      mockPriorityQueue,
+		deployer:         mockDeployer,
+		cache:            mockCache,
+		inferenceClient:  inferenceMockClient,
+		accountingClient: mockAccountingClient,
+		preader:          mockReader,
+	}
+	componentTestCodeWithMocks := &testCodeWithMocks{
+		codeComponentImpl: componentCodeComponentImpl,
+		mocks:             mocks,
+	}
+	return componentTestCodeWithMocks
+}
+
+func initializeTestMultiSyncComponent(ctx context.Context, t interface {
+	Cleanup(func())
+	mock.TestingT
+}) *testMultiSyncWithMocks {
+	config := ProvideTestConfig()
+	mockStores := tests.NewMockStores(t)
+	mockGitServer := gitserver.NewMockGitServer(t)
+	componentMultiSyncComponentImpl := NewTestMultiSyncComponent(config, mockStores, mockGitServer)
+	mockAccountingComponent := component.NewMockAccountingComponent(t)
+	mockRepoComponent := component.NewMockRepoComponent(t)
+	mockTagComponent := component.NewMockTagComponent(t)
+	mockSpaceComponent := component.NewMockSpaceComponent(t)
+	mockRuntimeArchitectureComponent := component.NewMockRuntimeArchitectureComponent(t)
+	mockSensitiveComponent := component.NewMockSensitiveComponent(t)
+	componentMockedComponents := &mockedComponents{
+		accounting:          mockAccountingComponent,
+		repo:                mockRepoComponent,
+		tag:                 mockTagComponent,
+		space:               mockSpaceComponent,
+		runtimeArchitecture: mockRuntimeArchitectureComponent,
+		sensitive:           mockSensitiveComponent,
+	}
+	mockUserSvcClient := rpc.NewMockUserSvcClient(t)
+	mockClient := s3.NewMockClient(t)
+	mockMirrorServer := mirrorserver.NewMockMirrorServer(t)
+	mockPriorityQueue := queue.NewMockPriorityQueue(t)
+	mockDeployer := deploy.NewMockDeployer(t)
+	mockCache := cache.NewMockCache(t)
+	inferenceMockClient := inference.NewMockClient(t)
+	mockAccountingClient := accounting.NewMockAccountingClient(t)
+	mockReader := parquet.NewMockReader(t)
+	mocks := &Mocks{
+		stores:           mockStores,
+		components:       componentMockedComponents,
+		gitServer:        mockGitServer,
+		userSvcClient:    mockUserSvcClient,
+		s3Client:         mockClient,
+		mirrorServer:     mockMirrorServer,
+		mirrorQueue:      mockPriorityQueue,
+		deployer:         mockDeployer,
+		cache:            mockCache,
+		inferenceClient:  inferenceMockClient,
+		accountingClient: mockAccountingClient,
+		preader:          mockReader,
+	}
+	componentTestMultiSyncWithMocks := &testMultiSyncWithMocks{
+		multiSyncComponentImpl: componentMultiSyncComponentImpl,
+		mocks:                  mocks,
+	}
+	return componentTestMultiSyncWithMocks
+}
+
 // wire.go:
 
 type testRepoWithMocks struct {
@@ -733,5 +837,15 @@ type testCollectionWithMocks struct {
 
 type testDatasetWithMocks struct {
 	*datasetComponentImpl
+	mocks *Mocks
+}
+
+type testCodeWithMocks struct {
+	*codeComponentImpl
+	mocks *Mocks
+}
+
+type testMultiSyncWithMocks struct {
+	*multiSyncComponentImpl
 	mocks *Mocks
 }

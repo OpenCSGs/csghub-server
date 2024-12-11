@@ -401,3 +401,34 @@ func NewTestDatasetComponent(config *config.Config, stores *tests.MockStores, re
 }
 
 var DatasetComponentSet = wire.NewSet(NewTestDatasetComponent)
+
+func NewTestCodeComponent(config *config.Config, stores *tests.MockStores, repoComponent RepoComponent, userSvcClient rpc.UserSvcClient, gitServer gitserver.GitServer) *codeComponentImpl {
+	return &codeComponentImpl{
+		config:         config,
+		repoComponent:  repoComponent,
+		codeStore:      stores.Code,
+		repoStore:      stores.Repo,
+		userLikesStore: stores.UserLikes,
+		gitServer:      gitServer,
+		userSvcClient:  userSvcClient,
+	}
+}
+
+var CodeComponentSet = wire.NewSet(NewTestCodeComponent)
+
+func NewTestMultiSyncComponent(config *config.Config, stores *tests.MockStores, gitServer gitserver.GitServer) *multiSyncComponentImpl {
+	return &multiSyncComponentImpl{
+		multiSyncStore:   stores.MultiSync,
+		repoStore:        stores.Repo,
+		modelStore:       stores.Model,
+		datasetStore:     stores.Dataset,
+		namespaceStore:   stores.Namespace,
+		userStore:        stores.User,
+		syncVersionStore: stores.SyncVersion,
+		tagStore:         stores.Tag,
+		fileStore:        stores.File,
+		gitServer:        gitServer,
+	}
+}
+
+var MultiSyncComponentSet = wire.NewSet(NewTestMultiSyncComponent)

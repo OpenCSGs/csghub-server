@@ -217,3 +217,35 @@ func initializeTestDatasetComponent(ctx context.Context, t interface {
 	)
 	return &testDatasetWithMocks{}
 }
+
+type testCodeWithMocks struct {
+	*codeComponentImpl
+	mocks *Mocks
+}
+
+func initializeTestCodeComponent(ctx context.Context, t interface {
+	Cleanup(func())
+	mock.TestingT
+}) *testCodeWithMocks {
+	wire.Build(
+		MockSuperSet, CodeComponentSet,
+		wire.Struct(new(testCodeWithMocks), "*"),
+	)
+	return &testCodeWithMocks{}
+}
+
+type testMultiSyncWithMocks struct {
+	*multiSyncComponentImpl
+	mocks *Mocks
+}
+
+func initializeTestMultiSyncComponent(ctx context.Context, t interface {
+	Cleanup(func())
+	mock.TestingT
+}) *testMultiSyncWithMocks {
+	wire.Build(
+		MockSuperSet, MultiSyncComponentSet,
+		wire.Struct(new(testMultiSyncWithMocks), "*"),
+	)
+	return &testMultiSyncWithMocks{}
+}

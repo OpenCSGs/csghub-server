@@ -41,6 +41,8 @@ type MockStores struct {
 	ResourceModel        database.ResourceModelStore
 	GitServerAccessToken database.GitServerAccessTokenStore
 	Org                  database.OrgStore
+	MultiSync            database.MultiSyncStore
+	File                 database.FileStore
 }
 
 func NewMockStores(t interface {
@@ -82,6 +84,8 @@ func NewMockStores(t interface {
 		ResourceModel:        mockdb.NewMockResourceModelStore(t),
 		GitServerAccessToken: mockdb.NewMockGitServerAccessTokenStore(t),
 		Org:                  mockdb.NewMockOrgStore(t),
+		MultiSync:            mockdb.NewMockMultiSyncStore(t),
+		File:                 mockdb.NewMockFileStore(t),
 	}
 }
 
@@ -219,4 +223,12 @@ func (s *MockStores) GitServerAccessTokenMock() *mockdb.MockGitServerAccessToken
 
 func (s *MockStores) OrgMock() *mockdb.MockOrgStore {
 	return s.Org.(*mockdb.MockOrgStore)
+}
+
+func (s *MockStores) MultiSyncMock() *mockdb.MockMultiSyncStore {
+	return s.MultiSync.(*mockdb.MockMultiSyncStore)
+}
+
+func (s *MockStores) FileMock() *mockdb.MockFileStore {
+	return s.File.(*mockdb.MockFileStore)
 }

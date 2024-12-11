@@ -94,3 +94,7 @@ packages:
         config:
         interfaces:
             Reader:
+    opencsg.com/csghub-server/builder/multisync:
+        config:
+        interfaces:
+            Client:

@@ -5,7 +5,10 @@ import (
 	"fmt"
 	"log/slog"
 
+	"opencsg.com/csghub-server/builder/git"
+	"opencsg.com/csghub-server/builder/git/gitserver"
 	"opencsg.com/csghub-server/builder/git/membership"
+	"opencsg.com/csghub-server/builder/rpc"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/types"
@@ -27,19 +30,32 @@ type CodeComponent interface {
 func NewCodeComponent(config *config.Config) (CodeComponent, error) {
 	c := &codeComponentImpl{}
 	var err error
-	c.repoComponentImpl, err = NewRepoComponentImpl(config)
+	c.repoComponent, err = NewRepoComponentImpl(config)
 	if err != nil {
 		return nil, err
 	}
-	c.cs = database.NewCodeStore()
-	c.rs = database.NewRepoStore()
+	c.codeStore = database.NewCodeStore()
+	c.repoStore = database.NewRepoStore()
+	gs, err := git.NewGitServer(config)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create git server, error: %w", err)
+	}
+	c.gitServer = gs
+	c.config = config
+	c.userLikesStore = database.NewUserLikesStore()
+	c.userSvcClient = rpc.NewUserSvcHttpClient(fmt.Sprintf("%s:%d", config.User.Host, config.User.Port),
+		rpc.AuthWithApiKey(config.APIToken))
 	return c, nil
 }
 
 type codeComponentImpl struct {
-	*repoComponentImpl
-	cs database.CodeStore
-	rs database.RepoStore
+	config         *config.Config
+	repoComponent  RepoComponent
+	codeStore      database.CodeStore
+	repoStore      database.RepoStore
+	userLikesStore database.UserLikesStore
+	gitServer      gitserver.GitServer
+	userSvcClient  rpc.UserSvcClient
 }
 
 func (c *codeComponentImpl) Create(ctx context.Context, req *types.CreateCodeReq) (*types.Code, error) {
@@ -61,7 +77,7 @@ func (c *codeComponentImpl) Create(ctx context.Context, req *types.CreateCodeReq
 	req.RepoType = types.CodeRepo
 	req.Readme = generateReadmeData(req.License)
 	req.Nickname = nickname
-	_, dbRepo, err := c.CreateRepo(ctx, req.CreateRepoReq)
+	_, dbRepo, err := c.repoComponent.CreateRepo(ctx, req.CreateRepoReq)
 	if err != nil {
 		return nil, err
 	}
@@ -71,13 +87,13 @@ func (c *codeComponentImpl) Create(ctx context.Context, req *types.CreateCodeReq
 		RepositoryID: dbRepo.ID,
 	}
 
-	code, err := c.cs.Create(ctx, dbCode)
+	code, err := c.codeStore.Create(ctx, dbCode)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create database code, cause: %w", err)
 	}
 
 	// Create README.md file
-	err = c.git.CreateRepoFile(buildCreateFileReq(&types.CreateFileParams{
+	err = c.gitServer.CreateRepoFile(buildCreateFileReq(&types.CreateFileParams{
 		Username:  dbRepo.User.Username,
 		Email:     dbRepo.User.Email,
 		Message:   initCommitMessage,
@@ -93,7 +109,7 @@ func (c *codeComponentImpl) Create(ctx context.Context, req *types.CreateCodeReq
 	}
 
 	// Create .gitattributes file
-	err = c.git.CreateRepoFile(buildCreateFileReq(&types.CreateFileParams{
+	err = c.gitServer.CreateRepoFile(buildCreateFileReq(&types.CreateFileParams{
 		Username:  dbRepo.User.Username,
 		Email:     dbRepo.User.Email,
 		Message:   initCommitMessage,
@@ -149,7 +165,7 @@ func (c *codeComponentImpl) Index(ctx context.Context, filter *types.RepoFilter,
 		err      error
 		resCodes []types.Code
 	)
-	repos, total, err := c.PublicToUser(ctx, types.CodeRepo, filter.Username, filter, per, page)
+	repos, total, err := c.repoComponent.PublicToUser(ctx, types.CodeRepo, filter.Username, filter, per, page)
 	if err != nil {
 		newError := fmt.Errorf("failed to get public code repos,error:%w", err)
 		return nil, 0, newError
@@ -158,7 +174,7 @@ func (c *codeComponentImpl) Index(ctx context.Context, filter *types.RepoFilter,
 	for _, repo := range repos {
 		repoIDs = append(repoIDs, repo.ID)
 	}
-	codes, err := c.cs.ByRepoIDs(ctx, repoIDs)
+	codes, err := c.codeStore.ByRepoIDs(ctx, repoIDs)
 	if err != nil {
 		newError := fmt.Errorf("failed to get codes by repo ids,error:%w", err)
 		return nil, 0, newError
@@ -210,18 +226,18 @@ func (c *codeComponentImpl) Index(ctx context.Context, filter *types.RepoFilter,
 
 func (c *codeComponentImpl) Update(ctx context.Context, req *types.UpdateCodeReq) (*types.Code, error) {
 	req.RepoType = types.CodeRepo
-	dbRepo, err := c.UpdateRepo(ctx, req.UpdateRepoReq)
+	dbRepo, err := c.repoComponent.UpdateRepo(ctx, req.UpdateRepoReq)
 	if err != nil {
 		return nil, err
 	}
 
-	code, err := c.cs.ByRepoID(ctx, dbRepo.ID)
+	code, err := c.codeStore.ByRepoID(ctx, dbRepo.ID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find code repo, error: %w", err)
 	}
 
 	//update times of code
-	err = c.cs.Update(ctx, *code)
+	err = c.codeStore.Update(ctx, *code)
 	if err != nil {
 		return nil, fmt.Errorf("failed to update database code repo, error: %w", err)
 	}
@@ -244,7 +260,7 @@ func (c *codeComponentImpl) Update(ctx context.Context, req *types.UpdateCodeReq
 }
 
 func (c *codeComponentImpl) Delete(ctx context.Context, namespace, name, currentUser string) error {
-	code, err := c.cs.FindByPath(ctx, namespace, name)
+	code, err := c.codeStore.FindByPath(ctx, namespace, name)
 	if err != nil {
 		return fmt.Errorf("failed to find code, error: %w", err)
 	}
@@ -255,12 +271,12 @@ func (c *codeComponentImpl) Delete(ctx context.Context, namespace, name, current
 		Name:      name,
 		RepoType:  types.CodeRepo,
 	}
-	_, err = c.DeleteRepo(ctx, deleteDatabaseRepoReq)
+	_, err = c.repoComponent.DeleteRepo(ctx, deleteDatabaseRepoReq)
 	if err != nil {
 		return fmt.Errorf("failed to delete repo of code, error: %w", err)
 	}
 
-	err = c.cs.Delete(ctx, *code)
+	err = c.codeStore.Delete(ctx, *code)
 	if err != nil {
 		return fmt.Errorf("failed to delete database code, error: %w", err)
 	}
@@ -269,12 +285,12 @@ func (c *codeComponentImpl) Delete(ctx context.Context, namespace, name, current
 
 func (c *codeComponentImpl) Show(ctx context.Context, namespace, name, currentUser string) (*types.Code, error) {
 	var tags []types.RepoTag
-	code, err := c.cs.FindByPath(ctx, namespace, name)
+	code, err := c.codeStore.FindByPath(ctx, namespace, name)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find code, error: %w", err)
 	}
 
-	permission, err := c.GetUserRepoPermission(ctx, currentUser, code.Repository)
+	permission, err := c.repoComponent.GetUserRepoPermission(ctx, currentUser, code.Repository)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get user repo permission, error: %w", err)
 	}
@@ -282,7 +298,7 @@ func (c *codeComponentImpl) Show(ctx context.Context, namespace, name, currentUs
 		return nil, ErrUnauthorized
 	}
 
-	ns, err := c.GetNameSpaceInfo(ctx, namespace)
+	ns, err := c.repoComponent.GetNameSpaceInfo(ctx, namespace)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get namespace info for code, error: %w", err)
 	}
@@ -338,12 +354,12 @@ func (c *codeComponentImpl) Show(ctx context.Context, namespace, name, currentUs
 }
 
 func (c *codeComponentImpl) Relations(ctx context.Context, namespace, name, currentUser string) (*types.Relations, error) {
-	code, err := c.cs.FindByPath(ctx, namespace, name)
+	code, err := c.codeStore.FindByPath(ctx, namespace, name)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find code repo, error: %w", err)
 	}
 
-	allow, _ := c.AllowReadAccessRepo(ctx, code.Repository, currentUser)
+	allow, _ := c.repoComponent.AllowReadAccessRepo(ctx, code.Repository, currentUser)
 	if !allow {
 		return nil, ErrUnauthorized
 	}
@@ -352,7 +368,7 @@ func (c *codeComponentImpl) Relations(ctx context.Context, namespace, name, curr
 }
 
 func (c *codeComponentImpl) getRelations(ctx context.Context, repoID int64, currentUser string) (*types.Relations, error) {
-	res, err := c.RelatedRepos(ctx, repoID, currentUser)
+	res, err := c.repoComponent.RelatedRepos(ctx, repoID, currentUser)
 	if err != nil {
 		return nil, err
 	}
@@ -387,7 +403,7 @@ func (c *codeComponentImpl) OrgCodes(ctx context.Context, req *types.OrgCodesReq
 		}
 	}
 	onlyPublic := !r.CanRead()
-	codes, total, err := c.cs.ByOrgPath(ctx, req.Namespace, req.PageSize, req.Page, onlyPublic)
+	codes, total, err := c.codeStore.ByOrgPath(ctx, req.Namespace, req.PageSize, req.Page, onlyPublic)
 	if err != nil {
 		newError := fmt.Errorf("failed to get org codes,error:%w", err)
 		slog.Error(newError.Error())
