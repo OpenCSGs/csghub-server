@@ -13,7 +13,6 @@ import (
 	"opencsg.com/csghub-server/builder/git"
 	"opencsg.com/csghub-server/builder/git/gitserver"
 	"opencsg.com/csghub-server/builder/git/membership"
-	"opencsg.com/csghub-server/builder/inference"
 	"opencsg.com/csghub-server/builder/rpc"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/config"
@@ -75,7 +74,6 @@ type ModelComponent interface {
 	SetRelationDatasets(ctx context.Context, req types.RelationDatasets) error
 	AddRelationDataset(ctx context.Context, req types.RelationDataset) error
 	DelRelationDataset(ctx context.Context, req types.RelationDataset) error
-	Predict(ctx context.Context, req *types.ModelPredictReq) (*types.ModelPredictResp, error)
 	// create model deploy as inference/serverless
 	Deploy(ctx context.Context, deployReq types.DeployActReq, req types.ModelRunReq) (int64, error)
 	ListModelsByRuntimeFrameworkID(ctx context.Context, currentUser string, per, page int, id int64, deployType int) ([]types.Model, int, error)
@@ -97,7 +95,6 @@ func NewModelComponent(config *config.Config) (ModelComponent, error) {
 	c.modelStore = database.NewModelStore()
 	c.repoStore = database.NewRepoStore()
 	c.spaceResourceStore = database.NewSpaceResourceStore()
-	c.inferClient = inference.NewInferClient(config.Inference.ServerAddr)
 	c.userStore = database.NewUserStore()
 	c.userLikesStore = database.NewUserLikesStore()
 	c.deployer = deploy.NewDeployer()
@@ -131,7 +128,6 @@ type modelComponentImpl struct {
 	modelStore                database.ModelStore
 	repoStore                 database.RepoStore
 	spaceResourceStore        database.SpaceResourceStore
-	inferClient               inference.Client
 	userStore                 database.UserStore
 	deployer                  deploy.Deployer
 	accountingComponent       AccountingComponent
@@ -869,25 +865,6 @@ func getFilePaths(namespace, repoName, folder string, repoType types.RepositoryT
 	}
 
 	return filePaths, nil
-}
-
-func (c *modelComponentImpl) Predict(ctx context.Context, req *types.ModelPredictReq) (*types.ModelPredictResp, error) {
-	mid := inference.ModelID{
-		Owner: req.Namespace,
-		Name:  req.Name,
-	}
-	inferReq := &inference.PredictRequest{
-		Prompt: req.Input,
-	}
-	inferResp, err := c.inferClient.Predict(mid, inferReq)
-	if err != nil {
-		slog.Error("failed to predict", slog.Any("req", *inferReq), slog.Any("model", mid), slog.String("error", err.Error()))
-		return nil, err
-	}
-	resp := &types.ModelPredictResp{
-		Content: inferResp.GeneratedText,
-	}
-	return resp, nil
 }
 
 // create model deploy as inference/serverless

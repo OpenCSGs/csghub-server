@@ -75,10 +75,6 @@ packages:
         config:
         interfaces:
             Deployer:
-    opencsg.com/csghub-server/builder/inference:
-        config:
-        interfaces:
-            Client:
     opencsg.com/csghub-server/accounting/component:
         config:
         interfaces:
