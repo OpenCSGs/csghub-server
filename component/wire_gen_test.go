@@ -696,7 +696,6 @@ func initializeTestCodeComponent(ctx context.Context, t interface {
 	mockMirrorServer := mirrorserver.NewMockMirrorServer(t)
 	mockPriorityQueue := queue.NewMockPriorityQueue(t)
 	mockDeployer := deploy.NewMockDeployer(t)
-	mockCache := cache.NewMockCache(t)
 	inferenceMockClient := inference.NewMockClient(t)
 	mockAccountingClient := accounting.NewMockAccountingClient(t)
 	mockReader := parquet.NewMockReader(t)
@@ -709,7 +708,6 @@ func initializeTestCodeComponent(ctx context.Context, t interface {
 		mirrorServer:     mockMirrorServer,
 		mirrorQueue:      mockPriorityQueue,
 		deployer:         mockDeployer,
-		cache:            mockCache,
 		inferenceClient:  inferenceMockClient,
 		accountingClient: mockAccountingClient,
 		preader:          mockReader,
@@ -748,7 +746,6 @@ func initializeTestMultiSyncComponent(ctx context.Context, t interface {
 	mockMirrorServer := mirrorserver.NewMockMirrorServer(t)
 	mockPriorityQueue := queue.NewMockPriorityQueue(t)
 	mockDeployer := deploy.NewMockDeployer(t)
-	mockCache := cache.NewMockCache(t)
 	inferenceMockClient := inference.NewMockClient(t)
 	mockAccountingClient := accounting.NewMockAccountingClient(t)
 	mockReader := parquet.NewMockReader(t)
@@ -761,7 +758,6 @@ func initializeTestMultiSyncComponent(ctx context.Context, t interface {
 		mirrorServer:     mockMirrorServer,
 		mirrorQueue:      mockPriorityQueue,
 		deployer:         mockDeployer,
-		cache:            mockCache,
 		inferenceClient:  inferenceMockClient,
 		accountingClient: mockAccountingClient,
 		preader:          mockReader,
