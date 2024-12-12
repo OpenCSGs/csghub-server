@@ -465,6 +465,7 @@ func NewTestTagComponent(config *config.Config, stores *tests.MockStores, sensit
 		tagStore:         stores.Tag,
 		repoStore:        stores.Repo,
 		sensitiveChecker: sensitiveChecker,
+		userStore:        stores.User,
 	}
 }
 

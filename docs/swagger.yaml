@@ -1236,6 +1236,35 @@ definitions:
     required:
     - token
     type: object
+<<<<<<< HEAD
+=======
+  types.CreateTag:
+    properties:
+      built_in:
+        type: boolean
+      category:
+        type: string
+      group:
+        type: string
+      name:
+        type: string
+      scope:
+        type: string
+      show_name:
+        type: string
+    required:
+    - category
+    - name
+    - scope
+    type: object
+  types.CreateUserResourceReq:
+    properties:
+      order_details:
+        items:
+          $ref: '#/definitions/types.AcctOrderDetailReq'
+        type: array
+    type: object
+>>>>>>> 43adc0f4 ([Tags] add tag management feature and UT for ce/ee/saas)
   types.CreateUserTokenRequest:
     properties:
       application:
@@ -1686,15 +1715,6 @@ definitions:
         - $ref: '#/definitions/types.ModelWidgetType'
         description: 'widget UI style: generation,chat'
         example: generation
-    type: object
-  types.ModelPredictReq:
-    properties:
-      current_user:
-        type: string
-      input:
-        type: string
-      version:
-        type: string
     type: object
   types.ModelResp:
     properties:
@@ -2342,6 +2362,25 @@ definitions:
         type: string
       version:
         type: string
+    type: object
+  types.UpdateTag:
+    properties:
+      built_in:
+        type: boolean
+      category:
+        type: string
+      group:
+        type: string
+      name:
+        type: string
+      scope:
+        type: string
+      show_name:
+        type: string
+    required:
+    - category
+    - name
+    - scope
     type: object
   types.UpdateUserRequest:
     properties:
@@ -6629,52 +6668,6 @@ paths:
       summary: Stop a finetune instance
       tags:
       - Model
-  /models/{namespace}/{name}/predict:
-    post:
-      consumes:
-      - application/json
-      description: invoke model prediction
-      parameters:
-      - description: namespace
-        in: path
-        name: namespace
-        required: true
-        type: string
-      - description: name
-        in: path
-        name: name
-        required: true
-        type: string
-      - description: current user
-        in: query
-        name: current_user
-        type: string
-      - description: input for model prediction
-        in: body
-        name: body
-        required: true
-        schema:
-          $ref: '#/definitions/types.ModelPredictReq'
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            type: string
-        "400":
-          description: Bad request
-          schema:
-            $ref: '#/definitions/types.APIBadRequest'
-        "500":
-          description: Internal server error
-          schema:
-            $ref: '#/definitions/types.APIInternalServerError'
-      security:
-      - ApiKey: []
-      summary: Invoke model prediction
-      tags:
-      - Model
   /models/{namespace}/{name}/relations:
     get:
       consumes:
@@ -10477,11 +10470,108 @@ paths:
       summary: Get latest version
       tags:
       - Sync
+  /tag/{id}:
+    delete:
+      consumes:
+      - application/json
+      description: Delete a tag by id
+      parameters:
+      - description: id of the tag
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/types.Response'
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Delete a tag by id
+      tags:
+      - Tag
+    get:
+      consumes:
+      - application/json
+      description: Get a tag by id
+      parameters:
+      - description: id of the tag
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/types.Response'
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Get a tag by id
+      tags:
+      - Tag
+    put:
+      consumes:
+      - application/json
+      description: Update a tag by id
+      parameters:
+      - description: id of the tag
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: body
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/types.UpdateTag'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/types.Response'
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Update a tag by id
+      tags:
+      - Tag
   /tags:
     get:
       consumes:
       - application/json
-      description: get all tags
+      description: Get all tags
       parameters:
       - description: category name
         in: query
@@ -10507,9 +10597,11 @@ paths:
                   items:
                     $ref: '#/definitions/database.Tag'
                   type: array
-                total:
-                  type: integer
               type: object
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
         "500":
           description: Internal server error
           schema:
@@ -10517,6 +10609,37 @@ paths:
       security:
       - ApiKey: []
       summary: Get all tags
+      tags:
+      - Tag
+    post:
+      consumes:
+      - application/json
+      description: Create new tag
+      parameters:
+      - description: body
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/types.CreateTag'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/types.Response'
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Create new tag
       tags:
       - Tag
   /telemetry/usage:

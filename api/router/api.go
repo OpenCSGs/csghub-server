@@ -222,15 +222,13 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 		apiGroup.PUT("/organization/:namespace/members/:username", userProxyHandler.ProxyToApi("/api/v1/organization/%s/members/%s", "namespace", "username"))
 		apiGroup.DELETE("/organization/:namespace/members/:username", userProxyHandler.ProxyToApi("/api/v1/organization/%s/members/%s", "namespace", "username"))
 	}
+
 	// Tag
 	tagCtrl, err := handler.NewTagHandler(config)
 	if err != nil {
 		return nil, fmt.Errorf("error creating tag controller:%w", err)
 	}
-	apiGroup.GET("/tags", tagCtrl.AllTags)
-	// apiGroup.POST("/tag", tagCtrl.NewTag)
-	// apiGroup.PUT("/tag", tagCtrl.UpdateTag)
-	// apiGroup.DELETE("/tag", tagCtrl.DeleteTag)
+	createTagsRoutes(apiGroup, tagCtrl)
 
 	// JWT token
 	apiGroup.POST("/jwt/token", needAPIKey, userProxyHandler.Proxy)
@@ -781,5 +779,16 @@ func createPromptRoutes(apiGroup *gin.RouterGroup, promptHandler *handler.Prompt
 		promptGrp.GET("/:namespace/:name/tags", promptHandler.Tags)
 		promptGrp.POST("/:namespace/:name/tags/:category", promptHandler.UpdateTags)
 		promptGrp.POST("/:namespace/:name/update_downloads", promptHandler.UpdateDownloads)
+	}
+}
+
+func createTagsRoutes(apiGroup *gin.RouterGroup, tagHandler *handler.TagsHandler) {
+	tagsGrp := apiGroup.Group("/tags")
+	{
+		tagsGrp.GET("", tagHandler.AllTags)
+		tagsGrp.POST("", tagHandler.CreateTag)
+		tagsGrp.GET("/:id", tagHandler.GetTagByID)
+		tagsGrp.PUT("/:id", tagHandler.UpdateTag)
+		tagsGrp.DELETE("/:id", tagHandler.DeleteTag)
 	}
 }

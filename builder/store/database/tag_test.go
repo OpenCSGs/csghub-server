@@ -542,3 +542,86 @@ func TestTagStore_RemoveRepoTags(t *testing.T) {
 	require.EqualValues(t, repoTags[0], tag1)
 
 }
+
+func TestTagStore_FindTagByID(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	var err error
+	ts := database.NewTagStoreWithDB(db)
+	t1, err := ts.CreateTag(ctx, "task", "tag_"+uuid.NewString(), "", database.ModelTagScope)
+	require.Empty(t, err)
+	require.NotEmpty(t, t1.ID)
+
+	tag, err := ts.FindTagByID(ctx, t1.ID)
+	require.Empty(t, err)
+	require.Equal(t, tag.ID, t1.ID)
+	require.Equal(t, tag.Name, t1.Name)
+}
+
+func TestTagStore_UpdateTagByID(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	ts := database.NewTagStoreWithDB(db)
+
+	t1, err := ts.CreateTag(ctx, "task", "tag_"+uuid.NewString(), "", database.ModelTagScope)
+	require.Empty(t, err)
+	require.NotEmpty(t, t1.ID)
+
+	newName := "new_tag_" + uuid.NewString()
+
+	t1.Name = newName
+
+	tag, err := ts.UpdateTagByID(ctx, &t1)
+	require.Empty(t, err)
+	require.Equal(t, tag.Name, newName)
+
+}
+
+func TestTagStore_DeleteTagByID(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	ts := database.NewTagStoreWithDB(db)
+	tag1, err := ts.CreateTag(ctx, "task", "tag_"+uuid.NewString(), "", database.ModelTagScope)
+	require.Empty(t, err)
+	require.NotEmpty(t, tag1.ID)
+
+	// insert a new repo with tags
+	rs := database.NewRepoStoreWithDB(db)
+	userName := "user_name_" + uuid.NewString()
+	repoName := "repo_name_" + uuid.NewString()
+	repo, err := rs.CreateRepo(ctx, database.Repository{
+		UserID:         1,
+		Path:           fmt.Sprintf("%s/%s", userName, repoName),
+		GitPath:        fmt.Sprintf("models_%s/%s", userName, repoName),
+		Name:           repoName,
+		Nickname:       "",
+		Description:    "",
+		Private:        false,
+		RepositoryType: types.ModelRepo,
+	})
+	require.Empty(t, err)
+	require.NotNil(t, repo)
+
+	// set repo tags
+	err = ts.UpsertRepoTags(ctx, repo.ID, []int64{}, []int64{tag1.ID})
+	require.Empty(t, err)
+
+	err = ts.DeleteTagByID(ctx, tag1.ID)
+	require.Empty(t, err)
+
+	_, err = ts.FindTagByID(ctx, tag1.ID)
+	require.NotEmpty(t, err)
+
+}

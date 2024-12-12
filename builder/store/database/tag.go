@@ -40,6 +40,9 @@ type TagStore interface {
 	RemoveRepoTags(ctx context.Context, repoID int64, tagIDs []int64) (err error)
 	FindOrCreate(ctx context.Context, tag Tag) (*Tag, error)
 	FindTag(ctx context.Context, name, scope, category string) (*Tag, error)
+	FindTagByID(ctx context.Context, id int64) (*Tag, error)
+	UpdateTagByID(ctx context.Context, tag *Tag) (*Tag, error)
+	DeleteTagByID(ctx context.Context, id int64) error
 }
 
 func NewTagStore() TagStore {
@@ -392,4 +395,48 @@ func (ts *tagStoreImpl) FindTag(ctx context.Context, name, scope, category strin
 		return nil, err
 	}
 	return &tag, nil
+}
+
+// find tag by id
+func (ts *tagStoreImpl) FindTagByID(ctx context.Context, id int64) (*Tag, error) {
+	var tag Tag
+	err := ts.db.Operator.Core.NewSelect().
+		Model(&tag).
+		Where("id = ?", id).
+		Scan(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("select tag by id %d error: %w", id, err)
+	}
+	return &tag, nil
+}
+
+func (ts *tagStoreImpl) UpdateTagByID(ctx context.Context, tag *Tag) (*Tag, error) {
+	_, err := ts.db.Operator.Core.NewUpdate().
+		Model(tag).WherePK().Exec(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("update tag by id %d error: %w", tag.ID, err)
+	}
+	return tag, nil
+}
+
+func (ts *tagStoreImpl) DeleteTagByID(ctx context.Context, id int64) error {
+	err := ts.db.Operator.Core.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
+		_, err := tx.NewDelete().
+			Model(&Tag{}).
+			Where("id = ?", id).
+			Exec(ctx)
+		if err != nil {
+			return fmt.Errorf("delete tag by id %d error: %w", id, err)
+		}
+		_, err = tx.NewDelete().
+			Model(&RepositoryTag{}).
+			Where("tag_id = ?", id).
+			Exec(ctx)
+		if err != nil {
+			return fmt.Errorf("delete repository_tag by tag_id %d error: %w", id, err)
+		}
+		return nil
+	})
+	return err
+
 }
