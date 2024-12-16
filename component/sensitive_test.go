@@ -6,7 +6,6 @@ import (
 
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
-	mockrpc "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/rpc"
 	mocktypes "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/common/types"
 	"opencsg.com/csghub-server/builder/rpc"
 	"opencsg.com/csghub-server/builder/sensitive"
@@ -15,13 +14,12 @@ import (
 )
 
 func TestSensitiveComponent_CheckText(t *testing.T) {
-	mockModeration := mockrpc.NewMockModerationSvcClient(t)
-	mockModeration.EXPECT().PassTextCheck(mock.Anything, mock.Anything, mock.Anything).Return(&rpc.CheckResult{
+	ctx := context.TODO()
+	comp := initializeTestSensitiveComponent(ctx, t)
+
+	comp.mocks.moderationClient.EXPECT().PassTextCheck(mock.Anything, mock.Anything, mock.Anything).Return(&rpc.CheckResult{
 		IsSensitive: false,
 	}, nil)
-	comp := &sensitiveComponentImpl{
-		checker: mockModeration,
-	}
 
 	success, err := comp.CheckText(context.TODO(), string(sensitive.ScenarioChatDetection), "test")
 	require.Nil(t, err)
@@ -29,13 +27,12 @@ func TestSensitiveComponent_CheckText(t *testing.T) {
 }
 
 func TestSensitiveComponent_CheckImage(t *testing.T) {
-	mockModeration := mockrpc.NewMockModerationSvcClient(t)
-	mockModeration.EXPECT().PassImageCheck(mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&rpc.CheckResult{
+	ctx := context.TODO()
+	comp := initializeTestSensitiveComponent(ctx, t)
+
+	comp.mocks.moderationClient.EXPECT().PassImageCheck(mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&rpc.CheckResult{
 		IsSensitive: false,
 	}, nil)
-	comp := &sensitiveComponentImpl{
-		checker: mockModeration,
-	}
 
 	success, err := comp.CheckImage(context.TODO(), string(sensitive.ScenarioChatDetection), "ossBucketName", "ossObjectName")
 	require.Nil(t, err)
@@ -43,13 +40,13 @@ func TestSensitiveComponent_CheckImage(t *testing.T) {
 }
 
 func TestSensitiveComponent_CheckRequestV2(t *testing.T) {
-	mockModeration := mockrpc.NewMockModerationSvcClient(t)
-	mockModeration.EXPECT().PassTextCheck(mock.Anything, mock.Anything, mock.Anything).Return(&rpc.CheckResult{
+	ctx := context.TODO()
+	comp := initializeTestSensitiveComponent(ctx, t)
+
+	comp.mocks.moderationClient.EXPECT().PassTextCheck(mock.Anything, mock.Anything, mock.Anything).Return(&rpc.CheckResult{
 		IsSensitive: false,
 	}, nil).Twice()
-	comp := &sensitiveComponentImpl{
-		checker: mockModeration,
-	}
+
 	mockRequest := mocktypes.NewMockSensitiveRequestV2(t)
 	mockRequest.EXPECT().GetSensitiveFields().Return([]types.SensitiveField{
 		{

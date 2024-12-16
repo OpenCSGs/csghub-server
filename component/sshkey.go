@@ -23,10 +23,10 @@ type SSHKeyComponent interface {
 
 func NewSSHKeyComponent(config *config.Config) (SSHKeyComponent, error) {
 	c := &sSHKeyComponentImpl{}
-	c.ss = database.NewSSHKeyStore()
-	c.us = database.NewUserStore()
+	c.sshKeyStore = database.NewSSHKeyStore()
+	c.userStore = database.NewUserStore()
 	var err error
-	c.gs, err = git.NewGitServer(config)
+	c.gitServer, err = git.NewGitServer(config)
 	if err != nil {
 		newError := fmt.Errorf("failed to create git server,error:%w", err)
 		slog.Error(newError.Error())
@@ -36,17 +36,17 @@ func NewSSHKeyComponent(config *config.Config) (SSHKeyComponent, error) {
 }
 
 type sSHKeyComponentImpl struct {
-	ss database.SSHKeyStore
-	us database.UserStore
-	gs gitserver.GitServer
+	sshKeyStore database.SSHKeyStore
+	userStore   database.UserStore
+	gitServer   gitserver.GitServer
 }
 
 func (c *sSHKeyComponentImpl) Create(ctx context.Context, req *types.CreateSSHKeyRequest) (*database.SSHKey, error) {
-	user, err := c.us.FindByUsername(ctx, req.Username)
+	user, err := c.userStore.FindByUsername(ctx, req.Username)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find user,error:%w", err)
 	}
-	nameExistsKey, err := c.ss.FindByNameAndUserID(ctx, req.Name, user.ID)
+	nameExistsKey, err := c.sshKeyStore.FindByNameAndUserID(ctx, req.Name, user.ID)
 	if err != nil && !errors.Is(err, sql.ErrNoRows) {
 		return nil, fmt.Errorf("failed to find if ssh key exists,error:%w", err)
 	}
@@ -54,15 +54,14 @@ func (c *sSHKeyComponentImpl) Create(ctx context.Context, req *types.CreateSSHKe
 		return nil, fmt.Errorf("ssh key name already exists")
 	}
 
-	contentExistsKey, err := c.ss.FindByKeyContent(ctx, req.Content)
+	contentExistsKey, err := c.sshKeyStore.FindByKeyContent(ctx, req.Content)
 	if err != nil && !errors.Is(err, sql.ErrNoRows) {
 		return nil, fmt.Errorf("failed to find if ssh key exists,error:%w", err)
 	}
 	if contentExistsKey.ID != 0 {
 		return nil, fmt.Errorf("ssh key already exists")
 	}
-
-	sk, err := c.gs.CreateSSHKey(req)
+	sk, err := c.gitServer.CreateSSHKey(req)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create git SSH key,error:%w", err)
 	}
@@ -80,7 +79,7 @@ func (c *sSHKeyComponentImpl) Create(ctx context.Context, req *types.CreateSSHKe
 	}
 	sk.UserID = user.ID
 	sk.FingerprintSHA256 = fingerprint
-	resSk, err := c.ss.Create(ctx, sk)
+	resSk, err := c.sshKeyStore.Create(ctx, sk)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create database SSH key,error:%w", err)
 	}
@@ -88,7 +87,7 @@ func (c *sSHKeyComponentImpl) Create(ctx context.Context, req *types.CreateSSHKe
 }
 
 func (c *sSHKeyComponentImpl) Index(ctx context.Context, username string, per, page int) ([]database.SSHKey, error) {
-	sks, err := c.ss.Index(ctx, username, per, page)
+	sks, err := c.sshKeyStore.Index(ctx, username, per, page)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get database SSH keys,error:%w", err)
 	}
@@ -96,15 +95,15 @@ func (c *sSHKeyComponentImpl) Index(ctx context.Context, username string, per, p
 }
 
 func (c *sSHKeyComponentImpl) Delete(ctx context.Context, username, name string) error {
-	sshKey, err := c.ss.FindByUsernameAndName(ctx, username, name)
+	sshKey, err := c.sshKeyStore.FindByUsernameAndName(ctx, username, name)
 	if err != nil {
 		return fmt.Errorf("failed to get database SSH keys,error:%w", err)
 	}
-	err = c.gs.DeleteSSHKey(int(sshKey.GitID))
+	err = c.gitServer.DeleteSSHKey(int(sshKey.GitID))
 	if err != nil {
 		return fmt.Errorf("failed to delete git SSH keys,error:%w", err)
 	}
-	err = c.ss.Delete(ctx, sshKey.GitID)
+	err = c.sshKeyStore.Delete(ctx, sshKey.ID)
 	if err != nil {
 		return fmt.Errorf("failed to delete database SSH keys,error:%w", err)
 	}

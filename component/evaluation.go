@@ -15,16 +15,16 @@ import (
 )
 
 type evaluationComponentImpl struct {
-	deployer           deploy.Deployer
-	userStore          database.UserStore
-	modelStore         database.ModelStore
-	datasetStore       database.DatasetStore
-	mirrorStore        database.MirrorStore
-	spaceResourceStore database.SpaceResourceStore
-	tokenStore         database.AccessTokenStore
-	rtfm               database.RuntimeFrameworksStore
-	config             *config.Config
-	ac                 AccountingComponent
+	deployer              deploy.Deployer
+	userStore             database.UserStore
+	modelStore            database.ModelStore
+	datasetStore          database.DatasetStore
+	mirrorStore           database.MirrorStore
+	spaceResourceStore    database.SpaceResourceStore
+	tokenStore            database.AccessTokenStore
+	runtimeFrameworkStore database.RuntimeFrameworksStore
+	config                *config.Config
+	accountingComponent   AccountingComponent
 }
 
 type EvaluationComponent interface {
@@ -43,13 +43,13 @@ func NewEvaluationComponent(config *config.Config) (EvaluationComponent, error) 
 	c.datasetStore = database.NewDatasetStore()
 	c.mirrorStore = database.NewMirrorStore()
 	c.tokenStore = database.NewAccessTokenStore()
-	c.rtfm = database.NewRuntimeFrameworksStore()
+	c.runtimeFrameworkStore = database.NewRuntimeFrameworksStore()
 	c.config = config
 	ac, err := NewAccountingComponent(config)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create accounting component, %w", err)
 	}
-	c.ac = ac
+	c.accountingComponent = ac
 	return c, nil
 }
 
@@ -97,7 +97,7 @@ func (c *evaluationComponentImpl) CreateEvaluation(ctx context.Context, req type
 		hardware.Cpu.Num = "8"
 		hardware.Memory = "32Gi"
 	}
-	frame, err := c.rtfm.FindEnabledByID(ctx, req.RuntimeFrameworkId)
+	frame, err := c.runtimeFrameworkStore.FindEnabledByID(ctx, req.RuntimeFrameworkId)
 	if err != nil {
 		return nil, fmt.Errorf("cannot find available runtime framework, %w", err)
 	}

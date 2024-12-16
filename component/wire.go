@@ -345,3 +345,163 @@ func initializeTestSpaceSdkComponent(ctx context.Context, t interface {
 	)
 	return &testSpaceSdkWithMocks{}
 }
+
+type testTelemetryWithMocks struct {
+	*telemetryComponentImpl
+	mocks *Mocks
+}
+
+func initializeTestTelemetryComponent(ctx context.Context, t interface {
+	Cleanup(func())
+	mock.TestingT
+}) *testTelemetryWithMocks {
+	wire.Build(
+		MockSuperSet, TelemetryComponentSet,
+		wire.Struct(new(testTelemetryWithMocks), "*"),
+	)
+	return &testTelemetryWithMocks{}
+}
+
+type testClusterWithMocks struct {
+	*clusterComponentImpl
+	mocks *Mocks
+}
+
+func initializeTestClusterComponent(ctx context.Context, t interface {
+	Cleanup(func())
+	mock.TestingT
+}) *testClusterWithMocks {
+	wire.Build(
+		MockSuperSet, ClusterComponentSet,
+		wire.Struct(new(testClusterWithMocks), "*"),
+	)
+	return &testClusterWithMocks{}
+}
+
+type testEvaluationWithMocks struct {
+	*evaluationComponentImpl
+	mocks *Mocks
+}
+
+func initializeTestEvaluationComponent(ctx context.Context, t interface {
+	Cleanup(func())
+	mock.TestingT
+}) *testEvaluationWithMocks {
+	wire.Build(
+		MockSuperSet, EvaluationComponentSet,
+		wire.Struct(new(testEvaluationWithMocks), "*"),
+	)
+	return &testEvaluationWithMocks{}
+}
+
+type testHFDatasetWithMocks struct {
+	*hFDatasetComponentImpl
+	mocks *Mocks
+}
+
+func initializeTestHFDatasetComponent(ctx context.Context, t interface {
+	Cleanup(func())
+	mock.TestingT
+}) *testHFDatasetWithMocks {
+	wire.Build(
+		MockSuperSet, HFDatasetComponentSet,
+		wire.Struct(new(testHFDatasetWithMocks), "*"),
+	)
+	return &testHFDatasetWithMocks{}
+}
+
+type testRepoFileWithMocks struct {
+	*repoFileComponentImpl
+	mocks *Mocks
+}
+
+func initializeTestRepoFileComponent(ctx context.Context, t interface {
+	Cleanup(func())
+	mock.TestingT
+}) *testRepoFileWithMocks {
+	wire.Build(
+		MockSuperSet, RepoFileComponentSet,
+		wire.Struct(new(testRepoFileWithMocks), "*"),
+	)
+	return &testRepoFileWithMocks{}
+}
+
+type testSensitiveWithMocks struct {
+	*sensitiveComponentImpl
+	mocks *Mocks
+}
+
+func initializeTestSensitiveComponent(ctx context.Context, t interface {
+	Cleanup(func())
+	mock.TestingT
+}) *testSensitiveWithMocks {
+	wire.Build(
+		MockSuperSet, SensitiveComponentSet,
+		wire.Struct(new(testSensitiveWithMocks), "*"),
+	)
+	return &testSensitiveWithMocks{}
+}
+
+type testSSHKeyWithMocks struct {
+	*sSHKeyComponentImpl
+	mocks *Mocks
+}
+
+func initializeTestSSHKeyComponent(ctx context.Context, t interface {
+	Cleanup(func())
+	mock.TestingT
+}) *testSSHKeyWithMocks {
+	wire.Build(
+		MockSuperSet, SSHKeyComponentSet,
+		wire.Struct(new(testSSHKeyWithMocks), "*"),
+	)
+	return &testSSHKeyWithMocks{}
+}
+
+type testListWithMocks struct {
+	*listComponentImpl
+	mocks *Mocks
+}
+
+func initializeTestListComponent(ctx context.Context, t interface {
+	Cleanup(func())
+	mock.TestingT
+}) *testListWithMocks {
+	wire.Build(
+		MockSuperSet, ListComponentSet,
+		wire.Struct(new(testListWithMocks), "*"),
+	)
+	return &testListWithMocks{}
+}
+
+type testSyncClientSettingWithMocks struct {
+	*syncClientSettingComponentImpl
+	mocks *Mocks
+}
+
+func initializeTestSyncClientSettingComponent(ctx context.Context, t interface {
+	Cleanup(func())
+	mock.TestingT
+}) *testSyncClientSettingWithMocks {
+	wire.Build(
+		MockSuperSet, SyncClientSettingComponentSet,
+		wire.Struct(new(testSyncClientSettingWithMocks), "*"),
+	)
+	return &testSyncClientSettingWithMocks{}
+}
+
+type testEventWithMocks struct {
+	*eventComponentImpl
+	mocks *Mocks
+}
+
+func initializeTestEventComponent(ctx context.Context, t interface {
+	Cleanup(func())
+	mock.TestingT
+}) *testEventWithMocks {
+	wire.Build(
+		MockSuperSet, EventComponentSet,
+		wire.Struct(new(testEventWithMocks), "*"),
+	)
+	return &testEventWithMocks{}
+}

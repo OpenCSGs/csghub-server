@@ -14,9 +14,9 @@ import (
 )
 
 type repoFileComponentImpl struct {
-	rfs database.RepoFileStore
-	rs  database.RepoStore
-	gs  gitserver.GitServer
+	repoFileStore database.RepoFileStore
+	repoStore     database.RepoStore
+	gitServer     gitserver.GitServer
 }
 
 type RepoFileComponent interface {
@@ -26,23 +26,23 @@ type RepoFileComponent interface {
 
 func NewRepoFileComponent(conf *config.Config) (RepoFileComponent, error) {
 	c := &repoFileComponentImpl{
-		rfs: database.NewRepoFileStore(),
-		rs:  database.NewRepoStore(),
+		repoFileStore: database.NewRepoFileStore(),
+		repoStore:     database.NewRepoStore(),
 	}
 	gs, err := git.NewGitServer(conf)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create git server, error: %w", err)
 	}
 
-	c.gs = gs
+	c.gitServer = gs
 	return c, nil
 }
 func (c *repoFileComponentImpl) GenRepoFileRecords(ctx context.Context, repoType types.RepositoryType, namespace, name string) error {
-	repo, err := c.rs.FindByPath(ctx, repoType, namespace, name)
+	repo, err := c.repoStore.FindByPath(ctx, repoType, namespace, name)
 	if err != nil {
 		return fmt.Errorf("failed to find repo, error: %w", err)
 	}
-	return c.createRepoFileRecords(ctx, *repo, "", c.gs.GetRepoFileTree)
+	return c.createRepoFileRecords(ctx, *repo, "", c.gitServer.GetRepoFileTree)
 }
 
 func (c *repoFileComponentImpl) GenRepoFileRecordsBatch(ctx context.Context, repoType types.RepositoryType, lastRepoID int64, concurrency int) error {
@@ -54,7 +54,7 @@ func (c *repoFileComponentImpl) GenRepoFileRecordsBatch(ctx context.Context, rep
 	//TODO: load last repo id from redis cache
 	batch := 10
 	for {
-		repos, err := c.rs.BatchGet(ctx, repoType, lastRepoID, batch)
+		repos, err := c.repoStore.BatchGet(ctx, repoType, lastRepoID, batch)
 		if err != nil {
 			return fmt.Errorf("failed to get repos in batch, error: %w", err)
 		}
@@ -65,7 +65,7 @@ func (c *repoFileComponentImpl) GenRepoFileRecordsBatch(ctx context.Context, rep
 			go func(repo database.Repository) {
 				slog.Info("start to get files of repository", slog.Any("repoType", repoType), slog.String("path", repo.Path))
 				//get file paths of repo
-				err := c.createRepoFileRecords(ctx, repo, "", c.gs.GetRepoFileTree)
+				err := c.createRepoFileRecords(ctx, repo, "", c.gitServer.GetRepoFileTree)
 				if err != nil {
 					slog.Error("fail to get all files of repository",
 						slog.String("path", repo.Path), slog.String("repo_type", string(repo.RepositoryType)),
@@ -127,7 +127,7 @@ func (c *repoFileComponentImpl) createRepoFileRecords(ctx context.Context, repo 
 
 		var exists bool
 		var err error
-		if exists, err = c.rfs.Exists(ctx, rf); err != nil {
+		if exists, err = c.repoFileStore.Exists(ctx, rf); err != nil {
 			slog.Error("failed to check repository file exists", slog.Any("repo_id", repo.ID),
 				slog.String("file_path", rf.Path), slog.String("error", err.Error()))
 			continue
@@ -137,7 +137,7 @@ func (c *repoFileComponentImpl) createRepoFileRecords(ctx context.Context, repo 
 			slog.Info("skip create exist repository file", slog.Any("repo_id", repo.ID), slog.String("file_path", rf.Path))
 			continue
 		}
-		if err := c.rfs.Create(ctx, &rf); err != nil {
+		if err := c.repoFileStore.Create(ctx, &rf); err != nil {
 			slog.Error("failed to save repository file", slog.Any("repo_id", repo.ID),
 				slog.String("error", err.Error()))
 			return fmt.Errorf("failed to save repository file, error: %w", err)

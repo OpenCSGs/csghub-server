@@ -13,10 +13,12 @@ cover:
 
 mock_wire:
 	@echo "Running wire for component mocks..."
-	@go run -mod=mod github.com/google/wire/cmd/wire opencsg.com/csghub-server/component
+	@go run -mod=mod github.com/google/wire/cmd/wire opencsg.com/csghub-server/component/...
 	@if [ $$? -eq 0 ]; then \
-		echo "Renaming wire_gen.go to wire_gen_test.go..."; \
+		echo "Renaming component wire_gen.go to wire_gen_test.go..."; \
 		mv component/wire_gen.go component/wire_gen_test.go; \
+		echo "Renaming component/callback wire_gen.go to wire_gen_test.go..."; \
+		mv component/callback/wire_gen.go component/callback/wire_gen_test.go; \
 	else \
 		echo "Wire failed, skipping renaming."; \
 	fi

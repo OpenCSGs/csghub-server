@@ -16,22 +16,22 @@ type ListComponent interface {
 
 func NewListComponent(config *config.Config) (ListComponent, error) {
 	c := &listComponentImpl{}
-	c.ds = database.NewDatasetStore()
-	c.ms = database.NewModelStore()
-	c.ss = database.NewSpaceStore()
+	c.datasetStore = database.NewDatasetStore()
+	c.modelStore = database.NewModelStore()
+	c.spaceStore = database.NewSpaceStore()
 	return c, nil
 }
 
 type listComponentImpl struct {
-	ms database.ModelStore
-	ds database.DatasetStore
-	ss database.SpaceStore
+	modelStore   database.ModelStore
+	datasetStore database.DatasetStore
+	spaceStore   database.SpaceStore
 }
 
 func (c *listComponentImpl) ListModelsByPath(ctx context.Context, req *types.ListByPathReq) ([]*types.ModelResp, error) {
 	var modelResp []*types.ModelResp
 
-	models, err := c.ms.ListByPath(ctx, req.Paths)
+	models, err := c.modelStore.ListByPath(ctx, req.Paths)
 	if err != nil {
 		slog.Error("error listing models by path", "error", err, slog.Any("paths", req.Paths))
 		return nil, err
@@ -67,7 +67,7 @@ func (c *listComponentImpl) ListModelsByPath(ctx context.Context, req *types.Lis
 func (c *listComponentImpl) ListDatasetsByPath(ctx context.Context, req *types.ListByPathReq) ([]*types.DatasetResp, error) {
 	var datasetResp []*types.DatasetResp
 
-	datasets, err := c.ds.ListByPath(ctx, req.Paths)
+	datasets, err := c.datasetStore.ListByPath(ctx, req.Paths)
 	if err != nil {
 		slog.Error("error listing datasets by path", "error", err, slog.Any("paths", req.Paths))
 		return nil, err

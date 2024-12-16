@@ -14,7 +14,7 @@ import (
 )
 
 type GitCallbackHandler struct {
-	cbc    *component.GitCallbackComponent
+	cbc    component.GitCallbackComponent
 	config *config.Config
 }
 
