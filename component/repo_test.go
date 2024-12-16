@@ -1404,7 +1404,7 @@ func TestRepoComponent_UpdateTags(t *testing.T) {
 
 }
 
-func TestRepoComponent_checkCurrentUserPermission(t *testing.T) {
+func TestRepoComponent_CheckCurrentUserPermission(t *testing.T) {
 
 	t.Run("can read self-owned", func(t *testing.T) {
 		ctx := context.TODO()
@@ -1671,4 +1671,145 @@ func TestRepoComponent_Tree(t *testing.T) {
 		})
 	}
 
+}
+
+func TestRepoComponent_AllowReadAccess(t *testing.T) {
+	t.Run("should return false if repo find return error", func(t *testing.T) {
+		ctx := context.TODO()
+		repoComp := initializeTestRepoComponent(ctx, t)
+		repoComp.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, types.ModelRepo, "namespace", "name").Return(&database.Repository{}, errors.New("error"))
+		allow, err := repoComp.AllowReadAccess(ctx, types.ModelRepo, "namespace", "name", "user_name")
+		require.Error(t, fmt.Errorf("failed to find repo, error: %w", err))
+		require.False(t, allow)
+	})
+}
+
+func TestRepoComponent_AllowWriteAccess(t *testing.T) {
+	t.Run("should return false if username is empty", func(t *testing.T) {
+		ctx := context.TODO()
+		repoComp := initializeTestRepoComponent(ctx, t)
+		repoComp.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, types.ModelRepo, "namespace", "name").Return(&database.Repository{
+			ID:      1,
+			Name:    "name",
+			Path:    "namespace/name",
+			Private: false,
+		}, nil)
+		allow, err := repoComp.AllowWriteAccess(ctx, types.ModelRepo, "namespace", "name", "")
+		require.Error(t, err, ErrUserNotFound)
+		require.False(t, allow)
+	})
+
+	t.Run("should return false if repo find return error", func(t *testing.T) {
+		ctx := context.TODO()
+		repoComp := initializeTestRepoComponent(ctx, t)
+		repoComp.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, types.ModelRepo, "namespace", "name").Return(&database.Repository{}, errors.New("error"))
+		allow, err := repoComp.AllowWriteAccess(ctx, types.ModelRepo, "namespace", "name", "user_name")
+		require.Error(t, err, fmt.Errorf("failed to find repo, error: %w", err))
+		require.False(t, allow)
+	})
+
+	t.Run("should return false if user has no write access for public repo", func(t *testing.T) {
+		ctx := context.TODO()
+		repoComp := initializeTestRepoComponent(ctx, t)
+		repoComp.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, types.ModelRepo, "namespace", "name").Return(&database.Repository{
+			ID:      1,
+			Name:    "name",
+			Path:    "namespace/name",
+			Private: false,
+		}, nil)
+		repoComp.mocks.stores.NamespaceMock().EXPECT().FindByPath(ctx, "namespace").Return(database.Namespace{
+			ID:            1,
+			Path:          "namespace",
+			NamespaceType: database.UserNamespace,
+		}, nil)
+		repoComp.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "user_name").Return(database.User{
+			ID:       1,
+			Username: "user_name",
+			Email:    "user@example.com",
+			RoleMask: "",
+		}, nil)
+		allow, err := repoComp.AllowAdminAccess(ctx, types.ModelRepo, "namespace", "name", "user_name")
+		require.NoError(t, err)
+		require.False(t, allow)
+	})
+}
+
+func TestRepoComponent_AllowAdminAccess(t *testing.T) {
+	t.Run("should return false if username is empty", func(t *testing.T) {
+		ctx := context.TODO()
+		repoComp := initializeTestRepoComponent(ctx, t)
+		repoComp.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, types.ModelRepo, "namespace", "name").Return(&database.Repository{
+			ID:      1,
+			Name:    "name",
+			Path:    "namespace/name",
+			Private: false,
+		}, nil)
+		allow, err := repoComp.AllowAdminAccess(ctx, types.ModelRepo, "namespace", "name", "")
+		require.Error(t, err, ErrUserNotFound)
+		require.False(t, allow)
+	})
+
+	t.Run("should return false if repo find return error", func(t *testing.T) {
+		ctx := context.TODO()
+		repoComp := initializeTestRepoComponent(ctx, t)
+		repoComp.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, types.ModelRepo, "namespace", "name").Return(&database.Repository{}, errors.New("error"))
+		allow, err := repoComp.AllowAdminAccess(ctx, types.ModelRepo, "namespace", "name", "user_name")
+		require.Error(t, err, fmt.Errorf("failed to find repo, error: %w", err))
+		require.False(t, allow)
+	})
+
+	t.Run("should return false if user has no admin access for public repo", func(t *testing.T) {
+		ctx := context.TODO()
+		repoComp := initializeTestRepoComponent(ctx, t)
+		repoComp.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, types.ModelRepo, "namespace", "name").Return(&database.Repository{
+			ID:      1,
+			Name:    "name",
+			Path:    "namespace/name",
+			Private: false,
+		}, nil)
+		repoComp.mocks.stores.NamespaceMock().EXPECT().FindByPath(ctx, "namespace").Return(database.Namespace{
+			ID:            1,
+			Path:          "namespace",
+			NamespaceType: database.UserNamespace,
+		}, nil)
+		repoComp.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "user_name").Return(database.User{
+			ID:       1,
+			Username: "user_name",
+			Email:    "user@example.com",
+			RoleMask: "",
+		}, nil)
+		allow, err := repoComp.AllowAdminAccess(ctx, types.ModelRepo, "namespace", "name", "user_name")
+		require.NoError(t, err)
+		require.False(t, allow)
+	})
+}
+
+func TestRepoComponent_AllowReadAccessRepo(t *testing.T) {
+	t.Run("should return true if repo is public", func(t *testing.T) {
+		ctx := context.TODO()
+		repoComp := initializeTestRepoComponent(ctx, t)
+
+		allow, err := repoComp.AllowReadAccessRepo(ctx, &database.Repository{
+			ID:      1,
+			Name:    "name",
+			Path:    "namespace/name",
+			Private: false,
+		}, "user_name")
+		require.NoError(t, err)
+		require.True(t, allow)
+	})
+
+	t.Run("should return false if repo is private and username is empty", func(t *testing.T) {
+		ctx := context.TODO()
+		repoComp := initializeTestRepoComponent(ctx, t)
+
+		allow, err := repoComp.AllowReadAccessRepo(ctx, &database.Repository{
+			ID:      1,
+			Name:    "name",
+			Path:    "namespace/name",
+			Private: true,
+		}, "")
+		require.Error(t, err, ErrUserNotFound)
+		require.False(t, allow)
+	})
 }
