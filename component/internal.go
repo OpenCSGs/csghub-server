@@ -8,6 +8,7 @@ import (
 	"strconv"
 
 	pb "gitlab.com/gitlab-org/gitaly/v16/proto/go/gitalypb"
+	"opencsg.com/csghub-server/builder/git"
 	"opencsg.com/csghub-server/builder/git/gitserver"
 	"opencsg.com/csghub-server/builder/git/gitserver/gitaly"
 	"opencsg.com/csghub-server/builder/store/database"
@@ -17,10 +18,13 @@ import (
 )
 
 type internalComponentImpl struct {
-	config      *config.Config
-	sshKeyStore database.SSHKeyStore
-	repoStore   database.RepoStore
-	*repoComponentImpl
+	config         *config.Config
+	sshKeyStore    database.SSHKeyStore
+	repoStore      database.RepoStore
+	tokenStore     database.AccessTokenStore
+	namespaceStore database.NamespaceStore
+	repoComponent  RepoComponent
+	gitServer      gitserver.GitServer
 }
 
 type InternalComponent interface {
@@ -37,11 +41,17 @@ func NewInternalComponent(config *config.Config) (InternalComponent, error) {
 	c.config = config
 	c.sshKeyStore = database.NewSSHKeyStore()
 	c.repoStore = database.NewRepoStore()
-	c.repoComponentImpl, err = NewRepoComponentImpl(config)
+	c.repoComponent, err = NewRepoComponentImpl(config)
 	c.tokenStore = database.NewAccessTokenStore()
+	c.namespaceStore = database.NewNamespaceStore()
 	if err != nil {
 		return nil, err
 	}
+	git, err := git.NewGitServer(config)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create git server: %w", err)
+	}
+	c.gitServer = git
 	return c, nil
 }
 
@@ -70,7 +80,7 @@ func (c *internalComponentImpl) SSHAllowed(ctx context.Context, req types.SSHAll
 		return nil, fmt.Errorf("failed to find ssh key by id, err: %v", err)
 	}
 	if req.Action == "git-receive-pack" {
-		allowed, err := c.AllowWriteAccess(ctx, req.RepoType, req.Namespace, req.Name, sshKey.User.Username)
+		allowed, err := c.repoComponent.AllowWriteAccess(ctx, req.RepoType, req.Namespace, req.Name, sshKey.User.Username)
 		if err != nil {
 			return nil, ErrUnauthorized
 		}
@@ -79,7 +89,7 @@ func (c *internalComponentImpl) SSHAllowed(ctx context.Context, req types.SSHAll
 		}
 	} else if req.Action == "git-upload-pack" {
 		if repo.Private {
-			allowed, err := c.AllowReadAccess(ctx, req.RepoType, req.Namespace, req.Name, sshKey.User.Username)
+			allowed, err := c.repoComponent.AllowReadAccess(ctx, req.RepoType, req.Namespace, req.Name, sshKey.User.Username)
 			if err != nil {
 				return nil, ErrUnauthorized
 			}
@@ -133,7 +143,7 @@ func (c *internalComponentImpl) GetCommitDiff(ctx context.Context, req types.Get
 	if repo == nil {
 		return nil, errors.New("repo not found")
 	}
-	diffs, err := c.git.GetDiffBetweenTwoCommits(ctx, gitserver.GetDiffBetweenTwoCommitsReq{
+	diffs, err := c.gitServer.GetDiffBetweenTwoCommits(ctx, gitserver.GetDiffBetweenTwoCommitsReq{
 		Namespace:     req.Namespace,
 		Name:          req.Name,
 		RepoType:      req.RepoType,
@@ -165,7 +175,7 @@ func (c *internalComponentImpl) LfsAuthenticate(ctx context.Context, req types.L
 		return nil, fmt.Errorf("failed to find ssh key by id, err: %v", err)
 	}
 	if repo.Private {
-		allowed, err := c.AllowReadAccess(ctx, req.RepoType, req.Namespace, req.Name, sshKey.User.Username)
+		allowed, err := c.repoComponent.AllowReadAccess(ctx, req.RepoType, req.Namespace, req.Name, sshKey.User.Username)
 		if err != nil {
 			return nil, ErrUnauthorized
 		}

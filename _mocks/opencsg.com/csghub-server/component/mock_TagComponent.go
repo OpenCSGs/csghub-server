@@ -24,64 +24,6 @@ func (_m *MockTagComponent) EXPECT() *MockTagComponent_Expecter {
 	return &MockTagComponent_Expecter{mock: &_m.Mock}
 }
 
-// AllTags provides a mock function with given fields: ctx
-func (_m *MockTagComponent) AllTags(ctx context.Context) ([]database.Tag, error) {
-	ret := _m.Called(ctx)
-
-	if len(ret) == 0 {
-		panic("no return value specified for AllTags")
-	}
-
-	var r0 []database.Tag
-	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context) ([]database.Tag, error)); ok {
-		return rf(ctx)
-	}
-	if rf, ok := ret.Get(0).(func(context.Context) []database.Tag); ok {
-		r0 = rf(ctx)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]database.Tag)
-		}
-	}
-
-	if rf, ok := ret.Get(1).(func(context.Context) error); ok {
-		r1 = rf(ctx)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
-// MockTagComponent_AllTags_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'AllTags'
-type MockTagComponent_AllTags_Call struct {
-	*mock.Call
-}
-
-// AllTags is a helper method to define mock.On call
-//   - ctx context.Context
-func (_e *MockTagComponent_Expecter) AllTags(ctx interface{}) *MockTagComponent_AllTags_Call {
-	return &MockTagComponent_AllTags_Call{Call: _e.mock.On("AllTags", ctx)}
-}
-
-func (_c *MockTagComponent_AllTags_Call) Run(run func(ctx context.Context)) *MockTagComponent_AllTags_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context))
-	})
-	return _c
-}
-
-func (_c *MockTagComponent_AllTags_Call) Return(_a0 []database.Tag, _a1 error) *MockTagComponent_AllTags_Call {
-	_c.Call.Return(_a0, _a1)
-	return _c
-}
-
-func (_c *MockTagComponent_AllTags_Call) RunAndReturn(run func(context.Context) ([]database.Tag, error)) *MockTagComponent_AllTags_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
 // AllTagsByScopeAndCategory provides a mock function with given fields: ctx, scope, category
 func (_m *MockTagComponent) AllTagsByScopeAndCategory(ctx context.Context, scope string, category string) ([]*database.Tag, error) {
 	ret := _m.Called(ctx, scope, category)

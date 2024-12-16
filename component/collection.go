@@ -31,11 +31,11 @@ type CollectionComponent interface {
 
 func NewCollectionComponent(config *config.Config) (CollectionComponent, error) {
 	cc := &collectionComponentImpl{}
-	cc.cs = database.NewCollectionStore()
-	cc.rs = database.NewRepoStore()
-	cc.us = database.NewUserStore()
-	cc.os = database.NewOrgStore()
-	cc.uls = database.NewUserLikesStore()
+	cc.collectionStore = database.NewCollectionStore()
+	cc.repoStore = database.NewRepoStore()
+	cc.userStore = database.NewUserStore()
+	cc.orgStore = database.NewOrgStore()
+	cc.userLikesStore = database.NewUserLikesStore()
 	cc.userSvcClient = rpc.NewUserSvcHttpClient(fmt.Sprintf("%s:%d", config.User.Host, config.User.Port),
 		rpc.AuthWithApiKey(config.APIToken))
 	spaceComponent, err := NewSpaceComponent(config)
@@ -47,17 +47,17 @@ func NewCollectionComponent(config *config.Config) (CollectionComponent, error) 
 }
 
 type collectionComponentImpl struct {
-	os             database.OrgStore
-	cs             database.CollectionStore
-	rs             database.RepoStore
-	us             database.UserStore
-	uls            database.UserLikesStore
-	userSvcClient  rpc.UserSvcClient
-	spaceComponent SpaceComponent
+	collectionStore database.CollectionStore
+	orgStore        database.OrgStore
+	repoStore       database.RepoStore
+	userStore       database.UserStore
+	userLikesStore  database.UserLikesStore
+	userSvcClient   rpc.UserSvcClient
+	spaceComponent  SpaceComponent
 }
 
 func (cc *collectionComponentImpl) GetCollections(ctx context.Context, filter *types.CollectionFilter, per, page int) ([]types.Collection, int, error) {
-	collections, total, err := cc.cs.GetCollections(ctx, filter, per, page, true)
+	collections, total, err := cc.collectionStore.GetCollections(ctx, filter, per, page, true)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -73,7 +73,7 @@ func (cc *collectionComponentImpl) GetCollections(ctx context.Context, filter *t
 
 func (cc *collectionComponentImpl) CreateCollection(ctx context.Context, input types.CreateCollectionReq) (*database.Collection, error) {
 	// find by user name
-	user, err := cc.us.FindByUsername(ctx, input.Username)
+	user, err := cc.userStore.FindByUsername(ctx, input.Username)
 	if err != nil {
 		return nil, fmt.Errorf("cannot find user for collection, %w", err)
 	}
@@ -92,24 +92,24 @@ func (cc *collectionComponentImpl) CreateCollection(ctx context.Context, input t
 		collection.Username = ""
 	}
 
-	return cc.cs.CreateCollection(ctx, collection)
+	return cc.collectionStore.CreateCollection(ctx, collection)
 }
 
 func (cc *collectionComponentImpl) GetCollection(ctx context.Context, currentUser string, id int64) (*types.Collection, error) {
-	collection, err := cc.cs.GetCollection(ctx, id)
+	collection, err := cc.collectionStore.GetCollection(ctx, id)
 	if err != nil {
 		return nil, err
 	}
 	// find by user name
 	avatar := ""
 	if collection.Username != "" {
-		user, err := cc.us.FindByUsername(ctx, collection.Username)
+		user, err := cc.userStore.FindByUsername(ctx, collection.Username)
 		if err != nil {
 			return nil, fmt.Errorf("cannot find user for collection, %w", err)
 		}
 		avatar = user.Avatar
 	} else if collection.Namespace != "" {
-		org, err := cc.os.FindByPath(ctx, collection.Namespace)
+		org, err := cc.orgStore.FindByPath(ctx, collection.Namespace)
 		if err != nil {
 			return nil, fmt.Errorf("fail to get org info, path: %s, error: %w", collection.Namespace, err)
 		}
@@ -131,7 +131,7 @@ func (cc *collectionComponentImpl) GetCollection(ctx context.Context, currentUse
 	if err != nil {
 		return nil, err
 	}
-	likeExists, err := cc.uls.IsExistCollection(ctx, currentUser, id)
+	likeExists, err := cc.userLikesStore.IsExistCollection(ctx, currentUser, id)
 	if err != nil {
 		newError := fmt.Errorf("failed to check for the presence of the user likes,error:%w", err)
 		return nil, newError
@@ -165,7 +165,7 @@ func (cc *collectionComponentImpl) GetPublicRepos(collection types.Collection) [
 }
 
 func (cc *collectionComponentImpl) UpdateCollection(ctx context.Context, input types.CreateCollectionReq) (*database.Collection, error) {
-	collection, err := cc.cs.GetCollection(ctx, input.ID)
+	collection, err := cc.collectionStore.GetCollection(ctx, input.ID)
 	if err != nil {
 		return nil, fmt.Errorf("cannot find collection to update, %w", err)
 	}
@@ -175,25 +175,25 @@ func (cc *collectionComponentImpl) UpdateCollection(ctx context.Context, input t
 	collection.Private = input.Private
 	collection.Theme = input.Theme
 	collection.UpdatedAt = time.Now()
-	return cc.cs.UpdateCollection(ctx, *collection)
+	return cc.collectionStore.UpdateCollection(ctx, *collection)
 }
 
 func (cc *collectionComponentImpl) DeleteCollection(ctx context.Context, id int64, userName string) error {
 	// find by user name
-	user, err := cc.us.FindByUsername(ctx, userName)
+	user, err := cc.userStore.FindByUsername(ctx, userName)
 	if err != nil {
 		return fmt.Errorf("cannot find user for collection, %w", err)
 	}
-	return cc.cs.DeleteCollection(ctx, id, user.ID)
+	return cc.collectionStore.DeleteCollection(ctx, id, user.ID)
 }
 
 func (cc *collectionComponentImpl) AddReposToCollection(ctx context.Context, req types.UpdateCollectionReposReq) error {
 	// find by user name
-	user, err := cc.us.FindByUsername(ctx, req.Username)
+	user, err := cc.userStore.FindByUsername(ctx, req.Username)
 	if err != nil {
 		return fmt.Errorf("cannot find user for collection, %w", err)
 	}
-	collection, err := cc.cs.GetCollection(ctx, req.ID)
+	collection, err := cc.collectionStore.GetCollection(ctx, req.ID)
 	if err != nil {
 		return err
 	}
@@ -207,16 +207,16 @@ func (cc *collectionComponentImpl) AddReposToCollection(ctx context.Context, req
 			RepositoryID: id,
 		})
 	}
-	return cc.cs.AddCollectionRepos(ctx, collectionRepos)
+	return cc.collectionStore.AddCollectionRepos(ctx, collectionRepos)
 }
 
 func (cc *collectionComponentImpl) RemoveReposFromCollection(ctx context.Context, req types.UpdateCollectionReposReq) error {
 	// find by user name
-	user, err := cc.us.FindByUsername(ctx, req.Username)
+	user, err := cc.userStore.FindByUsername(ctx, req.Username)
 	if err != nil {
 		return fmt.Errorf("cannot find user for collection, %w", err)
 	}
-	collection, err := cc.cs.GetCollection(ctx, req.ID)
+	collection, err := cc.collectionStore.GetCollection(ctx, req.ID)
 	if err != nil {
 		return err
 	}
@@ -230,7 +230,7 @@ func (cc *collectionComponentImpl) RemoveReposFromCollection(ctx context.Context
 			RepositoryID: id,
 		})
 	}
-	return cc.cs.RemoveCollectionRepos(ctx, collectionRepos)
+	return cc.collectionStore.RemoveCollectionRepos(ctx, collectionRepos)
 }
 
 func (cc *collectionComponentImpl) getUserCollectionPermission(ctx context.Context, userName string, collection *database.Collection) (*types.UserRepoPermission, error) {
@@ -290,7 +290,7 @@ func (c *collectionComponentImpl) OrgCollections(ctx context.Context, req *types
 		}
 	}
 	onlyPublic := !r.CanRead()
-	collections, total, err := c.cs.ByUserOrgs(ctx, req.Namespace, req.PageSize, req.Page, onlyPublic)
+	collections, total, err := c.collectionStore.ByUserOrgs(ctx, req.Namespace, req.PageSize, req.Page, onlyPublic)
 	if err != nil {
 		return nil, 0, err
 	}

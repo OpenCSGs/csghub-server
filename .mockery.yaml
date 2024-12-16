@@ -16,6 +16,7 @@ packages:
             AccountingComponent:
             SpaceComponent:
             RuntimeArchitectureComponent:
+            SensitiveComponent:
     opencsg.com/csghub-server/user/component:
         config:
         interfaces:
@@ -89,4 +90,11 @@ packages:
         config:
         interfaces:
             AccountingClient:
-            
+    opencsg.com/csghub-server/builder/parquet:
+        config:
+        interfaces:
+            Reader:
+    opencsg.com/csghub-server/builder/multisync:
+        config:
+        interfaces:
+            Client:

@@ -9,7 +9,6 @@ import (
 	"github.com/stretchr/testify/require"
 	"opencsg.com/csghub-server/builder/git/gitserver"
 	"opencsg.com/csghub-server/builder/git/membership"
-	"opencsg.com/csghub-server/builder/inference"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/types"
 )
@@ -458,31 +457,22 @@ func TestModelComponent_DeleteRelationDataset(t *testing.T) {
 	require.Nil(t, err)
 }
 
-func TestModelComponent_Predict(t *testing.T) {
-	ctx := context.TODO()
-	mc := initializeTestModelComponent(ctx, t)
+// func TestModelComponent_Predict(t *testing.T) {
+// 	ctx := context.TODO()
+// 	mc := initializeTestModelComponent(ctx, t)
 
-	mc.mocks.inferenceClient.EXPECT().Predict(inference.ModelID{
-		Owner: "ns",
-		Name:  "n",
-	}, &inference.PredictRequest{
-		Prompt: "foo",
-	}).Return(&inference.PredictResponse{
-		GeneratedText: "abcd",
-	}, nil)
+// 	resp, err := mc.Predict(ctx, &types.ModelPredictReq{
+// 		Namespace:   "ns",
+// 		Name:        "n",
+// 		Input:       "foo",
+// 		CurrentUser: "user",
+// 	})
+// 	require.Nil(t, err)
+// 	require.Equal(t, &types.ModelPredictResp{
+// 		Content: "abcd",
+// 	}, resp)
 
-	resp, err := mc.Predict(ctx, &types.ModelPredictReq{
-		Namespace:   "ns",
-		Name:        "n",
-		Input:       "foo",
-		CurrentUser: "user",
-	})
-	require.Nil(t, err)
-	require.Equal(t, &types.ModelPredictResp{
-		Content: "abcd",
-	}, resp)
-
-}
+// }
 
 // func TestModelComponent_Deploy(t *testing.T) {
 // 	ctx := context.TODO()

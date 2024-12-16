@@ -6,25 +6,48 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/mock"
-	gsmock "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/git/gitserver"
 	"opencsg.com/csghub-server/builder/git/gitserver"
 	"opencsg.com/csghub-server/builder/store/database"
-	"opencsg.com/csghub-server/common/tests"
 )
 
-func NewTestRecomComponent(stores *tests.MockStores, gitServer gitserver.GitServer) *recomComponentImpl {
-	return &recomComponentImpl{
-		repos: stores.Repo,
-		gs:    gitServer,
-	}
+// func TestRecomComponent_SetOpWeight(t *testing.T) {
+// 	ctx := context.TODO()
+// 	rc := initializeTestRecomComponent(ctx, t)
+
+// 	rc.mocks.stores.RepoMock().EXPECT().FindById(ctx, int64(1)).Return(&database.Repository{}, nil)
+// 	rc.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "user").Return(database.User{
+// 		RoleMask: "admin",
+// 	}, nil)
+// 	rc.mocks.stores.RecomMock().EXPECT().UpsetOpWeights(ctx, int64(1), int64(100)).Return(nil)
+
+// 	err := rc.SetOpWeight(ctx, 1, 100)
+// 	require.Nil(t, err)
+// }
+
+func TestRecomComponent_CalculateRecomScore(t *testing.T) {
+	ctx := context.TODO()
+	rc := initializeTestRecomComponent(ctx, t)
+
+	rc.mocks.stores.RecomMock().EXPECT().LoadWeights(mock.Anything).Return(
+		[]*database.RecomWeight{{Name: "freshness", WeightExp: "score = 12.34"}}, nil,
+	)
+	rc.mocks.stores.RepoMock().EXPECT().All(ctx).Return([]*database.Repository{
+		{ID: 1, Path: "foo/bar"},
+	}, nil)
+	rc.mocks.stores.RecomMock().EXPECT().UpsertScore(ctx, int64(1), 12.34).Return(nil)
+	rc.mocks.gitServer.EXPECT().GetRepoFileTree(mock.Anything, gitserver.GetRepoInfoByPathReq{
+		Namespace: "foo",
+		Name:      "bar",
+	}).Return(nil, nil)
+
+	rc.CalculateRecomScore(ctx)
 }
 
 func TestRecomComponent_CalculateTotalScore(t *testing.T) {
-	gitServer := gsmock.NewMockGitServer(t)
-	rc := &recomComponentImpl{gs: gitServer}
 	ctx := context.TODO()
+	rc := initializeTestRecomComponent(ctx, t)
 
-	gitServer.EXPECT().GetRepoFileTree(mock.Anything, gitserver.GetRepoInfoByPathReq{
+	rc.mocks.gitServer.EXPECT().GetRepoFileTree(mock.Anything, gitserver.GetRepoInfoByPathReq{
 		Namespace: "foo",
 		Name:      "bar",
 	}).Return(nil, nil)

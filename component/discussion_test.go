@@ -18,9 +18,9 @@ func TestDiscussionComponent_CreateDisucssion(t *testing.T) {
 	mockDiscussionStore := mockdb.NewMockDiscussionStore(t)
 	// new discussionComponentImpl from mock db store
 	comp := &discussionComponentImpl{
-		rs: mockRepoStore,
-		us: mockUserStore,
-		ds: mockDiscussionStore,
+		repoStore:       mockRepoStore,
+		userStore:       mockUserStore,
+		discussionStore: mockDiscussionStore,
 	}
 
 	repo := &database.Repository{
@@ -77,9 +77,9 @@ func TestDiscussionComponent_GetDisussion(t *testing.T) {
 	mockDiscussionStore := mockdb.NewMockDiscussionStore(t)
 	// new discussionComponentImpl from mock db store
 	comp := &discussionComponentImpl{
-		rs: mockRepoStore,
-		us: mockUserStore,
-		ds: mockDiscussionStore,
+		repoStore:       mockRepoStore,
+		userStore:       mockUserStore,
+		discussionStore: mockDiscussionStore,
 	}
 
 	disc := database.Discussion{
@@ -126,9 +126,9 @@ func TestDiscussionComponent_UpdateDisussion(t *testing.T) {
 	mockDiscussionStore := mockdb.NewMockDiscussionStore(t)
 	// new discussionComponentImpl from mock db store
 	comp := &discussionComponentImpl{
-		rs: mockRepoStore,
-		us: mockUserStore,
-		ds: mockDiscussionStore,
+		repoStore:       mockRepoStore,
+		userStore:       mockUserStore,
+		discussionStore: mockDiscussionStore,
 	}
 
 	req := UpdateDiscussionRequest{
@@ -164,9 +164,9 @@ func TestDiscussionComponent_DeleteDisussion(t *testing.T) {
 	mockDiscussionStore := mockdb.NewMockDiscussionStore(t)
 	// new discussionComponentImpl from mock db store
 	comp := &discussionComponentImpl{
-		rs: mockRepoStore,
-		us: mockUserStore,
-		ds: mockDiscussionStore,
+		repoStore:       mockRepoStore,
+		userStore:       mockUserStore,
+		discussionStore: mockDiscussionStore,
 	}
 
 	currentUser := "user"
@@ -197,9 +197,9 @@ func TestDiscussionComponent_ListRepoDiscussions(t *testing.T) {
 	mockDiscussionStore := mockdb.NewMockDiscussionStore(t)
 	// new discussionComponentImpl from mock db store
 	comp := &discussionComponentImpl{
-		rs: mockRepoStore,
-		us: mockUserStore,
-		ds: mockDiscussionStore,
+		repoStore:       mockRepoStore,
+		userStore:       mockUserStore,
+		discussionStore: mockDiscussionStore,
 	}
 
 	repo := &database.Repository{
@@ -239,9 +239,9 @@ func TestDiscussionComponent_CreateDisussionComment(t *testing.T) {
 	mockDiscussionStore := mockdb.NewMockDiscussionStore(t)
 	// new discussionComponentImpl from mock db store
 	comp := &discussionComponentImpl{
-		rs: mockRepoStore,
-		us: mockUserStore,
-		ds: mockDiscussionStore,
+		repoStore:       mockRepoStore,
+		userStore:       mockUserStore,
+		discussionStore: mockDiscussionStore,
 	}
 
 	req := CreateCommentRequest{
@@ -293,9 +293,9 @@ func TestDiscussionComponent_UpdateComment(t *testing.T) {
 	mockDiscussionStore := mockdb.NewMockDiscussionStore(t)
 	// new discussionComponentImpl from mock db store
 	comp := &discussionComponentImpl{
-		rs: mockRepoStore,
-		us: mockUserStore,
-		ds: mockDiscussionStore,
+		repoStore:       mockRepoStore,
+		userStore:       mockUserStore,
+		discussionStore: mockDiscussionStore,
 	}
 
 	req := CreateCommentRequest{
@@ -332,9 +332,9 @@ func TestDiscussionComponent_DeleteComment(t *testing.T) {
 	mockDiscussionStore := mockdb.NewMockDiscussionStore(t)
 	// new discussionComponentImpl from mock db store
 	comp := &discussionComponentImpl{
-		rs: mockRepoStore,
-		us: mockUserStore,
-		ds: mockDiscussionStore,
+		repoStore:       mockRepoStore,
+		userStore:       mockUserStore,
+		discussionStore: mockDiscussionStore,
 	}
 
 	req := CreateCommentRequest{
@@ -371,9 +371,9 @@ func TestDiscussionComponent_ListDiscussionComments(t *testing.T) {
 	mockDiscussionStore := mockdb.NewMockDiscussionStore(t)
 	// new discussionComponentImpl from mock db store
 	comp := &discussionComponentImpl{
-		rs: mockRepoStore,
-		us: mockUserStore,
-		ds: mockDiscussionStore,
+		repoStore:       mockRepoStore,
+		userStore:       mockUserStore,
+		discussionStore: mockDiscussionStore,
 	}
 
 	discussionID := int64(1)
