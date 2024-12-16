@@ -16,9 +16,26 @@ func TestOrganizationStore_CRUD(t *testing.T) {
 
 	store := database.NewOrgStoreWithDB(db)
 	err := store.Create(ctx, &database.Organization{
-		Name: "o1",
+		Name:     "o1",
+		Nickname: "o1_nickname",
 	}, &database.Namespace{Path: "o1"})
 	require.Nil(t, err)
+
+	//search with name
+	orgs, total, err := store.Search(ctx, "o1", 10, 1)
+	require.Nil(t, err)
+	require.Equal(t, 1, total)
+	require.Equal(t, "o1", orgs[0].Name)
+	//search with nickname
+	orgs, total, err = store.Search(ctx, "nickname", 10, 1)
+	require.Nil(t, err)
+	require.Equal(t, 1, total)
+	require.Equal(t, "o1_nickname", orgs[0].Nickname)
+	//empty search second page
+	orgs, total, err = store.Search(ctx, "nickname", 10, 2)
+	require.Nil(t, err)
+	require.Equal(t, 1, total)
+	require.Empty(t, orgs)
 
 	org := &database.Organization{}
 	err = db.Core.NewSelect().Model(org).Where("path=?", "o1").Scan(ctx)
@@ -63,9 +80,10 @@ func TestOrganizationStore_CRUD(t *testing.T) {
 	err = store.Update(ctx, org)
 	require.Nil(t, err)
 
-	orgs, err := store.GetUserOwnOrgs(ctx, "u1")
+	orgs, total, err = store.GetUserOwnOrgs(ctx, "u1")
 	require.Nil(t, err)
 	require.Equal(t, 1, len(orgs))
+	require.Equal(t, 1, total)
 
 	orgs, err = store.GetUserBelongOrgs(ctx, 321)
 	require.Nil(t, err)

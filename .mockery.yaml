@@ -21,6 +21,7 @@ packages:
         config:
         interfaces:
             MemberComponent:
+            OrganizationComponent:
     opencsg.com/csghub-server/builder/store/database:
         config:
           all: True
