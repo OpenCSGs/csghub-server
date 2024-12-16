@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"strings"
 
+	"opencsg.com/csghub-server/builder/git"
 	"opencsg.com/csghub-server/builder/git/gitserver"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/config"
@@ -19,22 +20,28 @@ type HFDatasetComponent interface {
 
 func NewHFDatasetComponent(config *config.Config) (HFDatasetComponent, error) {
 	c := &hFDatasetComponentImpl{}
-	c.ts = database.NewTagStore()
-	c.ds = database.NewDatasetStore()
-	c.rs = database.NewRepoStore()
+	c.tagStore = database.NewTagStore()
+	c.datasetStore = database.NewDatasetStore()
+	c.repoStore = database.NewRepoStore()
 	var err error
-	c.repoComponentImpl, err = NewRepoComponentImpl(config)
+	c.repoComponent, err = NewRepoComponentImpl(config)
 	if err != nil {
 		return nil, err
 	}
+	gs, err := git.NewGitServer(config)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create git server, error: %w", err)
+	}
+	c.gitServer = gs
 	return c, nil
 }
 
 type hFDatasetComponentImpl struct {
-	*repoComponentImpl
-	ts database.TagStore
-	ds database.DatasetStore
-	rs database.RepoStore
+	repoComponent RepoComponent
+	tagStore      database.TagStore
+	datasetStore  database.DatasetStore
+	repoStore     database.RepoStore
+	gitServer     gitserver.GitServer
 }
 
 func convertFilePathFromRoute(path string) string {
@@ -42,12 +49,12 @@ func convertFilePathFromRoute(path string) string {
 }
 
 func (h *hFDatasetComponentImpl) GetPathsInfo(ctx context.Context, req types.PathReq) ([]types.HFDSPathInfo, error) {
-	ds, err := h.ds.FindByPath(ctx, req.Namespace, req.Name)
+	ds, err := h.datasetStore.FindByPath(ctx, req.Namespace, req.Name)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find dataset, error: %w", err)
 	}
 
-	allow, err := h.AllowReadAccessRepo(ctx, ds.Repository, req.CurrentUser)
+	allow, err := h.repoComponent.AllowReadAccessRepo(ctx, ds.Repository, req.CurrentUser)
 	if err != nil {
 		return nil, fmt.Errorf("failed to check dataset permission, error: %w", err)
 	}
@@ -62,7 +69,7 @@ func (h *hFDatasetComponentImpl) GetPathsInfo(ctx context.Context, req types.Pat
 		Path:      convertFilePathFromRoute(req.Path),
 		RepoType:  types.DatasetRepo,
 	}
-	file, _ := h.git.GetRepoFileContents(ctx, getRepoFileTree)
+	file, _ := h.gitServer.GetRepoFileContents(ctx, getRepoFileTree)
 	if file == nil {
 		return []types.HFDSPathInfo{}, nil
 	}
@@ -81,12 +88,12 @@ func (h *hFDatasetComponentImpl) GetPathsInfo(ctx context.Context, req types.Pat
 }
 
 func (h *hFDatasetComponentImpl) GetDatasetTree(ctx context.Context, req types.PathReq) ([]types.HFDSPathInfo, error) {
-	ds, err := h.ds.FindByPath(ctx, req.Namespace, req.Name)
+	ds, err := h.datasetStore.FindByPath(ctx, req.Namespace, req.Name)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find dataset tree, error: %w", err)
 	}
 
-	allow, err := h.AllowReadAccessRepo(ctx, ds.Repository, req.CurrentUser)
+	allow, err := h.repoComponent.AllowReadAccessRepo(ctx, ds.Repository, req.CurrentUser)
 	if err != nil {
 		return nil, fmt.Errorf("failed to check dataset permission, error: %w", err)
 	}
@@ -102,7 +109,7 @@ func (h *hFDatasetComponentImpl) GetDatasetTree(ctx context.Context, req types.P
 		Path:      req.Path,
 		RepoType:  types.DatasetRepo,
 	}
-	tree, err := h.git.GetRepoFileTree(ctx, getRepoFileTree)
+	tree, err := h.gitServer.GetRepoFileTree(ctx, getRepoFileTree)
 	if err != nil {
 		slog.Warn("failed to get repo file tree", slog.Any("getRepoFileTree", getRepoFileTree), slog.String("error", err.Error()))
 		return []types.HFDSPathInfo{}, nil

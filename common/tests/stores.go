@@ -14,6 +14,7 @@ type MockStores struct {
 	Model                database.ModelStore
 	SpaceResource        database.SpaceResourceStore
 	Tag                  database.TagStore
+	TagRule              database.TagRuleStore
 	Dataset              database.DatasetStore
 	PromptConversation   database.PromptConversationStore
 	PromptPrefix         database.PromptPrefixStore
@@ -44,6 +45,9 @@ type MockStores struct {
 	MultiSync            database.MultiSyncStore
 	File                 database.FileStore
 	SSH                  database.SSHKeyStore
+	Telemetry            database.TelemetryStore
+	RepoFile             database.RepoFileStore
+	Event                database.EventStore
 }
 
 func NewMockStores(t interface {
@@ -88,6 +92,10 @@ func NewMockStores(t interface {
 		MultiSync:            mockdb.NewMockMultiSyncStore(t),
 		File:                 mockdb.NewMockFileStore(t),
 		SSH:                  mockdb.NewMockSSHKeyStore(t),
+		Telemetry:            mockdb.NewMockTelemetryStore(t),
+		RepoFile:             mockdb.NewMockRepoFileStore(t),
+		Event:                mockdb.NewMockEventStore(t),
+		TagRule:              mockdb.NewMockTagRuleStore(t),
 	}
 }
 
@@ -117,6 +125,10 @@ func (s *MockStores) SpaceResourceMock() *mockdb.MockSpaceResourceStore {
 
 func (s *MockStores) TagMock() *mockdb.MockTagStore {
 	return s.Tag.(*mockdb.MockTagStore)
+}
+
+func (s *MockStores) TagRuleMock() *mockdb.MockTagRuleStore {
+	return s.TagRule.(*mockdb.MockTagRuleStore)
 }
 
 func (s *MockStores) DatasetMock() *mockdb.MockDatasetStore {
@@ -237,4 +249,16 @@ func (s *MockStores) FileMock() *mockdb.MockFileStore {
 
 func (s *MockStores) SSHMock() *mockdb.MockSSHKeyStore {
 	return s.SSH.(*mockdb.MockSSHKeyStore)
+}
+
+func (s *MockStores) TelemetryMock() *mockdb.MockTelemetryStore {
+	return s.Telemetry.(*mockdb.MockTelemetryStore)
+}
+
+func (s *MockStores) RepoFileMock() *mockdb.MockRepoFileStore {
+	return s.RepoFile.(*mockdb.MockRepoFileStore)
+}
+
+func (s *MockStores) EventMock() *mockdb.MockEventStore {
+	return s.Event.(*mockdb.MockEventStore)
 }

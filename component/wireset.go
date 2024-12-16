@@ -487,3 +487,104 @@ func NewTestSpaceSdkComponent(config *config.Config, stores *tests.MockStores) *
 }
 
 var SpaceSdkComponentSet = wire.NewSet(NewTestSpaceSdkComponent)
+
+func NewTestTelemetryComponent(config *config.Config, stores *tests.MockStores) *telemetryComponentImpl {
+	return &telemetryComponentImpl{
+		telemetryStore: stores.Telemetry,
+		userStore:      stores.User,
+		repoStore:      stores.Repo,
+	}
+}
+
+var TelemetryComponentSet = wire.NewSet(NewTestTelemetryComponent)
+
+func NewTestClusterComponent(config *config.Config, deployer deploy.Deployer) *clusterComponentImpl {
+	return &clusterComponentImpl{
+		deployer: deployer,
+	}
+}
+
+var ClusterComponentSet = wire.NewSet(NewTestClusterComponent)
+
+func NewTestEvaluationComponent(config *config.Config, stores *tests.MockStores, deployer deploy.Deployer, accountingComponent AccountingComponent) *evaluationComponentImpl {
+	return &evaluationComponentImpl{
+		deployer:              deployer,
+		userStore:             stores.User,
+		modelStore:            stores.Model,
+		datasetStore:          stores.Dataset,
+		mirrorStore:           stores.Mirror,
+		spaceResourceStore:    stores.SpaceResource,
+		tokenStore:            stores.AccessToken,
+		runtimeFrameworkStore: stores.RuntimeFramework,
+		config:                config,
+		accountingComponent:   accountingComponent,
+	}
+}
+
+var EvaluationComponentSet = wire.NewSet(NewTestEvaluationComponent)
+
+func NewTestHFDatasetComponent(config *config.Config, stores *tests.MockStores, repoComponent RepoComponent, gitServer gitserver.GitServer) *hFDatasetComponentImpl {
+	return &hFDatasetComponentImpl{
+		repoComponent: repoComponent,
+		tagStore:      stores.Tag,
+		datasetStore:  stores.Dataset,
+		repoStore:     stores.Repo,
+		gitServer:     gitServer,
+	}
+}
+
+var HFDatasetComponentSet = wire.NewSet(NewTestHFDatasetComponent)
+
+func NewTestRepoFileComponent(config *config.Config, stores *tests.MockStores, gitServer gitserver.GitServer) *repoFileComponentImpl {
+	return &repoFileComponentImpl{
+		repoFileStore: stores.RepoFile,
+		repoStore:     stores.Repo,
+		gitServer:     gitServer,
+	}
+}
+
+var RepoFileComponentSet = wire.NewSet(NewTestRepoFileComponent)
+
+func NewTestSensitiveComponent(config *config.Config, checker rpc.ModerationSvcClient) *sensitiveComponentImpl {
+	return &sensitiveComponentImpl{
+		checker: checker,
+	}
+}
+
+var SensitiveComponentSet = wire.NewSet(NewTestSensitiveComponent)
+
+func NewTestSSHKeyComponent(config *config.Config, stores *tests.MockStores, gitServer gitserver.GitServer) *sSHKeyComponentImpl {
+	return &sSHKeyComponentImpl{
+		sshKeyStore: stores.SSH,
+		userStore:   stores.User,
+		gitServer:   gitServer,
+	}
+}
+
+var SSHKeyComponentSet = wire.NewSet(NewTestSSHKeyComponent)
+
+func NewTestListComponent(config *config.Config, stores *tests.MockStores) *listComponentImpl {
+	return &listComponentImpl{
+		modelStore:   stores.Model,
+		datasetStore: stores.Dataset,
+		spaceStore:   stores.Space,
+	}
+}
+
+var ListComponentSet = wire.NewSet(NewTestListComponent)
+
+func NewTestSyncClientSettingComponent(config *config.Config, stores *tests.MockStores) *syncClientSettingComponentImpl {
+	return &syncClientSettingComponentImpl{
+		settingStore: stores.SyncClientSetting,
+	}
+}
+
+var SyncClientSettingComponentSet = wire.NewSet(NewTestSyncClientSettingComponent)
+
+func NewTestEventComponent(config *config.Config, stores *tests.MockStores) *eventComponentImpl {
+	return &eventComponentImpl{
+		eventStore: stores.Event,
+	}
+}
+
+var EventComponentSet = wire.NewSet(NewTestEventComponent)

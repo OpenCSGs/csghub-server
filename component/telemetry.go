@@ -12,10 +12,9 @@ import (
 )
 
 type telemetryComponentImpl struct {
-	// Add telemetry related fields and methods here
-	ts database.TelemetryStore
-	us database.UserStore
-	rs database.RepoStore
+	telemetryStore database.TelemetryStore
+	userStore      database.UserStore
+	repoStore      database.RepoStore
 }
 
 type TelemetryComponent interface {
@@ -27,7 +26,7 @@ func NewTelemetryComponent() (TelemetryComponent, error) {
 	ts := database.NewTelemetryStore()
 	us := database.NewUserStore()
 	rs := database.NewRepoStore()
-	return &telemetryComponentImpl{ts: ts, us: us, rs: rs}, nil
+	return &telemetryComponentImpl{telemetryStore: ts, userStore: us, repoStore: rs}, nil
 }
 
 func (tc *telemetryComponentImpl) SaveUsageData(ctx context.Context, usage telemetry.Usage) error {
@@ -52,7 +51,7 @@ func (tc *telemetryComponentImpl) SaveUsageData(ctx context.Context, usage telem
 		Settings:             usage.Settings,
 		Counts:               usage.Counts,
 	}
-	err := tc.ts.Save(ctx, &t)
+	err := tc.telemetryStore.Save(ctx, &t)
 	if err != nil {
 		return fmt.Errorf("failed to save telemetry data to db: %w", err)
 	}
@@ -105,27 +104,27 @@ func (tc *telemetryComponentImpl) GenUsageData(ctx context.Context) (telemetry.U
 }
 
 func (tc *telemetryComponentImpl) getUserCnt(ctx context.Context) (int, error) {
-	return tc.us.CountUsers(ctx)
+	return tc.userStore.CountUsers(ctx)
 }
 
 func (tc *telemetryComponentImpl) getCounts(ctx context.Context) (telemetry.Counts, error) {
 	var counts telemetry.Counts
-	modelCnt, err := tc.rs.CountByRepoType(ctx, types.ModelRepo)
+	modelCnt, err := tc.repoStore.CountByRepoType(ctx, types.ModelRepo)
 	if err != nil {
 		return counts, fmt.Errorf("failed to get model repo count: %w", err)
 	}
 
-	dsCnt, err := tc.rs.CountByRepoType(ctx, types.DatasetRepo)
+	dsCnt, err := tc.repoStore.CountByRepoType(ctx, types.DatasetRepo)
 	if err != nil {
 		return counts, fmt.Errorf("failed to get dataset repo count: %w", err)
 	}
 
-	codeCnt, err := tc.rs.CountByRepoType(ctx, types.CodeRepo)
+	codeCnt, err := tc.repoStore.CountByRepoType(ctx, types.CodeRepo)
 	if err != nil {
 		return counts, fmt.Errorf("failed to get code repo count: %w", err)
 	}
 
-	spaceCnt, err := tc.rs.CountByRepoType(ctx, types.SpaceRepo)
+	spaceCnt, err := tc.repoStore.CountByRepoType(ctx, types.SpaceRepo)
 	if err != nil {
 		return counts, fmt.Errorf("failed to get space repo count: %w", err)
 	}

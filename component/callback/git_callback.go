@@ -21,33 +21,39 @@ import (
 	"opencsg.com/csghub-server/component"
 )
 
-// define GitCallbackComponent struct
-type GitCallbackComponent struct {
-	config       *config.Config
-	gs           gitserver.GitServer
-	tc           component.TagComponent
-	modSvcClient rpc.ModerationSvcClient
-	ms           database.ModelStore
-	ds           database.DatasetStore
-	sc           component.SpaceComponent
-	ss           database.SpaceStore
-	rs           database.RepoStore
-	rrs          database.RepoRelationsStore
-	mirrorStore  database.MirrorStore
-	rrf          database.RepositoriesRuntimeFrameworkStore
-	rac          component.RuntimeArchitectureComponent
-	ras          database.RuntimeArchitecturesStore
-	rfs          database.RuntimeFrameworksStore
-	ts           database.TagStore
-	dt           database.TagRuleStore
+type GitCallbackComponent interface {
+	SetRepoVisibility(yes bool)
+	WatchSpaceChange(ctx context.Context, req *types.GiteaCallbackPushReq) error
+	WatchRepoRelation(ctx context.Context, req *types.GiteaCallbackPushReq) error
+	SetRepoUpdateTime(ctx context.Context, req *types.GiteaCallbackPushReq) error
+	UpdateRepoInfos(ctx context.Context, req *types.GiteaCallbackPushReq) error
+}
+
+type gitCallbackComponentImpl struct {
+	config                    *config.Config
+	gitServer                 gitserver.GitServer
+	tagComponent              component.TagComponent
+	modSvcClient              rpc.ModerationSvcClient
+	modelStore                database.ModelStore
+	datasetStore              database.DatasetStore
+	spaceComponent            component.SpaceComponent
+	spaceStore                database.SpaceStore
+	repoStore                 database.RepoStore
+	repoRelationStore         database.RepoRelationsStore
+	mirrorStore               database.MirrorStore
+	repoRuntimeFrameworkStore database.RepositoriesRuntimeFrameworkStore
+	runtimeArchComponent      component.RuntimeArchitectureComponent
+	runtimeArchStore          database.RuntimeArchitecturesStore
+	runtimeFrameworkStore     database.RuntimeFrameworksStore
+	tagStore                  database.TagStore
+	tagRuleStore              database.TagRuleStore
 	// set visibility if file content is sensitive
 	setRepoVisibility bool
-	pp                component.PromptComponent
 	maxPromptFS       int64
 }
 
 // new CallbackComponent
-func NewGitCallback(config *config.Config) (*GitCallbackComponent, error) {
+func NewGitCallback(config *config.Config) (*gitCallbackComponentImpl, error) {
 	gs, err := git.NewGitServer(config)
 	if err != nil {
 		return nil, err
@@ -74,45 +80,40 @@ func NewGitCallback(config *config.Config) (*GitCallbackComponent, error) {
 	}
 	rfs := database.NewRuntimeFrameworksStore()
 	ts := database.NewTagStore()
-	pp, err := component.NewPromptComponent(config)
-	if err != nil {
-		return nil, err
-	}
 	var modSvcClient rpc.ModerationSvcClient
 	if config.SensitiveCheck.Enable {
 		modSvcClient = rpc.NewModerationSvcHttpClient(fmt.Sprintf("%s:%d", config.Moderation.Host, config.Moderation.Port))
 	}
 	dt := database.NewTagRuleStore()
-	return &GitCallbackComponent{
-		config:       config,
-		gs:           gs,
-		tc:           tc,
-		ms:           ms,
-		ds:           ds,
-		ss:           ss,
-		sc:           sc,
-		rs:           rs,
-		rrs:          rrs,
-		mirrorStore:  mirrorStore,
-		modSvcClient: modSvcClient,
-		rrf:          rrf,
-		rac:          rac,
-		ras:          ras,
-		rfs:          rfs,
-		pp:           pp,
-		ts:           ts,
-		dt:           dt,
-		maxPromptFS:  config.Dataset.PromptMaxJsonlFileSize,
+	return &gitCallbackComponentImpl{
+		config:                    config,
+		gitServer:                 gs,
+		tagComponent:              tc,
+		modelStore:                ms,
+		datasetStore:              ds,
+		spaceStore:                ss,
+		spaceComponent:            sc,
+		repoStore:                 rs,
+		repoRelationStore:         rrs,
+		mirrorStore:               mirrorStore,
+		modSvcClient:              modSvcClient,
+		repoRuntimeFrameworkStore: rrf,
+		runtimeArchComponent:      rac,
+		runtimeArchStore:          ras,
+		runtimeFrameworkStore:     rfs,
+		tagStore:                  ts,
+		tagRuleStore:              dt,
+		maxPromptFS:               config.Dataset.PromptMaxJsonlFileSize,
 	}, nil
 }
 
 // SetRepoVisibility sets a flag whether change repo's visibility if file content is sensitive
-func (c *GitCallbackComponent) SetRepoVisibility(yes bool) {
+func (c *gitCallbackComponentImpl) SetRepoVisibility(yes bool) {
 	c.setRepoVisibility = yes
 }
 
-func (c *GitCallbackComponent) WatchSpaceChange(ctx context.Context, req *types.GiteaCallbackPushReq) error {
-	err := WatchSpaceChange(req, c.ss, c.sc).Run()
+func (c *gitCallbackComponentImpl) WatchSpaceChange(ctx context.Context, req *types.GiteaCallbackPushReq) error {
+	err := WatchSpaceChange(req, c.spaceStore, c.spaceComponent).Run()
 	if err != nil {
 		slog.Error("watch space change failed", slog.Any("error", err))
 		return err
@@ -120,8 +121,8 @@ func (c *GitCallbackComponent) WatchSpaceChange(ctx context.Context, req *types.
 	return nil
 }
 
-func (c *GitCallbackComponent) WatchRepoRelation(ctx context.Context, req *types.GiteaCallbackPushReq) error {
-	err := WatchRepoRelation(req, c.rs, c.rrs, c.gs).Run()
+func (c *gitCallbackComponentImpl) WatchRepoRelation(ctx context.Context, req *types.GiteaCallbackPushReq) error {
+	err := WatchRepoRelation(req, c.repoStore, c.repoRelationStore, c.gitServer).Run()
 	if err != nil {
 		slog.Error("watch repo relation failed", slog.Any("error", err))
 		return err
@@ -129,7 +130,7 @@ func (c *GitCallbackComponent) WatchRepoRelation(ctx context.Context, req *types
 	return nil
 }
 
-func (c *GitCallbackComponent) SetRepoUpdateTime(ctx context.Context, req *types.GiteaCallbackPushReq) error {
+func (c *gitCallbackComponentImpl) SetRepoUpdateTime(ctx context.Context, req *types.GiteaCallbackPushReq) error {
 	// split req.Repository.FullName by '/'
 	splits := strings.Split(req.Repository.FullName, "/")
 	fullNamespace, repoName := splits[0], splits[1]
@@ -138,7 +139,7 @@ func (c *GitCallbackComponent) SetRepoUpdateTime(ctx context.Context, req *types
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 
-	isMirrorRepo, err := c.rs.IsMirrorRepo(ctx, adjustedRepoType, namespace, repoName)
+	isMirrorRepo, err := c.repoStore.IsMirrorRepo(ctx, adjustedRepoType, namespace, repoName)
 	if err != nil {
 		slog.Error("failed to check if a mirror repo", slog.Any("error", err), slog.String("repo_type", string(adjustedRepoType)), slog.String("namespace", namespace), slog.String("name", repoName))
 		return err
@@ -149,7 +150,7 @@ func (c *GitCallbackComponent) SetRepoUpdateTime(ctx context.Context, req *types
 			slog.Error("Error parsing time:", slog.Any("error", err), slog.String("timestamp", req.HeadCommit.Timestamp))
 			return err
 		}
-		err = c.rs.SetUpdateTimeByPath(ctx, adjustedRepoType, namespace, repoName, updated)
+		err = c.repoStore.SetUpdateTimeByPath(ctx, adjustedRepoType, namespace, repoName, updated)
 		if err != nil {
 			slog.Error("failed to set repo update time", slog.Any("error", err), slog.String("repo_type", string(adjustedRepoType)), slog.String("namespace", namespace), slog.String("name", repoName))
 			return err
@@ -166,7 +167,7 @@ func (c *GitCallbackComponent) SetRepoUpdateTime(ctx context.Context, req *types
 			return err
 		}
 	} else {
-		err := c.rs.SetUpdateTimeByPath(ctx, adjustedRepoType, namespace, repoName, time.Now())
+		err := c.repoStore.SetUpdateTimeByPath(ctx, adjustedRepoType, namespace, repoName, time.Now())
 		if err != nil {
 			slog.Error("failed to set repo update time", slog.Any("error", err), slog.String("repo_type", string(adjustedRepoType)), slog.String("namespace", namespace), slog.String("name", repoName))
 			return err
@@ -175,7 +176,7 @@ func (c *GitCallbackComponent) SetRepoUpdateTime(ctx context.Context, req *types
 	return nil
 }
 
-func (c *GitCallbackComponent) UpdateRepoInfos(ctx context.Context, req *types.GiteaCallbackPushReq) error {
+func (c *gitCallbackComponentImpl) UpdateRepoInfos(ctx context.Context, req *types.GiteaCallbackPushReq) error {
 	commits := req.Commits
 	ref := req.Ref
 	// split req.Repository.FullName by '/'
@@ -193,7 +194,7 @@ func (c *GitCallbackComponent) UpdateRepoInfos(ctx context.Context, req *types.G
 	return err
 }
 
-func (c *GitCallbackComponent) SensitiveCheck(ctx context.Context, req *types.GiteaCallbackPushReq) error {
+func (c *gitCallbackComponentImpl) SensitiveCheck(ctx context.Context, req *types.GiteaCallbackPushReq) error {
 	// split req.Repository.FullName by '/'
 	splits := strings.Split(req.Repository.FullName, "/")
 	fullNamespace, repoName := splits[0], splits[1]
@@ -208,11 +209,12 @@ func (c *GitCallbackComponent) SensitiveCheck(ctx context.Context, req *types.Gi
 		slog.Error("fail to submit repo sensitive check", slog.Any("error", err), slog.Any("repo_type", adjustedRepoType), slog.String("namespace", namespace), slog.String("name", repoName))
 		return err
 	}
+
 	return nil
 }
 
 // modifyFiles method handles modified files, skip if not modify README.md
-func (c *GitCallbackComponent) modifyFiles(ctx context.Context, repoType, namespace, repoName, ref string, fileNames []string) error {
+func (c *gitCallbackComponentImpl) modifyFiles(ctx context.Context, repoType, namespace, repoName, ref string, fileNames []string) error {
 	for _, fileName := range fileNames {
 		slog.Debug("modify file", slog.String("file", fileName))
 		// update model runtime
@@ -232,7 +234,7 @@ func (c *GitCallbackComponent) modifyFiles(ctx context.Context, repoType, namesp
 	return nil
 }
 
-func (c *GitCallbackComponent) removeFiles(ctx context.Context, repoType, namespace, repoName, ref string, fileNames []string) error {
+func (c *gitCallbackComponentImpl) removeFiles(ctx context.Context, repoType, namespace, repoName, ref string, fileNames []string) error {
 	// handle removed files
 	// delete tags
 	for _, fileName := range fileNames {
@@ -244,7 +246,7 @@ func (c *GitCallbackComponent) removeFiles(ctx context.Context, repoType, namesp
 			// use empty content to clear all the meta tags
 			const content string = ""
 			adjustedRepoType := types.RepositoryType(strings.TrimSuffix(repoType, "s"))
-			err := c.tc.ClearMetaTags(ctx, adjustedRepoType, namespace, repoName)
+			err := c.tagComponent.ClearMetaTags(ctx, adjustedRepoType, namespace, repoName)
 			if err != nil {
 				slog.Error("failed to clear meta tags", slog.String("content", content),
 					slog.String("repo", path.Join(namespace, repoName)), slog.String("ref", ref),
@@ -267,7 +269,7 @@ func (c *GitCallbackComponent) removeFiles(ctx context.Context, repoType, namesp
 				// case SpaceRepoType:
 				// 	tagScope = database.SpaceTagScope
 			}
-			err := c.tc.UpdateLibraryTags(ctx, tagScope, namespace, repoName, fileName, "")
+			err := c.tagComponent.UpdateLibraryTags(ctx, tagScope, namespace, repoName, fileName, "")
 			if err != nil {
 				slog.Error("failed to remove Library tag", slog.String("namespace", namespace),
 					slog.String("name", repoName), slog.String("ref", ref), slog.String("fileName", fileName),
@@ -279,7 +281,7 @@ func (c *GitCallbackComponent) removeFiles(ctx context.Context, repoType, namesp
 	return nil
 }
 
-func (c *GitCallbackComponent) addFiles(ctx context.Context, repoType, namespace, repoName, ref string, fileNames []string) error {
+func (c *gitCallbackComponentImpl) addFiles(ctx context.Context, repoType, namespace, repoName, ref string, fileNames []string) error {
 	for _, fileName := range fileNames {
 		slog.Debug("add file", slog.String("file", fileName))
 		// update model runtime
@@ -310,7 +312,7 @@ func (c *GitCallbackComponent) addFiles(ctx context.Context, repoType, namespace
 				// case SpaceRepoType:
 				// 	tagScope = database.SpaceTagScope
 			}
-			err := c.tc.UpdateLibraryTags(ctx, tagScope, namespace, repoName, "", fileName)
+			err := c.tagComponent.UpdateLibraryTags(ctx, tagScope, namespace, repoName, "", fileName)
 			if err != nil {
 				slog.Error("failed to add Library tag", slog.String("namespace", namespace),
 					slog.String("name", repoName), slog.String("ref", ref), slog.String("fileName", fileName),
@@ -322,7 +324,7 @@ func (c *GitCallbackComponent) addFiles(ctx context.Context, repoType, namespace
 	return nil
 }
 
-func (c *GitCallbackComponent) updateMetaTags(ctx context.Context, repoType, namespace, repoName, ref, content string) error {
+func (c *gitCallbackComponentImpl) updateMetaTags(ctx context.Context, repoType, namespace, repoName, ref, content string) error {
 	var (
 		err      error
 		tagScope database.TagScope
@@ -342,7 +344,7 @@ func (c *GitCallbackComponent) updateMetaTags(ctx context.Context, repoType, nam
 		// case SpaceRepoType:
 		// 	tagScope = database.SpaceTagScope
 	}
-	_, err = c.tc.UpdateMetaTags(ctx, tagScope, namespace, repoName, content)
+	_, err = c.tagComponent.UpdateMetaTags(ctx, tagScope, namespace, repoName, content)
 	if err != nil {
 		slog.Error("failed to update meta tags", slog.String("namespace", namespace),
 			slog.String("content", content), slog.String("repo", repoName), slog.String("ref", ref),
@@ -353,7 +355,7 @@ func (c *GitCallbackComponent) updateMetaTags(ctx context.Context, repoType, nam
 	return nil
 }
 
-func (c *GitCallbackComponent) getFileRaw(repoType, namespace, repoName, ref, fileName string) (string, error) {
+func (c *gitCallbackComponentImpl) getFileRaw(repoType, namespace, repoName, ref, fileName string) (string, error) {
 	var (
 		content string
 		err     error
@@ -366,7 +368,7 @@ func (c *GitCallbackComponent) getFileRaw(repoType, namespace, repoName, ref, fi
 		Path:      fileName,
 		RepoType:  types.RepositoryType(repoType),
 	}
-	content, err = c.gs.GetRepoFileRaw(context.Background(), getFileRawReq)
+	content, err = c.gitServer.GetRepoFileRaw(context.Background(), getFileRawReq)
 	if err != nil {
 		slog.Error("failed to get file content", slog.String("namespace", namespace),
 			slog.String("file", fileName), slog.String("repo", repoName), slog.String("ref", ref),
@@ -380,7 +382,7 @@ func (c *GitCallbackComponent) getFileRaw(repoType, namespace, repoName, ref, fi
 }
 
 // update repo relations
-func (c *GitCallbackComponent) updateRepoRelations(ctx context.Context, repoType, namespace, repoName, ref, fileName string, deleteAction bool, fileNames []string) {
+func (c *gitCallbackComponentImpl) updateRepoRelations(ctx context.Context, repoType, namespace, repoName, ref, fileName string, deleteAction bool, fileNames []string) {
 	slog.Debug("update model relation for git callback", slog.Any("namespace", namespace), slog.Any("repoName", repoName), slog.Any("repoType", repoType), slog.Any("fileName", fileName), slog.Any("branch", ref))
 	if repoType == fmt.Sprintf("%ss", types.ModelRepo) {
 		c.updateModelRuntimeFrameworks(ctx, repoType, namespace, repoName, ref, fileName, deleteAction)
@@ -391,19 +393,19 @@ func (c *GitCallbackComponent) updateRepoRelations(ctx context.Context, repoType
 }
 
 // update dataset tags for evaluation
-func (c *GitCallbackComponent) updateDatasetTags(ctx context.Context, namespace, repoName string, fileNames []string) {
+func (c *gitCallbackComponentImpl) updateDatasetTags(ctx context.Context, namespace, repoName string, fileNames []string) {
 	// script dataset repo was not supported so far
 	scriptName := fmt.Sprintf("%s.py", repoName)
 	if slices.Contains(fileNames, scriptName) {
 		return
 	}
-	repo, err := c.rs.FindByPath(ctx, types.DatasetRepo, namespace, repoName)
+	repo, err := c.repoStore.FindByPath(ctx, types.DatasetRepo, namespace, repoName)
 	if err != nil || repo == nil {
 		slog.Warn("fail to query repo for in callback", slog.Any("namespace", namespace), slog.Any("repoName", repoName), slog.Any("error", err))
 		return
 	}
 	// check if it's evaluation dataset
-	evalDataset, err := c.dt.FindByRepo(ctx, string(types.EvaluationCategory), namespace, repoName, string(types.DatasetRepo))
+	evalDataset, err := c.tagRuleStore.FindByRepo(ctx, string(types.EvaluationCategory), namespace, repoName, string(types.DatasetRepo))
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			// check if it's a mirror repo
@@ -415,7 +417,7 @@ func (c *GitCallbackComponent) updateDatasetTags(ctx context.Context, namespace,
 			namespace := strings.Split(mirror.SourceRepoPath, "/")[0]
 			name := strings.Split(mirror.SourceRepoPath, "/")[1]
 			// use mirror namespace and name to find dataset
-			evalDataset, err = c.dt.FindByRepo(ctx, string(types.EvaluationCategory), namespace, name, string(types.DatasetRepo))
+			evalDataset, err = c.tagRuleStore.FindByRepo(ctx, string(types.EvaluationCategory), namespace, name, string(types.DatasetRepo))
 			if err != nil {
 				slog.Debug("not an evaluation dataset, ignore it", slog.Any("repo id", repo.Path))
 				return
@@ -429,13 +431,13 @@ func (c *GitCallbackComponent) updateDatasetTags(ctx context.Context, namespace,
 	tagIds := []int64{}
 	tagIds = append(tagIds, evalDataset.Tag.ID)
 	if evalDataset.RuntimeFramework != "" {
-		rTag, _ := c.ts.FindTag(ctx, evalDataset.RuntimeFramework, string(types.DatasetRepo), "runtime_framework")
+		rTag, _ := c.tagStore.FindTag(ctx, evalDataset.RuntimeFramework, string(types.DatasetRepo), "runtime_framework")
 		if rTag != nil {
 			tagIds = append(tagIds, rTag.ID)
 		}
 	}
 
-	err = c.ts.UpsertRepoTags(ctx, repo.ID, []int64{}, tagIds)
+	err = c.tagStore.UpsertRepoTags(ctx, repo.ID, []int64{}, tagIds)
 	if err != nil {
 		slog.Warn("fail to add dataset tag", slog.Any("repoId", repo.ID), slog.Any("tag id", tagIds), slog.Any("error", err))
 	}
@@ -443,39 +445,39 @@ func (c *GitCallbackComponent) updateDatasetTags(ctx context.Context, namespace,
 }
 
 // update model runtime frameworks
-func (c *GitCallbackComponent) updateModelRuntimeFrameworks(ctx context.Context, repoType, namespace, repoName, ref, fileName string, deleteAction bool) {
+func (c *gitCallbackComponentImpl) updateModelRuntimeFrameworks(ctx context.Context, repoType, namespace, repoName, ref, fileName string, deleteAction bool) {
 	// must be model repo and config.json
 	if repoType != fmt.Sprintf("%ss", types.ModelRepo) || fileName != component.ConfigFileName || (ref != ("refs/heads/"+component.MainBranch) && ref != ("refs/heads/"+component.MasterBranch)) {
 		return
 	}
-	repo, err := c.rs.FindByPath(ctx, types.ModelRepo, namespace, repoName)
+	repo, err := c.repoStore.FindByPath(ctx, types.ModelRepo, namespace, repoName)
 	if err != nil || repo == nil {
 		slog.Warn("fail to query repo for git callback", slog.Any("namespace", namespace), slog.Any("repoName", repoName), slog.Any("error", err))
 		return
 	}
 	// delete event
 	if deleteAction {
-		err := c.rrf.DeleteByRepoID(ctx, repo.ID)
+		err := c.repoRuntimeFrameworkStore.DeleteByRepoID(ctx, repo.ID)
 		if err != nil {
 			slog.Warn("fail to remove repo runtimes for git callback", slog.Any("namespace", namespace), slog.Any("repoName", repoName), slog.Any("repoid", repo.ID), slog.Any("error", err))
 		}
 		return
 	}
-	arch, err := c.rac.GetArchitectureFromConfig(ctx, namespace, repoName)
+	arch, err := c.runtimeArchComponent.GetArchitectureFromConfig(ctx, namespace, repoName)
 	if err != nil {
 		slog.Warn("fail to get config.json content for git callback", slog.Any("namespace", namespace), slog.Any("repoName", repoName), slog.Any("error", err))
 		return
 	}
 	slog.Debug("get arch for git callback", slog.Any("namespace", namespace), slog.Any("repoName", repoName), slog.Any("arch", arch))
 	//add resource tag, like ascend
-	runtime_framework_tags, _ := c.ts.GetTagsByScopeAndCategories(ctx, "model", []string{"runtime_framework", "resource"})
+	runtime_framework_tags, _ := c.tagStore.GetTagsByScopeAndCategories(ctx, "model", []string{"runtime_framework", "resource"})
 	fields := strings.Split(repo.Path, "/")
-	err = c.rac.AddResourceTag(ctx, runtime_framework_tags, fields[1], repo.ID)
+	err = c.runtimeArchComponent.AddResourceTag(ctx, runtime_framework_tags, fields[1], repo.ID)
 	if err != nil {
 		slog.Warn("fail to add resource tag", slog.Any("error", err))
 		return
 	}
-	runtimes, err := c.ras.ListByRArchNameAndModel(ctx, arch, fields[1])
+	runtimes, err := c.runtimeArchStore.ListByRArchNameAndModel(ctx, arch, fields[1])
 	// to do check resource models
 	if err != nil {
 		slog.Warn("fail to get runtime ids by arch for git callback", slog.Any("arch", arch), slog.Any("error", err))
@@ -487,7 +489,7 @@ func (c *GitCallbackComponent) updateModelRuntimeFrameworks(ctx context.Context,
 		frameIDs = append(frameIDs, runtime.RuntimeFrameworkID)
 	}
 	slog.Debug("get new frame ids for git callback", slog.Any("namespace", namespace), slog.Any("repoName", repoName), slog.Any("frameIDs", frameIDs))
-	newFrames, err := c.rfs.ListByIDs(ctx, frameIDs)
+	newFrames, err := c.runtimeFrameworkStore.ListByIDs(ctx, frameIDs)
 	if err != nil {
 		slog.Warn("fail to get runtime frameworks for git callback", slog.Any("arch", arch), slog.Any("error", err))
 		return
@@ -498,7 +500,7 @@ func (c *GitCallbackComponent) updateModelRuntimeFrameworks(ctx context.Context,
 		newFrameMap[strconv.FormatInt(frame.ID, 10)] = strconv.FormatInt(frame.ID, 10)
 	}
 	slog.Debug("get new frame map by arch for git callback", slog.Any("namespace", namespace), slog.Any("repoName", repoName), slog.Any("newFrameMap", newFrameMap))
-	oldRepoRuntimes, err := c.rrf.GetByRepoIDs(ctx, repo.ID)
+	oldRepoRuntimes, err := c.repoRuntimeFrameworkStore.GetByRepoIDs(ctx, repo.ID)
 	if err != nil {
 		slog.Warn("fail to get repo runtimes for git callback", slog.Any("repo.ID", repo.ID), slog.Any("error", err))
 		return
@@ -516,12 +518,12 @@ func (c *GitCallbackComponent) updateModelRuntimeFrameworks(ctx context.Context,
 		_, exist := newFrameMap[strconv.FormatInt(old.RuntimeFrameworkID, 10)]
 		if !exist {
 			// remove incorrect relations
-			err := c.rrf.Delete(ctx, old.RuntimeFrameworkID, repo.ID, old.Type)
+			err := c.repoRuntimeFrameworkStore.Delete(ctx, old.RuntimeFrameworkID, repo.ID, old.Type)
 			if err != nil {
 				slog.Warn("fail to delete old repo runtimes for git callback", slog.Any("repo.ID", repo.ID), slog.Any("runtime framework id", old.RuntimeFrameworkID), slog.Any("error", err))
 			}
 			// remove runtime framework tags
-			c.rac.RemoveRuntimeFrameworkTag(ctx, runtime_framework_tags, repo.ID, old.RuntimeFrameworkID)
+			c.runtimeArchComponent.RemoveRuntimeFrameworkTag(ctx, runtime_framework_tags, repo.ID, old.RuntimeFrameworkID)
 		}
 	}
 
@@ -531,12 +533,12 @@ func (c *GitCallbackComponent) updateModelRuntimeFrameworks(ctx context.Context,
 		_, exist := oldFrameMap[strconv.FormatInt(new.ID, 10)]
 		if !exist {
 			// add new relations
-			err := c.rrf.Add(ctx, new.ID, repo.ID, new.Type)
+			err := c.repoRuntimeFrameworkStore.Add(ctx, new.ID, repo.ID, new.Type)
 			if err != nil {
 				slog.Warn("fail to add new repo runtimes for git callback", slog.Any("repo.ID", repo.ID), slog.Any("runtime framework id", new.ID), slog.Any("error", err))
 			}
 			// add runtime framework and resource tags
-			err = c.rac.AddRuntimeFrameworkTag(ctx, runtime_framework_tags, repo.ID, new.ID)
+			err = c.runtimeArchComponent.AddRuntimeFrameworkTag(ctx, runtime_framework_tags, repo.ID, new.ID)
 			if err != nil {
 				slog.Warn("fail to add runtime framework tag for git callback", slog.Any("repo.ID", repo.ID), slog.Any("runtime framework id", new.ID), slog.Any("error", err))
 			}
