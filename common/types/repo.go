@@ -9,6 +9,26 @@ type RepositorySource string
 type RepositorySyncStatus string
 type SensitiveCheckStatus int
 
+// String returns a string representation of the sensitive check status.
+//
+// It returns one of "Fail", "Pending", "Pass", "Skip", "Exception", or "Unknown".
+func (s SensitiveCheckStatus) String() string {
+	switch s {
+	case SensitiveCheckFail:
+		return "Fail"
+	case SensitiveCheckPending:
+		return "Pending"
+	case SensitiveCheckPass:
+		return "Pass"
+	case SensitiveCheckSkip:
+		return "Skip"
+	case SensitiveCheckException:
+		return "Exception"
+	default:
+		return "Unknown"
+	}
+}
+
 const (
 	ResTypeKey  string = "hub-res-type"
 	ResNameKey  string = "hub-res-name"
