@@ -1236,8 +1236,6 @@ definitions:
     required:
     - token
     type: object
-<<<<<<< HEAD
-=======
   types.CreateTag:
     properties:
       built_in:
@@ -1257,14 +1255,6 @@ definitions:
     - name
     - scope
     type: object
-  types.CreateUserResourceReq:
-    properties:
-      order_details:
-        items:
-          $ref: '#/definitions/types.AcctOrderDetailReq'
-        type: array
-    type: object
->>>>>>> 43adc0f4 ([Tags] add tag management feature and UT for ce/ee/saas)
   types.CreateUserTokenRequest:
     properties:
       application:
@@ -1715,6 +1705,15 @@ definitions:
         - $ref: '#/definitions/types.ModelWidgetType'
         description: 'widget UI style: generation,chat'
         example: generation
+    type: object
+  types.ModelPredictReq:
+    properties:
+      current_user:
+        type: string
+      input:
+        type: string
+      version:
+        type: string
     type: object
   types.ModelResp:
     properties:
@@ -6666,6 +6665,52 @@ paths:
       security:
       - ApiKey: []
       summary: Stop a finetune instance
+      tags:
+      - Model
+  /models/{namespace}/{name}/predict:
+    post:
+      consumes:
+      - application/json
+      description: invoke model prediction
+      parameters:
+      - description: namespace
+        in: path
+        name: namespace
+        required: true
+        type: string
+      - description: name
+        in: path
+        name: name
+        required: true
+        type: string
+      - description: current user
+        in: query
+        name: current_user
+        type: string
+      - description: input for model prediction
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/types.ModelPredictReq'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            type: string
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Invoke model prediction
       tags:
       - Model
   /models/{namespace}/{name}/relations:
