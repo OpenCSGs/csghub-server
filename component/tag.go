@@ -20,6 +20,10 @@ type TagComponent interface {
 	UpdateMetaTags(ctx context.Context, tagScope database.TagScope, namespace, name, content string) ([]*database.RepositoryTag, error)
 	UpdateLibraryTags(ctx context.Context, tagScope database.TagScope, namespace, name, oldFilePath, newFilePath string) error
 	UpdateRepoTagsByCategory(ctx context.Context, tagScope database.TagScope, repoID int64, category string, tagNames []string) error
+	CreateTag(ctx context.Context, username string, req types.CreateTag) (*database.Tag, error)
+	GetTagByID(ctx context.Context, username string, id int64) (*database.Tag, error)
+	UpdateTag(ctx context.Context, username string, id int64, req types.UpdateTag) (*database.Tag, error)
+	DeleteTag(ctx context.Context, username string, id int64) error
 }
 
 func NewTagComponent(config *config.Config) (TagComponent, error) {
@@ -29,6 +33,7 @@ func NewTagComponent(config *config.Config) (TagComponent, error) {
 	if config.SensitiveCheck.Enable {
 		tc.sensitiveChecker = rpc.NewModerationSvcHttpClient(fmt.Sprintf("%s:%d", config.Moderation.Host, config.Moderation.Port))
 	}
+	tc.userStore = database.NewUserStore()
 	return tc, nil
 }
 
@@ -36,6 +41,7 @@ type tagComponentImpl struct {
 	tagStore         database.TagStore
 	repoStore        database.RepoStore
 	sensitiveChecker rpc.ModerationSvcClient
+	userStore        database.UserStore
 }
 
 func (tc *tagComponentImpl) AllTagsByScopeAndCategory(ctx context.Context, scope string, category string) ([]*database.Tag, error) {
@@ -186,4 +192,102 @@ func (c *tagComponentImpl) UpdateRepoTagsByCategory(ctx context.Context, tagScop
 		return fmt.Errorf("failed to get old tag ids, error: %w", err)
 	}
 	return c.tagStore.UpsertRepoTags(ctx, repoID, oldTagIDs, tagIDs)
+}
+
+func (c *tagComponentImpl) CreateTag(ctx context.Context, username string, req types.CreateTag) (*database.Tag, error) {
+	user, err := c.userStore.FindByUsername(ctx, username)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get user, error: %w", err)
+	}
+	if !user.CanAdmin() {
+		return nil, fmt.Errorf("user %s do not allowed create tag", username)
+	}
+
+	if c.sensitiveChecker != nil {
+		result, err := c.sensitiveChecker.PassTextCheck(ctx, string(sensitive.ScenarioNicknameDetection), req.Name)
+		if err != nil {
+			return nil, fmt.Errorf("failed to check tag name sensitivity, error: %w", err)
+		}
+		if result.IsSensitive {
+			return nil, fmt.Errorf("tag name contains sensitive words")
+		}
+	}
+
+	newTag := database.Tag{
+		Name:     req.Name,
+		Category: req.Category,
+		Group:    req.Group,
+		Scope:    database.TagScope(req.Scope),
+		BuiltIn:  req.BuiltIn,
+	}
+
+	tag, err := c.tagStore.FindOrCreate(ctx, newTag)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create tag, error: %w", err)
+	}
+	return tag, nil
+}
+
+func (c *tagComponentImpl) GetTagByID(ctx context.Context, username string, id int64) (*database.Tag, error) {
+	user, err := c.userStore.FindByUsername(ctx, username)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get user, error: %w", err)
+	}
+	if !user.CanAdmin() {
+		return nil, fmt.Errorf("user %s do not allowed create tag", username)
+	}
+	tag, err := c.tagStore.FindTagByID(ctx, id)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get tag id %d, error: %w", id, err)
+	}
+	return tag, nil
+}
+
+func (c *tagComponentImpl) UpdateTag(ctx context.Context, username string, id int64, req types.UpdateTag) (*database.Tag, error) {
+	user, err := c.userStore.FindByUsername(ctx, username)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get user, error: %w", err)
+	}
+	if !user.CanAdmin() {
+		return nil, fmt.Errorf("user %s do not allowed create tag", username)
+	}
+
+	if c.sensitiveChecker != nil {
+		result, err := c.sensitiveChecker.PassTextCheck(ctx, string(sensitive.ScenarioNicknameDetection), req.Name)
+		if err != nil {
+			return nil, fmt.Errorf("failed to check tag name sensitivity, error: %w", err)
+		}
+		if result.IsSensitive {
+			return nil, fmt.Errorf("tag name contains sensitive words")
+		}
+	}
+
+	tag := &database.Tag{
+		ID:       id,
+		Category: req.Category,
+		Name:     req.Name,
+		Group:    req.Group,
+		Scope:    database.TagScope(req.Scope),
+		BuiltIn:  req.BuiltIn,
+	}
+	newTag, err := c.tagStore.UpdateTagByID(ctx, tag)
+	if err != nil {
+		return nil, fmt.Errorf("failed to update tag id %d, error: %w", id, err)
+	}
+	return newTag, nil
+}
+
+func (c *tagComponentImpl) DeleteTag(ctx context.Context, username string, id int64) error {
+	user, err := c.userStore.FindByUsername(ctx, username)
+	if err != nil {
+		return fmt.Errorf("failed to get user, error: %w", err)
+	}
+	if !user.CanAdmin() {
+		return fmt.Errorf("user %s do not allowed create tag", username)
+	}
+	err = c.tagStore.DeleteTagByID(ctx, id)
+	if err != nil {
+		return fmt.Errorf("failed to delete tag id %d, error: %w", id, err)
+	}
+	return nil
 }

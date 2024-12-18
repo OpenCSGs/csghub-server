@@ -4,10 +4,157 @@ import (
 	"context"
 	"testing"
 
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+	"opencsg.com/csghub-server/builder/rpc"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/types"
 )
+
+func TestTagComponent_CreateTag(t *testing.T) {
+	ctx := context.TODO()
+
+	username := "testUser"
+
+	req := types.CreateTag{
+		Name:     "my first tag",
+		Category: "testCategory",
+		Group:    "testGroup",
+		Scope:    "testScope",
+		BuiltIn:  true,
+	}
+
+	newTag := database.Tag{
+		Name:     req.Name,
+		Category: req.Category,
+		Group:    req.Group,
+		Scope:    database.TagScope(req.Scope),
+		BuiltIn:  req.BuiltIn,
+	}
+
+	t.Run("admin", func(t *testing.T) {
+		tc := initializeTestTagComponent(ctx, t)
+
+		tc.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, username).Return(database.User{UUID: "testUUID", RoleMask: "admin"}, nil)
+		tc.mocks.stores.TagMock().EXPECT().FindOrCreate(ctx, newTag).Return(&newTag, nil)
+		tc.mocks.moderationClient.EXPECT().PassTextCheck(ctx, mock.Anything, req.Name).Return(&rpc.CheckResult{
+			IsSensitive: false,
+		}, nil)
+
+		tag, err := tc.CreateTag(ctx, username, req)
+		require.Nil(t, err)
+		require.Equal(t, req.Name, tag.Name)
+		require.Equal(t, true, tag.BuiltIn)
+	})
+
+	t.Run("non-admin", func(t *testing.T) {
+		tc := initializeTestTagComponent(ctx, t)
+
+		tc.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, username).Return(database.User{UUID: "testUUID", RoleMask: "persion"}, nil)
+
+		tag, err := tc.CreateTag(ctx, username, req)
+		require.NotNil(t, err)
+		require.Nil(t, tag)
+	})
+}
+
+func TestTagComponent_GetTagByID(t *testing.T) {
+	ctx := context.TODO()
+	username := "testUser"
+	t.Run("admin", func(t *testing.T) {
+		tc := initializeTestTagComponent(ctx, t)
+		tc.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, username).Return(database.User{UUID: "testUUID", RoleMask: "admin"}, nil)
+		tc.mocks.stores.TagMock().EXPECT().FindTagByID(ctx, int64(1)).Return(&database.Tag{ID: int64(1), Name: "test-tag"}, nil)
+
+		tag, err := tc.GetTagByID(ctx, username, int64(1))
+		require.Nil(t, err)
+		require.Equal(t, int64(1), tag.ID)
+		require.Equal(t, "test-tag", tag.Name)
+	})
+
+	t.Run("non-admin", func(t *testing.T) {
+		tc := initializeTestTagComponent(ctx, t)
+
+		tc.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, username).Return(database.User{UUID: "testUUID", RoleMask: "person"}, nil)
+
+		tag, err := tc.GetTagByID(ctx, username, int64(1))
+		require.NotNil(t, err)
+		require.Nil(t, tag)
+	})
+}
+
+func TestTagComponent_UpdateTag(t *testing.T) {
+	ctx := context.TODO()
+
+	username := "testUser"
+
+	req := types.UpdateTag{
+		Name:     "testTag",
+		Category: "testCategory",
+		Group:    "testGroup",
+		Scope:    "testScope",
+		BuiltIn:  true,
+	}
+
+	newTag := database.Tag{
+		ID:       int64(1),
+		Name:     req.Name,
+		Category: req.Category,
+		Group:    req.Group,
+		Scope:    database.TagScope(req.Scope),
+		BuiltIn:  req.BuiltIn,
+	}
+
+	t.Run("admin", func(t *testing.T) {
+		tc := initializeTestTagComponent(ctx, t)
+
+		tc.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, username).Return(database.User{UUID: "testUUID", RoleMask: "admin"}, nil)
+		tc.mocks.stores.TagMock().EXPECT().UpdateTagByID(ctx, &newTag).Return(&newTag, nil)
+		tc.mocks.moderationClient.EXPECT().PassTextCheck(ctx, mock.Anything, req.Name).Return(&rpc.CheckResult{
+			IsSensitive: false,
+		}, nil)
+
+		tag, err := tc.UpdateTag(ctx, username, int64(1), req)
+		require.Nil(t, err)
+		require.Equal(t, req.Name, tag.Name)
+		require.Equal(t, true, tag.BuiltIn)
+	})
+
+	t.Run("non-admin", func(t *testing.T) {
+		tc := initializeTestTagComponent(ctx, t)
+
+		tc.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, username).Return(database.User{UUID: "testUUID", RoleMask: "persion"}, nil)
+
+		tag, err := tc.UpdateTag(ctx, username, int64(1), req)
+		require.NotNil(t, err)
+		require.Nil(t, tag)
+	})
+}
+
+func TestTagComponent_DeleteTag(t *testing.T) {
+	ctx := context.TODO()
+
+	username := "testUser"
+
+	t.Run("admin", func(t *testing.T) {
+		tc := initializeTestTagComponent(ctx, t)
+
+		tc.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, username).Return(database.User{UUID: "testUUID", RoleMask: "admin"}, nil)
+		tc.mocks.stores.TagMock().EXPECT().DeleteTagByID(ctx, int64(1)).Return(nil)
+
+		err := tc.DeleteTag(ctx, username, int64(1))
+		require.Nil(t, err)
+	})
+
+	t.Run("non-admin", func(t *testing.T) {
+		tc := initializeTestTagComponent(ctx, t)
+
+		tc.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, username).Return(database.User{UUID: "testUUID", RoleMask: "persion"}, nil)
+
+		err := tc.DeleteTag(ctx, username, int64(1))
+		require.NotNil(t, err)
+	})
+}
 
 func TestTagComponent_AllTagsByScopeAndCategory(t *testing.T) {
 	ctx := context.TODO()

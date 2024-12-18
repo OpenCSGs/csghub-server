@@ -133,6 +133,174 @@ func (_c *MockTagComponent_ClearMetaTags_Call) RunAndReturn(run func(context.Con
 	return _c
 }
 
+// CreateTag provides a mock function with given fields: ctx, username, req
+func (_m *MockTagComponent) CreateTag(ctx context.Context, username string, req types.CreateTag) (*database.Tag, error) {
+	ret := _m.Called(ctx, username, req)
+
+	if len(ret) == 0 {
+		panic("no return value specified for CreateTag")
+	}
+
+	var r0 *database.Tag
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, types.CreateTag) (*database.Tag, error)); ok {
+		return rf(ctx, username, req)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string, types.CreateTag) *database.Tag); ok {
+		r0 = rf(ctx, username, req)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*database.Tag)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string, types.CreateTag) error); ok {
+		r1 = rf(ctx, username, req)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockTagComponent_CreateTag_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'CreateTag'
+type MockTagComponent_CreateTag_Call struct {
+	*mock.Call
+}
+
+// CreateTag is a helper method to define mock.On call
+//   - ctx context.Context
+//   - username string
+//   - req types.CreateTag
+func (_e *MockTagComponent_Expecter) CreateTag(ctx interface{}, username interface{}, req interface{}) *MockTagComponent_CreateTag_Call {
+	return &MockTagComponent_CreateTag_Call{Call: _e.mock.On("CreateTag", ctx, username, req)}
+}
+
+func (_c *MockTagComponent_CreateTag_Call) Run(run func(ctx context.Context, username string, req types.CreateTag)) *MockTagComponent_CreateTag_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(string), args[2].(types.CreateTag))
+	})
+	return _c
+}
+
+func (_c *MockTagComponent_CreateTag_Call) Return(_a0 *database.Tag, _a1 error) *MockTagComponent_CreateTag_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockTagComponent_CreateTag_Call) RunAndReturn(run func(context.Context, string, types.CreateTag) (*database.Tag, error)) *MockTagComponent_CreateTag_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// DeleteTag provides a mock function with given fields: ctx, username, id
+func (_m *MockTagComponent) DeleteTag(ctx context.Context, username string, id int64) error {
+	ret := _m.Called(ctx, username, id)
+
+	if len(ret) == 0 {
+		panic("no return value specified for DeleteTag")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, int64) error); ok {
+		r0 = rf(ctx, username, id)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// MockTagComponent_DeleteTag_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'DeleteTag'
+type MockTagComponent_DeleteTag_Call struct {
+	*mock.Call
+}
+
+// DeleteTag is a helper method to define mock.On call
+//   - ctx context.Context
+//   - username string
+//   - id int64
+func (_e *MockTagComponent_Expecter) DeleteTag(ctx interface{}, username interface{}, id interface{}) *MockTagComponent_DeleteTag_Call {
+	return &MockTagComponent_DeleteTag_Call{Call: _e.mock.On("DeleteTag", ctx, username, id)}
+}
+
+func (_c *MockTagComponent_DeleteTag_Call) Run(run func(ctx context.Context, username string, id int64)) *MockTagComponent_DeleteTag_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(string), args[2].(int64))
+	})
+	return _c
+}
+
+func (_c *MockTagComponent_DeleteTag_Call) Return(_a0 error) *MockTagComponent_DeleteTag_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockTagComponent_DeleteTag_Call) RunAndReturn(run func(context.Context, string, int64) error) *MockTagComponent_DeleteTag_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// GetTagByID provides a mock function with given fields: ctx, username, id
+func (_m *MockTagComponent) GetTagByID(ctx context.Context, username string, id int64) (*database.Tag, error) {
+	ret := _m.Called(ctx, username, id)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetTagByID")
+	}
+
+	var r0 *database.Tag
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, int64) (*database.Tag, error)); ok {
+		return rf(ctx, username, id)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string, int64) *database.Tag); ok {
+		r0 = rf(ctx, username, id)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*database.Tag)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string, int64) error); ok {
+		r1 = rf(ctx, username, id)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockTagComponent_GetTagByID_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetTagByID'
+type MockTagComponent_GetTagByID_Call struct {
+	*mock.Call
+}
+
+// GetTagByID is a helper method to define mock.On call
+//   - ctx context.Context
+//   - username string
+//   - id int64
+func (_e *MockTagComponent_Expecter) GetTagByID(ctx interface{}, username interface{}, id interface{}) *MockTagComponent_GetTagByID_Call {
+	return &MockTagComponent_GetTagByID_Call{Call: _e.mock.On("GetTagByID", ctx, username, id)}
+}
+
+func (_c *MockTagComponent_GetTagByID_Call) Run(run func(ctx context.Context, username string, id int64)) *MockTagComponent_GetTagByID_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(string), args[2].(int64))
+	})
+	return _c
+}
+
+func (_c *MockTagComponent_GetTagByID_Call) Return(_a0 *database.Tag, _a1 error) *MockTagComponent_GetTagByID_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockTagComponent_GetTagByID_Call) RunAndReturn(run func(context.Context, string, int64) (*database.Tag, error)) *MockTagComponent_GetTagByID_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // UpdateLibraryTags provides a mock function with given fields: ctx, tagScope, namespace, name, oldFilePath, newFilePath
 func (_m *MockTagComponent) UpdateLibraryTags(ctx context.Context, tagScope database.TagScope, namespace string, name string, oldFilePath string, newFilePath string) error {
 	ret := _m.Called(ctx, tagScope, namespace, name, oldFilePath, newFilePath)
@@ -292,6 +460,67 @@ func (_c *MockTagComponent_UpdateRepoTagsByCategory_Call) Return(_a0 error) *Moc
 }
 
 func (_c *MockTagComponent_UpdateRepoTagsByCategory_Call) RunAndReturn(run func(context.Context, database.TagScope, int64, string, []string) error) *MockTagComponent_UpdateRepoTagsByCategory_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// UpdateTag provides a mock function with given fields: ctx, username, id, req
+func (_m *MockTagComponent) UpdateTag(ctx context.Context, username string, id int64, req types.UpdateTag) (*database.Tag, error) {
+	ret := _m.Called(ctx, username, id, req)
+
+	if len(ret) == 0 {
+		panic("no return value specified for UpdateTag")
+	}
+
+	var r0 *database.Tag
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, int64, types.UpdateTag) (*database.Tag, error)); ok {
+		return rf(ctx, username, id, req)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string, int64, types.UpdateTag) *database.Tag); ok {
+		r0 = rf(ctx, username, id, req)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*database.Tag)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string, int64, types.UpdateTag) error); ok {
+		r1 = rf(ctx, username, id, req)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockTagComponent_UpdateTag_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'UpdateTag'
+type MockTagComponent_UpdateTag_Call struct {
+	*mock.Call
+}
+
+// UpdateTag is a helper method to define mock.On call
+//   - ctx context.Context
+//   - username string
+//   - id int64
+//   - req types.UpdateTag
+func (_e *MockTagComponent_Expecter) UpdateTag(ctx interface{}, username interface{}, id interface{}, req interface{}) *MockTagComponent_UpdateTag_Call {
+	return &MockTagComponent_UpdateTag_Call{Call: _e.mock.On("UpdateTag", ctx, username, id, req)}
+}
+
+func (_c *MockTagComponent_UpdateTag_Call) Run(run func(ctx context.Context, username string, id int64, req types.UpdateTag)) *MockTagComponent_UpdateTag_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(string), args[2].(int64), args[3].(types.UpdateTag))
+	})
+	return _c
+}
+
+func (_c *MockTagComponent_UpdateTag_Call) Return(_a0 *database.Tag, _a1 error) *MockTagComponent_UpdateTag_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockTagComponent_UpdateTag_Call) RunAndReturn(run func(context.Context, string, int64, types.UpdateTag) (*database.Tag, error)) *MockTagComponent_UpdateTag_Call {
 	_c.Call.Return(run)
 	return _c
 }
