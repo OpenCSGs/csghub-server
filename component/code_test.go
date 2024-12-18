@@ -166,12 +166,13 @@ func TestCodeComponent_Show(t *testing.T) {
 			HTTPCloneURL: "/s/.git",
 			SSHCloneURL:  ":s/.git",
 		},
-		RepositoryID: 11,
-		Namespace:    &types.Namespace{},
-		Name:         "name",
-		User:         types.User{Username: "user"},
-		CanManage:    true,
-		UserLikes:    true,
+		RepositoryID:         11,
+		Namespace:            &types.Namespace{},
+		Name:                 "name",
+		User:                 types.User{Username: "user"},
+		CanManage:            true,
+		UserLikes:            true,
+		SensitiveCheckStatus: "Pending",
 	}, data)
 }
 

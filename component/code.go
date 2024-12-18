@@ -349,6 +349,9 @@ func (c *codeComponentImpl) Show(ctx context.Context, namespace, name, currentUs
 		CanManage:  permission.CanAdmin,
 		Namespace:  ns,
 	}
+	if permission.CanAdmin {
+		resCode.SensitiveCheckStatus = code.Repository.SensitiveCheckStatus.String()
+	}
 
 	return resCode, nil
 }
