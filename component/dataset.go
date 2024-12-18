@@ -77,7 +77,7 @@ saved_model/**/* filter=lfs diff=lfs merge=lfs -text
 
 const (
 	initCommitMessage     = "initial commit"
-	ossFileExpireSeconds  = 259200 * time.Second
+	ossFileExpire         = 259200 * time.Second
 	readmeFileName        = "README.md"
 	gitattributesFileName = ".gitattributes"
 )
@@ -472,6 +472,9 @@ func (c *datasetComponentImpl) Show(ctx context.Context, namespace, name, curren
 		CanWrite:            permission.CanWrite,
 		CanManage:           permission.CanAdmin,
 		Namespace:           ns,
+	}
+	if permission.CanAdmin {
+		resDataset.SensitiveCheckStatus = dataset.Repository.SensitiveCheckStatus.String()
 	}
 
 	return resDataset, nil

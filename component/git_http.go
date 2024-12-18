@@ -281,7 +281,7 @@ func (c *gitHTTPComponentImpl) buildObjectResponse(ctx context.Context, req type
 			var link *types.Link
 			reqParams := make(url.Values)
 			objectKey := path.Join("lfs", pointer.RelativePath())
-			url, err := c.s3Client.PresignedGetObject(ctx, c.config.S3.Bucket, objectKey, ossFileExpireSeconds, reqParams)
+			url, err := c.s3Client.PresignedGetObject(ctx, c.config.S3.Bucket, objectKey, ossFileExpire, reqParams)
 			if url != nil && err == nil {
 				delete(header, "Authorization")
 				link = &types.Link{Href: url.String(), Header: header}
@@ -682,7 +682,7 @@ func (c *gitHTTPComponentImpl) LfsDownload(ctx context.Context, req types.Downlo
 		// allow rename when download through content-disposition header
 		reqParams.Set("response-content-disposition", fmt.Sprintf("attachment;filename=%s", req.SaveAs))
 	}
-	signedUrl, err := c.s3Client.PresignedGetObject(ctx, c.config.S3.Bucket, objectKey, ossFileExpireSeconds, reqParams)
+	signedUrl, err := c.s3Client.PresignedGetObject(ctx, c.config.S3.Bucket, objectKey, ossFileExpire, reqParams)
 	if err != nil {
 		return nil, err
 	}
