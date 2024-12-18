@@ -123,7 +123,8 @@ func (h *MirrorHandler) Index(ctx *gin.Context) {
 		httpbase.UnauthorizedError(ctx, component.ErrUserNotFound)
 		return
 	}
-	repos, total, err := h.mc.Index(ctx, currentUser, per, page)
+	search := ctx.Query("search")
+	repos, total, err := h.mc.Index(ctx, currentUser, per, page, search)
 	if err != nil {
 		slog.Error("failed to get mirror repos", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)

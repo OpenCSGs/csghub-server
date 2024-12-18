@@ -51,6 +51,7 @@ func TestMirrorStore_CRUD(t *testing.T) {
 		RepositoryType: types.ModelRepo,
 		GitPath:        "models_ns/n",
 		Name:           "repo",
+		Path:           "ns/n",
 	}
 	err = db.Core.NewInsert().Model(repo).Scan(ctx, repo)
 	require.Nil(t, err)
@@ -194,7 +195,7 @@ func TestMirrorStore_ToSync(t *testing.T) {
 	for _, m := range ms {
 		names = append(names, m.Interval)
 	}
-	require.ElementsMatch(t, []string{"m1", "m3", "m6", "m7"}, names)
+	require.ElementsMatch(t, []string{"m1", "m3", "m5", "m6", "m7"}, names)
 
 	ms, err = store.ToSyncLfs(ctx)
 	require.Nil(t, err)
@@ -222,7 +223,7 @@ func TestMirrorStore_IndexWithPagination(t *testing.T) {
 		require.Nil(t, err)
 	}
 
-	ms, count, err := store.IndexWithPagination(ctx, 10, 1)
+	ms, count, err := store.IndexWithPagination(ctx, 10, 1, "foo")
 	require.Nil(t, err)
 	names := []string{}
 	for _, m := range ms {
@@ -249,5 +250,13 @@ func TestMirrorStore_StatusCount(t *testing.T) {
 		_, err := store.Create(ctx, m)
 		require.Nil(t, err)
 	}
+
+	cs, err := store.StatusCount(ctx)
+	require.Nil(t, err)
+	require.Equal(t, 2, len(cs))
+	require.ElementsMatch(t, []database.MirrorStatusCount{
+		{types.MirrorFailed, 2},
+		{types.MirrorFinished, 1},
+	}, cs)
 
 }
