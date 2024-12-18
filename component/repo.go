@@ -968,7 +968,7 @@ func (c *repoComponentImpl) DownloadFile(ctx context.Context, req *types.GetFile
 			// allow rename when download through content-disposition header
 			reqParams.Set("response-content-disposition", fmt.Sprintf("attachment;filename=%s", req.SaveAs))
 		}
-		signedUrl, err := c.s3Client.PresignedGetObject(ctx, c.lfsBucket, objectKey, ossFileExpireSeconds, reqParams)
+		signedUrl, err := c.s3Client.PresignedGetObject(ctx, c.lfsBucket, objectKey, ossFileExpire, reqParams)
 		if err != nil {
 			return nil, 0, downloadUrl, err
 		}
@@ -1289,7 +1289,7 @@ func (c *repoComponentImpl) SDKDownloadFile(ctx context.Context, req *types.GetF
 			// allow rename when download through content-disposition header
 			reqParams.Set("response-content-disposition", fmt.Sprintf("attachment;filename=%s", req.SaveAs))
 		}
-		signedUrl, err := c.s3Client.PresignedGetObject(ctx, c.lfsBucket, objectKey, ossFileExpireSeconds, reqParams)
+		signedUrl, err := c.s3Client.PresignedGetObject(ctx, c.lfsBucket, objectKey, ossFileExpire, reqParams)
 		if err != nil {
 			if err.Error() == ErrNotFoundMessage || err.Error() == ErrGetContentsOrList {
 				return nil, 0, downloadUrl, ErrNotFound

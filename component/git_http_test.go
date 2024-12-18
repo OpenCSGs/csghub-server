@@ -476,7 +476,7 @@ func TestGitHTTPComponent_LfsDownload(t *testing.T) {
 	reqParams := make(url.Values)
 	reqParams.Set("response-content-disposition", fmt.Sprintf("attachment;filename=%s", "sa"))
 	url := &url.URL{Scheme: "http"}
-	gc.mocks.s3Client.EXPECT().PresignedGetObject(ctx, "", "lfs/oid", ossFileExpireSeconds, reqParams).Return(url, nil)
+	gc.mocks.s3Client.EXPECT().PresignedGetObject(ctx, "", "lfs/oid", ossFileExpire, reqParams).Return(url, nil)
 
 	u, err := gc.LfsDownload(ctx, types.DownloadRequest{
 		Oid:         "oid",
