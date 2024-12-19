@@ -125,7 +125,7 @@ func (c *spaceComponentImpl) Create(ctx context.Context, req types.CreateSpaceRe
 	if err != nil {
 		return nil, fmt.Errorf("invalid hardware setting, %w", err)
 	}
-	_, err = c.deployer.CheckResourceAvailable(ctx, req.ClusterID, &hardware)
+	_, err = c.deployer.CheckResourceAvailable(ctx, req.ClusterID, 0, &hardware)
 	if err != nil {
 		return nil, fmt.Errorf("fail to check resource, %w", err)
 	}

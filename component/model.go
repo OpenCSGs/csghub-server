@@ -63,11 +63,11 @@ saved_model/**/* filter=lfs diff=lfs merge=lfs -text
 const LFSPrefix = "version https://git-lfs.github.com/spec/v1"
 
 type ModelComponent interface {
-	Index(ctx context.Context, filter *types.RepoFilter, per, page int) ([]types.Model, int, error)
+	Index(ctx context.Context, filter *types.RepoFilter, per, page int, needOpWeight bool) ([]*types.Model, int, error)
 	Create(ctx context.Context, req *types.CreateModelReq) (*types.Model, error)
 	Update(ctx context.Context, req *types.UpdateModelReq) (*types.Model, error)
 	Delete(ctx context.Context, namespace, name, currentUser string) error
-	Show(ctx context.Context, namespace, name, currentUser string) (*types.Model, error)
+	Show(ctx context.Context, namespace, name, currentUser string, needOpWeight bool) (*types.Model, error)
 	GetServerless(ctx context.Context, namespace, name, currentUser string) (*types.DeployRepo, error)
 	SDKModelInfo(ctx context.Context, namespace, name, ref, currentUser string) (*types.SDKModelInfo, error)
 	Relations(ctx context.Context, namespace, name, currentUser string) (*types.Relations, error)
@@ -143,10 +143,10 @@ type modelComponentImpl struct {
 	userSvcClient             rpc.UserSvcClient
 }
 
-func (c *modelComponentImpl) Index(ctx context.Context, filter *types.RepoFilter, per, page int) ([]types.Model, int, error) {
+func (c *modelComponentImpl) Index(ctx context.Context, filter *types.RepoFilter, per, page int, needOpWeight bool) ([]*types.Model, int, error) {
 	var (
 		err       error
-		resModels []types.Model
+		resModels []*types.Model
 	)
 	repos, total, err := c.repoComponent.PublicToUser(ctx, types.ModelRepo, filter.Username, filter, per, page)
 	if err != nil {
@@ -187,7 +187,7 @@ func (c *modelComponentImpl) Index(ctx context.Context, filter *types.RepoFilter
 				UpdatedAt: tag.UpdatedAt,
 			})
 		}
-		resModels = append(resModels, types.Model{
+		resModels = append(resModels, &types.Model{
 			ID:           model.ID,
 			Name:         repo.Name,
 			Nickname:     repo.Nickname,
@@ -205,6 +205,9 @@ func (c *modelComponentImpl) Index(ctx context.Context, filter *types.RepoFilter
 			License:      repo.License,
 			Repository:   common.BuildCloneInfo(c.config, model.Repository),
 		})
+	}
+	if needOpWeight {
+		c.addOpWeightToModel(ctx, repoIDs, resModels)
 	}
 	return resModels, total, nil
 }
@@ -393,7 +396,7 @@ func (c *modelComponentImpl) Delete(ctx context.Context, namespace, name, curren
 	return nil
 }
 
-func (c *modelComponentImpl) Show(ctx context.Context, namespace, name, currentUser string) (*types.Model, error) {
+func (c *modelComponentImpl) Show(ctx context.Context, namespace, name, currentUser string, needOpWeight bool) (*types.Model, error) {
 	var tags []types.RepoTag
 	model, err := c.modelStore.FindByPath(ctx, namespace, name)
 	if err != nil {
@@ -459,10 +462,16 @@ func (c *modelComponentImpl) Show(ctx context.Context, namespace, name, currentU
 		BaseModel:           model.BaseModel,
 		License:             model.Repository.License,
 		MirrorLastUpdatedAt: model.Repository.Mirror.LastUpdatedAt,
-
-		CanWrite:  permission.CanWrite,
-		CanManage: permission.CanAdmin,
-		Namespace: ns,
+		CanWrite:            permission.CanWrite,
+		CanManage:           permission.CanAdmin,
+		Namespace:           ns,
+	}
+	// admin user or owner can see the sensitive check status
+	if permission.CanAdmin {
+		resModel.SensitiveCheckStatus = model.Repository.SensitiveCheckStatus.String()
+	}
+	if needOpWeight {
+		c.addOpWeightToModel(ctx, []int64{model.RepositoryID}, []*types.Model{resModel})
 	}
 	inferences, _ := c.repoRuntimeFrameworkStore.GetByRepoIDsAndType(ctx, model.Repository.ID, types.InferenceType)
 	if len(inferences) > 0 {
@@ -922,17 +931,15 @@ func (c *modelComponentImpl) Deploy(ctx context.Context, deployReq types.DeployA
 		return -1, fmt.Errorf("invalid hardware setting, %w", err)
 	}
 
-	_, err = c.deployer.CheckResourceAvailable(ctx, req.ClusterID, &hardware)
+	// resource available only if err is nil, err message should contain
+	// the reason why resource is unavailable
+	err = c.resourceAvailable(ctx, resource, req, deployReq, hardware)
 	if err != nil {
-		return -1, fmt.Errorf("fail to check resource, %w", err)
+		return -1, err
 	}
 
 	// choose image
-	containerImg := frame.FrameCpuImage
-	if hardware.Gpu.Num != "" {
-		// use gpu image
-		containerImg = frame.FrameImage
-	}
+	containerImg := c.containerImg(frame, hardware)
 
 	// create deploy for model
 	return c.deployer.Deploy(ctx, types.DeployRepo{
@@ -957,6 +964,7 @@ func (c *modelComponentImpl) Deploy(ctx context.Context, deployReq types.DeployA
 		Type:             deployReq.DeployType,
 		UserUUID:         user.UUID,
 		SKU:              strconv.FormatInt(resource.ID, 10),
+		OrderDetailID:    req.OrderDetailID,
 	})
 }
 
