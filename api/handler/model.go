@@ -92,7 +92,7 @@ func (h *ModelHandler) Index(ctx *gin.Context) {
 		return
 	}
 
-	models, total, err := h.c.Index(ctx, filter, per, page)
+	models, total, err := h.c.Index(ctx, filter, per, page, false)
 	if err != nil {
 		slog.Error("Failed to get models", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
@@ -264,7 +264,7 @@ func (h *ModelHandler) Show(ctx *gin.Context) {
 		return
 	}
 	currentUser := httpbase.GetCurrentUser(ctx)
-	detail, err := h.c.Show(ctx, namespace, name, currentUser)
+	detail, err := h.c.Show(ctx, namespace, name, currentUser, false)
 	if err != nil {
 		if errors.Is(err, component.ErrUnauthorized) {
 			httpbase.UnauthorizedError(ctx, err)
