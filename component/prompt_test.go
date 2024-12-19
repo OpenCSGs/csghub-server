@@ -133,8 +133,8 @@ func TestPromptComponent_CreatePrompt(t *testing.T) {
 					Name:        "n",
 					CurrentUser: "foo",
 					Path:        "p",
-				}, &CreatePromptReq{
-					Prompt: Prompt{Title: "TEST", Content: "test"},
+				}, &types.CreatePromptReq{
+					Prompt: types.Prompt{Title: "TEST", Content: "test"},
 				})
 				require.NotNil(t, err)
 				return
@@ -166,8 +166,8 @@ func TestPromptComponent_CreatePrompt(t *testing.T) {
 				Name:        "n",
 				CurrentUser: "foo",
 				Path:        "p",
-			}, &CreatePromptReq{
-				Prompt: Prompt{Title: "TEST", Content: "test"},
+			}, &types.CreatePromptReq{
+				Prompt: types.Prompt{Title: "TEST", Content: "test"},
 			})
 			require.Nil(t, err)
 
@@ -204,8 +204,8 @@ func TestPromptComponent_UpdatePrompt(t *testing.T) {
 					Name:        "n",
 					CurrentUser: "foo",
 					Path:        "TEST.jsonl",
-				}, &UpdatePromptReq{
-					Prompt: Prompt{Title: "TEST.jsonl", Content: "test"},
+				}, &types.UpdatePromptReq{
+					Prompt: types.Prompt{Title: "TEST.jsonl", Content: "test"},
 				})
 				require.NotNil(t, err)
 				return
@@ -237,8 +237,8 @@ func TestPromptComponent_UpdatePrompt(t *testing.T) {
 				Name:        "n",
 				CurrentUser: "foo",
 				Path:        "TEST.jsonl",
-			}, &UpdatePromptReq{
-				Prompt: Prompt{Title: "TEST", Content: "test"},
+			}, &types.UpdatePromptReq{
+				Prompt: types.Prompt{Title: "TEST", Content: "test"},
 			})
 			require.Nil(t, err)
 

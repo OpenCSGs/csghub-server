@@ -15,8 +15,20 @@ import (
 	"github.com/alibabacloud-go/tea/tea"
 	"github.com/aliyun/alibaba-cloud-sdk-go/services/green"
 	"opencsg.com/csghub-server/common/config"
-	"opencsg.com/csghub-server/common/utils/common"
 )
+
+// copy from common/utils/common to avoid cycle import
+func truncString(s string, limit int) string {
+	if len(s) <= limit {
+		return s
+	}
+
+	s1 := []byte(s[:limit])
+	s1[limit-1] = '.'
+	s1[limit-2] = '.'
+	s1[limit-3] = '.'
+	return string(s1)
+}
 
 type GreenClient interface {
 	TextScan(request *green.TextScanRequest) (response *TextScanResponse, err error)
@@ -149,7 +161,7 @@ func (c *AliyunGreenChecker) PassLargeTextCheck(ctx context.Context, text string
 			}
 
 			if result.Suggestion == "block" {
-				slog.Info("block content", slog.String("content", common.TruncString(data.Content, 128)), slog.String("taskId", data.TaskId),
+				slog.Info("block content", slog.String("content", truncString(data.Content, 128)), slog.String("taskId", data.TaskId),
 					slog.String("aliyun_request_id", resp.RequestID))
 
 				return &CheckResult{IsSensitive: true, Reason: result.Label}, nil
