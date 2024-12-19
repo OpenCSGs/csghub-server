@@ -10515,7 +10515,82 @@ paths:
       summary: Get latest version
       tags:
       - Sync
-  /tag/{id}:
+  /tags:
+    get:
+      consumes:
+      - application/json
+      description: Get all tags
+      parameters:
+      - description: category name
+        in: query
+        name: category
+        type: string
+      - description: scope name
+        enum:
+        - model
+        - dataset
+        in: query
+        name: scope
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: tags
+          schema:
+            allOf:
+            - $ref: '#/definitions/types.ResponseWithTotal'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/database.Tag'
+                  type: array
+              type: object
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Get all tags
+      tags:
+      - Tag
+    post:
+      consumes:
+      - application/json
+      description: Create new tag
+      parameters:
+      - description: body
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/types.CreateTag'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/types.Response'
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Create new tag
+      tags:
+      - Tag
+  /tags/{id}:
     delete:
       consumes:
       - application/json
@@ -10610,81 +10685,6 @@ paths:
       security:
       - ApiKey: []
       summary: Update a tag by id
-      tags:
-      - Tag
-  /tags:
-    get:
-      consumes:
-      - application/json
-      description: Get all tags
-      parameters:
-      - description: category name
-        in: query
-        name: category
-        type: string
-      - description: scope name
-        enum:
-        - model
-        - dataset
-        in: query
-        name: scope
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: tags
-          schema:
-            allOf:
-            - $ref: '#/definitions/types.ResponseWithTotal'
-            - properties:
-                data:
-                  items:
-                    $ref: '#/definitions/database.Tag'
-                  type: array
-              type: object
-        "400":
-          description: Bad request
-          schema:
-            $ref: '#/definitions/types.APIBadRequest'
-        "500":
-          description: Internal server error
-          schema:
-            $ref: '#/definitions/types.APIInternalServerError'
-      security:
-      - ApiKey: []
-      summary: Get all tags
-      tags:
-      - Tag
-    post:
-      consumes:
-      - application/json
-      description: Create new tag
-      parameters:
-      - description: body
-        in: body
-        name: body
-        required: true
-        schema:
-          $ref: '#/definitions/types.CreateTag'
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/types.Response'
-        "400":
-          description: Bad request
-          schema:
-            $ref: '#/definitions/types.APIBadRequest'
-        "500":
-          description: Internal server error
-          schema:
-            $ref: '#/definitions/types.APIInternalServerError'
-      security:
-      - ApiKey: []
-      summary: Create new tag
       tags:
       - Tag
   /telemetry/usage:

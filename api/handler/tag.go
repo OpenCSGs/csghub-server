@@ -99,7 +99,7 @@ func (t *TagsHandler) CreateTag(ctx *gin.Context) {
 // @Success      200  {object}  types.Response{database.Tag} "OK"
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
-// @Router       /tag/{id} [get]
+// @Router       /tags/{id} [get]
 func (t *TagsHandler) GetTagByID(ctx *gin.Context) {
 	userName := httpbase.GetCurrentUser(ctx)
 	if userName == "" {
@@ -133,7 +133,7 @@ func (t *TagsHandler) GetTagByID(ctx *gin.Context) {
 // @Success      200  {object}  types.Response{database.Tag} "OK"
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
-// @Router       /tag/{id} [put]
+// @Router       /tags/{id} [put]
 func (t *TagsHandler) UpdateTag(ctx *gin.Context) {
 	userName := httpbase.GetCurrentUser(ctx)
 	if userName == "" {
@@ -172,7 +172,7 @@ func (t *TagsHandler) UpdateTag(ctx *gin.Context) {
 // @Success      200  {object}  types.Response{} "OK"
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
-// @Router       /tag/{id} [delete]
+// @Router       /tags/{id} [delete]
 func (t *TagsHandler) DeleteTag(ctx *gin.Context) {
 	userName := httpbase.GetCurrentUser(ctx)
 	if userName == "" {

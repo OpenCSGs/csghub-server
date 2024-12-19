@@ -10022,7 +10022,129 @@ const docTemplate = `{
                 }
             }
         },
-        "/tag/{id}": {
+        "/tags": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "description": "Get all tags",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Tag"
+                ],
+                "summary": "Get all tags",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "category name",
+                        "name": "category",
+                        "in": "query"
+                    },
+                    {
+                        "enum": [
+                            "model",
+                            "dataset"
+                        ],
+                        "type": "string",
+                        "description": "scope name",
+                        "name": "scope",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "tags",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/types.ResponseWithTotal"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/definitions/database.Tag"
+                                            }
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "description": "Create new tag",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Tag"
+                ],
+                "summary": "Create new tag",
+                "parameters": [
+                    {
+                        "description": "body",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/types.CreateTag"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/types.Response"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            }
+        },
+        "/tags/{id}": {
             "get": {
                 "security": [
                     {
@@ -10150,128 +10272,6 @@ const docTemplate = `{
                         "name": "id",
                         "in": "path",
                         "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/types.Response"
-                        }
-                    },
-                    "400": {
-                        "description": "Bad request",
-                        "schema": {
-                            "$ref": "#/definitions/types.APIBadRequest"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal server error",
-                        "schema": {
-                            "$ref": "#/definitions/types.APIInternalServerError"
-                        }
-                    }
-                }
-            }
-        },
-        "/tags": {
-            "get": {
-                "security": [
-                    {
-                        "ApiKey": []
-                    }
-                ],
-                "description": "Get all tags",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Tag"
-                ],
-                "summary": "Get all tags",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "category name",
-                        "name": "category",
-                        "in": "query"
-                    },
-                    {
-                        "enum": [
-                            "model",
-                            "dataset"
-                        ],
-                        "type": "string",
-                        "description": "scope name",
-                        "name": "scope",
-                        "in": "query"
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "tags",
-                        "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/types.ResponseWithTotal"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "type": "array",
-                                            "items": {
-                                                "$ref": "#/definitions/database.Tag"
-                                            }
-                                        }
-                                    }
-                                }
-                            ]
-                        }
-                    },
-                    "400": {
-                        "description": "Bad request",
-                        "schema": {
-                            "$ref": "#/definitions/types.APIBadRequest"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal server error",
-                        "schema": {
-                            "$ref": "#/definitions/types.APIInternalServerError"
-                        }
-                    }
-                }
-            },
-            "post": {
-                "security": [
-                    {
-                        "ApiKey": []
-                    }
-                ],
-                "description": "Create new tag",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Tag"
-                ],
-                "summary": "Create new tag",
-                "parameters": [
-                    {
-                        "description": "body",
-                        "name": "body",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/types.CreateTag"
-                        }
                     }
                 ],
                 "responses": {
