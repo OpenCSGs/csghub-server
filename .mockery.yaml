@@ -17,6 +17,8 @@ packages:
             SpaceComponent:
             RuntimeArchitectureComponent:
             SensitiveComponent:
+            CodeComponent:
+            PromptComponent:
     opencsg.com/csghub-server/user/component:
         config:
         interfaces:

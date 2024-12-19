@@ -25,14 +25,14 @@ func NewCodeHandler(config *config.Config) (*CodeHandler, error) {
 		return nil, fmt.Errorf("error creating sensitive component:%w", err)
 	}
 	return &CodeHandler{
-		c:  tc,
-		sc: sc,
+		code:      tc,
+		sensitive: sc,
 	}, nil
 }
 
 type CodeHandler struct {
-	c  component.CodeComponent
-	sc component.SensitiveComponent
+	code      component.CodeComponent
+	sensitive component.SensitiveComponent
 }
 
 // CreateCode   godoc
@@ -61,7 +61,7 @@ func (h *CodeHandler) Create(ctx *gin.Context) {
 		return
 	}
 
-	_, err := h.sc.CheckRequestV2(ctx, req)
+	_, err := h.sensitive.CheckRequestV2(ctx, req)
 	if err != nil {
 		slog.Error("failed to check sensitive request", slog.Any("error", err))
 		httpbase.BadRequest(ctx, fmt.Errorf("sensitive check failed: %w", err).Error())
@@ -69,7 +69,7 @@ func (h *CodeHandler) Create(ctx *gin.Context) {
 	}
 	req.Username = currentUser
 
-	code, err := h.c.Create(ctx, req)
+	code, err := h.code.Create(ctx, req)
 	if err != nil {
 		slog.Error("Failed to create code", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
@@ -128,7 +128,7 @@ func (h *CodeHandler) Index(ctx *gin.Context) {
 		return
 	}
 
-	codes, total, err := h.c.Index(ctx, filter, per, page)
+	codes, total, err := h.code.Index(ctx, filter, per, page)
 	if err != nil {
 		slog.Error("Failed to get codes", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
@@ -170,7 +170,7 @@ func (h *CodeHandler) Update(ctx *gin.Context) {
 		return
 	}
 
-	_, err := h.sc.CheckRequestV2(ctx, req)
+	_, err := h.sensitive.CheckRequestV2(ctx, req)
 	if err != nil {
 		slog.Error("failed to check sensitive request", slog.Any("error", err))
 		httpbase.BadRequest(ctx, fmt.Errorf("sensitive check failed: %w", err).Error())
@@ -187,7 +187,7 @@ func (h *CodeHandler) Update(ctx *gin.Context) {
 	req.Namespace = namespace
 	req.Name = name
 
-	code, err := h.c.Update(ctx, req)
+	code, err := h.code.Update(ctx, req)
 	if err != nil {
 		slog.Error("Failed to update code", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
@@ -224,7 +224,7 @@ func (h *CodeHandler) Delete(ctx *gin.Context) {
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
-	err = h.c.Delete(ctx, namespace, name, currentUser)
+	err = h.code.Delete(ctx, namespace, name, currentUser)
 	if err != nil {
 		slog.Error("Failed to delete code", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
@@ -256,7 +256,7 @@ func (h *CodeHandler) Show(ctx *gin.Context) {
 		return
 	}
 	currentUser := httpbase.GetCurrentUser(ctx)
-	detail, err := h.c.Show(ctx, namespace, name, currentUser)
+	detail, err := h.code.Show(ctx, namespace, name, currentUser)
 	if err != nil {
 		if errors.Is(err, component.ErrUnauthorized) {
 			httpbase.UnauthorizedError(ctx, err)
@@ -291,7 +291,7 @@ func (h *CodeHandler) Relations(ctx *gin.Context) {
 		return
 	}
 	currentUser := httpbase.GetCurrentUser(ctx)
-	detail, err := h.c.Relations(ctx, namespace, name, currentUser)
+	detail, err := h.code.Relations(ctx, namespace, name, currentUser)
 	if err != nil {
 		if errors.Is(err, component.ErrUnauthorized) {
 			httpbase.UnauthorizedError(ctx, err)

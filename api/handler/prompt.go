@@ -229,7 +229,7 @@ func (h *PromptHandler) CreatePrompt(ctx *gin.Context) {
 		return
 	}
 
-	var body *component.CreatePromptReq
+	var body *types.CreatePromptReq
 	if err := ctx.ShouldBindJSON(&body); err != nil {
 		slog.Error("Bad request prompt format", "error", err)
 		httpbase.BadRequest(ctx, err.Error())
@@ -291,7 +291,7 @@ func (h *PromptHandler) UpdatePrompt(ctx *gin.Context) {
 		return
 	}
 
-	var body *component.UpdatePromptReq
+	var body *types.UpdatePromptReq
 	if err := ctx.ShouldBindJSON(&body); err != nil {
 		slog.Error("Bad request prompt format", "error", err)
 		httpbase.BadRequest(ctx, err.Error())
