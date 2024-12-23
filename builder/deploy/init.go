@@ -14,6 +14,8 @@ var (
 	defaultDeployer Deployer
 )
 
+type DeployConfig = common.DeployConfig
+
 func Init(c common.DeployConfig) error {
 	// ib := imagebuilder.NewLocalBuilder()
 	ib, err := imagebuilder.NewRemoteBuilder(c.ImageBuilderURL)
@@ -26,7 +28,7 @@ func Init(c common.DeployConfig) error {
 	}
 
 	fifoScheduler = scheduler.NewFIFOScheduler(ib, ir, c)
-	deployer, err := newDeployer(fifoScheduler, ib, ir)
+	deployer, err := newDeployer(fifoScheduler, ib, ir, c)
 	if err != nil {
 		return fmt.Errorf("failed to create deployer:%w", err)
 	}
