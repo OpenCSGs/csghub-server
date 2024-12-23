@@ -942,7 +942,7 @@ func (c *modelComponentImpl) Deploy(ctx context.Context, deployReq types.DeployA
 	containerImg := c.containerImg(frame, hardware)
 
 	// create deploy for model
-	return c.deployer.Deploy(ctx, types.DeployRepo{
+	dp := types.DeployRepo{
 		DeployName:       req.DeployName,
 		SpaceID:          0,
 		Path:             m.Repository.Path,
@@ -964,8 +964,9 @@ func (c *modelComponentImpl) Deploy(ctx context.Context, deployReq types.DeployA
 		Type:             deployReq.DeployType,
 		UserUUID:         user.UUID,
 		SKU:              strconv.FormatInt(resource.ID, 10),
-		OrderDetailID:    req.OrderDetailID,
-	})
+	}
+	dp = modelRunUpdateDeployRepo(dp, req)
+	return c.deployer.Deploy(ctx, dp)
 }
 
 func (c *modelComponentImpl) ListModelsByRuntimeFrameworkID(ctx context.Context, currentUser string, per, page int, id int64, deployType int) ([]types.Model, int, error) {

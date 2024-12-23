@@ -145,7 +145,6 @@ type DeployRepo struct {
 	SKU              string     `json:"sku,omitempty"`
 	ResourceType     string     `json:"resource_type,omitempty"`
 	RepoTag          string     `json:"repo_tag,omitempty"`
-	OrderDetailID    int64      `json:"order_detail_id,omitempty"`
 }
 
 type RuntimeFrameworkReq struct {

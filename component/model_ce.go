@@ -31,3 +31,7 @@ func (c *modelComponentImpl) containerImg(frame *database.RuntimeFramework, hard
 	return containerImg
 
 }
+
+func modelRunUpdateDeployRepo(dp types.DeployRepo, req types.ModelRunReq) types.DeployRepo {
+	return dp
+}
