@@ -19,6 +19,9 @@ packages:
             SensitiveComponent:
             CodeComponent:
             PromptComponent:
+            ModelComponent:
+            UserComponent:
+            GitHTTPComponent:
     opencsg.com/csghub-server/user/component:
         config:
         interfaces:
