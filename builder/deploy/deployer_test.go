@@ -177,11 +177,10 @@ func TestDeployer_Deploy(t *testing.T) {
 
 	t.Run("use on-demand resource and skip build task", func(t *testing.T) {
 		dr := types.DeployRepo{
-			OrderDetailID: 0,
-			UserUUID:      "1",
-			Path:          "namespace/name",
-			Type:          types.InferenceType,
-			ImageID:       "image:1",
+			UserUUID: "1",
+			Path:     "namespace/name",
+			Type:     types.InferenceType,
+			ImageID:  "image:1",
 		}
 
 		buildTask := database.DeployTask{
@@ -222,10 +221,9 @@ func TestDeployer_Deploy(t *testing.T) {
 func TestDeployer_Status(t *testing.T) {
 	t.Run("no deploy", func(t *testing.T) {
 		dr := types.DeployRepo{
-			OrderDetailID: 1,
-			UserUUID:      "1",
-			Path:          "namespace/name",
-			Type:          types.InferenceType,
+			UserUUID: "1",
+			Path:     "namespace/name",
+			Type:     types.InferenceType,
 		}
 
 		mockDeployTaskStore := mockdb.NewMockDeployTaskStore(t)
@@ -245,11 +243,10 @@ func TestDeployer_Status(t *testing.T) {
 	})
 	t.Run("cache miss and running", func(t *testing.T) {
 		dr := types.DeployRepo{
-			DeployID:      1,
-			OrderDetailID: 1,
-			UserUUID:      "1",
-			Path:          "namespace/name",
-			Type:          types.InferenceType,
+			DeployID: 1,
+			UserUUID: "1",
+			Path:     "namespace/name",
+			Type:     types.InferenceType,
 		}
 		deploy := &database.Deploy{
 			Status:  common.Running,
@@ -275,11 +272,10 @@ func TestDeployer_Status(t *testing.T) {
 
 	t.Run("cache miss and not running", func(t *testing.T) {
 		dr := types.DeployRepo{
-			DeployID:      1,
-			OrderDetailID: 1,
-			UserUUID:      "1",
-			Path:          "namespace/name",
-			Type:          types.InferenceType,
+			DeployID: 1,
+			UserUUID: "1",
+			Path:     "namespace/name",
+			Type:     types.InferenceType,
 		}
 		deploy := &database.Deploy{
 			Status:  common.BuildSuccess,
@@ -305,12 +301,11 @@ func TestDeployer_Status(t *testing.T) {
 
 	t.Run("cache hit and running", func(t *testing.T) {
 		dr := types.DeployRepo{
-			DeployID:      1,
-			OrderDetailID: 1,
-			UserUUID:      "1",
-			Path:          "namespace/name",
-			Type:          types.InferenceType,
-			ModelID:       1,
+			DeployID: 1,
+			UserUUID: "1",
+			Path:     "namespace/name",
+			Type:     types.InferenceType,
+			ModelID:  1,
 		}
 		// build success status in db
 		deploy := &database.Deploy{
@@ -366,11 +361,10 @@ func TestDeployer_Status(t *testing.T) {
 func TestDeployer_Logs(t *testing.T) {
 	t.Run("no deploy", func(t *testing.T) {
 		dr := types.DeployRepo{
-			OrderDetailID: 1,
-			UserUUID:      "1",
-			Path:          "namespace/name",
-			Type:          types.InferenceType,
-			SpaceID:       1,
+			UserUUID: "1",
+			Path:     "namespace/name",
+			Type:     types.InferenceType,
+			SpaceID:  1,
 		}
 
 		mockDeployTaskStore := mockdb.NewMockDeployTaskStore(t)
@@ -388,12 +382,11 @@ func TestDeployer_Logs(t *testing.T) {
 	})
 	t.Run("get log reader", func(t *testing.T) {
 		dr := types.DeployRepo{
-			SpaceID:       1,
-			DeployID:      1,
-			OrderDetailID: 1,
-			UserUUID:      "1",
-			Path:          "namespace/name",
-			Type:          types.InferenceType,
+			SpaceID:  1,
+			DeployID: 1,
+			UserUUID: "1",
+			Path:     "namespace/name",
+			Type:     types.InferenceType,
 		}
 		deploy := &database.Deploy{
 			Status:  common.Running,
@@ -423,12 +416,11 @@ func TestDeployer_Logs(t *testing.T) {
 
 func TestDeployer_Purge(t *testing.T) {
 	dr := types.DeployRepo{
-		SpaceID:       0,
-		DeployID:      1,
-		OrderDetailID: 1,
-		UserUUID:      "1",
-		Path:          "namespace/name",
-		Type:          types.InferenceType,
+		SpaceID:  0,
+		DeployID: 1,
+		UserUUID: "1",
+		Path:     "namespace/name",
+		Type:     types.InferenceType,
 	}
 
 	mockRunner := mockrunner.NewMockRunner(t)
@@ -441,75 +433,13 @@ func TestDeployer_Purge(t *testing.T) {
 	require.Nil(t, err)
 }
 
-// func TestDeployer_Wakeup(t *testing.T) {
-// 	startDNSServer()
-// 	dr := types.DeployRepo{
-// 		SpaceID:       0,
-// 		DeployID:      1,
-// 		OrderDetailID: 1,
-// 		UserUUID:      "1",
-// 		Path:          "namespace/name",
-// 		Type:          types.InferenceType,
-// 		SvcName:       "svc",
-// 	}
-
-// 	s := httptest.NewUnstartedServer(&wakeupHandler{})
-// 	s.Config.Addr = "svc.internal.example.com:51000"
-// 	s.Config.ListenAndServe()
-// 	// s.Start()
-// 	defer s.Close()
-
-// 	d := &deployer{
-// 		internalRootDomain: "internal.example.com:51000",
-// 	}
-// 	err := d.Wakeup(context.TODO(), dr)
-// 	require.Nil(t, err)
-// }
-
-// type wakeupHandler struct {
-// }
-
-// func (h *wakeupHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-// 	w.WriteHeader(http.StatusOK)
-// }
-
-// func startDNSServer() (string, error) {
-// 	dnsServerAddr := ":53" // DNS 服务器的端口
-// 	go func() {
-// 		// Set up a new DNS server
-// 		dnsServer := &dns.Server{Addr: dnsServerAddr, Net: "udp"}
-
-// 		dns.HandleFunc("svc.internal.example.com", func(w dns.ResponseWriter, r *dns.Msg) {
-// 			m := new(dns.Msg)
-// 			m.SetReply(r)
-// 			m.Authoritative = true
-// 			m.Answer = append(m.Answer, &dns.A{
-// 				Hdr: dns.RR_Header{
-// 					Name:   "svc.internal.example.com",
-// 					Rrtype: dns.TypeA,
-// 					Class:  dns.ClassINET,
-// 					Ttl:    60,
-// 				},
-// 				A: net.ParseIP("127.0.0.1"),
-// 			})
-// 			w.WriteMsg(m)
-// 		})
-
-// 		if err := dnsServer.ListenAndServe(); err != nil {
-// 			panic(err)
-// 		}
-// 	}()
-// 	return dnsServerAddr, nil
-// }
-
 func TestDeployer_Exists(t *testing.T) {
 	dr := types.DeployRepo{
-		SpaceID:       0,
-		DeployID:      1,
-		OrderDetailID: 1,
-		UserUUID:      "1",
-		Path:          "namespace/name",
-		Type:          types.InferenceType,
+		SpaceID:  0,
+		DeployID: 1,
+		UserUUID: "1",
+		Path:     "namespace/name",
+		Type:     types.InferenceType,
 	}
 
 	t.Run("fail to check", func(t *testing.T) {
@@ -559,12 +489,11 @@ func TestDeployer_Exists(t *testing.T) {
 
 func TestDeployer_GetReplica(t *testing.T) {
 	dr := types.DeployRepo{
-		SpaceID:       0,
-		DeployID:      1,
-		OrderDetailID: 1,
-		UserUUID:      "1",
-		Path:          "namespace/name",
-		Type:          types.InferenceType,
+		SpaceID:  0,
+		DeployID: 1,
+		UserUUID: "1",
+		Path:     "namespace/name",
+		Type:     types.InferenceType,
 	}
 
 	t.Run("fail to check", func(t *testing.T) {
@@ -612,12 +541,11 @@ func TestDeployer_GetReplica(t *testing.T) {
 
 func TestDeployer_InstanceLogs(t *testing.T) {
 	dr := types.DeployRepo{
-		SpaceID:       0,
-		DeployID:      1,
-		OrderDetailID: 1,
-		UserUUID:      "1",
-		Path:          "namespace/name",
-		Type:          types.InferenceType,
+		SpaceID:  0,
+		DeployID: 1,
+		UserUUID: "1",
+		Path:     "namespace/name",
+		Type:     types.InferenceType,
 	}
 
 	mockRunner := mockrunner.NewMockRunner(t)
