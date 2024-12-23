@@ -75,6 +75,19 @@ packages:
         config:
         interfaces:
             Deployer:
+    opencsg.com/csghub-server/builder/deploy/scheduler:
+        config:
+        interfaces:
+            Scheduler:
+    opencsg.com/csghub-server/builder/deploy/imagerunner:
+        config:
+        interfaces:
+            Runner:
+    opencsg.com/csghub-server/builder/deploy/imagebuilder:
+        config:
+        interfaces:
+            Builder:
+              
     opencsg.com/csghub-server/accounting/component:
         config:
         interfaces:
