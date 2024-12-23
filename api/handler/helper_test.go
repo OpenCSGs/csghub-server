@@ -22,6 +22,7 @@ type GinTester struct {
 	ctx        *gin.Context
 	response   *httptest.ResponseRecorder
 	OKText     string // text of httpbase.OK
+	_executed  bool
 }
 
 func NewGinTester() *GinTester {
@@ -45,6 +46,7 @@ func (g *GinTester) Handler(handler gin.HandlerFunc) {
 
 func (g *GinTester) Execute() {
 	g.ginHandler(g.ctx)
+	g._executed = true
 }
 func (g *GinTester) WithUser() *GinTester {
 	g.ctx.Set(httpbase.CurrentUserCtxVar, "u")
@@ -87,6 +89,21 @@ func (g *GinTester) WithQuery(key, value string) *GinTester {
 	return g
 }
 
+func (g *GinTester) SetPath(path string) *GinTester {
+	g.ctx.Request.URL.Path = path
+	return g
+}
+
+func (g *GinTester) WithHeader(key, value string) *GinTester {
+	h := g.ctx.Request.Header
+	if h == nil {
+		h = map[string][]string{}
+	}
+	h.Add(key, value)
+	g.ctx.Request.Header = h
+	return g
+}
+
 func (g *GinTester) AddPagination(page int, per int) *GinTester {
 	g.WithQuery("page", cast.ToString(page))
 	g.WithQuery("per", cast.ToString(per))
@@ -94,6 +111,9 @@ func (g *GinTester) AddPagination(page int, per int) *GinTester {
 }
 
 func (g *GinTester) ResponseEq(t *testing.T, code int, msg string, expected any) {
+	if !g._executed {
+		require.FailNow(t, "call Execute method first")
+	}
 	var r = struct {
 		Msg  string `json:"msg"`
 		Data any    `json:"data,omitempty"`
@@ -109,9 +129,12 @@ func (g *GinTester) ResponseEq(t *testing.T, code int, msg string, expected any)
 }
 
 func (g *GinTester) ResponseEqSimple(t *testing.T, code int, expected any) {
+	if !g._executed {
+		require.FailNow(t, "call Execute method first")
+	}
 	b, err := json.Marshal(expected)
 	require.NoError(t, err)
-	require.Equal(t, code, g.response.Code)
+	require.Equal(t, code, g.response.Code, g.response.Body.String())
 	require.JSONEq(t, string(b), g.response.Body.String())
 
 }
@@ -121,6 +144,7 @@ func (g *GinTester) RequireUser(t *testing.T) {
 	tmp := NewGinTester()
 	tmp.ctx.Params = g.ctx.Params
 	g.ginHandler(tmp.ctx)
+	tmp._executed = true
 	tmp.ResponseEq(t, http.StatusUnauthorized, component.ErrUserNotFound.Error(), nil)
 	// add user to original test ctx now
 	_ = g.WithUser()
