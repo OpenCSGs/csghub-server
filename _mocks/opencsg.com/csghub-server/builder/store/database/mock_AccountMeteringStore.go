@@ -71,6 +71,65 @@ func (_c *MockAccountMeteringStore_Create_Call) RunAndReturn(run func(context.Co
 	return _c
 }
 
+// GetStatByDate provides a mock function with given fields: ctx, req
+func (_m *MockAccountMeteringStore) GetStatByDate(ctx context.Context, req types.ACCT_STATEMENTS_REQ) ([]map[string]interface{}, error) {
+	ret := _m.Called(ctx, req)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetStatByDate")
+	}
+
+	var r0 []map[string]interface{}
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, types.ACCT_STATEMENTS_REQ) ([]map[string]interface{}, error)); ok {
+		return rf(ctx, req)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, types.ACCT_STATEMENTS_REQ) []map[string]interface{}); ok {
+		r0 = rf(ctx, req)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]map[string]interface{})
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, types.ACCT_STATEMENTS_REQ) error); ok {
+		r1 = rf(ctx, req)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockAccountMeteringStore_GetStatByDate_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetStatByDate'
+type MockAccountMeteringStore_GetStatByDate_Call struct {
+	*mock.Call
+}
+
+// GetStatByDate is a helper method to define mock.On call
+//   - ctx context.Context
+//   - req types.ACCT_STATEMENTS_REQ
+func (_e *MockAccountMeteringStore_Expecter) GetStatByDate(ctx interface{}, req interface{}) *MockAccountMeteringStore_GetStatByDate_Call {
+	return &MockAccountMeteringStore_GetStatByDate_Call{Call: _e.mock.On("GetStatByDate", ctx, req)}
+}
+
+func (_c *MockAccountMeteringStore_GetStatByDate_Call) Run(run func(ctx context.Context, req types.ACCT_STATEMENTS_REQ)) *MockAccountMeteringStore_GetStatByDate_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(types.ACCT_STATEMENTS_REQ))
+	})
+	return _c
+}
+
+func (_c *MockAccountMeteringStore_GetStatByDate_Call) Return(_a0 []map[string]interface{}, _a1 error) *MockAccountMeteringStore_GetStatByDate_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockAccountMeteringStore_GetStatByDate_Call) RunAndReturn(run func(context.Context, types.ACCT_STATEMENTS_REQ) ([]map[string]interface{}, error)) *MockAccountMeteringStore_GetStatByDate_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // ListAllByUserUUID provides a mock function with given fields: ctx, userUUID
 func (_m *MockAccountMeteringStore) ListAllByUserUUID(ctx context.Context, userUUID string) ([]database.AccountMetering, error) {
 	ret := _m.Called(ctx, userUUID)

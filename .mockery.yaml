@@ -112,3 +112,7 @@ packages:
         config:
         interfaces:
             Client:
+    github.com/nats-io/nats.go/jetstream:
+        config:
+        interfaces:
+            Msg:
