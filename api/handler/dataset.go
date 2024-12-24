@@ -33,16 +33,16 @@ func NewDatasetHandler(config *config.Config) (*DatasetHandler, error) {
 	}
 
 	return &DatasetHandler{
-		c:    tc,
-		sc:   sc,
-		repo: repo,
+		dataset:   tc,
+		sensitive: sc,
+		repo:      repo,
 	}, nil
 }
 
 type DatasetHandler struct {
-	c    component.DatasetComponent
-	sc   component.SensitiveComponent
-	repo component.RepoComponent
+	dataset   component.DatasetComponent
+	sensitive component.SensitiveComponent
+	repo      component.RepoComponent
 }
 
 // CreateDataset   godoc
@@ -70,7 +70,7 @@ func (h *DatasetHandler) Create(ctx *gin.Context) {
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
-	_, err := h.sc.CheckRequestV2(ctx, req)
+	_, err := h.sensitive.CheckRequestV2(ctx, req)
 	if err != nil {
 		slog.Error("failed to check sensitive request", slog.Any("error", err))
 		httpbase.BadRequest(ctx, fmt.Errorf("sensitive check failed: %w", err).Error())
@@ -78,7 +78,7 @@ func (h *DatasetHandler) Create(ctx *gin.Context) {
 	}
 	req.Username = currentUser
 
-	dataset, err := h.c.Create(ctx, req)
+	dataset, err := h.dataset.Create(ctx, req)
 	if err != nil {
 		slog.Error("Failed to create dataset", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
@@ -137,7 +137,7 @@ func (h *DatasetHandler) Index(ctx *gin.Context) {
 		return
 	}
 
-	datasets, total, err := h.c.Index(ctx, filter, per, page)
+	datasets, total, err := h.dataset.Index(ctx, filter, per, page)
 	if err != nil {
 		slog.Error("Failed to get datasets", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
@@ -179,7 +179,7 @@ func (h *DatasetHandler) Update(ctx *gin.Context) {
 		return
 	}
 
-	_, err := h.sc.CheckRequestV2(ctx, req)
+	_, err := h.sensitive.CheckRequestV2(ctx, req)
 	if err != nil {
 		slog.Error("failed to check sensitive request", slog.Any("error", err))
 		httpbase.BadRequest(ctx, fmt.Errorf("sensitive check failed: %w", err).Error())
@@ -196,7 +196,7 @@ func (h *DatasetHandler) Update(ctx *gin.Context) {
 	req.Namespace = namespace
 	req.Name = name
 
-	dataset, err := h.c.Update(ctx, req)
+	dataset, err := h.dataset.Update(ctx, req)
 	if err != nil {
 		slog.Error("Failed to update dataset", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
@@ -233,7 +233,7 @@ func (h *DatasetHandler) Delete(ctx *gin.Context) {
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
-	err = h.c.Delete(ctx, namespace, name, currentUser)
+	err = h.dataset.Delete(ctx, namespace, name, currentUser)
 	if err != nil {
 		slog.Error("Failed to delete dataset", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
@@ -265,7 +265,7 @@ func (h *DatasetHandler) Show(ctx *gin.Context) {
 		return
 	}
 	currentUser := httpbase.GetCurrentUser(ctx)
-	detail, err := h.c.Show(ctx, namespace, name, currentUser)
+	detail, err := h.dataset.Show(ctx, namespace, name, currentUser)
 	if err != nil {
 		if errors.Is(err, component.ErrUnauthorized) {
 			httpbase.UnauthorizedError(ctx, err)
@@ -301,7 +301,7 @@ func (h *DatasetHandler) Relations(ctx *gin.Context) {
 		return
 	}
 	currentUser := httpbase.GetCurrentUser(ctx)
-	detail, err := h.c.Relations(ctx, namespace, name, currentUser)
+	detail, err := h.dataset.Relations(ctx, namespace, name, currentUser)
 	if err != nil {
 		if errors.Is(err, component.ErrUnauthorized) {
 			httpbase.UnauthorizedError(ctx, err)

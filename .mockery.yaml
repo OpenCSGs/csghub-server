@@ -22,6 +22,11 @@ packages:
             ModelComponent:
             UserComponent:
             GitHTTPComponent:
+            DiscussionComponent:
+            DatasetComponent:
+            CollectionComponent:
+
+
     opencsg.com/csghub-server/user/component:
         config:
         interfaces:
@@ -67,7 +72,7 @@ packages:
     opencsg.com/csghub-server/mq:
         config:
         interfaces:
-            MessageQueue:            
+            MessageQueue:
     opencsg.com/csghub-server/builder/store/s3:
         config:
         interfaces:
@@ -92,7 +97,7 @@ packages:
         config:
         interfaces:
             Builder:
-              
+
     opencsg.com/csghub-server/accounting/component:
         config:
         interfaces:
