@@ -585,14 +585,13 @@ func TestRepoHandler_HeadSDKDownload(t *testing.T) {
 			SaveAs:    "foo",
 			RepoType:  types.ModelRepo,
 		}, "u",
-	).Return(&types.File{Size: 100, SHA: "def"}, &types.Commit{ID: "abc"}, nil)
+	).Return(&types.File{Size: 100, SHA: "def"}, nil)
 
 	tester.Execute()
 	require.Equal(t, 200, tester.response.Code)
 	headers := tester.response.Header()
 	require.Equal(t, "100", headers.Get("Content-Length"))
-	require.Equal(t, "abc", headers.Get("X-Repo-Commit"))
-	require.Equal(t, "def", headers.Get("ETag"))
+	require.Equal(t, "def", headers.Get("X-Repo-Commit"))
 }
 
 func TestRepoHandler_CommitWithDiff(t *testing.T) {
@@ -945,24 +944,6 @@ func TestRepoHandler_SyncMirror(t *testing.T) {
 
 	tester.Execute()
 	tester.ResponseEq(t, 200, tester.OKText, nil)
-}
-
-func TestRepoHandler_MirrorProgress(t *testing.T) {
-	tester := NewRepoTester(t).WithHandleFunc(func(rp *RepoHandler) gin.HandlerFunc {
-		return rp.MirrorProgress
-	})
-	tester.RequireUser(t)
-
-	tester.WithKV("repo_type", types.ModelRepo)
-	tester.WithParam("id", "1")
-	tester.mocks.repo.EXPECT().MirrorProgress(
-		tester.ctx, types.ModelRepo, "u", "r", "u",
-	).Return([]types.LFSSyncProgressResp{{Oid: "o1"}}, nil)
-
-	tester.Execute()
-	tester.ResponseEq(
-		t, 200, tester.OKText, []types.LFSSyncProgressResp{{Oid: "o1"}},
-	)
 }
 
 func TestRepoHandler_DeployUpdate(t *testing.T) {
