@@ -236,6 +236,64 @@ func (_c *MockMessageQueue_CreateOrUpdateStream_Call) RunAndReturn(run func(cont
 	return _c
 }
 
+// FetchMeterEventMessages provides a mock function with given fields: batch
+func (_m *MockMessageQueue) FetchMeterEventMessages(batch int) (jetstream.MessageBatch, error) {
+	ret := _m.Called(batch)
+
+	if len(ret) == 0 {
+		panic("no return value specified for FetchMeterEventMessages")
+	}
+
+	var r0 jetstream.MessageBatch
+	var r1 error
+	if rf, ok := ret.Get(0).(func(int) (jetstream.MessageBatch, error)); ok {
+		return rf(batch)
+	}
+	if rf, ok := ret.Get(0).(func(int) jetstream.MessageBatch); ok {
+		r0 = rf(batch)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(jetstream.MessageBatch)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(int) error); ok {
+		r1 = rf(batch)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockMessageQueue_FetchMeterEventMessages_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'FetchMeterEventMessages'
+type MockMessageQueue_FetchMeterEventMessages_Call struct {
+	*mock.Call
+}
+
+// FetchMeterEventMessages is a helper method to define mock.On call
+//   - batch int
+func (_e *MockMessageQueue_Expecter) FetchMeterEventMessages(batch interface{}) *MockMessageQueue_FetchMeterEventMessages_Call {
+	return &MockMessageQueue_FetchMeterEventMessages_Call{Call: _e.mock.On("FetchMeterEventMessages", batch)}
+}
+
+func (_c *MockMessageQueue_FetchMeterEventMessages_Call) Run(run func(batch int)) *MockMessageQueue_FetchMeterEventMessages_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(int))
+	})
+	return _c
+}
+
+func (_c *MockMessageQueue_FetchMeterEventMessages_Call) Return(_a0 jetstream.MessageBatch, _a1 error) *MockMessageQueue_FetchMeterEventMessages_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockMessageQueue_FetchMeterEventMessages_Call) RunAndReturn(run func(int) (jetstream.MessageBatch, error)) *MockMessageQueue_FetchMeterEventMessages_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // GetConn provides a mock function with given fields:
 func (_m *MockMessageQueue) GetConn() *nats.Conn {
 	ret := _m.Called()
@@ -371,6 +429,144 @@ func (_c *MockMessageQueue_PublishData_Call) Return(_a0 error) *MockMessageQueue
 }
 
 func (_c *MockMessageQueue_PublishData_Call) RunAndReturn(run func(string, []byte) error) *MockMessageQueue_PublishData_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// PublishFeeCreditData provides a mock function with given fields: data
+func (_m *MockMessageQueue) PublishFeeCreditData(data []byte) error {
+	ret := _m.Called(data)
+
+	if len(ret) == 0 {
+		panic("no return value specified for PublishFeeCreditData")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func([]byte) error); ok {
+		r0 = rf(data)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// MockMessageQueue_PublishFeeCreditData_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'PublishFeeCreditData'
+type MockMessageQueue_PublishFeeCreditData_Call struct {
+	*mock.Call
+}
+
+// PublishFeeCreditData is a helper method to define mock.On call
+//   - data []byte
+func (_e *MockMessageQueue_Expecter) PublishFeeCreditData(data interface{}) *MockMessageQueue_PublishFeeCreditData_Call {
+	return &MockMessageQueue_PublishFeeCreditData_Call{Call: _e.mock.On("PublishFeeCreditData", data)}
+}
+
+func (_c *MockMessageQueue_PublishFeeCreditData_Call) Run(run func(data []byte)) *MockMessageQueue_PublishFeeCreditData_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].([]byte))
+	})
+	return _c
+}
+
+func (_c *MockMessageQueue_PublishFeeCreditData_Call) Return(_a0 error) *MockMessageQueue_PublishFeeCreditData_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockMessageQueue_PublishFeeCreditData_Call) RunAndReturn(run func([]byte) error) *MockMessageQueue_PublishFeeCreditData_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// PublishFeeQuotaData provides a mock function with given fields: data
+func (_m *MockMessageQueue) PublishFeeQuotaData(data []byte) error {
+	ret := _m.Called(data)
+
+	if len(ret) == 0 {
+		panic("no return value specified for PublishFeeQuotaData")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func([]byte) error); ok {
+		r0 = rf(data)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// MockMessageQueue_PublishFeeQuotaData_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'PublishFeeQuotaData'
+type MockMessageQueue_PublishFeeQuotaData_Call struct {
+	*mock.Call
+}
+
+// PublishFeeQuotaData is a helper method to define mock.On call
+//   - data []byte
+func (_e *MockMessageQueue_Expecter) PublishFeeQuotaData(data interface{}) *MockMessageQueue_PublishFeeQuotaData_Call {
+	return &MockMessageQueue_PublishFeeQuotaData_Call{Call: _e.mock.On("PublishFeeQuotaData", data)}
+}
+
+func (_c *MockMessageQueue_PublishFeeQuotaData_Call) Run(run func(data []byte)) *MockMessageQueue_PublishFeeQuotaData_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].([]byte))
+	})
+	return _c
+}
+
+func (_c *MockMessageQueue_PublishFeeQuotaData_Call) Return(_a0 error) *MockMessageQueue_PublishFeeQuotaData_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockMessageQueue_PublishFeeQuotaData_Call) RunAndReturn(run func([]byte) error) *MockMessageQueue_PublishFeeQuotaData_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// PublishFeeTokenData provides a mock function with given fields: data
+func (_m *MockMessageQueue) PublishFeeTokenData(data []byte) error {
+	ret := _m.Called(data)
+
+	if len(ret) == 0 {
+		panic("no return value specified for PublishFeeTokenData")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func([]byte) error); ok {
+		r0 = rf(data)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// MockMessageQueue_PublishFeeTokenData_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'PublishFeeTokenData'
+type MockMessageQueue_PublishFeeTokenData_Call struct {
+	*mock.Call
+}
+
+// PublishFeeTokenData is a helper method to define mock.On call
+//   - data []byte
+func (_e *MockMessageQueue_Expecter) PublishFeeTokenData(data interface{}) *MockMessageQueue_PublishFeeTokenData_Call {
+	return &MockMessageQueue_PublishFeeTokenData_Call{Call: _e.mock.On("PublishFeeTokenData", data)}
+}
+
+func (_c *MockMessageQueue_PublishFeeTokenData_Call) Run(run func(data []byte)) *MockMessageQueue_PublishFeeTokenData_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].([]byte))
+	})
+	return _c
+}
+
+func (_c *MockMessageQueue_PublishFeeTokenData_Call) Return(_a0 error) *MockMessageQueue_PublishFeeTokenData_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockMessageQueue_PublishFeeTokenData_Call) RunAndReturn(run func([]byte) error) *MockMessageQueue_PublishFeeTokenData_Call {
 	_c.Call.Return(run)
 	return _c
 }
