@@ -42,8 +42,8 @@ func NewDiscussionHandler(cfg *config.Config) (*DiscussionHandler, error) {
 // @Param        repo_type path string true "repository type" Enums(models,datasets,codes,spaces)
 // @Param        namespace path string true "namespace"
 // @Param        name path string true "name"
-// @Param        body body component.CreateRepoDiscussionRequest true "body"
-// @Success      200  {object}  types.Response{data=component.CreateDiscussionResponse} "OK"
+// @Param        body body types.CreateRepoDiscussionRequest true "body"
+// @Success      200  {object}  types.Response{data=types.CreateDiscussionResponse} "OK"
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
 // @Router       /{repo_type}/{namespace}/{name}/discussions [post]
@@ -96,7 +96,7 @@ func (h *DiscussionHandler) CreateRepoDiscussion(ctx *gin.Context) {
 // @Produce      json
 // @Param        id path string true "the discussion id"
 // @Param        current_user query string true "current user, the owner"
-// @Param        body body component.UpdateDiscussionRequest true "body"
+// @Param        body body types.UpdateDiscussionRequest true "body"
 // @Success      200  {object}  types.Response "OK"
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
@@ -180,7 +180,7 @@ func (h *DiscussionHandler) DeleteDiscussion(ctx *gin.Context) {
 // @Accept       json
 // @Produce      json
 // @Param        id path string true "the discussion id"
-// @Success      200  {object}  types.Response{data=component.ShowDiscussionResponse} "OK"
+// @Success      200  {object}  types.Response{data=types.ShowDiscussionResponse} "OK"
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
 // @Router       /discussions/{id} [get]
@@ -212,7 +212,7 @@ func (h *DiscussionHandler) ShowDiscussion(ctx *gin.Context) {
 // @Param        repo_type path string true "repository type" Enums(models,datasets,codes,spaces)
 // @Param        namespace path string true "namespace"
 // @Param        name query string true "name"
-// @Success      200  {object}  types.Response{data=component.ListRepoDiscussionResponse} "OK"
+// @Success      200  {object}  types.Response{data=types.ListRepoDiscussionResponse} "OK"
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
 // @Router       /{repo_type}/{namespace}/{name}/discussions [get]
@@ -247,8 +247,8 @@ func (h *DiscussionHandler) ListRepoDiscussions(ctx *gin.Context) {
 // @Accept       json
 // @Produce      json
 // @Param        id path string true "the discussion id"
-// @Param        body body component.CreateCommentRequest true "body"
-// @Success      200  {object}  types.Response{data=component.CreateCommentResponse} "OK"
+// @Param        body body types.CreateCommentRequest true "body"
+// @Success      200  {object}  types.Response{data=types.CreateCommentResponse} "OK"
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
 // @Router       /discussions/{id}/comments [post]
@@ -298,7 +298,7 @@ func (h *DiscussionHandler) CreateDiscussionComment(ctx *gin.Context) {
 // @Produce      json
 // @Param        id path string true "the comment id"
 // @Param        current_user query string true "current user, the owner of the comment"
-// @Param        body body component.UpdateCommentRequest true "body"
+// @Param        body body types.UpdateCommentRequest true "body"
 // @Success      200  {object}  types.Response "OK"
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
@@ -379,7 +379,7 @@ func (h *DiscussionHandler) DeleteComment(ctx *gin.Context) {
 // @Accept       json
 // @Produce      json
 // @Param        id path string true "the discussion id"
-// @Success      200  {object}  types.Response{data=[]component.DiscussionResponse_Comment} "OK"
+// @Success      200  {object}  types.Response{data=[]types.DiscussionResponse_Comment} "OK"
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
 // @Router       /discussions/{id}/comments [get]
