@@ -1,6 +1,6 @@
 FROM cledge/vllm-cpu:0.4.12-fix1 
 RUN pip config set global.index-url https://pypi.tuna.tsinghua.edu.cn/simple
-RUN pip install --no-cache-dir csghub-sdk==0.3.1
+RUN pip install --no-cache-dir csghub-sdk==0.4.6
 
 WORKDIR /workspace/
 

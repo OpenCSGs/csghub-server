@@ -20,6 +20,24 @@ if ! grep -q "chat_template" "$repo_tokenizer_config"; then
     cp "/workspace/$MODEL_ID/tokenizer_config.json" $filename
     awk -v ins="$insert_string" '/tokenizer_class/ {print; print ins; next}1' "$filename" > tmpfile && mv -f tmpfile $repo_tokenizer_config
 fi
+#fix: use local dataset
+export DATASET_SOURCE=ModelScope
+export COMPASS_DATA_CACHE=/workspace/data/
+dataset_path="/usr/local/lib/python3.10/dist-packages/opencompass/datasets/"
+find $dataset_path -type f -name "*.py" -exec sed -i 's/get_data_path(path)/"\/workspace\/data\/"+get_data_path(path)/g' {} +
+declare -A dataset_alias
+dataset_alias["ai2_arc"]="ARC-c"
+dataset_alias["ceval-exam"]="ceval"
+dataset_alias["OCNLI"]="ocnli"
+dataset_alias["cmrc_dev"]="CMRC_dev"
+dataset_alias["drcd_dev"]="DRCD_dev"
+dataset_alias["humaneval"]="openai_humaneval"
+dataset_alias["LCSTS"]="lcsts"
+dataset_alias["natural_question"]="nq"
+dataset_alias["strategy_qa"]="strategyqa"
+dataset_alias["boolq"]="BoolQ"
+dataset_alias["trivia_qa"]="triviaqa"
+dataset_alias["xsum"]="Xsum"
 # download datasets
 IFS=',' read -r -a dataset_repos <<< "$DATASET_IDS"
 # Loop through the array and print each value
@@ -29,9 +47,12 @@ for repo in "${dataset_repos[@]}"; do
     # check $dataset existing
     if [ ! -d "/workspace/data/$repo" ]; then
         echo "Start downloading dataset $repo..."
-        csghub-cli download $repo -t dataset -k $ACCESS_TOKEN -e $HF_ENDPOINT -cd /tmp/
-        # mv "$dataset" to "/workspace/data/"
-        mv -f "/tmp/$repo" "/workspace/data/"
+        csghub-cli download $repo -t dataset -r master -k $ACCESS_TOKEN -e $HF_ENDPOINT -cd /workspace/data/
+        if [ $? -ne 0 ]; then
+            echo "Download dataset $repo failed,retry with main branch"
+            #for some special case which use main branch
+            csghub-cli download $repo -t dataset -k $ACCESS_TOKEN -e $HF_ENDPOINT -cd /workspace/data/
+        fi
     fi
     # get answer mode
     task_path=`python -W ignore /etc/csghub/get_answer_mode.py $repo`
@@ -52,6 +73,9 @@ for repo in "${dataset_repos[@]}"; do
         task=`basename $task_conf_file | cut -d'.' -f1`
         dataset_tasks="$dataset_tasks $task"
         ori_name=`basename $repo`
+        if [ -n "${dataset_alias[$ori_name]}" ]; then
+            ori_name="${dataset_alias[$ori_name]}"
+        fi
         dataset_tasks_ori="$dataset_tasks_ori $ori_name"
         continue
     fi
