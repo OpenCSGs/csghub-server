@@ -27,12 +27,16 @@ type SceneType int
 
 var (
 	SceneReserve        SceneType = 0  // system reserve
+	ScenePortalCharge   SceneType = 1  // portal charge fee
+	ScenePayOrder       SceneType = 2  // create order to reduce fee
+	SceneCashCharge     SceneType = 3  // cash charge from user payment
 	SceneModelInference SceneType = 10 // model inference endpoint
 	SceneSpace          SceneType = 11 // csghub space
 	SceneModelFinetune  SceneType = 12 // model finetune
 	SceneMultiSync      SceneType = 13 // multi sync
 	SceneEvaluation     SceneType = 14 // model evaluation
 	SceneStarship       SceneType = 20 // starship
+	SceneGuiAgent       SceneType = 22 // gui agent
 	SceneUnknow         SceneType = 99 // unknow
 )
 

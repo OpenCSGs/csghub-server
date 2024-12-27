@@ -14,10 +14,14 @@ type MessageQueue interface {
 	BuildEventStreamAndConsumer(cfg EventConfig, streamCfg jetstream.StreamConfig, consumerCfg jetstream.ConsumerConfig) (jetstream.Consumer, error)
 	BuildMeterEventStream() error
 	BuildDLQStream() error
+	FetchMeterEventMessages(batch int) (jetstream.MessageBatch, error)
 	VerifyStreamByName(streamName string) error
 	VerifyMeteringStream() error
 	VerifyDLQStream() error
 	PublishData(subject string, data []byte) error
 	PublishMeterDataToDLQ(data []byte) error
 	PublishMeterDurationData(data []byte) error
+	PublishFeeCreditData(data []byte) error
+	PublishFeeTokenData(data []byte) error
+	PublishFeeQuotaData(data []byte) error
 }

@@ -756,17 +756,6 @@ func createPromptRoutes(apiGroup *gin.RouterGroup, promptHandler *handler.Prompt
 		promptGrp.PUT("/:namespace/:name/relations", promptHandler.SetRelations)
 		promptGrp.POST("/:namespace/:name/relations/model", promptHandler.AddModelRelation)
 		promptGrp.DELETE("/:namespace/:name/relations/model", promptHandler.DelModelRelation)
-		conversationGrp := promptGrp.Group("/conversations")
-		{
-			conversationGrp.POST("", promptHandler.NewConversation)
-			conversationGrp.GET("", promptHandler.ListConversation)
-			conversationGrp.GET("/:id", promptHandler.GetConversation)
-			conversationGrp.POST("/:id", promptHandler.SubmitMessage)
-			conversationGrp.PUT("/:id", promptHandler.UpdateConversation)
-			conversationGrp.DELETE("/:id", promptHandler.RemoveConversation)
-			conversationGrp.PUT("/:id/message/:msgid/like", promptHandler.LikeMessage)
-			conversationGrp.PUT("/:id/message/:msgid/hate", promptHandler.HateMessage)
-		}
 
 		promptGrp.POST("", promptHandler.Create)
 		promptGrp.PUT("/:namespace/:name", promptHandler.Update)

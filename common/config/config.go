@@ -164,8 +164,9 @@ type Config struct {
 	}
 
 	Accounting struct {
-		Host string `env:"OPENCSG_ACCOUNTING_SERVER_HOST, default=http://localhost"`
-		Port int    `env:"OPENCSG_ACCOUNTING_SERVER_PORT, default=8086"`
+		Host           string `env:"OPENCSG_ACCOUNTING_SERVER_HOST, default=http://localhost"`
+		Port           int    `env:"OPENCSG_ACCOUNTING_SERVER_PORT, default=8086"`
+		ChargingEnable bool   `env:"OPENCSG_ACCOUNTING_CHARGING_ENABLE, default=false"`
 	}
 
 	User struct {
