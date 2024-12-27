@@ -127,7 +127,7 @@ func (c *runtimeArchitectureComponentImpl) ScanArchitecture(ctx context.Context,
 	if err != nil {
 		return fmt.Errorf("list runtime arch failed, %w", err)
 	}
-	var archMap map[string]string = make(map[string]string)
+	var archMap = make(map[string]string)
 	for _, arch := range archs {
 		archMap[arch.ArchitectureName] = arch.ArchitectureName
 	}
@@ -232,6 +232,10 @@ func (c *runtimeArchitectureComponentImpl) IsSupportedModelResource(ctx context.
 	if strings.Contains(image, rm.EngineName) {
 		return true, nil
 	}
+	if matchRuntimeFrameworkWithEngineEE(rf, rm.EngineName) {
+		return true, nil
+	}
+
 	// special handling for nim models
 	nimImage := strings.ReplaceAll(image, "-", "")
 	nimMatchModel := strings.ReplaceAll(trimModel, "-", "")
@@ -311,7 +315,7 @@ func (c *runtimeArchitectureComponentImpl) getConfigContent(ctx context.Context,
 func (c *runtimeArchitectureComponentImpl) RemoveRuntimeFrameworkTag(ctx context.Context, rftags []*database.Tag, repoId, rfId int64) {
 	rfw, _ := c.runtimeFrameworksStore.FindByID(ctx, rfId)
 	for _, tag := range rftags {
-		if strings.Contains(rfw.FrameImage, tag.Name) {
+		if checkTagName(rfw, tag.Name) {
 			err := c.tagStore.RemoveRepoTags(ctx, repoId, []int64{tag.ID})
 			if err != nil {
 				slog.Warn("fail to remove runtime_framework tag from model repo", slog.Any("repoId", repoId), slog.Any("runtime_framework_id", rfId), slog.Any("error", err))
@@ -327,7 +331,7 @@ func (c *runtimeArchitectureComponentImpl) AddRuntimeFrameworkTag(ctx context.Co
 		return err
 	}
 	for _, tag := range rftags {
-		if strings.Contains(rfw.FrameImage, tag.Name) {
+		if checkTagName(rfw, tag.Name) {
 			err := c.tagStore.UpsertRepoTags(ctx, repoId, []int64{}, []int64{tag.ID})
 			if err != nil {
 				slog.Warn("fail to add runtime_framework tag to model repo", slog.Any("repoId", repoId), slog.Any("runtime_framework_id", rfId), slog.Any("error", err))
