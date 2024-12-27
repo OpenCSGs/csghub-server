@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"errors"
 	"log/slog"
 	"net/http"
 	"strconv"
@@ -188,6 +189,146 @@ func (t *TagsHandler) DeleteTag(ctx *gin.Context) {
 	err = t.tc.DeleteTag(ctx, userName, id)
 	if err != nil {
 		slog.Error("Failed to delete tag", slog.Int64("id", id), slog.Any("error", err))
+		httpbase.ServerError(ctx, err)
+		return
+	}
+	ctx.JSON(http.StatusOK, nil)
+}
+
+// GetAllCategories godoc
+// @Security     ApiKey
+// @Summary      Get all Categories
+// @Description  Get all Categories
+// @Tags         Tag
+// @Accept       json
+// @Produce      json
+// @Success      200  {object}  types.ResponseWithTotal{data=[]database.TagCategory} "categores"
+// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
+// @Router       /tags/categories [get]
+func (t *TagsHandler) AllCategories(ctx *gin.Context) {
+	categories, err := t.tag.AllCategories(ctx)
+	if err != nil {
+		slog.Error("Failed to load categories", slog.Any("error", err))
+		httpbase.ServerError(ctx, err)
+		return
+	}
+	respData := gin.H{
+		"data": categories,
+	}
+	ctx.JSON(http.StatusOK, respData)
+}
+
+// CreateCategory     godoc
+// @Security     ApiKey
+// @Summary      Create new category
+// @Description  Create new category
+// @Tags         Tag
+// @Accept       json
+// @Produce      json
+// @Param        body body types.CreateCategory true "body"
+// @Success      200  {object}  types.Response{database.TagCategory} "OK"
+// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
+// @Router       /tags/categories [post]
+func (t *TagsHandler) CreateCategory(ctx *gin.Context) {
+	userName := httpbase.GetCurrentUser(ctx)
+	if userName == "" {
+		httpbase.UnauthorizedError(ctx, component.ErrUserNotFound)
+		return
+	}
+	var req types.CreateCategory
+	if err := ctx.ShouldBindJSON(&req); err != nil {
+		slog.Error("Bad request format", slog.Any("error", err))
+		httpbase.BadRequest(ctx, err.Error())
+		return
+	}
+	category, err := t.tag.CreateCategory(ctx, userName, req)
+	if err != nil {
+		if errors.Is(err, component.ErrForbidden) {
+			httpbase.ForbiddenError(ctx, err)
+			return
+		}
+		slog.Error("Failed to create category", slog.Any("req", req), slog.Any("error", err))
+		httpbase.ServerError(ctx, err)
+		return
+	}
+	ctx.JSON(http.StatusOK, gin.H{"data": category})
+}
+
+// UpdateCategory     godoc
+// @Security     ApiKey
+// @Summary      Create new category
+// @Description  Create new category
+// @Tags         Tag
+// @Accept       json
+// @Produce      json
+// @Param        body body types.UpdateCategory true "body"
+// @Success      200  {object}  types.Response{database.TagCategory} "OK"
+// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
+// @Router       /tags/categories/id [put]
+func (t *TagsHandler) UpdateCategory(ctx *gin.Context) {
+	userName := httpbase.GetCurrentUser(ctx)
+	if userName == "" {
+		httpbase.UnauthorizedError(ctx, component.ErrUserNotFound)
+		return
+	}
+	var req types.UpdateCategory
+	if err := ctx.ShouldBindJSON(&req); err != nil {
+		slog.Error("Bad request format", slog.Any("error", err))
+		httpbase.BadRequest(ctx, err.Error())
+		return
+	}
+	id, err := strconv.ParseInt(ctx.Param("id"), 10, 64)
+	if err != nil {
+		slog.Error("Bad request format", slog.Any("error", err))
+		httpbase.BadRequest(ctx, err.Error())
+		return
+	}
+	category, err := t.tag.UpdateCategory(ctx, userName, req, id)
+	if err != nil {
+		if errors.Is(err, component.ErrForbidden) {
+			httpbase.ForbiddenError(ctx, err)
+			return
+		}
+		slog.Error("Failed to update category", slog.Any("req", req), slog.Any("id", id), slog.Any("error", err))
+		httpbase.ServerError(ctx, err)
+		return
+	}
+	ctx.JSON(http.StatusOK, gin.H{"data": category})
+}
+
+// DeleteCategory  godoc
+// @Security     ApiKey
+// @Summary      Delete a category by id
+// @Description  Delete a category by id
+// @Tags         Tag
+// @Accept       json
+// @Produce      json
+// @Success      200  {object}  types.Response{} "OK"
+// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
+// @Router       /tags/categories/id [delete]
+func (t *TagsHandler) DeleteCategory(ctx *gin.Context) {
+	userName := httpbase.GetCurrentUser(ctx)
+	if userName == "" {
+		httpbase.UnauthorizedError(ctx, component.ErrUserNotFound)
+		return
+	}
+	id, err := strconv.ParseInt(ctx.Param("id"), 10, 64)
+	if err != nil {
+		slog.Error("Bad request format", slog.Any("error", err))
+		httpbase.BadRequest(ctx, err.Error())
+		return
+	}
+	err = t.tag.DeleteCategory(ctx, userName, id)
+	if err != nil {
+		if errors.Is(err, component.ErrForbidden) {
+			httpbase.ForbiddenError(ctx, err)
+			return
+		}
+		slog.Error("Failed to delete category", slog.Any("id", id), slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
 		return
 	}
