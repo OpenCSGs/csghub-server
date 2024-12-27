@@ -83,13 +83,13 @@ var serverCmd = &cobra.Command{
 		if err != nil {
 			return fmt.Errorf("failed to init deploy: %w", err)
 		}
-		r, err := router.NewRouter(cfg, enableSwagger)
-		if err != nil {
-			return fmt.Errorf("failed to init router: %w", err)
-		}
 		err = workflow.StartWorker(cfg)
 		if err != nil {
 			return fmt.Errorf("failed to start worker:  %w", err)
+		}
+		r, err := router.NewRouter(cfg, enableSwagger)
+		if err != nil {
+			return fmt.Errorf("failed to init router: %w", err)
 		}
 
 		err = workflow.RegisterCronJobs(cfg)
