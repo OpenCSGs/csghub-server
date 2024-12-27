@@ -1,5 +1,5 @@
-.PHONY: test lint cover mock_wire mock_gen
- 
+.PHONY: test lint cover mock_wire mock_gen swag
+
 test:
 	go test ./...
 
@@ -25,3 +25,6 @@ mock_wire:
 
 mock_gen:
 	mockery
+
+swag:
+	swag init --pd -d cmd/csghub-server/cmd/start,api/router,api/handler,builder/store/database,common/types,accounting/handler,user/handler,component -g server.go

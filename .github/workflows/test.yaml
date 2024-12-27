@@ -17,17 +17,33 @@ jobs:
     steps:
       - uses: actions/setup-go@v5
         with:
-          go-version: '1.21'
+          go-version: '1.22'
       - uses: actions/checkout@v4
       - name: golangci-lint
         uses: golangci/golangci-lint-action@v6
         with:
           args: --timeout=5m
+  swagger:
+    name: swagger-gen
+    strategy:
+      matrix:
+        go: ["1.22"]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Setup Go
+        with:
+          go-version: ${{ matrix.go }}
+        uses: actions/setup-go@v2
+
+      - uses: actions/checkout@v2
+
+      - name: Gen
+        run: make swag
   test:
     name: test
     strategy:
       matrix:
-        go: ["1.21.x"]
+        go: ["1.22"]
     runs-on: ubuntu-latest
     steps:
       - name: Setup Go

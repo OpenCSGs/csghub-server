@@ -1,107 +1,4 @@
 definitions:
-  component.CreateCommentRequest:
-    properties:
-      commentable_id:
-        type: integer
-      commentable_type:
-        type: string
-      content:
-        type: string
-    required:
-    - content
-    type: object
-  component.CreateCommentResponse:
-    properties:
-      commentable_id:
-        type: integer
-      commentable_type:
-        type: string
-      created_at:
-        type: string
-      id:
-        type: integer
-      user:
-        $ref: '#/definitions/component.DiscussionResponse_User'
-    type: object
-  component.CreateDiscussionResponse:
-    properties:
-      comment_count:
-        description: |-
-          DiscussionableID   int64     `json:"discussionable_id"`
-          DiscussionableType string    `json:"discussionable_type"`
-        type: integer
-      created_at:
-        type: string
-      id:
-        type: integer
-      title:
-        type: string
-      user:
-        $ref: '#/definitions/component.DiscussionResponse_User'
-    type: object
-  component.CreateRepoDiscussionRequest:
-    properties:
-      title:
-        type: string
-    required:
-    - title
-    type: object
-  component.DiscussionResponse_Comment:
-    properties:
-      content:
-        type: string
-      created_at:
-        type: string
-      id:
-        type: integer
-      user:
-        $ref: '#/definitions/component.DiscussionResponse_User'
-    type: object
-  component.DiscussionResponse_User:
-    properties:
-      avatar:
-        type: string
-      id:
-        type: integer
-      name:
-        type: string
-    type: object
-  component.ListRepoDiscussionResponse:
-    properties:
-      discussions:
-        items:
-          $ref: '#/definitions/component.CreateDiscussionResponse'
-        type: array
-    type: object
-  component.ShowDiscussionResponse:
-    properties:
-      comment_count:
-        type: integer
-      comments:
-        items:
-          $ref: '#/definitions/component.DiscussionResponse_Comment'
-        type: array
-      id:
-        type: integer
-      title:
-        type: string
-      user:
-        $ref: '#/definitions/component.DiscussionResponse_User'
-    type: object
-  component.UpdateCommentRequest:
-    properties:
-      content:
-        type: string
-    required:
-    - content
-    type: object
-  component.UpdateDiscussionRequest:
-    properties:
-      title:
-        type: string
-    required:
-    - title
-    type: object
   database.AccessToken:
     properties:
       application:
@@ -723,6 +620,8 @@ definitions:
         $ref: '#/definitions/types.Repository'
       repository_id:
         type: integer
+      sensitive_check_status:
+        type: string
       source:
         $ref: '#/definitions/types.RepositorySource'
       sync_status:
@@ -878,28 +777,6 @@ definitions:
       total:
         type: integer
     type: object
-  types.Conversation:
-    properties:
-      message:
-        type: string
-      temperature:
-        type: number
-      uuid:
-        type: string
-    required:
-    - message
-    - uuid
-    type: object
-  types.ConversationTitle:
-    properties:
-      title:
-        type: string
-      uuid:
-        type: string
-    required:
-    - title
-    - uuid
-    type: object
   types.CreateCodeReq:
     properties:
       default_branch:
@@ -946,6 +823,30 @@ definitions:
         example: '#fff000'
         type: string
     type: object
+  types.CreateCommentRequest:
+    properties:
+      commentable_id:
+        type: integer
+      commentable_type:
+        type: string
+      content:
+        type: string
+    required:
+    - content
+    type: object
+  types.CreateCommentResponse:
+    properties:
+      commentable_id:
+        type: integer
+      commentable_type:
+        type: string
+      created_at:
+        type: string
+      id:
+        type: integer
+      user:
+        $ref: '#/definitions/types.DiscussionResponse_User'
+    type: object
   types.CreateDatasetReq:
     properties:
       default_branch:
@@ -974,6 +875,22 @@ definitions:
         type: string
       type:
         type: integer
+    type: object
+  types.CreateDiscussionResponse:
+    properties:
+      comment_count:
+        description: |-
+          DiscussionableID   int64     `json:"discussionable_id"`
+          DiscussionableType string    `json:"discussionable_type"`
+        type: integer
+      created_at:
+        type: string
+      id:
+        type: integer
+      title:
+        type: string
+      user:
+        $ref: '#/definitions/types.DiscussionResponse_User'
     type: object
   types.CreateFileReq:
     properties:
@@ -1148,6 +1065,13 @@ definitions:
       readme:
         type: string
     type: object
+  types.CreateRepoDiscussionRequest:
+    properties:
+      title:
+        type: string
+    required:
+    - title
+    type: object
   types.CreateSSHKeyRequest:
     properties:
       content:
@@ -1307,6 +1231,8 @@ definitions:
         $ref: '#/definitions/types.Repository'
       repository_id:
         type: integer
+      sensitive_check_status:
+        type: string
       source:
         $ref: '#/definitions/types.RepositorySource'
       sync_status:
@@ -1381,6 +1307,26 @@ definitions:
         type: integer
       secure_level:
         type: integer
+    type: object
+  types.DiscussionResponse_Comment:
+    properties:
+      content:
+        type: string
+      created_at:
+        type: string
+      id:
+        type: integer
+      user:
+        $ref: '#/definitions/types.DiscussionResponse_User'
+    type: object
+  types.DiscussionResponse_User:
+    properties:
+      avatar:
+        type: string
+      id:
+        type: integer
+      name:
+        type: string
     type: object
   types.EditOrgReq:
     properties:
@@ -1540,6 +1486,13 @@ definitions:
       paths:
         items:
           type: string
+        type: array
+    type: object
+  types.ListRepoDiscussionResponse:
+    properties:
+      discussions:
+        items:
+          $ref: '#/definitions/types.CreateDiscussionResponse'
         type: array
     type: object
   types.Member:
@@ -1705,15 +1658,6 @@ definitions:
         - $ref: '#/definitions/types.ModelWidgetType'
         description: 'widget UI style: generation,chat'
         example: generation
-    type: object
-  types.ModelPredictReq:
-    properties:
-      current_user:
-        type: string
-      input:
-        type: string
-      version:
-        type: string
     type: object
   types.ModelResp:
     properties:
@@ -2069,6 +2013,21 @@ definitions:
     - SensitiveCheckPass
     - SensitiveCheckSkip
     - SensitiveCheckException
+  types.ShowDiscussionResponse:
+    properties:
+      comment_count:
+        type: integer
+      comments:
+        items:
+          $ref: '#/definitions/types.DiscussionResponse_Comment'
+        type: array
+      id:
+        type: integer
+      title:
+        type: string
+      user:
+        $ref: '#/definitions/types.DiscussionResponse_User'
+    type: object
   types.Space:
     properties:
       can_manage:
@@ -2234,6 +2193,13 @@ definitions:
           type: integer
         type: array
     type: object
+  types.UpdateCommentRequest:
+    properties:
+      content:
+        type: string
+    required:
+    - content
+    type: object
   types.UpdateDatasetReq:
     properties:
       description:
@@ -2244,6 +2210,13 @@ definitions:
       private:
         example: false
         type: boolean
+    type: object
+  types.UpdateDiscussionRequest:
+    properties:
+      title:
+        type: string
+    required:
+    - title
     type: object
   types.UpdateFileReq:
     properties:
@@ -2744,7 +2717,7 @@ paths:
             - $ref: '#/definitions/types.Response'
             - properties:
                 data:
-                  $ref: '#/definitions/component.ListRepoDiscussionResponse'
+                  $ref: '#/definitions/types.ListRepoDiscussionResponse'
               type: object
         "400":
           description: Bad request
@@ -2794,7 +2767,7 @@ paths:
         name: body
         required: true
         schema:
-          $ref: '#/definitions/component.CreateRepoDiscussionRequest'
+          $ref: '#/definitions/types.CreateRepoDiscussionRequest'
       produces:
       - application/json
       responses:
@@ -2805,7 +2778,7 @@ paths:
             - $ref: '#/definitions/types.Response'
             - properties:
                 data:
-                  $ref: '#/definitions/component.CreateDiscussionResponse'
+                  $ref: '#/definitions/types.CreateDiscussionResponse'
               type: object
         "400":
           description: Bad request
@@ -4984,7 +4957,7 @@ paths:
         name: body
         required: true
         schema:
-          $ref: '#/definitions/component.UpdateCommentRequest'
+          $ref: '#/definitions/types.UpdateCommentRequest'
       produces:
       - application/json
       responses:
@@ -5446,7 +5419,7 @@ paths:
             - $ref: '#/definitions/types.Response'
             - properties:
                 data:
-                  $ref: '#/definitions/component.ShowDiscussionResponse'
+                  $ref: '#/definitions/types.ShowDiscussionResponse'
               type: object
         "400":
           description: Bad request
@@ -5481,7 +5454,7 @@ paths:
         name: body
         required: true
         schema:
-          $ref: '#/definitions/component.UpdateDiscussionRequest'
+          $ref: '#/definitions/types.UpdateDiscussionRequest'
       produces:
       - application/json
       responses:
@@ -5524,7 +5497,7 @@ paths:
             - properties:
                 data:
                   items:
-                    $ref: '#/definitions/component.DiscussionResponse_Comment'
+                    $ref: '#/definitions/types.DiscussionResponse_Comment'
                   type: array
               type: object
         "400":
@@ -5555,7 +5528,7 @@ paths:
         name: body
         required: true
         schema:
-          $ref: '#/definitions/component.CreateCommentRequest'
+          $ref: '#/definitions/types.CreateCommentRequest'
       produces:
       - application/json
       responses:
@@ -5566,7 +5539,7 @@ paths:
             - $ref: '#/definitions/types.Response'
             - properties:
                 data:
-                  $ref: '#/definitions/component.CreateCommentResponse'
+                  $ref: '#/definitions/types.CreateCommentResponse'
               type: object
         "400":
           description: Bad request
@@ -6665,52 +6638,6 @@ paths:
       security:
       - ApiKey: []
       summary: Stop a finetune instance
-      tags:
-      - Model
-  /models/{namespace}/{name}/predict:
-    post:
-      consumes:
-      - application/json
-      description: invoke model prediction
-      parameters:
-      - description: namespace
-        in: path
-        name: namespace
-        required: true
-        type: string
-      - description: name
-        in: path
-        name: name
-        required: true
-        type: string
-      - description: current user
-        in: query
-        name: current_user
-        type: string
-      - description: input for model prediction
-        in: body
-        name: body
-        required: true
-        schema:
-          $ref: '#/definitions/types.ModelPredictReq'
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            type: string
-        "400":
-          description: Bad request
-          schema:
-            $ref: '#/definitions/types.APIBadRequest'
-        "500":
-          description: Internal server error
-          schema:
-            $ref: '#/definitions/types.APIInternalServerError'
-      security:
-      - ApiKey: []
-      summary: Invoke model prediction
       tags:
       - Model
   /models/{namespace}/{name}/relations:
@@ -8991,267 +8918,6 @@ paths:
       security:
       - ApiKey: []
       summary: update the tags of a certain category
-      tags:
-      - Prompt
-  /prompts/conversations:
-    get:
-      consumes:
-      - application/json
-      description: List conversations of user
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/types.Response'
-        "400":
-          description: Bad request
-          schema:
-            $ref: '#/definitions/types.APIBadRequest'
-        "500":
-          description: Internal server error
-          schema:
-            $ref: '#/definitions/types.APIInternalServerError'
-      security:
-      - ApiKey: []
-      summary: List conversations of user
-      tags:
-      - Prompt
-    post:
-      consumes:
-      - application/json
-      description: Create new conversation
-      parameters:
-      - description: body
-        in: body
-        name: body
-        required: true
-        schema:
-          $ref: '#/definitions/types.Conversation'
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/types.Response'
-        "400":
-          description: Bad request
-          schema:
-            $ref: '#/definitions/types.APIBadRequest'
-        "500":
-          description: Internal server error
-          schema:
-            $ref: '#/definitions/types.APIInternalServerError'
-      security:
-      - ApiKey: []
-      summary: Create new conversation
-      tags:
-      - Prompt
-  /prompts/conversations/{id}:
-    delete:
-      consumes:
-      - application/json
-      description: Delete a conversation
-      parameters:
-      - description: conversation uuid
-        in: path
-        name: id
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/types.Response'
-        "400":
-          description: Bad request
-          schema:
-            $ref: '#/definitions/types.APIBadRequest'
-        "500":
-          description: Internal server error
-          schema:
-            $ref: '#/definitions/types.APIInternalServerError'
-      security:
-      - ApiKey: []
-      summary: Delete a conversation
-      tags:
-      - Prompt
-    get:
-      consumes:
-      - application/json
-      description: Get a conversation by uuid
-      parameters:
-      - description: conversation uuid
-        in: path
-        name: id
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/types.Response'
-        "400":
-          description: Bad request
-          schema:
-            $ref: '#/definitions/types.APIBadRequest'
-        "500":
-          description: Internal server error
-          schema:
-            $ref: '#/definitions/types.APIInternalServerError'
-      security:
-      - ApiKey: []
-      summary: Get a conversation by uuid
-      tags:
-      - Prompt
-    post:
-      consumes:
-      - application/json
-      description: Submit a conversation message
-      parameters:
-      - description: conversation uuid
-        in: path
-        name: id
-        required: true
-        type: string
-      - description: body
-        in: body
-        name: body
-        required: true
-        schema:
-          $ref: '#/definitions/types.Conversation'
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/types.Response'
-        "400":
-          description: Bad request
-          schema:
-            $ref: '#/definitions/types.APIBadRequest'
-        "500":
-          description: Internal server error
-          schema:
-            $ref: '#/definitions/types.APIInternalServerError'
-      security:
-      - ApiKey: []
-      summary: Submit a conversation message
-      tags:
-      - Prompt
-    put:
-      consumes:
-      - application/json
-      description: Update a conversation title
-      parameters:
-      - description: conversation uuid
-        in: path
-        name: id
-        required: true
-        type: string
-      - description: body
-        in: body
-        name: body
-        required: true
-        schema:
-          $ref: '#/definitions/types.ConversationTitle'
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/types.Response'
-        "400":
-          description: Bad request
-          schema:
-            $ref: '#/definitions/types.APIBadRequest'
-        "500":
-          description: Internal server error
-          schema:
-            $ref: '#/definitions/types.APIInternalServerError'
-      security:
-      - ApiKey: []
-      summary: Update a conversation title
-      tags:
-      - Prompt
-  /prompts/conversations/{id}/message/{msgid}/hate:
-    put:
-      consumes:
-      - application/json
-      description: Hate a conversation message
-      parameters:
-      - description: conversation uuid
-        in: path
-        name: uuid
-        required: true
-        type: string
-      - description: message id
-        in: path
-        name: id
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/types.Response'
-        "400":
-          description: Bad request
-          schema:
-            $ref: '#/definitions/types.APIBadRequest'
-        "500":
-          description: Internal server error
-          schema:
-            $ref: '#/definitions/types.APIInternalServerError'
-      security:
-      - ApiKey: []
-      summary: Hate a conversation message
-      tags:
-      - Prompt
-  /prompts/conversations/{id}/message/{msgid}/like:
-    put:
-      consumes:
-      - application/json
-      description: Like a conversation message
-      parameters:
-      - description: conversation uuid
-        in: path
-        name: uuid
-        required: true
-        type: string
-      - description: message id
-        in: path
-        name: id
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/types.Response'
-        "400":
-          description: Bad request
-          schema:
-            $ref: '#/definitions/types.APIBadRequest'
-        "500":
-          description: Internal server error
-          schema:
-            $ref: '#/definitions/types.APIInternalServerError'
-      security:
-      - ApiKey: []
-      summary: Like a conversation message
       tags:
       - Prompt
   /recom/opweight:
