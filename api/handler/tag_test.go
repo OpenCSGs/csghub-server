@@ -22,7 +22,7 @@ func NewTestTagHandler(
 	tagComp component.TagComponent,
 ) (*TagsHandler, error) {
 	return &TagsHandler{
-		tc: tagComp,
+		tag: tagComp,
 	}, nil
 }
 

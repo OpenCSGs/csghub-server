@@ -18,12 +18,12 @@ func NewMirrorHandler(config *config.Config) (*MirrorHandler, error) {
 		return nil, err
 	}
 	return &MirrorHandler{
-		mc: mc,
+		mirror: mc,
 	}, nil
 }
 
 type MirrorHandler struct {
-	mc component.MirrorComponent
+	mirror component.MirrorComponent
 }
 
 // CreateMirrorRepo godoc
@@ -38,19 +38,21 @@ type MirrorHandler struct {
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
 // @Router       /mirror/repo [post]
 func (h *MirrorHandler) CreateMirrorRepo(ctx *gin.Context) {
+	currentUser := httpbase.GetCurrentUser(ctx)
+	if currentUser == "" {
+		httpbase.UnauthorizedError(ctx, component.ErrUserNotFound)
+		return
+	}
+
 	var req types.CreateMirrorRepoReq
 	err := ctx.ShouldBindJSON(&req)
 	if err != nil {
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
-	currentUser := httpbase.GetCurrentUser(ctx)
-	if currentUser == "" {
-		httpbase.UnauthorizedError(ctx, component.ErrUserNotFound)
-		return
-	}
+
 	req.CurrentUser = currentUser
-	m, err := h.mc.CreateMirrorRepo(ctx, req)
+	m, err := h.mirror.CreateMirrorRepo(ctx, req)
 	if err != nil {
 		slog.Error("failed to create mirror repo", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
@@ -74,18 +76,20 @@ func (h *MirrorHandler) CreateMirrorRepo(ctx *gin.Context) {
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
 // @Router       /mirror/repos [get]
 func (h *MirrorHandler) Repos(ctx *gin.Context) {
+	currentUser := httpbase.GetCurrentUser(ctx)
+	if currentUser == "" {
+		httpbase.UnauthorizedError(ctx, component.ErrUserNotFound)
+		return
+	}
+
 	per, page, err := common.GetPerAndPageFromContext(ctx)
 	if err != nil {
 		slog.Error("Bad request format", "error", err)
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
-	currentUser := httpbase.GetCurrentUser(ctx)
-	if currentUser == "" {
-		httpbase.UnauthorizedError(ctx, component.ErrUserNotFound)
-		return
-	}
-	repos, total, err := h.mc.Repos(ctx, currentUser, per, page)
+
+	repos, total, err := h.mirror.Repos(ctx, currentUser, per, page)
 	if err != nil {
 		slog.Error("failed to get mirror repos", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
@@ -112,19 +116,21 @@ func (h *MirrorHandler) Repos(ctx *gin.Context) {
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
 // @Router       /mirrors [get]
 func (h *MirrorHandler) Index(ctx *gin.Context) {
+	currentUser := httpbase.GetCurrentUser(ctx)
+	if currentUser == "" {
+		httpbase.UnauthorizedError(ctx, component.ErrUserNotFound)
+		return
+	}
+
 	per, page, err := common.GetPerAndPageFromContext(ctx)
 	if err != nil {
 		slog.Error("Bad request format", "error", err)
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
-	currentUser := httpbase.GetCurrentUser(ctx)
-	if currentUser == "" {
-		httpbase.UnauthorizedError(ctx, component.ErrUserNotFound)
-		return
-	}
+
 	search := ctx.Query("search")
-	repos, total, err := h.mc.Index(ctx, currentUser, per, page, search)
+	repos, total, err := h.mirror.Index(ctx, currentUser, per, page, search)
 	if err != nil {
 		slog.Error("failed to get mirror repos", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)

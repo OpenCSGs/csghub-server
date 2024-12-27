@@ -38,22 +38,22 @@ func NewOrganizationHandler(config *config.Config) (*OrganizationHandler, error)
 		return nil, err
 	}
 	return &OrganizationHandler{
-		sc:   sc,
-		cc:   cc,
-		mc:   mc,
-		dsc:  dsc,
-		colc: colc,
-		pc:   pc,
+		space:      sc,
+		code:       cc,
+		model:      mc,
+		dataset:    dsc,
+		collection: colc,
+		prompt:     pc,
 	}, nil
 }
 
 type OrganizationHandler struct {
-	sc   component.SpaceComponent
-	cc   component.CodeComponent
-	mc   component.ModelComponent
-	dsc  component.DatasetComponent
-	colc component.CollectionComponent
-	pc   component.PromptComponent
+	space      component.SpaceComponent
+	code       component.CodeComponent
+	model      component.ModelComponent
+	dataset    component.DatasetComponent
+	collection component.CollectionComponent
+	prompt     component.PromptComponent
 }
 
 // GetOrganizationModels godoc
@@ -84,7 +84,7 @@ func (h *OrganizationHandler) Models(ctx *gin.Context) {
 	}
 	req.Page = page
 	req.PageSize = per
-	models, total, err := h.mc.OrgModels(ctx, &req)
+	models, total, err := h.model.OrgModels(ctx, &req)
 	if err != nil {
 		slog.Error("Failed to get org models", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
@@ -129,7 +129,7 @@ func (h *OrganizationHandler) Datasets(ctx *gin.Context) {
 	}
 	req.Page = page
 	req.PageSize = per
-	datasets, total, err := h.dsc.OrgDatasets(ctx, &req)
+	datasets, total, err := h.dataset.OrgDatasets(ctx, &req)
 	if err != nil {
 		slog.Error("Failed to get org datasets", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
@@ -173,7 +173,7 @@ func (h *OrganizationHandler) Codes(ctx *gin.Context) {
 	}
 	req.Page = page
 	req.PageSize = per
-	datasets, total, err := h.cc.OrgCodes(ctx, &req)
+	datasets, total, err := h.code.OrgCodes(ctx, &req)
 	if err != nil {
 		slog.Error("Failed to get org codes", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
@@ -217,7 +217,7 @@ func (h *OrganizationHandler) Spaces(ctx *gin.Context) {
 	}
 	req.Page = page
 	req.PageSize = per
-	datasets, total, err := h.sc.OrgSpaces(ctx, &req)
+	datasets, total, err := h.space.OrgSpaces(ctx, &req)
 	if err != nil {
 		slog.Error("Failed to get org spaces", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
@@ -261,7 +261,7 @@ func (h *OrganizationHandler) Collections(ctx *gin.Context) {
 	}
 	req.Page = page
 	req.PageSize = per
-	datasets, total, err := h.colc.OrgCollections(ctx, &req)
+	datasets, total, err := h.collection.OrgCollections(ctx, &req)
 	if err != nil {
 		slog.Error("Failed to get org collections", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
@@ -304,7 +304,7 @@ func (h *OrganizationHandler) Prompts(ctx *gin.Context) {
 	}
 	req.Page = page
 	req.PageSize = per
-	prompts, total, err := h.pc.OrgPrompts(ctx, &req)
+	prompts, total, err := h.prompt.OrgPrompts(ctx, &req)
 	if err != nil {
 		slog.Error("Failed to get org prompts", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)

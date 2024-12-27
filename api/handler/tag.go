@@ -18,12 +18,12 @@ func NewTagHandler(config *config.Config) (*TagsHandler, error) {
 		return nil, err
 	}
 	return &TagsHandler{
-		tc: tc,
+		tag: tc,
 	}, nil
 }
 
 type TagsHandler struct {
-	tc component.TagComponent
+	tag component.TagComponent
 }
 
 // GetAllTags godoc
@@ -43,7 +43,7 @@ func (t *TagsHandler) AllTags(ctx *gin.Context) {
 	//TODO:validate inputs
 	category := ctx.Query("category")
 	scope := ctx.Query("scope")
-	tags, err := t.tc.AllTagsByScopeAndCategory(ctx, scope, category)
+	tags, err := t.tag.AllTagsByScopeAndCategory(ctx, scope, category)
 	if err != nil {
 		slog.Error("Failed to load tags", slog.Any("category", category), slog.Any("scope", scope), slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
@@ -79,7 +79,7 @@ func (t *TagsHandler) CreateTag(ctx *gin.Context) {
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
-	tag, err := t.tc.CreateTag(ctx, userName, req)
+	tag, err := t.tag.CreateTag(ctx, userName, req)
 	if err != nil {
 		slog.Error("Failed to create tag", slog.Any("req", req), slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
@@ -112,7 +112,7 @@ func (t *TagsHandler) GetTagByID(ctx *gin.Context) {
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
-	tag, err := t.tc.GetTagByID(ctx, userName, id)
+	tag, err := t.tag.GetTagByID(ctx, userName, id)
 	if err != nil {
 		slog.Error("Failed to get tag", slog.Int64("id", id), slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
@@ -152,7 +152,7 @@ func (t *TagsHandler) UpdateTag(ctx *gin.Context) {
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
-	tag, err := t.tc.UpdateTag(ctx, userName, id, req)
+	tag, err := t.tag.UpdateTag(ctx, userName, id, req)
 	if err != nil {
 		slog.Error("Failed to update tag", slog.Int64("id", id), slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
@@ -185,7 +185,7 @@ func (t *TagsHandler) DeleteTag(ctx *gin.Context) {
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
-	err = t.tc.DeleteTag(ctx, userName, id)
+	err = t.tag.DeleteTag(ctx, userName, id)
 	if err != nil {
 		slog.Error("Failed to delete tag", slog.Int64("id", id), slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
