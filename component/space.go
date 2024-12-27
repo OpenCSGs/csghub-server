@@ -11,12 +11,9 @@ import (
 
 	"opencsg.com/csghub-server/builder/deploy"
 	"opencsg.com/csghub-server/builder/deploy/scheduler"
-	"opencsg.com/csghub-server/builder/git"
 	"opencsg.com/csghub-server/builder/git/gitserver"
 	"opencsg.com/csghub-server/builder/git/membership"
-	"opencsg.com/csghub-server/builder/rpc"
 	"opencsg.com/csghub-server/builder/store/database"
-	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/types"
 	"opencsg.com/csghub-server/common/utils/common"
 )
@@ -45,62 +42,13 @@ type SpaceComponent interface {
 	Delete(ctx context.Context, namespace, name, currentUser string) error
 	Deploy(ctx context.Context, namespace, name, currentUser string) (int64, error)
 	Wakeup(ctx context.Context, namespace, name string) error
-	Stop(ctx context.Context, namespace, name string) error
+	Stop(ctx context.Context, namespace, name string, deleteSpace bool) error
 	// FixHasEntryFile checks whether git repo has entry point file and update space's HasAppFile property in db
 	FixHasEntryFile(ctx context.Context, s *database.Space) *database.Space
 	Status(ctx context.Context, namespace, name string) (string, string, error)
 	Logs(ctx context.Context, namespace, name string) (*deploy.MultiLogReader, error)
 	// HasEntryFile checks whether space repo has entry point file to run with
 	HasEntryFile(ctx context.Context, space *database.Space) bool
-}
-
-func NewSpaceComponent(config *config.Config) (SpaceComponent, error) {
-	c := &spaceComponentImpl{}
-	c.spaceStore = database.NewSpaceStore()
-	var err error
-	c.spaceSdkStore = database.NewSpaceSdkStore()
-	c.spaceResourceStore = database.NewSpaceResourceStore()
-	c.repoStore = database.NewRepoStore()
-	c.repoComponent, err = NewRepoComponentImpl(config)
-	if err != nil {
-		return nil, err
-	}
-	c.deployer = deploy.NewDeployer()
-	c.publicRootDomain = config.Space.PublicRootDomain
-	c.userStore = database.NewUserStore()
-	c.accountingComponent, err = NewAccountingComponent(config)
-	if err != nil {
-		return nil, err
-	}
-	c.git, err = git.NewGitServer(config)
-	if err != nil {
-		return nil, err
-	}
-	c.serverBaseUrl = config.APIServer.PublicDomain
-	c.deployTaskStore = database.NewDeployTaskStore()
-	c.userSvcClient = rpc.NewUserSvcHttpClient(fmt.Sprintf("%s:%d", config.User.Host, config.User.Port),
-		rpc.AuthWithApiKey(config.APIToken))
-	c.userLikesStore = database.NewUserLikesStore()
-	c.config = config
-	return c, nil
-}
-
-type spaceComponentImpl struct {
-	config              *config.Config
-	repoComponent       RepoComponent
-	git                 gitserver.GitServer
-	spaceStore          database.SpaceStore
-	spaceSdkStore       database.SpaceSdkStore
-	spaceResourceStore  database.SpaceResourceStore
-	repoStore           database.RepoStore
-	userStore           database.UserStore
-	deployer            deploy.Deployer
-	publicRootDomain    string
-	accountingComponent AccountingComponent
-	serverBaseUrl       string
-	deployTaskStore     database.DeployTaskStore
-	userSvcClient       rpc.UserSvcClient
-	userLikesStore      database.UserLikesStore
 }
 
 func (c *spaceComponentImpl) Create(ctx context.Context, req types.CreateSpaceReq) (*types.Space, error) {
@@ -110,13 +58,19 @@ func (c *spaceComponentImpl) Create(ctx context.Context, req types.CreateSpaceRe
 	} else {
 		nickname = req.Name
 	}
+
 	if req.DefaultBranch == "" {
 		req.DefaultBranch = types.MainBranch
 	}
+
 	req.Nickname = nickname
 	req.RepoType = types.SpaceRepo
 	req.Readme = generateReadmeData(req.License)
 	resource, err := c.spaceResourceStore.FindByID(ctx, req.ResourceID)
+	if err != nil {
+		return nil, fmt.Errorf("fail to find resource by id, %w", err)
+	}
+	err = c.checkResourcePurchasableForCreate(ctx, req, resource)
 	if err != nil {
 		return nil, err
 	}
@@ -125,7 +79,7 @@ func (c *spaceComponentImpl) Create(ctx context.Context, req types.CreateSpaceRe
 	if err != nil {
 		return nil, fmt.Errorf("invalid hardware setting, %w", err)
 	}
-	_, err = c.deployer.CheckResourceAvailable(ctx, req.ClusterID, 0, &hardware)
+	_, err = c.checkResourceAvailable(ctx, req, hardware)
 	if err != nil {
 		return nil, fmt.Errorf("fail to check resource, %w", err)
 	}
@@ -145,6 +99,7 @@ func (c *spaceComponentImpl) Create(ctx context.Context, req types.CreateSpaceRe
 		Secrets:       req.Secrets,
 		SKU:           strconv.FormatInt(resource.ID, 10),
 	}
+	dbSpace = c.updateSpaceByReq(dbSpace, req)
 
 	resSpace, err := c.spaceStore.Create(ctx, dbSpace)
 	if err != nil {
@@ -302,12 +257,26 @@ func (c *spaceComponentImpl) Show(ctx context.Context, namespace, name, currentU
 		CanManage:     permission.CanAdmin,
 		Namespace:     ns,
 	}
+	if permission.CanAdmin {
+		resModel.SensitiveCheckStatus = space.Repository.SensitiveCheckStatus.String()
+	}
 
 	return resModel, nil
 }
 
 func (c *spaceComponentImpl) Update(ctx context.Context, req *types.UpdateSpaceReq) (*types.Space, error) {
 	req.RepoType = types.SpaceRepo
+	if req.ResourceID != nil {
+		resource, err := c.spaceResourceStore.FindByID(ctx, *req.ResourceID)
+		if err != nil {
+			return nil, fmt.Errorf("fail to find resource by id, %w", err)
+		}
+
+		err = c.checkResourcePurchasableForUpdate(ctx, *req, resource)
+		if err != nil {
+			return nil, err
+		}
+	}
 	dbRepo, err := c.repoComponent.UpdateRepo(ctx, req.UpdateRepoReq)
 	if err != nil {
 		return nil, err
@@ -316,6 +285,10 @@ func (c *spaceComponentImpl) Update(ctx context.Context, req *types.UpdateSpaceR
 	space, err := c.spaceStore.ByRepoID(ctx, dbRepo.ID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find space, error: %w", err)
+	}
+	// don't support switch reserved resource
+	if c.resourceReserved(space, req) {
+		return nil, fmt.Errorf("don't support switch reserved resource so far")
 	}
 	err = c.mergeUpdateSpaceRequest(ctx, space, req)
 	if err != nil {
@@ -602,7 +575,12 @@ func (c *spaceComponentImpl) Delete(ctx context.Context, namespace, name, curren
 	}
 
 	// stop any running space instance
-	go func() { _ = c.Stop(ctx, namespace, name) }()
+	go func() {
+		err := c.Stop(ctx, namespace, name, true)
+		if err != nil {
+			slog.Error("stop space failed", slog.Any("error", err))
+		}
+	}()
 
 	return nil
 }
@@ -641,7 +619,7 @@ func (c *spaceComponentImpl) Deploy(ctx context.Context, namespace, name, curren
 	slog.Info("run space with container image", slog.Any("namespace", namespace), slog.Any("name", name), slog.Any("containerImg", containerImg))
 
 	// create deploy for space
-	return c.deployer.Deploy(ctx, types.DeployRepo{
+	dr := types.DeployRepo{
 		SpaceID:    s.ID,
 		Path:       s.Repository.Path,
 		GitPath:    s.Repository.GitPath,
@@ -660,7 +638,9 @@ func (c *spaceComponentImpl) Deploy(ctx context.Context, namespace, name, curren
 		Type:       types.SpaceType,
 		UserUUID:   user.UUID,
 		SKU:        s.SKU,
-	})
+	}
+	dr = c.updateDeployRepoBySpace(dr, s)
+	return c.deployer.Deploy(ctx, dr)
 }
 
 func (c *spaceComponentImpl) Wakeup(ctx context.Context, namespace, name string) error {
@@ -682,7 +662,7 @@ func (c *spaceComponentImpl) Wakeup(ctx context.Context, namespace, name string)
 	})
 }
 
-func (c *spaceComponentImpl) Stop(ctx context.Context, namespace, name string) error {
+func (c *spaceComponentImpl) Stop(ctx context.Context, namespace, name string, deleteSpace bool) error {
 	s, err := c.spaceStore.FindByPath(ctx, namespace, name)
 	if err != nil {
 		slog.Error("can't stop space", slog.Any("error", err), slog.String("namespace", namespace), slog.String("name", name))
@@ -698,12 +678,14 @@ func (c *spaceComponentImpl) Stop(ctx context.Context, namespace, name string) e
 		return fmt.Errorf("can't get space deployment")
 	}
 
-	err = c.deployer.Stop(ctx, types.DeployRepo{
+	dr := types.DeployRepo{
 		SpaceID:   s.ID,
 		Namespace: namespace,
 		Name:      name,
 		SvcName:   deploy.SvcName,
-	})
+	}
+	dr = c.updateDeployRepoByDeploy(dr, deploy)
+	err = c.deployer.Stop(ctx, dr)
 	if err != nil {
 		return fmt.Errorf("can't stop space service deploy for service '%s', %w", deploy.SvcName, err)
 	}
@@ -720,9 +702,7 @@ func (c *spaceComponentImpl) FixHasEntryFile(ctx context.Context, s *database.Sp
 	hasAppFile := c.HasEntryFile(ctx, s)
 	if s.HasAppFile != hasAppFile {
 		s.HasAppFile = hasAppFile
-		if er := c.spaceStore.Update(ctx, *s); er != nil {
-			slog.Error("update space failed", "error", er)
-		}
+		_ = c.spaceStore.Update(ctx, *s)
 	}
 
 	return s

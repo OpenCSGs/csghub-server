@@ -6,7 +6,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/alibabacloud-go/tea/tea"
 	"github.com/stretchr/testify/require"
 	"opencsg.com/csghub-server/builder/deploy"
 	"opencsg.com/csghub-server/builder/deploy/scheduler"
@@ -15,111 +14,6 @@ import (
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/types"
 )
-
-// func TestSpaceComponent_Create(t *testing.T) {
-// 	ctx := context.TODO()
-// 	sc := initializeTestSpaceComponent(ctx, t)
-
-// 	sc.mocks.stores.SpaceResourceMock().EXPECT().FindByID(ctx, int64(1)).Return(&database.SpaceResource{
-// 		ID:        1,
-// 		Name:      "sp",
-// 		Resources: `{"memory": "foo"}`,
-// 	}, nil)
-
-// 	sc.mocks.deployer.EXPECT().CheckResourceAvailable(ctx, int64(0), &types.HardWare{
-// 		Memory: "foo",
-// 	}).Return(true, nil)
-
-// 	sc.mocks.components.repo.EXPECT().CreateRepo(ctx, types.CreateRepoReq{
-// 		DefaultBranch: "main",
-// 		Readme:        generateReadmeData("MIT"),
-// 		License:       "MIT",
-// 		Namespace:     "ns",
-// 		Name:          "n",
-// 		Nickname:      "n",
-// 		RepoType:      types.SpaceRepo,
-// 		Username:      "user",
-// 	}).Return(nil, &database.Repository{
-// 		ID: 321,
-// 		User: database.User{
-// 			Username: "user",
-// 			Email:    "foo@bar.com",
-// 		},
-// 	}, nil)
-
-// 	sc.mocks.stores.SpaceMock().EXPECT().Create(ctx, database.Space{
-// 		RepositoryID: 321,
-// 		Sdk:          scheduler.STREAMLIT.Name,
-// 		SdkVersion:   "v1",
-// 		Env:          "env",
-// 		Hardware:     `{"memory": "foo"}`,
-// 		Secrets:      "sss",
-// 		SKU:          "1",
-// 	}).Return(&database.Space{}, nil)
-// 	sc.mocks.gitServer.EXPECT().CreateRepoFile(buildCreateFileReq(&types.CreateFileParams{
-// 		Username:  "user",
-// 		Email:     "foo@bar.com",
-// 		Message:   initCommitMessage,
-// 		Branch:    "main",
-// 		Content:   generateReadmeData("MIT"),
-// 		NewBranch: "main",
-// 		Namespace: "ns",
-// 		Name:      "n",
-// 		FilePath:  readmeFileName,
-// 	}, types.SpaceRepo)).Return(nil)
-// 	sc.mocks.gitServer.EXPECT().CreateRepoFile(buildCreateFileReq(&types.CreateFileParams{
-// 		Username:  "user",
-// 		Email:     "foo@bar.com",
-// 		Message:   initCommitMessage,
-// 		Branch:    "main",
-// 		Content:   spaceGitattributesContent,
-// 		NewBranch: "main",
-// 		Namespace: "ns",
-// 		Name:      "n",
-// 		FilePath:  gitattributesFileName,
-// 	}, types.SpaceRepo)).Return(nil)
-// 	sc.mocks.gitServer.EXPECT().CreateRepoFile(buildCreateFileReq(&types.CreateFileParams{
-// 		Username:  "user",
-// 		Email:     "foo@bar.com",
-// 		Message:   initCommitMessage,
-// 		Branch:    "main",
-// 		Content:   streamlitConfigContent,
-// 		NewBranch: "main",
-// 		Namespace: "ns",
-// 		Name:      "n",
-// 		FilePath:  streamlitConfig,
-// 	}, types.SpaceRepo)).Return(nil)
-
-// 	space, err := sc.Create(ctx, types.CreateSpaceReq{
-// 		Sdk:        scheduler.STREAMLIT.Name,
-// 		SdkVersion: "v1",
-// 		Env:        "env",
-// 		Secrets:    "sss",
-// 		ResourceID: 1,
-// 		ClusterID:  "cluster",
-// 		CreateRepoReq: types.CreateRepoReq{
-// 			DefaultBranch: "main",
-// 			Readme:        "readme",
-// 			Namespace:     "ns",
-// 			Name:          "n",
-// 			License:       "MIT",
-// 			Username:      "user",
-// 		},
-// 	})
-// 	require.Nil(t, err)
-
-// 	require.Equal(t, &types.Space{
-// 		License:    "MIT",
-// 		Name:       "n",
-// 		Sdk:        "streamlit",
-// 		SdkVersion: "v1",
-// 		Env:        "env",
-// 		Secrets:    "sss",
-// 		Hardware:   `{"memory": "foo"}`,
-// 		Creator:    "user",
-// 	}, space)
-
-// }
 
 func TestSpaceComponent_Show(t *testing.T) {
 	ctx := context.TODO()
@@ -152,15 +46,16 @@ func TestSpaceComponent_Show(t *testing.T) {
 	space, err := sc.Show(ctx, "ns", "n", "user")
 	require.Nil(t, err)
 	require.Equal(t, &types.Space{
-		ID:           1,
-		Name:         "n",
-		Namespace:    &types.Namespace{Path: "ns"},
-		UserLikes:    true,
-		RepositoryID: 123,
-		Status:       "Stopped",
-		CanManage:    true,
-		User:         &types.User{},
-		Path:         "foo/bar",
+		ID:                   1,
+		Name:                 "n",
+		Namespace:            &types.Namespace{Path: "ns"},
+		UserLikes:            true,
+		RepositoryID:         123,
+		Status:               "Stopped",
+		CanManage:            true,
+		User:                 &types.User{},
+		Path:                 "foo/bar",
+		SensitiveCheckStatus: "Pending",
 		Repository: &types.Repository{
 			HTTPCloneURL: "/s/foo/bar.git",
 			SSHCloneURL:  ":s/foo/bar.git",
@@ -168,55 +63,6 @@ func TestSpaceComponent_Show(t *testing.T) {
 		Endpoint: "endpoint/svc",
 		SvcName:  "svc",
 	}, space)
-}
-
-func TestSpaceComponent_Update(t *testing.T) {
-	ctx := context.TODO()
-	sc := initializeTestSpaceComponent(ctx, t)
-
-	sc.mocks.stores.SpaceResourceMock().EXPECT().FindByID(ctx, int64(12)).Return(&database.SpaceResource{
-		ID:        12,
-		Name:      "sp",
-		Resources: `{"memory": "foo"}`,
-	}, nil)
-
-	sc.mocks.components.repo.EXPECT().UpdateRepo(ctx, types.UpdateRepoReq{
-		Username:  "user",
-		Namespace: "ns",
-		Name:      "n",
-		RepoType:  types.SpaceRepo,
-	}).Return(
-		&database.Repository{
-			ID:   123,
-			Name: "repo",
-		}, nil,
-	)
-	sc.mocks.stores.SpaceMock().EXPECT().ByRepoID(ctx, int64(123)).Return(&database.Space{
-		ID: 321,
-	}, nil)
-	sc.mocks.stores.SpaceMock().EXPECT().Update(ctx, database.Space{
-		ID:       321,
-		Hardware: `{"memory": "foo"}`,
-		SKU:      "12",
-	}).Return(nil)
-
-	space, err := sc.Update(ctx, &types.UpdateSpaceReq{
-		ResourceID: tea.Int64(12),
-		UpdateRepoReq: types.UpdateRepoReq{
-			Username:  "user",
-			Namespace: "ns",
-			Name:      "n",
-		},
-	})
-	require.Nil(t, err)
-
-	require.Equal(t, &types.Space{
-		ID:       321,
-		Name:     "repo",
-		Hardware: `{"memory": "foo"}`,
-		SKU:      "12",
-	}, space)
-
 }
 
 func TestSpaceComponent_Index(t *testing.T) {
@@ -455,6 +301,31 @@ func TestSpaceComponent_Wakeup(t *testing.T) {
 	err := sc.Wakeup(ctx, "ns", "n")
 	require.Nil(t, err)
 
+}
+
+func TestSpaceComponent_Stop(t *testing.T) {
+	ctx := context.TODO()
+	sc := initializeTestSpaceComponent(ctx, t)
+	sc.mocks.stores.SpaceMock().EXPECT().FindByPath(ctx, "ns", "n").Return(&database.Space{
+		ID: 1,
+	}, nil)
+
+	sc.mocks.stores.DeployTaskMock().EXPECT().GetLatestDeployBySpaceID(ctx, int64(1)).Return(
+		&database.Deploy{SvcName: "svc", RepoID: 1, UserID: 2, ID: 3}, nil,
+	)
+
+	sc.mocks.deployer.EXPECT().Stop(ctx, types.DeployRepo{
+		SpaceID:   1,
+		Namespace: "ns",
+		Name:      "n",
+		SvcName:   "svc",
+	}).Return(nil)
+	sc.mocks.stores.DeployTaskMock().EXPECT().StopDeploy(
+		ctx, types.SpaceRepo, int64(1), int64(2), int64(3),
+	).Return(nil)
+
+	err := sc.Stop(ctx, "ns", "n", false)
+	require.Nil(t, err)
 }
 
 func TestSpaceComponent_FixHasEntryFile(t *testing.T) {

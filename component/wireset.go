@@ -207,34 +207,6 @@ func NewTestUserComponent(
 
 var UserComponentSet = wire.NewSet(NewTestUserComponent)
 
-func NewTestSpaceComponent(
-	stores *tests.MockStores,
-	repoComponent RepoComponent,
-	git gitserver.GitServer,
-	deployer deploy.Deployer,
-	accountingComponent AccountingComponent,
-	config *config.Config,
-	userSvcClient rpc.UserSvcClient,
-) *spaceComponentImpl {
-	return &spaceComponentImpl{
-		repoComponent:       repoComponent,
-		git:                 git,
-		spaceStore:          stores.Space,
-		spaceSdkStore:       stores.SpaceSdk,
-		spaceResourceStore:  stores.SpaceResource,
-		repoStore:           stores.Repo,
-		userStore:           stores.User,
-		deployer:            deployer,
-		publicRootDomain:    config.Space.PublicRootDomain,
-		accountingComponent: accountingComponent,
-		serverBaseUrl:       config.APIServer.PublicDomain,
-		userLikesStore:      stores.UserLikes,
-		config:              config,
-		userSvcClient:       userSvcClient,
-		deployTaskStore:     stores.DeployTask,
-	}
-}
-
 var SpaceComponentSet = wire.NewSet(NewTestSpaceComponent)
 
 func NewTestModelComponent(
@@ -451,12 +423,6 @@ func NewTestMirrorSourceComponent(config *config.Config, stores *tests.MockStore
 }
 
 var MirrorSourceComponentSet = wire.NewSet(NewTestMirrorSourceComponent)
-
-func NewTestSpaceResourceComponent(config *config.Config, stores *tests.MockStores, deployer deploy.Deployer, accountComponent AccountingComponent) *spaceResourceComponentImpl {
-	return &spaceResourceComponentImpl{
-		deployer: deployer,
-	}
-}
 
 var SpaceResourceComponentSet = wire.NewSet(NewTestSpaceResourceComponent)
 
