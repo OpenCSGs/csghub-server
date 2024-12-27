@@ -387,7 +387,7 @@ func (h *SpaceHandler) Stop(ctx *gin.Context) {
 		return
 	}
 
-	err = h.c.Stop(ctx, namespace, name)
+	err = h.c.Stop(ctx, namespace, name, false)
 	if err != nil {
 		slog.Error("failed to stop space", slog.String("namespace", namespace),
 			slog.String("name", name), slog.Any("error", err))
