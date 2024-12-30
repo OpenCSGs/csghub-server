@@ -1,8 +1,6 @@
 module opencsg.com/csghub-server
 
-go 1.22.0
-
-toolchain go1.22.6
+go 1.23
 
 require (
 	github.com/DATA-DOG/go-txdb v0.2.0
@@ -20,7 +18,6 @@ require (
 	github.com/golang-jwt/jwt/v5 v5.2.1
 	github.com/golang/gddo v0.0.0-20210115222349-20d68f94ee1f
 	github.com/google/wire v0.6.0
-	github.com/jarcoal/httpmock v1.3.1
 	github.com/marcboeker/go-duckdb v1.5.6
 	github.com/minio/minio-go/v7 v7.0.66
 	github.com/minio/sha256-simd v1.0.1
