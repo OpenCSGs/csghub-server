@@ -17,9 +17,9 @@ import (
 )
 
 type PromptHandler struct {
-	pc   component.PromptComponent
-	sc   component.SensitiveComponent
-	repo component.RepoComponent
+	prompt    component.PromptComponent
+	sensitive component.SensitiveComponent
+	repo      component.RepoComponent
 }
 
 func NewPromptHandler(cfg *config.Config) (*PromptHandler, error) {
@@ -33,13 +33,12 @@ func NewPromptHandler(cfg *config.Config) (*PromptHandler, error) {
 	}
 	repo, err := component.NewRepoComponent(cfg)
 	if err != nil {
-		return nil, fmt.Errorf("error creating repo component:%w", err)
+		return nil, fmt.Errorf("failed to create repo component: %w", err)
 	}
-
 	return &PromptHandler{
-		pc:   promptComp,
-		sc:   sc,
-		repo: repo,
+		prompt:    promptComp,
+		sensitive: sc,
+		repo:      repo,
 	}, nil
 }
 
@@ -89,7 +88,7 @@ func (h *PromptHandler) Index(ctx *gin.Context) {
 		return
 	}
 
-	prompts, total, err := h.pc.IndexPromptRepo(ctx, filter, per, page)
+	prompts, total, err := h.prompt.IndexPromptRepo(ctx, filter, per, page)
 	if err != nil {
 		slog.Error("Failed to get prompts dataset", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
@@ -125,7 +124,7 @@ func (h *PromptHandler) ListPrompt(ctx *gin.Context) {
 		return
 	}
 
-	detail, err := h.pc.Show(ctx, namespace, name, currentUser)
+	detail, err := h.prompt.Show(ctx, namespace, name, currentUser)
 	if err != nil {
 		if errors.Is(err, component.ErrUnauthorized) {
 			httpbase.UnauthorizedError(ctx, err)
@@ -141,7 +140,7 @@ func (h *PromptHandler) ListPrompt(ctx *gin.Context) {
 		Name:        name,
 		CurrentUser: currentUser,
 	}
-	data, err := h.pc.ListPrompt(ctx, req)
+	data, err := h.prompt.ListPrompt(ctx, req)
 	if err != nil {
 		slog.Error("Failed to list prompts of repo", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
@@ -190,7 +189,7 @@ func (h *PromptHandler) GetPrompt(ctx *gin.Context) {
 		CurrentUser: currentUser,
 		Path:        convertFilePathFromRoute(filePath),
 	}
-	data, err := h.pc.GetPrompt(ctx, req)
+	data, err := h.prompt.GetPrompt(ctx, req)
 	if err != nil {
 		slog.Error("Failed to get prompt of repo", slog.Any("req", req), slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
@@ -232,7 +231,7 @@ func (h *PromptHandler) CreatePrompt(ctx *gin.Context) {
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
-	_, err = h.sc.CheckRequestV2(ctx, body)
+	_, err = h.sensitive.CheckRequestV2(ctx, body)
 	if err != nil {
 		slog.Error("failed to check sensitive request", slog.Any("error", err))
 		httpbase.BadRequest(ctx, fmt.Errorf("sensitive check failed: %w", err).Error())
@@ -244,8 +243,7 @@ func (h *PromptHandler) CreatePrompt(ctx *gin.Context) {
 		Name:        name,
 		CurrentUser: currentUser,
 	}
-
-	data, err := h.pc.CreatePrompt(ctx, req, body)
+	data, err := h.prompt.CreatePrompt(ctx, req, body)
 	if err != nil {
 		slog.Error("Failed to create prompt file of repo", slog.Any("req", req), slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
@@ -294,7 +292,7 @@ func (h *PromptHandler) UpdatePrompt(ctx *gin.Context) {
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
-	_, err = h.sc.CheckRequestV2(ctx, body)
+	_, err = h.sensitive.CheckRequestV2(ctx, body)
 	if err != nil {
 		slog.Error("failed to check sensitive request", slog.Any("error", err))
 		httpbase.BadRequest(ctx, fmt.Errorf("sensitive check failed: %w", err).Error())
@@ -307,7 +305,7 @@ func (h *PromptHandler) UpdatePrompt(ctx *gin.Context) {
 		CurrentUser: currentUser,
 		Path:        convertFilePathFromRoute(filePath),
 	}
-	data, err := h.pc.UpdatePrompt(ctx, req, body)
+	data, err := h.prompt.UpdatePrompt(ctx, req, body)
 	if err != nil {
 		slog.Error("Failed to update prompt file of repo", slog.Any("req", req), slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
@@ -357,7 +355,7 @@ func (h *PromptHandler) DeletePrompt(ctx *gin.Context) {
 		CurrentUser: currentUser,
 		Path:        convertFilePathFromRoute(filePath),
 	}
-	err = h.pc.DeletePrompt(ctx, req)
+	err = h.prompt.DeletePrompt(ctx, req)
 	if err != nil {
 		slog.Error("Failed to remove prompt file of repo", slog.Any("req", req), slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
@@ -387,7 +385,7 @@ func (h *PromptHandler) Relations(ctx *gin.Context) {
 		return
 	}
 	currentUser := httpbase.GetCurrentUser(ctx)
-	detail, err := h.pc.Relations(ctx, namespace, name, currentUser)
+	detail, err := h.prompt.Relations(ctx, namespace, name, currentUser)
 	if err != nil {
 		if errors.Is(err, component.ErrUnauthorized) {
 			httpbase.UnauthorizedError(ctx, err)
@@ -439,7 +437,7 @@ func (h *PromptHandler) SetRelations(ctx *gin.Context) {
 	req.Name = name
 	req.CurrentUser = currentUser
 
-	err = h.pc.SetRelationModels(ctx, req)
+	err = h.prompt.SetRelationModels(ctx, req)
 	if err != nil {
 		slog.Error("Failed to set models for prompt", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
@@ -486,7 +484,7 @@ func (h *PromptHandler) AddModelRelation(ctx *gin.Context) {
 	req.Name = name
 	req.CurrentUser = currentUser
 
-	err = h.pc.AddRelationModel(ctx, req)
+	err = h.prompt.AddRelationModel(ctx, req)
 	if err != nil {
 		slog.Error("Failed to add model for prompt", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
@@ -533,7 +531,7 @@ func (h *PromptHandler) DelModelRelation(ctx *gin.Context) {
 	req.Name = name
 	req.CurrentUser = currentUser
 
-	err = h.pc.DelRelationModel(ctx, req)
+	err = h.prompt.DelRelationModel(ctx, req)
 	if err != nil {
 		slog.Error("Failed to delete dataset for model", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
@@ -567,7 +565,7 @@ func (h *PromptHandler) Create(ctx *gin.Context) {
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
-	_, err := h.sc.CheckRequestV2(ctx, req)
+	_, err := h.sensitive.CheckRequestV2(ctx, req)
 	if err != nil {
 		slog.Error("failed to check sensitive request", slog.Any("error", err))
 		httpbase.BadRequest(ctx, fmt.Errorf("sensitive check failed: %w", err).Error())
@@ -575,7 +573,7 @@ func (h *PromptHandler) Create(ctx *gin.Context) {
 	}
 	req.Username = currentUser
 
-	prompt, err := h.pc.CreatePromptRepo(ctx, req)
+	prompt, err := h.prompt.CreatePromptRepo(ctx, req)
 	if err != nil {
 		slog.Error("Failed to create prompt repo", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
@@ -616,7 +614,7 @@ func (h *PromptHandler) Update(ctx *gin.Context) {
 		return
 	}
 
-	_, err := h.sc.CheckRequestV2(ctx, req)
+	_, err := h.sensitive.CheckRequestV2(ctx, req)
 	if err != nil {
 		slog.Error("failed to check sensitive request", slog.Any("error", err))
 		httpbase.BadRequest(ctx, fmt.Errorf("sensitive check failed: %w", err).Error())
@@ -633,7 +631,7 @@ func (h *PromptHandler) Update(ctx *gin.Context) {
 	req.Namespace = namespace
 	req.Name = name
 
-	prompt, err := h.pc.UpdatePromptRepo(ctx, req)
+	prompt, err := h.prompt.UpdatePromptRepo(ctx, req)
 	if err != nil {
 		slog.Error("Failed to update prompt repo", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
@@ -669,7 +667,7 @@ func (h *PromptHandler) Delete(ctx *gin.Context) {
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
-	err = h.pc.RemoveRepo(ctx, namespace, name, currentUser)
+	err = h.prompt.RemoveRepo(ctx, namespace, name, currentUser)
 	if err != nil {
 		slog.Error("Failed to delete prompt repo", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
@@ -778,7 +776,7 @@ func (h *PromptHandler) Tags(ctx *gin.Context) {
 func (h *PromptHandler) UpdateTags(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
 	if currentUser == "" {
-		httpbase.UnauthorizedError(ctx, httpbase.ErrorNeedLogin)
+		httpbase.UnauthorizedError(ctx, component.ErrUserNotFound)
 		return
 	}
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)

@@ -3,6 +3,7 @@ package component
 import (
 	"context"
 	"errors"
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -118,18 +119,36 @@ func TestRuntimeArchComponent_ScanArchitectures(t *testing.T) {
 }
 
 func TestRuntimeArchComponent_IsSupportedModelResource(t *testing.T) {
-	ctx := context.TODO()
-	rc := initializeTestRuntimeArchComponent(ctx, t)
 
-	rc.mocks.stores.ResourceModelMock().EXPECT().CheckModelNameNotInRFRepo(ctx, "model", int64(1)).Return(
-		&database.ResourceModel{EngineName: "a"}, nil,
-	)
+	cases := []struct {
+		image   string
+		support bool
+	}{
+		{"foo", false},
+		{"bar", true},
+		{"foo/bar", true},
+		{"bar/foo", false},
+		{"foo-bar", true},
+		{"foo-model", true},
+	}
 
-	r, err := rc.IsSupportedModelResource(ctx, "meta-model", &database.RuntimeFramework{
-		FrameImage: "a/b",
-	}, 1)
-	require.Nil(t, err, nil)
-	require.False(t, r)
+	for _, c := range cases {
+		t.Run(fmt.Sprintf("%+v", c), func(t *testing.T) {
+
+			ctx := context.TODO()
+			rc := initializeTestRuntimeArchComponent(ctx, t)
+
+			rc.mocks.stores.ResourceModelMock().EXPECT().CheckModelNameNotInRFRepo(ctx, "model", int64(1)).Return(
+				&database.ResourceModel{EngineName: "a"}, nil,
+			)
+
+			r, err := rc.IsSupportedModelResource(ctx, "meta-model", &database.RuntimeFramework{
+				FrameImage: c.image,
+			}, 1)
+			require.Nil(t, err, nil)
+			require.Equal(t, c.support, r)
+		})
+	}
 }
 
 func TestRuntimeArchComponent_GetArchitectureFromConfig(t *testing.T) {
@@ -150,60 +169,53 @@ func TestRuntimeArchComponent_GetArchitectureFromConfig(t *testing.T) {
 
 }
 
-// func TestRuntimeArchComponent_RemoveRuntimeFrameworkTag(t *testing.T) {
-// 	ctx := context.TODO()
-// 	rc := initializeTestRuntimeArchComponent(ctx, t)
+func TestRuntimeArchComponent_RemoveRuntimeFrameworkTag(t *testing.T) {
+	ctx := context.TODO()
+	rc := initializeTestRuntimeArchComponent(ctx, t)
 
-// 	rc.mocks.stores.RuntimeFrameworkMock().EXPECT().FindByID(ctx, int64(2)).Return(
-// 		&database.RuntimeFramework{
-// 			FrameImage:    "img",
-// 			FrameNpuImage: "npu",
-// 		}, nil,
-// 	)
-// 	rc.mocks.stores.TagMock().EXPECT().RemoveRepoTags(ctx, int64(1), []int64{1}).Return(nil)
-// 	rc.mocks.stores.TagMock().EXPECT().RemoveRepoTags(ctx, int64(1), []int64{2}).Return(nil)
+	rc.mocks.stores.RuntimeFrameworkMock().EXPECT().FindByID(ctx, int64(2)).Return(
+		&database.RuntimeFramework{
+			FrameImage: "img",
+		}, nil,
+	)
+	rc.mocks.stores.TagMock().EXPECT().RemoveRepoTags(ctx, int64(1), []int64{1}).Return(nil)
 
-// 	rc.RemoveRuntimeFrameworkTag(ctx, []*database.Tag{
-// 		{Name: "img", ID: 1},
-// 		{Name: "npu", ID: 2},
-// 	}, int64(1), int64(2))
-// }
+	rc.RemoveRuntimeFrameworkTag(ctx, []*database.Tag{
+		{Name: "img", ID: 1},
+	}, int64(1), int64(2))
+}
 
-// func TestRuntimeArchComponent_AddRuntimeFrameworkTag(t *testing.T) {
-// 	ctx := context.TODO()
-// 	rc := initializeTestRuntimeArchComponent(ctx, t)
+func TestRuntimeArchComponent_AddRuntimeFrameworkTag(t *testing.T) {
+	ctx := context.TODO()
+	rc := initializeTestRuntimeArchComponent(ctx, t)
 
-// 	rc.mocks.stores.RuntimeFrameworkMock().EXPECT().FindByID(ctx, int64(2)).Return(
-// 		&database.RuntimeFramework{
-// 			FrameImage:    "img",
-// 			FrameNpuImage: "npu",
-// 		}, nil,
-// 	)
-// 	rc.mocks.stores.TagMock().EXPECT().UpsertRepoTags(ctx, int64(1), []int64{}, []int64{1}).Return(nil)
-// 	rc.mocks.stores.TagMock().EXPECT().UpsertRepoTags(ctx, int64(1), []int64{}, []int64{2}).Return(nil)
+	rc.mocks.stores.RuntimeFrameworkMock().EXPECT().FindByID(ctx, int64(2)).Return(
+		&database.RuntimeFramework{
+			FrameImage: "img",
+		}, nil,
+	)
+	rc.mocks.stores.TagMock().EXPECT().UpsertRepoTags(ctx, int64(1), []int64{}, []int64{1}).Return(nil)
 
-// 	err := rc.AddRuntimeFrameworkTag(ctx, []*database.Tag{
-// 		{Name: "img", ID: 1},
-// 		{Name: "npu", ID: 2},
-// 	}, int64(1), int64(2))
-// 	require.Nil(t, err)
-// }
+	err := rc.AddRuntimeFrameworkTag(ctx, []*database.Tag{
+		{Name: "img", ID: 1},
+	}, int64(1), int64(2))
+	require.Nil(t, err)
+}
 
-// func TestRuntimeArchComponent_AddResourceTag(t *testing.T) {
-// 	ctx := context.TODO()
-// 	rc := initializeTestRuntimeArchComponent(ctx, t)
+func TestRuntimeArchComponent_AddResourceTag(t *testing.T) {
+	ctx := context.TODO()
+	rc := initializeTestRuntimeArchComponent(ctx, t)
 
-// 	rc.mocks.stores.ResourceModelMock().EXPECT().FindByModelName(ctx, "model").Return(
-// 		[]*database.ResourceModel{
-// 			{ResourceName: "r1"},
-// 			{ResourceName: "r2"},
-// 		}, nil,
-// 	)
-// 	rc.mocks.stores.TagMock().EXPECT().UpsertRepoTags(ctx, int64(1), []int64{}, []int64{1}).Return(nil)
-// 	rc.mocks.stores.TagMock().EXPECT().UpsertRepoTags(ctx, int64(1), []int64{}, []int64{2}).Return(nil)
+	rc.mocks.stores.ResourceModelMock().EXPECT().FindByModelName(ctx, "model").Return(
+		[]*database.ResourceModel{
+			{ResourceName: "r1"},
+			{ResourceName: "r2"},
+		}, nil,
+	)
+	rc.mocks.stores.TagMock().EXPECT().UpsertRepoTags(ctx, int64(1), []int64{}, []int64{1}).Return(nil)
 
-// 	err := rc.AddResourceTag(ctx, []*database.Tag{
-// 		{Name: "r1", ID: 1},
-// 	}, "model", int64(1))
-// 	require.Nil(t, err)
-// }
+	err := rc.AddResourceTag(ctx, []*database.Tag{
+		{Name: "r1", ID: 1},
+	}, "model", int64(1))
+	require.Nil(t, err)
+}

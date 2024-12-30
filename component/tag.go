@@ -24,6 +24,10 @@ type TagComponent interface {
 	GetTagByID(ctx context.Context, username string, id int64) (*database.Tag, error)
 	UpdateTag(ctx context.Context, username string, id int64, req types.UpdateTag) (*database.Tag, error)
 	DeleteTag(ctx context.Context, username string, id int64) error
+	AllCategories(ctx context.Context) ([]database.TagCategory, error)
+	CreateCategory(ctx context.Context, username string, req types.CreateCategory) (*database.TagCategory, error)
+	UpdateCategory(ctx context.Context, username string, req types.UpdateCategory, id int64) (*database.TagCategory, error)
+	DeleteCategory(ctx context.Context, username string, id int64) error
 }
 
 func NewTagComponent(config *config.Config) (TagComponent, error) {
@@ -288,6 +292,71 @@ func (c *tagComponentImpl) DeleteTag(ctx context.Context, username string, id in
 	err = c.tagStore.DeleteTagByID(ctx, id)
 	if err != nil {
 		return fmt.Errorf("failed to delete tag id %d, error: %w", id, err)
+	}
+	return nil
+}
+
+func (c *tagComponentImpl) AllCategories(ctx context.Context) ([]database.TagCategory, error) {
+	return c.tagStore.AllCategories(ctx, database.TagScope(""))
+}
+
+func (c *tagComponentImpl) CreateCategory(ctx context.Context, username string, req types.CreateCategory) (*database.TagCategory, error) {
+	user, err := c.userStore.FindByUsername(ctx, username)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get user, error: %w", err)
+	}
+	if !user.CanAdmin() {
+		return nil, ErrForbidden
+	}
+
+	newCategory := database.TagCategory{
+		Name:  req.Name,
+		Scope: database.TagScope(req.Scope),
+	}
+
+	category, err := c.tagStore.CreateCategory(ctx, newCategory)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create category, error: %w", err)
+	}
+
+	return category, nil
+}
+
+func (c *tagComponentImpl) UpdateCategory(ctx context.Context, username string, req types.UpdateCategory, id int64) (*database.TagCategory, error) {
+	user, err := c.userStore.FindByUsername(ctx, username)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get user, error: %w", err)
+	}
+	if !user.CanAdmin() {
+		return nil, ErrForbidden
+	}
+
+	newCategory := database.TagCategory{
+		ID:    id,
+		Name:  req.Name,
+		Scope: database.TagScope(req.Scope),
+	}
+
+	category, err := c.tagStore.UpdateCategory(ctx, newCategory)
+	if err != nil {
+		return nil, fmt.Errorf("failed to update category, error: %w", err)
+	}
+
+	return category, nil
+}
+
+func (c *tagComponentImpl) DeleteCategory(ctx context.Context, username string, id int64) error {
+	user, err := c.userStore.FindByUsername(ctx, username)
+	if err != nil {
+		return fmt.Errorf("failed to get user, error: %w", err)
+	}
+	if !user.CanAdmin() {
+		return ErrForbidden
+	}
+
+	err = c.tagStore.DeleteCategory(ctx, id)
+	if err != nil {
+		return fmt.Errorf("failed to delete category, error: %w", err)
 	}
 	return nil
 }

@@ -195,3 +195,142 @@ func TestTagHandler_DeleteTag(t *testing.T) {
 	require.Equal(t, "", resp.Msg)
 	require.Nil(t, resp.Data)
 }
+
+func TestTagHandler_AllCategories(t *testing.T) {
+	var categories []database.TagCategory
+	categories = append(categories, database.TagCategory{ID: 1, Name: "test1", Scope: database.TagScope("scope")})
+
+	req := httptest.NewRequest("get", "/tags/categories", nil)
+
+	hr := httptest.NewRecorder()
+	ginContext, _ := gin.CreateTestContext(hr)
+	ginContext.Request = req
+
+	tagComp := mockcom.NewMockTagComponent(t)
+	tagComp.EXPECT().AllCategories(ginContext).Return(categories, nil)
+
+	tagHandler, err := NewTestTagHandler(tagComp)
+	require.Nil(t, err)
+
+	tagHandler.AllCategories(ginContext)
+
+	require.Equal(t, http.StatusOK, hr.Code)
+
+	var resp httpbase.R
+
+	err = json.Unmarshal(hr.Body.Bytes(), &resp)
+	require.Nil(t, err)
+
+	require.Equal(t, 0, resp.Code)
+	require.Equal(t, "", resp.Msg)
+	require.NotNil(t, resp.Data)
+}
+
+func TestTagHandler_CreateCategory(t *testing.T) {
+	username := "testuser"
+	data := types.CreateCategory{
+		Name:  "testcate",
+		Scope: "testscope",
+	}
+
+	reqBody, _ := json.Marshal(data)
+
+	req := httptest.NewRequest("post", "/tags/categories", bytes.NewBuffer(reqBody))
+
+	hr := httptest.NewRecorder()
+	ginContext, _ := gin.CreateTestContext(hr)
+	ginContext.Set("currentUser", username)
+	ginContext.Request = req
+
+	tagComp := mockcom.NewMockTagComponent(t)
+	tagComp.EXPECT().CreateCategory(ginContext, username, data).Return(
+		&database.TagCategory{ID: 1, Name: "testcate", Scope: database.TagScope("testscope")},
+		nil,
+	)
+
+	tagHandler, err := NewTestTagHandler(tagComp)
+	require.Nil(t, err)
+
+	tagHandler.CreateCategory(ginContext)
+
+	require.Equal(t, http.StatusOK, hr.Code)
+
+	var resp httpbase.R
+
+	err = json.Unmarshal(hr.Body.Bytes(), &resp)
+	require.Nil(t, err)
+
+	require.Equal(t, 0, resp.Code)
+	require.Equal(t, "", resp.Msg)
+	require.NotNil(t, resp.Data)
+}
+
+func TestTagHandler_UpdateCategory(t *testing.T) {
+	username := "testuser"
+	data := types.UpdateCategory{
+		Name:  "testcate",
+		Scope: "testscope",
+	}
+
+	reqBody, _ := json.Marshal(data)
+
+	req := httptest.NewRequest("put", "/tags/categories/1", bytes.NewBuffer(reqBody))
+
+	hr := httptest.NewRecorder()
+	ginContext, _ := gin.CreateTestContext(hr)
+	ginContext.Set("currentUser", username)
+	ginContext.AddParam("id", "1")
+	ginContext.Request = req
+
+	tagComp := mockcom.NewMockTagComponent(t)
+	tagComp.EXPECT().UpdateCategory(ginContext, username, data, int64(1)).Return(
+		&database.TagCategory{ID: 1, Name: "testcate", Scope: database.TagScope("testscope")},
+		nil,
+	)
+
+	tagHandler, err := NewTestTagHandler(tagComp)
+	require.Nil(t, err)
+
+	tagHandler.UpdateCategory(ginContext)
+
+	require.Equal(t, http.StatusOK, hr.Code)
+
+	var resp httpbase.R
+
+	err = json.Unmarshal(hr.Body.Bytes(), &resp)
+	require.Nil(t, err)
+
+	require.Equal(t, 0, resp.Code)
+	require.Equal(t, "", resp.Msg)
+	require.NotNil(t, resp.Data)
+}
+
+func TestTagHandler_DeleteCategory(t *testing.T) {
+	username := "testuser"
+
+	req := httptest.NewRequest("delete", "/tags/categories/1", nil)
+
+	hr := httptest.NewRecorder()
+	ginContext, _ := gin.CreateTestContext(hr)
+	ginContext.Set("currentUser", username)
+	ginContext.AddParam("id", "1")
+	ginContext.Request = req
+
+	tagComp := mockcom.NewMockTagComponent(t)
+	tagComp.EXPECT().DeleteCategory(ginContext, username, int64(1)).Return(nil)
+
+	tagHandler, err := NewTestTagHandler(tagComp)
+	require.Nil(t, err)
+
+	tagHandler.DeleteCategory(ginContext)
+
+	require.Equal(t, http.StatusOK, hr.Code)
+
+	var resp httpbase.R
+
+	err = json.Unmarshal(hr.Body.Bytes(), &resp)
+	require.Nil(t, err)
+
+	require.Equal(t, 0, resp.Code)
+	require.Equal(t, "", resp.Msg)
+}

@@ -26,6 +26,7 @@ type TagStore interface {
 	AllDatasetTags(ctx context.Context) ([]*Tag, error)
 	AllCodeTags(ctx context.Context) ([]*Tag, error)
 	AllSpaceTags(ctx context.Context) ([]*Tag, error)
+	AllCategories(ctx context.Context, scope TagScope) ([]TagCategory, error)
 	AllModelCategories(ctx context.Context) ([]TagCategory, error)
 	AllPromptCategories(ctx context.Context) ([]TagCategory, error)
 	AllDatasetCategories(ctx context.Context) ([]TagCategory, error)
@@ -43,6 +44,9 @@ type TagStore interface {
 	FindTagByID(ctx context.Context, id int64) (*Tag, error)
 	UpdateTagByID(ctx context.Context, tag *Tag) (*Tag, error)
 	DeleteTagByID(ctx context.Context, id int64) error
+	CreateCategory(ctx context.Context, category TagCategory) (*TagCategory, error)
+	UpdateCategory(ctx context.Context, category TagCategory) (*TagCategory, error)
+	DeleteCategory(ctx context.Context, id int64) error
 }
 
 func NewTagStore() TagStore {
@@ -156,30 +160,32 @@ func (ts *tagStoreImpl) AllSpaceTags(ctx context.Context) ([]*Tag, error) {
 }
 
 func (ts *tagStoreImpl) AllModelCategories(ctx context.Context) ([]TagCategory, error) {
-	return ts.allCategories(ctx, ModelTagScope)
+	return ts.AllCategories(ctx, ModelTagScope)
 }
 
 func (ts *tagStoreImpl) AllPromptCategories(ctx context.Context) ([]TagCategory, error) {
-	return ts.allCategories(ctx, PromptTagScope)
+	return ts.AllCategories(ctx, PromptTagScope)
 }
 
 func (ts *tagStoreImpl) AllDatasetCategories(ctx context.Context) ([]TagCategory, error) {
-	return ts.allCategories(ctx, DatasetTagScope)
+	return ts.AllCategories(ctx, DatasetTagScope)
 }
 
 func (ts *tagStoreImpl) AllCodeCategories(ctx context.Context) ([]TagCategory, error) {
-	return ts.allCategories(ctx, CodeTagScope)
+	return ts.AllCategories(ctx, CodeTagScope)
 }
 
 func (ts *tagStoreImpl) AllSpaceCategories(ctx context.Context) ([]TagCategory, error) {
-	return ts.allCategories(ctx, SpaceTagScope)
+	return ts.AllCategories(ctx, SpaceTagScope)
 }
 
-func (ts *tagStoreImpl) allCategories(ctx context.Context, scope TagScope) ([]TagCategory, error) {
+func (ts *tagStoreImpl) AllCategories(ctx context.Context, scope TagScope) ([]TagCategory, error) {
 	var tags []TagCategory
-	err := ts.db.Operator.Core.NewSelect().Model(&TagCategory{}).
-		Where("scope = ?", scope).
-		Scan(ctx, &tags)
+	q := ts.db.Operator.Core.NewSelect().Model(&TagCategory{})
+	if len(scope) > 0 {
+		q = q.Where("scope = ?", scope)
+	}
+	err := q.Order("id").Scan(ctx, &tags)
 	if err != nil {
 		slog.Error("Failed to select tags", "error", err)
 		return nil, err
@@ -439,4 +445,28 @@ func (ts *tagStoreImpl) DeleteTagByID(ctx context.Context, id int64) error {
 	})
 	return err
 
+}
+
+func (ts *tagStoreImpl) CreateCategory(ctx context.Context, category TagCategory) (*TagCategory, error) {
+	_, err := ts.db.Operator.Core.NewInsert().Model(&category).Exec(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("insert category error: %w", err)
+	}
+	return &category, nil
+}
+
+func (ts *tagStoreImpl) UpdateCategory(ctx context.Context, category TagCategory) (*TagCategory, error) {
+	_, err := ts.db.Operator.Core.NewUpdate().Model(&category).WherePK().Exec(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("update category by id %d, error: %w", category.ID, err)
+	}
+	return &category, nil
+}
+
+func (ts *tagStoreImpl) DeleteCategory(ctx context.Context, id int64) error {
+	_, err := ts.db.Operator.Core.NewDelete().Model(&TagCategory{}).Where("id = ?", id).Exec(ctx)
+	if err != nil {
+		return fmt.Errorf("delete category by id %d, error: %w", id, err)
+	}
+	return nil
 }

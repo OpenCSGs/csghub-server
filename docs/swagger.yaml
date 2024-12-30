@@ -360,6 +360,15 @@ definitions:
       updated_at:
         type: string
     type: object
+  database.TagCategory:
+    properties:
+      id:
+        type: integer
+      name:
+        type: string
+      scope:
+        $ref: '#/definitions/database.TagScope'
+    type: object
   database.TagScope:
     enum:
     - model
@@ -776,6 +785,16 @@ definitions:
         type: integer
       total:
         type: integer
+    type: object
+  types.CreateCategory:
+    properties:
+      name:
+        type: string
+      scope:
+        type: string
+    required:
+    - name
+    - scope
     type: object
   types.CreateCodeReq:
     properties:
@@ -2175,6 +2194,16 @@ definitions:
     - TaskTypeTraining
     - TaskTypeComparison
     - TaskTypeLeaderBoard
+  types.UpdateCategory:
+    properties:
+      name:
+        type: string
+      scope:
+        type: string
+    required:
+    - name
+    - scope
+    type: object
   types.UpdateCodeReq:
     properties:
       description:
@@ -10351,6 +10380,125 @@ paths:
       security:
       - ApiKey: []
       summary: Update a tag by id
+      tags:
+      - Tag
+  /tags/categories:
+    get:
+      consumes:
+      - application/json
+      description: Get all Categories
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: categores
+          schema:
+            allOf:
+            - $ref: '#/definitions/types.ResponseWithTotal'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/database.TagCategory'
+                  type: array
+              type: object
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Get all Categories
+      tags:
+      - Tag
+    post:
+      consumes:
+      - application/json
+      description: Create new category
+      parameters:
+      - description: body
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/types.CreateCategory'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/types.Response'
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Create new category
+      tags:
+      - Tag
+  /tags/categories/id:
+    delete:
+      consumes:
+      - application/json
+      description: Delete a category by id
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/types.Response'
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Delete a category by id
+      tags:
+      - Tag
+    put:
+      consumes:
+      - application/json
+      description: Create new category
+      parameters:
+      - description: body
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/types.UpdateCategory'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/types.Response'
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Create new category
       tags:
       - Tag
   /telemetry/usage:
