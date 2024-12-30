@@ -771,6 +771,13 @@ func createPromptRoutes(apiGroup *gin.RouterGroup, promptHandler *handler.Prompt
 func createTagsRoutes(apiGroup *gin.RouterGroup, tagHandler *handler.TagsHandler) {
 	tagsGrp := apiGroup.Group("/tags")
 	{
+		categoryGrp := tagsGrp.Group("/categories")
+		{
+			categoryGrp.GET("", tagHandler.AllCategories)
+			categoryGrp.POST("", tagHandler.CreateCategory)
+			categoryGrp.PUT("/:id", tagHandler.UpdateCategory)
+			categoryGrp.DELETE("/:id", tagHandler.DeleteCategory)
+		}
 		tagsGrp.GET("", tagHandler.AllTags)
 		tagsGrp.POST("", tagHandler.CreateTag)
 		tagsGrp.GET("/:id", tagHandler.GetTagByID)

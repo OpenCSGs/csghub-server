@@ -35,3 +35,10 @@ type CreateTag struct {
 }
 
 type UpdateTag CreateTag
+
+type CreateCategory struct {
+	Name  string `json:"name" binding:"required"`
+	Scope string `json:"scope" binding:"required"`
+}
+
+type UpdateCategory CreateCategory

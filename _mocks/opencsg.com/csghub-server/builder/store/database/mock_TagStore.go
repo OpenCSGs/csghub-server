@@ -24,6 +24,65 @@ func (_m *MockTagStore) EXPECT() *MockTagStore_Expecter {
 	return &MockTagStore_Expecter{mock: &_m.Mock}
 }
 
+// AllCategories provides a mock function with given fields: ctx, scope
+func (_m *MockTagStore) AllCategories(ctx context.Context, scope database.TagScope) ([]database.TagCategory, error) {
+	ret := _m.Called(ctx, scope)
+
+	if len(ret) == 0 {
+		panic("no return value specified for AllCategories")
+	}
+
+	var r0 []database.TagCategory
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, database.TagScope) ([]database.TagCategory, error)); ok {
+		return rf(ctx, scope)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, database.TagScope) []database.TagCategory); ok {
+		r0 = rf(ctx, scope)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]database.TagCategory)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, database.TagScope) error); ok {
+		r1 = rf(ctx, scope)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockTagStore_AllCategories_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'AllCategories'
+type MockTagStore_AllCategories_Call struct {
+	*mock.Call
+}
+
+// AllCategories is a helper method to define mock.On call
+//   - ctx context.Context
+//   - scope database.TagScope
+func (_e *MockTagStore_Expecter) AllCategories(ctx interface{}, scope interface{}) *MockTagStore_AllCategories_Call {
+	return &MockTagStore_AllCategories_Call{Call: _e.mock.On("AllCategories", ctx, scope)}
+}
+
+func (_c *MockTagStore_AllCategories_Call) Run(run func(ctx context.Context, scope database.TagScope)) *MockTagStore_AllCategories_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(database.TagScope))
+	})
+	return _c
+}
+
+func (_c *MockTagStore_AllCategories_Call) Return(_a0 []database.TagCategory, _a1 error) *MockTagStore_AllCategories_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockTagStore_AllCategories_Call) RunAndReturn(run func(context.Context, database.TagScope) ([]database.TagCategory, error)) *MockTagStore_AllCategories_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // AllCodeCategories provides a mock function with given fields: ctx
 func (_m *MockTagStore) AllCodeCategories(ctx context.Context) ([]database.TagCategory, error) {
 	ret := _m.Called(ctx)
@@ -781,6 +840,65 @@ func (_c *MockTagStore_AllTagsByScopeAndCategory_Call) RunAndReturn(run func(con
 	return _c
 }
 
+// CreateCategory provides a mock function with given fields: ctx, category
+func (_m *MockTagStore) CreateCategory(ctx context.Context, category database.TagCategory) (*database.TagCategory, error) {
+	ret := _m.Called(ctx, category)
+
+	if len(ret) == 0 {
+		panic("no return value specified for CreateCategory")
+	}
+
+	var r0 *database.TagCategory
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, database.TagCategory) (*database.TagCategory, error)); ok {
+		return rf(ctx, category)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, database.TagCategory) *database.TagCategory); ok {
+		r0 = rf(ctx, category)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*database.TagCategory)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, database.TagCategory) error); ok {
+		r1 = rf(ctx, category)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockTagStore_CreateCategory_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'CreateCategory'
+type MockTagStore_CreateCategory_Call struct {
+	*mock.Call
+}
+
+// CreateCategory is a helper method to define mock.On call
+//   - ctx context.Context
+//   - category database.TagCategory
+func (_e *MockTagStore_Expecter) CreateCategory(ctx interface{}, category interface{}) *MockTagStore_CreateCategory_Call {
+	return &MockTagStore_CreateCategory_Call{Call: _e.mock.On("CreateCategory", ctx, category)}
+}
+
+func (_c *MockTagStore_CreateCategory_Call) Run(run func(ctx context.Context, category database.TagCategory)) *MockTagStore_CreateCategory_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(database.TagCategory))
+	})
+	return _c
+}
+
+func (_c *MockTagStore_CreateCategory_Call) Return(_a0 *database.TagCategory, _a1 error) *MockTagStore_CreateCategory_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockTagStore_CreateCategory_Call) RunAndReturn(run func(context.Context, database.TagCategory) (*database.TagCategory, error)) *MockTagStore_CreateCategory_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // CreateTag provides a mock function with given fields: ctx, category, name, group, scope
 func (_m *MockTagStore) CreateTag(ctx context.Context, category string, name string, group string, scope database.TagScope) (database.Tag, error) {
 	ret := _m.Called(ctx, category, name, group, scope)
@@ -837,6 +955,53 @@ func (_c *MockTagStore_CreateTag_Call) Return(_a0 database.Tag, _a1 error) *Mock
 }
 
 func (_c *MockTagStore_CreateTag_Call) RunAndReturn(run func(context.Context, string, string, string, database.TagScope) (database.Tag, error)) *MockTagStore_CreateTag_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// DeleteCategory provides a mock function with given fields: ctx, id
+func (_m *MockTagStore) DeleteCategory(ctx context.Context, id int64) error {
+	ret := _m.Called(ctx, id)
+
+	if len(ret) == 0 {
+		panic("no return value specified for DeleteCategory")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, int64) error); ok {
+		r0 = rf(ctx, id)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// MockTagStore_DeleteCategory_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'DeleteCategory'
+type MockTagStore_DeleteCategory_Call struct {
+	*mock.Call
+}
+
+// DeleteCategory is a helper method to define mock.On call
+//   - ctx context.Context
+//   - id int64
+func (_e *MockTagStore_Expecter) DeleteCategory(ctx interface{}, id interface{}) *MockTagStore_DeleteCategory_Call {
+	return &MockTagStore_DeleteCategory_Call{Call: _e.mock.On("DeleteCategory", ctx, id)}
+}
+
+func (_c *MockTagStore_DeleteCategory_Call) Run(run func(ctx context.Context, id int64)) *MockTagStore_DeleteCategory_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(int64))
+	})
+	return _c
+}
+
+func (_c *MockTagStore_DeleteCategory_Call) Return(_a0 error) *MockTagStore_DeleteCategory_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockTagStore_DeleteCategory_Call) RunAndReturn(run func(context.Context, int64) error) *MockTagStore_DeleteCategory_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -1331,6 +1496,65 @@ func (_c *MockTagStore_SetMetaTags_Call) Return(repoTags []*database.RepositoryT
 }
 
 func (_c *MockTagStore_SetMetaTags_Call) RunAndReturn(run func(context.Context, types.RepositoryType, string, string, []*database.Tag) ([]*database.RepositoryTag, error)) *MockTagStore_SetMetaTags_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// UpdateCategory provides a mock function with given fields: ctx, category
+func (_m *MockTagStore) UpdateCategory(ctx context.Context, category database.TagCategory) (*database.TagCategory, error) {
+	ret := _m.Called(ctx, category)
+
+	if len(ret) == 0 {
+		panic("no return value specified for UpdateCategory")
+	}
+
+	var r0 *database.TagCategory
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, database.TagCategory) (*database.TagCategory, error)); ok {
+		return rf(ctx, category)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, database.TagCategory) *database.TagCategory); ok {
+		r0 = rf(ctx, category)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*database.TagCategory)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, database.TagCategory) error); ok {
+		r1 = rf(ctx, category)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockTagStore_UpdateCategory_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'UpdateCategory'
+type MockTagStore_UpdateCategory_Call struct {
+	*mock.Call
+}
+
+// UpdateCategory is a helper method to define mock.On call
+//   - ctx context.Context
+//   - category database.TagCategory
+func (_e *MockTagStore_Expecter) UpdateCategory(ctx interface{}, category interface{}) *MockTagStore_UpdateCategory_Call {
+	return &MockTagStore_UpdateCategory_Call{Call: _e.mock.On("UpdateCategory", ctx, category)}
+}
+
+func (_c *MockTagStore_UpdateCategory_Call) Run(run func(ctx context.Context, category database.TagCategory)) *MockTagStore_UpdateCategory_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(database.TagCategory))
+	})
+	return _c
+}
+
+func (_c *MockTagStore_UpdateCategory_Call) Return(_a0 *database.TagCategory, _a1 error) *MockTagStore_UpdateCategory_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockTagStore_UpdateCategory_Call) RunAndReturn(run func(context.Context, database.TagCategory) (*database.TagCategory, error)) *MockTagStore_UpdateCategory_Call {
 	_c.Call.Return(run)
 	return _c
 }

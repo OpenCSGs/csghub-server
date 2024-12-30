@@ -625,3 +625,49 @@ func TestTagStore_DeleteTagByID(t *testing.T) {
 	require.NotEmpty(t, err)
 
 }
+
+func TestTagStore_Category_CURD(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	ts := database.NewTagStoreWithDB(db)
+
+	categories, err := ts.AllCategories(ctx, "")
+	require.Empty(t, err)
+	require.NotEmpty(t, categories)
+
+	total := len(categories)
+
+	catetory, err := ts.CreateCategory(ctx, database.TagCategory{
+		Name:  "test-category",
+		Scope: "test-scope",
+	})
+	require.Empty(t, err)
+	require.NotEmpty(t, catetory)
+
+	id := catetory.ID
+
+	catetory, err = ts.UpdateCategory(ctx, database.TagCategory{
+		ID:    1,
+		Name:  "test-category1",
+		Scope: "test-scope1",
+	})
+	require.Empty(t, err)
+	require.NotEmpty(t, catetory)
+
+	categories, err = ts.AllCategories(ctx, "")
+	require.Empty(t, err)
+	require.NotEmpty(t, categories)
+	require.Equal(t, "test-category1", categories[0].Name)
+	require.Equal(t, "test-scope1", string(categories[0].Scope))
+
+	err = ts.DeleteCategory(ctx, id)
+	require.Empty(t, err)
+
+	categories, err = ts.AllCategories(ctx, "")
+	require.Empty(t, err)
+	require.Equal(t, total, len(categories))
+}
