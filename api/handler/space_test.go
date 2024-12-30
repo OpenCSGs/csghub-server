@@ -183,7 +183,7 @@ func TestSpaceHandler_Stop(t *testing.T) {
 	tester.RequireUser(t)
 
 	tester.mocks.repo.EXPECT().AllowAdminAccess(tester.ctx, types.SpaceRepo, "u", "r", "u").Return(true, nil)
-	tester.mocks.space.EXPECT().Stop(tester.ctx, "u", "r").Return(nil)
+	tester.mocks.space.EXPECT().Stop(tester.ctx, "u", "r", false).Return(nil)
 	tester.Execute()
 
 	tester.ResponseEq(t, 200, tester.OKText, nil)

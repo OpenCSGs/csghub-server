@@ -51,7 +51,7 @@ func (h *SpaceResourceHandler) Index(ctx *gin.Context) {
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
-	spaceResources, err := h.spaceResource.Index(ctx, clusterId, deployType)
+	spaceResources, err := h.spaceResource.Index(ctx, clusterId, deployType, "")
 	if err != nil {
 		slog.Error("Failed to get space resources", slog.String("cluster_id", clusterId), slog.String("deploy_type", deployTypeStr), slog.Any("error", err))
 		httpbase.ServerError(ctx, err)

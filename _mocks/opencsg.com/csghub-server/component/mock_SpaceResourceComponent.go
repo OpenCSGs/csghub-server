@@ -128,9 +128,9 @@ func (_c *MockSpaceResourceComponent_Delete_Call) RunAndReturn(run func(context.
 	return _c
 }
 
-// Index provides a mock function with given fields: ctx, clusterId, deployType
-func (_m *MockSpaceResourceComponent) Index(ctx context.Context, clusterId string, deployType int) ([]types.SpaceResource, error) {
-	ret := _m.Called(ctx, clusterId, deployType)
+// Index provides a mock function with given fields: ctx, clusterId, deployType, currentUser
+func (_m *MockSpaceResourceComponent) Index(ctx context.Context, clusterId string, deployType int, currentUser string) ([]types.SpaceResource, error) {
+	ret := _m.Called(ctx, clusterId, deployType, currentUser)
 
 	if len(ret) == 0 {
 		panic("no return value specified for Index")
@@ -138,19 +138,19 @@ func (_m *MockSpaceResourceComponent) Index(ctx context.Context, clusterId strin
 
 	var r0 []types.SpaceResource
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, int) ([]types.SpaceResource, error)); ok {
-		return rf(ctx, clusterId, deployType)
+	if rf, ok := ret.Get(0).(func(context.Context, string, int, string) ([]types.SpaceResource, error)); ok {
+		return rf(ctx, clusterId, deployType, currentUser)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, string, int) []types.SpaceResource); ok {
-		r0 = rf(ctx, clusterId, deployType)
+	if rf, ok := ret.Get(0).(func(context.Context, string, int, string) []types.SpaceResource); ok {
+		r0 = rf(ctx, clusterId, deployType, currentUser)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).([]types.SpaceResource)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, string, int) error); ok {
-		r1 = rf(ctx, clusterId, deployType)
+	if rf, ok := ret.Get(1).(func(context.Context, string, int, string) error); ok {
+		r1 = rf(ctx, clusterId, deployType, currentUser)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -167,13 +167,14 @@ type MockSpaceResourceComponent_Index_Call struct {
 //   - ctx context.Context
 //   - clusterId string
 //   - deployType int
-func (_e *MockSpaceResourceComponent_Expecter) Index(ctx interface{}, clusterId interface{}, deployType interface{}) *MockSpaceResourceComponent_Index_Call {
-	return &MockSpaceResourceComponent_Index_Call{Call: _e.mock.On("Index", ctx, clusterId, deployType)}
+//   - currentUser string
+func (_e *MockSpaceResourceComponent_Expecter) Index(ctx interface{}, clusterId interface{}, deployType interface{}, currentUser interface{}) *MockSpaceResourceComponent_Index_Call {
+	return &MockSpaceResourceComponent_Index_Call{Call: _e.mock.On("Index", ctx, clusterId, deployType, currentUser)}
 }
 
-func (_c *MockSpaceResourceComponent_Index_Call) Run(run func(ctx context.Context, clusterId string, deployType int)) *MockSpaceResourceComponent_Index_Call {
+func (_c *MockSpaceResourceComponent_Index_Call) Run(run func(ctx context.Context, clusterId string, deployType int, currentUser string)) *MockSpaceResourceComponent_Index_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(string), args[2].(int))
+		run(args[0].(context.Context), args[1].(string), args[2].(int), args[3].(string))
 	})
 	return _c
 }
@@ -183,7 +184,7 @@ func (_c *MockSpaceResourceComponent_Index_Call) Return(_a0 []types.SpaceResourc
 	return _c
 }
 
-func (_c *MockSpaceResourceComponent_Index_Call) RunAndReturn(run func(context.Context, string, int) ([]types.SpaceResource, error)) *MockSpaceResourceComponent_Index_Call {
+func (_c *MockSpaceResourceComponent_Index_Call) RunAndReturn(run func(context.Context, string, int, string) ([]types.SpaceResource, error)) *MockSpaceResourceComponent_Index_Call {
 	_c.Call.Return(run)
 	return _c
 }

@@ -38,7 +38,7 @@ func TestSpaceResourceHandler_Index(t *testing.T) {
 		return h.Index
 	})
 
-	tester.mocks.spaceResource.EXPECT().Index(tester.ctx, "c1", types.InferenceType).Return(
+	tester.mocks.spaceResource.EXPECT().Index(tester.ctx, "c1", types.InferenceType, "").Return(
 		[]types.SpaceResource{{Name: "sp"}}, nil,
 	)
 	tester.WithQuery("cluster_id", "c1").WithQuery("deploy_type", "").WithUser().Execute()

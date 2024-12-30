@@ -726,17 +726,17 @@ func (_c *MockSpaceComponent_Status_Call) RunAndReturn(run func(context.Context,
 	return _c
 }
 
-// Stop provides a mock function with given fields: ctx, namespace, name
-func (_m *MockSpaceComponent) Stop(ctx context.Context, namespace string, name string) error {
-	ret := _m.Called(ctx, namespace, name)
+// Stop provides a mock function with given fields: ctx, namespace, name, deleteSpace
+func (_m *MockSpaceComponent) Stop(ctx context.Context, namespace string, name string, deleteSpace bool) error {
+	ret := _m.Called(ctx, namespace, name, deleteSpace)
 
 	if len(ret) == 0 {
 		panic("no return value specified for Stop")
 	}
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, string) error); ok {
-		r0 = rf(ctx, namespace, name)
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, bool) error); ok {
+		r0 = rf(ctx, namespace, name, deleteSpace)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -753,13 +753,14 @@ type MockSpaceComponent_Stop_Call struct {
 //   - ctx context.Context
 //   - namespace string
 //   - name string
-func (_e *MockSpaceComponent_Expecter) Stop(ctx interface{}, namespace interface{}, name interface{}) *MockSpaceComponent_Stop_Call {
-	return &MockSpaceComponent_Stop_Call{Call: _e.mock.On("Stop", ctx, namespace, name)}
+//   - deleteSpace bool
+func (_e *MockSpaceComponent_Expecter) Stop(ctx interface{}, namespace interface{}, name interface{}, deleteSpace interface{}) *MockSpaceComponent_Stop_Call {
+	return &MockSpaceComponent_Stop_Call{Call: _e.mock.On("Stop", ctx, namespace, name, deleteSpace)}
 }
 
-func (_c *MockSpaceComponent_Stop_Call) Run(run func(ctx context.Context, namespace string, name string)) *MockSpaceComponent_Stop_Call {
+func (_c *MockSpaceComponent_Stop_Call) Run(run func(ctx context.Context, namespace string, name string, deleteSpace bool)) *MockSpaceComponent_Stop_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(string), args[2].(string))
+		run(args[0].(context.Context), args[1].(string), args[2].(string), args[3].(bool))
 	})
 	return _c
 }
@@ -769,7 +770,7 @@ func (_c *MockSpaceComponent_Stop_Call) Return(_a0 error) *MockSpaceComponent_St
 	return _c
 }
 
-func (_c *MockSpaceComponent_Stop_Call) RunAndReturn(run func(context.Context, string, string) error) *MockSpaceComponent_Stop_Call {
+func (_c *MockSpaceComponent_Stop_Call) RunAndReturn(run func(context.Context, string, string, bool) error) *MockSpaceComponent_Stop_Call {
 	_c.Call.Return(run)
 	return _c
 }
