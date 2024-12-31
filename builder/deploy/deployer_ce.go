@@ -55,7 +55,6 @@ func newDeployer(s scheduler.Scheduler, ib imagebuilder.Builder, ir imagerunner.
 		userStore:             database.NewUserStore(),
 	}
 
-	go d.refreshStatus()
 	d.startJobs()
 	return d, nil
 }

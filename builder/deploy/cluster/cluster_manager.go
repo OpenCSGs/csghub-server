@@ -8,6 +8,7 @@ import (
 	"math/rand"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/argoproj/argo-workflows/v3/pkg/client/clientset/versioned"
 	v1 "k8s.io/api/core/v1"
@@ -24,7 +25,8 @@ import (
 
 // Cluster holds basic information about a Kubernetes cluster
 type Cluster struct {
-	ID            string                // Unique identifier for the cluster
+	CID           string                // config id
+	ID            string                // unique id
 	ConfigPath    string                // Path to the kubeconfig file
 	Client        *kubernetes.Clientset // Kubernetes client
 	KnativeClient *knative.Clientset    // Knative client
@@ -69,22 +71,26 @@ func NewClusterPool() (*ClusterPool, error) {
 		}
 		knativeClient, err := knative.NewForConfig(config)
 		if err != nil {
-			slog.Error("falied to create knative client", "error", err)
-			return nil, fmt.Errorf("falied to create knative client,%w", err)
+			slog.Error("failed to create knative client", "error", err)
+			return nil, fmt.Errorf("failed to create knative client,%w", err)
 		}
 		id := filepath.Base(kubeconfig)
+		ctxTimeout, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		cluster, err := pool.ClusterStore.Add(ctxTimeout, id, fmt.Sprintf("region-%d", i))
+		if err != nil {
+			slog.Error("failed to add cluster info to db", slog.Any("error", err), slog.Any("congfig id", id))
+			return nil, fmt.Errorf("failed to add cluster info to db,%v", err)
+		}
 		pool.Clusters = append(pool.Clusters, Cluster{
-			ID:            id,
+			CID:           id,
+			ID:            cluster.ClusterID,
 			ConfigPath:    kubeconfig,
 			Client:        client,
 			KnativeClient: knativeClient,
 			ArgoClient:    argoClient,
 		})
-		err = pool.ClusterStore.Add(context.TODO(), id, fmt.Sprintf("region-%d", i))
-		if err != nil {
-			slog.Error("falied to add cluster info to db", "error", err)
-			return nil, fmt.Errorf("falied to add cluster info to db,%w", err)
-		}
+
 	}
 
 	return pool, nil
@@ -114,7 +120,7 @@ func (p *ClusterPool) GetClusterByID(ctx context.Context, id string) (*Cluster, 
 		storageClass = cInfo.StorageClass
 	}
 	for _, Cluster := range p.Clusters {
-		if Cluster.ID == cfId {
+		if Cluster.CID == cfId {
 			Cluster.StorageClass = storageClass
 			return &Cluster, nil
 		}
@@ -140,7 +146,7 @@ func GetNodeResources(clientset *kubernetes.Clientset, config *config.Config) (m
 		memCapacity := node.Status.Capacity["memory"]
 		memQuantity, ok := memCapacity.AsInt64()
 		if !ok {
-			slog.Error("falied to get node memory", "node", node.Name, "error", err)
+			slog.Error("failed to get node memory", "node", node.Name, "error", err)
 			continue
 		}
 		totalMem := getMem(memQuantity)
