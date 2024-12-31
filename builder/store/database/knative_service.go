@@ -59,7 +59,7 @@ func (s *knativeServiceImpl) Get(ctx context.Context, svcName, clusterID string)
 
 // add
 func (s *knativeServiceImpl) Add(ctx context.Context, service *KnativeService) error {
-	_, err := s.db.Operator.Core.NewInsert().Model(service).On("CONFLICT(name, cluster_id, user_uid) DO UPDATE").Exec(ctx)
+	_, err := s.db.Operator.Core.NewInsert().Model(service).On("CONFLICT(name, cluster_id) DO UPDATE").Exec(ctx)
 	return err
 }
 
