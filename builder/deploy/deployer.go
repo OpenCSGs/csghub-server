@@ -219,7 +219,7 @@ func (d *deployer) Status(ctx context.Context, dr types.DeployRepo, needDetails 
 	svcName := deploy.SvcName
 	svc, err := d.imageRunner.Exist(ctx, &types.CheckRequest{
 		SvcName:   svcName,
-		ClusterID: dr.ClusterID,
+		ClusterID: deploy.ClusterID,
 	})
 	if err != nil {
 		slog.Error("fail to get deploy by service name", slog.Any("Service NamE", svcName), slog.Any("error", err))

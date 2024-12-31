@@ -53,7 +53,13 @@ type KnativeService struct {
 // get
 func (s *knativeServiceImpl) Get(ctx context.Context, svcName, clusterID string) (*KnativeService, error) {
 	var service KnativeService
-	err := s.db.Operator.Core.NewSelect().Model(&service).Where("name = ? and cluster_id = ?", svcName, clusterID).Scan(ctx)
+	var err error
+	if clusterID == "" {
+		// backward compatibility, some space has no cluster id
+		err = s.db.Operator.Core.NewSelect().Model(&service).Where("name = ?", svcName).Scan(ctx)
+	} else {
+		err = s.db.Operator.Core.NewSelect().Model(&service).Where("name = ? and cluster_id = ?", svcName, clusterID).Scan(ctx)
+	}
 	return &service, err
 }
 
