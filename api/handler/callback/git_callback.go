@@ -8,6 +8,7 @@ import (
 	"go.temporal.io/sdk/client"
 	"opencsg.com/csghub-server/api/httpbase"
 	"opencsg.com/csghub-server/api/workflow"
+	"opencsg.com/csghub-server/builder/temporal"
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/types"
 	component "opencsg.com/csghub-server/component/callback"
@@ -48,7 +49,7 @@ func (h *GitCallbackHandler) handlePush(c *gin.Context) {
 		return
 	}
 	//start workflow to handle push request
-	workflowClient := workflow.GetWorkflowClient()
+	workflowClient := temporal.GetClient()
 	workflowOptions := client.StartWorkflowOptions{
 		TaskQueue: workflow.HandlePushQueueName,
 	}

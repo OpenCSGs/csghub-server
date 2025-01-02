@@ -11,6 +11,7 @@ import (
 	"opencsg.com/csghub-server/api/workflow"
 	"opencsg.com/csghub-server/builder/git/gitserver"
 	"opencsg.com/csghub-server/builder/store/database"
+	"opencsg.com/csghub-server/builder/temporal"
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/types"
 )
@@ -39,11 +40,12 @@ var gitCallbackCmd = &cobra.Command{
 		if err != nil {
 			return fmt.Errorf("failed to load config: %w", err)
 		}
-		err = workflow.StartWorker(config)
+
+		err = workflow.StartWorkflow(config)
 		if err != nil {
-			slog.Error("failed to start worker", slog.Any("error", err))
-			return fmt.Errorf("failed to start worker: %w", err)
+			return err
 		}
+
 		if len(repoPaths) > 0 {
 			for _, rp := range repoPaths {
 				parts := strings.Split(rp, "/")
@@ -85,7 +87,7 @@ var gitCallbackCmd = &cobra.Command{
 			req.Commits = append(req.Commits, types.GiteaCallbackPushReq_Commit{})
 			req.Commits[0].Added = append(req.Commits[0].Added, filePaths...)
 			//start workflow to handle push request
-			workflowClient := workflow.GetWorkflowClient()
+			workflowClient := temporal.GetClient()
 			workflowOptions := client.StartWorkflowOptions{
 				TaskQueue: workflow.HandlePushQueueName,
 			}

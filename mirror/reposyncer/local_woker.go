@@ -15,6 +15,7 @@ import (
 	"opencsg.com/csghub-server/builder/git/gitserver"
 	"opencsg.com/csghub-server/builder/git/gitserver/gitaly"
 	"opencsg.com/csghub-server/builder/store/database"
+	"opencsg.com/csghub-server/builder/temporal"
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/types"
 	"opencsg.com/csghub-server/mirror/queue"
@@ -227,7 +228,7 @@ func (w *LocalMirrorWoker) SyncRepo(ctx context.Context, task queue.MirrorTask) 
 	callback.Ref = branch
 
 	//start workflow to handle push request
-	workflowClient := workflow.GetWorkflowClient()
+	workflowClient := temporal.GetClient()
 	workflowOptions := client.StartWorkflowOptions{
 		TaskQueue: workflow.HandlePushQueueName,
 	}

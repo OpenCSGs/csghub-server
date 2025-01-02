@@ -13,6 +13,7 @@ import (
 	"opencsg.com/csghub-server/builder/deploy/common"
 	"opencsg.com/csghub-server/builder/event"
 	"opencsg.com/csghub-server/builder/store/database"
+	"opencsg.com/csghub-server/builder/temporal"
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/types"
 	"opencsg.com/csghub-server/docs"
@@ -83,23 +84,14 @@ var serverCmd = &cobra.Command{
 		if err != nil {
 			return fmt.Errorf("failed to init deploy: %w", err)
 		}
-		err = workflow.StartWorker(cfg)
+
+		err = workflow.StartWorkflow(cfg)
 		if err != nil {
-			return fmt.Errorf("failed to start worker:  %w", err)
+			return err
 		}
 		r, err := router.NewRouter(cfg, enableSwagger)
 		if err != nil {
 			return fmt.Errorf("failed to init router: %w", err)
-		}
-
-		err = workflow.RegisterCronJobs(cfg)
-		if err != nil {
-			return fmt.Errorf("failed to register cron jobs:  %w", err)
-		}
-
-		err = workflow.StartCronWorker(cfg)
-		if err != nil {
-			return fmt.Errorf("failed to start cron worker:  %w", err)
 		}
 
 		server := httpbase.NewGracefulServer(
@@ -120,7 +112,7 @@ var serverCmd = &cobra.Command{
 		}
 
 		server.Run()
-		workflow.StopWorker()
+		temporal.Stop()
 
 		return nil
 	},
