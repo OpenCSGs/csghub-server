@@ -24,13 +24,14 @@ import (
 )
 
 // Cluster holds basic information about a Kubernetes cluster
+
 type Cluster struct {
-	CID           string                // config id
-	ID            string                // unique id
-	ConfigPath    string                // Path to the kubeconfig file
-	Client        *kubernetes.Clientset // Kubernetes client
-	KnativeClient *knative.Clientset    // Knative client
-	ArgoClient    *versioned.Clientset  // Argo client
+	CID           string               // config id
+	ID            string               // unique id
+	ConfigPath    string               // Path to the kubeconfig file
+	Client        kubernetes.Interface // Kubernetes client
+	KnativeClient knative.Interface    // Knative client
+	ArgoClient    versioned.Interface  // Argo client
 	StorageClass  string
 }
 
@@ -129,7 +130,7 @@ func (p *ClusterPool) GetClusterByID(ctx context.Context, id string) (*Cluster, 
 }
 
 // getNodeResources retrieves all node cpu and gpu info
-func GetNodeResources(clientset *kubernetes.Clientset, config *config.Config) (map[string]types.NodeResourceInfo, error) {
+func GetNodeResources(clientset kubernetes.Interface, config *config.Config) (map[string]types.NodeResourceInfo, error) {
 	nodes, err := clientset.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
 		return nil, err
