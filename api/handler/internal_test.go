@@ -153,7 +153,7 @@ func TestInternalHandler_PostReceive(t *testing.T) {
 		tester.ctx, client.StartWorkflowOptions{
 			TaskQueue: workflow.HandlePushQueueName,
 		}, mock.Anything,
-		&types.GiteaCallbackPushReq{Ref: "ref/heads/main"}, &config.Config{},
+		&types.GiteaCallbackPushReq{Ref: "ref/heads/main"},
 	).Return(
 		runMock, nil,
 	)

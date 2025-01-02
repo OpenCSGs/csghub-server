@@ -92,9 +92,8 @@ var gitCallbackCmd = &cobra.Command{
 				TaskQueue: workflow.HandlePushQueueName,
 			}
 
-			we, err := workflowClient.ExecuteWorkflow(context.Background(), workflowOptions, workflow.HandlePushWorkflow,
-				req,
-				config,
+			we, err := workflowClient.ExecuteWorkflow(
+				context.Background(), workflowOptions, workflow.HandlePushWorkflow, req,
 			)
 			if err != nil {
 				slog.Error("failed to handle git push callback", slog.String("repo", repo.Path), slog.Any("error", err))

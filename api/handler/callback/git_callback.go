@@ -54,9 +54,8 @@ func (h *GitCallbackHandler) handlePush(c *gin.Context) {
 		TaskQueue: workflow.HandlePushQueueName,
 	}
 
-	we, err := workflowClient.ExecuteWorkflow(c, workflowOptions, workflow.HandlePushWorkflow,
-		&req,
-		h.config,
+	we, err := workflowClient.ExecuteWorkflow(
+		c, workflowOptions, workflow.HandlePushWorkflow, &req,
 	)
 	if err != nil {
 		slog.Error("failed to handle git push callback", slog.Any("error", err))

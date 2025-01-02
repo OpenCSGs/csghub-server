@@ -143,9 +143,8 @@ func (h *InternalHandler) PostReceive(ctx *gin.Context) {
 		TaskQueue: workflow.HandlePushQueueName,
 	}
 
-	we, err := h.temporalClient.ExecuteWorkflow(ctx, workflowOptions, workflow.HandlePushWorkflow,
-		callback,
-		h.config,
+	we, err := h.temporalClient.ExecuteWorkflow(
+		ctx, workflowOptions, workflow.HandlePushWorkflow, callback,
 	)
 	if err != nil {
 		slog.Error("failed to handle git push callback", slog.Any("error", err))

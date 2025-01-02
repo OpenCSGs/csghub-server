@@ -233,9 +233,8 @@ func (w *LocalMirrorWoker) SyncRepo(ctx context.Context, task queue.MirrorTask) 
 		TaskQueue: workflow.HandlePushQueueName,
 	}
 
-	we, err := workflowClient.ExecuteWorkflow(ctx, workflowOptions, workflow.HandlePushWorkflow,
-		callback,
-		w.config,
+	we, err := workflowClient.ExecuteWorkflow(
+		ctx, workflowOptions, workflow.HandlePushWorkflow, callback,
 	)
 	if err != nil {
 		return fmt.Errorf("failed to handle git push callback: %w", err)
