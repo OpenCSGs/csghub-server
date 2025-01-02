@@ -4,9 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"time"
 
-	"opencsg.com/csghub-server/builder/sensitive"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/types"
 )
@@ -18,15 +16,15 @@ type discussionComponentImpl struct {
 }
 
 type DiscussionComponent interface {
-	CreateRepoDiscussion(ctx context.Context, req CreateRepoDiscussionRequest) (*CreateDiscussionResponse, error)
-	GetDiscussion(ctx context.Context, id int64) (*ShowDiscussionResponse, error)
-	UpdateDiscussion(ctx context.Context, req UpdateDiscussionRequest) error
+	CreateRepoDiscussion(ctx context.Context, req types.CreateRepoDiscussionRequest) (*types.CreateDiscussionResponse, error)
+	GetDiscussion(ctx context.Context, id int64) (*types.ShowDiscussionResponse, error)
+	UpdateDiscussion(ctx context.Context, req types.UpdateDiscussionRequest) error
 	DeleteDiscussion(ctx context.Context, currentUser string, id int64) error
-	ListRepoDiscussions(ctx context.Context, req ListRepoDiscussionRequest) (*ListRepoDiscussionResponse, error)
-	CreateDiscussionComment(ctx context.Context, req CreateCommentRequest) (*CreateCommentResponse, error)
+	ListRepoDiscussions(ctx context.Context, req types.ListRepoDiscussionRequest) (*types.ListRepoDiscussionResponse, error)
+	CreateDiscussionComment(ctx context.Context, req types.CreateCommentRequest) (*types.CreateCommentResponse, error)
 	UpdateComment(ctx context.Context, currentUser string, id int64, content string) error
 	DeleteComment(ctx context.Context, currentUser string, id int64) error
-	ListDiscussionComments(ctx context.Context, discussionID int64) ([]*DiscussionResponse_Comment, error)
+	ListDiscussionComments(ctx context.Context, discussionID int64) ([]*types.DiscussionResponse_Comment, error)
 }
 
 func NewDiscussionComponent() DiscussionComponent {
@@ -36,7 +34,7 @@ func NewDiscussionComponent() DiscussionComponent {
 	return &discussionComponentImpl{discussionStore: ds, repoStore: rs, userStore: us}
 }
 
-func (c *discussionComponentImpl) CreateRepoDiscussion(ctx context.Context, req CreateRepoDiscussionRequest) (*CreateDiscussionResponse, error) {
+func (c *discussionComponentImpl) CreateRepoDiscussion(ctx context.Context, req types.CreateRepoDiscussionRequest) (*types.CreateDiscussionResponse, error) {
 	//TODO:check if the user can access the repo
 
 	//get repo by namespace and name
@@ -57,9 +55,9 @@ func (c *discussionComponentImpl) CreateRepoDiscussion(ctx context.Context, req 
 	if err != nil {
 		return nil, fmt.Errorf("failed to create discussion: %w", err)
 	}
-	resp := &CreateDiscussionResponse{
+	resp := &types.CreateDiscussionResponse{
 		ID: discussion.ID,
-		User: &DiscussionResponse_User{
+		User: &types.DiscussionResponse_User{
 			ID:       user.ID,
 			Username: user.Username,
 			Avatar:   user.Avatar,
@@ -71,7 +69,7 @@ func (c *discussionComponentImpl) CreateRepoDiscussion(ctx context.Context, req 
 	return resp, nil
 }
 
-func (c *discussionComponentImpl) GetDiscussion(ctx context.Context, id int64) (*ShowDiscussionResponse, error) {
+func (c *discussionComponentImpl) GetDiscussion(ctx context.Context, id int64) (*types.ShowDiscussionResponse, error) {
 	discussion, err := c.discussionStore.FindByID(ctx, id)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find discussion by id '%d': %w", id, err)
@@ -80,20 +78,20 @@ func (c *discussionComponentImpl) GetDiscussion(ctx context.Context, id int64) (
 	if err != nil && err != sql.ErrNoRows {
 		return nil, fmt.Errorf("failed to find discussion comments by discussion id '%d': %w", discussion.ID, err)
 	}
-	resp := &ShowDiscussionResponse{
+	resp := &types.ShowDiscussionResponse{
 		ID:    discussion.ID,
 		Title: discussion.Title,
-		User: &DiscussionResponse_User{
+		User: &types.DiscussionResponse_User{
 			ID:       discussion.User.ID,
 			Username: discussion.User.Username,
 			Avatar:   discussion.User.Avatar,
 		},
 	}
 	for _, comment := range comments {
-		resp.Comments = append(resp.Comments, &DiscussionResponse_Comment{
+		resp.Comments = append(resp.Comments, &types.DiscussionResponse_Comment{
 			ID:      comment.ID,
 			Content: comment.Content,
-			User: &DiscussionResponse_User{
+			User: &types.DiscussionResponse_User{
 				ID:       comment.User.ID,
 				Username: comment.User.Username,
 				Avatar:   comment.User.Avatar,
@@ -103,7 +101,7 @@ func (c *discussionComponentImpl) GetDiscussion(ctx context.Context, id int64) (
 	return resp, nil
 }
 
-func (c *discussionComponentImpl) UpdateDiscussion(ctx context.Context, req UpdateDiscussionRequest) error {
+func (c *discussionComponentImpl) UpdateDiscussion(ctx context.Context, req types.UpdateDiscussionRequest) error {
 	//check if the user is the owner of the discussion
 	user, err := c.userStore.FindByUsername(ctx, req.CurrentUser)
 	if err != nil {
@@ -138,7 +136,7 @@ func (c *discussionComponentImpl) DeleteDiscussion(ctx context.Context, currentU
 	return nil
 }
 
-func (c *discussionComponentImpl) ListRepoDiscussions(ctx context.Context, req ListRepoDiscussionRequest) (*ListRepoDiscussionResponse, error) {
+func (c *discussionComponentImpl) ListRepoDiscussions(ctx context.Context, req types.ListRepoDiscussionRequest) (*types.ListRepoDiscussionResponse, error) {
 	//TODO:check if the user can access the repo
 	repo, err := c.repoStore.FindByPath(ctx, req.RepoType, req.Namespace, req.Name)
 	if err != nil {
@@ -148,14 +146,14 @@ func (c *discussionComponentImpl) ListRepoDiscussions(ctx context.Context, req L
 	if err != nil {
 		return nil, fmt.Errorf("failed to list repo discussions by repo type '%s', namespace '%s', name '%s': %w", req.RepoType, req.Namespace, req.Name, err)
 	}
-	resp := &ListRepoDiscussionResponse{}
+	resp := &types.ListRepoDiscussionResponse{}
 	for _, discussion := range discussions {
-		resp.Discussions = append(resp.Discussions, &CreateDiscussionResponse{
+		resp.Discussions = append(resp.Discussions, &types.CreateDiscussionResponse{
 			ID:           discussion.ID,
 			Title:        discussion.Title,
 			CommentCount: discussion.CommentCount,
 			CreatedAt:    discussion.CreatedAt,
-			User: &DiscussionResponse_User{
+			User: &types.DiscussionResponse_User{
 				ID:       discussion.User.ID,
 				Username: discussion.User.Username,
 				Avatar:   discussion.User.Avatar,
@@ -165,7 +163,7 @@ func (c *discussionComponentImpl) ListRepoDiscussions(ctx context.Context, req L
 	return resp, nil
 }
 
-func (c *discussionComponentImpl) CreateDiscussionComment(ctx context.Context, req CreateCommentRequest) (*CreateCommentResponse, error) {
+func (c *discussionComponentImpl) CreateDiscussionComment(ctx context.Context, req types.CreateCommentRequest) (*types.CreateCommentResponse, error) {
 	req.CommentableType = database.CommentableTypeDiscussion
 	// get discussion by  id
 	_, err := c.discussionStore.FindByID(ctx, req.CommentableID)
@@ -188,12 +186,12 @@ func (c *discussionComponentImpl) CreateDiscussionComment(ctx context.Context, r
 	if err != nil {
 		return nil, fmt.Errorf("failed to create discussion comment: %w", err)
 	}
-	return &CreateCommentResponse{
+	return &types.CreateCommentResponse{
 		ID:              comment.ID,
 		CommentableID:   comment.CommentableID,
 		CommentableType: comment.CommentableType,
 		CreatedAt:       comment.CreatedAt,
-		User: &DiscussionResponse_User{
+		User: &types.DiscussionResponse_User{
 			ID:       user.ID,
 			Username: user.Username,
 			Avatar:   user.Avatar,
@@ -243,17 +241,17 @@ func (c *discussionComponentImpl) DeleteComment(ctx context.Context, currentUser
 	return nil
 }
 
-func (c *discussionComponentImpl) ListDiscussionComments(ctx context.Context, discussionID int64) ([]*DiscussionResponse_Comment, error) {
+func (c *discussionComponentImpl) ListDiscussionComments(ctx context.Context, discussionID int64) ([]*types.DiscussionResponse_Comment, error) {
 	comments, err := c.discussionStore.FindDiscussionComments(ctx, discussionID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find discussion comments by discussion id '%d': %w", discussionID, err)
 	}
-	resp := make([]*DiscussionResponse_Comment, 0, len(comments))
+	resp := make([]*types.DiscussionResponse_Comment, 0, len(comments))
 	for _, comment := range comments {
-		resp = append(resp, &DiscussionResponse_Comment{
+		resp = append(resp, &types.DiscussionResponse_Comment{
 			ID:      comment.ID,
 			Content: comment.Content,
-			User: &DiscussionResponse_User{
+			User: &types.DiscussionResponse_User{
 				ID:       comment.User.ID,
 				Username: comment.User.Username,
 				Avatar:   comment.User.Avatar,
@@ -262,143 +260,4 @@ func (c *discussionComponentImpl) ListDiscussionComments(ctx context.Context, di
 		})
 	}
 	return resp, nil
-}
-
-//--- request and response ---//
-
-type CreateRepoDiscussionRequest struct {
-	Title       string               `json:"title" binding:"required"`
-	RepoType    types.RepositoryType `json:"-"`
-	Namespace   string               `json:"-"`
-	Name        string               `json:"-"`
-	CurrentUser string               `json:"-"`
-}
-
-// CreateRepoDiscussionRequest implements types.SensitiveRequestV2
-var _ types.SensitiveRequestV2 = (*CreateRepoDiscussionRequest)(nil)
-
-func (req *CreateRepoDiscussionRequest) GetSensitiveFields() []types.SensitiveField {
-	return []types.SensitiveField{
-		{
-			Name: "title",
-			Value: func() string {
-				return req.Title
-			},
-			Scenario: string(sensitive.ScenarioCommentDetection),
-		},
-	}
-}
-
-type CreateDiscussionResponse struct {
-	ID    int64                    `json:"id"`
-	User  *DiscussionResponse_User `json:"user"`
-	Title string                   `json:"title"`
-	// DiscussionableID   int64     `json:"discussionable_id"`
-	// DiscussionableType string    `json:"discussionable_type"`
-	CommentCount int64     `json:"comment_count"`
-	CreatedAt    time.Time `json:"created_at"`
-	// UpdatedAt    time.Time `json:"updated_at"`
-}
-
-type DiscussionResponse_User struct {
-	ID       int64  `json:"id"`
-	Username string `json:"name"`
-	Avatar   string `json:"avatar"`
-}
-
-type UpdateDiscussionRequest struct {
-	ID          int64  `json:"-"`
-	Title       string `json:"title" binding:"required"`
-	CurrentUser string `json:"-"`
-}
-
-// UpdateDiscussionRequest implements types.SensitiveRequestV2
-var _ types.SensitiveRequestV2 = (*UpdateDiscussionRequest)(nil)
-
-func (req *UpdateDiscussionRequest) GetSensitiveFields() []types.SensitiveField {
-	return []types.SensitiveField{
-		{
-			Name: "title",
-			Value: func() string {
-				return req.Title
-			},
-			Scenario: string(sensitive.ScenarioCommentDetection),
-		},
-	}
-}
-
-type ShowDiscussionResponse struct {
-	ID           int64                         `json:"id"`
-	Title        string                        `json:"title"`
-	User         *DiscussionResponse_User      `json:"user"`
-	CommentCount int64                         `json:"comment_count"`
-	Comments     []*DiscussionResponse_Comment `json:"comments,omitempty"`
-}
-
-type DiscussionResponse_Comment struct {
-	ID        int64                    `json:"id"`
-	Content   string                   `json:"content"`
-	User      *DiscussionResponse_User `json:"user"`
-	CreatedAt time.Time                `json:"created_at"`
-}
-
-type ListRepoDiscussionRequest struct {
-	RepoType    types.RepositoryType `json:"-"`
-	Namespace   string               `json:"-"`
-	Name        string               `json:"-"`
-	CurrentUser string               `json:"-"`
-}
-
-type ListRepoDiscussionResponse struct {
-	Discussions []*CreateDiscussionResponse `json:"discussions"`
-}
-
-type CreateCommentRequest struct {
-	Content         string `json:"content" binding:"required"`
-	CommentableID   int64  `json:"commentable_id"`
-	CommentableType string `json:"commentable_type"`
-	CurrentUser     string `json:"-"`
-}
-
-// CreateCommentRequest implements types.SensitiveRequestV2
-var _ types.SensitiveRequestV2 = (*CreateCommentRequest)(nil)
-
-func (req *CreateCommentRequest) GetSensitiveFields() []types.SensitiveField {
-	return []types.SensitiveField{
-		{
-			Name: "content",
-			Value: func() string {
-				return req.Content
-			},
-			Scenario: string(sensitive.ScenarioCommentDetection),
-		},
-	}
-}
-
-type CreateCommentResponse struct {
-	ID              int64                    `json:"id"`
-	CommentableID   int64                    `json:"commentable_id"`
-	CommentableType string                   `json:"commentable_type"`
-	CreatedAt       time.Time                `json:"created_at"`
-	User            *DiscussionResponse_User `json:"user"`
-}
-
-type UpdateCommentRequest struct {
-	ID      int64  `json:"-"`
-	Content string `json:"content" binding:"required"`
-}
-
-// UpdateCommentRequest implements types.SensitiveRequestV2
-var _ types.SensitiveRequestV2 = (*UpdateCommentRequest)(nil)
-
-func (req *UpdateCommentRequest) GetSensitiveFields() []types.SensitiveField {
-	return []types.SensitiveField{
-		{
-			Name: "content",
-			Value: func() string {
-				return req.Content
-			},
-			Scenario: string(sensitive.ScenarioCommentDetection),
-		},
-	}
 }

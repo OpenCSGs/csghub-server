@@ -691,6 +691,10 @@ func TestDeployer_CheckResource(t *testing.T) {
 			Gpu: types.GPU{Num: "1", Type: "t1"},
 			Cpu: types.CPU{Num: "20"},
 		}, false},
+		{&types.HardWare{
+			Gpu: types.GPU{Num: "1", Type: "t1"},
+			Cpu: types.CPU{Num: "12"},
+		}, true},
 	}
 
 	for _, c := range cases {
@@ -698,6 +702,7 @@ func TestDeployer_CheckResource(t *testing.T) {
 		v := CheckResource(&types.ClusterRes{
 			Resources: []types.NodeResourceInfo{
 				{AvailableXPU: 10, XPUModel: "t1", AvailableCPU: 10, AvailableMem: 10000},
+				{AvailableXPU: 12, XPUModel: "t1", AvailableCPU: 12, AvailableMem: 10000},
 			},
 		}, c.hardware)
 		require.Equal(t, c.available, v, c.hardware)

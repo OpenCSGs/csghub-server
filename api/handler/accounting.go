@@ -16,8 +16,8 @@ import (
 )
 
 type AccountingHandler struct {
-	ac       component.AccountingComponent
-	apiToken string
+	accounting component.AccountingComponent
+	apiToken   string
 }
 
 func NewAccountingHandler(config *config.Config) (*AccountingHandler, error) {
@@ -26,8 +26,8 @@ func NewAccountingHandler(config *config.Config) (*AccountingHandler, error) {
 		return nil, err
 	}
 	return &AccountingHandler{
-		ac:       acctComp,
-		apiToken: config.APIToken,
+		accounting: acctComp,
+		apiToken:   config.APIToken,
 	}, nil
 }
 
@@ -106,7 +106,7 @@ func (ah *AccountingHandler) QueryMeteringStatementByUserID(ctx *gin.Context) {
 		Per:          per,
 		Page:         page,
 	}
-	data, err := ah.ac.ListMeteringsByUserIDAndTime(ctx, req)
+	data, err := ah.accounting.ListMeteringsByUserIDAndTime(ctx, req)
 	if err != nil {
 		errTip := "fail to query meterings by user"
 		slog.Error(errTip, slog.Any("req", req), slog.Any("error", err))

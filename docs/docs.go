@@ -1173,7 +1173,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/component.UpdateCommentRequest"
+                            "$ref": "#/definitions/types.UpdateCommentRequest"
                         }
                     }
                 ],
@@ -1911,7 +1911,7 @@ const docTemplate = `{
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/component.ShowDiscussionResponse"
+                                            "$ref": "#/definitions/types.ShowDiscussionResponse"
                                         }
                                     }
                                 }
@@ -1970,7 +1970,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/component.UpdateDiscussionRequest"
+                            "$ref": "#/definitions/types.UpdateDiscussionRequest"
                         }
                     }
                 ],
@@ -2091,7 +2091,7 @@ const docTemplate = `{
                                         "data": {
                                             "type": "array",
                                             "items": {
-                                                "$ref": "#/definitions/component.DiscussionResponse_Comment"
+                                                "$ref": "#/definitions/types.DiscussionResponse_Comment"
                                             }
                                         }
                                     }
@@ -2144,7 +2144,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/component.CreateCommentRequest"
+                            "$ref": "#/definitions/types.CreateCommentRequest"
                         }
                     }
                 ],
@@ -2160,7 +2160,7 @@ const docTemplate = `{
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/component.CreateCommentResponse"
+                                            "$ref": "#/definitions/types.CreateCommentResponse"
                                         }
                                     }
                                 }
@@ -4006,77 +4006,6 @@ const docTemplate = `{
                         "description": "OK",
                         "schema": {
                             "$ref": "#/definitions/types.Response"
-                        }
-                    },
-                    "400": {
-                        "description": "Bad request",
-                        "schema": {
-                            "$ref": "#/definitions/types.APIBadRequest"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal server error",
-                        "schema": {
-                            "$ref": "#/definitions/types.APIInternalServerError"
-                        }
-                    }
-                }
-            }
-        },
-        "/models/{namespace}/{name}/predict": {
-            "post": {
-                "security": [
-                    {
-                        "ApiKey": []
-                    }
-                ],
-                "description": "invoke model prediction",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Model"
-                ],
-                "summary": "Invoke model prediction",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "namespace",
-                        "name": "namespace",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "name",
-                        "name": "name",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "current user",
-                        "name": "current_user",
-                        "in": "query"
-                    },
-                    {
-                        "description": "input for model prediction",
-                        "name": "body",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/types.ModelPredictReq"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "type": "string"
                         }
                     },
                     "400": {
@@ -6601,415 +6530,6 @@ const docTemplate = `{
                         "schema": {
                             "$ref": "#/definitions/types.CreatePromptRepoReq"
                         }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/types.Response"
-                        }
-                    },
-                    "400": {
-                        "description": "Bad request",
-                        "schema": {
-                            "$ref": "#/definitions/types.APIBadRequest"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal server error",
-                        "schema": {
-                            "$ref": "#/definitions/types.APIInternalServerError"
-                        }
-                    }
-                }
-            }
-        },
-        "/prompts/conversations": {
-            "get": {
-                "security": [
-                    {
-                        "ApiKey": []
-                    }
-                ],
-                "description": "List conversations of user",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Prompt"
-                ],
-                "summary": "List conversations of user",
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/types.Response"
-                        }
-                    },
-                    "400": {
-                        "description": "Bad request",
-                        "schema": {
-                            "$ref": "#/definitions/types.APIBadRequest"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal server error",
-                        "schema": {
-                            "$ref": "#/definitions/types.APIInternalServerError"
-                        }
-                    }
-                }
-            },
-            "post": {
-                "security": [
-                    {
-                        "ApiKey": []
-                    }
-                ],
-                "description": "Create new conversation",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Prompt"
-                ],
-                "summary": "Create new conversation",
-                "parameters": [
-                    {
-                        "description": "body",
-                        "name": "body",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/types.Conversation"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/types.Response"
-                        }
-                    },
-                    "400": {
-                        "description": "Bad request",
-                        "schema": {
-                            "$ref": "#/definitions/types.APIBadRequest"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal server error",
-                        "schema": {
-                            "$ref": "#/definitions/types.APIInternalServerError"
-                        }
-                    }
-                }
-            }
-        },
-        "/prompts/conversations/{id}": {
-            "get": {
-                "security": [
-                    {
-                        "ApiKey": []
-                    }
-                ],
-                "description": "Get a conversation by uuid",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Prompt"
-                ],
-                "summary": "Get a conversation by uuid",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "conversation uuid",
-                        "name": "id",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/types.Response"
-                        }
-                    },
-                    "400": {
-                        "description": "Bad request",
-                        "schema": {
-                            "$ref": "#/definitions/types.APIBadRequest"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal server error",
-                        "schema": {
-                            "$ref": "#/definitions/types.APIInternalServerError"
-                        }
-                    }
-                }
-            },
-            "put": {
-                "security": [
-                    {
-                        "ApiKey": []
-                    }
-                ],
-                "description": "Update a conversation title",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Prompt"
-                ],
-                "summary": "Update a conversation title",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "conversation uuid",
-                        "name": "id",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "description": "body",
-                        "name": "body",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/types.ConversationTitle"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/types.Response"
-                        }
-                    },
-                    "400": {
-                        "description": "Bad request",
-                        "schema": {
-                            "$ref": "#/definitions/types.APIBadRequest"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal server error",
-                        "schema": {
-                            "$ref": "#/definitions/types.APIInternalServerError"
-                        }
-                    }
-                }
-            },
-            "post": {
-                "security": [
-                    {
-                        "ApiKey": []
-                    }
-                ],
-                "description": "Submit a conversation message",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Prompt"
-                ],
-                "summary": "Submit a conversation message",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "conversation uuid",
-                        "name": "id",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "description": "body",
-                        "name": "body",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/types.Conversation"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/types.Response"
-                        }
-                    },
-                    "400": {
-                        "description": "Bad request",
-                        "schema": {
-                            "$ref": "#/definitions/types.APIBadRequest"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal server error",
-                        "schema": {
-                            "$ref": "#/definitions/types.APIInternalServerError"
-                        }
-                    }
-                }
-            },
-            "delete": {
-                "security": [
-                    {
-                        "ApiKey": []
-                    }
-                ],
-                "description": "Delete a conversation",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Prompt"
-                ],
-                "summary": "Delete a conversation",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "conversation uuid",
-                        "name": "id",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/types.Response"
-                        }
-                    },
-                    "400": {
-                        "description": "Bad request",
-                        "schema": {
-                            "$ref": "#/definitions/types.APIBadRequest"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal server error",
-                        "schema": {
-                            "$ref": "#/definitions/types.APIInternalServerError"
-                        }
-                    }
-                }
-            }
-        },
-        "/prompts/conversations/{id}/message/{msgid}/hate": {
-            "put": {
-                "security": [
-                    {
-                        "ApiKey": []
-                    }
-                ],
-                "description": "Hate a conversation message",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Prompt"
-                ],
-                "summary": "Hate a conversation message",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "conversation uuid",
-                        "name": "uuid",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "message id",
-                        "name": "id",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/types.Response"
-                        }
-                    },
-                    "400": {
-                        "description": "Bad request",
-                        "schema": {
-                            "$ref": "#/definitions/types.APIBadRequest"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal server error",
-                        "schema": {
-                            "$ref": "#/definitions/types.APIInternalServerError"
-                        }
-                    }
-                }
-            }
-        },
-        "/prompts/conversations/{id}/message/{msgid}/like": {
-            "put": {
-                "security": [
-                    {
-                        "ApiKey": []
-                    }
-                ],
-                "description": "Like a conversation message",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Prompt"
-                ],
-                "summary": "Like a conversation message",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "conversation uuid",
-                        "name": "uuid",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "message id",
-                        "name": "id",
-                        "in": "path",
-                        "required": true
                     }
                 ],
                 "responses": {
@@ -13189,7 +12709,7 @@ const docTemplate = `{
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/component.ListRepoDiscussionResponse"
+                                            "$ref": "#/definitions/types.ListRepoDiscussionResponse"
                                         }
                                     }
                                 }
@@ -13268,7 +12788,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/component.CreateRepoDiscussionRequest"
+                            "$ref": "#/definitions/types.CreateRepoDiscussionRequest"
                         }
                     }
                 ],
@@ -13284,7 +12804,7 @@ const docTemplate = `{
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/component.CreateDiscussionResponse"
+                                            "$ref": "#/definitions/types.CreateDiscussionResponse"
                                         }
                                     }
                                 }
@@ -15479,162 +14999,6 @@ const docTemplate = `{
         }
     },
     "definitions": {
-        "component.CreateCommentRequest": {
-            "type": "object",
-            "required": [
-                "content"
-            ],
-            "properties": {
-                "commentable_id": {
-                    "type": "integer"
-                },
-                "commentable_type": {
-                    "type": "string"
-                },
-                "content": {
-                    "type": "string"
-                }
-            }
-        },
-        "component.CreateCommentResponse": {
-            "type": "object",
-            "properties": {
-                "commentable_id": {
-                    "type": "integer"
-                },
-                "commentable_type": {
-                    "type": "string"
-                },
-                "created_at": {
-                    "type": "string"
-                },
-                "id": {
-                    "type": "integer"
-                },
-                "user": {
-                    "$ref": "#/definitions/component.DiscussionResponse_User"
-                }
-            }
-        },
-        "component.CreateDiscussionResponse": {
-            "type": "object",
-            "properties": {
-                "comment_count": {
-                    "description": "DiscussionableID   int64     ` + "`" + `json:\"discussionable_id\"` + "`" + `\nDiscussionableType string    ` + "`" + `json:\"discussionable_type\"` + "`" + `",
-                    "type": "integer"
-                },
-                "created_at": {
-                    "type": "string"
-                },
-                "id": {
-                    "type": "integer"
-                },
-                "title": {
-                    "type": "string"
-                },
-                "user": {
-                    "$ref": "#/definitions/component.DiscussionResponse_User"
-                }
-            }
-        },
-        "component.CreateRepoDiscussionRequest": {
-            "type": "object",
-            "required": [
-                "title"
-            ],
-            "properties": {
-                "title": {
-                    "type": "string"
-                }
-            }
-        },
-        "component.DiscussionResponse_Comment": {
-            "type": "object",
-            "properties": {
-                "content": {
-                    "type": "string"
-                },
-                "created_at": {
-                    "type": "string"
-                },
-                "id": {
-                    "type": "integer"
-                },
-                "user": {
-                    "$ref": "#/definitions/component.DiscussionResponse_User"
-                }
-            }
-        },
-        "component.DiscussionResponse_User": {
-            "type": "object",
-            "properties": {
-                "avatar": {
-                    "type": "string"
-                },
-                "id": {
-                    "type": "integer"
-                },
-                "name": {
-                    "type": "string"
-                }
-            }
-        },
-        "component.ListRepoDiscussionResponse": {
-            "type": "object",
-            "properties": {
-                "discussions": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/component.CreateDiscussionResponse"
-                    }
-                }
-            }
-        },
-        "component.ShowDiscussionResponse": {
-            "type": "object",
-            "properties": {
-                "comment_count": {
-                    "type": "integer"
-                },
-                "comments": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/component.DiscussionResponse_Comment"
-                    }
-                },
-                "id": {
-                    "type": "integer"
-                },
-                "title": {
-                    "type": "string"
-                },
-                "user": {
-                    "$ref": "#/definitions/component.DiscussionResponse_User"
-                }
-            }
-        },
-        "component.UpdateCommentRequest": {
-            "type": "object",
-            "required": [
-                "content"
-            ],
-            "properties": {
-                "content": {
-                    "type": "string"
-                }
-            }
-        },
-        "component.UpdateDiscussionRequest": {
-            "type": "object",
-            "required": [
-                "title"
-            ],
-            "properties": {
-                "title": {
-                    "type": "string"
-                }
-            }
-        },
         "database.AccessToken": {
             "type": "object",
             "properties": {
@@ -16574,6 +15938,9 @@ const docTemplate = `{
                 "repository_id": {
                     "type": "integer"
                 },
+                "sensitive_check_status": {
+                    "type": "string"
+                },
                 "source": {
                     "$ref": "#/definitions/types.RepositorySource"
                 },
@@ -16810,39 +16177,6 @@ const docTemplate = `{
                 }
             }
         },
-        "types.Conversation": {
-            "type": "object",
-            "required": [
-                "message",
-                "uuid"
-            ],
-            "properties": {
-                "message": {
-                    "type": "string"
-                },
-                "temperature": {
-                    "type": "number"
-                },
-                "uuid": {
-                    "type": "string"
-                }
-            }
-        },
-        "types.ConversationTitle": {
-            "type": "object",
-            "required": [
-                "title",
-                "uuid"
-            ],
-            "properties": {
-                "title": {
-                    "type": "string"
-                },
-                "uuid": {
-                    "type": "string"
-                }
-            }
-        },
         "types.CreateCategory": {
             "type": "object",
             "required": [
@@ -16923,6 +16257,43 @@ const docTemplate = `{
                 }
             }
         },
+        "types.CreateCommentRequest": {
+            "type": "object",
+            "required": [
+                "content"
+            ],
+            "properties": {
+                "commentable_id": {
+                    "type": "integer"
+                },
+                "commentable_type": {
+                    "type": "string"
+                },
+                "content": {
+                    "type": "string"
+                }
+            }
+        },
+        "types.CreateCommentResponse": {
+            "type": "object",
+            "properties": {
+                "commentable_id": {
+                    "type": "integer"
+                },
+                "commentable_type": {
+                    "type": "string"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "user": {
+                    "$ref": "#/definitions/types.DiscussionResponse_User"
+                }
+            }
+        },
         "types.CreateDatasetReq": {
             "type": "object",
             "properties": {
@@ -16961,6 +16332,27 @@ const docTemplate = `{
                 },
                 "type": {
                     "type": "integer"
+                }
+            }
+        },
+        "types.CreateDiscussionResponse": {
+            "type": "object",
+            "properties": {
+                "comment_count": {
+                    "description": "DiscussionableID   int64     ` + "`" + `json:\"discussionable_id\"` + "`" + `\nDiscussionableType string    ` + "`" + `json:\"discussionable_type\"` + "`" + `",
+                    "type": "integer"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "title": {
+                    "type": "string"
+                },
+                "user": {
+                    "$ref": "#/definitions/types.DiscussionResponse_User"
                 }
             }
         },
@@ -17216,6 +16608,17 @@ const docTemplate = `{
                 }
             }
         },
+        "types.CreateRepoDiscussionRequest": {
+            "type": "object",
+            "required": [
+                "title"
+            ],
+            "properties": {
+                "title": {
+                    "type": "string"
+                }
+            }
+        },
         "types.CreateSSHKeyRequest": {
             "type": "object",
             "properties": {
@@ -17453,6 +16856,9 @@ const docTemplate = `{
                 "repository_id": {
                     "type": "integer"
                 },
+                "sensitive_check_status": {
+                    "type": "string"
+                },
                 "source": {
                     "$ref": "#/definitions/types.RepositorySource"
                 },
@@ -17565,6 +16971,37 @@ const docTemplate = `{
                 },
                 "secure_level": {
                     "type": "integer"
+                }
+            }
+        },
+        "types.DiscussionResponse_Comment": {
+            "type": "object",
+            "properties": {
+                "content": {
+                    "type": "string"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "user": {
+                    "$ref": "#/definitions/types.DiscussionResponse_User"
+                }
+            }
+        },
+        "types.DiscussionResponse_User": {
+            "type": "object",
+            "properties": {
+                "avatar": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "name": {
+                    "type": "string"
                 }
             }
         },
@@ -17799,6 +17236,17 @@ const docTemplate = `{
                     "type": "array",
                     "items": {
                         "type": "string"
+                    }
+                }
+            }
+        },
+        "types.ListRepoDiscussionResponse": {
+            "type": "object",
+            "properties": {
+                "discussions": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/types.CreateDiscussionResponse"
                     }
                 }
             }
@@ -18041,20 +17489,6 @@ const docTemplate = `{
                         }
                     ],
                     "example": "generation"
-                }
-            }
-        },
-        "types.ModelPredictReq": {
-            "type": "object",
-            "properties": {
-                "current_user": {
-                    "type": "string"
-                },
-                "input": {
-                    "type": "string"
-                },
-                "version": {
-                    "type": "string"
                 }
             }
         },
@@ -18578,6 +18012,29 @@ const docTemplate = `{
                 "SensitiveCheckException"
             ]
         },
+        "types.ShowDiscussionResponse": {
+            "type": "object",
+            "properties": {
+                "comment_count": {
+                    "type": "integer"
+                },
+                "comments": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/types.DiscussionResponse_Comment"
+                    }
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "title": {
+                    "type": "string"
+                },
+                "user": {
+                    "$ref": "#/definitions/types.DiscussionResponse_User"
+                }
+            }
+        },
         "types.Space": {
             "type": "object",
             "properties": {
@@ -18834,6 +18291,17 @@ const docTemplate = `{
                 }
             }
         },
+        "types.UpdateCommentRequest": {
+            "type": "object",
+            "required": [
+                "content"
+            ],
+            "properties": {
+                "content": {
+                    "type": "string"
+                }
+            }
+        },
         "types.UpdateDatasetReq": {
             "type": "object",
             "properties": {
@@ -18847,6 +18315,17 @@ const docTemplate = `{
                 "private": {
                     "type": "boolean",
                     "example": false
+                }
+            }
+        },
+        "types.UpdateDiscussionRequest": {
+            "type": "object",
+            "required": [
+                "title"
+            ],
+            "properties": {
+                "title": {
+                    "type": "string"
                 }
             }
         },

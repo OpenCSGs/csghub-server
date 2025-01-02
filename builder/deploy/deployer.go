@@ -728,7 +728,11 @@ func CheckResource(clusterResources *types.ClusterRes, hardware *types.HardWare)
 	}
 	for _, node := range clusterResources.Resources {
 		if float32(mem) <= node.AvailableMem {
-			return checkNodeResource(node, hardware)
+			isAvailable := checkNodeResource(node, hardware)
+			if isAvailable {
+				// if true return, otherwise continue check next node
+				return true
+			}
 		}
 	}
 	return false

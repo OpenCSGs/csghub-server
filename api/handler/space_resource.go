@@ -17,12 +17,12 @@ func NewSpaceResourceHandler(config *config.Config) (*SpaceResourceHandler, erro
 		return nil, err
 	}
 	return &SpaceResourceHandler{
-		c: src,
+		spaceResource: src,
 	}, nil
 }
 
 type SpaceResourceHandler struct {
-	c component.SpaceResourceComponent
+	spaceResource component.SpaceResourceComponent
 }
 
 // GetSpaceResources godoc
@@ -51,7 +51,7 @@ func (h *SpaceResourceHandler) Index(ctx *gin.Context) {
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
-	spaceResources, err := h.c.Index(ctx, clusterId, deployType, "")
+	spaceResources, err := h.spaceResource.Index(ctx, clusterId, deployType, "")
 	if err != nil {
 		slog.Error("Failed to get space resources", slog.String("cluster_id", clusterId), slog.String("deploy_type", deployTypeStr), slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
@@ -80,7 +80,7 @@ func (h *SpaceResourceHandler) Create(ctx *gin.Context) {
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
-	spaceResource, err := h.c.Create(ctx, &req)
+	spaceResource, err := h.spaceResource.Create(ctx, &req)
 	if err != nil {
 		slog.Error("Failed to create space resources", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
@@ -122,7 +122,7 @@ func (h *SpaceResourceHandler) Update(ctx *gin.Context) {
 	}
 	req.ID = id
 
-	spaceResource, err := h.c.Update(ctx, req)
+	spaceResource, err := h.spaceResource.Update(ctx, req)
 	if err != nil {
 		slog.Error("Failed to update space resource", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
@@ -156,7 +156,7 @@ func (h *SpaceResourceHandler) Delete(ctx *gin.Context) {
 		return
 	}
 
-	err = h.c.Delete(ctx, id)
+	err = h.spaceResource.Delete(ctx, id)
 	if err != nil {
 		slog.Error("Failed to delete space resource", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
