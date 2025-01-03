@@ -24,6 +24,8 @@ type ArgoHandler struct {
 
 func NewArgoHandler(config *config.Config, clusterPool *cluster.ClusterPool) (*ArgoHandler, error) {
 	wfc := component.NewWorkFlowComponent(config, clusterPool)
+	//watch workflows events
+	go wfc.RunWorkflowsInformer(clusterPool, config)
 	return &ArgoHandler{
 		clusterPool:        clusterPool,
 		config:             config,

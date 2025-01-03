@@ -243,29 +243,36 @@ func TestDeployer_Status(t *testing.T) {
 	})
 	t.Run("cache miss and running", func(t *testing.T) {
 		dr := types.DeployRepo{
-			DeployID: 1,
-			UserUUID: "1",
-			Path:     "namespace/name",
-			Type:     types.InferenceType,
+			DeployID:  1,
+			UserUUID:  "1",
+			Path:      "namespace/name",
+			Type:      types.InferenceType,
+			ClusterID: "test",
 		}
 		deploy := &database.Deploy{
-			Status:  common.Running,
+			Status:  common.Building,
 			SvcName: "svc",
 		}
-
+		mockRunner := mockrunner.NewMockRunner(t)
 		mockDeployTaskStore := mockdb.NewMockDeployTaskStore(t)
 		mockDeployTaskStore.EXPECT().GetDeployByID(mock.Anything, dr.DeployID).
 			Return(deploy, nil)
 
 		d := &deployer{
 			deployTaskStore: mockDeployTaskStore,
+			imageRunner:     mockRunner,
 		}
-		d.runnerStatusCache = make(map[string]types.StatusResponse)
+		mockRunner.EXPECT().Exist(mock.Anything, mock.Anything).
+			Return(&types.StatusResponse{
+				DeployID: 1,
+				UserID:   "",
+				Code:     common.Stopped,
+			}, nil)
 
 		svcName, deployStatus, instances, err := d.Status(context.TODO(), dr, false)
 		require.Nil(t, err)
 		require.Equal(t, "svc", svcName)
-		require.Equal(t, common.Stopped, deployStatus)
+		require.Equal(t, common.Building, deployStatus)
 		require.Nil(t, instances)
 
 	})
@@ -281,15 +288,21 @@ func TestDeployer_Status(t *testing.T) {
 			Status:  common.BuildSuccess,
 			SvcName: "svc",
 		}
-
+		mockRunner := mockrunner.NewMockRunner(t)
 		mockDeployTaskStore := mockdb.NewMockDeployTaskStore(t)
 		mockDeployTaskStore.EXPECT().GetDeployByID(mock.Anything, dr.DeployID).
 			Return(deploy, nil)
 
 		d := &deployer{
 			deployTaskStore: mockDeployTaskStore,
+			imageRunner:     mockRunner,
 		}
-		d.runnerStatusCache = make(map[string]types.StatusResponse)
+		mockRunner.EXPECT().Exist(mock.Anything, mock.Anything).
+			Return(&types.StatusResponse{
+				DeployID: 1,
+				UserID:   "",
+				Code:     int(common.BuildSuccess),
+			}, nil)
 
 		svcName, deployStatus, instances, err := d.Status(context.TODO(), dr, false)
 		require.Nil(t, err)
@@ -318,36 +331,20 @@ func TestDeployer_Status(t *testing.T) {
 			Return(deploy, nil)
 
 		mockRunner := mockrunner.NewMockRunner(t)
-		mockRunner.EXPECT().Status(mock.Anything, mock.Anything).
-			Return(&types.StatusResponse{
-				DeployID: 1,
-				UserID:   "",
-				// running status from the runner (latest)
-				Code:     int(common.Running),
-				Message:  "",
-				Endpoint: "http://localhost",
-				Instances: []types.Instance{{
-					Name:   "instance1",
-					Status: "ready",
-				}},
-				Replica:     1,
-				DeployType:  0,
-				ServiceName: "svc",
-				DeploySku:   "",
-			}, nil)
 
 		d := &deployer{
 			deployTaskStore: mockDeployTaskStore,
 			imageRunner:     mockRunner,
 		}
-		d.runnerStatusCache = make(map[string]types.StatusResponse)
-		// deploying status in cache
-		d.runnerStatusCache["svc"] = types.StatusResponse{
-			DeployID: 1,
-			UserID:   "",
-			Code:     int(common.Deploying),
-			Message:  "",
-		}
+		mockRunner.EXPECT().Exist(mock.Anything, mock.Anything).
+			Return(&types.StatusResponse{
+				DeployID: 1,
+				UserID:   "",
+				Code:     common.Running,
+				Instances: []types.Instance{{
+					Name: "instance1",
+				}},
+			}, nil)
 
 		svcName, deployStatus, instances, err := d.Status(context.TODO(), dr, false)
 		require.Nil(t, err)
@@ -475,7 +472,7 @@ func TestDeployer_Exists(t *testing.T) {
 		mockRunner := mockrunner.NewMockRunner(t)
 		mockRunner.EXPECT().Exist(mock.Anything, mock.Anything).
 			Return(&types.StatusResponse{
-				Code: 2,
+				Code: common.Stopped,
 			}, nil)
 
 		d := &deployer{

@@ -26,19 +26,18 @@ RUN ln -sf /usr/bin/python3 /usr/bin/python && \
     pip config set global.index-url https://pypi.tuna.tsinghua.edu.cn/simple && \
     pip install --no-cache-dir jupyterlab numpy==1.26.4 \
     torch==2.1.2 torchvision==0.16.2 torchaudio==2.1.2 \
-    jupyter-server-proxy==4.2.0
+    jupyter-server-proxy==4.4.0 fastapi==0.112.2
 
 # Create a working directory
 WORKDIR /etc/csghub
 
-RUN git clone --depth 1 https://github.com/hiyouga/LLaMA-Factory.git --branch v0.8.3 --single-branch && cd LLaMA-Factory && \
+RUN git clone --depth 1 https://github.com/hiyouga/LLaMA-Factory.git --branch v0.9.1 --single-branch && cd LLaMA-Factory && \
     pip install --no-cache-dir -e ".[metrics,deepspeed]"
 
 # Setup supervisord
-COPY script/supervisord.conf /etc/supervisor/conf.d/supervisord.conf
-COPY script/jupyter_notebook_config.py /root/.jupyter/jupyter_notebook_config.py
-COPY script/ /etc/csghub/
-COPY script/handlers.py /usr/local/lib/python3.10/dist-packages/jupyter_server_proxy/handlers.py
+COPY llama-factory/supervisord.conf /etc/supervisor/conf.d/supervisord.conf
+COPY llama-factory/jupyter_notebook_config.py /root/.jupyter/jupyter_notebook_config.py
+COPY llama-factory/ /etc/csghub/
 
 RUN mkdir -p /var/log/supervisord && \
     chmod +x /etc/csghub/*.sh && \
