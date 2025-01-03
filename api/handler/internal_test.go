@@ -7,7 +7,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"go.temporal.io/sdk/client"
 	temporal_mock "go.temporal.io/sdk/mocks"
-	mock_temporal "opencsg.com/csghub-server/_mocks/go.temporal.io/sdk/client"
+	workflow_mock "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/temporal"
 	mockcomponent "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/component"
 	"opencsg.com/csghub-server/api/workflow"
 	"opencsg.com/csghub-server/builder/store/database"
@@ -19,19 +19,19 @@ type InternalTester struct {
 	*GinTester
 	handler *InternalHandler
 	mocks   struct {
-		internal       *mockcomponent.MockInternalComponent
-		workflowClient *mock_temporal.MockClient
+		internal *mockcomponent.MockInternalComponent
+		workflow *workflow_mock.MockClient
 	}
 }
 
 func NewInternalTester(t *testing.T) *InternalTester {
 	tester := &InternalTester{GinTester: NewGinTester()}
 	tester.mocks.internal = mockcomponent.NewMockInternalComponent(t)
-	tester.mocks.workflowClient = mock_temporal.NewMockClient(t)
+	tester.mocks.workflow = workflow_mock.NewMockClient(t)
 
 	tester.handler = &InternalHandler{
 		internal:       tester.mocks.internal,
-		workflowClient: tester.mocks.workflowClient,
+		temporalClient: tester.mocks.workflow,
 		config:         &config.Config{},
 	}
 	tester.WithParam("internalId", "testInternalId")
@@ -149,11 +149,11 @@ func TestInternalHandler_PostReceive(t *testing.T) {
 
 	runMock := &temporal_mock.WorkflowRun{}
 	runMock.On("GetID").Return("id")
-	tester.mocks.workflowClient.EXPECT().ExecuteWorkflow(
+	tester.mocks.workflow.EXPECT().ExecuteWorkflow(
 		tester.ctx, client.StartWorkflowOptions{
 			TaskQueue: workflow.HandlePushQueueName,
 		}, mock.Anything,
-		&types.GiteaCallbackPushReq{Ref: "ref/heads/main"}, &config.Config{},
+		&types.GiteaCallbackPushReq{Ref: "ref/heads/main"},
 	).Return(
 		runMock, nil,
 	)

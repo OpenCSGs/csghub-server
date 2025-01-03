@@ -27,6 +27,7 @@ type GitCallbackComponent interface {
 	WatchRepoRelation(ctx context.Context, req *types.GiteaCallbackPushReq) error
 	SetRepoUpdateTime(ctx context.Context, req *types.GiteaCallbackPushReq) error
 	UpdateRepoInfos(ctx context.Context, req *types.GiteaCallbackPushReq) error
+	SensitiveCheck(ctx context.Context, req *types.GiteaCallbackPushReq) error
 }
 
 type gitCallbackComponentImpl struct {

@@ -5,11 +5,9 @@ import (
 
 	"go.temporal.io/sdk/temporal"
 	"go.temporal.io/sdk/workflow"
-	"opencsg.com/csghub-server/api/workflow/activity"
-	"opencsg.com/csghub-server/common/config"
 )
 
-func SyncAsClientWorkflow(ctx workflow.Context, config *config.Config) error {
+func SyncAsClientWorkflow(ctx workflow.Context) error {
 	logger := workflow.GetLogger(ctx)
 	logger.Info("sync as client workflow started")
 
@@ -23,7 +21,7 @@ func SyncAsClientWorkflow(ctx workflow.Context, config *config.Config) error {
 	}
 
 	ctx = workflow.WithActivityOptions(ctx, options)
-	err := workflow.ExecuteActivity(ctx, activity.SyncAsClient, config).Get(ctx, nil)
+	err := workflow.ExecuteActivity(ctx, activities.SyncAsClient).Get(ctx, nil)
 	if err != nil {
 		logger.Error("failed to sync as client", "error", err)
 		return err

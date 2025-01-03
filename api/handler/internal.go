@@ -9,6 +9,7 @@ import (
 	"go.temporal.io/sdk/client"
 	"opencsg.com/csghub-server/api/httpbase"
 	"opencsg.com/csghub-server/api/workflow"
+	"opencsg.com/csghub-server/builder/temporal"
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/types"
 	"opencsg.com/csghub-server/component"
@@ -22,14 +23,14 @@ func NewInternalHandler(config *config.Config) (*InternalHandler, error) {
 	return &InternalHandler{
 		internal:       uc,
 		config:         config,
-		workflowClient: workflow.GetWorkflowClient(),
+		temporalClient: temporal.GetClient(),
 	}, nil
 }
 
 type InternalHandler struct {
 	internal       component.InternalComponent
 	config         *config.Config
-	workflowClient client.Client
+	temporalClient temporal.Client
 }
 
 // TODO: add prmission check
@@ -138,14 +139,12 @@ func (h *InternalHandler) PostReceive(ctx *gin.Context) {
 	}
 	callback.Ref = originalRef
 	//start workflow to handle push request
-	workflowClient := h.workflowClient
 	workflowOptions := client.StartWorkflowOptions{
 		TaskQueue: workflow.HandlePushQueueName,
 	}
 
-	we, err := workflowClient.ExecuteWorkflow(ctx, workflowOptions, workflow.HandlePushWorkflow,
-		callback,
-		h.config,
+	we, err := h.temporalClient.ExecuteWorkflow(
+		ctx, workflowOptions, workflow.HandlePushWorkflow, callback,
 	)
 	if err != nil {
 		slog.Error("failed to handle git push callback", slog.Any("error", err))

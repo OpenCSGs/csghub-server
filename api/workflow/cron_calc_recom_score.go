@@ -5,11 +5,9 @@ import (
 
 	"go.temporal.io/sdk/temporal"
 	"go.temporal.io/sdk/workflow"
-	"opencsg.com/csghub-server/api/workflow/activity"
-	"opencsg.com/csghub-server/common/config"
 )
 
-func CalcRecomScoreWorkflow(ctx workflow.Context, config *config.Config) error {
+func CalcRecomScoreWorkflow(ctx workflow.Context) error {
 	logger := workflow.GetLogger(ctx)
 	logger.Info("calc recom score workflow started")
 
@@ -23,7 +21,7 @@ func CalcRecomScoreWorkflow(ctx workflow.Context, config *config.Config) error {
 	}
 
 	ctx = workflow.WithActivityOptions(ctx, options)
-	err := workflow.ExecuteActivity(ctx, activity.CalcRecomScore, config).Get(ctx, nil)
+	err := workflow.ExecuteActivity(ctx, activities.CalcRecomScore).Get(ctx, nil)
 	if err != nil {
 		logger.Error("failed to calc recom score", "error", err)
 		return err
