@@ -210,22 +210,6 @@ func (d *deployer) Deploy(ctx context.Context, dr types.DeployRepo) (int64, erro
 	return deploy.ID, nil
 }
 
-func (d *deployer) refreshStatus() {
-	for {
-		ctxTimeout, cancel := context.WithTimeout(context.Background(), 3*time.Second)
-		status, err := d.imageRunner.StatusAll(ctxTimeout)
-		cancel()
-		if err != nil {
-			slog.Error("refresh status all failed", slog.Any("error", err))
-		} else {
-			slog.Debug("status all cached", slog.Any("status", d.runnerStatusCache))
-			d.runnerStatusCache = status
-		}
-
-		time.Sleep(5 * time.Second)
-	}
-}
-
 func (d *deployer) Status(ctx context.Context, dr types.DeployRepo, needDetails bool) (string, int, []types.Instance, error) {
 	deploy, err := d.deployTaskStore.GetDeployByID(ctx, dr.DeployID)
 	if err != nil || deploy == nil {
@@ -233,39 +217,19 @@ func (d *deployer) Status(ctx context.Context, dr types.DeployRepo, needDetails 
 		return "", common.Stopped, nil, fmt.Errorf("can't get deploy, %w", err)
 	}
 	svcName := deploy.SvcName
-	// srvName := common.UniqueSpaceAppName(dr.Namespace, dr.Name, dr.SpaceID)
-	rstatus, found := d.runnerStatusCache[svcName]
-	if !found {
-		slog.Debug("status cache miss", slog.String("svc_name", svcName))
-		if deploy.Status == common.Running {
-			// service was Stopped or delete, so no running instance
-			return svcName, common.Stopped, nil, nil
-		}
+	svc, err := d.imageRunner.Exist(ctx, &types.CheckRequest{
+		SvcName:   svcName,
+		ClusterID: deploy.ClusterID,
+	})
+	if err != nil {
+		slog.Error("fail to get deploy by service name", slog.Any("Service NamE", svcName), slog.Any("error", err))
+		return "", common.Stopped, nil, fmt.Errorf("can't get svc, %w", err)
+	}
+	if svc.Code == common.Stopped || svc.Code == -1 {
+		// like queuing, or stopped, use status from deploy
 		return svcName, deploy.Status, nil, nil
 	}
-	deployStatus := rstatus.Code
-	if dr.ModelID > 0 {
-		targetID := dr.DeployID // support model deploy with multi-instance
-		status, err := d.imageRunner.Status(ctx, &types.StatusRequest{
-			ClusterID:   dr.ClusterID,
-			OrgName:     dr.Namespace,
-			RepoName:    dr.Name,
-			SvcName:     deploy.SvcName,
-			ID:          targetID,
-			NeedDetails: needDetails,
-		})
-		if err != nil {
-			slog.Error("fail to get status by deploy id", slog.Any("DeployID", deploy.ID), slog.Any("error", err))
-			return "", common.RunTimeError, nil, fmt.Errorf("can't get deploy status, %w", err)
-		}
-		rstatus.Instances = status.Instances
-		deployStatus = status.Code
-
-	}
-	if rstatus.DeployID == 0 || rstatus.DeployID >= deploy.ID {
-		return svcName, deployStatus, rstatus.Instances, nil
-	}
-	return svcName, deployStatus, rstatus.Instances, nil
+	return svcName, svc.Code, svc.Instances, nil
 }
 
 func (d *deployer) Logs(ctx context.Context, dr types.DeployRepo) (*MultiLogReader, error) {
@@ -395,12 +359,11 @@ func (d *deployer) Exist(ctx context.Context, dr types.DeployRepo) (bool, error)
 		// service check with error
 		slog.Error("deploy check result", slog.Any("resp", resp))
 		return true, errors.New("fail to check deploy instance")
-	} else if resp.Code == 1 {
-		// service exist
-		return true, nil
+	} else if resp.Code == common.Stopped {
+		// service not exist
+		return false, nil
 	}
-	// service not exist
-	return false, nil
+	return true, nil
 }
 
 func (d *deployer) GetReplica(ctx context.Context, dr types.DeployRepo) (int, int, []types.Instance, error) {
@@ -622,7 +585,13 @@ func (d *deployer) startAcctFeeing() {
 	for {
 		resMap := d.getResourceMap()
 		slog.Debug("get resources map", slog.Any("resMap", resMap))
-		for _, svc := range d.runnerStatusCache {
+		ctxTimeout, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		cancel()
+		status, err := d.imageRunner.StatusAll(ctxTimeout)
+		if err != nil {
+			slog.Error("failed to get all service status", slog.Any("error", err))
+		}
+		for _, svc := range status {
 			d.startAcctRequestFee(resMap, svc)
 		}
 		// accounting interval in min, get from env config

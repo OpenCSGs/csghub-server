@@ -16,7 +16,7 @@ func TestClusterStore_CRUD(t *testing.T) {
 
 	store := database.NewClusterInfoStoreWithDB(db)
 
-	err := store.Add(ctx, "foo", "bar")
+	_, err := store.Add(ctx, "foo", "bar")
 	require.Nil(t, err)
 
 	cfg := &database.ClusterInfo{}
@@ -25,7 +25,7 @@ func TestClusterStore_CRUD(t *testing.T) {
 	require.Equal(t, "bar", cfg.Region)
 
 	// already exist, do nothing
-	err = store.Add(ctx, "foo", "bar2")
+	_, err = store.Add(ctx, "foo", "bar2")
 	require.Nil(t, err)
 	err = db.Core.NewSelect().Model(cfg).Where("cluster_config=?", "foo").Scan(ctx)
 	require.Nil(t, err)

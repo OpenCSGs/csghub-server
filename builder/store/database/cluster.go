@@ -14,7 +14,7 @@ type clusterInfoStoreImpl struct {
 }
 
 type ClusterInfoStore interface {
-	Add(ctx context.Context, clusterConfig string, region string) error
+	Add(ctx context.Context, clusterConfig string, region string) (*ClusterInfo, error)
 	Update(ctx context.Context, clusterInfo ClusterInfo) error
 	ByClusterID(ctx context.Context, clusterId string) (clusterInfo ClusterInfo, err error)
 	ByClusterConfig(ctx context.Context, clusterConfig string) (clusterInfo ClusterInfo, err error)
@@ -43,22 +43,21 @@ type ClusterInfo struct {
 	Enable        bool   `bun:",notnull" json:"enable"`
 }
 
-func (r *clusterInfoStoreImpl) Add(ctx context.Context, clusterConfig string, region string) error {
-	err := r.db.Operator.Core.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
+func (r *clusterInfoStoreImpl) Add(ctx context.Context, clusterConfig string, region string) (*ClusterInfo, error) {
+	cluster, err := r.ByClusterConfig(ctx, clusterConfig)
+	if errors.Is(err, sql.ErrNoRows) {
 		cluster := &ClusterInfo{
 			ClusterID:     uuid.New().String(),
 			ClusterConfig: clusterConfig,
 			Region:        region,
 			Enable:        true,
 		}
-
-		_, err := r.ByClusterConfig(ctx, clusterConfig)
-		if errors.Is(err, sql.ErrNoRows) {
-			return assertAffectedOneRow(r.db.Operator.Core.NewInsert().Model(cluster).Exec(ctx))
+		_, err = r.db.Operator.Core.NewInsert().Model(cluster).Exec(ctx)
+		if err != nil {
+			return nil, err
 		}
-		return err
-	})
-	return err
+	}
+	return &cluster, err
 }
 
 func (r *clusterInfoStoreImpl) Update(ctx context.Context, clusterInfo ClusterInfo) error {

@@ -55,8 +55,6 @@ func NewWorkFlowComponent(config *config.Config, clusterPool *cluster.ClusterPoo
 		clusterPool: clusterPool,
 		eventPub:    &event.DefaultEventPublisher,
 	}
-	//watch workflows events
-	go wc.RunWorkflowsInformer(clusterPool, config)
 	return wc
 }
 
@@ -271,7 +269,7 @@ func generateWorkflow(req types.ArgoWorkFlowReq, config *config.Config) *v1alpha
 
 func (wc *workFlowComponentImpl) RunWorkflowsInformer(clusterPool *cluster.ClusterPool, c *config.Config) {
 	clientset := clusterPool.Clusters[0].ArgoClient
-	f := externalversions.NewSharedInformerFactoryWithOptions(clientset, 60*time.Second, externalversions.WithTweakListOptions(func(list *v1.ListOptions) {
+	f := externalversions.NewSharedInformerFactoryWithOptions(clientset, 2*time.Minute, externalversions.WithTweakListOptions(func(list *v1.ListOptions) {
 		list.LabelSelector = "workflow-scope=csghub"
 	}))
 	informer := f.Argoproj().V1alpha1().Workflows().Informer()
@@ -371,7 +369,7 @@ func (wc *workFlowComponentImpl) StartAcctRequestFee(wf database.ArgoWorkflow) {
 // get cluster
 func GetCluster(ctx context.Context, clusterPool *cluster.ClusterPool, clusterID string) (*cluster.Cluster, string, error) {
 	if clusterID == "" {
-		clusterInfo, err := clusterPool.ClusterStore.ByClusterConfig(ctx, clusterPool.Clusters[0].ID)
+		clusterInfo, err := clusterPool.ClusterStore.ByClusterConfig(ctx, clusterPool.Clusters[0].CID)
 		if err != nil {
 			return nil, "", fmt.Errorf("failed to get cluster info: %v", err)
 		}
