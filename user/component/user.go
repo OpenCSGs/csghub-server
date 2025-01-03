@@ -24,12 +24,12 @@ import (
 const GitalyRepoNotFoundErr = "rpc error: code = NotFound desc = repository does not exist"
 
 type userComponentImpl struct {
-	us   database.UserStore
-	os   database.OrgStore
-	ns   database.NamespaceStore
-	repo database.RepoStore
-	ds   database.DeployTaskStore
-	ams  database.AccountMeteringStore
+	userStore database.UserStore
+	orgStore  database.OrgStore
+	nsStore   database.NamespaceStore
+	repo      database.RepoStore
+	ds        database.DeployTaskStore
+	ams       database.AccountMeteringStore
 
 	gs     gitserver.GitServer
 	jwtc   JwtComponent
@@ -73,9 +73,9 @@ type UserComponent interface {
 func NewUserComponent(config *config.Config) (UserComponent, error) {
 	var err error
 	c := &userComponentImpl{}
-	c.us = database.NewUserStore()
-	c.os = database.NewOrgStore()
-	c.ns = database.NewNamespaceStore()
+	c.userStore = database.NewUserStore()
+	c.orgStore = database.NewOrgStore()
+	c.nsStore = database.NewNamespaceStore()
 	c.repo = database.NewRepoStore()
 	c.ds = database.NewDeployTaskStore()
 	c.ams = database.NewAccountMeteringStore()
@@ -175,7 +175,7 @@ func (c *userComponentImpl) createFromCasdoorUser(ctx context.Context, cu casdoo
 		user.GitID = gsUserResp.GitID
 		user.Password = gsUserResp.Password
 	}
-	err = c.us.Create(ctx, user, namespace)
+	err = c.userStore.Create(ctx, user, namespace)
 	if err != nil {
 		newError := fmt.Errorf("failed to create user in db,error:%w", err)
 		return nil, newError
@@ -189,7 +189,7 @@ func (c *userComponentImpl) ChangeUserName(ctx context.Context, oldUserName, new
 		return fmt.Errorf("user name can only be changed by user self, user: '%s', op user: '%s'", oldUserName, opUser)
 	}
 
-	user, err := c.us.FindByUsername(ctx, oldUserName)
+	user, err := c.userStore.FindByUsername(ctx, oldUserName)
 	if err != nil {
 		return fmt.Errorf("failed to find user by old name in db,error:%w", err)
 	}
@@ -198,7 +198,7 @@ func (c *userComponentImpl) ChangeUserName(ctx context.Context, oldUserName, new
 		return fmt.Errorf("user name can not be changed")
 	}
 
-	newUser, err := c.us.FindByUsername(ctx, newUserName)
+	newUser, err := c.userStore.FindByUsername(ctx, newUserName)
 	if err != nil && !errors.Is(err, sql.ErrNoRows) {
 		return fmt.Errorf("failed to find user by new name in db,error:%w", err)
 	}
@@ -206,7 +206,7 @@ func (c *userComponentImpl) ChangeUserName(ctx context.Context, oldUserName, new
 		return fmt.Errorf("user name '%s' already exists", newUserName)
 	}
 
-	err = c.us.ChangeUserName(ctx, oldUserName, newUserName)
+	err = c.userStore.ChangeUserName(ctx, oldUserName, newUserName)
 	if err != nil {
 		return fmt.Errorf("failed to change user name in db,error:%w", err)
 	}
@@ -232,7 +232,7 @@ func (c *userComponentImpl) ChangeUserName(ctx context.Context, oldUserName, new
 func (c *userComponentImpl) Update(ctx context.Context, req *types.UpdateUserRequest, opUser string) error {
 	c.lazyInit()
 
-	user, err := c.us.FindByUsername(ctx, req.Username)
+	user, err := c.userStore.FindByUsername(ctx, req.Username)
 	if err != nil {
 		newError := fmt.Errorf("failed to find user by name in db,error:%w", err)
 		return newError
@@ -242,7 +242,7 @@ func (c *userComponentImpl) Update(ctx context.Context, req *types.UpdateUserReq
 	}
 	// need at least admin permission to update other user's info
 	if req.Username != opUser {
-		opuser, err := c.us.FindByUsername(ctx, opUser)
+		opuser, err := c.userStore.FindByUsername(ctx, opUser)
 		if err != nil {
 			return fmt.Errorf("failed to find op user by name in db,user: '%s', error:%w", opUser, err)
 		}
@@ -261,7 +261,7 @@ func (c *userComponentImpl) Update(ctx context.Context, req *types.UpdateUserReq
 	}
 
 	c.setChangedProps(&user, req)
-	err = c.us.Update(ctx, &user)
+	err = c.userStore.Update(ctx, &user)
 	if err != nil {
 		newError := fmt.Errorf("failed to update database user '%s',error:%w", req.Username, err)
 		return newError
@@ -348,7 +348,7 @@ func (c *userComponentImpl) setChangedProps(user *database.User, req *types.Upda
 }
 
 func (c *userComponentImpl) Delete(ctx context.Context, operator, username string) error {
-	user, err := c.us.FindByUsername(ctx, username)
+	user, err := c.userStore.FindByUsername(ctx, username)
 	if err != nil {
 		newError := fmt.Errorf("failed to find user by name in db,error:%w", err)
 		return newError
@@ -380,7 +380,7 @@ func (c *userComponentImpl) Delete(ctx context.Context, operator, username strin
 		}
 	}
 	// delete user from db
-	err = c.us.DeleteUserAndRelations(ctx, user)
+	err = c.userStore.DeleteUserAndRelations(ctx, user)
 	if err != nil {
 		return fmt.Errorf("failed to delete user and user relations: %v", err)
 	}
@@ -404,7 +404,7 @@ func (c *userComponentImpl) Delete(ctx context.Context, operator, username strin
 // - bool: True if the user has admin privileges, false otherwise.
 // - error: An error if the user cannot be found in the database.
 func (c *userComponentImpl) CanAdmin(ctx context.Context, username string) (bool, error) {
-	user, err := c.us.FindByUsername(ctx, username)
+	user, err := c.userStore.FindByUsername(ctx, username)
 	if err != nil {
 		newError := fmt.Errorf("failed to find user by name '%s' in db,error:%w", username, err)
 		return false, newError
@@ -419,9 +419,9 @@ func (c *userComponentImpl) GetInternal(ctx context.Context, userNameOrUUID stri
 	var dbuser = new(database.User)
 	var err error
 	if useUUID {
-		dbuser, err = c.us.FindByUUID(ctx, userNameOrUUID)
+		dbuser, err = c.userStore.FindByUUID(ctx, userNameOrUUID)
 	} else {
-		*dbuser, err = c.us.FindByUsername(ctx, userNameOrUUID)
+		*dbuser, err = c.userStore.FindByUsername(ctx, userNameOrUUID)
 	}
 	if err != nil {
 		return nil, fmt.Errorf("failed to find user by name or uuid '%s' in db,error:%w", userNameOrUUID, err)
@@ -433,9 +433,9 @@ func (c *userComponentImpl) Get(ctx context.Context, userNameOrUUID, visitorName
 	var dbuser = new(database.User)
 	var err error
 	if useUUID {
-		dbuser, err = c.us.FindByUUID(ctx, userNameOrUUID)
+		dbuser, err = c.userStore.FindByUUID(ctx, userNameOrUUID)
 	} else {
-		*dbuser, err = c.us.FindByUsername(ctx, userNameOrUUID)
+		*dbuser, err = c.userStore.FindByUsername(ctx, userNameOrUUID)
 	}
 	if err != nil {
 		return nil, fmt.Errorf("failed to find user by name or uuid  '%s' in db,error:%w", userNameOrUUID, err)
@@ -460,13 +460,13 @@ func (c *userComponentImpl) Get(ctx context.Context, userNameOrUUID, visitorName
 }
 
 func (c *userComponentImpl) CheckOperatorAndUser(ctx context.Context, operator, username string) (bool, error) {
-	opUser, err := c.us.FindByUsername(ctx, operator)
+	opUser, err := c.userStore.FindByUsername(ctx, operator)
 	if err != nil {
 		newError := fmt.Errorf("failed to find operator by name in db,error:%w", err)
 		return true, newError
 	}
 
-	user, err := c.us.FindByUsername(ctx, username)
+	user, err := c.userStore.FindByUsername(ctx, username)
 	if err != nil {
 		newError := fmt.Errorf("failed to find user by name in db,error:%w", err)
 		return true, newError
@@ -483,20 +483,17 @@ func (c *userComponentImpl) CheckOperatorAndUser(ctx context.Context, operator, 
 
 func (c *userComponentImpl) CheckIfUserHasOrgs(ctx context.Context, userName string) (bool, error) {
 	var (
-		err  error
-		orgs []database.Organization
+		err   error
+		total int
 	)
-	if orgs, err = c.os.GetUserOwnOrgs(ctx, userName); err != nil {
+	if _, total, err = c.orgStore.GetUserOwnOrgs(ctx, userName); err != nil {
 		return false, fmt.Errorf("failed to find orgs by username in db,error:%w", err)
 	}
-	if len(orgs) == 0 {
-		return false, nil
-	}
-	return true, nil
+	return total > 0, nil
 }
 
 func (c *userComponentImpl) CheckIffUserHasRunningOrBuildingDeployments(ctx context.Context, userName string) (bool, error) {
-	user, err := c.us.FindByUsername(ctx, userName)
+	user, err := c.userStore.FindByUsername(ctx, userName)
 	if err != nil {
 		return false, fmt.Errorf("failed to find user by username in db, error: %v", err)
 	}
@@ -511,7 +508,7 @@ func (c *userComponentImpl) CheckIffUserHasRunningOrBuildingDeployments(ctx cont
 }
 
 func (c *userComponentImpl) CheckIfUserHasBills(ctx context.Context, userName string) (bool, error) {
-	user, err := c.us.FindByUsername(ctx, userName)
+	user, err := c.userStore.FindByUsername(ctx, userName)
 	if err != nil {
 		return false, fmt.Errorf("failed to find user by username in db, error: %v", err)
 	}
@@ -543,7 +540,7 @@ func (c *userComponentImpl) buildUserInfo(ctx context.Context, dbuser *database.
 		u.Roles = dbuser.Roles()
 	}
 
-	dborgs, err := c.os.GetUserBelongOrgs(ctx, dbuser.ID)
+	dborgs, err := c.orgStore.GetUserBelongOrgs(ctx, dbuser.ID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get orgs for user %s,error:%w", dbuser.Username, err)
 	}
@@ -578,7 +575,7 @@ func (c *userComponentImpl) Index(ctx context.Context, visitorName, search strin
 		onlyBasicInfo = true
 	}
 
-	dbusers, count, err := c.us.IndexWithSearch(ctx, search, per, page)
+	dbusers, count, err := c.userStore.IndexWithSearch(ctx, search, per, page)
 	if err != nil {
 		newError := fmt.Errorf("failed to find user by name in db,error:%w", err)
 		return nil, count, newError
@@ -619,7 +616,7 @@ func (c *userComponentImpl) Signin(ctx context.Context, code, state string) (*ty
 	}
 
 	cu := claims.User
-	exists, err := c.us.IsExistByUUID(ctx, cu.Id)
+	exists, err := c.userStore.IsExistByUUID(ctx, cu.Id)
 	if err != nil {
 		return nil, "", fmt.Errorf("failed to check user existence by name in db,error:%w", err)
 	}
@@ -645,14 +642,14 @@ func (c *userComponentImpl) Signin(ctx context.Context, code, state string) (*ty
 		}(dbu.Username)
 	} else {
 		// get user from db for username, as casdoor may have different username
-		dbu, err = c.us.FindByUUID(ctx, cu.Id)
+		dbu, err = c.userStore.FindByUUID(ctx, cu.Id)
 		if err != nil {
 			return nil, "", fmt.Errorf("failed to find user by uuid in db, uuid:%s, error:%w", cu.Id, err)
 		}
 		// update user login time asynchronously
 		go func() {
 			dbu.LastLoginAt = time.Now().Format("2006-01-02 15:04:05")
-			err := c.us.Update(ctx, dbu)
+			err := c.userStore.Update(ctx, dbu)
 			if err != nil {
 				slog.Error("failed to update user login time", "error", err, "username", dbu.Username)
 			}
