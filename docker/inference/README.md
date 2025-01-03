@@ -12,8 +12,8 @@ echo "$OPENCSG_ACR_PASSWORD" | docker login $OPENCSG_ACR -u $OPENCSG_ACR_USERNAM
 ```bash
 export BUILDX_NO_DEFAULT_ATTESTATIONS=1
 
-# For vllm: opencsg-registry.cn-beijing.cr.aliyuncs.com/public/vllm-local:2.7
-export IMAGE_TAG=2.8
+# For vllm: opencsg-registry.cn-beijing.cr.aliyuncs.com/public/vllm-local:3.2
+export IMAGE_TAG=3.2
 docker buildx build --platform linux/amd64,linux/arm64 \
   -t ${OPENCSG_ACR}/public/vllm-local:${IMAGE_TAG} \
   -t ${OPENCSG_ACR}/public/vllm-local:latest \
@@ -28,8 +28,8 @@ docker buildx build --platform linux/amd64,linux/arm64 \
   -f Dockerfile.vllm-cpu \
   --push .
 
-# For tgi: opencsg-registry.cn-beijing.cr.aliyuncs.com/public/tgi:2.2
-export IMAGE_TAG=2.2
+# For tgi: opencsg-registry.cn-beijing.cr.aliyuncs.com/public/tgi:3.2
+export IMAGE_TAG=3.2
 docker buildx build --platform linux/amd64 \
   -t ${OPENCSG_ACR}/public/tgi:${IMAGE_TAG} \
   -t ${OPENCSG_ACR}/public/tgi:latest \
@@ -62,13 +62,13 @@ docker run -d \
 *Note: HF_ENDPOINT should be use the real csghub address.*
 
 ## inference image name, version and cuda version
-| Image Name | Version | CUDA Version |
-| --- | --- | --- |
-| vllm | 2.8 | 12.1 |
-| vllm | 3.0 | 12.4 |
-| vllm-cpu | 2.4 | -|
-| tgi | 2.2 | 12.1 |
-| tgi | 3.0 | 12.4 |
+| Image Name | Version | CUDA Version | Fix
+| --- | --- | --- |--- |
+| vllm | 2.8 | 12.1 | - |
+| vllm | 3.2 | 12.4 |fix hf hub timestamp|
+| vllm-cpu | 2.4 | -|fix hf hub timestamp |
+| tgi | 2.2 | 12.1 |- |
+| tgi | 3.2 | 12.4 |fix hf hub timestamp|
 
 
 ## API to Call Inference
