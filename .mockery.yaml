@@ -33,7 +33,6 @@ packages:
       EvaluationComponent:
       RecomComponent:
       MultiSyncComponent:
-      ModelTreeComponent:
   opencsg.com/csghub-server/component/callback:
     config:
     interfaces:
@@ -48,10 +47,6 @@ packages:
   opencsg.com/csghub-server/builder/store/database:
     config:
       all: True
-  opencsg.com/csghub-server/builder/store/database/ee:
-    config:
-      all: True
-      mock-build-tags: "saas || ee"
   opencsg.com/csghub-server/builder/rpc:
     config:
     interfaces:
