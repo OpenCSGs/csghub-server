@@ -15,7 +15,7 @@ import (
 
 func RegisterCronJobs(config *config.Config, temporalClient temporal.Client) error {
 	var err error
-	scheduler := temporalClient.ScheduleClient()
+	scheduler := temporalClient.GetScheduleClient()
 
 	_, err = scheduler.Create(context.Background(), client.ScheduleOptions{
 		ID: "sync-as-client-schedule",

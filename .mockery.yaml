@@ -149,6 +149,7 @@ packages:
     config:
     interfaces:
       Client:
+      ScheduleClient:
   opencsg.com/csghub-server/builder/importer:
     config:
     interfaces:

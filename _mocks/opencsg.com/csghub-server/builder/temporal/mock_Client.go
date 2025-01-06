@@ -15,6 +15,8 @@ import (
 
 	operatorservice "go.temporal.io/api/operatorservice/v1"
 
+	temporal "opencsg.com/csghub-server/builder/temporal"
+
 	worker "go.temporal.io/sdk/worker"
 
 	workflowservice "go.temporal.io/api/workflowservice/v1"
@@ -576,6 +578,53 @@ func (_c *MockClient_ExecuteWorkflow_Call) Return(_a0 client.WorkflowRun, _a1 er
 }
 
 func (_c *MockClient_ExecuteWorkflow_Call) RunAndReturn(run func(context.Context, client.StartWorkflowOptions, interface{}, ...interface{}) (client.WorkflowRun, error)) *MockClient_ExecuteWorkflow_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// GetScheduleClient provides a mock function with given fields:
+func (_m *MockClient) GetScheduleClient() temporal.ScheduleClient {
+	ret := _m.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetScheduleClient")
+	}
+
+	var r0 temporal.ScheduleClient
+	if rf, ok := ret.Get(0).(func() temporal.ScheduleClient); ok {
+		r0 = rf()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(temporal.ScheduleClient)
+		}
+	}
+
+	return r0
+}
+
+// MockClient_GetScheduleClient_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetScheduleClient'
+type MockClient_GetScheduleClient_Call struct {
+	*mock.Call
+}
+
+// GetScheduleClient is a helper method to define mock.On call
+func (_e *MockClient_Expecter) GetScheduleClient() *MockClient_GetScheduleClient_Call {
+	return &MockClient_GetScheduleClient_Call{Call: _e.mock.On("GetScheduleClient")}
+}
+
+func (_c *MockClient_GetScheduleClient_Call) Run(run func()) *MockClient_GetScheduleClient_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run()
+	})
+	return _c
+}
+
+func (_c *MockClient_GetScheduleClient_Call) Return(_a0 temporal.ScheduleClient) *MockClient_GetScheduleClient_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockClient_GetScheduleClient_Call) RunAndReturn(run func() temporal.ScheduleClient) *MockClient_GetScheduleClient_Call {
 	_c.Call.Return(run)
 	return _c
 }
