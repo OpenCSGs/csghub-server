@@ -69,7 +69,7 @@ func StartWorkflowDI(
 
 	worker.RegisterWorkflow(HandlePushWorkflow)
 
-	RegisterCronWorker(cfg, temporalClient)
+	RegisterCronWorker(cfg, temporalClient, act)
 	err := RegisterCronJobs(cfg, temporalClient)
 	if err != nil {
 		return fmt.Errorf("failed to register cron jobs:  %w", err)

@@ -9,6 +9,7 @@ import (
 	enumspb "go.temporal.io/api/enums/v1"
 	"go.temporal.io/sdk/client"
 	"go.temporal.io/sdk/worker"
+	"opencsg.com/csghub-server/api/workflow/activity"
 	"opencsg.com/csghub-server/builder/temporal"
 	"opencsg.com/csghub-server/common/config"
 )
@@ -54,9 +55,10 @@ func RegisterCronJobs(config *config.Config, temporalClient temporal.Client) err
 	return nil
 }
 
-func RegisterCronWorker(config *config.Config, temporalClient temporal.Client) {
+func RegisterCronWorker(config *config.Config, temporalClient temporal.Client, activities *activity.Activities) {
 
 	wfWorker := temporalClient.NewWorker(CronJobQueueName, worker.Options{})
+	wfWorker.RegisterActivity(activities)
 	wfWorker.RegisterWorkflow(SyncAsClientWorkflow)
 	wfWorker.RegisterWorkflow(CalcRecomScoreWorkflow)
 

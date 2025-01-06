@@ -21,7 +21,10 @@ import (
 
 func newWorkflowTester(t *testing.T) (*workflowTester, error) {
 	suite := testsuite.WorkflowTestSuite{}
-	tester := &workflowTester{env: suite.NewTestWorkflowEnvironment()}
+	tester := &workflowTester{
+		env:     suite.NewTestWorkflowEnvironment(),
+		cronEnv: suite.NewTestWorkflowEnvironment(),
+	}
 
 	// Mock the dependencies
 	tester.mocks.stores = tests.NewMockStores(t)
@@ -41,7 +44,7 @@ func newWorkflowTester(t *testing.T) (*workflowTester, error) {
 	cfg := &config.Config{}
 	mtc := mock_temporal.NewMockClient(t)
 	mtc.EXPECT().NewWorker(workflow.HandlePushQueueName, mock.Anything).Return(tester.env)
-	mtc.EXPECT().NewWorker(workflow.CronJobQueueName, mock.Anything).Return(tester.env)
+	mtc.EXPECT().NewWorker(workflow.CronJobQueueName, mock.Anything).Return(tester.cronEnv)
 	mtc.EXPECT().Start().Return(nil)
 	tester.mocks.temporal = mtc
 	msc := mock_temporal.NewMockScheduleClient(t)

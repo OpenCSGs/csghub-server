@@ -18,8 +18,9 @@ import (
 )
 
 type workflowTester struct {
-	env   *testsuite.TestWorkflowEnvironment
-	mocks struct {
+	env     *testsuite.TestWorkflowEnvironment
+	cronEnv *testsuite.TestWorkflowEnvironment
+	mocks   struct {
 		callback  *mock_callback.MockGitCallbackComponent
 		recom     *mock_component.MockRecomComponent
 		multisync *mock_component.MockMultiSyncComponent
@@ -34,9 +35,9 @@ func TestWorkflow_CalcRecomScoreWorkflow(t *testing.T) {
 	require.NoError(t, err)
 
 	tester.mocks.recom.EXPECT().CalculateRecomScore(mock.Anything).Return()
-	tester.env.ExecuteWorkflow(workflow.CalcRecomScoreWorkflow)
-	require.True(t, tester.env.IsWorkflowCompleted())
-	require.NoError(t, tester.env.GetWorkflowError())
+	tester.cronEnv.ExecuteWorkflow(workflow.CalcRecomScoreWorkflow)
+	require.True(t, tester.cronEnv.IsWorkflowCompleted())
+	require.NoError(t, tester.cronEnv.GetWorkflowError())
 }
 
 func TestWorkflow_SyncAsClient(t *testing.T) {
@@ -50,9 +51,9 @@ func TestWorkflow_SyncAsClient(t *testing.T) {
 		mock.Anything, multisync.FromOpenCSG("", "tk"),
 	).Return(nil)
 
-	tester.env.ExecuteWorkflow(workflow.SyncAsClientWorkflow)
-	require.True(t, tester.env.IsWorkflowCompleted())
-	require.NoError(t, tester.env.GetWorkflowError())
+	tester.cronEnv.ExecuteWorkflow(workflow.SyncAsClientWorkflow)
+	require.True(t, tester.cronEnv.IsWorkflowCompleted())
+	require.NoError(t, tester.cronEnv.GetWorkflowError())
 
 }
 
