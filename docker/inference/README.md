@@ -35,7 +35,15 @@ docker buildx build --platform linux/amd64 \
   -t ${OPENCSG_ACR}/public/tgi:latest \
   -f Dockerfile.tgi \
   --push .
-```
+
+# For sglang: opencsg-registry.cn-beijing.cr.aliyuncs.com/public/sglang:v0.4.1.post3-cu124-srt
+export IMAGE_TAG=v0.4.1.post3-cu124-srt
+docker buildx build --platform linux/amd64 \
+  -t ${OPENCSG_ACR}/public/sglang:${IMAGE_TAG} \
+  -t ${OPENCSG_ACR}/public/sglang:latest \
+  -f Dockerfile.sglang \
+  --push .
+
 *Note: The above command will create `linux/amd64` and `linux/arm64` images with the tags `${IMAGE_TAG}` and `latest` at the same time.*
 
 ## Run Inference Image Locally
@@ -69,6 +77,7 @@ docker run -d \
 | vllm-cpu | 2.4 | -|fix hf hub timestamp |
 | tgi | 2.2 | 12.1 |- |
 | tgi | 3.2 | 12.4 |fix hf hub timestamp|
+| sglang | v0.4.1.post3-cu124-srt | 12.4 |- |
 
 
 ## API to Call Inference

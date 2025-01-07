@@ -91,8 +91,13 @@ for repo in "${dataset_repos[@]}"; do
     else
         common_path=$(dirname "$common_path")
     fi
+    #fix sub task from groups
+    sub_group_task_yaml=""
+    if [ ${#yaml_files[@]} -eq 1 ]; then
+        sub_group_task_yaml="${yaml_files[0]}"
+    fi
     echo "common path found for repo $repo: $common_path"
-    repo_task=`python /etc/csghub/get_task.py $common_path`
+    repo_task=`python /etc/csghub/get_task.py task --task_dir $common_path --sub_task_yaml $sub_group_task_yaml`
     if [ ! -z "$repo_task" ]; then
         tasks="$tasks,$repo_task"
     fi

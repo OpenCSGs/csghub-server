@@ -7,15 +7,8 @@ if [ ! -f "/workspace/.csghub_init" ]; then
     touch /workspace/.csghub_init
 fi
 
-#use csghub model_id_or_path
-model_path="/etc/csghub/ms-swift/swift/llm/model/register.py"
-argument_path="/etc/csghub/ms-swift/swift/llm/argument/base_args/base_args.py"
-sed -i "s|'\([^']*/$MODEL_NAME',\)|'$REPO_ID',|g" $model_path
-#use csghub variable 
-sed -i "s|USE_HF|USE_CSGHUB_MODEL|" $argument_path
-sed -i "s|USE_HF'|USE_CSGHUB_MODEL'|" $model_path
-sed -i "s|USE_HF_TRANSFER|USE_CSGHUB_TRANSFER|" $model_path
-sed -i "s|USE_HF|USE_CSGHUB_MODEL|" /etc/csghub/ms-swift/swift/hub/hub.py
+#use csghub variable
+sed -i "s|get_hub(use_hf)|get_hub(True)|g" /etc/csghub/ms-swift/swift/llm/model/utils.py
 #change deploy port
 sed -i "s|8000|9000|" /etc/csghub/ms-swift/swift/ui/llm_infer/generate.py
 

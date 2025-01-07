@@ -87,7 +87,7 @@ def get_task_and_group(task_dir: str):
     return tasks_and_groups
 
 
-def get_related_task(task_dir):
+def get_related_task(task_dir, sub_task_yaml):
     tasks_and_groups = get_task_and_group(task_dir)
     # loop group
     all_groups = []
@@ -96,6 +96,8 @@ def get_related_task(task_dir):
         if tasks_and_groups[task]["type"] == "group":
             all_groups.append(task)
         if tasks_and_groups[task]["type"] == "task":
+            if sub_task_yaml == tasks_and_groups[task]["yaml_path"]:
+                return task
             all_tasks.append(task)
     if len(all_groups) > 0:
         sorted_tasks = sorted(all_groups, key=len)
@@ -106,7 +108,10 @@ def get_related_task(task_dir):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Get dataset task by dir.')
-    parser.add_argument('task_dir', type=str, help='The task dir')
+    subparsers = parser.add_subparsers(dest='command', required=True)
+    parser_c = subparsers.add_parser('task', help='Get task from path')
+    parser_c.add_argument('--task_dir', type=str, help='Task dir')
+    parser_c.add_argument('--sub_task_yaml', type=str, help='Sub task yaml')
     args = parser.parse_args()
 
-    print(get_related_task(args.task_dir))
+    print(get_related_task(args.task_dir, args.sub_task_yaml))
