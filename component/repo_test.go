@@ -45,8 +45,8 @@ func TestRepoComponent_CreateRepo(t *testing.T) {
 	repo.mocks.gitServer.EXPECT().CreateRepo(ctx, gitserver.CreateRepoReq{
 		Username:      "user",
 		Namespace:     "ns",
-		Name:          "n",
-		Nickname:      "n",
+		Name:          "name",
+		Nickname:      "nn",
 		License:       "MIT",
 		DefaultBranch: "main",
 		Readme:        "rr",
@@ -56,9 +56,9 @@ func TestRepoComponent_CreateRepo(t *testing.T) {
 
 	dbrepo := &database.Repository{
 		UserID:         123,
-		Path:           "ns/n",
+		Path:           "ns/name",
 		GitPath:        "gp",
-		Name:           "n",
+		Name:           "name",
 		Nickname:       "nn",
 		Description:    "desc",
 		Private:        true,
@@ -73,7 +73,7 @@ func TestRepoComponent_CreateRepo(t *testing.T) {
 	r1, r2, err := repo.CreateRepo(ctx, types.CreateRepoReq{
 		Username:      "user",
 		Namespace:     "ns",
-		Name:          "n",
+		Name:          "name",
 		Nickname:      "nn",
 		License:       "MIT",
 		DefaultBranch: "main",

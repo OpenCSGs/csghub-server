@@ -1,8 +1,10 @@
 package common
 
 import (
+	"errors"
 	"fmt"
 	"net/url"
+	"regexp"
 	"strings"
 
 	"opencsg.com/csghub-server/builder/store/database"
@@ -79,4 +81,67 @@ func buildSSHCloneURL(domain string, repoType types.RepositoryType, path string)
 	} else {
 		return fmt.Sprintf("ssh://%s/%ss/%s.git", strings.TrimSuffix(sshDomainWithoutPrefix, "/"), repoType, path)
 	}
+}
+
+func IsValidName(name string) (bool, error) {
+	// validate name
+	if err := validate(name); err != nil {
+		return false, err
+	}
+	// repeat special character check
+	if hasRepeatSpecialCharacter(name) {
+		return false, errors.New("Name contains consecutive special characters which is not allowed.")
+	}
+	return true, nil
+}
+
+func hasRepeatSpecialCharacter(s string) bool {
+	for i := 0; i < len(s)-1; i++ {
+		if strings.Contains("-_.", string(s[i])) && s[i] == s[i+1] {
+			return true
+		}
+	}
+	return false
+}
+
+func validate(name string) error {
+	rules := []struct {
+		pattern *regexp.Regexp
+		message string
+	}{
+		// Length mast between 2 and 64
+		{
+			pattern: regexp.MustCompile(`^.{2,64}$`),
+			message: "Length must be between 2 and 64 characters.",
+		},
+		// Must start with a letter
+		{
+			pattern: regexp.MustCompile(`^[a-zA-Z]`),
+			message: "Must start with a letter.",
+		},
+		// Must end with a letter or number
+		{
+			pattern: regexp.MustCompile(`[a-zA-Z0-9]$`),
+			message: "Must end with a letter or number.",
+		},
+		// Only letters, numbers, and -_. are allowed
+		{
+			pattern: regexp.MustCompile(`^[a-zA-Z0-9-_\.]+$`),
+			message: "Only letters, numbers, and -_. are allowed.",
+		},
+		// Final regex check
+		{
+			pattern: regexp.MustCompile(`^[a-zA-Z][a-zA-Z0-9-_\.]*[a-zA-Z0-9]$`),
+			message: "Name does not match the required format.",
+		},
+	}
+
+	// Validate name
+	for _, rule := range rules {
+		if !rule.pattern.MatchString(name) {
+			return errors.New(rule.message)
+		}
+	}
+
+	return nil
 }
