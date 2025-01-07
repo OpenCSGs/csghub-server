@@ -22,11 +22,11 @@ docker buildx build --platform linux/amd64,linux/arm64 \
   -f Dockerfile.llamafactory \
   --push .
 ```
-
 ## Build Multi-Platform Images for swift
 ```bash
+#opencsg-registry.cn-beijing.cr.aliyuncs.com/public/ms-swift:v3.0.1
 export BUILDX_NO_DEFAULT_ATTESTATIONS=1
-export IMAGE_TAG=1.0-cuda12.1-devel-ubuntu22.04-py310-torch2.4.0
+export IMAGE_TAG=v3.0.1
 docker buildx build --platform linux/amd64,linux/arm64 \
   -t ${OPENCSG_ACR}/public/ms-swift:${IMAGE_TAG} \
   -t ${OPENCSG_ACR}/public/ms-swift:latest \
@@ -45,6 +45,12 @@ docker buildx build --platform linux/amd64,linux/arm64 \
 6. check whl file in dist folder and upload to https://git-devops.opencsg.com/opensource/gradio/
 ```
 
+## fintune image name, version and cuda version
+| Image Name | Version | CUDA Version | Fix
+| --- | --- | --- |--- |
+| llama-factory | 1.21-cuda12.1-devel-ubuntu22.04-py310-torch2.1.2 | 12.1 |- |
+| ms-swift | v3.0.1 | 12.4 |- |
+
 
 ## Run Finetune Image Locally
 ```bash
@@ -55,6 +61,14 @@ docker run -d \
   -e HF_ENDPOINT=https://hub.opencsg.com/hf \
   -p 30148:8000 \
   ${OPENCSG_ACR}/public/llama-factory:${IMAGE_TAG}
+
+docker run -d \
+  --gpus device=5 \
+  -e HF_TOKEN=xxx \
+  -e REPO_ID="OpenCSG/csg-wukong-1B" \
+  -e HF_ENDPOINT=https://hub.opencsg.com/hf \
+  -p 30147:8000 \
+  ${OPENCSG_ACR}/public/ms-swift:${IMAGE_TAG}
 ```
 *Note: HF_ENDPOINT should be use the real csghub address.*
 
