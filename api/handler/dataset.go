@@ -76,6 +76,10 @@ func (h *DatasetHandler) Create(ctx *gin.Context) {
 		httpbase.BadRequest(ctx, fmt.Errorf("sensitive check failed: %w", err).Error())
 		return
 	}
+	if !req.Private && !h.allowCreatePublic() {
+		httpbase.BadRequest(ctx, "creating public dataset is not allowed")
+		return
+	}
 	req.Username = currentUser
 
 	dataset, err := h.dataset.Create(ctx, req)
