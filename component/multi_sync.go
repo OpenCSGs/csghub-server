@@ -20,16 +20,16 @@ import (
 )
 
 type multiSyncComponentImpl struct {
-	s            database.MultiSyncStore
-	repo         database.RepoStore
-	model        database.ModelStore
-	dataset      database.DatasetStore
-	namespace    database.NamespaceStore
-	user         database.UserStore
-	versionStore database.SyncVersionStore
-	tag          database.TagStore
-	file         database.FileStore
-	git          gitserver.GitServer
+	multiSyncStore   database.MultiSyncStore
+	repoStore        database.RepoStore
+	modelStore       database.ModelStore
+	datasetStore     database.DatasetStore
+	namespaceStore   database.NamespaceStore
+	userStore        database.UserStore
+	syncVersionStore database.SyncVersionStore
+	tagStore         database.TagStore
+	fileStore        database.FileStore
+	gitServer        gitserver.GitServer
 }
 
 type MultiSyncComponent interface {
@@ -43,21 +43,21 @@ func NewMultiSyncComponent(config *config.Config) (MultiSyncComponent, error) {
 		return nil, fmt.Errorf("failed to create git server: %w", err)
 	}
 	return &multiSyncComponentImpl{
-		s:            database.NewMultiSyncStore(),
-		repo:         database.NewRepoStore(),
-		model:        database.NewModelStore(),
-		dataset:      database.NewDatasetStore(),
-		namespace:    database.NewNamespaceStore(),
-		user:         database.NewUserStore(),
-		versionStore: database.NewSyncVersionStore(),
-		tag:          database.NewTagStore(),
-		file:         database.NewFileStore(),
-		git:          git,
+		multiSyncStore:   database.NewMultiSyncStore(),
+		repoStore:        database.NewRepoStore(),
+		modelStore:       database.NewModelStore(),
+		datasetStore:     database.NewDatasetStore(),
+		namespaceStore:   database.NewNamespaceStore(),
+		userStore:        database.NewUserStore(),
+		syncVersionStore: database.NewSyncVersionStore(),
+		tagStore:         database.NewTagStore(),
+		fileStore:        database.NewFileStore(),
+		gitServer:        git,
 	}, nil
 }
 
 func (c *multiSyncComponentImpl) More(ctx context.Context, cur int64, limit int64) ([]types.SyncVersion, error) {
-	dbVersions, err := c.s.GetAfter(ctx, cur, limit)
+	dbVersions, err := c.multiSyncStore.GetAfter(ctx, cur, limit)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get sync versions after %d from db: %w", cur, err)
 	}
@@ -77,7 +77,7 @@ func (c *multiSyncComponentImpl) More(ctx context.Context, cur int64, limit int6
 
 func (c *multiSyncComponentImpl) SyncAsClient(ctx context.Context, sc multisync.Client) error {
 	var currentVersion int64
-	v, err := c.s.GetLatest(ctx)
+	v, err := c.multiSyncStore.GetLatest(ctx)
 	if err != nil {
 		if err != sql.ErrNoRows {
 			return fmt.Errorf("failed to get latest sync version from db: %w", err)
@@ -108,7 +108,7 @@ func (c *multiSyncComponentImpl) SyncAsClient(ctx context.Context, sc multisync.
 		}
 	}
 
-	syncVersions, err := c.s.GetAfterDistinct(ctx, v.Version)
+	syncVersions, err := c.multiSyncStore.GetAfterDistinct(ctx, v.Version)
 	if err != nil {
 		slog.Error("failed to find distinct sync versions", slog.Any("error", err))
 		return err
@@ -214,7 +214,7 @@ func (c *multiSyncComponentImpl) createLocalDataset(ctx context.Context, m *type
 		// HTTPCloneURL:   gitRepo.HttpCloneURL,
 		// SSHCloneURL:    gitRepo.SshCloneURL,
 	}
-	newDBRepo, err := c.repo.UpdateOrCreateRepo(ctx, dbRepo)
+	newDBRepo, err := c.repoStore.UpdateOrCreateRepo(ctx, dbRepo)
 	if err != nil {
 		return fmt.Errorf("fail to create database repo, error: %w", err)
 	}
@@ -230,7 +230,7 @@ func (c *multiSyncComponentImpl) createLocalDataset(ctx context.Context, m *type
 				ShowName: tag.ShowName,
 				Scope:    database.DatasetTagScope,
 			}
-			t, err := c.tag.FindOrCreate(ctx, dbTag)
+			t, err := c.tagStore.FindOrCreate(ctx, dbTag)
 			if err != nil {
 				slog.Error("failed to create or find database tag", slog.Any("tag", dbTag))
 				continue
@@ -241,26 +241,26 @@ func (c *multiSyncComponentImpl) createLocalDataset(ctx context.Context, m *type
 			})
 		}
 
-		err = c.repo.DeleteAllTags(ctx, newDBRepo.ID)
-		if err != nil {
+		err = c.repoStore.DeleteAllTags(ctx, newDBRepo.ID)
+		if err != nil && err != sql.ErrNoRows {
 			slog.Error("failed to delete database tag", slog.Any("error", err))
 		}
 
-		err = c.repo.BatchCreateRepoTags(ctx, repoTags)
+		err = c.repoStore.BatchCreateRepoTags(ctx, repoTags)
 		if err != nil {
 			slog.Error("failed to create database tag", slog.Any("error", err))
 		}
 	}
 
-	err = c.repo.DeleteAllFiles(ctx, newDBRepo.ID)
-	if err != nil {
+	err = c.repoStore.DeleteAllFiles(ctx, newDBRepo.ID)
+	if err != nil && err != sql.ErrNoRows {
 		slog.Error("failed to delete database files", slog.Any("error", err))
 	}
 
 	ctxGetFileList, cancel := context.WithTimeout(ctx, 5*time.Second)
 	files, err := sc.FileList(ctxGetFileList, s)
 	cancel()
-	if err != nil {
+	if err != nil && err != sql.ErrNoRows {
 		slog.Error("failed to get all files of repo", slog.Any("sync_version", s), slog.Any("error", err))
 	}
 	if len(files) > 0 {
@@ -277,7 +277,7 @@ func (c *multiSyncComponentImpl) createLocalDataset(ctx context.Context, m *type
 			})
 		}
 
-		err = c.file.BatchCreate(ctx, dbFiles)
+		err = c.fileStore.BatchCreate(ctx, dbFiles)
 		if err != nil {
 			slog.Error("failed to create all files of repo", slog.Any("sync_version", s))
 		}
@@ -288,7 +288,7 @@ func (c *multiSyncComponentImpl) createLocalDataset(ctx context.Context, m *type
 		Repository:   newDBRepo,
 		RepositoryID: newDBRepo.ID,
 	}
-	_, err = c.dataset.CreateIfNotExist(ctx, dbDataset)
+	_, err = c.datasetStore.CreateIfNotExist(ctx, dbDataset)
 	if err != nil {
 		return fmt.Errorf("failed to create dataset in db, cause: %w", err)
 	}
@@ -340,7 +340,7 @@ func (c *multiSyncComponentImpl) createLocalModel(ctx context.Context, m *types.
 		// HTTPCloneURL:   gitRepo.HttpCloneURL,
 		// SSHCloneURL:    gitRepo.SshCloneURL,
 	}
-	newDBRepo, err := c.repo.UpdateOrCreateRepo(ctx, dbRepo)
+	newDBRepo, err := c.repoStore.UpdateOrCreateRepo(ctx, dbRepo)
 	if err != nil {
 		return fmt.Errorf("fail to create database repo, error: %w", err)
 	}
@@ -356,7 +356,7 @@ func (c *multiSyncComponentImpl) createLocalModel(ctx context.Context, m *types.
 				ShowName: tag.ShowName,
 				Scope:    database.ModelTagScope,
 			}
-			t, err := c.tag.FindOrCreate(ctx, dbTag)
+			t, err := c.tagStore.FindOrCreate(ctx, dbTag)
 			if err != nil {
 				slog.Error("failed to create or find database tag", slog.Any("tag", dbTag))
 				continue
@@ -366,25 +366,25 @@ func (c *multiSyncComponentImpl) createLocalModel(ctx context.Context, m *types.
 				TagID:        t.ID,
 			})
 		}
-		err = c.repo.DeleteAllTags(ctx, newDBRepo.ID)
-		if err != nil {
+		err = c.repoStore.DeleteAllTags(ctx, newDBRepo.ID)
+		if err != nil && err != sql.ErrNoRows {
 			slog.Error("failed to delete database tag", slog.Any("error", err))
 		}
-		err = c.repo.BatchCreateRepoTags(ctx, repoTags)
+		err = c.repoStore.BatchCreateRepoTags(ctx, repoTags)
 		if err != nil {
 			slog.Error("failed to batch create database tag", slog.Any("error", err))
 		}
 	}
 
-	err = c.repo.DeleteAllFiles(ctx, newDBRepo.ID)
-	if err != nil {
+	err = c.repoStore.DeleteAllFiles(ctx, newDBRepo.ID)
+	if err != nil && err != sql.ErrNoRows {
 		slog.Error("failed to delete all files for repo", slog.Any("error", err))
 	}
 
 	ctxGetFileList, cancel := context.WithTimeout(ctx, 5*time.Second)
 	files, err := sc.FileList(ctxGetFileList, s)
 	cancel()
-	if err != nil {
+	if err != nil && err != sql.ErrNoRows {
 		slog.Error("failed to get all files of repo", slog.Any("sync_version", s), slog.Any("error", err))
 	}
 	if len(files) > 0 {
@@ -401,7 +401,7 @@ func (c *multiSyncComponentImpl) createLocalModel(ctx context.Context, m *types.
 			})
 		}
 
-		err = c.file.BatchCreate(ctx, dbFiles)
+		err = c.fileStore.BatchCreate(ctx, dbFiles)
 		if err != nil {
 			slog.Error("failed to create all files of repo", slog.Any("sync_version", s))
 		}
@@ -413,7 +413,7 @@ func (c *multiSyncComponentImpl) createLocalModel(ctx context.Context, m *types.
 		RepositoryID: newDBRepo.ID,
 		BaseModel:    m.BaseModel,
 	}
-	_, err = c.model.CreateIfNotExist(ctx, dbModel)
+	_, err = c.modelStore.CreateIfNotExist(ctx, dbModel)
 	if err != nil {
 		return fmt.Errorf("failed to create database model, cause: %w", err)
 	}
@@ -426,7 +426,7 @@ func (c *multiSyncComponentImpl) createUser(ctx context.Context, req types.Creat
 		Username: req.Username,
 		Email:    req.Email,
 	}
-	gsUserResp, err := c.git.CreateUser(gsUserReq)
+	gsUserResp, err := c.gitServer.CreateUser(gsUserReq)
 	if err != nil {
 		newError := fmt.Errorf("failed to create gitserver user,error:%w", err)
 		return database.User{}, newError
@@ -443,7 +443,7 @@ func (c *multiSyncComponentImpl) createUser(ctx context.Context, req types.Creat
 		GitID:    gsUserResp.GitID,
 		Password: gsUserResp.Password,
 	}
-	err = c.user.Create(ctx, user, namespace)
+	err = c.userStore.Create(ctx, user, namespace)
 	if err != nil {
 		newError := fmt.Errorf("failed to create user,error:%w", err)
 		return database.User{}, newError
@@ -453,7 +453,7 @@ func (c *multiSyncComponentImpl) createUser(ctx context.Context, req types.Creat
 }
 
 func (c *multiSyncComponentImpl) getUser(ctx context.Context, userName string) (database.User, error) {
-	return c.user.FindByUsername(ctx, userName)
+	return c.userStore.FindByUsername(ctx, userName)
 }
 
 func (c *multiSyncComponentImpl) createLocalSyncVersion(ctx context.Context, v types.SyncVersion) error {
@@ -465,7 +465,7 @@ func (c *multiSyncComponentImpl) createLocalSyncVersion(ctx context.Context, v t
 		LastModifiedAt: v.LastModifyTime,
 		ChangeLog:      v.ChangeLog,
 	}
-	err := c.versionStore.Create(ctx, &syncVersion)
+	err := c.syncVersionStore.Create(ctx, &syncVersion)
 	if err != nil {
 		return err
 	}

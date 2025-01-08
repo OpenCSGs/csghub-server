@@ -7,7 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
-	"regexp"
 	"strings"
 	"sync"
 
@@ -17,7 +16,6 @@ import (
 	"opencsg.com/csghub-server/builder/git/membership"
 	"opencsg.com/csghub-server/builder/llm"
 	"opencsg.com/csghub-server/builder/rpc"
-	"opencsg.com/csghub-server/builder/sensitive"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/types"
@@ -48,11 +46,11 @@ type promptComponentImpl struct {
 }
 
 type PromptComponent interface {
-	ListPrompt(ctx context.Context, req types.PromptReq) ([]PromptOutput, error)
-	GetPrompt(ctx context.Context, req types.PromptReq) (*PromptOutput, error)
-	ParseJsonFile(ctx context.Context, req gitserver.GetRepoInfoByPathReq) (*PromptOutput, error)
-	CreatePrompt(ctx context.Context, req types.PromptReq, body *CreatePromptReq) (*Prompt, error)
-	UpdatePrompt(ctx context.Context, req types.PromptReq, body *UpdatePromptReq) (*Prompt, error)
+	ListPrompt(ctx context.Context, req types.PromptReq) ([]types.PromptOutput, error)
+	GetPrompt(ctx context.Context, req types.PromptReq) (*types.PromptOutput, error)
+	ParseJsonFile(ctx context.Context, req gitserver.GetRepoInfoByPathReq) (*types.PromptOutput, error)
+	CreatePrompt(ctx context.Context, req types.PromptReq, body *types.CreatePromptReq) (*types.Prompt, error)
+	UpdatePrompt(ctx context.Context, req types.PromptReq, body *types.UpdatePromptReq) (*types.Prompt, error)
 	DeletePrompt(ctx context.Context, req types.PromptReq) error
 	NewConversation(ctx context.Context, req types.ConversationTitleReq) (*database.PromptConversation, error)
 	ListConversationsByUserID(ctx context.Context, currentUser string) ([]database.PromptConversation, error)
@@ -104,7 +102,7 @@ func NewPromptComponent(cfg *config.Config) (PromptComponent, error) {
 	}, nil
 }
 
-func (c *promptComponentImpl) ListPrompt(ctx context.Context, req types.PromptReq) ([]PromptOutput, error) {
+func (c *promptComponentImpl) ListPrompt(ctx context.Context, req types.PromptReq) ([]types.PromptOutput, error) {
 	r, err := c.repoStore.FindByPath(ctx, types.PromptRepo, req.Namespace, req.Name)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find prompt set, error: %w", err)
@@ -129,9 +127,9 @@ func (c *promptComponentImpl) ListPrompt(ctx context.Context, req types.PromptRe
 	if tree == nil {
 		return nil, fmt.Errorf("failed to find any files")
 	}
-	var prompts []PromptOutput
+	var prompts []types.PromptOutput
 	wg := &sync.WaitGroup{}
-	chPrompts := make(chan *PromptOutput, len(tree))
+	chPrompts := make(chan *types.PromptOutput, len(tree))
 	done := make(chan struct{}, 1)
 
 	go func() {
@@ -177,7 +175,7 @@ func (c *promptComponentImpl) ListPrompt(ctx context.Context, req types.PromptRe
 	return prompts, nil
 }
 
-func (c *promptComponentImpl) GetPrompt(ctx context.Context, req types.PromptReq) (*PromptOutput, error) {
+func (c *promptComponentImpl) GetPrompt(ctx context.Context, req types.PromptReq) (*types.PromptOutput, error) {
 	r, err := c.repoStore.FindByPath(ctx, types.PromptRepo, req.Namespace, req.Name)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find prompt repo, error: %w", err)
@@ -207,7 +205,7 @@ func (c *promptComponentImpl) GetPrompt(ctx context.Context, req types.PromptReq
 	return p, nil
 }
 
-func (c *promptComponentImpl) ParseJsonFile(ctx context.Context, req gitserver.GetRepoInfoByPathReq) (*PromptOutput, error) {
+func (c *promptComponentImpl) ParseJsonFile(ctx context.Context, req gitserver.GetRepoInfoByPathReq) (*types.PromptOutput, error) {
 	f, err := c.gitServer.GetRepoFileContents(ctx, req)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get %s contents, cause:%w", req.Path, err)
@@ -216,7 +214,7 @@ func (c *promptComponentImpl) ParseJsonFile(ctx context.Context, req gitserver.G
 	if err != nil {
 		return nil, fmt.Errorf("failed to base64 decode %s contents, cause:%w", req.Path, err)
 	}
-	var prompt Prompt
+	var prompt types.Prompt
 	err = yaml.Unmarshal(decodedContent, &prompt)
 	if err != nil {
 		return nil, fmt.Errorf("failed to Unmarshal %s contents, cause: %w, decodedContent: %v", req.Path, err, string(decodedContent))
@@ -224,14 +222,14 @@ func (c *promptComponentImpl) ParseJsonFile(ctx context.Context, req gitserver.G
 	if len(prompt.Title) < 1 {
 		prompt.Title = f.Name
 	}
-	po := PromptOutput{
+	po := types.PromptOutput{
 		Prompt:   prompt,
 		FilePath: req.Path,
 	}
 	return &po, nil
 }
 
-func (c *promptComponentImpl) CreatePrompt(ctx context.Context, req types.PromptReq, body *CreatePromptReq) (*Prompt, error) {
+func (c *promptComponentImpl) CreatePrompt(ctx context.Context, req types.PromptReq, body *types.CreatePromptReq) (*types.Prompt, error) {
 	u, err := c.checkPromptRepoPermission(ctx, req)
 	if err != nil {
 		return nil, fmt.Errorf("user do not allowed create prompt")
@@ -267,7 +265,7 @@ func (c *promptComponentImpl) CreatePrompt(ctx context.Context, req types.Prompt
 	return &body.Prompt, nil
 }
 
-func (c *promptComponentImpl) UpdatePrompt(ctx context.Context, req types.PromptReq, body *UpdatePromptReq) (*Prompt, error) {
+func (c *promptComponentImpl) UpdatePrompt(ctx context.Context, req types.PromptReq, body *types.UpdatePromptReq) (*types.Prompt, error) {
 	u, err := c.checkPromptRepoPermission(ctx, req)
 	if err != nil {
 		return nil, fmt.Errorf("user do not allowed update prompt")
@@ -376,200 +374,6 @@ func (c *promptComponentImpl) checkPromptRepoPermission(ctx context.Context, req
 		}
 	}
 	return &user, nil
-}
-
-func (c *promptComponentImpl) NewConversation(ctx context.Context, req types.ConversationTitleReq) (*database.PromptConversation, error) {
-	user, err := c.userStore.FindByUsername(ctx, req.CurrentUser)
-	if err != nil {
-		return nil, errors.New("user does not exist")
-	}
-	conversation := database.PromptConversation{
-		UserID:         user.ID,
-		ConversationID: req.Uuid,
-		Title:          req.Title,
-	}
-
-	err = c.promptConvStore.CreateConversation(ctx, conversation)
-	if err != nil {
-		return nil, fmt.Errorf("new conversation error: %w", err)
-	}
-
-	return &conversation, nil
-}
-
-func (c *promptComponentImpl) ListConversationsByUserID(ctx context.Context, currentUser string) ([]database.PromptConversation, error) {
-	user, err := c.userStore.FindByUsername(ctx, currentUser)
-	if err != nil {
-		return nil, errors.New("user does not exist")
-	}
-	conversations, err := c.promptConvStore.FindConversationsByUserID(ctx, user.ID)
-	if err != nil {
-		return nil, fmt.Errorf("find conversations by user %s error: %w", currentUser, err)
-	}
-	return conversations, nil
-}
-
-func (c *promptComponentImpl) GetConversation(ctx context.Context, req types.ConversationReq) (*database.PromptConversation, error) {
-	user, err := c.userStore.FindByUsername(ctx, req.CurrentUser)
-	if err != nil {
-		return nil, errors.New("user does not exist")
-	}
-	conversation, err := c.promptConvStore.GetConversationByID(ctx, user.ID, req.Uuid, true)
-	if err != nil {
-		return nil, fmt.Errorf("get conversation by id %s error: %w", req.Uuid, err)
-	}
-	return conversation, nil
-}
-
-func (c *promptComponentImpl) SubmitMessage(ctx context.Context, req types.ConversationReq) (<-chan string, error) {
-	user, err := c.userStore.FindByUsername(ctx, req.CurrentUser)
-	if err != nil {
-		return nil, errors.New("user does not exist")
-	}
-
-	_, err = c.promptConvStore.GetConversationByID(ctx, user.ID, req.Uuid, false)
-	if err != nil {
-		return nil, fmt.Errorf("invalid conversation by uuid %s error: %w", req.Uuid, err)
-	}
-
-	reqMsg := database.PromptConversationMessage{
-		ConversationID: req.Uuid,
-		Role:           UserRole,
-		Content:        req.Message,
-	}
-	_, err = c.promptConvStore.SaveConversationMessage(ctx, reqMsg)
-	if err != nil {
-		return nil, fmt.Errorf("save user prompt input error: %w", err)
-	}
-
-	llmConfig, err := c.llmConfigStore.GetOptimization(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("get llm config error: %w", err)
-	}
-	slog.Debug("use llm", slog.Any("llmConfig", llmConfig))
-	var headers map[string]string
-	err = json.Unmarshal([]byte(llmConfig.AuthHeader), &headers)
-	if err != nil {
-		return nil, fmt.Errorf("parse llm config header error: %w", err)
-	}
-
-	promptPrefix := ""
-	prefix, err := c.promptPrefixStore.Get(ctx)
-	if err != nil {
-		slog.Warn("fail to find prompt prefix", slog.Any("err", err))
-	} else {
-		chs := isChinese(reqMsg.Content)
-		if chs {
-			promptPrefix = prefix.ZH
-		} else {
-			promptPrefix = prefix.EN
-		}
-	}
-
-	reqData := types.LLMReqBody{
-		Model: llmConfig.ModelName,
-		Messages: []types.LLMMessage{
-			{Role: SystemRole, Content: promptPrefix},
-			{Role: UserRole, Content: reqMsg.Content},
-		},
-		Stream:      true,
-		Temperature: 0.2,
-	}
-	if req.Temperature != nil {
-		reqData.Temperature = *req.Temperature
-	}
-
-	slog.Debug("llm request", slog.Any("reqData", reqData))
-	ch, err := c.llmClient.Chat(ctx, llmConfig.ApiEndpoint, headers, reqData)
-	if err != nil {
-		return nil, fmt.Errorf("call llm error: %w", err)
-	}
-	return ch, nil
-}
-
-func (c *promptComponentImpl) SaveGeneratedText(ctx context.Context, req types.Conversation) (*database.PromptConversationMessage, error) {
-	respMsg := database.PromptConversationMessage{
-		ConversationID: req.Uuid,
-		Role:           AssistantRole,
-		Content:        req.Message,
-	}
-	msg, err := c.promptConvStore.SaveConversationMessage(ctx, respMsg)
-	if err != nil {
-		return nil, fmt.Errorf("save system generated response error: %w", err)
-	}
-	return msg, nil
-}
-
-func (c *promptComponentImpl) RemoveConversation(ctx context.Context, req types.ConversationReq) error {
-	user, err := c.userStore.FindByUsername(ctx, req.CurrentUser)
-	if err != nil {
-		return errors.New("user does not exist")
-	}
-
-	err = c.promptConvStore.DeleteConversationsByID(ctx, user.ID, req.Uuid)
-	if err != nil {
-		return fmt.Errorf("remove conversation error: %w", err)
-	}
-	return nil
-}
-
-func (c *promptComponentImpl) UpdateConversation(ctx context.Context, req types.ConversationTitleReq) (*database.PromptConversation, error) {
-	user, err := c.userStore.FindByUsername(ctx, req.CurrentUser)
-	if err != nil {
-		return nil, errors.New("user does not exist")
-	}
-
-	err = c.promptConvStore.UpdateConversation(ctx, database.PromptConversation{
-		UserID:         user.ID,
-		ConversationID: req.Uuid,
-		Title:          req.Title,
-	})
-	if err != nil {
-		return nil, fmt.Errorf("update conversation title error: %w", err)
-	}
-
-	resp, err := c.promptConvStore.GetConversationByID(ctx, user.ID, req.Uuid, false)
-	if err != nil {
-		return nil, fmt.Errorf("invalid conversation by uuid %s error: %w", req.Uuid, err)
-	}
-	return resp, nil
-}
-
-func (c *promptComponentImpl) LikeConversationMessage(ctx context.Context, req types.ConversationMessageReq) error {
-	user, err := c.userStore.FindByUsername(ctx, req.CurrentUser)
-	if err != nil {
-		return errors.New("user does not exist")
-	}
-	_, err = c.promptConvStore.GetConversationByID(ctx, user.ID, req.Uuid, false)
-	if err != nil {
-		return fmt.Errorf("invalid conversation by uuid %s error: %w", req.Uuid, err)
-	}
-	err = c.promptConvStore.LikeMessageByID(ctx, req.Id)
-	if err != nil {
-		return fmt.Errorf("update like message by id %d error: %w", req.Id, err)
-	}
-	return nil
-}
-
-func (c *promptComponentImpl) HateConversationMessage(ctx context.Context, req types.ConversationMessageReq) error {
-	user, err := c.userStore.FindByUsername(ctx, req.CurrentUser)
-	if err != nil {
-		return errors.New("user does not exist")
-	}
-	_, err = c.promptConvStore.GetConversationByID(ctx, user.ID, req.Uuid, false)
-	if err != nil {
-		return fmt.Errorf("invalid conversation by uuid %s error: %w", req.Uuid, err)
-	}
-	err = c.promptConvStore.HateMessageByID(ctx, req.Id)
-	if err != nil {
-		return fmt.Errorf("update hate message by id %d error: %w", req.Id, err)
-	}
-	return nil
-}
-
-func isChinese(s string) bool {
-	re := regexp.MustCompile(`[\p{Han}]`)
-	return re.MatchString(s)
 }
 
 func (c *promptComponentImpl) SetRelationModels(ctx context.Context, req types.RelationModels) error {
@@ -1161,63 +965,7 @@ func (c *promptComponentImpl) getRelations(ctx context.Context, repoID int64, cu
 	return rels, nil
 }
 
-type Prompt struct {
-	Title     string   `json:"title" binding:"required"`
-	Content   string   `json:"content" binding:"required"`
-	Language  string   `json:"language" binding:"required"`
-	Tags      []string `json:"tags"`
-	Type      string   `json:"type"` // "text|image|video|audio"
-	Source    string   `json:"source"`
-	Author    string   `json:"author"`
-	Time      string   `json:"time"`
-	Copyright string   `json:"copyright"`
-	Feedback  []string `json:"feedback"`
-}
-
-type PromptOutput struct {
-	Prompt
-	FilePath  string `json:"file_path"`
-	CanWrite  bool   `json:"can_write"`
-	CanManage bool   `json:"can_manage"`
-}
-
-type CreatePromptReq struct {
-	Prompt
-}
-
-type UpdatePromptReq struct {
-	Prompt
-}
-
-var _ types.SensitiveRequestV2 = (*Prompt)(nil)
-
-func (req *Prompt) GetSensitiveFields() []types.SensitiveField {
-	var fields []types.SensitiveField
-	fields = append(fields, types.SensitiveField{
-		Name: "title",
-		Value: func() string {
-			return req.Title
-		},
-		Scenario: string(sensitive.ScenarioCommentDetection),
-	})
-	fields = append(fields, types.SensitiveField{
-		Name: "content",
-		Value: func() string {
-			return req.Content
-		},
-		Scenario: string(sensitive.ScenarioCommentDetection),
-	})
-	if len(req.Source) > 0 {
-		fields = append(fields, types.SensitiveField{
-			Name: "source",
-			Value: func() string {
-				return req.Source
-			},
-			Scenario: string(sensitive.ScenarioCommentDetection),
-		})
-	}
-	return fields
-}
+var _ types.SensitiveRequestV2 = (*types.Prompt)(nil)
 
 func (c *promptComponentImpl) OrgPrompts(ctx context.Context, req *types.OrgPromptsReq) ([]types.PromptRes, int, error) {
 	var resPrompts []types.PromptRes

@@ -29,12 +29,14 @@ func NewRepoHandler(config *config.Config) (*RepoHandler, error) {
 		return nil, err
 	}
 	return &RepoHandler{
-		c: uc,
+		c:                         uc,
+		deployStatusCheckInterval: 5 * time.Second,
 	}, nil
 }
 
 type RepoHandler struct {
-	c component.RepoComponent
+	c                         component.RepoComponent
+	deployStatusCheckInterval time.Duration
 }
 
 // CreateRepoFile godoc
@@ -521,7 +523,7 @@ func (h *RepoHandler) Tags(ctx *gin.Context) {
 func (h *RepoHandler) UpdateTags(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
 	if currentUser == "" {
-		httpbase.UnauthorizedError(ctx, httpbase.ErrorNeedLogin)
+		httpbase.UnauthorizedError(ctx, component.ErrUserNotFound)
 		return
 	}
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
@@ -1695,7 +1697,7 @@ func (h *RepoHandler) DeployStatus(ctx *gin.Context) {
 			slog.Info("deploy handler status request context done", slog.Any("error", ctx.Request.Context().Err()))
 			return
 		default:
-			time.Sleep(time.Second * 5)
+			time.Sleep(h.deployStatusCheckInterval)
 			// user http request context instead of gin context, so that server knows the life cycle of the request
 			_, status, instances, err := h.c.DeployStatus(ctx.Request.Context(), repoType, namespace, name, deployID)
 			if err != nil {
@@ -2136,7 +2138,7 @@ func (h *RepoHandler) ServerlessStatus(ctx *gin.Context) {
 			slog.Info("deploy handler status request context done", slog.Any("error", ctx.Request.Context().Err()))
 			return
 		default:
-			time.Sleep(time.Second * 5)
+			time.Sleep(h.deployStatusCheckInterval)
 			// user http request context instead of gin context, so that server knows the life cycle of the request
 			_, status, instances, err := h.c.DeployStatus(ctx.Request.Context(), types.ModelRepo, namespace, name, deployID)
 			if err != nil {

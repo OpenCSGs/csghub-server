@@ -109,10 +109,6 @@ type Config struct {
 		ValidHour  int    `env:"STARHUB_JWT_VALIDATE_HOUR, default=24"`
 	}
 
-	Inference struct {
-		ServerAddr string `env:"STARHUB_SERVER_INFERENCE_SERVER_ADDR, default=http://localhost:8000"`
-	}
-
 	Space struct {
 		BuilderEndpoint string `env:"STARHUB_SERVER_SPACE_BUILDER_ENDPOINT, default=http://localhost:8081"`
 		// base url for space api running in k8s cluster
@@ -168,8 +164,9 @@ type Config struct {
 	}
 
 	Accounting struct {
-		Host string `env:"OPENCSG_ACCOUNTING_SERVER_HOST, default=http://localhost"`
-		Port int    `env:"OPENCSG_ACCOUNTING_SERVER_PORT, default=8086"`
+		Host           string `env:"OPENCSG_ACCOUNTING_SERVER_HOST, default=http://localhost"`
+		Port           int    `env:"OPENCSG_ACCOUNTING_SERVER_PORT, default=8086"`
+		ChargingEnable bool   `env:"OPENCSG_ACCOUNTING_CHARGING_ENABLE, default=false"`
 	}
 
 	User struct {
@@ -223,6 +220,11 @@ type Config struct {
 		ServiceAccountName string `env:"STARHUB_SERVER_ARGO_SERVICE_ACCOUNT, default=executor"`
 		// S3PublicBucket is used to store public files, should set bucket same with portal
 		S3PublicBucket string `env:"STARHUB_SERVER_ARGO_S3_PUBLIC_BUCKET"`
+	}
+
+	CronJob struct {
+		SyncAsClientCronExpression   string `env:"STARHUB_SERVER_CRON_JOB_SYNC_AS_CLIENT_CRON_EXPRESSION, default=0 * * * *"`
+		CalcRecomScoreCronExpression string `env:"STARHUB_SERVER_CRON_JOB_CLAC_RECOM_SCORE_CRON_EXPRESSION, default=0 1 * * *"`
 	}
 }
 

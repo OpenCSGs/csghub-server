@@ -26,13 +26,14 @@ import (
 )
 
 type gitHTTPComponentImpl struct {
-	git                gitserver.GitServer
+	gitServer          gitserver.GitServer
 	config             *config.Config
 	s3Client           s3.Client
 	lfsMetaObjectStore database.LfsMetaObjectStore
 	lfsLockStore       database.LfsLockStore
-	repo               database.RepoStore
-	*repoComponentImpl
+	repoStore          database.RepoStore
+	userStore          database.UserStore
+	repoComponent      RepoComponent
 }
 
 type GitHTTPComponent interface {
@@ -53,7 +54,7 @@ func NewGitHTTPComponent(config *config.Config) (GitHTTPComponent, error) {
 	c := &gitHTTPComponentImpl{}
 	c.config = config
 	var err error
-	c.git, err = git.NewGitServer(config)
+	c.gitServer, err = git.NewGitServer(config)
 	if err != nil {
 		newError := fmt.Errorf("fail to create git server,error:%w", err)
 		slog.Error(newError.Error())
@@ -66,9 +67,10 @@ func NewGitHTTPComponent(config *config.Config) (GitHTTPComponent, error) {
 		return nil, newError
 	}
 	c.lfsMetaObjectStore = database.NewLfsMetaObjectStore()
-	c.repo = database.NewRepoStore()
+	c.repoStore = database.NewRepoStore()
 	c.lfsLockStore = database.NewLfsLockStore()
-	c.repoComponentImpl, err = NewRepoComponentImpl(config)
+	c.userStore = database.NewUserStore()
+	c.repoComponent, err = NewRepoComponentImpl(config)
 	if err != nil {
 		return nil, err
 	}
@@ -76,13 +78,13 @@ func NewGitHTTPComponent(config *config.Config) (GitHTTPComponent, error) {
 }
 
 func (c *gitHTTPComponentImpl) InfoRefs(ctx context.Context, req types.InfoRefsReq) (io.Reader, error) {
-	repo, err := c.repo.FindByPath(ctx, req.RepoType, req.Namespace, req.Name)
+	repo, err := c.repoStore.FindByPath(ctx, req.RepoType, req.Namespace, req.Name)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find repo, error: %w", err)
 	}
 
 	if req.Rpc == "git-receive-pack" {
-		allowed, err := c.AllowWriteAccess(ctx, req.RepoType, req.Namespace, req.Name, req.CurrentUser)
+		allowed, err := c.repoComponent.AllowWriteAccess(ctx, req.RepoType, req.Namespace, req.Name, req.CurrentUser)
 		if err != nil {
 			return nil, ErrUnauthorized
 		}
@@ -91,7 +93,7 @@ func (c *gitHTTPComponentImpl) InfoRefs(ctx context.Context, req types.InfoRefsR
 		}
 	} else {
 		if repo.Private {
-			allowed, err := c.AllowReadAccess(ctx, req.RepoType, req.Namespace, req.Name, req.CurrentUser)
+			allowed, err := c.repoComponent.AllowReadAccess(ctx, req.RepoType, req.Namespace, req.Name, req.CurrentUser)
 			if err != nil {
 				return nil, ErrUnauthorized
 			}
@@ -101,7 +103,7 @@ func (c *gitHTTPComponentImpl) InfoRefs(ctx context.Context, req types.InfoRefsR
 		}
 	}
 
-	reader, err := c.git.InfoRefsResponse(ctx, gitserver.InfoRefsReq{
+	reader, err := c.gitServer.InfoRefsResponse(ctx, gitserver.InfoRefsReq{
 		Namespace:   req.Namespace,
 		Name:        req.Name,
 		Rpc:         req.Rpc,
@@ -113,13 +115,13 @@ func (c *gitHTTPComponentImpl) InfoRefs(ctx context.Context, req types.InfoRefsR
 }
 
 func (c *gitHTTPComponentImpl) GitUploadPack(ctx context.Context, req types.GitUploadPackReq) error {
-	repo, err := c.repo.FindByPath(ctx, req.RepoType, req.Namespace, req.Name)
+	repo, err := c.repoStore.FindByPath(ctx, req.RepoType, req.Namespace, req.Name)
 	if err != nil {
 		return fmt.Errorf("failed to find repo, error: %w", err)
 	}
 
 	if repo.Private {
-		allowed, err := c.AllowReadAccess(ctx, req.RepoType, req.Namespace, req.Name, req.CurrentUser)
+		allowed, err := c.repoComponent.AllowReadAccess(ctx, req.RepoType, req.Namespace, req.Name, req.CurrentUser)
 		if err != nil {
 			return ErrUnauthorized
 		}
@@ -127,7 +129,7 @@ func (c *gitHTTPComponentImpl) GitUploadPack(ctx context.Context, req types.GitU
 			return ErrForbidden
 		}
 	}
-	err = c.git.UploadPack(ctx, gitserver.UploadPackReq{
+	err = c.gitServer.UploadPack(ctx, gitserver.UploadPackReq{
 		Namespace:   req.Namespace,
 		Name:        req.Name,
 		Request:     req.Request,
@@ -140,7 +142,7 @@ func (c *gitHTTPComponentImpl) GitUploadPack(ctx context.Context, req types.GitU
 }
 
 func (c *gitHTTPComponentImpl) GitReceivePack(ctx context.Context, req types.GitReceivePackReq) error {
-	_, err := c.repo.FindByPath(ctx, req.RepoType, req.Namespace, req.Name)
+	_, err := c.repoStore.FindByPath(ctx, req.RepoType, req.Namespace, req.Name)
 	if err != nil {
 		return fmt.Errorf("failed to find repo, error: %w", err)
 	}
@@ -150,14 +152,14 @@ func (c *gitHTTPComponentImpl) GitReceivePack(ctx context.Context, req types.Git
 		return ErrUnauthorized
 	}
 
-	allowed, err := c.AllowWriteAccess(ctx, req.RepoType, req.Namespace, req.Name, req.CurrentUser)
+	allowed, err := c.repoComponent.AllowWriteAccess(ctx, req.RepoType, req.Namespace, req.Name, req.CurrentUser)
 	if err != nil {
 		return ErrUnauthorized
 	}
 	if !allowed {
 		return ErrForbidden
 	}
-	err = c.git.ReceivePack(ctx, gitserver.ReceivePackReq{
+	err = c.gitServer.ReceivePack(ctx, gitserver.ReceivePackReq{
 		Namespace:   req.Namespace,
 		Name:        req.Name,
 		Request:     req.Request,
@@ -176,7 +178,7 @@ func (c *gitHTTPComponentImpl) BuildObjectResponse(ctx context.Context, req type
 		respObjects []*types.ObjectResponse
 		exists      bool
 	)
-	repo, err := c.repo.FindByPath(ctx, req.RepoType, req.Namespace, req.Name)
+	repo, err := c.repoStore.FindByPath(ctx, req.RepoType, req.Namespace, req.Name)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find repo, error: %w", err)
 	}
@@ -223,7 +225,7 @@ func (c *gitHTTPComponentImpl) BuildObjectResponse(ctx context.Context, req type
 			// }
 
 			if exists && lfsMetaObject == nil {
-				allowed, err := c.AllowWriteAccess(ctx, req.RepoType, req.Namespace, req.Name, req.CurrentUser)
+				allowed, err := c.repoComponent.AllowWriteAccess(ctx, req.RepoType, req.Namespace, req.Name, req.CurrentUser)
 				if err != nil {
 					slog.Error("unable to check if user can wirte this repo", slog.String("lfs oid", obj.Oid), slog.Any("error", err))
 					return nil, ErrUnauthorized
@@ -279,7 +281,7 @@ func (c *gitHTTPComponentImpl) buildObjectResponse(ctx context.Context, req type
 			var link *types.Link
 			reqParams := make(url.Values)
 			objectKey := path.Join("lfs", pointer.RelativePath())
-			url, err := c.s3Client.PresignedGetObject(ctx, c.config.S3.Bucket, objectKey, ossFileExpireSeconds, reqParams)
+			url, err := c.s3Client.PresignedGetObject(ctx, c.config.S3.Bucket, objectKey, ossFileExpire, reqParams)
 			if url != nil && err == nil {
 				delete(header, "Authorization")
 				link = &types.Link{Href: url.String(), Header: header}
@@ -307,7 +309,7 @@ func (c *gitHTTPComponentImpl) buildObjectResponse(ctx context.Context, req type
 
 func (c *gitHTTPComponentImpl) LfsUpload(ctx context.Context, body io.ReadCloser, req types.UploadRequest) error {
 	var exists bool
-	repo, err := c.repo.FindByPath(ctx, req.RepoType, req.Namespace, req.Name)
+	repo, err := c.repoStore.FindByPath(ctx, req.RepoType, req.Namespace, req.Name)
 	if err != nil {
 		return fmt.Errorf("failed to find repo, error: %w", err)
 	}
@@ -332,7 +334,7 @@ func (c *gitHTTPComponentImpl) LfsUpload(ctx context.Context, body io.ReadCloser
 	}
 	uploadOrVerify := func() error {
 		if exists {
-			allowed, err := c.AllowWriteAccess(ctx, req.RepoType, req.Namespace, req.Name, req.CurrentUser)
+			allowed, err := c.repoComponent.AllowWriteAccess(ctx, req.RepoType, req.Namespace, req.Name, req.CurrentUser)
 			if err != nil {
 				slog.Error("Unable to check if LFS MetaObject [%s] is allowed. Error: %v", pointer.Oid, err)
 				return err
@@ -414,7 +416,7 @@ func (c *gitHTTPComponentImpl) LfsUpload(ctx context.Context, body io.ReadCloser
 }
 
 func (c *gitHTTPComponentImpl) LfsVerify(ctx context.Context, req types.VerifyRequest, p types.Pointer) error {
-	repo, err := c.repo.FindByPath(ctx, req.RepoType, req.Namespace, req.Name)
+	repo, err := c.repoStore.FindByPath(ctx, req.RepoType, req.Namespace, req.Name)
 	if err != nil {
 		return fmt.Errorf("failed to find repo, error: %w", err)
 	}
@@ -451,7 +453,7 @@ func (c *gitHTTPComponentImpl) CreateLock(ctx context.Context, req types.LfsLock
 	var (
 		lock *database.LfsLock
 	)
-	repo, err := c.repo.FindByPath(ctx, req.RepoType, req.Namespace, req.Name)
+	repo, err := c.repoStore.FindByPath(ctx, req.RepoType, req.Namespace, req.Name)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find repo, error: %w", err)
 	}
@@ -461,7 +463,7 @@ func (c *gitHTTPComponentImpl) CreateLock(ctx context.Context, req types.LfsLock
 		return nil, ErrUnauthorized
 	}
 
-	allowed, err := c.AllowWriteAccess(ctx, req.RepoType, req.Namespace, req.Name, req.CurrentUser)
+	allowed, err := c.repoComponent.AllowWriteAccess(ctx, req.RepoType, req.Namespace, req.Name, req.CurrentUser)
 	if err != nil {
 		slog.Error("Unable to check user write access:", slog.Any("error", err))
 		return nil, err
@@ -492,7 +494,7 @@ func (c *gitHTTPComponentImpl) CreateLock(ctx context.Context, req types.LfsLock
 }
 
 func (c *gitHTTPComponentImpl) ListLocks(ctx context.Context, req types.ListLFSLockReq) (*types.LFSLockList, error) {
-	repo, err := c.repo.FindByPath(ctx, req.RepoType, req.Namespace, req.Name)
+	repo, err := c.repoStore.FindByPath(ctx, req.RepoType, req.Namespace, req.Name)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find repo, error: %w", err)
 	}
@@ -502,7 +504,7 @@ func (c *gitHTTPComponentImpl) ListLocks(ctx context.Context, req types.ListLFSL
 		return nil, ErrUnauthorized
 	}
 
-	allowed, err := c.AllowReadAccess(ctx, req.RepoType, req.Namespace, req.Name, req.CurrentUser)
+	allowed, err := c.repoComponent.AllowReadAccess(ctx, req.RepoType, req.Namespace, req.Name, req.CurrentUser)
 	if err != nil {
 		slog.Error("Unable to check user write access:", slog.Any("error", err))
 		return nil, err
@@ -557,7 +559,7 @@ func (c *gitHTTPComponentImpl) UnLock(ctx context.Context, req types.UnlockLFSRe
 		lock *database.LfsLock
 		err  error
 	)
-	_, err = c.repo.FindByPath(ctx, req.RepoType, req.Namespace, req.Name)
+	_, err = c.repoStore.FindByPath(ctx, req.RepoType, req.Namespace, req.Name)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find repo, error: %w", err)
 	}
@@ -567,7 +569,7 @@ func (c *gitHTTPComponentImpl) UnLock(ctx context.Context, req types.UnlockLFSRe
 		return nil, ErrUnauthorized
 	}
 
-	allowed, err := c.AllowWriteAccess(ctx, req.RepoType, req.Namespace, req.Name, req.CurrentUser)
+	allowed, err := c.repoComponent.AllowWriteAccess(ctx, req.RepoType, req.Namespace, req.Name, req.CurrentUser)
 	if err != nil {
 		slog.Error("Unable to check user write access:", slog.Any("error", err))
 		return nil, err
@@ -602,7 +604,7 @@ func (c *gitHTTPComponentImpl) VerifyLock(ctx context.Context, req types.VerifyL
 		theirLocks []*types.LFSLock
 		res        types.LFSLockListVerify
 	)
-	repo, err := c.repo.FindByPath(ctx, req.RepoType, req.Namespace, req.Name)
+	repo, err := c.repoStore.FindByPath(ctx, req.RepoType, req.Namespace, req.Name)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find repo, error: %w", err)
 	}
@@ -612,7 +614,7 @@ func (c *gitHTTPComponentImpl) VerifyLock(ctx context.Context, req types.VerifyL
 		return nil, ErrUnauthorized
 	}
 
-	allowed, err := c.AllowReadAccess(ctx, req.RepoType, req.Namespace, req.Name, req.CurrentUser)
+	allowed, err := c.repoComponent.AllowReadAccess(ctx, req.RepoType, req.Namespace, req.Name, req.CurrentUser)
 	if err != nil {
 		slog.Error("Unable to check user write access:", slog.Any("error", err))
 		return nil, err
@@ -656,11 +658,11 @@ func (c *gitHTTPComponentImpl) VerifyLock(ctx context.Context, req types.VerifyL
 
 func (c *gitHTTPComponentImpl) LfsDownload(ctx context.Context, req types.DownloadRequest) (*url.URL, error) {
 	pointer := types.Pointer{Oid: req.Oid}
-	repo, err := c.repo.FindByPath(ctx, req.RepoType, req.Namespace, req.Name)
+	repo, err := c.repoStore.FindByPath(ctx, req.RepoType, req.Namespace, req.Name)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find repo, error: %w", err)
 	}
-	allowed, err := c.AllowReadAccess(ctx, req.RepoType, req.Namespace, req.Name, req.CurrentUser)
+	allowed, err := c.repoComponent.AllowReadAccess(ctx, req.RepoType, req.Namespace, req.Name, req.CurrentUser)
 	if err != nil {
 		return nil, fmt.Errorf("failed to check allowed, error: %w", err)
 	}
@@ -680,7 +682,7 @@ func (c *gitHTTPComponentImpl) LfsDownload(ctx context.Context, req types.Downlo
 		// allow rename when download through content-disposition header
 		reqParams.Set("response-content-disposition", fmt.Sprintf("attachment;filename=%s", req.SaveAs))
 	}
-	signedUrl, err := c.s3Client.PresignedGetObject(ctx, c.config.S3.Bucket, objectKey, ossFileExpireSeconds, reqParams)
+	signedUrl, err := c.s3Client.PresignedGetObject(ctx, c.config.S3.Bucket, objectKey, ossFileExpire, reqParams)
 	if err != nil {
 		return nil, err
 	}

@@ -15,15 +15,21 @@ import (
 	"opencsg.com/csghub-server/mq"
 )
 
+var (
+	idleDuration = 10 * time.Second
+)
+
 type Metering struct {
-	sysMQ     *mq.NatsHandler
-	meterComp component.MeteringComponent
+	sysMQ          mq.MessageQueue
+	meterComp      component.MeteringComponent
+	chargingEnable bool
 }
 
-func NewMetering(natHandler *mq.NatsHandler, config *config.Config) *Metering {
+func NewMetering(natHandler mq.MessageQueue, config *config.Config) *Metering {
 	meter := &Metering{
-		sysMQ:     natHandler,
-		meterComp: component.NewMeteringComponent(),
+		sysMQ:          natHandler,
+		meterComp:      component.NewMeteringComponent(),
+		chargingEnable: config.Accounting.ChargingEnable,
 	}
 	return meter
 }
@@ -36,7 +42,7 @@ func (m *Metering) startMetering() {
 	for {
 		m.preReadMsgs()
 		m.handleReadMsgs(10)
-		time.Sleep(10 * time.Second)
+		time.Sleep(2 * idleDuration)
 	}
 }
 
@@ -105,10 +111,11 @@ func (m *Metering) handleMsgWithRetry(msg jetstream.Msg) {
 	slog.Debug("Meter->received", slog.Any("msg.subject", msg.Subject()), slog.Any("msg.data", strData))
 	// A maximum of 3 attempts
 	var (
-		err error = nil
+		err error                 = nil
+		evt *types.METERING_EVENT = nil
 	)
 	for j := 0; j < 3; j++ {
-		_, err = m.handleMsgData(msg)
+		evt, err = m.handleMsgData(msg)
 		if err == nil {
 			break
 		}
@@ -121,6 +128,15 @@ func (m *Metering) handleMsgWithRetry(msg jetstream.Msg) {
 		if err != nil {
 			tip := fmt.Sprintf("failed to move meter msg to DLQ with %d retries", 5)
 			slog.Error(tip, slog.Any("msg.data", string(msg.Data())), slog.Any("error", err))
+		}
+	} else {
+		if m.chargingEnable {
+			err = m.pubFeeEventWithReTry(msg, evt, 5)
+			if err != nil {
+				tip := fmt.Sprintf("failed to pub fee event msg with %d retries", 5)
+				slog.Error(tip, slog.Any("msg.data", string(msg.Data())), slog.Any("error", err))
+				// todo: need more discuss on how to persist failed message finally
+			}
 		}
 	}
 
@@ -155,9 +171,28 @@ func (m *Metering) parseMessageData(msg jetstream.Msg) (*types.METERING_EVENT, e
 	return &evt, nil
 }
 
+func (m *Metering) pubFeeEventWithReTry(msg jetstream.Msg, evt *types.METERING_EVENT, limit int) error {
+	// A maximum of five attempts for pub fee event
+	var err error
+	for i := 0; i < limit; i++ {
+		switch evt.ValueType {
+		case types.TimeDurationMinType:
+			err = m.sysMQ.PublishFeeCreditData(msg.Data())
+		case types.TokenNumberType:
+			err = m.sysMQ.PublishFeeTokenData(msg.Data())
+		case types.QuotaNumberType:
+			err = m.sysMQ.PublishFeeQuotaData(msg.Data())
+		}
+		if err == nil {
+			break
+		}
+	}
+	return err
+}
+
 func (m *Metering) moveMsgToDLQWithReTry(msg jetstream.Msg, limit int) error {
 	// A maximum of five attempts for move DLQ
-	var err error = nil
+	var err error
 	for i := 0; i < limit; i++ {
 		err = m.sysMQ.PublishMeterDataToDLQ(msg.Data())
 		if err == nil {

@@ -135,3 +135,8 @@ type Mirror struct {
 type MirrorSource struct {
 	SourceName string `json:"source_name"`
 }
+
+type MirrorStatusCount struct {
+	Status MirrorTaskStatus
+	Count  int
+}

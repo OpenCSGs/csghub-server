@@ -8,7 +8,7 @@ import (
 )
 
 type eventComponentImpl struct {
-	es database.EventStore
+	eventStore database.EventStore
 }
 
 // NewEventComponent creates a new EventComponent
@@ -19,7 +19,7 @@ type EventComponent interface {
 
 func NewEventComponent() EventComponent {
 	return &eventComponentImpl{
-		es: database.NewEventStore(),
+		eventStore: database.NewEventStore(),
 	}
 }
 
@@ -34,5 +34,5 @@ func (ec *eventComponentImpl) NewEvents(ctx context.Context, events []types.Even
 		})
 	}
 
-	return ec.es.BatchSave(ctx, dbevents)
+	return ec.eventStore.BatchSave(ctx, dbevents)
 }

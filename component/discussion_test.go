@@ -18,9 +18,9 @@ func TestDiscussionComponent_CreateDisucssion(t *testing.T) {
 	mockDiscussionStore := mockdb.NewMockDiscussionStore(t)
 	// new discussionComponentImpl from mock db store
 	comp := &discussionComponentImpl{
-		rs: mockRepoStore,
-		us: mockUserStore,
-		ds: mockDiscussionStore,
+		repoStore:       mockRepoStore,
+		userStore:       mockUserStore,
+		discussionStore: mockDiscussionStore,
 	}
 
 	repo := &database.Repository{
@@ -46,7 +46,7 @@ func TestDiscussionComponent_CreateDisucssion(t *testing.T) {
 	dbdisc.CreatedAt = time.Now()
 	mockDiscussionStore.EXPECT().Create(mock.Anything, disc).Return(&dbdisc, nil).Once()
 
-	req := CreateRepoDiscussionRequest{
+	req := types.CreateRepoDiscussionRequest{
 		Title:       "test discussion",
 		RepoType:    "model",
 		Namespace:   "namespace",
@@ -56,12 +56,12 @@ func TestDiscussionComponent_CreateDisucssion(t *testing.T) {
 	actualDisc, err := comp.CreateRepoDiscussion(context.TODO(), req)
 	require.Nil(t, err)
 
-	expectedDisc := &CreateDiscussionResponse{
+	expectedDisc := &types.CreateDiscussionResponse{
 		ID:           1,
 		Title:        "test discussion",
 		CommentCount: 0,
 		CreatedAt:    dbdisc.CreatedAt,
-		User: &DiscussionResponse_User{
+		User: &types.DiscussionResponse_User{
 			ID:       1,
 			Username: "user",
 			Avatar:   "avatar",
@@ -77,9 +77,9 @@ func TestDiscussionComponent_GetDisussion(t *testing.T) {
 	mockDiscussionStore := mockdb.NewMockDiscussionStore(t)
 	// new discussionComponentImpl from mock db store
 	comp := &discussionComponentImpl{
-		rs: mockRepoStore,
-		us: mockUserStore,
-		ds: mockDiscussionStore,
+		repoStore:       mockRepoStore,
+		userStore:       mockUserStore,
+		discussionStore: mockDiscussionStore,
 	}
 
 	disc := database.Discussion{
@@ -126,12 +126,12 @@ func TestDiscussionComponent_UpdateDisussion(t *testing.T) {
 	mockDiscussionStore := mockdb.NewMockDiscussionStore(t)
 	// new discussionComponentImpl from mock db store
 	comp := &discussionComponentImpl{
-		rs: mockRepoStore,
-		us: mockUserStore,
-		ds: mockDiscussionStore,
+		repoStore:       mockRepoStore,
+		userStore:       mockUserStore,
+		discussionStore: mockDiscussionStore,
 	}
 
-	req := UpdateDiscussionRequest{
+	req := types.UpdateDiscussionRequest{
 		ID:          1,
 		Title:       "test discussion",
 		CurrentUser: "user",
@@ -164,9 +164,9 @@ func TestDiscussionComponent_DeleteDisussion(t *testing.T) {
 	mockDiscussionStore := mockdb.NewMockDiscussionStore(t)
 	// new discussionComponentImpl from mock db store
 	comp := &discussionComponentImpl{
-		rs: mockRepoStore,
-		us: mockUserStore,
-		ds: mockDiscussionStore,
+		repoStore:       mockRepoStore,
+		userStore:       mockUserStore,
+		discussionStore: mockDiscussionStore,
 	}
 
 	currentUser := "user"
@@ -197,9 +197,9 @@ func TestDiscussionComponent_ListRepoDiscussions(t *testing.T) {
 	mockDiscussionStore := mockdb.NewMockDiscussionStore(t)
 	// new discussionComponentImpl from mock db store
 	comp := &discussionComponentImpl{
-		rs: mockRepoStore,
-		us: mockUserStore,
-		ds: mockDiscussionStore,
+		repoStore:       mockRepoStore,
+		userStore:       mockUserStore,
+		discussionStore: mockDiscussionStore,
 	}
 
 	repo := &database.Repository{
@@ -222,7 +222,7 @@ func TestDiscussionComponent_ListRepoDiscussions(t *testing.T) {
 	})
 	mockDiscussionStore.EXPECT().FindByDiscussionableID(mock.Anything, database.DiscussionableTypeRepo, repo.ID).Return(discussions, nil).Once()
 
-	resp, err := comp.ListRepoDiscussions(context.TODO(), ListRepoDiscussionRequest{
+	resp, err := comp.ListRepoDiscussions(context.TODO(), types.ListRepoDiscussionRequest{
 		RepoType:    types.ModelRepo,
 		Namespace:   "namespace",
 		Name:        "name",
@@ -239,12 +239,12 @@ func TestDiscussionComponent_CreateDisussionComment(t *testing.T) {
 	mockDiscussionStore := mockdb.NewMockDiscussionStore(t)
 	// new discussionComponentImpl from mock db store
 	comp := &discussionComponentImpl{
-		rs: mockRepoStore,
-		us: mockUserStore,
-		ds: mockDiscussionStore,
+		repoStore:       mockRepoStore,
+		userStore:       mockUserStore,
+		discussionStore: mockDiscussionStore,
 	}
 
-	req := CreateCommentRequest{
+	req := types.CreateCommentRequest{
 		Content:         "test comment",
 		CommentableID:   1,
 		CommentableType: database.CommentableTypeDiscussion,
@@ -293,12 +293,12 @@ func TestDiscussionComponent_UpdateComment(t *testing.T) {
 	mockDiscussionStore := mockdb.NewMockDiscussionStore(t)
 	// new discussionComponentImpl from mock db store
 	comp := &discussionComponentImpl{
-		rs: mockRepoStore,
-		us: mockUserStore,
-		ds: mockDiscussionStore,
+		repoStore:       mockRepoStore,
+		userStore:       mockUserStore,
+		discussionStore: mockDiscussionStore,
 	}
 
-	req := CreateCommentRequest{
+	req := types.CreateCommentRequest{
 		Content:         "test comment",
 		CommentableID:   1,
 		CommentableType: database.CommentableTypeDiscussion,
@@ -332,12 +332,12 @@ func TestDiscussionComponent_DeleteComment(t *testing.T) {
 	mockDiscussionStore := mockdb.NewMockDiscussionStore(t)
 	// new discussionComponentImpl from mock db store
 	comp := &discussionComponentImpl{
-		rs: mockRepoStore,
-		us: mockUserStore,
-		ds: mockDiscussionStore,
+		repoStore:       mockRepoStore,
+		userStore:       mockUserStore,
+		discussionStore: mockDiscussionStore,
 	}
 
-	req := CreateCommentRequest{
+	req := types.CreateCommentRequest{
 		Content:         "test comment",
 		CommentableID:   1,
 		CommentableType: database.CommentableTypeDiscussion,
@@ -371,9 +371,9 @@ func TestDiscussionComponent_ListDiscussionComments(t *testing.T) {
 	mockDiscussionStore := mockdb.NewMockDiscussionStore(t)
 	// new discussionComponentImpl from mock db store
 	comp := &discussionComponentImpl{
-		rs: mockRepoStore,
-		us: mockUserStore,
-		ds: mockDiscussionStore,
+		repoStore:       mockRepoStore,
+		userStore:       mockUserStore,
+		discussionStore: mockDiscussionStore,
 	}
 
 	discussionID := int64(1)
@@ -399,7 +399,7 @@ func TestDiscussionComponent_ListDiscussionComments(t *testing.T) {
 
 func TestCreateRepoDiscussionRequest_GetSensitiveFields(t *testing.T) {
 
-	req := CreateRepoDiscussionRequest{
+	req := types.CreateRepoDiscussionRequest{
 		Title: "title",
 	}
 	fields := req.GetSensitiveFields()
@@ -410,7 +410,7 @@ func TestCreateRepoDiscussionRequest_GetSensitiveFields(t *testing.T) {
 
 func TestUpdateDiscussionRequest_GetSensitiveFields(t *testing.T) {
 
-	req := UpdateDiscussionRequest{
+	req := types.UpdateDiscussionRequest{
 		Title: "title",
 	}
 	fields := req.GetSensitiveFields()
@@ -420,7 +420,7 @@ func TestUpdateDiscussionRequest_GetSensitiveFields(t *testing.T) {
 }
 func TestCreateCommentRequest_GetSensitiveFields(t *testing.T) {
 
-	req := CreateCommentRequest{
+	req := types.CreateCommentRequest{
 		Content: "content",
 	}
 	fields := req.GetSensitiveFields()
@@ -431,7 +431,7 @@ func TestCreateCommentRequest_GetSensitiveFields(t *testing.T) {
 
 func TestUpdateCommentRequest_GetSensitiveFields(t *testing.T) {
 
-	req := UpdateCommentRequest{
+	req := types.UpdateCommentRequest{
 		Content: "content",
 	}
 	fields := req.GetSensitiveFields()

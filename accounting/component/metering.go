@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"opencsg.com/csghub-server/accounting/utils"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/types"
 )
@@ -15,6 +16,7 @@ type meteringComponentImpl struct {
 type MeteringComponent interface {
 	SaveMeteringEventRecord(ctx context.Context, req *types.METERING_EVENT) error
 	ListMeteringByUserIDAndDate(ctx context.Context, req types.ACCT_STATEMENTS_REQ) ([]database.AccountMetering, int, error)
+	GetMeteringStatByDate(ctx context.Context, req types.ACCT_STATEMENTS_REQ) ([]map[string]interface{}, error)
 }
 
 func NewMeteringComponent() MeteringComponent {
@@ -37,7 +39,7 @@ func (mc *meteringComponentImpl) SaveMeteringEventRecord(ctx context.Context, re
 		CustomerID:   req.CustomerID,
 		RecordedAt:   req.CreatedAt,
 		Extra:        req.Extra,
-		SkuUnitType:  getUnitString(req.Scene),
+		SkuUnitType:  utils.GetSkuUnitTypeByScene(types.SceneType(req.Scene)),
 	}
 	err := mc.ams.Create(ctx, am)
 	if err != nil {
@@ -54,19 +56,10 @@ func (mc *meteringComponentImpl) ListMeteringByUserIDAndDate(ctx context.Context
 	return meters, total, nil
 }
 
-func getUnitString(scene int) string {
-	switch types.SceneType(scene) {
-	case types.SceneModelInference:
-		return types.UnitMinute
-	case types.SceneSpace:
-		return types.UnitMinute
-	case types.SceneModelFinetune:
-		return types.UnitMinute
-	case types.SceneStarship:
-		return types.UnitToken
-	case types.SceneMultiSync:
-		return types.UnitRepo
-	default:
-		return types.UnitMinute
+func (mc *meteringComponentImpl) GetMeteringStatByDate(ctx context.Context, req types.ACCT_STATEMENTS_REQ) ([]map[string]interface{}, error) {
+	res, err := mc.ams.GetStatByDate(ctx, req)
+	if err != nil {
+		return nil, fmt.Errorf("fail to get metering stat, error: %w", err)
 	}
+	return res, nil
 }

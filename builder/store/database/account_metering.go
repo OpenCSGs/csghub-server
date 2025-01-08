@@ -7,7 +7,6 @@ import (
 
 	"github.com/google/uuid"
 	"opencsg.com/csghub-server/common/types"
-	commonTypes "opencsg.com/csghub-server/common/types"
 )
 
 type accountMeteringStoreImpl struct {
@@ -17,6 +16,7 @@ type accountMeteringStoreImpl struct {
 type AccountMeteringStore interface {
 	Create(ctx context.Context, input AccountMetering) error
 	ListByUserIDAndTime(ctx context.Context, req types.ACCT_STATEMENTS_REQ) ([]AccountMetering, int, error)
+	GetStatByDate(ctx context.Context, req types.ACCT_STATEMENTS_REQ) ([]map[string]interface{}, error)
 	ListAllByUserUUID(ctx context.Context, userUUID string) ([]AccountMetering, error)
 }
 
@@ -57,7 +57,7 @@ func (am *accountMeteringStoreImpl) Create(ctx context.Context, input AccountMet
 	return nil
 }
 
-func (am *accountMeteringStoreImpl) ListByUserIDAndTime(ctx context.Context, req commonTypes.ACCT_STATEMENTS_REQ) ([]AccountMetering, int, error) {
+func (am *accountMeteringStoreImpl) ListByUserIDAndTime(ctx context.Context, req types.ACCT_STATEMENTS_REQ) ([]AccountMetering, int, error) {
 	var accountMeters []AccountMetering
 	q := am.db.Operator.Core.NewSelect().Model(&accountMeters).Where("user_uuid = ? and scene = ? and customer_id = ? and recorded_at >= ? and recorded_at <= ?", req.UserUUID, req.Scene, req.InstanceName, req.StartTime, req.EndTime)
 
@@ -71,6 +71,31 @@ func (am *accountMeteringStoreImpl) ListByUserIDAndTime(ctx context.Context, req
 		return nil, 0, fmt.Errorf("list all meters, error: %w", err)
 	}
 	return accountMeters, count, nil
+}
+
+func (am *accountMeteringStoreImpl) GetStatByDate(ctx context.Context, req types.ACCT_STATEMENTS_REQ) ([]map[string]interface{}, error) {
+	var meter []AccountMetering
+	var res []map[string]interface{}
+	err := am.db.Operator.Core.NewSelect().Model(&meter).
+		ColumnExpr("users.username").
+		ColumnExpr("account_metering.user_uuid").
+		ColumnExpr("account_metering.resource_id").
+		ColumnExpr("sum(account_metering.value) as value").
+		Join("join users on users.uuid = account_metering.user_uuid").
+		Where("account_metering.scene = ?", req.Scene).
+		Where("account_metering.recorded_at >= ?", req.StartTime).
+		Where("account_metering.recorded_at <= ?", req.EndTime).
+		Group("users.username").
+		Group("account_metering.user_uuid").
+		Group("account_metering.resource_id").
+		Order("account_metering.resource_id").
+		Order("value desc").
+		Scan(ctx, &res)
+
+	if err != nil {
+		return nil, fmt.Errorf("select metering stat, error: %w", err)
+	}
+	return res, nil
 }
 
 func (am *accountMeteringStoreImpl) ListAllByUserUUID(ctx context.Context, userUUID string) ([]AccountMetering, error) {

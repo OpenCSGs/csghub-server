@@ -12,13 +12,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/bwmarrin/snowflake"
 	"github.com/google/uuid"
 	"opencsg.com/csghub-server/builder/deploy/common"
 	"opencsg.com/csghub-server/builder/deploy/imagebuilder"
-	"opencsg.com/csghub-server/builder/deploy/imagerunner"
 	"opencsg.com/csghub-server/builder/deploy/scheduler"
-	"opencsg.com/csghub-server/builder/event"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/types"
 )
@@ -38,59 +35,11 @@ type Deployer interface {
 	UpdateCluster(ctx context.Context, data types.ClusterRequest) (*types.UpdateClusterResponse, error)
 	UpdateDeploy(ctx context.Context, dur *types.DeployUpdateReq, deploy *database.Deploy) error
 	StartDeploy(ctx context.Context, deploy *database.Deploy) error
-	CheckResourceAvailable(ctx context.Context, clusterId string, hardWare *types.HardWare) (bool, error)
+	CheckResourceAvailable(ctx context.Context, clusterId string, orderDetailID int64, hardWare *types.HardWare) (bool, error)
 	SubmitEvaluation(ctx context.Context, req types.EvaluationReq) (*types.ArgoWorkFlowRes, error)
 	ListEvaluations(context.Context, string, int, int) (*types.ArgoWorkFlowListRes, error)
 	DeleteEvaluation(ctx context.Context, req types.ArgoWorkFlowDeleteReq) error
 	GetEvaluation(ctx context.Context, req types.EvaluationGetReq) (*types.ArgoWorkFlowRes, error)
-}
-
-var _ Deployer = (*deployer)(nil)
-
-type deployer struct {
-	s  scheduler.Scheduler
-	ib imagebuilder.Builder
-	ir imagerunner.Runner
-
-	store              database.DeployTaskStore
-	spaceStore         database.SpaceStore
-	spaceResourceStore database.SpaceResourceStore
-	runnerStatuscache  map[string]types.StatusResponse
-	internalRootDomain string
-	sfNode             *snowflake.Node
-	eventPub           *event.EventPublisher
-	rtfm               database.RuntimeFrameworksStore
-}
-
-func newDeployer(s scheduler.Scheduler, ib imagebuilder.Builder, ir imagerunner.Runner) (*deployer, error) {
-	store := database.NewDeployTaskStore()
-	node, err := snowflake.NewNode(1)
-	if err != nil || node == nil {
-		slog.Error("fail to generate uuid for inference service name", slog.Any("error", err))
-		return nil, err
-	}
-	d := &deployer{
-		s:                  s,
-		ib:                 ib,
-		ir:                 ir,
-		store:              store,
-		spaceStore:         database.NewSpaceStore(),
-		spaceResourceStore: database.NewSpaceResourceStore(),
-		runnerStatuscache:  make(map[string]types.StatusResponse),
-		sfNode:             node,
-		eventPub:           &event.DefaultEventPublisher,
-		rtfm:               database.NewRuntimeFrameworksStore(),
-	}
-
-	go d.refreshStatus()
-	go func() {
-		err = d.s.Run()
-		if err != nil {
-			slog.Error("run scheduler failed", slog.Any("error", err))
-		}
-	}()
-	go d.startAccounting()
-	return d, nil
 }
 
 func (d *deployer) GenerateUniqueSvcName(dr types.DeployRepo) string {
@@ -106,7 +55,7 @@ func (d *deployer) GenerateUniqueSvcName(dr types.DeployRepo) string {
 	} else {
 		// model inference
 		// generate unique service name from uuid when create new deploy by snowflake
-		uniqueSvcName = d.sfNode.Generate().Base36()
+		uniqueSvcName = d.snowflakeNode.Generate().Base36()
 	}
 	return uniqueSvcName
 }
@@ -118,9 +67,9 @@ func (d *deployer) serverlessDeploy(ctx context.Context, dr types.DeployRepo) (*
 	)
 	slog.Info("do deployer.serverlessDeploy check type", slog.Any("dr.Type", dr.Type))
 	if dr.Type == types.SpaceType {
-		deploy, err = d.store.GetLatestDeployBySpaceID(ctx, dr.SpaceID)
+		deploy, err = d.deployTaskStore.GetLatestDeployBySpaceID(ctx, dr.SpaceID)
 	} else {
-		deploy, err = d.store.GetServerlessDeployByRepID(ctx, dr.RepoID)
+		deploy, err = d.deployTaskStore.GetServerlessDeployByRepID(ctx, dr.RepoID)
 	}
 	if err == sql.ErrNoRows {
 		return nil, nil
@@ -135,8 +84,18 @@ func (d *deployer) serverlessDeploy(ctx context.Context, dr types.DeployRepo) (*
 	deploy.SKU = dr.SKU
 	// dr.ImageID is not null for nginx space, otherwise it's ""
 	deploy.ImageID = dr.ImageID
+	deploy.Annotation = dr.Annotation
+	deploy.Env = dr.Env
+	deploy.Hardware = dr.Hardware
+	deploy.RuntimeFramework = dr.RuntimeFramework
+	deploy.Secret = dr.Secret
+	deploy.SecureLevel = dr.SecureLevel
+	deploy.ContainerPort = dr.ContainerPort
+	deploy.Template = dr.Template
+	deploy.MinReplica = dr.MinReplica
+	deploy.MaxReplica = dr.MaxReplica
 	slog.Debug("do deployer.serverlessDeploy", slog.Any("dr", dr), slog.Any("deploy", deploy))
-	err = d.store.UpdateDeploy(ctx, deploy)
+	err = d.deployTaskStore.UpdateDeploy(ctx, deploy)
 	if err != nil {
 		return nil, fmt.Errorf("fail reset deploy image, %w", err)
 	}
@@ -174,7 +133,8 @@ func (d *deployer) dedicatedDeploy(ctx context.Context, dr types.DeployRepo) (*d
 		UserUUID:         dr.UserUUID,
 		SKU:              dr.SKU,
 	}
-	err := d.store.CreateDeploy(ctx, deploy)
+	updateDatabaseDeploy(deploy, dr)
+	err := d.deployTaskStore.CreateDeploy(ctx, deploy)
 	return deploy, err
 }
 
@@ -203,6 +163,13 @@ func (d *deployer) buildDeploy(ctx context.Context, dr types.DeployRepo) (*datab
 }
 
 func (d *deployer) Deploy(ctx context.Context, dr types.DeployRepo) (int64, error) {
+
+	//check reserved resource
+	err := d.checkOrderDetail(ctx, dr)
+	if err != nil {
+		return -1, err
+	}
+
 	deploy, err := d.buildDeploy(ctx, dr)
 	slog.Info("do deployer.Deploy", slog.Any("dr", dr), slog.Any("deploy", deploy))
 	if err != nil || deploy == nil {
@@ -225,95 +192,55 @@ func (d *deployer) Deploy(ctx context.Context, dr types.DeployRepo) (int64, erro
 		Status:   bldTaskStatus,
 		Message:  bldTaskMsg,
 	}
-	err = d.store.CreateDeployTask(ctx, buildTask)
+	err = d.deployTaskStore.CreateDeployTask(ctx, buildTask)
 	if err != nil {
-		return -1, fmt.Errorf("failed to create deploy task: %w", err)
+		return -1, fmt.Errorf("create deploy task failed: %w", err)
 	}
 	runTask := &database.DeployTask{
 		DeployID: deploy.ID,
 		TaskType: 1,
 	}
-	err = d.store.CreateDeployTask(ctx, runTask)
+	err = d.deployTaskStore.CreateDeployTask(ctx, runTask)
 	if err != nil {
-		return -1, fmt.Errorf("failed to create deploy task: %w", err)
+		return -1, fmt.Errorf("create deploy task failed: %w", err)
 	}
 
-	go func() {
-		if err := d.s.Queue(buildTask.ID); err != nil {
-			slog.Error("failed to queue task", slog.Any("error", err))
-		}
-	}()
+	go func() { _ = d.scheduler.Queue(buildTask.ID) }()
 
 	return deploy.ID, nil
 }
 
-func (d *deployer) refreshStatus() {
-	for {
-		ctxTimeout, cancel := context.WithTimeout(context.Background(), 3*time.Second)
-		status, err := d.ir.StatusAll(ctxTimeout)
-		cancel()
-		if err != nil {
-			slog.Error("refresh status all failed", slog.Any("error", err))
-		} else {
-			slog.Debug("status all cached", slog.Any("status", d.runnerStatuscache))
-			d.runnerStatuscache = status
-		}
-
-		time.Sleep(5 * time.Second)
-	}
-}
-
 func (d *deployer) Status(ctx context.Context, dr types.DeployRepo, needDetails bool) (string, int, []types.Instance, error) {
-	deploy, err := d.store.GetDeployByID(ctx, dr.DeployID)
+	deploy, err := d.deployTaskStore.GetDeployByID(ctx, dr.DeployID)
 	if err != nil || deploy == nil {
-		slog.Error("fail to get deploy by deploy id", slog.Any("DeployID", deploy.ID), slog.Any("error", err))
+		slog.Error("fail to get deploy by deploy id", slog.Any("DeployID", dr.DeployID), slog.Any("error", err))
 		return "", common.Stopped, nil, fmt.Errorf("can't get deploy, %w", err)
 	}
 	svcName := deploy.SvcName
-	// srvName := common.UniqueSpaceAppName(dr.Namespace, dr.Name, dr.SpaceID)
-	rstatus, found := d.runnerStatuscache[svcName]
-	if !found {
-		slog.Debug("status cache miss", slog.String("svc_name", svcName))
-		if deploy.Status == common.Running {
-			// service was Stopped or delete, so no running instance
-			return svcName, common.Stopped, nil, nil
-		}
+	svc, err := d.imageRunner.Exist(ctx, &types.CheckRequest{
+		SvcName:   svcName,
+		ClusterID: deploy.ClusterID,
+	})
+	if err != nil {
+		slog.Error("fail to get deploy by service name", slog.Any("Service NamE", svcName), slog.Any("error", err))
+		return "", common.Stopped, nil, fmt.Errorf("can't get svc, %w", err)
+	}
+	if svc.Code == common.Stopped || svc.Code == -1 {
+		// like queuing, or stopped, use status from deploy
 		return svcName, deploy.Status, nil, nil
 	}
-	deployStatus := rstatus.Code
-	if dr.ModelID > 0 {
-		targetID := dr.DeployID // support model deploy with multi-instance
-		status, err := d.ir.Status(ctx, &types.StatusRequest{
-			ClusterID:   dr.ClusterID,
-			OrgName:     dr.Namespace,
-			RepoName:    dr.Name,
-			SvcName:     deploy.SvcName,
-			ID:          targetID,
-			NeedDetails: needDetails,
-		})
-		if err != nil {
-			slog.Error("fail to get status by deploy id", slog.Any("DeployID", deploy.ID), slog.Any("error", err))
-			return "", common.RunTimeError, nil, fmt.Errorf("can't get deploy status, %w", err)
-		}
-		rstatus.Instances = status.Instances
-		deployStatus = status.Code
-
-	}
-	if rstatus.DeployID == 0 || rstatus.DeployID >= deploy.ID {
-		return svcName, deployStatus, rstatus.Instances, nil
-	}
-	return svcName, deployStatus, rstatus.Instances, nil
+	return svcName, svc.Code, svc.Instances, nil
 }
 
 func (d *deployer) Logs(ctx context.Context, dr types.DeployRepo) (*MultiLogReader, error) {
 	// get latest Deploy
-	deploy, err := d.store.GetLatestDeployBySpaceID(ctx, dr.SpaceID)
+	deploy, err := d.deployTaskStore.GetLatestDeployBySpaceID(ctx, dr.SpaceID)
 	if err != nil {
 		return nil, fmt.Errorf("can't get space delopyment,%w", err)
 	}
 
 	slog.Debug("get logs for space", slog.Any("deploy", deploy), slog.Int64("space_id", dr.SpaceID))
-	buildLog, err := d.ib.Logs(ctx, &imagebuilder.LogsRequest{
+	buildLog, err := d.imageBuilder.Logs(ctx, &imagebuilder.LogsRequest{
 		OrgName:   dr.Namespace,
 		SpaceName: dr.Name,
 		BuildID:   strconv.FormatInt(deploy.ID, 10),
@@ -327,7 +254,7 @@ func (d *deployer) Logs(ctx context.Context, dr types.DeployRepo) (*MultiLogRead
 	if dr.SpaceID == 0 {
 		targetID = dr.DeployID // support model deploy with multi-instance
 	}
-	runLog, err := d.ir.Logs(ctx, &types.LogsRequest{
+	runLog, err := d.imageRunner.Logs(ctx, &types.LogsRequest{
 		ID:        targetID,
 		OrgName:   dr.Namespace,
 		RepoName:  dr.Name,
@@ -347,7 +274,7 @@ func (d *deployer) Stop(ctx context.Context, dr types.DeployRepo) error {
 	if dr.SpaceID == 0 {
 		targetID = dr.DeployID // support model deploy with multi-instance
 	}
-	resp, err := d.ir.Stop(ctx, &types.StopRequest{
+	resp, err := d.imageRunner.Stop(ctx, &types.StopRequest{
 		ID:        targetID,
 		OrgName:   dr.Namespace,
 		RepoName:  dr.Name,
@@ -357,6 +284,11 @@ func (d *deployer) Stop(ctx context.Context, dr types.DeployRepo) error {
 	if err != nil {
 		slog.Error("deployer stop deploy", slog.Any("runner_resp", resp), slog.Int64("space_id", dr.SpaceID), slog.Any("deploy_id", dr.DeployID), slog.Any("error", err))
 	}
+	// release resource if it's a order case
+	err = d.releaseUserResourceByOrder(ctx, dr)
+	if err != nil {
+		return err
+	}
 	return err
 }
 
@@ -365,7 +297,7 @@ func (d *deployer) Purge(ctx context.Context, dr types.DeployRepo) error {
 	if dr.SpaceID == 0 {
 		targetID = dr.DeployID // support model deploy with multi-instance
 	}
-	resp, err := d.ir.Purge(ctx, &types.PurgeRequest{
+	resp, err := d.imageRunner.Purge(ctx, &types.PurgeRequest{
 		ID:         targetID,
 		OrgName:    dr.Namespace,
 		RepoName:   dr.Name,
@@ -417,7 +349,7 @@ func (d *deployer) Exist(ctx context.Context, dr types.DeployRepo) (bool, error)
 		SvcName:   dr.SvcName,
 		ClusterID: dr.ClusterID,
 	}
-	resp, err := d.ir.Exist(ctx, req)
+	resp, err := d.imageRunner.Exist(ctx, req)
 	if err != nil {
 		slog.Error("fail to check deploy", slog.Any("req", req), slog.Any("error", err))
 		return true, err
@@ -427,12 +359,11 @@ func (d *deployer) Exist(ctx context.Context, dr types.DeployRepo) (bool, error)
 		// service check with error
 		slog.Error("deploy check result", slog.Any("resp", resp))
 		return true, errors.New("fail to check deploy instance")
-	} else if resp.Code == 1 {
-		// service exist
-		return true, nil
+	} else if resp.Code == common.Stopped {
+		// service not exist
+		return false, nil
 	}
-	// service not exist
-	return false, nil
+	return true, nil
 }
 
 func (d *deployer) GetReplica(ctx context.Context, dr types.DeployRepo) (int, int, []types.Instance, error) {
@@ -447,7 +378,7 @@ func (d *deployer) GetReplica(ctx context.Context, dr types.DeployRepo) (int, in
 		ClusterID: dr.ClusterID,
 		SvcName:   dr.SvcName,
 	}
-	resp, err := d.ir.GetReplica(ctx, req)
+	resp, err := d.imageRunner.GetReplica(ctx, req)
 	if err != nil {
 		slog.Warn("fail to get deploy replica with error", slog.Any("req", req), slog.Any("error", err))
 		return 0, 0, []types.Instance{}, err
@@ -462,7 +393,7 @@ func (d *deployer) InstanceLogs(ctx context.Context, dr types.DeployRepo) (*Mult
 	if dr.SpaceID == 0 {
 		targetID = dr.DeployID // support model deploy with multi-instance
 	}
-	runLog, err := d.ir.InstanceLogs(ctx, &types.InstanceLogsRequest{
+	runLog, err := d.imageRunner.InstanceLogs(ctx, &types.InstanceLogsRequest{
 		ID:           targetID,
 		OrgName:      dr.Namespace,
 		RepoName:     dr.Name,
@@ -479,7 +410,7 @@ func (d *deployer) InstanceLogs(ctx context.Context, dr types.DeployRepo) (*Mult
 }
 
 func (d *deployer) ListCluster(ctx context.Context) ([]types.ClusterRes, error) {
-	resp, err := d.ir.ListCluster(ctx)
+	resp, err := d.imageRunner.ListCluster(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -501,13 +432,15 @@ func (d *deployer) ListCluster(ctx context.Context) ([]types.ClusterRes, error) 
 }
 
 func (d *deployer) GetClusterById(ctx context.Context, clusterId string) (*types.ClusterRes, error) {
-	resp, err := d.ir.GetClusterById(ctx, clusterId)
+	resp, err := d.imageRunner.GetClusterById(ctx, clusterId)
 	if err != nil {
 		return nil, err
 	}
-	resources := make([]types.NodeResourceInfo, 0)
-	for _, node := range resp.Nodes {
-		resources = append(resources, node)
+
+	// get reserved resources
+	resources, err := d.getResources(ctx, clusterId, resp)
+	if err != nil {
+		return nil, err
 	}
 	result := types.ClusterRes{
 		ClusterID: resp.ClusterID,
@@ -520,8 +453,7 @@ func (d *deployer) GetClusterById(ctx context.Context, clusterId string) (*types
 }
 
 func (d *deployer) UpdateCluster(ctx context.Context, data types.ClusterRequest) (*types.UpdateClusterResponse, error) {
-	resp, err := d.ir.UpdateCluster(ctx, &data)
-	return (*types.UpdateClusterResponse)(resp), err
+	return d.imageRunner.UpdateCluster(ctx, &data)
 }
 
 // UpdateDeploy implements Deployer.
@@ -534,7 +466,7 @@ func (d *deployer) UpdateDeploy(ctx context.Context, dur *types.DeployUpdateReq,
 	)
 
 	if dur.RuntimeFrameworkID != nil {
-		frame, err = d.rtfm.FindEnabledByID(ctx, *dur.RuntimeFrameworkID)
+		frame, err = d.runtimeFrameworkStore.FindEnabledByID(ctx, *dur.RuntimeFrameworkID)
 		if err != nil || frame == nil {
 			return fmt.Errorf("can't find available runtime framework %v, %w", *dur.RuntimeFrameworkID, err)
 		}
@@ -567,11 +499,7 @@ func (d *deployer) UpdateDeploy(ctx context.Context, dur *types.DeployUpdateReq,
 
 	if frame != nil {
 		// choose image
-		containerImg := frame.FrameCpuImage
-		if hardware != nil && hardware.Gpu.Num != "" {
-			// use gpu image
-			containerImg = frame.FrameImage
-		}
+		containerImg := containerImage(hardware, frame)
 		deploy.ImageID = containerImg
 		deploy.RuntimeFramework = frame.FrameName
 		deploy.ContainerPort = frame.ContainerPort
@@ -601,7 +529,7 @@ func (d *deployer) UpdateDeploy(ctx context.Context, dur *types.DeployUpdateReq,
 	}
 
 	// update deploy table
-	err = d.store.UpdateDeploy(ctx, deploy)
+	err = d.deployTaskStore.UpdateDeploy(ctx, deploy)
 	if err != nil {
 		return fmt.Errorf("failed to update deploy, %w", err)
 	}
@@ -612,7 +540,7 @@ func (d *deployer) UpdateDeploy(ctx context.Context, dur *types.DeployUpdateReq,
 func (d *deployer) StartDeploy(ctx context.Context, deploy *database.Deploy) error {
 	deploy.Status = common.Pending
 	// update deploy table
-	err := d.store.UpdateDeploy(ctx, deploy)
+	err := d.deployTaskStore.UpdateDeploy(ctx, deploy)
 	if err != nil {
 		return fmt.Errorf("failed to update deploy, %w", err)
 	}
@@ -622,19 +550,20 @@ func (d *deployer) StartDeploy(ctx context.Context, deploy *database.Deploy) err
 		DeployID: deploy.ID,
 		TaskType: 1,
 	}
-	err = d.store.CreateDeployTask(ctx, runTask)
+	err = d.deployTaskStore.CreateDeployTask(ctx, runTask)
 	if err != nil {
-		return fmt.Errorf("failed to create deploy task: %w", err)
+		return fmt.Errorf("create deploy task failed: %w", err)
 	}
 
-	go func() { _ = d.s.Queue(runTask.ID) }()
+	go func() { _ = d.scheduler.Queue(runTask.ID) }()
+
+	// update resource if it's a order case
+	err = d.updateUserResourceByOrder(ctx, deploy)
+	if err != nil {
+		return err
+	}
 
 	return nil
-}
-
-// accounting timer
-func (d *deployer) startAccounting() {
-	d.startAccountingMetering()
 }
 
 func (d *deployer) getResourceMap() map[string]string {
@@ -652,19 +581,25 @@ func (d *deployer) getResourceMap() map[string]string {
 	return resources
 }
 
-func (d *deployer) startAccountingMetering() {
+func (d *deployer) startAcctFeeing() {
 	for {
 		resMap := d.getResourceMap()
-		slog.Debug("get resources map and runnerStatuscache", slog.Any("resMap", resMap), slog.Any("runnerStatuscache", d.runnerStatuscache))
-		for _, svc := range d.runnerStatuscache {
-			d.startAccountingRequestMeter(resMap, svc)
+		slog.Debug("get resources map", slog.Any("resMap", resMap))
+		ctxTimeout, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		cancel()
+		status, err := d.imageRunner.StatusAll(ctxTimeout)
+		if err != nil {
+			slog.Error("failed to get all service status", slog.Any("error", err))
+		}
+		for _, svc := range status {
+			d.startAcctRequestFee(resMap, svc)
 		}
 		// accounting interval in min, get from env config
 		time.Sleep(time.Duration(d.eventPub.SyncInterval) * time.Minute)
 	}
 }
 
-func (d *deployer) startAccountingRequestMeter(resMap map[string]string, svcRes types.StatusResponse) {
+func (d *deployer) startAcctRequestFee(resMap map[string]string, svcRes types.StatusResponse) {
 	// ignore not ready svc
 	if svcRes.Code != common.Running {
 		return
@@ -684,6 +619,8 @@ func (d *deployer) startAccountingRequestMeter(resMap map[string]string, svcRes 
 		slog.Error("invalid deploy type of service for metering", slog.Any("svcRes", svcRes))
 		return
 	}
+
+	extra := startAcctRequestFeeExtra(svcRes)
 	event := types.METERING_EVENT{
 		Uuid:         uuid.New(),
 		UserUUID:     svcRes.UserID,
@@ -695,7 +632,7 @@ func (d *deployer) startAccountingRequestMeter(resMap map[string]string, svcRes 
 		ResourceName: resName,
 		CustomerID:   svcRes.ServiceName,
 		CreatedAt:    time.Now(),
-		Extra:        "",
+		Extra:        extra,
 	}
 	str, err := json.Marshal(event)
 	if err != nil {
@@ -725,7 +662,7 @@ func getValidSceneType(deployType int) types.SceneType {
 	}
 }
 
-func (d *deployer) CheckResourceAvailable(ctx context.Context, clusterId string, hardWare *types.HardWare) (bool, error) {
+func (d *deployer) CheckResourceAvailable(ctx context.Context, clusterId string, orderDetailID int64, hardWare *types.HardWare) (bool, error) {
 	// backward compatibility for old api
 	if clusterId == "" {
 		clusters, err := d.ListCluster(ctx)
@@ -738,6 +675,10 @@ func (d *deployer) CheckResourceAvailable(ctx context.Context, clusterId string,
 		clusterId = clusters[0].ClusterID
 	}
 	clusterResources, err := d.GetClusterById(ctx, clusterId)
+	if err != nil {
+		return false, err
+	}
+	err = d.checkOrderDetailByID(ctx, orderDetailID)
 	if err != nil {
 		return false, err
 	}
@@ -756,22 +697,9 @@ func CheckResource(clusterResources *types.ClusterRes, hardware *types.HardWare)
 	}
 	for _, node := range clusterResources.Resources {
 		if float32(mem) <= node.AvailableMem {
-			if hardware.Gpu.Num != "" {
-				gpu, err := strconv.Atoi(hardware.Gpu.Num)
-				if err != nil {
-					slog.Error("failed to parse hardware gpu ", slog.Any("error", err))
-					return false
-				}
-				cpu, err := strconv.Atoi(hardware.Cpu.Num)
-				if err != nil {
-					slog.Error("failed to parse hardware cpu ", slog.Any("error", err))
-					return false
-
-				}
-				if gpu <= int(node.AvailableXPU) && hardware.Gpu.Type == node.XPUModel && cpu <= int(node.AvailableCPU) {
-					return true
-				}
-			} else {
+			isAvailable := checkNodeResource(node, hardware)
+			if isAvailable {
+				// if true return, otherwise continue check next node
 				return true
 			}
 		}
@@ -789,9 +717,8 @@ func (d *deployer) SubmitEvaluation(ctx context.Context, req types.EvaluationReq
 	env["ACCESS_TOKEN"] = req.Token
 	env["HF_ENDPOINT"] = req.DownloadEndpoint
 
-	if req.Hardware.Gpu.Num != "" {
-		env["GPU_NUM"] = req.Hardware.Gpu.Num
-	}
+	updateEvaluationEnvHardware(env, req)
+
 	templates := []types.ArgoFlowTemplate{}
 	templates = append(templates, types.ArgoFlowTemplate{
 		Name:     "evaluation",
@@ -800,7 +727,7 @@ func (d *deployer) SubmitEvaluation(ctx context.Context, req types.EvaluationReq
 		Image:    req.Image,
 	},
 	)
-	uniqueFlowName := d.sfNode.Generate().Base36()
+	uniqueFlowName := d.snowflakeNode.Generate().Base36()
 	flowReq := &types.ArgoWorkFlowReq{
 		TaskName:     req.TaskName,
 		TaskId:       uniqueFlowName,
@@ -821,14 +748,14 @@ func (d *deployer) SubmitEvaluation(ctx context.Context, req types.EvaluationReq
 	if req.ResourceId == 0 {
 		flowReq.ShareMode = true
 	}
-	return d.ir.SubmitWorkFlow(ctx, flowReq)
+	return d.imageRunner.SubmitWorkFlow(ctx, flowReq)
 }
 func (d *deployer) ListEvaluations(ctx context.Context, username string, per int, page int) (*types.ArgoWorkFlowListRes, error) {
-	return d.ir.ListWorkFlows(ctx, username, per, page)
+	return d.imageRunner.ListWorkFlows(ctx, username, per, page)
 }
 
 func (d *deployer) DeleteEvaluation(ctx context.Context, req types.ArgoWorkFlowDeleteReq) error {
-	_, err := d.ir.DeleteWorkFlow(ctx, req)
+	_, err := d.imageRunner.DeleteWorkFlow(ctx, req)
 	if err != nil {
 		return err
 	}
@@ -836,7 +763,7 @@ func (d *deployer) DeleteEvaluation(ctx context.Context, req types.ArgoWorkFlowD
 }
 
 func (d *deployer) GetEvaluation(ctx context.Context, req types.EvaluationGetReq) (*types.ArgoWorkFlowRes, error) {
-	wf, err := d.ir.GetWorkFlow(ctx, req)
+	wf, err := d.imageRunner.GetWorkFlow(ctx, req)
 	if err != nil {
 		return nil, err
 	}

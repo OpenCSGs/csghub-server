@@ -26,9 +26,9 @@ func (_m *MockDeployer) EXPECT() *MockDeployer_Expecter {
 	return &MockDeployer_Expecter{mock: &_m.Mock}
 }
 
-// CheckResourceAvailable provides a mock function with given fields: ctx, clusterId, hardWare
-func (_m *MockDeployer) CheckResourceAvailable(ctx context.Context, clusterId string, hardWare *types.HardWare) (bool, error) {
-	ret := _m.Called(ctx, clusterId, hardWare)
+// CheckResourceAvailable provides a mock function with given fields: ctx, clusterId, orderDetailID, hardWare
+func (_m *MockDeployer) CheckResourceAvailable(ctx context.Context, clusterId string, orderDetailID int64, hardWare *types.HardWare) (bool, error) {
+	ret := _m.Called(ctx, clusterId, orderDetailID, hardWare)
 
 	if len(ret) == 0 {
 		panic("no return value specified for CheckResourceAvailable")
@@ -36,17 +36,17 @@ func (_m *MockDeployer) CheckResourceAvailable(ctx context.Context, clusterId st
 
 	var r0 bool
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, *types.HardWare) (bool, error)); ok {
-		return rf(ctx, clusterId, hardWare)
+	if rf, ok := ret.Get(0).(func(context.Context, string, int64, *types.HardWare) (bool, error)); ok {
+		return rf(ctx, clusterId, orderDetailID, hardWare)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, string, *types.HardWare) bool); ok {
-		r0 = rf(ctx, clusterId, hardWare)
+	if rf, ok := ret.Get(0).(func(context.Context, string, int64, *types.HardWare) bool); ok {
+		r0 = rf(ctx, clusterId, orderDetailID, hardWare)
 	} else {
 		r0 = ret.Get(0).(bool)
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, string, *types.HardWare) error); ok {
-		r1 = rf(ctx, clusterId, hardWare)
+	if rf, ok := ret.Get(1).(func(context.Context, string, int64, *types.HardWare) error); ok {
+		r1 = rf(ctx, clusterId, orderDetailID, hardWare)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -62,14 +62,15 @@ type MockDeployer_CheckResourceAvailable_Call struct {
 // CheckResourceAvailable is a helper method to define mock.On call
 //   - ctx context.Context
 //   - clusterId string
+//   - orderDetailID int64
 //   - hardWare *types.HardWare
-func (_e *MockDeployer_Expecter) CheckResourceAvailable(ctx interface{}, clusterId interface{}, hardWare interface{}) *MockDeployer_CheckResourceAvailable_Call {
-	return &MockDeployer_CheckResourceAvailable_Call{Call: _e.mock.On("CheckResourceAvailable", ctx, clusterId, hardWare)}
+func (_e *MockDeployer_Expecter) CheckResourceAvailable(ctx interface{}, clusterId interface{}, orderDetailID interface{}, hardWare interface{}) *MockDeployer_CheckResourceAvailable_Call {
+	return &MockDeployer_CheckResourceAvailable_Call{Call: _e.mock.On("CheckResourceAvailable", ctx, clusterId, orderDetailID, hardWare)}
 }
 
-func (_c *MockDeployer_CheckResourceAvailable_Call) Run(run func(ctx context.Context, clusterId string, hardWare *types.HardWare)) *MockDeployer_CheckResourceAvailable_Call {
+func (_c *MockDeployer_CheckResourceAvailable_Call) Run(run func(ctx context.Context, clusterId string, orderDetailID int64, hardWare *types.HardWare)) *MockDeployer_CheckResourceAvailable_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(string), args[2].(*types.HardWare))
+		run(args[0].(context.Context), args[1].(string), args[2].(int64), args[3].(*types.HardWare))
 	})
 	return _c
 }
@@ -79,7 +80,7 @@ func (_c *MockDeployer_CheckResourceAvailable_Call) Return(_a0 bool, _a1 error) 
 	return _c
 }
 
-func (_c *MockDeployer_CheckResourceAvailable_Call) RunAndReturn(run func(context.Context, string, *types.HardWare) (bool, error)) *MockDeployer_CheckResourceAvailable_Call {
+func (_c *MockDeployer_CheckResourceAvailable_Call) RunAndReturn(run func(context.Context, string, int64, *types.HardWare) (bool, error)) *MockDeployer_CheckResourceAvailable_Call {
 	_c.Call.Return(run)
 	return _c
 }

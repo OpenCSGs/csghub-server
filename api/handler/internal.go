@@ -9,6 +9,7 @@ import (
 	"go.temporal.io/sdk/client"
 	"opencsg.com/csghub-server/api/httpbase"
 	"opencsg.com/csghub-server/api/workflow"
+	"opencsg.com/csghub-server/builder/temporal"
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/types"
 	"opencsg.com/csghub-server/component"
@@ -20,19 +21,21 @@ func NewInternalHandler(config *config.Config) (*InternalHandler, error) {
 		return nil, err
 	}
 	return &InternalHandler{
-		c:      uc,
-		config: config,
+		internal:       uc,
+		config:         config,
+		temporalClient: temporal.GetClient(),
 	}, nil
 }
 
 type InternalHandler struct {
-	c      component.InternalComponent
-	config *config.Config
+	internal       component.InternalComponent
+	config         *config.Config
+	temporalClient temporal.Client
 }
 
 // TODO: add prmission check
 func (h *InternalHandler) Allowed(ctx *gin.Context) {
-	allowed, err := h.c.Allowed(ctx)
+	allowed, err := h.internal.Allowed(ctx)
 	if err != nil {
 		httpbase.ServerError(ctx, err)
 		return
@@ -67,7 +70,7 @@ func (h *InternalHandler) SSHAllowed(ctx *gin.Context) {
 		req.Protocol = rawReq.Protocol
 		req.CheckIP = rawReq.CheckIP
 
-		resp, err := h.c.SSHAllowed(ctx, req)
+		resp, err := h.internal.SSHAllowed(ctx, req)
 		if err != nil {
 			httpbase.ServerError(ctx, err)
 			return
@@ -90,7 +93,7 @@ func (h *InternalHandler) LfsAuthenticate(ctx *gin.Context) {
 		return
 	}
 	req.RepoType, req.Namespace, req.Name = getRepoInfoFronClonePath(req.Repo)
-	resp, err := h.c.LfsAuthenticate(ctx, req)
+	resp, err := h.internal.LfsAuthenticate(ctx, req)
 	if err != nil {
 		httpbase.ServerError(ctx, err)
 		return
@@ -128,7 +131,7 @@ func (h *InternalHandler) PostReceive(ctx *gin.Context) {
 		Ref:           ref,
 		RepoType:      types.RepositoryType(strings.TrimSuffix(paths[0], "s")),
 	}
-	callback, err := h.c.GetCommitDiff(ctx, diffReq)
+	callback, err := h.internal.GetCommitDiff(ctx, diffReq)
 	if err != nil {
 		slog.Error("post receive: failed to get commit diff", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
@@ -136,14 +139,12 @@ func (h *InternalHandler) PostReceive(ctx *gin.Context) {
 	}
 	callback.Ref = originalRef
 	//start workflow to handle push request
-	workflowClient := workflow.GetWorkflowClient()
 	workflowOptions := client.StartWorkflowOptions{
 		TaskQueue: workflow.HandlePushQueueName,
 	}
 
-	we, err := workflowClient.ExecuteWorkflow(ctx, workflowOptions, workflow.HandlePushWorkflow,
-		callback,
-		h.config,
+	we, err := h.temporalClient.ExecuteWorkflow(
+		ctx, workflowOptions, workflow.HandlePushWorkflow, callback,
 	)
 	if err != nil {
 		slog.Error("failed to handle git push callback", slog.Any("error", err))
@@ -165,7 +166,7 @@ func (h *InternalHandler) PostReceive(ctx *gin.Context) {
 
 func (h *InternalHandler) GetAuthorizedKeys(ctx *gin.Context) {
 	key := ctx.Query("key")
-	sshKey, err := h.c.GetAuthorizedKeys(ctx, key)
+	sshKey, err := h.internal.GetAuthorizedKeys(ctx, key)
 	if err != nil {
 		slog.Error("failed to get authorize keys", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)

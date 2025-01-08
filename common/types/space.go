@@ -43,16 +43,17 @@ type Space struct {
 	// the serving endpoint url
 	Endpoint string `json:"endpoint,omitempty" example:"https://localhost/spaces/myname/myspace"`
 	// deploying, running, failed
-	Status       string               `json:"status"`
-	RepositoryID int64                `json:"repository_id,omitempty"`
-	UserLikes    bool                 `json:"user_likes"`
-	Source       RepositorySource     `json:"source"`
-	SyncStatus   RepositorySyncStatus `json:"sync_status"`
-	SKU          string               `json:"sku,omitempty"`
-	SvcName      string               `json:"svc_name,omitempty"`
-	CanWrite     bool                 `json:"can_write"`
-	CanManage    bool                 `json:"can_manage"`
-	Namespace    *Namespace           `json:"namespace"`
+	Status               string               `json:"status"`
+	RepositoryID         int64                `json:"repository_id,omitempty"`
+	UserLikes            bool                 `json:"user_likes"`
+	Source               RepositorySource     `json:"source"`
+	SyncStatus           RepositorySyncStatus `json:"sync_status"`
+	SKU                  string               `json:"sku,omitempty"`
+	SvcName              string               `json:"svc_name,omitempty"`
+	CanWrite             bool                 `json:"can_write"`
+	CanManage            bool                 `json:"can_manage"`
+	Namespace            *Namespace           `json:"namespace"`
+	SensitiveCheckStatus string               `json:"sensitive_check_status"`
 }
 
 type UpdateSpaceReq struct {

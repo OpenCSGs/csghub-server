@@ -3,6 +3,7 @@ package database
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/uptrace/bun"
@@ -31,7 +32,8 @@ type MirrorStore interface {
 	Finished(ctx context.Context) ([]Mirror, error)
 	ToSyncRepo(ctx context.Context) ([]Mirror, error)
 	ToSyncLfs(ctx context.Context) ([]Mirror, error)
-	IndexWithPagination(ctx context.Context, per, page int) (mirrors []Mirror, count int, err error)
+	IndexWithPagination(ctx context.Context, per, page int, search string) (mirrors []Mirror, count int, err error)
+	StatusCount(ctx context.Context) ([]MirrorStatusCount, error)
 	UpdateMirrorAndRepository(ctx context.Context, mirror *Mirror, repo *Repository) error
 }
 
@@ -76,6 +78,11 @@ type Mirror struct {
 	times
 }
 
+type MirrorStatusCount struct {
+	Status types.MirrorTaskStatus `bun:"status"`
+	Count  int                    `bun:"count"`
+}
+
 func (s *mirrorStoreImpl) IsExist(ctx context.Context, repoID int64) (exists bool, err error) {
 	var mirror Mirror
 	exists, err = s.db.Operator.Core.
@@ -90,7 +97,8 @@ func (s *mirrorStoreImpl) IsRepoExist(ctx context.Context, repoType types.Reposi
 	exists, err = s.db.Operator.Core.
 		NewSelect().
 		Model(&repo).
-		Where("git_path=?", fmt.Sprintf("%ss_%s/%s", repoType, namespace, name)).
+		Where("path=?", fmt.Sprintf("%s/%s", namespace, name)).
+		Where("repository_type=?", repoType).
 		Exists(ctx)
 	return
 }
@@ -273,7 +281,13 @@ func (s *mirrorStoreImpl) ToSyncRepo(ctx context.Context) ([]Mirror, error) {
 	var mirrors []Mirror
 	err := s.db.Operator.Core.NewSelect().
 		Model(&mirrors).
-		Where("next_execution_timestamp < ? or status in (?,?,?)", time.Now(), types.MirrorIncomplete, types.MirrorFailed, types.MirrorWaiting).
+		Where(
+			"next_execution_timestamp < ? or status in (?,?,?,?)",
+			time.Now(),
+			types.MirrorIncomplete,
+			types.MirrorFailed,
+			types.MirrorWaiting,
+			types.MirrorRunning).
 		Scan(ctx)
 	if err != nil {
 		return nil, err
@@ -293,11 +307,17 @@ func (s *mirrorStoreImpl) ToSyncLfs(ctx context.Context) ([]Mirror, error) {
 	return mirrors, nil
 }
 
-func (s *mirrorStoreImpl) IndexWithPagination(ctx context.Context, per, page int) (mirrors []Mirror, count int, err error) {
+func (s *mirrorStoreImpl) IndexWithPagination(ctx context.Context, per, page int, search string) (mirrors []Mirror, count int, err error) {
 	q := s.db.Operator.Core.NewSelect().
 		Model(&mirrors).
 		Relation("Repository").
 		Relation("MirrorSource")
+	if search != "" {
+		q = q.Where("LOWER(mirror.source_url) like ? or LOWER(mirror.local_repo_path) like ?",
+			fmt.Sprintf("%%%s%%", strings.ToLower(search)),
+			fmt.Sprintf("%%%s%%", strings.ToLower(search)),
+		)
+	}
 	count, err = q.Count(ctx)
 	if err != nil {
 		return
@@ -311,6 +331,17 @@ func (s *mirrorStoreImpl) IndexWithPagination(ctx context.Context, per, page int
 	}
 
 	return
+}
+
+func (s *mirrorStoreImpl) StatusCount(ctx context.Context) ([]MirrorStatusCount, error) {
+	var statusCounts []MirrorStatusCount
+	err := s.db.Operator.Core.NewSelect().
+		Model((*Mirror)(nil)).
+		Column("status").
+		ColumnExpr("COUNT(*) AS count").
+		Group("status").
+		Scan(ctx, &statusCounts)
+	return statusCounts, err
 }
 
 func (s *mirrorStoreImpl) UpdateMirrorAndRepository(ctx context.Context, mirror *Mirror, repo *Repository) error {

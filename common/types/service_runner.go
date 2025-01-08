@@ -67,16 +67,19 @@ type (
 	}
 
 	StatusResponse struct {
-		DeployID    int64      `json:"deploy_id"`
-		UserID      string     `json:"user_id"`
-		Code        int        `json:"code"`
-		Message     string     `json:"message"`
-		Endpoint    string     `json:"url"`
-		Instances   []Instance `json:"instance"`
-		Replica     int        `json:"replica"`
-		DeployType  int        `json:"deploy_type"`
-		ServiceName string     `json:"service_name"`
-		DeploySku   string     `json:"deploy_sku"`
+		DeployID       int64      `json:"deploy_id"`
+		UserID         string     `json:"user_id"`
+		Code           int        `json:"code"`
+		Message        string     `json:"message"`
+		Endpoint       string     `json:"url"`
+		Instances      []Instance `json:"instance"`
+		Replica        int        `json:"replica"`
+		DeployType     int        `json:"deploy_type"`
+		ServiceName    string     `json:"service_name"`
+		DeploySku      string     `json:"deploy_sku"`
+		OrderDetailID  int64      `json:"order_detail_id"`
+		ActualReplica  int        `json:"actual_replica"`
+		DesiredReplica int        `json:"desired_replica"`
 	}
 
 	LogsRequest struct {
@@ -130,7 +133,8 @@ type (
 	}
 
 	ServiceRequest struct {
-		ClusterID string `json:"cluster_id"`
+		ServiceName string `json:"-"`
+		ClusterID   string `json:"cluster_id"`
 	}
 
 	ServiceInfoResponse struct {
@@ -169,17 +173,19 @@ type (
 		KnativeClient *knative.Clientset    // Knative client
 	}
 	SVCRequest struct {
-		ImageID    string            `json:"image_id" binding:"required"`
-		Hardware   HardWare          `json:"hardware,omitempty"`
-		Env        map[string]string `json:"env,omitempty"`
-		Annotation map[string]string `json:"annotation,omitempty"`
-		DeployID   int64             `json:"deploy_id" binding:"required"`
-		RepoType   string            `json:"repo_type"`
-		MinReplica int               `json:"min_replica"`
-		MaxReplica int               `json:"max_replica"`
-		ClusterID  string            `json:"cluster_id"`
-		DeployType int               `json:"deploy_type"`
-		UserID     string            `json:"user_id"`
-		Sku        string            `json:"sku"`
+		ImageID       string            `json:"image_id" binding:"required"`
+		Hardware      HardWare          `json:"hardware,omitempty"`
+		Env           map[string]string `json:"env,omitempty"`
+		Annotation    map[string]string `json:"annotation,omitempty"`
+		DeployID      int64             `json:"deploy_id" binding:"required"`
+		RepoType      string            `json:"repo_type"`
+		MinReplica    int               `json:"min_replica"`
+		MaxReplica    int               `json:"max_replica"`
+		ClusterID     string            `json:"cluster_id"`
+		DeployType    int               `json:"deploy_type"`
+		UserID        string            `json:"user_id"`
+		Sku           string            `json:"sku"`
+		OrderDetailID int64             `json:"order_detail_id"`
+		SrvName       string            `json:"-"`
 	}
 )

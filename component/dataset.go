@@ -7,7 +7,10 @@ import (
 	"log/slog"
 	"time"
 
+	"opencsg.com/csghub-server/builder/git"
+	"opencsg.com/csghub-server/builder/git/gitserver"
 	"opencsg.com/csghub-server/builder/git/membership"
+	"opencsg.com/csghub-server/builder/rpc"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/types"
@@ -74,7 +77,7 @@ saved_model/**/* filter=lfs diff=lfs merge=lfs -text
 
 const (
 	initCommitMessage     = "initial commit"
-	ossFileExpireSeconds  = 259200 * time.Second
+	ossFileExpire         = 259200 * time.Second
 	readmeFileName        = "README.md"
 	gitattributesFileName = ".gitattributes"
 )
@@ -91,27 +94,44 @@ type DatasetComponent interface {
 
 func NewDatasetComponent(config *config.Config) (DatasetComponent, error) {
 	c := &datasetComponentImpl{}
-	c.ts = database.NewTagStore()
-	c.ds = database.NewDatasetStore()
-	c.rs = database.NewRepoStore()
+	c.tagStore = database.NewTagStore()
+	c.datasetStore = database.NewDatasetStore()
+	c.repoStore = database.NewRepoStore()
+	c.namespaceStore = database.NewNamespaceStore()
+	c.userStore = database.NewUserStore()
+	c.userLikesStore = database.NewUserLikesStore()
 	var err error
-	c.repoComponentImpl, err = NewRepoComponentImpl(config)
+	c.repoComponent, err = NewRepoComponentImpl(config)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create repo component, error: %w", err)
 	}
-	c.sc, err = NewSensitiveComponent(config)
+	c.sensitiveComponent, err = NewSensitiveComponent(config)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create sensitive component, error: %w", err)
 	}
+	gs, err := git.NewGitServer(config)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create git server, error: %w", err)
+	}
+	c.userSvcClient = rpc.NewUserSvcHttpClient(fmt.Sprintf("%s:%d", config.User.Host, config.User.Port),
+		rpc.AuthWithApiKey(config.APIToken))
+	c.gitServer = gs
+	c.config = config
 	return c, nil
 }
 
 type datasetComponentImpl struct {
-	*repoComponentImpl
-	ts database.TagStore
-	ds database.DatasetStore
-	rs database.RepoStore
-	sc SensitiveComponent
+	config             *config.Config
+	repoComponent      RepoComponent
+	tagStore           database.TagStore
+	datasetStore       database.DatasetStore
+	repoStore          database.RepoStore
+	namespaceStore     database.NamespaceStore
+	userStore          database.UserStore
+	sensitiveComponent SensitiveComponent
+	gitServer          gitserver.GitServer
+	userLikesStore     database.UserLikesStore
+	userSvcClient      rpc.UserSvcClient
 }
 
 func (c *datasetComponentImpl) Create(ctx context.Context, req *types.CreateDatasetReq) (*types.Dataset, error) {
@@ -131,7 +151,7 @@ func (c *datasetComponentImpl) Create(ctx context.Context, req *types.CreateData
 	}
 	if !user.CanAdmin() {
 		if namespace.NamespaceType == database.OrgNamespace {
-			canWrite, err := c.CheckCurrentUserPermission(ctx, req.Username, req.Namespace, membership.RoleWrite)
+			canWrite, err := c.repoComponent.CheckCurrentUserPermission(ctx, req.Username, req.Namespace, membership.RoleWrite)
 			if err != nil {
 				return nil, err
 			}
@@ -158,7 +178,7 @@ func (c *datasetComponentImpl) Create(ctx context.Context, req *types.CreateData
 	req.RepoType = types.DatasetRepo
 	req.Readme = generateReadmeData(req.License)
 	req.Nickname = nickname
-	_, dbRepo, err := c.CreateRepo(ctx, req.CreateRepoReq)
+	_, dbRepo, err := c.repoComponent.CreateRepo(ctx, req.CreateRepoReq)
 	if err != nil {
 		return nil, err
 	}
@@ -168,13 +188,13 @@ func (c *datasetComponentImpl) Create(ctx context.Context, req *types.CreateData
 		RepositoryID: dbRepo.ID,
 	}
 
-	dataset, err := c.ds.Create(ctx, dbDataset)
+	dataset, err := c.datasetStore.Create(ctx, dbDataset)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create database dataset, cause: %w", err)
 	}
 
 	// Create README.md file
-	err = c.git.CreateRepoFile(buildCreateFileReq(&types.CreateFileParams{
+	err = c.gitServer.CreateRepoFile(buildCreateFileReq(&types.CreateFileParams{
 		Username:  user.Username,
 		Email:     user.Email,
 		Message:   initCommitMessage,
@@ -190,7 +210,7 @@ func (c *datasetComponentImpl) Create(ctx context.Context, req *types.CreateData
 	}
 
 	// Create .gitattributes file
-	err = c.git.CreateRepoFile(buildCreateFileReq(&types.CreateFileParams{
+	err = c.gitServer.CreateRepoFile(buildCreateFileReq(&types.CreateFileParams{
 		Username:  user.Username,
 		Email:     user.Email,
 		Message:   initCommitMessage,
@@ -258,7 +278,7 @@ func (c *datasetComponentImpl) commonIndex(ctx context.Context, filter *types.Re
 		err         error
 		resDatasets []types.Dataset
 	)
-	repos, total, err := c.PublicToUser(ctx, types.DatasetRepo, filter.Username, filter, per, page)
+	repos, total, err := c.repoComponent.PublicToUser(ctx, types.DatasetRepo, filter.Username, filter, per, page)
 	if err != nil {
 		newError := fmt.Errorf("failed to get public dataset repos,error:%w", err)
 		return nil, 0, newError
@@ -267,7 +287,7 @@ func (c *datasetComponentImpl) commonIndex(ctx context.Context, filter *types.Re
 	for _, repo := range repos {
 		repoIDs = append(repoIDs, repo.ID)
 	}
-	datasets, err := c.ds.ByRepoIDs(ctx, repoIDs)
+	datasets, err := c.datasetStore.ByRepoIDs(ctx, repoIDs)
 	if err != nil {
 		newError := fmt.Errorf("failed to get datasets by repo ids,error:%w", err)
 		return nil, 0, newError
@@ -328,18 +348,18 @@ func (c *datasetComponentImpl) commonIndex(ctx context.Context, filter *types.Re
 
 func (c *datasetComponentImpl) Update(ctx context.Context, req *types.UpdateDatasetReq) (*types.Dataset, error) {
 	req.RepoType = types.DatasetRepo
-	dbRepo, err := c.UpdateRepo(ctx, req.UpdateRepoReq)
+	dbRepo, err := c.repoComponent.UpdateRepo(ctx, req.UpdateRepoReq)
 	if err != nil {
 		return nil, err
 	}
 
-	dataset, err := c.ds.ByRepoID(ctx, dbRepo.ID)
+	dataset, err := c.datasetStore.ByRepoID(ctx, dbRepo.ID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find dataset, error: %w", err)
 	}
 
 	// update times of dateset
-	err = c.ds.Update(ctx, *dataset)
+	err = c.datasetStore.Update(ctx, *dataset)
 	if err != nil {
 		return nil, fmt.Errorf("failed to update database dataset, error: %w", err)
 	}
@@ -362,7 +382,7 @@ func (c *datasetComponentImpl) Update(ctx context.Context, req *types.UpdateData
 }
 
 func (c *datasetComponentImpl) Delete(ctx context.Context, namespace, name, currentUser string) error {
-	dataset, err := c.ds.FindByPath(ctx, namespace, name)
+	dataset, err := c.datasetStore.FindByPath(ctx, namespace, name)
 	if err != nil {
 		return fmt.Errorf("failed to find dataset, error: %w", err)
 	}
@@ -373,12 +393,12 @@ func (c *datasetComponentImpl) Delete(ctx context.Context, namespace, name, curr
 		Name:      name,
 		RepoType:  types.DatasetRepo,
 	}
-	_, err = c.DeleteRepo(ctx, deleteDatabaseRepoReq)
+	_, err = c.repoComponent.DeleteRepo(ctx, deleteDatabaseRepoReq)
 	if err != nil {
 		return fmt.Errorf("failed to delete repo of dataset, error: %w", err)
 	}
 
-	err = c.ds.Delete(ctx, *dataset)
+	err = c.datasetStore.Delete(ctx, *dataset)
 	if err != nil {
 		return fmt.Errorf("failed to delete database dataset, error: %w", err)
 	}
@@ -387,12 +407,12 @@ func (c *datasetComponentImpl) Delete(ctx context.Context, namespace, name, curr
 
 func (c *datasetComponentImpl) Show(ctx context.Context, namespace, name, currentUser string) (*types.Dataset, error) {
 	var tags []types.RepoTag
-	dataset, err := c.ds.FindByPath(ctx, namespace, name)
+	dataset, err := c.datasetStore.FindByPath(ctx, namespace, name)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find dataset, error: %w", err)
 	}
 
-	permission, err := c.GetUserRepoPermission(ctx, currentUser, dataset.Repository)
+	permission, err := c.repoComponent.GetUserRepoPermission(ctx, currentUser, dataset.Repository)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get user repo permission, error: %w", err)
 	}
@@ -400,7 +420,7 @@ func (c *datasetComponentImpl) Show(ctx context.Context, namespace, name, curren
 		return nil, ErrUnauthorized
 	}
 
-	ns, err := c.GetNameSpaceInfo(ctx, namespace)
+	ns, err := c.repoComponent.GetNameSpaceInfo(ctx, namespace)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get namespace info for dataset, error: %w", err)
 	}
@@ -453,17 +473,20 @@ func (c *datasetComponentImpl) Show(ctx context.Context, namespace, name, curren
 		CanManage:           permission.CanAdmin,
 		Namespace:           ns,
 	}
+	if permission.CanAdmin {
+		resDataset.SensitiveCheckStatus = dataset.Repository.SensitiveCheckStatus.String()
+	}
 
 	return resDataset, nil
 }
 
 func (c *datasetComponentImpl) Relations(ctx context.Context, namespace, name, currentUser string) (*types.Relations, error) {
-	dataset, err := c.ds.FindByPath(ctx, namespace, name)
+	dataset, err := c.datasetStore.FindByPath(ctx, namespace, name)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find dataset repo, error: %w", err)
 	}
 
-	allow, _ := c.AllowReadAccessRepo(ctx, dataset.Repository, currentUser)
+	allow, _ := c.repoComponent.AllowReadAccessRepo(ctx, dataset.Repository, currentUser)
 	if !allow {
 		return nil, ErrUnauthorized
 	}
@@ -472,7 +495,7 @@ func (c *datasetComponentImpl) Relations(ctx context.Context, namespace, name, c
 }
 
 func (c *datasetComponentImpl) getRelations(ctx context.Context, repoID int64, currentUser string) (*types.Relations, error) {
-	res, err := c.RelatedRepos(ctx, repoID, currentUser)
+	res, err := c.repoComponent.RelatedRepos(ctx, repoID, currentUser)
 	if err != nil {
 		return nil, err
 	}
@@ -507,7 +530,7 @@ func (c *datasetComponentImpl) OrgDatasets(ctx context.Context, req *types.OrgDa
 		}
 	}
 	onlyPublic := !r.CanRead()
-	datasets, total, err := c.ds.ByOrgPath(ctx, req.Namespace, req.PageSize, req.Page, onlyPublic)
+	datasets, total, err := c.datasetStore.ByOrgPath(ctx, req.Namespace, req.PageSize, req.Page, onlyPublic)
 	if err != nil {
 		newError := fmt.Errorf("failed to get user datasets,error:%w", err)
 		slog.Error(newError.Error())

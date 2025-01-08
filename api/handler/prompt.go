@@ -1,14 +1,11 @@
 package handler
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
 	"slices"
-	"strconv"
-	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -20,9 +17,9 @@ import (
 )
 
 type PromptHandler struct {
-	pc   component.PromptComponent
-	sc   component.SensitiveComponent
-	repo component.RepoComponent
+	prompt    component.PromptComponent
+	sensitive component.SensitiveComponent
+	repo      component.RepoComponent
 }
 
 func NewPromptHandler(cfg *config.Config) (*PromptHandler, error) {
@@ -36,13 +33,12 @@ func NewPromptHandler(cfg *config.Config) (*PromptHandler, error) {
 	}
 	repo, err := component.NewRepoComponent(cfg)
 	if err != nil {
-		return nil, fmt.Errorf("error creating repo component:%w", err)
+		return nil, fmt.Errorf("failed to create repo component: %w", err)
 	}
-
 	return &PromptHandler{
-		pc:   promptComp,
-		sc:   sc,
-		repo: repo,
+		prompt:    promptComp,
+		sensitive: sc,
+		repo:      repo,
 	}, nil
 }
 
@@ -92,7 +88,7 @@ func (h *PromptHandler) Index(ctx *gin.Context) {
 		return
 	}
 
-	prompts, total, err := h.pc.IndexPromptRepo(ctx, filter, per, page)
+	prompts, total, err := h.prompt.IndexPromptRepo(ctx, filter, per, page)
 	if err != nil {
 		slog.Error("Failed to get prompts dataset", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
@@ -128,7 +124,7 @@ func (h *PromptHandler) ListPrompt(ctx *gin.Context) {
 		return
 	}
 
-	detail, err := h.pc.Show(ctx, namespace, name, currentUser)
+	detail, err := h.prompt.Show(ctx, namespace, name, currentUser)
 	if err != nil {
 		if errors.Is(err, component.ErrUnauthorized) {
 			httpbase.UnauthorizedError(ctx, err)
@@ -144,7 +140,7 @@ func (h *PromptHandler) ListPrompt(ctx *gin.Context) {
 		Name:        name,
 		CurrentUser: currentUser,
 	}
-	data, err := h.pc.ListPrompt(ctx, req)
+	data, err := h.prompt.ListPrompt(ctx, req)
 	if err != nil {
 		slog.Error("Failed to list prompts of repo", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
@@ -193,7 +189,7 @@ func (h *PromptHandler) GetPrompt(ctx *gin.Context) {
 		CurrentUser: currentUser,
 		Path:        convertFilePathFromRoute(filePath),
 	}
-	data, err := h.pc.GetPrompt(ctx, req)
+	data, err := h.prompt.GetPrompt(ctx, req)
 	if err != nil {
 		slog.Error("Failed to get prompt of repo", slog.Any("req", req), slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
@@ -229,13 +225,13 @@ func (h *PromptHandler) CreatePrompt(ctx *gin.Context) {
 		return
 	}
 
-	var body *component.CreatePromptReq
+	var body *types.CreatePromptReq
 	if err := ctx.ShouldBindJSON(&body); err != nil {
 		slog.Error("Bad request prompt format", "error", err)
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
-	_, err = h.sc.CheckRequestV2(ctx, body)
+	_, err = h.sensitive.CheckRequestV2(ctx, body)
 	if err != nil {
 		slog.Error("failed to check sensitive request", slog.Any("error", err))
 		httpbase.BadRequest(ctx, fmt.Errorf("sensitive check failed: %w", err).Error())
@@ -247,8 +243,7 @@ func (h *PromptHandler) CreatePrompt(ctx *gin.Context) {
 		Name:        name,
 		CurrentUser: currentUser,
 	}
-
-	data, err := h.pc.CreatePrompt(ctx, req, body)
+	data, err := h.prompt.CreatePrompt(ctx, req, body)
 	if err != nil {
 		slog.Error("Failed to create prompt file of repo", slog.Any("req", req), slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
@@ -291,13 +286,13 @@ func (h *PromptHandler) UpdatePrompt(ctx *gin.Context) {
 		return
 	}
 
-	var body *component.UpdatePromptReq
+	var body *types.UpdatePromptReq
 	if err := ctx.ShouldBindJSON(&body); err != nil {
 		slog.Error("Bad request prompt format", "error", err)
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
-	_, err = h.sc.CheckRequestV2(ctx, body)
+	_, err = h.sensitive.CheckRequestV2(ctx, body)
 	if err != nil {
 		slog.Error("failed to check sensitive request", slog.Any("error", err))
 		httpbase.BadRequest(ctx, fmt.Errorf("sensitive check failed: %w", err).Error())
@@ -310,7 +305,7 @@ func (h *PromptHandler) UpdatePrompt(ctx *gin.Context) {
 		CurrentUser: currentUser,
 		Path:        convertFilePathFromRoute(filePath),
 	}
-	data, err := h.pc.UpdatePrompt(ctx, req, body)
+	data, err := h.prompt.UpdatePrompt(ctx, req, body)
 	if err != nil {
 		slog.Error("Failed to update prompt file of repo", slog.Any("req", req), slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
@@ -360,399 +355,9 @@ func (h *PromptHandler) DeletePrompt(ctx *gin.Context) {
 		CurrentUser: currentUser,
 		Path:        convertFilePathFromRoute(filePath),
 	}
-	err = h.pc.DeletePrompt(ctx, req)
+	err = h.prompt.DeletePrompt(ctx, req)
 	if err != nil {
 		slog.Error("Failed to remove prompt file of repo", slog.Any("req", req), slog.Any("error", err))
-		httpbase.ServerError(ctx, err)
-		return
-	}
-	httpbase.OK(ctx, nil)
-}
-
-// NewConversation godoc
-// @Security     ApiKey
-// @Summary      Create new conversation
-// @Description  Create new conversation
-// @Tags         Prompt
-// @Accept       json
-// @Produce      json
-// @Param        body body types.Conversation true "body"
-// @Success      200  {object}  types.Response{} "OK"
-// @Failure      400  {object}  types.APIBadRequest "Bad request"
-// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
-// @Router       /prompts/conversations [post]
-func (h *PromptHandler) NewConversation(ctx *gin.Context) {
-	currentUser := httpbase.GetCurrentUser(ctx)
-	if currentUser == "" {
-		httpbase.UnauthorizedError(ctx, component.ErrUserNotFound)
-		return
-	}
-	var body *types.ConversationTitle
-	if err := ctx.ShouldBindJSON(&body); err != nil {
-		slog.Error("Bad request conversation body", "error", err)
-		httpbase.BadRequest(ctx, err.Error())
-		return
-	}
-	req := types.ConversationTitleReq{
-		CurrentUser: currentUser,
-		ConversationTitle: types.ConversationTitle{
-			Uuid:  body.Uuid,
-			Title: body.Title,
-		},
-	}
-	resp, err := h.pc.NewConversation(ctx, req)
-	if err != nil {
-		slog.Error("Failed to create conversation", slog.Any("req", req), slog.Any("error", err))
-		httpbase.ServerError(ctx, err)
-		return
-	}
-	httpbase.OK(ctx, resp)
-}
-
-// ListConversation godoc
-// @Security     ApiKey
-// @Summary      List conversations of user
-// @Description  List conversations of user
-// @Tags         Prompt
-// @Accept       json
-// @Produce      json
-// @Success      200  {object}  types.Response{} "OK"
-// @Failure      400  {object}  types.APIBadRequest "Bad request"
-// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
-// @Router       /prompts/conversations [get]
-func (h *PromptHandler) ListConversation(ctx *gin.Context) {
-	currentUser := httpbase.GetCurrentUser(ctx)
-	if currentUser == "" {
-		httpbase.UnauthorizedError(ctx, component.ErrUserNotFound)
-		return
-	}
-	data, err := h.pc.ListConversationsByUserID(ctx, currentUser)
-	if err != nil {
-		slog.Error("Failed to list conversations", slog.Any("currentUser", currentUser), slog.Any("error", err))
-		httpbase.ServerError(ctx, err)
-		return
-	}
-	httpbase.OK(ctx, data)
-}
-
-// GetConversation godoc
-// @Security     ApiKey
-// @Summary      Get a conversation by uuid
-// @Description  Get a conversation by uuid
-// @Tags         Prompt
-// @Accept       json
-// @Produce      json
-// @Param        id   path string true "conversation uuid"
-// @Success      200  {object}  types.Response{} "OK"
-// @Failure      400  {object}  types.APIBadRequest "Bad request"
-// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
-// @Router       /prompts/conversations/{id} [get]
-func (h *PromptHandler) GetConversation(ctx *gin.Context) {
-	currentUser := httpbase.GetCurrentUser(ctx)
-	if currentUser == "" {
-		httpbase.UnauthorizedError(ctx, component.ErrUserNotFound)
-		return
-	}
-	uuid := ctx.Param("id")
-	if len(uuid) < 1 {
-		slog.Error("Bad request conversation uuid")
-		httpbase.BadRequest(ctx, "uuid is empty")
-		return
-	}
-	req := types.ConversationReq{
-		CurrentUser: currentUser,
-		Conversation: types.Conversation{
-			Uuid: uuid,
-		},
-	}
-	conversation, err := h.pc.GetConversation(ctx, req)
-	if err != nil {
-		slog.Error("Failed to get conversation by id", slog.Any("req", req), slog.Any("error", err))
-		httpbase.ServerError(ctx, err)
-		return
-	}
-	httpbase.OK(ctx, conversation)
-}
-
-// SubmitMessage godoc
-// @Security     ApiKey
-// @Summary      Submit a conversation message
-// @Description  Submit a conversation message
-// @Tags         Prompt
-// @Accept       json
-// @Produce      json
-// @Param        id   path string true "conversation uuid"
-// @Param        body body types.Conversation true "body"
-// @Success      200  {object}  types.Response{} "OK"
-// @Failure      400  {object}  types.APIBadRequest "Bad request"
-// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
-// @Router       /prompts/conversations/{id} [post]
-func (h *PromptHandler) SubmitMessage(ctx *gin.Context) {
-	currentUser := httpbase.GetCurrentUser(ctx)
-	if currentUser == "" {
-		httpbase.UnauthorizedError(ctx, component.ErrUserNotFound)
-		return
-	}
-	uuid := ctx.Param("id")
-	if len(uuid) < 1 {
-		slog.Error("Bad request conversation uuid")
-		httpbase.BadRequest(ctx, "uuid is empty")
-		return
-	}
-	var body *types.Conversation
-	if err := ctx.ShouldBindJSON(&body); err != nil {
-		slog.Error("Bad request messsage body", "error", err)
-		httpbase.BadRequest(ctx, err.Error())
-		return
-	}
-	req := types.ConversationReq{
-		CurrentUser: currentUser,
-		Conversation: types.Conversation{
-			Uuid:        uuid,
-			Message:     body.Message,
-			Temperature: body.Temperature,
-		},
-	}
-
-	ch, err := h.pc.SubmitMessage(ctx, req)
-	if err != nil {
-		slog.Error("Failed to submit message", slog.Any("req", req), slog.Any("error", err))
-		httpbase.ServerError(ctx, err)
-		return
-	}
-	ctx.Writer.Header().Set("Content-Type", "text/event-stream")
-	ctx.Writer.Header().Set("Cache-Control", "no-cache")
-	ctx.Writer.Header().Set("Connection", "keep-alive")
-	ctx.Writer.Header().Set("Transfer-Encoding", "chunked")
-
-	ctx.Writer.WriteHeader(http.StatusOK)
-	ctx.Writer.Flush()
-
-	generatedText := ""
-	for {
-		select {
-		case <-ctx.Request.Context().Done():
-			slog.Debug("generate respose end for context done", slog.Any("error", ctx.Request.Context().Err()))
-			res := types.Conversation{
-				Uuid:    uuid,
-				Message: generatedText,
-			}
-			_, err = h.pc.SaveGeneratedText(ctx, res)
-			if err != nil {
-				slog.Error("fail to save generated message for request cancel", slog.Any("res", res), slog.Any("error", err))
-				httpbase.ServerError(ctx, err)
-			}
-			return
-		case data, ok := <-ch:
-			if ok {
-				if len(data) < 1 {
-					continue
-				}
-				data := strings.TrimSpace(strings.TrimPrefix(data, "data:"))
-				ctx.SSEvent("data", data)
-				ctx.Writer.Flush()
-				resp := types.LLMResponse{}
-				err := json.Unmarshal([]byte(data), &resp)
-				if err != nil {
-					slog.Warn("unmarshal llm response", slog.Any("data", data), slog.Any("error", err))
-					continue
-				}
-				if len(resp.Choices) < 1 {
-					continue
-				}
-				generatedText = fmt.Sprintf("%s%s", generatedText, resp.Choices[0].Delta.Content)
-			} else {
-				slog.Debug("stream channel closed")
-				res := types.Conversation{
-					Uuid:    uuid,
-					Message: generatedText,
-				}
-				msg, err := h.pc.SaveGeneratedText(ctx, res)
-				if err != nil {
-					slog.Error("fail to save generated message for stream close", slog.Any("res", res), slog.Any("error", err))
-					httpbase.ServerError(ctx, err)
-				}
-				ctx.SSEvent("data", fmt.Sprintf("{\"msg_id\": %d}", msg.ID))
-				ctx.Writer.Flush()
-				return
-			}
-		}
-	}
-}
-
-// UpdateConversation godoc
-// @Security     ApiKey
-// @Summary      Update a conversation title
-// @Description  Update a conversation title
-// @Tags         Prompt
-// @Accept       json
-// @Produce      json
-// @Param        id   path string true "conversation uuid"
-// @Param        body body types.ConversationTitle true "body"
-// @Success      200  {object}  types.Response{} "OK"
-// @Failure      400  {object}  types.APIBadRequest "Bad request"
-// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
-// @Router       /prompts/conversations/{id} [put]
-func (h *PromptHandler) UpdateConversation(ctx *gin.Context) {
-	currentUser := httpbase.GetCurrentUser(ctx)
-	if currentUser == "" {
-		httpbase.UnauthorizedError(ctx, component.ErrUserNotFound)
-		return
-	}
-	uuid := ctx.Param("id")
-	if len(uuid) < 1 {
-		slog.Error("Bad request conversation uuid")
-		httpbase.BadRequest(ctx, "uuid is empty")
-		return
-	}
-	var body *types.ConversationTitle
-	if err := ctx.ShouldBindJSON(&body); err != nil {
-		slog.Error("Bad request messsage body", "error", err)
-		httpbase.BadRequest(ctx, err.Error())
-		return
-	}
-
-	req := types.ConversationTitleReq{
-		CurrentUser: currentUser,
-		ConversationTitle: types.ConversationTitle{
-			Uuid:  uuid,
-			Title: body.Title,
-		},
-	}
-	resp, err := h.pc.UpdateConversation(ctx, req)
-	if err != nil {
-		slog.Error("Failed to update conversation", slog.Any("req", req), slog.Any("error", err))
-		httpbase.ServerError(ctx, err)
-		return
-	}
-	httpbase.OK(ctx, resp)
-}
-
-// DeleteConversation godoc
-// @Security     ApiKey
-// @Summary      Delete a conversation
-// @Description  Delete a conversation
-// @Tags         Prompt
-// @Accept       json
-// @Produce      json
-// @Param        id   path string true  "conversation uuid"
-// @Success      200  {object}  types.Response{} "OK"
-// @Failure      400  {object}  types.APIBadRequest "Bad request"
-// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
-// @Router       /prompts/conversations/{id} [delete]
-func (h *PromptHandler) RemoveConversation(ctx *gin.Context) {
-	currentUser := httpbase.GetCurrentUser(ctx)
-	if currentUser == "" {
-		httpbase.UnauthorizedError(ctx, component.ErrUserNotFound)
-		return
-	}
-	uuid := ctx.Param("id")
-	if len(uuid) < 1 {
-		slog.Error("Bad request conversation uuid")
-		httpbase.BadRequest(ctx, "uuid is empty")
-		return
-	}
-	req := types.ConversationReq{
-		CurrentUser: currentUser,
-		Conversation: types.Conversation{
-			Uuid: uuid,
-		},
-	}
-	err := h.pc.RemoveConversation(ctx, req)
-	if err != nil {
-		slog.Error("Failed to remove conversation by id", slog.Any("req", req), slog.Any("error", err))
-		httpbase.ServerError(ctx, err)
-		return
-	}
-	httpbase.OK(ctx, nil)
-}
-
-// LikeMessage godoc
-// @Security     ApiKey
-// @Summary      Like a conversation message
-// @Description  Like a conversation message
-// @Tags         Prompt
-// @Accept       json
-// @Produce      json
-// @Param        uuid path string true  "conversation uuid"
-// @Param        id  path string true  "message id"
-// @Success      200  {object}  types.Response{} "OK"
-// @Failure      400  {object}  types.APIBadRequest "Bad request"
-// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
-// @Router       /prompts/conversations/{id}/message/{msgid}/like [put]
-func (h *PromptHandler) LikeMessage(ctx *gin.Context) {
-	currentUser := httpbase.GetCurrentUser(ctx)
-	if currentUser == "" {
-		httpbase.UnauthorizedError(ctx, component.ErrUserNotFound)
-		return
-	}
-	uuid := ctx.Param("id")
-	if len(uuid) < 1 {
-		slog.Error("Bad request conversation uuid")
-		httpbase.BadRequest(ctx, "uuid is empty")
-		return
-	}
-	msgid := ctx.Param("msgid")
-	idInt, err := strconv.ParseInt(msgid, 10, 64)
-	if err != nil {
-		slog.Error("Bad request message id", slog.Any("msgid", msgid), slog.Any("error", err))
-		httpbase.BadRequest(ctx, err.Error())
-		return
-	}
-	req := types.ConversationMessageReq{
-		Uuid:        uuid,
-		Id:          idInt,
-		CurrentUser: currentUser,
-	}
-	err = h.pc.LikeConversationMessage(ctx, req)
-	if err != nil {
-		slog.Error("Failed to like conversation message", slog.Any("req", req), slog.Any("error", err))
-		httpbase.ServerError(ctx, err)
-		return
-	}
-	httpbase.OK(ctx, nil)
-}
-
-// HateMessage godoc
-// @Security     ApiKey
-// @Summary      Hate a conversation message
-// @Description  Hate a conversation message
-// @Tags         Prompt
-// @Accept       json
-// @Produce      json
-// @Param        uuid path string true  "conversation uuid"
-// @Param        id  path string true  "message id"
-// @Success      200  {object}  types.Response{} "OK"
-// @Failure      400  {object}  types.APIBadRequest "Bad request"
-// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
-// @Router       /prompts/conversations/{id}/message/{msgid}/hate [put]
-func (h *PromptHandler) HateMessage(ctx *gin.Context) {
-	currentUser := httpbase.GetCurrentUser(ctx)
-	if currentUser == "" {
-		httpbase.UnauthorizedError(ctx, component.ErrUserNotFound)
-		return
-	}
-	uuid := ctx.Param("id")
-	if len(uuid) < 1 {
-		slog.Error("Bad request conversation uuid")
-		httpbase.BadRequest(ctx, "uuid is empty")
-		return
-	}
-	msgid := ctx.Param("msgid")
-	idInt, err := strconv.ParseInt(msgid, 10, 64)
-	if err != nil {
-		slog.Error("Bad request message id", slog.Any("msgid", msgid), slog.Any("error", err))
-		httpbase.BadRequest(ctx, err.Error())
-		return
-	}
-	req := types.ConversationMessageReq{
-		Uuid:        uuid,
-		Id:          idInt,
-		CurrentUser: currentUser,
-	}
-	err = h.pc.HateConversationMessage(ctx, req)
-	if err != nil {
-		slog.Error("Failed to hate conversation message", slog.Any("req", req), slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
 		return
 	}
@@ -780,7 +385,7 @@ func (h *PromptHandler) Relations(ctx *gin.Context) {
 		return
 	}
 	currentUser := httpbase.GetCurrentUser(ctx)
-	detail, err := h.pc.Relations(ctx, namespace, name, currentUser)
+	detail, err := h.prompt.Relations(ctx, namespace, name, currentUser)
 	if err != nil {
 		if errors.Is(err, component.ErrUnauthorized) {
 			httpbase.UnauthorizedError(ctx, err)
@@ -832,7 +437,7 @@ func (h *PromptHandler) SetRelations(ctx *gin.Context) {
 	req.Name = name
 	req.CurrentUser = currentUser
 
-	err = h.pc.SetRelationModels(ctx, req)
+	err = h.prompt.SetRelationModels(ctx, req)
 	if err != nil {
 		slog.Error("Failed to set models for prompt", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
@@ -879,7 +484,7 @@ func (h *PromptHandler) AddModelRelation(ctx *gin.Context) {
 	req.Name = name
 	req.CurrentUser = currentUser
 
-	err = h.pc.AddRelationModel(ctx, req)
+	err = h.prompt.AddRelationModel(ctx, req)
 	if err != nil {
 		slog.Error("Failed to add model for prompt", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
@@ -926,7 +531,7 @@ func (h *PromptHandler) DelModelRelation(ctx *gin.Context) {
 	req.Name = name
 	req.CurrentUser = currentUser
 
-	err = h.pc.DelRelationModel(ctx, req)
+	err = h.prompt.DelRelationModel(ctx, req)
 	if err != nil {
 		slog.Error("Failed to delete dataset for model", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
@@ -960,7 +565,7 @@ func (h *PromptHandler) Create(ctx *gin.Context) {
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
-	_, err := h.sc.CheckRequestV2(ctx, req)
+	_, err := h.sensitive.CheckRequestV2(ctx, req)
 	if err != nil {
 		slog.Error("failed to check sensitive request", slog.Any("error", err))
 		httpbase.BadRequest(ctx, fmt.Errorf("sensitive check failed: %w", err).Error())
@@ -968,7 +573,7 @@ func (h *PromptHandler) Create(ctx *gin.Context) {
 	}
 	req.Username = currentUser
 
-	prompt, err := h.pc.CreatePromptRepo(ctx, req)
+	prompt, err := h.prompt.CreatePromptRepo(ctx, req)
 	if err != nil {
 		slog.Error("Failed to create prompt repo", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
@@ -1009,7 +614,7 @@ func (h *PromptHandler) Update(ctx *gin.Context) {
 		return
 	}
 
-	_, err := h.sc.CheckRequestV2(ctx, req)
+	_, err := h.sensitive.CheckRequestV2(ctx, req)
 	if err != nil {
 		slog.Error("failed to check sensitive request", slog.Any("error", err))
 		httpbase.BadRequest(ctx, fmt.Errorf("sensitive check failed: %w", err).Error())
@@ -1026,7 +631,7 @@ func (h *PromptHandler) Update(ctx *gin.Context) {
 	req.Namespace = namespace
 	req.Name = name
 
-	prompt, err := h.pc.UpdatePromptRepo(ctx, req)
+	prompt, err := h.prompt.UpdatePromptRepo(ctx, req)
 	if err != nil {
 		slog.Error("Failed to update prompt repo", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
@@ -1062,7 +667,7 @@ func (h *PromptHandler) Delete(ctx *gin.Context) {
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
-	err = h.pc.RemoveRepo(ctx, namespace, name, currentUser)
+	err = h.prompt.RemoveRepo(ctx, namespace, name, currentUser)
 	if err != nil {
 		slog.Error("Failed to delete prompt repo", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
@@ -1171,7 +776,7 @@ func (h *PromptHandler) Tags(ctx *gin.Context) {
 func (h *PromptHandler) UpdateTags(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
 	if currentUser == "" {
-		httpbase.UnauthorizedError(ctx, httpbase.ErrorNeedLogin)
+		httpbase.UnauthorizedError(ctx, component.ErrUserNotFound)
 		return
 	}
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)

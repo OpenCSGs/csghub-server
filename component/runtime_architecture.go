@@ -8,6 +8,7 @@ import (
 	"strings"
 	"sync"
 
+	"opencsg.com/csghub-server/builder/git"
 	"opencsg.com/csghub-server/builder/git/gitserver"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/config"
@@ -22,11 +23,14 @@ var (
 )
 
 type runtimeArchitectureComponentImpl struct {
-	r   *repoComponentImpl
-	ras database.RuntimeArchitecturesStore
-	rfs database.RuntimeFrameworksStore
-	ts  database.TagStore
-	rms database.ResourceModelStore
+	repoComponent             RepoComponent
+	repoStore                 database.RepoStore
+	repoRuntimeFrameworkStore database.RepositoriesRuntimeFrameworkStore
+	runtimeArchStore          database.RuntimeArchitecturesStore
+	runtimeFrameworksStore    database.RuntimeFrameworksStore
+	tagStore                  database.TagStore
+	resouceModelStore         database.ResourceModelStore
+	gitServer                 gitserver.GitServer
 }
 
 type RuntimeArchitectureComponent interface {
@@ -47,20 +51,28 @@ type RuntimeArchitectureComponent interface {
 
 func NewRuntimeArchitectureComponent(config *config.Config) (RuntimeArchitectureComponent, error) {
 	c := &runtimeArchitectureComponentImpl{}
-	c.rfs = database.NewRuntimeFrameworksStore()
-	c.ras = database.NewRuntimeArchitecturesStore()
-	c.ts = database.NewTagStore()
-	c.rms = database.NewResourceModelStore()
+	c.runtimeFrameworksStore = database.NewRuntimeFrameworksStore()
+	c.runtimeArchStore = database.NewRuntimeArchitecturesStore()
+	c.tagStore = database.NewTagStore()
+	c.resouceModelStore = database.NewResourceModelStore()
 	repo, err := NewRepoComponentImpl(config)
 	if err != nil {
 		return nil, fmt.Errorf("fail to create repo component, %w", err)
 	}
-	c.r = repo
+	c.repoComponent = repo
+	c.repoStore = database.NewRepoStore()
+	c.repoRuntimeFrameworkStore = database.NewRepositoriesRuntimeFramework()
+	c.gitServer, err = git.NewGitServer(config)
+	if err != nil {
+		newError := fmt.Errorf("fail to create git server,error:%w", err)
+		slog.Error(newError.Error())
+		return nil, newError
+	}
 	return c, nil
 }
 
 func (c *runtimeArchitectureComponentImpl) ListByRuntimeFrameworkID(ctx context.Context, id int64) ([]database.RuntimeArchitecture, error) {
-	archs, err := c.ras.ListByRuntimeFrameworkID(ctx, id)
+	archs, err := c.runtimeArchStore.ListByRuntimeFrameworkID(ctx, id)
 	if err != nil {
 		return nil, fmt.Errorf("list runtime arch failed, %w", err)
 	}
@@ -68,7 +80,7 @@ func (c *runtimeArchitectureComponentImpl) ListByRuntimeFrameworkID(ctx context.
 }
 
 func (c *runtimeArchitectureComponentImpl) SetArchitectures(ctx context.Context, id int64, architectures []string) ([]string, error) {
-	_, err := c.r.runtimeFrameworksStore.FindByID(ctx, id)
+	_, err := c.runtimeFrameworksStore.FindByID(ctx, id)
 	if err != nil {
 		return nil, fmt.Errorf("invalid runtime framework id, %w", err)
 	}
@@ -77,7 +89,7 @@ func (c *runtimeArchitectureComponentImpl) SetArchitectures(ctx context.Context,
 		if len(strings.Trim(arch, " ")) < 1 {
 			continue
 		}
-		err := c.ras.Add(ctx, database.RuntimeArchitecture{
+		err := c.runtimeArchStore.Add(ctx, database.RuntimeArchitecture{
 			RuntimeFrameworkID: id,
 			ArchitectureName:   strings.Trim(arch, " "),
 		})
@@ -89,7 +101,7 @@ func (c *runtimeArchitectureComponentImpl) SetArchitectures(ctx context.Context,
 }
 
 func (c *runtimeArchitectureComponentImpl) DeleteArchitectures(ctx context.Context, id int64, architectures []string) ([]string, error) {
-	_, err := c.r.runtimeFrameworksStore.FindByID(ctx, id)
+	_, err := c.runtimeFrameworksStore.FindByID(ctx, id)
 	if err != nil {
 		return nil, fmt.Errorf("invalid runtime framework id, %w", err)
 	}
@@ -98,7 +110,7 @@ func (c *runtimeArchitectureComponentImpl) DeleteArchitectures(ctx context.Conte
 		if len(strings.Trim(arch, " ")) < 1 {
 			continue
 		}
-		err := c.ras.DeleteByRuntimeIDAndArchName(ctx, id, strings.Trim(arch, " "))
+		err := c.runtimeArchStore.DeleteByRuntimeIDAndArchName(ctx, id, strings.Trim(arch, " "))
 		if err != nil {
 			failedDeletes = append(failedDeletes, arch)
 		}
@@ -107,15 +119,15 @@ func (c *runtimeArchitectureComponentImpl) DeleteArchitectures(ctx context.Conte
 }
 
 func (c *runtimeArchitectureComponentImpl) ScanArchitecture(ctx context.Context, id int64, scanType int, models []string) error {
-	frame, err := c.r.runtimeFrameworksStore.FindByID(ctx, id)
+	frame, err := c.runtimeFrameworksStore.FindByID(ctx, id)
 	if err != nil {
 		return fmt.Errorf("invalid runtime framework id, %w", err)
 	}
-	archs, err := c.ras.ListByRuntimeFrameworkID(ctx, id)
+	archs, err := c.runtimeArchStore.ListByRuntimeFrameworkID(ctx, id)
 	if err != nil {
 		return fmt.Errorf("list runtime arch failed, %w", err)
 	}
-	var archMap map[string]string = make(map[string]string)
+	var archMap = make(map[string]string)
 	for _, arch := range archs {
 		archMap[arch.ArchitectureName] = arch.ArchitectureName
 	}
@@ -156,18 +168,18 @@ func (c *runtimeArchitectureComponentImpl) ScanArchitecture(ctx context.Context,
 }
 
 func (c *runtimeArchitectureComponentImpl) scanNewModels(ctx context.Context, req types.ScanReq) error {
-	repos, err := c.r.repoStore.GetRepoWithoutRuntimeByID(ctx, req.FrameID, req.Models)
+	repos, err := c.repoStore.GetRepoWithoutRuntimeByID(ctx, req.FrameID, req.Models)
 	if err != nil {
 		return fmt.Errorf("failed to get repos without runtime by ID, %w", err)
 	}
 	if repos == nil {
 		return nil
 	}
-	runtime_framework, err := c.rfs.FindByID(ctx, req.FrameID)
+	runtime_framework, err := c.runtimeFrameworksStore.FindByID(ctx, req.FrameID)
 	if err != nil {
 		return fmt.Errorf("failed to get runtime framework by ID, %w", err)
 	}
-	runtime_framework_tags, _ := c.ts.GetTagsByScopeAndCategories(ctx, "model", []string{"runtime_framework", "resource"})
+	runtime_framework_tags, _ := c.tagStore.GetTagsByScopeAndCategories(ctx, "model", []string{"runtime_framework", "resource"})
 	for _, repo := range repos {
 		namespace, name := repo.NamespaceAndName()
 		arch, err := c.GetArchitectureFromConfig(ctx, namespace, name)
@@ -187,7 +199,7 @@ func (c *runtimeArchitectureComponentImpl) scanNewModels(ctx context.Context, re
 		if !exist && !isSupportedRM {
 			continue
 		}
-		err = c.r.repoRuntimeFrameworkStore.Add(ctx, req.FrameID, repo.ID, req.FrameType)
+		err = c.repoRuntimeFrameworkStore.Add(ctx, req.FrameID, repo.ID, req.FrameType)
 		if err != nil {
 			slog.Warn("fail to create relation", slog.Any("repo", repo.Path), slog.Any("frameid", req.FrameID), slog.Any("error", err))
 		}
@@ -207,7 +219,7 @@ func (c *runtimeArchitectureComponentImpl) scanNewModels(ctx context.Context, re
 // check if it's supported model resource by name
 func (c *runtimeArchitectureComponentImpl) IsSupportedModelResource(ctx context.Context, modelName string, rf *database.RuntimeFramework, id int64) (bool, error) {
 	trimModel := strings.Replace(strings.ToLower(modelName), "meta-", "", 1)
-	rm, err := c.rms.CheckModelNameNotInRFRepo(ctx, trimModel, id)
+	rm, err := c.resouceModelStore.CheckModelNameNotInRFRepo(ctx, trimModel, id)
 	if err != nil || rm == nil {
 		return false, err
 	}
@@ -220,6 +232,10 @@ func (c *runtimeArchitectureComponentImpl) IsSupportedModelResource(ctx context.
 	if strings.Contains(image, rm.EngineName) {
 		return true, nil
 	}
+	if matchRuntimeFrameworkWithEngineEE(rf, rm.EngineName) {
+		return true, nil
+	}
+
 	// special handling for nim models
 	nimImage := strings.ReplaceAll(image, "-", "")
 	nimMatchModel := strings.ReplaceAll(trimModel, "-", "")
@@ -230,7 +246,7 @@ func (c *runtimeArchitectureComponentImpl) IsSupportedModelResource(ctx context.
 }
 
 func (c *runtimeArchitectureComponentImpl) scanExistModels(ctx context.Context, req types.ScanReq) error {
-	repos, err := c.r.repoStore.GetRepoWithRuntimeByID(ctx, req.FrameID, req.Models)
+	repos, err := c.repoStore.GetRepoWithRuntimeByID(ctx, req.FrameID, req.Models)
 	if err != nil {
 		return fmt.Errorf("fail to get repos with runtime by ID, %w", err)
 	}
@@ -251,7 +267,7 @@ func (c *runtimeArchitectureComponentImpl) scanExistModels(ctx context.Context, 
 		if exist {
 			continue
 		}
-		err = c.r.repoRuntimeFrameworkStore.Delete(ctx, req.FrameID, repo.ID, req.FrameType)
+		err = c.repoRuntimeFrameworkStore.Delete(ctx, req.FrameID, repo.ID, req.FrameType)
 		if err != nil {
 			slog.Warn("fail to remove relation", slog.Any("repo", repo.Path), slog.Any("frameid", req.FrameID), slog.Any("error", err))
 		}
@@ -282,7 +298,7 @@ func (c *runtimeArchitectureComponentImpl) GetArchitectureFromConfig(ctx context
 }
 
 func (c *runtimeArchitectureComponentImpl) getConfigContent(ctx context.Context, namespace, name string) (string, error) {
-	content, err := c.r.git.GetRepoFileRaw(ctx, gitserver.GetRepoInfoByPathReq{
+	content, err := c.gitServer.GetRepoFileRaw(ctx, gitserver.GetRepoInfoByPathReq{
 		Namespace: namespace,
 		Name:      name,
 		Ref:       MainBranch,
@@ -297,10 +313,10 @@ func (c *runtimeArchitectureComponentImpl) getConfigContent(ctx context.Context,
 
 // remove runtime_framework tag from model
 func (c *runtimeArchitectureComponentImpl) RemoveRuntimeFrameworkTag(ctx context.Context, rftags []*database.Tag, repoId, rfId int64) {
-	rfw, _ := c.rfs.FindByID(ctx, rfId)
+	rfw, _ := c.runtimeFrameworksStore.FindByID(ctx, rfId)
 	for _, tag := range rftags {
-		if strings.Contains(rfw.FrameImage, tag.Name) {
-			err := c.ts.RemoveRepoTags(ctx, repoId, []int64{tag.ID})
+		if checkTagName(rfw, tag.Name) {
+			err := c.tagStore.RemoveRepoTags(ctx, repoId, []int64{tag.ID})
 			if err != nil {
 				slog.Warn("fail to remove runtime_framework tag from model repo", slog.Any("repoId", repoId), slog.Any("runtime_framework_id", rfId), slog.Any("error", err))
 			}
@@ -310,13 +326,13 @@ func (c *runtimeArchitectureComponentImpl) RemoveRuntimeFrameworkTag(ctx context
 
 // add runtime_framework tag to model
 func (c *runtimeArchitectureComponentImpl) AddRuntimeFrameworkTag(ctx context.Context, rftags []*database.Tag, repoId, rfId int64) error {
-	rfw, err := c.rfs.FindByID(ctx, rfId)
+	rfw, err := c.runtimeFrameworksStore.FindByID(ctx, rfId)
 	if err != nil {
 		return err
 	}
 	for _, tag := range rftags {
-		if strings.Contains(rfw.FrameImage, tag.Name) {
-			err := c.ts.UpsertRepoTags(ctx, repoId, []int64{}, []int64{tag.ID})
+		if checkTagName(rfw, tag.Name) {
+			err := c.tagStore.UpsertRepoTags(ctx, repoId, []int64{}, []int64{tag.ID})
 			if err != nil {
 				slog.Warn("fail to add runtime_framework tag to model repo", slog.Any("repoId", repoId), slog.Any("runtime_framework_id", rfId), slog.Any("error", err))
 			}
@@ -327,14 +343,14 @@ func (c *runtimeArchitectureComponentImpl) AddRuntimeFrameworkTag(ctx context.Co
 
 // add resource tag to model
 func (c *runtimeArchitectureComponentImpl) AddResourceTag(ctx context.Context, rstags []*database.Tag, modelname string, repoId int64) error {
-	rms, err := c.rms.FindByModelName(ctx, modelname)
+	rms, err := c.resouceModelStore.FindByModelName(ctx, modelname)
 	if err != nil {
 		return err
 	}
 	for _, rm := range rms {
 		for _, tag := range rstags {
 			if strings.Contains(rm.ResourceName, tag.Name) {
-				err := c.ts.UpsertRepoTags(ctx, repoId, []int64{}, []int64{tag.ID})
+				err := c.tagStore.UpsertRepoTags(ctx, repoId, []int64{}, []int64{tag.ID})
 				if err != nil {
 					slog.Warn("fail to add resource tag to model repo", slog.Any("repoId", repoId), slog.Any("error", err))
 				}

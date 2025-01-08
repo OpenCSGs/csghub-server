@@ -81,9 +81,6 @@ enable_ssl = true
 signing_key = "signing-key"
 valid_hour = 24
 
-[inference]
-server_addr = "http://localhost:8000"
-
 [space]
 builder_endpoint = "http://localhost:8081"
 runner_endpoint = "http://localhost:8082"
@@ -161,3 +158,7 @@ encoded_sensitive_words = "5Lmg6L+R5bmzLHhpamlucGluZw=="
 
 [workflow]
 endpoint = "localhost:7233"
+
+[cron_job]
+sync_as_client_cron_expression = "0 * * * *"
+calc_recom_score_cron_expression = "0 1 * * *"

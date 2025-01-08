@@ -23,21 +23,33 @@ func (_m *MockClusterInfoStore) EXPECT() *MockClusterInfoStore_Expecter {
 }
 
 // Add provides a mock function with given fields: ctx, clusterConfig, region
-func (_m *MockClusterInfoStore) Add(ctx context.Context, clusterConfig string, region string) error {
+func (_m *MockClusterInfoStore) Add(ctx context.Context, clusterConfig string, region string) (*database.ClusterInfo, error) {
 	ret := _m.Called(ctx, clusterConfig, region)
 
 	if len(ret) == 0 {
 		panic("no return value specified for Add")
 	}
 
-	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, string) error); ok {
+	var r0 *database.ClusterInfo
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, string) (*database.ClusterInfo, error)); ok {
+		return rf(ctx, clusterConfig, region)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string, string) *database.ClusterInfo); ok {
 		r0 = rf(ctx, clusterConfig, region)
 	} else {
-		r0 = ret.Error(0)
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*database.ClusterInfo)
+		}
 	}
 
-	return r0
+	if rf, ok := ret.Get(1).(func(context.Context, string, string) error); ok {
+		r1 = rf(ctx, clusterConfig, region)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
 }
 
 // MockClusterInfoStore_Add_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'Add'
@@ -60,12 +72,12 @@ func (_c *MockClusterInfoStore_Add_Call) Run(run func(ctx context.Context, clust
 	return _c
 }
 
-func (_c *MockClusterInfoStore_Add_Call) Return(_a0 error) *MockClusterInfoStore_Add_Call {
-	_c.Call.Return(_a0)
+func (_c *MockClusterInfoStore_Add_Call) Return(_a0 *database.ClusterInfo, _a1 error) *MockClusterInfoStore_Add_Call {
+	_c.Call.Return(_a0, _a1)
 	return _c
 }
 
-func (_c *MockClusterInfoStore_Add_Call) RunAndReturn(run func(context.Context, string, string) error) *MockClusterInfoStore_Add_Call {
+func (_c *MockClusterInfoStore_Add_Call) RunAndReturn(run func(context.Context, string, string) (*database.ClusterInfo, error)) *MockClusterInfoStore_Add_Call {
 	_c.Call.Return(run)
 	return _c
 }

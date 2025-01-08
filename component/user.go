@@ -296,7 +296,7 @@ func (c *userComponentImpl) AddLikes(ctx context.Context, req *types.UserLikesRe
 		return newError
 	}
 	var likesRepoIDs []int64
-	likesRepoIDs = append(likesRepoIDs, req.Repo_id)
+	likesRepoIDs = append(likesRepoIDs, req.RepoID)
 
 	var opts []database.SelectOption
 	opts = append(opts, database.Columns("id", "repository_type", "path", "user_id", "private"))
@@ -314,7 +314,7 @@ func (c *userComponentImpl) AddLikes(ctx context.Context, req *types.UserLikesRe
 		return fmt.Errorf("do not found likes repositories visiable to user:%s, %w", req.CurrentUser, err)
 	}
 
-	err = c.userLikeStore.Add(ctx, user.ID, req.Repo_id)
+	err = c.userLikeStore.Add(ctx, user.ID, req.RepoID)
 	return err
 }
 
@@ -391,7 +391,7 @@ func (c *userComponentImpl) LikeCollection(ctx context.Context, req *types.UserL
 		return newError
 	}
 
-	collection, err := c.collectionStore.FindById(ctx, req.Collection_id)
+	collection, err := c.collectionStore.FindById(ctx, req.CollectionID)
 	if err != nil {
 		return fmt.Errorf("failed to get likes collection by id, error: %w", err)
 	}
@@ -400,7 +400,7 @@ func (c *userComponentImpl) LikeCollection(ctx context.Context, req *types.UserL
 		return fmt.Errorf("no permission to like this collection for user:%s", req.CurrentUser)
 	}
 
-	err = c.userLikeStore.LikeCollection(ctx, user.ID, req.Collection_id)
+	err = c.userLikeStore.LikeCollection(ctx, user.ID, req.CollectionID)
 	return err
 }
 
@@ -410,7 +410,7 @@ func (c *userComponentImpl) UnLikeCollection(ctx context.Context, req *types.Use
 		newError := fmt.Errorf("failed to check for the presence of the user,error:%w", err)
 		return newError
 	}
-	err = c.userLikeStore.UnLikeCollection(ctx, user.ID, req.Collection_id)
+	err = c.userLikeStore.UnLikeCollection(ctx, user.ID, req.CollectionID)
 	return err
 }
 
@@ -420,7 +420,7 @@ func (c *userComponentImpl) DeleteLikes(ctx context.Context, req *types.UserLike
 		newError := fmt.Errorf("failed to check for the presence of the user,error:%w", err)
 		return newError
 	}
-	err = c.userLikeStore.Delete(ctx, user.ID, req.Repo_id)
+	err = c.userLikeStore.Delete(ctx, user.ID, req.RepoID)
 	return err
 }
 

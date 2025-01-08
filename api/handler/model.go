@@ -32,16 +32,16 @@ func NewModelHandler(config *config.Config) (*ModelHandler, error) {
 	}
 
 	return &ModelHandler{
-		c:    uc,
-		sc:   sc,
-		repo: repo,
+		model:     uc,
+		sensitive: sc,
+		repo:      repo,
 	}, nil
 }
 
 type ModelHandler struct {
-	c    component.ModelComponent
-	sc   component.SensitiveComponent
-	repo component.RepoComponent
+	model     component.ModelComponent
+	repo      component.RepoComponent
+	sensitive component.SensitiveComponent
 }
 
 // GetVisiableModels godoc
@@ -92,7 +92,8 @@ func (h *ModelHandler) Index(ctx *gin.Context) {
 		return
 	}
 
-	models, total, err := h.c.Index(ctx, filter, per, page)
+	models, total, err := h.model.Index(ctx, filter, per, page, false)
+
 	if err != nil {
 		slog.Error("Failed to get models", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
@@ -133,14 +134,14 @@ func (h *ModelHandler) Create(ctx *gin.Context) {
 	}
 	req.Username = currentUser
 
-	_, err := h.sc.CheckRequestV2(ctx, req)
+	_, err := h.sensitive.CheckRequestV2(ctx, req)
 	if err != nil {
 		slog.Error("failed to check sensitive request", slog.Any("error", err))
 		httpbase.BadRequest(ctx, fmt.Errorf("sensitive check failed: %w", err).Error())
 		return
 	}
 
-	model, err := h.c.Create(ctx, req)
+	model, err := h.model.Create(ctx, req)
 	if err != nil {
 		slog.Error("Failed to create model", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
@@ -178,7 +179,7 @@ func (h *ModelHandler) Update(ctx *gin.Context) {
 		return
 	}
 
-	_, err := h.sc.CheckRequestV2(ctx, req)
+	_, err := h.sensitive.CheckRequestV2(ctx, req)
 	if err != nil {
 		slog.Error("failed to check sensitive request", slog.Any("error", err))
 		httpbase.BadRequest(ctx, fmt.Errorf("sensitive check failed: %w", err).Error())
@@ -195,7 +196,7 @@ func (h *ModelHandler) Update(ctx *gin.Context) {
 	req.Name = name
 	req.Username = currentUser
 
-	model, err := h.c.Update(ctx, req)
+	model, err := h.model.Update(ctx, req)
 	if err != nil {
 		slog.Error("Failed to update model", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
@@ -232,7 +233,7 @@ func (h *ModelHandler) Delete(ctx *gin.Context) {
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
-	err = h.c.Delete(ctx, namespace, name, currentUser)
+	err = h.model.Delete(ctx, namespace, name, currentUser)
 	if err != nil {
 		slog.Error("Failed to delete model", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
@@ -264,7 +265,8 @@ func (h *ModelHandler) Show(ctx *gin.Context) {
 		return
 	}
 	currentUser := httpbase.GetCurrentUser(ctx)
-	detail, err := h.c.Show(ctx, namespace, name, currentUser)
+	detail, err := h.model.Show(ctx, namespace, name, currentUser, false)
+
 	if err != nil {
 		if errors.Is(err, component.ErrUnauthorized) {
 			httpbase.UnauthorizedError(ctx, err)
@@ -292,7 +294,7 @@ func (h *ModelHandler) SDKModelInfo(ctx *gin.Context) {
 		ref = mappedBranch
 	}
 	currentUser := httpbase.GetCurrentUser(ctx)
-	modelInfo, err := h.c.SDKModelInfo(ctx, namespace, name, ref, currentUser)
+	modelInfo, err := h.model.SDKModelInfo(ctx, namespace, name, ref, currentUser)
 	if err != nil {
 		if errors.Is(err, component.ErrUnauthorized) {
 			httpbase.UnauthorizedError(ctx, err)
@@ -327,7 +329,7 @@ func (h *ModelHandler) Relations(ctx *gin.Context) {
 		return
 	}
 	currentUser := httpbase.GetCurrentUser(ctx)
-	detail, err := h.c.Relations(ctx, namespace, name, currentUser)
+	detail, err := h.model.Relations(ctx, namespace, name, currentUser)
 	if err != nil {
 		if errors.Is(err, component.ErrUnauthorized) {
 			httpbase.UnauthorizedError(ctx, err)
@@ -379,7 +381,7 @@ func (h *ModelHandler) SetRelations(ctx *gin.Context) {
 	req.Name = name
 	req.CurrentUser = currentUser
 
-	err = h.c.SetRelationDatasets(ctx, req)
+	err = h.model.SetRelationDatasets(ctx, req)
 	if err != nil {
 		slog.Error("Failed to set datasets for model", slog.Any("req", req), slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
@@ -426,7 +428,7 @@ func (h *ModelHandler) AddDatasetRelation(ctx *gin.Context) {
 	req.Name = name
 	req.CurrentUser = currentUser
 
-	err = h.c.AddRelationDataset(ctx, req)
+	err = h.model.AddRelationDataset(ctx, req)
 	if err != nil {
 		slog.Error("Failed to add dataset for model", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
@@ -473,56 +475,13 @@ func (h *ModelHandler) DelDatasetRelation(ctx *gin.Context) {
 	req.Name = name
 	req.CurrentUser = currentUser
 
-	err = h.c.DelRelationDataset(ctx, req)
+	err = h.model.DelRelationDataset(ctx, req)
 	if err != nil {
 		slog.Error("Failed to delete dataset for model", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
 		return
 	}
 	httpbase.OK(ctx, nil)
-}
-
-// Predict godoc
-// @Security     ApiKey
-// @Summary      Invoke model prediction
-// @Description  invoke model prediction
-// @Tags         Model
-// @Accept       json
-// @Produce      json
-// @Param        namespace path string true "namespace"
-// @Param        name path string true "name"
-// @Param        current_user query string false "current user"
-// @Param        body body types.ModelPredictReq true "input for model prediction"
-// @Success      200  {object}  string "OK"
-// @Failure      400  {object}  types.APIBadRequest "Bad request"
-// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
-// @Router       /models/{namespace}/{name}/predict [post]
-func (h *ModelHandler) Predict(ctx *gin.Context) {
-	var req types.ModelPredictReq
-	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
-	if err != nil {
-		slog.Error("Bad request format", "error", err)
-		httpbase.BadRequest(ctx, err.Error())
-		return
-	}
-
-	if err := ctx.ShouldBindJSON(&req); err != nil {
-		slog.Error("Bad request format", "error", err)
-		httpbase.BadRequest(ctx, err.Error())
-		return
-	}
-
-	req.Name = name
-	req.Namespace = namespace
-
-	resp, err := h.c.Predict(ctx, &req)
-	if err != nil {
-		slog.Error("fail to call predict", slog.String("error", err.Error()))
-		httpbase.ServerError(ctx, err)
-		return
-	}
-
-	httpbase.OK(ctx, resp)
 }
 
 func parseTagReqs(ctx *gin.Context) (tags []types.TagReq) {
@@ -641,7 +600,7 @@ func (h *ModelHandler) DeployDedicated(ctx *gin.Context) {
 		return
 	}
 
-	_, err = h.sc.CheckRequestV2(ctx, &req)
+	_, err = h.sensitive.CheckRequestV2(ctx, &req)
 	if err != nil {
 		slog.Error("failed to check sensitive request", slog.Any("error", err))
 		httpbase.BadRequest(ctx, fmt.Errorf("sensitive check failed: %w", err).Error())
@@ -654,7 +613,7 @@ func (h *ModelHandler) DeployDedicated(ctx *gin.Context) {
 		CurrentUser: currentUser,
 		DeployType:  types.InferenceType,
 	}
-	deployID, err := h.c.Deploy(ctx, epReq, req)
+	deployID, err := h.model.Deploy(ctx, epReq, req)
 	if err != nil {
 		slog.Error("failed to deploy model as inference", slog.String("namespace", namespace),
 			slog.String("name", name), slog.Any("currentUser", currentUser), slog.Any("req", req), slog.Any("error", err))
@@ -736,7 +695,7 @@ func (h *ModelHandler) FinetuneCreate(ctx *gin.Context) {
 		DeployType:  types.FinetuneType,
 	}
 
-	deployID, err := h.c.Deploy(ctx, ftReq, *modelReq)
+	deployID, err := h.model.Deploy(ctx, ftReq, *modelReq)
 	if err != nil {
 		slog.Error("failed to deploy model as notebook instance", slog.String("namespace", namespace),
 			slog.String("name", name), slog.Any("error", err))
@@ -1018,7 +977,7 @@ func (h *ModelHandler) ListByRuntimeFrameworkID(ctx *gin.Context) {
 		return
 	}
 
-	models, total, err := h.c.ListModelsByRuntimeFrameworkID(ctx, currentUser, per, page, id, deployType)
+	models, total, err := h.model.ListModelsByRuntimeFrameworkID(ctx, currentUser, per, page, id, deployType)
 	if err != nil {
 		slog.Error("Failed to get models", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
@@ -1158,7 +1117,7 @@ func (h *ModelHandler) ListAllRuntimeFramework(ctx *gin.Context) {
 		return
 	}
 
-	runtimes, err := h.c.ListAllByRuntimeFramework(ctx, currentUser)
+	runtimes, err := h.model.ListAllByRuntimeFramework(ctx, currentUser)
 	if err != nil {
 		slog.Error("Failed to get runtime frameworks", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
@@ -1214,7 +1173,7 @@ func (h *ModelHandler) UpdateModelRuntimeFrameworks(ctx *gin.Context) {
 
 	slog.Info("update runtime frameworks models", slog.Any("req", req), slog.Any("runtime framework id", id), slog.Any("deployType", deployType))
 
-	list, err := h.c.SetRuntimeFrameworkModes(ctx, deployType, id, req.Models)
+	list, err := h.model.SetRuntimeFrameworkModes(ctx, deployType, id, req.Models)
 	if err != nil {
 		slog.Error("Failed to set models runtime framework", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
@@ -1267,7 +1226,7 @@ func (h *ModelHandler) DeleteModelRuntimeFrameworks(ctx *gin.Context) {
 
 	slog.Info("update runtime frameworks models", slog.Any("req", req), slog.Any("runtime framework id", id), slog.Any("deployType", deployType))
 
-	list, err := h.c.DeleteRuntimeFrameworkModes(ctx, deployType, id, req.Models)
+	list, err := h.model.DeleteRuntimeFrameworkModes(ctx, deployType, id, req.Models)
 	if err != nil {
 		slog.Error("Failed to set models runtime framework", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
@@ -1320,7 +1279,7 @@ func (h *ModelHandler) ListModelsOfRuntimeFrameworks(ctx *gin.Context) {
 		return
 	}
 
-	models, total, err := h.c.ListModelsOfRuntimeFrameworks(ctx, currentUser, filter.Search, filter.Sort, per, page, deployType)
+	models, total, err := h.model.ListModelsOfRuntimeFrameworks(ctx, currentUser, filter.Search, filter.Sort, per, page, deployType)
 	if err != nil {
 		slog.Error("fail to get models for all runtime frameworks", slog.Any("deployType", deployType), slog.Any("per", per), slog.Any("page", page), slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
@@ -1425,7 +1384,7 @@ func (h *ModelHandler) DeployServerless(ctx *gin.Context) {
 	}
 
 	req.SecureLevel = 1 // public for serverless
-	deployID, err := h.c.Deploy(ctx, deployReq, req)
+	deployID, err := h.model.Deploy(ctx, deployReq, req)
 	if err != nil {
 		slog.Error("failed to deploy model as serverless", slog.String("namespace", namespace),
 			slog.String("name", name), slog.Any("currentUser", currentUser), slog.Any("req", req), slog.Any("error", err))
@@ -1575,7 +1534,7 @@ func (h *ModelHandler) GetDeployServerless(ctx *gin.Context) {
 		return
 	}
 
-	response, err := h.c.GetServerless(ctx, namespace, name, currentUser)
+	response, err := h.model.GetServerless(ctx, namespace, name, currentUser)
 	if err != nil {
 		slog.Error("failed to get model serverless endpoint", slog.String("namespace", namespace),
 			slog.String("name", name), slog.Any("currentUser", currentUser), slog.Any("error", err))

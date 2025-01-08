@@ -46,42 +46,42 @@ func TestAccountMeteringStore_ListByUserIDAndTime(t *testing.T) {
 	ams := []database.AccountMetering{
 		{
 			UserUUID: "foo", Value: 12.34, ValueType: 1,
-			ResourceName: "r1", Scene: types.SceneSpace, CustomerID: "bar",
+			ResourceName: "r1", Scene: types.ScenePayOrder, CustomerID: "bar",
 			RecordedAt: dt.Add(-1 * time.Hour), EventUUID: uuid.New(),
 		},
 		{
 			UserUUID: "foo", Value: 12.34, ValueType: 1,
-			ResourceName: "r2", Scene: types.SceneSpace, CustomerID: "bar",
+			ResourceName: "r2", Scene: types.ScenePayOrder, CustomerID: "bar",
 			RecordedAt: dt.Add(-2 * time.Hour), EventUUID: uuid.New(),
 		},
 		{
 			UserUUID: "foo", Value: 12.34, ValueType: 1,
-			ResourceName: "r3", Scene: types.SceneSpace, CustomerID: "bar",
+			ResourceName: "r3", Scene: types.ScenePayOrder, CustomerID: "bar",
 			RecordedAt: dt.Add(1 * time.Hour), EventUUID: uuid.New(),
 		},
 		{
 			UserUUID: "foo", Value: 12.34, ValueType: 1,
-			ResourceName: "r4", Scene: types.SceneSpace, CustomerID: "bar",
+			ResourceName: "r4", Scene: types.ScenePayOrder, CustomerID: "bar",
 			RecordedAt: dt.Add(2 * time.Hour), EventUUID: uuid.New(),
 		},
 		{
 			UserUUID: "foo", Value: 12.34, ValueType: 1,
-			ResourceName: "r5", Scene: types.SceneSpace, CustomerID: "bar",
+			ResourceName: "r5", Scene: types.ScenePayOrder, CustomerID: "bar",
 			RecordedAt: dt.Add(-1 * time.Hour), EventUUID: uuid.New(),
 		},
 		{
 			UserUUID: "foo", Value: 12.34, ValueType: 1,
-			ResourceName: "r6", Scene: types.SceneSpace, CustomerID: "bar",
+			ResourceName: "r6", Scene: types.ScenePayOrder, CustomerID: "bar",
 			RecordedAt: dt.Add(-6 * time.Hour), EventUUID: uuid.New(),
 		},
 		{
 			UserUUID: "foo", Value: 12.34, ValueType: 1,
-			ResourceName: "r7", Scene: types.SceneSpace, CustomerID: "bar",
+			ResourceName: "r7", Scene: types.ScenePayOrder, CustomerID: "bar",
 			RecordedAt: dt.Add(6 * time.Hour), EventUUID: uuid.New(),
 		},
 		{
 			UserUUID: "bar", Value: 12.34, ValueType: 1,
-			ResourceName: "r8", Scene: types.SceneSpace, CustomerID: "bar",
+			ResourceName: "r8", Scene: types.ScenePayOrder, CustomerID: "bar",
 			RecordedAt: dt.Add(-1 * time.Hour), EventUUID: uuid.New(),
 		},
 		{
@@ -91,7 +91,7 @@ func TestAccountMeteringStore_ListByUserIDAndTime(t *testing.T) {
 		},
 		{
 			UserUUID: "foo", Value: 12.34, ValueType: 1,
-			ResourceName: "r10", Scene: types.SceneSpace, CustomerID: "barz",
+			ResourceName: "r10", Scene: types.ScenePayOrder, CustomerID: "barz",
 			RecordedAt: dt.Add(-1 * time.Hour), EventUUID: uuid.New(),
 		},
 	}
@@ -103,7 +103,7 @@ func TestAccountMeteringStore_ListByUserIDAndTime(t *testing.T) {
 
 	ams, total, err := store.ListByUserIDAndTime(ctx, types.ACCT_STATEMENTS_REQ{
 		UserUUID:     "foo",
-		Scene:        11,
+		Scene:        2,
 		InstanceName: "bar",
 		StartTime:    dt.Add(-5 * time.Hour).Format(time.RFC3339),
 		EndTime:      dt.Add(5 * time.Hour).Format(time.RFC3339),
@@ -117,6 +117,92 @@ func TestAccountMeteringStore_ListByUserIDAndTime(t *testing.T) {
 	require.Equal(t, []string{"r5", "r4", "r3", "r2", "r1"}, names)
 }
 
+func TestAccountMeteringStore_GetStatByDate(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+	ctx := context.TODO()
+
+	store := database.NewAccountMeteringStoreWithDB(db)
+	us := database.NewUserStoreWithDB(db)
+	err := us.Create(ctx, &database.User{
+		Username: "u1",
+		UUID:     "foo",
+	}, &database.Namespace{Path: "a"})
+	require.Nil(t, err)
+
+	err = us.Create(ctx, &database.User{
+		Username: "u2",
+		UUID:     "bar",
+	}, &database.Namespace{Path: "b"})
+	require.Nil(t, err)
+
+	dt := time.Date(2022, 11, 22, 3, 0, 0, 0, time.UTC)
+	ams := []database.AccountMetering{
+		{
+			UserUUID: "foo", Value: 1.1, ValueType: 1,
+			ResourceID: "r1", Scene: types.ScenePayOrder,
+			RecordedAt: dt.Add(-1 * time.Hour), EventUUID: uuid.New(),
+		},
+		{
+			UserUUID: "foo", Value: 1.2, ValueType: 2,
+			ResourceID: "r1", Scene: types.SceneModelFinetune,
+			RecordedAt: dt.Add(-2 * time.Hour), EventUUID: uuid.New(),
+		},
+		{
+			UserUUID: "foo", Value: 1.2, ValueType: 2,
+			ResourceID: "r1", Scene: types.ScenePayOrder,
+			RecordedAt: dt.Add(-6 * time.Hour), EventUUID: uuid.New(),
+		},
+		{
+			UserUUID: "foo", Value: 1.5, ValueType: 1,
+			ResourceID: "r2", Scene: types.ScenePayOrder,
+			RecordedAt: dt.Add(-1 * time.Hour), EventUUID: uuid.New(),
+		},
+		{
+			UserUUID: "bar", Value: 1.1, ValueType: 1,
+			ResourceID: "r1", Scene: types.ScenePayOrder,
+			RecordedAt: dt.Add(-1 * time.Hour), EventUUID: uuid.New(),
+		},
+		{
+			UserUUID: "bar", Value: 1.2, ValueType: 2,
+			ResourceID: "r1", Scene: types.ScenePayOrder,
+			RecordedAt: dt.Add(-6 * time.Hour), EventUUID: uuid.New(),
+		},
+		{
+			UserUUID: "bar", Value: 1.2, ValueType: 2,
+			ResourceID: "r1", Scene: types.ScenePayOrder,
+			RecordedAt: dt.Add(-2 * time.Hour), EventUUID: uuid.New(),
+		},
+		{
+			UserUUID: "bar", Value: 1.5, ValueType: 1,
+			ResourceID: "r2", Scene: types.ScenePayOrder,
+			RecordedAt: dt.Add(-1 * time.Hour), EventUUID: uuid.New(),
+		},
+	}
+
+	for _, am := range ams {
+		err := store.Create(ctx, am)
+		require.Nil(t, err)
+	}
+
+	data, err := store.GetStatByDate(ctx, types.ACCT_STATEMENTS_REQ{
+		UserUUID:     "foo",
+		Scene:        2,
+		InstanceName: "bar",
+		StartTime:    dt.Add(-5 * time.Hour).Format(time.RFC3339),
+		EndTime:      dt.Add(5 * time.Hour).Format(time.RFC3339),
+	})
+	require.Nil(t, err)
+	require.Equal(t, 4, len(data))
+	expected := []map[string]interface{}{
+		{"resource_id": "r1", "user_uuid": "bar", "username": "u2", "value": 2.3},
+		{"resource_id": "r1", "user_uuid": "foo", "username": "u1", "value": 1.1},
+		{"resource_id": "r2", "user_uuid": "foo", "username": "u1", "value": 1.5},
+		{"resource_id": "r2", "user_uuid": "bar", "username": "u2", "value": 1.5},
+	}
+	require.Equal(t, expected, data)
+}
+
 func TestAccountMeteringStore_ListAllByUserUUID(t *testing.T) {
 	db := tests.InitTestDB()
 	defer db.Close()
@@ -126,22 +212,22 @@ func TestAccountMeteringStore_ListAllByUserUUID(t *testing.T) {
 	ams := []database.AccountMetering{
 		{
 			UserUUID: "foo", Value: 12.34, ValueType: 1,
-			ResourceName: "r1", Scene: types.SceneSpace, CustomerID: "bar",
+			ResourceName: "r1", Scene: types.ScenePayOrder, CustomerID: "bar",
 			EventUUID: uuid.New(),
 		},
 		{
 			UserUUID: "foo", Value: 12.34, ValueType: 1,
-			ResourceName: "r2", Scene: types.SceneSpace, CustomerID: "bar",
+			ResourceName: "r2", Scene: types.ScenePayOrder, CustomerID: "bar",
 			EventUUID: uuid.New(),
 		},
 		{
 			UserUUID: "foo", Value: 12.34, ValueType: 1,
-			ResourceName: "r3", Scene: types.SceneSpace, CustomerID: "bar",
+			ResourceName: "r3", Scene: types.ScenePayOrder, CustomerID: "bar",
 			EventUUID: uuid.New(),
 		},
 		{
 			UserUUID: "bar", Value: 12.34, ValueType: 1,
-			ResourceName: "r4", Scene: types.SceneSpace, CustomerID: "bar",
+			ResourceName: "r4", Scene: types.ScenePayOrder, CustomerID: "bar",
 			EventUUID: uuid.New(),
 		},
 	}

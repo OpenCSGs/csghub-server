@@ -222,15 +222,13 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 		apiGroup.PUT("/organization/:namespace/members/:username", userProxyHandler.ProxyToApi("/api/v1/organization/%s/members/%s", "namespace", "username"))
 		apiGroup.DELETE("/organization/:namespace/members/:username", userProxyHandler.ProxyToApi("/api/v1/organization/%s/members/%s", "namespace", "username"))
 	}
+
 	// Tag
 	tagCtrl, err := handler.NewTagHandler(config)
 	if err != nil {
 		return nil, fmt.Errorf("error creating tag controller:%w", err)
 	}
-	apiGroup.GET("/tags", tagCtrl.AllTags)
-	// apiGroup.POST("/tag", tagCtrl.NewTag)
-	// apiGroup.PUT("/tag", tagCtrl.UpdateTag)
-	// apiGroup.DELETE("/tag", tagCtrl.DeleteTag)
+	createTagsRoutes(apiGroup, tagCtrl)
 
 	// JWT token
 	apiGroup.POST("/jwt/token", needAPIKey, userProxyHandler.Proxy)
@@ -437,9 +435,6 @@ func createModelRoutes(config *config.Config, apiGroup *gin.RouterGroup, needAPI
 		modelsGroup.POST("/:namespace/:name/update_downloads", middleware.RepoType(types.ModelRepo), repoCommonHandler.UpdateDownloads)
 		modelsGroup.PUT("/:namespace/:name/incr_downloads", middleware.RepoType(types.ModelRepo), repoCommonHandler.IncrDownloads)
 		modelsGroup.POST("/:namespace/:name/upload_file", middleware.RepoType(types.ModelRepo), repoCommonHandler.UploadFile)
-		// invoke model endpoint to do pediction
-		modelsGroup.POST("/:namespace/:name/predict", modelHandler.Predict)
-
 		modelsGroup.POST("/:namespace/:name/mirror", middleware.RepoType(types.ModelRepo), repoCommonHandler.CreateMirror)
 		modelsGroup.GET("/:namespace/:name/mirror", middleware.RepoType(types.ModelRepo), repoCommonHandler.GetMirror)
 		modelsGroup.PUT("/:namespace/:name/mirror", middleware.RepoType(types.ModelRepo), repoCommonHandler.UpdateMirror)
@@ -761,17 +756,6 @@ func createPromptRoutes(apiGroup *gin.RouterGroup, promptHandler *handler.Prompt
 		promptGrp.PUT("/:namespace/:name/relations", promptHandler.SetRelations)
 		promptGrp.POST("/:namespace/:name/relations/model", promptHandler.AddModelRelation)
 		promptGrp.DELETE("/:namespace/:name/relations/model", promptHandler.DelModelRelation)
-		conversationGrp := promptGrp.Group("/conversations")
-		{
-			conversationGrp.POST("", promptHandler.NewConversation)
-			conversationGrp.GET("", promptHandler.ListConversation)
-			conversationGrp.GET("/:id", promptHandler.GetConversation)
-			conversationGrp.POST("/:id", promptHandler.SubmitMessage)
-			conversationGrp.PUT("/:id", promptHandler.UpdateConversation)
-			conversationGrp.DELETE("/:id", promptHandler.RemoveConversation)
-			conversationGrp.PUT("/:id/message/:msgid/like", promptHandler.LikeMessage)
-			conversationGrp.PUT("/:id/message/:msgid/hate", promptHandler.HateMessage)
-		}
 
 		promptGrp.POST("", promptHandler.Create)
 		promptGrp.PUT("/:namespace/:name", promptHandler.Update)
@@ -781,5 +765,23 @@ func createPromptRoutes(apiGroup *gin.RouterGroup, promptHandler *handler.Prompt
 		promptGrp.GET("/:namespace/:name/tags", promptHandler.Tags)
 		promptGrp.POST("/:namespace/:name/tags/:category", promptHandler.UpdateTags)
 		promptGrp.POST("/:namespace/:name/update_downloads", promptHandler.UpdateDownloads)
+	}
+}
+
+func createTagsRoutes(apiGroup *gin.RouterGroup, tagHandler *handler.TagsHandler) {
+	tagsGrp := apiGroup.Group("/tags")
+	{
+		categoryGrp := tagsGrp.Group("/categories")
+		{
+			categoryGrp.GET("", tagHandler.AllCategories)
+			categoryGrp.POST("", tagHandler.CreateCategory)
+			categoryGrp.PUT("/:id", tagHandler.UpdateCategory)
+			categoryGrp.DELETE("/:id", tagHandler.DeleteCategory)
+		}
+		tagsGrp.GET("", tagHandler.AllTags)
+		tagsGrp.POST("", tagHandler.CreateTag)
+		tagsGrp.GET("/:id", tagHandler.GetTagByID)
+		tagsGrp.PUT("/:id", tagHandler.UpdateTag)
+		tagsGrp.DELETE("/:id", tagHandler.DeleteTag)
 	}
 }

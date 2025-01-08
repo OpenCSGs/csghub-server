@@ -16,39 +16,45 @@ import (
 
 type TagComponent interface {
 	AllTagsByScopeAndCategory(ctx context.Context, scope string, category string) ([]*database.Tag, error)
-	AllTags(ctx context.Context) ([]database.Tag, error)
 	ClearMetaTags(ctx context.Context, repoType types.RepositoryType, namespace, name string) error
 	UpdateMetaTags(ctx context.Context, tagScope database.TagScope, namespace, name, content string) ([]*database.RepositoryTag, error)
 	UpdateLibraryTags(ctx context.Context, tagScope database.TagScope, namespace, name, oldFilePath, newFilePath string) error
 	UpdateRepoTagsByCategory(ctx context.Context, tagScope database.TagScope, repoID int64, category string, tagNames []string) error
+	CreateTag(ctx context.Context, username string, req types.CreateTag) (*database.Tag, error)
+	GetTagByID(ctx context.Context, username string, id int64) (*database.Tag, error)
+	UpdateTag(ctx context.Context, username string, id int64, req types.UpdateTag) (*database.Tag, error)
+	DeleteTag(ctx context.Context, username string, id int64) error
+	AllCategories(ctx context.Context) ([]database.TagCategory, error)
+	CreateCategory(ctx context.Context, username string, req types.CreateCategory) (*database.TagCategory, error)
+	UpdateCategory(ctx context.Context, username string, req types.UpdateCategory, id int64) (*database.TagCategory, error)
+	DeleteCategory(ctx context.Context, username string, id int64) error
 }
 
 func NewTagComponent(config *config.Config) (TagComponent, error) {
 	tc := &tagComponentImpl{}
-	tc.ts = database.NewTagStore()
-	tc.rs = database.NewRepoStore()
+	tc.tagStore = database.NewTagStore()
+	tc.repoStore = database.NewRepoStore()
 	if config.SensitiveCheck.Enable {
 		tc.sensitiveChecker = rpc.NewModerationSvcHttpClient(fmt.Sprintf("%s:%d", config.Moderation.Host, config.Moderation.Port))
 	}
+	tc.userStore = database.NewUserStore()
 	return tc, nil
 }
 
 type tagComponentImpl struct {
-	ts               database.TagStore
-	rs               database.RepoStore
+	tagStore         database.TagStore
+	repoStore        database.RepoStore
 	sensitiveChecker rpc.ModerationSvcClient
+	userStore        database.UserStore
 }
 
-func (c *tagComponentImpl) AllTags(ctx context.Context) ([]database.Tag, error) {
-	// TODO: query cache for tags at first
-	return c.ts.AllTags(ctx)
-}
-func (c *tagComponentImpl) AllTagsByScopeAndCategory(ctx context.Context, scope string, category string) ([]*database.Tag, error) {
-	return c.ts.AllTagsByScopeAndCategory(ctx, database.TagScope(scope), category)
+func (tc *tagComponentImpl) AllTagsByScopeAndCategory(ctx context.Context, scope string, category string) ([]*database.Tag, error) {
+	return tc.tagStore.AllTagsByScopeAndCategory(ctx, database.TagScope(scope), category)
 }
 
 func (c *tagComponentImpl) ClearMetaTags(ctx context.Context, repoType types.RepositoryType, namespace, name string) error {
-	_, err := c.ts.SetMetaTags(ctx, repoType, namespace, name, nil)
+
+	_, err := c.tagStore.SetMetaTags(ctx, repoType, namespace, name, nil)
 	return err
 }
 
@@ -60,13 +66,13 @@ func (c *tagComponentImpl) UpdateMetaTags(ctx context.Context, tagScope database
 	// TODO:load from cache
 
 	if tagScope == database.DatasetTagScope {
-		tp = tagparser.NewDatasetTagProcessor(c.ts)
+		tp = tagparser.NewDatasetTagProcessor(c.tagStore)
 		repoType = types.DatasetRepo
 	} else if tagScope == database.ModelTagScope {
-		tp = tagparser.NewModelTagProcessor(c.ts)
+		tp = tagparser.NewModelTagProcessor(c.tagStore)
 		repoType = types.ModelRepo
 	} else if tagScope == database.PromptTagScope {
-		tp = tagparser.NewPromptTagProcessor(c.ts)
+		tp = tagparser.NewPromptTagProcessor(c.tagStore)
 		repoType = types.PromptRepo
 	} else {
 		// skip tag process for code and space now
@@ -91,13 +97,13 @@ func (c *tagComponentImpl) UpdateMetaTags(ctx context.Context, tagScope database
 		})
 	}
 
-	err = c.ts.SaveTags(ctx, tagToCreate)
+	err = c.tagStore.SaveTags(ctx, tagToCreate)
 	if err != nil {
 		slog.Error("Failed to save tags", slog.Any("error", err))
 		return nil, fmt.Errorf("failed to save tags, cause: %w", err)
 	}
 
-	repo, err := c.rs.FindByPath(ctx, repoType, namespace, name)
+	repo, err := c.repoStore.FindByPath(ctx, repoType, namespace, name)
 	if err != nil {
 		slog.Error("failed to find repo", slog.Any("error", err))
 		return nil, fmt.Errorf("failed to find repo, cause: %w", err)
@@ -105,14 +111,14 @@ func (c *tagComponentImpl) UpdateMetaTags(ctx context.Context, tagScope database
 
 	metaTags := append(tagsMatched, tagToCreate...)
 	var repoTags []*database.RepositoryTag
-	repoTags, err = c.ts.SetMetaTags(ctx, repoType, namespace, name, metaTags)
+	repoTags, err = c.tagStore.SetMetaTags(ctx, repoType, namespace, name, metaTags)
 	if err != nil {
 		slog.Error("failed to set dataset's tags", slog.String("namespace", namespace),
 			slog.String("name", name), slog.Any("error", err))
 		return nil, fmt.Errorf("failed to set dataset's tags, cause: %w", err)
 	}
 
-	err = c.rs.UpdateLicenseByTag(ctx, repo.ID)
+	err = c.repoStore.UpdateLicenseByTag(ctx, repo.ID)
 	if err != nil {
 		slog.Error("failed to update repo license tags", slog.Any("error", err))
 	}
@@ -130,13 +136,13 @@ func (c *tagComponentImpl) UpdateLibraryTags(ctx context.Context, tagScope datab
 		repoType types.RepositoryType
 	)
 	if tagScope == database.DatasetTagScope {
-		allTags, err = c.ts.AllDatasetTags(ctx)
+		allTags, err = c.tagStore.AllDatasetTags(ctx)
 		repoType = types.DatasetRepo
 	} else if tagScope == database.ModelTagScope {
-		allTags, err = c.ts.AllModelTags(ctx)
+		allTags, err = c.tagStore.AllModelTags(ctx)
 		repoType = types.ModelRepo
 	} else if tagScope == database.PromptTagScope {
-		allTags, err = c.ts.AllPromptTags(ctx)
+		allTags, err = c.tagStore.AllPromptTags(ctx)
 		repoType = types.PromptRepo
 	} else {
 		return nil
@@ -156,7 +162,7 @@ func (c *tagComponentImpl) UpdateLibraryTags(ctx context.Context, tagScope datab
 			oldLibTag = t
 		}
 	}
-	err = c.ts.SetLibraryTag(ctx, repoType, namespace, name, newLibTag, oldLibTag)
+	err = c.tagStore.SetLibraryTag(ctx, repoType, namespace, name, newLibTag, oldLibTag)
 	if err != nil {
 		slog.Error("failed to set %s's tags", string(repoType), slog.String("namespace", namespace),
 			slog.String("name", name), slog.Any("error", err))
@@ -166,7 +172,7 @@ func (c *tagComponentImpl) UpdateLibraryTags(ctx context.Context, tagScope datab
 }
 
 func (c *tagComponentImpl) UpdateRepoTagsByCategory(ctx context.Context, tagScope database.TagScope, repoID int64, category string, tagNames []string) error {
-	allTags, err := c.ts.AllTagsByScopeAndCategory(ctx, tagScope, category)
+	allTags, err := c.tagStore.AllTagsByScopeAndCategory(ctx, tagScope, category)
 	if err != nil {
 		return fmt.Errorf("failed to get all tags of scope `%s`, error: %w", tagScope, err)
 	}
@@ -185,9 +191,172 @@ func (c *tagComponentImpl) UpdateRepoTagsByCategory(ctx context.Context, tagScop
 	}
 
 	var oldTagIDs []int64
-	oldTagIDs, err = c.rs.TagIDs(ctx, repoID, category)
+	oldTagIDs, err = c.repoStore.TagIDs(ctx, repoID, category)
 	if err != nil {
 		return fmt.Errorf("failed to get old tag ids, error: %w", err)
 	}
-	return c.ts.UpsertRepoTags(ctx, repoID, oldTagIDs, tagIDs)
+	return c.tagStore.UpsertRepoTags(ctx, repoID, oldTagIDs, tagIDs)
+}
+
+func (c *tagComponentImpl) CreateTag(ctx context.Context, username string, req types.CreateTag) (*database.Tag, error) {
+	user, err := c.userStore.FindByUsername(ctx, username)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get user, error: %w", err)
+	}
+	if !user.CanAdmin() {
+		return nil, fmt.Errorf("user %s do not allowed create tag", username)
+	}
+
+	if c.sensitiveChecker != nil {
+		result, err := c.sensitiveChecker.PassTextCheck(ctx, string(sensitive.ScenarioNicknameDetection), req.Name)
+		if err != nil {
+			return nil, fmt.Errorf("failed to check tag name sensitivity, error: %w", err)
+		}
+		if result.IsSensitive {
+			return nil, fmt.Errorf("tag name contains sensitive words")
+		}
+	}
+
+	newTag := database.Tag{
+		Name:     req.Name,
+		Category: req.Category,
+		Group:    req.Group,
+		Scope:    database.TagScope(req.Scope),
+		BuiltIn:  req.BuiltIn,
+	}
+
+	tag, err := c.tagStore.FindOrCreate(ctx, newTag)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create tag, error: %w", err)
+	}
+	return tag, nil
+}
+
+func (c *tagComponentImpl) GetTagByID(ctx context.Context, username string, id int64) (*database.Tag, error) {
+	user, err := c.userStore.FindByUsername(ctx, username)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get user, error: %w", err)
+	}
+	if !user.CanAdmin() {
+		return nil, fmt.Errorf("user %s do not allowed create tag", username)
+	}
+	tag, err := c.tagStore.FindTagByID(ctx, id)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get tag id %d, error: %w", id, err)
+	}
+	return tag, nil
+}
+
+func (c *tagComponentImpl) UpdateTag(ctx context.Context, username string, id int64, req types.UpdateTag) (*database.Tag, error) {
+	user, err := c.userStore.FindByUsername(ctx, username)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get user, error: %w", err)
+	}
+	if !user.CanAdmin() {
+		return nil, fmt.Errorf("user %s do not allowed create tag", username)
+	}
+
+	if c.sensitiveChecker != nil {
+		result, err := c.sensitiveChecker.PassTextCheck(ctx, string(sensitive.ScenarioNicknameDetection), req.Name)
+		if err != nil {
+			return nil, fmt.Errorf("failed to check tag name sensitivity, error: %w", err)
+		}
+		if result.IsSensitive {
+			return nil, fmt.Errorf("tag name contains sensitive words")
+		}
+	}
+
+	tag := &database.Tag{
+		ID:       id,
+		Category: req.Category,
+		Name:     req.Name,
+		Group:    req.Group,
+		Scope:    database.TagScope(req.Scope),
+		BuiltIn:  req.BuiltIn,
+	}
+	newTag, err := c.tagStore.UpdateTagByID(ctx, tag)
+	if err != nil {
+		return nil, fmt.Errorf("failed to update tag id %d, error: %w", id, err)
+	}
+	return newTag, nil
+}
+
+func (c *tagComponentImpl) DeleteTag(ctx context.Context, username string, id int64) error {
+	user, err := c.userStore.FindByUsername(ctx, username)
+	if err != nil {
+		return fmt.Errorf("failed to get user, error: %w", err)
+	}
+	if !user.CanAdmin() {
+		return fmt.Errorf("user %s do not allowed create tag", username)
+	}
+	err = c.tagStore.DeleteTagByID(ctx, id)
+	if err != nil {
+		return fmt.Errorf("failed to delete tag id %d, error: %w", id, err)
+	}
+	return nil
+}
+
+func (c *tagComponentImpl) AllCategories(ctx context.Context) ([]database.TagCategory, error) {
+	return c.tagStore.AllCategories(ctx, database.TagScope(""))
+}
+
+func (c *tagComponentImpl) CreateCategory(ctx context.Context, username string, req types.CreateCategory) (*database.TagCategory, error) {
+	user, err := c.userStore.FindByUsername(ctx, username)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get user, error: %w", err)
+	}
+	if !user.CanAdmin() {
+		return nil, ErrForbidden
+	}
+
+	newCategory := database.TagCategory{
+		Name:  req.Name,
+		Scope: database.TagScope(req.Scope),
+	}
+
+	category, err := c.tagStore.CreateCategory(ctx, newCategory)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create category, error: %w", err)
+	}
+
+	return category, nil
+}
+
+func (c *tagComponentImpl) UpdateCategory(ctx context.Context, username string, req types.UpdateCategory, id int64) (*database.TagCategory, error) {
+	user, err := c.userStore.FindByUsername(ctx, username)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get user, error: %w", err)
+	}
+	if !user.CanAdmin() {
+		return nil, ErrForbidden
+	}
+
+	newCategory := database.TagCategory{
+		ID:    id,
+		Name:  req.Name,
+		Scope: database.TagScope(req.Scope),
+	}
+
+	category, err := c.tagStore.UpdateCategory(ctx, newCategory)
+	if err != nil {
+		return nil, fmt.Errorf("failed to update category, error: %w", err)
+	}
+
+	return category, nil
+}
+
+func (c *tagComponentImpl) DeleteCategory(ctx context.Context, username string, id int64) error {
+	user, err := c.userStore.FindByUsername(ctx, username)
+	if err != nil {
+		return fmt.Errorf("failed to get user, error: %w", err)
+	}
+	if !user.CanAdmin() {
+		return ErrForbidden
+	}
+
+	err = c.tagStore.DeleteCategory(ctx, id)
+	if err != nil {
+		return fmt.Errorf("failed to delete category, error: %w", err)
+	}
+	return nil
 }

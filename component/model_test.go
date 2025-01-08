@@ -9,50 +9,49 @@ import (
 	"github.com/stretchr/testify/require"
 	"opencsg.com/csghub-server/builder/git/gitserver"
 	"opencsg.com/csghub-server/builder/git/membership"
-	"opencsg.com/csghub-server/builder/inference"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/types"
 )
 
-// func TestModelComponent_Index(t *testing.T) {
-// 	ctx := context.TODO()
-// 	mc := initializeTestModelComponent(ctx, t)
+func TestModelComponent_Index(t *testing.T) {
+	ctx := context.TODO()
+	mc := initializeTestModelComponent(ctx, t)
 
-// 	filter := &types.RepoFilter{Username: "user"}
-// 	mc.mocks.components.repo.EXPECT().PublicToUser(ctx, types.ModelRepo, "user", filter, 10, 1).Return(
-// 		[]*database.Repository{
-// 			{ID: 1, Name: "r1", Tags: []database.Tag{{Name: "t1"}}},
-// 			{ID: 2, Name: "r2", Tags: []database.Tag{{Name: "t2"}}},
-// 		}, 100, nil,
-// 	)
+	filter := &types.RepoFilter{Username: "user"}
+	mc.mocks.components.repo.EXPECT().PublicToUser(ctx, types.ModelRepo, "user", filter, 10, 1).Return(
+		[]*database.Repository{
+			{ID: 1, Name: "r1", Tags: []database.Tag{{Name: "t1"}}},
+			{ID: 2, Name: "r2", Tags: []database.Tag{{Name: "t2"}}},
+		}, 100, nil,
+	)
 
-// 	mc.mocks.stores.ModelMock().EXPECT().ByRepoIDs(ctx, []int64{1, 2}).Return([]database.Model{
-// 		{RepositoryID: 1, ID: 11, Repository: &database.Repository{}},
-// 		{RepositoryID: 2, ID: 12, Repository: &database.Repository{}},
-// 	}, nil)
+	mc.mocks.stores.ModelMock().EXPECT().ByRepoIDs(ctx, []int64{1, 2}).Return([]database.Model{
+		{RepositoryID: 1, ID: 11, Repository: &database.Repository{}},
+		{RepositoryID: 2, ID: 12, Repository: &database.Repository{}},
+	}, nil)
 
-// 	data, total, err := mc.Index(ctx, filter, 10, 1)
-// 	require.Nil(t, err)
-// 	require.Equal(t, 100, total)
+	data, total, err := mc.Index(ctx, filter, 10, 1, false)
+	require.Nil(t, err)
+	require.Equal(t, 100, total)
 
-// 	require.Equal(t, []*types.Model{
-// 		{
-// 			ID: 11, Name: "r1", Tags: []types.RepoTag{{Name: "t1"}}, RepositoryID: 1,
-// 			Repository: types.Repository{
-// 				HTTPCloneURL: "https://foo.com/s/.git",
-// 				SSHCloneURL:  "test@127.0.0.1:s/.git",
-// 			},
-// 		},
-// 		{
-// 			ID: 12, Name: "r2", Tags: []types.RepoTag{{Name: "t2"}}, RepositoryID: 2,
-// 			Repository: types.Repository{
-// 				HTTPCloneURL: "https://foo.com/s/.git",
-// 				SSHCloneURL:  "test@127.0.0.1:s/.git",
-// 			},
-// 		},
-// 	}, data)
+	require.Equal(t, []*types.Model{
+		{
+			ID: 11, Name: "r1", Tags: []types.RepoTag{{Name: "t1"}}, RepositoryID: 1,
+			Repository: types.Repository{
+				HTTPCloneURL: "https://foo.com/s/.git",
+				SSHCloneURL:  "test@127.0.0.1:s/.git",
+			},
+		},
+		{
+			ID: 12, Name: "r2", Tags: []types.RepoTag{{Name: "t2"}}, RepositoryID: 2,
+			Repository: types.Repository{
+				HTTPCloneURL: "https://foo.com/s/.git",
+				SSHCloneURL:  "test@127.0.0.1:s/.git",
+			},
+		},
+	}, data)
 
-// }
+}
 
 func TestModelComponent_Create(t *testing.T) {
 	ctx := context.TODO()
@@ -217,17 +216,18 @@ func TestModelComponent_Show(t *testing.T) {
 		ctx, int64(123), mock.Anything,
 	).Return([]database.RepositoriesRuntimeFramework{{}}, nil)
 
-	model, err := mc.Show(ctx, "ns", "n", "user")
+	model, err := mc.Show(ctx, "ns", "n", "user", false)
 	require.Nil(t, err)
 	require.Equal(t, &types.Model{
-		ID:           1,
-		Name:         "n",
-		Namespace:    &types.Namespace{Path: "ns"},
-		UserLikes:    true,
-		RepositoryID: 123,
-		CanManage:    true,
-		User:         &types.User{},
-		Path:         "foo/bar",
+		ID:                   1,
+		Name:                 "n",
+		Namespace:            &types.Namespace{Path: "ns"},
+		UserLikes:            true,
+		RepositoryID:         123,
+		CanManage:            true,
+		User:                 &types.User{},
+		Path:                 "foo/bar",
+		SensitiveCheckStatus: "Pending",
 		Repository: types.Repository{
 			HTTPCloneURL: "https://foo.com/s/foo/bar.git",
 			SSHCloneURL:  "test@127.0.0.1:s/foo/bar.git",
@@ -458,92 +458,6 @@ func TestModelComponent_DeleteRelationDataset(t *testing.T) {
 	require.Nil(t, err)
 }
 
-func TestModelComponent_Predict(t *testing.T) {
-	ctx := context.TODO()
-	mc := initializeTestModelComponent(ctx, t)
-
-	mc.mocks.inferenceClient.EXPECT().Predict(inference.ModelID{
-		Owner: "ns",
-		Name:  "n",
-	}, &inference.PredictRequest{
-		Prompt: "foo",
-	}).Return(&inference.PredictResponse{
-		GeneratedText: "abcd",
-	}, nil)
-
-	resp, err := mc.Predict(ctx, &types.ModelPredictReq{
-		Namespace:   "ns",
-		Name:        "n",
-		Input:       "foo",
-		CurrentUser: "user",
-	})
-	require.Nil(t, err)
-	require.Equal(t, &types.ModelPredictResp{
-		Content: "abcd",
-	}, resp)
-
-}
-
-// func TestModelComponent_Deploy(t *testing.T) {
-// 	ctx := context.TODO()
-// 	mc := initializeTestModelComponent(ctx, t)
-
-// 	mc.mocks.stores.ModelMock().EXPECT().FindByPath(ctx, "ns", "n").Return(&database.Model{
-// 		RepositoryID: int64(123),
-// 		Repository: &database.Repository{
-// 			ID:   1,
-// 			Path: "foo",
-// 		},
-// 	}, nil)
-// 	mc.mocks.stores.DeployTaskMock().EXPECT().GetServerlessDeployByRepID(ctx, int64(1)).Return(
-// 		nil, nil,
-// 	)
-// 	mc.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "user").Return(database.User{
-// 		RoleMask: "admin",
-// 	}, nil)
-// 	mc.mocks.stores.RuntimeFrameworkMock().EXPECT().FindEnabledByID(ctx, int64(11)).Return(
-// 		&database.RuntimeFramework{}, nil,
-// 	)
-// 	mc.mocks.components.repo.EXPECT().IsAdminRole(database.User{
-// 		RoleMask: "admin",
-// 	}).Return(true)
-// 	mc.mocks.stores.SpaceResourceMock().EXPECT().FindByID(ctx, int64(123)).Return(
-// 		&database.SpaceResource{
-// 			ID:        123,
-// 			Resources: `{"memory": "foo"}`,
-// 		}, nil,
-// 	)
-
-// 	mc.mocks.deployer.EXPECT().CheckResourceAvailable(ctx, int64(0), &types.HardWare{
-// 		Memory: "foo",
-// 	}).Return(true, nil)
-// 	mc.mocks.deployer.EXPECT().Deploy(ctx, types.DeployRepo{
-// 		DeployName: "dp",
-// 		Path:       "foo",
-// 		Hardware:   "{\"memory\": \"foo\"}",
-// 		Annotation: "{\"hub-res-name\":\"ns/n\",\"hub-res-type\":\"model\"}",
-// 		ClusterID:  "cluster",
-// 		RepoID:     1,
-// 		SKU:        "123",
-// 		Type:       types.ServerlessType,
-// 	}).Return(111, nil)
-
-// 	id, err := mc.Deploy(ctx, types.DeployActReq{
-// 		Namespace:   "ns",
-// 		Name:        "n",
-// 		CurrentUser: "user",
-// 		DeployType:  types.ServerlessType,
-// 	}, types.ModelRunReq{
-// 		RuntimeFrameworkID: 11,
-// 		ResourceID:         123,
-// 		ClusterID:          "cluster",
-// 		DeployName:         "dp",
-// 	})
-// 	require.Nil(t, err)
-// 	require.Equal(t, int64(111), id)
-
-// }
-
 func TestModelComponent_ListModelsByRuntimeFrameworkID(t *testing.T) {
 	ctx := context.TODO()
 	mc := initializeTestModelComponent(ctx, t)
@@ -572,22 +486,25 @@ func TestModelComponent_SetRuntimeFrameworkModes(t *testing.T) {
 	mc := initializeTestModelComponent(ctx, t)
 
 	mc.mocks.stores.RuntimeFrameworkMock().EXPECT().FindByID(ctx, int64(1)).Return(
-		&database.RuntimeFramework{
-			ID: 1,
-		}, nil,
+		&database.RuntimeFramework{}, nil,
 	)
 	mc.mocks.stores.ModelMock().EXPECT().ListByPath(ctx, []string{"a", "b"}).Return(
 		[]database.Model{
 			{RepositoryID: 1, Repository: &database.Repository{ID: 1, Path: "m1/foo"}},
+			{RepositoryID: 2, Repository: &database.Repository{ID: 2, Path: "m2/foo"}},
 		}, nil,
 	)
 	rftags := []*database.Tag{{Name: "t1"}, {Name: "t2"}}
 	mc.mocks.stores.TagMock().EXPECT().GetTagsByScopeAndCategories(
 		ctx, database.TagScope("model"), []string{"runtime_framework", "resource"},
 	).Return(rftags, nil)
+
 	mc.mocks.stores.RepoRuntimeFrameworkMock().EXPECT().GetByIDsAndType(
 		ctx, int64(1), int64(1), 1,
-	).Return(nil, nil)
+	).Return([]database.RepositoriesRuntimeFramework{}, nil)
+	mc.mocks.stores.RepoRuntimeFrameworkMock().EXPECT().GetByIDsAndType(
+		ctx, int64(1), int64(2), 1,
+	).Return([]database.RepositoriesRuntimeFramework{{}}, nil)
 
 	mc.mocks.stores.RepoRuntimeFrameworkMock().EXPECT().Add(ctx, int64(1), int64(1), 1).Return(nil)
 	mc.mocks.components.runtimeArchitecture.EXPECT().AddRuntimeFrameworkTag(

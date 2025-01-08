@@ -23,6 +23,7 @@ type DLQEventConfig struct {
 }
 
 type RequestSubject struct {
+	fee      string // fee charging subject
 	token    string // token subject
 	quota    string // quota subject
 	duration string // duration subject
@@ -52,6 +53,7 @@ type NatsHandler struct {
 	conn *nats.Conn
 
 	msgFetchTimeoutInSec int
+	feeReqSub            RequestSubject
 	meterReqSub          RequestSubject
 	dlqEvtCfg            jetstream.StreamConfig
 	meterEvtCfg          jetstream.StreamConfig
@@ -199,4 +201,16 @@ func (nh *NatsHandler) PublishMeterDataToDLQ(data []byte) error {
 
 func (nh *NatsHandler) PublishMeterDurationData(data []byte) error {
 	return nh.PublishData(nh.meterReqSub.duration, data)
+}
+
+func (nh *NatsHandler) PublishFeeCreditData(data []byte) error {
+	return nh.PublishData(nh.feeReqSub.fee, data)
+}
+
+func (nh *NatsHandler) PublishFeeTokenData(data []byte) error {
+	return nh.PublishData(nh.feeReqSub.token, data)
+}
+
+func (nh *NatsHandler) PublishFeeQuotaData(data []byte) error {
+	return nh.PublishData(nh.feeReqSub.quota, data)
 }

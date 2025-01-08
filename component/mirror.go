@@ -48,7 +48,8 @@ type MirrorComponent interface {
 	CreateMirrorRepo(ctx context.Context, req types.CreateMirrorRepoReq) (*database.Mirror, error)
 	CheckMirrorProgress(ctx context.Context) error
 	Repos(ctx context.Context, currentUser string, per, page int) ([]types.MirrorRepo, int, error)
-	Index(ctx context.Context, currentUser string, per, page int) ([]types.Mirror, int, error)
+	Index(ctx context.Context, currentUser string, per, page int, search string) ([]types.Mirror, int, error)
+	Statistics(ctx context.Context, currentUser string) ([]types.MirrorStatusCount, error)
 }
 
 func NewMirrorComponent(config *config.Config) (MirrorComponent, error) {
@@ -66,7 +67,8 @@ func NewMirrorComponent(config *config.Config) (MirrorComponent, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to get priority queue: %v", err)
 	}
-	c.repoComp, err = NewRepoComponent(config)
+
+	c.repoComp, err = NewRepoComponentImpl(config)
 	if err != nil {
 		return nil, fmt.Errorf("fail to create repo component,error:%w", err)
 	}
@@ -246,6 +248,7 @@ func (c *mirrorComponentImpl) CreateMirrorRepo(ctx context.Context, req types.Cr
 	mirror.LocalRepoPath = fmt.Sprintf("%s_%s_%s_%s", mirrorSource.SourceName, req.RepoType, req.SourceNamespace, req.SourceName)
 	mirror.SourceRepoPath = fmt.Sprintf("%s/%s", req.SourceNamespace, req.SourceName)
 	mirror.Priority = types.HighMirrorPriority
+
 	var taskId int64
 	if c.config.GitServer.Type == types.GitServerTypeGitea {
 		taskId, err = c.mirrorServer.CreateMirrorRepo(ctx, mirrorserver.CreateMirrorRepoReq{
@@ -262,14 +265,12 @@ func (c *mirrorComponentImpl) CreateMirrorRepo(ctx context.Context, req types.Cr
 			return nil, fmt.Errorf("failed to create push mirror in mirror server: %v", err)
 		}
 	}
-
 	mirror.MirrorTaskID = taskId
 
 	reqMirror, err := c.mirrorStore.Create(ctx, &mirror)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create mirror")
 	}
-
 	if c.config.GitServer.Type == types.GitServerTypeGitaly {
 		c.mq.PushRepoMirror(&queue.MirrorTask{
 			MirrorID: reqMirror.ID,
@@ -283,6 +284,7 @@ func (c *mirrorComponentImpl) CreateMirrorRepo(ctx context.Context, req types.Cr
 	}
 
 	return reqMirror, nil
+
 }
 
 func (m *mirrorComponentImpl) mapNamespaceAndName(sourceNamespace string) string {
@@ -620,7 +622,7 @@ func (c *mirrorComponentImpl) Repos(ctx context.Context, currentUser string, per
 	return mirrorRepos, total, nil
 }
 
-func (c *mirrorComponentImpl) Index(ctx context.Context, currentUser string, per, page int) ([]types.Mirror, int, error) {
+func (c *mirrorComponentImpl) Index(ctx context.Context, currentUser string, per, page int, search string) ([]types.Mirror, int, error) {
 	var mirrorsResp []types.Mirror
 	user, err := c.userStore.FindByUsername(ctx, currentUser)
 	if err != nil {
@@ -629,28 +631,54 @@ func (c *mirrorComponentImpl) Index(ctx context.Context, currentUser string, per
 	if !user.CanAdmin() {
 		return nil, 0, errors.New("user does not have admin permission")
 	}
-	mirrors, total, err := c.mirrorStore.IndexWithPagination(ctx, per, page)
+	mirrors, total, err := c.mirrorStore.IndexWithPagination(ctx, per, page, search)
 	if err != nil {
 		return nil, 0, fmt.Errorf("failed to get mirror mirrors: %v", err)
 	}
 	for _, mirror := range mirrors {
-		mirrorsResp = append(mirrorsResp, types.Mirror{
-			SourceUrl: mirror.SourceUrl,
-			MirrorSource: types.MirrorSource{
-				SourceName: mirror.MirrorSource.SourceName,
-			},
-			Username:        mirror.Username,
-			AccessToken:     mirror.AccessToken,
-			PushUrl:         mirror.PushUrl,
-			PushUsername:    mirror.PushUsername,
-			PushAccessToken: mirror.PushAccessToken,
-			LastUpdatedAt:   mirror.LastUpdatedAt,
-			SourceRepoPath:  mirror.SourceRepoPath,
-			LocalRepoPath:   fmt.Sprintf("%ss/%s", mirror.Repository.RepositoryType, mirror.Repository.Path),
-			LastMessage:     mirror.LastMessage,
-			Status:          mirror.Status,
-			Progress:        mirror.Progress,
-		})
+		if mirror.Repository != nil {
+			mirrorsResp = append(mirrorsResp, types.Mirror{
+				SourceUrl: mirror.SourceUrl,
+				MirrorSource: types.MirrorSource{
+					SourceName: mirror.MirrorSource.SourceName,
+				},
+				Username:        mirror.Username,
+				AccessToken:     mirror.AccessToken,
+				PushUrl:         mirror.PushUrl,
+				PushUsername:    mirror.PushUsername,
+				PushAccessToken: mirror.PushAccessToken,
+				LastUpdatedAt:   mirror.LastUpdatedAt,
+				SourceRepoPath:  mirror.SourceRepoPath,
+				LocalRepoPath:   fmt.Sprintf("%ss/%s", mirror.Repository.RepositoryType, mirror.Repository.Path),
+				LastMessage:     mirror.LastMessage,
+				Status:          mirror.Status,
+				Progress:        mirror.Progress,
+			})
+		}
 	}
 	return mirrorsResp, total, nil
+}
+
+func (c *mirrorComponentImpl) Statistics(ctx context.Context, currentUser string) ([]types.MirrorStatusCount, error) {
+	var scs []types.MirrorStatusCount
+	user, err := c.userStore.FindByUsername(ctx, currentUser)
+	if err != nil {
+		return nil, errors.New("user does not exist")
+	}
+	if !user.CanAdmin() {
+		return nil, errors.New("user does not have admin permission")
+	}
+	statusCounts, err := c.mirrorStore.StatusCount(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get mirror statistics: %v", err)
+	}
+
+	for _, statusCount := range statusCounts {
+		scs = append(scs, types.MirrorStatusCount{
+			Status: statusCount.Status,
+			Count:  statusCount.Count,
+		})
+	}
+
+	return scs, nil
 }

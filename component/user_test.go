@@ -136,10 +136,10 @@ func TestUserComponent_AddLikes(t *testing.T) {
 	uc.mocks.stores.UserLikesMock().EXPECT().Add(ctx, int64(1), int64(123)).Return(nil)
 
 	err := uc.AddLikes(ctx, &types.UserLikesRequest{
-		Username:      "user",
-		Repo_id:       123,
-		Collection_id: 456,
-		CurrentUser:   "user",
+		Username:     "user",
+		RepoID:       123,
+		CollectionID: 456,
+		CurrentUser:  "user",
 	})
 	require.Nil(t, err)
 }
@@ -201,10 +201,10 @@ func TestUserComponent_LikeCollection(t *testing.T) {
 	}, nil)
 	uc.mocks.stores.UserLikesMock().EXPECT().LikeCollection(ctx, int64(1), int64(456)).Return(nil)
 	err := uc.LikeCollection(ctx, &types.UserLikesRequest{
-		Username:      "user",
-		Repo_id:       123,
-		Collection_id: 456,
-		CurrentUser:   "user",
+		Username:     "user",
+		RepoID:       123,
+		CollectionID: 456,
+		CurrentUser:  "user",
 	})
 	require.Nil(t, err)
 }
@@ -216,10 +216,10 @@ func TestUserComponent_UnLikeCollection(t *testing.T) {
 	uc.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "user").Return(database.User{ID: 1}, nil)
 	uc.mocks.stores.UserLikesMock().EXPECT().UnLikeCollection(ctx, int64(1), int64(456)).Return(nil)
 	err := uc.UnLikeCollection(ctx, &types.UserLikesRequest{
-		Username:      "user",
-		Repo_id:       123,
-		Collection_id: 456,
-		CurrentUser:   "user",
+		Username:     "user",
+		RepoID:       123,
+		CollectionID: 456,
+		CurrentUser:  "user",
 	})
 	require.Nil(t, err)
 }
@@ -231,10 +231,10 @@ func TestUserComponent_DeleteLikes(t *testing.T) {
 	uc.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "user").Return(database.User{ID: 1}, nil)
 	uc.mocks.stores.UserLikesMock().EXPECT().Delete(ctx, int64(1), int64(123)).Return(nil)
 	err := uc.DeleteLikes(ctx, &types.UserLikesRequest{
-		Username:      "user",
-		Repo_id:       123,
-		Collection_id: 456,
-		CurrentUser:   "user",
+		Username:     "user",
+		RepoID:       123,
+		CollectionID: 456,
+		CurrentUser:  "user",
 	})
 	require.Nil(t, err)
 }

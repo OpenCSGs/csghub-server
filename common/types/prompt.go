@@ -1,6 +1,10 @@
 package types
 
-import "time"
+import (
+	"time"
+
+	"opencsg.com/csghub-server/builder/sensitive"
+)
 
 type PromptReq struct {
 	Namespace   string `json:"namespace"`
@@ -100,4 +104,60 @@ type PromptRes struct {
 	CanWrite      bool                 `json:"can_write"`
 	CanManage     bool                 `json:"can_manage"`
 	Namespace     *Namespace           `json:"namespace"`
+}
+
+type PromptOutput struct {
+	Prompt
+	FilePath  string `json:"file_path"`
+	CanWrite  bool   `json:"can_write"`
+	CanManage bool   `json:"can_manage"`
+}
+
+type CreatePromptReq struct {
+	Prompt
+}
+
+type UpdatePromptReq struct {
+	Prompt
+}
+
+type Prompt struct {
+	Title     string   `json:"title" binding:"required"`
+	Content   string   `json:"content" binding:"required"`
+	Language  string   `json:"language" binding:"required"`
+	Tags      []string `json:"tags"`
+	Type      string   `json:"type"` // "text|image|video|audio"
+	Source    string   `json:"source"`
+	Author    string   `json:"author"`
+	Time      string   `json:"time"`
+	Copyright string   `json:"copyright"`
+	Feedback  []string `json:"feedback"`
+}
+
+func (req *Prompt) GetSensitiveFields() []SensitiveField {
+	var fields []SensitiveField
+	fields = append(fields, SensitiveField{
+		Name: "title",
+		Value: func() string {
+			return req.Title
+		},
+		Scenario: string(sensitive.ScenarioCommentDetection),
+	})
+	fields = append(fields, SensitiveField{
+		Name: "content",
+		Value: func() string {
+			return req.Content
+		},
+		Scenario: string(sensitive.ScenarioCommentDetection),
+	})
+	if len(req.Source) > 0 {
+		fields = append(fields, SensitiveField{
+			Name: "source",
+			Value: func() string {
+				return req.Source
+			},
+			Scenario: string(sensitive.ScenarioCommentDetection),
+		})
+	}
+	return fields
 }

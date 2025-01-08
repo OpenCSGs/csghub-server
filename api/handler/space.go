@@ -29,18 +29,19 @@ func NewSpaceHandler(config *config.Config) (*SpaceHandler, error) {
 	if err != nil {
 		return nil, fmt.Errorf("error creating repo component:%w", err)
 	}
-
 	return &SpaceHandler{
-		c:    c,
-		ssc:  ssc,
-		repo: repo,
+		space:                    c,
+		sensitive:                ssc,
+		repo:                     repo,
+		spaceStatusCheckInterval: 5 * time.Second,
 	}, nil
 }
 
 type SpaceHandler struct {
-	c    component.SpaceComponent
-	ssc  component.SensitiveComponent
-	repo component.RepoComponent
+	space                    component.SpaceComponent
+	sensitive                component.SensitiveComponent
+	repo                     component.RepoComponent
+	spaceStatusCheckInterval time.Duration
 }
 
 // GetAllSpaces   godoc
@@ -89,7 +90,7 @@ func (h *SpaceHandler) Index(ctx *gin.Context) {
 		return
 	}
 
-	spaces, total, err := h.c.Index(ctx, filter, per, page)
+	spaces, total, err := h.space.Index(ctx, filter, per, page)
 	if err != nil {
 		slog.Error("Failed to get spaces", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
@@ -123,7 +124,7 @@ func (h *SpaceHandler) Show(ctx *gin.Context) {
 		return
 	}
 	currentUser := httpbase.GetCurrentUser(ctx)
-	detail, err := h.c.Show(ctx, namespace, name, currentUser)
+	detail, err := h.space.Show(ctx, namespace, name, currentUser)
 	if err != nil {
 		if errors.Is(err, component.ErrUnauthorized) {
 			httpbase.UnauthorizedError(ctx, err)
@@ -162,7 +163,7 @@ func (h *SpaceHandler) Create(ctx *gin.Context) {
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
-	_, err := h.ssc.CheckRequestV2(ctx, &req)
+	_, err := h.sensitive.CheckRequestV2(ctx, &req)
 	if err != nil {
 		slog.Error("failed to check sensitive request", slog.Any("error", err))
 		httpbase.BadRequest(ctx, fmt.Errorf("sensitive check failed: %w", err).Error())
@@ -170,7 +171,7 @@ func (h *SpaceHandler) Create(ctx *gin.Context) {
 	}
 	req.Username = currentUser
 
-	space, err := h.c.Create(ctx, req)
+	space, err := h.space.Create(ctx, req)
 	if err != nil {
 		slog.Error("Failed to create space", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
@@ -207,7 +208,7 @@ func (h *SpaceHandler) Update(ctx *gin.Context) {
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
-	_, err := h.ssc.CheckRequestV2(ctx, req)
+	_, err := h.sensitive.CheckRequestV2(ctx, req)
 	if err != nil {
 		slog.Error("failed to check sensitive request", slog.Any("error", err))
 		httpbase.BadRequest(ctx, fmt.Errorf("sensitive check failed: %w", err).Error())
@@ -224,7 +225,7 @@ func (h *SpaceHandler) Update(ctx *gin.Context) {
 	req.Namespace = namespace
 	req.Name = name
 
-	space, err := h.c.Update(ctx, req)
+	space, err := h.space.Update(ctx, req)
 	if err != nil {
 		slog.Error("Failed to update space", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
@@ -261,7 +262,7 @@ func (h *SpaceHandler) Delete(ctx *gin.Context) {
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
-	err = h.c.Delete(ctx, namespace, name, currentUser)
+	err = h.space.Delete(ctx, namespace, name, currentUser)
 	if err != nil {
 		slog.Error("Failed to delete space", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
@@ -308,7 +309,7 @@ func (h *SpaceHandler) Run(ctx *gin.Context) {
 		httpbase.UnauthorizedError(ctx, errors.New("user not allowed to run sapce"))
 		return
 	}
-	deployID, err := h.c.Deploy(ctx, namespace, name, currentUser)
+	deployID, err := h.space.Deploy(ctx, namespace, name, currentUser)
 	if err != nil {
 		slog.Error("failed to deploy space", slog.String("namespace", namespace),
 			slog.String("name", name), slog.Any("error", err))
@@ -339,7 +340,7 @@ func (h *SpaceHandler) Wakeup(ctx *gin.Context) {
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
-	err = h.c.Wakeup(ctx, namespace, name)
+	err = h.space.Wakeup(ctx, namespace, name)
 	if err != nil {
 		slog.Error("failed to wakeup space", slog.String("namespace", namespace),
 			slog.String("name", name), slog.Any("error", err))
@@ -387,7 +388,7 @@ func (h *SpaceHandler) Stop(ctx *gin.Context) {
 		return
 	}
 
-	err = h.c.Stop(ctx, namespace, name)
+	err = h.space.Stop(ctx, namespace, name, false)
 	if err != nil {
 		slog.Error("failed to stop space", slog.String("namespace", namespace),
 			slog.String("name", name), slog.Any("error", err))
@@ -452,9 +453,9 @@ func (h *SpaceHandler) Status(ctx *gin.Context) {
 			slog.Info("space handler status request context done", slog.Any("error", ctx.Request.Context().Err()))
 			return
 		default:
-			time.Sleep(time.Second * 5)
+			time.Sleep(h.spaceStatusCheckInterval)
 			//user http request context instead of gin context, so that server knows the life cycle of the request
-			_, status, err := h.c.Status(ctx.Request.Context(), namespace, name)
+			_, status, err := h.space.Status(ctx.Request.Context(), namespace, name)
 			if err != nil {
 				slog.Error("failed to get space status", slog.Any("error", err), slog.String("namespace", namespace),
 					slog.String("name", name))
@@ -543,7 +544,7 @@ func (h *SpaceHandler) Logs(ctx *gin.Context) {
 	ctx.Writer.Header().Set("Transfer-Encoding", "chunked")
 
 	//user http request context instead of gin context, so that server knows the life cycle of the request
-	logReader, err := h.c.Logs(ctx.Request.Context(), namespace, name)
+	logReader, err := h.space.Logs(ctx.Request.Context(), namespace, name)
 	if err != nil {
 		httpbase.ServerError(ctx, err)
 		return

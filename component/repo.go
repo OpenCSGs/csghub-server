@@ -968,7 +968,7 @@ func (c *repoComponentImpl) DownloadFile(ctx context.Context, req *types.GetFile
 			// allow rename when download through content-disposition header
 			reqParams.Set("response-content-disposition", fmt.Sprintf("attachment;filename=%s", req.SaveAs))
 		}
-		signedUrl, err := c.s3Client.PresignedGetObject(ctx, c.lfsBucket, objectKey, ossFileExpireSeconds, reqParams)
+		signedUrl, err := c.s3Client.PresignedGetObject(ctx, c.lfsBucket, objectKey, ossFileExpire, reqParams)
 		if err != nil {
 			return nil, 0, downloadUrl, err
 		}
@@ -1289,7 +1289,7 @@ func (c *repoComponentImpl) SDKDownloadFile(ctx context.Context, req *types.GetF
 			// allow rename when download through content-disposition header
 			reqParams.Set("response-content-disposition", fmt.Sprintf("attachment;filename=%s", req.SaveAs))
 		}
-		signedUrl, err := c.s3Client.PresignedGetObject(ctx, c.lfsBucket, objectKey, ossFileExpireSeconds, reqParams)
+		signedUrl, err := c.s3Client.PresignedGetObject(ctx, c.lfsBucket, objectKey, ossFileExpire, reqParams)
 		if err != nil {
 			if err.Error() == ErrNotFoundMessage || err.Error() == ErrGetContentsOrList {
 				return nil, 0, downloadUrl, ErrNotFound
@@ -1429,12 +1429,9 @@ func (c *repoComponentImpl) AllowReadAccess(ctx context.Context, repoType types.
 }
 
 func (c *repoComponentImpl) AllowWriteAccess(ctx context.Context, repoType types.RepositoryType, namespace, name, username string) (bool, error) {
-	repo, err := c.repoStore.FindByPath(ctx, repoType, namespace, name)
+	_, err := c.repoStore.FindByPath(ctx, repoType, namespace, name)
 	if err != nil {
 		return false, fmt.Errorf("failed to find repo, error: %w", err)
-	}
-	if !repo.Private {
-		return true, nil
 	}
 
 	if username == "" {
@@ -1445,12 +1442,9 @@ func (c *repoComponentImpl) AllowWriteAccess(ctx context.Context, repoType types
 }
 
 func (c *repoComponentImpl) AllowAdminAccess(ctx context.Context, repoType types.RepositoryType, namespace, name, username string) (bool, error) {
-	repo, err := c.repoStore.FindByPath(ctx, repoType, namespace, name)
+	_, err := c.repoStore.FindByPath(ctx, repoType, namespace, name)
 	if err != nil {
 		return false, fmt.Errorf("failed to find repo, error: %w", err)
-	}
-	if !repo.Private {
-		return true, nil
 	}
 
 	if username == "" {
