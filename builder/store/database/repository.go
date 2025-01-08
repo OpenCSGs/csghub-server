@@ -58,9 +58,9 @@ type RepoStore interface {
 	GetRepoWithoutRuntimeByID(ctx context.Context, rfID int64, paths []string) ([]Repository, error)
 	GetRepoWithRuntimeByID(ctx context.Context, rfID int64, paths []string) ([]Repository, error)
 	BatchGet(ctx context.Context, repoType types.RepositoryType, lastRepoID int64, batch int) ([]Repository, error)
-	FindWithBatch(ctx context.Context, batchSize, batch int) ([]Repository, error)
-	FindByRepoSourceWithBatch(ctx context.Context, repoSource types.RepositorySource, batchSize, batch int) ([]Repository, error)
+	FindWithBatch(ctx context.Context, batchSize, batch int, repoTypes ...types.RepositoryType) ([]Repository, error)
 	ByUser(ctx context.Context, userID int64) ([]Repository, error)
+	FindByRepoSourceWithBatch(ctx context.Context, repoSource types.RepositorySource, batchSize, batch int) ([]Repository, error)
 }
 
 func NewRepoStore() RepoStore {
@@ -689,11 +689,14 @@ func (s *repoStoreImpl) BatchGet(ctx context.Context, repoType types.RepositoryT
 	return res, nil
 }
 
-func (s *repoStoreImpl) FindWithBatch(ctx context.Context, batchSize, batch int) ([]Repository, error) {
+func (s *repoStoreImpl) FindWithBatch(ctx context.Context, batchSize, batch int, repoTypes ...types.RepositoryType) ([]Repository, error) {
 	var res []Repository
-	err := s.db.Operator.Core.NewSelect().
-		Model(&res).
-		Order("id desc").
+	q := s.db.Operator.Core.NewSelect().
+		Model(&res)
+	if len(repoTypes) > 0 {
+		q.Where("repository_type in (?)", bun.In(repoTypes))
+	}
+	err := q.Order("id desc").
 		Limit(batchSize).
 		Offset(batchSize * batch).
 		Scan(ctx)

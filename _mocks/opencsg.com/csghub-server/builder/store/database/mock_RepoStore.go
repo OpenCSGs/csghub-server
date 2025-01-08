@@ -1126,9 +1126,16 @@ func (_c *MockRepoStore_FindByRepoSourceWithBatch_Call) RunAndReturn(run func(co
 	return _c
 }
 
-// FindWithBatch provides a mock function with given fields: ctx, batchSize, batch
-func (_m *MockRepoStore) FindWithBatch(ctx context.Context, batchSize int, batch int) ([]database.Repository, error) {
-	ret := _m.Called(ctx, batchSize, batch)
+// FindWithBatch provides a mock function with given fields: ctx, batchSize, batch, repoTypes
+func (_m *MockRepoStore) FindWithBatch(ctx context.Context, batchSize int, batch int, repoTypes ...types.RepositoryType) ([]database.Repository, error) {
+	_va := make([]interface{}, len(repoTypes))
+	for _i := range repoTypes {
+		_va[_i] = repoTypes[_i]
+	}
+	var _ca []interface{}
+	_ca = append(_ca, ctx, batchSize, batch)
+	_ca = append(_ca, _va...)
+	ret := _m.Called(_ca...)
 
 	if len(ret) == 0 {
 		panic("no return value specified for FindWithBatch")
@@ -1136,19 +1143,19 @@ func (_m *MockRepoStore) FindWithBatch(ctx context.Context, batchSize int, batch
 
 	var r0 []database.Repository
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, int, int) ([]database.Repository, error)); ok {
-		return rf(ctx, batchSize, batch)
+	if rf, ok := ret.Get(0).(func(context.Context, int, int, ...types.RepositoryType) ([]database.Repository, error)); ok {
+		return rf(ctx, batchSize, batch, repoTypes...)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, int, int) []database.Repository); ok {
-		r0 = rf(ctx, batchSize, batch)
+	if rf, ok := ret.Get(0).(func(context.Context, int, int, ...types.RepositoryType) []database.Repository); ok {
+		r0 = rf(ctx, batchSize, batch, repoTypes...)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).([]database.Repository)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, int, int) error); ok {
-		r1 = rf(ctx, batchSize, batch)
+	if rf, ok := ret.Get(1).(func(context.Context, int, int, ...types.RepositoryType) error); ok {
+		r1 = rf(ctx, batchSize, batch, repoTypes...)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -1165,13 +1172,21 @@ type MockRepoStore_FindWithBatch_Call struct {
 //   - ctx context.Context
 //   - batchSize int
 //   - batch int
-func (_e *MockRepoStore_Expecter) FindWithBatch(ctx interface{}, batchSize interface{}, batch interface{}) *MockRepoStore_FindWithBatch_Call {
-	return &MockRepoStore_FindWithBatch_Call{Call: _e.mock.On("FindWithBatch", ctx, batchSize, batch)}
+//   - repoTypes ...types.RepositoryType
+func (_e *MockRepoStore_Expecter) FindWithBatch(ctx interface{}, batchSize interface{}, batch interface{}, repoTypes ...interface{}) *MockRepoStore_FindWithBatch_Call {
+	return &MockRepoStore_FindWithBatch_Call{Call: _e.mock.On("FindWithBatch",
+		append([]interface{}{ctx, batchSize, batch}, repoTypes...)...)}
 }
 
-func (_c *MockRepoStore_FindWithBatch_Call) Run(run func(ctx context.Context, batchSize int, batch int)) *MockRepoStore_FindWithBatch_Call {
+func (_c *MockRepoStore_FindWithBatch_Call) Run(run func(ctx context.Context, batchSize int, batch int, repoTypes ...types.RepositoryType)) *MockRepoStore_FindWithBatch_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(int), args[2].(int))
+		variadicArgs := make([]types.RepositoryType, len(args)-3)
+		for i, a := range args[3:] {
+			if a != nil {
+				variadicArgs[i] = a.(types.RepositoryType)
+			}
+		}
+		run(args[0].(context.Context), args[1].(int), args[2].(int), variadicArgs...)
 	})
 	return _c
 }
@@ -1181,7 +1196,7 @@ func (_c *MockRepoStore_FindWithBatch_Call) Return(_a0 []database.Repository, _a
 	return _c
 }
 
-func (_c *MockRepoStore_FindWithBatch_Call) RunAndReturn(run func(context.Context, int, int) ([]database.Repository, error)) *MockRepoStore_FindWithBatch_Call {
+func (_c *MockRepoStore_FindWithBatch_Call) RunAndReturn(run func(context.Context, int, int, ...types.RepositoryType) ([]database.Repository, error)) *MockRepoStore_FindWithBatch_Call {
 	_c.Call.Return(run)
 	return _c
 }
