@@ -1,6 +1,8 @@
 package temporal
 
 import (
+	"context"
+
 	"go.temporal.io/sdk/client"
 	"go.temporal.io/sdk/worker"
 )
@@ -8,8 +10,13 @@ import (
 type Client interface {
 	client.Client
 	NewWorker(queue string, options worker.Options) worker.Registry
+	GetScheduleClient() ScheduleClient
 	Start() error
 	Stop()
+}
+
+type ScheduleClient interface {
+	Create(ctx context.Context, options client.ScheduleOptions) (client.ScheduleHandle, error)
 }
 
 type clientImpl struct {
@@ -30,6 +37,10 @@ func (c *clientImpl) NewWorker(queue string, options worker.Options) worker.Regi
 	w := worker.New(c.Client, queue, options)
 	c.workers = append(c.workers, w)
 	return w
+}
+
+func (c *clientImpl) GetScheduleClient() ScheduleClient {
+	return c.ScheduleClient()
 }
 
 func (c *clientImpl) Start() error {
