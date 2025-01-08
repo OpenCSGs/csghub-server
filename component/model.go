@@ -878,6 +878,10 @@ func getFilePaths(namespace, repoName, folder string, repoType types.RepositoryT
 
 // create model deploy as inference/serverless
 func (c *modelComponentImpl) Deploy(ctx context.Context, deployReq types.DeployActReq, req types.ModelRunReq) (int64, error) {
+	valid, err := common.IsValidName(req.DeployName)
+	if !valid {
+		return -1, fmt.Errorf("deploy name is invalid, error: %w", err)
+	}
 	m, err := c.modelStore.FindByPath(ctx, deployReq.Namespace, deployReq.Name)
 	if err != nil {
 		return -1, fmt.Errorf("cannot find model, %w", err)
