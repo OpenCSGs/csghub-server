@@ -9,6 +9,7 @@ import (
 	"opencsg.com/csghub-server/api/httpbase"
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/types"
+	"opencsg.com/csghub-server/common/utils/common"
 	apicomponent "opencsg.com/csghub-server/component"
 	"opencsg.com/csghub-server/user/component"
 )
@@ -115,15 +116,27 @@ func (h *OrganizationHandler) Get(ctx *gin.Context) {
 // @Router       /organizations [get]
 func (h *OrganizationHandler) Index(ctx *gin.Context) {
 	username := httpbase.GetCurrentUser(ctx)
-	orgs, err := h.c.Index(ctx, username)
+	search := ctx.Query("search")
+	per, page, err := common.GetPerAndPageFromContext(ctx)
+	if err != nil {
+		slog.Error("Failed to get per and page", slog.Any("error", err))
+		httpbase.BadRequest(ctx, err.Error())
+		return
+	}
+	orgs, total, err := h.c.Index(ctx, username, search, per, page)
 	if err != nil {
 		slog.Error("Failed to get organizations", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
 		return
 	}
 
-	slog.Info("Get organizations succeed")
-	httpbase.OK(ctx, orgs)
+	respData := gin.H{
+		"data":  orgs,
+		"total": total,
+	}
+
+	slog.Info("Get organizations succeed", slog.String("username", username), slog.String("search", search), slog.Int("per", per), slog.Int("page", page))
+	httpbase.OK(ctx, respData)
 }
 
 // DeleteOrganization godoc

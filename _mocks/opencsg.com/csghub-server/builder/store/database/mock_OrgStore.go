@@ -291,7 +291,7 @@ func (_c *MockOrgStore_GetUserBelongOrgs_Call) RunAndReturn(run func(context.Con
 }
 
 // GetUserOwnOrgs provides a mock function with given fields: ctx, username
-func (_m *MockOrgStore) GetUserOwnOrgs(ctx context.Context, username string) ([]database.Organization, error) {
+func (_m *MockOrgStore) GetUserOwnOrgs(ctx context.Context, username string) ([]database.Organization, int, error) {
 	ret := _m.Called(ctx, username)
 
 	if len(ret) == 0 {
@@ -299,8 +299,9 @@ func (_m *MockOrgStore) GetUserOwnOrgs(ctx context.Context, username string) ([]
 	}
 
 	var r0 []database.Organization
-	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, string) ([]database.Organization, error)); ok {
+	var r1 int
+	var r2 error
+	if rf, ok := ret.Get(0).(func(context.Context, string) ([]database.Organization, int, error)); ok {
 		return rf(ctx, username)
 	}
 	if rf, ok := ret.Get(0).(func(context.Context, string) []database.Organization); ok {
@@ -311,13 +312,19 @@ func (_m *MockOrgStore) GetUserOwnOrgs(ctx context.Context, username string) ([]
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
+	if rf, ok := ret.Get(1).(func(context.Context, string) int); ok {
 		r1 = rf(ctx, username)
 	} else {
-		r1 = ret.Error(1)
+		r1 = ret.Get(1).(int)
 	}
 
-	return r0, r1
+	if rf, ok := ret.Get(2).(func(context.Context, string) error); ok {
+		r2 = rf(ctx, username)
+	} else {
+		r2 = ret.Error(2)
+	}
+
+	return r0, r1, r2
 }
 
 // MockOrgStore_GetUserOwnOrgs_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetUserOwnOrgs'
@@ -339,12 +346,80 @@ func (_c *MockOrgStore_GetUserOwnOrgs_Call) Run(run func(ctx context.Context, us
 	return _c
 }
 
-func (_c *MockOrgStore_GetUserOwnOrgs_Call) Return(orgs []database.Organization, err error) *MockOrgStore_GetUserOwnOrgs_Call {
-	_c.Call.Return(orgs, err)
+func (_c *MockOrgStore_GetUserOwnOrgs_Call) Return(orgs []database.Organization, total int, err error) *MockOrgStore_GetUserOwnOrgs_Call {
+	_c.Call.Return(orgs, total, err)
 	return _c
 }
 
-func (_c *MockOrgStore_GetUserOwnOrgs_Call) RunAndReturn(run func(context.Context, string) ([]database.Organization, error)) *MockOrgStore_GetUserOwnOrgs_Call {
+func (_c *MockOrgStore_GetUserOwnOrgs_Call) RunAndReturn(run func(context.Context, string) ([]database.Organization, int, error)) *MockOrgStore_GetUserOwnOrgs_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// Search provides a mock function with given fields: ctx, search, per, page
+func (_m *MockOrgStore) Search(ctx context.Context, search string, per int, page int) ([]database.Organization, int, error) {
+	ret := _m.Called(ctx, search, per, page)
+
+	if len(ret) == 0 {
+		panic("no return value specified for Search")
+	}
+
+	var r0 []database.Organization
+	var r1 int
+	var r2 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, int, int) ([]database.Organization, int, error)); ok {
+		return rf(ctx, search, per, page)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string, int, int) []database.Organization); ok {
+		r0 = rf(ctx, search, per, page)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]database.Organization)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string, int, int) int); ok {
+		r1 = rf(ctx, search, per, page)
+	} else {
+		r1 = ret.Get(1).(int)
+	}
+
+	if rf, ok := ret.Get(2).(func(context.Context, string, int, int) error); ok {
+		r2 = rf(ctx, search, per, page)
+	} else {
+		r2 = ret.Error(2)
+	}
+
+	return r0, r1, r2
+}
+
+// MockOrgStore_Search_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'Search'
+type MockOrgStore_Search_Call struct {
+	*mock.Call
+}
+
+// Search is a helper method to define mock.On call
+//   - ctx context.Context
+//   - search string
+//   - per int
+//   - page int
+func (_e *MockOrgStore_Expecter) Search(ctx interface{}, search interface{}, per interface{}, page interface{}) *MockOrgStore_Search_Call {
+	return &MockOrgStore_Search_Call{Call: _e.mock.On("Search", ctx, search, per, page)}
+}
+
+func (_c *MockOrgStore_Search_Call) Run(run func(ctx context.Context, search string, per int, page int)) *MockOrgStore_Search_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(string), args[2].(int), args[3].(int))
+	})
+	return _c
+}
+
+func (_c *MockOrgStore_Search_Call) Return(orgs []database.Organization, total int, err error) *MockOrgStore_Search_Call {
+	_c.Call.Return(orgs, total, err)
+	return _c
+}
+
+func (_c *MockOrgStore_Search_Call) RunAndReturn(run func(context.Context, string, int, int) ([]database.Organization, int, error)) *MockOrgStore_Search_Call {
 	_c.Call.Return(run)
 	return _c
 }
