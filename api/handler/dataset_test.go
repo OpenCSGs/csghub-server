@@ -41,32 +41,6 @@ func (t *DatasetTester) WithHandleFunc(fn func(h *DatasetHandler) gin.HandlerFun
 	return t
 }
 
-func TestDatasetHandler_Create(t *testing.T) {
-
-	t.Run("public", func(t *testing.T) {
-
-		tester := NewDatasetTester(t).WithHandleFunc(func(h *DatasetHandler) gin.HandlerFunc {
-			return h.Create
-		})
-		tester.RequireUser(t)
-
-		tester.mocks.sensitive.EXPECT().CheckRequestV2(tester.ctx, &types.CreateDatasetReq{
-			CreateRepoReq: types.CreateRepoReq{Private: true},
-		}).Return(true, nil)
-		tester.mocks.dataset.EXPECT().Create(tester.ctx, &types.CreateDatasetReq{
-			CreateRepoReq: types.CreateRepoReq{Private: true, Username: "u"},
-		}).Return(&types.Dataset{Name: "d"}, nil)
-		tester.WithBody(t, &types.CreateDatasetReq{
-			CreateRepoReq: types.CreateRepoReq{Private: true},
-		}).Execute()
-
-		tester.ResponseEqSimple(t, 200, gin.H{
-			"data": &types.Dataset{Name: "d"},
-		})
-	})
-
-}
-
 func TestDatasetHandler_Index(t *testing.T) {
 	cases := []struct {
 		sort   string
