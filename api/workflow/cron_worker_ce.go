@@ -28,7 +28,7 @@ func RegisterCronJobs(config *config.Config, temporalClient temporal.Client) err
 			ID:        "sync-as-client-workflow",
 			TaskQueue: CronJobQueueName,
 			Workflow:  SyncAsClientWorkflow,
-			Args:      []interface{}{config},
+			Args:      []interface{}{},
 		},
 	})
 	if err != nil && err.Error() != AlreadyScheduledMessage {
@@ -45,7 +45,7 @@ func RegisterCronJobs(config *config.Config, temporalClient temporal.Client) err
 			ID:        "calc-recom-score-workflow",
 			TaskQueue: CronJobQueueName,
 			Workflow:  CalcRecomScoreWorkflow,
-			Args:      []interface{}{config},
+			Args:      []interface{}{},
 		},
 	})
 	if err != nil && err.Error() != AlreadyScheduledMessage {
