@@ -1,4 +1,4 @@
-//go:build !ee && !saas
+//go:build !saas
 
 package workflow
 
@@ -59,6 +59,7 @@ func RegisterCronWorker(config *config.Config, temporalClient temporal.Client, a
 
 	wfWorker := temporalClient.NewWorker(CronJobQueueName, worker.Options{})
 	wfWorker.RegisterActivity(activities)
+
 	wfWorker.RegisterWorkflow(SyncAsClientWorkflow)
 	wfWorker.RegisterWorkflow(CalcRecomScoreWorkflow)
 

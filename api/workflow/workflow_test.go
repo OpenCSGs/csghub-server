@@ -11,16 +11,16 @@ import (
 	mock_component "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/component"
 	mock_callback "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/component/callback"
 	"opencsg.com/csghub-server/api/workflow"
-	"opencsg.com/csghub-server/builder/multisync"
-	"opencsg.com/csghub-server/builder/store/database"
+	"opencsg.com/csghub-server/builder/temporal"
 	"opencsg.com/csghub-server/common/tests"
 	"opencsg.com/csghub-server/common/types"
 )
 
 type workflowTester struct {
-	env     *testsuite.TestWorkflowEnvironment
-	cronEnv *testsuite.TestWorkflowEnvironment
-	mocks   struct {
+	env       *testsuite.TestWorkflowEnvironment
+	cronEnv   *testsuite.TestWorkflowEnvironment
+	scheduler *temporal.TestScheduler
+	mocks     struct {
 		callback  *mock_callback.MockGitCallbackComponent
 		recom     *mock_component.MockRecomComponent
 		multisync *mock_component.MockMultiSyncComponent
@@ -28,33 +28,6 @@ type workflowTester struct {
 		temporal  *mock_temporal.MockClient
 		stores    *tests.MockStores
 	}
-}
-
-func TestWorkflow_CalcRecomScoreWorkflow(t *testing.T) {
-	tester, err := newWorkflowTester(t)
-	require.NoError(t, err)
-
-	tester.mocks.recom.EXPECT().CalculateRecomScore(mock.Anything).Return()
-	tester.cronEnv.ExecuteWorkflow(workflow.CalcRecomScoreWorkflow)
-	require.True(t, tester.cronEnv.IsWorkflowCompleted())
-	require.NoError(t, tester.cronEnv.GetWorkflowError())
-}
-
-func TestWorkflow_SyncAsClient(t *testing.T) {
-	tester, err := newWorkflowTester(t)
-	require.NoError(t, err)
-
-	tester.mocks.stores.SyncClientSettingMock().EXPECT().First(mock.Anything).Return(
-		&database.SyncClientSetting{Token: "tk"}, nil,
-	)
-	tester.mocks.multisync.EXPECT().SyncAsClient(
-		mock.Anything, multisync.FromOpenCSG("", "tk"),
-	).Return(nil)
-
-	tester.cronEnv.ExecuteWorkflow(workflow.SyncAsClientWorkflow)
-	require.True(t, tester.cronEnv.IsWorkflowCompleted())
-	require.NoError(t, tester.cronEnv.GetWorkflowError())
-
 }
 
 func TestWorkflow_HandlePushWorkflow(t *testing.T) {
