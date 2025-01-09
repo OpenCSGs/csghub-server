@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/spf13/cast"
 	"opencsg.com/csghub-server/api/httpbase"
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/types"
@@ -591,6 +592,114 @@ func (h *RepoHandler) Tree(ctx *gin.Context) {
 	}
 
 	slog.Info("Get repo file tree succeed", slog.String("repo_type", string(req.RepoType)), slog.String("name", name), slog.String("path", req.Path), slog.String("ref", req.Ref))
+	httpbase.OK(ctx, tree)
+}
+
+// GetTreeV2 godoc
+// @Security     ApiKey
+// @Summary      Get file tree
+// @Tags         Repository
+// @Accept       json
+// @Produce      json
+// @Param        repo_type path string true "models,dataset,codes or spaces" Enums(models,datasets,codes,spaces)
+// @Param	 namespace path string true "repo owner name"
+// @Param	 name path string true "repo name"
+// @Param        path path string false "dir to list"
+// @Param        ref path string false "branch or tag"
+// @Param        limit query int false "limit of records return"
+// @Param        cursor query string false "pagination cursor"
+// @Success      200  {object}  types.ResponseWithTotal{data=types.GetRepoFileTreeResp} "OK"
+// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
+// @Router       /{repo_type}/{namespace}/{name}/refs/{ref}/tree/{path} [get]
+func (h *RepoHandler) TreeV2(ctx *gin.Context) {
+	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
+	if err != nil {
+		slog.Error("Bad request format", "error", err)
+		httpbase.BadRequest(ctx, err.Error())
+		return
+	}
+	currentUser := httpbase.GetCurrentUser(ctx)
+	req := &types.GetTreeRequest{
+		Namespace:   namespace,
+		Name:        name,
+		Path:        ctx.Param("path"),
+		Ref:         ctx.Param("ref"),
+		RepoType:    common.RepoTypeFromContext(ctx),
+		CurrentUser: currentUser,
+		Limit:       cast.ToInt(ctx.Query("limit")),
+		Cursor:      ctx.Query("cursor"),
+	}
+	tree, err := h.c.TreeV2(ctx, req)
+	if err != nil {
+		if errors.Is(err, component.ErrForbidden) {
+			httpbase.ForbiddenError(ctx, err)
+			return
+		}
+		slog.Error(
+			"Failed to get tree", slog.String("repo_type", string(req.RepoType)),
+			slog.Any("error", err),
+		)
+		httpbase.ServerError(ctx, err)
+		return
+	}
+
+	httpbase.OK(ctx, tree)
+}
+
+// Get Logs Tree godoc
+// @Security     ApiKey
+// @Summary      Get last commit for file tree
+// @Tags         Repository
+// @Accept       json
+// @Produce      json
+// @Param        repo_type path string true "models,dataset,codes or spaces" Enums(models,datasets,codes,spaces)
+// @Param	 namespace path string true "repo owner name"
+// @Param	 name path string true "repo name"
+// @Param        path path string false "dir to list"
+// @Param        ref path string false "branch or tag"
+// @Param        limit query int false "limit of records return"
+// @Param        offset query int false "pagination offset"
+// @Success      200  {object}  types.ResponseWithTotal{data=types.LogsTreeResp} "OK"
+// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
+// @Router       /{repo_type}/{namespace}/{name}/refs/{ref}/logs_tree/{path} [get]
+func (h *RepoHandler) LogsTree(ctx *gin.Context) {
+	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
+	if err != nil {
+		slog.Error("Bad request format", "error", err)
+		httpbase.BadRequest(ctx, err.Error())
+		return
+	}
+	currentUser := httpbase.GetCurrentUser(ctx)
+	req := &types.GetLogsTreeRequest{
+		Namespace:   namespace,
+		Name:        name,
+		Path:        ctx.Param("path"),
+		Ref:         ctx.Param("ref"),
+		RepoType:    common.RepoTypeFromContext(ctx),
+		CurrentUser: currentUser,
+		Limit:       cast.ToInt(ctx.Query("limit")),
+		Offset:      cast.ToInt(ctx.Query("offset")),
+	}
+
+	if req.Limit == 0 {
+		req.Limit = 25
+	}
+	tree, err := h.c.LogsTree(ctx, req)
+	if err != nil {
+		if errors.Is(err, component.ErrForbidden) {
+			httpbase.ForbiddenError(ctx, err)
+			return
+		}
+		slog.Error(
+			"Failed to get logs tree",
+			slog.String("repo_type", string(req.RepoType)), slog.Any("error", err),
+		)
+		httpbase.ServerError(ctx, err)
+		return
+	}
+
 	httpbase.OK(ctx, tree)
 }
 

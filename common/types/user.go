@@ -149,6 +149,11 @@ type PageOpts struct {
 	PageSize int `json:"page_size"`
 }
 
+type OffsetPagination struct {
+	Limit  int `json:"limit"`
+	Offset int `json:"offset"`
+}
+
 type User struct {
 	ID                int64          `json:"id,omitempty"`
 	Username          string         `json:"username"`

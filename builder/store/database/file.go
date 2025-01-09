@@ -2,6 +2,8 @@ package database
 
 import (
 	"context"
+
+	"opencsg.com/csghub-server/common/types"
 )
 
 type fileStoreImpl struct {
@@ -9,7 +11,7 @@ type fileStoreImpl struct {
 }
 
 type FileStore interface {
-	FindByParentPath(ctx context.Context, repoID int64, path string) ([]File, error)
+	FindByParentPath(ctx context.Context, repoID int64, path string, pagination *types.OffsetPagination) ([]File, error)
 	BatchCreate(ctx context.Context, files []File) error
 }
 
@@ -39,12 +41,15 @@ type File struct {
 	times
 }
 
-func (s *fileStoreImpl) FindByParentPath(ctx context.Context, repoID int64, path string) ([]File, error) {
+func (s *fileStoreImpl) FindByParentPath(ctx context.Context, repoID int64, path string, pagination *types.OffsetPagination) ([]File, error) {
 	var files []File
-	err := s.db.Operator.Core.NewSelect().
+	query := s.db.Operator.Core.NewSelect().
 		Model(&files).
-		Where("parent_path = ? and repository_id = ?", path, repoID).
-		Scan(ctx)
+		Where("parent_path = ? and repository_id = ?", path, repoID)
+	if pagination != nil {
+		query = query.Limit(pagination.Limit).Offset(pagination.Offset)
+	}
+	err := query.Scan(ctx)
 	if err != nil {
 		return nil, err
 	}

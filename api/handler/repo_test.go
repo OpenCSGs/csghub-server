@@ -1151,3 +1151,53 @@ func TestRepoHandler_ServelessUpdate(t *testing.T) {
 	tester.Execute()
 	tester.ResponseEq(t, 200, tester.OKText, nil)
 }
+
+func TestRepoHandler_TreeV2(t *testing.T) {
+
+	tester := NewRepoTester(t).WithHandleFunc(func(rp *RepoHandler) gin.HandlerFunc {
+		return rp.TreeV2
+	})
+	tester.mocks.repo.EXPECT().TreeV2(mock.Anything, &types.GetTreeRequest{
+		Namespace:   "u",
+		Name:        "r",
+		Path:        "foo",
+		Ref:         "main",
+		RepoType:    types.ModelRepo,
+		CurrentUser: "u",
+		Limit:       5,
+		Cursor:      "cc",
+	}).Return(
+		&types.GetRepoFileTreeResp{Files: []*types.File{{Name: "f1"}}}, nil,
+	).Once()
+	tester.WithParam("path", "foo").WithParam("ref", "main").WithQuery("limit", "5")
+	tester.WithKV("repo_type", types.ModelRepo).WithUser().WithQuery("cursor", "cc").Execute()
+
+	tester.ResponseEq(
+		t, 200, tester.OKText, &types.GetRepoFileTreeResp{Files: []*types.File{{Name: "f1"}}},
+	)
+}
+
+func TestRepoHandler_LogsTree(t *testing.T) {
+
+	tester := NewRepoTester(t).WithHandleFunc(func(rp *RepoHandler) gin.HandlerFunc {
+		return rp.LogsTree
+	})
+	tester.mocks.repo.EXPECT().LogsTree(mock.Anything, &types.GetLogsTreeRequest{
+		Namespace:   "u",
+		Name:        "r",
+		Path:        "foo",
+		Ref:         "main",
+		RepoType:    types.ModelRepo,
+		CurrentUser: "u",
+		Limit:       5,
+		Offset:      1,
+	}).Return(
+		&types.LogsTreeResp{Commits: []*types.CommitForTree{{Name: "c1"}}}, nil,
+	).Once()
+	tester.WithParam("path", "foo").WithParam("ref", "main").WithQuery("limit", "5")
+	tester.WithKV("repo_type", types.ModelRepo).WithUser().WithQuery("offset", "1").Execute()
+
+	tester.ResponseEq(
+		t, 200, tester.OKText, &types.LogsTreeResp{Commits: []*types.CommitForTree{{Name: "c1"}}},
+	)
+}

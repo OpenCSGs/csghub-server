@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/tests"
+	"opencsg.com/csghub-server/common/types"
 )
 
 func TestFileStore_FindByParentPath(t *testing.T) {
@@ -36,7 +37,7 @@ func TestFileStore_FindByParentPath(t *testing.T) {
 	require.Nil(t, err)
 
 	// Query files by parent path
-	result, err := fs.FindByParentPath(ctx, repo.ID, "test-path")
+	result, err := fs.FindByParentPath(ctx, repo.ID, "test-path", nil)
 	require.Nil(t, err)
 	require.Equal(t, 2, len(result))
 
@@ -45,6 +46,19 @@ func TestFileStore_FindByParentPath(t *testing.T) {
 		names = append(names, f.Name)
 	}
 	require.ElementsMatch(t, []string{"file1", "file2"}, names)
+
+	result, err = fs.FindByParentPath(ctx, repo.ID, "test-path", &types.OffsetPagination{
+		Limit:  1,
+		Offset: 1,
+	})
+	require.Nil(t, err)
+	require.Equal(t, 1, len(result))
+
+	names = []string{}
+	for _, f := range result {
+		names = append(names, f.Name)
+	}
+	require.ElementsMatch(t, []string{"file2"}, names)
 }
 
 func TestFileStore_BatchCreate(t *testing.T) {
@@ -73,7 +87,7 @@ func TestFileStore_BatchCreate(t *testing.T) {
 	require.Nil(t, err)
 
 	// Validate files are inserted correctly
-	result, err := fs.FindByParentPath(ctx, repo.ID, "test-path")
+	result, err := fs.FindByParentPath(ctx, repo.ID, "test-path", nil)
 	require.Nil(t, err)
 	require.Equal(t, 2, len(result))
 

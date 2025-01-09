@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/OpenCSGs/gitea-go-sdk/gitea"
+	"github.com/spf13/cast"
 	"opencsg.com/csghub-server/builder/git/gitserver"
 	"opencsg.com/csghub-server/common/types"
 	"opencsg.com/csghub-server/common/utils/common"
@@ -246,4 +247,58 @@ func (c *Client) GetRepoAllFiles(ctx context.Context, req gitserver.GetRepoAllFi
 
 func (c *Client) GetRepoAllLfsPointers(ctx context.Context, req gitserver.GetRepoAllFilesReq) ([]*types.LFSPointer, error) {
 	return nil, nil
+}
+
+func (c *Client) GetTree(ctx context.Context, req types.GetTreeRequest) (*types.GetRepoFileTreeResp, error) {
+	namespace := common.WithPrefix(req.Namespace, repoPrefixByType(req.RepoType))
+	fs, err := c.getRepoDir(namespace, req.Name, req.Ref, req.Path)
+	if err != nil {
+		return nil, errors.New("failed to list dir")
+	}
+	offset := 0
+	if req.Cursor != "" {
+		r, err := base64.StdEncoding.DecodeString(req.Cursor)
+		if err == nil {
+			offset = cast.ToInt(string(r))
+		}
+	}
+
+	upper := offset + req.Limit
+	cursor := base64.StdEncoding.EncodeToString([]byte(cast.ToString(offset + req.Limit)))
+	if upper >= len(fs) {
+		upper = len(fs)
+		cursor = ""
+	}
+
+	return &types.GetRepoFileTreeResp{
+		Files:  fs[offset:upper],
+		Cursor: cursor,
+	}, nil
+}
+
+func (c *Client) GetLogsTree(ctx context.Context, req types.GetLogsTreeRequest) (*types.LogsTreeResp, error) {
+	namespace := common.WithPrefix(req.Namespace, repoPrefixByType(req.RepoType))
+	fs, err := c.getRepoDir(namespace, req.Name, req.Ref, req.Path)
+	if err != nil {
+		return nil, errors.New("failed to list dir")
+	}
+	lower := req.Offset
+	upper := req.Offset + req.Limit
+	if lower >= len(fs) {
+		lower = len(fs)
+	}
+	if upper >= len(fs) {
+		upper = len(fs)
+	}
+	commits := []*types.CommitForTree{}
+	for _, e := range fs[lower:upper] {
+		commits = append(commits, &types.CommitForTree{
+			Message: e.Commit.Message,
+			ID:      e.Commit.ID,
+			Path:    e.Path,
+		})
+
+	}
+
+	return &types.LogsTreeResp{Commits: commits}, nil
 }

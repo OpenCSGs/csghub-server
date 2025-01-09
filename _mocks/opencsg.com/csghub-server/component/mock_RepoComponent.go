@@ -2593,6 +2593,65 @@ func (_c *MockRepoComponent_ListRuntimeFrameworkWithType_Call) RunAndReturn(run 
 	return _c
 }
 
+// LogsTree provides a mock function with given fields: ctx, req
+func (_m *MockRepoComponent) LogsTree(ctx context.Context, req *types.GetLogsTreeRequest) (*types.LogsTreeResp, error) {
+	ret := _m.Called(ctx, req)
+
+	if len(ret) == 0 {
+		panic("no return value specified for LogsTree")
+	}
+
+	var r0 *types.LogsTreeResp
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, *types.GetLogsTreeRequest) (*types.LogsTreeResp, error)); ok {
+		return rf(ctx, req)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, *types.GetLogsTreeRequest) *types.LogsTreeResp); ok {
+		r0 = rf(ctx, req)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*types.LogsTreeResp)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, *types.GetLogsTreeRequest) error); ok {
+		r1 = rf(ctx, req)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockRepoComponent_LogsTree_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'LogsTree'
+type MockRepoComponent_LogsTree_Call struct {
+	*mock.Call
+}
+
+// LogsTree is a helper method to define mock.On call
+//   - ctx context.Context
+//   - req *types.GetLogsTreeRequest
+func (_e *MockRepoComponent_Expecter) LogsTree(ctx interface{}, req interface{}) *MockRepoComponent_LogsTree_Call {
+	return &MockRepoComponent_LogsTree_Call{Call: _e.mock.On("LogsTree", ctx, req)}
+}
+
+func (_c *MockRepoComponent_LogsTree_Call) Run(run func(ctx context.Context, req *types.GetLogsTreeRequest)) *MockRepoComponent_LogsTree_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(*types.GetLogsTreeRequest))
+	})
+	return _c
+}
+
+func (_c *MockRepoComponent_LogsTree_Call) Return(_a0 *types.LogsTreeResp, _a1 error) *MockRepoComponent_LogsTree_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockRepoComponent_LogsTree_Call) RunAndReturn(run func(context.Context, *types.GetLogsTreeRequest) (*types.LogsTreeResp, error)) *MockRepoComponent_LogsTree_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // MirrorFromSaas provides a mock function with given fields: ctx, namespace, name, currentUser, repoType
 func (_m *MockRepoComponent) MirrorFromSaas(ctx context.Context, namespace string, name string, currentUser string, repoType types.RepositoryType) error {
 	ret := _m.Called(ctx, namespace, name, currentUser, repoType)
@@ -3074,6 +3133,65 @@ func (_c *MockRepoComponent_Tree_Call) Return(_a0 []*types.File, _a1 error) *Moc
 }
 
 func (_c *MockRepoComponent_Tree_Call) RunAndReturn(run func(context.Context, *types.GetFileReq) ([]*types.File, error)) *MockRepoComponent_Tree_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// TreeV2 provides a mock function with given fields: ctx, req
+func (_m *MockRepoComponent) TreeV2(ctx context.Context, req *types.GetTreeRequest) (*types.GetRepoFileTreeResp, error) {
+	ret := _m.Called(ctx, req)
+
+	if len(ret) == 0 {
+		panic("no return value specified for TreeV2")
+	}
+
+	var r0 *types.GetRepoFileTreeResp
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, *types.GetTreeRequest) (*types.GetRepoFileTreeResp, error)); ok {
+		return rf(ctx, req)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, *types.GetTreeRequest) *types.GetRepoFileTreeResp); ok {
+		r0 = rf(ctx, req)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*types.GetRepoFileTreeResp)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, *types.GetTreeRequest) error); ok {
+		r1 = rf(ctx, req)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockRepoComponent_TreeV2_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'TreeV2'
+type MockRepoComponent_TreeV2_Call struct {
+	*mock.Call
+}
+
+// TreeV2 is a helper method to define mock.On call
+//   - ctx context.Context
+//   - req *types.GetTreeRequest
+func (_e *MockRepoComponent_Expecter) TreeV2(ctx interface{}, req interface{}) *MockRepoComponent_TreeV2_Call {
+	return &MockRepoComponent_TreeV2_Call{Call: _e.mock.On("TreeV2", ctx, req)}
+}
+
+func (_c *MockRepoComponent_TreeV2_Call) Run(run func(ctx context.Context, req *types.GetTreeRequest)) *MockRepoComponent_TreeV2_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(*types.GetTreeRequest))
+	})
+	return _c
+}
+
+func (_c *MockRepoComponent_TreeV2_Call) Return(_a0 *types.GetRepoFileTreeResp, _a1 error) *MockRepoComponent_TreeV2_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockRepoComponent_TreeV2_Call) RunAndReturn(run func(context.Context, *types.GetTreeRequest) (*types.GetRepoFileTreeResp, error)) *MockRepoComponent_TreeV2_Call {
 	_c.Call.Return(run)
 	return _c
 }
