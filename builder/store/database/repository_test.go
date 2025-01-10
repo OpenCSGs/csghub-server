@@ -805,6 +805,11 @@ func TestRepoStore_BatchMethods(t *testing.T) {
 	require.Equal(t, len(rs), 2)
 	require.Equal(t, []string{"rp3", "rp2"}, names(rs))
 
+	rs, err = store.FindWithBatch(ctx, 2, 0, types.DatasetRepo)
+	require.Nil(t, err)
+	require.Equal(t, len(rs), 1)
+	require.Equal(t, []string{"rp5"}, names(rs))
+
 	rs, err = store.ByUser(ctx, 123)
 	require.Nil(t, err)
 	require.Equal(t, len(rs), 3)

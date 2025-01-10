@@ -230,3 +230,31 @@ func TestBuildCloneInfo(t *testing.T) {
 		})
 	}
 }
+
+func TestIsValidName(t *testing.T) {
+	type args struct {
+		name string
+	}
+	tests := []struct {
+		name string
+		args args
+		want bool
+	}{
+		{name: "Test IsValidName when name is valid", args: args{name: "abc"}, want: true},
+		{name: "Test IsValidName when name is valid", args: args{name: "abc_def"}, want: true},
+		{name: "Test IsValidName when name is valid", args: args{name: "abc-def"}, want: true},
+		{name: "Test IsValidName when name is invalid", args: args{name: "abc/def"}, want: false},
+		{name: "Test IsValidName when name is invalid", args: args{name: "abc def"}, want: false},
+		{name: "Test IsValidName when name is invalid", args: args{name: "abc__def"}, want: false},
+		{name: "Test IsValidName when name is invalid", args: args{name: "a"}, want: false},
+		{name: "Test IsValidName when name is invalid", args: args{name: "abc..def"}, want: false},
+		{name: "Test IsValidName when name is invalid", args: args{name: "--def"}, want: false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got, _ := IsValidName(tt.args.name); got != tt.want {
+				t.Errorf("IsValidName() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}

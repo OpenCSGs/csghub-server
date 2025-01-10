@@ -222,6 +222,12 @@ func NewRepoComponent(config *config.Config) (RepoComponent, error) {
 }
 
 func (c *repoComponentImpl) CreateRepo(ctx context.Context, req types.CreateRepoReq) (*gitserver.CreateRepoResp, *database.Repository, error) {
+	// Name validation
+	valid, err := common.IsValidName(req.Name)
+	if !valid {
+		return nil, nil, fmt.Errorf("repo name is invalid, error: %w", err)
+	}
+
 	namespace, err := c.namespaceStore.FindByPath(ctx, req.Namespace)
 	if err != nil {
 		return nil, nil, errors.New("namespace does not exist")
@@ -259,7 +265,7 @@ func (c *repoComponentImpl) CreateRepo(ctx context.Context, req types.CreateRepo
 		Username:      req.Username,
 		Namespace:     req.Namespace,
 		Name:          req.Name,
-		Nickname:      req.Name,
+		Nickname:      req.Nickname,
 		License:       req.License,
 		DefaultBranch: req.DefaultBranch,
 		// Readme:        "Please introduce your space.",

@@ -248,10 +248,10 @@ func (_c *MockOrganizationComponent_Get_Call) RunAndReturn(run func(context.Cont
 	return _c
 }
 
-
 // Index provides a mock function with given fields: ctx, username, search, per, page
 func (_m *MockOrganizationComponent) Index(ctx context.Context, username string, search string, per int, page int) ([]types.Organization, int, error) {
 	ret := _m.Called(ctx, username, search, per, page)
+
 	if len(ret) == 0 {
 		panic("no return value specified for Index")
 	}
@@ -306,7 +306,6 @@ func (_c *MockOrganizationComponent_Index_Call) Run(run func(ctx context.Context
 	})
 	return _c
 }
-
 
 func (_c *MockOrganizationComponent_Index_Call) Return(_a0 []types.Organization, _a1 int, _a2 error) *MockOrganizationComponent_Index_Call {
 	_c.Call.Return(_a0, _a1, _a2)
