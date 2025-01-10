@@ -1,0 +1,14 @@
+FROM lmsysorg/sglang:v0.4.1.post3-cu124-srt
+RUN pip config set global.index-url https://pypi.tuna.tsinghua.edu.cn/simple
+RUN apt-get update && apt-get install -y dumb-init && apt-get clean && rm -rf /var/lib/apt/lists/*
+RUN pip install --no-cache-dir csghub-sdk==0.4.6
+COPY ./sglang/ /etc/csghub/
+RUN chmod +x /etc/csghub/*.sh
+
+WORKDIR /workspace/
+ENV HUGGINGFACE_HUB_CACHE=/workspace/ \
+    HF_HUB_ENABLE_HF_TRANSFER=0
+ENV PORT=8000
+EXPOSE 8000
+ENTRYPOINT [ "/usr/bin/dumb-init", "--" ]
+CMD ["/etc/csghub/serve.sh"]
