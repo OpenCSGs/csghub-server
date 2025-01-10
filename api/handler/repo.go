@@ -341,8 +341,6 @@ func (h *RepoHandler) FileInfo(ctx *gin.Context) {
 	httpbase.OK(ctx, file)
 }
 
-// Deprecated: use ResolveDownload instead
-//
 // DownloadRepoFile godoc
 // @Security     ApiKey or JWT
 // @Summary      Download a repo file [Depricated: use 'resolve' api instead]
