@@ -3,6 +3,7 @@ package config
 import (
 	"context"
 	"os"
+	"reflect"
 
 	"github.com/naoina/toml"
 	"github.com/sethvargo/go-envconfig"
@@ -240,6 +241,10 @@ func SetConfigFile(file string) {
 
 func LoadConfig() (*Config, error) {
 	cfg := &Config{}
+
+	toml.DefaultConfig.MissingField = func(typ reflect.Type, key string) error {
+		return nil
+	}
 
 	if configFile != "" {
 		f, err := os.Open(configFile)
