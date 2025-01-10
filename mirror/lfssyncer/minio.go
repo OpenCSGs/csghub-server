@@ -31,6 +31,7 @@ type MinioLFSSyncWorker struct {
 	config             *config.Config
 	repoStore          database.RepoStore
 	numWorkers         int
+	httpClient         *http.Client
 }
 
 func NewMinioLFSSyncWorker(config *config.Config, numWorkers int) (*MinioLFSSyncWorker, error) {
@@ -53,6 +54,19 @@ func NewMinioLFSSyncWorker(config *config.Config, numWorkers int) (*MinioLFSSync
 	}
 	w.mq = mq
 	w.tasks = make(chan queue.MirrorTask)
+	if !config.Proxy.Enable || config.Proxy.URL == "" {
+		w.httpClient = &http.Client{}
+	} else {
+		proxyURL, err := url.Parse(config.Proxy.URL)
+		if err != nil {
+			return nil, fmt.Errorf("fail to parse proxy url: %w", err)
+		}
+		w.httpClient = &http.Client{
+			Transport: &http.Transport{
+				Proxy: http.ProxyURL(proxyURL),
+			},
+		}
+	}
 	return w, nil
 }
 
@@ -188,8 +202,7 @@ func (w *MinioLFSSyncWorker) GetLFSDownloadURLs(ctx context.Context, mirror *dat
 	req.Header.Set("Content-Type", "application/vnd.git-lfs+json; charset=utf-8")
 	req.Header.Set("User-Agent", "git-lfs/3.5.1")
 
-	client := &http.Client{}
-	resp, err := client.Do(req)
+	resp, err := w.httpClient.Do(req)
 	if err != nil {
 		return resPointers, fmt.Errorf("failed to send LFS batch request: %v", err)
 	}
@@ -282,8 +295,7 @@ func (w *MinioLFSSyncWorker) DownloadAndUploadLFSFile(ctx context.Context, mirro
 	req.Header.Set("Content-Type", "application/vnd.git-lfs+json; charset=utf-8")
 	req.Header.Set("User-Agent", "git-lfs/3.5.1")
 
-	client := &http.Client{}
-	resp, err := client.Do(req)
+	resp, err := w.httpClient.Do(req)
 	if err != nil {
 		return fmt.Errorf("failed to download LFS file: %w", err)
 	}

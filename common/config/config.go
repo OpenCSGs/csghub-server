@@ -226,6 +226,12 @@ type Config struct {
 		SyncAsClientCronExpression   string `env:"STARHUB_SERVER_CRON_JOB_SYNC_AS_CLIENT_CRON_EXPRESSION, default=0 * * * *"`
 		CalcRecomScoreCronExpression string `env:"STARHUB_SERVER_CRON_JOB_CLAC_RECOM_SCORE_CRON_EXPRESSION, default=0 1 * * *"`
 	}
+
+	Proxy struct {
+		Enable bool     `env:"STARHUB_SERVER_PROXY_ENABLE, default=false"`
+		URL    string   `env:"STARHUB_SERVER_PROXY_URL, default="`
+		Hosts  []string `env:"STARHUB_SERVER_PROXY_HOSTS, delimiter=;"`
+	}
 }
 
 func SetConfigFile(file string) {
