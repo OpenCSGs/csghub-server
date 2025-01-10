@@ -6,14 +6,46 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/url"
+	"strings"
+
+	"opencsg.com/csghub-server/common/config"
 )
 
 func NewHttpClient(endpoint string, opts ...RequestOption) *HttpClient {
-	return &HttpClient{
+	defaultClient := &HttpClient{
 		endpoint: endpoint,
 		hc:       http.DefaultClient,
 		authOpts: opts,
 	}
+	cfg, err := config.LoadConfig()
+	if err != nil {
+		return defaultClient
+	}
+	if !cfg.Proxy.Enable || cfg.Proxy.URL == "" {
+		return defaultClient
+	}
+	proxyHosts := cfg.Proxy.Hosts
+	proxyURL, err := url.Parse(cfg.Proxy.URL)
+	if err != nil {
+		return defaultClient
+	}
+
+	for _, host := range proxyHosts {
+		if strings.Contains(endpoint, host) {
+			return &HttpClient{
+				endpoint: endpoint,
+				hc: &http.Client{
+					Transport: &http.Transport{
+						Proxy: http.ProxyURL(proxyURL),
+					},
+				},
+				authOpts: opts,
+			}
+		}
+	}
+
+	return defaultClient
 }
 
 type HttpClient struct {
