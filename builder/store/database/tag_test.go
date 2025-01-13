@@ -642,8 +642,10 @@ func TestTagStore_Category_CURD(t *testing.T) {
 	total := len(categories)
 
 	catetory, err := ts.CreateCategory(ctx, database.TagCategory{
-		Name:  "test-category",
-		Scope: "test-scope",
+		Name:     "test-category",
+		Scope:    "test-scope",
+		ShowName: "测试分类",
+		Enabled:  true,
 	})
 	require.Empty(t, err)
 	require.NotEmpty(t, catetory)
@@ -651,9 +653,11 @@ func TestTagStore_Category_CURD(t *testing.T) {
 	id := catetory.ID
 
 	catetory, err = ts.UpdateCategory(ctx, database.TagCategory{
-		ID:    1,
-		Name:  "test-category1",
-		Scope: "test-scope1",
+		ID:       1,
+		Name:     "test-category1",
+		Scope:    "test-scope1",
+		ShowName: "测试分类1",
+		Enabled:  false,
 	})
 	require.Empty(t, err)
 	require.NotEmpty(t, catetory)
@@ -663,6 +667,8 @@ func TestTagStore_Category_CURD(t *testing.T) {
 	require.NotEmpty(t, categories)
 	require.Equal(t, "test-category1", categories[0].Name)
 	require.Equal(t, "test-scope1", string(categories[0].Scope))
+	require.Equal(t, "测试分类1", categories[0].ShowName)
+	require.Equal(t, false, categories[0].Enabled)
 
 	err = ts.DeleteCategory(ctx, id)
 	require.Empty(t, err)

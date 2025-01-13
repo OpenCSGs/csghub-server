@@ -310,8 +310,10 @@ func (c *tagComponentImpl) CreateCategory(ctx context.Context, username string, 
 	}
 
 	newCategory := database.TagCategory{
-		Name:  req.Name,
-		Scope: database.TagScope(req.Scope),
+		Name:     req.Name,
+		ShowName: req.ShowName,
+		Scope:    database.TagScope(req.Scope),
+		Enabled:  req.Enabled,
 	}
 
 	category, err := c.tagStore.CreateCategory(ctx, newCategory)
@@ -332,9 +334,11 @@ func (c *tagComponentImpl) UpdateCategory(ctx context.Context, username string, 
 	}
 
 	newCategory := database.TagCategory{
-		ID:    id,
-		Name:  req.Name,
-		Scope: database.TagScope(req.Scope),
+		ID:       id,
+		Name:     req.Name,
+		ShowName: req.ShowName,
+		Scope:    database.TagScope(req.Scope),
+		Enabled:  req.Enabled,
 	}
 
 	category, err := c.tagStore.UpdateCategory(ctx, newCategory)

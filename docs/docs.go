@@ -15550,6 +15550,9 @@ const docTemplate = `{
         "database.TagCategory": {
             "type": "object",
             "properties": {
+                "enabled": {
+                    "type": "boolean"
+                },
                 "id": {
                     "type": "integer"
                 },
@@ -15558,6 +15561,9 @@ const docTemplate = `{
                 },
                 "scope": {
                     "$ref": "#/definitions/database.TagScope"
+                },
+                "show_name": {
+                    "type": "string"
                 }
             }
         },
@@ -16184,10 +16190,16 @@ const docTemplate = `{
                 "scope"
             ],
             "properties": {
+                "enabled": {
+                    "type": "boolean"
+                },
                 "name": {
                     "type": "string"
                 },
                 "scope": {
+                    "type": "string"
+                },
+                "show_name": {
                     "type": "string"
                 }
             }
@@ -18114,6 +18126,9 @@ const docTemplate = `{
                 "secrets": {
                     "type": "string"
                 },
+                "sensitive_check_status": {
+                    "type": "string"
+                },
                 "sku": {
                     "type": "string"
                 },
@@ -18256,10 +18271,16 @@ const docTemplate = `{
                 "scope"
             ],
             "properties": {
+                "enabled": {
+                    "type": "boolean"
+                },
                 "name": {
                     "type": "string"
                 },
                 "scope": {
+                    "type": "string"
+                },
+                "show_name": {
                     "type": "string"
                 }
             }
