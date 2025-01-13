@@ -223,6 +223,7 @@ func (c *tagComponentImpl) CreateTag(ctx context.Context, username string, req t
 		Group:    req.Group,
 		Scope:    database.TagScope(req.Scope),
 		BuiltIn:  req.BuiltIn,
+		ShowName: req.ShowName,
 	}
 
 	tag, err := c.tagStore.FindOrCreate(ctx, newTag)
@@ -273,6 +274,7 @@ func (c *tagComponentImpl) UpdateTag(ctx context.Context, username string, id in
 		Group:    req.Group,
 		Scope:    database.TagScope(req.Scope),
 		BuiltIn:  req.BuiltIn,
+		ShowName: req.ShowName,
 	}
 	newTag, err := c.tagStore.UpdateTagByID(ctx, tag)
 	if err != nil {
