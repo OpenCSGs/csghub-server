@@ -362,12 +362,16 @@ definitions:
     type: object
   database.TagCategory:
     properties:
+      enabled:
+        type: boolean
       id:
         type: integer
       name:
         type: string
       scope:
         $ref: '#/definitions/database.TagScope'
+      show_name:
+        type: string
     type: object
   database.TagScope:
     enum:
@@ -788,9 +792,13 @@ definitions:
     type: object
   types.CreateCategory:
     properties:
+      enabled:
+        type: boolean
       name:
         type: string
       scope:
+        type: string
+      show_name:
         type: string
     required:
     - name
@@ -2103,6 +2111,8 @@ definitions:
         type: string
       secrets:
         type: string
+      sensitive_check_status:
+        type: string
       sku:
         type: string
       source:
@@ -2196,9 +2206,13 @@ definitions:
     - TaskTypeLeaderBoard
   types.UpdateCategory:
     properties:
+      enabled:
+        type: boolean
       name:
         type: string
       scope:
+        type: string
+      show_name:
         type: string
     required:
     - name
