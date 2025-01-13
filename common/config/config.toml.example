@@ -164,4 +164,4 @@ sync_as_client_cron_expression = "0 * * * *"
 calc_recom_score_cron_expression = "0 1 * * *"
 
 [proxy]
-hosts = "opencsg.com;sync.opencsg.com"
+hosts = ["opencsg.com", "sync.opencsg.com"]
