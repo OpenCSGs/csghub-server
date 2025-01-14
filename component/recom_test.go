@@ -31,16 +31,21 @@ func TestRecomComponent_CalculateRecomScore(t *testing.T) {
 	rc.mocks.stores.RecomMock().EXPECT().LoadWeights(mock.Anything).Return(
 		[]*database.RecomWeight{{Name: "freshness", WeightExp: "score = 12.34"}}, nil,
 	)
-	rc.mocks.stores.RepoMock().EXPECT().All(ctx).Return([]*database.Repository{
+	// loop 1
+	rc.mocks.stores.RepoMock().EXPECT().FindWithBatch(ctx, 1, 0).Return([]database.Repository{
 		{ID: 1, Path: "foo/bar"},
 	}, nil)
+	// loop 2
+	rc.mocks.stores.RepoMock().EXPECT().FindWithBatch(ctx, 1, 1).Return([]database.Repository{}, nil)
+
 	rc.mocks.stores.RecomMock().EXPECT().UpsertScore(ctx, int64(1), 12.34).Return(nil)
 	rc.mocks.gitServer.EXPECT().GetRepoFileTree(mock.Anything, gitserver.GetRepoInfoByPathReq{
 		Namespace: "foo",
 		Name:      "bar",
 	}).Return(nil, nil)
 
-	rc.CalculateRecomScore(ctx)
+	err := rc.CalculateRecomScore(ctx, 1)
+	require.NoError(t, err)
 }
 
 func TestRecomComponent_CalculateTotalScore(t *testing.T) {

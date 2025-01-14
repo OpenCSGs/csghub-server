@@ -2,6 +2,7 @@ package component
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"time"
@@ -22,7 +23,7 @@ type recomComponentImpl struct {
 type RecomComponent interface {
 	SetOpWeight(ctx context.Context, repoID, weight int64) error
 	// loop through repositories and calculate the recom score of the repository
-	CalculateRecomScore(ctx context.Context)
+	CalculateRecomScore(ctx context.Context, batchSize int) error
 	CalcTotalScore(ctx context.Context, repo *database.Repository, weights map[string]string) float64
 }
 
@@ -48,26 +49,38 @@ func (rc *recomComponentImpl) SetOpWeight(ctx context.Context, repoID, weight in
 }
 
 // loop through repositories and calculate the recom score of the repository
-func (rc *recomComponentImpl) CalculateRecomScore(ctx context.Context) {
+func (rc *recomComponentImpl) CalculateRecomScore(ctx context.Context, batchSize int) error {
 	weights, err := rc.loadWeights()
 	if err != nil {
-		slog.Error("Error loading weights", "error", err)
-		return
+		return errors.New("error loading weights")
 	}
-	repos, err := rc.repoStore.All(ctx)
-	if err != nil {
-		slog.Error("Error fetching repositories", "error", err)
-		return
+	if batchSize <= 0 {
+		batchSize = 1000
 	}
-	for _, repo := range repos {
-		repoID := repo.ID
-		score := rc.CalcTotalScore(ctx, repo, weights)
-		err := rc.recomStore.UpsertScore(ctx, repoID, score)
+	batch := 0
+	for {
+		repos, err := rc.repoStore.FindWithBatch(ctx, batchSize, batch)
 		if err != nil {
-			slog.Error("Error updating recom score", slog.Int64("repo_id", repoID), slog.Float64("score", score),
-				slog.String("error", err.Error()))
+			return errors.New("error fetching repositories")
 		}
+		for _, repo := range repos {
+			repoID := repo.ID
+			score := rc.CalcTotalScore(ctx, &repo, weights)
+			err := rc.recomStore.UpsertScore(ctx, repoID, score)
+			if err != nil {
+				slog.Error("Error updating recom score", slog.Int64("repo_id", repoID), slog.Float64("score", score),
+					slog.String("error", err.Error()))
+			}
+		}
+
+		if len(repos) < batchSize {
+			break
+		}
+
+		batch++
 	}
+
+	return nil
 }
 
 func (rc *recomComponentImpl) CalcTotalScore(ctx context.Context, repo *database.Repository, weights map[string]string) float64 {
@@ -83,7 +96,7 @@ func (rc *recomComponentImpl) CalcTotalScore(ctx context.Context, repo *database
 
 	qualityScore, err := rc.calcQualityScore(ctx, repo)
 	if err != nil {
-		slog.Error("failed to calculate quality score", slog.Any("error", err))
+		slog.Error("failed to calculate quality score", slog.Any("error", err), slog.Int64("repo_id", repo.ID), slog.String("repo_path", repo.Path))
 	} else {
 		score += qualityScore
 	}

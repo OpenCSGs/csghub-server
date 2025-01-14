@@ -70,9 +70,22 @@ func (_c *MockRecomComponent_CalcTotalScore_Call) RunAndReturn(run func(context.
 	return _c
 }
 
-// CalculateRecomScore provides a mock function with given fields: ctx
-func (_m *MockRecomComponent) CalculateRecomScore(ctx context.Context) {
-	_m.Called(ctx)
+// CalculateRecomScore provides a mock function with given fields: ctx, batchSize
+func (_m *MockRecomComponent) CalculateRecomScore(ctx context.Context, batchSize int) error {
+	ret := _m.Called(ctx, batchSize)
+
+	if len(ret) == 0 {
+		panic("no return value specified for CalculateRecomScore")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, int) error); ok {
+		r0 = rf(ctx, batchSize)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
 }
 
 // MockRecomComponent_CalculateRecomScore_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'CalculateRecomScore'
@@ -82,23 +95,24 @@ type MockRecomComponent_CalculateRecomScore_Call struct {
 
 // CalculateRecomScore is a helper method to define mock.On call
 //   - ctx context.Context
-func (_e *MockRecomComponent_Expecter) CalculateRecomScore(ctx interface{}) *MockRecomComponent_CalculateRecomScore_Call {
-	return &MockRecomComponent_CalculateRecomScore_Call{Call: _e.mock.On("CalculateRecomScore", ctx)}
+//   - batchSize int
+func (_e *MockRecomComponent_Expecter) CalculateRecomScore(ctx interface{}, batchSize interface{}) *MockRecomComponent_CalculateRecomScore_Call {
+	return &MockRecomComponent_CalculateRecomScore_Call{Call: _e.mock.On("CalculateRecomScore", ctx, batchSize)}
 }
 
-func (_c *MockRecomComponent_CalculateRecomScore_Call) Run(run func(ctx context.Context)) *MockRecomComponent_CalculateRecomScore_Call {
+func (_c *MockRecomComponent_CalculateRecomScore_Call) Run(run func(ctx context.Context, batchSize int)) *MockRecomComponent_CalculateRecomScore_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context))
+		run(args[0].(context.Context), args[1].(int))
 	})
 	return _c
 }
 
-func (_c *MockRecomComponent_CalculateRecomScore_Call) Return() *MockRecomComponent_CalculateRecomScore_Call {
-	_c.Call.Return()
+func (_c *MockRecomComponent_CalculateRecomScore_Call) Return(_a0 error) *MockRecomComponent_CalculateRecomScore_Call {
+	_c.Call.Return(_a0)
 	return _c
 }
 
-func (_c *MockRecomComponent_CalculateRecomScore_Call) RunAndReturn(run func(context.Context)) *MockRecomComponent_CalculateRecomScore_Call {
+func (_c *MockRecomComponent_CalculateRecomScore_Call) RunAndReturn(run func(context.Context, int) error) *MockRecomComponent_CalculateRecomScore_Call {
 	_c.Call.Return(run)
 	return _c
 }
