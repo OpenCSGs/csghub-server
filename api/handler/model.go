@@ -143,6 +143,10 @@ func (h *ModelHandler) Create(ctx *gin.Context) {
 
 	model, err := h.model.Create(ctx.Request.Context(), req)
 	if err != nil {
+		if errors.Is(err, component.ErrForbidden) {
+			httpbase.ForbiddenError(ctx, err)
+			return
+		}
 		slog.Error("Failed to create model", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
 		return
@@ -198,6 +202,10 @@ func (h *ModelHandler) Update(ctx *gin.Context) {
 
 	model, err := h.model.Update(ctx.Request.Context(), req)
 	if err != nil {
+		if errors.Is(err, component.ErrForbidden) {
+			httpbase.ForbiddenError(ctx, err)
+			return
+		}
 		slog.Error("Failed to update model", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
 		return
@@ -235,6 +243,10 @@ func (h *ModelHandler) Delete(ctx *gin.Context) {
 	}
 	err = h.model.Delete(ctx.Request.Context(), namespace, name, currentUser)
 	if err != nil {
+		if errors.Is(err, component.ErrForbidden) {
+			httpbase.ForbiddenError(ctx, err)
+			return
+		}
 		slog.Error("Failed to delete model", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
 		return
@@ -268,8 +280,8 @@ func (h *ModelHandler) Show(ctx *gin.Context) {
 	detail, err := h.model.Show(ctx.Request.Context(), namespace, name, currentUser, false)
 
 	if err != nil {
-		if errors.Is(err, component.ErrUnauthorized) {
-			httpbase.UnauthorizedError(ctx, err)
+		if errors.Is(err, component.ErrForbidden) {
+			httpbase.ForbiddenError(ctx, err)
 			return
 		}
 		slog.Error("Failed to get model detail", slog.Any("error", err))
@@ -296,8 +308,8 @@ func (h *ModelHandler) SDKModelInfo(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
 	modelInfo, err := h.model.SDKModelInfo(ctx.Request.Context(), namespace, name, ref, currentUser)
 	if err != nil {
-		if errors.Is(err, component.ErrUnauthorized) {
-			httpbase.UnauthorizedError(ctx, err)
+		if errors.Is(err, component.ErrForbidden) {
+			httpbase.ForbiddenError(ctx, err)
 			return
 		}
 		slog.Error("Failed to get sdk model info", slog.String("namespace", namespace), slog.String("name", name), slog.Any("error", err))
@@ -331,8 +343,8 @@ func (h *ModelHandler) Relations(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
 	detail, err := h.model.Relations(ctx.Request.Context(), namespace, name, currentUser)
 	if err != nil {
-		if errors.Is(err, component.ErrUnauthorized) {
-			httpbase.UnauthorizedError(ctx, err)
+		if errors.Is(err, component.ErrForbidden) {
+			httpbase.ForbiddenError(ctx, err)
 			return
 		}
 		slog.Error("Failed to get model relations", slog.Any("error", err))
@@ -383,6 +395,10 @@ func (h *ModelHandler) SetRelations(ctx *gin.Context) {
 
 	err = h.model.SetRelationDatasets(ctx.Request.Context(), req)
 	if err != nil {
+		if errors.Is(err, component.ErrForbidden) {
+			httpbase.ForbiddenError(ctx, err)
+			return
+		}
 		slog.Error("Failed to set datasets for model", slog.Any("req", req), slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
 		return
@@ -430,6 +446,10 @@ func (h *ModelHandler) AddDatasetRelation(ctx *gin.Context) {
 
 	err = h.model.AddRelationDataset(ctx.Request.Context(), req)
 	if err != nil {
+		if errors.Is(err, component.ErrForbidden) {
+			httpbase.ForbiddenError(ctx, err)
+			return
+		}
 		slog.Error("Failed to add dataset for model", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
 		return
@@ -477,6 +497,10 @@ func (h *ModelHandler) DelDatasetRelation(ctx *gin.Context) {
 
 	err = h.model.DelRelationDataset(ctx.Request.Context(), req)
 	if err != nil {
+		if errors.Is(err, component.ErrForbidden) {
+			httpbase.ForbiddenError(ctx, err)
+			return
+		}
 		slog.Error("Failed to delete dataset for model", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
 		return
@@ -579,7 +603,7 @@ func (h *ModelHandler) DeployDedicated(ctx *gin.Context) {
 	if !allow {
 		slog.Info("user not allowed to run model", slog.String("namespace", namespace),
 			slog.String("name", name), slog.Any("username", currentUser))
-		httpbase.UnauthorizedError(ctx, errors.New("user not allowed to run model"))
+		httpbase.ForbiddenError(ctx, errors.New("user not allowed to run model"))
 		return
 	}
 
@@ -666,7 +690,7 @@ func (h *ModelHandler) FinetuneCreate(ctx *gin.Context) {
 	if !allow {
 		slog.Info("user is not allowed to run model", slog.String("namespace", namespace),
 			slog.String("name", name), slog.Any("username", currentUser))
-		httpbase.UnauthorizedError(ctx, errors.New("user not allowed to run model"))
+		httpbase.ForbiddenError(ctx, errors.New("user not allowed to run model"))
 		return
 	}
 
@@ -759,7 +783,12 @@ func (h *ModelHandler) DeployDelete(ctx *gin.Context) {
 	}
 	err = h.repo.DeleteDeploy(ctx.Request.Context(), delReq)
 	if err != nil {
-		slog.Error("Failed to delete deploy", slog.Any("error", err))
+		if errors.Is(err, component.ErrForbidden) {
+			slog.Info("not allowed to delete inference", slog.Any("error", err), slog.Any("req", delReq))
+			httpbase.ForbiddenError(ctx, err)
+			return
+		}
+		slog.Error("Failed to delete inference", slog.Any("error", err), slog.Any("req", delReq))
 		httpbase.ServerError(ctx, err)
 		return
 	}
@@ -814,7 +843,12 @@ func (h *ModelHandler) FinetuneDelete(ctx *gin.Context) {
 	}
 	err = h.repo.DeleteDeploy(ctx.Request.Context(), delReq)
 	if err != nil {
-		slog.Error("Failed to delete deploy", slog.Any("error", err))
+		if errors.Is(err, component.ErrForbidden) {
+			slog.Error("not allowed to delete finetune", slog.Any("error", err), slog.Any("req", delReq))
+			httpbase.ForbiddenError(ctx, err)
+			return
+		}
+		slog.Error("Failed to delete finetune", slog.Any("error", err), slog.Any("req", delReq))
 		httpbase.ServerError(ctx, err)
 		return
 	}
@@ -868,7 +902,12 @@ func (h *ModelHandler) DeployStop(ctx *gin.Context) {
 	}
 	err = h.repo.DeployStop(ctx.Request.Context(), stopReq)
 	if err != nil {
-		slog.Error("Failed to stop deploy", slog.Any("error", err))
+		if errors.Is(err, component.ErrForbidden) {
+			slog.Info("not allowed to stop inference", slog.Any("error", err), slog.Any("req", stopReq))
+			httpbase.ForbiddenError(ctx, err)
+			return
+		}
+		slog.Error("Failed to stop inference", slog.Any("error", err), slog.Any("req", stopReq))
 		httpbase.ServerError(ctx, err)
 		return
 	}
@@ -924,7 +963,12 @@ func (h *ModelHandler) DeployStart(ctx *gin.Context) {
 
 	err = h.repo.DeployStart(ctx.Request.Context(), startReq)
 	if err != nil {
-		slog.Error("Failed to start deploy", slog.Any("error", err), slog.Any("repoType", types.ModelRepo), slog.String("namespace", namespace), slog.String("name", name), slog.Any("deployID", id))
+		if errors.Is(err, component.ErrForbidden) {
+			slog.Info("not allowed to start inference", slog.Any("error", err), slog.Any("req", startReq))
+			httpbase.ForbiddenError(ctx, err)
+			return
+		}
+		slog.Error("Failed to start inference", slog.Any("error", err), slog.Any("req", startReq))
 		httpbase.ServerError(ctx, err)
 		return
 	}
@@ -1037,7 +1081,12 @@ func (h *ModelHandler) FinetuneStop(ctx *gin.Context) {
 	}
 	err = h.repo.DeployStop(ctx.Request.Context(), stopReq)
 	if err != nil {
-		slog.Error("Failed to stop deploy", slog.Any("error", err))
+		if errors.Is(err, component.ErrForbidden) {
+			slog.Info("not allowed to stop finetune", slog.Any("req", stopReq), slog.Any("error", err))
+			httpbase.ForbiddenError(ctx, err)
+			return
+		}
+		slog.Error("Failed to stop finetune", slog.Any("req", stopReq), slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
 		return
 	}
@@ -1091,7 +1140,12 @@ func (h *ModelHandler) FinetuneStart(ctx *gin.Context) {
 	}
 	err = h.repo.DeployStart(ctx.Request.Context(), startReq)
 	if err != nil {
-		slog.Error("Failed to start deploy", slog.Any("error", err), slog.Any("repoType", types.ModelRepo), slog.String("namespace", namespace), slog.String("name", name), slog.Any("deployID", id))
+		if errors.Is(err, component.ErrForbidden) {
+			slog.Info("not allowed to start finetune", slog.Any("error", err), slog.Any("req", startReq))
+			httpbase.ForbiddenError(ctx, err)
+			return
+		}
+		slog.Error("Failed to start finetune", slog.Any("error", err), slog.Any("req", startReq))
 		httpbase.ServerError(ctx, err)
 		return
 	}
@@ -1319,11 +1373,12 @@ func (h *ModelHandler) AllFiles(ctx *gin.Context) {
 	req.CurrentUser = httpbase.GetCurrentUser(ctx)
 	detail, err := h.repo.AllFiles(ctx.Request.Context(), req)
 	if err != nil {
-		if errors.Is(err, component.ErrUnauthorized) {
-			httpbase.UnauthorizedError(ctx, err)
+		if errors.Is(err, component.ErrForbidden) {
+			slog.Info("not allowed to get model all files", slog.Any("error", err), slog.Any("req", req))
+			httpbase.ForbiddenError(ctx, err)
 			return
 		}
-		slog.Error("Failed to get model all files", slog.Any("error", err))
+		slog.Error("Failed to get model all files", slog.Any("error", err), slog.Any("req", req))
 		httpbase.ServerError(ctx, err)
 		return
 	}
@@ -1386,14 +1441,19 @@ func (h *ModelHandler) DeployServerless(ctx *gin.Context) {
 	req.SecureLevel = 1 // public for serverless
 	deployID, err := h.model.Deploy(ctx.Request.Context(), deployReq, req)
 	if err != nil {
-		slog.Error("failed to deploy model as serverless", slog.String("namespace", namespace),
-			slog.String("name", name), slog.Any("currentUser", currentUser), slog.Any("req", req), slog.Any("error", err))
+		if errors.Is(err, component.ErrForbidden) {
+			slog.Info("not allowed to deploy model as serverless", slog.Any("error", err), slog.Any("deploy_req", deployReq))
+
+			httpbase.ForbiddenError(ctx, err)
+			return
+		}
+		slog.Error("failed to deploy model as serverless", slog.Any("deploy_req", deployReq), slog.Any("run_req", req), slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
 		return
 	}
 
-	slog.Debug("deploy model as serverless created", slog.String("namespace", namespace),
-		slog.String("name", name), slog.Int64("deploy_id", deployID))
+	slog.Info("deploy model as serverless created", slog.String("namespace", namespace),
+		slog.String("name", name), slog.Int64("deploy_id", deployID), slog.String("current_user", currentUser))
 
 	// return deploy_id
 	response := types.DeployRepo{DeployID: deployID}
@@ -1450,7 +1510,13 @@ func (h *ModelHandler) ServerlessStart(ctx *gin.Context) {
 
 	err = h.repo.DeployStart(ctx.Request.Context(), startReq)
 	if err != nil {
-		slog.Error("Failed to start deploy", slog.Any("error", err), slog.Any("repoType", types.ModelRepo), slog.String("namespace", namespace), slog.String("name", name), slog.Any("deployID", id))
+		if errors.Is(err, component.ErrForbidden) {
+			slog.Info("not allowed to start model serverless deploy", slog.Any("error", err), slog.Any("req", startReq))
+
+			httpbase.ForbiddenError(ctx, err)
+			return
+		}
+		slog.Info("failed to start model serverless deploy", slog.Any("error", err), slog.Any("req", startReq))
 		httpbase.ServerError(ctx, err)
 		return
 	}

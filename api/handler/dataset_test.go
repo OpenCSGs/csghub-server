@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/require"
 	mockcomponent "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/component"
 	"opencsg.com/csghub-server/common/types"
+	"opencsg.com/csghub-server/component"
 )
 
 type DatasetTester struct {
@@ -86,78 +87,167 @@ func TestDatasetHandler_Index(t *testing.T) {
 }
 
 func TestDatasetHandler_Update(t *testing.T) {
-	tester := NewDatasetTester(t).WithHandleFunc(func(h *DatasetHandler) gin.HandlerFunc {
-		return h.Update
+	t.Run("forbidden", func(t *testing.T) {
+		tester := NewDatasetTester(t).WithHandleFunc(func(h *DatasetHandler) gin.HandlerFunc {
+			return h.Update
+		})
+		tester.RequireUser(t)
+
+		tester.mocks.sensitive.EXPECT().CheckRequestV2(tester.ctx, &types.UpdateDatasetReq{}).Return(true, nil)
+		tester.mocks.dataset.EXPECT().Update(tester.ctx, &types.UpdateDatasetReq{
+			UpdateRepoReq: types.UpdateRepoReq{
+				Username:  "u",
+				Namespace: "u-other",
+				Name:      "r",
+			},
+		}).Return(nil, component.ErrForbiddenMsg("user not allowed to update dataset"))
+		tester.WithParam("namespace", "u-other").WithParam("name", "r").
+			WithBody(t, &types.UpdateDatasetReq{
+				UpdateRepoReq: types.UpdateRepoReq{Name: "r"},
+			}).
+			WithUser().
+			Execute()
+
+		require.Equal(t, 403, tester.response.Code)
 	})
-	tester.RequireUser(t)
 
-	tester.mocks.sensitive.EXPECT().CheckRequestV2(tester.ctx, &types.UpdateDatasetReq{}).Return(true, nil)
-	tester.mocks.dataset.EXPECT().Update(tester.ctx, &types.UpdateDatasetReq{
-		UpdateRepoReq: types.UpdateRepoReq{
-			Username:  "u",
-			Namespace: "u",
-			Name:      "r",
-		},
-	}).Return(&types.Dataset{Name: "foo"}, nil)
-	tester.WithBody(t, &types.UpdateDatasetReq{
-		UpdateRepoReq: types.UpdateRepoReq{Name: "r"},
-	}).Execute()
+	t.Run("normal", func(t *testing.T) {
+		tester := NewDatasetTester(t).WithHandleFunc(func(h *DatasetHandler) gin.HandlerFunc {
+			return h.Update
+		})
+		tester.RequireUser(t)
 
-	tester.ResponseEq(t, 200, tester.OKText, &types.Dataset{Name: "foo"})
+		tester.mocks.sensitive.EXPECT().CheckRequestV2(tester.ctx, &types.UpdateDatasetReq{}).Return(true, nil)
+		tester.mocks.dataset.EXPECT().Update(tester.ctx, &types.UpdateDatasetReq{
+			UpdateRepoReq: types.UpdateRepoReq{
+				Username:  "u",
+				Namespace: "u",
+				Name:      "r",
+			},
+		}).Return(&types.Dataset{Name: "foo"}, nil)
+		tester.WithBody(t, &types.UpdateDatasetReq{
+			UpdateRepoReq: types.UpdateRepoReq{Name: "r"},
+		}).Execute()
+
+		tester.ResponseEq(t, 200, tester.OKText, &types.Dataset{Name: "foo"})
+	})
 }
 
 func TestDatasetHandler_Delete(t *testing.T) {
-	tester := NewDatasetTester(t).WithHandleFunc(func(h *DatasetHandler) gin.HandlerFunc {
-		return h.Delete
+	t.Run("forbidden", func(t *testing.T) {
+		tester := NewDatasetTester(t).WithHandleFunc(func(h *DatasetHandler) gin.HandlerFunc {
+			return h.Delete
+		})
+		tester.RequireUser(t)
+
+		tester.mocks.dataset.EXPECT().Delete(tester.ctx, "u-other", "r", "u").Return(component.ErrForbidden)
+		tester.WithParam("namespace", "u-other").WithParam("name", "r")
+		tester.WithUser().Execute()
+
+		require.Equal(t, 403, tester.response.Code)
 	})
-	tester.RequireUser(t)
 
-	tester.mocks.dataset.EXPECT().Delete(tester.ctx, "u", "r", "u").Return(nil)
-	tester.Execute()
+	t.Run("normal", func(t *testing.T) {
+		tester := NewDatasetTester(t).WithHandleFunc(func(h *DatasetHandler) gin.HandlerFunc {
+			return h.Delete
+		})
+		tester.RequireUser(t)
 
-	tester.ResponseEq(t, 200, tester.OKText, nil)
+		tester.mocks.dataset.EXPECT().Delete(tester.ctx, "u", "r", "u").Return(nil)
+		tester.Execute()
+
+		tester.ResponseEq(t, 200, tester.OKText, nil)
+	})
 }
 
 func TestDatasetHandler_Show(t *testing.T) {
-	tester := NewDatasetTester(t).WithHandleFunc(func(h *DatasetHandler) gin.HandlerFunc {
-		return h.Show
+	t.Run("forbidden", func(t *testing.T) {
+		tester := NewDatasetTester(t).WithHandleFunc(func(h *DatasetHandler) gin.HandlerFunc {
+			return h.Show
+		})
+
+		tester.mocks.dataset.EXPECT().Show(tester.ctx, "u-other", "r", "u").Return(nil, component.ErrForbidden)
+		tester.WithParam("namespace", "u-other").WithParam("name", "r")
+		tester.WithUser().Execute()
+
+		require.Equal(t, 403, tester.response.Code)
 	})
 
-	tester.mocks.dataset.EXPECT().Show(tester.ctx, "u", "r", "u").Return(&types.Dataset{
-		Name: "d",
-	}, nil)
-	tester.WithUser().Execute()
+	t.Run("normal", func(t *testing.T) {
+		tester := NewDatasetTester(t).WithHandleFunc(func(h *DatasetHandler) gin.HandlerFunc {
+			return h.Show
+		})
 
-	tester.ResponseEq(t, 200, tester.OKText, &types.Dataset{Name: "d"})
+		tester.mocks.dataset.EXPECT().Show(tester.ctx, "u", "r", "u").Return(&types.Dataset{
+			Name: "d",
+		}, nil)
+		tester.WithUser().Execute()
+
+		tester.ResponseEq(t, 200, tester.OKText, &types.Dataset{Name: "d"})
+	})
 }
 
 func TestDatasetHandler_Relations(t *testing.T) {
-	tester := NewDatasetTester(t).WithHandleFunc(func(h *DatasetHandler) gin.HandlerFunc {
-		return h.Relations
+	t.Run("forbidden", func(t *testing.T) {
+		tester := NewDatasetTester(t).WithHandleFunc(func(h *DatasetHandler) gin.HandlerFunc {
+			return h.Relations
+		})
+
+		tester.mocks.dataset.EXPECT().Relations(tester.ctx, "u-other", "r", "u").Return(nil, component.ErrForbidden)
+		tester.WithParam("namespace", "u-other").WithParam("name", "r")
+		tester.WithUser().Execute()
+
+		require.Equal(t, 403, tester.response.Code)
+
 	})
 
-	tester.mocks.dataset.EXPECT().Relations(tester.ctx, "u", "r", "u").Return(&types.Relations{
-		Models: []*types.Model{{Name: "m"}},
-	}, nil)
-	tester.WithUser().Execute()
+	t.Run("normal", func(t *testing.T) {
+		tester := NewDatasetTester(t).WithHandleFunc(func(h *DatasetHandler) gin.HandlerFunc {
+			return h.Relations
+		})
 
-	tester.ResponseEq(t, 200, tester.OKText, &types.Relations{
-		Models: []*types.Model{{Name: "m"}},
+		tester.mocks.dataset.EXPECT().Relations(tester.ctx, "u", "r", "u").Return(&types.Relations{
+			Models: []*types.Model{{Name: "m"}},
+		}, nil)
+		tester.WithUser().Execute()
+
+		tester.ResponseEq(t, 200, tester.OKText, &types.Relations{
+			Models: []*types.Model{{Name: "m"}},
+		})
 	})
 }
 
 func TestDatasetHandler_AllFiles(t *testing.T) {
-	tester := NewDatasetTester(t).WithHandleFunc(func(h *DatasetHandler) gin.HandlerFunc {
-		return h.AllFiles
+	t.Run("forbidden", func(t *testing.T) {
+		tester := NewDatasetTester(t).WithHandleFunc(func(h *DatasetHandler) gin.HandlerFunc {
+			return h.AllFiles
+		})
+
+		tester.mocks.repo.EXPECT().AllFiles(tester.ctx, types.GetAllFilesReq{
+			Namespace:   "u-other",
+			Name:        "r",
+			RepoType:    types.DatasetRepo,
+			CurrentUser: "u",
+		}).Return(nil, component.ErrForbidden)
+		tester.WithParam("namespace", "u-other").WithParam("name", "r")
+		tester.WithUser().Execute()
+
+		require.Equal(t, 403, tester.response.Code)
 	})
 
-	tester.mocks.repo.EXPECT().AllFiles(tester.ctx, types.GetAllFilesReq{
-		Namespace:   "u",
-		Name:        "r",
-		RepoType:    types.DatasetRepo,
-		CurrentUser: "u",
-	}).Return([]*types.File{{Name: "f"}}, nil)
-	tester.WithUser().Execute()
+	t.Run("normal", func(t *testing.T) {
+		tester := NewDatasetTester(t).WithHandleFunc(func(h *DatasetHandler) gin.HandlerFunc {
+			return h.AllFiles
+		})
 
-	tester.ResponseEq(t, 200, tester.OKText, []*types.File{{Name: "f"}})
+		tester.mocks.repo.EXPECT().AllFiles(tester.ctx, types.GetAllFilesReq{
+			Namespace:   "u",
+			Name:        "r",
+			RepoType:    types.DatasetRepo,
+			CurrentUser: "u",
+		}).Return([]*types.File{{Name: "f"}}, nil)
+		tester.WithUser().Execute()
+
+		tester.ResponseEq(t, 200, tester.OKText, []*types.File{{Name: "f"}})
+	})
 }

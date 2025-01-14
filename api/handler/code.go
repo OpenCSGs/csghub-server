@@ -71,6 +71,10 @@ func (h *CodeHandler) Create(ctx *gin.Context) {
 
 	code, err := h.code.Create(ctx.Request.Context(), req)
 	if err != nil {
+		if errors.Is(err, component.ErrForbidden) {
+			httpbase.ForbiddenError(ctx, err)
+			return
+		}
 		slog.Error("Failed to create code", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
 		return
@@ -189,6 +193,10 @@ func (h *CodeHandler) Update(ctx *gin.Context) {
 
 	code, err := h.code.Update(ctx.Request.Context(), req)
 	if err != nil {
+		if errors.Is(err, component.ErrForbidden) {
+			httpbase.ForbiddenError(ctx, err)
+			return
+		}
 		slog.Error("Failed to update code", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
 		return
@@ -226,6 +234,10 @@ func (h *CodeHandler) Delete(ctx *gin.Context) {
 	}
 	err = h.code.Delete(ctx.Request.Context(), namespace, name, currentUser)
 	if err != nil {
+		if errors.Is(err, component.ErrForbidden) {
+			httpbase.ForbiddenError(ctx, err)
+			return
+		}
 		slog.Error("Failed to delete code", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
 		return
@@ -258,8 +270,8 @@ func (h *CodeHandler) Show(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
 	detail, err := h.code.Show(ctx.Request.Context(), namespace, name, currentUser)
 	if err != nil {
-		if errors.Is(err, component.ErrUnauthorized) {
-			httpbase.UnauthorizedError(ctx, err)
+		if errors.Is(err, component.ErrForbidden) {
+			httpbase.ForbiddenError(ctx, err)
 			return
 		}
 		slog.Error("Failed to get code", slog.Any("error", err))
@@ -293,8 +305,8 @@ func (h *CodeHandler) Relations(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
 	detail, err := h.code.Relations(ctx.Request.Context(), namespace, name, currentUser)
 	if err != nil {
-		if errors.Is(err, component.ErrUnauthorized) {
-			httpbase.UnauthorizedError(ctx, err)
+		if errors.Is(err, component.ErrForbidden) {
+			httpbase.ForbiddenError(ctx, err)
 			return
 		}
 		slog.Error("Failed to get code relations", slog.Any("error", err))

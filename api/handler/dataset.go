@@ -84,6 +84,10 @@ func (h *DatasetHandler) Create(ctx *gin.Context) {
 
 	dataset, err := h.dataset.Create(ctx.Request.Context(), req)
 	if err != nil {
+		if errors.Is(err, component.ErrForbidden) {
+			httpbase.ForbiddenError(ctx, err)
+			return
+		}
 		slog.Error("Failed to create dataset", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
 		return
@@ -202,6 +206,10 @@ func (h *DatasetHandler) Update(ctx *gin.Context) {
 
 	dataset, err := h.dataset.Update(ctx.Request.Context(), req)
 	if err != nil {
+		if errors.Is(err, component.ErrForbidden) {
+			httpbase.ForbiddenError(ctx, err)
+			return
+		}
 		slog.Error("Failed to update dataset", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
 		return
@@ -239,6 +247,10 @@ func (h *DatasetHandler) Delete(ctx *gin.Context) {
 	}
 	err = h.dataset.Delete(ctx.Request.Context(), namespace, name, currentUser)
 	if err != nil {
+		if errors.Is(err, component.ErrForbidden) {
+			httpbase.ForbiddenError(ctx, err)
+			return
+		}
 		slog.Error("Failed to delete dataset", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
 		return
@@ -271,8 +283,8 @@ func (h *DatasetHandler) Show(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
 	detail, err := h.dataset.Show(ctx.Request.Context(), namespace, name, currentUser)
 	if err != nil {
-		if errors.Is(err, component.ErrUnauthorized) {
-			httpbase.UnauthorizedError(ctx, err)
+		if errors.Is(err, component.ErrForbidden) {
+			httpbase.ForbiddenError(ctx, err)
 			return
 		}
 		slog.Error("Failed to get dataset", slog.Any("error", err))
@@ -307,8 +319,8 @@ func (h *DatasetHandler) Relations(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
 	detail, err := h.dataset.Relations(ctx.Request.Context(), namespace, name, currentUser)
 	if err != nil {
-		if errors.Is(err, component.ErrUnauthorized) {
-			httpbase.UnauthorizedError(ctx, err)
+		if errors.Is(err, component.ErrForbidden) {
+			httpbase.ForbiddenError(ctx, err)
 			return
 		}
 		slog.Error("Failed to get dataset relations", slog.Any("error", err))
@@ -357,8 +369,8 @@ func (h *DatasetHandler) AllFiles(ctx *gin.Context) {
 	req.Ref = ""
 	detail, err := h.repo.AllFiles(ctx.Request.Context(), req)
 	if err != nil {
-		if errors.Is(err, component.ErrUnauthorized) {
-			httpbase.UnauthorizedError(ctx, err)
+		if errors.Is(err, component.ErrForbidden) {
+			httpbase.ForbiddenError(ctx, err)
 			return
 		}
 		slog.Error("Failed to get dataset all files", slog.Any("error", err))

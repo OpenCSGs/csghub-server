@@ -295,7 +295,7 @@ func (c *codeComponentImpl) Show(ctx context.Context, namespace, name, currentUs
 		return nil, fmt.Errorf("failed to get user repo permission, error: %w", err)
 	}
 	if !permission.CanRead {
-		return nil, ErrUnauthorized
+		return nil, ErrForbidden
 	}
 
 	ns, err := c.repoComponent.GetNameSpaceInfo(ctx, namespace)
@@ -364,7 +364,7 @@ func (c *codeComponentImpl) Relations(ctx context.Context, namespace, name, curr
 
 	allow, _ := c.repoComponent.AllowReadAccessRepo(ctx, code.Repository, currentUser)
 	if !allow {
-		return nil, ErrUnauthorized
+		return nil, ErrForbidden
 	}
 
 	return c.getRelations(ctx, code.RepositoryID, currentUser)

@@ -12,6 +12,7 @@ import (
 	mockcomponent "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/component"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/types"
+	"opencsg.com/csghub-server/component"
 )
 
 type GitHTTPTester struct {
@@ -71,27 +72,49 @@ func TestGitHTTPHandler_InfoRefs(t *testing.T) {
 }
 
 func TestGitHTTPHandler_GitUploadPack(t *testing.T) {
-	tester := NewGitHTTPTester(t).WithHandleFunc(func(h *GitHTTPHandler) gin.HandlerFunc {
-		return h.GitUploadPack
+	t.Run("normal", func(t *testing.T) {
+		tester := NewGitHTTPTester(t).WithHandleFunc(func(h *GitHTTPHandler) gin.HandlerFunc {
+			return h.GitUploadPack
+		})
+
+		tester.mocks.gitHttp.EXPECT().GitUploadPack(tester.ctx, types.GitUploadPackReq{
+			Namespace:   "u",
+			Name:        "r",
+			RepoType:    types.ModelRepo,
+			GitProtocol: "ssh",
+			Request:     tester.gctx.Request,
+			Writer:      tester.gctx.Writer,
+			CurrentUser: "u",
+		}).Return(nil)
+		tester.SetPath("git").WithQuery("service", "git-upload-pack").WithHeader("Git-Protocol", "ssh")
+		tester.WithKV("namespace", "u").WithKV("name", "r")
+		tester.WithKV("repo_type", "model").WithUser().WithHeader("Accept-Encoding", "gzip").Execute()
+
+		require.Equal(t, 200, tester.response.Code)
+		headers := tester.response.Header()
+		require.Equal(t, "application/x-git-result", headers.Get("Content-Type"))
+		require.Equal(t, "no-cache", headers.Get("Cache-Control"))
 	})
 
-	tester.mocks.gitHttp.EXPECT().GitUploadPack(tester.ctx, types.GitUploadPackReq{
-		Namespace:   "u",
-		Name:        "r",
-		RepoType:    types.ModelRepo,
-		GitProtocol: "ssh",
-		Request:     tester.gctx.Request,
-		Writer:      tester.gctx.Writer,
-		CurrentUser: "u",
-	}).Return(nil)
-	tester.SetPath("git").WithQuery("service", "git-upload-pack").WithHeader("Git-Protocol", "ssh")
-	tester.WithKV("namespace", "u").WithKV("name", "r")
-	tester.WithKV("repo_type", "model").WithUser().WithHeader("Accept-Encoding", "gzip").Execute()
+	t.Run("no permission", func(t *testing.T) {
+		tester := NewGitHTTPTester(t).WithHandleFunc(func(h *GitHTTPHandler) gin.HandlerFunc {
+			return h.GitUploadPack
+		})
+		tester.mocks.gitHttp.EXPECT().GitUploadPack(tester.ctx, types.GitUploadPackReq{
+			Namespace:   "u-other",
+			Name:        "r",
+			RepoType:    types.ModelRepo,
+			GitProtocol: "ssh",
+			Request:     tester.gctx.Request,
+			Writer:      tester.gctx.Writer,
+			CurrentUser: "u",
+		}).Return(component.ErrForbidden)
+		tester.SetPath("git").WithQuery("service", "git-upload-pack").WithHeader("Git-Protocol", "ssh")
+		tester.WithKV("namespace", "u-other").WithKV("name", "r")
+		tester.WithKV("repo_type", "model").WithUser().WithHeader("Accept-Encoding", "gzip").Execute()
 
-	require.Equal(t, 200, tester.response.Code)
-	headers := tester.response.Header()
-	require.Equal(t, "application/x-git-result", headers.Get("Content-Type"))
-	require.Equal(t, "no-cache", headers.Get("Cache-Control"))
+		require.Equal(t, 403, tester.response.Code)
+	})
 }
 
 func TestGitHTTPHandler_GitReceivePack(t *testing.T) {

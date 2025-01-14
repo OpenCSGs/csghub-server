@@ -1580,13 +1580,14 @@ func (h *RepoHandler) DeployDetail(ctx *gin.Context) {
 
 	response, err := h.c.DeployDetail(ctx.Request.Context(), detailReq)
 	if err != nil {
-		slog.Error("fail to deploy detail", slog.String("error", err.Error()), slog.Any("repotype", repoType), slog.Any("namespace", namespace), slog.Any("name", name), slog.Any("deploy id", deployID))
-		var pErr *types.PermissionError
-		if errors.As(err, &pErr) {
-			httpbase.UnauthorizedError(ctx, err)
-		} else {
-			httpbase.ServerError(ctx, err)
+		if errors.Is(err, component.ErrForbidden) {
+			slog.Info("not allowed to get deploy detail", slog.Any("error", err), slog.Any("req", detailReq))
+			httpbase.ForbiddenError(ctx, err)
+			return
 		}
+
+		slog.Error("failed to get deploy detail", slog.Any("error", err), slog.Any("req", detailReq))
+		httpbase.ServerError(ctx, err)
 		return
 	}
 
@@ -1656,13 +1657,14 @@ func (h *RepoHandler) DeployInstanceLogs(ctx *gin.Context) {
 	// user http request context instead of gin context, so that server knows the life cycle of the request
 	logReader, err := h.c.DeployInstanceLogs(ctx.Request.Context(), logReq)
 	if err != nil {
-		var pErr *types.PermissionError
-		if errors.As(err, &pErr) {
-			httpbase.UnauthorizedError(ctx, err)
-		} else {
-			slog.Error("Failed to get deploy instance logs", slog.Any("logReq", logReq), slog.Any("error", err))
-			httpbase.ServerError(ctx, err)
+		if errors.Is(err, component.ErrForbidden) {
+			slog.Info("not allowed to get instance logs", slog.Any("error", err), slog.Any("req", logReq))
+			httpbase.ForbiddenError(ctx, err)
+			return
 		}
+
+		slog.Error("failed to get instance logs", slog.Any("error", err), slog.Any("req", logReq))
+		httpbase.ServerError(ctx, err)
 		return
 	}
 
@@ -1775,19 +1777,22 @@ func (h *RepoHandler) DeployStatus(ctx *gin.Context) {
 
 	allow, err := h.c.AllowAccessDeploy(ctx.Request.Context(), statusReq)
 	if err != nil {
-		slog.Error("failed to check user permission", "error", err)
-		var pErr *types.PermissionError
-		if errors.As(err, &pErr) {
-			httpbase.UnauthorizedError(ctx, err)
-		} else {
-			httpbase.ServerError(ctx, err)
+
+		if errors.Is(err, component.ErrForbidden) {
+			slog.Info("not allowed to get deploy status", slog.Any("error", err), slog.Any("req", statusReq))
+			httpbase.ForbiddenError(ctx, err)
+			return
 		}
+
+		slog.Error("failed to get deploy status", "error", err, "req", statusReq)
+		httpbase.ServerError(ctx, err)
 		return
 	}
 
 	if !allow {
-		slog.Info("user not allowed to query deploy status", slog.String("namespace", namespace),
-			slog.String("name", name), slog.Any("username", currentUser), slog.Any("deploy_id", deployID))
+		slog.Info("not allowed to query deploy status", "req", statusReq)
+		httpbase.ForbiddenError(ctx, err)
+		return
 	}
 
 	ctx.Writer.Header().Set("Content-Type", "text/event-stream")
@@ -1852,6 +1857,12 @@ func (h *RepoHandler) SyncMirror(ctx *gin.Context) {
 	}
 	err = h.c.SyncMirror(ctx.Request.Context(), repoType, namespace, name, currentUser)
 	if err != nil {
+		if errors.Is(err, component.ErrForbidden) {
+			slog.Info("not allowed to sync mirror", slog.Any("error", err), slog.String("repo_type", string(repoType)), slog.String("path", fmt.Sprintf("%s/%s", namespace, name)))
+			httpbase.ForbiddenError(ctx, err)
+			return
+		}
+
 		slog.Error("Failed to sync mirror for", slog.String("repo_type", string(repoType)), slog.String("path", fmt.Sprintf("%s/%s", namespace, name)), "error", err)
 		httpbase.ServerError(ctx, err)
 		return
@@ -1928,7 +1939,7 @@ func (h *RepoHandler) DeployUpdate(ctx *gin.Context) {
 	if !allow {
 		slog.Info("user not allowed to update deploy", slog.String("namespace", namespace),
 			slog.String("name", name), slog.Any("username", currentUser))
-		httpbase.UnauthorizedError(ctx, errors.New("user not allowed to update deploy"))
+		httpbase.ForbiddenError(ctx, errors.New("user not allowed to update deploy"))
 		return
 	}
 
@@ -1965,6 +1976,12 @@ func (h *RepoHandler) DeployUpdate(ctx *gin.Context) {
 	}
 	err = h.c.DeployUpdate(ctx.Request.Context(), updateReq, req)
 	if err != nil {
+		if errors.Is(err, component.ErrForbidden) {
+			slog.Info("user not allowed to update deploy", slog.String("namespace", namespace),
+				slog.String("name", name), slog.Any("username", currentUser), slog.Int64("deploy_id", deployID))
+			httpbase.ForbiddenError(ctx, err)
+			return
+		}
 		slog.Error("failed to update deploy", slog.String("namespace", namespace), slog.String("name", name), slog.Any("username", currentUser), slog.Int64("deploy_id", deployID), slog.Any("error", err))
 		httpbase.ServerError(ctx, fmt.Errorf("failed to update deploy, %w", err))
 		return
@@ -2068,7 +2085,14 @@ func (h *RepoHandler) ServerlessDetail(ctx *gin.Context) {
 
 	response, err := h.c.DeployDetail(ctx.Request.Context(), detailReq)
 	if err != nil {
-		slog.Error("fail to serverless detail", slog.String("error", err.Error()), slog.Any("namespace", namespace), slog.Any("name", name), slog.Any("deploy id", deployID))
+		if errors.Is(err, component.ErrForbidden) {
+			slog.Info("user not allowed to get serverless deploy detail", slog.String("namespace", namespace),
+				slog.String("name", name), slog.Any("username", currentUser), slog.Int64("deploy_id", deployID))
+			httpbase.ForbiddenError(ctx, err)
+			return
+		}
+
+		slog.Error("fail to get serverless deploy detail", slog.String("error", err.Error()), slog.Any("namespace", namespace), slog.Any("name", name), slog.Any("deploy id", deployID))
 		httpbase.ServerError(ctx, err)
 		return
 	}
@@ -2138,13 +2162,14 @@ func (h *RepoHandler) ServerlessLogs(ctx *gin.Context) {
 	// user http request context instead of gin context, so that server knows the life cycle of the request
 	logReader, err := h.c.DeployInstanceLogs(ctx.Request.Context(), logReq)
 	if err != nil {
-		var pErr *types.PermissionError
-		if errors.As(err, &pErr) {
-			httpbase.UnauthorizedError(ctx, err)
-		} else {
-			slog.Error("Failed to get deploy instance logs", slog.Any("logReq", logReq), slog.Any("error", err))
-			httpbase.ServerError(ctx, err)
+		if errors.Is(err, component.ErrForbidden) {
+			slog.Info("user not allowed to get serverless deploy logs", slog.Any("logReq", logReq), slog.Any("error", err))
+			httpbase.ForbiddenError(ctx, err)
+			return
 		}
+
+		slog.Error("Failed to get serverless deploy logs", slog.Any("logReq", logReq), slog.Any("error", err))
+		httpbase.ServerError(ctx, err)
 		return
 	}
 
@@ -2221,14 +2246,21 @@ func (h *RepoHandler) ServerlessStatus(ctx *gin.Context) {
 
 	allow, err := h.c.AllowAccessDeploy(ctx.Request.Context(), statusReq)
 	if err != nil {
-		slog.Error("failed to check user permission", slog.Any("error", err))
+		if errors.Is(err, component.ErrForbidden) {
+			slog.Info("user not allowed to get serverless deploy status", slog.Any("error", err), slog.Any("req", statusReq))
+			httpbase.ForbiddenError(ctx, err)
+			return
+		}
+
+		slog.Error("failed to check user permission", slog.Any("error", err), slog.Any("req", statusReq))
 		httpbase.ServerError(ctx, fmt.Errorf("failed to check user permission, %w", err))
 		return
 	}
 
 	if !allow {
-		slog.Info("user not allowed to query deploy status", slog.String("namespace", namespace),
-			slog.String("name", name), slog.Any("username", currentUser), slog.Any("deploy_id", deployID))
+		slog.Info("user not allowed to query deploy status", slog.Any("req", statusReq))
+		httpbase.ForbiddenError(ctx, errors.New("user not allowed to query serverless deploy status"))
+		return
 	}
 
 	ctx.Writer.Header().Set("Content-Type", "text/event-stream")
@@ -2326,7 +2358,13 @@ func (h *RepoHandler) ServerlessUpdate(ctx *gin.Context) {
 	}
 	err = h.c.DeployUpdate(ctx.Request.Context(), updateReq, req)
 	if err != nil {
-		slog.Error("failed to update serverless", slog.String("namespace", namespace), slog.String("name", name), slog.Any("username", currentUser), slog.Int64("deploy_id", deployID), slog.Any("error", err))
+		if errors.Is(err, component.ErrForbidden) {
+			slog.Info("user not allowed to update serverless", slog.Any("error", err), slog.Any("req", updateReq))
+			httpbase.ForbiddenError(ctx, err)
+			return
+		}
+
+		slog.Error("failed to update serverless", slog.Any("error", err), slog.Any("req", updateReq))
 		httpbase.ServerError(ctx, fmt.Errorf("failed to update serverless, %w", err))
 		return
 	}

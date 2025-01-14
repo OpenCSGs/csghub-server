@@ -959,7 +959,7 @@ func TestRepoHandler_DeployUpdate(t *testing.T) {
 		tester.mocks.repo.EXPECT().AllowAdminAccess(tester.ctx, types.ModelRepo, "u", "r", "u").Return(false, nil)
 		tester.Execute()
 		tester.ResponseEq(
-			t, 401, "user not allowed to update deploy", nil,
+			t, 403, "user not allowed to update deploy", nil,
 		)
 	})
 
