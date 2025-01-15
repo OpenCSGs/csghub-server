@@ -186,6 +186,7 @@ func (w *LocalMirrorWoker) SyncRepo(ctx context.Context, task queue.MirrorTask) 
 		})
 	} else {
 		mirror.Status = types.MirrorFinished
+		mirror.Progress = 100
 		mirror.Repository.SyncStatus = types.SyncStatusCompleted
 		_, err = w.repoStore.UpdateRepo(ctx, *mirror.Repository)
 		if err != nil {
