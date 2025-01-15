@@ -425,25 +425,6 @@ func TestModelHandler_ListAllRuntimeFramework(t *testing.T) {
 	})
 }
 
-func TestModelHandler_RuntimeFrameworkCreate(t *testing.T) {
-
-	tester := NewModelTester(t).WithHandleFunc(func(h *ModelHandler) gin.HandlerFunc {
-		return h.CreateRuntimeFramework
-	})
-	tester.WithUser().WithQuery("deploy_type", "").AddPagination(1, 10).WithParam("id", "1")
-	tester.WithKV("repo_type", types.ModelRepo)
-	tester.WithBody(t, &types.RuntimeFrameworkReq{
-		FrameName:   "f1",
-		CurrentUser: "u",
-	})
-	tester.mocks.model.EXPECT().CreateRuntimeFramework(
-		tester.ctx, &types.RuntimeFrameworkReq{FrameName: "f1", CurrentUser: "u"},
-	).Return(&types.RuntimeFramework{FrameName: "f1"}, nil)
-
-	tester.Execute()
-	tester.ResponseEq(t, 200, tester.OKText, &types.RuntimeFramework{FrameName: "f1"})
-}
-
 func TestModelHandler_UpdateModelRuntimeFramework(t *testing.T) {
 	tester := NewModelTester(t).WithHandleFunc(func(h *ModelHandler) gin.HandlerFunc {
 		return h.UpdateModelRuntimeFrameworks

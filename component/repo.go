@@ -126,7 +126,7 @@ type RepoComponent interface {
 	ListRuntimeFramework(ctx context.Context, repoType types.RepositoryType, namespace, name string, deployType int) ([]types.RuntimeFramework, error)
 	CreateRuntimeFramework(ctx context.Context, req *types.RuntimeFrameworkReq) (*types.RuntimeFramework, error)
 	UpdateRuntimeFramework(ctx context.Context, id int64, req *types.RuntimeFrameworkReq) (*types.RuntimeFramework, error)
-	DeleteRuntimeFramework(ctx context.Context, id int64) error
+	DeleteRuntimeFramework(ctx context.Context, currentUser string, id int64) error
 	ListDeploy(ctx context.Context, repoType types.RepositoryType, namespace, name, currentUser string) ([]types.DeployRepo, error)
 	DeleteDeploy(ctx context.Context, delReq types.DeployActReq) error
 	DeployDetail(ctx context.Context, detailReq types.DeployActReq) (*types.DeployRepo, error)
@@ -2091,6 +2091,15 @@ func (c *repoComponentImpl) ListRuntimeFramework(ctx context.Context, repoType t
 }
 
 func (c *repoComponentImpl) CreateRuntimeFramework(ctx context.Context, req *types.RuntimeFrameworkReq) (*types.RuntimeFramework, error) {
+	// found user id
+	user, err := c.userStore.FindByUsername(ctx, req.CurrentUser)
+	if err != nil {
+		return nil, fmt.Errorf("cannot find user for runtime framework, %w", err)
+	}
+	isAdmin := c.IsAdminRole(user)
+	if !isAdmin {
+		return nil, ErrForbiddenMsg("need admin permission for runtime framework")
+	}
 	newFrame := database.RuntimeFramework{
 		FrameName:     req.FrameName,
 		FrameVersion:  req.FrameVersion,
@@ -2100,7 +2109,7 @@ func (c *repoComponentImpl) CreateRuntimeFramework(ctx context.Context, req *typ
 		ContainerPort: req.ContainerPort,
 		Type:          req.Type,
 	}
-	err := c.runtimeFrameworksStore.Add(ctx, newFrame)
+	err = c.runtimeFrameworksStore.Add(ctx, newFrame)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create runtime framework, error: %w", err)
 	}
@@ -2117,6 +2126,15 @@ func (c *repoComponentImpl) CreateRuntimeFramework(ctx context.Context, req *typ
 }
 
 func (c *repoComponentImpl) UpdateRuntimeFramework(ctx context.Context, id int64, req *types.RuntimeFrameworkReq) (*types.RuntimeFramework, error) {
+	// found user id
+	user, err := c.userStore.FindByUsername(ctx, req.CurrentUser)
+	if err != nil {
+		return nil, fmt.Errorf("cannot find user for runtime framework, %w", err)
+	}
+	isAdmin := c.IsAdminRole(user)
+	if !isAdmin {
+		return nil, ErrForbiddenMsg("need admin permission for runtime framework")
+	}
 	newFrame := database.RuntimeFramework{
 		ID:            id,
 		FrameName:     req.FrameName,
@@ -2143,7 +2161,16 @@ func (c *repoComponentImpl) UpdateRuntimeFramework(ctx context.Context, id int64
 	}, nil
 }
 
-func (c *repoComponentImpl) DeleteRuntimeFramework(ctx context.Context, id int64) error {
+func (c *repoComponentImpl) DeleteRuntimeFramework(ctx context.Context, currentUser string, id int64) error {
+	// found user id
+	user, err := c.userStore.FindByUsername(ctx, currentUser)
+	if err != nil {
+		return fmt.Errorf("cannot find user for runtime framework, %w", err)
+	}
+	isAdmin := c.IsAdminRole(user)
+	if !isAdmin {
+		return ErrForbiddenMsg("need admin permission for runtime framework")
+	}
 	frame, err := c.runtimeFrameworksStore.FindByID(ctx, id)
 	if err != nil {
 		return fmt.Errorf("failed to find runtime frameworks, error: %w", err)

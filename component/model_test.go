@@ -481,48 +481,6 @@ func TestModelComponent_ListModelsByRuntimeFrameworkID(t *testing.T) {
 
 }
 
-func TestModelComponent_CreateRuntimeFramework(t *testing.T) {
-	ctx := context.TODO()
-	mc := initializeTestModelComponent(ctx, t)
-
-	frame := database.RuntimeFramework{
-		FrameName:     "fm",
-		FrameVersion:  "v1",
-		FrameImage:    "img",
-		FrameCpuImage: "cimg",
-		Enabled:       2,
-		ContainerPort: 321,
-		Type:          2,
-	}
-
-	mc.mocks.components.repo.EXPECT().IsAdminRole(mock.Anything).Return(true)
-	mc.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "user").Return(database.User{ID: 1}, nil)
-
-	mc.mocks.stores.RuntimeFrameworkMock().EXPECT().Add(ctx, frame).Return(nil)
-
-	fn, err := mc.CreateRuntimeFramework(ctx, &types.RuntimeFrameworkReq{
-		FrameName:     "fm",
-		FrameVersion:  "v1",
-		FrameImage:    "img",
-		FrameCpuImage: "cimg",
-		Enabled:       2,
-		ContainerPort: 321,
-		Type:          2,
-		CurrentUser:   "user",
-	})
-	require.Nil(t, err)
-	require.Equal(t, types.RuntimeFramework{
-		FrameName:     "fm",
-		FrameVersion:  "v1",
-		FrameImage:    "img",
-		FrameCpuImage: "cimg",
-		Enabled:       2,
-		ContainerPort: 321,
-		Type:          2,
-	}, *fn)
-
-}
-
 func TestModelComponent_SetRuntimeFrameworkModes(t *testing.T) {
 	ctx := context.TODO()
 	mc := initializeTestModelComponent(ctx, t)

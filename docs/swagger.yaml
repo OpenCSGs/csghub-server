@@ -4075,171 +4075,7 @@ paths:
         - ApiKey: []
       summary: List repo runtime framework
       tags:
-        - Repository
-    post:
-      consumes:
-        - application/json
-      description: create runtime framework
-      parameters:
-        - description: models,spaces
-          enum:
-            - models
-            - spaces
-          in: path
-          name: repo_type
-          required: true
-          type: string
-        - description: namespace
-          in: path
-          name: namespace
-          required: true
-          type: string
-        - description: name
-          in: path
-          name: name
-          required: true
-          type: string
-        - description: current user
-          in: query
-          name: current_user
-          type: string
-        - description: body
-          in: body
-          name: body
-          required: true
-          schema:
-            $ref: "#/definitions/types.RuntimeFrameworkReq"
-      produces:
-        - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: "#/definitions/types.RuntimeFramework"
-        "400":
-          description: Bad request
-          schema:
-            $ref: "#/definitions/types.APIBadRequest"
-        "500":
-          description: Internal server error
-          schema:
-            $ref: "#/definitions/types.APIInternalServerError"
-      security:
-        - ApiKey: []
-      summary: Create runtime framework
-      tags:
-        - Repository
-  /{repo_type}/{namespace}/{name}/runtime_framework/{id}:
-    delete:
-      consumes:
-        - application/json
-      description: delete a exist RuntimeFramework
-      parameters:
-        - description: models,spaces
-          enum:
-            - models
-            - spaces
-          in: path
-          name: repo_type
-          required: true
-          type: string
-        - description: namespace
-          in: path
-          name: namespace
-          required: true
-          type: string
-        - description: name
-          in: path
-          name: name
-          required: true
-          type: string
-        - description: id
-          in: path
-          name: id
-          required: true
-          type: integer
-        - description: current user
-          in: query
-          name: current_user
-          type: string
-      produces:
-        - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: "#/definitions/types.Response"
-        "400":
-          description: Bad request
-          schema:
-            $ref: "#/definitions/types.APIBadRequest"
-        "500":
-          description: Internal server error
-          schema:
-            $ref: "#/definitions/types.APIInternalServerError"
-      security:
-        - ApiKey: []
-      summary: Delete a exist RuntimeFramework
-      tags:
-        - Repository
-    put:
-      consumes:
-        - application/json
-      description: Update runtime framework
-      parameters:
-        - description: models,spaces
-          enum:
-            - models
-            - spaces
-          in: path
-          name: repo_type
-          required: true
-          type: string
-        - description: namespace
-          in: path
-          name: namespace
-          required: true
-          type: string
-        - description: name
-          in: path
-          name: name
-          required: true
-          type: string
-        - description: id
-          in: path
-          name: id
-          required: true
-          type: integer
-        - description: current user
-          in: query
-          name: current_user
-          type: string
-        - description: body
-          in: body
-          name: body
-          required: true
-          schema:
-            $ref: "#/definitions/types.RuntimeFrameworkReq"
-      produces:
-        - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: "#/definitions/types.RuntimeFramework"
-        "400":
-          description: Bad request
-          schema:
-            $ref: "#/definitions/types.APIBadRequest"
-        "500":
-          description: Internal server error
-          schema:
-            $ref: "#/definitions/types.APIInternalServerError"
-      security:
-        - ApiKey: []
-      summary: Update runtime framework
-      tags:
-        - Repository
+        - RuntimeFramework
   /{repo_type}/{namespace}/{name}/tags:
     get:
       consumes:
@@ -9166,6 +9002,28 @@ paths:
         - application/json
       description: create runtime framework
       parameters:
+        - description: models,spaces
+          enum:
+            - models
+            - spaces
+          in: path
+          name: repo_type
+          required: true
+          type: string
+        - description: namespace
+          in: path
+          name: namespace
+          required: true
+          type: string
+        - description: name
+          in: path
+          name: name
+          required: true
+          type: string
+        - description: current user
+          in: query
+          name: current_user
+          type: string
         - description: body
           in: body
           name: body
@@ -9183,10 +9041,6 @@ paths:
           description: Bad request
           schema:
             $ref: "#/definitions/types.APIBadRequest"
-        "403":
-          description: Forbidden
-          schema:
-            $ref: "#/definitions/types.APIForbidden"
         "500":
           description: Internal server error
           schema:
@@ -9200,28 +9054,35 @@ paths:
     delete:
       consumes:
         - application/json
-      description: set model runtime frameworks
+      description: delete a exist RuntimeFramework
       parameters:
-        - description: runtime framework id
+        - description: models,spaces
+          enum:
+            - models
+            - spaces
+          in: path
+          name: repo_type
+          required: true
+          type: string
+        - description: namespace
+          in: path
+          name: namespace
+          required: true
+          type: string
+        - description: name
+          in: path
+          name: name
+          required: true
+          type: string
+        - description: id
           in: path
           name: id
           required: true
           type: integer
-        - default: 1
-          description: deploy_type
-          enum:
-            - 0
-            - 1
-            - 2
+        - description: current user
           in: query
-          name: deploy_type
-          type: integer
-        - description: body
-          in: body
-          name: body
-          required: true
-          schema:
-            $ref: "#/definitions/types.RuntimeFrameworkModels"
+          name: current_user
+          type: string
       produces:
         - application/json
       responses:
@@ -9233,37 +9094,42 @@ paths:
           description: Bad request
           schema:
             $ref: "#/definitions/types.APIBadRequest"
-        "403":
-          description: Forbidden
-          schema:
-            $ref: "#/definitions/types.APIForbidden"
         "500":
           description: Internal server error
           schema:
             $ref: "#/definitions/types.APIInternalServerError"
       security:
         - ApiKey: []
-      summary: Set model runtime frameworks
+      summary: Delete a exist RuntimeFramework
       tags:
         - RuntimeFramework
     put:
       consumes:
         - application/json
-      description: set model runtime frameworks
+      description: Update runtime framework
       parameters:
-        - description: runtime framework id
+        - description: models,spaces
+          enum:
+            - models
+            - spaces
+          in: path
+          name: repo_type
+          required: true
+          type: string
+        - description: namespace
+          in: path
+          name: namespace
+          required: true
+          type: string
+        - description: name
+          in: path
+          name: name
+          required: true
+          type: string
+        - description: id
           in: path
           name: id
           required: true
-          type: integer
-        - default: 1
-          description: deploy_type
-          enum:
-            - 0
-            - 1
-            - 2
-          in: query
-          name: deploy_type
           type: integer
         - description: current user
           in: query
@@ -9274,29 +9140,25 @@ paths:
           name: body
           required: true
           schema:
-            $ref: "#/definitions/types.RuntimeFrameworkModels"
+            $ref: "#/definitions/types.RuntimeFrameworkReq"
       produces:
         - application/json
       responses:
         "200":
           description: OK
           schema:
-            $ref: "#/definitions/types.Response"
+            $ref: "#/definitions/types.RuntimeFramework"
         "400":
           description: Bad request
           schema:
             $ref: "#/definitions/types.APIBadRequest"
-        "403":
-          description: Forbidden
-          schema:
-            $ref: "#/definitions/types.APIForbidden"
         "500":
           description: Internal server error
           schema:
             $ref: "#/definitions/types.APIInternalServerError"
       security:
         - ApiKey: []
-      summary: Set model runtime frameworks
+      summary: Update runtime framework
       tags:
         - RuntimeFramework
   /runtime_framework/{id}/architecture:
@@ -9403,6 +9265,55 @@ paths:
       tags:
         - RuntimeFramework
   /runtime_framework/{id}/models:
+    delete:
+      consumes:
+        - application/json
+      description: set model runtime frameworks
+      parameters:
+        - description: runtime framework id
+          in: path
+          name: id
+          required: true
+          type: integer
+        - default: 1
+          description: deploy_type
+          enum:
+            - 0
+            - 1
+            - 2
+          in: query
+          name: deploy_type
+          type: integer
+        - description: body
+          in: body
+          name: body
+          required: true
+          schema:
+            $ref: "#/definitions/types.RuntimeFrameworkModels"
+      produces:
+        - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: "#/definitions/types.Response"
+        "400":
+          description: Bad request
+          schema:
+            $ref: "#/definitions/types.APIBadRequest"
+        "403":
+          description: Forbidden
+          schema:
+            $ref: "#/definitions/types.APIForbidden"
+        "500":
+          description: Internal server error
+          schema:
+            $ref: "#/definitions/types.APIInternalServerError"
+      security:
+        - ApiKey: []
+      summary: Set model runtime frameworks
+      tags:
+        - RuntimeFramework
     get:
       consumes:
         - application/json
@@ -9454,6 +9365,59 @@ paths:
       security:
         - ApiKey: []
       summary: Get Visible models by runtime framework for current user
+      tags:
+        - RuntimeFramework
+    put:
+      consumes:
+        - application/json
+      description: set model runtime frameworks
+      parameters:
+        - description: runtime framework id
+          in: path
+          name: id
+          required: true
+          type: integer
+        - default: 1
+          description: deploy_type
+          enum:
+            - 0
+            - 1
+            - 2
+          in: query
+          name: deploy_type
+          type: integer
+        - description: current user
+          in: query
+          name: current_user
+          type: string
+        - description: body
+          in: body
+          name: body
+          required: true
+          schema:
+            $ref: "#/definitions/types.RuntimeFrameworkModels"
+      produces:
+        - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: "#/definitions/types.Response"
+        "400":
+          description: Bad request
+          schema:
+            $ref: "#/definitions/types.APIBadRequest"
+        "403":
+          description: Forbidden
+          schema:
+            $ref: "#/definitions/types.APIForbidden"
+        "500":
+          description: Internal server error
+          schema:
+            $ref: "#/definitions/types.APIInternalServerError"
+      security:
+        - ApiKey: []
+      summary: Set model runtime frameworks
       tags:
         - RuntimeFramework
   /runtime_framework/{id}/scan:

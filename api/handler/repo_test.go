@@ -722,6 +722,7 @@ func TestRepoHandler_DeleteMirror(t *testing.T) {
 	tester := NewRepoTester(t).WithHandleFunc(func(rp *RepoHandler) gin.HandlerFunc {
 		return rp.DeleteMirror
 	})
+
 	tester.RequireUser(t)
 
 	tester.WithKV("repo_type", types.ModelRepo)
@@ -758,12 +759,13 @@ func TestRepoHandler_RuntimeFrameworkCreate(t *testing.T) {
 		return rp.RuntimeFrameworkCreate
 	})
 
-	tester.WithKV("repo_type", types.ModelRepo)
+	tester.WithUser().WithKV("repo_type", types.ModelRepo)
 	tester.WithBody(t, &types.RuntimeFrameworkReq{
-		FrameName: "f1",
+		FrameName:   "f1",
+		CurrentUser: "u",
 	})
 	tester.mocks.repo.EXPECT().CreateRuntimeFramework(
-		tester.ctx, &types.RuntimeFrameworkReq{FrameName: "f1"},
+		tester.ctx, &types.RuntimeFrameworkReq{FrameName: "f1", CurrentUser: "u"},
 	).Return(&types.RuntimeFramework{FrameName: "f1"}, nil)
 
 	tester.Execute()
@@ -775,13 +777,13 @@ func TestRepoHandler_RuntimeFrameworkUpdate(t *testing.T) {
 		return rp.RuntimeFrameworkUpdate
 	})
 
-	tester.WithKV("repo_type", types.ModelRepo)
+	tester.WithUser().WithKV("repo_type", types.ModelRepo)
 	tester.WithBody(t, &types.RuntimeFrameworkReq{
 		FrameName: "f1",
 	})
 	tester.WithParam("id", "1")
 	tester.mocks.repo.EXPECT().UpdateRuntimeFramework(
-		tester.ctx, int64(1), &types.RuntimeFrameworkReq{FrameName: "f1"},
+		tester.ctx, int64(1), &types.RuntimeFrameworkReq{FrameName: "f1", CurrentUser: "u"},
 	).Return(&types.RuntimeFramework{FrameName: "f1"}, nil)
 
 	tester.Execute()
@@ -792,11 +794,10 @@ func TestRepoHandler_RuntimeFrameworkDelete(t *testing.T) {
 	tester := NewRepoTester(t).WithHandleFunc(func(rp *RepoHandler) gin.HandlerFunc {
 		return rp.RuntimeFrameworkDelete
 	})
-
-	tester.WithKV("repo_type", types.ModelRepo)
+	tester.WithUser().WithKV("repo_type", types.ModelRepo)
 	tester.WithParam("id", "1")
 	tester.mocks.repo.EXPECT().DeleteRuntimeFramework(
-		tester.ctx, int64(1),
+		tester.ctx, "u", int64(1),
 	).Return(nil)
 
 	tester.Execute()
