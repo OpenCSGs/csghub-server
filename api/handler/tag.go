@@ -44,7 +44,7 @@ func (t *TagsHandler) AllTags(ctx *gin.Context) {
 	//TODO:validate inputs
 	category := ctx.Query("category")
 	scope := ctx.Query("scope")
-	tags, err := t.tag.AllTagsByScopeAndCategory(ctx, scope, category)
+	tags, err := t.tag.AllTagsByScopeAndCategory(ctx.Request.Context(), scope, category)
 	if err != nil {
 		slog.Error("Failed to load tags", slog.Any("category", category), slog.Any("scope", scope), slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
@@ -80,7 +80,7 @@ func (t *TagsHandler) CreateTag(ctx *gin.Context) {
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
-	tag, err := t.tag.CreateTag(ctx, userName, req)
+	tag, err := t.tag.CreateTag(ctx.Request.Context(), userName, req)
 	if err != nil {
 		slog.Error("Failed to create tag", slog.Any("req", req), slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
@@ -113,7 +113,7 @@ func (t *TagsHandler) GetTagByID(ctx *gin.Context) {
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
-	tag, err := t.tag.GetTagByID(ctx, userName, id)
+	tag, err := t.tag.GetTagByID(ctx.Request.Context(), userName, id)
 	if err != nil {
 		slog.Error("Failed to get tag", slog.Int64("id", id), slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
@@ -153,7 +153,7 @@ func (t *TagsHandler) UpdateTag(ctx *gin.Context) {
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
-	tag, err := t.tag.UpdateTag(ctx, userName, id, req)
+	tag, err := t.tag.UpdateTag(ctx.Request.Context(), userName, id, req)
 	if err != nil {
 		slog.Error("Failed to update tag", slog.Int64("id", id), slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
@@ -186,7 +186,7 @@ func (t *TagsHandler) DeleteTag(ctx *gin.Context) {
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
-	err = t.tag.DeleteTag(ctx, userName, id)
+	err = t.tag.DeleteTag(ctx.Request.Context(), userName, id)
 	if err != nil {
 		slog.Error("Failed to delete tag", slog.Int64("id", id), slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
@@ -207,7 +207,7 @@ func (t *TagsHandler) DeleteTag(ctx *gin.Context) {
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
 // @Router       /tags/categories [get]
 func (t *TagsHandler) AllCategories(ctx *gin.Context) {
-	categories, err := t.tag.AllCategories(ctx)
+	categories, err := t.tag.AllCategories(ctx.Request.Context())
 	if err != nil {
 		slog.Error("Failed to load categories", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
@@ -243,7 +243,7 @@ func (t *TagsHandler) CreateCategory(ctx *gin.Context) {
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
-	category, err := t.tag.CreateCategory(ctx, userName, req)
+	category, err := t.tag.CreateCategory(ctx.Request.Context(), userName, req)
 	if err != nil {
 		if errors.Is(err, component.ErrForbidden) {
 			httpbase.ForbiddenError(ctx, err)
@@ -286,7 +286,7 @@ func (t *TagsHandler) UpdateCategory(ctx *gin.Context) {
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
-	category, err := t.tag.UpdateCategory(ctx, userName, req, id)
+	category, err := t.tag.UpdateCategory(ctx.Request.Context(), userName, req, id)
 	if err != nil {
 		if errors.Is(err, component.ErrForbidden) {
 			httpbase.ForbiddenError(ctx, err)
@@ -322,7 +322,7 @@ func (t *TagsHandler) DeleteCategory(ctx *gin.Context) {
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
-	err = t.tag.DeleteCategory(ctx, userName, id)
+	err = t.tag.DeleteCategory(ctx.Request.Context(), userName, id)
 	if err != nil {
 		if errors.Is(err, component.ErrForbidden) {
 			httpbase.ForbiddenError(ctx, err)

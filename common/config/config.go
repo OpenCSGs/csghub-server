@@ -233,6 +233,11 @@ type Config struct {
 		URL    string   `env:"STARHUB_SERVER_PROXY_URL, default="`
 		Hosts  []string `env:"STARHUB_SERVER_PROXY_HOSTS, delimiter=;"`
 	}
+
+	Instrumentation struct {
+		OTLPEndpoint string `env:"OPENCSG_TRACING_OTLP_ENDPOINT"`
+		OTLPLogging  bool   `env:"OPENCSG_TRACING_OTLP_LOGGING"`
+	}
 }
 
 func SetConfigFile(file string) {

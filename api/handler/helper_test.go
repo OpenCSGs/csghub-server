@@ -2,6 +2,7 @@ package handler
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"io"
 	"mime/multipart"
@@ -19,7 +20,8 @@ import (
 
 type GinTester struct {
 	ginHandler gin.HandlerFunc
-	ctx        *gin.Context
+	gctx       *gin.Context
+	ctx        context.Context
 	response   *httptest.ResponseRecorder
 	OKText     string // text of httpbase.OK
 	_executed  bool
@@ -34,7 +36,8 @@ func NewGinTester() *GinTester {
 
 	return &GinTester{
 		ginHandler: nil,
-		ctx:        ctx,
+		gctx:       ctx,
+		ctx:        ctx.Request.Context(),
 		response:   response,
 		OKText:     "OK",
 	}
@@ -45,62 +48,62 @@ func (g *GinTester) Handler(handler gin.HandlerFunc) {
 }
 
 func (g *GinTester) Execute() {
-	g.ginHandler(g.ctx)
+	g.ginHandler(g.gctx)
 	g._executed = true
 }
 func (g *GinTester) WithUser() *GinTester {
-	g.ctx.Set(httpbase.CurrentUserCtxVar, "u")
+	g.gctx.Set(httpbase.CurrentUserCtxVar, "u")
 	return g
 }
 
 func (g *GinTester) WithParam(key string, value string) *GinTester {
-	params := g.ctx.Params
+	params := g.gctx.Params
 	for i, param := range params {
 		if param.Key == key {
 			params[i].Value = value
 			return g
 		}
 	}
-	g.ctx.AddParam(key, value)
+	g.gctx.AddParam(key, value)
 	return g
 }
 
 func (g *GinTester) WithKV(key string, value any) *GinTester {
-	g.ctx.Set(key, value)
+	g.gctx.Set(key, value)
 	return g
 }
 
 func (g *GinTester) WithBody(t *testing.T, body any) *GinTester {
 	b, err := json.Marshal(body)
 	require.Nil(t, err)
-	g.ctx.Request.Body = io.NopCloser(bytes.NewBuffer(b))
+	g.gctx.Request.Body = io.NopCloser(bytes.NewBuffer(b))
 	return g
 }
 
 func (g *GinTester) WithMultipartForm(mf *multipart.Form) *GinTester {
-	g.ctx.Request.MultipartForm = mf
+	g.gctx.Request.MultipartForm = mf
 	return g
 }
 
 func (g *GinTester) WithQuery(key, value string) *GinTester {
-	q := g.ctx.Request.URL.Query()
+	q := g.gctx.Request.URL.Query()
 	q.Add(key, value)
-	g.ctx.Request.URL.RawQuery = q.Encode()
+	g.gctx.Request.URL.RawQuery = q.Encode()
 	return g
 }
 
 func (g *GinTester) SetPath(path string) *GinTester {
-	g.ctx.Request.URL.Path = path
+	g.gctx.Request.URL.Path = path
 	return g
 }
 
 func (g *GinTester) WithHeader(key, value string) *GinTester {
-	h := g.ctx.Request.Header
+	h := g.gctx.Request.Header
 	if h == nil {
 		h = map[string][]string{}
 	}
 	h.Add(key, value)
-	g.ctx.Request.Header = h
+	g.gctx.Request.Header = h
 	return g
 }
 
@@ -142,8 +145,8 @@ func (g *GinTester) ResponseEqSimple(t *testing.T, code int, expected any) {
 func (g *GinTester) RequireUser(t *testing.T) {
 	// use a tmp ctx to test no user case
 	tmp := NewGinTester()
-	tmp.ctx.Params = g.ctx.Params
-	g.ginHandler(tmp.ctx)
+	tmp.gctx.Params = g.gctx.Params
+	g.ginHandler(tmp.gctx)
 	tmp._executed = true
 	tmp.ResponseEq(t, http.StatusUnauthorized, component.ErrUserNotFound.Error(), nil)
 	// add user to original test ctx now

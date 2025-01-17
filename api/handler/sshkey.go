@@ -53,7 +53,7 @@ func (h *SSHKeyHandler) Create(ctx *gin.Context) {
 		return
 	}
 
-	_, err := h.sc.CheckRequestV2(ctx, &req)
+	_, err := h.sc.CheckRequestV2(ctx.Request.Context(), &req)
 	if err != nil {
 		slog.Error("failed to check sensitive request", slog.Any("error", err))
 		httpbase.BadRequest(ctx, fmt.Errorf("sensitive check failed: %w", err).Error())
@@ -68,7 +68,7 @@ func (h *SSHKeyHandler) Create(ctx *gin.Context) {
 	req.Username = currentUser
 
 	req.Username = ctx.Param("username")
-	sk, err := h.c.Create(ctx, &req)
+	sk, err := h.c.Create(ctx.Request.Context(), &req)
 	if err != nil {
 		slog.Error("Failed to create SSH key", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
@@ -99,7 +99,7 @@ func (h *SSHKeyHandler) Index(ctx *gin.Context) {
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
-	sks, err := h.c.Index(ctx, username, per, page)
+	sks, err := h.c.Index(ctx.Request.Context(), username, per, page)
 	if err != nil {
 		slog.Error("Failed to create SSH key", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
@@ -132,7 +132,7 @@ func (h *SSHKeyHandler) Delete(ctx *gin.Context) {
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
-	err := h.c.Delete(ctx, username, name)
+	err := h.c.Delete(ctx.Request.Context(), username, name)
 	if err != nil {
 		slog.Error("Failed to delete SSH key", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)

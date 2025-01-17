@@ -51,7 +51,7 @@ func (h *SyncHandler) Latest(c *gin.Context) {
 		return
 	}
 	const limit int64 = 100
-	versions, err := h.c.More(c, cur, limit)
+	versions, err := h.c.More(c.Request.Context(), cur, limit)
 	if err != nil {
 		httpbase.ServerError(c, fmt.Errorf("failed to get more versions: %w", err))
 		return

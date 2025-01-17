@@ -53,7 +53,7 @@ func (h *UserHandler) Datasets(ctx *gin.Context) {
 	req.CurrentUser = httpbase.GetCurrentUser(ctx)
 	req.Page = page
 	req.PageSize = per
-	ds, total, err := h.user.Datasets(ctx, &req)
+	ds, total, err := h.user.Datasets(ctx.Request.Context(), &req)
 	if err != nil {
 		slog.Error("Failed to gat user datasets", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
@@ -94,7 +94,7 @@ func (h *UserHandler) Models(ctx *gin.Context) {
 	req.CurrentUser = httpbase.GetCurrentUser(ctx)
 	req.Page = page
 	req.PageSize = per
-	ms, total, err := h.user.Models(ctx, &req)
+	ms, total, err := h.user.Models(ctx.Request.Context(), &req)
 	if err != nil {
 		slog.Error("Failed to gat user models", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
@@ -136,7 +136,7 @@ func (h *UserHandler) Codes(ctx *gin.Context) {
 	req.CurrentUser = httpbase.GetCurrentUser(ctx)
 	req.Page = page
 	req.PageSize = per
-	ms, total, err := h.user.Codes(ctx, &req)
+	ms, total, err := h.user.Codes(ctx.Request.Context(), &req)
 	if err != nil {
 		slog.Error("Failed to gat user codes", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
@@ -177,7 +177,7 @@ func (h *UserHandler) Spaces(ctx *gin.Context) {
 	req.CurrentUser = httpbase.GetCurrentUser(ctx)
 	req.Page = page
 	req.PageSize = per
-	ms, total, err := h.user.Spaces(ctx, &req)
+	ms, total, err := h.user.Spaces(ctx.Request.Context(), &req)
 	if err != nil {
 		slog.Error("Failed to gat user space", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
@@ -220,7 +220,7 @@ func (h *UserHandler) LikesAdd(ctx *gin.Context) {
 		return
 	}
 	req.RepoID = repo_id
-	err = h.user.AddLikes(ctx, &req)
+	err = h.user.AddLikes(ctx.Request.Context(), &req)
 	if err != nil {
 		httpbase.ServerError(ctx, err)
 		return
@@ -257,7 +257,7 @@ func (h *UserHandler) LikesCollections(ctx *gin.Context) {
 	req.CurrentUser = httpbase.GetCurrentUser(ctx)
 	req.Page = page
 	req.PageSize = per
-	ms, total, err := h.user.LikesCollection(ctx, &req)
+	ms, total, err := h.user.LikesCollection(ctx.Request.Context(), &req)
 	if err != nil {
 		slog.Error("Failed to get user collections", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
@@ -296,7 +296,7 @@ func (h *UserHandler) UserCollections(ctx *gin.Context) {
 	req.CurrentUser = httpbase.GetCurrentUser(ctx)
 	req.Page = page
 	req.PageSize = per
-	ms, total, err := h.user.Collections(ctx, &req)
+	ms, total, err := h.user.Collections(ctx.Request.Context(), &req)
 	if err != nil {
 		slog.Error("Failed to get user collections", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
@@ -337,7 +337,7 @@ func (h *UserHandler) LikeCollection(ctx *gin.Context) {
 		return
 	}
 	req.CollectionID = collectionID
-	err = h.user.LikeCollection(ctx, &req)
+	err = h.user.LikeCollection(ctx.Request.Context(), &req)
 	if err != nil {
 		httpbase.ServerError(ctx, err)
 		return
@@ -371,7 +371,7 @@ func (h *UserHandler) UnLikeCollection(ctx *gin.Context) {
 		return
 	}
 	req.CollectionID = collection_id
-	err = h.user.UnLikeCollection(ctx, &req)
+	err = h.user.UnLikeCollection(ctx.Request.Context(), &req)
 	if err != nil {
 		httpbase.ServerError(ctx, err)
 		return
@@ -408,7 +408,7 @@ func (h *UserHandler) LikesDelete(ctx *gin.Context) {
 	}
 	req.RepoID = repo_id
 	// slog.Info("user.likes.delete.req=%v", req)
-	err = h.user.DeleteLikes(ctx, &req)
+	err = h.user.DeleteLikes(ctx.Request.Context(), &req)
 	if err != nil {
 		httpbase.ServerError(ctx, err)
 		return
@@ -446,7 +446,7 @@ func (h *UserHandler) LikesSpaces(ctx *gin.Context) {
 	req.Page = page
 	req.PageSize = per
 
-	ms, total, err := h.user.LikesSpaces(ctx, &req)
+	ms, total, err := h.user.LikesSpaces(ctx.Request.Context(), &req)
 	if err != nil {
 		slog.Error("Failed to gat user space", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
@@ -492,7 +492,7 @@ func (h *UserHandler) LikesCodes(ctx *gin.Context) {
 	req.CurrentUser = currentUser
 	req.Page = page
 	req.PageSize = per
-	ms, total, err := h.user.LikesCodes(ctx, &req)
+	ms, total, err := h.user.LikesCodes(ctx.Request.Context(), &req)
 	if err != nil {
 		slog.Error("Failed to gat user codes", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
@@ -539,7 +539,7 @@ func (h *UserHandler) LikesModels(ctx *gin.Context) {
 	req.CurrentUser = currentUser
 	req.Page = page
 	req.PageSize = per
-	ms, total, err := h.user.LikesModels(ctx, &req)
+	ms, total, err := h.user.LikesModels(ctx.Request.Context(), &req)
 	if err != nil {
 		slog.Error("Failed to gat user models", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
@@ -586,7 +586,7 @@ func (h *UserHandler) LikesDatasets(ctx *gin.Context) {
 	req.CurrentUser = currentUser
 	req.Page = page
 	req.PageSize = per
-	ds, total, err := h.user.LikesDatasets(ctx, &req)
+	ds, total, err := h.user.LikesDatasets(ctx.Request.Context(), &req)
 	if err != nil {
 		slog.Error("Failed to gat user datasets", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
@@ -683,7 +683,7 @@ func (h *UserHandler) GetRunDeploys(ctx *gin.Context) {
 	req.PageSize = per
 	req.RepoType = repoType
 	req.DeployType = deployType
-	ds, total, err := h.user.ListDeploys(ctx, repoType, &req)
+	ds, total, err := h.user.ListDeploys(ctx.Request.Context(), repoType, &req)
 	if err != nil {
 		slog.Error("Failed to get deploy repo list", slog.Any("error", err), slog.Any("req", req))
 		httpbase.ServerError(ctx, err)
@@ -743,7 +743,7 @@ func (h *UserHandler) GetFinetuneInstances(ctx *gin.Context) {
 	req.CurrentUser = currentUser
 	req.Page = page
 	req.PageSize = per
-	ds, total, err := h.user.ListInstances(ctx, &req)
+	ds, total, err := h.user.ListInstances(ctx.Request.Context(), &req)
 	if err != nil {
 		slog.Error("Failed to get instance list", slog.Any("error", err), slog.Any("req", req))
 		httpbase.ServerError(ctx, err)
@@ -799,7 +799,7 @@ func (h *UserHandler) GetRunServerless(ctx *gin.Context) {
 	req.PageSize = per
 	req.RepoType = types.ModelRepo
 	req.DeployType = types.ServerlessType
-	ds, total, err := h.user.ListServerless(ctx, req)
+	ds, total, err := h.user.ListServerless(ctx.Request.Context(), req)
 	if err != nil {
 		slog.Error("Failed to get serverless list", slog.Any("error", err), slog.Any("req", req))
 		httpbase.ServerError(ctx, err)
@@ -840,7 +840,7 @@ func (h *UserHandler) Prompts(ctx *gin.Context) {
 	req.CurrentUser = httpbase.GetCurrentUser(ctx)
 	req.Page = page
 	req.PageSize = per
-	ds, total, err := h.user.Prompts(ctx, &req)
+	ds, total, err := h.user.Prompts(ctx.Request.Context(), &req)
 	if err != nil {
 		slog.Error("Failed to get user prompts", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
@@ -887,7 +887,7 @@ func (h *UserHandler) GetEvaluations(ctx *gin.Context) {
 	req.CurrentUser = httpbase.GetCurrentUser(ctx)
 	req.Page = page
 	req.PageSize = per
-	ds, total, err := h.user.Evaluations(ctx, &req)
+	ds, total, err := h.user.Evaluations(ctx.Request.Context(), &req)
 	if err != nil {
 		slog.Error("Failed to get user evaluations", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)

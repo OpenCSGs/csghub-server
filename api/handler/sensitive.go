@@ -38,7 +38,7 @@ func (h *SensitiveHandler) Text(ctx *gin.Context) {
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
-	ok, err := h.c.CheckText(ctx, r.Scenario, r.Text)
+	ok, err := h.c.CheckText(ctx.Request.Context(), r.Scenario, r.Text)
 	if err != nil {
 		httpbase.ServerError(ctx, err)
 		return
@@ -67,7 +67,7 @@ func (h *SensitiveHandler) Image(ctx *gin.Context) {
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
-	ok, err := h.c.CheckImage(ctx, r.Scenario, r.OssBucketName, r.OssObjectName)
+	ok, err := h.c.CheckImage(ctx.Request.Context(), r.Scenario, r.OssBucketName, r.OssObjectName)
 	if err != nil {
 		httpbase.ServerError(ctx, err)
 		return

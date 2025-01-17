@@ -84,7 +84,7 @@ func (h *RepoHandler) CreateFile(ctx *gin.Context) {
 	req.RepoType = common.RepoTypeFromContext(ctx)
 	req.CurrentUser = userName
 
-	resp, err := h.c.CreateFile(ctx, req)
+	resp, err := h.c.CreateFile(ctx.Request.Context(), req)
 	if err != nil {
 		slog.Error("Failed to create repo file", slog.String("repo_type", string(req.RepoType)), slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
@@ -139,7 +139,7 @@ func (h *RepoHandler) UpdateFile(ctx *gin.Context) {
 	req.RepoType = common.RepoTypeFromContext(ctx)
 	req.CurrentUser = userName
 
-	resp, err := h.c.UpdateFile(ctx, req)
+	resp, err := h.c.UpdateFile(ctx.Request.Context(), req)
 	if err != nil {
 		slog.Error("Failed to update repo file", slog.String("repo_type", string(req.RepoType)), slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
@@ -190,7 +190,7 @@ func (h *RepoHandler) Commits(ctx *gin.Context) {
 		RepoType:    common.RepoTypeFromContext(ctx),
 		CurrentUser: currentUser,
 	}
-	commits, pageOpt, err := h.c.Commits(ctx, req)
+	commits, pageOpt, err := h.c.Commits(ctx.Request.Context(), req)
 	if err != nil {
 		slog.Error("Failed to get repo commits", slog.String("repo_type", string(req.RepoType)), slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
@@ -237,7 +237,7 @@ func (h *RepoHandler) LastCommit(ctx *gin.Context) {
 		RepoType:    common.RepoTypeFromContext(ctx),
 		CurrentUser: currentUser,
 	}
-	commit, err := h.c.LastCommit(ctx, req)
+	commit, err := h.c.LastCommit(ctx.Request.Context(), req)
 	if err != nil {
 		if errors.Is(err, component.ErrForbidden) {
 			httpbase.ForbiddenError(ctx, err)
@@ -286,7 +286,7 @@ func (h *RepoHandler) FileRaw(ctx *gin.Context) {
 		RepoType:    common.RepoTypeFromContext(ctx),
 		CurrentUser: currentUser,
 	}
-	raw, err := h.c.FileRaw(ctx, req)
+	raw, err := h.c.FileRaw(ctx.Request.Context(), req)
 	if err != nil {
 		slog.Error("Failed to get repo file raw", slog.String("repo_type", string(req.RepoType)), slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
@@ -331,7 +331,7 @@ func (h *RepoHandler) FileInfo(ctx *gin.Context) {
 		RepoType:    common.RepoTypeFromContext(ctx),
 		CurrentUser: currentUser,
 	}
-	file, err := h.c.FileInfo(ctx, req)
+	file, err := h.c.FileInfo(ctx.Request.Context(), req)
 	if err != nil {
 		slog.Error("Failed to get repo file info", slog.Any("req", req), slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
@@ -392,7 +392,7 @@ func (h *RepoHandler) DownloadFile(ctx *gin.Context) {
 	if s3Internal == "true" {
 		ctx.Set("X-OPENCSG-S3-Internal", true)
 	}
-	reader, size, url, err := h.c.DownloadFile(ctx, req, currentUser)
+	reader, size, url, err := h.c.DownloadFile(ctx.Request.Context(), req, currentUser)
 	if err != nil {
 		slog.Error("Failed to download repo file", slog.String("repo_type", string(req.RepoType)), slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
@@ -453,7 +453,7 @@ func (h *RepoHandler) Branches(ctx *gin.Context) {
 		RepoType:    common.RepoTypeFromContext(ctx),
 		CurrentUser: currentUser,
 	}
-	branches, err := h.c.Branches(ctx, req)
+	branches, err := h.c.Branches(ctx.Request.Context(), req)
 	if err != nil {
 		slog.Error("Failed to get repo branches", slog.String("repo_type", string(req.RepoType)), slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
@@ -492,7 +492,7 @@ func (h *RepoHandler) Tags(ctx *gin.Context) {
 		RepoType:    common.RepoTypeFromContext(ctx),
 		CurrentUser: currentUser,
 	}
-	tags, err := h.c.Tags(ctx, req)
+	tags, err := h.c.Tags(ctx.Request.Context(), req)
 	if err != nil {
 		slog.Error("Failed to get repo tags", slog.String("repo_type", string(req.RepoType)), slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
@@ -538,7 +538,7 @@ func (h *RepoHandler) UpdateTags(ctx *gin.Context) {
 	}
 	category := ctx.Param("category")
 	repoType := common.RepoTypeFromContext(ctx)
-	err = h.c.UpdateTags(ctx, namespace, name, repoType, category, currentUser, tags)
+	err = h.c.UpdateTags(ctx.Request.Context(), namespace, name, repoType, category, currentUser, tags)
 	if err != nil {
 		slog.Error("Failed to update tags", slog.String("error", err.Error()), slog.String("category", category), slog.String("repo_type", string(repoType)),
 			slog.String("namespace", namespace), slog.String("name", name))
@@ -580,7 +580,7 @@ func (h *RepoHandler) Tree(ctx *gin.Context) {
 		RepoType:    common.RepoTypeFromContext(ctx),
 		CurrentUser: currentUser,
 	}
-	tree, err := h.c.Tree(ctx, req)
+	tree, err := h.c.Tree(ctx.Request.Context(), req)
 	if err != nil {
 		if errors.Is(err, component.ErrForbidden) {
 			httpbase.ForbiddenError(ctx, err)
@@ -630,7 +630,7 @@ func (h *RepoHandler) TreeV2(ctx *gin.Context) {
 		Limit:       cast.ToInt(ctx.Query("limit")),
 		Cursor:      ctx.Query("cursor"),
 	}
-	tree, err := h.c.TreeV2(ctx, req)
+	tree, err := h.c.TreeV2(ctx.Request.Context(), req)
 	if err != nil {
 		if errors.Is(err, component.ErrForbidden) {
 			httpbase.ForbiddenError(ctx, err)
@@ -686,7 +686,7 @@ func (h *RepoHandler) LogsTree(ctx *gin.Context) {
 	if req.Limit == 0 {
 		req.Limit = 25
 	}
-	tree, err := h.c.LogsTree(ctx, req)
+	tree, err := h.c.LogsTree(ctx.Request.Context(), req)
 	if err != nil {
 		if errors.Is(err, component.ErrForbidden) {
 			httpbase.ForbiddenError(ctx, err)
@@ -729,7 +729,7 @@ func (h *RepoHandler) UpdateDownloads(ctx *gin.Context) {
 	}
 	req.Date = date
 
-	err = h.c.UpdateDownloads(ctx, req)
+	err = h.c.UpdateDownloads(ctx.Request.Context(), req)
 	if err != nil {
 		slog.Error("Failed to update repo download count", slog.String("repo_type", string(req.RepoType)), slog.Any("error", err), slog.String("namespace", namespace), slog.String("name", name), slog.Time("date", date), slog.Int64("clone_count", req.CloneCount))
 		httpbase.ServerError(ctx, err)
@@ -762,7 +762,7 @@ func (h *RepoHandler) IncrDownloads(ctx *gin.Context) {
 
 	repoType := common.RepoTypeFromContext(ctx)
 
-	err = h.c.IncrDownloads(ctx, repoType, namespace, name)
+	err = h.c.IncrDownloads(ctx.Request.Context(), repoType, namespace, name)
 	if err != nil {
 		slog.Error("Failed to increase repo download count", slog.String("repo_type", string(repoType)), slog.Any("error", err), slog.String("namespace", namespace), slog.String("name", name))
 		httpbase.ServerError(ctx, err)
@@ -828,7 +828,7 @@ func (h *RepoHandler) UploadFile(ctx *gin.Context) {
 			OriginalContent: originalBytes,
 			CurrentUser:     userName,
 		}
-		err = h.c.UploadFile(ctx, upload)
+		err = h.c.UploadFile(ctx.Request.Context(), upload)
 		if err != nil {
 			slog.Error("Failed to upload repo file", slog.String("repo_type", string(upload.RepoType)), slog.Any("error", err), slog.String("file_path", filePath))
 			httpbase.ServerError(ctx, err)
@@ -854,7 +854,7 @@ func (h *RepoHandler) SDKListFiles(ctx *gin.Context) {
 	if mappedBranch != "" {
 		ref = mappedBranch
 	}
-	files, err := h.c.SDKListFiles(ctx, common.RepoTypeFromContext(ctx), namespace, name, ref, currentUser)
+	files, err := h.c.SDKListFiles(ctx.Request.Context(), common.RepoTypeFromContext(ctx), namespace, name, ref, currentUser)
 	if err != nil {
 		if errors.Is(err, component.ErrUnauthorized) {
 			slog.Error("permission denied when accessing repo", slog.String("repo_type", string(common.RepoTypeFromContext(ctx))), slog.Any("path", fmt.Sprintf("%s/%s", namespace, name)))
@@ -923,7 +923,7 @@ func (h *RepoHandler) HeadSDKDownload(ctx *gin.Context) {
 		RepoType:  common.RepoTypeFromContext(ctx),
 	}
 
-	file, err := h.c.HeadDownloadFile(ctx, req, currentUser)
+	file, err := h.c.HeadDownloadFile(ctx.Request.Context(), req, currentUser)
 	if err != nil {
 		if errors.Is(err, component.ErrUnauthorized) {
 			slog.Error("permission denied when accessing repo head", slog.String("repo_type", string(req.RepoType)), slog.Any("path", fmt.Sprintf("%s/%s", namespace, name)))
@@ -996,7 +996,7 @@ func (h *RepoHandler) handleDownload(ctx *gin.Context, isResolve bool) {
 		RepoType:  common.RepoTypeFromContext(ctx),
 	}
 	// TODO:move the check into SDKDownloadFile, and can return the file content as we get all the content before check lfs pointer
-	lfs, contentLength, err := h.c.IsLfs(ctx, req)
+	lfs, contentLength, err := h.c.IsLfs(ctx.Request.Context(), req)
 	if err != nil {
 		if errors.Is(err, component.ErrNotFound) {
 			slog.Error("repo not found", slog.String("repo_type", string(common.RepoTypeFromContext(ctx))), slog.Any("path", fmt.Sprintf("%s/%s", namespace, name)))
@@ -1012,7 +1012,7 @@ func (h *RepoHandler) handleDownload(ctx *gin.Context, isResolve bool) {
 
 	if contentLength > 0 {
 		// file content is not empty, download it directly
-		reader, size, url, err = h.c.SDKDownloadFile(ctx, req, currentUser)
+		reader, size, url, err = h.c.SDKDownloadFile(ctx.Request.Context(), req, currentUser)
 		if err != nil {
 			if errors.Is(err, component.ErrUnauthorized) {
 				slog.Error("permission denied when accessing repo", slog.String("repo_type", string(req.RepoType)), slog.Any("path", fmt.Sprintf("%s/%s", namespace, name)))
@@ -1082,7 +1082,7 @@ func (h *RepoHandler) CommitWithDiff(ctx *gin.Context) {
 		RepoType:    common.RepoTypeFromContext(ctx),
 		CurrentUser: currentUser,
 	}
-	commit, err := h.c.GetCommitWithDiff(ctx, req)
+	commit, err := h.c.GetCommitWithDiff(ctx.Request.Context(), req)
 	if err != nil {
 		slog.Error("Failed to get repo with commit diff", slog.String("repo_type", string(req.RepoType)), slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
@@ -1136,7 +1136,7 @@ func (h *RepoHandler) CreateMirror(ctx *gin.Context) {
 	mirrorReq.RepoType = common.RepoTypeFromContext(ctx)
 	mirrorReq.CurrentUser = currentUser
 	mirrorReq.SourceRepoPath = sourceRepoPath
-	mirror, err := h.c.CreateMirror(ctx, mirrorReq)
+	mirror, err := h.c.CreateMirror(ctx.Request.Context(), mirrorReq)
 	if err != nil {
 		slog.Error("Failed to create mirror for", slog.String("repo_type", string(mirrorReq.RepoType)), slog.String("path", fmt.Sprintf("%s/%s", mirrorReq.Namespace, mirrorReq.Name)), "error", err)
 		httpbase.ServerError(ctx, err)
@@ -1175,7 +1175,7 @@ func (h *RepoHandler) MirrorFromSaas(ctx *gin.Context) {
 		httpbase.BadRequest(ctx, "Repo could not be mirrored")
 		return
 	}
-	err = h.c.MirrorFromSaas(ctx, namespace, name, currentUser, repoType)
+	err = h.c.MirrorFromSaas(ctx.Request.Context(), namespace, name, currentUser, repoType)
 	if err != nil {
 		slog.Error("Failed to create mirror for", slog.String("repo_type", string(repoType)), slog.String("path", fmt.Sprintf("%s/%s", namespace, name)), "error", err)
 		httpbase.ServerError(ctx, err)
@@ -1215,7 +1215,7 @@ func (h *RepoHandler) GetMirror(ctx *gin.Context) {
 	mirrorReq.Name = name
 	mirrorReq.RepoType = common.RepoTypeFromContext(ctx)
 	mirrorReq.CurrentUser = currentUser
-	mirror, err := h.c.GetMirror(ctx, mirrorReq)
+	mirror, err := h.c.GetMirror(ctx.Request.Context(), mirrorReq)
 	if err != nil {
 		slog.Error("Failed to get mirror of", slog.String("repo_type", string(mirrorReq.RepoType)), slog.String("path", fmt.Sprintf("%s/%s", mirrorReq.Namespace, mirrorReq.Name)), "error", err)
 		httpbase.ServerError(ctx, err)
@@ -1267,7 +1267,7 @@ func (h *RepoHandler) UpdateMirror(ctx *gin.Context) {
 	mirrorReq.Name = name
 	mirrorReq.RepoType = common.RepoTypeFromContext(ctx)
 	mirrorReq.CurrentUser = currentUser
-	mirror, err := h.c.UpdateMirror(ctx, mirrorReq)
+	mirror, err := h.c.UpdateMirror(ctx.Request.Context(), mirrorReq)
 	if err != nil {
 		slog.Error("Failed to update mirror for", slog.String("repo_type", string(mirrorReq.RepoType)), slog.String("path", fmt.Sprintf("%s/%s", mirrorReq.Namespace, mirrorReq.Name)), "error", err)
 		httpbase.ServerError(ctx, err)
@@ -1306,7 +1306,7 @@ func (h *RepoHandler) DeleteMirror(ctx *gin.Context) {
 	mirrorReq.Name = name
 	mirrorReq.RepoType = common.RepoTypeFromContext(ctx)
 	mirrorReq.CurrentUser = currentUser
-	err = h.c.DeleteMirror(ctx, mirrorReq)
+	err = h.c.DeleteMirror(ctx.Request.Context(), mirrorReq)
 	if err != nil {
 		slog.Error("Failed to delete mirror of", slog.String("repo_type", string(mirrorReq.RepoType)), slog.String("path", fmt.Sprintf("%s/%s", mirrorReq.Namespace, mirrorReq.Name)), "error", err)
 		httpbase.ServerError(ctx, err)
@@ -1356,7 +1356,7 @@ func (h *RepoHandler) RuntimeFrameworkList(ctx *gin.Context) {
 		httpbase.BadRequest(ctx, "Bad request of repo type")
 		return
 	}
-	response, err := h.c.ListRuntimeFramework(ctx, repoType, namespace, name, deployType)
+	response, err := h.c.ListRuntimeFramework(ctx.Request.Context(), repoType, namespace, name, deployType)
 	if err != nil {
 		slog.Error("fail to list runtime framework", slog.String("error", err.Error()))
 		httpbase.ServerError(ctx, err)
@@ -1397,7 +1397,7 @@ func (h *RepoHandler) RuntimeFrameworkCreate(ctx *gin.Context) {
 		return
 	}
 
-	frame, err := h.c.CreateRuntimeFramework(ctx, &req)
+	frame, err := h.c.CreateRuntimeFramework(ctx.Request.Context(), &req)
 	if err != nil {
 		slog.Error("Failed to create runtime framework", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
@@ -1444,7 +1444,7 @@ func (h *RepoHandler) RuntimeFrameworkUpdate(ctx *gin.Context) {
 		return
 	}
 
-	frame, err := h.c.UpdateRuntimeFramework(ctx, id, &req)
+	frame, err := h.c.UpdateRuntimeFramework(ctx.Request.Context(), id, &req)
 	if err != nil {
 		slog.Error("Failed to update runtime framework", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
@@ -1481,7 +1481,7 @@ func (h *RepoHandler) RuntimeFrameworkDelete(ctx *gin.Context) {
 		return
 	}
 
-	err = h.c.DeleteRuntimeFramework(ctx, id)
+	err = h.c.DeleteRuntimeFramework(ctx.Request.Context(), id)
 	if err != nil {
 		slog.Error("Failed to delete runtime framework", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
@@ -1518,7 +1518,7 @@ func (h *RepoHandler) DeployList(ctx *gin.Context) {
 		return
 	}
 	repoType := common.RepoTypeFromContext(ctx)
-	response, err := h.c.ListDeploy(ctx, repoType, namespace, name, currentUser)
+	response, err := h.c.ListDeploy(ctx.Request.Context(), repoType, namespace, name, currentUser)
 	if err != nil {
 		slog.Error("fail to list deploy", slog.String("error", err.Error()), slog.Any("repotype", repoType), slog.Any("namespace", namespace), slog.Any("name", name))
 		httpbase.ServerError(ctx, err)
@@ -1578,7 +1578,7 @@ func (h *RepoHandler) DeployDetail(ctx *gin.Context) {
 		detailReq.DeployType = types.InferenceType
 	}
 
-	response, err := h.c.DeployDetail(ctx, detailReq)
+	response, err := h.c.DeployDetail(ctx.Request.Context(), detailReq)
 	if err != nil {
 		slog.Error("fail to deploy detail", slog.String("error", err.Error()), slog.Any("repotype", repoType), slog.Any("namespace", namespace), slog.Any("name", name), slog.Any("deploy id", deployID))
 		var pErr *types.PermissionError
@@ -1773,7 +1773,7 @@ func (h *RepoHandler) DeployStatus(ctx *gin.Context) {
 		DeployType:  types.InferenceType,
 	}
 
-	allow, err := h.c.AllowAccessDeploy(ctx, statusReq)
+	allow, err := h.c.AllowAccessDeploy(ctx.Request.Context(), statusReq)
 	if err != nil {
 		slog.Error("failed to check user permission", "error", err)
 		var pErr *types.PermissionError
@@ -1850,7 +1850,7 @@ func (h *RepoHandler) SyncMirror(ctx *gin.Context) {
 		httpbase.UnauthorizedError(ctx, component.ErrUserNotFound)
 		return
 	}
-	err = h.c.SyncMirror(ctx, repoType, namespace, name, currentUser)
+	err = h.c.SyncMirror(ctx.Request.Context(), repoType, namespace, name, currentUser)
 	if err != nil {
 		slog.Error("Failed to sync mirror for", slog.String("repo_type", string(repoType)), slog.String("path", fmt.Sprintf("%s/%s", namespace, name)), "error", err)
 		httpbase.ServerError(ctx, err)
@@ -1919,7 +1919,7 @@ func (h *RepoHandler) DeployUpdate(ctx *gin.Context) {
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
-	allow, err := h.c.AllowAdminAccess(ctx, types.ModelRepo, namespace, name, currentUser)
+	allow, err := h.c.AllowAdminAccess(ctx.Request.Context(), types.ModelRepo, namespace, name, currentUser)
 	if err != nil {
 		slog.Error("failed to check user permission", "error", err, slog.Any("currentUser", currentUser), slog.Any("namespace", name), slog.Any("name", name))
 		httpbase.ServerError(ctx, errors.New("failed to check user permission"))
@@ -1963,7 +1963,7 @@ func (h *RepoHandler) DeployUpdate(ctx *gin.Context) {
 		DeployID:    deployID,
 		DeployType:  types.InferenceType,
 	}
-	err = h.c.DeployUpdate(ctx, updateReq, req)
+	err = h.c.DeployUpdate(ctx.Request.Context(), updateReq, req)
 	if err != nil {
 		slog.Error("failed to update deploy", slog.String("namespace", namespace), slog.String("name", name), slog.Any("username", currentUser), slog.Int64("deploy_id", deployID), slog.Any("error", err))
 		httpbase.ServerError(ctx, fmt.Errorf("failed to update deploy, %w", err))
@@ -2013,7 +2013,7 @@ func (h *RepoHandler) RuntimeFrameworkListWithType(ctx *gin.Context) {
 		httpbase.BadRequest(ctx, "Bad request of repo type")
 		return
 	}
-	response, err := h.c.ListRuntimeFrameworkWithType(ctx, deployType)
+	response, err := h.c.ListRuntimeFrameworkWithType(ctx.Request.Context(), deployType)
 	if err != nil {
 		slog.Error("fail to list runtime framework", slog.String("error", err.Error()))
 		httpbase.ServerError(ctx, err)
@@ -2066,7 +2066,7 @@ func (h *RepoHandler) ServerlessDetail(ctx *gin.Context) {
 		DeployType:  types.ServerlessType,
 	}
 
-	response, err := h.c.DeployDetail(ctx, detailReq)
+	response, err := h.c.DeployDetail(ctx.Request.Context(), detailReq)
 	if err != nil {
 		slog.Error("fail to serverless detail", slog.String("error", err.Error()), slog.Any("namespace", namespace), slog.Any("name", name), slog.Any("deploy id", deployID))
 		httpbase.ServerError(ctx, err)
@@ -2219,7 +2219,7 @@ func (h *RepoHandler) ServerlessStatus(ctx *gin.Context) {
 		DeployType:  types.ServerlessType,
 	}
 
-	allow, err := h.c.AllowAccessDeploy(ctx, statusReq)
+	allow, err := h.c.AllowAccessDeploy(ctx.Request.Context(), statusReq)
 	if err != nil {
 		slog.Error("failed to check user permission", slog.Any("error", err))
 		httpbase.ServerError(ctx, fmt.Errorf("failed to check user permission, %w", err))
@@ -2324,7 +2324,7 @@ func (h *RepoHandler) ServerlessUpdate(ctx *gin.Context) {
 		DeployID:    deployID,
 		DeployType:  types.ServerlessType,
 	}
-	err = h.c.DeployUpdate(ctx, updateReq, req)
+	err = h.c.DeployUpdate(ctx.Request.Context(), updateReq, req)
 	if err != nil {
 		slog.Error("failed to update serverless", slog.String("namespace", namespace), slog.String("name", name), slog.Any("username", currentUser), slog.Int64("deploy_id", deployID), slog.Any("error", err))
 		httpbase.ServerError(ctx, fmt.Errorf("failed to update serverless, %w", err))

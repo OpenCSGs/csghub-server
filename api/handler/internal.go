@@ -35,7 +35,7 @@ type InternalHandler struct {
 
 // TODO: add prmission check
 func (h *InternalHandler) Allowed(ctx *gin.Context) {
-	allowed, err := h.internal.Allowed(ctx)
+	allowed, err := h.internal.Allowed(ctx.Request.Context())
 	if err != nil {
 		httpbase.ServerError(ctx, err)
 		return
@@ -70,7 +70,7 @@ func (h *InternalHandler) SSHAllowed(ctx *gin.Context) {
 		req.Protocol = rawReq.Protocol
 		req.CheckIP = rawReq.CheckIP
 
-		resp, err := h.internal.SSHAllowed(ctx, req)
+		resp, err := h.internal.SSHAllowed(ctx.Request.Context(), req)
 		if err != nil {
 			httpbase.ServerError(ctx, err)
 			return
@@ -93,7 +93,7 @@ func (h *InternalHandler) LfsAuthenticate(ctx *gin.Context) {
 		return
 	}
 	req.RepoType, req.Namespace, req.Name = getRepoInfoFronClonePath(req.Repo)
-	resp, err := h.internal.LfsAuthenticate(ctx, req)
+	resp, err := h.internal.LfsAuthenticate(ctx.Request.Context(), req)
 	if err != nil {
 		httpbase.ServerError(ctx, err)
 		return
@@ -131,7 +131,7 @@ func (h *InternalHandler) PostReceive(ctx *gin.Context) {
 		Ref:           ref,
 		RepoType:      types.RepositoryType(strings.TrimSuffix(paths[0], "s")),
 	}
-	callback, err := h.internal.GetCommitDiff(ctx, diffReq)
+	callback, err := h.internal.GetCommitDiff(ctx.Request.Context(), diffReq)
 	if err != nil {
 		slog.Error("post receive: failed to get commit diff", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
@@ -144,7 +144,7 @@ func (h *InternalHandler) PostReceive(ctx *gin.Context) {
 	}
 
 	we, err := h.temporalClient.ExecuteWorkflow(
-		ctx, workflowOptions, workflow.HandlePushWorkflow, callback,
+		ctx.Request.Context(), workflowOptions, workflow.HandlePushWorkflow, callback,
 	)
 	if err != nil {
 		slog.Error("failed to handle git push callback", slog.Any("error", err))
@@ -166,7 +166,7 @@ func (h *InternalHandler) PostReceive(ctx *gin.Context) {
 
 func (h *InternalHandler) GetAuthorizedKeys(ctx *gin.Context) {
 	key := ctx.Query("key")
-	sshKey, err := h.internal.GetAuthorizedKeys(ctx, key)
+	sshKey, err := h.internal.GetAuthorizedKeys(ctx.Request.Context(), key)
 	if err != nil {
 		slog.Error("failed to get authorize keys", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)

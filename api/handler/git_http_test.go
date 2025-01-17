@@ -80,8 +80,8 @@ func TestGitHTTPHandler_GitUploadPack(t *testing.T) {
 		Name:        "r",
 		RepoType:    types.ModelRepo,
 		GitProtocol: "ssh",
-		Request:     tester.ctx.Request,
-		Writer:      tester.ctx.Writer,
+		Request:     tester.gctx.Request,
+		Writer:      tester.gctx.Writer,
 		CurrentUser: "u",
 	}).Return(nil)
 	tester.SetPath("git").WithQuery("service", "git-upload-pack").WithHeader("Git-Protocol", "ssh")
@@ -104,8 +104,8 @@ func TestGitHTTPHandler_GitReceivePack(t *testing.T) {
 		Name:        "r",
 		RepoType:    types.ModelRepo,
 		GitProtocol: "ssh",
-		Request:     tester.ctx.Request,
-		Writer:      tester.ctx.Writer,
+		Request:     tester.gctx.Request,
+		Writer:      tester.gctx.Writer,
 		CurrentUser: "u",
 	}).Return(nil)
 	tester.SetPath("git").WithQuery("service", "git-upload-pack").WithHeader("Git-Protocol", "ssh")
@@ -152,7 +152,7 @@ func TestGitHTTPHandler_LfsUpload(t *testing.T) {
 		return h.LfsUpload
 	})
 
-	tester.mocks.gitHttp.EXPECT().LfsUpload(tester.ctx, tester.ctx.Request.Body, types.UploadRequest{
+	tester.mocks.gitHttp.EXPECT().LfsUpload(tester.ctx, tester.gctx.Request.Body, types.UploadRequest{
 		Namespace:   "u",
 		Name:        "r",
 		RepoType:    types.ModelRepo,

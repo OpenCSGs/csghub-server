@@ -1,7 +1,9 @@
 package router
 
 import (
+	"context"
 	"fmt"
+	"log/slog"
 	"time"
 
 	cache "github.com/chenyahui/gin-cache"
@@ -10,15 +12,56 @@ import (
 	"github.com/gin-gonic/gin"
 	swaggerFiles "github.com/swaggo/files"
 	ginSwagger "github.com/swaggo/gin-swagger"
+	"go.opentelemetry.io/contrib/instrumentation/github.com/gin-gonic/gin/otelgin"
 	"opencsg.com/csghub-server/api/handler"
 	"opencsg.com/csghub-server/api/handler/callback"
+	"opencsg.com/csghub-server/api/httpbase"
 	"opencsg.com/csghub-server/api/middleware"
+	"opencsg.com/csghub-server/builder/instrumentation"
+	"opencsg.com/csghub-server/builder/temporal"
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/types"
+	"opencsg.com/csghub-server/mirror"
 )
+
+func RunServer(config *config.Config, enableSwagger bool) {
+	stopOtel, err := instrumentation.SetupOTelSDK(context.Background(), config, "csghub-api")
+	if err != nil {
+		panic(err)
+	}
+	r, err := NewRouter(config, enableSwagger)
+	if err != nil {
+		panic(err)
+	}
+	slog.Info("csghub service is running", slog.Any("port", config.APIServer.Port))
+	server := httpbase.NewGracefulServer(
+		httpbase.GraceServerOpt{
+			Port: config.APIServer.Port,
+		},
+		r,
+	)
+	// Initialize mirror service
+	mirrorService, err := mirror.NewMirrorPriorityQueue(config)
+	if err != nil {
+		panic(fmt.Errorf("failed to init mirror service: %w", err))
+	}
+
+	if config.MirrorServer.Enable && config.GitServer.Type == types.GitServerTypeGitaly {
+		mirrorService.EnqueueMirrorTasks()
+	}
+
+	server.Run()
+	_ = stopOtel(context.Background())
+	temporal.Stop()
+
+}
 
 func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 	r := gin.New()
+	if config.Instrumentation.OTLPEndpoint != "" {
+		r.Use(otelgin.Middleware("csghub-server"))
+	}
+
 	r.Use(cors.New(cors.Config{
 		AllowCredentials: true,
 		AllowHeaders:     []string{"*"},
@@ -26,7 +69,8 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 		AllowAllOrigins:  true,
 	}))
 	r.Use(gin.Recovery())
-	r.Use(middleware.Log())
+	r.Use(middleware.Log(config))
+
 	gitHTTPHandler, err := handler.NewGitHTTPHandler(config)
 	if err != nil {
 		return nil, fmt.Errorf("error creating git http handler:%w", err)

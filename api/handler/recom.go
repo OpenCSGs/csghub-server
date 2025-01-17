@@ -48,7 +48,7 @@ func (h *RecomHandler) SetOpWeight(ctx *gin.Context) {
 		return
 	}
 
-	err := h.c.SetOpWeight(ctx, req.RepoID, req.Weight)
+	err := h.c.SetOpWeight(ctx.Request.Context(), req.RepoID, req.Weight)
 	if err != nil {
 		slog.Error("failed to set op weight", slog.Int64("repo_id", req.RepoID), slog.Int64("weight", req.Weight),
 			slog.Any("error", err))

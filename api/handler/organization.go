@@ -84,7 +84,7 @@ func (h *OrganizationHandler) Models(ctx *gin.Context) {
 	}
 	req.Page = page
 	req.PageSize = per
-	models, total, err := h.model.OrgModels(ctx, &req)
+	models, total, err := h.model.OrgModels(ctx.Request.Context(), &req)
 	if err != nil {
 		slog.Error("Failed to get org models", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
@@ -129,7 +129,7 @@ func (h *OrganizationHandler) Datasets(ctx *gin.Context) {
 	}
 	req.Page = page
 	req.PageSize = per
-	datasets, total, err := h.dataset.OrgDatasets(ctx, &req)
+	datasets, total, err := h.dataset.OrgDatasets(ctx.Request.Context(), &req)
 	if err != nil {
 		slog.Error("Failed to get org datasets", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
@@ -173,7 +173,7 @@ func (h *OrganizationHandler) Codes(ctx *gin.Context) {
 	}
 	req.Page = page
 	req.PageSize = per
-	datasets, total, err := h.code.OrgCodes(ctx, &req)
+	datasets, total, err := h.code.OrgCodes(ctx.Request.Context(), &req)
 	if err != nil {
 		slog.Error("Failed to get org codes", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
@@ -217,7 +217,7 @@ func (h *OrganizationHandler) Spaces(ctx *gin.Context) {
 	}
 	req.Page = page
 	req.PageSize = per
-	datasets, total, err := h.space.OrgSpaces(ctx, &req)
+	datasets, total, err := h.space.OrgSpaces(ctx.Request.Context(), &req)
 	if err != nil {
 		slog.Error("Failed to get org spaces", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
@@ -261,7 +261,7 @@ func (h *OrganizationHandler) Collections(ctx *gin.Context) {
 	}
 	req.Page = page
 	req.PageSize = per
-	datasets, total, err := h.collection.OrgCollections(ctx, &req)
+	datasets, total, err := h.collection.OrgCollections(ctx.Request.Context(), &req)
 	if err != nil {
 		slog.Error("Failed to get org collections", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
@@ -304,7 +304,7 @@ func (h *OrganizationHandler) Prompts(ctx *gin.Context) {
 	}
 	req.Page = page
 	req.PageSize = per
-	prompts, total, err := h.prompt.OrgPrompts(ctx, &req)
+	prompts, total, err := h.prompt.OrgPrompts(ctx.Request.Context(), &req)
 	if err != nil {
 		slog.Error("Failed to get org prompts", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)

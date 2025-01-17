@@ -1,4 +1,4 @@
-.PHONY: test lint cover mock_wire mock_gen swag
+.PHONY: test lint cover mock_wire mock_gen swag migrate_local
 
 test:
 	go test ./...
@@ -28,3 +28,6 @@ mock_gen:
 
 swag:
 	swag init --pd -d cmd/csghub-server/cmd/start,api/router,api/handler,builder/store/database,common/types,accounting/handler,user/handler,component -g server.go
+
+migrate_local:
+	go run cmd/csghub-server/main.go migration migrate --config local.toml

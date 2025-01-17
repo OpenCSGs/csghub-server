@@ -41,7 +41,7 @@ func (r *RProxyHandler) Proxy(ctx *gin.Context) {
 	slog.Debug("http request", slog.Any("request", ctx.Request.URL), slog.Any("header", ctx.Request.Header))
 	appSrvName := r.GetSrvName(ctx)
 
-	deploy, err := r.repoComp.GetDeployBySvcName(ctx, appSrvName)
+	deploy, err := r.repoComp.GetDeployBySvcName(ctx.Request.Context(), appSrvName)
 	if err != nil {
 		slog.Error("failed to get deploy in rproxy", slog.Any("error", err), slog.Any("appSrvName", appSrvName))
 		httpbase.ServerError(ctx, fmt.Errorf("failed to get deploy, %w", err))
@@ -59,10 +59,10 @@ func (r *RProxyHandler) Proxy(ctx *gin.Context) {
 		}
 
 		// check space
-		allow, err = r.repoComp.AllowAccessByRepoID(ctx, deploy.RepoID, username)
+		allow, err = r.repoComp.AllowAccessByRepoID(ctx.Request.Context(), deploy.RepoID, username)
 	} else if deploy.ModelID > 0 {
 		// check model inference
-		allow, err = r.repoComp.AllowAccessEndpoint(ctx, username, deploy)
+		allow, err = r.repoComp.AllowAccessEndpoint(ctx.Request.Context(), username, deploy)
 	}
 
 	if err != nil {

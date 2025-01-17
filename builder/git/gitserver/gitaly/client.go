@@ -7,6 +7,7 @@ import (
 	gitalyauth "gitlab.com/gitlab-org/gitaly/v16/auth"
 	gitalyclient "gitlab.com/gitlab-org/gitaly/v16/client"
 	gitalypb "gitlab.com/gitlab-org/gitaly/v16/proto/go/gitalypb"
+	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	"opencsg.com/csghub-server/builder/git/gitserver"
@@ -37,6 +38,7 @@ func NewClient(config *config.Config) (*Client, error) {
 		grpc.WithPerRPCCredentials(gitalyauth.RPCCredentialsV2(config.GitalyServer.Token)),
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
 		gitalyclient.WithGitalyDNSResolver(gitalyclient.DefaultDNSResolverBuilderConfig()),
+		grpc.WithStatsHandler(otelgrpc.NewClientHandler()),
 	)
 
 	conn, connErr := gitalyclient.DialSidechannel(context.Background(), config.GitalyServer.Address, sidechannelRegistry, connOpts)

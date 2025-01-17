@@ -67,7 +67,7 @@ func (h *DiscussionHandler) CreateRepoDiscussion(ctx *gin.Context) {
 		return
 	}
 
-	_, err = h.sensitive.CheckRequestV2(ctx, &req)
+	_, err = h.sensitive.CheckRequestV2(ctx.Request.Context(), &req)
 	if err != nil {
 		slog.Error("failed to check sensitive request", slog.Any("error", err))
 		httpbase.BadRequest(ctx, fmt.Errorf("sensitive check failed: %w", err).Error())
@@ -78,7 +78,7 @@ func (h *DiscussionHandler) CreateRepoDiscussion(ctx *gin.Context) {
 	req.RepoType = types.RepositoryType(repoType)
 	req.Namespace = namespace
 	req.Name = name
-	resp, err := h.discussion.CreateRepoDiscussion(ctx, req)
+	resp, err := h.discussion.CreateRepoDiscussion(ctx.Request.Context(), req)
 	if err != nil {
 		slog.Error("Failed to create repo discussion", "error", err, "request", req)
 		httpbase.ServerError(ctx, fmt.Errorf("failed to create repo discussion: %w", err))
@@ -118,7 +118,7 @@ func (h *DiscussionHandler) UpdateDiscussion(ctx *gin.Context) {
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
-	_, err = h.sensitive.CheckRequestV2(ctx, &req)
+	_, err = h.sensitive.CheckRequestV2(ctx.Request.Context(), &req)
 	if err != nil {
 		slog.Error("failed to check sensitive request", slog.Any("error", err))
 		httpbase.BadRequest(ctx, fmt.Errorf("sensitive check failed: %w", err).Error())
@@ -127,7 +127,7 @@ func (h *DiscussionHandler) UpdateDiscussion(ctx *gin.Context) {
 
 	req.ID = idInt
 	req.CurrentUser = currentUser
-	err = h.discussion.UpdateDiscussion(ctx, req)
+	err = h.discussion.UpdateDiscussion(ctx.Request.Context(), req)
 	if err != nil {
 		slog.Error("Failed to update discussion", "error", err, "request", req)
 		httpbase.ServerError(ctx, fmt.Errorf("failed to update discussion: %w", err))
@@ -163,7 +163,7 @@ func (h *DiscussionHandler) DeleteDiscussion(ctx *gin.Context) {
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
-	err = h.discussion.DeleteDiscussion(ctx, currentUser, idInt)
+	err = h.discussion.DeleteDiscussion(ctx.Request.Context(), currentUser, idInt)
 	if err != nil {
 		slog.Error("Failed to delete discussion", "error", err, "id", id)
 		httpbase.ServerError(ctx, fmt.Errorf("failed to delete discussion: %w", err))
@@ -192,7 +192,7 @@ func (h *DiscussionHandler) ShowDiscussion(ctx *gin.Context) {
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
-	d, err := h.discussion.GetDiscussion(ctx, idInt)
+	d, err := h.discussion.GetDiscussion(ctx.Request.Context(), idInt)
 	if err != nil {
 		slog.Error("Failed to get discussion", "error", err, "id", id)
 		httpbase.ServerError(ctx, fmt.Errorf("failed to get discussion: %w", err))
@@ -230,7 +230,7 @@ func (h *DiscussionHandler) ListRepoDiscussions(ctx *gin.Context) {
 	req.RepoType = types.RepositoryType(repoType)
 	req.Namespace = namespace
 	req.Name = name
-	resp, err := h.discussion.ListRepoDiscussions(ctx, req)
+	resp, err := h.discussion.ListRepoDiscussions(ctx.Request.Context(), req)
 	if err != nil {
 		slog.Error("Failed to list repo discussions", "error", err, "request", req)
 		httpbase.ServerError(ctx, fmt.Errorf("failed to list repo discussions: %w", err))
@@ -270,7 +270,7 @@ func (h *DiscussionHandler) CreateDiscussionComment(ctx *gin.Context) {
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
-	_, err = h.sensitive.CheckRequestV2(ctx, &req)
+	_, err = h.sensitive.CheckRequestV2(ctx.Request.Context(), &req)
 	if err != nil {
 		slog.Error("failed to check sensitive request", slog.Any("error", err))
 		httpbase.BadRequest(ctx, fmt.Errorf("sensitive check failed: %w", err).Error())
@@ -280,7 +280,7 @@ func (h *DiscussionHandler) CreateDiscussionComment(ctx *gin.Context) {
 	req.CommentableID = idInt
 	req.CurrentUser = currentUser
 
-	resp, err := h.discussion.CreateDiscussionComment(ctx, req)
+	resp, err := h.discussion.CreateDiscussionComment(ctx.Request.Context(), req)
 	if err != nil {
 		slog.Error("Failed to create discussion comment", "error", err, "request", req)
 		httpbase.ServerError(ctx, fmt.Errorf("failed to create discussion comment: %w", err))
@@ -321,14 +321,14 @@ func (h *DiscussionHandler) UpdateComment(ctx *gin.Context) {
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
-	_, err = h.sensitive.CheckRequestV2(ctx, &req)
+	_, err = h.sensitive.CheckRequestV2(ctx.Request.Context(), &req)
 	if err != nil {
 		slog.Error("failed to check sensitive request", slog.Any("error", err))
 		httpbase.BadRequest(ctx, fmt.Errorf("sensitive check failed: %w", err).Error())
 		return
 	}
 
-	err = h.discussion.UpdateComment(ctx, currentUser, idInt, req.Content)
+	err = h.discussion.UpdateComment(ctx.Request.Context(), currentUser, idInt, req.Content)
 	if err != nil {
 		slog.Error("Failed to update comment", "error", err, "request", req)
 		httpbase.ServerError(ctx, fmt.Errorf("failed to update comment: %w", err))
@@ -362,7 +362,7 @@ func (h *DiscussionHandler) DeleteComment(ctx *gin.Context) {
 		httpbase.BadRequest(ctx, fmt.Errorf("invalid comment id: %w", err).Error())
 		return
 	}
-	err = h.discussion.DeleteComment(ctx, currentUser, idInt)
+	err = h.discussion.DeleteComment(ctx.Request.Context(), currentUser, idInt)
 	if err != nil {
 		slog.Error("Failed to delete comment", "error", err, "id", id)
 		httpbase.ServerError(ctx, fmt.Errorf("failed to delete comment: %w", err))
@@ -389,7 +389,7 @@ func (h *DiscussionHandler) ListDiscussionComments(ctx *gin.Context) {
 	if err != nil {
 		httpbase.BadRequest(ctx, fmt.Errorf("invalid discussion id: %w", err).Error())
 	}
-	comments, err := h.discussion.ListDiscussionComments(ctx, idInt)
+	comments, err := h.discussion.ListDiscussionComments(ctx.Request.Context(), idInt)
 	if err != nil {
 		slog.Error("Failed to list discussion comments", "error", err, "id", id)
 		httpbase.ServerError(ctx, fmt.Errorf("failed to list discussion comments: %w", err))

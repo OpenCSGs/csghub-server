@@ -22,7 +22,7 @@ func NewRProxyRouter(config *config.Config) (*gin.Engine, error) {
 		AllowAllOrigins:  true,
 	}))
 	r.Use(gin.Recovery())
-	r.Use(middleware.Log())
+	r.Use(middleware.Log(config))
 	store := cookie.NewStore([]byte(config.Space.SessionSecretKey))
 	store.Options(sessions.Options{
 		SameSite: http.SameSiteNoneMode,

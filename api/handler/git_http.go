@@ -53,7 +53,7 @@ func (h *GitHTTPHandler) InfoRefs(ctx *gin.Context) {
 		GitProtocol: gitProtocol,
 		CurrentUser: httpbase.GetCurrentUser(ctx),
 	}
-	reader, err := h.gitHttp.InfoRefs(ctx, req)
+	reader, err := h.gitHttp.InfoRefs(ctx.Request.Context(), req)
 	if err != nil {
 		if err == component.ErrUnauthorized {
 			ctx.Header("WWW-Authenticate", "Basic realm=opencsg-git")
@@ -109,7 +109,7 @@ func (h *GitHTTPHandler) GitUploadPack(ctx *gin.Context) {
 	ctx.Header("Content-Type", fmt.Sprintf("application/x-%s-result", action))
 	ctx.Header("Cache-Control", "no-cache")
 
-	err := h.gitHttp.GitUploadPack(ctx, req)
+	err := h.gitHttp.GitUploadPack(ctx.Request.Context(), req)
 	if err != nil {
 		httpbase.ServerError(ctx, err)
 		return
@@ -132,7 +132,7 @@ func (h *GitHTTPHandler) GitReceivePack(ctx *gin.Context) {
 	ctx.Header("Content-Type", fmt.Sprintf("application/x-%s-result", action))
 	ctx.Header("Cache-Control", "no-cache")
 
-	err := h.gitHttp.GitReceivePack(ctx, req)
+	err := h.gitHttp.GitReceivePack(ctx.Request.Context(), req)
 	if err != nil {
 		if err == component.ErrUnauthorized {
 			ctx.Header("WWW-Authenticate", "Basic realm=opencsg-git")
@@ -180,7 +180,7 @@ func (h *GitHTTPHandler) LfsBatch(ctx *gin.Context) {
 		ctx.Set("X-OPENCSG-S3-Internal", true)
 	}
 
-	objectResponse, err := h.gitHttp.BuildObjectResponse(ctx, batchRequest, isUpload)
+	objectResponse, err := h.gitHttp.BuildObjectResponse(ctx.Request.Context(), batchRequest, isUpload)
 	if err != nil {
 		if errors.Is(err, component.ErrUnauthorized) {
 			ctx.Header("WWW-Authenticate", "Basic realm=opencsg-git")
@@ -216,7 +216,7 @@ func (h *GitHTTPHandler) LfsUpload(ctx *gin.Context) {
 	uploadRequest.RepoType = types.RepositoryType(ctx.GetString("repo_type"))
 	uploadRequest.CurrentUser = httpbase.GetCurrentUser(ctx)
 
-	err = h.gitHttp.LfsUpload(ctx, ctx.Request.Body, uploadRequest)
+	err = h.gitHttp.LfsUpload(ctx.Request.Context(), ctx.Request.Body, uploadRequest)
 	if err != nil {
 		httpbase.ServerError(ctx, err)
 		return
@@ -245,7 +245,7 @@ func (h *GitHTTPHandler) LfsDownload(ctx *gin.Context) {
 		ctx.Set("X-OPENCSG-S3-Internal", true)
 	}
 
-	url, err := h.gitHttp.LfsDownload(ctx, downloadRequest)
+	url, err := h.gitHttp.LfsDownload(ctx.Request.Context(), downloadRequest)
 	if err != nil {
 		httpbase.ServerError(ctx, err)
 		return
@@ -269,7 +269,7 @@ func (h *GitHTTPHandler) LfsVerify(ctx *gin.Context) {
 	verifyRequest.RepoType = types.RepositoryType(ctx.GetString("repo_type"))
 	verifyRequest.CurrentUser = httpbase.GetCurrentUser(ctx)
 
-	err := h.gitHttp.LfsVerify(ctx, verifyRequest, pointer)
+	err := h.gitHttp.LfsVerify(ctx.Request.Context(), verifyRequest, pointer)
 	if err != nil {
 		slog.Error("Bad request format", "error", err)
 		httpbase.BadRequest(ctx, err.Error())
@@ -312,7 +312,7 @@ func (h *GitHTTPHandler) ListLocks(ctx *gin.Context) {
 	}
 	req.Limit = limit
 
-	res, err := h.gitHttp.ListLocks(ctx, req)
+	res, err := h.gitHttp.ListLocks(ctx.Request.Context(), req)
 	if err != nil {
 		if errors.Is(err, component.ErrUnauthorized) {
 			ctx.Header("WWW-Authenticate", "Basic realm=opencsg-git")
@@ -344,7 +344,7 @@ func (h *GitHTTPHandler) CreateLock(ctx *gin.Context) {
 	req.RepoType = types.RepositoryType(ctx.GetString("repo_type"))
 	req.CurrentUser = httpbase.GetCurrentUser(ctx)
 
-	lock, err := h.gitHttp.CreateLock(ctx, req)
+	lock, err := h.gitHttp.CreateLock(ctx.Request.Context(), req)
 	if err != nil {
 		if errors.Is(err, component.ErrAlreadyExists) {
 			ctx.PureJSON(http.StatusConflict, types.LFSLockError{
@@ -413,7 +413,7 @@ func (h *GitHTTPHandler) VerifyLock(ctx *gin.Context) {
 	}
 	req.Limit = limit
 
-	res, err := h.gitHttp.VerifyLock(ctx, req)
+	res, err := h.gitHttp.VerifyLock(ctx.Request.Context(), req)
 	if err != nil {
 		slog.Error("Bad request format", "error", err)
 		ctx.PureJSON(http.StatusInternalServerError, types.LFSLockError{
@@ -452,7 +452,7 @@ func (h *GitHTTPHandler) UnLock(ctx *gin.Context) {
 	req.RepoType = types.RepositoryType(ctx.GetString("repo_type"))
 	req.CurrentUser = httpbase.GetCurrentUser(ctx)
 
-	lock, err = h.gitHttp.UnLock(ctx, req)
+	lock, err = h.gitHttp.UnLock(ctx.Request.Context(), req)
 	if err != nil {
 		if errors.Is(err, component.ErrUnauthorized) {
 			ctx.Header("WWW-Authenticate", "Basic realm=opencsg-git")

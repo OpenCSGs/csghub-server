@@ -52,7 +52,7 @@ func (h *MirrorSourceHandler) Create(ctx *gin.Context) {
 	}
 
 	msReq.CurrentUser = currentUser
-	ms, err := h.mirrorSource.Create(ctx, msReq)
+	ms, err := h.mirrorSource.Create(ctx.Request.Context(), msReq)
 	if err != nil {
 		slog.Error("Failed to create mirror source", "error", err)
 		httpbase.ServerError(ctx, err)
@@ -77,7 +77,7 @@ func (h *MirrorSourceHandler) Index(ctx *gin.Context) {
 		httpbase.UnauthorizedError(ctx, component.ErrUserNotFound)
 		return
 	}
-	ms, err := h.mirrorSource.Index(ctx, currentUser)
+	ms, err := h.mirrorSource.Index(ctx.Request.Context(), currentUser)
 	if err != nil {
 		slog.Error("Failed to get mirror sources", "error", err)
 		httpbase.ServerError(ctx, err)
@@ -127,7 +127,7 @@ func (h *MirrorSourceHandler) Update(ctx *gin.Context) {
 	}
 	msReq.ID = msId
 	msReq.CurrentUser = currentUser
-	ms, err := h.mirrorSource.Update(ctx, msReq)
+	ms, err := h.mirrorSource.Update(ctx.Request.Context(), msReq)
 	if err != nil {
 		slog.Error("Failed to get mirror sources", "error", err)
 		httpbase.ServerError(ctx, err)
@@ -169,7 +169,7 @@ func (h *MirrorSourceHandler) Get(ctx *gin.Context) {
 		return
 	}
 
-	ms, err := h.mirrorSource.Get(ctx, msId, currentUser)
+	ms, err := h.mirrorSource.Get(ctx.Request.Context(), msId, currentUser)
 	if err != nil {
 		slog.Error("Failed to get mirror source", "error", err)
 		httpbase.ServerError(ctx, err)
@@ -211,7 +211,7 @@ func (h *MirrorSourceHandler) Delete(ctx *gin.Context) {
 		return
 	}
 
-	err = h.mirrorSource.Delete(ctx, msId, currentUser)
+	err = h.mirrorSource.Delete(ctx.Request.Context(), msId, currentUser)
 	if err != nil {
 		slog.Error("Failed to delete mirror source", "error", err)
 		httpbase.ServerError(ctx, err)

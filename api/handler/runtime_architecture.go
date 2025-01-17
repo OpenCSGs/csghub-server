@@ -53,7 +53,7 @@ func (r *RuntimeArchitectureHandler) ListByRuntimeFrameworkID(ctx *gin.Context) 
 		httpbase.BadRequest(ctx, "invalid runtime framework ID format")
 		return
 	}
-	resp, err := r.runtimeArch.ListByRuntimeFrameworkID(ctx, id)
+	resp, err := r.runtimeArch.ListByRuntimeFrameworkID(ctx.Request.Context(), id)
 	if err != nil {
 		slog.Error("fail to list runtime architectures", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
@@ -90,7 +90,7 @@ func (r *RuntimeArchitectureHandler) UpdateArchitecture(ctx *gin.Context) {
 		return
 	}
 
-	res, err := r.runtimeArch.SetArchitectures(ctx, id, req.Architectures)
+	res, err := r.runtimeArch.SetArchitectures(ctx.Request.Context(), id, req.Architectures)
 	if err != nil {
 		slog.Error("Failed to set architectures", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
@@ -128,7 +128,7 @@ func (r *RuntimeArchitectureHandler) DeleteArchitecture(ctx *gin.Context) {
 		return
 	}
 
-	list, err := r.runtimeArch.DeleteArchitectures(ctx, id, req.Architectures)
+	list, err := r.runtimeArch.DeleteArchitectures(ctx.Request.Context(), id, req.Architectures)
 	if err != nil {
 		slog.Error("Failed to delete architectures", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
@@ -181,7 +181,7 @@ func (r *RuntimeArchitectureHandler) ScanArchitecture(ctx *gin.Context) {
 		return
 	}
 
-	err = r.runtimeArch.ScanArchitecture(ctx, id, scanType, req.Models)
+	err = r.runtimeArch.ScanArchitecture(ctx.Request.Context(), id, scanType, req.Models)
 	if err != nil {
 		slog.Error("Failed to scan architecture", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)

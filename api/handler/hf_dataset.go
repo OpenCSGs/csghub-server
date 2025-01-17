@@ -60,7 +60,7 @@ func (h *HFDatasetHandler) DatasetPathsInfo(ctx *gin.Context) {
 	req.CurrentUser = currentUser
 	slog.Debug("Received req for dataset paths info", slog.Any("req", req))
 
-	res, err := h.dc.GetPathsInfo(ctx, req)
+	res, err := h.dc.GetPathsInfo(ctx.Request.Context(), req)
 	if err != nil {
 		slog.Error("fail to get dataset paths info", slog.Any("req", req), slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
@@ -88,7 +88,7 @@ func (h *HFDatasetHandler) DatasetTree(ctx *gin.Context) {
 	req.CurrentUser = currentUser
 	slog.Debug("received req for tree", slog.Any("req", req))
 
-	tree, err := h.dc.GetDatasetTree(ctx, req)
+	tree, err := h.dc.GetDatasetTree(ctx.Request.Context(), req)
 	if err != nil {
 		slog.Error("fail to get dataset tree", slog.Any("req", req), slog.Any("error", err))
 		httpbase.ServerError(ctx, err)

@@ -26,3 +26,6 @@ local.toml
 */*/_api_test/
 redis/dump.rdb
 run_server_local.sh
+
+**/loki-data/
+**/tempo-data/

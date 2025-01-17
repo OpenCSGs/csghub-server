@@ -1,0 +1,44 @@
+server:
+  http_listen_port: 3200
+  grpc_listen_port: 3201
+
+distributor:
+  receivers:
+    otlp:
+      protocols:
+        grpc:
+          endpoint: "tempo:4317"
+        http:
+          endpoint: "tempo:4318"
+
+storage:
+  trace:
+    backend: local
+    wal:
+      path: /data/tempo/wal
+    local:
+      path: /data/tempo/blocks
+
+compactor:
+  compaction:
+    block_retention: 72h
+      
+metrics_generator:
+  processor:
+    local_blocks:
+      filter_server_spans: false
+    span_metrics:
+      dimensions:
+        - service_name
+        - operation
+        - status_code
+  traces_storage:
+    path: /data/tempo/generator/traces
+  storage:
+    path: /data/tempo/generator/wal
+    remote_write:
+      - url: http://prometheus:9090/api/v1/write
+        send_exemplars: true
+
+overrides:
+  metrics_generator_processors: [service-graphs, local-blocks, span-metrics]

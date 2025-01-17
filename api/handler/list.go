@@ -51,7 +51,7 @@ func (h *ListHandler) ListModelsByPath(ctx *gin.Context) {
 		return
 	}
 
-	resp, err := h.c.ListModelsByPath(ctx, &listTrendingReq)
+	resp, err := h.c.ListModelsByPath(ctx.Request.Context(), &listTrendingReq)
 	if err != nil {
 		slog.Error("Failed to update dataset", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
@@ -80,7 +80,7 @@ func (h *ListHandler) ListDatasetsByPath(ctx *gin.Context) {
 		return
 	}
 
-	resp, err := h.c.ListDatasetsByPath(ctx, &listTrendingReq)
+	resp, err := h.c.ListDatasetsByPath(ctx.Request.Context(), &listTrendingReq)
 	if err != nil {
 		slog.Error("Failed to update dataset", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
@@ -107,7 +107,7 @@ func (h *ListHandler) ListSpacesByPath(ctx *gin.Context) {
 		return
 	}
 
-	resp, err := h.sc.ListByPath(ctx, listTrendingReq.Paths)
+	resp, err := h.sc.ListByPath(ctx.Request.Context(), listTrendingReq.Paths)
 	if err != nil {
 		httpbase.ServerError(ctx, err)
 		return
