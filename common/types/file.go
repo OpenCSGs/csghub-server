@@ -105,6 +105,28 @@ type GetFileReq struct {
 	CurrentUser string `json:"current_user"`
 }
 
+type GetTreeRequest struct {
+	Namespace   string         `json:"namespace"`
+	Name        string         `json:"name"`
+	Ref         string         `json:"ref"`
+	Path        string         `json:"path"`
+	RepoType    RepositoryType `json:"repo_type"`
+	Limit       int            `json:"limit"`
+	Cursor      string         `json:"cursor"`
+	CurrentUser string         `json:"current_user"`
+}
+
+type GetLogsTreeRequest struct {
+	Namespace   string         `json:"namespace"`
+	Name        string         `json:"name"`
+	Ref         string         `json:"ref"`
+	Path        string         `json:"path"`
+	RepoType    RepositoryType `json:"repo_type"`
+	Limit       int            `json:"limit"`
+	Offset      int            `json:"offset"`
+	CurrentUser string         `json:"current_user"`
+}
+
 type GetBranchesReq struct {
 	Namespace   string `json:"namespace"`
 	Name        string `json:"name"`
@@ -166,3 +188,19 @@ type LFSPointer struct {
 	Data     string `json:"data"`
 	FileSize int64  `json:"file_size"`
 }
+
+type GetRepoFileTreeResp struct {
+	Files  []*File
+	Cursor string
+}
+
+type FilePreviewCode int
+
+const (
+	// allow to preview, by default
+	FilePreviewCodeNormal FilePreviewCode = iota
+	// dont allow to preview because file size is too large
+	FilePreviewCodeTooLarge
+	// dont allow to preview because file content is not text
+	FilePreviewCodeNotText
+)

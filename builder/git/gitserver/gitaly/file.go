@@ -8,6 +8,7 @@ import (
 	"io"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"time"
 
 	"gitlab.com/gitlab-org/gitaly/v16/proto/go/gitalypb"
@@ -141,14 +142,7 @@ func (c *Client) CreateRepoFile(req *types.CreateFileReq) (err error) {
 	if req.NewBranch == "" {
 		req.NewBranch = req.Branch
 	}
-	conn, err := grpc.NewClient(
-		c.config.GitalyServer.Address,
-		grpc.WithTransportCredentials(insecure.NewCredentials()),
-	)
-	if err != nil {
-		return err
-	}
-	defer conn.Close()
+
 	ctx, cancel := context.WithTimeout(ctx, timeoutTime)
 	defer cancel()
 	userCommitFilesClient, err := c.operationClient.UserCommitFiles(ctx)
@@ -227,14 +221,7 @@ func (c *Client) CreateRepoFile(req *types.CreateFileReq) (err error) {
 func (c *Client) UpdateRepoFile(req *types.UpdateFileReq) (err error) {
 	ctx := context.Background()
 	repoType := fmt.Sprintf("%ss", string(req.RepoType))
-	conn, err := grpc.NewClient(
-		c.config.GitalyServer.Address,
-		grpc.WithTransportCredentials(insecure.NewCredentials()),
-	)
-	if err != nil {
-		return err
-	}
-	defer conn.Close()
+
 	ctx, cancel := context.WithTimeout(ctx, timeoutTime)
 	defer cancel()
 	userCommitFilesClient, err := c.operationClient.UserCommitFiles(ctx)
@@ -383,6 +370,68 @@ func (c *Client) DeleteRepoFile(req *types.DeleteFileReq) (err error) {
 	return err
 }
 
+func (c *Client) getBlobInfo(ctx context.Context, repo *gitalypb.Repository, paths []*gitalypb.GetBlobsRequest_RevisionPath) ([]*types.File, error) {
+
+	var files []*types.File
+	listBlobsReq := &gitalypb.GetBlobsRequest{
+		Repository:    repo,
+		RevisionPaths: paths,
+		Limit:         0,
+	}
+
+	listBlobsStream, err := c.blobClient.GetBlobs(ctx, listBlobsReq)
+	if err != nil {
+		return nil, err
+	}
+	for {
+		listBlobResp, err := listBlobsStream.Recv()
+		if err != nil {
+			if err == io.EOF {
+				break
+			}
+			return nil, err
+		}
+		if listBlobResp != nil {
+			var (
+				fileType        string
+				fileSize        int64
+				isLfs           bool
+				lfsPointerSize  int
+				LfsRelativePath string
+			)
+			filename := filepath.Base(string(listBlobResp.Path))
+			if listBlobResp.Type == gitalypb.ObjectType_BLOB {
+				fileType = "file"
+			} else {
+				fileType = "dir"
+			}
+			fileSize = listBlobResp.Size
+			if listBlobResp.Size <= 1024 {
+				p, _ := ReadPointerFromBuffer(listBlobResp.Data)
+				if p.Valid() {
+					fileSize = p.Size
+					isLfs = true
+					LfsRelativePath = p.RelativePath()
+					lfsPointerSize = int(listBlobResp.Size)
+				}
+			}
+			file := &types.File{
+				Name:            filename,
+				Type:            fileType,
+				Size:            fileSize,
+				Lfs:             isLfs,
+				Path:            string(listBlobResp.Path),
+				Mode:            strconv.Itoa(int(listBlobResp.Mode)),
+				SHA:             listBlobResp.Oid,
+				LfsPointerSize:  lfsPointerSize,
+				LfsRelativePath: LfsRelativePath,
+			}
+			files = append(files, file)
+		}
+	}
+	return files, nil
+}
+
 func (c *Client) GetRepoFileTree(ctx context.Context, req gitserver.GetRepoInfoByPathReq) ([]*types.File, error) {
 	var files []*types.File
 	repoType := fmt.Sprintf("%ss", string(req.RepoType))
@@ -512,6 +561,141 @@ func (c *Client) GetRepoFileTree(ctx context.Context, req gitserver.GetRepoInfoB
 	}
 
 	return files, nil
+}
+
+func (c *Client) GetTree(ctx context.Context, req types.GetTreeRequest) (*types.GetRepoFileTreeResp, error) {
+	repoType := fmt.Sprintf("%ss", string(req.RepoType))
+	ctx, cancel := context.WithTimeout(ctx, time.Second*3)
+	defer cancel()
+
+	req.Path = strings.TrimPrefix(req.Path, "/")
+
+	if req.Path == "" || req.Path == "/" {
+		req.Path = "."
+	}
+
+	if req.Ref == "" {
+		req.Ref = "main"
+	}
+	repository := &gitalypb.Repository{
+		StorageName:  c.config.GitalyServer.Storge,
+		RelativePath: BuildRelativePath(repoType, req.Namespace, req.Name),
+	}
+
+	var revisionPaths []*gitalypb.GetBlobsRequest_RevisionPath
+
+	gitalyReq := &gitalypb.GetTreeEntriesRequest{
+		Repository: repository,
+		Revision:   []byte(req.Ref),
+		Path:       []byte(req.Path),
+		Sort:       gitalypb.GetTreeEntriesRequest_TREES_FIRST,
+		PaginationParams: &gitalypb.PaginationParameter{
+			PageToken: req.Cursor,
+			Limit:     int32(req.Limit),
+		},
+	}
+	treeStream, err := c.commitClient.GetTreeEntries(ctx, gitalyReq)
+	if err != nil {
+		return nil, err
+	}
+	cursor := ""
+	for {
+		treeEntries, err := treeStream.Recv()
+		if err != nil {
+			if err == io.EOF {
+				break
+			}
+		}
+		if treeEntries == nil {
+			return nil, errors.New("bad request")
+		}
+		cursor = treeEntries.PaginationCursor.GetNextCursor()
+		entries := treeEntries.Entries
+		if len(entries) > 0 {
+			for _, e := range entries {
+				revisionPaths = append(revisionPaths, &gitalypb.GetBlobsRequest_RevisionPath{
+					Revision: req.Ref,
+					Path:     e.Path,
+				})
+			}
+		}
+	}
+
+	files, err := c.getBlobInfo(ctx, repository, revisionPaths)
+	if err != nil {
+		return nil, err
+	}
+	return &types.GetRepoFileTreeResp{
+		Files:  files,
+		Cursor: cursor,
+	}, nil
+}
+
+func (c *Client) GetLogsTree(ctx context.Context, req types.GetLogsTreeRequest) (*types.LogsTreeResp, error) {
+	var resp []*types.CommitForTree
+	repoType := fmt.Sprintf("%ss", string(req.RepoType))
+	ctx, cancel := context.WithTimeout(ctx, time.Second*3)
+	defer cancel()
+
+	req.Path = strings.TrimPrefix(req.Path, "/")
+
+	if req.Ref == "" {
+		req.Ref = "main"
+	}
+	if !strings.HasSuffix(req.Path, "/") {
+		req.Path += "/"
+	}
+	repository := &gitalypb.Repository{
+		StorageName:  c.config.GitalyServer.Storge,
+		RelativePath: BuildRelativePath(repoType, req.Namespace, req.Name),
+	}
+
+	gitalyReq := &gitalypb.ListLastCommitsForTreeRequest{
+		Repository: repository,
+		Revision:   req.Ref,
+		Path:       []byte(req.Path),
+		Offset:     int32(req.Offset),
+		Limit:      int32(req.Limit),
+	}
+	commitStream, err := c.commitClient.ListLastCommitsForTree(ctx, gitalyReq)
+	if err != nil {
+		return nil, err
+	}
+	for {
+		commitResp, err := commitStream.Recv()
+		if err != nil {
+			if err == io.EOF {
+				break
+			}
+		}
+		if commitResp == nil {
+			return nil, errors.New("bad request")
+		}
+		commits := commitResp.Commits
+		if len(commits) > 0 {
+			for _, c := range commits {
+				commit := c.Commit
+				if commit == nil {
+					continue
+				}
+				resp = append(resp, &types.CommitForTree{
+					Name:           filepath.Base(string(c.PathBytes)),
+					Path:           string(c.PathBytes),
+					ID:             commit.Id,
+					CommitterName:  string(commit.Committer.Name),
+					CommitterEmail: string(commit.Committer.Email),
+					CommitterDate:  commit.Committer.Date.AsTime().Format(time.RFC3339),
+					CreatedAt:      commit.Committer.Date.AsTime().Format(time.RFC3339),
+					Message:        string(commit.Subject),
+					AuthorName:     string(commit.Author.Name),
+					AuthorEmail:    string(commit.Author.Email),
+					AuthoredDate:   commit.Author.Date.AsTime().Format(time.RFC3339),
+				})
+			}
+		}
+	}
+	return &types.LogsTreeResp{Commits: resp}, nil
+
 }
 
 func (c *Client) GetRepoAllFiles(ctx context.Context, req gitserver.GetRepoAllFilesReq) ([]*types.File, error) {

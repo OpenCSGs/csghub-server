@@ -151,6 +151,7 @@ func NewTestRepoComponent(config *config.Config, stores *tests.MockStores, rpcUs
 		spaceResourceStore:     stores.SpaceResource,
 		mq:                     mq,
 		mirrorServer:           mirrorServer,
+		fileStore:              stores.File,
 	}
 }
 

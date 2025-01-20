@@ -154,3 +154,14 @@ packages:
     config:
     interfaces:
       Importer:
+  gitlab.com/gitlab-org/gitaly/v16/proto/go/gitalypb:
+    config:
+    interfaces:
+      RepositoryServiceClient:
+      CommitServiceClient:
+      BlobServiceClient:
+      RefServiceClient:
+      DiffServiceClient:
+      OperationServiceClient:
+      SmartHTTPServiceClient:
+      RemoteServiceClient:

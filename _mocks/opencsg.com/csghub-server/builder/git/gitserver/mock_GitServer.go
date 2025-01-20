@@ -866,6 +866,65 @@ func (_c *MockGitServer_GetDiffBetweenTwoCommits_Call) RunAndReturn(run func(con
 	return _c
 }
 
+// GetLogsTree provides a mock function with given fields: ctx, req
+func (_m *MockGitServer) GetLogsTree(ctx context.Context, req types.GetLogsTreeRequest) (*types.LogsTreeResp, error) {
+	ret := _m.Called(ctx, req)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetLogsTree")
+	}
+
+	var r0 *types.LogsTreeResp
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, types.GetLogsTreeRequest) (*types.LogsTreeResp, error)); ok {
+		return rf(ctx, req)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, types.GetLogsTreeRequest) *types.LogsTreeResp); ok {
+		r0 = rf(ctx, req)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*types.LogsTreeResp)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, types.GetLogsTreeRequest) error); ok {
+		r1 = rf(ctx, req)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockGitServer_GetLogsTree_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetLogsTree'
+type MockGitServer_GetLogsTree_Call struct {
+	*mock.Call
+}
+
+// GetLogsTree is a helper method to define mock.On call
+//   - ctx context.Context
+//   - req types.GetLogsTreeRequest
+func (_e *MockGitServer_Expecter) GetLogsTree(ctx interface{}, req interface{}) *MockGitServer_GetLogsTree_Call {
+	return &MockGitServer_GetLogsTree_Call{Call: _e.mock.On("GetLogsTree", ctx, req)}
+}
+
+func (_c *MockGitServer_GetLogsTree_Call) Run(run func(ctx context.Context, req types.GetLogsTreeRequest)) *MockGitServer_GetLogsTree_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(types.GetLogsTreeRequest))
+	})
+	return _c
+}
+
+func (_c *MockGitServer_GetLogsTree_Call) Return(_a0 *types.LogsTreeResp, _a1 error) *MockGitServer_GetLogsTree_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockGitServer_GetLogsTree_Call) RunAndReturn(run func(context.Context, types.GetLogsTreeRequest) (*types.LogsTreeResp, error)) *MockGitServer_GetLogsTree_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // GetMirrorTaskInfo provides a mock function with given fields: ctx, taskId
 func (_m *MockGitServer) GetMirrorTaskInfo(ctx context.Context, taskId int64) (*gitserver.MirrorTaskInfo, error) {
 	ret := _m.Called(ctx, taskId)
@@ -1643,6 +1702,65 @@ func (_c *MockGitServer_GetSingleCommit_Call) Return(_a0 *types.CommitResponse, 
 }
 
 func (_c *MockGitServer_GetSingleCommit_Call) RunAndReturn(run func(context.Context, gitserver.GetRepoLastCommitReq) (*types.CommitResponse, error)) *MockGitServer_GetSingleCommit_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// GetTree provides a mock function with given fields: ctx, req
+func (_m *MockGitServer) GetTree(ctx context.Context, req types.GetTreeRequest) (*types.GetRepoFileTreeResp, error) {
+	ret := _m.Called(ctx, req)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetTree")
+	}
+
+	var r0 *types.GetRepoFileTreeResp
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, types.GetTreeRequest) (*types.GetRepoFileTreeResp, error)); ok {
+		return rf(ctx, req)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, types.GetTreeRequest) *types.GetRepoFileTreeResp); ok {
+		r0 = rf(ctx, req)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*types.GetRepoFileTreeResp)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, types.GetTreeRequest) error); ok {
+		r1 = rf(ctx, req)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockGitServer_GetTree_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetTree'
+type MockGitServer_GetTree_Call struct {
+	*mock.Call
+}
+
+// GetTree is a helper method to define mock.On call
+//   - ctx context.Context
+//   - req types.GetTreeRequest
+func (_e *MockGitServer_Expecter) GetTree(ctx interface{}, req interface{}) *MockGitServer_GetTree_Call {
+	return &MockGitServer_GetTree_Call{Call: _e.mock.On("GetTree", ctx, req)}
+}
+
+func (_c *MockGitServer_GetTree_Call) Run(run func(ctx context.Context, req types.GetTreeRequest)) *MockGitServer_GetTree_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(types.GetTreeRequest))
+	})
+	return _c
+}
+
+func (_c *MockGitServer_GetTree_Call) Return(_a0 *types.GetRepoFileTreeResp, _a1 error) *MockGitServer_GetTree_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockGitServer_GetTree_Call) RunAndReturn(run func(context.Context, types.GetTreeRequest) (*types.GetRepoFileTreeResp, error)) *MockGitServer_GetTree_Call {
 	_c.Call.Return(run)
 	return _c
 }

@@ -12,6 +12,20 @@ type Commit struct {
 	AuthoredDate   string `json:"authored_date"`
 }
 
+type CommitForTree struct {
+	Name           string `json:"name"`
+	Path           string `json:"path"`
+	ID             string `json:"id"`
+	CommitterName  string `json:"committer_name"`
+	CommitterEmail string `json:"committer_email"`
+	CommitterDate  string `json:"committer_date"`
+	CreatedAt      string `json:"created_at"`
+	Message        string `json:"message"`
+	AuthorName     string `json:"author_name"`
+	AuthorEmail    string `json:"author_email"`
+	AuthoredDate   string `json:"authored_date"`
+}
+
 type CommitMeta struct {
 	SHA string `json:"sha"`
 }
@@ -28,4 +42,8 @@ type CommitResponse struct {
 	Parents []*CommitMeta `json:"parents"`
 	Diff    []byte        `json:"diff"`
 	Stats   *CommitStats  `json:"stats"`
+}
+
+type LogsTreeResp struct {
+	Commits []*CommitForTree
 }

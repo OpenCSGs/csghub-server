@@ -1813,3 +1813,230 @@ func TestRepoComponent_AllowReadAccessRepo(t *testing.T) {
 		require.False(t, allow)
 	})
 }
+
+func TestRepoComponent_TreeV2(t *testing.T) {
+	{
+		t.Run("can read self-owned", func(t *testing.T) {
+			ctx := context.TODO()
+			repoComp := initializeTestRepoComponent(ctx, t)
+
+			user := database.User{}
+			user.Username = "user_name"
+			repoComp.mocks.stores.UserMock().EXPECT().FindByUsername(mock.Anything, user.Username).Return(user, nil)
+
+			ns := database.Namespace{}
+			ns.NamespaceType = "user"
+			ns.Path = "user_name"
+			repoComp.mocks.stores.NamespaceMock().EXPECT().FindByPath(mock.Anything, ns.Path).Return(ns, nil)
+
+			repo := &database.Repository{
+				Private: true,
+				User:    user,
+				Path:    fmt.Sprintf("%s/%s", ns.Path, "repo_name"),
+				Source:  types.LocalSource,
+			}
+			repoComp.mocks.stores.RepoMock().EXPECT().FindByPath(mock.Anything, types.ModelRepo, ns.Path, repo.Name).Return(repo, nil)
+
+			tree := &types.GetRepoFileTreeResp{}
+			req := &types.GetTreeRequest{
+				Namespace:   ns.Path,
+				Name:        repo.Name,
+				Path:        "go",
+				RepoType:    types.ModelRepo,
+				CurrentUser: user.Username,
+				Limit:       100,
+				Cursor:      "cc",
+			}
+			repoComp.mocks.gitServer.EXPECT().GetTree(mock.Anything, *req).Return(tree, nil)
+
+			actualTree, err := repoComp.TreeV2(context.Background(), req)
+			require.Nil(t, err)
+			require.Equal(t, tree, actualTree)
+
+		})
+
+		t.Run("forbidden anoymous user to read private repo", func(t *testing.T) {
+			ctx := context.TODO()
+			repoComp := initializeTestRepoComponent(ctx, t)
+
+			repoComp.mocks.stores.RepoMock().EXPECT().FindByPath(mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&database.Repository{
+				// private repo don't allow read from other user
+				Private: true,
+			}, nil)
+
+			actualTree, err := repoComp.TreeV2(context.Background(), &types.GetTreeRequest{})
+			require.Nil(t, actualTree)
+			require.Equal(t, err, ErrForbidden)
+
+		})
+	}
+
+}
+
+func TestRepoComponent_TreeV2Remote(t *testing.T) {
+	ctx := context.TODO()
+	repoComp := initializeTestRepoComponent(ctx, t)
+
+	user := database.User{}
+	user.Username = "user_name"
+	repoComp.mocks.stores.UserMock().EXPECT().FindByUsername(mock.Anything, user.Username).Return(user, nil)
+
+	ns := database.Namespace{}
+	ns.NamespaceType = "user"
+	ns.Path = "user_name"
+	repoComp.mocks.stores.NamespaceMock().EXPECT().FindByPath(mock.Anything, ns.Path).Return(ns, nil)
+
+	repo := &database.Repository{
+		ID:      1,
+		Private: true,
+		User:    user,
+		Path:    fmt.Sprintf("%s/%s", ns.Path, "repo_name"),
+		Source:  types.OpenCSGSource,
+	}
+	repoComp.mocks.stores.RepoMock().EXPECT().FindByPath(mock.Anything, types.ModelRepo, ns.Path, repo.Name).Return(repo, nil)
+	repoComp.mocks.stores.MirrorMock().EXPECT().FindByRepoID(ctx, int64(1)).Return(nil, sql.ErrNoRows)
+	repoComp.mocks.stores.FileMock().EXPECT().FindByParentPath(
+		ctx, int64(1), "go", &types.OffsetPagination{Limit: 1, Offset: 0},
+	).Return([]database.File{{Name: "f1"}}, nil)
+	repoComp.mocks.stores.FileMock().EXPECT().FindByParentPath(
+		ctx, int64(1), "go", &types.OffsetPagination{Limit: 1, Offset: 1},
+	).Return([]database.File{{Name: "f2"}}, nil)
+	repoComp.mocks.stores.FileMock().EXPECT().FindByParentPath(
+		ctx, int64(1), "go", &types.OffsetPagination{Limit: 1, Offset: 2},
+	).Return([]database.File{}, nil)
+
+	req := &types.GetTreeRequest{
+		Namespace:   ns.Path,
+		Name:        repo.Name,
+		Path:        "go",
+		RepoType:    types.ModelRepo,
+		CurrentUser: user.Username,
+		Limit:       1,
+	}
+
+	files := []*types.File{}
+	for {
+		tree, err := repoComp.TreeV2(ctx, req)
+		require.Nil(t, err)
+		req.Cursor = tree.Cursor
+		files = append(files, tree.Files...)
+		if tree.Cursor == "" {
+			break
+		}
+	}
+	require.Equal(t, []*types.File{{Name: "f1"}, {Name: "f2"}}, files)
+}
+
+func TestRepoComponent_LogsTree(t *testing.T) {
+	{
+		t.Run("can read self-owned", func(t *testing.T) {
+			ctx := context.TODO()
+			repoComp := initializeTestRepoComponent(ctx, t)
+
+			user := database.User{}
+			user.Username = "user_name"
+			repoComp.mocks.stores.UserMock().EXPECT().FindByUsername(mock.Anything, user.Username).Return(user, nil)
+
+			ns := database.Namespace{}
+			ns.NamespaceType = "user"
+			ns.Path = "user_name"
+			repoComp.mocks.stores.NamespaceMock().EXPECT().FindByPath(mock.Anything, ns.Path).Return(ns, nil)
+
+			repo := &database.Repository{
+				Private: true,
+				User:    user,
+				Path:    fmt.Sprintf("%s/%s", ns.Path, "repo_name"),
+				Source:  types.LocalSource,
+			}
+			repoComp.mocks.stores.RepoMock().EXPECT().FindByPath(mock.Anything, types.ModelRepo, ns.Path, repo.Name).Return(repo, nil)
+
+			tree := &types.LogsTreeResp{}
+			req := &types.GetLogsTreeRequest{
+				Namespace:   ns.Path,
+				Name:        repo.Name,
+				Path:        "go",
+				RepoType:    types.ModelRepo,
+				CurrentUser: user.Username,
+				Limit:       10,
+				Offset:      5,
+			}
+			repoComp.mocks.gitServer.EXPECT().GetLogsTree(mock.Anything, *req).Return(tree, nil)
+
+			actualTree, err := repoComp.LogsTree(context.Background(), req)
+			require.Nil(t, err)
+			require.Equal(t, tree, actualTree)
+
+		})
+
+		t.Run("forbidden anoymous user to read private repo", func(t *testing.T) {
+			ctx := context.TODO()
+			repoComp := initializeTestRepoComponent(ctx, t)
+
+			repoComp.mocks.stores.RepoMock().EXPECT().FindByPath(mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&database.Repository{
+				// private repo don't allow read from other user
+				Private: true,
+			}, nil)
+
+			actualTree, err := repoComp.LogsTree(context.Background(), &types.GetLogsTreeRequest{})
+			require.Nil(t, actualTree)
+			require.Equal(t, err, ErrForbidden)
+
+		})
+	}
+
+}
+
+func TestRepoComponent_LogsTreeRemote(t *testing.T) {
+	ctx := context.TODO()
+	repoComp := initializeTestRepoComponent(ctx, t)
+
+	user := database.User{}
+	user.Username = "user_name"
+	repoComp.mocks.stores.UserMock().EXPECT().FindByUsername(mock.Anything, user.Username).Return(user, nil)
+
+	ns := database.Namespace{}
+	ns.NamespaceType = "user"
+	ns.Path = "user_name"
+	repoComp.mocks.stores.NamespaceMock().EXPECT().FindByPath(mock.Anything, ns.Path).Return(ns, nil)
+
+	repo := &database.Repository{
+		ID:      1,
+		Private: true,
+		User:    user,
+		Path:    fmt.Sprintf("%s/%s", ns.Path, "repo_name"),
+		Source:  types.OpenCSGSource,
+	}
+	repoComp.mocks.stores.RepoMock().EXPECT().FindByPath(mock.Anything, types.ModelRepo, ns.Path, repo.Name).Return(repo, nil)
+	repoComp.mocks.stores.MirrorMock().EXPECT().FindByRepoID(ctx, int64(1)).Return(nil, sql.ErrNoRows)
+	repoComp.mocks.stores.FileMock().EXPECT().FindByParentPath(
+		ctx, int64(1), "go", &types.OffsetPagination{Limit: 1, Offset: 0},
+	).Return([]database.File{{LastCommitMessage: "m1"}}, nil)
+	repoComp.mocks.stores.FileMock().EXPECT().FindByParentPath(
+		ctx, int64(1), "go", &types.OffsetPagination{Limit: 1, Offset: 1},
+	).Return([]database.File{{LastCommitMessage: "m2"}}, nil)
+	repoComp.mocks.stores.FileMock().EXPECT().FindByParentPath(
+		ctx, int64(1), "go", &types.OffsetPagination{Limit: 1, Offset: 2},
+	).Return([]database.File{}, nil)
+
+	req := &types.GetLogsTreeRequest{
+		Namespace:   ns.Path,
+		Name:        repo.Name,
+		Path:        "go",
+		RepoType:    types.ModelRepo,
+		CurrentUser: user.Username,
+		Limit:       1,
+		Offset:      0,
+	}
+
+	commits := []*types.CommitForTree{}
+	for {
+		tree, err := repoComp.LogsTree(ctx, req)
+		require.Nil(t, err)
+		commits = append(commits, tree.Commits...)
+		if len(tree.Commits) == 0 {
+			break
+		}
+		req.Offset += 1
+	}
+	require.Equal(t, []*types.CommitForTree{{Message: "m1"}, {Message: "m2"}}, commits)
+}

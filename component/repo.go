@@ -19,6 +19,7 @@ import (
 	"time"
 
 	"github.com/minio/minio-go/v7"
+	"github.com/spf13/cast"
 	"opencsg.com/csghub-server/builder/deploy"
 	deployStatus "opencsg.com/csghub-server/builder/deploy/common"
 	"opencsg.com/csghub-server/builder/git"
@@ -39,6 +40,10 @@ const (
 	ErrGetContentsOrList  = "GetContentsOrList"
 	AdminSecret           = "gnuRYKce"
 	GitAttributesFileName = ".gitattributes"
+	DefaultTreeLimit      = 500
+	MaxTreeLimit          = 10000
+	DefaultLogTreeLimit   = 25
+	MaxLogTreeLimit       = 100
 )
 
 type repoComponentImpl struct {
@@ -93,6 +98,8 @@ type RepoComponent interface {
 	Tags(ctx context.Context, req *types.GetTagsReq) ([]database.Tag, error)
 	UpdateTags(ctx context.Context, namespace, name string, repoType types.RepositoryType, category, currentUser string, tags []string) error
 	Tree(ctx context.Context, req *types.GetFileReq) ([]*types.File, error)
+	TreeV2(ctx context.Context, req *types.GetTreeRequest) (*types.GetRepoFileTreeResp, error)
+	LogsTree(ctx context.Context, req *types.GetLogsTreeRequest) (*types.LogsTreeResp, error)
 	UploadFile(ctx context.Context, req *types.CreateFileReq) error
 	SDKListFiles(ctx context.Context, repoType types.RepositoryType, namespace, name, ref, userName string) (*types.SDKFiles, error)
 	IsLfs(ctx context.Context, req *types.GetFileReq) (bool, int64, error)
@@ -1092,7 +1099,7 @@ func (c *repoComponentImpl) Tree(ctx context.Context, req *types.GetFileReq) ([]
 				if req.Path == "" {
 					req.Path = "/"
 				}
-				files, err := c.fileStore.FindByParentPath(ctx, repo.ID, req.Path)
+				files, err := c.fileStore.FindByParentPath(ctx, repo.ID, req.Path, nil)
 				if err != nil {
 					if errors.Is(err, sql.ErrNoRows) {
 						return []*types.File{}, nil
@@ -1127,6 +1134,160 @@ func (c *repoComponentImpl) Tree(ctx context.Context, req *types.GetFileReq) ([]
 		RepoType:  req.RepoType,
 	}
 	tree, err := c.git.GetRepoFileTree(ctx, getRepoFileTree)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get git %s repository file tree, error: %w", req.RepoType, err)
+	}
+	return tree, nil
+}
+
+func (c *repoComponentImpl) TreeV2(ctx context.Context, req *types.GetTreeRequest) (*types.GetRepoFileTreeResp, error) {
+	repo, err := c.repoStore.FindByPath(ctx, req.RepoType, req.Namespace, req.Name)
+	if err != nil {
+		return nil, fmt.Errorf("failed to find repo, error: %w", err)
+	}
+	if repo == nil {
+		return nil, fmt.Errorf("repo does not exist, error: %w", err)
+	}
+
+	permission, err := c.GetUserRepoPermission(ctx, req.CurrentUser, repo)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get user repo permission, error: %w", err)
+	}
+	if !permission.CanRead {
+		return nil, ErrForbidden
+	}
+
+	if req.Limit == 0 {
+		req.Limit = DefaultTreeLimit
+	} else if req.Limit > MaxTreeLimit {
+		req.Limit = MaxTreeLimit
+	}
+
+	if repo.Source != types.LocalSource {
+		_, err := c.mirrorStore.FindByRepoID(ctx, repo.ID)
+		if err != nil {
+			if errors.Is(err, sql.ErrNoRows) {
+				if req.Path == "" {
+					req.Path = "/"
+				}
+
+				offset := 0
+				if req.Cursor != "" {
+					r, err := base64.StdEncoding.DecodeString(req.Cursor)
+					if err == nil {
+						offset = cast.ToInt(string(r))
+					}
+				}
+				files, err := c.fileStore.FindByParentPath(
+					ctx, repo.ID, req.Path, &types.OffsetPagination{
+						Limit:  req.Limit,
+						Offset: offset,
+					},
+				)
+				if err != nil {
+					if errors.Is(err, sql.ErrNoRows) {
+						return nil, nil
+					} else {
+						return nil, err
+					}
+				}
+				var resFiles []*types.File
+				for _, f := range files {
+					resFiles = append(resFiles, &types.File{
+						Name: f.Name,
+						Path: f.Path,
+						Size: f.Size,
+						Commit: types.Commit{
+							Message:       f.LastCommitMessage,
+							CommitterDate: f.LastCommitDate,
+						},
+					})
+				}
+
+				cursor := ""
+				if len(files) == req.Limit {
+					cursor = base64.StdEncoding.EncodeToString(
+						[]byte(cast.ToString(offset + req.Limit)),
+					)
+				}
+				return &types.GetRepoFileTreeResp{
+					Files:  resFiles,
+					Cursor: cursor,
+				}, nil
+			}
+		}
+	}
+	if req.Ref == "" {
+		req.Ref = repo.DefaultBranch
+	}
+	tree, err := c.git.GetTree(ctx, *req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get git %s repository file tree, error: %w", req.RepoType, err)
+	}
+	return tree, nil
+}
+
+func (c *repoComponentImpl) LogsTree(ctx context.Context, req *types.GetLogsTreeRequest) (*types.LogsTreeResp, error) {
+	repo, err := c.repoStore.FindByPath(ctx, req.RepoType, req.Namespace, req.Name)
+	if err != nil {
+		return nil, fmt.Errorf("failed to find repo, error: %w", err)
+	}
+	if repo == nil {
+		return nil, fmt.Errorf("repo does not exist, error: %w", err)
+	}
+
+	permission, err := c.GetUserRepoPermission(ctx, req.CurrentUser, repo)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get user repo permission, error: %w", err)
+	}
+	if !permission.CanRead {
+		return nil, ErrForbidden
+	}
+
+	if req.Limit == 0 {
+		req.Limit = DefaultLogTreeLimit
+	} else if req.Limit > MaxLogTreeLimit {
+		req.Limit = MaxLogTreeLimit
+	}
+
+	if repo.Source != types.LocalSource {
+		_, err := c.mirrorStore.FindByRepoID(ctx, repo.ID)
+		if err != nil {
+			if errors.Is(err, sql.ErrNoRows) {
+				if req.Path == "" {
+					req.Path = "/"
+				}
+				files, err := c.fileStore.FindByParentPath(
+					ctx, repo.ID, req.Path, &types.OffsetPagination{
+						Offset: req.Offset,
+						Limit:  req.Limit,
+					},
+				)
+				if err != nil {
+					if errors.Is(err, sql.ErrNoRows) {
+						return nil, nil
+					} else {
+						return nil, err
+					}
+				}
+				var commits []*types.CommitForTree
+				for _, f := range files {
+					commits = append(commits, &types.CommitForTree{
+						Message:       f.LastCommitMessage,
+						CommitterDate: f.LastCommitDate,
+					})
+				}
+				return &types.LogsTreeResp{
+					Commits: commits,
+				}, nil
+			}
+		}
+	}
+	if req.Ref == "" {
+		req.Ref = repo.DefaultBranch
+	}
+
+	tree, err := c.git.GetLogsTree(ctx, *req)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get git %s repository file tree, error: %w", req.RepoType, err)
 	}
