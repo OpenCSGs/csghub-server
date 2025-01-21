@@ -9,6 +9,8 @@ var REPOCARD_FILENAME = "README.md"
 type RepositoryType string
 type RepositorySource string
 type RepositorySyncStatus string
+type PipelineTask string
+
 type SensitiveCheckStatus int
 
 // String returns a string representation of the sensitive check status.
@@ -65,6 +67,10 @@ const (
 
 	ReadmeFileName        = "README.md"
 	GitAttributesFileName = ".gitattributes"
+
+	TextGeneration    PipelineTask = "text-generation"
+	Text2Image        PipelineTask = "text-to-image"
+	TaskAutoDetection PipelineTask = "task-auto-detection"
 )
 
 type RepoRequest struct {
@@ -125,6 +131,7 @@ type DeployRepo struct {
 	UserID           int64      `json:"user_id,omitempty"`
 	ModelID          int64      `json:"repo_model_id,omitempty"` // for URM code logic
 	RepoID           int64      `json:"repository_id,omitempty"`
+	Provider         string     `json:"provider,omitempty"`
 	RuntimeFramework string     `json:"runtime_framework,omitempty"`
 	ContainerPort    int        `json:"container_port,omitempty"`
 	Annotation       string     `json:"annotation,omitempty"`
@@ -147,6 +154,7 @@ type DeployRepo struct {
 	SKU              string     `json:"sku,omitempty"`
 	ResourceType     string     `json:"resource_type,omitempty"`
 	RepoTag          string     `json:"repo_tag,omitempty"`
+	Task             string     `json:"task,omitempty"`
 }
 
 type RuntimeFrameworkReq struct {
@@ -172,7 +180,10 @@ type RuntimeFramework struct {
 }
 
 type RuntimeFrameworkModels struct {
-	Models []string `json:"models"`
+	Models   []string     `json:"models"`
+	ID       int64        `json:"id"`
+	ScanType int          `json:"scan_type"`
+	Task     PipelineTask `json:"task"`
 }
 
 type RepoFilter struct {
@@ -197,4 +208,5 @@ type ScanReq struct {
 	FrameType int
 	ArchMap   map[string]string
 	Models    []string
+	Task      PipelineTask
 }

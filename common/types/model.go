@@ -214,6 +214,8 @@ type ModelRunReq struct {
 	MaxReplica         int    `json:"max_replica"`
 	Revision           string `json:"revision"`
 	SecureLevel        int    `json:"secure_level"`
+	OrderDetailID      int64  `json:"order_detail_id"`
+	Task               string `json:"task"`
 }
 
 var _ SensitiveRequestV2 = (*ModelRunReq)(nil)

@@ -6,7 +6,10 @@ import (
 	"strconv"
 
 	"github.com/gin-gonic/gin"
+	"go.temporal.io/sdk/client"
 	"opencsg.com/csghub-server/api/httpbase"
+	"opencsg.com/csghub-server/api/workflow"
+	"opencsg.com/csghub-server/builder/temporal"
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/types"
 	"opencsg.com/csghub-server/component"
@@ -23,14 +26,16 @@ func NewRuntimeArchitectureHandler(config *config.Config) (*RuntimeArchitectureH
 	}
 
 	return &RuntimeArchitectureHandler{
-		repo:        nrc,
-		runtimeArch: nrac,
+		repo:           nrc,
+		runtimeArch:    nrac,
+		temporalClient: temporal.GetClient(),
 	}, nil
 }
 
 type RuntimeArchitectureHandler struct {
-	repo        component.RepoComponent
-	runtimeArch component.RuntimeArchitectureComponent
+	repo           component.RepoComponent
+	runtimeArch    component.RuntimeArchitectureComponent
+	temporalClient temporal.Client
 }
 
 // GetArchitectures godoc
@@ -147,6 +152,7 @@ func (r *RuntimeArchitectureHandler) DeleteArchitecture(ctx *gin.Context) {
 // @Produce      json
 // @Param        id path int true "runtime framework id"
 // @Param 		 scan_type query int false "scan_type(0:all models, 1:new models, 2:old models)" Enums(0, 1, 2)
+// @Param        task query string false "task" Enums(text-generation, text-to-image)
 // @Param        body body types.RuntimeFrameworkModels true "body"
 // @Success      200  {object}  types.Response{} "OK"
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
@@ -172,16 +178,30 @@ func (r *RuntimeArchitectureHandler) ScanArchitecture(ctx *gin.Context) {
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
-
-	var req types.RuntimeFrameworkModels
-	err = ctx.ShouldBindJSON(&req)
-	if err != nil {
-		slog.Error("Failed to bind json", slog.Any("error", err))
-		httpbase.BadRequest(ctx, err.Error())
-		return
+	req := types.RuntimeFrameworkModels{}
+	contentLength := ctx.GetHeader("Content-Length")
+	if contentLength != "0" {
+		err := ctx.ShouldBindJSON(&req)
+		if err != nil {
+			slog.Error("Failed to bind json", slog.Any("error", err))
+			httpbase.BadRequest(ctx, err.Error())
+			return
+		}
 	}
 
-	err = r.runtimeArch.ScanArchitecture(ctx.Request.Context(), id, scanType, req.Models)
+	taskStr := ctx.Query("task")
+	req.Task = types.PipelineTask(taskStr)
+	req.ID = id
+	req.ScanType = scanType
+
+	//start workflow to do full scaning
+	workflowOptions := client.StartWorkflowOptions{
+		TaskQueue: workflow.HandlePushQueueName,
+	}
+
+	_, err = r.temporalClient.ExecuteWorkflow(
+		ctx.Request.Context(), workflowOptions, workflow.RuntimeFrameworkWorkflow, req,
+	)
 	if err != nil {
 		slog.Error("Failed to scan architecture", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)

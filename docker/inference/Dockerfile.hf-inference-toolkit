@@ -1,0 +1,55 @@
+FROM nvidia/cuda:12.1.0-devel-ubuntu22.04
+SHELL ["/bin/bash", "-c"]
+
+LABEL maintainer="opencsg"
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Install required dependencies
+RUN apt-get update && \
+    apt-get install software-properties-common -y && \
+    add-apt-repository ppa:deadsnakes/ppa && \
+    apt-get install -y \
+    build-essential \
+    bzip2 \
+    curl \
+    git \
+    git-lfs \
+    tar \
+    gcc \
+    g++ \
+    cmake \
+    libprotobuf-dev \
+    protobuf-compiler \
+    python3.11 \
+    python3.11-dev \
+    libsndfile1-dev \
+    dumb-init \
+    ffmpeg && \
+    rm -rf /var/lib/apt/lists/*
+
+# Set Python 3.11 as the default python version
+RUN update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.11 1 && \
+    ln -sf /usr/bin/python3.11 /usr/bin/python
+
+# Install pip from source
+RUN curl -O https://bootstrap.pypa.io/get-pip.py && \
+    python get-pip.py && \
+    rm get-pip.py
+
+# Hugging Face Inference Toolkit
+WORKDIR /etc/csghub
+RUN pip config set global.index-url https://pypi.tuna.tsinghua.edu.cn/simple
+RUN git clone --depth 1 https://gitee.com/xzgan/huggingface-inference-toolkit.git --branch 0.5.3 --single-branch && \
+    cd huggingface-inference-toolkit && pip install --no-cache-dir -e ".[torch,diffusers,st]" && \
+    mkdir -p /workspace && cp src/huggingface_inference_toolkit/webservice_starlette.py /workspace/ 
+
+RUN pip install --no-cache-dir csghub-sdk==0.4.7
+
+# copy entrypoint and change permissions
+COPY --chmod=0755 ./hf-inference-toolkit/ /etc/csghub/
+
+WORKDIR /workspace/
+EXPOSE 8000
+ENTRYPOINT [ "/usr/bin/dumb-init", "--" ]
+CMD ["/etc/csghub/entrypoint.sh"]

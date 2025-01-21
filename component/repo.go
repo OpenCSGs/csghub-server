@@ -2216,6 +2216,7 @@ func (c *repoComponentImpl) ListDeploy(ctx context.Context, repoType types.Repos
 			SecureLevel:      deploy.SecureLevel,
 			CreatedAt:        deploy.CreatedAt,
 			UpdatedAt:        deploy.UpdatedAt,
+			Task:             string(deploy.Task),
 		})
 	}
 	return resDeploys, nil
@@ -2325,6 +2326,7 @@ func (c *repoComponentImpl) DeployDetail(ctx context.Context, detailReq types.De
 		Path:             repoPath,
 		ProxyEndpoint:    proxyEndPoint,
 		SKU:              deploy.SKU,
+		Task:             string(deploy.Task),
 	}
 
 	return &resDeploy, nil

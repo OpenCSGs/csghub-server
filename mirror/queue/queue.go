@@ -42,7 +42,7 @@ type MirrorTask struct {
 }
 
 type MirrorQueue struct {
-	redis     *cache.Cache
+	redis     cache.RedisClient
 	QueueName string
 }
 

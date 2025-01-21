@@ -7,6 +7,7 @@ CSGHub supports TOML format for config files. When starting any service from the
 ```
 go run cmd/csghub-server/main.go start server --config local.toml
 go run cmd/csghub-server/main.go deploy runner --config local.toml
+go run cmd/csghub-server/main.go mirror repo-sync --config common/config/test.toml
 ```
 
 We provide an [example config file](common/config/config.toml.example), you can rename it, modify as needed and use. All available configurations are defined in [this Go file](common/config/config.go). The TOML configuration uses snake_case naming convention, and names automatically map to corresponding struct field names.

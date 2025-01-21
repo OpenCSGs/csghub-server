@@ -126,7 +126,7 @@ func TestGitCallbackComponent_UpdateRepoInfos(t *testing.T) {
 	gc.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, types.ModelRepo, "ns", "n").Return(
 		&database.Repository{ID: 1, Path: "foo/bar"}, nil,
 	)
-	gc.mocks.runtimeArchComponent.EXPECT().GetArchitectureFromConfig(ctx, "ns", "n").Return("foo", nil)
+	gc.mocks.runtimeArchComponent.EXPECT().GetArchitecture(ctx, types.TaskAutoDetection, &database.Repository{ID: 1, Path: "foo/bar"}).Return("foo", nil)
 	gc.mocks.stores.TagMock().EXPECT().GetTagsByScopeAndCategories(
 		ctx, database.ModelTagScope, []string{"runtime_framework", "resource"},
 	).Return([]*database.Tag{{Name: "t1"}}, nil)

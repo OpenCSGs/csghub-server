@@ -132,6 +132,7 @@ func (d *deployer) dedicatedDeploy(ctx context.Context, dr types.DeployRepo) (*d
 		Type:             dr.Type,
 		UserUUID:         dr.UserUUID,
 		SKU:              dr.SKU,
+		Task:             types.PipelineTask(dr.Task),
 	}
 	updateDatabaseDeploy(deploy, dr)
 	err := d.deployTaskStore.CreateDeploy(ctx, deploy)

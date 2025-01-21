@@ -464,7 +464,7 @@ func (c *gitCallbackComponentImpl) updateModelRuntimeFrameworks(ctx context.Cont
 		}
 		return
 	}
-	arch, err := c.runtimeArchComponent.GetArchitectureFromConfig(ctx, namespace, repoName)
+	arch, err := c.runtimeArchComponent.GetArchitecture(ctx, types.TaskAutoDetection, repo)
 	if err != nil {
 		slog.Warn("fail to get config.json content for git callback", slog.Any("namespace", namespace), slog.Any("repoName", repoName), slog.Any("error", err))
 		return
@@ -546,4 +546,20 @@ func (c *gitCallbackComponentImpl) updateModelRuntimeFrameworks(ctx context.Cont
 		}
 	}
 
+}
+
+// check if the repo is valid for runtime framework
+func (c *gitCallbackComponentImpl) isValidForRuntime(repoType, ref, fileName string) bool {
+	if repoType != fmt.Sprintf("%ss", types.ModelRepo) {
+		return false
+	}
+	if fileName != component.ConfigFileName && fileName != component.ModelIndexFileName {
+		return false
+	}
+
+	if !strings.Contains(ref, component.MainBranch) && !strings.Contains(ref, component.MasterBranch) {
+		return false
+	}
+
+	return true
 }

@@ -55,7 +55,7 @@ type RepoStore interface {
 	UpdateOrCreateRepo(ctx context.Context, input Repository) (*Repository, error)
 	UpdateLicenseByTag(ctx context.Context, repoID int64) error
 	CountByRepoType(ctx context.Context, repoType types.RepositoryType) (int, error)
-	GetRepoWithoutRuntimeByID(ctx context.Context, rfID int64, paths []string) ([]Repository, error)
+	GetRepoWithoutRuntimeByID(ctx context.Context, rfID int64, paths []string, batchSize, batch int) ([]Repository, error)
 	GetRepoWithRuntimeByID(ctx context.Context, rfID int64, paths []string) ([]Repository, error)
 	BatchGet(ctx context.Context, repoType types.RepositoryType, lastRepoID int64, batch int) ([]Repository, error)
 	FindWithBatch(ctx context.Context, batchSize, batch int, repoTypes ...types.RepositoryType) ([]Repository, error)
@@ -643,14 +643,17 @@ func (s *repoStoreImpl) CountByRepoType(ctx context.Context, repoType types.Repo
 	return s.db.Core.NewSelect().Model(&Repository{}).Where("repository_type = ?", repoType).Count(ctx)
 }
 
-func (s *repoStoreImpl) GetRepoWithoutRuntimeByID(ctx context.Context, rfID int64, paths []string) ([]Repository, error) {
+func (s *repoStoreImpl) GetRepoWithoutRuntimeByID(ctx context.Context, rfID int64, paths []string, batchSize, batch int) ([]Repository, error) {
 	var res []Repository
 	q := s.db.Operator.Core.NewSelect().Model(&res)
 	if len(paths) > 0 {
 		q.Where("path in (?)", bun.In(paths))
 	}
-	err := q.Where("repository_type = ?", types.ModelRepo).
-		Where("id not in (select repo_id from repositories_runtime_frameworks where runtime_framework_id = ?)", rfID).
+	q.Where("repository_type = ?", types.ModelRepo).
+		Where("id not in (select repo_id from repositories_runtime_frameworks where runtime_framework_id = ?)", rfID)
+	err := q.Order("id desc").
+		Limit(batchSize).
+		Offset(batchSize * batch).
 		Scan(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("select repos without runtime failed, %w", err)

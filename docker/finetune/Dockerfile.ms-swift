@@ -55,8 +55,6 @@ RUN mkdir -p /root/.jupyter/lab/user-settings/@jupyterlab/apputils-extension && 
 #fix gradio proxy issue
 RUN pip uninstall -y gradio && pip install https://opencsg-public-resource.oss-cn-beijing.aliyuncs.com/csghub/gradio/gradio-5.1.0-py3-none-any.whl
 
-#install flash-attn
-RUN pip install --no-build-isolation --no-cache-dir ninja flash-attn
 
 # Create a working directory
 WORKDIR /workspace/

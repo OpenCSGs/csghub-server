@@ -523,6 +523,7 @@ func (c *modelComponentImpl) GetServerless(ctx context.Context, namespace, name,
 		CreatedAt:        deploy.CreatedAt,
 		UpdatedAt:        deploy.UpdatedAt,
 		ProxyEndpoint:    endpoint,
+		Task:             string(deploy.Task),
 	}
 	return &resDeploy, nil
 }
@@ -968,6 +969,7 @@ func (c *modelComponentImpl) Deploy(ctx context.Context, deployReq types.DeployA
 		Type:             deployReq.DeployType,
 		UserUUID:         user.UUID,
 		SKU:              strconv.FormatInt(resource.ID, 10),
+		Task:             req.Task,
 	}
 	dp = modelRunUpdateDeployRepo(dp, req)
 	return c.deployer.Deploy(ctx, dp)
