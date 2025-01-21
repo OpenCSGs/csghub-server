@@ -195,11 +195,11 @@ func TestSpaceHandler_Status(t *testing.T) {
 	})
 	tester.handler.spaceStatusCheckInterval = 0
 
+	cc, cancel := context.WithCancel(tester.gctx.Request.Context())
+	tester.gctx.Request = tester.gctx.Request.WithContext(cc)
 	tester.mocks.repo.EXPECT().AllowReadAccess(
-		tester.ctx, types.SpaceRepo, "u", "r", "u",
+		tester.gctx.Request.Context(), types.SpaceRepo, "u", "r", "u",
 	).Return(true, nil)
-	cc, cancel := context.WithCancel(tester.ctx.Request.Context())
-	tester.ctx.Request = tester.ctx.Request.WithContext(cc)
 	tester.mocks.space.EXPECT().Status(
 		mock.Anything, "u", "r",
 	).Return("", "s1", nil).Once()
@@ -229,15 +229,15 @@ func TestSpaceHandler_Logs(t *testing.T) {
 		return h.Logs
 	})
 
+	cc, cancel := context.WithCancel(tester.gctx.Request.Context())
+	tester.gctx.Request = tester.gctx.Request.WithContext(cc)
 	tester.mocks.repo.EXPECT().AllowReadAccess(
-		tester.ctx, types.SpaceRepo, "u", "r", "u",
+		tester.gctx.Request.Context(), types.SpaceRepo, "u", "r", "u",
 	).Return(true, nil)
 	runlogChan := make(chan string)
 	tester.mocks.space.EXPECT().Logs(
 		mock.Anything, "u", "r",
 	).Return(deploy.NewMultiLogReader(nil, runlogChan), nil)
-	cc, cancel := context.WithCancel(tester.ctx.Request.Context())
-	tester.ctx.Request = tester.ctx.Request.WithContext(cc)
 	go func() {
 		runlogChan <- "foo"
 		runlogChan <- "bar"

@@ -90,7 +90,7 @@ func (h *SpaceHandler) Index(ctx *gin.Context) {
 		return
 	}
 
-	spaces, total, err := h.space.Index(ctx, filter, per, page)
+	spaces, total, err := h.space.Index(ctx.Request.Context(), filter, per, page)
 	if err != nil {
 		slog.Error("Failed to get spaces", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
@@ -124,7 +124,7 @@ func (h *SpaceHandler) Show(ctx *gin.Context) {
 		return
 	}
 	currentUser := httpbase.GetCurrentUser(ctx)
-	detail, err := h.space.Show(ctx, namespace, name, currentUser)
+	detail, err := h.space.Show(ctx.Request.Context(), namespace, name, currentUser)
 	if err != nil {
 		if errors.Is(err, component.ErrUnauthorized) {
 			httpbase.UnauthorizedError(ctx, err)
@@ -163,7 +163,7 @@ func (h *SpaceHandler) Create(ctx *gin.Context) {
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
-	_, err := h.sensitive.CheckRequestV2(ctx, &req)
+	_, err := h.sensitive.CheckRequestV2(ctx.Request.Context(), &req)
 	if err != nil {
 		slog.Error("failed to check sensitive request", slog.Any("error", err))
 		httpbase.BadRequest(ctx, fmt.Errorf("sensitive check failed: %w", err).Error())
@@ -171,7 +171,7 @@ func (h *SpaceHandler) Create(ctx *gin.Context) {
 	}
 	req.Username = currentUser
 
-	space, err := h.space.Create(ctx, req)
+	space, err := h.space.Create(ctx.Request.Context(), req)
 	if err != nil {
 		slog.Error("Failed to create space", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
@@ -208,7 +208,7 @@ func (h *SpaceHandler) Update(ctx *gin.Context) {
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
-	_, err := h.sensitive.CheckRequestV2(ctx, req)
+	_, err := h.sensitive.CheckRequestV2(ctx.Request.Context(), req)
 	if err != nil {
 		slog.Error("failed to check sensitive request", slog.Any("error", err))
 		httpbase.BadRequest(ctx, fmt.Errorf("sensitive check failed: %w", err).Error())
@@ -225,7 +225,7 @@ func (h *SpaceHandler) Update(ctx *gin.Context) {
 	req.Namespace = namespace
 	req.Name = name
 
-	space, err := h.space.Update(ctx, req)
+	space, err := h.space.Update(ctx.Request.Context(), req)
 	if err != nil {
 		slog.Error("Failed to update space", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
@@ -262,7 +262,7 @@ func (h *SpaceHandler) Delete(ctx *gin.Context) {
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
-	err = h.space.Delete(ctx, namespace, name, currentUser)
+	err = h.space.Delete(ctx.Request.Context(), namespace, name, currentUser)
 	if err != nil {
 		slog.Error("Failed to delete space", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
@@ -297,7 +297,7 @@ func (h *SpaceHandler) Run(ctx *gin.Context) {
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
-	allow, err := h.repo.AllowAdminAccess(ctx, types.SpaceRepo, namespace, name, currentUser)
+	allow, err := h.repo.AllowAdminAccess(ctx.Request.Context(), types.SpaceRepo, namespace, name, currentUser)
 	if err != nil {
 		slog.Error("failed to check user permission", "error", err)
 		httpbase.ServerError(ctx, errors.New("failed to check user permission"))
@@ -309,7 +309,7 @@ func (h *SpaceHandler) Run(ctx *gin.Context) {
 		httpbase.UnauthorizedError(ctx, errors.New("user not allowed to run sapce"))
 		return
 	}
-	deployID, err := h.space.Deploy(ctx, namespace, name, currentUser)
+	deployID, err := h.space.Deploy(ctx.Request.Context(), namespace, name, currentUser)
 	if err != nil {
 		slog.Error("failed to deploy space", slog.String("namespace", namespace),
 			slog.String("name", name), slog.Any("error", err))
@@ -340,7 +340,7 @@ func (h *SpaceHandler) Wakeup(ctx *gin.Context) {
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
-	err = h.space.Wakeup(ctx, namespace, name)
+	err = h.space.Wakeup(ctx.Request.Context(), namespace, name)
 	if err != nil {
 		slog.Error("failed to wakeup space", slog.String("namespace", namespace),
 			slog.String("name", name), slog.Any("error", err))
@@ -375,7 +375,7 @@ func (h *SpaceHandler) Stop(ctx *gin.Context) {
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
-	allow, err := h.repo.AllowAdminAccess(ctx, types.SpaceRepo, namespace, name, currentUser)
+	allow, err := h.repo.AllowAdminAccess(ctx.Request.Context(), types.SpaceRepo, namespace, name, currentUser)
 	if err != nil {
 		slog.Error("failed to check user permission", "error", err)
 		httpbase.ServerError(ctx, errors.New("failed to check user permission"))
@@ -388,7 +388,7 @@ func (h *SpaceHandler) Stop(ctx *gin.Context) {
 		return
 	}
 
-	err = h.space.Stop(ctx, namespace, name, false)
+	err = h.space.Stop(ctx.Request.Context(), namespace, name, false)
 	if err != nil {
 		slog.Error("failed to stop space", slog.String("namespace", namespace),
 			slog.String("name", name), slog.Any("error", err))
@@ -427,7 +427,7 @@ func (h *SpaceHandler) Status(ctx *gin.Context) {
 	}
 
 	currentUser := httpbase.GetCurrentUser(ctx)
-	allow, err := h.repo.AllowReadAccess(ctx, types.SpaceRepo, namespace, name, currentUser)
+	allow, err := h.repo.AllowReadAccess(ctx.Request.Context(), types.SpaceRepo, namespace, name, currentUser)
 	if err != nil {
 		slog.Error("failed to check user permission", "error", err)
 		httpbase.ServerError(ctx, errors.New("failed to check user permission"))
@@ -524,7 +524,7 @@ func (h *SpaceHandler) Logs(ctx *gin.Context) {
 	}
 
 	currentUser := httpbase.GetCurrentUser(ctx)
-	allow, err := h.repo.AllowReadAccess(ctx, types.SpaceRepo, namespace, name, currentUser)
+	allow, err := h.repo.AllowReadAccess(ctx.Request.Context(), types.SpaceRepo, namespace, name, currentUser)
 	if err != nil {
 		slog.Error("failed to check user permission", "error", err)
 		httpbase.ServerError(ctx, errors.New("failed to check user permission"))

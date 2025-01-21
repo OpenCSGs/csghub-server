@@ -862,8 +862,8 @@ func TestRepoHandler_DeployInstanceLogs(t *testing.T) {
 			InstanceName: "ii",
 		},
 	).Return(deploy.NewMultiLogReader(nil, runlogChan), nil)
-	cc, cancel := context.WithCancel(tester.ctx.Request.Context())
-	tester.ctx.Request = tester.ctx.Request.WithContext(cc)
+	cc, cancel := context.WithCancel(tester.gctx.Request.Context())
+	tester.gctx.Request = tester.gctx.Request.WithContext(cc)
 	go func() {
 		runlogChan <- "foo"
 		runlogChan <- "bar"
@@ -894,8 +894,10 @@ func TestRepoHandler_DeployStatus(t *testing.T) {
 
 	tester.WithKV("repo_type", types.ModelRepo)
 	tester.WithParam("id", "1")
+	cc, cancel := context.WithCancel(tester.gctx.Request.Context())
+	tester.gctx.Request = tester.gctx.Request.WithContext(cc)
 	tester.mocks.repo.EXPECT().AllowAccessDeploy(
-		tester.ctx, types.DeployActReq{
+		tester.gctx.Request.Context(), types.DeployActReq{
 			RepoType:    types.ModelRepo,
 			Namespace:   "u",
 			Name:        "r",
@@ -904,8 +906,6 @@ func TestRepoHandler_DeployStatus(t *testing.T) {
 			DeployType:  types.InferenceType,
 		},
 	).Return(true, nil)
-	cc, cancel := context.WithCancel(tester.ctx.Request.Context())
-	tester.ctx.Request = tester.ctx.Request.WithContext(cc)
 	tester.mocks.repo.EXPECT().DeployStatus(
 		mock.Anything, types.ModelRepo, "u", "r", int64(1),
 	).Return("", "s1", []types.Instance{{Name: "i1"}}, nil).Once()
@@ -1056,8 +1056,8 @@ func TestRepoHandler_ServerlessLogs(t *testing.T) {
 			InstanceName: "ii",
 		},
 	).Return(deploy.NewMultiLogReader(nil, runlogChan), nil)
-	cc, cancel := context.WithCancel(tester.ctx.Request.Context())
-	tester.ctx.Request = tester.ctx.Request.WithContext(cc)
+	cc, cancel := context.WithCancel(tester.gctx.Request.Context())
+	tester.gctx.Request = tester.gctx.Request.WithContext(cc)
 	go func() {
 		runlogChan <- "foo"
 		runlogChan <- "bar"
@@ -1088,8 +1088,10 @@ func TestRepoHandler_ServerlessStatus(t *testing.T) {
 
 	tester.WithKV("repo_type", types.ModelRepo)
 	tester.WithParam("id", "1")
+	cc, cancel := context.WithCancel(tester.gctx.Request.Context())
+	tester.gctx.Request = tester.gctx.Request.WithContext(cc)
 	tester.mocks.repo.EXPECT().AllowAccessDeploy(
-		tester.ctx, types.DeployActReq{
+		tester.gctx.Request.Context(), types.DeployActReq{
 			RepoType:    types.ModelRepo,
 			Namespace:   "u",
 			Name:        "r",
@@ -1098,8 +1100,6 @@ func TestRepoHandler_ServerlessStatus(t *testing.T) {
 			DeployType:  types.ServerlessType,
 		},
 	).Return(true, nil)
-	cc, cancel := context.WithCancel(tester.ctx.Request.Context())
-	tester.ctx.Request = tester.ctx.Request.WithContext(cc)
 	tester.mocks.repo.EXPECT().DeployStatus(
 		mock.Anything, types.ModelRepo, "u", "r", int64(1),
 	).Return("", "s1", []types.Instance{{Name: "i1"}}, nil).Once()

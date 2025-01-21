@@ -59,14 +59,14 @@ func (h *EvaluationHandler) RunEvaluation(ctx *gin.Context) {
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
-	_, err := h.sensitive.CheckRequestV2(ctx, &req)
+	_, err := h.sensitive.CheckRequestV2(ctx.Request.Context(), &req)
 	if err != nil {
 		slog.Error("failed to check sensitive request", slog.Any("error", err))
 		httpbase.BadRequest(ctx, fmt.Errorf("sensitive check failed: %w", err).Error())
 		return
 	}
 	req.Username = currentUser
-	evaluation, err := h.evaluation.CreateEvaluation(ctx, req)
+	evaluation, err := h.evaluation.CreateEvaluation(ctx.Request.Context(), req)
 	if err != nil {
 		slog.Error("Failed to create evaluation job", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
@@ -101,7 +101,7 @@ func (h *EvaluationHandler) GetEvaluation(ctx *gin.Context) {
 	var req = &types.EvaluationGetReq{}
 	req.ID = id
 	req.Username = currentUser
-	evaluation, err := h.evaluation.GetEvaluation(ctx, *req)
+	evaluation, err := h.evaluation.GetEvaluation(ctx.Request.Context(), *req)
 	if err != nil {
 		slog.Error("Failed to get evaluation job", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
@@ -137,7 +137,7 @@ func (h *EvaluationHandler) DeleteEvaluation(ctx *gin.Context) {
 	var req = &types.EvaluationDelReq{}
 	req.ID = id
 	req.Username = currentUser
-	err = h.evaluation.DeleteEvaluation(ctx, *req)
+	err = h.evaluation.DeleteEvaluation(ctx.Request.Context(), *req)
 	if err != nil {
 		slog.Error("Failed to delete evaluation job", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)

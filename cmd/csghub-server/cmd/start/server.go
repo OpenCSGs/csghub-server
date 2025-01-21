@@ -6,18 +6,14 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
-	"opencsg.com/csghub-server/api/httpbase"
 	"opencsg.com/csghub-server/api/router"
 	"opencsg.com/csghub-server/api/workflow"
 	"opencsg.com/csghub-server/builder/deploy"
 	"opencsg.com/csghub-server/builder/deploy/common"
 	"opencsg.com/csghub-server/builder/event"
 	"opencsg.com/csghub-server/builder/store/database"
-	"opencsg.com/csghub-server/builder/temporal"
 	"opencsg.com/csghub-server/common/config"
-	"opencsg.com/csghub-server/common/types"
 	"opencsg.com/csghub-server/docs"
-	"opencsg.com/csghub-server/mirror"
 )
 
 var enableSwagger bool
@@ -89,30 +85,7 @@ var serverCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		r, err := router.NewRouter(cfg, enableSwagger)
-		if err != nil {
-			return fmt.Errorf("failed to init router: %w", err)
-		}
-
-		server := httpbase.NewGracefulServer(
-			httpbase.GraceServerOpt{
-				Port: cfg.APIServer.Port,
-			},
-			r,
-		)
-
-		// Initialize mirror service
-		mirrorService, err := mirror.NewMirrorPriorityQueue(cfg)
-		if err != nil {
-			return fmt.Errorf("failed to init mirror service: %w", err)
-		}
-
-		if cfg.MirrorServer.Enable && cfg.GitServer.Type == types.GitServerTypeGitaly {
-			mirrorService.EnqueueMirrorTasks()
-		}
-
-		server.Run()
-		temporal.Stop()
+		router.RunServer(cfg, enableSwagger)
 
 		return nil
 	},

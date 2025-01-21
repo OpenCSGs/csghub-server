@@ -13,6 +13,7 @@ import (
 	"github.com/uptrace/bun/driver/pgdriver"
 	"github.com/uptrace/bun/driver/sqliteshim"
 	"github.com/uptrace/bun/extra/bundebug"
+	"github.com/uptrace/bun/extra/bunotel"
 
 	"github.com/uptrace/bun"
 )
@@ -100,6 +101,10 @@ func NewDB(ctx context.Context, config DBConfig) (db *DB, err error) {
 
 	bunDB.AddQueryHook(bundebug.NewQueryHook(
 		bundebug.FromEnv("DB_DEBUG"),
+	))
+	bunDB.AddQueryHook(bunotel.NewQueryHook(
+		bunotel.WithDBName("csghub"),
+		bunotel.WithFormattedQueries(true),
 	))
 
 	err = bunDB.PingContext(ctx)

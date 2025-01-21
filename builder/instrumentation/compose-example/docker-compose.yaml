@@ -1,0 +1,74 @@
+version: '3'
+services:
+  otel-collector:
+    image: otel/opentelemetry-collector:latest
+    volumes:
+      - ./config/otel-collector.yaml:/etc/otel/config.yaml
+    command:
+      - '--config=/etc/otel/config.yaml'
+    ports:
+      - "4317:4317" #grpc
+      - "4318:4318" #http
+    depends_on:
+      - loki
+      - prometheus
+    networks:
+      - grafana
+      
+  loki:
+    image: grafana/loki:main
+    ports:
+      - "3100:3100"
+      - "3101:3101"
+    volumes:
+      - ./config/loki.yaml:/etc/loki/local-config.yaml
+      - ./loki-data:/data
+    command: -config.file=/etc/loki/local-config.yaml
+    networks:
+      - grafana
+      
+  grafana:
+    image: grafana/grafana:latest
+    environment:
+      - GF_AUTH_ANONYMOUS_ORG_ROLE=Admin
+      - GF_AUTH_ANONYMOUS_ENABLED=true
+      - GF_AUTH_BASIC_ENABLED=false
+    ports:
+      - 3000:3000/tcp
+    volumes:
+      - ./grafana:/etc/grafana/provisioning
+    networks:
+      - grafana
+      
+  prometheus:
+    image: prom/prometheus:latest
+    command:
+      - --config.file=/etc/prometheus.yaml
+      - --web.enable-remote-write-receiver
+      - --web.enable-otlp-receiver
+      - --enable-feature=exemplar-storage
+      - --enable-feature=native-histograms
+      - --storage.tsdb.retention.time=3d
+    volumes:
+      - ./config/prometheus.yaml:/etc/prometheus.yaml
+    ports:
+      - "9090:9090"
+    networks:
+      - grafana
+      
+  tempo:
+    image: grafana/tempo:latest
+    command: [ "-config.file=/etc/tempo.yaml" ]
+    volumes:
+      - ./config/tempo.yaml:/etc/tempo.yaml
+      - ./tempo-data:/data
+    ports:
+      - "3200:3200"
+      - "3201:3201"
+    networks:
+      - grafana
+    depends_on:
+      - otel-collector
+    
+networks:
+    grafana:

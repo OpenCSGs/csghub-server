@@ -92,7 +92,7 @@ func (h *ModelHandler) Index(ctx *gin.Context) {
 		return
 	}
 
-	models, total, err := h.model.Index(ctx, filter, per, page, false)
+	models, total, err := h.model.Index(ctx.Request.Context(), filter, per, page, false)
 
 	if err != nil {
 		slog.Error("Failed to get models", slog.Any("error", err))
@@ -134,14 +134,14 @@ func (h *ModelHandler) Create(ctx *gin.Context) {
 	}
 	req.Username = currentUser
 
-	_, err := h.sensitive.CheckRequestV2(ctx, req)
+	_, err := h.sensitive.CheckRequestV2(ctx.Request.Context(), req)
 	if err != nil {
 		slog.Error("failed to check sensitive request", slog.Any("error", err))
 		httpbase.BadRequest(ctx, fmt.Errorf("sensitive check failed: %w", err).Error())
 		return
 	}
 
-	model, err := h.model.Create(ctx, req)
+	model, err := h.model.Create(ctx.Request.Context(), req)
 	if err != nil {
 		slog.Error("Failed to create model", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
@@ -179,7 +179,7 @@ func (h *ModelHandler) Update(ctx *gin.Context) {
 		return
 	}
 
-	_, err := h.sensitive.CheckRequestV2(ctx, req)
+	_, err := h.sensitive.CheckRequestV2(ctx.Request.Context(), req)
 	if err != nil {
 		slog.Error("failed to check sensitive request", slog.Any("error", err))
 		httpbase.BadRequest(ctx, fmt.Errorf("sensitive check failed: %w", err).Error())
@@ -196,7 +196,7 @@ func (h *ModelHandler) Update(ctx *gin.Context) {
 	req.Name = name
 	req.Username = currentUser
 
-	model, err := h.model.Update(ctx, req)
+	model, err := h.model.Update(ctx.Request.Context(), req)
 	if err != nil {
 		slog.Error("Failed to update model", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
@@ -233,7 +233,7 @@ func (h *ModelHandler) Delete(ctx *gin.Context) {
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
-	err = h.model.Delete(ctx, namespace, name, currentUser)
+	err = h.model.Delete(ctx.Request.Context(), namespace, name, currentUser)
 	if err != nil {
 		slog.Error("Failed to delete model", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
@@ -265,7 +265,7 @@ func (h *ModelHandler) Show(ctx *gin.Context) {
 		return
 	}
 	currentUser := httpbase.GetCurrentUser(ctx)
-	detail, err := h.model.Show(ctx, namespace, name, currentUser, false)
+	detail, err := h.model.Show(ctx.Request.Context(), namespace, name, currentUser, false)
 
 	if err != nil {
 		if errors.Is(err, component.ErrUnauthorized) {
@@ -294,7 +294,7 @@ func (h *ModelHandler) SDKModelInfo(ctx *gin.Context) {
 		ref = mappedBranch
 	}
 	currentUser := httpbase.GetCurrentUser(ctx)
-	modelInfo, err := h.model.SDKModelInfo(ctx, namespace, name, ref, currentUser)
+	modelInfo, err := h.model.SDKModelInfo(ctx.Request.Context(), namespace, name, ref, currentUser)
 	if err != nil {
 		if errors.Is(err, component.ErrUnauthorized) {
 			httpbase.UnauthorizedError(ctx, err)
@@ -329,7 +329,7 @@ func (h *ModelHandler) Relations(ctx *gin.Context) {
 		return
 	}
 	currentUser := httpbase.GetCurrentUser(ctx)
-	detail, err := h.model.Relations(ctx, namespace, name, currentUser)
+	detail, err := h.model.Relations(ctx.Request.Context(), namespace, name, currentUser)
 	if err != nil {
 		if errors.Is(err, component.ErrUnauthorized) {
 			httpbase.UnauthorizedError(ctx, err)
@@ -381,7 +381,7 @@ func (h *ModelHandler) SetRelations(ctx *gin.Context) {
 	req.Name = name
 	req.CurrentUser = currentUser
 
-	err = h.model.SetRelationDatasets(ctx, req)
+	err = h.model.SetRelationDatasets(ctx.Request.Context(), req)
 	if err != nil {
 		slog.Error("Failed to set datasets for model", slog.Any("req", req), slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
@@ -428,7 +428,7 @@ func (h *ModelHandler) AddDatasetRelation(ctx *gin.Context) {
 	req.Name = name
 	req.CurrentUser = currentUser
 
-	err = h.model.AddRelationDataset(ctx, req)
+	err = h.model.AddRelationDataset(ctx.Request.Context(), req)
 	if err != nil {
 		slog.Error("Failed to add dataset for model", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
@@ -475,7 +475,7 @@ func (h *ModelHandler) DelDatasetRelation(ctx *gin.Context) {
 	req.Name = name
 	req.CurrentUser = currentUser
 
-	err = h.model.DelRelationDataset(ctx, req)
+	err = h.model.DelRelationDataset(ctx.Request.Context(), req)
 	if err != nil {
 		slog.Error("Failed to delete dataset for model", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
@@ -570,7 +570,7 @@ func (h *ModelHandler) DeployDedicated(ctx *gin.Context) {
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
-	allow, err := h.repo.AllowReadAccess(ctx, types.ModelRepo, namespace, name, currentUser)
+	allow, err := h.repo.AllowReadAccess(ctx.Request.Context(), types.ModelRepo, namespace, name, currentUser)
 	if err != nil {
 		slog.Error("failed to check user permission", "error", err)
 		httpbase.ServerError(ctx, errors.New("failed to check user permission"))
@@ -600,7 +600,7 @@ func (h *ModelHandler) DeployDedicated(ctx *gin.Context) {
 		return
 	}
 
-	_, err = h.sensitive.CheckRequestV2(ctx, &req)
+	_, err = h.sensitive.CheckRequestV2(ctx.Request.Context(), &req)
 	if err != nil {
 		slog.Error("failed to check sensitive request", slog.Any("error", err))
 		httpbase.BadRequest(ctx, fmt.Errorf("sensitive check failed: %w", err).Error())
@@ -613,7 +613,7 @@ func (h *ModelHandler) DeployDedicated(ctx *gin.Context) {
 		CurrentUser: currentUser,
 		DeployType:  types.InferenceType,
 	}
-	deployID, err := h.model.Deploy(ctx, epReq, req)
+	deployID, err := h.model.Deploy(ctx.Request.Context(), epReq, req)
 	if err != nil {
 		slog.Error("failed to deploy model as inference", slog.String("namespace", namespace),
 			slog.String("name", name), slog.Any("currentUser", currentUser), slog.Any("req", req), slog.Any("error", err))
@@ -657,7 +657,7 @@ func (h *ModelHandler) FinetuneCreate(ctx *gin.Context) {
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
-	allow, err := h.repo.AllowAdminAccess(ctx, types.ModelRepo, namespace, name, currentUser)
+	allow, err := h.repo.AllowAdminAccess(ctx.Request.Context(), types.ModelRepo, namespace, name, currentUser)
 	if err != nil {
 		slog.Error("failed to check user permission", "error", err)
 		httpbase.ServerError(ctx, errors.New("failed to check user permission"))
@@ -695,7 +695,7 @@ func (h *ModelHandler) FinetuneCreate(ctx *gin.Context) {
 		DeployType:  types.FinetuneType,
 	}
 
-	deployID, err := h.model.Deploy(ctx, ftReq, *modelReq)
+	deployID, err := h.model.Deploy(ctx.Request.Context(), ftReq, *modelReq)
 	if err != nil {
 		slog.Error("failed to deploy model as notebook instance", slog.String("namespace", namespace),
 			slog.String("name", name), slog.Any("error", err))
@@ -757,7 +757,7 @@ func (h *ModelHandler) DeployDelete(ctx *gin.Context) {
 		DeployID:    id,
 		DeployType:  types.InferenceType,
 	}
-	err = h.repo.DeleteDeploy(ctx, delReq)
+	err = h.repo.DeleteDeploy(ctx.Request.Context(), delReq)
 	if err != nil {
 		slog.Error("Failed to delete deploy", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
@@ -812,7 +812,7 @@ func (h *ModelHandler) FinetuneDelete(ctx *gin.Context) {
 		DeployID:    id,
 		DeployType:  types.FinetuneType,
 	}
-	err = h.repo.DeleteDeploy(ctx, delReq)
+	err = h.repo.DeleteDeploy(ctx.Request.Context(), delReq)
 	if err != nil {
 		slog.Error("Failed to delete deploy", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
@@ -866,7 +866,7 @@ func (h *ModelHandler) DeployStop(ctx *gin.Context) {
 		DeployID:    id,
 		DeployType:  types.InferenceType,
 	}
-	err = h.repo.DeployStop(ctx, stopReq)
+	err = h.repo.DeployStop(ctx.Request.Context(), stopReq)
 	if err != nil {
 		slog.Error("Failed to stop deploy", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
@@ -922,7 +922,7 @@ func (h *ModelHandler) DeployStart(ctx *gin.Context) {
 		DeployType:  types.InferenceType,
 	}
 
-	err = h.repo.DeployStart(ctx, startReq)
+	err = h.repo.DeployStart(ctx.Request.Context(), startReq)
 	if err != nil {
 		slog.Error("Failed to start deploy", slog.Any("error", err), slog.Any("repoType", types.ModelRepo), slog.String("namespace", namespace), slog.String("name", name), slog.Any("deployID", id))
 		httpbase.ServerError(ctx, err)
@@ -977,7 +977,7 @@ func (h *ModelHandler) ListByRuntimeFrameworkID(ctx *gin.Context) {
 		return
 	}
 
-	models, total, err := h.model.ListModelsByRuntimeFrameworkID(ctx, currentUser, per, page, id, deployType)
+	models, total, err := h.model.ListModelsByRuntimeFrameworkID(ctx.Request.Context(), currentUser, per, page, id, deployType)
 	if err != nil {
 		slog.Error("Failed to get models", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
@@ -1035,7 +1035,7 @@ func (h *ModelHandler) FinetuneStop(ctx *gin.Context) {
 		DeployID:    id,
 		DeployType:  types.FinetuneType,
 	}
-	err = h.repo.DeployStop(ctx, stopReq)
+	err = h.repo.DeployStop(ctx.Request.Context(), stopReq)
 	if err != nil {
 		slog.Error("Failed to stop deploy", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
@@ -1089,7 +1089,7 @@ func (h *ModelHandler) FinetuneStart(ctx *gin.Context) {
 		DeployID:    id,
 		DeployType:  types.FinetuneType,
 	}
-	err = h.repo.DeployStart(ctx, startReq)
+	err = h.repo.DeployStart(ctx.Request.Context(), startReq)
 	if err != nil {
 		slog.Error("Failed to start deploy", slog.Any("error", err), slog.Any("repoType", types.ModelRepo), slog.String("namespace", namespace), slog.String("name", name), slog.Any("deployID", id))
 		httpbase.ServerError(ctx, err)
@@ -1117,7 +1117,7 @@ func (h *ModelHandler) ListAllRuntimeFramework(ctx *gin.Context) {
 		return
 	}
 
-	runtimes, err := h.model.ListAllByRuntimeFramework(ctx, currentUser)
+	runtimes, err := h.model.ListAllByRuntimeFramework(ctx.Request.Context(), currentUser)
 	if err != nil {
 		slog.Error("Failed to get runtime frameworks", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
@@ -1173,7 +1173,7 @@ func (h *ModelHandler) UpdateModelRuntimeFrameworks(ctx *gin.Context) {
 
 	slog.Info("update runtime frameworks models", slog.Any("req", req), slog.Any("runtime framework id", id), slog.Any("deployType", deployType))
 
-	list, err := h.model.SetRuntimeFrameworkModes(ctx, deployType, id, req.Models)
+	list, err := h.model.SetRuntimeFrameworkModes(ctx.Request.Context(), deployType, id, req.Models)
 	if err != nil {
 		slog.Error("Failed to set models runtime framework", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
@@ -1226,7 +1226,7 @@ func (h *ModelHandler) DeleteModelRuntimeFrameworks(ctx *gin.Context) {
 
 	slog.Info("update runtime frameworks models", slog.Any("req", req), slog.Any("runtime framework id", id), slog.Any("deployType", deployType))
 
-	list, err := h.model.DeleteRuntimeFrameworkModes(ctx, deployType, id, req.Models)
+	list, err := h.model.DeleteRuntimeFrameworkModes(ctx.Request.Context(), deployType, id, req.Models)
 	if err != nil {
 		slog.Error("Failed to set models runtime framework", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
@@ -1279,7 +1279,7 @@ func (h *ModelHandler) ListModelsOfRuntimeFrameworks(ctx *gin.Context) {
 		return
 	}
 
-	models, total, err := h.model.ListModelsOfRuntimeFrameworks(ctx, currentUser, filter.Search, filter.Sort, per, page, deployType)
+	models, total, err := h.model.ListModelsOfRuntimeFrameworks(ctx.Request.Context(), currentUser, filter.Search, filter.Sort, per, page, deployType)
 	if err != nil {
 		slog.Error("fail to get models for all runtime frameworks", slog.Any("deployType", deployType), slog.Any("per", per), slog.Any("page", page), slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
@@ -1317,7 +1317,7 @@ func (h *ModelHandler) AllFiles(ctx *gin.Context) {
 	req.Name = name
 	req.RepoType = types.ModelRepo
 	req.CurrentUser = httpbase.GetCurrentUser(ctx)
-	detail, err := h.repo.AllFiles(ctx, req)
+	detail, err := h.repo.AllFiles(ctx.Request.Context(), req)
 	if err != nil {
 		if errors.Is(err, component.ErrUnauthorized) {
 			httpbase.UnauthorizedError(ctx, err)
@@ -1384,7 +1384,7 @@ func (h *ModelHandler) DeployServerless(ctx *gin.Context) {
 	}
 
 	req.SecureLevel = 1 // public for serverless
-	deployID, err := h.model.Deploy(ctx, deployReq, req)
+	deployID, err := h.model.Deploy(ctx.Request.Context(), deployReq, req)
 	if err != nil {
 		slog.Error("failed to deploy model as serverless", slog.String("namespace", namespace),
 			slog.String("name", name), slog.Any("currentUser", currentUser), slog.Any("req", req), slog.Any("error", err))
@@ -1448,7 +1448,7 @@ func (h *ModelHandler) ServerlessStart(ctx *gin.Context) {
 		DeployType:  types.ServerlessType,
 	}
 
-	err = h.repo.DeployStart(ctx, startReq)
+	err = h.repo.DeployStart(ctx.Request.Context(), startReq)
 	if err != nil {
 		slog.Error("Failed to start deploy", slog.Any("error", err), slog.Any("repoType", types.ModelRepo), slog.String("namespace", namespace), slog.String("name", name), slog.Any("deployID", id))
 		httpbase.ServerError(ctx, err)
@@ -1504,7 +1504,7 @@ func (h *ModelHandler) ServerlessStop(ctx *gin.Context) {
 		DeployType:  types.ServerlessType,
 	}
 
-	err = h.repo.DeployStop(ctx, stopReq)
+	err = h.repo.DeployStop(ctx.Request.Context(), stopReq)
 	if err != nil {
 		slog.Error("Failed to stop deploy", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
@@ -1534,7 +1534,7 @@ func (h *ModelHandler) GetDeployServerless(ctx *gin.Context) {
 		return
 	}
 
-	response, err := h.model.GetServerless(ctx, namespace, name, currentUser)
+	response, err := h.model.GetServerless(ctx.Request.Context(), namespace, name, currentUser)
 	if err != nil {
 		slog.Error("failed to get model serverless endpoint", slog.String("namespace", namespace),
 			slog.String("name", name), slog.Any("currentUser", currentUser), slog.Any("error", err))

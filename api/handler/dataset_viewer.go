@@ -54,7 +54,7 @@ func (h *DatasetViewerHandler) View(ctx *gin.Context) {
 	req.Path = ctx.Param("file_path")
 	pcount := ctx.Query("count")
 	req.RowCount, _ = strconv.Atoi(pcount)
-	resp, err := h.c.ViewParquetFile(ctx, req)
+	resp, err := h.c.ViewParquetFile(ctx.Request.Context(), req)
 	if err != nil {
 		slog.Error("Failed to view parquet file", "error", err)
 		httpbase.ServerError(ctx, err)

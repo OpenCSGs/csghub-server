@@ -52,7 +52,7 @@ func (h *MirrorHandler) CreateMirrorRepo(ctx *gin.Context) {
 	}
 
 	req.CurrentUser = currentUser
-	m, err := h.mirror.CreateMirrorRepo(ctx, req)
+	m, err := h.mirror.CreateMirrorRepo(ctx.Request.Context(), req)
 	if err != nil {
 		slog.Error("failed to create mirror repo", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
@@ -89,7 +89,7 @@ func (h *MirrorHandler) Repos(ctx *gin.Context) {
 		return
 	}
 
-	repos, total, err := h.mirror.Repos(ctx, currentUser, per, page)
+	repos, total, err := h.mirror.Repos(ctx.Request.Context(), currentUser, per, page)
 	if err != nil {
 		slog.Error("failed to get mirror repos", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
@@ -130,7 +130,7 @@ func (h *MirrorHandler) Index(ctx *gin.Context) {
 	}
 
 	search := ctx.Query("search")
-	repos, total, err := h.mirror.Index(ctx, currentUser, per, page, search)
+	repos, total, err := h.mirror.Index(ctx.Request.Context(), currentUser, per, page, search)
 	if err != nil {
 		slog.Error("failed to get mirror repos", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)

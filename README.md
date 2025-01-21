@@ -70,6 +70,8 @@ We use the Apache 2.0 license, the content of which is detailed in the `LICENSE`
 ## Contributing
 If you wish to contribute, please follow the [Contribution Guidelines](docs/en/contributing.md). We are very excited about your contributions!
 
+Before you begin development, we highly recommend checking out our [Backend Developer Guides](contribute/), which provide helpful information to ensure a smooth development process.
+
 ## Acknowledgments
 This project is based on open source projects such as Gin, DuckDB, minio, and Gitea. We would like to express our sincere gratitude to them for their open source contributions!
 

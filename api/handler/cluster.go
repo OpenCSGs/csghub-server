@@ -41,7 +41,7 @@ func (h *ClusterHandler) Index(ctx *gin.Context) {
 		httpbase.UnauthorizedError(ctx, component.ErrUserNotFound)
 		return
 	}
-	clusters, err := h.c.Index(ctx)
+	clusters, err := h.c.Index(ctx.Request.Context())
 	if err != nil {
 		slog.Error("Failed to get cluster list", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
@@ -68,7 +68,7 @@ func (h *ClusterHandler) GetClusterById(ctx *gin.Context) {
 		return
 	}
 	id := ctx.Param("id")
-	cluster, err := h.c.GetClusterById(ctx, id)
+	cluster, err := h.c.GetClusterById(ctx.Request.Context(), id)
 	if err != nil {
 		slog.Error("Failed to get cluster", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
@@ -85,7 +85,7 @@ func (h *ClusterHandler) Update(ctx *gin.Context) {
 		return
 	}
 	req.ClusterID = ctx.Param("id")
-	result, err := h.c.Update(ctx, req)
+	result, err := h.c.Update(ctx.Request.Context(), req)
 	if err != nil {
 		slog.Error("Failed to update cluster info", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)

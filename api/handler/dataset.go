@@ -70,7 +70,7 @@ func (h *DatasetHandler) Create(ctx *gin.Context) {
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
-	_, err := h.sensitive.CheckRequestV2(ctx, req)
+	_, err := h.sensitive.CheckRequestV2(ctx.Request.Context(), req)
 	if err != nil {
 		slog.Error("failed to check sensitive request", slog.Any("error", err))
 		httpbase.BadRequest(ctx, fmt.Errorf("sensitive check failed: %w", err).Error())
@@ -82,7 +82,7 @@ func (h *DatasetHandler) Create(ctx *gin.Context) {
 	}
 	req.Username = currentUser
 
-	dataset, err := h.dataset.Create(ctx, req)
+	dataset, err := h.dataset.Create(ctx.Request.Context(), req)
 	if err != nil {
 		slog.Error("Failed to create dataset", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
@@ -141,7 +141,7 @@ func (h *DatasetHandler) Index(ctx *gin.Context) {
 		return
 	}
 
-	datasets, total, err := h.dataset.Index(ctx, filter, per, page)
+	datasets, total, err := h.dataset.Index(ctx.Request.Context(), filter, per, page)
 	if err != nil {
 		slog.Error("Failed to get datasets", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
@@ -183,7 +183,7 @@ func (h *DatasetHandler) Update(ctx *gin.Context) {
 		return
 	}
 
-	_, err := h.sensitive.CheckRequestV2(ctx, req)
+	_, err := h.sensitive.CheckRequestV2(ctx.Request.Context(), req)
 	if err != nil {
 		slog.Error("failed to check sensitive request", slog.Any("error", err))
 		httpbase.BadRequest(ctx, fmt.Errorf("sensitive check failed: %w", err).Error())
@@ -200,7 +200,7 @@ func (h *DatasetHandler) Update(ctx *gin.Context) {
 	req.Namespace = namespace
 	req.Name = name
 
-	dataset, err := h.dataset.Update(ctx, req)
+	dataset, err := h.dataset.Update(ctx.Request.Context(), req)
 	if err != nil {
 		slog.Error("Failed to update dataset", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
@@ -237,7 +237,7 @@ func (h *DatasetHandler) Delete(ctx *gin.Context) {
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
-	err = h.dataset.Delete(ctx, namespace, name, currentUser)
+	err = h.dataset.Delete(ctx.Request.Context(), namespace, name, currentUser)
 	if err != nil {
 		slog.Error("Failed to delete dataset", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
@@ -269,7 +269,7 @@ func (h *DatasetHandler) Show(ctx *gin.Context) {
 		return
 	}
 	currentUser := httpbase.GetCurrentUser(ctx)
-	detail, err := h.dataset.Show(ctx, namespace, name, currentUser)
+	detail, err := h.dataset.Show(ctx.Request.Context(), namespace, name, currentUser)
 	if err != nil {
 		if errors.Is(err, component.ErrUnauthorized) {
 			httpbase.UnauthorizedError(ctx, err)
@@ -305,7 +305,7 @@ func (h *DatasetHandler) Relations(ctx *gin.Context) {
 		return
 	}
 	currentUser := httpbase.GetCurrentUser(ctx)
-	detail, err := h.dataset.Relations(ctx, namespace, name, currentUser)
+	detail, err := h.dataset.Relations(ctx.Request.Context(), namespace, name, currentUser)
 	if err != nil {
 		if errors.Is(err, component.ErrUnauthorized) {
 			httpbase.UnauthorizedError(ctx, err)
@@ -355,7 +355,7 @@ func (h *DatasetHandler) AllFiles(ctx *gin.Context) {
 	req.RepoType = types.DatasetRepo
 	req.CurrentUser = httpbase.GetCurrentUser(ctx)
 	req.Ref = ""
-	detail, err := h.repo.AllFiles(ctx, req)
+	detail, err := h.repo.AllFiles(ctx.Request.Context(), req)
 	if err != nil {
 		if errors.Is(err, component.ErrUnauthorized) {
 			httpbase.UnauthorizedError(ctx, err)

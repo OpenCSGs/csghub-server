@@ -37,7 +37,7 @@ type SpaceSdkHandler struct {
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
 // @Router       /space_sdks [get]
 func (h *SpaceSdkHandler) Index(ctx *gin.Context) {
-	spaceSdks, err := h.c.Index(ctx)
+	spaceSdks, err := h.c.Index(ctx.Request.Context())
 	if err != nil {
 		slog.Error("Failed to get space sdks", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
@@ -66,7 +66,7 @@ func (h *SpaceSdkHandler) Create(ctx *gin.Context) {
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
-	spaceSdk, err := h.c.Create(ctx, &req)
+	spaceSdk, err := h.c.Create(ctx.Request.Context(), &req)
 	if err != nil {
 		slog.Error("Failed to create space sdk", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
@@ -108,7 +108,7 @@ func (h *SpaceSdkHandler) Update(ctx *gin.Context) {
 	}
 	req.ID = id
 
-	spaceSdk, err := h.c.Update(ctx, &req)
+	spaceSdk, err := h.c.Update(ctx.Request.Context(), &req)
 	if err != nil {
 		slog.Error("Failed to update space sdk", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
@@ -142,7 +142,7 @@ func (h *SpaceSdkHandler) Delete(ctx *gin.Context) {
 		return
 	}
 
-	err = h.c.Delete(ctx, id)
+	err = h.c.Delete(ctx.Request.Context(), id)
 	if err != nil {
 		slog.Error("Failed to delete space sdk", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)

@@ -14,7 +14,7 @@ import (
 func NewHttpServer(config *config.Config) (*gin.Engine, error) {
 	r := gin.New()
 	r.Use(gin.Recovery())
-	r.Use(middleware.Log())
+	r.Use(middleware.Log(config))
 
 	clusterPool, err := cluster.NewClusterPool()
 	if err != nil {

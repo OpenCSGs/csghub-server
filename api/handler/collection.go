@@ -65,7 +65,7 @@ func (c *CollectionHandler) Index(ctx *gin.Context) {
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
-	collections, total, err := c.collection.GetCollections(ctx, filter, per, page)
+	collections, total, err := c.collection.GetCollections(ctx.Request.Context(), filter, per, page)
 	if err != nil {
 		slog.Error("Failed to load collections", "error", err)
 		httpbase.ServerError(ctx, err)
@@ -104,7 +104,7 @@ func (c *CollectionHandler) Create(ctx *gin.Context) {
 		return
 	}
 
-	_, err := c.sensitive.CheckRequestV2(ctx, req)
+	_, err := c.sensitive.CheckRequestV2(ctx.Request.Context(), req)
 	if err != nil {
 		slog.Error("failed to check sensitive request", slog.Any("error", err))
 		httpbase.BadRequest(ctx, fmt.Errorf("sensitive check failed: %w", err).Error())
@@ -112,7 +112,7 @@ func (c *CollectionHandler) Create(ctx *gin.Context) {
 	}
 
 	req.Username = currentUser
-	collection, err := c.collection.CreateCollection(ctx, *req)
+	collection, err := c.collection.CreateCollection(ctx.Request.Context(), *req)
 	if err != nil {
 		slog.Error("Failed to create collection", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
@@ -140,7 +140,7 @@ func (c *CollectionHandler) GetCollection(ctx *gin.Context) {
 		return
 	}
 	currentUser := httpbase.GetCurrentUser(ctx)
-	collection, err := c.collection.GetCollection(ctx, currentUser, id)
+	collection, err := c.collection.GetCollection(ctx.Request.Context(), currentUser, id)
 	if err != nil {
 		slog.Error("Failed to create space", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
@@ -176,7 +176,7 @@ func (c *CollectionHandler) UpdateCollection(ctx *gin.Context) {
 		return
 	}
 
-	_, err := c.sensitive.CheckRequestV2(ctx, req)
+	_, err := c.sensitive.CheckRequestV2(ctx.Request.Context(), req)
 	if err != nil {
 		slog.Error("failed to check sensitive request", slog.Any("error", err))
 		httpbase.BadRequest(ctx, fmt.Errorf("sensitive check failed: %w", err).Error())
@@ -192,7 +192,7 @@ func (c *CollectionHandler) UpdateCollection(ctx *gin.Context) {
 
 	req.ID = id
 
-	collection, err := c.collection.UpdateCollection(ctx, *req)
+	collection, err := c.collection.UpdateCollection(ctx.Request.Context(), *req)
 	if err != nil {
 		slog.Error("Failed to create space", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
@@ -227,7 +227,7 @@ func (c *CollectionHandler) DeleteCollection(ctx *gin.Context) {
 		return
 	}
 
-	err = c.collection.DeleteCollection(ctx, id, currentUser)
+	err = c.collection.DeleteCollection(ctx.Request.Context(), id, currentUser)
 	if err != nil {
 		slog.Error("Failed to delete collection", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
@@ -271,7 +271,7 @@ func (c *CollectionHandler) AddRepoToCollection(ctx *gin.Context) {
 	}
 	req.ID = id
 
-	err = c.collection.AddReposToCollection(ctx, *req)
+	err = c.collection.AddReposToCollection(ctx.Request.Context(), *req)
 	if err != nil {
 		slog.Error("Failed to create collection", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
@@ -314,7 +314,7 @@ func (c *CollectionHandler) RemoveRepoFromCollection(ctx *gin.Context) {
 	}
 	req.ID = id
 
-	err = c.collection.RemoveReposFromCollection(ctx, *req)
+	err = c.collection.RemoveReposFromCollection(ctx.Request.Context(), *req)
 	if err != nil {
 		slog.Error("Failed to create collection", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
