@@ -16,3 +16,5 @@ type APIInternalServerError struct{}
 type APIBadRequest struct{}
 
 type APIUnauthorized struct{}
+
+type APIForbidden struct{}

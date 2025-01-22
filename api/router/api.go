@@ -728,8 +728,9 @@ func createRuntimeFrameworkRoutes(apiGroup *gin.RouterGroup, needAPIKey gin.Hand
 	{
 		runtimeFramework.GET("/:id/models", modelHandler.ListByRuntimeFrameworkID)
 		runtimeFramework.GET("", modelHandler.ListAllRuntimeFramework)
-		runtimeFramework.POST("/:id", needAPIKey, modelHandler.UpdateModelRuntimeFrameworks)
-		runtimeFramework.DELETE("/:id", needAPIKey, modelHandler.DeleteModelRuntimeFrameworks)
+		runtimeFramework.POST("", modelHandler.CreateRuntimeFramework)
+		runtimeFramework.PUT("/:id", modelHandler.UpdateModelRuntimeFrameworks)
+		runtimeFramework.DELETE("/:id", modelHandler.DeleteModelRuntimeFrameworks)
 		runtimeFramework.GET("/models", modelHandler.ListModelsOfRuntimeFrameworks)
 
 		runtimeFramework.GET("/:id/architecture", needAPIKey, runtimeArchHandler.ListByRuntimeFrameworkID)

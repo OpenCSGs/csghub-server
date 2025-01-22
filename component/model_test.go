@@ -481,6 +481,48 @@ func TestModelComponent_ListModelsByRuntimeFrameworkID(t *testing.T) {
 
 }
 
+func TestModelComponent_CreateRuntimeFramework(t *testing.T) {
+	ctx := context.TODO()
+	mc := initializeTestModelComponent(ctx, t)
+
+	frame := database.RuntimeFramework{
+		FrameName:     "fm",
+		FrameVersion:  "v1",
+		FrameImage:    "img",
+		FrameCpuImage: "cimg",
+		Enabled:       2,
+		ContainerPort: 321,
+		Type:          2,
+	}
+
+	mc.mocks.components.repo.EXPECT().IsAdminRole(mock.Anything).Return(true)
+	mc.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "user").Return(database.User{ID: 1}, nil)
+
+	mc.mocks.stores.RuntimeFrameworkMock().EXPECT().Add(ctx, frame).Return(nil)
+
+	fn, err := mc.CreateRuntimeFramework(ctx, &types.RuntimeFrameworkReq{
+		FrameName:     "fm",
+		FrameVersion:  "v1",
+		FrameImage:    "img",
+		FrameCpuImage: "cimg",
+		Enabled:       2,
+		ContainerPort: 321,
+		Type:          2,
+		CurrentUser:   "user",
+	})
+	require.Nil(t, err)
+	require.Equal(t, types.RuntimeFramework{
+		FrameName:     "fm",
+		FrameVersion:  "v1",
+		FrameImage:    "img",
+		FrameCpuImage: "cimg",
+		Enabled:       2,
+		ContainerPort: 321,
+		Type:          2,
+	}, *fn)
+
+}
+
 func TestModelComponent_SetRuntimeFrameworkModes(t *testing.T) {
 	ctx := context.TODO()
 	mc := initializeTestModelComponent(ctx, t)
@@ -505,13 +547,14 @@ func TestModelComponent_SetRuntimeFrameworkModes(t *testing.T) {
 	mc.mocks.stores.RepoRuntimeFrameworkMock().EXPECT().GetByIDsAndType(
 		ctx, int64(1), int64(2), 1,
 	).Return([]database.RepositoriesRuntimeFramework{{}}, nil)
-
+	mc.mocks.components.repo.EXPECT().IsAdminRole(mock.Anything).Return(true)
+	mc.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "user").Return(database.User{ID: 1}, nil)
 	mc.mocks.stores.RepoRuntimeFrameworkMock().EXPECT().Add(ctx, int64(1), int64(1), 1).Return(nil)
 	mc.mocks.components.runtimeArchitecture.EXPECT().AddRuntimeFrameworkTag(
 		ctx, rftags, int64(1), int64(1),
 	).Return(nil)
 	mc.mocks.components.runtimeArchitecture.EXPECT().AddResourceTag(ctx, rftags, "foo", int64(1)).Return(nil)
-	f, err := mc.SetRuntimeFrameworkModes(ctx, 1, 1, []string{"a", "b"})
+	f, err := mc.SetRuntimeFrameworkModes(ctx, "user", 1, 1, []string{"a", "b"})
 	require.Nil(t, err)
 	require.Empty(t, f)
 
@@ -527,11 +570,13 @@ func TestModelComponent_DeleteRuntimeFrameworkModes(t *testing.T) {
 			{RepositoryID: 2, Repository: &database.Repository{ID: 2, Path: "m2/foo"}},
 		}, nil,
 	)
+	mc.mocks.components.repo.EXPECT().IsAdminRole(mock.Anything).Return(true)
+	mc.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "user").Return(database.User{ID: 1}, nil)
 
 	mc.mocks.stores.RepoRuntimeFrameworkMock().EXPECT().Delete(ctx, int64(123), int64(1), 1).Return(nil)
 	mc.mocks.stores.RepoRuntimeFrameworkMock().EXPECT().Delete(ctx, int64(123), int64(2), 1).Return(nil)
 
-	f, err := mc.DeleteRuntimeFrameworkModes(ctx, 1, 123, []string{"a", "b"})
+	f, err := mc.DeleteRuntimeFrameworkModes(ctx, "user", 1, 123, []string{"a", "b"})
 	require.Nil(t, err)
 	require.Empty(t, f)
 }
