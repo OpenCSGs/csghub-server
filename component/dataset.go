@@ -417,7 +417,7 @@ func (c *datasetComponentImpl) Show(ctx context.Context, namespace, name, curren
 		return nil, fmt.Errorf("failed to get user repo permission, error: %w", err)
 	}
 	if !permission.CanRead {
-		return nil, ErrUnauthorized
+		return nil, ErrForbidden
 	}
 
 	ns, err := c.repoComponent.GetNameSpaceInfo(ctx, namespace)
@@ -488,7 +488,7 @@ func (c *datasetComponentImpl) Relations(ctx context.Context, namespace, name, c
 
 	allow, _ := c.repoComponent.AllowReadAccessRepo(ctx, dataset.Repository, currentUser)
 	if !allow {
-		return nil, ErrUnauthorized
+		return nil, ErrForbidden
 	}
 
 	return c.getRelations(ctx, dataset.RepositoryID, currentUser)

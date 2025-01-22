@@ -408,7 +408,7 @@ func (c *modelComponentImpl) Show(ctx context.Context, namespace, name, currentU
 		return nil, fmt.Errorf("failed to get user repo permission, error: %w", err)
 	}
 	if !permission.CanRead {
-		return nil, ErrUnauthorized
+		return nil, ErrForbidden
 	}
 
 	ns, err := c.repoComponent.GetNameSpaceInfo(ctx, namespace)
@@ -906,7 +906,7 @@ func (c *modelComponentImpl) Deploy(ctx context.Context, deployReq types.DeployA
 		// Check if the user is an admin
 		isAdmin := c.repoComponent.IsAdminRole(user)
 		if !isAdmin {
-			return -1, fmt.Errorf("need admin permission for Serverless deploy")
+			return -1, ErrForbiddenMsg("need admin permission for Serverless deploy")
 		}
 	}
 

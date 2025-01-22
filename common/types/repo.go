@@ -195,12 +195,3 @@ type ScanReq struct {
 	ArchMap   map[string]string
 	Models    []string
 }
-
-type PermissionError struct {
-	Message string
-}
-
-// Add the Error() method to PermissionError.
-func (e *PermissionError) Error() string {
-	return e.Message // Return the message field as the error description.
-}

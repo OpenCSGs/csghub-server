@@ -111,6 +111,10 @@ func (h *GitHTTPHandler) GitUploadPack(ctx *gin.Context) {
 
 	err := h.gitHttp.GitUploadPack(ctx.Request.Context(), req)
 	if err != nil {
+		if errors.Is(err, component.ErrForbidden) {
+			httpbase.ForbiddenError(ctx, err)
+			return
+		}
 		httpbase.ServerError(ctx, err)
 		return
 	}

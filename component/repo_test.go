@@ -587,7 +587,7 @@ func TestRepoComponent_FileRaw(t *testing.T) {
 					Path:        c.path,
 					CurrentUser: currentUser,
 				})
-				require.Equal(t, ErrUnauthorized, err)
+				require.True(t, errors.Is(err, ErrForbidden))
 				return
 			}
 
@@ -1612,7 +1612,7 @@ func TestRepoComponent_LastCommit(t *testing.T) {
 
 		actualCommit, err := repoComp.LastCommit(context.Background(), &types.GetCommitsReq{})
 		require.Nil(t, actualCommit)
-		require.Equal(t, err, ErrForbidden)
+		require.ErrorIs(t, err, ErrForbidden)
 
 	})
 }
@@ -1666,7 +1666,7 @@ func TestRepoComponent_Tree(t *testing.T) {
 
 			actualTree, err := repoComp.Tree(context.Background(), &types.GetFileReq{})
 			require.Nil(t, actualTree)
-			require.Equal(t, err, ErrForbidden)
+			require.ErrorIs(t, err, ErrForbidden)
 
 		})
 	}
@@ -1866,7 +1866,7 @@ func TestRepoComponent_TreeV2(t *testing.T) {
 
 			actualTree, err := repoComp.TreeV2(context.Background(), &types.GetTreeRequest{})
 			require.Nil(t, actualTree)
-			require.Equal(t, err, ErrForbidden)
+			require.ErrorIs(t, err, ErrForbidden)
 
 		})
 	}
@@ -1979,7 +1979,7 @@ func TestRepoComponent_LogsTree(t *testing.T) {
 
 			actualTree, err := repoComp.LogsTree(context.Background(), &types.GetLogsTreeRequest{})
 			require.Nil(t, actualTree)
-			require.Equal(t, err, ErrForbidden)
+			require.ErrorIs(t, err, ErrForbidden)
 
 		})
 	}
