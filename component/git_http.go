@@ -2,9 +2,7 @@ package component
 
 import (
 	"context"
-	"crypto/sha256"
 	"database/sql"
-	"encoding/hex"
 	"errors"
 	"fmt"
 	"io"
@@ -308,16 +306,24 @@ func (c *gitHTTPComponentImpl) buildObjectResponse(ctx context.Context, req type
 }
 
 func (c *gitHTTPComponentImpl) LfsUpload(ctx context.Context, body io.ReadCloser, req types.UploadRequest) error {
-	var exists bool
+	var exists, allowed bool
+	defer body.Close()
 	repo, err := c.repoStore.FindByPath(ctx, req.RepoType, req.Namespace, req.Name)
 	if err != nil {
 		return fmt.Errorf("failed to find repo, error: %w", err)
 	}
 
+	allowed, err = c.repoComponent.AllowWriteAccess(ctx, req.RepoType, req.Namespace, req.Name, req.CurrentUser)
+	if err != nil {
+		return err
+	}
+	if !allowed {
+		return ErrPermissionDenied
+	}
+
 	pointer := types.Pointer{Oid: req.Oid, Size: req.Size}
 
 	if !pointer.Valid() {
-		slog.Error("invalid lfs oid", slog.String("oid", req.Oid))
 		return errors.New("invalid lfs oid")
 	}
 
@@ -334,28 +340,7 @@ func (c *gitHTTPComponentImpl) LfsUpload(ctx context.Context, body io.ReadCloser
 	}
 	uploadOrVerify := func() error {
 		if exists {
-			allowed, err := c.repoComponent.AllowWriteAccess(ctx, req.RepoType, req.Namespace, req.Name, req.CurrentUser)
-			if err != nil {
-				slog.Error("Unable to check if LFS MetaObject [%s] is allowed. Error: %v", pointer.Oid, err)
-				return err
-			}
-			if !allowed {
-				// The file exists but the user has no access to it.
-				// The upload gets verified by hashing and size comparison to prove access to it.
-				hash := sha256.New()
-				written, err := io.Copy(hash, body)
-				if err != nil {
-					slog.Error("Error creating hash. Error", "error", err)
-					return err
-				}
-
-				if written != pointer.Size {
-					return types.ErrSizeMismatch
-				}
-				if hex.EncodeToString(hash.Sum(nil)) != pointer.Oid {
-					return types.ErrHashMismatch
-				}
-			}
+			return nil
 		} else {
 			var (
 				uploadErr  error
@@ -399,7 +384,6 @@ func (c *gitHTTPComponentImpl) LfsUpload(ctx context.Context, body io.ReadCloser
 		})
 		return err
 	}
-	defer body.Close()
 	if err := uploadOrVerify(); err != nil {
 		if errors.Is(err, types.ErrSizeMismatch) || errors.Is(err, types.ErrHashMismatch) {
 			slog.Error("Upload does not match LFS MetaObject [%s]. Error: %v", pointer.Oid, err)
@@ -436,14 +420,17 @@ func (c *gitHTTPComponentImpl) LfsVerify(ctx context.Context, req types.VerifyRe
 		return types.ErrSizeMismatch
 	}
 
-	_, err = c.lfsMetaObjectStore.Create(ctx, database.LfsMetaObject{
-		Oid:          p.Oid,
-		Size:         p.Size,
-		RepositoryID: repo.ID,
-		Existing:     true,
-	})
-	if err != nil {
-		return fmt.Errorf("failed to create lfs meta object in database: %w", err)
+	_, err = c.lfsMetaObjectStore.FindByOID(ctx, repo.ID, p.Oid)
+	if err != nil && errors.Is(err, sql.ErrNoRows) {
+		_, err = c.lfsMetaObjectStore.Create(ctx, database.LfsMetaObject{
+			Oid:          p.Oid,
+			Size:         p.Size,
+			RepositoryID: repo.ID,
+			Existing:     true,
+		})
+		if err != nil {
+			return fmt.Errorf("failed to create lfs meta object in database: %w", err)
+		}
 	}
 
 	return nil
@@ -698,12 +685,16 @@ func (c *gitHTTPComponentImpl) buildDownloadLink(req types.BatchRequest, pointer
 // }
 
 func (c *gitHTTPComponentImpl) buildUploadLink(req types.BatchRequest, pointer types.Pointer) string {
-	objectKey := path.Join("lfs", pointer.RelativePath())
-	u, err := c.s3Client.PresignedPutObject(context.Background(), c.config.S3.Bucket, objectKey, time.Hour*24)
-	if err != nil {
+	if pointer.Size >= c.config.S3.URLUploadMaxFileSize {
 		return c.config.APIServer.PublicDomain + "/" + path.Join(fmt.Sprintf("%ss", req.RepoType), url.PathEscape(req.Namespace), url.PathEscape(req.Name+".git"), "info/lfs/objects", url.PathEscape(pointer.Oid), strconv.FormatInt(pointer.Size, 10))
+	} else {
+		objectKey := path.Join("lfs", pointer.RelativePath())
+		u, err := c.s3Client.PresignedPutObject(context.Background(), c.config.S3.Bucket, objectKey, time.Hour*24)
+		if err != nil {
+			return c.config.APIServer.PublicDomain + "/" + path.Join(fmt.Sprintf("%ss", req.RepoType), url.PathEscape(req.Namespace), url.PathEscape(req.Name+".git"), "info/lfs/objects", url.PathEscape(pointer.Oid), strconv.FormatInt(pointer.Size, 10))
+		}
+		return u.String()
 	}
-	return u.String()
 }
 
 func (c *gitHTTPComponentImpl) buildVerifyLink(req types.BatchRequest) string {

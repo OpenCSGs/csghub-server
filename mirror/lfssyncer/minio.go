@@ -233,7 +233,10 @@ func (w *MinioLFSSyncWorker) GetLFSDownloadURLs(ctx context.Context, mirror *dat
 }
 
 func (w *MinioLFSSyncWorker) DownloadAndUploadLFSFiles(ctx context.Context, mirror *database.Mirror, pointers []*types.Pointer) error {
-	var finishedLFSFileCount int
+	var (
+		finishedLFSFileCount int
+		success              bool
+	)
 	lfsFilesCount := len(pointers)
 	for _, pointer := range pointers {
 		objectKey := filepath.Join("lfs", pointer.RelativePath())
@@ -245,6 +248,7 @@ func (w *MinioLFSSyncWorker) DownloadAndUploadLFSFiles(ctx context.Context, mirr
 		if (err != nil && err.Error() != "The specified key does not exist.") || fileInfo.Size != pointer.Size {
 			err = w.DownloadAndUploadLFSFile(ctx, mirror, pointer)
 			if err != nil {
+				success = false
 				slog.Error("failed to download and upload LFS file", slog.Any("error", err))
 			}
 		}
@@ -253,7 +257,7 @@ func (w *MinioLFSSyncWorker) DownloadAndUploadLFSFiles(ctx context.Context, mirr
 			Size:         pointer.Size,
 			Oid:          pointer.Oid,
 			RepositoryID: mirror.Repository.ID,
-			Existing:     true,
+			Existing:     success,
 		}
 		_, err = w.lfsMetaObjectStore.UpdateOrCreate(ctx, lfsMetaObject)
 		if err != nil {
@@ -261,14 +265,20 @@ func (w *MinioLFSSyncWorker) DownloadAndUploadLFSFiles(ctx context.Context, mirr
 			return fmt.Errorf("failed to update or create LFS meta object: %w", err)
 		}
 		slog.Info("finish to download and upload LFS file", slog.Any("objectKey", objectKey))
-		finishedLFSFileCount += 1
+		if success {
+			finishedLFSFileCount += 1
+		}
 		mirror.Progress = int8(finishedLFSFileCount * 100 / lfsFilesCount)
 		err = w.mirrorStore.Update(ctx, mirror)
 		if err != nil {
 			return fmt.Errorf("failed to update mirror progress: %w", err)
 		}
 	}
-	mirror.Status = types.MirrorFinished
+	if mirror.Progress != 100 {
+		mirror.Status = types.MirrorIncomplete
+	} else {
+		mirror.Status = types.MirrorFinished
+	}
 	err := w.mirrorStore.Update(ctx, mirror)
 	if err != nil {
 		return fmt.Errorf("failed to update mirror status: %w", err)

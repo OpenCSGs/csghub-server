@@ -22,15 +22,20 @@ type duckdbReader struct {
 
 // NewS3Reader create a new reader to read from s3 compatible object storage service
 func NewS3Reader(cfg *config.Config) (Reader, error) {
+	urlStyle := "vhost"
+	if cfg.S3.BucketLookup == "path" {
+		urlStyle = "path"
+	}
 	s3SetupSql := fmt.Sprintf(`
 	INSTALL httpfs;
 	LOAD httpfs;
 	SET s3_region = '%s';
 	SET s3_endpoint = '%s';
-	SET s3_url_style = 'vhost';
 	SET s3_access_key_id = '%s';
 	SET s3_secret_access_key = '%s';
-	`, cfg.S3.Region, cfg.S3.Endpoint, cfg.S3.AccessKeyID, cfg.S3.AccessKeySecret)
+	SET s3_use_ssl = %t;
+	SET s3_url_style = '%s';
+	`, cfg.S3.Region, cfg.S3.Endpoint, cfg.S3.AccessKeyID, cfg.S3.AccessKeySecret, cfg.S3.EnableSSL, urlStyle)
 	db, err := sql.Open("duckdb", "")
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to duckdb, cause:%w", err)

@@ -68,6 +68,7 @@ endpoint = "localhost:9000"
 internal_endpoint = ""
 bucket = "opencsg-test"
 enable_ssl = false
+url_upload_max_file_size = 5153960755
 
 [sensitive_check]
 enable = false

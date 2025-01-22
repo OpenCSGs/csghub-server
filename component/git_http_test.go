@@ -231,11 +231,11 @@ func TestGitHTTPComponent_LfsUpload(t *testing.T) {
 				)
 			}
 
-			if exist {
-				gc.mocks.components.repo.EXPECT().AllowWriteAccess(
-					ctx, types.ModelRepo, "ns", "n", "user",
-				).Return(true, nil)
-			} else {
+			gc.mocks.components.repo.EXPECT().AllowWriteAccess(
+				ctx, types.ModelRepo, "ns", "n", "user",
+			).Return(true, nil)
+
+			if !exist {
 				gc.mocks.s3Client.EXPECT().PutObject(
 					ctx, "",
 					"lfs/a3/f8/e1b4f77bb24e508906c6972f81928f0d926e6daef1b29d12e348b8a3547e",
@@ -245,13 +245,14 @@ func TestGitHTTPComponent_LfsUpload(t *testing.T) {
 						ConcurrentStreamParts: true,
 						NumThreads:            5,
 					}).Return(minio.UploadInfo{Size: 100}, nil)
+
+				gc.mocks.stores.LfsMetaObjectMock().EXPECT().Create(ctx, database.LfsMetaObject{
+					Oid:          oid,
+					Size:         100,
+					RepositoryID: 123,
+					Existing:     true,
+				}).Return(nil, nil)
 			}
-			gc.mocks.stores.LfsMetaObjectMock().EXPECT().Create(ctx, database.LfsMetaObject{
-				Oid:          oid,
-				Size:         100,
-				RepositoryID: 123,
-				Existing:     true,
-			}).Return(nil, nil)
 
 			err := gc.LfsUpload(ctx, rc, types.UploadRequest{
 				Oid:         oid,
@@ -281,6 +282,7 @@ func TestGitHTTPComponent_LfsVerify(t *testing.T) {
 	gc.mocks.s3Client.EXPECT().StatObject(ctx, "", "lfs/oid", minio.StatObjectOptions{}).Return(
 		minio.ObjectInfo{Size: 100}, nil,
 	)
+	gc.mocks.stores.LfsMetaObjectMock().EXPECT().FindByOID(ctx, int64(123), "oid").Return(nil, sql.ErrNoRows)
 	gc.mocks.stores.LfsMetaObjectMock().EXPECT().Create(ctx, database.LfsMetaObject{
 		Oid:          "oid",
 		Size:         100,

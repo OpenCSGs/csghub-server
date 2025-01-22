@@ -216,8 +216,17 @@ func (h *GitHTTPHandler) LfsUpload(ctx *gin.Context) {
 	uploadRequest.RepoType = types.RepositoryType(ctx.GetString("repo_type"))
 	uploadRequest.CurrentUser = httpbase.GetCurrentUser(ctx)
 
+	if uploadRequest.CurrentUser == "" {
+		httpbase.UnauthorizedError(ctx, component.ErrUnauthorized)
+		return
+	}
+
 	err = h.gitHttp.LfsUpload(ctx.Request.Context(), ctx.Request.Body, uploadRequest)
 	if err != nil {
+		slog.Error("Failed to upload lfs file", slog.Any("error", err), slog.String("namespace", uploadRequest.Namespace), slog.String("name", uploadRequest.Name), slog.String("oid", uploadRequest.Oid))
+		if errors.Is(err, component.ErrPermissionDenied) {
+			httpbase.UnauthorizedError(ctx, err)
+		}
 		httpbase.ServerError(ctx, err)
 		return
 	}

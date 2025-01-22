@@ -91,9 +91,12 @@ type Config struct {
 		Region          string `env:"STARHUB_SERVER_S3_REGION"`
 		Endpoint        string `env:"STARHUB_SERVER_S3_ENDPOINT, default=localhost:9000"`
 		//for better performance of LFS downloading from s3. (can ignore if S3.Endpoint is alreay an internal domain or ip address)
-		InternalEndpoint string `env:"STARHUB_SERVER_S3_INTERNAL_ENDPOINT, default="`
-		Bucket           string `env:"STARHUB_SERVER_S3_BUCKET, default=opencsg-test"`
-		EnableSSL        bool   `env:"STARHUB_SERVER_S3_ENABLE_SSL, default=false"`
+		InternalEndpoint     string `env:"STARHUB_SERVER_S3_INTERNAL_ENDPOINT, default="`
+		Bucket               string `env:"STARHUB_SERVER_S3_BUCKET, default=opencsg-test"`
+		EnableSSL            bool   `env:"STARHUB_SERVER_S3_ENABLE_SSL, default=false"`
+		URLUploadMaxFileSize int64  `env:"STARHUB_SERVER_S3_URL_UPLOAD_MAX_FILE_SIZE, default=5153960755"`
+		// BucketLookup type, can be "auto" "dns" or "path"
+		BucketLookup string `env:"STARHUB_SERVER_S3_BUCKET_LOOKUP, default=auto"`
 	}
 
 	SensitiveCheck struct {

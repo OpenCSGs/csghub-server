@@ -13,11 +13,23 @@ import (
 	"opencsg.com/csghub-server/common/config"
 )
 
+var bucketLookupMapping = map[string]minio.BucketLookupType{
+	"auto": minio.BucketLookupAuto,
+	"dns":  minio.BucketLookupDNS,
+	"path": minio.BucketLookupPath,
+}
+
 func NewMinio(cfg *config.Config) (Client, error) {
+	var bucketLookupType minio.BucketLookupType
+	if val, ok := bucketLookupMapping[cfg.S3.BucketLookup]; ok {
+		bucketLookupType = val
+	} else {
+		bucketLookupType = minio.BucketLookupAuto
+	}
 	mClient, err := minio.New(cfg.S3.Endpoint, &minio.Options{
 		Creds:        credentials.NewStaticV4(cfg.S3.AccessKeyID, cfg.S3.AccessKeySecret, ""),
 		Secure:       cfg.S3.EnableSSL,
-		BucketLookup: minio.BucketLookupAuto,
+		BucketLookup: bucketLookupType,
 		Region:       cfg.S3.Region,
 	})
 	if err != nil {
