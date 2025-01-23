@@ -184,7 +184,8 @@ func MustLogin() gin.HandlerFunc {
 }
 
 func AdminAuthenticator(config *config.Config) gin.HandlerFunc {
-	userSvcClient := rpc.NewUserSvcHttpClient(fmt.Sprintf("%s:%d", config.User.Host, config.User.Port))
+	userSvcClient := rpc.NewUserSvcHttpClient(fmt.Sprintf("%s:%d", config.User.Host, config.User.Port),
+		rpc.AuthWithApiKey(config.APIToken))
 
 	return func(ctx *gin.Context) {
 		currentUser := httpbase.GetCurrentUser(ctx)
