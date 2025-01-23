@@ -155,6 +155,7 @@ type RuntimeFrameworkReq struct {
 	Enabled       int64  `json:"enabled"`
 	ContainerPort int    `json:"container_port"`
 	Type          int    `json:"type"`
+	CurrentUser   string `json:"-"`
 }
 
 type RuntimeFramework struct {

@@ -1319,7 +1319,7 @@ func (h *RepoHandler) DeleteMirror(ctx *gin.Context) {
 // @Security     ApiKey
 // @Summary      List repo runtime framework
 // @Description  List repo runtime framework
-// @Tags         Repository
+// @Tags         RuntimeFramework
 // @Accept       json
 // @Produce      json
 // @Param        repo_type path string true "models,spaces" Enums(models,spaces)
@@ -1370,7 +1370,7 @@ func (h *RepoHandler) RuntimeFrameworkList(ctx *gin.Context) {
 // @Security     ApiKey
 // @Summary      Create runtime framework
 // @Description  create runtime framework
-// @Tags         Repository
+// @Tags         RuntimeFramework
 // @Accept       json
 // @Produce      json
 // @Param        repo_type path string true "models,spaces" Enums(models,spaces)
@@ -1381,24 +1381,26 @@ func (h *RepoHandler) RuntimeFrameworkList(ctx *gin.Context) {
 // @Success      200  {object}  types.RuntimeFramework "OK"
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
-// @Router       /{repo_type}/{namespace}/{name}/runtime_framework [post]
+// @Router       /runtime_framework [post]
 func (h *RepoHandler) RuntimeFrameworkCreate(ctx *gin.Context) {
-	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
-	if err != nil {
-		slog.Error("Bad request format", "error", err)
-		httpbase.BadRequest(ctx, err.Error())
+	currentUser := httpbase.GetCurrentUser(ctx)
+	if currentUser == "" {
+		httpbase.UnauthorizedError(ctx, component.ErrUserNotFound)
 		return
 	}
-	slog.Debug("create runtime framework", slog.Any("namespace", namespace), slog.Any("name", name))
 	var req types.RuntimeFrameworkReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {
 		slog.Error("Bad request format", "error", err)
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
-
+	req.CurrentUser = currentUser
 	frame, err := h.c.CreateRuntimeFramework(ctx.Request.Context(), &req)
 	if err != nil {
+		if errors.Is(err, component.ErrForbidden) {
+			httpbase.ForbiddenError(ctx, err)
+			return
+		}
 		slog.Error("Failed to create runtime framework", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
 		return
@@ -1410,7 +1412,7 @@ func (h *RepoHandler) RuntimeFrameworkCreate(ctx *gin.Context) {
 // @Security     ApiKey
 // @Summary      Update runtime framework
 // @Description  Update runtime framework
-// @Tags         Repository
+// @Tags         RuntimeFramework
 // @Accept       json
 // @Produce      json
 // @Param        repo_type path string true "models,spaces" Enums(models,spaces)
@@ -1422,21 +1424,20 @@ func (h *RepoHandler) RuntimeFrameworkCreate(ctx *gin.Context) {
 // @Success      200  {object}  types.RuntimeFramework "OK"
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
-// @Router       /{repo_type}/{namespace}/{name}/runtime_framework/{id} [put]
+// @Router       /runtime_framework/{id} [put]
 func (h *RepoHandler) RuntimeFrameworkUpdate(ctx *gin.Context) {
-	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
-	if err != nil {
-		slog.Error("Bad request format", "error", err)
-		httpbase.BadRequest(ctx, err.Error())
+	currentUser := httpbase.GetCurrentUser(ctx)
+	if currentUser == "" {
+		httpbase.UnauthorizedError(ctx, component.ErrUserNotFound)
 		return
 	}
-	slog.Debug("update runtime framework", slog.Any("namespace", namespace), slog.Any("name", name))
 	var req types.RuntimeFrameworkReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {
 		slog.Error("Bad request format", "error", err)
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
+	req.CurrentUser = currentUser
 	id, err := strconv.ParseInt(ctx.Param("id"), 10, 64)
 	if err != nil {
 		slog.Error("Bad request url format", "error", err)
@@ -1446,6 +1447,10 @@ func (h *RepoHandler) RuntimeFrameworkUpdate(ctx *gin.Context) {
 
 	frame, err := h.c.UpdateRuntimeFramework(ctx.Request.Context(), id, &req)
 	if err != nil {
+		if errors.Is(err, component.ErrForbidden) {
+			httpbase.ForbiddenError(ctx, err)
+			return
+		}
 		slog.Error("Failed to update runtime framework", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
 		return
@@ -1457,7 +1462,7 @@ func (h *RepoHandler) RuntimeFrameworkUpdate(ctx *gin.Context) {
 // @Security     ApiKey
 // @Summary      Delete a exist RuntimeFramework
 // @Description  delete a exist RuntimeFramework
-// @Tags         Repository
+// @Tags         RuntimeFramework
 // @Accept       json
 // @Produce      json
 // @Param        repo_type path string true "models,spaces" Enums(models,spaces)
@@ -1468,7 +1473,7 @@ func (h *RepoHandler) RuntimeFrameworkUpdate(ctx *gin.Context) {
 // @Success      200  {object}  types.Response{} "OK"
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
-// @Router       /{repo_type}/{namespace}/{name}/runtime_framework/{id} [delete]
+// @Router       /runtime_framework/{id} [delete]
 func (h *RepoHandler) RuntimeFrameworkDelete(ctx *gin.Context) {
 	var (
 		id  int64
@@ -1481,8 +1486,18 @@ func (h *RepoHandler) RuntimeFrameworkDelete(ctx *gin.Context) {
 		return
 	}
 
-	err = h.c.DeleteRuntimeFramework(ctx.Request.Context(), id)
+	currentUser := httpbase.GetCurrentUser(ctx)
+	if currentUser == "" {
+		httpbase.UnauthorizedError(ctx, component.ErrUserNotFound)
+		return
+	}
+
+	err = h.c.DeleteRuntimeFramework(ctx.Request.Context(), currentUser, id)
 	if err != nil {
+		if errors.Is(err, component.ErrForbidden) {
+			httpbase.ForbiddenError(ctx, err)
+			return
+		}
 		slog.Error("Failed to delete runtime framework", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
 		return

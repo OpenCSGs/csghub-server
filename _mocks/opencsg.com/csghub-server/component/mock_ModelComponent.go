@@ -130,6 +130,65 @@ func (_c *MockModelComponent_Create_Call) RunAndReturn(run func(context.Context,
 	return _c
 }
 
+// CreateRuntimeFramework provides a mock function with given fields: ctx, req
+func (_m *MockModelComponent) CreateRuntimeFramework(ctx context.Context, req *types.RuntimeFrameworkReq) (*types.RuntimeFramework, error) {
+	ret := _m.Called(ctx, req)
+
+	if len(ret) == 0 {
+		panic("no return value specified for CreateRuntimeFramework")
+	}
+
+	var r0 *types.RuntimeFramework
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, *types.RuntimeFrameworkReq) (*types.RuntimeFramework, error)); ok {
+		return rf(ctx, req)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, *types.RuntimeFrameworkReq) *types.RuntimeFramework); ok {
+		r0 = rf(ctx, req)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*types.RuntimeFramework)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, *types.RuntimeFrameworkReq) error); ok {
+		r1 = rf(ctx, req)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockModelComponent_CreateRuntimeFramework_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'CreateRuntimeFramework'
+type MockModelComponent_CreateRuntimeFramework_Call struct {
+	*mock.Call
+}
+
+// CreateRuntimeFramework is a helper method to define mock.On call
+//   - ctx context.Context
+//   - req *types.RuntimeFrameworkReq
+func (_e *MockModelComponent_Expecter) CreateRuntimeFramework(ctx interface{}, req interface{}) *MockModelComponent_CreateRuntimeFramework_Call {
+	return &MockModelComponent_CreateRuntimeFramework_Call{Call: _e.mock.On("CreateRuntimeFramework", ctx, req)}
+}
+
+func (_c *MockModelComponent_CreateRuntimeFramework_Call) Run(run func(ctx context.Context, req *types.RuntimeFrameworkReq)) *MockModelComponent_CreateRuntimeFramework_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(*types.RuntimeFrameworkReq))
+	})
+	return _c
+}
+
+func (_c *MockModelComponent_CreateRuntimeFramework_Call) Return(_a0 *types.RuntimeFramework, _a1 error) *MockModelComponent_CreateRuntimeFramework_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockModelComponent_CreateRuntimeFramework_Call) RunAndReturn(run func(context.Context, *types.RuntimeFrameworkReq) (*types.RuntimeFramework, error)) *MockModelComponent_CreateRuntimeFramework_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // DelRelationDataset provides a mock function with given fields: ctx, req
 func (_m *MockModelComponent) DelRelationDataset(ctx context.Context, req types.RelationDataset) error {
 	ret := _m.Called(ctx, req)
@@ -226,9 +285,9 @@ func (_c *MockModelComponent_Delete_Call) RunAndReturn(run func(context.Context,
 	return _c
 }
 
-// DeleteRuntimeFrameworkModes provides a mock function with given fields: ctx, deployType, id, paths
-func (_m *MockModelComponent) DeleteRuntimeFrameworkModes(ctx context.Context, deployType int, id int64, paths []string) ([]string, error) {
-	ret := _m.Called(ctx, deployType, id, paths)
+// DeleteRuntimeFrameworkModes provides a mock function with given fields: ctx, currentUser, deployType, id, paths
+func (_m *MockModelComponent) DeleteRuntimeFrameworkModes(ctx context.Context, currentUser string, deployType int, id int64, paths []string) ([]string, error) {
+	ret := _m.Called(ctx, currentUser, deployType, id, paths)
 
 	if len(ret) == 0 {
 		panic("no return value specified for DeleteRuntimeFrameworkModes")
@@ -236,19 +295,19 @@ func (_m *MockModelComponent) DeleteRuntimeFrameworkModes(ctx context.Context, d
 
 	var r0 []string
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, int, int64, []string) ([]string, error)); ok {
-		return rf(ctx, deployType, id, paths)
+	if rf, ok := ret.Get(0).(func(context.Context, string, int, int64, []string) ([]string, error)); ok {
+		return rf(ctx, currentUser, deployType, id, paths)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, int, int64, []string) []string); ok {
-		r0 = rf(ctx, deployType, id, paths)
+	if rf, ok := ret.Get(0).(func(context.Context, string, int, int64, []string) []string); ok {
+		r0 = rf(ctx, currentUser, deployType, id, paths)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).([]string)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, int, int64, []string) error); ok {
-		r1 = rf(ctx, deployType, id, paths)
+	if rf, ok := ret.Get(1).(func(context.Context, string, int, int64, []string) error); ok {
+		r1 = rf(ctx, currentUser, deployType, id, paths)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -263,16 +322,17 @@ type MockModelComponent_DeleteRuntimeFrameworkModes_Call struct {
 
 // DeleteRuntimeFrameworkModes is a helper method to define mock.On call
 //   - ctx context.Context
+//   - currentUser string
 //   - deployType int
 //   - id int64
 //   - paths []string
-func (_e *MockModelComponent_Expecter) DeleteRuntimeFrameworkModes(ctx interface{}, deployType interface{}, id interface{}, paths interface{}) *MockModelComponent_DeleteRuntimeFrameworkModes_Call {
-	return &MockModelComponent_DeleteRuntimeFrameworkModes_Call{Call: _e.mock.On("DeleteRuntimeFrameworkModes", ctx, deployType, id, paths)}
+func (_e *MockModelComponent_Expecter) DeleteRuntimeFrameworkModes(ctx interface{}, currentUser interface{}, deployType interface{}, id interface{}, paths interface{}) *MockModelComponent_DeleteRuntimeFrameworkModes_Call {
+	return &MockModelComponent_DeleteRuntimeFrameworkModes_Call{Call: _e.mock.On("DeleteRuntimeFrameworkModes", ctx, currentUser, deployType, id, paths)}
 }
 
-func (_c *MockModelComponent_DeleteRuntimeFrameworkModes_Call) Run(run func(ctx context.Context, deployType int, id int64, paths []string)) *MockModelComponent_DeleteRuntimeFrameworkModes_Call {
+func (_c *MockModelComponent_DeleteRuntimeFrameworkModes_Call) Run(run func(ctx context.Context, currentUser string, deployType int, id int64, paths []string)) *MockModelComponent_DeleteRuntimeFrameworkModes_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(int), args[2].(int64), args[3].([]string))
+		run(args[0].(context.Context), args[1].(string), args[2].(int), args[3].(int64), args[4].([]string))
 	})
 	return _c
 }
@@ -282,7 +342,7 @@ func (_c *MockModelComponent_DeleteRuntimeFrameworkModes_Call) Return(_a0 []stri
 	return _c
 }
 
-func (_c *MockModelComponent_DeleteRuntimeFrameworkModes_Call) RunAndReturn(run func(context.Context, int, int64, []string) ([]string, error)) *MockModelComponent_DeleteRuntimeFrameworkModes_Call {
+func (_c *MockModelComponent_DeleteRuntimeFrameworkModes_Call) RunAndReturn(run func(context.Context, string, int, int64, []string) ([]string, error)) *MockModelComponent_DeleteRuntimeFrameworkModes_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -911,9 +971,9 @@ func (_c *MockModelComponent_SetRelationDatasets_Call) RunAndReturn(run func(con
 	return _c
 }
 
-// SetRuntimeFrameworkModes provides a mock function with given fields: ctx, deployType, id, paths
-func (_m *MockModelComponent) SetRuntimeFrameworkModes(ctx context.Context, deployType int, id int64, paths []string) ([]string, error) {
-	ret := _m.Called(ctx, deployType, id, paths)
+// SetRuntimeFrameworkModes provides a mock function with given fields: ctx, currentUser, deployType, id, paths
+func (_m *MockModelComponent) SetRuntimeFrameworkModes(ctx context.Context, currentUser string, deployType int, id int64, paths []string) ([]string, error) {
+	ret := _m.Called(ctx, currentUser, deployType, id, paths)
 
 	if len(ret) == 0 {
 		panic("no return value specified for SetRuntimeFrameworkModes")
@@ -921,19 +981,19 @@ func (_m *MockModelComponent) SetRuntimeFrameworkModes(ctx context.Context, depl
 
 	var r0 []string
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, int, int64, []string) ([]string, error)); ok {
-		return rf(ctx, deployType, id, paths)
+	if rf, ok := ret.Get(0).(func(context.Context, string, int, int64, []string) ([]string, error)); ok {
+		return rf(ctx, currentUser, deployType, id, paths)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, int, int64, []string) []string); ok {
-		r0 = rf(ctx, deployType, id, paths)
+	if rf, ok := ret.Get(0).(func(context.Context, string, int, int64, []string) []string); ok {
+		r0 = rf(ctx, currentUser, deployType, id, paths)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).([]string)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, int, int64, []string) error); ok {
-		r1 = rf(ctx, deployType, id, paths)
+	if rf, ok := ret.Get(1).(func(context.Context, string, int, int64, []string) error); ok {
+		r1 = rf(ctx, currentUser, deployType, id, paths)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -948,16 +1008,17 @@ type MockModelComponent_SetRuntimeFrameworkModes_Call struct {
 
 // SetRuntimeFrameworkModes is a helper method to define mock.On call
 //   - ctx context.Context
+//   - currentUser string
 //   - deployType int
 //   - id int64
 //   - paths []string
-func (_e *MockModelComponent_Expecter) SetRuntimeFrameworkModes(ctx interface{}, deployType interface{}, id interface{}, paths interface{}) *MockModelComponent_SetRuntimeFrameworkModes_Call {
-	return &MockModelComponent_SetRuntimeFrameworkModes_Call{Call: _e.mock.On("SetRuntimeFrameworkModes", ctx, deployType, id, paths)}
+func (_e *MockModelComponent_Expecter) SetRuntimeFrameworkModes(ctx interface{}, currentUser interface{}, deployType interface{}, id interface{}, paths interface{}) *MockModelComponent_SetRuntimeFrameworkModes_Call {
+	return &MockModelComponent_SetRuntimeFrameworkModes_Call{Call: _e.mock.On("SetRuntimeFrameworkModes", ctx, currentUser, deployType, id, paths)}
 }
 
-func (_c *MockModelComponent_SetRuntimeFrameworkModes_Call) Run(run func(ctx context.Context, deployType int, id int64, paths []string)) *MockModelComponent_SetRuntimeFrameworkModes_Call {
+func (_c *MockModelComponent_SetRuntimeFrameworkModes_Call) Run(run func(ctx context.Context, currentUser string, deployType int, id int64, paths []string)) *MockModelComponent_SetRuntimeFrameworkModes_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(int), args[2].(int64), args[3].([]string))
+		run(args[0].(context.Context), args[1].(string), args[2].(int), args[3].(int64), args[4].([]string))
 	})
 	return _c
 }
@@ -967,7 +1028,7 @@ func (_c *MockModelComponent_SetRuntimeFrameworkModes_Call) Return(_a0 []string,
 	return _c
 }
 
-func (_c *MockModelComponent_SetRuntimeFrameworkModes_Call) RunAndReturn(run func(context.Context, int, int64, []string) ([]string, error)) *MockModelComponent_SetRuntimeFrameworkModes_Call {
+func (_c *MockModelComponent_SetRuntimeFrameworkModes_Call) RunAndReturn(run func(context.Context, string, int, int64, []string) ([]string, error)) *MockModelComponent_SetRuntimeFrameworkModes_Call {
 	_c.Call.Return(run)
 	return _c
 }

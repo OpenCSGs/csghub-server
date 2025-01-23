@@ -355,7 +355,7 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 		return nil, fmt.Errorf("error creating runtime framework architecture handler:%w", err)
 	}
 
-	createRuntimeFrameworkRoutes(apiGroup, needAPIKey, modelHandler, runtimeArchHandler)
+	createRuntimeFrameworkRoutes(apiGroup, needAPIKey, modelHandler, runtimeArchHandler, repoCommonHandler)
 
 	syncHandler, err := handler.NewSyncHandler(config)
 	if err != nil {
@@ -494,9 +494,6 @@ func createModelRoutes(config *config.Config, apiGroup *gin.RouterGroup, needAPI
 
 		// runtime framework
 		modelsGroup.GET("/:namespace/:name/runtime_framework", middleware.RepoType(types.ModelRepo), repoCommonHandler.RuntimeFrameworkList)
-		modelsGroup.POST("/:namespace/:name/runtime_framework", needAPIKey, middleware.RepoType(types.ModelRepo), repoCommonHandler.RuntimeFrameworkCreate)
-		modelsGroup.PUT("/:namespace/:name/runtime_framework/:id", needAPIKey, middleware.RepoType(types.ModelRepo), repoCommonHandler.RuntimeFrameworkUpdate)
-		modelsGroup.DELETE("/:namespace/:name/runtime_framework/:id", needAPIKey, middleware.RepoType(types.ModelRepo), repoCommonHandler.RuntimeFrameworkDelete)
 		// list model inference
 		modelsGroup.GET("/:namespace/:name/run", middleware.RepoType(types.ModelRepo), repoCommonHandler.DeployList)
 		// deploy model as inference
@@ -723,13 +720,16 @@ func createUserRoutes(apiGroup *gin.RouterGroup, needAPIKey gin.HandlerFunc, use
 	apiGroup.GET("/user/:username/run/serverless", needAPIKey, userHandler.GetRunServerless)
 }
 
-func createRuntimeFrameworkRoutes(apiGroup *gin.RouterGroup, needAPIKey gin.HandlerFunc, modelHandler *handler.ModelHandler, runtimeArchHandler *handler.RuntimeArchitectureHandler) {
+func createRuntimeFrameworkRoutes(apiGroup *gin.RouterGroup, needAPIKey gin.HandlerFunc, modelHandler *handler.ModelHandler, runtimeArchHandler *handler.RuntimeArchitectureHandler, repoCommonHandler *handler.RepoHandler) {
 	runtimeFramework := apiGroup.Group("/runtime_framework")
 	{
 		runtimeFramework.GET("/:id/models", modelHandler.ListByRuntimeFrameworkID)
 		runtimeFramework.GET("", modelHandler.ListAllRuntimeFramework)
-		runtimeFramework.POST("/:id", needAPIKey, modelHandler.UpdateModelRuntimeFrameworks)
-		runtimeFramework.DELETE("/:id", needAPIKey, modelHandler.DeleteModelRuntimeFrameworks)
+		runtimeFramework.POST("", repoCommonHandler.RuntimeFrameworkCreate)
+		runtimeFramework.PUT("/:id", repoCommonHandler.RuntimeFrameworkUpdate)
+		runtimeFramework.DELETE("/:id", repoCommonHandler.RuntimeFrameworkDelete)
+		runtimeFramework.PUT("/:id/models", modelHandler.UpdateModelRuntimeFrameworks)
+		runtimeFramework.DELETE("/:id/models", modelHandler.DeleteModelRuntimeFrameworks)
 		runtimeFramework.GET("/models", modelHandler.ListModelsOfRuntimeFrameworks)
 
 		runtimeFramework.GET("/:id/architecture", needAPIKey, runtimeArchHandler.ListByRuntimeFrameworkID)

@@ -78,8 +78,8 @@ type ModelComponent interface {
 	Deploy(ctx context.Context, deployReq types.DeployActReq, req types.ModelRunReq) (int64, error)
 	ListModelsByRuntimeFrameworkID(ctx context.Context, currentUser string, per, page int, id int64, deployType int) ([]types.Model, int, error)
 	ListAllByRuntimeFramework(ctx context.Context, currentUser string) ([]database.RuntimeFramework, error)
-	SetRuntimeFrameworkModes(ctx context.Context, deployType int, id int64, paths []string) ([]string, error)
-	DeleteRuntimeFrameworkModes(ctx context.Context, deployType int, id int64, paths []string) ([]string, error)
+	SetRuntimeFrameworkModes(ctx context.Context, currentUser string, deployType int, id int64, paths []string) ([]string, error)
+	DeleteRuntimeFrameworkModes(ctx context.Context, currentUser string, deployType int, id int64, paths []string) ([]string, error)
 	ListModelsOfRuntimeFrameworks(ctx context.Context, currentUser, search, sort string, per, page int, deployType int) ([]types.Model, int, error)
 	OrgModels(ctx context.Context, req *types.OrgModelsReq) ([]types.Model, int, error)
 }
@@ -1029,7 +1029,15 @@ func (c *modelComponentImpl) ListAllByRuntimeFramework(ctx context.Context, curr
 	return runtimes, nil
 }
 
-func (c *modelComponentImpl) SetRuntimeFrameworkModes(ctx context.Context, deployType int, id int64, paths []string) ([]string, error) {
+func (c *modelComponentImpl) SetRuntimeFrameworkModes(ctx context.Context, currentUser string, deployType int, id int64, paths []string) ([]string, error) {
+	user, err := c.userStore.FindByUsername(ctx, currentUser)
+	if err != nil {
+		return nil, fmt.Errorf("cannot find user for runtime framework, %w", err)
+	}
+	isAdmin := c.repoComponent.IsAdminRole(user)
+	if !isAdmin {
+		return nil, ErrForbiddenMsg("need admin permission for runtime framework")
+	}
 	runtimeRepos, err := c.runtimeFrameworksStore.FindByID(ctx, id)
 	if err != nil {
 		return nil, err
@@ -1072,7 +1080,15 @@ func (c *modelComponentImpl) SetRuntimeFrameworkModes(ctx context.Context, deplo
 	return failedModels, nil
 }
 
-func (c *modelComponentImpl) DeleteRuntimeFrameworkModes(ctx context.Context, deployType int, id int64, paths []string) ([]string, error) {
+func (c *modelComponentImpl) DeleteRuntimeFrameworkModes(ctx context.Context, currentUser string, deployType int, id int64, paths []string) ([]string, error) {
+	user, err := c.userStore.FindByUsername(ctx, currentUser)
+	if err != nil {
+		return nil, fmt.Errorf("cannot find user for runtime framework, %w", err)
+	}
+	isAdmin := c.repoComponent.IsAdminRole(user)
+	if !isAdmin {
+		return nil, ErrForbiddenMsg("need admin permission for runtime framework")
+	}
 	models, err := c.modelStore.ListByPath(ctx, paths)
 	if err != nil {
 		return nil, err

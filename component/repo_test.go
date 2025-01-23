@@ -944,7 +944,7 @@ func TestRepoComponent_CreateRuntimeFramework(t *testing.T) {
 		ContainerPort: 321,
 		Type:          2,
 	}
-
+	repo.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "user").Return(database.User{ID: 1, RoleMask: "admin"}, nil)
 	repo.mocks.stores.RuntimeFrameworkMock().EXPECT().Add(ctx, frame).Return(nil)
 
 	fn, err := repo.CreateRuntimeFramework(ctx, &types.RuntimeFrameworkReq{
@@ -955,6 +955,7 @@ func TestRepoComponent_CreateRuntimeFramework(t *testing.T) {
 		Enabled:       2,
 		ContainerPort: 321,
 		Type:          2,
+		CurrentUser:   "user",
 	})
 	require.Nil(t, err)
 	require.Equal(t, types.RuntimeFramework{
@@ -983,7 +984,7 @@ func TestRepoComponent_UpdateRuntimeFramework(t *testing.T) {
 		ContainerPort: 321,
 		Type:          2,
 	}
-
+	repo.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "user").Return(database.User{ID: 1, RoleMask: "admin"}, nil)
 	repo.mocks.stores.RuntimeFrameworkMock().EXPECT().Update(ctx, frame).Return(&frame, nil)
 
 	fn, err := repo.UpdateRuntimeFramework(ctx, 123, &types.RuntimeFrameworkReq{
@@ -994,6 +995,7 @@ func TestRepoComponent_UpdateRuntimeFramework(t *testing.T) {
 		Enabled:       2,
 		ContainerPort: 321,
 		Type:          2,
+		CurrentUser:   "user",
 	})
 	require.Nil(t, err)
 	require.Equal(t, types.RuntimeFramework{
@@ -1022,11 +1024,11 @@ func TestRepoComponent_DeleteRuntimeFramework(t *testing.T) {
 		ContainerPort: 321,
 		Type:          2,
 	}
-
+	repo.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "user").Return(database.User{ID: 1, RoleMask: "admin"}, nil)
 	repo.mocks.stores.RuntimeFrameworkMock().EXPECT().FindByID(ctx, int64(123)).Return(&frame, nil)
 	repo.mocks.stores.RuntimeFrameworkMock().EXPECT().Delete(ctx, frame).Return(nil)
 
-	err := repo.DeleteRuntimeFramework(ctx, 123)
+	err := repo.DeleteRuntimeFramework(ctx, "user", 123)
 	require.Nil(t, err)
 
 }

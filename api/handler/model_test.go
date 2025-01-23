@@ -432,7 +432,7 @@ func TestModelHandler_UpdateModelRuntimeFramework(t *testing.T) {
 
 	tester.WithUser().WithQuery("deploy_type", "").AddPagination(1, 10).WithParam("id", "1")
 	tester.mocks.model.EXPECT().SetRuntimeFrameworkModes(
-		tester.ctx, types.InferenceType, int64(1), []string{"foo"},
+		tester.ctx, "u", types.InferenceType, int64(1), []string{"foo"},
 	).Return([]string{"bar"}, nil)
 	tester.WithBody(t, types.RuntimeFrameworkModels{
 		Models: []string{"foo"},
@@ -447,7 +447,7 @@ func TestModelHandler_DeleteModelRuntimeFramework(t *testing.T) {
 
 	tester.WithUser().WithQuery("deploy_type", "").AddPagination(1, 10).WithParam("id", "1")
 	tester.mocks.model.EXPECT().DeleteRuntimeFrameworkModes(
-		tester.ctx, types.InferenceType, int64(1), []string{"foo"},
+		tester.ctx, "u", types.InferenceType, int64(1), []string{"foo"},
 	).Return([]string{"bar"}, nil)
 	tester.WithBody(t, types.RuntimeFrameworkModels{
 		Models: []string{"foo"},

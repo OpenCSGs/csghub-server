@@ -1206,17 +1206,17 @@ func (_c *MockRepoComponent_DeleteRepo_Call) RunAndReturn(run func(context.Conte
 	return _c
 }
 
-// DeleteRuntimeFramework provides a mock function with given fields: ctx, id
-func (_m *MockRepoComponent) DeleteRuntimeFramework(ctx context.Context, id int64) error {
-	ret := _m.Called(ctx, id)
+// DeleteRuntimeFramework provides a mock function with given fields: ctx, currentUser, id
+func (_m *MockRepoComponent) DeleteRuntimeFramework(ctx context.Context, currentUser string, id int64) error {
+	ret := _m.Called(ctx, currentUser, id)
 
 	if len(ret) == 0 {
 		panic("no return value specified for DeleteRuntimeFramework")
 	}
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, int64) error); ok {
-		r0 = rf(ctx, id)
+	if rf, ok := ret.Get(0).(func(context.Context, string, int64) error); ok {
+		r0 = rf(ctx, currentUser, id)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -1231,14 +1231,15 @@ type MockRepoComponent_DeleteRuntimeFramework_Call struct {
 
 // DeleteRuntimeFramework is a helper method to define mock.On call
 //   - ctx context.Context
+//   - currentUser string
 //   - id int64
-func (_e *MockRepoComponent_Expecter) DeleteRuntimeFramework(ctx interface{}, id interface{}) *MockRepoComponent_DeleteRuntimeFramework_Call {
-	return &MockRepoComponent_DeleteRuntimeFramework_Call{Call: _e.mock.On("DeleteRuntimeFramework", ctx, id)}
+func (_e *MockRepoComponent_Expecter) DeleteRuntimeFramework(ctx interface{}, currentUser interface{}, id interface{}) *MockRepoComponent_DeleteRuntimeFramework_Call {
+	return &MockRepoComponent_DeleteRuntimeFramework_Call{Call: _e.mock.On("DeleteRuntimeFramework", ctx, currentUser, id)}
 }
 
-func (_c *MockRepoComponent_DeleteRuntimeFramework_Call) Run(run func(ctx context.Context, id int64)) *MockRepoComponent_DeleteRuntimeFramework_Call {
+func (_c *MockRepoComponent_DeleteRuntimeFramework_Call) Run(run func(ctx context.Context, currentUser string, id int64)) *MockRepoComponent_DeleteRuntimeFramework_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(int64))
+		run(args[0].(context.Context), args[1].(string), args[2].(int64))
 	})
 	return _c
 }
@@ -1248,7 +1249,7 @@ func (_c *MockRepoComponent_DeleteRuntimeFramework_Call) Return(_a0 error) *Mock
 	return _c
 }
 
-func (_c *MockRepoComponent_DeleteRuntimeFramework_Call) RunAndReturn(run func(context.Context, int64) error) *MockRepoComponent_DeleteRuntimeFramework_Call {
+func (_c *MockRepoComponent_DeleteRuntimeFramework_Call) RunAndReturn(run func(context.Context, string, int64) error) *MockRepoComponent_DeleteRuntimeFramework_Call {
 	_c.Call.Return(run)
 	return _c
 }
