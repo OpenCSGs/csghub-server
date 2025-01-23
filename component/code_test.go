@@ -51,7 +51,7 @@ func TestCodeComponent_Create(t *testing.T) {
 		NewBranch: "main",
 		Namespace: "ns",
 		Name:      "n",
-		FilePath:  readmeFileName,
+		FilePath:  types.ReadmeFileName,
 	}, types.CodeRepo)).Return(nil)
 	cc.mocks.gitServer.EXPECT().CreateRepoFile(buildCreateFileReq(&types.CreateFileParams{
 		Username:  "user",

@@ -1,0 +1,267 @@
+package component
+
+import (
+	"context"
+	"testing"
+
+	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
+	"opencsg.com/csghub-server/builder/git/gitserver"
+	"opencsg.com/csghub-server/builder/store/database"
+	"opencsg.com/csghub-server/common/types"
+	dvCom "opencsg.com/csghub-server/dataviewer/common"
+)
+
+func TestDatasetViewerComppnent_ViewParquetFile(t *testing.T) {
+
+	ctx := context.TODO()
+	dc := initializeTestDatasetViewerComponent(ctx, t)
+
+	repo := &database.Repository{DefaultBranch: "main"}
+	dc.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, types.DatasetRepo, "ns", "repo").Return(
+		repo, nil,
+	)
+	dc.mocks.components.repo.EXPECT().AllowReadAccessRepo(ctx, repo, "user").Return(true, nil)
+	dc.mocks.gitServer.EXPECT().GetRepoFileContents(mock.Anything, gitserver.GetRepoInfoByPathReq{
+		Namespace: "ns",
+		Name:      "repo",
+		Ref:       "main",
+		Path:      "foo",
+		RepoType:  types.DatasetRepo,
+	}).Return(&types.File{
+		LfsRelativePath: "a/b",
+	}, nil)
+	dc.mocks.preader.EXPECT().RowCount(mock.Anything, []string{"lfs/a/b"}, types.QueryReq{
+		PageSize:  10,
+		PageIndex: 1,
+	}, true).Return(100, nil)
+	dc.mocks.preader.EXPECT().FetchRows(mock.Anything, []string{"lfs/a/b"}, types.QueryReq{
+		PageSize:  10,
+		PageIndex: 1,
+	}, true).Return([]string{"a", "b"}, []string{"c", "d"}, [][]interface{}{
+		{1, 2, 3},
+	}, nil)
+
+	resp, err := dc.ViewParquetFile(ctx, &dvCom.ViewParquetFileReq{
+		Namespace:   "ns",
+		RepoName:    "repo",
+		Branch:      "main",
+		Path:        "foo",
+		Per:         10,
+		Page:        1,
+		CurrentUser: "user",
+	})
+	require.Nil(t, err)
+	require.Equal(t, &dvCom.ViewParquetFileResp{
+		Columns:     []string{"a", "b"},
+		ColumnsType: []string{"c", "d"},
+		Rows: [][]interface{}{
+			{1, 2, 3},
+		},
+		Total: 100,
+	}, resp)
+
+}
+
+func TestDatasetViewerComppnent_Rows(t *testing.T) {
+	ctx := context.TODO()
+	dc := initializeTestDatasetViewerComponent(ctx, t)
+
+	repo := &database.Repository{DefaultBranch: "main"}
+
+	dc.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, types.DatasetRepo, "ns", "repo").Return(
+		repo, nil,
+	)
+	dc.mocks.components.repo.EXPECT().AllowReadAccessRepo(ctx, repo, "user").Return(true, nil)
+
+	dc.mocks.stores.ViewerMock().EXPECT().GetViewerByRepoID(ctx, int64(0)).Return(nil, nil)
+
+	dc.mocks.gitServer.EXPECT().GetRepoFileContents(mock.Anything, gitserver.GetRepoInfoByPathReq{
+		Namespace: "ns",
+		Name:      "repo",
+		Ref:       "main",
+		Path:      types.REPOCARD_FILENAME,
+		RepoType:  types.DatasetRepo,
+	}).Return(&types.File{
+		LfsRelativePath: "a/b",
+		Content:         "LS0tCmNvbmZpZ3M6Ci0gY29uZmlnX25hbWU6ICJmb28iCiAgZGF0YV9maWxlczoKICAtIHNwbGl0OiB0cmFpbgogICAgcGF0aDogZm9vLy4qCi0gY29uZmlnX25hbWU6ICJiYXIiCiAgZGF0YV9maWxlczoKICAtIHNwbGl0OiB0cmFpbgpwYXRoOiBiYXIvLioKLS0tCg==",
+	}, nil)
+	dc.mocks.gitServer.EXPECT().GetRepoFileContents(mock.Anything, gitserver.GetRepoInfoByPathReq{
+		Namespace: "ns",
+		Name:      "repo",
+		Ref:       "main",
+		Path:      "foo/foobar.parquet",
+		RepoType:  types.DatasetRepo,
+	}).Return(&types.File{
+		LfsRelativePath: "a/b",
+	}, nil)
+	dc.mocks.preader.EXPECT().RowCount(mock.Anything, []string{"lfs/a/b"}, types.QueryReq{
+		PageSize:  10,
+		PageIndex: 1,
+	}, true).Return(100, nil)
+	dc.mocks.preader.EXPECT().FetchRows(mock.Anything, []string{"lfs/a/b"}, types.QueryReq{
+		PageSize:  10,
+		PageIndex: 1,
+	}, true).Return([]string{"a", "b"}, []string{"c", "d"}, [][]interface{}{
+		{1, 2, 3},
+	}, nil)
+	dc.mocks.gitServer.EXPECT().GetRepoFileTree(mock.Anything, gitserver.GetRepoInfoByPathReq{
+		Namespace: "ns",
+		Name:      "repo",
+
+		Ref:      "main",
+		RepoType: types.DatasetRepo,
+	}).Return(
+		[]*types.File{
+			{Name: "foobar.parquet", Path: "foo/foobar.parquet"},
+		}, nil,
+	)
+
+	resp, err := dc.Rows(ctx, &dvCom.ViewParquetFileReq{
+		Namespace:   "ns",
+		RepoName:    "repo",
+		Branch:      "main",
+		Path:        "foo",
+		Per:         10,
+		Page:        1,
+		CurrentUser: "user",
+	}, types.DataViewerReq{Split: "train", Config: "foo"})
+	require.Nil(t, err)
+	require.Equal(t, &dvCom.ViewParquetFileResp{
+		Columns:     []string{"a", "b"},
+		ColumnsType: []string{"c", "d"},
+		Rows: [][]interface{}{
+			{1, 2, 3},
+		},
+		Total: 100,
+	}, resp)
+
+}
+
+func TestDatasetViewerComppnent_GetCatalog(t *testing.T) {
+	t.Run("has card data", func(t *testing.T) {
+
+		ctx := context.TODO()
+		dc := initializeTestDatasetViewerComponent(ctx, t)
+
+		repo := &database.Repository{DefaultBranch: "main"}
+		dc.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, types.DatasetRepo, "ns", "repo").Return(
+			repo, nil,
+		)
+		dc.mocks.components.repo.EXPECT().AllowReadAccessRepo(ctx, repo, "user").Return(true, nil)
+		dc.mocks.stores.ViewerMock().EXPECT().GetViewerByRepoID(ctx, int64(0)).Return(nil, nil)
+		dc.mocks.gitServer.EXPECT().GetRepoFileContents(mock.Anything, gitserver.GetRepoInfoByPathReq{
+			Namespace: "ns",
+			Name:      "repo",
+			Ref:       "main",
+			Path:      types.REPOCARD_FILENAME,
+			RepoType:  types.DatasetRepo,
+		}).Return(&types.File{
+			LfsRelativePath: "a/b",
+			Content:         "LS0tCmNvbmZpZ3M6Ci0gY29uZmlnX25hbWU6ICJmb28iCiAgZGF0YV9maWxlczoKICAtIHNwbGl0OiB0cmFpbgogICAgcGF0aDogZm9vLy4qCi0gY29uZmlnX25hbWU6ICJiYXIiCiAgZGF0YV9maWxlczoKICAtIHNwbGl0OiB0cmFpbgpwYXRoOiBiYXIvLioKLS0tCg==",
+		}, nil)
+		dc.mocks.gitServer.EXPECT().GetRepoFileContents(mock.Anything, gitserver.GetRepoInfoByPathReq{
+			Namespace: "ns",
+			Name:      "repo",
+			Ref:       "main",
+			Path:      "foo/foobar.parquet",
+			RepoType:  types.DatasetRepo,
+		}).Return(&types.File{
+			LfsRelativePath: "a/b",
+		}, nil)
+		dc.mocks.preader.EXPECT().RowCount(mock.Anything, []string{"lfs/a/b"}, types.QueryReq{
+			PageSize:  10,
+			PageIndex: 1,
+		}, true).Return(100, nil)
+		dc.mocks.gitServer.EXPECT().GetRepoFileTree(mock.Anything, gitserver.GetRepoInfoByPathReq{
+			Namespace: "ns",
+			Name:      "repo",
+
+			Ref:      "main",
+			RepoType: types.DatasetRepo,
+		}).Return(
+			[]*types.File{
+				{Name: "foobar.parquet", Path: "foo/foobar.parquet"},
+			}, nil,
+		)
+
+		data, err := dc.GetCatalog(ctx, &dvCom.ViewParquetFileReq{
+			Namespace:   "ns",
+			RepoName:    "repo",
+			Branch:      "main",
+			Path:        "foo",
+			Per:         10,
+			Page:        1,
+			CurrentUser: "user",
+		})
+		require.Nil(t, err)
+		require.Equal(t, &dvCom.CataLogRespone{
+			Configs: []dvCom.ConfigData{
+				{ConfigName: "foo", DataFiles: []dvCom.DataFiles{
+					{Split: "train", Path: []string{"foo/.*"}},
+				}}, {ConfigName: "bar", DataFiles: []dvCom.DataFiles{{Split: "train"}}}},
+			DatasetInfos: []dvCom.DatasetInfo{
+				{ConfigName: "foo", Splits: []dvCom.Split{{Name: "train", NumExamples: 100}}},
+				{ConfigName: "bar", Splits: []dvCom.Split{{Name: "train", NumExamples: 0}}}},
+		}, data)
+	})
+
+	t.Run("auto generate card data", func(t *testing.T) {
+
+		ctx := context.TODO()
+		dc := initializeTestDatasetViewerComponent(ctx, t)
+
+		repo := &database.Repository{DefaultBranch: "main"}
+		dc.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, types.DatasetRepo, "ns", "repo").Return(
+			repo, nil,
+		)
+		dc.mocks.components.repo.EXPECT().AllowReadAccessRepo(ctx, repo, "user").Return(true, nil)
+		dc.mocks.stores.ViewerMock().EXPECT().GetViewerByRepoID(ctx, int64(0)).Return(nil, nil)
+		dc.mocks.gitServer.EXPECT().GetRepoFileContents(mock.Anything, gitserver.GetRepoInfoByPathReq{
+			Namespace: "ns",
+			Name:      "repo",
+			Ref:       "main",
+			Path:      types.REPOCARD_FILENAME,
+			RepoType:  types.DatasetRepo,
+		}).Return(&types.File{
+			LfsRelativePath: "a/b",
+			Content:         "xxx",
+		}, nil)
+		dc.mocks.gitServer.EXPECT().GetRepoFileContents(mock.Anything, gitserver.GetRepoInfoByPathReq{
+			Namespace: "ns",
+			Name:      "repo",
+			Ref:       "main",
+			Path:      "foo/train.parquet",
+			RepoType:  types.DatasetRepo,
+		}).Return(&types.File{
+			LfsRelativePath: "a/b",
+		}, nil)
+		dc.mocks.preader.EXPECT().RowCount(mock.Anything, []string{"lfs/a/b"}, types.QueryReq{
+			PageSize:  10,
+			PageIndex: 1,
+		}, true).Return(100, nil)
+		dc.mocks.gitServer.EXPECT().GetRepoFileTree(mock.Anything, gitserver.GetRepoInfoByPathReq{
+			Namespace: "ns",
+			Name:      "repo",
+
+			Ref:      "main",
+			RepoType: types.DatasetRepo,
+		}).Return(
+			[]*types.File{
+				{Name: "foobar.parquet", Path: "foo/train.parquet"},
+			}, nil,
+		)
+
+		data, err := dc.GetCatalog(ctx, &dvCom.ViewParquetFileReq{
+			Namespace:   "ns",
+			RepoName:    "repo",
+			Branch:      "main",
+			Path:        "foo",
+			Per:         10,
+			Page:        1,
+			CurrentUser: "user",
+		})
+		require.Nil(t, err)
+		require.Equal(t, &dvCom.CataLogRespone{Configs: []dvCom.ConfigData{{ConfigName: "default", DataFiles: []dvCom.DataFiles{{Split: "train", Path: []string{"foo/train.parquet"}}}}}, DatasetInfos: []dvCom.DatasetInfo{{ConfigName: "default", Splits: []dvCom.Split{{Name: "train", NumExamples: 100}}}}}, data)
+	})
+}

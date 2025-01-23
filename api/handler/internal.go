@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"context"
 	"log/slog"
 	"net/http"
 	"strings"
@@ -13,6 +14,7 @@ import (
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/types"
 	"opencsg.com/csghub-server/component"
+	dvCom "opencsg.com/csghub-server/dataviewer/common"
 )
 
 func NewInternalHandler(config *config.Config) (*InternalHandler, error) {
@@ -101,15 +103,23 @@ func (h *InternalHandler) LfsAuthenticate(ctx *gin.Context) {
 	ctx.PureJSON(http.StatusOK, resp)
 }
 
-// TODO: add logic
 func (h *InternalHandler) PreReceive(ctx *gin.Context) {
 	ctx.PureJSON(http.StatusOK, gin.H{
 		"reference_counter_increased": true,
 	})
 }
 
-// TODO: add logic
 func (h *InternalHandler) PostReceive(ctx *gin.Context) {
+	successResp := gin.H{
+		"reference_counter_decreased": true,
+		"messages": []Messages{
+			{
+				Message: "Welcome to OpenCSG!",
+				Type:    "alert",
+			},
+		},
+	}
+
 	var req types.PostReceiveReq
 	if err := ctx.ShouldBind(&req); err != nil {
 		slog.Error("Bad request format", "error", err)
@@ -123,6 +133,7 @@ func (h *InternalHandler) PostReceive(ctx *gin.Context) {
 	// the format of ref is main
 	ref = strings.ReplaceAll(ref, "\n", "")
 	paths := strings.Split(req.GlRepository, "/")
+
 	diffReq := types.GetDiffBetweenTwoCommitsReq{
 		LeftCommitId:  strs[0],
 		RightCommitId: strs[1],
@@ -134,10 +145,17 @@ func (h *InternalHandler) PostReceive(ctx *gin.Context) {
 	callback, err := h.internal.GetCommitDiff(ctx.Request.Context(), diffReq)
 	if err != nil {
 		slog.Error("post receive: failed to get commit diff", slog.Any("error", err))
-		httpbase.ServerError(ctx, err)
-		return
+		if diffReq.RightCommitId == types.NoCommitID {
+			// delete branch action
+			ctx.PureJSON(http.StatusOK, successResp)
+			return
+		} else {
+			httpbase.ServerError(ctx, err)
+			return
+		}
 	}
 	callback.Ref = originalRef
+
 	//start workflow to handle push request
 	workflowOptions := client.StartWorkflowOptions{
 		TaskQueue: workflow.HandlePushQueueName,
@@ -151,17 +169,32 @@ func (h *InternalHandler) PostReceive(ctx *gin.Context) {
 		httpbase.ServerError(ctx, err)
 		return
 	}
+
+	if diffReq.RepoType == types.DatasetRepo {
+		h.CallDataViewer(ctx.Request.Context(), diffReq.Namespace, diffReq.Name, diffReq.Ref)
+	}
+
 	slog.Info("start handle push workflow", slog.String("workflow_id", we.GetID()), slog.Any("req", callback))
 
-	ctx.PureJSON(http.StatusOK, gin.H{
-		"reference_counter_decreased": true,
-		"messages": []Messages{
-			{
-				Message: "Welcome to OpenCSG!",
-				Type:    "alert",
-			},
-		},
-	})
+	ctx.PureJSON(http.StatusOK, successResp)
+}
+
+func (h *InternalHandler) CallDataViewer(ctx context.Context, namespace, name, branch string) {
+	if branch == dvCom.ParquetBranch || branch == dvCom.DuckdbBranch {
+		return
+	}
+	req := types.UpdateViewerReq{
+		Namespace: namespace,
+		Name:      name,
+		Branch:    branch,
+		RepoType:  types.DatasetRepo,
+	}
+	res, err := h.internal.TriggerDataviewerWorkflow(ctx, req)
+	if err != nil {
+		slog.Error("fail to read dataviewer response", slog.Any("req", req), slog.Any("err", err))
+		return
+	}
+	slog.Info("dataviewer callback response", slog.Any("req", req), slog.Any("res", res))
 }
 
 func (h *InternalHandler) GetAuthorizedKeys(ctx *gin.Context) {

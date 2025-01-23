@@ -260,7 +260,7 @@ func (c *modelComponentImpl) Create(ctx context.Context, req *types.CreateModelR
 		NewBranch: req.DefaultBranch,
 		Namespace: req.Namespace,
 		Name:      req.Name,
-		FilePath:  readmeFileName,
+		FilePath:  types.ReadmeFileName,
 	}, types.ModelRepo))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create README.md file, cause: %w", err)
@@ -550,7 +550,7 @@ func (c *modelComponentImpl) SDKModelInfo(ctx context.Context, namespace, name, 
 		}
 	}
 
-	filePaths, err := getFilePaths(namespace, name, "", types.ModelRepo, ref, c.gitServer.GetRepoFileTree)
+	filePaths, err := GetFilePaths(namespace, name, "", types.ModelRepo, ref, c.gitServer.GetRepoFileTree)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get all %s files, error: %w", types.ModelRepo, err)
 	}
@@ -647,7 +647,7 @@ func (c *modelComponentImpl) SetRelationDatasets(ctx context.Context, req types.
 		Namespace: req.Namespace,
 		Name:      req.Name,
 		Ref:       types.MainBranch,
-		Path:      REPOCARD_FILENAME,
+		Path:      types.REPOCARD_FILENAME,
 		RepoType:  types.ModelRepo,
 	}
 
@@ -664,7 +664,7 @@ func (c *modelComponentImpl) SetRelationDatasets(ctx context.Context, req types.
 	var readmeReq types.UpdateFileReq
 	readmeReq.Branch = types.MainBranch
 	readmeReq.Message = "update dataset tags"
-	readmeReq.FilePath = REPOCARD_FILENAME
+	readmeReq.FilePath = types.REPOCARD_FILENAME
 	readmeReq.RepoType = types.ModelRepo
 	readmeReq.Namespace = req.Namespace
 	readmeReq.Name = req.Name
@@ -699,7 +699,7 @@ func (c *modelComponentImpl) AddRelationDataset(ctx context.Context, req types.R
 		Namespace: req.Namespace,
 		Name:      req.Name,
 		Ref:       "main",
-		Path:      REPOCARD_FILENAME,
+		Path:      types.REPOCARD_FILENAME,
 		RepoType:  types.ModelRepo,
 	}
 	metaMap, splits, err := GetMetaMapFromReadMe(c.gitServer, getFileContentReq)
@@ -721,7 +721,7 @@ func (c *modelComponentImpl) AddRelationDataset(ctx context.Context, req types.R
 	var readmeReq types.UpdateFileReq
 	readmeReq.Branch = "main"
 	readmeReq.Message = "add relation dataset"
-	readmeReq.FilePath = REPOCARD_FILENAME
+	readmeReq.FilePath = types.REPOCARD_FILENAME
 	readmeReq.RepoType = types.ModelRepo
 	readmeReq.Namespace = req.Namespace
 	readmeReq.Name = req.Name
@@ -756,7 +756,7 @@ func (c *modelComponentImpl) DelRelationDataset(ctx context.Context, req types.R
 		Namespace: req.Namespace,
 		Name:      req.Name,
 		Ref:       "main",
-		Path:      REPOCARD_FILENAME,
+		Path:      types.REPOCARD_FILENAME,
 		RepoType:  types.ModelRepo,
 	}
 	metaMap, splits, err := GetMetaMapFromReadMe(c.gitServer, getFileContentReq)
@@ -783,7 +783,7 @@ func (c *modelComponentImpl) DelRelationDataset(ctx context.Context, req types.R
 	var readmeReq types.UpdateFileReq
 	readmeReq.Branch = "main"
 	readmeReq.Message = "delete relation dataset"
-	readmeReq.FilePath = REPOCARD_FILENAME
+	readmeReq.FilePath = types.REPOCARD_FILENAME
 	readmeReq.RepoType = types.ModelRepo
 	readmeReq.Namespace = req.Namespace
 	readmeReq.Name = req.Name
@@ -863,7 +863,7 @@ func GetFilePathObjects(namespace, repoName, folder string, repoType types.Repos
 	return allFiles, nil
 }
 
-func getFilePaths(namespace, repoName, folder string, repoType types.RepositoryType, ref string, gsTree func(ctx context.Context, req gitserver.GetRepoInfoByPathReq) ([]*types.File, error)) ([]string, error) {
+func GetFilePaths(namespace, repoName, folder string, repoType types.RepositoryType, ref string, gsTree func(ctx context.Context, req gitserver.GetRepoInfoByPathReq) ([]*types.File, error)) ([]string, error) {
 	var filePaths []string
 	allFiles, err := getAllFiles(namespace, repoName, folder, repoType, ref, gsTree)
 	if err != nil {

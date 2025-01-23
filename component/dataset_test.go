@@ -50,7 +50,7 @@ func TestDatasetCompnent_Create(t *testing.T) {
 			Content:   "\n---\nlicense: \n---\n\t",
 			Namespace: "ns",
 			Name:      "n",
-			FilePath:  readmeFileName,
+			FilePath:  types.ReadmeFileName,
 		}, types.DatasetRepo),
 	).Return(nil)
 	dc.mocks.gitServer.EXPECT().CreateRepoFile(buildCreateFileReq(
@@ -58,7 +58,7 @@ func TestDatasetCompnent_Create(t *testing.T) {
 			Username:  "user",
 			Message:   initCommitMessage,
 			Branch:    "main",
-			Content:   datasetGitattributesContent,
+			Content:   types.DatasetGitattributesContent,
 			Namespace: "ns",
 			Name:      "n",
 			FilePath:  gitattributesFileName,

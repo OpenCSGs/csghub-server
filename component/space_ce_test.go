@@ -62,7 +62,7 @@ func TestSpaceComponent_Create(t *testing.T) {
 		NewBranch: "main",
 		Namespace: "ns",
 		Name:      "n",
-		FilePath:  readmeFileName,
+		FilePath:  types.ReadmeFileName,
 	}, types.SpaceRepo)).Return(nil)
 	sc.mocks.gitServer.EXPECT().CreateRepoFile(buildCreateFileReq(&types.CreateFileParams{
 		Username:  "user",

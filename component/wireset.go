@@ -258,15 +258,6 @@ func NewTestAccountingComponent(stores *tests.MockStores, accountingClient accou
 
 var AccountingComponentSet = wire.NewSet(NewTestAccountingComponent)
 
-func NewTestDatasetViewerComponent(stores *tests.MockStores, cfg *config.Config, repoComponent RepoComponent, gitServer gitserver.GitServer, preader parquet.Reader) *datasetViewerComponentImpl {
-	return &datasetViewerComponentImpl{
-		cfg:     cfg,
-		preader: preader,
-	}
-}
-
-var DatasetViewerComponentSet = wire.NewSet(NewTestDatasetViewerComponent)
-
 func NewTestGitHTTPComponent(
 	config *config.Config,
 	stores *tests.MockStores,

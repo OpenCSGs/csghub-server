@@ -516,6 +516,53 @@ func (_c *MockGitServer_DeleteRepo_Call) RunAndReturn(run func(context.Context, 
 	return _c
 }
 
+// DeleteRepoBranch provides a mock function with given fields: ctx, req
+func (_m *MockGitServer) DeleteRepoBranch(ctx context.Context, req gitserver.DeleteBranchReq) error {
+	ret := _m.Called(ctx, req)
+
+	if len(ret) == 0 {
+		panic("no return value specified for DeleteRepoBranch")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, gitserver.DeleteBranchReq) error); ok {
+		r0 = rf(ctx, req)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// MockGitServer_DeleteRepoBranch_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'DeleteRepoBranch'
+type MockGitServer_DeleteRepoBranch_Call struct {
+	*mock.Call
+}
+
+// DeleteRepoBranch is a helper method to define mock.On call
+//   - ctx context.Context
+//   - req gitserver.DeleteBranchReq
+func (_e *MockGitServer_Expecter) DeleteRepoBranch(ctx interface{}, req interface{}) *MockGitServer_DeleteRepoBranch_Call {
+	return &MockGitServer_DeleteRepoBranch_Call{Call: _e.mock.On("DeleteRepoBranch", ctx, req)}
+}
+
+func (_c *MockGitServer_DeleteRepoBranch_Call) Run(run func(ctx context.Context, req gitserver.DeleteBranchReq)) *MockGitServer_DeleteRepoBranch_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(gitserver.DeleteBranchReq))
+	})
+	return _c
+}
+
+func (_c *MockGitServer_DeleteRepoBranch_Call) Return(_a0 error) *MockGitServer_DeleteRepoBranch_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockGitServer_DeleteRepoBranch_Call) RunAndReturn(run func(context.Context, gitserver.DeleteBranchReq) error) *MockGitServer_DeleteRepoBranch_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // DeleteRepoFile provides a mock function with given fields: req
 func (_m *MockGitServer) DeleteRepoFile(req *types.DeleteFileReq) error {
 	ret := _m.Called(req)
@@ -1157,6 +1204,65 @@ func (_c *MockGitServer_GetRepoAllLfsPointers_Call) Return(_a0 []*types.LFSPoint
 }
 
 func (_c *MockGitServer_GetRepoAllLfsPointers_Call) RunAndReturn(run func(context.Context, gitserver.GetRepoAllFilesReq) ([]*types.LFSPointer, error)) *MockGitServer_GetRepoAllLfsPointers_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// GetRepoBranchByName provides a mock function with given fields: ctx, req
+func (_m *MockGitServer) GetRepoBranchByName(ctx context.Context, req gitserver.GetBranchReq) (*types.Branch, error) {
+	ret := _m.Called(ctx, req)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetRepoBranchByName")
+	}
+
+	var r0 *types.Branch
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, gitserver.GetBranchReq) (*types.Branch, error)); ok {
+		return rf(ctx, req)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, gitserver.GetBranchReq) *types.Branch); ok {
+		r0 = rf(ctx, req)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*types.Branch)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, gitserver.GetBranchReq) error); ok {
+		r1 = rf(ctx, req)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockGitServer_GetRepoBranchByName_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetRepoBranchByName'
+type MockGitServer_GetRepoBranchByName_Call struct {
+	*mock.Call
+}
+
+// GetRepoBranchByName is a helper method to define mock.On call
+//   - ctx context.Context
+//   - req gitserver.GetBranchReq
+func (_e *MockGitServer_Expecter) GetRepoBranchByName(ctx interface{}, req interface{}) *MockGitServer_GetRepoBranchByName_Call {
+	return &MockGitServer_GetRepoBranchByName_Call{Call: _e.mock.On("GetRepoBranchByName", ctx, req)}
+}
+
+func (_c *MockGitServer_GetRepoBranchByName_Call) Run(run func(ctx context.Context, req gitserver.GetBranchReq)) *MockGitServer_GetRepoBranchByName_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(gitserver.GetBranchReq))
+	})
+	return _c
+}
+
+func (_c *MockGitServer_GetRepoBranchByName_Call) Return(_a0 *types.Branch, _a1 error) *MockGitServer_GetRepoBranchByName_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockGitServer_GetRepoBranchByName_Call) RunAndReturn(run func(context.Context, gitserver.GetBranchReq) (*types.Branch, error)) *MockGitServer_GetRepoBranchByName_Call {
 	_c.Call.Return(run)
 	return _c
 }

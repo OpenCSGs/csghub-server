@@ -165,3 +165,11 @@ packages:
       OperationServiceClient:
       SmartHTTPServiceClient:
       RemoteServiceClient:
+  opencsg.com/csghub-server/builder/dataviewer:
+    config:
+    interfaces:
+      DataviewerClient:
+  opencsg.com/csghub-server/dataviewer/workflows:
+    config:
+    interfaces:
+      DataViewerActivity:

@@ -316,6 +316,65 @@ func (_c *MockInternalComponent_SSHAllowed_Call) RunAndReturn(run func(context.C
 	return _c
 }
 
+// TriggerDataviewerWorkflow provides a mock function with given fields: ctx, req
+func (_m *MockInternalComponent) TriggerDataviewerWorkflow(ctx context.Context, req types.UpdateViewerReq) (*types.WorkFlowInfo, error) {
+	ret := _m.Called(ctx, req)
+
+	if len(ret) == 0 {
+		panic("no return value specified for TriggerDataviewerWorkflow")
+	}
+
+	var r0 *types.WorkFlowInfo
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, types.UpdateViewerReq) (*types.WorkFlowInfo, error)); ok {
+		return rf(ctx, req)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, types.UpdateViewerReq) *types.WorkFlowInfo); ok {
+		r0 = rf(ctx, req)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*types.WorkFlowInfo)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, types.UpdateViewerReq) error); ok {
+		r1 = rf(ctx, req)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockInternalComponent_TriggerDataviewerWorkflow_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'TriggerDataviewerWorkflow'
+type MockInternalComponent_TriggerDataviewerWorkflow_Call struct {
+	*mock.Call
+}
+
+// TriggerDataviewerWorkflow is a helper method to define mock.On call
+//   - ctx context.Context
+//   - req types.UpdateViewerReq
+func (_e *MockInternalComponent_Expecter) TriggerDataviewerWorkflow(ctx interface{}, req interface{}) *MockInternalComponent_TriggerDataviewerWorkflow_Call {
+	return &MockInternalComponent_TriggerDataviewerWorkflow_Call{Call: _e.mock.On("TriggerDataviewerWorkflow", ctx, req)}
+}
+
+func (_c *MockInternalComponent_TriggerDataviewerWorkflow_Call) Run(run func(ctx context.Context, req types.UpdateViewerReq)) *MockInternalComponent_TriggerDataviewerWorkflow_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(types.UpdateViewerReq))
+	})
+	return _c
+}
+
+func (_c *MockInternalComponent_TriggerDataviewerWorkflow_Call) Return(_a0 *types.WorkFlowInfo, _a1 error) *MockInternalComponent_TriggerDataviewerWorkflow_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockInternalComponent_TriggerDataviewerWorkflow_Call) RunAndReturn(run func(context.Context, types.UpdateViewerReq) (*types.WorkFlowInfo, error)) *MockInternalComponent_TriggerDataviewerWorkflow_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // NewMockInternalComponent creates a new instance of MockInternalComponent. It also registers a testing interface on the mock and a cleanup function to assert the mocks expectations.
 // The first argument is typically a *testing.T value.
 func NewMockInternalComponent(t interface {

@@ -26,6 +26,8 @@ type GitServer interface {
 	UpdateRepo(ctx context.Context, req UpdateRepoReq) (*CreateRepoResp, error)
 	DeleteRepo(ctx context.Context, req DeleteRepoReq) error
 	GetRepoBranches(ctx context.Context, req GetBranchesReq) ([]types.Branch, error)
+	GetRepoBranchByName(ctx context.Context, req GetBranchReq) (*types.Branch, error)
+	DeleteRepoBranch(ctx context.Context, req DeleteBranchReq) error
 	GetRepoCommits(ctx context.Context, req GetRepoCommitsReq) ([]types.Commit, *types.RepoPageOpts, error)
 	GetRepoLastCommit(ctx context.Context, req GetRepoLastCommitReq) (*types.Commit, error)
 	GetSingleCommit(ctx context.Context, req GetRepoLastCommitReq) (*types.CommitResponse, error)

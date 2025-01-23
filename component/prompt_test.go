@@ -381,7 +381,7 @@ func TestPromptComponent_SetRelationModels(t *testing.T) {
 	pc.mocks.gitServer.EXPECT().UpdateRepoFile(&types.UpdateFileReq{
 		Branch:    types.MainBranch,
 		Message:   "update model relation tags",
-		FilePath:  REPOCARD_FILENAME,
+		FilePath:  types.REPOCARD_FILENAME,
 		RepoType:  types.PromptRepo,
 		Namespace: "ns",
 		Name:      "n",
@@ -423,7 +423,7 @@ func TestPromptComponent_AddRelationModel(t *testing.T) {
 	pc.mocks.gitServer.EXPECT().UpdateRepoFile(&types.UpdateFileReq{
 		Branch:    types.MainBranch,
 		Message:   "add relation model",
-		FilePath:  REPOCARD_FILENAME,
+		FilePath:  types.REPOCARD_FILENAME,
 		RepoType:  types.PromptRepo,
 		Namespace: "ns",
 		Name:      "n",
@@ -465,7 +465,7 @@ func TestPromptComponent_DelRelationModel(t *testing.T) {
 	pc.mocks.gitServer.EXPECT().UpdateRepoFile(&types.UpdateFileReq{
 		Branch:    types.MainBranch,
 		Message:   "delete relation model",
-		FilePath:  REPOCARD_FILENAME,
+		FilePath:  types.REPOCARD_FILENAME,
 		RepoType:  types.PromptRepo,
 		Namespace: "ns",
 		Name:      "n",
@@ -538,7 +538,7 @@ func TestPromptComponent_CreatePromptRepo(t *testing.T) {
 		Email:     "foo@bar.com",
 		Message:   "initial commit",
 		Branch:    "main",
-		Content:   base64.StdEncoding.EncodeToString([]byte(datasetGitattributesContent)),
+		Content:   base64.StdEncoding.EncodeToString([]byte(types.DatasetGitattributesContent)),
 		NewBranch: "main",
 		FilePath:  ".gitattributes",
 		Namespace: "ns",

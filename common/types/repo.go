@@ -4,6 +4,8 @@ import (
 	"time"
 )
 
+var REPOCARD_FILENAME = "README.md"
+
 type RepositoryType string
 type RepositorySource string
 type RepositorySyncStatus string

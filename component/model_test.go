@@ -97,7 +97,7 @@ func TestModelComponent_Create(t *testing.T) {
 		NewBranch: "main",
 		Namespace: "ns",
 		Name:      "n",
-		FilePath:  readmeFileName,
+		FilePath:  types.ReadmeFileName,
 	}, types.ModelRepo)).Return(nil)
 	mc.mocks.gitServer.EXPECT().CreateRepoFile(buildCreateFileReq(&types.CreateFileParams{
 		Username:  "user",
@@ -362,7 +362,7 @@ func TestModelComponent_SetRelationDatasets(t *testing.T) {
 		Namespace: "ns",
 		Name:      "n",
 		Ref:       "main",
-		Path:      REPOCARD_FILENAME,
+		Path:      types.REPOCARD_FILENAME,
 		RepoType:  types.ModelRepo,
 	}).Return(&types.File{}, nil)
 	mc.mocks.gitServer.EXPECT().UpdateRepoFile(&types.UpdateFileReq{
@@ -398,7 +398,7 @@ func TestModelComponent_AddRelationDataset(t *testing.T) {
 		Namespace: "ns",
 		Name:      "n",
 		Ref:       "main",
-		Path:      REPOCARD_FILENAME,
+		Path:      types.REPOCARD_FILENAME,
 		RepoType:  types.ModelRepo,
 	}).Return(&types.File{}, nil)
 	mc.mocks.gitServer.EXPECT().UpdateRepoFile(&types.UpdateFileReq{
@@ -434,7 +434,7 @@ func TestModelComponent_DeleteRelationDataset(t *testing.T) {
 		Namespace: "ns",
 		Name:      "n",
 		Ref:       "main",
-		Path:      REPOCARD_FILENAME,
+		Path:      types.REPOCARD_FILENAME,
 		RepoType:  types.ModelRepo,
 	}).Return(&types.File{
 		Content: "LS0tCiBkYXRhc2V0czoKICAgLSBkczE=",

@@ -8,6 +8,7 @@ import (
 	"github.com/spf13/cobra"
 	"opencsg.com/csghub-server/cmd/csghub-server/cmd/accounting"
 	"opencsg.com/csghub-server/cmd/csghub-server/cmd/cron"
+	"opencsg.com/csghub-server/cmd/csghub-server/cmd/dataviewer"
 	"opencsg.com/csghub-server/cmd/csghub-server/cmd/deploy"
 	"opencsg.com/csghub-server/cmd/csghub-server/cmd/git"
 	"opencsg.com/csghub-server/cmd/csghub-server/cmd/logscan"
@@ -64,7 +65,11 @@ func init() {
 		user.Cmd,
 		git.Cmd,
 		moderation.Cmd,
+		dataviewer.Cmd,
 	)
+
+	addCommands()
+
 }
 
 func setupLog(lvl, format string) {

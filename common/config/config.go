@@ -94,6 +94,7 @@ type Config struct {
 		InternalEndpoint string `env:"STARHUB_SERVER_S3_INTERNAL_ENDPOINT, default="`
 		Bucket           string `env:"STARHUB_SERVER_S3_BUCKET, default=opencsg-test"`
 		EnableSSL        bool   `env:"STARHUB_SERVER_S3_ENABLE_SSL, default=false"`
+		BucketLookup     string `env:"STARHUB_SERVER_S3_BUCKET_LOOKUP, default=auto"`
 	}
 
 	SensitiveCheck struct {
@@ -208,7 +209,9 @@ type Config struct {
 	}
 
 	WorkFLow struct {
-		Endpoint string `env:"OPENCSG_WORKFLOW_SERVER_ENDPOINT, default=localhost:7233"`
+		Endpoint         string `env:"OPENCSG_WORKFLOW_SERVER_ENDPOINT, default=localhost:7233"`
+		ExecutionTimeout int64  `env:"OPENCSG_WORKFLOW_EXECUTION_TIMEOUT, default=43200"`
+		TaskTimeout      int64  `env:"OPENCSG_WORKFLOW_TASK_TIMEOUT, default=43200"`
 	}
 
 	Argo struct {
@@ -226,6 +229,22 @@ type Config struct {
 	CronJob struct {
 		SyncAsClientCronExpression   string `env:"STARHUB_SERVER_CRON_JOB_SYNC_AS_CLIENT_CRON_EXPRESSION, default=0 * * * *"`
 		CalcRecomScoreCronExpression string `env:"STARHUB_SERVER_CRON_JOB_CLAC_RECOM_SCORE_CRON_EXPRESSION, default=0 1 * * *"`
+	}
+
+	DataViewer struct {
+		Host                                    string `env:"OPENCSG_DATAVIEWER_SERVER_HOST, default=http://localhost"`
+		Port                                    int    `env:"OPENCSG_DATAVIEWER_SERVER_PORT, default=8093"`
+		MaxConcurrentActivityExecutionSize      int    `env:"OPENCSG_DATAVIEWER_MAX_CONCURRENT_ACTIVITY_EXECUTION_SIZE, default=5"`
+		MaxConcurrentLocalActivityExecutionSize int    `env:"OPENCSG_DATAVIEWER_MAX_CONCURRENT_LOCAL_ACTIVITY_EXECUTION_SIZE, default=10"`
+		MaxConcurrentWorkflowTaskExecutionSize  int    `env:"OPENCSG_DATAVIEWER_MAX_CONCURRENT_WORKFLOW_TASK_EXECUTION_SIZE, default=2"`
+		ActivityStartToCloseTimeout             int    `env:"OPENCSG_DATAVIEWER_ACTIVITY_START_TO_CLOSE_TIMEOUT, default=7200"`
+		ActivityMaximumAttempts                 int32  `env:"OPENCSG_DATAVIEWER_ACTIVITY_MAXIMUM_ATTEMPTS, default=2"`
+		CacheDir                                string `env:"OPENCSG_DATAVIEWER_CACHE_DIR, default=/tmp/opencsg"`
+		DownloadLfsFile                         bool   `env:"OPENCSG_DATAVIEWER_DOWNLOAD_LFS_FILE, default=true"`
+		ThreadNumOfExport                       int    `env:"OPENCSG_DATAVIEWER_THREAD_NUM_OF_EXPORT, default=4"`
+		MaxFileSize                             int64  `env:"OPENCSG_DATAVIEWER_MAX_FILE_SIZE, default=104857600"` // 100 MB
+		MaxConcurrentSessionExecutionSize       int    `env:"OPENCSG_DATAVIEWER_MAX_CONCURRENT_SESSION_EXECUTION_SIZE, default=1"`
+		SessionExecutionTimeout                 int    `env:"OPENCSG_DATAVIEWER_SESSION_EXECUTION_TIMEOUT, default=240"` // 240 minutes
 	}
 
 	Proxy struct {
