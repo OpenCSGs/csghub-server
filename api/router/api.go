@@ -427,6 +427,13 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 		return nil, fmt.Errorf("error creating prompt handler,%w", err)
 	}
 	createPromptRoutes(apiGroup, promptHandler)
+
+	dataViewerAddr := fmt.Sprintf("%s:%d", config.DataViewer.Host, config.DataViewer.Port)
+	dsViewerHandler, err := handler.NewInternalServiceProxyHandler(dataViewerAddr)
+	if err != nil {
+		return nil, fmt.Errorf("error creating dataset viewer proxy:%w", err)
+	}
+	createDataViewerRoutes(apiGroup, dsViewerHandler)
 	return r, nil
 }
 
@@ -835,5 +842,17 @@ func createTagsRoutes(apiGroup *gin.RouterGroup, tagHandler *handler.TagsHandler
 		tagsGrp.GET("/:id", tagHandler.GetTagByID)
 		tagsGrp.PUT("/:id", tagHandler.UpdateTag)
 		tagsGrp.DELETE("/:id", tagHandler.DeleteTag)
+	}
+}
+
+func createDataViewerRoutes(apiGroup *gin.RouterGroup, dsViewerHandler *handler.InternalServiceProxyHandler) {
+	datasetRepoGrp := apiGroup.Group("/datasets/:namespace/:name")
+	fileViewerGrp := datasetRepoGrp.Group("/viewer")
+	{
+		fileViewerGrp.Any("/*any", dsViewerHandler.Proxy)
+	}
+	dataViewerGrp := datasetRepoGrp.Group("/dataviewer")
+	{
+		dataViewerGrp.Any("/*any", dsViewerHandler.Proxy)
 	}
 }

@@ -94,6 +94,22 @@ type GetBranchesReq struct {
 	RepoType  types.RepositoryType `json:"repo_type"`
 }
 
+type GetBranchReq struct {
+	Namespace string               `json:"namespace"`
+	Name      string               `json:"name"`
+	Ref       string               `json:"ref"`
+	RepoType  types.RepositoryType `json:"repo_type"`
+}
+
+type DeleteBranchReq struct {
+	Namespace string               `json:"namespace"`
+	Name      string               `json:"name"`
+	Ref       string               `json:"ref"`
+	RepoType  types.RepositoryType `json:"repo_type"`
+	Username  string               `json:"username"`
+	Email     string               `json:"email"`
+}
+
 type GetRepoCommitsReq struct {
 	Namespace string               `json:"namespace"`
 	Name      string               `json:"name"`

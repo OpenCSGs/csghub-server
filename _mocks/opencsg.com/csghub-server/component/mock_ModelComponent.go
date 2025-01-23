@@ -130,65 +130,6 @@ func (_c *MockModelComponent_Create_Call) RunAndReturn(run func(context.Context,
 	return _c
 }
 
-// CreateRuntimeFramework provides a mock function with given fields: ctx, req
-func (_m *MockModelComponent) CreateRuntimeFramework(ctx context.Context, req *types.RuntimeFrameworkReq) (*types.RuntimeFramework, error) {
-	ret := _m.Called(ctx, req)
-
-	if len(ret) == 0 {
-		panic("no return value specified for CreateRuntimeFramework")
-	}
-
-	var r0 *types.RuntimeFramework
-	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, *types.RuntimeFrameworkReq) (*types.RuntimeFramework, error)); ok {
-		return rf(ctx, req)
-	}
-	if rf, ok := ret.Get(0).(func(context.Context, *types.RuntimeFrameworkReq) *types.RuntimeFramework); ok {
-		r0 = rf(ctx, req)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*types.RuntimeFramework)
-		}
-	}
-
-	if rf, ok := ret.Get(1).(func(context.Context, *types.RuntimeFrameworkReq) error); ok {
-		r1 = rf(ctx, req)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
-// MockModelComponent_CreateRuntimeFramework_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'CreateRuntimeFramework'
-type MockModelComponent_CreateRuntimeFramework_Call struct {
-	*mock.Call
-}
-
-// CreateRuntimeFramework is a helper method to define mock.On call
-//   - ctx context.Context
-//   - req *types.RuntimeFrameworkReq
-func (_e *MockModelComponent_Expecter) CreateRuntimeFramework(ctx interface{}, req interface{}) *MockModelComponent_CreateRuntimeFramework_Call {
-	return &MockModelComponent_CreateRuntimeFramework_Call{Call: _e.mock.On("CreateRuntimeFramework", ctx, req)}
-}
-
-func (_c *MockModelComponent_CreateRuntimeFramework_Call) Run(run func(ctx context.Context, req *types.RuntimeFrameworkReq)) *MockModelComponent_CreateRuntimeFramework_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(*types.RuntimeFrameworkReq))
-	})
-	return _c
-}
-
-func (_c *MockModelComponent_CreateRuntimeFramework_Call) Return(_a0 *types.RuntimeFramework, _a1 error) *MockModelComponent_CreateRuntimeFramework_Call {
-	_c.Call.Return(_a0, _a1)
-	return _c
-}
-
-func (_c *MockModelComponent_CreateRuntimeFramework_Call) RunAndReturn(run func(context.Context, *types.RuntimeFrameworkReq) (*types.RuntimeFramework, error)) *MockModelComponent_CreateRuntimeFramework_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
 // DelRelationDataset provides a mock function with given fields: ctx, req
 func (_m *MockModelComponent) DelRelationDataset(ctx context.Context, req types.RelationDataset) error {
 	ret := _m.Called(ctx, req)

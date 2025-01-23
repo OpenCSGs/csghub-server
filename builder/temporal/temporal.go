@@ -2,8 +2,10 @@ package temporal
 
 import (
 	"context"
+	"log/slog"
 
 	"go.temporal.io/sdk/client"
+	"go.temporal.io/sdk/log"
 	"go.temporal.io/sdk/worker"
 )
 
@@ -30,6 +32,20 @@ func NewClient(temporalClient client.Client) (*clientImpl, error) {
 	c := _client.(*clientImpl)
 	c.Client = temporalClient
 
+	return c, nil
+}
+
+func NewClientByHostPort(hostPort string) (*clientImpl, error) {
+	logger := log.NewStructuredLogger(slog.Default())
+	temporalClient, err := client.Dial(client.Options{
+		HostPort: hostPort,
+		Logger:   logger,
+	})
+	if err != nil {
+		return nil, err
+	}
+	c := _client.(*clientImpl)
+	c.Client = temporalClient
 	return c, nil
 }
 

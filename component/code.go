@@ -102,7 +102,7 @@ func (c *codeComponentImpl) Create(ctx context.Context, req *types.CreateCodeReq
 		NewBranch: req.DefaultBranch,
 		Namespace: req.Namespace,
 		Name:      req.Name,
-		FilePath:  readmeFileName,
+		FilePath:  types.ReadmeFileName,
 	}, types.CodeRepo))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create README.md file, cause: %w", err)

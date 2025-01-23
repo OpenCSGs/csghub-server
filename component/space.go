@@ -117,7 +117,7 @@ func (c *spaceComponentImpl) Create(ctx context.Context, req types.CreateSpaceRe
 		NewBranch: req.DefaultBranch,
 		Namespace: req.Namespace,
 		Name:      req.Name,
-		FilePath:  readmeFileName,
+		FilePath:  types.ReadmeFileName,
 	}, types.SpaceRepo))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create README.md file, cause: %w", err)

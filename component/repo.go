@@ -1348,7 +1348,7 @@ func (c *repoComponentImpl) SDKListFiles(ctx context.Context, repoType types.Rep
 		ref = repo.DefaultBranch
 	}
 
-	filePaths, err := getFilePaths(namespace, name, "", repoType, ref, c.git.GetRepoFileTree)
+	filePaths, err := GetFilePaths(namespace, name, "", repoType, ref, c.git.GetRepoFileTree)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get all %s files, error: %w", repoType, err)
 	}

@@ -400,7 +400,7 @@ func (c *promptComponentImpl) SetRelationModels(ctx context.Context, req types.R
 		Namespace: req.Namespace,
 		Name:      req.Name,
 		Ref:       types.MainBranch,
-		Path:      REPOCARD_FILENAME,
+		Path:      types.REPOCARD_FILENAME,
 		RepoType:  types.PromptRepo,
 	}
 	metaMap, splits, err := GetMetaMapFromReadMe(c.gitServer, getFileContentReq)
@@ -416,7 +416,7 @@ func (c *promptComponentImpl) SetRelationModels(ctx context.Context, req types.R
 	var readmeReq types.UpdateFileReq
 	readmeReq.Branch = types.MainBranch
 	readmeReq.Message = "update model relation tags"
-	readmeReq.FilePath = REPOCARD_FILENAME
+	readmeReq.FilePath = types.REPOCARD_FILENAME
 	readmeReq.RepoType = types.PromptRepo
 	readmeReq.Namespace = req.Namespace
 	readmeReq.Name = req.Name
@@ -498,7 +498,7 @@ func (c *promptComponentImpl) AddRelationModel(ctx context.Context, req types.Re
 		Namespace: req.Namespace,
 		Name:      req.Name,
 		Ref:       types.MainBranch,
-		Path:      REPOCARD_FILENAME,
+		Path:      types.REPOCARD_FILENAME,
 		RepoType:  types.PromptRepo,
 	}
 	metaMap, splits, err := GetMetaMapFromReadMe(c.gitServer, getFileContentReq)
@@ -520,7 +520,7 @@ func (c *promptComponentImpl) AddRelationModel(ctx context.Context, req types.Re
 	var readmeReq types.UpdateFileReq
 	readmeReq.Branch = types.MainBranch
 	readmeReq.Message = "add relation model"
-	readmeReq.FilePath = REPOCARD_FILENAME
+	readmeReq.FilePath = types.REPOCARD_FILENAME
 	readmeReq.RepoType = types.PromptRepo
 	readmeReq.Namespace = req.Namespace
 	readmeReq.Name = req.Name
@@ -555,7 +555,7 @@ func (c *promptComponentImpl) DelRelationModel(ctx context.Context, req types.Re
 		Namespace: req.Namespace,
 		Name:      req.Name,
 		Ref:       types.MainBranch,
-		Path:      REPOCARD_FILENAME,
+		Path:      types.REPOCARD_FILENAME,
 		RepoType:  types.PromptRepo,
 	}
 	metaMap, splits, err := GetMetaMapFromReadMe(c.gitServer, getFileContentReq)
@@ -582,7 +582,7 @@ func (c *promptComponentImpl) DelRelationModel(ctx context.Context, req types.Re
 	var readmeReq types.UpdateFileReq
 	readmeReq.Branch = types.MainBranch
 	readmeReq.Message = "delete relation model"
-	readmeReq.FilePath = REPOCARD_FILENAME
+	readmeReq.FilePath = types.REPOCARD_FILENAME
 	readmeReq.RepoType = types.PromptRepo
 	readmeReq.Namespace = req.Namespace
 	readmeReq.Name = req.Name
@@ -667,7 +667,7 @@ func (c *promptComponentImpl) CreatePromptRepo(ctx context.Context, req *types.C
 		NewBranch: req.DefaultBranch,
 		Namespace: req.Namespace,
 		Name:      req.Name,
-		FilePath:  readmeFileName,
+		FilePath:  types.ReadmeFileName,
 	}, types.PromptRepo))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create prompt repo README.md file, cause: %w", err)
@@ -679,7 +679,7 @@ func (c *promptComponentImpl) CreatePromptRepo(ctx context.Context, req *types.C
 		Email:     user.Email,
 		Message:   initCommitMessage,
 		Branch:    req.DefaultBranch,
-		Content:   datasetGitattributesContent,
+		Content:   types.DatasetGitattributesContent,
 		NewBranch: req.DefaultBranch,
 		Namespace: req.Namespace,
 		Name:      req.Name,

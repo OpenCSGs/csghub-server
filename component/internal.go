@@ -8,6 +8,7 @@ import (
 	"strconv"
 
 	pb "gitlab.com/gitlab-org/gitaly/v16/proto/go/gitalypb"
+	"opencsg.com/csghub-server/builder/dataviewer"
 	"opencsg.com/csghub-server/builder/git"
 	"opencsg.com/csghub-server/builder/git/gitserver"
 	"opencsg.com/csghub-server/builder/git/gitserver/gitaly"
@@ -25,6 +26,7 @@ type internalComponentImpl struct {
 	namespaceStore database.NamespaceStore
 	repoComponent  RepoComponent
 	gitServer      gitserver.GitServer
+	dataviewer     dataviewer.DataviewerClient
 }
 
 type InternalComponent interface {
@@ -33,6 +35,7 @@ type InternalComponent interface {
 	GetAuthorizedKeys(ctx context.Context, key string) (*database.SSHKey, error)
 	GetCommitDiff(ctx context.Context, req types.GetDiffBetweenTwoCommitsReq) (*types.GiteaCallbackPushReq, error)
 	LfsAuthenticate(ctx context.Context, req types.LfsAuthenticateReq) (*types.LfsAuthenticateResp, error)
+	TriggerDataviewerWorkflow(ctx context.Context, req types.UpdateViewerReq) (*types.WorkFlowInfo, error)
 }
 
 func NewInternalComponent(config *config.Config) (InternalComponent, error) {
@@ -44,6 +47,7 @@ func NewInternalComponent(config *config.Config) (InternalComponent, error) {
 	c.repoComponent, err = NewRepoComponentImpl(config)
 	c.tokenStore = database.NewAccessTokenStore()
 	c.namespaceStore = database.NewNamespaceStore()
+	c.dataviewer = dataviewer.NewDataviewerClient(config)
 	if err != nil {
 		return nil, err
 	}
@@ -193,4 +197,12 @@ func (c *internalComponentImpl) LfsAuthenticate(ctx context.Context, req types.L
 		LfsToken: token.Token,
 		RepoPath: c.config.APIServer.PublicDomain + "/" + filepath.Join(repoType, req.Namespace, req.Name+".git"),
 	}, nil
+}
+
+func (c *internalComponentImpl) TriggerDataviewerWorkflow(ctx context.Context, req types.UpdateViewerReq) (*types.WorkFlowInfo, error) {
+	res, err := c.dataviewer.TriggerWorkflow(ctx, req)
+	if err != nil {
+		return nil, fmt.Errorf("fail to trigger dataviewer workflow, error: %w", err)
+	}
+	return res, nil
 }

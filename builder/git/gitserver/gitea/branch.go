@@ -33,3 +33,32 @@ func (c *Client) GetRepoBranches(ctx context.Context, req gitserver.GetBranchesR
 	}
 	return branches, err
 }
+
+func (c *Client) GetRepoBranchByName(ctx context.Context, req gitserver.GetBranchReq) (*types.Branch, error) {
+	var branch types.Branch
+	namespace := common.WithPrefix(req.Namespace, repoPrefixByType(req.RepoType))
+	giteaBranch, _, err := c.giteaClient.GetRepoBranch(
+		namespace,
+		req.Name,
+		req.Ref,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	if giteaBranch == nil {
+		return nil, nil
+	}
+
+	branch.Name = giteaBranch.Name
+	branch.Message = giteaBranch.Commit.Message
+	branch.Commit = types.RepoBranchCommit{
+		ID: giteaBranch.Commit.ID,
+	}
+
+	return &branch, err
+}
+
+func (c *Client) DeleteRepoBranch(ctx context.Context, req gitserver.DeleteBranchReq) error {
+	return nil
+}
