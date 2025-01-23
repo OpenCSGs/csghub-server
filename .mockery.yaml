@@ -26,6 +26,7 @@ packages:
       DiscussionComponent:
       DatasetComponent:
       CollectionComponent:
+      BroadcastComponent:
       InternalComponent:
       MirrorSourceComponent:
       MirrorComponent:

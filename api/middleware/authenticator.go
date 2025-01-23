@@ -12,6 +12,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
 	"opencsg.com/csghub-server/api/httpbase"
+	"opencsg.com/csghub-server/builder/rpc"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/types"
@@ -168,5 +169,49 @@ func OnlyAPIKeyAuthenticator(config *config.Config) gin.HandlerFunc {
 		}
 
 		c.Next()
+	}
+}
+
+func MustLogin() gin.HandlerFunc {
+	return func(ctx *gin.Context) {
+		currentUser := httpbase.GetCurrentUser(ctx)
+		if currentUser == "" {
+			httpbase.UnauthorizedError(ctx, errors.New("unknown user, please login first"))
+			ctx.Abort()
+			return
+		}
+	}
+}
+
+func AdminAuthenticator(config *config.Config) gin.HandlerFunc {
+	userSvcClient := rpc.NewUserSvcHttpClient(fmt.Sprintf("%s:%d", config.User.Host, config.User.Port))
+
+	return func(ctx *gin.Context) {
+		currentUser := httpbase.GetCurrentUser(ctx)
+		if currentUser == "" {
+			httpbase.UnauthorizedError(ctx, errors.New("unknown user, please login first"))
+			ctx.Abort()
+			return
+		}
+
+		user, err := userSvcClient.GetUserInfo(ctx, currentUser, currentUser)
+
+		if err != nil {
+			httpbase.ServerError(ctx, errors.New("failed to find user"))
+			ctx.Abort()
+			return
+		}
+
+		dbUser := &database.User{
+			RoleMask: strings.Join(user.Roles, ","),
+		}
+
+		if !dbUser.CanAdmin() {
+			httpbase.ForbiddenError(ctx, errors.New("only admin user can access"))
+			ctx.Abort()
+			return
+		}
+
+		ctx.Next()
 	}
 }
