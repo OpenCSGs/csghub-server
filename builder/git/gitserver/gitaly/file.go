@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -23,6 +24,7 @@ const (
 	LFSPrefix             = "version https://git-lfs.github.com/spec/v1"
 	NonLFSFileSizeLimit   = 10485760
 	GitAttributesFileName = ".gitattributes"
+	lfsMaxPointerSize     = 400
 )
 
 func (c *Client) GetRepoFileRaw(ctx context.Context, req gitserver.GetRepoInfoByPathReq) (string, error) {
@@ -383,6 +385,7 @@ func (c *Client) getBlobInfo(ctx context.Context, repo *gitalypb.Repository, pat
 	if err != nil {
 		return nil, err
 	}
+	oidFiles := map[string]*types.File{}
 	for {
 		listBlobResp, err := listBlobsStream.Recv()
 		if err != nil {
@@ -406,15 +409,6 @@ func (c *Client) getBlobInfo(ctx context.Context, repo *gitalypb.Repository, pat
 				fileType = "dir"
 			}
 			fileSize = listBlobResp.Size
-			if listBlobResp.Size <= 1024 {
-				p, _ := ReadPointerFromBuffer(listBlobResp.Data)
-				if p.Valid() {
-					fileSize = p.Size
-					isLfs = true
-					LfsRelativePath = p.RelativePath()
-					lfsPointerSize = int(listBlobResp.Size)
-				}
-			}
 			file := &types.File{
 				Name:            filename,
 				Type:            fileType,
@@ -426,9 +420,52 @@ func (c *Client) getBlobInfo(ctx context.Context, repo *gitalypb.Repository, pat
 				LfsPointerSize:  lfsPointerSize,
 				LfsRelativePath: LfsRelativePath,
 			}
+			if listBlobResp.Oid != "" && fileSize < lfsMaxPointerSize {
+				oidFiles[listBlobResp.Oid] = file
+			}
 			files = append(files, file)
 		}
 	}
+
+	// get lfs data
+	oids := []string{}
+	for oid := range oidFiles {
+		oids = append(oids, oid)
+	}
+	slices.Sort(oids)
+	if len(oids) > 0 {
+		listLfsStream, err := c.blobClient.GetLFSPointers(ctx, &gitalypb.GetLFSPointersRequest{
+			BlobIds:    oids,
+			Repository: repo,
+		})
+		if err != nil {
+			return nil, err
+		}
+		for {
+			lfsResp, err := listLfsStream.Recv()
+			if err != nil {
+				if err == io.EOF {
+					break
+				}
+				return nil, err
+			}
+			if lfsResp != nil {
+				pointers := lfsResp.GetLfsPointers()
+				for _, pointer := range pointers {
+					p, _ := ReadPointerFromBuffer(pointer.Data)
+					if p.Valid() {
+						file := oidFiles[string(pointer.Oid)]
+						file.Size = p.Size
+						file.Lfs = true
+						file.SHA = p.Oid
+						file.LfsRelativePath = p.RelativePath()
+						file.LfsPointerSize = int(pointer.Size)
+					}
+				}
+			}
+		}
+	}
+
 	return files, nil
 }
 
@@ -594,6 +631,7 @@ func (c *Client) GetTree(ctx context.Context, req types.GetTreeRequest) (*types.
 			Limit:     int32(req.Limit),
 		},
 	}
+
 	treeStream, err := c.commitClient.GetTreeEntries(ctx, gitalyReq)
 	if err != nil {
 		return nil, err

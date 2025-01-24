@@ -607,6 +607,25 @@ func TestGitalyFile_GetTree(t *testing.T) {
 				},
 			}, nil)
 
+			pointer := `version https://git-lfs.github.com/spec/v1
+oid sha256:a4f0e7e96b4f6af4a1b597c2fc4a42ec9a997c64ab7da96760c40582a0ac27a5
+size 507607173`
+
+			tester.mocks.blobClient.EXPECT().GetLFSPointers(
+				mock.Anything, &gitalypb.GetLFSPointersRequest{
+					BlobIds:    []string{"o1", "o2"},
+					Repository: repo,
+				}).Return(&MockGrpcStreamClient[*gitalypb.GetLFSPointersResponse]{
+				data: []*gitalypb.GetLFSPointersResponse{
+					{LfsPointers: []*gitalypb.LFSPointer{
+						{
+							Size: 1234, Oid: "o1", FileOid: []byte("o11"),
+							Data: []byte(pointer),
+						},
+					}},
+				},
+			}, nil)
+
 			tree, err := tester.GetTree(ctx, types.GetTreeRequest{
 				Namespace: "ns",
 				Name:      "n",
@@ -617,7 +636,12 @@ func TestGitalyFile_GetTree(t *testing.T) {
 			})
 			require.NoError(t, err)
 			require.Equal(t, []*types.File{
-				{Name: "a", Path: prefix + "a", Type: "dir", Mode: "1", SHA: "o1"},
+				{Name: "a", Path: prefix + "a", Type: "dir", Mode: "1",
+					SHA: "a4f0e7e96b4f6af4a1b597c2fc4a42ec9a997c64ab7da96760c40582a0ac27a5",
+					Lfs: true, Size: 507607173,
+					LfsRelativePath: "a4/f0/e7e96b4f6af4a1b597c2fc4a42ec9a997c64ab7da96760c40582a0ac27a5",
+					LfsPointerSize:  1234,
+				},
 				{Name: "b", Path: prefix + "b", Type: "dir", Mode: "1", SHA: "o2"},
 			}, tree.Files)
 			require.Equal(t, "nc", tree.Cursor)
