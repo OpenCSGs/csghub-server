@@ -98,6 +98,7 @@ func NewMockStores(t interface {
 		RepoFile:             mockdb.NewMockRepoFileStore(t),
 		Event:                mockdb.NewMockEventStore(t),
 		TagRule:              mockdb.NewMockTagRuleStore(t),
+		ViewerStore:          mockdb.NewMockDataviewerStore(t),
 		Broadcast:            mockdb.NewMockBroadcastStore(t),
 	}
 }
