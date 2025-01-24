@@ -89,6 +89,7 @@ func (dva *dataViewerActivityImpl) BeginViewerJob(ctx context.Context) error {
 }
 
 func (dva *dataViewerActivityImpl) GetCardFromReadme(ctx context.Context, req types.UpdateViewerReq) (*dvCom.CardData, error) {
+	var card dvCom.CardData
 	fileReq := gitserver.GetRepoInfoByPathReq{
 		Namespace: req.Namespace,
 		Name:      req.Name,
@@ -98,25 +99,27 @@ func (dva *dataViewerActivityImpl) GetCardFromReadme(ctx context.Context, req ty
 	}
 	f, err := dva.gitServer.GetRepoFileContents(context.Background(), fileReq)
 	if err != nil {
-		return nil, fmt.Errorf("get %s repo %s/%s branch %s file %s content error: %w", fileReq.RepoType, fileReq.Namespace, fileReq.Name, fileReq.Ref, fileReq.Path, err)
+		slog.Warn("get repo branch readme.md content error", slog.Any("fileReq", fileReq), slog.Any("err", err))
+		return &card, nil
 	}
 	slog.Debug("getRepoCardData", slog.Any("f.Content", f.Content))
 	decodedContent, err := base64.StdEncoding.DecodeString(f.Content)
 	if err != nil {
-		return nil, fmt.Errorf("decode %s repo %s/%s branch %s file %s content, error: %w", fileReq.RepoType, fileReq.Namespace, fileReq.Name, fileReq.Ref, fileReq.Path, err)
+		slog.Warn("decode repo branch readme.md content, error", slog.Any("fileReq", fileReq), slog.Any("err", err))
+		return &card, nil
 	}
 	matches := dvCom.REG.FindStringSubmatch(string(decodedContent))
 	yamlString := ""
 	if len(matches) > 1 {
 		yamlString = matches[1]
 	} else {
-		return nil, fmt.Errorf("%s repo %s/%s branch %s card yaml config is empty due to invalid content", fileReq.RepoType, fileReq.Namespace, fileReq.Name, fileReq.Ref)
+		slog.Warn("repo branch card yaml config is empty due to invalid content", slog.Any("fileReq", fileReq), slog.Any("err", err), slog.Any("decodedContent", string(decodedContent)))
+		return &card, nil
 	}
 
-	var card dvCom.CardData
 	err = yaml.Unmarshal([]byte(yamlString), &card)
 	if err != nil {
-		return nil, fmt.Errorf("unmarshal %s repo %s/%s branch %s yaml error: %w, decoded content: %s", fileReq.RepoType, fileReq.Namespace, fileReq.Name, fileReq.Ref, err, yamlString)
+		slog.Warn("unmarshal repo branch yaml error", slog.Any("fileReq", fileReq), slog.Any("err", err), slog.Any("yamlString", yamlString))
 	}
 	return &card, nil
 }
@@ -805,9 +808,9 @@ func (dva *dataViewerActivityImpl) UpdateWorkflowStatus(ctx context.Context, sta
 	workflowID := wfCtx.WorkflowExecution.ID
 	runID := wfCtx.WorkflowExecution.RunID
 
-	if status.WorkflowErr != nil {
+	if len(status.WorkflowErrMsg) > 0 {
 		slog.Error("run data viewer workflow error", slog.Any("workflowID", workflowID), slog.Any("runID", runID),
-			slog.Any("status", status), slog.Any("workflowErr", status.WorkflowErr))
+			slog.Any("status", status), slog.Any("workflowErr", status.WorkflowErrMsg))
 	}
 
 	job, err := dva.viewerStore.GetJob(ctx, workflowID)
@@ -816,9 +819,9 @@ func (dva *dataViewerActivityImpl) UpdateWorkflowStatus(ctx context.Context, sta
 		return nil
 	}
 
-	if status.WorkflowErr != nil {
+	if len(status.WorkflowErrMsg) > 0 {
 		job.Status = types.WorkflowFailed
-		job.Logs = status.WorkflowErr.Error()
+		job.Logs = status.WorkflowErrMsg
 	} else {
 		job.Status = types.WorkflowDone
 		job.Logs = types.WorkflowMsgDone
@@ -831,7 +834,7 @@ func (dva *dataViewerActivityImpl) UpdateWorkflowStatus(ctx context.Context, sta
 		slog.Error("update workflow result for ending", slog.Any("workflowID", workflowID), slog.Any("job", job), slog.Any("error", err))
 	}
 
-	if status.WorkflowErr != nil || !status.ShouldUpdateViewer {
+	if len(status.WorkflowErrMsg) > 0 || !status.ShouldUpdateViewer {
 		return nil
 	}
 

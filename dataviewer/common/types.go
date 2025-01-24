@@ -169,6 +169,6 @@ type UpdateCardReq struct {
 
 type UpdateWorkflowStatusReq struct {
 	Req                types.UpdateViewerReq
-	WorkflowErr        error
+	WorkflowErrMsg     string
 	ShouldUpdateViewer bool
 }

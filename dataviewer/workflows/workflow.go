@@ -221,10 +221,14 @@ func updateWorkflowStatus(sessionCtx workflow.Context,
 	wfErr error,
 	shouldUpdateViewer bool,
 ) {
+	errMsg := ""
+	if wfErr != nil {
+		errMsg = wfErr.Error()
+	}
 	err := workflow.ExecuteActivity(sessionCtx, DataViewerActivity.UpdateWorkflowStatus,
 		dvCom.UpdateWorkflowStatusReq{
 			Req:                updateWorkflow.Req,
-			WorkflowErr:        wfErr,
+			WorkflowErrMsg:     errMsg,
 			ShouldUpdateViewer: shouldUpdateViewer,
 		},
 	).Get(sessionCtx, nil)
