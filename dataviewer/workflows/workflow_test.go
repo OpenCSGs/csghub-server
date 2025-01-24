@@ -128,7 +128,7 @@ func TestWorkflow_DataviewerWorkflow(t *testing.T) {
 
 		tester.mocks.mockact.EXPECT().UpdateWorkflowStatus(mock.Anything, dvCom.UpdateWorkflowStatusReq{
 			Req:                req,
-			WorkflowErr:        nil,
+			WorkflowErrMsg:     "",
 			ShouldUpdateViewer: true,
 		}).Return(nil)
 
@@ -206,7 +206,7 @@ func TestWorkflow_DataviewerWorkflow(t *testing.T) {
 
 		tester.mocks.mockact.EXPECT().UpdateWorkflowStatus(mock.Anything, dvCom.UpdateWorkflowStatusReq{
 			Req:                req,
-			WorkflowErr:        nil,
+			WorkflowErrMsg:     "",
 			ShouldUpdateViewer: true,
 		}).Return(nil)
 

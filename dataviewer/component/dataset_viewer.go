@@ -253,11 +253,13 @@ func (c *datasetViewerComponentImpl) getViewerCardData(ctx context.Context, repo
 		return nil, nil, fmt.Errorf("failed to get viewer by repo_id %d, error: %w", repoID, err)
 	}
 
-	if viewer == nil || viewer.DataviewerJob == nil || len(viewer.DataviewerJob.CardData) < 1 {
+	if viewer == nil || viewer.DataviewerJob == nil {
 		return nil, nil, fmt.Errorf("viewer card data is empty")
 	}
 
-	if viewer.DataviewerJob.Status == types.WorkflowPending || viewer.DataviewerJob.Status == types.WorkflowFailed {
+	if len(viewer.DataviewerJob.CardData) < 1 &&
+		(viewer.DataviewerJob.Status == types.WorkflowPending ||
+			viewer.DataviewerJob.Status == types.WorkflowFailed) {
 		return &dvCom.CataLogRespone{
 			Status: viewer.DataviewerJob.Status,
 			Logs:   viewer.DataviewerJob.Logs,
