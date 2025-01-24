@@ -594,12 +594,9 @@ func initializeTestBroadcastComponent(ctx context.Context, t interface {
 	mockMirrorServer := mirrorserver.NewMockMirrorServer(t)
 	mockPriorityQueue := queue.NewMockPriorityQueue(t)
 	mockDeployer := deploy.NewMockDeployer(t)
-	mockCache := cache.NewMockCache(t)
 	mockAccountingClient := accounting.NewMockAccountingClient(t)
 	mockReader := parquet.NewMockReader(t)
 	mockModerationSvcClient := rpc.NewMockModerationSvcClient(t)
-	mockKeysReader := rsa.NewMockKeysReader(t)
-	mockImporter := importer.NewMockImporter(t)
 	mocks := &Mocks{
 		stores:           mockStores,
 		components:       componentMockedComponents,
@@ -609,12 +606,9 @@ func initializeTestBroadcastComponent(ctx context.Context, t interface {
 		mirrorServer:     mockMirrorServer,
 		mirrorQueue:      mockPriorityQueue,
 		deployer:         mockDeployer,
-		cache:            mockCache,
 		accountingClient: mockAccountingClient,
 		preader:          mockReader,
 		moderationClient: mockModerationSvcClient,
-		rsaReader:        mockKeysReader,
-		importer:         mockImporter,
 	}
 	componentTestBroadcastWithMocks := &testBroadcastWithMocks{
 		broadcastComponentImpl: componentBroadcastComponentImpl,
