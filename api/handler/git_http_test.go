@@ -11,12 +11,13 @@ import (
 	"github.com/stretchr/testify/require"
 	mockcomponent "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/component"
 	"opencsg.com/csghub-server/builder/store/database"
+	"opencsg.com/csghub-server/builder/testutil"
 	"opencsg.com/csghub-server/common/types"
 	"opencsg.com/csghub-server/component"
 )
 
 type GitHTTPTester struct {
-	*GinTester
+	*testutil.GinTester
 	handler *GitHTTPHandler
 	mocks   struct {
 		gitHttp *mockcomponent.MockGitHTTPComponent
@@ -24,7 +25,7 @@ type GitHTTPTester struct {
 }
 
 func NewGitHTTPTester(t *testing.T) *GitHTTPTester {
-	tester := &GitHTTPTester{GinTester: NewGinTester()}
+	tester := &GitHTTPTester{GinTester: testutil.NewGinTester()}
 	tester.mocks.gitHttp = mockcomponent.NewMockGitHTTPComponent(t)
 
 	tester.handler = &GitHTTPHandler{
@@ -36,7 +37,7 @@ func NewGitHTTPTester(t *testing.T) *GitHTTPTester {
 }
 
 func (t *GitHTTPTester) WithHandleFunc(fn func(h *GitHTTPHandler) gin.HandlerFunc) *GitHTTPTester {
-	t.ginHandler = fn(t.handler)
+	t.Handler(fn(t.handler))
 	return t
 }
 
@@ -46,7 +47,7 @@ func TestGitHTTPHandler_InfoRefs(t *testing.T) {
 	})
 
 	reader := io.NopCloser(bytes.NewBuffer([]byte("foo")))
-	tester.mocks.gitHttp.EXPECT().InfoRefs(tester.ctx, types.InfoRefsReq{
+	tester.mocks.gitHttp.EXPECT().InfoRefs(tester.Ctx(), types.InfoRefsReq{
 		Namespace:   "u",
 		Name:        "r",
 		RepoType:    types.ModelRepo,
@@ -58,15 +59,15 @@ func TestGitHTTPHandler_InfoRefs(t *testing.T) {
 	tester.WithKV("namespace", "u").WithKV("name", "r")
 	tester.WithKV("repo_type", "model").WithUser().WithHeader("Accept-Encoding", "gzip").Execute()
 
-	require.Equal(t, 200, tester.response.Code)
+	require.Equal(t, 200, tester.Response().Code)
 	var b bytes.Buffer
 	gz := gzip.NewWriter(&b)
 	_, err := gz.Write([]byte("foo"))
 	require.NoError(t, err)
 	err = gz.Close()
 	require.NoError(t, err)
-	require.Equal(t, b.String(), tester.response.Body.String())
-	headers := tester.response.Header()
+	require.Equal(t, b.String(), tester.Response().Body.String())
+	headers := tester.Response().Header()
 	require.Equal(t, "application/x-git-upload-pack-advertisement", headers.Get("Content-Type"))
 	require.Equal(t, "no-cache", headers.Get("Cache-Control"))
 }
@@ -77,21 +78,21 @@ func TestGitHTTPHandler_GitUploadPack(t *testing.T) {
 			return h.GitUploadPack
 		})
 
-		tester.mocks.gitHttp.EXPECT().GitUploadPack(tester.ctx, types.GitUploadPackReq{
+		tester.mocks.gitHttp.EXPECT().GitUploadPack(tester.Ctx(), types.GitUploadPackReq{
 			Namespace:   "u",
 			Name:        "r",
 			RepoType:    types.ModelRepo,
 			GitProtocol: "ssh",
-			Request:     tester.gctx.Request,
-			Writer:      tester.gctx.Writer,
+			Request:     tester.Gctx().Request,
+			Writer:      tester.Gctx().Writer,
 			CurrentUser: "u",
 		}).Return(nil)
 		tester.SetPath("git").WithQuery("service", "git-upload-pack").WithHeader("Git-Protocol", "ssh")
 		tester.WithKV("namespace", "u").WithKV("name", "r")
 		tester.WithKV("repo_type", "model").WithUser().WithHeader("Accept-Encoding", "gzip").Execute()
 
-		require.Equal(t, 200, tester.response.Code)
-		headers := tester.response.Header()
+		require.Equal(t, 200, tester.Response().Code)
+		headers := tester.Response().Header()
 		require.Equal(t, "application/x-git-result", headers.Get("Content-Type"))
 		require.Equal(t, "no-cache", headers.Get("Cache-Control"))
 	})
@@ -100,20 +101,20 @@ func TestGitHTTPHandler_GitUploadPack(t *testing.T) {
 		tester := NewGitHTTPTester(t).WithHandleFunc(func(h *GitHTTPHandler) gin.HandlerFunc {
 			return h.GitUploadPack
 		})
-		tester.mocks.gitHttp.EXPECT().GitUploadPack(tester.ctx, types.GitUploadPackReq{
+		tester.mocks.gitHttp.EXPECT().GitUploadPack(tester.Ctx(), types.GitUploadPackReq{
 			Namespace:   "u-other",
 			Name:        "r",
 			RepoType:    types.ModelRepo,
 			GitProtocol: "ssh",
-			Request:     tester.gctx.Request,
-			Writer:      tester.gctx.Writer,
+			Request:     tester.Gctx().Request,
+			Writer:      tester.Gctx().Writer,
 			CurrentUser: "u",
 		}).Return(component.ErrForbidden)
 		tester.SetPath("git").WithQuery("service", "git-upload-pack").WithHeader("Git-Protocol", "ssh")
 		tester.WithKV("namespace", "u-other").WithKV("name", "r")
 		tester.WithKV("repo_type", "model").WithUser().WithHeader("Accept-Encoding", "gzip").Execute()
 
-		require.Equal(t, 403, tester.response.Code)
+		require.Equal(t, 403, tester.Response().Code)
 	})
 }
 
@@ -122,21 +123,21 @@ func TestGitHTTPHandler_GitReceivePack(t *testing.T) {
 		return h.GitReceivePack
 	})
 
-	tester.mocks.gitHttp.EXPECT().GitReceivePack(tester.ctx, types.GitUploadPackReq{
+	tester.mocks.gitHttp.EXPECT().GitReceivePack(tester.Ctx(), types.GitUploadPackReq{
 		Namespace:   "u",
 		Name:        "r",
 		RepoType:    types.ModelRepo,
 		GitProtocol: "ssh",
-		Request:     tester.gctx.Request,
-		Writer:      tester.gctx.Writer,
+		Request:     tester.Gctx().Request,
+		Writer:      tester.Gctx().Writer,
 		CurrentUser: "u",
 	}).Return(nil)
 	tester.SetPath("git").WithQuery("service", "git-upload-pack").WithHeader("Git-Protocol", "ssh")
 	tester.WithKV("namespace", "u").WithKV("name", "r")
 	tester.WithKV("repo_type", "model").WithUser().WithHeader("Accept-Encoding", "gzip").Execute()
 
-	require.Equal(t, 200, tester.response.Code)
-	headers := tester.response.Header()
+	require.Equal(t, 200, tester.Response().Code)
+	headers := tester.Response().Header()
 	require.Equal(t, "application/x-git-result", headers.Get("Content-Type"))
 	require.Equal(t, "no-cache", headers.Get("Cache-Control"))
 }
@@ -150,7 +151,7 @@ func TestGitHTTPHandler_LfsBatch(t *testing.T) {
 				return h.LfsBatch
 			})
 
-			tester.mocks.gitHttp.EXPECT().BuildObjectResponse(tester.ctx, types.BatchRequest{
+			tester.mocks.gitHttp.EXPECT().BuildObjectResponse(tester.Ctx(), types.BatchRequest{
 				Namespace:     "u",
 				Name:          "r",
 				RepoType:      types.ModelRepo,
@@ -164,7 +165,7 @@ func TestGitHTTPHandler_LfsBatch(t *testing.T) {
 			tester.WithKV("repo_type", "model").WithUser().WithHeader("Accept-Encoding", "gzip").Execute()
 
 			tester.ResponseEqSimple(t, 200, &types.BatchResponse{Transfer: "t"})
-			headers := tester.response.Header()
+			headers := tester.Response().Header()
 			require.Equal(t, types.LfsMediaType, headers.Get("Content-Type"))
 		})
 	}
@@ -175,7 +176,7 @@ func TestGitHTTPHandler_LfsUpload(t *testing.T) {
 		return h.LfsUpload
 	})
 
-	tester.mocks.gitHttp.EXPECT().LfsUpload(tester.ctx, tester.gctx.Request.Body, types.UploadRequest{
+	tester.mocks.gitHttp.EXPECT().LfsUpload(tester.Ctx(), tester.Gctx().Request.Body, types.UploadRequest{
 		Namespace:   "u",
 		Name:        "r",
 		RepoType:    types.ModelRepo,
@@ -187,8 +188,8 @@ func TestGitHTTPHandler_LfsUpload(t *testing.T) {
 	tester.WithKV("namespace", "u").WithKV("name", "r").WithHeader("Authorization", "auth")
 	tester.WithKV("repo_type", "model").WithUser().Execute()
 
-	require.Equal(t, 200, tester.response.Code)
-	headers := tester.response.Header()
+	require.Equal(t, 200, tester.Response().Code)
+	headers := tester.Response().Header()
 	require.Equal(t, types.LfsMediaType, headers.Get("Content-Type"))
 }
 
@@ -197,7 +198,7 @@ func TestGitHTTPHandler_LfsDownload(t *testing.T) {
 		return h.LfsDownload
 	})
 
-	tester.mocks.gitHttp.EXPECT().LfsDownload(tester.ctx, types.DownloadRequest{
+	tester.mocks.gitHttp.EXPECT().LfsDownload(tester.Ctx(), types.DownloadRequest{
 		Namespace:   "u",
 		Name:        "r",
 		RepoType:    types.ModelRepo,
@@ -209,8 +210,8 @@ func TestGitHTTPHandler_LfsDownload(t *testing.T) {
 	tester.WithKV("namespace", "u").WithKV("name", "r").WithHeader("Authorization", "auth")
 	tester.WithKV("repo_type", "model").WithUser().Execute()
 
-	require.Equal(t, 200, tester.response.Code)
-	resp := tester.response.Result()
+	require.Equal(t, 200, tester.Response().Code)
+	resp := tester.Response().Result()
 	defer resp.Body.Close()
 	lc, err := resp.Location()
 	require.NoError(t, err)
@@ -222,7 +223,7 @@ func TestGitHTTPHandler_LfsVerify(t *testing.T) {
 		return h.LfsVerify
 	})
 
-	tester.mocks.gitHttp.EXPECT().LfsVerify(tester.ctx, types.VerifyRequest{
+	tester.mocks.gitHttp.EXPECT().LfsVerify(tester.Ctx(), types.VerifyRequest{
 		Namespace:   "u",
 		Name:        "r",
 		RepoType:    types.ModelRepo,
@@ -241,7 +242,7 @@ func TestGitHTTPHandler_ListLocks(t *testing.T) {
 		return h.ListLocks
 	})
 
-	tester.mocks.gitHttp.EXPECT().ListLocks(tester.ctx, types.ListLFSLockReq{
+	tester.mocks.gitHttp.EXPECT().ListLocks(tester.Ctx(), types.ListLFSLockReq{
 		ID:          1,
 		Namespace:   "u",
 		Name:        "r",
@@ -262,7 +263,7 @@ func TestGitHTTPHandler_CreateLock(t *testing.T) {
 		return h.CreateLock
 	})
 
-	tester.mocks.gitHttp.EXPECT().CreateLock(tester.ctx, types.LfsLockReq{
+	tester.mocks.gitHttp.EXPECT().CreateLock(tester.Ctx(), types.LfsLockReq{
 		Namespace:   "u",
 		Name:        "r",
 		RepoType:    types.ModelRepo,
@@ -291,7 +292,7 @@ func TestGitHTTPHandler_VerifyLock(t *testing.T) {
 		return h.VerifyLock
 	})
 
-	tester.mocks.gitHttp.EXPECT().VerifyLock(tester.ctx, types.VerifyLFSLockReq{
+	tester.mocks.gitHttp.EXPECT().VerifyLock(tester.Ctx(), types.VerifyLFSLockReq{
 		Namespace:   "u",
 		Name:        "r",
 		RepoType:    types.ModelRepo,
@@ -312,7 +313,7 @@ func TestGitHTTPHandler_UnLock(t *testing.T) {
 		return h.UnLock
 	})
 
-	tester.mocks.gitHttp.EXPECT().UnLock(tester.ctx, types.UnlockLFSReq{
+	tester.mocks.gitHttp.EXPECT().UnLock(tester.Ctx(), types.UnlockLFSReq{
 		ID:          1,
 		Namespace:   "u",
 		Name:        "r",

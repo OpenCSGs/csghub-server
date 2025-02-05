@@ -2,6 +2,7 @@ package component
 
 import (
 	"context"
+	"math"
 	"testing"
 
 	"github.com/stretchr/testify/mock"
@@ -12,7 +13,7 @@ import (
 	dvCom "opencsg.com/csghub-server/dataviewer/common"
 )
 
-func TestDatasetViewerComppnent_ViewParquetFile(t *testing.T) {
+func TestDatasetViewerComponent_ViewParquetFile(t *testing.T) {
 
 	ctx := context.TODO()
 	dc := initializeTestDatasetViewerComponent(ctx, t)
@@ -63,7 +64,7 @@ func TestDatasetViewerComppnent_ViewParquetFile(t *testing.T) {
 
 }
 
-func TestDatasetViewerComppnent_Rows(t *testing.T) {
+func TestDatasetViewerComponent_Rows(t *testing.T) {
 	ctx := context.TODO()
 	dc := initializeTestDatasetViewerComponent(ctx, t)
 
@@ -108,9 +109,8 @@ func TestDatasetViewerComppnent_Rows(t *testing.T) {
 	dc.mocks.gitServer.EXPECT().GetRepoFileTree(mock.Anything, gitserver.GetRepoInfoByPathReq{
 		Namespace: "ns",
 		Name:      "repo",
-
-		Ref:      "main",
-		RepoType: types.DatasetRepo,
+		Ref:       "main",
+		RepoType:  types.DatasetRepo,
 	}).Return(
 		[]*types.File{
 			{Name: "foobar.parquet", Path: "foo/foobar.parquet"},
@@ -138,7 +138,142 @@ func TestDatasetViewerComppnent_Rows(t *testing.T) {
 
 }
 
-func TestDatasetViewerComppnent_GetCatalog(t *testing.T) {
+func TestDatasetViewerComponent_LimitOffsetRowsNoCard(t *testing.T) {
+	ctx := context.TODO()
+	dc := initializeTestDatasetViewerComponent(ctx, t)
+
+	repo := &database.Repository{DefaultBranch: "main"}
+
+	dc.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, types.DatasetRepo, "ns", "repo").Return(
+		repo, nil,
+	)
+	dc.mocks.components.repo.EXPECT().AllowReadAccessRepo(ctx, repo, "user").Return(true, nil)
+
+	dc.mocks.stores.ViewerMock().EXPECT().GetViewerByRepoID(ctx, int64(0)).Return(nil, nil)
+
+	dc.mocks.gitServer.EXPECT().GetRepoFileContents(mock.Anything, gitserver.GetRepoInfoByPathReq{
+		Namespace: "ns",
+		Name:      "repo",
+		Ref:       "main",
+		Path:      types.REPOCARD_FILENAME,
+		RepoType:  types.DatasetRepo,
+	}).Return(&types.File{
+		LfsRelativePath: "a/b",
+		Content:         "xxx",
+	}, nil)
+	dc.mocks.gitServer.EXPECT().GetTree(mock.Anything, types.GetTreeRequest{
+		Namespace: "ns",
+		Name:      "repo",
+		Ref:       "main",
+		Path:      "foo",
+		RepoType:  types.DatasetRepo,
+		Limit:     math.MaxInt,
+		Recursive: true,
+	}).Return(
+		&types.GetRepoFileTreeResp{Files: []*types.File{
+			{
+				Name: "foobar.parquet", Path: "train/foobar.parquet",
+				LfsRelativePath: "a/b",
+			},
+		}}, nil,
+	)
+
+	dc.mocks.limitOffsetReader.EXPECT().RowsWithCount(ctx, []string{"lfs/a/b"}, int64(16), int64(48)).Return(
+		[]string{"a", "b"}, []string{"c", "d"}, [][]any{
+			{1, 2, 3},
+		}, 12000, nil,
+	)
+
+	resp, err := dc.LimitOffsetRows(ctx, &dvCom.ViewParquetFileReq{
+		Namespace:   "ns",
+		RepoName:    "repo",
+		Branch:      "main",
+		Path:        "foo",
+		Per:         16,
+		Page:        4,
+		CurrentUser: "user",
+	}, types.DataViewerReq{Split: "train", Config: "foo"})
+	require.Nil(t, err)
+	require.Equal(t, &dvCom.ViewParquetFileResp{
+		Columns:     []string{"a", "b"},
+		ColumnsType: []string{"c", "d"},
+		Rows: [][]interface{}{
+			{1, 2, 3},
+		},
+		Total: 12000,
+	}, resp)
+}
+
+func TestDatasetViewerComponent_LimitOffsetRowsWithCard(t *testing.T) {
+	ctx := context.TODO()
+	dc := initializeTestDatasetViewerComponent(ctx, t)
+
+	repo := &database.Repository{DefaultBranch: "main"}
+
+	dc.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, types.DatasetRepo, "ns", "repo").Return(
+		repo, nil,
+	)
+	dc.mocks.components.repo.EXPECT().AllowReadAccessRepo(ctx, repo, "user").Return(true, nil)
+
+	dc.mocks.stores.ViewerMock().EXPECT().GetViewerByRepoID(ctx, int64(0)).Return(nil, nil)
+
+	dc.mocks.gitServer.EXPECT().GetRepoFileContents(mock.Anything, gitserver.GetRepoInfoByPathReq{
+		Namespace: "ns",
+		Name:      "repo",
+		Ref:       "main",
+		Path:      types.REPOCARD_FILENAME,
+		RepoType:  types.DatasetRepo,
+	}).Return(&types.File{
+		LfsRelativePath: "a/b",
+		Content:         "LS0tCmNvbmZpZ3M6Ci0gY29uZmlnX25hbWU6ICJmb28iCiAgZGF0YV9maWxlczoKICAtIHNwbGl0OiB0cmFpbgogICAgcGF0aDogZm9vLy4qCi0gY29uZmlnX25hbWU6ICJiYXIiCiAgZGF0YV9maWxlczoKICAtIHNwbGl0OiB0cmFpbgpwYXRoOiBiYXIvLioKLS0tCg==",
+	}, nil)
+	dc.mocks.gitServer.EXPECT().GetRepoFileContents(mock.Anything, gitserver.GetRepoInfoByPathReq{
+		Namespace: "ns",
+		Name:      "repo",
+		Ref:       "main",
+		Path:      "foo/foobar.parquet",
+		RepoType:  types.DatasetRepo,
+	}).Return(&types.File{
+		LfsRelativePath: "a/b",
+	}, nil)
+	dc.mocks.gitServer.EXPECT().GetRepoFileTree(mock.Anything, gitserver.GetRepoInfoByPathReq{
+		Namespace: "ns",
+		Name:      "repo",
+		Ref:       "main",
+		RepoType:  types.DatasetRepo,
+	}).Return(
+		[]*types.File{
+			{Name: "foobar.parquet", Path: "foo/foobar.parquet"},
+		}, nil,
+	)
+
+	dc.mocks.limitOffsetReader.EXPECT().RowsWithCount(ctx, []string{"lfs/a/b"}, int64(16), int64(48)).Return(
+		[]string{"a", "b"}, []string{"c", "d"}, [][]any{
+			{1, 2, 3},
+		}, 12000, nil,
+	)
+
+	resp, err := dc.LimitOffsetRows(ctx, &dvCom.ViewParquetFileReq{
+		Namespace:   "ns",
+		RepoName:    "repo",
+		Branch:      "main",
+		Path:        "foo",
+		Per:         16,
+		Page:        4,
+		CurrentUser: "user",
+	}, types.DataViewerReq{Split: "train", Config: "foo"})
+	require.Nil(t, err)
+	require.Equal(t, &dvCom.ViewParquetFileResp{
+		Columns:     []string{"a", "b"},
+		ColumnsType: []string{"c", "d"},
+		Rows: [][]interface{}{
+			{1, 2, 3},
+		},
+		Total: 12000,
+	}, resp)
+}
+
+func TestDatasetViewerComponent_GetCatalog(t *testing.T) {
 	t.Run("has card data", func(t *testing.T) {
 
 		ctx := context.TODO()

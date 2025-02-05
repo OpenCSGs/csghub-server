@@ -17,7 +17,7 @@ import (
 )
 
 type DatasetViewerHandler struct {
-	c component.DatasetViewerComponent
+	viewer component.DatasetViewerComponent
 }
 
 func NewDatasetViewerHandler(cfg *config.Config, gs gitserver.GitServer) (*DatasetViewerHandler, error) {
@@ -27,7 +27,7 @@ func NewDatasetViewerHandler(cfg *config.Config, gs gitserver.GitServer) (*Datas
 	}
 
 	return &DatasetViewerHandler{
-		c: dvc,
+		viewer: dvc,
 	}, nil
 }
 
@@ -69,7 +69,7 @@ func (h *DatasetViewerHandler) View(ctx *gin.Context) {
 	req.Page = page
 	req.CurrentUser = currentUser
 
-	resp, err := h.c.ViewParquetFile(ctx.Request.Context(), req)
+	resp, err := h.viewer.ViewParquetFile(ctx.Request.Context(), req)
 	if err != nil {
 		slog.Error("Failed to view parquet file", "error", err)
 		httpbase.ServerError(ctx, err)
@@ -105,7 +105,7 @@ func (h *DatasetViewerHandler) Catalog(ctx *gin.Context) {
 	req.RepoName = name
 	req.CurrentUser = currentUser
 
-	catalog, err := h.c.GetCatalog(ctx.Request.Context(), req)
+	catalog, err := h.viewer.GetCatalog(ctx.Request.Context(), req)
 	if err != nil {
 		slog.Error("Failed to get dataset catalog", slog.Any("req", req), slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
@@ -114,10 +114,10 @@ func (h *DatasetViewerHandler) Catalog(ctx *gin.Context) {
 	httpbase.OK(ctx, catalog)
 }
 
-// GetDatasetCatalog godoc
+// GetRows godoc
 // @Security     ApiKey
-// @Summary      Get catalog of the dataset
-// @Description  get catalog of the dataset
+// @Summary      Get rows of the dataset
+// @Description  get rows of the dataset
 // @Tags         Dataset
 // @Accept       json
 // @Produce      json
@@ -197,7 +197,13 @@ func (h *DatasetViewerHandler) Rows(ctx *gin.Context) {
 		return
 	}
 
-	rows, err := h.c.Rows(ctx.Request.Context(), req, viewReq)
+	var rows *dvCom.ViewParquetFileResp
+	// simple limit offset request, use the fast RowsLimited method
+	if viewReq.Orderby == "" && viewReq.Search == "" && viewReq.Where == "" {
+		rows, err = h.viewer.LimitOffsetRows(ctx.Request.Context(), req, viewReq)
+	} else {
+		rows, err = h.viewer.Rows(ctx.Request.Context(), req, viewReq)
+	}
 	if err != nil {
 		slog.Error("Failed to get dataset rows", slog.Any("req", req), slog.Any("viewReq", viewReq), slog.Any("error", err))
 		httpbase.ServerError(ctx, err)

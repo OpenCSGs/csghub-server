@@ -21,12 +21,13 @@ import (
 	mockcomponent "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/component"
 	"opencsg.com/csghub-server/builder/deploy"
 	"opencsg.com/csghub-server/builder/store/database"
+	"opencsg.com/csghub-server/builder/testutil"
 	"opencsg.com/csghub-server/common/types"
 	"opencsg.com/csghub-server/component"
 )
 
 type RepoTester struct {
-	*GinTester
+	*testutil.GinTester
 	handler *RepoHandler
 	mocks   struct {
 		repo *mockcomponent.MockRepoComponent
@@ -34,7 +35,7 @@ type RepoTester struct {
 }
 
 func NewRepoTester(t *testing.T) *RepoTester {
-	tester := &RepoTester{GinTester: NewGinTester()}
+	tester := &RepoTester{GinTester: testutil.NewGinTester()}
 	tester.mocks.repo = mockcomponent.NewMockRepoComponent(t)
 	tester.handler = &RepoHandler{tester.mocks.repo, 0}
 	tester.WithParam("name", "r")
@@ -44,7 +45,7 @@ func NewRepoTester(t *testing.T) *RepoTester {
 }
 
 func (rt *RepoTester) WithHandleFunc(fn func(rp *RepoHandler) gin.HandlerFunc) *RepoTester {
-	rt.ginHandler = fn(rt.handler)
+	rt.Handler(fn(rt.handler))
 	return rt
 }
 
@@ -54,7 +55,7 @@ func TestRepoHandler_CreateFile(t *testing.T) {
 	})
 	tester.RequireUser(t)
 
-	tester.mocks.repo.EXPECT().CreateFile(tester.ctx, &types.CreateFileReq{
+	tester.mocks.repo.EXPECT().CreateFile(tester.Ctx(), &types.CreateFileReq{
 		Message:     "foo",
 		Branch:      "main",
 		Content:     "bar",
@@ -83,7 +84,7 @@ func TestRepoHandler_UpdateFile(t *testing.T) {
 	})
 	tester.RequireUser(t)
 
-	tester.mocks.repo.EXPECT().UpdateFile(tester.ctx, &types.UpdateFileReq{
+	tester.mocks.repo.EXPECT().UpdateFile(tester.Ctx(), &types.UpdateFileReq{
 		Message:     "foo",
 		Branch:      "main",
 		Content:     "bar",
@@ -112,7 +113,7 @@ func TestRepoHandler_Commits(t *testing.T) {
 	})
 
 	tester.WithUser()
-	tester.mocks.repo.EXPECT().Commits(tester.ctx, &types.GetCommitsReq{
+	tester.mocks.repo.EXPECT().Commits(tester.Ctx(), &types.GetCommitsReq{
 		Namespace:   "u",
 		Name:        "r",
 		Ref:         "main",
@@ -144,7 +145,7 @@ func TestRepoHandler_LastCommit(t *testing.T) {
 		//user does not have permission to access repo
 		tester.mocks.repo.EXPECT().LastCommit(mock.Anything, mock.Anything).Return(nil, component.ErrForbidden).Once()
 		tester.Execute()
-		require.Equal(t, http.StatusForbidden, tester.response.Code)
+		require.Equal(t, http.StatusForbidden, tester.Response().Code)
 	})
 
 	t.Run("server error", func(t *testing.T) {
@@ -155,7 +156,7 @@ func TestRepoHandler_LastCommit(t *testing.T) {
 
 		tester.mocks.repo.EXPECT().LastCommit(mock.Anything, mock.Anything).Return(commit, errors.New("custome error")).Once()
 		tester.Execute()
-		require.Equal(t, http.StatusInternalServerError, tester.response.Code)
+		require.Equal(t, http.StatusInternalServerError, tester.Response().Code)
 	})
 
 	t.Run("success", func(t *testing.T) {
@@ -169,14 +170,14 @@ func TestRepoHandler_LastCommit(t *testing.T) {
 
 		tester.mocks.repo.EXPECT().LastCommit(mock.Anything, mock.Anything).Return(commit, nil).Once()
 		tester.Execute()
-		require.Equal(t, http.StatusOK, tester.response.Code)
+		require.Equal(t, http.StatusOK, tester.Response().Code)
 
 		var r = struct {
 			Code int           `json:"code,omitempty"`
 			Msg  string        `json:"msg"`
 			Data *types.Commit `json:"data,omitempty"`
 		}{}
-		err := json.Unmarshal(tester.response.Body.Bytes(), &r)
+		err := json.Unmarshal(tester.Response().Body.Bytes(), &r)
 		require.Empty(t, err)
 		require.Equal(t, commit.ID, r.Data.ID)
 	})
@@ -188,7 +189,7 @@ func TestRepoHandler_FileRaw(t *testing.T) {
 	})
 
 	tester.WithUser()
-	tester.mocks.repo.EXPECT().FileRaw(tester.ctx, &types.GetFileReq{
+	tester.mocks.repo.EXPECT().FileRaw(tester.Ctx(), &types.GetFileReq{
 		Namespace:   "u",
 		Name:        "r",
 		Ref:         "main",
@@ -211,7 +212,7 @@ func TestRepoHandler_FileInfo(t *testing.T) {
 	})
 
 	tester.WithUser()
-	tester.mocks.repo.EXPECT().FileInfo(tester.ctx, &types.GetFileReq{
+	tester.mocks.repo.EXPECT().FileInfo(tester.Ctx(), &types.GetFileReq{
 		Namespace:   "u",
 		Name:        "r",
 		Ref:         "main",
@@ -236,7 +237,7 @@ func TestRepoHandler_DownloadFile(t *testing.T) {
 		})
 
 		tester.WithUser()
-		tester.mocks.repo.EXPECT().DownloadFile(tester.ctx, &types.GetFileReq{
+		tester.mocks.repo.EXPECT().DownloadFile(tester.Ctx(), &types.GetFileReq{
 			Namespace:   "u",
 			Name:        "r",
 			Ref:         "main",
@@ -260,7 +261,7 @@ func TestRepoHandler_DownloadFile(t *testing.T) {
 		})
 
 		tester.WithUser()
-		tester.mocks.repo.EXPECT().DownloadFile(tester.ctx, &types.GetFileReq{
+		tester.mocks.repo.EXPECT().DownloadFile(tester.Ctx(), &types.GetFileReq{
 			Namespace:   "u",
 			Name:        "r",
 			Ref:         "main",
@@ -275,12 +276,12 @@ func TestRepoHandler_DownloadFile(t *testing.T) {
 		tester.WithKV("repo_type", types.ModelRepo)
 
 		tester.Execute()
-		require.Equal(t, 200, tester.response.Code)
-		headers := tester.response.Header()
+		require.Equal(t, 200, tester.Response().Code)
+		headers := tester.Response().Header()
 		require.Equal(t, "application/octet-stream", headers.Get("Content-Type"))
 		require.Equal(t, `attachment; filename="foo"`, headers.Get("Content-Disposition"))
 		require.Equal(t, "100", headers.Get("Content-Length"))
-		r := tester.response.Body.String()
+		r := tester.Response().Body.String()
 		require.Equal(t, "bar", r)
 	})
 
@@ -292,7 +293,7 @@ func TestRepoHandler_Branches(t *testing.T) {
 	})
 
 	tester.WithUser()
-	tester.mocks.repo.EXPECT().Branches(tester.ctx, &types.GetBranchesReq{
+	tester.mocks.repo.EXPECT().Branches(tester.Ctx(), &types.GetBranchesReq{
 		Namespace:   "u",
 		Name:        "r",
 		RepoType:    types.ModelRepo,
@@ -314,7 +315,7 @@ func TestRepoHandler_Tags(t *testing.T) {
 	})
 
 	tester.WithUser()
-	tester.mocks.repo.EXPECT().Tags(tester.ctx, &types.GetTagsReq{
+	tester.mocks.repo.EXPECT().Tags(tester.Ctx(), &types.GetTagsReq{
 		Namespace:   "u",
 		Name:        "r",
 		RepoType:    types.ModelRepo,
@@ -334,7 +335,7 @@ func TestRepoHandler_UpdateTags(t *testing.T) {
 	tester.RequireUser(t)
 
 	tester.mocks.repo.EXPECT().UpdateTags(
-		tester.ctx, "u", "r", types.ModelRepo,
+		tester.Ctx(), "u", "r", types.ModelRepo,
 		"cat", "u", []string{"foo", "bar"},
 	).Return(nil)
 	tester.WithKV("repo_type", types.ModelRepo)
@@ -354,7 +355,7 @@ func TestRepoHandler_Tree(t *testing.T) {
 		//user does not have permission to access repo
 		tester.mocks.repo.EXPECT().Tree(mock.Anything, mock.Anything).Return(nil, component.ErrForbidden).Once()
 		tester.Execute()
-		require.Equal(t, http.StatusForbidden, tester.response.Code)
+		require.Equal(t, http.StatusForbidden, tester.Response().Code)
 	})
 
 	t.Run("server error", func(t *testing.T) {
@@ -364,7 +365,7 @@ func TestRepoHandler_Tree(t *testing.T) {
 
 		tester.mocks.repo.EXPECT().Tree(mock.Anything, mock.Anything).Return(nil, errors.New("custome error")).Once()
 		tester.Execute()
-		require.Equal(t, http.StatusInternalServerError, tester.response.Code)
+		require.Equal(t, http.StatusInternalServerError, tester.Response().Code)
 	})
 
 	t.Run("success", func(t *testing.T) {
@@ -374,14 +375,14 @@ func TestRepoHandler_Tree(t *testing.T) {
 		var tree []*types.File
 		tester.mocks.repo.EXPECT().Tree(mock.Anything, mock.Anything).Return(tree, nil).Once()
 		tester.Execute()
-		require.Equal(t, http.StatusOK, tester.response.Code)
+		require.Equal(t, http.StatusOK, tester.Response().Code)
 
 		var r = struct {
 			Code int           `json:"code,omitempty"`
 			Msg  string        `json:"msg"`
 			Data []*types.File `json:"data,omitempty"`
 		}{}
-		err := json.Unmarshal(tester.response.Body.Bytes(), &r)
+		err := json.Unmarshal(tester.Response().Body.Bytes(), &r)
 		require.Empty(t, err)
 		require.Equal(t, tree, r.Data)
 	})
@@ -394,7 +395,7 @@ func TestRepoHandler_UpdateDownloads(t *testing.T) {
 
 	tester.WithUser()
 	tester.mocks.repo.EXPECT().UpdateDownloads(
-		tester.ctx, &types.UpdateDownloadsReq{
+		tester.Ctx(), &types.UpdateDownloadsReq{
 			Namespace: "u",
 			Name:      "r",
 			RepoType:  types.ModelRepo,
@@ -417,7 +418,7 @@ func TestRepoHandler_IncrDownloads(t *testing.T) {
 
 	tester.WithUser()
 	tester.mocks.repo.EXPECT().IncrDownloads(
-		tester.ctx, types.ModelRepo, "u", "r",
+		tester.Ctx(), types.ModelRepo, "u", "r",
 	).Return(nil)
 	tester.WithKV("repo_type", types.ModelRepo)
 	tester.WithBody(t, &types.UpdateDownloadsReq{ReqDate: "2002-02-01"})
@@ -456,7 +457,7 @@ func TestRepoHandler_UploadFile(t *testing.T) {
 	tester.WithMultipartForm(req.MultipartForm)
 
 	tester.mocks.repo.EXPECT().UploadFile(
-		tester.ctx, &types.CreateFileReq{
+		tester.Ctx(), &types.CreateFileReq{
 			Namespace:       "u",
 			Name:            "r",
 			RepoType:        types.ModelRepo,
@@ -486,7 +487,7 @@ func TestRepoHandler_SDKListFiles(t *testing.T) {
 	tester.WithParam("branch_mapped", "main_main")
 	tester.WithKV("repo_type", types.ModelRepo)
 	tester.mocks.repo.EXPECT().SDKListFiles(
-		tester.ctx, types.ModelRepo, "u", "r", "main_main", "u",
+		tester.Ctx(), types.ModelRepo, "u", "r", "main_main", "u",
 	).Return(&types.SDKFiles{ID: "f1"}, nil)
 
 	tester.Execute()
@@ -514,18 +515,18 @@ func TestRepoHandler_HandleDownload(t *testing.T) {
 			SaveAs:    "foo",
 			RepoType:  types.ModelRepo,
 		}
-		tester.mocks.repo.EXPECT().IsLfs(tester.ctx, req).Return(true, 100, nil)
+		tester.mocks.repo.EXPECT().IsLfs(tester.Ctx(), req).Return(true, 100, nil)
 		reqnew := *req
 		reqnew.Lfs = true
-		tester.mocks.repo.EXPECT().SDKDownloadFile(tester.ctx, &reqnew, "u").Return(
+		tester.mocks.repo.EXPECT().SDKDownloadFile(tester.Ctx(), &reqnew, "u").Return(
 			nil, 100, "url", nil,
 		)
 
 		tester.Execute()
 
 		// redirected
-		require.Equal(t, http.StatusOK, tester.response.Code)
-		resp := tester.response.Result()
+		require.Equal(t, http.StatusOK, tester.Response().Code)
+		resp := tester.Response().Result()
 		defer resp.Body.Close()
 		lc, err := resp.Location()
 		require.NoError(t, err)
@@ -551,18 +552,18 @@ func TestRepoHandler_HandleDownload(t *testing.T) {
 			SaveAs:    "foo",
 			RepoType:  types.ModelRepo,
 		}
-		tester.mocks.repo.EXPECT().IsLfs(tester.ctx, req).Return(false, 100, nil)
-		tester.mocks.repo.EXPECT().SDKDownloadFile(tester.ctx, req, "u").Return(
+		tester.mocks.repo.EXPECT().IsLfs(tester.Ctx(), req).Return(false, 100, nil)
+		tester.mocks.repo.EXPECT().SDKDownloadFile(tester.Ctx(), req, "u").Return(
 			io.NopCloser(bytes.NewBuffer([]byte("bar"))), 100, "url", nil,
 		)
 
 		tester.Execute()
-		require.Equal(t, 200, tester.response.Code)
-		headers := tester.response.Header()
+		require.Equal(t, 200, tester.Response().Code)
+		headers := tester.Response().Header()
 		require.Equal(t, "application/octet-stream", headers.Get("Content-Type"))
 		require.Equal(t, `attachment; filename="foo"`, headers.Get("Content-Disposition"))
 		require.Equal(t, "100", headers.Get("Content-Length"))
-		r := tester.response.Body.String()
+		r := tester.Response().Body.String()
 		require.Equal(t, "bar", r)
 	})
 }
@@ -577,7 +578,7 @@ func TestRepoHandler_HeadSDKDownload(t *testing.T) {
 	tester.WithParam("branch", "main")
 	tester.WithKV("repo_type", types.ModelRepo)
 	tester.mocks.repo.EXPECT().HeadDownloadFile(
-		tester.ctx, &types.GetFileReq{
+		tester.Ctx(), &types.GetFileReq{
 			Namespace: "u",
 			Name:      "r",
 			Path:      "foo",
@@ -588,8 +589,8 @@ func TestRepoHandler_HeadSDKDownload(t *testing.T) {
 	).Return(&types.File{Size: 100, SHA: "def"}, nil)
 
 	tester.Execute()
-	require.Equal(t, 200, tester.response.Code)
-	headers := tester.response.Header()
+	require.Equal(t, 200, tester.Response().Code)
+	headers := tester.Response().Header()
 	require.Equal(t, "100", headers.Get("Content-Length"))
 	require.Equal(t, "def", headers.Get("X-Repo-Commit"))
 }
@@ -603,7 +604,7 @@ func TestRepoHandler_CommitWithDiff(t *testing.T) {
 	tester.WithParam("commit_id", "foo")
 	tester.WithKV("repo_type", types.ModelRepo)
 	tester.mocks.repo.EXPECT().GetCommitWithDiff(
-		tester.ctx, &types.GetCommitsReq{
+		tester.Ctx(), &types.GetCommitsReq{
 			Namespace:   "u",
 			Name:        "r",
 			Ref:         "foo",
@@ -628,7 +629,7 @@ func TestRepoHandler_CreateMirror(t *testing.T) {
 		MirrorSourceID: 12,
 	})
 	tester.mocks.repo.EXPECT().CreateMirror(
-		tester.ctx, types.CreateMirrorReq{
+		tester.Ctx(), types.CreateMirrorReq{
 			Namespace:      "u",
 			Name:           "r",
 			RepoType:       types.ModelRepo,
@@ -652,7 +653,7 @@ func TestRepoHandler_MirrorFromSaas(t *testing.T) {
 		tester.WithParam("namespace", types.OpenCSGPrefix+"repo")
 		tester.WithKV("repo_type", types.ModelRepo)
 		tester.mocks.repo.EXPECT().MirrorFromSaas(
-			tester.ctx, "CSG_repo", "r", "u", types.ModelRepo,
+			tester.Ctx(), "CSG_repo", "r", "u", types.ModelRepo,
 		).Return(nil)
 
 		tester.Execute()
@@ -679,7 +680,7 @@ func TestRepoHandler_GetMirror(t *testing.T) {
 
 	tester.WithKV("repo_type", types.ModelRepo)
 	tester.mocks.repo.EXPECT().GetMirror(
-		tester.ctx, types.GetMirrorReq{
+		tester.Ctx(), types.GetMirrorReq{
 			Namespace:   "u",
 			Name:        "r",
 			RepoType:    types.ModelRepo,
@@ -703,7 +704,7 @@ func TestRepoHandler_UpdateMirror(t *testing.T) {
 		SourceUrl:      "foo",
 	})
 	tester.mocks.repo.EXPECT().UpdateMirror(
-		tester.ctx, types.UpdateMirrorReq{
+		tester.Ctx(), types.UpdateMirrorReq{
 			Namespace:      "u",
 			Name:           "r",
 			RepoType:       types.ModelRepo,
@@ -727,7 +728,7 @@ func TestRepoHandler_DeleteMirror(t *testing.T) {
 
 	tester.WithKV("repo_type", types.ModelRepo)
 	tester.mocks.repo.EXPECT().DeleteMirror(
-		tester.ctx, types.DeleteMirrorReq{
+		tester.Ctx(), types.DeleteMirrorReq{
 			Namespace:   "u",
 			Name:        "r",
 			RepoType:    types.ModelRepo,
@@ -747,7 +748,7 @@ func TestRepoHandler_RuntimeFrameworkList(t *testing.T) {
 	tester.WithKV("repo_type", types.ModelRepo)
 	tester.WithQuery("deploy_type", "1")
 	tester.mocks.repo.EXPECT().ListRuntimeFramework(
-		tester.ctx, types.ModelRepo, "u", "r", 1,
+		tester.Ctx(), types.ModelRepo, "u", "r", 1,
 	).Return([]types.RuntimeFramework{{FrameName: "f1"}}, nil)
 
 	tester.Execute()
@@ -765,7 +766,7 @@ func TestRepoHandler_RuntimeFrameworkCreate(t *testing.T) {
 		CurrentUser: "u",
 	})
 	tester.mocks.repo.EXPECT().CreateRuntimeFramework(
-		tester.ctx, &types.RuntimeFrameworkReq{FrameName: "f1", CurrentUser: "u"},
+		tester.Ctx(), &types.RuntimeFrameworkReq{FrameName: "f1", CurrentUser: "u"},
 	).Return(&types.RuntimeFramework{FrameName: "f1"}, nil)
 
 	tester.Execute()
@@ -783,7 +784,7 @@ func TestRepoHandler_RuntimeFrameworkUpdate(t *testing.T) {
 	})
 	tester.WithParam("id", "1")
 	tester.mocks.repo.EXPECT().UpdateRuntimeFramework(
-		tester.ctx, int64(1), &types.RuntimeFrameworkReq{FrameName: "f1", CurrentUser: "u"},
+		tester.Ctx(), int64(1), &types.RuntimeFrameworkReq{FrameName: "f1", CurrentUser: "u"},
 	).Return(&types.RuntimeFramework{FrameName: "f1"}, nil)
 
 	tester.Execute()
@@ -797,7 +798,7 @@ func TestRepoHandler_RuntimeFrameworkDelete(t *testing.T) {
 	tester.WithUser().WithKV("repo_type", types.ModelRepo)
 	tester.WithParam("id", "1")
 	tester.mocks.repo.EXPECT().DeleteRuntimeFramework(
-		tester.ctx, "u", int64(1),
+		tester.Ctx(), "u", int64(1),
 	).Return(nil)
 
 	tester.Execute()
@@ -812,7 +813,7 @@ func TestRepoHandler_DeployList(t *testing.T) {
 
 	tester.WithKV("repo_type", types.ModelRepo)
 	tester.mocks.repo.EXPECT().ListDeploy(
-		tester.ctx, types.ModelRepo, "u", "r", "u",
+		tester.Ctx(), types.ModelRepo, "u", "r", "u",
 	).Return([]types.DeployRepo{{DeployName: "n"}}, nil)
 
 	tester.Execute()
@@ -828,7 +829,7 @@ func TestRepoHandler_DeployDetail(t *testing.T) {
 	tester.WithKV("repo_type", types.ModelRepo)
 	tester.WithParam("id", "1")
 	tester.mocks.repo.EXPECT().DeployDetail(
-		tester.ctx, types.DeployActReq{
+		tester.Ctx(), types.DeployActReq{
 			RepoType:    types.ModelRepo,
 			Namespace:   "u",
 			Name:        "r",
@@ -863,8 +864,8 @@ func TestRepoHandler_DeployInstanceLogs(t *testing.T) {
 			InstanceName: "ii",
 		},
 	).Return(deploy.NewMultiLogReader(nil, runlogChan), nil)
-	cc, cancel := context.WithCancel(tester.gctx.Request.Context())
-	tester.gctx.Request = tester.gctx.Request.WithContext(cc)
+	cc, cancel := context.WithCancel(tester.Gctx().Request.Context())
+	tester.Gctx().Request = tester.Gctx().Request.WithContext(cc)
 	go func() {
 		runlogChan <- "foo"
 		runlogChan <- "bar"
@@ -873,15 +874,15 @@ func TestRepoHandler_DeployInstanceLogs(t *testing.T) {
 	}()
 
 	tester.Execute()
-	require.Equal(t, 200, tester.response.Code)
-	headers := tester.response.Header()
+	require.Equal(t, 200, tester.Response().Code)
+	headers := tester.Response().Header()
 	require.Equal(t, "text/event-stream", headers.Get("Content-Type"))
 	require.Equal(t, "no-cache", headers.Get("Cache-Control"))
 	require.Equal(t, "keep-alive", headers.Get("Connection"))
 	require.Equal(t, "chunked", headers.Get("Transfer-Encoding"))
 	require.Equal(
 		t, "event:Container\ndata:foo\n\nevent:Container\ndata:bar\n\n",
-		tester.response.Body.String(),
+		tester.Response().Body.String(),
 	)
 
 }
@@ -895,10 +896,10 @@ func TestRepoHandler_DeployStatus(t *testing.T) {
 
 	tester.WithKV("repo_type", types.ModelRepo)
 	tester.WithParam("id", "1")
-	cc, cancel := context.WithCancel(tester.gctx.Request.Context())
-	tester.gctx.Request = tester.gctx.Request.WithContext(cc)
+	cc, cancel := context.WithCancel(tester.Gctx().Request.Context())
+	tester.Gctx().Request = tester.Gctx().Request.WithContext(cc)
 	tester.mocks.repo.EXPECT().AllowAccessDeploy(
-		tester.gctx.Request.Context(), types.DeployActReq{
+		tester.Gctx().Request.Context(), types.DeployActReq{
 			RepoType:    types.ModelRepo,
 			Namespace:   "u",
 			Name:        "r",
@@ -918,15 +919,15 @@ func TestRepoHandler_DeployStatus(t *testing.T) {
 	}).Once()
 
 	tester.Execute()
-	require.Equal(t, 200, tester.response.Code)
-	headers := tester.response.Header()
+	require.Equal(t, 200, tester.Response().Code)
+	headers := tester.Response().Header()
 	require.Equal(t, "text/event-stream", headers.Get("Content-Type"))
 	require.Equal(t, "no-cache", headers.Get("Cache-Control"))
 	require.Equal(t, "keep-alive", headers.Get("Connection"))
 	require.Equal(t, "chunked", headers.Get("Transfer-Encoding"))
 	require.Equal(
 		t, "event:status\ndata:{\"status\":\"s1\",\"details\":[{\"name\":\"i1\",\"status\":\"\"}]}\n\nevent:status\ndata:{\"status\":\"s3\",\"details\":null}\n\n",
-		tester.response.Body.String(),
+		tester.Response().Body.String(),
 	)
 
 }
@@ -940,7 +941,7 @@ func TestRepoHandler_SyncMirror(t *testing.T) {
 	tester.WithKV("repo_type", types.ModelRepo)
 	tester.WithParam("id", "1")
 	tester.mocks.repo.EXPECT().SyncMirror(
-		tester.ctx, types.ModelRepo, "u", "r", "u",
+		tester.Ctx(), types.ModelRepo, "u", "r", "u",
 	).Return(nil)
 
 	tester.Execute()
@@ -957,7 +958,7 @@ func TestRepoHandler_DeployUpdate(t *testing.T) {
 
 		tester.WithKV("repo_type", types.ModelRepo)
 		tester.WithParam("id", "1")
-		tester.mocks.repo.EXPECT().AllowAdminAccess(tester.ctx, types.ModelRepo, "u", "r", "u").Return(false, nil)
+		tester.mocks.repo.EXPECT().AllowAdminAccess(tester.Ctx(), types.ModelRepo, "u", "r", "u").Return(false, nil)
 		tester.Execute()
 		tester.ResponseEq(
 			t, 403, "user not allowed to update deploy", nil,
@@ -973,12 +974,12 @@ func TestRepoHandler_DeployUpdate(t *testing.T) {
 
 		tester.WithKV("repo_type", types.ModelRepo)
 		tester.WithParam("id", "1")
-		tester.mocks.repo.EXPECT().AllowAdminAccess(tester.ctx, types.ModelRepo, "u", "r", "u").Return(true, nil)
+		tester.mocks.repo.EXPECT().AllowAdminAccess(tester.Ctx(), types.ModelRepo, "u", "r", "u").Return(true, nil)
 		tester.WithBody(t, &types.DeployUpdateReq{
 			MinReplica: tea.Int(1),
 			MaxReplica: tea.Int(5),
 		})
-		tester.mocks.repo.EXPECT().DeployUpdate(tester.ctx, types.DeployActReq{
+		tester.mocks.repo.EXPECT().DeployUpdate(tester.Ctx(), types.DeployActReq{
 			RepoType:    types.ModelRepo,
 			Namespace:   "u",
 			Name:        "r",
@@ -1002,7 +1003,7 @@ func TestRepoHandler_RuntimeFrameworkListWithType(t *testing.T) {
 
 	tester.WithKV("repo_type", types.ModelRepo)
 	tester.mocks.repo.EXPECT().ListRuntimeFrameworkWithType(
-		tester.ctx, types.InferenceType,
+		tester.Ctx(), types.InferenceType,
 	).Return([]types.RuntimeFramework{{FrameName: "f1"}}, nil)
 
 	tester.Execute()
@@ -1019,7 +1020,7 @@ func TestRepoHandler_ServerlessDetail(t *testing.T) {
 
 	tester.WithParam("id", "1")
 	tester.mocks.repo.EXPECT().DeployDetail(
-		tester.ctx, types.DeployActReq{
+		tester.Ctx(), types.DeployActReq{
 			RepoType:    types.ModelRepo,
 			Namespace:   "u",
 			Name:        "r",
@@ -1057,8 +1058,8 @@ func TestRepoHandler_ServerlessLogs(t *testing.T) {
 			InstanceName: "ii",
 		},
 	).Return(deploy.NewMultiLogReader(nil, runlogChan), nil)
-	cc, cancel := context.WithCancel(tester.gctx.Request.Context())
-	tester.gctx.Request = tester.gctx.Request.WithContext(cc)
+	cc, cancel := context.WithCancel(tester.Gctx().Request.Context())
+	tester.Gctx().Request = tester.Gctx().Request.WithContext(cc)
 	go func() {
 		runlogChan <- "foo"
 		runlogChan <- "bar"
@@ -1067,15 +1068,15 @@ func TestRepoHandler_ServerlessLogs(t *testing.T) {
 	}()
 
 	tester.Execute()
-	require.Equal(t, 200, tester.response.Code)
-	headers := tester.response.Header()
+	require.Equal(t, 200, tester.Response().Code)
+	headers := tester.Response().Header()
 	require.Equal(t, "text/event-stream", headers.Get("Content-Type"))
 	require.Equal(t, "no-cache", headers.Get("Cache-Control"))
 	require.Equal(t, "keep-alive", headers.Get("Connection"))
 	require.Equal(t, "chunked", headers.Get("Transfer-Encoding"))
 	require.Equal(
 		t, "event:Container\ndata:foo\n\nevent:Container\ndata:bar\n\n",
-		tester.response.Body.String(),
+		tester.Response().Body.String(),
 	)
 
 }
@@ -1089,10 +1090,10 @@ func TestRepoHandler_ServerlessStatus(t *testing.T) {
 
 	tester.WithKV("repo_type", types.ModelRepo)
 	tester.WithParam("id", "1")
-	cc, cancel := context.WithCancel(tester.gctx.Request.Context())
-	tester.gctx.Request = tester.gctx.Request.WithContext(cc)
+	cc, cancel := context.WithCancel(tester.Gctx().Request.Context())
+	tester.Gctx().Request = tester.Gctx().Request.WithContext(cc)
 	tester.mocks.repo.EXPECT().AllowAccessDeploy(
-		tester.gctx.Request.Context(), types.DeployActReq{
+		tester.Gctx().Request.Context(), types.DeployActReq{
 			RepoType:    types.ModelRepo,
 			Namespace:   "u",
 			Name:        "r",
@@ -1112,15 +1113,15 @@ func TestRepoHandler_ServerlessStatus(t *testing.T) {
 	}).Once()
 
 	tester.Execute()
-	require.Equal(t, 200, tester.response.Code)
-	headers := tester.response.Header()
+	require.Equal(t, 200, tester.Response().Code)
+	headers := tester.Response().Header()
 	require.Equal(t, "text/event-stream", headers.Get("Content-Type"))
 	require.Equal(t, "no-cache", headers.Get("Cache-Control"))
 	require.Equal(t, "keep-alive", headers.Get("Connection"))
 	require.Equal(t, "chunked", headers.Get("Transfer-Encoding"))
 	require.Equal(
 		t, "event:status\ndata:{\"status\":\"s1\",\"details\":[{\"name\":\"i1\",\"status\":\"\"}]}\n\nevent:status\ndata:{\"status\":\"s3\",\"details\":null}\n\n",
-		tester.response.Body.String(),
+		tester.Response().Body.String(),
 	)
 
 }
@@ -1138,7 +1139,7 @@ func TestRepoHandler_ServelessUpdate(t *testing.T) {
 		MinReplica: tea.Int(1),
 		MaxReplica: tea.Int(5),
 	})
-	tester.mocks.repo.EXPECT().DeployUpdate(tester.ctx, types.DeployActReq{
+	tester.mocks.repo.EXPECT().DeployUpdate(tester.Ctx(), types.DeployActReq{
 		RepoType:    types.ModelRepo,
 		Namespace:   "u",
 		Name:        "r",

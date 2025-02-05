@@ -393,7 +393,7 @@ func (c *mirrorComponentImpl) checkAndUpdateMirrorStatus(ctx context.Context, mi
 	return nil
 }
 
-func getAllFiles(namespace, repoName, folder string, repoType types.RepositoryType, ref string, gsTree func(ctx context.Context, req gitserver.GetRepoInfoByPathReq) ([]*types.File, error)) ([]*types.File, error) {
+func getAllFiles(ctx context.Context, namespace, repoName, folder string, repoType types.RepositoryType, ref string, gsTree func(ctx context.Context, req gitserver.GetRepoInfoByPathReq) ([]*types.File, error)) ([]*types.File, error) {
 	var files []*types.File
 
 	getRepoFileTree := gitserver.GetRepoInfoByPathReq{
@@ -403,13 +403,13 @@ func getAllFiles(namespace, repoName, folder string, repoType types.RepositoryTy
 		Path:      folder,
 		RepoType:  repoType,
 	}
-	gitFiles, err := gsTree(context.Background(), getRepoFileTree)
+	gitFiles, err := gsTree(ctx, getRepoFileTree)
 	if err != nil {
 		return files, fmt.Errorf("failed to get repo file tree,%w", err)
 	}
 	for _, file := range gitFiles {
 		if file.Type == "dir" {
-			subFiles, err := getAllFiles(namespace, repoName, file.Path, repoType, ref, gsTree)
+			subFiles, err := getAllFiles(ctx, namespace, repoName, file.Path, repoType, ref, gsTree)
 			if err != nil {
 				return files, err
 			}
@@ -563,7 +563,7 @@ func (c *mirrorComponentImpl) countMirrorProgress(ctx context.Context, mirror da
 	namespaceAndName := strings.Split(mirror.Repository.Path, "/")
 	namespace := namespaceAndName[0]
 	name := namespaceAndName[1]
-	allFiles, err := getAllFiles(namespace, name, "", mirror.Repository.RepositoryType, "", c.git.GetRepoFileTree)
+	allFiles, err := getAllFiles(ctx, namespace, name, "", mirror.Repository.RepositoryType, "", c.git.GetRepoFileTree)
 
 	if err != nil {
 		slog.Error("fail to get all files of mirror repository", slog.Int64("mirrorId", mirror.ID), slog.String("namespace", namespace), slog.String("name", name), slog.String("error", err.Error()))

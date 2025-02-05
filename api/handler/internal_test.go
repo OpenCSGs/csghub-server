@@ -11,12 +11,13 @@ import (
 	mockcomponent "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/component"
 	"opencsg.com/csghub-server/api/workflow"
 	"opencsg.com/csghub-server/builder/store/database"
+	"opencsg.com/csghub-server/builder/testutil"
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/types"
 )
 
 type InternalTester struct {
-	*GinTester
+	*testutil.GinTester
 	handler *InternalHandler
 	mocks   struct {
 		internal *mockcomponent.MockInternalComponent
@@ -25,7 +26,7 @@ type InternalTester struct {
 }
 
 func NewInternalTester(t *testing.T) *InternalTester {
-	tester := &InternalTester{GinTester: NewGinTester()}
+	tester := &InternalTester{GinTester: testutil.NewGinTester()}
 	tester.mocks.internal = mockcomponent.NewMockInternalComponent(t)
 	tester.mocks.workflow = workflow_mock.NewMockClient(t)
 
@@ -40,7 +41,7 @@ func NewInternalTester(t *testing.T) *InternalTester {
 }
 
 func (t *InternalTester) WithHandleFunc(fn func(h *InternalHandler) gin.HandlerFunc) *InternalTester {
-	t.ginHandler = fn(t.handler)
+	t.Handler(fn(t.handler))
 	return t
 }
 
@@ -49,7 +50,7 @@ func TestInternalHandler_Allowed(t *testing.T) {
 		return h.Allowed
 	})
 
-	tester.mocks.internal.EXPECT().Allowed(tester.ctx).Return(true, nil)
+	tester.mocks.internal.EXPECT().Allowed(tester.Ctx()).Return(true, nil)
 	tester.Execute()
 
 	tester.ResponseEqSimple(t, 200, gin.H{
@@ -79,7 +80,7 @@ func TestInternalHandler_SSHAllowed(t *testing.T) {
 			return h.SSHAllowed
 		})
 
-		tester.mocks.internal.EXPECT().SSHAllowed(tester.ctx, types.SSHAllowedReq{
+		tester.mocks.internal.EXPECT().SSHAllowed(tester.Ctx(), types.SSHAllowedReq{
 			RepoType:  types.ModelRepo,
 			Namespace: "u",
 			Name:      "r",
@@ -108,7 +109,7 @@ func TestInternalHandler_LfsAuthenticate(t *testing.T) {
 		return h.LfsAuthenticate
 	})
 
-	tester.mocks.internal.EXPECT().LfsAuthenticate(tester.ctx, types.LfsAuthenticateReq{
+	tester.mocks.internal.EXPECT().LfsAuthenticate(tester.Ctx(), types.LfsAuthenticateReq{
 		RepoType:  types.ModelRepo,
 		Namespace: "u",
 		Name:      "r",
@@ -138,7 +139,7 @@ func TestInternalHandler_PostReceive(t *testing.T) {
 		return h.PostReceive
 	})
 
-	tester.mocks.internal.EXPECT().GetCommitDiff(tester.ctx, types.GetDiffBetweenTwoCommitsReq{
+	tester.mocks.internal.EXPECT().GetCommitDiff(tester.Ctx(), types.GetDiffBetweenTwoCommitsReq{
 		LeftCommitId:  "foo",
 		RightCommitId: "bar",
 		Namespace:     "u",
@@ -150,7 +151,7 @@ func TestInternalHandler_PostReceive(t *testing.T) {
 	runMock := &temporal_mock.WorkflowRun{}
 	runMock.On("GetID").Return("id")
 	tester.mocks.workflow.EXPECT().ExecuteWorkflow(
-		tester.ctx, client.StartWorkflowOptions{
+		tester.Ctx(), client.StartWorkflowOptions{
 			TaskQueue: workflow.HandlePushQueueName,
 		}, mock.Anything,
 		&types.GiteaCallbackPushReq{Ref: "ref/heads/main"},
@@ -178,7 +179,7 @@ func TestInternalHandler_GetAuthorizedKeys(t *testing.T) {
 		return h.GetAuthorizedKeys
 	})
 
-	tester.mocks.internal.EXPECT().GetAuthorizedKeys(tester.ctx, "k").Return(&database.SSHKey{
+	tester.mocks.internal.EXPECT().GetAuthorizedKeys(tester.Ctx(), "k").Return(&database.SSHKey{
 		ID:      1,
 		Content: "kk",
 	}, nil)
