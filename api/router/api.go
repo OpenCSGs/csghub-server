@@ -147,8 +147,12 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 	if err != nil {
 		return nil, fmt.Errorf("error creating HF dataset handler: %w", err)
 	}
-
-	createHFRoutes(r, hfdsHandler, repoCommonHandler, modelHandler, userHandler)
+	//create routes for hf
+	createMappingRoutes(r, "/hf", hfdsHandler, repoCommonHandler, modelHandler, userHandler)
+	//create routes for ms
+	createMappingRoutes(r, "/ms", hfdsHandler, repoCommonHandler, modelHandler, userHandler)
+	//create routes for csg
+	createMappingRoutes(r, "/csg", hfdsHandler, repoCommonHandler, modelHandler, userHandler)
 
 	apiGroup := r.Group("/api/v1")
 	// TODO:use middleware to handle common response
@@ -758,9 +762,9 @@ func createAccountRoutes(apiGroup *gin.RouterGroup, needAPIKey gin.HandlerFunc, 
 	}
 }
 
-func createHFRoutes(r *gin.Engine, hfdsHandler *handler.HFDatasetHandler, repoCommonHandler *handler.RepoHandler, modelHandler *handler.ModelHandler, userHandler *handler.UserHandler) {
+func createMappingRoutes(r *gin.Engine, group string, hfdsHandler *handler.HFDatasetHandler, repoCommonHandler *handler.RepoHandler, modelHandler *handler.ModelHandler, userHandler *handler.UserHandler) {
 	// Huggingface SDK routes
-	hfGroup := r.Group("/hf")
+	hfGroup := r.Group(group)
 	{
 		hfGroup.GET("/:namespace/:name/resolve/:branch/*file_path", middleware.RepoMapping(types.ModelRepo), repoCommonHandler.SDKDownload)
 		hfGroup.HEAD("/:namespace/:name/resolve/:branch/*file_path", middleware.RepoMapping(types.ModelRepo), repoCommonHandler.HeadSDKDownload)
