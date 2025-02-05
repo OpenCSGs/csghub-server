@@ -86,12 +86,12 @@ func TestMultiSyncComponent_SyncAsClient(t *testing.T) {
 	mc.mocks.gitServer.EXPECT().CreateUser(gitserver.CreateUserRequest{
 		Nickname: "nn",
 		Username: "CSG_ns",
-		Email:    "CSG_",
+		Email:    "CSG_ns_",
 	}).Return(&gitserver.CreateUserResponse{GitID: 123}, nil)
 	mc.mocks.stores.UserMock().EXPECT().Create(ctx, &database.User{
 		NickName: "nn",
 		Username: "CSG_ns",
-		Email:    "CSG_",
+		Email:    "CSG_ns_",
 		GitID:    123,
 	}, &database.Namespace{
 		Path:     "CSG_ns",
