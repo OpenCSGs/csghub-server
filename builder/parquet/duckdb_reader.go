@@ -19,6 +19,10 @@ type Reader interface {
 	FetchRows(ctx context.Context, objNames []string, req types.QueryReq, lfs bool) (columns []string, columnsType []string, rows [][]interface{}, err error)
 }
 
+type LimitOffsetCountReader interface {
+	RowsWithCount(ctx context.Context, paths []string, limit, offset int64) (columns []string, columnsType []string, rows [][]any, total int64, err error)
+}
+
 type duckdbReader struct {
 	db     *sql.DB
 	bucket string

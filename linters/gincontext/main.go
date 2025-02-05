@@ -17,6 +17,7 @@ import (
 
 var lintPath = []string{
 	"opencsg.com/csghub-server/api/handler",
+	"opencsg.com/csghub-server/dataviewer/handler",
 }
 
 func main() {

@@ -11,7 +11,6 @@ variables:
   DOCKER_TLS_CERTDIR: ""
   GOLANGCI_LINT_CACHE: ${CI_PROJECT_DIR}/.golangci-lint
   GOMODCACHE: ${CI_PROJECT_DIR}/.cache/go-mod
-  GOCACHE: ${CI_PROJECT_DIR}/.cache/go-build
   TESTCONTAINERS_HUB_IMAGE_NAME_PREFIX: opencsg-registry.cn-beijing.cr.aliyuncs.com/opencsg_public
   TESTCONTAINERS_RYUK_DISABLED: true
 
@@ -20,9 +19,6 @@ variables:
     - key: lint-cache
       paths:
         - .golangci-lint/
-    - key: mod-cache
-      paths:
-        - .cache/
 
 .go-test-cache:
   cache:

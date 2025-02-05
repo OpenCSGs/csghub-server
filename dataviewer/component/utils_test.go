@@ -30,7 +30,8 @@ func initializeTestDatasetViewerComponent(ctx context.Context, t interface {
 	mockRepoComponent := component.NewMockRepoComponent(t)
 	mockGitServer := gitserver.NewMockGitServer(t)
 	mockReader := parquet.NewMockReader(t)
-	componentDatasetViewerComponentImpl := NewTestDatasetViewerComponent(mockStores, config, mockRepoComponent, mockGitServer, mockReader)
+	mockLimitOffsetReader := parquet.NewMockLimitOffsetCountReader(t)
+	componentDatasetViewerComponentImpl := NewTestDatasetViewerComponent(mockStores, config, mockRepoComponent, mockGitServer, mockReader, mockLimitOffsetReader)
 	mockAccountingComponent := component.NewMockAccountingComponent(t)
 	mockTagComponent := component.NewMockTagComponent(t)
 	mockSpaceComponent := component.NewMockSpaceComponent(t)
@@ -53,18 +54,19 @@ func initializeTestDatasetViewerComponent(ctx context.Context, t interface {
 	mockModerationSvcClient := rpc.NewMockModerationSvcClient(t)
 	mockKeysReader := rsa.NewMockKeysReader(t)
 	mocks := &Mocks{
-		stores:           mockStores,
-		components:       componentMockedComponents,
-		gitServer:        mockGitServer,
-		userSvcClient:    mockUserSvcClient,
-		s3Client:         mockClient,
-		mirrorServer:     mockMirrorServer,
-		mirrorQueue:      mockPriorityQueue,
-		deployer:         mockDeployer,
-		accountingClient: mockAccountingClient,
-		preader:          mockReader,
-		moderationClient: mockModerationSvcClient,
-		rsaReader:        mockKeysReader,
+		stores:            mockStores,
+		components:        componentMockedComponents,
+		gitServer:         mockGitServer,
+		userSvcClient:     mockUserSvcClient,
+		s3Client:          mockClient,
+		mirrorServer:      mockMirrorServer,
+		mirrorQueue:       mockPriorityQueue,
+		deployer:          mockDeployer,
+		accountingClient:  mockAccountingClient,
+		preader:           mockReader,
+		limitOffsetReader: mockLimitOffsetReader,
+		moderationClient:  mockModerationSvcClient,
+		rsaReader:         mockKeysReader,
 	}
 	componentTestDatasetViewerWithMocks := &testDatasetViewerWithMocks{
 		datasetViewerComponentImpl: componentDatasetViewerComponentImpl,

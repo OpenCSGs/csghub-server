@@ -28,6 +28,67 @@ func (_m *MockClient) EXPECT() *MockClient_Expecter {
 	return &MockClient_Expecter{mock: &_m.Mock}
 }
 
+// GetObject provides a mock function with given fields: ctx, bucketName, objectName, opts
+func (_m *MockClient) GetObject(ctx context.Context, bucketName string, objectName string, opts minio.GetObjectOptions) (*minio.Object, error) {
+	ret := _m.Called(ctx, bucketName, objectName, opts)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetObject")
+	}
+
+	var r0 *minio.Object
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, minio.GetObjectOptions) (*minio.Object, error)); ok {
+		return rf(ctx, bucketName, objectName, opts)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, minio.GetObjectOptions) *minio.Object); ok {
+		r0 = rf(ctx, bucketName, objectName, opts)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*minio.Object)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string, string, minio.GetObjectOptions) error); ok {
+		r1 = rf(ctx, bucketName, objectName, opts)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockClient_GetObject_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetObject'
+type MockClient_GetObject_Call struct {
+	*mock.Call
+}
+
+// GetObject is a helper method to define mock.On call
+//   - ctx context.Context
+//   - bucketName string
+//   - objectName string
+//   - opts minio.GetObjectOptions
+func (_e *MockClient_Expecter) GetObject(ctx interface{}, bucketName interface{}, objectName interface{}, opts interface{}) *MockClient_GetObject_Call {
+	return &MockClient_GetObject_Call{Call: _e.mock.On("GetObject", ctx, bucketName, objectName, opts)}
+}
+
+func (_c *MockClient_GetObject_Call) Run(run func(ctx context.Context, bucketName string, objectName string, opts minio.GetObjectOptions)) *MockClient_GetObject_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(string), args[2].(string), args[3].(minio.GetObjectOptions))
+	})
+	return _c
+}
+
+func (_c *MockClient_GetObject_Call) Return(_a0 *minio.Object, _a1 error) *MockClient_GetObject_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockClient_GetObject_Call) RunAndReturn(run func(context.Context, string, string, minio.GetObjectOptions) (*minio.Object, error)) *MockClient_GetObject_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // PresignedGetObject provides a mock function with given fields: ctx, bucketName, objectName, expires, reqParams
 func (_m *MockClient) PresignedGetObject(ctx context.Context, bucketName string, objectName string, expires time.Duration, reqParams url.Values) (*url.URL, error) {
 	ret := _m.Called(ctx, bucketName, objectName, expires, reqParams)

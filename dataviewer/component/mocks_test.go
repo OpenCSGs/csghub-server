@@ -2,6 +2,7 @@ package component
 
 import (
 	"github.com/google/wire"
+	"go.opentelemetry.io/otel"
 	mock_accounting "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/accounting"
 	mock_deploy "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/deploy"
 	mock_git "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/git/gitserver"
@@ -33,32 +34,35 @@ var MockedStoreSet = wire.NewSet(
 )
 
 type Mocks struct {
-	stores           *tests.MockStores
-	components       *mockedComponents
-	gitServer        *mock_git.MockGitServer
-	userSvcClient    *mock_rpc.MockUserSvcClient
-	s3Client         *mock_s3.MockClient
-	mirrorServer     *mock_mirror.MockMirrorServer
-	mirrorQueue      *mock_mirror_queue.MockPriorityQueue
-	deployer         *mock_deploy.MockDeployer
-	accountingClient *mock_accounting.MockAccountingClient
-	preader          *mock_preader.MockReader
-	moderationClient *mock_rpc.MockModerationSvcClient
-	rsaReader        *mock_rsa.MockKeysReader
+	stores            *tests.MockStores
+	components        *mockedComponents
+	gitServer         *mock_git.MockGitServer
+	userSvcClient     *mock_rpc.MockUserSvcClient
+	s3Client          *mock_s3.MockClient
+	mirrorServer      *mock_mirror.MockMirrorServer
+	mirrorQueue       *mock_mirror_queue.MockPriorityQueue
+	deployer          *mock_deploy.MockDeployer
+	accountingClient  *mock_accounting.MockAccountingClient
+	preader           *mock_preader.MockReader
+	limitOffsetReader *mock_preader.MockLimitOffsetCountReader
+	moderationClient  *mock_rpc.MockModerationSvcClient
+	rsaReader         *mock_rsa.MockKeysReader
 }
 
 func ProvideTestConfig() *config.Config {
 	return &config.Config{}
 }
 
-func NewTestDatasetViewerComponent(stores *tests.MockStores, cfg *config.Config, repoComponent hubCom.RepoComponent, gitServer gitserver.GitServer, preader parquet.Reader) *datasetViewerComponentImpl {
+func NewTestDatasetViewerComponent(stores *tests.MockStores, cfg *config.Config, repoComponent hubCom.RepoComponent, gitServer gitserver.GitServer, preader parquet.Reader, limitOffsetReader parquet.LimitOffsetCountReader) *datasetViewerComponentImpl {
 	return &datasetViewerComponentImpl{
-		cfg:           cfg,
-		repoStore:     stores.Repo,
-		repoComponent: repoComponent,
-		gitServer:     gitServer,
-		preader:       preader,
-		viewerStore:   stores.ViewerStore,
+		cfg:                    cfg,
+		repoStore:              stores.Repo,
+		repoComponent:          repoComponent,
+		gitServer:              gitServer,
+		preader:                preader,
+		limitOffsetCountReader: limitOffsetReader,
+		viewerStore:            stores.ViewerStore,
+		tracer:                 otel.Tracer("dataset-viewer"),
 	}
 }
 

@@ -6,11 +6,12 @@ import (
 	"github.com/gin-gonic/gin"
 	mockcomponent "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/component"
 	"opencsg.com/csghub-server/builder/store/database"
+	"opencsg.com/csghub-server/builder/testutil"
 	"opencsg.com/csghub-server/common/types"
 )
 
 type RuntimeArchitectureTester struct {
-	*GinTester
+	*testutil.GinTester
 	handler *RuntimeArchitectureHandler
 	mocks   struct {
 		repo        *mockcomponent.MockRepoComponent
@@ -19,7 +20,7 @@ type RuntimeArchitectureTester struct {
 }
 
 func NewRuntimeArchitectureTester(t *testing.T) *RuntimeArchitectureTester {
-	tester := &RuntimeArchitectureTester{GinTester: NewGinTester()}
+	tester := &RuntimeArchitectureTester{GinTester: testutil.NewGinTester()}
 	tester.mocks.repo = mockcomponent.NewMockRepoComponent(t)
 	tester.mocks.runtimeArch = mockcomponent.NewMockRuntimeArchitectureComponent(t)
 
@@ -33,7 +34,7 @@ func NewRuntimeArchitectureTester(t *testing.T) *RuntimeArchitectureTester {
 }
 
 func (t *RuntimeArchitectureTester) WithHandleFunc(fn func(h *RuntimeArchitectureHandler) gin.HandlerFunc) *RuntimeArchitectureTester {
-	t.ginHandler = fn(t.handler)
+	t.Handler(fn(t.handler))
 	return t
 }
 
@@ -42,7 +43,7 @@ func TestRuntimeArchHandler_ListByRuntimeFrameworkID(t *testing.T) {
 		return h.ListByRuntimeFrameworkID
 	})
 
-	tester.mocks.runtimeArch.EXPECT().ListByRuntimeFrameworkID(tester.ctx, int64(1)).Return([]database.RuntimeArchitecture{{ID: 1}}, nil)
+	tester.mocks.runtimeArch.EXPECT().ListByRuntimeFrameworkID(tester.Ctx(), int64(1)).Return([]database.RuntimeArchitecture{{ID: 1}}, nil)
 	tester.WithParam("id", "1").Execute()
 
 	tester.ResponseEq(t, 200, tester.OKText, []database.RuntimeArchitecture{{ID: 1}})
@@ -54,7 +55,7 @@ func TestRuntimeArchHandler_UpdateArchitecture(t *testing.T) {
 	})
 
 	tester.mocks.runtimeArch.EXPECT().SetArchitectures(
-		tester.ctx, int64(1), []string{"foo"},
+		tester.Ctx(), int64(1), []string{"foo"},
 	).Return([]string{"bar"}, nil)
 	tester.WithParam("id", "1").WithBody(t, &types.RuntimeArchitecture{
 		Architectures: []string{"foo"},
@@ -69,7 +70,7 @@ func TestRuntimeArchHandler_DeleteArchitecture(t *testing.T) {
 	})
 
 	tester.mocks.runtimeArch.EXPECT().DeleteArchitectures(
-		tester.ctx, int64(1), []string{"foo"},
+		tester.Ctx(), int64(1), []string{"foo"},
 	).Return([]string{"bar"}, nil)
 	tester.WithParam("id", "1").WithBody(t, &types.RuntimeArchitecture{
 		Architectures: []string{"foo"},
@@ -84,7 +85,7 @@ func TestRuntimeArchHandler_ScanArchitecture(t *testing.T) {
 	})
 
 	tester.mocks.runtimeArch.EXPECT().ScanArchitecture(
-		tester.ctx, int64(1), 2, []string{"foo"},
+		tester.Ctx(), int64(1), 2, []string{"foo"},
 	).Return(nil)
 	tester.WithParam("id", "1").WithQuery("scan_type", "2").WithBody(t, &types.RuntimeFrameworkModels{
 		Models: []string{"foo"},

@@ -630,6 +630,7 @@ func (c *Client) GetTree(ctx context.Context, req types.GetTreeRequest) (*types.
 			PageToken: req.Cursor,
 			Limit:     int32(req.Limit),
 		},
+		Recursive: req.Recursive,
 	}
 
 	treeStream, err := c.commitClient.GetTreeEntries(ctx, gitalyReq)

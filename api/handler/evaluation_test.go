@@ -5,11 +5,12 @@ import (
 
 	"github.com/gin-gonic/gin"
 	mockcomponent "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/component"
+	"opencsg.com/csghub-server/builder/testutil"
 	"opencsg.com/csghub-server/common/types"
 )
 
 type EvaluationTester struct {
-	*GinTester
+	*testutil.GinTester
 	handler *EvaluationHandler
 	mocks   struct {
 		evaluation *mockcomponent.MockEvaluationComponent
@@ -18,7 +19,7 @@ type EvaluationTester struct {
 }
 
 func NewEvaluationTester(t *testing.T) *EvaluationTester {
-	tester := &EvaluationTester{GinTester: NewGinTester()}
+	tester := &EvaluationTester{GinTester: testutil.NewGinTester()}
 	tester.mocks.evaluation = mockcomponent.NewMockEvaluationComponent(t)
 	tester.mocks.sensitive = mockcomponent.NewMockSensitiveComponent(t)
 
@@ -32,7 +33,7 @@ func NewEvaluationTester(t *testing.T) *EvaluationTester {
 }
 
 func (t *EvaluationTester) WithHandleFunc(fn func(h *EvaluationHandler) gin.HandlerFunc) *EvaluationTester {
-	t.ginHandler = fn(t.handler)
+	t.Handler(fn(t.handler))
 	return t
 }
 
@@ -42,8 +43,8 @@ func TestEvaluationHandler_Run(t *testing.T) {
 	})
 	tester.RequireUser(t)
 
-	tester.mocks.sensitive.EXPECT().CheckRequestV2(tester.ctx, &types.EvaluationReq{}).Return(true, nil)
-	tester.mocks.evaluation.EXPECT().CreateEvaluation(tester.ctx, types.EvaluationReq{
+	tester.mocks.sensitive.EXPECT().CheckRequestV2(tester.Ctx(), &types.EvaluationReq{}).Return(true, nil)
+	tester.mocks.evaluation.EXPECT().CreateEvaluation(tester.Ctx(), types.EvaluationReq{
 		Username: "u",
 	}).Return(&types.ArgoWorkFlowRes{ID: 1}, nil)
 	tester.WithBody(t, &types.EvaluationReq{}).Execute()
@@ -58,7 +59,7 @@ func TestEvaluationHandler_Get(t *testing.T) {
 	})
 	tester.RequireUser(t)
 
-	tester.mocks.evaluation.EXPECT().GetEvaluation(tester.ctx, types.EvaluationGetReq{
+	tester.mocks.evaluation.EXPECT().GetEvaluation(tester.Ctx(), types.EvaluationGetReq{
 		Username: "u",
 		ID:       1,
 	}).Return(&types.EvaluationRes{ID: 1}, nil)
@@ -74,7 +75,7 @@ func TestEvaluationHandler_Delete(t *testing.T) {
 	})
 	tester.RequireUser(t)
 
-	tester.mocks.evaluation.EXPECT().DeleteEvaluation(tester.ctx, types.EvaluationGetReq{
+	tester.mocks.evaluation.EXPECT().DeleteEvaluation(tester.Ctx(), types.EvaluationGetReq{
 		Username: "u",
 		ID:       1,
 	}).Return(nil)

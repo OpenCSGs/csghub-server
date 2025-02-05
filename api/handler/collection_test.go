@@ -8,11 +8,12 @@ import (
 	"github.com/stretchr/testify/require"
 	mockcomponent "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/component"
 	"opencsg.com/csghub-server/builder/store/database"
+	"opencsg.com/csghub-server/builder/testutil"
 	"opencsg.com/csghub-server/common/types"
 )
 
 type CollectionTester struct {
-	*GinTester
+	*testutil.GinTester
 	handler *CollectionHandler
 	mocks   struct {
 		collection *mockcomponent.MockCollectionComponent
@@ -21,7 +22,7 @@ type CollectionTester struct {
 }
 
 func NewCollectionTester(t *testing.T) *CollectionTester {
-	tester := &CollectionTester{GinTester: NewGinTester()}
+	tester := &CollectionTester{GinTester: testutil.NewGinTester()}
 	tester.mocks.collection = mockcomponent.NewMockCollectionComponent(t)
 	tester.mocks.sensitive = mockcomponent.NewMockSensitiveComponent(t)
 
@@ -35,7 +36,7 @@ func NewCollectionTester(t *testing.T) *CollectionTester {
 }
 
 func (t *CollectionTester) WithHandleFunc(fn func(h *CollectionHandler) gin.HandlerFunc) *CollectionTester {
-	t.ginHandler = fn(t.handler)
+	t.Handler(fn(t.handler))
 	return t
 }
 
@@ -56,7 +57,7 @@ func TestCollectionHandler_Index(t *testing.T) {
 			})
 
 			if !c.error {
-				tester.mocks.collection.EXPECT().GetCollections(tester.ctx, &types.CollectionFilter{
+				tester.mocks.collection.EXPECT().GetCollections(tester.Ctx(), &types.CollectionFilter{
 					Search: "foo",
 					Sort:   c.sort,
 				}, 10, 1).Return([]types.Collection{
@@ -68,7 +69,7 @@ func TestCollectionHandler_Index(t *testing.T) {
 				WithQuery("sort", c.sort).Execute()
 
 			if c.error {
-				require.Equal(t, 400, tester.response.Code)
+				require.Equal(t, 400, tester.Response().Code)
 			} else {
 				tester.ResponseEqSimple(t, 200, gin.H{
 					"data":  []types.Collection{{Name: "cc"}},
@@ -85,8 +86,8 @@ func TestCollectionHandler_Create(t *testing.T) {
 	})
 	tester.RequireUser(t)
 
-	tester.mocks.sensitive.EXPECT().CheckRequestV2(tester.ctx, &types.CreateCollectionReq{}).Return(true, nil)
-	tester.mocks.collection.EXPECT().CreateCollection(tester.ctx, types.CreateCollectionReq{
+	tester.mocks.sensitive.EXPECT().CheckRequestV2(tester.Ctx(), &types.CreateCollectionReq{}).Return(true, nil)
+	tester.mocks.collection.EXPECT().CreateCollection(tester.Ctx(), types.CreateCollectionReq{
 		Username: "u",
 	}).Return(&database.Collection{ID: 1}, nil)
 	tester.WithBody(t, &types.CreateCollectionReq{}).Execute()
@@ -101,7 +102,7 @@ func TestCollectionHandler_GetCollection(t *testing.T) {
 	})
 
 	tester.mocks.collection.EXPECT().GetCollection(
-		tester.ctx, "u", int64(1),
+		tester.Ctx(), "u", int64(1),
 	).Return(&types.Collection{ID: 1}, nil)
 	tester.WithUser().WithParam("id", "1").Execute()
 
@@ -115,8 +116,8 @@ func TestCollectionHandler_UpdateCollection(t *testing.T) {
 	})
 	tester.RequireUser(t)
 
-	tester.mocks.sensitive.EXPECT().CheckRequestV2(tester.ctx, &types.CreateCollectionReq{}).Return(true, nil)
-	tester.mocks.collection.EXPECT().UpdateCollection(tester.ctx, types.CreateCollectionReq{
+	tester.mocks.sensitive.EXPECT().CheckRequestV2(tester.Ctx(), &types.CreateCollectionReq{}).Return(true, nil)
+	tester.mocks.collection.EXPECT().UpdateCollection(tester.Ctx(), types.CreateCollectionReq{
 		ID: 1,
 	}).Return(&database.Collection{ID: 1}, nil)
 	tester.WithParam("id", "1").WithBody(t, &types.CreateCollectionReq{}).Execute()
@@ -132,7 +133,7 @@ func TestCollectionHandler_DeleteCollection(t *testing.T) {
 	tester.RequireUser(t)
 
 	tester.mocks.collection.EXPECT().DeleteCollection(
-		tester.ctx, int64(1), "u",
+		tester.Ctx(), int64(1), "u",
 	).Return(nil)
 	tester.WithParam("id", "1").Execute()
 
@@ -146,7 +147,7 @@ func TestCollectionHandler_AddRepoToCollection(t *testing.T) {
 	})
 	tester.RequireUser(t)
 
-	tester.mocks.collection.EXPECT().AddReposToCollection(tester.ctx, types.UpdateCollectionReposReq{
+	tester.mocks.collection.EXPECT().AddReposToCollection(tester.Ctx(), types.UpdateCollectionReposReq{
 		Username: "u",
 		ID:       1,
 	}).Return(nil)
@@ -162,7 +163,7 @@ func TestCollectionHandler_RemoveRepoFromCollection(t *testing.T) {
 	})
 	tester.RequireUser(t)
 
-	tester.mocks.collection.EXPECT().RemoveReposFromCollection(tester.ctx, types.UpdateCollectionReposReq{
+	tester.mocks.collection.EXPECT().RemoveReposFromCollection(tester.Ctx(), types.UpdateCollectionReposReq{
 		Username: "u",
 		ID:       1,
 	}).Return(nil)

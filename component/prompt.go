@@ -119,7 +119,7 @@ func (c *promptComponentImpl) ListPrompt(ctx context.Context, req types.PromptRe
 	}
 
 	slog.Debug("ListPrompt get repo file tree begin")
-	tree, err := GetFilePathObjects(req.Namespace, req.Name, "", types.PromptRepo, "", c.gitServer.GetRepoFileTree)
+	tree, err := GetFilePathObjects(ctx, req.Namespace, req.Name, "", types.PromptRepo, "", c.gitServer.GetRepoFileTree)
 	slog.Debug("ListPrompt get repo file tree end")
 	if err != nil {
 		return nil, fmt.Errorf("failed to get repo file tree, error: %w", err)

@@ -5,11 +5,12 @@ import (
 
 	"github.com/gin-gonic/gin"
 	mockcomponent "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/component"
+	"opencsg.com/csghub-server/builder/testutil"
 	"opencsg.com/csghub-server/common/types"
 )
 
 type AccountingTester struct {
-	*GinTester
+	*testutil.GinTester
 	handler *AccountingHandler
 	mocks   struct {
 		accounting *mockcomponent.MockAccountingComponent
@@ -17,7 +18,7 @@ type AccountingTester struct {
 }
 
 func NewAccountingTester(t *testing.T) *AccountingTester {
-	tester := &AccountingTester{GinTester: NewGinTester()}
+	tester := &AccountingTester{GinTester: testutil.NewGinTester()}
 	tester.mocks.accounting = mockcomponent.NewMockAccountingComponent(t)
 
 	tester.handler = &AccountingHandler{
@@ -30,7 +31,7 @@ func NewAccountingTester(t *testing.T) *AccountingTester {
 }
 
 func (t *AccountingTester) WithHandleFunc(fn func(h *AccountingHandler) gin.HandlerFunc) *AccountingTester {
-	t.ginHandler = fn(t.handler)
+	t.Handler(fn(t.handler))
 	return t
 }
 
@@ -41,7 +42,7 @@ func TestAccountingHandler_QueryMeteringStatementByUserID(t *testing.T) {
 	tester.RequireUser(t)
 
 	tester.mocks.accounting.EXPECT().ListMeteringsByUserIDAndTime(
-		tester.ctx, types.ACCT_STATEMENTS_REQ{
+		tester.Ctx(), types.ACCT_STATEMENTS_REQ{
 			CurrentUser:  "u",
 			UserUUID:     "1",
 			Scene:        2,

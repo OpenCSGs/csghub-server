@@ -7,12 +7,13 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/require"
 	mockcomponent "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/component"
+	"opencsg.com/csghub-server/builder/testutil"
 	"opencsg.com/csghub-server/common/types"
 	"opencsg.com/csghub-server/component"
 )
 
 type DatasetTester struct {
-	*GinTester
+	*testutil.GinTester
 	handler *DatasetHandler
 	mocks   struct {
 		dataset   *mockcomponent.MockDatasetComponent
@@ -22,7 +23,7 @@ type DatasetTester struct {
 }
 
 func NewDatasetTester(t *testing.T) *DatasetTester {
-	tester := &DatasetTester{GinTester: NewGinTester()}
+	tester := &DatasetTester{GinTester: testutil.NewGinTester()}
 	tester.mocks.dataset = mockcomponent.NewMockDatasetComponent(t)
 	tester.mocks.sensitive = mockcomponent.NewMockSensitiveComponent(t)
 	tester.mocks.repo = mockcomponent.NewMockRepoComponent(t)
@@ -38,7 +39,7 @@ func NewDatasetTester(t *testing.T) *DatasetTester {
 }
 
 func (t *DatasetTester) WithHandleFunc(fn func(h *DatasetHandler) gin.HandlerFunc) *DatasetTester {
-	t.ginHandler = fn(t.handler)
+	t.Handler(fn(t.handler))
 	return t
 }
 
@@ -61,7 +62,7 @@ func TestDatasetHandler_Index(t *testing.T) {
 			})
 
 			if !c.error {
-				tester.mocks.dataset.EXPECT().Index(tester.ctx, &types.RepoFilter{
+				tester.mocks.dataset.EXPECT().Index(tester.Ctx(), &types.RepoFilter{
 					Search: "foo",
 					Sort:   c.sort,
 					Source: c.source,
@@ -75,7 +76,7 @@ func TestDatasetHandler_Index(t *testing.T) {
 				WithQuery("source", c.source).Execute()
 
 			if c.error {
-				require.Equal(t, 400, tester.response.Code)
+				require.Equal(t, 400, tester.Response().Code)
 			} else {
 				tester.ResponseEqSimple(t, 200, gin.H{
 					"data":  []types.Dataset{{Name: "cc"}},
@@ -93,8 +94,8 @@ func TestDatasetHandler_Update(t *testing.T) {
 		})
 		tester.RequireUser(t)
 
-		tester.mocks.sensitive.EXPECT().CheckRequestV2(tester.ctx, &types.UpdateDatasetReq{}).Return(true, nil)
-		tester.mocks.dataset.EXPECT().Update(tester.ctx, &types.UpdateDatasetReq{
+		tester.mocks.sensitive.EXPECT().CheckRequestV2(tester.Ctx(), &types.UpdateDatasetReq{}).Return(true, nil)
+		tester.mocks.dataset.EXPECT().Update(tester.Ctx(), &types.UpdateDatasetReq{
 			UpdateRepoReq: types.UpdateRepoReq{
 				Username:  "u",
 				Namespace: "u-other",
@@ -108,7 +109,7 @@ func TestDatasetHandler_Update(t *testing.T) {
 			WithUser().
 			Execute()
 
-		require.Equal(t, 403, tester.response.Code)
+		require.Equal(t, 403, tester.Response().Code)
 	})
 
 	t.Run("normal", func(t *testing.T) {
@@ -117,8 +118,8 @@ func TestDatasetHandler_Update(t *testing.T) {
 		})
 		tester.RequireUser(t)
 
-		tester.mocks.sensitive.EXPECT().CheckRequestV2(tester.ctx, &types.UpdateDatasetReq{}).Return(true, nil)
-		tester.mocks.dataset.EXPECT().Update(tester.ctx, &types.UpdateDatasetReq{
+		tester.mocks.sensitive.EXPECT().CheckRequestV2(tester.Ctx(), &types.UpdateDatasetReq{}).Return(true, nil)
+		tester.mocks.dataset.EXPECT().Update(tester.Ctx(), &types.UpdateDatasetReq{
 			UpdateRepoReq: types.UpdateRepoReq{
 				Username:  "u",
 				Namespace: "u",
@@ -140,11 +141,11 @@ func TestDatasetHandler_Delete(t *testing.T) {
 		})
 		tester.RequireUser(t)
 
-		tester.mocks.dataset.EXPECT().Delete(tester.ctx, "u-other", "r", "u").Return(component.ErrForbidden)
+		tester.mocks.dataset.EXPECT().Delete(tester.Ctx(), "u-other", "r", "u").Return(component.ErrForbidden)
 		tester.WithParam("namespace", "u-other").WithParam("name", "r")
 		tester.WithUser().Execute()
 
-		require.Equal(t, 403, tester.response.Code)
+		require.Equal(t, 403, tester.Response().Code)
 	})
 
 	t.Run("normal", func(t *testing.T) {
@@ -153,7 +154,7 @@ func TestDatasetHandler_Delete(t *testing.T) {
 		})
 		tester.RequireUser(t)
 
-		tester.mocks.dataset.EXPECT().Delete(tester.ctx, "u", "r", "u").Return(nil)
+		tester.mocks.dataset.EXPECT().Delete(tester.Ctx(), "u", "r", "u").Return(nil)
 		tester.Execute()
 
 		tester.ResponseEq(t, 200, tester.OKText, nil)
@@ -166,11 +167,11 @@ func TestDatasetHandler_Show(t *testing.T) {
 			return h.Show
 		})
 
-		tester.mocks.dataset.EXPECT().Show(tester.ctx, "u-other", "r", "u").Return(nil, component.ErrForbidden)
+		tester.mocks.dataset.EXPECT().Show(tester.Ctx(), "u-other", "r", "u").Return(nil, component.ErrForbidden)
 		tester.WithParam("namespace", "u-other").WithParam("name", "r")
 		tester.WithUser().Execute()
 
-		require.Equal(t, 403, tester.response.Code)
+		require.Equal(t, 403, tester.Response().Code)
 	})
 
 	t.Run("normal", func(t *testing.T) {
@@ -178,7 +179,7 @@ func TestDatasetHandler_Show(t *testing.T) {
 			return h.Show
 		})
 
-		tester.mocks.dataset.EXPECT().Show(tester.ctx, "u", "r", "u").Return(&types.Dataset{
+		tester.mocks.dataset.EXPECT().Show(tester.Ctx(), "u", "r", "u").Return(&types.Dataset{
 			Name: "d",
 		}, nil)
 		tester.WithUser().Execute()
@@ -193,11 +194,11 @@ func TestDatasetHandler_Relations(t *testing.T) {
 			return h.Relations
 		})
 
-		tester.mocks.dataset.EXPECT().Relations(tester.ctx, "u-other", "r", "u").Return(nil, component.ErrForbidden)
+		tester.mocks.dataset.EXPECT().Relations(tester.Ctx(), "u-other", "r", "u").Return(nil, component.ErrForbidden)
 		tester.WithParam("namespace", "u-other").WithParam("name", "r")
 		tester.WithUser().Execute()
 
-		require.Equal(t, 403, tester.response.Code)
+		require.Equal(t, 403, tester.Response().Code)
 
 	})
 
@@ -206,7 +207,7 @@ func TestDatasetHandler_Relations(t *testing.T) {
 			return h.Relations
 		})
 
-		tester.mocks.dataset.EXPECT().Relations(tester.ctx, "u", "r", "u").Return(&types.Relations{
+		tester.mocks.dataset.EXPECT().Relations(tester.Ctx(), "u", "r", "u").Return(&types.Relations{
 			Models: []*types.Model{{Name: "m"}},
 		}, nil)
 		tester.WithUser().Execute()
@@ -223,7 +224,7 @@ func TestDatasetHandler_AllFiles(t *testing.T) {
 			return h.AllFiles
 		})
 
-		tester.mocks.repo.EXPECT().AllFiles(tester.ctx, types.GetAllFilesReq{
+		tester.mocks.repo.EXPECT().AllFiles(tester.Ctx(), types.GetAllFilesReq{
 			Namespace:   "u-other",
 			Name:        "r",
 			RepoType:    types.DatasetRepo,
@@ -232,7 +233,7 @@ func TestDatasetHandler_AllFiles(t *testing.T) {
 		tester.WithParam("namespace", "u-other").WithParam("name", "r")
 		tester.WithUser().Execute()
 
-		require.Equal(t, 403, tester.response.Code)
+		require.Equal(t, 403, tester.Response().Code)
 	})
 
 	t.Run("normal", func(t *testing.T) {
@@ -240,7 +241,7 @@ func TestDatasetHandler_AllFiles(t *testing.T) {
 			return h.AllFiles
 		})
 
-		tester.mocks.repo.EXPECT().AllFiles(tester.ctx, types.GetAllFilesReq{
+		tester.mocks.repo.EXPECT().AllFiles(tester.Ctx(), types.GetAllFilesReq{
 			Namespace:   "u",
 			Name:        "r",
 			RepoType:    types.DatasetRepo,

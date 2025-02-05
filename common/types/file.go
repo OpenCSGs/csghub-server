@@ -114,6 +114,7 @@ type GetTreeRequest struct {
 	Limit       int            `json:"limit"`
 	Cursor      string         `json:"cursor"`
 	CurrentUser string         `json:"current_user"`
+	Recursive   bool           `json:"-"`
 }
 
 type GetLogsTreeRequest struct {
