@@ -20,8 +20,8 @@ import (
 
 const (
 	S3_TMP_DIR         = "lfs/tmp/"
-	MINIO_PUT_PARALLEL = 3
-	MINIO_PART_SIZE    = 64 << 20
+	MINIO_PUT_PARALLEL = 5
+	MINIO_PART_SIZE    = 5 << 20
 )
 
 var tracer trace.Tracer
