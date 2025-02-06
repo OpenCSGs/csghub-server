@@ -30,12 +30,6 @@ func init() {
 	tracer = otel.Tracer("builder.store.s3")
 }
 
-var bucketLookupMapping = map[string]minio.BucketLookupType{
-	"auto": minio.BucketLookupAuto,
-	"dns":  minio.BucketLookupDNS,
-	"path": minio.BucketLookupPath,
-}
-
 type MinioClient interface {
 	PresignedGetObject(ctx context.Context, bucketName, objectName string, expires time.Duration, reqParams url.Values) (*url.URL, error)
 	PutObject(ctx context.Context, bucketName, objectName string, reader io.Reader, objectSize int64,

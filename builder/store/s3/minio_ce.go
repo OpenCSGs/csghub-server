@@ -21,16 +21,10 @@ type minioClient struct {
 }
 
 func NewMinio(cfg *config.Config) (Client, error) {
-	var bucketLookupType minio.BucketLookupType
-	if val, ok := bucketLookupMapping[cfg.S3.BucketLookup]; ok {
-		bucketLookupType = val
-	} else {
-		bucketLookupType = minio.BucketLookupAuto
-	}
 	mClient, err := minio.New(cfg.S3.Endpoint, &minio.Options{
 		Creds:        credentials.NewStaticV4(cfg.S3.AccessKeyID, cfg.S3.AccessKeySecret, ""),
 		Secure:       cfg.S3.EnableSSL,
-		BucketLookup: bucketLookupType,
+		BucketLookup: minio.BucketLookupAuto,
 		Region:       cfg.S3.Region,
 	})
 	if err != nil {
@@ -39,7 +33,18 @@ func NewMinio(cfg *config.Config) (Client, error) {
 	client := &minioClient{
 		Client: mClient,
 	}
-
+	if len(cfg.S3.InternalEndpoint) > 0 {
+		minioClientInternal, err := minio.New(cfg.S3.InternalEndpoint, &minio.Options{
+			Creds:        credentials.NewStaticV4(cfg.S3.AccessKeyID, cfg.S3.AccessKeySecret, ""),
+			Secure:       cfg.S3.EnableSSL,
+			BucketLookup: minio.BucketLookupAuto,
+			Region:       cfg.S3.Region,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("failed to init s3 internal client, error:%w", err)
+		}
+		client.internalClient = minioClientInternal
+	}
 	return client, nil
 }
 
