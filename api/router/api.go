@@ -106,7 +106,9 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 
 	r.Use(middleware.Authenticator(config))
 
-	needAPIKey := middleware.OnlyAPIKeyAuthenticator(config)
+	authCollection := middleware.AuthenticatorCollection{}
+	authCollection.NeedAPIKey = middleware.OnlyAPIKeyAuthenticator(config)
+	authCollection.NeedAdmin = middleware.NeedAdmin(config)
 
 	if enableSwagger {
 		r.GET("/api/v1/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
@@ -173,7 +175,7 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 	createEvaluationRoutes(apiGroup, evaluationHandler)
 
 	// Model routes
-	createModelRoutes(config, apiGroup, needAPIKey, modelHandler, repoCommonHandler)
+	createModelRoutes(config, apiGroup, authCollection.NeedAPIKey, modelHandler, repoCommonHandler)
 
 	// Dataset routes
 	createDatasetRoutes(config, apiGroup, dsHandler, repoCommonHandler)
@@ -200,9 +202,9 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 	spaceResource := apiGroup.Group("space_resources")
 	{
 		spaceResource.GET("", spaceResourceHandler.Index)
-		spaceResource.POST("", needAPIKey, spaceResourceHandler.Create)
-		spaceResource.PUT("/:id", needAPIKey, spaceResourceHandler.Update)
-		spaceResource.DELETE("/:id", needAPIKey, spaceResourceHandler.Delete)
+		spaceResource.POST("", authCollection.NeedAdmin, spaceResourceHandler.Create)
+		spaceResource.PUT("/:id", authCollection.NeedAdmin, spaceResourceHandler.Update)
+		spaceResource.DELETE("/:id", authCollection.NeedAdmin, spaceResourceHandler.Delete)
 	}
 
 	spaceSdkHandler, err := handler.NewSpaceSdkHandler(config)
@@ -213,9 +215,9 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 	spaceSdk := apiGroup.Group("space_sdks")
 	{
 		spaceSdk.GET("", spaceSdkHandler.Index)
-		spaceSdk.POST("", needAPIKey, spaceSdkHandler.Create)
-		spaceSdk.PUT("/:id", needAPIKey, spaceSdkHandler.Update)
-		spaceSdk.DELETE("/:id", needAPIKey, spaceSdkHandler.Delete)
+		spaceSdk.POST("", authCollection.NeedAPIKey, spaceSdkHandler.Create)
+		spaceSdk.PUT("/:id", authCollection.NeedAPIKey, spaceSdkHandler.Update)
+		spaceSdk.DELETE("/:id", authCollection.NeedAPIKey, spaceSdkHandler.Delete)
 	}
 
 	userProxyHandler, err := handler.NewInternalServiceProxyHandler(fmt.Sprintf("%s:%d", config.User.Host, config.User.Port))
@@ -223,7 +225,7 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 		return nil, fmt.Errorf("error creating user proxy handler:%w", err)
 	}
 
-	createUserRoutes(apiGroup, needAPIKey, userProxyHandler, userHandler)
+	createUserRoutes(apiGroup, authCollection.NeedAPIKey, userProxyHandler, userHandler)
 
 	tokenGroup := apiGroup.Group("token")
 	{
@@ -231,7 +233,7 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 		tokenGroup.PUT("/:app/:token_name", userProxyHandler.ProxyToApi("/api/v1/token/%s/%s", "app", "token_name"))
 		tokenGroup.DELETE("/:app/:token_name", userProxyHandler.ProxyToApi("/api/v1/token/%s/%s", "app", "token_name"))
 		// check token info
-		tokenGroup.GET("/:token_value", needAPIKey, userProxyHandler.ProxyToApi("/api/v1/token/%s", "token_value"))
+		tokenGroup.GET("/:token_value", authCollection.NeedAPIKey, userProxyHandler.ProxyToApi("/api/v1/token/%s", "token_value"))
 	}
 
 	sshKeyHandler, err := handler.NewSSHKeyHandler(config)
@@ -275,8 +277,8 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 	createTagsRoutes(apiGroup, tagCtrl)
 
 	// JWT token
-	apiGroup.POST("/jwt/token", needAPIKey, userProxyHandler.Proxy)
-	apiGroup.GET("/jwt/:token", needAPIKey, userProxyHandler.ProxyToApi("/api/v1/jwt/%s", "token"))
+	apiGroup.POST("/jwt/token", authCollection.NeedAPIKey, userProxyHandler.Proxy)
+	apiGroup.GET("/jwt/:token", authCollection.NeedAPIKey, userProxyHandler.ProxyToApi("/api/v1/jwt/%s", "token"))
 	apiGroup.GET("/users", userProxyHandler.Proxy)
 
 	// callback
@@ -340,7 +342,7 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 	{
 		cluster.GET("", clusterHandler.Index)
 		cluster.GET("/:id", clusterHandler.GetClusterById)
-		cluster.PUT("/:id", needAPIKey, clusterHandler.Update)
+		cluster.PUT("/:id", authCollection.NeedAPIKey, clusterHandler.Update)
 	}
 
 	eventHandler, err := handler.NewEventHandler()
@@ -355,7 +357,7 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 		return nil, fmt.Errorf("error creating runtime framework architecture handler:%w", err)
 	}
 
-	createRuntimeFrameworkRoutes(apiGroup, needAPIKey, modelHandler, runtimeArchHandler, repoCommonHandler)
+	createRuntimeFrameworkRoutes(apiGroup, authCollection.NeedAPIKey, modelHandler, runtimeArchHandler, repoCommonHandler)
 
 	syncHandler, err := handler.NewSyncHandler(config)
 	if err != nil {
@@ -378,7 +380,7 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 		return nil, fmt.Errorf("error creating accounting handler setting handler:%w", err)
 	}
 
-	createAccountRoutes(apiGroup, needAPIKey, accountingHandler)
+	createAccountRoutes(apiGroup, authCollection.NeedAPIKey, accountingHandler)
 
 	recomHandler, err := handler.NewRecomHandler(config)
 	if err != nil {
@@ -386,7 +388,7 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 	}
 	recomGroup := apiGroup.Group("/recom")
 	{
-		recomGroup.POST("opweight", needAPIKey, recomHandler.SetOpWeight)
+		recomGroup.POST("opweight", authCollection.NeedAPIKey, recomHandler.SetOpWeight)
 	}
 
 	// telemetry
@@ -419,7 +421,7 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 	if err != nil {
 		return nil, fmt.Errorf("error creating discussion handler:%w", err)
 	}
-	createDiscussionRoutes(apiGroup, needAPIKey, discussionHandler)
+	createDiscussionRoutes(apiGroup, authCollection.NeedAPIKey, discussionHandler)
 
 	// prompt
 	promptHandler, err := handler.NewPromptHandler(config)
