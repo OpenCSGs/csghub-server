@@ -3,10 +3,10 @@ package component
 import (
 	"context"
 	"database/sql"
-	"errors"
 	"fmt"
 	"io"
 	"net/url"
+	"os"
 	"testing"
 
 	"github.com/minio/minio-go/v7"
@@ -227,31 +227,26 @@ func TestGitHTTPComponent_LfsUpload(t *testing.T) {
 					"lfs/a3/f8/e1b4f77bb24e508906c6972f81928f0d926e6daef1b29d12e348b8a3547e",
 					minio.StatObjectOptions{},
 				).Return(
-					minio.ObjectInfo{Size: 100}, errors.New("zzzz"),
+					minio.ObjectInfo{Size: 100}, os.ErrNotExist,
 				)
 			}
+			gc.mocks.components.repo.EXPECT().AllowWriteAccess(
+				ctx, types.ModelRepo, "ns", "n", "user",
+			).Return(true, nil)
 
-			if exist {
-				gc.mocks.components.repo.EXPECT().AllowWriteAccess(
-					ctx, types.ModelRepo, "ns", "n", "user",
-				).Return(true, nil)
-			} else {
-				gc.mocks.s3Client.EXPECT().PutObject(
+			if !exist {
+				gc.mocks.s3Client.EXPECT().UploadAndValidate(
 					ctx, "",
 					"lfs/a3/f8/e1b4f77bb24e508906c6972f81928f0d926e6daef1b29d12e348b8a3547e",
-					rc, int64(100), minio.PutObjectOptions{
-						ContentType:           "application/octet-stream",
-						SendContentMd5:        true,
-						ConcurrentStreamParts: true,
-						NumThreads:            5,
-					}).Return(minio.UploadInfo{Size: 100}, nil)
+					rc, int64(100)).Return(minio.UploadInfo{Size: 100}, nil)
+
+				gc.mocks.stores.LfsMetaObjectMock().EXPECT().Create(ctx, database.LfsMetaObject{
+					Oid:          oid,
+					Size:         100,
+					RepositoryID: 123,
+					Existing:     true,
+				}).Return(nil, nil)
 			}
-			gc.mocks.stores.LfsMetaObjectMock().EXPECT().Create(ctx, database.LfsMetaObject{
-				Oid:          oid,
-				Size:         100,
-				RepositoryID: 123,
-				Existing:     true,
-			}).Return(nil, nil)
 
 			err := gc.LfsUpload(ctx, rc, types.UploadRequest{
 				Oid:         oid,
@@ -281,6 +276,7 @@ func TestGitHTTPComponent_LfsVerify(t *testing.T) {
 	gc.mocks.s3Client.EXPECT().StatObject(ctx, "", "lfs/oid", minio.StatObjectOptions{}).Return(
 		minio.ObjectInfo{Size: 100}, nil,
 	)
+	gc.mocks.stores.LfsMetaObjectMock().EXPECT().FindByOID(ctx, int64(123), "oid").Return(nil, sql.ErrNoRows)
 	gc.mocks.stores.LfsMetaObjectMock().EXPECT().Create(ctx, database.LfsMetaObject{
 		Oid:          "oid",
 		Size:         100,
@@ -476,7 +472,7 @@ func TestGitHTTPComponent_LfsDownload(t *testing.T) {
 	reqParams := make(url.Values)
 	reqParams.Set("response-content-disposition", fmt.Sprintf("attachment;filename=%s", "sa"))
 	url := &url.URL{Scheme: "http"}
-	gc.mocks.s3Client.EXPECT().PresignedGetObject(ctx, "", "lfs/oid", ossFileExpire, reqParams).Return(url, nil)
+	gc.mocks.s3Client.EXPECT().PresignedGetObject(ctx, "", "lfs/oid", types.OssFileExpire, reqParams).Return(url, nil)
 
 	u, err := gc.LfsDownload(ctx, types.DownloadRequest{
 		Oid:         "oid",

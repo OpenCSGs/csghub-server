@@ -28,6 +28,64 @@ func (_m *MockClient) EXPECT() *MockClient_Expecter {
 	return &MockClient_Expecter{mock: &_m.Mock}
 }
 
+// CopyObject provides a mock function with given fields: ctx, dst, src
+func (_m *MockClient) CopyObject(ctx context.Context, dst minio.CopyDestOptions, src minio.CopySrcOptions) (minio.UploadInfo, error) {
+	ret := _m.Called(ctx, dst, src)
+
+	if len(ret) == 0 {
+		panic("no return value specified for CopyObject")
+	}
+
+	var r0 minio.UploadInfo
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, minio.CopyDestOptions, minio.CopySrcOptions) (minio.UploadInfo, error)); ok {
+		return rf(ctx, dst, src)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, minio.CopyDestOptions, minio.CopySrcOptions) minio.UploadInfo); ok {
+		r0 = rf(ctx, dst, src)
+	} else {
+		r0 = ret.Get(0).(minio.UploadInfo)
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, minio.CopyDestOptions, minio.CopySrcOptions) error); ok {
+		r1 = rf(ctx, dst, src)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockClient_CopyObject_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'CopyObject'
+type MockClient_CopyObject_Call struct {
+	*mock.Call
+}
+
+// CopyObject is a helper method to define mock.On call
+//   - ctx context.Context
+//   - dst minio.CopyDestOptions
+//   - src minio.CopySrcOptions
+func (_e *MockClient_Expecter) CopyObject(ctx interface{}, dst interface{}, src interface{}) *MockClient_CopyObject_Call {
+	return &MockClient_CopyObject_Call{Call: _e.mock.On("CopyObject", ctx, dst, src)}
+}
+
+func (_c *MockClient_CopyObject_Call) Run(run func(ctx context.Context, dst minio.CopyDestOptions, src minio.CopySrcOptions)) *MockClient_CopyObject_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(minio.CopyDestOptions), args[2].(minio.CopySrcOptions))
+	})
+	return _c
+}
+
+func (_c *MockClient_CopyObject_Call) Return(_a0 minio.UploadInfo, _a1 error) *MockClient_CopyObject_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockClient_CopyObject_Call) RunAndReturn(run func(context.Context, minio.CopyDestOptions, minio.CopySrcOptions) (minio.UploadInfo, error)) *MockClient_CopyObject_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // GetObject provides a mock function with given fields: ctx, bucketName, objectName, opts
 func (_m *MockClient) GetObject(ctx context.Context, bucketName string, objectName string, opts minio.GetObjectOptions) (*minio.Object, error) {
 	ret := _m.Called(ctx, bucketName, objectName, opts)
@@ -377,6 +435,66 @@ func (_c *MockClient_StatObject_Call) Return(_a0 minio.ObjectInfo, _a1 error) *M
 }
 
 func (_c *MockClient_StatObject_Call) RunAndReturn(run func(context.Context, string, string, minio.StatObjectOptions) (minio.ObjectInfo, error)) *MockClient_StatObject_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// UploadAndValidate provides a mock function with given fields: ctx, bucketName, objectName, reader, objectSize
+func (_m *MockClient) UploadAndValidate(ctx context.Context, bucketName string, objectName string, reader io.Reader, objectSize int64) (minio.UploadInfo, error) {
+	ret := _m.Called(ctx, bucketName, objectName, reader, objectSize)
+
+	if len(ret) == 0 {
+		panic("no return value specified for UploadAndValidate")
+	}
+
+	var r0 minio.UploadInfo
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, io.Reader, int64) (minio.UploadInfo, error)); ok {
+		return rf(ctx, bucketName, objectName, reader, objectSize)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, io.Reader, int64) minio.UploadInfo); ok {
+		r0 = rf(ctx, bucketName, objectName, reader, objectSize)
+	} else {
+		r0 = ret.Get(0).(minio.UploadInfo)
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string, string, io.Reader, int64) error); ok {
+		r1 = rf(ctx, bucketName, objectName, reader, objectSize)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockClient_UploadAndValidate_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'UploadAndValidate'
+type MockClient_UploadAndValidate_Call struct {
+	*mock.Call
+}
+
+// UploadAndValidate is a helper method to define mock.On call
+//   - ctx context.Context
+//   - bucketName string
+//   - objectName string
+//   - reader io.Reader
+//   - objectSize int64
+func (_e *MockClient_Expecter) UploadAndValidate(ctx interface{}, bucketName interface{}, objectName interface{}, reader interface{}, objectSize interface{}) *MockClient_UploadAndValidate_Call {
+	return &MockClient_UploadAndValidate_Call{Call: _e.mock.On("UploadAndValidate", ctx, bucketName, objectName, reader, objectSize)}
+}
+
+func (_c *MockClient_UploadAndValidate_Call) Run(run func(ctx context.Context, bucketName string, objectName string, reader io.Reader, objectSize int64)) *MockClient_UploadAndValidate_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(string), args[2].(string), args[3].(io.Reader), args[4].(int64))
+	})
+	return _c
+}
+
+func (_c *MockClient_UploadAndValidate_Call) Return(_a0 minio.UploadInfo, _a1 error) *MockClient_UploadAndValidate_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockClient_UploadAndValidate_Call) RunAndReturn(run func(context.Context, string, string, io.Reader, int64) (minio.UploadInfo, error)) *MockClient_UploadAndValidate_Call {
 	_c.Call.Return(run)
 	return _c
 }
