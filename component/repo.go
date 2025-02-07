@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"net/http"
 	"net/url"
 	"path"
 	"path/filepath"
@@ -1557,18 +1558,38 @@ func (c *repoComponentImpl) FileInfo(ctx context.Context, req *types.GetFileReq)
 	return file, nil
 }
 
-func getTagScopeByRepoType(repoType types.RepositoryType) database.TagScope {
+func (c *repoComponentImpl) getFilePreviewCode(fileContent []byte) types.FilePreviewCode {
+	// detect the file content type like text/plain, image/jpeg, etc
+	detectedType := http.DetectContentType(fileContent)
+	switch {
+	case strings.HasPrefix(detectedType, "text"):
+		return types.FilePreviewCodeNormal
+	default:
+		return types.FilePreviewCodeNotText
+	}
+}
+
+func (c *repoComponentImpl) adjustMaxFileSize(maxFileSize int64) int64 {
+	// same with aliyun green check large content size
+	const maxModerationContentSize = 100 * 9000
+	if maxFileSize == 0 || maxFileSize > maxModerationContentSize {
+		maxFileSize = maxModerationContentSize
+	}
+	return maxFileSize
+}
+
+func getTagScopeByRepoType(repoType types.RepositoryType) types.TagScope {
 	switch repoType {
 	case types.ModelRepo:
-		return database.ModelTagScope
+		return types.ModelTagScope
 	case types.DatasetRepo:
-		return database.DatasetTagScope
+		return types.DatasetTagScope
 	case types.CodeRepo:
-		return database.CodeTagScope
+		return types.CodeTagScope
 	case types.SpaceRepo:
-		return database.SpaceTagScope
+		return types.SpaceTagScope
 	case types.PromptRepo:
-		return database.PromptTagScope
+		return types.PromptTagScope
 	default:
 		panic("convert repo type to tag scope failed, unknown repo type:" + repoType)
 	}

@@ -6,6 +6,7 @@ import (
 	"log/slog"
 
 	"opencsg.com/csghub-server/builder/store/database"
+	"opencsg.com/csghub-server/common/types"
 )
 
 type DatasetTagStore interface {
@@ -30,27 +31,27 @@ var _ TagProcessor = (*tagProcessor)(nil)
 
 type tagProcessor struct {
 	existingTags func(ctx context.Context) ([]*database.Tag, error)
-	tagScope     database.TagScope
+	tagScope     types.TagScope
 }
 
 func NewDatasetTagProcessor(ts DatasetTagStore) TagProcessor {
 	p := new(tagProcessor)
 	p.existingTags = ts.AllDatasetTags
-	p.tagScope = database.DatasetTagScope
+	p.tagScope = types.DatasetTagScope
 	return p
 }
 
 func NewModelTagProcessor(ts ModelTagStore) TagProcessor {
 	p := new(tagProcessor)
 	p.existingTags = ts.AllModelTags
-	p.tagScope = database.ModelTagScope
+	p.tagScope = types.ModelTagScope
 	return p
 }
 
 func NewPromptTagProcessor(ts PromptTagStore) TagProcessor {
 	p := new(tagProcessor)
 	p.existingTags = ts.AllPromptTags
-	p.tagScope = database.PromptTagScope
+	p.tagScope = types.PromptTagScope
 	return p
 }
 

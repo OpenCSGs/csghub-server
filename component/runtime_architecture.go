@@ -204,7 +204,12 @@ func (c *runtimeArchitectureComponentImpl) scanNewModels(ctx context.Context, re
 		if err != nil {
 			return fmt.Errorf("failed to get runtime framework by ID, %w", err)
 		}
-		runtime_framework_tags, _ := c.tagStore.GetTagsByScopeAndCategories(ctx, "model", []string{"runtime_framework", "resource"})
+		//add resource tag, like ascend
+		filter := &types.TagFilter{
+			Scopes:     []types.TagScope{types.ModelTagScope},
+			Categories: []string{"runtime_framework", "resource"},
+		}
+		runtime_framework_tags, _ := c.tagStore.AllTags(ctx, filter)
 		for _, repo := range repos {
 			arch, err := c.GetArchitecture(ctx, req.Task, &repo)
 			if err != nil {

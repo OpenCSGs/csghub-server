@@ -354,7 +354,7 @@ definitions:
       name:
         type: string
       scope:
-        $ref: '#/definitions/database.TagScope'
+        $ref: '#/definitions/types.TagScope'
       show_name:
         type: string
       updated_at:
@@ -369,11 +369,11 @@ definitions:
       name:
         type: string
       scope:
-        $ref: '#/definitions/database.TagScope'
+        $ref: '#/definitions/types.TagScope'
       show_name:
         type: string
     type: object
-  database.TagScope:
+  types.TagScope:
     enum:
     - model
     - dataset

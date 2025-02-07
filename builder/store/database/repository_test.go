@@ -297,7 +297,7 @@ func TestRepoStore_PublicToUserSimple(t *testing.T) {
 		Name:     "tag_" + uuid.NewString(),
 		Category: "evaluation",
 		Group:    "",
-		Scope:    database.DatasetTagScope,
+		Scope:    types.DatasetTagScope,
 		BuiltIn:  true,
 		ShowName: "",
 	})
@@ -305,7 +305,7 @@ func TestRepoStore_PublicToUserSimple(t *testing.T) {
 		Name:     "tag_" + uuid.NewString(),
 		Category: "runtime_framework",
 		Group:    "",
-		Scope:    database.DatasetTagScope,
+		Scope:    types.DatasetTagScope,
 		BuiltIn:  true,
 		ShowName: "",
 	})

@@ -127,8 +127,12 @@ func TestGitCallbackComponent_UpdateRepoInfos(t *testing.T) {
 		&database.Repository{ID: 1, Path: "foo/bar"}, nil,
 	)
 	gc.mocks.runtimeArchComponent.EXPECT().GetArchitecture(ctx, types.TaskAutoDetection, &database.Repository{ID: 1, Path: "foo/bar"}).Return("foo", nil)
-	gc.mocks.stores.TagMock().EXPECT().GetTagsByScopeAndCategories(
-		ctx, database.ModelTagScope, []string{"runtime_framework", "resource"},
+	filter := &types.TagFilter{
+		Categories: []string{"runtime_framework", "resource"},
+		Scopes:     []types.TagScope{types.ModelTagScope},
+	}
+	gc.mocks.stores.TagMock().EXPECT().AllTags(
+		ctx, filter,
 	).Return([]*database.Tag{{Name: "t1"}}, nil)
 	gc.mocks.runtimeArchComponent.EXPECT().AddResourceTag(
 		ctx, []*database.Tag{{Name: "t1"}}, "bar", int64(1),
@@ -152,12 +156,12 @@ func TestGitCallbackComponent_UpdateRepoInfos(t *testing.T) {
 	).Return(nil)
 	// removed mock
 	gc.mocks.tagComponent.EXPECT().UpdateLibraryTags(
-		ctx, database.ModelTagScope, "ns", "n", "bar.go", "",
+		ctx, types.ModelTagScope, "ns", "n", "bar.go", "",
 	).Return(nil)
 	gc.mocks.tagComponent.EXPECT().ClearMetaTags(ctx, types.ModelRepo, "ns", "n").Return(nil)
 	// added mock
 	gc.mocks.tagComponent.EXPECT().UpdateLibraryTags(
-		ctx, database.ModelTagScope, "ns", "n", "", "foo.go",
+		ctx, types.ModelTagScope, "ns", "n", "", "foo.go",
 	).Return(nil)
 	gc.mocks.gitServer.EXPECT().GetRepoFileRaw(mock.Anything, gitserver.GetRepoInfoByPathReq{
 		Namespace: "ns",
@@ -167,7 +171,7 @@ func TestGitCallbackComponent_UpdateRepoInfos(t *testing.T) {
 		RepoType:  types.ModelRepo,
 	}).Return("", nil)
 	gc.mocks.tagComponent.EXPECT().UpdateMetaTags(
-		ctx, database.ModelTagScope, "ns", "n", "",
+		ctx, types.ModelTagScope, "ns", "n", "",
 	).Return(nil, nil)
 
 	err := gc.UpdateRepoInfos(ctx, &types.GiteaCallbackPushReq{

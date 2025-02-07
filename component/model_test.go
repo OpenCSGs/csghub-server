@@ -495,8 +495,12 @@ func TestModelComponent_SetRuntimeFrameworkModes(t *testing.T) {
 		}, nil,
 	)
 	rftags := []*database.Tag{{Name: "t1"}, {Name: "t2"}}
-	mc.mocks.stores.TagMock().EXPECT().GetTagsByScopeAndCategories(
-		ctx, database.TagScope("model"), []string{"runtime_framework", "resource"},
+	filter := &types.TagFilter{
+		Categories: []string{"runtime_framework", "resource"},
+		Scopes:     []types.TagScope{types.ModelTagScope},
+	}
+	mc.mocks.stores.TagMock().EXPECT().AllTags(
+		ctx, filter,
 	).Return(rftags, nil)
 
 	mc.mocks.stores.RepoRuntimeFrameworkMock().EXPECT().GetByIDsAndType(
