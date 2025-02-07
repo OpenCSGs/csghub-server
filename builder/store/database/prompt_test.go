@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/tests"
+	"opencsg.com/csghub-server/common/types"
 )
 
 func TestPromptStore_Create(t *testing.T) {
@@ -153,7 +154,7 @@ func TestPromptStore_FindByPath(t *testing.T) {
 		if n == "b" {
 			c = 1
 		}
-		tag, err := ts.CreateTag(ctx, "foo", n, n, database.DatasetTagScope)
+		tag, err := ts.CreateTag(ctx, "foo", n, n, types.DatasetTagScope)
 		require.Nil(t, err)
 		tags = append(tags, database.RepositoryTag{
 			RepositoryID: repo.ID,

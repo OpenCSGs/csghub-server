@@ -228,7 +228,7 @@ func (c *multiSyncComponentImpl) createLocalDataset(ctx context.Context, m *type
 				Group:    tag.Group,
 				BuiltIn:  tag.BuiltIn,
 				ShowName: tag.ShowName,
-				Scope:    database.DatasetTagScope,
+				Scope:    types.DatasetTagScope,
 			}
 			t, err := c.tagStore.FindOrCreate(ctx, dbTag)
 			if err != nil {
@@ -354,7 +354,7 @@ func (c *multiSyncComponentImpl) createLocalModel(ctx context.Context, m *types.
 				Group:    tag.Group,
 				BuiltIn:  tag.BuiltIn,
 				ShowName: tag.ShowName,
-				Scope:    database.ModelTagScope,
+				Scope:    types.ModelTagScope,
 			}
 			t, err := c.tagStore.FindOrCreate(ctx, dbTag)
 			if err != nil {

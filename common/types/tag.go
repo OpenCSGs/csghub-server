@@ -44,3 +44,19 @@ type CreateCategory struct {
 }
 
 type UpdateCategory CreateCategory
+
+type TagScope string
+
+const (
+	ModelTagScope   TagScope = "model"
+	DatasetTagScope TagScope = "dataset"
+	CodeTagScope    TagScope = "code"
+	SpaceTagScope   TagScope = "space"
+	PromptTagScope  TagScope = "prompt"
+)
+
+type TagFilter struct {
+	Scopes     []TagScope `form:"scope" binding:"omitempty,dive,eq=model|eq=dataset|eq=code|eq=space|eq=prompt"`
+	Categories []string   `form:"category" binding:"omitempty,dive"`
+	BuiltIn    *bool      `form:"built_in" binding:"omitnil"`
+}

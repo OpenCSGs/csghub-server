@@ -89,9 +89,11 @@ func TestRuntimeArchComponent_ScanArchitectures(t *testing.T) {
 	}, nil)
 	//page 2
 	rc.mocks.stores.RepoMock().EXPECT().GetRepoWithoutRuntimeByID(ctx, int64(1), []string{"foo"}, 1000, 1).Return(nil, nil)
-	rc.mocks.stores.TagMock().EXPECT().GetTagsByScopeAndCategories(ctx, database.ModelTagScope, []string{
-		"runtime_framework", "resource",
-	}).Return([]*database.Tag{}, nil)
+	filter := &types.TagFilter{
+		Categories: []string{"runtime_framework", "resource"},
+		Scopes:     []types.TagScope{types.ModelTagScope},
+	}
+	rc.mocks.stores.TagMock().EXPECT().AllTags(ctx, filter).Return([]*database.Tag{}, nil)
 	rc.mocks.stores.RepoRuntimeFrameworkMock().EXPECT().Add(ctx, int64(1), int64(0), 0).Return(nil)
 	rc.mocks.stores.ResourceModelMock().EXPECT().CheckModelNameNotInRFRepo(ctx, "bar", int64(0)).Return(
 		&database.ResourceModel{}, nil,

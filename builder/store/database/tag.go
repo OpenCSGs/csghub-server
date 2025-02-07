@@ -17,22 +17,19 @@ type tagStoreImpl struct {
 
 type TagStore interface {
 	// Alltags returns all tags in the database
-	AllTags(ctx context.Context) ([]Tag, error)
-	AllTagsByScope(ctx context.Context, scope TagScope) ([]*Tag, error)
-	AllTagsByScopeAndCategory(ctx context.Context, scope TagScope, category string) ([]*Tag, error)
-	GetTagsByScopeAndCategories(ctx context.Context, scope TagScope, categories []string) ([]*Tag, error)
+	AllTags(ctx context.Context, filter *types.TagFilter) ([]*Tag, error)
 	AllModelTags(ctx context.Context) ([]*Tag, error)
 	AllPromptTags(ctx context.Context) ([]*Tag, error)
 	AllDatasetTags(ctx context.Context) ([]*Tag, error)
 	AllCodeTags(ctx context.Context) ([]*Tag, error)
 	AllSpaceTags(ctx context.Context) ([]*Tag, error)
-	AllCategories(ctx context.Context, scope TagScope) ([]TagCategory, error)
+	AllCategories(ctx context.Context, scope types.TagScope) ([]TagCategory, error)
 	AllModelCategories(ctx context.Context) ([]TagCategory, error)
 	AllPromptCategories(ctx context.Context) ([]TagCategory, error)
 	AllDatasetCategories(ctx context.Context) ([]TagCategory, error)
 	AllCodeCategories(ctx context.Context) ([]TagCategory, error)
 	AllSpaceCategories(ctx context.Context) ([]TagCategory, error)
-	CreateTag(ctx context.Context, category, name, group string, scope TagScope) (Tag, error)
+	CreateTag(ctx context.Context, category, name, group string, scope types.TagScope) (Tag, error)
 	SaveTags(ctx context.Context, tags []*Tag) error
 	// SetMetaTags will delete existing tags and create new ones
 	SetMetaTags(ctx context.Context, repoType types.RepositoryType, namespace, name string, tags []*Tag) (repoTags []*RepositoryTag, err error)
@@ -61,127 +58,114 @@ func NewTagStoreWithDB(db *DB) TagStore {
 	}
 }
 
-type TagScope string
-
-const (
-	ModelTagScope   TagScope = "model"
-	DatasetTagScope TagScope = "dataset"
-	CodeTagScope    TagScope = "code"
-	SpaceTagScope   TagScope = "space"
-	PromptTagScope  TagScope = "prompt"
-)
-
 type Tag struct {
-	ID       int64    `bun:",pk,autoincrement" json:"id"`
-	Name     string   `bun:",notnull" json:"name" yaml:"name"`
-	Category string   `bun:",notnull" json:"category" yaml:"category"`
-	Group    string   `bun:",notnull" json:"group" yaml:"group"`
-	Scope    TagScope `bun:",notnull" json:"scope" yaml:"scope"`
-	BuiltIn  bool     `bun:",notnull" json:"built_in" yaml:"built_in"`
-	ShowName string   `bun:"" json:"show_name" yaml:"show_name"`
+	ID       int64          `bun:",pk,autoincrement" json:"id"`
+	Name     string         `bun:",notnull" json:"name" yaml:"name"`
+	Category string         `bun:",notnull" json:"category" yaml:"category"`
+	Group    string         `bun:",notnull" json:"group" yaml:"group"`
+	Scope    types.TagScope `bun:",notnull" json:"scope" yaml:"scope"`
+	BuiltIn  bool           `bun:",notnull" json:"built_in" yaml:"built_in"`
+	ShowName string         `bun:"" json:"show_name" yaml:"show_name"`
 	times
 }
 
 // TagCategory represents the category of tags
 type TagCategory struct {
-	ID       int64    `bun:",pk,autoincrement" json:"id"`
-	Name     string   `bun:",notnull" json:"name" yaml:"name"`
-	ShowName string   `bun:"" json:"show_name" yaml:"show_name"`
-	Scope    TagScope `bun:",notnull" json:"scope" yaml:"scope"`
-	Enabled  bool     `bun:"default:true" json:"enabled" yaml:"enabled"`
+	ID       int64          `bun:",pk,autoincrement" json:"id"`
+	Name     string         `bun:",notnull" json:"name" yaml:"name"`
+	ShowName string         `bun:"" json:"show_name" yaml:"show_name"`
+	Scope    types.TagScope `bun:",notnull" json:"scope" yaml:"scope"`
+	Enabled  bool           `bun:"default:true" json:"enabled" yaml:"enabled"`
 }
 
 // Alltags returns all tags in the database
-func (ts *tagStoreImpl) AllTags(ctx context.Context) ([]Tag, error) {
-	var tags []Tag
-	err := ts.db.Operator.Core.NewSelect().Model(&Tag{}).Scan(ctx, &tags)
+func (ts *tagStoreImpl) AllTags(ctx context.Context, filter *types.TagFilter) ([]*Tag, error) {
+	var tags []*Tag
+	q := ts.db.Operator.Core.NewSelect().Model(&Tag{})
+
+	if filter != nil {
+		if len(filter.Scopes) > 0 {
+			q = q.Where("scope in (?)", bun.In(filter.Scopes))
+		}
+		if len(filter.Categories) > 0 {
+			q = q.Where("category in (?)", bun.In(filter.Categories))
+		}
+		if filter.BuiltIn != nil {
+			q = q.Where("built_in = ?", *filter.BuiltIn)
+		}
+	}
+
+	err := q.Scan(ctx, &tags)
 	if err != nil {
-		slog.Error("Failed to select tags", "error", err)
-		return nil, err
+		return nil, fmt.Errorf("failed to select tags,cause: %w", err)
 	}
 	return tags, nil
 }
 
-func (ts *tagStoreImpl) AllTagsByScope(ctx context.Context, scope TagScope) ([]*Tag, error) {
-	var tags []*Tag
-	err := ts.db.Operator.Core.NewSelect().Model(&tags).
-		Where("scope =?", scope).
-		Scan(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("failed to select tags by scope,cause: %w", err)
+func (ts *tagStoreImpl) AllTagsByScope(ctx context.Context, scope types.TagScope) ([]*Tag, error) {
+	filter := &types.TagFilter{
+		Scopes: []types.TagScope{scope},
 	}
-	return tags, nil
+	return ts.AllTags(ctx, filter)
 }
 
-func (ts *tagStoreImpl) AllTagsByScopeAndCategory(ctx context.Context, scope TagScope, category string) ([]*Tag, error) {
-	var tags []*Tag
-	query := ts.db.Operator.Core.NewSelect().Model(&tags)
-	if scope != "" {
-		query.Where("scope = ?", scope)
+func (ts *tagStoreImpl) AllTagsByScopeAndCategory(ctx context.Context, scope types.TagScope, category string) ([]*Tag, error) {
+	filter := &types.TagFilter{
+		Scopes:     []types.TagScope{scope},
+		Categories: []string{category},
 	}
-	if category != "" {
-		query.Where("category = ?", category)
-	}
-
-	err := query.Scan(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("failed to select tags by scope,cause: %w", err)
-	}
-	return tags, nil
+	return ts.AllTags(ctx, filter)
 }
 
-func (ts *tagStoreImpl) GetTagsByScopeAndCategories(ctx context.Context, scope TagScope, categories []string) ([]*Tag, error) {
-	var tags []*Tag
-	err := ts.db.Operator.Core.NewSelect().Model(&tags).
-		Where("scope = ? and category in (?)", scope, bun.In(categories)).
-		Scan(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("failed to select tags by scope,cause: %w", err)
+func (ts *tagStoreImpl) GetTagsByScopeAndCategories(ctx context.Context, scope types.TagScope, categories []string) ([]*Tag, error) {
+	filter := &types.TagFilter{
+		Scopes:     []types.TagScope{scope},
+		Categories: categories,
 	}
-	return tags, nil
+	return ts.AllTags(ctx, filter)
 }
 
 func (ts *tagStoreImpl) AllModelTags(ctx context.Context) ([]*Tag, error) {
-	return ts.AllTagsByScope(ctx, ModelTagScope)
+	return ts.AllTagsByScope(ctx, types.ModelTagScope)
 }
 
 func (ts *tagStoreImpl) AllPromptTags(ctx context.Context) ([]*Tag, error) {
-	return ts.AllTagsByScope(ctx, PromptTagScope)
+	return ts.AllTagsByScope(ctx, types.PromptTagScope)
 }
 
 func (ts *tagStoreImpl) AllDatasetTags(ctx context.Context) ([]*Tag, error) {
-	return ts.AllTagsByScope(ctx, DatasetTagScope)
+	return ts.AllTagsByScope(ctx, types.DatasetTagScope)
 }
 
 func (ts *tagStoreImpl) AllCodeTags(ctx context.Context) ([]*Tag, error) {
-	return ts.AllTagsByScope(ctx, CodeTagScope)
+	return ts.AllTagsByScope(ctx, types.CodeTagScope)
 }
 
 func (ts *tagStoreImpl) AllSpaceTags(ctx context.Context) ([]*Tag, error) {
-	return ts.AllTagsByScope(ctx, SpaceTagScope)
+	return ts.AllTagsByScope(ctx, types.SpaceTagScope)
 }
 
 func (ts *tagStoreImpl) AllModelCategories(ctx context.Context) ([]TagCategory, error) {
-	return ts.AllCategories(ctx, ModelTagScope)
+	return ts.AllCategories(ctx, types.ModelTagScope)
 }
 
 func (ts *tagStoreImpl) AllPromptCategories(ctx context.Context) ([]TagCategory, error) {
-	return ts.AllCategories(ctx, PromptTagScope)
+	return ts.AllCategories(ctx, types.PromptTagScope)
 }
 
 func (ts *tagStoreImpl) AllDatasetCategories(ctx context.Context) ([]TagCategory, error) {
-	return ts.AllCategories(ctx, DatasetTagScope)
+	return ts.AllCategories(ctx, types.DatasetTagScope)
 }
 
 func (ts *tagStoreImpl) AllCodeCategories(ctx context.Context) ([]TagCategory, error) {
-	return ts.AllCategories(ctx, CodeTagScope)
+	return ts.AllCategories(ctx, types.CodeTagScope)
 }
 
 func (ts *tagStoreImpl) AllSpaceCategories(ctx context.Context) ([]TagCategory, error) {
-	return ts.AllCategories(ctx, SpaceTagScope)
+	return ts.AllCategories(ctx, types.SpaceTagScope)
 }
 
-func (ts *tagStoreImpl) AllCategories(ctx context.Context, scope TagScope) ([]TagCategory, error) {
+func (ts *tagStoreImpl) AllCategories(ctx context.Context, scope types.TagScope) ([]TagCategory, error) {
 	var tags []TagCategory
 	q := ts.db.Operator.Core.NewSelect().Model(&TagCategory{})
 	if len(scope) > 0 {
@@ -195,7 +179,7 @@ func (ts *tagStoreImpl) AllCategories(ctx context.Context, scope TagScope) ([]Ta
 	return tags, nil
 }
 
-func (ts *tagStoreImpl) CreateTag(ctx context.Context, category, name, group string, scope TagScope) (Tag, error) {
+func (ts *tagStoreImpl) CreateTag(ctx context.Context, category, name, group string, scope types.TagScope) (Tag, error) {
 	tag := Tag{
 		Name:     name,
 		Category: category,

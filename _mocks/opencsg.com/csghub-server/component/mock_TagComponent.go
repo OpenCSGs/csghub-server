@@ -82,29 +82,29 @@ func (_c *MockTagComponent_AllCategories_Call) RunAndReturn(run func(context.Con
 	return _c
 }
 
-// AllTagsByScopeAndCategory provides a mock function with given fields: ctx, scope, category
-func (_m *MockTagComponent) AllTagsByScopeAndCategory(ctx context.Context, scope string, category string) ([]*database.Tag, error) {
-	ret := _m.Called(ctx, scope, category)
+// AllTags provides a mock function with given fields: ctx, filter
+func (_m *MockTagComponent) AllTags(ctx context.Context, filter *types.TagFilter) ([]*database.Tag, error) {
+	ret := _m.Called(ctx, filter)
 
 	if len(ret) == 0 {
-		panic("no return value specified for AllTagsByScopeAndCategory")
+		panic("no return value specified for AllTags")
 	}
 
 	var r0 []*database.Tag
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, string) ([]*database.Tag, error)); ok {
-		return rf(ctx, scope, category)
+	if rf, ok := ret.Get(0).(func(context.Context, *types.TagFilter) ([]*database.Tag, error)); ok {
+		return rf(ctx, filter)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, string, string) []*database.Tag); ok {
-		r0 = rf(ctx, scope, category)
+	if rf, ok := ret.Get(0).(func(context.Context, *types.TagFilter) []*database.Tag); ok {
+		r0 = rf(ctx, filter)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).([]*database.Tag)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, string, string) error); ok {
-		r1 = rf(ctx, scope, category)
+	if rf, ok := ret.Get(1).(func(context.Context, *types.TagFilter) error); ok {
+		r1 = rf(ctx, filter)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -112,32 +112,31 @@ func (_m *MockTagComponent) AllTagsByScopeAndCategory(ctx context.Context, scope
 	return r0, r1
 }
 
-// MockTagComponent_AllTagsByScopeAndCategory_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'AllTagsByScopeAndCategory'
-type MockTagComponent_AllTagsByScopeAndCategory_Call struct {
+// MockTagComponent_AllTags_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'AllTags'
+type MockTagComponent_AllTags_Call struct {
 	*mock.Call
 }
 
-// AllTagsByScopeAndCategory is a helper method to define mock.On call
+// AllTags is a helper method to define mock.On call
 //   - ctx context.Context
-//   - scope string
-//   - category string
-func (_e *MockTagComponent_Expecter) AllTagsByScopeAndCategory(ctx interface{}, scope interface{}, category interface{}) *MockTagComponent_AllTagsByScopeAndCategory_Call {
-	return &MockTagComponent_AllTagsByScopeAndCategory_Call{Call: _e.mock.On("AllTagsByScopeAndCategory", ctx, scope, category)}
+//   - filter *types.TagFilter
+func (_e *MockTagComponent_Expecter) AllTags(ctx interface{}, filter interface{}) *MockTagComponent_AllTags_Call {
+	return &MockTagComponent_AllTags_Call{Call: _e.mock.On("AllTags", ctx, filter)}
 }
 
-func (_c *MockTagComponent_AllTagsByScopeAndCategory_Call) Run(run func(ctx context.Context, scope string, category string)) *MockTagComponent_AllTagsByScopeAndCategory_Call {
+func (_c *MockTagComponent_AllTags_Call) Run(run func(ctx context.Context, filter *types.TagFilter)) *MockTagComponent_AllTags_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(string), args[2].(string))
+		run(args[0].(context.Context), args[1].(*types.TagFilter))
 	})
 	return _c
 }
 
-func (_c *MockTagComponent_AllTagsByScopeAndCategory_Call) Return(_a0 []*database.Tag, _a1 error) *MockTagComponent_AllTagsByScopeAndCategory_Call {
+func (_c *MockTagComponent_AllTags_Call) Return(_a0 []*database.Tag, _a1 error) *MockTagComponent_AllTags_Call {
 	_c.Call.Return(_a0, _a1)
 	return _c
 }
 
-func (_c *MockTagComponent_AllTagsByScopeAndCategory_Call) RunAndReturn(run func(context.Context, string, string) ([]*database.Tag, error)) *MockTagComponent_AllTagsByScopeAndCategory_Call {
+func (_c *MockTagComponent_AllTags_Call) RunAndReturn(run func(context.Context, *types.TagFilter) ([]*database.Tag, error)) *MockTagComponent_AllTags_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -529,7 +528,7 @@ func (_c *MockTagComponent_UpdateCategory_Call) RunAndReturn(run func(context.Co
 }
 
 // UpdateLibraryTags provides a mock function with given fields: ctx, tagScope, namespace, name, oldFilePath, newFilePath
-func (_m *MockTagComponent) UpdateLibraryTags(ctx context.Context, tagScope database.TagScope, namespace string, name string, oldFilePath string, newFilePath string) error {
+func (_m *MockTagComponent) UpdateLibraryTags(ctx context.Context, tagScope types.TagScope, namespace string, name string, oldFilePath string, newFilePath string) error {
 	ret := _m.Called(ctx, tagScope, namespace, name, oldFilePath, newFilePath)
 
 	if len(ret) == 0 {
@@ -537,7 +536,7 @@ func (_m *MockTagComponent) UpdateLibraryTags(ctx context.Context, tagScope data
 	}
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, database.TagScope, string, string, string, string) error); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, types.TagScope, string, string, string, string) error); ok {
 		r0 = rf(ctx, tagScope, namespace, name, oldFilePath, newFilePath)
 	} else {
 		r0 = ret.Error(0)
@@ -553,7 +552,7 @@ type MockTagComponent_UpdateLibraryTags_Call struct {
 
 // UpdateLibraryTags is a helper method to define mock.On call
 //   - ctx context.Context
-//   - tagScope database.TagScope
+//   - tagScope types.TagScope
 //   - namespace string
 //   - name string
 //   - oldFilePath string
@@ -562,9 +561,9 @@ func (_e *MockTagComponent_Expecter) UpdateLibraryTags(ctx interface{}, tagScope
 	return &MockTagComponent_UpdateLibraryTags_Call{Call: _e.mock.On("UpdateLibraryTags", ctx, tagScope, namespace, name, oldFilePath, newFilePath)}
 }
 
-func (_c *MockTagComponent_UpdateLibraryTags_Call) Run(run func(ctx context.Context, tagScope database.TagScope, namespace string, name string, oldFilePath string, newFilePath string)) *MockTagComponent_UpdateLibraryTags_Call {
+func (_c *MockTagComponent_UpdateLibraryTags_Call) Run(run func(ctx context.Context, tagScope types.TagScope, namespace string, name string, oldFilePath string, newFilePath string)) *MockTagComponent_UpdateLibraryTags_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(database.TagScope), args[2].(string), args[3].(string), args[4].(string), args[5].(string))
+		run(args[0].(context.Context), args[1].(types.TagScope), args[2].(string), args[3].(string), args[4].(string), args[5].(string))
 	})
 	return _c
 }
@@ -574,13 +573,13 @@ func (_c *MockTagComponent_UpdateLibraryTags_Call) Return(_a0 error) *MockTagCom
 	return _c
 }
 
-func (_c *MockTagComponent_UpdateLibraryTags_Call) RunAndReturn(run func(context.Context, database.TagScope, string, string, string, string) error) *MockTagComponent_UpdateLibraryTags_Call {
+func (_c *MockTagComponent_UpdateLibraryTags_Call) RunAndReturn(run func(context.Context, types.TagScope, string, string, string, string) error) *MockTagComponent_UpdateLibraryTags_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
 // UpdateMetaTags provides a mock function with given fields: ctx, tagScope, namespace, name, content
-func (_m *MockTagComponent) UpdateMetaTags(ctx context.Context, tagScope database.TagScope, namespace string, name string, content string) ([]*database.RepositoryTag, error) {
+func (_m *MockTagComponent) UpdateMetaTags(ctx context.Context, tagScope types.TagScope, namespace string, name string, content string) ([]*database.RepositoryTag, error) {
 	ret := _m.Called(ctx, tagScope, namespace, name, content)
 
 	if len(ret) == 0 {
@@ -589,10 +588,10 @@ func (_m *MockTagComponent) UpdateMetaTags(ctx context.Context, tagScope databas
 
 	var r0 []*database.RepositoryTag
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, database.TagScope, string, string, string) ([]*database.RepositoryTag, error)); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, types.TagScope, string, string, string) ([]*database.RepositoryTag, error)); ok {
 		return rf(ctx, tagScope, namespace, name, content)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, database.TagScope, string, string, string) []*database.RepositoryTag); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, types.TagScope, string, string, string) []*database.RepositoryTag); ok {
 		r0 = rf(ctx, tagScope, namespace, name, content)
 	} else {
 		if ret.Get(0) != nil {
@@ -600,7 +599,7 @@ func (_m *MockTagComponent) UpdateMetaTags(ctx context.Context, tagScope databas
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, database.TagScope, string, string, string) error); ok {
+	if rf, ok := ret.Get(1).(func(context.Context, types.TagScope, string, string, string) error); ok {
 		r1 = rf(ctx, tagScope, namespace, name, content)
 	} else {
 		r1 = ret.Error(1)
@@ -616,7 +615,7 @@ type MockTagComponent_UpdateMetaTags_Call struct {
 
 // UpdateMetaTags is a helper method to define mock.On call
 //   - ctx context.Context
-//   - tagScope database.TagScope
+//   - tagScope types.TagScope
 //   - namespace string
 //   - name string
 //   - content string
@@ -624,9 +623,9 @@ func (_e *MockTagComponent_Expecter) UpdateMetaTags(ctx interface{}, tagScope in
 	return &MockTagComponent_UpdateMetaTags_Call{Call: _e.mock.On("UpdateMetaTags", ctx, tagScope, namespace, name, content)}
 }
 
-func (_c *MockTagComponent_UpdateMetaTags_Call) Run(run func(ctx context.Context, tagScope database.TagScope, namespace string, name string, content string)) *MockTagComponent_UpdateMetaTags_Call {
+func (_c *MockTagComponent_UpdateMetaTags_Call) Run(run func(ctx context.Context, tagScope types.TagScope, namespace string, name string, content string)) *MockTagComponent_UpdateMetaTags_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(database.TagScope), args[2].(string), args[3].(string), args[4].(string))
+		run(args[0].(context.Context), args[1].(types.TagScope), args[2].(string), args[3].(string), args[4].(string))
 	})
 	return _c
 }
@@ -636,13 +635,13 @@ func (_c *MockTagComponent_UpdateMetaTags_Call) Return(_a0 []*database.Repositor
 	return _c
 }
 
-func (_c *MockTagComponent_UpdateMetaTags_Call) RunAndReturn(run func(context.Context, database.TagScope, string, string, string) ([]*database.RepositoryTag, error)) *MockTagComponent_UpdateMetaTags_Call {
+func (_c *MockTagComponent_UpdateMetaTags_Call) RunAndReturn(run func(context.Context, types.TagScope, string, string, string) ([]*database.RepositoryTag, error)) *MockTagComponent_UpdateMetaTags_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
 // UpdateRepoTagsByCategory provides a mock function with given fields: ctx, tagScope, repoID, category, tagNames
-func (_m *MockTagComponent) UpdateRepoTagsByCategory(ctx context.Context, tagScope database.TagScope, repoID int64, category string, tagNames []string) error {
+func (_m *MockTagComponent) UpdateRepoTagsByCategory(ctx context.Context, tagScope types.TagScope, repoID int64, category string, tagNames []string) error {
 	ret := _m.Called(ctx, tagScope, repoID, category, tagNames)
 
 	if len(ret) == 0 {
@@ -650,7 +649,7 @@ func (_m *MockTagComponent) UpdateRepoTagsByCategory(ctx context.Context, tagSco
 	}
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, database.TagScope, int64, string, []string) error); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, types.TagScope, int64, string, []string) error); ok {
 		r0 = rf(ctx, tagScope, repoID, category, tagNames)
 	} else {
 		r0 = ret.Error(0)
@@ -666,7 +665,7 @@ type MockTagComponent_UpdateRepoTagsByCategory_Call struct {
 
 // UpdateRepoTagsByCategory is a helper method to define mock.On call
 //   - ctx context.Context
-//   - tagScope database.TagScope
+//   - tagScope types.TagScope
 //   - repoID int64
 //   - category string
 //   - tagNames []string
@@ -674,9 +673,9 @@ func (_e *MockTagComponent_Expecter) UpdateRepoTagsByCategory(ctx interface{}, t
 	return &MockTagComponent_UpdateRepoTagsByCategory_Call{Call: _e.mock.On("UpdateRepoTagsByCategory", ctx, tagScope, repoID, category, tagNames)}
 }
 
-func (_c *MockTagComponent_UpdateRepoTagsByCategory_Call) Run(run func(ctx context.Context, tagScope database.TagScope, repoID int64, category string, tagNames []string)) *MockTagComponent_UpdateRepoTagsByCategory_Call {
+func (_c *MockTagComponent_UpdateRepoTagsByCategory_Call) Run(run func(ctx context.Context, tagScope types.TagScope, repoID int64, category string, tagNames []string)) *MockTagComponent_UpdateRepoTagsByCategory_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(database.TagScope), args[2].(int64), args[3].(string), args[4].([]string))
+		run(args[0].(context.Context), args[1].(types.TagScope), args[2].(int64), args[3].(string), args[4].([]string))
 	})
 	return _c
 }
@@ -686,7 +685,7 @@ func (_c *MockTagComponent_UpdateRepoTagsByCategory_Call) Return(_a0 error) *Moc
 	return _c
 }
 
-func (_c *MockTagComponent_UpdateRepoTagsByCategory_Call) RunAndReturn(run func(context.Context, database.TagScope, int64, string, []string) error) *MockTagComponent_UpdateRepoTagsByCategory_Call {
+func (_c *MockTagComponent_UpdateRepoTagsByCategory_Call) RunAndReturn(run func(context.Context, types.TagScope, int64, string, []string) error) *MockTagComponent_UpdateRepoTagsByCategory_Call {
 	_c.Call.Return(run)
 	return _c
 }

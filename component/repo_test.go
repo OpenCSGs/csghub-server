@@ -1395,7 +1395,7 @@ func TestRepoComponent_UpdateTags(t *testing.T) {
 		mockedRepo, nil,
 	).Once()
 	repo.mocks.components.tag.EXPECT().UpdateRepoTagsByCategory(
-		ctx, database.ModelTagScope, int64(123), "cat", []string{"foo", "bar"},
+		ctx, types.ModelTagScope, int64(123), "cat", []string{"foo", "bar"},
 	).Return(nil)
 	repo.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "user").Return(database.User{
 		RoleMask: "admin",

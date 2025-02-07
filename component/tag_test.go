@@ -28,7 +28,7 @@ func TestTagComponent_CreateTag(t *testing.T) {
 		Name:     req.Name,
 		Category: req.Category,
 		Group:    req.Group,
-		Scope:    database.TagScope(req.Scope),
+		Scope:    types.TagScope(req.Scope),
 		BuiltIn:  req.BuiltIn,
 	}
 
@@ -101,7 +101,7 @@ func TestTagComponent_UpdateTag(t *testing.T) {
 		Name:     req.Name,
 		Category: req.Category,
 		Group:    req.Group,
-		Scope:    database.TagScope(req.Scope),
+		Scope:    types.TagScope(req.Scope),
 		BuiltIn:  req.BuiltIn,
 	}
 
@@ -156,19 +156,6 @@ func TestTagComponent_DeleteTag(t *testing.T) {
 	})
 }
 
-func TestTagComponent_AllTagsByScopeAndCategory(t *testing.T) {
-	ctx := context.TODO()
-	tc := initializeTestTagComponent(ctx, t)
-
-	tc.mocks.stores.TagMock().EXPECT().AllTagsByScopeAndCategory(ctx, database.CodeTagScope, "cat").Return(
-		[]*database.Tag{{Name: "t"}}, nil,
-	)
-
-	data, err := tc.AllTagsByScopeAndCategory(ctx, "code", "cat")
-	require.Nil(t, err)
-	require.Equal(t, []*database.Tag{{Name: "t"}}, data)
-}
-
 func TestTagComponent_ClearMetaTags(t *testing.T) {
 	ctx := context.TODO()
 	tc := initializeTestTagComponent(ctx, t)
@@ -195,7 +182,7 @@ func TestTagComponent_UpdateMetaTags(t *testing.T) {
 	).Return(nil, nil)
 	tc.mocks.stores.RepoMock().EXPECT().UpdateLicenseByTag(ctx, int64(1)).Return(nil)
 
-	data, err := tc.UpdateMetaTags(ctx, database.DatasetTagScope, "ns", "n", "")
+	data, err := tc.UpdateMetaTags(ctx, types.DatasetTagScope, "ns", "n", "")
 	require.Nil(t, err)
 	require.Equal(t, []*database.RepositoryTag(nil), data)
 }
@@ -214,7 +201,7 @@ func TestTagComponent_UpdateLibraryTags(t *testing.T) {
 	).Return(nil)
 
 	err := tc.UpdateLibraryTags(
-		ctx, database.DatasetTagScope, "ns", "n", "pytorch_model_old.bin", "tf_model_new.h5",
+		ctx, types.DatasetTagScope, "ns", "n", "pytorch_model_old.bin", "tf_model_new.h5",
 	)
 	require.Nil(t, err)
 
@@ -224,7 +211,11 @@ func TestTagComponent_UpdateRepoTagsByCategory(t *testing.T) {
 	ctx := context.TODO()
 	tc := initializeTestTagComponent(ctx, t)
 
-	tc.mocks.stores.TagMock().EXPECT().AllTagsByScopeAndCategory(ctx, database.DatasetTagScope, "c").Return(
+	filter := &types.TagFilter{
+		Categories: []string{"c"},
+		Scopes:     []types.TagScope{types.DatasetTagScope},
+	}
+	tc.mocks.stores.TagMock().EXPECT().AllTags(ctx, filter).Return(
 		[]*database.Tag{
 			{Name: "t1", ID: 2},
 		}, nil,
@@ -232,7 +223,7 @@ func TestTagComponent_UpdateRepoTagsByCategory(t *testing.T) {
 	tc.mocks.stores.RepoMock().EXPECT().TagIDs(ctx, int64(1), "c").Return([]int64{1}, nil)
 	tc.mocks.stores.TagMock().EXPECT().UpsertRepoTags(ctx, int64(1), []int64{1}, []int64{2}).Return(nil)
 
-	err := tc.UpdateRepoTagsByCategory(ctx, database.DatasetTagScope, 1, "c", []string{"t1"})
+	err := tc.UpdateRepoTagsByCategory(ctx, types.DatasetTagScope, 1, "c", []string{"t1"})
 	require.Nil(t, err)
 }
 
@@ -240,7 +231,7 @@ func TestTagComponent_AllCategories(t *testing.T) {
 	ctx := context.TODO()
 	tc := initializeTestTagComponent(ctx, t)
 
-	tc.mocks.stores.TagMock().EXPECT().AllCategories(ctx, database.TagScope("")).Return([]database.TagCategory{}, nil)
+	tc.mocks.stores.TagMock().EXPECT().AllCategories(ctx, types.TagScope("")).Return([]database.TagCategory{}, nil)
 
 	categories, err := tc.AllCategories(ctx)
 	require.Nil(t, err)
@@ -259,7 +250,7 @@ func TestTagComponent_CreateCategory(t *testing.T) {
 		}, nil)
 		tc.mocks.stores.TagMock().EXPECT().CreateCategory(ctx, database.TagCategory{
 			Name:  "test-cate",
-			Scope: database.TagScope("test-scope"),
+			Scope: types.TagScope("test-scope"),
 		}).Return(&database.TagCategory{
 			ID:    1,
 			Name:  "test-cate",
@@ -304,7 +295,7 @@ func TestTagComponent_UpdateCategory(t *testing.T) {
 		tc.mocks.stores.TagMock().EXPECT().UpdateCategory(ctx, database.TagCategory{
 			ID:    int64(1),
 			Name:  "test-cate",
-			Scope: database.TagScope("test-scope"),
+			Scope: types.TagScope("test-scope"),
 		}).Return(&database.TagCategory{
 			ID:    1,
 			Name:  "test-cate",

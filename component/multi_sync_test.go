@@ -109,7 +109,7 @@ func TestMultiSyncComponent_SyncAsClient(t *testing.T) {
 	mc.mocks.stores.RepoMock().EXPECT().UpdateOrCreateRepo(ctx, *dbrepo).Return(dbrepo, nil)
 	dbrepo.ID = 1
 	mc.mocks.stores.TagMock().EXPECT().FindOrCreate(ctx, database.Tag{
-		Name: "t1", Scope: database.ModelTagScope,
+		Name: "t1", Scope: types.ModelTagScope,
 	}).Return(
 		&database.Tag{Name: "t1", ID: 11}, nil,
 	)
@@ -148,7 +148,7 @@ func TestMultiSyncComponent_SyncAsClient(t *testing.T) {
 	mc.mocks.stores.RepoMock().EXPECT().UpdateOrCreateRepo(ctx, *dbrepo).Return(dbrepo, nil)
 	dbrepo.ID = 2
 	mc.mocks.stores.TagMock().EXPECT().FindOrCreate(ctx, database.Tag{
-		Name: "t2", Scope: database.DatasetTagScope,
+		Name: "t2", Scope: types.DatasetTagScope,
 	}).Return(
 		&database.Tag{Name: "t2", ID: 12}, nil,
 	)

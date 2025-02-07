@@ -1055,7 +1055,12 @@ func (c *modelComponentImpl) SetRuntimeFrameworkModes(ctx context.Context, curre
 		return nil, err
 	}
 
-	runtime_framework_tags, _ := c.tagStore.GetTagsByScopeAndCategories(ctx, "model", []string{"runtime_framework", "resource"})
+	//add resource tag, like ascend
+	filter := &types.TagFilter{
+		Scopes:     []types.TagScope{types.ModelTagScope},
+		Categories: []string{"runtime_framework", "resource"},
+	}
+	runtime_framework_tags, _ := c.tagStore.AllTags(ctx, filter)
 
 	var failedModels []string
 	for _, model := range models {

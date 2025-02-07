@@ -15702,7 +15702,7 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "scope": {
-                    "$ref": "#/definitions/database.TagScope"
+                    "$ref": "#/definitions/types.TagScope"
                 },
                 "show_name": {
                     "type": "string"
@@ -15725,14 +15725,14 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "scope": {
-                    "$ref": "#/definitions/database.TagScope"
+                    "$ref": "#/definitions/types.TagScope"
                 },
                 "show_name": {
                     "type": "string"
                 }
             }
         },
-        "database.TagScope": {
+        "types.TagScope": {
             "type": "string",
             "enum": [
                 "model",

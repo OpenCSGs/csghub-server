@@ -53,24 +53,34 @@ func TestTagStore_AllTags(t *testing.T) {
 	require.Empty(t, err)
 
 	ts := database.NewTagStoreWithDB(db)
-	tags, err := ts.AllTags(ctx)
+	tags, err := ts.AllTags(ctx, nil)
 	require.Empty(t, err)
 	require.Equal(t, 0, len(tags))
 
-	modelTag, err := ts.CreateTag(ctx, "task", "tag_"+uuid.New().String(), "Group One", database.ModelTagScope)
+	modelTag, err := ts.CreateTag(ctx, "task", "tag_"+uuid.New().String(), "Group One", types.ModelTagScope)
 	require.Empty(t, err)
-	datasetTag, err := ts.CreateTag(ctx, "library", "tag_"+uuid.New().String(), "Group One", database.DatasetTagScope)
+	datasetTag, err := ts.CreateTag(ctx, "library", "tag_"+uuid.New().String(), "Group One", types.DatasetTagScope)
 	require.Empty(t, err)
-	codeTag, err := ts.CreateTag(ctx, "task", "tag_"+uuid.New().String(), "Group One", database.CodeTagScope)
+	codeTag, err := ts.CreateTag(ctx, "task", "tag_"+uuid.New().String(), "Group One", types.CodeTagScope)
 	require.Empty(t, err)
-	promptTag, err := ts.CreateTag(ctx, "library", "tag_"+uuid.New().String(), "Group One", database.PromptTagScope)
+	promptTag, err := ts.CreateTag(ctx, "library", "tag_"+uuid.New().String(), "Group One", types.PromptTagScope)
 	require.Empty(t, err)
-	spaceTag, err := ts.CreateTag(ctx, "library", "tag_"+uuid.New().String(), "Group One", database.SpaceTagScope)
+	spaceTag, err := ts.CreateTag(ctx, "library", "tag_"+uuid.New().String(), "Group One", types.SpaceTagScope)
 	require.Empty(t, err)
 
-	tags, err = ts.AllTags(ctx)
+	tags, err = ts.AllTags(ctx, nil)
 	require.Empty(t, err)
 	require.Equal(t, 5, len(tags))
+
+	builtIn := false
+	filter := &types.TagFilter{
+		Scopes:     []types.TagScope{types.ModelTagScope, types.DatasetTagScope, types.CodeTagScope, types.PromptTagScope, types.SpaceTagScope},
+		Categories: []string{"task"},
+		BuiltIn:    &builtIn,
+	}
+	tags, err = ts.AllTags(ctx, filter)
+	require.Empty(t, err)
+	require.Equal(t, 2, len(tags))
 
 	modelTags, err := ts.AllModelTags(ctx)
 	require.Empty(t, err)
@@ -98,68 +108,6 @@ func TestTagStore_AllTags(t *testing.T) {
 	require.Equal(t, spaceTag.Name, spaceTags[0].Name)
 }
 
-// TestAllTagsByScope tests the AllTagsByScope method
-func TestTagStore_AllTagsByScope(t *testing.T) {
-	db := tests.InitTestDB()
-	defer db.Close()
-
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer cancel()
-
-	ts := database.NewTagStoreWithDB(db)
-	_, err := ts.CreateTag(ctx, "task", "tag_"+uuid.New().String(), "Group One", "test_scope")
-	require.Empty(t, err)
-	_, err = ts.CreateTag(ctx, "task", "tag_"+uuid.New().String(), "Group One", "test_scope")
-	require.Empty(t, err)
-
-	tags, err := ts.AllTagsByScope(ctx, "test_scope")
-	require.Empty(t, err)
-	require.Len(t, tags, 2)
-	require.Equal(t, string(tags[0].Scope), "test_scope")
-	require.Equal(t, string(tags[1].Scope), "test_scope")
-}
-
-// TestAllTagsByScopeAndCategory tests the AllTagsByScopeAndCategory method
-func TestTagStore_AllTagsByScopeAndCategory(t *testing.T) {
-	db := tests.InitTestDB()
-	defer db.Close()
-
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer cancel()
-
-	ts := database.NewTagStoreWithDB(db)
-	_, err := ts.CreateTag(ctx, "task", "tag_"+uuid.New().String(), "Group One", "test_scope")
-	require.Empty(t, err)
-	_, err = ts.CreateTag(ctx, "library", "tag_"+uuid.New().String(), "Group One", "test_scope")
-	require.Empty(t, err)
-
-	tags, err := ts.AllTagsByScopeAndCategory(ctx, "test_scope", "task")
-	require.Empty(t, err)
-	require.Len(t, tags, 1)
-	require.Equal(t, string(tags[0].Scope), "test_scope")
-}
-
-// TestGetTagsByScopeAndCategories tests the GetTagsByScopeAndCategories method
-func TestTagStore_GetTagsByScopeAndCategories(t *testing.T) {
-	db := tests.InitTestDB()
-	defer db.Close()
-
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer cancel()
-
-	ts := database.NewTagStoreWithDB(db)
-	_, err := ts.CreateTag(ctx, "task", "tag_"+uuid.New().String(), "Group One", "test_scope")
-	require.Empty(t, err)
-	_, err = ts.CreateTag(ctx, "library", "tag_"+uuid.New().String(), "Group One", "test_scope")
-	require.Empty(t, err)
-	_, err = ts.CreateTag(ctx, "test_category", "tag_"+uuid.New().String(), "Group One", "test_scope")
-	require.Empty(t, err)
-
-	tags, err := ts.GetTagsByScopeAndCategories(ctx, "test_scope", []string{"task", "library"})
-	require.Empty(t, err)
-	require.Len(t, tags, 2)
-}
-
 // TestAllModelCategories tests the AllModelCategories method
 func TestTagStore_AllModelCategories(t *testing.T) {
 	db := tests.InitTestDB()
@@ -180,11 +128,11 @@ func TestTagStore_AllModelCategories(t *testing.T) {
 
 	tc1 := &database.TagCategory{
 		Name:  "tc_1",
-		Scope: database.ModelTagScope,
+		Scope: types.ModelTagScope,
 	}
 	tc2 := &database.TagCategory{
 		Name:  "tc_2",
-		Scope: database.DatasetTagScope,
+		Scope: types.DatasetTagScope,
 	}
 	_, err = db.Core.NewInsert().Model(tc1).Exec(ctx)
 	require.Empty(t, err)
@@ -216,11 +164,11 @@ func TestTagStore_AllPromptCategories(t *testing.T) {
 
 	tc1 := &database.TagCategory{
 		Name:  "tc_1",
-		Scope: database.ModelTagScope,
+		Scope: types.ModelTagScope,
 	}
 	tc2 := &database.TagCategory{
 		Name:  "tc_2",
-		Scope: database.PromptTagScope,
+		Scope: types.PromptTagScope,
 	}
 	_, err = db.Core.NewInsert().Model(tc1).Exec(ctx)
 	require.Empty(t, err)
@@ -252,11 +200,11 @@ func TestTagStore_AllDatasetCategories(t *testing.T) {
 
 	tc1 := &database.TagCategory{
 		Name:  "tc_1",
-		Scope: database.ModelTagScope,
+		Scope: types.ModelTagScope,
 	}
 	tc2 := &database.TagCategory{
 		Name:  "tc_2",
-		Scope: database.DatasetTagScope,
+		Scope: types.DatasetTagScope,
 	}
 	_, err = db.Core.NewInsert().Model(tc1).Exec(ctx)
 	require.Empty(t, err)
@@ -288,11 +236,11 @@ func TestTagStore_AllCodeCategories(t *testing.T) {
 
 	tc1 := &database.TagCategory{
 		Name:  "tc_1",
-		Scope: database.ModelTagScope,
+		Scope: types.ModelTagScope,
 	}
 	tc2 := &database.TagCategory{
 		Name:  "tc_2",
-		Scope: database.CodeTagScope,
+		Scope: types.CodeTagScope,
 	}
 	_, err = db.Core.NewInsert().Model(tc1).Exec(ctx)
 	require.Empty(t, err)
@@ -324,11 +272,11 @@ func TestTagStore_AllSpaceCategories(t *testing.T) {
 
 	tc1 := &database.TagCategory{
 		Name:  "tc_1",
-		Scope: database.ModelTagScope,
+		Scope: types.ModelTagScope,
 	}
 	tc2 := &database.TagCategory{
 		Name:  "tc_2",
-		Scope: database.SpaceTagScope,
+		Scope: types.SpaceTagScope,
 	}
 	_, err = db.Core.NewInsert().Model(tc1).Exec(ctx)
 	require.Empty(t, err)
@@ -350,7 +298,7 @@ func TestTagStore_CreateTag(t *testing.T) {
 
 	var err error
 	ts := database.NewTagStoreWithDB(db)
-	t1, err := ts.CreateTag(ctx, "task", "tag_"+uuid.NewString(), "", database.ModelTagScope)
+	t1, err := ts.CreateTag(ctx, "task", "tag_"+uuid.NewString(), "", types.ModelTagScope)
 	require.Empty(t, err)
 	require.NotEmpty(t, t1.ID)
 }
@@ -386,7 +334,7 @@ func TestTagStore_SetMetaTags(t *testing.T) {
 		Name:     "tag_" + uuid.NewString(),
 		Category: "task",
 		Group:    "",
-		Scope:    database.ModelTagScope,
+		Scope:    types.ModelTagScope,
 		BuiltIn:  true,
 		ShowName: "",
 	})
@@ -394,7 +342,7 @@ func TestTagStore_SetMetaTags(t *testing.T) {
 		Name:     "tag_" + uuid.NewString(),
 		Category: "framework",
 		Group:    "",
-		Scope:    database.ModelTagScope,
+		Scope:    types.ModelTagScope,
 		BuiltIn:  true,
 		ShowName: "",
 	})
@@ -434,9 +382,9 @@ func TestTagStore_SetLibraryTag(t *testing.T) {
 	require.NotNil(t, repo)
 
 	ts := database.NewTagStoreWithDB(db)
-	oldTag, err := ts.CreateTag(ctx, "task", "tag_"+uuid.NewString(), "", database.ModelTagScope)
+	oldTag, err := ts.CreateTag(ctx, "task", "tag_"+uuid.NewString(), "", types.ModelTagScope)
 	require.Empty(t, err)
-	newTag, err := ts.CreateTag(ctx, "task", "tag_"+uuid.NewString(), "", database.ModelTagScope)
+	newTag, err := ts.CreateTag(ctx, "task", "tag_"+uuid.NewString(), "", types.ModelTagScope)
 	require.Empty(t, err)
 
 	err = ts.SetLibraryTag(ctx, types.ModelRepo, userName, repoName, &newTag, &oldTag)
@@ -457,7 +405,7 @@ func TestTagStore_UpsertRepoTags(t *testing.T) {
 	defer cancel()
 
 	ts := database.NewTagStoreWithDB(db)
-	oldTag, err := ts.CreateTag(ctx, "task", "tag_"+uuid.NewString(), "", database.ModelTagScope)
+	oldTag, err := ts.CreateTag(ctx, "task", "tag_"+uuid.NewString(), "", types.ModelTagScope)
 	require.Empty(t, err)
 
 	// insert a new repo with tags
@@ -482,7 +430,7 @@ func TestTagStore_UpsertRepoTags(t *testing.T) {
 	oldTagIds := make([]int64, 0, len(repo.Tags))
 	oldTagIds = append(oldTagIds, repo.Tags[0].ID)
 
-	newTag, err := ts.CreateTag(ctx, "task", "tag_"+uuid.NewString(), "", database.ModelTagScope)
+	newTag, err := ts.CreateTag(ctx, "task", "tag_"+uuid.NewString(), "", types.ModelTagScope)
 	require.Empty(t, err)
 	newTagIds := make([]int64, 0, 2)
 	newTagIds = append(newTagIds, newTag.ID)
@@ -504,10 +452,10 @@ func TestTagStore_RemoveRepoTags(t *testing.T) {
 	defer cancel()
 
 	ts := database.NewTagStoreWithDB(db)
-	tag1, err := ts.CreateTag(ctx, "task", "tag_"+uuid.NewString(), "", database.ModelTagScope)
+	tag1, err := ts.CreateTag(ctx, "task", "tag_"+uuid.NewString(), "", types.ModelTagScope)
 	require.Empty(t, err)
 	require.NotEmpty(t, tag1.ID)
-	tag2, err := ts.CreateTag(ctx, "task", "tag_"+uuid.NewString(), "", database.ModelTagScope)
+	tag2, err := ts.CreateTag(ctx, "task", "tag_"+uuid.NewString(), "", types.ModelTagScope)
 	require.Empty(t, err)
 	require.NotEmpty(t, tag2.ID)
 
@@ -552,7 +500,7 @@ func TestTagStore_FindTagByID(t *testing.T) {
 
 	var err error
 	ts := database.NewTagStoreWithDB(db)
-	t1, err := ts.CreateTag(ctx, "task", "tag_"+uuid.NewString(), "", database.ModelTagScope)
+	t1, err := ts.CreateTag(ctx, "task", "tag_"+uuid.NewString(), "", types.ModelTagScope)
 	require.Empty(t, err)
 	require.NotEmpty(t, t1.ID)
 
@@ -571,7 +519,7 @@ func TestTagStore_UpdateTagByID(t *testing.T) {
 
 	ts := database.NewTagStoreWithDB(db)
 
-	t1, err := ts.CreateTag(ctx, "task", "tag_"+uuid.NewString(), "", database.ModelTagScope)
+	t1, err := ts.CreateTag(ctx, "task", "tag_"+uuid.NewString(), "", types.ModelTagScope)
 	require.Empty(t, err)
 	require.NotEmpty(t, t1.ID)
 
@@ -593,7 +541,7 @@ func TestTagStore_DeleteTagByID(t *testing.T) {
 	defer cancel()
 
 	ts := database.NewTagStoreWithDB(db)
-	tag1, err := ts.CreateTag(ctx, "task", "tag_"+uuid.NewString(), "", database.ModelTagScope)
+	tag1, err := ts.CreateTag(ctx, "task", "tag_"+uuid.NewString(), "", types.ModelTagScope)
 	require.Empty(t, err)
 	require.NotEmpty(t, tag1.ID)
 
