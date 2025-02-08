@@ -24,9 +24,9 @@ docker buildx build --platform linux/amd64,linux/arm64 \
 ```
 ## Build Multi-Platform Images for swift
 ```bash
-#opencsg-registry.cn-beijing.cr.aliyuncs.com/public/ms-swift:v3.0.1
+#opencsg-registry.cn-beijing.cr.aliyuncs.com/public/ms-swift:v3.1.0
 export BUILDX_NO_DEFAULT_ATTESTATIONS=1
-export IMAGE_TAG=v3.0.1
+export IMAGE_TAG=v3.1.0
 docker buildx build --platform linux/amd64,linux/arm64 \
   -t ${OPENCSG_ACR}/public/ms-swift:${IMAGE_TAG} \
   -t ${OPENCSG_ACR}/public/ms-swift:latest \
@@ -49,7 +49,7 @@ docker buildx build --platform linux/amd64,linux/arm64 \
 | Image Name | Version | CUDA Version | Fix
 | --- | --- | --- |--- |
 | llama-factory | 1.21-cuda12.1-devel-ubuntu22.04-py310-torch2.1.2 | 12.1 |- |
-| ms-swift | v3.0.1 | 12.4 |- |
+| ms-swift | v3.1.0 | 12.4 |- |
 
 
 ## Run Finetune Image Locally
