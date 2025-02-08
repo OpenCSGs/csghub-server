@@ -162,40 +162,28 @@ func (h *GitHTTPHandler) LfsBatch(ctx *gin.Context) {
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
+
 	batchRequest.CurrentUser = httpbase.GetCurrentUser(ctx)
 	batchRequest.Authorization = ctx.Request.Header.Get("Authorization")
 	batchRequest.Namespace = ctx.GetString("namespace")
 	batchRequest.Name = ctx.GetString("name")
 	batchRequest.RepoType = types.RepositoryType(ctx.GetString("repo_type"))
 
-	var isUpload bool
-	if batchRequest.Operation == "upload" {
-		isUpload = true
-	} else if batchRequest.Operation == "download" {
-		isUpload = false
-	} else {
-		slog.Error("Invalid lfs batch operation", slog.String("operation", batchRequest.Operation))
-		httpbase.BadRequest(ctx, fmt.Sprintf("Invalid lfs batch operation: %s", batchRequest.Operation))
-		return
-	}
-
-	s3Internal := ctx.GetHeader("X-OPENCSG-S3-Internal")
-	if s3Internal == "true" {
-		ctx.Set("X-OPENCSG-S3-Internal", true)
-	}
-
-	objectResponse, err := h.gitHttp.BuildObjectResponse(ctx.Request.Context(), batchRequest, isUpload)
+	objectResponse, err := h.gitHttp.LFSBatch(ctx.Request.Context(), batchRequest)
 	if err != nil {
-		if errors.Is(err, component.ErrUnauthorized) {
+		httpErr := &component.HTTPError{}
+		switch {
+		case errors.Is(err, component.ErrUnauthorized):
 			ctx.Header("WWW-Authenticate", "Basic realm=opencsg-git")
 			ctx.PureJSON(http.StatusUnauthorized, nil)
 			return
-		}
-
-		if errors.Is(err, component.ErrForbidden) {
+		case errors.Is(err, component.ErrForbidden):
 			ctx.PureJSON(http.StatusForbidden, gin.H{
 				"error": "You do not have permission to access this repository.",
 			})
+			return
+		case errors.As(err, &httpErr):
+			ctx.PureJSON(httpErr.StatusCode, httpErr.Message)
 			return
 		}
 		httpbase.ServerError(ctx, err)

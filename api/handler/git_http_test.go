@@ -3,6 +3,7 @@ package handler
 import (
 	"bytes"
 	"compress/gzip"
+	"errors"
 	"io"
 	"net/url"
 	"testing"
@@ -144,29 +145,62 @@ func TestGitHTTPHandler_GitReceivePack(t *testing.T) {
 
 func TestGitHTTPHandler_LfsBatch(t *testing.T) {
 
-	for _, c := range []string{"upload", "download"} {
-		t.Run("c", func(t *testing.T) {
-
+	for _, op := range []types.LFSBatchOperation{types.LFSBatchUpload, types.LFSBatchDownload} {
+		t.Run("success/"+string(op), func(t *testing.T) {
 			tester := NewGitHTTPTester(t).WithHandleFunc(func(h *GitHTTPHandler) gin.HandlerFunc {
 				return h.LfsBatch
 			})
 
-			tester.mocks.gitHttp.EXPECT().BuildObjectResponse(tester.Ctx(), types.BatchRequest{
+			tester.mocks.gitHttp.EXPECT().LFSBatch(tester.Ctx(), types.BatchRequest{
 				Namespace:     "u",
 				Name:          "r",
 				RepoType:      types.ModelRepo,
 				CurrentUser:   "u",
 				Authorization: "auth",
-				Operation:     c,
-			}, c == "upload").Return(&types.BatchResponse{Transfer: "t"}, nil)
+				Operation:     op,
+			}).Return(&types.BatchResponse{Transfer: "t"}, nil)
 			tester.SetPath("git").WithQuery("service", "git-upload-pack").WithHeader("Git-Protocol", "ssh")
 			tester.WithKV("namespace", "u").WithKV("name", "r").WithHeader("Authorization", "auth")
-			tester.WithBody(t, &types.BatchRequest{Operation: c})
+			tester.WithBody(t, &types.BatchRequest{Operation: op})
 			tester.WithKV("repo_type", "model").WithUser().WithHeader("Accept-Encoding", "gzip").Execute()
 
 			tester.ResponseEqSimple(t, 200, &types.BatchResponse{Transfer: "t"})
 			headers := tester.Response().Header()
 			require.Equal(t, types.LfsMediaType, headers.Get("Content-Type"))
+		})
+	}
+
+	for _, c := range []struct {
+		err        error
+		statusCode int
+	}{
+		{component.ErrUnauthorized, 401},
+		{component.ErrForbidden, 403},
+		{&component.HTTPError{
+			StatusCode: 499,
+			Message:    "xxx",
+		}, 499},
+		{errors.New("500"), 500},
+	} {
+		t.Run("error/"+c.err.Error(), func(t *testing.T) {
+			tester := NewGitHTTPTester(t).WithHandleFunc(func(h *GitHTTPHandler) gin.HandlerFunc {
+				return h.LfsBatch
+			})
+
+			tester.mocks.gitHttp.EXPECT().LFSBatch(tester.Ctx(), types.BatchRequest{
+				Namespace:     "u",
+				Name:          "r",
+				RepoType:      types.ModelRepo,
+				CurrentUser:   "u",
+				Authorization: "auth",
+				Operation:     types.LFSBatchDownload,
+			}).Return(nil, c.err)
+			tester.SetPath("git").WithQuery("service", "git-upload-pack").WithHeader("Git-Protocol", "ssh")
+			tester.WithKV("namespace", "u").WithKV("name", "r").WithHeader("Authorization", "auth")
+			tester.WithBody(t, &types.BatchRequest{Operation: types.LFSBatchDownload})
+			tester.WithKV("repo_type", "model").WithUser().WithHeader("Accept-Encoding", "gzip").Execute()
+
+			require.Equal(t, c.statusCode, tester.Response().Code)
 		})
 	}
 }
