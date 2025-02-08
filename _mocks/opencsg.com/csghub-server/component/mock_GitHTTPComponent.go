@@ -28,66 +28,6 @@ func (_m *MockGitHTTPComponent) EXPECT() *MockGitHTTPComponent_Expecter {
 	return &MockGitHTTPComponent_Expecter{mock: &_m.Mock}
 }
 
-// BuildObjectResponse provides a mock function with given fields: ctx, req, isUpload
-func (_m *MockGitHTTPComponent) BuildObjectResponse(ctx context.Context, req types.BatchRequest, isUpload bool) (*types.BatchResponse, error) {
-	ret := _m.Called(ctx, req, isUpload)
-
-	if len(ret) == 0 {
-		panic("no return value specified for BuildObjectResponse")
-	}
-
-	var r0 *types.BatchResponse
-	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, types.BatchRequest, bool) (*types.BatchResponse, error)); ok {
-		return rf(ctx, req, isUpload)
-	}
-	if rf, ok := ret.Get(0).(func(context.Context, types.BatchRequest, bool) *types.BatchResponse); ok {
-		r0 = rf(ctx, req, isUpload)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*types.BatchResponse)
-		}
-	}
-
-	if rf, ok := ret.Get(1).(func(context.Context, types.BatchRequest, bool) error); ok {
-		r1 = rf(ctx, req, isUpload)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
-// MockGitHTTPComponent_BuildObjectResponse_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'BuildObjectResponse'
-type MockGitHTTPComponent_BuildObjectResponse_Call struct {
-	*mock.Call
-}
-
-// BuildObjectResponse is a helper method to define mock.On call
-//   - ctx context.Context
-//   - req types.BatchRequest
-//   - isUpload bool
-func (_e *MockGitHTTPComponent_Expecter) BuildObjectResponse(ctx interface{}, req interface{}, isUpload interface{}) *MockGitHTTPComponent_BuildObjectResponse_Call {
-	return &MockGitHTTPComponent_BuildObjectResponse_Call{Call: _e.mock.On("BuildObjectResponse", ctx, req, isUpload)}
-}
-
-func (_c *MockGitHTTPComponent_BuildObjectResponse_Call) Run(run func(ctx context.Context, req types.BatchRequest, isUpload bool)) *MockGitHTTPComponent_BuildObjectResponse_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(types.BatchRequest), args[2].(bool))
-	})
-	return _c
-}
-
-func (_c *MockGitHTTPComponent_BuildObjectResponse_Call) Return(_a0 *types.BatchResponse, _a1 error) *MockGitHTTPComponent_BuildObjectResponse_Call {
-	_c.Call.Return(_a0, _a1)
-	return _c
-}
-
-func (_c *MockGitHTTPComponent_BuildObjectResponse_Call) RunAndReturn(run func(context.Context, types.BatchRequest, bool) (*types.BatchResponse, error)) *MockGitHTTPComponent_BuildObjectResponse_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
 // CreateLock provides a mock function with given fields: ctx, req
 func (_m *MockGitHTTPComponent) CreateLock(ctx context.Context, req types.LfsLockReq) (*database.LfsLock, error) {
 	ret := _m.Called(ctx, req)
@@ -296,6 +236,65 @@ func (_c *MockGitHTTPComponent_InfoRefs_Call) Return(_a0 io.Reader, _a1 error) *
 }
 
 func (_c *MockGitHTTPComponent_InfoRefs_Call) RunAndReturn(run func(context.Context, types.InfoRefsReq) (io.Reader, error)) *MockGitHTTPComponent_InfoRefs_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// LFSBatch provides a mock function with given fields: ctx, req
+func (_m *MockGitHTTPComponent) LFSBatch(ctx context.Context, req types.BatchRequest) (*types.BatchResponse, error) {
+	ret := _m.Called(ctx, req)
+
+	if len(ret) == 0 {
+		panic("no return value specified for LFSBatch")
+	}
+
+	var r0 *types.BatchResponse
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, types.BatchRequest) (*types.BatchResponse, error)); ok {
+		return rf(ctx, req)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, types.BatchRequest) *types.BatchResponse); ok {
+		r0 = rf(ctx, req)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*types.BatchResponse)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, types.BatchRequest) error); ok {
+		r1 = rf(ctx, req)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockGitHTTPComponent_LFSBatch_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'LFSBatch'
+type MockGitHTTPComponent_LFSBatch_Call struct {
+	*mock.Call
+}
+
+// LFSBatch is a helper method to define mock.On call
+//   - ctx context.Context
+//   - req types.BatchRequest
+func (_e *MockGitHTTPComponent_Expecter) LFSBatch(ctx interface{}, req interface{}) *MockGitHTTPComponent_LFSBatch_Call {
+	return &MockGitHTTPComponent_LFSBatch_Call{Call: _e.mock.On("LFSBatch", ctx, req)}
+}
+
+func (_c *MockGitHTTPComponent_LFSBatch_Call) Run(run func(ctx context.Context, req types.BatchRequest)) *MockGitHTTPComponent_LFSBatch_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(types.BatchRequest))
+	})
+	return _c
+}
+
+func (_c *MockGitHTTPComponent_LFSBatch_Call) Return(_a0 *types.BatchResponse, _a1 error) *MockGitHTTPComponent_LFSBatch_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockGitHTTPComponent_LFSBatch_Call) RunAndReturn(run func(context.Context, types.BatchRequest) (*types.BatchResponse, error)) *MockGitHTTPComponent_LFSBatch_Call {
 	_c.Call.Return(run)
 	return _c
 }

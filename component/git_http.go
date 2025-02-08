@@ -3,17 +3,18 @@ package component
 import (
 	"context"
 	"database/sql"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"io"
 	"log/slog"
-	"net/http"
 	"net/url"
 	"os"
 	"path"
 	"strconv"
 
 	"github.com/minio/minio-go/v7"
+	"github.com/minio/sha256-simd"
 	"opencsg.com/csghub-server/builder/git"
 	"opencsg.com/csghub-server/builder/git/gitserver"
 	"opencsg.com/csghub-server/builder/store/database"
@@ -37,7 +38,7 @@ type GitHTTPComponent interface {
 	InfoRefs(ctx context.Context, req types.InfoRefsReq) (io.Reader, error)
 	GitUploadPack(ctx context.Context, req types.GitUploadPackReq) error
 	GitReceivePack(ctx context.Context, req types.GitReceivePackReq) error
-	BuildObjectResponse(ctx context.Context, req types.BatchRequest, isUpload bool) (*types.BatchResponse, error)
+	LFSBatch(ctx context.Context, req types.BatchRequest) (*types.BatchResponse, error)
 	LfsUpload(ctx context.Context, body io.ReadCloser, req types.UploadRequest) error
 	LfsVerify(ctx context.Context, req types.VerifyRequest, p types.Pointer) error
 	CreateLock(ctx context.Context, req types.LfsLockReq) (*database.LfsLock, error)
@@ -170,138 +171,161 @@ func (c *gitHTTPComponentImpl) GitReceivePack(ctx context.Context, req types.Git
 	return err
 }
 
-func (c *gitHTTPComponentImpl) BuildObjectResponse(ctx context.Context, req types.BatchRequest, isUpload bool) (*types.BatchResponse, error) {
-	var (
-		respObjects []*types.ObjectResponse
-		exists      bool
-	)
+func (c *gitHTTPComponentImpl) lfsBatchDownloadInfo(ctx context.Context, req types.BatchRequest, repo *database.Repository) (*types.BatchResponse, error) {
+	var objs []*types.ObjectResponse
+	lfsFiles, err := c.lfsMetaObjectStore.FindByRepoID(ctx, repo.ID)
+	if err != nil {
+		return nil, err
+	}
+	exists := map[string]*database.LfsMetaObject{}
+	for _, f := range lfsFiles {
+		exists[f.Oid] = &f
+	}
+
+	for _, obj := range req.Objects {
+		if _, ok := exists[obj.Oid]; !ok {
+			objs = append(objs, &types.ObjectResponse{
+				Error: &types.ObjectError{
+					Code:    404,
+					Message: "Object does not exist",
+				},
+			})
+			continue
+		}
+		if !obj.Valid() {
+			objs = append(objs, &types.ObjectResponse{
+				Error: &types.ObjectError{},
+			})
+			continue
+		}
+		objectKey := path.Join("lfs", obj.RelativePath())
+		resp := &types.ObjectResponse{
+			Actions: map[string]*types.Link{},
+			Pointer: obj,
+		}
+		reqParams := make(url.Values)
+		url, err := c.s3Client.PresignedGetObject(ctx, c.config.S3.Bucket, objectKey, types.OssFileExpire, reqParams)
+		if err != nil {
+			objs = append(objs, &types.ObjectResponse{
+				Error: &types.ObjectError{},
+			})
+			continue
+		}
+		resp.Actions["download"] = &types.Link{Href: url.String(), Header: map[string]string{}}
+		objs = append(objs, resp)
+	}
+	return &types.BatchResponse{Objects: objs}, nil
+}
+
+func (c *gitHTTPComponentImpl) lfsBatchUploadInfo(ctx context.Context, req types.BatchRequest, repo *database.Repository) (*types.BatchResponse, error) {
+	header := make(map[string]string)
+	if len(req.Authorization) > 0 {
+		header["Authorization"] = req.Authorization
+	}
+
+	var objs []*types.ObjectResponse
+	lfsFiles, err := c.lfsMetaObjectStore.FindByRepoID(ctx, repo.ID)
+	if err != nil {
+		return nil, err
+	}
+	exists := map[string]*database.LfsMetaObject{}
+	for _, f := range lfsFiles {
+		exists[f.Oid] = &f
+	}
+
+	for _, obj := range req.Objects {
+		if _, ok := exists[obj.Oid]; ok {
+			continue
+		}
+		if !obj.Valid() {
+			objs = append(objs, &types.ObjectResponse{
+				Error: &types.ObjectError{},
+			})
+			continue
+		}
+		resp := &types.ObjectResponse{
+			Actions: map[string]*types.Link{},
+			Pointer: obj,
+		}
+		resp.Actions["upload"] = &types.Link{Href: c.buildUploadLink(req, obj), Header: header}
+		verifyHeader := make(map[string]string)
+		for key, value := range header {
+			verifyHeader[key] = value
+		}
+		verifyHeader["Accept"] = types.LfsMediaType
+		resp.Actions["verify"] = &types.Link{Href: c.buildVerifyLink(req), Header: verifyHeader}
+		objs = append(objs, resp)
+	}
+	return &types.BatchResponse{Objects: objs}, nil
+}
+
+// https://gitlab.com/gitlab-org/gitlab-foss/-/blob/master/app/controllers/concerns/lfs_request.rb#L45
+// Only return a 403 response if the user has download(read) access permission,
+// otherwise return a 404 to avoid exposing the existence of the container.
+// Return nil means user has required permission.
+func (c *gitHTTPComponentImpl) lfsCheckAccess(ctx context.Context, req types.BatchRequest) error {
+	switch req.Operation {
+	case types.LFSBatchUpload:
+		allowWrite, err := c.repoComponent.AllowWriteAccess(
+			ctx, req.RepoType, req.Namespace, req.Name, req.CurrentUser,
+		)
+		if err != nil {
+			return err
+		}
+		if allowWrite {
+			return nil
+		}
+		allowRead, err := c.repoComponent.AllowReadAccess(
+			ctx, req.RepoType, req.Namespace, req.Name, req.CurrentUser,
+		)
+		if err != nil {
+			return err
+		}
+		if allowRead {
+			return ErrForbidden
+		}
+		return ErrNotFound
+	case types.LFSBatchDownload:
+		allowRead, err := c.repoComponent.AllowReadAccess(
+			ctx, req.RepoType, req.Namespace, req.Name, req.CurrentUser,
+		)
+		if err != nil {
+			return err
+		}
+		if !allowRead {
+			return ErrNotFound
+		}
+		return nil
+	}
+	return &HTTPError{
+		StatusCode: 400,
+		Message:    fmt.Errorf("invalid lfs batch operation: %s", req.Operation),
+	}
+}
+
+func (c *gitHTTPComponentImpl) LFSBatch(ctx context.Context, req types.BatchRequest) (*types.BatchResponse, error) {
 	repo, err := c.repoStore.FindByPath(ctx, req.RepoType, req.Namespace, req.Name)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find repo, error: %w", err)
 	}
-
-	for _, obj := range req.Objects {
-		if !obj.Valid() {
-			respObjects = append(respObjects, c.buildObjectResponse(ctx, req, obj, false, false, &types.ObjectError{
-				Code:    http.StatusUnprocessableEntity,
-				Message: "Oid or size are invalid",
-			}))
-			continue
-		}
-		objectKey := path.Join("lfs", obj.RelativePath())
-		_, err := c.s3Client.StatObject(ctx, c.config.S3.Bucket, objectKey, minio.StatObjectOptions{})
-		if err != nil {
-			slog.Error("failed to check if lfs file exists", slog.String("oid", objectKey), slog.Any("error", err))
-			exists = false
-		} else {
-			exists = true
-		}
-
-		lfsMetaObject, err := c.lfsMetaObjectStore.FindByOID(ctx, repo.ID, obj.Oid)
-		if err != nil && !errors.Is(err, sql.ErrNoRows) {
-			slog.Error("failed to check if lfs file exists in database", slog.String("oid", objectKey), slog.Any("error", err))
-			return nil, err
-		}
-
-		if lfsMetaObject != nil && obj.Size != lfsMetaObject.Size {
-			respObjects = append(respObjects, c.buildObjectResponse(ctx, req, obj, false, false, &types.ObjectError{
-				Code:    http.StatusUnprocessableEntity,
-				Message: fmt.Sprintf("Object %s is not %d bytes", obj.Oid, obj.Size),
-			}))
-			continue
-		}
-
-		var responseObject *types.ObjectResponse
-		if isUpload {
-			var err *types.ObjectError
-			// if !exists && setting.LFS.MaxFileSize > 0 && p.Size > setting.LFS.MaxFileSize {
-			// 	err = &types.ObjectError{
-			// 		Code:    http.StatusUnprocessableEntity,
-			// 		Message: fmt.Sprintf("Size must be less than or equal to %d", setting.LFS.MaxFileSize),
-			// 	}
-			// }
-
-			if exists && lfsMetaObject == nil {
-				allowed, err := c.repoComponent.AllowWriteAccess(ctx, req.RepoType, req.Namespace, req.Name, req.CurrentUser)
-				if err != nil {
-					slog.Error("unable to check if user can wirte this repo", slog.String("lfs oid", obj.Oid), slog.Any("error", err))
-					return nil, ErrUnauthorized
-				}
-				if allowed {
-					_, err := c.lfsMetaObjectStore.Create(ctx, database.LfsMetaObject{
-						Oid:          obj.Oid,
-						Size:         obj.Size,
-						RepositoryID: repo.ID,
-						Existing:     true,
-					})
-					if err != nil {
-						slog.Error("Unable to create LFS MetaObject [%s] for %s/%s. Error: %v", obj.Oid, req.Namespace, req.Name, err)
-						return nil, err
-					}
-				} else {
-					exists = false
-				}
-			}
-
-			responseObject = c.buildObjectResponse(ctx, req, obj, false, !exists, err)
-		} else {
-			var err *types.ObjectError
-			// if !exists || lfsMetaObject == nil {
-			// 	err = &types.ObjectError{
-			// 		Code:    http.StatusNotFound,
-			// 		Message: http.StatusText(http.StatusNotFound),
-			// 	}
-			// }
-
-			responseObject = c.buildObjectResponse(ctx, req, obj, true, false, err)
-		}
-		respObjects = append(respObjects, responseObject)
-	}
-	respobj := &types.BatchResponse{Objects: respObjects}
-	return respobj, nil
-}
-
-func (c *gitHTTPComponentImpl) buildObjectResponse(ctx context.Context, req types.BatchRequest, pointer types.Pointer, download, upload bool, err *types.ObjectError) *types.ObjectResponse {
-	rep := &types.ObjectResponse{Pointer: pointer}
+	err = c.lfsCheckAccess(ctx, req)
 	if err != nil {
-		rep.Error = err
-	} else {
-		rep.Actions = make(map[string]*types.Link)
+		return nil, err
+	}
 
-		header := make(map[string]string)
-
-		if len(req.Authorization) > 0 {
-			header["Authorization"] = req.Authorization
-		}
-
-		if download {
-			var link *types.Link
-			reqParams := make(url.Values)
-			objectKey := path.Join("lfs", pointer.RelativePath())
-			url, err := c.s3Client.PresignedGetObject(ctx, c.config.S3.Bucket, objectKey, types.OssFileExpire, reqParams)
-			if url != nil && err == nil {
-				delete(header, "Authorization")
-				link = &types.Link{Href: url.String(), Header: header}
-			}
-			if link == nil {
-				link = &types.Link{Href: c.buildDownloadLink(req, pointer), Header: header}
-			}
-			rep.Actions["download"] = link
-		}
-		if upload {
-			rep.Actions["upload"] = &types.Link{Href: c.buildUploadLink(req, pointer), Header: header}
-
-			verifyHeader := make(map[string]string)
-			for key, value := range header {
-				verifyHeader[key] = value
-			}
-
-			verifyHeader["Accept"] = types.LfsMediaType
-
-			rep.Actions["verify"] = &types.Link{Href: c.buildVerifyLink(req), Header: verifyHeader}
+	var resp *types.BatchResponse
+	switch req.Operation {
+	case types.LFSBatchUpload:
+		resp, err = c.lfsBatchUploadInfo(ctx, req, repo)
+	case types.LFSBatchDownload:
+		resp, err = c.lfsBatchDownloadInfo(ctx, req, repo)
+	default:
+		return nil, &HTTPError{
+			StatusCode: 400,
+			Message:    fmt.Errorf("invalid lfs batch operation: %s", req.Operation),
 		}
 	}
-	return rep
+	return resp, err
 }
 
 // https://github.com/minio/minio-go/issues/1082
@@ -342,6 +366,19 @@ func (c *gitHTTPComponentImpl) LfsUpload(ctx context.Context, body io.ReadCloser
 			return err
 		}
 	} else {
+		// object already exists on minio,
+		// we still need to read whole file and calculate sha256
+		// to verify user has the file
+		h := sha256.New()
+		size, err := io.Copy(h, body)
+		if err != nil {
+			return err
+		}
+
+		checksum := hex.EncodeToString(h.Sum(nil))
+		if size != pointer.Size || checksum != pointer.Oid {
+			return errors.New("invalid lfs size or oid")
+		}
 		return nil
 	}
 
@@ -366,15 +403,6 @@ func (c *gitHTTPComponentImpl) LfsUpload(ctx context.Context, body io.ReadCloser
 }
 
 func (c *gitHTTPComponentImpl) LfsVerify(ctx context.Context, req types.VerifyRequest, p types.Pointer) error {
-	repo, err := c.repoStore.FindByPath(ctx, req.RepoType, req.Namespace, req.Name)
-	if err != nil {
-		return fmt.Errorf("failed to find repo, error: %w", err)
-	}
-
-	// _, err = c.lfsMetaObjectStore.FindByOID(ctx, repo.ID, p.Oid)
-	// if err != nil {
-	// 	return fmt.Errorf("failed to find lfs meta object, error: %w", err)
-	// }
 	objectKey := path.Join("lfs", p.RelativePath())
 	fileInfo, err := c.s3Client.StatObject(ctx, c.config.S3.Bucket, objectKey, minio.StatObjectOptions{})
 	if err != nil {
@@ -384,19 +412,6 @@ func (c *gitHTTPComponentImpl) LfsVerify(ctx context.Context, req types.VerifyRe
 
 	if fileInfo.Size != p.Size {
 		return types.ErrSizeMismatch
-	}
-
-	_, err = c.lfsMetaObjectStore.FindByOID(ctx, repo.ID, p.Oid)
-	if err != nil && errors.Is(err, sql.ErrNoRows) {
-		_, err = c.lfsMetaObjectStore.Create(ctx, database.LfsMetaObject{
-			Oid:          p.Oid,
-			Size:         p.Size,
-			RepositoryID: repo.ID,
-			Existing:     true,
-		})
-		if err != nil {
-			return fmt.Errorf("failed to create lfs meta object in database: %w", err)
-		}
 	}
 
 	return nil
@@ -641,14 +656,6 @@ func (c *gitHTTPComponentImpl) LfsDownload(ctx context.Context, req types.Downlo
 	}
 	return signedUrl, nil
 }
-
-func (c *gitHTTPComponentImpl) buildDownloadLink(req types.BatchRequest, pointer types.Pointer) string {
-	return c.config.APIServer.PublicDomain + "/" + path.Join(fmt.Sprintf("%ss", req.RepoType), url.PathEscape(req.Namespace), url.PathEscape(req.Name+".git"), "info/lfs/objects", url.PathEscape(pointer.Oid))
-}
-
-// func (c *gitHTTPComponentImpl) buildUploadLink(req types.BatchRequest, pointer types.Pointer) string {
-// 	return c.config.APIServer.PublicDomain + "/" + path.Join(fmt.Sprintf("%ss", req.RepoType), url.PathEscape(req.Namespace), url.PathEscape(req.Name+".git"), "info/lfs/objects", url.PathEscape(pointer.Oid), strconv.FormatInt(pointer.Size, 10))
-// }
 
 func (c *gitHTTPComponentImpl) buildUploadLink(req types.BatchRequest, pointer types.Pointer) string {
 	return c.config.APIServer.PublicDomain + "/" + path.Join(fmt.Sprintf("%ss", req.RepoType), url.PathEscape(req.Namespace), url.PathEscape(req.Name+".git"), "info/lfs/objects", url.PathEscape(pointer.Oid), strconv.FormatInt(pointer.Size, 10))

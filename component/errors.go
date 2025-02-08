@@ -20,3 +20,12 @@ var (
 func ErrForbiddenMsg(msg string) error {
 	return fmt.Errorf("%s, %w", msg, ErrForbidden)
 }
+
+type HTTPError struct {
+	StatusCode int
+	Message    any
+}
+
+func (e *HTTPError) Error() string {
+	return fmt.Sprintf("StatusCode: %d, Message: %v", e.StatusCode, e.Message)
+}
