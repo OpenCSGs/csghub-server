@@ -266,6 +266,9 @@ func (c *gitHTTPComponentImpl) lfsBatchUploadInfo(ctx context.Context, req types
 func (c *gitHTTPComponentImpl) lfsCheckAccess(ctx context.Context, req types.BatchRequest) error {
 	switch req.Operation {
 	case types.LFSBatchUpload:
+		if req.CurrentUser == "" {
+			return ErrUnauthorized
+		}
 		allowWrite, err := c.repoComponent.AllowWriteAccess(
 			ctx, req.RepoType, req.Namespace, req.Name, req.CurrentUser,
 		)
