@@ -290,6 +290,9 @@ func (c *gitHTTPComponentImpl) lfsCheckAccess(ctx context.Context, req types.Bat
 			ctx, req.RepoType, req.Namespace, req.Name, req.CurrentUser,
 		)
 		if err != nil {
+			if errors.Is(err, ErrUserNotFound) && req.CurrentUser == "" {
+				err = ErrUnauthorized
+			}
 			return err
 		}
 		if !allowRead {
