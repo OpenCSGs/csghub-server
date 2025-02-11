@@ -1762,6 +1762,8 @@ definitions:
         type: integer
       min_replica:
         type: integer
+      order_detail_id:
+        type: integer
       resource_id:
         type: integer
       revision:
@@ -1770,6 +1772,8 @@ definitions:
         type: integer
       secure_level:
         type: integer
+      task:
+        type: string
     type: object
   types.ModelWidgetType:
     enum:
@@ -1808,6 +1812,16 @@ definitions:
       verified:
         type: boolean
     type: object
+  types.PipelineTask:
+    enum:
+    - text-generation
+    - text-to-image
+    - task-auto-detection
+    type: string
+    x-enum-varnames:
+    - TextGeneration
+    - Text2Image
+    - TaskAutoDetection
   types.Pointer:
     properties:
       download_url:
@@ -2041,10 +2055,16 @@ definitions:
     type: object
   types.RuntimeFrameworkModels:
     properties:
+      id:
+        type: integer
       models:
         items:
           type: string
         type: array
+      scan_type:
+        type: integer
+      task:
+        $ref: '#/definitions/types.PipelineTask'
     type: object
   types.RuntimeFrameworkReq:
     properties:
@@ -5332,100 +5352,6 @@ paths:
       summary: Get all files of a dataset
       tags:
       - Dataset
-  /datasets/{namespace}/{name}/dataviewer/catalog:
-    get:
-      consumes:
-      - application/json
-      description: get catalog of the dataset
-      parameters:
-      - description: namespace
-        in: path
-        name: namespace
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/types.Response'
-        "400":
-          description: Bad request
-          schema:
-            $ref: '#/definitions/types.APIBadRequest'
-        "500":
-          description: Internal server error
-          schema:
-            $ref: '#/definitions/types.APIInternalServerError'
-      security:
-      - ApiKey: []
-      summary: Get catalog of the dataset
-      tags:
-      - Dataset
-  /datasets/{namespace}/{name}/dataviewer/rows:
-    get:
-      consumes:
-      - application/json
-      description: get catalog of the dataset
-      parameters:
-      - description: namespace
-        in: path
-        name: namespace
-        required: true
-        type: string
-      - description: config
-        in: query
-        name: config
-        required: true
-        type: string
-      - description: split
-        in: query
-        name: split
-        required: true
-        type: string
-      - description: search
-        in: query
-        name: search
-        type: string
-      - description: where
-        in: query
-        name: where
-        type: string
-      - description: orderby
-        in: query
-        name: orderby
-        type: string
-      - default: 50
-        description: per
-        in: query
-        name: per
-        type: integer
-      - default: 1
-        description: per page
-        in: query
-        name: page
-        type: integer
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/types.Response'
-        "400":
-          description: Bad request
-          schema:
-            $ref: '#/definitions/types.APIBadRequest'
-        "500":
-          description: Internal server error
-          schema:
-            $ref: '#/definitions/types.APIInternalServerError'
-      security:
-      - ApiKey: []
-      summary: Get catalog of the dataset
-      tags:
-      - Dataset
   /datasets/{namespace}/{name}/relations:
     get:
       consumes:
@@ -5468,52 +5394,6 @@ paths:
       security:
       - ApiKey: []
       summary: Get dataset related assets
-      tags:
-      - Dataset
-  /datasets/{namespace}/{name}/viewer/{file_path}:
-    get:
-      consumes:
-      - application/json
-      description: get the demo data of the dataset
-      parameters:
-      - description: namespace
-        in: path
-        name: namespace
-        required: true
-        type: string
-      - description: file_path
-        in: path
-        name: file_path
-        required: true
-        type: string
-      - default: 50
-        description: per
-        in: query
-        name: per
-        type: integer
-      - default: 1
-        description: per page
-        in: query
-        name: page
-        type: integer
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/types.Response'
-        "400":
-          description: Bad request
-          schema:
-            $ref: '#/definitions/types.APIBadRequest'
-        "500":
-          description: Internal server error
-          schema:
-            $ref: '#/definitions/types.APIInternalServerError'
-      security:
-      - ApiKey: []
-      summary: Get the demo data of the dataset
       tags:
       - Dataset
   /discussions/{id}:
@@ -9576,6 +9456,13 @@ paths:
         in: query
         name: scan_type
         type: integer
+      - description: task
+        enum:
+        - text-generation
+        - text-to-image
+        in: query
+        name: task
+        type: string
       - description: body
         in: body
         name: body

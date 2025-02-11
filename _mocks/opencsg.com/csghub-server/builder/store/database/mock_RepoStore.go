@@ -1261,9 +1261,9 @@ func (_c *MockRepoStore_GetRepoWithRuntimeByID_Call) RunAndReturn(run func(conte
 	return _c
 }
 
-// GetRepoWithoutRuntimeByID provides a mock function with given fields: ctx, rfID, paths
-func (_m *MockRepoStore) GetRepoWithoutRuntimeByID(ctx context.Context, rfID int64, paths []string) ([]database.Repository, error) {
-	ret := _m.Called(ctx, rfID, paths)
+// GetRepoWithoutRuntimeByID provides a mock function with given fields: ctx, rfID, paths, batchSize, batch
+func (_m *MockRepoStore) GetRepoWithoutRuntimeByID(ctx context.Context, rfID int64, paths []string, batchSize int, batch int) ([]database.Repository, error) {
+	ret := _m.Called(ctx, rfID, paths, batchSize, batch)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetRepoWithoutRuntimeByID")
@@ -1271,19 +1271,19 @@ func (_m *MockRepoStore) GetRepoWithoutRuntimeByID(ctx context.Context, rfID int
 
 	var r0 []database.Repository
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, int64, []string) ([]database.Repository, error)); ok {
-		return rf(ctx, rfID, paths)
+	if rf, ok := ret.Get(0).(func(context.Context, int64, []string, int, int) ([]database.Repository, error)); ok {
+		return rf(ctx, rfID, paths, batchSize, batch)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, int64, []string) []database.Repository); ok {
-		r0 = rf(ctx, rfID, paths)
+	if rf, ok := ret.Get(0).(func(context.Context, int64, []string, int, int) []database.Repository); ok {
+		r0 = rf(ctx, rfID, paths, batchSize, batch)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).([]database.Repository)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, int64, []string) error); ok {
-		r1 = rf(ctx, rfID, paths)
+	if rf, ok := ret.Get(1).(func(context.Context, int64, []string, int, int) error); ok {
+		r1 = rf(ctx, rfID, paths, batchSize, batch)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -1300,13 +1300,15 @@ type MockRepoStore_GetRepoWithoutRuntimeByID_Call struct {
 //   - ctx context.Context
 //   - rfID int64
 //   - paths []string
-func (_e *MockRepoStore_Expecter) GetRepoWithoutRuntimeByID(ctx interface{}, rfID interface{}, paths interface{}) *MockRepoStore_GetRepoWithoutRuntimeByID_Call {
-	return &MockRepoStore_GetRepoWithoutRuntimeByID_Call{Call: _e.mock.On("GetRepoWithoutRuntimeByID", ctx, rfID, paths)}
+//   - batchSize int
+//   - batch int
+func (_e *MockRepoStore_Expecter) GetRepoWithoutRuntimeByID(ctx interface{}, rfID interface{}, paths interface{}, batchSize interface{}, batch interface{}) *MockRepoStore_GetRepoWithoutRuntimeByID_Call {
+	return &MockRepoStore_GetRepoWithoutRuntimeByID_Call{Call: _e.mock.On("GetRepoWithoutRuntimeByID", ctx, rfID, paths, batchSize, batch)}
 }
 
-func (_c *MockRepoStore_GetRepoWithoutRuntimeByID_Call) Run(run func(ctx context.Context, rfID int64, paths []string)) *MockRepoStore_GetRepoWithoutRuntimeByID_Call {
+func (_c *MockRepoStore_GetRepoWithoutRuntimeByID_Call) Run(run func(ctx context.Context, rfID int64, paths []string, batchSize int, batch int)) *MockRepoStore_GetRepoWithoutRuntimeByID_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(int64), args[2].([]string))
+		run(args[0].(context.Context), args[1].(int64), args[2].([]string), args[3].(int), args[4].(int))
 	})
 	return _c
 }
@@ -1316,7 +1318,7 @@ func (_c *MockRepoStore_GetRepoWithoutRuntimeByID_Call) Return(_a0 []database.Re
 	return _c
 }
 
-func (_c *MockRepoStore_GetRepoWithoutRuntimeByID_Call) RunAndReturn(run func(context.Context, int64, []string) ([]database.Repository, error)) *MockRepoStore_GetRepoWithoutRuntimeByID_Call {
+func (_c *MockRepoStore_GetRepoWithoutRuntimeByID_Call) RunAndReturn(run func(context.Context, int64, []string, int, int) ([]database.Repository, error)) *MockRepoStore_GetRepoWithoutRuntimeByID_Call {
 	_c.Call.Return(run)
 	return _c
 }

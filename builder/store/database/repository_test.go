@@ -730,7 +730,7 @@ func TestRepoStore_GetRepoRuntimeByID(t *testing.T) {
 	require.Nil(t, err)
 	require.Equal(t, 1, len(rs))
 
-	rs, err = store.GetRepoWithoutRuntimeByID(ctx, rf.RuntimeFrameworkID, []string{"codes_ns/n"})
+	rs, err = store.GetRepoWithoutRuntimeByID(ctx, rf.RuntimeFrameworkID, []string{"codes_ns/n"}, 1000, 0)
 	require.Nil(t, err)
 	require.Equal(t, 0, len(rs))
 

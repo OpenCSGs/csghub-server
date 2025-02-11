@@ -39,6 +39,7 @@ func newWorkflowTester(t *testing.T) (*workflowTester, error) {
 
 	mg := mock_git.NewMockGitServer(t)
 	tester.mocks.gitServer = mg
+	scanner := mock_component.NewMockRuntimeArchitectureComponent(t)
 
 	cfg := &config.Config{}
 	mtc := mock_temporal.NewMockClient(t)
@@ -49,7 +50,7 @@ func newWorkflowTester(t *testing.T) (*workflowTester, error) {
 	mtc.EXPECT().GetScheduleClient().Return(tester.scheduler)
 
 	err := workflow.StartWorkflowDI(
-		cfg, mcb, mr, mg, mm, tester.mocks.stores.SyncClientSettingMock(), mtc,
+		cfg, mcb, mr, mg, mm, tester.mocks.stores.SyncClientSettingMock(), mtc, scanner,
 	)
 
 	if err != nil {

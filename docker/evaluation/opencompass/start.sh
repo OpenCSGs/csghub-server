@@ -61,14 +61,19 @@ for repo in "${dataset_repos[@]}"; do
         exit 1
     fi
     datasets_conf_dir="/usr/local/lib/python3.10/dist-packages/opencompass/configs/datasets/"
-    dataset_conf_file=`find $datasets_conf_dir -type f -name "*.py" -exec grep -rl "'$task_path'" {} + | head -n 1`
-    if [ -z "$dataset_conf_file" ]; then
+    mapfile -t dataset_conf_files < <(find $datasets_conf_dir -type f -name "*.py" -exec grep -rl "'$task_path'" {} + )
+    if [ -z "$dataset_conf_files" ]; then
         echo "Cannot find dataset config location for $task_path"
         exit 1
     fi
-    #get dataset_location dir
-    dataset_conf_dir=`dirname $dataset_conf_file`
-    task_conf_file=`find $dataset_conf_dir -type f -name "*$ANSWER_MODE.py" | head -n 1`
+    #loop dataset_conf_files
+    for dataset_conf_file in "${dataset_conf_files[@]}"; do
+        dataset_conf_dir=`dirname $dataset_conf_file`
+        task_conf_file=`find $dataset_conf_dir -type f -name "*$ANSWER_MODE.py" | head -n 1`
+        if [ -n "$task_conf_file" ]; then
+            break
+        fi
+    done
     if [ -n "$task_conf_file" ]; then
         task=`basename $task_conf_file | cut -d'.' -f1`
         dataset_tasks="$dataset_tasks $task"
@@ -85,6 +90,7 @@ if [ -z "$dataset_tasks" ]; then
     echo "dataset_tasks is empty for dataset $DATASET_IDS"
     exit 1
 fi
+echo "Running tasks: $dataset_tasks"
 if [ -z "$GPU_NUM" ]; then
     GPU_NUM=1
 fi

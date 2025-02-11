@@ -523,6 +523,7 @@ func (c *modelComponentImpl) GetServerless(ctx context.Context, namespace, name,
 		CreatedAt:        deploy.CreatedAt,
 		UpdatedAt:        deploy.UpdatedAt,
 		ProxyEndpoint:    endpoint,
+		Task:             string(deploy.Task),
 	}
 	return &resDeploy, nil
 }
@@ -886,6 +887,7 @@ func (c *modelComponentImpl) Deploy(ctx context.Context, deployReq types.DeployA
 	if err != nil {
 		return -1, fmt.Errorf("cannot find model, %w", err)
 	}
+	task := common.GetBuiltInTaskFromTags(m.Repository.Tags)
 	if deployReq.DeployType == types.ServerlessType {
 		// only one service deploy was allowed
 		d, err := c.deployTaskStore.GetServerlessDeployByRepID(ctx, m.Repository.ID)
@@ -968,6 +970,7 @@ func (c *modelComponentImpl) Deploy(ctx context.Context, deployReq types.DeployA
 		Type:             deployReq.DeployType,
 		UserUUID:         user.UUID,
 		SKU:              strconv.FormatInt(resource.ID, 10),
+		Task:             task,
 	}
 	dp = modelRunUpdateDeployRepo(dp, req)
 	return c.deployer.Deploy(ctx, dp)
