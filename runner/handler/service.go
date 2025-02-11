@@ -121,8 +121,16 @@ func (s *K8sHandler) ServiceStatus(c *gin.Context) {
 	srvName := s.getServiceNameFromRequest(c)
 	resp, err := s.serviceCompoent.GetServiceByName(c.Request.Context(), srvName, request.ClusterID)
 	if err != nil {
+		if err == sql.ErrNoRows {
+			resp = &types.StatusResponse{}
+			resp.Code = common.Stopped
+			resp.Message = "service was deleted"
+			c.JSON(http.StatusOK, resp)
+			return
+		}
 		slog.Error("failed to get service", slog.Any("error", err), slog.String("srv_name", srvName))
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to get service"})
+		return
 	}
 	c.JSON(http.StatusOK, resp)
 }
