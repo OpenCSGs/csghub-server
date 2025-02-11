@@ -590,6 +590,7 @@ func TestGitalyFile_GetTree(t *testing.T) {
 					{Entries: []*gitalypb.TreeEntry{
 						{Path: []byte(prefix + "a")},
 						{Path: []byte(prefix + "b")},
+						{Path: []byte(prefix + "c")},
 					}, PaginationCursor: &gitalypb.PaginationCursor{NextCursor: "nc"}},
 				},
 			}, nil)
@@ -598,12 +599,14 @@ func TestGitalyFile_GetTree(t *testing.T) {
 				RevisionPaths: []*gitalypb.GetBlobsRequest_RevisionPath{
 					{Revision: "main", Path: []byte(prefix + "a")},
 					{Revision: "main", Path: []byte(prefix + "b")},
+					{Revision: "main", Path: []byte(prefix + "c")},
 				},
 				Limit: 0,
 			}).Return(&MockGrpcStreamClient[*gitalypb.GetBlobsResponse]{
 				data: []*gitalypb.GetBlobsResponse{
 					{Path: []byte(prefix + "a"), Mode: 1, Oid: "o1"},
 					{Path: []byte(prefix + "b"), Mode: 1, Oid: "o2"},
+					{Path: []byte(prefix + "c"), Mode: 1, Oid: "o1"},
 				},
 			}, nil)
 
@@ -643,6 +646,12 @@ size 507607173`
 					LfsPointerSize:  1234,
 				},
 				{Name: "b", Path: prefix + "b", Type: "dir", Mode: "1", SHA: "o2"},
+				{Name: "c", Path: prefix + "c", Type: "dir", Mode: "1",
+					SHA: "a4f0e7e96b4f6af4a1b597c2fc4a42ec9a997c64ab7da96760c40582a0ac27a5",
+					Lfs: true, Size: 507607173,
+					LfsRelativePath: "a4/f0/e7e96b4f6af4a1b597c2fc4a42ec9a997c64ab7da96760c40582a0ac27a5",
+					LfsPointerSize:  1234,
+				},
 			}, tree.Files)
 			require.Equal(t, "nc", tree.Cursor)
 		})
