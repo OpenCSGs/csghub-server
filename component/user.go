@@ -69,7 +69,7 @@ func NewUserComponent(config *config.Config) (UserComponent, error) {
 	c.deployer = deploy.NewDeployer()
 	c.userLikeStore = database.NewUserLikesStore()
 	c.repoStore = database.NewRepoStore()
-	c.deploy = database.NewDeployTaskStore()
+	c.deployTaskStore = database.NewDeployTaskStore()
 	c.accountingComponent, err = NewAccountingComponent(config)
 	if err != nil {
 		return nil, err
@@ -93,7 +93,7 @@ type userComponentImpl struct {
 	deployer            deploy.Deployer
 	userLikeStore       database.UserLikesStore
 	repoStore           database.RepoStore
-	deploy              database.DeployTaskStore
+	deployTaskStore     database.DeployTaskStore
 	collectionStore     database.CollectionStore
 	accountingComponent AccountingComponent
 	// srs            database.SpaceResourceStore
@@ -542,7 +542,7 @@ func (c *userComponentImpl) ListServerless(ctx context.Context, req types.Deploy
 	if !isAdmin {
 		return nil, 0, fmt.Errorf("user %s does not have admin privileges", req.CurrentUser)
 	}
-	deploys, total, err := c.deploy.ListServerless(ctx, req)
+	deploys, total, err := c.deployTaskStore.ListServerless(ctx, req)
 	if err != nil {
 		newError := fmt.Errorf("failed to get user serverless for %s with error:%w", req.RepoType, err)
 		return nil, 0, newError

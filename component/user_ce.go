@@ -18,7 +18,7 @@ func (c *userComponentImpl) ListDeploys(ctx context.Context, repoType types.Repo
 		newError := fmt.Errorf("failed to check for the presence of the user:%s, error:%w", req.CurrentUser, err)
 		return nil, 0, newError
 	}
-	deploys, total, err := c.deploy.ListDeployByUserID(ctx, user.ID, req)
+	deploys, total, err := c.deployTaskStore.ListDeployByUserID(ctx, user.ID, req)
 	if err != nil {
 		newError := fmt.Errorf("failed to get user deploys for %s with error:%w", repoType, err)
 		return nil, 0, newError
@@ -82,7 +82,7 @@ func (c *userComponentImpl) ListInstances(ctx context.Context, req *types.UserRe
 		newError := fmt.Errorf("failed to check for the presence of the user:%s, error:%w", req.CurrentUser, err)
 		return nil, 0, newError
 	}
-	deploys, total, err := c.deploy.ListInstancesByUserID(ctx, user.ID, req.PageSize, req.Page)
+	deploys, total, err := c.deployTaskStore.ListInstancesByUserID(ctx, user.ID, req.PageSize, req.Page)
 	if err != nil {
 		newError := fmt.Errorf("failed to get user instances error:%w", err)
 		return nil, 0, newError
