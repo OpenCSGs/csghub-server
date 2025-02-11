@@ -448,7 +448,8 @@ func (c *gitCallbackComponentImpl) updateDatasetTags(ctx context.Context, namesp
 // update model runtime frameworks
 func (c *gitCallbackComponentImpl) updateModelRuntimeFrameworks(ctx context.Context, repoType, namespace, repoName, ref, fileName string, deleteAction bool) {
 	// must be model repo and config.json
-	if repoType != fmt.Sprintf("%ss", types.ModelRepo) || fileName != component.ConfigFileName || (ref != ("refs/heads/"+component.MainBranch) && ref != ("refs/heads/"+component.MasterBranch)) {
+	valid := c.isValidForRuntime(repoType, ref, fileName)
+	if !valid {
 		return
 	}
 	repo, err := c.repoStore.FindByPath(ctx, types.ModelRepo, namespace, repoName)
