@@ -12,8 +12,8 @@ echo "$OPENCSG_ACR_PASSWORD" | docker login $OPENCSG_ACR -u $OPENCSG_ACR_USERNAM
 ```bash
 export BUILDX_NO_DEFAULT_ATTESTATIONS=1
 
-# For vllm: opencsg-registry.cn-beijing.cr.aliyuncs.com/public/vllm-local:3.2
-export IMAGE_TAG=3.2
+# For vllm: opencsg-registry.cn-beijing.cr.aliyuncs.com/public/vllm-local:v0.7.2
+export IMAGE_TAG=v0.7.2
 docker buildx build --platform linux/amd64,linux/arm64 \
   -t ${OPENCSG_ACR}/public/vllm-local:${IMAGE_TAG} \
   -t ${OPENCSG_ACR}/public/vllm-local:latest \
@@ -36,8 +36,8 @@ docker buildx build --platform linux/amd64 \
   -f Dockerfile.tgi \
   --push .
 
-# For sglang: opencsg-registry.cn-beijing.cr.aliyuncs.com/public/sglang:v0.4.1.post3-cu124-srt
-export IMAGE_TAG=v0.4.1.post3-cu124-srt
+# For sglang: opencsg-registry.cn-beijing.cr.aliyuncs.com/public/sglang:v0.4.2.post2-cu124-srt
+export IMAGE_TAG=v0.4.2.post2-cu124-srt
 docker buildx build --platform linux/amd64 \
   -t ${OPENCSG_ACR}/public/sglang:${IMAGE_TAG} \
   -t ${OPENCSG_ACR}/public/sglang:latest \
@@ -88,11 +88,11 @@ docker run -d \
 | Task| Image Name | Version | CUDA Version | Fix
 | --- | --- | --- | --- |--- |
 |text generation| vllm | 2.8 | 12.1 | - |
-|text generation| vllm | 3.2 | 12.4 |fix hf hub timestamp|
+|text generation| vllm | v0.7.1 | 12.4 |fix hf hub timestamp|
 |text generation| vllm-cpu | 2.4 | -|fix hf hub timestamp |
 |text generation| tgi | 2.2 | 12.1 |- |
 |text generation| tgi | 3.2 | 12.4 |fix hf hub timestamp|
-|image generation| hf-inference-toolkit | 0.3.5 | 12.1 |-|
+|image generation| hf-inference-toolkit | 0.5.3 | 12.1 |-|
 |text generation| sglang | v0.4.1.post3-cu124-srt | 12.4 |- |
 
 

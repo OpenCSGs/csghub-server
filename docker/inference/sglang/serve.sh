@@ -7,7 +7,7 @@ python3 /etc/csghub/entry.py
 if [ -z "$GPU_NUM" ]; then
     GPU_NUM=1
 fi
-LimitedMaxToken=$(($GPU_NUM * 4096))
+LimitedMaxToken=$(($GPU_NUM * 5120))
 args="--tp $GPU_NUM --enable-mixed-chunk --disable-radix-cache --trust-remote-code --enable-p2p-check --model-path $REPO_ID --port 8000 --host 0.0.0.0 --mem-fraction-static 0.8 --enable-torch-compile"
 configfile="/workspace/$REPO_ID/config.json"
 if [ -f "$configfile" ]; then

@@ -7,7 +7,7 @@ if [ -z "$GPU_NUM" ]; then
     GPU_NUM=1
 fi
 #LimitedMaxToken is gpu_num multiplied by 4096
-LimitedMaxToken=$(($GPU_NUM * 4096))
+LimitedMaxToken=$(($GPU_NUM * 5120))
 GPU_MEMORY_UTILIZATION=0.9
 args="--trust-remote-code --model $REPO_ID --tensor-parallel-size $GPU_NUM --gpu-memory-utilization $GPU_MEMORY_UTILIZATION"
 configfile="/workspace/$REPO_ID/config.json"

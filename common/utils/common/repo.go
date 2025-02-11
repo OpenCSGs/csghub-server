@@ -179,9 +179,12 @@ func GetSourceTypeAndPathFromURL(url string) (string, string, error) {
 // get built-int task from tags
 func GetBuiltInTaskFromTags(tags []database.Tag) string {
 	for _, tag := range tags {
-		if tag.BuiltIn && tag.Category == "task" {
+		if tag.Name == string(types.TextGeneration) {
+			return tag.Name
+		}
+		if tag.Name == string(types.Text2Image) {
 			return tag.Name
 		}
 	}
-	return ""
+	return string(types.TextGeneration)
 }
