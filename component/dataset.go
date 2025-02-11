@@ -413,6 +413,11 @@ func (c *datasetComponentImpl) Show(ctx context.Context, namespace, name, curren
 		CanWrite:            permission.CanWrite,
 		CanManage:           permission.CanAdmin,
 		Namespace:           ns,
+		MultiSource: types.MultiSource{
+			HFPath:  dataset.Repository.HFPath,
+			MSPath:  dataset.Repository.MSPath,
+			CSGPath: dataset.Repository.CSGPath,
+		},
 	}
 	if permission.CanAdmin {
 		resDataset.SensitiveCheckStatus = dataset.Repository.SensitiveCheckStatus.String()

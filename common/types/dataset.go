@@ -45,6 +45,7 @@ type Dataset struct {
 	Namespace            *Namespace           `json:"namespace"`
 	SensitiveCheckStatus string               `json:"sensitive_check_status"`
 	MirrorLastUpdatedAt  time.Time            `json:"mirror_last_updated_at"`
+	MultiSource
 }
 
 type DataViewerReq struct {

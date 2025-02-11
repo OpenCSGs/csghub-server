@@ -258,3 +258,36 @@ func TestIsValidName(t *testing.T) {
 		})
 	}
 }
+
+func TestGetSourceTypeAndPathFromURL(t *testing.T) {
+	type args struct {
+		url string
+	}
+	tests := []struct {
+		name    string
+		args    args
+		want    string
+		want1   string
+		wantErr bool
+	}{
+		{name: "Test GetSourceTypeAndPathFromURL when url is opencsg", args: args{url: "https://opencsg.com/models/abc/def.git"}, want: "opencsg", want1: "abc/def", wantErr: false},
+		{name: "Test GetSourceTypeAndPathFromURL when url is huggingface", args: args{url: "https://huggingface.co/aaa/bbb.git"}, want: "huggingface", want1: "aaa/bbb", wantErr: false},
+		{name: "Test GetSourceTypeAndPathFromURL when url is modelscope", args: args{url: "https://www.modelscope.cn/models/ccc/ddd.git"}, want: "modelscope", want1: "ccc/ddd", wantErr: false},
+		{name: "Test GetSourceTypeAndPathFromURL when url is unknown", args: args{url: "https://aaa.cn/models/ccc/ddd.git"}, want: "", want1: "", wantErr: true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, got1, err := GetSourceTypeAndPathFromURL(tt.args.url)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("GetSourceTypeAndPathFromURL() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if got != tt.want {
+				t.Errorf("GetSourceTypeAndPathFromURL() got = %v, want %v", got, tt.want)
+			}
+			if got1 != tt.want1 {
+				t.Errorf("GetSourceTypeAndPathFromURL() got1 = %v, want %v", got1, tt.want1)
+			}
+		})
+	}
+}

@@ -105,6 +105,7 @@ func TestMultiSyncComponent_SyncAsClient(t *testing.T) {
 		Source:         types.OpenCSGSource,
 		SyncStatus:     types.SyncStatusPending,
 		RepositoryType: types.ModelRepo,
+		CSGPath:        "ns/user",
 	}
 	mc.mocks.stores.RepoMock().EXPECT().UpdateOrCreateRepo(ctx, *dbrepo).Return(dbrepo, nil)
 	dbrepo.ID = 1
@@ -138,6 +139,7 @@ func TestMultiSyncComponent_SyncAsClient(t *testing.T) {
 		Source:         types.OpenCSGSource,
 		SyncStatus:     types.SyncStatusPending,
 		RepositoryType: types.DatasetRepo,
+		CSGPath:        "ns/user",
 	}
 	mockedClient.EXPECT().DatasetInfo(ctx, svs[1]).Return(&types.Dataset{
 		User: types.User{Nickname: "nn"},

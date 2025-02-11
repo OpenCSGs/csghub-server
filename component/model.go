@@ -465,6 +465,11 @@ func (c *modelComponentImpl) Show(ctx context.Context, namespace, name, currentU
 		CanWrite:            permission.CanWrite,
 		CanManage:           permission.CanAdmin,
 		Namespace:           ns,
+		MultiSource: types.MultiSource{
+			HFPath:  model.Repository.HFPath,
+			MSPath:  model.Repository.MSPath,
+			CSGPath: model.Repository.CSGPath,
+		},
 	}
 	// admin user or owner can see the sensitive check status
 	if permission.CanAdmin {

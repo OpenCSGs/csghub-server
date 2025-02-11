@@ -820,3 +820,104 @@ func TestRepoStore_BatchMethods(t *testing.T) {
 	require.Equal(t, len(rs), 2)
 	require.Equal(t, []string{"rp2", "rp1"}, names(rs))
 }
+
+func TestRepoStore_UpdateSourcePath(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+	ctx := context.TODO()
+
+	repoStore := database.NewRepoStoreWithDB(db)
+	userStore := database.NewUserStoreWithDB(db)
+
+	namespace := &database.Namespace{
+		Path: "test",
+	}
+	user := &database.User{
+		Username: "test",
+	}
+	err := userStore.Create(ctx, user, namespace)
+	require.Nil(t, err)
+
+	repo := database.Repository{
+		Path:           "test/test",
+		GitPath:        "test/test",
+		Name:           "test",
+		Nickname:       "test",
+		Private:        false,
+		DefaultBranch:  "main",
+		RepositoryType: types.CodeRepo,
+		UserID:         user.ID,
+	}
+	repoRes, err := repoStore.CreateRepo(ctx, repo)
+	require.Nil(t, err)
+
+	err = repoStore.UpdateSourcePath(ctx, repoRes.ID, "abc/def", "opencsg")
+	require.Nil(t, err)
+	err = repoStore.UpdateSourcePath(ctx, repoRes.ID, "aaa/bbb", "huggingface")
+	require.Nil(t, err)
+	err = repoStore.UpdateSourcePath(ctx, repoRes.ID, "ccc/ddd", "modelscope")
+	require.Nil(t, err)
+	repoFinal, err := repoStore.FindById(ctx, repoRes.ID)
+	require.Nil(t, err)
+	require.Equal(t, repoFinal.CSGPath, "abc/def")
+	require.Equal(t, repoFinal.HFPath, "aaa/bbb")
+	require.Equal(t, repoFinal.MSPath, "ccc/ddd")
+}
+
+func TestRepoStore_FindMirrorReposWithBatch(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+	ctx := context.TODO()
+
+	store := database.NewRepoStoreWithDB(db)
+	rn, err := store.CreateRepo(ctx, database.Repository{
+		GitPath: "codes_ns/n",
+	})
+	require.Nil(t, err)
+	mi := &database.Mirror{RepositoryID: rn.ID}
+	_, err = db.Core.NewInsert().Model(mi).Exec(ctx)
+	require.Nil(t, err)
+	_, err = store.CreateRepo(ctx, database.Repository{
+		GitPath: "codes_ns2/n",
+		Path:    "zzz",
+	})
+	require.Nil(t, err)
+	rs, err := store.FindMirrorReposWithBatch(ctx, 10, 1)
+	require.Nil(t, err)
+	require.Equal(t, 1, len(rs))
+	require.Equal(t, "codes_ns/n", rs[0].GitPath)
+}
+
+func TestRepoStore_BulkUpdateSourcePath(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+	ctx := context.TODO()
+
+	var repos []*database.Repository
+	store := database.NewRepoStoreWithDB(db)
+	rn, err := store.CreateRepo(ctx, database.Repository{
+		GitPath: "codes_ns/n",
+	})
+	require.Nil(t, err)
+
+	rn2, err := store.CreateRepo(ctx, database.Repository{
+		GitPath: "codes_ns2/n",
+		Path:    "zzz",
+	})
+	require.Nil(t, err)
+
+	rn.CSGPath = "abc/def"
+	rn2.MSPath = "aaa/bbb"
+
+	repos = append(repos, rn, rn2)
+	err = store.BulkUpdateSourcePath(ctx, repos)
+	require.Nil(t, err)
+
+	rn, err = store.FindById(ctx, rn.ID)
+	require.Nil(t, err)
+	require.Equal(t, "abc/def", rn.CSGPath)
+
+	rn2, err = store.FindById(ctx, rn2.ID)
+	require.Nil(t, err)
+	require.Equal(t, "aaa/bbb", rn2.MSPath)
+}
