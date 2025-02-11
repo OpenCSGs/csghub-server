@@ -385,7 +385,7 @@ func (c *Client) getBlobInfo(ctx context.Context, repo *gitalypb.Repository, pat
 	if err != nil {
 		return nil, err
 	}
-	oidFiles := map[string]*types.File{}
+	oidFiles := map[string][]*types.File{}
 	for {
 		listBlobResp, err := listBlobsStream.Recv()
 		if err != nil {
@@ -421,7 +421,7 @@ func (c *Client) getBlobInfo(ctx context.Context, repo *gitalypb.Repository, pat
 				LfsRelativePath: LfsRelativePath,
 			}
 			if listBlobResp.Oid != "" && fileSize < lfsMaxPointerSize {
-				oidFiles[listBlobResp.Oid] = file
+				oidFiles[listBlobResp.Oid] = append(oidFiles[listBlobResp.Oid], file)
 			}
 			files = append(files, file)
 		}
@@ -454,12 +454,13 @@ func (c *Client) getBlobInfo(ctx context.Context, repo *gitalypb.Repository, pat
 				for _, pointer := range pointers {
 					p, _ := ReadPointerFromBuffer(pointer.Data)
 					if p.Valid() {
-						file := oidFiles[string(pointer.Oid)]
-						file.Size = p.Size
-						file.Lfs = true
-						file.SHA = p.Oid
-						file.LfsRelativePath = p.RelativePath()
-						file.LfsPointerSize = int(pointer.Size)
+						for _, file := range oidFiles[string(pointer.Oid)] {
+							file.Size = p.Size
+							file.Lfs = true
+							file.SHA = p.Oid
+							file.LfsRelativePath = p.RelativePath()
+							file.LfsPointerSize = int(pointer.Size)
+						}
 					}
 				}
 			}
