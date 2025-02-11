@@ -225,6 +225,8 @@ definitions:
     properties:
       created_at:
         type: string
+      csg_path:
+        type: string
       default_branch:
         type: string
       description:
@@ -236,6 +238,8 @@ definitions:
           $ref: '#/definitions/database.RepositoryDownload'
         type: array
       git_path:
+        type: string
+      hf_path:
         type: string
       http_clone_url:
         type: string
@@ -250,6 +254,8 @@ definitions:
         type: integer
       mirror:
         $ref: '#/definitions/database.Mirror'
+      ms_path:
+        type: string
       name:
         type: string
       nickname:
@@ -373,20 +379,6 @@ definitions:
       show_name:
         type: string
     type: object
-  types.TagScope:
-    enum:
-    - model
-    - dataset
-    - code
-    - space
-    - prompt
-    type: string
-    x-enum-varnames:
-    - ModelTagScope
-    - DatasetTagScope
-    - CodeTagScope
-    - SpaceTagScope
-    - PromptTagScope
   database.User:
     properties:
       accessTokens:
@@ -1255,12 +1247,16 @@ definitions:
         type: boolean
       created_at:
         type: string
+      csg_path:
+        type: string
       default_branch:
         type: string
       description:
         type: string
       downloads:
         type: integer
+      hf_path:
+        type: string
       id:
         type: integer
       license:
@@ -1268,6 +1264,8 @@ definitions:
       likes:
         type: integer
       mirror_last_updated_at:
+        type: string
+      ms_path:
         type: string
       name:
         type: string
@@ -1665,6 +1663,8 @@ definitions:
         type: boolean
       created_at:
         type: string
+      csg_path:
+        type: string
       default_branch:
         type: string
       description:
@@ -1677,6 +1677,8 @@ definitions:
         type: boolean
       enable_inference:
         type: boolean
+      hf_path:
+        type: string
       id:
         type: integer
       license:
@@ -1684,6 +1686,8 @@ definitions:
       likes:
         type: integer
       mirror_last_updated_at:
+        type: string
+      ms_path:
         type: string
       name:
         type: string
@@ -1772,8 +1776,6 @@ definitions:
         type: integer
       secure_level:
         type: integer
-      task:
-        type: string
     type: object
   types.ModelWidgetType:
     enum:
@@ -2255,6 +2257,20 @@ definitions:
       msg:
         type: string
     type: object
+  types.TagScope:
+    enum:
+    - model
+    - dataset
+    - code
+    - space
+    - prompt
+    type: string
+    x-enum-varnames:
+    - ModelTagScope
+    - DatasetTagScope
+    - CodeTagScope
+    - SpaceTagScope
+    - PromptTagScope
   types.TaskType:
     enum:
     - evaluation
@@ -10406,9 +10422,16 @@ paths:
         enum:
         - model
         - dataset
+        - code
+        - space
+        - prompt
         in: query
         name: scope
         type: string
+      - description: built_in
+        in: query
+        name: built_in
+        type: boolean
       produces:
       - application/json
       responses:

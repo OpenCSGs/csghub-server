@@ -20,7 +20,7 @@ type MirrorStore interface {
 	FindByRepoID(ctx context.Context, repoID int64) (*Mirror, error)
 	FindByID(ctx context.Context, ID int64) (*Mirror, error)
 	FindByRepoPath(ctx context.Context, repoType types.RepositoryType, namespace, name string) (*Mirror, error)
-	FindWithMapping(ctx context.Context, repoType types.RepositoryType, namespace, name string, mapping types.Mapping) (*Mirror, error)
+	FindWithMapping(ctx context.Context, repoType types.RepositoryType, namespace, name string, mapping types.Mapping) (*Repository, error)
 	Create(ctx context.Context, mirror *Mirror) (*Mirror, error)
 	WithPagination(ctx context.Context) ([]Mirror, error)
 	WithPaginationWithRepository(ctx context.Context) ([]Mirror, error)
@@ -141,37 +141,25 @@ func (s *mirrorStoreImpl) FindByRepoPath(ctx context.Context, repoType types.Rep
 	return &mirror, nil
 }
 
-func (s *mirrorStoreImpl) FindWithMapping(ctx context.Context, repoType types.RepositoryType, namespace, name string, mapping types.Mapping) (*Mirror, error) {
-	var mirror Mirror
-	var err error
-	if mapping == types.CSGHubMapping {
-		return s.FindByRepoPath(ctx, repoType, namespace, name)
-	} else if mapping == types.HFMapping {
-		err = s.db.Operator.Core.NewSelect().
-			Model(&mirror).
-			Relation("Repository").
-			Where("mirror.source_repo_path=?", fmt.Sprintf("%s/%s", namespace, name)).
-			Where("repository.repository_type=?", repoType).
-			Scan(ctx)
+func (s *mirrorStoreImpl) FindWithMapping(ctx context.Context, repoType types.RepositoryType, namespace, name string, mapping types.Mapping) (*Repository, error) {
+	resRepo := new(Repository)
+	query := s.db.Operator.Core.
+		NewSelect().
+		Model(resRepo)
+	path := fmt.Sprintf("%s/%s", namespace, name)
+	query.Where("repository_type = ?", repoType)
+	if mapping == types.HFMapping {
+		//compatiebility with old data
+		//TODO: remove path after sdk 0.4.6
+		query.Where("hf_path = ? or path = ?", path, path)
+	} else if mapping == types.ModelScopeMapping {
+		query.Where("ms_path = ?", path, path)
 	} else {
-		// auto mapping
-		//fix some repo id has mirror but it's not public,for example: https://opencsg.com/models/Qwen/Qwen_Qwen2-7B-Instruct
-		exist, _ := s.IsRepoExist(ctx, repoType, namespace, name)
-		if exist {
-			// no need mapping if repo id already exists in reporitory
-			return nil, fmt.Errorf("repo already exists, no need mapping")
-		}
-		err = s.db.Operator.Core.NewSelect().
-			Model(&mirror).
-			Relation("Repository").
-			Where("mirror.source_repo_path=?", fmt.Sprintf("%s/%s", namespace, name)).
-			Where("repository.repository_type=?", repoType).
-			Scan(ctx)
+		// for csg path
+		query.Where("path = ?", path)
 	}
-	if err != nil {
-		return nil, err
-	}
-	return &mirror, nil
+	err := query.Limit(1).Scan(ctx)
+	return resRepo, err
 }
 
 func (s *mirrorStoreImpl) Create(ctx context.Context, mirror *Mirror) (*Mirror, error) {

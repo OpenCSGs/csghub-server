@@ -2,7 +2,6 @@ package database_test
 
 import (
 	"context"
-	"strings"
 	"testing"
 	"time"
 
@@ -129,42 +128,34 @@ func TestMirrorStore_FindWithMapping(t *testing.T) {
 	store := database.NewMirrorStoreWithDB(db)
 
 	repos := []*database.Repository{
-		{Name: "repo1", RepositoryType: types.ModelRepo, Path: "models_ns/repo1"},
-		{Name: "repo2", RepositoryType: types.DatasetRepo, Path: "datasets_ns/repo2"},
-		{Name: "repo3", RepositoryType: types.PromptRepo, Path: "prompts_ns/repo3"},
+		{Name: "repo1", RepositoryType: types.ModelRepo, Path: "ns/repo1", HFPath: "hf/repo1"},
+		{Name: "repo2", RepositoryType: types.DatasetRepo, Path: "ns/repo2", MSPath: "ms/repo2"},
+		{Name: "repo3", RepositoryType: types.PromptRepo, Path: "ns/repo3"},
 	}
 
 	for _, repo := range repos {
 		repo.GitPath = repo.Path
 		err := db.Core.NewInsert().Model(repo).Scan(ctx, repo)
 		require.Nil(t, err)
-		sp := strings.Split(repo.Path, "_")
-		_, err = store.Create(ctx, &database.Mirror{
-			RepositoryID:   repo.ID,
-			SourceRepoPath: strings.ReplaceAll(sp[1], "ns/", "nsn/"),
-			Interval:       repo.Name,
-		})
-		require.Nil(t, err)
 	}
 
 	mi, err := store.FindWithMapping(ctx, types.ModelRepo, "ns", "repo1", types.CSGHubMapping)
 	require.Nil(t, err)
-	require.Equal(t, "repo1", mi.Interval)
+	require.Equal(t, "repo1", mi.Name)
 
-	_, err = store.FindWithMapping(ctx, types.ModelRepo, "ns", "repo1", types.HFMapping)
+	_, err = store.FindWithMapping(ctx, types.ModelRepo, "hf", "repo1", types.HFMapping)
+	require.Nil(t, err)
+
+	_, err = store.FindWithMapping(ctx, types.ModelRepo, "aaa", "repo1", types.HFMapping)
 	require.NotNil(t, err)
 
-	mi, err = store.FindWithMapping(ctx, types.ModelRepo, "nsn", "repo1", types.HFMapping)
+	mi, err = store.FindWithMapping(ctx, types.DatasetRepo, "ms", "repo2", types.ModelScopeMapping)
 	require.Nil(t, err)
-	require.Equal(t, "repo1", mi.Interval)
+	require.Equal(t, "repo2", mi.Name)
 
-	mi, err = store.FindWithMapping(ctx, types.DatasetRepo, "nsn", "repo2", types.HFMapping)
+	mi, err = store.FindWithMapping(ctx, types.PromptRepo, "ns", "repo3", types.CSGHubMapping)
 	require.Nil(t, err)
-	require.Equal(t, "repo2", mi.Interval)
-
-	mi, err = store.FindWithMapping(ctx, types.PromptRepo, "nsn", "repo3", types.AutoMapping)
-	require.Nil(t, err)
-	require.Equal(t, "repo3", mi.Interval)
+	require.Equal(t, "repo3", mi.Name)
 }
 
 func TestMirrorStore_ToSync(t *testing.T) {

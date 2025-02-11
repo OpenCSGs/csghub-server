@@ -9774,11 +9774,20 @@ const docTemplate = `{
                     {
                         "enum": [
                             "model",
-                            "dataset"
+                            "dataset",
+                            "code",
+                            "space",
+                            "prompt"
                         ],
                         "type": "string",
                         "description": "scope name",
                         "name": "scope",
+                        "in": "query"
+                    },
+                    {
+                        "type": "boolean",
+                        "description": "built_in",
+                        "name": "built_in",
                         "in": "query"
                     }
                 ],
@@ -15508,6 +15517,9 @@ const docTemplate = `{
                 "created_at": {
                     "type": "string"
                 },
+                "csg_path": {
+                    "type": "string"
+                },
                 "default_branch": {
                     "type": "string"
                 },
@@ -15524,6 +15536,9 @@ const docTemplate = `{
                     }
                 },
                 "git_path": {
+                    "type": "string"
+                },
+                "hf_path": {
                     "type": "string"
                 },
                 "http_clone_url": {
@@ -15544,6 +15559,9 @@ const docTemplate = `{
                 },
                 "mirror": {
                     "$ref": "#/definitions/database.Mirror"
+                },
+                "ms_path": {
+                    "type": "string"
                 },
                 "name": {
                     "type": "string"
@@ -15731,23 +15749,6 @@ const docTemplate = `{
                     "type": "string"
                 }
             }
-        },
-        "types.TagScope": {
-            "type": "string",
-            "enum": [
-                "model",
-                "dataset",
-                "code",
-                "space",
-                "prompt"
-            ],
-            "x-enum-varnames": [
-                "ModelTagScope",
-                "DatasetTagScope",
-                "CodeTagScope",
-                "SpaceTagScope",
-                "PromptTagScope"
-            ]
         },
         "database.User": {
             "type": "object",
@@ -17029,6 +17030,9 @@ const docTemplate = `{
                 "created_at": {
                     "type": "string"
                 },
+                "csg_path": {
+                    "type": "string"
+                },
                 "default_branch": {
                     "type": "string"
                 },
@@ -17037,6 +17041,9 @@ const docTemplate = `{
                 },
                 "downloads": {
                     "type": "integer"
+                },
+                "hf_path": {
+                    "type": "string"
                 },
                 "id": {
                     "type": "integer"
@@ -17048,6 +17055,9 @@ const docTemplate = `{
                     "type": "integer"
                 },
                 "mirror_last_updated_at": {
+                    "type": "string"
+                },
+                "ms_path": {
                     "type": "string"
                 },
                 "name": {
@@ -17638,6 +17648,9 @@ const docTemplate = `{
                 "created_at": {
                     "type": "string"
                 },
+                "csg_path": {
+                    "type": "string"
+                },
                 "default_branch": {
                     "type": "string"
                 },
@@ -17656,6 +17669,9 @@ const docTemplate = `{
                 "enable_inference": {
                     "type": "boolean"
                 },
+                "hf_path": {
+                    "type": "string"
+                },
                 "id": {
                     "type": "integer"
                 },
@@ -17666,6 +17682,9 @@ const docTemplate = `{
                     "type": "integer"
                 },
                 "mirror_last_updated_at": {
+                    "type": "string"
+                },
+                "ms_path": {
                     "type": "string"
                 },
                 "name": {
@@ -17799,9 +17818,6 @@ const docTemplate = `{
                 },
                 "secure_level": {
                     "type": "integer"
-                },
-                "task": {
-                    "type": "string"
                 }
             }
         },
@@ -18507,6 +18523,23 @@ const docTemplate = `{
                     "type": "string"
                 }
             }
+        },
+        "types.TagScope": {
+            "type": "string",
+            "enum": [
+                "model",
+                "dataset",
+                "code",
+                "space",
+                "prompt"
+            ],
+            "x-enum-varnames": [
+                "ModelTagScope",
+                "DatasetTagScope",
+                "CodeTagScope",
+                "SpaceTagScope",
+                "PromptTagScope"
+            ]
         },
         "types.TaskType": {
             "type": "string",
