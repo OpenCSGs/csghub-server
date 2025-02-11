@@ -215,7 +215,7 @@ func (c *multiSyncComponentImpl) createLocalDataset(ctx context.Context, m *type
 		// SSHCloneURL:    gitRepo.SshCloneURL,
 		MSPath:  m.MultiSource.MSPath,
 		HFPath:  m.MultiSource.HFPath,
-		CSGPath: m.MultiSource.CSGPath,
+		CSGPath: m.Path,
 	}
 	newDBRepo, err := c.repoStore.UpdateOrCreateRepo(ctx, dbRepo)
 	if err != nil {
@@ -344,7 +344,7 @@ func (c *multiSyncComponentImpl) createLocalModel(ctx context.Context, m *types.
 		// SSHCloneURL:    gitRepo.SshCloneURL,
 		MSPath:  m.MultiSource.MSPath,
 		HFPath:  m.MultiSource.HFPath,
-		CSGPath: m.MultiSource.CSGPath,
+		CSGPath: m.Path,
 	}
 	newDBRepo, err := c.repoStore.UpdateOrCreateRepo(ctx, dbRepo)
 	if err != nil {
