@@ -249,6 +249,14 @@ func (c *mirrorComponentImpl) CreateMirrorRepo(ctx context.Context, req types.Cr
 	mirror.SourceRepoPath = fmt.Sprintf("%s/%s", req.SourceNamespace, req.SourceName)
 	mirror.Priority = types.HighMirrorPriority
 
+	sourceType, sourcePath, err := common.GetSourceTypeAndPathFromURL(req.SourceGitCloneUrl)
+	if err == nil {
+		err = c.repoStore.UpdateSourcePath(ctx, repo.ID, sourcePath, sourceType)
+		if err != nil {
+			return nil, fmt.Errorf("failed to update source path in repo: %v", err)
+		}
+	}
+
 	var taskId int64
 	if c.config.GitServer.Type == types.GitServerTypeGitea {
 		taskId, err = c.mirrorServer.CreateMirrorRepo(ctx, mirrorserver.CreateMirrorRepoReq{

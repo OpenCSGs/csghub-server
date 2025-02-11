@@ -20,6 +20,12 @@ const (
 	CodeOrgPrefix    = "codes_"
 )
 
+const (
+	CSGSourceType = "csghub"
+	HFSourceType  = "huggingface"
+	MSSourceType  = "modelscope"
+)
+
 func WithPrefix(name string, prefix string) string {
 	return prefix + name
 }

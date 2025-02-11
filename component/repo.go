@@ -1777,6 +1777,14 @@ func (c *repoComponentImpl) CreateMirror(ctx context.Context, req types.CreateMi
 	mirror.LocalRepoPath = fmt.Sprintf("%s_%s_%s_%s", mirrorSource.SourceName, req.RepoType, req.Namespace, req.Name)
 	mirror.RepositoryID = repo.ID
 
+	sourceType, sourcePath, err := common.GetSourceTypeAndPathFromURL(req.SourceUrl)
+	if err == nil {
+		err = c.repoStore.UpdateSourcePath(ctx, repo.ID, sourceType, sourcePath)
+		if err != nil {
+			return nil, fmt.Errorf("failed to update source path in repo: %v", err)
+		}
+	}
+
 	if c.config.Saas {
 		if c.config.GitServer.Type == types.GitServerTypeGitea {
 			mirror.PushUsername = req.CurrentUser

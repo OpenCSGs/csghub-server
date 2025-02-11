@@ -169,6 +169,7 @@ type Model struct {
 	RecomOpWeight        int                  `json:"recom_op_weight,omitempty"`
 	SensitiveCheckStatus string               `json:"sensitive_check_status"`
 	MirrorLastUpdatedAt  time.Time            `json:"mirror_last_updated_at"`
+	MultiSource
 }
 
 type SDKModelInfo struct {

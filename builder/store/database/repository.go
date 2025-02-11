@@ -11,6 +11,7 @@ import (
 
 	"github.com/uptrace/bun"
 	"opencsg.com/csghub-server/common/types"
+	"opencsg.com/csghub-server/common/types/enum"
 )
 
 var RepositorySourceAndPrefixMapping = map[types.RepositorySource]string{
@@ -61,6 +62,9 @@ type RepoStore interface {
 	FindWithBatch(ctx context.Context, batchSize, batch int, repoTypes ...types.RepositoryType) ([]Repository, error)
 	ByUser(ctx context.Context, userID int64) ([]Repository, error)
 	FindByRepoSourceWithBatch(ctx context.Context, repoSource types.RepositorySource, batchSize, batch int) ([]Repository, error)
+	UpdateSourcePath(ctx context.Context, repoID int64, sourcePath, sourceType string) error
+	FindMirrorReposWithBatch(ctx context.Context, batchSize, batch int) ([]Repository, error)
+	BulkUpdateSourcePath(ctx context.Context, repos []*Repository) error
 }
 
 func NewRepoStore() RepoStore {
@@ -103,6 +107,9 @@ type Repository struct {
 	Source               types.RepositorySource     `bun:",nullzero,default:'local'" json:"source"`
 	SyncStatus           types.RepositorySyncStatus `bun:",nullzero" json:"sync_status"`
 	SensitiveCheckStatus types.SensitiveCheckStatus `bun:",default:0" json:"sensitive_check_status"`
+	MSPath               string                     `bun:",nullzero" json:"ms_path"`
+	CSGPath              string                     `bun:",nullzero" json:"csg_path"`
+	HFPath               string                     `bun:",nullzero" json:"hf_path"`
 	// updated_at timestamp will be updated only if files changed
 	times
 }
@@ -111,6 +118,17 @@ type Repository struct {
 func (r Repository) NamespaceAndName() (namespace string, name string) {
 	fields := strings.Split(r.Path, "/")
 	return fields[0], fields[1]
+}
+
+func (r *Repository) UpdateSourceBySourceTypeAndSourcePath(sourceType, sourcePath string) {
+	switch sourceType {
+	case enum.HFSource:
+		r.HFPath = sourcePath
+	case enum.MSSource:
+		r.MSPath = sourcePath
+	case enum.CSGSource:
+		r.CSGPath = sourcePath
+	}
 }
 
 type RepositoryTag struct {
@@ -722,4 +740,50 @@ func (s *repoStoreImpl) ByUser(ctx context.Context, userID int64) ([]Repository,
 	var repos []Repository
 	err := s.db.Operator.Core.NewSelect().Model(&repos).Where("user_id = ?", userID).Scan(ctx)
 	return repos, err
+}
+
+func (s *repoStoreImpl) FindMirrorReposWithBatch(ctx context.Context, batchSize, batch int) ([]Repository, error) {
+	var res []Repository
+	err := s.db.Operator.Core.NewSelect().
+		Model(&res).
+		Relation("Mirror").
+		Where("mirror.id is not null").
+		Order("id desc").
+		Limit(batchSize).
+		Offset(batchSize * (batch - 1)).
+		Scan(ctx)
+	return res, err
+}
+
+func (s *repoStoreImpl) UpdateSourcePath(ctx context.Context, repoID int64, sourcePath, sourceType string) error {
+	var field string
+	switch sourceType {
+	case enum.CSGSource:
+		field = "csg_path"
+	case enum.HFSource:
+		field = "hf_path"
+	case enum.MSSource:
+		field = "ms_path"
+	default:
+		return fmt.Errorf("unknown source type: %s", sourceType)
+	}
+
+	_, err := s.db.Operator.Core.NewUpdate().
+		Model(&Repository{}).
+		Set(field+" = ?", sourcePath).
+		Where("id = ?", repoID).
+		Exec(ctx)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s *repoStoreImpl) BulkUpdateSourcePath(ctx context.Context, repos []*Repository) error {
+	_, err := s.db.Operator.Core.NewUpdate().
+		Model(&repos).
+		Column("csg_path", "hf_path", "ms_path").
+		Bulk().
+		Exec(ctx)
+	return err
 }
