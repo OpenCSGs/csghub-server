@@ -644,9 +644,10 @@ func (c *Client) GetTree(ctx context.Context, req types.GetTreeRequest) (*types.
 			if err == io.EOF {
 				break
 			}
+			return nil, err
 		}
 		if treeEntries == nil {
-			return nil, errors.New("bad request")
+			return nil, errors.New("GetTreeEntries API invalid response")
 		}
 		cursor = treeEntries.PaginationCursor.GetNextCursor()
 		entries := treeEntries.Entries

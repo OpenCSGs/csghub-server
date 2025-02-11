@@ -131,7 +131,9 @@ func TestGitHTTPComponent_Batch(t *testing.T) {
 		operation      types.LFSBatchOperation
 		exist          bool
 		err            error
+		readAccessErr  error
 		resp           *types.BatchResponse
+		noUser         bool
 	}{
 		{
 			name:          "download success",
@@ -225,6 +227,25 @@ func TestGitHTTPComponent_Batch(t *testing.T) {
 				Objects: nil,
 			},
 		},
+		{
+			name:      "upload and current user empty, 401",
+			operation: types.LFSBatchUpload,
+			err:       ErrUnauthorized,
+			noUser:    true,
+		},
+		{
+			name:          "download and current user empty, 401",
+			operation:     types.LFSBatchDownload,
+			err:           ErrUnauthorized,
+			readAccessErr: ErrUserNotFound,
+			noUser:        true,
+		},
+		{
+			name:          "download and user not found",
+			operation:     types.LFSBatchDownload,
+			err:           ErrUserNotFound,
+			readAccessErr: ErrUserNotFound,
+		},
 	}
 
 	for _, c := range cases {
@@ -236,6 +257,10 @@ func TestGitHTTPComponent_Batch(t *testing.T) {
 				oid = notExistOID
 			}
 			path := path.Join(oid[0:2], oid[2:4], oid[4:])
+			user := "user"
+			if c.noUser {
+				user = ""
+			}
 
 			gc.mocks.stores.RepoMock().EXPECT().FindByPath(
 				ctx, types.ModelRepo, "ns", "n",
@@ -245,10 +270,10 @@ func TestGitHTTPComponent_Batch(t *testing.T) {
 			}, nil).Maybe()
 
 			gc.mocks.components.repo.EXPECT().AllowReadAccess(
-				ctx, types.ModelRepo, "ns", "n", "user",
-			).Return(c.hasReadAccess, nil).Maybe()
+				ctx, types.ModelRepo, "ns", "n", user,
+			).Return(c.hasReadAccess, c.readAccessErr).Maybe()
 			gc.mocks.components.repo.EXPECT().AllowWriteAccess(
-				ctx, types.ModelRepo, "ns", "n", "user",
+				ctx, types.ModelRepo, "ns", "n", user,
 			).Return(c.hasWriteAccess, nil).Maybe()
 			gc.mocks.stores.LfsMetaObjectMock().EXPECT().FindByRepoID(ctx, int64(123)).Return(
 				[]database.LfsMetaObject{{
@@ -268,7 +293,7 @@ func TestGitHTTPComponent_Batch(t *testing.T) {
 				Namespace:   "ns",
 				Name:        "n",
 				RepoType:    types.ModelRepo,
-				CurrentUser: "user",
+				CurrentUser: user,
 				Objects: []types.Pointer{
 					{Oid: oid, Size: 100},
 				},
