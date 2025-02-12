@@ -1073,7 +1073,7 @@ func (c *modelComponentImpl) SetRuntimeFrameworkModes(ctx context.Context, curre
 		if err != nil {
 			return nil, err
 		}
-		if relations == nil || len(relations) < 1 {
+		if len(relations) < 1 {
 			err = c.repoRuntimeFrameworkStore.Add(ctx, id, model.Repository.ID, deployType)
 			if err != nil {
 				failedModels = append(failedModels, model.Repository.Path)
@@ -1135,7 +1135,7 @@ func (c *modelComponentImpl) ListModelsOfRuntimeFrameworks(ctx context.Context, 
 		return nil, 0, fmt.Errorf("failed to get repo by deploy type, error:%w", err)
 	}
 
-	if runtimeRepos == nil || len(runtimeRepos) < 1 {
+	if len(runtimeRepos) < 1 {
 		return nil, 0, nil
 	}
 

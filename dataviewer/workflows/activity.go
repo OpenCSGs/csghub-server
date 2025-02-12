@@ -258,7 +258,7 @@ func (dva *dataViewerActivityImpl) DetermineCardData(ctx context.Context, determ
 	} else if determineParam.RepoDataType == RepoCsvData {
 		scopeFiles = determineParam.Class.CsvFiles
 	}
-	if scopeFiles == nil || len(scopeFiles) < 1 {
+	if len(scopeFiles) < 1 {
 		slog.Warn("no valid target files found", slog.Any("card", determineParam.Card))
 		return nil, nil
 	}
