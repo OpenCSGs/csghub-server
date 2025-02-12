@@ -36,18 +36,19 @@ type Deploy struct {
 	// repository_id of model/space/code/dataset
 	RepoID int64 `json:"repo_id"`
 	// model running engine vllm or TGI
-	RuntimeFramework string `bun:",nullzero" json:"runtime_framework"`
-	ContainerPort    int    `json:"container_port"`
-	Annotation       string `bun:",nullzero" json:"annotation"`
-	MinReplica       int    `json:"min_replica"`
-	MaxReplica       int    `json:"max_replica"`
-	SvcName          string `json:"svc_name"`
-	Endpoint         string `json:"endpoint"`
-	ClusterID        string `json:"cluster_id"`
-	SecureLevel      int    `json:"secure_level"` // 1-public, 2-private, 3-extension in future
-	Type             int    `json:"type"`         // 0-space, 1-inference, 2-finetune, 3-serverless
-	UserUUID         string `bun:"," json:"user_uuid"`
-	SKU              string `bun:"," json:"sku"`
+	RuntimeFramework string             `bun:",nullzero" json:"runtime_framework"`
+	ContainerPort    int                `json:"container_port"`
+	Annotation       string             `bun:",nullzero" json:"annotation"`
+	MinReplica       int                `json:"min_replica"`
+	MaxReplica       int                `json:"max_replica"`
+	SvcName          string             `json:"svc_name"`
+	Endpoint         string             `json:"endpoint"`
+	ClusterID        string             `json:"cluster_id"`
+	SecureLevel      int                `json:"secure_level"`         // 1-public, 2-private, 3-extension in future
+	Type             int                `json:"type"`                 // 0-space, 1-inference, 2-finetune, 3-serverless
+	Task             types.PipelineTask `bun:",nullzero" json:"task"` //text-generation,text-to-image
+	UserUUID         string             `bun:"," json:"user_uuid"`
+	SKU              string             `bun:"," json:"sku"`
 	times
 }
 

@@ -35,6 +35,10 @@ func TestLfsMetaStore_CRUD(t *testing.T) {
 	require.Equal(t, 1, len(objs))
 	require.Equal(t, "foobar", objs[0].Oid)
 
+	objs, err = store.FindByRepoID(ctx, 987)
+	require.Nil(t, err)
+	require.Equal(t, 0, len(objs))
+
 	// update
 	_, err = store.UpdateOrCreate(ctx, database.LfsMetaObject{
 		RepositoryID: 123,

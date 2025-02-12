@@ -5,11 +5,12 @@ import (
 
 	"github.com/gin-gonic/gin"
 	mockcomponent "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/component"
+	"opencsg.com/csghub-server/builder/testutil"
 	"opencsg.com/csghub-server/common/types"
 )
 
 type SpaceResourceTester struct {
-	*GinTester
+	*testutil.GinTester
 	handler *SpaceResourceHandler
 	mocks   struct {
 		spaceResource *mockcomponent.MockSpaceResourceComponent
@@ -17,7 +18,7 @@ type SpaceResourceTester struct {
 }
 
 func NewSpaceResourceTester(t *testing.T) *SpaceResourceTester {
-	tester := &SpaceResourceTester{GinTester: NewGinTester()}
+	tester := &SpaceResourceTester{GinTester: testutil.NewGinTester()}
 	tester.mocks.spaceResource = mockcomponent.NewMockSpaceResourceComponent(t)
 
 	tester.handler = &SpaceResourceHandler{
@@ -29,7 +30,7 @@ func NewSpaceResourceTester(t *testing.T) *SpaceResourceTester {
 }
 
 func (t *SpaceResourceTester) WithHandleFunc(fn func(h *SpaceResourceHandler) gin.HandlerFunc) *SpaceResourceTester {
-	t.ginHandler = fn(t.handler)
+	t.Handler(fn(t.handler))
 	return t
 }
 
@@ -38,7 +39,7 @@ func TestSpaceResourceHandler_Index(t *testing.T) {
 		return h.Index
 	})
 
-	tester.mocks.spaceResource.EXPECT().Index(tester.ctx, "c1", types.InferenceType, "").Return(
+	tester.mocks.spaceResource.EXPECT().Index(tester.Ctx(), "c1", types.InferenceType, "").Return(
 		[]types.SpaceResource{{Name: "sp"}}, nil,
 	)
 	tester.WithQuery("cluster_id", "c1").WithQuery("deploy_type", "").WithUser().Execute()
@@ -51,7 +52,7 @@ func TestSpaceResourceHandler_Create(t *testing.T) {
 		return h.Create
 	})
 
-	tester.mocks.spaceResource.EXPECT().Create(tester.ctx, &types.CreateSpaceResourceReq{
+	tester.mocks.spaceResource.EXPECT().Create(tester.Ctx(), &types.CreateSpaceResourceReq{
 		ClusterID: "c",
 		Name:      "n",
 		Resources: "r",
@@ -70,7 +71,7 @@ func TestSpaceResourceHandler_Update(t *testing.T) {
 		return h.Update
 	})
 
-	tester.mocks.spaceResource.EXPECT().Update(tester.ctx, &types.UpdateSpaceResourceReq{
+	tester.mocks.spaceResource.EXPECT().Update(tester.Ctx(), &types.UpdateSpaceResourceReq{
 		Name:      "n",
 		Resources: "r",
 		ID:        1,
@@ -89,7 +90,7 @@ func TestSpaceResourceHandler_Delete(t *testing.T) {
 		return h.Delete
 	})
 
-	tester.mocks.spaceResource.EXPECT().Delete(tester.ctx, int64(1)).Return(
+	tester.mocks.spaceResource.EXPECT().Delete(tester.Ctx(), int64(1)).Return(
 		nil,
 	)
 	tester.WithUser().WithParam("id", "1").Execute()

@@ -38,19 +38,23 @@ func StartWorkflow(cfg *config.Config) error {
 	if err != nil {
 		return err
 	}
-	temporalClient, err := client.Dial(client.Options{
+	client, err := temporal.NewClient(client.Options{
 		HostPort: cfg.WorkFLow.Endpoint,
-	})
+	}, "csghub-api")
 	if err != nil {
 		return fmt.Errorf("unable to create workflow client, error: %w", err)
 	}
-	client, err := temporal.NewClient(temporalClient)
+	if err != nil {
+		return err
+	}
+	rftScanner, err := component.NewRuntimeArchitectureComponent(cfg)
 	if err != nil {
 		return err
 	}
 	return StartWorkflowDI(
 		cfg, gitcallback, recom,
 		gitserver, multisync, database.NewSyncClientSettingStore(), client,
+		rftScanner,
 	)
 }
 
@@ -62,12 +66,14 @@ func StartWorkflowDI(
 	multisync component.MultiSyncComponent,
 	syncClientSetting database.SyncClientSettingStore,
 	temporalClient temporal.Client,
+	rftScanner component.RuntimeArchitectureComponent,
 ) error {
 	worker := temporalClient.NewWorker(HandlePushQueueName, worker.Options{})
-	act := activity.NewActivities(cfg, callback, recom, gitServer, multisync, syncClientSetting)
+	act := activity.NewActivities(cfg, callback, recom, gitServer, multisync, syncClientSetting, rftScanner)
 	worker.RegisterActivity(act)
 
 	worker.RegisterWorkflow(HandlePushWorkflow)
+	worker.RegisterWorkflow(RuntimeFrameworkWorkflow)
 
 	RegisterCronWorker(cfg, temporalClient, act)
 	err := RegisterCronJobs(cfg, temporalClient)

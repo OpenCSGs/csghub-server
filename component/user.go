@@ -69,7 +69,7 @@ func NewUserComponent(config *config.Config) (UserComponent, error) {
 	c.deployer = deploy.NewDeployer()
 	c.userLikeStore = database.NewUserLikesStore()
 	c.repoStore = database.NewRepoStore()
-	c.deploy = database.NewDeployTaskStore()
+	c.deployTaskStore = database.NewDeployTaskStore()
 	c.accountingComponent, err = NewAccountingComponent(config)
 	if err != nil {
 		return nil, err
@@ -93,7 +93,7 @@ type userComponentImpl struct {
 	deployer            deploy.Deployer
 	userLikeStore       database.UserLikesStore
 	repoStore           database.RepoStore
-	deploy              database.DeployTaskStore
+	deployTaskStore     database.DeployTaskStore
 	collectionStore     database.CollectionStore
 	accountingComponent AccountingComponent
 	// srs            database.SpaceResourceStore
@@ -532,108 +532,6 @@ func (c *userComponentImpl) LikesDatasets(ctx context.Context, req *types.UserDa
 	return resDatasets, total, nil
 }
 
-func (c *userComponentImpl) ListDeploys(ctx context.Context, repoType types.RepositoryType, req *types.DeployReq) ([]types.DeployRepo, int, error) {
-	user, err := c.userStore.FindByUsername(ctx, req.CurrentUser)
-	if err != nil {
-		newError := fmt.Errorf("failed to check for the presence of the user:%s, error:%w", req.CurrentUser, err)
-		return nil, 0, newError
-	}
-	deploys, total, err := c.deploy.ListDeployByUserID(ctx, user.ID, req)
-	if err != nil {
-		newError := fmt.Errorf("failed to get user deploys for %s with error:%w", repoType, err)
-		return nil, 0, newError
-	}
-
-	var resDeploys []types.DeployRepo
-	for _, deploy := range deploys {
-		d := &database.Deploy{
-			SvcName:   deploy.SvcName,
-			ClusterID: deploy.ClusterID,
-			Status:    deploy.Status,
-		}
-		endpoint, _ := c.repoComponent.GenerateEndpoint(ctx, d)
-		repoPath := strings.TrimPrefix(deploy.GitPath, string(repoType)+"s_")
-		var hardware types.HardWare
-		_ = json.Unmarshal([]byte(deploy.Hardware), &hardware)
-		resourceType := ""
-		if hardware.Gpu.Num != "" {
-			resourceType = hardware.Gpu.Type
-		} else {
-			resourceType = hardware.Cpu.Type
-		}
-		tag := ""
-		tags, _ := c.repoStore.TagsWithCategory(ctx, deploy.RepoID, "task")
-		if len(tags) > 0 {
-			tag = tags[0].Name
-		}
-		resDeploys = append(resDeploys, types.DeployRepo{
-			DeployID:         deploy.ID,
-			DeployName:       deploy.DeployName,
-			Path:             repoPath,
-			RepoID:           deploy.RepoID,
-			SvcName:          deploy.SvcName,
-			Status:           deployStatusCodeToString(deploy.Status),
-			Hardware:         deploy.Hardware,
-			Env:              deploy.Env,
-			RuntimeFramework: deploy.RuntimeFramework,
-			ImageID:          deploy.ImageID,
-			MinReplica:       deploy.MinReplica,
-			MaxReplica:       deploy.MaxReplica,
-			GitPath:          deploy.GitPath,
-			GitBranch:        deploy.GitBranch,
-			ClusterID:        deploy.ClusterID,
-			SecureLevel:      deploy.SecureLevel,
-			CreatedAt:        deploy.CreatedAt,
-			UpdatedAt:        deploy.UpdatedAt,
-			Type:             deploy.Type,
-			ResourceType:     resourceType,
-			RepoTag:          tag,
-			Endpoint:         endpoint,
-		})
-	}
-	return resDeploys, total, nil
-}
-
-func (c *userComponentImpl) ListInstances(ctx context.Context, req *types.UserRepoReq) ([]types.DeployRepo, int, error) {
-	user, err := c.userStore.FindByUsername(ctx, req.CurrentUser)
-	if err != nil {
-		newError := fmt.Errorf("failed to check for the presence of the user:%s, error:%w", req.CurrentUser, err)
-		return nil, 0, newError
-	}
-	deploys, total, err := c.deploy.ListInstancesByUserID(ctx, user.ID, req.PageSize, req.Page)
-	if err != nil {
-		newError := fmt.Errorf("failed to get user instances error:%w", err)
-		return nil, 0, newError
-	}
-
-	var resDeploys []types.DeployRepo
-	for _, deploy := range deploys {
-		repoPath := strings.TrimPrefix(deploy.GitPath, "models_")
-		resDeploys = append(resDeploys, types.DeployRepo{
-			DeployID:         deploy.ID,
-			DeployName:       deploy.DeployName,
-			Path:             repoPath,
-			RepoID:           deploy.RepoID,
-			SvcName:          deploy.SvcName,
-			Status:           deployStatusCodeToString(deploy.Status),
-			Hardware:         deploy.Hardware,
-			Env:              deploy.Env,
-			RuntimeFramework: deploy.RuntimeFramework,
-			ImageID:          deploy.ImageID,
-			MinReplica:       deploy.MinReplica,
-			MaxReplica:       deploy.MaxReplica,
-			GitPath:          deploy.GitPath,
-			GitBranch:        deploy.GitBranch,
-			ClusterID:        deploy.ClusterID,
-			SecureLevel:      deploy.SecureLevel,
-			CreatedAt:        deploy.CreatedAt,
-			UpdatedAt:        deploy.UpdatedAt,
-			Type:             deploy.Type,
-		})
-	}
-	return resDeploys, total, nil
-}
-
 func (c *userComponentImpl) ListServerless(ctx context.Context, req types.DeployReq) ([]types.DeployRepo, int, error) {
 	user, err := c.userStore.FindByUsername(ctx, req.CurrentUser)
 	if err != nil {
@@ -644,7 +542,7 @@ func (c *userComponentImpl) ListServerless(ctx context.Context, req types.Deploy
 	if !isAdmin {
 		return nil, 0, fmt.Errorf("user %s does not have admin privileges", req.CurrentUser)
 	}
-	deploys, total, err := c.deploy.ListServerless(ctx, req)
+	deploys, total, err := c.deployTaskStore.ListServerless(ctx, req)
 	if err != nil {
 		newError := fmt.Errorf("failed to get user serverless for %s with error:%w", req.RepoType, err)
 		return nil, 0, newError
@@ -674,6 +572,7 @@ func (c *userComponentImpl) ListServerless(ctx context.Context, req types.Deploy
 			UpdatedAt:        deploy.UpdatedAt,
 			Type:             deploy.Type,
 			SKU:              deploy.SKU,
+			Task:             string(deploy.Task),
 		})
 	}
 	return resDeploys, total, nil

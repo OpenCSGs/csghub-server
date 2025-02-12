@@ -225,6 +225,8 @@ definitions:
     properties:
       created_at:
         type: string
+      csg_path:
+        type: string
       default_branch:
         type: string
       description:
@@ -236,6 +238,8 @@ definitions:
           $ref: '#/definitions/database.RepositoryDownload'
         type: array
       git_path:
+        type: string
+      hf_path:
         type: string
       http_clone_url:
         type: string
@@ -250,6 +254,8 @@ definitions:
         type: integer
       mirror:
         $ref: '#/definitions/database.Mirror'
+      ms_path:
+        type: string
       name:
         type: string
       nickname:
@@ -354,7 +360,7 @@ definitions:
       name:
         type: string
       scope:
-        $ref: '#/definitions/database.TagScope'
+        $ref: '#/definitions/types.TagScope'
       show_name:
         type: string
       updated_at:
@@ -369,24 +375,10 @@ definitions:
       name:
         type: string
       scope:
-        $ref: '#/definitions/database.TagScope'
+        $ref: '#/definitions/types.TagScope'
       show_name:
         type: string
     type: object
-  database.TagScope:
-    enum:
-    - model
-    - dataset
-    - code
-    - space
-    - prompt
-    type: string
-    x-enum-varnames:
-    - ModelTagScope
-    - DatasetTagScope
-    - CodeTagScope
-    - SpaceTagScope
-    - PromptTagScope
   database.User:
     properties:
       accessTokens:
@@ -1268,12 +1260,16 @@ definitions:
         type: boolean
       created_at:
         type: string
+      csg_path:
+        type: string
       default_branch:
         type: string
       description:
         type: string
       downloads:
         type: integer
+      hf_path:
+        type: string
       id:
         type: integer
       license:
@@ -1281,6 +1277,8 @@ definitions:
       likes:
         type: integer
       mirror_last_updated_at:
+        type: string
+      ms_path:
         type: string
       name:
         type: string
@@ -1678,6 +1676,8 @@ definitions:
         type: boolean
       created_at:
         type: string
+      csg_path:
+        type: string
       default_branch:
         type: string
       description:
@@ -1690,6 +1690,8 @@ definitions:
         type: boolean
       enable_inference:
         type: boolean
+      hf_path:
+        type: string
       id:
         type: integer
       license:
@@ -1697,6 +1699,8 @@ definitions:
       likes:
         type: integer
       mirror_last_updated_at:
+        type: string
+      ms_path:
         type: string
       name:
         type: string
@@ -1775,6 +1779,8 @@ definitions:
         type: integer
       min_replica:
         type: integer
+      order_detail_id:
+        type: integer
       resource_id:
         type: integer
       revision:
@@ -1821,6 +1827,16 @@ definitions:
       verified:
         type: boolean
     type: object
+  types.PipelineTask:
+    enum:
+    - text-generation
+    - text-to-image
+    - task-auto-detection
+    type: string
+    x-enum-varnames:
+    - TextGeneration
+    - Text2Image
+    - TaskAutoDetection
   types.Pointer:
     properties:
       download_url:
@@ -2054,10 +2070,16 @@ definitions:
     type: object
   types.RuntimeFrameworkModels:
     properties:
+      id:
+        type: integer
       models:
         items:
           type: string
         type: array
+      scan_type:
+        type: integer
+      task:
+        $ref: '#/definitions/types.PipelineTask'
     type: object
   types.RuntimeFrameworkReq:
     properties:
@@ -2248,6 +2270,20 @@ definitions:
       msg:
         type: string
     type: object
+  types.TagScope:
+    enum:
+    - model
+    - dataset
+    - code
+    - space
+    - prompt
+    type: string
+    x-enum-varnames:
+    - ModelTagScope
+    - DatasetTagScope
+    - CodeTagScope
+    - SpaceTagScope
+    - PromptTagScope
   types.TaskType:
     enum:
     - evaluation
@@ -5480,100 +5516,6 @@ paths:
       summary: Get all files of a dataset
       tags:
       - Dataset
-  /datasets/{namespace}/{name}/dataviewer/catalog:
-    get:
-      consumes:
-      - application/json
-      description: get catalog of the dataset
-      parameters:
-      - description: namespace
-        in: path
-        name: namespace
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/types.Response'
-        "400":
-          description: Bad request
-          schema:
-            $ref: '#/definitions/types.APIBadRequest'
-        "500":
-          description: Internal server error
-          schema:
-            $ref: '#/definitions/types.APIInternalServerError'
-      security:
-      - ApiKey: []
-      summary: Get catalog of the dataset
-      tags:
-      - Dataset
-  /datasets/{namespace}/{name}/dataviewer/rows:
-    get:
-      consumes:
-      - application/json
-      description: get catalog of the dataset
-      parameters:
-      - description: namespace
-        in: path
-        name: namespace
-        required: true
-        type: string
-      - description: config
-        in: query
-        name: config
-        required: true
-        type: string
-      - description: split
-        in: query
-        name: split
-        required: true
-        type: string
-      - description: search
-        in: query
-        name: search
-        type: string
-      - description: where
-        in: query
-        name: where
-        type: string
-      - description: orderby
-        in: query
-        name: orderby
-        type: string
-      - default: 50
-        description: per
-        in: query
-        name: per
-        type: integer
-      - default: 1
-        description: per page
-        in: query
-        name: page
-        type: integer
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/types.Response'
-        "400":
-          description: Bad request
-          schema:
-            $ref: '#/definitions/types.APIBadRequest'
-        "500":
-          description: Internal server error
-          schema:
-            $ref: '#/definitions/types.APIInternalServerError'
-      security:
-      - ApiKey: []
-      summary: Get catalog of the dataset
-      tags:
-      - Dataset
   /datasets/{namespace}/{name}/relations:
     get:
       consumes:
@@ -5616,52 +5558,6 @@ paths:
       security:
       - ApiKey: []
       summary: Get dataset related assets
-      tags:
-      - Dataset
-  /datasets/{namespace}/{name}/viewer/{file_path}:
-    get:
-      consumes:
-      - application/json
-      description: get the demo data of the dataset
-      parameters:
-      - description: namespace
-        in: path
-        name: namespace
-        required: true
-        type: string
-      - description: file_path
-        in: path
-        name: file_path
-        required: true
-        type: string
-      - default: 50
-        description: per
-        in: query
-        name: per
-        type: integer
-      - default: 1
-        description: per page
-        in: query
-        name: page
-        type: integer
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/types.Response'
-        "400":
-          description: Bad request
-          schema:
-            $ref: '#/definitions/types.APIBadRequest'
-        "500":
-          description: Internal server error
-          schema:
-            $ref: '#/definitions/types.APIInternalServerError'
-      security:
-      - ApiKey: []
-      summary: Get the demo data of the dataset
       tags:
       - Dataset
   /discussions/{id}:
@@ -9724,6 +9620,13 @@ paths:
         in: query
         name: scan_type
         type: integer
+      - description: task
+        enum:
+        - text-generation
+        - text-to-image
+        in: query
+        name: task
+        type: string
       - description: body
         in: body
         name: body
@@ -10667,9 +10570,16 @@ paths:
         enum:
         - model
         - dataset
+        - code
+        - space
+        - prompt
         in: query
         name: scope
         type: string
+      - description: built_in
+        in: query
+        name: built_in
+        type: boolean
       produces:
       - application/json
       responses:

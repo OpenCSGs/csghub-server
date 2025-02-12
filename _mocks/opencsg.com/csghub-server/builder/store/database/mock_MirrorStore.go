@@ -310,23 +310,23 @@ func (_c *MockMirrorStore_FindByRepoPath_Call) RunAndReturn(run func(context.Con
 }
 
 // FindWithMapping provides a mock function with given fields: ctx, repoType, namespace, name, mapping
-func (_m *MockMirrorStore) FindWithMapping(ctx context.Context, repoType types.RepositoryType, namespace string, name string, mapping types.Mapping) (*database.Mirror, error) {
+func (_m *MockMirrorStore) FindWithMapping(ctx context.Context, repoType types.RepositoryType, namespace string, name string, mapping types.Mapping) (*database.Repository, error) {
 	ret := _m.Called(ctx, repoType, namespace, name, mapping)
 
 	if len(ret) == 0 {
 		panic("no return value specified for FindWithMapping")
 	}
 
-	var r0 *database.Mirror
+	var r0 *database.Repository
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, types.RepositoryType, string, string, types.Mapping) (*database.Mirror, error)); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, types.RepositoryType, string, string, types.Mapping) (*database.Repository, error)); ok {
 		return rf(ctx, repoType, namespace, name, mapping)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, types.RepositoryType, string, string, types.Mapping) *database.Mirror); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, types.RepositoryType, string, string, types.Mapping) *database.Repository); ok {
 		r0 = rf(ctx, repoType, namespace, name, mapping)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*database.Mirror)
+			r0 = ret.Get(0).(*database.Repository)
 		}
 	}
 
@@ -361,12 +361,12 @@ func (_c *MockMirrorStore_FindWithMapping_Call) Run(run func(ctx context.Context
 	return _c
 }
 
-func (_c *MockMirrorStore_FindWithMapping_Call) Return(_a0 *database.Mirror, _a1 error) *MockMirrorStore_FindWithMapping_Call {
+func (_c *MockMirrorStore_FindWithMapping_Call) Return(_a0 *database.Repository, _a1 error) *MockMirrorStore_FindWithMapping_Call {
 	_c.Call.Return(_a0, _a1)
 	return _c
 }
 
-func (_c *MockMirrorStore_FindWithMapping_Call) RunAndReturn(run func(context.Context, types.RepositoryType, string, string, types.Mapping) (*database.Mirror, error)) *MockMirrorStore_FindWithMapping_Call {
+func (_c *MockMirrorStore_FindWithMapping_Call) RunAndReturn(run func(context.Context, types.RepositoryType, string, string, types.Mapping) (*database.Repository, error)) *MockMirrorStore_FindWithMapping_Call {
 	_c.Call.Return(run)
 	return _c
 }

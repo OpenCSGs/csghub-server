@@ -100,8 +100,10 @@ func (c *callbackComponentImpl) TriggerDataviewUpdateWorkflow(ctx context.Contex
 		WorkflowExecutionTimeout: executeTimeOut,
 		WorkflowTaskTimeout:      taskTimeout,
 	}
-	wfRun, err := c.workflowClient.ExecuteWorkflow(ctx, options, workflows.DataViewerUpdateWorkflow,
-		dvCom.WorkflowUpdateParams{Req: req, Config: c.cfg})
+	wfRun, err := c.workflowClient.ExecuteWorkflow(
+		context.Background(), options, workflows.DataViewerUpdateWorkflow,
+		dvCom.WorkflowUpdateParams{Req: req, Config: c.cfg},
+	)
 	if err != nil {
 		return nil, fmt.Errorf("fail to execute workflow, error: %w", err)
 	}

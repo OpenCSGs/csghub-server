@@ -1,4 +1,4 @@
-package handler
+package testutil
 
 import (
 	"bytes"
@@ -152,4 +152,16 @@ func (g *GinTester) RequireUser(t *testing.T) {
 	// add user to original test ctx now
 	_ = g.WithUser()
 
+}
+
+func (g *GinTester) Ctx() context.Context {
+	return g.ctx
+}
+
+func (g *GinTester) Gctx() *gin.Context {
+	return g.gctx
+}
+
+func (g *GinTester) Response() *httptest.ResponseRecorder {
+	return g.response
 }

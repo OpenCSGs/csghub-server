@@ -241,10 +241,10 @@ type Config struct {
 		ActivityMaximumAttempts                 int32  `env:"OPENCSG_DATAVIEWER_ACTIVITY_MAXIMUM_ATTEMPTS, default=2"`
 		CacheDir                                string `env:"OPENCSG_DATAVIEWER_CACHE_DIR, default=/tmp/opencsg"`
 		DownloadLfsFile                         bool   `env:"OPENCSG_DATAVIEWER_DOWNLOAD_LFS_FILE, default=true"`
-		ThreadNumOfExport                       int    `env:"OPENCSG_DATAVIEWER_THREAD_NUM_OF_EXPORT, default=4"`
-		MaxFileSize                             int64  `env:"OPENCSG_DATAVIEWER_MAX_FILE_SIZE, default=104857600"` // 100 MB
+		MaxThreadNumOfExport                    int    `env:"OPENCSG_DATAVIEWER_MAX_THREAD_NUM_OF_EXPORT, default=8"`
 		MaxConcurrentSessionExecutionSize       int    `env:"OPENCSG_DATAVIEWER_MAX_CONCURRENT_SESSION_EXECUTION_SIZE, default=1"`
-		SessionExecutionTimeout                 int    `env:"OPENCSG_DATAVIEWER_SESSION_EXECUTION_TIMEOUT, default=240"` // 240 minutes
+		SessionExecutionTimeout                 int    `env:"OPENCSG_DATAVIEWER_SESSION_EXECUTION_TIMEOUT, default=240"` // 240 mins
+		ConvertLimitSize                        int64  `env:"OPENCSG_DATAVIEWER_CONVERT_LIMIT_SIZE, default=5368709120"` // 5G
 	}
 
 	Proxy struct {

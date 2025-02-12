@@ -465,6 +465,11 @@ func (c *modelComponentImpl) Show(ctx context.Context, namespace, name, currentU
 		CanWrite:            permission.CanWrite,
 		CanManage:           permission.CanAdmin,
 		Namespace:           ns,
+		MultiSource: types.MultiSource{
+			HFPath:  model.Repository.HFPath,
+			MSPath:  model.Repository.MSPath,
+			CSGPath: model.Repository.CSGPath,
+		},
 	}
 	// admin user or owner can see the sensitive check status
 	if permission.CanAdmin {
@@ -523,6 +528,7 @@ func (c *modelComponentImpl) GetServerless(ctx context.Context, namespace, name,
 		CreatedAt:        deploy.CreatedAt,
 		UpdatedAt:        deploy.UpdatedAt,
 		ProxyEndpoint:    endpoint,
+		Task:             string(deploy.Task),
 	}
 	return &resDeploy, nil
 }
@@ -550,7 +556,7 @@ func (c *modelComponentImpl) SDKModelInfo(ctx context.Context, namespace, name, 
 		}
 	}
 
-	filePaths, err := GetFilePaths(namespace, name, "", types.ModelRepo, ref, c.gitServer.GetRepoFileTree)
+	filePaths, err := GetFilePaths(ctx, namespace, name, "", types.ModelRepo, ref, c.gitServer.GetRepoFileTree)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get all %s files, error: %w", types.ModelRepo, err)
 	}
@@ -855,17 +861,17 @@ func (c *modelComponentImpl) getRelations(ctx context.Context, fromRepoID int64,
 	return rels, nil
 }
 
-func GetFilePathObjects(namespace, repoName, folder string, repoType types.RepositoryType, ref string, gsTree func(ctx context.Context, req gitserver.GetRepoInfoByPathReq) ([]*types.File, error)) ([]*types.File, error) {
-	allFiles, err := getAllFiles(namespace, repoName, folder, repoType, ref, gsTree)
+func GetFilePathObjects(ctx context.Context, namespace, repoName, folder string, repoType types.RepositoryType, ref string, gsTree func(ctx context.Context, req gitserver.GetRepoInfoByPathReq) ([]*types.File, error)) ([]*types.File, error) {
+	allFiles, err := getAllFiles(ctx, namespace, repoName, folder, repoType, ref, gsTree)
 	if err != nil {
 		return nil, err
 	}
 	return allFiles, nil
 }
 
-func GetFilePaths(namespace, repoName, folder string, repoType types.RepositoryType, ref string, gsTree func(ctx context.Context, req gitserver.GetRepoInfoByPathReq) ([]*types.File, error)) ([]string, error) {
+func GetFilePaths(ctx context.Context, namespace, repoName, folder string, repoType types.RepositoryType, ref string, gsTree func(ctx context.Context, req gitserver.GetRepoInfoByPathReq) ([]*types.File, error)) ([]string, error) {
 	var filePaths []string
-	allFiles, err := getAllFiles(namespace, repoName, folder, repoType, ref, gsTree)
+	allFiles, err := getAllFiles(ctx, namespace, repoName, folder, repoType, ref, gsTree)
 	if err != nil {
 		return nil, err
 	}
@@ -886,6 +892,7 @@ func (c *modelComponentImpl) Deploy(ctx context.Context, deployReq types.DeployA
 	if err != nil {
 		return -1, fmt.Errorf("cannot find model, %w", err)
 	}
+	task := common.GetBuiltInTaskFromTags(m.Repository.Tags)
 	if deployReq.DeployType == types.ServerlessType {
 		// only one service deploy was allowed
 		d, err := c.deployTaskStore.GetServerlessDeployByRepID(ctx, m.Repository.ID)
@@ -968,6 +975,7 @@ func (c *modelComponentImpl) Deploy(ctx context.Context, deployReq types.DeployA
 		Type:             deployReq.DeployType,
 		UserUUID:         user.UUID,
 		SKU:              strconv.FormatInt(resource.ID, 10),
+		Task:             task,
 	}
 	dp = modelRunUpdateDeployRepo(dp, req)
 	return c.deployer.Deploy(ctx, dp)
@@ -1052,7 +1060,12 @@ func (c *modelComponentImpl) SetRuntimeFrameworkModes(ctx context.Context, curre
 		return nil, err
 	}
 
-	runtime_framework_tags, _ := c.tagStore.GetTagsByScopeAndCategories(ctx, "model", []string{"runtime_framework", "resource"})
+	//add resource tag, like ascend
+	filter := &types.TagFilter{
+		Scopes:     []types.TagScope{types.ModelTagScope},
+		Categories: []string{"runtime_framework", "resource"},
+	}
+	runtime_framework_tags, _ := c.tagStore.AllTags(ctx, filter)
 
 	var failedModels []string
 	for _, model := range models {
@@ -1060,7 +1073,7 @@ func (c *modelComponentImpl) SetRuntimeFrameworkModes(ctx context.Context, curre
 		if err != nil {
 			return nil, err
 		}
-		if relations == nil || len(relations) < 1 {
+		if len(relations) < 1 {
 			err = c.repoRuntimeFrameworkStore.Add(ctx, id, model.Repository.ID, deployType)
 			if err != nil {
 				failedModels = append(failedModels, model.Repository.Path)
@@ -1122,7 +1135,7 @@ func (c *modelComponentImpl) ListModelsOfRuntimeFrameworks(ctx context.Context, 
 		return nil, 0, fmt.Errorf("failed to get repo by deploy type, error:%w", err)
 	}
 
-	if runtimeRepos == nil || len(runtimeRepos) < 1 {
+	if len(runtimeRepos) < 1 {
 		return nil, 0, nil
 	}
 

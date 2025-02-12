@@ -335,112 +335,38 @@ func TestUserComponent_LikesDatasets(t *testing.T) {
 	}, data)
 }
 
-// func TestUserComponent_ListDeploys(t *testing.T) {
-// 	ctx := context.TODO()
-// 	uc := initializeTestUserComponent(ctx, t)
+func TestUserComponent_ListServeless(t *testing.T) {
+	ctx := context.TODO()
+	uc := initializeTestUserComponent(ctx, t)
 
-// 	req := &types.DeployReq{
-// 		CurrentUser: "user",
-// 		PageOpts: types.PageOpts{
-// 			Page:     1,
-// 			PageSize: 10,
-// 		},
-// 	}
-// 	uc.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "user").Return(database.User{ID: 1}, nil)
-// 	uc.mocks.stores.DeployTaskMock().EXPECT().ListDeployByUserID(ctx, int64(1), req).Return([]database.Deploy{
-// 		{
-// 			SvcName: "svc", ClusterID: "cluster", SKU: "sku",
-// 			GitPath: "models_foo/bar", Hardware: `{"memory": "foo"}`,
-// 			RepoID: 123,
-// 		},
-// 	}, 100, nil)
+	req := &types.DeployReq{
+		CurrentUser: "user",
+		PageOpts: types.PageOpts{
+			Page:     1,
+			PageSize: 10,
+		},
+	}
+	uc.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "user").Return(database.User{ID: 1}, nil)
+	uc.mocks.components.repo.EXPECT().IsAdminRole(database.User{ID: 1}).Return(true)
+	uc.mocks.stores.DeployTaskMock().EXPECT().ListServerless(ctx, *req).Return([]database.Deploy{
+		{
+			SvcName: "svc", ClusterID: "cluster", SKU: "sku",
+			GitPath: "models_foo/bar", Hardware: `{"memory": "foo"}`,
+			RepoID: 123,
+		},
+	}, 100, nil)
 
-// 	uc.mocks.components.repo.EXPECT().GenerateEndpoint(ctx, &database.Deploy{
-// 		SvcName:   "svc",
-// 		ClusterID: "cluster",
-// 	}).Return("endpoint", "foo")
-// 	uc.mocks.stores.RepoMock().EXPECT().TagsWithCategory(ctx, int64(123), "task").Return([]database.Tag{
-// 		{Name: "tag1"},
-// 		{Name: "tag2"},
-// 	}, nil)
+	data, total, err := uc.ListServerless(ctx, *req)
+	require.Nil(t, err)
+	require.Equal(t, 100, total)
+	require.Equal(t, []types.DeployRepo{
+		{
+			Path: "models_foo/bar", Status: "Stopped", GitPath: "models_foo/bar", Hardware: `{"memory": "foo"}`,
+			RepoID: 123, SvcName: "svc", ClusterID: "cluster", SKU: "sku",
+		},
+	}, data)
 
-// 	data, total, err := uc.ListDeploys(ctx, types.ModelRepo, req)
-// 	require.Nil(t, err)
-// 	require.Equal(t, 100, total)
-// 	require.Equal(t, []types.DeployRepo{
-// 		{
-// 			Path: "foo/bar", Status: "Stopped", GitPath: "models_foo/bar", Hardware: `{"memory": "foo"}`,
-// 			RepoID: 123, SvcName: "svc", Endpoint: "endpoint", ClusterID: "cluster",
-// 			RepoTag: "tag1",
-// 		},
-// 	}, data)
-
-// }
-
-// func TestUserComponent_ListInstances(t *testing.T) {
-// 	ctx := context.TODO()
-// 	uc := initializeTestUserComponent(ctx, t)
-
-// 	req := &types.UserRepoReq{
-// 		CurrentUser: "user",
-// 		PageOpts: types.PageOpts{
-// 			Page:     1,
-// 			PageSize: 10,
-// 		},
-// 	}
-// 	uc.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "user").Return(database.User{ID: 1}, nil)
-// 	uc.mocks.stores.DeployTaskMock().EXPECT().ListInstancesByUserID(ctx, int64(1), 10, 1).Return([]database.Deploy{
-// 		{
-// 			SvcName: "svc", ClusterID: "cluster", SKU: "sku",
-// 			GitPath: "models_foo/bar", Hardware: `{"memory": "foo"}`,
-// 			RepoID: 123,
-// 		},
-// 	}, 100, nil)
-
-// 	data, total, err := uc.ListInstances(ctx, req)
-// 	require.Nil(t, err)
-// 	require.Equal(t, 100, total)
-// 	require.Equal(t, []types.DeployRepo{
-// 		{
-// 			Path: "foo/bar", Status: "Stopped", GitPath: "models_foo/bar", Hardware: `{"memory": "foo"}`,
-// 			RepoID: 123, SvcName: "svc", ClusterID: "cluster",
-// 		},
-// 	}, data)
-
-// }
-
-// func TestUserComponent_ListServeless(t *testing.T) {
-// 	ctx := context.TODO()
-// 	uc := initializeTestUserComponent(ctx, t)
-
-// 	req := &types.DeployReq{
-// 		CurrentUser: "user",
-// 		PageOpts: types.PageOpts{
-// 			Page:     1,
-// 			PageSize: 10,
-// 		},
-// 	}
-// 	uc.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "user").Return(database.User{ID: 1}, nil)
-// 	uc.mocks.components.repo.EXPECT().IsAdminRole(database.User{ID: 1}).Return(true)
-// 	uc.mocks.stores.DeployTaskMock().EXPECT().ListServerless(ctx, *req).Return([]database.Deploy{
-// 		{
-// 			SvcName: "svc", ClusterID: "cluster", SKU: "sku",
-// 			GitPath: "models_foo/bar", Hardware: `{"memory": "foo"}`,
-// 			RepoID: 123,
-// 		},
-// 	}, 100, nil)
-
-// 	data, total, err := uc.ListServerless(ctx, *req)
-// 	require.Nil(t, err)
-// 	require.Equal(t, 100, total)
-// 	require.Equal(t, []types.DeployRepo{
-// 		{
-// 			Path: "models_foo/bar", Status: "Stopped", GitPath: "models_foo/bar", Hardware: `{"memory": "foo"}`,
-// 			RepoID: 123, SvcName: "svc", ClusterID: "cluster", SKU: "sku",
-// 		},
-// 	}, data)
-
-// }
+}
 
 func TestUserComponent_GetUserByName(t *testing.T) {
 	ctx := context.TODO()
@@ -478,4 +404,27 @@ func TestUserComponent_Prompts(t *testing.T) {
 	require.Equal(t, []types.PromptRes{
 		{ID: 1, Name: "foo"},
 	}, data)
+}
+
+func TestUserComponent_Evaluations(t *testing.T) {
+	ctx := context.TODO()
+	uc := initializeTestUserComponent(ctx, t)
+	uc.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "user").Return(
+		database.User{ID: 1, UUID: "uuid"}, nil,
+	)
+	uc.mocks.deployer.EXPECT().ListEvaluations(ctx, "user", 10, 1).Return(&types.ArgoWorkFlowListRes{
+		List:  []types.ArgoWorkFlowRes{{ID: 1}},
+		Total: 100,
+	}, nil)
+	data, total, err := uc.Evaluations(ctx, &types.UserDatasetsReq{
+		Owner:       "owner",
+		CurrentUser: "user",
+		PageOpts: types.PageOpts{
+			Page:     1,
+			PageSize: 10,
+		},
+	})
+	require.Nil(t, err)
+	require.Equal(t, 100, total)
+	require.Equal(t, []types.ArgoWorkFlowRes{{ID: 1}}, data)
 }

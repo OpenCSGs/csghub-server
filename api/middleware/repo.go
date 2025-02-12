@@ -34,29 +34,31 @@ func RepoMapping(repo_type types.RepositoryType) gin.HandlerFunc {
 			ctx.Next()
 			return
 		}
-		mirror, err := mirrorStore.FindWithMapping(ctx, repo_type, namespace, name, mapping)
+		repo, err := mirrorStore.FindWithMapping(ctx, repo_type, namespace, name, mapping)
 		//if found mirror, that means this is a synced source, otherwise it's may a user-upload repo
 		if err == nil {
-			repo_id := strings.Split(mirror.Repository.Path, "/")
+			namespace, name = repo.NamespaceAndName()
 			//set the real namespace, the name was unchange
-			slog.Info("namespace changed: ", "namespace", repo_id[0])
-			ctx.Set("namespace_mapped", repo_id[0])
-			ctx.Set("name_mapped", repo_id[1])
-			// for modelscope, the default branch is master, we should mapp it to real branch
-			if (branch == "main" || branch == "master") && mirror.Repository.DefaultBranch != branch {
-				ctx.Set("branch_mapped", mirror.Repository.DefaultBranch)
+			slog.Info("namespace changed: ", "namespace", namespace)
+			ctx.Set("namespace_mapped", namespace)
+			ctx.Set("name_mapped", name)
+			// for modelscope, the default branch is master, we should map it to real branch
+			if (branch == "main" || branch == "master") && repo.DefaultBranch != branch {
+				ctx.Set("branch_mapped", repo.DefaultBranch)
 			}
-			ctx.Next()
-			return
 		}
 		ctx.Next()
 	}
 }
 
 func GetMapping(ctx *gin.Context) types.Mapping {
-	rawRp := ctx.Query("mirror")
-	if rawRp == "" {
-		return types.AutoMapping
+	fullPath := ctx.FullPath()
+	if strings.HasPrefix(fullPath, "/hf/") {
+		return types.HFMapping
 	}
-	return types.Mapping(rawRp)
+	if strings.HasPrefix(fullPath, "/ms/") {
+		return types.ModelScopeMapping
+	}
+	//csg
+	return types.CSGHubMapping
 }

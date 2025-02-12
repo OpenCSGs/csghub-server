@@ -5,11 +5,12 @@ import (
 
 	"github.com/gin-gonic/gin"
 	mockcomponent "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/component"
+	"opencsg.com/csghub-server/builder/testutil"
 	"opencsg.com/csghub-server/common/types"
 )
 
 type UserTester struct {
-	*GinTester
+	*testutil.GinTester
 	handler *UserHandler
 	mocks   struct {
 		user *mockcomponent.MockUserComponent
@@ -17,7 +18,7 @@ type UserTester struct {
 }
 
 func NewUserTester(t *testing.T) *UserTester {
-	tester := &UserTester{GinTester: NewGinTester()}
+	tester := &UserTester{GinTester: testutil.NewGinTester()}
 	tester.mocks.user = mockcomponent.NewMockUserComponent(t)
 
 	tester.handler = &UserHandler{
@@ -29,7 +30,7 @@ func NewUserTester(t *testing.T) *UserTester {
 }
 
 func (t *UserTester) WithHandleFunc(fn func(h *UserHandler) gin.HandlerFunc) *UserTester {
-	t.ginHandler = fn(t.handler)
+	t.Handler(fn(t.handler))
 	return t
 }
 
@@ -38,7 +39,7 @@ func TestUserHandler_Datasets(t *testing.T) {
 		return h.Datasets
 	})
 
-	tester.mocks.user.EXPECT().Datasets(tester.ctx, &types.UserDatasetsReq{
+	tester.mocks.user.EXPECT().Datasets(tester.Ctx(), &types.UserDatasetsReq{
 		Owner:       "go",
 		CurrentUser: "u",
 		PageOpts: types.PageOpts{
@@ -59,7 +60,7 @@ func TestUserHandler_Models(t *testing.T) {
 		return h.Models
 	})
 
-	tester.mocks.user.EXPECT().Models(tester.ctx, &types.UserDatasetsReq{
+	tester.mocks.user.EXPECT().Models(tester.Ctx(), &types.UserDatasetsReq{
 		Owner:       "go",
 		CurrentUser: "u",
 		PageOpts: types.PageOpts{
@@ -80,7 +81,7 @@ func TestUserHandler_Codes(t *testing.T) {
 		return h.Codes
 	})
 
-	tester.mocks.user.EXPECT().Codes(tester.ctx, &types.UserDatasetsReq{
+	tester.mocks.user.EXPECT().Codes(tester.Ctx(), &types.UserDatasetsReq{
 		Owner:       "go",
 		CurrentUser: "u",
 		PageOpts: types.PageOpts{
@@ -101,7 +102,7 @@ func TestUserHandler_Spaces(t *testing.T) {
 		return h.Spaces
 	})
 
-	tester.mocks.user.EXPECT().Spaces(tester.ctx, &types.UserDatasetsReq{
+	tester.mocks.user.EXPECT().Spaces(tester.Ctx(), &types.UserDatasetsReq{
 		Owner:       "go",
 		CurrentUser: "u",
 		PageOpts: types.PageOpts{
@@ -123,7 +124,7 @@ func TestUserHandler_LikesAdd(t *testing.T) {
 	})
 	tester.RequireUser(t)
 
-	tester.mocks.user.EXPECT().AddLikes(tester.ctx, &types.UserLikesRequest{
+	tester.mocks.user.EXPECT().AddLikes(tester.Ctx(), &types.UserLikesRequest{
 		Username:    "go",
 		CurrentUser: "u",
 		RepoID:      123,
@@ -138,7 +139,7 @@ func TestUserHandler_LikesCollections(t *testing.T) {
 	})
 	tester.RequireUser(t)
 
-	tester.mocks.user.EXPECT().LikesCollection(tester.ctx, &types.UserCollectionReq{
+	tester.mocks.user.EXPECT().LikesCollection(tester.Ctx(), &types.UserCollectionReq{
 		Owner:       "go",
 		CurrentUser: "u",
 		PageOpts: types.PageOpts{
@@ -158,7 +159,7 @@ func TestUserHandler_UserCollections(t *testing.T) {
 		return h.UserCollections
 	})
 
-	tester.mocks.user.EXPECT().Collections(tester.ctx, &types.UserCollectionReq{
+	tester.mocks.user.EXPECT().Collections(tester.Ctx(), &types.UserCollectionReq{
 		Owner:       "go",
 		CurrentUser: "u",
 		PageOpts: types.PageOpts{
@@ -179,7 +180,7 @@ func TestUserHandler_LikeCollection(t *testing.T) {
 	})
 	tester.RequireUser(t)
 
-	tester.mocks.user.EXPECT().LikeCollection(tester.ctx, &types.UserLikesRequest{
+	tester.mocks.user.EXPECT().LikeCollection(tester.Ctx(), &types.UserLikesRequest{
 		CurrentUser:  "u",
 		CollectionID: 123,
 	}).Return(nil)
@@ -193,7 +194,7 @@ func TestUserHandler_UnLikeCollection(t *testing.T) {
 	})
 	tester.RequireUser(t)
 
-	tester.mocks.user.EXPECT().UnLikeCollection(tester.ctx, &types.UserLikesRequest{
+	tester.mocks.user.EXPECT().UnLikeCollection(tester.Ctx(), &types.UserLikesRequest{
 		CurrentUser:  "u",
 		CollectionID: 123,
 	}).Return(nil)
@@ -207,7 +208,7 @@ func TestUserHandler_LikesDelete(t *testing.T) {
 	})
 	tester.RequireUser(t)
 
-	tester.mocks.user.EXPECT().DeleteLikes(tester.ctx, &types.UserLikesRequest{
+	tester.mocks.user.EXPECT().DeleteLikes(tester.Ctx(), &types.UserLikesRequest{
 		CurrentUser: "u",
 		RepoID:      123,
 	}).Return(nil)
@@ -221,7 +222,7 @@ func TestUserHandler_LikesSpaces(t *testing.T) {
 	})
 	tester.RequireUser(t)
 
-	tester.mocks.user.EXPECT().LikesSpaces(tester.ctx, &types.UserSpacesReq{
+	tester.mocks.user.EXPECT().LikesSpaces(tester.Ctx(), &types.UserSpacesReq{
 		Owner:       "foo",
 		CurrentUser: "u",
 		PageOpts: types.PageOpts{
@@ -243,7 +244,7 @@ func TestUserHandler_LikesCodes(t *testing.T) {
 	})
 	tester.RequireUser(t)
 
-	tester.mocks.user.EXPECT().LikesCodes(tester.ctx, &types.UserDatasetsReq{
+	tester.mocks.user.EXPECT().LikesCodes(tester.Ctx(), &types.UserDatasetsReq{
 		Owner:       "foo",
 		CurrentUser: "u",
 		PageOpts: types.PageOpts{
@@ -265,7 +266,7 @@ func TestUserHandler_LikesModels(t *testing.T) {
 	})
 	tester.RequireUser(t)
 
-	tester.mocks.user.EXPECT().LikesModels(tester.ctx, &types.UserDatasetsReq{
+	tester.mocks.user.EXPECT().LikesModels(tester.Ctx(), &types.UserDatasetsReq{
 		Owner:       "foo",
 		CurrentUser: "u",
 		PageOpts: types.PageOpts{
@@ -287,7 +288,7 @@ func TestUserHandler_LikesDatasets(t *testing.T) {
 	})
 	tester.RequireUser(t)
 
-	tester.mocks.user.EXPECT().LikesDatasets(tester.ctx, &types.UserDatasetsReq{
+	tester.mocks.user.EXPECT().LikesDatasets(tester.Ctx(), &types.UserDatasetsReq{
 		Owner:       "foo",
 		CurrentUser: "u",
 		PageOpts: types.PageOpts{
@@ -328,7 +329,7 @@ func TestUserHandler_GetRunDeploys(t *testing.T) {
 	})
 	tester.RequireUser(t)
 
-	tester.mocks.user.EXPECT().ListDeploys(tester.ctx, types.ModelRepo, &types.DeployReq{
+	tester.mocks.user.EXPECT().ListDeploys(tester.Ctx(), types.ModelRepo, &types.DeployReq{
 		CurrentUser: "u",
 		RepoType:    types.ModelRepo,
 		DeployType:  1,
@@ -352,7 +353,7 @@ func TestUserHandler_GetFinetuneInstances(t *testing.T) {
 		return h.GetFinetuneInstances
 	})
 
-	tester.mocks.user.EXPECT().ListInstances(tester.ctx, &types.UserRepoReq{
+	tester.mocks.user.EXPECT().ListInstances(tester.Ctx(), &types.UserRepoReq{
 		CurrentUser: "u",
 		PageOpts: types.PageOpts{
 			Page:     1,
@@ -375,7 +376,7 @@ func TestUserHandler_GetRunServerless(t *testing.T) {
 	})
 	tester.RequireUser(t)
 
-	tester.mocks.user.EXPECT().ListServerless(tester.ctx, types.DeployReq{
+	tester.mocks.user.EXPECT().ListServerless(tester.Ctx(), types.DeployReq{
 		CurrentUser: "u",
 		RepoType:    types.ModelRepo,
 		DeployType:  3,
@@ -399,7 +400,7 @@ func TestUserHandler_Prompts(t *testing.T) {
 		return h.Prompts
 	})
 
-	tester.mocks.user.EXPECT().Prompts(tester.ctx, &types.UserPromptsReq{
+	tester.mocks.user.EXPECT().Prompts(tester.Ctx(), &types.UserPromptsReq{
 		CurrentUser: "u",
 		Owner:       "u",
 		PageOpts: types.PageOpts{
@@ -422,7 +423,7 @@ func TestUserHandler_GetEvaluations(t *testing.T) {
 	})
 	tester.RequireUser(t)
 
-	tester.mocks.user.EXPECT().Evaluations(tester.ctx, &types.UserEvaluationReq{
+	tester.mocks.user.EXPECT().Evaluations(tester.Ctx(), &types.UserEvaluationReq{
 		CurrentUser: "u",
 		Owner:       "u",
 		PageOpts: types.PageOpts{

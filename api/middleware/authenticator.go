@@ -183,7 +183,7 @@ func MustLogin() gin.HandlerFunc {
 	}
 }
 
-func AdminAuthenticator(config *config.Config) gin.HandlerFunc {
+func NeedAdmin(config *config.Config) gin.HandlerFunc {
 	userSvcClient := rpc.NewUserSvcHttpClient(fmt.Sprintf("%s:%d", config.User.Host, config.User.Port),
 		rpc.AuthWithApiKey(config.APIToken))
 
@@ -198,7 +198,7 @@ func AdminAuthenticator(config *config.Config) gin.HandlerFunc {
 		user, err := userSvcClient.GetUserInfo(ctx, currentUser, currentUser)
 
 		if err != nil {
-			httpbase.ServerError(ctx, errors.New("failed to find user"))
+			httpbase.ServerError(ctx, fmt.Errorf("failed to find user, cause:%w", err))
 			ctx.Abort()
 			return
 		}
@@ -215,4 +215,13 @@ func AdminAuthenticator(config *config.Config) gin.HandlerFunc {
 
 		ctx.Next()
 	}
+}
+
+type AuthenticatorCollection struct {
+	// only can be accessed by api key
+	NeedAPIKey gin.HandlerFunc
+	// user need to login first
+	NeedLogin gin.HandlerFunc
+	//user must be admin role to access
+	NeedAdmin gin.HandlerFunc
 }

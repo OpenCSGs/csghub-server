@@ -18,6 +18,9 @@ type Client interface {
 }
 
 func FromOpenCSG(endpoint string, accessToken string) Client {
+	if endpoint == "" {
+		return &commonClient{}
+	}
 	return &commonClient{rpcClent: rpc.NewHttpClient(endpoint, rpc.AuthWithApiKey(accessToken))}
 }
 

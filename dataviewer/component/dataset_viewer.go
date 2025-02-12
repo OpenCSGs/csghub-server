@@ -6,13 +6,18 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"math"
 	"regexp"
 	"strings"
 
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 	"gopkg.in/yaml.v3"
 	"opencsg.com/csghub-server/builder/git/gitserver"
 	"opencsg.com/csghub-server/builder/parquet"
 	"opencsg.com/csghub-server/builder/store/database"
+	"opencsg.com/csghub-server/builder/store/s3"
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/types"
 	hubCom "opencsg.com/csghub-server/component"
@@ -20,19 +25,28 @@ import (
 	"opencsg.com/csghub-server/dataviewer/workflows"
 )
 
+var tracer trace.Tracer
+
+func init() {
+	tracer = otel.Tracer("dataset-viewer")
+}
+
 type DatasetViewerComponent interface {
 	ViewParquetFile(ctx context.Context, req *dvCom.ViewParquetFileReq) (*dvCom.ViewParquetFileResp, error)
 	Rows(ctx context.Context, req *dvCom.ViewParquetFileReq, viewerReq types.DataViewerReq) (*dvCom.ViewParquetFileResp, error)
+	LimitOffsetRows(ctx context.Context, req *dvCom.ViewParquetFileReq, viewerReq types.DataViewerReq) (*dvCom.ViewParquetFileResp, error)
 	GetCatalog(ctx context.Context, req *dvCom.ViewParquetFileReq) (*dvCom.CataLogRespone, error)
 }
 
 type datasetViewerComponentImpl struct {
-	repoStore     database.RepoStore
-	repoComponent hubCom.RepoComponent
-	gitServer     gitserver.GitServer
-	preader       parquet.Reader
-	cfg           *config.Config
-	viewerStore   database.DataviewerStore
+	repoStore              database.RepoStore
+	repoComponent          hubCom.RepoComponent
+	gitServer              gitserver.GitServer
+	preader                parquet.Reader
+	limitOffsetCountReader parquet.LimitOffsetCountReader
+	cfg                    *config.Config
+	viewerStore            database.DataviewerStore
+	tracer                 trace.Tracer
 }
 
 func NewDatasetViewerComponent(cfg *config.Config, gs gitserver.GitServer) (DatasetViewerComponent, error) {
@@ -41,12 +55,21 @@ func NewDatasetViewerComponent(cfg *config.Config, gs gitserver.GitServer) (Data
 		return nil, fmt.Errorf("failed to create repo component,cause:%w", err)
 	}
 
+	mio, err := s3.NewMinio(cfg)
+	if err != nil {
+		return nil, err
+	}
+
 	return &datasetViewerComponentImpl{
 		gitServer:     gs,
 		cfg:           cfg,
 		repoComponent: r,
 		repoStore:     database.NewRepoStore(),
 		viewerStore:   database.NewDataviewerStore(),
+		limitOffsetCountReader: parquet.NewParquetGoReader(
+			parquet.NewMinIOClient(mio), tracer, cfg.S3.Bucket,
+		),
+		tracer: tracer,
 	}, nil
 }
 
@@ -112,6 +135,99 @@ func (c *datasetViewerComponentImpl) ViewParquetFile(ctx context.Context, req *d
 		Total:       total,
 	}
 	return resp, nil
+}
+
+func (c *datasetViewerComponentImpl) getFilesFromDatasetCard(ctx context.Context, req *dvCom.ViewParquetFileReq, config, split string) ([]string, error) {
+	cardData, err := c.getRepoCardData(ctx, req, false)
+	if err != nil {
+		return nil, err
+	}
+
+	var reqFiles []string
+	var hasWildCard bool
+	var tree []string
+
+	for _, cfg := range cardData.Configs {
+		if cfg.ConfigName == config {
+			for _, datafile := range cfg.DataFiles {
+				if datafile.Split == split {
+					reqFiles, hasWildCard = c.getPatternFileList(datafile.Path)
+					break
+				}
+			}
+			break
+		}
+	}
+
+	realReqFiles := reqFiles
+	if hasWildCard {
+		// need get real files match test/test-* in repo
+		realReqFiles, _ = c.convertRealFiles(ctx, req, reqFiles, tree)
+	}
+	parquetObjs := c.getFilesOBJs(ctx, req, realReqFiles)
+	if len(parquetObjs) < 1 {
+		return nil, fmt.Errorf("no valid files in request")
+	}
+	return parquetObjs, nil
+
+}
+
+// Retrieves rows quickly using the parquet-go client. This endpoint only supports limit and offset parameters.
+// For search or sorting, use the Rows method instead. Note that the Rows method performs poorly when only limit/offset is used, especially with large offsets.
+func (c *datasetViewerComponentImpl) LimitOffsetRows(ctx context.Context, req *dvCom.ViewParquetFileReq, viewerReq types.DataViewerReq) (*dvCom.ViewParquetFileResp, error) {
+	r, err := c.repoStore.FindByPath(ctx, types.DatasetRepo, req.Namespace, req.RepoName)
+	if err != nil {
+		return nil, fmt.Errorf("failed to find dataset, error: %w", err)
+	}
+
+	allow, err := c.repoComponent.AllowReadAccessRepo(ctx, r, req.CurrentUser)
+	if err != nil {
+		return nil, fmt.Errorf("failed to check dataset permission, error: %w", err)
+	}
+	if !allow {
+		return nil, hubCom.ErrForbidden
+	}
+	req.Branch = r.DefaultBranch
+
+	_, paths, err := c.getViewerCardData(ctx, r.ID, &viewerReq)
+	if err != nil {
+		// parse readme dataset yaml
+		paths, err = c.getFilesFromDatasetCard(ctx, req, viewerReq.Config, viewerReq.Split)
+		if err != nil {
+			// get files dynamically and assign them to default config
+			paths = []string{}
+			fs, err := c.getParquetFilesBySplit(ctx, req, viewerReq.Split)
+			if err != nil {
+				return nil, fmt.Errorf("failed to get parquet objects, %w", err)
+			}
+			for _, f := range fs {
+				paths = append(paths, "lfs/"+f.LfsRelativePath)
+			}
+		}
+	}
+
+	if len(paths) < 1 {
+		return nil, fmt.Errorf("no valid parquet file in request for row data")
+	}
+
+	offset := int64(req.Page-1) * int64(req.Per)
+	if offset < 0 {
+		offset = 0
+	}
+	columns, columnTypes, rows, total, err := c.limitOffsetCountReader.RowsWithCount(
+		ctx, paths, int64(req.Per), offset,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("RowsLimited: %w", err)
+	}
+
+	return &dvCom.ViewParquetFileResp{
+		Columns:     columns,
+		ColumnsType: columnTypes,
+		Rows:        rows,
+		Total:       int(total),
+	}, nil
+
 }
 
 func (c *datasetViewerComponentImpl) Rows(ctx context.Context, req *dvCom.ViewParquetFileReq, viewerReq types.DataViewerReq) (*dvCom.ViewParquetFileResp, error) {
@@ -201,7 +317,7 @@ func (c *datasetViewerComponentImpl) getRepoParquetObjs(ctx context.Context, req
 	realReqFiles := reqFiles
 	if hasWildCard {
 		// need get real files match test/test-* in repo
-		realReqFiles, _ = c.convertRealFiles(req, reqFiles, tree)
+		realReqFiles, _ = c.convertRealFiles(ctx, req, reqFiles, tree)
 	}
 	parquetObjs := c.getFilesOBJs(ctx, req, realReqFiles)
 	if len(parquetObjs) < 1 {
@@ -377,7 +493,7 @@ func (c *datasetViewerComponentImpl) generateCardDatasetInfo(ctx context.Context
 			datafiles = append(datafiles, dvCom.DataFiles{Split: datafile.Split, Path: newPath})
 			realReqFiles := reqFiles
 			if hasWildCard {
-				realReqFiles, tree = c.convertRealFiles(req, reqFiles, tree)
+				realReqFiles, tree = c.convertRealFiles(ctx, req, reqFiles, tree)
 			}
 			total := c.getFilesRowCount(ctx, req, realReqFiles)
 			splits = append(splits, dvCom.Split{Name: datafile.Split, NumExamples: total})
@@ -421,11 +537,11 @@ func (c *datasetViewerComponentImpl) getPatternFileList(path interface{}) ([]str
 	return files, hasWildCard
 }
 
-func (c *datasetViewerComponentImpl) convertRealFiles(req *dvCom.ViewParquetFileReq, splitFiles []string, tree []string) ([]string, []string) {
+func (c *datasetViewerComponentImpl) convertRealFiles(ctx context.Context, req *dvCom.ViewParquetFileReq, splitFiles []string, tree []string) ([]string, []string) {
 	var err error
 	if len(tree) < 1 {
 		// skip get all tree
-		tree, err = hubCom.GetFilePaths(req.Namespace, req.RepoName, "", types.DatasetRepo, req.Branch, c.gitServer.GetRepoFileTree)
+		tree, err = hubCom.GetFilePaths(ctx, req.Namespace, req.RepoName, "", types.DatasetRepo, req.Branch, c.gitServer.GetRepoFileTree)
 		if err != nil {
 			slog.Error("Failed to get repo file paths", slog.Any("req", req), slog.Any("error", err))
 			return splitFiles, tree
@@ -459,8 +575,56 @@ func (c *datasetViewerComponentImpl) convertRealFiles(req *dvCom.ViewParquetFile
 	return phyFiles, tree
 }
 
+func (c *datasetViewerComponentImpl) getParquetFilesBySplit(ctx context.Context, req *dvCom.ViewParquetFileReq, split string) ([]*types.File, error) {
+	ctx, span := c.tracer.Start(ctx, "datasetViewer.getParquetFilesBySplit")
+	defer span.End()
+
+	treeReq := types.GetTreeRequest{
+		Namespace: req.Namespace,
+		Name:      req.RepoName,
+		Ref:       req.Branch,
+		Path:      req.Path,
+		RepoType:  types.DatasetRepo,
+		Limit:     math.MaxInt,
+		Recursive: true,
+	}
+	files := []*types.File{}
+
+	resp, err := c.gitServer.GetTree(ctx, treeReq)
+	if err != nil {
+		return nil, err
+	}
+	for _, file := range resp.Files {
+		if file.Type != "dir" {
+			if !workflows.IsValidParquetFile(file.Path) {
+				continue
+			}
+
+			var validator func(string) bool
+			switch split {
+			case workflows.SplitName.Train:
+				validator = workflows.IsTrainFile
+			case workflows.SplitName.Test:
+				validator = workflows.IsTestFile
+			case workflows.SplitName.Val:
+				validator = workflows.IsValidationFile
+			default:
+				return nil, fmt.Errorf("unknown split type: %s", split)
+			}
+			if validator(strings.ToLower(file.Path)) {
+				files = append(files, file)
+			}
+
+		}
+	}
+	return files, nil
+}
+
 func (c *datasetViewerComponentImpl) autoGenerateCatalog(ctx context.Context, req *dvCom.ViewParquetFileReq, calcTotal bool) (*dvCom.CardData, error) {
-	tree, err := hubCom.GetFilePaths(req.Namespace, req.RepoName, "", types.DatasetRepo, req.Branch, c.gitServer.GetRepoFileTree)
+	ctx, span := c.tracer.Start(ctx, "datasetViewer.autoGenerateCatalog")
+	defer span.End()
+
+	tree, err := hubCom.GetFilePaths(ctx, req.Namespace, req.RepoName, "", types.DatasetRepo, req.Branch, c.gitServer.GetRepoFileTree)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get repo tree, error: %w", err)
 	}
@@ -497,24 +661,24 @@ func (c *datasetViewerComponentImpl) genDefaultCatalog(ctx context.Context, req 
 		if calcTotal {
 			total = c.getFilesRowCount(ctx, req, trainFiles)
 		}
-		configData.DataFiles = append(configData.DataFiles, dvCom.DataFiles{Split: workflows.TrainSplitName, Path: trainFiles})
-		datasetInfo.Splits = append(datasetInfo.Splits, dvCom.Split{Name: workflows.TrainSplitName, NumExamples: total})
+		configData.DataFiles = append(configData.DataFiles, dvCom.DataFiles{Split: workflows.SplitName.Train, Path: trainFiles})
+		datasetInfo.Splits = append(datasetInfo.Splits, dvCom.Split{Name: workflows.SplitName.Train, NumExamples: total})
 	}
 	if len(testFiles) > 0 {
 		total := 0
 		if calcTotal {
 			total = c.getFilesRowCount(ctx, req, testFiles)
 		}
-		configData.DataFiles = append(configData.DataFiles, dvCom.DataFiles{Split: workflows.TestSplitName, Path: testFiles})
-		datasetInfo.Splits = append(datasetInfo.Splits, dvCom.Split{Name: workflows.TestSplitName, NumExamples: total})
+		configData.DataFiles = append(configData.DataFiles, dvCom.DataFiles{Split: workflows.SplitName.Test, Path: testFiles})
+		datasetInfo.Splits = append(datasetInfo.Splits, dvCom.Split{Name: workflows.SplitName.Test, NumExamples: total})
 	}
 	if len(valFiles) > 0 {
 		total := 0
 		if calcTotal {
 			total = c.getFilesRowCount(ctx, req, valFiles)
 		}
-		configData.DataFiles = append(configData.DataFiles, dvCom.DataFiles{Split: workflows.ValSplitName, Path: valFiles})
-		datasetInfo.Splits = append(datasetInfo.Splits, dvCom.Split{Name: workflows.ValSplitName, NumExamples: total})
+		configData.DataFiles = append(configData.DataFiles, dvCom.DataFiles{Split: workflows.SplitName.Val, Path: valFiles})
+		datasetInfo.Splits = append(datasetInfo.Splits, dvCom.Split{Name: workflows.SplitName.Val, NumExamples: total})
 	}
 	configData.ConfigName = workflows.DefaultSubsetName
 	datasetInfo.ConfigName = workflows.DefaultSubsetName
@@ -566,6 +730,10 @@ func (c *datasetViewerComponentImpl) getFilesOBJs(ctx context.Context, req *dvCo
 }
 
 func (c *datasetViewerComponentImpl) getParquetObject(ctx context.Context, req *dvCom.ViewParquetFileReq) (string, error) {
+	ctx, span := c.tracer.Start(ctx, "datasetViewer.getParquetObject")
+	defer span.End()
+	span.SetAttributes(attribute.String("path", req.Path))
+
 	getFileContentReq := gitserver.GetRepoInfoByPathReq{
 		Namespace: req.Namespace,
 		Name:      req.RepoName,

@@ -9,11 +9,12 @@ import (
 	"github.com/stretchr/testify/require"
 	mock_component "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/component"
 	"opencsg.com/csghub-server/builder/store/database"
+	"opencsg.com/csghub-server/builder/testutil"
 	"opencsg.com/csghub-server/common/types"
 )
 
 type PromptTester struct {
-	*GinTester
+	*testutil.GinTester
 	handler *PromptHandler
 	mocks   struct {
 		prompt    *mock_component.MockPromptComponent
@@ -23,7 +24,7 @@ type PromptTester struct {
 }
 
 func NewPromptTester(t *testing.T) *PromptTester {
-	tester := &PromptTester{GinTester: NewGinTester()}
+	tester := &PromptTester{GinTester: testutil.NewGinTester()}
 	tester.mocks.prompt = mock_component.NewMockPromptComponent(t)
 	tester.mocks.sensitive = mock_component.NewMockSensitiveComponent(t)
 	tester.mocks.repo = mock_component.NewMockRepoComponent(t)
@@ -38,7 +39,7 @@ func NewPromptTester(t *testing.T) *PromptTester {
 }
 
 func (t *PromptTester) WithHandleFunc(fn func(h *PromptHandler) gin.HandlerFunc) *PromptTester {
-	t.ginHandler = fn(t.handler)
+	t.Handler(fn(t.handler))
 	return t
 
 }
@@ -62,7 +63,7 @@ func TestPromptHandler_Index(t *testing.T) {
 			})
 
 			if !c.error {
-				tester.mocks.prompt.EXPECT().IndexPromptRepo(tester.ctx, &types.RepoFilter{
+				tester.mocks.prompt.EXPECT().IndexPromptRepo(tester.Ctx(), &types.RepoFilter{
 					Search: "foo",
 					Sort:   c.sort,
 					Source: c.source,
@@ -76,7 +77,7 @@ func TestPromptHandler_Index(t *testing.T) {
 				WithQuery("source", c.source).Execute()
 
 			if c.error {
-				require.Equal(t, 400, tester.response.Code)
+				require.Equal(t, 400, tester.Response().Code)
 			} else {
 				tester.ResponseEqSimple(t, 200, gin.H{
 					"data":  []types.PromptRes{{Name: "cc"}},
@@ -93,8 +94,8 @@ func TestPromptHandler_ListPrompt(t *testing.T) {
 	})
 
 	tester.WithUser()
-	tester.mocks.prompt.EXPECT().Show(tester.ctx, "u", "r", "u").Return(&types.PromptRes{Name: "p"}, nil)
-	tester.mocks.prompt.EXPECT().ListPrompt(tester.ctx, types.PromptReq{
+	tester.mocks.prompt.EXPECT().Show(tester.Ctx(), "u", "r", "u").Return(&types.PromptRes{Name: "p"}, nil)
+	tester.mocks.prompt.EXPECT().ListPrompt(tester.Ctx(), types.PromptReq{
 		Namespace: "u", Name: "r", CurrentUser: "u",
 	}).Return([]types.PromptOutput{{FilePath: "fp"}}, nil)
 	tester.Execute()
@@ -111,7 +112,7 @@ func TestPromptHandler_GetPrompt(t *testing.T) {
 	})
 
 	tester.WithUser().WithParam("file_path", "fp")
-	tester.mocks.prompt.EXPECT().GetPrompt(tester.ctx, types.PromptReq{
+	tester.mocks.prompt.EXPECT().GetPrompt(tester.Ctx(), types.PromptReq{
 		Namespace: "u", Name: "r", CurrentUser: "u", Path: "fp",
 	}).Return(&types.PromptOutput{FilePath: "fp"}, nil)
 	tester.Execute()
@@ -128,8 +129,8 @@ func TestPromptHandler_CreatePrompt(t *testing.T) {
 	req := &types.CreatePromptReq{Prompt: types.Prompt{
 		Title: "t", Content: "c", Language: "l",
 	}}
-	tester.mocks.sensitive.EXPECT().CheckRequestV2(tester.ctx, req).Return(true, nil)
-	tester.mocks.prompt.EXPECT().CreatePrompt(tester.ctx, types.PromptReq{
+	tester.mocks.sensitive.EXPECT().CheckRequestV2(tester.Ctx(), req).Return(true, nil)
+	tester.mocks.prompt.EXPECT().CreatePrompt(tester.Ctx(), types.PromptReq{
 		Namespace: "u", Name: "r", CurrentUser: "u",
 	}, req).Return(&types.Prompt{Title: "p"}, nil)
 	tester.WithBody(t, req).Execute()
@@ -146,8 +147,8 @@ func TestPromptHandler_UpdatePrompt(t *testing.T) {
 	req := &types.UpdatePromptReq{Prompt: types.Prompt{
 		Title: "t", Content: "c", Language: "l",
 	}}
-	tester.mocks.sensitive.EXPECT().CheckRequestV2(tester.ctx, req).Return(true, nil)
-	tester.mocks.prompt.EXPECT().UpdatePrompt(tester.ctx, types.PromptReq{
+	tester.mocks.sensitive.EXPECT().CheckRequestV2(tester.Ctx(), req).Return(true, nil)
+	tester.mocks.prompt.EXPECT().UpdatePrompt(tester.Ctx(), types.PromptReq{
 		Namespace: "u", Name: "r", CurrentUser: "u", Path: "fp",
 	}, req).Return(&types.Prompt{Title: "p"}, nil)
 	tester.WithParam("file_path", "fp").WithBody(t, req).Execute()
@@ -162,7 +163,7 @@ func TestPromptHandler_DeletePrompt(t *testing.T) {
 	tester.RequireUser(t)
 
 	tester.WithUser().WithParam("file_path", "fp")
-	tester.mocks.prompt.EXPECT().DeletePrompt(tester.ctx, types.PromptReq{
+	tester.mocks.prompt.EXPECT().DeletePrompt(tester.Ctx(), types.PromptReq{
 		Namespace: "u", Name: "r", CurrentUser: "u", Path: "fp",
 	}).Return(nil)
 	tester.Execute()
@@ -176,7 +177,7 @@ func TestPromptHandler_Relations(t *testing.T) {
 	})
 
 	tester.WithUser()
-	tester.mocks.prompt.EXPECT().Relations(tester.ctx, "u", "r", "u").Return(&types.Relations{}, nil)
+	tester.mocks.prompt.EXPECT().Relations(tester.Ctx(), "u", "r", "u").Return(&types.Relations{}, nil)
 	tester.Execute()
 
 	tester.ResponseEq(t, 200, tester.OKText, &types.Relations{})
@@ -189,7 +190,7 @@ func TestPromptHandler_SetRelations(t *testing.T) {
 	tester.RequireUser(t)
 
 	req := types.RelationModels{Namespace: "u", Name: "r", CurrentUser: "u"}
-	tester.mocks.prompt.EXPECT().SetRelationModels(tester.ctx, req).Return(nil)
+	tester.mocks.prompt.EXPECT().SetRelationModels(tester.Ctx(), req).Return(nil)
 	tester.WithBody(t, types.RelationModels{Name: "rm"}).Execute()
 
 	tester.ResponseEq(t, 200, tester.OKText, nil)
@@ -202,7 +203,7 @@ func TestPromptHandler_AddModelRelation(t *testing.T) {
 	tester.RequireUser(t)
 
 	req := types.RelationModel{Namespace: "u", Name: "r", CurrentUser: "u"}
-	tester.mocks.prompt.EXPECT().AddRelationModel(tester.ctx, req).Return(nil)
+	tester.mocks.prompt.EXPECT().AddRelationModel(tester.Ctx(), req).Return(nil)
 	tester.WithBody(t, types.RelationModels{Name: "rm"}).Execute()
 
 	tester.ResponseEq(t, 200, tester.OKText, nil)
@@ -215,7 +216,7 @@ func TestPromptHandler_DeleteModelRelation(t *testing.T) {
 	tester.RequireUser(t)
 
 	req := types.RelationModel{Namespace: "u", Name: "r", CurrentUser: "u"}
-	tester.mocks.prompt.EXPECT().AddRelationModel(tester.ctx, req).Return(nil)
+	tester.mocks.prompt.EXPECT().AddRelationModel(tester.Ctx(), req).Return(nil)
 	tester.WithBody(t, types.RelationModels{Name: "rm"}).Execute()
 
 	tester.ResponseEq(t, 200, tester.OKText, nil)
@@ -228,10 +229,10 @@ func TestPromptHandler_CreatePromptRepo(t *testing.T) {
 	tester.RequireUser(t)
 
 	req := &types.CreatePromptRepoReq{CreateRepoReq: types.CreateRepoReq{}}
-	tester.mocks.sensitive.EXPECT().CheckRequestV2(tester.ctx, req).Return(true, nil)
+	tester.mocks.sensitive.EXPECT().CheckRequestV2(tester.Ctx(), req).Return(true, nil)
 	reqn := *req
 	reqn.Username = "u"
-	tester.mocks.prompt.EXPECT().CreatePromptRepo(tester.ctx, &reqn).Return(
+	tester.mocks.prompt.EXPECT().CreatePromptRepo(tester.Ctx(), &reqn).Return(
 		&types.PromptRes{Name: "p"}, nil,
 	)
 	tester.WithBody(t, req).Execute()
@@ -248,12 +249,12 @@ func TestPromptHandler_UpdatePromptRepo(t *testing.T) {
 	tester.RequireUser(t)
 
 	req := &types.UpdatePromptRepoReq{UpdateRepoReq: types.UpdateRepoReq{}}
-	tester.mocks.sensitive.EXPECT().CheckRequestV2(tester.ctx, req).Return(true, nil)
+	tester.mocks.sensitive.EXPECT().CheckRequestV2(tester.Ctx(), req).Return(true, nil)
 	reqn := *req
 	reqn.Namespace = "u"
 	reqn.Name = "r"
 	reqn.Username = "u"
-	tester.mocks.prompt.EXPECT().UpdatePromptRepo(tester.ctx, &reqn).Return(
+	tester.mocks.prompt.EXPECT().UpdatePromptRepo(tester.Ctx(), &reqn).Return(
 		&types.PromptRes{Name: "p"}, nil,
 	)
 	tester.WithBody(t, req).Execute()
@@ -267,7 +268,7 @@ func TestPromptHandler_DeletePromptRepo(t *testing.T) {
 	})
 	tester.RequireUser(t)
 
-	tester.mocks.prompt.EXPECT().RemoveRepo(tester.ctx, "u", "r", "u").Return(nil)
+	tester.mocks.prompt.EXPECT().RemoveRepo(tester.Ctx(), "u", "r", "u").Return(nil)
 	tester.Execute()
 
 	tester.ResponseEq(t, 200, tester.OKText, nil)
@@ -278,7 +279,7 @@ func TestPromptHandler_Branches(t *testing.T) {
 		return h.Branches
 	})
 
-	tester.mocks.repo.EXPECT().Branches(tester.ctx, &types.GetBranchesReq{
+	tester.mocks.repo.EXPECT().Branches(tester.Ctx(), &types.GetBranchesReq{
 		Namespace:   "u",
 		Name:        "r",
 		Per:         10,
@@ -296,7 +297,7 @@ func TestPromptHandler_Tags(t *testing.T) {
 		return h.Tags
 	})
 
-	tester.mocks.repo.EXPECT().Tags(tester.ctx, &types.GetTagsReq{
+	tester.mocks.repo.EXPECT().Tags(tester.Ctx(), &types.GetTagsReq{
 		Namespace:   "u",
 		Name:        "r",
 		RepoType:    types.PromptRepo,
@@ -314,7 +315,7 @@ func TestPromptHandler_UpdateTags(t *testing.T) {
 	tester.RequireUser(t)
 
 	req := []string{"a", "b"}
-	tester.mocks.repo.EXPECT().UpdateTags(tester.ctx, "u", "r", types.PromptRepo, "cat", "u", req).Return(nil)
+	tester.mocks.repo.EXPECT().UpdateTags(tester.Ctx(), "u", "r", types.PromptRepo, "cat", "u", req).Return(nil)
 	tester.WithBody(t, req).WithParam("category", "cat").Execute()
 	tester.ResponseEq(t, 200, tester.OKText, nil)
 }
@@ -324,7 +325,7 @@ func TestPromptHandler_UpdateDownloads(t *testing.T) {
 		return h.UpdateDownloads
 	})
 
-	tester.mocks.repo.EXPECT().UpdateDownloads(tester.ctx, &types.UpdateDownloadsReq{
+	tester.mocks.repo.EXPECT().UpdateDownloads(tester.Ctx(), &types.UpdateDownloadsReq{
 		Namespace: "u",
 		Name:      "r",
 		RepoType:  types.PromptRepo,

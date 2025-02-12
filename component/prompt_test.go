@@ -285,7 +285,7 @@ func TestPromptComponent_ListPrompt(t *testing.T) {
 	pc.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, types.PromptRepo, "ns", "n").Return(repo, nil).Once()
 	pc.mocks.components.repo.EXPECT().AllowReadAccessRepo(ctx, repo, "foo").Return(true, nil).Once()
 
-	pc.mocks.gitServer.EXPECT().GetRepoFileTree(context.Background(), gitserver.GetRepoInfoByPathReq{
+	pc.mocks.gitServer.EXPECT().GetRepoFileTree(ctx, gitserver.GetRepoInfoByPathReq{
 		Namespace: "ns",
 		Name:      "n",
 		RepoType:  types.PromptRepo,

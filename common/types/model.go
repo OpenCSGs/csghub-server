@@ -169,6 +169,7 @@ type Model struct {
 	RecomOpWeight        int                  `json:"recom_op_weight,omitempty"`
 	SensitiveCheckStatus string               `json:"sensitive_check_status"`
 	MirrorLastUpdatedAt  time.Time            `json:"mirror_last_updated_at"`
+	MultiSource
 }
 
 type SDKModelInfo struct {
@@ -214,6 +215,7 @@ type ModelRunReq struct {
 	MaxReplica         int    `json:"max_replica"`
 	Revision           string `json:"revision"`
 	SecureLevel        int    `json:"secure_level"`
+	OrderDetailID      int64  `json:"order_detail_id"`
 }
 
 var _ SensitiveRequestV2 = (*ModelRunReq)(nil)

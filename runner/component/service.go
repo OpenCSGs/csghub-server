@@ -554,6 +554,12 @@ func (s *serviceComponentImpl) GetServiceStatus(ctx context.Context, ks v1.Servi
 		}
 	case serviceCondition.Status == corev1.ConditionFalse:
 		resp.Code = common.DeployFailed
+		for _, instance := range instList {
+			if instance.Status == string(corev1.PodRunning) || instance.Status == string(corev1.PodPending) {
+				resp.Code = common.Deploying
+				break
+			}
+		}
 	}
 	resp.Instances = instList
 	return resp, err

@@ -5,11 +5,12 @@ import (
 
 	"github.com/gin-gonic/gin"
 	mockcomponent "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/component"
+	"opencsg.com/csghub-server/builder/testutil"
 	"opencsg.com/csghub-server/common/types"
 )
 
 type DiscussionTester struct {
-	*GinTester
+	*testutil.GinTester
 	handler *DiscussionHandler
 	mocks   struct {
 		discussion *mockcomponent.MockDiscussionComponent
@@ -18,7 +19,7 @@ type DiscussionTester struct {
 }
 
 func NewDiscussionTester(t *testing.T) *DiscussionTester {
-	tester := &DiscussionTester{GinTester: NewGinTester()}
+	tester := &DiscussionTester{GinTester: testutil.NewGinTester()}
 	tester.mocks.discussion = mockcomponent.NewMockDiscussionComponent(t)
 	tester.mocks.sensitive = mockcomponent.NewMockSensitiveComponent(t)
 
@@ -32,7 +33,7 @@ func NewDiscussionTester(t *testing.T) *DiscussionTester {
 }
 
 func (t *DiscussionTester) WithHandleFunc(fn func(h *DiscussionHandler) gin.HandlerFunc) *DiscussionTester {
-	t.ginHandler = fn(t.handler)
+	t.Handler(fn(t.handler))
 	return t
 }
 
@@ -43,10 +44,10 @@ func TestDiscussionHandler_CreateRepoDiscussion(t *testing.T) {
 	tester.RequireUser(t)
 
 	tester.mocks.sensitive.EXPECT().CheckRequestV2(
-		tester.ctx, &types.CreateRepoDiscussionRequest{Title: "foo"},
+		tester.Ctx(), &types.CreateRepoDiscussionRequest{Title: "foo"},
 	).Return(true, nil)
 	tester.mocks.discussion.EXPECT().CreateRepoDiscussion(
-		tester.ctx, types.CreateRepoDiscussionRequest{
+		tester.Ctx(), types.CreateRepoDiscussionRequest{
 			CurrentUser: "u",
 			Namespace:   "u",
 			Name:        "r",
@@ -69,10 +70,10 @@ func TestDiscussionHandler_UpdateDiscussion(t *testing.T) {
 	tester.RequireUser(t)
 
 	tester.mocks.sensitive.EXPECT().CheckRequestV2(
-		tester.ctx, &types.UpdateDiscussionRequest{Title: "foo"},
+		tester.Ctx(), &types.UpdateDiscussionRequest{Title: "foo"},
 	).Return(true, nil)
 	tester.mocks.discussion.EXPECT().UpdateDiscussion(
-		tester.ctx, types.UpdateDiscussionRequest{
+		tester.Ctx(), types.UpdateDiscussionRequest{
 			CurrentUser: "u",
 			ID:          1,
 			Title:       "foo",
@@ -93,7 +94,7 @@ func TestDiscussionHandler_DeleteDiscussion(t *testing.T) {
 	tester.RequireUser(t)
 
 	tester.mocks.discussion.EXPECT().DeleteDiscussion(
-		tester.ctx, "u", int64(1),
+		tester.Ctx(), "u", int64(1),
 	).Return(nil)
 	tester.WithParam("id", "1").Execute()
 
@@ -107,7 +108,7 @@ func TestDiscussionHandler_ShowDiscussion(t *testing.T) {
 	})
 
 	tester.mocks.discussion.EXPECT().GetDiscussion(
-		tester.ctx, int64(1),
+		tester.Ctx(), int64(1),
 	).Return(&types.ShowDiscussionResponse{Title: "foo"}, nil)
 	tester.WithParam("id", "1").Execute()
 
@@ -121,7 +122,7 @@ func TestDiscussionHandler_ListRepoDiscussions(t *testing.T) {
 	})
 
 	tester.mocks.discussion.EXPECT().ListRepoDiscussions(
-		tester.ctx, types.ListRepoDiscussionRequest{
+		tester.Ctx(), types.ListRepoDiscussionRequest{
 			CurrentUser: "u",
 			RepoType:    types.ModelRepo,
 			Namespace:   "u",
@@ -145,10 +146,10 @@ func TestDiscussionHandler_CreateDiscussionComment(t *testing.T) {
 	tester.RequireUser(t)
 
 	tester.mocks.sensitive.EXPECT().CheckRequestV2(
-		tester.ctx, &types.CreateCommentRequest{Content: "foo"},
+		tester.Ctx(), &types.CreateCommentRequest{Content: "foo"},
 	).Return(true, nil)
 	tester.mocks.discussion.EXPECT().CreateDiscussionComment(
-		tester.ctx, types.CreateCommentRequest{
+		tester.Ctx(), types.CreateCommentRequest{
 			CurrentUser:   "u",
 			Content:       "foo",
 			CommentableID: 1,
@@ -169,10 +170,10 @@ func TestDiscussionHandler_UpdateComment(t *testing.T) {
 	tester.RequireUser(t)
 
 	tester.mocks.sensitive.EXPECT().CheckRequestV2(
-		tester.ctx, &types.UpdateCommentRequest{Content: "foo"},
+		tester.Ctx(), &types.UpdateCommentRequest{Content: "foo"},
 	).Return(true, nil)
 	tester.mocks.discussion.EXPECT().UpdateComment(
-		tester.ctx, "u", int64(1), "foo",
+		tester.Ctx(), "u", int64(1), "foo",
 	).Return(nil)
 	tester.WithParam("id", "1").WithBody(
 		t, &types.UpdateCommentRequest{Content: "foo"},
@@ -189,7 +190,7 @@ func TestDiscussionHandler_DeleteComment(t *testing.T) {
 	tester.RequireUser(t)
 
 	tester.mocks.discussion.EXPECT().DeleteComment(
-		tester.ctx, "u", int64(1),
+		tester.Ctx(), "u", int64(1),
 	).Return(nil)
 	tester.WithParam("id", "1").Execute()
 
@@ -203,7 +204,7 @@ func TestDiscussionHandler_ListDiscussionComments(t *testing.T) {
 	})
 
 	tester.mocks.discussion.EXPECT().ListDiscussionComments(
-		tester.ctx, int64(1),
+		tester.Ctx(), int64(1),
 	).Return([]*types.DiscussionResponse_Comment{{Content: "foo"}}, nil)
 	tester.WithUser().WithParam("id", "1").Execute()
 

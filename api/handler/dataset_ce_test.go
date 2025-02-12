@@ -17,10 +17,10 @@ func TestDatasetHandler_Create(t *testing.T) {
 		})
 		tester.RequireUser(t)
 
-		tester.mocks.sensitive.EXPECT().CheckRequestV2(tester.ctx, &types.CreateDatasetReq{
+		tester.mocks.sensitive.EXPECT().CheckRequestV2(tester.Ctx(), &types.CreateDatasetReq{
 			CreateRepoReq: types.CreateRepoReq{Private: true},
 		}).Return(true, nil)
-		tester.mocks.dataset.EXPECT().Create(tester.ctx, &types.CreateDatasetReq{
+		tester.mocks.dataset.EXPECT().Create(tester.Ctx(), &types.CreateDatasetReq{
 			CreateRepoReq: types.CreateRepoReq{Private: true, Username: "u"},
 		}).Return(&types.Dataset{Name: "d"}, nil)
 		tester.WithBody(t, &types.CreateDatasetReq{
@@ -40,10 +40,10 @@ func TestDatasetHandler_Create(t *testing.T) {
 		})
 		tester.RequireUser(t)
 
-		tester.mocks.sensitive.EXPECT().CheckRequestV2(tester.ctx, &types.CreateDatasetReq{
+		tester.mocks.sensitive.EXPECT().CheckRequestV2(tester.Ctx(), &types.CreateDatasetReq{
 			CreateRepoReq: types.CreateRepoReq{Private: false},
 		}).Return(true, nil)
-		tester.mocks.dataset.EXPECT().Create(tester.ctx, &types.CreateDatasetReq{
+		tester.mocks.dataset.EXPECT().Create(tester.Ctx(), &types.CreateDatasetReq{
 			CreateRepoReq: types.CreateRepoReq{Private: false, Username: "u"},
 		}).Return(&types.Dataset{Name: "d"}, nil)
 		tester.WithBody(t, &types.CreateDatasetReq{

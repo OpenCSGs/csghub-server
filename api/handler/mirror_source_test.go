@@ -6,11 +6,12 @@ import (
 	"github.com/gin-gonic/gin"
 	mockcomponent "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/component"
 	"opencsg.com/csghub-server/builder/store/database"
+	"opencsg.com/csghub-server/builder/testutil"
 	"opencsg.com/csghub-server/common/types"
 )
 
 type MirrorSourceTester struct {
-	*GinTester
+	*testutil.GinTester
 	handler *MirrorSourceHandler
 	mocks   struct {
 		mirrorSource *mockcomponent.MockMirrorSourceComponent
@@ -18,7 +19,7 @@ type MirrorSourceTester struct {
 }
 
 func NewMirrorSourceTester(t *testing.T) *MirrorSourceTester {
-	tester := &MirrorSourceTester{GinTester: NewGinTester()}
+	tester := &MirrorSourceTester{GinTester: testutil.NewGinTester()}
 	tester.mocks.mirrorSource = mockcomponent.NewMockMirrorSourceComponent(t)
 
 	tester.handler = &MirrorSourceHandler{
@@ -30,7 +31,7 @@ func NewMirrorSourceTester(t *testing.T) *MirrorSourceTester {
 }
 
 func (t *MirrorSourceTester) WithHandleFunc(fn func(h *MirrorSourceHandler) gin.HandlerFunc) *MirrorSourceTester {
-	t.ginHandler = fn(t.handler)
+	t.Handler(fn(t.handler))
 	return t
 }
 
@@ -40,7 +41,7 @@ func TestMirrorSourceHandler_Create(t *testing.T) {
 	})
 	tester.RequireUser(t)
 
-	tester.mocks.mirrorSource.EXPECT().Create(tester.ctx, types.CreateMirrorSourceReq{
+	tester.mocks.mirrorSource.EXPECT().Create(tester.Ctx(), types.CreateMirrorSourceReq{
 		SourceName:  "sn",
 		CurrentUser: "u",
 	}).Return(&database.MirrorSource{ID: 1}, nil)
@@ -55,7 +56,7 @@ func TestMirrorSourceHandler_Index(t *testing.T) {
 	})
 	tester.RequireUser(t)
 
-	tester.mocks.mirrorSource.EXPECT().Index(tester.ctx, "u").Return([]database.MirrorSource{{ID: 1}}, nil)
+	tester.mocks.mirrorSource.EXPECT().Index(tester.Ctx(), "u").Return([]database.MirrorSource{{ID: 1}}, nil)
 	tester.Execute()
 
 	tester.ResponseEq(t, 200, tester.OKText, []database.MirrorSource{{ID: 1}})
@@ -67,7 +68,7 @@ func TestMirrorSourceHandler_Update(t *testing.T) {
 	})
 	tester.RequireUser(t)
 
-	tester.mocks.mirrorSource.EXPECT().Update(tester.ctx, types.UpdateMirrorSourceReq{
+	tester.mocks.mirrorSource.EXPECT().Update(tester.Ctx(), types.UpdateMirrorSourceReq{
 		ID:          1,
 		CurrentUser: "u",
 		SourceName:  "sn",
@@ -85,7 +86,7 @@ func TestMirrorSourceHandler_Get(t *testing.T) {
 	})
 	tester.RequireUser(t)
 
-	tester.mocks.mirrorSource.EXPECT().Get(tester.ctx, int64(1), "u").Return(&database.MirrorSource{ID: 1}, nil)
+	tester.mocks.mirrorSource.EXPECT().Get(tester.Ctx(), int64(1), "u").Return(&database.MirrorSource{ID: 1}, nil)
 	tester.WithParam("id", "1").Execute()
 
 	tester.ResponseEq(t, 200, tester.OKText, &database.MirrorSource{ID: 1})
@@ -97,7 +98,7 @@ func TestMirrorSourceHandler_Delete(t *testing.T) {
 	})
 	tester.RequireUser(t)
 
-	tester.mocks.mirrorSource.EXPECT().Delete(tester.ctx, int64(1), "u").Return(nil)
+	tester.mocks.mirrorSource.EXPECT().Delete(tester.Ctx(), int64(1), "u").Return(nil)
 	tester.WithParam("id", "1").Execute()
 
 	tester.ResponseEq(t, 200, tester.OKText, nil)

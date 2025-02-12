@@ -18,6 +18,13 @@ var (
 	ErrSizeMismatch = errors.New("content size does not match")
 )
 
+type LFSBatchOperation string
+
+const (
+	LFSBatchUpload   LFSBatchOperation = "upload"
+	LFSBatchDownload LFSBatchOperation = "download"
+)
+
 type InfoRefsReq struct {
 	Namespace   string         `json:"namespace"`
 	Name        string         `json:"name"`
@@ -40,15 +47,15 @@ type GitUploadPackReq struct {
 type GitReceivePackReq = GitUploadPackReq
 
 type BatchRequest struct {
-	Operation     string         `json:"operation"`
-	Transfers     []string       `json:"transfers,omitempty"`
-	Ref           *Reference     `json:"ref,omitempty"`
-	Objects       []Pointer      `json:"objects"`
-	Authorization string         `json:"authorization"`
-	Namespace     string         `json:"namespace"`
-	Name          string         `json:"name"`
-	RepoType      RepositoryType `json:"repo_type"`
-	CurrentUser   string         `json:"current_user"`
+	Operation     LFSBatchOperation `json:"operation"`
+	Transfers     []string          `json:"transfers,omitempty"`
+	Ref           *Reference        `json:"ref,omitempty"`
+	Objects       []Pointer         `json:"objects"`
+	Authorization string            `json:"authorization"`
+	Namespace     string            `json:"namespace"`
+	Name          string            `json:"name"`
+	RepoType      RepositoryType    `json:"repo_type"`
+	CurrentUser   string            `json:"current_user"`
 }
 
 type UploadRequest struct {

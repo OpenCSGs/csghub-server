@@ -2,10 +2,12 @@ package temporal
 
 import (
 	"context"
-	"log/slog"
+	"fmt"
 
+	"go.opentelemetry.io/otel"
 	"go.temporal.io/sdk/client"
-	"go.temporal.io/sdk/log"
+	"go.temporal.io/sdk/contrib/opentelemetry"
+	"go.temporal.io/sdk/interceptor"
 	"go.temporal.io/sdk/worker"
 )
 
@@ -28,25 +30,30 @@ type clientImpl struct {
 
 var _client Client = &clientImpl{}
 
-func NewClient(temporalClient client.Client) (*clientImpl, error) {
-	c := _client.(*clientImpl)
-	c.Client = temporalClient
-
-	return c, nil
-}
-
-func NewClientByHostPort(hostPort string) (*clientImpl, error) {
-	logger := log.NewStructuredLogger(slog.Default())
-	temporalClient, err := client.Dial(client.Options{
-		HostPort: hostPort,
-		Logger:   logger,
+func NewClient(options client.Options, serviceName string) (*clientImpl, error) {
+	tracingInterceptor, err := opentelemetry.NewTracingInterceptor(opentelemetry.TracerOptions{
+		Tracer: otel.Tracer(serviceName),
 	})
+	if err != nil {
+		return nil, fmt.Errorf("temporal otel interceptor %w", err)
+	}
+	options.Interceptors = []interceptor.ClientInterceptor{tracingInterceptor}
+
+	t, err := client.Dial(options)
 	if err != nil {
 		return nil, err
 	}
 	c := _client.(*clientImpl)
-	c.Client = temporalClient
+	c.Client = t
+
 	return c, nil
+}
+
+// used in test only
+func Assign(temporalClient client.Client) {
+	c := _client.(*clientImpl)
+	c.Client = temporalClient
+
 }
 
 func (c *clientImpl) NewWorker(queue string, options worker.Options) worker.Registry {

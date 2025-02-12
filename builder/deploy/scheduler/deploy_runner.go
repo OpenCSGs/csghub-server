@@ -66,6 +66,8 @@ func (t *DeployRunner) Run(ctx context.Context) error {
 			// record time of create knative service
 			t.deployStartTime = time.Now()
 		}
+		//wait svc to be created in k8s
+		time.Sleep(10 * time.Second)
 
 		fields := strings.Split(t.repo.Path, "/")
 
@@ -265,6 +267,7 @@ func (t *DeployRunner) makeDeployRequest() (*types.RunRequest, error) {
 		envMap["port"] = strconv.Itoa(deploy.ContainerPort)
 		envMap["HF_ENDPOINT"] = t.deployCfg.ModelDownloadEndpoint // "https://hub-stg.opencsg.com/"
 		envMap["HF_HUB_OFFLINE"] = "1"
+		envMap["HF_TASK"] = string(deploy.Task)
 	}
 
 	if deploy.Type == types.FinetuneType {

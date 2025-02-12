@@ -71,13 +71,6 @@ func TestRuntimeArchComponent_ScanArchitectures(t *testing.T) {
 			Type: 11,
 		}, nil,
 	)
-	data := []database.RuntimeArchitecture{
-		{ID: 123, ArchitectureName: "arch"},
-		{ID: 124, ArchitectureName: "foo"},
-	}
-	rc.mocks.stores.RuntimeArchMock().EXPECT().ListByRuntimeFrameworkID(ctx, int64(1)).Return(
-		data, nil,
-	)
 
 	// scan exists mocks
 	rc.mocks.stores.RepoMock().EXPECT().GetRepoWithRuntimeByID(ctx, int64(1), []string{"foo"}).Return([]database.Repository{
@@ -86,19 +79,22 @@ func TestRuntimeArchComponent_ScanArchitectures(t *testing.T) {
 	rc.mocks.gitServer.EXPECT().GetRepoFileRaw(ctx, gitserver.GetRepoInfoByPathReq{
 		Namespace: "foo",
 		Name:      "bar",
-		Ref:       "main",
 		Path:      ConfigFileName,
 		RepoType:  types.ModelRepo,
 	}).Return(`{"architectures": ["foo","bar"]}`, nil)
 
 	// scan new mocks
-	rc.mocks.stores.RepoMock().EXPECT().GetRepoWithoutRuntimeByID(ctx, int64(1), []string{"foo"}).Return([]database.Repository{
+	rc.mocks.stores.RepoMock().EXPECT().GetRepoWithoutRuntimeByID(ctx, int64(1), []string{"foo"}, 1000, 0).Return([]database.Repository{
 		{Path: "foo/bar"},
 	}, nil)
-	rc.mocks.stores.TagMock().EXPECT().GetTagsByScopeAndCategories(ctx, database.ModelTagScope, []string{
-		"runtime_framework", "resource",
-	}).Return([]*database.Tag{}, nil)
-	rc.mocks.stores.RepoRuntimeFrameworkMock().EXPECT().Add(ctx, int64(1), int64(0), 11).Return(nil)
+	//page 2
+	rc.mocks.stores.RepoMock().EXPECT().GetRepoWithoutRuntimeByID(ctx, int64(1), []string{"foo"}, 1000, 1).Return(nil, nil)
+	filter := &types.TagFilter{
+		Categories: []string{"runtime_framework", "resource"},
+		Scopes:     []types.TagScope{types.ModelTagScope},
+	}
+	rc.mocks.stores.TagMock().EXPECT().AllTags(ctx, filter).Return([]*database.Tag{}, nil)
+	rc.mocks.stores.RepoRuntimeFrameworkMock().EXPECT().Add(ctx, int64(1), int64(0), 0).Return(nil)
 	rc.mocks.stores.ResourceModelMock().EXPECT().CheckModelNameNotInRFRepo(ctx, "bar", int64(0)).Return(
 		&database.ResourceModel{}, nil,
 	)
@@ -108,13 +104,25 @@ func TestRuntimeArchComponent_ScanArchitectures(t *testing.T) {
 			{ResourceName: "r2"},
 		}, nil,
 	)
-
-	err := rc.ScanArchitecture(ctx, 1, 0, []string{"foo"})
+	var archMap = make(map[string]string)
+	archMap["foo"] = "bar"
+	models := []string{"foo"}
+	err := rc.scanExistModels(ctx, types.ScanReq{
+		FrameID:   1,
+		FrameType: 0,
+		ArchMap:   archMap,
+		Models:    models,
+		Task:      types.TextGeneration,
+	})
 	require.Nil(t, err)
-	// wait async code finish
-	ScanLock.Lock()
-	_ = 1
-	ScanLock.Unlock()
+	err = rc.scanNewModels(ctx, types.ScanReq{
+		FrameID:   1,
+		FrameType: 0,
+		ArchMap:   archMap,
+		Models:    models,
+		Task:      types.TextGeneration,
+	})
+	require.Nil(t, err)
 
 }
 
@@ -163,7 +171,10 @@ func TestRuntimeArchComponent_GetArchitectureFromConfig(t *testing.T) {
 		RepoType:  types.ModelRepo,
 	}).Return(`{"architectures": ["foo","bar"]}`, nil)
 
-	arch, err := rc.GetArchitectureFromConfig(ctx, "foo", "bar")
+	arch, err := rc.GetArchitecture(ctx, types.TextGeneration, &database.Repository{
+		Path:          "foo/bar",
+		DefaultBranch: "main",
+	})
 	require.Nil(t, err)
 	require.Equal(t, "foo", arch)
 

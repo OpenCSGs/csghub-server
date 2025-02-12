@@ -15,11 +15,11 @@ import (
 )
 
 type TagComponent interface {
-	AllTagsByScopeAndCategory(ctx context.Context, scope string, category string) ([]*database.Tag, error)
+	AllTags(ctx context.Context, filter *types.TagFilter) ([]*database.Tag, error)
 	ClearMetaTags(ctx context.Context, repoType types.RepositoryType, namespace, name string) error
-	UpdateMetaTags(ctx context.Context, tagScope database.TagScope, namespace, name, content string) ([]*database.RepositoryTag, error)
-	UpdateLibraryTags(ctx context.Context, tagScope database.TagScope, namespace, name, oldFilePath, newFilePath string) error
-	UpdateRepoTagsByCategory(ctx context.Context, tagScope database.TagScope, repoID int64, category string, tagNames []string) error
+	UpdateMetaTags(ctx context.Context, tagScope types.TagScope, namespace, name, content string) ([]*database.RepositoryTag, error)
+	UpdateLibraryTags(ctx context.Context, tagScope types.TagScope, namespace, name, oldFilePath, newFilePath string) error
+	UpdateRepoTagsByCategory(ctx context.Context, tagScope types.TagScope, repoID int64, category string, tagNames []string) error
 	CreateTag(ctx context.Context, username string, req types.CreateTag) (*database.Tag, error)
 	GetTagByID(ctx context.Context, username string, id int64) (*database.Tag, error)
 	UpdateTag(ctx context.Context, username string, id int64, req types.UpdateTag) (*database.Tag, error)
@@ -48,8 +48,8 @@ type tagComponentImpl struct {
 	userStore        database.UserStore
 }
 
-func (tc *tagComponentImpl) AllTagsByScopeAndCategory(ctx context.Context, scope string, category string) ([]*database.Tag, error) {
-	return tc.tagStore.AllTagsByScopeAndCategory(ctx, database.TagScope(scope), category)
+func (tc *tagComponentImpl) AllTags(ctx context.Context, filter *types.TagFilter) ([]*database.Tag, error) {
+	return tc.tagStore.AllTags(ctx, filter)
 }
 
 func (c *tagComponentImpl) ClearMetaTags(ctx context.Context, repoType types.RepositoryType, namespace, name string) error {
@@ -58,20 +58,20 @@ func (c *tagComponentImpl) ClearMetaTags(ctx context.Context, repoType types.Rep
 	return err
 }
 
-func (c *tagComponentImpl) UpdateMetaTags(ctx context.Context, tagScope database.TagScope, namespace, name, content string) ([]*database.RepositoryTag, error) {
+func (c *tagComponentImpl) UpdateMetaTags(ctx context.Context, tagScope types.TagScope, namespace, name, content string) ([]*database.RepositoryTag, error) {
 	var (
 		tp       tagparser.TagProcessor
 		repoType types.RepositoryType
 	)
 	// TODO:load from cache
 
-	if tagScope == database.DatasetTagScope {
+	if tagScope == types.DatasetTagScope {
 		tp = tagparser.NewDatasetTagProcessor(c.tagStore)
 		repoType = types.DatasetRepo
-	} else if tagScope == database.ModelTagScope {
+	} else if tagScope == types.ModelTagScope {
 		tp = tagparser.NewModelTagProcessor(c.tagStore)
 		repoType = types.ModelRepo
-	} else if tagScope == database.PromptTagScope {
+	} else if tagScope == types.PromptTagScope {
 		tp = tagparser.NewPromptTagProcessor(c.tagStore)
 		repoType = types.PromptRepo
 	} else {
@@ -126,7 +126,7 @@ func (c *tagComponentImpl) UpdateMetaTags(ctx context.Context, tagScope database
 	return repoTags, nil
 }
 
-func (c *tagComponentImpl) UpdateLibraryTags(ctx context.Context, tagScope database.TagScope, namespace, name, oldFilePath, newFilePath string) error {
+func (c *tagComponentImpl) UpdateLibraryTags(ctx context.Context, tagScope types.TagScope, namespace, name, oldFilePath, newFilePath string) error {
 	oldLibTagName := tagparser.LibraryTag(oldFilePath)
 	newLibTagName := tagparser.LibraryTag(newFilePath)
 	// TODO:load from cache
@@ -135,13 +135,13 @@ func (c *tagComponentImpl) UpdateLibraryTags(ctx context.Context, tagScope datab
 		err      error
 		repoType types.RepositoryType
 	)
-	if tagScope == database.DatasetTagScope {
+	if tagScope == types.DatasetTagScope {
 		allTags, err = c.tagStore.AllDatasetTags(ctx)
 		repoType = types.DatasetRepo
-	} else if tagScope == database.ModelTagScope {
+	} else if tagScope == types.ModelTagScope {
 		allTags, err = c.tagStore.AllModelTags(ctx)
 		repoType = types.ModelRepo
-	} else if tagScope == database.PromptTagScope {
+	} else if tagScope == types.PromptTagScope {
 		allTags, err = c.tagStore.AllPromptTags(ctx)
 		repoType = types.PromptRepo
 	} else {
@@ -171,8 +171,12 @@ func (c *tagComponentImpl) UpdateLibraryTags(ctx context.Context, tagScope datab
 	return nil
 }
 
-func (c *tagComponentImpl) UpdateRepoTagsByCategory(ctx context.Context, tagScope database.TagScope, repoID int64, category string, tagNames []string) error {
-	allTags, err := c.tagStore.AllTagsByScopeAndCategory(ctx, tagScope, category)
+func (c *tagComponentImpl) UpdateRepoTagsByCategory(ctx context.Context, tagScope types.TagScope, repoID int64, category string, tagNames []string) error {
+	filter := &types.TagFilter{
+		Scopes:     []types.TagScope{tagScope},
+		Categories: []string{category},
+	}
+	allTags, err := c.tagStore.AllTags(ctx, filter)
 	if err != nil {
 		return fmt.Errorf("failed to get all tags of scope `%s`, error: %w", tagScope, err)
 	}
@@ -221,7 +225,7 @@ func (c *tagComponentImpl) CreateTag(ctx context.Context, username string, req t
 		Name:     req.Name,
 		Category: req.Category,
 		Group:    req.Group,
-		Scope:    database.TagScope(req.Scope),
+		Scope:    types.TagScope(req.Scope),
 		BuiltIn:  req.BuiltIn,
 		ShowName: req.ShowName,
 	}
@@ -272,7 +276,7 @@ func (c *tagComponentImpl) UpdateTag(ctx context.Context, username string, id in
 		Category: req.Category,
 		Name:     req.Name,
 		Group:    req.Group,
-		Scope:    database.TagScope(req.Scope),
+		Scope:    types.TagScope(req.Scope),
 		BuiltIn:  req.BuiltIn,
 		ShowName: req.ShowName,
 	}
@@ -299,7 +303,7 @@ func (c *tagComponentImpl) DeleteTag(ctx context.Context, username string, id in
 }
 
 func (c *tagComponentImpl) AllCategories(ctx context.Context) ([]database.TagCategory, error) {
-	return c.tagStore.AllCategories(ctx, database.TagScope(""))
+	return c.tagStore.AllCategories(ctx, types.TagScope(""))
 }
 
 func (c *tagComponentImpl) CreateCategory(ctx context.Context, username string, req types.CreateCategory) (*database.TagCategory, error) {
@@ -314,7 +318,7 @@ func (c *tagComponentImpl) CreateCategory(ctx context.Context, username string, 
 	newCategory := database.TagCategory{
 		Name:     req.Name,
 		ShowName: req.ShowName,
-		Scope:    database.TagScope(req.Scope),
+		Scope:    types.TagScope(req.Scope),
 		Enabled:  req.Enabled,
 	}
 
@@ -339,7 +343,7 @@ func (c *tagComponentImpl) UpdateCategory(ctx context.Context, username string, 
 		ID:       id,
 		Name:     req.Name,
 		ShowName: req.ShowName,
-		Scope:    database.TagScope(req.Scope),
+		Scope:    types.TagScope(req.Scope),
 		Enabled:  req.Enabled,
 	}
 

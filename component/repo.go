@@ -1348,7 +1348,7 @@ func (c *repoComponentImpl) SDKListFiles(ctx context.Context, repoType types.Rep
 		ref = repo.DefaultBranch
 	}
 
-	filePaths, err := GetFilePaths(namespace, name, "", repoType, ref, c.git.GetRepoFileTree)
+	filePaths, err := GetFilePaths(ctx, namespace, name, "", repoType, ref, c.git.GetRepoFileTree)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get all %s files, error: %w", repoType, err)
 	}
@@ -1557,18 +1557,18 @@ func (c *repoComponentImpl) FileInfo(ctx context.Context, req *types.GetFileReq)
 	return file, nil
 }
 
-func getTagScopeByRepoType(repoType types.RepositoryType) database.TagScope {
+func getTagScopeByRepoType(repoType types.RepositoryType) types.TagScope {
 	switch repoType {
 	case types.ModelRepo:
-		return database.ModelTagScope
+		return types.ModelTagScope
 	case types.DatasetRepo:
-		return database.DatasetTagScope
+		return types.DatasetTagScope
 	case types.CodeRepo:
-		return database.CodeTagScope
+		return types.CodeTagScope
 	case types.SpaceRepo:
-		return database.SpaceTagScope
+		return types.SpaceTagScope
 	case types.PromptRepo:
-		return database.PromptTagScope
+		return types.PromptTagScope
 	default:
 		panic("convert repo type to tag scope failed, unknown repo type:" + repoType)
 	}
@@ -1776,6 +1776,14 @@ func (c *repoComponentImpl) CreateMirror(ctx context.Context, req types.CreateMi
 	mirror.SourceRepoPath = req.SourceRepoPath
 	mirror.LocalRepoPath = fmt.Sprintf("%s_%s_%s_%s", mirrorSource.SourceName, req.RepoType, req.Namespace, req.Name)
 	mirror.RepositoryID = repo.ID
+
+	sourceType, sourcePath, err := common.GetSourceTypeAndPathFromURL(req.SourceUrl)
+	if err == nil {
+		err = c.repoStore.UpdateSourcePath(ctx, repo.ID, sourceType, sourcePath)
+		if err != nil {
+			return nil, fmt.Errorf("failed to update source path in repo: %v", err)
+		}
+	}
 
 	if c.config.Saas {
 		if c.config.GitServer.Type == types.GitServerTypeGitea {
@@ -2216,6 +2224,7 @@ func (c *repoComponentImpl) ListDeploy(ctx context.Context, repoType types.Repos
 			SecureLevel:      deploy.SecureLevel,
 			CreatedAt:        deploy.CreatedAt,
 			UpdatedAt:        deploy.UpdatedAt,
+			Task:             string(deploy.Task),
 		})
 	}
 	return resDeploys, nil
@@ -2325,6 +2334,7 @@ func (c *repoComponentImpl) DeployDetail(ctx context.Context, detailReq types.De
 		Path:             repoPath,
 		ProxyEndpoint:    proxyEndPoint,
 		SKU:              deploy.SKU,
+		Task:             string(deploy.Task),
 	}
 
 	return &resDeploy, nil
@@ -2815,7 +2825,7 @@ func (c *repoComponentImpl) AllFiles(ctx context.Context, req types.GetAllFilesR
 			return nil, ErrForbiddenMsg("users do not have permission to get all files for this repo")
 		}
 	}
-	allFiles, err := getAllFiles(req.Namespace, req.Name, "", req.RepoType, req.Ref, c.git.GetRepoFileTree)
+	allFiles, err := getAllFiles(ctx, req.Namespace, req.Name, "", req.RepoType, req.Ref, c.git.GetRepoFileTree)
 	if err != nil {
 		slog.Error("fail to get all files of repository", slog.Any("repoType", req.RepoType), slog.String("namespace", req.Namespace), slog.String("name", req.Name), slog.String("error", err.Error()))
 		return nil, err

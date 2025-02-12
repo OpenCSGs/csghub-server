@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"opencsg.com/csghub-server/builder/store/database"
+	"opencsg.com/csghub-server/common/types"
 )
 
 type mockTagStore struct {
@@ -61,7 +62,7 @@ func Test_ProcessReadme(t *testing.T) {
 }
 func Test_processTags(t *testing.T) {
 	p := new(tagProcessor)
-	p.tagScope = database.DatasetTagScope
+	p.tagScope = types.DatasetTagScope
 
 	existingCategoryTagMap := make(map[string]map[string]*database.Tag)
 
@@ -80,7 +81,7 @@ func Test_processTags(t *testing.T) {
 	categoryTagMap := make(map[string][]string)
 	categoryTagMap[categoryNameTask] = append(categoryTagMap[categoryNameTask], "finance", "code", "mit") //should create an "task" tag "mit"
 	categoryTagMap[categoryNameLicense] = append(categoryTagMap[categoryNameLicense], "mit")              //should match this one
-	categoryTagMap["Unknown"] = append(categoryTagMap["Unknown"], "mit")                                   //should igore this one
+	categoryTagMap["Unknown"] = append(categoryTagMap["Unknown"], "mit")                                  //should igore this one
 
 	tagsMatched, tagsToCreate := p.processTags(existingCategoryTagMap, categoryTagMap)
 	if len(tagsMatched) != 3 {

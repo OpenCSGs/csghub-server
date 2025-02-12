@@ -1965,150 +1965,6 @@ const docTemplate = `{
                 }
             }
         },
-        "/datasets/{namespace}/{name}/dataviewer/catalog": {
-            "get": {
-                "security": [
-                    {
-                        "ApiKey": []
-                    }
-                ],
-                "description": "get catalog of the dataset",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Dataset"
-                ],
-                "summary": "Get catalog of the dataset",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "namespace",
-                        "name": "namespace",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/types.Response"
-                        }
-                    },
-                    "400": {
-                        "description": "Bad request",
-                        "schema": {
-                            "$ref": "#/definitions/types.APIBadRequest"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal server error",
-                        "schema": {
-                            "$ref": "#/definitions/types.APIInternalServerError"
-                        }
-                    }
-                }
-            }
-        },
-        "/datasets/{namespace}/{name}/dataviewer/rows": {
-            "get": {
-                "security": [
-                    {
-                        "ApiKey": []
-                    }
-                ],
-                "description": "get catalog of the dataset",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Dataset"
-                ],
-                "summary": "Get catalog of the dataset",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "namespace",
-                        "name": "namespace",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "config",
-                        "name": "config",
-                        "in": "query",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "split",
-                        "name": "split",
-                        "in": "query",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "search",
-                        "name": "search",
-                        "in": "query"
-                    },
-                    {
-                        "type": "string",
-                        "description": "where",
-                        "name": "where",
-                        "in": "query"
-                    },
-                    {
-                        "type": "string",
-                        "description": "orderby",
-                        "name": "orderby",
-                        "in": "query"
-                    },
-                    {
-                        "type": "integer",
-                        "default": 50,
-                        "description": "per",
-                        "name": "per",
-                        "in": "query"
-                    },
-                    {
-                        "type": "integer",
-                        "default": 1,
-                        "description": "per page",
-                        "name": "page",
-                        "in": "query"
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/types.Response"
-                        }
-                    },
-                    "400": {
-                        "description": "Bad request",
-                        "schema": {
-                            "$ref": "#/definitions/types.APIBadRequest"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal server error",
-                        "schema": {
-                            "$ref": "#/definitions/types.APIInternalServerError"
-                        }
-                    }
-                }
-            }
-        },
         "/datasets/{namespace}/{name}/relations": {
             "get": {
                 "security": [
@@ -2165,76 +2021,6 @@ const docTemplate = `{
                                     }
                                 }
                             ]
-                        }
-                    },
-                    "400": {
-                        "description": "Bad request",
-                        "schema": {
-                            "$ref": "#/definitions/types.APIBadRequest"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal server error",
-                        "schema": {
-                            "$ref": "#/definitions/types.APIInternalServerError"
-                        }
-                    }
-                }
-            }
-        },
-        "/datasets/{namespace}/{name}/viewer/{file_path}": {
-            "get": {
-                "security": [
-                    {
-                        "ApiKey": []
-                    }
-                ],
-                "description": "get the demo data of the dataset",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Dataset"
-                ],
-                "summary": "Get the demo data of the dataset",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "namespace",
-                        "name": "namespace",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "file_path",
-                        "name": "file_path",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "type": "integer",
-                        "default": 50,
-                        "description": "per",
-                        "name": "per",
-                        "in": "query"
-                    },
-                    {
-                        "type": "integer",
-                        "default": 1,
-                        "description": "per page",
-                        "name": "page",
-                        "in": "query"
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/types.Response"
                         }
                     },
                     "400": {
@@ -8776,6 +8562,16 @@ const docTemplate = `{
                         "in": "query"
                     },
                     {
+                        "enum": [
+                            "text-generation",
+                            "text-to-image"
+                        ],
+                        "type": "string",
+                        "description": "task",
+                        "name": "task",
+                        "in": "query"
+                    },
+                    {
                         "description": "body",
                         "name": "body",
                         "in": "body",
@@ -10207,11 +10003,20 @@ const docTemplate = `{
                     {
                         "enum": [
                             "model",
-                            "dataset"
+                            "dataset",
+                            "code",
+                            "space",
+                            "prompt"
                         ],
                         "type": "string",
                         "description": "scope name",
                         "name": "scope",
+                        "in": "query"
+                    },
+                    {
+                        "type": "boolean",
+                        "description": "built_in",
+                        "name": "built_in",
                         "in": "query"
                     }
                 ],
@@ -15941,6 +15746,9 @@ const docTemplate = `{
                 "created_at": {
                     "type": "string"
                 },
+                "csg_path": {
+                    "type": "string"
+                },
                 "default_branch": {
                     "type": "string"
                 },
@@ -15957,6 +15765,9 @@ const docTemplate = `{
                     }
                 },
                 "git_path": {
+                    "type": "string"
+                },
+                "hf_path": {
                     "type": "string"
                 },
                 "http_clone_url": {
@@ -15977,6 +15788,9 @@ const docTemplate = `{
                 },
                 "mirror": {
                     "$ref": "#/definitions/database.Mirror"
+                },
+                "ms_path": {
+                    "type": "string"
                 },
                 "name": {
                     "type": "string"
@@ -16135,7 +15949,7 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "scope": {
-                    "$ref": "#/definitions/database.TagScope"
+                    "$ref": "#/definitions/types.TagScope"
                 },
                 "show_name": {
                     "type": "string"
@@ -16158,29 +15972,12 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "scope": {
-                    "$ref": "#/definitions/database.TagScope"
+                    "$ref": "#/definitions/types.TagScope"
                 },
                 "show_name": {
                     "type": "string"
                 }
             }
-        },
-        "database.TagScope": {
-            "type": "string",
-            "enum": [
-                "model",
-                "dataset",
-                "code",
-                "space",
-                "prompt"
-            ],
-            "x-enum-varnames": [
-                "ModelTagScope",
-                "DatasetTagScope",
-                "CodeTagScope",
-                "SpaceTagScope",
-                "PromptTagScope"
-            ]
         },
         "database.User": {
             "type": "object",
@@ -17482,6 +17279,9 @@ const docTemplate = `{
                 "created_at": {
                     "type": "string"
                 },
+                "csg_path": {
+                    "type": "string"
+                },
                 "default_branch": {
                     "type": "string"
                 },
@@ -17490,6 +17290,9 @@ const docTemplate = `{
                 },
                 "downloads": {
                     "type": "integer"
+                },
+                "hf_path": {
+                    "type": "string"
                 },
                 "id": {
                     "type": "integer"
@@ -17501,6 +17304,9 @@ const docTemplate = `{
                     "type": "integer"
                 },
                 "mirror_last_updated_at": {
+                    "type": "string"
+                },
+                "ms_path": {
                     "type": "string"
                 },
                 "name": {
@@ -18091,6 +17897,9 @@ const docTemplate = `{
                 "created_at": {
                     "type": "string"
                 },
+                "csg_path": {
+                    "type": "string"
+                },
                 "default_branch": {
                     "type": "string"
                 },
@@ -18109,6 +17918,9 @@ const docTemplate = `{
                 "enable_inference": {
                     "type": "boolean"
                 },
+                "hf_path": {
+                    "type": "string"
+                },
                 "id": {
                     "type": "integer"
                 },
@@ -18119,6 +17931,9 @@ const docTemplate = `{
                     "type": "integer"
                 },
                 "mirror_last_updated_at": {
+                    "type": "string"
+                },
+                "ms_path": {
                     "type": "string"
                 },
                 "name": {
@@ -18238,6 +18053,9 @@ const docTemplate = `{
                 "min_replica": {
                     "type": "integer"
                 },
+                "order_detail_id": {
+                    "type": "integer"
+                },
                 "resource_id": {
                     "type": "integer"
                 },
@@ -18304,6 +18122,19 @@ const docTemplate = `{
                     "type": "boolean"
                 }
             }
+        },
+        "types.PipelineTask": {
+            "type": "string",
+            "enum": [
+                "text-generation",
+                "text-to-image",
+                "task-auto-detection"
+            ],
+            "x-enum-varnames": [
+                "TextGeneration",
+                "Text2Image",
+                "TaskAutoDetection"
+            ]
         },
         "types.Pointer": {
             "type": "object",
@@ -18650,11 +18481,20 @@ const docTemplate = `{
         "types.RuntimeFrameworkModels": {
             "type": "object",
             "properties": {
+                "id": {
+                    "type": "integer"
+                },
                 "models": {
                     "type": "array",
                     "items": {
                         "type": "string"
                     }
+                },
+                "scan_type": {
+                    "type": "integer"
+                },
+                "task": {
+                    "$ref": "#/definitions/types.PipelineTask"
                 }
             }
         },
@@ -18932,6 +18772,23 @@ const docTemplate = `{
                     "type": "string"
                 }
             }
+        },
+        "types.TagScope": {
+            "type": "string",
+            "enum": [
+                "model",
+                "dataset",
+                "code",
+                "space",
+                "prompt"
+            ],
+            "x-enum-varnames": [
+                "ModelTagScope",
+                "DatasetTagScope",
+                "CodeTagScope",
+                "SpaceTagScope",
+                "PromptTagScope"
+            ]
         },
         "types.TaskType": {
             "type": "string",

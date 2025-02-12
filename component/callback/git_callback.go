@@ -255,20 +255,20 @@ func (c *gitCallbackComponentImpl) removeFiles(ctx context.Context, repoType, na
 				return fmt.Errorf("failed to clear met tags,cause: %w", err)
 			}
 		} else {
-			var tagScope database.TagScope
+			var tagScope types.TagScope
 			switch repoType {
 			case fmt.Sprintf("%ss", types.DatasetRepo):
-				tagScope = database.DatasetTagScope
+				tagScope = types.DatasetTagScope
 			case fmt.Sprintf("%ss", types.ModelRepo):
-				tagScope = database.ModelTagScope
+				tagScope = types.ModelTagScope
 			case fmt.Sprintf("%ss", types.PromptRepo):
-				tagScope = database.PromptTagScope
+				tagScope = types.PromptTagScope
 			default:
 				return nil
 				// case CodeRepoType:
-				// 	tagScope = database.CodeTagScope
+				// 	tagScope = types.CodeTagScope
 				// case SpaceRepoType:
-				// 	tagScope = database.SpaceTagScope
+				// 	tagScope = types.SpaceTagScope
 			}
 			err := c.tagComponent.UpdateLibraryTags(ctx, tagScope, namespace, repoName, fileName, "")
 			if err != nil {
@@ -298,20 +298,20 @@ func (c *gitCallbackComponentImpl) addFiles(ctx context.Context, repoType, names
 				return err
 			}
 		} else {
-			var tagScope database.TagScope
+			var tagScope types.TagScope
 			switch repoType {
 			case fmt.Sprintf("%ss", types.DatasetRepo):
-				tagScope = database.DatasetTagScope
+				tagScope = types.DatasetTagScope
 			case fmt.Sprintf("%ss", types.ModelRepo):
-				tagScope = database.ModelTagScope
+				tagScope = types.ModelTagScope
 			case fmt.Sprintf("%ss", types.PromptRepo):
-				tagScope = database.PromptTagScope
+				tagScope = types.PromptTagScope
 			default:
 				return nil
 				// case CodeRepoType:
-				// 	tagScope = database.CodeTagScope
+				// 	tagScope = types.CodeTagScope
 				// case SpaceRepoType:
-				// 	tagScope = database.SpaceTagScope
+				// 	tagScope = types.SpaceTagScope
 			}
 			err := c.tagComponent.UpdateLibraryTags(ctx, tagScope, namespace, repoName, "", fileName)
 			if err != nil {
@@ -328,22 +328,22 @@ func (c *gitCallbackComponentImpl) addFiles(ctx context.Context, repoType, names
 func (c *gitCallbackComponentImpl) updateMetaTags(ctx context.Context, repoType, namespace, repoName, ref, content string) error {
 	var (
 		err      error
-		tagScope database.TagScope
+		tagScope types.TagScope
 	)
 	switch repoType {
 	case fmt.Sprintf("%ss", types.DatasetRepo):
-		tagScope = database.DatasetTagScope
+		tagScope = types.DatasetTagScope
 	case fmt.Sprintf("%ss", types.ModelRepo):
-		tagScope = database.ModelTagScope
+		tagScope = types.ModelTagScope
 	case fmt.Sprintf("%ss", types.PromptRepo):
-		tagScope = database.PromptTagScope
+		tagScope = types.PromptTagScope
 	default:
 		return nil
 		// TODO: support code and space
 		// case CodeRepoType:
-		// 	tagScope = database.CodeTagScope
+		// 	tagScope = types.CodeTagScope
 		// case SpaceRepoType:
-		// 	tagScope = database.SpaceTagScope
+		// 	tagScope = types.SpaceTagScope
 	}
 	_, err = c.tagComponent.UpdateMetaTags(ctx, tagScope, namespace, repoName, content)
 	if err != nil {
@@ -448,7 +448,8 @@ func (c *gitCallbackComponentImpl) updateDatasetTags(ctx context.Context, namesp
 // update model runtime frameworks
 func (c *gitCallbackComponentImpl) updateModelRuntimeFrameworks(ctx context.Context, repoType, namespace, repoName, ref, fileName string, deleteAction bool) {
 	// must be model repo and config.json
-	if repoType != fmt.Sprintf("%ss", types.ModelRepo) || fileName != component.ConfigFileName || (ref != ("refs/heads/"+component.MainBranch) && ref != ("refs/heads/"+component.MasterBranch)) {
+	valid := c.isValidForRuntime(repoType, ref, fileName)
+	if !valid {
 		return
 	}
 	repo, err := c.repoStore.FindByPath(ctx, types.ModelRepo, namespace, repoName)
@@ -464,14 +465,18 @@ func (c *gitCallbackComponentImpl) updateModelRuntimeFrameworks(ctx context.Cont
 		}
 		return
 	}
-	arch, err := c.runtimeArchComponent.GetArchitectureFromConfig(ctx, namespace, repoName)
+	arch, err := c.runtimeArchComponent.GetArchitecture(ctx, types.TaskAutoDetection, repo)
 	if err != nil {
 		slog.Warn("fail to get config.json content for git callback", slog.Any("namespace", namespace), slog.Any("repoName", repoName), slog.Any("error", err))
 		return
 	}
 	slog.Debug("get arch for git callback", slog.Any("namespace", namespace), slog.Any("repoName", repoName), slog.Any("arch", arch))
 	//add resource tag, like ascend
-	runtime_framework_tags, _ := c.tagStore.GetTagsByScopeAndCategories(ctx, "model", []string{"runtime_framework", "resource"})
+	filter := &types.TagFilter{
+		Scopes:     []types.TagScope{types.ModelTagScope},
+		Categories: []string{"runtime_framework", "resource"},
+	}
+	runtime_framework_tags, _ := c.tagStore.AllTags(ctx, filter)
 	fields := strings.Split(repo.Path, "/")
 	err = c.runtimeArchComponent.AddResourceTag(ctx, runtime_framework_tags, fields[1], repo.ID)
 	if err != nil {
@@ -546,4 +551,20 @@ func (c *gitCallbackComponentImpl) updateModelRuntimeFrameworks(ctx context.Cont
 		}
 	}
 
+}
+
+// check if the repo is valid for runtime framework
+func (c *gitCallbackComponentImpl) isValidForRuntime(repoType, ref, fileName string) bool {
+	if repoType != fmt.Sprintf("%ss", types.ModelRepo) {
+		return false
+	}
+	if fileName != component.ConfigFileName && fileName != component.ModelIndexFileName {
+		return false
+	}
+
+	if !strings.Contains(ref, component.MainBranch) && !strings.Contains(ref, component.MasterBranch) {
+		return false
+	}
+
+	return true
 }

@@ -10,6 +10,7 @@ import (
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/types"
+	"opencsg.com/csghub-server/common/types/enum"
 )
 
 const (
@@ -17,6 +18,12 @@ const (
 	DatasetOrgPrefix = "datasets_"
 	SpaceOrgPrefix   = "spaces_"
 	CodeOrgPrefix    = "codes_"
+)
+
+const (
+	CSGSourceType = "csghub"
+	HFSourceType  = "huggingface"
+	MSSourceType  = "modelscope"
 )
 
 func WithPrefix(name string, prefix string) string {
@@ -144,4 +151,40 @@ func validate(name string) error {
 	}
 
 	return nil
+}
+
+func GetSourceTypeAndPathFromURL(url string) (string, string, error) {
+	if url == "" {
+		return "", "", errors.New("url is empty")
+	}
+	var sourceType, path string
+	url = strings.TrimSuffix(url, ".git")
+	strs := strings.Split(url, "/")
+	if len(strs) < 2 {
+		return "", "", errors.New("invalid url")
+	}
+	path = strings.Join(strs[len(strs)-2:], "/")
+	if strings.Contains(url, "https://huggingface.co/") {
+		sourceType = enum.HFSource
+	} else if strings.Contains(url, "https://www.modelscope.cn") {
+		sourceType = enum.MSSource
+	} else if strings.Contains(url, "https://opencsg.com/") {
+		sourceType = enum.CSGSource
+	} else {
+		return "", "", fmt.Errorf("unsupported source type: %s", url)
+	}
+	return sourceType, path, nil
+}
+
+// get built-int task from tags
+func GetBuiltInTaskFromTags(tags []database.Tag) string {
+	for _, tag := range tags {
+		if tag.Name == string(types.TextGeneration) {
+			return tag.Name
+		}
+		if tag.Name == string(types.Text2Image) {
+			return tag.Name
+		}
+	}
+	return string(types.TextGeneration)
 }

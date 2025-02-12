@@ -130,6 +130,7 @@ packages:
     config:
     interfaces:
       Reader:
+      LimitOffsetCountReader:
   opencsg.com/csghub-server/builder/multisync:
     config:
     interfaces:
@@ -174,3 +175,7 @@ packages:
     config:
     interfaces:
       DataViewerActivity:
+  opencsg.com/csghub-server/dataviewer/component:
+    config:
+    interfaces:
+      DatasetViewerComponent:

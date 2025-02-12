@@ -10,11 +10,12 @@ import (
 	"github.com/stretchr/testify/require"
 	mockcomponent "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/component"
 	"opencsg.com/csghub-server/builder/deploy"
+	"opencsg.com/csghub-server/builder/testutil"
 	"opencsg.com/csghub-server/common/types"
 )
 
 type SpaceTester struct {
-	*GinTester
+	*testutil.GinTester
 	handler *SpaceHandler
 	mocks   struct {
 		space     *mockcomponent.MockSpaceComponent
@@ -24,7 +25,7 @@ type SpaceTester struct {
 }
 
 func NewSpaceTester(t *testing.T) *SpaceTester {
-	tester := &SpaceTester{GinTester: NewGinTester()}
+	tester := &SpaceTester{GinTester: testutil.NewGinTester()}
 	tester.mocks.space = mockcomponent.NewMockSpaceComponent(t)
 	tester.mocks.sensitive = mockcomponent.NewMockSensitiveComponent(t)
 	tester.mocks.repo = mockcomponent.NewMockRepoComponent(t)
@@ -40,7 +41,7 @@ func NewSpaceTester(t *testing.T) *SpaceTester {
 }
 
 func (t *SpaceTester) WithHandleFunc(fn func(h *SpaceHandler) gin.HandlerFunc) *SpaceTester {
-	t.ginHandler = fn(t.handler)
+	t.Handler(fn(t.handler))
 	return t
 }
 
@@ -63,7 +64,7 @@ func TestSpaceHandler_Index(t *testing.T) {
 			})
 
 			if !c.error {
-				tester.mocks.space.EXPECT().Index(tester.ctx, &types.RepoFilter{
+				tester.mocks.space.EXPECT().Index(tester.Ctx(), &types.RepoFilter{
 					Search: "foo",
 					Sort:   c.sort,
 					Source: c.source,
@@ -77,7 +78,7 @@ func TestSpaceHandler_Index(t *testing.T) {
 				WithQuery("source", c.source).Execute()
 
 			if c.error {
-				require.Equal(t, 400, tester.response.Code)
+				require.Equal(t, 400, tester.Response().Code)
 			} else {
 				tester.ResponseEqSimple(t, 200, gin.H{
 					"data":  []types.Space{{Name: "cc"}},
@@ -95,7 +96,7 @@ func TestSpaceHandler_Show(t *testing.T) {
 	})
 
 	tester.WithUser()
-	tester.mocks.space.EXPECT().Show(tester.ctx, "u", "r", "u").Return(&types.Space{
+	tester.mocks.space.EXPECT().Show(tester.Ctx(), "u", "r", "u").Return(&types.Space{
 		Name: "m",
 	}, nil)
 	tester.Execute()
@@ -111,10 +112,10 @@ func TestSpaceHandler_Create(t *testing.T) {
 	tester.RequireUser(t)
 
 	req := &types.CreateSpaceReq{CreateRepoReq: types.CreateRepoReq{}}
-	tester.mocks.sensitive.EXPECT().CheckRequestV2(tester.ctx, req).Return(true, nil)
+	tester.mocks.sensitive.EXPECT().CheckRequestV2(tester.Ctx(), req).Return(true, nil)
 	reqn := *req
 	reqn.Username = "u"
-	tester.mocks.space.EXPECT().Create(tester.ctx, reqn).Return(&types.Space{Name: "m"}, nil)
+	tester.mocks.space.EXPECT().Create(tester.Ctx(), reqn).Return(&types.Space{Name: "m"}, nil)
 	tester.WithBody(t, req).Execute()
 
 	tester.ResponseEq(t, 200, tester.OKText, &types.Space{Name: "m"})
@@ -127,8 +128,8 @@ func TestSpaceHandler_Update(t *testing.T) {
 	tester.RequireUser(t)
 
 	req := &types.UpdateSpaceReq{UpdateRepoReq: types.UpdateRepoReq{}}
-	tester.mocks.sensitive.EXPECT().CheckRequestV2(tester.ctx, req).Return(true, nil)
-	tester.mocks.space.EXPECT().Update(tester.ctx, &types.UpdateSpaceReq{
+	tester.mocks.sensitive.EXPECT().CheckRequestV2(tester.Ctx(), req).Return(true, nil)
+	tester.mocks.space.EXPECT().Update(tester.Ctx(), &types.UpdateSpaceReq{
 		UpdateRepoReq: types.UpdateRepoReq{
 			Namespace: "u",
 			Name:      "r",
@@ -146,7 +147,7 @@ func TestSpaceHandler_Delete(t *testing.T) {
 	})
 	tester.RequireUser(t)
 
-	tester.mocks.space.EXPECT().Delete(tester.ctx, "u", "r", "u").Return(nil)
+	tester.mocks.space.EXPECT().Delete(tester.Ctx(), "u", "r", "u").Return(nil)
 	tester.Execute()
 
 	tester.ResponseEq(t, 200, tester.OKText, nil)
@@ -158,8 +159,8 @@ func TestSpaceHandler_Run(t *testing.T) {
 	})
 	tester.RequireUser(t)
 
-	tester.mocks.repo.EXPECT().AllowAdminAccess(tester.ctx, types.SpaceRepo, "u", "r", "u").Return(true, nil)
-	tester.mocks.space.EXPECT().Deploy(tester.ctx, "u", "r", "u").Return(123, nil)
+	tester.mocks.repo.EXPECT().AllowAdminAccess(tester.Ctx(), types.SpaceRepo, "u", "r", "u").Return(true, nil)
+	tester.mocks.space.EXPECT().Deploy(tester.Ctx(), "u", "r", "u").Return(123, nil)
 	tester.Execute()
 
 	tester.ResponseEq(t, 200, tester.OKText, nil)
@@ -170,7 +171,7 @@ func TestSpaceHandler_Wakeup(t *testing.T) {
 		return h.Wakeup
 	})
 
-	tester.mocks.space.EXPECT().Wakeup(tester.ctx, "u", "r").Return(nil)
+	tester.mocks.space.EXPECT().Wakeup(tester.Ctx(), "u", "r").Return(nil)
 	tester.Execute()
 
 	tester.ResponseEq(t, 200, tester.OKText, nil)
@@ -182,8 +183,8 @@ func TestSpaceHandler_Stop(t *testing.T) {
 	})
 	tester.RequireUser(t)
 
-	tester.mocks.repo.EXPECT().AllowAdminAccess(tester.ctx, types.SpaceRepo, "u", "r", "u").Return(true, nil)
-	tester.mocks.space.EXPECT().Stop(tester.ctx, "u", "r", false).Return(nil)
+	tester.mocks.repo.EXPECT().AllowAdminAccess(tester.Ctx(), types.SpaceRepo, "u", "r", "u").Return(true, nil)
+	tester.mocks.space.EXPECT().Stop(tester.Ctx(), "u", "r", false).Return(nil)
 	tester.Execute()
 
 	tester.ResponseEq(t, 200, tester.OKText, nil)
@@ -195,10 +196,10 @@ func TestSpaceHandler_Status(t *testing.T) {
 	})
 	tester.handler.spaceStatusCheckInterval = 0
 
-	cc, cancel := context.WithCancel(tester.gctx.Request.Context())
-	tester.gctx.Request = tester.gctx.Request.WithContext(cc)
+	cc, cancel := context.WithCancel(tester.Gctx().Request.Context())
+	tester.Gctx().Request = tester.Gctx().Request.WithContext(cc)
 	tester.mocks.repo.EXPECT().AllowReadAccess(
-		tester.gctx.Request.Context(), types.SpaceRepo, "u", "r", "u",
+		tester.Gctx().Request.Context(), types.SpaceRepo, "u", "r", "u",
 	).Return(true, nil)
 	tester.mocks.space.EXPECT().Status(
 		mock.Anything, "u", "r",
@@ -211,15 +212,15 @@ func TestSpaceHandler_Status(t *testing.T) {
 	}).Once()
 
 	tester.WithUser().Execute()
-	require.Equal(t, 200, tester.response.Code)
-	headers := tester.response.Header()
+	require.Equal(t, 200, tester.Response().Code)
+	headers := tester.Response().Header()
 	require.Equal(t, "text/event-stream", headers.Get("Content-Type"))
 	require.Equal(t, "no-cache", headers.Get("Cache-Control"))
 	require.Equal(t, "keep-alive", headers.Get("Connection"))
 	require.Equal(t, "chunked", headers.Get("Transfer-Encoding"))
 	require.Equal(
 		t, "event:status\ndata:s1\n\nevent:status\ndata:s3\n\n",
-		tester.response.Body.String(),
+		tester.Response().Body.String(),
 	)
 
 }
@@ -229,10 +230,10 @@ func TestSpaceHandler_Logs(t *testing.T) {
 		return h.Logs
 	})
 
-	cc, cancel := context.WithCancel(tester.gctx.Request.Context())
-	tester.gctx.Request = tester.gctx.Request.WithContext(cc)
+	cc, cancel := context.WithCancel(tester.Gctx().Request.Context())
+	tester.Gctx().Request = tester.Gctx().Request.WithContext(cc)
 	tester.mocks.repo.EXPECT().AllowReadAccess(
-		tester.gctx.Request.Context(), types.SpaceRepo, "u", "r", "u",
+		tester.Gctx().Request.Context(), types.SpaceRepo, "u", "r", "u",
 	).Return(true, nil)
 	runlogChan := make(chan string)
 	tester.mocks.space.EXPECT().Logs(
@@ -246,14 +247,14 @@ func TestSpaceHandler_Logs(t *testing.T) {
 	}()
 
 	tester.WithUser().Execute()
-	require.Equal(t, 200, tester.response.Code)
-	headers := tester.response.Header()
+	require.Equal(t, 200, tester.Response().Code)
+	headers := tester.Response().Header()
 	require.Equal(t, "text/event-stream", headers.Get("Content-Type"))
 	require.Equal(t, "no-cache", headers.Get("Cache-Control"))
 	require.Equal(t, "keep-alive", headers.Get("Connection"))
 	require.Equal(t, "chunked", headers.Get("Transfer-Encoding"))
 	require.Equal(
 		t, "event:Container\ndata:foo\n\nevent:Container\ndata:bar\n\n",
-		tester.response.Body.String(),
+		tester.Response().Body.String(),
 	)
 }

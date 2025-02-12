@@ -53,6 +53,7 @@ func TestModelComponent_Deploy(t *testing.T) {
 		RepoID:     1,
 		SKU:        "123",
 		Type:       types.ServerlessType,
+		Task:       "text-generation",
 	}).Return(111, nil)
 
 	id, err := mc.Deploy(ctx, types.DeployActReq{

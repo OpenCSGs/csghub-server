@@ -34,15 +34,14 @@ func TestTemporalClient(t *testing.T) {
 	c := ts.GetDefaultClient()
 
 	tester := &Tester{client: temporal.GetClient()}
-	_, err := temporal.NewClient(c)
-	require.NoError(t, err)
+	temporal.Assign(c)
 
 	worker1 := tester.client.NewWorker("q1", worker.Options{})
 	worker1.RegisterWorkflow(tester.Count)
 	worker2 := tester.client.NewWorker("q2", worker.Options{})
 	worker2.RegisterWorkflow(tester.Add)
 
-	err = tester.client.Start()
+	err := tester.client.Start()
 	require.NoError(t, err)
 
 	r, err := tester.client.ExecuteWorkflow(context.TODO(), client.StartWorkflowOptions{

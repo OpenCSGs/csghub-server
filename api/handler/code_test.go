@@ -8,11 +8,12 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/require"
 	mockcomponent "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/component"
+	"opencsg.com/csghub-server/builder/testutil"
 	"opencsg.com/csghub-server/common/types"
 )
 
 type CodeTester struct {
-	*GinTester
+	*testutil.GinTester
 	handler *CodeHandler
 	mocks   struct {
 		code      *mockcomponent.MockCodeComponent
@@ -21,7 +22,7 @@ type CodeTester struct {
 }
 
 func NewCodeTester(t *testing.T) *CodeTester {
-	tester := &CodeTester{GinTester: NewGinTester()}
+	tester := &CodeTester{GinTester: testutil.NewGinTester()}
 	tester.mocks.code = mockcomponent.NewMockCodeComponent(t)
 	tester.mocks.sensitive = mockcomponent.NewMockSensitiveComponent(t)
 	tester.handler = &CodeHandler{code: tester.mocks.code, sensitive: tester.mocks.sensitive}
@@ -32,7 +33,7 @@ func NewCodeTester(t *testing.T) *CodeTester {
 }
 
 func (ct *CodeTester) WithHandleFunc(fn func(cp *CodeHandler) gin.HandlerFunc) *CodeTester {
-	ct.ginHandler = fn(ct.handler)
+	ct.Handler(fn(ct.handler))
 	return ct
 }
 
@@ -43,10 +44,10 @@ func TestCodeHandler_Create(t *testing.T) {
 	tester.RequireUser(t)
 
 	req := &types.CreateCodeReq{CreateRepoReq: types.CreateRepoReq{Name: "c"}}
-	tester.mocks.sensitive.EXPECT().CheckRequestV2(tester.ctx, req).Return(true, nil)
+	tester.mocks.sensitive.EXPECT().CheckRequestV2(tester.Ctx(), req).Return(true, nil)
 	reqn := *req
 	reqn.Username = "u"
-	tester.mocks.code.EXPECT().Create(tester.ctx, &reqn).Return(&types.Code{Name: "c"}, nil)
+	tester.mocks.code.EXPECT().Create(tester.Ctx(), &reqn).Return(&types.Code{Name: "c"}, nil)
 	tester.WithBody(t, req).Execute()
 
 	tester.ResponseEqSimple(t, 200, gin.H{"data": &types.Code{Name: "c"}})
@@ -73,7 +74,7 @@ func TestCodeHandler_Index(t *testing.T) {
 			})
 
 			if !c.error {
-				tester.mocks.code.EXPECT().Index(tester.ctx, &types.RepoFilter{
+				tester.mocks.code.EXPECT().Index(tester.Ctx(), &types.RepoFilter{
 					Search: "foo",
 					Sort:   c.sort,
 					Source: c.source,
@@ -87,7 +88,7 @@ func TestCodeHandler_Index(t *testing.T) {
 				WithQuery("source", c.source).Execute()
 
 			if c.error {
-				require.Equal(t, 400, tester.response.Code)
+				require.Equal(t, 400, tester.Response().Code)
 			} else {
 				tester.ResponseEqSimple(t, 200, gin.H{
 					"data":  []types.Code{{Name: "cc"}},
@@ -105,12 +106,12 @@ func TestCodeHandler_Update(t *testing.T) {
 	tester.RequireUser(t)
 
 	req := &types.UpdateCodeReq{UpdateRepoReq: types.UpdateRepoReq{Nickname: tea.String("nc")}}
-	tester.mocks.sensitive.EXPECT().CheckRequestV2(tester.ctx, req).Return(true, nil)
+	tester.mocks.sensitive.EXPECT().CheckRequestV2(tester.Ctx(), req).Return(true, nil)
 	reqn := *req
 	reqn.Username = "u"
 	reqn.Name = "r"
 	reqn.Namespace = "u"
-	tester.mocks.code.EXPECT().Update(tester.ctx, &reqn).Return(&types.Code{Name: "c"}, nil)
+	tester.mocks.code.EXPECT().Update(tester.Ctx(), &reqn).Return(&types.Code{Name: "c"}, nil)
 	tester.WithBody(t, req).Execute()
 
 	tester.ResponseEq(t, 200, tester.OKText, &types.Code{Name: "c"})
@@ -123,7 +124,7 @@ func TestCodeHandler_Delete(t *testing.T) {
 	})
 	tester.RequireUser(t)
 
-	tester.mocks.code.EXPECT().Delete(tester.ctx, "u", "r", "u").Return(nil)
+	tester.mocks.code.EXPECT().Delete(tester.Ctx(), "u", "r", "u").Return(nil)
 	tester.Execute()
 	tester.ResponseEq(t, 200, tester.OKText, nil)
 }
@@ -133,7 +134,7 @@ func TestCodeHandler_Show(t *testing.T) {
 		return cp.Show
 	})
 
-	tester.mocks.code.EXPECT().Show(tester.ctx, "u", "r", "u").Return(&types.Code{Name: "c"}, nil)
+	tester.mocks.code.EXPECT().Show(tester.Ctx(), "u", "r", "u").Return(&types.Code{Name: "c"}, nil)
 	tester.WithUser().Execute()
 	tester.ResponseEq(t, 200, tester.OKText, &types.Code{Name: "c"})
 }
@@ -143,7 +144,7 @@ func TestCodeHandler_Relations(t *testing.T) {
 		return cp.Relations
 	})
 
-	tester.mocks.code.EXPECT().Relations(tester.ctx, "u", "r", "u").Return(&types.Relations{}, nil)
+	tester.mocks.code.EXPECT().Relations(tester.Ctx(), "u", "r", "u").Return(&types.Relations{}, nil)
 	tester.WithUser().Execute()
 	tester.ResponseEq(t, 200, tester.OKText, &types.Relations{})
 }

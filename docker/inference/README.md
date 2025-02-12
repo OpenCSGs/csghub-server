@@ -12,8 +12,8 @@ echo "$OPENCSG_ACR_PASSWORD" | docker login $OPENCSG_ACR -u $OPENCSG_ACR_USERNAM
 ```bash
 export BUILDX_NO_DEFAULT_ATTESTATIONS=1
 
-# For vllm: opencsg-registry.cn-beijing.cr.aliyuncs.com/public/vllm-local:3.2
-export IMAGE_TAG=3.2
+# For vllm: opencsg-registry.cn-beijing.cr.aliyuncs.com/public/vllm-local:v0.7.2
+export IMAGE_TAG=v0.7.2
 docker buildx build --platform linux/amd64,linux/arm64 \
   -t ${OPENCSG_ACR}/public/vllm-local:${IMAGE_TAG} \
   -t ${OPENCSG_ACR}/public/vllm-local:latest \
@@ -36,14 +36,29 @@ docker buildx build --platform linux/amd64 \
   -f Dockerfile.tgi \
   --push .
 
-# For sglang: opencsg-registry.cn-beijing.cr.aliyuncs.com/public/sglang:v0.4.1.post3-cu124-srt
-export IMAGE_TAG=v0.4.1.post3-cu124-srt
+# For sglang: opencsg-registry.cn-beijing.cr.aliyuncs.com/public/sglang:v0.4.2.post2-cu124-srt
+export IMAGE_TAG=v0.4.2.post2-cu124-srt
 docker buildx build --platform linux/amd64 \
   -t ${OPENCSG_ACR}/public/sglang:${IMAGE_TAG} \
   -t ${OPENCSG_ACR}/public/sglang:latest \
   -f Dockerfile.sglang \
   --push .
 
+# For hf-inference-toolkit: opencsg-registry.cn-beijing.cr.aliyuncs.com/public/hf-inference-toolkit:0.5.3
+export IMAGE_TAG=0.5.3
+docker buildx build --platform linux/amd64,linux/arm64 \
+  -t ${OPENCSG_ACR}/public/hf-inference-toolkit:${IMAGE_TAG} \
+  -t ${OPENCSG_ACR}/public/hf-inference-toolkit:latest \
+  -f Dockerfile.hf-inference-toolkit \
+  --push .
+# For Text Embeddings Inference: opencsg-registry.cn-beijing.cr.aliyuncs.com/public/tei:cpu-1.6
+export IMAGE_TAG=cpu-1.6
+docker buildx build --platform linux/amd64,linux/arm64 \
+  -t ${OPENCSG_ACR}/public/tei:${IMAGE_TAG} \
+  -t ${OPENCSG_ACR}/public/tei:latest \
+  -f Dockerfile.tei-cpu \
+  --push .
+```
 *Note: The above command will create `linux/amd64` and `linux/arm64` images with the tags `${IMAGE_TAG}` and `latest` at the same time.*
 
 ## Run Inference Image Locally
@@ -52,7 +67,7 @@ docker buildx build --platform linux/amd64 \
 docker run -d \
   -e ACCESS_TOKEN=xxx \
   -e REPO_ID="xzgan001/csg-wukong-1B" \
-  -e HF_ENDPOINT=https://opencsg.com/hf \
+  -e HF_ENDPOINT=https://hub.opencsg.com \
   --gpus device=1 \
   -p 8000:8000 \
   ${OPENCSG_ACR}/public/vllm-local:2.8
@@ -61,8 +76,8 @@ docker run -d \
 docker run -d \
   -e ACCESS_TOKEN=xxx  \
   -e REPO_ID="xzgan001/csg-wukong-1B" \
-  -e HF_ENDPOINT=https://opencsg.com/hf \
-  -v llm:/data \
+  -e HF_ENDPOINT=https://hub.opencsg.com \
+  -v llm:/workspace \
   --gpus device=7 \
   -p 8000:8000
   ${OPENCSG_ACR}/public/tgi:2.2
@@ -70,14 +85,15 @@ docker run -d \
 *Note: HF_ENDPOINT should be use the real csghub address.*
 
 ## inference image name, version and cuda version
-| Image Name | Version | CUDA Version | Fix
-| --- | --- | --- |--- |
-| vllm | 2.8 | 12.1 | - |
-| vllm | 3.2 | 12.4 |fix hf hub timestamp|
-| vllm-cpu | 2.4 | -|fix hf hub timestamp |
-| tgi | 2.2 | 12.1 |- |
-| tgi | 3.2 | 12.4 |fix hf hub timestamp|
-| sglang | v0.4.1.post3-cu124-srt | 12.4 |- |
+| Task| Image Name | Version | CUDA Version | Fix
+| --- | --- | --- | --- |--- |
+|text generation| vllm | 2.8 | 12.1 | - |
+|text generation| vllm | v0.7.1 | 12.4 |fix hf hub timestamp|
+|text generation| vllm-cpu | 2.4 | -|fix hf hub timestamp |
+|text generation| tgi | 2.2 | 12.1 |- |
+|text generation| tgi | 3.2 | 12.4 |fix hf hub timestamp|
+|image generation| hf-inference-toolkit | 0.5.3 | 12.1 |-|
+|text generation| sglang | v0.4.1.post3-cu124-srt | 12.4 |- |
 
 
 ## API to Call Inference

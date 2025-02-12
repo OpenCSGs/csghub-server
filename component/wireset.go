@@ -203,6 +203,7 @@ func NewTestUserComponent(
 		collectionStore:     stores.Collection,
 		accountingComponent: accountingComponent,
 		promptStore:         stores.Prompt,
+		deployTaskStore:     stores.DeployTask,
 	}
 }
 

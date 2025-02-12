@@ -86,12 +86,12 @@ func TestMultiSyncComponent_SyncAsClient(t *testing.T) {
 	mc.mocks.gitServer.EXPECT().CreateUser(gitserver.CreateUserRequest{
 		Nickname: "nn",
 		Username: "CSG_ns",
-		Email:    "CSG_",
+		Email:    "CSG_ns_",
 	}).Return(&gitserver.CreateUserResponse{GitID: 123}, nil)
 	mc.mocks.stores.UserMock().EXPECT().Create(ctx, &database.User{
 		NickName: "nn",
 		Username: "CSG_ns",
-		Email:    "CSG_",
+		Email:    "CSG_ns_",
 		GitID:    123,
 	}, &database.Namespace{
 		Path:     "CSG_ns",
@@ -105,11 +105,12 @@ func TestMultiSyncComponent_SyncAsClient(t *testing.T) {
 		Source:         types.OpenCSGSource,
 		SyncStatus:     types.SyncStatusPending,
 		RepositoryType: types.ModelRepo,
+		CSGPath:        "ns/user",
 	}
 	mc.mocks.stores.RepoMock().EXPECT().UpdateOrCreateRepo(ctx, *dbrepo).Return(dbrepo, nil)
 	dbrepo.ID = 1
 	mc.mocks.stores.TagMock().EXPECT().FindOrCreate(ctx, database.Tag{
-		Name: "t1", Scope: database.ModelTagScope,
+		Name: "t1", Scope: types.ModelTagScope,
 	}).Return(
 		&database.Tag{Name: "t1", ID: 11}, nil,
 	)
@@ -138,6 +139,7 @@ func TestMultiSyncComponent_SyncAsClient(t *testing.T) {
 		Source:         types.OpenCSGSource,
 		SyncStatus:     types.SyncStatusPending,
 		RepositoryType: types.DatasetRepo,
+		CSGPath:        "ns/user",
 	}
 	mockedClient.EXPECT().DatasetInfo(ctx, svs[1]).Return(&types.Dataset{
 		User: types.User{Nickname: "nn"},
@@ -148,7 +150,7 @@ func TestMultiSyncComponent_SyncAsClient(t *testing.T) {
 	mc.mocks.stores.RepoMock().EXPECT().UpdateOrCreateRepo(ctx, *dbrepo).Return(dbrepo, nil)
 	dbrepo.ID = 2
 	mc.mocks.stores.TagMock().EXPECT().FindOrCreate(ctx, database.Tag{
-		Name: "t2", Scope: database.DatasetTagScope,
+		Name: "t2", Scope: types.DatasetTagScope,
 	}).Return(
 		&database.Tag{Name: "t2", ID: 12}, nil,
 	)

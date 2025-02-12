@@ -35,12 +35,12 @@ RUN pip install --no-cache-dir jupyterlab numpy==1.26.4 \
     gradio-client==1.4.0
 # Create a working directory
 WORKDIR /etc/csghub
-RUN git clone https://github.com/modelscope/ms-swift.git --branch v3.0.1 --single-branch
+RUN git clone https://github.com/modelscope/ms-swift.git --branch v3.1.0 --single-branch
 RUN cd ms-swift && pip install --no-cache-dir -e "."
-#because this library is update frequently, we use new line
+#Due to the frequent updates of this library, we use a new line
 RUN pip install --no-cache-dir vllm==v0.6.3.post1 transformers==4.47.1 timm==1.0.11 evalscope==0.5.5
 #install flash-attn
-RUN pip install --no-build-isolation --no-cache-dir ninja flash-attn
+RUN pip install https://github.com/Dao-AILab/flash-attention/releases/download/v2.7.4.post1/flash_attn-2.7.4.post1+cu12torch2.4cxx11abiFALSE-cp310-cp310-linux_x86_64.whl
 # setup supervisord
 RUN mkdir -p /var/log/supervisord
 COPY swift/supervisord.conf /etc/supervisor/conf.d/supervisord.conf
@@ -55,8 +55,6 @@ RUN mkdir -p /root/.jupyter/lab/user-settings/@jupyterlab/apputils-extension && 
 #fix gradio proxy issue
 RUN pip uninstall -y gradio && pip install https://opencsg-public-resource.oss-cn-beijing.aliyuncs.com/csghub/gradio/gradio-5.1.0-py3-none-any.whl
 
-#install flash-attn
-RUN pip install --no-build-isolation --no-cache-dir ninja flash-attn
 
 # Create a working directory
 WORKDIR /workspace/
