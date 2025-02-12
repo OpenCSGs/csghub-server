@@ -5,11 +5,12 @@ import (
 
 	"github.com/gin-gonic/gin"
 	mockcomponent "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/component"
+	"opencsg.com/csghub-server/builder/testutil"
 	"opencsg.com/csghub-server/common/types"
 )
 
 type BroadcastTester struct {
-	*GinTester
+	*testutil.GinTester
 	handler *BroadcastHandler
 	mocks   struct {
 		ec *mockcomponent.MockBroadcastComponent
@@ -17,7 +18,7 @@ type BroadcastTester struct {
 }
 
 func NewBroadcastTester(t *testing.T) *BroadcastTester {
-	tester := &BroadcastTester{GinTester: NewGinTester()}
+	tester := &BroadcastTester{GinTester: testutil.NewGinTester()}
 	tester.mocks.ec = mockcomponent.NewMockBroadcastComponent(t)
 
 	tester.handler = &BroadcastHandler{
@@ -28,7 +29,7 @@ func NewBroadcastTester(t *testing.T) *BroadcastTester {
 }
 
 func (t *BroadcastTester) WithHandleFunc(fn func(h *BroadcastHandler) gin.HandlerFunc) *BroadcastTester {
-	t.ginHandler = fn(t.handler)
+	t.Handler(fn(t.handler))
 	return t
 }
 
@@ -37,7 +38,7 @@ func TestBroadcastHandler_Index(t *testing.T) {
 		return h.Index
 	})
 
-	tester.mocks.ec.EXPECT().AllBroadcasts(tester.ctx).Return([]types.Broadcast{
+	tester.mocks.ec.EXPECT().AllBroadcasts(tester.Ctx()).Return([]types.Broadcast{
 		{Content: "test", BcType: "banner", Theme: "light", Status: "inactive"},
 	}, nil)
 
@@ -58,7 +59,7 @@ func TestBroadcastHandler_Create(t *testing.T) {
 		Content: "test", BcType: "banner", Theme: "light", Status: "inactive",
 	}
 
-	tester.mocks.ec.EXPECT().NewBroadcast(tester.ctx, broadcast).Return(nil)
+	tester.mocks.ec.EXPECT().NewBroadcast(tester.Ctx(), broadcast).Return(nil)
 
 	tester.WithBody(t, &types.Broadcast{
 		Content: "test", BcType: "banner", Theme: "light", Status: "inactive",
@@ -78,8 +79,8 @@ func TestBroadcastHandler_Update(t *testing.T) {
 		ID: 1, Content: "test", BcType: "banner", Theme: "light", Status: "inactive",
 	}
 
-	tester.mocks.ec.EXPECT().ActiveBroadcast(tester.ctx).Return(&broadcast, nil)
-	tester.mocks.ec.EXPECT().UpdateBroadcast(tester.ctx, broadcast).Return(&broadcast, nil)
+	tester.mocks.ec.EXPECT().ActiveBroadcast(tester.Ctx()).Return(&broadcast, nil)
+	tester.mocks.ec.EXPECT().UpdateBroadcast(tester.Ctx(), broadcast).Return(&broadcast, nil)
 
 	tester.WithBody(t, &types.Broadcast{
 		Content: "test", BcType: "banner", Theme: "light", Status: "inactive",
@@ -100,7 +101,7 @@ func TestBroadcastHandler_Show(t *testing.T) {
 		ID: 1, Content: "test", BcType: "banner", Theme: "light", Status: "inactive",
 	}
 
-	tester.mocks.ec.EXPECT().GetBroadcast(tester.ctx, broadcast.ID).Return(&broadcast, nil)
+	tester.mocks.ec.EXPECT().GetBroadcast(tester.Ctx(), broadcast.ID).Return(&broadcast, nil)
 
 	tester.Execute()
 
