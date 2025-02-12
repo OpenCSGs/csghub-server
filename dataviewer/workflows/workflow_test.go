@@ -68,13 +68,15 @@ func TestWorkflow_DataviewerWorkflow(t *testing.T) {
 		tester.mocks.mockact.EXPECT().GetCardFromReadme(mock.Anything, req).Return(&dvCom.CardData{}, nil)
 		tester.mocks.mockact.EXPECT().ScanRepoFiles(mock.Anything,
 			dvCom.ScanRepoFileReq{
-				Req:         req,
-				MaxFileSize: cfg.DataViewer.MaxFileSize,
+				Req:              req,
+				ConvertLimitSize: cfg.DataViewer.ConvertLimitSize,
 			}).Return(&dvCom.RepoFilesClass{
-			JsonlFiles: map[string]*types.File{
+			JsonlFiles: map[string]*dvCom.RepoFile{
 				"test": {
-					Path: "test",
-					Size: 1024,
+					File: &types.File{
+						Path: "test",
+						Size: 1024,
+					},
 				},
 			},
 		}, nil)
@@ -82,10 +84,12 @@ func TestWorkflow_DataviewerWorkflow(t *testing.T) {
 			dvCom.DetermineCardReq{
 				Card: dvCom.CardData{},
 				Class: dvCom.RepoFilesClass{
-					JsonlFiles: map[string]*types.File{
+					JsonlFiles: map[string]*dvCom.RepoFile{
 						"test": {
-							Path: "test",
-							Size: 1024,
+							File: &types.File{
+								Path: "test",
+								Size: 1024,
+							},
 						},
 					},
 				},
@@ -159,13 +163,15 @@ func TestWorkflow_DataviewerWorkflow(t *testing.T) {
 		tester.mocks.mockact.EXPECT().GetCardFromReadme(mock.Anything, req).Return(&dvCom.CardData{}, nil)
 		tester.mocks.mockact.EXPECT().ScanRepoFiles(mock.Anything,
 			dvCom.ScanRepoFileReq{
-				Req:         req,
-				MaxFileSize: cfg.DataViewer.MaxFileSize,
+				Req:              req,
+				ConvertLimitSize: cfg.DataViewer.ConvertLimitSize,
 			}).Return(&dvCom.RepoFilesClass{
-			ParquetFiles: map[string]*types.File{
+			ParquetFiles: map[string]*dvCom.RepoFile{
 				"test": {
-					Path: "test",
-					Size: 1024,
+					File: &types.File{
+						Path: "test",
+						Size: 1024,
+					},
 				},
 			},
 		}, nil)
@@ -173,10 +179,12 @@ func TestWorkflow_DataviewerWorkflow(t *testing.T) {
 			dvCom.DetermineCardReq{
 				Card: dvCom.CardData{},
 				Class: dvCom.RepoFilesClass{
-					ParquetFiles: map[string]*types.File{
+					ParquetFiles: map[string]*dvCom.RepoFile{
 						"test": {
-							Path: "test",
-							Size: 1024,
+							File: &types.File{
+								Path: "test",
+								Size: 1024,
+							},
 						},
 					},
 				},

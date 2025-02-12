@@ -67,19 +67,27 @@ type Split struct {
 }
 
 type RepoFilesReq struct {
-	Namespace string
-	RepoName  string
-	RepoType  types.RepositoryType
-	Ref       string
-	Folder    string
-	GSTree    func(ctx context.Context, req gitserver.GetRepoInfoByPathReq) ([]*types.File, error)
+	Namespace      string
+	RepoName       string
+	RepoType       types.RepositoryType
+	Ref            string
+	Folder         string
+	GSTree         func(ctx context.Context, req gitserver.GetRepoInfoByPathReq) ([]*types.File, error)
+	TotalLimitSize int64
+}
+
+type RepoFile struct {
+	*types.File
+	DownloadSize int64
 }
 
 type RepoFilesClass struct {
-	AllFiles     map[string]*types.File
-	ParquetFiles map[string]*types.File
-	JsonlFiles   map[string]*types.File
-	CsvFiles     map[string]*types.File
+	AllFiles      map[string]*RepoFile
+	ParquetFiles  map[string]*RepoFile
+	JsonlFiles    map[string]*RepoFile
+	CsvFiles      map[string]*RepoFile
+	TotalJsonSize int64
+	TotalCsvSize  int64
 }
 
 type DownloadCard struct {
@@ -111,6 +119,7 @@ type FileObject struct {
 	ObjectKey       string `yaml:"object_key" json:"object_key"`
 	LocalRepoPath   string `yaml:"local_repo_path" json:"local_repo_path"`
 	LocalFileName   string `yaml:"local_file_name" json:"local_file_name"`
+	DownloadSize    int64  `yaml:"download_size" json:"download_size"`
 }
 
 type CataLogRespone struct {
@@ -126,8 +135,8 @@ type WorkflowUpdateParams struct {
 }
 
 type ScanRepoFileReq struct {
-	Req         types.UpdateViewerReq
-	MaxFileSize int64
+	Req              types.UpdateViewerReq
+	ConvertLimitSize int64
 }
 
 type DetermineCardReq struct {
@@ -171,4 +180,18 @@ type UpdateWorkflowStatusReq struct {
 	Req                types.UpdateViewerReq
 	WorkflowErrMsg     string
 	ShouldUpdateViewer bool
+}
+
+type FileExtName struct {
+	Parquet string
+	Jsonl   string
+	Json    string
+	Csv     string
+}
+
+type SplitName struct {
+	Train string
+	Test  string
+	Val   string
+	Other string
 }

@@ -602,11 +602,11 @@ func (c *datasetViewerComponentImpl) getParquetFilesBySplit(ctx context.Context,
 
 			var validator func(string) bool
 			switch split {
-			case workflows.TrainSplitName:
+			case workflows.SplitName.Train:
 				validator = workflows.IsTrainFile
-			case workflows.TestSplitName:
+			case workflows.SplitName.Test:
 				validator = workflows.IsTestFile
-			case workflows.ValSplitName:
+			case workflows.SplitName.Val:
 				validator = workflows.IsValidationFile
 			default:
 				return nil, fmt.Errorf("unknown split type: %s", split)
@@ -661,24 +661,24 @@ func (c *datasetViewerComponentImpl) genDefaultCatalog(ctx context.Context, req 
 		if calcTotal {
 			total = c.getFilesRowCount(ctx, req, trainFiles)
 		}
-		configData.DataFiles = append(configData.DataFiles, dvCom.DataFiles{Split: workflows.TrainSplitName, Path: trainFiles})
-		datasetInfo.Splits = append(datasetInfo.Splits, dvCom.Split{Name: workflows.TrainSplitName, NumExamples: total})
+		configData.DataFiles = append(configData.DataFiles, dvCom.DataFiles{Split: workflows.SplitName.Train, Path: trainFiles})
+		datasetInfo.Splits = append(datasetInfo.Splits, dvCom.Split{Name: workflows.SplitName.Train, NumExamples: total})
 	}
 	if len(testFiles) > 0 {
 		total := 0
 		if calcTotal {
 			total = c.getFilesRowCount(ctx, req, testFiles)
 		}
-		configData.DataFiles = append(configData.DataFiles, dvCom.DataFiles{Split: workflows.TestSplitName, Path: testFiles})
-		datasetInfo.Splits = append(datasetInfo.Splits, dvCom.Split{Name: workflows.TestSplitName, NumExamples: total})
+		configData.DataFiles = append(configData.DataFiles, dvCom.DataFiles{Split: workflows.SplitName.Test, Path: testFiles})
+		datasetInfo.Splits = append(datasetInfo.Splits, dvCom.Split{Name: workflows.SplitName.Test, NumExamples: total})
 	}
 	if len(valFiles) > 0 {
 		total := 0
 		if calcTotal {
 			total = c.getFilesRowCount(ctx, req, valFiles)
 		}
-		configData.DataFiles = append(configData.DataFiles, dvCom.DataFiles{Split: workflows.ValSplitName, Path: valFiles})
-		datasetInfo.Splits = append(datasetInfo.Splits, dvCom.Split{Name: workflows.ValSplitName, NumExamples: total})
+		configData.DataFiles = append(configData.DataFiles, dvCom.DataFiles{Split: workflows.SplitName.Val, Path: valFiles})
+		datasetInfo.Splits = append(datasetInfo.Splits, dvCom.Split{Name: workflows.SplitName.Val, NumExamples: total})
 	}
 	configData.ConfigName = workflows.DefaultSubsetName
 	datasetInfo.ConfigName = workflows.DefaultSubsetName

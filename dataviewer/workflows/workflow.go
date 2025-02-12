@@ -102,8 +102,8 @@ func runWorkFlow(sessionCtx workflow.Context, updateWorkflow dvCom.WorkflowUpdat
 	var repoFileClass dvCom.RepoFilesClass
 	err = workflow.ExecuteActivity(sessionCtx, DataViewerActivity.ScanRepoFiles,
 		dvCom.ScanRepoFileReq{
-			Req:         updateWorkflow.Req,
-			MaxFileSize: updateWorkflow.Config.DataViewer.MaxFileSize},
+			Req:              updateWorkflow.Req,
+			ConvertLimitSize: updateWorkflow.Config.DataViewer.ConvertLimitSize},
 	).Get(sessionCtx, &repoFileClass)
 	if err != nil {
 		return false, fmt.Errorf("run data viewer activity GetCardFromReadme error: %w", err)
@@ -171,7 +171,7 @@ func runWorkFlow(sessionCtx workflow.Context, updateWorkflow dvCom.WorkflowUpdat
 			},
 		).Get(sessionCtx, &downloadCard)
 		if err != nil {
-			return false, fmt.Errorf("run data viewer activity CopyParquetFiles error: %w", err)
+			return false, fmt.Errorf("run data viewer activity DownloadSplitFiles error: %w", err)
 		}
 
 		err = workflow.ExecuteActivity(sessionCtx, DataViewerActivity.ConvertToParquetFiles,
