@@ -1,6 +1,7 @@
 package workflows
 
 import (
+	"fmt"
 	"io"
 	"os"
 	"strings"
@@ -26,29 +27,50 @@ func TestUtils_GetPatternFileList(t *testing.T) {
 }
 
 func TestUtils_ConvertRealFiles(t *testing.T) {
-	splitFiles := []string{"a/1.parquet", "b/2.parquet"}
-	sortKeys := []string{"a", "b"}
+	exists := map[string]*dvCom.RepoFile{}
+	paths := []string{
+		"foo/a.csv",
+		"foo/b.csv",
+		"foo/a.json",
+		"bar/c.csv",
+		"bar/d.csv",
+		"bar/a.json",
+		"foo/v1/e.csv",
+		"foo/v2/f.csv",
+		"foo/v1/t1/g.csv",
+	}
+	for _, path := range paths {
+		exists[path] = &dvCom.RepoFile{File: &types.File{Path: path}}
+	}
+	// not exists files
+	paths = append(paths, "foo/zz.csv")
+	paths = append(paths, "bar/qq.csv")
 
-	targetFiles := map[string]*dvCom.RepoFile{
-		"a/1.parquet": {
-			File: &types.File{
-				Path: "a/1.parquet",
-			},
-		},
-		"b/2.parquet": {
-			File: &types.File{
-				Path: "b/2.parquet",
-			},
-		},
-		"c/3.parquet": {
-			File: &types.File{
-				Path: "c/3.parquet",
-			},
-		},
+	cases := []struct {
+		split    string
+		expected []string
+	}{
+		{split: "foobar/a.csv", expected: []string{}},
+		{split: "foo/a.csv", expected: []string{"foo/a.csv"}},
+		{split: "foo/*.csv", expected: []string{"foo/a.csv", "foo/b.csv"}},
+		{split: "bar/*.csv", expected: []string{"bar/c.csv", "bar/d.csv"}},
+		{split: "foo/**/*.csv", expected: []string{
+			"foo/a.csv", "foo/b.csv", "foo/v1/e.csv", "foo/v2/f.csv",
+			"foo/v1/t1/g.csv",
+		}},
+		{split: "bar/**/*.csv", expected: []string{"bar/c.csv", "bar/d.csv"}},
 	}
 
-	res := ConvertRealFiles(splitFiles, sortKeys, targetFiles, "default", "train")
-	require.Equal(t, 2, len(res))
+	for _, c := range cases {
+		t.Run(fmt.Sprintf("%+v", c), func(t *testing.T) {
+			match := ConvertRealFiles([]string{c.split}, paths, exists, "default", "test")
+			paths := []string{}
+			for _, f := range match {
+				paths = append(paths, f.RepoFile)
+			}
+			require.Equal(t, c.expected, paths)
+		})
+	}
 }
 
 func TestUtils_GetCardDataMD5(t *testing.T) {

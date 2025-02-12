@@ -9,6 +9,7 @@ require (
 	github.com/alibabacloud-go/green-20220302 v1.2.0
 	github.com/alibabacloud-go/tea v1.2.1
 	github.com/aliyun/alibaba-cloud-sdk-go v1.62.648
+	github.com/bmatcuk/doublestar/v4 v4.8.1
 	github.com/casdoor/casdoor-go-sdk v0.41.0
 	github.com/chenyahui/gin-cache v1.9.0
 	github.com/d5/tengo/v2 v2.17.0
@@ -61,6 +62,7 @@ require (
 	go.opentelemetry.io/otel/trace v1.33.0
 	go.temporal.io/api v1.43.0
 	go.temporal.io/sdk v1.31.0
+	go.temporal.io/sdk/contrib/opentelemetry v0.6.0
 	go.temporal.io/server v1.26.2
 	google.golang.org/grpc v1.68.1
 	gopkg.in/yaml.v2 v2.4.0

@@ -3,6 +3,7 @@ package workflows
 import (
 	"context"
 	"encoding/base64"
+	"math"
 	"testing"
 
 	"github.com/stretchr/testify/mock"
@@ -91,15 +92,18 @@ func TestActivity_ScanRepoFiles(t *testing.T) {
 		RepoID:    int64(1),
 	}
 
-	mockGitServer.EXPECT().GetRepoFileTree(mock.Anything, gitserver.GetRepoInfoByPathReq{
+	mockGitServer.EXPECT().GetTree(mock.Anything, types.GetTreeRequest{
 		Namespace: req.Namespace,
 		Name:      req.Name,
 		Ref:       req.Branch,
 		RepoType:  req.RepoType,
+		Limit:     math.MaxInt,
+		Recursive: true,
 	}).Return(
-		[]*types.File{
-			{Name: "foobar.parquet", Path: "foo/foobar.parquet"},
-		}, nil,
+		&types.GetRepoFileTreeResp{
+			Files: []*types.File{
+				{Name: "foobar.parquet", Path: "foo/foobar.parquet"},
+			}}, nil,
 	)
 
 	dvActivity, err := NewTestDataViewerActivity(config, mockGitServer, s3Client, dvstore)

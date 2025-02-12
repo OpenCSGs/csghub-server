@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"math"
 	"net/http"
 	"net/url"
 	"os"
@@ -99,7 +100,7 @@ func (dva *dataViewerActivityImpl) GetCardFromReadme(ctx context.Context, req ty
 		Path:      types.REPOCARD_FILENAME,
 		RepoType:  req.RepoType,
 	}
-	f, err := dva.gitServer.GetRepoFileContents(context.Background(), fileReq)
+	f, err := dva.gitServer.GetRepoFileContents(ctx, fileReq)
 	if err != nil {
 		slog.Warn("get repo branch readme.md content error", slog.Any("fileReq", fileReq), slog.Any("err", err))
 		return &card, nil
@@ -127,15 +128,6 @@ func (dva *dataViewerActivityImpl) GetCardFromReadme(ctx context.Context, req ty
 }
 
 func (dva *dataViewerActivityImpl) ScanRepoFiles(ctx context.Context, scanParam dvCom.ScanRepoFileReq) (*dvCom.RepoFilesClass, error) {
-	repoReq := dvCom.RepoFilesReq{
-		Namespace:      scanParam.Req.Namespace,
-		RepoName:       scanParam.Req.Name,
-		RepoType:       scanParam.Req.RepoType,
-		Ref:            scanParam.Req.Branch,
-		Folder:         "",
-		GSTree:         dva.gitServer.GetRepoFileTree,
-		TotalLimitSize: scanParam.ConvertLimitSize,
-	}
 	fileClass := dvCom.RepoFilesClass{
 		AllFiles:      make(map[string]*dvCom.RepoFile),
 		ParquetFiles:  make(map[string]*dvCom.RepoFile),
@@ -144,9 +136,24 @@ func (dva *dataViewerActivityImpl) ScanRepoFiles(ctx context.Context, scanParam 
 		TotalJsonSize: 0,
 		TotalCsvSize:  0,
 	}
-	err := GetFilePaths(repoReq, &fileClass)
+
+	resp, err := dva.gitServer.GetTree(ctx, types.GetTreeRequest{
+		Namespace: scanParam.Req.Namespace,
+		Name:      scanParam.Req.Name,
+		RepoType:  scanParam.Req.RepoType,
+		Ref:       scanParam.Req.Branch,
+		Recursive: true,
+		Limit:     math.MaxInt,
+	})
 	if err != nil {
-		return nil, fmt.Errorf("scan repo file error: %w", err)
+		return nil, err
+	}
+
+	for _, file := range resp.Files {
+		if file.Type == "dir" {
+			continue
+		}
+		appendFile(file, &fileClass, scanParam.ConvertLimitSize)
 	}
 	return &fileClass, nil
 }
