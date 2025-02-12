@@ -6,6 +6,7 @@ import (
 	"log/slog"
 
 	"github.com/spf13/cobra"
+	"go.temporal.io/sdk/client"
 	"opencsg.com/csghub-server/api/httpbase"
 	"opencsg.com/csghub-server/builder/instrumentation"
 	"opencsg.com/csghub-server/builder/store/database"
@@ -34,17 +35,18 @@ var launchCmd = &cobra.Command{
 		}
 		database.InitDB(dbConfig)
 
-		tc, err := temporal.NewClientByHostPort(cfg.WorkFLow.Endpoint)
-		if err != nil {
-			return fmt.Errorf("build workflow client, error: %w", err)
-		}
-
 		stopOtel, err := instrumentation.SetupOTelSDK(context.Background(), cfg, "dataviewer-api")
 		if err != nil {
 			panic(err)
 		}
 
-		r, err := router.NewDataViewerRouter(cfg, tc)
+		client, err := temporal.NewClient(client.Options{
+			HostPort: cfg.WorkFLow.Endpoint,
+		}, "dataset-viewer")
+		if err != nil {
+			return fmt.Errorf("unable to create workflow client, error: %w", err)
+		}
+		r, err := router.NewDataViewerRouter(cfg, client)
 		if err != nil {
 			return fmt.Errorf("failed to init dataviewer router: %w", err)
 		}

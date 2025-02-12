@@ -10,10 +10,10 @@ import (
 	"io"
 	"log/slog"
 	"os"
-	"regexp"
 	"strings"
 	"time"
 
+	"github.com/bmatcuk/doublestar/v4"
 	"go.temporal.io/sdk/activity"
 	"opencsg.com/csghub-server/common/types"
 	dvCom "opencsg.com/csghub-server/dataviewer/common"
@@ -51,10 +51,10 @@ func GetPatternFileList(path interface{}) []string {
 	return files
 }
 
-func ConvertRealFiles(splitFiles []string, sortKeys []string, targetFiles map[string]*dvCom.RepoFile, subsetName, splitName string) []dvCom.FileObject {
+func ConvertRealFiles(splitFiles []string, filePaths []string, targetFiles map[string]*dvCom.RepoFile, subsetName, splitName string) []dvCom.FileObject {
 	var phyFiles []dvCom.FileObject
 	for _, filePattern := range splitFiles {
-		if !strings.Contains(filePattern, dvCom.WILDCARD) {
+		if !strings.Contains(filePattern, dvCom.WILDCARD) || !doublestar.ValidatePathPattern(filePattern) {
 			file, exists := targetFiles[filePattern]
 			if exists {
 				phyFiles = append(phyFiles, TransferFileObject(file, subsetName, splitName))
@@ -62,18 +62,12 @@ func ConvertRealFiles(splitFiles []string, sortKeys []string, targetFiles map[st
 			continue
 		}
 
-		fileReg, err := regexp.Compile(filePattern)
-		if err != nil {
-			slog.Warn("invalid regexp format of split file", slog.Any("filePattern", filePattern), slog.Any("err", err))
-			file, exists := targetFiles[filePattern]
-			if exists {
-				phyFiles = append(phyFiles, TransferFileObject(file, subsetName, splitName))
+		for _, path := range filePaths {
+			match, err := doublestar.PathMatch(filePattern, path)
+			if err != nil {
+				slog.Error("file pattern match", "error", err)
 			}
-			continue
-		}
-		for _, path := range sortKeys {
-			// repo file match like: test/test-*
-			if fileReg.MatchString(path) {
+			if match {
 				file, exists := targetFiles[path]
 				if exists {
 					phyFiles = append(phyFiles, TransferFileObject(file, subsetName, splitName))

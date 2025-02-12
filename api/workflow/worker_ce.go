@@ -38,13 +38,12 @@ func StartWorkflow(cfg *config.Config) error {
 	if err != nil {
 		return err
 	}
-	temporalClient, err := client.Dial(client.Options{
+	client, err := temporal.NewClient(client.Options{
 		HostPort: cfg.WorkFLow.Endpoint,
-	})
+	}, "csghub-api")
 	if err != nil {
 		return fmt.Errorf("unable to create workflow client, error: %w", err)
 	}
-	client, err := temporal.NewClient(temporalClient)
 	if err != nil {
 		return err
 	}
