@@ -568,6 +568,55 @@ func initializeTestCollectionComponent(ctx context.Context, t interface {
 	return componentTestCollectionWithMocks
 }
 
+func initializeTestBroadcastComponent(ctx context.Context, t interface {
+	Cleanup(func())
+	mock.TestingT
+}) *testBroadcastWithMocks {
+	mockStores := tests.NewMockStores(t)
+	componentBroadcastComponentImpl := NewTestBroadcastComponent(mockStores)
+	mockAccountingComponent := component.NewMockAccountingComponent(t)
+	mockRepoComponent := component.NewMockRepoComponent(t)
+	mockTagComponent := component.NewMockTagComponent(t)
+	mockSpaceComponent := component.NewMockSpaceComponent(t)
+	mockRuntimeArchitectureComponent := component.NewMockRuntimeArchitectureComponent(t)
+	mockSensitiveComponent := component.NewMockSensitiveComponent(t)
+	componentMockedComponents := &mockedComponents{
+		accounting:          mockAccountingComponent,
+		repo:                mockRepoComponent,
+		tag:                 mockTagComponent,
+		space:               mockSpaceComponent,
+		runtimeArchitecture: mockRuntimeArchitectureComponent,
+		sensitive:           mockSensitiveComponent,
+	}
+	mockGitServer := gitserver.NewMockGitServer(t)
+	mockUserSvcClient := rpc.NewMockUserSvcClient(t)
+	mockClient := s3.NewMockClient(t)
+	mockMirrorServer := mirrorserver.NewMockMirrorServer(t)
+	mockPriorityQueue := queue.NewMockPriorityQueue(t)
+	mockDeployer := deploy.NewMockDeployer(t)
+	mockAccountingClient := accounting.NewMockAccountingClient(t)
+	mockReader := parquet.NewMockReader(t)
+	mockModerationSvcClient := rpc.NewMockModerationSvcClient(t)
+	mocks := &Mocks{
+		stores:           mockStores,
+		components:       componentMockedComponents,
+		gitServer:        mockGitServer,
+		userSvcClient:    mockUserSvcClient,
+		s3Client:         mockClient,
+		mirrorServer:     mockMirrorServer,
+		mirrorQueue:      mockPriorityQueue,
+		deployer:         mockDeployer,
+		accountingClient: mockAccountingClient,
+		preader:          mockReader,
+		moderationClient: mockModerationSvcClient,
+	}
+	componentTestBroadcastWithMocks := &testBroadcastWithMocks{
+		broadcastComponentImpl: componentBroadcastComponentImpl,
+		mocks:                  mocks,
+	}
+	return componentTestBroadcastWithMocks
+}
+
 func initializeTestDatasetComponent(ctx context.Context, t interface {
 	Cleanup(func())
 	mock.TestingT
@@ -1572,6 +1621,11 @@ type testMirrorWithMocks struct {
 
 type testCollectionWithMocks struct {
 	*collectionComponentImpl
+	mocks *Mocks
+}
+
+type testBroadcastWithMocks struct {
+	*broadcastComponentImpl
 	mocks *Mocks
 }
 

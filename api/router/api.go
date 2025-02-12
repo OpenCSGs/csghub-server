@@ -356,6 +356,23 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 	event := apiGroup.Group("/events")
 	event.POST("", eventHandler.Create)
 
+	// routes for broadcast
+	broadcastHandler, err := handler.NewBroadcastHandler()
+	if err != nil {
+		return nil, fmt.Errorf("error creating broadcast handler:%w", err)
+	}
+	broadcast := apiGroup.Group("/broadcasts")
+	adminBroadcast := apiGroup.Group("/admin/broadcasts")
+	adminBroadcast.Use(authCollection.NeedAdmin)
+
+	adminBroadcast.POST("", broadcastHandler.Create)
+	adminBroadcast.PUT("/:id", broadcastHandler.Update)
+	adminBroadcast.GET("", broadcastHandler.Index)
+	adminBroadcast.GET("/:id", broadcastHandler.Show)
+	broadcast.GET("/:id", broadcastHandler.Show)
+	broadcast.GET("/active", broadcastHandler.Active)
+	// end routes for broadcast
+
 	runtimeArchHandler, err := handler.NewRuntimeArchitectureHandler(config)
 	if err != nil {
 		return nil, fmt.Errorf("error creating runtime framework architecture handler:%w", err)

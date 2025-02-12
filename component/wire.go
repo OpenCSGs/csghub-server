@@ -202,6 +202,22 @@ func initializeTestCollectionComponent(ctx context.Context, t interface {
 	return &testCollectionWithMocks{}
 }
 
+type testBroadcastWithMocks struct {
+	*broadcastComponentImpl
+	mocks *Mocks
+}
+
+func initializeTestBroadcastComponent(ctx context.Context, t interface {
+	Cleanup(func())
+	mock.TestingT
+}) *testBroadcastWithMocks {
+	wire.Build(
+		MockSuperSet, BroadcastComponentSet,
+		wire.Struct(new(testBroadcastWithMocks), "*"),
+	)
+	return &testBroadcastWithMocks{}
+}
+
 type testDatasetWithMocks struct {
 	*datasetComponentImpl
 	mocks *Mocks

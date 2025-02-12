@@ -345,6 +345,14 @@ func NewTestCollectionComponent(stores *tests.MockStores, userSvcClient rpc.User
 
 var CollectionComponentSet = wire.NewSet(NewTestCollectionComponent)
 
+func NewTestBroadcastComponent(stores *tests.MockStores) *broadcastComponentImpl {
+	return &broadcastComponentImpl{
+		broadcastStore: stores.Broadcast,
+	}
+}
+
+var BroadcastComponentSet = wire.NewSet(NewTestBroadcastComponent)
+
 func NewTestDatasetComponent(config *config.Config, stores *tests.MockStores, repoComponent RepoComponent, userSvcClient rpc.UserSvcClient, sensitiveComponent SensitiveComponent, gitServer gitserver.GitServer) *datasetComponentImpl {
 	return &datasetComponentImpl{
 		config:             config,

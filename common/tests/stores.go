@@ -48,6 +48,7 @@ type MockStores struct {
 	Telemetry            database.TelemetryStore
 	RepoFile             database.RepoFileStore
 	Event                database.EventStore
+	Broadcast            database.BroadcastStore
 	ViewerStore          database.DataviewerStore
 }
 
@@ -98,6 +99,7 @@ func NewMockStores(t interface {
 		Event:                mockdb.NewMockEventStore(t),
 		TagRule:              mockdb.NewMockTagRuleStore(t),
 		ViewerStore:          mockdb.NewMockDataviewerStore(t),
+		Broadcast:            mockdb.NewMockBroadcastStore(t),
 	}
 }
 
@@ -267,4 +269,8 @@ func (s *MockStores) RepoFileMock() *mockdb.MockRepoFileStore {
 
 func (s *MockStores) EventMock() *mockdb.MockEventStore {
 	return s.Event.(*mockdb.MockEventStore)
+}
+
+func (s *MockStores) BroadcastMock() *mockdb.MockBroadcastStore {
+	return s.Broadcast.(*mockdb.MockBroadcastStore)
 }
