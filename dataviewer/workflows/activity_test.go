@@ -106,8 +106,8 @@ func TestActivity_ScanRepoFiles(t *testing.T) {
 	require.Nil(t, err)
 
 	cls, err := dvActivity.ScanRepoFiles(ctx, dvCom.ScanRepoFileReq{
-		Req:         req,
-		MaxFileSize: config.DataViewer.MaxFileSize,
+		Req:              req,
+		ConvertLimitSize: config.DataViewer.ConvertLimitSize,
 	})
 	require.Nil(t, err)
 	require.NotNil(t, cls)
@@ -128,14 +128,24 @@ func TestActivity_DetermineCardData(t *testing.T) {
 	card := dvCom.CardData{}
 
 	repoFileClass := dvCom.RepoFilesClass{
-		AllFiles: map[string]*types.File{
-			"foo.parquet": {Name: "foo.parquet", Path: "train/foo.parquet"},
+		AllFiles: map[string]*dvCom.RepoFile{
+			"foo.parquet": {
+				File: &types.File{
+					Name: "foo.parquet",
+					Path: "train/foo.parquet",
+				},
+			},
 		},
-		ParquetFiles: map[string]*types.File{
-			"foo.parquet": {Name: "foo.parquet", Path: "train/foo.parquet"},
+		ParquetFiles: map[string]*dvCom.RepoFile{
+			"foo.parquet": {
+				File: &types.File{
+					Name: "foo.parquet",
+					Path: "train/foo.parquet",
+				},
+			},
 		},
-		JsonlFiles: map[string]*types.File{},
-		CsvFiles:   map[string]*types.File{},
+		JsonlFiles: map[string]*dvCom.RepoFile{},
+		CsvFiles:   map[string]*dvCom.RepoFile{},
 	}
 
 	dvActivity, err := NewTestDataViewerActivity(config, mockGitServer, s3Client, dvstore)

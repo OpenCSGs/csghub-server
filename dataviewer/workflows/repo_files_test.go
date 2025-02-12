@@ -15,14 +15,14 @@ func TestRepoFiles_appendFile(t *testing.T) {
 	}
 
 	fileClass := dvCom.RepoFilesClass{
-		AllFiles:     make(map[string]*types.File),
-		ParquetFiles: make(map[string]*types.File),
-		JsonlFiles:   make(map[string]*types.File),
-		CsvFiles:     make(map[string]*types.File),
+		AllFiles:     make(map[string]*dvCom.RepoFile),
+		ParquetFiles: make(map[string]*dvCom.RepoFile),
+		JsonlFiles:   make(map[string]*dvCom.RepoFile),
+		CsvFiles:     make(map[string]*dvCom.RepoFile),
 	}
 
 	appendFile(file, &fileClass, 100)
 
 	require.Equal(t, 1, len(fileClass.AllFiles))
-	require.Equal(t, 0, len(fileClass.JsonlFiles))
+	require.Equal(t, 1, len(fileClass.JsonlFiles))
 }

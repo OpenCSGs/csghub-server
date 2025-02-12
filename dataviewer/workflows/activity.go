@@ -47,10 +47,11 @@ type DataViewerActivity interface {
 }
 
 type dataViewerActivityImpl struct {
-	gitServer   gitserver.GitServer
-	s3Client    s3.Client
-	cfg         *config.Config
-	viewerStore database.DataviewerStore
+	gitServer    gitserver.GitServer
+	s3Client     s3.Client
+	cfg          *config.Config
+	viewerStore  database.DataviewerStore
+	lfsMetaStore database.LfsMetaObjectStore
 }
 
 func NewDataViewerActivity(cfg *config.Config, gs gitserver.GitServer) (DataViewerActivity, error) {
@@ -59,10 +60,11 @@ func NewDataViewerActivity(cfg *config.Config, gs gitserver.GitServer) (DataView
 		return nil, fmt.Errorf("fail to init s3 client for data viewer, error: %w", err)
 	}
 	return &dataViewerActivityImpl{
-		gitServer:   gs,
-		s3Client:    s3Client,
-		cfg:         cfg,
-		viewerStore: database.NewDataviewerStore(),
+		gitServer:    gs,
+		s3Client:     s3Client,
+		cfg:          cfg,
+		viewerStore:  database.NewDataviewerStore(),
+		lfsMetaStore: database.NewLfsMetaObjectStore(),
 	}, nil
 }
 
@@ -126,27 +128,30 @@ func (dva *dataViewerActivityImpl) GetCardFromReadme(ctx context.Context, req ty
 
 func (dva *dataViewerActivityImpl) ScanRepoFiles(ctx context.Context, scanParam dvCom.ScanRepoFileReq) (*dvCom.RepoFilesClass, error) {
 	repoReq := dvCom.RepoFilesReq{
-		Namespace: scanParam.Req.Namespace,
-		RepoName:  scanParam.Req.Name,
-		RepoType:  scanParam.Req.RepoType,
-		Ref:       scanParam.Req.Branch,
-		Folder:    "",
-		GSTree:    dva.gitServer.GetRepoFileTree,
+		Namespace:      scanParam.Req.Namespace,
+		RepoName:       scanParam.Req.Name,
+		RepoType:       scanParam.Req.RepoType,
+		Ref:            scanParam.Req.Branch,
+		Folder:         "",
+		GSTree:         dva.gitServer.GetRepoFileTree,
+		TotalLimitSize: scanParam.ConvertLimitSize,
 	}
 	fileClass := dvCom.RepoFilesClass{
-		AllFiles:     make(map[string]*types.File),
-		ParquetFiles: make(map[string]*types.File),
-		JsonlFiles:   make(map[string]*types.File),
-		CsvFiles:     make(map[string]*types.File),
+		AllFiles:      make(map[string]*dvCom.RepoFile),
+		ParquetFiles:  make(map[string]*dvCom.RepoFile),
+		JsonlFiles:    make(map[string]*dvCom.RepoFile),
+		CsvFiles:      make(map[string]*dvCom.RepoFile),
+		TotalJsonSize: 0,
+		TotalCsvSize:  0,
 	}
-	err := GetFilePaths(repoReq, &fileClass, scanParam.MaxFileSize)
+	err := GetFilePaths(repoReq, &fileClass)
 	if err != nil {
 		return nil, fmt.Errorf("scan repo file error: %w", err)
 	}
 	return &fileClass, nil
 }
 
-func (dva *dataViewerActivityImpl) autoBuildCardData(card *dvCom.CardData, sortKeys []string, targetFiles map[string]*types.File) {
+func (dva *dataViewerActivityImpl) autoBuildCardData(card *dvCom.CardData, sortKeys []string, targetFiles map[string]*dvCom.RepoFile) {
 	var (
 		trainFiles []string
 		testFiles  []string
@@ -165,50 +170,50 @@ func (dva *dataViewerActivityImpl) autoBuildCardData(card *dvCom.CardData, sortK
 		}
 		if IsTrainFile(path) {
 			trainFiles = append(trainFiles, path)
-			trainFileObjects = append(trainFileObjects, TransferFileObject(file, DefaultSubsetName, TrainSplitName))
+			trainFileObjects = append(trainFileObjects, TransferFileObject(file, DefaultSubsetName, SplitName.Train))
 		} else if IsTestFile(path) {
 			testFiles = append(testFiles, path)
-			testFileObjects = append(testFileObjects, TransferFileObject(file, DefaultSubsetName, TestSplitName))
+			testFileObjects = append(testFileObjects, TransferFileObject(file, DefaultSubsetName, SplitName.Test))
 		} else if IsValidationFile(path) {
 			valFiles = append(valFiles, path)
-			valFileObjects = append(valFileObjects, TransferFileObject(file, DefaultSubsetName, ValSplitName))
+			valFileObjects = append(valFileObjects, TransferFileObject(file, DefaultSubsetName, SplitName.Val))
 		} else {
 			otherFiles = append(otherFiles, path)
-			otherFileObjects = append(otherFileObjects, TransferFileObject(file, DefaultSubsetName, OtherSplitName))
+			otherFileObjects = append(otherFileObjects, TransferFileObject(file, DefaultSubsetName, SplitName.Other))
 		}
 	}
 	var configData dvCom.ConfigData
 	var datasetInfo dvCom.DatasetInfo
 	if len(trainFiles) > 0 {
 		configData.DataFiles = append(configData.DataFiles,
-			dvCom.DataFiles{Split: TrainSplitName, Path: trainFiles},
+			dvCom.DataFiles{Split: SplitName.Train, Path: trainFiles},
 		)
 		datasetInfo.Splits = append(datasetInfo.Splits,
-			dvCom.Split{Name: TrainSplitName, NumExamples: 0, Origins: trainFileObjects},
+			dvCom.Split{Name: SplitName.Train, NumExamples: 0, Origins: trainFileObjects},
 		)
 	}
 	if len(testFiles) > 0 {
 		configData.DataFiles = append(configData.DataFiles,
-			dvCom.DataFiles{Split: TestSplitName, Path: testFiles},
+			dvCom.DataFiles{Split: SplitName.Test, Path: testFiles},
 		)
 		datasetInfo.Splits = append(datasetInfo.Splits,
-			dvCom.Split{Name: TestSplitName, NumExamples: 0, Origins: testFileObjects},
+			dvCom.Split{Name: SplitName.Test, NumExamples: 0, Origins: testFileObjects},
 		)
 	}
 	if len(valFiles) > 0 {
 		configData.DataFiles = append(configData.DataFiles,
-			dvCom.DataFiles{Split: ValSplitName, Path: valFiles},
+			dvCom.DataFiles{Split: SplitName.Val, Path: valFiles},
 		)
 		datasetInfo.Splits = append(datasetInfo.Splits,
-			dvCom.Split{Name: ValSplitName, NumExamples: 0, Origins: valFileObjects},
+			dvCom.Split{Name: SplitName.Val, NumExamples: 0, Origins: valFileObjects},
 		)
 	}
 	if len(otherFiles) > 0 {
 		configData.DataFiles = append(configData.DataFiles,
-			dvCom.DataFiles{Split: OtherSplitName, Path: otherFiles},
+			dvCom.DataFiles{Split: SplitName.Other, Path: otherFiles},
 		)
 		datasetInfo.Splits = append(datasetInfo.Splits,
-			dvCom.Split{Name: OtherSplitName, NumExamples: 0, Origins: otherFileObjects},
+			dvCom.Split{Name: SplitName.Other, NumExamples: 0, Origins: otherFileObjects},
 		)
 	}
 	if len(configData.DataFiles) > 0 {
@@ -219,7 +224,7 @@ func (dva *dataViewerActivityImpl) autoBuildCardData(card *dvCom.CardData, sortK
 	}
 }
 
-func (dva *dataViewerActivityImpl) fillUpCardData(card *dvCom.CardData, sortKeys []string, targetFiles map[string]*types.File) *dvCom.CardData {
+func (dva *dataViewerActivityImpl) fillUpCardData(card *dvCom.CardData, sortKeys []string, targetFiles map[string]*dvCom.RepoFile) *dvCom.CardData {
 	var configs []dvCom.ConfigData
 	var infos []dvCom.DatasetInfo
 	for _, conf := range card.Configs {
@@ -245,7 +250,7 @@ func (dva *dataViewerActivityImpl) fillUpCardData(card *dvCom.CardData, sortKeys
 }
 
 func (dva *dataViewerActivityImpl) DetermineCardData(ctx context.Context, determineParam dvCom.DetermineCardReq) (*dvCom.CardData, error) {
-	var scopeFiles map[string]*types.File
+	var scopeFiles map[string]*dvCom.RepoFile
 	if determineParam.RepoDataType == RepoParquetData {
 		scopeFiles = determineParam.Class.ParquetFiles
 	} else if determineParam.RepoDataType == RepoJsonData {
@@ -253,8 +258,8 @@ func (dva *dataViewerActivityImpl) DetermineCardData(ctx context.Context, determ
 	} else if determineParam.RepoDataType == RepoCsvData {
 		scopeFiles = determineParam.Class.CsvFiles
 	}
-	if scopeFiles == nil || len(scopeFiles) < 1 {
-		slog.Warn("no target valid files found", slog.Any("card", determineParam.Card))
+	if len(scopeFiles) < 1 {
+		slog.Warn("no valid target files found", slog.Any("card", determineParam.Card))
 		return nil, nil
 	}
 
@@ -468,14 +473,13 @@ func (dva *dataViewerActivityImpl) DownloadSplitFiles(ctx context.Context, downl
 					Size:          file.Size,
 					SubsetName:    info.ConfigName,
 					SplitName:     split.Name,
-				})
+				}, extName)
 				if err != nil {
 					slog.Error("failed to download file", slog.Any("req", downloadReq.Req),
 						slog.Any("file", file), slog.Any("error", err))
 					return nil, fmt.Errorf("failed to download file %s in branch %s, cause: %w",
 						file.RepoFile, downloadReq.Req.Branch, err)
 				}
-				// slog.Info("downloaded file successfully", slog.Any("req", req), slog.Any("file", file), slog.Any("downloadObj", downloadObj))
 				newFiles = append(newFiles, *downloadObj)
 			}
 			splitPath := fmt.Sprintf("%s/%s/%s", cacheRepoPath, info.ConfigName, split.Name)
@@ -489,7 +493,7 @@ func (dva *dataViewerActivityImpl) DownloadSplitFiles(ctx context.Context, downl
 	return &dvCom.DownloadCard{Configs: downloadReq.Card.Configs, Subsets: subsets}, nil
 }
 
-func (dva *dataViewerActivityImpl) downloadFile(ctx context.Context, req types.UpdateViewerReq, orginFile dvCom.FileObject, loadFile *dvCom.FileObject) (*dvCom.FileObject, error) {
+func (dva *dataViewerActivityImpl) downloadFile(ctx context.Context, req types.UpdateViewerReq, orginFile dvCom.FileObject, loadFile *dvCom.FileObject, fileExtName string) (*dvCom.FileObject, error) {
 	cacheFilePath := fmt.Sprintf("%s/%s/%s", loadFile.LocalRepoPath, loadFile.SubsetName, loadFile.SplitName)
 	_, err := os.Stat(cacheFilePath)
 	if err != nil && !os.IsNotExist(err) {
@@ -504,12 +508,12 @@ func (dva *dataViewerActivityImpl) downloadFile(ctx context.Context, req types.U
 	}
 	localFileFullPath := fmt.Sprintf("%s/%s", cacheFilePath, loadFile.LocalFileName)
 	if orginFile.Lfs {
-		err := dva.downloadLfsFile(ctx, localFileFullPath, orginFile, loadFile)
+		err := dva.downloadLfsFile(ctx, localFileFullPath, orginFile, loadFile, fileExtName)
 		if err != nil {
 			return nil, fmt.Errorf("fail to download repo %s/%s lfs file %s, error: %w", req.Namespace, req.Name, orginFile.RepoFile, err)
 		}
 	} else {
-		err := dva.downloadNormalFile(ctx, localFileFullPath, req, orginFile, loadFile)
+		err := dva.downloadNormalFile(ctx, localFileFullPath, req, orginFile, loadFile, fileExtName)
 		if err != nil {
 			return nil, fmt.Errorf("fail to download repo %s/%s normal file %s, error: %w", req.Namespace, req.Name, orginFile.RepoFile, err)
 		}
@@ -518,7 +522,7 @@ func (dva *dataViewerActivityImpl) downloadFile(ctx context.Context, req types.U
 	return loadFile, nil
 }
 
-func (dva *dataViewerActivityImpl) downloadLfsFile(ctx context.Context, localFileFullPath string, orginFile dvCom.FileObject, loadFile *dvCom.FileObject) error {
+func (dva *dataViewerActivityImpl) downloadLfsFile(ctx context.Context, localFileFullPath string, orginFile dvCom.FileObject, loadFile *dvCom.FileObject, fileExtName string) error {
 	objectKey := orginFile.LfsRelativePath
 	objectKey = path.Join("lfs", objectKey)
 	loadFile.ObjectKey = objectKey
@@ -545,14 +549,15 @@ func (dva *dataViewerActivityImpl) downloadLfsFile(ctx context.Context, localFil
 	}
 	defer writeFile.Close()
 
-	_, err = io.Copy(writeFile, resp.Body)
+	err = dva.CopyFileContent(writeFile, resp.Body, orginFile, loadFile, fileExtName)
 	if err != nil {
-		return fmt.Errorf("failed to save local file %s, error: %w", localFileFullPath, err)
+		return fmt.Errorf("failed to save local file %s for repo file %s from url: %s, error: %w", localFileFullPath, orginFile.RepoFile, signedUrl.String(), err)
 	}
+
 	return nil
 }
 
-func (dva *dataViewerActivityImpl) downloadNormalFile(ctx context.Context, localFileFullPath string, req types.UpdateViewerReq, orginFile dvCom.FileObject, loadFile *dvCom.FileObject) error {
+func (dva *dataViewerActivityImpl) downloadNormalFile(ctx context.Context, localFileFullPath string, req types.UpdateViewerReq, orginFile dvCom.FileObject, loadFile *dvCom.FileObject, fileExtName string) error {
 	getFileReaderReq := gitserver.GetRepoInfoByPathReq{
 		Namespace: req.Namespace,
 		Name:      req.Name,
@@ -561,20 +566,51 @@ func (dva *dataViewerActivityImpl) downloadNormalFile(ctx context.Context, local
 		RepoType:  req.RepoType,
 	}
 	reader, size, err := dva.gitServer.GetRepoFileReader(ctx, getFileReaderReq)
-	loadFile.Size = size
 	if err != nil {
 		return fmt.Errorf("failed to get repo %s/%s file %s for reader, error: %w", req.Namespace, req.Name, orginFile.RepoFile, err)
 	}
+	loadFile.Size = size
+	defer reader.Close()
+
 	writeFile, err := os.Create(localFileFullPath)
 	if err != nil {
 		return fmt.Errorf("failed to create local file %s for repo %s/%s file %s, error: %w", localFileFullPath, req.Namespace, req.Name, orginFile.RepoFile, err)
 	}
 	defer writeFile.Close()
 
-	_, err = io.Copy(writeFile, reader)
+	err = dva.CopyFileContent(writeFile, reader, orginFile, loadFile, fileExtName)
+
 	if err != nil {
 		return fmt.Errorf("failed to save local file %s for repo %s/%s file %s, error: %w", localFileFullPath, req.Namespace, req.Name, orginFile.RepoFile, err)
 	}
+
+	return nil
+}
+
+func (dva *dataViewerActivityImpl) CopyFileContent(writeFile *os.File, reader io.ReadCloser, orginFile dvCom.FileObject, loadFile *dvCom.FileObject, fileExtName string) error {
+	if (orginFile.Size - orginFile.DownloadSize) <= MinFileSizeGap {
+		_, err := io.Copy(writeFile, reader)
+		if err != nil {
+			return fmt.Errorf("failed to copy the whole file content error: %w", err)
+		}
+		loadFile.DownloadSize = loadFile.Size
+		return nil
+	}
+
+	if fileExtName == FileExtName.Json {
+		copyedSize, err := CopyJsonArray(writeFile, reader, orginFile.DownloadSize)
+		if err != nil {
+			return fmt.Errorf("failed to copy json array partly, error: %w", err)
+		}
+		loadFile.DownloadSize = copyedSize
+	} else {
+		copyedSize, err := CopyFileContext(writeFile, reader, orginFile.DownloadSize)
+		if err != nil {
+			return fmt.Errorf("failed to copy content partly, error: %w", err)
+		}
+		loadFile.DownloadSize = copyedSize
+	}
+
 	return nil
 }
 
@@ -590,12 +626,14 @@ func (dva *dataViewerActivityImpl) ConvertToParquetFiles(ctx context.Context, co
 				continue
 			}
 			objectNames := []string{}
+			totalDataSize := int64(0)
 			for _, file := range split.Files {
 				if file.Lfs && !dva.cfg.DataViewer.DownloadLfsFile {
 					objectNames = append(objectNames, fmt.Sprintf("'s3://%s/%s'", dva.cfg.S3.Bucket, file.ObjectKey))
 				} else {
 					objectNames = append(objectNames, fmt.Sprintf("'%s/%s/%s/%s'", file.LocalRepoPath, file.SubsetName, file.SplitName, file.LocalFileName))
 				}
+				totalDataSize += file.DownloadSize
 			}
 			slog.Debug("ConvertToParquetFiles", slog.Any("objectNames", objectNames))
 			_, err = os.Stat(split.ExportPath)
@@ -615,7 +653,8 @@ func (dva *dataViewerActivityImpl) ConvertToParquetFiles(ctx context.Context, co
 				method = "read_csv_auto"
 			}
 			splitExportPath := fmt.Sprintf("%s/", strings.TrimSuffix(split.ExportPath, "/"))
-			err = writer.ConvertToParquet(ctx, method, objectNames, dva.cfg.DataViewer.ThreadNumOfExport, splitExportPath)
+			threadNum := GetThreadNum(totalDataSize, dva.cfg.DataViewer.MaxThreadNumOfExport)
+			err = writer.ConvertToParquet(ctx, method, objectNames, threadNum, splitExportPath)
 			if err != nil {
 				slog.Error("failed to convert data", slog.Any("objectNames", objectNames),
 					slog.Any("req", convertReq.Req), slog.Any("configname", subset.ConfigName),
@@ -744,6 +783,17 @@ func (dva *dataViewerActivityImpl) uploadToRepo(ctx context.Context, req types.U
 
 	if uploadInfo.Size != pointer.Size {
 		return fmt.Errorf("uploaded S3 file %s size does not match expected size: %d != %d", uploadFile.ConvertPath, uploadInfo.Size, pointer.Size)
+	}
+
+	metaReq := database.LfsMetaObject{
+		Oid:          pointer.Oid,
+		Size:         pointer.Size,
+		RepositoryID: req.RepoID,
+		Existing:     true,
+	}
+	_, err = dva.lfsMetaStore.UpdateOrCreate(ctx, metaReq)
+	if err != nil {
+		return fmt.Errorf("failed to create meta record for lfs file %s in repo %s/%s branch %s, cause: %w", uploadFile.RepoFile, req.Namespace, req.Name, newBranch, err)
 	}
 
 	createReq := &types.CreateFileReq{
