@@ -7,6 +7,7 @@ import (
 
 	"github.com/spf13/cobra"
 	"go.temporal.io/sdk/client"
+	"go.temporal.io/sdk/log"
 	"opencsg.com/csghub-server/api/httpbase"
 	"opencsg.com/csghub-server/builder/instrumentation"
 	"opencsg.com/csghub-server/builder/store/database"
@@ -42,6 +43,7 @@ var launchCmd = &cobra.Command{
 
 		client, err := temporal.NewClient(client.Options{
 			HostPort: cfg.WorkFLow.Endpoint,
+			Logger:   log.NewStructuredLogger(slog.Default()),
 		}, "dataset-viewer")
 		if err != nil {
 			return fmt.Errorf("unable to create workflow client, error: %w", err)
