@@ -1,5 +1,4 @@
 FROM golang:1.21.0-bullseye
-ENV GOPROXY=https://goproxy.cn,direct
 WORKDIR /starhub
 COPY . .
 RUN  CGO_ENABLED=1 GOOS=linux go build -tags netgo -a  -installsuffix cgo -ldflags '-extldflags "-static"'   -v -o /go/bin/starhub ./cmd/csghub-server && \
