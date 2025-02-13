@@ -146,7 +146,7 @@ func (dva *dataViewerActivityImpl) ScanRepoFiles(ctx context.Context, scanParam 
 		Limit:     math.MaxInt,
 	})
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("fail to scan repo %s/%s branch %s files error: %w", scanParam.Req.Namespace, scanParam.Req.Name, scanParam.Req.Branch, err)
 	}
 
 	for _, file := range resp.Files {
@@ -361,6 +361,15 @@ func (dva *dataViewerActivityImpl) CopyParquetFiles(ctx context.Context, copyReq
 	if err != nil {
 		return nil, fmt.Errorf("failed to create duckdb reader, cause: %w", err)
 	}
+	repoAllFiles, err := dva.getRepoFiles(ctx, types.UpdateViewerReq{
+		Namespace: copyReq.Req.Namespace,
+		Name:      copyReq.Req.Name,
+		RepoType:  copyReq.Req.RepoType,
+		Branch:    copyReq.NewBranch,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to get repo files, cause: %w", err)
+	}
 	cardData := dvCom.CardData{}
 	var datasetInfos []dvCom.DatasetInfo
 	for _, info := range copyReq.ComputedCardData.DatasetInfos {
@@ -388,23 +397,46 @@ func (dva *dataViewerActivityImpl) CopyParquetFiles(ctx context.Context, copyReq
 							copyReq.Req.Branch, err)
 					}
 					newFileName := fmt.Sprintf("%s/%s/%05d.parquet", info.ConfigName, split.Name, idx)
-					createReq := &types.CreateFileReq{
-						Username:  GitDefaultUserName,
-						Email:     GitDefaultUserEmail,
-						Message:   fmt.Sprintf("submit %s file", newFileName),
-						Content:   f.Content,
-						Branch:    copyReq.NewBranch,
-						Namespace: copyReq.Req.Namespace,
-						Name:      copyReq.Req.Name,
-						FilePath:  newFileName,
-						RepoType:  copyReq.Req.RepoType,
-					}
-					err = dva.gitServer.CreateRepoFile(createReq)
-					if err != nil {
-						slog.Error("failed to create file in branch", slog.Any("newfile", newFileName),
-							slog.Any("newBranch", copyReq.NewBranch), slog.Any("req", copyReq.Req), slog.Any("error", err))
-						return nil, fmt.Errorf("failed to create new file %s in new branch %s, cause: %w",
-							newFileName, copyReq.NewBranch, err)
+					_, exists := repoAllFiles[newFileName]
+					if exists {
+						updateReq := &types.UpdateFileReq{
+							Username:        GitDefaultUserName,
+							Email:           GitDefaultUserEmail,
+							Message:         fmt.Sprintf("update %s file", newFileName),
+							FilePath:        newFileName,
+							Namespace:       copyReq.Req.Namespace,
+							Name:            copyReq.Req.Name,
+							Branch:          copyReq.NewBranch,
+							Content:         f.Content,
+							OriginalContent: []byte(f.Content),
+							RepoType:        copyReq.Req.RepoType,
+						}
+						err = dva.gitServer.UpdateRepoFile(updateReq)
+						if err != nil {
+							slog.Error("failed to update file in branch", slog.Any("newfile", newFileName),
+								slog.Any("newBranch", copyReq.NewBranch), slog.Any("req", copyReq.Req), slog.Any("error", err))
+							return nil, fmt.Errorf("failed to update file %s in new branch %s, cause: %w",
+								newFileName, copyReq.NewBranch, err)
+						}
+					} else {
+						createReq := &types.CreateFileReq{
+							Username:  GitDefaultUserName,
+							Email:     GitDefaultUserEmail,
+							Message:   fmt.Sprintf("submit %s file", newFileName),
+							Content:   f.Content,
+							Branch:    copyReq.NewBranch,
+							Namespace: copyReq.Req.Namespace,
+							Name:      copyReq.Req.Name,
+							FilePath:  newFileName,
+							RepoType:  copyReq.Req.RepoType,
+						}
+						err = dva.gitServer.CreateRepoFile(createReq)
+						if err != nil {
+							slog.Error("failed to create file in branch", slog.Any("newfile", newFileName),
+								slog.Any("newBranch", copyReq.NewBranch), slog.Any("req", copyReq.Req), slog.Any("error", err))
+							return nil, fmt.Errorf("failed to create new file %s in new branch %s, cause: %w",
+								newFileName, copyReq.NewBranch, err)
+						}
 					}
 					newFiles = append(newFiles, dvCom.FileObject{
 						RepoFile:        newFileName,
@@ -436,6 +468,28 @@ func (dva *dataViewerActivityImpl) CopyParquetFiles(ctx context.Context, copyReq
 	cardData.Configs = copyReq.ComputedCardData.Configs
 	cardData.DatasetInfos = datasetInfos
 	return &cardData, nil
+}
+
+func (dva *dataViewerActivityImpl) getRepoFiles(ctx context.Context, req types.UpdateViewerReq) (map[string]string, error) {
+	resp, err := dva.gitServer.GetTree(ctx, types.GetTreeRequest{
+		Namespace: req.Namespace,
+		Name:      req.Name,
+		RepoType:  req.RepoType,
+		Ref:       req.Branch,
+		Recursive: true,
+		Limit:     math.MaxInt,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("fail to get repo %s/%s branch %s all files error: %w", req.Namespace, req.Name, req.Branch, err)
+	}
+	allFiles := make(map[string]string)
+	for _, file := range resp.Files {
+		if file.Type == "dir" {
+			continue
+		}
+		allFiles[file.Path] = file.Path
+	}
+	return allFiles, nil
 }
 
 func (dva *dataViewerActivityImpl) DownloadSplitFiles(ctx context.Context, downloadReq dvCom.DownloadFileReq) (*dvCom.DownloadCard, error) {
@@ -556,7 +610,7 @@ func (dva *dataViewerActivityImpl) downloadLfsFile(ctx context.Context, localFil
 	}
 	defer writeFile.Close()
 
-	err = dva.CopyFileContent(writeFile, resp.Body, orginFile, loadFile, fileExtName)
+	err = dva.copyFileContent(writeFile, resp.Body, orginFile, loadFile, fileExtName)
 	if err != nil {
 		return fmt.Errorf("failed to save local file %s for repo file %s from url: %s, error: %w", localFileFullPath, orginFile.RepoFile, signedUrl.String(), err)
 	}
@@ -585,7 +639,7 @@ func (dva *dataViewerActivityImpl) downloadNormalFile(ctx context.Context, local
 	}
 	defer writeFile.Close()
 
-	err = dva.CopyFileContent(writeFile, reader, orginFile, loadFile, fileExtName)
+	err = dva.copyFileContent(writeFile, reader, orginFile, loadFile, fileExtName)
 
 	if err != nil {
 		return fmt.Errorf("failed to save local file %s for repo %s/%s file %s, error: %w", localFileFullPath, req.Namespace, req.Name, orginFile.RepoFile, err)
@@ -594,7 +648,7 @@ func (dva *dataViewerActivityImpl) downloadNormalFile(ctx context.Context, local
 	return nil
 }
 
-func (dva *dataViewerActivityImpl) CopyFileContent(writeFile *os.File, reader io.ReadCloser, orginFile dvCom.FileObject, loadFile *dvCom.FileObject, fileExtName string) error {
+func (dva *dataViewerActivityImpl) copyFileContent(writeFile *os.File, reader io.ReadCloser, orginFile dvCom.FileObject, loadFile *dvCom.FileObject, fileExtName string) error {
 	if (orginFile.Size - orginFile.DownloadSize) <= MinFileSizeGap {
 		_, err := io.Copy(writeFile, reader)
 		if err != nil {
@@ -682,6 +736,15 @@ func (dva *dataViewerActivityImpl) UploadParquetFiles(ctx context.Context, uploa
 	if err != nil {
 		return nil, fmt.Errorf("failed to create duckdb reader, cause: %w", err)
 	}
+	repoAllFiles, err := dva.getRepoFiles(ctx, types.UpdateViewerReq{
+		Namespace: uploadReq.Req.Namespace,
+		Name:      uploadReq.Req.Name,
+		RepoType:  uploadReq.Req.RepoType,
+		Branch:    uploadReq.NewBranch,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to get repo files, cause: %w", err)
+	}
 	cardData := dvCom.CardData{}
 	var datasetInfos []dvCom.DatasetInfo
 	for _, subset := range uploadReq.DownloadCard.Subsets {
@@ -729,7 +792,7 @@ func (dva *dataViewerActivityImpl) UploadParquetFiles(ctx context.Context, uploa
 						Size:        fileInfo.Size(),
 						Lfs:         true,
 					}
-					err = dva.uploadToRepo(ctx, uploadReq.Req, uploadFile, uploadReq.NewBranch)
+					err = dva.uploadToRepo(ctx, uploadReq.Req, uploadFile, uploadReq.NewBranch, repoAllFiles)
 					if err != nil {
 						slog.Error("upload file to repo error", slog.Any("realFile", realFile),
 							slog.Any("req", uploadReq.Req), slog.Any("newbranch", uploadReq.NewBranch), slog.Any("error", err))
@@ -763,7 +826,7 @@ func (dva *dataViewerActivityImpl) UploadParquetFiles(ctx context.Context, uploa
 	return &cardData, nil
 }
 
-func (dva *dataViewerActivityImpl) uploadToRepo(ctx context.Context, req types.UpdateViewerReq, uploadFile *dvCom.FileObject, newBranch string) error {
+func (dva *dataViewerActivityImpl) uploadToRepo(ctx context.Context, req types.UpdateViewerReq, uploadFile *dvCom.FileObject, newBranch string, repoAllFiles map[string]string) error {
 	f, err := os.Open(uploadFile.ConvertPath)
 	if err != nil {
 		return fmt.Errorf("open file %s, cause: %w", uploadFile.ConvertPath, err)
@@ -803,22 +866,46 @@ func (dva *dataViewerActivityImpl) uploadToRepo(ctx context.Context, req types.U
 		return fmt.Errorf("failed to create meta record for lfs file %s in repo %s/%s branch %s, cause: %w", uploadFile.RepoFile, req.Namespace, req.Name, newBranch, err)
 	}
 
-	createReq := &types.CreateFileReq{
-		Username:  GitDefaultUserName,
-		Email:     GitDefaultUserEmail,
-		Message:   "upload parquet file",
-		FilePath:  uploadFile.RepoFile,
-		Content:   encodingLfsContent,
-		Namespace: req.Namespace,
-		Name:      req.Name,
-		RepoType:  req.RepoType,
-		Branch:    newBranch,
+	_, exists := repoAllFiles[uploadFile.RepoFile]
+	if exists {
+		updateReq := &types.UpdateFileReq{
+			Username:        GitDefaultUserName,
+			Email:           GitDefaultUserEmail,
+			Message:         fmt.Sprintf("update %s file", uploadFile.RepoFile),
+			FilePath:        uploadFile.RepoFile,
+			Namespace:       req.Namespace,
+			Name:            req.Name,
+			Branch:          newBranch,
+			Content:         encodingLfsContent,
+			OriginalContent: []byte(encodingLfsContent),
+			RepoType:        req.RepoType,
+		}
+		err = dva.gitServer.UpdateRepoFile(updateReq)
+		if err != nil {
+			slog.Error("failed to update file in branch", slog.Any("newfile", uploadFile.RepoFile),
+				slog.Any("newBranch", newBranch), slog.Any("req", req), slog.Any("error", err))
+			return fmt.Errorf("failed to update file %s in new branch %s, cause: %w",
+				uploadFile.RepoFile, newBranch, err)
+		}
+	} else {
+		createReq := &types.CreateFileReq{
+			Username:  GitDefaultUserName,
+			Email:     GitDefaultUserEmail,
+			Message:   "upload parquet file",
+			FilePath:  uploadFile.RepoFile,
+			Content:   encodingLfsContent,
+			Namespace: req.Namespace,
+			Name:      req.Name,
+			RepoType:  req.RepoType,
+			Branch:    newBranch,
+		}
+
+		err = dva.gitServer.CreateRepoFile(createReq)
+		if err != nil {
+			return fmt.Errorf("failed to create lfs file %s in repo %s/%s branch %s, cause: %w", uploadFile.RepoFile, req.Namespace, req.Name, newBranch, err)
+		}
 	}
 
-	err = dva.gitServer.CreateRepoFile(createReq)
-	if err != nil {
-		return fmt.Errorf("failed to create lfs file %s in repo %s/%s branch %s, cause: %w", uploadFile.RepoFile, req.Namespace, req.Name, newBranch, err)
-	}
 	return nil
 }
 
