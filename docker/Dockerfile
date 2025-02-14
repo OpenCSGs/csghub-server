@@ -1,11 +1,11 @@
-FROM opencsg-registry.cn-beijing.cr.aliyuncs.com/opencsg_public/csghub_server:base-1.0 AS build-env
+FROM opencsg-registry.cn-beijing.cr.aliyuncs.com/opencsg_public/csghub_server:base-1.1 AS build-env
 WORKDIR /starhub
 COPY . .
 RUN  CGO_ENABLED=1 GOOS=linux go build  -v -o /go/bin/starhub ./cmd/csghub-server && \
      rm -rf /go/pkg && \
      rm -rf /starhub
 
-FROM opencsg-registry.cn-beijing.cr.aliyuncs.com/opencsg_public/csghub_server:base-1.0
+FROM opencsg-registry.cn-beijing.cr.aliyuncs.com/opencsg_public/csghub_server:base-1.1
 WORKDIR /starhub-bin
 ENV GIN_MODE=release
 COPY --from=build-env /go/bin/starhub .
