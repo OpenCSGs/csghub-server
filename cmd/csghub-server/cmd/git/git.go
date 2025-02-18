@@ -6,6 +6,7 @@ import (
 
 func init() {
 	Cmd.AddCommand(generateLfsMetaObjectsCmd)
+	Cmd.AddCommand(cloneProjectStorageCmd)
 }
 
 var Cmd = &cobra.Command{

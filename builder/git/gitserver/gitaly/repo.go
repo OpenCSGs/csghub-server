@@ -2,11 +2,24 @@ package gitaly
 
 import (
 	"context"
+	"encoding/base64"
+	"encoding/json"
+	"errors"
 	"fmt"
+	"io"
+	"os"
 	"strings"
 	"time"
 
+	log "github.com/sirupsen/logrus"
+	gitalyauth "gitlab.com/gitlab-org/gitaly/v16/auth"
+	gitalyclient "gitlab.com/gitlab-org/gitaly/v16/client"
 	gitalypb "gitlab.com/gitlab-org/gitaly/v16/proto/go/gitalypb"
+	"gitlab.com/gitlab-org/gitaly/v16/streamio"
+	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/metadata"
 	"opencsg.com/csghub-server/builder/git/gitserver"
 )
 
@@ -82,4 +95,145 @@ func (c *Client) GetRepo(ctx context.Context, req gitserver.GetRepoReq) (*gitser
 	}
 
 	return &gitserver.CreateRepoResp{DefaultBranch: string(resp.Name)}, nil
+}
+
+type ProjectStorageCloneRequest struct {
+	CurrentGitalyAddress string
+	CurrentGitalyToken   string
+	CurrentGitalyStorage string
+	NewGitalyAddress     string
+	NewGitalyToken       string
+	NewGitalyStorage     string
+	Concurrency          int
+	FilesServer          string
+}
+
+type CloneStorageHelper struct {
+	from gitalypb.RepositoryServiceClient
+	to   gitalypb.RepositoryServiceClient
+}
+
+func repoClient(address, token, storage string) (gitalypb.RepositoryServiceClient, error) {
+	var sidechannelRegistry *gitalyclient.SidechannelRegistry
+	accessLogger := log.New()
+	accessLogger.SetLevel(log.InfoLevel)
+	sidechannelRegistry = gitalyclient.NewSidechannelRegistry(log.NewEntry(accessLogger))
+	addressInfo := map[string]string{"address": address, "token": token}
+	jsonData, err := json.Marshal(map[string]any{storage: addressInfo})
+	if err != nil {
+		return nil, err
+	}
+
+	encoded := base64.StdEncoding.EncodeToString(jsonData)
+
+	md := metadata.New(map[string]string{"gitaly-servers": encoded})
+	streamingAddMd := func(ctx context.Context, desc *grpc.StreamDesc, cc *grpc.ClientConn, method string, streamer grpc.Streamer, opts ...grpc.CallOption) (grpc.ClientStream, error) {
+		mdo, _ := metadata.FromOutgoingContext(ctx)
+		ctx = metadata.NewOutgoingContext(ctx, metadata.Join(mdo, md))
+		return streamer(ctx, desc, cc, method, opts...)
+	}
+	unaryAddMd := func(ctx context.Context, method string, req, reply any, cc *grpc.ClientConn, invoker grpc.UnaryInvoker, opts ...grpc.CallOption) error {
+		mdo, _ := metadata.FromOutgoingContext(ctx)
+		ctx = metadata.NewOutgoingContext(ctx, metadata.Join(mdo, md))
+		return invoker(ctx, method, req, reply, cc, opts...)
+	}
+
+	connOpts := append(gitalyclient.DefaultDialOpts,
+		grpc.WithPerRPCCredentials(gitalyauth.RPCCredentialsV2(token)),
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
+		gitalyclient.WithGitalyDNSResolver(gitalyclient.DefaultDNSResolverBuilderConfig()),
+		grpc.WithStatsHandler(otelgrpc.NewClientHandler()),
+		grpc.WithStreamInterceptor(streamingAddMd),
+		grpc.WithUnaryInterceptor(unaryAddMd),
+	)
+
+	conn, err := gitalyclient.DialSidechannel(context.Background(), address, sidechannelRegistry, connOpts)
+	if err != nil {
+		return nil, err
+	}
+	return gitalypb.NewRepositoryServiceClient(conn), nil
+
+}
+
+func (h *CloneStorageHelper) CloneRepoStorage(ctx context.Context, path string, req *ProjectStorageCloneRequest) error {
+	r, err := h.from.RepositoryExists(ctx, &gitalypb.RepositoryExistsRequest{
+		Repository: &gitalypb.Repository{
+			StorageName:  req.CurrentGitalyStorage,
+			RelativePath: path,
+		},
+	})
+	if err != nil {
+		return err
+	}
+	if !r.Exists {
+		return errors.New("repo not exists on current Gitaly instance")
+	}
+
+	r, err = h.to.RepositoryExists(ctx, &gitalypb.RepositoryExistsRequest{
+		Repository: &gitalypb.Repository{
+			StorageName:  req.NewGitalyStorage,
+			RelativePath: path,
+		},
+	})
+	if err != nil {
+		return err
+	}
+	if r.Exists {
+		return nil
+	}
+
+	stream, err := h.from.GetSnapshot(ctx, &gitalypb.GetSnapshotRequest{
+		Repository: &gitalypb.Repository{
+			StorageName:  req.CurrentGitalyStorage,
+			RelativePath: path,
+		},
+	})
+	if err != nil {
+		return err
+	}
+	reader := streamio.NewReader(func() ([]byte, error) {
+		response, err := stream.Recv()
+		return response.GetData(), err
+	})
+	fileName := fmt.Sprintf("%s.tar", strings.ReplaceAll(path, "/", "_"))
+	outFile, err := os.Create(fileName)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = os.Remove(fileName) }()
+	_, err = io.Copy(outFile, reader)
+	_ = outFile.Close()
+	if err != nil {
+
+		return err
+	}
+
+	_, err = h.to.CreateRepositoryFromSnapshot(ctx,
+		&gitalypb.CreateRepositoryFromSnapshotRequest{
+			Repository: &gitalypb.Repository{
+				StorageName:  req.NewGitalyStorage,
+				RelativePath: path,
+			},
+			HttpUrl: req.FilesServer + fileName,
+		})
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func NewCloneStorageHelper(req *ProjectStorageCloneRequest) (*CloneStorageHelper, error) {
+	from, err := repoClient(
+		req.CurrentGitalyAddress, req.CurrentGitalyToken, req.CurrentGitalyStorage,
+	)
+	if err != nil {
+		return nil, err
+	}
+	to, err := repoClient(
+		req.NewGitalyAddress, req.NewGitalyToken, req.NewGitalyStorage,
+	)
+	if err != nil {
+		return nil, err
+	}
+	return &CloneStorageHelper{from: from, to: to}, nil
 }
