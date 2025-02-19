@@ -234,12 +234,21 @@ func (c *gitHTTPComponentImpl) lfsBatchUploadInfo(ctx context.Context, req types
 	}
 
 	for _, obj := range req.Objects {
+		// for existing lfs files, return pointer only and no action,
+		// this is the expeted format when file exists and doesn't
+		// need to be reuploaded. See:
+		// https://github.com/git-lfs/git-lfs/blob/main/docs/api/batch.md
+		// "If a client requests to upload an object that the server already has,the server should omit the actions property completely. The client will then assume the server already has it."
 		if _, ok := exists[obj.Oid]; ok {
+			objs = append(objs, &types.ObjectResponse{
+				Pointer: obj,
+			})
 			continue
 		}
 		if !obj.Valid() {
 			objs = append(objs, &types.ObjectResponse{
-				Error: &types.ObjectError{},
+				Pointer: obj,
+				Error:   &types.ObjectError{},
 			})
 			continue
 		}

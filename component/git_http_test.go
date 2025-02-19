@@ -224,7 +224,12 @@ func TestGitHTTPComponent_Batch(t *testing.T) {
 			hasWriteAccess: true,
 			exist:          true,
 			resp: &types.BatchResponse{
-				Objects: nil,
+				Objects: []*types.ObjectResponse{
+					{
+						Pointer: types.Pointer{Oid: existOID, Size: 100},
+						Actions: nil,
+					},
+				},
 			},
 		},
 		{
