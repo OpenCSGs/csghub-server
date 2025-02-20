@@ -676,35 +676,43 @@ func (c *userComponentImpl) genUniqueName() (string, error) {
 }
 
 func (c *userComponentImpl) updateCasdoorUser(req *types.UpdateUserRequest) error {
+	if req.UUID == nil {
+		return errors.New("uuid is required to update casdoor user")
+	}
+	//nothing to update
+	if req.Email == nil && req.Phone == nil && req.NewUserName == nil && req.Nickname == nil {
+		return errors.New("nothing to update, at least one of email/phone/new_username/nickname is required")
+	}
+
 	c.lazyInit()
 
 	casu, err := c.casc.GetUserByUserId(*req.UUID)
 	if err != nil {
-		return fmt.Errorf("failed to get user from casdoor,error:%w", err)
+		return fmt.Errorf("failed to get user from casdoor by uuid: %s,error:%w", *req.UUID, err)
 	}
 	if casu == nil {
-		return fmt.Errorf("user not exists in casdoor")
+		return fmt.Errorf("user not found in casdoor by uuid:%s", *req.UUID)
 	}
-	var cols []string
 	if req.Email != nil {
 		casu.Email = *req.Email
-		cols = append(cols, "email")
 	}
 	if req.Phone != nil {
 		casu.Phone = *req.Phone
-		cols = append(cols, "phone")
 	}
-
-	if len(cols) == 0 {
-		return nil
+	if req.Nickname != nil {
+		casu.DisplayName = *req.Nickname
 	}
-
-	// casdoor update user api don't allow empty display name, so we set it but not update it
+	// casdoor update user api don't allow empty display name, so we set it
 	if casu.DisplayName == "" {
 		casu.DisplayName = casu.Name
 	}
 
-	_, err = c.casc.UpdateUserForColumns(casu, cols)
+	// get id by user name before changed
+	id := c.casc.GetId(casu.Name)
+	if req.NewUserName != nil {
+		casu.Name = *req.NewUserName
+	}
+	_, err = c.casc.UpdateUserById(id, casu)
 	return err
 }
 
