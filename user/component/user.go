@@ -268,9 +268,10 @@ func (c *userComponentImpl) Update(ctx context.Context, req *types.UpdateUserReq
 	}
 
 	//skip casdoor update if it's not a casdoor user
-	if req.UUID == nil || user.RegProvider != "casdoor" {
+	if user.UUID == "" || user.RegProvider != "casdoor" {
 		return nil
 	}
+	req.UUID = &user.UUID
 	err = c.updateCasdoorUser(req)
 	if err != nil {
 		newError := fmt.Errorf("failed to update casdoor user '%s',error:%w", req.Username, err)
