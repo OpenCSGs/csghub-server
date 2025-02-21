@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"net/url"
 	"os"
 	"strings"
 	"sync"
@@ -710,6 +711,7 @@ func (c *userComponentImpl) updateCasdoorUser(req *types.UpdateUserRequest) erro
 
 	// get id by user name before changed
 	id := c.casc.GetId(casu.Name)
+	id = url.QueryEscape(id) // wechat user's name may contain special characters
 	if req.NewUserName != nil {
 		casu.Name = *req.NewUserName
 	}
