@@ -83,7 +83,7 @@ func NewRuntimeArchitectureComponent(config *config.Config) (RuntimeArchitecture
 	if err != nil {
 		return nil, fmt.Errorf("failed to create redis cache, error: %w", err)
 	}
-	c.fileDownloadPath = fmt.Sprintf("%s/%s", config.APIServer.PublicDomain, "csg")
+	c.fileDownloadPath = fmt.Sprintf("%s/%s", config.Model.DownloadEndpoint, "csg")
 	c.apiToken = config.APIToken
 	c.cache = cache
 	return c, nil
@@ -431,8 +431,14 @@ func (c *runtimeArchitectureComponentImpl) getConfigContent(ctx context.Context,
 
 // get gguf content
 func (c *runtimeArchitectureComponentImpl) GetGGUFContent(ctx context.Context, filename string, repo *database.Repository) (*gguf.GGUFFile, error) {
+	var options []gguf.GGUFReadOption
+	if c.apiToken != "" {
+		options = append(options, gguf.UseBearerAuth(c.apiToken))
+	}
+	options = append(options, gguf.SkipRangeDownloadDetection())
 	url := fmt.Sprintf("%s/%s/resolve/%s/%s", c.fileDownloadPath, repo.Path, repo.DefaultBranch, filename)
-	f, err := gguf.ParseGGUFFileRemote(ctx, url, gguf.UseBearerAuth(c.apiToken), gguf.SkipRangeDownloadDetection())
+
+	f, err := gguf.ParseGGUFFileRemote(ctx, url, options...)
 	if err != nil {
 		return nil, err
 	}

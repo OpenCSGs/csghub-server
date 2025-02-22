@@ -1275,6 +1275,10 @@ func (c *modelComponentImpl) ListQuantizations(ctx context.Context, namespace, n
 	if err != nil {
 		return nil, fmt.Errorf("failed to find model, error: %w", err)
 	}
+	if !isGGUFModel(repo) {
+		//no need to get quantization files for non gguf models
+		return nil, nil
+	}
 	files, err := getAllFiles(ctx, namespace, name, "", types.ModelRepo, repo.DefaultBranch, c.gitServer.GetRepoFileTree)
 	if err != nil {
 		return nil, fmt.Errorf("get RepoFileTree for relation, %w", err)

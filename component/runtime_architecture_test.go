@@ -230,3 +230,17 @@ func TestRuntimeArchComponent_AddResourceTag(t *testing.T) {
 	}, "model", int64(1))
 	require.Nil(t, err)
 }
+
+func TestRuntimeArchComponent_GetGGUFContent(t *testing.T) {
+	ctx := context.TODO()
+	rc := initializeTestRuntimeArchComponent(ctx, t)
+	rc.fileDownloadPath = "https://hub.opencsg.com/csg"
+
+	file, err := rc.GetGGUFContent(ctx, "llama-2-7b.Q2_K.gguf", &database.Repository{
+		Path:          "AIWizards/Llama-2-7B-GGUF",
+		DefaultBranch: "main",
+	})
+	require.Nil(t, err)
+	meta := file.Metadata()
+	require.Equal(t, "llama", meta.Architecture)
+}
