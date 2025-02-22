@@ -254,7 +254,7 @@ func (c *modelComponentImpl) Create(ctx context.Context, req *types.CreateModelR
 	err = c.gitServer.CreateRepoFile(buildCreateFileReq(&types.CreateFileParams{
 		Username:  user.Username,
 		Email:     user.Email,
-		Message:   initCommitMessage,
+		Message:   types.InitCommitMessage,
 		Branch:    req.DefaultBranch,
 		Content:   req.Readme,
 		NewBranch: req.DefaultBranch,
@@ -270,7 +270,7 @@ func (c *modelComponentImpl) Create(ctx context.Context, req *types.CreateModelR
 	err = c.gitServer.CreateRepoFile(buildCreateFileReq(&types.CreateFileParams{
 		Username:  user.Username,
 		Email:     user.Email,
-		Message:   initCommitMessage,
+		Message:   types.InitCommitMessage,
 		Branch:    req.DefaultBranch,
 		Content:   modelGitattributesContent,
 		NewBranch: req.DefaultBranch,

@@ -4,8 +4,10 @@ package workflow
 
 import (
 	"fmt"
+	"log/slog"
 
 	"go.temporal.io/sdk/client"
+	"go.temporal.io/sdk/log"
 	"go.temporal.io/sdk/worker"
 	"opencsg.com/csghub-server/api/workflow/activity"
 	"opencsg.com/csghub-server/builder/git"
@@ -40,6 +42,7 @@ func StartWorkflow(cfg *config.Config) error {
 	}
 	client, err := temporal.NewClient(client.Options{
 		HostPort: cfg.WorkFLow.Endpoint,
+		Logger:   log.NewStructuredLogger(slog.Default()),
 	}, "csghub-api")
 	if err != nil {
 		return fmt.Errorf("unable to create workflow client, error: %w", err)

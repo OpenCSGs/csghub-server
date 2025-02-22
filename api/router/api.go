@@ -457,6 +457,13 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 		return nil, fmt.Errorf("error creating dataset viewer proxy:%w", err)
 	}
 	createDataViewerRoutes(apiGroup, dsViewerHandler)
+
+	// space template
+	templateHandler, err := handler.NewSpaceTemplateHandler(config)
+	if err != nil {
+		return nil, fmt.Errorf("error creating space template proxy:%w", err)
+	}
+	createSpaceTemplateRoutes(apiGroup, authCollection, templateHandler)
 	return r, nil
 }
 
@@ -877,5 +884,16 @@ func createDataViewerRoutes(apiGroup *gin.RouterGroup, dsViewerHandler *handler.
 	dataViewerGrp := datasetRepoGrp.Group("/dataviewer")
 	{
 		dataViewerGrp.Any("/*any", dsViewerHandler.Proxy)
+	}
+}
+
+func createSpaceTemplateRoutes(apiGroup *gin.RouterGroup, authCollection middleware.AuthenticatorCollection, templateHandler *handler.SpaceTemplateHandler) {
+	spaceTemplateGrp := apiGroup.Group("/space_templates")
+	{
+		spaceTemplateGrp.GET("", authCollection.NeedAdmin, templateHandler.Index)
+		spaceTemplateGrp.POST("", authCollection.NeedAdmin, templateHandler.Create)
+		spaceTemplateGrp.PUT("/:id", authCollection.NeedAdmin, templateHandler.Update)
+		spaceTemplateGrp.DELETE("/:id", authCollection.NeedAdmin, templateHandler.Delete)
+		spaceTemplateGrp.GET("/:type", templateHandler.List)
 	}
 }

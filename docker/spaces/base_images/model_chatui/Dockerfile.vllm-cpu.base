@@ -1,0 +1,8 @@
+FROM cledge/vllm-cpu:0.4.12-fix1
+RUN pip config set global.index-url https://pypi.tuna.tsinghua.edu.cn/simple
+RUN apt-get update -y && apt-get install -y curl python3.11 && apt-get clean
+RUN rm /usr/bin/python3 && \
+    ln -s /usr/bin/python3.11 /usr/bin/python3 && \
+    python3.10 -m pip install --no-cache-dir csghub-sdk && \
+    python3.11 -m pip install --no-cache-dir --upgrade setuptools open-webui && \
+    pip cache purge 

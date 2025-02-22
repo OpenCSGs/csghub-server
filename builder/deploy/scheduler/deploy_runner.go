@@ -226,12 +226,6 @@ func (t *DeployRunner) makeDeployRequest() (*types.RunRequest, error) {
 	}
 	annoMap[types.ResDeployID] = fmt.Sprintf("%v", deploy.ID)
 
-	envMap, err := common.JsonStrToMap(deploy.Env)
-	if err != nil {
-		slog.Error("deploy env is invalid json data", slog.Any("env", deploy.Env))
-		return nil, err
-	}
-
 	var hardware = types.HardWare{}
 	err = json.Unmarshal([]byte(deploy.Hardware), &hardware)
 	if err != nil {
@@ -239,54 +233,7 @@ func (t *DeployRunner) makeDeployRequest() (*types.RunRequest, error) {
 		return nil, err
 	}
 
-	// for space and models
-	envMap["S3_INTERNAL"] = fmt.Sprintf("%v", t.deployCfg.S3Internal)
-	envMap["HTTPCloneURL"] = t.getHttpCloneURLWithToken(t.repo.HTTPCloneURL, token.Token)
-	envMap["ACCESS_TOKEN"] = token.Token
-	envMap["REPO_ID"] = t.repo.Path       // "namespace/name"
-	envMap["REVISION"] = deploy.GitBranch // branch
-	if hardware.Gpu.Num != "" {
-		envMap["GPU_NUM"] = hardware.Gpu.Num
-	}
-
-	if deploy.SpaceID > 0 {
-		// sdk port for space
-		if t.repo.Sdk == GRADIO.Name {
-			envMap["port"] = GRADIO.Port
-		} else if t.repo.Sdk == STREAMLIT.Name {
-			envMap["port"] = STREAMLIT.Port
-		} else if t.repo.Sdk == NGINX.Name {
-			envMap["port"] = NGINX.Port
-		} else {
-			envMap["port"] = "8080"
-		}
-	}
-
-	if deploy.Type == types.InferenceType || deploy.Type == types.ServerlessType {
-		// runtime framework port for model
-		envMap["port"] = strconv.Itoa(deploy.ContainerPort)
-		envMap["HF_ENDPOINT"] = t.deployCfg.ModelDownloadEndpoint // "https://hub-stg.opencsg.com/"
-		envMap["HF_HUB_OFFLINE"] = "1"
-		envMap["HF_TASK"] = string(deploy.Task)
-	}
-
-	if deploy.Type == types.FinetuneType {
-		envMap["port"] = strconv.Itoa(deploy.ContainerPort)
-		envMap["HF_ENDPOINT"], _ = url.JoinPath(t.deployCfg.ModelDownloadEndpoint, "hf")
-		envMap["HF_TOKEN"] = token.Token
-		envMap["USE_CSGHUB_MODEL"] = "1"
-	}
-
-	if t.deployCfg.PublicRootDomain == "" {
-		if deploy.Type == types.FinetuneType {
-			envMap["CONTEXT_PATH"] = "/endpoint/" + deploy.SvcName
-		}
-		if deploy.Type == types.SpaceType {
-			envMap["GRADIO_ROOT_PATH"] = "/endpoint/" + deploy.SvcName
-			envMap["STREAMLIT_SERVER_BASE_URL_PATH"] = "/endpoint/" + deploy.SvcName
-		}
-
-	}
+	envMap := t.makeDeployEnv(hardware, token, deploy)
 
 	targetID := deploy.SpaceID
 	// deployID is unique for space and model
@@ -316,6 +263,80 @@ func (t *DeployRunner) makeDeployRequest() (*types.RunRequest, error) {
 		UserID:      deploy.UserUUID,
 		Sku:         deploy.SKU,
 	}, nil
+}
+
+func (t *DeployRunner) makeDeployEnv(
+	hardware types.HardWare,
+	token *database.AccessToken, deploy *database.Deploy,
+) map[string]string {
+	envMap, err := common.JsonStrToMap(deploy.Env)
+	if err != nil {
+		slog.Error("deploy env is invalid json data", slog.Any("deploy", deploy))
+	}
+
+	varMap, err := common.JsonStrToMap(deploy.Variables)
+	if err != nil {
+		slog.Error("deploy variables is invalid json data", slog.Any("deploy", deploy))
+	} else {
+		for key, value := range varMap {
+			envMap[key] = value
+		}
+	}
+
+	// for space and models
+	envMap["S3_INTERNAL"] = fmt.Sprintf("%v", t.deployCfg.S3Internal)
+	envMap["HTTPCloneURL"] = t.getHttpCloneURLWithToken(t.repo.HTTPCloneURL, token.Token)
+	envMap["ACCESS_TOKEN"] = token.Token
+	envMap["REPO_ID"] = t.repo.Path       // "namespace/name"
+	envMap["REVISION"] = deploy.GitBranch // branch
+	envMap["ENGINE_ARGS"] = deploy.EngineArgs
+	if hardware.Gpu.Num != "" {
+		envMap["GPU_NUM"] = hardware.Gpu.Num
+	}
+
+	if deploy.SpaceID > 0 {
+		// sdk port for space
+		if t.repo.Sdk == GRADIO.Name {
+			envMap["port"] = strconv.Itoa(GRADIO.Port)
+		} else if t.repo.Sdk == STREAMLIT.Name {
+			envMap["port"] = strconv.Itoa(STREAMLIT.Port)
+		} else if t.repo.Sdk == NGINX.Name {
+			envMap["port"] = strconv.Itoa(NGINX.Port)
+		} else if t.repo.Sdk == DOCKER.Name {
+			envMap["port"] = strconv.Itoa(deploy.ContainerPort)
+			envMap["HF_ENDPOINT"] = t.deployCfg.ModelDownloadEndpoint
+		} else {
+			envMap["port"] = strconv.Itoa(DefaultContainerPort)
+		}
+	}
+
+	if deploy.Type == types.InferenceType || deploy.Type == types.ServerlessType {
+		// runtime framework port for model
+		envMap["port"] = strconv.Itoa(deploy.ContainerPort)
+		envMap["HF_ENDPOINT"] = t.deployCfg.ModelDownloadEndpoint // "https://hub.opencsg-stg.com/"
+		envMap["HF_HUB_OFFLINE"] = "1"
+		envMap["HF_TASK"] = string(deploy.Task)
+	}
+
+	if deploy.Type == types.FinetuneType {
+		envMap["port"] = strconv.Itoa(deploy.ContainerPort)
+		envMap["HF_ENDPOINT"], _ = url.JoinPath(t.deployCfg.ModelDownloadEndpoint, "hf")
+		envMap["HF_TOKEN"] = token.Token
+		envMap["USE_CSGHUB_MODEL"] = "1"
+		envMap["USE_CSGHUB_DATASET"] = "1"
+	}
+
+	if t.deployCfg.PublicRootDomain == "" {
+		if deploy.Type == types.FinetuneType {
+			envMap["CONTEXT_PATH"] = "/endpoint/" + deploy.SvcName
+		}
+		if deploy.Type == types.SpaceType {
+			envMap["GRADIO_ROOT_PATH"] = "/endpoint/" + deploy.SvcName
+			envMap["STREAMLIT_SERVER_BASE_URL_PATH"] = "/endpoint/" + deploy.SvcName
+		}
+	}
+
+	return envMap
 }
 
 func (t *DeployRunner) cancelDeploy(ctx context.Context, orgName, repoName string) error {

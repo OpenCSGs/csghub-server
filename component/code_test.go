@@ -45,7 +45,7 @@ func TestCodeComponent_Create(t *testing.T) {
 	}, nil)
 	cc.mocks.gitServer.EXPECT().CreateRepoFile(buildCreateFileReq(&types.CreateFileParams{
 		Username:  "user",
-		Message:   initCommitMessage,
+		Message:   types.InitCommitMessage,
 		Branch:    "main",
 		Content:   crq.Readme,
 		NewBranch: "main",
@@ -55,7 +55,7 @@ func TestCodeComponent_Create(t *testing.T) {
 	}, types.CodeRepo)).Return(nil)
 	cc.mocks.gitServer.EXPECT().CreateRepoFile(buildCreateFileReq(&types.CreateFileParams{
 		Username:  "user",
-		Message:   initCommitMessage,
+		Message:   types.InitCommitMessage,
 		Branch:    "main",
 		Content:   codeGitattributesContent,
 		NewBranch: "main",

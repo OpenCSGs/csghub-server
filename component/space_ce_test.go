@@ -56,7 +56,7 @@ func TestSpaceComponent_Create(t *testing.T) {
 	sc.mocks.gitServer.EXPECT().CreateRepoFile(buildCreateFileReq(&types.CreateFileParams{
 		Username:  "user",
 		Email:     "foo@bar.com",
-		Message:   initCommitMessage,
+		Message:   types.InitCommitMessage,
 		Branch:    "main",
 		Content:   generateReadmeData("MIT"),
 		NewBranch: "main",
@@ -67,7 +67,7 @@ func TestSpaceComponent_Create(t *testing.T) {
 	sc.mocks.gitServer.EXPECT().CreateRepoFile(buildCreateFileReq(&types.CreateFileParams{
 		Username:  "user",
 		Email:     "foo@bar.com",
-		Message:   initCommitMessage,
+		Message:   types.InitCommitMessage,
 		Branch:    "main",
 		Content:   spaceGitattributesContent,
 		NewBranch: "main",
@@ -78,7 +78,7 @@ func TestSpaceComponent_Create(t *testing.T) {
 	sc.mocks.gitServer.EXPECT().CreateRepoFile(buildCreateFileReq(&types.CreateFileParams{
 		Username:  "user",
 		Email:     "foo@bar.com",
-		Message:   initCommitMessage,
+		Message:   types.InitCommitMessage,
 		Branch:    "main",
 		Content:   streamlitConfigContent,
 		NewBranch: "main",

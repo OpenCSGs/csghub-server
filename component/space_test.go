@@ -269,9 +269,10 @@ func TestSpaceComponent_Deploy(t *testing.T) {
 	}, nil)
 	sc.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "user").Return(database.User{}, nil)
 	sc.mocks.deployer.EXPECT().Deploy(ctx, types.DeployRepo{
-		SpaceID:    1,
-		Path:       "foo/bar",
-		Annotation: "{\"hub-res-name\":\"ns/n\",\"hub-res-type\":\"space\"}",
+		SpaceID:       1,
+		Path:          "foo/bar",
+		Annotation:    "{\"hub-res-name\":\"ns/n\",\"hub-res-type\":\"space\"}",
+		ContainerPort: 8080,
 	}).Return(123, nil)
 
 	id, err := sc.Deploy(ctx, "ns", "n", "user")

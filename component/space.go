@@ -6,6 +6,9 @@ import (
 	"fmt"
 	"log/slog"
 	"net/url"
+	"os"
+	"path/filepath"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -84,6 +87,14 @@ func (c *spaceComponentImpl) Create(ctx context.Context, req types.CreateSpaceRe
 		return nil, fmt.Errorf("fail to check resource, %w", err)
 	}
 
+	var templatePath string
+	if req.Sdk == scheduler.DOCKER.Name {
+		templatePath, err = c.getSpaceDockerTemplatePath(ctx, req)
+		if err != nil {
+			return nil, fmt.Errorf("fail to get space docker template path, %w", err)
+		}
+	}
+
 	_, dbRepo, err := c.repoComponent.CreateRepo(ctx, req.CreateRepoReq)
 	if err != nil {
 		return nil, err
@@ -98,6 +109,8 @@ func (c *spaceComponentImpl) Create(ctx context.Context, req types.CreateSpaceRe
 		Hardware:      resource.Resources,
 		Secrets:       req.Secrets,
 		SKU:           strconv.FormatInt(resource.ID, 10),
+		Variables:     req.Variables,
+		Template:      req.Template,
 	}
 	dbSpace = c.updateSpaceByReq(dbSpace, req)
 
@@ -107,55 +120,10 @@ func (c *spaceComponentImpl) Create(ctx context.Context, req types.CreateSpaceRe
 		return nil, fmt.Errorf("fail to create space in db, error: %w", err)
 	}
 
-	// Create README.md file
-	err = c.git.CreateRepoFile(buildCreateFileReq(&types.CreateFileParams{
-		Username:  dbRepo.User.Username,
-		Email:     dbRepo.User.Email,
-		Message:   initCommitMessage,
-		Branch:    req.DefaultBranch,
-		Content:   req.Readme,
-		NewBranch: req.DefaultBranch,
-		Namespace: req.Namespace,
-		Name:      req.Name,
-		FilePath:  types.ReadmeFileName,
-	}, types.SpaceRepo))
+	err = c.createSpaceDefaultFiles(dbRepo, req, templatePath)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create README.md file, cause: %w", err)
-	}
-
-	// Create .gitattributes file
-	err = c.git.CreateRepoFile(buildCreateFileReq(&types.CreateFileParams{
-		Username:  dbRepo.User.Username,
-		Email:     dbRepo.User.Email,
-		Message:   initCommitMessage,
-		Branch:    req.DefaultBranch,
-		Content:   spaceGitattributesContent,
-		NewBranch: req.DefaultBranch,
-		Namespace: req.Namespace,
-		Name:      req.Name,
-		FilePath:  gitattributesFileName,
-	}, types.SpaceRepo))
-	if err != nil {
-		return nil, fmt.Errorf("failed to create .gitattributes file, cause: %w", err)
-	}
-
-	if req.Sdk == scheduler.STREAMLIT.Name {
-		// create .streamlit/config.toml for support cors
-		fileReq := types.CreateFileParams{
-			Username:  dbRepo.User.Username,
-			Email:     dbRepo.User.Email,
-			Message:   initCommitMessage,
-			Branch:    req.DefaultBranch,
-			Content:   streamlitConfigContent,
-			NewBranch: req.DefaultBranch,
-			Namespace: req.Namespace,
-			Name:      req.Name,
-			FilePath:  streamlitConfig,
-		}
-		err = c.git.CreateRepoFile(buildCreateFileReq(&fileReq, types.SpaceRepo))
-		if err != nil {
-			return nil, fmt.Errorf("failed to create .streamlit/config.toml file, cause: %w", err)
-		}
+		slog.Error("fail to create space default files", slog.Any("req", req), slog.Any("error", err))
+		return nil, fmt.Errorf("fail to create space default files, error: %w", err)
 	}
 
 	space := &types.Space{
@@ -165,9 +133,11 @@ func (c *spaceComponentImpl) Create(ctx context.Context, req types.CreateSpaceRe
 		Name:          req.Name,
 		Sdk:           req.Sdk,
 		SdkVersion:    req.SdkVersion,
+		Template:      resSpace.Template,
 		Env:           req.Env,
 		Hardware:      resource.Resources,
 		Secrets:       req.Secrets,
+		Variables:     resSpace.Variables,
 		CoverImageUrl: resSpace.CoverImageUrl,
 		Endpoint:      "",
 		Status:        "",
@@ -175,6 +145,166 @@ func (c *spaceComponentImpl) Create(ctx context.Context, req types.CreateSpaceRe
 		CreatedAt:     resSpace.CreatedAt,
 	}
 	return space, nil
+}
+
+func (c *spaceComponentImpl) getSpaceDockerTemplatePath(ctx context.Context, req types.CreateSpaceReq) (string, error) {
+	// check docker template
+	if len(req.Template) < 1 {
+		return "", fmt.Errorf("template must be specified when creating a docker space")
+	}
+	template, err := c.templateStore.FindByName(ctx, req.Sdk, req.Template)
+	if err != nil {
+		return "", fmt.Errorf("get %s template by name %s error: %w", req.Sdk, req.Template, err)
+	}
+	if len(template.Path) < 1 {
+		return "", fmt.Errorf("invalid docker template path error: %w", err)
+	}
+	currentDir, err := filepath.Abs(filepath.Dir("."))
+	if err != nil {
+		return "", fmt.Errorf("getting current directory error: %w", err)
+	}
+	templatePath := filepath.Join(currentDir, "docker", "spaces", "templates", template.Path)
+	_, err = os.Stat(templatePath)
+	if err != nil {
+		return "", fmt.Errorf("check docker template path %s error: %w", templatePath, err)
+	}
+	return templatePath, nil
+}
+
+func (c *spaceComponentImpl) createSpaceDefaultFiles(dbRepo *database.Repository, req types.CreateSpaceReq, templatePath string) error {
+	err := c.createSpaceReadmeFile(dbRepo, req)
+	if err != nil {
+		return fmt.Errorf("failed to create space readme file, cause: %w", err)
+	}
+
+	err = c.createSpaceGitAttibuteFile(dbRepo, req)
+	if err != nil {
+		return fmt.Errorf("failed to create space gitattibute file, cause: %w", err)
+	}
+
+	if req.Sdk == scheduler.STREAMLIT.Name {
+		err = c.createSpaceStreamlitFile(dbRepo, req)
+		if err != nil {
+			return fmt.Errorf("failed to create space streamlit file, cause: %w", err)
+		}
+	}
+
+	if req.Sdk == scheduler.DOCKER.Name && len(templatePath) > 0 {
+		err = c.createSpaceDockerTemplateFile(dbRepo, req, templatePath)
+		if err != nil {
+			return fmt.Errorf("failed to create space docker template file, cause: %w", err)
+		}
+	}
+	return nil
+}
+
+func (c *spaceComponentImpl) createSpaceReadmeFile(dbRepo *database.Repository, req types.CreateSpaceReq) error {
+	// Create README.md file
+	err := c.git.CreateRepoFile(buildCreateFileReq(&types.CreateFileParams{
+		Username:  dbRepo.User.Username,
+		Email:     dbRepo.User.Email,
+		Message:   types.InitCommitMessage,
+		Branch:    req.DefaultBranch,
+		Content:   req.Readme,
+		NewBranch: req.DefaultBranch,
+		Namespace: req.Namespace,
+		Name:      req.Name,
+		FilePath:  types.ReadmeFileName,
+	}, types.SpaceRepo))
+	if err != nil {
+		return fmt.Errorf("failed to create %s file, cause: %w", types.ReadmeFileName, err)
+	}
+	return nil
+}
+
+func (c *spaceComponentImpl) createSpaceGitAttibuteFile(dbRepo *database.Repository, req types.CreateSpaceReq) error {
+	// Create .gitattributes file
+	err := c.git.CreateRepoFile(buildCreateFileReq(&types.CreateFileParams{
+		Username:  dbRepo.User.Username,
+		Email:     dbRepo.User.Email,
+		Message:   types.InitCommitMessage,
+		Branch:    req.DefaultBranch,
+		Content:   spaceGitattributesContent,
+		NewBranch: req.DefaultBranch,
+		Namespace: req.Namespace,
+		Name:      req.Name,
+		FilePath:  types.GitattributesFileName,
+	}, types.SpaceRepo))
+	if err != nil {
+		return fmt.Errorf("failed to create %s file, cause: %w", types.GitattributesFileName, err)
+	}
+	return nil
+}
+
+func (c *spaceComponentImpl) createSpaceStreamlitFile(dbRepo *database.Repository, req types.CreateSpaceReq) error {
+	// create .streamlit/config.toml for support cors
+	fileReq := types.CreateFileParams{
+		Username:  dbRepo.User.Username,
+		Email:     dbRepo.User.Email,
+		Message:   types.InitCommitMessage,
+		Branch:    req.DefaultBranch,
+		Content:   streamlitConfigContent,
+		NewBranch: req.DefaultBranch,
+		Namespace: req.Namespace,
+		Name:      req.Name,
+		FilePath:  streamlitConfig,
+	}
+	err := c.git.CreateRepoFile(buildCreateFileReq(&fileReq, types.SpaceRepo))
+	if err != nil {
+		return fmt.Errorf("failed to create %s file for streamlit space, cause: %w", streamlitConfig, err)
+	}
+	return nil
+}
+
+func (c *spaceComponentImpl) createSpaceDockerTemplateFile(dbRepo *database.Repository, req types.CreateSpaceReq, templatePath string) error {
+	// create docker template files
+	entries, err := os.ReadDir(templatePath)
+	if err != nil {
+		return fmt.Errorf("failed to list dir %s error: %w", templatePath, err)
+	}
+
+	sort.Slice(entries, func(i, j int) bool {
+		nameI := entries[i].Name()
+		nameJ := entries[j].Name()
+		if nameI == types.EntryFileDockerfile {
+			return false
+		}
+		if nameJ == types.EntryFileDockerfile {
+			return true
+		}
+		return nameI < nameJ
+	})
+
+	for _, entry := range entries {
+		if !entry.Type().IsRegular() {
+			continue
+		}
+		fileName := entry.Name()
+		slog.Info("get file", slog.Any("sdk", req.Sdk), slog.Any("template", req.Template), slog.Any("templatePath", templatePath), slog.Any("fileName", fileName))
+
+		content, err := os.ReadFile(filepath.Join(templatePath, fileName))
+		if err != nil {
+			return fmt.Errorf("failed to read %s/%s file for %s space, cause: %w", templatePath, fileName, req.Sdk, err)
+		}
+
+		fileReq := types.CreateFileParams{
+			Username:  dbRepo.User.Username,
+			Email:     dbRepo.User.Email,
+			Message:   types.InitCommitMessage,
+			Branch:    req.DefaultBranch,
+			Content:   string(content),
+			NewBranch: req.DefaultBranch,
+			Namespace: req.Namespace,
+			Name:      req.Name,
+			FilePath:  fileName,
+		}
+		err = c.git.CreateRepoFile(buildCreateFileReq(&fileReq, types.SpaceRepo))
+		if err != nil {
+			return fmt.Errorf("failed to create %s file for %s space, cause: %w", fileName, req.Sdk, err)
+		}
+	}
+
+	return nil
 }
 
 func (c *spaceComponentImpl) Show(ctx context.Context, namespace, name, currentUser string) (*types.Space, error) {
@@ -248,6 +378,8 @@ func (c *spaceComponentImpl) Show(ctx context.Context, namespace, name, currentU
 		UserLikes:     likeExists,
 		Sdk:           space.Sdk,
 		SdkVersion:    space.SdkVersion,
+		Secrets:       space.Secrets,
+		Variables:     space.Variables,
 		CoverImageUrl: space.CoverImageUrl,
 		Source:        space.Repository.Source,
 		SyncStatus:    space.Repository.SyncStatus,
@@ -310,6 +442,7 @@ func (c *spaceComponentImpl) Update(ctx context.Context, req *types.UpdateSpaceR
 		Env:           space.Env,
 		Hardware:      space.Hardware,
 		Secrets:       space.Secrets,
+		Variables:     space.Variables,
 		CoverImageUrl: space.CoverImageUrl,
 		License:       dbRepo.License,
 		Private:       dbRepo.Private,
@@ -586,15 +719,15 @@ func (c *spaceComponentImpl) Delete(ctx context.Context, namespace, name, curren
 }
 
 func (c *spaceComponentImpl) Deploy(ctx context.Context, namespace, name, currentUser string) (int64, error) {
-	s, err := c.spaceStore.FindByPath(ctx, namespace, name)
+	space, err := c.spaceStore.FindByPath(ctx, namespace, name)
 	if err != nil {
-		slog.Error("can't deploy space", slog.Any("error", err), slog.String("namespace", namespace), slog.String("name", name))
+		slog.Error("can't find space to deploy", slog.Any("error", err), slog.String("namespace", namespace), slog.String("name", name))
 		return -1, err
 	}
 	// found user id
 	user, err := c.userStore.FindByUsername(ctx, currentUser)
 	if err != nil {
-		slog.Error("can't find user for create deploy space", slog.Any("error", err), slog.String("username", currentUser))
+		slog.Error("can't find user for deploy space", slog.Any("error", err), slog.String("username", currentUser))
 		return -1, err
 	}
 
@@ -609,37 +742,47 @@ func (c *spaceComponentImpl) Deploy(ctx context.Context, namespace, name, curren
 	}
 
 	containerImg := ""
-	slog.Info("get space for deploy", slog.Any("space", s), slog.Any("NGINX", scheduler.NGINX))
-	slog.Info("compare space sdk", slog.Any("s.Sdk", s.Sdk), slog.Any("scheduler.NGINX.Name", scheduler.NGINX.Name))
-	if s.Sdk == scheduler.NGINX.Name {
-		slog.Warn("space use nginx pre-define image", slog.Any("namespace", namespace), slog.Any("name", name), slog.Any("scheduler.NGINX.Image", scheduler.NGINX.Image))
+	containerPort := scheduler.DefaultContainerPort
+	if space.Sdk == scheduler.GRADIO.Name {
+		containerPort = scheduler.GRADIO.Port
+	} else if space.Sdk == scheduler.STREAMLIT.Name {
+		containerPort = scheduler.STREAMLIT.Port
+	} else if space.Sdk == scheduler.NGINX.Name {
 		// Use default image for nginx space
 		containerImg = scheduler.NGINX.Image
+		containerPort = scheduler.NGINX.Port
+	} else if space.Sdk == scheduler.DOCKER.Name {
+		template, err := c.templateStore.FindByName(ctx, scheduler.DOCKER.Name, space.Template)
+		if err != nil {
+			return -1, fmt.Errorf("fail to query %s template %s error: %w", scheduler.DOCKER.Name, space.Template, err)
+		}
+		containerPort = template.Port
 	}
-	slog.Info("run space with container image", slog.Any("namespace", namespace), slog.Any("name", name), slog.Any("containerImg", containerImg))
 
 	// create deploy for space
 	dr := types.DeployRepo{
-		SpaceID:    s.ID,
-		Path:       s.Repository.Path,
-		GitPath:    s.Repository.GitPath,
-		GitBranch:  s.Repository.DefaultBranch,
-		Sdk:        s.Sdk,
-		SdkVersion: s.SdkVersion,
-		Template:   s.Template,
-		Env:        s.Env,
-		Hardware:   s.Hardware,
-		Secret:     s.Secrets,
-		RepoID:     s.Repository.ID,
-		ModelID:    0,
-		UserID:     user.ID,
-		Annotation: string(annoStr),
-		ImageID:    containerImg,
-		Type:       types.SpaceType,
-		UserUUID:   user.UUID,
-		SKU:        s.SKU,
+		SpaceID:       space.ID,
+		Path:          space.Repository.Path,
+		GitPath:       space.Repository.GitPath,
+		GitBranch:     space.Repository.DefaultBranch,
+		Sdk:           space.Sdk,
+		SdkVersion:    space.SdkVersion,
+		Template:      space.Template,
+		Env:           space.Env,
+		Hardware:      space.Hardware,
+		Secret:        space.Secrets,
+		RepoID:        space.Repository.ID,
+		ModelID:       0,
+		UserID:        user.ID,
+		Annotation:    string(annoStr),
+		ImageID:       containerImg,
+		Type:          types.SpaceType,
+		UserUUID:      user.UUID,
+		SKU:           space.SKU,
+		ContainerPort: containerPort,
+		Variables:     space.Variables,
 	}
-	dr = c.updateDeployRepoBySpace(dr, s)
+	dr = c.updateDeployRepoBySpace(dr, space)
 	return c.deployer.Deploy(ctx, dr)
 }
 
@@ -762,9 +905,11 @@ func (c *spaceComponentImpl) Logs(ctx context.Context, namespace, name string) (
 // HasEntryFile checks whether space repo has entry point file to run with
 func (c *spaceComponentImpl) HasEntryFile(ctx context.Context, space *database.Space) bool {
 	namespace, name := space.Repository.NamespaceAndName()
-	entryFile := "app.py"
+	entryFile := types.EntryFileAppFile
 	if space.Sdk == scheduler.NGINX.Name {
-		entryFile = "nginx.conf"
+		entryFile = types.EntryFileNginx
+	} else if space.Sdk == scheduler.DOCKER.Name {
+		entryFile = types.EntryFileDockerfile
 	}
 
 	return c.hasEntryFile(ctx, namespace, name, entryFile)
@@ -779,7 +924,7 @@ func (c *spaceComponentImpl) hasEntryFile(ctx context.Context, namespace, name, 
 	req.RepoType = types.SpaceRepo
 	files, err := c.git.GetRepoFileTree(ctx, req)
 	if err != nil {
-		slog.Error("check repo app file existence failed", slog.Any("eror", err))
+		slog.Error("check repo entry file existence failed", slog.Any("entryFile", entryFile), slog.Any("eror", err))
 		return false
 	}
 
@@ -822,6 +967,9 @@ func (c *spaceComponentImpl) mergeUpdateSpaceRequest(ctx context.Context, space 
 		space.SKU = strconv.FormatInt(resource.ID, 10)
 	}
 
+	if req.Variables != nil {
+		space.Variables = *req.Variables
+	}
 	return nil
 }
 

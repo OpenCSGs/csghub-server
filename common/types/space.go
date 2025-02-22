@@ -10,6 +10,7 @@ type CreateSpaceReq struct {
 	Template      string `json:"template"`
 	Env           string `json:"env"`
 	Secrets       string `json:"secrets"`
+	Variables     string `json:"variables"`
 	ResourceID    int64  `json:"resource_id"`
 	ClusterID     string `json:"cluster_id"`
 }
@@ -40,6 +41,7 @@ type Space struct {
 	Env           string `json:"env,omitempty"`
 	Hardware      string `json:"hardware,omitempty"`
 	Secrets       string `json:"secrets,omitempty"`
+	Variables     string `json:"variables,omitempty"`
 	// the serving endpoint url
 	Endpoint string `json:"endpoint,omitempty" example:"https://localhost/spaces/myname/myspace"`
 	// deploying, running, failed
@@ -65,4 +67,6 @@ type UpdateSpaceReq struct {
 	Env           *string `json:"env"`
 	ResourceID    *int64  `json:"resource_id"`
 	Secrets       *string `json:"secrets"`
+	Variables     *string `json:"variables"`
+	OrderDetailID int64   `json:"order_detail_id"`
 }

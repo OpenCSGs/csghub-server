@@ -10,6 +10,7 @@ import (
 	"context"
 	"github.com/stretchr/testify/mock"
 	"opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/accounting"
+	"opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/dataviewer"
 	"opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/deploy"
 	"opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/git/gitserver"
 	"opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/git/mirrorserver"
@@ -53,6 +54,7 @@ func initializeTestRepoComponent(ctx context.Context, t interface {
 	mockAccountingClient := accounting.NewMockAccountingClient(t)
 	mockReader := parquet.NewMockReader(t)
 	mockModerationSvcClient := rpc.NewMockModerationSvcClient(t)
+	mockDataviewerClient := dataviewer.NewMockDataviewerClient(t)
 	mocks := &Mocks{
 		stores:           mockStores,
 		components:       componentMockedComponents,
@@ -65,6 +67,7 @@ func initializeTestRepoComponent(ctx context.Context, t interface {
 		accountingClient: mockAccountingClient,
 		preader:          mockReader,
 		moderationClient: mockModerationSvcClient,
+		dataviewerClient: mockDataviewerClient,
 	}
 	componentTestRepoWithMocks := &testRepoWithMocks{
 		repoComponentImpl: componentRepoComponentImpl,
@@ -103,6 +106,7 @@ func initializeTestPromptComponent(ctx context.Context, t interface {
 	mockAccountingClient := accounting.NewMockAccountingClient(t)
 	mockReader := parquet.NewMockReader(t)
 	mockModerationSvcClient := rpc.NewMockModerationSvcClient(t)
+	mockDataviewerClient := dataviewer.NewMockDataviewerClient(t)
 	mocks := &Mocks{
 		stores:           mockStores,
 		components:       componentMockedComponents,
@@ -115,6 +119,7 @@ func initializeTestPromptComponent(ctx context.Context, t interface {
 		accountingClient: mockAccountingClient,
 		preader:          mockReader,
 		moderationClient: mockModerationSvcClient,
+		dataviewerClient: mockDataviewerClient,
 	}
 	componentTestPromptWithMocks := &testPromptWithMocks{
 		promptComponentImpl: componentPromptComponentImpl,
@@ -152,6 +157,7 @@ func initializeTestUserComponent(ctx context.Context, t interface {
 	mockAccountingClient := accounting.NewMockAccountingClient(t)
 	mockReader := parquet.NewMockReader(t)
 	mockModerationSvcClient := rpc.NewMockModerationSvcClient(t)
+	mockDataviewerClient := dataviewer.NewMockDataviewerClient(t)
 	mocks := &Mocks{
 		stores:           mockStores,
 		components:       componentMockedComponents,
@@ -164,6 +170,7 @@ func initializeTestUserComponent(ctx context.Context, t interface {
 		accountingClient: mockAccountingClient,
 		preader:          mockReader,
 		moderationClient: mockModerationSvcClient,
+		dataviewerClient: mockDataviewerClient,
 	}
 	componentTestUserWithMocks := &testUserWithMocks{
 		userComponentImpl: componentUserComponentImpl,
@@ -202,6 +209,7 @@ func initializeTestSpaceComponent(ctx context.Context, t interface {
 	mockAccountingClient := accounting.NewMockAccountingClient(t)
 	mockReader := parquet.NewMockReader(t)
 	mockModerationSvcClient := rpc.NewMockModerationSvcClient(t)
+	mockDataviewerClient := dataviewer.NewMockDataviewerClient(t)
 	mocks := &Mocks{
 		stores:           mockStores,
 		components:       componentMockedComponents,
@@ -214,6 +222,7 @@ func initializeTestSpaceComponent(ctx context.Context, t interface {
 		accountingClient: mockAccountingClient,
 		preader:          mockReader,
 		moderationClient: mockModerationSvcClient,
+		dataviewerClient: mockDataviewerClient,
 	}
 	componentTestSpaceWithMocks := &testSpaceWithMocks{
 		spaceComponentImpl: componentSpaceComponentImpl,
@@ -252,6 +261,7 @@ func initializeTestModelComponent(ctx context.Context, t interface {
 	mockAccountingClient := accounting.NewMockAccountingClient(t)
 	mockReader := parquet.NewMockReader(t)
 	mockModerationSvcClient := rpc.NewMockModerationSvcClient(t)
+	mockDataviewerClient := dataviewer.NewMockDataviewerClient(t)
 	mocks := &Mocks{
 		stores:           mockStores,
 		components:       componentMockedComponents,
@@ -264,6 +274,7 @@ func initializeTestModelComponent(ctx context.Context, t interface {
 		accountingClient: mockAccountingClient,
 		preader:          mockReader,
 		moderationClient: mockModerationSvcClient,
+		dataviewerClient: mockDataviewerClient,
 	}
 	componentTestModelWithMocks := &testModelWithMocks{
 		modelComponentImpl: componentModelComponentImpl,
@@ -301,6 +312,7 @@ func initializeTestAccountingComponent(ctx context.Context, t interface {
 	mockDeployer := deploy.NewMockDeployer(t)
 	mockReader := parquet.NewMockReader(t)
 	mockModerationSvcClient := rpc.NewMockModerationSvcClient(t)
+	mockDataviewerClient := dataviewer.NewMockDataviewerClient(t)
 	mocks := &Mocks{
 		stores:           mockStores,
 		components:       componentMockedComponents,
@@ -313,6 +325,7 @@ func initializeTestAccountingComponent(ctx context.Context, t interface {
 		accountingClient: mockAccountingClient,
 		preader:          mockReader,
 		moderationClient: mockModerationSvcClient,
+		dataviewerClient: mockDataviewerClient,
 	}
 	componentTestAccountingWithMocks := &testAccountingWithMocks{
 		accountingComponentImpl: componentAccountingComponentImpl,
@@ -351,6 +364,7 @@ func initializeTestGitHTTPComponent(ctx context.Context, t interface {
 	mockAccountingClient := accounting.NewMockAccountingClient(t)
 	mockReader := parquet.NewMockReader(t)
 	mockModerationSvcClient := rpc.NewMockModerationSvcClient(t)
+	mockDataviewerClient := dataviewer.NewMockDataviewerClient(t)
 	mocks := &Mocks{
 		stores:           mockStores,
 		components:       componentMockedComponents,
@@ -363,6 +377,7 @@ func initializeTestGitHTTPComponent(ctx context.Context, t interface {
 		accountingClient: mockAccountingClient,
 		preader:          mockReader,
 		moderationClient: mockModerationSvcClient,
+		dataviewerClient: mockDataviewerClient,
 	}
 	componentTestGitHTTPWithMocks := &testGitHTTPWithMocks{
 		gitHTTPComponentImpl: componentGitHTTPComponentImpl,
@@ -400,6 +415,7 @@ func initializeTestDiscussionComponent(ctx context.Context, t interface {
 	mockAccountingClient := accounting.NewMockAccountingClient(t)
 	mockReader := parquet.NewMockReader(t)
 	mockModerationSvcClient := rpc.NewMockModerationSvcClient(t)
+	mockDataviewerClient := dataviewer.NewMockDataviewerClient(t)
 	mocks := &Mocks{
 		stores:           mockStores,
 		components:       componentMockedComponents,
@@ -412,6 +428,7 @@ func initializeTestDiscussionComponent(ctx context.Context, t interface {
 		accountingClient: mockAccountingClient,
 		preader:          mockReader,
 		moderationClient: mockModerationSvcClient,
+		dataviewerClient: mockDataviewerClient,
 	}
 	componentTestDiscussionWithMocks := &testDiscussionWithMocks{
 		discussionComponentImpl: componentDiscussionComponentImpl,
@@ -449,6 +466,7 @@ func initializeTestRuntimeArchComponent(ctx context.Context, t interface {
 	mockAccountingClient := accounting.NewMockAccountingClient(t)
 	mockReader := parquet.NewMockReader(t)
 	mockModerationSvcClient := rpc.NewMockModerationSvcClient(t)
+	mockDataviewerClient := dataviewer.NewMockDataviewerClient(t)
 	mocks := &Mocks{
 		stores:           mockStores,
 		components:       componentMockedComponents,
@@ -461,6 +479,7 @@ func initializeTestRuntimeArchComponent(ctx context.Context, t interface {
 		accountingClient: mockAccountingClient,
 		preader:          mockReader,
 		moderationClient: mockModerationSvcClient,
+		dataviewerClient: mockDataviewerClient,
 	}
 	componentTestRuntimeArchWithMocks := &testRuntimeArchWithMocks{
 		runtimeArchitectureComponentImpl: componentRuntimeArchitectureComponentImpl,
@@ -499,6 +518,7 @@ func initializeTestMirrorComponent(ctx context.Context, t interface {
 	mockAccountingClient := accounting.NewMockAccountingClient(t)
 	mockReader := parquet.NewMockReader(t)
 	mockModerationSvcClient := rpc.NewMockModerationSvcClient(t)
+	mockDataviewerClient := dataviewer.NewMockDataviewerClient(t)
 	mocks := &Mocks{
 		stores:           mockStores,
 		components:       componentMockedComponents,
@@ -511,6 +531,7 @@ func initializeTestMirrorComponent(ctx context.Context, t interface {
 		accountingClient: mockAccountingClient,
 		preader:          mockReader,
 		moderationClient: mockModerationSvcClient,
+		dataviewerClient: mockDataviewerClient,
 	}
 	componentTestMirrorWithMocks := &testMirrorWithMocks{
 		mirrorComponentImpl: componentMirrorComponentImpl,
@@ -548,6 +569,7 @@ func initializeTestCollectionComponent(ctx context.Context, t interface {
 	mockAccountingClient := accounting.NewMockAccountingClient(t)
 	mockReader := parquet.NewMockReader(t)
 	mockModerationSvcClient := rpc.NewMockModerationSvcClient(t)
+	mockDataviewerClient := dataviewer.NewMockDataviewerClient(t)
 	mocks := &Mocks{
 		stores:           mockStores,
 		components:       componentMockedComponents,
@@ -560,6 +582,7 @@ func initializeTestCollectionComponent(ctx context.Context, t interface {
 		accountingClient: mockAccountingClient,
 		preader:          mockReader,
 		moderationClient: mockModerationSvcClient,
+		dataviewerClient: mockDataviewerClient,
 	}
 	componentTestCollectionWithMocks := &testCollectionWithMocks{
 		collectionComponentImpl: componentCollectionComponentImpl,
@@ -597,6 +620,7 @@ func initializeTestBroadcastComponent(ctx context.Context, t interface {
 	mockAccountingClient := accounting.NewMockAccountingClient(t)
 	mockReader := parquet.NewMockReader(t)
 	mockModerationSvcClient := rpc.NewMockModerationSvcClient(t)
+	mockDataviewerClient := dataviewer.NewMockDataviewerClient(t)
 	mocks := &Mocks{
 		stores:           mockStores,
 		components:       componentMockedComponents,
@@ -609,6 +633,7 @@ func initializeTestBroadcastComponent(ctx context.Context, t interface {
 		accountingClient: mockAccountingClient,
 		preader:          mockReader,
 		moderationClient: mockModerationSvcClient,
+		dataviewerClient: mockDataviewerClient,
 	}
 	componentTestBroadcastWithMocks := &testBroadcastWithMocks{
 		broadcastComponentImpl: componentBroadcastComponentImpl,
@@ -647,6 +672,7 @@ func initializeTestDatasetComponent(ctx context.Context, t interface {
 	mockAccountingClient := accounting.NewMockAccountingClient(t)
 	mockReader := parquet.NewMockReader(t)
 	mockModerationSvcClient := rpc.NewMockModerationSvcClient(t)
+	mockDataviewerClient := dataviewer.NewMockDataviewerClient(t)
 	mocks := &Mocks{
 		stores:           mockStores,
 		components:       componentMockedComponents,
@@ -659,6 +685,7 @@ func initializeTestDatasetComponent(ctx context.Context, t interface {
 		accountingClient: mockAccountingClient,
 		preader:          mockReader,
 		moderationClient: mockModerationSvcClient,
+		dataviewerClient: mockDataviewerClient,
 	}
 	componentTestDatasetWithMocks := &testDatasetWithMocks{
 		datasetComponentImpl: componentDatasetComponentImpl,
@@ -697,6 +724,7 @@ func initializeTestCodeComponent(ctx context.Context, t interface {
 	mockAccountingClient := accounting.NewMockAccountingClient(t)
 	mockReader := parquet.NewMockReader(t)
 	mockModerationSvcClient := rpc.NewMockModerationSvcClient(t)
+	mockDataviewerClient := dataviewer.NewMockDataviewerClient(t)
 	mocks := &Mocks{
 		stores:           mockStores,
 		components:       componentMockedComponents,
@@ -709,6 +737,7 @@ func initializeTestCodeComponent(ctx context.Context, t interface {
 		accountingClient: mockAccountingClient,
 		preader:          mockReader,
 		moderationClient: mockModerationSvcClient,
+		dataviewerClient: mockDataviewerClient,
 	}
 	componentTestCodeWithMocks := &testCodeWithMocks{
 		codeComponentImpl: componentCodeComponentImpl,
@@ -747,6 +776,7 @@ func initializeTestMultiSyncComponent(ctx context.Context, t interface {
 	mockAccountingClient := accounting.NewMockAccountingClient(t)
 	mockReader := parquet.NewMockReader(t)
 	mockModerationSvcClient := rpc.NewMockModerationSvcClient(t)
+	mockDataviewerClient := dataviewer.NewMockDataviewerClient(t)
 	mocks := &Mocks{
 		stores:           mockStores,
 		components:       componentMockedComponents,
@@ -759,6 +789,7 @@ func initializeTestMultiSyncComponent(ctx context.Context, t interface {
 		accountingClient: mockAccountingClient,
 		preader:          mockReader,
 		moderationClient: mockModerationSvcClient,
+		dataviewerClient: mockDataviewerClient,
 	}
 	componentTestMultiSyncWithMocks := &testMultiSyncWithMocks{
 		multiSyncComponentImpl: componentMultiSyncComponentImpl,
@@ -797,6 +828,7 @@ func initializeTestInternalComponent(ctx context.Context, t interface {
 	mockAccountingClient := accounting.NewMockAccountingClient(t)
 	mockReader := parquet.NewMockReader(t)
 	mockModerationSvcClient := rpc.NewMockModerationSvcClient(t)
+	mockDataviewerClient := dataviewer.NewMockDataviewerClient(t)
 	mocks := &Mocks{
 		stores:           mockStores,
 		components:       componentMockedComponents,
@@ -809,6 +841,7 @@ func initializeTestInternalComponent(ctx context.Context, t interface {
 		accountingClient: mockAccountingClient,
 		preader:          mockReader,
 		moderationClient: mockModerationSvcClient,
+		dataviewerClient: mockDataviewerClient,
 	}
 	componentTestInternalWithMocks := &testInternalWithMocks{
 		internalComponentImpl: componentInternalComponentImpl,
@@ -847,6 +880,7 @@ func initializeTestMirrorSourceComponent(ctx context.Context, t interface {
 	mockAccountingClient := accounting.NewMockAccountingClient(t)
 	mockReader := parquet.NewMockReader(t)
 	mockModerationSvcClient := rpc.NewMockModerationSvcClient(t)
+	mockDataviewerClient := dataviewer.NewMockDataviewerClient(t)
 	mocks := &Mocks{
 		stores:           mockStores,
 		components:       componentMockedComponents,
@@ -859,6 +893,7 @@ func initializeTestMirrorSourceComponent(ctx context.Context, t interface {
 		accountingClient: mockAccountingClient,
 		preader:          mockReader,
 		moderationClient: mockModerationSvcClient,
+		dataviewerClient: mockDataviewerClient,
 	}
 	componentTestMirrorSourceWithMocks := &testMirrorSourceWithMocks{
 		mirrorSourceComponentImpl: componentMirrorSourceComponentImpl,
@@ -897,6 +932,7 @@ func initializeTestSpaceResourceComponent(ctx context.Context, t interface {
 	mockAccountingClient := accounting.NewMockAccountingClient(t)
 	mockReader := parquet.NewMockReader(t)
 	mockModerationSvcClient := rpc.NewMockModerationSvcClient(t)
+	mockDataviewerClient := dataviewer.NewMockDataviewerClient(t)
 	mocks := &Mocks{
 		stores:           mockStores,
 		components:       componentMockedComponents,
@@ -909,6 +945,7 @@ func initializeTestSpaceResourceComponent(ctx context.Context, t interface {
 		accountingClient: mockAccountingClient,
 		preader:          mockReader,
 		moderationClient: mockModerationSvcClient,
+		dataviewerClient: mockDataviewerClient,
 	}
 	componentTestSpaceResourceWithMocks := &testSpaceResourceWithMocks{
 		spaceResourceComponentImpl: componentSpaceResourceComponentImpl,
@@ -947,6 +984,7 @@ func initializeTestTagComponent(ctx context.Context, t interface {
 	mockDeployer := deploy.NewMockDeployer(t)
 	mockAccountingClient := accounting.NewMockAccountingClient(t)
 	mockReader := parquet.NewMockReader(t)
+	mockDataviewerClient := dataviewer.NewMockDataviewerClient(t)
 	mocks := &Mocks{
 		stores:           mockStores,
 		components:       componentMockedComponents,
@@ -959,6 +997,7 @@ func initializeTestTagComponent(ctx context.Context, t interface {
 		accountingClient: mockAccountingClient,
 		preader:          mockReader,
 		moderationClient: mockModerationSvcClient,
+		dataviewerClient: mockDataviewerClient,
 	}
 	componentTestTagWithMocks := &testTagWithMocks{
 		tagComponentImpl: componentTagComponentImpl,
@@ -997,6 +1036,7 @@ func initializeTestRecomComponent(ctx context.Context, t interface {
 	mockAccountingClient := accounting.NewMockAccountingClient(t)
 	mockReader := parquet.NewMockReader(t)
 	mockModerationSvcClient := rpc.NewMockModerationSvcClient(t)
+	mockDataviewerClient := dataviewer.NewMockDataviewerClient(t)
 	mocks := &Mocks{
 		stores:           mockStores,
 		components:       componentMockedComponents,
@@ -1009,6 +1049,7 @@ func initializeTestRecomComponent(ctx context.Context, t interface {
 		accountingClient: mockAccountingClient,
 		preader:          mockReader,
 		moderationClient: mockModerationSvcClient,
+		dataviewerClient: mockDataviewerClient,
 	}
 	componentTestRecomWithMocks := &testRecomWithMocks{
 		recomComponentImpl: componentRecomComponentImpl,
@@ -1047,6 +1088,7 @@ func initializeTestSpaceSdkComponent(ctx context.Context, t interface {
 	mockAccountingClient := accounting.NewMockAccountingClient(t)
 	mockReader := parquet.NewMockReader(t)
 	mockModerationSvcClient := rpc.NewMockModerationSvcClient(t)
+	mockDataviewerClient := dataviewer.NewMockDataviewerClient(t)
 	mocks := &Mocks{
 		stores:           mockStores,
 		components:       componentMockedComponents,
@@ -1059,6 +1101,7 @@ func initializeTestSpaceSdkComponent(ctx context.Context, t interface {
 		accountingClient: mockAccountingClient,
 		preader:          mockReader,
 		moderationClient: mockModerationSvcClient,
+		dataviewerClient: mockDataviewerClient,
 	}
 	componentTestSpaceSdkWithMocks := &testSpaceSdkWithMocks{
 		spaceSdkComponentImpl: componentSpaceSdkComponentImpl,
@@ -1097,6 +1140,7 @@ func initializeTestTelemetryComponent(ctx context.Context, t interface {
 	mockAccountingClient := accounting.NewMockAccountingClient(t)
 	mockReader := parquet.NewMockReader(t)
 	mockModerationSvcClient := rpc.NewMockModerationSvcClient(t)
+	mockDataviewerClient := dataviewer.NewMockDataviewerClient(t)
 	mocks := &Mocks{
 		stores:           mockStores,
 		components:       componentMockedComponents,
@@ -1109,6 +1153,7 @@ func initializeTestTelemetryComponent(ctx context.Context, t interface {
 		accountingClient: mockAccountingClient,
 		preader:          mockReader,
 		moderationClient: mockModerationSvcClient,
+		dataviewerClient: mockDataviewerClient,
 	}
 	componentTestTelemetryWithMocks := &testTelemetryWithMocks{
 		telemetryComponentImpl: componentTelemetryComponentImpl,
@@ -1147,6 +1192,7 @@ func initializeTestClusterComponent(ctx context.Context, t interface {
 	mockAccountingClient := accounting.NewMockAccountingClient(t)
 	mockReader := parquet.NewMockReader(t)
 	mockModerationSvcClient := rpc.NewMockModerationSvcClient(t)
+	mockDataviewerClient := dataviewer.NewMockDataviewerClient(t)
 	mocks := &Mocks{
 		stores:           mockStores,
 		components:       componentMockedComponents,
@@ -1159,6 +1205,7 @@ func initializeTestClusterComponent(ctx context.Context, t interface {
 		accountingClient: mockAccountingClient,
 		preader:          mockReader,
 		moderationClient: mockModerationSvcClient,
+		dataviewerClient: mockDataviewerClient,
 	}
 	componentTestClusterWithMocks := &testClusterWithMocks{
 		clusterComponentImpl: componentClusterComponentImpl,
@@ -1197,6 +1244,7 @@ func initializeTestEvaluationComponent(ctx context.Context, t interface {
 	mockAccountingClient := accounting.NewMockAccountingClient(t)
 	mockReader := parquet.NewMockReader(t)
 	mockModerationSvcClient := rpc.NewMockModerationSvcClient(t)
+	mockDataviewerClient := dataviewer.NewMockDataviewerClient(t)
 	mocks := &Mocks{
 		stores:           mockStores,
 		components:       componentMockedComponents,
@@ -1209,6 +1257,7 @@ func initializeTestEvaluationComponent(ctx context.Context, t interface {
 		accountingClient: mockAccountingClient,
 		preader:          mockReader,
 		moderationClient: mockModerationSvcClient,
+		dataviewerClient: mockDataviewerClient,
 	}
 	componentTestEvaluationWithMocks := &testEvaluationWithMocks{
 		evaluationComponentImpl: componentEvaluationComponentImpl,
@@ -1247,6 +1296,7 @@ func initializeTestHFDatasetComponent(ctx context.Context, t interface {
 	mockAccountingClient := accounting.NewMockAccountingClient(t)
 	mockReader := parquet.NewMockReader(t)
 	mockModerationSvcClient := rpc.NewMockModerationSvcClient(t)
+	mockDataviewerClient := dataviewer.NewMockDataviewerClient(t)
 	mocks := &Mocks{
 		stores:           mockStores,
 		components:       componentMockedComponents,
@@ -1259,6 +1309,7 @@ func initializeTestHFDatasetComponent(ctx context.Context, t interface {
 		accountingClient: mockAccountingClient,
 		preader:          mockReader,
 		moderationClient: mockModerationSvcClient,
+		dataviewerClient: mockDataviewerClient,
 	}
 	componentTestHFDatasetWithMocks := &testHFDatasetWithMocks{
 		hFDatasetComponentImpl: componentHFDatasetComponentImpl,
@@ -1297,6 +1348,7 @@ func initializeTestRepoFileComponent(ctx context.Context, t interface {
 	mockAccountingClient := accounting.NewMockAccountingClient(t)
 	mockReader := parquet.NewMockReader(t)
 	mockModerationSvcClient := rpc.NewMockModerationSvcClient(t)
+	mockDataviewerClient := dataviewer.NewMockDataviewerClient(t)
 	mocks := &Mocks{
 		stores:           mockStores,
 		components:       componentMockedComponents,
@@ -1309,6 +1361,7 @@ func initializeTestRepoFileComponent(ctx context.Context, t interface {
 		accountingClient: mockAccountingClient,
 		preader:          mockReader,
 		moderationClient: mockModerationSvcClient,
+		dataviewerClient: mockDataviewerClient,
 	}
 	componentTestRepoFileWithMocks := &testRepoFileWithMocks{
 		repoFileComponentImpl: componentRepoFileComponentImpl,
@@ -1347,6 +1400,7 @@ func initializeTestSensitiveComponent(ctx context.Context, t interface {
 	mockDeployer := deploy.NewMockDeployer(t)
 	mockAccountingClient := accounting.NewMockAccountingClient(t)
 	mockReader := parquet.NewMockReader(t)
+	mockDataviewerClient := dataviewer.NewMockDataviewerClient(t)
 	mocks := &Mocks{
 		stores:           mockStores,
 		components:       componentMockedComponents,
@@ -1359,6 +1413,7 @@ func initializeTestSensitiveComponent(ctx context.Context, t interface {
 		accountingClient: mockAccountingClient,
 		preader:          mockReader,
 		moderationClient: mockModerationSvcClient,
+		dataviewerClient: mockDataviewerClient,
 	}
 	componentTestSensitiveWithMocks := &testSensitiveWithMocks{
 		sensitiveComponentImpl: componentSensitiveComponentImpl,
@@ -1397,6 +1452,7 @@ func initializeTestSSHKeyComponent(ctx context.Context, t interface {
 	mockAccountingClient := accounting.NewMockAccountingClient(t)
 	mockReader := parquet.NewMockReader(t)
 	mockModerationSvcClient := rpc.NewMockModerationSvcClient(t)
+	mockDataviewerClient := dataviewer.NewMockDataviewerClient(t)
 	mocks := &Mocks{
 		stores:           mockStores,
 		components:       componentMockedComponents,
@@ -1409,6 +1465,7 @@ func initializeTestSSHKeyComponent(ctx context.Context, t interface {
 		accountingClient: mockAccountingClient,
 		preader:          mockReader,
 		moderationClient: mockModerationSvcClient,
+		dataviewerClient: mockDataviewerClient,
 	}
 	componentTestSSHKeyWithMocks := &testSSHKeyWithMocks{
 		sSHKeyComponentImpl: componentSSHKeyComponentImpl,
@@ -1447,6 +1504,7 @@ func initializeTestListComponent(ctx context.Context, t interface {
 	mockAccountingClient := accounting.NewMockAccountingClient(t)
 	mockReader := parquet.NewMockReader(t)
 	mockModerationSvcClient := rpc.NewMockModerationSvcClient(t)
+	mockDataviewerClient := dataviewer.NewMockDataviewerClient(t)
 	mocks := &Mocks{
 		stores:           mockStores,
 		components:       componentMockedComponents,
@@ -1459,6 +1517,7 @@ func initializeTestListComponent(ctx context.Context, t interface {
 		accountingClient: mockAccountingClient,
 		preader:          mockReader,
 		moderationClient: mockModerationSvcClient,
+		dataviewerClient: mockDataviewerClient,
 	}
 	componentTestListWithMocks := &testListWithMocks{
 		listComponentImpl: componentListComponentImpl,
@@ -1497,6 +1556,7 @@ func initializeTestSyncClientSettingComponent(ctx context.Context, t interface {
 	mockAccountingClient := accounting.NewMockAccountingClient(t)
 	mockReader := parquet.NewMockReader(t)
 	mockModerationSvcClient := rpc.NewMockModerationSvcClient(t)
+	mockDataviewerClient := dataviewer.NewMockDataviewerClient(t)
 	mocks := &Mocks{
 		stores:           mockStores,
 		components:       componentMockedComponents,
@@ -1509,6 +1569,7 @@ func initializeTestSyncClientSettingComponent(ctx context.Context, t interface {
 		accountingClient: mockAccountingClient,
 		preader:          mockReader,
 		moderationClient: mockModerationSvcClient,
+		dataviewerClient: mockDataviewerClient,
 	}
 	componentTestSyncClientSettingWithMocks := &testSyncClientSettingWithMocks{
 		syncClientSettingComponentImpl: componentSyncClientSettingComponentImpl,
@@ -1547,6 +1608,7 @@ func initializeTestEventComponent(ctx context.Context, t interface {
 	mockAccountingClient := accounting.NewMockAccountingClient(t)
 	mockReader := parquet.NewMockReader(t)
 	mockModerationSvcClient := rpc.NewMockModerationSvcClient(t)
+	mockDataviewerClient := dataviewer.NewMockDataviewerClient(t)
 	mocks := &Mocks{
 		stores:           mockStores,
 		components:       componentMockedComponents,
@@ -1559,12 +1621,65 @@ func initializeTestEventComponent(ctx context.Context, t interface {
 		accountingClient: mockAccountingClient,
 		preader:          mockReader,
 		moderationClient: mockModerationSvcClient,
+		dataviewerClient: mockDataviewerClient,
 	}
 	componentTestEventWithMocks := &testEventWithMocks{
 		eventComponentImpl: componentEventComponentImpl,
 		mocks:              mocks,
 	}
 	return componentTestEventWithMocks
+}
+
+func initializeTestSpaceTemplateComponent(ctx context.Context, t interface {
+	Cleanup(func())
+	mock.TestingT
+}) *testSpaceTemplateWithMocks {
+	config := ProvideTestConfig()
+	mockStores := tests.NewMockStores(t)
+	componentSpaceTemplateComponentImpl := NewTestSpaceTemplateComponent(config, mockStores)
+	mockAccountingComponent := component.NewMockAccountingComponent(t)
+	mockRepoComponent := component.NewMockRepoComponent(t)
+	mockTagComponent := component.NewMockTagComponent(t)
+	mockSpaceComponent := component.NewMockSpaceComponent(t)
+	mockRuntimeArchitectureComponent := component.NewMockRuntimeArchitectureComponent(t)
+	mockSensitiveComponent := component.NewMockSensitiveComponent(t)
+	componentMockedComponents := &mockedComponents{
+		accounting:          mockAccountingComponent,
+		repo:                mockRepoComponent,
+		tag:                 mockTagComponent,
+		space:               mockSpaceComponent,
+		runtimeArchitecture: mockRuntimeArchitectureComponent,
+		sensitive:           mockSensitiveComponent,
+	}
+	mockGitServer := gitserver.NewMockGitServer(t)
+	mockUserSvcClient := rpc.NewMockUserSvcClient(t)
+	mockClient := s3.NewMockClient(t)
+	mockMirrorServer := mirrorserver.NewMockMirrorServer(t)
+	mockPriorityQueue := queue.NewMockPriorityQueue(t)
+	mockDeployer := deploy.NewMockDeployer(t)
+	mockAccountingClient := accounting.NewMockAccountingClient(t)
+	mockReader := parquet.NewMockReader(t)
+	mockModerationSvcClient := rpc.NewMockModerationSvcClient(t)
+	mockDataviewerClient := dataviewer.NewMockDataviewerClient(t)
+	mocks := &Mocks{
+		stores:           mockStores,
+		components:       componentMockedComponents,
+		gitServer:        mockGitServer,
+		userSvcClient:    mockUserSvcClient,
+		s3Client:         mockClient,
+		mirrorServer:     mockMirrorServer,
+		mirrorQueue:      mockPriorityQueue,
+		deployer:         mockDeployer,
+		accountingClient: mockAccountingClient,
+		preader:          mockReader,
+		moderationClient: mockModerationSvcClient,
+		dataviewerClient: mockDataviewerClient,
+	}
+	componentTestSpaceTemplateWithMocks := &testSpaceTemplateWithMocks{
+		spaceTemplateComponentImpl: componentSpaceTemplateComponentImpl,
+		mocks:                      mocks,
+	}
+	return componentTestSpaceTemplateWithMocks
 }
 
 // wire.go:
@@ -1721,5 +1836,10 @@ type testSyncClientSettingWithMocks struct {
 
 type testEventWithMocks struct {
 	*eventComponentImpl
+	mocks *Mocks
+}
+
+type testSpaceTemplateWithMocks struct {
+	*spaceTemplateComponentImpl
 	mocks *Mocks
 }

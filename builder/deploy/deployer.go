@@ -65,7 +65,7 @@ func (d *deployer) serverlessDeploy(ctx context.Context, dr types.DeployRepo) (*
 		deploy *database.Deploy
 		err    error
 	)
-	slog.Info("do deployer.serverlessDeploy check type", slog.Any("dr.Type", dr.Type))
+	slog.Debug("do deployer.serverlessDeploy check type", slog.Any("dr.Type", dr.Type))
 	if dr.Type == types.SpaceType {
 		deploy, err = d.deployTaskStore.GetLatestDeployBySpaceID(ctx, dr.SpaceID)
 	} else {
@@ -94,6 +94,9 @@ func (d *deployer) serverlessDeploy(ctx context.Context, dr types.DeployRepo) (*
 	deploy.Template = dr.Template
 	deploy.MinReplica = dr.MinReplica
 	deploy.MaxReplica = dr.MaxReplica
+	deploy.EngineArgs = dr.EngineArgs
+	deploy.Variables = dr.Variables
+	// deploy
 	slog.Debug("do deployer.serverlessDeploy", slog.Any("dr", dr), slog.Any("deploy", deploy))
 	err = d.deployTaskStore.UpdateDeploy(ctx, deploy)
 	if err != nil {
@@ -133,6 +136,8 @@ func (d *deployer) dedicatedDeploy(ctx context.Context, dr types.DeployRepo) (*d
 		UserUUID:         dr.UserUUID,
 		SKU:              dr.SKU,
 		Task:             types.PipelineTask(dr.Task),
+		EngineArgs:       dr.EngineArgs,
+		Variables:        dr.Variables,
 	}
 	updateDatabaseDeploy(deploy, dr)
 	err := d.deployTaskStore.CreateDeploy(ctx, deploy)
@@ -142,7 +147,7 @@ func (d *deployer) dedicatedDeploy(ctx context.Context, dr types.DeployRepo) (*d
 func (d *deployer) buildDeploy(ctx context.Context, dr types.DeployRepo) (*database.Deploy, error) {
 	var deploy *database.Deploy = nil
 	var err error = nil
-	slog.Info("do deployer.buildDeploy check type", slog.Any("dr.Type", dr.Type))
+	slog.Debug("do deployer.buildDeploy check type", slog.Any("dr.Type", dr.Type))
 	if dr.Type == types.SpaceType || dr.Type == types.ServerlessType {
 		// space case: SpaceID>0 and ModelID=0, reuse latest deploy of spaces
 		deploy, err = d.serverlessDeploy(ctx, dr)
@@ -150,7 +155,7 @@ func (d *deployer) buildDeploy(ctx context.Context, dr types.DeployRepo) (*datab
 			return nil, fmt.Errorf("fail to check serverless deploy for spaceID %v, %w", dr.SpaceID, err)
 		}
 	}
-	slog.Info("do deployer.buildDeploy", slog.Any("dr", dr), slog.Any("deploy", deploy))
+	slog.Debug("do deployer.buildDeploy", slog.Any("dr", dr), slog.Any("deploy", deploy))
 	if deploy == nil {
 		// create new deploy for model inference and no latest deploy of space
 		deploy, err = d.dedicatedDeploy(ctx, dr)
@@ -159,12 +164,11 @@ func (d *deployer) buildDeploy(ctx context.Context, dr types.DeployRepo) (*datab
 	if err != nil {
 		return nil, err
 	}
-	slog.Info("return deployer.buildDeploy", slog.Any("dr", dr), slog.Any("deploy", deploy))
+	slog.Debug("return deployer.buildDeploy", slog.Any("dr", dr), slog.Any("deploy", deploy))
 	return deploy, nil
 }
 
 func (d *deployer) Deploy(ctx context.Context, dr types.DeployRepo) (int64, error) {
-
 	//check reserved resource
 	err := d.checkOrderDetail(ctx, dr)
 	if err != nil {
@@ -172,7 +176,7 @@ func (d *deployer) Deploy(ctx context.Context, dr types.DeployRepo) (int64, erro
 	}
 
 	deploy, err := d.buildDeploy(ctx, dr)
-	slog.Info("do deployer.Deploy", slog.Any("dr", dr), slog.Any("deploy", deploy))
+	slog.Debug("do deployer.Deploy", slog.Any("dr", dr), slog.Any("deploy", deploy))
 	if err != nil || deploy == nil {
 		return -1, fmt.Errorf("failed to create deploy in db, %w", err)
 	}
@@ -181,12 +185,12 @@ func (d *deployer) Deploy(ctx context.Context, dr types.DeployRepo) (int64, erro
 	bldTaskMsg := ""
 
 	imgStrLen := len(strings.Trim(deploy.ImageID, " "))
-	slog.Info("do deployer.Deploy check image", slog.Any("deploy.ImageID", deploy.ImageID), slog.Any("imgStrLen", imgStrLen))
+	slog.Debug("do deployer.Deploy check image", slog.Any("deploy.ImageID", deploy.ImageID), slog.Any("imgStrLen", imgStrLen))
 	if imgStrLen > 0 {
 		bldTaskStatus = scheduler.BuildSkip
 		bldTaskMsg = "Skip"
 	}
-	slog.Info("create build task", slog.Any("bldTaskStatus", bldTaskStatus), slog.Any("bldTaskMsg", bldTaskMsg))
+	slog.Debug("create build task", slog.Any("bldTaskStatus", bldTaskStatus), slog.Any("bldTaskMsg", bldTaskMsg))
 	buildTask := &database.DeployTask{
 		DeployID: deploy.ID,
 		TaskType: 0,

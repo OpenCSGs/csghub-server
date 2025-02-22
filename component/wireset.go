@@ -3,6 +3,7 @@ package component
 import (
 	"github.com/google/wire"
 	mock_accounting "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/accounting"
+	mock_dataviewer_client "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/dataviewer"
 	mock_deploy "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/deploy"
 	mock_git "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/git/gitserver"
 	mock_mirror "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/git/mirrorserver"
@@ -12,6 +13,7 @@ import (
 	mock_component "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/component"
 	mock_mirror_queue "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/mirror/queue"
 	"opencsg.com/csghub-server/builder/accounting"
+	"opencsg.com/csghub-server/builder/dataviewer"
 	"opencsg.com/csghub-server/builder/deploy"
 	"opencsg.com/csghub-server/builder/git/gitserver"
 	"opencsg.com/csghub-server/builder/git/mirrorserver"
@@ -50,6 +52,8 @@ var MockedComponentSet = wire.NewSet(
 	wire.Bind(new(RuntimeArchitectureComponent), new(*mock_component.MockRuntimeArchitectureComponent)),
 	mock_component.NewMockSensitiveComponent,
 	wire.Bind(new(SensitiveComponent), new(*mock_component.MockSensitiveComponent)),
+	mock_component.NewMockSpaceTemplateComponent,
+	wire.Bind(new(SpaceTemplateComponent), new(*mock_component.MockSpaceTemplateComponent)),
 )
 
 var MockedGitServerSet = wire.NewSet(
@@ -97,6 +101,11 @@ var MockedModerationSvcClientSet = wire.NewSet(
 	wire.Bind(new(rpc.ModerationSvcClient), new(*mock_rpc.MockModerationSvcClient)),
 )
 
+var MockedDataviewerClientSet = wire.NewSet(
+	mock_dataviewer_client.NewMockDataviewerClient,
+	wire.Bind(new(dataviewer.DataviewerClient), new(*mock_dataviewer_client.MockDataviewerClient)),
+)
+
 type Mocks struct {
 	stores           *tests.MockStores
 	components       *mockedComponents
@@ -109,6 +118,7 @@ type Mocks struct {
 	accountingClient *mock_accounting.MockAccountingClient
 	preader          *mock_preader.MockReader
 	moderationClient *mock_rpc.MockModerationSvcClient
+	dataviewerClient *mock_dataviewer_client.MockDataviewerClient
 }
 
 var AllMockSet = wire.NewSet(
@@ -124,7 +134,7 @@ var MockSuperSet = wire.NewSet(
 	MockedComponentSet, AllMockSet, MockedStoreSet, MockedGitServerSet, MockedUserSvcSet,
 	MockedS3Set, MockedDeployerSet, ProvideTestConfig, MockedMirrorServerSet,
 	MockedMirrorQueueSet, MockedAccountingClientSet, MockedParquetReaderSet,
-	MockedModerationSvcClientSet,
+	MockedModerationSvcClientSet, MockedDataviewerClientSet,
 )
 
 func NewTestRepoComponent(config *config.Config, stores *tests.MockStores, rpcUser rpc.UserSvcClient, gitServer gitserver.GitServer, tagComponent TagComponent, s3Client s3.Client, deployer deploy.Deployer, accountingComponent AccountingComponent, mq queue.PriorityQueue, mirrorServer mirrorserver.MirrorServer) *repoComponentImpl {
@@ -556,3 +566,11 @@ func NewTestEventComponent(config *config.Config, stores *tests.MockStores) *eve
 }
 
 var EventComponentSet = wire.NewSet(NewTestEventComponent)
+
+func NewTestSpaceTemplateComponent(config *config.Config, stores *tests.MockStores) *spaceTemplateComponentImpl {
+	return &spaceTemplateComponentImpl{
+		spaceTemplateStore: stores.SpaceTemplate,
+	}
+}
+
+var SpaceTemplateComponentSet = wire.NewSet(NewTestSpaceTemplateComponent)

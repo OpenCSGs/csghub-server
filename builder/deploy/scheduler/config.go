@@ -8,29 +8,38 @@ type Config struct {
 type SDKConfig struct {
 	Name    string
 	Version string
-	Port    string
+	Port    int
 	Image   string
 }
 
-var GRADIO = SDKConfig{
-	Name:    "gradio",
-	Version: "3.37.0",
-	Port:    "7860",
-	Image:   "",
-}
-var STREAMLIT = SDKConfig{
-	Name:    "streamlit",
-	Version: "1.33.0",
-	Port:    "8501",
-	Image:   "",
-}
+const DefaultContainerPort = 8080
 
-var NGINX = SDKConfig{
-	Name:    "nginx",
-	Version: "1.25.0",
-	Port:    "8000",
-	Image:   "csg-nginx:1.2",
-}
+var (
+	GRADIO = SDKConfig{
+		Name:    "gradio",
+		Version: "3.37.0",
+		Port:    7860,
+		Image:   "",
+	}
+	STREAMLIT = SDKConfig{
+		Name:    "streamlit",
+		Version: "1.33.0",
+		Port:    8501,
+		Image:   "",
+	}
+	NGINX = SDKConfig{
+		Name:    "nginx",
+		Version: "1.25.0",
+		Port:    8000,
+		Image:   "csg-nginx:1.2",
+	}
+	DOCKER = SDKConfig{
+		Name:    "docker",
+		Version: "",
+		Port:    8080,
+		Image:   "",
+	}
+)
 
 type RepoInfo struct {
 	DeployID     int64

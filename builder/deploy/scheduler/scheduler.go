@@ -193,7 +193,7 @@ func (rs *FIFOScheduler) next() (Runner, error) {
 	}
 	// for build task
 	if deployTask.TaskType == 0 {
-		t = NewBuidRunner(rs.ib, &repo, deployTask)
+		t = NewBuildRunner(rs.ib, &repo, deployTask)
 	} else {
 		t = NewDeployRunner(rs.ir, &repo, deployTask, rs.deployCfg)
 	}
