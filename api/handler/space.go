@@ -177,7 +177,6 @@ func (h *SpaceHandler) Create(ctx *gin.Context) {
 		httpbase.ServerError(ctx, err)
 		return
 	}
-	slog.Info("Create space succeed", slog.String("space", space.Name))
 	httpbase.OK(ctx, space)
 }
 

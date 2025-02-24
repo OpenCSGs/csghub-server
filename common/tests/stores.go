@@ -50,6 +50,7 @@ type MockStores struct {
 	Event                database.EventStore
 	Broadcast            database.BroadcastStore
 	ViewerStore          database.DataviewerStore
+	SpaceTemplate        database.SpaceTemplateStore
 }
 
 func NewMockStores(t interface {
@@ -100,6 +101,7 @@ func NewMockStores(t interface {
 		TagRule:              mockdb.NewMockTagRuleStore(t),
 		ViewerStore:          mockdb.NewMockDataviewerStore(t),
 		Broadcast:            mockdb.NewMockBroadcastStore(t),
+		SpaceTemplate:        mockdb.NewMockSpaceTemplateStore(t),
 	}
 }
 
@@ -273,4 +275,8 @@ func (s *MockStores) EventMock() *mockdb.MockEventStore {
 
 func (s *MockStores) BroadcastMock() *mockdb.MockBroadcastStore {
 	return s.Broadcast.(*mockdb.MockBroadcastStore)
+}
+
+func (s *MockStores) SpaceTemplateMock() *mockdb.MockSpaceTemplateStore {
+	return s.SpaceTemplate.(*mockdb.MockSpaceTemplateStore)
 }

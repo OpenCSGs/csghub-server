@@ -34,6 +34,8 @@ packages:
       EvaluationComponent:
       RecomComponent:
       MultiSyncComponent:
+      ModelTreeComponent:
+      SpaceTemplateComponent:
   opencsg.com/csghub-server/component/callback:
     config:
     interfaces:
@@ -44,7 +46,6 @@ packages:
     interfaces:
       MemberComponent:
       OrganizationComponent:
-
   opencsg.com/csghub-server/builder/store/database:
     config:
       all: True

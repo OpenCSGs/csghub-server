@@ -10,6 +10,7 @@ type RepositoryType string
 type RepositorySource string
 type RepositorySyncStatus string
 type PipelineTask string
+type InferenceEngine string
 
 type SensitiveCheckStatus int
 
@@ -65,12 +66,18 @@ const (
 
 	MainBranch string = "main"
 
+	InitCommitMessage     = "initial commit"
 	ReadmeFileName        = "README.md"
 	GitAttributesFileName = ".gitattributes"
 
-	TextGeneration    PipelineTask = "text-generation"
-	Text2Image        PipelineTask = "text-to-image"
-	TaskAutoDetection PipelineTask = "task-auto-detection"
+	EntryFileAppFile    = "app.py"
+	EntryFileNginx      = "nginx.conf"
+	EntryFileDockerfile = "Dockerfile"
+
+	TextGeneration    PipelineTask    = "text-generation"
+	Text2Image        PipelineTask    = "text-to-image"
+	TaskAutoDetection PipelineTask    = "task-auto-detection"
+	LlamaCpp          InferenceEngine = "llama.cpp"
 )
 
 type RepoRequest struct {
@@ -155,6 +162,8 @@ type DeployRepo struct {
 	ResourceType     string     `json:"resource_type,omitempty"`
 	RepoTag          string     `json:"repo_tag,omitempty"`
 	Task             string     `json:"task,omitempty"`
+	EngineArgs       string     `json:"engine_args,omitempty"`
+	Variables        string     `json:"variables,omitempty"`
 }
 
 type RuntimeFrameworkReq struct {

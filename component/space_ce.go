@@ -44,6 +44,7 @@ func NewSpaceComponent(config *config.Config) (SpaceComponent, error) {
 	if err != nil {
 		return nil, err
 	}
+	c.templateStore = database.NewSpaceTemplateStore()
 	return c, nil
 }
 
@@ -63,6 +64,7 @@ type spaceComponentImpl struct {
 	config              *config.Config
 	userSvcClient       rpc.UserSvcClient
 	deployTaskStore     database.DeployTaskStore
+	templateStore       database.SpaceTemplateStore
 }
 
 func (c *spaceComponentImpl) checkResourcePurchasableForCreate(ctx context.Context, req types.CreateSpaceReq, resource *database.SpaceResource) error {

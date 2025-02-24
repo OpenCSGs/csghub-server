@@ -138,7 +138,7 @@ func (c *datasetComponentImpl) Create(ctx context.Context, req *types.CreateData
 	err = c.gitServer.CreateRepoFile(buildCreateFileReq(&types.CreateFileParams{
 		Username:  user.Username,
 		Email:     user.Email,
-		Message:   initCommitMessage,
+		Message:   types.InitCommitMessage,
 		Branch:    req.DefaultBranch,
 		Content:   req.Readme,
 		NewBranch: req.DefaultBranch,
@@ -154,7 +154,7 @@ func (c *datasetComponentImpl) Create(ctx context.Context, req *types.CreateData
 	err = c.gitServer.CreateRepoFile(buildCreateFileReq(&types.CreateFileParams{
 		Username:  user.Username,
 		Email:     user.Email,
-		Message:   initCommitMessage,
+		Message:   types.InitCommitMessage,
 		Branch:    req.DefaultBranch,
 		Content:   types.DatasetGitattributesContent,
 		NewBranch: req.DefaultBranch,

@@ -21,6 +21,7 @@ type Space struct {
 	Secrets       string `bun:",notnull" json:"secrets"`
 	HasAppFile    bool   `bun:"," json:"has_app_file"`
 	SKU           string `bun:"," json:"sku"`
+	Variables     string `bun:",nullzero" json:"variables"`
 	times
 }
 

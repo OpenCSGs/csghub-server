@@ -125,7 +125,7 @@ func (h *SpaceSdkHandler) Update(ctx *gin.Context) {
 // @Tags         SpaceSdk
 // @Accept       json
 // @Produce      json
-// @Param        写id path int true "id"
+// @Param        id path int true "id"
 // @Success      200  {object}  types.Response{} "OK"
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"

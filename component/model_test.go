@@ -91,7 +91,7 @@ func TestModelComponent_Create(t *testing.T) {
 	mc.mocks.gitServer.EXPECT().CreateRepoFile(buildCreateFileReq(&types.CreateFileParams{
 		Username:  "user",
 		Email:     "foo@bar.com",
-		Message:   initCommitMessage,
+		Message:   types.InitCommitMessage,
 		Branch:    "main",
 		Content:   generateReadmeData("MIT"),
 		NewBranch: "main",
@@ -102,7 +102,7 @@ func TestModelComponent_Create(t *testing.T) {
 	mc.mocks.gitServer.EXPECT().CreateRepoFile(buildCreateFileReq(&types.CreateFileParams{
 		Username:  "user",
 		Email:     "foo@bar.com",
-		Message:   initCommitMessage,
+		Message:   types.InitCommitMessage,
 		Branch:    "main",
 		Content:   spaceGitattributesContent,
 		NewBranch: "main",

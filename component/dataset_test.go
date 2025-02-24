@@ -45,7 +45,7 @@ func TestDatasetCompnent_Create(t *testing.T) {
 	dc.mocks.gitServer.EXPECT().CreateRepoFile(buildCreateFileReq(
 		&types.CreateFileParams{
 			Username:  "user",
-			Message:   initCommitMessage,
+			Message:   types.InitCommitMessage,
 			Branch:    "main",
 			Content:   "\n---\nlicense: \n---\n\t",
 			Namespace: "ns",
@@ -56,7 +56,7 @@ func TestDatasetCompnent_Create(t *testing.T) {
 	dc.mocks.gitServer.EXPECT().CreateRepoFile(buildCreateFileReq(
 		&types.CreateFileParams{
 			Username:  "user",
-			Message:   initCommitMessage,
+			Message:   types.InitCommitMessage,
 			Branch:    "main",
 			Content:   types.DatasetGitattributesContent,
 			Namespace: "ns",

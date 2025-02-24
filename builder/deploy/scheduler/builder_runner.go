@@ -22,7 +22,7 @@ type BuilderRunner struct {
 	tokenStore  database.AccessTokenStore
 }
 
-func NewBuidRunner(b imagebuilder.Builder, r *RepoInfo, t *database.DeployTask) Runner {
+func NewBuildRunner(b imagebuilder.Builder, r *RepoInfo, t *database.DeployTask) Runner {
 	return &BuilderRunner{
 		repo:        r,
 		task:        t,
@@ -40,7 +40,7 @@ func (t *BuilderRunner) makeBuildRequest() (*imagebuilder.BuildRequest, error) {
 	fields := strings.Split(t.repo.Path, "/")
 	sdkVer := ""
 	if t.repo.SdkVersion == "" {
-		slog.Warn("Use SDK default version", slog.Any("repository path", t.repo.Path))
+		slog.Debug("Use SDK default version", slog.Any("repository path", t.repo.Path))
 		if t.repo.Sdk == GRADIO.Name {
 			sdkVer = GRADIO.Version
 		} else if t.repo.Sdk == STREAMLIT.Name {

@@ -96,7 +96,7 @@ func (c *codeComponentImpl) Create(ctx context.Context, req *types.CreateCodeReq
 	err = c.gitServer.CreateRepoFile(buildCreateFileReq(&types.CreateFileParams{
 		Username:  dbRepo.User.Username,
 		Email:     dbRepo.User.Email,
-		Message:   initCommitMessage,
+		Message:   types.InitCommitMessage,
 		Branch:    req.DefaultBranch,
 		Content:   req.Readme,
 		NewBranch: req.DefaultBranch,
@@ -112,7 +112,7 @@ func (c *codeComponentImpl) Create(ctx context.Context, req *types.CreateCodeReq
 	err = c.gitServer.CreateRepoFile(buildCreateFileReq(&types.CreateFileParams{
 		Username:  dbRepo.User.Username,
 		Email:     dbRepo.User.Email,
-		Message:   initCommitMessage,
+		Message:   types.InitCommitMessage,
 		Branch:    req.DefaultBranch,
 		Content:   codeGitattributesContent,
 		NewBranch: req.DefaultBranch,

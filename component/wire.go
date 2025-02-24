@@ -106,22 +106,6 @@ func initializeTestAccountingComponent(ctx context.Context, t interface {
 	return &testAccountingWithMocks{}
 }
 
-type testDatasetViewerWithMocks struct {
-	*datasetViewerComponentImpl
-	mocks *Mocks
-}
-
-func initializeTestDatasetViewerComponent(ctx context.Context, t interface {
-	Cleanup(func())
-	mock.TestingT
-}) *testDatasetViewerWithMocks {
-	wire.Build(
-		MockSuperSet, DatasetViewerComponentSet,
-		wire.Struct(new(testDatasetViewerWithMocks), "*"),
-	)
-	return &testDatasetViewerWithMocks{}
-}
-
 type testGitHTTPWithMocks struct {
 	*gitHTTPComponentImpl
 	mocks *Mocks
@@ -520,4 +504,20 @@ func initializeTestEventComponent(ctx context.Context, t interface {
 		wire.Struct(new(testEventWithMocks), "*"),
 	)
 	return &testEventWithMocks{}
+}
+
+type testSpaceTemplateWithMocks struct {
+	*spaceTemplateComponentImpl
+	mocks *Mocks
+}
+
+func initializeTestSpaceTemplateComponent(ctx context.Context, t interface {
+	Cleanup(func())
+	mock.TestingT
+}) *testSpaceTemplateWithMocks {
+	wire.Build(
+		MockSuperSet, SpaceTemplateComponentSet,
+		wire.Struct(new(testSpaceTemplateWithMocks), "*"),
+	)
+	return &testSpaceTemplateWithMocks{}
 }

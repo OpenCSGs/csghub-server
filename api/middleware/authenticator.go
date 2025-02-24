@@ -22,7 +22,6 @@ import (
 func BuildJwtSession(jwtSignKey string) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		token := c.Query("jwt")
-
 		// If no JWT provided, continue with the next middleware
 		if token == "" {
 			c.Next()
@@ -65,6 +64,21 @@ func Authenticator(config *config.Config) gin.HandlerFunc {
 	//TODO:change to component
 	userStore := database.NewUserStore()
 	return func(c *gin.Context) {
+		sessionObj, sessionExists := c.Get(sessions.DefaultKey)
+		if sessionExists && sessionObj != nil {
+			session := sessions.Default(c)
+			sessionUserName := session.Get(httpbase.CurrentUserCtxVar)
+			if sessionUserName != nil {
+				slog.Debug("get username from session", slog.Any("session username", sessionUserName.(string)))
+				if len(sessionUserName.(string)) > 0 {
+					httpbase.SetCurrentUser(c, sessionUserName.(string))
+					httpbase.SetAuthType(c, httpbase.AuthTypeJwt)
+					c.Next()
+					return
+				}
+			}
+		}
+
 		apiToken := config.APIToken
 
 		// Get Auzhorization token
@@ -98,6 +112,8 @@ func Authenticator(config *config.Config) gin.HandlerFunc {
 				httpbase.SetCurrentUser(c, claims.CurrentUser)
 				httpbase.SetAuthType(c, httpbase.AuthTypeJwt)
 				return
+			} else {
+				slog.Error("verify jwt token error", slog.Any("error", err))
 			}
 		} else {
 			//TODO:use cache to check access token
