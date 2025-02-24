@@ -407,7 +407,7 @@ func (c *runtimeArchitectureComponentImpl) GetMainGGUFFileName(ctx context.Conte
 	for _, file := range files {
 		if strings.Contains(file.Name, ".gguf") {
 			if strings.Contains(file.Name, "00001-of-") || !strings.Contains(file.Name, "-of-") {
-				return file.Name, nil
+				return file.Path, nil
 			}
 		}
 	}
