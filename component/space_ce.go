@@ -64,7 +64,6 @@ type spaceComponentImpl struct {
 	config              *config.Config
 	userSvcClient       rpc.UserSvcClient
 	deployTaskStore     database.DeployTaskStore
-	recomStore          database.RecomStore
 	templateStore       database.SpaceTemplateStore
 }
 
