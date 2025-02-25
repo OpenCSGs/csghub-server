@@ -75,10 +75,12 @@ const (
 	EntryFileNginx      = "nginx.conf"
 	EntryFileDockerfile = "Dockerfile"
 
-	TextGeneration    PipelineTask    = "text-generation"
-	Text2Image        PipelineTask    = "text-to-image"
-	TaskAutoDetection PipelineTask    = "task-auto-detection"
-	LlamaCpp          InferenceEngine = "llama.cpp"
+	TextGeneration     PipelineTask    = "text-generation"
+	Text2Image         PipelineTask    = "text-to-image"
+	FeatureExtraction  PipelineTask    = "feature-extraction"
+	SentenceSimilarity PipelineTask    = "sentence-similarity"
+	TaskAutoDetection  PipelineTask    = "task-auto-detection"
+	LlamaCpp           InferenceEngine = "llama.cpp"
 )
 
 type RepoRequest struct {

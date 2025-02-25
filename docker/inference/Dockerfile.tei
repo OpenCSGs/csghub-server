@@ -1,4 +1,4 @@
-FROM ghcr.io/huggingface/text-embeddings-inference:cpu-1.6
+FROM ghcr.io/huggingface/text-embeddings-inference:1.6
 LABEL maintainer="opencsg"
 
 ENV DEBIAN_FRONTEND=noninteractive
@@ -9,8 +9,7 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 # Set Python 3.10 as the default Python version
-RUN pip3 config set global.index-url https://pypi.tuna.tsinghua.edu.cn/simple 
-RUN pip3 install --no-cache-dir csghub-sdk==0.4.7 --break-system-packages
+RUN pip3 install --no-cache-dir csghub-sdk==0.4.7
 
 WORKDIR /workspace/
 

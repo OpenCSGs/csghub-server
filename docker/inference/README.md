@@ -53,10 +53,17 @@ docker buildx build --platform linux/amd64,linux/arm64 \
   --push .
 # For Text Embeddings Inference: opencsg-registry.cn-beijing.cr.aliyuncs.com/public/tei:cpu-1.6
 export IMAGE_TAG=cpu-1.6
-docker buildx build --platform linux/amd64,linux/arm64 \
+docker buildx build --platform linux/amd64 \
   -t ${OPENCSG_ACR}/public/tei:${IMAGE_TAG} \
   -t ${OPENCSG_ACR}/public/tei:latest \
   -f Dockerfile.tei-cpu \
+  --push .
+# For Text Embeddings Inference: opencsg-registry.cn-beijing.cr.aliyuncs.com/public/tei:1.6
+export IMAGE_TAG=1.6
+docker buildx build --platform linux/amd64 \
+  -t ${OPENCSG_ACR}/public/tei:${IMAGE_TAG} \
+  -t ${OPENCSG_ACR}/public/tei:latest \
+  -f Dockerfile.tei \
   --push .
 # For Text Llama.cpp Inference: opencsg-registry.cn-beijing.cr.aliyuncs.com/public/llama.cpp:b4689
 export IMAGE_TAG=b4689
@@ -103,6 +110,7 @@ docker run -d \
 |text generation| sglang | v0.4.1.post3-cu124-srt | 12.4 |- |
 |text generation| mindie | 2.0-csg-1.0.RC2 | 1.0.RC2 |- |
 |text generation| llama.cpp | b4689 | - |- |
+|text generation| tei | 1.6 | - |- |
 
 
 ## API to Call Inference

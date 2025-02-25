@@ -310,6 +310,10 @@ func (c *runtimeArchitectureComponentImpl) scanExistModels(ctx context.Context, 
 	return nil
 }
 func (c *runtimeArchitectureComponentImpl) GetArchitecture(ctx context.Context, task types.PipelineTask, repo *database.Repository) (string, error) {
+	//set task if task is TaskAutoDetection
+	if task == types.TaskAutoDetection {
+		task = types.PipelineTask(GetBuiltInTaskFromTags(repo.Tags))
+	}
 	if task == types.TextGeneration {
 		if isGGUFModel(repo) {
 			return c.GetArchitectureFromGGUF(ctx, "", repo)
@@ -317,12 +321,8 @@ func (c *runtimeArchitectureComponentImpl) GetArchitecture(ctx context.Context, 
 		return c.GetArchitectureFromConfig(ctx, repo)
 	} else if task == types.Text2Image {
 		return c.GetClassNameFromConfig(ctx, repo)
-	} else if task == types.TaskAutoDetection {
-		arch, err := c.GetArchitectureFromConfig(ctx, repo)
-		if err == nil {
-			return arch, err
-		}
-		return c.GetClassNameFromConfig(ctx, repo)
+	} else if task == types.FeatureExtraction {
+		return c.GetModelTypeFromConfig(ctx, repo)
 	} else {
 		return "", fmt.Errorf("task type %s not supported", task)
 	}
@@ -359,6 +359,25 @@ func (c *runtimeArchitectureComponentImpl) GetArchitectureFromConfig(ctx context
 	}
 	slog.Debug("architectures of config", slog.Any("Architectures", config.Architectures))
 	return config.Architectures[0], nil
+}
+
+func (c *runtimeArchitectureComponentImpl) GetModelTypeFromConfig(ctx context.Context, repo *database.Repository) (string, error) {
+	content, err := c.getConfigContent(ctx, ConfigFileName, repo)
+	if err != nil {
+		return "", fmt.Errorf("fail to read config.json for relation, %w", err)
+	}
+	var config struct {
+		ModelType string `json:"model_type"`
+	}
+	if err := json.Unmarshal([]byte(content), &config); err != nil {
+		return "", fmt.Errorf("fail to unmarshal config, %w", err)
+	}
+	slog.Debug("unmarshal config", slog.Any("config", config))
+	if len(config.ModelType) < 1 {
+		return "", nil
+	}
+	slog.Debug("model type of config", slog.Any("Architectures", config.ModelType))
+	return config.ModelType, nil
 }
 
 // for text-to-image

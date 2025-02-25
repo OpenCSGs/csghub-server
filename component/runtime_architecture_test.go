@@ -180,6 +180,32 @@ func TestRuntimeArchComponent_GetArchitectureFromConfig(t *testing.T) {
 
 }
 
+func TestRuntimeArchComponent_GetModelTypeFromConfig(t *testing.T) {
+	ctx := context.TODO()
+	rc := initializeTestRuntimeArchComponent(ctx, t)
+
+	rc.mocks.gitServer.EXPECT().GetRepoFileRaw(ctx, gitserver.GetRepoInfoByPathReq{
+		Namespace: "foo",
+		Name:      "bar",
+		Ref:       "main",
+		Path:      ConfigFileName,
+		RepoType:  types.ModelRepo,
+	}).Return(`{"model_type": "bert"}`, nil)
+
+	arch, err := rc.GetArchitecture(ctx, types.TaskAutoDetection, &database.Repository{
+		Path:          "foo/bar",
+		DefaultBranch: "main",
+		Tags: []database.Tag{{
+			Name: "feature-extraction",
+		}, {
+			Name: "sentence-similarity",
+		}},
+	})
+	require.Nil(t, err)
+	require.Equal(t, "bert", arch)
+
+}
+
 func TestRuntimeArchComponent_RemoveRuntimeFrameworkTag(t *testing.T) {
 	ctx := context.TODO()
 	rc := initializeTestRuntimeArchComponent(ctx, t)
