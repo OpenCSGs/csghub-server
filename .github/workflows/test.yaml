@@ -44,7 +44,7 @@ jobs:
         run: |
           go install github.com/swaggo/swag/cmd/swag@latest
           make swag
-  unit-tests::
+  unit-tests:
     name: test
     strategy:
       matrix:
@@ -60,7 +60,7 @@ jobs:
 
       - name: Test
         run: go test ./... -short
-  integration-tests::
+  integration-tests:
     name: test
     strategy:
       matrix:
