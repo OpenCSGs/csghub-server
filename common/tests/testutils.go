@@ -69,6 +69,11 @@ func chProjectRoot() {
 
 // Init a test db, must call `defer db.Close()` in the test
 func InitTestDB() *database.DB {
+	db, _ := CreateTestDB()
+	return db
+}
+
+func CreateTestDB() (*database.DB, string) {
 	ctx := context.TODO()
 	// reuse the container, so we don't need to recreate the db for each test
 	// https://github.com/testcontainers/testcontainers-go/issues/2726
@@ -141,7 +146,7 @@ func InitTestDB() *database.DB {
 	return &database.DB{
 		Operator: database.Operator{Core: bdb},
 		BunDB:    bdb,
-	}
+	}, dsn
 }
 
 // Create a random test postgres Database without txdb,

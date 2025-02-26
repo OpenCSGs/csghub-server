@@ -2,6 +2,7 @@ package workflow
 
 import (
 	"fmt"
+	"log/slog"
 
 	"go.temporal.io/sdk/client"
 	"go.temporal.io/sdk/worker"
@@ -18,6 +19,7 @@ func StartWorker(config *config.Config) error {
 	var err error
 	wfClient, err = client.Dial(client.Options{
 		HostPort: config.WorkFLow.Endpoint,
+		Logger:   slog.Default(),
 	})
 	if err != nil {
 		return fmt.Errorf("unable to create workflow client, error:%w", err)

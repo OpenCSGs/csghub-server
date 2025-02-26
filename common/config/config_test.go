@@ -23,9 +23,8 @@ func TestConfig_LoadConfig(t *testing.T) {
 		cfg, err := LoadConfig()
 		require.Nil(t, err)
 
-		require.Equal(t, "bar", cfg.InstanceID)
-		require.Equal(t, 4321, cfg.APIServer.Port)
-		require.Equal(t, "git@localhost:2222", cfg.APIServer.SSHDomain)
+		require.Equal(t, 8090, cfg.APIServer.Port)
+		require.Equal(t, "ssh://git@localhost:2222", cfg.APIServer.SSHDomain)
 	})
 
 	t.Run("file and env", func(t *testing.T) {
@@ -35,7 +34,34 @@ func TestConfig_LoadConfig(t *testing.T) {
 		require.Nil(t, err)
 
 		require.Equal(t, "foobar", cfg.InstanceID)
-		require.Equal(t, 4321, cfg.APIServer.Port)
-		require.Equal(t, "git@localhost:2222", cfg.APIServer.SSHDomain)
+		require.Equal(t, 8090, cfg.APIServer.Port)
+		require.Equal(t, "ssh://git@localhost:2222", cfg.APIServer.SSHDomain)
 	})
+}
+
+func TestConfig_LoadConfigOnce(t *testing.T) {
+	cfg, err := LoadConfig()
+	require.NoError(t, err)
+	require.Equal(t, 8080, cfg.APIServer.Port)
+
+	SetConfigFile("test.toml")
+	cfg, err = LoadConfig()
+	require.NoError(t, err)
+	require.Equal(t, 8090, cfg.APIServer.Port)
+
+}
+
+func TestConfig_Update(t *testing.T) {
+	cfg, err := LoadConfig()
+	require.NoError(t, err)
+	require.Equal(t, "", cfg.InstanceID)
+
+	cfg, err = LoadConfig()
+	require.NoError(t, err)
+	cfg.InstanceID = "abc"
+
+	cfg, err = LoadConfig()
+	require.NoError(t, err)
+	require.Equal(t, "abc", cfg.InstanceID)
+
 }

@@ -65,3 +65,7 @@ func (s *GracefulServer) Run() {
 
 	slog.Info("Server stopped")
 }
+
+func (s *GracefulServer) Shutdown(ctx context.Context) error {
+	return s.server.Shutdown(ctx)
+}

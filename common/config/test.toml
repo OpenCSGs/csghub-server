@@ -1,4 +1,95 @@
-instance_id = "bar"
+saas = false
+instance_id = ""
+enable_swagger = false
+enable_https = false
+api_token = "f3a7b9c1d6e5f8e2a1b5d4f9e6a2b8d7c3a4e2b1d9f6e7a8d2c5a7b4c1e3f5b8a1d4f9b7d6e2f8a5d3b1e7f9c6a8b2d1e4f7d5b6e9f2a4b3c8e1d7f995hd82hf"
 
 [api_server]
-port = 4321
+port = 9091
+public_domain = "http://localhost:9091"
+
+[database]
+driver = "pg"
+dsn = ""
+timezone = "Asia/Shanghai"
+
+[redis]
+endpoint = "localhost:6379"
+max_retries = 3
+min_idle_connections = 0
+user = ""
+password = ""
+sentinel_mode = false
+sentinel_master = ""
+sentinel_endpoint = ""
+
+[git_server]
+type = "gitaly"
+
+[gitaly_server]
+address = "tcp://localhost:9876"
+storge = "default"
+token = "abc123secret"
+jwt_secret = "signing-key"
+
+[jwt]
+signing_key = "signing-key"
+valid_hour = 24
+
+[model]
+deploy_timeout_in_min = 60
+download_endpoint = "https://hub.opencsg.com"
+docker_reg_base = "opencsg-registry.cn-beijing.cr.aliyuncs.com/public/"
+nim_docker_secret_name = "ngc-secret"
+nim_ngc_secret_name = "nvidia-nim-secrets"
+
+[event]
+sync_interval = 1
+
+[nats]
+url = "nats://natsadmin:AkxjzcHaK4uRqInuPRLeoUYYV5xYKIWv3jlzCehgoe@127.0.0.1:4222"
+msg_fetch_timeout_in_sec = 5
+fee_notify_no_balance_subject = "accounting.notify.nobalance"
+fee_request_subject = "accounting.fee.>"
+fee_send_subject = "accounting.fee.credit"
+token_send_subject = "accounting.fee.token"
+quota_send_subject = "accounting.fee.quota"
+meter_request_subject = "accounting.metering.>"
+meter_duration_send_subject = "accounting.metering.duration"
+meter_token_send_subject = "accounting.metering.token"
+meter_quota_send_subject = "accounting.metering.quota"
+order_expired_subject = "accounting.order.expired"
+
+[user]
+host = "http://localhost"
+port = 9092
+signin_success_redirect_url = "http://localhost:3000/server/callback"
+codesouler_vscode_redirect_url = "http://127.0.0.1:37678/callback"
+codesouler_jetbrains_redirect_url = "http://127.0.0.1:37679/callback"
+
+[multi_sync]
+saasApiDomain = ""
+saasSyncDomain = ""
+
+[telemetry]
+enable = false
+
+[dataset]
+promptMaxJsonlFileSize = 1048576  # 1MB
+
+[workflow]
+endpoint = "localhost:7233"
+
+[cron_job]
+sync_as_client_cron_expression = "0 * * * *"
+calc_recom_score_cron_expression = "0 1 * * *"
+
+[dataviewer]
+host = "http://localhost"
+port = 9093
+
+[proxy]
+hosts = ["opencsg.com", "sync.opencsg.com"]
+
+[casdoor]
+certificate = "go.mod"

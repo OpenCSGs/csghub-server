@@ -14,6 +14,9 @@ func (a *Activities) SyncAsClient(ctx context.Context) error {
 		return err
 	}
 	apiDomain := a.config.MultiSync.SaasAPIDomain
+	if apiDomain == "" {
+		return nil
+	}
 	sc := multisync.FromOpenCSG(apiDomain, setting.Token)
 	return a.multisync.SyncAsClient(ctx, sc)
 }
