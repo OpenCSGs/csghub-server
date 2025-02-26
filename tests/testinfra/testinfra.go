@@ -123,7 +123,7 @@ func StartTestEnv() (*TestEnv, error) {
 		return nil, err
 	}
 	// create test postgres
-	_, dsn := tests.CreateTestDB()
+	_, dsn := tests.CreateTestDB("csghub_integration_test")
 	cfg.Database.DSN = dsn
 	dbConfig := database.DBConfig{
 		Dialect: database.DatabaseDialect(cfg.Database.Driver),

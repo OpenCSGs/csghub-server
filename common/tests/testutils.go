@@ -69,18 +69,18 @@ func chProjectRoot() {
 
 // Init a test db, must call `defer db.Close()` in the test
 func InitTestDB() *database.DB {
-	db, _ := CreateTestDB()
+	db, _ := CreateTestDB("csghub_test")
 	return db
 }
 
-func CreateTestDB() (*database.DB, string) {
+func CreateTestDB(name string) (*database.DB, string) {
 	ctx := context.TODO()
 	// reuse the container, so we don't need to recreate the db for each test
 	// https://github.com/testcontainers/testcontainers-go/issues/2726
 	reuse := testcontainers.CustomizeRequestOption(
 		func(req *testcontainers.GenericContainerRequest) error {
 			req.Reuse = true
-			req.Name = "csghub_test"
+			req.Name = name
 			return nil
 		},
 	)
@@ -88,7 +88,7 @@ func CreateTestDB() (*database.DB, string) {
 	pc, err := postgres.Run(ctx,
 		"postgres:15.7",
 		reuse,
-		postgres.WithDatabase("csghub_test"),
+		postgres.WithDatabase(name),
 		testcontainers.WithWaitStrategy(
 			wait.ForLog("database system is ready to accept connections").
 				WithOccurrence(2).
