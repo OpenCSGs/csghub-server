@@ -135,7 +135,7 @@ func StartTestEnv() (*TestEnv, error) {
 
 	// create test gitaly
 	configFile := "tests/gitaly.toml"
-	// http://host.docker.internal:9091 is not accessable in github CI,
+	// http://host.docker.internal:9091 is not accessible in github CI,
 	// use http://172.17.0.1:9091
 	if os.Getenv("GITHUB") == "true" {
 		configFile = "tests/gitaly_github.toml"
