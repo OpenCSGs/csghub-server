@@ -12,14 +12,12 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
 	"opencsg.com/csghub-server/api/httpbase"
-	"opencsg.com/csghub-server/builder/rpc"
 	"opencsg.com/csghub-server/builder/store/database"
-	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/types"
 )
 
 // BuildJwtSession create and save session with jwt from query string
-func BuildJwtSession(jwtSignKey string) gin.HandlerFunc {
+func (m *Middleware) BuildJwtSession(jwtSignKey string) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		token := c.Query("jwt")
 		// If no JWT provided, continue with the next middleware
@@ -47,7 +45,7 @@ func BuildJwtSession(jwtSignKey string) gin.HandlerFunc {
 }
 
 // AuthSession verify user login by session, ans save user name into context if login
-func AuthSession() gin.HandlerFunc {
+func (m *Middleware) AuthSession() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		session := sessions.Default(c)
 		userName := session.Get(httpbase.CurrentUserCtxVar)
@@ -60,26 +58,9 @@ func AuthSession() gin.HandlerFunc {
 	}
 }
 
-func Authenticator(config *config.Config) gin.HandlerFunc {
-	//TODO:change to component
-	userStore := database.NewUserStore()
+func (m *Middleware) Authenticator() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		sessionObj, sessionExists := c.Get(sessions.DefaultKey)
-		if sessionExists && sessionObj != nil {
-			session := sessions.Default(c)
-			sessionUserName := session.Get(httpbase.CurrentUserCtxVar)
-			if sessionUserName != nil {
-				slog.Debug("get username from session", slog.Any("session username", sessionUserName.(string)))
-				if len(sessionUserName.(string)) > 0 {
-					httpbase.SetCurrentUser(c, sessionUserName.(string))
-					httpbase.SetAuthType(c, httpbase.AuthTypeJwt)
-					c.Next()
-					return
-				}
-			}
-		}
-
-		apiToken := config.APIToken
+		apiToken := m.config.APIToken
 
 		// Get Auzhorization token
 		authHeader := c.Request.Header.Get("Authorization")
@@ -107,7 +88,7 @@ func Authenticator(config *config.Config) gin.HandlerFunc {
 		}
 
 		if strings.Contains(token, ".") {
-			claims, err := parseJWTToken(config.JWT.SigningKey, token)
+			claims, err := parseJWTToken(m.config.JWT.SigningKey, token)
 			if err == nil {
 				httpbase.SetCurrentUser(c, claims.CurrentUser)
 				httpbase.SetAuthType(c, httpbase.AuthTypeJwt)
@@ -117,7 +98,7 @@ func Authenticator(config *config.Config) gin.HandlerFunc {
 			}
 		} else {
 			//TODO:use cache to check access token
-			user, _ := userStore.FindByAccessToken(context.Background(), token)
+			user, _ := m.userComponent.FindByAccessToken(context.Background(), token)
 			if user != nil {
 				httpbase.SetCurrentUser(c, user.Username)
 				httpbase.SetAccessToken(c, token)
@@ -156,9 +137,9 @@ func parseJWTToken(signKey, tokenString string) (*types.JWTClaims, error) {
 	return nil, fmt.Errorf("JWT token claims not match: %+v", *token)
 }
 
-func OnlyAPIKeyAuthenticator(config *config.Config) gin.HandlerFunc {
+func (m *Middleware) NeedAPIKey() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		apiToken := config.APIToken
+		apiToken := m.config.APIToken
 
 		// Get Authorization token
 		authHeader := c.Request.Header.Get("Authorization")
@@ -188,7 +169,7 @@ func OnlyAPIKeyAuthenticator(config *config.Config) gin.HandlerFunc {
 	}
 }
 
-func MustLogin() gin.HandlerFunc {
+func (m *Middleware) MustLogin() gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		currentUser := httpbase.GetCurrentUser(ctx)
 		if currentUser == "" {
@@ -199,10 +180,7 @@ func MustLogin() gin.HandlerFunc {
 	}
 }
 
-func NeedAdmin(config *config.Config) gin.HandlerFunc {
-	userSvcClient := rpc.NewUserSvcHttpClient(fmt.Sprintf("%s:%d", config.User.Host, config.User.Port),
-		rpc.AuthWithApiKey(config.APIToken))
-
+func (m *Middleware) NeedAdmin() gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		currentUser := httpbase.GetCurrentUser(ctx)
 		if currentUser == "" {
@@ -211,7 +189,7 @@ func NeedAdmin(config *config.Config) gin.HandlerFunc {
 			return
 		}
 
-		user, err := userSvcClient.GetUserInfo(ctx, currentUser, currentUser)
+		user, err := m.userServiceClient.GetUserInfo(ctx, currentUser, currentUser)
 
 		if err != nil {
 			httpbase.ServerError(ctx, fmt.Errorf("failed to find user, cause:%w", err))
@@ -231,13 +209,4 @@ func NeedAdmin(config *config.Config) gin.HandlerFunc {
 
 		ctx.Next()
 	}
-}
-
-type AuthenticatorCollection struct {
-	// only can be accessed by api key
-	NeedAPIKey gin.HandlerFunc
-	// user need to login first
-	NeedLogin gin.HandlerFunc
-	//user must be admin role to access
-	NeedAdmin gin.HandlerFunc
 }

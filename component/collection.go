@@ -36,8 +36,7 @@ func NewCollectionComponent(config *config.Config) (CollectionComponent, error) 
 	cc.userStore = database.NewUserStore()
 	cc.orgStore = database.NewOrgStore()
 	cc.userLikesStore = database.NewUserLikesStore()
-	cc.userSvcClient = rpc.NewUserSvcHttpClient(fmt.Sprintf("%s:%d", config.User.Host, config.User.Port),
-		rpc.AuthWithApiKey(config.APIToken))
+	cc.userSvcClient = rpc.NewUserSvcHttpClient(config)
 	spaceComponent, err := NewSpaceComponent(config)
 	if err != nil {
 		return nil, err

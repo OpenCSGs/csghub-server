@@ -12,9 +12,10 @@ import (
 func NewAccountRouter(config *config.Config) (*gin.Engine, error) {
 	r := gin.New()
 	r.Use(gin.Recovery())
+	middleware := middleware.NewMiddleware(config)
 
-	r.Use(middleware.Log(config))
-	r.Use(middleware.Authenticator(config))
+	r.Use(middleware.Log())
+	r.Use(middleware.Authenticator())
 
 	// metering
 	meterHandler, err := handler.NewMeteringHandler()

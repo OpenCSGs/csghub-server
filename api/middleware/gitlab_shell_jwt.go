@@ -8,7 +8,6 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
-	"opencsg.com/csghub-server/common/config"
 )
 
 const apiSecretHeaderName = "Gitlab-Shell-Api-Request"
@@ -27,10 +26,10 @@ func parseGitlabShellJWTToken(signKey, tokenString string) (bool, error) {
 	return true, nil
 }
 
-func CheckGitlabShellJWTToken(config *config.Config) gin.HandlerFunc {
+func (m *Middleware) CheckGitlabShellJWTToken() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		tokenString := c.Request.Header.Get(apiSecretHeaderName)
-		pass, err := parseGitlabShellJWTToken(config.GitalyServer.JWTSecret, tokenString)
+		pass, err := parseGitlabShellJWTToken(m.config.GitalyServer.JWTSecret, tokenString)
 		if err != nil {
 			slog.Debug("fail to parse gitlab-shell jwt token", slog.String("token_get", tokenString), slog.Any("error", err))
 			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": err.Error()})

@@ -6,6 +6,7 @@ import (
 
 	"opencsg.com/csghub-server/api/httpbase"
 	"opencsg.com/csghub-server/builder/git/membership"
+	"opencsg.com/csghub-server/common/config"
 )
 
 type UserSvcClient interface {
@@ -14,15 +15,14 @@ type UserSvcClient interface {
 	GetUserInfo(ctx context.Context, userName, visitorName string) (*User, error)
 }
 
-//go:generate mockgen -destination=mocks/client.go -package=mocks . Client
-
 type UserSvcHttpClient struct {
 	hc *HttpClient
 }
 
-func NewUserSvcHttpClient(endpoint string, opts ...RequestOption) UserSvcClient {
+func NewUserSvcHttpClient(config *config.Config) UserSvcClient {
+	endpoint := fmt.Sprintf("%s:%d", config.User.Host, config.User.Port)
 	return &UserSvcHttpClient{
-		hc: NewHttpClient(endpoint, opts...),
+		hc: NewHttpClient(endpoint, AuthWithApiKey(config.APIToken)),
 	}
 }
 

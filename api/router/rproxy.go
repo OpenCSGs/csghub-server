@@ -22,7 +22,8 @@ func NewRProxyRouter(config *config.Config) (*gin.Engine, error) {
 		AllowAllOrigins:  true,
 	}))
 	r.Use(gin.Recovery())
-	r.Use(middleware.Log(config))
+	middleware := middleware.NewMiddleware(config)
+	r.Use(middleware.Log())
 	store := cookie.NewStore([]byte(config.Space.SessionSecretKey))
 	store.Options(sessions.Options{
 		// SameSite: http.SameSiteNoneMode, // support 3rd part
@@ -34,7 +35,7 @@ func NewRProxyRouter(config *config.Config) (*gin.Engine, error) {
 	//to access space with jwt token in query string
 	r.Use(middleware.BuildJwtSession(config.JWT.SigningKey))
 	//to access model,fintune with any kind of tokens in auth header
-	r.Use(middleware.Authenticator(config))
+	r.Use(middleware.Authenticator())
 
 	handler, err := handler.NewRProxyHandler(config)
 	if err != nil {

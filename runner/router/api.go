@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log/slog"
 
+	"github.com/gin-contrib/pprof"
 	"github.com/gin-gonic/gin"
 	"opencsg.com/csghub-server/api/middleware"
 	"opencsg.com/csghub-server/builder/deploy/cluster"
@@ -14,7 +15,14 @@ import (
 func NewHttpServer(config *config.Config) (*gin.Engine, error) {
 	r := gin.New()
 	r.Use(gin.Recovery())
-	r.Use(middleware.Log(config))
+	middleware := middleware.NewMiddleware(config)
+	r.Use(middleware.Log())
+
+	needAPIKey := middleware.NeedAPIKey()
+
+	//add router for golang pprof
+	debugGroup := r.Group("/debug", needAPIKey)
+	pprof.RouteRegister(debugGroup, "pprof")
 
 	clusterPool, err := cluster.NewClusterPool()
 	if err != nil {

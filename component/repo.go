@@ -208,8 +208,7 @@ func NewRepoComponent(config *config.Config) (RepoComponent, error) {
 		return nil, newError
 	}
 	c.lfsBucket = config.S3.Bucket
-	c.userSvcClient = rpc.NewUserSvcHttpClient(fmt.Sprintf("%s:%d", config.User.Host, config.User.Port),
-		rpc.AuthWithApiKey(config.APIToken))
+	c.userSvcClient = rpc.NewUserSvcHttpClient(config)
 	c.runtimeFrameworksStore = database.NewRuntimeFrameworksStore()
 	c.deployTaskStore = database.NewDeployTaskStore()
 	c.deployer = deploy.NewDeployer()

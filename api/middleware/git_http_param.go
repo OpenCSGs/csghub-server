@@ -11,12 +11,11 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"opencsg.com/csghub-server/api/httpbase"
-	"opencsg.com/csghub-server/builder/store/database"
 )
 
 const gitSuffix = ".git"
 
-func GitHTTPParamMiddleware() gin.HandlerFunc {
+func (m *Middleware) GitHTTPParamMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		name := c.Param("name")
 		namespace := c.Param("namespace")
@@ -49,7 +48,7 @@ func GitHTTPParamMiddleware() gin.HandlerFunc {
 	}
 }
 
-func ContentEncoding() gin.HandlerFunc {
+func (m *Middleware) ContentEncoding() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var (
 			body io.ReadCloser
@@ -80,8 +79,7 @@ func ContentEncoding() gin.HandlerFunc {
 	}
 }
 
-func GetCurrentUserFromHeader() gin.HandlerFunc {
-	userStore := database.NewUserStore()
+func (m *Middleware) GetCurrentUserFromHeader() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		authHeader := c.Request.Header.Get("Authorization")
 		if authHeader != "" && !strings.HasPrefix(authHeader, "X-OPENCSG-Sync-Token") {
@@ -96,7 +94,7 @@ func GetCurrentUserFromHeader() gin.HandlerFunc {
 			username := strings.Split(string(authInfo), ":")[0]
 			password := strings.Split(string(authInfo), ":")[1]
 
-			user, err := userStore.FindByGitAccessToken(context.Background(), password)
+			user, err := m.userComponent.FindByGitAccessToken(context.Background(), password)
 			if err != nil {
 				c.Header("WWW-Authenticate", "Basic realm=opencsg-git")
 				c.PureJSON(http.StatusUnauthorized, nil)

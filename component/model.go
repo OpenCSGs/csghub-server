@@ -115,8 +115,7 @@ func NewModelComponent(config *config.Config) (ModelComponent, error) {
 	if err != nil {
 		return nil, err
 	}
-	c.userSvcClient = rpc.NewUserSvcHttpClient(fmt.Sprintf("%s:%d", config.User.Host, config.User.Port),
-		rpc.AuthWithApiKey(config.APIToken))
+	c.userSvcClient = rpc.NewUserSvcHttpClient(config)
 	c.recomStore = database.NewRecomStore()
 	return c, nil
 }

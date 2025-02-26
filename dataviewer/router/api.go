@@ -27,14 +27,15 @@ func NewDataViewerRouter(config *config.Config, tc temporal.Client) (*gin.Engine
 		r.Use(otelgin.Middleware("csghub-dataviewer"))
 	}
 	r.Use(gin.Recovery())
-	r.Use(middleware.Log(config))
-	needAPIKey := middleware.OnlyAPIKeyAuthenticator(config)
+	middleware := middleware.NewMiddleware(config)
+	r.Use(middleware.Log())
+	needAPIKey := middleware.NeedAPIKey()
 
 	//add router for golang pprof
 	debugGroup := r.Group("/debug", needAPIKey)
 	pprof.RouteRegister(debugGroup, "pprof")
 
-	r.Use(middleware.Authenticator(config))
+	r.Use(middleware.Authenticator())
 	apiGroup := r.Group("/api/v1")
 	datasetsGrp := apiGroup.Group("/datasets/:namespace/:name")
 
