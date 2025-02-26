@@ -7,6 +7,7 @@ api_token = "f3a7b9c1d6e5f8e2a1b5d4f9e6a2b8d7c3a4e2b1d9f6e7a8d2c5a7b4c1e3f5b8a1d
 [api_server]
 port = 9091
 public_domain = "http://localhost:9091"
+ssh_domain = "ssh://git@localhost:2222"
 
 [database]
 driver = "pg"

@@ -29,7 +29,7 @@ func TestSchedule_SyncAsClient(t *testing.T) {
 		&database.SyncClientSetting{Token: "tk"}, nil,
 	)
 	tester.mocks.multisync.EXPECT().SyncAsClient(
-		mock.Anything, multisync.FromOpenCSG("", "tk"),
+		mock.Anything, multisync.FromOpenCSG("http://foo.com", "tk"),
 	).Return(nil)
 
 	tester.scheduler.Execute("sync-as-client-schedule", tester.cronEnv)
