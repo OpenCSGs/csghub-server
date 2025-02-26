@@ -66,7 +66,7 @@ func TestBroadcastComponent_UpdateBroadcast(t *testing.T) {
 	dbBroadcast := database.Broadcast{ID: 1, Content: "test", BcType: "banner", Theme: "light", Status: "active"}
 	broadcast := types.Broadcast{ID: 1, Content: "test", BcType: "banner", Theme: "light", Status: "active"}
 
-	cc.mocks.stores.BroadcastMock().EXPECT().Get(ctx, 1).Return(&dbBroadcast, nil)
+	cc.mocks.stores.BroadcastMock().EXPECT().Get(ctx, int64(1)).Return(&dbBroadcast, nil)
 	cc.mocks.stores.BroadcastMock().EXPECT().Update(ctx, dbBroadcast).Return(&dbBroadcast, nil)
 
 	data, _ := cc.UpdateBroadcast(ctx, broadcast)
