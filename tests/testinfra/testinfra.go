@@ -77,24 +77,25 @@ func (t *TestEnv) Shutdown(ctx context.Context) error {
 	return err
 }
 
-func (t *TestEnv) CreateAdminUser(ctx context.Context) (string, error) {
+// Create a new user in database and return an access token
+func (t *TestEnv) CreateUser(ctx context.Context, userName string) (string, error) {
 	namespace := &database.Namespace{
-		Path: "admin",
+		Path: userName,
 	}
 	user := &database.User{
-		Username:      "admin",
-		NickName:      "admin",
-		Email:         "admin@admin.com",
-		UUID:          "adminuuid",
+		Username:      userName,
+		NickName:      userName,
+		Email:         userName + "@csg.com",
+		UUID:          userName + "uuid",
 		RegProvider:   "casdoor",
 		EmailVerified: true,
-		RoleMask:      "admin",
+		RoleMask:      "user",
 	}
 	err := t.userStore.Create(ctx, user, namespace)
 	if err != nil {
 		return "", err
 	}
-	uw, err := t.userStore.FindByUsername(ctx, "admin")
+	uw, err := t.userStore.FindByUsername(ctx, userName)
 	if err != nil {
 		return "", err
 	}
@@ -289,8 +290,12 @@ func (adt *AddHeaderTransport) RoundTrip(req *http.Request) (*http.Response, err
 }
 
 func GetClient(accessToken string) *http.Client {
+	header := map[string]string{}
+	if accessToken != "" {
+		header["Authorization"] = fmt.Sprintf("Bearer %s", accessToken)
+	}
 	return &http.Client{Transport: &AddHeaderTransport{
 		t:       http.DefaultTransport,
-		headers: map[string]string{"Authorization": fmt.Sprintf("Bearer %s", accessToken)},
+		headers: header,
 	}}
 }
