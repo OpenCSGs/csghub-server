@@ -81,6 +81,7 @@ const (
 	SentenceSimilarity PipelineTask    = "sentence-similarity"
 	TaskAutoDetection  PipelineTask    = "task-auto-detection"
 	LlamaCpp           InferenceEngine = "llama.cpp"
+	TEI                InferenceEngine = "tei"
 )
 
 type RepoRequest struct {

@@ -206,6 +206,9 @@ func TestGitCallbackComponent_UpdateGGUFRepoInfos(t *testing.T) {
 	gc.mocks.stores.TagMock().EXPECT().AllTags(
 		ctx, filter,
 	).Return([]*database.Tag{{Name: "t1"}}, nil)
+	gc.mocks.stores.RuntimeFrameworkMock().EXPECT().ListByIDs(ctx, []int64{12}).Return(
+		[]database.RuntimeFramework{{ID: 12, FrameName: "fm"}}, nil,
+	)
 
 	gc.mocks.stores.RuntimeArchMock().EXPECT().ListByRArchName(ctx, "foo").Return(
 		[]database.RuntimeArchitecture{{ID: 11, RuntimeFrameworkID: 12}}, nil,

@@ -154,6 +154,8 @@ func (s *mirrorStoreImpl) FindWithMapping(ctx context.Context, repoType types.Re
 		query.Where("hf_path = ? or path = ?", path, path)
 	} else if mapping == types.ModelScopeMapping {
 		query.Where("ms_path = ?", path, path)
+	} else if mapping == types.AutoMapping {
+		query.Where("hf_path = ? or ms_path = ? or path = ?", path, path, path)
 	} else {
 		// for csg path
 		query.Where("path = ?", path)
