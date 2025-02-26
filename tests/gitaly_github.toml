@@ -6,7 +6,7 @@ name = "default"
 path = "/home/git/repositories"
 
 [gitlab]
-url = "http://host.docker.internal:9091"
+url = "http://172.17.0.1:9091"
 secret = "signing-key"
 
 [git]

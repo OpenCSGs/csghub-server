@@ -134,12 +134,18 @@ func StartTestEnv() (*TestEnv, error) {
 	env.accessTokenStore = database.NewAccessTokenStoreWithDB(database.GetDB())
 
 	// create test gitaly
+	configFile := "/etc/gitaly.toml"
+	// http://host.docker.internal:9091 is not accessable in github CI,
+	// use http://172.17.0.1:9091
+	if os.Getenv("GITHUB") == "true" {
+		configFile = "/etc/gitaly_github.toml"
+	}
 	req := testcontainers.ContainerRequest{
 		Name:         "csghub_test_gitaly",
 		Image:        "opencsg-registry.cn-beijing.cr.aliyuncs.com/opencsg_public/gitaly:v17.5.0",
 		ExposedPorts: []string{"9876/tcp"},
 		User:         "root",
-		Env:          map[string]string{"GITALY_CONFIG_FILE": "/etc/gitaly.toml"},
+		Env:          map[string]string{"GITALY_CONFIG_FILE": configFile},
 		Files: []testcontainers.ContainerFile{
 			{
 				HostFilePath:      "tests/gitaly.toml",
