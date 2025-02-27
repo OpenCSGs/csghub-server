@@ -11104,6 +11104,56 @@ paths:
       summary: Get token and owner's detail by the token value
       tags:
       - Access token
+  /user/{id}:
+    put:
+      consumes:
+      - application/json
+      description: update user
+      parameters:
+      - description: user identifier, could be username(depricated) or uuid
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: current user
+        in: query
+        name: current_user
+        required: true
+        type: string
+      - description: type of identifier, uuid or username, default is username
+        enum:
+        - uuid
+        - username
+        in: query
+        name: type
+        type: string
+      - description: body
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/types.UpdateUserRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/types.Response'
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Update user. If change user name, should only send 'new_username' in
+        the request body.
+      tags:
+      - User
   /user/{username}:
     delete:
       consumes:
@@ -11189,48 +11239,6 @@ paths:
       - ApiKey: []
       summary: Get user info. Admin and the user self can see full info, other users
         can only see basic info.
-      tags:
-      - User
-    put:
-      consumes:
-      - application/json
-      description: update user
-      parameters:
-      - description: username
-        in: path
-        name: username
-        required: true
-        type: string
-      - description: current user
-        in: query
-        name: current_user
-        required: true
-        type: string
-      - description: body
-        in: body
-        name: body
-        required: true
-        schema:
-          $ref: '#/definitions/types.UpdateUserRequest'
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/types.Response'
-        "400":
-          description: Bad request
-          schema:
-            $ref: '#/definitions/types.APIBadRequest'
-        "500":
-          description: Internal server error
-          schema:
-            $ref: '#/definitions/types.APIInternalServerError'
-      security:
-      - ApiKey: []
-      summary: Update user. If change user name, should only send 'new_username' in
-        the request body.
       tags:
       - User
   /user/{username}/codes:

@@ -33,6 +33,8 @@ type UpdateUserRequest struct {
 
 	//if use want to change username, this should be the only field to send in request body
 	NewUserName *string `json:"new_username,omitempty"`
+
+	OpUser string `json:"-"` // the user who perform this action, used for audit and permission check
 }
 
 var _ SensitiveRequestV2 = (*UpdateUserRequest)(nil)

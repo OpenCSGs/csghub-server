@@ -45,6 +45,7 @@ type userComponentImpl struct {
 
 type UserComponent interface {
 	ChangeUserName(ctx context.Context, oldUserName, newUserName, opUser string) error
+	UpdateByUUID(ctx context.Context, req *types.UpdateUserRequest) error
 	Update(ctx context.Context, req *types.UpdateUserRequest, opUser string) error
 	Delete(ctx context.Context, operator, username string) error
 	// CanAdmin checks if a user has admin privileges.
@@ -219,7 +220,7 @@ func (c *userComponentImpl) ChangeUserName(ctx context.Context, oldUserName, new
 
 	c.lazyInit()
 
-	err = c.updateCasdoorUser(&types.UpdateUserRequest{
+	_, err = c.updateCasdoorUser(&types.UpdateUserRequest{
 		UUID:        &user.UUID,
 		NewUserName: &newUserName,
 	})
@@ -228,6 +229,165 @@ func (c *userComponentImpl) ChangeUserName(ctx context.Context, oldUserName, new
 		return newError
 	}
 	return nil
+}
+func (c *userComponentImpl) UpdateByUUID(ctx context.Context, req *types.UpdateUserRequest) error {
+	c.lazyInit()
+
+	if req.UUID == nil {
+		return errors.New("can not update user without uuid in request")
+	}
+	uuid := *req.UUID
+	user, err := c.userStore.FindByUUID(ctx, uuid)
+	if err != nil {
+		return fmt.Errorf("failed to find user by uuid in db,error:%w", err)
+	}
+	opUserName := req.OpUser
+	var opUser database.User
+	if user.Username != opUserName {
+		//find op user by username
+		opUser, err = c.userStore.FindByUsername(ctx, opUserName)
+		if err != nil {
+			return fmt.Errorf("failed to find op user by name in db,user: '%s', error:%w", opUserName, err)
+		}
+	} else {
+		opUser = *user
+	}
+	if req.Roles != nil {
+		if can, reason := c.canChangeRole(*user, opUser); !can {
+			return errors.New(reason)
+		}
+	}
+
+	if req.NewUserName != nil && user.Username != *req.NewUserName {
+		if can, reason := c.canChangeUserName(ctx, *user, opUser, *req.NewUserName); !can {
+			return errors.New(reason)
+		}
+	}
+
+	if req.Email != nil && user.Email != *req.Email {
+		if can, reason := c.canChangeEmail(ctx, *user, opUser, *req.Email); !can {
+			return errors.New(reason)
+		}
+	}
+
+	if req.Phone != nil && user.Phone != *req.Phone {
+		if can, reason := c.canChangePhone(*user, opUser, *req.Phone); !can {
+			return errors.New(reason)
+		}
+	}
+
+	// update user in casdoor first, then update user in db
+	var oldCasdoorUser *casdoorsdk.User
+	if user.RegProvider == "casdoor" {
+		oldCasdoorUser, err = c.updateCasdoorUser(req)
+		if err != nil {
+			return fmt.Errorf("failed to update user in casdoor, uuid:'%s',error:%w", user.UUID, err)
+		}
+	}
+
+	/* dont update git user email anymore, as gitea has been depricated */
+
+	changedUser := c.setChangedProps(user, req)
+	if err := c.userStore.Update(ctx, changedUser, user.Username); err != nil {
+		// rollback casdoor user change
+		// get id by user name before changed
+		id := c.casc.GetId(oldCasdoorUser.Name)
+		id = url.QueryEscape(id) // wechat user's name may contain special characters
+		if _, err := c.casc.UpdateUserById(id, oldCasdoorUser); err != nil {
+			slog.Error("failed to rollback casdoor user change", slog.String("uuid", user.UUID), slog.Any("error", err))
+		}
+
+		return fmt.Errorf("failed to update user in db,error:%w", err)
+	}
+
+	return nil
+
+}
+
+func (c *userComponentImpl) canChangeRole(user, opuser database.User) (can bool, reason string) {
+	if opuser.ID == user.ID {
+		return false, "user can not change roles of self"
+	}
+	if !opuser.CanAdmin() {
+		return false, "op user is not admin"
+	}
+	return true, ""
+}
+
+func (c *userComponentImpl) canChangeUserName(ctx context.Context, user, opuser database.User, newUserName string) (can bool, reason string) {
+	if opuser.ID != user.ID {
+		return false, "user name can only be changed by the user itself"
+	}
+	if !user.CanChangeUserName {
+		return false, "user name can only be changed once"
+	}
+	// check username existence in db and casdoor
+	u, err := c.userStore.FindByUsername(ctx, newUserName)
+	if err != nil {
+		if !errors.Is(err, sql.ErrNoRows) {
+			return false, "failed to check new username existence in db"
+		}
+	}
+	if u.ID > 0 {
+		return false, fmt.Sprintf("new username '%s' already exists", newUserName)
+	}
+	if user.RegProvider != "casdoor" {
+		return true, ""
+	}
+	casu, err := c.casc.GetUser(newUserName)
+	if err != nil {
+		return false, "failed to check new username existence in casdoor"
+	}
+	if casu != nil && casu.Id != user.UUID {
+		return false, "user name already exists in casdoor"
+	}
+	return true, ""
+}
+
+func (c *userComponentImpl) canChangeEmail(ctx context.Context, user, opuser database.User, newEmail string) (can bool, reason string) {
+	if opuser.ID != user.ID {
+		return false, "email can only be changed by the user itself"
+	}
+	// check email existence in db and casdoor
+	u, err := c.userStore.FindByEmail(ctx, newEmail)
+	if err != nil {
+		if !errors.Is(err, sql.ErrNoRows) {
+			return false, "failed to check new email existence in db"
+		}
+	}
+	if u.ID > 0 {
+		return false, fmt.Sprintf("email '%s' already exists", newEmail)
+	}
+	if user.RegProvider != "casdoor" {
+		return true, ""
+	}
+	casu, err := c.casc.GetUserByEmail(newEmail)
+	if err != nil {
+		return false, "failed to check new email existence in casdoor"
+	}
+	if casu != nil && casu.Id != user.UUID {
+		return false, "email already exists in casdoor"
+	}
+
+	return true, ""
+}
+
+func (c *userComponentImpl) canChangePhone(user database.User, opUser database.User, newPhone string) (bool, string) {
+	if opUser.ID != user.ID {
+		return false, "phone can only be changed by the user itself"
+	}
+	if user.RegProvider != "casdoor" {
+		return true, ""
+	}
+	// check phone existence in casdoor
+	casu, err := c.casc.GetUserByPhone(newPhone)
+	if err != nil {
+		return false, "failed to check new phone existence in casdoor"
+	}
+	if casu != nil && casu.Id != user.UUID {
+		return false, "new phone already exists in casdoor"
+	}
+	return true, ""
 }
 
 func (c *userComponentImpl) Update(ctx context.Context, req *types.UpdateUserRequest, opUser string) error {
@@ -260,9 +420,8 @@ func (c *userComponentImpl) Update(ctx context.Context, req *types.UpdateUserReq
 			return err
 		}
 	}
-
-	c.setChangedProps(&user, req)
-	err = c.userStore.Update(ctx, &user)
+	newUser := c.setChangedProps(&user, req)
+	err = c.userStore.Update(ctx, newUser, "")
 	if err != nil {
 		newError := fmt.Errorf("failed to update database user '%s',error:%w", req.Username, err)
 		return newError
@@ -273,7 +432,7 @@ func (c *userComponentImpl) Update(ctx context.Context, req *types.UpdateUserReq
 		return nil
 	}
 	req.UUID = &user.UUID
-	err = c.updateCasdoorUser(req)
+	_, err = c.updateCasdoorUser(req)
 	if err != nil {
 		newError := fmt.Errorf("failed to update casdoor user '%s',error:%w", req.Username, err)
 		return newError
@@ -282,6 +441,7 @@ func (c *userComponentImpl) Update(ctx context.Context, req *types.UpdateUserReq
 	return nil
 }
 
+// Depricated: only useful for gitea, will be removed in the future
 // user registry with wechat does not have email, so git user is not created after signin
 // when user set email, a git user needs to be created
 func (c *userComponentImpl) upsertGitUser(username string, nickname *string, oldEmail, newEmail string) error {
@@ -317,17 +477,14 @@ func (c *userComponentImpl) upsertGitUser(username string, nickname *string, old
 	return nil
 }
 
-func (c *userComponentImpl) setChangedProps(user *database.User, req *types.UpdateUserRequest) {
+func (c *userComponentImpl) setChangedProps(oldUser *database.User, req *types.UpdateUserRequest) *database.User {
+	user := *oldUser
+	if req.NewUserName != nil {
+		user.CanChangeUserName = false // user name can only be changed once
+		user.Username = *req.NewUserName
+	}
 	if req.Email != nil {
 		user.Email = *req.Email
-		if user.CanChangeUserName {
-			user.CanChangeUserName = false
-			slog.Info("use set email, disallow to change user name later (can_change_user_name=false)",
-				slog.String("username", user.Username), slog.String("email", user.Email))
-		}
-	}
-	if req.UUID != nil {
-		user.UUID = *req.UUID
 	}
 	if req.Avatar != nil {
 		user.Avatar = *req.Avatar
@@ -347,6 +504,8 @@ func (c *userComponentImpl) setChangedProps(user *database.User, req *types.Upda
 	if req.Roles != nil {
 		user.SetRoles(*req.Roles)
 	}
+
+	return &user
 }
 
 func (c *userComponentImpl) Delete(ctx context.Context, operator, username string) error {
@@ -651,7 +810,7 @@ func (c *userComponentImpl) Signin(ctx context.Context, code, state string) (*ty
 		// update user login time asynchronously
 		go func() {
 			dbu.LastLoginAt = time.Now().Format("2006-01-02 15:04:05")
-			err := c.userStore.Update(ctx, dbu)
+			err := c.userStore.Update(ctx, dbu, "")
 			if err != nil {
 				slog.Error("failed to update user login time", "error", err, "username", dbu.Username)
 			}
@@ -677,24 +836,25 @@ func (c *userComponentImpl) genUniqueName() (string, error) {
 	return "user_" + id, nil
 }
 
-func (c *userComponentImpl) updateCasdoorUser(req *types.UpdateUserRequest) error {
+func (c *userComponentImpl) updateCasdoorUser(req *types.UpdateUserRequest) (*casdoorsdk.User, error) {
 	if req.UUID == nil {
-		return errors.New("uuid is required to update casdoor user")
+		return nil, errors.New("uuid is required to update casdoor user")
 	}
 	//nothing to update
 	if req.Email == nil && req.Phone == nil && req.NewUserName == nil && req.Nickname == nil {
-		return errors.New("nothing to update, at least one of email/phone/new_username/nickname is required")
+		return nil, errors.New("nothing to update, at least one of email/phone/new_username/nickname is required")
 	}
 
 	c.lazyInit()
 
 	casu, err := c.casc.GetUserByUserId(*req.UUID)
 	if err != nil {
-		return fmt.Errorf("failed to get user from casdoor by uuid: %s,error:%w", *req.UUID, err)
+		return nil, fmt.Errorf("failed to get user from casdoor by uuid: %s,error:%w", *req.UUID, err)
 	}
 	if casu == nil {
-		return fmt.Errorf("user not found in casdoor by uuid:%s", *req.UUID)
+		return nil, fmt.Errorf("user not found in casdoor by uuid:%s", *req.UUID)
 	}
+	casuCopy := *casu
 	if req.Email != nil {
 		casu.Email = *req.Email
 	}
@@ -716,7 +876,7 @@ func (c *userComponentImpl) updateCasdoorUser(req *types.UpdateUserRequest) erro
 		casu.Name = *req.NewUserName
 	}
 	_, err = c.casc.UpdateUserById(id, casu)
-	return err
+	return &casuCopy, err
 }
 
 func (c *userComponentImpl) lazyInit() {

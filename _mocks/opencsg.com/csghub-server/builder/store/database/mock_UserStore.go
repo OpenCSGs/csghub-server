@@ -280,6 +280,63 @@ func (_c *MockUserStore_FindByAccessToken_Call) RunAndReturn(run func(context.Co
 	return _c
 }
 
+// FindByEmail provides a mock function with given fields: ctx, email
+func (_m *MockUserStore) FindByEmail(ctx context.Context, email string) (database.User, error) {
+	ret := _m.Called(ctx, email)
+
+	if len(ret) == 0 {
+		panic("no return value specified for FindByEmail")
+	}
+
+	var r0 database.User
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string) (database.User, error)); ok {
+		return rf(ctx, email)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string) database.User); ok {
+		r0 = rf(ctx, email)
+	} else {
+		r0 = ret.Get(0).(database.User)
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
+		r1 = rf(ctx, email)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockUserStore_FindByEmail_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'FindByEmail'
+type MockUserStore_FindByEmail_Call struct {
+	*mock.Call
+}
+
+// FindByEmail is a helper method to define mock.On call
+//   - ctx context.Context
+//   - email string
+func (_e *MockUserStore_Expecter) FindByEmail(ctx interface{}, email interface{}) *MockUserStore_FindByEmail_Call {
+	return &MockUserStore_FindByEmail_Call{Call: _e.mock.On("FindByEmail", ctx, email)}
+}
+
+func (_c *MockUserStore_FindByEmail_Call) Run(run func(ctx context.Context, email string)) *MockUserStore_FindByEmail_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(string))
+	})
+	return _c
+}
+
+func (_c *MockUserStore_FindByEmail_Call) Return(_a0 database.User, _a1 error) *MockUserStore_FindByEmail_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockUserStore_FindByEmail_Call) RunAndReturn(run func(context.Context, string) (database.User, error)) *MockUserStore_FindByEmail_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // FindByGitAccessToken provides a mock function with given fields: ctx, token
 func (_m *MockUserStore) FindByGitAccessToken(ctx context.Context, token string) (*database.User, error) {
 	ret := _m.Called(ctx, token)
@@ -752,17 +809,17 @@ func (_c *MockUserStore_IsExistByUUID_Call) RunAndReturn(run func(context.Contex
 	return _c
 }
 
-// Update provides a mock function with given fields: ctx, user
-func (_m *MockUserStore) Update(ctx context.Context, user *database.User) error {
-	ret := _m.Called(ctx, user)
+// Update provides a mock function with given fields: ctx, user, oldUserName
+func (_m *MockUserStore) Update(ctx context.Context, user *database.User, oldUserName string) error {
+	ret := _m.Called(ctx, user, oldUserName)
 
 	if len(ret) == 0 {
 		panic("no return value specified for Update")
 	}
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, *database.User) error); ok {
-		r0 = rf(ctx, user)
+	if rf, ok := ret.Get(0).(func(context.Context, *database.User, string) error); ok {
+		r0 = rf(ctx, user, oldUserName)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -778,13 +835,14 @@ type MockUserStore_Update_Call struct {
 // Update is a helper method to define mock.On call
 //   - ctx context.Context
 //   - user *database.User
-func (_e *MockUserStore_Expecter) Update(ctx interface{}, user interface{}) *MockUserStore_Update_Call {
-	return &MockUserStore_Update_Call{Call: _e.mock.On("Update", ctx, user)}
+//   - oldUserName string
+func (_e *MockUserStore_Expecter) Update(ctx interface{}, user interface{}, oldUserName interface{}) *MockUserStore_Update_Call {
+	return &MockUserStore_Update_Call{Call: _e.mock.On("Update", ctx, user, oldUserName)}
 }
 
-func (_c *MockUserStore_Update_Call) Run(run func(ctx context.Context, user *database.User)) *MockUserStore_Update_Call {
+func (_c *MockUserStore_Update_Call) Run(run func(ctx context.Context, user *database.User, oldUserName string)) *MockUserStore_Update_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(*database.User))
+		run(args[0].(context.Context), args[1].(*database.User), args[2].(string))
 	})
 	return _c
 }
@@ -794,7 +852,7 @@ func (_c *MockUserStore_Update_Call) Return(err error) *MockUserStore_Update_Cal
 	return _c
 }
 
-func (_c *MockUserStore_Update_Call) RunAndReturn(run func(context.Context, *database.User) error) *MockUserStore_Update_Call {
+func (_c *MockUserStore_Update_Call) RunAndReturn(run func(context.Context, *database.User, string) error) *MockUserStore_Update_Call {
 	_c.Call.Return(run)
 	return _c
 }
