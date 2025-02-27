@@ -286,7 +286,6 @@ func StartTestEnv() (*TestEnv, error) {
 	if !success {
 		return env, errors.New("api health check failed")
 	}
-	fmt.Println("===== api health check success")
 	return env, nil
 }
 

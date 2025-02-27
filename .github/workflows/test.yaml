@@ -79,4 +79,4 @@ jobs:
       - uses: actions/checkout@v2
 
       - name: Test
-        run: GITHUB=true go test opencsg.com/csghub-server/tests/... -v -p=1
+        run: GITHUB=true go test opencsg.com/csghub-server/tests/...

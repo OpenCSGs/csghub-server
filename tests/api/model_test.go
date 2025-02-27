@@ -173,9 +173,7 @@ func gitClone(url, dir string) error {
 func gitCommitAndPush(dir string) error {
 	emailCheck := exec.Command("git", "-C", dir, "config", "--get", "user.email")
 	emailCheckOutput, err := emailCheck.Output()
-	fmt.Println("====== check git email", string(emailCheckOutput), err)
 	if err != nil || string(emailCheckOutput) == "" {
-		fmt.Println("===== set email")
 		err = exec.Command("git", "-C", dir, "config", "user.email", "you@example.com").Run()
 		if err != nil {
 			return err
@@ -185,7 +183,6 @@ func gitCommitAndPush(dir string) error {
 	nameCheck := exec.Command("git", "-C", dir, "config", "--get", "user.name")
 	nameCheckOutput, err := nameCheck.Output()
 	if err != nil || string(nameCheckOutput) == "" {
-		// Set default username if not set
 		err = exec.Command("git", "-C", dir, "config", "user.name", "you").Run()
 		if err != nil {
 			return err
@@ -215,12 +212,10 @@ func TestIntegrationModel_Git(t *testing.T) {
 	}
 	ctx := context.TODO()
 	env, err := testinfra.StartTestEnv()
-	fmt.Println("===== env start")
 	defer func() { _ = env.Shutdown(ctx) }()
 	require.NoError(t, err)
 	token, err := env.CreateUser(ctx, "user1")
 	require.NoError(t, err)
-	fmt.Println("===== create user done")
 	userClientA := testinfra.GetClient(token)
 	_, err = env.CreateUser(ctx, "user2")
 	require.NoError(t, err)
