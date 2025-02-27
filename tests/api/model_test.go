@@ -182,6 +182,16 @@ func gitCommitAndPush(dir string) error {
 		}
 	}
 
+	nameCheck := exec.Command("git", "-C", dir, "config", "--get", "user.name")
+	nameCheckOutput, err := nameCheck.Output()
+	if err != nil || string(nameCheckOutput) == "" {
+		// Set default username if not set
+		err = exec.Command("git", "-C", dir, "config", "user.name", "you").Run()
+		if err != nil {
+			return err
+		}
+	}
+
 	err = exec.Command("git", "-C", dir, "add", ".").Run()
 	if err != nil {
 		return err
