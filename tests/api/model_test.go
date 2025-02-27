@@ -190,7 +190,10 @@ func gitCommitAndPush(dir string) error {
 	if err != nil {
 		return err
 	}
-	return exec.Command("git", "-C", dir, "push").Run()
+	cmd := exec.Command("git", "-C", dir, "push")
+	cmd.Stderr = os.Stderr
+	cmd.Stdout = os.Stdout
+	return cmd.Run()
 }
 
 func TestIntegrationModel_Git(t *testing.T) {
