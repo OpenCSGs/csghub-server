@@ -173,7 +173,9 @@ func gitClone(url, dir string) error {
 func gitCommitAndPush(dir string) error {
 	emailCheck := exec.Command("git", "-C", dir, "config", "--get", "user.email")
 	emailCheckOutput, err := emailCheck.Output()
+	fmt.Println("====== check git email", string(emailCheckOutput), err)
 	if err != nil || string(emailCheckOutput) == "" {
+		fmt.Println("===== set email")
 		err = exec.Command("git", "-C", dir, "config", "user.email", "you@example.com").Run()
 		if err != nil {
 			return err
