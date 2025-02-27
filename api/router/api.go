@@ -24,14 +24,10 @@ import (
 	"opencsg.com/csghub-server/mirror"
 )
 
-func RunServer(config *config.Config, enableSwagger bool) {
-	stopOtel, err := instrumentation.SetupOTelSDK(context.Background(), config, "csghub-api")
-	if err != nil {
-		panic(err)
-	}
+func NewServer(config *config.Config, enableSwagger bool) (*httpbase.GracefulServer, error) {
 	r, err := NewRouter(config, enableSwagger)
 	if err != nil {
-		panic(err)
+		return nil, err
 	}
 	slog.Info("csghub service is running", slog.Any("port", config.APIServer.Port))
 	server := httpbase.NewGracefulServer(
@@ -49,11 +45,21 @@ func RunServer(config *config.Config, enableSwagger bool) {
 	if config.MirrorServer.Enable && config.GitServer.Type == types.GitServerTypeGitaly {
 		mirrorService.EnqueueMirrorTasks()
 	}
+	return server, nil
+}
 
+func RunServer(config *config.Config, enableSwagger bool) {
+	stopOtel, err := instrumentation.SetupOTelSDK(context.Background(), config, "csghub-api")
+	if err != nil {
+		panic(err)
+	}
+	server, err := NewServer(config, enableSwagger)
+	if err != nil {
+		panic(err)
+	}
 	server.Run()
 	_ = stopOtel(context.Background())
 	temporal.Stop()
-
 }
 
 func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {

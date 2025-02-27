@@ -132,13 +132,14 @@ func StartTestEnv() (*TestEnv, error) {
 	if err != nil {
 		return nil, err
 	}
-	// create test postgres
-	_, dsn := tests.CreateTestDB("csghub_integration_test")
+	// create test postgres container
+	_, dsn := tests.CreateTestDB("csghub_integration_test" + cast.ToString(time.Now().Unix()))
 	cfg.Database.DSN = dsn
 	dbConfig := database.DBConfig{
 		Dialect: database.DatabaseDialect(cfg.Database.Driver),
 		DSN:     cfg.Database.DSN + "sslmode=disable",
 	}
+	// init db from test container
 	database.InitDB(dbConfig)
 	env.userStore = database.NewUserStoreWithDB(database.GetDB())
 	env.accessTokenStore = database.NewAccessTokenStoreWithDB(database.GetDB())
@@ -254,11 +255,17 @@ func StartTestEnv() (*TestEnv, error) {
 	go env.datasetViewerServer.Run()
 
 	// start api
+	as, err := api_router.NewServer(cfg, false)
+	if err != nil {
+		return env, err
+	}
+	env.apiServer = as
+	go env.apiServer.Run()
+
 	err = api_workflow.StartWorkflow(cfg)
 	if err != nil {
 		return env, err
 	}
-	go api_router.RunServer(cfg, false)
 	var success bool
 	for i := 0; i < 10; i++ {
 		time.Sleep(1 * time.Second)
