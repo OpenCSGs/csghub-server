@@ -281,3 +281,57 @@ func TestUserStore_CountUsers(t *testing.T) {
 	require.Nil(t, err)
 	require.Equal(t, 2, count)
 }
+
+func TestUserStore_Update(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	us := database.NewUserStoreWithDB(db)
+	err := us.Create(ctx, &database.User{
+		GitID:    3321,
+		UUID:     "123456",
+		Username: "u-foo",
+	}, &database.Namespace{Path: "u-foo"})
+	require.Nil(t, err)
+
+	user, err := us.FindByUsername(ctx, "u-foo")
+	require.Nil(t, err)
+	require.Equal(t, "u-foo", user.Username)
+
+	ns := database.NewNamespaceStoreWithDB(db)
+	namepsace, err := ns.FindByPath(ctx, "u-foo")
+	require.NoError(t, err)
+	require.Equal(t, namepsace.UserID, user.ID)
+
+	changedUser := user
+	changedUser.Username = "u-foo-changed"
+	changedUser.Email = "email changed"
+	changedUser.Phone = "phone changed"
+	err = us.Update(ctx, &changedUser, "")
+	require.NoError(t, err)
+
+	user2, err := us.FindByUUID(ctx, user.UUID)
+	require.NoError(t, err)
+	require.Equal(t, "u-foo-changed", user2.Username)
+	require.Equal(t, "email changed", user2.Email)
+	require.Equal(t, "phone changed", user2.Phone)
+	//namespace path not changed
+	namepsace, err = ns.FindByPath(ctx, "u-foo")
+	require.NoError(t, err)
+	require.Equal(t, namepsace.UserID, user2.ID)
+
+	err = us.Update(ctx, &changedUser, "u-foo")
+	require.NoError(t, err)
+
+	user3, err := us.FindByUUID(ctx, user.UUID)
+	require.NoError(t, err)
+	require.Equal(t, "u-foo-changed", user3.Username)
+	require.Equal(t, "email changed", user3.Email)
+	require.Equal(t, "phone changed", user3.Phone)
+	//namespace path changed
+	namepsace, err = ns.FindByPath(ctx, "u-foo-changed")
+	require.NoError(t, err)
+	require.Equal(t, namepsace.UserID, user3.ID)
+}

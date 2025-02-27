@@ -90,13 +90,14 @@ func NewUserHandler(config *config.Config) (*UserHandler, error) {
 // @Tags         User
 // @Accept       json
 // @Produce      json
-// @Param        username path string true "username"
+// @Param        id path string true "user identifier, could be username(depricated) or uuid"
 // @Param        current_user  query  string true "current user"
+// @Param        type query string false "type of identifier, uuid or username, default is username" Enums(uuid, username)
 // @Param        body   body  types.UpdateUserRequest true "body"
 // @Success      200  {object}  types.Response{} "OK"
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
-// @Router       /user/{username} [put]
+// @Router       /user/{id} [put]
 func (h *UserHandler) Update(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
 	var req *types.UpdateUserRequest
@@ -114,16 +115,32 @@ func (h *UserHandler) Update(ctx *gin.Context) {
 		return
 	}
 
-	userName := ctx.Param("username")
-	req.Username = userName
+	useUUID := ctx.Query("type") == "uuid"
+	id := ctx.Param("id")
+	if useUUID {
+		req.UUID = &id
+		req.OpUser = currentUser
+		err = h.c.UpdateByUUID(ctx.Request.Context(), req)
+		if err != nil {
+			slog.Error("Failed to update user by uuid", slog.Any("error", err), slog.String("uuid", *req.UUID), slog.String("current_user", currentUser), slog.Any("req", *req))
+			httpbase.ServerError(ctx, err)
+			return
+		}
 
+		slog.Info("Update user by uuid succeed", slog.String("uuid", *req.UUID), slog.String("current_user", currentUser))
+		httpbase.OK(ctx, nil)
+		return
+	}
+
+	//TODO: remove after Portal upgrade to use UUID
+	req.Username = id
 	if req.NewUserName != nil {
 		err = h.c.ChangeUserName(ctx, req.Username, *req.NewUserName, currentUser)
 	} else {
 		err = h.c.Update(ctx, req, currentUser)
 	}
 	if err != nil {
-		slog.Error("Failed to update user", slog.Any("error", err))
+		slog.Error("Failed to update user", slog.Any("error", err), slog.String("current_user", currentUser), slog.Any("req", *req))
 		httpbase.ServerError(ctx, err)
 		return
 	}

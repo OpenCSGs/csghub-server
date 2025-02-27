@@ -13,7 +13,9 @@ type UserStore interface {
 	IndexWithSearch(ctx context.Context, search string, per, page int) (users []User, count int, err error)
 	FindByUsername(ctx context.Context, username string) (user User, err error)
 	FindByID(ctx context.Context, id int) (user User, err error)
-	Update(ctx context.Context, user *User) (err error)
+	FindByEmail(ctx context.Context, email string) (User, error)
+	// Update write the user data back to db. odlUserName should not be empty if username changed
+	Update(ctx context.Context, user *User, oldUserName string) (err error)
 	ChangeUserName(ctx context.Context, username string, newUsername string) (err error)
 	Create(ctx context.Context, user *User, namespace *Namespace) (err error)
 	IsExist(ctx context.Context, username string) (exists bool, err error)
@@ -138,20 +140,40 @@ func (s *userStoreImpl) FindByUsername(ctx context.Context, username string) (us
 	return
 }
 
+func (s *userStoreImpl) FindByEmail(ctx context.Context, email string) (user User, err error) {
+	user.Email = email
+	err = s.db.Operator.Core.NewSelect().Model(&user).Where("email = ?", email).Scan(ctx)
+	return
+}
+
 func (s *userStoreImpl) FindByID(ctx context.Context, id int) (user User, err error) {
 	user.ID = int64(id)
 	err = s.db.Operator.Core.NewSelect().Model(&user).WherePK().Scan(ctx)
 	return
 }
 
-func (s *userStoreImpl) Update(ctx context.Context, user *User) (err error) {
-	err = assertAffectedOneRow(s.db.Operator.Core.NewUpdate().
-		Model(user).
-		WherePK().
-		Exec(ctx),
-	)
+func (s *userStoreImpl) Update(ctx context.Context, user *User, oldUserName string) (err error) {
+	return s.db.Operator.Core.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
+		if len(oldUserName) > 0 && oldUserName != user.Username {
+			if err = assertAffectedOneRow(tx.NewUpdate().Model((*Namespace)(nil)).
+				Set("path = ?", user.Username).
+				Set("updated_at = now()").
+				Where("path = ?", oldUserName).
+				Exec(ctx)); err != nil {
+				return fmt.Errorf("failed to change namespace from '%s' to '%s' in db, error:%w", oldUserName, user.Username, err)
+			}
+		}
 
-	return
+		err = assertAffectedOneRow(tx.NewUpdate().
+			Model(user).
+			WherePK().
+			Exec(ctx),
+		)
+		if err != nil {
+			return fmt.Errorf("failed to change username from '%s' to '%s' in db, error:%w", oldUserName, user.Username, err)
+		}
+		return nil
+	})
 }
 
 func (s *userStoreImpl) ChangeUserName(ctx context.Context, username string, newUsername string) (err error) {
