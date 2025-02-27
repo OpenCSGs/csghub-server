@@ -186,11 +186,14 @@ func gitCommitAndPush(dir string) error {
 	if err != nil {
 		return err
 	}
-	err = exec.Command("git", "-C", dir, "commit", "-m", "Update").Run()
+	cmd := exec.Command("git", "-C", dir, "commit", "-m", "Update")
+	cmd.Stderr = os.Stderr
+	cmd.Stdout = os.Stdout
+	err = cmd.Run()
 	if err != nil {
 		return err
 	}
-	cmd := exec.Command("git", "-C", dir, "push")
+	cmd = exec.Command("git", "-C", dir, "push")
 	cmd.Stderr = os.Stderr
 	cmd.Stdout = os.Stdout
 	return cmd.Run()
