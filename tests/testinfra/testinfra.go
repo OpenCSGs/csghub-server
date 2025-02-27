@@ -28,6 +28,7 @@ import (
 	"opencsg.com/csghub-server/builder/temporal"
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/tests"
+	"opencsg.com/csghub-server/common/types"
 	dv_router "opencsg.com/csghub-server/dataviewer/router"
 	user_router "opencsg.com/csghub-server/user/router"
 	user_workflow "opencsg.com/csghub-server/user/workflow"
@@ -77,6 +78,26 @@ func (t *TestEnv) Shutdown(ctx context.Context) error {
 	return err
 }
 
+func (t *TestEnv) CreateAccessToken(ctx context.Context, userName string, app types.AccessTokenApp) (string, error) {
+	uw, err := t.userStore.FindByUsername(ctx, userName)
+	if err != nil {
+		return "", err
+	}
+	token := cast.ToString(time.Now().UnixNano())
+	err = t.accessTokenStore.Create(ctx, &database.AccessToken{
+		Token:       token,
+		User:        &uw,
+		UserID:      uw.ID,
+		IsActive:    true,
+		ExpiredAt:   time.Now().Add(10 * time.Hour),
+		Application: app,
+	})
+	if err != nil {
+		return "", err
+	}
+	return token, nil
+}
+
 // Create a new user in database and return an access token
 func (t *TestEnv) CreateUser(ctx context.Context, userName string) (string, error) {
 	namespace := &database.Namespace{
@@ -95,18 +116,7 @@ func (t *TestEnv) CreateUser(ctx context.Context, userName string) (string, erro
 	if err != nil {
 		return "", err
 	}
-	uw, err := t.userStore.FindByUsername(ctx, userName)
-	if err != nil {
-		return "", err
-	}
-	token := cast.ToString(time.Now().UnixNano())
-	err = t.accessTokenStore.Create(ctx, &database.AccessToken{
-		Token:     token,
-		User:      &uw,
-		UserID:    uw.ID,
-		IsActive:  true,
-		ExpiredAt: time.Now().Add(10 * time.Hour),
-	})
+	token, err := t.CreateAccessToken(ctx, userName, types.AccessTokenAppCSGHub)
 	if err != nil {
 		return "", err
 	}

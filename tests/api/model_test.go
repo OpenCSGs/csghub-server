@@ -3,12 +3,18 @@ package api_test
 import (
 	"bytes"
 	"context"
+	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
+	"os"
+	"os/exec"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 	"github.com/tidwall/gjson"
+	"opencsg.com/csghub-server/common/types"
 	"opencsg.com/csghub-server/tests/testinfra"
 )
 
@@ -157,4 +163,87 @@ func TestIntegrationModel_CRUD(t *testing.T) {
 		require.Equal(t, int64(0), gjson.GetBytes(b, "total").Int())
 	}
 
+}
+
+func gitClone(url, dir string) error {
+	cmd := exec.Command("git", "clone", url, dir)
+	return cmd.Run()
+}
+
+func gitCommitAndPush(dir string) error {
+	err := exec.Command("git", "-C", dir, "add", ".").Run()
+	if err != nil {
+		return err
+	}
+	err = exec.Command("git", "-C", dir, "commit", "-m", "Update").Run()
+	if err != nil {
+		return err
+	}
+	return exec.Command("git", "-C", dir, "push").Run()
+}
+
+func TestIntegrationModel_Git(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping integration test")
+	}
+	ctx := context.TODO()
+	env, err := testinfra.StartTestEnv()
+	defer func() { _ = env.Shutdown(ctx) }()
+	require.NoError(t, err)
+	token, err := env.CreateUser(ctx, "user1")
+	require.NoError(t, err)
+	userClientA := testinfra.GetClient(token)
+	_, err = env.CreateUser(ctx, "user2")
+	require.NoError(t, err)
+	// userClientB := testinfra.GetClient(token)
+	// anonymousClient := testinfra.GetClient("")
+
+	data := `{"name":"test1","nickname":"","namespace":"user1","license":"apache-2.0","description":"","private":false}`
+	req, err := http.NewRequest(
+		"POST", "http://localhost:9091/api/v1/models", bytes.NewBuffer([]byte(data)),
+	)
+	require.NoError(t, err)
+	resp, err := userClientA.Do(req)
+	require.NoError(t, err)
+	defer resp.Body.Close()
+	require.Equal(t, 200, resp.StatusCode)
+	resp, err = userClientA.Get("http://localhost:9091/api/v1/models/user1/test1")
+	require.NoError(t, err)
+	defer resp.Body.Close()
+	body, err := io.ReadAll(resp.Body)
+	require.NoError(t, err)
+	var model types.Model
+	err = json.Unmarshal([]byte(gjson.GetBytes(body, "data").Raw), &model)
+	require.NoError(t, err)
+	cloneURL := model.Repository.HTTPCloneURL
+
+	// git clone repo without token
+	err = gitClone(cloneURL, "model_clone_1")
+	require.NoError(t, err)
+	defer os.RemoveAll("model_clone_1")
+	// change and git push
+	err = exec.Command("cp", "Makefile", "model_clone_1/Makefile").Run()
+	require.NoError(t, err)
+	err = gitCommitAndPush("model_clone_1")
+	require.Error(t, err)
+
+	// clone and push
+	for _, user := range []string{"user1", "user2"} {
+		token, err := env.CreateAccessToken(ctx, user, types.AccessTokenAppGit)
+		require.NoError(t, err)
+		url := strings.ReplaceAll(cloneURL, "http://", fmt.Sprintf("http://%s:%s@", user, token))
+		dir := "model_clone_" + user
+		err = gitClone(url, dir)
+		require.NoError(t, err)
+		defer os.RemoveAll(dir)
+		// change and push
+		err = exec.Command("cp", "Makefile", dir+"/Makefile").Run()
+		require.NoError(t, err)
+		err = gitCommitAndPush(dir)
+		if user == "user1" {
+			require.NoError(t, err)
+		} else {
+			require.Error(t, err)
+		}
+	}
 }
