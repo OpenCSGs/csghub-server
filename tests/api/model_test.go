@@ -197,10 +197,12 @@ func TestIntegrationModel_Git(t *testing.T) {
 	}
 	ctx := context.TODO()
 	env, err := testinfra.StartTestEnv()
+	fmt.Println("===== env start")
 	defer func() { _ = env.Shutdown(ctx) }()
 	require.NoError(t, err)
 	token, err := env.CreateUser(ctx, "user1")
 	require.NoError(t, err)
+	fmt.Println("===== create user done")
 	userClientA := testinfra.GetClient(token)
 	_, err = env.CreateUser(ctx, "user2")
 	require.NoError(t, err)
