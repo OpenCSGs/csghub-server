@@ -1,3 +1,5 @@
+name: Flaky
+
 on:
   schedule:
     - cron: '*/5 * * * *'
