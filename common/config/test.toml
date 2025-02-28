@@ -102,3 +102,4 @@ endpoint = ""
 bucket = "testcsg"
 enable_ssl = false
 url_upload_max_file_size = 5153960755
+bucket_lookup = "path"
