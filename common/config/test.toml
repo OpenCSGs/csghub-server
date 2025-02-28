@@ -94,3 +94,11 @@ hosts = ["opencsg.com", "sync.opencsg.com"]
 
 [casdoor]
 certificate = "go.mod"
+
+[s3]
+access_key_id = "abc"
+access_key_secret = "def"
+endpoint = ""
+bucket = "testcsg"
+enable_ssl = false
+url_upload_max_file_size = 5153960755

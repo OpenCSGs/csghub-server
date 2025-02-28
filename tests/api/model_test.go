@@ -12,8 +12,11 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/spf13/cast"
 	"github.com/stretchr/testify/require"
 	"github.com/tidwall/gjson"
+	"go.opentelemetry.io/otel"
+	"opencsg.com/csghub-server/builder/parquet"
 	"opencsg.com/csghub-server/common/types"
 	"opencsg.com/csghub-server/tests/testinfra"
 )
@@ -167,6 +170,10 @@ func TestIntegrationModel_CRUD(t *testing.T) {
 
 func gitClone(url, dir string) error {
 	cmd := exec.Command("git", "clone", url, dir)
+	// cmd.Env = os.Environ()
+	// cmd.Env = append(cmd.Env, "GIT_CURL_VERBOSE=1")
+	cmd.Stderr = os.Stderr
+	cmd.Stdout = os.Stdout
 	return cmd.Run()
 }
 
@@ -201,6 +208,8 @@ func gitCommitAndPush(dir string) error {
 		return err
 	}
 	cmd = exec.Command("git", "-C", dir, "push")
+	cmd.Env = os.Environ()
+	cmd.Env = append(cmd.Env, "GIT_CURL_VERBOSE=1")
 	cmd.Stderr = os.Stderr
 	cmd.Stdout = os.Stdout
 	return cmd.Run()
@@ -263,6 +272,10 @@ func TestIntegrationModel_Git(t *testing.T) {
 		// change and push
 		err = exec.Command("cp", "Makefile", dir+"/Makefile").Run()
 		require.NoError(t, err)
+		// test lfs
+		err = exec.Command("cp", "tests/0.parquet", dir+"/0.parquet").Run()
+		require.NoError(t, err)
+
 		err = gitCommitAndPush(dir)
 		if user == "user1" {
 			require.NoError(t, err)
@@ -270,4 +283,33 @@ func TestIntegrationModel_Git(t *testing.T) {
 			require.Error(t, err)
 		}
 	}
+
+	// clone and validate parquet file
+	token, err = env.CreateAccessToken(ctx, "user1", types.AccessTokenAppGit)
+	require.NoError(t, err)
+	url := strings.ReplaceAll(cloneURL, "http://", fmt.Sprintf("http://%s:%s@", "user1", token))
+	dir := "model_clone_user1_again"
+	err = gitClone(url, dir)
+	require.NoError(t, err)
+	defer os.RemoveAll(dir)
+	reader := parquet.NewParquetGoReader(&parquet.OSFileClient{}, otel.Tracer("test"), "")
+	columns, columnTypes, pdata, total, err := reader.RowsWithCount(
+		context.TODO(),
+		[]string{dir + "/0.parquet"},
+		30,
+		0,
+	)
+	require.NoError(t, err)
+	require.Equal(t, []string{"Id", "Name"}, columns)
+	require.Equal(t, []string{"INT64", "INT64"}, columnTypes)
+	require.Equal(t, int64(20), total)
+	var current int64
+	for _, row := range pdata {
+		id := cast.ToInt64(row[0])
+		name := cast.ToInt64(row[1])
+		require.Equal(t, current, id)
+		require.Equal(t, current, name)
+		current += 1
+	}
+	require.Equal(t, int64(20), current)
 }

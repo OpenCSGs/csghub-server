@@ -194,7 +194,7 @@ func (c *gitHTTPComponentImpl) lfsBatchDownloadInfo(ctx context.Context, req typ
 		}
 		if !obj.Valid() {
 			objs = append(objs, &types.ObjectResponse{
-				Error: &types.ObjectError{},
+				Error: &types.ObjectError{Message: "object not valid"},
 			})
 			continue
 		}
@@ -207,7 +207,7 @@ func (c *gitHTTPComponentImpl) lfsBatchDownloadInfo(ctx context.Context, req typ
 		url, err := c.s3Client.PresignedGetObject(ctx, c.config.S3.Bucket, objectKey, types.OssFileExpire, reqParams)
 		if err != nil {
 			objs = append(objs, &types.ObjectResponse{
-				Error: &types.ObjectError{},
+				Error: &types.ObjectError{Message: err.Error()},
 			})
 			continue
 		}

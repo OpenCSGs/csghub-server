@@ -6,12 +6,15 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"net/http/httptest"
 	"os"
 	"strings"
 	"sync"
 	"testing"
 	"time"
 
+	"github.com/johannesboyne/gofakes3"
+	"github.com/johannesboyne/gofakes3/backend/s3mem"
 	"github.com/spf13/cast"
 	"github.com/stretchr/testify/require"
 	"github.com/testcontainers/testcontainers-go"
@@ -59,6 +62,7 @@ type TestEnv struct {
 	userServer          *httpbase.GracefulServer
 	datasetViewerServer *httpbase.GracefulServer
 	apiServer           *httpbase.GracefulServer
+	s3Server            *httptest.Server
 }
 
 func (t *TestEnv) Shutdown(ctx context.Context) error {
@@ -74,6 +78,9 @@ func (t *TestEnv) Shutdown(ctx context.Context) error {
 	}
 	if t.apiServer != nil {
 		err = errors.Join(err, t.apiServer.Shutdown(ctx))
+	}
+	if t.s3Server != nil {
+		t.s3Server.Close()
 	}
 	return err
 }
@@ -194,6 +201,20 @@ func StartTestEnv() (*TestEnv, error) {
 		Namespace:                        "default",
 		WorkflowExecutionRetentionPeriod: &durationpb.Duration{Seconds: 1000000000},
 	})
+	if err != nil {
+		return env, err
+	}
+
+	// create local s3
+	backend := s3mem.New()
+	faker := gofakes3.New(
+		backend, gofakes3.WithHostBucket(false),
+		gofakes3.WithLogger(gofakes3.GlobalLog()),
+	)
+	ts := httptest.NewServer(faker.Server())
+	env.s3Server = ts
+	cfg.S3.Endpoint = strings.TrimPrefix(ts.URL, "http://")
+	err = backend.CreateBucket(cfg.S3.Bucket)
 	if err != nil {
 		return env, err
 	}
