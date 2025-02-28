@@ -4,6 +4,8 @@ This directory contains integration tests for the CSGHub server.
 
 ### Starting and Stopping the Test Environment
 
+**Note:** The test server requires Docker and an internet connection (if the images have not been pulled yet) to run correctly, as we use Testcontainers to start various services and components.
+
 Setting up the test environment for integration testing is simple. Follow the steps below:
 
 ```go
