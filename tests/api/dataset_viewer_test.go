@@ -80,7 +80,8 @@ configs:
 ---
 `
 	newContent := configContent + fileContent
-	file.Seek(0, 0)
+	_, err = file.Seek(0, 0)
+	require.NoError(t, err)
 	_, err = file.WriteString(newContent)
 	require.NoError(t, err)
 
