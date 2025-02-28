@@ -107,12 +107,21 @@ configs:
 	require.Equal(t, expected, string(body))
 
 	// check auto created branch
-	time.Sleep(2 * time.Second)
-	resp, err = userClient.Get("http://localhost:9091/api/v1/datasets/user/test/branches")
-	require.NoError(t, err)
-	defer resp.Body.Close()
-	body, err = io.ReadAll(resp.Body)
-	require.NoError(t, err)
-	branches := gjson.GetBytes(body, "data.#.name").String()
-	require.Equal(t, `["main","refs-convert-parquet"]`, branches)
+	maxAttempts := 10
+	for attempts := 1; attempts <= maxAttempts; attempts++ {
+		resp, err = userClient.Get("http://localhost:9091/api/v1/datasets/user/test/branches")
+		require.NoError(t, err)
+		defer resp.Body.Close()
+		body, err = io.ReadAll(resp.Body)
+		require.NoError(t, err)
+		branches := gjson.GetBytes(body, "data.#.name").String()
+		if branches == `["main","refs-convert-parquet"]` {
+			break
+		}
+		if attempts < maxAttempts {
+			time.Sleep(1 * time.Second)
+		} else {
+			require.FailNow(t, "Branch check failed")
+		}
+	}
 }
