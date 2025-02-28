@@ -228,8 +228,6 @@ func TestIntegrationModel_Git(t *testing.T) {
 	userClientA := testinfra.GetClient(token)
 	_, err = env.CreateUser(ctx, "user2")
 	require.NoError(t, err)
-	// userClientB := testinfra.GetClient(token)
-	// anonymousClient := testinfra.GetClient("")
 
 	data := `{"name":"test1","nickname":"","namespace":"user1","license":"apache-2.0","description":"","private":false}`
 	req, err := http.NewRequest(
