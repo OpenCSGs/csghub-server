@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"log/slog"
 	"strconv"
+	"strings"
 
 	"opencsg.com/csghub-server/builder/deploy"
 	"opencsg.com/csghub-server/builder/git"
@@ -922,10 +923,16 @@ func (c *modelComponentImpl) Deploy(ctx context.Context, deployReq types.DeployA
 		return -1, fmt.Errorf("cannot find available runtime framework, %w", err)
 	}
 
+	varStr, err := c.buildVariables(req, frame)
+	if err != nil {
+		return -1, fmt.Errorf("fail to generate variables, %w", err)
+	}
+
 	// put repo-type and namespace/name in annotation
 	annotations := make(map[string]string)
 	annotations[types.ResTypeKey] = string(types.ModelRepo)
 	annotations[types.ResNameKey] = fmt.Sprintf("%s/%s", deployReq.Namespace, deployReq.Name)
+	annotations[types.ResDeployUser] = user.Username
 	annoStr, err := json.Marshal(annotations)
 	if err != nil {
 		return -1, fmt.Errorf("fail to create annotations for deploy model, %w", err)
@@ -952,6 +959,13 @@ func (c *modelComponentImpl) Deploy(ctx context.Context, deployReq types.DeployA
 	// choose image
 	containerImg := c.containerImg(frame, hardware)
 
+	if len(req.EngineArgs) > 0 {
+		_, err = common.JsonStrToMap(req.EngineArgs)
+		if err != nil {
+			return -1, fmt.Errorf("invalid engine args, %w", err)
+		}
+	}
+
 	// create deploy for model
 	dp := types.DeployRepo{
 		DeployName:       req.DeployName,
@@ -976,9 +990,29 @@ func (c *modelComponentImpl) Deploy(ctx context.Context, deployReq types.DeployA
 		UserUUID:         user.UUID,
 		SKU:              strconv.FormatInt(resource.ID, 10),
 		Task:             task,
+		Variables:        varStr,
+		EngineArgs:       req.EngineArgs,
 	}
 	dp = modelRunUpdateDeployRepo(dp, req)
 	return c.deployer.Deploy(ctx, dp)
+}
+
+func (c *modelComponentImpl) buildVariables(req types.ModelRunReq, frame *database.RuntimeFramework) (string, error) {
+	engineName := strings.ToLower(frame.FrameName)
+	if engineName == string(types.LlamaCpp) {
+		//check entrypoint for llama.cpp
+		if len(req.Entrypoint) < 1 {
+			return "", fmt.Errorf("entrypoint is required for llama.cpp")
+		}
+		varMap := make(map[string]string)
+		varMap[types.GGUFEntryPoint] = req.Entrypoint
+		varBytes, err := json.Marshal(varMap)
+		if err != nil {
+			return "", fmt.Errorf("convert map to string error: %w", err)
+		}
+		return string(varBytes), nil
+	}
+	return "", nil
 }
 
 func (c *modelComponentImpl) ListModelsByRuntimeFrameworkID(ctx context.Context, currentUser string, per, page int, id int64, deployType int) ([]types.Model, int, error) {

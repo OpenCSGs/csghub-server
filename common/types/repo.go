@@ -35,9 +35,10 @@ func (s SensitiveCheckStatus) String() string {
 }
 
 const (
-	ResTypeKey  string = "hub-res-type"
-	ResNameKey  string = "hub-res-name"
-	ResDeployID string = "hub-deploy-id"
+	ResTypeKey    string = "hub-res-type"
+	ResNameKey    string = "hub-res-name"
+	ResDeployID   string = "hub-deploy-id"
+	ResDeployUser string = "hub-deploy-user"
 
 	ModelRepo   RepositoryType = "model"
 	DatasetRepo RepositoryType = "dataset"
@@ -164,6 +165,7 @@ type DeployRepo struct {
 	Task             string     `json:"task,omitempty"`
 	EngineArgs       string     `json:"engine_args,omitempty"`
 	Variables        string     `json:"variables,omitempty"`
+	Entrypoint       string     `json:"entrypoint,omitempty"`
 }
 
 type RuntimeFrameworkReq struct {
@@ -174,6 +176,7 @@ type RuntimeFrameworkReq struct {
 	Enabled       int64  `json:"enabled"`
 	ContainerPort int    `json:"container_port"`
 	Type          int    `json:"type"`
+	EngineArgs    string `json:"engine_args"`
 	CurrentUser   string `json:"-"`
 }
 
@@ -186,6 +189,7 @@ type RuntimeFramework struct {
 	Enabled       int64  `json:"enabled"`
 	ContainerPort int    `json:"container_port"`
 	Type          int    `json:"type"`
+	EngineArgs    string `json:"engine_args"`
 }
 
 type RuntimeFrameworkModels struct {

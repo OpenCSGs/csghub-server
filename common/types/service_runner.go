@@ -188,4 +188,10 @@ type (
 		OrderDetailID int64             `json:"order_detail_id"`
 		SrvName       string            `json:"-"`
 	}
+
+	EngineArg struct {
+		Name   string `json:"name"`
+		Value  string `json:"value"`
+		Format string `json:"format"`
+	}
 )

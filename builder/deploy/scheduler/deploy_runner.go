@@ -14,28 +14,31 @@ import (
 	"opencsg.com/csghub-server/builder/deploy/imagerunner"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/types"
+	hubcom "opencsg.com/csghub-server/common/utils/common"
 )
 
 // DeployRunner defines a k8s image running task
 type DeployRunner struct {
-	repo            *RepoInfo
-	task            *database.DeployTask
-	ir              imagerunner.Runner
-	store           database.DeployTaskStore
-	tokenStore      database.AccessTokenStore
-	deployStartTime time.Time
-	deployCfg       common.DeployConfig
+	repo                   *RepoInfo
+	task                   *database.DeployTask
+	ir                     imagerunner.Runner
+	store                  database.DeployTaskStore
+	tokenStore             database.AccessTokenStore
+	deployStartTime        time.Time
+	deployCfg              common.DeployConfig
+	runtimeFrameworksStore database.RuntimeFrameworksStore
 }
 
 func NewDeployRunner(ir imagerunner.Runner, r *RepoInfo, t *database.DeployTask, deployCfg common.DeployConfig) Runner {
 	return &DeployRunner{
-		repo:            r,
-		task:            t,
-		ir:              ir,
-		store:           database.NewDeployTaskStore(),
-		deployStartTime: time.Now(),
-		tokenStore:      database.NewAccessTokenStore(),
-		deployCfg:       deployCfg,
+		repo:                   r,
+		task:                   t,
+		ir:                     ir,
+		store:                  database.NewDeployTaskStore(),
+		deployStartTime:        time.Now(),
+		tokenStore:             database.NewAccessTokenStore(),
+		deployCfg:              deployCfg,
+		runtimeFrameworksStore: database.NewRuntimeFrameworksStore(),
 	}
 
 }
@@ -209,17 +212,34 @@ func (t *DeployRunner) runtimeError(msg string) {
 }
 
 func (t *DeployRunner) makeDeployRequest() (*types.RunRequest, error) {
-	token, err := t.tokenStore.FindByUID(context.Background(), t.task.Deploy.UserID)
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	token, err := t.tokenStore.FindByUID(ctx, t.task.Deploy.UserID)
 	if err != nil {
 		return nil, fmt.Errorf("cant get git access token:%w", err)
 	}
 	fields := strings.Split(t.repo.Path, "/")
-	deploy, err := t.store.GetDeployByID(context.Background(), t.task.DeployID)
+	deploy, err := t.store.GetDeployByID(ctx, t.task.DeployID)
 	if err != nil {
-		return nil, fmt.Errorf("fail to get deploy with error :%w", err)
+		return nil, fmt.Errorf("fail to get deploy with error: %w", err)
 	}
 
-	annoMap, err := common.JsonStrToMap(deploy.Annotation)
+	var engineArgsTemplate []types.EngineArg
+	if len(deploy.RuntimeFramework) > 0 {
+		frame, err := t.runtimeFrameworksStore.FindEnabledByName(ctx, deploy.RuntimeFramework)
+		if err != nil {
+			return nil, fmt.Errorf("get runtime framework by name %s error: %w", deploy.RuntimeFramework, err)
+		}
+		if len(strings.TrimSpace(frame.EngineArgs)) > 0 {
+			err = json.Unmarshal([]byte(frame.EngineArgs), &engineArgsTemplate)
+			if err != nil {
+				return nil, fmt.Errorf("unmarshal engine args error: %w", err)
+			}
+		}
+	}
+
+	annoMap, err := hubcom.JsonStrToMap(deploy.Annotation)
 	if err != nil {
 		slog.Error("deploy annotation is invalid json data", slog.Any("Annotation", deploy.Annotation))
 		return nil, err
@@ -233,7 +253,7 @@ func (t *DeployRunner) makeDeployRequest() (*types.RunRequest, error) {
 		return nil, err
 	}
 
-	envMap := t.makeDeployEnv(hardware, token, deploy)
+	envMap := t.makeDeployEnv(hardware, token, deploy, engineArgsTemplate)
 
 	targetID := deploy.SpaceID
 	// deployID is unique for space and model
@@ -267,14 +287,16 @@ func (t *DeployRunner) makeDeployRequest() (*types.RunRequest, error) {
 
 func (t *DeployRunner) makeDeployEnv(
 	hardware types.HardWare,
-	token *database.AccessToken, deploy *database.Deploy,
+	token *database.AccessToken,
+	deploy *database.Deploy,
+	engineArgsTemplate []types.EngineArg,
 ) map[string]string {
-	envMap, err := common.JsonStrToMap(deploy.Env)
+	envMap, err := hubcom.JsonStrToMap(deploy.Env)
 	if err != nil {
 		slog.Error("deploy env is invalid json data", slog.Any("deploy", deploy))
 	}
 
-	varMap, err := common.JsonStrToMap(deploy.Variables)
+	varMap, err := hubcom.JsonStrToMap(deploy.Variables)
 	if err != nil {
 		slog.Error("deploy variables is invalid json data", slog.Any("deploy", deploy))
 	} else {
@@ -289,7 +311,22 @@ func (t *DeployRunner) makeDeployEnv(
 	envMap["ACCESS_TOKEN"] = token.Token
 	envMap["REPO_ID"] = t.repo.Path       // "namespace/name"
 	envMap["REVISION"] = deploy.GitBranch // branch
-	envMap["ENGINE_ARGS"] = deploy.EngineArgs
+	if len(engineArgsTemplate) > 0 {
+		ENGINE_ARGS := ""
+		argValuesMap, err := hubcom.JsonStrToMap(deploy.EngineArgs)
+		if err != nil {
+			slog.Error("deploy engine args is invalid json data", slog.Any("deploy", *deploy), slog.Any("error", err))
+		} else {
+			for _, arg := range engineArgsTemplate {
+				if value, ok := argValuesMap[arg.Name]; ok {
+					ENGINE_ARGS += " " + fmt.Sprintf(arg.Format, value)
+				}
+			}
+		}
+		slog.Debug("makeDeployEnv", slog.Any("ENGINE_ARGS", ENGINE_ARGS))
+		envMap["ENGINE_ARGS"] = ENGINE_ARGS
+	}
+
 	if hardware.Gpu.Num != "" {
 		envMap["GPU_NUM"] = hardware.Gpu.Num
 	}
