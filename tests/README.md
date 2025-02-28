@@ -44,9 +44,9 @@ The test code in these files clearly demonstrates how to test the API, Git, and 
 One important thing to remember is that for all integration tests, you should add the following snippet at the beginning of your test function:
 
 ```go
-	if testing.Short() {
-		t.Skip("skipping integration test")
-	}
+if testing.Short() {
+	t.Skip("skipping integration test")
+}
 ```
 
 This allows you to differentiate between unit tests and integration tests.
