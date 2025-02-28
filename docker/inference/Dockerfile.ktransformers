@@ -1,0 +1,26 @@
+FROM nvidia/cuda:12.4.1-runtime-ubuntu22.04
+# Build with some basic utilities
+RUN apt-get update && apt-get install -y \
+    python3-pip apt-utils \
+    wget curl vim git \
+    unzip dumb-init
+# alias python='python3'
+RUN ln -s /usr/bin/python3 /usr/bin/python
+RUN pip config set global.index-url https://mirrors.aliyun.com/pypi/simple/ && \
+    pip install --no-cache-dir \
+    torch==2.4.0 torchvision==0.19.0 torchaudio==2.4.0 \
+    packaging ninja cpufeature numpy csghub-sdk
+RUN pip install https://git-devops.opencsg.com/opensource/public_files/-/raw/main/flash_attn-2.7.4.post1+cu12torch2.4cxx11abiFALSE-cp310-cp310-linux_x86_64.whl
+
+WORKDIR /etc/csghub/
+#download ktransformers with ISA
+ARG KT_VERSION=0.2.1.post1
+RUN wget -O ktransformers-avx2-cp310-cp310-linux_x86_64.whl https://github.com/kvcache-ai/ktransformers/releases/download/v${KT_VERSION}/ktransformers-${KT_VERSION}+cu124torch24avx2-cp310-cp310-linux_x86_64.whl && \
+    wget -O ktransformers-avx512-cp310-cp310-linux_x86_64.whl https://github.com/kvcache-ai/ktransformers/releases/download/v${KT_VERSION}/ktransformers-${KT_VERSION}+cu124torch24avx512-cp310-cp310-linux_x86_64.whl && \
+    wget -O ktransformers-fancy-cp310-cp310-linux_x86_64.whl https://github.com/kvcache-ai/ktransformers/releases/download/v${KT_VERSION}/ktransformers-${KT_VERSION}+cu124torch24fancy-cp310-cp310-linux_x86_64.whl
+COPY ./ktransformers/ /etc/csghub/
+RUN chmod +x /etc/csghub/*.sh
+
+WORKDIR /workspace/
+ENTRYPOINT [ "/usr/bin/dumb-init", "--" ]
+CMD ["/etc/csghub/serve.sh"]

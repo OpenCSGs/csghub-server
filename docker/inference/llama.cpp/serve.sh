@@ -8,16 +8,12 @@ fi
 if [[ ! $ENGINE_ARGS == *"-np "* ]]; then
     ENGINE_ARGS="$ENGINE_ARGS -np 1"
 fi
-# number of parallel requests
-if [[ ! $ENGINE_ARGS == *"-np "* ]]; then
-    ENGINE_ARGS="$ENGINE_ARGS -np 1"
-fi
 #size of the prompt context
 if [[ ! $ENGINE_ARGS == *"-c "* ]]; then
     ENGINE_ARGS="$ENGINE_ARGS -c 8192"
 fi
 #gguf path
-if [[ ! $ENGINE_ARGS == *"-m "* ]]; then
+if [[ ! $ENGINE_ARGS == *"-m "* ]] && [[ -z $GGUF_ENTRY_POINT ]]; then
     echo "model file name is required, ex: -m DeepSeek-R1-UD-IQ1_M/DeepSeek-R1-UD-IQ1_M-00001-of-00004.gguf"
     exit 1
 fi

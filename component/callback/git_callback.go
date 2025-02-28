@@ -523,7 +523,7 @@ func (c *gitCallbackComponentImpl) updateSafetensorModel(ctx context.Context, re
 		return
 	}
 	// get runtime frameworks by arch
-	newFrames, err := c.getRuntimeFrameworks(ctx, arch, fields[1], types.Safetensors)
+	newFrames, err := c.getRuntimeFrameworks(ctx, arch, *repo, types.Safetensors)
 	if err != nil {
 		slog.Warn("fail to get runtime frameworks for git callback", slog.Any("arch", arch), slog.Any("namespace", namespace), slog.Any("repoName", repoName), slog.Any("error", err))
 		return
@@ -602,7 +602,7 @@ func (c *gitCallbackComponentImpl) updateGGUFModel(ctx context.Context, namespac
 		return
 	}
 	// get runtime frameworks by arch
-	newFrames, err := c.getRuntimeFrameworks(ctx, arch, "", types.GGUF)
+	newFrames, err := c.getRuntimeFrameworks(ctx, arch, *repo, types.GGUF)
 	if err != nil {
 		slog.Warn("fail to get runtime frameworks for git callback", slog.Any("arch", arch), slog.Any("namespace", namespace), slog.Any("repoName", repoName), slog.Any("error", err))
 		return
@@ -631,14 +631,14 @@ func (c *gitCallbackComponentImpl) updateGGUFModel(ctx context.Context, namespac
 }
 
 // get runtime frameworks by ids
-func (c *gitCallbackComponentImpl) getRuntimeFrameworks(ctx context.Context, arch, modelName string, modelType types.ModelType) ([]database.RuntimeFramework, error) {
-	var runtimes []database.RuntimeArchitecture
-	var err error
-	if modelName == "" {
-		runtimes, err = c.runtimeArchStore.ListByRArchName(ctx, arch)
-	} else {
-		runtimes, err = c.runtimeArchStore.ListByRArchNameAndModel(ctx, arch, modelName)
+func (c *gitCallbackComponentImpl) getRuntimeFrameworks(ctx context.Context, arch string, repo database.Repository, modelType types.ModelType) ([]database.RuntimeFramework, error) {
+	oriName := repo.Name
+	if repo.HFPath != "" {
+		oriName = strings.Split(repo.HFPath, "/")[1]
+	} else if repo.MSPath != "" {
+		oriName = strings.Split(repo.MSPath, "/")[1]
 	}
+	runtimes, err := c.runtimeArchStore.ListByRArchNameAndModel(ctx, arch, oriName)
 	// to do check resource models
 	if err != nil {
 		slog.Warn("fail to get runtime frameworks for git callback", slog.Any("arch", arch), slog.Any("error", err))
@@ -656,17 +656,12 @@ func (c *gitCallbackComponentImpl) getRuntimeFrameworks(ctx context.Context, arc
 	}
 	var frames []database.RuntimeFramework
 	for _, frame := range newFrames {
-		if modelType == types.Safetensors {
-			//filter out llama.cpp for safetensor model
-			if strings.Contains(strings.ToLower(frame.FrameName), string(types.LlamaCpp)) {
-				continue
-			}
+		supportedFormat := string(types.Safetensors)
+		if frame.ModelFormat != "" {
+			supportedFormat = frame.ModelFormat
 		}
-		if modelType == types.GGUF {
-			//filter out llama.cpp for gguf model
-			if strings.Contains(strings.ToLower(frame.FrameName), string(types.TEI)) {
-				continue
-			}
+		if !strings.Contains(supportedFormat, string(modelType)) {
+			continue
 		}
 		frames = append(frames, frame)
 

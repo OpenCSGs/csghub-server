@@ -12,8 +12,8 @@ echo "$OPENCSG_ACR_PASSWORD" | docker login $OPENCSG_ACR -u $OPENCSG_ACR_USERNAM
 ```bash
 export BUILDX_NO_DEFAULT_ATTESTATIONS=1
 
-# For vllm: opencsg-registry.cn-beijing.cr.aliyuncs.com/public/vllm-local:v0.7.2
-export IMAGE_TAG=v0.7.2
+# For vllm: opencsg-registry.cn-beijing.cr.aliyuncs.com/public/vllm-local:v0.7.3
+export IMAGE_TAG=v0.7.3
 docker buildx build --platform linux/amd64,linux/arm64 \
   -t ${OPENCSG_ACR}/public/vllm-local:${IMAGE_TAG} \
   -t ${OPENCSG_ACR}/public/vllm-local:latest \
@@ -36,8 +36,8 @@ docker buildx build --platform linux/amd64 \
   -f Dockerfile.tgi \
   --push .
 
-# For sglang: opencsg-registry.cn-beijing.cr.aliyuncs.com/public/sglang:v0.4.2.post2-cu124-srt
-export IMAGE_TAG=v0.4.2.post2-cu124-srt
+# For sglang: opencsg-registry.cn-beijing.cr.aliyuncs.com/public/sglang:v0.4.3.post2-cu124-srt
+export IMAGE_TAG=v0.4.3.post2-cu124-srt
 docker buildx build --platform linux/amd64 \
   -t ${OPENCSG_ACR}/public/sglang:${IMAGE_TAG} \
   -t ${OPENCSG_ACR}/public/sglang:latest \
@@ -71,6 +71,13 @@ docker buildx build --platform linux/amd64 \
   -t ${OPENCSG_ACR}/public/llama.cpp:${IMAGE_TAG} \
   -t ${OPENCSG_ACR}/public/llama.cpp:latest \
   -f Dockerfile.llama.cpp \
+  --push .
+# For Text ktransformers Inference: opencsg-registry.cn-beijing.cr.aliyuncs.com/public/ktransformers:0.2.1.post1  
+export IMAGE_TAG=0.2.1.post1
+docker build --platform linux/amd64 \
+  -t ${OPENCSG_ACR}/public/ktransformers:${IMAGE_TAG} \
+  -t ${OPENCSG_ACR}/public/ktransformers:latest \
+  -f Dockerfile.ktransformers \
   --push .
 ```
 *Note: The above command will create `linux/amd64` and `linux/arm64` images with the tags `${IMAGE_TAG}` and `latest` at the same time.*

@@ -124,9 +124,9 @@ func TestGitCallbackComponent_UpdateRepoInfos(t *testing.T) {
 
 	// modified mock
 	gc.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, types.ModelRepo, "ns", "n").Return(
-		&database.Repository{ID: 1, Path: "foo/bar"}, nil,
+		&database.Repository{ID: 1, Path: "foo/bar", Name: "bar"}, nil,
 	)
-	gc.mocks.runtimeArchComponent.EXPECT().GetArchitecture(ctx, types.TaskAutoDetection, &database.Repository{ID: 1, Path: "foo/bar"}).Return("foo", nil)
+	gc.mocks.runtimeArchComponent.EXPECT().GetArchitecture(ctx, types.TaskAutoDetection, &database.Repository{ID: 1, Path: "foo/bar", Name: "bar"}).Return("foo", nil)
 	filter := &types.TagFilter{
 		Categories: []string{"runtime_framework", "resource"},
 		Scopes:     []types.TagScope{types.ModelTagScope},
@@ -196,9 +196,9 @@ func TestGitCallbackComponent_UpdateGGUFRepoInfos(t *testing.T) {
 
 	// modified mock
 	gc.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, types.ModelRepo, "ns", "n").Return(
-		&database.Repository{ID: 1, Path: "foo/bar", Tags: []database.Tag{{Name: "text-generation"}}}, nil,
+		&database.Repository{ID: 1, Path: "foo/bar", Name: "bar", Tags: []database.Tag{{Name: "text-generation"}}}, nil,
 	)
-	gc.mocks.runtimeArchComponent.EXPECT().GetArchitecture(ctx, types.TextGeneration, &database.Repository{ID: 1, Path: "foo/bar", Tags: []database.Tag{{Name: "text-generation"}}}).Return("foo", nil)
+	gc.mocks.runtimeArchComponent.EXPECT().GetArchitecture(ctx, types.TextGeneration, &database.Repository{ID: 1, Path: "foo/bar", Name: "bar", Tags: []database.Tag{{Name: "text-generation"}}}).Return("foo", nil)
 	filter := &types.TagFilter{
 		Categories: []string{"runtime_framework", "resource"},
 		Scopes:     []types.TagScope{types.ModelTagScope},
@@ -207,10 +207,10 @@ func TestGitCallbackComponent_UpdateGGUFRepoInfos(t *testing.T) {
 		ctx, filter,
 	).Return([]*database.Tag{{Name: "t1"}}, nil)
 	gc.mocks.stores.RuntimeFrameworkMock().EXPECT().ListByIDs(ctx, []int64{12}).Return(
-		[]database.RuntimeFramework{{ID: 12, FrameName: "fm"}}, nil,
+		[]database.RuntimeFramework{{ID: 12, FrameName: "fm", ModelFormat: "gguf"}}, nil,
 	)
 
-	gc.mocks.stores.RuntimeArchMock().EXPECT().ListByRArchName(ctx, "foo").Return(
+	gc.mocks.stores.RuntimeArchMock().EXPECT().ListByRArchNameAndModel(ctx, "foo", "bar").Return(
 		[]database.RuntimeArchitecture{{ID: 11, RuntimeFrameworkID: 12}}, nil,
 	)
 

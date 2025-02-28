@@ -1007,7 +1007,7 @@ func (c *modelComponentImpl) Deploy(ctx context.Context, deployReq types.DeployA
 
 func (c *modelComponentImpl) buildVariables(req types.ModelRunReq, frame *database.RuntimeFramework) (string, error) {
 	engineName := strings.ToLower(frame.FrameName)
-	if engineName == string(types.LlamaCpp) {
+	if engineName == string(types.LlamaCpp) || engineName == string(types.Ktransformers) {
 		//check entrypoint for llama.cpp
 		if len(req.Entrypoint) < 1 {
 			return "", fmt.Errorf("entrypoint is required for llama.cpp")

@@ -31,6 +31,8 @@ def get_argument_value(arg_string: str, target_arg: str) -> str:
 
 if __name__ == "__main__":
     model_file = get_argument_value(os.environ['ENGINE_ARGS'], '-m')
+    if model_file is None:
+        model_file = os.environ['GGUF_ENTRYPOINT']
     model_file = model_file.replace("00001-of", "*")
     DOWNLOAD_DIR = "/workspace"
     REPO_ID = os.environ['REPO_ID']

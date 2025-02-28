@@ -82,6 +82,7 @@ const (
 	TaskAutoDetection  PipelineTask    = "task-auto-detection"
 	LlamaCpp           InferenceEngine = "llama.cpp"
 	TEI                InferenceEngine = "tei"
+	Ktransformers      InferenceEngine = "ktransformers"
 )
 
 type RepoRequest struct {

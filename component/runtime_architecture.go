@@ -216,6 +216,9 @@ func (c *runtimeArchitectureComponentImpl) scanNewModels(ctx context.Context, re
 		}
 		runtime_framework_tags, _ := c.tagStore.AllTags(ctx, filter)
 		for _, repo := range repos {
+			if !IsSupportedRuntimeFrame(&repo, runtime_framework) {
+				continue
+			}
 			arch, err := c.GetArchitecture(ctx, req.Task, &repo)
 			if err != nil {
 				slog.Warn("did not to get arch for create relation", slog.Any("ConfigFileName", ConfigFileName), slog.Any("repo", repo.Path), slog.Any("error", err))
@@ -250,6 +253,16 @@ func (c *runtimeArchitectureComponentImpl) scanNewModels(ctx context.Context, re
 		}
 	}
 	return nil
+}
+
+// check model format
+func IsSupportedRuntimeFrame(repo *database.Repository, runtimeFrame *database.RuntimeFramework) bool {
+	supportedFormat := string(types.Safetensors)
+	if runtimeFrame.ModelFormat != "" {
+		supportedFormat = runtimeFrame.ModelFormat
+	}
+	modelFormat := getModelFormat(repo)
+	return strings.Contains(supportedFormat, modelFormat)
 }
 
 // check if it's supported model resource by name
@@ -336,6 +349,20 @@ func isGGUFModel(repo *database.Repository) bool {
 		}
 	}
 	return false
+}
+
+func getModelFormat(repo *database.Repository) string {
+	for _, tag := range repo.Tags {
+		if tag.Category == "framework" {
+			if tag.Name == "gguf" {
+				return tag.Name
+			}
+			if tag.Name == "onnx" {
+				return tag.Name
+			}
+		}
+	}
+	return string(types.Safetensors)
 }
 
 // for text-generation
