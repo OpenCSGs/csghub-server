@@ -26,7 +26,7 @@ When `testinfra.StartTestEnv()` is called, the following actions are performed i
 8. **Start the CSGHub dataset viewer server**: The CSGHub dataset viewer server and its workflows are started.
 9. **Start the CSGHub main API server**: The CSGHub main API server and its workflows are started.
 
-That’s all. Note that not all services are started by default. For example, the NATS server or runner server is not started. If you need to test functionality related to these services, be sure to add them to the environment startup function.
+That’s all. All docker containers are started using Testcontainers, so all data will be removed after test done.Note that not all services are started by default. For example, the NATS server or runner server is not started. If you need to test functionality related to these services, be sure to add them to the environment startup function.
 
 After the test environment is started, always defer the call to `env.Shutdown(ctx)` to ensure all resources are properly cleaned up.
 
@@ -51,7 +51,7 @@ This allows you to differentiate between unit tests and integration tests.
 
 ### What to Test in Integration Tests
 
-Integration tests involve starting multiple services and interacting with real databases (as opposed to database unit tests, which use in-memory or transactional databases and roll back changes after the test). Writing too many integration tests can significantly slow down the testing process, so here are three key suggestions:
+Integration tests involve starting multiple services and save data to database (as opposed to database unit tests, which use in-memory transaction and roll back changes after the test). Writing too many integration tests can significantly slow down the testing process, so here are three key suggestions:
 
 1. **Group related actions into single test cases**: For example, basic CRUD operations can be tested in a single test case. However, avoid overloading tests. Separate unrelated actions, such as API and Git operations, into different tests.
 2. **Prioritize the most used features**: Focus on testing the 80% of use cases that are most commonly used in your service. These are the most critical and should not fail.
@@ -62,5 +62,11 @@ Integration tests involve starting multiple services and interacting with real d
 You can also use the test environment to start a temporary test server. To do so, run the following command:
 
 ```
-go run main.go start-test-env
+make run_test_server
+```
+
+To integrate the test server into CSGHub portal, change CSGHUB_PORTAL_STARHUB_BASE_URL env:
+
+```
+CSGHUB_PORTAL_STARHUB_BASE_URL=http://localhost:9091 make
 ```

@@ -1,4 +1,4 @@
-.PHONY: test lint cover mock_wire mock_gen swag migrate_local
+.PHONY: test lint cover mock_wire mock_gen swag migrate_local run_test_server
 
 test:
 	go test ./...
@@ -31,3 +31,6 @@ swag:
 
 migrate_local:
 	go run cmd/csghub-server/main.go migration migrate --config local.toml
+
+run_test_server:
+	go run tests/main.go
