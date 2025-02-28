@@ -9,9 +9,9 @@ This directory contains integration tests for the CSGHub server.
 Setting up the test environment for integration testing is simple. Follow the steps below:
 
 ```go
-	ctx := context.TODO()
-	env, err := testinfra.StartTestEnv()
-	defer func() { _ = env.Shutdown(ctx) }()
+ctx := context.TODO()
+env, err := testinfra.StartTestEnv()
+defer func() { _ = env.Shutdown(ctx) }()
 ```
 
 However, before proceeding with writing your tests, please read the following explanation to fully understand what happens in these three lines of code. A lot is happening behind the scenes.
