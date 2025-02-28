@@ -1,0 +1,24 @@
+on:
+  schedule:
+    - cron: '*/5 * * * *'
+
+permissions:
+  contents: read
+
+jobs:
+    integration-tests:
+    name: integration-tests
+    strategy:
+      matrix:
+        go: ["1.23"]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Setup Go
+        with:
+          go-version: ${{ matrix.go }}
+        uses: actions/setup-go@v2
+
+      - uses: actions/checkout@v2
+
+      - name: Test
+        run: GITHUB=true go test opencsg.com/csghub-server/tests/...
