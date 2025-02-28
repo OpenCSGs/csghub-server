@@ -1,6 +1,6 @@
 # Integration Test
 
-This directory contains integration tests for the CSGHb server.
+This directory contains integration tests for the CSGHub server.
 
 ### Starting and Stopping the Test Environment
 
@@ -18,11 +18,11 @@ When `testinfra.StartTestEnv()` is called, the following actions are performed i
 
 1. **Load the configuration file**: The `common/config/test.toml` configuration file is loaded. This config is used during integration tests.
 2. **Create a test PostgreSQL database**: A PostgreSQL database is created on a random port using test containers. The database configuration in the test config is updated accordingly.
-3. **Start the Gitaly server**: A Gitaly server is started using test containers. The configuration used for Gitaly is either `tests/gitaly.toml` or `tests/gitaly_github.toml` (used when running on GitHub). Please add a comment in the code explaining why two config files are required. The Gitaly server configuration is updated once the container is started.
+3. **Start the Gitaly server**: A Gitaly server is started using test containers. The configuration used for Gitaly is either `tests/gitaly.toml` or `tests/gitaly_github.toml` (used when running on GitHub). Please see the comment in the `testinfra.go` explaining why two config files are required. The Gitaly server configuration is updated once the container is started.
 4. **Start the Temporal test server**: A local Temporal test server is started using the [temporaltest package](https://github.com/temporalio/temporal/blob/main/temporaltest/README.md). The workflow endpoint config is also updated. By default, the Temporal test server uses a random namespace to avoid conflicts, but we force the registration of the default namespace to ensure tests run.
 5. **Start the in-memory S3 server**: A local in-memory S3 server is started using [GoFakeS3](https://github.com/johannesboyne/gofakes3). This server is used with the MinIO Go SDK for testing LFS (Large File Storage) functionality. The S3 configuration is updated accordingly.
 6. **Start the Redis server**: A Redis server is started using test containers, and the Redis endpoint configuration is updated.
-7. **Start the CSGHub server**: The CSGHub user server and its workflows are started.
+7. **Start the CSGHub user server**: The CSGHub user server and its workflows are started.
 8. **Start the CSGHub dataset viewer server**: The CSGHub dataset viewer server and its workflows are started.
 9. **Start the CSGHub main API server**: The CSGHub main API server and its workflows are started.
 
@@ -34,8 +34,8 @@ After the test environment is started, always defer the call to `env.Shutdown(ct
 
 There are two test files provided:
 
-- **model_test.go**: This tests CRUD operations for models and Git-related functionality. Since the model, dataset, space, and code all share the same repository and Git API code, you can consider this file to also test dataset, space, and code-related features.
-- **dataset_viewer_test.go**: This file tests the Temporal workflows for the dataset viewer server.
+- **api/model_test.go**: This tests CRUD operations for models and Git-related functionality. Since the model, dataset, space, and code all share the same repo/Git code, you can consider this file to also test dataset, space, and code-related features.
+- **api/dataset_viewer_test.go**: This file tests the Temporal workflows for the dataset viewer server.
 
 The test code in these files clearly demonstrates how to test the API, Git, and workflows. There’s no need to repeat this here.
 
@@ -65,7 +65,7 @@ You can also use the test environment to start a temporary test server. To do so
 make run_test_server
 ```
 
-To integrate the test server into CSGHub portal, change CSGHUB_PORTAL_STARHUB_BASE_URL env:
+To integrate the test server into CSGHub portal, change CSGHUB_PORTAL_STARHUB_BASE_URL env before make:
 
 ```
 CSGHUB_PORTAL_STARHUB_BASE_URL=http://localhost:9091 make
