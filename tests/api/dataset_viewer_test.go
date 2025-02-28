@@ -11,6 +11,7 @@ import (
 	"os/exec"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 	"github.com/tidwall/gjson"
@@ -104,4 +105,14 @@ configs:
 	expected := `{"msg":"OK","data":{"configs":[{"config_name":"defaultgo","data_files":[{"split":"traingo","path":["train/0.parquet"]},{"split":"testgo","path":["test/1.parquet"]}]}],"dataset_info":[{"config_name":"defaultgo","splits":[{"name":"traingo","num_examples":20},{"name":"testgo","num_examples":20}]}],"status":0,"logs":""}}
 `
 	require.Equal(t, expected, string(body))
+
+	// check auto created branch
+	time.Sleep(2 * time.Second)
+	resp, err = userClient.Get("http://localhost:9091/api/v1/datasets/user/test/branches")
+	require.NoError(t, err)
+	defer resp.Body.Close()
+	body, err = io.ReadAll(resp.Body)
+	require.NoError(t, err)
+	branches := gjson.GetBytes(body, "data.#.name").String()
+	require.Equal(t, `["main","refs-convert-parquet"]`, branches)
 }
