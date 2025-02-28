@@ -96,6 +96,8 @@ func TestIntegrationModel_CRUD(t *testing.T) {
 	require.Equal(t, []int{200, 200, 200}, rp.codes)
 	for _, b := range rp.bodys {
 		require.Equal(t, "test1", gjson.GetBytes(b, "data.name").String())
+		// FIXME: user email leak
+		require.Equal(t, "user1@csg.com", gjson.GetBytes(b, "data.user.email").String())
 	}
 
 	// create private model
