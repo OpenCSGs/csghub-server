@@ -34,7 +34,7 @@ After the test environment is started, always defer the call to `env.Shutdown(ct
 
 ### Writing Tests
 
-There are two test files provided:
+There are two example test files:
 
 - **api/model_test.go**: This tests CRUD operations for models and Git-related functionality. Since the model, dataset, space, and code all share the same repo/Git code, you can consider this file to also test dataset, space, and code-related features.
 - **api/dataset_viewer_test.go**: This file tests the Temporal workflows for the dataset viewer server.
