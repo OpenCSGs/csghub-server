@@ -75,9 +75,9 @@ configs:
 - config_name: defaultgo
   data_files:
   - split: traingo
-    path: "train/0.parquet"
+    path: "train/*.parquet"
   - split: testgo
-    path: "test/1.parquet"
+    path: "test/*.parquet"
 ---
 `
 	newContent := configContent + fileContent
@@ -96,13 +96,15 @@ configs:
 	require.NoError(t, err)
 	err = gitCommitAndPush(dir)
 	require.NoError(t, err)
+	// wait temporal workflow
+	time.Sleep(5 * time.Second)
 
 	resp, err = userClient.Get("http://localhost:9091/api/v1/datasets/user/test/dataviewer/catalog")
 	require.NoError(t, err)
 	defer resp.Body.Close()
 	body, err = io.ReadAll(resp.Body)
 	require.NoError(t, err)
-	expected := `{"msg":"OK","data":{"configs":[{"config_name":"defaultgo","data_files":[{"split":"traingo","path":["train/0.parquet"]},{"split":"testgo","path":["test/1.parquet"]}]}],"dataset_info":[{"config_name":"defaultgo","splits":[{"name":"traingo","num_examples":20},{"name":"testgo","num_examples":20}]}],"status":0,"logs":""}}
+	expected := `{"msg":"OK","data":{"configs":[{"config_name":"defaultgo","data_files":[{"split":"traingo","path":["train/*.parquet"]},{"split":"testgo","path":["test/*.parquet"]}]}],"dataset_info":[{"config_name":"defaultgo","splits":[{"name":"traingo","num_examples":20},{"name":"testgo","num_examples":20}]}],"status":2,"logs":"Done"}}
 `
 	require.Equal(t, expected, string(body))
 
