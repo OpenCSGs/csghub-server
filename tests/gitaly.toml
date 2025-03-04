@@ -1,0 +1,13 @@
+listen_addr = "0.0.0.0:9876"
+bin_dir = "/usr/bin"
+
+[[storage]]
+name = "default"
+path = "/home/git/repositories"
+
+[gitlab]
+url = "http://host.docker.internal:9091"
+secret = "signing-key"
+
+[git]
+use_bundled_binaries = true

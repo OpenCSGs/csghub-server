@@ -2,8 +2,10 @@ package config
 
 import (
 	"context"
+	"log/slog"
 	"os"
 	"reflect"
+	"sync"
 
 	"github.com/naoina/toml"
 	"github.com/sethvargo/go-envconfig"
@@ -261,9 +263,30 @@ type Config struct {
 
 func SetConfigFile(file string) {
 	configFile = file
+	// The config file is provided via the command line, which should be the only entry point for running
+	// all CSGHub server commands. However, if some code accidentally calls LoadConfig in the init function
+	// before the config file is loaded from the command line, the config system will be broken entirely.
+	// To address this, we reset the `once` variable when SetConfigFile is called, ensuring that even if
+	// the config is incorrect during initialization, it will be corrected when the config is loaded again
+	// from the command line.
+	// This is a temporary fix. We should avoid relying on a global config and instead use DI
+	// to pass the config wherever it's needed.
+	once = sync.OnceValues(func() (*Config, error) {
+		return loadConfig()
+	})
 }
 
+var once = sync.OnceValues(func() (*Config, error) {
+	return loadConfig()
+})
+
 func LoadConfig() (*Config, error) {
+	return once()
+}
+
+func loadConfig() (*Config, error) {
+	defer slog.Debug("end load config")
+	slog.Debug("start load config")
 	cfg := &Config{}
 
 	toml.DefaultConfig.MissingField = func(typ reflect.Type, key string) error {

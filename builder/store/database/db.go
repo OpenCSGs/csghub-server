@@ -51,6 +51,10 @@ type Operator struct {
 	Core bun.IDB
 }
 
+func GetDB() *DB {
+	return defaultDB
+}
+
 func InitDB(config DBConfig) {
 	bg, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()

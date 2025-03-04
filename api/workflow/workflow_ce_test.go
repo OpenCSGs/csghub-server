@@ -42,6 +42,7 @@ func newWorkflowTester(t *testing.T) (*workflowTester, error) {
 	scanner := mock_component.NewMockRuntimeArchitectureComponent(t)
 
 	cfg := &config.Config{}
+	cfg.MultiSync.SaasAPIDomain = "http://foo.com"
 	mtc := mock_temporal.NewMockClient(t)
 	mtc.EXPECT().NewWorker(workflow.HandlePushQueueName, mock.Anything).Return(tester.env)
 	mtc.EXPECT().NewWorker(workflow.CronJobQueueName, mock.Anything).Return(tester.cronEnv)
