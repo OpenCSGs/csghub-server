@@ -46,6 +46,7 @@ type RuntimeFramework struct {
 	Enabled       int64  `bun:",notnull" json:"enabled"`
 	ContainerPort int    `bun:",notnull" json:"container_port"`
 	Type          int    `bun:",notnull" json:"type"` // 0-space, 1-inference, 2-finetune
+	EngineArgs    string `bun:",notnull" json:"engine_args"`
 	times
 }
 

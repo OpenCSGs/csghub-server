@@ -205,6 +205,17 @@ const (
 	ModelWidgetTypeChat       ModelWidgetType = "chat"
 )
 
+type ModelType string
+
+const (
+	GGUF        ModelType = "gguf"
+	Safetensors ModelType = "safetensors"
+)
+
+const (
+	GGUFEntryPoint = "GGUF_ENTRY_POINT"
+)
+
 type ModelRunReq struct {
 	DeployName         string `json:"deploy_name"`
 	ClusterID          string `json:"cluster_id"`
@@ -216,6 +227,8 @@ type ModelRunReq struct {
 	Revision           string `json:"revision"`
 	SecureLevel        int    `json:"secure_level"`
 	OrderDetailID      int64  `json:"order_detail_id"`
+	Entrypoint         string `json:"entrypoint"` // model file name for gguf model
+	EngineArgs         string `json:"engine_args"`
 }
 
 var _ SensitiveRequestV2 = (*ModelRunReq)(nil)
@@ -238,6 +251,8 @@ type InstanceRunReq struct {
 	ResourceID         int64  `json:"resource_id"`
 	RuntimeFrameworkID int64  `json:"runtime_framework_id"`
 	Revision           string `json:"revision"`
+	OrderDetailID      int64  `json:"order_detail_id"`
+	EngineArgs         string `json:"engine_args"`
 }
 
 var _ SensitiveRequestV2 = (*InstanceRunReq)(nil)
@@ -304,6 +319,9 @@ type DeployUpdateReq struct {
 	MaxReplica         *int    `json:"max_replica" validate:"min=1,gtefield=MinReplica"`
 	Revision           *string `json:"revision"`
 	SecureLevel        *int    `json:"secure_level"`
+	Entrypoint         *string `json:"entrypoint"`
+	Variables          *string `json:"variables"`
+	EngineArgs         *string `json:"engine_args"`
 }
 
 type RelationModels struct {

@@ -2066,6 +2066,7 @@ func (c *repoComponentImpl) ListRuntimeFrameworkWithType(ctx context.Context, de
 			Enabled:       frame.Enabled,
 			ContainerPort: frame.ContainerPort,
 			Type:          frame.Type,
+			EngineArgs:    frame.EngineArgs,
 		})
 	}
 	return frameList, nil
@@ -2092,6 +2093,7 @@ func (c *repoComponentImpl) ListRuntimeFramework(ctx context.Context, repoType t
 				FrameCpuImage: modelFrame.RuntimeFramework.FrameCpuImage,
 				Enabled:       modelFrame.RuntimeFramework.Enabled,
 				ContainerPort: modelFrame.RuntimeFramework.ContainerPort,
+				EngineArgs:    modelFrame.RuntimeFramework.EngineArgs,
 			})
 		}
 	}
@@ -2116,6 +2118,7 @@ func (c *repoComponentImpl) CreateRuntimeFramework(ctx context.Context, req *typ
 		Enabled:       req.Enabled,
 		ContainerPort: req.ContainerPort,
 		Type:          req.Type,
+		EngineArgs:    req.EngineArgs,
 	}
 	err = c.runtimeFrameworksStore.Add(ctx, newFrame)
 	if err != nil {
@@ -2129,6 +2132,7 @@ func (c *repoComponentImpl) CreateRuntimeFramework(ctx context.Context, req *typ
 		Enabled:       req.Enabled,
 		ContainerPort: req.ContainerPort,
 		Type:          req.Type,
+		EngineArgs:    req.EngineArgs,
 	}
 	return frame, nil
 }
@@ -2152,6 +2156,7 @@ func (c *repoComponentImpl) UpdateRuntimeFramework(ctx context.Context, id int64
 		Enabled:       req.Enabled,
 		ContainerPort: req.ContainerPort,
 		Type:          req.Type,
+		EngineArgs:    req.EngineArgs,
 	}
 	frame, err := c.runtimeFrameworksStore.Update(ctx, newFrame)
 	if err != nil {
@@ -2166,6 +2171,7 @@ func (c *repoComponentImpl) UpdateRuntimeFramework(ctx context.Context, id int64
 		Enabled:       frame.Enabled,
 		ContainerPort: frame.ContainerPort,
 		Type:          req.Type,
+		EngineArgs:    req.EngineArgs,
 	}, nil
 }
 
@@ -2225,6 +2231,7 @@ func (c *repoComponentImpl) ListDeploy(ctx context.Context, repoType types.Repos
 			CreatedAt:        deploy.CreatedAt,
 			UpdatedAt:        deploy.UpdatedAt,
 			Task:             string(deploy.Task),
+			EngineArgs:       deploy.EngineArgs,
 		})
 	}
 	return resDeploys, nil
@@ -2309,6 +2316,17 @@ func (c *repoComponentImpl) DeployDetail(ctx context.Context, detailReq types.De
 		proxyEndPoint = endpoint + "/proxy/7860/"
 	}
 	repoPath := strings.TrimPrefix(deploy.GitPath, string(detailReq.RepoType)+"s_")
+
+	varMap, err := common.JsonStrToMap(deploy.Variables)
+	if err != nil {
+		return nil, fmt.Errorf("failed to convert variables to map, error: %w", err)
+	}
+	var entrypoint string
+	val, exist := varMap[types.GGUFEntryPoint]
+	if exist {
+		entrypoint = val
+	}
+
 	resDeploy := types.DeployRepo{
 		DeployID:         deploy.ID,
 		DeployName:       deploy.DeployName,
@@ -2335,6 +2353,9 @@ func (c *repoComponentImpl) DeployDetail(ctx context.Context, detailReq types.De
 		ProxyEndpoint:    proxyEndPoint,
 		SKU:              deploy.SKU,
 		Task:             string(deploy.Task),
+		EngineArgs:       deploy.EngineArgs,
+		Variables:        deploy.Variables,
+		Entrypoint:       entrypoint,
 	}
 
 	return &resDeploy, nil
@@ -2722,14 +2743,15 @@ func (c *repoComponentImpl) DeployUpdate(ctx context.Context, updateReq types.De
 	if err != nil {
 		return fmt.Errorf("fail to check permission for update deploy, %w", err)
 	}
-	// check user balance if resource changed
 	if req.ResourceID != nil {
-		frame, err := c.runtimeFrameworksStore.FindEnabledByName(ctx, deploy.RuntimeFramework)
-		if err != nil {
-			return fmt.Errorf("cannot find available runtime framework, %w", err)
+		if req.RuntimeFrameworkID == nil {
+			frame, err := c.runtimeFrameworksStore.FindEnabledByName(ctx, deploy.RuntimeFramework)
+			if err != nil {
+				return fmt.Errorf("cannot find available runtime framework, %w", err)
+			}
+			//update runtime image once user changed cpu to gpu
+			req.RuntimeFrameworkID = &frame.ID
 		}
-		//update runtime image once user changed cpu to gpu
-		req.RuntimeFrameworkID = &frame.ID
 	}
 
 	if req.ClusterID != nil {
@@ -2757,6 +2779,13 @@ func (c *repoComponentImpl) DeployUpdate(ctx context.Context, updateReq types.De
 	if exist {
 		// deploy instance is running
 		return errors.New("stop deploy first")
+	}
+
+	if req.EngineArgs != nil {
+		_, err = common.JsonStrToMap(*req.EngineArgs)
+		if err != nil {
+			return fmt.Errorf("invalid engine args, %w", err)
+		}
 	}
 
 	// update inference service and keep deploy_id and svc_name unchanged

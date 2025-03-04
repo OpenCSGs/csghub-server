@@ -48,7 +48,7 @@ func TestModelComponent_Deploy(t *testing.T) {
 		DeployName: "dp",
 		Path:       "foo",
 		Hardware:   "{\"memory\": \"foo\"}",
-		Annotation: "{\"hub-res-name\":\"ns/n\",\"hub-res-type\":\"model\"}",
+		Annotation: "{\"hub-deploy-user\":\"\",\"hub-res-name\":\"ns/n\",\"hub-res-type\":\"model\"}",
 		ClusterID:  "cluster",
 		RepoID:     1,
 		SKU:        "123",

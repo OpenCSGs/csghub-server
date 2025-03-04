@@ -3,7 +3,18 @@ package common
 import (
 	"crypto/md5"
 	"encoding/hex"
+	"encoding/json"
+	"strings"
 )
+
+func JsonStrToMap(jsonStr string) (map[string]string, error) {
+	var resMap map[string]string
+	if len(strings.Trim(jsonStr, " ")) == 0 {
+		return map[string]string{}, nil
+	}
+	err := json.Unmarshal([]byte(jsonStr), &resMap)
+	return resMap, err
+}
 
 // TruncString return a substring if the input string is larger than limit size, truncated string ends with "..."
 func TruncString(s string, limit int) string {

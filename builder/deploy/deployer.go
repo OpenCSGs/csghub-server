@@ -18,6 +18,7 @@ import (
 	"opencsg.com/csghub-server/builder/deploy/scheduler"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/types"
+	hubcom "opencsg.com/csghub-server/common/utils/common"
 )
 
 type Deployer interface {
@@ -529,8 +530,27 @@ func (d *deployer) UpdateDeploy(ctx context.Context, dur *types.DeployUpdateReq,
 	if dur.SecureLevel != nil {
 		deploy.SecureLevel = *dur.SecureLevel
 	}
+
 	if dur.ClusterID != nil {
 		deploy.ClusterID = *dur.ClusterID
+	}
+
+	if dur.EngineArgs != nil {
+		deploy.EngineArgs = *dur.EngineArgs
+	}
+
+	if dur.Entrypoint != nil {
+		if deploy.RuntimeFramework == string(types.LlamaCpp) {
+			newVarStr, err := buildVariables(dur)
+			if err != nil {
+				return fmt.Errorf("build variables for llama cpp error: %w", err)
+			}
+			dur.Variables = &newVarStr
+		}
+	}
+
+	if dur.Variables != nil {
+		deploy.Variables = *dur.Variables
 	}
 
 	// update deploy table
@@ -540,6 +560,24 @@ func (d *deployer) UpdateDeploy(ctx context.Context, dur *types.DeployUpdateReq,
 	}
 
 	return nil
+}
+
+func buildVariables(dur *types.DeployUpdateReq) (string, error) {
+	varStr := ""
+	if dur.Variables != nil {
+		varStr = *dur.Variables
+	}
+	varMap, err := hubcom.JsonStrToMap(varStr)
+	if err != nil {
+		return "", fmt.Errorf("invalid json format of variables error: %w", err)
+	}
+	varMap[types.GGUFEntryPoint] = *dur.Entrypoint
+	varBytes, err := json.Marshal(varMap)
+	if err != nil {
+		return "", fmt.Errorf("marshal variables error: %w", err)
+	}
+	varStr = string(varBytes)
+	return varStr, nil
 }
 
 func (d *deployer) StartDeploy(ctx context.Context, deploy *database.Deploy) error {
