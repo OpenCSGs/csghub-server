@@ -285,6 +285,8 @@ type ModelUpdateResponse struct {
 type ModelStatusEventData struct {
 	Status  string     `json:"status"`
 	Details []Instance `json:"details"`
+	Message string     `json:"message"`
+	Reason  string     `json:"reason"`
 }
 
 const (

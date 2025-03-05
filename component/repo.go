@@ -139,7 +139,7 @@ type RepoComponent interface {
 	AllowAccessDeploy(ctx context.Context, req types.DeployActReq) (bool, error)
 	DeployStop(ctx context.Context, stopReq types.DeployActReq) error
 	AllowReadAccessByDeployID(ctx context.Context, repoType types.RepositoryType, namespace, name, currentUser string, deployID int64) (bool, error)
-	DeployStatus(ctx context.Context, repoType types.RepositoryType, namespace, name string, deployID int64) (string, string, []types.Instance, error)
+	DeployStatus(ctx context.Context, repoType types.RepositoryType, namespace, name string, deployID int64) (types.ModelStatusEventData, error)
 	GetDeployBySvcName(ctx context.Context, svcName string) (*database.Deploy, error)
 	SyncMirror(ctx context.Context, repoType types.RepositoryType, namespace, name, currentUser string) error
 	DeployUpdate(ctx context.Context, updateReq types.DeployActReq, req *types.DeployUpdateReq) error
@@ -2356,6 +2356,8 @@ func (c *repoComponentImpl) DeployDetail(ctx context.Context, detailReq types.De
 		EngineArgs:       deploy.EngineArgs,
 		Variables:        deploy.Variables,
 		Entrypoint:       entrypoint,
+		Reason:           deploy.Reason,
+		Message:          deploy.Message,
 	}
 
 	return &resDeploy, nil
@@ -2618,13 +2620,15 @@ func (c *repoComponentImpl) AllowReadAccessByDeployID(ctx context.Context, repoT
 	return c.AllowReadAccessRepo(ctx, repo, currentUser)
 }
 
-func (c *repoComponentImpl) DeployStatus(ctx context.Context, repoType types.RepositoryType, namespace, name string, deployID int64) (string, string, []types.Instance, error) {
+func (c *repoComponentImpl) DeployStatus(ctx context.Context, repoType types.RepositoryType, namespace, name string, deployID int64) (types.ModelStatusEventData, error) {
+	var status types.ModelStatusEventData
 	deploy, err := c.deployTaskStore.GetDeployByID(ctx, deployID)
 	if err != nil {
-		return "", SpaceStatusStopped, nil, err
+		status.Status = SpaceStatusStopped
+		return status, err
 	}
 	// request deploy status by deploy id
-	srvName, code, instances, err := c.deployer.Status(ctx, types.DeployRepo{
+	_, code, instances, err := c.deployer.Status(ctx, types.DeployRepo{
 		DeployID:  deploy.ID,
 		SpaceID:   deploy.SpaceID,
 		ModelID:   deploy.ModelID,
@@ -2635,9 +2639,15 @@ func (c *repoComponentImpl) DeployStatus(ctx context.Context, repoType types.Rep
 	}, true)
 	if err != nil {
 		slog.Error("error happen when get deploy status", slog.Any("error", err), slog.String("path", deploy.GitPath))
-		return "", SpaceStatusStopped, instances, err
+		status.Status = SpaceStatusStopped
+		status.Details = instances
+		return status, err
 	}
-	return srvName, deployStatusCodeToString(code), instances, nil
+	status.Status = deployStatusCodeToString(code)
+	status.Details = instances
+	status.Message = deploy.Message
+	status.Reason = deploy.Reason
+	return status, nil
 }
 
 func (c *repoComponentImpl) GetDeployBySvcName(ctx context.Context, svcName string) (*database.Deploy, error) {

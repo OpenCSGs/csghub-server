@@ -306,11 +306,8 @@ func hasFailedStatus(pod *corev1.Pod) bool {
 	return false
 }
 
-func getPodError(pod *corev1.PodList) (*string, *string) {
-	for _, pod := range pod.Items {
-		if len(pod.Status.ContainerStatuses) == 0 {
-			return nil, nil
-		}
+func getPodError(podList *corev1.PodList) (*string, *string) {
+	for _, pod := range podList.Items {
 		for _, cs := range pod.Status.ContainerStatuses {
 			if cs.Name != "user-container" {
 				continue

@@ -176,6 +176,8 @@ type DeployRepo struct {
 	EngineArgs       string     `json:"engine_args,omitempty"`
 	Variables        string     `json:"variables,omitempty"`
 	Entrypoint       string     `json:"entrypoint,omitempty"`
+	Reason           string     `json:"reason,omitempty"`
+	Message          string     `json:"message,omitempty"`
 }
 
 type RuntimeFrameworkReq struct {
