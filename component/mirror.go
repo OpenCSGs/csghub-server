@@ -50,6 +50,7 @@ type MirrorComponent interface {
 	Repos(ctx context.Context, currentUser string, per, page int) ([]types.MirrorRepo, int, error)
 	Index(ctx context.Context, currentUser string, per, page int, search string) ([]types.Mirror, int, error)
 	Statistics(ctx context.Context, currentUser string) ([]types.MirrorStatusCount, error)
+	FindWithMapping(ctx context.Context, repoType types.RepositoryType, namespace, name string, mapping types.Mapping) (*database.Repository, error)
 }
 
 func NewMirrorComponent(config *config.Config) (MirrorComponent, error) {
@@ -689,4 +690,8 @@ func (c *mirrorComponentImpl) Statistics(ctx context.Context, currentUser string
 	}
 
 	return scs, nil
+}
+
+func (c *mirrorComponentImpl) FindWithMapping(ctx context.Context, repoType types.RepositoryType, namespace, name string, mapping types.Mapping) (*database.Repository, error) {
+	return c.mirrorStore.FindWithMapping(ctx, repoType, namespace, name, mapping)
 }

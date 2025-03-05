@@ -39,6 +39,8 @@ type UserComponent interface {
 	GetUserByName(ctx context.Context, userName string) (*database.User, error)
 	Prompts(ctx context.Context, req *types.UserPromptsReq) ([]types.PromptRes, int, error)
 	Evaluations(ctx context.Context, req *types.UserEvaluationReq) ([]types.ArgoWorkFlowRes, int, error)
+	FindByAccessToken(ctx context.Context, token string) (*database.User, error)
+	FindByGitAccessToken(ctx context.Context, token string) (*database.User, error)
 }
 
 func NewUserComponent(config *config.Config) (UserComponent, error) {
@@ -655,4 +657,12 @@ func (c *userComponentImpl) Evaluations(ctx context.Context, req *types.UserEval
 		return nil, 0, newError
 	}
 	return res.List, res.Total, nil
+}
+
+func (c *userComponentImpl) FindByAccessToken(ctx context.Context, token string) (*database.User, error) {
+	return c.userStore.FindByAccessToken(ctx, token)
+}
+
+func (c *userComponentImpl) FindByGitAccessToken(ctx context.Context, token string) (*database.User, error) {
+	return c.userStore.FindByGitAccessToken(ctx, token)
 }

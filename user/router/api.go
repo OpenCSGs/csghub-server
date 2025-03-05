@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 
+	"github.com/gin-contrib/pprof"
 	"github.com/gin-gonic/gin"
 	"opencsg.com/csghub-server/api/httpbase"
 	"opencsg.com/csghub-server/api/middleware"
@@ -15,8 +16,15 @@ import (
 func NewRouter(config *config.Config) (*gin.Engine, error) {
 	r := gin.New()
 	r.Use(gin.Recovery())
-	r.Use(middleware.Log(config))
-	r.Use(middleware.Authenticator(config))
+	middleware := middleware.NewMiddleware(config)
+	r.Use(middleware.Log())
+	needAPIKey := middleware.NeedAPIKey()
+
+	//add router for golang pprof
+	debugGroup := r.Group("/debug", needAPIKey)
+	pprof.RouteRegister(debugGroup, "pprof")
+
+	r.Use(middleware.Authenticator())
 
 	userHandler, err := handler.NewUserHandler(config)
 	if err != nil {
@@ -46,7 +54,6 @@ func NewRouter(config *config.Config) (*gin.Engine, error) {
 	userGroup := apiV1Group.Group("/user")
 	tokenGroup := apiV1Group.Group("/token")
 
-	needAPIKey := middleware.OnlyAPIKeyAuthenticator(config)
 	jwtHandler, err := handler.NewJWTHandler(config)
 	if err != nil {
 		return nil, fmt.Errorf("error creating jwt handler:%w", err)

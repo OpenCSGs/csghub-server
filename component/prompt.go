@@ -82,8 +82,7 @@ func NewPromptComponent(cfg *config.Config) (PromptComponent, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to create git server,cause:%w", err)
 	}
-	usc := rpc.NewUserSvcHttpClient(fmt.Sprintf("%s:%d", cfg.User.Host, cfg.User.Port),
-		rpc.AuthWithApiKey(cfg.APIToken))
+	usc := rpc.NewUserSvcHttpClient(cfg)
 	return &promptComponentImpl{
 		config:            cfg,
 		userStore:         database.NewUserStore(),

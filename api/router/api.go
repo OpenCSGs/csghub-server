@@ -9,6 +9,7 @@ import (
 	cache "github.com/chenyahui/gin-cache"
 	"github.com/chenyahui/gin-cache/persist"
 	"github.com/gin-contrib/cors"
+	"github.com/gin-contrib/pprof"
 	"github.com/gin-gonic/gin"
 	swaggerFiles "github.com/swaggo/files"
 	ginSwagger "github.com/swaggo/gin-swagger"
@@ -18,18 +19,170 @@ import (
 	"opencsg.com/csghub-server/api/httpbase"
 	"opencsg.com/csghub-server/api/middleware"
 	"opencsg.com/csghub-server/builder/instrumentation"
+	"opencsg.com/csghub-server/builder/rpc"
 	"opencsg.com/csghub-server/builder/temporal"
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/types"
 	"opencsg.com/csghub-server/mirror"
 )
 
+type UserProxyHandler handler.InternalServiceProxyHandler
+type DatasetViewerPeoxyHandler handler.InternalServiceProxyHandler
+
+func newUserProxyHandler(config *config.Config) (*UserProxyHandler, error) {
+
+	h, err := handler.NewInternalServiceProxyHandler(fmt.Sprintf("%s:%d", config.User.Host, config.User.Port))
+	return (*UserProxyHandler)(h), err
+}
+
+func newDatasetViewerProxyHandler(config *config.Config) (*DatasetViewerPeoxyHandler, error) {
+	dataViewerAddr := fmt.Sprintf("%s:%d", config.DataViewer.Host, config.DataViewer.Port)
+	h, err := handler.NewInternalServiceProxyHandler(dataViewerAddr)
+	return (*DatasetViewerPeoxyHandler)(h), err
+}
+
+func newMemoryStore() *persist.MemoryStore {
+	return persist.NewMemoryStore(1 * time.Minute)
+}
+
+type BaseServer struct {
+	Config                   *config.Config
+	Middleware               *middleware.Middleware
+	GitHTTPHandler           *handler.GitHTTPHandler
+	UserHandler              *handler.UserHandler
+	OrgHandler               *handler.OrganizationHandler
+	RepoCommonHandler        *handler.RepoHandler
+	ModelHandler             *handler.ModelHandler
+	DsHandler                *handler.DatasetHandler
+	MirrorHandler            *handler.MirrorHandler
+	HfdsHandler              *handler.HFDatasetHandler
+	ListHandler              *handler.ListHandler
+	EvaluationHandler        *handler.EvaluationHandler
+	CodeHandler              *handler.CodeHandler
+	SpaceHandler             *handler.SpaceHandler
+	SpaceResourceHandler     *handler.SpaceResourceHandler
+	SpaceSdkHandler          *handler.SpaceSdkHandler
+	UserProxyHandler         *handler.InternalServiceProxyHandler
+	SshKeyHandler            *handler.SSHKeyHandler
+	TagCtrl                  *handler.TagsHandler
+	CallbackCtrl             *callback.GitCallbackHandler
+	SensitiveCtrl            *handler.SensitiveHandler
+	MsHandler                *handler.MirrorSourceHandler
+	CollectionHandler        *handler.CollectionHandler
+	ClusterHandler           *handler.ClusterHandler
+	EventHandler             *handler.EventHandler
+	BroadcastHandler         *handler.BroadcastHandler
+	RuntimeArchHandler       *handler.RuntimeArchitectureHandler
+	SyncHandler              *handler.SyncHandler
+	SyncClientSettingHandler *handler.SyncClientSettingHandler
+	MeteringHandler          *handler.AccountingHandler
+	RecomHandler             *handler.RecomHandler
+	TelemetryHandler         *handler.TelemetryHandler
+	InternalHandler          *handler.InternalHandler
+	DiscussionHandler        *handler.DiscussionHandler
+	PromptHandler            *handler.PromptHandler
+	DsViewerHandler          *handler.InternalServiceProxyHandler
+	PaymentProxyHandler      *handler.InternalServiceProxyHandler
+	MemoryStore              *persist.MemoryStore
+	UserServiceClient        rpc.UserSvcClient
+	Engine                   *gin.Engine
+}
+
+func NewBaseServer(
+	config *config.Config,
+	middleware *middleware.Middleware,
+	gitHTTPHandler *handler.GitHTTPHandler,
+	userHandler *handler.UserHandler,
+	orgHandler *handler.OrganizationHandler,
+	repoCommonHandler *handler.RepoHandler,
+	modelHandler *handler.ModelHandler,
+	dsHandler *handler.DatasetHandler,
+	mirrorHandler *handler.MirrorHandler,
+	hfdsHandler *handler.HFDatasetHandler,
+	listHandler *handler.ListHandler,
+	evaluationHandler *handler.EvaluationHandler,
+	codeHandler *handler.CodeHandler,
+	spaceHandler *handler.SpaceHandler,
+	spaceResourceHandler *handler.SpaceResourceHandler,
+	spaceSdkHandler *handler.SpaceSdkHandler,
+	userProxyHandler *UserProxyHandler,
+	datasetViewerProxyHandler *DatasetViewerPeoxyHandler,
+	sshKeyHandler *handler.SSHKeyHandler,
+	tagCtrl *handler.TagsHandler,
+	callbackCtrl *callback.GitCallbackHandler,
+	sensitiveCtrl *handler.SensitiveHandler,
+	msHandler *handler.MirrorSourceHandler,
+	collectionHandler *handler.CollectionHandler,
+	clusterHandler *handler.ClusterHandler,
+	eventHandler *handler.EventHandler,
+	broadcastHandler *handler.BroadcastHandler,
+	runtimeArchHandler *handler.RuntimeArchitectureHandler,
+	syncHandler *handler.SyncHandler,
+	syncClientSettingHandler *handler.SyncClientSettingHandler,
+	meteringHandler *handler.AccountingHandler,
+	recomHandler *handler.RecomHandler,
+	telemetryHandler *handler.TelemetryHandler,
+	internalHandler *handler.InternalHandler,
+	discussionHandler *handler.DiscussionHandler,
+	promptHandler *handler.PromptHandler,
+	memoryStore *persist.MemoryStore,
+	userServiceClient rpc.UserSvcClient,
+
+) (*BaseServer, error) {
+	server := &BaseServer{
+		Config:                   config,
+		Middleware:               middleware,
+		GitHTTPHandler:           gitHTTPHandler,
+		UserHandler:              userHandler,
+		OrgHandler:               orgHandler,
+		RepoCommonHandler:        repoCommonHandler,
+		ModelHandler:             modelHandler,
+		DsHandler:                dsHandler,
+		MirrorHandler:            mirrorHandler,
+		HfdsHandler:              hfdsHandler,
+		ListHandler:              listHandler,
+		EvaluationHandler:        evaluationHandler,
+		CodeHandler:              codeHandler,
+		SpaceHandler:             spaceHandler,
+		SpaceResourceHandler:     spaceResourceHandler,
+		SpaceSdkHandler:          spaceSdkHandler,
+		UserProxyHandler:         (*handler.InternalServiceProxyHandler)(userProxyHandler),
+		SshKeyHandler:            sshKeyHandler,
+		TagCtrl:                  tagCtrl,
+		CallbackCtrl:             callbackCtrl,
+		SensitiveCtrl:            sensitiveCtrl,
+		MsHandler:                msHandler,
+		CollectionHandler:        collectionHandler,
+		ClusterHandler:           clusterHandler,
+		EventHandler:             eventHandler,
+		BroadcastHandler:         broadcastHandler,
+		RuntimeArchHandler:       runtimeArchHandler,
+		SyncHandler:              syncHandler,
+		SyncClientSettingHandler: syncClientSettingHandler,
+		MeteringHandler:          meteringHandler,
+		RecomHandler:             recomHandler,
+		TelemetryHandler:         telemetryHandler,
+		InternalHandler:          internalHandler,
+		DiscussionHandler:        discussionHandler,
+		PromptHandler:            promptHandler,
+		MemoryStore:              memoryStore,
+		UserServiceClient:        userServiceClient,
+		DsViewerHandler:          (*handler.InternalServiceProxyHandler)(datasetViewerProxyHandler),
+	}
+	return server, nil
+}
+
 func RunServer(config *config.Config, enableSwagger bool) {
 	stopOtel, err := instrumentation.SetupOTelSDK(context.Background(), config, "csghub-api")
 	if err != nil {
 		panic(err)
 	}
-	r, err := NewRouter(config, enableSwagger)
+	slog.Info("init gin http router")
+	srv, err := InitializeServer(config)
+	if err != nil {
+		panic(err)
+	}
+	err = srv.RegisterRoutes(enableSwagger)
 	if err != nil {
 		panic(err)
 	}
@@ -38,7 +191,7 @@ func RunServer(config *config.Config, enableSwagger bool) {
 		httpbase.GraceServerOpt{
 			Port: config.APIServer.Port,
 		},
-		r,
+		srv.Engine,
 	)
 	// Initialize mirror service
 	mirrorService, err := mirror.NewMirrorPriorityQueue(config)
@@ -53,12 +206,16 @@ func RunServer(config *config.Config, enableSwagger bool) {
 	server.Run()
 	_ = stopOtel(context.Background())
 	temporal.Stop()
-
 }
 
-func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
+func (s *BaseServer) GetEngine() *gin.Engine {
+	return s.Engine
+}
+
+func (s *BaseServer) RegisterRoutes(enableSwagger bool) error {
 	r := gin.New()
-	if config.Instrumentation.OTLPEndpoint != "" {
+	s.Engine = r
+	if s.Config.Instrumentation.OTLPEndpoint != "" {
 		r.Use(otelgin.Middleware("csghub-server"))
 	}
 
@@ -69,402 +226,253 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 		AllowAllOrigins:  true,
 	}))
 	r.Use(gin.Recovery())
-	r.Use(middleware.Log(config))
+	r.Use(s.Middleware.Log())
 
-	gitHTTPHandler, err := handler.NewGitHTTPHandler(config)
-	if err != nil {
-		return nil, fmt.Errorf("error creating git http handler:%w", err)
-	}
+	//add router for golang pprof
+	debugGroup := r.Group("/debug", s.Middleware.NeedAPIKey())
+	pprof.RouteRegister(debugGroup, "pprof")
+
 	gitHTTP := r.Group("/:repo_type/:namespace/:name")
-	gitHTTP.Use(middleware.GitHTTPParamMiddleware())
-	gitHTTP.Use(middleware.GetCurrentUserFromHeader())
+	gitHTTP.Use(s.Middleware.GitHTTPParamMiddleware())
+	gitHTTP.Use(s.Middleware.GetCurrentUserFromHeader())
 	{
-		gitHTTP.GET("/info/refs", gitHTTPHandler.InfoRefs)
-		gitHTTP.POST("/git-upload-pack", middleware.ContentEncoding(), gitHTTPHandler.GitUploadPack)
-		gitHTTP.POST("/git-receive-pack", middleware.ContentEncoding(), gitHTTPHandler.GitReceivePack)
+		gitHTTP.GET("/info/refs", s.GitHTTPHandler.InfoRefs)
+		gitHTTP.POST("/git-upload-pack", s.Middleware.ContentEncoding(), s.GitHTTPHandler.GitUploadPack)
+		gitHTTP.POST("/git-receive-pack", s.Middleware.ContentEncoding(), s.GitHTTPHandler.GitReceivePack)
+
 		lfsGroup := gitHTTP.Group("/info/lfs")
 		{
 			objectsGroup := lfsGroup.Group("/objects")
 			{
-				objectsGroup.POST("/batch", gitHTTPHandler.LfsBatch)
-				objectsGroup.PUT("/:oid/:size", gitHTTPHandler.LfsUpload)
-				lfsGroup.GET("/:oid", gitHTTPHandler.LfsDownload)
+				objectsGroup.POST("/batch", s.GitHTTPHandler.LfsBatch)
+				objectsGroup.PUT("/:oid/:size", s.GitHTTPHandler.LfsUpload)
+				lfsGroup.GET("/:oid", s.GitHTTPHandler.LfsDownload)
 			}
-			lfsGroup.POST("/verify", gitHTTPHandler.LfsVerify)
+			lfsGroup.POST("/verify", s.GitHTTPHandler.LfsVerify)
 
 			locksGroup := lfsGroup.Group("/locks")
 			{
-				locksGroup.GET("", gitHTTPHandler.ListLocks)
-				locksGroup.POST("", gitHTTPHandler.CreateLock)
-				locksGroup.POST("/verify", gitHTTPHandler.VerifyLock)
-				locksGroup.POST("/:lid/unlock", gitHTTPHandler.UnLock)
+				locksGroup.GET("", s.GitHTTPHandler.ListLocks)
+				locksGroup.POST("", s.GitHTTPHandler.CreateLock)
+				locksGroup.POST("/verify", s.GitHTTPHandler.VerifyLock)
+				locksGroup.POST("/:lid/unlock", s.GitHTTPHandler.UnLock)
 			}
 
 		}
 
 	}
-
-	r.Use(middleware.Authenticator(config))
-
-	authCollection := middleware.AuthenticatorCollection{}
-	authCollection.NeedAPIKey = middleware.OnlyAPIKeyAuthenticator(config)
-	authCollection.NeedAdmin = middleware.NeedAdmin(config)
+	r.Use(s.Middleware.Authenticator())
 
 	if enableSwagger {
 		r.GET("/api/v1/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 	}
 
-	// User routes
-	userHandler, err := handler.NewUserHandler(config)
-	if err != nil {
-		return nil, fmt.Errorf("error creating user controller:%w", err)
-	}
-	orgHandler, err := handler.NewOrganizationHandler(config)
-	if err != nil {
-		return nil, fmt.Errorf("error creating organization controller:%w", err)
-	}
-
-	repoCommonHandler, err := handler.NewRepoHandler(config)
-	if err != nil {
-		return nil, fmt.Errorf("error creating repo common handler: %w", err)
-	}
-	modelHandler, err := handler.NewModelHandler(config)
-	if err != nil {
-		return nil, fmt.Errorf("error creating model controller:%w", err)
-	}
-	dsHandler, err := handler.NewDatasetHandler(config)
-	if err != nil {
-		return nil, fmt.Errorf("error creating dataset handler:%w", err)
-	}
-
-	// Mirror
-	mirrorHandler, err := handler.NewMirrorHandler(config)
-	if err != nil {
-		return nil, fmt.Errorf("error creating mirror controller:%w", err)
-	}
-
-	hfdsHandler, err := handler.NewHFDatasetHandler(config)
-	if err != nil {
-		return nil, fmt.Errorf("error creating HF dataset handler: %w", err)
-	}
 	//create routes for hf
-	createMappingRoutes(r, "/hf", hfdsHandler, repoCommonHandler, modelHandler, userHandler)
+	createMappingRoutes(r, "/hf", s.HfdsHandler, s.RepoCommonHandler, s.ModelHandler, s.UserHandler, s.Middleware)
 	//create routes for ms
-	createMappingRoutes(r, "/ms", hfdsHandler, repoCommonHandler, modelHandler, userHandler)
+	createMappingRoutes(r, "/ms", s.HfdsHandler, s.RepoCommonHandler, s.ModelHandler, s.UserHandler, s.Middleware)
 	//create routes for csg
-	createMappingRoutes(r, "/csg", hfdsHandler, repoCommonHandler, modelHandler, userHandler)
+	createMappingRoutes(r, "/csg", s.HfdsHandler, s.RepoCommonHandler, s.ModelHandler, s.UserHandler, s.Middleware)
 
 	apiGroup := r.Group("/api/v1")
-	// TODO:use middleware to handle common response
-	//
-	memoryStore := persist.NewMemoryStore(1 * time.Minute)
 
 	// List trending models and datasets routes
-	listHandler, err := handler.NewListHandler(config)
-	if err != nil {
-		return nil, fmt.Errorf("error creatring list handler: %v", err)
-	}
 	{
-		apiGroup.POST("/list/models_by_path", cache.CacheByRequestURI(memoryStore, 1*time.Minute), listHandler.ListModelsByPath)
-		apiGroup.POST("/list/datasets_by_path", cache.CacheByRequestURI(memoryStore, 1*time.Minute), listHandler.ListDatasetsByPath)
-		apiGroup.POST("/list/spaces_by_path", cache.CacheByRequestURI(memoryStore, 1*time.Minute), listHandler.ListSpacesByPath)
+		apiGroup.POST("/list/models_by_path", cache.CacheByRequestURI(s.MemoryStore, 1*time.Minute), s.ListHandler.ListModelsByPath)
+		apiGroup.POST("/list/datasets_by_path", cache.CacheByRequestURI(s.MemoryStore, 1*time.Minute), s.ListHandler.ListDatasetsByPath)
+		apiGroup.POST("/list/spaces_by_path", cache.CacheByRequestURI(s.MemoryStore, 1*time.Minute), s.ListHandler.ListSpacesByPath)
 	}
 
 	//evaluation handler
-	evaluationHandler, err := handler.NewEvaluationHandler(config)
-	if err != nil {
-		return nil, fmt.Errorf("error creatring evaluation handler: %v", err)
-	}
-
-	createEvaluationRoutes(apiGroup, evaluationHandler)
+	createEvaluationRoutes(apiGroup, s.EvaluationHandler)
 
 	// Model routes
-	createModelRoutes(config, apiGroup, authCollection.NeedAPIKey, modelHandler, repoCommonHandler)
+	createModelRoutes(s.Config, apiGroup, s.Middleware, s.ModelHandler, s.RepoCommonHandler)
 
 	// Dataset routes
-	createDatasetRoutes(config, apiGroup, dsHandler, repoCommonHandler)
+	createDatasetRoutes(s.Config, apiGroup, s.DsHandler, s.RepoCommonHandler, s.Middleware)
 
-	codeHandler, err := handler.NewCodeHandler(config)
-	if err != nil {
-		return nil, fmt.Errorf("error creating code handler:%w", err)
-	}
 	// Code routes
-	createCodeRoutes(config, apiGroup, codeHandler, repoCommonHandler)
+	createCodeRoutes(s.Config, apiGroup, s.CodeHandler, s.RepoCommonHandler, s.Middleware)
 
-	spaceHandler, err := handler.NewSpaceHandler(config)
-	if err != nil {
-		return nil, fmt.Errorf("error creating space handler:%w", err)
-	}
 	// space routers
-	createSpaceRoutes(config, apiGroup, spaceHandler, repoCommonHandler)
-
-	spaceResourceHandler, err := handler.NewSpaceResourceHandler(config)
-	if err != nil {
-		return nil, fmt.Errorf("error creating space resource handler:%w", err)
-	}
+	createSpaceRoutes(s.Config, apiGroup, s.SpaceHandler, s.RepoCommonHandler, s.Middleware)
 
 	spaceResource := apiGroup.Group("space_resources")
 	{
-		spaceResource.GET("", spaceResourceHandler.Index)
-		spaceResource.POST("", authCollection.NeedAdmin, spaceResourceHandler.Create)
-		spaceResource.PUT("/:id", authCollection.NeedAdmin, spaceResourceHandler.Update)
-		spaceResource.DELETE("/:id", authCollection.NeedAdmin, spaceResourceHandler.Delete)
-	}
-
-	spaceSdkHandler, err := handler.NewSpaceSdkHandler(config)
-	if err != nil {
-		return nil, fmt.Errorf("error creating space sdk handler:%w", err)
+		spaceResource.GET("", s.SpaceResourceHandler.Index)
+		spaceResource.POST("", s.Middleware.NeedAdmin(), s.SpaceResourceHandler.Create)
+		spaceResource.PUT("/:id", s.Middleware.NeedAdmin(), s.SpaceResourceHandler.Update)
+		spaceResource.DELETE("/:id", s.Middleware.NeedAdmin(), s.SpaceResourceHandler.Delete)
 	}
 
 	spaceSdk := apiGroup.Group("space_sdks")
 	{
-		spaceSdk.GET("", spaceSdkHandler.Index)
-		spaceSdk.POST("", authCollection.NeedAPIKey, spaceSdkHandler.Create)
-		spaceSdk.PUT("/:id", authCollection.NeedAPIKey, spaceSdkHandler.Update)
-		spaceSdk.DELETE("/:id", authCollection.NeedAPIKey, spaceSdkHandler.Delete)
+		spaceSdk.GET("", s.SpaceSdkHandler.Index)
+		spaceSdk.POST("", s.Middleware.NeedAPIKey(), s.SpaceSdkHandler.Create)
+		spaceSdk.PUT("/:id", s.Middleware.NeedAPIKey(), s.SpaceSdkHandler.Update)
+		spaceSdk.DELETE("/:id", s.Middleware.NeedAPIKey(), s.SpaceSdkHandler.Delete)
 	}
 
-	userProxyHandler, err := handler.NewInternalServiceProxyHandler(fmt.Sprintf("%s:%d", config.User.Host, config.User.Port))
-	if err != nil {
-		return nil, fmt.Errorf("error creating user proxy handler:%w", err)
-	}
-
-	createUserRoutes(apiGroup, authCollection.NeedAPIKey, userProxyHandler, userHandler)
-
+	createUserRoutes(apiGroup, s.Middleware, s.UserProxyHandler, s.UserHandler)
 	tokenGroup := apiGroup.Group("token")
 	{
-		tokenGroup.POST("/:app/:token_name", userProxyHandler.ProxyToApi("/api/v1/token/%s/%s", "app", "token_name"))
-		tokenGroup.PUT("/:app/:token_name", userProxyHandler.ProxyToApi("/api/v1/token/%s/%s", "app", "token_name"))
-		tokenGroup.DELETE("/:app/:token_name", userProxyHandler.ProxyToApi("/api/v1/token/%s/%s", "app", "token_name"))
+		tokenGroup.POST("/:app/:token_name", s.UserProxyHandler.ProxyToApi("/api/v1/token/%s/%s", "app", "token_name"))
+		tokenGroup.PUT("/:app/:token_name", s.UserProxyHandler.ProxyToApi("/api/v1/token/%s/%s", "app", "token_name"))
+		tokenGroup.DELETE("/:app/:token_name", s.UserProxyHandler.ProxyToApi("/api/v1/token/%s/%s", "app", "token_name"))
 		// check token info
-		tokenGroup.GET("/:token_value", authCollection.NeedAPIKey, userProxyHandler.ProxyToApi("/api/v1/token/%s", "token_value"))
-	}
-
-	sshKeyHandler, err := handler.NewSSHKeyHandler(config)
-	if err != nil {
-		return nil, fmt.Errorf("error creating user controller:%w", err)
-	}
-	{
-		apiGroup.GET("/user/:username/ssh_keys", sshKeyHandler.Index)
-		apiGroup.POST("/user/:username/ssh_keys", sshKeyHandler.Create)
-		apiGroup.DELETE("/user/:username/ssh_key/:name", sshKeyHandler.Delete)
+		tokenGroup.GET("/:token_value", s.Middleware.NeedAPIKey(), s.UserProxyHandler.ProxyToApi("/api/v1/token/%s", "token_value"))
 	}
 
 	{
-		apiGroup.GET("/organizations", userProxyHandler.Proxy)
-		apiGroup.POST("/organizations", userProxyHandler.Proxy)
-		apiGroup.GET("/organization/:namespace", userProxyHandler.ProxyToApi("/api/v1/organization/%s", "namespace"))
-		apiGroup.PUT("/organization/:namespace", userProxyHandler.ProxyToApi("/api/v1/organization/%s", "namespace"))
-		apiGroup.DELETE("/organization/:namespace", userProxyHandler.ProxyToApi("/api/v1/organization/%s", "namespace"))
+		apiGroup.GET("/user/:username/ssh_keys", s.SshKeyHandler.Index)
+		apiGroup.POST("/user/:username/ssh_keys", s.SshKeyHandler.Create)
+		apiGroup.DELETE("/user/:username/ssh_key/:name", s.SshKeyHandler.Delete)
+	}
+
+	{
+		apiGroup.GET("/organizations", s.UserProxyHandler.Proxy)
+		apiGroup.POST("/organizations", s.UserProxyHandler.Proxy)
+		apiGroup.GET("/organization/:namespace", s.UserProxyHandler.ProxyToApi("/api/v1/organization/%s", "namespace"))
+		apiGroup.PUT("/organization/:namespace", s.UserProxyHandler.ProxyToApi("/api/v1/organization/%s", "namespace"))
+		apiGroup.DELETE("/organization/:namespace", s.UserProxyHandler.ProxyToApi("/api/v1/organization/%s", "namespace"))
 		// Organization assets
-		apiGroup.GET("/organization/:namespace/models", orgHandler.Models)
-		apiGroup.GET("/organization/:namespace/datasets", orgHandler.Datasets)
-		apiGroup.GET("/organization/:namespace/codes", orgHandler.Codes)
-		apiGroup.GET("/organization/:namespace/spaces", orgHandler.Spaces)
-		apiGroup.GET("/organization/:namespace/collections", orgHandler.Collections)
-		apiGroup.GET("/organization/:namespace/prompts", orgHandler.Prompts)
+		apiGroup.GET("/organization/:namespace/models", s.OrgHandler.Models)
+		apiGroup.GET("/organization/:namespace/datasets", s.OrgHandler.Datasets)
+		apiGroup.GET("/organization/:namespace/codes", s.OrgHandler.Codes)
+		apiGroup.GET("/organization/:namespace/spaces", s.OrgHandler.Spaces)
+		apiGroup.GET("/organization/:namespace/collections", s.OrgHandler.Collections)
+		apiGroup.GET("/organization/:namespace/prompts", s.OrgHandler.Prompts)
 	}
 
 	{
-		apiGroup.GET("/organization/:namespace/members", userProxyHandler.ProxyToApi("/api/v1/organization/%s/members", "namespace"))
-		apiGroup.POST("/organization/:namespace/members", userProxyHandler.ProxyToApi("/api/v1/organization/%s/members", "namespace"))
-		apiGroup.GET("/organization/:namespace/members/:username", userProxyHandler.ProxyToApi("/api/v1/organization/%s/members/%s", "namespace", "username"))
-		apiGroup.PUT("/organization/:namespace/members/:username", userProxyHandler.ProxyToApi("/api/v1/organization/%s/members/%s", "namespace", "username"))
-		apiGroup.DELETE("/organization/:namespace/members/:username", userProxyHandler.ProxyToApi("/api/v1/organization/%s/members/%s", "namespace", "username"))
+		apiGroup.GET("/organization/:namespace/members", s.UserProxyHandler.ProxyToApi("/api/v1/organization/%s/members", "namespace"))
+		apiGroup.POST("/organization/:namespace/members", s.UserProxyHandler.ProxyToApi("/api/v1/organization/%s/members", "namespace"))
+		apiGroup.GET("/organization/:namespace/members/:username", s.UserProxyHandler.ProxyToApi("/api/v1/organization/%s/members/%s", "namespace", "username"))
+		apiGroup.PUT("/organization/:namespace/members/:username", s.UserProxyHandler.ProxyToApi("/api/v1/organization/%s/members/%s", "namespace", "username"))
+		apiGroup.DELETE("/organization/:namespace/members/:username", s.UserProxyHandler.ProxyToApi("/api/v1/organization/%s/members/%s", "namespace", "username"))
 	}
 
 	// Tag
-	tagCtrl, err := handler.NewTagHandler(config)
-	if err != nil {
-		return nil, fmt.Errorf("error creating tag controller:%w", err)
-	}
-	createTagsRoutes(apiGroup, tagCtrl)
+	createTagsRoutes(apiGroup, s.TagCtrl)
 
 	// JWT token
-	apiGroup.POST("/jwt/token", authCollection.NeedAPIKey, userProxyHandler.Proxy)
-	apiGroup.GET("/jwt/:token", authCollection.NeedAPIKey, userProxyHandler.ProxyToApi("/api/v1/jwt/%s", "token"))
-	apiGroup.GET("/users", userProxyHandler.Proxy)
+	apiGroup.POST("/jwt/token", s.Middleware.NeedAPIKey(), s.UserProxyHandler.Proxy)
+	apiGroup.GET("/jwt/:token", s.Middleware.NeedAPIKey(), s.UserProxyHandler.ProxyToApi("/api/v1/jwt/%s", "token"))
+	apiGroup.GET("/users", s.UserProxyHandler.Proxy)
 
 	// callback
-	callbackCtrl, err := callback.NewGitCallbackHandler(config)
-	if err != nil {
-		return nil, fmt.Errorf("error creating callback controller:%w", err)
-	}
-	apiGroup.POST("/callback/git", callbackCtrl.Handle)
-	apiGroup.GET("/callback/casdoor", userProxyHandler.Proxy)
+	apiGroup.POST("/callback/git", s.CallbackCtrl.Handle)
+	apiGroup.GET("/callback/casdoor", s.UserProxyHandler.Proxy)
 	// Sensive check
-	if config.SensitiveCheck.Enable {
-		sensitiveCtrl, err := handler.NewSensitiveHandler(config)
+	if s.Config.SensitiveCheck.Enable {
+		sensitiveCtrl, err := handler.NewSensitiveHandler(s.Config)
 		if err != nil {
-			return nil, fmt.Errorf("error creating sensitive handler:%w", err)
+			return fmt.Errorf("error creating sensitive handler:%w", err)
 		}
 		apiGroup.POST("/sensitive/text", sensitiveCtrl.Text)
 		apiGroup.POST("/sensitive/image", sensitiveCtrl.Image)
 	}
 
 	// MirrorSource
-	msHandler, err := handler.NewMirrorSourceHandler(config)
-	if err != nil {
-		return nil, fmt.Errorf("error creating mirror source controller:%w", err)
-	}
+	apiGroup.GET("/mirrors", s.MirrorHandler.Index)
 
-	apiGroup.GET("/mirrors", mirrorHandler.Index)
 	mirror := apiGroup.Group("/mirror")
 	{
-		mirror.GET("/sources", msHandler.Index)
-		mirror.POST("/sources", msHandler.Create)
-		mirror.PUT("/sources/:id", msHandler.Update)
-		mirror.DELETE("/sources/:id", msHandler.Delete)
-		mirror.GET("/sources/:id", msHandler.Get)
-		mirror.POST("/repo", mirrorHandler.CreateMirrorRepo)
-		mirror.GET("/repos", mirrorHandler.Repos)
+		mirror.GET("/sources", s.MsHandler.Index)
+		mirror.POST("/sources", s.MsHandler.Create)
+		mirror.PUT("/sources/:id", s.MsHandler.Update)
+		mirror.DELETE("/sources/:id", s.MsHandler.Delete)
+		mirror.GET("/sources/:id", s.MsHandler.Get)
+		mirror.POST("/repo", s.MirrorHandler.CreateMirrorRepo)
+		mirror.GET("/repos", s.MirrorHandler.Repos)
 
 	}
 
-	collectionHandler, err := handler.NewCollectionHandler(config)
-	if err != nil {
-		return nil, fmt.Errorf("error creating collection handler:%w", err)
-	}
 	collections := apiGroup.Group("/collections")
 	{
 		// list all collection
-		collections.GET("", collectionHandler.Index)
-		collections.POST("", collectionHandler.Create)
-		collections.GET("/:id", collectionHandler.GetCollection)
-		collections.PUT("/:id", collectionHandler.UpdateCollection)
-		collections.DELETE("/:id", collectionHandler.DeleteCollection)
-		collections.POST("/:id/repos", collectionHandler.AddRepoToCollection)
-		collections.DELETE("/:id/repos", collectionHandler.RemoveRepoFromCollection)
+		collections.GET("", s.CollectionHandler.Index)
+		collections.POST("", s.CollectionHandler.Create)
+		collections.GET("/:id", s.CollectionHandler.GetCollection)
+		collections.PUT("/:id", s.CollectionHandler.UpdateCollection)
+		collections.DELETE("/:id", s.CollectionHandler.DeleteCollection)
+		collections.POST("/:id/repos", s.CollectionHandler.AddRepoToCollection)
+		collections.DELETE("/:id/repos", s.CollectionHandler.RemoveRepoFromCollection)
 	}
 
 	// cluster infos
-	clusterHandler, err := handler.NewClusterHandler(config)
-	if err != nil {
-		return nil, fmt.Errorf("fail to creating cluster handler: %w", err)
-	}
 	cluster := apiGroup.Group("/cluster")
 	{
-		cluster.GET("", clusterHandler.Index)
-		cluster.GET("/:id", clusterHandler.GetClusterById)
-		cluster.PUT("/:id", authCollection.NeedAPIKey, clusterHandler.Update)
+		cluster.GET("", s.ClusterHandler.Index)
+		cluster.GET("/:id", s.ClusterHandler.GetClusterById)
+		cluster.PUT("/:id", s.Middleware.NeedAPIKey(), s.ClusterHandler.Update)
 	}
 
-	eventHandler, err := handler.NewEventHandler()
-	if err != nil {
-		return nil, fmt.Errorf("error creating event handler:%w", err)
-	}
 	event := apiGroup.Group("/events")
-	event.POST("", eventHandler.Create)
+	event.POST("", s.EventHandler.Create)
 
 	// routes for broadcast
-	broadcastHandler, err := handler.NewBroadcastHandler()
-	if err != nil {
-		return nil, fmt.Errorf("error creating broadcast handler:%w", err)
-	}
 	broadcast := apiGroup.Group("/broadcasts")
 	adminBroadcast := apiGroup.Group("/admin/broadcasts")
-	adminBroadcast.Use(authCollection.NeedAdmin)
+	adminBroadcast.Use(s.Middleware.NeedAdmin())
 
-	adminBroadcast.POST("", broadcastHandler.Create)
-	adminBroadcast.PUT("/:id", broadcastHandler.Update)
-	adminBroadcast.GET("", broadcastHandler.Index)
-	adminBroadcast.GET("/:id", broadcastHandler.Show)
-	broadcast.GET("/:id", broadcastHandler.Show)
-	broadcast.GET("/active", broadcastHandler.Active)
+	broadcast.GET("/active", s.BroadcastHandler.Active)
+	adminBroadcast.POST("", s.BroadcastHandler.Create)
+	adminBroadcast.PUT("/:id", s.BroadcastHandler.Update)
+	adminBroadcast.GET("", s.BroadcastHandler.Index)
+	adminBroadcast.GET("/:id", s.BroadcastHandler.Show)
+	broadcast.GET("/:id", s.BroadcastHandler.Show)
 	// end routes for broadcast
+	createRuntimeFrameworkRoutes(
+		apiGroup, s.Middleware, s.ModelHandler, s.RuntimeArchHandler, s.RepoCommonHandler,
+	)
 
-	runtimeArchHandler, err := handler.NewRuntimeArchitectureHandler(config)
-	if err != nil {
-		return nil, fmt.Errorf("error creating runtime framework architecture handler:%w", err)
-	}
-
-	createRuntimeFrameworkRoutes(apiGroup, authCollection.NeedAPIKey, modelHandler, runtimeArchHandler, repoCommonHandler)
-
-	syncHandler, err := handler.NewSyncHandler(config)
-	if err != nil {
-		return nil, fmt.Errorf("error creating sync handler:%w", err)
-	}
-	syncClientSettingHandler, err := handler.NewSyncClientSettingHandler(config)
-	if err != nil {
-		return nil, fmt.Errorf("error creating sync client setting handler:%w", err)
-	}
 	syncGroup := apiGroup.Group("sync")
 	{
-		syncGroup.GET("/version/latest", syncHandler.Latest)
+		syncGroup.GET("/version/latest", s.SyncHandler.Latest)
 		// syncGroup.GET("/version/oldest", syncHandler.Oldest)
-		syncGroup.GET("/client_setting", syncClientSettingHandler.Show)
-		syncGroup.POST("/client_setting", syncClientSettingHandler.Create)
+		syncGroup.GET("/client_setting", s.SyncClientSettingHandler.Show)
+		syncGroup.POST("/client_setting", s.SyncClientSettingHandler.Create)
 	}
 
-	accountingHandler, err := handler.NewAccountingHandler(config)
-	if err != nil {
-		return nil, fmt.Errorf("error creating accounting handler setting handler:%w", err)
-	}
-
-	createAccountRoutes(apiGroup, authCollection.NeedAPIKey, accountingHandler)
-
-	recomHandler, err := handler.NewRecomHandler(config)
-	if err != nil {
-		return nil, fmt.Errorf("error creating recomHandler,%w", err)
-	}
 	recomGroup := apiGroup.Group("/recom")
 	{
-		recomGroup.POST("opweight", authCollection.NeedAPIKey, recomHandler.SetOpWeight)
+		recomGroup.POST("opweight", s.Middleware.NeedAdmin(), s.RecomHandler.SetOpWeight)
 	}
 
 	// telemetry
-	telemetryHandler, err := handler.NewTelemetryHandler()
-	if err != nil {
-		return nil, fmt.Errorf("error creating telemetry handler:%w", err)
-	}
 	teleGroup := apiGroup.Group("/telemetry")
-	teleGroup.POST("/usage", telemetryHandler.Usage)
+	teleGroup.POST("/usage", s.TelemetryHandler.Usage)
 
 	// internal API for gitaly to check request permissions
-	internalHandler, err := handler.NewInternalHandler(config)
-	if err != nil {
-		return nil, fmt.Errorf("error creating internalHandler,%w", err)
-	}
-	needGitlabShellJWTToken := middleware.CheckGitlabShellJWTToken(config)
-	r.GET("/api/v4/internal/authorized_keys", needGitlabShellJWTToken, internalHandler.GetAuthorizedKeys)
-	r.POST("/api/v4/internal/allowed", needGitlabShellJWTToken, internalHandler.SSHAllowed)
-	r.POST("/api/v4/internal/pre_receive", needGitlabShellJWTToken, internalHandler.PreReceive)
-	r.POST("api/v4/internal/lfs_authenticate", needGitlabShellJWTToken, internalHandler.LfsAuthenticate)
-	r.POST("/api/v4/internal/post_receive", needGitlabShellJWTToken, internalHandler.PostReceive)
+	needGitlabShellJWTToken := s.Middleware.CheckGitlabShellJWTToken()
+	r.GET("/api/v4/internal/authorized_keys", needGitlabShellJWTToken, s.InternalHandler.GetAuthorizedKeys)
+	r.POST("/api/v4/internal/allowed", needGitlabShellJWTToken, s.InternalHandler.SSHAllowed)
+	r.POST("/api/v4/internal/pre_receive", needGitlabShellJWTToken, s.InternalHandler.PreReceive)
+	r.POST("api/v4/internal/lfs_authenticate", needGitlabShellJWTToken, s.InternalHandler.LfsAuthenticate)
+	r.POST("/api/v4/internal/post_receive", needGitlabShellJWTToken, s.InternalHandler.PostReceive)
 	internalGroup := apiGroup.Group("/internal")
 	{
-		internalGroup.POST("/allowed", needGitlabShellJWTToken, internalHandler.Allowed)
-		internalGroup.POST("/pre_receive", needGitlabShellJWTToken, internalHandler.PreReceive)
-		internalGroup.POST("/post_receive", needGitlabShellJWTToken, internalHandler.PostReceive)
+		internalGroup.POST("/allowed", needGitlabShellJWTToken, s.InternalHandler.Allowed)
+		internalGroup.POST("/pre_receive", needGitlabShellJWTToken, s.InternalHandler.PreReceive)
+		internalGroup.POST("/post_receive", needGitlabShellJWTToken, s.InternalHandler.PostReceive)
 	}
-
-	discussionHandler, err := handler.NewDiscussionHandler(config)
-	if err != nil {
-		return nil, fmt.Errorf("error creating discussion handler:%w", err)
-	}
-	createDiscussionRoutes(apiGroup, authCollection.NeedAPIKey, discussionHandler)
+	createDiscussionRoutes(apiGroup, s.Middleware.NeedAPIKey(), s.DiscussionHandler)
 
 	// prompt
-	promptHandler, err := handler.NewPromptHandler(config)
-	if err != nil {
-		return nil, fmt.Errorf("error creating prompt handler,%w", err)
-	}
-	createPromptRoutes(apiGroup, promptHandler)
-
-	dataViewerAddr := fmt.Sprintf("%s:%d", config.DataViewer.Host, config.DataViewer.Port)
-	dsViewerHandler, err := handler.NewInternalServiceProxyHandler(dataViewerAddr)
-	if err != nil {
-		return nil, fmt.Errorf("error creating dataset viewer proxy:%w", err)
-	}
-	createDataViewerRoutes(apiGroup, dsViewerHandler)
+	createPromptRoutes(apiGroup, s.PromptHandler)
+	// Dataset viewer proxy
+	createDataViewerRoutes(apiGroup, s.DsViewerHandler)
 
 	// space template
-	templateHandler, err := handler.NewSpaceTemplateHandler(config)
+	templateHandler, err := handler.NewSpaceTemplateHandler(s.Config)
 	if err != nil {
-		return nil, fmt.Errorf("error creating space template proxy:%w", err)
+		return fmt.Errorf("error creating space template proxy:%w", err)
 	}
-	createSpaceTemplateRoutes(apiGroup, authCollection, templateHandler)
-	return r, nil
+	createSpaceTemplateRoutes(apiGroup, s.Middleware, templateHandler)
+
+	return nil
 }
 
 func createEvaluationRoutes(apiGroup *gin.RouterGroup, evaluationHandler *handler.EvaluationHandler) {
@@ -477,7 +485,7 @@ func createEvaluationRoutes(apiGroup *gin.RouterGroup, evaluationHandler *handle
 	}
 }
 
-func createModelRoutes(config *config.Config, apiGroup *gin.RouterGroup, needAPIKey gin.HandlerFunc, modelHandler *handler.ModelHandler, repoCommonHandler *handler.RepoHandler) {
+func createModelRoutes(config *config.Config, apiGroup *gin.RouterGroup, middleware *middleware.Middleware, modelHandler *handler.ModelHandler, repoCommonHandler *handler.RepoHandler) {
 	// Models routes
 	modelsGroup := apiGroup.Group("/models")
 	{
@@ -568,7 +576,7 @@ func createModelRoutes(config *config.Config, apiGroup *gin.RouterGroup, needAPI
 	}
 }
 
-func createDatasetRoutes(config *config.Config, apiGroup *gin.RouterGroup, dsHandler *handler.DatasetHandler, repoCommonHandler *handler.RepoHandler) {
+func createDatasetRoutes(config *config.Config, apiGroup *gin.RouterGroup, dsHandler *handler.DatasetHandler, repoCommonHandler *handler.RepoHandler, middleware *middleware.Middleware) {
 	datasetsGroup := apiGroup.Group("/datasets")
 	{
 		datasetsGroup.POST("", dsHandler.Create)
@@ -610,7 +618,7 @@ func createDatasetRoutes(config *config.Config, apiGroup *gin.RouterGroup, dsHan
 	}
 }
 
-func createCodeRoutes(config *config.Config, apiGroup *gin.RouterGroup, codeHandler *handler.CodeHandler, repoCommonHandler *handler.RepoHandler) {
+func createCodeRoutes(config *config.Config, apiGroup *gin.RouterGroup, codeHandler *handler.CodeHandler, repoCommonHandler *handler.RepoHandler, middleware *middleware.Middleware) {
 	codesGroup := apiGroup.Group("/codes")
 	{
 		codesGroup.POST("", codeHandler.Create)
@@ -651,7 +659,7 @@ func createCodeRoutes(config *config.Config, apiGroup *gin.RouterGroup, codeHand
 	}
 }
 
-func createSpaceRoutes(config *config.Config, apiGroup *gin.RouterGroup, spaceHandler *handler.SpaceHandler, repoCommonHandler *handler.RepoHandler) {
+func createSpaceRoutes(config *config.Config, apiGroup *gin.RouterGroup, spaceHandler *handler.SpaceHandler, repoCommonHandler *handler.RepoHandler, middleware *middleware.Middleware) {
 	spaces := apiGroup.Group("/spaces")
 	{
 		// list all spaces
@@ -710,7 +718,7 @@ func createSpaceRoutes(config *config.Config, apiGroup *gin.RouterGroup, spaceHa
 	}
 }
 
-func createUserRoutes(apiGroup *gin.RouterGroup, needAPIKey gin.HandlerFunc, userProxyHandler *handler.InternalServiceProxyHandler, userHandler *handler.UserHandler) {
+func createUserRoutes(apiGroup *gin.RouterGroup, middleware *middleware.Middleware, userProxyHandler *handler.InternalServiceProxyHandler, userHandler *handler.UserHandler) {
 	// depricated
 	{
 		apiGroup.POST("/users", userProxyHandler.ProxyToApi("/api/v1/user"))
@@ -754,10 +762,11 @@ func createUserRoutes(apiGroup *gin.RouterGroup, needAPIKey gin.HandlerFunc, use
 	apiGroup.GET("/user/:username/tokens", userProxyHandler.ProxyToApi("/api/v1/user/%s/tokens", "username"))
 
 	// serverless list
-	apiGroup.GET("/user/:username/run/serverless", needAPIKey, userHandler.GetRunServerless)
+	apiGroup.GET("/user/:username/run/serverless", middleware.NeedAPIKey(), userHandler.GetRunServerless)
 }
 
-func createRuntimeFrameworkRoutes(apiGroup *gin.RouterGroup, needAPIKey gin.HandlerFunc, modelHandler *handler.ModelHandler, runtimeArchHandler *handler.RuntimeArchitectureHandler, repoCommonHandler *handler.RepoHandler) {
+func createRuntimeFrameworkRoutes(apiGroup *gin.RouterGroup, middleware *middleware.Middleware, modelHandler *handler.ModelHandler, runtimeArchHandler *handler.RuntimeArchitectureHandler, repoCommonHandler *handler.RepoHandler) {
+	needAPIKey := middleware.NeedAPIKey()
 	runtimeFramework := apiGroup.Group("/runtime_framework")
 	{
 		runtimeFramework.GET("/:id/models", modelHandler.ListByRuntimeFrameworkID)
@@ -776,17 +785,7 @@ func createRuntimeFrameworkRoutes(apiGroup *gin.RouterGroup, needAPIKey gin.Hand
 	}
 }
 
-func createAccountRoutes(apiGroup *gin.RouterGroup, needAPIKey gin.HandlerFunc, accountingHandler *handler.AccountingHandler) {
-	accountingGroup := apiGroup.Group("/accounting")
-	{
-		meterGroup := accountingGroup.Group("/metering")
-		{
-			meterGroup.GET("/:id/statements", accountingHandler.QueryMeteringStatementByUserID)
-		}
-	}
-}
-
-func createMappingRoutes(r *gin.Engine, group string, hfdsHandler *handler.HFDatasetHandler, repoCommonHandler *handler.RepoHandler, modelHandler *handler.ModelHandler, userHandler *handler.UserHandler) {
+func createMappingRoutes(r *gin.Engine, group string, hfdsHandler *handler.HFDatasetHandler, repoCommonHandler *handler.RepoHandler, modelHandler *handler.ModelHandler, userHandler *handler.UserHandler, middleware *middleware.Middleware) {
 	// Huggingface SDK routes
 	hfGroup := r.Group(group)
 	{
@@ -887,13 +886,13 @@ func createDataViewerRoutes(apiGroup *gin.RouterGroup, dsViewerHandler *handler.
 	}
 }
 
-func createSpaceTemplateRoutes(apiGroup *gin.RouterGroup, authCollection middleware.AuthenticatorCollection, templateHandler *handler.SpaceTemplateHandler) {
+func createSpaceTemplateRoutes(apiGroup *gin.RouterGroup, middleware *middleware.Middleware, templateHandler *handler.SpaceTemplateHandler) {
 	spaceTemplateGrp := apiGroup.Group("/space_templates")
 	{
-		spaceTemplateGrp.GET("", authCollection.NeedAdmin, templateHandler.Index)
-		spaceTemplateGrp.POST("", authCollection.NeedAdmin, templateHandler.Create)
-		spaceTemplateGrp.PUT("/:id", authCollection.NeedAdmin, templateHandler.Update)
-		spaceTemplateGrp.DELETE("/:id", authCollection.NeedAdmin, templateHandler.Delete)
+		spaceTemplateGrp.GET("", middleware.NeedAdmin(), templateHandler.Index)
+		spaceTemplateGrp.POST("", middleware.NeedAdmin(), templateHandler.Create)
+		spaceTemplateGrp.PUT("/:id", middleware.NeedAdmin(), templateHandler.Update)
+		spaceTemplateGrp.DELETE("/:id", middleware.NeedAdmin(), templateHandler.Delete)
 		spaceTemplateGrp.GET("/:type", templateHandler.List)
 	}
 }

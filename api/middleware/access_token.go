@@ -7,11 +7,9 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"opencsg.com/csghub-server/api/httpbase"
-	"opencsg.com/csghub-server/builder/store/database"
 )
 
-func GetUserFromAccessToken() gin.HandlerFunc {
-	userStore := database.NewUserStore()
+func (m *Middleware) GetUserFromAccessToken() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		// Get Auzhorization token
 		authHeader := c.Request.Header.Get("Authorization")
@@ -19,7 +17,7 @@ func GetUserFromAccessToken() gin.HandlerFunc {
 		if authHeader != "" {
 			// Get token
 			token := strings.TrimPrefix(authHeader, "Bearer ")
-			user, err := userStore.FindByAccessToken(context.Background(), token)
+			user, err := m.userComponent.FindByAccessToken(context.Background(), token)
 			if err != nil {
 				slog.Debug("Can not find user by access token", slog.String("token", token))
 				c.Next()

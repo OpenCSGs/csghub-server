@@ -19,6 +19,13 @@ type DiscussionHandler struct {
 	sensitive  component.SensitiveComponent
 }
 
+func NewDiscussionHandlerDI(discussion component.DiscussionComponent, sensitive component.SensitiveComponent) *DiscussionHandler {
+	return &DiscussionHandler{
+		discussion: discussion,
+		sensitive:  sensitive,
+	}
+}
+
 func NewDiscussionHandler(cfg *config.Config) (*DiscussionHandler, error) {
 	c := component.NewDiscussionComponent()
 	sc, err := component.NewSensitiveComponent(cfg)

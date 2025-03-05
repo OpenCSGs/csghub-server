@@ -43,8 +43,7 @@ func NewCodeComponent(config *config.Config) (CodeComponent, error) {
 	c.gitServer = gs
 	c.config = config
 	c.userLikesStore = database.NewUserLikesStore()
-	c.userSvcClient = rpc.NewUserSvcHttpClient(fmt.Sprintf("%s:%d", config.User.Host, config.User.Port),
-		rpc.AuthWithApiKey(config.APIToken))
+	c.userSvcClient = rpc.NewUserSvcHttpClient(config)
 	return c, nil
 }
 

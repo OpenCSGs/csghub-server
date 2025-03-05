@@ -175,6 +175,68 @@ func (_c *MockMirrorComponent_CreatePushMirrorForFinishedMirrorTask_Call) RunAnd
 	return _c
 }
 
+// FindWithMapping provides a mock function with given fields: ctx, repoType, namespace, name, mapping
+func (_m *MockMirrorComponent) FindWithMapping(ctx context.Context, repoType types.RepositoryType, namespace string, name string, mapping types.Mapping) (*database.Repository, error) {
+	ret := _m.Called(ctx, repoType, namespace, name, mapping)
+
+	if len(ret) == 0 {
+		panic("no return value specified for FindWithMapping")
+	}
+
+	var r0 *database.Repository
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, types.RepositoryType, string, string, types.Mapping) (*database.Repository, error)); ok {
+		return rf(ctx, repoType, namespace, name, mapping)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, types.RepositoryType, string, string, types.Mapping) *database.Repository); ok {
+		r0 = rf(ctx, repoType, namespace, name, mapping)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*database.Repository)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, types.RepositoryType, string, string, types.Mapping) error); ok {
+		r1 = rf(ctx, repoType, namespace, name, mapping)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockMirrorComponent_FindWithMapping_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'FindWithMapping'
+type MockMirrorComponent_FindWithMapping_Call struct {
+	*mock.Call
+}
+
+// FindWithMapping is a helper method to define mock.On call
+//   - ctx context.Context
+//   - repoType types.RepositoryType
+//   - namespace string
+//   - name string
+//   - mapping types.Mapping
+func (_e *MockMirrorComponent_Expecter) FindWithMapping(ctx interface{}, repoType interface{}, namespace interface{}, name interface{}, mapping interface{}) *MockMirrorComponent_FindWithMapping_Call {
+	return &MockMirrorComponent_FindWithMapping_Call{Call: _e.mock.On("FindWithMapping", ctx, repoType, namespace, name, mapping)}
+}
+
+func (_c *MockMirrorComponent_FindWithMapping_Call) Run(run func(ctx context.Context, repoType types.RepositoryType, namespace string, name string, mapping types.Mapping)) *MockMirrorComponent_FindWithMapping_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(types.RepositoryType), args[2].(string), args[3].(string), args[4].(types.Mapping))
+	})
+	return _c
+}
+
+func (_c *MockMirrorComponent_FindWithMapping_Call) Return(_a0 *database.Repository, _a1 error) *MockMirrorComponent_FindWithMapping_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockMirrorComponent_FindWithMapping_Call) RunAndReturn(run func(context.Context, types.RepositoryType, string, string, types.Mapping) (*database.Repository, error)) *MockMirrorComponent_FindWithMapping_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // Index provides a mock function with given fields: ctx, currentUser, per, page, search
 func (_m *MockMirrorComponent) Index(ctx context.Context, currentUser string, per int, page int, search string) ([]types.Mirror, int, error) {
 	ret := _m.Called(ctx, currentUser, per, page, search)

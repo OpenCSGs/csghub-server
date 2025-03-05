@@ -9,17 +9,16 @@ import (
 	slogmulti "github.com/samber/slog-multi"
 	"go.opentelemetry.io/contrib/bridges/otelslog"
 	"opencsg.com/csghub-server/api/httpbase"
-	"opencsg.com/csghub-server/common/config"
 )
 
-func Log(config *config.Config) gin.HandlerFunc {
+func (m *Middleware) Log() gin.HandlerFunc {
 	handlers := []slog.Handler{
 		slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
 			AddSource: false,
 			Level:     slog.LevelInfo,
 		}),
 	}
-	if config.Instrumentation.OTLPEndpoint != "" && config.Instrumentation.OTLPLogging {
+	if m.config.Instrumentation.OTLPEndpoint != "" && m.config.Instrumentation.OTLPLogging {
 		handlers = append(handlers, otelslog.NewHandler("csghub-server"))
 	}
 
