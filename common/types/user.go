@@ -24,7 +24,7 @@ type UpdateUserRequest struct {
 	Username string  `json:"-"`
 	Email    *string `json:"email,omitempty" binding:"omitnil,email"`
 	Phone    *string `json:"phone,omitempty"`
-	UUID     *string `json:"uuid,omitempty"`
+	UUID     *string `json:"-"`
 	// should be updated by admin
 	Roles    *[]string `json:"roles,omitempty" example:"[super_user, admin, personal_user]"`
 	Avatar   *string   `json:"avatar,omitempty"`

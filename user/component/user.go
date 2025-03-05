@@ -842,7 +842,7 @@ func (c *userComponentImpl) updateCasdoorUser(req *types.UpdateUserRequest) (*ca
 	}
 	//nothing to update
 	if req.Email == nil && req.Phone == nil && req.NewUserName == nil && req.Nickname == nil {
-		return nil, errors.New("nothing to update, at least one of email/phone/new_username/nickname is required")
+		return nil, nil
 	}
 
 	c.lazyInit()

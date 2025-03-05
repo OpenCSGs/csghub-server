@@ -115,37 +115,17 @@ func (h *UserHandler) Update(ctx *gin.Context) {
 		return
 	}
 
-	useUUID := ctx.Query("type") == "uuid"
 	id := ctx.Param("id")
-	if useUUID {
-		req.UUID = &id
-		req.OpUser = currentUser
-		err = h.c.UpdateByUUID(ctx.Request.Context(), req)
-		if err != nil {
-			slog.Error("Failed to update user by uuid", slog.Any("error", err), slog.String("uuid", *req.UUID), slog.String("current_user", currentUser), slog.Any("req", *req))
-			httpbase.ServerError(ctx, err)
-			return
-		}
-
-		slog.Info("Update user by uuid succeed", slog.String("uuid", *req.UUID), slog.String("current_user", currentUser))
-		httpbase.OK(ctx, nil)
-		return
-	}
-
-	//TODO: remove after Portal upgrade to use UUID
-	req.Username = id
-	if req.NewUserName != nil {
-		err = h.c.ChangeUserName(ctx, req.Username, *req.NewUserName, currentUser)
-	} else {
-		err = h.c.Update(ctx, req, currentUser)
-	}
+	req.UUID = &id
+	req.OpUser = currentUser
+	err = h.c.UpdateByUUID(ctx.Request.Context(), req)
 	if err != nil {
-		slog.Error("Failed to update user", slog.Any("error", err), slog.String("current_user", currentUser), slog.Any("req", *req))
+		slog.Error("Failed to update user by uuid", slog.Any("error", err), slog.String("uuid", *req.UUID), slog.String("current_user", currentUser), slog.Any("req", *req))
 		httpbase.ServerError(ctx, err)
 		return
 	}
 
-	slog.Info("Update user succeed", slog.String("user", req.Username))
+	slog.Info("Update user by uuid succeed", slog.String("uuid", *req.UUID), slog.String("current_user", currentUser))
 	httpbase.OK(ctx, nil)
 }
 
