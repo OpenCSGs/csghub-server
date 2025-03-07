@@ -861,6 +861,10 @@ func (d *deployer) serviceUpdateConsumerCallback(msg jetstream.Msg) {
 	defer cancel()
 	deploy, err := d.deployTaskStore.GetDeployBySvcName(ctx, event.ServiceName)
 	if err != nil {
+		err = msg.Ack()
+		if err != nil {
+			slog.Warn("fail to ack after processing service message", slog.Any("msg", string(msg.Data())))
+		}
 		slog.Warn("fail to get deploy by service name in event consumer", slog.Any("service_name", event.ServiceName))
 		return
 	}
