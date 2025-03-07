@@ -14,8 +14,9 @@ echo "$OPENCSG_ACR_PASSWORD" | docker login $OPENCSG_ACR -u $OPENCSG_ACR_USERNAM
 
 ## Build Multi-Platform Images
 ```bash
+#opencsg-registry.cn-beijing.cr.aliyuncs.com/public/llama-factory:0.9.2
 export BUILDX_NO_DEFAULT_ATTESTATIONS=1
-export IMAGE_TAG=1.21-cuda12.1-devel-ubuntu22.04-py310-torch2.1.2
+export IMAGE_TAG=0.9.2
 docker buildx build --platform linux/amd64,linux/arm64 \
   -t ${OPENCSG_ACR}/public/llama-factory:${IMAGE_TAG} \
   -t ${OPENCSG_ACR}/public/llama-factory:latest \
@@ -24,9 +25,9 @@ docker buildx build --platform linux/amd64,linux/arm64 \
 ```
 ## Build Multi-Platform Images for swift
 ```bash
-#opencsg-registry.cn-beijing.cr.aliyuncs.com/public/ms-swift:v3.1.0
+#opencsg-registry.cn-beijing.cr.aliyuncs.com/public/ms-swift:v3.2.0.post2
 export BUILDX_NO_DEFAULT_ATTESTATIONS=1
-export IMAGE_TAG=v3.1.0
+export IMAGE_TAG=v3.2.0.post2
 docker buildx build --platform linux/amd64,linux/arm64 \
   -t ${OPENCSG_ACR}/public/ms-swift:${IMAGE_TAG} \
   -t ${OPENCSG_ACR}/public/ms-swift:latest \
@@ -48,8 +49,8 @@ docker buildx build --platform linux/amd64,linux/arm64 \
 ## fintune image name, version and cuda version
 | Image Name | Version | CUDA Version | Fix
 | --- | --- | --- |--- |
-| llama-factory | 1.21-cuda12.1-devel-ubuntu22.04-py310-torch2.1.2 | 12.1 |- |
-| ms-swift | v3.1.0 | 12.4 |- |
+| llama-factory | 0.9.2 | 12.4 |- |
+| ms-swift | v3.2.0 | 12.4 |- |
 
 
 ## Run Finetune Image Locally

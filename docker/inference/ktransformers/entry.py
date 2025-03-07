@@ -51,7 +51,7 @@ if __name__ == "__main__":
         if engine_args is not None:
             model_file = get_argument_value(os.environ['ENGINE_ARGS'], '-m')
         if model_file is None:
-            model_file = os.environ['GGUF_ENTRYPOINT']
+            model_file = os.environ['GGUF_ENTRY_POINT']
         model_file = model_file.replace("00001-of", "*")
         allow_patterns = [
             model_file,

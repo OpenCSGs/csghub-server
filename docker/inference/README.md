@@ -73,7 +73,7 @@ docker buildx build --platform linux/amd64 \
   -f Dockerfile.llama.cpp \
   --push .
 # For Text ktransformers Inference: opencsg-registry.cn-beijing.cr.aliyuncs.com/public/ktransformers:0.2.1.post1  
-export IMAGE_TAG=0.2.1.post1
+export IMAGE_TAG=0.2.3
 docker build --platform linux/amd64 \
   -t ${OPENCSG_ACR}/public/ktransformers:${IMAGE_TAG} \
   -t ${OPENCSG_ACR}/public/ktransformers:latest \

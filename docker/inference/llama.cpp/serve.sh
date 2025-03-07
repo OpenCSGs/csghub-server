@@ -17,7 +17,9 @@ if [[ ! $ENGINE_ARGS == *"-m "* ]] && [[ -z $GGUF_ENTRY_POINT ]]; then
     echo "model file name is required, ex: -m DeepSeek-R1-UD-IQ1_M/DeepSeek-R1-UD-IQ1_M-00001-of-00004.gguf"
     exit 1
 fi
-export ENGINE_ARGS=$ENGINE_ARGS
+if [[ ! $ENGINE_ARGS == *"-m"* ]]; then
+    ENGINE_ARGS="$ENGINE_ARGS -m $GGUF_ENTRY_POINT"
+fi
 echo $ENGINE_ARGS
 
 python3 /etc/csghub/entry.py

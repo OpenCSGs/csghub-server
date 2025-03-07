@@ -14,7 +14,7 @@ RUN pip install https://git-devops.opencsg.com/opensource/public_files/-/raw/mai
 
 WORKDIR /etc/csghub/
 #download ktransformers with ISA
-ARG KT_VERSION=0.2.1.post1
+ARG KT_VERSION=0.2.3
 RUN wget -O ktransformers-avx2-cp310-cp310-linux_x86_64.whl https://github.com/kvcache-ai/ktransformers/releases/download/v${KT_VERSION}/ktransformers-${KT_VERSION}+cu124torch24avx2-cp310-cp310-linux_x86_64.whl && \
     wget -O ktransformers-avx512-cp310-cp310-linux_x86_64.whl https://github.com/kvcache-ai/ktransformers/releases/download/v${KT_VERSION}/ktransformers-${KT_VERSION}+cu124torch24avx512-cp310-cp310-linux_x86_64.whl && \
     wget -O ktransformers-fancy-cp310-cp310-linux_x86_64.whl https://github.com/kvcache-ai/ktransformers/releases/download/v${KT_VERSION}/ktransformers-${KT_VERSION}+cu124torch24fancy-cp310-cp310-linux_x86_64.whl

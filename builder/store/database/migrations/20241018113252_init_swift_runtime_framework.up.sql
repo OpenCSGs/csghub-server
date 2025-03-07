@@ -1,7 +1,6 @@
 SET statement_timeout = 0;
 
 --bun:split
-
 INSERT INTO resource_models (resource_name, engine_name, model_name, type) VALUES ('nvidia', 'ms-swift', 'Qwen-1_8B-Chat', 'gpu') ON CONFLICT (engine_name, model_name) DO NOTHING;
 INSERT INTO resource_models (resource_name, engine_name, model_name, type) VALUES ('nvidia', 'ms-swift', 'Qwen-7B-Chat', 'gpu') ON CONFLICT (engine_name, model_name) DO NOTHING;
 INSERT INTO resource_models (resource_name, engine_name, model_name, type) VALUES ('nvidia', 'ms-swift', 'Qwen-14B-Chat', 'gpu') ON CONFLICT (engine_name, model_name) DO NOTHING;
@@ -87,6 +86,9 @@ INSERT INTO resource_models (resource_name, engine_name, model_name, type) VALUE
 INSERT INTO resource_models (resource_name, engine_name, model_name, type) VALUES ('nvidia', 'ms-swift', 'Qwen2-Math-1.5B', 'gpu') ON CONFLICT (engine_name, model_name) DO NOTHING;
 INSERT INTO resource_models (resource_name, engine_name, model_name, type) VALUES ('nvidia', 'ms-swift', 'Qwen2-Math-7B', 'gpu') ON CONFLICT (engine_name, model_name) DO NOTHING;
 INSERT INTO resource_models (resource_name, engine_name, model_name, type) VALUES ('nvidia', 'ms-swift', 'Qwen2-Math-72B', 'gpu') ON CONFLICT (engine_name, model_name) DO NOTHING;
+INSERT INTO resource_models (resource_name, engine_name, model_name, type) VALUES ('nvidia', 'ms-swift', 'Qwen2.5-7B-Instruct-1M', 'gpu') ON CONFLICT (engine_name, model_name) DO NOTHING;
+INSERT INTO resource_models (resource_name, engine_name, model_name, type) VALUES ('nvidia', 'ms-swift', 'Qwen2.5-14B-Instruct-1M', 'gpu') ON CONFLICT (engine_name, model_name) DO NOTHING;
+INSERT INTO resource_models (resource_name, engine_name, model_name, type) VALUES ('nvidia', 'ms-swift', 'SmallThinker-3B-Preview', 'gpu') ON CONFLICT (engine_name, model_name) DO NOTHING;
 INSERT INTO resource_models (resource_name, engine_name, model_name, type) VALUES ('nvidia', 'ms-swift', 'Qwen2.5-0.5B-Instruct', 'gpu') ON CONFLICT (engine_name, model_name) DO NOTHING;
 INSERT INTO resource_models (resource_name, engine_name, model_name, type) VALUES ('nvidia', 'ms-swift', 'Qwen2.5-1.5B-Instruct', 'gpu') ON CONFLICT (engine_name, model_name) DO NOTHING;
 INSERT INTO resource_models (resource_name, engine_name, model_name, type) VALUES ('nvidia', 'ms-swift', 'Qwen2.5-3B-Instruct', 'gpu') ON CONFLICT (engine_name, model_name) DO NOTHING;
@@ -165,6 +167,8 @@ INSERT INTO resource_models (resource_name, engine_name, model_name, type) VALUE
 INSERT INTO resource_models (resource_name, engine_name, model_name, type) VALUES ('nvidia', 'ms-swift', 'Qwen2-57B-A14B', 'gpu') ON CONFLICT (engine_name, model_name) DO NOTHING;
 INSERT INTO resource_models (resource_name, engine_name, model_name, type) VALUES ('nvidia', 'ms-swift', 'Qwen2-57B-A14B-Instruct-GPTQ-Int4', 'gpu') ON CONFLICT (engine_name, model_name) DO NOTHING;
 INSERT INTO resource_models (resource_name, engine_name, model_name, type) VALUES ('nvidia', 'ms-swift', 'QwQ-32B-Preview', 'gpu') ON CONFLICT (engine_name, model_name) DO NOTHING;
+INSERT INTO resource_models (resource_name, engine_name, model_name, type) VALUES ('nvidia', 'ms-swift', 'QwQ-32B', 'gpu') ON CONFLICT (engine_name, model_name) DO NOTHING;
+INSERT INTO resource_models (resource_name, engine_name, model_name, type) VALUES ('nvidia', 'ms-swift', 'QwQ-32B-AWQ', 'gpu') ON CONFLICT (engine_name, model_name) DO NOTHING;
 INSERT INTO resource_models (resource_name, engine_name, model_name, type) VALUES ('nvidia', 'ms-swift', 'CodeFuse-QWen-14B', 'gpu') ON CONFLICT (engine_name, model_name) DO NOTHING;
 INSERT INTO resource_models (resource_name, engine_name, model_name, type) VALUES ('nvidia', 'ms-swift', 'Marco-o1', 'gpu') ON CONFLICT (engine_name, model_name) DO NOTHING;
 INSERT INTO resource_models (resource_name, engine_name, model_name, type) VALUES ('nvidia', 'ms-swift', 'Llama-2-7b-hf', 'gpu') ON CONFLICT (engine_name, model_name) DO NOTHING;
@@ -304,6 +308,7 @@ INSERT INTO resource_models (resource_name, engine_name, model_name, type) VALUE
 INSERT INTO resource_models (resource_name, engine_name, model_name, type) VALUES ('nvidia', 'ms-swift', 'internlm2_5-7b-chat-1m', 'gpu') ON CONFLICT (engine_name, model_name) DO NOTHING;
 INSERT INTO resource_models (resource_name, engine_name, model_name, type) VALUES ('nvidia', 'ms-swift', 'internlm2_5-20b', 'gpu') ON CONFLICT (engine_name, model_name) DO NOTHING;
 INSERT INTO resource_models (resource_name, engine_name, model_name, type) VALUES ('nvidia', 'ms-swift', 'internlm2_5-20b-chat', 'gpu') ON CONFLICT (engine_name, model_name) DO NOTHING;
+INSERT INTO resource_models (resource_name, engine_name, model_name, type) VALUES ('nvidia', 'ms-swift', 'internlm3-8b-instruct', 'gpu') ON CONFLICT (engine_name, model_name) DO NOTHING;
 INSERT INTO resource_models (resource_name, engine_name, model_name, type) VALUES ('nvidia', 'ms-swift', 'deepseek-llm-7b-base', 'gpu') ON CONFLICT (engine_name, model_name) DO NOTHING;
 INSERT INTO resource_models (resource_name, engine_name, model_name, type) VALUES ('nvidia', 'ms-swift', 'deepseek-llm-7b-chat', 'gpu') ON CONFLICT (engine_name, model_name) DO NOTHING;
 INSERT INTO resource_models (resource_name, engine_name, model_name, type) VALUES ('nvidia', 'ms-swift', 'deepseek-llm-67b-base', 'gpu') ON CONFLICT (engine_name, model_name) DO NOTHING;
@@ -331,6 +336,16 @@ INSERT INTO resource_models (resource_name, engine_name, model_name, type) VALUE
 INSERT INTO resource_models (resource_name, engine_name, model_name, type) VALUES ('nvidia', 'ms-swift', 'DeepSeek-V2.5-1210', 'gpu') ON CONFLICT (engine_name, model_name) DO NOTHING;
 INSERT INTO resource_models (resource_name, engine_name, model_name, type) VALUES ('nvidia', 'ms-swift', 'DeepSeek-V3-Base', 'gpu') ON CONFLICT (engine_name, model_name) DO NOTHING;
 INSERT INTO resource_models (resource_name, engine_name, model_name, type) VALUES ('nvidia', 'ms-swift', 'DeepSeek-V3', 'gpu') ON CONFLICT (engine_name, model_name) DO NOTHING;
+INSERT INTO resource_models (resource_name, engine_name, model_name, type) VALUES ('nvidia', 'ms-swift', 'DeepSeek-V3-AWQ', 'gpu') ON CONFLICT (engine_name, model_name) DO NOTHING;
+INSERT INTO resource_models (resource_name, engine_name, model_name, type) VALUES ('nvidia', 'ms-swift', 'DeepSeek-R1', 'gpu') ON CONFLICT (engine_name, model_name) DO NOTHING;
+INSERT INTO resource_models (resource_name, engine_name, model_name, type) VALUES ('nvidia', 'ms-swift', 'DeepSeek-R1-Zero', 'gpu') ON CONFLICT (engine_name, model_name) DO NOTHING;
+INSERT INTO resource_models (resource_name, engine_name, model_name, type) VALUES ('nvidia', 'ms-swift', 'DeepSeek-R1-AWQ', 'gpu') ON CONFLICT (engine_name, model_name) DO NOTHING;
+INSERT INTO resource_models (resource_name, engine_name, model_name, type) VALUES ('nvidia', 'ms-swift', 'DeepSeek-R1-Distill-Qwen-1.5B', 'gpu') ON CONFLICT (engine_name, model_name) DO NOTHING;
+INSERT INTO resource_models (resource_name, engine_name, model_name, type) VALUES ('nvidia', 'ms-swift', 'DeepSeek-R1-Distill-Qwen-7B', 'gpu') ON CONFLICT (engine_name, model_name) DO NOTHING;
+INSERT INTO resource_models (resource_name, engine_name, model_name, type) VALUES ('nvidia', 'ms-swift', 'DeepSeek-R1-Distill-Qwen-14B', 'gpu') ON CONFLICT (engine_name, model_name) DO NOTHING;
+INSERT INTO resource_models (resource_name, engine_name, model_name, type) VALUES ('nvidia', 'ms-swift', 'DeepSeek-R1-Distill-Qwen-32B', 'gpu') ON CONFLICT (engine_name, model_name) DO NOTHING;
+INSERT INTO resource_models (resource_name, engine_name, model_name, type) VALUES ('nvidia', 'ms-swift', 'DeepSeek-R1-Distill-Llama-8B', 'gpu') ON CONFLICT (engine_name, model_name) DO NOTHING;
+INSERT INTO resource_models (resource_name, engine_name, model_name, type) VALUES ('nvidia', 'ms-swift', 'DeepSeek-R1-Distill-Llama-70B', 'gpu') ON CONFLICT (engine_name, model_name) DO NOTHING;
 INSERT INTO resource_models (resource_name, engine_name, model_name, type) VALUES ('nvidia', 'ms-swift', 'openbuddy-llama-65b-v8-bf16', 'gpu') ON CONFLICT (engine_name, model_name) DO NOTHING;
 INSERT INTO resource_models (resource_name, engine_name, model_name, type) VALUES ('nvidia', 'ms-swift', 'openbuddy-llama2-13b-v8.1-fp16', 'gpu') ON CONFLICT (engine_name, model_name) DO NOTHING;
 INSERT INTO resource_models (resource_name, engine_name, model_name, type) VALUES ('nvidia', 'ms-swift', 'openbuddy-llama2-70b-v10.1-bf16', 'gpu') ON CONFLICT (engine_name, model_name) DO NOTHING;
@@ -353,6 +368,7 @@ INSERT INTO resource_models (resource_name, engine_name, model_name, type) VALUE
 INSERT INTO resource_models (resource_name, engine_name, model_name, type) VALUES ('nvidia', 'ms-swift', 'Baichuan2-13B-Base', 'gpu') ON CONFLICT (engine_name, model_name) DO NOTHING;
 INSERT INTO resource_models (resource_name, engine_name, model_name, type) VALUES ('nvidia', 'ms-swift', 'Baichuan2-7B-Chat-4bits', 'gpu') ON CONFLICT (engine_name, model_name) DO NOTHING;
 INSERT INTO resource_models (resource_name, engine_name, model_name, type) VALUES ('nvidia', 'ms-swift', 'Baichuan2-13B-Chat-4bits', 'gpu') ON CONFLICT (engine_name, model_name) DO NOTHING;
+INSERT INTO resource_models (resource_name, engine_name, model_name, type) VALUES ('nvidia', 'ms-swift', 'Baichuan-M1-14B-Instruct', 'gpu') ON CONFLICT (engine_name, model_name) DO NOTHING;
 INSERT INTO resource_models (resource_name, engine_name, model_name, type) VALUES ('nvidia', 'ms-swift', 'MiniCPM-2B-sft-fp32', 'gpu') ON CONFLICT (engine_name, model_name) DO NOTHING;
 INSERT INTO resource_models (resource_name, engine_name, model_name, type) VALUES ('nvidia', 'ms-swift', 'MiniCPM-2B-dpo-fp32', 'gpu') ON CONFLICT (engine_name, model_name) DO NOTHING;
 INSERT INTO resource_models (resource_name, engine_name, model_name, type) VALUES ('nvidia', 'ms-swift', 'MiniCPM-1B-sft-bf16', 'gpu') ON CONFLICT (engine_name, model_name) DO NOTHING;
@@ -385,6 +401,8 @@ INSERT INTO resource_models (resource_name, engine_name, model_name, type) VALUE
 INSERT INTO resource_models (resource_name, engine_name, model_name, type) VALUES ('nvidia', 'ms-swift', 'Mistral-Nemo-Base-2407', 'gpu') ON CONFLICT (engine_name, model_name) DO NOTHING;
 INSERT INTO resource_models (resource_name, engine_name, model_name, type) VALUES ('nvidia', 'ms-swift', 'Mistral-Nemo-Instruct-2407', 'gpu') ON CONFLICT (engine_name, model_name) DO NOTHING;
 INSERT INTO resource_models (resource_name, engine_name, model_name, type) VALUES ('nvidia', 'ms-swift', 'Ministral-8B-Instruct-2410', 'gpu') ON CONFLICT (engine_name, model_name) DO NOTHING;
+INSERT INTO resource_models (resource_name, engine_name, model_name, type) VALUES ('nvidia', 'ms-swift', 'Mistral-Small-24B-Base-2501', 'gpu') ON CONFLICT (engine_name, model_name) DO NOTHING;
+INSERT INTO resource_models (resource_name, engine_name, model_name, type) VALUES ('nvidia', 'ms-swift', 'Mistral-Small-24B-Instruct-2501', 'gpu') ON CONFLICT (engine_name, model_name) DO NOTHING;
 INSERT INTO resource_models (resource_name, engine_name, model_name, type) VALUES ('nvidia', 'ms-swift', 'WizardLM-2-7B-AWQ', 'gpu') ON CONFLICT (engine_name, model_name) DO NOTHING;
 INSERT INTO resource_models (resource_name, engine_name, model_name, type) VALUES ('nvidia', 'ms-swift', 'WizardLM-2-8x22B', 'gpu') ON CONFLICT (engine_name, model_name) DO NOTHING;
 INSERT INTO resource_models (resource_name, engine_name, model_name, type) VALUES ('nvidia', 'ms-swift', 'phi-2', 'gpu') ON CONFLICT (engine_name, model_name) DO NOTHING;
@@ -395,7 +413,10 @@ INSERT INTO resource_models (resource_name, engine_name, model_name, type) VALUE
 INSERT INTO resource_models (resource_name, engine_name, model_name, type) VALUES ('nvidia', 'ms-swift', 'Phi-3-medium-4k-instruct', 'gpu') ON CONFLICT (engine_name, model_name) DO NOTHING;
 INSERT INTO resource_models (resource_name, engine_name, model_name, type) VALUES ('nvidia', 'ms-swift', 'Phi-3-medium-128k-instruct', 'gpu') ON CONFLICT (engine_name, model_name) DO NOTHING;
 INSERT INTO resource_models (resource_name, engine_name, model_name, type) VALUES ('nvidia', 'ms-swift', 'Phi-3.5-mini-instruct', 'gpu') ON CONFLICT (engine_name, model_name) DO NOTHING;
+INSERT INTO resource_models (resource_name, engine_name, model_name, type) VALUES ('nvidia', 'ms-swift', 'Phi-4-mini-instruct', 'gpu') ON CONFLICT (engine_name, model_name) DO NOTHING;
 INSERT INTO resource_models (resource_name, engine_name, model_name, type) VALUES ('nvidia', 'ms-swift', 'Phi-3.5-MoE-instruct', 'gpu') ON CONFLICT (engine_name, model_name) DO NOTHING;
+INSERT INTO resource_models (resource_name, engine_name, model_name, type) VALUES ('nvidia', 'ms-swift', 'phi-4', 'gpu') ON CONFLICT (engine_name, model_name) DO NOTHING;
+INSERT INTO resource_models (resource_name, engine_name, model_name, type) VALUES ('nvidia', 'ms-swift', 'MiniMax-Text-01', 'gpu') ON CONFLICT (engine_name, model_name) DO NOTHING;
 INSERT INTO resource_models (resource_name, engine_name, model_name, type) VALUES ('nvidia', 'ms-swift', 'gemma-2b-it', 'gpu') ON CONFLICT (engine_name, model_name) DO NOTHING;
 INSERT INTO resource_models (resource_name, engine_name, model_name, type) VALUES ('nvidia', 'ms-swift', 'gemma-2b', 'gpu') ON CONFLICT (engine_name, model_name) DO NOTHING;
 INSERT INTO resource_models (resource_name, engine_name, model_name, type) VALUES ('nvidia', 'ms-swift', 'gemma-7b', 'gpu') ON CONFLICT (engine_name, model_name) DO NOTHING;
@@ -408,6 +429,10 @@ INSERT INTO resource_models (resource_name, engine_name, model_name, type) VALUE
 INSERT INTO resource_models (resource_name, engine_name, model_name, type) VALUES ('nvidia', 'ms-swift', 'gemma-2-27b-it', 'gpu') ON CONFLICT (engine_name, model_name) DO NOTHING;
 INSERT INTO resource_models (resource_name, engine_name, model_name, type) VALUES ('nvidia', 'ms-swift', 'Skywork-13B-base', 'gpu') ON CONFLICT (engine_name, model_name) DO NOTHING;
 INSERT INTO resource_models (resource_name, engine_name, model_name, type) VALUES ('nvidia', 'ms-swift', 'Skywork-o1-Open-Llama-3.1-8B', 'gpu') ON CONFLICT (engine_name, model_name) DO NOTHING;
+INSERT INTO resource_models (resource_name, engine_name, model_name, type) VALUES ('nvidia', 'ms-swift', 'Ling-lite', 'gpu') ON CONFLICT (engine_name, model_name) DO NOTHING;
+INSERT INTO resource_models (resource_name, engine_name, model_name, type) VALUES ('nvidia', 'ms-swift', 'Ling-plus', 'gpu') ON CONFLICT (engine_name, model_name) DO NOTHING;
+INSERT INTO resource_models (resource_name, engine_name, model_name, type) VALUES ('nvidia', 'ms-swift', 'Ling-lite-base', 'gpu') ON CONFLICT (engine_name, model_name) DO NOTHING;
+INSERT INTO resource_models (resource_name, engine_name, model_name, type) VALUES ('nvidia', 'ms-swift', 'Ling-plus-base', 'gpu') ON CONFLICT (engine_name, model_name) DO NOTHING;
 INSERT INTO resource_models (resource_name, engine_name, model_name, type) VALUES ('nvidia', 'ms-swift', 'Yuan2-2B-hf', 'gpu') ON CONFLICT (engine_name, model_name) DO NOTHING;
 INSERT INTO resource_models (resource_name, engine_name, model_name, type) VALUES ('nvidia', 'ms-swift', 'Yuan2-51B-hf', 'gpu') ON CONFLICT (engine_name, model_name) DO NOTHING;
 INSERT INTO resource_models (resource_name, engine_name, model_name, type) VALUES ('nvidia', 'ms-swift', 'Yuan2-102B-hf', 'gpu') ON CONFLICT (engine_name, model_name) DO NOTHING;
@@ -443,19 +468,8 @@ INSERT INTO resource_models (resource_name, engine_name, model_name, type) VALUE
 INSERT INTO resource_models (resource_name, engine_name, model_name, type) VALUES ('nvidia', 'ms-swift', 'polylm-13b', 'gpu') ON CONFLICT (engine_name, model_name) DO NOTHING;
 INSERT INTO resource_models (resource_name, engine_name, model_name, type) VALUES ('nvidia', 'ms-swift', 'aya-expanse-8b', 'gpu') ON CONFLICT (engine_name, model_name) DO NOTHING;
 INSERT INTO resource_models (resource_name, engine_name, model_name, type) VALUES ('nvidia', 'ms-swift', 'aya-expanse-32b', 'gpu') ON CONFLICT (engine_name, model_name) DO NOTHING;
-INSERT INTO resource_models (resource_name, engine_name, model_name, type) VALUES ('nvidia', 'ms-swift', 'ModernBERT-base', 'gpu') ON CONFLICT (engine_name, model_name) DO NOTHING;
-INSERT INTO resource_models (resource_name, engine_name, model_name, type) VALUES ('nvidia', 'ms-swift', 'ModernBERT-large', 'gpu') ON CONFLICT (engine_name, model_name) DO NOTHING;
-INSERT INTO resource_models (resource_name, engine_name, model_name, type) VALUES ('nvidia', 'ms-swift', 'internlm2-1_8b-reward', 'gpu') ON CONFLICT (engine_name, model_name) DO NOTHING;
-INSERT INTO resource_models (resource_name, engine_name, model_name, type) VALUES ('nvidia', 'ms-swift', 'internlm2-7b-reward', 'gpu') ON CONFLICT (engine_name, model_name) DO NOTHING;
-INSERT INTO resource_models (resource_name, engine_name, model_name, type) VALUES ('nvidia', 'ms-swift', 'internlm2-20b-reward', 'gpu') ON CONFLICT (engine_name, model_name) DO NOTHING;
-INSERT INTO resource_models (resource_name, engine_name, model_name, type) VALUES ('nvidia', 'ms-swift', 'Qwen2-Math-RM-72B', 'gpu') ON CONFLICT (engine_name, model_name) DO NOTHING;
-INSERT INTO resource_models (resource_name, engine_name, model_name, type) VALUES ('nvidia', 'ms-swift', 'Qwen2.5-Math-RM-72B', 'gpu') ON CONFLICT (engine_name, model_name) DO NOTHING;
-INSERT INTO resource_models (resource_name, engine_name, model_name, type) VALUES ('nvidia', 'ms-swift', 'Skywork-Reward-Llama-3.1-8B', 'gpu') ON CONFLICT (engine_name, model_name) DO NOTHING;
-INSERT INTO resource_models (resource_name, engine_name, model_name, type) VALUES ('nvidia', 'ms-swift', 'Skywork-Reward-Llama-3.1-8B-v0.2', 'gpu') ON CONFLICT (engine_name, model_name) DO NOTHING;
-INSERT INTO resource_models (resource_name, engine_name, model_name, type) VALUES ('nvidia', 'ms-swift', 'GRM_Llama3.1_8B_rewardmodel-ft', 'gpu') ON CONFLICT (engine_name, model_name) DO NOTHING;
-INSERT INTO resource_models (resource_name, engine_name, model_name, type) VALUES ('nvidia', 'ms-swift', 'GRM-llama3.2-3B-rewardmodel-ft', 'gpu') ON CONFLICT (engine_name, model_name) DO NOTHING;
-INSERT INTO resource_models (resource_name, engine_name, model_name, type) VALUES ('nvidia', 'ms-swift', 'Skywork-Reward-Gemma-2-27B', 'gpu') ON CONFLICT (engine_name, model_name) DO NOTHING;
-INSERT INTO resource_models (resource_name, engine_name, model_name, type) VALUES ('nvidia', 'ms-swift', 'Skywork-Reward-Gemma-2-27B-v0.2', 'gpu') ON CONFLICT (engine_name, model_name) DO NOTHING;
+INSERT INTO resource_models (resource_name, engine_name, model_name, type) VALUES ('nvidia', 'ms-swift', 'Moonlight-16B-A3B', 'gpu') ON CONFLICT (engine_name, model_name) DO NOTHING;
+INSERT INTO resource_models (resource_name, engine_name, model_name, type) VALUES ('nvidia', 'ms-swift', 'Moonlight-16B-A3B-Instruct', 'gpu') ON CONFLICT (engine_name, model_name) DO NOTHING;
 INSERT INTO resource_models (resource_name, engine_name, model_name, type) VALUES ('nvidia', 'ms-swift', 'Qwen-VL-Chat', 'gpu') ON CONFLICT (engine_name, model_name) DO NOTHING;
 INSERT INTO resource_models (resource_name, engine_name, model_name, type) VALUES ('nvidia', 'ms-swift', 'Qwen-VL', 'gpu') ON CONFLICT (engine_name, model_name) DO NOTHING;
 INSERT INTO resource_models (resource_name, engine_name, model_name, type) VALUES ('nvidia', 'ms-swift', 'Qwen-VL-Chat-Int4', 'gpu') ON CONFLICT (engine_name, model_name) DO NOTHING;
@@ -476,6 +490,18 @@ INSERT INTO resource_models (resource_name, engine_name, model_name, type) VALUE
 INSERT INTO resource_models (resource_name, engine_name, model_name, type) VALUES ('nvidia', 'ms-swift', 'Qwen2-VL-2B-Instruct-AWQ', 'gpu') ON CONFLICT (engine_name, model_name) DO NOTHING;
 INSERT INTO resource_models (resource_name, engine_name, model_name, type) VALUES ('nvidia', 'ms-swift', 'Qwen2-VL-7B-Instruct-AWQ', 'gpu') ON CONFLICT (engine_name, model_name) DO NOTHING;
 INSERT INTO resource_models (resource_name, engine_name, model_name, type) VALUES ('nvidia', 'ms-swift', 'Qwen2-VL-72B-Instruct-AWQ', 'gpu') ON CONFLICT (engine_name, model_name) DO NOTHING;
+INSERT INTO resource_models (resource_name, engine_name, model_name, type) VALUES ('nvidia', 'ms-swift', 'UI-TARS-2B-SFT', 'gpu') ON CONFLICT (engine_name, model_name) DO NOTHING;
+INSERT INTO resource_models (resource_name, engine_name, model_name, type) VALUES ('nvidia', 'ms-swift', 'UI-TARS-7B-SFT', 'gpu') ON CONFLICT (engine_name, model_name) DO NOTHING;
+INSERT INTO resource_models (resource_name, engine_name, model_name, type) VALUES ('nvidia', 'ms-swift', 'UI-TARS-7B-DPO', 'gpu') ON CONFLICT (engine_name, model_name) DO NOTHING;
+INSERT INTO resource_models (resource_name, engine_name, model_name, type) VALUES ('nvidia', 'ms-swift', 'UI-TARS-72B-SFT', 'gpu') ON CONFLICT (engine_name, model_name) DO NOTHING;
+INSERT INTO resource_models (resource_name, engine_name, model_name, type) VALUES ('nvidia', 'ms-swift', 'UI-TARS-72B-DPO', 'gpu') ON CONFLICT (engine_name, model_name) DO NOTHING;
+INSERT INTO resource_models (resource_name, engine_name, model_name, type) VALUES ('nvidia', 'ms-swift', 'olmOCR-7B-0225-preview', 'gpu') ON CONFLICT (engine_name, model_name) DO NOTHING;
+INSERT INTO resource_models (resource_name, engine_name, model_name, type) VALUES ('nvidia', 'ms-swift', 'Qwen2.5-VL-3B-Instruct', 'gpu') ON CONFLICT (engine_name, model_name) DO NOTHING;
+INSERT INTO resource_models (resource_name, engine_name, model_name, type) VALUES ('nvidia', 'ms-swift', 'Qwen2.5-VL-7B-Instruct', 'gpu') ON CONFLICT (engine_name, model_name) DO NOTHING;
+INSERT INTO resource_models (resource_name, engine_name, model_name, type) VALUES ('nvidia', 'ms-swift', 'Qwen2.5-VL-72B-Instruct', 'gpu') ON CONFLICT (engine_name, model_name) DO NOTHING;
+INSERT INTO resource_models (resource_name, engine_name, model_name, type) VALUES ('nvidia', 'ms-swift', 'Qwen2.5-VL-3B-Instruct-AWQ', 'gpu') ON CONFLICT (engine_name, model_name) DO NOTHING;
+INSERT INTO resource_models (resource_name, engine_name, model_name, type) VALUES ('nvidia', 'ms-swift', 'Qwen2.5-VL-7B-Instruct-AWQ', 'gpu') ON CONFLICT (engine_name, model_name) DO NOTHING;
+INSERT INTO resource_models (resource_name, engine_name, model_name, type) VALUES ('nvidia', 'ms-swift', 'Qwen2.5-VL-72B-Instruct-AWQ', 'gpu') ON CONFLICT (engine_name, model_name) DO NOTHING;
 INSERT INTO resource_models (resource_name, engine_name, model_name, type) VALUES ('nvidia', 'ms-swift', 'Qwen2-Audio-7B-Instruct', 'gpu') ON CONFLICT (engine_name, model_name) DO NOTHING;
 INSERT INTO resource_models (resource_name, engine_name, model_name, type) VALUES ('nvidia', 'ms-swift', 'Qwen2-Audio-7B', 'gpu') ON CONFLICT (engine_name, model_name) DO NOTHING;
 INSERT INTO resource_models (resource_name, engine_name, model_name, type) VALUES ('nvidia', 'ms-swift', 'QVQ-72B-Preview', 'gpu') ON CONFLICT (engine_name, model_name) DO NOTHING;
@@ -483,6 +509,12 @@ INSERT INTO resource_models (resource_name, engine_name, model_name, type) VALUE
 INSERT INTO resource_models (resource_name, engine_name, model_name, type) VALUES ('nvidia', 'ms-swift', 'Ovis1.6-Gemma2-9B-GPTQ-Int4', 'gpu') ON CONFLICT (engine_name, model_name) DO NOTHING;
 INSERT INTO resource_models (resource_name, engine_name, model_name, type) VALUES ('nvidia', 'ms-swift', 'Ovis1.6-Gemma2-27B', 'gpu') ON CONFLICT (engine_name, model_name) DO NOTHING;
 INSERT INTO resource_models (resource_name, engine_name, model_name, type) VALUES ('nvidia', 'ms-swift', 'Ovis1.6-Llama3.2-3B', 'gpu') ON CONFLICT (engine_name, model_name) DO NOTHING;
+INSERT INTO resource_models (resource_name, engine_name, model_name, type) VALUES ('nvidia', 'ms-swift', 'Ovis2-1B', 'gpu') ON CONFLICT (engine_name, model_name) DO NOTHING;
+INSERT INTO resource_models (resource_name, engine_name, model_name, type) VALUES ('nvidia', 'ms-swift', 'Ovis2-2B', 'gpu') ON CONFLICT (engine_name, model_name) DO NOTHING;
+INSERT INTO resource_models (resource_name, engine_name, model_name, type) VALUES ('nvidia', 'ms-swift', 'Ovis2-4B', 'gpu') ON CONFLICT (engine_name, model_name) DO NOTHING;
+INSERT INTO resource_models (resource_name, engine_name, model_name, type) VALUES ('nvidia', 'ms-swift', 'Ovis2-8B', 'gpu') ON CONFLICT (engine_name, model_name) DO NOTHING;
+INSERT INTO resource_models (resource_name, engine_name, model_name, type) VALUES ('nvidia', 'ms-swift', 'Ovis2-16B', 'gpu') ON CONFLICT (engine_name, model_name) DO NOTHING;
+INSERT INTO resource_models (resource_name, engine_name, model_name, type) VALUES ('nvidia', 'ms-swift', 'Ovis2-34B', 'gpu') ON CONFLICT (engine_name, model_name) DO NOTHING;
 INSERT INTO resource_models (resource_name, engine_name, model_name, type) VALUES ('nvidia', 'ms-swift', 'glm-4v-9b', 'gpu') ON CONFLICT (engine_name, model_name) DO NOTHING;
 INSERT INTO resource_models (resource_name, engine_name, model_name, type) VALUES ('nvidia', 'ms-swift', 'cogagent-9b-20241220', 'gpu') ON CONFLICT (engine_name, model_name) DO NOTHING;
 INSERT INTO resource_models (resource_name, engine_name, model_name, type) VALUES ('nvidia', 'ms-swift', 'glm-edge-v-2b', 'gpu') ON CONFLICT (engine_name, model_name) DO NOTHING;
@@ -509,13 +541,6 @@ INSERT INTO resource_models (resource_name, engine_name, model_name, type) VALUE
 INSERT INTO resource_models (resource_name, engine_name, model_name, type) VALUES ('nvidia', 'ms-swift', 'InternVL2-40B-AWQ', 'gpu') ON CONFLICT (engine_name, model_name) DO NOTHING;
 INSERT INTO resource_models (resource_name, engine_name, model_name, type) VALUES ('nvidia', 'ms-swift', 'InternVL2-Llama3-76B-AWQ', 'gpu') ON CONFLICT (engine_name, model_name) DO NOTHING;
 INSERT INTO resource_models (resource_name, engine_name, model_name, type) VALUES ('nvidia', 'ms-swift', 'InternVL2-8B-MPO', 'gpu') ON CONFLICT (engine_name, model_name) DO NOTHING;
-INSERT INTO resource_models (resource_name, engine_name, model_name, type) VALUES ('nvidia', 'ms-swift', 'InternVL2-Pretrain-Models', 'gpu') ON CONFLICT (engine_name, model_name) DO NOTHING;
-INSERT INTO resource_models (resource_name, engine_name, model_name, type) VALUES ('nvidia', 'ms-swift', 'InternVL2-Pretrain-Models', 'gpu') ON CONFLICT (engine_name, model_name) DO NOTHING;
-INSERT INTO resource_models (resource_name, engine_name, model_name, type) VALUES ('nvidia', 'ms-swift', 'InternVL2-Pretrain-Models', 'gpu') ON CONFLICT (engine_name, model_name) DO NOTHING;
-INSERT INTO resource_models (resource_name, engine_name, model_name, type) VALUES ('nvidia', 'ms-swift', 'InternVL2-Pretrain-Models', 'gpu') ON CONFLICT (engine_name, model_name) DO NOTHING;
-INSERT INTO resource_models (resource_name, engine_name, model_name, type) VALUES ('nvidia', 'ms-swift', 'InternVL2-Pretrain-Models', 'gpu') ON CONFLICT (engine_name, model_name) DO NOTHING;
-INSERT INTO resource_models (resource_name, engine_name, model_name, type) VALUES ('nvidia', 'ms-swift', 'InternVL2-Pretrain-Models', 'gpu') ON CONFLICT (engine_name, model_name) DO NOTHING;
-INSERT INTO resource_models (resource_name, engine_name, model_name, type) VALUES ('nvidia', 'ms-swift', 'InternVL2-Pretrain-Models', 'gpu') ON CONFLICT (engine_name, model_name) DO NOTHING;
 INSERT INTO resource_models (resource_name, engine_name, model_name, type) VALUES ('nvidia', 'ms-swift', 'InternVL2-4B', 'gpu') ON CONFLICT (engine_name, model_name) DO NOTHING;
 INSERT INTO resource_models (resource_name, engine_name, model_name, type) VALUES ('nvidia', 'ms-swift', 'InternVL2_5-1B', 'gpu') ON CONFLICT (engine_name, model_name) DO NOTHING;
 INSERT INTO resource_models (resource_name, engine_name, model_name, type) VALUES ('nvidia', 'ms-swift', 'InternVL2_5-2B', 'gpu') ON CONFLICT (engine_name, model_name) DO NOTHING;
@@ -539,8 +564,6 @@ INSERT INTO resource_models (resource_name, engine_name, model_name, type) VALUE
 INSERT INTO resource_models (resource_name, engine_name, model_name, type) VALUES ('nvidia', 'ms-swift', 'internlm-xcomposer2-7b', 'gpu') ON CONFLICT (engine_name, model_name) DO NOTHING;
 INSERT INTO resource_models (resource_name, engine_name, model_name, type) VALUES ('nvidia', 'ms-swift', 'internlm-xcomposer2-4khd-7b', 'gpu') ON CONFLICT (engine_name, model_name) DO NOTHING;
 INSERT INTO resource_models (resource_name, engine_name, model_name, type) VALUES ('nvidia', 'ms-swift', 'internlm-xcomposer2d5-7b', 'gpu') ON CONFLICT (engine_name, model_name) DO NOTHING;
-INSERT INTO resource_models (resource_name, engine_name, model_name, type) VALUES ('nvidia', 'ms-swift', 'internlm-xcomposer2d5-ol-7b', 'gpu') ON CONFLICT (engine_name, model_name) DO NOTHING;
-INSERT INTO resource_models (resource_name, engine_name, model_name, type) VALUES ('nvidia', 'ms-swift', 'internlm-xcomposer2d5-ol-7b', 'gpu') ON CONFLICT (engine_name, model_name) DO NOTHING;
 INSERT INTO resource_models (resource_name, engine_name, model_name, type) VALUES ('nvidia', 'ms-swift', 'Llama-3.2-11B-Vision-Instruct', 'gpu') ON CONFLICT (engine_name, model_name) DO NOTHING;
 INSERT INTO resource_models (resource_name, engine_name, model_name, type) VALUES ('nvidia', 'ms-swift', 'Llama-3.2-90B-Vision-Instruct', 'gpu') ON CONFLICT (engine_name, model_name) DO NOTHING;
 INSERT INTO resource_models (resource_name, engine_name, model_name, type) VALUES ('nvidia', 'ms-swift', 'Llama-3.2-11B-Vision', 'gpu') ON CONFLICT (engine_name, model_name) DO NOTHING;
@@ -576,10 +599,14 @@ INSERT INTO resource_models (resource_name, engine_name, model_name, type) VALUE
 INSERT INTO resource_models (resource_name, engine_name, model_name, type) VALUES ('nvidia', 'ms-swift', 'deepseek-vl2-small', 'gpu') ON CONFLICT (engine_name, model_name) DO NOTHING;
 INSERT INTO resource_models (resource_name, engine_name, model_name, type) VALUES ('nvidia', 'ms-swift', 'deepseek-vl2', 'gpu') ON CONFLICT (engine_name, model_name) DO NOTHING;
 INSERT INTO resource_models (resource_name, engine_name, model_name, type) VALUES ('nvidia', 'ms-swift', 'Janus-1.3B', 'gpu') ON CONFLICT (engine_name, model_name) DO NOTHING;
+INSERT INTO resource_models (resource_name, engine_name, model_name, type) VALUES ('nvidia', 'ms-swift', 'Janus-Pro-1B', 'gpu') ON CONFLICT (engine_name, model_name) DO NOTHING;
+INSERT INTO resource_models (resource_name, engine_name, model_name, type) VALUES ('nvidia', 'ms-swift', 'Janus-Pro-7B', 'gpu') ON CONFLICT (engine_name, model_name) DO NOTHING;
 INSERT INTO resource_models (resource_name, engine_name, model_name, type) VALUES ('nvidia', 'ms-swift', 'MiniCPM-V', 'gpu') ON CONFLICT (engine_name, model_name) DO NOTHING;
 INSERT INTO resource_models (resource_name, engine_name, model_name, type) VALUES ('nvidia', 'ms-swift', 'MiniCPM-V-2', 'gpu') ON CONFLICT (engine_name, model_name) DO NOTHING;
-INSERT INTO resource_models (resource_name, engine_name, model_name, type) VALUES ('nvidia', 'ms-swift', 'MiniCPM-V-2_6', 'gpu') ON CONFLICT (engine_name, model_name) DO NOTHING;
 INSERT INTO resource_models (resource_name, engine_name, model_name, type) VALUES ('nvidia', 'ms-swift', 'MiniCPM-Llama3-V-2_5', 'gpu') ON CONFLICT (engine_name, model_name) DO NOTHING;
+INSERT INTO resource_models (resource_name, engine_name, model_name, type) VALUES ('nvidia', 'ms-swift', 'MiniCPM-V-2_6', 'gpu') ON CONFLICT (engine_name, model_name) DO NOTHING;
+INSERT INTO resource_models (resource_name, engine_name, model_name, type) VALUES ('nvidia', 'ms-swift', 'MiniCPM-o-2_6', 'gpu') ON CONFLICT (engine_name, model_name) DO NOTHING;
+INSERT INTO resource_models (resource_name, engine_name, model_name, type) VALUES ('nvidia', 'ms-swift', 'MiniMax-VL-01', 'gpu') ON CONFLICT (engine_name, model_name) DO NOTHING;
 INSERT INTO resource_models (resource_name, engine_name, model_name, type) VALUES ('nvidia', 'ms-swift', 'mplug-owl2-llama2-7b', 'gpu') ON CONFLICT (engine_name, model_name) DO NOTHING;
 INSERT INTO resource_models (resource_name, engine_name, model_name, type) VALUES ('nvidia', 'ms-swift', 'mplug_owl_2_1', 'gpu') ON CONFLICT (engine_name, model_name) DO NOTHING;
 INSERT INTO resource_models (resource_name, engine_name, model_name, type) VALUES ('nvidia', 'ms-swift', 'mPLUG-Owl3-1B-241014', 'gpu') ON CONFLICT (engine_name, model_name) DO NOTHING;
@@ -590,8 +617,11 @@ INSERT INTO resource_models (resource_name, engine_name, model_name, type) VALUE
 INSERT INTO resource_models (resource_name, engine_name, model_name, type) VALUES ('nvidia', 'ms-swift', 'Emu3-Gen', 'gpu') ON CONFLICT (engine_name, model_name) DO NOTHING;
 INSERT INTO resource_models (resource_name, engine_name, model_name, type) VALUES ('nvidia', 'ms-swift', 'Emu3-Chat', 'gpu') ON CONFLICT (engine_name, model_name) DO NOTHING;
 INSERT INTO resource_models (resource_name, engine_name, model_name, type) VALUES ('nvidia', 'ms-swift', 'GOT-OCR2_0', 'gpu') ON CONFLICT (engine_name, model_name) DO NOTHING;
+INSERT INTO resource_models (resource_name, engine_name, model_name, type) VALUES ('nvidia', 'ms-swift', 'GOT-OCR-2.0-hf', 'gpu') ON CONFLICT (engine_name, model_name) DO NOTHING;
+INSERT INTO resource_models (resource_name, engine_name, model_name, type) VALUES ('nvidia', 'ms-swift', 'Step-Audio-Chat', 'gpu') ON CONFLICT (engine_name, model_name) DO NOTHING;
 INSERT INTO resource_models (resource_name, engine_name, model_name, type) VALUES ('nvidia', 'ms-swift', 'Phi-3-vision-128k-instruct', 'gpu') ON CONFLICT (engine_name, model_name) DO NOTHING;
 INSERT INTO resource_models (resource_name, engine_name, model_name, type) VALUES ('nvidia', 'ms-swift', 'Phi-3.5-vision-instruct', 'gpu') ON CONFLICT (engine_name, model_name) DO NOTHING;
+INSERT INTO resource_models (resource_name, engine_name, model_name, type) VALUES ('nvidia', 'ms-swift', 'Phi-4-multimodal-instruct', 'gpu') ON CONFLICT (engine_name, model_name) DO NOTHING;
 INSERT INTO resource_models (resource_name, engine_name, model_name, type) VALUES ('nvidia', 'ms-swift', 'Florence-2-base-ft', 'gpu') ON CONFLICT (engine_name, model_name) DO NOTHING;
 INSERT INTO resource_models (resource_name, engine_name, model_name, type) VALUES ('nvidia', 'ms-swift', 'Florence-2-base', 'gpu') ON CONFLICT (engine_name, model_name) DO NOTHING;
 INSERT INTO resource_models (resource_name, engine_name, model_name, type) VALUES ('nvidia', 'ms-swift', 'Florence-2-large', 'gpu') ON CONFLICT (engine_name, model_name) DO NOTHING;
@@ -619,4 +649,20 @@ INSERT INTO resource_models (resource_name, engine_name, model_name, type) VALUE
 INSERT INTO resource_models (resource_name, engine_name, model_name, type) VALUES ('nvidia', 'ms-swift', 'MolmoE-1B-0924', 'gpu') ON CONFLICT (engine_name, model_name) DO NOTHING;
 INSERT INTO resource_models (resource_name, engine_name, model_name, type) VALUES ('nvidia', 'ms-swift', 'pixtral-12b', 'gpu') ON CONFLICT (engine_name, model_name) DO NOTHING;
 INSERT INTO resource_models (resource_name, engine_name, model_name, type) VALUES ('nvidia', 'ms-swift', 'Megrez-3B-Omni', 'gpu') ON CONFLICT (engine_name, model_name) DO NOTHING;
-
+INSERT INTO resource_models (resource_name, engine_name, model_name, type) VALUES ('nvidia', 'ms-swift', 'ModernBERT-base', 'gpu') ON CONFLICT (engine_name, model_name) DO NOTHING;
+INSERT INTO resource_models (resource_name, engine_name, model_name, type) VALUES ('nvidia', 'ms-swift', 'ModernBERT-large', 'gpu') ON CONFLICT (engine_name, model_name) DO NOTHING;
+INSERT INTO resource_models (resource_name, engine_name, model_name, type) VALUES ('nvidia', 'ms-swift', 'gte-modernbert-base', 'gpu') ON CONFLICT (engine_name, model_name) DO NOTHING;
+INSERT INTO resource_models (resource_name, engine_name, model_name, type) VALUES ('nvidia', 'ms-swift', 'internlm2-1_8b-reward', 'gpu') ON CONFLICT (engine_name, model_name) DO NOTHING;
+INSERT INTO resource_models (resource_name, engine_name, model_name, type) VALUES ('nvidia', 'ms-swift', 'internlm2-7b-reward', 'gpu') ON CONFLICT (engine_name, model_name) DO NOTHING;
+INSERT INTO resource_models (resource_name, engine_name, model_name, type) VALUES ('nvidia', 'ms-swift', 'internlm2-20b-reward', 'gpu') ON CONFLICT (engine_name, model_name) DO NOTHING;
+INSERT INTO resource_models (resource_name, engine_name, model_name, type) VALUES ('nvidia', 'ms-swift', 'Qwen2-Math-RM-72B', 'gpu') ON CONFLICT (engine_name, model_name) DO NOTHING;
+INSERT INTO resource_models (resource_name, engine_name, model_name, type) VALUES ('nvidia', 'ms-swift', 'Qwen2.5-Math-PRM-7B', 'gpu') ON CONFLICT (engine_name, model_name) DO NOTHING;
+INSERT INTO resource_models (resource_name, engine_name, model_name, type) VALUES ('nvidia', 'ms-swift', 'Qwen2.5-Math-7B-PRM800K', 'gpu') ON CONFLICT (engine_name, model_name) DO NOTHING;
+INSERT INTO resource_models (resource_name, engine_name, model_name, type) VALUES ('nvidia', 'ms-swift', 'Qwen2.5-Math-PRM-72B', 'gpu') ON CONFLICT (engine_name, model_name) DO NOTHING;
+INSERT INTO resource_models (resource_name, engine_name, model_name, type) VALUES ('nvidia', 'ms-swift', 'Qwen2.5-Math-RM-72B', 'gpu') ON CONFLICT (engine_name, model_name) DO NOTHING;
+INSERT INTO resource_models (resource_name, engine_name, model_name, type) VALUES ('nvidia', 'ms-swift', 'Skywork-Reward-Llama-3.1-8B', 'gpu') ON CONFLICT (engine_name, model_name) DO NOTHING;
+INSERT INTO resource_models (resource_name, engine_name, model_name, type) VALUES ('nvidia', 'ms-swift', 'Skywork-Reward-Llama-3.1-8B-v0.2', 'gpu') ON CONFLICT (engine_name, model_name) DO NOTHING;
+INSERT INTO resource_models (resource_name, engine_name, model_name, type) VALUES ('nvidia', 'ms-swift', 'GRM_Llama3.1_8B_rewardmodel-ft', 'gpu') ON CONFLICT (engine_name, model_name) DO NOTHING;
+INSERT INTO resource_models (resource_name, engine_name, model_name, type) VALUES ('nvidia', 'ms-swift', 'GRM-llama3.2-3B-rewardmodel-ft', 'gpu') ON CONFLICT (engine_name, model_name) DO NOTHING;
+INSERT INTO resource_models (resource_name, engine_name, model_name, type) VALUES ('nvidia', 'ms-swift', 'Skywork-Reward-Gemma-2-27B', 'gpu') ON CONFLICT (engine_name, model_name) DO NOTHING;
+INSERT INTO resource_models (resource_name, engine_name, model_name, type) VALUES ('nvidia', 'ms-swift', 'Skywork-Reward-Gemma-2-27B-v0.2', 'gpu') ON CONFLICT (engine_name, model_name) DO NOTHING;
