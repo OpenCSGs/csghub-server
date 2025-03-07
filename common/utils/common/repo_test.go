@@ -246,6 +246,8 @@ func TestIsValidName(t *testing.T) {
 		{name: "Test IsValidName when name is invalid", args: args{name: "abc/def"}, want: false},
 		{name: "Test IsValidName when name is invalid", args: args{name: "abc def"}, want: false},
 		{name: "Test IsValidName when name is invalid", args: args{name: "abc__def"}, want: false},
+		{name: "Test IsValidName when name is invalid", args: args{name: "abc_-def"}, want: false},
+		{name: "Test IsValidName when name is invalid", args: args{name: "abc.-def"}, want: false},
 		{name: "Test IsValidName when name is invalid", args: args{name: "a"}, want: false},
 		{name: "Test IsValidName when name is invalid", args: args{name: "abc..def"}, want: false},
 		{name: "Test IsValidName when name is invalid", args: args{name: "--def"}, want: false},
@@ -253,7 +255,7 @@ func TestIsValidName(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			if got, _ := IsValidName(tt.args.name); got != tt.want {
-				t.Errorf("IsValidName() = %v, want %v", got, tt.want)
+				t.Errorf("IsValidName(%q) = %v, want %v", tt.args, got, tt.want)
 			}
 		})
 	}
