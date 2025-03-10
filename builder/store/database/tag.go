@@ -380,7 +380,7 @@ func (ts *tagStoreImpl) FindOrCreate(ctx context.Context, tag Tag) (*Tag, error)
 	var resTag Tag
 	err := ts.db.Operator.Core.NewSelect().
 		Model(&resTag).
-		Where("name = ? and category = ? and built_in = ? and scope = ?", tag.Name, tag.Category, tag.BuiltIn, tag.Scope).
+		Where("name = ? and category = ? and scope = ?", tag.Name, tag.Category, tag.Scope).
 		Scan(ctx)
 	if err == nil {
 		return &resTag, nil
