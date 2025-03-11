@@ -18,18 +18,25 @@ var (
 )
 
 type EventPublisher struct {
-	Connector    *mq.NatsHandler
+	Connector    mq.MessageQueue
 	SyncInterval int //in minutes
 }
 
 // NewNatsConnector initializes a new connection to the NATS server
-func InitEventPublisher(cfg *config.Config) error {
-	hander, err := mq.Init(cfg)
-	if err != nil {
-		return err
+
+func InitEventPublisher(cfg *config.Config, natsHandler mq.MessageQueue) error {
+	var handler mq.MessageQueue
+	var err error
+	if natsHandler == nil {
+		handler, err = mq.Init(cfg)
+		if err != nil {
+			return err
+		}
+	} else {
+		handler = natsHandler
 	}
 	DefaultEventPublisher = EventPublisher{
-		Connector:    hander,
+		Connector:    handler,
 		SyncInterval: cfg.Event.SyncInterval,
 	}
 	return nil

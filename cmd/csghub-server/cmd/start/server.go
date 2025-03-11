@@ -60,7 +60,7 @@ var serverCmd = &cobra.Command{
 			DSN:     cfg.Database.DSN,
 		}
 		database.InitDB(dbConfig)
-		err = event.InitEventPublisher(cfg)
+		err = event.InitEventPublisher(cfg, nil)
 		if err != nil {
 			return fmt.Errorf("fail to initialize message queue, %w", err)
 		}

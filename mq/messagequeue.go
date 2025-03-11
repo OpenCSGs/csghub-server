@@ -27,4 +27,5 @@ type MessageQueue interface {
 	PublishFeeQuotaData(data []byte) error
 	PublishDeployServiceData(data []byte) error
 	BuildDeployServiceConsumerWithName(consumerName string) (jetstream.Consumer, error)
+	BuildDeployServiceStream() error
 }
