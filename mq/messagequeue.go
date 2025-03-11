@@ -18,10 +18,13 @@ type MessageQueue interface {
 	VerifyStreamByName(streamName string) error
 	VerifyMeteringStream() error
 	VerifyDLQStream() error
+	VerifyDeployServiceStream() error
 	PublishData(subject string, data []byte) error
 	PublishMeterDataToDLQ(data []byte) error
 	PublishMeterDurationData(data []byte) error
 	PublishFeeCreditData(data []byte) error
 	PublishFeeTokenData(data []byte) error
 	PublishFeeQuotaData(data []byte) error
+	PublishDeployServiceData(data []byte) error
+	BuildDeployServiceConsumerWithName(consumerName string) (jetstream.Consumer, error)
 }

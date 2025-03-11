@@ -52,6 +52,8 @@ type Deploy struct {
 	Variables        string             `bun:",nullzero" json:"variables"`
 	OrderDetailID    int64              `bun:"," json:"order_detail_id"`
 	EngineArgs       string             `bun:"," json:"engine_args"`
+	Message          string             `bun:",nullzero" json:"message"`
+	Reason           string             `bun:",nullzero" json:"reason"`
 	times
 }
 

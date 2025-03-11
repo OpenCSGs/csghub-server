@@ -1,15 +1,19 @@
 package event
 
 import (
+	"encoding/json"
 	"fmt"
 	"time"
 
+	"github.com/nats-io/nats.go/jetstream"
 	"opencsg.com/csghub-server/common/config"
+	"opencsg.com/csghub-server/common/types"
 	"opencsg.com/csghub-server/mq"
 )
 
 var (
 	CSGHubServerDurableConsumerName string = "NoBalanceConsumerForCSGHubServer"
+	CSGHubServiceConsumerName       string = "DeployServiceConsumerForCSGHubServer"
 	DefaultEventPublisher           EventPublisher
 )
 
@@ -29,6 +33,14 @@ func InitEventPublisher(cfg *config.Config) error {
 		SyncInterval: cfg.Event.SyncInterval,
 	}
 	return nil
+}
+
+func (ec *EventPublisher) BuildServiceStream() error {
+	return ec.Connector.BuildDeployServiceStream()
+}
+
+func (ec *EventPublisher) CreateServiceConsumer() (jetstream.Consumer, error) {
+	return ec.Connector.BuildDeployServiceConsumerWithName(CSGHubServiceConsumerName)
 }
 
 // Publish a message to the specified subject
@@ -52,4 +64,36 @@ func (ec *EventPublisher) PublishMeteringEvent(message []byte) error {
 	}
 
 	return nil
+}
+
+func (ec *EventPublisher) PublishServiceEvent(message []byte) error {
+	var err error
+	for i := 0; i < 3; i++ {
+		err = ec.Connector.VerifyDeployServiceStream()
+		if err != nil {
+			time.Sleep(2 * time.Second)
+			continue
+		}
+		err = ec.Connector.PublishDeployServiceData(message)
+		if err == nil {
+			break
+		}
+		time.Sleep(1 * time.Second)
+	}
+
+	if err != nil {
+		return fmt.Errorf("failed to publish service event for 3 retries, %w", err)
+	}
+
+	return nil
+}
+
+func (c *EventPublisher) ParseServiceMessageData(msg jetstream.Msg) (*types.ServiceEvent, error) {
+	strData := string(msg.Data())
+	evt := types.ServiceEvent{}
+	err := json.Unmarshal(msg.Data(), &evt)
+	if err != nil {
+		return nil, fmt.Errorf("fail to unmarshal fee event, %v, %w", strData, err)
+	}
+	return &evt, nil
 }

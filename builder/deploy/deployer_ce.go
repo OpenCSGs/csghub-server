@@ -84,7 +84,8 @@ func containerImage(hardware *types.HardWare, frame *database.RuntimeFramework) 
 }
 
 func (d *deployer) startAccounting() {
-	d.startAcctFeeing()
+	go d.startAcctFeeing()
+	go d.startServiceConsuming()
 }
 
 func checkNodeResource(node types.NodeResourceInfo, hardware *types.HardWare) bool {

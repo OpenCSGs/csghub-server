@@ -2,6 +2,7 @@ package component
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -17,11 +18,13 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/client-go/informers"
 	"k8s.io/client-go/tools/cache"
 	v1 "knative.dev/serving/pkg/apis/serving/v1"
 	"knative.dev/serving/pkg/client/informers/externalversions"
 	"opencsg.com/csghub-server/builder/deploy/cluster"
 	"opencsg.com/csghub-server/builder/deploy/common"
+	"opencsg.com/csghub-server/builder/event"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/types"
@@ -34,6 +37,7 @@ var (
 	KeyDeploySKU     string = "deploy_sku"
 	KeyOrderDetailID string = "order-detail-id"
 	KeyMinScale      string = "autoscaling.knative.dev/min-scale"
+	KeyServiceLabel  string = "serving.knative.dev/service"
 )
 
 type serviceComponentImpl struct {
@@ -44,6 +48,7 @@ type serviceComponentImpl struct {
 	imagePullSecret    string
 	serviceStore       database.KnativeServiceStore
 	clusterPool        *cluster.ClusterPool
+	eventPub           *event.EventPublisher
 }
 
 type ServiceComponent interface {
@@ -55,7 +60,7 @@ type ServiceComponent interface {
 	// get secret from k8s
 	// notes: admin should create nim secret "ngc-secret" and "nvidia-nim-secrets" in related namespace before deploy
 	GetNimSecret(ctx context.Context, cluster cluster.Cluster) (string, error)
-	GetServicePodsWithStatus(ctx context.Context, cluster cluster.Cluster, srvName string, namespace string) ([]types.Instance, error)
+	GetServicePodsWithStatus(ctx context.Context, cluster cluster.Cluster, srvName string, namespace string) (*types.InstanceInfo, error)
 	// NewPersistentVolumeClaim creates a new k8s PVC with some default values set.
 	NewPersistentVolumeClaim(name string, ctx context.Context, cluster cluster.Cluster, hardware types.HardWare) error
 	RunInformer()
@@ -66,7 +71,7 @@ type ServiceComponent interface {
 	GetServiceInfo(ctx context.Context, req types.ServiceRequest) (*types.ServiceInfoResponse, error)
 	AddServiceInDB(srv v1.Service, clusterID string) error
 	DeleteServiceInDB(srv v1.Service, clusterID string) error
-	UpdateServiceInDB(srv v1.Service, revision *v1.Revision, clusterID string) error
+	UpdateServiceInDB(srv v1.Service, clusterID string) error
 }
 
 func NewServiceComponent(config *config.Config, clusterPool *cluster.ClusterPool) ServiceComponent {
@@ -79,6 +84,7 @@ func NewServiceComponent(config *config.Config, clusterPool *cluster.ClusterPool
 		imagePullSecret:    config.Space.ImagePullSecret,
 		serviceStore:       database.NewKnativeServiceStore(),
 		clusterPool:        clusterPool,
+		eventPub:           &event.DefaultEventPublisher,
 	}
 	return sc
 }
@@ -233,7 +239,7 @@ func (s *serviceComponentImpl) GetNimSecret(ctx context.Context, cluster cluster
 	return string(secret.Data["NGC_API_KEY"]), nil
 }
 
-func (s *serviceComponentImpl) GetServicePodsWithStatus(ctx context.Context, cluster cluster.Cluster, srvName string, namespace string) ([]types.Instance, error) {
+func (s *serviceComponentImpl) GetServicePodsWithStatus(ctx context.Context, cluster cluster.Cluster, srvName string, namespace string) (*types.InstanceInfo, error) {
 	labelSelector := fmt.Sprintf("serving.knative.dev/service=%s", srvName)
 	// Get the list of Pods based on the label selector
 	pods, err := cluster.Client.CoreV1().Pods(namespace).List(ctx, metav1.ListOptions{
@@ -242,21 +248,80 @@ func (s *serviceComponentImpl) GetServicePodsWithStatus(ctx context.Context, clu
 	if err != nil {
 		return nil, err
 	}
-
 	// Extract the Pod names and status
 	var podInstances []types.Instance
+	var instanceInfo types.InstanceInfo
 	for _, pod := range pods.Items {
 		if pod.DeletionTimestamp != nil {
 			continue
 		}
+		status := pod.Status.Phase
+		// Check container statuses for failure reasons
+		if hasFailedStatus(&pod) {
+			status = corev1.PodFailed
+		}
 		podInstances = append(podInstances,
 			types.Instance{
 				Name:   pod.Name,
-				Status: string(pod.Status.Phase),
+				Status: string(status),
 			},
 		)
 	}
-	return podInstances, nil
+	instanceInfo.Instances = podInstances
+	message, reason := getPodError(pods)
+	if message != nil {
+		instanceInfo.Message = *message
+		instanceInfo.Reason = *reason
+	}
+	return &instanceInfo, nil
+}
+
+func hasFailedStatus(pod *corev1.Pod) bool {
+	if pod == nil || len(pod.Status.ContainerStatuses) == 0 {
+		return false
+	}
+
+	failureReasons := map[string]struct{}{
+		"CrashLoopBackOff": {},
+		"ErrImagePull":     {},
+		"ImagePullBackOff": {},
+		"OOMKilled":        {},
+	}
+
+	for _, cs := range pod.Status.ContainerStatuses {
+		if cs.Name != "user-container" {
+			continue
+		}
+		if cs.State.Waiting != nil {
+			if _, exists := failureReasons[cs.State.Waiting.Reason]; exists {
+				return true
+			}
+		}
+		if cs.State.Terminated != nil {
+			if _, exists := failureReasons[cs.State.Terminated.Reason]; exists {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func getPodError(pod *corev1.PodList) (*string, *string) {
+	for _, pod := range pod.Items {
+		if len(pod.Status.ContainerStatuses) == 0 {
+			return nil, nil
+		}
+		for _, cs := range pod.Status.ContainerStatuses {
+			if cs.Name != "user-container" {
+				continue
+			}
+			if cs.LastTerminationState.Terminated != nil {
+				lastState := cs.LastTerminationState.Terminated
+				return &lastState.Message, &lastState.Reason
+			}
+		}
+	}
+	return nil, nil
 }
 
 func GenerateResources(hardware types.HardWare) (map[corev1.ResourceName]resource.Quantity, map[string]string) {
@@ -343,46 +408,14 @@ func (s *serviceComponentImpl) RunInformer() {
 		wg.Add(2)
 		go func(cluster cluster.Cluster) {
 			defer wg.Done()
-			s.RunRevisionInformer(stopCh, cluster)
+			s.RunServiceInformer(stopCh, cluster)
 		}(cls)
 		go func(cluster cluster.Cluster) {
 			defer wg.Done()
-			s.RunServiceInformer(stopCh, cluster)
+			s.RunPodInformer(stopCh, cluster)
 		}(cls)
 	}
 	wg.Wait()
-}
-
-// Run Revision informer,mainly handle pod changes
-func (s *serviceComponentImpl) RunRevisionInformer(stopCh <-chan struct{}, cluster cluster.Cluster) {
-	informerFactory := externalversions.NewSharedInformerFactoryWithOptions(
-		cluster.KnativeClient,
-		0, //never resync
-		externalversions.WithNamespace(s.k8sNameSpace),
-	)
-	informer := informerFactory.Serving().V1().Revisions().Informer()
-	_, err := informer.AddEventHandler(cache.ResourceEventHandlerFuncs{
-		UpdateFunc: func(oldObj, newObj interface{}) {
-			revision := newObj.(*v1.Revision)
-			service, err := s.getServiceByRevision(revision, cluster.ID)
-			if err != nil {
-				slog.Error("failed to get service from revision ", slog.Any("service", service.Name), slog.Any("error", err))
-				return
-			}
-			err = s.UpdateServiceInDB(*service, revision, cluster.ID)
-			if err != nil {
-				slog.Error("failed to update service status ", slog.Any("service", service.Name), slog.Any("error", err))
-			}
-
-		},
-	})
-	if err != nil {
-		runtime.HandleError(fmt.Errorf("failed to add event handler for knative revision informer"))
-	}
-	informer.Run(stopCh)
-	if !cache.WaitForCacheSync(stopCh, informer.HasSynced) {
-		runtime.HandleError(fmt.Errorf("timed out waiting for caches to sync for knative revision informer"))
-	}
 }
 
 // Run service informer, main handle the service changes
@@ -394,26 +427,26 @@ func (s *serviceComponentImpl) RunServiceInformer(stopCh <-chan struct{}, cluste
 	)
 	informer := informerFactory.Serving().V1().Services().Informer()
 	_, err := informer.AddEventHandler(cache.ResourceEventHandlerFuncs{
-		AddFunc: func(obj interface{}) {
+		AddFunc: func(obj any) {
 			service := obj.(*v1.Service)
 			err := s.AddServiceInDB(*service, cluster.ID)
 			if err != nil {
 				slog.Error("failed to add service ", slog.Any("service", service.Name), slog.Any("error", err))
 			}
 		},
-		UpdateFunc: func(oldObj, newObj interface{}) {
+		UpdateFunc: func(oldObj, newObj any) {
 			new := newObj.(*v1.Service)
 			old := oldObj.(*v1.Service)
 			newStatus := getReadyCondition(new)
 			oldStatus := getReadyCondition(old)
-			if newStatus != oldStatus || newStatus == corev1.ConditionUnknown {
-				err := s.UpdateServiceInDB(*new, nil, cluster.ID)
+			if newStatus != oldStatus {
+				err := s.UpdateServiceInDB(*new, cluster.ID)
 				if err != nil {
 					slog.Error("failed to update service status ", slog.Any("service", new.Name), slog.Any("error", err))
 				}
 			}
 		},
-		DeleteFunc: func(obj interface{}) {
+		DeleteFunc: func(obj any) {
 			service := obj.(*v1.Service)
 			err := s.DeleteServiceInDB(*service, cluster.ID)
 			if err != nil {
@@ -430,22 +463,56 @@ func (s *serviceComponentImpl) RunServiceInformer(stopCh <-chan struct{}, cluste
 	}
 }
 
-func (s *serviceComponentImpl) getServiceByRevision(revision *v1.Revision, clusterID string) (*v1.Service, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-	serviceName, exists := revision.Labels["serving.knative.dev/service"]
-	if !exists {
-		return nil, fmt.Errorf("revision %s does not have a parent service", revision.Name)
-	}
-	cluster, err := s.clusterPool.GetClusterByID(context.Background(), clusterID)
+func (s *serviceComponentImpl) RunPodInformer(stopCh <-chan struct{}, cluster cluster.Cluster) {
+	factory := informers.NewSharedInformerFactoryWithOptions(
+		cluster.Client,
+		0,
+		informers.WithNamespace(s.k8sNameSpace),
+		informers.WithTweakListOptions(func(options *metav1.ListOptions) {
+			options.LabelSelector = KeyServiceLabel
+		}),
+	)
+
+	// Get pod informer
+	podInformer := factory.Core().V1().Pods()
+
+	// Add event handler
+	_, err := podInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+		UpdateFunc: func(oldObj, newObj any) {
+			new := newObj.(*corev1.Pod)
+			serviceName := new.Labels[KeyServiceLabel]
+			if serviceName != "" && hasFailedStatus(new) {
+				ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+				defer cancel()
+				srv, err := cluster.KnativeClient.ServingV1().Services(s.k8sNameSpace).
+					Get(ctx, serviceName, metav1.GetOptions{})
+				if err != nil {
+					slog.Error("failed to get service ", slog.Any("service", serviceName), slog.Any("error", err))
+				}
+				err = s.UpdateServiceInDB(*srv, cluster.ID)
+				if err != nil {
+					slog.Error("failed to update service status ", slog.Any("service", serviceName), slog.Any("error", err))
+				}
+			}
+		},
+	})
+
 	if err != nil {
-		return nil, fmt.Errorf("fail to get cluster,error: %v ", err)
+		runtime.HandleError(fmt.Errorf("failed to add event handler for pod informer"))
 	}
-	return cluster.KnativeClient.ServingV1().Services(s.k8sNameSpace).Get(ctx, serviceName, metav1.GetOptions{})
+
+	// Start informer
+	factory.Start(stopCh)
+
+	// Wait for cache sync
+	if !cache.WaitForCacheSync(stopCh, podInformer.Informer().HasSynced) {
+		runtime.HandleError(fmt.Errorf("timed out waiting for caches to sync"))
+	}
+	<-stopCh
 }
 
 func (s *serviceComponentImpl) AddServiceInDB(srv v1.Service, clusterID string) error {
-	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	status, err := s.GetServiceStatus(ctx, srv, clusterID)
 	if err != nil {
@@ -482,7 +549,7 @@ func (s *serviceComponentImpl) AddServiceInDB(srv v1.Service, clusterID string) 
 		OrderDetailID:  orderDetailId,
 		Instances:      status.Instances,
 		DesiredReplica: DesiredReplica,
-		ActualReplica:  len(status.Instances),
+		ActualReplica:  0,
 	}
 
 	return s.serviceStore.Add(ctx, service)
@@ -492,10 +559,17 @@ func (s *serviceComponentImpl) AddServiceInDB(srv v1.Service, clusterID string) 
 func (s *serviceComponentImpl) DeleteServiceInDB(srv v1.Service, clusterID string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 	defer cancel()
+
+	event := types.ServiceEvent{
+		ServiceName: srv.Name,
+		Status:      common.Stopped,
+	}
+	s.sendServiceUpdateEvent(event)
+
 	return s.serviceStore.Delete(ctx, srv.Name, clusterID)
 }
 
-func (s *serviceComponentImpl) UpdateServiceInDB(srv v1.Service, revision *v1.Revision, clusterID string) error {
+func (s *serviceComponentImpl) UpdateServiceInDB(srv v1.Service, clusterID string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 	defer cancel()
 	status, err := s.GetServiceStatus(ctx, srv, clusterID)
@@ -505,6 +579,10 @@ func (s *serviceComponentImpl) UpdateServiceInDB(srv v1.Service, revision *v1.Re
 	oldService, err := s.serviceStore.Get(ctx, srv.Name, clusterID)
 	if err != nil {
 		return err
+	}
+	revision, err := s.getRevisionByServiceName(srv, clusterID)
+	if err != nil {
+		slog.Error("failed to get revision ", slog.Any("service", srv.Name), slog.Any("error", err))
 	}
 	oldService.Code = status.Code
 	oldService.Endpoint = srv.Status.URL.String()
@@ -523,7 +601,31 @@ func (s *serviceComponentImpl) UpdateServiceInDB(srv v1.Service, revision *v1.Re
 		oldService.DesiredReplica = DesiredReplicas
 		oldService.ActualReplica = ActualReplicas
 	}
+	if oldService.Code != status.Code || status.Message != "" {
+		event := types.ServiceEvent{
+			ServiceName: srv.Name,
+			Status:      status.Code,
+			Message:     status.Message,
+			Reason:      status.Reason,
+		}
+		s.sendServiceUpdateEvent(event)
+	}
 	return s.serviceStore.Update(ctx, oldService)
+}
+
+// Get Revision by Service name
+func (s *serviceComponentImpl) getRevisionByServiceName(service v1.Service, clusterID string) (*v1.Revision, error) {
+
+	// Extract the latest ready Revision name
+	revisionName := service.Status.LatestReadyRevisionName
+	if revisionName == "" {
+		return nil, fmt.Errorf("no LatestReadyRevisionName found for Service %s", service.Name)
+	}
+	cluster, err := s.clusterPool.GetClusterByID(context.Background(), clusterID)
+	if err != nil {
+		return nil, fmt.Errorf("fail to get cluster,error: %v ", err)
+	}
+	return cluster.KnativeClient.ServingV1().Revisions(s.k8sNameSpace).Get(context.Background(), revisionName, metav1.GetOptions{})
 }
 
 func (s *serviceComponentImpl) GetServiceStatus(ctx context.Context, ks v1.Service, clusterID string) (resp types.StatusResponse, err error) {
@@ -532,37 +634,42 @@ func (s *serviceComponentImpl) GetServiceStatus(ctx context.Context, ks v1.Servi
 	if err != nil {
 		return resp, fmt.Errorf("fail to get cluster,error: %v ", err)
 	}
-	instList, err := s.GetServicePodsWithStatus(ctx, *cluster, ks.Name, ks.Namespace)
+	instInfo, err := s.GetServicePodsWithStatus(ctx, *cluster, ks.Name, ks.Namespace)
 	if err != nil {
 		return resp, fmt.Errorf("fail to get service pod name list,error: %v ", err)
 	}
+
 	switch {
 	case serviceCondition == nil:
 		resp.Code = common.Deploying
 	case serviceCondition.Status == corev1.ConditionUnknown:
 		resp.Code = common.DeployFailed
-		for _, instance := range instList {
-			if instance.Status == string(corev1.PodRunning) || instance.Status == string(corev1.PodPending) {
-				resp.Code = common.Deploying
-				break
-			}
+		if isUserContainerActive(instInfo.Instances) {
+			resp.Code = common.Deploying
 		}
 	case serviceCondition.Status == corev1.ConditionTrue:
 		resp.Code = common.Running
-		if len(instList) == 0 {
+		if len(instInfo.Instances) == 0 {
 			resp.Code = common.Sleeping
 		}
 	case serviceCondition.Status == corev1.ConditionFalse:
 		resp.Code = common.DeployFailed
-		for _, instance := range instList {
-			if instance.Status == string(corev1.PodRunning) || instance.Status == string(corev1.PodPending) {
-				resp.Code = common.Deploying
-				break
-			}
+		if isUserContainerActive(instInfo.Instances) {
+			resp.Code = common.Deploying
 		}
 	}
-	resp.Instances = instList
+	resp.Message = instInfo.Message
+	resp.Instances = instInfo.Instances
+	resp.Reason = instInfo.Reason
 	return resp, err
+}
+func isUserContainerActive(instList []types.Instance) bool {
+	for _, instance := range instList {
+		if instance.Status == string(corev1.PodRunning) || instance.Status == string(corev1.PodPending) {
+			return true
+		}
+	}
+	return false
 }
 
 // corev1.ConditionTrue
@@ -903,4 +1010,18 @@ func (s *serviceComponentImpl) GetServiceInfo(ctx context.Context, req types.Ser
 		resp.PodNames = append(resp.PodNames, v.Name)
 	}
 	return &resp, nil
+}
+
+func (wc *serviceComponentImpl) sendServiceUpdateEvent(event types.ServiceEvent) {
+	str, err := json.Marshal(event)
+	if err != nil {
+		slog.Error("error marshal service event", slog.Any("event", event), slog.Any("error", err))
+		return
+	}
+	err = wc.eventPub.PublishServiceEvent(str)
+	if err != nil {
+		slog.Error("failed to pub service event", slog.Any("data", string(str)), slog.Any("error", err))
+	} else {
+		slog.Debug("pub service event success", slog.Any("data", string(str)))
+	}
 }

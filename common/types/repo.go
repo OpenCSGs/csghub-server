@@ -122,6 +122,12 @@ type Instance struct {
 	Status string `json:"status"`
 }
 
+type InstanceInfo struct {
+	Instances []Instance `json:"instances"`
+	Message   string     `json:"message"`
+	Reason    string     `json:"reason"`
+}
+
 // repo object(cover model/space/code/dataset) for deployer
 type DeployRepo struct {
 	DeployID         int64      `json:"deploy_id,omitempty"`
