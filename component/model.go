@@ -595,12 +595,15 @@ func (c *modelComponentImpl) SDKModelInfo(ctx context.Context, namespace, name, 
 		sha = lastCommit.ID
 	}
 
+	hfCreatedAt := reSetHFTime(model.Repository.CreatedAt)
+	hfUpdatedAt := reSetHFTime(model.Repository.UpdatedAt)
+
 	resModel := &types.SDKModelInfo{
 		ID:               model.Repository.Path,
 		Author:           model.Repository.User.Username,
 		Sha:              sha,
-		CreatedAt:        model.Repository.CreatedAt,
-		LastModified:     model.Repository.UpdatedAt,
+		CreatedAt:        hfCreatedAt,
+		LastModified:     hfUpdatedAt,
 		Private:          model.Repository.Private,
 		Disabled:         false,
 		Gated:            nil,

@@ -23,14 +23,11 @@ type DLQEventConfig struct {
 }
 
 type RequestSubject struct {
-	fee             string // fee charging subject
-	token           string // token subject
-	quota           string // quota subject
-	nobalance       string // subject name for pub notification of no balance
-	duration        string // duration subject
-	orderExpired    string // subject name for pub notification of order expired
-	rechargeSucceed string //
-	deployService   string // service update subject
+	fee           string // fee charging subject
+	token         string // token subject
+	quota         string // quota subject
+	duration      string // duration subject
+	deployService string // service update subject
 }
 
 var (
