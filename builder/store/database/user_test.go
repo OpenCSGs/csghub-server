@@ -267,11 +267,13 @@ func TestUserStore_CountUsers(t *testing.T) {
 	err = us.Create(ctx, &database.User{
 		GitID:    3321,
 		Username: "u-foo",
+		UUID:     "1",
 	}, &database.Namespace{Path: "u-foo"})
 	require.Nil(t, err)
 	err = us.Create(ctx, &database.User{
 		GitID:    3321,
 		Username: "u-foo-2",
+		UUID:     "2",
 	}, &database.Namespace{Path: "u-foo-2"})
 	require.Nil(t, err)
 
