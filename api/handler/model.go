@@ -1632,3 +1632,32 @@ func (h *ModelHandler) GetDeployServerless(ctx *gin.Context) {
 
 	httpbase.OK(ctx, response)
 }
+
+// ListQuantization      godoc
+// @Security     ApiKey
+// @Summary      list all gguf quantizations
+// @Tags         Model
+// @Accept       json
+// @Produce      json
+// @Param        namespace path string true "namespace"
+// @Param        name path string true "name"
+// @Success      200  {object}  types.Response{} "OK"
+// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
+// @Router       /models/{namespace}/{name}/quantizations [get]
+func (h *ModelHandler) ListQuantizations(ctx *gin.Context) {
+	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
+	if err != nil {
+		slog.Error("failed to get namespace from context", "error", err)
+		httpbase.BadRequest(ctx, err.Error())
+		return
+	}
+	files, err := h.model.ListQuantizations(ctx.Request.Context(), namespace, name)
+	if err != nil {
+		slog.Error("failed to list quantizations", slog.String("namespace", namespace),
+			slog.String("name", name), slog.Any("error", err))
+		httpbase.ServerError(ctx, err)
+		return
+	}
+	httpbase.OK(ctx, files)
+}

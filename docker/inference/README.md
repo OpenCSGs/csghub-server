@@ -58,6 +58,13 @@ docker buildx build --platform linux/amd64,linux/arm64 \
   -t ${OPENCSG_ACR}/public/tei:latest \
   -f Dockerfile.tei-cpu \
   --push .
+# For Text Llama.cpp Inference: opencsg-registry.cn-beijing.cr.aliyuncs.com/public/llama.cpp:b4689
+export IMAGE_TAG=b4689
+docker buildx build --platform linux/amd64 \
+  -t ${OPENCSG_ACR}/public/llama.cpp:${IMAGE_TAG} \
+  -t ${OPENCSG_ACR}/public/llama.cpp:latest \
+  -f Dockerfile.llama.cpp \
+  --push .
 ```
 *Note: The above command will create `linux/amd64` and `linux/arm64` images with the tags `${IMAGE_TAG}` and `latest` at the same time.*
 
@@ -94,6 +101,8 @@ docker run -d \
 |text generation| tgi | 3.2 | 12.4 |fix hf hub timestamp|
 |image generation| hf-inference-toolkit | 0.5.3 | 12.1 |-|
 |text generation| sglang | v0.4.1.post3-cu124-srt | 12.4 |- |
+|text generation| mindie | 2.0-csg-1.0.RC2 | 1.0.RC2 |- |
+|text generation| llama.cpp | b4689 | - |- |
 
 
 ## API to Call Inference

@@ -1596,6 +1596,8 @@ definitions:
       access_token:
         description: source access token
         type: string
+      id:
+        type: integer
       last_message:
         type: string
       last_updated_at:
@@ -1772,6 +1774,9 @@ definitions:
       cluster_id:
         type: string
       deploy_name:
+        type: string
+      entrypoint:
+        description: model file name for gguf model
         type: string
       env:
         type: string
@@ -6835,6 +6840,41 @@ paths:
       security:
       - ApiKey: []
       summary: Stop a finetune instance
+      tags:
+      - Model
+  /models/{namespace}/{name}/quantizations:
+    get:
+      consumes:
+      - application/json
+      parameters:
+      - description: namespace
+        in: path
+        name: namespace
+        required: true
+        type: string
+      - description: name
+        in: path
+        name: name
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/types.Response'
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: list all gguf quantizations
       tags:
       - Model
   /models/{namespace}/{name}/relations:

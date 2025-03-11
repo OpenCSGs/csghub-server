@@ -221,6 +221,7 @@ func (s *repoStoreImpl) FindByPath(ctx context.Context, repoType types.Repositor
 	err := s.db.Operator.Core.
 		NewSelect().
 		Model(resRepo).
+		Relation("Tags").
 		Where("LOWER(git_path) = LOWER(?)", fmt.Sprintf("%ss_%s/%s", repoType, namespace, name)).
 		Limit(1).
 		Scan(ctx)
@@ -663,7 +664,7 @@ func (s *repoStoreImpl) CountByRepoType(ctx context.Context, repoType types.Repo
 
 func (s *repoStoreImpl) GetRepoWithoutRuntimeByID(ctx context.Context, rfID int64, paths []string, batchSize, batch int) ([]Repository, error) {
 	var res []Repository
-	q := s.db.Operator.Core.NewSelect().Model(&res)
+	q := s.db.Operator.Core.NewSelect().Model(&res).Relation("Tags")
 	if len(paths) > 0 {
 		q.Where("path in (?)", bun.In(paths))
 	}
@@ -681,7 +682,7 @@ func (s *repoStoreImpl) GetRepoWithoutRuntimeByID(ctx context.Context, rfID int6
 
 func (s *repoStoreImpl) GetRepoWithRuntimeByID(ctx context.Context, rfID int64, paths []string) ([]Repository, error) {
 	var res []Repository
-	q := s.db.Operator.Core.NewSelect().Model(&res)
+	q := s.db.Operator.Core.NewSelect().Model(&res).Relation("Tags")
 	if len(paths) > 0 {
 		q.Where("path in (?)", bun.In(paths))
 	}

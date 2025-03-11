@@ -676,6 +676,66 @@ func (_c *MockModelComponent_ListModelsOfRuntimeFrameworks_Call) RunAndReturn(ru
 	return _c
 }
 
+// ListQuantizations provides a mock function with given fields: ctx, namespace, name
+func (_m *MockModelComponent) ListQuantizations(ctx context.Context, namespace string, name string) ([]*types.File, error) {
+	ret := _m.Called(ctx, namespace, name)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ListQuantizations")
+	}
+
+	var r0 []*types.File
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, string) ([]*types.File, error)); ok {
+		return rf(ctx, namespace, name)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string, string) []*types.File); ok {
+		r0 = rf(ctx, namespace, name)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]*types.File)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string, string) error); ok {
+		r1 = rf(ctx, namespace, name)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockModelComponent_ListQuantizations_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ListQuantizations'
+type MockModelComponent_ListQuantizations_Call struct {
+	*mock.Call
+}
+
+// ListQuantizations is a helper method to define mock.On call
+//   - ctx context.Context
+//   - namespace string
+//   - name string
+func (_e *MockModelComponent_Expecter) ListQuantizations(ctx interface{}, namespace interface{}, name interface{}) *MockModelComponent_ListQuantizations_Call {
+	return &MockModelComponent_ListQuantizations_Call{Call: _e.mock.On("ListQuantizations", ctx, namespace, name)}
+}
+
+func (_c *MockModelComponent_ListQuantizations_Call) Run(run func(ctx context.Context, namespace string, name string)) *MockModelComponent_ListQuantizations_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(string), args[2].(string))
+	})
+	return _c
+}
+
+func (_c *MockModelComponent_ListQuantizations_Call) Return(_a0 []*types.File, _a1 error) *MockModelComponent_ListQuantizations_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockModelComponent_ListQuantizations_Call) RunAndReturn(run func(context.Context, string, string) ([]*types.File, error)) *MockModelComponent_ListQuantizations_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // OrgModels provides a mock function with given fields: ctx, req
 func (_m *MockModelComponent) OrgModels(ctx context.Context, req *types.OrgModelsReq) ([]types.Model, int, error) {
 	ret := _m.Called(ctx, req)

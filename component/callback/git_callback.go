@@ -216,15 +216,15 @@ func (c *gitCallbackComponentImpl) SensitiveCheck(ctx context.Context, req *type
 
 // modifyFiles method handles modified files, skip if not modify README.md
 func (c *gitCallbackComponentImpl) modifyFiles(ctx context.Context, repoType, namespace, repoName, ref string, fileNames []string) error {
+	// update model runtime
+	c.updateRepoRelations(ctx, repoType, namespace, repoName, ref, false, fileNames)
+
 	for _, fileName := range fileNames {
 		slog.Debug("modify file", slog.String("file", fileName))
-		// update model runtime
-		c.updateRepoRelations(ctx, repoType, namespace, repoName, ref, fileName, false, fileNames)
 		// only care about readme file under root directory
 		if fileName != types.ReadmeFileName {
 			continue
 		}
-
 		content, err := c.getFileRaw(repoType, namespace, repoName, ref, fileName)
 		if err != nil {
 			return err
@@ -238,10 +238,11 @@ func (c *gitCallbackComponentImpl) modifyFiles(ctx context.Context, repoType, na
 func (c *gitCallbackComponentImpl) removeFiles(ctx context.Context, repoType, namespace, repoName, ref string, fileNames []string) error {
 	// handle removed files
 	// delete tags
+	// update model runtime
+	c.updateRepoRelations(ctx, repoType, namespace, repoName, ref, true, fileNames)
+
 	for _, fileName := range fileNames {
 		slog.Debug("remove file", slog.String("file", fileName))
-		// update model runtime
-		c.updateRepoRelations(ctx, repoType, namespace, repoName, ref, fileName, true, fileNames)
 		// only care about readme file under root directory
 		if fileName == types.ReadmeFileName {
 			// use empty content to clear all the meta tags
@@ -283,10 +284,21 @@ func (c *gitCallbackComponentImpl) removeFiles(ctx context.Context, repoType, na
 }
 
 func (c *gitCallbackComponentImpl) addFiles(ctx context.Context, repoType, namespace, repoName, ref string, fileNames []string) error {
+	if len(fileNames) == 0 {
+		return nil
+	}
+	// update tag firstly
+	err := c.updateRepoTags(ctx, repoType, namespace, repoName, ref, fileNames)
+	// update model runtime
+	c.updateRepoRelations(ctx, repoType, namespace, repoName, ref, false, fileNames)
+
+	return err
+}
+
+// update Repo tags
+func (c *gitCallbackComponentImpl) updateRepoTags(ctx context.Context, repoType, namespace, repoName, ref string, fileNames []string) error {
 	for _, fileName := range fileNames {
 		slog.Debug("add file", slog.String("file", fileName))
-		// update model runtime
-		c.updateRepoRelations(ctx, repoType, namespace, repoName, ref, fileName, false, fileNames)
 		// only care about readme file under root directory
 		if fileName == types.ReadmeFileName {
 			content, err := c.getFileRaw(repoType, namespace, repoName, ref, fileName)
@@ -383,10 +395,10 @@ func (c *gitCallbackComponentImpl) getFileRaw(repoType, namespace, repoName, ref
 }
 
 // update repo relations
-func (c *gitCallbackComponentImpl) updateRepoRelations(ctx context.Context, repoType, namespace, repoName, ref, fileName string, deleteAction bool, fileNames []string) {
-	slog.Debug("update model relation for git callback", slog.Any("namespace", namespace), slog.Any("repoName", repoName), slog.Any("repoType", repoType), slog.Any("fileName", fileName), slog.Any("branch", ref))
+func (c *gitCallbackComponentImpl) updateRepoRelations(ctx context.Context, repoType, namespace, repoName, ref string, deleteAction bool, fileNames []string) {
+	slog.Debug("update model relation for git callback", slog.Any("namespace", namespace), slog.Any("repoName", repoName), slog.Any("repoType", repoType), slog.Any("branch", ref))
 	if repoType == fmt.Sprintf("%ss", types.ModelRepo) {
-		c.updateModelRuntimeFrameworks(ctx, repoType, namespace, repoName, ref, fileName, deleteAction)
+		c.updateModelRuntimeFrameworks(ctx, repoType, namespace, repoName, ref, fileNames, deleteAction)
 	}
 	if repoType == fmt.Sprintf("%ss", types.DatasetRepo) {
 		c.updateDatasetTags(ctx, namespace, repoName, fileNames)
@@ -446,15 +458,43 @@ func (c *gitCallbackComponentImpl) updateDatasetTags(ctx context.Context, namesp
 }
 
 // update model runtime frameworks
-func (c *gitCallbackComponentImpl) updateModelRuntimeFrameworks(ctx context.Context, repoType, namespace, repoName, ref, fileName string, deleteAction bool) {
-	// must be model repo and config.json
-	valid := c.isValidForRuntime(repoType, ref, fileName)
-	if !valid {
+func (c *gitCallbackComponentImpl) updateModelRuntimeFrameworks(ctx context.Context, repoType, namespace, repoName, ref string, fileNames []string, deleteAction bool) {
+	//check file contains
+	if len(fileNames) == 0 {
 		return
 	}
 	repo, err := c.repoStore.FindByPath(ctx, types.ModelRepo, namespace, repoName)
 	if err != nil || repo == nil {
 		slog.Warn("fail to query repo for git callback", slog.Any("namespace", namespace), slog.Any("repoName", repoName), slog.Any("error", err))
+		return
+	}
+	if hasGGUFFile(fileNames, repo) {
+		// for gguf model
+		c.updateGGUFModel(ctx, namespace, repoName, deleteAction, repo)
+	} else {
+		// for safetensor model
+		c.updateSafetensorModel(ctx, repoType, namespace, repoName, ref, fileNames, deleteAction, repo)
+	}
+}
+
+func hasGGUFFile(fileList []string, repo *database.Repository) bool {
+	for _, file := range fileList {
+		if strings.HasSuffix(file, ".gguf") {
+			return true
+		}
+	}
+	for _, tag := range repo.Tags {
+		if tag.Name == "gguf" {
+			return true
+		}
+	}
+	return false
+}
+
+func (c *gitCallbackComponentImpl) updateSafetensorModel(ctx context.Context, repoType, namespace, repoName, ref string, fileNames []string, deleteAction bool, repo *database.Repository) {
+	// must be model repo and config.json
+	valid := c.isValidForRuntime(repoType, ref, fileNames)
+	if !valid {
 		return
 	}
 	// delete event
@@ -553,12 +593,61 @@ func (c *gitCallbackComponentImpl) updateModelRuntimeFrameworks(ctx context.Cont
 
 }
 
+/**
+ * update runtime framework for gguf model
+ */
+func (c *gitCallbackComponentImpl) updateGGUFModel(ctx context.Context, namespace, repoName string, deleteAction bool, repo *database.Repository) {
+	// delete event
+	if deleteAction {
+		err := c.repoRuntimeFrameworkStore.DeleteByRepoID(ctx, repo.ID)
+		if err != nil {
+			slog.Warn("fail to remove repo runtimes for git callback", slog.Any("namespace", namespace), slog.Any("repoName", repoName), slog.Any("repoid", repo.ID), slog.Any("error", err))
+		}
+		return
+	}
+	task := GetPipelineTaskFromTags(repo.Tags)
+	if task != types.TextGeneration {
+		return
+	}
+	arch, err := c.runtimeArchComponent.GetArchitecture(ctx, types.TextGeneration, repo)
+	if err != nil {
+		slog.Warn("fail to get gguf arch for git callback", slog.Any("namespace", namespace), slog.Any("repoName", repoName), slog.Any("error", err))
+		return
+	}
+	runtimes, err := c.runtimeArchStore.ListByRArchName(ctx, arch)
+	if err != nil {
+		slog.Warn("fail to get runtime framework for git callback", slog.Any("namespace", namespace), slog.Any("repoName", repoName), slog.Any("error", err))
+		return
+	}
+
+	//get tags
+	filter := &types.TagFilter{
+		Scopes:     []types.TagScope{types.ModelTagScope},
+		Categories: []string{"runtime_framework", "resource"},
+	}
+	runtime_framework_tags, _ := c.tagStore.AllTags(ctx, filter)
+
+	//add runtime framework and tags
+	for _, runtime := range runtimes {
+		// add runtime framework
+		err := c.repoRuntimeFrameworkStore.Add(ctx, runtime.RuntimeFrameworkID, repo.ID, types.InferenceType)
+		if err != nil {
+			slog.Warn("fail to add new repo runtimes for git callback", slog.Any("repo.ID", repo.ID), slog.Any("runtime framework id", runtime.ID), slog.Any("error", err))
+		}
+		// add runtime framework tags
+		err = c.runtimeArchComponent.AddRuntimeFrameworkTag(ctx, runtime_framework_tags, repo.ID, runtime.RuntimeFrameworkID)
+		if err != nil {
+			slog.Warn("fail to add runtime framework tag for git callback", slog.Any("repo.ID", repo.ID), slog.Any("runtime framework id", runtime.ID), slog.Any("error", err))
+		}
+	}
+}
+
 // check if the repo is valid for runtime framework
-func (c *gitCallbackComponentImpl) isValidForRuntime(repoType, ref, fileName string) bool {
+func (c *gitCallbackComponentImpl) isValidForRuntime(repoType, ref string, fileNames []string) bool {
 	if repoType != fmt.Sprintf("%ss", types.ModelRepo) {
 		return false
 	}
-	if fileName != component.ConfigFileName && fileName != component.ModelIndexFileName {
+	if !slices.Contains(fileNames, component.ConfigFileName) && !slices.Contains(fileNames, component.ModelIndexFileName) {
 		return false
 	}
 
@@ -567,4 +656,16 @@ func (c *gitCallbackComponentImpl) isValidForRuntime(repoType, ref, fileName str
 	}
 
 	return true
+}
+
+func GetPipelineTaskFromTags(tags []database.Tag) types.PipelineTask {
+	for _, tag := range tags {
+		if tag.Name == string(types.TextGeneration) {
+			return types.TextGeneration
+		}
+		if tag.Name == string(types.Text2Image) {
+			return types.Text2Image
+		}
+	}
+	return ""
 }

@@ -49,8 +49,9 @@ type Deploy struct {
 	Task             types.PipelineTask `bun:",nullzero" json:"task"` //text-generation,text-to-image
 	UserUUID         string             `bun:"," json:"user_uuid"`
 	SKU              string             `bun:"," json:"sku"`
-	EngineArgs       string             `bun:"," json:"engine_args"`
 	Variables        string             `bun:",nullzero" json:"variables"`
+	OrderDetailID    int64              `bun:"," json:"order_detail_id"`
+	EngineArgs       string             `bun:"," json:"engine_args"`
 	times
 }
 
