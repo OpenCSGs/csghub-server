@@ -104,11 +104,15 @@ func IsValidName(name string) (bool, error) {
 
 func hasRepeatSpecialCharacter(s string) bool {
 	for i := 0; i < len(s)-1; i++ {
-		if strings.Contains("-_.", string(s[i])) && s[i] == s[i+1] {
+		if isSpecialChar(s[i]) && isSpecialChar(s[i+1]) {
 			return true
 		}
 	}
 	return false
+}
+
+func isSpecialChar(c byte) bool {
+	return c == '-' || c == '_' || c == '.'
 }
 
 func validate(name string) error {
