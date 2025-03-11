@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/google/uuid"
 	"opencsg.com/csghub-server/builder/git"
 	"opencsg.com/csghub-server/builder/git/gitserver"
 	"opencsg.com/csghub-server/builder/multisync"
@@ -190,6 +191,7 @@ func (c *multiSyncComponentImpl) createLocalDataset(ctx context.Context, m *type
 			Name:     m.User.Nickname,
 			Username: userName,
 			Email:    common.MD5Hash(fmt.Sprintf("%s_%s", userName, m.User.Email)),
+			UUID:     uuid.New().String(),
 		})
 		if err != nil {
 			return fmt.Errorf("fail to create user for namespace, namespace:%s, error: %w", namespace, err)
@@ -319,6 +321,7 @@ func (c *multiSyncComponentImpl) createLocalModel(ctx context.Context, m *types.
 			Name:     m.User.Nickname,
 			Username: userName,
 			Email:    common.MD5Hash(fmt.Sprintf("%s_%s", userName, m.User.Email)),
+			UUID:     uuid.New().String(),
 		})
 		if err != nil {
 			return fmt.Errorf("fail to create user for namespace, namespace:%s, error: %w", namespace, err)
@@ -448,6 +451,7 @@ func (c *multiSyncComponentImpl) createUser(ctx context.Context, req types.Creat
 		Email:    req.Email,
 		GitID:    gsUserResp.GitID,
 		Password: gsUserResp.Password,
+		UUID:     req.UUID,
 	}
 	err = c.userStore.Create(ctx, user, namespace)
 	if err != nil {

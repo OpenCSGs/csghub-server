@@ -88,15 +88,17 @@ func TestMultiSyncComponent_SyncAsClient(t *testing.T) {
 		Username: "CSG_ns",
 		Email:    "ba63d40b48ed06ce1fba4f23c65c058c",
 	}).Return(&gitserver.CreateUserResponse{GitID: 123}, nil)
-	mc.mocks.stores.UserMock().EXPECT().Create(ctx, &database.User{
-		NickName: "nn",
-		Username: "CSG_ns",
-		Email:    "ba63d40b48ed06ce1fba4f23c65c058c",
-		GitID:    123,
-	}, &database.Namespace{
-		Path:     "CSG_ns",
-		Mirrored: true,
-	}).Return(nil)
+	mc.mocks.stores.UserMock().EXPECT().Create(ctx, mock.Anything, mock.Anything).RunAndReturn(
+		func(ctx context.Context, u *database.User, n *database.Namespace) error {
+			require.Equal(t, u.NickName, "nn")
+			require.Equal(t, u.Username, "CSG_ns")
+			require.Equal(t, u.Email, "ba63d40b48ed06ce1fba4f23c65c058c")
+			require.Equal(t, u.GitID, int64(123))
+			require.Equal(t, n.Path, "CSG_ns")
+			require.Equal(t, n.Mirrored, true)
+			return nil
+		},
+	)
 	dbrepo := &database.Repository{
 		Path:           "CSG_ns/user",
 		GitPath:        "models_CSG_ns/user",

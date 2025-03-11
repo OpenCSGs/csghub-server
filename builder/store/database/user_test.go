@@ -119,6 +119,7 @@ func TestUserStore_IndexWithSearch(t *testing.T) {
 	err := userStore.Create(ctx, &database.User{
 		GitID:    3321,
 		Username: "u-foo",
+		UUID:     "1",
 	}, &database.Namespace{Path: "1"})
 	require.Nil(t, err)
 
@@ -126,6 +127,7 @@ func TestUserStore_IndexWithSearch(t *testing.T) {
 		GitID:    3322,
 		Username: "u-bar",
 		Email:    "efoo@z.com",
+		UUID:     "2",
 	}, &database.Namespace{Path: "2"})
 	require.Nil(t, err)
 
@@ -133,6 +135,7 @@ func TestUserStore_IndexWithSearch(t *testing.T) {
 		GitID:    3323,
 		Username: "u-barz",
 		Email:    "ebar@z.com",
+		UUID:     "3",
 	}, &database.Namespace{Path: "3"})
 	require.Nil(t, err)
 
@@ -264,11 +267,13 @@ func TestUserStore_CountUsers(t *testing.T) {
 	err = us.Create(ctx, &database.User{
 		GitID:    3321,
 		Username: "u-foo",
+		UUID:     "1",
 	}, &database.Namespace{Path: "u-foo"})
 	require.Nil(t, err)
 	err = us.Create(ctx, &database.User{
 		GitID:    3321,
 		Username: "u-foo-2",
+		UUID:     "2",
 	}, &database.Namespace{Path: "u-foo-2"})
 	require.Nil(t, err)
 
