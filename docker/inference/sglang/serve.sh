@@ -8,9 +8,15 @@ if [ -z "$GPU_NUM" ]; then
     GPU_NUM=1
 fi
 LimitedMaxToken=$(($GPU_NUM * 5120))
-args="--tp $GPU_NUM --enable-mixed-chunk --disable-radix-cache --trust-remote-code --enable-p2p-check --model-path $REPO_ID --port 8000 --host 0.0.0.0 --mem-fraction-static 0.8 --enable-torch-compile"
+ENGINE_ARGS="$ENGINE_ARGS --trust-remote-code --enable-mixed-chunk --host 0.0.0.0 --port 8000 --model-path $REPO_ID"
+if [[ ! $ENGINE_ARGS == *"--tensor-parallel-size"* ]]; then
+    ENGINE_ARGS="$ENGINE_ARGS --tensor-parallel-size $GPU_NUM"
+fi
+if [[ ! $ENGINE_ARGS == *"--mem-fraction-static"* ]]; then
+    ENGINE_ARGS="$ENGINE_ARGS --mem-fraction-static 0.8"
+fi
 configfile="/workspace/$REPO_ID/config.json"
-if [ -f "$configfile" ]; then
+if [[ -f "$configfile" ]] && [[ ! $ENGINE_ARGS == *"--context-length"* ]]; then
     MAX_TOKENS=$(grep '"max_position_embeddings"' $configfile | cut -d":" -f2 | sed 's/[^0-9]*//g')
     # if max_tokens is not set, use 4096
     if [ -z "$MAX_TOKENS" ]; then
@@ -20,12 +26,12 @@ if [ -f "$configfile" ]; then
         if [ $MAX_TOKENS -gt $LimitedMaxToken ]; then
             MAX_TOKENS=$LimitedMaxToken       
         fi
-        args="$args --context-length $MAX_TOKENS"
+        ENGINE_ARGS="$ENGINE_ARGS --context-length $MAX_TOKENS"
     fi
 fi
 tokenizer_config="/workspace/$REPO_ID/tokenizer_config.json"
 if ! grep -q "chat_template" "$tokenizer_config"; then
-    args="$args --chat-template /etc/csghub/chat_template.jinja"
+    ENGINE_ARGS="$ENGINE_ARGS --chat-template /etc/csghub/chat_template.jinja"
 fi
-echo "start running with args: $args"
-python3 -m sglang.launch_server $args
+echo "start running with args: $ENGINE_ARGS"
+python3 -m sglang.launch_server $ENGINE_ARGS

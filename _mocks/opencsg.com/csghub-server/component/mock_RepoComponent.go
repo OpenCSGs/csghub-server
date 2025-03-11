@@ -1420,47 +1420,31 @@ func (_c *MockRepoComponent_DeployStart_Call) RunAndReturn(run func(context.Cont
 }
 
 // DeployStatus provides a mock function with given fields: ctx, repoType, namespace, name, deployID
-func (_m *MockRepoComponent) DeployStatus(ctx context.Context, repoType types.RepositoryType, namespace string, name string, deployID int64) (string, string, []types.Instance, error) {
+func (_m *MockRepoComponent) DeployStatus(ctx context.Context, repoType types.RepositoryType, namespace string, name string, deployID int64) (types.ModelStatusEventData, error) {
 	ret := _m.Called(ctx, repoType, namespace, name, deployID)
 
 	if len(ret) == 0 {
 		panic("no return value specified for DeployStatus")
 	}
 
-	var r0 string
-	var r1 string
-	var r2 []types.Instance
-	var r3 error
-	if rf, ok := ret.Get(0).(func(context.Context, types.RepositoryType, string, string, int64) (string, string, []types.Instance, error)); ok {
+	var r0 types.ModelStatusEventData
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, types.RepositoryType, string, string, int64) (types.ModelStatusEventData, error)); ok {
 		return rf(ctx, repoType, namespace, name, deployID)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, types.RepositoryType, string, string, int64) string); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, types.RepositoryType, string, string, int64) types.ModelStatusEventData); ok {
 		r0 = rf(ctx, repoType, namespace, name, deployID)
 	} else {
-		r0 = ret.Get(0).(string)
+		r0 = ret.Get(0).(types.ModelStatusEventData)
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, types.RepositoryType, string, string, int64) string); ok {
+	if rf, ok := ret.Get(1).(func(context.Context, types.RepositoryType, string, string, int64) error); ok {
 		r1 = rf(ctx, repoType, namespace, name, deployID)
 	} else {
-		r1 = ret.Get(1).(string)
+		r1 = ret.Error(1)
 	}
 
-	if rf, ok := ret.Get(2).(func(context.Context, types.RepositoryType, string, string, int64) []types.Instance); ok {
-		r2 = rf(ctx, repoType, namespace, name, deployID)
-	} else {
-		if ret.Get(2) != nil {
-			r2 = ret.Get(2).([]types.Instance)
-		}
-	}
-
-	if rf, ok := ret.Get(3).(func(context.Context, types.RepositoryType, string, string, int64) error); ok {
-		r3 = rf(ctx, repoType, namespace, name, deployID)
-	} else {
-		r3 = ret.Error(3)
-	}
-
-	return r0, r1, r2, r3
+	return r0, r1
 }
 
 // MockRepoComponent_DeployStatus_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'DeployStatus'
@@ -1485,12 +1469,12 @@ func (_c *MockRepoComponent_DeployStatus_Call) Run(run func(ctx context.Context,
 	return _c
 }
 
-func (_c *MockRepoComponent_DeployStatus_Call) Return(_a0 string, _a1 string, _a2 []types.Instance, _a3 error) *MockRepoComponent_DeployStatus_Call {
-	_c.Call.Return(_a0, _a1, _a2, _a3)
+func (_c *MockRepoComponent_DeployStatus_Call) Return(_a0 types.ModelStatusEventData, _a1 error) *MockRepoComponent_DeployStatus_Call {
+	_c.Call.Return(_a0, _a1)
 	return _c
 }
 
-func (_c *MockRepoComponent_DeployStatus_Call) RunAndReturn(run func(context.Context, types.RepositoryType, string, string, int64) (string, string, []types.Instance, error)) *MockRepoComponent_DeployStatus_Call {
+func (_c *MockRepoComponent_DeployStatus_Call) RunAndReturn(run func(context.Context, types.RepositoryType, string, string, int64) (types.ModelStatusEventData, error)) *MockRepoComponent_DeployStatus_Call {
 	_c.Call.Return(run)
 	return _c
 }

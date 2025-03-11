@@ -10,8 +10,10 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 	knativefake "knative.dev/serving/pkg/client/clientset/versioned/fake"
 	mockdb "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/store/database"
+	mockmq "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/mq"
 	"opencsg.com/csghub-server/builder/deploy/cluster"
 	"opencsg.com/csghub-server/builder/deploy/common"
+	"opencsg.com/csghub-server/builder/event"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/types"
@@ -609,21 +611,30 @@ func TestServiceComponent_updateServiceInDB(t *testing.T) {
 	ksvc, err := knativeClient.ServingV1().Services("test").
 		Get(ctx, "test", metav1.GetOptions{})
 	require.Nil(t, err)
-	err = sc.UpdateServiceInDB(*ksvc, nil, "test")
+	err = sc.UpdateServiceInDB(*ksvc, "test")
 	require.Nil(t, err)
 }
 
-func TestServiceComponent_deleteServiceInDB(t *testing.T) {
+func TestServiceComponent_deleteServiceInDB2(t *testing.T) {
+	cfg, err := config.LoadConfig()
+	cfg.Accounting.ChargingEnable = true
+	require.Nil(t, err)
+
+	mq := mockmq.NewMockMessageQueue(t)
+	mq.EXPECT().VerifyDeployServiceStream().Return(nil)
+	mq.EXPECT().PublishDeployServiceData(mock.Anything).Return(nil)
+	eventPub := event.EventPublisher{
+		Connector:    mq,
+		SyncInterval: cfg.Event.SyncInterval,
+	}
 	kss := mockdb.NewMockKnativeServiceStore(t)
 	pool := &cluster.ClusterPool{}
 	cis := mockdb.NewMockClusterInfoStore(t)
 	pool.ClusterStore = cis
-	kubeClient := fake.NewSimpleClientset()
 	knativeClient := knativefake.NewSimpleClientset()
 	pool.Clusters = append(pool.Clusters, cluster.Cluster{
 		CID:           "config",
 		ID:            "test",
-		Client:        kubeClient,
 		KnativeClient: knativeClient,
 	})
 	sc := &serviceComponentImpl{
@@ -634,6 +645,7 @@ func TestServiceComponent_deleteServiceInDB(t *testing.T) {
 		imagePullSecret:    "test",
 		serviceStore:       kss,
 		clusterPool:        pool,
+		eventPub:           &eventPub,
 	}
 	req := types.SVCRequest{
 		ImageID:    "test",
@@ -659,12 +671,12 @@ func TestServiceComponent_deleteServiceInDB(t *testing.T) {
 		Annotation: map[string]string{},
 	}
 	ctx := context.TODO()
-	err := sc.RunService(ctx, req)
+	err = sc.RunService(ctx, req)
 	require.Nil(t, err)
-	kss.EXPECT().Delete(mock.Anything, "test", "test").Return(nil)
 	ksvc, err := knativeClient.ServingV1().Services("test").
 		Get(ctx, "test", metav1.GetOptions{})
 	require.Nil(t, err)
+	kss.EXPECT().Delete(mock.Anything, "test", "test").Return(nil)
 	err = sc.DeleteServiceInDB(*ksvc, "test")
 	require.Nil(t, err)
 }

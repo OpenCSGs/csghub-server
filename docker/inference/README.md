@@ -12,8 +12,8 @@ echo "$OPENCSG_ACR_PASSWORD" | docker login $OPENCSG_ACR -u $OPENCSG_ACR_USERNAM
 ```bash
 export BUILDX_NO_DEFAULT_ATTESTATIONS=1
 
-# For vllm: opencsg-registry.cn-beijing.cr.aliyuncs.com/public/vllm-local:v0.7.2
-export IMAGE_TAG=v0.7.2
+# For vllm: opencsg-registry.cn-beijing.cr.aliyuncs.com/public/vllm-local:v0.7.3
+export IMAGE_TAG=v0.7.3
 docker buildx build --platform linux/amd64,linux/arm64 \
   -t ${OPENCSG_ACR}/public/vllm-local:${IMAGE_TAG} \
   -t ${OPENCSG_ACR}/public/vllm-local:latest \
@@ -36,8 +36,8 @@ docker buildx build --platform linux/amd64 \
   -f Dockerfile.tgi \
   --push .
 
-# For sglang: opencsg-registry.cn-beijing.cr.aliyuncs.com/public/sglang:v0.4.2.post2-cu124-srt
-export IMAGE_TAG=v0.4.2.post2-cu124-srt
+# For sglang: opencsg-registry.cn-beijing.cr.aliyuncs.com/public/sglang:v0.4.3.post2-cu124-srt
+export IMAGE_TAG=v0.4.3.post2-cu124-srt
 docker buildx build --platform linux/amd64 \
   -t ${OPENCSG_ACR}/public/sglang:${IMAGE_TAG} \
   -t ${OPENCSG_ACR}/public/sglang:latest \
@@ -53,10 +53,31 @@ docker buildx build --platform linux/amd64,linux/arm64 \
   --push .
 # For Text Embeddings Inference: opencsg-registry.cn-beijing.cr.aliyuncs.com/public/tei:cpu-1.6
 export IMAGE_TAG=cpu-1.6
-docker buildx build --platform linux/amd64,linux/arm64 \
+docker buildx build --platform linux/amd64 \
   -t ${OPENCSG_ACR}/public/tei:${IMAGE_TAG} \
   -t ${OPENCSG_ACR}/public/tei:latest \
   -f Dockerfile.tei-cpu \
+  --push .
+# For Text Embeddings Inference: opencsg-registry.cn-beijing.cr.aliyuncs.com/public/tei:1.6
+export IMAGE_TAG=1.6
+docker buildx build --platform linux/amd64 \
+  -t ${OPENCSG_ACR}/public/tei:${IMAGE_TAG} \
+  -t ${OPENCSG_ACR}/public/tei:latest \
+  -f Dockerfile.tei \
+  --push .
+# For Text Llama.cpp Inference: opencsg-registry.cn-beijing.cr.aliyuncs.com/public/llama.cpp:b4689
+export IMAGE_TAG=b4689
+docker buildx build --platform linux/amd64 \
+  -t ${OPENCSG_ACR}/public/llama.cpp:${IMAGE_TAG} \
+  -t ${OPENCSG_ACR}/public/llama.cpp:latest \
+  -f Dockerfile.llama.cpp \
+  --push .
+# For Text ktransformers Inference: opencsg-registry.cn-beijing.cr.aliyuncs.com/public/ktransformers:0.2.1.post1  
+export IMAGE_TAG=0.2.3
+docker build --platform linux/amd64 \
+  -t ${OPENCSG_ACR}/public/ktransformers:${IMAGE_TAG} \
+  -t ${OPENCSG_ACR}/public/ktransformers:latest \
+  -f Dockerfile.ktransformers \
   --push .
 ```
 *Note: The above command will create `linux/amd64` and `linux/arm64` images with the tags `${IMAGE_TAG}` and `latest` at the same time.*
@@ -94,6 +115,9 @@ docker run -d \
 |text generation| tgi | 3.2 | 12.4 |fix hf hub timestamp|
 |image generation| hf-inference-toolkit | 0.5.3 | 12.1 |-|
 |text generation| sglang | v0.4.1.post3-cu124-srt | 12.4 |- |
+|text generation| mindie | 2.0-csg-1.0.RC2 | 1.0.RC2 |- |
+|text generation| llama.cpp | b4689 | - |- |
+|text generation| tei | 1.6 | - |- |
 
 
 ## API to Call Inference

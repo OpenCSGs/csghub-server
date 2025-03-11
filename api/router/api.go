@@ -546,7 +546,7 @@ func createModelRoutes(config *config.Config, apiGroup *gin.RouterGroup, needAPI
 
 		// runtime framework for both finetune and inference
 		modelsGroup.GET("/runtime_framework", middleware.RepoType(types.ModelRepo), repoCommonHandler.RuntimeFrameworkListWithType)
-
+		modelsGroup.GET("/:namespace/:name/quantizations", middleware.RepoType(types.ModelRepo), modelHandler.ListQuantizations)
 		// deploy model as finetune instance
 		modelsGroup.POST("/:namespace/:name/finetune", middleware.RepoType(types.ModelRepo), modelHandler.FinetuneCreate)
 		// stop a finetune instance

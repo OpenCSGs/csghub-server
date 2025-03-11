@@ -163,6 +163,7 @@ type Config struct {
 		MeterDurationSendSubject string `env:"STARHUB_SERVER_METER_DURATION_SEND_SUBJECT, default=accounting.metering.duration"`
 		MeterTokenSendSubject    string `env:"STARHUB_SERVER_METER_TOKEN_SEND_SUBJECT, default=accounting.metering.token"`
 		MeterQuotaSendSubject    string `env:"STARHUB_SERVER_METER_QUOTA_SEND_SUBJECT, default=accounting.metering.quota"`
+		ServiceUpdateSubject     string `env:"STARHUB_SERVER_DEPLOY_SERVICE_SUBJECT, default=deploy.service.update"`
 	}
 
 	Accounting struct {

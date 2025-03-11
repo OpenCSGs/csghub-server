@@ -1,4 +1,4 @@
-FROM vllm/vllm-openai:v0.7.2
+FROM vllm/vllm-openai:v0.7.3
 RUN pip config set global.index-url https://pypi.tuna.tsinghua.edu.cn/simple
 RUN pip install --no-cache-dir csghub-sdk==0.4.3 ray supervisor huggingface-hub==0.27.0
 RUN apt-get update && apt-get install -y supervisor

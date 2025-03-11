@@ -75,10 +75,14 @@ const (
 	EntryFileNginx      = "nginx.conf"
 	EntryFileDockerfile = "Dockerfile"
 
-	TextGeneration    PipelineTask    = "text-generation"
-	Text2Image        PipelineTask    = "text-to-image"
-	TaskAutoDetection PipelineTask    = "task-auto-detection"
-	LlamaCpp          InferenceEngine = "llama.cpp"
+	TextGeneration     PipelineTask    = "text-generation"
+	Text2Image         PipelineTask    = "text-to-image"
+	FeatureExtraction  PipelineTask    = "feature-extraction"
+	SentenceSimilarity PipelineTask    = "sentence-similarity"
+	TaskAutoDetection  PipelineTask    = "task-auto-detection"
+	LlamaCpp           InferenceEngine = "llama.cpp"
+	TEI                InferenceEngine = "tei"
+	Ktransformers      InferenceEngine = "ktransformers"
 )
 
 type RepoRequest struct {
@@ -116,6 +120,12 @@ type RepoPageOpts struct {
 type Instance struct {
 	Name   string `json:"name"`
 	Status string `json:"status"`
+}
+
+type InstanceInfo struct {
+	Instances []Instance `json:"instances"`
+	Message   string     `json:"message"`
+	Reason    string     `json:"reason"`
 }
 
 // repo object(cover model/space/code/dataset) for deployer
@@ -166,6 +176,8 @@ type DeployRepo struct {
 	EngineArgs       string     `json:"engine_args,omitempty"`
 	Variables        string     `json:"variables,omitempty"`
 	Entrypoint       string     `json:"entrypoint,omitempty"`
+	Reason           string     `json:"reason,omitempty"`
+	Message          string     `json:"message,omitempty"`
 }
 
 type RuntimeFrameworkReq struct {

@@ -28,7 +28,7 @@ var startRunnerCmd = &cobra.Command{
 			DSN:     config.Database.DSN,
 		}
 		database.InitDB(dbConfig)
-		err = event.InitEventPublisher(config)
+		err = event.InitEventPublisher(config, nil)
 		if err != nil {
 			return fmt.Errorf("fail to initialize message queue, %w", err)
 		}

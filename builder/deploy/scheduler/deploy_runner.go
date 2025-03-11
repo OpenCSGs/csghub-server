@@ -327,6 +327,7 @@ func (t *DeployRunner) makeDeployEnv(
 		envMap["ENGINE_ARGS"] = ENGINE_ARGS
 	}
 
+	envMap["ENGINE_ARGS"] = deploy.EngineArgs
 	if hardware.Gpu.Num != "" {
 		envMap["GPU_NUM"] = hardware.Gpu.Num
 	}

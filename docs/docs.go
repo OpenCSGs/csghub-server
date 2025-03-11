@@ -4189,6 +4189,61 @@ const docTemplate = `{
                 }
             }
         },
+        "/models/{namespace}/{name}/quantizations": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Model"
+                ],
+                "summary": "list all gguf quantizations",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "namespace",
+                        "name": "namespace",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "name",
+                        "name": "name",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/types.Response"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            }
+        },
         "/models/{namespace}/{name}/relations": {
             "get": {
                 "security": [
@@ -17783,6 +17838,9 @@ const docTemplate = `{
                     "description": "source access token",
                     "type": "string"
                 },
+                "id": {
+                    "type": "integer"
+                },
                 "last_message": {
                     "type": "string"
                 },
@@ -18042,6 +18100,10 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "deploy_name": {
+                    "type": "string"
+                },
+                "entrypoint": {
+                    "description": "model file name for gguf model",
                     "type": "string"
                 },
                 "env": {

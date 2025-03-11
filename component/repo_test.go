@@ -1259,11 +1259,10 @@ func TestRepoComponent_DeployStatus(t *testing.T) {
 		SvcName:   "svc",
 		ClusterID: "cluster",
 	}, true).Return("svc", 2, []types.Instance{{Name: "i1"}}, nil)
-	a, b, c, err := repo.DeployStatus(ctx, types.ModelRepo, "ns", "n", 123)
+	status, err := repo.DeployStatus(ctx, types.ModelRepo, "ns", "n", 123)
 	require.Nil(t, err)
-	require.Equal(t, a, "svc")
-	require.Equal(t, "Stopped", b)
-	require.Equal(t, []types.Instance{{Name: "i1"}}, c)
+	require.Equal(t, "Stopped", status.Status)
+	require.Equal(t, []types.Instance{{Name: "i1"}}, status.Details)
 
 }
 

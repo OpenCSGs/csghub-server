@@ -80,6 +80,7 @@ type (
 		OrderDetailID  int64      `json:"order_detail_id"`
 		ActualReplica  int        `json:"actual_replica"`
 		DesiredReplica int        `json:"desired_replica"`
+		Reason         string     `json:"reason"`
 	}
 
 	LogsRequest struct {

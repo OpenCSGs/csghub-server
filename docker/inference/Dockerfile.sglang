@@ -1,6 +1,7 @@
-FROM lmsysorg/sglang:v0.4.2.post2-cu124-srt
-RUN pip config set global.index-url https://pypi.tuna.tsinghua.edu.cn/simple
-RUN apt-get update && apt-get install -y dumb-init && apt-get clean && rm -rf /var/lib/apt/lists/*
+FROM lmsysorg/sglang:v0.4.3.post2-cu124-srt
+RUN pip config set global.index-url https://pypi.tuna.tsinghua.edu.cn/simple && \
+    apt-get update && \
+    apt-get install -y dumb-init && apt-get clean && rm -rf /var/lib/apt/lists/*
 RUN pip install --no-cache-dir csghub-sdk==0.4.6
 COPY ./sglang/ /etc/csghub/
 RUN chmod +x /etc/csghub/*.sh

@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/nats-io/nats.go/jetstream"
 	"opencsg.com/csghub-server/builder/deploy/common"
 	"opencsg.com/csghub-server/builder/deploy/imagebuilder"
 	"opencsg.com/csghub-server/builder/deploy/scheduler"
@@ -811,4 +812,72 @@ func (d *deployer) GetEvaluation(ctx context.Context, req types.EvaluationGetReq
 		return nil, err
 	}
 	return wf, err
+}
+
+func (d *deployer) startServiceConsuming() {
+	d.buildStream()
+	for {
+		consumer, err := d.eventPub.CreateServiceConsumer()
+		if err != nil {
+			slog.Error("fail to create continuous polling order expired consumer", slog.Any("error", err))
+		} else {
+			_, err = consumer.Consume(d.serviceUpdateConsumerCallback)
+			if err != nil {
+				slog.Error("fail to begin consuming order expired message", slog.Any("error", err))
+			} else {
+				break
+			}
+		}
+		time.Sleep(10 * time.Second)
+	}
+}
+
+func (d *deployer) buildStream() {
+	var i int = 0
+	for {
+		i++
+		err := d.eventPub.BuildServiceStream()
+		if err != nil {
+			tip := fmt.Sprintf("fail to build deploy service stream for the %d time", i)
+			slog.Error(tip, slog.Any("error", err))
+			time.Sleep(2 * time.Second)
+			continue
+		}
+		break
+	}
+}
+
+func (d *deployer) serviceUpdateConsumerCallback(msg jetstream.Msg) {
+	event, err := d.eventPub.ParseServiceMessageData(msg)
+	if err != nil {
+		slog.Warn("fail to parse service message", slog.Any("msg", string(msg.Data())))
+		err = msg.Ack()
+		if err != nil {
+			slog.Warn("fail to ack after processing service message", slog.Any("msg", string(msg.Data())))
+		}
+		return
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	deploy, err := d.deployTaskStore.GetDeployBySvcName(ctx, event.ServiceName)
+	if err != nil {
+		err = msg.Ack()
+		if err != nil {
+			slog.Warn("fail to ack after processing service message", slog.Any("msg", string(msg.Data())))
+		}
+		slog.Warn("fail to get deploy by service name in event consumer", slog.Any("service_name", event.ServiceName))
+		return
+	}
+	deploy.Status = event.Status
+	deploy.Message = event.Message
+	deploy.Reason = event.Reason
+	err = d.deployTaskStore.UpdateDeploy(ctx, deploy)
+	if err != nil {
+		slog.Warn("fail to update deploy status in event consumer", slog.Any("service_name", event.ServiceName), slog.Any("error", err))
+		return
+	}
+	err = msg.Ack()
+	if err != nil {
+		slog.Warn("fail to ack after processing service message", slog.Any("msg", string(msg.Data())))
+	}
 }

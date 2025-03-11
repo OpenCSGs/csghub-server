@@ -9,6 +9,7 @@ import (
 	"sync"
 	"time"
 
+	gguf "github.com/gpustack/gguf-parser-go"
 	"opencsg.com/csghub-server/builder/git"
 	"opencsg.com/csghub-server/builder/git/gitserver"
 	"opencsg.com/csghub-server/builder/store/cache"
@@ -35,6 +36,8 @@ type runtimeArchitectureComponentImpl struct {
 	resouceModelStore         database.ResourceModelStore
 	gitServer                 gitserver.GitServer
 	cache                     cache.RedisClient
+	fileDownloadPath          string
+	apiToken                  string
 }
 
 type RuntimeArchitectureComponent interface {
@@ -80,6 +83,8 @@ func NewRuntimeArchitectureComponent(config *config.Config) (RuntimeArchitecture
 	if err != nil {
 		return nil, fmt.Errorf("failed to create redis cache, error: %w", err)
 	}
+	c.fileDownloadPath = fmt.Sprintf("%s/%s", config.Model.DownloadEndpoint, "csg")
+	c.apiToken = config.APIToken
 	c.cache = cache
 	return c, nil
 }
@@ -211,6 +216,9 @@ func (c *runtimeArchitectureComponentImpl) scanNewModels(ctx context.Context, re
 		}
 		runtime_framework_tags, _ := c.tagStore.AllTags(ctx, filter)
 		for _, repo := range repos {
+			if !IsSupportedRuntimeFrame(&repo, runtime_framework) {
+				continue
+			}
 			arch, err := c.GetArchitecture(ctx, req.Task, &repo)
 			if err != nil {
 				slog.Warn("did not to get arch for create relation", slog.Any("ConfigFileName", ConfigFileName), slog.Any("repo", repo.Path), slog.Any("error", err))
@@ -245,6 +253,16 @@ func (c *runtimeArchitectureComponentImpl) scanNewModels(ctx context.Context, re
 		}
 	}
 	return nil
+}
+
+// check model format
+func IsSupportedRuntimeFrame(repo *database.Repository, runtimeFrame *database.RuntimeFramework) bool {
+	supportedFormat := string(types.Safetensors)
+	if runtimeFrame.ModelFormat != "" {
+		supportedFormat = runtimeFrame.ModelFormat
+	}
+	modelFormat := getModelFormat(repo)
+	return strings.Contains(supportedFormat, modelFormat)
 }
 
 // check if it's supported model resource by name
@@ -305,19 +323,46 @@ func (c *runtimeArchitectureComponentImpl) scanExistModels(ctx context.Context, 
 	return nil
 }
 func (c *runtimeArchitectureComponentImpl) GetArchitecture(ctx context.Context, task types.PipelineTask, repo *database.Repository) (string, error) {
+	//set task if task is TaskAutoDetection
+	if task == types.TaskAutoDetection {
+		task = types.PipelineTask(GetBuiltInTaskFromTags(repo.Tags))
+	}
 	if task == types.TextGeneration {
+		if isGGUFModel(repo) {
+			return c.GetArchitectureFromGGUF(ctx, "", repo)
+		}
 		return c.GetArchitectureFromConfig(ctx, repo)
 	} else if task == types.Text2Image {
 		return c.GetClassNameFromConfig(ctx, repo)
-	} else if task == types.TaskAutoDetection {
-		arch, err := c.GetArchitectureFromConfig(ctx, repo)
-		if err == nil {
-			return arch, err
-		}
-		return c.GetClassNameFromConfig(ctx, repo)
+	} else if task == types.FeatureExtraction {
+		return c.GetModelTypeFromConfig(ctx, repo)
 	} else {
 		return "", fmt.Errorf("task type %s not supported", task)
 	}
+}
+
+// check model framework
+func isGGUFModel(repo *database.Repository) bool {
+	for _, tag := range repo.Tags {
+		if tag.Name == "gguf" {
+			return true
+		}
+	}
+	return false
+}
+
+func getModelFormat(repo *database.Repository) string {
+	for _, tag := range repo.Tags {
+		if tag.Category == "framework" {
+			if tag.Name == "gguf" {
+				return tag.Name
+			}
+			if tag.Name == "onnx" {
+				return tag.Name
+			}
+		}
+	}
+	return string(types.Safetensors)
 }
 
 // for text-generation
@@ -343,6 +388,25 @@ func (c *runtimeArchitectureComponentImpl) GetArchitectureFromConfig(ctx context
 	return config.Architectures[0], nil
 }
 
+func (c *runtimeArchitectureComponentImpl) GetModelTypeFromConfig(ctx context.Context, repo *database.Repository) (string, error) {
+	content, err := c.getConfigContent(ctx, ConfigFileName, repo)
+	if err != nil {
+		return "", fmt.Errorf("fail to read config.json for relation, %w", err)
+	}
+	var config struct {
+		ModelType string `json:"model_type"`
+	}
+	if err := json.Unmarshal([]byte(content), &config); err != nil {
+		return "", fmt.Errorf("fail to unmarshal config, %w", err)
+	}
+	slog.Debug("unmarshal config", slog.Any("config", config))
+	if len(config.ModelType) < 1 {
+		return "", nil
+	}
+	slog.Debug("model type of config", slog.Any("Architectures", config.ModelType))
+	return config.ModelType, nil
+}
+
 // for text-to-image
 func (c *runtimeArchitectureComponentImpl) GetClassNameFromConfig(ctx context.Context, repo *database.Repository) (string, error) {
 	content, err := c.getConfigContent(ctx, ModelIndexFileName, repo)
@@ -363,6 +427,39 @@ func (c *runtimeArchitectureComponentImpl) GetClassNameFromConfig(ctx context.Co
 	return config.ClassName, nil
 }
 
+func (c *runtimeArchitectureComponentImpl) GetArchitectureFromGGUF(ctx context.Context, fileName string, repo *database.Repository) (string, error) {
+	if fileName == "" {
+		mainGGUF, err := c.GetMainGGUFFileName(ctx, repo)
+		if err != nil {
+			return "", fmt.Errorf("fail to get main gguf file name, %w", err)
+		}
+		fileName = mainGGUF
+	}
+	fs, err := c.GetGGUFContent(ctx, fileName, repo)
+	if err != nil {
+		return "", fmt.Errorf("fail to get main gguf content, %w", err)
+	}
+	metadata := fs.Metadata()
+	return metadata.Architecture, nil
+}
+
+// get main gguf file name
+func (c *runtimeArchitectureComponentImpl) GetMainGGUFFileName(ctx context.Context, repo *database.Repository) (string, error) {
+	namespace, name := repo.NamespaceAndName()
+	files, err := getAllFiles(ctx, namespace, name, "", types.ModelRepo, repo.DefaultBranch, c.gitServer.GetRepoFileTree)
+	if err != nil {
+		return "", fmt.Errorf("get RepoFileTree for relation, %w", err)
+	}
+	for _, file := range files {
+		if strings.Contains(file.Name, ".gguf") {
+			if strings.Contains(file.Name, "00001-of-") || !strings.Contains(file.Name, "-of-") {
+				return file.Path, nil
+			}
+		}
+	}
+	return "", fmt.Errorf("no gguf file found")
+}
+
 func (c *runtimeArchitectureComponentImpl) getConfigContent(ctx context.Context, configFileName string, repo *database.Repository) (string, error) {
 	namespace, name := repo.NamespaceAndName()
 	content, err := c.gitServer.GetRepoFileRaw(ctx, gitserver.GetRepoInfoByPathReq{
@@ -376,6 +473,22 @@ func (c *runtimeArchitectureComponentImpl) getConfigContent(ctx context.Context,
 		return "", fmt.Errorf("get RepoFileRaw for relation, %w", err)
 	}
 	return content, nil
+}
+
+// get gguf content
+func (c *runtimeArchitectureComponentImpl) GetGGUFContent(ctx context.Context, filename string, repo *database.Repository) (*gguf.GGUFFile, error) {
+	var options []gguf.GGUFReadOption
+	if c.apiToken != "" {
+		options = append(options, gguf.UseBearerAuth(c.apiToken))
+	}
+	options = append(options, gguf.SkipRangeDownloadDetection())
+	url := fmt.Sprintf("%s/%s/resolve/%s/%s", c.fileDownloadPath, repo.Path, repo.DefaultBranch, filename)
+
+	f, err := gguf.ParseGGUFFileRemote(ctx, url, options...)
+	if err != nil {
+		return nil, err
+	}
+	return f, nil
 }
 
 // remove runtime_framework tag from model

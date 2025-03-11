@@ -910,12 +910,14 @@ func TestRepoHandler_DeployStatus(t *testing.T) {
 	).Return(true, nil)
 	tester.mocks.repo.EXPECT().DeployStatus(
 		mock.Anything, types.ModelRepo, "u", "r", int64(1),
-	).Return("", "s1", []types.Instance{{Name: "i1"}}, nil).Once()
+	).Return(types.ModelStatusEventData{Details: []types.Instance{{Name: "i1"}},
+		Status: "s1", Message: "", Reason: ""}, nil).Once()
 	tester.mocks.repo.EXPECT().DeployStatus(
 		mock.Anything, types.ModelRepo, "u", "r", int64(1),
-	).RunAndReturn(func(ctx context.Context, rt types.RepositoryType, s1, s2 string, i int64) (string, string, []types.Instance, error) {
+	).RunAndReturn(func(ctx context.Context, rt types.RepositoryType, s1, s2 string, i int64) (types.ModelStatusEventData, error) {
 		cancel()
-		return "", "s3", nil, nil
+		return types.ModelStatusEventData{
+			Status: "s3", Message: "", Reason: ""}, nil
 	}).Once()
 
 	tester.Execute()
@@ -926,7 +928,7 @@ func TestRepoHandler_DeployStatus(t *testing.T) {
 	require.Equal(t, "keep-alive", headers.Get("Connection"))
 	require.Equal(t, "chunked", headers.Get("Transfer-Encoding"))
 	require.Equal(
-		t, "event:status\ndata:{\"status\":\"s1\",\"details\":[{\"name\":\"i1\",\"status\":\"\"}]}\n\nevent:status\ndata:{\"status\":\"s3\",\"details\":null}\n\n",
+		t, "event:status\ndata:{\"status\":\"s1\",\"details\":[{\"name\":\"i1\",\"status\":\"\"}],\"message\":\"\",\"reason\":\"\"}\n\nevent:status\ndata:{\"status\":\"s3\",\"details\":null,\"message\":\"\",\"reason\":\"\"}\n\n",
 		tester.Response().Body.String(),
 	)
 
@@ -1104,12 +1106,14 @@ func TestRepoHandler_ServerlessStatus(t *testing.T) {
 	).Return(true, nil)
 	tester.mocks.repo.EXPECT().DeployStatus(
 		mock.Anything, types.ModelRepo, "u", "r", int64(1),
-	).Return("", "s1", []types.Instance{{Name: "i1"}}, nil).Once()
+	).Return(types.ModelStatusEventData{Details: []types.Instance{{Name: "i1"}},
+		Status: "s1"}, nil).Once()
 	tester.mocks.repo.EXPECT().DeployStatus(
 		mock.Anything, types.ModelRepo, "u", "r", int64(1),
-	).RunAndReturn(func(ctx context.Context, rt types.RepositoryType, s1, s2 string, i int64) (string, string, []types.Instance, error) {
+	).RunAndReturn(func(ctx context.Context, rt types.RepositoryType, s1, s2 string, i int64) (types.ModelStatusEventData, error) {
 		cancel()
-		return "", "s3", nil, nil
+		return types.ModelStatusEventData{
+			Status: "s3"}, nil
 	}).Once()
 
 	tester.Execute()
@@ -1120,7 +1124,7 @@ func TestRepoHandler_ServerlessStatus(t *testing.T) {
 	require.Equal(t, "keep-alive", headers.Get("Connection"))
 	require.Equal(t, "chunked", headers.Get("Transfer-Encoding"))
 	require.Equal(
-		t, "event:status\ndata:{\"status\":\"s1\",\"details\":[{\"name\":\"i1\",\"status\":\"\"}]}\n\nevent:status\ndata:{\"status\":\"s3\",\"details\":null}\n\n",
+		t, "event:status\ndata:{\"status\":\"s1\",\"details\":[{\"name\":\"i1\",\"status\":\"\"}],\"message\":\"\",\"reason\":\"\"}\n\nevent:status\ndata:{\"status\":\"s3\",\"details\":null,\"message\":\"\",\"reason\":\"\"}\n\n",
 		tester.Response().Body.String(),
 	)
 

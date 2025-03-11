@@ -23,10 +23,11 @@ type DLQEventConfig struct {
 }
 
 type RequestSubject struct {
-	fee      string // fee charging subject
-	token    string // token subject
-	quota    string // quota subject
-	duration string // duration subject
+	fee           string // fee charging subject
+	token         string // token subject
+	quota         string // quota subject
+	duration      string // duration subject
+	deployService string // service update subject
 }
 
 var (
@@ -47,6 +48,10 @@ var (
 		StreamName:   "meteringEventStream", // metering request
 		ConsumerName: "metertingServerDurableConsumer",
 	}
+	svcCfg = EventConfig{
+		StreamName:   "deployServiceUpdateStream", // order
+		ConsumerName: "deployServiceUpdateConsumer",
+	}
 )
 
 type NatsHandler struct {
@@ -55,7 +60,9 @@ type NatsHandler struct {
 	msgFetchTimeoutInSec int
 	feeReqSub            RequestSubject
 	meterReqSub          RequestSubject
+	serviceReqSub        RequestSubject
 	dlqEvtCfg            jetstream.StreamConfig
+	svcEvtCfg            jetstream.StreamConfig
 	meterEvtCfg          jetstream.StreamConfig
 	meterConsumerCfg     jetstream.ConsumerConfig
 
@@ -87,6 +94,7 @@ func NewNats(config *config.Config) (*NatsHandler, error) {
 
 	dlqEC, _ := initStreamAndConsumerConfig(dlqCfg, []string{dlq.MeterSubjectName})
 	meterEC, meterCC := initStreamAndConsumerConfig(meterCfg, []string{config.Nats.MeterRequestSubject})
+	svcEC, _ := initStreamAndConsumerConfig(svcCfg, []string{config.Nats.ServiceUpdateSubject})
 
 	return &NatsHandler{
 		conn:                 nc,
@@ -96,9 +104,13 @@ func NewNats(config *config.Config) (*NatsHandler, error) {
 			token:    config.Nats.MeterTokenSendSubject,
 			quota:    config.Nats.MeterQuotaSendSubject,
 		},
+		serviceReqSub: RequestSubject{
+			deployService: config.Nats.ServiceUpdateSubject,
+		},
 		dlqEvtCfg:        dlqEC,
 		meterEvtCfg:      meterEC,
 		meterConsumerCfg: meterCC,
+		svcEvtCfg:        svcEC,
 	}, nil
 }
 
@@ -213,4 +225,31 @@ func (nh *NatsHandler) PublishFeeTokenData(data []byte) error {
 
 func (nh *NatsHandler) PublishFeeQuotaData(data []byte) error {
 	return nh.PublishData(nh.feeReqSub.quota, data)
+}
+
+func (nh *NatsHandler) BuildDeployServiceStream() error {
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	err := nh.GetJetStream()
+	if err != nil {
+		return err
+	}
+	_, err = nh.CreateOrUpdateStream(ctx, svcCfg.StreamName, nh.svcEvtCfg)
+	return err
+}
+
+func (nh *NatsHandler) VerifyDeployServiceStream() error {
+	return nh.VerifyStreamByName(svcCfg.StreamName)
+}
+func (nh *NatsHandler) PublishDeployServiceData(data []byte) error {
+	return nh.PublishData(nh.serviceReqSub.deployService, data)
+}
+
+func (nh *NatsHandler) BuildDeployServiceConsumerWithName(consumerName string) (jetstream.Consumer, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	ec := EventConfig{StreamName: svcCfg.StreamName, ConsumerName: consumerName}
+	_, conCfg := initStreamAndConsumerConfig(ec, []string{nh.serviceReqSub.deployService})
+	consumer, err := nh.js.CreateOrUpdateConsumer(ctx, svcCfg.StreamName, conCfg)
+	return consumer, err
 }

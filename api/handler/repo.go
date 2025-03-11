@@ -1826,17 +1826,13 @@ func (h *RepoHandler) DeployStatus(ctx *gin.Context) {
 		default:
 			time.Sleep(h.deployStatusCheckInterval)
 			// user http request context instead of gin context, so that server knows the life cycle of the request
-			_, status, instances, err := h.c.DeployStatus(ctx.Request.Context(), repoType, namespace, name, deployID)
+			status, err := h.c.DeployStatus(ctx.Request.Context(), repoType, namespace, name, deployID)
 			if err != nil {
 				slog.Error("failed to get deploy status", slog.Any("error", err), slog.String("namespace", namespace),
 					slog.String("name", name), slog.Any("deploy_id", deployID))
 				ctx.SSEvent("error", err.Error())
 			} else {
-				eventData := &types.ModelStatusEventData{
-					Status:  status,
-					Details: instances,
-				}
-				ctx.SSEvent("status", eventData)
+				ctx.SSEvent("status", status)
 
 			}
 			ctx.Writer.Flush()
@@ -2294,17 +2290,13 @@ func (h *RepoHandler) ServerlessStatus(ctx *gin.Context) {
 		default:
 			time.Sleep(h.deployStatusCheckInterval)
 			// user http request context instead of gin context, so that server knows the life cycle of the request
-			_, status, instances, err := h.c.DeployStatus(ctx.Request.Context(), types.ModelRepo, namespace, name, deployID)
+			status, err := h.c.DeployStatus(ctx.Request.Context(), types.ModelRepo, namespace, name, deployID)
 			if err != nil {
 				slog.Error("failed to get deploy status", slog.Any("error", err), slog.String("namespace", namespace),
 					slog.String("name", name), slog.Any("deploy_id", deployID))
 				ctx.SSEvent("error", err.Error())
 			} else {
-				eventData := &types.ModelStatusEventData{
-					Status:  status,
-					Details: instances,
-				}
-				ctx.SSEvent("status", eventData)
+				ctx.SSEvent("status", status)
 
 			}
 			ctx.Writer.Flush()

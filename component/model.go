@@ -9,6 +9,7 @@ import (
 	"log/slog"
 	"strconv"
 	"strings"
+	"time"
 
 	"opencsg.com/csghub-server/builder/deploy"
 	"opencsg.com/csghub-server/builder/git"
@@ -83,6 +84,7 @@ type ModelComponent interface {
 	DeleteRuntimeFrameworkModes(ctx context.Context, currentUser string, deployType int, id int64, paths []string) ([]string, error)
 	ListModelsOfRuntimeFrameworks(ctx context.Context, currentUser, search, sort string, per, page int, deployType int) ([]types.Model, int, error)
 	OrgModels(ctx context.Context, req *types.OrgModelsReq) ([]types.Model, int, error)
+	ListQuantizations(ctx context.Context, namespace, name string) ([]*types.File, error)
 }
 
 func NewModelComponent(config *config.Config) (ModelComponent, error) {
@@ -593,12 +595,15 @@ func (c *modelComponentImpl) SDKModelInfo(ctx context.Context, namespace, name, 
 		sha = lastCommit.ID
 	}
 
+	hfCreatedAt := reSetHFTime(model.Repository.CreatedAt)
+	hfUpdatedAt := reSetHFTime(model.Repository.UpdatedAt)
+
 	resModel := &types.SDKModelInfo{
 		ID:               model.Repository.Path,
 		Author:           model.Repository.User.Username,
 		Sha:              sha,
-		CreatedAt:        model.Repository.CreatedAt,
-		LastModified:     model.Repository.UpdatedAt,
+		CreatedAt:        hfCreatedAt,
+		LastModified:     hfUpdatedAt,
 		Private:          model.Repository.Private,
 		Disabled:         false,
 		Gated:            nil,
@@ -893,7 +898,7 @@ func (c *modelComponentImpl) Deploy(ctx context.Context, deployReq types.DeployA
 	if err != nil {
 		return -1, fmt.Errorf("cannot find model, %w", err)
 	}
-	task := common.GetBuiltInTaskFromTags(m.Repository.Tags)
+	task := GetBuiltInTaskFromTags(m.Repository.Tags)
 	if deployReq.DeployType == types.ServerlessType {
 		// only one service deploy was allowed
 		d, err := c.deployTaskStore.GetServerlessDeployByRepID(ctx, m.Repository.ID)
@@ -921,6 +926,12 @@ func (c *modelComponentImpl) Deploy(ctx context.Context, deployReq types.DeployA
 	frame, err := c.runtimeFrameworksStore.FindEnabledByID(ctx, req.RuntimeFrameworkID)
 	if err != nil {
 		return -1, fmt.Errorf("cannot find available runtime framework, %w", err)
+	}
+	//check entrypoint for llama.cpp
+	if frame.FrameName == string(types.LlamaCpp) {
+		if req.Entrypoint == "" {
+			return -1, fmt.Errorf("entrypoint is required for llama.cpp")
+		}
 	}
 
 	varStr, err := c.buildVariables(req, frame)
@@ -999,7 +1010,7 @@ func (c *modelComponentImpl) Deploy(ctx context.Context, deployReq types.DeployA
 
 func (c *modelComponentImpl) buildVariables(req types.ModelRunReq, frame *database.RuntimeFramework) (string, error) {
 	engineName := strings.ToLower(frame.FrameName)
-	if engineName == string(types.LlamaCpp) {
+	if engineName == string(types.LlamaCpp) || engineName == string(types.Ktransformers) {
 		//check entrypoint for llama.cpp
 		if len(req.Entrypoint) < 1 {
 			return "", fmt.Errorf("entrypoint is required for llama.cpp")
@@ -1242,4 +1253,62 @@ func (c *modelComponentImpl) OrgModels(ctx context.Context, req *types.OrgModels
 	}
 
 	return resModels, total, nil
+}
+
+// only need it for huggingface_hub <= 0.26.2
+func reSetHFTime(sysTime time.Time) time.Time {
+	nanosecond := sysTime.Nanosecond()
+	if nanosecond < 1 {
+		nanosecond = 1
+	}
+	hfTime := time.Date(
+		sysTime.Year(),
+		sysTime.Month(),
+		sysTime.Day(),
+		sysTime.Hour(),
+		sysTime.Minute(),
+		sysTime.Second(),
+		nanosecond,
+		time.UTC)
+	return hfTime
+}
+
+func (c *modelComponentImpl) ListQuantizations(ctx context.Context, namespace, name string) ([]*types.File, error) {
+	repo, err := c.repoStore.FindByPath(ctx, types.ModelRepo, namespace, name)
+	if err != nil {
+		return nil, fmt.Errorf("failed to find model, error: %w", err)
+	}
+	if !isGGUFModel(repo) {
+		//no need to get quantization files for non gguf models
+		return nil, nil
+	}
+	files, err := getAllFiles(ctx, namespace, name, "", types.ModelRepo, repo.DefaultBranch, c.gitServer.GetRepoFileTree)
+	if err != nil {
+		return nil, fmt.Errorf("get RepoFileTree for relation, %w", err)
+	}
+	var ggufFiles []*types.File
+	for _, file := range files {
+		if strings.HasSuffix(file.Name, ".gguf") {
+			if strings.Contains(file.Name, "00001-of-") || !strings.Contains(file.Name, "-of-") {
+				ggufFiles = append(ggufFiles, file)
+			}
+		}
+	}
+	return ggufFiles, nil
+}
+
+// get built-int task from tags
+func GetBuiltInTaskFromTags(tags []database.Tag) string {
+	for _, tag := range tags {
+		if tag.Name == string(types.TextGeneration) {
+			return tag.Name
+		}
+		if tag.Name == string(types.Text2Image) {
+			return tag.Name
+		}
+		if tag.Name == string(types.FeatureExtraction) || tag.Name == string(types.SentenceSimilarity) {
+			return string(types.FeatureExtraction)
+		}
+	}
+	return string(types.TextGeneration)
 }

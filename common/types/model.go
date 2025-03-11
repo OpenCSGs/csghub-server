@@ -208,12 +208,9 @@ const (
 type ModelType string
 
 const (
-	GGUF        ModelType = "gguf"
-	Safetensors ModelType = "safetensors"
-)
-
-const (
-	GGUFEntryPoint = "GGUF_ENTRY_POINT"
+	GGUF           ModelType = "gguf"
+	Safetensors    ModelType = "safetensors"
+	GGUFEntryPoint string    = "GGUF_ENTRY_POINT"
 )
 
 type ModelRunReq struct {
@@ -288,6 +285,8 @@ type ModelUpdateResponse struct {
 type ModelStatusEventData struct {
 	Status  string     `json:"status"`
 	Details []Instance `json:"details"`
+	Message string     `json:"message"`
+	Reason  string     `json:"reason"`
 }
 
 const (

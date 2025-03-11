@@ -3,6 +3,7 @@ package component
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/alibabacloud-go/tea/tea"
 	"github.com/stretchr/testify/mock"
@@ -279,6 +280,9 @@ func TestModelComponent_SDKModelInfo(t *testing.T) {
 		User: database.User{Username: "user"},
 		Tags: []database.Tag{{Name: "t1"}},
 	}
+	repo.CreatedAt = time.Date(2024, time.November, 6, 13, 19, 10, 1, time.UTC)
+	repo.UpdatedAt = time.Date(2024, time.November, 6, 13, 19, 10, 1, time.UTC)
+
 	mc.mocks.stores.ModelMock().EXPECT().FindByPath(ctx, "ns", "n").Return(&database.Model{
 		ID:           1,
 		RepositoryID: 123,
@@ -306,12 +310,14 @@ func TestModelComponent_SDKModelInfo(t *testing.T) {
 	info, err := mc.SDKModelInfo(ctx, "ns", "n", "main", "user")
 	require.Nil(t, err)
 	require.Equal(t, &types.SDKModelInfo{
-		ID:       "p/p",
-		Spaces:   []string{"sp"},
-		Author:   "user",
-		Sha:      "zzz",
-		Siblings: []types.SDKFile{{Filename: "file1.txt"}},
-		Tags:     []string{"t1"},
+		ID:           "p/p",
+		Spaces:       []string{"sp"},
+		Author:       "user",
+		Sha:          "zzz",
+		Siblings:     []types.SDKFile{{Filename: "file1.txt"}},
+		Tags:         []string{"t1"},
+		CreatedAt:    time.Date(2024, time.November, 6, 13, 19, 10, 1, time.UTC),
+		LastModified: time.Date(2024, time.November, 6, 13, 19, 10, 1, time.UTC),
 	}, info)
 
 }

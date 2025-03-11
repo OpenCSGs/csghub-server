@@ -124,9 +124,9 @@ func TestGitCallbackComponent_UpdateRepoInfos(t *testing.T) {
 
 	// modified mock
 	gc.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, types.ModelRepo, "ns", "n").Return(
-		&database.Repository{ID: 1, Path: "foo/bar"}, nil,
+		&database.Repository{ID: 1, Path: "foo/bar", Name: "bar"}, nil,
 	)
-	gc.mocks.runtimeArchComponent.EXPECT().GetArchitecture(ctx, types.TaskAutoDetection, &database.Repository{ID: 1, Path: "foo/bar"}).Return("foo", nil)
+	gc.mocks.runtimeArchComponent.EXPECT().GetArchitecture(ctx, types.TaskAutoDetection, &database.Repository{ID: 1, Path: "foo/bar", Name: "bar"}).Return("foo", nil)
 	filter := &types.TagFilter{
 		Categories: []string{"runtime_framework", "resource"},
 		Scopes:     []types.TagScope{types.ModelTagScope},
@@ -184,6 +184,71 @@ func TestGitCallbackComponent_UpdateRepoInfos(t *testing.T) {
 				Modified: []string{component.ConfigFileName},
 				Removed:  []string{"bar.go", types.ReadmeFileName},
 				Added:    []string{"foo.go", types.ReadmeFileName},
+			},
+		},
+	})
+	require.Nil(t, err)
+}
+
+func TestGitCallbackComponent_UpdateGGUFRepoInfos(t *testing.T) {
+	ctx := context.TODO()
+	gc := initializeTestGitCallbackComponent(context.TODO(), t)
+
+	// modified mock
+	gc.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, types.ModelRepo, "ns", "n").Return(
+		&database.Repository{ID: 1, Path: "foo/bar", Name: "bar", Tags: []database.Tag{{Name: "text-generation"}}}, nil,
+	)
+	gc.mocks.runtimeArchComponent.EXPECT().GetArchitecture(ctx, types.TextGeneration, &database.Repository{ID: 1, Path: "foo/bar", Name: "bar", Tags: []database.Tag{{Name: "text-generation"}}}).Return("foo", nil)
+	filter := &types.TagFilter{
+		Categories: []string{"runtime_framework", "resource"},
+		Scopes:     []types.TagScope{types.ModelTagScope},
+	}
+	gc.mocks.stores.TagMock().EXPECT().AllTags(
+		ctx, filter,
+	).Return([]*database.Tag{{Name: "t1"}}, nil)
+	gc.mocks.stores.RuntimeFrameworkMock().EXPECT().ListByIDs(ctx, []int64{12}).Return(
+		[]database.RuntimeFramework{{ID: 12, FrameName: "fm", ModelFormat: "gguf"}}, nil,
+	)
+
+	gc.mocks.stores.RuntimeArchMock().EXPECT().ListByRArchNameAndModel(ctx, "foo", "bar").Return(
+		[]database.RuntimeArchitecture{{ID: 11, RuntimeFrameworkID: 12}}, nil,
+	)
+
+	gc.mocks.stores.RepoRuntimeFrameworkMock().EXPECT().Add(ctx, int64(12), int64(1), 1).Return(nil)
+	gc.mocks.stores.RepoRuntimeFrameworkMock().EXPECT().DeleteByRepoID(ctx, int64(1)).Return(nil)
+	gc.mocks.runtimeArchComponent.EXPECT().AddRuntimeFrameworkTag(
+		ctx, []*database.Tag{{Name: "t1"}}, int64(1), int64(12),
+	).Return(nil)
+	// removed mock
+	gc.mocks.tagComponent.EXPECT().UpdateLibraryTags(
+		ctx, types.ModelTagScope, "ns", "n", "DeepSeek-R1.BF16-00001-of-00030.gguf", "",
+	).Return(nil)
+	gc.mocks.tagComponent.EXPECT().ClearMetaTags(ctx, types.ModelRepo, "ns", "n").Return(nil)
+	// added mock
+	gc.mocks.tagComponent.EXPECT().UpdateLibraryTags(
+		ctx, types.ModelTagScope, "ns", "n", "", "DeepSeek-R1.BF16-00002-of-00030.gguf",
+	).Return(nil)
+	gc.mocks.gitServer.EXPECT().GetRepoFileRaw(mock.Anything, gitserver.GetRepoInfoByPathReq{
+		Namespace: "ns",
+		Name:      "n",
+		Ref:       "refs/heads/main",
+		Path:      "README.md",
+		RepoType:  types.ModelRepo,
+	}).Return("", nil)
+	gc.mocks.tagComponent.EXPECT().UpdateMetaTags(
+		ctx, types.ModelTagScope, "ns", "n", "",
+	).Return(nil, nil)
+
+	err := gc.UpdateRepoInfos(ctx, &types.GiteaCallbackPushReq{
+		Ref: "refs/heads/main",
+		Repository: types.GiteaCallbackPushReq_Repository{
+			FullName: "models_ns/n",
+		},
+		Commits: []types.GiteaCallbackPushReq_Commit{
+			{
+				Modified: []string{"DeepSeek-R1.BF16-00001-of-00030.gguf"},
+				Removed:  []string{"DeepSeek-R1.BF16-00001-of-00030.gguf", types.ReadmeFileName},
+				Added:    []string{"DeepSeek-R1.BF16-00002-of-00030.gguf", types.ReadmeFileName},
 			},
 		},
 	})

@@ -22,6 +22,9 @@ def generate_model_sql():
                 if hf_model_id is None:
                     continue
                 namespace_and_name = hf_model_id.split('/')
+                # check namespace_and_name contains ':'
+                if ":" in namespace_and_name[1]:
+                    continue
                 # generate sql and save to file
                 sql = f"INSERT INTO resource_models (resource_name, engine_name, model_name, type) VALUES ('nvidia', 'ms-swift', '{namespace_and_name[1]}', 'gpu') ON CONFLICT (engine_name, model_name) DO NOTHING;"
                 with open("resource_model.sql", 'a') as file:
