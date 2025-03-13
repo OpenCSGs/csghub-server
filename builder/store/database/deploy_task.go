@@ -30,11 +30,13 @@ type Deploy struct {
 	// add at 2024-05
 	DeployName string `json:"deploy_name"`
 	// user_id trigger deploy action, rather than repo owner user_id
-	UserID int64 `json:"user_id"`
+	UserID int64 `bun:",notnull" json:"user_id"`
+	User   *User `bun:"rel:belongs-to,join:user_id=id" json:"user,omitempty"`
 	// model_id to deploy, it's 0 if deploy space
 	ModelID int64 `json:"model_id"`
 	// repository_id of model/space/code/dataset
-	RepoID int64 `json:"repo_id"`
+	RepoID     int64       `json:"repo_id"`
+	Repository *Repository `bun:"rel:belongs-to,join:repo_id=id" json:"repository,omitempty"`
 	// model running engine vllm or TGI
 	RuntimeFramework string             `bun:",nullzero" json:"runtime_framework"`
 	ContainerPort    int                `json:"container_port"`
@@ -93,7 +95,10 @@ type DeployTaskStore interface {
 	StopDeploy(ctx context.Context, repoType types.RepositoryType, repoID, userID int64, deployID int64) error
 	GetServerlessDeployByRepID(ctx context.Context, repoID int64) (*Deploy, error)
 	ListServerless(ctx context.Context, req types.DeployReq) ([]Deploy, int, error)
-	ListAllDeployments(ctx context.Context, userID int64) ([]Deploy, error)
+	GetRunningInferenceAndFinetuneByUserID(ctx context.Context, userID int64) ([]Deploy, error)
+	ListAllDeployByUID(ctx context.Context, userID int64) ([]Deploy, error)
+	ListAllDeploys(ctx context.Context, req types.DeployReq) ([]Deploy, int, error)
+	RunningVisibleToUser(ctx context.Context, userID int64) ([]Deploy, error)
 }
 
 func NewDeployTaskStore() DeployTaskStore {
@@ -324,7 +329,50 @@ func (s *deployTaskStoreImpl) ListServerless(ctx context.Context, req types.Depl
 	return result, total, nil
 }
 
-func (s *deployTaskStoreImpl) ListAllDeployments(ctx context.Context, userID int64) ([]Deploy, error) {
+type DeployFilter struct {
+	UserID *int64
+	Type   *int
+	Status []int
+}
+
+func (s *deployTaskStoreImpl) GetDeploys(ctx context.Context, filter DeployFilter) ([]Deploy, error) {
+	var result []Deploy
+	q := s.db.Operator.Core.NewSelect().Model(&result)
+	if filter.UserID != nil {
+		q = q.Where("user_id = ?", *filter.UserID)
+	}
+	if filter.Type != nil {
+		q = q.Where("type = ?", *filter.Type)
+	}
+	if len(filter.Status) > 0 {
+		q = q.Where("status in (?)", bun.In(filter.Status))
+	}
+	_, err := q.Exec(ctx, &result)
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
+		return nil, fmt.Errorf("select deploy with filter from db failed, error:%w", err)
+	}
+
+	return result, nil
+}
+
+func (s *deployTaskStoreImpl) GetRunningInferenceAndFinetuneByUserID(ctx context.Context, userID int64) ([]Deploy, error) {
+	// get all running inference and finetune of user
+	var result []Deploy
+	_, err := s.db.Operator.Core.NewSelect().Model(&result).
+		Where("user_id = ?", userID).
+		Where("type in (1,2)").
+		Where("status = ?", common.Running).
+		Exec(ctx, &result)
+	if err != nil && errors.Is(err, sql.ErrNoRows) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("select deploy error, %w", err)
+	}
+	return result, nil
+}
+
+func (s *deployTaskStoreImpl) ListAllDeployByUID(ctx context.Context, userID int64) ([]Deploy, error) {
 	var result []Deploy
 	err := s.db.Operator.Core.NewSelect().
 		Model(&result).
@@ -332,4 +380,36 @@ func (s *deployTaskStoreImpl) ListAllDeployments(ctx context.Context, userID int
 		Scan(ctx)
 
 	return result, err
+}
+
+func (s *deployTaskStoreImpl) RunningVisibleToUser(ctx context.Context, userID int64) ([]Deploy, error) {
+	var result []Deploy
+	err := s.db.Operator.Core.NewSelect().
+		Model(&result).
+		Relation("Repository").
+		Relation("User").
+		// running dedicated and serverless model inference
+		Where("status = ? and type in (?)", common.Running, bun.In([]int64{1, 3})).
+		WhereGroup("AND", func(q *bun.SelectQuery) *bun.SelectQuery {
+			return q.WhereOr("deploy.user_id =?", userID). //user owned
+									WhereOr("secure_level =?", 1) // other users owned but public
+		}).
+		Scan(ctx)
+	return result, err
+}
+
+// list all deploy
+func (s *deployTaskStoreImpl) ListAllDeploys(ctx context.Context, req types.DeployReq) ([]Deploy, int, error) {
+	var result []Deploy
+	query := s.db.Operator.Core.NewSelect().Model(&result)
+	query = query.Limit(req.PageSize).Offset((req.Page - 1) * req.PageSize)
+	_, err := query.Exec(ctx, &result)
+	if err != nil {
+		return nil, 0, err
+	}
+	total, err := query.Count(ctx)
+	if err != nil {
+		return nil, 0, err
+	}
+	return result, total, nil
 }

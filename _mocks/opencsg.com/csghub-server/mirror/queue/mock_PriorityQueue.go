@@ -20,8 +20,104 @@ func (_m *MockPriorityQueue) EXPECT() *MockPriorityQueue_Expecter {
 	return &MockPriorityQueue_Expecter{mock: &_m.Mock}
 }
 
+// ListLfsMirrorTasks provides a mock function with given fields: count
+func (_m *MockPriorityQueue) ListLfsMirrorTasks(count int64) []int64 {
+	ret := _m.Called(count)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ListLfsMirrorTasks")
+	}
+
+	var r0 []int64
+	if rf, ok := ret.Get(0).(func(int64) []int64); ok {
+		r0 = rf(count)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]int64)
+		}
+	}
+
+	return r0
+}
+
+// MockPriorityQueue_ListLfsMirrorTasks_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ListLfsMirrorTasks'
+type MockPriorityQueue_ListLfsMirrorTasks_Call struct {
+	*mock.Call
+}
+
+// ListLfsMirrorTasks is a helper method to define mock.On call
+//   - count int64
+func (_e *MockPriorityQueue_Expecter) ListLfsMirrorTasks(count interface{}) *MockPriorityQueue_ListLfsMirrorTasks_Call {
+	return &MockPriorityQueue_ListLfsMirrorTasks_Call{Call: _e.mock.On("ListLfsMirrorTasks", count)}
+}
+
+func (_c *MockPriorityQueue_ListLfsMirrorTasks_Call) Run(run func(count int64)) *MockPriorityQueue_ListLfsMirrorTasks_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(int64))
+	})
+	return _c
+}
+
+func (_c *MockPriorityQueue_ListLfsMirrorTasks_Call) Return(_a0 []int64) *MockPriorityQueue_ListLfsMirrorTasks_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockPriorityQueue_ListLfsMirrorTasks_Call) RunAndReturn(run func(int64) []int64) *MockPriorityQueue_ListLfsMirrorTasks_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// ListRepoMirrorTasks provides a mock function with given fields: count
+func (_m *MockPriorityQueue) ListRepoMirrorTasks(count int64) []int64 {
+	ret := _m.Called(count)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ListRepoMirrorTasks")
+	}
+
+	var r0 []int64
+	if rf, ok := ret.Get(0).(func(int64) []int64); ok {
+		r0 = rf(count)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]int64)
+		}
+	}
+
+	return r0
+}
+
+// MockPriorityQueue_ListRepoMirrorTasks_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ListRepoMirrorTasks'
+type MockPriorityQueue_ListRepoMirrorTasks_Call struct {
+	*mock.Call
+}
+
+// ListRepoMirrorTasks is a helper method to define mock.On call
+//   - count int64
+func (_e *MockPriorityQueue_Expecter) ListRepoMirrorTasks(count interface{}) *MockPriorityQueue_ListRepoMirrorTasks_Call {
+	return &MockPriorityQueue_ListRepoMirrorTasks_Call{Call: _e.mock.On("ListRepoMirrorTasks", count)}
+}
+
+func (_c *MockPriorityQueue_ListRepoMirrorTasks_Call) Run(run func(count int64)) *MockPriorityQueue_ListRepoMirrorTasks_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(int64))
+	})
+	return _c
+}
+
+func (_c *MockPriorityQueue_ListRepoMirrorTasks_Call) Return(_a0 []int64) *MockPriorityQueue_ListRepoMirrorTasks_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockPriorityQueue_ListRepoMirrorTasks_Call) RunAndReturn(run func(int64) []int64) *MockPriorityQueue_ListRepoMirrorTasks_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // PopLfsMirror provides a mock function with no fields
-func (_m *MockPriorityQueue) PopLfsMirror() *queue.MirrorTask {
+func (_m *MockPriorityQueue) PopLfsMirror() *int64 {
 	ret := _m.Called()
 
 	if len(ret) == 0 {
@@ -68,7 +164,7 @@ func (_c *MockPriorityQueue_PopLfsMirror_Call) RunAndReturn(run func() *queue.Mi
 }
 
 // PopRepoMirror provides a mock function with no fields
-func (_m *MockPriorityQueue) PopRepoMirror() *queue.MirrorTask {
+func (_m *MockPriorityQueue) PopRepoMirror() *int64 {
 	ret := _m.Called()
 
 	if len(ret) == 0 {
@@ -177,6 +273,52 @@ func (_c *MockPriorityQueue_PushRepoMirror_Call) Return() *MockPriorityQueue_Pus
 
 func (_c *MockPriorityQueue_PushRepoMirror_Call) RunAndReturn(run func(*queue.MirrorTask)) *MockPriorityQueue_PushRepoMirror_Call {
 	_c.Run(run)
+	return _c
+}
+
+// ZRem provides a mock function with given fields: value
+func (_m *MockPriorityQueue) ZRem(value string) error {
+	ret := _m.Called(value)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ZRem")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(string) error); ok {
+		r0 = rf(value)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// MockPriorityQueue_ZRem_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ZRem'
+type MockPriorityQueue_ZRem_Call struct {
+	*mock.Call
+}
+
+// ZRem is a helper method to define mock.On call
+//   - value string
+func (_e *MockPriorityQueue_Expecter) ZRem(value interface{}) *MockPriorityQueue_ZRem_Call {
+	return &MockPriorityQueue_ZRem_Call{Call: _e.mock.On("ZRem", value)}
+}
+
+func (_c *MockPriorityQueue_ZRem_Call) Run(run func(value string)) *MockPriorityQueue_ZRem_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(string))
+	})
+	return _c
+}
+
+func (_c *MockPriorityQueue_ZRem_Call) Return(_a0 error) *MockPriorityQueue_ZRem_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockPriorityQueue_ZRem_Call) RunAndReturn(run func(string) error) *MockPriorityQueue_ZRem_Call {
+	_c.Call.Return(run)
 	return _c
 }
 

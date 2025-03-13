@@ -7,6 +7,7 @@ import (
 
 	"github.com/spf13/cobra"
 	"opencsg.com/csghub-server/cmd/csghub-server/cmd/accounting"
+	"opencsg.com/csghub-server/cmd/csghub-server/cmd/aigateway"
 	"opencsg.com/csghub-server/cmd/csghub-server/cmd/cron"
 	"opencsg.com/csghub-server/cmd/csghub-server/cmd/dataviewer"
 	"opencsg.com/csghub-server/cmd/csghub-server/cmd/deploy"
@@ -66,6 +67,7 @@ func init() {
 		git.Cmd,
 		moderation.Cmd,
 		dataviewer.Cmd,
+		aigateway.Cmd,
 	)
 
 	addCommands()

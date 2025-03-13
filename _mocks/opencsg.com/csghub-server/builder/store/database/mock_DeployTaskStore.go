@@ -960,6 +960,65 @@ func (_c *MockDeployTaskStore_ListServerless_Call) RunAndReturn(run func(context
 	return _c
 }
 
+// RunningVisibleToUser provides a mock function with given fields: ctx, userID
+func (_m *MockDeployTaskStore) RunningVisibleToUser(ctx context.Context, userID int64) ([]database.Deploy, error) {
+	ret := _m.Called(ctx, userID)
+
+	if len(ret) == 0 {
+		panic("no return value specified for RunningVisibleToUser")
+	}
+
+	var r0 []database.Deploy
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, int64) ([]database.Deploy, error)); ok {
+		return rf(ctx, userID)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, int64) []database.Deploy); ok {
+		r0 = rf(ctx, userID)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]database.Deploy)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, int64) error); ok {
+		r1 = rf(ctx, userID)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockDeployTaskStore_RunningVisibleToUser_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'RunningVisibleToUser'
+type MockDeployTaskStore_RunningVisibleToUser_Call struct {
+	*mock.Call
+}
+
+// RunningVisibleToUser is a helper method to define mock.On call
+//   - ctx context.Context
+//   - userID int64
+func (_e *MockDeployTaskStore_Expecter) RunningVisibleToUser(ctx interface{}, userID interface{}) *MockDeployTaskStore_RunningVisibleToUser_Call {
+	return &MockDeployTaskStore_RunningVisibleToUser_Call{Call: _e.mock.On("RunningVisibleToUser", ctx, userID)}
+}
+
+func (_c *MockDeployTaskStore_RunningVisibleToUser_Call) Run(run func(ctx context.Context, userID int64)) *MockDeployTaskStore_RunningVisibleToUser_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(int64))
+	})
+	return _c
+}
+
+func (_c *MockDeployTaskStore_RunningVisibleToUser_Call) Return(_a0 []database.Deploy, _a1 error) *MockDeployTaskStore_RunningVisibleToUser_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockDeployTaskStore_RunningVisibleToUser_Call) RunAndReturn(run func(context.Context, int64) ([]database.Deploy, error)) *MockDeployTaskStore_RunningVisibleToUser_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // StopDeploy provides a mock function with given fields: ctx, repoType, repoID, userID, deployID
 func (_m *MockDeployTaskStore) StopDeploy(ctx context.Context, repoType types.RepositoryType, repoID int64, userID int64, deployID int64) error {
 	ret := _m.Called(ctx, repoType, repoID, userID, deployID)

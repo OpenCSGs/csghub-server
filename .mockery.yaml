@@ -180,3 +180,6 @@ packages:
     config:
     interfaces:
       DatasetViewerComponent:
+  opencsg.com/csghub-server/aigateway/component:
+    config:
+      all: true
