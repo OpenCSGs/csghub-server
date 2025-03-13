@@ -238,3 +238,147 @@ func TestDeployTaskStore_UpdateInTx(t *testing.T) {
 	require.ElementsMatch(t, []int{3, 3}, types)
 
 }
+
+func TestDeployTaskStore_GetRunningInferenceAndFinetuneByUserID(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+	ctx := context.TODO()
+
+	store := database.NewDeployTaskStoreWithDB(db)
+	deploys := []database.Deploy{
+		{UserID: 123, Type: 1, Status: common.Running, DeployName: "d1"},
+		{UserID: 123, Type: 0, Status: common.Running, DeployName: "d2"},
+		{UserID: 123, Type: 2, Status: common.Running, DeployName: "d3"},
+		{UserID: 123, Type: 3, Status: common.Running, DeployName: "d4"},
+		{UserID: 123, Type: 1, Status: common.Stopped, DeployName: "d5"},
+		{UserID: 456, Type: 1, Status: common.Running, DeployName: "d6"},
+	}
+
+	for _, dp := range deploys {
+		err := store.CreateDeploy(ctx, &dp)
+		require.Nil(t, err)
+	}
+
+	dps, err := store.GetRunningInferenceAndFinetuneByUserID(ctx, 123)
+	require.Nil(t, err)
+	names := []string{}
+	for _, dp := range dps {
+		names = append(names, dp.DeployName)
+	}
+	require.ElementsMatch(t, []string{"d1", "d3"}, names)
+
+}
+
+func TestDeployTaskStore_RunningVisibleToUser(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+	ctx := context.TODO()
+
+	store := database.NewDeployTaskStoreWithDB(db)
+
+	// user 1 's public dedicated inference
+	deploy1 := database.Deploy{
+		ID:          1,
+		DeployName:  "deploy1",
+		SvcName:     "svc1",
+		RepoID:      1,
+		UserID:      1,
+		Type:        1,
+		SecureLevel: 1,
+		Status:      common.Running,
+	}
+	// user 2 's public fintune
+	deploy2 := database.Deploy{
+		ID:          2,
+		DeployName:  "deploy2",
+		SvcName:     "svc2",
+		RepoID:      2,
+		UserID:      2,
+		Type:        2,
+		SecureLevel: 1,
+		Status:      common.Running,
+	}
+	// user 1 's private dedicated inference
+	deploy3 := database.Deploy{
+		ID:          3,
+		DeployName:  "deploy3",
+		SvcName:     "svc3",
+		RepoID:      3,
+		UserID:      1,
+		Type:        1,
+		SecureLevel: 2, //private
+		Status:      common.Running,
+	}
+	// user 2 's public dedicated inference
+	deploy4 := database.Deploy{
+		ID:          4,
+		DeployName:  "deploy4",
+		SvcName:     "svc4",
+		RepoID:      4,
+		UserID:      2,
+		Type:        1,
+		SecureLevel: 1,
+		Status:      common.Running,
+	}
+	// user 3 's serverless inference
+	deploy5 := database.Deploy{
+		ID:          5,
+		DeployName:  "deploy5",
+		SvcName:     "svc5",
+		RepoID:      5,
+		UserID:      3,
+		Type:        3,
+		SecureLevel: 1,
+		Status:      common.Running,
+	}
+	// user 3 's serverless inference not running
+	deploy6 := database.Deploy{
+		ID:          6,
+		DeployName:  "deploy6",
+		SvcName:     "svc6",
+		RepoID:      6,
+		UserID:      3,
+		Type:        3,
+		SecureLevel: 1,
+		Status:      common.Stopped,
+	}
+
+	// Insert test data into the database
+	err := store.CreateDeploy(ctx, &deploy1)
+	require.Nil(t, err)
+	err = store.CreateDeploy(ctx, &deploy2)
+	require.Nil(t, err)
+	err = store.CreateDeploy(ctx, &deploy3)
+	require.Nil(t, err)
+	err = store.CreateDeploy(ctx, &deploy4)
+	require.Nil(t, err)
+	err = store.CreateDeploy(ctx, &deploy5)
+	require.Nil(t, err)
+	err = store.CreateDeploy(ctx, &deploy6)
+	require.Nil(t, err)
+
+	// Test RunningVisibleToUser with user ID 1
+	deploys, err := store.RunningVisibleToUser(ctx, 1)
+	require.Nil(t, err)
+	require.Len(t, deploys, 4)
+	require.Equal(t, deploy1.ID, deploys[0].ID)
+	require.Equal(t, deploy3.ID, deploys[1].ID)
+	require.Equal(t, deploy4.ID, deploys[2].ID)
+	require.Equal(t, deploy5.ID, deploys[3].ID)
+
+	// Test RunningVisibleToUser with user ID 2
+	deploys, err = store.RunningVisibleToUser(ctx, 2)
+	require.Nil(t, err)
+	require.Len(t, deploys, 3)
+	require.Equal(t, deploy1.ID, deploys[0].ID)
+	require.Equal(t, deploy4.ID, deploys[1].ID)
+	require.Equal(t, deploy5.ID, deploys[2].ID)
+
+	// Test RunningVisibleToUser with user ID 3
+	deploys, err = store.RunningVisibleToUser(ctx, 3)
+	require.Nil(t, err)
+	require.Len(t, deploys, 3)
+	require.Equal(t, deploy1.ID, deploys[0].ID)
+	require.Equal(t, deploy4.ID, deploys[1].ID)
+	require.Equal(t, deploy5.ID, deploys[2].ID)
+}

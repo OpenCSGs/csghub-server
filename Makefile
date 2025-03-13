@@ -27,7 +27,7 @@ mock_gen:
 	mockery
 
 swag:
-	swag init --pd -d cmd/csghub-server/cmd/start,api/router,api/handler,builder/store/database,common/types,accounting/handler,user/handler,moderation/handler,component,dataviewer/handler -g server.go
+	swag init --pd -d cmd/csghub-server/cmd/start,api/router,api/handler,builder/store/database,common/types,accounting/handler,user/handler,moderation/handler,component,dataviewer/handler,aigateway/handler,aigateway/types -g server.go
 
 migrate_local:
 	go run cmd/csghub-server/main.go migration migrate --config local.toml

@@ -262,6 +262,10 @@ type Config struct {
 	Git struct {
 		SkipLfsFileValidation bool `env:"STARHUB_SERVER_SKIP_LFS_FILE_VALIDATION, default=false"`
 	}
+
+	AIGateway struct {
+		Port int `env:"OPENCSG_AIGATEWAY_PORT, default=8094"`
+	}
 }
 
 func SetConfigFile(file string) {
