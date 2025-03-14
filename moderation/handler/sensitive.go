@@ -66,3 +66,28 @@ func (h *SensitiveHandler) Image(ctx *gin.Context) {
 
 	httpbase.OK(ctx, result)
 }
+
+func (h *SensitiveHandler) Stream(ctx *gin.Context) {
+	type request struct {
+		Service           string `json:"Service"`
+		ServiceParameters struct {
+			Content   string `json:"content"`
+			SessionId string `json:"sessionId"`
+		} `json:"ServiceParameters"`
+	}
+	var (
+		r   request
+		err error
+	)
+	if err = ctx.ShouldBindJSON(&r); err != nil {
+		slog.Error("Bad request format", slog.String("err", err.Error()))
+		httpbase.BadRequest(ctx, err.Error())
+		return
+	}
+	result, err := h.c.PassStreamCheck(ctx, sensitive.ScenarioLLMResModeration, r.ServiceParameters.Content, r.ServiceParameters.SessionId)
+	if err != nil {
+		httpbase.ServerError(ctx, err)
+		return
+	}
+	httpbase.OK(ctx, result)
+}

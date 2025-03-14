@@ -11,7 +11,10 @@ import (
 	"strings"
 
 	openapi "github.com/alibabacloud-go/darabonba-openapi/v2/client"
-	green20220302 "github.com/alibabacloud-go/green-20220302/client"
+	//green20220302 "github.com/alibabacloud-go/green-20220302/client"
+	green20220302 "github.com/alibabacloud-go/green-20220302/v2/client"
+	util "github.com/alibabacloud-go/tea-utils/v2/service"
+
 	"github.com/alibabacloud-go/tea/tea"
 	"github.com/aliyun/alibaba-cloud-sdk-go/services/green"
 	"opencsg.com/csghub-server/common/config"
@@ -57,6 +60,7 @@ type Green2022Client interface {
 	GetRegionId() string
 	TextModeration(request *green20220302.TextModerationRequest) (_result *green20220302.TextModerationResponse, _err error)
 	ImageModeration(request *green20220302.ImageModerationRequest) (_result *green20220302.ImageModerationResponse, _err error)
+	TextModerationPlusWithOptions(request *green20220302.TextModerationPlusRequest, options *util.RuntimeOptions) (_result *green20220302.TextModerationPlusResponse, _err error)
 }
 
 type green2022ClientImpl struct {
@@ -73,6 +77,10 @@ func (c *green2022ClientImpl) TextModeration(request *green20220302.TextModerati
 
 func (c *green2022ClientImpl) ImageModeration(request *green20220302.ImageModerationRequest) (_result *green20220302.ImageModerationResponse, _err error) {
 	return c.green.ImageModeration(request)
+}
+
+func (c *green2022ClientImpl) TextModerationPlusWithOptions(request *green20220302.TextModerationPlusRequest, options *util.RuntimeOptions) (_result *green20220302.TextModerationPlusResponse, _err error) {
+	return c.green.TextModerationPlusWithOptions(request, options)
 }
 
 /*
@@ -225,6 +233,50 @@ func (*AliyunGreenChecker) SplitTasks(text string) []map[string]string {
 		tasks = append(tasks, map[string]string{"content": text[i:]})
 	}
 	return tasks
+}
+
+func (c *AliyunGreenChecker) PassStreamCheck(ctx context.Context, scenario Scenario, text, sessionId string) (*CheckResult, error) {
+	serviceParameters, _ := json.Marshal(
+		map[string]interface{}{
+			"content":   text,
+			"sessionId": sessionId,
+		},
+	)
+	req := &green20220302.TextModerationPlusRequest{
+		Service:           tea.String(string(scenario)),
+		ServiceParameters: tea.String(string(serviceParameters)),
+	}
+	options := &util.RuntimeOptions{
+		ReadTimeout:    tea.Int(500),
+		ConnectTimeout: tea.Int(500),
+	}
+	resp, err := c.green2022.TextModerationPlusWithOptions(req, options)
+	if err != nil {
+		slog.Error("fail to call aliyun TextModerationPlusWithOptions", slog.String("content", text), slog.Any("error", err))
+		return nil, err
+	}
+
+	if *resp.StatusCode != http.StatusOK {
+		slog.Error("aliyun TextModerationPlusWithOptions response not success", slog.String("content", text),
+			slog.Any("resp.code", resp.StatusCode))
+		return nil, fmt.Errorf("aliyun TextModerationPlusWithOptions response not success")
+	}
+
+	if *resp.Body.Code != http.StatusOK {
+		slog.Error("text moderation not success.", slog.Any("resp.Body.code", *resp.Body.Code))
+		return nil, fmt.Errorf("aliyun TextModerationPlusWithOptions text moderation not success")
+	}
+
+	if *resp.Body.Data.RiskLevel == "low" || *resp.Body.Data.RiskLevel == "none" {
+		return &CheckResult{IsSensitive: false}, nil
+	}
+
+	result, err := json.Marshal(resp.Body.Data.Result)
+	if err != nil {
+		return nil, fmt.Errorf("resp.Body.Data.result Marshal error: %v", err)
+	}
+
+	return &CheckResult{IsSensitive: true, Reason: string(result)}, nil
 }
 
 func (c *AliyunGreenChecker) PassImageCheck(ctx context.Context, scenario Scenario, ossBucketName, ossObjectName string) (*CheckResult, error) {

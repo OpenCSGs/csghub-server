@@ -10,6 +10,7 @@ import (
 type ModerationSvcClient interface {
 	PassTextCheck(ctx context.Context, scenario, text string) (*CheckResult, error)
 	PassImageCheck(ctx context.Context, scenario, ossBucketName, ossObjectName string) (*CheckResult, error)
+	PassStreamCheck(ctx context.Context, scenario, text, id string) (*CheckResult, error)
 	SubmitRepoCheck(ctx context.Context, repoType types.RepositoryType, namespace, name string) error
 }
 
@@ -39,6 +40,32 @@ func (c *ModerationSvcHttpClient) PassTextCheck(ctx context.Context, scenario, t
 		Text:     text,
 	}
 	const path = "/api/v1/text"
+	var resp httpbase.R
+	resp.Data = &CheckResult{}
+	err := c.hc.Post(ctx, path, req, &resp)
+	if err != nil {
+		return nil, err
+	}
+	return resp.Data.(*CheckResult), nil
+}
+
+func (c *ModerationSvcHttpClient) PassStreamCheck(ctx context.Context, scenario, text, id string) (*CheckResult, error) {
+	type ServiceParameters struct {
+		Content   string `json:"content"`
+		SessionId string `json:"sessionId"`
+	}
+	type CheckRequest struct {
+		Service           string            `json:"Service"`
+		ServiceParameters ServiceParameters `json:"ServiceParameters"`
+	}
+	req := &CheckRequest{
+		Service: scenario,
+		ServiceParameters: ServiceParameters{
+			Content:   text,
+			SessionId: id,
+		},
+	}
+	const path = "/api/v1/stream"
 	var resp httpbase.R
 	resp.Data = &CheckResult{}
 	err := c.hc.Post(ctx, path, req, &resp)

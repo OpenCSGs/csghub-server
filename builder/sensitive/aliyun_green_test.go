@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/alibabacloud-go/green-20220302/client"
+	"github.com/alibabacloud-go/green-20220302/v2/client"
 	"github.com/alibabacloud-go/tea/tea"
 	"github.com/aliyun/alibaba-cloud-sdk-go/services/green"
 	"github.com/stretchr/testify/mock"

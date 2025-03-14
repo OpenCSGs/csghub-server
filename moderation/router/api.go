@@ -32,6 +32,7 @@ func NewRouter(config *config.Config) (*gin.Engine, error) {
 	}
 	apiV1Group.POST("/text", sc.Text)
 	apiV1Group.POST("/image", sc.Image)
+	apiV1Group.POST("/stream", sc.Stream)
 
 	return r, nil
 }
