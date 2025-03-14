@@ -5,9 +5,10 @@ go 1.23.3
 require (
 	github.com/DATA-DOG/go-txdb v0.2.0
 	github.com/OpenCSGs/gitea-go-sdk/gitea v0.0.0-20240618091626-54fa52f1cec6
-	github.com/alibabacloud-go/darabonba-openapi/v2 v2.0.5
+	github.com/alibabacloud-go/darabonba-openapi/v2 v2.0.10
 	github.com/alibabacloud-go/green-20220302 v1.2.0
-	github.com/alibabacloud-go/tea v1.2.1
+	github.com/alibabacloud-go/green-20220302/v2 v2.20.0
+	github.com/alibabacloud-go/tea v1.2.2
 	github.com/aliyun/alibaba-cloud-sdk-go v1.62.648
 	github.com/bmatcuk/doublestar/v4 v4.8.1
 	github.com/casdoor/casdoor-go-sdk v0.41.0
@@ -217,6 +218,7 @@ require (
 	golang.org/x/exp v0.0.0-20250103183323-7d7fa50e5329 // indirect
 	golang.org/x/mod v0.22.0 // indirect
 	golang.org/x/xerrors v0.0.0-20231012003039-104605ab7028 // indirect
+	gonum.org/v1/gonum v0.15.1 // indirect
 	google.golang.org/api v0.183.0 // indirect
 	google.golang.org/genproto v0.0.0-20240528184218-531527333157 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20241209162323-e6fa225c2576 // indirect
@@ -230,14 +232,13 @@ require (
 require (
 	github.com/KyleBanks/depth v1.2.1 // indirect
 	github.com/XSAM/otelsql v0.36.0
-	github.com/alibabacloud-go/alibabacloud-gateway-spi v0.0.4 // indirect
-	github.com/alibabacloud-go/debug v1.0.0 // indirect
+	github.com/alibabacloud-go/alibabacloud-gateway-spi v0.0.5 // indirect
+	github.com/alibabacloud-go/debug v1.0.1 // indirect
 	github.com/alibabacloud-go/endpoint-util v1.1.1 // indirect
-	github.com/alibabacloud-go/openapi-util v0.1.0 // indirect
-	github.com/alibabacloud-go/tea-utils v1.4.5 // indirect
-	github.com/alibabacloud-go/tea-utils/v2 v2.0.4 // indirect
+	github.com/alibabacloud-go/openapi-util v0.1.1 // indirect
+	github.com/alibabacloud-go/tea-utils/v2 v2.0.6
 	github.com/alibabacloud-go/tea-xml v1.1.3 // indirect
-	github.com/aliyun/credentials-go v1.3.2 // indirect
+	github.com/aliyun/credentials-go v1.3.10 // indirect
 	github.com/argoproj/argo-workflows/v3 v3.5.12
 	github.com/blendle/zapdriver v1.3.1 // indirect
 	github.com/bwmarrin/snowflake v0.3.0
