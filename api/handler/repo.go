@@ -35,6 +35,13 @@ func NewRepoHandler(config *config.Config) (*RepoHandler, error) {
 	}, nil
 }
 
+func NewRepoHandlerDI(repo component.RepoComponent, deployStatusCheckInterval time.Duration) *RepoHandler {
+	return &RepoHandler{
+		c:                         repo,
+		deployStatusCheckInterval: deployStatusCheckInterval,
+	}
+}
+
 type RepoHandler struct {
 	c                         component.RepoComponent
 	deployStatusCheckInterval time.Duration

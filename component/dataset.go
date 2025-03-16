@@ -54,8 +54,7 @@ func NewDatasetComponent(config *config.Config) (DatasetComponent, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to create git server, error: %w", err)
 	}
-	c.userSvcClient = rpc.NewUserSvcHttpClient(fmt.Sprintf("%s:%d", config.User.Host, config.User.Port),
-		rpc.AuthWithApiKey(config.APIToken))
+	c.userSvcClient = rpc.NewUserSvcHttpClient(config)
 	c.gitServer = gs
 	c.config = config
 	return c, nil

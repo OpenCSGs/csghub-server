@@ -382,6 +382,124 @@ func (_c *MockUserComponent_Evaluations_Call) RunAndReturn(run func(context.Cont
 	return _c
 }
 
+// FindByAccessToken provides a mock function with given fields: ctx, token
+func (_m *MockUserComponent) FindByAccessToken(ctx context.Context, token string) (*database.User, error) {
+	ret := _m.Called(ctx, token)
+
+	if len(ret) == 0 {
+		panic("no return value specified for FindByAccessToken")
+	}
+
+	var r0 *database.User
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string) (*database.User, error)); ok {
+		return rf(ctx, token)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string) *database.User); ok {
+		r0 = rf(ctx, token)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*database.User)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
+		r1 = rf(ctx, token)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockUserComponent_FindByAccessToken_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'FindByAccessToken'
+type MockUserComponent_FindByAccessToken_Call struct {
+	*mock.Call
+}
+
+// FindByAccessToken is a helper method to define mock.On call
+//   - ctx context.Context
+//   - token string
+func (_e *MockUserComponent_Expecter) FindByAccessToken(ctx interface{}, token interface{}) *MockUserComponent_FindByAccessToken_Call {
+	return &MockUserComponent_FindByAccessToken_Call{Call: _e.mock.On("FindByAccessToken", ctx, token)}
+}
+
+func (_c *MockUserComponent_FindByAccessToken_Call) Run(run func(ctx context.Context, token string)) *MockUserComponent_FindByAccessToken_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(string))
+	})
+	return _c
+}
+
+func (_c *MockUserComponent_FindByAccessToken_Call) Return(_a0 *database.User, _a1 error) *MockUserComponent_FindByAccessToken_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockUserComponent_FindByAccessToken_Call) RunAndReturn(run func(context.Context, string) (*database.User, error)) *MockUserComponent_FindByAccessToken_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// FindByGitAccessToken provides a mock function with given fields: ctx, token
+func (_m *MockUserComponent) FindByGitAccessToken(ctx context.Context, token string) (*database.User, error) {
+	ret := _m.Called(ctx, token)
+
+	if len(ret) == 0 {
+		panic("no return value specified for FindByGitAccessToken")
+	}
+
+	var r0 *database.User
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string) (*database.User, error)); ok {
+		return rf(ctx, token)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string) *database.User); ok {
+		r0 = rf(ctx, token)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*database.User)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
+		r1 = rf(ctx, token)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockUserComponent_FindByGitAccessToken_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'FindByGitAccessToken'
+type MockUserComponent_FindByGitAccessToken_Call struct {
+	*mock.Call
+}
+
+// FindByGitAccessToken is a helper method to define mock.On call
+//   - ctx context.Context
+//   - token string
+func (_e *MockUserComponent_Expecter) FindByGitAccessToken(ctx interface{}, token interface{}) *MockUserComponent_FindByGitAccessToken_Call {
+	return &MockUserComponent_FindByGitAccessToken_Call{Call: _e.mock.On("FindByGitAccessToken", ctx, token)}
+}
+
+func (_c *MockUserComponent_FindByGitAccessToken_Call) Run(run func(ctx context.Context, token string)) *MockUserComponent_FindByGitAccessToken_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(string))
+	})
+	return _c
+}
+
+func (_c *MockUserComponent_FindByGitAccessToken_Call) Return(_a0 *database.User, _a1 error) *MockUserComponent_FindByGitAccessToken_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockUserComponent_FindByGitAccessToken_Call) RunAndReturn(run func(context.Context, string) (*database.User, error)) *MockUserComponent_FindByGitAccessToken_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // GetUserByName provides a mock function with given fields: ctx, userName
 func (_m *MockUserComponent) GetUserByName(ctx context.Context, userName string) (*database.User, error) {
 	ret := _m.Called(ctx, userName)

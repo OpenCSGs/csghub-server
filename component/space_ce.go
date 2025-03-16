@@ -4,7 +4,6 @@ package component
 
 import (
 	"context"
-	"fmt"
 
 	"opencsg.com/csghub-server/builder/deploy"
 	"opencsg.com/csghub-server/builder/git"
@@ -36,8 +35,7 @@ func NewSpaceComponent(config *config.Config) (SpaceComponent, error) {
 	c.serverBaseUrl = config.APIServer.PublicDomain
 	c.userLikesStore = database.NewUserLikesStore()
 	c.config = config
-	c.userSvcClient = rpc.NewUserSvcHttpClient(fmt.Sprintf("%s:%d", config.User.Host, config.User.Port),
-		rpc.AuthWithApiKey(config.APIToken))
+	c.userSvcClient = rpc.NewUserSvcHttpClient(config)
 
 	c.deployTaskStore = database.NewDeployTaskStore()
 	c.git, err = git.NewGitServer(config)
