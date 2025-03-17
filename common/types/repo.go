@@ -83,6 +83,8 @@ const (
 	LlamaCpp           InferenceEngine = "llama.cpp"
 	TEI                InferenceEngine = "tei"
 	Ktransformers      InferenceEngine = "ktransformers"
+
+	MaxFileTreeSize int = 500
 )
 
 type RepoRequest struct {

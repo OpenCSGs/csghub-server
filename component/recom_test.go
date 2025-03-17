@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"opencsg.com/csghub-server/builder/git/gitserver"
 	"opencsg.com/csghub-server/builder/store/database"
+	"opencsg.com/csghub-server/common/types"
 )
 
 // func TestRecomComponent_SetOpWeight(t *testing.T) {
@@ -47,10 +48,9 @@ func TestRecomComponent_CalculateTotalScore(t *testing.T) {
 	ctx := context.TODO()
 	rc := initializeTestRecomComponent(ctx, t)
 
-	rc.mocks.gitServer.EXPECT().GetRepoFileTree(mock.Anything, gitserver.GetRepoInfoByPathReq{
-		Namespace: "foo",
-		Name:      "bar",
-	}).Return(nil, nil)
+	rc.mocks.gitServer.EXPECT().GetTree(
+		mock.Anything, types.GetTreeRequest{Namespace: "foo", Name: "bar", Limit: 500, Recursive: true},
+	).Return(nil, nil)
 
 	// Test case 1: repository created 24 hours ago
 	repo1 := &database.Repository{Path: "foo/bar"}

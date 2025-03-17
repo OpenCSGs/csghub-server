@@ -1348,7 +1348,7 @@ func (c *repoComponentImpl) SDKListFiles(ctx context.Context, repoType types.Rep
 		ref = repo.DefaultBranch
 	}
 
-	filePaths, err := GetFilePaths(ctx, namespace, name, "", repoType, ref, c.git.GetRepoFileTree)
+	filePaths, err := GetFilePaths(ctx, namespace, name, "", repoType, ref, c.git.GetTree)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get all %s files, error: %w", repoType, err)
 	}
@@ -2864,7 +2864,7 @@ func (c *repoComponentImpl) AllFiles(ctx context.Context, req types.GetAllFilesR
 			return nil, ErrForbiddenMsg("users do not have permission to get all files for this repo")
 		}
 	}
-	allFiles, err := getAllFiles(ctx, req.Namespace, req.Name, "", req.RepoType, req.Ref, c.git.GetRepoFileTree)
+	allFiles, err := getAllFiles(ctx, req.Namespace, req.Name, "", req.RepoType, req.Ref, c.git.GetTree)
 	if err != nil {
 		slog.Error("fail to get all files of repository", slog.Any("repoType", req.RepoType), slog.String("namespace", req.Namespace), slog.String("name", req.Name), slog.String("error", err.Error()))
 		return nil, err

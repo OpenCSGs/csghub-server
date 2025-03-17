@@ -43,7 +43,7 @@ func (c *repoFileComponentImpl) GenRepoFileRecords(ctx context.Context, repoType
 	if err != nil {
 		return fmt.Errorf("failed to find repo, error: %w", err)
 	}
-	return c.createRepoFileRecords(ctx, *repo, "", c.gs.GetRepoFileTree)
+	return c.createRepoFileRecords(ctx, *repo)
 }
 
 func (c *repoFileComponentImpl) GenRepoFileRecordsBatch(ctx context.Context, repoType types.RepositoryType, lastRepoID int64, concurrency int) error {
@@ -66,7 +66,7 @@ func (c *repoFileComponentImpl) GenRepoFileRecordsBatch(ctx context.Context, rep
 			go func(repo database.Repository) {
 				slog.Info("start to get files of repository", slog.Any("repoType", repoType), slog.String("path", repo.Path))
 				//get file paths of repo
-				err := c.createRepoFileRecords(ctx, repo, "", c.gs.GetRepoFileTree)
+				err := c.createRepoFileRecords(ctx, repo)
 				if err != nil {
 					slog.Error("fail to get all files of repository",
 						slog.String("path", repo.Path), slog.String("repo_type", string(repo.RepositoryType)),
@@ -88,29 +88,41 @@ func (c *repoFileComponentImpl) GenRepoFileRecordsBatch(ctx context.Context, rep
 	return nil
 }
 
-func (c *repoFileComponentImpl) createRepoFileRecords(ctx context.Context, repo database.Repository, folder string, gsTree func(ctx context.Context, req gitserver.GetRepoInfoByPathReq) ([]*types.File, error)) error {
+func (c *repoFileComponentImpl) createRepoFileRecords(ctx context.Context, repo database.Repository) error {
 	namespace, name := repo.NamespaceAndName()
-	var files []*types.File
+	var (
+		files  []*types.File
+		cursor string
+	)
 
-	getRepoFileTree := gitserver.GetRepoInfoByPathReq{
-		Namespace: namespace,
-		Name:      name,
-		Ref:       repo.DefaultBranch,
-		Path:      folder,
-		RepoType:  repo.RepositoryType,
-	}
-	gitFiles, err := gsTree(context.Background(), getRepoFileTree)
-	if err != nil {
-		return fmt.Errorf("failed to get repo file tree,%w", err)
-	}
-	for _, file := range gitFiles {
-		if file.Type == "dir" {
-			err := c.createRepoFileRecords(ctx, repo, file.Path, gsTree)
-			if err != nil {
-				return err
+	for {
+		resp, err := c.gs.GetTree(ctx, types.GetTreeRequest{
+			Namespace: namespace,
+			Name:      name,
+			RepoType:  repo.RepositoryType,
+			Ref:       repo.DefaultBranch,
+			Recursive: true,
+			Limit:     types.MaxFileTreeSize,
+			Cursor:    cursor,
+		})
+		if resp == nil {
+			break
+		}
+
+		cursor = resp.Cursor
+		if err != nil {
+			return fmt.Errorf("failed to get repo %s/%s/%s file tree,%w", repo.RepositoryType, namespace, name, err)
+		}
+
+		for _, file := range resp.Files {
+			if file.Type == "dir" {
+				continue
 			}
-		} else {
 			files = append(files, file)
+		}
+
+		if resp.Cursor == "" {
+			break
 		}
 	}
 	//get all files

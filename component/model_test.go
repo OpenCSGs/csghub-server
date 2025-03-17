@@ -298,7 +298,9 @@ func TestModelComponent_SDKModelInfo(t *testing.T) {
 	}).Return(&types.Commit{ID: "zzz"}, nil)
 	file := types.File{Path: "file1.txt", Type: "file", Size: 100, SHA: "sha1"}
 	repoFiles := []*types.File{&file}
-	mc.mocks.gitServer.EXPECT().GetRepoFileTree(mock.Anything, mock.Anything).Return(repoFiles, nil)
+	mc.mocks.gitServer.EXPECT().GetTree(
+		mock.Anything, mock.Anything,
+	).Return(&types.GetRepoFileTreeResp{Files: repoFiles, Cursor: ""}, nil)
 	mc.mocks.components.repo.EXPECT().RelatedRepos(ctx, int64(123), "user").Return(
 		map[types.RepositoryType][]*database.Repository{
 			types.SpaceRepo: {

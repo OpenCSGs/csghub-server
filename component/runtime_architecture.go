@@ -446,7 +446,7 @@ func (c *runtimeArchitectureComponentImpl) GetArchitectureFromGGUF(ctx context.C
 // get main gguf file name
 func (c *runtimeArchitectureComponentImpl) GetMainGGUFFileName(ctx context.Context, repo *database.Repository) (string, error) {
 	namespace, name := repo.NamespaceAndName()
-	files, err := getAllFiles(ctx, namespace, name, "", types.ModelRepo, repo.DefaultBranch, c.gitServer.GetRepoFileTree)
+	files, err := getAllFiles(ctx, namespace, name, "", types.ModelRepo, repo.DefaultBranch, c.gitServer.GetTree)
 	if err != nil {
 		return "", fmt.Errorf("get RepoFileTree for relation, %w", err)
 	}
