@@ -3,7 +3,6 @@ package workflows
 import (
 	"context"
 	"encoding/base64"
-	"math"
 	"testing"
 
 	"github.com/stretchr/testify/mock"
@@ -97,7 +96,7 @@ func TestActivity_ScanRepoFiles(t *testing.T) {
 		Name:      req.Name,
 		Ref:       req.Branch,
 		RepoType:  req.RepoType,
-		Limit:     math.MaxInt,
+		Limit:     500,
 		Recursive: true,
 	}).Return(
 		&types.GetRepoFileTreeResp{

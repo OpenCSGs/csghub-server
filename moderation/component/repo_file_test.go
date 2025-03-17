@@ -46,7 +46,9 @@ func TestRepoFileComponent_GenRepoFileRecords(t *testing.T) {
 		mockRepoStore.EXPECT().FindByPath(mock.Anything, repoType, namespace, name).Return(repo, nil)
 		file := types.File{Path: "file1.txt", Type: "file", Size: 100, SHA: "sha1"}
 		repoFiles := []*types.File{&file}
-		mockGitServer.EXPECT().GetRepoFileTree(mock.Anything, mock.Anything).Return(repoFiles, nil)
+		mockGitServer.EXPECT().GetTree(
+			mock.Anything, mock.Anything,
+		).Return(&types.GetRepoFileTreeResp{Files: repoFiles, Cursor: ""}, nil)
 		rf := database.RepositoryFile{
 			RepositoryID:    repo.ID,
 			Path:            file.Path,

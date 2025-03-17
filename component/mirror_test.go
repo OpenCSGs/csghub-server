@@ -285,10 +285,9 @@ func TestMirrorComponent_CheckMirrorProgress(t *testing.T) {
 					},
 				).Return(nil, nil).Once()
 			}
-			mc.mocks.gitServer.EXPECT().GetRepoFileTree(
-				mock.Anything, gitserver.GetRepoInfoByPathReq{
-					Namespace: "foo", Name: "bar", RepoType: "model"},
-			).Return([]*types.File{{Name: "foo.go"}}, nil)
+			mc.mocks.gitServer.EXPECT().GetTree(
+				mock.Anything, types.GetTreeRequest{Namespace: "foo", Name: "bar", RepoType: "model", Limit: 500, Recursive: true},
+			).Return(&types.GetRepoFileTreeResp{Files: []*types.File{{Name: "foo.go"}}, Cursor: ""}, nil)
 
 			err := mc.CheckMirrorProgress(ctx)
 			require.Nil(t, err)

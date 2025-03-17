@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
-	"math"
 	"net/http"
 	"net/url"
 	"os"
@@ -137,23 +136,36 @@ func (dva *dataViewerActivityImpl) ScanRepoFiles(ctx context.Context, scanParam 
 		TotalCsvSize:  0,
 	}
 
-	resp, err := dva.gitServer.GetTree(ctx, types.GetTreeRequest{
-		Namespace: scanParam.Req.Namespace,
-		Name:      scanParam.Req.Name,
-		RepoType:  scanParam.Req.RepoType,
-		Ref:       scanParam.Req.Branch,
-		Recursive: true,
-		Limit:     math.MaxInt,
-	})
-	if err != nil {
-		return nil, fmt.Errorf("fail to scan repo %s/%s branch %s files error: %w", scanParam.Req.Namespace, scanParam.Req.Name, scanParam.Req.Branch, err)
-	}
-
-	for _, file := range resp.Files {
-		if file.Type == "dir" {
-			continue
+	var cursor string
+	for {
+		resp, err := dva.gitServer.GetTree(ctx, types.GetTreeRequest{
+			Namespace: scanParam.Req.Namespace,
+			Name:      scanParam.Req.Name,
+			RepoType:  scanParam.Req.RepoType,
+			Ref:       scanParam.Req.Branch,
+			Recursive: true,
+			Limit:     types.MaxFileTreeSize,
+			Cursor:    cursor,
+		})
+		if resp == nil {
+			break
 		}
-		appendFile(file, &fileClass, scanParam.ConvertLimitSize)
+
+		cursor = resp.Cursor
+		if err != nil {
+			return nil, fmt.Errorf("fail to scan repo %s/%s branch %s files error: %w", scanParam.Req.Namespace, scanParam.Req.Name, scanParam.Req.Branch, err)
+		}
+
+		for _, file := range resp.Files {
+			if file.Type == "dir" {
+				continue
+			}
+			appendFile(file, &fileClass, scanParam.ConvertLimitSize)
+		}
+
+		if resp.Cursor == "" {
+			break
+		}
 	}
 	return &fileClass, nil
 }
@@ -477,7 +489,7 @@ func (dva *dataViewerActivityImpl) getRepoFiles(ctx context.Context, req types.U
 		RepoType:  req.RepoType,
 		Ref:       req.Branch,
 		Recursive: true,
-		Limit:     math.MaxInt,
+		Limit:     types.MaxFileTreeSize,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("fail to get repo %s/%s branch %s all files error: %w", req.Namespace, req.Name, req.Branch, err)

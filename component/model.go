@@ -559,7 +559,7 @@ func (c *modelComponentImpl) SDKModelInfo(ctx context.Context, namespace, name, 
 		}
 	}
 
-	filePaths, err := GetFilePaths(ctx, namespace, name, "", types.ModelRepo, ref, c.gitServer.GetRepoFileTree)
+	filePaths, err := GetFilePaths(ctx, namespace, name, "", types.ModelRepo, ref, c.gitServer.GetTree)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get all %s files, error: %w", types.ModelRepo, err)
 	}
@@ -867,7 +867,7 @@ func (c *modelComponentImpl) getRelations(ctx context.Context, fromRepoID int64,
 	return rels, nil
 }
 
-func GetFilePathObjects(ctx context.Context, namespace, repoName, folder string, repoType types.RepositoryType, ref string, gsTree func(ctx context.Context, req gitserver.GetRepoInfoByPathReq) ([]*types.File, error)) ([]*types.File, error) {
+func GetFilePathObjects(ctx context.Context, namespace, repoName, folder string, repoType types.RepositoryType, ref string, gsTree func(ctx context.Context, req types.GetTreeRequest) (*types.GetRepoFileTreeResp, error)) ([]*types.File, error) {
 	allFiles, err := getAllFiles(ctx, namespace, repoName, folder, repoType, ref, gsTree)
 	if err != nil {
 		return nil, err
@@ -875,7 +875,7 @@ func GetFilePathObjects(ctx context.Context, namespace, repoName, folder string,
 	return allFiles, nil
 }
 
-func GetFilePaths(ctx context.Context, namespace, repoName, folder string, repoType types.RepositoryType, ref string, gsTree func(ctx context.Context, req gitserver.GetRepoInfoByPathReq) ([]*types.File, error)) ([]string, error) {
+func GetFilePaths(ctx context.Context, namespace, repoName, folder string, repoType types.RepositoryType, ref string, gsTree func(ctx context.Context, req types.GetTreeRequest) (*types.GetRepoFileTreeResp, error)) ([]string, error) {
 	var filePaths []string
 	allFiles, err := getAllFiles(ctx, namespace, repoName, folder, repoType, ref, gsTree)
 	if err != nil {
@@ -1282,7 +1282,7 @@ func (c *modelComponentImpl) ListQuantizations(ctx context.Context, namespace, n
 		//no need to get quantization files for non gguf models
 		return nil, nil
 	}
-	files, err := getAllFiles(ctx, namespace, name, "", types.ModelRepo, repo.DefaultBranch, c.gitServer.GetRepoFileTree)
+	files, err := getAllFiles(ctx, namespace, name, "", types.ModelRepo, repo.DefaultBranch, c.gitServer.GetTree)
 	if err != nil {
 		return nil, fmt.Errorf("get RepoFileTree for relation, %w", err)
 	}

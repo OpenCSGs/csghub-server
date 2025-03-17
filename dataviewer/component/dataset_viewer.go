@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
-	"math"
 	"regexp"
 	"strings"
 
@@ -541,7 +540,7 @@ func (c *datasetViewerComponentImpl) convertRealFiles(ctx context.Context, req *
 	var err error
 	if len(tree) < 1 {
 		// skip get all tree
-		tree, err = hubCom.GetFilePaths(ctx, req.Namespace, req.RepoName, "", types.DatasetRepo, req.Branch, c.gitServer.GetRepoFileTree)
+		tree, err = hubCom.GetFilePaths(ctx, req.Namespace, req.RepoName, "", types.DatasetRepo, req.Branch, c.gitServer.GetTree)
 		if err != nil {
 			slog.Error("Failed to get repo file paths", slog.Any("req", req), slog.Any("error", err))
 			return splitFiles, tree
@@ -585,7 +584,7 @@ func (c *datasetViewerComponentImpl) getParquetFilesBySplit(ctx context.Context,
 		Ref:       req.Branch,
 		Path:      req.Path,
 		RepoType:  types.DatasetRepo,
-		Limit:     math.MaxInt,
+		Limit:     types.MaxFileTreeSize,
 		Recursive: true,
 	}
 	files := []*types.File{}
@@ -624,7 +623,7 @@ func (c *datasetViewerComponentImpl) autoGenerateCatalog(ctx context.Context, re
 	ctx, span := c.tracer.Start(ctx, "datasetViewer.autoGenerateCatalog")
 	defer span.End()
 
-	tree, err := hubCom.GetFilePaths(ctx, req.Namespace, req.RepoName, "", types.DatasetRepo, req.Branch, c.gitServer.GetRepoFileTree)
+	tree, err := hubCom.GetFilePaths(ctx, req.Namespace, req.RepoName, "", types.DatasetRepo, req.Branch, c.gitServer.GetTree)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get repo tree, error: %w", err)
 	}

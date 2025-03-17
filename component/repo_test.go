@@ -699,12 +699,9 @@ func TestRepoComponent_SDKListFiles(t *testing.T) {
 	)
 
 	files := []*types.File{{Name: "test.go"}}
-	repo.mocks.gitServer.EXPECT().GetRepoFileTree(mock.Anything, gitserver.GetRepoInfoByPathReq{
-		Namespace: "ns",
-		Name:      "n",
-		Ref:       "main",
-		RepoType:  types.ModelRepo,
-	}).Return(files, nil)
+	repo.mocks.gitServer.EXPECT().GetTree(
+		mock.Anything, types.GetTreeRequest{Namespace: "ns", Name: "n", Ref: "main", RepoType: "model", Limit: 500, Recursive: true},
+	).Return(&types.GetRepoFileTreeResp{Files: files, Cursor: ""}, nil)
 
 	fs, err := repo.SDKListFiles(ctx, types.ModelRepo, "ns", "n", "main", "user")
 	require.Nil(t, err)

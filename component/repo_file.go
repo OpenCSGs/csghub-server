@@ -42,7 +42,7 @@ func (c *repoFileComponentImpl) GenRepoFileRecords(ctx context.Context, repoType
 	if err != nil {
 		return fmt.Errorf("failed to find repo, error: %w", err)
 	}
-	return c.createRepoFileRecords(ctx, *repo, "", c.gitServer.GetRepoFileTree)
+	return c.createRepoFileRecords(ctx, *repo)
 }
 
 func (c *repoFileComponentImpl) GenRepoFileRecordsBatch(ctx context.Context, repoType types.RepositoryType, lastRepoID int64, concurrency int) error {
@@ -65,7 +65,7 @@ func (c *repoFileComponentImpl) GenRepoFileRecordsBatch(ctx context.Context, rep
 			go func(repo database.Repository) {
 				slog.Info("start to get files of repository", slog.Any("repoType", repoType), slog.String("path", repo.Path))
 				//get file paths of repo
-				err := c.createRepoFileRecords(ctx, repo, "", c.gitServer.GetRepoFileTree)
+				err := c.createRepoFileRecords(ctx, repo)
 				if err != nil {
 					slog.Error("fail to get all files of repository",
 						slog.String("path", repo.Path), slog.String("repo_type", string(repo.RepositoryType)),
@@ -87,61 +87,73 @@ func (c *repoFileComponentImpl) GenRepoFileRecordsBatch(ctx context.Context, rep
 	return nil
 }
 
-func (c *repoFileComponentImpl) createRepoFileRecords(ctx context.Context, repo database.Repository, folder string, gsTree func(ctx context.Context, req gitserver.GetRepoInfoByPathReq) ([]*types.File, error)) error {
+func (c *repoFileComponentImpl) createRepoFileRecords(ctx context.Context, repo database.Repository) error {
 	namespace, name := repo.NamespaceAndName()
-	var files []*types.File
+	var cursor string
 
-	getRepoFileTree := gitserver.GetRepoInfoByPathReq{
-		Namespace: namespace,
-		Name:      name,
-		Ref:       "",
-		Path:      folder,
-		RepoType:  repo.RepositoryType,
-	}
-	gitFiles, err := gsTree(context.Background(), getRepoFileTree)
-	if err != nil {
-		return fmt.Errorf("failed to get repo file tree,%w", err)
-	}
-	for _, file := range gitFiles {
-		if file.Type == "dir" {
-			err := c.createRepoFileRecords(ctx, repo, file.Path, gsTree)
-			if err != nil {
-				return err
+	for {
+		var files []*types.File
+		resp, err := c.gitServer.GetTree(ctx, types.GetTreeRequest{
+			Namespace: namespace,
+			Name:      name,
+			RepoType:  repo.RepositoryType,
+			Ref:       repo.DefaultBranch,
+			Recursive: true,
+			Limit:     types.MaxFileTreeSize,
+			Cursor:    cursor,
+		})
+		if resp == nil {
+			break
+		}
+
+		cursor = resp.Cursor
+		if err != nil {
+			return fmt.Errorf("failed to get repo %s/%s/%s file tree,%w", repo.RepositoryType, namespace, name, err)
+		}
+
+		for _, file := range resp.Files {
+			if file.Type == "dir" {
+				continue
 			}
-		} else {
 			files = append(files, file)
 		}
-	}
-	//get all files
-	for _, file := range files {
-		// save repo files into db
-		rf := database.RepositoryFile{
-			RepositoryID:    repo.ID,
-			Path:            file.Path,
-			FileType:        file.Type,
-			Size:            file.Size,
-			CommitSha:       file.SHA,
-			LfsRelativePath: file.LfsRelativePath,
-			Branch:          repo.DefaultBranch,
+
+		//get all files
+		for _, file := range files {
+			// save repo files into db
+			rf := database.RepositoryFile{
+				RepositoryID:    repo.ID,
+				Path:            file.Path,
+				FileType:        file.Type,
+				Size:            file.Size,
+				CommitSha:       file.SHA,
+				LfsRelativePath: file.LfsRelativePath,
+				Branch:          repo.DefaultBranch,
+			}
+
+			var exists bool
+			var err error
+			if exists, err = c.repoFileStore.Exists(ctx, rf); err != nil {
+				slog.Error("failed to check repository file exists", slog.Any("repo_id", repo.ID),
+					slog.String("file_path", rf.Path), slog.String("error", err.Error()))
+				continue
+			}
+
+			if exists {
+				slog.Info("skip create exist repository file", slog.Any("repo_id", repo.ID), slog.String("file_path", rf.Path))
+				continue
+			}
+			if err := c.repoFileStore.Create(ctx, &rf); err != nil {
+				slog.Error("failed to save repository file", slog.Any("repo_id", repo.ID),
+					slog.String("error", err.Error()))
+				return fmt.Errorf("failed to save repository file, error: %w", err)
+			}
 		}
 
-		var exists bool
-		var err error
-		if exists, err = c.repoFileStore.Exists(ctx, rf); err != nil {
-			slog.Error("failed to check repository file exists", slog.Any("repo_id", repo.ID),
-				slog.String("file_path", rf.Path), slog.String("error", err.Error()))
-			continue
-		}
-
-		if exists {
-			slog.Info("skip create exist repository file", slog.Any("repo_id", repo.ID), slog.String("file_path", rf.Path))
-			continue
-		}
-		if err := c.repoFileStore.Create(ctx, &rf); err != nil {
-			slog.Error("failed to save repository file", slog.Any("repo_id", repo.ID),
-				slog.String("error", err.Error()))
-			return fmt.Errorf("failed to save repository file, error: %w", err)
+		if resp.Cursor == "" {
+			break
 		}
 	}
+
 	return nil
 }

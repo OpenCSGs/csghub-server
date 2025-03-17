@@ -285,16 +285,14 @@ func TestPromptComponent_ListPrompt(t *testing.T) {
 	pc.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, types.PromptRepo, "ns", "n").Return(repo, nil).Once()
 	pc.mocks.components.repo.EXPECT().AllowReadAccessRepo(ctx, repo, "foo").Return(true, nil).Once()
 
-	pc.mocks.gitServer.EXPECT().GetRepoFileTree(ctx, gitserver.GetRepoInfoByPathReq{
-		Namespace: "ns",
-		Name:      "n",
-		RepoType:  types.PromptRepo,
-	}).Return([]*types.File{
+	pc.mocks.gitServer.EXPECT().GetTree(
+		mock.Anything, types.GetTreeRequest{Namespace: "ns", Name: "n", RepoType: "prompt", Limit: 500, Recursive: true},
+	).Return(&types.GetRepoFileTreeResp{Files: []*types.File{
 		{Name: "foo.jsonl", Path: "foo.jsonl"},
 		{Name: "bar.jsonl", Path: "bar.jsonl"},
 		{Name: "main.go", Path: "main.go"},
 		{Name: "large.jsonl", Path: "large.jsonl", Size: 12345678987654},
-	}, nil)
+	}, Cursor: ""}, nil)
 
 	for _, name := range []string{"foo.jsonl", "bar.jsonl"} {
 		pc.mocks.gitServer.EXPECT().GetRepoFileContents(ctx, gitserver.GetRepoInfoByPathReq{

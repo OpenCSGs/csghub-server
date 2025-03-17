@@ -2,7 +2,6 @@ package component
 
 import (
 	"context"
-	"math"
 	"testing"
 
 	"github.com/stretchr/testify/mock"
@@ -106,16 +105,11 @@ func TestDatasetViewerComponent_Rows(t *testing.T) {
 	}, true).Return([]string{"a", "b"}, []string{"c", "d"}, [][]interface{}{
 		{1, 2, 3},
 	}, nil)
-	dc.mocks.gitServer.EXPECT().GetRepoFileTree(mock.Anything, gitserver.GetRepoInfoByPathReq{
-		Namespace: "ns",
-		Name:      "repo",
-		Ref:       "main",
-		RepoType:  types.DatasetRepo,
-	}).Return(
-		[]*types.File{
-			{Name: "foobar.parquet", Path: "foo/foobar.parquet"},
-		}, nil,
-	)
+	dc.mocks.gitServer.EXPECT().GetTree(
+		mock.Anything, types.GetTreeRequest{Namespace: "ns", Name: "repo", Ref: "main", Limit: 500, RepoType: "dataset", Recursive: true},
+	).Return(&types.GetRepoFileTreeResp{Files: []*types.File{
+		{Name: "foobar.parquet", Path: "foo/foobar.parquet"},
+	}, Cursor: ""}, nil)
 
 	resp, err := dc.Rows(ctx, &dvCom.ViewParquetFileReq{
 		Namespace:   "ns",
@@ -167,7 +161,7 @@ func TestDatasetViewerComponent_LimitOffsetRowsNoCard(t *testing.T) {
 		Ref:       "main",
 		Path:      "foo",
 		RepoType:  types.DatasetRepo,
-		Limit:     math.MaxInt,
+		Limit:     500,
 		Recursive: true,
 	}).Return(
 		&types.GetRepoFileTreeResp{Files: []*types.File{
@@ -236,16 +230,12 @@ func TestDatasetViewerComponent_LimitOffsetRowsWithCard(t *testing.T) {
 	}).Return(&types.File{
 		LfsRelativePath: "a/b",
 	}, nil)
-	dc.mocks.gitServer.EXPECT().GetRepoFileTree(mock.Anything, gitserver.GetRepoInfoByPathReq{
-		Namespace: "ns",
-		Name:      "repo",
-		Ref:       "main",
-		RepoType:  types.DatasetRepo,
-	}).Return(
-		[]*types.File{
-			{Name: "foobar.parquet", Path: "foo/foobar.parquet"},
-		}, nil,
-	)
+
+	dc.mocks.gitServer.EXPECT().GetTree(
+		mock.Anything, types.GetTreeRequest{Namespace: "ns", Name: "repo", RepoType: "dataset", Ref: "main", Limit: 500, Recursive: true},
+	).Return(&types.GetRepoFileTreeResp{Files: []*types.File{
+		{Name: "foobar.parquet", Path: "foo/foobar.parquet"},
+	}, Cursor: ""}, nil)
 
 	dc.mocks.limitOffsetReader.EXPECT().RowsWithCount(ctx, []string{"lfs/a/b"}, int64(16), int64(48)).Return(
 		[]string{"a", "b"}, []string{"c", "d"}, [][]any{
@@ -308,17 +298,12 @@ func TestDatasetViewerComponent_GetCatalog(t *testing.T) {
 			PageSize:  10,
 			PageIndex: 1,
 		}, true).Return(100, nil)
-		dc.mocks.gitServer.EXPECT().GetRepoFileTree(mock.Anything, gitserver.GetRepoInfoByPathReq{
-			Namespace: "ns",
-			Name:      "repo",
 
-			Ref:      "main",
-			RepoType: types.DatasetRepo,
-		}).Return(
-			[]*types.File{
-				{Name: "foobar.parquet", Path: "foo/foobar.parquet"},
-			}, nil,
-		)
+		dc.mocks.gitServer.EXPECT().GetTree(
+			mock.Anything, types.GetTreeRequest{Namespace: "ns", Name: "repo", RepoType: "dataset", Ref: "main", Limit: 500, Recursive: true},
+		).Return(&types.GetRepoFileTreeResp{Files: []*types.File{
+			{Name: "foobar.parquet", Path: "foo/foobar.parquet"},
+		}, Cursor: ""}, nil)
 
 		data, err := dc.GetCatalog(ctx, &dvCom.ViewParquetFileReq{
 			Namespace:   "ns",
@@ -375,17 +360,12 @@ func TestDatasetViewerComponent_GetCatalog(t *testing.T) {
 			PageSize:  10,
 			PageIndex: 1,
 		}, true).Return(100, nil)
-		dc.mocks.gitServer.EXPECT().GetRepoFileTree(mock.Anything, gitserver.GetRepoInfoByPathReq{
-			Namespace: "ns",
-			Name:      "repo",
 
-			Ref:      "main",
-			RepoType: types.DatasetRepo,
-		}).Return(
-			[]*types.File{
-				{Name: "foobar.parquet", Path: "foo/train.parquet"},
-			}, nil,
-		)
+		dc.mocks.gitServer.EXPECT().GetTree(
+			mock.Anything, types.GetTreeRequest{Namespace: "ns", Name: "repo", RepoType: "dataset", Ref: "main", Limit: 500, Recursive: true},
+		).Return(&types.GetRepoFileTreeResp{Files: []*types.File{
+			{Name: "foobar.parquet", Path: "foo/train.parquet"},
+		}, Cursor: ""}, nil)
 
 		data, err := dc.GetCatalog(ctx, &dvCom.ViewParquetFileReq{
 			Namespace:   "ns",

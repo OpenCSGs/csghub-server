@@ -6,7 +6,6 @@ import (
 
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
-	"opencsg.com/csghub-server/builder/git/gitserver"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/types"
 )
@@ -18,22 +17,14 @@ func TestRepoFileComponent_GenRepoFileRecords(t *testing.T) {
 	rc.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, types.ModelRepo, "ns", "n").Return(
 		&database.Repository{ID: 1, Path: "foo/bar"}, nil,
 	)
-	rc.mocks.gitServer.EXPECT().GetRepoFileTree(mock.Anything, gitserver.GetRepoInfoByPathReq{
-		Namespace: "foo",
-		Name:      "bar",
-	}).Return(
-		[]*types.File{
-			{Path: "a/b", Type: "dir"},
-			{Path: "foo.go", Type: "go"},
-		}, nil,
-	)
-	rc.mocks.gitServer.EXPECT().GetRepoFileTree(mock.Anything, gitserver.GetRepoInfoByPathReq{
-		Path:      "a/b",
-		Namespace: "foo",
-		Name:      "bar",
-	}).Return(
-		[]*types.File{}, nil,
-	)
+
+	rc.mocks.gitServer.EXPECT().GetTree(
+		mock.Anything, types.GetTreeRequest{Namespace: "foo", Name: "bar", Limit: 500, Recursive: true},
+	).Return(&types.GetRepoFileTreeResp{Files: []*types.File{
+		{Path: "a/b", Type: "dir"},
+		{Path: "foo.go", Type: "go"},
+	}, Cursor: ""}, nil)
+
 	rc.mocks.stores.RepoFileMock().EXPECT().Exists(ctx, database.RepositoryFile{
 		RepositoryID: 1,
 		Path:         "foo.go",
@@ -57,22 +48,14 @@ func TestRepoFileComponent_GenRepoFileRecordsBatch(t *testing.T) {
 	rc.mocks.stores.RepoMock().EXPECT().BatchGet(ctx, types.ModelRepo, int64(1), 10).Return(
 		[]database.Repository{{ID: 1, Path: "foo/bar"}}, nil,
 	)
-	rc.mocks.gitServer.EXPECT().GetRepoFileTree(mock.Anything, gitserver.GetRepoInfoByPathReq{
-		Namespace: "foo",
-		Name:      "bar",
-	}).Return(
-		[]*types.File{
-			{Path: "a/b", Type: "dir"},
-			{Path: "foo.go", Type: "go"},
-		}, nil,
-	)
-	rc.mocks.gitServer.EXPECT().GetRepoFileTree(mock.Anything, gitserver.GetRepoInfoByPathReq{
-		Path:      "a/b",
-		Namespace: "foo",
-		Name:      "bar",
-	}).Return(
-		[]*types.File{}, nil,
-	)
+
+	rc.mocks.gitServer.EXPECT().GetTree(
+		mock.Anything, types.GetTreeRequest{Namespace: "foo", Name: "bar", Limit: 500, Recursive: true},
+	).Return(&types.GetRepoFileTreeResp{Files: []*types.File{
+		{Path: "a/b", Type: "dir"},
+		{Path: "foo.go", Type: "go"},
+	}, Cursor: ""}, nil)
+
 	rc.mocks.stores.RepoFileMock().EXPECT().Exists(ctx, database.RepositoryFile{
 		RepositoryID: 1,
 		Path:         "foo.go",
