@@ -1,6 +1,7 @@
 package proxy
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"encoding/json"
@@ -8,6 +9,7 @@ import (
 	"fmt"
 	"hash/fnv"
 	"log/slog"
+	"net"
 	"net/http"
 	"strings"
 	"time"
@@ -21,10 +23,17 @@ import (
 
 var ErrSensitiveContent = errors.New("sensitive content detected")
 
+var _ http.Hijacker = (*ResponseWriterWrapper)(nil)
+
 type ResponseWriterWrapper struct {
 	internalWritter gin.ResponseWriter
 	modSvcClient    rpc.ModerationSvcClient
 	acceptType      string
+}
+
+// Hijack allows the HTTP connection upgrading to a different protocol, such as WebSockets or HTTP/2.
+func (rw *ResponseWriterWrapper) Hijack() (net.Conn, *bufio.ReadWriter, error) {
+	return rw.internalWritter.Hijack()
 }
 
 func NewResponseWriterWrapper(internalWritter gin.ResponseWriter, acceptType string) *ResponseWriterWrapper {
