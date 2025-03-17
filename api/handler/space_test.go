@@ -65,17 +65,20 @@ func TestSpaceHandler_Index(t *testing.T) {
 
 			if !c.error {
 				tester.mocks.space.EXPECT().Index(tester.Ctx(), &types.RepoFilter{
-					Search: "foo",
-					Sort:   c.sort,
-					Source: c.source,
-				}, 10, 1).Return([]types.Space{
+					Search:   "foo",
+					Sort:     c.sort,
+					Source:   c.source,
+					SpaceSDK: "gradio",
+				}, 10, 1, true).Return([]*types.Space{
 					{Name: "cc"},
 				}, 100, nil)
 			}
 
 			tester.AddPagination(1, 10).WithQuery("search", "foo").
 				WithQuery("sort", c.sort).
-				WithQuery("source", c.source).Execute()
+				WithQuery("source", c.source).
+				WithQuery("sdk", "gradio").
+				WithQuery("need_op_weight", "true").Execute()
 
 			if c.error {
 				require.Equal(t, 400, tester.Response().Code)

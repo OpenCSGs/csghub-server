@@ -105,7 +105,7 @@ func (s *spaceStoreImpl) ByID(ctx context.Context, id int64) (*Space, error) {
 	return &space, err
 }
 
-// ByRepoIDs get spaces by repoIDs, only basice info, no related repo
+// ByRepoIDs get spaces by repoIDs, only basic info, no related repo
 func (s *spaceStoreImpl) ByRepoIDs(ctx context.Context, repoIDs []int64) (spaces []Space, err error) {
 	err = s.db.Operator.Core.NewSelect().
 		Model(&spaces).
@@ -113,6 +113,7 @@ func (s *spaceStoreImpl) ByRepoIDs(ctx context.Context, repoIDs []int64) (spaces
 		Scan(ctx)
 
 	return
+
 }
 
 func (s *spaceStoreImpl) ByRepoID(ctx context.Context, repoID int64) (*Space, error) {
