@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/mock"
-	"opencsg.com/csghub-server/builder/git/gitserver"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/types"
 )
@@ -36,10 +35,9 @@ func TestRecomComponent_CalculateRecomScore(t *testing.T) {
 		{ID: 1, Path: "foo/bar"},
 	}, nil)
 	rc.mocks.stores.RecomMock().EXPECT().UpsertScore(ctx, int64(1), 12.34).Return(nil)
-	rc.mocks.gitServer.EXPECT().GetRepoFileTree(mock.Anything, gitserver.GetRepoInfoByPathReq{
-		Namespace: "foo",
-		Name:      "bar",
-	}).Return(nil, nil)
+	rc.mocks.gitServer.EXPECT().GetTree(
+		mock.Anything, types.GetTreeRequest{Namespace: "foo", Name: "bar", Limit: 500, Recursive: true},
+	).Return(nil, nil)
 
 	rc.CalculateRecomScore(ctx)
 }

@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
-	"math"
 	"net/http"
 	"net/url"
 	"os"
@@ -490,7 +489,7 @@ func (dva *dataViewerActivityImpl) getRepoFiles(ctx context.Context, req types.U
 		RepoType:  req.RepoType,
 		Ref:       req.Branch,
 		Recursive: true,
-		Limit:     math.MaxInt,
+		Limit:     types.MaxFileTreeSize,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("fail to get repo %s/%s branch %s all files error: %w", req.Namespace, req.Name, req.Branch, err)

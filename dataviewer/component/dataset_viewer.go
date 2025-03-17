@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
-	"math"
 	"regexp"
 	"strings"
 
@@ -585,7 +584,7 @@ func (c *datasetViewerComponentImpl) getParquetFilesBySplit(ctx context.Context,
 		Ref:       req.Branch,
 		Path:      req.Path,
 		RepoType:  types.DatasetRepo,
-		Limit:     math.MaxInt,
+		Limit:     types.MaxFileTreeSize,
 		Recursive: true,
 	}
 	files := []*types.File{}
