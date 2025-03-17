@@ -13,14 +13,14 @@ func TestBroadcastComponent_GetBroadcast(t *testing.T) {
 	ctx := context.TODO()
 	cc := initializeTestBroadcastComponent(ctx, t)
 
-	broadcast := database.Broadcast{ID: 1, Content: "test", BcType: "banner", Theme: "light", Status: "active"}
+	broadcast := database.Broadcast{ID: int64(1), Content: "test", BcType: "banner", Theme: "light", Status: "active"}
 
-	cc.mocks.stores.BroadcastMock().EXPECT().Get(ctx, 1).Return(
+	cc.mocks.stores.BroadcastMock().EXPECT().Get(ctx, int64(1)).Return(
 		&broadcast, nil,
 	)
-	data, err := cc.GetBroadcast(ctx, 1)
+	data, err := cc.GetBroadcast(ctx, int64(1))
 	require.Nil(t, err)
-	require.Equal(t, &types.Broadcast{ID: 1, Content: "test", BcType: "banner", Theme: "light", Status: "active"}, data)
+	require.Equal(t, &types.Broadcast{ID: int64(1), Content: "test", BcType: "banner", Theme: "light", Status: "active"}, data)
 }
 
 func TestBroadcastComponent_AllBroadcasts(t *testing.T) {
