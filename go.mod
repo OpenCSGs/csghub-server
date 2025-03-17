@@ -26,6 +26,7 @@ require (
 	github.com/minio/minio-go/v7 v7.0.84
 	github.com/minio/sha256-simd v1.0.1
 	github.com/naoina/toml v0.1.1
+	github.com/openai/openai-go v0.1.0-alpha.59
 	github.com/parquet-go/parquet-go v0.24.0
 	github.com/redis/go-redis/v9 v9.5.1
 	github.com/samber/slog-multi v1.3.3
@@ -38,6 +39,7 @@ require (
 	github.com/swaggo/swag v1.16.2
 	github.com/testcontainers/testcontainers-go v0.33.0
 	github.com/testcontainers/testcontainers-go/modules/postgres v0.33.0
+	github.com/tidwall/gjson v1.18.0
 	github.com/tidwall/sjson v1.2.5
 	github.com/uptrace/bun v1.2.8
 	github.com/uptrace/bun/dialect/pgdialect v1.2.8
@@ -190,7 +192,6 @@ require (
 	github.com/temporalio/ringpop-go v0.0.0-20241119001152-e505ebd8f887 // indirect
 	github.com/temporalio/sqlparser v0.0.0-20231115171017-f4060bcfa6cb // indirect
 	github.com/temporalio/tchannel-go v1.22.1-0.20240528171429-1db37fdea938 // indirect
-	github.com/tidwall/gjson v1.18.0 // indirect
 	github.com/tidwall/match v1.1.1 // indirect
 	github.com/tidwall/pretty v1.2.1 // indirect
 	github.com/tinylib/msgp v1.1.2 // indirect
