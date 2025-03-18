@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	"github.com/minio/minio-go/v7"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"opencsg.com/csghub-server/builder/git/gitserver"
 	"opencsg.com/csghub-server/builder/store/database"
@@ -358,13 +359,6 @@ func TestGitHTTPComponent_LfsUpload(t *testing.T) {
 					ctx, "",
 					"lfs/a3/f8/e1b4f77bb24e508906c6972f81928f0d926e6daef1b29d12e348b8a3547e",
 					rc, int64(100)).Return(minio.UploadInfo{Size: 100}, nil)
-
-				gc.mocks.stores.LfsMetaObjectMock().EXPECT().Create(ctx, database.LfsMetaObject{
-					Oid:          oid,
-					Size:         size,
-					RepositoryID: 123,
-					Existing:     true,
-				}).Return(nil, nil)
 			}
 
 			err := gc.LfsUpload(ctx, rc, types.UploadRequest{
@@ -421,9 +415,19 @@ func TestGitHTTPComponent_LfsVerify(t *testing.T) {
 	ctx := context.TODO()
 	gc := initializeTestGitHTTPComponent(ctx, t)
 
+	repo := &database.Repository{
+		ID:             1,
+		RepositoryType: types.ModelRepo,
+		Path:           "ns/n",
+	}
+
+	gc.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, types.ModelRepo, "ns", "n").Return(repo, nil)
+
 	gc.mocks.s3Client.EXPECT().StatObject(ctx, "", "lfs/oid", minio.StatObjectOptions{}).Return(
 		minio.ObjectInfo{Size: 100}, nil,
 	)
+
+	gc.mocks.stores.LfsMetaObjectMock().EXPECT().UpdateOrCreate(ctx, mock.Anything).Return(nil, nil)
 
 	err := gc.LfsVerify(ctx, types.VerifyRequest{
 		CurrentUser: "user",

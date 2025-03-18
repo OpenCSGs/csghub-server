@@ -258,6 +258,10 @@ type Config struct {
 		OTLPEndpoint string `env:"OPENCSG_TRACING_OTLP_ENDPOINT"`
 		OTLPLogging  bool   `env:"OPENCSG_TRACING_OTLP_LOGGING"`
 	}
+
+	Git struct {
+		SkipLfsFileValidation bool `env:"STARHUB_SERVER_SKIP_LFS_FILE_VALIDATION, default=false"`
+	}
 }
 
 func SetConfigFile(file string) {
