@@ -256,7 +256,7 @@ func (c *gitHTTPComponentImpl) lfsBatchUploadInfo(ctx context.Context, req types
 			Actions: map[string]*types.Link{},
 			Pointer: obj,
 		}
-		resp.Actions["upload"] = &types.Link{Href: c.buildUploadLink(req, obj), Header: header}
+		resp.Actions["upload"] = &types.Link{Href: c.buildUploadLink(ctx, req, obj), Header: header}
 		verifyHeader := make(map[string]string)
 		for key, value := range header {
 			verifyHeader[key] = value
@@ -355,7 +355,7 @@ func noSuchKey(err error) bool {
 func (c *gitHTTPComponentImpl) LfsUpload(ctx context.Context, body io.ReadCloser, req types.UploadRequest) error {
 	var allowed bool
 	defer body.Close()
-	repo, err := c.repoStore.FindByPath(ctx, req.RepoType, req.Namespace, req.Name)
+	_, err := c.repoStore.FindByPath(ctx, req.RepoType, req.Namespace, req.Name)
 	if err != nil {
 		return fmt.Errorf("failed to find repo, error: %w", err)
 	}
@@ -407,17 +407,15 @@ func (c *gitHTTPComponentImpl) LfsUpload(ctx context.Context, body io.ReadCloser
 	if err != nil {
 		return err
 	}
-
-	_, err = c.lfsMetaObjectStore.Create(ctx, database.LfsMetaObject{
-		Oid:          pointer.Oid,
-		Size:         pointer.Size,
-		RepositoryID: repo.ID,
-		Existing:     true,
-	})
 	return err
 }
 
 func (c *gitHTTPComponentImpl) LfsVerify(ctx context.Context, req types.VerifyRequest, p types.Pointer) error {
+	repo, err := c.repoStore.FindByPath(ctx, req.RepoType, req.Namespace, req.Name)
+	if err != nil {
+		return fmt.Errorf("failed to find repo, error: %w", err)
+	}
+
 	objectKey := path.Join("lfs", p.RelativePath())
 	fileInfo, err := c.s3Client.StatObject(ctx, c.config.S3.Bucket, objectKey, minio.StatObjectOptions{})
 	if err != nil {
@@ -427,6 +425,16 @@ func (c *gitHTTPComponentImpl) LfsVerify(ctx context.Context, req types.VerifyRe
 
 	if fileInfo.Size != p.Size {
 		return types.ErrSizeMismatch
+	}
+
+	_, err = c.lfsMetaObjectStore.UpdateOrCreate(ctx, database.LfsMetaObject{
+		Oid:          p.Oid,
+		Size:         p.Size,
+		RepositoryID: repo.ID,
+		Existing:     true,
+	})
+	if err != nil {
+		return fmt.Errorf("failed to update or create lfs meta object: %w", err)
 	}
 
 	return nil
@@ -672,9 +680,15 @@ func (c *gitHTTPComponentImpl) LfsDownload(ctx context.Context, req types.Downlo
 	return signedUrl, nil
 }
 
-func (c *gitHTTPComponentImpl) buildUploadLink(req types.BatchRequest, pointer types.Pointer) string {
+func (c *gitHTTPComponentImpl) buildUploadLink(ctx context.Context, req types.BatchRequest, pointer types.Pointer) string {
+	if c.config.Git.SkipLfsFileValidation {
+		u, err := c.s3Client.PresignedPutObject(ctx, c.config.S3.Bucket, path.Join("lfs", pointer.RelativePath()), types.OssFileExpire)
+		if err != nil {
+			return c.config.APIServer.PublicDomain + "/" + path.Join(fmt.Sprintf("%ss", req.RepoType), url.PathEscape(req.Namespace), url.PathEscape(req.Name+".git"), "info/lfs/objects", url.PathEscape(pointer.Oid), strconv.FormatInt(pointer.Size, 10))
+		}
+		return u.String()
+	}
 	return c.config.APIServer.PublicDomain + "/" + path.Join(fmt.Sprintf("%ss", req.RepoType), url.PathEscape(req.Namespace), url.PathEscape(req.Name+".git"), "info/lfs/objects", url.PathEscape(pointer.Oid), strconv.FormatInt(pointer.Size, 10))
-
 }
 
 func (c *gitHTTPComponentImpl) buildVerifyLink(req types.BatchRequest) string {
