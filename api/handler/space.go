@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"net/http"
 	"slices"
+	"strconv"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -59,6 +60,7 @@ type SpaceHandler struct {
 // @Param        language_tag query string false "filter by language tag"
 // @Param        sort query string false "sort by"
 // @Param        source query string false "source" Enums(opencsg, huggingface, local)
+// @Param        sdk query string false "filter by space sdk"
 // @Param        per query int false "per" default(20)
 // @Param        page query int false "per page" default(1)
 // @Success      200  {object}  types.ResponseWithTotal{data=[]types.Space,total=int} "OK"
@@ -66,31 +68,35 @@ type SpaceHandler struct {
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
 // @Router       /spaces [get]
 func (h *SpaceHandler) Index(ctx *gin.Context) {
-	filter := new(types.RepoFilter)
-	filter.Tags = parseTagReqs(ctx)
-	filter.Username = httpbase.GetCurrentUser(ctx)
+	repoFilter := new(types.RepoFilter)
+	repoFilter.Tags = parseTagReqs(ctx)
+	repoFilter.Username = httpbase.GetCurrentUser(ctx)
 	per, page, err := common.GetPerAndPageFromContext(ctx)
 	if err != nil {
 		slog.Error("Bad request format", "error", err)
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
-	filter = getFilterFromContext(ctx, filter)
-	if !slices.Contains[[]string](Sorts, filter.Sort) {
+	repoFilter = getFilterFromContext(ctx, repoFilter)
+	if !slices.Contains(Sorts, repoFilter.Sort) {
 		msg := fmt.Sprintf("sort parameter must be one of %v", Sorts)
 		slog.Error("Bad request format,", slog.String("error", msg))
 		httpbase.BadRequest(ctx, msg)
 		return
 	}
-
-	if filter.Source != "" && !slices.Contains[[]string](Sources, filter.Source) {
+	if repoFilter.Source != "" && !slices.Contains(Sources, repoFilter.Source) {
 		msg := fmt.Sprintf("source parameter must be one of %v", Sources)
 		slog.Error("Bad request format,", slog.String("error", msg))
 		ctx.JSON(http.StatusBadRequest, gin.H{"message": msg})
 		return
 	}
-
-	spaces, total, err := h.space.Index(ctx.Request.Context(), filter, per, page)
+	repoFilter.SpaceSDK = ctx.Query("sdk")
+	qNeedOpWeight := ctx.Query("need_op_weight")
+	needOpWeight, err := strconv.ParseBool(qNeedOpWeight)
+	if err != nil {
+		needOpWeight = false
+	}
+	spaces, total, err := h.space.Index(ctx.Request.Context(), repoFilter, per, page, needOpWeight)
 	if err != nil {
 		slog.Error("Failed to get spaces", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)

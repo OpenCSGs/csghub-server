@@ -35,7 +35,7 @@ type SpaceComponent interface {
 	Create(ctx context.Context, req types.CreateSpaceReq) (*types.Space, error)
 	Show(ctx context.Context, namespace, name, currentUser string) (*types.Space, error)
 	Update(ctx context.Context, req *types.UpdateSpaceReq) (*types.Space, error)
-	Index(ctx context.Context, filter *types.RepoFilter, per, page int) ([]types.Space, int, error)
+	Index(ctx context.Context, repoFilter *types.RepoFilter, per, page int, needOpWeight bool) ([]*types.Space, int, error)
 	OrgSpaces(ctx context.Context, req *types.OrgSpacesReq) ([]types.Space, int, error)
 	// UserSpaces get spaces of owner and visible to current user
 	UserSpaces(ctx context.Context, req *types.UserSpacesReq) ([]types.Space, int, error)
@@ -453,12 +453,12 @@ func (c *spaceComponentImpl) Update(ctx context.Context, req *types.UpdateSpaceR
 	return resDataset, nil
 }
 
-func (c *spaceComponentImpl) Index(ctx context.Context, filter *types.RepoFilter, per, page int) ([]types.Space, int, error) {
+func (c *spaceComponentImpl) Index(ctx context.Context, repoFilter *types.RepoFilter, per, page int, needOpWeight bool) ([]*types.Space, int, error) {
 	var (
-		resSpaces []types.Space
+		resSpaces []*types.Space
 		err       error
 	)
-	repos, total, err := c.repoComponent.PublicToUser(ctx, types.SpaceRepo, filter.Username, filter, per, page)
+	repos, total, err := c.repoComponent.PublicToUser(ctx, types.SpaceRepo, repoFilter.Username, repoFilter, per, page)
 	if err != nil {
 		newError := fmt.Errorf("failed to get public space repos,error:%w", err)
 		return nil, 0, newError
@@ -499,7 +499,7 @@ func (c *spaceComponentImpl) Index(ctx context.Context, filter *types.RepoFilter
 				UpdatedAt: tag.UpdatedAt,
 			})
 		}
-		resSpaces = append(resSpaces, types.Space{
+		resSpaces = append(resSpaces, &types.Space{
 			Name:          space.Repository.Name,
 			Description:   space.Repository.Description,
 			Path:          space.Repository.Path,

@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/uptrace/bun"
+	"opencsg.com/csghub-server/builder/deploy/common"
 	"opencsg.com/csghub-server/common/types"
 	"opencsg.com/csghub-server/common/types/enum"
 )
@@ -451,6 +452,15 @@ func (s *repoStoreImpl) PublicToUser(ctx context.Context, repoType types.Reposit
 			fmt.Sprintf("%%%s%%", filter.Search),
 		)
 	}
+	// list serverless
+	if filter.ListServerless {
+		q.Where("repository.id IN (SELECT repo_id FROM deploys WHERE type = ? and status = ?)", types.ServerlessType, common.Running)
+	}
+
+	if len(filter.SpaceSDK) > 0 {
+		q.Join("LEFT JOIN spaces AS spaces ON repository.id = spaces.repository_id").Where("spaces.sdk = ?", filter.SpaceSDK)
+	}
+
 	if len(filter.Tags) > 0 {
 		for i, tag := range filter.Tags {
 			var asRepoTag = fmt.Sprintf("%s%d", "rt", i)

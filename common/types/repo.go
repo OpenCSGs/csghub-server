@@ -214,11 +214,13 @@ type RuntimeFrameworkModels struct {
 }
 
 type RepoFilter struct {
-	Tags     []TagReq
-	Sort     string
-	Search   string
-	Source   string
-	Username string
+	Tags           []TagReq
+	Sort           string
+	Search         string
+	Source         string
+	Username       string
+	ListServerless bool
+	SpaceSDK       string
 }
 
 type TagReq struct {

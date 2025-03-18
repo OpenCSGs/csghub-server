@@ -70,8 +70,7 @@ func TestSpaceComponent_Index(t *testing.T) {
 	sc := initializeTestSpaceComponent(ctx, t)
 
 	sc.mocks.components.repo.EXPECT().PublicToUser(
-		ctx, types.SpaceRepo, "user", &types.RepoFilter{Sort: "z", Username: "user"}, 10, 1,
-	).Return([]*database.Repository{
+		ctx, types.SpaceRepo, "user", &types.RepoFilter{Sort: "z", Username: "user"}, 10, 1).Return([]*database.Repository{
 		{ID: 123, Name: "r1", Tags: []database.Tag{{Name: "t1"}}},
 		{ID: 124, Name: "r2", Tags: []database.Tag{{Name: "t2"}}},
 	}, 100, nil)
@@ -89,10 +88,10 @@ func TestSpaceComponent_Index(t *testing.T) {
 		}, nil,
 	)
 
-	data, total, err := sc.Index(ctx, &types.RepoFilter{Sort: "z", Username: "user"}, 10, 1)
+	data, total, err := sc.Index(ctx, &types.RepoFilter{Sort: "z", Username: "user"}, 10, 1, true)
 	require.Nil(t, err)
 	require.Equal(t, 100, total)
-	require.Equal(t, []types.Space{
+	require.Equal(t, []*types.Space{
 		{
 			RepositoryID: 123, Name: "r1", Tags: []types.RepoTag{{Name: "t1"}},
 			Status: "NoAppFile",
