@@ -50,7 +50,7 @@ func (rp *ReverseProxy) ServeHTTP(w http.ResponseWriter, r *http.Request, api st
 		// 	fmt.Println(string(data))
 		// }
 	}
-	proxy.ModifyResponse = func(r *http.Response) error {
+	proxy.ModifyResponse = func(resp *http.Response) error {
 		// data, err := httputil.DumpResponse(r, true)
 		// fmt.Println(string(data))
 		// remove duplicated header
