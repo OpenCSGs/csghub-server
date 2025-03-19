@@ -12,6 +12,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	mockcomp "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/aigateway/component"
+	rpcmock "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/rpc"
 	apicomp "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/component"
 	"opencsg.com/csghub-server/aigateway/types"
 	"opencsg.com/csghub-server/api/httpbase"
@@ -20,7 +21,8 @@ import (
 func setupTest(t *testing.T) (*OpenAIHandlerImpl, *mockcomp.MockOpenAIComponent, *apicomp.MockRepoComponent, *gin.Context, *httptest.ResponseRecorder) {
 	mockOpenAI := mockcomp.NewMockOpenAIComponent(t)
 	mockRepo := apicomp.NewMockRepoComponent(t)
-	handler := NewOpenAIHandler(mockOpenAI, mockRepo)
+	modSvcClient := rpcmock.NewMockModerationSvcClient(t)
+	handler := NewOpenAIHandler(mockOpenAI, mockRepo, modSvcClient)
 
 	w := httptest.NewRecorder()
 	c, _ := gin.CreateTestContext(w)

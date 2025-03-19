@@ -13,23 +13,29 @@ import (
 	"opencsg.com/csghub-server/aigateway/types"
 	"opencsg.com/csghub-server/api/httpbase"
 	"opencsg.com/csghub-server/builder/proxy"
+	"opencsg.com/csghub-server/builder/rpc"
 	"opencsg.com/csghub-server/common/config"
 	apicomp "opencsg.com/csghub-server/component"
 )
 
 // ChatCompletionRequest represents a chat completion request
 type ChatCompletionRequest struct {
-	Model       string        `json:"model"`
-	Messages    []ChatMessage `json:"messages"`
-	Temperature float64       `json:"temperature,omitempty"`
-	MaxTokens   int           `json:"max_tokens,omitempty"`
-	Stream      bool          `json:"stream,omitempty"`
+	Model         string         `json:"model"`
+	Messages      []ChatMessage  `json:"messages"`
+	Temperature   float64        `json:"temperature,omitempty"`
+	MaxTokens     int            `json:"max_tokens,omitempty"`
+	Stream        bool           `json:"stream,omitempty"`
+	StreamOptions *StreamOptions `json:"stream_options,omitempty"`
 }
 
 // ChatMessage represents a chat message
 type ChatMessage struct {
 	Role    string `json:"role"`
 	Content string `json:"content"`
+}
+
+type StreamOptions struct {
+	IncludeUsage bool `json:"include_usage,omitempty"`
 }
 
 // ChatCompletionResponse represents a chat completion response
@@ -74,14 +80,18 @@ func NewOpenAIHandlerFromConfig(config *config.Config) (OpenAIHandler, error) {
 	if err != nil {
 		return nil, err
 	}
-	return NewOpenAIHandler(modelService, repoComp), nil
+	var modSvcClient rpc.ModerationSvcClient
+	if config.SensitiveCheck.Enable {
+		modSvcClient = rpc.NewModerationSvcHttpClient(fmt.Sprintf("%s:%d", config.Moderation.Host, config.Moderation.Port))
+	}
+	return NewOpenAIHandler(modelService, repoComp, modSvcClient), nil
 }
 
-func NewOpenAIHandler(modelService component.OpenAIComponent, repoComp apicomp.RepoComponent) OpenAIHandler {
-
+func NewOpenAIHandler(modelService component.OpenAIComponent, repoComp apicomp.RepoComponent, modSvcClient rpc.ModerationSvcClient) OpenAIHandler {
 	return &OpenAIHandlerImpl{
 		openaiComponent: modelService,
 		repoComp:        repoComp,
+		modSvcClient:    modSvcClient,
 	}
 }
 
@@ -89,6 +99,7 @@ func NewOpenAIHandler(modelService component.OpenAIComponent, repoComp apicomp.R
 type OpenAIHandlerImpl struct {
 	openaiComponent component.OpenAIComponent
 	repoComp        apicomp.RepoComponent
+	modSvcClient    rpc.ModerationSvcClient
 }
 
 // ListModels godoc
@@ -194,10 +205,26 @@ func (h *OpenAIHandlerImpl) Chat(c *gin.Context) {
 		return
 	}
 	chatReq.Model = modelName
+	if chatReq.Stream {
+		chatReq.StreamOptions = &StreamOptions{
+			IncludeUsage: true,
+		}
+	}
 	data, _ := json.Marshal(chatReq)
 	c.Request.Body = io.NopCloser(bytes.NewReader(data))
 	c.Request.ContentLength = int64(len(data))
 	rp, _ := proxy.NewReverseProxy(endpoint)
 	slog.Info("proxy chat request to model endpoint", "endpoint", endpoint, "user", username, "model_id", modelID)
-	rp.ServeHTTP(c.Writer, c.Request, "")
+	w := NewResponseWriterWrapper(c.Writer, chatReq.Stream)
+	if h.modSvcClient != nil {
+		w.WithModeration(h.modSvcClient)
+	}
+	tokenizer := &dumyyTokenizer{}
+	llmTokenCounter := NewLLMTokenCounter(tokenizer)
+	w.WithLLMTokenCounter(llmTokenCounter)
+	rp.ServeHTTP(w, c.Request, "")
+
+	//TODO:record token usage:
+	usage, err := llmTokenCounter.Usage()
+	slog.Debug("token usage", "prompt_token", usage.PromptTokens, "completion_tokens", usage.CompletionTokens, "total_tokens", usage.TotalTokens, "err", err)
 }
