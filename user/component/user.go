@@ -106,6 +106,7 @@ func NewUserComponent(config *config.Config) (UserComponent, error) {
 		ApplicationName:  config.Casdoor.ApplicationName,
 	}
 	c.config = config
+
 	return c, nil
 }
 
@@ -514,6 +515,8 @@ func (c *userComponentImpl) Delete(ctx context.Context, operator, username strin
 		newError := fmt.Errorf("failed to find user by name in db,error:%w", err)
 		return newError
 	}
+
+	// TODO:delete user from git server
 	slog.Debug("delete user from git server", slog.String("operator", operator), slog.String("username", user.Username))
 
 	// if c.config.GitServer.Type == types.GitServerTypeGitea {
@@ -658,7 +661,7 @@ func (c *userComponentImpl) CheckIffUserHasRunningOrBuildingDeployments(ctx cont
 	if err != nil {
 		return false, fmt.Errorf("failed to find user by username in db, error: %v", err)
 	}
-	deploys, err := c.ds.ListAllDeployments(ctx, user.ID)
+	deploys, err := c.ds.ListAllDeployByUID(ctx, user.ID)
 	if err != nil {
 		return false, fmt.Errorf("failed to list all deployments for user %s in db, error:  %v", userName, err)
 	}

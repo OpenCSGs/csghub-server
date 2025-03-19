@@ -5,10 +5,12 @@ import (
 )
 
 const (
-	CurrentUserCtxVar   = "currentUser"
-	AccessTokenCtxVar   = "accessToken"
-	AuthTypeCtxVar      = "authType"
-	CurrentUserQueryVar = "current_user"
+	CurrentUserCtxVar       = "currentUser"
+	CurrentUserUUIDCtxVar   = "currentUserUUID"
+	AccessTokenCtxVar       = "accessToken"
+	AuthTypeCtxVar          = "authType"
+	CurrentUserQueryVar     = "current_user"
+	CurrentUserUUIDQueryVar = "current_user_uuid"
 )
 
 type AuthType string
@@ -44,4 +46,12 @@ func GetAuthType(ctx *gin.Context) AuthType {
 
 func SetAuthType(ctx *gin.Context, t AuthType) {
 	ctx.Set(AuthTypeCtxVar, string(t))
+}
+
+func GetCurrentUserUUID(ctx *gin.Context) string {
+	return ctx.GetString(CurrentUserUUIDCtxVar)
+}
+
+func SetCurrentUserUUID(ctx *gin.Context, userUUID string) {
+	ctx.Set(CurrentUserUUIDCtxVar, userUUID)
 }
