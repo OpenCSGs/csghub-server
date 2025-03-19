@@ -79,11 +79,7 @@ func (r *RProxyHandler) Proxy(ctx *gin.Context) {
 			contextPath := fmt.Sprintf("/%s/%s", "endpoint", appSvcName)
 			apiname = strings.TrimPrefix(apiname, contextPath)
 		}
-		writerWrapper := proxy.NewResponseWriterWrapper(ctx.Writer, ctx.Request.Header.Get("Accept"))
-		if r.modSvcClient != nil {
-			writerWrapper.WithModeration(r.modSvcClient)
-		}
-		rp.ServeHTTP(writerWrapper, ctx.Request, apiname)
+		rp.ServeHTTP(ctx.Writer, ctx.Request, apiname)
 	} else {
 		slog.Warn("user not allowed to call endpoint api", slog.String("svc_name", appSvcName), slog.Any("user_name", username), slog.Any("deployID", deploy.ID))
 		ctx.Status(http.StatusForbidden)
