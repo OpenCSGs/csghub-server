@@ -83,4 +83,4 @@ echo "Trigger multisync once in background"
 nohup /starhub-bin/starhub sync sync-as-client >> /starhub-bin/cron-sync-as-client.log 2>&1 &
 
 echo "Start server..."
-/starhub-bin/starhub start server
+/starhub-bin/starhub start server --config=/starhub-bin/config/config.toml
