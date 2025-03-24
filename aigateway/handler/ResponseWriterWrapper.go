@@ -15,6 +15,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/openai/openai-go"
+	"opencsg.com/csghub-server/aigateway/token"
 	"opencsg.com/csghub-server/builder/rpc"
 	"opencsg.com/csghub-server/builder/sensitive"
 )
@@ -27,7 +28,7 @@ type ResponseWriterWrapper struct {
 	internalWritter    gin.ResponseWriter
 	modSvcClient       rpc.ModerationSvcClient
 	eventStreamDecoder *eventStreamDecoder
-	tokenCounter       LLMTokenCounter
+	tokenCounter       token.LLMTokenCounter
 	useStream          bool
 }
 
@@ -49,7 +50,7 @@ func (rw *ResponseWriterWrapper) WithModeration(modSvcClient rpc.ModerationSvcCl
 	return rw
 }
 
-func (rw *ResponseWriterWrapper) WithLLMTokenCounter(llmTokenCounter LLMTokenCounter) *ResponseWriterWrapper {
+func (rw *ResponseWriterWrapper) WithLLMTokenCounter(llmTokenCounter token.LLMTokenCounter) *ResponseWriterWrapper {
 	rw.tokenCounter = llmTokenCounter
 	return rw
 }

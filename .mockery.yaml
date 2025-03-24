@@ -183,3 +183,6 @@ packages:
   opencsg.com/csghub-server/aigateway/component:
     config:
       all: true
+  opencsg.com/csghub-server/aigateway/token:
+    config:
+      all: true
