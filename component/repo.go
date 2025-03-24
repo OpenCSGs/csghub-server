@@ -2786,7 +2786,7 @@ func (c *repoComponentImpl) DeployUpdate(ctx context.Context, updateReq types.De
 		return fmt.Errorf("check deploy exists, err: %w", err)
 	}
 
-	if exist {
+	if needRestartDeploy(req) && exist {
 		// deploy instance is running
 		return errors.New("stop deploy first")
 	}
@@ -2801,6 +2801,15 @@ func (c *repoComponentImpl) DeployUpdate(ctx context.Context, updateReq types.De
 	// update inference service and keep deploy_id and svc_name unchanged
 	err = c.deployer.UpdateDeploy(ctx, req, deploy)
 	return err
+}
+
+func needRestartDeploy(req *types.DeployUpdateReq) bool {
+	if req.ClusterID != nil || req.RuntimeFrameworkID != nil || req.ResourceID != nil ||
+		req.MaxReplica != nil || req.MinReplica != nil || req.Env != nil ||
+		req.EngineArgs != nil || req.Variables != nil || req.Entrypoint != nil {
+		return true
+	}
+	return false
 }
 
 func (c *repoComponentImpl) DeployStart(ctx context.Context, startReq types.DeployActReq) error {

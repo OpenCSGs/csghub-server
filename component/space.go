@@ -11,6 +11,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"time"
 
 	"opencsg.com/csghub-server/builder/deploy"
 	"opencsg.com/csghub-server/builder/deploy/scheduler"
@@ -709,7 +710,9 @@ func (c *spaceComponentImpl) Delete(ctx context.Context, namespace, name, curren
 
 	// stop any running space instance
 	go func() {
-		err := c.Stop(ctx, namespace, name, true)
+		cleanCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+		err := c.stopSpaceDeploy(cleanCtx, namespace, name, space)
 		if err != nil {
 			slog.Error("stop space failed", slog.Any("error", err))
 		}
@@ -811,6 +814,14 @@ func (c *spaceComponentImpl) Stop(ctx context.Context, namespace, name string, d
 		slog.Error("can't stop space", slog.Any("error", err), slog.String("namespace", namespace), slog.String("name", name))
 		return err
 	}
+	err = c.stopSpaceDeploy(ctx, namespace, name, s)
+	if err != nil {
+		return fmt.Errorf("fail stop space %s/%s deploy error: %w", namespace, name, err)
+	}
+	return nil
+}
+
+func (c *spaceComponentImpl) stopSpaceDeploy(ctx context.Context, namespace, name string, s *database.Space) error {
 	// get latest Deploy of space
 	deploy, err := c.deployTaskStore.GetLatestDeployBySpaceID(ctx, s.ID)
 	if err != nil {

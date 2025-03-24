@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"opencsg.com/csghub-server/builder/deploy"
 	"opencsg.com/csghub-server/builder/deploy/scheduler"
@@ -228,28 +229,28 @@ func TestSpaceComponent_Delete(t *testing.T) {
 	ctx := context.TODO()
 	sc := initializeTestSpaceComponent(ctx, t)
 
-	sc.mocks.stores.SpaceMock().EXPECT().FindByPath(ctx, "ns", "n").Return(&database.Space{ID: 1}, nil)
+	sc.mocks.stores.SpaceMock().EXPECT().FindByPath(mock.Anything, "ns", "n").Return(&database.Space{ID: 1}, nil)
 	sc.mocks.components.repo.EXPECT().DeleteRepo(ctx, types.DeleteRepoReq{
 		Username:  "user",
 		Namespace: "ns",
 		Name:      "n",
 		RepoType:  types.SpaceRepo,
 	}).Return(nil, nil)
-	sc.mocks.stores.SpaceMock().EXPECT().Delete(ctx, database.Space{ID: 1}).Return(nil)
-	sc.mocks.stores.DeployTaskMock().EXPECT().GetLatestDeployBySpaceID(ctx, int64(1)).Return(
+	sc.mocks.stores.SpaceMock().EXPECT().Delete(mock.Anything, database.Space{ID: 1}).Return(nil)
+	sc.mocks.stores.DeployTaskMock().EXPECT().GetLatestDeployBySpaceID(mock.Anything, int64(1)).Return(
 		&database.Deploy{
 			RepoID: 2,
 			UserID: 3,
 			ID:     4,
 		}, nil,
 	)
-	sc.mocks.deployer.EXPECT().Stop(ctx, types.DeployRepo{
+	sc.mocks.deployer.EXPECT().Stop(mock.Anything, types.DeployRepo{
 		SpaceID:   1,
 		Namespace: "ns",
 		Name:      "n",
 	}).Return(nil)
 	sc.mocks.stores.DeployTaskMock().EXPECT().StopDeploy(
-		ctx, types.SpaceRepo, int64(2), int64(3), int64(4),
+		mock.Anything, types.SpaceRepo, int64(2), int64(3), int64(4),
 	).Return(nil)
 
 	err := sc.Delete(ctx, "ns", "n", "user")
