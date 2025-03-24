@@ -10,6 +10,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"opencsg.com/csghub-server/aigateway/component"
+	"opencsg.com/csghub-server/aigateway/token"
 	"opencsg.com/csghub-server/aigateway/types"
 	"opencsg.com/csghub-server/api/httpbase"
 	"opencsg.com/csghub-server/builder/proxy"
@@ -172,6 +173,7 @@ func (h *OpenAIHandlerImpl) GetModel(c *gin.Context) {
 */
 func (h *OpenAIHandlerImpl) Chat(c *gin.Context) {
 	username := httpbase.GetCurrentUser(c)
+	userUUID := httpbase.GetCurrentUserUUID(c)
 	chatReq := &ChatCompletionRequest{}
 	if err := c.BindJSON(chatReq); err != nil {
 		slog.Error("invalid chat compoletion request body", "error", err.Error())
@@ -219,12 +221,19 @@ func (h *OpenAIHandlerImpl) Chat(c *gin.Context) {
 	if h.modSvcClient != nil {
 		w.WithModeration(h.modSvcClient)
 	}
-	tokenizer := &dumyyTokenizer{}
-	llmTokenCounter := NewLLMTokenCounter(tokenizer)
+	//TODO: use real tokenizer to count token usag
+	tokenizer := &token.DumyTokenizer{}
+	llmTokenCounter := token.NewLLMTokenCounter(tokenizer)
+	for _, msg := range chatReq.Messages {
+		llmTokenCounter.AppendPrompts(msg.Content)
+	}
 	w.WithLLMTokenCounter(llmTokenCounter)
 	rp.ServeHTTP(w, c.Request, "")
 
-	//TODO:record token usage:
-	usage, err := llmTokenCounter.Usage()
-	slog.Debug("token usage", "prompt_token", usage.PromptTokens, "completion_tokens", usage.CompletionTokens, "total_tokens", usage.TotalTokens, "err", err)
+	go func() {
+		err := h.openaiComponent.RecordUsage(c.Request.Context(), userUUID, model, llmTokenCounter)
+		if err != nil {
+			slog.Error("failed to record token usage", "error", err)
+		}
+	}()
 }

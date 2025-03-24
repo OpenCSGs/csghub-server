@@ -8,8 +8,11 @@ type Model struct {
 	OwnedBy string `json:"owned_by"`
 
 	// extend opanai struct
-	Task     string `json:"task"` // like text-generation,text-to-image etc
-	Endpoint string `json:"-"`
+	Task          string `json:"task"` // like text-generation,text-to-image etc
+	Endpoint      string `json:"-"`
+	CSGHubModelID string `json:"-"` // the internal model id (repo path) in CSGHub
+	SvcName       string `json:"-"` // the internal service name in CSGHub
+	SvcType       int    `json:"-"` // the internal service type like dedicated or serverless in CSGHub
 }
 
 // ModelList represents the model list response

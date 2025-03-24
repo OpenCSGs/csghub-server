@@ -2,14 +2,23 @@ package component
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 	mockdb "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/store/database"
+	mockmq "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/mq"
+	"opencsg.com/csghub-server/aigateway/types"
+
+	"github.com/openai/openai-go"
+	mockcomp "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/aigateway/component"
+	"opencsg.com/csghub-server/builder/event"
 	"opencsg.com/csghub-server/builder/store/database"
+	commontypes "opencsg.com/csghub-server/common/types"
 )
 
 func TestOpenAIComponent_GetAvailableModels(t *testing.T) {
@@ -148,4 +157,240 @@ func TestOpenAIComponent_GetModelByID(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Nil(t, model)
 	})
+}
+
+func TestGetSceneFromSvcType(t *testing.T) {
+	tests := []struct {
+		name     string
+		svcType  int
+		expected int
+	}{
+		{
+			name:     "inference type",
+			svcType:  commontypes.InferenceType,
+			expected: int(commontypes.SceneModelInference),
+		},
+		{
+			name:     "serverless type",
+			svcType:  commontypes.ServerlessType,
+			expected: int(commontypes.SceneModelServerless),
+		},
+		{
+			name:     "unknown type",
+			svcType:  999, // Some arbitrary value not defined in commontypes
+			expected: int(commontypes.SceneUnknow),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := getSceneFromSvcType(tt.svcType)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+func TestOpenAIComponentImpl_RecordUsage(t *testing.T) {
+	mockUserStore := &mockdb.MockUserStore{}
+	mockDeployStore := &mockdb.MockDeployTaskStore{}
+
+	var mockCounter *mockcomp.MockLLMTokenCounter
+	var comp *openaiComponentImpl
+
+	tests := []struct {
+		name      string
+		userUUID  string
+		model     *types.Model
+		usage     *openai.CompletionUsage
+		wantError bool
+		setupMock func()
+	}{
+		{
+			name:     "successful record - dedicated inference",
+			userUUID: "test-user-uuid",
+			model: &types.Model{
+				CSGHubModelID: "test-model",
+				SvcName:       "test-service",
+				SvcType:       commontypes.InferenceType,
+			},
+			usage: &openai.CompletionUsage{
+				PromptTokens:     100,
+				CompletionTokens: 50,
+				TotalTokens:      150,
+			},
+			wantError: false,
+			setupMock: func() {
+				mockMQ := mockmq.NewMockMessageQueue(t)
+				eventPub := &event.EventPublisher{
+					Connector:    mockMQ,
+					SyncInterval: 1,
+				}
+				mockCounter = mockcomp.NewMockLLMTokenCounter(t)
+
+				comp = &openaiComponentImpl{
+					userStore:   mockUserStore,
+					deployStore: mockDeployStore,
+					eventPub:    eventPub,
+				}
+				mockCounter.EXPECT().Usage().Return(&openai.CompletionUsage{
+					PromptTokens:     100,
+					CompletionTokens: 50,
+					TotalTokens:      150,
+				}, nil)
+				mockMQ.EXPECT().VerifyMeteringStream().Return(nil)
+				mockMQ.EXPECT().PublishMeterDurationData(mock.Anything).RunAndReturn(func(data []byte) error {
+					var evt commontypes.METERING_EVENT
+					err := json.Unmarshal(data, &evt)
+					require.NoError(t, err)
+					require.Equal(t, "test-model", evt.ResourceID)
+					require.Equal(t, "test-model", evt.ResourceName)
+					require.Equal(t, "test-service", evt.CustomerID)
+					require.Equal(t, int(commontypes.SceneModelInference), evt.Scene)
+					require.Equal(t, "test-user-uuid", evt.UserUUID)
+					require.Equal(t, commontypes.TokenNumberType, evt.ValueType)
+					require.Equal(t, int64(150), evt.Value)
+					var tokenUsageExtra struct {
+						PromptTokenNum     int64 `json:"prompt_token_num"`
+						CompletionTokenNum int64 `json:"completion_token_num"`
+					}
+					err = json.Unmarshal([]byte(evt.Extra), &tokenUsageExtra)
+					require.NoError(t, err)
+					require.Equal(t, int64(100), tokenUsageExtra.PromptTokenNum)
+					require.Equal(t, int64(50), tokenUsageExtra.CompletionTokenNum)
+					return nil
+				})
+			},
+		},
+		{
+			name:     "successful record - serverless inference",
+			userUUID: "test-user-uuid",
+			model: &types.Model{
+				CSGHubModelID: "test-model",
+				SvcName:       "test-service",
+				SvcType:       commontypes.ServerlessType,
+			},
+			usage: &openai.CompletionUsage{
+				PromptTokens:     100,
+				CompletionTokens: 50,
+				TotalTokens:      150,
+			},
+			wantError: false,
+			setupMock: func() {
+				mockMQ := mockmq.NewMockMessageQueue(t)
+				eventPub := &event.EventPublisher{
+					Connector:    mockMQ,
+					SyncInterval: 1,
+				}
+				mockCounter = mockcomp.NewMockLLMTokenCounter(t)
+
+				comp = &openaiComponentImpl{
+					userStore:   mockUserStore,
+					deployStore: mockDeployStore,
+					eventPub:    eventPub,
+				}
+				mockCounter.EXPECT().Usage().Return(&openai.CompletionUsage{
+					PromptTokens:     100,
+					CompletionTokens: 50,
+					TotalTokens:      150,
+				}, nil)
+				mockMQ.EXPECT().VerifyMeteringStream().Return(nil)
+				mockMQ.EXPECT().PublishMeterDurationData(mock.Anything).RunAndReturn(func(data []byte) error {
+					var evt commontypes.METERING_EVENT
+					err := json.Unmarshal(data, &evt)
+					require.NoError(t, err)
+					require.Equal(t, "test-model", evt.ResourceID)
+					require.Equal(t, "test-model", evt.ResourceName)
+					require.Equal(t, "test-service", evt.CustomerID)
+					require.Equal(t, int(commontypes.SceneModelServerless), evt.Scene)
+					require.Equal(t, "test-user-uuid", evt.UserUUID)
+					require.Equal(t, commontypes.TokenNumberType, evt.ValueType)
+					require.Equal(t, int64(150), evt.Value)
+					var tokenUsageExtra struct {
+						PromptTokenNum     int64 `json:"prompt_token_num"`
+						CompletionTokenNum int64 `json:"completion_token_num"`
+					}
+					err = json.Unmarshal([]byte(evt.Extra), &tokenUsageExtra)
+					require.NoError(t, err)
+					require.Equal(t, int64(100), tokenUsageExtra.PromptTokenNum)
+					require.Equal(t, int64(50), tokenUsageExtra.CompletionTokenNum)
+					return nil
+
+				})
+			},
+		},
+		{
+			name:     "counter error",
+			userUUID: "test-user-uuid",
+			model: &types.Model{
+				CSGHubModelID: "test-model",
+				SvcName:       "test-service",
+				SvcType:       commontypes.InferenceType,
+			},
+			wantError: true,
+			setupMock: func() {
+				mockMQ := mockmq.NewMockMessageQueue(t)
+				eventPub := &event.EventPublisher{
+					Connector:    mockMQ,
+					SyncInterval: 1,
+				}
+				mockCounter = mockcomp.NewMockLLMTokenCounter(t)
+
+				comp = &openaiComponentImpl{
+					userStore:   mockUserStore,
+					deployStore: mockDeployStore,
+					eventPub:    eventPub,
+				}
+				mockCounter.EXPECT().Usage().Return(nil, errors.New("counter error"))
+			},
+		},
+		{
+			name:     "publish error",
+			userUUID: "test-user-uuid",
+			model: &types.Model{
+				CSGHubModelID: "test-model",
+				SvcName:       "test-service",
+				SvcType:       commontypes.InferenceType,
+			},
+			usage: &openai.CompletionUsage{
+				PromptTokens:     100,
+				CompletionTokens: 50,
+				TotalTokens:      150,
+			},
+			wantError: true,
+			setupMock: func() {
+				mockMQ := mockmq.NewMockMessageQueue(t)
+				eventPub := &event.EventPublisher{
+					Connector:    mockMQ,
+					SyncInterval: 1,
+				}
+				mockCounter = mockcomp.NewMockLLMTokenCounter(t)
+
+				comp = &openaiComponentImpl{
+					userStore:   mockUserStore,
+					deployStore: mockDeployStore,
+					eventPub:    eventPub,
+				}
+				mockCounter.EXPECT().Usage().Return(&openai.CompletionUsage{
+					PromptTokens:     100,
+					CompletionTokens: 50,
+					TotalTokens:      150,
+				}, nil)
+				mockMQ.EXPECT().VerifyMeteringStream().Return(nil)
+				mockMQ.EXPECT().PublishMeterDurationData(mock.Anything).Return(errors.New("publish error")).Times(3)
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tt.setupMock()
+
+			err := comp.RecordUsage(context.Background(), tt.userUUID, tt.model, mockCounter)
+			if tt.wantError {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
 }

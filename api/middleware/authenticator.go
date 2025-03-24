@@ -35,6 +35,7 @@ func BuildJwtSession(jwtSignKey string) gin.HandlerFunc {
 		}
 
 		sessions.Default(c).Set(httpbase.CurrentUserCtxVar, claims.CurrentUser)
+		sessions.Default(c).Set(httpbase.CurrentUserUUIDCtxVar, claims.UUID)
 		err = sessions.Default(c).Save()
 		if err != nil {
 			slog.Error("fail to save session", slog.Any("error", err))
@@ -51,9 +52,11 @@ func AuthSession() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		session := sessions.Default(c)
 		userName := session.Get(httpbase.CurrentUserCtxVar)
+		uuid := session.Get(httpbase.CurrentUserUUIDCtxVar)
 		if userName != nil {
 			httpbase.SetAuthType(c, httpbase.AuthTypeJwt)
 			httpbase.SetCurrentUser(c, userName.(string))
+			httpbase.SetCurrentUserUUID(c, uuid.(string))
 		}
 
 		c.Next()

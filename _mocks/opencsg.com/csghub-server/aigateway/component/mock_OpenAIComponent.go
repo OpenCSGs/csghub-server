@@ -6,6 +6,8 @@ import (
 	context "context"
 
 	mock "github.com/stretchr/testify/mock"
+	token "opencsg.com/csghub-server/aigateway/token"
+
 	types "opencsg.com/csghub-server/aigateway/types"
 )
 
@@ -137,6 +139,55 @@ func (_c *MockOpenAIComponent_GetModelByID_Call) Return(_a0 *types.Model, _a1 er
 }
 
 func (_c *MockOpenAIComponent_GetModelByID_Call) RunAndReturn(run func(context.Context, string, string) (*types.Model, error)) *MockOpenAIComponent_GetModelByID_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// RecordUsage provides a mock function with given fields: c, userUUID, model, tokenCounter
+func (_m *MockOpenAIComponent) RecordUsage(c context.Context, userUUID string, model *types.Model, tokenCounter token.LLMTokenCounter) error {
+	ret := _m.Called(c, userUUID, model, tokenCounter)
+
+	if len(ret) == 0 {
+		panic("no return value specified for RecordUsage")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, *types.Model, token.LLMTokenCounter) error); ok {
+		r0 = rf(c, userUUID, model, tokenCounter)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// MockOpenAIComponent_RecordUsage_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'RecordUsage'
+type MockOpenAIComponent_RecordUsage_Call struct {
+	*mock.Call
+}
+
+// RecordUsage is a helper method to define mock.On call
+//   - c context.Context
+//   - userUUID string
+//   - model *types.Model
+//   - tokenCounter token.LLMTokenCounter
+func (_e *MockOpenAIComponent_Expecter) RecordUsage(c interface{}, userUUID interface{}, model interface{}, tokenCounter interface{}) *MockOpenAIComponent_RecordUsage_Call {
+	return &MockOpenAIComponent_RecordUsage_Call{Call: _e.mock.On("RecordUsage", c, userUUID, model, tokenCounter)}
+}
+
+func (_c *MockOpenAIComponent_RecordUsage_Call) Run(run func(c context.Context, userUUID string, model *types.Model, tokenCounter token.LLMTokenCounter)) *MockOpenAIComponent_RecordUsage_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(string), args[2].(*types.Model), args[3].(token.LLMTokenCounter))
+	})
+	return _c
+}
+
+func (_c *MockOpenAIComponent_RecordUsage_Call) Return(_a0 error) *MockOpenAIComponent_RecordUsage_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockOpenAIComponent_RecordUsage_Call) RunAndReturn(run func(context.Context, string, *types.Model, token.LLMTokenCounter) error) *MockOpenAIComponent_RecordUsage_Call {
 	_c.Call.Return(run)
 	return _c
 }

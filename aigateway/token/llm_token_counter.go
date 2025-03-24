@@ -1,4 +1,4 @@
-package handler
+package token
 
 import (
 	"errors"
@@ -8,21 +8,8 @@ import (
 	"github.com/openai/openai-go"
 )
 
-type Tokenizer interface {
-	Encode(string) (int64, error)
-}
-
-var _ Tokenizer = (*dumyyTokenizer)(nil)
-
-type dumyyTokenizer struct{}
-
-// Encode implements Tokenizer.
-func (d *dumyyTokenizer) Encode(s string) (int64, error) {
-	return int64(len(s)), nil
-}
-
 type LLMTokenCounter interface {
-	ChatReqeuestTokens(ChatCompletionRequest)
+	AppendPrompts(prompts ...string)
 	// set completion if not using stream
 	Completion(openai.ChatCompletion)
 	// record completion chunk if using stream
@@ -34,21 +21,19 @@ type LLMTokenCounter interface {
 var _ LLMTokenCounter = (*llmTokenCounter)(nil)
 
 type llmTokenCounter struct {
-	req        *ChatCompletionRequest
+	prompts    []string
 	completion *openai.ChatCompletion
 	chunks     []openai.ChatCompletionChunk
 	tokenizer  Tokenizer
 }
 
-// ChatReqeuestTokens implements LLMTokenCounter.
-func (l *llmTokenCounter) ChatReqeuestTokens(req ChatCompletionRequest) {
-	l.req = &req
+func (l *llmTokenCounter) AppendPrompts(prompts ...string) {
+	l.prompts = append(l.prompts, prompts...)
 }
 
 func NewLLMTokenCounter(tokenizer Tokenizer) LLMTokenCounter {
 	return &llmTokenCounter{
 		completion: nil,
-		chunks:     make([]openai.ChatCompletionChunk, 0),
 		tokenizer:  tokenizer,
 	}
 }
