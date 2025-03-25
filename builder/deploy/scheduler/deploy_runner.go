@@ -334,17 +334,19 @@ func (t *DeployRunner) makeDeployEnv(
 
 	if deploy.SpaceID > 0 {
 		// sdk port for space
-		if t.repo.Sdk == GRADIO.Name {
-			envMap["port"] = strconv.Itoa(GRADIO.Port)
-		} else if t.repo.Sdk == STREAMLIT.Name {
-			envMap["port"] = strconv.Itoa(STREAMLIT.Port)
-		} else if t.repo.Sdk == NGINX.Name {
-			envMap["port"] = strconv.Itoa(NGINX.Port)
-		} else if t.repo.Sdk == DOCKER.Name {
+		if t.repo.Sdk == types.GRADIO.Name {
+			envMap["port"] = strconv.Itoa(types.GRADIO.Port)
+		} else if t.repo.Sdk == types.STREAMLIT.Name {
+			envMap["port"] = strconv.Itoa(types.STREAMLIT.Port)
+		} else if t.repo.Sdk == types.NGINX.Name {
+			envMap["port"] = strconv.Itoa(types.NGINX.Port)
+		} else if t.repo.Sdk == types.DOCKER.Name {
 			envMap["port"] = strconv.Itoa(deploy.ContainerPort)
 			envMap["HF_ENDPOINT"] = t.deployCfg.ModelDownloadEndpoint
+		} else if t.repo.Sdk == types.MCPSERVER.Name {
+			envMap["port"] = strconv.Itoa(types.MCPSERVER.Port)
 		} else {
-			envMap["port"] = strconv.Itoa(DefaultContainerPort)
+			envMap["port"] = strconv.Itoa(types.DefaultContainerPort)
 		}
 	}
 

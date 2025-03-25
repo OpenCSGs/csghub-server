@@ -11,6 +11,7 @@ import (
 	"opencsg.com/csghub-server/builder/deploy/common"
 	"opencsg.com/csghub-server/builder/deploy/imagebuilder"
 	"opencsg.com/csghub-server/builder/store/database"
+	"opencsg.com/csghub-server/common/types"
 )
 
 // BuilderRunner defines a docker image building task
@@ -41,10 +42,10 @@ func (t *BuilderRunner) makeBuildRequest() (*imagebuilder.BuildRequest, error) {
 	sdkVer := ""
 	if t.repo.SdkVersion == "" {
 		slog.Debug("Use SDK default version", slog.Any("repository path", t.repo.Path))
-		if t.repo.Sdk == GRADIO.Name {
-			sdkVer = GRADIO.Version
-		} else if t.repo.Sdk == STREAMLIT.Name {
-			sdkVer = STREAMLIT.Version
+		if t.repo.Sdk == types.GRADIO.Name {
+			sdkVer = types.GRADIO.Version
+		} else if t.repo.Sdk == types.STREAMLIT.Name {
+			sdkVer = types.STREAMLIT.Version
 		}
 	} else {
 		sdkVer = t.repo.SdkVersion

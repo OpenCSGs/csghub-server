@@ -300,6 +300,65 @@ func (_c *MockSpaceComponent_FixHasEntryFile_Call) RunAndReturn(run func(context
 	return _c
 }
 
+// GetByID provides a mock function with given fields: ctx, spaceID
+func (_m *MockSpaceComponent) GetByID(ctx context.Context, spaceID int64) (*database.Space, error) {
+	ret := _m.Called(ctx, spaceID)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetByID")
+	}
+
+	var r0 *database.Space
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, int64) (*database.Space, error)); ok {
+		return rf(ctx, spaceID)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, int64) *database.Space); ok {
+		r0 = rf(ctx, spaceID)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*database.Space)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, int64) error); ok {
+		r1 = rf(ctx, spaceID)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockSpaceComponent_GetByID_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetByID'
+type MockSpaceComponent_GetByID_Call struct {
+	*mock.Call
+}
+
+// GetByID is a helper method to define mock.On call
+//   - ctx context.Context
+//   - spaceID int64
+func (_e *MockSpaceComponent_Expecter) GetByID(ctx interface{}, spaceID interface{}) *MockSpaceComponent_GetByID_Call {
+	return &MockSpaceComponent_GetByID_Call{Call: _e.mock.On("GetByID", ctx, spaceID)}
+}
+
+func (_c *MockSpaceComponent_GetByID_Call) Run(run func(ctx context.Context, spaceID int64)) *MockSpaceComponent_GetByID_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(int64))
+	})
+	return _c
+}
+
+func (_c *MockSpaceComponent_GetByID_Call) Return(_a0 *database.Space, _a1 error) *MockSpaceComponent_GetByID_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockSpaceComponent_GetByID_Call) RunAndReturn(run func(context.Context, int64) (*database.Space, error)) *MockSpaceComponent_GetByID_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // HasEntryFile provides a mock function with given fields: ctx, space
 func (_m *MockSpaceComponent) HasEntryFile(ctx context.Context, space *database.Space) bool {
 	ret := _m.Called(ctx, space)
@@ -531,6 +590,74 @@ func (_c *MockSpaceComponent_Logs_Call) Return(_a0 *deploy.MultiLogReader, _a1 e
 }
 
 func (_c *MockSpaceComponent_Logs_Call) RunAndReturn(run func(context.Context, string, string) (*deploy.MultiLogReader, error)) *MockSpaceComponent_Logs_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// MCPIndex provides a mock function with given fields: ctx, repoFilter, per, page
+func (_m *MockSpaceComponent) MCPIndex(ctx context.Context, repoFilter *types.RepoFilter, per int, page int) ([]*types.MCPService, int, error) {
+	ret := _m.Called(ctx, repoFilter, per, page)
+
+	if len(ret) == 0 {
+		panic("no return value specified for MCPIndex")
+	}
+
+	var r0 []*types.MCPService
+	var r1 int
+	var r2 error
+	if rf, ok := ret.Get(0).(func(context.Context, *types.RepoFilter, int, int) ([]*types.MCPService, int, error)); ok {
+		return rf(ctx, repoFilter, per, page)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, *types.RepoFilter, int, int) []*types.MCPService); ok {
+		r0 = rf(ctx, repoFilter, per, page)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]*types.MCPService)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, *types.RepoFilter, int, int) int); ok {
+		r1 = rf(ctx, repoFilter, per, page)
+	} else {
+		r1 = ret.Get(1).(int)
+	}
+
+	if rf, ok := ret.Get(2).(func(context.Context, *types.RepoFilter, int, int) error); ok {
+		r2 = rf(ctx, repoFilter, per, page)
+	} else {
+		r2 = ret.Error(2)
+	}
+
+	return r0, r1, r2
+}
+
+// MockSpaceComponent_MCPIndex_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'MCPIndex'
+type MockSpaceComponent_MCPIndex_Call struct {
+	*mock.Call
+}
+
+// MCPIndex is a helper method to define mock.On call
+//   - ctx context.Context
+//   - repoFilter *types.RepoFilter
+//   - per int
+//   - page int
+func (_e *MockSpaceComponent_Expecter) MCPIndex(ctx interface{}, repoFilter interface{}, per interface{}, page interface{}) *MockSpaceComponent_MCPIndex_Call {
+	return &MockSpaceComponent_MCPIndex_Call{Call: _e.mock.On("MCPIndex", ctx, repoFilter, per, page)}
+}
+
+func (_c *MockSpaceComponent_MCPIndex_Call) Run(run func(ctx context.Context, repoFilter *types.RepoFilter, per int, page int)) *MockSpaceComponent_MCPIndex_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(*types.RepoFilter), args[2].(int), args[3].(int))
+	})
+	return _c
+}
+
+func (_c *MockSpaceComponent_MCPIndex_Call) Return(_a0 []*types.MCPService, _a1 int, _a2 error) *MockSpaceComponent_MCPIndex_Call {
+	_c.Call.Return(_a0, _a1, _a2)
+	return _c
+}
+
+func (_c *MockSpaceComponent_MCPIndex_Call) RunAndReturn(run func(context.Context, *types.RepoFilter, int, int) ([]*types.MCPService, int, error)) *MockSpaceComponent_MCPIndex_Call {
 	_c.Call.Return(run)
 	return _c
 }

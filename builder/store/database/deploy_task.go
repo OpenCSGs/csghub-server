@@ -22,7 +22,7 @@ type Deploy struct {
 	GitBranch string `bun:",notnull" json:"git_branch"`
 	Env       string `bun:",nullzero" json:"env"`
 	Secret    string `bun:",nullzero" json:"secret"`
-	Template  string `bun:",notnull" json:"tmeplate"`
+	Template  string `bun:",notnull" json:"template"`
 	Hardware  string `bun:",notnull" json:"hardware"`
 	// for image run task, aka task_type = 1
 	// running image of cluster, comes from builder or pre-define

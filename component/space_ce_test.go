@@ -8,7 +8,6 @@ import (
 
 	"github.com/alibabacloud-go/tea/tea"
 	"github.com/stretchr/testify/require"
-	"opencsg.com/csghub-server/builder/deploy/scheduler"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/types"
 )
@@ -46,7 +45,7 @@ func TestSpaceComponent_Create(t *testing.T) {
 
 	sc.mocks.stores.SpaceMock().EXPECT().Create(ctx, database.Space{
 		RepositoryID: 321,
-		Sdk:          scheduler.STREAMLIT.Name,
+		Sdk:          types.STREAMLIT.Name,
 		SdkVersion:   "v1",
 		Env:          "env",
 		Hardware:     `{"memory": "foo"}`,
@@ -88,7 +87,7 @@ func TestSpaceComponent_Create(t *testing.T) {
 	}, types.SpaceRepo)).Return(nil)
 
 	space, err := sc.Create(ctx, types.CreateSpaceReq{
-		Sdk:        scheduler.STREAMLIT.Name,
+		Sdk:        types.STREAMLIT.Name,
 		SdkVersion: "v1",
 		Env:        "env",
 		Secrets:    "sss",
