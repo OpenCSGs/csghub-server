@@ -109,6 +109,7 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 	authCollection := middleware.AuthenticatorCollection{}
 	authCollection.NeedAPIKey = middleware.OnlyAPIKeyAuthenticator(config)
 	authCollection.NeedAdmin = middleware.NeedAdmin(config)
+	authCollection.UserMatch = middleware.UserMatch()
 
 	if enableSwagger {
 		r.GET("/api/v1/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
@@ -245,9 +246,9 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 		return nil, fmt.Errorf("error creating user controller:%w", err)
 	}
 	{
-		apiGroup.GET("/user/:username/ssh_keys", sshKeyHandler.Index)
-		apiGroup.POST("/user/:username/ssh_keys", sshKeyHandler.Create)
-		apiGroup.DELETE("/user/:username/ssh_key/:name", sshKeyHandler.Delete)
+		apiGroup.GET("/user/:username/ssh_keys", authCollection.UserMatch, sshKeyHandler.Index)
+		apiGroup.POST("/user/:username/ssh_keys", authCollection.UserMatch, sshKeyHandler.Create)
+		apiGroup.DELETE("/user/:username/ssh_key/:name", authCollection.UserMatch, sshKeyHandler.Delete)
 	}
 
 	{
