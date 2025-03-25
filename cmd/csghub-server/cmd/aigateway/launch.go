@@ -7,6 +7,7 @@ import (
 	"github.com/spf13/cobra"
 	"opencsg.com/csghub-server/aigateway/router"
 	"opencsg.com/csghub-server/api/httpbase"
+	"opencsg.com/csghub-server/builder/event"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/config"
 )
@@ -30,6 +31,10 @@ var cmdLaunch = &cobra.Command{
 			DSN:     cfg.Database.DSN,
 		}
 		database.InitDB(dbConfig)
+		err = event.InitEventPublisher(cfg, nil)
+		if err != nil {
+			return fmt.Errorf("fail to initialize message queue, %w", err)
+		}
 
 		r, err := router.NewRouter(cfg)
 		if err != nil {
