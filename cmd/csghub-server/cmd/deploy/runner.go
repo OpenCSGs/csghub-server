@@ -2,6 +2,7 @@ package deploy
 
 import (
 	"fmt"
+	"log/slog"
 
 	"github.com/spf13/cobra"
 	"opencsg.com/csghub-server/api/httpbase"
@@ -36,6 +37,8 @@ var startRunnerCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
+
+		slog.Info("deploy runner is running", slog.Any("port", config.Space.RunnerServerPort))
 		server := httpbase.NewGracefulServer(
 			httpbase.GraceServerOpt{
 				Port: config.Space.RunnerServerPort,

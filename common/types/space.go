@@ -2,6 +2,69 @@ package types
 
 import "time"
 
+const DefaultContainerPort = 8080
+
+type SDKConfig struct {
+	Name    string
+	Version string
+	Port    int
+	Image   string
+}
+
+var (
+	GRADIO = SDKConfig{
+		Name:    "gradio",
+		Version: "3.37.0",
+		Port:    7860,
+		Image:   "",
+	}
+	STREAMLIT = SDKConfig{
+		Name:    "streamlit",
+		Version: "1.33.0",
+		Port:    8501,
+		Image:   "",
+	}
+	NGINX = SDKConfig{
+		Name:    "nginx",
+		Version: "1.25.0",
+		Port:    8000,
+		Image:   "csg-nginx:1.2",
+	}
+	DOCKER = SDKConfig{
+		Name:    "docker",
+		Version: "",
+		Port:    8080,
+		Image:   "",
+	}
+	MCPSERVER = SDKConfig{
+		Name:    "mcp_server",
+		Version: "",
+		Port:    8000,
+		Image:   "",
+	}
+)
+
+type MCPService struct {
+	ID            int64     `json:"id,omitempty"`
+	Creator       string    `json:"username,omitempty" example:"creator_user_name"`
+	Name          string    `json:"name,omitempty" example:"mcp_name_1"`
+	Nickname      string    `json:"nickname,omitempty" example:""`
+	Description   string    `json:"description,omitempty" example:""`
+	Path          string    `json:"path" example:"user_or_org_name/mcp_name_1"`
+	License       string    `json:"license,omitempty" example:"MIT"`
+	DefaultBranch string    `json:"default_branch,omitempty"`
+	Private       bool      `json:"private"`
+	CreatedAt     time.Time `json:"created_at,omitempty"`
+	UpdatedAt     time.Time `json:"updated_at,omitempty"`
+	Env           string    `json:"env,omitempty"`
+	Secrets       string    `json:"secrets,omitempty"`
+	Variables     string    `json:"variables,omitempty"`
+	Endpoint      string    `json:"endpoint,omitempty" example:"https://localhost/spaces/myname/mymcp"`
+	Status        string    `json:"status"`
+	RepositoryID  int64     `json:"repository_id,omitempty"`
+	SvcName       string    `json:"svc_name,omitempty"`
+}
+
 type CreateSpaceReq struct {
 	CreateRepoReq
 	Sdk           string `json:"sdk" example:"1"`

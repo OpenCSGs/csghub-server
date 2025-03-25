@@ -14,7 +14,6 @@ import (
 	"time"
 
 	"opencsg.com/csghub-server/builder/deploy"
-	"opencsg.com/csghub-server/builder/deploy/scheduler"
 	"opencsg.com/csghub-server/builder/git/gitserver"
 	"opencsg.com/csghub-server/builder/git/membership"
 	"opencsg.com/csghub-server/builder/store/database"
@@ -53,6 +52,8 @@ type SpaceComponent interface {
 	Logs(ctx context.Context, namespace, name string) (*deploy.MultiLogReader, error)
 	// HasEntryFile checks whether space repo has entry point file to run with
 	HasEntryFile(ctx context.Context, space *database.Space) bool
+	GetByID(ctx context.Context, spaceID int64) (*database.Space, error)
+	MCPIndex(ctx context.Context, repoFilter *types.RepoFilter, per, page int) ([]*types.MCPService, int, error)
 }
 
 func (c *spaceComponentImpl) Create(ctx context.Context, req types.CreateSpaceReq) (*types.Space, error) {
@@ -89,7 +90,7 @@ func (c *spaceComponentImpl) Create(ctx context.Context, req types.CreateSpaceRe
 	}
 
 	var templatePath string
-	if req.Sdk == scheduler.DOCKER.Name {
+	if req.Sdk == types.DOCKER.Name {
 		templatePath, err = c.getSpaceDockerTemplatePath(ctx, req)
 		if err != nil {
 			return nil, fmt.Errorf("fail to get space docker template path, %w", err)
@@ -160,12 +161,7 @@ func (c *spaceComponentImpl) getSpaceDockerTemplatePath(ctx context.Context, req
 	if len(template.Path) < 1 {
 		return "", fmt.Errorf("invalid docker template path error: %w", err)
 	}
-	currentDir, err := filepath.Abs(filepath.Dir("."))
-	if err != nil {
-		return "", fmt.Errorf("getting current directory error: %w", err)
-	}
-	templatePath := filepath.Join(currentDir, "docker", "spaces", "templates", template.Path)
-	_, err = os.Stat(templatePath)
+	templatePath, err := getSpaceTemplatePath(template.Path)
 	if err != nil {
 		return "", fmt.Errorf("check docker template path %s error: %w", templatePath, err)
 	}
@@ -183,17 +179,24 @@ func (c *spaceComponentImpl) createSpaceDefaultFiles(dbRepo *database.Repository
 		return fmt.Errorf("failed to create space gitattibute file, cause: %w", err)
 	}
 
-	if req.Sdk == scheduler.STREAMLIT.Name {
+	if req.Sdk == types.STREAMLIT.Name {
 		err = c.createSpaceStreamlitFile(dbRepo, req)
 		if err != nil {
 			return fmt.Errorf("failed to create space streamlit file, cause: %w", err)
 		}
 	}
 
-	if req.Sdk == scheduler.DOCKER.Name && len(templatePath) > 0 {
+	if req.Sdk == types.DOCKER.Name && len(templatePath) > 0 {
 		err = c.createSpaceDockerTemplateFile(dbRepo, req, templatePath)
 		if err != nil {
 			return fmt.Errorf("failed to create space docker template file, cause: %w", err)
+		}
+	}
+
+	if req.Sdk == types.MCPSERVER.Name {
+		err = c.createSpaceMCPServerTemplateFile(dbRepo, req)
+		if err != nil {
+			return fmt.Errorf("failed to create space mcp server file, cause: %w", err)
 		}
 	}
 	return nil
@@ -276,12 +279,65 @@ func (c *spaceComponentImpl) createSpaceDockerTemplateFile(dbRepo *database.Repo
 		return nameI < nameJ
 	})
 
+	err = c.uploadTemplateFiles(entries, req, dbRepo, templatePath)
+	if err != nil {
+		return fmt.Errorf("fail to upload space docker template files error: %w", err)
+	}
+
+	return nil
+}
+
+func (c *spaceComponentImpl) createSpaceMCPServerTemplateFile(dbRepo *database.Repository, req types.CreateSpaceReq) error {
+	// create mcp server template files
+	templatePath, err := getSpaceTemplatePath(req.Sdk)
+	if err != nil {
+		return fmt.Errorf("check mcp server template path %s error: %w", templatePath, err)
+	}
+	entries, err := os.ReadDir(templatePath)
+	if err != nil {
+		return fmt.Errorf("failed to list dir %s error: %w", templatePath, err)
+	}
+
+	sort.Slice(entries, func(i, j int) bool {
+		nameI := entries[i].Name()
+		nameJ := entries[j].Name()
+		if nameI == types.EntryFileAppFile {
+			return false
+		}
+		if nameJ == types.EntryFileAppFile {
+			return true
+		}
+		return nameI < nameJ
+	})
+
+	err = c.uploadTemplateFiles(entries, req, dbRepo, templatePath)
+	if err != nil {
+		return fmt.Errorf("fail to upload space mcp server template files error: %w", err)
+	}
+
+	return nil
+}
+
+func getSpaceTemplatePath(subPath string) (string, error) {
+	currentDir, err := filepath.Abs(filepath.Dir("."))
+	if err != nil {
+		return "", fmt.Errorf("getting current directory error: %w", err)
+	}
+	templatePath := filepath.Join(currentDir, "docker", "spaces", "templates", subPath)
+	_, err = os.Stat(templatePath)
+	if err != nil {
+		return "", fmt.Errorf("get template path %s error: %w", templatePath, err)
+	}
+	return templatePath, nil
+}
+
+func (c *spaceComponentImpl) uploadTemplateFiles(entries []os.DirEntry, req types.CreateSpaceReq, dbRepo *database.Repository, templatePath string) error {
 	for _, entry := range entries {
 		if !entry.Type().IsRegular() {
 			continue
 		}
 		fileName := entry.Name()
-		slog.Info("get file", slog.Any("sdk", req.Sdk), slog.Any("template", req.Template), slog.Any("templatePath", templatePath), slog.Any("fileName", fileName))
+		slog.Debug("get file", slog.Any("sdk", req.Sdk), slog.Any("template", req.Template), slog.Any("templatePath", templatePath), slog.Any("fileName", fileName))
 
 		content, err := os.ReadFile(filepath.Join(templatePath, fileName))
 		if err != nil {
@@ -304,7 +360,6 @@ func (c *spaceComponentImpl) createSpaceDockerTemplateFile(dbRepo *database.Repo
 			return fmt.Errorf("failed to create %s file for %s space, cause: %w", fileName, req.Sdk, err)
 		}
 	}
-
 	return nil
 }
 
@@ -325,26 +380,11 @@ func (c *spaceComponentImpl) Show(ctx context.Context, namespace, name, currentU
 
 	ns, err := c.repoComponent.GetNameSpaceInfo(ctx, namespace)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get namespace info for model, error: %w", err)
+		return nil, fmt.Errorf("failed to get namespace info for space, error: %w", err)
 	}
 
-	var endpoint string
 	svcName, status, _ := c.status(ctx, space)
-	if len(svcName) > 0 {
-		if c.publicRootDomain == "" {
-			if space.Sdk == scheduler.STREAMLIT.Name || space.Sdk == scheduler.GRADIO.Name {
-				// if endpoint not ends with /, fastapi based app (gradio and streamlit) will redirect with http 307
-				// see issue: https://stackoverflow.com/questions/70351360/keep-getting-307-temporary-redirect-before-returning-status-200-hosted-on-fast
-				endpoint, _ = url.JoinPath(c.serverBaseUrl, "endpoint", svcName, "/")
-			} else {
-				endpoint, _ = url.JoinPath(c.serverBaseUrl, "endpoint", svcName)
-			}
-			endpoint = strings.Replace(endpoint, "http://", "", 1)
-			endpoint = strings.Replace(endpoint, "https://", "", 1)
-		} else {
-			endpoint = fmt.Sprintf("%s.%s", svcName, c.publicRootDomain)
-		}
-	}
+	endpoint := c.getEndpoint(svcName, space)
 
 	likeExists, err := c.userLikesStore.IsExist(ctx, currentUser, space.Repository.ID)
 	if err != nil {
@@ -745,21 +785,23 @@ func (c *spaceComponentImpl) Deploy(ctx context.Context, namespace, name, curren
 	}
 
 	containerImg := ""
-	containerPort := scheduler.DefaultContainerPort
-	if space.Sdk == scheduler.GRADIO.Name {
-		containerPort = scheduler.GRADIO.Port
-	} else if space.Sdk == scheduler.STREAMLIT.Name {
-		containerPort = scheduler.STREAMLIT.Port
-	} else if space.Sdk == scheduler.NGINX.Name {
+	containerPort := types.DefaultContainerPort
+	if space.Sdk == types.GRADIO.Name {
+		containerPort = types.GRADIO.Port
+	} else if space.Sdk == types.STREAMLIT.Name {
+		containerPort = types.STREAMLIT.Port
+	} else if space.Sdk == types.NGINX.Name {
 		// Use default image for nginx space
-		containerImg = scheduler.NGINX.Image
-		containerPort = scheduler.NGINX.Port
-	} else if space.Sdk == scheduler.DOCKER.Name {
-		template, err := c.templateStore.FindByName(ctx, scheduler.DOCKER.Name, space.Template)
+		containerImg = types.NGINX.Image
+		containerPort = types.NGINX.Port
+	} else if space.Sdk == types.DOCKER.Name {
+		template, err := c.templateStore.FindByName(ctx, types.DOCKER.Name, space.Template)
 		if err != nil {
-			return -1, fmt.Errorf("fail to query %s template %s error: %w", scheduler.DOCKER.Name, space.Template, err)
+			return -1, fmt.Errorf("fail to query %s template %s error: %w", types.DOCKER.Name, space.Template, err)
 		}
 		containerPort = template.Port
+	} else if space.Sdk == types.MCPSERVER.Name {
+		containerPort = types.MCPSERVER.Port
 	}
 
 	// create deploy for space
@@ -864,7 +906,7 @@ func (c *spaceComponentImpl) FixHasEntryFile(ctx context.Context, s *database.Sp
 
 func (c *spaceComponentImpl) status(ctx context.Context, s *database.Space) (string, string, error) {
 	if !s.HasAppFile {
-		if s.Sdk == scheduler.NGINX.Name {
+		if s.Sdk == types.NGINX.Name {
 			return "", SpaceStatusNoNGINXConf, nil
 		}
 		return "", SpaceStatusNoAppFile, nil
@@ -875,22 +917,8 @@ func (c *spaceComponentImpl) status(ctx context.Context, s *database.Space) (str
 		slog.Error("fail to get latest space deploy by space id", slog.Any("SpaceID", s.ID))
 		return "", SpaceStatusStopped, fmt.Errorf("can't get space deployment,%w", err)
 	}
-
-	namespace, name := s.Repository.NamespaceAndName()
-	// request space deploy status by deploy id
-	srvName, code, _, err := c.deployer.Status(ctx, types.DeployRepo{
-		DeployID:  deploy.ID,
-		SpaceID:   deploy.SpaceID,
-		ModelID:   deploy.ModelID,
-		Namespace: namespace,
-		Name:      name,
-		SvcName:   deploy.SvcName,
-	}, true)
-	if err != nil {
-		slog.Error("error happen when get space status", slog.Any("error", err), slog.String("path", s.Repository.Path))
-		return "", SpaceStatusStopped, err
-	}
-	return srvName, deployStatusCodeToString(code), nil
+	slog.Debug("space deploy", slog.Any("deploy", deploy))
+	return deploy.SvcName, deployStatusCodeToString(deploy.Status), nil
 }
 
 func (c *spaceComponentImpl) Status(ctx context.Context, namespace, name string) (string, string, error) {
@@ -917,9 +945,9 @@ func (c *spaceComponentImpl) Logs(ctx context.Context, namespace, name string) (
 func (c *spaceComponentImpl) HasEntryFile(ctx context.Context, space *database.Space) bool {
 	namespace, name := space.Repository.NamespaceAndName()
 	entryFile := types.EntryFileAppFile
-	if space.Sdk == scheduler.NGINX.Name {
+	if space.Sdk == types.NGINX.Name {
 		entryFile = types.EntryFileNginx
-	} else if space.Sdk == scheduler.DOCKER.Name {
+	} else if space.Sdk == types.DOCKER.Name {
 		entryFile = types.EntryFileDockerfile
 	}
 
@@ -982,6 +1010,89 @@ func (c *spaceComponentImpl) mergeUpdateSpaceRequest(ctx context.Context, space 
 		space.Variables = *req.Variables
 	}
 	return nil
+}
+
+func (c *spaceComponentImpl) GetByID(ctx context.Context, spaceID int64) (*database.Space, error) {
+	return c.spaceStore.ByID(ctx, spaceID)
+}
+
+func (c *spaceComponentImpl) MCPIndex(ctx context.Context, repoFilter *types.RepoFilter, per, page int) ([]*types.MCPService, int, error) {
+	var (
+		resSpaces []*types.MCPService
+		err       error
+	)
+	repos, total, err := c.repoComponent.PublicToUser(ctx, types.SpaceRepo, repoFilter.Username, repoFilter, per, page)
+	if err != nil {
+		newError := fmt.Errorf("failed to get public space repos,error:%w", err)
+		return nil, 0, newError
+	}
+	var repoIDs []int64
+	for _, repo := range repos {
+		repoIDs = append(repoIDs, repo.ID)
+	}
+	spaces, err := c.spaceStore.ByRepoIDs(ctx, repoIDs)
+	if err != nil {
+		newError := fmt.Errorf("failed to get spaces by repo ids,error:%w", err)
+		return nil, 0, newError
+	}
+
+	// loop through repos to keep the repos in sort order
+	for _, repo := range repos {
+		var space *database.Space
+		for _, s := range spaces {
+			if s.RepositoryID == repo.ID {
+				space = &s
+				space.Repository = repo
+				break
+			}
+		}
+		if space == nil {
+			continue
+		}
+
+		svcName, status, _ := c.status(ctx, space)
+		endpoint := c.getEndpoint(svcName, space)
+
+		resSpaces = append(resSpaces, &types.MCPService{
+			ID:           space.ID,
+			Name:         space.Repository.Name,
+			Description:  space.Repository.Description,
+			Path:         space.Repository.Path,
+			Env:          space.Env,
+			License:      space.Repository.License,
+			Private:      space.Repository.Private,
+			CreatedAt:    space.Repository.CreatedAt,
+			UpdatedAt:    space.Repository.UpdatedAt,
+			Status:       status,
+			RepositoryID: space.Repository.ID,
+			SvcName:      svcName,
+			Endpoint:     endpoint,
+		})
+	}
+	return resSpaces, total, nil
+}
+
+func (c *spaceComponentImpl) getEndpoint(svcName string, space *database.Space) string {
+	endpoint := ""
+	if len(svcName) < 1 {
+		return endpoint
+	}
+
+	if c.publicRootDomain == "" {
+		if space.Sdk == types.STREAMLIT.Name || space.Sdk == types.GRADIO.Name {
+			// if endpoint not ends with /, fastapi based app (gradio and streamlit) will redirect with http 307
+			// see issue: https://stackoverflow.com/questions/70351360/keep-getting-307-temporary-redirect-before-returning-status-200-hosted-on-fast
+			endpoint, _ = url.JoinPath(c.serverBaseUrl, "endpoint", svcName, "/")
+		} else {
+			endpoint, _ = url.JoinPath(c.serverBaseUrl, "endpoint", svcName)
+		}
+		endpoint = strings.Replace(endpoint, "http://", "", 1)
+		endpoint = strings.Replace(endpoint, "https://", "", 1)
+	} else {
+		endpoint = fmt.Sprintf("%s.%s", svcName, c.publicRootDomain)
+	}
+
+	return endpoint
 }
 
 const (

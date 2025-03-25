@@ -9,7 +9,6 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"opencsg.com/csghub-server/builder/deploy"
-	"opencsg.com/csghub-server/builder/deploy/scheduler"
 	"opencsg.com/csghub-server/builder/git/gitserver"
 	"opencsg.com/csghub-server/builder/git/membership"
 	"opencsg.com/csghub-server/builder/store/database"
@@ -35,12 +34,10 @@ func TestSpaceComponent_Show(t *testing.T) {
 	sc.mocks.components.repo.EXPECT().GetNameSpaceInfo(ctx, "ns").Return(&types.Namespace{Path: "ns"}, nil)
 
 	sc.mocks.stores.DeployTaskMock().EXPECT().GetLatestDeployBySpaceID(ctx, int64(1)).Return(
-		&database.Deploy{}, nil,
+		&database.Deploy{
+			SvcName: "svc",
+		}, nil,
 	)
-	sc.mocks.deployer.EXPECT().Status(ctx, types.DeployRepo{
-		Namespace: "foo",
-		Name:      "bar",
-	}, true).Return("svc", 1, nil, nil)
 
 	sc.mocks.stores.UserLikesMock().EXPECT().IsExist(ctx, "user", int64(123)).Return(true, nil)
 
@@ -359,7 +356,7 @@ func TestSpaceComponent_FixHasEntryFile(t *testing.T) {
 			}, nil)
 			sdk := ""
 			if c.nginx {
-				sdk = scheduler.NGINX.Name
+				sdk = types.NGINX.Name
 			}
 			exist := sc.HasEntryFile(ctx, &database.Space{
 				Repository: &database.Repository{Path: "foo/bar"},
@@ -387,5 +384,53 @@ func TestSpaceComponent_Logs(t *testing.T) {
 
 	require.Nil(t, err)
 	require.Equal(t, &deploy.MultiLogReader{}, r)
+
+}
+
+func TestSpaceComponent_GetByID(t *testing.T) {
+	ctx := context.TODO()
+	sc := initializeTestSpaceComponent(ctx, t)
+	sc.mocks.stores.SpaceMock().EXPECT().ByID(ctx, int64(1)).Return(&database.Space{
+		ID: 1,
+	}, nil)
+
+	r, err := sc.GetByID(ctx, int64(1))
+
+	require.Nil(t, err)
+	require.Equal(t, &database.Space{
+		ID: 1,
+	}, r)
+}
+
+func TestSpaceComponent_MCPIndex(t *testing.T) {
+	ctx := context.TODO()
+	sc := initializeTestSpaceComponent(ctx, t)
+
+	sc.mocks.components.repo.EXPECT().PublicToUser(
+		ctx, types.SpaceRepo, "user", &types.RepoFilter{Sort: "z", Username: "user"}, 10, 1).Return([]*database.Repository{
+		{ID: 123, Name: "r1", Tags: []database.Tag{{Name: "t1"}}},
+		{ID: 124, Name: "r2", Tags: []database.Tag{{Name: "t2"}}},
+	}, 100, nil)
+
+	sc.mocks.stores.SpaceMock().EXPECT().ByRepoIDs(ctx, []int64{123, 124}).Return(
+		[]database.Space{
+			{ID: 11, RepositoryID: 123, Repository: &database.Repository{
+				ID:   123,
+				Name: "r1",
+			}},
+			{ID: 12, RepositoryID: 124, Repository: &database.Repository{
+				ID:   124,
+				Name: "r2",
+			}},
+		}, nil,
+	)
+
+	data, total, err := sc.MCPIndex(ctx, &types.RepoFilter{Sort: "z", Username: "user"}, 10, 1)
+	require.Nil(t, err)
+	require.Equal(t, 100, total)
+	require.Equal(t, []*types.MCPService{
+		{ID: 11, RepositoryID: 123, Name: "r1", Status: "NoAppFile"},
+		{ID: 12, RepositoryID: 124, Name: "r2", Status: "NoAppFile"},
+	}, data)
 
 }

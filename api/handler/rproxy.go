@@ -10,10 +10,13 @@ import (
 	"github.com/gin-gonic/gin"
 	"opencsg.com/csghub-server/api/httpbase"
 	"opencsg.com/csghub-server/builder/proxy"
+	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/types"
 	"opencsg.com/csghub-server/component"
 )
+
+var ErrUnauthorized = errors.New("user not found in session, please access with jwt token first")
 
 type RProxyHandler struct {
 	SpaceRootDomain string
@@ -48,25 +51,15 @@ func (r *RProxyHandler) Proxy(ctx *gin.Context) {
 		httpbase.ServerError(ctx, fmt.Errorf("failed to get deploy, %w", err))
 		return
 	}
-
 	username := httpbase.GetCurrentUser(ctx)
-	allow := false
-	err = nil
-	if deploy.SpaceID > 0 {
-		// user must login to visit space
-		if httpbase.GetAuthType(ctx) != httpbase.AuthTypeJwt {
-			slog.Error("invalid auth type in proxy", slog.Any("AuthType(ctx)", httpbase.GetAuthType(ctx)), slog.Any("URI", ctx.Request.RequestURI))
-			httpbase.UnauthorizedError(ctx, errors.New("user not found in session, please access with jwt token first"))
-			return
-		}
-		// check space
-		allow, err = r.repoComp.AllowAccessByRepoID(ctx.Request.Context(), deploy.RepoID, username)
-	} else if deploy.ModelID > 0 {
-		// check model inference
-		allow, err = r.repoComp.AllowAccessEndpoint(ctx.Request.Context(), username, deploy)
-	}
+	allow, err := r.CheckAccessPermission(ctx, deploy, username)
 
 	if err != nil {
+		if errors.Is(err, ErrUnauthorized) {
+			httpbase.UnauthorizedError(ctx, ErrUnauthorized)
+			return
+		}
+
 		slog.Error("failed to check user permission", "error", err)
 		httpbase.ServerError(ctx, fmt.Errorf("failed to check user permission,%w", err))
 		return
@@ -91,6 +84,32 @@ func (r *RProxyHandler) Proxy(ctx *gin.Context) {
 		slog.Warn("user not allowed to call endpoint api", slog.String("svc_name", appSvcName), slog.Any("user_name", username), slog.Any("deployID", deploy.ID))
 		ctx.Status(http.StatusForbidden)
 	}
+}
+
+func (r *RProxyHandler) CheckAccessPermission(ctx *gin.Context, deploy *database.Deploy, username string) (bool, error) {
+	var (
+		allow bool
+		err   error
+		space *database.Space
+	)
+	if deploy.SpaceID > 0 {
+		space, err = r.spaceComp.GetByID(ctx.Request.Context(), deploy.SpaceID)
+		if err != nil {
+			slog.Error("failed to get space by id", slog.Any("spaceID", deploy.SpaceID), slog.Any("error", err))
+			return false, fmt.Errorf("failed to get space, %w", err)
+		}
+		// user must login to visit space except mcp server
+		if space.Sdk != types.MCPSERVER.Name && httpbase.GetAuthType(ctx) != httpbase.AuthTypeJwt {
+			slog.Error("invalid auth type in proxy", slog.Any("AuthType(ctx)", httpbase.GetAuthType(ctx)), slog.Any("URI", ctx.Request.RequestURI))
+			return false, ErrUnauthorized
+		}
+		// check space
+		allow, err = r.repoComp.AllowAccessByRepoID(ctx.Request.Context(), deploy.RepoID, username)
+	} else if deploy.ModelID > 0 {
+		// check model inference
+		allow, err = r.repoComp.AllowAccessEndpoint(ctx.Request.Context(), username, deploy)
+	}
+	return allow, err
 }
 
 // get service name based on request
