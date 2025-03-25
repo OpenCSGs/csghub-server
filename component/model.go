@@ -207,6 +207,11 @@ func (c *modelComponentImpl) Index(ctx context.Context, filter *types.RepoFilter
 			SyncStatus:   repo.SyncStatus,
 			License:      repo.License,
 			Repository:   common.BuildCloneInfo(c.config, model.Repository),
+			MultiSource: types.MultiSource{
+				HFPath:  model.Repository.HFPath,
+				MSPath:  model.Repository.MSPath,
+				CSGPath: model.Repository.CSGPath,
+			},
 		})
 	}
 	if needOpWeight {

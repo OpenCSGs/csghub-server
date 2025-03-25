@@ -281,6 +281,11 @@ func (c *datasetComponentImpl) commonIndex(ctx context.Context, filter *types.Re
 				Email:    dataset.Repository.User.Email,
 				Avatar:   dataset.Repository.User.Avatar,
 			},
+			MultiSource: types.MultiSource{
+				HFPath:  dataset.Repository.HFPath,
+				MSPath:  dataset.Repository.MSPath,
+				CSGPath: dataset.Repository.CSGPath,
+			},
 		})
 	}
 
