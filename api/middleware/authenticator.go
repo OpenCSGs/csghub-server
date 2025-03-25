@@ -233,6 +233,25 @@ func NeedAdmin(config *config.Config) gin.HandlerFunc {
 	}
 }
 
+func UserMatch() gin.HandlerFunc {
+	return func(ctx *gin.Context) {
+		currentUser := httpbase.GetCurrentUser(ctx)
+		if currentUser == "" {
+			httpbase.UnauthorizedError(ctx, errors.New("unknown user, please login first"))
+			ctx.Abort()
+			return
+		}
+
+		userName := ctx.Param("username")
+		if userName != currentUser {
+			httpbase.UnauthorizedError(ctx, errors.New("user not match, try to query user account not owned"))
+			slog.Error("user not match, try to query user account not owned", "currentUser", currentUser, "userName", userName)
+			ctx.Abort()
+			return
+		}
+	}
+}
+
 type AuthenticatorCollection struct {
 	// only can be accessed by api key
 	NeedAPIKey gin.HandlerFunc
@@ -240,4 +259,6 @@ type AuthenticatorCollection struct {
 	NeedLogin gin.HandlerFunc
 	//user must be admin role to access
 	NeedAdmin gin.HandlerFunc
+	// user must be the owner of the resource
+	UserMatch gin.HandlerFunc
 }
