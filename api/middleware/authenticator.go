@@ -64,25 +64,14 @@ func AuthSession() gin.HandlerFunc {
 }
 
 func Authenticator(config *config.Config) gin.HandlerFunc {
-	//TODO:change to component
-	userStore := database.NewUserStore()
+	svcAddr := fmt.Sprintf("%s:%d", config.User.Host, config.User.Port)
+	userSvcClient := rpc.NewUserSvcHttpClient(svcAddr, rpc.AuthWithApiKey(config.APIToken))
 	return func(c *gin.Context) {
-		sessionObj, sessionExists := c.Get(sessions.DefaultKey)
-		if sessionExists && sessionObj != nil {
-			session := sessions.Default(c)
-			sessionUserName := session.Get(httpbase.CurrentUserCtxVar)
-			if sessionUserName != nil {
-				slog.Debug("get username from session", slog.Any("session username", sessionUserName.(string)))
-				if len(sessionUserName.(string)) > 0 {
-					httpbase.SetCurrentUser(c, sessionUserName.(string))
-					httpbase.SetAuthType(c, httpbase.AuthTypeJwt)
-					c.Next()
-					return
-				}
-			}
+		result := isValidBrowserSession(c)
+		if result {
+			c.Next()
+			return
 		}
-
-		apiToken := config.APIToken
 
 		// Get Auzhorization token
 		authHeader := c.Request.Header.Get("Authorization")
@@ -96,38 +85,26 @@ func Authenticator(config *config.Config) gin.HandlerFunc {
 			c.Abort()
 			return
 		}
-		// Get token
+
+		// Get token from header
 		token := strings.TrimPrefix(authHeader, "Bearer ")
-		if token == apiToken {
-			// get current user from query string
-			currentUser := c.Query(httpbase.CurrentUserQueryVar)
-			if len(currentUser) > 0 {
-				httpbase.SetCurrentUser(c, currentUser)
-			}
-			httpbase.SetAuthType(c, httpbase.AuthTypeApiKey)
+
+		result = isValidApiToken(c, config, token)
+		if result {
 			c.Next()
 			return
 		}
 
-		if strings.Contains(token, ".") {
-			claims, err := parseJWTToken(config.JWT.SigningKey, token)
-			if err == nil {
-				httpbase.SetCurrentUser(c, claims.CurrentUser)
-				httpbase.SetAuthType(c, httpbase.AuthTypeJwt)
-				return
-			} else {
-				slog.Error("verify jwt token error", slog.Any("error", err))
-			}
-		} else {
-			//TODO:use cache to check access token
-			user, _ := userStore.FindByAccessToken(context.Background(), token)
-			if user != nil {
-				httpbase.SetCurrentUser(c, user.Username)
-				httpbase.SetAccessToken(c, token)
-				httpbase.SetAuthType(c, httpbase.AuthTypeAccessToken)
-				c.Next()
-				return
-			}
+		result = isValidJWTToken(c, config, token)
+		if result {
+			c.Next()
+			return
+		}
+
+		result = isValidAccessToken(c, userSvcClient, token)
+		if result {
+			c.Next()
+			return
 		}
 
 		slog.ErrorContext(c, "invalid Bearer token", slog.String("token", token),
@@ -138,6 +115,74 @@ func Authenticator(config *config.Config) gin.HandlerFunc {
 		httpbase.UnauthorizedError(c, errors.New("invalid Bearer token"))
 		c.Abort()
 	}
+}
+
+func isValidBrowserSession(c *gin.Context) bool {
+	// check access from UI
+	sessionObj, sessionExists := c.Get(sessions.DefaultKey)
+	if sessionExists && sessionObj != nil {
+		session := sessions.Default(c)
+		sessionUserName := session.Get(httpbase.CurrentUserCtxVar)
+		if sessionUserName != nil {
+			slog.Debug("get username from session", slog.Any("session username", sessionUserName.(string)))
+			if len(sessionUserName.(string)) > 0 {
+				// login success on UI
+				httpbase.SetCurrentUser(c, sessionUserName.(string))
+				httpbase.SetAuthType(c, httpbase.AuthTypeJwt)
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func isValidApiToken(c *gin.Context, config *config.Config, token string) bool {
+	apiToken := config.APIToken
+	if token == apiToken {
+		// get current user from query string
+		currentUser := c.Query(httpbase.CurrentUserQueryVar)
+		if len(currentUser) > 0 {
+			httpbase.SetCurrentUser(c, currentUser)
+		}
+		currentUserUUID := c.Query(httpbase.CurrentUserUUIDQueryVar)
+		if len(currentUserUUID) > 0 {
+			httpbase.SetCurrentUserUUID(c, currentUserUUID)
+		}
+		httpbase.SetAuthType(c, httpbase.AuthTypeApiKey)
+		return true
+	}
+	return false
+}
+
+func isValidJWTToken(c *gin.Context, config *config.Config, token string) bool {
+	if strings.Contains(token, ".") {
+		claims, err := parseJWTToken(config.JWT.SigningKey, token)
+		if err == nil {
+			httpbase.SetCurrentUser(c, claims.CurrentUser)
+			httpbase.SetCurrentUserUUID(c, claims.UUID)
+			httpbase.SetAuthType(c, httpbase.AuthTypeJwt)
+			return true
+		} else {
+			slog.Error("verify jwt token error", slog.Any("error", err))
+		}
+	}
+	return false
+}
+
+func isValidAccessToken(c *gin.Context, userSvcClient rpc.UserSvcClient, token string) bool {
+	user, err := userSvcClient.VerifyByAccessToken(context.Background(), token)
+	if err != nil {
+		slog.ErrorContext(c, "verify access token error", slog.Any("error", err))
+		return false
+	}
+	if user != nil && user.Application == types.AccessTokenAppCSGHub {
+		httpbase.SetCurrentUser(c, user.Username)
+		httpbase.SetCurrentUserUUID(c, user.UserUUID)
+		httpbase.SetAccessToken(c, token)
+		httpbase.SetAuthType(c, httpbase.AuthTypeAccessToken)
+		return true
+	}
+	return false
 }
 
 func parseJWTToken(signKey, tokenString string) (*types.JWTClaims, error) {

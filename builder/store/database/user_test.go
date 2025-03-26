@@ -249,7 +249,7 @@ func TestUserStore_FindByAccessToken(t *testing.T) {
 	_, err = db.Core.NewInsert().Model(at).Exec(ctx)
 	require.Nil(t, err)
 
-	user, err := us.FindByAccessToken(ctx, at.Token)
+	user, err := us.FindByGitAccessToken(ctx, at.Token)
 	require.Empty(t, err)
 	require.Equal(t, "u-foo", user.Username)
 }

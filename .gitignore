@@ -17,6 +17,8 @@ run_deploy_runner_local.sh
 run_rproxy_local.sh
 run_server_local.sh
 run_user_local.sh
+run_aigateway_local.sh
+run_server_my_local.sh
 cmd/csghub-server/__debug_*
 run_dataviewer_local.sh
 local.toml

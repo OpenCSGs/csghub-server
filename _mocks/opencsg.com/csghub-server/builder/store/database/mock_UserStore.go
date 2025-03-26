@@ -60,8 +60,8 @@ func (_c *MockUserStore_ChangeUserName_Call) Run(run func(ctx context.Context, u
 	return _c
 }
 
-func (_c *MockUserStore_ChangeUserName_Call) Return(err error) *MockUserStore_ChangeUserName_Call {
-	_c.Call.Return(err)
+func (_c *MockUserStore_ChangeUserName_Call) Return(_a0 error) *MockUserStore_ChangeUserName_Call {
+	_c.Call.Return(_a0)
 	return _c
 }
 
@@ -164,8 +164,8 @@ func (_c *MockUserStore_Create_Call) Run(run func(ctx context.Context, user *dat
 	return _c
 }
 
-func (_c *MockUserStore_Create_Call) Return(err error) *MockUserStore_Create_Call {
-	_c.Call.Return(err)
+func (_c *MockUserStore_Create_Call) Return(_a0 error) *MockUserStore_Create_Call {
+	_c.Call.Return(_a0)
 	return _c
 }
 
@@ -211,71 +211,12 @@ func (_c *MockUserStore_DeleteUserAndRelations_Call) Run(run func(ctx context.Co
 	return _c
 }
 
-func (_c *MockUserStore_DeleteUserAndRelations_Call) Return(err error) *MockUserStore_DeleteUserAndRelations_Call {
-	_c.Call.Return(err)
+func (_c *MockUserStore_DeleteUserAndRelations_Call) Return(_a0 error) *MockUserStore_DeleteUserAndRelations_Call {
+	_c.Call.Return(_a0)
 	return _c
 }
 
 func (_c *MockUserStore_DeleteUserAndRelations_Call) RunAndReturn(run func(context.Context, database.User) error) *MockUserStore_DeleteUserAndRelations_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
-// FindByAccessToken provides a mock function with given fields: ctx, token
-func (_m *MockUserStore) FindByAccessToken(ctx context.Context, token string) (*database.User, error) {
-	ret := _m.Called(ctx, token)
-
-	if len(ret) == 0 {
-		panic("no return value specified for FindByAccessToken")
-	}
-
-	var r0 *database.User
-	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, string) (*database.User, error)); ok {
-		return rf(ctx, token)
-	}
-	if rf, ok := ret.Get(0).(func(context.Context, string) *database.User); ok {
-		r0 = rf(ctx, token)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*database.User)
-		}
-	}
-
-	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
-		r1 = rf(ctx, token)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
-// MockUserStore_FindByAccessToken_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'FindByAccessToken'
-type MockUserStore_FindByAccessToken_Call struct {
-	*mock.Call
-}
-
-// FindByAccessToken is a helper method to define mock.On call
-//   - ctx context.Context
-//   - token string
-func (_e *MockUserStore_Expecter) FindByAccessToken(ctx interface{}, token interface{}) *MockUserStore_FindByAccessToken_Call {
-	return &MockUserStore_FindByAccessToken_Call{Call: _e.mock.On("FindByAccessToken", ctx, token)}
-}
-
-func (_c *MockUserStore_FindByAccessToken_Call) Run(run func(ctx context.Context, token string)) *MockUserStore_FindByAccessToken_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(string))
-	})
-	return _c
-}
-
-func (_c *MockUserStore_FindByAccessToken_Call) Return(_a0 *database.User, _a1 error) *MockUserStore_FindByAccessToken_Call {
-	_c.Call.Return(_a0, _a1)
-	return _c
-}
-
-func (_c *MockUserStore_FindByAccessToken_Call) RunAndReturn(run func(context.Context, string) (*database.User, error)) *MockUserStore_FindByAccessToken_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -396,63 +337,6 @@ func (_c *MockUserStore_FindByGitAccessToken_Call) RunAndReturn(run func(context
 	return _c
 }
 
-// FindByID provides a mock function with given fields: ctx, id
-func (_m *MockUserStore) FindByID(ctx context.Context, id int) (database.User, error) {
-	ret := _m.Called(ctx, id)
-
-	if len(ret) == 0 {
-		panic("no return value specified for FindByID")
-	}
-
-	var r0 database.User
-	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, int) (database.User, error)); ok {
-		return rf(ctx, id)
-	}
-	if rf, ok := ret.Get(0).(func(context.Context, int) database.User); ok {
-		r0 = rf(ctx, id)
-	} else {
-		r0 = ret.Get(0).(database.User)
-	}
-
-	if rf, ok := ret.Get(1).(func(context.Context, int) error); ok {
-		r1 = rf(ctx, id)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
-// MockUserStore_FindByID_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'FindByID'
-type MockUserStore_FindByID_Call struct {
-	*mock.Call
-}
-
-// FindByID is a helper method to define mock.On call
-//   - ctx context.Context
-//   - id int
-func (_e *MockUserStore_Expecter) FindByID(ctx interface{}, id interface{}) *MockUserStore_FindByID_Call {
-	return &MockUserStore_FindByID_Call{Call: _e.mock.On("FindByID", ctx, id)}
-}
-
-func (_c *MockUserStore_FindByID_Call) Run(run func(ctx context.Context, id int)) *MockUserStore_FindByID_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(int))
-	})
-	return _c
-}
-
-func (_c *MockUserStore_FindByID_Call) Return(user database.User, err error) *MockUserStore_FindByID_Call {
-	_c.Call.Return(user, err)
-	return _c
-}
-
-func (_c *MockUserStore_FindByID_Call) RunAndReturn(run func(context.Context, int) (database.User, error)) *MockUserStore_FindByID_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
 // FindByUUID provides a mock function with given fields: ctx, uuid
 func (_m *MockUserStore) FindByUUID(ctx context.Context, uuid string) (*database.User, error) {
 	ret := _m.Called(ctx, uuid)
@@ -559,8 +443,8 @@ func (_c *MockUserStore_FindByUsername_Call) Run(run func(ctx context.Context, u
 	return _c
 }
 
-func (_c *MockUserStore_FindByUsername_Call) Return(user database.User, err error) *MockUserStore_FindByUsername_Call {
-	_c.Call.Return(user, err)
+func (_c *MockUserStore_FindByUsername_Call) Return(_a0 database.User, _a1 error) *MockUserStore_FindByUsername_Call {
+	_c.Call.Return(_a0, _a1)
 	return _c
 }
 
@@ -617,8 +501,8 @@ func (_c *MockUserStore_Index_Call) Run(run func(ctx context.Context)) *MockUser
 	return _c
 }
 
-func (_c *MockUserStore_Index_Call) Return(users []database.User, err error) *MockUserStore_Index_Call {
-	_c.Call.Return(users, err)
+func (_c *MockUserStore_Index_Call) Return(_a0 []database.User, _a1 error) *MockUserStore_Index_Call {
+	_c.Call.Return(_a0, _a1)
 	return _c
 }
 
@@ -685,8 +569,8 @@ func (_c *MockUserStore_IndexWithSearch_Call) Run(run func(ctx context.Context, 
 	return _c
 }
 
-func (_c *MockUserStore_IndexWithSearch_Call) Return(users []database.User, count int, err error) *MockUserStore_IndexWithSearch_Call {
-	_c.Call.Return(users, count, err)
+func (_c *MockUserStore_IndexWithSearch_Call) Return(_a0 []database.User, _a1 int, _a2 error) *MockUserStore_IndexWithSearch_Call {
+	_c.Call.Return(_a0, _a1, _a2)
 	return _c
 }
 
@@ -742,8 +626,8 @@ func (_c *MockUserStore_IsExist_Call) Run(run func(ctx context.Context, username
 	return _c
 }
 
-func (_c *MockUserStore_IsExist_Call) Return(exists bool, err error) *MockUserStore_IsExist_Call {
-	_c.Call.Return(exists, err)
+func (_c *MockUserStore_IsExist_Call) Return(_a0 bool, _a1 error) *MockUserStore_IsExist_Call {
+	_c.Call.Return(_a0, _a1)
 	return _c
 }
 
@@ -799,8 +683,8 @@ func (_c *MockUserStore_IsExistByUUID_Call) Run(run func(ctx context.Context, uu
 	return _c
 }
 
-func (_c *MockUserStore_IsExistByUUID_Call) Return(exists bool, err error) *MockUserStore_IsExistByUUID_Call {
-	_c.Call.Return(exists, err)
+func (_c *MockUserStore_IsExistByUUID_Call) Return(_a0 bool, _a1 error) *MockUserStore_IsExistByUUID_Call {
+	_c.Call.Return(_a0, _a1)
 	return _c
 }
 
@@ -847,8 +731,8 @@ func (_c *MockUserStore_Update_Call) Run(run func(ctx context.Context, user *dat
 	return _c
 }
 
-func (_c *MockUserStore_Update_Call) Return(err error) *MockUserStore_Update_Call {
-	_c.Call.Return(err)
+func (_c *MockUserStore_Update_Call) Return(_a0 error) *MockUserStore_Update_Call {
+	_c.Call.Return(_a0)
 	return _c
 }
 

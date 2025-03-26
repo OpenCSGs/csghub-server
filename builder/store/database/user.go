@@ -8,39 +8,37 @@ import (
 	"github.com/uptrace/bun"
 )
 
+// Define the UserStore interface
 type UserStore interface {
-	Index(ctx context.Context) (users []User, err error)
-	IndexWithSearch(ctx context.Context, search string, per, page int) (users []User, count int, err error)
-	FindByUsername(ctx context.Context, username string) (user User, err error)
-	FindByID(ctx context.Context, id int) (user User, err error)
+	Index(ctx context.Context) ([]User, error)
+	IndexWithSearch(ctx context.Context, search string, per, page int) ([]User, int, error)
+	FindByUsername(ctx context.Context, username string) (User, error)
 	FindByEmail(ctx context.Context, email string) (User, error)
 	// Update write the user data back to db. odlUserName should not be empty if username changed
-	Update(ctx context.Context, user *User, oldUserName string) (err error)
-	ChangeUserName(ctx context.Context, username string, newUsername string) (err error)
-	Create(ctx context.Context, user *User, namespace *Namespace) (err error)
-	IsExist(ctx context.Context, username string) (exists bool, err error)
-	IsExistByUUID(ctx context.Context, uuid string) (exists bool, err error)
-	// FindByAccessToken retrieves user information based on the access token. The access token must be active and not expired.
-	FindByAccessToken(ctx context.Context, token string) (*User, error)
+	Update(ctx context.Context, user *User, oldUserName string) error
+	ChangeUserName(ctx context.Context, username string, newUsername string) error
+	Create(ctx context.Context, user *User, namespace *Namespace) error
+	IsExist(ctx context.Context, username string) (bool, error)
+	IsExistByUUID(ctx context.Context, uuid string) (bool, error)
 	FindByGitAccessToken(ctx context.Context, token string) (*User, error)
 	FindByUUID(ctx context.Context, uuid string) (*User, error)
-	DeleteUserAndRelations(ctx context.Context, input User) (err error)
+	DeleteUserAndRelations(ctx context.Context, input User) error
 	CountUsers(ctx context.Context) (int, error)
 }
 
 // Implement the UserStore interface in UserStoreImpl
-type userStoreImpl struct {
+type UserStoreImpl struct {
 	db *DB
 }
 
 func NewUserStore() UserStore {
-	return &userStoreImpl{
+	return &UserStoreImpl{
 		db: defaultDB,
 	}
 }
 
 func NewUserStoreWithDB(db *DB) UserStore {
-	return &userStoreImpl{
+	return &UserStoreImpl{
 		db: db,
 	}
 }
@@ -97,7 +95,6 @@ func (u *User) Roles() []string {
 }
 
 // CanAdmin checks if the user has admin or super_user roles.
-//
 // It returns a boolean indicating whether the user has admin or super_user roles.
 func (u *User) CanAdmin() bool {
 	return strings.Contains(u.RoleMask, "admin") || strings.Contains(u.RoleMask, "super_user")
@@ -107,7 +104,7 @@ func (u *User) SetRoles(roles []string) {
 	u.RoleMask = strings.Join(roles, ",")
 }
 
-func (s *userStoreImpl) Index(ctx context.Context) (users []User, err error) {
+func (s *UserStoreImpl) Index(ctx context.Context) (users []User, err error) {
 	err = s.db.Operator.Core.NewSelect().Model(&users).Scan(ctx, &users)
 	if err != nil {
 		return
@@ -115,7 +112,7 @@ func (s *userStoreImpl) Index(ctx context.Context) (users []User, err error) {
 	return
 }
 
-func (s *userStoreImpl) IndexWithSearch(ctx context.Context, search string, per, page int) (users []User, count int, err error) {
+func (s *UserStoreImpl) IndexWithSearch(ctx context.Context, search string, per, page int) (users []User, count int, err error) {
 	search = strings.ToLower(search)
 	query := s.db.Operator.Core.NewSelect().
 		Model(&users)
@@ -134,25 +131,25 @@ func (s *userStoreImpl) IndexWithSearch(ctx context.Context, search string, per,
 	return
 }
 
-func (s *userStoreImpl) FindByUsername(ctx context.Context, username string) (user User, err error) {
+func (s *UserStoreImpl) FindByUsername(ctx context.Context, username string) (user User, err error) {
 	user.Username = username
 	err = s.db.Operator.Core.NewSelect().Model(&user).Where("username = ?", username).Scan(ctx)
 	return
 }
 
-func (s *userStoreImpl) FindByEmail(ctx context.Context, email string) (user User, err error) {
+func (s *UserStoreImpl) FindByEmail(ctx context.Context, email string) (user User, err error) {
 	user.Email = email
 	err = s.db.Operator.Core.NewSelect().Model(&user).Where("email = ?", email).Scan(ctx)
 	return
 }
 
-func (s *userStoreImpl) FindByID(ctx context.Context, id int) (user User, err error) {
+func (s *UserStoreImpl) FindByID(ctx context.Context, id int) (user User, err error) {
 	user.ID = int64(id)
 	err = s.db.Operator.Core.NewSelect().Model(&user).WherePK().Scan(ctx)
 	return
 }
 
-func (s *userStoreImpl) Update(ctx context.Context, user *User, oldUserName string) (err error) {
+func (s *UserStoreImpl) Update(ctx context.Context, user *User, oldUserName string) (err error) {
 	return s.db.Operator.Core.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
 		if len(oldUserName) > 0 && oldUserName != user.Username {
 			if err = assertAffectedOneRow(tx.NewUpdate().Model((*Namespace)(nil)).
@@ -176,7 +173,7 @@ func (s *userStoreImpl) Update(ctx context.Context, user *User, oldUserName stri
 	})
 }
 
-func (s *userStoreImpl) ChangeUserName(ctx context.Context, username string, newUsername string) (err error) {
+func (s *UserStoreImpl) ChangeUserName(ctx context.Context, username string, newUsername string) (err error) {
 	return s.db.Operator.Core.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
 		if err = assertAffectedOneRow(tx.NewUpdate().Model((*Namespace)(nil)).
 			Set("path = ?", newUsername).
@@ -200,7 +197,7 @@ func (s *userStoreImpl) ChangeUserName(ctx context.Context, username string, new
 	})
 }
 
-func (s *userStoreImpl) Create(ctx context.Context, user *User, namespace *Namespace) (err error) {
+func (s *UserStoreImpl) Create(ctx context.Context, user *User, namespace *Namespace) (err error) {
 	err = s.db.Operator.Core.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
 		if err = assertAffectedOneRow(tx.NewInsert().Model(user).Exec(ctx)); err != nil {
 			return err
@@ -215,7 +212,7 @@ func (s *userStoreImpl) Create(ctx context.Context, user *User, namespace *Names
 	return
 }
 
-func (s *userStoreImpl) IsExist(ctx context.Context, username string) (exists bool, err error) {
+func (s *UserStoreImpl) IsExist(ctx context.Context, username string) (exists bool, err error) {
 	return s.db.Operator.Core.
 		NewSelect().
 		Model((*User)(nil)).
@@ -223,7 +220,7 @@ func (s *userStoreImpl) IsExist(ctx context.Context, username string) (exists bo
 		Exists(ctx)
 }
 
-func (s *userStoreImpl) IsExistByUUID(ctx context.Context, uuid string) (exists bool, err error) {
+func (s *UserStoreImpl) IsExistByUUID(ctx context.Context, uuid string) (exists bool, err error) {
 	return s.db.Operator.Core.
 		NewSelect().
 		Model((*User)(nil)).
@@ -232,22 +229,7 @@ func (s *userStoreImpl) IsExistByUUID(ctx context.Context, uuid string) (exists 
 }
 
 // FindByAccessToken retrieves user information based on the access token. The access token must be active and not expired.
-func (s *userStoreImpl) FindByAccessToken(ctx context.Context, token string) (*User, error) {
-	var user User
-	_, err := s.db.Operator.Core.
-		NewSelect().
-		ColumnExpr("u.*").
-		TableExpr("users AS u").
-		Join("JOIN access_tokens AS t ON u.id = t.user_id").
-		Where("t.token = ? and t.is_active = true and (t.expired_at is null or t.expired_at > now()) ", token).
-		Exec(ctx, &user)
-	if err != nil {
-		return nil, err
-	}
-	return &user, nil
-}
-
-func (s *userStoreImpl) FindByGitAccessToken(ctx context.Context, token string) (*User, error) {
+func (s *UserStoreImpl) FindByGitAccessToken(ctx context.Context, token string) (*User, error) {
 	var user User
 	_, err := s.db.Operator.Core.
 		NewSelect().
@@ -263,7 +245,7 @@ func (s *userStoreImpl) FindByGitAccessToken(ctx context.Context, token string) 
 	return &user, nil
 }
 
-func (s *userStoreImpl) FindByUUID(ctx context.Context, uuid string) (*User, error) {
+func (s *UserStoreImpl) FindByUUID(ctx context.Context, uuid string) (*User, error) {
 	var user User
 	err := s.db.Operator.Core.NewSelect().Model(&user).Where("uuid = ?", uuid).Scan(ctx)
 	if err != nil {
@@ -272,7 +254,14 @@ func (s *userStoreImpl) FindByUUID(ctx context.Context, uuid string) (*User, err
 	return &user, nil
 }
 
-func (s *userStoreImpl) DeleteUserAndRelations(ctx context.Context, input User) (err error) {
+func (s *UserStoreImpl) GetActiveUserCount(ctx context.Context) (int, error) {
+	return s.db.Operator.Core.
+		NewSelect().
+		Model(&User{}).
+		Count(ctx)
+}
+
+func (s *UserStoreImpl) DeleteUserAndRelations(ctx context.Context, input User) (err error) {
 	exists, err := s.IsExist(ctx, input.Username)
 	if err != nil {
 		return fmt.Errorf("error checking if user exists: %v", err)
@@ -353,7 +342,7 @@ func (s *userStoreImpl) DeleteUserAndRelations(ctx context.Context, input User) 
 	return
 }
 
-func (s *userStoreImpl) CountUsers(ctx context.Context) (int, error) {
+func (s *UserStoreImpl) CountUsers(ctx context.Context) (int, error) {
 	var users []User
 	q := s.db.Operator.Core.NewSelect().Model(&users)
 	count, err := q.Count(ctx)
