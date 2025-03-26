@@ -2,6 +2,7 @@ package start
 
 import (
 	"fmt"
+	"log/slog"
 
 	"github.com/spf13/cobra"
 	"opencsg.com/csghub-server/api/httpbase"
@@ -29,6 +30,7 @@ var rproxyCmd = &cobra.Command{
 		if err != nil {
 			return fmt.Errorf("failed to init router: %w", err)
 		}
+		slog.Info("rproxy http server is running", slog.Any("port", cfg.Space.RProxyServerPort))
 		server := httpbase.NewGracefulServer(
 			httpbase.GraceServerOpt{
 				Port: cfg.Space.RProxyServerPort,
