@@ -267,16 +267,24 @@ func (c *AliyunGreenChecker) PassStreamCheck(ctx context.Context, scenario Scena
 		return nil, fmt.Errorf("aliyun TextModerationPlusWithOptions text moderation not success")
 	}
 
-	if *resp.Body.Data.RiskLevel == "low" || *resp.Body.Data.RiskLevel == "none" {
-		return &CheckResult{IsSensitive: false}, nil
-	}
-
-	result, err := json.Marshal(resp.Body.Data.Result)
+	resultStr, err := json.Marshal(resp.Body.Data.Result)
 	if err != nil {
 		return nil, fmt.Errorf("resp.Body.Data.result Marshal error: %v", err)
 	}
+	if *resp.Body.Data.RiskLevel == "low" || *resp.Body.Data.RiskLevel == "none" {
+		return &CheckResult{IsSensitive: false, Reason: string(resultStr)}, nil
+	}
+	// refer to label https://help.aliyun.com/document_detail/2671445.html#section-3t8-ane-efg
+	for _, result := range resp.Body.Data.Result {
+		if !strings.Contains(*result.Label, "political") {
+			continue
+		}
+		slog.Info("sensitive content detected", slog.String("content", text),
+			slog.String("label", *result.Label), slog.String("aliyun_request_id", *resp.Body.RequestId))
+		return &CheckResult{IsSensitive: true, Reason: string(resultStr)}, nil
+	}
 
-	return &CheckResult{IsSensitive: true, Reason: string(result)}, nil
+	return &CheckResult{IsSensitive: false, Reason: string(resultStr)}, nil
 }
 
 func (c *AliyunGreenChecker) PassImageCheck(ctx context.Context, scenario Scenario, ossBucketName, ossObjectName string) (*CheckResult, error) {
