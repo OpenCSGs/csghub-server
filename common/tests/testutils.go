@@ -67,6 +67,10 @@ func chProjectRoot() {
 	}
 }
 
+const (
+	pgImage = "opencsg-registry.cn-beijing.cr.aliyuncs.com/opencsg_public/csghub/postgres:15.10"
+)
+
 // Init a test db, must call `defer db.Close()` in the test
 func InitTestDB() *database.DB {
 	ctx := context.TODO()
@@ -81,7 +85,7 @@ func InitTestDB() *database.DB {
 	)
 
 	pc, err := postgres.Run(ctx,
-		"postgres:15.7",
+		pgImage,
 		reuse,
 		postgres.WithDatabase("csghub_test"),
 		testcontainers.WithWaitStrategy(

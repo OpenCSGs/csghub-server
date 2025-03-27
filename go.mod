@@ -6,7 +6,6 @@ require (
 	github.com/DATA-DOG/go-txdb v0.2.0
 	github.com/OpenCSGs/gitea-go-sdk/gitea v0.0.0-20240618091626-54fa52f1cec6
 	github.com/alibabacloud-go/darabonba-openapi/v2 v2.0.10
-	github.com/alibabacloud-go/green-20220302 v1.2.0
 	github.com/alibabacloud-go/green-20220302/v2 v2.20.0
 	github.com/alibabacloud-go/tea v1.2.2
 	github.com/aliyun/alibaba-cloud-sdk-go v1.62.648
@@ -39,7 +38,6 @@ require (
 	github.com/swaggo/swag v1.16.2
 	github.com/testcontainers/testcontainers-go v0.33.0
 	github.com/testcontainers/testcontainers-go/modules/postgres v0.33.0
-	github.com/tidwall/gjson v1.18.0
 	github.com/tidwall/sjson v1.2.5
 	github.com/uptrace/bun v1.2.8
 	github.com/uptrace/bun/dialect/pgdialect v1.2.8
@@ -192,6 +190,7 @@ require (
 	github.com/temporalio/ringpop-go v0.0.0-20241119001152-e505ebd8f887 // indirect
 	github.com/temporalio/sqlparser v0.0.0-20231115171017-f4060bcfa6cb // indirect
 	github.com/temporalio/tchannel-go v1.22.1-0.20240528171429-1db37fdea938 // indirect
+	github.com/tidwall/gjson v1.18.0 // indirect
 	github.com/tidwall/match v1.1.1 // indirect
 	github.com/tidwall/pretty v1.2.1 // indirect
 	github.com/tinylib/msgp v1.1.2 // indirect
@@ -320,7 +319,7 @@ require (
 	golang.org/x/crypto v0.32.0
 	golang.org/x/net v0.34.0 // indirect
 	golang.org/x/oauth2 v0.24.0 // indirect
-	golang.org/x/sync v0.10.0 // indirect
+	golang.org/x/sync v0.10.0
 	golang.org/x/sys v0.29.0 // indirect
 	golang.org/x/term v0.28.0 // indirect
 	golang.org/x/text v0.21.0 // indirect

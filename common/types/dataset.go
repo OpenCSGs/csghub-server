@@ -43,6 +43,7 @@ type Dataset struct {
 	CanWrite             bool                 `json:"can_write"`
 	CanManage            bool                 `json:"can_manage"`
 	Namespace            *Namespace           `json:"namespace"`
+	Scores               []WeightScore        `json:"scores"`
 	SensitiveCheckStatus string               `json:"sensitive_check_status"`
 	MirrorLastUpdatedAt  time.Time            `json:"mirror_last_updated_at"`
 	MultiSource

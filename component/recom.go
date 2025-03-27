@@ -62,7 +62,11 @@ func (rc *recomComponentImpl) CalculateRecomScore(ctx context.Context) {
 	for _, repo := range repos {
 		repoID := repo.ID
 		score := rc.CalcTotalScore(ctx, repo, weights)
-		err := rc.recomStore.UpsertScore(ctx, repoID, score)
+		dbRecomScore := &database.RecomRepoScore{
+			RepositoryID: repoID,
+			WeightName:   database.RecomWeightTotal,
+			Score:        score}
+		err := rc.recomStore.UpsertScore(ctx, []*database.RecomRepoScore{dbRecomScore})
 		if err != nil {
 			slog.Error("Error updating recom score", slog.Int64("repo_id", repoID), slog.Float64("score", score),
 				slog.String("error", err.Error()))

@@ -6,6 +6,17 @@ import (
 	"opencsg.com/csghub-server/common/types"
 )
 
+type RecomWeightName string // like freshess, downloads, quality, op, etc
+
+const (
+	RecomWeightFreshness RecomWeightName = "freshness"
+	RecomWeightDownloads RecomWeightName = "downloads"
+	RecomWeightQuality   RecomWeightName = "quality"
+	RecomWeightOp        RecomWeightName = "op"
+	// sum of all other weight scores
+	RecomWeightTotal RecomWeightName = "total"
+)
+
 type Space struct {
 	ID           int64       `bun:",pk,autoincrement" json:"id"`
 	RepositoryID int64       `bun:",notnull" json:"repository_id"`
@@ -35,6 +46,7 @@ type RecomWeight struct {
 	times
 }
 
+// Deprecated: use RecomRepoScore's 'op' score instead
 // RecomOpWeight are the special weights of a repository manually set by operator
 type RecomOpWeight struct {
 	RepositoryID int64 `bun:",pk" json:"repository_id"`
@@ -44,8 +56,11 @@ type RecomOpWeight struct {
 
 // RecomRepoScore is the recommendation score of a repository
 type RecomRepoScore struct {
-	RepositoryID int64 `bun:",pk" json:"repository_id"`
-	//the total recommendation score calculated by all the recommendation weights
+	ID           int64 `bun:",pk,autoincrement" json:"id"`
+	RepositoryID int64 `bun:",notnull" json:"repository_id"`
+	// like freshess, downloads, quality, op, etc
+	WeightName RecomWeightName `bun:",notnull" json:"weight_name"`
+	//the recommendation score calculated for corresponding weights
 	Score float64 `bun:",notnull" json:"score"`
 	times
 }
