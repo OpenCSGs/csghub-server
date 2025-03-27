@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/alibabacloud-go/green-20220302/v2/client"
+	util "github.com/alibabacloud-go/tea-utils/v2/service"
 	"github.com/alibabacloud-go/tea/tea"
 	"github.com/aliyun/alibaba-cloud-sdk-go/services/green"
 	"github.com/stretchr/testify/mock"
@@ -135,6 +136,64 @@ func TestSensitiveChecker_PassTextCheck(t *testing.T) {
 			require.Equal(t, c.isSensitive, result.IsSensitive)
 			if result.IsSensitive {
 				require.Equal(t, "bar", result.Reason)
+			}
+		})
+	}
+}
+
+func TestSensitiveChecker_PassStreamCheck(t *testing.T) {
+	gc := mockgreen.NewMockGreenClient(t)
+	g2c := mockgreen.NewMockGreen2022Client(t)
+	checker := sensitive.NewAliyunChecker(gc, g2c)
+
+	cases := []struct {
+		labels      string
+		isSensitive bool
+		riskLevel   string
+	}{
+		{"", false, "none"},
+		{"ad", false, "low"},
+		{"flood", false, "low"},
+		{"ad,flood", false, "low"},
+		{"political_content", true, "high"},
+	}
+
+	id := "123"
+	options := &util.RuntimeOptions{
+		ReadTimeout:    tea.Int(500),
+		ConnectTimeout: tea.Int(500),
+	}
+	for _, c := range cases {
+		t.Run(c.labels, func(t *testing.T) {
+			task := map[string]string{"content": "foo", "sessionId": id}
+			params, err := json.Marshal(task)
+			require.Nil(t, err)
+
+			req := &client.TextModerationPlusRequest{
+				Service:           tea.String("foo"),
+				ServiceParameters: tea.String(string(params)),
+			}
+
+			g2c.EXPECT().TextModerationPlusWithOptions(req, options).Return(&client.TextModerationPlusResponse{
+				StatusCode: tea.Int32(200),
+				Body: &client.TextModerationPlusResponseBody{
+					Code:      tea.Int32(200),
+					RequestId: tea.String("z"),
+					Data: &client.TextModerationPlusResponseBodyData{
+						Result: []*client.TextModerationPlusResponseBodyDataResult{
+							{
+								Label: &c.labels,
+							},
+						},
+						RiskLevel: &c.riskLevel,
+					},
+				},
+			}, nil).Once()
+			result, err := checker.PassStreamCheck(context.Background(), "foo", "foo", id)
+			require.Nil(t, err)
+			require.Equal(t, c.isSensitive, result.IsSensitive)
+			if result.IsSensitive {
+				require.Equal(t, "[{\"Label\":\"political_content\"}]", result.Reason)
 			}
 		})
 	}

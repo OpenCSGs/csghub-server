@@ -7,18 +7,27 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"hash/fnv"
 	"log/slog"
 	"net"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 	"github.com/openai/openai-go"
 	"opencsg.com/csghub-server/aigateway/token"
 	"opencsg.com/csghub-server/builder/rpc"
 	"opencsg.com/csghub-server/builder/sensitive"
 )
+
+type CommonResponseWriter interface {
+	Header() http.Header
+	WriteHeader(int)
+	Write([]byte) (int, error)
+	Flush()
+	WithModeration(rpc.ModerationSvcClient)
+}
 
 var ErrSensitiveContent = errors.New("sensitive content detected")
 
@@ -30,6 +39,7 @@ type ResponseWriterWrapper struct {
 	eventStreamDecoder *eventStreamDecoder
 	tokenCounter       token.LLMTokenCounter
 	useStream          bool
+	id                 string
 }
 
 // Hijack allows the HTTP connection upgrading to a different protocol, such as WebSockets or HTTP/2.
@@ -38,21 +48,21 @@ func (rw *ResponseWriterWrapper) Hijack() (net.Conn, *bufio.ReadWriter, error) {
 }
 
 func NewResponseWriterWrapper(internalWritter gin.ResponseWriter, useStream bool) *ResponseWriterWrapper {
+	id := uuid.New().ID()
 	return &ResponseWriterWrapper{
 		internalWritter:    internalWritter,
 		eventStreamDecoder: &eventStreamDecoder{},
 		useStream:          useStream,
+		id:                 fmt.Sprint(id),
 	}
 }
 
-func (rw *ResponseWriterWrapper) WithModeration(modSvcClient rpc.ModerationSvcClient) *ResponseWriterWrapper {
+func (rw *ResponseWriterWrapper) WithModeration(modSvcClient rpc.ModerationSvcClient) {
 	rw.modSvcClient = modSvcClient
-	return rw
 }
 
-func (rw *ResponseWriterWrapper) WithLLMTokenCounter(llmTokenCounter token.LLMTokenCounter) *ResponseWriterWrapper {
+func (rw *ResponseWriterWrapper) WithLLMTokenCounter(llmTokenCounter token.LLMTokenCounter) {
 	rw.tokenCounter = llmTokenCounter
-	return rw
 }
 
 func (rw *ResponseWriterWrapper) Header() http.Header {
@@ -126,7 +136,7 @@ func (rw *ResponseWriterWrapper) streamWrite(data []byte) (int, error) {
 				return len(data), nil
 			}
 			// call moderation service
-			if chunk.Choices[0].Delta.Content == "" {
+			if chunk.Choices[0].Delta.Content == "" || strings.TrimSpace(chunk.Choices[0].Delta.Content) == "" {
 				rw.writeInternal(event.Raw)
 				continue
 			}
@@ -136,7 +146,7 @@ func (rw *ResponseWriterWrapper) streamWrite(data []byte) (int, error) {
 				continue
 			}
 
-			result, err := rw.modStream(chunk.Choices[0].Delta.Content, stringToNumber(chunk.ID))
+			result, err := rw.modStream(chunk.Choices[0].Delta.Content, rw.id)
 			if err != nil {
 				slog.Error("ResponseWriterWrapper streamWrite modStream err", slog.String("content", chunk.Choices[0].Delta.Content), slog.Any("error", err))
 				rw.writeInternal(event.Raw)
@@ -205,10 +215,4 @@ func (rw *ResponseWriterWrapper) modStream(text, id string) (*rpc.CheckResult, e
 		return nil, fmt.Errorf("failed to call moderation service to check content sensitive: %w", err)
 	}
 	return result, nil
-}
-
-func stringToNumber(s string) string {
-	h := fnv.New64a()
-	h.Write([]byte(s))
-	return fmt.Sprintf("%d", h.Sum64())
 }
