@@ -337,11 +337,10 @@ func (d *deployer) Wakeup(ctx context.Context, dr types.DeployRepo) error {
 	defer resp.Body.Close()
 
 	// Check if the request was successful
-	if resp.StatusCode == http.StatusOK {
-		return nil
-	} else {
+	if resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("space endpoint status not ok, status:%d", resp.StatusCode)
 	}
+	return nil
 }
 
 func (d *deployer) Exist(ctx context.Context, dr types.DeployRepo) (bool, error) {
