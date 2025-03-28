@@ -23,13 +23,13 @@ type UserComponent interface {
 	Spaces(ctx context.Context, req *types.UserSpacesReq) ([]types.Space, int, error)
 	AddLikes(ctx context.Context, req *types.UserLikesRequest) error
 	// user likes collection
-	LikesCollection(ctx context.Context, req *types.UserSpacesReq) ([]types.Collection, int, error)
+	LikesCollection(ctx context.Context, req *types.UserCollectionReq) ([]types.Collection, int, error)
 	// UserCollections get collections of owner or visible to current user
 	Collections(ctx context.Context, req *types.UserCollectionReq) ([]types.Collection, int, error)
 	LikeCollection(ctx context.Context, req *types.UserLikesRequest) error
 	UnLikeCollection(ctx context.Context, req *types.UserLikesRequest) error
 	DeleteLikes(ctx context.Context, req *types.UserLikesRequest) error
-	LikesSpaces(ctx context.Context, req *types.UserSpacesReq) ([]types.Space, int, error)
+	LikesSpaces(ctx context.Context, req *types.UserCollectionReq) ([]types.Space, int, error)
 	LikesCodes(ctx context.Context, req *types.UserModelsReq) ([]types.Code, int, error)
 	LikesModels(ctx context.Context, req *types.UserModelsReq) ([]types.Model, int, error)
 	LikesDatasets(ctx context.Context, req *types.UserDatasetsReq) ([]types.Dataset, int, error)
@@ -424,7 +424,7 @@ func (c *userComponentImpl) DeleteLikes(ctx context.Context, req *types.UserLike
 	return err
 }
 
-func (c *userComponentImpl) LikesSpaces(ctx context.Context, req *types.UserSpacesReq) ([]types.Space, int, error) {
+func (c *userComponentImpl) LikesSpaces(ctx context.Context, req *types.UserCollectionReq) ([]types.Space, int, error) {
 	user, err := c.userStore.FindByUsername(ctx, req.CurrentUser)
 	if err != nil {
 		newError := fmt.Errorf("failed to check for the presence of the user, error:%w", err)

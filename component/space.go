@@ -39,7 +39,7 @@ type SpaceComponent interface {
 	OrgSpaces(ctx context.Context, req *types.OrgSpacesReq) ([]types.Space, int, error)
 	// UserSpaces get spaces of owner and visible to current user
 	UserSpaces(ctx context.Context, req *types.UserSpacesReq) ([]types.Space, int, error)
-	UserLikesSpaces(ctx context.Context, req *types.UserSpacesReq, userID int64) ([]types.Space, int, error)
+	UserLikesSpaces(ctx context.Context, req *types.UserCollectionReq, userID int64) ([]types.Space, int, error)
 	ListByPath(ctx context.Context, paths []string) ([]*types.Space, error)
 	AllowCallApi(ctx context.Context, spaceID int64, username string) (bool, error)
 	Delete(ctx context.Context, namespace, name, currentUser string) error
@@ -547,7 +547,6 @@ func (c *spaceComponentImpl) Index(ctx context.Context, repoFilter *types.RepoFi
 			Sdk:           space.Sdk,
 			SdkVersion:    space.SdkVersion,
 			Template:      space.Template,
-			Env:           space.Env,
 			Hardware:      space.Hardware,
 			Secrets:       space.Secrets,
 			CoverImageUrl: space.CoverImageUrl,
@@ -611,7 +610,7 @@ func (c *spaceComponentImpl) OrgSpaces(ctx context.Context, req *types.OrgSpaces
 // UserSpaces get spaces of owner and visible to current user
 func (c *spaceComponentImpl) UserSpaces(ctx context.Context, req *types.UserSpacesReq) ([]types.Space, int, error) {
 	onlyPublic := req.Owner != req.CurrentUser
-	ms, total, err := c.spaceStore.ByUsername(ctx, req.Owner, req.PageSize, req.Page, onlyPublic)
+	ms, total, err := c.spaceStore.ByUsername(ctx, req, onlyPublic)
 	if err != nil {
 		newError := fmt.Errorf("failed to get spaces by username,%w", err)
 		return nil, 0, newError
@@ -619,7 +618,8 @@ func (c *spaceComponentImpl) UserSpaces(ctx context.Context, req *types.UserSpac
 
 	var resSpaces []types.Space
 	for _, data := range ms {
-		_, status, _ := c.status(ctx, &data)
+		svcName, status, _ := c.status(ctx, &data)
+		endpoint := c.getEndpoint(svcName, &data)
 		resSpaces = append(resSpaces, types.Space{
 			ID:            data.ID,
 			Name:          data.Repository.Name,
@@ -634,13 +634,15 @@ func (c *spaceComponentImpl) UserSpaces(ctx context.Context, req *types.UserSpac
 			Hardware:      data.Hardware,
 			Status:        status,
 			CoverImageUrl: data.CoverImageUrl,
+			Sdk:           data.Sdk,
+			Endpoint:      endpoint,
 		})
 	}
 
 	return resSpaces, total, nil
 }
 
-func (c *spaceComponentImpl) UserLikesSpaces(ctx context.Context, req *types.UserSpacesReq, userID int64) ([]types.Space, int, error) {
+func (c *spaceComponentImpl) UserLikesSpaces(ctx context.Context, req *types.UserCollectionReq, userID int64) ([]types.Space, int, error) {
 	ms, total, err := c.spaceStore.ByUserLikes(ctx, userID, req.PageSize, req.Page)
 	if err != nil {
 		newError := fmt.Errorf("failed to get spaces by username,%w", err)

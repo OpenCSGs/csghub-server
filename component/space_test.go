@@ -135,14 +135,21 @@ func TestSpaceComponent_UserSpaces(t *testing.T) {
 	ctx := context.TODO()
 	sc := initializeTestSpaceComponent(ctx, t)
 
-	sc.mocks.stores.SpaceMock().EXPECT().ByUsername(ctx, "owner", 10, 1, true).Return(
+	sc.mocks.stores.SpaceMock().EXPECT().ByUsername(ctx, &types.UserSpacesReq{
+		Owner:       "owner",
+		CurrentUser: "user",
+		PageOpts: types.PageOpts{
+			Page:     1,
+			PageSize: 10,
+		},
+	}, true).Return(
 		[]database.Space{
 			{ID: 1, RepositoryID: 11, Repository: &database.Repository{ID: 11, Name: "r1"}},
 			{ID: 2, RepositoryID: 12, Repository: &database.Repository{ID: 12, Name: "r2"}},
 		}, 100, nil,
 	)
 
-	data, total, err := sc.UserSpaces(ctx, &types.UserDatasetsReq{
+	data, total, err := sc.UserSpaces(ctx, &types.UserSpacesReq{
 		Owner:       "owner",
 		CurrentUser: "user",
 		PageOpts: types.PageOpts{
@@ -170,7 +177,7 @@ func TestSpaceComponent_UserLikeSpaces(t *testing.T) {
 		}, 100, nil,
 	)
 
-	data, total, err := sc.UserLikesSpaces(ctx, &types.UserDatasetsReq{
+	data, total, err := sc.UserLikesSpaces(ctx, &types.UserCollectionReq{
 		Owner:       "owner",
 		CurrentUser: "user",
 		PageOpts: types.PageOpts{

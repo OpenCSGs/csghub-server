@@ -136,11 +136,17 @@ type UserDatasetsReq struct {
 	PageOpts
 }
 
+type UserSpacesReq struct {
+	SDK         string `json:"sdk"`
+	Owner       string `json:"owner"`
+	CurrentUser string `json:"current_user"`
+	PageOpts
+}
+
 type (
 	UserModelsReq          = UserDatasetsReq
 	UserCodesReq           = UserDatasetsReq
-	UserSpacesReq          = UserDatasetsReq
-	UserCollectionReq      = UserDatasetsReq
+	UserCollectionReq      = UserSpacesReq
 	DeleteUserTokenRequest = CreateUserTokenRequest
 	UserPromptsReq         = UserDatasetsReq
 	UserEvaluationReq      = UserDatasetsReq

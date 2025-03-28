@@ -176,7 +176,7 @@ func TestUserComponent_Collections(t *testing.T) {
 	uc.mocks.stores.CollectionMock().EXPECT().ByUsername(ctx, "owner", 10, 1, true).Return([]database.Collection{
 		{ID: 1, Name: "foo"},
 	}, 100, nil)
-	data, total, err := uc.Collections(ctx, &types.UserSpacesReq{
+	data, total, err := uc.Collections(ctx, &types.UserCollectionReq{
 		Owner:       "owner",
 		CurrentUser: "user",
 		PageOpts: types.PageOpts{
@@ -243,7 +243,7 @@ func TestUserComponent_LikesSpaces(t *testing.T) {
 	ctx := context.TODO()
 	uc := initializeTestUserComponent(ctx, t)
 
-	req := &types.UserSpacesReq{
+	req := &types.UserCollectionReq{
 		Owner:       "owner",
 		CurrentUser: "user",
 		PageOpts: types.PageOpts{

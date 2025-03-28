@@ -18,6 +18,7 @@ func TestSpaceStore_CRUD(t *testing.T) {
 	store := database.NewSpaceStoreWithDB(db)
 	_, err := store.Create(ctx, database.Space{
 		RepositoryID: 123,
+		Sdk:          "sdk1",
 	})
 	require.Nil(t, err)
 
@@ -50,21 +51,36 @@ func TestSpaceStore_CRUD(t *testing.T) {
 		Private:        true,
 		RepositoryType: types.SpaceRepo,
 	}
+
+	req := &types.UserSpacesReq{
+		Owner: "foo",
+		PageOpts: types.PageOpts{
+			PageSize: 10,
+			Page:     1,
+		},
+	}
+
 	err = db.Core.NewInsert().Model(repo).Scan(ctx, repo)
 	require.Nil(t, err)
 	sp.RepositoryID = repo.ID
 	err = store.Update(ctx, *sp)
 	require.Nil(t, err)
 
-	sps, total, err := store.ByUsername(ctx, "foo", 10, 1, false)
+	sps, total, err := store.ByUsername(ctx, req, false)
 	require.Nil(t, err)
 	require.Equal(t, 1, total)
 	require.Equal(t, len(sps), 1)
 
-	sps, total, err = store.ByUsername(ctx, "foo", 10, 1, true)
+	sps, total, err = store.ByUsername(ctx, req, true)
 	require.Nil(t, err)
 	require.Equal(t, 0, total)
 	require.Equal(t, len(sps), 0)
+
+	req.SDK = "sdk1"
+	sps, total, err = store.ByUsername(ctx, req, false)
+	require.Nil(t, err)
+	require.Equal(t, 1, total)
+	require.Equal(t, len(sps), 1)
 
 	sps, total, err = store.ByOrgPath(ctx, "foo", 10, 1, false)
 	require.Nil(t, err)
