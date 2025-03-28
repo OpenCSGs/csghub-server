@@ -102,7 +102,7 @@ func TestUserHandler_Spaces(t *testing.T) {
 		return h.Spaces
 	})
 
-	tester.mocks.user.EXPECT().Spaces(tester.Ctx(), &types.UserDatasetsReq{
+	tester.mocks.user.EXPECT().Spaces(tester.Ctx(), &types.UserSpacesReq{
 		Owner:       "go",
 		CurrentUser: "u",
 		PageOpts: types.PageOpts{

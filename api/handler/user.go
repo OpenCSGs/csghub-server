@@ -159,6 +159,7 @@ func (h *UserHandler) Codes(ctx *gin.Context) {
 // @Tags         User
 // @Accept       json
 // @Produce      json
+// @Param        sdk query string false "filter by space sdk"
 // @Param        username path string true "username"
 // @Success      200  {object}  types.ResponseWithTotal{data=[]types.Space,total=int} "OK"
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
@@ -172,7 +173,7 @@ func (h *UserHandler) Spaces(ctx *gin.Context) {
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
-
+	req.SDK = ctx.Query("sdk")
 	req.Owner = ctx.Param("username")
 	req.CurrentUser = httpbase.GetCurrentUser(ctx)
 	req.Page = page
@@ -433,7 +434,7 @@ func (h *UserHandler) LikesSpaces(ctx *gin.Context) {
 		httpbase.UnauthorizedError(ctx, component.ErrUserNotFound)
 		return
 	}
-	var req types.UserSpacesReq
+	var req types.UserCollectionReq
 	per, page, err := common.GetPerAndPageFromContext(ctx)
 	if err != nil {
 		slog.Error("Bad request format of page and per", "error", err)

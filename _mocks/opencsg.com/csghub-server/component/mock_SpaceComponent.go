@@ -963,7 +963,7 @@ func (_c *MockSpaceComponent_Update_Call) RunAndReturn(run func(context.Context,
 }
 
 // UserLikesSpaces provides a mock function with given fields: ctx, req, userID
-func (_m *MockSpaceComponent) UserLikesSpaces(ctx context.Context, req *types.UserSpacesReq, userID int64) ([]types.Space, int, error) {
+func (_m *MockSpaceComponent) UserLikesSpaces(ctx context.Context, req *types.UserCollectionReq, userID int64) ([]types.Space, int, error) {
 	ret := _m.Called(ctx, req, userID)
 
 	if len(ret) == 0 {
@@ -973,10 +973,10 @@ func (_m *MockSpaceComponent) UserLikesSpaces(ctx context.Context, req *types.Us
 	var r0 []types.Space
 	var r1 int
 	var r2 error
-	if rf, ok := ret.Get(0).(func(context.Context, *types.UserSpacesReq, int64) ([]types.Space, int, error)); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, *types.UserCollectionReq, int64) ([]types.Space, int, error)); ok {
 		return rf(ctx, req, userID)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, *types.UserSpacesReq, int64) []types.Space); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, *types.UserCollectionReq, int64) []types.Space); ok {
 		r0 = rf(ctx, req, userID)
 	} else {
 		if ret.Get(0) != nil {
@@ -984,13 +984,13 @@ func (_m *MockSpaceComponent) UserLikesSpaces(ctx context.Context, req *types.Us
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, *types.UserSpacesReq, int64) int); ok {
+	if rf, ok := ret.Get(1).(func(context.Context, *types.UserCollectionReq, int64) int); ok {
 		r1 = rf(ctx, req, userID)
 	} else {
 		r1 = ret.Get(1).(int)
 	}
 
-	if rf, ok := ret.Get(2).(func(context.Context, *types.UserSpacesReq, int64) error); ok {
+	if rf, ok := ret.Get(2).(func(context.Context, *types.UserCollectionReq, int64) error); ok {
 		r2 = rf(ctx, req, userID)
 	} else {
 		r2 = ret.Error(2)
@@ -1006,15 +1006,15 @@ type MockSpaceComponent_UserLikesSpaces_Call struct {
 
 // UserLikesSpaces is a helper method to define mock.On call
 //   - ctx context.Context
-//   - req *types.UserSpacesReq
+//   - req *types.UserCollectionReq
 //   - userID int64
 func (_e *MockSpaceComponent_Expecter) UserLikesSpaces(ctx interface{}, req interface{}, userID interface{}) *MockSpaceComponent_UserLikesSpaces_Call {
 	return &MockSpaceComponent_UserLikesSpaces_Call{Call: _e.mock.On("UserLikesSpaces", ctx, req, userID)}
 }
 
-func (_c *MockSpaceComponent_UserLikesSpaces_Call) Run(run func(ctx context.Context, req *types.UserSpacesReq, userID int64)) *MockSpaceComponent_UserLikesSpaces_Call {
+func (_c *MockSpaceComponent_UserLikesSpaces_Call) Run(run func(ctx context.Context, req *types.UserCollectionReq, userID int64)) *MockSpaceComponent_UserLikesSpaces_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(*types.UserSpacesReq), args[2].(int64))
+		run(args[0].(context.Context), args[1].(*types.UserCollectionReq), args[2].(int64))
 	})
 	return _c
 }
@@ -1024,7 +1024,7 @@ func (_c *MockSpaceComponent_UserLikesSpaces_Call) Return(_a0 []types.Space, _a1
 	return _c
 }
 
-func (_c *MockSpaceComponent_UserLikesSpaces_Call) RunAndReturn(run func(context.Context, *types.UserSpacesReq, int64) ([]types.Space, int, error)) *MockSpaceComponent_UserLikesSpaces_Call {
+func (_c *MockSpaceComponent_UserLikesSpaces_Call) RunAndReturn(run func(context.Context, *types.UserCollectionReq, int64) ([]types.Space, int, error)) *MockSpaceComponent_UserLikesSpaces_Call {
 	_c.Call.Return(run)
 	return _c
 }

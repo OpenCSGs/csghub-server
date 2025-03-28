@@ -24,7 +24,7 @@ type SpaceStore interface {
 	// ByRepoIDs get spaces by repoIDs, only basice info, no related repo
 	ByRepoIDs(ctx context.Context, repoIDs []int64) (spaces []Space, err error)
 	ByRepoID(ctx context.Context, repoID int64) (*Space, error)
-	ByUsername(ctx context.Context, username string, per, page int, onlyPublic bool) (spaces []Space, total int, err error)
+	ByUsername(ctx context.Context, req *types.UserSpacesReq, onlyPublic bool) (spaces []Space, total int, err error)
 	ByUserLikes(ctx context.Context, userID int64, per, page int) (spaces []Space, total int, err error)
 	ByOrgPath(ctx context.Context, namespace string, per, page int, onlyPublic bool) (spaces []Space, total int, err error)
 	ListByPath(ctx context.Context, paths []string) ([]Space, error)
@@ -125,19 +125,21 @@ func (s *spaceStoreImpl) ByRepoID(ctx context.Context, repoID int64) (*Space, er
 	return &space, err
 }
 
-func (s *spaceStoreImpl) ByUsername(ctx context.Context, username string, per, page int, onlyPublic bool) (spaces []Space, total int, err error) {
+func (s *spaceStoreImpl) ByUsername(ctx context.Context, req *types.UserSpacesReq, onlyPublic bool) (spaces []Space, total int, err error) {
 	query := s.db.Operator.Core.
 		NewSelect().
 		Model(&spaces).
 		Relation("Repository.Tags").
-		Where("repository.path like ?", fmt.Sprintf("%s/%%", username))
-
+		Where("repository.path like ?", fmt.Sprintf("%s/%%", req.Owner))
+	if len(req.SDK) > 0 {
+		query = query.Where("space.sdk = ?", req.SDK)
+	}
 	if onlyPublic {
 		query = query.Where("repository.private = ?", false)
 	}
 	query = query.Order("space.created_at DESC").
-		Limit(per).
-		Offset((page - 1) * per)
+		Limit(req.PageSize).
+		Offset((req.Page - 1) * req.PageSize)
 
 	err = query.Scan(ctx)
 	if err != nil {
