@@ -2,7 +2,6 @@ package database_test
 
 import (
 	"context"
-	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -17,41 +16,52 @@ func TestRecomStore_All(t *testing.T) {
 
 	store := database.NewRecomStoreWithDB(db)
 
-	err := store.UpsertScore(ctx, 123, 1)
+	err := store.UpsertScore(ctx, []*database.RecomRepoScore{
+		{RepositoryID: 123, WeightName: database.RecomWeightFreshness, Score: 1},
+	})
 	require.Nil(t, err)
-	err = store.UpsertScore(ctx, 123, 2)
+	repoScore, err := store.FindScoreByRepoIDs(ctx, []int64{123})
 	require.Nil(t, err)
-	err = store.UpsertScore(ctx, 456, 1)
+	require.Equal(t, float64(1), repoScore[0].Score)
+
+	err = store.UpsertScore(ctx, []*database.RecomRepoScore{
+		//change repo 1 weight1 score to 2
+		{RepositoryID: 123, WeightName: database.RecomWeightFreshness, Score: 2},
+		// new repo 1 weight2 score
+		{RepositoryID: 123, WeightName: database.RecomWeightDownloads, Score: 2},
+	})
+	require.Nil(t, err)
+	err = store.UpsertScore(ctx, []*database.RecomRepoScore{
+		{RepositoryID: 456, WeightName: database.RecomWeightFreshness, Score: 1},
+		{RepositoryID: 789, WeightName: database.RecomWeightOp, Score: 300},
+	})
 	require.Nil(t, err)
 
-	scores, err := store.Index(ctx, 0, 10)
+	scores, err := store.FindScoreByRepoIDs(ctx, []int64{123, 456, 789})
 	require.Nil(t, err)
-	require.Equal(t, 2, len(scores))
-	ids := []string{}
-	for _, s := range scores {
-		ids = append(ids, fmt.Sprintf("%d/%.0f", s.RepositoryID, s.Score))
+	require.Equal(t, 4, len(scores))
+	var scoresToCompare []*database.RecomRepoScore
+	for _, score := range scores {
+		scoresToCompare = append(scoresToCompare, &database.RecomRepoScore{
+			RepositoryID: score.RepositoryID,
+			WeightName:   score.WeightName,
+			Score:        score.Score,
+		})
 	}
-	require.Equal(t, []string{"123/2", "456/1"}, ids)
+	require.Contains(t, scoresToCompare, &database.RecomRepoScore{RepositoryID: 123, WeightName: database.RecomWeightFreshness, Score: 2})
+	require.Contains(t, scoresToCompare, &database.RecomRepoScore{RepositoryID: 123, WeightName: database.RecomWeightDownloads, Score: 2})
+	require.Contains(t, scoresToCompare, &database.RecomRepoScore{RepositoryID: 456, WeightName: database.RecomWeightFreshness, Score: 1})
+	require.Contains(t, scoresToCompare, &database.RecomRepoScore{RepositoryID: 789, WeightName: database.RecomWeightOp, Score: 300})
 
 	_, err = db.Core.NewInsert().Model(&database.RecomWeight{Name: "w1"}).Exec(ctx)
 	require.Nil(t, err)
 	ws, err := store.LoadWeights(ctx)
 	require.Nil(t, err)
 	require.Equal(t, 3, len(ws))
-	names := []string{}
+	names := []database.RecomWeightName{}
 	for _, w := range ws {
-		names = append(names, w.Name)
+		names = append(names, database.RecomWeightName(w.Name))
 	}
-	require.ElementsMatch(t, []string{"freshness", "downloads", "w1"}, names)
-
-	_, err = db.Core.NewInsert().Model(&database.RecomOpWeight{
-		Weight:       3,
-		RepositoryID: 123,
-	}).Exec(ctx)
-	require.Nil(t, err)
-	wos, err := store.LoadOpWeights(ctx)
-	require.Nil(t, err)
-	require.Equal(t, 1, len(wos))
-	require.Equal(t, 3, wos[0].Weight)
+	require.ElementsMatch(t, []database.RecomWeightName{"freshness", "downloads", "w1"}, names)
 
 }

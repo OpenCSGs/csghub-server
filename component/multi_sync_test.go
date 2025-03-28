@@ -31,7 +31,6 @@ func TestMultiSyncComponent_More(t *testing.T) {
 func TestMultiSyncComponent_SyncAsClient(t *testing.T) {
 	ctx := mock.Anything
 	mc := initializeTestMultiSyncComponent(context.TODO(), t)
-
 	mc.mocks.stores.MultiSyncMock().EXPECT().GetLatest(ctx).Return(database.SyncVersion{
 		Version: 1,
 	}, nil)
@@ -80,6 +79,22 @@ func TestMultiSyncComponent_SyncAsClient(t *testing.T) {
 		User: &types.User{Nickname: "nn"},
 		Path: "ns/user",
 		Tags: []types.RepoTag{{Name: "t1"}},
+		Scores: []types.WeightScore{{
+			WeightName: string(database.RecomWeightOp),
+			Score:      40,
+		}, {
+			WeightName: string(database.RecomWeightQuality),
+			Score:      50,
+		}, {
+			WeightName: string(database.RecomWeightDownloads),
+			Score:      60,
+		}, {
+			WeightName: string(database.RecomWeightFreshness),
+			Score:      70,
+		}, {
+			WeightName: string(database.RecomWeightTotal),
+			Score:      100,
+		}},
 	}, nil)
 	mockedClient.EXPECT().ReadMeData(ctx, svs[0]).Return("readme", nil)
 	mc.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "CSG_ns").Return(database.User{}, sql.ErrNoRows)
@@ -107,7 +122,6 @@ func TestMultiSyncComponent_SyncAsClient(t *testing.T) {
 		Source:         types.OpenCSGSource,
 		SyncStatus:     types.SyncStatusPending,
 		RepositoryType: types.ModelRepo,
-		CSGPath:        "ns/user",
 	}
 	mc.mocks.stores.RepoMock().EXPECT().UpdateOrCreateRepo(ctx, *dbrepo).Return(dbrepo, nil)
 	dbrepo.ID = 1
@@ -131,6 +145,13 @@ func TestMultiSyncComponent_SyncAsClient(t *testing.T) {
 		RepositoryID: 1,
 		Repository:   dbrepo,
 	}).Return(nil, nil)
+	mc.mocks.stores.RecomMock().EXPECT().UpsertScore(ctx, []*database.RecomRepoScore{
+		{RepositoryID: 1, WeightName: database.RecomWeightOp, Score: 40},
+		{RepositoryID: 1, WeightName: database.RecomWeightQuality, Score: 50},
+		{RepositoryID: 1, WeightName: database.RecomWeightDownloads, Score: 60},
+		{RepositoryID: 1, WeightName: database.RecomWeightFreshness, Score: 70},
+		{RepositoryID: 1, WeightName: database.RecomWeightTotal, Score: 100},
+	}).Return(nil)
 
 	// new dataset mock
 	dbrepo = &database.Repository{
@@ -141,12 +162,27 @@ func TestMultiSyncComponent_SyncAsClient(t *testing.T) {
 		Source:         types.OpenCSGSource,
 		SyncStatus:     types.SyncStatusPending,
 		RepositoryType: types.DatasetRepo,
-		CSGPath:        "ns/user",
 	}
 	mockedClient.EXPECT().DatasetInfo(ctx, svs[1]).Return(&types.Dataset{
 		User: types.User{Nickname: "nn"},
 		Path: "ns/user",
 		Tags: []types.RepoTag{{Name: "t2"}},
+		Scores: []types.WeightScore{{
+			WeightName: string(database.RecomWeightOp),
+			Score:      40,
+		}, {
+			WeightName: string(database.RecomWeightQuality),
+			Score:      50,
+		}, {
+			WeightName: string(database.RecomWeightDownloads),
+			Score:      60,
+		}, {
+			WeightName: string(database.RecomWeightFreshness),
+			Score:      70,
+		}, {
+			WeightName: string(database.RecomWeightTotal),
+			Score:      100,
+		}},
 	}, nil)
 	mockedClient.EXPECT().ReadMeData(ctx, svs[1]).Return("readme", nil)
 	mc.mocks.stores.RepoMock().EXPECT().UpdateOrCreateRepo(ctx, *dbrepo).Return(dbrepo, nil)
@@ -171,6 +207,13 @@ func TestMultiSyncComponent_SyncAsClient(t *testing.T) {
 		RepositoryID: 2,
 		Repository:   dbrepo,
 	}).Return(nil, nil)
+	mc.mocks.stores.RecomMock().EXPECT().UpsertScore(ctx, []*database.RecomRepoScore{
+		{RepositoryID: 2, WeightName: database.RecomWeightOp, Score: 40},
+		{RepositoryID: 2, WeightName: database.RecomWeightQuality, Score: 50},
+		{RepositoryID: 2, WeightName: database.RecomWeightDownloads, Score: 60},
+		{RepositoryID: 2, WeightName: database.RecomWeightFreshness, Score: 70},
+		{RepositoryID: 2, WeightName: database.RecomWeightTotal, Score: 100},
+	}).Return(nil)
 
 	err := mc.SyncAsClient(context.TODO(), mockedClient)
 	require.Nil(t, err)

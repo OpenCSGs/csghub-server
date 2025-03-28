@@ -29,9 +29,9 @@ type commonClient struct {
 }
 
 func (c *commonClient) Latest(ctx context.Context, currentVersion int64) (types.SyncVersionResponse, error) {
-	var svc types.SyncVersionResponse
 	path := fmt.Sprintf("/api/v1/sync/version/latest?cur=%d", currentVersion)
 
+	var svc types.SyncVersionResponse
 	err := c.rpcClent.Get(ctx, path, &svc)
 	if err != nil {
 		return svc, fmt.Errorf("failed to get latest version, cause: %w", err)
@@ -41,7 +41,7 @@ func (c *commonClient) Latest(ctx context.Context, currentVersion int64) (types.
 
 func (c *commonClient) ModelInfo(ctx context.Context, v types.SyncVersion) (*types.Model, error) {
 	namespace, name, _ := strings.Cut(v.RepoPath, "/")
-	url := fmt.Sprintf("/api/v1/models/%s/%s", namespace, name)
+	url := fmt.Sprintf("/api/v1/models/%s/%s?need_multi_sync=true", namespace, name)
 	var res types.ModelResponse
 	err := c.rpcClent.Get(ctx, url, &res)
 	if err != nil {
@@ -52,7 +52,7 @@ func (c *commonClient) ModelInfo(ctx context.Context, v types.SyncVersion) (*typ
 
 func (c *commonClient) DatasetInfo(ctx context.Context, v types.SyncVersion) (*types.Dataset, error) {
 	namespace, name, _ := strings.Cut(v.RepoPath, "/")
-	url := fmt.Sprintf("/api/v1/datasets/%s/%s", namespace, name)
+	url := fmt.Sprintf("/api/v1/datasets/%s/%s?need_multi_sync=true", namespace, name)
 	var res types.DatasetResponse
 	err := c.rpcClent.Get(ctx, url, &res)
 	if err != nil {

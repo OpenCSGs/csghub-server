@@ -535,7 +535,7 @@ func TestRepoStore_ListRepoPublicToUserByRepoIDs(t *testing.T) {
 		},
 	}
 
-	for _, c := range cases {
+	for i, c := range cases {
 		t.Run(fmt.Sprintf("%+v", c), func(t *testing.T) {
 			db := tests.InitTestDB()
 			defer db.Close()
@@ -591,7 +591,9 @@ func TestRepoStore_ListRepoPublicToUserByRepoIDs(t *testing.T) {
 					require.Nil(t, err)
 				}
 			}
-
+			if i == 4 {
+				fmt.Print("")
+			}
 			rs, count, err := store.ListRepoPublicToUserByRepoIDs(ctx, c.repoType, 123, c.search, c.sort, 10, 1, rids)
 			require.Nil(t, err)
 			names := []string{}

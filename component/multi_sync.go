@@ -27,6 +27,7 @@ type multiSyncComponentImpl struct {
 	datasetStore     database.DatasetStore
 	namespaceStore   database.NamespaceStore
 	userStore        database.UserStore
+	recomStore       database.RecomStore
 	syncVersionStore database.SyncVersionStore
 	tagStore         database.TagStore
 	fileStore        database.FileStore
@@ -50,6 +51,7 @@ func NewMultiSyncComponent(config *config.Config) (MultiSyncComponent, error) {
 		datasetStore:     database.NewDatasetStore(),
 		namespaceStore:   database.NewNamespaceStore(),
 		userStore:        database.NewUserStore(),
+		recomStore:       database.NewRecomStore(),
 		syncVersionStore: database.NewSyncVersionStore(),
 		tagStore:         database.NewTagStore(),
 		fileStore:        database.NewFileStore(),
@@ -147,12 +149,12 @@ func (c *multiSyncComponentImpl) SyncAsClient(ctx context.Context, sc multisync.
 			ctxGetDataset, cancel := context.WithTimeout(ctx, 10*time.Second)
 			datasetInfo, err := sc.DatasetInfo(ctxGetDataset, sv)
 			if err != nil {
-				slog.Error("failed to get model info from client", slog.Any("sync_version", v))
+				slog.Error("failed to get dataset info from client", slog.Any("sync_version", v))
 				continue
 			}
 			ReadMeData, err := sc.ReadMeData(ctxGetDataset, sv)
 			if err != nil {
-				slog.Error("failed to get model readme from client", slog.Any("sync_version", v), slog.Any("error", err))
+				slog.Error("failed to get dataset readme from client", slog.Any("sync_version", v), slog.Any("error", err))
 			}
 			cancel()
 			datasetInfo.Readme = ReadMeData
@@ -217,7 +219,7 @@ func (c *multiSyncComponentImpl) createLocalDataset(ctx context.Context, m *type
 		// SSHCloneURL:    gitRepo.SshCloneURL,
 		MSPath:  m.MultiSource.MSPath,
 		HFPath:  m.MultiSource.HFPath,
-		CSGPath: m.Path,
+		CSGPath: m.MultiSource.CSGPath,
 	}
 	newDBRepo, err := c.repoStore.UpdateOrCreateRepo(ctx, dbRepo)
 	if err != nil {
@@ -297,6 +299,14 @@ func (c *multiSyncComponentImpl) createLocalDataset(ctx context.Context, m *type
 	if err != nil {
 		return fmt.Errorf("failed to create dataset in db, cause: %w", err)
 	}
+
+	// create new trending scores related to repo
+	if len(m.Scores) != 0 {
+		err = c.createLocalRecom(ctx, newDBRepo.ID, m.Scores)
+		if err != nil {
+			return fmt.Errorf("failed to create database.recom_repo_scores, cause: %w", err)
+		}
+	}
 	return nil
 
 }
@@ -320,8 +330,9 @@ func (c *multiSyncComponentImpl) createLocalModel(ctx context.Context, m *types.
 		user, err = c.createUser(ctx, types.CreateUserRequest{
 			Name:     m.User.Nickname,
 			Username: userName,
-			Email:    common.MD5Hash(fmt.Sprintf("%s_%s", userName, m.User.Email)),
-			UUID:     uuid.New().String(),
+			// Add userName to email to avoid email conflict
+			Email: common.MD5Hash(fmt.Sprintf("%s_%s", userName, m.User.Email)),
+			UUID:  uuid.New().String(),
 		})
 		if err != nil {
 			return fmt.Errorf("fail to create user for namespace, namespace:%s, error: %w", namespace, err)
@@ -347,7 +358,7 @@ func (c *multiSyncComponentImpl) createLocalModel(ctx context.Context, m *types.
 		// SSHCloneURL:    gitRepo.SshCloneURL,
 		MSPath:  m.MultiSource.MSPath,
 		HFPath:  m.MultiSource.HFPath,
-		CSGPath: m.Path,
+		CSGPath: m.MultiSource.CSGPath,
 	}
 	newDBRepo, err := c.repoStore.UpdateOrCreateRepo(ctx, dbRepo)
 	if err != nil {
@@ -426,6 +437,14 @@ func (c *multiSyncComponentImpl) createLocalModel(ctx context.Context, m *types.
 	if err != nil {
 		return fmt.Errorf("failed to create database model, cause: %w", err)
 	}
+
+	// create new trending scores related to repo
+	if len(m.Scores) != 0 {
+		err = c.createLocalRecom(ctx, newDBRepo.ID, m.Scores)
+		if err != nil {
+			return fmt.Errorf("failed to create database.recom_repo_scores, cause: %w", err)
+		}
+	}
 	return nil
 }
 
@@ -478,6 +497,21 @@ func (c *multiSyncComponentImpl) createLocalSyncVersion(ctx context.Context, v t
 	err := c.syncVersionStore.Create(ctx, &syncVersion)
 	if err != nil {
 		return err
+	}
+	return nil
+}
+
+func (c *multiSyncComponentImpl) createLocalRecom(ctx context.Context, repoID int64, scores []types.WeightScore) error {
+	dbRecomRepoScores := make([]*database.RecomRepoScore, len(scores))
+	for i, score := range scores {
+		dbRecomRepoScores[i] = &database.RecomRepoScore{
+			RepositoryID: repoID,
+			WeightName:   database.RecomWeightName(score.WeightName),
+			Score:        score.Score}
+	}
+	err := c.recomStore.UpsertScore(ctx, dbRecomRepoScores)
+	if err != nil {
+		return fmt.Errorf("failed to create recom score, cause: %w", err)
 	}
 	return nil
 }

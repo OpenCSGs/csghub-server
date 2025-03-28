@@ -22,6 +22,65 @@ func (_m *MockRecomStore) EXPECT() *MockRecomStore_Expecter {
 	return &MockRecomStore_Expecter{mock: &_m.Mock}
 }
 
+// FindScoreByRepoIDs provides a mock function with given fields: ctx, repoIDs
+func (_m *MockRecomStore) FindScoreByRepoIDs(ctx context.Context, repoIDs []int64) ([]*database.RecomRepoScore, error) {
+	ret := _m.Called(ctx, repoIDs)
+
+	if len(ret) == 0 {
+		panic("no return value specified for FindScoreByRepoIDs")
+	}
+
+	var r0 []*database.RecomRepoScore
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, []int64) ([]*database.RecomRepoScore, error)); ok {
+		return rf(ctx, repoIDs)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, []int64) []*database.RecomRepoScore); ok {
+		r0 = rf(ctx, repoIDs)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]*database.RecomRepoScore)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, []int64) error); ok {
+		r1 = rf(ctx, repoIDs)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockRecomStore_FindScoreByRepoIDs_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'FindScoreByRepoIDs'
+type MockRecomStore_FindScoreByRepoIDs_Call struct {
+	*mock.Call
+}
+
+// FindScoreByRepoIDs is a helper method to define mock.On call
+//   - ctx context.Context
+//   - repoIDs []int64
+func (_e *MockRecomStore_Expecter) FindScoreByRepoIDs(ctx interface{}, repoIDs interface{}) *MockRecomStore_FindScoreByRepoIDs_Call {
+	return &MockRecomStore_FindScoreByRepoIDs_Call{Call: _e.mock.On("FindScoreByRepoIDs", ctx, repoIDs)}
+}
+
+func (_c *MockRecomStore_FindScoreByRepoIDs_Call) Run(run func(ctx context.Context, repoIDs []int64)) *MockRecomStore_FindScoreByRepoIDs_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].([]int64))
+	})
+	return _c
+}
+
+func (_c *MockRecomStore_FindScoreByRepoIDs_Call) Return(_a0 []*database.RecomRepoScore, _a1 error) *MockRecomStore_FindScoreByRepoIDs_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockRecomStore_FindScoreByRepoIDs_Call) RunAndReturn(run func(context.Context, []int64) ([]*database.RecomRepoScore, error)) *MockRecomStore_FindScoreByRepoIDs_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // Index provides a mock function with given fields: ctx, page, pageSize
 func (_m *MockRecomStore) Index(ctx context.Context, page int, pageSize int) ([]*database.RecomRepoScore, error) {
 	ret := _m.Called(ctx, page, pageSize)
@@ -82,29 +141,29 @@ func (_c *MockRecomStore_Index_Call) RunAndReturn(run func(context.Context, int,
 	return _c
 }
 
-// LoadOpWeights provides a mock function with given fields: ctx
-func (_m *MockRecomStore) LoadOpWeights(ctx context.Context) ([]*database.RecomOpWeight, error) {
-	ret := _m.Called(ctx)
+// LoadRepoOpWeights provides a mock function with given fields: ctx, repoIDs
+func (_m *MockRecomStore) LoadRepoOpWeights(ctx context.Context, repoIDs []int64) (map[int64]int, error) {
+	ret := _m.Called(ctx, repoIDs)
 
 	if len(ret) == 0 {
-		panic("no return value specified for LoadOpWeights")
+		panic("no return value specified for LoadRepoOpWeights")
 	}
 
-	var r0 []*database.RecomOpWeight
+	var r0 map[int64]int
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context) ([]*database.RecomOpWeight, error)); ok {
-		return rf(ctx)
+	if rf, ok := ret.Get(0).(func(context.Context, []int64) (map[int64]int, error)); ok {
+		return rf(ctx, repoIDs)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context) []*database.RecomOpWeight); ok {
-		r0 = rf(ctx)
+	if rf, ok := ret.Get(0).(func(context.Context, []int64) map[int64]int); ok {
+		r0 = rf(ctx, repoIDs)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]*database.RecomOpWeight)
+			r0 = ret.Get(0).(map[int64]int)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context) error); ok {
-		r1 = rf(ctx)
+	if rf, ok := ret.Get(1).(func(context.Context, []int64) error); ok {
+		r1 = rf(ctx, repoIDs)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -112,30 +171,31 @@ func (_m *MockRecomStore) LoadOpWeights(ctx context.Context) ([]*database.RecomO
 	return r0, r1
 }
 
-// MockRecomStore_LoadOpWeights_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'LoadOpWeights'
-type MockRecomStore_LoadOpWeights_Call struct {
+// MockRecomStore_LoadRepoOpWeights_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'LoadRepoOpWeights'
+type MockRecomStore_LoadRepoOpWeights_Call struct {
 	*mock.Call
 }
 
-// LoadOpWeights is a helper method to define mock.On call
+// LoadRepoOpWeights is a helper method to define mock.On call
 //   - ctx context.Context
-func (_e *MockRecomStore_Expecter) LoadOpWeights(ctx interface{}) *MockRecomStore_LoadOpWeights_Call {
-	return &MockRecomStore_LoadOpWeights_Call{Call: _e.mock.On("LoadOpWeights", ctx)}
+//   - repoIDs []int64
+func (_e *MockRecomStore_Expecter) LoadRepoOpWeights(ctx interface{}, repoIDs interface{}) *MockRecomStore_LoadRepoOpWeights_Call {
+	return &MockRecomStore_LoadRepoOpWeights_Call{Call: _e.mock.On("LoadRepoOpWeights", ctx, repoIDs)}
 }
 
-func (_c *MockRecomStore_LoadOpWeights_Call) Run(run func(ctx context.Context)) *MockRecomStore_LoadOpWeights_Call {
+func (_c *MockRecomStore_LoadRepoOpWeights_Call) Run(run func(ctx context.Context, repoIDs []int64)) *MockRecomStore_LoadRepoOpWeights_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context))
+		run(args[0].(context.Context), args[1].([]int64))
 	})
 	return _c
 }
 
-func (_c *MockRecomStore_LoadOpWeights_Call) Return(_a0 []*database.RecomOpWeight, _a1 error) *MockRecomStore_LoadOpWeights_Call {
+func (_c *MockRecomStore_LoadRepoOpWeights_Call) Return(_a0 map[int64]int, _a1 error) *MockRecomStore_LoadRepoOpWeights_Call {
 	_c.Call.Return(_a0, _a1)
 	return _c
 }
 
-func (_c *MockRecomStore_LoadOpWeights_Call) RunAndReturn(run func(context.Context) ([]*database.RecomOpWeight, error)) *MockRecomStore_LoadOpWeights_Call {
+func (_c *MockRecomStore_LoadRepoOpWeights_Call) RunAndReturn(run func(context.Context, []int64) (map[int64]int, error)) *MockRecomStore_LoadRepoOpWeights_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -198,17 +258,17 @@ func (_c *MockRecomStore_LoadWeights_Call) RunAndReturn(run func(context.Context
 	return _c
 }
 
-// UpsertScore provides a mock function with given fields: ctx, repoID, score
-func (_m *MockRecomStore) UpsertScore(ctx context.Context, repoID int64, score float64) error {
-	ret := _m.Called(ctx, repoID, score)
+// UpsertScore provides a mock function with given fields: ctx, scores
+func (_m *MockRecomStore) UpsertScore(ctx context.Context, scores []*database.RecomRepoScore) error {
+	ret := _m.Called(ctx, scores)
 
 	if len(ret) == 0 {
 		panic("no return value specified for UpsertScore")
 	}
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, int64, float64) error); ok {
-		r0 = rf(ctx, repoID, score)
+	if rf, ok := ret.Get(0).(func(context.Context, []*database.RecomRepoScore) error); ok {
+		r0 = rf(ctx, scores)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -223,15 +283,14 @@ type MockRecomStore_UpsertScore_Call struct {
 
 // UpsertScore is a helper method to define mock.On call
 //   - ctx context.Context
-//   - repoID int64
-//   - score float64
-func (_e *MockRecomStore_Expecter) UpsertScore(ctx interface{}, repoID interface{}, score interface{}) *MockRecomStore_UpsertScore_Call {
-	return &MockRecomStore_UpsertScore_Call{Call: _e.mock.On("UpsertScore", ctx, repoID, score)}
+//   - scores []*database.RecomRepoScore
+func (_e *MockRecomStore_Expecter) UpsertScore(ctx interface{}, scores interface{}) *MockRecomStore_UpsertScore_Call {
+	return &MockRecomStore_UpsertScore_Call{Call: _e.mock.On("UpsertScore", ctx, scores)}
 }
 
-func (_c *MockRecomStore_UpsertScore_Call) Run(run func(ctx context.Context, repoID int64, score float64)) *MockRecomStore_UpsertScore_Call {
+func (_c *MockRecomStore_UpsertScore_Call) Run(run func(ctx context.Context, scores []*database.RecomRepoScore)) *MockRecomStore_UpsertScore_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(int64), args[2].(float64))
+		run(args[0].(context.Context), args[1].([]*database.RecomRepoScore))
 	})
 	return _c
 }
@@ -241,7 +300,7 @@ func (_c *MockRecomStore_UpsertScore_Call) Return(_a0 error) *MockRecomStore_Ups
 	return _c
 }
 
-func (_c *MockRecomStore_UpsertScore_Call) RunAndReturn(run func(context.Context, int64, float64) error) *MockRecomStore_UpsertScore_Call {
+func (_c *MockRecomStore_UpsertScore_Call) RunAndReturn(run func(context.Context, []*database.RecomRepoScore) error) *MockRecomStore_UpsertScore_Call {
 	_c.Call.Return(run)
 	return _c
 }

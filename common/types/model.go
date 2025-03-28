@@ -167,6 +167,7 @@ type Model struct {
 	CanManage            bool                 `json:"can_manage"`
 	Namespace            *Namespace           `json:"namespace"`
 	RecomOpWeight        int                  `json:"recom_op_weight,omitempty"`
+	Scores               []WeightScore        `json:"scores"`
 	SensitiveCheckStatus string               `json:"sensitive_check_status"`
 	MirrorLastUpdatedAt  time.Time            `json:"mirror_last_updated_at"`
 	MultiSource

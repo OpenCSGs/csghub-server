@@ -15,7 +15,7 @@ func TestSchedule_CalcRecomScoreWorkflow(t *testing.T) {
 	tester, err := newWorkflowTester(t)
 	require.NoError(t, err)
 
-	tester.mocks.recom.EXPECT().CalculateRecomScore(mock.Anything).Return()
+	tester.mocks.recom.EXPECT().CalculateRecomScore(mock.Anything, 0).Return(nil)
 	tester.scheduler.Execute("calc-recom-score-schedule", tester.cronEnv)
 	require.True(t, tester.cronEnv.IsWorkflowCompleted())
 	require.NoError(t, tester.cronEnv.GetWorkflowError())

@@ -517,7 +517,7 @@ func (s *repoStoreImpl) ListRepoPublicToUserByRepoIDs(ctx context.Context, repoT
 
 	q.Where("repository.repository_type = ?", repoType)
 	q.Where("repository.private = ? or repository.user_id = ?", false, userID)
-	q.Where("id in (?)", bun.In(repoIDs))
+	q.Where("repository.id in (?)", bun.In(repoIDs))
 
 	if search != "" {
 		search = strings.ToLower(search)
@@ -538,9 +538,12 @@ func (s *repoStoreImpl) ListRepoPublicToUserByRepoIDs(ctx context.Context, repoT
 
 	if sort != "" {
 		if sort == "trending" {
-			q.Join("Left Join recom_repo_scores on repository.id = recom_repo_scores.repository_id")
-			q.Join("Left Join recom_op_weights on repository.id = recom_op_weights.repository_id")
-			q.ColumnExpr(`COALESCE(recom_repo_scores.score, 0)+COALESCE(recom_op_weights.weight, 0) AS popularity`)
+			subQuery := s.db.Operator.Core.NewSelect().
+				Model((*RecomRepoScore)(nil)).
+				Column("score", "repository_id").
+				Where("weight_name = ?", RecomWeightTotal)
+			q.Join("LEFT JOIN (" + subQuery.String() + ") AS recom_repo_scores ON repository.id = recom_repo_scores.repository_id")
+			q.ColumnExpr(`COALESCE(recom_repo_scores.score, 0) AS popularity`)
 		}
 		sortByStr, exits := sortBy[sort]
 		if exits {
