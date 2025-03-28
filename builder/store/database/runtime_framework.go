@@ -41,13 +41,13 @@ type RuntimeFramework struct {
 	ID            int64  `bun:",pk,autoincrement" json:"id"`
 	FrameName     string `bun:",notnull" json:"frame_name"`
 	FrameVersion  string `bun:",notnull" json:"frame_version"`
-	FrameImage    string `bun:",notnull" json:"frame_image"`
-	FrameCpuImage string `bun:",notnull" json:"frame_cpu_image"`
+	FrameImage    string `bun:",nullzero" json:"frame_image"`
+	FrameCpuImage string `bun:",nullzero" json:"frame_cpu_image"`
 	Enabled       int64  `bun:",notnull" json:"enabled"`
 	ContainerPort int    `bun:",notnull" json:"container_port"`
 	Type          int    `bun:",notnull" json:"type"` // 0-space, 1-inference, 2-finetune
-	EngineArgs    string `bun:",notnull" json:"engine_args"`
-	ModelFormat   string `bun:"," json:"model_format"` // safetensors, gguf, or onnx
+	EngineArgs    string `bun:",nullzero" json:"engine_args"`
+	ModelFormat   string `bun:",nullzero" json:"model_format"` // safetensors, gguf, or onnx
 	times
 }
 
