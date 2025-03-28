@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"opencsg.com/csghub-server/builder/store/database"
@@ -104,51 +105,60 @@ func TestRecomComponent_CalculateRecomScore(t *testing.T) {
 	require.NoError(t, err)
 }
 
-/*
-	func TestRecomComponent_CalculateTotalScore(t *testing.T) {
-		ctx := context.TODO()
-		rc := initializeTestRecomComponent(ctx, t)
+func TestRecomComponent_CalculateTotalScore(t *testing.T) {
+	ctx := context.TODO()
+	rc := initializeTestRecomComponent(ctx, t)
 
-		rc.mocks.gitServer.EXPECT().GetTree(
-			mock.Anything, types.GetTreeRequest{Namespace: "foo", Name: "bar", Limit: 500, Recursive: true},
-		).Return(nil, nil)
+	/*rc.mocks.gitServer.EXPECT().GetTree(
+		mock.Anything, types.GetTreeRequest{Namespace: "foo", Name: "bar", Limit: 500, Recursive: true},
+	).Return(nil, nil)*/
 
-		// Test case 1: repository created 24 hours ago
-		repo1 := &database.Repository{Path: "foo/bar"}
-		repo1.CreatedAt = time.Now().Add(-24 * time.Hour)
-		weights1 := map[database.RecomWeightName]string{
-			database.RecomWeightFreshness: expFreshness,
-		}
-		oldScore1 := map[database.RecomWeightName]*database.RecomRepoScore{}
-		score1, err := rc.calcTotalScore(ctx, repo1, weights1, oldScore1)
-		testing.assert(t, nil)
-		if score1 > 100 || score1 < 98 {
-			t.Errorf("Expected score1 should in range [98,100], got: %f", score1)
-		}
-
-		// Test case 2: repository created 48 hours ago
-		repo2 := &database.Repository{Path: "foo/bar"}
-		repo2.CreatedAt = time.Now().Add(-50 * time.Hour)
-		weights2 := map[string]string{
-			"freshness": expFreshness,
-		}
-		score2 := rc.CalcTotalScore(ctx, repo2, weights2)
-		if score2 > 98.0 || score2 < 60.0 {
-			t.Errorf("Expected score1 should in range [60,98), got: %f", score2)
-		}
-
-		// Test case 3: repository created 168 hours ago
-		repo3 := &database.Repository{Path: "foo/bar"}
-		repo3.CreatedAt = time.Now().Add(-168 * time.Hour)
-		weights3 := map[string]string{
-			"freshness": expFreshness,
-		}
-		score3 := rc.CalcTotalScore(ctx, repo3, weights3)
-		if score3 < 0 || score3 > 60 {
-			t.Errorf("Expected score1 should in range [0,60), got: %f", score2)
+	// Test case 1: repository created 24 hours ago
+	repo1 := &database.Repository{Path: "foo/bar"}
+	repo1.CreatedAt = time.Now().Add(-24 * time.Hour)
+	weights1 := map[database.RecomWeightName]string{
+		database.RecomWeightFreshness: expFreshness,
+	}
+	oldScore1 := map[database.RecomWeightName]*database.RecomRepoScore{}
+	score1, err := rc.calcTotalScore(ctx, repo1, weights1, oldScore1)
+	assert.Nil(t, err, "calcTotalScore error")
+	for _, score := range score1 {
+		if score.WeightName == database.RecomWeightTotal && (score.Score > 100 || score.Score < 98) {
+			t.Errorf("Expected score1 should in range [98,100], got: %v", score1)
 		}
 	}
-*/
+
+	// Test case 2: repository created 48 hours ago
+	repo2 := &database.Repository{Path: "foo/bar"}
+	repo2.CreatedAt = time.Now().Add(-50 * time.Hour)
+	weights2 := map[database.RecomWeightName]string{
+		database.RecomWeightFreshness: expFreshness,
+	}
+	oldScore2 := map[database.RecomWeightName]*database.RecomRepoScore{}
+	score2, err := rc.calcTotalScore(ctx, repo2, weights2, oldScore2)
+	assert.Nil(t, err, "calcTotalScore error")
+	for _, score := range score2 {
+		if score.WeightName == database.RecomWeightTotal && (score.Score > 98.0 || score.Score < 60.0) {
+			t.Errorf("Expected score1 should in range [60,98), got: %v", score2)
+		}
+	}
+
+	// Test case 3: repository created 168 hours ago
+	repo3 := &database.Repository{Path: "foo/bar"}
+	repo3.CreatedAt = time.Now().Add(-168 * time.Hour)
+	weights3 := map[database.RecomWeightName]string{
+		database.RecomWeightFreshness: expFreshness,
+	}
+	oldScore3 := map[database.RecomWeightName]*database.RecomRepoScore{}
+	score3, err := rc.calcTotalScore(ctx, repo3, weights3, oldScore3)
+	assert.Nil(t, err, "calcTotalScore error")
+	for _, score := range score3 {
+		if score.WeightName == database.RecomWeightTotal && (score.Score < 0 || score.Score > 60) {
+			t.Errorf("Expected score1 should in range [0,60), got: %v", score3)
+		}
+	}
+}
+
 const expFreshness = `
 if hours <= 48{
 	score = 100 - 2.0/48.0 * hours
