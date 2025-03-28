@@ -35,9 +35,12 @@ func TestSyncClientSettingComponent_Show(t *testing.T) {
 	ctx := context.TODO()
 	sc := initializeTestSyncClientSettingComponent(ctx, t)
 
+	sc.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "user").Return(database.User{
+		RoleMask: "admin",
+	}, nil)
 	sc.mocks.stores.SyncClientSettingMock().EXPECT().First(ctx).Return(&database.SyncClientSetting{}, nil)
 
-	data, err := sc.Show(ctx)
+	data, err := sc.Show(ctx, "user")
 	require.Nil(t, err)
 	require.Equal(t, &database.SyncClientSetting{}, data)
 }

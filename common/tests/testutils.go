@@ -4,12 +4,14 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"math/rand/v2"
 	"os"
 	"sync"
 	"time"
 
 	"github.com/DATA-DOG/go-txdb"
 	"github.com/google/uuid"
+	"github.com/spf13/cast"
 	"github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/modules/postgres"
 	"github.com/testcontainers/testcontainers-go/wait"
@@ -67,6 +69,22 @@ func chProjectRoot() {
 	}
 }
 
+var _dbSuffix = ""
+var _suffixMu sync.Mutex
+
+// Get db suffix, different packages will use different random numbers.
+// We do this because the migrator can't run parallel, but different packages' tests are running parallel.
+// So different packages must use different test databases to avoid migrate error.
+func dbSuffix() string {
+	_suffixMu.Lock()
+	defer _suffixMu.Unlock()
+
+	if _dbSuffix == "" {
+		_dbSuffix = cast.ToString(rand.IntN(2 << 16))
+	}
+	return _dbSuffix
+}
+
 const (
 	pgImage = "opencsg-registry.cn-beijing.cr.aliyuncs.com/opencsg_public/csghub/postgres:15.10"
 )
@@ -79,7 +97,7 @@ func InitTestDB() *database.DB {
 	reuse := testcontainers.CustomizeRequestOption(
 		func(req *testcontainers.GenericContainerRequest) error {
 			req.Reuse = true
-			req.Name = "csghub_test"
+			req.Name = "csghub_test_" + dbSuffix()
 			return nil
 		},
 	)
@@ -164,7 +182,9 @@ func InitTransactionTestDB() *database.DB {
 		},
 	)
 
-	pc, err := postgres.Run(ctx, "postgres:15.7", reuse, postgres.WithDatabase(cname),
+	pc, err := postgres.Run(ctx,
+		pgImage,
+		reuse, postgres.WithDatabase(cname),
 		testcontainers.WithWaitStrategy(
 			wait.ForLog("database system is ready to accept connections").
 				WithOccurrence(2).
@@ -216,4 +236,21 @@ func InitTransactionTestDB() *database.DB {
 		Operator: database.Operator{Core: bdb},
 		BunDB:    bdb,
 	}
+}
+
+func CheckZhparser(ctx context.Context, db *bun.DB, driver string) (bool, error) {
+	if driver != "pg" {
+		return false, nil
+	}
+	var count int
+	err := db.NewRaw("SELECT COUNT(*) FROM pg_extension WHERE extname = 'zhparser'").
+		Scan(ctx, &count)
+	if err != nil {
+		return false, err
+	}
+
+	if count > 0 {
+		return true, nil
+	}
+	return false, nil
 }

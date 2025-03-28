@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"errors"
 	"log/slog"
 
 	"github.com/gin-gonic/gin"
@@ -43,8 +44,17 @@ func (h *SyncClientSettingHandler) Create(ctx *gin.Context) {
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
+	req.CurrentUser = httpbase.GetCurrentUser(ctx)
+	if req.CurrentUser == "" {
+		httpbase.UnauthorizedError(ctx, component.ErrUserNotFound)
+		return
+	}
 	ms, err := h.c.Create(ctx.Request.Context(), req)
 	if err != nil {
+		if errors.Is(err, component.ErrUnauthorized) {
+			httpbase.UnauthorizedError(ctx, err)
+			return
+		}
 		slog.Error("Failed to create sync client setting", "error", err)
 		httpbase.ServerError(ctx, err)
 		return
@@ -64,8 +74,17 @@ func (h *SyncClientSettingHandler) Create(ctx *gin.Context) {
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
 // @Router       /sync/client_setting [get]
 func (h *SyncClientSettingHandler) Show(ctx *gin.Context) {
-	ms, err := h.c.Show(ctx.Request.Context())
+	currentUser := httpbase.GetCurrentUser(ctx)
+	if currentUser == "" {
+		httpbase.UnauthorizedError(ctx, component.ErrUserNotFound)
+		return
+	}
+	ms, err := h.c.Show(ctx.Request.Context(), currentUser)
 	if err != nil {
+		if errors.Is(err, component.ErrUnauthorized) {
+			httpbase.UnauthorizedError(ctx, err)
+			return
+		}
 		slog.Error("Failed to find sync client setting", "error", err)
 		httpbase.ServerError(ctx, err)
 		return

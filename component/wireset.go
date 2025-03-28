@@ -555,6 +555,7 @@ var ListComponentSet = wire.NewSet(NewTestListComponent)
 func NewTestSyncClientSettingComponent(config *config.Config, stores *tests.MockStores) *syncClientSettingComponentImpl {
 	return &syncClientSettingComponentImpl{
 		settingStore: stores.SyncClientSetting,
+		userStore:    stores.User,
 	}
 }
 

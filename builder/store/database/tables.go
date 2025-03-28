@@ -40,7 +40,7 @@ type Space struct {
 
 // RecomWeight are recommendation weight settings
 type RecomWeight struct {
-	Name string `bun:",pk" json:"name"`
+	Name RecomWeightName `bun:",pk" json:"name"`
 	//the expression to calculate weight
 	WeightExp string `bun:",notnull" json:"weight_exp" `
 	times
