@@ -39,16 +39,16 @@ func TestRecomComponent_CalculateRecomScore(t *testing.T) {
 	repo1.UpdatedAt = time.Now().Add(-24 * time.Hour)
 	repo2 := database.Repository{ID: 2, Path: "foo/bar2"}
 	repo2.UpdatedAt = time.Now().Add(24 * time.Hour)
-	/*repo3 := database.Repository{ID: 3, Path: "foo/bar3"}
-	repo3.UpdatedAt = time.Now().Add(24 * time.Hour)*/
+	repo3 := database.Repository{ID: 3, Path: "foo/bar3"}
+	repo3.UpdatedAt = time.Now().Add(24 * time.Hour)
 	// loop 1
 	rc.mocks.stores.RepoMock().EXPECT().FindWithBatch(ctx, batchSize, 0).Return([]database.Repository{
 		repo1, repo2,
 	}, nil)
 	// loop 2
-	/*rc.mocks.stores.RepoMock().EXPECT().FindWithBatch(ctx, batchSize, 1).Return([]database.Repository{
+	rc.mocks.stores.RepoMock().EXPECT().FindWithBatch(ctx, batchSize, 1).Return([]database.Repository{
 		repo3,
-	}, nil)*/
+	}, nil)
 
 	repo1FreshnessScore := database.RecomRepoScore{RepositoryID: 1, Score: 12.34, WeightName: "freshness"}
 	repo1FreshnessScore.UpdatedAt = time.Now()
@@ -60,21 +60,21 @@ func TestRecomComponent_CalculateRecomScore(t *testing.T) {
 			&repo1QualityScore,
 		}, nil,
 	)
-	/*repo3Score := database.RecomRepoScore{RepositoryID: 3, Score: 12.34, WeightName: "freshness"}
+	repo3Score := database.RecomRepoScore{RepositoryID: 3, Score: 12.34, WeightName: "freshness"}
 	repo3Score.UpdatedAt = time.Now()
 	rc.mocks.stores.RecomMock().EXPECT().FindScoreByRepoIDs(mock.Anything, []int64{3}).Return(
 		[]*database.RecomRepoScore{
 			&repo3Score,
 		}, nil,
-	)*/
+	)
 
 	rc.mocks.gitServer.EXPECT().GetTree(
 		mock.Anything, types.GetTreeRequest{Namespace: "foo", Name: "bar2", Limit: 500, Recursive: true},
 	).Return(nil, nil)
 
-	/*rc.mocks.gitServer.EXPECT().GetTree(
+	rc.mocks.gitServer.EXPECT().GetTree(
 		mock.Anything, types.GetTreeRequest{Namespace: "foo", Name: "bar3", Limit: 500, Recursive: true},
-	).Return(nil, nil)*/
+	).Return(nil, nil)
 
 	// rc.mocks.stores.RecomMock().EXPECT().UpsertScore(ctx, int64(2), 12.34).Return(nil)
 	rc.mocks.stores.RecomMock().EXPECT().UpsertScore(ctx, mock.Anything).RunAndReturn(
