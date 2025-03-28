@@ -42,7 +42,6 @@ type RuntimeFramework struct {
 	FrameName     string `bun:",notnull" json:"frame_name"`
 	FrameVersion  string `bun:",notnull" json:"frame_version"`
 	FrameImage    string `bun:",nullzero" json:"frame_image"`
-	FrameNpuImage string `bun:",nullzero" json:"frame_npu_image"`
 	FrameCpuImage string `bun:",nullzero" json:"frame_cpu_image"`
 	Enabled       int64  `bun:",notnull" json:"enabled"`
 	ContainerPort int    `bun:",notnull" json:"container_port"`
