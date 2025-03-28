@@ -169,10 +169,11 @@ func (c *AliyunGreenChecker) PassLargeTextCheck(ctx context.Context, text string
 			}
 
 			if result.Suggestion == "block" {
-				slog.Info("block content", slog.String("content", truncString(data.Content, 128)), slog.String("taskId", data.TaskId),
-					slog.String("aliyun_request_id", resp.RequestID))
+				slog.Info("block content", slog.String("label", result.Label), slog.String("content", truncString(data.Content, 128)),
+					slog.String("aliyun_taskId", data.TaskId),
+					slog.String("aliyun_requestId", resp.RequestID))
 
-				return &CheckResult{IsSensitive: true, Reason: result.Label}, nil
+				return &CheckResult{IsSensitive: true, Reason: fmt.Sprintf("label:%s,taskId:%s,requestId:%s", result.Label, data.TaskId, resp.RequestID)}, nil
 			}
 		}
 	}
@@ -215,8 +216,9 @@ func (c *AliyunGreenChecker) PassTextCheck(ctx context.Context, scenario Scenari
 		}
 
 		slog.Info("sensitive content detected", slog.String("content", text),
-			slog.String("label", label), slog.String("aliyun_request_id", *resp.Body.RequestId))
-		return &CheckResult{IsSensitive: true, Reason: *resp.Body.Data.Reason}, nil
+			slog.String("label", label), slog.String("reason", *resp.Body.Data.Reason),
+			slog.String("aliyun_request_id", *resp.Body.RequestId))
+		return &CheckResult{IsSensitive: true, Reason: fmt.Sprintf("label:%s,reason:%s,requestId:%s", label, *resp.Body.Data.Reason, *resp.Body.RequestId)}, nil
 	}
 
 	return &CheckResult{IsSensitive: false}, nil
@@ -267,24 +269,21 @@ func (c *AliyunGreenChecker) PassStreamCheck(ctx context.Context, scenario Scena
 		return nil, fmt.Errorf("aliyun TextModerationPlusWithOptions text moderation not success")
 	}
 
-	resultStr, err := json.Marshal(resp.Body.Data.Result)
-	if err != nil {
-		return nil, fmt.Errorf("resp.Body.Data.result Marshal error: %v", err)
-	}
+	results := resp.Body.Data.Result
 	if *resp.Body.Data.RiskLevel == "low" || *resp.Body.Data.RiskLevel == "none" {
-		return &CheckResult{IsSensitive: false, Reason: string(resultStr)}, nil
+		return &CheckResult{IsSensitive: false}, nil
 	}
 	// refer to label https://help.aliyun.com/document_detail/2671445.html#section-3t8-ane-efg
-	for _, result := range resp.Body.Data.Result {
+	for _, result := range results {
 		if !strings.Contains(*result.Label, "political") {
 			continue
 		}
-		slog.Info("sensitive content detected", slog.String("content", text),
+		slog.Info("sensitive content detected", slog.String("content", text), slog.String("reason", *result.RiskWords),
 			slog.String("label", *result.Label), slog.String("aliyun_request_id", *resp.Body.RequestId))
-		return &CheckResult{IsSensitive: true, Reason: string(resultStr)}, nil
+		return &CheckResult{IsSensitive: true, Reason: fmt.Sprintf("label:%s,reason:%s,requestId:%s", *result.Label, *result.RiskWords, *resp.Body.RequestId)}, nil
 	}
 
-	return &CheckResult{IsSensitive: false, Reason: string(resultStr)}, nil
+	return &CheckResult{IsSensitive: false}, nil
 }
 
 func (c *AliyunGreenChecker) PassImageCheck(ctx context.Context, scenario Scenario, ossBucketName, ossObjectName string) (*CheckResult, error) {
