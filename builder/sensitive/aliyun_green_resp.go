@@ -13,12 +13,12 @@ type TextScanResponseDataItem struct {
 	Msg     string                           `json:"msg"`
 	Content string                           `json:"content"`
 	Results []TextScanResponseDataItemResult `json:"results"`
-	TaskId  string                           `json:"task_id"`
+	TaskId  string                           `json:"taskId"`
 }
 
 type TextScanResponse struct {
 	Code      int                        `json:"code"`
 	Msg       string                     `json:"msg"`
 	Data      []TextScanResponseDataItem `json:"data"`
-	RequestID string                     `json:"request_id"`
+	RequestID string                     `json:"requestId"`
 }

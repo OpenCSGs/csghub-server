@@ -47,11 +47,13 @@ func TestSensitiveChecker_PassLargeTextCheck(t *testing.T) {
 		rate        float32
 		suggestion  string
 		isSensitive bool
+		wantReason  string
 	}{
-		{"ad tag", "ad", 0.1, "", false},
-		{"flood tag", "flood", 0.1, "block", false},
-		{"low rate", "terrorism", 0.75, "block", false},
-		{"block", "foo", 0.85, "block", true},
+		{"non politics low rate", "ad", 0.1, "", false, ""},
+		{"non politics hight rate", "ad", 0.9, "", false, ""},
+		{"politics low rate", "politics", 0.1, "", false, ""},
+		{"politics hight rate", "politics", 0.9, "block", true, "label:politics,taskId:task_id_1,requestId:request_id_1"},
+		{"politic content hight rate", "political_content", 0.9, "block", true, "label:political_content,taskId:task_id_1,requestId:request_id_1"},
 	}
 
 	for _, c := range cases {
@@ -70,13 +72,19 @@ func TestSensitiveChecker_PassLargeTextCheck(t *testing.T) {
 
 			gc.EXPECT().TextScan(textScanRequest).Return(&sensitive.TextScanResponse{
 				Data: []sensitive.TextScanResponseDataItem{
-					{Results: []sensitive.TextScanResponseDataItemResult{
-						{Label: c.label, Rate: c.rate, Suggestion: c.suggestion},
-					}},
-				}}, nil).Once()
+					{
+						Results: []sensitive.TextScanResponseDataItemResult{
+							{Label: c.label, Rate: c.rate, Suggestion: c.suggestion},
+						},
+						TaskId: "task_id_1",
+					},
+				},
+				RequestID: "request_id_1",
+			}, nil).Once()
 			result, err := checker.PassLargeTextCheck(context.Background(), strings.Repeat("a", sensitive.LargeTextSize+10))
 			require.Nil(t, err)
 			require.Equal(t, c.isSensitive, result.IsSensitive)
+			require.Equal(t, c.wantReason, result.Reason)
 		})
 	}
 
@@ -101,12 +109,15 @@ func TestSensitiveChecker_PassTextCheck(t *testing.T) {
 	cases := []struct {
 		labels      string
 		isSensitive bool
+		wantReason  string
 	}{
-		{"", false},
-		{"ad", false},
-		{"flood", false},
-		{"ad,flood", false},
-		{"ad,flood,foo", true},
+		{"", false, ""},
+		{"ad", false, ""},
+		{"flood", false, ""},
+		{"ad,flood", false, ""},
+		{"ad,flood,politics", true, "label:politics,reason:bar,requestId:z"},
+		{"politics", true, "label:politics,reason:bar,requestId:z"},
+		{"political_content", true, "label:political_content,reason:bar,requestId:z"},
 	}
 
 	for _, c := range cases {
@@ -134,9 +145,7 @@ func TestSensitiveChecker_PassTextCheck(t *testing.T) {
 			result, err := checker.PassTextCheck(context.Background(), "foo", "foo")
 			require.Nil(t, err)
 			require.Equal(t, c.isSensitive, result.IsSensitive)
-			if result.IsSensitive {
-				require.Equal(t, "bar", result.Reason)
-			}
+			require.Equal(t, c.wantReason, result.Reason)
 		})
 	}
 }
@@ -150,15 +159,17 @@ func TestSensitiveChecker_PassStreamCheck(t *testing.T) {
 		labels      string
 		isSensitive bool
 		riskLevel   string
+		wantReason  string
 	}{
-		{"", false, "none"},
-		{"ad", false, "low"},
-		{"flood", false, "low"},
-		{"ad,flood", false, "low"},
-		{"political_content", true, "high"},
+		{"", false, "none", ""},
+		{"ad", false, "low", ""},
+		{"flood", false, "low", ""},
+		{"ad,flood", false, "low", ""},
+		{"political_content", true, "high", "label:political_content,reason:risk_words,requestId:z"},
 	}
 
 	id := "123"
+	riskWords := "risk_words"
 	options := &util.RuntimeOptions{
 		ReadTimeout:    tea.Int(500),
 		ConnectTimeout: tea.Int(500),
@@ -182,7 +193,8 @@ func TestSensitiveChecker_PassStreamCheck(t *testing.T) {
 					Data: &client.TextModerationPlusResponseBodyData{
 						Result: []*client.TextModerationPlusResponseBodyDataResult{
 							{
-								Label: &c.labels,
+								Label:     &c.labels,
+								RiskWords: &riskWords,
 							},
 						},
 						RiskLevel: &c.riskLevel,
@@ -192,9 +204,7 @@ func TestSensitiveChecker_PassStreamCheck(t *testing.T) {
 			result, err := checker.PassStreamCheck(context.Background(), "foo", "foo", id)
 			require.Nil(t, err)
 			require.Equal(t, c.isSensitive, result.IsSensitive)
-			if result.IsSensitive {
-				require.Equal(t, "[{\"Label\":\"political_content\"}]", result.Reason)
-			}
+			require.Equal(t, c.wantReason, result.Reason)
 		})
 	}
 }
