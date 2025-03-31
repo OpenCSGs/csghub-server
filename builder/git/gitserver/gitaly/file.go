@@ -235,6 +235,16 @@ func (c *Client) UpdateRepoFile(req *types.UpdateFileReq) (err error) {
 		RelativePath: BuildRelativePath(repoType, req.Namespace, req.Name),
 		GlRepository: filepath.Join(repoType, req.Namespace, req.Name),
 	}
+	header := &gitalypb.UserCommitFilesActionHeader{
+		Action:        gitalypb.UserCommitFilesActionHeader_UPDATE,
+		Base64Content: true,
+		FilePath:      []byte(req.FilePath),
+	}
+
+	if req.OriginPath != "" {
+		header.Action = gitalypb.UserCommitFilesActionHeader_MOVE
+		header.PreviousPath = []byte(req.OriginPath)
+	}
 	actions := []*gitalypb.UserCommitFilesRequest{
 		{
 			UserCommitFilesRequestPayload: &gitalypb.UserCommitFilesRequest_Header{
@@ -260,11 +270,7 @@ func (c *Client) UpdateRepoFile(req *types.UpdateFileReq) (err error) {
 			UserCommitFilesRequestPayload: &gitalypb.UserCommitFilesRequest_Action{
 				Action: &gitalypb.UserCommitFilesAction{
 					UserCommitFilesActionPayload: &gitalypb.UserCommitFilesAction_Header{
-						Header: &gitalypb.UserCommitFilesActionHeader{
-							Action:        gitalypb.UserCommitFilesActionHeader_UPDATE,
-							Base64Content: true,
-							FilePath:      []byte(req.FilePath),
-						},
+						Header: header,
 					},
 				},
 			},
