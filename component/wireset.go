@@ -403,6 +403,7 @@ func NewTestMultiSyncComponent(config *config.Config, stores *tests.MockStores, 
 		datasetStore:     stores.Dataset,
 		namespaceStore:   stores.Namespace,
 		userStore:        stores.User,
+		recomStore:       stores.Recom,
 		syncVersionStore: stores.SyncVersion,
 		tagStore:         stores.Tag,
 		fileStore:        stores.File,
@@ -554,6 +555,7 @@ var ListComponentSet = wire.NewSet(NewTestListComponent)
 func NewTestSyncClientSettingComponent(config *config.Config, stores *tests.MockStores) *syncClientSettingComponentImpl {
 	return &syncClientSettingComponentImpl{
 		settingStore: stores.SyncClientSetting,
+		userStore:    stores.User,
 	}
 }
 

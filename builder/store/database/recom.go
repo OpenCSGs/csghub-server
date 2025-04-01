@@ -1,6 +1,11 @@
 package database
 
-import "context"
+import (
+	"context"
+	"fmt"
+
+	"github.com/uptrace/bun"
+)
 
 type recomStoreImpl struct {
 	db *DB
@@ -10,10 +15,11 @@ type RecomStore interface {
 	// Index returns repos in descend order of score.
 	Index(ctx context.Context, page, pageSize int) ([]*RecomRepoScore, error)
 	// Upsert recom repo score
-	UpsertScore(ctx context.Context, repoID int64, score float64) error
+	UpsertScore(ctx context.Context, scores []*RecomRepoScore) error
 	LoadWeights(ctx context.Context) ([]*RecomWeight, error)
-	LoadOpWeights(ctx context.Context) ([]*RecomOpWeight, error)
+	LoadRepoOpWeights(ctx context.Context, repoIDs []int64) (map[int64]int, error)
 	UpsetOpWeights(ctx context.Context, repoID, weight int64) error
+	FindScoreByRepoIDs(ctx context.Context, repoIDs []int64) ([]*RecomRepoScore, error)
 }
 
 func NewRecomStore() RecomStore {
@@ -39,13 +45,10 @@ func (s *recomStoreImpl) Index(ctx context.Context, page, pageSize int) ([]*Reco
 }
 
 // Upsert recom repo score
-func (s *recomStoreImpl) UpsertScore(ctx context.Context, repoID int64, score float64) error {
+func (s *recomStoreImpl) UpsertScore(ctx context.Context, scores []*RecomRepoScore) error {
 	_, err := s.db.Operator.Core.NewInsert().
-		Model(&RecomRepoScore{
-			RepositoryID: repoID,
-			Score:        score,
-		}).
-		On("CONFLICT (repository_id) DO UPDATE").
+		Model(&scores).
+		On("CONFLICT (repository_id, weight_name) DO UPDATE").
 		Exec(ctx)
 	return err
 }
@@ -56,10 +59,20 @@ func (s *recomStoreImpl) LoadWeights(ctx context.Context) ([]*RecomWeight, error
 	return weights, err
 }
 
-func (s *recomStoreImpl) LoadOpWeights(ctx context.Context) ([]*RecomOpWeight, error) {
-	weights := make([]*RecomOpWeight, 0)
-	err := s.db.Operator.Core.NewSelect().Model(&RecomOpWeight{}).Scan(ctx, &weights)
-	return weights, err
+func (s *recomStoreImpl) LoadRepoOpWeights(ctx context.Context, repoIDs []int64) (map[int64]int, error) {
+	weights := make([]*RecomRepoScore, 0)
+	err := s.db.Operator.Core.NewSelect().Model(&RecomRepoScore{}).Where("repository_id IN (?)", bun.In(repoIDs)).
+		Where("weight_name = ?", RecomWeightOp).
+		Column("repository_id", "score").
+		Scan(ctx, &weights)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load repo op weights: %w", err)
+	}
+	repoWeights := make(map[int64]int)
+	for _, weight := range weights {
+		repoWeights[weight.RepositoryID] = int(weight.Score)
+	}
+	return repoWeights, nil
 }
 
 func (s *recomStoreImpl) UpsetOpWeights(ctx context.Context, repoID, weight int64) error {
@@ -71,4 +84,13 @@ func (s *recomStoreImpl) UpsetOpWeights(ctx context.Context, repoID, weight int6
 		On("CONFLICT (repository_id) DO UPDATE").
 		Exec(ctx)
 	return err
+}
+
+// FindScoreByRepoIDs implements RecomStore.
+func (s *recomStoreImpl) FindScoreByRepoIDs(ctx context.Context, repoIDs []int64) ([]*RecomRepoScore, error) {
+	items := make([]*RecomRepoScore, 0)
+	err := s.db.Operator.Core.NewSelect().Model(&RecomRepoScore{}).
+		Where("repository_id IN (?)", bun.In(repoIDs)).
+		Scan(ctx, &items)
+	return items, err
 }

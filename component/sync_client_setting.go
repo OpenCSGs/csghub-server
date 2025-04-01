@@ -13,20 +13,29 @@ import (
 
 type syncClientSettingComponentImpl struct {
 	settingStore database.SyncClientSettingStore
+	userStore    database.UserStore
 }
 
 type SyncClientSettingComponent interface {
 	Create(ctx context.Context, req types.CreateSyncClientSettingReq) (*database.SyncClientSetting, error)
-	Show(ctx context.Context) (*database.SyncClientSetting, error)
+	Show(ctx context.Context, currentUser string) (*database.SyncClientSetting, error)
 }
 
 func NewSyncClientSettingComponent(config *config.Config) (SyncClientSettingComponent, error) {
 	return &syncClientSettingComponentImpl{
 		settingStore: database.NewSyncClientSettingStore(),
+		userStore:    database.NewUserStore(),
 	}, nil
 }
 
 func (c *syncClientSettingComponentImpl) Create(ctx context.Context, req types.CreateSyncClientSettingReq) (*database.SyncClientSetting, error) {
+	user, err := c.userStore.FindByUsername(ctx, req.CurrentUser)
+	if err != nil {
+		return nil, ErrUnauthorized
+	}
+	if !user.CanAdmin() {
+		return nil, fmt.Errorf("only admin was allowed create sync client setting")
+	}
 	exists, err := c.settingStore.SyncClientSettingExists(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to check sync client setting if exists, error: %w", err)
@@ -48,7 +57,14 @@ func (c *syncClientSettingComponentImpl) Create(ctx context.Context, req types.C
 	return res, nil
 }
 
-func (c *syncClientSettingComponentImpl) Show(ctx context.Context) (*database.SyncClientSetting, error) {
+func (c *syncClientSettingComponentImpl) Show(ctx context.Context, currentUser string) (*database.SyncClientSetting, error) {
+	user, err := c.userStore.FindByUsername(ctx, currentUser)
+	if err != nil {
+		return nil, ErrUnauthorized
+	}
+	if !user.CanAdmin() {
+		return nil, fmt.Errorf("only admin was allowed get sync client setting")
+	}
 	res, err := c.settingStore.First(ctx)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {

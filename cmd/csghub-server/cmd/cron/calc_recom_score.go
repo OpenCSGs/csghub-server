@@ -45,6 +45,9 @@ var cmdCalcRecomScore = &cobra.Command{
 			slog.Error("failed to create recom component", "err", err)
 			return
 		}
-		c.CalculateRecomScore(cmd.Context())
+		err = c.CalculateRecomScore(cmd.Context(), 0)
+		if err != nil {
+			slog.Error("failed to calculate recom score", "err", err)
+		}
 	},
 }
