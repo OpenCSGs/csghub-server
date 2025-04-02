@@ -182,119 +182,47 @@ func (_c *MockRuntimeArchitectureComponent_DeleteArchitectures_Call) RunAndRetur
 	return _c
 }
 
-// GetArchitecture provides a mock function with given fields: ctx, task, repo
-func (_m *MockRuntimeArchitectureComponent) GetArchitecture(ctx context.Context, task types.PipelineTask, repo *database.Repository) (string, error) {
-	ret := _m.Called(ctx, task, repo)
+// InitRuntimeFrameworkAndArchitectures provides a mock function with no fields
+func (_m *MockRuntimeArchitectureComponent) InitRuntimeFrameworkAndArchitectures() error {
+	ret := _m.Called()
 
 	if len(ret) == 0 {
-		panic("no return value specified for GetArchitecture")
+		panic("no return value specified for InitRuntimeFrameworkAndArchitectures")
 	}
 
-	var r0 string
-	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, types.PipelineTask, *database.Repository) (string, error)); ok {
-		return rf(ctx, task, repo)
-	}
-	if rf, ok := ret.Get(0).(func(context.Context, types.PipelineTask, *database.Repository) string); ok {
-		r0 = rf(ctx, task, repo)
+	var r0 error
+	if rf, ok := ret.Get(0).(func() error); ok {
+		r0 = rf()
 	} else {
-		r0 = ret.Get(0).(string)
+		r0 = ret.Error(0)
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, types.PipelineTask, *database.Repository) error); ok {
-		r1 = rf(ctx, task, repo)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
+	return r0
 }
 
-// MockRuntimeArchitectureComponent_GetArchitecture_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetArchitecture'
-type MockRuntimeArchitectureComponent_GetArchitecture_Call struct {
+// MockRuntimeArchitectureComponent_InitRuntimeFrameworkAndArchitectures_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'InitRuntimeFrameworkAndArchitectures'
+type MockRuntimeArchitectureComponent_InitRuntimeFrameworkAndArchitectures_Call struct {
 	*mock.Call
 }
 
-// GetArchitecture is a helper method to define mock.On call
-//   - ctx context.Context
-//   - task types.PipelineTask
-//   - repo *database.Repository
-func (_e *MockRuntimeArchitectureComponent_Expecter) GetArchitecture(ctx interface{}, task interface{}, repo interface{}) *MockRuntimeArchitectureComponent_GetArchitecture_Call {
-	return &MockRuntimeArchitectureComponent_GetArchitecture_Call{Call: _e.mock.On("GetArchitecture", ctx, task, repo)}
+// InitRuntimeFrameworkAndArchitectures is a helper method to define mock.On call
+func (_e *MockRuntimeArchitectureComponent_Expecter) InitRuntimeFrameworkAndArchitectures() *MockRuntimeArchitectureComponent_InitRuntimeFrameworkAndArchitectures_Call {
+	return &MockRuntimeArchitectureComponent_InitRuntimeFrameworkAndArchitectures_Call{Call: _e.mock.On("InitRuntimeFrameworkAndArchitectures")}
 }
 
-func (_c *MockRuntimeArchitectureComponent_GetArchitecture_Call) Run(run func(ctx context.Context, task types.PipelineTask, repo *database.Repository)) *MockRuntimeArchitectureComponent_GetArchitecture_Call {
+func (_c *MockRuntimeArchitectureComponent_InitRuntimeFrameworkAndArchitectures_Call) Run(run func()) *MockRuntimeArchitectureComponent_InitRuntimeFrameworkAndArchitectures_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(types.PipelineTask), args[2].(*database.Repository))
+		run()
 	})
 	return _c
 }
 
-func (_c *MockRuntimeArchitectureComponent_GetArchitecture_Call) Return(_a0 string, _a1 error) *MockRuntimeArchitectureComponent_GetArchitecture_Call {
-	_c.Call.Return(_a0, _a1)
+func (_c *MockRuntimeArchitectureComponent_InitRuntimeFrameworkAndArchitectures_Call) Return(_a0 error) *MockRuntimeArchitectureComponent_InitRuntimeFrameworkAndArchitectures_Call {
+	_c.Call.Return(_a0)
 	return _c
 }
 
-func (_c *MockRuntimeArchitectureComponent_GetArchitecture_Call) RunAndReturn(run func(context.Context, types.PipelineTask, *database.Repository) (string, error)) *MockRuntimeArchitectureComponent_GetArchitecture_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
-// IsSupportedModelResource provides a mock function with given fields: ctx, modelName, rfm, id
-func (_m *MockRuntimeArchitectureComponent) IsSupportedModelResource(ctx context.Context, modelName string, rfm *database.RuntimeFramework, id int64) (bool, error) {
-	ret := _m.Called(ctx, modelName, rfm, id)
-
-	if len(ret) == 0 {
-		panic("no return value specified for IsSupportedModelResource")
-	}
-
-	var r0 bool
-	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, *database.RuntimeFramework, int64) (bool, error)); ok {
-		return rf(ctx, modelName, rfm, id)
-	}
-	if rf, ok := ret.Get(0).(func(context.Context, string, *database.RuntimeFramework, int64) bool); ok {
-		r0 = rf(ctx, modelName, rfm, id)
-	} else {
-		r0 = ret.Get(0).(bool)
-	}
-
-	if rf, ok := ret.Get(1).(func(context.Context, string, *database.RuntimeFramework, int64) error); ok {
-		r1 = rf(ctx, modelName, rfm, id)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
-// MockRuntimeArchitectureComponent_IsSupportedModelResource_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'IsSupportedModelResource'
-type MockRuntimeArchitectureComponent_IsSupportedModelResource_Call struct {
-	*mock.Call
-}
-
-// IsSupportedModelResource is a helper method to define mock.On call
-//   - ctx context.Context
-//   - modelName string
-//   - rfm *database.RuntimeFramework
-//   - id int64
-func (_e *MockRuntimeArchitectureComponent_Expecter) IsSupportedModelResource(ctx interface{}, modelName interface{}, rfm interface{}, id interface{}) *MockRuntimeArchitectureComponent_IsSupportedModelResource_Call {
-	return &MockRuntimeArchitectureComponent_IsSupportedModelResource_Call{Call: _e.mock.On("IsSupportedModelResource", ctx, modelName, rfm, id)}
-}
-
-func (_c *MockRuntimeArchitectureComponent_IsSupportedModelResource_Call) Run(run func(ctx context.Context, modelName string, rfm *database.RuntimeFramework, id int64)) *MockRuntimeArchitectureComponent_IsSupportedModelResource_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(string), args[2].(*database.RuntimeFramework), args[3].(int64))
-	})
-	return _c
-}
-
-func (_c *MockRuntimeArchitectureComponent_IsSupportedModelResource_Call) Return(_a0 bool, _a1 error) *MockRuntimeArchitectureComponent_IsSupportedModelResource_Call {
-	_c.Call.Return(_a0, _a1)
-	return _c
-}
-
-func (_c *MockRuntimeArchitectureComponent_IsSupportedModelResource_Call) RunAndReturn(run func(context.Context, string, *database.RuntimeFramework, int64) (bool, error)) *MockRuntimeArchitectureComponent_IsSupportedModelResource_Call {
+func (_c *MockRuntimeArchitectureComponent_InitRuntimeFrameworkAndArchitectures_Call) RunAndReturn(run func() error) *MockRuntimeArchitectureComponent_InitRuntimeFrameworkAndArchitectures_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -358,53 +286,17 @@ func (_c *MockRuntimeArchitectureComponent_ListByRuntimeFrameworkID_Call) RunAnd
 	return _c
 }
 
-// RemoveRuntimeFrameworkTag provides a mock function with given fields: ctx, rftags, repoId, rfId
-func (_m *MockRuntimeArchitectureComponent) RemoveRuntimeFrameworkTag(ctx context.Context, rftags []*database.Tag, repoId int64, rfId int64) {
-	_m.Called(ctx, rftags, repoId, rfId)
-}
-
-// MockRuntimeArchitectureComponent_RemoveRuntimeFrameworkTag_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'RemoveRuntimeFrameworkTag'
-type MockRuntimeArchitectureComponent_RemoveRuntimeFrameworkTag_Call struct {
-	*mock.Call
-}
-
-// RemoveRuntimeFrameworkTag is a helper method to define mock.On call
-//   - ctx context.Context
-//   - rftags []*database.Tag
-//   - repoId int64
-//   - rfId int64
-func (_e *MockRuntimeArchitectureComponent_Expecter) RemoveRuntimeFrameworkTag(ctx interface{}, rftags interface{}, repoId interface{}, rfId interface{}) *MockRuntimeArchitectureComponent_RemoveRuntimeFrameworkTag_Call {
-	return &MockRuntimeArchitectureComponent_RemoveRuntimeFrameworkTag_Call{Call: _e.mock.On("RemoveRuntimeFrameworkTag", ctx, rftags, repoId, rfId)}
-}
-
-func (_c *MockRuntimeArchitectureComponent_RemoveRuntimeFrameworkTag_Call) Run(run func(ctx context.Context, rftags []*database.Tag, repoId int64, rfId int64)) *MockRuntimeArchitectureComponent_RemoveRuntimeFrameworkTag_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].([]*database.Tag), args[2].(int64), args[3].(int64))
-	})
-	return _c
-}
-
-func (_c *MockRuntimeArchitectureComponent_RemoveRuntimeFrameworkTag_Call) Return() *MockRuntimeArchitectureComponent_RemoveRuntimeFrameworkTag_Call {
-	_c.Call.Return()
-	return _c
-}
-
-func (_c *MockRuntimeArchitectureComponent_RemoveRuntimeFrameworkTag_Call) RunAndReturn(run func(context.Context, []*database.Tag, int64, int64)) *MockRuntimeArchitectureComponent_RemoveRuntimeFrameworkTag_Call {
-	_c.Run(run)
-	return _c
-}
-
-// ScanArchitecture provides a mock function with given fields: ctx, id, scanType, task, models
-func (_m *MockRuntimeArchitectureComponent) ScanArchitecture(ctx context.Context, id int64, scanType int, task types.PipelineTask, models []string) error {
-	ret := _m.Called(ctx, id, scanType, task, models)
+// ScanAllModels provides a mock function with given fields: ctx, scanType
+func (_m *MockRuntimeArchitectureComponent) ScanAllModels(ctx context.Context, scanType int) error {
+	ret := _m.Called(ctx, scanType)
 
 	if len(ret) == 0 {
-		panic("no return value specified for ScanArchitecture")
+		panic("no return value specified for ScanAllModels")
 	}
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, int64, int, types.PipelineTask, []string) error); ok {
-		r0 = rf(ctx, id, scanType, task, models)
+	if rf, ok := ret.Get(0).(func(context.Context, int) error); ok {
+		r0 = rf(ctx, scanType)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -412,34 +304,31 @@ func (_m *MockRuntimeArchitectureComponent) ScanArchitecture(ctx context.Context
 	return r0
 }
 
-// MockRuntimeArchitectureComponent_ScanArchitecture_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ScanArchitecture'
-type MockRuntimeArchitectureComponent_ScanArchitecture_Call struct {
+// MockRuntimeArchitectureComponent_ScanAllModels_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ScanAllModels'
+type MockRuntimeArchitectureComponent_ScanAllModels_Call struct {
 	*mock.Call
 }
 
-// ScanArchitecture is a helper method to define mock.On call
+// ScanAllModels is a helper method to define mock.On call
 //   - ctx context.Context
-//   - id int64
 //   - scanType int
-//   - task types.PipelineTask
-//   - models []string
-func (_e *MockRuntimeArchitectureComponent_Expecter) ScanArchitecture(ctx interface{}, id interface{}, scanType interface{}, task interface{}, models interface{}) *MockRuntimeArchitectureComponent_ScanArchitecture_Call {
-	return &MockRuntimeArchitectureComponent_ScanArchitecture_Call{Call: _e.mock.On("ScanArchitecture", ctx, id, scanType, task, models)}
+func (_e *MockRuntimeArchitectureComponent_Expecter) ScanAllModels(ctx interface{}, scanType interface{}) *MockRuntimeArchitectureComponent_ScanAllModels_Call {
+	return &MockRuntimeArchitectureComponent_ScanAllModels_Call{Call: _e.mock.On("ScanAllModels", ctx, scanType)}
 }
 
-func (_c *MockRuntimeArchitectureComponent_ScanArchitecture_Call) Run(run func(ctx context.Context, id int64, scanType int, task types.PipelineTask, models []string)) *MockRuntimeArchitectureComponent_ScanArchitecture_Call {
+func (_c *MockRuntimeArchitectureComponent_ScanAllModels_Call) Run(run func(ctx context.Context, scanType int)) *MockRuntimeArchitectureComponent_ScanAllModels_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(int64), args[2].(int), args[3].(types.PipelineTask), args[4].([]string))
+		run(args[0].(context.Context), args[1].(int))
 	})
 	return _c
 }
 
-func (_c *MockRuntimeArchitectureComponent_ScanArchitecture_Call) Return(_a0 error) *MockRuntimeArchitectureComponent_ScanArchitecture_Call {
+func (_c *MockRuntimeArchitectureComponent_ScanAllModels_Call) Return(_a0 error) *MockRuntimeArchitectureComponent_ScanAllModels_Call {
 	_c.Call.Return(_a0)
 	return _c
 }
 
-func (_c *MockRuntimeArchitectureComponent_ScanArchitecture_Call) RunAndReturn(run func(context.Context, int64, int, types.PipelineTask, []string) error) *MockRuntimeArchitectureComponent_ScanArchitecture_Call {
+func (_c *MockRuntimeArchitectureComponent_ScanAllModels_Call) RunAndReturn(run func(context.Context, int) error) *MockRuntimeArchitectureComponent_ScanAllModels_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -500,6 +389,113 @@ func (_c *MockRuntimeArchitectureComponent_SetArchitectures_Call) Return(_a0 []s
 }
 
 func (_c *MockRuntimeArchitectureComponent_SetArchitectures_Call) RunAndReturn(run func(context.Context, int64, []string) ([]string, error)) *MockRuntimeArchitectureComponent_SetArchitectures_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// UpdateModelMetadata provides a mock function with given fields: ctx, repo
+func (_m *MockRuntimeArchitectureComponent) UpdateModelMetadata(ctx context.Context, repo *database.Repository) (*types.ModelInfo, error) {
+	ret := _m.Called(ctx, repo)
+
+	if len(ret) == 0 {
+		panic("no return value specified for UpdateModelMetadata")
+	}
+
+	var r0 *types.ModelInfo
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, *database.Repository) (*types.ModelInfo, error)); ok {
+		return rf(ctx, repo)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, *database.Repository) *types.ModelInfo); ok {
+		r0 = rf(ctx, repo)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*types.ModelInfo)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, *database.Repository) error); ok {
+		r1 = rf(ctx, repo)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockRuntimeArchitectureComponent_UpdateModelMetadata_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'UpdateModelMetadata'
+type MockRuntimeArchitectureComponent_UpdateModelMetadata_Call struct {
+	*mock.Call
+}
+
+// UpdateModelMetadata is a helper method to define mock.On call
+//   - ctx context.Context
+//   - repo *database.Repository
+func (_e *MockRuntimeArchitectureComponent_Expecter) UpdateModelMetadata(ctx interface{}, repo interface{}) *MockRuntimeArchitectureComponent_UpdateModelMetadata_Call {
+	return &MockRuntimeArchitectureComponent_UpdateModelMetadata_Call{Call: _e.mock.On("UpdateModelMetadata", ctx, repo)}
+}
+
+func (_c *MockRuntimeArchitectureComponent_UpdateModelMetadata_Call) Run(run func(ctx context.Context, repo *database.Repository)) *MockRuntimeArchitectureComponent_UpdateModelMetadata_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(*database.Repository))
+	})
+	return _c
+}
+
+func (_c *MockRuntimeArchitectureComponent_UpdateModelMetadata_Call) Return(_a0 *types.ModelInfo, _a1 error) *MockRuntimeArchitectureComponent_UpdateModelMetadata_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockRuntimeArchitectureComponent_UpdateModelMetadata_Call) RunAndReturn(run func(context.Context, *database.Repository) (*types.ModelInfo, error)) *MockRuntimeArchitectureComponent_UpdateModelMetadata_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// UpdateRuntimeFrameworkTag provides a mock function with given fields: ctx, modelInfo, repo
+func (_m *MockRuntimeArchitectureComponent) UpdateRuntimeFrameworkTag(ctx context.Context, modelInfo *types.ModelInfo, repo *database.Repository) error {
+	ret := _m.Called(ctx, modelInfo, repo)
+
+	if len(ret) == 0 {
+		panic("no return value specified for UpdateRuntimeFrameworkTag")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, *types.ModelInfo, *database.Repository) error); ok {
+		r0 = rf(ctx, modelInfo, repo)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// MockRuntimeArchitectureComponent_UpdateRuntimeFrameworkTag_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'UpdateRuntimeFrameworkTag'
+type MockRuntimeArchitectureComponent_UpdateRuntimeFrameworkTag_Call struct {
+	*mock.Call
+}
+
+// UpdateRuntimeFrameworkTag is a helper method to define mock.On call
+//   - ctx context.Context
+//   - modelInfo *types.ModelInfo
+//   - repo *database.Repository
+func (_e *MockRuntimeArchitectureComponent_Expecter) UpdateRuntimeFrameworkTag(ctx interface{}, modelInfo interface{}, repo interface{}) *MockRuntimeArchitectureComponent_UpdateRuntimeFrameworkTag_Call {
+	return &MockRuntimeArchitectureComponent_UpdateRuntimeFrameworkTag_Call{Call: _e.mock.On("UpdateRuntimeFrameworkTag", ctx, modelInfo, repo)}
+}
+
+func (_c *MockRuntimeArchitectureComponent_UpdateRuntimeFrameworkTag_Call) Run(run func(ctx context.Context, modelInfo *types.ModelInfo, repo *database.Repository)) *MockRuntimeArchitectureComponent_UpdateRuntimeFrameworkTag_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(*types.ModelInfo), args[2].(*database.Repository))
+	})
+	return _c
+}
+
+func (_c *MockRuntimeArchitectureComponent_UpdateRuntimeFrameworkTag_Call) Return(_a0 error) *MockRuntimeArchitectureComponent_UpdateRuntimeFrameworkTag_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockRuntimeArchitectureComponent_UpdateRuntimeFrameworkTag_Call) RunAndReturn(run func(context.Context, *types.ModelInfo, *database.Repository) error) *MockRuntimeArchitectureComponent_UpdateRuntimeFrameworkTag_Call {
 	_c.Call.Return(run)
 	return _c
 }

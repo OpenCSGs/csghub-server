@@ -504,107 +504,94 @@ func TestRepoStore_WithMirror(t *testing.T) {
 
 }
 
-func TestRepoStore_ListRepoPublicToUserByRepoIDs(t *testing.T) {
+func TestRepoStore_ListRepoByDeployType(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+	ctx := context.TODO()
 
-	cases := []struct {
-		admin    bool
-		repoType types.RepositoryType
-		search   string
-		sort     string
-		expected []string
-	}{
-		{
-			admin: false, repoType: types.CodeRepo,
-			expected: []string{"rp1", "rp2", "rp4", "rp5", "rp6"},
-		},
-		{
-			admin: true, repoType: types.CodeRepo,
-			expected: []string{"rp1", "rp2", "rp4", "rp5", "rp6"},
-		},
-		{
-			admin: false, repoType: types.CodeRepo, search: "rp4",
-			expected: []string{"rp4", "rp6"},
-		},
-		{
-			admin: false, repoType: types.CodeRepo, sort: "most_download",
-			expected: []string{"rp1", "rp2", "rp4", "rp5", "rp6"},
-		},
-		{
-			admin: false, repoType: types.CodeRepo, sort: "trending",
-			expected: []string{"rp1", "rp2", "rp4", "rp5", "rp6"},
-		},
-	}
+	store := database.NewRepoStoreWithDB(db)
+	rn1, err := store.CreateRepo(ctx, database.Repository{
+		ID:             1,
+		UserID:         123,
+		Path:           "ns/n",
+		GitPath:        "models_ns/n",
+		RepositoryType: types.ModelRepo,
+		Private:        true,
+	})
+	require.Nil(t, err)
 
-	for i, c := range cases {
-		t.Run(fmt.Sprintf("%+v", c), func(t *testing.T) {
-			db := tests.InitTestDB()
-			defer db.Close()
-			ctx := context.TODO()
+	_, err = db.Core.NewInsert().Model(&database.Metadata{
+		RepositoryID: rn1.ID,
+		Architecture: "Qwen2ForCausalLM",
+		ClassName:    "qwen2",
+	}).Exec(ctx)
+	require.Nil(t, err)
 
-			store := database.NewRepoStoreWithDB(db)
+	_, err = db.Core.NewInsert().Model(&database.Metadata{
+		RepositoryID: 2,
+		Architecture: "Qwen3ForCausalLM",
+		ClassName:    "qwen3",
+	}).Exec(ctx)
+	require.Nil(t, err)
 
-			repos := []*database.Repository{
-				{
-					Name: "rp1", Path: "rp1", UserID: 123, RepositoryType: types.CodeRepo,
-					DownloadCount: 10,
-				},
-				{
-					Name: "rp2", Path: "rp2", UserID: 123, RepositoryType: types.CodeRepo,
-					Private:       true,
-					DownloadCount: 10,
-				},
-				{
-					Name: "rp3", Path: "rp3", UserID: 456, RepositoryType: types.CodeRepo,
-					Private:       true,
-					DownloadCount: 15,
-				},
-				{
-					Name: "rp4", Path: "rp4", UserID: 456, RepositoryType: types.CodeRepo,
-					Private: false, Tags: []database.Tag{{Name: "foo"}},
-					DownloadCount: 10,
-				},
-				{
-					Name: "rp5", Path: "rp5", UserID: 789, RepositoryType: types.CodeRepo,
-					Private: false, Tags: []database.Tag{{Name: "bar"}},
-					DownloadCount: 10,
-				},
-				{
-					Name: "rp6", Path: "rp6", UserID: 789, RepositoryType: types.CodeRepo,
-					Private: false, Description: "rp4desc",
-					DownloadCount: 10,
-				},
-			}
+	_, err = db.Core.NewInsert().Model(&database.Metadata{
+		RepositoryID: 3,
+		Architecture: "Qwen4ForCausalLM",
+		ClassName:    "qwen4",
+	}).Exec(ctx)
+	require.Nil(t, err)
 
-			rids := []int64{}
-			for _, repo := range repos {
-				repo.GitPath = repo.Path
-				rn, err := store.CreateRepo(ctx, *repo)
-				require.Nil(t, err)
-				rids = append(rids, rn.ID)
-				for _, tag := range repo.Tags {
-					_, err = db.Core.NewInsert().Model(&tag).Exec(ctx, &tag)
-					require.Nil(t, err)
-					rtags := []database.RepositoryTag{
-						{TagID: tag.ID, RepositoryID: rn.ID, Count: 1},
-					}
-					err = store.BatchCreateRepoTags(ctx, rtags)
-					require.Nil(t, err)
-				}
-			}
-			if i == 4 {
-				fmt.Print("")
-			}
-			rs, count, err := store.ListRepoPublicToUserByRepoIDs(ctx, c.repoType, 123, c.search, c.sort, 10, 1, rids)
-			require.Nil(t, err)
-			names := []string{}
-			for _, r := range rs {
-				names = append(names, r.Name)
-			}
-			require.Equal(t, len(c.expected), count)
-			require.Equal(t, c.expected, names)
+	_, err = db.Core.NewInsert().Model(&database.RuntimeFramework{
+		ID:          1,
+		FrameName:   "vllm",
+		Type:        1,
+		ModelFormat: "safetensors",
+	}).Exec(ctx)
+	require.Nil(t, err)
 
-		})
-	}
+	_, err = db.Core.NewInsert().Model(&database.RuntimeFramework{
+		ID:          2,
+		FrameName:   "llama.cpp",
+		Type:        1,
+		ModelFormat: "gguf",
+	}).Exec(ctx)
+	require.Nil(t, err)
+
+	_, err = db.Core.NewInsert().Model(&database.RuntimeArchitecture{
+		ArchitectureName:   "Qwen2ForCausalLM",
+		RuntimeFrameworkID: 1,
+	}).Exec(ctx)
+	require.Nil(t, err)
+
+	_, err = db.Core.NewInsert().Model(&database.RuntimeArchitecture{
+		ArchitectureName:   "qwen3",
+		RuntimeFrameworkID: 1,
+	}).Exec(ctx)
+	require.Nil(t, err)
+
+	_, err = store.CreateRepo(ctx, database.Repository{
+		ID:             2,
+		UserID:         123,
+		Path:           "ns/n2",
+		GitPath:        "models_ns/n2",
+		RepositoryType: types.ModelRepo,
+		Private:        false,
+	})
+	require.Nil(t, err)
+	_, err = store.CreateRepo(ctx, database.Repository{
+		ID:             3,
+		UserID:         123,
+		Path:           "ns/n3",
+		GitPath:        "models_ns/n3",
+		RepositoryType: types.ModelRepo,
+		Private:        false,
+	})
+	require.Nil(t, err)
+	rs, count, err := store.ListRepoByDeployType(ctx, types.ModelRepo, 123, "", "", 1, 10, 1)
+	require.Nil(t, err)
+	require.Equal(t, 2, count)
+	require.Equal(t, "ns/n", rs[0].Path)
+
 }
 
 func TestRepoStore_CleanRelationsByRepoID(t *testing.T) {

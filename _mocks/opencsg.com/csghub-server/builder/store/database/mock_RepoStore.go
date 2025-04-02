@@ -1489,36 +1489,36 @@ func (_c *MockRepoStore_IsMirrorRepo_Call) RunAndReturn(run func(context.Context
 	return _c
 }
 
-// ListRepoPublicToUserByRepoIDs provides a mock function with given fields: ctx, repoType, userID, search, sort, per, page, repoIDs
-func (_m *MockRepoStore) ListRepoPublicToUserByRepoIDs(ctx context.Context, repoType types.RepositoryType, userID int64, search string, sort string, per int, page int, repoIDs []int64) ([]*database.Repository, int, error) {
-	ret := _m.Called(ctx, repoType, userID, search, sort, per, page, repoIDs)
+// ListRepoByDeployType provides a mock function with given fields: ctx, repoType, userID, search, sort, deployType, per, page
+func (_m *MockRepoStore) ListRepoByDeployType(ctx context.Context, repoType types.RepositoryType, userID int64, search string, sort string, deployType int, per int, page int) ([]*database.Repository, int, error) {
+	ret := _m.Called(ctx, repoType, userID, search, sort, deployType, per, page)
 
 	if len(ret) == 0 {
-		panic("no return value specified for ListRepoPublicToUserByRepoIDs")
+		panic("no return value specified for ListRepoByDeployType")
 	}
 
 	var r0 []*database.Repository
 	var r1 int
 	var r2 error
-	if rf, ok := ret.Get(0).(func(context.Context, types.RepositoryType, int64, string, string, int, int, []int64) ([]*database.Repository, int, error)); ok {
-		return rf(ctx, repoType, userID, search, sort, per, page, repoIDs)
+	if rf, ok := ret.Get(0).(func(context.Context, types.RepositoryType, int64, string, string, int, int, int) ([]*database.Repository, int, error)); ok {
+		return rf(ctx, repoType, userID, search, sort, deployType, per, page)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, types.RepositoryType, int64, string, string, int, int, []int64) []*database.Repository); ok {
-		r0 = rf(ctx, repoType, userID, search, sort, per, page, repoIDs)
+	if rf, ok := ret.Get(0).(func(context.Context, types.RepositoryType, int64, string, string, int, int, int) []*database.Repository); ok {
+		r0 = rf(ctx, repoType, userID, search, sort, deployType, per, page)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).([]*database.Repository)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, types.RepositoryType, int64, string, string, int, int, []int64) int); ok {
-		r1 = rf(ctx, repoType, userID, search, sort, per, page, repoIDs)
+	if rf, ok := ret.Get(1).(func(context.Context, types.RepositoryType, int64, string, string, int, int, int) int); ok {
+		r1 = rf(ctx, repoType, userID, search, sort, deployType, per, page)
 	} else {
 		r1 = ret.Get(1).(int)
 	}
 
-	if rf, ok := ret.Get(2).(func(context.Context, types.RepositoryType, int64, string, string, int, int, []int64) error); ok {
-		r2 = rf(ctx, repoType, userID, search, sort, per, page, repoIDs)
+	if rf, ok := ret.Get(2).(func(context.Context, types.RepositoryType, int64, string, string, int, int, int) error); ok {
+		r2 = rf(ctx, repoType, userID, search, sort, deployType, per, page)
 	} else {
 		r2 = ret.Error(2)
 	}
@@ -1526,37 +1526,37 @@ func (_m *MockRepoStore) ListRepoPublicToUserByRepoIDs(ctx context.Context, repo
 	return r0, r1, r2
 }
 
-// MockRepoStore_ListRepoPublicToUserByRepoIDs_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ListRepoPublicToUserByRepoIDs'
-type MockRepoStore_ListRepoPublicToUserByRepoIDs_Call struct {
+// MockRepoStore_ListRepoByDeployType_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ListRepoByDeployType'
+type MockRepoStore_ListRepoByDeployType_Call struct {
 	*mock.Call
 }
 
-// ListRepoPublicToUserByRepoIDs is a helper method to define mock.On call
+// ListRepoByDeployType is a helper method to define mock.On call
 //   - ctx context.Context
 //   - repoType types.RepositoryType
 //   - userID int64
 //   - search string
 //   - sort string
+//   - deployType int
 //   - per int
 //   - page int
-//   - repoIDs []int64
-func (_e *MockRepoStore_Expecter) ListRepoPublicToUserByRepoIDs(ctx interface{}, repoType interface{}, userID interface{}, search interface{}, sort interface{}, per interface{}, page interface{}, repoIDs interface{}) *MockRepoStore_ListRepoPublicToUserByRepoIDs_Call {
-	return &MockRepoStore_ListRepoPublicToUserByRepoIDs_Call{Call: _e.mock.On("ListRepoPublicToUserByRepoIDs", ctx, repoType, userID, search, sort, per, page, repoIDs)}
+func (_e *MockRepoStore_Expecter) ListRepoByDeployType(ctx interface{}, repoType interface{}, userID interface{}, search interface{}, sort interface{}, deployType interface{}, per interface{}, page interface{}) *MockRepoStore_ListRepoByDeployType_Call {
+	return &MockRepoStore_ListRepoByDeployType_Call{Call: _e.mock.On("ListRepoByDeployType", ctx, repoType, userID, search, sort, deployType, per, page)}
 }
 
-func (_c *MockRepoStore_ListRepoPublicToUserByRepoIDs_Call) Run(run func(ctx context.Context, repoType types.RepositoryType, userID int64, search string, sort string, per int, page int, repoIDs []int64)) *MockRepoStore_ListRepoPublicToUserByRepoIDs_Call {
+func (_c *MockRepoStore_ListRepoByDeployType_Call) Run(run func(ctx context.Context, repoType types.RepositoryType, userID int64, search string, sort string, deployType int, per int, page int)) *MockRepoStore_ListRepoByDeployType_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(types.RepositoryType), args[2].(int64), args[3].(string), args[4].(string), args[5].(int), args[6].(int), args[7].([]int64))
+		run(args[0].(context.Context), args[1].(types.RepositoryType), args[2].(int64), args[3].(string), args[4].(string), args[5].(int), args[6].(int), args[7].(int))
 	})
 	return _c
 }
 
-func (_c *MockRepoStore_ListRepoPublicToUserByRepoIDs_Call) Return(repos []*database.Repository, count int, err error) *MockRepoStore_ListRepoPublicToUserByRepoIDs_Call {
+func (_c *MockRepoStore_ListRepoByDeployType_Call) Return(repos []*database.Repository, count int, err error) *MockRepoStore_ListRepoByDeployType_Call {
 	_c.Call.Return(repos, count, err)
 	return _c
 }
 
-func (_c *MockRepoStore_ListRepoPublicToUserByRepoIDs_Call) RunAndReturn(run func(context.Context, types.RepositoryType, int64, string, string, int, int, []int64) ([]*database.Repository, int, error)) *MockRepoStore_ListRepoPublicToUserByRepoIDs_Call {
+func (_c *MockRepoStore_ListRepoByDeployType_Call) RunAndReturn(run func(context.Context, types.RepositoryType, int64, string, string, int, int, int) ([]*database.Repository, int, error)) *MockRepoStore_ListRepoByDeployType_Call {
 	_c.Call.Return(run)
 	return _c
 }

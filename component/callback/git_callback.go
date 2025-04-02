@@ -8,7 +8,6 @@ import (
 	"log/slog"
 	"path"
 	"slices"
-	"strconv"
 	"strings"
 	"time"
 
@@ -398,7 +397,7 @@ func (c *gitCallbackComponentImpl) getFileRaw(repoType, namespace, repoName, ref
 func (c *gitCallbackComponentImpl) updateRepoRelations(ctx context.Context, repoType, namespace, repoName, ref string, deleteAction bool, fileNames []string) {
 	slog.Debug("update model relation for git callback", slog.Any("namespace", namespace), slog.Any("repoName", repoName), slog.Any("repoType", repoType), slog.Any("branch", ref))
 	if repoType == fmt.Sprintf("%ss", types.ModelRepo) {
-		c.updateModelRuntimeFrameworks(ctx, repoType, namespace, repoName, ref, fileNames, deleteAction)
+		c.updateModelInfo(ctx, repoType, namespace, repoName, fileNames)
 	}
 	if repoType == fmt.Sprintf("%ss", types.DatasetRepo) {
 		c.updateDatasetTags(ctx, namespace, repoName, fileNames)
@@ -457,7 +456,7 @@ func (c *gitCallbackComponentImpl) updateDatasetTags(ctx context.Context, namesp
 }
 
 // update model runtime frameworks
-func (c *gitCallbackComponentImpl) updateModelRuntimeFrameworks(ctx context.Context, repoType, namespace, repoName, ref string, fileNames []string, deleteAction bool) {
+func (c *gitCallbackComponentImpl) updateModelInfo(ctx context.Context, repoType, namespace, repoName string, fileNames []string) {
 	//check file contains
 	if len(fileNames) == 0 {
 		return
@@ -467,222 +466,47 @@ func (c *gitCallbackComponentImpl) updateModelRuntimeFrameworks(ctx context.Cont
 		slog.Warn("fail to query repo for git callback", slog.Any("namespace", namespace), slog.Any("repoName", repoName), slog.Any("error", err))
 		return
 	}
-	if hasGGUFFile(fileNames, repo) {
-		// for gguf model
-		c.updateGGUFModel(ctx, namespace, repoName, deleteAction, repo)
-	} else {
-		// for safetensor model
-		c.updateSafetensorModel(ctx, repoType, namespace, repoName, ref, fileNames, deleteAction, repo)
-	}
+	c.updateModelMetadata(ctx, fileNames, repo)
 }
 
-func hasGGUFFile(fileList []string, repo *database.Repository) bool {
-	for _, file := range fileList {
-		if strings.HasSuffix(file, ".gguf") {
-			return true
-		}
-	}
-	for _, tag := range repo.Tags {
-		if tag.Name == "gguf" {
-			return true
-		}
-	}
-	return false
-}
-
-func (c *gitCallbackComponentImpl) updateSafetensorModel(ctx context.Context, repoType, namespace, repoName, ref string, fileNames []string, deleteAction bool, repo *database.Repository) {
+func (c *gitCallbackComponentImpl) updateModelMetadata(ctx context.Context, fileNames []string, repo *database.Repository) {
 	// must be model repo and config.json
-	valid := c.isValidForRuntime(repoType, ref, fileNames)
+	valid := c.isValidForRuntime(fileNames)
 	if !valid {
 		return
 	}
-	// delete event
-	if deleteAction {
-		err := c.repoRuntimeFrameworkStore.DeleteByRepoID(ctx, repo.ID)
-		if err != nil {
-			slog.Warn("fail to remove repo runtimes for git callback", slog.Any("namespace", namespace), slog.Any("repoName", repoName), slog.Any("repoid", repo.ID), slog.Any("error", err))
-		}
-		return
-	}
-	arch, err := c.runtimeArchComponent.GetArchitecture(ctx, types.TaskAutoDetection, repo)
+	modelInfo, err := c.runtimeArchComponent.UpdateModelMetadata(ctx, repo)
 	if err != nil {
-		slog.Warn("fail to get config.json content for git callback", slog.Any("namespace", namespace), slog.Any("repoName", repoName), slog.Any("error", err))
+		slog.Warn("fail to update model metadata", slog.Any("error", err), slog.Any("repo path", repo.Path))
 		return
 	}
-	slog.Debug("get arch for git callback", slog.Any("namespace", namespace), slog.Any("repoName", repoName), slog.Any("arch", arch))
-	//add resource tag, like ascend
-	filter := &types.TagFilter{
-		Scopes:     []types.TagScope{types.ModelTagScope},
-		Categories: []string{"runtime_framework", "resource"},
-	}
-	runtime_framework_tags, _ := c.tagStore.AllTags(ctx, filter)
-	fields := strings.Split(repo.Path, "/")
-	err = c.runtimeArchComponent.AddResourceTag(ctx, runtime_framework_tags, fields[1], repo.ID)
+	err = c.runtimeArchComponent.UpdateRuntimeFrameworkTag(ctx, modelInfo, repo)
 	if err != nil {
-		slog.Warn("fail to add resource tag", slog.Any("error", err))
-		return
+		slog.Warn("fail to update runtime framework tag", slog.Any("error", err), slog.Any("repo path", repo.Path))
 	}
-	// get runtime frameworks by arch
-	newFrames, err := c.getRuntimeFrameworks(ctx, arch, *repo, types.Safetensors)
-	if err != nil {
-		slog.Warn("fail to get runtime frameworks for git callback", slog.Any("arch", arch), slog.Any("namespace", namespace), slog.Any("repoName", repoName), slog.Any("error", err))
-		return
-	}
-
-	var newFrameMap = make(map[string]string)
-	for _, frame := range newFrames {
-		newFrameMap[strconv.FormatInt(frame.ID, 10)] = strconv.FormatInt(frame.ID, 10)
-	}
-
-	oldRepoRuntimes, err := c.repoRuntimeFrameworkStore.GetByRepoIDs(ctx, repo.ID)
-	if err != nil {
-		slog.Warn("fail to get repo runtimes for git callback", slog.Any("repo.ID", repo.ID), slog.Any("error", err))
-		return
-	}
-	var oldFrameMap = make(map[string]string)
-	// get map
-	for _, runtime := range oldRepoRuntimes {
-		oldFrameMap[strconv.FormatInt(runtime.RuntimeFrameworkID, 10)] = strconv.FormatInt(runtime.RuntimeFrameworkID, 10)
-	}
-	slog.Debug("get old frame map by arch for git callback", slog.Any("namespace", namespace), slog.Any("repoName", repoName), slog.Any("oldFrameMap", oldFrameMap))
-	// remove incorrect relation
-	for _, old := range oldRepoRuntimes {
-		// check if it need remove
-		_, exist := newFrameMap[strconv.FormatInt(old.RuntimeFrameworkID, 10)]
-		if !exist {
-			// remove incorrect relations
-			err := c.repoRuntimeFrameworkStore.Delete(ctx, old.RuntimeFrameworkID, repo.ID, old.Type)
-			if err != nil {
-				slog.Warn("fail to delete old repo runtimes for git callback", slog.Any("repo.ID", repo.ID), slog.Any("runtime framework id", old.RuntimeFrameworkID), slog.Any("error", err))
-			}
-			// remove runtime framework tags
-			c.runtimeArchComponent.RemoveRuntimeFrameworkTag(ctx, runtime_framework_tags, repo.ID, old.RuntimeFrameworkID)
-		}
-	}
-
-	// add new relation
-	for _, new := range newFrames {
-		// check if it need add
-		_, exist := oldFrameMap[strconv.FormatInt(new.ID, 10)]
-		if !exist {
-			// add new relations
-			err := c.repoRuntimeFrameworkStore.Add(ctx, new.ID, repo.ID, new.Type)
-			if err != nil {
-				slog.Warn("fail to add new repo runtimes for git callback", slog.Any("repo.ID", repo.ID), slog.Any("runtime framework id", new.ID), slog.Any("error", err))
-			}
-			// add runtime framework and resource tags
-			err = c.runtimeArchComponent.AddRuntimeFrameworkTag(ctx, runtime_framework_tags, repo.ID, new.ID)
-			if err != nil {
-				slog.Warn("fail to add runtime framework tag for git callback", slog.Any("repo.ID", repo.ID), slog.Any("runtime framework id", new.ID), slog.Any("error", err))
-			}
-		}
-	}
-
-}
-
-/**
- * update runtime framework for gguf model
- */
-func (c *gitCallbackComponentImpl) updateGGUFModel(ctx context.Context, namespace, repoName string, deleteAction bool, repo *database.Repository) {
-	// delete event
-	if deleteAction {
-		err := c.repoRuntimeFrameworkStore.DeleteByRepoID(ctx, repo.ID)
-		if err != nil {
-			slog.Warn("fail to remove repo runtimes for git callback", slog.Any("namespace", namespace), slog.Any("repoName", repoName), slog.Any("repoid", repo.ID), slog.Any("error", err))
-		}
-		return
-	}
-	task := GetPipelineTaskFromTags(repo.Tags)
-	if task != types.TextGeneration {
-		return
-	}
-	arch, err := c.runtimeArchComponent.GetArchitecture(ctx, types.TextGeneration, repo)
-	if err != nil {
-		slog.Warn("fail to get gguf arch for git callback", slog.Any("namespace", namespace), slog.Any("repoName", repoName), slog.Any("error", err))
-		return
-	}
-	// get runtime frameworks by arch
-	newFrames, err := c.getRuntimeFrameworks(ctx, arch, *repo, types.GGUF)
-	if err != nil {
-		slog.Warn("fail to get runtime frameworks for git callback", slog.Any("arch", arch), slog.Any("namespace", namespace), slog.Any("repoName", repoName), slog.Any("error", err))
-		return
-	}
-
-	//get tags
-	filter := &types.TagFilter{
-		Scopes:     []types.TagScope{types.ModelTagScope},
-		Categories: []string{"runtime_framework", "resource"},
-	}
-	runtime_framework_tags, _ := c.tagStore.AllTags(ctx, filter)
-
-	//add runtime framework and tags
-	for _, runtime := range newFrames {
-		// add runtime framework
-		err := c.repoRuntimeFrameworkStore.Add(ctx, runtime.ID, repo.ID, types.InferenceType)
-		if err != nil {
-			slog.Warn("fail to add new repo runtimes for git callback", slog.Any("repo.ID", repo.ID), slog.Any("runtime framework id", runtime.ID), slog.Any("error", err))
-		}
-		// add runtime framework tags
-		err = c.runtimeArchComponent.AddRuntimeFrameworkTag(ctx, runtime_framework_tags, repo.ID, runtime.ID)
-		if err != nil {
-			slog.Warn("fail to add runtime framework tag for git callback", slog.Any("repo.ID", repo.ID), slog.Any("runtime framework id", runtime.ID), slog.Any("error", err))
-		}
-	}
-}
-
-// get runtime frameworks by ids
-func (c *gitCallbackComponentImpl) getRuntimeFrameworks(ctx context.Context, arch string, repo database.Repository, modelType types.ModelType) ([]database.RuntimeFramework, error) {
-	oriName := repo.Name
-	if repo.HFPath != "" {
-		oriName = strings.Split(repo.HFPath, "/")[1]
-	} else if repo.MSPath != "" {
-		oriName = strings.Split(repo.MSPath, "/")[1]
-	}
-	runtimes, err := c.runtimeArchStore.ListByRArchNameAndModel(ctx, arch, oriName)
-	// to do check resource models
-	if err != nil {
-		slog.Warn("fail to get runtime frameworks for git callback", slog.Any("arch", arch), slog.Any("error", err))
-		return nil, err
-	}
-	var frameIDs []int64
-	for _, runtime := range runtimes {
-		frameIDs = append(frameIDs, runtime.RuntimeFrameworkID)
-	}
-
-	newFrames, err := c.runtimeFrameworkStore.ListByIDs(ctx, frameIDs)
-	if err != nil {
-		slog.Warn("fail to get runtime frameworks for git callback", slog.Any("arch", arch), slog.Any("error", err))
-		return nil, err
-	}
-	var frames []database.RuntimeFramework
-	for _, frame := range newFrames {
-		supportedFormat := string(types.Safetensors)
-		if frame.ModelFormat != "" {
-			supportedFormat = frame.ModelFormat
-		}
-		if !strings.Contains(supportedFormat, string(modelType)) {
-			continue
-		}
-		frames = append(frames, frame)
-
-	}
-	return frames, nil
 }
 
 // check if the repo is valid for runtime framework
-func (c *gitCallbackComponentImpl) isValidForRuntime(repoType, ref string, fileNames []string) bool {
-	if repoType != fmt.Sprintf("%ss", types.ModelRepo) {
-		return false
-	}
-	if !slices.Contains(fileNames, component.ConfigFileName) && !slices.Contains(fileNames, component.ModelIndexFileName) {
-		return false
+func (c *gitCallbackComponentImpl) isValidForRuntime(fileNames []string) bool {
+	for _, fileName := range fileNames {
+		if strings.Contains(fileName, component.ConfigFileName) {
+			return true
+		}
+		if strings.Contains(fileName, component.ModelIndexFileName) {
+			return true
+		}
+		if strings.Contains(fileName, "README.md") {
+			return true
+		}
+		if strings.Contains(fileName, string(types.Safetensors)) {
+			return true
+		}
+		if strings.Contains(fileName, string(types.GGUF)) {
+			return true
+		}
 	}
 
-	if !strings.Contains(ref, component.MainBranch) && !strings.Contains(ref, component.MasterBranch) {
-		return false
-	}
-
-	return true
+	return false
 }
 
 func GetPipelineTaskFromTags(tags []database.Tag) types.PipelineTask {

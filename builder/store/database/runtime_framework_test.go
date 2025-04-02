@@ -17,7 +17,7 @@ func TestRuntimeFrameworksStore_AddAndUpdateAndList(t *testing.T) {
 
 	rfStore := database.NewRuntimeFrameworksStoreWithDB(db)
 
-	err := rfStore.Add(ctx, database.RuntimeFramework{
+	_, err := rfStore.Add(ctx, database.RuntimeFramework{
 		ID:        1,
 		FrameName: "vllm",
 		Type:      1,
@@ -44,7 +44,7 @@ func TestRuntimeFrameworksStore_FindByIDAndDelete(t *testing.T) {
 
 	rfStore := database.NewRuntimeFrameworksStoreWithDB(db)
 
-	err := rfStore.Add(ctx, database.RuntimeFramework{
+	_, err := rfStore.Add(ctx, database.RuntimeFramework{
 		ID:        1,
 		FrameName: "vllm",
 		Type:      1,
@@ -72,7 +72,7 @@ func TestRuntimeFrameworksStore_FindEnabledByID(t *testing.T) {
 	ctx := context.TODO()
 
 	rfStore := database.NewRuntimeFrameworksStoreWithDB(db)
-	err := rfStore.Add(ctx, database.RuntimeFramework{
+	_, err := rfStore.Add(ctx, database.RuntimeFramework{
 		ID:        1,
 		FrameName: "vllm",
 		Type:      1,
@@ -91,7 +91,7 @@ func TestRuntimeFrameworksStore_FindEnabledByName(t *testing.T) {
 	ctx := context.TODO()
 
 	rfStore := database.NewRuntimeFrameworksStoreWithDB(db)
-	err := rfStore.Add(ctx, database.RuntimeFramework{
+	_, err := rfStore.Add(ctx, database.RuntimeFramework{
 		ID:        1,
 		FrameName: "vllm",
 		Type:      1,
@@ -110,7 +110,7 @@ func TestRuntimeFrameworksStore_ListAll(t *testing.T) {
 	ctx := context.TODO()
 
 	rfStore := database.NewRuntimeFrameworksStoreWithDB(db)
-	err := rfStore.Add(ctx, database.RuntimeFramework{
+	_, err := rfStore.Add(ctx, database.RuntimeFramework{
 		ID:        1,
 		FrameName: "vllm",
 		Type:      1,
@@ -130,7 +130,7 @@ func TestRuntimeFrameworksStore_ListByIDs(t *testing.T) {
 	ctx := context.TODO()
 
 	rfStore := database.NewRuntimeFrameworksStoreWithDB(db)
-	err := rfStore.Add(ctx, database.RuntimeFramework{
+	_, err := rfStore.Add(ctx, database.RuntimeFramework{
 		ID:        1,
 		FrameName: "vllm",
 		Type:      1,
@@ -142,4 +142,25 @@ func TestRuntimeFrameworksStore_ListByIDs(t *testing.T) {
 	require.Nil(t, err)
 	require.Equal(t, 1, len(res))
 	require.Equal(t, "vllm", res[0].FrameName)
+}
+
+func TestRuntimeFrameworksStore_FindByNameAndComputeType(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+	ctx := context.TODO()
+
+	rfStore := database.NewRuntimeFrameworksStoreWithDB(db)
+	_, err := rfStore.Add(ctx, database.RuntimeFramework{
+		ID:            1,
+		FrameName:     "vllm",
+		Type:          1,
+		Enabled:       1,
+		DriverVersion: "12.1",
+		ComputeType:   "gpu",
+	})
+	require.Nil(t, err)
+
+	rf, err := rfStore.FindByNameAndComputeType(ctx, "vllm", "12.1", "gpu")
+	require.Nil(t, err)
+	require.Equal(t, "vllm", rf.FrameName)
 }

@@ -1,0 +1,28 @@
+{
+  "engine_name": "tei",
+  "engine_version": "1.6",
+  "enabled": 1,
+  "container_port": 8000,
+  "model_format": "safetensors",
+  "description": "A blazing fast inference solution for text embeddings models",
+  "engine_images": [
+    {
+      "compute_type": "gpu",
+      "image": "tei:1.6",
+      "driver_version": "12.4"
+    },
+    {
+      "compute_type": "cpu",
+      "image": "tei:cpu-1.6"
+    }
+  ],
+  "supported_archs": [
+    "bert",
+    "mistral",
+    "mpnet",
+    "new",
+    "nomic_bert",
+    "qwen2",
+    "xlm-roberta"
+  ]
+}

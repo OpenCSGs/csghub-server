@@ -27,6 +27,7 @@ import (
 	"opencsg.com/csghub-server/builder/git/membership"
 	"opencsg.com/csghub-server/builder/git/mirrorserver"
 	"opencsg.com/csghub-server/builder/rpc"
+	"opencsg.com/csghub-server/builder/store/cache"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/builder/store/s3"
 	"opencsg.com/csghub-server/common/config"
@@ -47,38 +48,38 @@ const (
 )
 
 type repoComponentImpl struct {
-	tagComponent              TagComponent
-	userStore                 database.UserStore
-	orgStore                  database.OrgStore
-	namespaceStore            database.NamespaceStore
-	repoStore                 database.RepoStore
-	repoFileStore             database.RepoFileStore
-	repoRelationsStore        database.RepoRelationsStore
-	mirrorStore               database.MirrorStore
-	git                       gitserver.GitServer
-	s3Client                  s3.Client
-	userSvcClient             rpc.UserSvcClient
-	lfsBucket                 string
-	userLikesStore            database.UserLikesStore
-	mirrorServer              mirrorserver.MirrorServer
-	runtimeFrameworksStore    database.RuntimeFrameworksStore
-	deployTaskStore           database.DeployTaskStore
-	deployer                  deploy.Deployer
-	publicRootDomain          string
-	serverBaseUrl             string
-	cluster                   database.ClusterInfoStore
-	mirrorSourceStore         database.MirrorSourceStore
-	tokenStore                database.AccessTokenStore
-	repoRuntimeFrameworkStore database.RepositoriesRuntimeFrameworkStore
-	syncVersionStore          database.SyncVersionStore
-	syncClientSettingStore    database.SyncClientSettingStore
-	fileStore                 database.FileStore
-	config                    *config.Config
-	accountingComponent       AccountingComponent
-	spaceResourceStore        database.SpaceResourceStore
-	lfsMetaObjectStore        database.LfsMetaObjectStore
-	recomStore                database.RecomStore
-	mq                        queue.PriorityQueue
+	tagComponent           TagComponent
+	userStore              database.UserStore
+	orgStore               database.OrgStore
+	namespaceStore         database.NamespaceStore
+	repoStore              database.RepoStore
+	repoFileStore          database.RepoFileStore
+	repoRelationsStore     database.RepoRelationsStore
+	mirrorStore            database.MirrorStore
+	git                    gitserver.GitServer
+	s3Client               s3.Client
+	userSvcClient          rpc.UserSvcClient
+	lfsBucket              string
+	userLikesStore         database.UserLikesStore
+	mirrorServer           mirrorserver.MirrorServer
+	runtimeFrameworksStore database.RuntimeFrameworksStore
+	deployTaskStore        database.DeployTaskStore
+	deployer               deploy.Deployer
+	publicRootDomain       string
+	serverBaseUrl          string
+	clusterInfoStore       database.ClusterInfoStore
+	mirrorSourceStore      database.MirrorSourceStore
+	tokenStore             database.AccessTokenStore
+	syncVersionStore       database.SyncVersionStore
+	syncClientSettingStore database.SyncClientSettingStore
+	fileStore              database.FileStore
+	config                 *config.Config
+	accountingComponent    AccountingComponent
+	spaceResourceStore     database.SpaceResourceStore
+	lfsMetaObjectStore     database.LfsMetaObjectStore
+	recomStore             database.RecomStore
+	mq                     queue.PriorityQueue
+	syncCache              cache.Cache
 }
 
 type RepoComponent interface {
@@ -210,13 +211,12 @@ func NewRepoComponent(config *config.Config) (RepoComponent, error) {
 	c.lfsBucket = config.S3.Bucket
 	c.userSvcClient = rpc.NewUserSvcHttpClient(fmt.Sprintf("%s:%d", config.User.Host, config.User.Port),
 		rpc.AuthWithApiKey(config.APIToken))
-	c.runtimeFrameworksStore = database.NewRuntimeFrameworksStore()
 	c.deployTaskStore = database.NewDeployTaskStore()
 	c.deployer = deploy.NewDeployer()
 	c.publicRootDomain = config.Space.PublicRootDomain
 	c.serverBaseUrl = config.APIServer.PublicDomain
-	c.cluster = database.NewClusterInfoStore()
-	c.repoRuntimeFrameworkStore = database.NewRepositoriesRuntimeFramework()
+	c.clusterInfoStore = database.NewClusterInfoStore()
+	c.runtimeFrameworksStore = database.NewRuntimeFrameworksStore()
 	c.accountingComponent, err = NewAccountingComponent(config)
 	if err != nil {
 		return nil, err
@@ -2062,11 +2062,12 @@ func (c *repoComponentImpl) ListRuntimeFrameworkWithType(ctx context.Context, de
 			FrameName:     frame.FrameName,
 			FrameVersion:  frame.FrameVersion,
 			FrameImage:    frame.FrameImage,
-			FrameCpuImage: frame.FrameCpuImage,
 			Enabled:       frame.Enabled,
 			ContainerPort: frame.ContainerPort,
 			Type:          frame.Type,
 			EngineArgs:    frame.EngineArgs,
+			ComputeType:   frame.ComputeType,
+			DriverVersion: frame.DriverVersion,
 		})
 	}
 	return frameList, nil
@@ -2078,24 +2079,29 @@ func (c *repoComponentImpl) ListRuntimeFramework(ctx context.Context, repoType t
 	if err != nil {
 		return nil, fmt.Errorf("failed to find repo, error: %w", err)
 	}
-	frames, err := c.runtimeFrameworksStore.ListByRepoID(ctx, repo.ID, deployType)
+	archs := repo.Archs()
+	originName := repo.OriginName()
+	format := repo.Format()
+	frames, err := c.runtimeFrameworksStore.ListByArchsNameAndType(ctx, originName, format, archs, deployType)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list runtime frameworks, error: %w", err)
 	}
 	var frameList []types.RuntimeFramework
 	for _, modelFrame := range frames {
-		if modelFrame.RuntimeFramework != nil {
-			frameList = append(frameList, types.RuntimeFramework{
-				ID:            modelFrame.RuntimeFramework.ID,
-				FrameName:     modelFrame.RuntimeFramework.FrameName,
-				FrameVersion:  modelFrame.RuntimeFramework.FrameVersion,
-				FrameImage:    modelFrame.RuntimeFramework.FrameImage,
-				FrameCpuImage: modelFrame.RuntimeFramework.FrameCpuImage,
-				Enabled:       modelFrame.RuntimeFramework.Enabled,
-				ContainerPort: modelFrame.RuntimeFramework.ContainerPort,
-				EngineArgs:    modelFrame.RuntimeFramework.EngineArgs,
-			})
-		}
+		frameList = append(frameList, types.RuntimeFramework{
+			ID:            modelFrame.ID,
+			FrameName:     modelFrame.FrameName,
+			FrameVersion:  modelFrame.FrameVersion,
+			FrameImage:    modelFrame.FrameImage,
+			Enabled:       modelFrame.Enabled,
+			ContainerPort: modelFrame.ContainerPort,
+			EngineArgs:    modelFrame.EngineArgs,
+			ComputeType:   modelFrame.ComputeType,
+			DriverVersion: modelFrame.DriverVersion,
+			Description:   modelFrame.Description,
+			Type:          modelFrame.Type,
+		})
+
 	}
 	return frameList, nil
 }
@@ -2114,13 +2120,13 @@ func (c *repoComponentImpl) CreateRuntimeFramework(ctx context.Context, req *typ
 		FrameName:     req.FrameName,
 		FrameVersion:  req.FrameVersion,
 		FrameImage:    req.FrameImage,
-		FrameCpuImage: req.FrameCpuImage,
 		Enabled:       req.Enabled,
 		ContainerPort: req.ContainerPort,
+		ComputeType:   req.ComputeType,
 		Type:          req.Type,
 		EngineArgs:    req.EngineArgs,
 	}
-	err = c.runtimeFrameworksStore.Add(ctx, newFrame)
+	_, err = c.runtimeFrameworksStore.Add(ctx, newFrame)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create runtime framework, error: %w", err)
 	}
@@ -2128,11 +2134,12 @@ func (c *repoComponentImpl) CreateRuntimeFramework(ctx context.Context, req *typ
 		FrameName:     req.FrameName,
 		FrameVersion:  req.FrameVersion,
 		FrameImage:    req.FrameImage,
-		FrameCpuImage: req.FrameCpuImage,
 		Enabled:       req.Enabled,
 		ContainerPort: req.ContainerPort,
 		Type:          req.Type,
 		EngineArgs:    req.EngineArgs,
+		ComputeType:   req.ComputeType,
+		DriverVersion: req.DriverVersion,
 	}
 	return frame, nil
 }
@@ -2152,7 +2159,6 @@ func (c *repoComponentImpl) UpdateRuntimeFramework(ctx context.Context, id int64
 		FrameName:     req.FrameName,
 		FrameVersion:  req.FrameVersion,
 		FrameImage:    req.FrameImage,
-		FrameCpuImage: req.FrameCpuImage,
 		Enabled:       req.Enabled,
 		ContainerPort: req.ContainerPort,
 		Type:          req.Type,
@@ -2167,7 +2173,6 @@ func (c *repoComponentImpl) UpdateRuntimeFramework(ctx context.Context, id int64
 		FrameName:     frame.FrameName,
 		FrameVersion:  frame.FrameVersion,
 		FrameImage:    frame.FrameImage,
-		FrameCpuImage: frame.FrameCpuImage,
 		Enabled:       frame.Enabled,
 		ContainerPort: frame.ContainerPort,
 		Type:          req.Type,
@@ -2367,7 +2372,7 @@ func (c *repoComponentImpl) DeployDetail(ctx context.Context, detailReq types.De
 func (c *repoComponentImpl) GenerateEndpoint(ctx context.Context, deploy *database.Deploy) (string, string) {
 	var endpoint string
 	provider := ""
-	cls, err := c.cluster.ByClusterID(ctx, deploy.ClusterID)
+	cls, err := c.clusterInfoStore.ByClusterID(ctx, deploy.ClusterID)
 	zone := ""
 	if err != nil {
 		slog.Warn("Get cluster with error", slog.Any("error", err))
@@ -2765,7 +2770,7 @@ func (c *repoComponentImpl) DeployUpdate(ctx context.Context, updateReq types.De
 	}
 
 	if req.ClusterID != nil {
-		_, err = c.cluster.ByClusterID(ctx, *req.ClusterID)
+		_, err = c.clusterInfoStore.ByClusterID(ctx, *req.ClusterID)
 		if err != nil {
 			return fmt.Errorf("invalid cluster %v, %w", *req.ClusterID, err)
 		}

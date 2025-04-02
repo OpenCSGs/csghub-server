@@ -883,7 +883,7 @@ func TestRepoComponent_ListRuntimeFrameworkWithType(t *testing.T) {
 
 	frames := []database.RuntimeFramework{
 		{
-			ID: 1, FrameName: "foo", FrameVersion: "v1", FrameImage: "i", FrameCpuImage: "c",
+			ID: 1, FrameName: "foo", FrameVersion: "v1", FrameImage: "i",
 			Enabled: 1, ContainerPort: 321, Type: 12,
 		},
 	}
@@ -893,7 +893,7 @@ func TestRepoComponent_ListRuntimeFrameworkWithType(t *testing.T) {
 	require.Nil(t, err)
 	require.Equal(t, 1, len(fs))
 	require.Equal(t, types.RuntimeFramework{
-		ID: 1, FrameName: "foo", FrameVersion: "v1", FrameImage: "i", FrameCpuImage: "c",
+		ID: 1, FrameName: "foo", FrameVersion: "v1", FrameImage: "i",
 		Enabled: 1, ContainerPort: 321, Type: 12,
 	}, fs[0])
 
@@ -904,26 +904,34 @@ func TestRepoComponent_ListRuntimeFramework(t *testing.T) {
 	repo := initializeTestRepoComponent(ctx, t)
 
 	repo.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, types.ModelRepo, "ns", "n").Return(&database.Repository{
-		ID: 123,
-	}, nil)
-
-	frames := []database.RepositoriesRuntimeFramework{
-		{
-			RuntimeFramework: &database.RuntimeFramework{
-				ID: 1, FrameName: "foo", FrameVersion: "v1",
-				FrameImage: "i", FrameCpuImage: "c",
-				Enabled: 1, ContainerPort: 321, Type: 12,
+		ID:   123,
+		Name: "test",
+		Tags: []database.Tag{
+			{
+				Name:     "safetensors",
+				Category: "framework",
 			},
 		},
-	}
-	repo.mocks.stores.RuntimeFrameworkMock().EXPECT().ListByRepoID(ctx, int64(123), 1).Return(frames, nil)
+		Metadata: database.Metadata{
+			Architecture: "qwen",
+		},
+	}, nil)
+
+	frames := []database.RuntimeFramework{}
+	frames = append(frames, database.RuntimeFramework{
+		ID: 1, FrameName: "foo", FrameVersion: "v1",
+		FrameImage: "i",
+		Enabled:    1, ContainerPort: 321, Type: 12,
+		ModelFormat: "safetensors",
+	})
+	repo.mocks.stores.RuntimeFrameworkMock().EXPECT().ListByArchsNameAndType(ctx, "test", "safetensors", []string{"qwen"}, 1).Return(frames, nil)
 
 	fs, err := repo.ListRuntimeFramework(ctx, types.ModelRepo, "ns", "n", 1)
 	require.Nil(t, err)
 	require.Equal(t, 1, len(fs))
 	require.Equal(t, types.RuntimeFramework{
-		ID: 1, FrameName: "foo", FrameVersion: "v1", FrameImage: "i", FrameCpuImage: "c",
-		Enabled: 1, ContainerPort: 321,
+		ID: 1, FrameName: "foo", FrameVersion: "v1", FrameImage: "i",
+		Enabled: 1, ContainerPort: 321, Type: 12,
 	}, fs[0])
 
 }
@@ -936,19 +944,17 @@ func TestRepoComponent_CreateRuntimeFramework(t *testing.T) {
 		FrameName:     "fm",
 		FrameVersion:  "v1",
 		FrameImage:    "img",
-		FrameCpuImage: "cimg",
 		Enabled:       2,
 		ContainerPort: 321,
 		Type:          2,
 	}
 	repo.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "user").Return(database.User{ID: 1, RoleMask: "admin"}, nil)
-	repo.mocks.stores.RuntimeFrameworkMock().EXPECT().Add(ctx, frame).Return(nil)
+	repo.mocks.stores.RuntimeFrameworkMock().EXPECT().Add(ctx, frame).Return(nil, nil)
 
 	fn, err := repo.CreateRuntimeFramework(ctx, &types.RuntimeFrameworkReq{
 		FrameName:     "fm",
 		FrameVersion:  "v1",
 		FrameImage:    "img",
-		FrameCpuImage: "cimg",
 		Enabled:       2,
 		ContainerPort: 321,
 		Type:          2,
@@ -959,7 +965,6 @@ func TestRepoComponent_CreateRuntimeFramework(t *testing.T) {
 		FrameName:     "fm",
 		FrameVersion:  "v1",
 		FrameImage:    "img",
-		FrameCpuImage: "cimg",
 		Enabled:       2,
 		ContainerPort: 321,
 		Type:          2,
@@ -976,7 +981,6 @@ func TestRepoComponent_UpdateRuntimeFramework(t *testing.T) {
 		FrameName:     "fm",
 		FrameVersion:  "v1",
 		FrameImage:    "img",
-		FrameCpuImage: "cimg",
 		Enabled:       2,
 		ContainerPort: 321,
 		Type:          2,
@@ -988,7 +992,6 @@ func TestRepoComponent_UpdateRuntimeFramework(t *testing.T) {
 		FrameName:     "fm",
 		FrameVersion:  "v1",
 		FrameImage:    "img",
-		FrameCpuImage: "cimg",
 		Enabled:       2,
 		ContainerPort: 321,
 		Type:          2,
@@ -1000,7 +1003,6 @@ func TestRepoComponent_UpdateRuntimeFramework(t *testing.T) {
 		FrameName:     "fm",
 		FrameVersion:  "v1",
 		FrameImage:    "img",
-		FrameCpuImage: "cimg",
 		Enabled:       2,
 		ContainerPort: 321,
 		Type:          2,
@@ -1016,7 +1018,6 @@ func TestRepoComponent_DeleteRuntimeFramework(t *testing.T) {
 		FrameName:     "fm",
 		FrameVersion:  "v1",
 		FrameImage:    "img",
-		FrameCpuImage: "cimg",
 		Enabled:       2,
 		ContainerPort: 321,
 		Type:          2,

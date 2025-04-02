@@ -1,0 +1,42 @@
+{
+  "engine_name": "llama-factory",
+  "engine_version": "0.9.2",
+  "model_format": "safetensors",
+  "enabled": 1,
+  "container_port": 8000,
+  "engine_images": [
+    {
+      "compute_type": "gpu",
+      "image": "llama-factory:0.9.2",
+      "driver_version": "12.4"
+    }
+  ],
+  "supported_archs": [
+    "BaiChuanForCausalLM",
+    "BloomForCausalLM",
+    "ChatGLMModel",
+    "CohereForCausalLM",
+    "DeepseekV2ForCausalLM",
+    "FalconForCausalLM",
+    "Gemma2ForCausalLM",
+    "GemmaForCausalLM",
+    "InternLM2ForCausalLM",
+    "InternLM2ForRewardModel",
+    "LlamaForCausalLM",
+    "LlavaForConditionalGeneration",
+    "LlavaLlamaForCausalLM",
+    "LlavaNextForConditionalGeneration",
+    "MistralForCausalLM",
+    "MixtralForCausalLM",
+    "OlmoForCausalLM",
+    "PaliGemmaForConditionalGeneration",
+    "Phi3ForCausalLM",
+    "PhiForCausalLM",
+    "QWenLMHeadModel",
+    "Qwen2ForCausalLM",
+    "Qwen2MoeForCausalLM",
+    "Starcoder2ForCausalLM",
+    "XverseForCausalLM",
+    "YuanForCausalLM"
+  ]
+}

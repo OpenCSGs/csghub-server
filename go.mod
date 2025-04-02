@@ -276,7 +276,7 @@ require (
 	github.com/gorilla/context v1.1.1 // indirect
 	github.com/gorilla/securecookie v1.1.1 // indirect
 	github.com/gorilla/sessions v1.2.1 // indirect
-	github.com/gpustack/gguf-parser-go v0.13.16
+	github.com/gpustack/gguf-parser-go v0.13.20
 	github.com/hashicorp/go-version v1.7.0 // indirect
 	github.com/imdario/mergo v0.3.16 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect

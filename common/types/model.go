@@ -170,6 +170,7 @@ type Model struct {
 	Scores               []WeightScore        `json:"scores"`
 	SensitiveCheckStatus string               `json:"sensitive_check_status"`
 	MirrorLastUpdatedAt  time.Time            `json:"mirror_last_updated_at"`
+	Metadata             Metadata             `json:"metadata"`
 	MultiSource
 }
 
@@ -209,9 +210,10 @@ const (
 type ModelType string
 
 const (
+	GGUFEntryPoint string    = "GGUF_ENTRY_POINT"
 	GGUF           ModelType = "gguf"
 	Safetensors    ModelType = "safetensors"
-	GGUFEntryPoint string    = "GGUF_ENTRY_POINT"
+	Unknown        ModelType = "unknown"
 )
 
 type ModelRunReq struct {
@@ -350,4 +352,69 @@ type RelationDataset struct {
 	Namespace   string `json:"-"`
 	Name        string `json:"-"`
 	CurrentUser string `json:"-"`
+}
+
+type ModelInfo struct {
+	TotalParams int64 `json:"total_params"`
+	// 1b, 7b, 13b
+	ParamsBillions float32 `json:"params_billions"`
+	//fp16, fp32, int8
+	TensorType      string  `json:"tensor_type"`
+	MiniGPUMemoryGB float32 `json:"mini_gpu_memory_gb"`
+	ModelWeightsGB  float32 `json:"model_weights_gb"`
+	//qwen2
+	ModelType string `json:"model_type"`
+	//Qwen2ForCausalLM
+	Architecture      string         `json:"architecture"`
+	ClassName         string         `json:"class_name"`
+	Quantizations     []Quantization `json:"quantizations"`
+	ContextSize       int            `json:"-"`
+	BatchSize         int            `json:"-"`
+	HiddenSize        int            `json:"-"`
+	NumHiddenLayers   int            `json:"-"`
+	BytesPerParam     int            `json:"-"`
+	NumAttentionHeads int            `json:"-"`
+}
+type Quantization struct {
+	VERSION         string  `json:"version"`
+	TYPE            string  `json:"type"`
+	MiniGPUMemoryGB float32 `json:"mini_gpu_memory_gb"`
+}
+
+type ModelConfig struct {
+	Architectures     []string `json:"architectures"`
+	ModelType         string   `json:"model_type"`
+	NumHiddenLayers   int      `json:"num_hidden_layers"`
+	HiddenSize        int      `json:"hidden_size"`
+	NumAttentionHeads int      `json:"num_attention_heads"`
+}
+
+type EngineConfig struct {
+	EngineName      string      `json:"engine_name"`
+	EngineVersion   string      `json:"engine_version"`
+	ContainerPort   int         `json:"container_port"`
+	ModelFormat     string      `json:"model_format"`
+	EngineImages    []Image     `json:"engine_images"`
+	SupportedArchs  []string    `json:"supported_archs"`
+	SupportedModels []string    `json:"supported_models"`
+	EngineArgs      []EngineArg `json:"engine_args"`
+	Enabled         int64       `json:"enabled"`
+	UpdatedAt       time.Time   `json:"updated_at"`
+	Description     string      `json:"description"`
+}
+
+type ComputeType string
+
+const (
+	GPU_TYPE     ComputeType = "gpu"
+	CPU_TYPE     ComputeType = "cpu"
+	Enflame_Type ComputeType = "enflame"
+	MLU_TYPE     ComputeType = "mlu"
+)
+
+// Image represents an engine image with a specific computing power type
+type Image struct {
+	ComputeType   ComputeType `json:"compute_type"`
+	Image         string      `json:"image"`
+	DriverVersion string      `json:"driver_version"`
 }

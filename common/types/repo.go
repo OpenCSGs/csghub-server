@@ -80,6 +80,7 @@ const (
 	FeatureExtraction  PipelineTask    = "feature-extraction"
 	SentenceSimilarity PipelineTask    = "sentence-similarity"
 	TaskAutoDetection  PipelineTask    = "task-auto-detection"
+	VideoText2Text     PipelineTask    = "video-text-to-text"
 	LlamaCpp           InferenceEngine = "llama.cpp"
 	TEI                InferenceEngine = "tei"
 	Ktransformers      InferenceEngine = "ktransformers"
@@ -111,6 +112,16 @@ type Tag struct {
 type Repository struct {
 	HTTPCloneURL string `json:"http_clone_url"`
 	SSHCloneURL  string `json:"ssh_clone_url"`
+}
+
+type Metadata struct {
+	ModelParams     float32        `json:"model_params"`
+	TensorType      string         `json:"tensor_type"`
+	Architecture    string         `json:"architecture"`
+	MiniGPUMemoryGB float32        `json:"mini_gpu_memory_gb"`
+	ModelType       string         `json:"model_type"`
+	ClassName       string         `json:"class_name"`
+	Quantizations   []Quantization `json:"quantizations,omitempty"`
 }
 
 type RepoPageOpts struct {
@@ -186,12 +197,13 @@ type RuntimeFrameworkReq struct {
 	FrameName     string `json:"frame_name"`
 	FrameVersion  string `json:"frame_version"`
 	FrameImage    string `json:"frame_image"`
-	FrameCpuImage string `json:"frame_cpu_image"`
 	Enabled       int64  `json:"enabled"`
 	ContainerPort int    `json:"container_port"`
 	Type          int    `json:"type"`
 	EngineArgs    string `json:"engine_args"`
 	CurrentUser   string `json:"-"`
+	ComputeType   string `json:"compute_type"`
+	DriverVersion string `json:"driver_version"`
 }
 
 type RuntimeFramework struct {
@@ -199,11 +211,13 @@ type RuntimeFramework struct {
 	FrameName     string `json:"frame_name"`
 	FrameVersion  string `json:"frame_version"`
 	FrameImage    string `json:"frame_image"`
-	FrameCpuImage string `json:"frame_cpu_image"`
 	Enabled       int64  `json:"enabled"`
 	ContainerPort int    `json:"container_port"`
 	Type          int    `json:"type"`
 	EngineArgs    string `json:"engine_args"`
+	ComputeType   string `json:"compute_type"`
+	DriverVersion string `json:"driver_version"`
+	Description   string `json:"description"`
 }
 
 type RuntimeFrameworkModels struct {

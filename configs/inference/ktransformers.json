@@ -1,0 +1,23 @@
+{
+  "engine_name": "ktransformers",
+  "engine_version": "0.2.1.post1",
+  "enabled": 1,
+  "model_format": "gguf",
+  "container_port": 8000,
+  "engine_images": [
+    {
+      "compute_type": "gpu",
+      "image": "ktransformers:0.2.1.post1",
+      "driver_version": "12.4"
+    }
+  ],
+  "supported_models": [
+    "DeepSeek-R1-GGUF",
+    "DeepSeek-V2-Lite-Chat-GGUF",
+    "DeepSeek-V2.5-GGUF",
+    "DeepSeek-V3-GGUF",
+    "Mixtral-8x22B-v0.1-GGUF",
+    "Mixtral-8x7B-Instruct-v0.1-GGUF",
+    "Qwen2-57B-A14B-Instruct-GGUF"
+  ]
+}

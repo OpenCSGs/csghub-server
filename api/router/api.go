@@ -379,7 +379,7 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 		return nil, fmt.Errorf("error creating runtime framework architecture handler:%w", err)
 	}
 
-	createRuntimeFrameworkRoutes(apiGroup, authCollection.NeedAPIKey, modelHandler, runtimeArchHandler, repoCommonHandler)
+	createRuntimeFrameworkRoutes(apiGroup, authCollection, modelHandler, runtimeArchHandler, repoCommonHandler)
 
 	syncHandler, err := handler.NewSyncHandler(config)
 	if err != nil {
@@ -758,7 +758,8 @@ func createUserRoutes(apiGroup *gin.RouterGroup, needAPIKey gin.HandlerFunc, use
 	apiGroup.GET("/user/:username/run/serverless", needAPIKey, userHandler.GetRunServerless)
 }
 
-func createRuntimeFrameworkRoutes(apiGroup *gin.RouterGroup, needAPIKey gin.HandlerFunc, modelHandler *handler.ModelHandler, runtimeArchHandler *handler.RuntimeArchitectureHandler, repoCommonHandler *handler.RepoHandler) {
+func createRuntimeFrameworkRoutes(apiGroup *gin.RouterGroup, authCollection middleware.AuthenticatorCollection, modelHandler *handler.ModelHandler, runtimeArchHandler *handler.RuntimeArchitectureHandler, repoCommonHandler *handler.RepoHandler) {
+	needAdmin := authCollection.NeedAdmin
 	runtimeFramework := apiGroup.Group("/runtime_framework")
 	{
 		runtimeFramework.GET("/:id/models", modelHandler.ListByRuntimeFrameworkID)
@@ -770,10 +771,10 @@ func createRuntimeFrameworkRoutes(apiGroup *gin.RouterGroup, needAPIKey gin.Hand
 		runtimeFramework.DELETE("/:id/models", modelHandler.DeleteModelRuntimeFrameworks)
 		runtimeFramework.GET("/models", modelHandler.ListModelsOfRuntimeFrameworks)
 
-		runtimeFramework.GET("/:id/architecture", needAPIKey, runtimeArchHandler.ListByRuntimeFrameworkID)
-		runtimeFramework.PUT("/:id/architecture", needAPIKey, runtimeArchHandler.UpdateArchitecture)
-		runtimeFramework.DELETE("/:id/architecture", needAPIKey, runtimeArchHandler.DeleteArchitecture)
-		runtimeFramework.POST("/:id/scan", needAPIKey, runtimeArchHandler.ScanArchitecture)
+		runtimeFramework.GET("/:id/architecture", needAdmin, runtimeArchHandler.ListByRuntimeFrameworkID)
+		runtimeFramework.PUT("/:id/architecture", needAdmin, runtimeArchHandler.UpdateArchitecture)
+		runtimeFramework.DELETE("/:id/architecture", needAdmin, runtimeArchHandler.DeleteArchitecture)
+		runtimeFramework.POST("/scan", needAdmin, runtimeArchHandler.ScanArchitecture)
 	}
 }
 

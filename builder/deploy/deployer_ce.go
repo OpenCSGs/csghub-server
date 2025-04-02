@@ -75,14 +75,6 @@ func (d *deployer) releaseUserResourceByOrder(ctx context.Context, dr types.Depl
 	return nil
 }
 
-func containerImage(hardware *types.HardWare, frame *database.RuntimeFramework) string {
-	// use gpu image
-	if hardware.Gpu.Num != "" {
-		return frame.FrameImage
-	}
-	return frame.FrameCpuImage
-}
-
 func (d *deployer) startAccounting() {
 	go d.startAcctFeeing()
 	go d.startServiceConsuming()

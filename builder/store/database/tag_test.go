@@ -491,6 +491,47 @@ func TestTagStore_RemoveRepoTags(t *testing.T) {
 
 }
 
+// TestRemoveRepoTags tests the RemoveRepoTagsByCategory method
+func TestTagStore_RemoveRepoTagsByCategory(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	ts := database.NewTagStoreWithDB(db)
+	tag1, err := ts.CreateTag(ctx, "task", "tag_"+uuid.NewString(), "", types.ModelTagScope)
+	require.Empty(t, err)
+	require.NotEmpty(t, tag1.ID)
+	tag2, err := ts.CreateTag(ctx, "task", "tag_"+uuid.NewString(), "", types.ModelTagScope)
+	require.Empty(t, err)
+	require.NotEmpty(t, tag2.ID)
+
+	// insert a new repo with tags
+	rs := database.NewRepoStoreWithDB(db)
+	userName := "user_name_" + uuid.NewString()
+	repoName := "repo_name_" + uuid.NewString()
+	repo, err := rs.CreateRepo(ctx, database.Repository{
+		UserID:         1,
+		Path:           fmt.Sprintf("%s/%s", userName, repoName),
+		GitPath:        fmt.Sprintf("models_%s/%s", userName, repoName),
+		Name:           repoName,
+		Nickname:       "",
+		Description:    "",
+		Private:        false,
+		RepositoryType: types.ModelRepo,
+	})
+	require.Empty(t, err)
+	require.NotNil(t, repo)
+	// set repo tags
+	err = ts.UpsertRepoTags(ctx, repo.ID, []int64{}, []int64{tag1.ID, tag2.ID})
+	require.Empty(t, err)
+
+	err = ts.RemoveRepoTagsByCategory(ctx, repo.ID, []string{"task"})
+	require.Nil(t, err)
+
+}
+
 func TestTagStore_FindTagByID(t *testing.T) {
 	db := tests.InitTestDB()
 	defer db.Close()

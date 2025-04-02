@@ -505,7 +505,7 @@ func (d *deployer) UpdateDeploy(ctx context.Context, dur *types.DeployUpdateReq,
 
 	if frame != nil {
 		// choose image
-		containerImg := containerImage(hardware, frame)
+		containerImg := frame.FrameImage
 		deploy.ImageID = containerImg
 		deploy.RuntimeFramework = frame.FrameName
 		deploy.ContainerPort = frame.ContainerPort
