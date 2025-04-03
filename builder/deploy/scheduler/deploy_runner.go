@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	corev1 "k8s.io/api/core/v1"
 	"opencsg.com/csghub-server/builder/deploy/common"
 	"opencsg.com/csghub-server/builder/deploy/imagerunner"
 	"opencsg.com/csghub-server/builder/store/database"
@@ -103,18 +104,12 @@ func (t *DeployRunner) Run(ctx context.Context) error {
 		}
 		switch resp.Code {
 		case common.Deploying:
-			duration := time.Since(t.deployStartTime).Minutes()
-			limitTime := t.deployCfg.SpaceDeployTimeoutInMin
-			if t.task.Deploy.SpaceID == 0 && t.task.Deploy.ModelID > 0 {
-				limitTime = t.deployCfg.ModelDeployTimeoutInMin
-			}
-			if duration >= float64(limitTime) {
-				// space or model deploy duration is greater than timeout defined in env (default is 30 mins)
-				slog.Warn("Space or Model is going to be undeploy due to timeout of deploying", slog.Any("duration", duration), slog.Any("timeout", limitTime), slog.Any("namespace", fields[0]), slog.Any("repoName", fields[1]))
-				return t.cancelDeploy(ctx, fields[0], fields[1])
+			isCancel, reason := t.shouldForceCancelDeploy(fields[0], fields[1], resp)
+			if isCancel {
+				return t.cancelDeploy(ctx, fields[0], fields[1], reason)
 			}
 			t.deployInProgress("")
-			// wait before next check
+			// waitting for check next time
 			time.Sleep(10 * time.Second)
 		case common.DeployFailed:
 			slog.Error("image deploy failed", slog.String("repo_name", t.repo.Name), slog.Any("deplopy_task_id", t.task.ID), slog.Any("resp", resp))
@@ -143,6 +138,28 @@ func (t *DeployRunner) Run(ctx context.Context) error {
 			return fmt.Errorf("unknown image status, resp msg:%s", resp.Message)
 		}
 	}
+}
+
+func (t *DeployRunner) shouldForceCancelDeploy(orgName, repoName string, resp *types.StatusResponse) (bool, string) {
+	duration := time.Since(t.deployStartTime).Minutes()
+	limitTime := t.deployCfg.SpaceDeployTimeoutInMin
+	if t.task.Deploy.SpaceID == 0 && t.task.Deploy.ModelID > 0 {
+		limitTime = t.deployCfg.ModelDeployTimeoutInMin
+	}
+	if duration >= float64(limitTime) {
+		// space or model deploy duration is greater than timeout defined in env (default is 30 mins)
+		reason := "This Space/Model has been cancelled automatically by the system due to deployment timeout."
+		slog.Warn(reason, slog.Any("duration", duration), slog.Any("timeout", limitTime), slog.Any("namespace", orgName), slog.Any("repoName", repoName))
+		return true, reason
+	}
+
+	if t.task.Deploy.SpaceID > 0 && len(resp.Instances) > 0 && resp.Instances[0].Status == string(corev1.PodPending) {
+		reason := "The deployment has been cancelled because it took too long to acquire the necessary hardware resources."
+		slog.Warn(reason, slog.Any("namespace", orgName), slog.Any("repoName", repoName))
+		return true, reason
+	}
+
+	return false, ""
 }
 
 func (t *DeployRunner) WatchID() int64 { return t.task.ID }
@@ -379,7 +396,7 @@ func (t *DeployRunner) makeDeployEnv(
 	return envMap
 }
 
-func (t *DeployRunner) cancelDeploy(ctx context.Context, orgName, repoName string) error {
+func (t *DeployRunner) cancelDeploy(ctx context.Context, orgName, repoName, reason string) error {
 	targetID := t.task.Deploy.SpaceID
 	if t.task.Deploy.SpaceID == 0 {
 		// support model deploy with multi-instance
@@ -395,7 +412,7 @@ func (t *DeployRunner) cancelDeploy(ctx context.Context, orgName, repoName strin
 	if err != nil {
 		return fmt.Errorf("fail to undeploy space/model with err: %v", err)
 	}
-	t.deployFailed("space/model deploy timeout")
+	t.deployFailed(reason)
 	return nil
 }
 
