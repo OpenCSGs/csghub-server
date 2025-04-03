@@ -21,6 +21,7 @@ type RuntimeFrameworksStore interface {
 	Delete(ctx context.Context, frame RuntimeFramework) error
 	FindEnabledByID(ctx context.Context, id int64) (*RuntimeFramework, error)
 	FindEnabledByName(ctx context.Context, name string) (*RuntimeFramework, error)
+	FindByImageId(ctx context.Context, imageId string) (*RuntimeFramework, error)
 	FindByNameAndComputeType(ctx context.Context, engineName, driverVersion, ComputeType string) (*RuntimeFramework, error)
 	ListAll(ctx context.Context) ([]RuntimeFramework, error)
 	ListByIDs(ctx context.Context, ids []int64) ([]RuntimeFramework, error)
@@ -152,5 +153,12 @@ func (rf *runtimeFrameworksStoreImpl) ListByArchsNameAndType(ctx context.Context
 func (rf *runtimeFrameworksStoreImpl) FindByNameAndComputeType(ctx context.Context, frameName, driverVersion, computeType string) (*RuntimeFramework, error) {
 	var res RuntimeFramework
 	_, err := rf.db.Core.NewSelect().Model(&res).Where("LOWER(frame_name) = LOWER(?)", frameName).Where("compute_type = ?", computeType).Where("driver_version = ?", driverVersion).Exec(ctx, &res)
+	return &res, err
+}
+
+// FindByImageId
+func (rf *runtimeFrameworksStoreImpl) FindByImageId(ctx context.Context, imageID string) (*RuntimeFramework, error) {
+	var res RuntimeFramework
+	_, err := rf.db.Core.NewSelect().Model(&res).Where("frame_image = ?", imageID).Exec(ctx, &res)
 	return &res, err
 }

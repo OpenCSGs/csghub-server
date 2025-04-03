@@ -187,6 +187,65 @@ func (_c *MockRuntimeFrameworksStore_FindByID_Call) RunAndReturn(run func(contex
 	return _c
 }
 
+// FindByImageId provides a mock function with given fields: ctx, imageId
+func (_m *MockRuntimeFrameworksStore) FindByImageId(ctx context.Context, imageId string) (*database.RuntimeFramework, error) {
+	ret := _m.Called(ctx, imageId)
+
+	if len(ret) == 0 {
+		panic("no return value specified for FindByImageId")
+	}
+
+	var r0 *database.RuntimeFramework
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string) (*database.RuntimeFramework, error)); ok {
+		return rf(ctx, imageId)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string) *database.RuntimeFramework); ok {
+		r0 = rf(ctx, imageId)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*database.RuntimeFramework)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
+		r1 = rf(ctx, imageId)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockRuntimeFrameworksStore_FindByImageId_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'FindByImageId'
+type MockRuntimeFrameworksStore_FindByImageId_Call struct {
+	*mock.Call
+}
+
+// FindByImageId is a helper method to define mock.On call
+//   - ctx context.Context
+//   - imageId string
+func (_e *MockRuntimeFrameworksStore_Expecter) FindByImageId(ctx interface{}, imageId interface{}) *MockRuntimeFrameworksStore_FindByImageId_Call {
+	return &MockRuntimeFrameworksStore_FindByImageId_Call{Call: _e.mock.On("FindByImageId", ctx, imageId)}
+}
+
+func (_c *MockRuntimeFrameworksStore_FindByImageId_Call) Run(run func(ctx context.Context, imageId string)) *MockRuntimeFrameworksStore_FindByImageId_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(string))
+	})
+	return _c
+}
+
+func (_c *MockRuntimeFrameworksStore_FindByImageId_Call) Return(_a0 *database.RuntimeFramework, _a1 error) *MockRuntimeFrameworksStore_FindByImageId_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockRuntimeFrameworksStore_FindByImageId_Call) RunAndReturn(run func(context.Context, string) (*database.RuntimeFramework, error)) *MockRuntimeFrameworksStore_FindByImageId_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // FindByNameAndComputeType provides a mock function with given fields: ctx, engineName, driverVersion, ComputeType
 func (_m *MockRuntimeFrameworksStore) FindByNameAndComputeType(ctx context.Context, engineName string, driverVersion string, ComputeType string) (*database.RuntimeFramework, error) {
 	ret := _m.Called(ctx, engineName, driverVersion, ComputeType)

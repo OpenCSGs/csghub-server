@@ -180,6 +180,7 @@ func (c *runtimeArchitectureComponentImpl) ScanAllModels(ctx context.Context, sc
 					slog.Error("fail to update runtime framework tag", slog.Any("err", err), slog.Any("repo path", repo.Path))
 				}
 			}
+			slog.Info("scanned %d repositories for model metadata", slog.Any("count", len(repos)))
 			cancel()
 		}
 		return nil

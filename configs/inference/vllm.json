@@ -12,7 +12,7 @@
     },
     {
       "compute_type": "cpu",
-      "image": "vllm-cpu:2.4"
+      "image": "vllm-cpu:0.8.2"
     }
   ],
   "engine_args": [

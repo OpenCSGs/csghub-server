@@ -268,19 +268,30 @@ func TestModelComponent_GetServerless(t *testing.T) {
 		ctx, &database.Repository{ID: 123, Name: "n"}, "user",
 	).Return(true, nil)
 
-	deploy := &database.Deploy{ID: 1}
+	deploy := &database.Deploy{ID: 1, ImageID: "vllm:1.6"}
 	mc.mocks.stores.DeployTaskMock().EXPECT().GetServerlessDeployByRepID(ctx, int64(123)).Return(
 		deploy, nil,
 	)
+
+	mc.mocks.stores.RuntimeFrameworkMock().EXPECT().FindByImageId(ctx, "vllm:1.6").Return(&database.RuntimeFramework{
+		FrameName:     "fm",
+		FrameVersion:  "v1",
+		FrameImage:    "img",
+		Enabled:       2,
+		ContainerPort: 321,
+		Type:          2,
+		ID:            12,
+	}, nil)
 
 	mc.mocks.components.repo.EXPECT().GenerateEndpoint(ctx, deploy).Return("ep", "")
 
 	dr, err := mc.GetServerless(ctx, "ns", "n", "user")
 	require.Nil(t, err)
 	require.Equal(t, &types.DeployRepo{
-		DeployID:      1,
-		ProxyEndpoint: "ep",
-		Status:        "Stopped",
+		DeployID:           1,
+		ProxyEndpoint:      "ep",
+		Status:             "Stopped",
+		RuntimeFrameworkID: 12,
 	}, dr)
 
 }
