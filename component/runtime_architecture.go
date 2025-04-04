@@ -155,8 +155,8 @@ func (c *runtimeArchitectureComponentImpl) ScanAllModels(ctx context.Context, sc
 	err := c.cache.RunWhileLocked(ctx, "runtime_architecture_scan_lock", durationUntilDeadline, func(ctx context.Context) error {
 		var i int
 		for {
-			ctxBatch, cancel := context.WithTimeout(context.Background(), 2*time.Hour)
-			repos, err := c.repoStore.FindWithBatch(ctxBatch, 1000, i, types.ModelRepo)
+			ctxBatch, cancel := context.WithTimeout(context.Background(), 1*time.Hour)
+			repos, err := c.repoStore.FindWithBatch(ctxBatch, 500, i, types.ModelRepo)
 			i += 1
 			if err != nil {
 				slog.Error("fail to batch get repositories for scanning all models", slog.Any("err", err))
@@ -180,9 +180,10 @@ func (c *runtimeArchitectureComponentImpl) ScanAllModels(ctx context.Context, sc
 					slog.Error("fail to update runtime framework tag", slog.Any("err", err), slog.Any("repo path", repo.Path))
 				}
 			}
-			slog.Info("scanned %d repositories for model metadata", slog.Any("count", len(repos)))
+			slog.Info("scanned repositories for model metadata", slog.Any("count", len(repos)))
 			cancel()
 		}
+		slog.Info("scanned all repositories for model metadata")
 		return nil
 	})
 	if err != nil {

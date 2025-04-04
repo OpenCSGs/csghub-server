@@ -530,28 +530,23 @@ func (c *modelComponentImpl) GetServerless(ctx context.Context, namespace, name,
 	endpoint, _ := c.repoComponent.GenerateEndpoint(ctx, deploy)
 
 	resDeploy := types.DeployRepo{
-		DeployID:      deploy.ID,
-		DeployName:    deploy.DeployName,
-		RepoID:        deploy.RepoID,
-		SvcName:       deploy.SvcName,
-		Status:        deployStatusCodeToString(deploy.Status),
-		Hardware:      deploy.Hardware,
-		Env:           deploy.Env,
-		MinReplica:    deploy.MinReplica,
-		MaxReplica:    deploy.MaxReplica,
-		GitBranch:     deploy.GitBranch,
-		ClusterID:     deploy.ClusterID,
-		SecureLevel:   deploy.SecureLevel,
-		CreatedAt:     deploy.CreatedAt,
-		UpdatedAt:     deploy.UpdatedAt,
-		ProxyEndpoint: endpoint,
-		Task:          string(deploy.Task),
-	}
-	rf, err := c.runtimeFrameworksStore.FindByImageId(ctx, deploy.ImageID)
-	if err != nil {
-		slog.Warn("fail to get runtime framework", slog.Any("error", err))
-	} else {
-		resDeploy.RuntimeFrameworkID = rf.ID
+		DeployID:         deploy.ID,
+		DeployName:       deploy.DeployName,
+		RepoID:           deploy.RepoID,
+		SvcName:          deploy.SvcName,
+		Status:           deployStatusCodeToString(deploy.Status),
+		RuntimeFramework: deploy.RuntimeFramework,
+		Hardware:         deploy.Hardware,
+		Env:              deploy.Env,
+		MinReplica:       deploy.MinReplica,
+		MaxReplica:       deploy.MaxReplica,
+		GitBranch:        deploy.GitBranch,
+		ClusterID:        deploy.ClusterID,
+		SecureLevel:      deploy.SecureLevel,
+		CreatedAt:        deploy.CreatedAt,
+		UpdatedAt:        deploy.UpdatedAt,
+		ProxyEndpoint:    endpoint,
+		Task:             string(deploy.Task),
 	}
 	return &resDeploy, nil
 }

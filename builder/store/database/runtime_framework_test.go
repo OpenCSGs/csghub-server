@@ -164,25 +164,3 @@ func TestRuntimeFrameworksStore_FindByNameAndComputeType(t *testing.T) {
 	require.Nil(t, err)
 	require.Equal(t, "vllm", rf.FrameName)
 }
-
-func TestRuntimeFrameworksStore_FindByImageId(t *testing.T) {
-	db := tests.InitTestDB()
-	defer db.Close()
-	ctx := context.TODO()
-
-	rfStore := database.NewRuntimeFrameworksStoreWithDB(db)
-	_, err := rfStore.Add(ctx, database.RuntimeFramework{
-		ID:            1,
-		FrameName:     "vllm",
-		FrameImage:    "vllm:12.1",
-		Type:          1,
-		Enabled:       1,
-		DriverVersion: "12.1",
-		ComputeType:   "gpu",
-	})
-	require.Nil(t, err)
-
-	rf, err := rfStore.FindByImageId(ctx, "vllm:12.1")
-	require.Nil(t, err)
-	require.Equal(t, "vllm", rf.FrameName)
-}

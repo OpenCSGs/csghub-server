@@ -2364,14 +2364,6 @@ func (c *repoComponentImpl) DeployDetail(ctx context.Context, detailReq types.De
 		Reason:           deploy.Reason,
 		Message:          deploy.Message,
 	}
-	if deploy.Type == types.SpaceType {
-		rf, err := c.runtimeFrameworksStore.FindByImageId(ctx, deploy.ImageID)
-		if err != nil {
-			slog.Warn("fail to get runtime framework", slog.Any("error", err))
-		} else {
-			resDeploy.RuntimeFrameworkID = rf.ID
-		}
-	}
 
 	return &resDeploy, nil
 }
