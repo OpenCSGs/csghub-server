@@ -11,7 +11,9 @@ import (
 	"time"
 
 	"github.com/argoproj/argo-workflows/v3/pkg/apis/workflow/v1alpha1"
+	versioned "github.com/argoproj/argo-workflows/v3/pkg/client/clientset/versioned"
 	"github.com/argoproj/argo-workflows/v3/pkg/client/informers/externalversions"
+	internalinterfaces "github.com/argoproj/argo-workflows/v3/pkg/client/informers/externalversions/internalinterfaces"
 	"github.com/google/uuid"
 	corev1 "k8s.io/api/core/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -268,16 +270,8 @@ func generateWorkflow(req types.ArgoWorkFlowReq, config *config.Config) *v1alpha
 }
 
 func (wc *workFlowComponentImpl) RunWorkflowsInformer(clusterPool *cluster.ClusterPool, c *config.Config) {
+	labelSelector := "workflow-scope=csghub"
 	clientset := clusterPool.Clusters[0].ArgoClient
-	f := externalversions.NewSharedInformerFactoryWithOptions(clientset, 2*time.Minute, externalversions.WithTweakListOptions(func(list *v1.ListOptions) {
-		list.LabelSelector = "workflow-scope=csghub"
-	}))
-	informer := f.Argoproj().V1alpha1().Workflows().Informer()
-
-	stopper := make(chan struct{})
-	defer close(stopper)
-
-	defer runtime.HandleCrash()
 
 	eventHandler := cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
@@ -319,6 +313,21 @@ func (wc *workFlowComponentImpl) RunWorkflowsInformer(clusterPool *cluster.Clust
 		},
 	}
 
+	CreateInfomerFactory(clientset, labelSelector, wc.config.Argo.Namespace, eventHandler)
+
+}
+
+func CreateInfomerFactory(client versioned.Interface, namespace, labelSelector string, eventHandler cache.ResourceEventHandler) {
+	f := externalversions.NewFilteredSharedInformerFactory(client, 2*time.Minute, namespace, internalinterfaces.TweakListOptionsFunc(func(list *v1.ListOptions) {
+		list.LabelSelector = labelSelector
+	}))
+
+	informer := f.Argoproj().V1alpha1().Workflows().Informer()
+
+	stopper := make(chan struct{})
+	defer close(stopper)
+
+	defer runtime.HandleCrash()
 	_, _ = informer.AddEventHandler(eventHandler)
 
 	informer.Run(stopper)
