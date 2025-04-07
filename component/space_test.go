@@ -270,13 +270,20 @@ func TestSpaceComponent_Deploy(t *testing.T) {
 	sc.mocks.stores.SpaceMock().EXPECT().FindByPath(ctx, "ns", "n").Return(&database.Space{
 		ID:         1,
 		Repository: &database.Repository{Path: "foo/bar"},
+		SKU:        "1",
 	}, nil)
-	sc.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "user").Return(database.User{}, nil)
+	sc.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "user").Return(database.User{
+		Username: "user1",
+	}, nil)
+	sc.mocks.stores.SpaceResourceMock().EXPECT().FindByID(ctx, int64(1)).Return(&database.SpaceResource{
+		ID: 1,
+	}, nil)
 	sc.mocks.deployer.EXPECT().Deploy(ctx, types.DeployRepo{
 		SpaceID:       1,
 		Path:          "foo/bar",
-		Annotation:    "{\"hub-res-name\":\"ns/n\",\"hub-res-type\":\"space\"}",
+		Annotation:    "{\"hub-deploy-user\":\"user1\",\"hub-res-name\":\"ns/n\",\"hub-res-type\":\"space\"}",
 		ContainerPort: 8080,
+		SKU:           "1",
 	}).Return(123, nil)
 
 	id, err := sc.Deploy(ctx, "ns", "n", "user")

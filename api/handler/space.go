@@ -318,7 +318,7 @@ func (h *SpaceHandler) Run(ctx *gin.Context) {
 	if err != nil {
 		slog.Error("failed to deploy space", slog.String("namespace", namespace),
 			slog.String("name", name), slog.Any("error", err))
-		httpbase.ServerError(ctx, errors.New("failed to deploy space"))
+		httpbase.ServerError(ctx, err)
 		return
 	}
 

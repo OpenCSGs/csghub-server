@@ -776,10 +776,21 @@ func (c *spaceComponentImpl) Deploy(ctx context.Context, namespace, name, curren
 		return -1, err
 	}
 
+	resID, err := strconv.Atoi(space.SKU)
+	if err != nil {
+		return -1, fmt.Errorf("invalid space %s/%s resource id %s, error: %w", namespace, name, space.SKU, err)
+	}
+
+	_, err = c.spaceResourceStore.FindByID(ctx, int64(resID))
+	if err != nil {
+		return -1, fmt.Errorf("fail to find resource by id %d, error: %w", resID, err)
+	}
+
 	// put repo-type and namespace/name in annotation
 	annotations := make(map[string]string)
 	annotations[types.ResTypeKey] = string(types.SpaceRepo)
 	annotations[types.ResNameKey] = fmt.Sprintf("%s/%s", namespace, name)
+	annotations[types.ResDeployUser] = user.Username
 	annoStr, err := json.Marshal(annotations)
 	if err != nil {
 		slog.Error("fail to create annotations for deploy space", slog.Any("error", err), slog.String("username", currentUser))
