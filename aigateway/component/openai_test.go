@@ -15,7 +15,7 @@ import (
 	"opencsg.com/csghub-server/aigateway/types"
 
 	"github.com/openai/openai-go"
-	mockcomp "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/aigateway/component"
+	mocktoken "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/aigateway/token"
 	"opencsg.com/csghub-server/builder/event"
 	"opencsg.com/csghub-server/builder/store/database"
 	commontypes "opencsg.com/csghub-server/common/types"
@@ -194,7 +194,7 @@ func TestOpenAIComponentImpl_RecordUsage(t *testing.T) {
 	mockUserStore := &mockdb.MockUserStore{}
 	mockDeployStore := &mockdb.MockDeployTaskStore{}
 
-	var mockCounter *mockcomp.MockLLMTokenCounter
+	var mockCounter *mocktoken.MockLLMTokenCounter
 	var comp *openaiComponentImpl
 
 	tests := []struct {
@@ -225,7 +225,7 @@ func TestOpenAIComponentImpl_RecordUsage(t *testing.T) {
 					Connector:    mockMQ,
 					SyncInterval: 1,
 				}
-				mockCounter = mockcomp.NewMockLLMTokenCounter(t)
+				mockCounter = mocktoken.NewMockLLMTokenCounter(t)
 
 				comp = &openaiComponentImpl{
 					userStore:   mockUserStore,
@@ -281,7 +281,7 @@ func TestOpenAIComponentImpl_RecordUsage(t *testing.T) {
 					Connector:    mockMQ,
 					SyncInterval: 1,
 				}
-				mockCounter = mockcomp.NewMockLLMTokenCounter(t)
+				mockCounter = mocktoken.NewMockLLMTokenCounter(t)
 
 				comp = &openaiComponentImpl{
 					userStore:   mockUserStore,
@@ -333,7 +333,7 @@ func TestOpenAIComponentImpl_RecordUsage(t *testing.T) {
 					Connector:    mockMQ,
 					SyncInterval: 1,
 				}
-				mockCounter = mockcomp.NewMockLLMTokenCounter(t)
+				mockCounter = mocktoken.NewMockLLMTokenCounter(t)
 
 				comp = &openaiComponentImpl{
 					userStore:   mockUserStore,
@@ -363,7 +363,7 @@ func TestOpenAIComponentImpl_RecordUsage(t *testing.T) {
 					Connector:    mockMQ,
 					SyncInterval: 1,
 				}
-				mockCounter = mockcomp.NewMockLLMTokenCounter(t)
+				mockCounter = mocktoken.NewMockLLMTokenCounter(t)
 
 				comp = &openaiComponentImpl{
 					userStore:   mockUserStore,

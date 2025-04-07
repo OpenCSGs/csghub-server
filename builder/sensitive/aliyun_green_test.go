@@ -150,7 +150,7 @@ func TestSensitiveChecker_PassTextCheck(t *testing.T) {
 	}
 }
 
-func TestSensitiveChecker_PassStreamCheck(t *testing.T) {
+func TestSensitiveChecker_PassLLMCheck(t *testing.T) {
 	gc := mockgreen.NewMockGreenClient(t)
 	g2c := mockgreen.NewMockGreen2022Client(t)
 	checker := sensitive.NewAliyunChecker(gc, g2c)
@@ -201,7 +201,41 @@ func TestSensitiveChecker_PassStreamCheck(t *testing.T) {
 					},
 				},
 			}, nil).Once()
-			result, err := checker.PassStreamCheck(context.Background(), "foo", "foo", id)
+			result, err := checker.PassLLMCheck(context.Background(), "foo", "foo", id, "")
+			require.Nil(t, err)
+			require.Equal(t, c.isSensitive, result.IsSensitive)
+			require.Equal(t, c.wantReason, result.Reason)
+		})
+	}
+
+	for _, c := range cases {
+		t.Run(c.labels, func(t *testing.T) {
+			task := map[string]string{"content": "foo", "accountId": id}
+			params, err := json.Marshal(task)
+			require.Nil(t, err)
+
+			req := &client.TextModerationPlusRequest{
+				Service:           tea.String("foo"),
+				ServiceParameters: tea.String(string(params)),
+			}
+
+			g2c.EXPECT().TextModerationPlusWithOptions(req, options).Return(&client.TextModerationPlusResponse{
+				StatusCode: tea.Int32(200),
+				Body: &client.TextModerationPlusResponseBody{
+					Code:      tea.Int32(200),
+					RequestId: tea.String("z"),
+					Data: &client.TextModerationPlusResponseBodyData{
+						Result: []*client.TextModerationPlusResponseBodyDataResult{
+							{
+								Label:     &c.labels,
+								RiskWords: &riskWords,
+							},
+						},
+						RiskLevel: &c.riskLevel,
+					},
+				},
+			}, nil).Once()
+			result, err := checker.PassLLMCheck(context.Background(), "foo", "foo", "", id)
 			require.Nil(t, err)
 			require.Equal(t, c.isSensitive, result.IsSensitive)
 			require.Equal(t, c.wantReason, result.Reason)

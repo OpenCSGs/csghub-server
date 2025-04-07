@@ -85,29 +85,29 @@ func (_c *MockModerationSvcClient_PassImageCheck_Call) RunAndReturn(run func(con
 	return _c
 }
 
-// PassStreamCheck provides a mock function with given fields: ctx, scenario, text, id
-func (_m *MockModerationSvcClient) PassStreamCheck(ctx context.Context, scenario string, text string, id string) (*rpc.CheckResult, error) {
-	ret := _m.Called(ctx, scenario, text, id)
+// PassLLMPromptCheck provides a mock function with given fields: ctx, text, accountId
+func (_m *MockModerationSvcClient) PassLLMPromptCheck(ctx context.Context, text string, accountId string) (*rpc.CheckResult, error) {
+	ret := _m.Called(ctx, text, accountId)
 
 	if len(ret) == 0 {
-		panic("no return value specified for PassStreamCheck")
+		panic("no return value specified for PassLLMPromptCheck")
 	}
 
 	var r0 *rpc.CheckResult
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, string, string) (*rpc.CheckResult, error)); ok {
-		return rf(ctx, scenario, text, id)
+	if rf, ok := ret.Get(0).(func(context.Context, string, string) (*rpc.CheckResult, error)); ok {
+		return rf(ctx, text, accountId)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, string, string, string) *rpc.CheckResult); ok {
-		r0 = rf(ctx, scenario, text, id)
+	if rf, ok := ret.Get(0).(func(context.Context, string, string) *rpc.CheckResult); ok {
+		r0 = rf(ctx, text, accountId)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*rpc.CheckResult)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, string, string, string) error); ok {
-		r1 = rf(ctx, scenario, text, id)
+	if rf, ok := ret.Get(1).(func(context.Context, string, string) error); ok {
+		r1 = rf(ctx, text, accountId)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -115,33 +115,92 @@ func (_m *MockModerationSvcClient) PassStreamCheck(ctx context.Context, scenario
 	return r0, r1
 }
 
-// MockModerationSvcClient_PassStreamCheck_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'PassStreamCheck'
-type MockModerationSvcClient_PassStreamCheck_Call struct {
+// MockModerationSvcClient_PassLLMPromptCheck_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'PassLLMPromptCheck'
+type MockModerationSvcClient_PassLLMPromptCheck_Call struct {
 	*mock.Call
 }
 
-// PassStreamCheck is a helper method to define mock.On call
+// PassLLMPromptCheck is a helper method to define mock.On call
 //   - ctx context.Context
-//   - scenario string
 //   - text string
-//   - id string
-func (_e *MockModerationSvcClient_Expecter) PassStreamCheck(ctx interface{}, scenario interface{}, text interface{}, id interface{}) *MockModerationSvcClient_PassStreamCheck_Call {
-	return &MockModerationSvcClient_PassStreamCheck_Call{Call: _e.mock.On("PassStreamCheck", ctx, scenario, text, id)}
+//   - accountId string
+func (_e *MockModerationSvcClient_Expecter) PassLLMPromptCheck(ctx interface{}, text interface{}, accountId interface{}) *MockModerationSvcClient_PassLLMPromptCheck_Call {
+	return &MockModerationSvcClient_PassLLMPromptCheck_Call{Call: _e.mock.On("PassLLMPromptCheck", ctx, text, accountId)}
 }
 
-func (_c *MockModerationSvcClient_PassStreamCheck_Call) Run(run func(ctx context.Context, scenario string, text string, id string)) *MockModerationSvcClient_PassStreamCheck_Call {
+func (_c *MockModerationSvcClient_PassLLMPromptCheck_Call) Run(run func(ctx context.Context, text string, accountId string)) *MockModerationSvcClient_PassLLMPromptCheck_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(string), args[2].(string), args[3].(string))
+		run(args[0].(context.Context), args[1].(string), args[2].(string))
 	})
 	return _c
 }
 
-func (_c *MockModerationSvcClient_PassStreamCheck_Call) Return(_a0 *rpc.CheckResult, _a1 error) *MockModerationSvcClient_PassStreamCheck_Call {
+func (_c *MockModerationSvcClient_PassLLMPromptCheck_Call) Return(_a0 *rpc.CheckResult, _a1 error) *MockModerationSvcClient_PassLLMPromptCheck_Call {
 	_c.Call.Return(_a0, _a1)
 	return _c
 }
 
-func (_c *MockModerationSvcClient_PassStreamCheck_Call) RunAndReturn(run func(context.Context, string, string, string) (*rpc.CheckResult, error)) *MockModerationSvcClient_PassStreamCheck_Call {
+func (_c *MockModerationSvcClient_PassLLMPromptCheck_Call) RunAndReturn(run func(context.Context, string, string) (*rpc.CheckResult, error)) *MockModerationSvcClient_PassLLMPromptCheck_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// PassLLMRespCheck provides a mock function with given fields: ctx, text, sessionId
+func (_m *MockModerationSvcClient) PassLLMRespCheck(ctx context.Context, text string, sessionId string) (*rpc.CheckResult, error) {
+	ret := _m.Called(ctx, text, sessionId)
+
+	if len(ret) == 0 {
+		panic("no return value specified for PassLLMRespCheck")
+	}
+
+	var r0 *rpc.CheckResult
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, string) (*rpc.CheckResult, error)); ok {
+		return rf(ctx, text, sessionId)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string, string) *rpc.CheckResult); ok {
+		r0 = rf(ctx, text, sessionId)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*rpc.CheckResult)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string, string) error); ok {
+		r1 = rf(ctx, text, sessionId)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockModerationSvcClient_PassLLMRespCheck_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'PassLLMRespCheck'
+type MockModerationSvcClient_PassLLMRespCheck_Call struct {
+	*mock.Call
+}
+
+// PassLLMRespCheck is a helper method to define mock.On call
+//   - ctx context.Context
+//   - text string
+//   - sessionId string
+func (_e *MockModerationSvcClient_Expecter) PassLLMRespCheck(ctx interface{}, text interface{}, sessionId interface{}) *MockModerationSvcClient_PassLLMRespCheck_Call {
+	return &MockModerationSvcClient_PassLLMRespCheck_Call{Call: _e.mock.On("PassLLMRespCheck", ctx, text, sessionId)}
+}
+
+func (_c *MockModerationSvcClient_PassLLMRespCheck_Call) Run(run func(ctx context.Context, text string, sessionId string)) *MockModerationSvcClient_PassLLMRespCheck_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(string), args[2].(string))
+	})
+	return _c
+}
+
+func (_c *MockModerationSvcClient_PassLLMRespCheck_Call) Return(_a0 *rpc.CheckResult, _a1 error) *MockModerationSvcClient_PassLLMRespCheck_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockModerationSvcClient_PassLLMRespCheck_Call) RunAndReturn(run func(context.Context, string, string) (*rpc.CheckResult, error)) *MockModerationSvcClient_PassLLMRespCheck_Call {
 	_c.Call.Return(run)
 	return _c
 }

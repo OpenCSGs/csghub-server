@@ -21,18 +21,12 @@ import (
 
 // ChatCompletionRequest represents a chat completion request
 type ChatCompletionRequest struct {
-	Model         string         `json:"model"`
-	Messages      []ChatMessage  `json:"messages"`
-	Temperature   float64        `json:"temperature,omitempty"`
-	MaxTokens     int            `json:"max_tokens,omitempty"`
-	Stream        bool           `json:"stream,omitempty"`
-	StreamOptions *StreamOptions `json:"stream_options,omitempty"`
-}
-
-// ChatMessage represents a chat message
-type ChatMessage struct {
-	Role    string `json:"role"`
-	Content string `json:"content"`
+	Model         string              `json:"model"`
+	Messages      []types.ChatMessage `json:"messages"`
+	Temperature   float64             `json:"temperature,omitempty"`
+	MaxTokens     int                 `json:"max_tokens,omitempty"`
+	Stream        bool                `json:"stream,omitempty"`
+	StreamOptions *StreamOptions      `json:"stream_options,omitempty"`
 }
 
 type StreamOptions struct {
@@ -46,9 +40,9 @@ type ChatCompletionResponse struct {
 	Created int64  `json:"created"`
 	Model   string `json:"model"`
 	Choices []struct {
-		Index        int         `json:"index"`
-		Message      ChatMessage `json:"message"`
-		FinishReason string      `json:"finish_reason"`
+		Index        int               `json:"index"`
+		Message      types.ChatMessage `json:"message"`
+		FinishReason string            `json:"finish_reason"`
 	} `json:"choices"`
 	Usage struct {
 		PromptTokens     int `json:"prompt_tokens"`
@@ -59,7 +53,7 @@ type ChatCompletionResponse struct {
 
 // ChatMessageHistoryResponse represents the chat message history response format
 type ChatMessageHistoryResponse struct {
-	Messages []ChatMessage `json:"messages"`
+	Messages []types.ChatMessage `json:"messages"`
 }
 
 // OpenAIHandler defines the interface for handling OpenAI compatible APIs
@@ -216,18 +210,39 @@ func (h *OpenAIHandlerImpl) Chat(c *gin.Context) {
 	c.Request.Body = io.NopCloser(bytes.NewReader(data))
 	c.Request.ContentLength = int64(len(data))
 	rp, _ := proxy.NewReverseProxy(endpoint)
-	slog.Info("proxy chat request to model endpoint", "endpoint", endpoint, "user", username, "model_id", modelID)
+	slog.Info("proxy chat request to model endpoint", "endpoint", endpoint, "user", username, "model_name", modelName)
 	w := NewResponseWriterWrapper(c.Writer, chatReq.Stream)
 	if h.modSvcClient != nil {
 		w.WithModeration(h.modSvcClient)
 	}
-	//TODO: use real tokenizer to count token usag
-	tokenizer := &token.DumyTokenizer{}
+	var tokenizer token.Tokenizer
+	if model.Hardware.Gpu.Type != "" {
+		tokenizer = token.NewTokenizerImpl(endpoint, modelName, "GPU", model.RuntimeFramework)
+	} else {
+		tokenizer = &token.DumyTokenizer{}
+	}
 	llmTokenCounter := token.NewLLMTokenCounter(tokenizer)
 	for _, msg := range chatReq.Messages {
-		llmTokenCounter.AppendPrompts(msg.Content)
+		result, err := h.modSvcClient.PassLLMPromptCheck(c, msg.Content, userUUID+modelID)
+		if err != nil {
+			c.String(http.StatusInternalServerError, fmt.Errorf("failed to call moderation error:%w", err).Error())
+			return
+		}
+		if result.IsSensitive {
+			slog.Debug("sensitive content", slog.String("reason", result.Reason))
+			errorChunk := generateSensitiveRespForPrompt()
+			errorChunkJson, _ := json.Marshal(errorChunk)
+			_, err := c.Writer.Write([]byte("data: " + string(errorChunkJson) + "\n\n" + "[DONE]"))
+			if err != nil {
+				slog.Error("write into resp error:", slog.String("err", err.Error()))
+			}
+			c.Writer.Flush()
+			return
+		}
+		llmTokenCounter.AppendPrompts(msg)
 	}
 	w.WithLLMTokenCounter(llmTokenCounter)
+
 	rp.ServeHTTP(w, c.Request, "")
 
 	go func() {
