@@ -278,9 +278,6 @@ func TestSpaceComponent_Deploy(t *testing.T) {
 	sc.mocks.stores.SpaceResourceMock().EXPECT().FindByID(ctx, int64(1)).Return(&database.SpaceResource{
 		ID: 1,
 	}, nil)
-	sc.mocks.components.repo.EXPECT().CheckAccountAndResource(ctx, "user", "", int64(0), &database.SpaceResource{
-		ID: 1,
-	}).Return(nil)
 	sc.mocks.deployer.EXPECT().Deploy(ctx, types.DeployRepo{
 		SpaceID:       1,
 		Path:          "foo/bar",
