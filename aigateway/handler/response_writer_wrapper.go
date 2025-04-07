@@ -154,7 +154,7 @@ func (rw *ResponseWriterWrapper) streamWrite(data []byte) (int, error) {
 			}
 			if result.IsSensitive {
 				slog.Debug("ResponseWriterWrapper streamWrite checkresult is sensitive", slog.Any("content", chunk.Choices[0].Delta.Content), slog.Any("reason", result.Reason))
-				errorChunk := rw.generateSensitiveResp(chunk)
+				errorChunk := generateSensitiveResp(chunk)
 				errorChunkJson, _ := json.Marshal(errorChunk)
 				rw.writeInternal([]byte("data: " + string(errorChunkJson) + "\n\n"))
 				return 0, ErrSensitiveContent
@@ -191,9 +191,39 @@ func (rw *ResponseWriterWrapper) writeInternal(data []byte) {
 // 	return cur, nil
 // }
 
-func (rw *ResponseWriterWrapper) generateSensitiveResp(cur openai.ChatCompletionChunk) openai.ChatCompletionChunk {
-	cur.Choices[0].Delta.Content = "The message includes inappropriate content and has been blocked. We appreciate your understanding and cooperation."
-	return cur
+func generateSensitiveResp(curChunk openai.ChatCompletionChunk) openai.ChatCompletionChunk {
+	newChunk := openai.ChatCompletionChunk{
+		ID:    curChunk.ID,
+		Model: curChunk.Model,
+		Choices: []openai.ChatCompletionChunkChoice{
+			{
+				Delta: openai.ChatCompletionChunkChoicesDelta{
+					Content: "The message includes inappropriate content and has been blocked. We appreciate your understanding and cooperation.",
+				},
+				FinishReason: "sensitive",
+				Index:        curChunk.Choices[0].Index,
+			},
+		},
+		SystemFingerprint: curChunk.SystemFingerprint,
+		Object:            curChunk.Object,
+		Usage:             curChunk.Usage,
+	}
+	return newChunk
+}
+
+func generateSensitiveRespForPrompt() openai.ChatCompletionChunk {
+	newChunk := openai.ChatCompletionChunk{
+		Choices: []openai.ChatCompletionChunkChoice{
+			{
+				Delta: openai.ChatCompletionChunkChoicesDelta{
+					Content: "The prompt includes inappropriate content and has been blocked. We appreciate your understanding and cooperation.",
+				},
+				FinishReason: "sensitive",
+				Index:        0,
+			},
+		},
+	}
+	return newChunk
 }
 
 /*
@@ -210,7 +240,7 @@ func (rw *ResponseWriterWrapper) modStream(text, id string) (*rpc.CheckResult, e
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	result, err := rw.modSvcClient.PassStreamCheck(ctx, string(sensitive.ScenarioLLMResModeration), text, id)
+	result, err := rw.modSvcClient.PassLLMRespCheck(ctx, text, id)
 	if err != nil {
 		return nil, fmt.Errorf("failed to call moderation service to check content sensitive: %w", err)
 	}

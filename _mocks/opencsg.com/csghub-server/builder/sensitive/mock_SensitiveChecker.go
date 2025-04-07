@@ -83,29 +83,29 @@ func (_c *MockSensitiveChecker_PassImageCheck_Call) RunAndReturn(run func(contex
 	return _c
 }
 
-// PassStreamCheck provides a mock function with given fields: ctx, scenario, text, id
-func (_m *MockSensitiveChecker) PassStreamCheck(ctx context.Context, scenario sensitive.Scenario, text string, id string) (*sensitive.CheckResult, error) {
-	ret := _m.Called(ctx, scenario, text, id)
+// PassLLMCheck provides a mock function with given fields: ctx, scenario, text, sessionId, accountId
+func (_m *MockSensitiveChecker) PassLLMCheck(ctx context.Context, scenario sensitive.Scenario, text string, sessionId string, accountId string) (*sensitive.CheckResult, error) {
+	ret := _m.Called(ctx, scenario, text, sessionId, accountId)
 
 	if len(ret) == 0 {
-		panic("no return value specified for PassStreamCheck")
+		panic("no return value specified for PassLLMCheck")
 	}
 
 	var r0 *sensitive.CheckResult
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, sensitive.Scenario, string, string) (*sensitive.CheckResult, error)); ok {
-		return rf(ctx, scenario, text, id)
+	if rf, ok := ret.Get(0).(func(context.Context, sensitive.Scenario, string, string, string) (*sensitive.CheckResult, error)); ok {
+		return rf(ctx, scenario, text, sessionId, accountId)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, sensitive.Scenario, string, string) *sensitive.CheckResult); ok {
-		r0 = rf(ctx, scenario, text, id)
+	if rf, ok := ret.Get(0).(func(context.Context, sensitive.Scenario, string, string, string) *sensitive.CheckResult); ok {
+		r0 = rf(ctx, scenario, text, sessionId, accountId)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*sensitive.CheckResult)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, sensitive.Scenario, string, string) error); ok {
-		r1 = rf(ctx, scenario, text, id)
+	if rf, ok := ret.Get(1).(func(context.Context, sensitive.Scenario, string, string, string) error); ok {
+		r1 = rf(ctx, scenario, text, sessionId, accountId)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -113,33 +113,34 @@ func (_m *MockSensitiveChecker) PassStreamCheck(ctx context.Context, scenario se
 	return r0, r1
 }
 
-// MockSensitiveChecker_PassStreamCheck_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'PassStreamCheck'
-type MockSensitiveChecker_PassStreamCheck_Call struct {
+// MockSensitiveChecker_PassLLMCheck_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'PassLLMCheck'
+type MockSensitiveChecker_PassLLMCheck_Call struct {
 	*mock.Call
 }
 
-// PassStreamCheck is a helper method to define mock.On call
+// PassLLMCheck is a helper method to define mock.On call
 //   - ctx context.Context
 //   - scenario sensitive.Scenario
 //   - text string
-//   - id string
-func (_e *MockSensitiveChecker_Expecter) PassStreamCheck(ctx interface{}, scenario interface{}, text interface{}, id interface{}) *MockSensitiveChecker_PassStreamCheck_Call {
-	return &MockSensitiveChecker_PassStreamCheck_Call{Call: _e.mock.On("PassStreamCheck", ctx, scenario, text, id)}
+//   - sessionId string
+//   - accountId string
+func (_e *MockSensitiveChecker_Expecter) PassLLMCheck(ctx interface{}, scenario interface{}, text interface{}, sessionId interface{}, accountId interface{}) *MockSensitiveChecker_PassLLMCheck_Call {
+	return &MockSensitiveChecker_PassLLMCheck_Call{Call: _e.mock.On("PassLLMCheck", ctx, scenario, text, sessionId, accountId)}
 }
 
-func (_c *MockSensitiveChecker_PassStreamCheck_Call) Run(run func(ctx context.Context, scenario sensitive.Scenario, text string, id string)) *MockSensitiveChecker_PassStreamCheck_Call {
+func (_c *MockSensitiveChecker_PassLLMCheck_Call) Run(run func(ctx context.Context, scenario sensitive.Scenario, text string, sessionId string, accountId string)) *MockSensitiveChecker_PassLLMCheck_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(sensitive.Scenario), args[2].(string), args[3].(string))
+		run(args[0].(context.Context), args[1].(sensitive.Scenario), args[2].(string), args[3].(string), args[4].(string))
 	})
 	return _c
 }
 
-func (_c *MockSensitiveChecker_PassStreamCheck_Call) Return(_a0 *sensitive.CheckResult, _a1 error) *MockSensitiveChecker_PassStreamCheck_Call {
+func (_c *MockSensitiveChecker_PassLLMCheck_Call) Return(_a0 *sensitive.CheckResult, _a1 error) *MockSensitiveChecker_PassLLMCheck_Call {
 	_c.Call.Return(_a0, _a1)
 	return _c
 }
 
-func (_c *MockSensitiveChecker_PassStreamCheck_Call) RunAndReturn(run func(context.Context, sensitive.Scenario, string, string) (*sensitive.CheckResult, error)) *MockSensitiveChecker_PassStreamCheck_Call {
+func (_c *MockSensitiveChecker_PassLLMCheck_Call) RunAndReturn(run func(context.Context, sensitive.Scenario, string, string, string) (*sensitive.CheckResult, error)) *MockSensitiveChecker_PassLLMCheck_Call {
 	_c.Call.Return(run)
 	return _c
 }

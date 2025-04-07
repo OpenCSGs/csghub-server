@@ -107,7 +107,7 @@ func TestOpenAIHandler_Chat(t *testing.T) {
 		handler, mockOpenAI, _, c, w := setupTest(t)
 		chatReq := ChatCompletionRequest{
 			Model: "nonexistent:svc",
-			Messages: []ChatMessage{
+			Messages: []types.ChatMessage{
 				{Role: "user", Content: "Hello"},
 			},
 		}
@@ -126,7 +126,7 @@ func TestOpenAIHandler_Chat(t *testing.T) {
 		handler, mockOpenAI, _, c, w := setupTest(t)
 		chatReq := ChatCompletionRequest{
 			Model: "model1:svc1",
-			Messages: []ChatMessage{
+			Messages: []types.ChatMessage{
 				{Role: "user", Content: "Hello"},
 			},
 		}

@@ -11,9 +11,10 @@ const (
 	ScenarioCommentDetection  Scenario = "comment_detection"
 )
 
-// for llm response
+// for llm text
 const (
-	ScenarioLLMResModeration Scenario = "llm_response_moderation"
+	ScenarioLLMQueryModeration Scenario = "llm_query_moderation"
+	ScenarioLLMResModeration   Scenario = "llm_response_moderation"
 )
 
 // for image
@@ -36,6 +37,8 @@ func (s Scenario) FromString(scenario string) (Scenario, bool) {
 		return ScenarioImageBaseLineCheck, true
 	case "llm_response_moderation":
 		return ScenarioLLMResModeration, true
+	case "llm_query_moderation":
+		return ScenarioLLMQueryModeration, true
 	default:
 		return Scenario(""), false
 	}
@@ -44,7 +47,7 @@ func (s Scenario) FromString(scenario string) (Scenario, bool) {
 type SensitiveChecker interface {
 	PassTextCheck(ctx context.Context, scenario Scenario, text string) (*CheckResult, error)
 	PassImageCheck(ctx context.Context, scenario Scenario, ossBucketName, ossObjectName string) (*CheckResult, error)
-	PassStreamCheck(ctx context.Context, scenario Scenario, text, id string) (*CheckResult, error)
+	PassLLMCheck(ctx context.Context, scenario Scenario, text string, sessionId string, accountId string) (*CheckResult, error)
 }
 
 type CheckResult struct {
