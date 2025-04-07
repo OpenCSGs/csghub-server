@@ -247,8 +247,9 @@ func (c *runtimeArchitectureComponentImpl) UpdateRuntimeFrameworkTag(ctx context
 	if len(archs) == 0 {
 		return fmt.Errorf("fail to get architecture from model info")
 	}
-	newFrames, err := c.getRuntimeFrameworks(ctx, archs, *repo, types.Safetensors)
-	if err != nil {
+	modelFormat := repo.Format()
+	newFrames, err := c.getRuntimeFrameworks(ctx, archs, *repo, types.ModelType(modelFormat))
+	if err != nil || len(newFrames) == 0 {
 		return fmt.Errorf("fail to get runtime frameworks for %s, %w", archs, err)
 	}
 	// clean old runtime tags

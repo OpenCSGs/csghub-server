@@ -241,6 +241,7 @@ type RepoFilter struct {
 type TagReq struct {
 	Name     string `json:"name"`
 	Category string `json:"category"`
+	Group    string `json:"group"`
 }
 
 type RuntimeArchitecture struct {

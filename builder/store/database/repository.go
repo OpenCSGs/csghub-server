@@ -158,6 +158,10 @@ func (r Repository) Format() string {
 			}
 		}
 	}
+	//handle some old repo has no gguf tag
+	if strings.Contains(strings.ToLower(r.Name), "gguf") {
+		return "gguf"
+	}
 	return string(types.Unknown)
 }
 
@@ -517,7 +521,15 @@ func (s *repoStoreImpl) PublicToUser(ctx context.Context, repoType types.Reposit
 			var asTag = fmt.Sprintf("%s%d", "ts", i)
 			q.Join(fmt.Sprintf("JOIN repository_tags AS %s ON repository.id = %s.repository_id", asRepoTag, asRepoTag)).
 				Join(fmt.Sprintf("JOIN tags AS %s ON %s.tag_id = %s.id", asTag, asRepoTag, asTag))
-			q.Where(fmt.Sprintf("%s.category = ? AND %s.name = ?", asTag, asTag), tag.Category, tag.Name)
+			if tag.Category != "" {
+				q.Where(fmt.Sprintf("%s.category = ?", asTag), tag.Category)
+			}
+			if tag.Name != "" {
+				q.Where(fmt.Sprintf("%s.name = ?", asTag), tag.Name)
+			}
+			if tag.Group != "" {
+				q.Where(fmt.Sprintf("%s.group = ?", asTag), tag.Group)
+			}
 		}
 
 	}

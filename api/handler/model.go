@@ -59,6 +59,8 @@ type ModelHandler struct {
 // @Param        language_tag query string false "filter by language tag, deprecated"
 // @Param        tag_category query string false "filter by tag category"
 // @Param        tag_name query string false "filter by tag name"
+// @Param        tag_group query string false "filter by tag group"
+// @Param        need_op_weight query bool false "need op weight" default(false)
 // @Param        sort query string false "sort by"
 // @Param        source query string false "source" Enums(opencsg, huggingface, local)
 // @Param        per query int false "per" default(20)
@@ -511,12 +513,18 @@ func (h *ModelHandler) DelDatasetRelation(ctx *gin.Context) {
 func parseTagReqs(ctx *gin.Context) (tags []types.TagReq) {
 	tagCategories := ctx.QueryArray("tag_category")
 	tagNames := ctx.QueryArray("tag_name")
-	if len(tagCategories) > 0 && len(tagCategories) == len(tagNames) {
+	tagGroups := ctx.QueryArray("tag_group")
+	if len(tagCategories) > 0 {
 		for i, category := range tagCategories {
-			tags = append(tags, types.TagReq{
-				Name:     tagNames[i],
-				Category: category,
-			})
+			var tag types.TagReq
+			tag.Category = category
+			if len(tagCategories) == len(tagNames) {
+				tag.Name = strings.ToLower(tagNames[i])
+			}
+			if len(tagCategories) == len(tagGroups) {
+				tag.Group = strings.ToLower(tagGroups[i])
+			}
+			tags = append(tags, tag)
 		}
 		return
 	}
