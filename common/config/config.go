@@ -112,7 +112,7 @@ type Config struct {
 	}
 
 	Space struct {
-		BuilderEndpoint string `env:"STARHUB_SERVER_SPACE_BUILDER_ENDPOINT, default=http://localhost:8081"`
+		BuilderEndpoint string `env:"STARHUB_SERVER_SPACE_BUILDER_ENDPOINT, default=http://localhost:8082"`
 		// base url for space api running in k8s cluster
 		RunnerEndpoint   string `env:"STARHUB_SERVER_SPACE_RUNNER_ENDPOINT, default=http://localhost:8082"`
 		RunnerServerPort int    `env:"STARHUB_SERVER_SPACE_RUNNER_SERVER_PORT, default=8082"`
