@@ -10,7 +10,6 @@ import (
 	"strings"
 	"time"
 
-	corev1 "k8s.io/api/core/v1"
 	"opencsg.com/csghub-server/builder/deploy/common"
 	"opencsg.com/csghub-server/builder/deploy/imagerunner"
 	"opencsg.com/csghub-server/builder/store/database"
@@ -153,11 +152,12 @@ func (t *DeployRunner) shouldForceCancelDeploy(orgName, repoName string, resp *t
 		return true, reason
 	}
 
-	if t.task.Deploy.SpaceID > 0 && len(resp.Instances) > 0 && resp.Instances[0].Status == string(corev1.PodPending) {
-		reason := "The deployment has been cancelled because it took too long to acquire the necessary hardware resources."
-		slog.Warn(reason, slog.Any("namespace", orgName), slog.Any("repoName", repoName))
-		return true, reason
-	}
+	// Todo: check if pod is pending for too long due to not enough hardware resources
+	// if t.task.Deploy.SpaceID > 0 && len(resp.Instances) > 0 && resp.Instances[0].Status == string(corev1.PodPending) {
+	// 	reason := "The deployment has been cancelled because it took too long to acquire the necessary hardware resources."
+	// 	slog.Warn(reason, slog.Any("namespace", orgName), slog.Any("repoName", repoName))
+	// 	return true, reason
+	// }
 
 	return false, ""
 }
