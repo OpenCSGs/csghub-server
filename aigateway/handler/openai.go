@@ -203,7 +203,8 @@ func (h *OpenAIHandlerImpl) Chat(c *gin.Context) {
 	}
 	chatReq.Model = modelName
 	if chatReq.Stream {
-		if !(model.Hardware.Gpu.Type == "" && strings.ToLower(model.RuntimeFramework) == "vllm") {
+		c.Writer.Header().Set("Content-Type", "text/event-stream")
+		if !strings.Contains(model.ImageID, "vllm-cpu") {
 			chatReq.StreamOptions = &StreamOptions{
 				IncludeUsage: true,
 			}

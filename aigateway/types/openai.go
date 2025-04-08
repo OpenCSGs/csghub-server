@@ -18,6 +18,7 @@ type Model struct {
 
 	Hardware         types.HardWare `json:"-"` // the deployed hardware
 	RuntimeFramework string         `json:"-"` // the deployed framework
+	ImageID          string         `json:"-"` // the deployed image
 }
 
 // ModelList represents the model list response

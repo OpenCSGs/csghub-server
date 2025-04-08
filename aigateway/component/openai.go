@@ -49,13 +49,21 @@ func (m *openaiComponentImpl) GetAvailableModels(c context.Context, userName str
 	}
 	var models []types.Model
 	for _, deploy := range runningDeploys {
+		var hardwareInfo commontypes.HardWare
+		err := json.Unmarshal([]byte(deploy.Hardware), &hardwareInfo)
+		if err != nil {
+			slog.Error("get deploy hardware ")
+		}
 		m := types.Model{
-			Object:        "model",
-			Created:       deploy.CreatedAt.Unix(),
-			Task:          string(deploy.Task),
-			CSGHubModelID: deploy.Repository.Path,
-			SvcName:       deploy.SvcName,
-			SvcType:       deploy.Type,
+			Object:           "model",
+			Created:          deploy.CreatedAt.Unix(),
+			Task:             string(deploy.Task),
+			CSGHubModelID:    deploy.Repository.Path,
+			SvcName:          deploy.SvcName,
+			SvcType:          deploy.Type,
+			Hardware:         hardwareInfo,
+			RuntimeFramework: deploy.RuntimeFramework,
+			ImageID:          deploy.ImageID,
 		}
 		modelName := ""
 		if deploy.Repository.HFPath != "" {
@@ -106,6 +114,7 @@ func (m *openaiComponentImpl) RecordUsage(c context.Context, userUUID string, mo
 	if err != nil {
 		return fmt.Errorf("failed to get token usage from counter,error:%w", err)
 	}
+	slog.Debug("token", slog.Any("usage", usage))
 	var tokenUsageExtra = struct {
 		PromptTokenNum     int64 `json:"prompt_token_num"`
 		CompletionTokenNum int64 `json:"completion_token_num"`
