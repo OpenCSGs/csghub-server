@@ -68,7 +68,7 @@ func (c *ModerationSvcHttpClient) PassLLMRespCheck(ctx context.Context, text, se
 			SessionId: sessionId,
 		},
 	}
-	const path = "/api/v1/stream"
+	const path = "/api/v1/llmresp"
 	var resp httpbase.R
 	resp.Data = &CheckResult{}
 	err := c.hc.Post(ctx, path, req, &resp)
@@ -133,7 +133,7 @@ func (c *ModerationSvcHttpClient) PassLLMPromptCheck(ctx context.Context, text, 
 			SessionId: accountId,
 		},
 	}
-	const path = "/api/v1/llmQuery"
+	const path = "/api/v1/llmprompt"
 	var resp httpbase.R
 	resp.Data = &CheckResult{}
 	err := c.hc.Post(ctx, path, req, &resp)
