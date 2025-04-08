@@ -7,6 +7,7 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"opencsg.com/csghub-server/aigateway/component"
@@ -202,8 +203,10 @@ func (h *OpenAIHandlerImpl) Chat(c *gin.Context) {
 	}
 	chatReq.Model = modelName
 	if chatReq.Stream {
-		chatReq.StreamOptions = &StreamOptions{
-			IncludeUsage: true,
+		if !(model.Hardware.Gpu.Type == "" && strings.ToLower(model.RuntimeFramework) == "vllm") {
+			chatReq.StreamOptions = &StreamOptions{
+				IncludeUsage: true,
+			}
 		}
 	}
 	data, _ := json.Marshal(chatReq)
