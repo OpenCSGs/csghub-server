@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"strings"
 
+	"opencsg.com/csghub-server/builder/deploy/common"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/types"
 )
@@ -35,12 +36,7 @@ func (c *userComponentImpl) ListDeploys(ctx context.Context, repoType types.Repo
 		repoPath := strings.TrimPrefix(deploy.GitPath, string(repoType)+"s_")
 		var hardware types.HardWare
 		_ = json.Unmarshal([]byte(deploy.Hardware), &hardware)
-		resourceType := ""
-		if hardware.Gpu.Num != "" {
-			resourceType = hardware.Gpu.Type
-		} else {
-			resourceType = hardware.Cpu.Type
-		}
+		resourceType := common.ResourceType(hardware)
 		tag := ""
 		tags, _ := c.repoStore.TagsWithCategory(ctx, deploy.RepoID, "task")
 		if len(tags) > 0 {
@@ -68,7 +64,7 @@ func (c *userComponentImpl) ListDeploys(ctx context.Context, repoType types.Repo
 			Type:             deploy.Type,
 			Endpoint:         endpoint,
 			Provider:         provider,
-			ResourceType:     resourceType,
+			ResourceType:     string(resourceType),
 			RepoTag:          tag,
 			Task:             string(deploy.Task),
 		})

@@ -760,7 +760,7 @@ func (d *deployer) SubmitEvaluation(ctx context.Context, req types.EvaluationReq
 	env["ACCESS_TOKEN"] = req.Token
 	env["HF_ENDPOINT"] = req.DownloadEndpoint
 
-	updateEvaluationEnvHardware(env, req)
+	common.UpdateEvaluationEnvHardware(env, req.Hardware)
 
 	templates := []types.ArgoFlowTemplate{}
 	templates = append(templates, types.ArgoFlowTemplate{

@@ -529,6 +529,16 @@ func (c *modelComponentImpl) GetServerless(ctx context.Context, namespace, name,
 	}
 	endpoint, _ := c.repoComponent.GenerateEndpoint(ctx, deploy)
 
+	varMap, err := common.JsonStrToMap(deploy.Variables)
+	if err != nil {
+		return nil, fmt.Errorf("failed to convert variables to map, error: %w", err)
+	}
+	var entrypoint string
+	val, exist := varMap[types.GGUFEntryPoint]
+	if exist {
+		entrypoint = val
+	}
+
 	resDeploy := types.DeployRepo{
 		DeployID:         deploy.ID,
 		DeployName:       deploy.DeployName,
@@ -547,6 +557,7 @@ func (c *modelComponentImpl) GetServerless(ctx context.Context, namespace, name,
 		UpdatedAt:        deploy.UpdatedAt,
 		ProxyEndpoint:    endpoint,
 		Task:             string(deploy.Task),
+		Entrypoint:       entrypoint,
 	}
 	return &resDeploy, nil
 }

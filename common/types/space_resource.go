@@ -3,8 +3,11 @@ package types
 type ResourceType string
 
 const (
-	ResourceTypeCPU ResourceType = "cpu"
-	ResourceTypeGPU ResourceType = "gpu"
+	ResourceTypeCPU     ResourceType = "cpu"
+	ResourceTypeGPU     ResourceType = "gpu"
+	ResourceTypeNPU     ResourceType = "npu"
+	ResourceTypeEnflame ResourceType = "enflame"
+	ResourceTypeMLU     ResourceType = "mlu"
 )
 
 type SpaceResource struct {

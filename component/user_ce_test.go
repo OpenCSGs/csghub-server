@@ -47,6 +47,7 @@ func TestUserComponent_ListDeploys(t *testing.T) {
 			Path: "foo/bar", Status: "Stopped", GitPath: "models_foo/bar", Hardware: `{"memory": "foo"}`,
 			RepoID: 123, SvcName: "svc", Endpoint: "endpoint", ClusterID: "cluster",
 			Provider: "foo", RepoTag: "tag1",
+			ResourceType: "cpu",
 		},
 	}, data)
 

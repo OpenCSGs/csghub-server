@@ -127,9 +127,3 @@ func startAcctRequestFeeExtra(res types.StatusResponse) string {
 
 func updateDatabaseDeploy(dp *database.Deploy, dt types.DeployRepo) {
 }
-
-func updateEvaluationEnvHardware(env map[string]string, req types.EvaluationReq) {
-	if req.Hardware.Gpu.Num != "" {
-		env["GPU_NUM"] = req.Hardware.Gpu.Num
-	}
-}
