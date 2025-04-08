@@ -251,7 +251,7 @@ func (ibc *imagebuilderComponentImpl) workFlowInit(ctx context.Context) error {
 			}
 			if err := createOrUpdateConfigMap(ctx, cluster.Client, cmd); err != nil {
 				slog.Error(fmt.Sprintf("failed to create %s configmap", cfg.FileName), "err", err)
-				return err
+				continue
 			}
 
 		}
