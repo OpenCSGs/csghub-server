@@ -230,7 +230,7 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 		return nil, fmt.Errorf("error creating user proxy handler:%w", err)
 	}
 
-	createUserRoutes(apiGroup, authCollection.NeedAPIKey, userProxyHandler, userHandler)
+	createUserRoutes(apiGroup, authCollection, userProxyHandler, userHandler)
 
 	tokenGroup := apiGroup.Group("token")
 	{
@@ -711,7 +711,7 @@ func createSpaceRoutes(config *config.Config, apiGroup *gin.RouterGroup, spaceHa
 	}
 }
 
-func createUserRoutes(apiGroup *gin.RouterGroup, needAPIKey gin.HandlerFunc, userProxyHandler *handler.InternalServiceProxyHandler, userHandler *handler.UserHandler) {
+func createUserRoutes(apiGroup *gin.RouterGroup, authCollection middleware.AuthenticatorCollection, userProxyHandler *handler.InternalServiceProxyHandler, userHandler *handler.UserHandler) {
 	// depricated
 	{
 		apiGroup.POST("/users", userProxyHandler.ProxyToApi("/api/v1/user"))
@@ -755,7 +755,7 @@ func createUserRoutes(apiGroup *gin.RouterGroup, needAPIKey gin.HandlerFunc, use
 	apiGroup.GET("/user/:username/tokens", userProxyHandler.ProxyToApi("/api/v1/user/%s/tokens", "username"))
 
 	// serverless list
-	apiGroup.GET("/user/:username/run/serverless", needAPIKey, userHandler.GetRunServerless)
+	apiGroup.GET("/user/:username/run/serverless", authCollection.NeedAdmin, userHandler.GetRunServerless)
 }
 
 func createRuntimeFrameworkRoutes(apiGroup *gin.RouterGroup, authCollection middleware.AuthenticatorCollection, modelHandler *handler.ModelHandler, runtimeArchHandler *handler.RuntimeArchitectureHandler, repoCommonHandler *handler.RepoHandler) {
