@@ -165,3 +165,7 @@ calc_recom_score_cron_expression = "0 1 * * *"
 
 [proxy]
 hosts = ["opencsg.com", "sync.opencsg.com"]
+
+[instrumentation]
+otlp_endpoint = "http://localhost:4317"
+otlp_logging = false

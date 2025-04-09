@@ -256,7 +256,8 @@ type Config struct {
 
 	Instrumentation struct {
 		OTLPEndpoint string `env:"OPENCSG_TRACING_OTLP_ENDPOINT"`
-		OTLPLogging  bool   `env:"OPENCSG_TRACING_OTLP_LOGGING"`
+		//Note: don't enable it unless you have no other way to collect service logs. It will leads to very high CPU usage.
+		OTLPLogging bool `env:"OPENCSG_TRACING_OTLP_LOGGING"`
 	}
 
 	Git struct {

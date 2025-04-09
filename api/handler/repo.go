@@ -1702,6 +1702,9 @@ func (h *RepoHandler) DeployInstanceLogs(ctx *gin.Context) {
 				ctx.SSEvent("Container", string(data))
 				ctx.Writer.Flush()
 			}
+		default:
+			// Add a small sleep to prevent CPU spinning when no data is available
+			time.Sleep(time.Second * 1)
 		}
 	}
 }
@@ -2203,6 +2206,9 @@ func (h *RepoHandler) ServerlessLogs(ctx *gin.Context) {
 				ctx.SSEvent("Container", string(data))
 				ctx.Writer.Flush()
 			}
+		default:
+			// Add a small sleep to prevent CPU spinning when no data is available
+			time.Sleep(time.Second * 1)
 		}
 	}
 }
