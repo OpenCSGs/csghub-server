@@ -95,6 +95,7 @@ type RepoComponent interface {
 	LastCommit(ctx context.Context, req *types.GetCommitsReq) (*types.Commit, error)
 	FileRaw(ctx context.Context, req *types.GetFileReq) (string, error)
 	DownloadFile(ctx context.Context, req *types.GetFileReq, userName string) (io.ReadCloser, int64, string, error)
+	InternalDownloadFile(ctx context.Context, req *types.GetFileReq) (io.ReadCloser, int64, string, error)
 	Branches(ctx context.Context, req *types.GetBranchesReq) ([]types.Branch, error)
 	Tags(ctx context.Context, req *types.GetTagsReq) ([]database.Tag, error)
 	UpdateTags(ctx context.Context, namespace, name string, repoType types.RepositoryType, category, currentUser string, tags []string) error
@@ -1464,6 +1465,62 @@ func (c *repoComponentImpl) SDKDownloadFile(ctx context.Context, req *types.GetF
 			return nil, 0, downloadUrl, err
 		}
 		return nil, 0, signedUrl.String(), nil
+	} else {
+		getFileReaderReq := gitserver.GetRepoInfoByPathReq{
+			Namespace: req.Namespace,
+			Name:      req.Name,
+			Ref:       req.Ref,
+			Path:      req.Path,
+			RepoType:  req.RepoType,
+		}
+		reader, size, err := c.git.GetRepoFileReader(ctx, getFileReaderReq)
+		if err != nil {
+			if err.Error() == ErrNotFoundMessage {
+				return nil, 0, downloadUrl, ErrNotFound
+			}
+			return nil, 0, "", fmt.Errorf("failed to download git %s repository file, error: %w", req.RepoType, err)
+		}
+		return reader, size, downloadUrl, nil
+	}
+}
+
+func (c *repoComponentImpl) InternalDownloadFile(ctx context.Context, req *types.GetFileReq) (io.ReadCloser, int64, string, error) {
+	var downloadUrl string
+	repo, err := c.repoStore.FindByPath(ctx, req.RepoType, req.Namespace, req.Name)
+	if err != nil {
+		return nil, 0, "", fmt.Errorf("failed to find repo, error: %w", err)
+	}
+	if req.Ref == "" {
+		req.Ref = repo.DefaultBranch
+	}
+	if req.Lfs {
+		getFileContentReq := gitserver.GetRepoInfoByPathReq{
+			Namespace: req.Namespace,
+			Name:      req.Name,
+			Ref:       req.Ref,
+			Path:      req.Path,
+			RepoType:  req.RepoType,
+		}
+		file, err := c.git.GetRepoFileContents(ctx, getFileContentReq)
+		if err != nil {
+			return nil, 0, "", err
+		}
+		objectKey := file.LfsRelativePath
+		objectKey = path.Join("lfs", objectKey)
+		reqParams := make(url.Values)
+		if req.SaveAs != "" {
+			// allow rename when download through content-disposition header
+			reqParams.Set("response-content-disposition", fmt.Sprintf("attachment;filename=%s", req.SaveAs))
+		}
+		signedUrl, err := c.s3Client.PresignedGetObject(ctx, c.lfsBucket, objectKey, types.OssFileExpire, reqParams)
+		if err != nil {
+			if err.Error() == ErrNotFoundMessage || err.Error() == ErrGetContentsOrList {
+				return nil, 0, downloadUrl, ErrNotFound
+			}
+			return nil, 0, downloadUrl, err
+		}
+		return nil, 0, signedUrl.String(), nil
+
 	} else {
 		getFileReaderReq := gitserver.GetRepoInfoByPathReq{
 			Namespace: req.Namespace,

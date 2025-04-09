@@ -689,6 +689,66 @@ func TestRepoComponent_DownloadFile(t *testing.T) {
 
 }
 
+func TestRepoComponent_InternalDownloadFile(t *testing.T) {
+	for _, lfs := range []bool{true} {
+		t.Run(fmt.Sprintf("is lfs: %v", lfs), func(t *testing.T) {
+			ctx := context.TODO()
+			repo := initializeTestRepoComponent(ctx, t)
+
+			mockedRepo := &database.Repository{}
+			repo.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, types.ModelRepo, "ns", "n").Return(
+				mockedRepo, nil,
+			)
+			file := &types.File{Name: "zzz"}
+			repo.mocks.gitServer.EXPECT().GetRepoFileContents(ctx, gitserver.GetRepoInfoByPathReq{
+				Namespace: "ns",
+				Name:      "n",
+				Ref:       "main",
+				Path:      "path",
+				RepoType:  types.ModelRepo,
+			}).Return(file, nil)
+
+			if lfs {
+				reqParams := make(url.Values)
+				reqParams.Set("response-content-disposition", fmt.Sprintf("attachment;filename=%s", "zzz"))
+				repo.mocks.s3Client.EXPECT().PresignedGetObject(
+					ctx, repo.lfsBucket, "lfs", types.OssFileExpire, reqParams,
+				).Return(&url.URL{Path: "foobar"}, nil)
+			} else {
+				repo.mocks.gitServer.EXPECT().GetRepoFileReader(ctx, gitserver.GetRepoInfoByPathReq{
+					Namespace: "ns",
+					Name:      "n",
+					Ref:       "main",
+					Path:      "path",
+					RepoType:  types.ModelRepo,
+				}).Return(nil, 100, nil)
+			}
+
+			a, b, c, err := repo.InternalDownloadFile(ctx, &types.GetFileReq{
+				Namespace:   "ns",
+				Name:        "n",
+				Ref:         "main",
+				Path:        "path",
+				RepoType:    types.ModelRepo,
+				Lfs:         lfs,
+				SaveAs:      "zzz",
+				CurrentUser: "user",
+			})
+			require.Nil(t, err)
+			if lfs {
+				require.Nil(t, a)
+				require.Equal(t, int64(0), b)
+				require.Equal(t, "foobar", c)
+			} else {
+				require.Nil(t, a)
+				require.Equal(t, int64(100), b)
+				require.Equal(t, "", c)
+			}
+		})
+	}
+
+}
+
 func TestRepoComponent_SDKListFiles(t *testing.T) {
 	ctx := context.TODO()
 	repo := initializeTestRepoComponent(ctx, t)

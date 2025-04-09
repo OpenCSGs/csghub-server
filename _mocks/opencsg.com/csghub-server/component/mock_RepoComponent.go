@@ -2226,6 +2226,79 @@ func (_c *MockRepoComponent_IncrDownloads_Call) RunAndReturn(run func(context.Co
 	return _c
 }
 
+// InternalDownloadFile provides a mock function with given fields: ctx, req
+func (_m *MockRepoComponent) InternalDownloadFile(ctx context.Context, req *types.GetFileReq) (io.ReadCloser, int64, string, error) {
+	ret := _m.Called(ctx, req)
+
+	if len(ret) == 0 {
+		panic("no return value specified for InternalDownloadFile")
+	}
+
+	var r0 io.ReadCloser
+	var r1 int64
+	var r2 string
+	var r3 error
+	if rf, ok := ret.Get(0).(func(context.Context, *types.GetFileReq) (io.ReadCloser, int64, string, error)); ok {
+		return rf(ctx, req)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, *types.GetFileReq) io.ReadCloser); ok {
+		r0 = rf(ctx, req)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(io.ReadCloser)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, *types.GetFileReq) int64); ok {
+		r1 = rf(ctx, req)
+	} else {
+		r1 = ret.Get(1).(int64)
+	}
+
+	if rf, ok := ret.Get(2).(func(context.Context, *types.GetFileReq) string); ok {
+		r2 = rf(ctx, req)
+	} else {
+		r2 = ret.Get(2).(string)
+	}
+
+	if rf, ok := ret.Get(3).(func(context.Context, *types.GetFileReq) error); ok {
+		r3 = rf(ctx, req)
+	} else {
+		r3 = ret.Error(3)
+	}
+
+	return r0, r1, r2, r3
+}
+
+// MockRepoComponent_InternalDownloadFile_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'InternalDownloadFile'
+type MockRepoComponent_InternalDownloadFile_Call struct {
+	*mock.Call
+}
+
+// InternalDownloadFile is a helper method to define mock.On call
+//   - ctx context.Context
+//   - req *types.GetFileReq
+func (_e *MockRepoComponent_Expecter) InternalDownloadFile(ctx interface{}, req interface{}) *MockRepoComponent_InternalDownloadFile_Call {
+	return &MockRepoComponent_InternalDownloadFile_Call{Call: _e.mock.On("InternalDownloadFile", ctx, req)}
+}
+
+func (_c *MockRepoComponent_InternalDownloadFile_Call) Run(run func(ctx context.Context, req *types.GetFileReq)) *MockRepoComponent_InternalDownloadFile_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(*types.GetFileReq))
+	})
+	return _c
+}
+
+func (_c *MockRepoComponent_InternalDownloadFile_Call) Return(_a0 io.ReadCloser, _a1 int64, _a2 string, _a3 error) *MockRepoComponent_InternalDownloadFile_Call {
+	_c.Call.Return(_a0, _a1, _a2, _a3)
+	return _c
+}
+
+func (_c *MockRepoComponent_InternalDownloadFile_Call) RunAndReturn(run func(context.Context, *types.GetFileReq) (io.ReadCloser, int64, string, error)) *MockRepoComponent_InternalDownloadFile_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // IsAdminRole provides a mock function with given fields: user
 func (_m *MockRepoComponent) IsAdminRole(user database.User) bool {
 	ret := _m.Called(user)

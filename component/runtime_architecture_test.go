@@ -8,6 +8,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"opencsg.com/csghub-server/builder/store/database"
+	"opencsg.com/csghub-server/common/types"
 	"opencsg.com/csghub-server/common/utils/common"
 )
 
@@ -100,7 +101,17 @@ func TestRuntimeArchComponent_GetGGUFContent(t *testing.T) {
 	ctx := context.TODO()
 	rc := initializeTestRuntimeArchComponent(ctx, t)
 	rc.fileDownloadPath = "https://hub.opencsg.com/csg"
-
+	req := types.GetFileReq{
+		Lfs:       true,
+		Namespace: "AIWizards",
+		Name:      "Llama-2-7B-GGUF",
+		Path:      "llama-2-7b.Q2_K.gguf",
+		Ref:       "main",
+		RepoType:  types.ModelRepo,
+	}
+	rc.mocks.components.repo.EXPECT().InternalDownloadFile(ctx, &req).Return(
+		nil, 0, "https://hub.opencsg.com/csg/AIWizards/Llama-2-7B-GGUF/resolve/main/llama-2-7b.Q2_K.gguf", nil,
+	)
 	file, err := rc.GetGGUFContent(ctx, "llama-2-7b.Q2_K.gguf", &database.Repository{
 		Path:          "AIWizards/Llama-2-7B-GGUF",
 		DefaultBranch: "main",

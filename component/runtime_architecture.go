@@ -424,7 +424,18 @@ func (c *runtimeArchitectureComponentImpl) GetMetadataFromSafetensors(ctx contex
 			hasModelIndex = true
 		}
 		if strings.Contains(file.Name, ".safetensors") {
-			url := fmt.Sprintf("%s/%s/resolve/%s/%s?current_user=admin", c.fileDownloadPath, repo.Path, repo.DefaultBranch, file.Path)
+			req := types.GetFileReq{
+				Lfs:       true,
+				Namespace: namespace,
+				Name:      name,
+				Path:      file.Path,
+				Ref:       repo.DefaultBranch,
+				RepoType:  types.ModelRepo,
+			}
+			_, _, url, err := c.repoComponent.InternalDownloadFile(ctx, &req)
+			if err != nil {
+				return nil, fmt.Errorf("fail to get safetensors file url, %w", err)
+			}
 			fileUrls = append(fileUrls, url)
 		}
 	}
@@ -483,7 +494,19 @@ func (c *runtimeArchitectureComponentImpl) GetGGUFContent(ctx context.Context, f
 		options = append(options, gguf.UseBearerAuth(c.apiToken))
 	}
 	options = append(options, gguf.SkipRangeDownloadDetection(), gguf.SkipTLSVerification())
-	url := fmt.Sprintf("%s/%s/resolve/%s/%s?current_user=admin", c.fileDownloadPath, repo.Path, repo.DefaultBranch, filename)
+	namespace, name := repo.NamespaceAndName()
+	req := types.GetFileReq{
+		Lfs:       true,
+		Namespace: namespace,
+		Name:      name,
+		Path:      filename,
+		Ref:       repo.DefaultBranch,
+		RepoType:  types.ModelRepo,
+	}
+	_, _, url, err := c.repoComponent.InternalDownloadFile(ctx, &req)
+	if err != nil {
+		return nil, fmt.Errorf("fail to get gguf file url, %w", err)
+	}
 
 	f, err := gguf.ParseGGUFFileRemote(ctx, url, options...)
 	if err != nil {
