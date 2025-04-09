@@ -104,7 +104,7 @@ func (rf *runtimeFrameworksStoreImpl) FindEnabledByID(ctx context.Context, id in
 
 func (rf *runtimeFrameworksStoreImpl) FindEnabledByName(ctx context.Context, name string) (*RuntimeFramework, error) {
 	var res RuntimeFramework
-	_, err := rf.db.Core.NewSelect().Model(&res).Where("frame_name = ?", name).Where("enabled = 1").Exec(ctx, &res)
+	_, err := rf.db.Core.NewSelect().Model(&res).Where("LOWER(frame_name) = LOWER(?)", name).Where("enabled = 1").Exec(ctx, &res)
 	return &res, err
 }
 
