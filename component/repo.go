@@ -2757,7 +2757,7 @@ func (c *repoComponentImpl) DeployUpdate(ctx context.Context, updateReq types.De
 		if req.RuntimeFrameworkID == nil {
 			frame, err := c.runtimeFrameworksStore.FindEnabledByName(ctx, deploy.RuntimeFramework)
 			if err != nil {
-				return fmt.Errorf("cannot find available runtime framework by name %s, %w", deploy.RuntimeFramework, err)
+				return fmt.Errorf("cannot find available runtime framework by name , %w", err)
 			}
 			//update runtime image once user changed cpu to gpu
 			req.RuntimeFrameworkID = &frame.ID

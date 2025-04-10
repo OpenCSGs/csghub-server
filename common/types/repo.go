@@ -40,12 +40,15 @@ const (
 	ResDeployID   string = "hub-deploy-id"
 	ResDeployUser string = "hub-deploy-user"
 
-	ModelRepo   RepositoryType = "model"
-	DatasetRepo RepositoryType = "dataset"
-	SpaceRepo   RepositoryType = "space"
-	CodeRepo    RepositoryType = "code"
-	PromptRepo  RepositoryType = "prompt"
-	UnknownRepo RepositoryType = ""
+	RepoTypeSuffix string = "s_"
+
+	ModelRepo     RepositoryType = "model"
+	DatasetRepo   RepositoryType = "dataset"
+	SpaceRepo     RepositoryType = "space"
+	CodeRepo      RepositoryType = "code"
+	PromptRepo    RepositoryType = "prompt"
+	MCPServerRepo RepositoryType = "mcpserver"
+	UnknownRepo   RepositoryType = ""
 
 	OpenCSGSource     RepositorySource = "opencsg"
 	LocalSource       RepositorySource = "local"
