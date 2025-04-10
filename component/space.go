@@ -937,7 +937,7 @@ func (c *spaceComponentImpl) status(ctx context.Context, s *database.Space) (str
 func (c *spaceComponentImpl) Status(ctx context.Context, namespace, name string) (string, string, error) {
 	s, err := c.spaceStore.FindByPath(ctx, namespace, name)
 	if err != nil {
-		return "", SpaceStatusStopped, fmt.Errorf("can't find space by path:%w", err)
+		return "", SpaceStatusStopped, fmt.Errorf("can't find space by path status, error: %w", err)
 	}
 	return c.status(ctx, s)
 }
@@ -945,7 +945,7 @@ func (c *spaceComponentImpl) Status(ctx context.Context, namespace, name string)
 func (c *spaceComponentImpl) Logs(ctx context.Context, namespace, name string) (*deploy.MultiLogReader, error) {
 	s, err := c.spaceStore.FindByPath(ctx, namespace, name)
 	if err != nil {
-		return nil, fmt.Errorf("can't find space by path:%w", err)
+		return nil, fmt.Errorf("can't find space for logs, error: %w", err)
 	}
 	return c.deployer.Logs(ctx, types.DeployRepo{
 		SpaceID:   s.ID,
