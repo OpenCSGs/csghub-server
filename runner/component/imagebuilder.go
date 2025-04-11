@@ -526,7 +526,9 @@ func createOrUpdateConfigMap(ctx context.Context, client kubernetes.Interface, c
 }
 
 func buildImageName(orgName, spaceName, buildId string) string {
-	name := orgName + "_" + spaceName + ":" + buildId
+	// Example: opencsg_test-model:1-1678901234
+	timestamp := time.Now().Unix()
+	name := orgName + "_" + spaceName + ":" + buildId + "-" + fmt.Sprintf("%d", timestamp)
 	imageName := strings.ToLower(name)
 	return imageName
 }
