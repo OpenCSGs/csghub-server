@@ -465,6 +465,13 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 		return nil, fmt.Errorf("error creating space template proxy:%w", err)
 	}
 	createSpaceTemplateRoutes(apiGroup, authCollection, templateHandler)
+
+	// mcp server
+	mcpHandler, err := handler.NewMCPServerHandler(config)
+	if err != nil {
+		return nil, fmt.Errorf("error creating mcp server handler: %w", err)
+	}
+	CreateMCPServerRoutes(apiGroup, authCollection, mcpHandler, repoCommonHandler)
 	return r, nil
 }
 
