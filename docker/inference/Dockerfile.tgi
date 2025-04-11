@@ -1,4 +1,7 @@
-FROM ghcr.io/huggingface/text-generation-inference:2.4.0
+FROM ghcr.io/huggingface/text-generation-inference:3.2.1
+RUN curl https://bootstrap.pypa.io/get-pip.py -o get-pip.py && \
+    python get-pip.py && \
+    rm get-pip.py
 RUN pip config set global.index-url https://pypi.tuna.tsinghua.edu.cn/simple 
 RUN pip install --no-cache-dir csghub-sdk==0.4.5 huggingface-hub==0.27.0
 RUN apt-get update && apt-get install -y dumb-init && apt-get clean && rm -rf /var/lib/apt/lists/*

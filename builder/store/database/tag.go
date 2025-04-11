@@ -36,6 +36,7 @@ type TagStore interface {
 	SetLibraryTag(ctx context.Context, repoType types.RepositoryType, namespace, name string, newTag, oldTag *Tag) (err error)
 	UpsertRepoTags(ctx context.Context, repoID int64, oldTagIDs, newTagIDs []int64) (err error)
 	RemoveRepoTags(ctx context.Context, repoID int64, tagIDs []int64) (err error)
+	RemoveRepoTagsByCategory(ctx context.Context, repoID int64, category []string) (err error)
 	FindOrCreate(ctx context.Context, tag Tag) (*Tag, error)
 	FindTag(ctx context.Context, name, scope, category string) (*Tag, error)
 	FindTagByID(ctx context.Context, id int64) (*Tag, error)
@@ -355,6 +356,15 @@ func (ts *tagStoreImpl) RemoveRepoTags(ctx context.Context, repoID int64, tagIDs
 		Where("repository_id =? and tag_id in (?)", repoID, bun.In(tagIDs)).
 		Exec(ctx)
 
+	return err
+}
+
+// RemoveRepoTagsByCategory
+func (ts *tagStoreImpl) RemoveRepoTagsByCategory(ctx context.Context, repoID int64, category []string) error {
+	_, err := ts.db.Operator.Core.NewDelete().
+		Model(&RepositoryTag{}).
+		Where("repository_id =? and tag_id in (select id from tags where category in (?))", repoID, bun.In(category)).
+		Exec(ctx)
 	return err
 }
 

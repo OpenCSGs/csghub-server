@@ -7,6 +7,7 @@ import (
 	"log/slog"
 
 	"opencsg.com/csghub-server/builder/deploy"
+	"opencsg.com/csghub-server/builder/deploy/common"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/types"
 )
@@ -52,7 +53,7 @@ func (c *spaceResourceComponentImpl) Index(ctx context.Context, clusterId string
 		if !c.deployAvailable(deployType, hardware) {
 			continue
 		}
-		resourceType := c.resourceType(hardware)
+		resourceType := common.ResourceType(hardware)
 		result = append(result, types.SpaceResource{
 			ID:          r.ID,
 			Name:        r.Name,

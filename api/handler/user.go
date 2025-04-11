@@ -780,13 +780,6 @@ func (h *UserHandler) GetRunServerless(ctx *gin.Context) {
 		return
 	}
 
-	username := ctx.Param("username")
-	if currentUser != username {
-		slog.Warn("invalid user to list serverless", slog.String("currentUser", currentUser), slog.String("username", username))
-		httpbase.ServerError(ctx, errors.New("invalid user"))
-		return
-	}
-
 	per, page, err := common.GetPerAndPageFromContext(ctx)
 	if err != nil {
 		slog.Error("Bad request format of page and per", slog.Any("error", err))

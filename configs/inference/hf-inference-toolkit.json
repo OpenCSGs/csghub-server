@@ -1,0 +1,21 @@
+{
+  "engine_name": "hf-inference-toolkit",
+  "engine_version": "0.5.3",
+  "enabled": 1,
+  "container_port": 8000,
+  "model_format": "safetensors",
+  "engine_images": [
+    {
+      "compute_type": "gpu",
+      "image": "hf-inference-toolkit:0.5.3",
+      "driver_version": "12.4"
+    }
+  ],
+  "supported_archs": [
+    "FluxPipeline",
+    "LatentConsistencyModelPipeline",
+    "StableDiffusion3Pipeline",
+    "StableDiffusionPipeline",
+    "StableDiffusionXLPipeline"
+  ]
+}

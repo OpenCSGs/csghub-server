@@ -14,13 +14,14 @@ type runtimeFrameworksStoreImpl struct {
 
 type RuntimeFrameworksStore interface {
 	List(ctx context.Context, deployType int) ([]RuntimeFramework, error)
-	ListByRepoID(ctx context.Context, repoID int64, deployType int) ([]RepositoriesRuntimeFramework, error)
+	ListByArchsNameAndType(ctx context.Context, name, format string, archs []string, deployType int) ([]RuntimeFramework, error)
 	FindByID(ctx context.Context, id int64) (*RuntimeFramework, error)
-	Add(ctx context.Context, frame RuntimeFramework) error
+	Add(ctx context.Context, frame RuntimeFramework) (*RuntimeFramework, error)
 	Update(ctx context.Context, frame RuntimeFramework) (*RuntimeFramework, error)
 	Delete(ctx context.Context, frame RuntimeFramework) error
 	FindEnabledByID(ctx context.Context, id int64) (*RuntimeFramework, error)
 	FindEnabledByName(ctx context.Context, name string) (*RuntimeFramework, error)
+	FindByNameAndComputeType(ctx context.Context, engineName, driverVersion, ComputeType string) (*RuntimeFramework, error)
 	ListAll(ctx context.Context) ([]RuntimeFramework, error)
 	ListByIDs(ctx context.Context, ids []int64) ([]RuntimeFramework, error)
 }
@@ -41,8 +42,10 @@ type RuntimeFramework struct {
 	ID            int64  `bun:",pk,autoincrement" json:"id"`
 	FrameName     string `bun:",notnull" json:"frame_name"`
 	FrameVersion  string `bun:",notnull" json:"frame_version"`
-	FrameImage    string `bun:",nullzero" json:"frame_image"`
-	FrameCpuImage string `bun:",nullzero" json:"frame_cpu_image"`
+	FrameImage    string `bun:",notnull" json:"frame_image"`
+	ComputeType   string `bun:",notnull" json:"compute_type"` // cpu, gpu,npu,mlu
+	DriverVersion string `bun:"," json:"driver_version"`      //12.1
+	Description   string `bun:"," json:"description"`
 	Enabled       int64  `bun:",notnull" json:"enabled"`
 	ContainerPort int    `bun:",notnull" json:"container_port"`
 	Type          int    `bun:",notnull" json:"type"` // 0-space, 1-inference, 2-finetune
@@ -76,13 +79,13 @@ func (rf *runtimeFrameworksStoreImpl) FindByID(ctx context.Context, id int64) (*
 	return &res, err
 }
 
-func (rf *runtimeFrameworksStoreImpl) Add(ctx context.Context, frame RuntimeFramework) error {
+func (rf *runtimeFrameworksStoreImpl) Add(ctx context.Context, frame RuntimeFramework) (*RuntimeFramework, error) {
 	res, err := rf.db.Core.NewInsert().Model(&frame).Exec(ctx, &frame)
 	if err := assertAffectedOneRow(res, err); err != nil {
 		slog.Error("create runtime framework in db failed", slog.String("error", err.Error()))
-		return fmt.Errorf("create runtime framework in db failed,error:%w", err)
+		return nil, fmt.Errorf("create runtime framework in db failed,error:%w", err)
 	}
-	return nil
+	return &frame, nil
 }
 
 func (rf *runtimeFrameworksStoreImpl) Update(ctx context.Context, frame RuntimeFramework) (*RuntimeFramework, error) {
@@ -124,4 +127,30 @@ func (rf *runtimeFrameworksStoreImpl) ListByIDs(ctx context.Context, ids []int64
 		return nil, fmt.Errorf("query runtimes failed, %w", err)
 	}
 	return result, nil
+}
+
+// ListByArchsNameAndType
+func (rf *runtimeFrameworksStoreImpl) ListByArchsNameAndType(ctx context.Context, name, format string, archs []string, deployType int) ([]RuntimeFramework, error) {
+	var result []RuntimeFramework
+	var ras []RuntimeArchitecture
+	_, err := rf.db.Operator.Core.
+		NewSelect().Model(&ras).
+		Relation("RuntimeFramework", func(q *bun.SelectQuery) *bun.SelectQuery {
+			return q.Where("model_format = ?", format).Where("type = ?", deployType)
+		}).
+		Where("architecture_name in (?) or model_name=?", bun.In(archs), name).Exec(ctx, &result)
+	if err != nil {
+		return nil, fmt.Errorf("error happened while getting runtime architecture, %w", err)
+	}
+	for _, ra := range ras {
+		result = append(result, *ra.RuntimeFramework)
+	}
+	return result, nil
+}
+
+// FindByNameAndComputeType
+func (rf *runtimeFrameworksStoreImpl) FindByNameAndComputeType(ctx context.Context, frameName, driverVersion, computeType string) (*RuntimeFramework, error) {
+	var res RuntimeFramework
+	_, err := rf.db.Core.NewSelect().Model(&res).Where("LOWER(frame_name) = LOWER(?)", frameName).Where("compute_type = ?", computeType).Where("driver_version = ?", driverVersion).Exec(ctx, &res)
+	return &res, err
 }

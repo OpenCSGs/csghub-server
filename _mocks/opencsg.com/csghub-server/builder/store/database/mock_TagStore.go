@@ -1162,6 +1162,54 @@ func (_c *MockTagStore_RemoveRepoTags_Call) RunAndReturn(run func(context.Contex
 	return _c
 }
 
+// RemoveRepoTagsByCategory provides a mock function with given fields: ctx, repoID, category
+func (_m *MockTagStore) RemoveRepoTagsByCategory(ctx context.Context, repoID int64, category []string) error {
+	ret := _m.Called(ctx, repoID, category)
+
+	if len(ret) == 0 {
+		panic("no return value specified for RemoveRepoTagsByCategory")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, int64, []string) error); ok {
+		r0 = rf(ctx, repoID, category)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// MockTagStore_RemoveRepoTagsByCategory_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'RemoveRepoTagsByCategory'
+type MockTagStore_RemoveRepoTagsByCategory_Call struct {
+	*mock.Call
+}
+
+// RemoveRepoTagsByCategory is a helper method to define mock.On call
+//   - ctx context.Context
+//   - repoID int64
+//   - category []string
+func (_e *MockTagStore_Expecter) RemoveRepoTagsByCategory(ctx interface{}, repoID interface{}, category interface{}) *MockTagStore_RemoveRepoTagsByCategory_Call {
+	return &MockTagStore_RemoveRepoTagsByCategory_Call{Call: _e.mock.On("RemoveRepoTagsByCategory", ctx, repoID, category)}
+}
+
+func (_c *MockTagStore_RemoveRepoTagsByCategory_Call) Run(run func(ctx context.Context, repoID int64, category []string)) *MockTagStore_RemoveRepoTagsByCategory_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(int64), args[2].([]string))
+	})
+	return _c
+}
+
+func (_c *MockTagStore_RemoveRepoTagsByCategory_Call) Return(err error) *MockTagStore_RemoveRepoTagsByCategory_Call {
+	_c.Call.Return(err)
+	return _c
+}
+
+func (_c *MockTagStore_RemoveRepoTagsByCategory_Call) RunAndReturn(run func(context.Context, int64, []string) error) *MockTagStore_RemoveRepoTagsByCategory_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // SaveTags provides a mock function with given fields: ctx, tags
 func (_m *MockTagStore) SaveTags(ctx context.Context, tags []*database.Tag) error {
 	ret := _m.Called(ctx, tags)

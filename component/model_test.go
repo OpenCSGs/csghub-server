@@ -201,21 +201,34 @@ func TestModelComponent_Show(t *testing.T) {
 	mc.mocks.stores.ModelMock().EXPECT().FindByPath(ctx, "ns", "n").Return(&database.Model{
 		ID:           1,
 		RepositoryID: 123,
-		Repository:   &database.Repository{ID: 123, Name: "n", Path: "foo/bar"},
+		Repository:   &database.Repository{ID: 123, Name: "n", Path: "foo/bar", Tags: []database.Tag{{Name: "safetensors", Category: "framework"}}},
 	}, nil)
 	mc.mocks.components.repo.EXPECT().GetUserRepoPermission(ctx, "user", &database.Repository{
 		ID:   123,
 		Name: "n",
 		Path: "foo/bar",
+		Tags: []database.Tag{{Name: "safetensors", Category: "framework"}},
 	}).Return(
 		&types.UserRepoPermission{CanRead: true, CanAdmin: true}, nil,
 	)
 	mc.mocks.components.repo.EXPECT().GetNameSpaceInfo(ctx, "ns").Return(&types.Namespace{Path: "ns"}, nil)
 
 	mc.mocks.stores.UserLikesMock().EXPECT().IsExist(ctx, "user", int64(123)).Return(true, nil)
-	mc.mocks.stores.RepoRuntimeFrameworkMock().EXPECT().GetByRepoIDsAndType(
-		ctx, int64(123), mock.Anything,
-	).Return([]database.RepositoriesRuntimeFramework{{}}, nil)
+	mc.mocks.stores.RuntimeArchMock().EXPECT().CheckEngineByArchModelNameAndType(
+		ctx, mock.Anything, "n", "safetensors", types.InferenceType,
+	).Return(true, nil)
+	mc.mocks.stores.RuntimeArchMock().EXPECT().CheckEngineByArchModelNameAndType(
+		ctx, mock.Anything, "n", "safetensors", types.FinetuneType,
+	).Return(true, nil)
+	mc.mocks.stores.RuntimeArchMock().EXPECT().CheckEngineByArchModelNameAndType(
+		ctx, mock.Anything, "n", "safetensors", types.EvaluationType,
+	).Return(true, nil)
+	/*mc.mocks.stores.RecomMock().EXPECT().FindByRepoIDs(ctx, []int64{123}).Return([]*database.RecomRepoScore{
+		{ID: 1, RepositoryID: 123, WeightName: database.RecomWeightTotal, Score: 100},
+		{ID: 2, RepositoryID: 2, WeightName: database.RecomWeightDownloads, Score: 40},
+		{ID: 3, RepositoryID: 2, WeightName: database.RecomWeightFreshness, Score: 50},
+		{ID: 4, RepositoryID: 2, WeightName: database.RecomWeightQuality, Score: 80},
+	}, nil)*/
 
 	model, err := mc.Show(ctx, "ns", "n", "user", false)
 	require.Nil(t, err)
@@ -233,6 +246,7 @@ func TestModelComponent_Show(t *testing.T) {
 			HTTPCloneURL: "https://foo.com/s/foo/bar.git",
 			SSHCloneURL:  "test@127.0.0.1:s/foo/bar.git",
 		},
+		Tags:             []types.RepoTag{{Name: "safetensors", Category: "framework"}},
 		EnableInference:  true,
 		EnableFinetune:   true,
 		EnableEvaluation: true,
@@ -254,7 +268,7 @@ func TestModelComponent_GetServerless(t *testing.T) {
 		ctx, &database.Repository{ID: 123, Name: "n"}, "user",
 	).Return(true, nil)
 
-	deploy := &database.Deploy{ID: 1}
+	deploy := &database.Deploy{ID: 1, ImageID: "vllm:1.6"}
 	mc.mocks.stores.DeployTaskMock().EXPECT().GetServerlessDeployByRepID(ctx, int64(123)).Return(
 		deploy, nil,
 	)
@@ -471,12 +485,7 @@ func TestModelComponent_ListModelsByRuntimeFrameworkID(t *testing.T) {
 	mc := initializeTestModelComponent(ctx, t)
 
 	mc.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "user").Return(database.User{ID: 1}, nil)
-	mc.mocks.stores.RepoRuntimeFrameworkMock().EXPECT().ListByRuntimeFrameworkID(ctx, int64(123), 1).Return(
-		[]database.RepositoriesRuntimeFramework{
-			{RepoID: 1}, {RepoID: 2},
-		}, nil,
-	)
-	mc.mocks.stores.RepoMock().EXPECT().ListRepoPublicToUserByRepoIDs(ctx, types.ModelRepo, int64(1), "", "", 10, 1, []int64{1, 2}).Return([]*database.Repository{
+	mc.mocks.stores.RepoMock().EXPECT().ListRepoByDeployType(ctx, types.ModelRepo, int64(1), "", "", 1, 10, 1).Return([]*database.Repository{
 		{ID: 1, Name: "r1"},
 	}, 100, nil)
 
@@ -556,12 +565,7 @@ func TestModelComponent_ListModelsOfRuntimeFrameworks(t *testing.T) {
 	mc := initializeTestModelComponent(ctx, t)
 
 	mc.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "user").Return(database.User{ID: 1}, nil)
-	mc.mocks.stores.RepoRuntimeFrameworkMock().EXPECT().ListRepoIDsByType(ctx, 1).Return(
-		[]database.RepositoriesRuntimeFramework{
-			{RepoID: 123},
-		}, nil,
-	)
-	mc.mocks.stores.RepoMock().EXPECT().ListRepoPublicToUserByRepoIDs(ctx, types.ModelRepo, int64(1), "s", "ss", 10, 1, []int64{123}).Return([]*database.Repository{
+	mc.mocks.stores.RepoMock().EXPECT().ListRepoByDeployType(ctx, types.ModelRepo, int64(1), "s", "ss", 1, 10, 1).Return([]*database.Repository{
 		{Name: "r1", Path: "foo"},
 	}, 100, nil)
 	data, total, err := mc.ListModelsOfRuntimeFrameworks(ctx, "user", "s", "ss", 10, 1, 1)

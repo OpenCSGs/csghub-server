@@ -7,5 +7,5 @@ import (
 )
 
 func (a *Activities) RuntimeFrameworkScan(ctx context.Context, req types.RuntimeFrameworkModels) error {
-	return a.rftScanner.ScanArchitecture(ctx, req.ID, req.ScanType, req.Task, req.Models)
+	return a.rftScanner.ScanAllModels(ctx, req.ScanType)
 }

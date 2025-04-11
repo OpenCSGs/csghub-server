@@ -48,11 +48,3 @@ func (c *spaceResourceComponentImpl) deployAvailable(deployType int, hardware ty
 	}
 	return true
 }
-
-func (c *spaceResourceComponentImpl) resourceType(hardware types.HardWare) types.ResourceType {
-	resourceType := types.ResourceTypeCPU
-	if hardware.Gpu.Num != "" {
-		resourceType = types.ResourceTypeGPU
-	}
-	return resourceType
-}

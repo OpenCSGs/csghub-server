@@ -71,25 +71,3 @@ func TestModelComponent_Deploy(t *testing.T) {
 	require.Equal(t, int64(111), id)
 
 }
-
-func TestModelComponent_containerImg(t *testing.T) {
-	ctx := context.TODO()
-	mc := initializeTestModelComponent(ctx, t)
-
-	cases := []struct {
-		hd  types.HardWare
-		img string
-	}{
-		{hd: types.HardWare{}, img: "cpu"},
-		{hd: types.HardWare{Gpu: types.GPU{}}, img: "cpu"},
-		{hd: types.HardWare{Gpu: types.GPU{Num: "1"}}, img: "gpu"},
-	}
-
-	for _, c := range cases {
-		v := mc.containerImg(&database.RuntimeFramework{
-			FrameImage:    "gpu",
-			FrameCpuImage: "cpu",
-		}, c.hd)
-		require.Equal(t, c.img, v)
-	}
-}

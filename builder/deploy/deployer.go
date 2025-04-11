@@ -505,7 +505,7 @@ func (d *deployer) UpdateDeploy(ctx context.Context, dur *types.DeployUpdateReq,
 
 	if frame != nil {
 		// choose image
-		containerImg := containerImage(hardware, frame)
+		containerImg := frame.FrameImage
 		deploy.ImageID = containerImg
 		deploy.RuntimeFramework = frame.FrameName
 		deploy.ContainerPort = frame.ContainerPort
@@ -760,7 +760,7 @@ func (d *deployer) SubmitEvaluation(ctx context.Context, req types.EvaluationReq
 	env["ACCESS_TOKEN"] = req.Token
 	env["HF_ENDPOINT"] = req.DownloadEndpoint
 
-	updateEvaluationEnvHardware(env, req)
+	common.UpdateEvaluationEnvHardware(env, req.Hardware)
 
 	templates := []types.ArgoFlowTemplate{}
 	templates = append(templates, types.ArgoFlowTemplate{

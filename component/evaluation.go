@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"opencsg.com/csghub-server/builder/deploy"
+	"opencsg.com/csghub-server/builder/deploy/common"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/types"
@@ -85,8 +86,8 @@ func (c *evaluationComponentImpl) CreateEvaluation(ctx context.Context, req type
 		if err != nil {
 			return nil, fmt.Errorf("invalid hardware setting, %w", err)
 		}
-		if hardware.Gpu.Num == "" {
-			return nil, fmt.Errorf("evaluation requires GPU or NPU resources")
+		if !common.ContainsGraphicResource(hardware) {
+			return nil, fmt.Errorf("evaluation requires graphics card resources")
 		}
 		req.ClusterID = resource.ClusterID
 		req.ResourceName = resource.Name

@@ -254,6 +254,7 @@ func NewTestModelComponent(
 		deployTaskStore:           stores.DeployTask,
 		runtimeFrameworksStore:    stores.RuntimeFramework,
 		userSvcClient:             userSvcClient,
+		runtimeArchitecturesStore: stores.RuntimeArch,
 	}
 }
 
