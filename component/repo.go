@@ -27,7 +27,6 @@ import (
 	"opencsg.com/csghub-server/builder/git/membership"
 	"opencsg.com/csghub-server/builder/git/mirrorserver"
 	"opencsg.com/csghub-server/builder/rpc"
-	"opencsg.com/csghub-server/builder/store/cache"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/builder/store/s3"
 	"opencsg.com/csghub-server/common/config"
@@ -79,7 +78,6 @@ type repoComponentImpl struct {
 	lfsMetaObjectStore     database.LfsMetaObjectStore
 	recomStore             database.RecomStore
 	mq                     queue.PriorityQueue
-	syncCache              cache.Cache
 }
 
 type RepoComponent interface {
