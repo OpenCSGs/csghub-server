@@ -54,6 +54,7 @@ func NewImagebuilderComponent(ctx context.Context, config *config.Config, cluste
 		clusterPool: clusterPool,
 		db:          database.NewImageBuilderStore(),
 	}
+
 	if err := ibc.workFlowInit(ctx); err != nil {
 		slog.Error("failed to init workflow", slog.Any("error", err))
 		return nil, err
@@ -80,6 +81,7 @@ func (ibc *imagebuilderComponentImpl) Build(ctx context.Context, spaceConfig typ
 		ibc.config.Runner.ImageBuilderKanikoImage,
 		imagePath,
 		spaceConfig,
+		ibc.config.Runner.ImageBuilderKanikoArgs,
 	)
 
 	if err != nil {
@@ -88,7 +90,9 @@ func (ibc *imagebuilderComponentImpl) Build(ctx context.Context, spaceConfig typ
 	}
 
 	wft.Spec.TTLStrategy = &v1alpha1.TTLStrategy{
-		SecondsAfterSuccess: ptr.To(int32(ibc.config.Argo.JobTTL)),
+		SecondsAfterSuccess:    ptr.To(int32(ibc.config.Runner.ImageBuilderJobTTL)),
+		SecondsAfterFailure:    ptr.To(int32(ibc.config.Runner.ImageBuilderJobTTL)),
+		SecondsAfterCompletion: ptr.To(int32(ibc.config.Runner.ImageBuilderJobTTL)),
 	}
 
 	wft.Spec.ImagePullSecrets = []corev1.LocalObjectReference{
@@ -263,7 +267,7 @@ func (ibc *imagebuilderComponentImpl) workFlowInit(ctx context.Context) error {
 func (ibc *imagebuilderComponentImpl) workInformer(ctx context.Context) {
 	cluster, err := ibc.GetCluster(ctx, ibc.config.Runner.ImageBuilderClusterID)
 	if err != nil {
-		slog.Error("failed to get cluster", "error", err)
+		slog.Error("failed to get cluster for image builder", "clusterID", ibc.config.Runner.ImageBuilderClusterID, "error", err)
 		return
 	}
 	labelSelector := "workflow-scope=imagebuilder"
@@ -296,7 +300,17 @@ func (ibc *imagebuilderComponentImpl) workInformer(ctx context.Context) {
 	CreateInfomerFactory(cluster.ArgoClient, ibc.config.Runner.ImageBuilderNamespace, labelSelector, eventHandler)
 }
 
-func wfTemplateForImageBuilder(gitImg, kanikoImg, ImageDestination string, params types.SpaceBuilderConfig) (*v1alpha1.Workflow, error) {
+func wfTemplateForImageBuilder(gitImg, kanikoImg, imageDestination string, params types.SpaceBuilderConfig, kanikoArgs []string) (*v1alpha1.Workflow, error) {
+	builderArgs := []string{
+		"--context=/shared/" + params.SpaceName,
+		"--destination=" + imageDestination,
+	}
+	for _, arg := range kanikoArgs {
+		if arg == "" || strings.HasPrefix(arg, "--context") || strings.HasPrefix(arg, "--destination") {
+			continue
+		}
+		builderArgs = append(builderArgs, arg)
+	}
 	return &v1alpha1.Workflow{
 		ObjectMeta: metav1.ObjectMeta{
 			GenerateName: "imagebuilder-",
@@ -411,10 +425,7 @@ func wfTemplateForImageBuilder(gitImg, kanikoImg, ImageDestination string, param
 					Container: &corev1.Container{
 						Name:  buildContainerType,
 						Image: kanikoImg,
-						Args: []string{
-							"--context=/shared/" + params.SpaceName,
-							"--destination=" + ImageDestination,
-						},
+						Args:  builderArgs,
 						VolumeMounts: []corev1.VolumeMount{
 							{
 								Name:      "shared",
@@ -456,14 +467,14 @@ func (ibc *imagebuilderComponentImpl) updateImagebuilderWork(ctx context.Context
 	// get container status and logs
 	pod, err := cluster.Client.CoreV1().Pods(ibw.Namespace).Get(ctx, ibw.PodName, metav1.GetOptions{})
 	if err != nil {
-		slog.Error("failed to get pod %s: %w", ibw.PodName, err)
+		slog.Warn("failed to get pod", "pod", ibw.PodName, "error", err)
 	} else {
 		ibw.InitContainerStatus = getInitContainerStatus(pod, initContainerType)
 		// get logs from cluster
 		if ibw.InitContainerStatus == containerStatusTerminated {
 			logs, err := getContainerLogs(ctx, cluster, pod, initContainerType)
 			if err != nil {
-				slog.Warn("failed to get init container logs from cluster: ", "err:", err.Error())
+				slog.Warn("failed to get pod log", "pod", ibw.PodName, "error", err)
 			} else {
 				ibw.InitContainerLog = string(logs)
 			}
@@ -471,7 +482,7 @@ func (ibc *imagebuilderComponentImpl) updateImagebuilderWork(ctx context.Context
 		if ibw.WorkStatus != string(v1alpha1.WorkflowRunning) && ibw.WorkStatus != string(v1alpha1.WorkflowPending) && ibw.WorkStatus != string(v1alpha1.WorkflowUnknown) {
 			logs, err := getContainerLogs(ctx, cluster, pod, buildContainerType)
 			if err != nil {
-				slog.Warn("failed to get main container logs from cluster: ", "err:", err.Error())
+				slog.Warn("failed to get main container logs from cluster", "err:", err.Error())
 			} else {
 				ibw.MainContainerLog = string(logs)
 			}

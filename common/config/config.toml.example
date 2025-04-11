@@ -176,3 +176,11 @@ image_builder_git_image = "opencsg-registry.cn-beijing.cr.aliyuncs.com/opencsg_p
 image_builder_kaniko_image = "opencsg-registry.cn-beijing.cr.aliyuncs.com/public/kaniko-project-executor:v1.23.2"
 image_builder_job_ttl = 120
 image_builder_status_ttl = 300
+# Kaniko arguments to configure logging and registry access.
+# See official flags: https://github.com/GoogleContainerTools/kaniko?tab=readme-ov-file#additional-flags
+# --log-format=json : Output logs in JSON format for structured parsing.
+# --log-timestamp=true : Include timestamps in log entries.
+# --insecure : Allow connections to HTTP registries (non-HTTPS).
+# --skip-tls-verify : Disable TLS certificate validation for registries.
+# Uncomment the following line to enable pull images from a private registry without https
+# image_builder_kaniko_args = ["--insecure", "--skip-tls-verify"]
