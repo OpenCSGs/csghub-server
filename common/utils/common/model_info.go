@@ -158,6 +158,11 @@ func fetchSafetensorsMetadata(url string, bearerToken string) (map[string]any, e
 	// Interpret the bytes as a little-endian unsigned 64-bit integer
 	lengthOfHeader := binary.LittleEndian.Uint64(lengthBytes)
 
+	maxSize := uint64(100 * 1024)
+	if lengthOfHeader > maxSize {
+		return nil, fmt.Errorf("header size exceeds maximum allowed size: %d bytes,header length: %d", maxSize, lengthOfHeader)
+	}
+
 	// Fetch length_of_header bytes starting from the 9th byte
 	req, err = http.NewRequest("GET", url, nil)
 	if err != nil {

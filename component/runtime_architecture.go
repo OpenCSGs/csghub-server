@@ -152,10 +152,10 @@ func (c *runtimeArchitectureComponentImpl) ScanAllModels(ctx context.Context, sc
 	if ok {
 		durationUntilDeadline = time.Until(deadline)
 	}
-	err := c.cache.RunWhileLocked(ctx, "runtime_architecture_scan_lock", durationUntilDeadline, func(ctx context.Context) error {
+	err := c.cache.RunWhileLocked(ctx, "runtime_architecture_scan_lock", durationUntilDeadline, func(ctxLock context.Context) error {
 		var i int
 		for {
-			ctxBatch, cancel := context.WithTimeout(context.Background(), 1*time.Hour)
+			ctxBatch, cancel := context.WithTimeout(ctxLock, 1*time.Hour)
 			repos, err := c.repoStore.FindWithBatch(ctxBatch, 500, i, types.ModelRepo)
 			i += 1
 			if err != nil {
@@ -374,14 +374,17 @@ func (c *runtimeArchitectureComponentImpl) GetClassNameFromConfig(ctx context.Co
 func (c *runtimeArchitectureComponentImpl) GetMetadataFromGGUF(ctx context.Context, repo *database.Repository) (*types.ModelInfo, error) {
 	namespace, name := repo.NamespaceAndName()
 	files, err := getAllFiles(ctx, namespace, name, "", types.ModelRepo, repo.DefaultBranch, c.gitServer.GetTree)
-	if err != nil {
+	if err != nil || len(files) == 0 {
 		return nil, fmt.Errorf("get RepoFileTree for relation, %w", err)
 	}
 	modelInfo := &types.ModelInfo{}
+	hasGGuf := false
 	for _, file := range files {
-		if strings.Contains(file.Name, ".gguf") {
+		ext := filepath.Ext(file.Name)
+		if ext == ".gguf" {
 			if strings.Contains(file.Name, "00001-of-") || !strings.Contains(file.Name, "-of-") {
-				fs, err := c.GetGGUFContent(ctx, file.Name, repo)
+				hasGGuf = true
+				fs, err := c.GetGGUFContent(ctx, file.Path, repo)
 				if err != nil {
 					return nil, fmt.Errorf("fail to get main gguf content, %w", err)
 				}
@@ -404,6 +407,9 @@ func (c *runtimeArchitectureComponentImpl) GetMetadataFromGGUF(ctx context.Conte
 			}
 		}
 	}
+	if !hasGGuf {
+		return nil, fmt.Errorf("no gguf file found")
+	}
 	return modelInfo, nil
 }
 
@@ -423,7 +429,8 @@ func (c *runtimeArchitectureComponentImpl) GetMetadataFromSafetensors(ctx contex
 		if strings.Contains(file.Name, ModelIndexFileName) {
 			hasModelIndex = true
 		}
-		if strings.Contains(file.Name, ".safetensors") {
+		ext := filepath.Ext(file.Name)
+		if ext == ".safetensors" {
 			req := types.GetFileReq{
 				Lfs:       true,
 				Namespace: namespace,
@@ -439,37 +446,47 @@ func (c *runtimeArchitectureComponentImpl) GetMetadataFromSafetensors(ctx contex
 			fileUrls = append(fileUrls, url)
 		}
 	}
-	modelInfo, err := common.GetModelInfo(fileUrls, c.apiToken, c.config.Model.MinContextForEstimation)
-	if err != nil {
-		return nil, fmt.Errorf("fail to get model info from safetensors file, %w", err)
+	if len(fileUrls) == 0 {
+		return nil, fmt.Errorf("no safetensors file found")
 	}
+	modelInfo := &types.ModelInfo{}
 	//check files contains config.json
-	if hasConfig {
-		config, err := c.GetArchitectureFromConfig(ctx, repo)
+	if hasConfig && !hasModelIndex {
+		modelInfo, err := common.GetModelInfo(fileUrls, c.apiToken, c.config.Model.MinContextForEstimation)
 		if err != nil {
-			slog.Error("fail to get architecture from config", slog.Any("err", err))
+			slog.Error("fail to get model info from safetensors", slog.Any("err", err), slog.Any("repo", repo.Path))
+			return nil, fmt.Errorf("fail to get model info from safetensors, %w, repo: %v", err, repo.Path)
 		}
-		modelInfo.Architecture = config.Architectures[0]
+		config, err := c.GetArchitectureFromConfig(ctx, repo)
+		if err != nil || config == nil {
+			slog.Error("fail to get architecture from config", slog.Any("err", err))
+			return nil, fmt.Errorf("fail to get architecture from config, %w", err)
+		}
+		if len(config.Architectures) > 0 {
+			modelInfo.Architecture = config.Architectures[0]
+		}
 		modelInfo.ModelType = config.ModelType
 		modelInfo.NumHiddenLayers = config.NumHiddenLayers
 		modelInfo.HiddenSize = config.HiddenSize
 		modelInfo.NumAttentionHeads = config.NumAttentionHeads
+		if modelInfo.HiddenSize != 0 {
+			kvcacheSize := common.GetKvCacheSize(modelInfo.ContextSize, modelInfo.BatchSize, modelInfo.HiddenSize, modelInfo.NumHiddenLayers, modelInfo.BytesPerParam)
+			activateMemory := common.GetActivationMemory(modelInfo.BatchSize, modelInfo.ContextSize, modelInfo.NumHiddenLayers, modelInfo.HiddenSize, modelInfo.NumAttentionHeads, modelInfo.BytesPerParam)
+			modelInfo.MiniGPUMemoryGB = float32(math.Round(float64(kvcacheSize+modelInfo.ModelWeightsGB+activateMemory)*100)) / 100
+		}
+		return modelInfo, nil
 	}
 	if hasModelIndex {
 		className, err := c.GetClassNameFromConfig(ctx, repo)
 		if err != nil {
 			slog.Error("fail to get class name from model_index.json", slog.Any("err", err))
+			return nil, fmt.Errorf("fail to get class name from model_index.json, %w", err)
 		}
 		modelInfo.ClassName = className
+		return modelInfo, nil
 	}
 
-	if modelInfo.HiddenSize != 0 {
-		kvcacheSize := common.GetKvCacheSize(modelInfo.ContextSize, modelInfo.BatchSize, modelInfo.HiddenSize, modelInfo.NumHiddenLayers, modelInfo.BytesPerParam)
-		activateMemory := common.GetActivationMemory(modelInfo.BatchSize, modelInfo.ContextSize, modelInfo.NumHiddenLayers, modelInfo.HiddenSize, modelInfo.NumAttentionHeads, modelInfo.BytesPerParam)
-		modelInfo.MiniGPUMemoryGB = float32(math.Round(float64(kvcacheSize+modelInfo.ModelWeightsGB+activateMemory)*100)) / 100
-	}
-
-	return modelInfo, nil
+	return nil, fmt.Errorf("no model_index.json or config.json found, repo: %v", repo.Path)
 }
 
 func (c *runtimeArchitectureComponentImpl) getConfigContent(ctx context.Context, configFileName string, repo *database.Repository) (string, error) {
@@ -510,7 +527,7 @@ func (c *runtimeArchitectureComponentImpl) GetGGUFContent(ctx context.Context, f
 
 	f, err := gguf.ParseGGUFFileRemote(ctx, url, options...)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("fail to parse gguf file, %w, url: %v", err, url)
 	}
 	return f, nil
 }
