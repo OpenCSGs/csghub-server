@@ -6,8 +6,10 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"opencsg.com/csghub-server/builder/store/database"
+	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/types"
 	"opencsg.com/csghub-server/common/utils/common"
 )
@@ -128,14 +130,60 @@ func TestRuntimeArchComponent_GetSafetensorsContent(t *testing.T) {
 		fileList = append(fileList, fmt.Sprintf("https://hub.opencsg.com/csg/Qwen/Qwen2.5-7B-Instruct/resolve/main/model-%05d-of-00004.safetensors", i))
 	}
 	modelInfo, err := common.GetModelInfo(fileList, "", 5120)
+	require.Nil(t, err)
 	modelInfo.HiddenSize = 3584
 	modelInfo.NumHiddenLayers = 28
 	modelInfo.NumAttentionHeads = 28
 	kvcacheSize := common.GetKvCacheSize(modelInfo.ContextSize, modelInfo.BatchSize, modelInfo.HiddenSize, modelInfo.NumHiddenLayers, modelInfo.BytesPerParam)
 	activateMemory := common.GetActivationMemory(modelInfo.BatchSize, modelInfo.ContextSize, modelInfo.NumHiddenLayers, modelInfo.HiddenSize, modelInfo.NumAttentionHeads, modelInfo.BytesPerParam)
 	modelInfo.MiniGPUMemoryGB = kvcacheSize + modelInfo.ModelWeightsGB + activateMemory
-	require.Nil(t, err)
 	require.Equal(t, "BF16", modelInfo.TensorType)
 	require.Equal(t, float32(7.62), modelInfo.ParamsBillions)
 	require.Equal(t, 22, int(modelInfo.MiniGPUMemoryGB))
+}
+
+func TestGetMetadataFromSafetensors_Error(t *testing.T) {
+	ctx := context.TODO()
+	rc := initializeTestRuntimeArchComponent(ctx, t)
+	rc.config = &config.Config{}
+	rc.mocks.gitServer.EXPECT().GetTree(
+		mock.Anything, mock.Anything,
+	).Return(&types.GetRepoFileTreeResp{Files: []*types.File{{Name: "config.json", Path: "config.json"},
+		{Name: "model.safetensors", Path: "model.safetensors"}}, Cursor: ""}, nil)
+
+	//internalDownloadFile
+	rc.mocks.components.repo.EXPECT().InternalDownloadFile(
+		ctx, mock.AnythingOfType("*types.GetFileReq"),
+	).Return(nil, 0, "test", nil)
+	_, err := rc.GetMetadataFromSafetensors(ctx, &database.Repository{
+		Path:           "AIWizards/drawatoon-v1",
+		DefaultBranch:  "main",
+		Tags:           []database.Tag{{Name: "safetensors", Category: "framework"}},
+		RepositoryType: types.ModelRepo,
+	})
+	require.NotNil(t, err)
+}
+
+func TestGetMetadataFromSafetensors_className(t *testing.T) {
+	ctx := context.TODO()
+	rc := initializeTestRuntimeArchComponent(ctx, t)
+	rc.mocks.gitServer.EXPECT().GetTree(
+		mock.Anything, mock.Anything,
+	).Return(&types.GetRepoFileTreeResp{Files: []*types.File{{Name: "model_index.json", Path: "model_index.json"},
+		{Name: "model.safetensors", Path: "model.safetensors"}}, Cursor: ""}, nil)
+	//internalDownloadFile
+	rc.mocks.components.repo.EXPECT().InternalDownloadFile(
+		ctx, mock.AnythingOfType("*types.GetFileReq"),
+	).Return(nil, 0, "test", nil)
+	rc.mocks.gitServer.EXPECT().GetRepoFileRaw(
+		mock.Anything, mock.Anything,
+	).Return(`{"_class_name": "PixArtSigmaPipeline"}`, nil)
+	modelInfo, err := rc.GetMetadataFromSafetensors(ctx, &database.Repository{
+		Path:           "AIWizards/drawatoon-v1",
+		DefaultBranch:  "main",
+		Tags:           []database.Tag{{Name: "safetensors", Category: "framework"}},
+		RepositoryType: types.ModelRepo,
+	})
+	require.Nil(t, err)
+	require.NotNil(t, modelInfo)
 }
