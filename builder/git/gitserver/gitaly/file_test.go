@@ -349,6 +349,7 @@ func TestGitalyFile_UpdateRepoFile(t *testing.T) {
 		Message:   "new",
 		FilePath:  "foo",
 		Content:   "bar",
+		Username:  "user-1",
 	})
 	require.NoError(t, err)
 	repository := &gitalypb.Repository{
@@ -360,12 +361,13 @@ func TestGitalyFile_UpdateRepoFile(t *testing.T) {
 	header := &gitalypb.UserCommitFilesRequestHeader{
 		Repository: repository,
 		User: &gitalypb.User{
-			GlId: "user-1",
-			Name: []byte("n"),
+			GlId:       "user-1",
+			Name:       []byte("user-1"),
+			GlUsername: "user-1",
 		},
 		BranchName:       []byte("main"),
 		CommitMessage:    []byte("new"),
-		CommitAuthorName: []byte("n"),
+		CommitAuthorName: []byte("user-1"),
 		StartRepository:  repository,
 		StartBranchName:  []byte("main"),
 		Timestamp:        timestamppb.New(time.Now()),
@@ -430,6 +432,7 @@ func TestGitalyFile_DeleteRepoFile(t *testing.T) {
 		Message:   "new",
 		FilePath:  "foo",
 		Content:   "bar",
+		Username:  "user-1",
 	})
 	require.NoError(t, err)
 	repository := &gitalypb.Repository{
@@ -441,12 +444,13 @@ func TestGitalyFile_DeleteRepoFile(t *testing.T) {
 	header := &gitalypb.UserCommitFilesRequestHeader{
 		Repository: repository,
 		User: &gitalypb.User{
-			GlId: "user-1",
-			Name: []byte("n"),
+			GlId:       "user-1",
+			Name:       []byte("user-1"),
+			GlUsername: "user-1",
 		},
 		BranchName:       []byte("main"),
 		CommitMessage:    []byte("new"),
-		CommitAuthorName: []byte("n"),
+		CommitAuthorName: []byte("user-1"),
 		StartRepository:  repository,
 		StartBranchName:  []byte("main"),
 		Timestamp:        timestamppb.New(time.Now()),
