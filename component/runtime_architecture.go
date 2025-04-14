@@ -423,10 +423,10 @@ func (c *runtimeArchitectureComponentImpl) GetMetadataFromSafetensors(ctx contex
 	var hasConfig bool
 	var hasModelIndex bool
 	for _, file := range files {
-		if strings.Contains(file.Name, ConfigFileName) {
+		if file.Path == ConfigFileName {
 			hasConfig = true
 		}
-		if strings.Contains(file.Name, ModelIndexFileName) {
+		if file.Path == ModelIndexFileName {
 			hasModelIndex = true
 		}
 		ext := filepath.Ext(file.Name)
@@ -451,7 +451,7 @@ func (c *runtimeArchitectureComponentImpl) GetMetadataFromSafetensors(ctx contex
 	}
 	modelInfo := &types.ModelInfo{}
 	//check files contains config.json
-	if hasConfig && !hasModelIndex {
+	if hasConfig {
 		modelInfo, err := common.GetModelInfo(fileUrls, c.apiToken, c.config.Model.MinContextForEstimation)
 		if err != nil {
 			slog.Error("fail to get model info from safetensors", slog.Any("err", err), slog.Any("repo", repo.Path))
