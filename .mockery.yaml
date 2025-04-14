@@ -36,6 +36,7 @@ packages:
       MultiSyncComponent:
       ModelTreeComponent:
       SpaceTemplateComponent:
+      MCPServerComponent:
   opencsg.com/csghub-server/component/callback:
     config:
     interfaces:

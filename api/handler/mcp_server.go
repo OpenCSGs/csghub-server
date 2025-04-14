@@ -78,10 +78,7 @@ func (h *MCPServerHandler) Create(ctx *gin.Context) {
 		httpbase.ServerError(ctx, err)
 		return
 	}
-	respData := gin.H{
-		"data": mcpServer,
-	}
-	ctx.JSON(http.StatusOK, respData)
+	httpbase.OK(ctx, mcpServer)
 }
 
 // DeleteMCPServer    godoc
@@ -160,16 +157,16 @@ func (h *MCPServerHandler) Update(ctx *gin.Context) {
 		return
 	}
 
+	req.Username = currentUser
+	req.Namespace = namespace
+	req.Name = name
+
 	_, err = h.sensitive.CheckRequestV2(ctx.Request.Context(), req)
 	if err != nil {
 		slog.Error("failed to check sensitive request for update mcp server", slog.Any("error", err))
 		httpbase.BadRequest(ctx, fmt.Errorf("sensitive check failed: %w", err).Error())
 		return
 	}
-
-	req.Username = currentUser
-	req.Namespace = namespace
-	req.Name = name
 
 	res, err := h.mcpComp.Update(ctx.Request.Context(), req)
 	if err != nil {
@@ -283,7 +280,7 @@ func (h *MCPServerHandler) Index(ctx *gin.Context) {
 		"data":  mcps,
 		"total": total,
 	}
-	ctx.JSON(http.StatusOK, respData)
+	httpbase.OK(ctx, respData)
 }
 
 // GetVisiableMCPServersTools godoc
@@ -330,5 +327,5 @@ func (h *MCPServerHandler) Properties(ctx *gin.Context) {
 		"data":  properties,
 		"total": total,
 	}
-	ctx.JSON(http.StatusOK, respData)
+	httpbase.OK(ctx, respData)
 }

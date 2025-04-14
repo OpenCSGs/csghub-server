@@ -203,13 +203,12 @@ func (m *mcpServerComponentImpl) Delete(ctx context.Context, req *types.UpdateMC
 }
 
 func (m *mcpServerComponentImpl) Update(ctx context.Context, req *types.UpdateMCPServerReq) (*types.MCPServer, error) {
-	req.RepoType = types.MCPServerRepo
-	dbRepo, err := m.repoComponent.UpdateRepo(ctx, req.UpdateRepoReq)
+	mcpServer, err := m.mcpServerStore.ByPath(ctx, req.Namespace, req.Name)
 	if err != nil {
-		return nil, fmt.Errorf("failed to update mcp server repo %s/%s, error: %w", req.Namespace, req.Name, err)
+		return nil, fmt.Errorf("failed to find mcp server %s/%s, error: %w", req.Namespace, req.Name, err)
 	}
 
-	permission, err := m.repoComponent.GetUserRepoPermission(ctx, req.Username, dbRepo)
+	permission, err := m.repoComponent.GetUserRepoPermission(ctx, req.Username, mcpServer.Repository)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get user %s permission for repo %s/%s, error: %w", req.Namespace, req.Namespace, req.Name, err)
 	}
@@ -217,9 +216,10 @@ func (m *mcpServerComponentImpl) Update(ctx context.Context, req *types.UpdateMC
 		return nil, ErrForbidden
 	}
 
-	mcpServer, err := m.mcpServerStore.ByRepoID(ctx, dbRepo.ID)
+	req.RepoType = types.MCPServerRepo
+	dbRepo, err := m.repoComponent.UpdateRepo(ctx, req.UpdateRepoReq)
 	if err != nil {
-		return nil, fmt.Errorf("failed to find mcp server repo by repo id %d, error: %w", dbRepo.ID, err)
+		return nil, fmt.Errorf("failed to update mcp server repo %s/%s, error: %w", req.Namespace, req.Name, err)
 	}
 
 	if req.Configuration != nil {

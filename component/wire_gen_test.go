@@ -1682,6 +1682,58 @@ func initializeTestSpaceTemplateComponent(ctx context.Context, t interface {
 	return componentTestSpaceTemplateWithMocks
 }
 
+func initializeTestMCPServerComponent(ctx context.Context, t interface {
+	Cleanup(func())
+	mock.TestingT
+}) *testMCPServerWithMocks {
+	config := ProvideTestConfig()
+	mockStores := tests.NewMockStores(t)
+	mockUserSvcClient := rpc.NewMockUserSvcClient(t)
+	mockRepoComponent := component.NewMockRepoComponent(t)
+	mockGitServer := gitserver.NewMockGitServer(t)
+	componentMcpServerComponentImpl := NewTestMCPServerComponent(config, mockStores, mockUserSvcClient, mockRepoComponent, mockGitServer)
+	mockAccountingComponent := component.NewMockAccountingComponent(t)
+	mockTagComponent := component.NewMockTagComponent(t)
+	mockSpaceComponent := component.NewMockSpaceComponent(t)
+	mockRuntimeArchitectureComponent := component.NewMockRuntimeArchitectureComponent(t)
+	mockSensitiveComponent := component.NewMockSensitiveComponent(t)
+	componentMockedComponents := &mockedComponents{
+		accounting:          mockAccountingComponent,
+		repo:                mockRepoComponent,
+		tag:                 mockTagComponent,
+		space:               mockSpaceComponent,
+		runtimeArchitecture: mockRuntimeArchitectureComponent,
+		sensitive:           mockSensitiveComponent,
+	}
+	mockClient := s3.NewMockClient(t)
+	mockMirrorServer := mirrorserver.NewMockMirrorServer(t)
+	mockPriorityQueue := queue.NewMockPriorityQueue(t)
+	mockDeployer := deploy.NewMockDeployer(t)
+	mockAccountingClient := accounting.NewMockAccountingClient(t)
+	mockReader := parquet.NewMockReader(t)
+	mockModerationSvcClient := rpc.NewMockModerationSvcClient(t)
+	mockDataviewerClient := dataviewer.NewMockDataviewerClient(t)
+	mocks := &Mocks{
+		stores:           mockStores,
+		components:       componentMockedComponents,
+		gitServer:        mockGitServer,
+		userSvcClient:    mockUserSvcClient,
+		s3Client:         mockClient,
+		mirrorServer:     mockMirrorServer,
+		mirrorQueue:      mockPriorityQueue,
+		deployer:         mockDeployer,
+		accountingClient: mockAccountingClient,
+		preader:          mockReader,
+		moderationClient: mockModerationSvcClient,
+		dataviewerClient: mockDataviewerClient,
+	}
+	componentTestMCPServerWithMocks := &testMCPServerWithMocks{
+		mcpServerComponentImpl: componentMcpServerComponentImpl,
+		mocks:                  mocks,
+	}
+	return componentTestMCPServerWithMocks
+}
+
 // wire.go:
 
 type testRepoWithMocks struct {
@@ -1841,5 +1893,10 @@ type testEventWithMocks struct {
 
 type testSpaceTemplateWithMocks struct {
 	*spaceTemplateComponentImpl
+	mocks *Mocks
+}
+
+type testMCPServerWithMocks struct {
+	*mcpServerComponentImpl
 	mocks *Mocks
 }
