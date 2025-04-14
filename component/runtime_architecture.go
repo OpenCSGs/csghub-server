@@ -224,6 +224,7 @@ func (c *runtimeArchitectureComponentImpl) UpdateModelMetadata(ctx context.Conte
 	if err != nil {
 		return nil, fmt.Errorf("fail to update model metadata in db, %w", err)
 	}
+	slog.Info("updated model metadata successfully", slog.Any("repo path", repo.Path), slog.Any("model info", metadata))
 	return modelInfo, nil
 }
 
@@ -507,9 +508,6 @@ func (c *runtimeArchitectureComponentImpl) getConfigContent(ctx context.Context,
 // get gguf content
 func (c *runtimeArchitectureComponentImpl) GetGGUFContent(ctx context.Context, filename string, repo *database.Repository) (*gguf.GGUFFile, error) {
 	var options []gguf.GGUFReadOption
-	if c.apiToken != "" {
-		options = append(options, gguf.UseBearerAuth(c.apiToken))
-	}
 	options = append(options, gguf.SkipRangeDownloadDetection(), gguf.SkipTLSVerification())
 	namespace, name := repo.NamespaceAndName()
 	req := types.GetFileReq{
