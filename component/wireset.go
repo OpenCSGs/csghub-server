@@ -54,6 +54,8 @@ var MockedComponentSet = wire.NewSet(
 	wire.Bind(new(SensitiveComponent), new(*mock_component.MockSensitiveComponent)),
 	mock_component.NewMockSpaceTemplateComponent,
 	wire.Bind(new(SpaceTemplateComponent), new(*mock_component.MockSpaceTemplateComponent)),
+	mock_component.NewMockMCPServerComponent,
+	wire.Bind(new(MCPServerComponent), new(*mock_component.MockMCPServerComponent)),
 )
 
 var MockedGitServerSet = wire.NewSet(
@@ -577,3 +579,18 @@ func NewTestSpaceTemplateComponent(config *config.Config, stores *tests.MockStor
 }
 
 var SpaceTemplateComponentSet = wire.NewSet(NewTestSpaceTemplateComponent)
+
+func NewTestMCPServerComponent(config *config.Config, stores *tests.MockStores, rpcUser rpc.UserSvcClient, repoComponent RepoComponent, gitServer gitserver.GitServer) *mcpServerComponentImpl {
+	return &mcpServerComponentImpl{
+		config:         config,
+		repoComponent:  repoComponent,
+		repoStore:      stores.Repo,
+		gitServer:      gitServer,
+		userSvcClient:  rpcUser,
+		mcpServerStore: stores.MCPServerStore,
+		userLikesStore: stores.UserLikes,
+		recomStore:     stores.Recom,
+	}
+}
+
+var MCPServerComponentSet = wire.NewSet(NewTestMCPServerComponent)
