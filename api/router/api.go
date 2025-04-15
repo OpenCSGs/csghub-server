@@ -294,14 +294,12 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 	apiGroup.POST("/callback/git", callbackCtrl.Handle)
 	apiGroup.GET("/callback/casdoor", userProxyHandler.Proxy)
 	// Sensive check
-	if config.SensitiveCheck.Enable {
-		sensitiveCtrl, err := handler.NewSensitiveHandler(config)
-		if err != nil {
-			return nil, fmt.Errorf("error creating sensitive handler:%w", err)
-		}
-		apiGroup.POST("/sensitive/text", sensitiveCtrl.Text)
-		apiGroup.POST("/sensitive/image", sensitiveCtrl.Image)
+	sensitiveCtrl, err := handler.NewSensitiveHandler(config)
+	if err != nil {
+		return nil, fmt.Errorf("error creating sensitive handler:%w", err)
 	}
+	apiGroup.POST("/sensitive/text", sensitiveCtrl.Text)
+	apiGroup.POST("/sensitive/image", sensitiveCtrl.Image)
 
 	// MirrorSource
 	msHandler, err := handler.NewMirrorSourceHandler(config)
