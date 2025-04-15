@@ -125,6 +125,28 @@ func TestTagStore_AllTags(t *testing.T) {
 	require.Empty(t, err)
 	require.Equal(t, 2, len(tags))
 
+	filterSearch := &types.TagFilter{
+		Scopes:     []types.TagScope{types.ModelTagScope, types.DatasetTagScope, types.CodeTagScope, types.PromptTagScope, types.SpaceTagScope},
+		Categories: []string{"task"},
+		BuiltIn:    &builtIn,
+		Search:     "search",
+	}
+
+	tags, err = ts.AllTags(ctx, filterSearch)
+	require.Empty(t, err)
+	require.Equal(t, 1, len(tags))
+
+	filterSearchNoResult := &types.TagFilter{
+		Scopes:     []types.TagScope{types.ModelTagScope, types.DatasetTagScope, types.CodeTagScope, types.PromptTagScope, types.SpaceTagScope},
+		Categories: []string{"task"},
+		BuiltIn:    &builtIn,
+		Search:     "noResult",
+	}
+
+	tags, err = ts.AllTags(ctx, filterSearchNoResult)
+	require.Empty(t, err)
+	require.Equal(t, 0, len(tags))
+
 	modelTags, err := ts.AllModelTags(ctx)
 	require.Empty(t, err)
 	require.Equal(t, 1, len(modelTags))
