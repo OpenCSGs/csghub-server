@@ -33,7 +33,7 @@ func GetModelInfo(fileList []string, token string, minContext int) (*types.Model
 	var modelSize int64
 	var bytesPerParam int
 	for _, file := range fileList {
-		header, err := fetchSafetensorsMetadata(file, token)
+		header, err := fetchSafetensorsMetadata(file)
 		if err != nil {
 			return nil, fmt.Errorf("failed to fetch metadata: %v", err)
 		}
@@ -122,20 +122,20 @@ func calculateTensorParams(shape []int) int64 {
 }
 
 // fetchSafetensorsMetadata fetches the metadata header from a safetensors file
-func fetchSafetensorsMetadata(url string, bearerToken string) (map[string]any, error) {
+func fetchSafetensorsMetadata(url string) (map[string]any, error) {
 	// Create a custom http.Transport that skips TLS verification
 	tr := &http.Transport{
 		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
 	}
 	client := &http.Client{Transport: tr}
+	if strings.HasPrefix(url, "http://") {
+		client = &http.Client{}
+	}
 
 	// Fetch the first 8 bytes of the file
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
 		return nil, err
-	}
-	if bearerToken != "" {
-		req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", bearerToken))
 	}
 	req.Header.Add("Range", "bytes=0-7")
 
@@ -167,9 +167,6 @@ func fetchSafetensorsMetadata(url string, bearerToken string) (map[string]any, e
 	req, err = http.NewRequest("GET", url, nil)
 	if err != nil {
 		return nil, err
-	}
-	if bearerToken != "" {
-		req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", bearerToken))
 	}
 	req.Header.Add("Range", fmt.Sprintf("bytes=8-%d", 7+lengthOfHeader))
 
