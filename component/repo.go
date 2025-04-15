@@ -1631,6 +1631,8 @@ func getTagScopeByRepoType(repoType types.RepositoryType) types.TagScope {
 		return types.SpaceTagScope
 	case types.PromptRepo:
 		return types.PromptTagScope
+	case types.MCPServerRepo:
+		return types.MCPTagScope
 	default:
 		panic("convert repo type to tag scope failed, unknown repo type:" + repoType)
 	}

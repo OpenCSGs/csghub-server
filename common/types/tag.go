@@ -53,6 +53,7 @@ const (
 	CodeTagScope    TagScope = "code"
 	SpaceTagScope   TagScope = "space"
 	PromptTagScope  TagScope = "prompt"
+	MCPTagScope     TagScope = "mcp"
 )
 
 type TagFilter struct {
