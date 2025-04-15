@@ -97,6 +97,10 @@ func (ts *tagStoreImpl) AllTags(ctx context.Context, filter *types.TagFilter) ([
 		if filter.BuiltIn != nil {
 			q = q.Where("built_in = ?", *filter.BuiltIn)
 		}
+		if filter.Search != "" {
+			searchName := "%" + filter.Search + "%"
+			q = q.Where("name like ? OR show_name like ?", searchName, searchName)
+		}
 	}
 
 	err := q.Scan(ctx, &tags)
