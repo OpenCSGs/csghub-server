@@ -341,6 +341,13 @@ func (c *repoComponentImpl) UpdateRepo(ctx context.Context, req types.UpdateRepo
 	}
 
 	if req.Private != nil {
+		// try to public a repo
+		if !*req.Private {
+			allow, reason := c.allowPublic(repo)
+			if !allow {
+				return nil, ErrForbiddenMsg(reason)
+			}
+		}
 		repo.Private = *req.Private
 	}
 	if req.Nickname != nil {
