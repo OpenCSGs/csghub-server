@@ -33,7 +33,7 @@ var startRunnerCmd = &cobra.Command{
 		if err != nil {
 			return fmt.Errorf("fail to initialize message queue, %w", err)
 		}
-		s, err := router.NewHttpServer(config)
+		s, err := router.NewHttpServer(cmd.Context(), config)
 		if err != nil {
 			return err
 		}

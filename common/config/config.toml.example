@@ -169,3 +169,10 @@ hosts = ["opencsg.com", "sync.opencsg.com"]
 [instrumentation]
 otlp_endpoint = "http://localhost:4317"
 otlp_logging = false
+
+[runner]
+image_builder_namespace = "imagebuilder-stg"
+image_builder_git_image = "opencsg-registry.cn-beijing.cr.aliyuncs.com/opencsg_public/alpine/git:2.36.2"
+image_builder_kaniko_image = "opencsg-registry.cn-beijing.cr.aliyuncs.com/public/kaniko-project-executor:v1.23.2"
+image_builder_job_ttl = 120
+image_builder_status_ttl = 300

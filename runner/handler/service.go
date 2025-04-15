@@ -1,23 +1,20 @@
 package handler
 
 import (
-	"context"
 	"database/sql"
 	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
 	"strings"
-	"time"
 
 	"github.com/gin-gonic/gin"
-	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"opencsg.com/csghub-server/builder/deploy/cluster"
 	"opencsg.com/csghub-server/builder/deploy/common"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/types"
+	rcommon "opencsg.com/csghub-server/runner/common"
 	"opencsg.com/csghub-server/runner/component"
 )
 
@@ -186,17 +183,12 @@ func (s *K8sHandler) ServiceLogsByPod(c *gin.Context) {
 }
 
 func (s *K8sHandler) GetLogsByPod(c *gin.Context, cluster cluster.Cluster, podName string, srvName string) {
-
-	logs := cluster.Client.CoreV1().Pods(s.k8sNameSpace).GetLogs(podName, &corev1.PodLogOptions{
-		Container: "user-container",
-		Follow:    true,
-	})
-	stream, err := logs.Stream(context.Background())
+	ch, message, err := rcommon.GetPodLogStream(c, &cluster, podName, s.k8sNameSpace, "user-container")
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to open stream"})
 		return
 	}
-	defer stream.Close()
+	defer close(ch)
 
 	// c.Header("Content-Type", "text/event-stream")
 	c.Header("Content-Type", "text/plain")
@@ -204,56 +196,25 @@ func (s *K8sHandler) GetLogsByPod(c *gin.Context, cluster cluster.Cluster, podNa
 	c.Header("Connection", "keep-alive")
 	c.Header("Transfer-Encoding", "chunked")
 	c.Writer.WriteHeader(http.StatusOK)
-	buf := make([]byte, 32*1024)
 
-	pod, err := cluster.Client.CoreV1().Pods(s.k8sNameSpace).Get(context.Background(), podName, metav1.GetOptions{})
-	if err != nil {
-		slog.Error("fail to get pod ", slog.Any("error", err), slog.String("pod name", podName))
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+	if message != "" {
+		_, err = c.Writer.Write([]byte(message))
+		if err != nil {
+			slog.Error("write data failed", "error", err)
+		}
+		c.Writer.Flush()
+		c.JSON(http.StatusBadRequest, gin.H{"error": message})
 		return
 	}
 
-	if pod.Status.Phase == "Pending" {
-		for _, condition := range pod.Status.Conditions {
-			if condition.Type == "PodScheduled" && condition.Status == "False" {
-				message := fmt.Sprintf("Pod is pending due to reason: %s, message: %s", condition.Reason, condition.Message)
-				_, err = c.Writer.Write([]byte(message))
-				if err != nil {
-					slog.Error("write data failed", "error", err)
-				}
-				c.Writer.Flush()
-				c.JSON(http.StatusBadRequest, gin.H{"error": message})
-				return
-			}
+	for log := range ch {
+		_, err := c.Writer.Write(log)
+		if err != nil {
+			slog.Error("write data failed", "error", err)
 		}
+		c.Writer.Flush()
 	}
 
-	for {
-		select {
-		case <-c.Request.Context().Done():
-			slog.Info("logs request context done", slog.Any("error", c.Request.Context().Err()))
-			return
-		default:
-			n, err := stream.Read(buf)
-			if err != nil {
-				slog.Error("read pod logs failed", slog.Any("error", err), slog.String("srv_name", srvName))
-				break
-			}
-			if n == 0 {
-				time.Sleep(5 * time.Second)
-			}
-
-			if n > 0 {
-				_, err = c.Writer.Write(buf[:n])
-				if err != nil {
-					slog.Error("write data failed", "error", err)
-				}
-				c.Writer.Flush()
-				slog.Info("send pod logs", slog.String("srv_name", srvName), slog.String("srv_name", srvName), slog.Int("len", n))
-			}
-		}
-
-	}
 }
 
 func (s *K8sHandler) ServiceStatusAll(c *gin.Context) {
