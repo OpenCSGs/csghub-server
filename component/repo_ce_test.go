@@ -23,7 +23,6 @@ func TestRepoComponent_DeployUpdate(t *testing.T) {
 
 	req := &types.DeployUpdateReq{
 		ResourceID: tea.Int64(111),
-		ClusterID:  tea.String("cluster"),
 	}
 
 	deploy := &database.Deploy{
@@ -31,32 +30,28 @@ func TestRepoComponent_DeployUpdate(t *testing.T) {
 		SpaceID:          2,
 		ModelID:          3,
 		SvcName:          "svc",
-		ClusterID:        "cluster",
 		RuntimeFramework: "fm",
 	}
-	repo.mocks.stores.DeployTaskMock().EXPECT().GetDeployByID(ctx, int64(1)).Return(deploy, nil)
-	repo.mocks.stores.SpaceResourceMock().EXPECT().FindByID(ctx, int64(111)).Return(&database.SpaceResource{
-		ID:        111,
-		ClusterID: "cluster",
-		Resources: `{ "gpu": { "type": "A10", "num": "1", "resource_name": "nvidia.com/gpu", "labels": { "aliyun.accelerator/nvidia_name": "NVIDIA-A10" } }, "cpu": { "type": "Intel", "num": "12" },  "memory": "46Gi" }`,
-	}, nil)
 
-	repo.mocks.deployer.EXPECT().CheckResourceAvailable(ctx, "cluster", int64(0), mock.Anything).Return(true, nil)
+	repo.mocks.stores.DeployTaskMock().EXPECT().GetDeployByID(ctx, int64(1)).Return(deploy, nil)
+
+	repo.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "user").Return(database.User{
+		Username: "user",
+	}, nil)
 
 	repo.mocks.stores.RuntimeFrameworkMock().EXPECT().FindEnabledByName(ctx, "fm").Return(&database.RuntimeFramework{
-		ID: 999,
+		ID: int64(999),
 	}, nil)
-	repo.mocks.stores.ClusterInfoMock().EXPECT().ByClusterID(ctx, "cluster").Return(database.ClusterInfo{}, nil)
 
 	repo.mocks.deployer.EXPECT().Exist(ctx, types.DeployRepo{
 		DeployID:  1,
 		Namespace: "ns",
 		Name:      "n",
 		SvcName:   "svc",
-		ClusterID: "cluster",
 		SpaceID:   2,
 		ModelID:   3,
 	}).Return(false, nil)
+
 	repo.mocks.deployer.EXPECT().UpdateDeploy(ctx, req, deploy).Return(nil)
 
 	err := repo.DeployUpdate(ctx, types.DeployActReq{
@@ -85,14 +80,8 @@ func TestRepoComponent_DeployStart(t *testing.T) {
 		RuntimeFramework: "fm",
 		SKU:              "111",
 	}
+
 	repo.mocks.stores.DeployTaskMock().EXPECT().GetDeployByID(ctx, int64(1)).Return(deploy, nil)
-
-	repo.mocks.stores.SpaceResourceMock().EXPECT().FindByID(ctx, int64(111)).Return(&database.SpaceResource{
-		ID:        111,
-		Resources: `{ "gpu": { "type": "A10", "num": "1", "resource_name": "nvidia.com/gpu", "labels": { "aliyun.accelerator/nvidia_name": "NVIDIA-A10" } }, "cpu": { "type": "Intel", "num": "12" },  "memory": "46Gi" }`,
-	}, nil)
-
-	repo.mocks.deployer.EXPECT().CheckResourceAvailable(ctx, "cluster", int64(0), mock.Anything).Return(true, nil)
 
 	repo.mocks.deployer.EXPECT().Exist(ctx, types.DeployRepo{
 		DeployID:  1,
