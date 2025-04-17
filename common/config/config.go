@@ -262,6 +262,8 @@ type Config struct {
 	}
 
 	Git struct {
+		// Timeout time(seconds) for git operations
+		OperationTimeout      int  `env:"STARHUB_SERVER_GIT_OPERATION_TIMEOUT, default=10"`
 		SkipLfsFileValidation bool `env:"STARHUB_SERVER_SKIP_LFS_FILE_VALIDATION, default=false"`
 	}
 
