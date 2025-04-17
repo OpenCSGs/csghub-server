@@ -1942,16 +1942,18 @@ func (h *RepoHandler) DeployUpdate(ctx *gin.Context) {
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
-	allow, err := h.c.AllowAdminAccess(ctx.Request.Context(), types.ModelRepo, namespace, name, currentUser)
+
+	allow, err := h.c.AllowReadAccess(ctx.Request.Context(), types.ModelRepo, namespace, name, currentUser)
 	if err != nil {
 		slog.Error("failed to check user permission", "error", err, slog.Any("currentUser", currentUser), slog.Any("namespace", name), slog.Any("name", name))
 		httpbase.ServerError(ctx, errors.New("failed to check user permission"))
 		return
 	}
+
 	if !allow {
 		slog.Warn("user not allowed to update deploy", slog.String("namespace", namespace),
 			slog.String("name", name), slog.Any("username", currentUser))
-		httpbase.ForbiddenError(ctx, errors.New("user not allowed to update deploy"))
+		httpbase.ForbiddenError(ctx, errors.New("user is not authorized to read this repository for update deploy"))
 		return
 	}
 

@@ -960,10 +960,10 @@ func TestRepoHandler_DeployUpdate(t *testing.T) {
 
 		tester.WithKV("repo_type", types.ModelRepo)
 		tester.WithParam("id", "1")
-		tester.mocks.repo.EXPECT().AllowAdminAccess(tester.Ctx(), types.ModelRepo, "u", "r", "u").Return(false, nil)
+		tester.mocks.repo.EXPECT().AllowReadAccess(tester.Ctx(), types.ModelRepo, "u", "r", "u").Return(false, nil)
 		tester.Execute()
 		tester.ResponseEq(
-			t, 403, "user not allowed to update deploy", nil,
+			t, 403, "user is not authorized to read this repository for update deploy", nil,
 		)
 	})
 
@@ -976,7 +976,7 @@ func TestRepoHandler_DeployUpdate(t *testing.T) {
 
 		tester.WithKV("repo_type", types.ModelRepo)
 		tester.WithParam("id", "1")
-		tester.mocks.repo.EXPECT().AllowAdminAccess(tester.Ctx(), types.ModelRepo, "u", "r", "u").Return(true, nil)
+		tester.mocks.repo.EXPECT().AllowReadAccess(tester.Ctx(), types.ModelRepo, "u", "r", "u").Return(true, nil)
 		tester.WithBody(t, &types.DeployUpdateReq{
 			MinReplica: tea.Int(1),
 			MaxReplica: tea.Int(5),

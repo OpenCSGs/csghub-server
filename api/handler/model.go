@@ -602,16 +602,18 @@ func (h *ModelHandler) DeployDedicated(ctx *gin.Context) {
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
+
 	allow, err := h.repo.AllowReadAccess(ctx.Request.Context(), types.ModelRepo, namespace, name, currentUser)
 	if err != nil {
 		slog.Error("failed to check user permission", "error", err)
 		httpbase.ServerError(ctx, errors.New("failed to check user permission"))
 		return
 	}
+
 	if !allow {
-		slog.Info("user not allowed to run model", slog.String("namespace", namespace),
+		slog.Info("user do not allowed to create deploy", slog.String("namespace", namespace),
 			slog.String("name", name), slog.Any("username", currentUser))
-		httpbase.ForbiddenError(ctx, errors.New("user not allowed to run model"))
+		httpbase.ForbiddenError(ctx, errors.New("user is not authorized to read this repository for create deploy"))
 		return
 	}
 
