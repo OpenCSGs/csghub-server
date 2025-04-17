@@ -2,6 +2,7 @@ package gitaly
 
 import (
 	"context"
+	"time"
 
 	log "github.com/sirupsen/logrus"
 	gitalyauth "gitlab.com/gitlab-org/gitaly/v16/auth"
@@ -27,6 +28,7 @@ type Client struct {
 	operationClient     gitalypb.OperationServiceClient
 	smartHttpClient     gitalypb.SmartHTTPServiceClient
 	remoteClient        gitalypb.RemoteServiceClient
+	timeoutTime         time.Duration
 }
 
 func NewClient(config *config.Config) (*Client, error) {
@@ -54,6 +56,7 @@ func NewClient(config *config.Config) (*Client, error) {
 	if connErr != nil {
 		return nil, connErr
 	}
+	timeoutTime := time.Duration(config.Git.OperationTimeout) * time.Second
 
 	return &Client{
 		config:              config,
@@ -66,5 +69,6 @@ func NewClient(config *config.Config) (*Client, error) {
 		operationClient:     operationClient,
 		smartHttpClient:     smartHttpClient,
 		remoteClient:        remoteClient,
+		timeoutTime:         timeoutTime,
 	}, nil
 }

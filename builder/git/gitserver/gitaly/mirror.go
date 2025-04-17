@@ -17,7 +17,7 @@ func (c *Client) CreateMirrorRepo(ctx context.Context, req gitserver.CreateMirro
 		err            error
 	)
 	repoType := fmt.Sprintf("%ss", string(req.RepoType))
-	ctx, cancel := context.WithTimeout(ctx, timeoutTime)
+	ctx, cancel := context.WithTimeout(ctx, c.timeoutTime)
 	defer cancel()
 
 	if req.MirrorToken == "" {
@@ -61,7 +61,7 @@ func (c *Client) CreateMirrorRepo(ctx context.Context, req gitserver.CreateMirro
 func (c *Client) CreateMirrorForExistsRepo(ctx context.Context, req gitserver.CreateMirrorRepoReq) error {
 	var authorHeader string
 	repoType := fmt.Sprintf("%ss", string(req.RepoType))
-	ctx, cancel := context.WithTimeout(ctx, timeoutTime)
+	ctx, cancel := context.WithTimeout(ctx, c.timeoutTime)
 	defer cancel()
 
 	fetchRemoteReq := &gitalypb.FetchRemoteRequest{

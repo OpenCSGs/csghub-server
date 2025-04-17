@@ -9,7 +9,6 @@ import (
 	"io"
 	"os"
 	"strings"
-	"time"
 
 	log "github.com/sirupsen/logrus"
 	gitalyauth "gitlab.com/gitlab-org/gitaly/v16/auth"
@@ -23,11 +22,9 @@ import (
 	"opencsg.com/csghub-server/builder/git/gitserver"
 )
 
-const timeoutTime = 10 * time.Second
-
 func (c *Client) CreateRepo(ctx context.Context, req gitserver.CreateRepoReq) (*gitserver.CreateRepoResp, error) {
 	repoType := fmt.Sprintf("%ss", string(req.RepoType))
-	ctx, cancel := context.WithTimeout(ctx, timeoutTime)
+	ctx, cancel := context.WithTimeout(ctx, c.timeoutTime)
 	defer cancel()
 
 	gitalyReq := &gitalypb.CreateRepositoryRequest{
@@ -63,7 +60,7 @@ func (c *Client) UpdateRepo(ctx context.Context, req gitserver.UpdateRepoReq) (*
 
 func (c *Client) DeleteRepo(ctx context.Context, req gitserver.DeleteRepoReq) error {
 	repoType := fmt.Sprintf("%ss", string(req.RepoType))
-	ctx, cancel := context.WithTimeout(ctx, timeoutTime)
+	ctx, cancel := context.WithTimeout(ctx, c.timeoutTime)
 	defer cancel()
 	gitalyReq := &gitalypb.RemoveRepositoryRequest{
 		Repository: &gitalypb.Repository{
@@ -81,7 +78,7 @@ func (c *Client) DeleteRepo(ctx context.Context, req gitserver.DeleteRepoReq) er
 
 func (c *Client) GetRepo(ctx context.Context, req gitserver.GetRepoReq) (*gitserver.CreateRepoResp, error) {
 	repoType := fmt.Sprintf("%ss", string(req.RepoType))
-	ctx, cancel := context.WithTimeout(ctx, timeoutTime)
+	ctx, cancel := context.WithTimeout(ctx, c.timeoutTime)
 	defer cancel()
 	gitalyReq := &gitalypb.FindDefaultBranchNameRequest{
 		Repository: &gitalypb.Repository{

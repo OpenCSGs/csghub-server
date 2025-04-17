@@ -14,7 +14,7 @@ import (
 func (c *Client) GetRepoBranches(ctx context.Context, req gitserver.GetBranchesReq) ([]types.Branch, error) {
 	var branches []types.Branch
 	repoType := fmt.Sprintf("%ss", string(req.RepoType))
-	ctx, cancel := context.WithTimeout(ctx, timeoutTime)
+	ctx, cancel := context.WithTimeout(ctx, c.timeoutTime)
 	defer cancel()
 	branchesReq := &gitalypb.FindAllBranchesRequest{
 		Repository: &gitalypb.Repository{
@@ -53,7 +53,7 @@ func (c *Client) GetRepoBranches(ctx context.Context, req gitserver.GetBranchesR
 func (c *Client) GetRepoBranchByName(ctx context.Context, req gitserver.GetBranchReq) (*types.Branch, error) {
 	var branch types.Branch
 	repoType := fmt.Sprintf("%ss", string(req.RepoType))
-	ctx, cancel := context.WithTimeout(ctx, timeoutTime)
+	ctx, cancel := context.WithTimeout(ctx, c.timeoutTime)
 	defer cancel()
 	branchReq := &gitalypb.FindBranchRequest{
 		Repository: &gitalypb.Repository{
