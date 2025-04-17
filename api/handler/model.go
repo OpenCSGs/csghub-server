@@ -517,7 +517,7 @@ func parseTagReqs(ctx *gin.Context) (tags []types.TagReq) {
 	if len(tagCategories) > 0 {
 		for i, category := range tagCategories {
 			var tag types.TagReq
-			tag.Category = category
+			tag.Category = strings.ToLower(category)
 			if len(tagCategories) == len(tagNames) {
 				tag.Name = strings.ToLower(tagNames[i])
 			}
