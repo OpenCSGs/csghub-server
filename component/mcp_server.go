@@ -319,6 +319,7 @@ func (m *mcpServerComponentImpl) Show(ctx context.Context, namespace string, nam
 		Configuration: mcpServer.Configuration,
 		Schema:        mcpServer.Schema,
 		GithubPath:    mcpServer.Repository.GithubPath,
+		StarNum:       mcpServer.Repository.StarCount,
 	}
 	if permission.CanAdmin {
 		res.SensitiveCheckStatus = mcpServer.Repository.SensitiveCheckStatus.String()
@@ -389,6 +390,8 @@ func (m *mcpServerComponentImpl) Index(ctx context.Context, filter *types.RepoFi
 			License:      repo.License,
 			Repository:   common.BuildCloneInfo(m.config, mcpServer.Repository),
 			GithubPath:   mcpServer.Repository.GithubPath,
+			ToolsNum:     mcpServer.ToolsNum,
+			StarNum:      repo.StarCount,
 		})
 	}
 	if needOpWeight {
