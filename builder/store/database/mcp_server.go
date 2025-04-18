@@ -19,13 +19,13 @@ type MCPServer struct {
 }
 
 type MCPServerProperty struct {
-	ID          int64      `bun:",pk,autoincrement" json:"id"`
-	MCPServerID int64      `bun:",notnull" json:"mcp_server_id"`
-	MCPServer   *MCPServer `bun:"rel:belongs-to,join:mcp_server_id=id" json:"mcp_server"`
-	Kind        string     `bun:",notnull" json:"kind"` // tool, prompt, resource, resource_template
-	Name        string     `bun:",notnull" json:"name"`
-	Description string     `bun:",nullzero" json:"description"`
-	Schema      string     `bun:",nullzero" json:"schema"` // single property json string
+	ID          int64                 `bun:",pk,autoincrement" json:"id"`
+	MCPServerID int64                 `bun:",notnull" json:"mcp_server_id"`
+	MCPServer   *MCPServer            `bun:"rel:belongs-to,join:mcp_server_id=id" json:"mcp_server"`
+	Kind        types.MCPPropertyKind `bun:",notnull" json:"kind"` // tool, prompt, resource, resource_template
+	Name        string                `bun:",notnull" json:"name"`
+	Description string                `bun:",nullzero" json:"description"`
+	Schema      string                `bun:",nullzero" json:"schema"` // single property json string
 	times
 }
 

@@ -174,6 +174,8 @@ func GetSourceTypeAndPathFromURL(url string) (string, string, error) {
 		sourceType = enum.MSSource
 	} else if strings.Contains(url, "https://opencsg.com/") {
 		sourceType = enum.CSGSource
+	} else if strings.Contains(url, "https://github.com/") {
+		sourceType = enum.GitHubSource
 	} else {
 		return "", "", fmt.Errorf("unsupported source type: %s", url)
 	}

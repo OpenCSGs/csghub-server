@@ -51,6 +51,7 @@ type MCPServer struct {
 	Configuration        string               `json:"configuration"`
 	Schema               string               `json:"schema"`
 	StarNum              int                  `json:"star_num"`
+	GithubPath           string               `json:"github_path"` // github path
 }
 
 type MCPPropertyFilter struct {
@@ -64,15 +65,15 @@ type MCPPropertyFilter struct {
 }
 
 type MCPServerProperties struct {
-	ID           int64     `json:"id"`
-	MCPServerID  int64     `json:"mcp_server_id"`
-	RepositoryID int64     `json:"repository_id"`
-	Kind         string    `json:"kind"` // tool, prompt, resource, resource_template
-	Name         string    `json:"name"`
-	Description  string    `json:"description"`
-	Schema       string    `json:"schema"`
-	CreatedAt    time.Time `json:"created_at"`
-	UpdatedAt    time.Time `json:"updated_at"`
-	RepoPath     string    `json:"repo_path"`
-	Tags         []RepoTag `json:"tags"`
+	ID           int64           `json:"id"`
+	MCPServerID  int64           `json:"mcp_server_id"`
+	RepositoryID int64           `json:"repository_id"`
+	Kind         MCPPropertyKind `json:"kind"` // tool, prompt, resource, resource_template
+	Name         string          `json:"name"`
+	Description  string          `json:"description"`
+	Schema       string          `json:"schema"`
+	CreatedAt    time.Time       `json:"created_at"`
+	UpdatedAt    time.Time       `json:"updated_at"`
+	RepoPath     string          `json:"repo_path"`
+	Tags         []RepoTag       `json:"tags"`
 }

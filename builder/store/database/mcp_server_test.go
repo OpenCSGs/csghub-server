@@ -62,7 +62,7 @@ func TestMCPServerStore_CURD(t *testing.T) {
 	tool := database.MCPServerProperty{
 		ID:          int64(1),
 		MCPServerID: resServer.ID,
-		Kind:        string(types.MCPPropTool),
+		Kind:        types.MCPPropTool,
 		Name:        "tool1",
 		Description: "description1",
 		Schema:      "schema1",
