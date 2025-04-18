@@ -147,15 +147,15 @@ func (c *memberComponentImpl) GetMemberRole(ctx context.Context, orgName, userNa
 	)
 	org, err = c.orgStore.FindByPath(ctx, orgName)
 	if err != nil {
-		return membership.RoleUnknown, fmt.Errorf("failed to find org,caused by:%w", err)
+		return membership.RoleUnknown, fmt.Errorf("failed to find org %s, caused by:%w", orgName, err)
 	}
 	user, err = c.userStore.FindByUsername(ctx, userName)
 	if err != nil {
-		return membership.RoleUnknown, fmt.Errorf("failed to find user,caused by:%w", err)
+		return membership.RoleUnknown, fmt.Errorf("failed to find user %s, caused by:%w", userName, err)
 	}
 	m, err := c.memberStore.Find(ctx, org.ID, user.ID)
 	if err != nil && !errors.Is(err, sql.ErrNoRows) {
-		return membership.RoleUnknown, fmt.Errorf("failed to check memberhsip existence,caused by:%w", err)
+		return membership.RoleUnknown, fmt.Errorf("failed to check memberhsip existence, caused by:%w", err)
 	}
 	if m == nil {
 		return membership.RoleUnknown, nil

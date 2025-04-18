@@ -107,3 +107,122 @@ func TestMCPServerStore_CURD(t *testing.T) {
 	require.Nil(t, err)
 	require.Equal(t, 0, total)
 }
+
+func TestMCPServerStore_ByUsername(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+	ctx := context.TODO()
+
+	us := database.NewUserStoreWithDB(db)
+	err := us.Create(ctx, &database.User{Username: "foo"}, &database.Namespace{})
+	require.Nil(t, err)
+
+	user, err := us.FindByUsername(ctx, "foo")
+	require.Nil(t, err)
+
+	repoStore := database.NewRepoStoreWithDB(db)
+	repo, err := repoStore.CreateRepo(ctx, database.Repository{
+		UserID:  user.ID,
+		Path:    "foo/bar",
+		Private: false,
+	})
+	require.Nil(t, err)
+
+	store := database.NewMCPServerStoreWithDB(db)
+
+	server := database.MCPServer{
+		RepositoryID:  repo.ID,
+		ToolsNum:      1,
+		Configuration: "config1",
+		Schema:        "schema1",
+	}
+
+	resServer, err := store.Create(ctx, server)
+	require.Nil(t, err)
+	require.Equal(t, server.RepositoryID, resServer.RepositoryID)
+
+	mcps, total, err := store.ByUsername(ctx, user.Username, 10, 1, false)
+	require.Nil(t, err)
+	require.Equal(t, 1, total)
+	require.Equal(t, resServer.ID, mcps[0].ID)
+}
+
+func TestMCPServerStore_ByOrgPath(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+	ctx := context.TODO()
+
+	repoStore := database.NewRepoStoreWithDB(db)
+
+	repo, err := repoStore.CreateRepo(ctx, database.Repository{
+		Path:    "foo/bar",
+		Private: false,
+	})
+	require.Nil(t, err)
+
+	store := database.NewMCPServerStoreWithDB(db)
+
+	server := database.MCPServer{
+		RepositoryID:  repo.ID,
+		ToolsNum:      1,
+		Configuration: "config1",
+		Schema:        "schema1",
+	}
+
+	resServer, err := store.Create(ctx, server)
+	require.Nil(t, err)
+	require.Equal(t, server.RepositoryID, resServer.RepositoryID)
+
+	mcps, total, err := store.ByOrgPath(ctx, "foo", 10, 1, false)
+	require.Nil(t, err)
+	require.Equal(t, 1, total)
+	require.Equal(t, resServer.ID, mcps[0].ID)
+}
+
+func TestMCPServerStore_UserLikes(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+	ctx := context.TODO()
+
+	store := database.NewMCPServerStoreWithDB(db)
+
+	repos := []*database.Repository{
+		{Name: "repo1", Path: "p1", GitPath: "p1"},
+		{Name: "repo2", Path: "p2", GitPath: "p2"},
+		{Name: "repo3", Path: "p3", GitPath: "p3"},
+	}
+
+	for _, repo := range repos {
+		err := db.Core.NewInsert().Model(repo).Scan(ctx, repo)
+		require.Nil(t, err)
+
+		_, err = store.Create(ctx, database.MCPServer{
+			RepositoryID: repo.ID,
+		})
+		require.Nil(t, err)
+	}
+
+	_, err := db.Core.NewInsert().Model(&database.UserLike{
+		UserID: 123,
+		RepoID: repos[0].ID,
+	}).Exec(ctx)
+	require.Nil(t, err)
+
+	_, err = db.Core.NewInsert().Model(&database.UserLike{
+		UserID: 123,
+		RepoID: repos[2].ID,
+	}).Exec(ctx)
+	require.Nil(t, err)
+
+	mcps, total, err := store.UserLikes(ctx, 123, 10, 1)
+	require.Nil(t, err)
+	require.Equal(t, 2, total)
+	require.Equal(t, 2, len(mcps))
+
+	names := []string{}
+	for _, mcp := range mcps {
+		names = append(names, mcp.Repository.Name)
+	}
+	require.Equal(t, []string{"repo3", "repo1"}, names)
+
+}

@@ -8,6 +8,7 @@ import (
 
 	"opencsg.com/csghub-server/builder/git"
 	"opencsg.com/csghub-server/builder/git/gitserver"
+	"opencsg.com/csghub-server/builder/git/membership"
 	"opencsg.com/csghub-server/builder/rpc"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/config"
@@ -22,6 +23,7 @@ type MCPServerComponent interface {
 	Show(ctx context.Context, namespace, name, currentUser string, needOpWeight bool) (*types.MCPServer, error)
 	Index(ctx context.Context, filter *types.RepoFilter, per, page int, needOpWeight bool) ([]*types.MCPServer, int, error)
 	Properties(ctx context.Context, req *types.MCPPropertyFilter) ([]types.MCPServerProperties, int, error)
+	OrgMCPServers(ctx context.Context, req *types.OrgMCPsReq) ([]types.MCPServer, int, error)
 }
 
 type mcpServerComponentImpl struct {
@@ -466,4 +468,52 @@ func (m *mcpServerComponentImpl) Properties(ctx context.Context, req *types.MCPP
 		})
 	}
 	return properties, total, nil
+}
+
+func (m *mcpServerComponentImpl) OrgMCPServers(ctx context.Context, req *types.OrgMCPsReq) ([]types.MCPServer, int, error) {
+	var resp []types.MCPServer
+	var err error
+
+	r := membership.RoleUnknown
+
+	if req.CurrentUser != "" {
+		r, err = m.userSvcClient.GetMemberRole(ctx, req.Namespace, req.CurrentUser)
+		// log error, and treat user as unknown role in org
+		if err != nil {
+			slog.Warn("faild to get member role",
+				slog.String("org", req.Namespace), slog.String("user", req.CurrentUser),
+				slog.String("error", err.Error()))
+		}
+	}
+
+	onlyPublic := !r.CanRead()
+
+	mcps, total, err := m.mcpServerStore.ByOrgPath(ctx, req.Namespace, req.PageSize, req.Page, onlyPublic)
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to get org %s mcp servers, error:%w", req.Namespace, err)
+	}
+
+	for _, mcpServer := range mcps {
+		resp = append(resp, types.MCPServer{
+			ID:           mcpServer.ID,
+			Name:         mcpServer.Repository.Name,
+			Nickname:     mcpServer.Repository.Nickname,
+			Description:  mcpServer.Repository.Description,
+			Likes:        mcpServer.Repository.Likes,
+			Downloads:    mcpServer.Repository.DownloadCount,
+			Path:         mcpServer.Repository.Path,
+			RepositoryID: mcpServer.RepositoryID,
+			Private:      mcpServer.Repository.Private,
+			CreatedAt:    mcpServer.CreatedAt,
+			UpdatedAt:    mcpServer.Repository.UpdatedAt,
+			Source:       mcpServer.Repository.Source,
+			SyncStatus:   mcpServer.Repository.SyncStatus,
+			License:      mcpServer.Repository.License,
+			GithubPath:   mcpServer.Repository.GithubPath,
+			ToolsNum:     mcpServer.ToolsNum,
+			StarNum:      mcpServer.Repository.StarCount,
+		})
+	}
+
+	return resp, total, nil
 }

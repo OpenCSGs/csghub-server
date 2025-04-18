@@ -83,6 +83,75 @@ func (_c *MockMCPServerStore_AddProperty_Call) RunAndReturn(run func(context.Con
 	return _c
 }
 
+// ByOrgPath provides a mock function with given fields: ctx, namespace, per, page, onlyPublic
+func (_m *MockMCPServerStore) ByOrgPath(ctx context.Context, namespace string, per int, page int, onlyPublic bool) ([]database.MCPServer, int, error) {
+	ret := _m.Called(ctx, namespace, per, page, onlyPublic)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ByOrgPath")
+	}
+
+	var r0 []database.MCPServer
+	var r1 int
+	var r2 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, int, int, bool) ([]database.MCPServer, int, error)); ok {
+		return rf(ctx, namespace, per, page, onlyPublic)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string, int, int, bool) []database.MCPServer); ok {
+		r0 = rf(ctx, namespace, per, page, onlyPublic)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]database.MCPServer)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string, int, int, bool) int); ok {
+		r1 = rf(ctx, namespace, per, page, onlyPublic)
+	} else {
+		r1 = ret.Get(1).(int)
+	}
+
+	if rf, ok := ret.Get(2).(func(context.Context, string, int, int, bool) error); ok {
+		r2 = rf(ctx, namespace, per, page, onlyPublic)
+	} else {
+		r2 = ret.Error(2)
+	}
+
+	return r0, r1, r2
+}
+
+// MockMCPServerStore_ByOrgPath_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ByOrgPath'
+type MockMCPServerStore_ByOrgPath_Call struct {
+	*mock.Call
+}
+
+// ByOrgPath is a helper method to define mock.On call
+//   - ctx context.Context
+//   - namespace string
+//   - per int
+//   - page int
+//   - onlyPublic bool
+func (_e *MockMCPServerStore_Expecter) ByOrgPath(ctx interface{}, namespace interface{}, per interface{}, page interface{}, onlyPublic interface{}) *MockMCPServerStore_ByOrgPath_Call {
+	return &MockMCPServerStore_ByOrgPath_Call{Call: _e.mock.On("ByOrgPath", ctx, namespace, per, page, onlyPublic)}
+}
+
+func (_c *MockMCPServerStore_ByOrgPath_Call) Run(run func(ctx context.Context, namespace string, per int, page int, onlyPublic bool)) *MockMCPServerStore_ByOrgPath_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(string), args[2].(int), args[3].(int), args[4].(bool))
+	})
+	return _c
+}
+
+func (_c *MockMCPServerStore_ByOrgPath_Call) Return(_a0 []database.MCPServer, _a1 int, _a2 error) *MockMCPServerStore_ByOrgPath_Call {
+	_c.Call.Return(_a0, _a1, _a2)
+	return _c
+}
+
+func (_c *MockMCPServerStore_ByOrgPath_Call) RunAndReturn(run func(context.Context, string, int, int, bool) ([]database.MCPServer, int, error)) *MockMCPServerStore_ByOrgPath_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // ByPath provides a mock function with given fields: ctx, namespace, name
 func (_m *MockMCPServerStore) ByPath(ctx context.Context, namespace string, name string) (*database.MCPServer, error) {
 	ret := _m.Called(ctx, namespace, name)
@@ -257,6 +326,75 @@ func (_c *MockMCPServerStore_ByRepoIDs_Call) Return(_a0 []database.MCPServer, _a
 }
 
 func (_c *MockMCPServerStore_ByRepoIDs_Call) RunAndReturn(run func(context.Context, []int64) ([]database.MCPServer, error)) *MockMCPServerStore_ByRepoIDs_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// ByUsername provides a mock function with given fields: ctx, username, per, page, onlyPublic
+func (_m *MockMCPServerStore) ByUsername(ctx context.Context, username string, per int, page int, onlyPublic bool) ([]database.MCPServer, int, error) {
+	ret := _m.Called(ctx, username, per, page, onlyPublic)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ByUsername")
+	}
+
+	var r0 []database.MCPServer
+	var r1 int
+	var r2 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, int, int, bool) ([]database.MCPServer, int, error)); ok {
+		return rf(ctx, username, per, page, onlyPublic)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string, int, int, bool) []database.MCPServer); ok {
+		r0 = rf(ctx, username, per, page, onlyPublic)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]database.MCPServer)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string, int, int, bool) int); ok {
+		r1 = rf(ctx, username, per, page, onlyPublic)
+	} else {
+		r1 = ret.Get(1).(int)
+	}
+
+	if rf, ok := ret.Get(2).(func(context.Context, string, int, int, bool) error); ok {
+		r2 = rf(ctx, username, per, page, onlyPublic)
+	} else {
+		r2 = ret.Error(2)
+	}
+
+	return r0, r1, r2
+}
+
+// MockMCPServerStore_ByUsername_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ByUsername'
+type MockMCPServerStore_ByUsername_Call struct {
+	*mock.Call
+}
+
+// ByUsername is a helper method to define mock.On call
+//   - ctx context.Context
+//   - username string
+//   - per int
+//   - page int
+//   - onlyPublic bool
+func (_e *MockMCPServerStore_Expecter) ByUsername(ctx interface{}, username interface{}, per interface{}, page interface{}, onlyPublic interface{}) *MockMCPServerStore_ByUsername_Call {
+	return &MockMCPServerStore_ByUsername_Call{Call: _e.mock.On("ByUsername", ctx, username, per, page, onlyPublic)}
+}
+
+func (_c *MockMCPServerStore_ByUsername_Call) Run(run func(ctx context.Context, username string, per int, page int, onlyPublic bool)) *MockMCPServerStore_ByUsername_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(string), args[2].(int), args[3].(int), args[4].(bool))
+	})
+	return _c
+}
+
+func (_c *MockMCPServerStore_ByUsername_Call) Return(_a0 []database.MCPServer, _a1 int, _a2 error) *MockMCPServerStore_ByUsername_Call {
+	_c.Call.Return(_a0, _a1, _a2)
+	return _c
+}
+
+func (_c *MockMCPServerStore_ByUsername_Call) RunAndReturn(run func(context.Context, string, int, int, bool) ([]database.MCPServer, int, error)) *MockMCPServerStore_ByUsername_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -582,6 +720,74 @@ func (_c *MockMCPServerStore_Update_Call) Return(_a0 *database.MCPServer, _a1 er
 }
 
 func (_c *MockMCPServerStore_Update_Call) RunAndReturn(run func(context.Context, database.MCPServer) (*database.MCPServer, error)) *MockMCPServerStore_Update_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// UserLikes provides a mock function with given fields: ctx, userID, per, page
+func (_m *MockMCPServerStore) UserLikes(ctx context.Context, userID int64, per int, page int) ([]database.MCPServer, int, error) {
+	ret := _m.Called(ctx, userID, per, page)
+
+	if len(ret) == 0 {
+		panic("no return value specified for UserLikes")
+	}
+
+	var r0 []database.MCPServer
+	var r1 int
+	var r2 error
+	if rf, ok := ret.Get(0).(func(context.Context, int64, int, int) ([]database.MCPServer, int, error)); ok {
+		return rf(ctx, userID, per, page)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, int64, int, int) []database.MCPServer); ok {
+		r0 = rf(ctx, userID, per, page)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]database.MCPServer)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, int64, int, int) int); ok {
+		r1 = rf(ctx, userID, per, page)
+	} else {
+		r1 = ret.Get(1).(int)
+	}
+
+	if rf, ok := ret.Get(2).(func(context.Context, int64, int, int) error); ok {
+		r2 = rf(ctx, userID, per, page)
+	} else {
+		r2 = ret.Error(2)
+	}
+
+	return r0, r1, r2
+}
+
+// MockMCPServerStore_UserLikes_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'UserLikes'
+type MockMCPServerStore_UserLikes_Call struct {
+	*mock.Call
+}
+
+// UserLikes is a helper method to define mock.On call
+//   - ctx context.Context
+//   - userID int64
+//   - per int
+//   - page int
+func (_e *MockMCPServerStore_Expecter) UserLikes(ctx interface{}, userID interface{}, per interface{}, page interface{}) *MockMCPServerStore_UserLikes_Call {
+	return &MockMCPServerStore_UserLikes_Call{Call: _e.mock.On("UserLikes", ctx, userID, per, page)}
+}
+
+func (_c *MockMCPServerStore_UserLikes_Call) Run(run func(ctx context.Context, userID int64, per int, page int)) *MockMCPServerStore_UserLikes_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(int64), args[2].(int), args[3].(int))
+	})
+	return _c
+}
+
+func (_c *MockMCPServerStore_UserLikes_Call) Return(_a0 []database.MCPServer, _a1 int, _a2 error) *MockMCPServerStore_UserLikes_Call {
+	_c.Call.Return(_a0, _a1, _a2)
+	return _c
+}
+
+func (_c *MockMCPServerStore_UserLikes_Call) RunAndReturn(run func(context.Context, int64, int, int) ([]database.MCPServer, int, error)) *MockMCPServerStore_UserLikes_Call {
 	_c.Call.Return(run)
 	return _c
 }

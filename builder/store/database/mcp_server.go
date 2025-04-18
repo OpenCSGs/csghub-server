@@ -40,6 +40,9 @@ type MCPServerStore interface {
 	DeletePropertiesByServerID(ctx context.Context, serverID int64) error
 	DeleteProperty(ctx context.Context, input MCPServerProperty) error
 	ListProperties(ctx context.Context, req *types.MCPPropertyFilter) ([]MCPServerProperty, int, error)
+	ByUsername(ctx context.Context, username string, per, page int, onlyPublic bool) ([]MCPServer, int, error)
+	ByOrgPath(ctx context.Context, namespace string, per, page int, onlyPublic bool) ([]MCPServer, int, error)
+	UserLikes(ctx context.Context, userID int64, per, page int) ([]MCPServer, int, error)
 }
 
 type mcpServerStoreImpl struct {
@@ -212,4 +215,63 @@ func (m *mcpServerStoreImpl) DeletePropertiesByServerID(ctx context.Context, ser
 		return fmt.Errorf("delete mcp server properties by server id %d error:%w", serverID, err)
 	}
 	return nil
+}
+
+func (m *mcpServerStoreImpl) ByUsername(ctx context.Context, username string, per, page int, onlyPublic bool) ([]MCPServer, int, error) {
+	var mcps []MCPServer
+	var count int
+
+	q := m.db.Operator.Core.NewSelect().
+		Model(&mcps).Relation("Repository").Relation("Repository.User").
+		Where("username = ?", username)
+
+	if onlyPublic {
+		q.Where("repository.private = ?", false)
+	}
+
+	count, err := q.Order("mcp_server.id desc").Limit(per).Offset((page - 1) * per).ScanAndCount(ctx)
+	if err != nil {
+		return nil, 0, fmt.Errorf("select mcp servers by username %s, error: %w", username, err)
+	}
+
+	return mcps, count, nil
+}
+
+func (m *mcpServerStoreImpl) ByOrgPath(ctx context.Context, namespace string, per, page int, onlyPublic bool) ([]MCPServer, int, error) {
+	var mcps []MCPServer
+	var count int
+
+	q := m.db.Operator.Core.NewSelect().
+		Model(&mcps).Relation("Repository").
+		Where("repository.path like ?", fmt.Sprintf("%s/%%", namespace))
+
+	if onlyPublic {
+		q.Where("repository.private = ?", false)
+	}
+
+	count, err := q.Order("mcp_server.id desc").Limit(per).Offset((page - 1) * per).ScanAndCount(ctx)
+	if err != nil {
+		return nil, 0, fmt.Errorf("select mcp servers by org path %s, error: %w", namespace, err)
+	}
+
+	return mcps, count, nil
+}
+
+func (m *mcpServerStoreImpl) UserLikes(ctx context.Context, userID int64, per, page int) ([]MCPServer, int, error) {
+	var mcps []MCPServer
+	query := m.db.Operator.Core.NewSelect().Model(&mcps).
+		Relation("Repository").
+		Where("repository.id in (select repo_id from user_likes where user_id=?)", userID)
+
+	query = query.Order("mcp_server.id DESC").Limit(per).Offset((page - 1) * per)
+
+	err := query.Scan(ctx)
+	if err != nil {
+		return nil, 0, fmt.Errorf("select user liked mcp servers by userid %d: %w", userID, err)
+	}
+	count, err := query.Count(ctx)
+	if err != nil {
+		return nil, 0, fmt.Errorf("count user liked mcp servers by userid %d: %w", userID, err)
+	}
+	return mcps, count, nil
 }
