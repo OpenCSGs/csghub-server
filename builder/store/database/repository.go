@@ -112,6 +112,8 @@ type Repository struct {
 	MSPath               string                     `bun:",nullzero" json:"ms_path"`
 	CSGPath              string                     `bun:",nullzero" json:"csg_path"`
 	HFPath               string                     `bun:",nullzero" json:"hf_path"`
+	GithubPath           string                     `bun:",nullzero" json:"github_path"`
+	StarCount            int                        `bun:",nullzero" json:"star_count"`
 	// updated_at timestamp will be updated only if files changed
 	times
 }
@@ -849,6 +851,8 @@ func (s *repoStoreImpl) UpdateSourcePath(ctx context.Context, repoID int64, sour
 		field = "hf_path"
 	case enum.MSSource:
 		field = "ms_path"
+	case enum.GitHubSource:
+		field = "github_path"
 	default:
 		return fmt.Errorf("unknown source type: %s", sourceType)
 	}

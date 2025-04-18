@@ -88,6 +88,8 @@ type CreateRepoReq struct {
 	Readme        string         `json:"readme"`
 	DefaultBranch string         `json:"default_branch" example:"main"`
 	RepoType      RepositoryType `json:"-"`
+	ToolCount     int            `json:"tool_count"`
+	StarCount     int            `json:"star_count"`
 }
 
 // make sure CreateRepoReq implements SensitiveRequest
