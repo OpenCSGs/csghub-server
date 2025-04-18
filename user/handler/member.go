@@ -208,6 +208,7 @@ func (h *MemberHandler) GetMemberRole(ctx *gin.Context) {
 	// Assuming GetMemberRole returns a role (or similar) and an error
 	role, err := h.c.GetMemberRole(ctx.Request.Context(), org, userName)
 	if err != nil {
+		slog.Error("fail to get org member", slog.Any("org", org), slog.Any("member", userName), slog.Any("err", err))
 		httpbase.ServerError(ctx, err)
 		return
 	}

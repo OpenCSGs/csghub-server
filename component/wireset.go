@@ -216,6 +216,7 @@ func NewTestUserComponent(
 		accountingComponent: accountingComponent,
 		promptStore:         stores.Prompt,
 		deployTaskStore:     stores.DeployTask,
+		mcpServerStore:      stores.MCPServerStore,
 	}
 }
 

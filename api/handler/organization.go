@@ -37,6 +37,10 @@ func NewOrganizationHandler(config *config.Config) (*OrganizationHandler, error)
 	if err != nil {
 		return nil, err
 	}
+	mcp, err := component.NewMCPServerComponent(config)
+	if err != nil {
+		return nil, err
+	}
 	return &OrganizationHandler{
 		space:      sc,
 		code:       cc,
@@ -44,6 +48,7 @@ func NewOrganizationHandler(config *config.Config) (*OrganizationHandler, error)
 		dataset:    dsc,
 		collection: colc,
 		prompt:     pc,
+		mcp:        mcp,
 	}, nil
 }
 
@@ -54,6 +59,7 @@ type OrganizationHandler struct {
 	dataset    component.DatasetComponent
 	collection component.CollectionComponent
 	prompt     component.PromptComponent
+	mcp        component.MCPServerComponent
 }
 
 // GetOrganizationModels godoc
@@ -317,4 +323,46 @@ func (h *OrganizationHandler) Prompts(ctx *gin.Context) {
 		"total":   total,
 	}
 	ctx.JSON(http.StatusOK, respData)
+}
+
+// GetOrganizationMCPs godoc
+// @Security     ApiKey
+// @Summary      Get organization mcp servers
+// @Description  get organization mcp servers
+// @Tags         Organization
+// @Accept       json
+// @Produce      json
+// @Param        namespace path string true "org name"
+// @Param        current_user query string true "current user name"
+// @Param        per query int false "page size"
+// @Param        page query int false "current page number"
+// @Success      200  {object}  types.ResponseWithTotal{data=[]types.MCPServer,total=int} "OK"
+// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
+// @Router       /organization/{namespace}/mcps [get]
+func (h *OrganizationHandler) MCPServers(ctx *gin.Context) {
+	var req types.OrgMCPsReq
+	req.Namespace = ctx.Param("namespace")
+	req.CurrentUser = httpbase.GetCurrentUser(ctx)
+
+	per, page, err := common.GetPerAndPageFromContext(ctx)
+	if err != nil {
+		slog.Error("Bad request format", "error", err)
+		httpbase.BadRequest(ctx, err.Error())
+		return
+	}
+	req.Page = page
+	req.PageSize = per
+	data, total, err := h.mcp.OrgMCPServers(ctx.Request.Context(), &req)
+	if err != nil {
+		slog.Error("Failed to get org mcp servers", slog.Any("error", err))
+		httpbase.ServerError(ctx, err)
+		return
+	}
+
+	respData := gin.H{
+		"data":  data,
+		"total": total,
+	}
+	httpbase.OK(ctx, respData)
 }

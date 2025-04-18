@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	"opencsg.com/csghub-server/builder/git/membership"
 	"opencsg.com/csghub-server/builder/rpc"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/types"
@@ -300,4 +301,44 @@ func TestMCPServerComponent_Properties(t *testing.T) {
 	require.Nil(t, err)
 	require.NotNil(t, res)
 	require.Equal(t, total, 1)
+}
+
+func TestMCPServerComponent_OrgMCPServers(t *testing.T) {
+	ctx := context.TODO()
+	mc := initializeTestMCPServerComponent(ctx, t)
+
+	cases := []struct {
+		role       membership.Role
+		publicOnly bool
+	}{
+		{membership.RoleUnknown, true},
+		{membership.RoleAdmin, false},
+	}
+
+	for _, c := range cases {
+		t.Run(string(c.role), func(t *testing.T) {
+			mc.mocks.userSvcClient.EXPECT().GetMemberRole(ctx, "ns", "foo").Return(c.role, nil).Once()
+			mc.mocks.stores.MCPServerMock().EXPECT().ByOrgPath(ctx, "ns", 1, 1, c.publicOnly).Return([]database.MCPServer{
+				{ID: 1, Repository: &database.Repository{Name: "r1"}},
+				{ID: 2, Repository: &database.Repository{Name: "r2"}},
+				{ID: 3, Repository: &database.Repository{Name: "r3"}},
+			}, 100, nil)
+			res, count, err := mc.OrgMCPServers(ctx, &types.OrgMCPsReq{
+				Namespace:   "ns",
+				CurrentUser: "foo",
+				PageOpts: types.PageOpts{
+					Page:     1,
+					PageSize: 1,
+				},
+			})
+			require.Nil(t, err)
+			require.Equal(t, 100, count)
+			require.Equal(t, []types.MCPServer{
+				{ID: 1, Name: "r1"},
+				{ID: 2, Name: "r2"},
+				{ID: 3, Name: "r3"},
+			}, res)
+		})
+
+	}
 }

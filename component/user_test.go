@@ -428,3 +428,56 @@ func TestUserComponent_Evaluations(t *testing.T) {
 	require.Equal(t, 100, total)
 	require.Equal(t, []types.ArgoWorkFlowRes{{ID: 1}}, data)
 }
+
+func TestUserComponent_MCPServers(t *testing.T) {
+	ctx := context.TODO()
+	uc := initializeTestUserComponent(ctx, t)
+
+	uc.mocks.stores.UserMock().EXPECT().IsExist(ctx, "owner").Return(true, nil)
+	uc.mocks.stores.UserMock().EXPECT().IsExist(ctx, "user").Return(true, nil)
+	uc.mocks.stores.MCPServerMock().EXPECT().ByUsername(ctx, "owner", 10, 1, true).Return([]database.MCPServer{
+		{ID: 1, Repository: &database.Repository{Name: "foo"}},
+	}, 1, nil)
+
+	data, total, err := uc.MCPServers(ctx, &types.UserMCPsReq{
+		Owner:       "owner",
+		CurrentUser: "user",
+		PageOpts: types.PageOpts{
+			Page:     1,
+			PageSize: 10,
+		},
+	})
+	require.Nil(t, err)
+	require.Equal(t, 1, total)
+
+	require.Equal(t, []types.MCPServer{
+		{ID: 1, Name: "foo"},
+	}, data)
+}
+
+func TestUserComponent_LikesMCPServers(t *testing.T) {
+	ctx := context.TODO()
+	uc := initializeTestUserComponent(ctx, t)
+
+	req := &types.UserMCPsReq{
+		Owner:       "owner",
+		CurrentUser: "user",
+		PageOpts: types.PageOpts{
+			Page:     1,
+			PageSize: 10,
+		},
+	}
+	uc.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "user").Return(database.User{ID: 1}, nil)
+
+	uc.mocks.stores.MCPServerMock().EXPECT().UserLikes(ctx, int64(1), 10, 1).Return([]database.MCPServer{
+		{ID: 1, Repository: &database.Repository{Name: "foo"}},
+	}, 100, nil)
+
+	data, total, err := uc.LikesMCPServers(ctx, req)
+	require.Nil(t, err)
+	require.Equal(t, 100, total)
+	require.Equal(t, []types.MCPServer{
+		{ID: 1, Name: "foo"},
+	}, data)
+
+}

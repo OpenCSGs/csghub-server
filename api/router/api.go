@@ -251,28 +251,8 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 		apiGroup.DELETE("/user/:username/ssh_key/:name", authCollection.UserMatch, sshKeyHandler.Delete)
 	}
 
-	{
-		apiGroup.GET("/organizations", userProxyHandler.Proxy)
-		apiGroup.POST("/organizations", userProxyHandler.Proxy)
-		apiGroup.GET("/organization/:namespace", userProxyHandler.ProxyToApi("/api/v1/organization/%s", "namespace"))
-		apiGroup.PUT("/organization/:namespace", userProxyHandler.ProxyToApi("/api/v1/organization/%s", "namespace"))
-		apiGroup.DELETE("/organization/:namespace", userProxyHandler.ProxyToApi("/api/v1/organization/%s", "namespace"))
-		// Organization assets
-		apiGroup.GET("/organization/:namespace/models", orgHandler.Models)
-		apiGroup.GET("/organization/:namespace/datasets", orgHandler.Datasets)
-		apiGroup.GET("/organization/:namespace/codes", orgHandler.Codes)
-		apiGroup.GET("/organization/:namespace/spaces", orgHandler.Spaces)
-		apiGroup.GET("/organization/:namespace/collections", orgHandler.Collections)
-		apiGroup.GET("/organization/:namespace/prompts", orgHandler.Prompts)
-	}
-
-	{
-		apiGroup.GET("/organization/:namespace/members", userProxyHandler.ProxyToApi("/api/v1/organization/%s/members", "namespace"))
-		apiGroup.POST("/organization/:namespace/members", userProxyHandler.ProxyToApi("/api/v1/organization/%s/members", "namespace"))
-		apiGroup.GET("/organization/:namespace/members/:username", userProxyHandler.ProxyToApi("/api/v1/organization/%s/members/%s", "namespace", "username"))
-		apiGroup.PUT("/organization/:namespace/members/:username", userProxyHandler.ProxyToApi("/api/v1/organization/%s/members/%s", "namespace", "username"))
-		apiGroup.DELETE("/organization/:namespace/members/:username", userProxyHandler.ProxyToApi("/api/v1/organization/%s/members/%s", "namespace", "username"))
-	}
+	// Organization routes
+	createOrgRoutes(apiGroup, userProxyHandler, orgHandler)
 
 	// Tag
 	tagCtrl, err := handler.NewTagHandler(config)
@@ -717,7 +697,7 @@ func createSpaceRoutes(config *config.Config, apiGroup *gin.RouterGroup, spaceHa
 }
 
 func createUserRoutes(apiGroup *gin.RouterGroup, authCollection middleware.AuthenticatorCollection, userProxyHandler *handler.InternalServiceProxyHandler, userHandler *handler.UserHandler) {
-	// depricated
+	// deprecated
 	{
 		apiGroup.POST("/users", userProxyHandler.ProxyToApi("/api/v1/user"))
 		apiGroup.PUT("/users/:username", userProxyHandler.ProxyToApi("/api/v1/user/%v", "username"))
@@ -738,6 +718,7 @@ func createUserRoutes(apiGroup *gin.RouterGroup, authCollection middleware.Authe
 		apiGroup.GET("/user/:username/codes", userHandler.Codes)
 		apiGroup.GET("/user/:username/spaces", userHandler.Spaces)
 		apiGroup.GET("/user/:username/prompts", userHandler.Prompts)
+		apiGroup.GET("/user/:username/mcps", userHandler.MCPServers)
 		// User likes
 		apiGroup.PUT("/user/:username/likes/:repo_id", userHandler.LikesAdd)
 		apiGroup.DELETE("/user/:username/likes/:repo_id", userHandler.LikesDelete)
@@ -745,6 +726,7 @@ func createUserRoutes(apiGroup *gin.RouterGroup, authCollection middleware.Authe
 		apiGroup.GET("/user/:username/likes/codes", userHandler.LikesCodes)
 		apiGroup.GET("/user/:username/likes/models", userHandler.LikesModels)
 		apiGroup.GET("/user/:username/likes/datasets", userHandler.LikesDatasets)
+		apiGroup.GET("/user/:username/likes/mcps", userHandler.LikesMCPServers)
 		apiGroup.GET("/user/:username/run/:repo_type", userHandler.GetRunDeploys)
 		apiGroup.GET("/user/:username/finetune/instances", userHandler.GetFinetuneInstances)
 		// User evaluations
@@ -912,5 +894,31 @@ func createSpaceTemplateRoutes(apiGroup *gin.RouterGroup, authCollection middlew
 		spaceTemplateGrp.PUT("/:id", authCollection.NeedAdmin, templateHandler.Update)
 		spaceTemplateGrp.DELETE("/:id", authCollection.NeedAdmin, templateHandler.Delete)
 		spaceTemplateGrp.GET("/:type", templateHandler.List)
+	}
+}
+
+func createOrgRoutes(apiGroup *gin.RouterGroup, userProxyHandler *handler.InternalServiceProxyHandler, orgHandler *handler.OrganizationHandler) {
+	{
+		apiGroup.GET("/organizations", userProxyHandler.Proxy)
+		apiGroup.POST("/organizations", userProxyHandler.Proxy)
+		apiGroup.GET("/organization/:namespace", userProxyHandler.ProxyToApi("/api/v1/organization/%s", "namespace"))
+		apiGroup.PUT("/organization/:namespace", userProxyHandler.ProxyToApi("/api/v1/organization/%s", "namespace"))
+		apiGroup.DELETE("/organization/:namespace", userProxyHandler.ProxyToApi("/api/v1/organization/%s", "namespace"))
+		// Organization assets
+		apiGroup.GET("/organization/:namespace/models", orgHandler.Models)
+		apiGroup.GET("/organization/:namespace/datasets", orgHandler.Datasets)
+		apiGroup.GET("/organization/:namespace/codes", orgHandler.Codes)
+		apiGroup.GET("/organization/:namespace/spaces", orgHandler.Spaces)
+		apiGroup.GET("/organization/:namespace/collections", orgHandler.Collections)
+		apiGroup.GET("/organization/:namespace/prompts", orgHandler.Prompts)
+		apiGroup.GET("/organization/:namespace/mcps", orgHandler.MCPServers)
+	}
+
+	{
+		apiGroup.GET("/organization/:namespace/members", userProxyHandler.ProxyToApi("/api/v1/organization/%s/members", "namespace"))
+		apiGroup.POST("/organization/:namespace/members", userProxyHandler.ProxyToApi("/api/v1/organization/%s/members", "namespace"))
+		apiGroup.GET("/organization/:namespace/members/:username", userProxyHandler.ProxyToApi("/api/v1/organization/%s/members/%s", "namespace", "username"))
+		apiGroup.PUT("/organization/:namespace/members/:username", userProxyHandler.ProxyToApi("/api/v1/organization/%s/members/%s", "namespace", "username"))
+		apiGroup.DELETE("/organization/:namespace/members/:username", userProxyHandler.ProxyToApi("/api/v1/organization/%s/members/%s", "namespace", "username"))
 	}
 }
