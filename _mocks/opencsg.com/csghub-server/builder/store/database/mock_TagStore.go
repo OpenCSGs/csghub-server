@@ -315,6 +315,64 @@ func (_c *MockTagStore_AllDatasetTags_Call) RunAndReturn(run func(context.Contex
 	return _c
 }
 
+// AllMCPTags provides a mock function with given fields: ctx
+func (_m *MockTagStore) AllMCPTags(ctx context.Context) ([]*database.Tag, error) {
+	ret := _m.Called(ctx)
+
+	if len(ret) == 0 {
+		panic("no return value specified for AllMCPTags")
+	}
+
+	var r0 []*database.Tag
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context) ([]*database.Tag, error)); ok {
+		return rf(ctx)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context) []*database.Tag); ok {
+		r0 = rf(ctx)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]*database.Tag)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context) error); ok {
+		r1 = rf(ctx)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockTagStore_AllMCPTags_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'AllMCPTags'
+type MockTagStore_AllMCPTags_Call struct {
+	*mock.Call
+}
+
+// AllMCPTags is a helper method to define mock.On call
+//   - ctx context.Context
+func (_e *MockTagStore_Expecter) AllMCPTags(ctx interface{}) *MockTagStore_AllMCPTags_Call {
+	return &MockTagStore_AllMCPTags_Call{Call: _e.mock.On("AllMCPTags", ctx)}
+}
+
+func (_c *MockTagStore_AllMCPTags_Call) Run(run func(ctx context.Context)) *MockTagStore_AllMCPTags_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context))
+	})
+	return _c
+}
+
+func (_c *MockTagStore_AllMCPTags_Call) Return(_a0 []*database.Tag, _a1 error) *MockTagStore_AllMCPTags_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockTagStore_AllMCPTags_Call) RunAndReturn(run func(context.Context) ([]*database.Tag, error)) *MockTagStore_AllMCPTags_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // AllModelCategories provides a mock function with given fields: ctx
 func (_m *MockTagStore) AllModelCategories(ctx context.Context) ([]database.TagCategory, error) {
 	ret := _m.Called(ctx)

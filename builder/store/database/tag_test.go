@@ -67,10 +67,12 @@ func TestTagStore_AllTags(t *testing.T) {
 	require.Empty(t, err)
 	spaceTag, err := ts.CreateTag(ctx, "library", "tag_"+uuid.New().String(), "Group One", types.SpaceTagScope)
 	require.Empty(t, err)
+	mcpTag, err := ts.CreateTag(ctx, "task", "tag_"+uuid.New().String(), "Group One", types.MCPTagScope)
+	require.Empty(t, err)
 
 	tags, err = ts.AllTags(ctx, nil)
 	require.Empty(t, err)
-	require.Equal(t, 5, len(tags))
+	require.Equal(t, 6, len(tags))
 
 	builtIn := false
 	filter := &types.TagFilter{
@@ -106,6 +108,11 @@ func TestTagStore_AllTags(t *testing.T) {
 	require.Empty(t, err)
 	require.Equal(t, 1, len(spaceTags))
 	require.Equal(t, spaceTag.Name, spaceTags[0].Name)
+
+	mcpTags, err := ts.AllMCPTags(ctx)
+	require.Empty(t, err)
+	require.Equal(t, 1, len(mcpTags))
+	require.Equal(t, mcpTag.Name, mcpTags[0].Name)
 }
 
 // TestAllModelCategories tests the AllModelCategories method

@@ -255,22 +255,15 @@ func (c *gitCallbackComponentImpl) removeFiles(ctx context.Context, repoType, na
 				return fmt.Errorf("failed to clear met tags,cause: %w", err)
 			}
 		} else {
-			var tagScope types.TagScope
-			switch repoType {
-			case fmt.Sprintf("%ss", types.DatasetRepo):
-				tagScope = types.DatasetTagScope
-			case fmt.Sprintf("%ss", types.ModelRepo):
-				tagScope = types.ModelTagScope
-			case fmt.Sprintf("%ss", types.PromptRepo):
-				tagScope = types.PromptTagScope
-			default:
-				return nil
-				// case CodeRepoType:
-				// 	tagScope = types.CodeTagScope
-				// case SpaceRepoType:
-				// 	tagScope = types.SpaceTagScope
+			tagScope, err := getTagScopeByRepoType(repoType)
+			if err != nil {
+				slog.Error("failed to get tag scope for remove repo library file",
+					slog.Any("namespace", namespace), slog.Any("reponame", repoName),
+					slog.Any("file", fileName), slog.Any("err", err))
+				return fmt.Errorf("failed to get tag scope for remove repo %s/%s library file %s, error: %w",
+					namespace, repoName, fileName, err)
 			}
-			err := c.tagComponent.UpdateLibraryTags(ctx, tagScope, namespace, repoName, fileName, "")
+			err = c.tagComponent.UpdateLibraryTags(ctx, tagScope, namespace, repoName, fileName, "")
 			if err != nil {
 				slog.Error("failed to remove Library tag", slog.String("namespace", namespace),
 					slog.String("name", repoName), slog.String("ref", ref), slog.String("fileName", fileName),
@@ -309,22 +302,15 @@ func (c *gitCallbackComponentImpl) updateRepoTags(ctx context.Context, repoType,
 				return err
 			}
 		} else {
-			var tagScope types.TagScope
-			switch repoType {
-			case fmt.Sprintf("%ss", types.DatasetRepo):
-				tagScope = types.DatasetTagScope
-			case fmt.Sprintf("%ss", types.ModelRepo):
-				tagScope = types.ModelTagScope
-			case fmt.Sprintf("%ss", types.PromptRepo):
-				tagScope = types.PromptTagScope
-			default:
-				return nil
-				// case CodeRepoType:
-				// 	tagScope = types.CodeTagScope
-				// case SpaceRepoType:
-				// 	tagScope = types.SpaceTagScope
+			tagScope, err := getTagScopeByRepoType(repoType)
+			if err != nil {
+				slog.Error("failed to get tag scope for update repo library file",
+					slog.Any("namespace", namespace), slog.Any("reponame", repoName),
+					slog.Any("file", fileName), slog.Any("err", err))
+				return fmt.Errorf("failed to get tag scope for update repo %s/%s library file %s, error: %w",
+					namespace, repoName, fileName, err)
 			}
-			err := c.tagComponent.UpdateLibraryTags(ctx, tagScope, namespace, repoName, "", fileName)
+			err = c.tagComponent.UpdateLibraryTags(ctx, tagScope, namespace, repoName, "", fileName)
 			if err != nil {
 				slog.Error("failed to add Library tag", slog.String("namespace", namespace),
 					slog.String("name", repoName), slog.String("ref", ref), slog.String("fileName", fileName),
@@ -341,27 +327,18 @@ func (c *gitCallbackComponentImpl) updateMetaTags(ctx context.Context, repoType,
 		err      error
 		tagScope types.TagScope
 	)
-	switch repoType {
-	case fmt.Sprintf("%ss", types.DatasetRepo):
-		tagScope = types.DatasetTagScope
-	case fmt.Sprintf("%ss", types.ModelRepo):
-		tagScope = types.ModelTagScope
-	case fmt.Sprintf("%ss", types.PromptRepo):
-		tagScope = types.PromptTagScope
-	default:
-		return nil
-		// TODO: support code and space
-		// case CodeRepoType:
-		// 	tagScope = types.CodeTagScope
-		// case SpaceRepoType:
-		// 	tagScope = types.SpaceTagScope
+	tagScope, err = getTagScopeByRepoType(repoType)
+	if err != nil {
+		slog.Error("failed to get tag scope for update meta tags",
+			slog.Any("namespace", namespace), slog.Any("reponame", repoName), slog.Any("err", err))
+		return fmt.Errorf("failed to get tag scope for update repo %s/%s meta tags, error: %w", namespace, repoName, err)
 	}
 	_, err = c.tagComponent.UpdateMetaTags(ctx, tagScope, namespace, repoName, content)
 	if err != nil {
 		slog.Error("failed to update meta tags", slog.String("namespace", namespace),
 			slog.String("content", content), slog.String("repo", repoName), slog.String("ref", ref),
 			slog.Any("error", err))
-		return fmt.Errorf("failed to update met tags,cause: %w", err)
+		return fmt.Errorf("failed to update met tags, cause: %w", err)
 	}
 	slog.Info("update meta tags success", slog.String("repo", path.Join(namespace, repoName)), slog.String("type", repoType))
 	return nil
@@ -495,7 +472,7 @@ func (c *gitCallbackComponentImpl) isValidForRuntime(fileNames []string) bool {
 		if strings.Contains(fileName, component.ModelIndexFileName) {
 			return true
 		}
-		if strings.Contains(fileName, "README.md") {
+		if strings.Contains(fileName, types.ReadmeFileName) {
 			return true
 		}
 		if strings.Contains(fileName, string(types.Safetensors)) {
@@ -519,4 +496,28 @@ func GetPipelineTaskFromTags(tags []database.Tag) types.PipelineTask {
 		}
 	}
 	return ""
+}
+
+func getTagScopeByRepoType(repoType string) (types.TagScope, error) {
+	var tagScope types.TagScope
+	switch repoType {
+	case fmt.Sprintf("%ss", types.DatasetRepo):
+		tagScope = types.DatasetTagScope
+	case fmt.Sprintf("%ss", types.ModelRepo):
+		tagScope = types.ModelTagScope
+	case fmt.Sprintf("%ss", types.PromptRepo):
+		tagScope = types.PromptTagScope
+	case fmt.Sprintf("%ss", types.MCPServerRepo):
+		tagScope = types.MCPTagScope
+	default:
+		return types.UnknownScope, fmt.Errorf("get tag scope by invalid repo type %s", repoType)
+		// TODO: support code and space
+		// case CodeRepoType:
+		// 	tagScope = types.CodeTagScope
+		// case SpaceRepoType:
+		// 	tagScope = types.SpaceTagScope
+	}
+
+	return tagScope, nil
+
 }

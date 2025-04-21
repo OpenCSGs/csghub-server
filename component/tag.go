@@ -74,6 +74,9 @@ func (c *tagComponentImpl) UpdateMetaTags(ctx context.Context, tagScope types.Ta
 	} else if tagScope == types.PromptTagScope {
 		tp = tagparser.NewPromptTagProcessor(c.tagStore)
 		repoType = types.PromptRepo
+	} else if tagScope == types.MCPTagScope {
+		tp = tagparser.NewMCPTagProcessor(c.tagStore)
+		repoType = types.MCPServerRepo
 	} else {
 		// skip tag process for code and space now
 		return nil, nil
