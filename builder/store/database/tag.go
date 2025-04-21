@@ -20,6 +20,7 @@ type TagStore interface {
 	AllTags(ctx context.Context, filter *types.TagFilter) ([]*Tag, error)
 	AllModelTags(ctx context.Context) ([]*Tag, error)
 	AllPromptTags(ctx context.Context) ([]*Tag, error)
+	AllMCPTags(ctx context.Context) ([]*Tag, error)
 	AllDatasetTags(ctx context.Context) ([]*Tag, error)
 	AllCodeTags(ctx context.Context) ([]*Tag, error)
 	AllSpaceTags(ctx context.Context) ([]*Tag, error)
@@ -132,6 +133,10 @@ func (ts *tagStoreImpl) AllModelTags(ctx context.Context) ([]*Tag, error) {
 
 func (ts *tagStoreImpl) AllPromptTags(ctx context.Context) ([]*Tag, error) {
 	return ts.AllTagsByScope(ctx, types.PromptTagScope)
+}
+
+func (ts *tagStoreImpl) AllMCPTags(ctx context.Context) ([]*Tag, error) {
+	return ts.AllTagsByScope(ctx, types.MCPTagScope)
 }
 
 func (ts *tagStoreImpl) AllDatasetTags(ctx context.Context) ([]*Tag, error) {

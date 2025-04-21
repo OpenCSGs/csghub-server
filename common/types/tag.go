@@ -54,6 +54,7 @@ const (
 	SpaceTagScope   TagScope = "space"
 	PromptTagScope  TagScope = "prompt"
 	MCPTagScope     TagScope = "mcp"
+	UnknownScope    TagScope = "unknown"
 )
 
 type TagFilter struct {

@@ -21,6 +21,10 @@ type PromptTagStore interface {
 	AllPromptTags(ctx context.Context) ([]*database.Tag, error)
 }
 
+type MCPTagStore interface {
+	AllMCPTags(ctx context.Context) ([]*database.Tag, error)
+}
+
 type TagProcessor interface {
 	ProcessReadme(ctx context.Context, content string) (tagsMatched, tagsNew []*database.Tag, err error)
 	ProcessFramework(ctx context.Context, fileName string) (*database.Tag, error)
@@ -52,6 +56,13 @@ func NewPromptTagProcessor(ts PromptTagStore) TagProcessor {
 	p := new(tagProcessor)
 	p.existingTags = ts.AllPromptTags
 	p.tagScope = types.PromptTagScope
+	return p
+}
+
+func NewMCPTagProcessor(ts MCPTagStore) TagProcessor {
+	p := new(tagProcessor)
+	p.existingTags = ts.AllMCPTags
+	p.tagScope = types.MCPTagScope
 	return p
 }
 
