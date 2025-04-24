@@ -77,7 +77,7 @@ func TestTagStore_AllTags(t *testing.T) {
 
 	tag = database.Tag{
 		Category: "task",
-		Name:     "tag_" + uuid.New().String(),
+		Name:     "tag_" + uuid.New().String() + "search",
 		Group:    "Group One",
 		Scope:    types.CodeTagScope,
 	}
@@ -86,7 +86,7 @@ func TestTagStore_AllTags(t *testing.T) {
 
 	tag = database.Tag{
 		Category: "library",
-		Name:     "tag_" + uuid.New().String(),
+		Name:     "tag_" + uuid.New().String() + "search",
 		Group:    "Group One",
 		Scope:    types.PromptTagScope,
 	}
@@ -370,7 +370,7 @@ func TestTagStore_CreateTag(t *testing.T) {
 	ts := database.NewTagStoreWithDB(db)
 	tag := database.Tag{
 		Category: "task",
-		Name:     "tag_" + uuid.New().String(),
+		Name:     "tag_" + uuid.NewString(),
 		Group:    "",
 		Scope:    types.ModelTagScope,
 	}
@@ -489,7 +489,7 @@ func TestTagStore_SetLibraryTag(t *testing.T) {
 	ts := database.NewTagStoreWithDB(db)
 	tag := database.Tag{
 		Category: "task",
-		Name:     "tag_" + uuid.New().String(),
+		Name:     "tag_" + uuid.NewString(),
 		Group:    "",
 		Scope:    types.ModelTagScope,
 	}
@@ -498,7 +498,7 @@ func TestTagStore_SetLibraryTag(t *testing.T) {
 
 	tag = database.Tag{
 		Category: "task",
-		Name:     "tag_" + uuid.New().String(),
+		Name:     "tag_" + uuid.NewString(),
 		Group:    "",
 		Scope:    types.ModelTagScope,
 	}
@@ -525,7 +525,7 @@ func TestTagStore_UpsertRepoTags(t *testing.T) {
 	ts := database.NewTagStoreWithDB(db)
 	tag := database.Tag{
 		Category: "task",
-		Name:     "tag_" + uuid.New().String(),
+		Name:     "tag_" + uuid.NewString(),
 		Group:    "",
 		Scope:    types.ModelTagScope,
 	}
@@ -556,7 +556,7 @@ func TestTagStore_UpsertRepoTags(t *testing.T) {
 
 	tag = database.Tag{
 		Category: "task",
-		Name:     "tag_" + uuid.New().String(),
+		Name:     "tag_" + uuid.NewString(),
 		Group:    "",
 		Scope:    types.ModelTagScope,
 	}
@@ -584,17 +584,16 @@ func TestTagStore_RemoveRepoTags(t *testing.T) {
 	ts := database.NewTagStoreWithDB(db)
 	tag := database.Tag{
 		Category: "task",
-		Name:     "tag_" + uuid.New().String(),
+		Name:     "tag_" + uuid.NewString(),
 		Group:    "",
 		Scope:    types.ModelTagScope,
 	}
 	tag1, err := ts.CreateTag(ctx, tag)
 	require.Empty(t, err)
 	require.NotEmpty(t, tag1.ID)
-
 	tag = database.Tag{
 		Category: "task",
-		Name:     "tag_" + uuid.New().String(),
+		Name:     "tag_" + uuid.NewString(),
 		Group:    "",
 		Scope:    types.ModelTagScope,
 	}
@@ -645,7 +644,7 @@ func TestTagStore_RemoveRepoTagsByCategory(t *testing.T) {
 	ts := database.NewTagStoreWithDB(db)
 	tag := database.Tag{
 		Category: "task",
-		Name:     "tag_" + uuid.New().String(),
+		Name:     "tag_" + uuid.NewString(),
 		Group:    "",
 		Scope:    types.ModelTagScope,
 	}
@@ -654,7 +653,7 @@ func TestTagStore_RemoveRepoTagsByCategory(t *testing.T) {
 	require.NotEmpty(t, tag1.ID)
 	tag = database.Tag{
 		Category: "task",
-		Name:     "tag_" + uuid.New().String(),
+		Name:     "tag_" + uuid.NewString(),
 		Group:    "",
 		Scope:    types.ModelTagScope,
 	}
@@ -698,7 +697,7 @@ func TestTagStore_FindTagByID(t *testing.T) {
 	ts := database.NewTagStoreWithDB(db)
 	tag := database.Tag{
 		Category: "task",
-		Name:     "tag_" + uuid.New().String(),
+		Name:     "tag_" + uuid.NewString(),
 		Group:    "",
 		Scope:    types.ModelTagScope,
 	}
@@ -723,7 +722,7 @@ func TestTagStore_UpdateTagByID(t *testing.T) {
 
 	tag := database.Tag{
 		Category: "task",
-		Name:     "tag_" + uuid.New().String(),
+		Name:     "tag_" + uuid.NewString(),
 		Group:    "",
 		Scope:    types.ModelTagScope,
 	}
@@ -751,7 +750,7 @@ func TestTagStore_DeleteTagByID(t *testing.T) {
 	ts := database.NewTagStoreWithDB(db)
 	tag := database.Tag{
 		Category: "task",
-		Name:     "tag_" + uuid.New().String(),
+		Name:     "tag_" + uuid.NewString(),
 		Group:    "",
 		Scope:    types.ModelTagScope,
 	}

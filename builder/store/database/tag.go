@@ -192,7 +192,7 @@ func (ts *tagStoreImpl) AllCategories(ctx context.Context, scope types.TagScope)
 }
 
 func (ts *tagStoreImpl) CreateTag(ctx context.Context, tag Tag) (*Tag, error) {
-	_, err := ts.db.Operator.Core.NewInsert().Model(&tag).Exec(ctx)
+	err := ts.db.Operator.Core.NewInsert().Model(&tag).Scan(ctx, &tag)
 	return &tag, err
 }
 
