@@ -154,11 +154,17 @@ func TestPromptStore_FindByPath(t *testing.T) {
 		if n == "b" {
 			c = 1
 		}
-		tag, err := ts.CreateTag(ctx, "foo", n, n, types.DatasetTagScope)
+		tag := database.Tag{
+			Category: "foo",
+			Name:     n,
+			Group:    n,
+			Scope:    types.DatasetTagScope,
+		}
+		dbTag, err := ts.CreateTag(ctx, tag)
 		require.Nil(t, err)
 		tags = append(tags, database.RepositoryTag{
 			RepositoryID: repo.ID,
-			TagID:        tag.ID,
+			TagID:        dbTag.ID,
 			Count:        c,
 		})
 	}

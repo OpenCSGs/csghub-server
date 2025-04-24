@@ -233,7 +233,7 @@ func (c *tagComponentImpl) CreateTag(ctx context.Context, username string, req t
 		ShowName: req.ShowName,
 	}
 
-	tag, err := c.tagStore.FindOrCreate(ctx, newTag)
+	tag, err := c.tagStore.CreateTag(ctx, newTag)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create tag, error: %w", err)
 	}
