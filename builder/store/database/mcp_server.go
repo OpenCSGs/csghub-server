@@ -9,12 +9,17 @@ import (
 )
 
 type MCPServer struct {
-	ID            int64       `bun:",pk,autoincrement" json:"id"`
-	RepositoryID  int64       `bun:",notnull" json:"repository_id"`
-	Repository    *Repository `bun:"rel:belongs-to,join:repository_id=id" json:"repository"`
-	ToolsNum      int         `bun:",nullzero" json:"tools_num"`
-	Configuration string      `bun:",nullzero" json:"configuration"` // server configuration json string
-	Schema        string      `bun:",nullzero" json:"schema"`        // all properties json string
+	ID              int64       `bun:",pk,autoincrement" json:"id"`
+	RepositoryID    int64       `bun:",notnull" json:"repository_id"`
+	Repository      *Repository `bun:"rel:belongs-to,join:repository_id=id" json:"repository"`
+	ToolsNum        int         `bun:",nullzero" json:"tools_num"`
+	Configuration   string      `bun:",nullzero" json:"configuration"`    // server configuration json string
+	Schema          string      `bun:",nullzero" json:"schema"`           // all properties json string
+	ProgramLanguage string      `bun:",nullzero" json:"program_language"` // default program language
+	RunMode         string      `bun:",nullzero" json:"run_mode"`         // default run mode
+	InstallDepsCmds string      `bun:",nullzero" json:"install_deps_cmds"`
+	BuildCmds       string      `bun:",nullzero" json:"build_cmds"`
+	LaunchCmds      string      `bun:",nullzero" json:"launch_cmds"` // {"local": "cmd1", "remote": "cmd2"}
 	times
 }
 
@@ -88,7 +93,7 @@ func (m *mcpServerStoreImpl) ByPath(ctx context.Context, namespace string, name 
 		NewSelect().
 		Model(mcpServer).
 		Relation("Repository.User").
-		Where("repository.path =?", fmt.Sprintf("%s/%s", namespace, name)).
+		Where("repository.path = ?", fmt.Sprintf("%s/%s", namespace, name)).
 		Scan(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("select mcp server %s/%s error: %w", namespace, name, err)

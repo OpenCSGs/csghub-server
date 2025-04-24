@@ -22,6 +22,7 @@ func CreateMCPServerRoutes(
 		mcpGroup.POST("", authCollection.NeedLogin, mcpServerHandler.Create)
 		mcpGroup.DELETE("/:namespace/:name", authCollection.NeedLogin, mcpServerHandler.Delete)
 		mcpGroup.PUT("/:namespace/:name", authCollection.NeedLogin, mcpServerHandler.Update)
+		mcpGroup.POST("/:namespace/:name/deploys", authCollection.NeedLogin, mcpServerHandler.Deploy)
 
 		// repo common handler functions
 		mcpGroup.GET("/:namespace/:name/branches", middleware.RepoType(types.MCPServerRepo), repoCommonHandler.Branches)

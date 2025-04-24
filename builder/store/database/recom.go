@@ -20,6 +20,7 @@ type RecomStore interface {
 	LoadRepoOpWeights(ctx context.Context, repoIDs []int64) (map[int64]int, error)
 	UpsetOpWeights(ctx context.Context, repoID, weight int64) error
 	FindScoreByRepoIDs(ctx context.Context, repoIDs []int64) ([]*RecomRepoScore, error)
+	FindByRepoIDs(ctx context.Context, repoIDs []int64) ([]*RecomRepoScore, error)
 }
 
 func NewRecomStore() RecomStore {
@@ -88,6 +89,14 @@ func (s *recomStoreImpl) UpsetOpWeights(ctx context.Context, repoID, weight int6
 
 // FindScoreByRepoIDs implements RecomStore.
 func (s *recomStoreImpl) FindScoreByRepoIDs(ctx context.Context, repoIDs []int64) ([]*RecomRepoScore, error) {
+	items := make([]*RecomRepoScore, 0)
+	err := s.db.Operator.Core.NewSelect().Model(&RecomRepoScore{}).
+		Where("repository_id IN (?)", bun.In(repoIDs)).
+		Scan(ctx, &items)
+	return items, err
+}
+
+func (s *recomStoreImpl) FindByRepoIDs(ctx context.Context, repoIDs []int64) ([]*RecomRepoScore, error) {
 	items := make([]*RecomRepoScore, 0)
 	err := s.db.Operator.Core.NewSelect().Model(&RecomRepoScore{}).
 		Where("repository_id IN (?)", bun.In(repoIDs)).

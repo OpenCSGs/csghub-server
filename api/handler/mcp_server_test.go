@@ -105,7 +105,7 @@ func TestMCPServerHandler_Show(t *testing.T) {
 		return h.Show
 	})
 
-	tester.mocks.mcpServerComp.EXPECT().Show(tester.Ctx(), "u", "r", "", false).Return(&types.MCPServer{ID: 1}, nil)
+	tester.mocks.mcpServerComp.EXPECT().Show(tester.Ctx(), "u", "r", "", false, false).Return(&types.MCPServer{ID: 1}, nil)
 
 	tester.Execute()
 
@@ -144,4 +144,44 @@ func TestMCPServerHandler_Properties(t *testing.T) {
 	tester.Execute()
 
 	tester.ResponseEq(t, 200, tester.OKText, gin.H{"data": []types.MCPServerProperties{{ID: 1}}, "total": 1})
+}
+
+func TestMCPServerHandler_Deploy(t *testing.T) {
+	tester := NewMCPServerTester(t)
+	tester.WithHandleFunc(func(h *MCPServerHandler) gin.HandlerFunc {
+		return h.Deploy
+	})
+
+	req := &types.DeployMCPServerReq{
+		CreateRepoReq: types.CreateRepoReq{
+			Namespace: "u1",
+			Name:      "r1",
+		},
+		ResourceID: 11,
+		ClusterID:  "ab45d3ba-a2ff-466e-887a-b2e5c0c070c5",
+	}
+
+	tester.mocks.sensitive.EXPECT().CheckRequestV2(tester.Ctx(), req).Return(true, nil)
+	tester.mocks.mcpServerComp.EXPECT().Deploy(tester.Ctx(), &types.DeployMCPServerReq{
+		MCPRepo: types.RepoRequest{
+			Namespace: "u",
+			Name:      "r",
+		},
+		CreateRepoReq: types.CreateRepoReq{
+			Namespace:     "u1",
+			Name:          "r1",
+			Nickname:      "r1",
+			DefaultBranch: "main",
+		},
+		ResourceID: 11,
+		ClusterID:  "ab45d3ba-a2ff-466e-887a-b2e5c0c070c5",
+	}).Return(&types.Space{
+		Name: "r",
+	}, nil)
+
+	tester.WithBody(t, req).Execute()
+
+	tester.ResponseEq(t, 200, tester.OKText, &types.Space{
+		Name: "r",
+	})
 }

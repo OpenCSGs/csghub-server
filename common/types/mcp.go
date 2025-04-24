@@ -11,6 +11,11 @@ const (
 	MCPPropresourceTemplate MCPPropertyKind = "resource_template"
 )
 
+var (
+	MCPSpaceConfFileName string = "mcp_space_conf.json"
+	MCPSpacePypiKey      string = "PYPI_INDEX_URL"
+)
+
 type CreateMCPServerReq struct {
 	CreateRepoReq
 	Configuration string `json:"configuration"`
@@ -18,7 +23,12 @@ type CreateMCPServerReq struct {
 
 type UpdateMCPServerReq struct {
 	UpdateRepoReq
-	Configuration *string `json:"configuration"`
+	Configuration   *string `json:"configuration"`
+	ProgramLanguage *string `json:"program_language"`
+	RunMode         *string `json:"run_mode"`
+	InstallDepsCmds *string `json:"install_deps_cmds"`
+	BuildCmds       *string `json:"build_cmds"`
+	LaunchCmds      *string `json:"launch_cmds"`
 }
 
 type MCPServer struct {
@@ -52,6 +62,13 @@ type MCPServer struct {
 	Schema               string               `json:"schema"`
 	StarNum              int                  `json:"star_num"`
 	GithubPath           string               `json:"github_path"` // github path
+	Readme               string               `json:"readme"`
+	MultiSource
+	ProgramLanguage string `json:"program_language"`
+	RunMode         string `json:"run_mode"`
+	InstallDepsCmds string `json:"install_deps_cmds"`
+	BuildCmds       string `json:"build_cmds"`
+	LaunchCmds      string `json:"launch_cmds"`
 }
 
 type MCPPropertyFilter struct {
@@ -76,4 +93,22 @@ type MCPServerProperties struct {
 	UpdatedAt    time.Time       `json:"updated_at"`
 	RepoPath     string          `json:"repo_path"`
 	Tags         []RepoTag       `json:"tags"`
+}
+
+type DeployMCPServerReq struct {
+	CurrentUser string      `json:"-"`
+	MCPRepo     RepoRequest `json:"-"`
+	CreateRepoReq
+	CoverImageUrl string `json:"cover_image_url"`
+	Env           string `json:"env"`
+	ResourceID    int64  `json:"resource_id"` // space resource id
+	ClusterID     string `json:"cluster_id"`
+}
+
+type MCPSpaceConfig struct {
+	ProgramLanguage string `json:"program_language"`
+	RunMode         string `json:"run_mode"`
+	InstallDepsCmds string `json:"install_deps_cmds"`
+	BuildCmds       string `json:"build_cmds"`
+	LaunchCmds      string `json:"launch_cmds"`
 }

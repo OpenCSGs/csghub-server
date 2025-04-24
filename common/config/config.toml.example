@@ -96,6 +96,7 @@ gpu_model_label = "aliyun.accelerator/nvidia_name"
 readness_delay_seconds = 120
 readness_period_seconds = 10
 readness_failure_threshold = 3
+pypi_index_url = ""
 
 [model]
 deploy_timeout_in_min = 60

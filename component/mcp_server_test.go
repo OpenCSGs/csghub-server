@@ -225,7 +225,7 @@ func TestMCPServerComponent_Show(t *testing.T) {
 
 	mc.mocks.stores.UserLikesMock().EXPECT().IsExist(ctx, "user", dbrepo.ID).Return(false, nil)
 
-	res, err := mc.Show(ctx, "ns", "n", "user", false)
+	res, err := mc.Show(ctx, "ns", "n", "user", false, false)
 	require.Nil(t, err)
 	require.NotNil(t, res)
 	require.Equal(t, res.UserLikes, false)
