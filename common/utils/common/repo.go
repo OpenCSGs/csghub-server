@@ -181,3 +181,7 @@ func GetSourceTypeAndPathFromURL(url string) (string, string, error) {
 	}
 	return sourceType, path, nil
 }
+
+func BuildRelativePath(repoType, namespace, name string) string {
+	return strings.ToLower(repoType + "_" + namespace + "/" + name)
+}

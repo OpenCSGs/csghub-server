@@ -622,6 +622,56 @@ func (_c *MockRepoComponent_Branches_Call) RunAndReturn(run func(context.Context
 	return _c
 }
 
+// CheckAccountAndResource provides a mock function with given fields: ctx, userName, clusterID, orderDetailID, resource
+func (_m *MockRepoComponent) CheckAccountAndResource(ctx context.Context, userName string, clusterID string, orderDetailID int64, resource *database.SpaceResource) error {
+	ret := _m.Called(ctx, userName, clusterID, orderDetailID, resource)
+
+	if len(ret) == 0 {
+		panic("no return value specified for CheckAccountAndResource")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, int64, *database.SpaceResource) error); ok {
+		r0 = rf(ctx, userName, clusterID, orderDetailID, resource)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// MockRepoComponent_CheckAccountAndResource_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'CheckAccountAndResource'
+type MockRepoComponent_CheckAccountAndResource_Call struct {
+	*mock.Call
+}
+
+// CheckAccountAndResource is a helper method to define mock.On call
+//   - ctx context.Context
+//   - userName string
+//   - clusterID string
+//   - orderDetailID int64
+//   - resource *database.SpaceResource
+func (_e *MockRepoComponent_Expecter) CheckAccountAndResource(ctx interface{}, userName interface{}, clusterID interface{}, orderDetailID interface{}, resource interface{}) *MockRepoComponent_CheckAccountAndResource_Call {
+	return &MockRepoComponent_CheckAccountAndResource_Call{Call: _e.mock.On("CheckAccountAndResource", ctx, userName, clusterID, orderDetailID, resource)}
+}
+
+func (_c *MockRepoComponent_CheckAccountAndResource_Call) Run(run func(ctx context.Context, userName string, clusterID string, orderDetailID int64, resource *database.SpaceResource)) *MockRepoComponent_CheckAccountAndResource_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(string), args[2].(string), args[3].(int64), args[4].(*database.SpaceResource))
+	})
+	return _c
+}
+
+func (_c *MockRepoComponent_CheckAccountAndResource_Call) Return(_a0 error) *MockRepoComponent_CheckAccountAndResource_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockRepoComponent_CheckAccountAndResource_Call) RunAndReturn(run func(context.Context, string, string, int64, *database.SpaceResource) error) *MockRepoComponent_CheckAccountAndResource_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // CheckCurrentUserPermission provides a mock function with given fields: ctx, userName, namespace, role
 func (_m *MockRepoComponent) CheckCurrentUserPermission(ctx context.Context, userName string, namespace string, role membership.Role) (bool, error) {
 	ret := _m.Called(ctx, userName, namespace, role)

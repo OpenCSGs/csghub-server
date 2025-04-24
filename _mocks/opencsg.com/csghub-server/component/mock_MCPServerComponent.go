@@ -128,6 +128,65 @@ func (_c *MockMCPServerComponent_Delete_Call) RunAndReturn(run func(context.Cont
 	return _c
 }
 
+// Deploy provides a mock function with given fields: ctx, req
+func (_m *MockMCPServerComponent) Deploy(ctx context.Context, req *types.DeployMCPServerReq) (*types.Space, error) {
+	ret := _m.Called(ctx, req)
+
+	if len(ret) == 0 {
+		panic("no return value specified for Deploy")
+	}
+
+	var r0 *types.Space
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, *types.DeployMCPServerReq) (*types.Space, error)); ok {
+		return rf(ctx, req)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, *types.DeployMCPServerReq) *types.Space); ok {
+		r0 = rf(ctx, req)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*types.Space)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, *types.DeployMCPServerReq) error); ok {
+		r1 = rf(ctx, req)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockMCPServerComponent_Deploy_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'Deploy'
+type MockMCPServerComponent_Deploy_Call struct {
+	*mock.Call
+}
+
+// Deploy is a helper method to define mock.On call
+//   - ctx context.Context
+//   - req *types.DeployMCPServerReq
+func (_e *MockMCPServerComponent_Expecter) Deploy(ctx interface{}, req interface{}) *MockMCPServerComponent_Deploy_Call {
+	return &MockMCPServerComponent_Deploy_Call{Call: _e.mock.On("Deploy", ctx, req)}
+}
+
+func (_c *MockMCPServerComponent_Deploy_Call) Run(run func(ctx context.Context, req *types.DeployMCPServerReq)) *MockMCPServerComponent_Deploy_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(*types.DeployMCPServerReq))
+	})
+	return _c
+}
+
+func (_c *MockMCPServerComponent_Deploy_Call) Return(_a0 *types.Space, _a1 error) *MockMCPServerComponent_Deploy_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockMCPServerComponent_Deploy_Call) RunAndReturn(run func(context.Context, *types.DeployMCPServerReq) (*types.Space, error)) *MockMCPServerComponent_Deploy_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // Index provides a mock function with given fields: ctx, filter, per, page, needOpWeight
 func (_m *MockMCPServerComponent) Index(ctx context.Context, filter *types.RepoFilter, per int, page int, needOpWeight bool) ([]*types.MCPServer, int, error) {
 	ret := _m.Called(ctx, filter, per, page, needOpWeight)
@@ -329,9 +388,9 @@ func (_c *MockMCPServerComponent_Properties_Call) RunAndReturn(run func(context.
 	return _c
 }
 
-// Show provides a mock function with given fields: ctx, namespace, name, currentUser, needOpWeight
-func (_m *MockMCPServerComponent) Show(ctx context.Context, namespace string, name string, currentUser string, needOpWeight bool) (*types.MCPServer, error) {
-	ret := _m.Called(ctx, namespace, name, currentUser, needOpWeight)
+// Show provides a mock function with given fields: ctx, namespace, name, currentUser, needOpWeight, needMultiSync
+func (_m *MockMCPServerComponent) Show(ctx context.Context, namespace string, name string, currentUser string, needOpWeight bool, needMultiSync bool) (*types.MCPServer, error) {
+	ret := _m.Called(ctx, namespace, name, currentUser, needOpWeight, needMultiSync)
 
 	if len(ret) == 0 {
 		panic("no return value specified for Show")
@@ -339,19 +398,19 @@ func (_m *MockMCPServerComponent) Show(ctx context.Context, namespace string, na
 
 	var r0 *types.MCPServer
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, string, string, bool) (*types.MCPServer, error)); ok {
-		return rf(ctx, namespace, name, currentUser, needOpWeight)
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, string, bool, bool) (*types.MCPServer, error)); ok {
+		return rf(ctx, namespace, name, currentUser, needOpWeight, needMultiSync)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, string, string, string, bool) *types.MCPServer); ok {
-		r0 = rf(ctx, namespace, name, currentUser, needOpWeight)
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, string, bool, bool) *types.MCPServer); ok {
+		r0 = rf(ctx, namespace, name, currentUser, needOpWeight, needMultiSync)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*types.MCPServer)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, string, string, string, bool) error); ok {
-		r1 = rf(ctx, namespace, name, currentUser, needOpWeight)
+	if rf, ok := ret.Get(1).(func(context.Context, string, string, string, bool, bool) error); ok {
+		r1 = rf(ctx, namespace, name, currentUser, needOpWeight, needMultiSync)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -370,13 +429,14 @@ type MockMCPServerComponent_Show_Call struct {
 //   - name string
 //   - currentUser string
 //   - needOpWeight bool
-func (_e *MockMCPServerComponent_Expecter) Show(ctx interface{}, namespace interface{}, name interface{}, currentUser interface{}, needOpWeight interface{}) *MockMCPServerComponent_Show_Call {
-	return &MockMCPServerComponent_Show_Call{Call: _e.mock.On("Show", ctx, namespace, name, currentUser, needOpWeight)}
+//   - needMultiSync bool
+func (_e *MockMCPServerComponent_Expecter) Show(ctx interface{}, namespace interface{}, name interface{}, currentUser interface{}, needOpWeight interface{}, needMultiSync interface{}) *MockMCPServerComponent_Show_Call {
+	return &MockMCPServerComponent_Show_Call{Call: _e.mock.On("Show", ctx, namespace, name, currentUser, needOpWeight, needMultiSync)}
 }
 
-func (_c *MockMCPServerComponent_Show_Call) Run(run func(ctx context.Context, namespace string, name string, currentUser string, needOpWeight bool)) *MockMCPServerComponent_Show_Call {
+func (_c *MockMCPServerComponent_Show_Call) Run(run func(ctx context.Context, namespace string, name string, currentUser string, needOpWeight bool, needMultiSync bool)) *MockMCPServerComponent_Show_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(string), args[2].(string), args[3].(string), args[4].(bool))
+		run(args[0].(context.Context), args[1].(string), args[2].(string), args[3].(string), args[4].(bool), args[5].(bool))
 	})
 	return _c
 }
@@ -386,7 +446,7 @@ func (_c *MockMCPServerComponent_Show_Call) Return(_a0 *types.MCPServer, _a1 err
 	return _c
 }
 
-func (_c *MockMCPServerComponent_Show_Call) RunAndReturn(run func(context.Context, string, string, string, bool) (*types.MCPServer, error)) *MockMCPServerComponent_Show_Call {
+func (_c *MockMCPServerComponent_Show_Call) RunAndReturn(run func(context.Context, string, string, string, bool, bool) (*types.MCPServer, error)) *MockMCPServerComponent_Show_Call {
 	_c.Call.Return(run)
 	return _c
 }

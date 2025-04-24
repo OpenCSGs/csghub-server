@@ -1,7 +1,9 @@
 package gitaly
 
-import "strings"
+import (
+	"opencsg.com/csghub-server/common/utils/common"
+)
 
 func BuildRelativePath(repoType, namespace, name string) string {
-	return strings.ToLower(repoType + "_" + namespace + "/" + name + ".git")
+	return common.BuildRelativePath(repoType, namespace, name) + ".git"
 }

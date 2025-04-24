@@ -133,6 +133,7 @@ type Config struct {
 		ReadnessDelaySeconds     int    `env:"STARHUB_SERVER_READNESS_DELAY_SECONDS, default=120"`
 		ReadnessPeriodSeconds    int    `env:"STARHUB_SERVER_READNESS_PERIOD_SECONDS, default=10"`
 		ReadnessFailureThreshold int    `env:"STARHUB_SERVER_READNESS_FAILURE_THRESHOLD, default=3"`
+		PYPIIndexURL             string `env:"STARHUB_SERVER_SPACE_PYPI_INDEX_URL, default="`
 	}
 
 	Model struct {

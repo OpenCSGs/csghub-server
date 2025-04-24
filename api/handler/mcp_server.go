@@ -193,6 +193,7 @@ func (h *MCPServerHandler) Update(ctx *gin.Context) {
 // @Param        name path string true "name"
 // @Param        current_user query string true "current_user"
 // @Param        need_op_weight query bool false "need op weight" default(false)
+// @Param        need_multi_sync query bool false "need multi sync" default(false)
 // @Success      200  {object}  types.Response{data=types.MCPServer} "OK"
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
@@ -212,7 +213,13 @@ func (h *MCPServerHandler) Show(ctx *gin.Context) {
 		needOpWeight = false
 	}
 
-	detail, err := h.mcpComp.Show(ctx.Request.Context(), namespace, name, currentUser, needOpWeight)
+	qNeedMultiSync := ctx.Query("need_multi_sync")
+	needMultiSync, err := strconv.ParseBool(qNeedMultiSync)
+	if err != nil {
+		needMultiSync = false
+	}
+
+	detail, err := h.mcpComp.Show(ctx.Request.Context(), namespace, name, currentUser, needOpWeight, needMultiSync)
 	if err != nil {
 		if errors.Is(err, component.ErrForbidden) {
 			httpbase.ForbiddenError(ctx, err)
@@ -327,5 +334,71 @@ func (h *MCPServerHandler) Properties(ctx *gin.Context) {
 		"data":  properties,
 		"total": total,
 	}
+	httpbase.OK(ctx, respData)
+}
+
+// DeployMCPServer   godoc
+// @Security     ApiKey
+// @Summary      Deploy a exists mcp server as space
+// @Description  Deploy a exists mcp server as space
+// @Tags         MCP
+// @Accept       json
+// @Produce      json
+// @Param        namespace path string true "namespace"
+// @Param        name path string true "name"
+// @Param        current_user query string false "current user"
+// @Param        body body types.DeployMCPServerReq true "body"
+// @Success      200  {object}  types.Response{data=types.Space} "OK"
+// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
+// @Router       /mcps/{namespace}/{name}/deploy [post]
+func (h *MCPServerHandler) Deploy(ctx *gin.Context) {
+	currentUser := httpbase.GetCurrentUser(ctx)
+
+	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
+	if err != nil {
+		slog.Error("Bad mcp server request format", "error", err)
+		httpbase.BadRequest(ctx, err.Error())
+		return
+	}
+
+	var req *types.DeployMCPServerReq
+	if err := ctx.ShouldBindJSON(&req); err != nil {
+		slog.Error("Bad request format for deploy mcp server", "error", err)
+		httpbase.BadRequest(ctx, err.Error())
+		return
+	}
+
+	_, err = h.sensitive.CheckRequestV2(ctx.Request.Context(), req)
+	if err != nil {
+		slog.Error("failed to check sensitive for mcp deploy request", slog.Any("error", err))
+		httpbase.BadRequest(ctx, fmt.Errorf("sensitive check failed: %w", err).Error())
+		return
+	}
+
+	req.Username = currentUser
+	req.CurrentUser = currentUser
+	req.MCPRepo.Namespace = namespace
+	req.MCPRepo.Name = name
+
+	if req.DefaultBranch == "" {
+		req.DefaultBranch = types.MainBranch
+	}
+
+	if len(req.Nickname) < 1 {
+		req.Nickname = req.Name
+	}
+
+	respData, err := h.mcpComp.Deploy(ctx.Request.Context(), req)
+	if err != nil {
+		if errors.Is(err, component.ErrForbidden) {
+			httpbase.ForbiddenError(ctx, err)
+			return
+		}
+		slog.Error("failed to deploy mcp server as space", slog.Any("error", err), slog.Any("req", req))
+		httpbase.ServerError(ctx, err)
+		return
+	}
+
 	httpbase.OK(ctx, respData)
 }

@@ -152,6 +152,7 @@ type RepoComponent interface {
 	VisiableToUser(ctx context.Context, repos []*database.Repository, currentUser string) ([]*database.Repository, error)
 	GenerateEndpoint(ctx context.Context, deploy *database.Deploy) (string, string)
 	IsAdminRole(user database.User) bool
+	CheckAccountAndResource(ctx context.Context, userName string, clusterID string, orderDetailID int64, resource *database.SpaceResource) error
 }
 
 func NewRepoComponentImpl(config *config.Config) (*repoComponentImpl, error) {
