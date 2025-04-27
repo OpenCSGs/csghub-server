@@ -20,10 +20,10 @@ jobs:
           go-version: "1.24"
       - uses: actions/checkout@v4
       - name: golangci-lint
-        uses: golangci/golangci-lint-action@v7
+        uses: golangci/golangci-lint-action@v6
         with:
           args: --timeout=5m
-          version: v2.1.5
+          version: v1.62
       - name: GinContext
         run: go run linters/gincontext/main.go
   swagger:
