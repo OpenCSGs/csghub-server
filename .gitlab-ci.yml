@@ -42,7 +42,7 @@ include:
     - docker run --privileged --rm opencsg-registry.cn-beijing.cr.aliyuncs.com/opencsg_public/tonistiigi/binfmt --install all
 
 lint-all:
-  image: opencsg-registry.cn-beijing.cr.aliyuncs.com/opencsg_public/golangci/golangci-lint:v1.62.0
+  image: opencsg-registry.cn-beijing.cr.aliyuncs.com/opencsg_public/golangci/golangci-lint:latest
   extends: .go-lint-cache
   stage: lint
   interruptible: true

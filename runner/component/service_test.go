@@ -120,6 +120,7 @@ func TestServiceComponent_StopService(t *testing.T) {
 		ClusterConfig: "config",
 		StorageClass:  "test",
 	}, nil)
+	kss.EXPECT().Delete(ctx, "test", "test").Return(nil)
 	resp, err := sc.StopService(ctx, types.StopRequest{
 		SvcName:   "test",
 		ClusterID: "test",
