@@ -23,7 +23,7 @@ jobs:
         uses: golangci/golangci-lint-action@v7
         with:
           args: --timeout=5m
-          version: v2.0
+          version: v1.64.6
       - name: GinContext
         run: go run linters/gincontext/main.go
   swagger:
