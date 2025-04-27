@@ -1,13 +1,13 @@
 {
   "engine_name": "vllm",
-  "engine_version": "0.7.3",
+  "engine_version": "v0.8.4",
   "enabled": 1,
   "container_port": 8000,
   "model_format": "safetensors",
   "engine_images": [
     {
       "compute_type": "gpu",
-      "image": "vllm-local:v0.7.3",
+      "image": "vllm:v0.8.4",
       "driver_version": "12.4"
     },
     {

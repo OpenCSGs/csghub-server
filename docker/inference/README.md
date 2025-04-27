@@ -12,11 +12,11 @@ echo "$OPENCSG_ACR_PASSWORD" | docker login $OPENCSG_ACR -u $OPENCSG_ACR_USERNAM
 ```bash
 export BUILDX_NO_DEFAULT_ATTESTATIONS=1
 
-# For vllm: opencsg-registry.cn-beijing.cr.aliyuncs.com/public/vllm-local:v0.7.3
-export IMAGE_TAG=v0.7.3
+# For vllm: opencsg-registry.cn-beijing.cr.aliyuncs.com/public/vllm:v0.8.4
+export IMAGE_TAG=v0.8.4
 docker buildx build --platform linux/amd64,linux/arm64 \
-  -t ${OPENCSG_ACR}/public/vllm-local:${IMAGE_TAG} \
-  -t ${OPENCSG_ACR}/public/vllm-local:latest \
+  -t ${OPENCSG_ACR}/public/vllm:${IMAGE_TAG} \
+  -t ${OPENCSG_ACR}/public/vllm:latest \
   -f Dockerfile.vllm \
   --push .
   
@@ -36,8 +36,8 @@ docker buildx build --platform linux/amd64 \
   -f Dockerfile.tgi \
   --push .
 
-# For sglang: opencsg-registry.cn-beijing.cr.aliyuncs.com/public/sglang:v0.4.3.post2-cu124-srt
-export IMAGE_TAG=v0.4.3.post2-cu124-srt
+# For sglang: opencsg-registry.cn-beijing.cr.aliyuncs.com/public/sglang:v0.4.5.post2-cu124-srt
+export IMAGE_TAG=v0.4.5.post2-cu124-srt
 docker buildx build --platform linux/amd64 \
   -t ${OPENCSG_ACR}/public/sglang:${IMAGE_TAG} \
   -t ${OPENCSG_ACR}/public/sglang:latest \

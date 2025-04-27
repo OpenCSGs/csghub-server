@@ -229,7 +229,6 @@ func TestDeployer_Status(t *testing.T) {
 		mockDeployTaskStore := mockdb.NewMockDeployTaskStore(t)
 		mockDeployTaskStore.EXPECT().GetDeployByID(mock.Anything, dr.DeployID).
 			Return(nil, nil)
-
 		d := &deployer{
 			deployTaskStore: mockDeployTaskStore,
 		}

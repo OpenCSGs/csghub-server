@@ -206,9 +206,11 @@ func (rs *FIFOScheduler) next() (Runner, error) {
 
 func (rs *FIFOScheduler) failDeployFollowingTasks(deploytaskID int64, reason string) {
 	slog.Info("scheduler fail following tasks", slog.Any("deploy_task_id", deploytaskID))
-	t, _ := rs.store.GetDeployTask(context.Background(), deploytaskID)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	t, _ := rs.store.GetDeployTask(ctx, deploytaskID)
 
-	dps, err := rs.store.GetDeployTasksOfDeploy(context.Background(), t.DeployID)
+	dps, err := rs.store.GetDeployTasksOfDeploy(ctx, t.DeployID)
 	if err != nil {
 		slog.Error("failed to get tasks of deploy when check build status", slog.Any("error", err),
 			slog.Int64("deploy_id", t.DeployID))
@@ -227,10 +229,27 @@ func (rs *FIFOScheduler) failDeployFollowingTasks(deploytaskID int64, reason str
 		if dp.ID > t.ID {
 			dp.Status = cancelled
 			dp.Message = "cancel as previous task failed"
+		} else {
+			dp.Status = deployFailed
+			dp.Message = reason
 		}
 	}
-	if err := rs.store.UpdateInTx(context.Background(), nil, []string{"status", "message"}, nil, dps...); err != nil {
+	if err := rs.store.UpdateInTx(ctx, nil, []string{"status", "message"}, nil, dps...); err != nil {
 		slog.Error("failed update deploy status to `BuildFailed`", slog.Int64("deploy_task_id", t.ID), "error", err)
 		return
 	}
+
+	deploy, err := rs.store.GetDeployByID(ctx, t.DeployID)
+	if err != nil {
+		slog.Error("failed to get deploy when check build status", slog.Any("error", err),
+			slog.Int64("deploy_id", t.DeployID))
+		return
+	}
+	deploy.Status = common.DeployFailed
+	deploy.Message = reason
+	if err := rs.store.UpdateDeploy(ctx, deploy); err != nil {
+		slog.Error("failed update deploy status to `DeployFailed`", slog.Int64("deploy_id", t.DeployID), "error", err)
+		return
+	}
+
 }

@@ -172,7 +172,7 @@ func (c *runtimeArchitectureComponentImpl) ScanAllModels(ctx context.Context, sc
 				}
 				modelInfo, err := c.UpdateModelMetadata(ctxBatch, &repo)
 				if err != nil {
-					slog.Warn("fail to update model metadata", slog.Any("err", err), slog.Any("repo path", repo.Path))
+					slog.Error("fail to update model metadata", slog.Any("err", err), slog.Any("repo path", repo.Path))
 					continue
 				}
 				err = c.UpdateRuntimeFrameworkTag(ctxBatch, modelInfo, &repo)
@@ -540,7 +540,7 @@ func (c *runtimeArchitectureComponentImpl) AddRuntimeFrameworkTag(ctx context.Co
 		if checkTagName(rfw, tag.Name) {
 			err := c.tagStore.UpsertRepoTags(ctx, repoId, []int64{}, []int64{tag.ID})
 			if err != nil {
-				slog.Warn("fail to add runtime_framework tag to model repo", slog.Any("repoId", repoId), slog.Any("runtime_framework_id", rfId), slog.Any("error", err))
+				slog.Error("fail to add runtime_framework tag to model repo", slog.Any("repoId", repoId), slog.Any("runtime_framework_id", rfId), slog.Any("error", err))
 			}
 		}
 	}
