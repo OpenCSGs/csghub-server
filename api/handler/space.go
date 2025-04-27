@@ -130,7 +130,7 @@ func (h *SpaceHandler) Show(ctx *gin.Context) {
 		return
 	}
 	currentUser := httpbase.GetCurrentUser(ctx)
-	detail, err := h.space.Show(ctx.Request.Context(), namespace, name, currentUser)
+	detail, err := h.space.Show(ctx.Request.Context(), namespace, name, currentUser, false)
 	if err != nil {
 		if errors.Is(err, component.ErrUnauthorized) {
 			httpbase.UnauthorizedError(ctx, err)

@@ -33,7 +33,7 @@ enableXsrfProtection = false
 
 type SpaceComponent interface {
 	Create(ctx context.Context, req types.CreateSpaceReq) (*types.Space, error)
-	Show(ctx context.Context, namespace, name, currentUser string) (*types.Space, error)
+	Show(ctx context.Context, namespace, name, currentUser string, needOpWeight bool) (*types.Space, error)
 	Update(ctx context.Context, req *types.UpdateSpaceReq) (*types.Space, error)
 	Index(ctx context.Context, repoFilter *types.RepoFilter, per, page int, needOpWeight bool) ([]*types.Space, int, error)
 	OrgSpaces(ctx context.Context, req *types.OrgSpacesReq) ([]types.Space, int, error)
@@ -363,7 +363,7 @@ func (c *spaceComponentImpl) uploadTemplateFiles(entries []os.DirEntry, req type
 	return nil
 }
 
-func (c *spaceComponentImpl) Show(ctx context.Context, namespace, name, currentUser string) (*types.Space, error) {
+func (c *spaceComponentImpl) Show(ctx context.Context, namespace, name, currentUser string, needOpWeight bool) (*types.Space, error) {
 	var tags []types.RepoTag
 	space, err := c.spaceStore.FindByPath(ctx, namespace, name)
 	if err != nil {
@@ -393,7 +393,7 @@ func (c *spaceComponentImpl) Show(ctx context.Context, namespace, name, currentU
 	}
 	repository := common.BuildCloneInfo(c.config, space.Repository)
 
-	resModel := &types.Space{
+	resSpace := &types.Space{
 		ID:            space.ID,
 		Name:          space.Repository.Name,
 		Nickname:      space.Repository.Nickname,
@@ -419,7 +419,6 @@ func (c *spaceComponentImpl) Show(ctx context.Context, namespace, name, currentU
 		UserLikes:     likeExists,
 		Sdk:           space.Sdk,
 		SdkVersion:    space.SdkVersion,
-		Secrets:       space.Secrets,
 		Variables:     space.Variables,
 		CoverImageUrl: space.CoverImageUrl,
 		Source:        space.Repository.Source,
@@ -431,10 +430,17 @@ func (c *spaceComponentImpl) Show(ctx context.Context, namespace, name, currentU
 		Namespace:     ns,
 	}
 	if permission.CanAdmin {
-		resModel.SensitiveCheckStatus = space.Repository.SensitiveCheckStatus.String()
+		resSpace.SensitiveCheckStatus = space.Repository.SensitiveCheckStatus.String()
+	}
+	if permission.CanWrite {
+		resSpace.Env = space.Env
+		resSpace.Secrets = space.Secrets
+	}
+	if needOpWeight {
+		c.addOpWeightToSpaces(ctx, []int64{resSpace.RepositoryID}, []*types.Space{resSpace})
 	}
 
-	return resModel, nil
+	return resSpace, nil
 }
 
 func (c *spaceComponentImpl) Update(ctx context.Context, req *types.UpdateSpaceReq) (*types.Space, error) {

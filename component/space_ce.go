@@ -94,3 +94,6 @@ func (c *spaceComponentImpl) updateDeployRepoBySpace(repo types.DeployRepo, spac
 func (c *spaceComponentImpl) updateDeployRepoByDeploy(repo types.DeployRepo, deploy *database.Deploy) types.DeployRepo {
 	return repo
 }
+
+func (c *spaceComponentImpl) addOpWeightToSpaces(ctx context.Context, repoIDs []int64, spaces []*types.Space) {
+}
