@@ -224,6 +224,10 @@ func (d *deployer) Status(ctx context.Context, dr types.DeployRepo, needDetails 
 		return "", common.Stopped, nil, fmt.Errorf("can't get deploy, %w", err)
 	}
 	svcName := deploy.SvcName
+	if deploy.Status == common.Pending {
+		//if deploy is pending, no need to check ksvc status
+		return svcName, common.Pending, nil, nil
+	}
 	svc, err := d.imageRunner.Exist(ctx, &types.CheckRequest{
 		SvcName:   svcName,
 		ClusterID: deploy.ClusterID,
@@ -738,12 +742,37 @@ func CheckResource(clusterResources *types.ClusterRes, hardware *types.HardWare)
 		slog.Error("failed to parse hardware memory ", slog.Any("error", err))
 		return false
 	}
+	if hardware.Replicas > 1 {
+		return checkMultiNodeResource(mem, clusterResources, hardware)
+	} else {
+		return checkSingleNodeResource(mem, clusterResources, hardware)
+	}
+}
+
+// check reousrce for sigle node
+func checkSingleNodeResource(mem int, clusterResources *types.ClusterRes, hardware *types.HardWare) bool {
 	for _, node := range clusterResources.Resources {
 		if float32(mem) <= node.AvailableMem {
 			isAvailable := checkNodeResource(node, hardware)
 			if isAvailable {
 				// if true return, otherwise continue check next node
 				return true
+			}
+		}
+	}
+	return false
+}
+
+func checkMultiNodeResource(mem int, clusterResources *types.ClusterRes, hardware *types.HardWare) bool {
+	ready := 0
+	for _, node := range clusterResources.Resources {
+		if float32(mem) <= node.AvailableMem {
+			isAvailable := checkNodeResource(node, hardware)
+			if isAvailable {
+				ready++
+				if ready >= hardware.Replicas {
+					return true
+				}
 			}
 		}
 	}

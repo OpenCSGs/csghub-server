@@ -22,5 +22,6 @@ type (
 		Cpu              CPU       `json:"cpu,omitempty"`
 		Memory           string    `json:"memory,omitempty"`
 		EphemeralStorage string    `json:"ephemeral_storage,omitempty"`
+		Replicas         int       `json:"replicas,omitempty"`
 	}
 )

@@ -2,10 +2,10 @@ name: Go
 
 on:
   push:
-    branches: ['*', '*/*']
-    tags: ['v*']
+    branches: ["*", "*/*"]
+    tags: ["v*"]
   pull_request:
-    branches: ['*']
+    branches: ["*"]
 
 permissions:
   contents: read
@@ -17,20 +17,20 @@ jobs:
     steps:
       - uses: actions/setup-go@v5
         with:
-          go-version: '1.23'
+          go-version: "1.24"
       - uses: actions/checkout@v4
       - name: golangci-lint
         uses: golangci/golangci-lint-action@v6
         with:
-          args: --timeout=5m
-          version: v1.62
+          args: --timeout=10m
+          version: v1.64.6
       - name: GinContext
         run: go run linters/gincontext/main.go
   swagger:
     name: swagger-gen
     strategy:
       matrix:
-        go: ["1.23"]
+        go: ["1.24"]
     runs-on: ubuntu-latest
     steps:
       - name: Setup Go
@@ -48,7 +48,7 @@ jobs:
     name: test
     strategy:
       matrix:
-        go: ["1.23"]
+        go: ["1.24"]
     runs-on: ubuntu-latest
     steps:
       - name: Setup Go

@@ -986,6 +986,16 @@ func (c *modelComponentImpl) Deploy(ctx context.Context, deployReq types.DeployA
 		return -1, fmt.Errorf("invalid hardware setting, %w", err)
 	}
 
+	// only vllm and sglang support multi-host inference
+	if hardware.Replicas > 1 {
+		if frame.FrameName != "vllm" && frame.FrameName != "sglang" {
+			return -1, fmt.Errorf("only vllm and sglang support multi-host inference")
+		}
+		if req.MinReplica < 1 {
+			return -1, fmt.Errorf("Multi-host inference only supports a minimum replica count greater than 0")
+		}
+	}
+
 	// resource available only if err is nil, err message should contain
 	// the reason why resource is unavailable
 	_, err = c.deployer.CheckResourceAvailable(ctx, req.ClusterID, req.OrderDetailID, &hardware)

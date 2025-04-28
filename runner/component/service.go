@@ -38,6 +38,8 @@ var (
 	KeyOrderDetailID string = "order-detail-id"
 	KeyMinScale      string = "autoscaling.knative.dev/min-scale"
 	KeyServiceLabel  string = "serving.knative.dev/service"
+	KeyRunModeLabel  string = "run-mode"
+	ValueMultiHost   string = "multi-host"
 )
 
 type serviceComponentImpl struct {
@@ -97,7 +99,6 @@ func (s *serviceComponentImpl) GenerateService(ctx context.Context, cluster clus
 	hardware := request.Hardware
 	resReq, nodeSelector := GenerateResources(hardware)
 	var err error
-
 	if request.Env != nil {
 		// generate env
 		for key, value := range request.Env {
@@ -325,31 +326,74 @@ func GenerateResources(hardware types.HardWare) (map[corev1.ResourceName]resourc
 	nodeSelector := make(map[string]string)
 	resReq := make(map[corev1.ResourceName]resource.Quantity)
 
-	// generate node selector
-	if hardware.Gpu.Labels != nil {
-		for key, value := range hardware.Gpu.Labels {
-			nodeSelector[key] = value
-		}
-	}
-	if hardware.Cpu.Labels != nil {
-		for key, value := range hardware.Cpu.Labels {
+	// Helper function to process labels
+	addLabels := func(labels map[string]string) {
+		for key, value := range labels {
 			nodeSelector[key] = value
 		}
 	}
 
-	// generate knative resource requirement
+	// Process all hardware labels
+	hardwareTypes := []struct {
+		labels map[string]string
+	}{
+		{hardware.Gpu.Labels},
+		{hardware.Npu.Labels},
+		{hardware.Enflame.Labels},
+		{hardware.Mlu.Labels},
+		{hardware.Cpu.Labels},
+	}
+
+	for _, hw := range hardwareTypes {
+		if hw.labels != nil {
+			addLabels(hw.labels)
+		}
+	}
+
+	// Helper function to parse resource quantities
+	parseResource := func(value string) resource.Quantity {
+		if value == "" {
+			return resource.Quantity{}
+		}
+		return resource.MustParse(value)
+	}
+
+	// Process CPU resources
 	if hardware.Cpu.Num != "" {
-		resReq[corev1.ResourceCPU] = resource.MustParse(hardware.Cpu.Num)
+		qty := parseResource(hardware.Cpu.Num)
+		resReq[corev1.ResourceCPU] = qty
 	}
+
+	// Process memory resources
 	if hardware.Memory != "" {
-		resReq[corev1.ResourceMemory] = resource.MustParse(hardware.Memory)
+		qty := parseResource(hardware.Memory)
+		resReq[corev1.ResourceMemory] = qty
 	}
+
+	// Process ephemeral storage
 	if hardware.EphemeralStorage != "" {
-		resReq[corev1.ResourceEphemeralStorage] = resource.MustParse(hardware.EphemeralStorage)
+		qty := parseResource(hardware.EphemeralStorage)
+		resReq[corev1.ResourceEphemeralStorage] = qty
 	}
-	if hardware.Gpu.ResourceName != "" && hardware.Gpu.Num != "" {
-		resReq[corev1.ResourceName(hardware.Gpu.ResourceName)] = resource.MustParse(hardware.Gpu.Num)
+
+	// Process accelerator resources
+	accelerators := []struct {
+		resourceName string
+		num          string
+	}{
+		{hardware.Gpu.ResourceName, hardware.Gpu.Num},
+		{hardware.Npu.ResourceName, hardware.Npu.Num},
+		{hardware.Enflame.ResourceName, hardware.Enflame.Num},
+		{hardware.Mlu.ResourceName, hardware.Mlu.Num},
 	}
+
+	for _, acc := range accelerators {
+		if acc.resourceName != "" && acc.num != "" {
+			qty := parseResource(acc.num)
+			resReq[corev1.ResourceName(acc.resourceName)] = qty
+		}
+	}
+
 	return resReq, nodeSelector
 }
 
@@ -754,8 +798,16 @@ func (s *serviceComponentImpl) GetServiceByName(ctx context.Context, srvName, cl
 
 }
 
-// RunService
 func (s *serviceComponentImpl) RunService(ctx context.Context, req types.SVCRequest) error {
+	if req.Hardware.Replicas > 1 {
+		return s.RunServiceMultiHost(ctx, req)
+	} else {
+		return s.RunServiceSingleHost(ctx, req)
+	}
+}
+
+// RunService
+func (s *serviceComponentImpl) RunServiceSingleHost(ctx context.Context, req types.SVCRequest) error {
 	cluster, err := s.clusterPool.GetClusterByID(ctx, req.ClusterID)
 	if err != nil {
 		return fmt.Errorf("fail to get cluster, error %v ", err)
@@ -893,6 +945,18 @@ func (s *serviceComponentImpl) StopService(ctx context.Context, req types.StopRe
 		resp.Message = "failed to get service status"
 		return &resp, fmt.Errorf("cannot delete service,error: %v", err)
 	}
+	err = s.RemoveWorkset(ctx, *cluster, srv)
+	if err != nil {
+		resp.Code = -1
+		resp.Message = "failed to remove workset pod"
+		return &resp, fmt.Errorf("failed to remove workset pod, error: %v", err)
+	}
+	err = s.serviceStore.Delete(ctx, req.SvcName, cluster.ID)
+	if err != nil {
+		resp.Code = -1
+		resp.Message = "failed to delete service"
+		return &resp, fmt.Errorf("cannot delete service info from db, error: %v", err)
+	}
 	return &resp, nil
 }
 
@@ -939,12 +1003,13 @@ func (s *serviceComponentImpl) UpdateService(ctx context.Context, req types.Mode
 	}
 	// Update CPU and Memory requests and limits
 	hardware := req.Hardware
-	resReq, _ := GenerateResources(hardware)
+	resReq, nodeSelector := GenerateResources(hardware)
 	resources := corev1.ResourceRequirements{
 		Limits:   resReq,
 		Requests: resReq,
 	}
 	srv.Spec.Template.Spec.Containers[0].Resources = resources
+	srv.Spec.Template.Spec.NodeSelector = nodeSelector
 	// Update replica
 	srv.Spec.Template.Annotations["autoscaling.knative.dev/min-scale"] = strconv.Itoa(req.MinReplica)
 	srv.Spec.Template.Annotations["autoscaling.knative.dev/max-scale"] = strconv.Itoa(req.MaxReplica)
@@ -964,7 +1029,7 @@ func (s *serviceComponentImpl) PurgeService(ctx context.Context, req types.Purge
 	if err != nil {
 		return nil, fmt.Errorf("fail to get cluster, error: %v ", err)
 	}
-	_, err = cluster.KnativeClient.ServingV1().Services(s.k8sNameSpace).
+	ksvc, err := cluster.KnativeClient.ServingV1().Services(s.k8sNameSpace).
 		Get(ctx, req.SvcName, metav1.GetOptions{})
 	if err != nil {
 		k8serr := new(k8serrors.StatusError)
@@ -992,6 +1057,14 @@ func (s *serviceComponentImpl) PurgeService(ctx context.Context, req types.Purge
 			return &resp, fmt.Errorf("failed to remove pvc, error: %v", err)
 		}
 	}
+	// 3 clean up workset pod
+	err = s.RemoveWorkset(ctx, *cluster, ksvc)
+	if err != nil {
+		resp.Code = -1
+		resp.Message = "failed to remove workset pod"
+		return &resp, fmt.Errorf("failed to remove workset pod, error: %v", err)
+	}
+
 	return &resp, nil
 }
 

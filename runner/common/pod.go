@@ -29,15 +29,17 @@ func GetPod(ctx context.Context, cluster *cluster.Cluster, podName string, names
 }
 
 func GetPodLogStream(ctx context.Context, cluster *cluster.Cluster, podName string, namespace string, container string) (chan []byte, string, error) {
-	logs := cluster.Client.CoreV1().Pods(namespace).GetLogs(podName, &corev1.PodLogOptions{
-		Container: container,
-		Follow:    true,
-	})
 
 	pod, err := GetPod(ctx, cluster, podName, namespace)
 	if err != nil {
 		return nil, "", err
 	}
+
+	cName := GetContainerName(pod, container)
+	logs := cluster.Client.CoreV1().Pods(namespace).GetLogs(podName, &corev1.PodLogOptions{
+		Container: cName,
+		Follow:    true,
+	})
 
 	if pod.Status.Phase == "Pending" {
 		for _, condition := range pod.Status.Conditions {
@@ -82,4 +84,15 @@ func GetPodLogStream(ctx context.Context, cluster *cluster.Cluster, podName stri
 	}()
 
 	return ch, "", nil
+}
+
+// get container name
+func GetContainerName(pod *corev1.Pod, container string) string {
+	name := pod.Spec.Containers[0].Name
+	for _, c := range pod.Spec.Containers {
+		if c.Name == container {
+			name = c.Name
+		}
+	}
+	return name
 }
