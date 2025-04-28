@@ -264,8 +264,8 @@ func (h *MCPServerHandler) Index(ctx *gin.Context) {
 		return
 	}
 	filter = getFilterFromContext(ctx, filter)
-	if !slices.Contains(Sorts, filter.Sort) {
-		msg := fmt.Sprintf("sort parameter must be one of %v", Sorts)
+	if !slices.Contains(types.Sorts, filter.Sort) {
+		msg := fmt.Sprintf("sort parameter must be one of %v", types.Sorts)
 		slog.Error("check list mcp server filter", slog.String("msg", msg))
 		ctx.JSON(http.StatusBadRequest, gin.H{"message": msg})
 		return

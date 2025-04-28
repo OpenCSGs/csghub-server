@@ -91,6 +91,9 @@ const (
 	MaxFileTreeSize int = 500
 )
 
+var Sorts = []string{"trending", "recently_update", "most_download", "most_favorite", "most_star"}
+var Sources = []string{"opencsg", "huggingface", "local"}
+
 type RepoRequest struct {
 	Namespace string `json:"namespace"`
 	Name      string `json:"name"`

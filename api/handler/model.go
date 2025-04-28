@@ -80,15 +80,15 @@ func (h *ModelHandler) Index(ctx *gin.Context) {
 		return
 	}
 	filter = getFilterFromContext(ctx, filter)
-	if !slices.Contains(Sorts, filter.Sort) {
-		msg := fmt.Sprintf("sort parameter must be one of %v", Sorts)
+	if !slices.Contains(types.Sorts, filter.Sort) {
+		msg := fmt.Sprintf("sort parameter must be one of %v", types.Sorts)
 		slog.Error("Bad request format,", slog.String("error", msg))
 		ctx.JSON(http.StatusBadRequest, gin.H{"message": msg})
 		return
 	}
 
-	if filter.Source != "" && !slices.Contains[[]string](Sources, filter.Source) {
-		msg := fmt.Sprintf("source parameter must be one of %v", Sources)
+	if filter.Source != "" && !slices.Contains(types.Sources, filter.Source) {
+		msg := fmt.Sprintf("source parameter must be one of %v", types.Sources)
 		slog.Error("Bad request format,", slog.String("error", msg))
 		ctx.JSON(http.StatusBadRequest, gin.H{"message": msg})
 		return
