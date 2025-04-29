@@ -199,6 +199,13 @@ func (c *spaceComponentImpl) createSpaceDefaultFiles(dbRepo *database.Repository
 			return fmt.Errorf("failed to create space mcp server file, cause: %w", err)
 		}
 	}
+
+	if req.Sdk == types.NGINX.Name {
+		err = c.createSpaceNginxTemplateFile(dbRepo, req)
+		if err != nil {
+			return fmt.Errorf("failed to create space nginx template file, cause: %w", err)
+		}
+	}
 	return nil
 }
 
@@ -315,6 +322,33 @@ func (c *spaceComponentImpl) createSpaceMCPServerTemplateFile(dbRepo *database.R
 		return fmt.Errorf("fail to upload space mcp server template files error: %w", err)
 	}
 
+	return nil
+}
+
+func (c *spaceComponentImpl) createSpaceNginxTemplateFile(dbRepo *database.Repository, req types.CreateSpaceReq) error {
+	templatePath, err := getSpaceTemplatePath(req.Sdk)
+	if err != nil {
+		return fmt.Errorf("check space nginx template path %s error: %w", templatePath, err)
+	}
+	entries, err := os.ReadDir(templatePath)
+	if err != nil {
+		return fmt.Errorf("failed to list dir %s error: %w", templatePath, err)
+	}
+	sort.Slice(entries, func(i, j int) bool {
+		nameI := entries[i].Name()
+		nameJ := entries[j].Name()
+		if nameI == types.EntryFileNginx {
+			return false
+		}
+		if nameJ == types.EntryFileNginx {
+			return true
+		}
+		return nameI < nameJ
+	})
+	err = c.uploadTemplateFiles(entries, req, dbRepo, templatePath)
+	if err != nil {
+		return fmt.Errorf("failed to upload space nginx template files error: %w", err)
+	}
 	return nil
 }
 
