@@ -41,7 +41,7 @@ func TestSpaceComponent_Show(t *testing.T) {
 
 	sc.mocks.stores.UserLikesMock().EXPECT().IsExist(ctx, "user", int64(123)).Return(true, nil)
 
-	space, err := sc.Show(ctx, "ns", "n", "user")
+	space, err := sc.Show(ctx, "ns", "n", "user", false)
 	require.Nil(t, err)
 	require.Equal(t, &types.Space{
 		ID:                   1,

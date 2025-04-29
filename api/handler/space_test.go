@@ -99,7 +99,7 @@ func TestSpaceHandler_Show(t *testing.T) {
 	})
 
 	tester.WithUser()
-	tester.mocks.space.EXPECT().Show(tester.Ctx(), "u", "r", "u").Return(&types.Space{
+	tester.mocks.space.EXPECT().Show(tester.Ctx(), "u", "r", "u", false).Return(&types.Space{
 		Name: "m",
 	}, nil)
 	tester.Execute()
