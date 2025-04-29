@@ -4,6 +4,7 @@ SDK_GRADIO="gradio"
 SDK_STREAMLIT="streamlit"
 SDK_DOCKER="docker"
 SDK_MCPSERVER="mcp_server"
+SDK_NGINX="nginx"
 
 CURRENT_DIR=$(
    cd "$(dirname "$0")"
@@ -45,6 +46,14 @@ gen_dockerfile(){
     file=$file"-cuda11.8.0"
   fi
 
+  if [[ $sdk == $SDK_NGINX ]]; then
+    if [[ ! -f "$repo/nginx.conf" ]]; then
+      echo "nginx conf file $repo/nginx.conf does not exist"
+      exit 1
+    fi
+    file="Dockerfile-nginx"
+  fi
+
   echo "the Dockerfile is $file"
 
   sourcefile="$source_dir/$file"
@@ -74,8 +83,8 @@ EOF
 
 streamlit run $app_file
 EOF
-  elif [[ $sdk == $SDK_DOCKER ]]; then
-      echo "do not create app file for docker sdk"
+  elif [[ $sdk == $SDK_DOCKER || $sdk == $SDK_NGINX ]]; then
+      echo "do not create app file for docker and nginx sdk"
   else 
       echo "not supported sdk $sdk"
       exit 1

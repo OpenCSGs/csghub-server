@@ -803,15 +803,12 @@ func (c *spaceComponentImpl) Deploy(ctx context.Context, namespace, name, curren
 		return -1, err
 	}
 
-	containerImg := ""
 	containerPort := types.DefaultContainerPort
 	if space.Sdk == types.GRADIO.Name {
 		containerPort = types.GRADIO.Port
 	} else if space.Sdk == types.STREAMLIT.Name {
 		containerPort = types.STREAMLIT.Port
 	} else if space.Sdk == types.NGINX.Name {
-		// Use default image for nginx space
-		containerImg = types.NGINX.Image
 		containerPort = types.NGINX.Port
 	} else if space.Sdk == types.DOCKER.Name {
 		template, err := c.templateStore.FindByName(ctx, types.DOCKER.Name, space.Template)
@@ -839,7 +836,7 @@ func (c *spaceComponentImpl) Deploy(ctx context.Context, namespace, name, curren
 		ModelID:       0,
 		UserID:        user.ID,
 		Annotation:    string(annoStr),
-		ImageID:       containerImg,
+		ImageID:       "",
 		Type:          types.SpaceType,
 		UserUUID:      user.UUID,
 		SKU:           space.SKU,

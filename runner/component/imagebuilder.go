@@ -227,13 +227,8 @@ func (ibc *imagebuilderComponentImpl) Logs(ctx context.Context, buildId string) 
 func (ibc *imagebuilderComponentImpl) workFlowInit(ctx context.Context) error {
 	namespace := ibc.config.Runner.ImageBuilderNamespace
 
-	cmList := []types.FileCMConfig{
-		{FileName: "init.sh", CMName: "init-configmap"},
-		{FileName: "Dockerfile-python3.10", CMName: "cpu-docker-configmap"},
-		{FileName: "Dockerfile-python3.10-cuda11.8.0", CMName: "gpu-docker-configmap"},
-	}
 	fcMap := make(map[string][]byte)
-	for _, cfg := range cmList {
+	for _, cfg := range types.ConfigMapFiles {
 		data, err := embed.ImagebuilderFs.ReadFile(cfg.FileName)
 		if err != nil {
 			return fmt.Errorf("failed to read file %s: %w", cfg.FileName, err)
@@ -242,14 +237,14 @@ func (ibc *imagebuilderComponentImpl) workFlowInit(ctx context.Context) error {
 	}
 
 	for _, cluster := range ibc.clusterPool.Clusters {
-		for _, cfg := range cmList {
+		for _, cfg := range types.ConfigMapFiles {
 			data, exists := fcMap[cfg.FileName]
 			if !exists {
 				return fmt.Errorf("file %s not loaded", cfg.FileName)
 			}
 			cmd := types.CMConfig{
 				Namespace:   namespace,
-				CmName:      cfg.CMName,
+				CmName:      cfg.ConfigMapName,
 				DataKey:     cfg.FileName,
 				FileContent: data,
 			}
@@ -311,6 +306,53 @@ func wfTemplateForImageBuilder(gitImg, kanikoImg, imageDestination string, param
 		}
 		builderArgs = append(builderArgs, arg)
 	}
+
+	// volumes
+	specVolumes := []corev1.Volume{}
+	specVolumes = append(specVolumes, corev1.Volume{
+		Name: "shared",
+		VolumeSource: corev1.VolumeSource{
+			EmptyDir: &corev1.EmptyDirVolumeSource{},
+		},
+	})
+	for _, cfg := range types.ConfigMapFiles {
+		specVolumes = append(specVolumes, corev1.Volume{
+			Name: cfg.VolumeName,
+			VolumeSource: corev1.VolumeSource{
+				ConfigMap: &corev1.ConfigMapVolumeSource{
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: cfg.ConfigMapName,
+					},
+				},
+			},
+		})
+	}
+
+	sharedVolumeMount := corev1.VolumeMount{
+		Name:      "shared",
+		MountPath: "/shared",
+	}
+
+	// init container volume mounts
+	initContainerVolumeMounts := []corev1.VolumeMount{}
+	initContainerVolumeMounts = append(initContainerVolumeMounts, sharedVolumeMount)
+
+	for _, cfg := range types.ConfigMapFiles {
+		initContainerVolumeMounts = append(initContainerVolumeMounts, corev1.VolumeMount{
+			Name:      cfg.VolumeName,
+			MountPath: "/builder/config/" + cfg.FileName,
+			SubPath:   cfg.FileName,
+			ReadOnly:  cfg.ReadOnly,
+		})
+	}
+
+	// container volume mounts
+	containerVolumeMounts := []corev1.VolumeMount{}
+	containerVolumeMounts = append(containerVolumeMounts, sharedVolumeMount, corev1.VolumeMount{
+		Name:      "docker-config",
+		MountPath: "/kaniko/.docker",
+	})
+
 	return &v1alpha1.Workflow{
 		ObjectMeta: metav1.ObjectMeta{
 			GenerateName: "imagebuilder-",
@@ -320,44 +362,7 @@ func wfTemplateForImageBuilder(gitImg, kanikoImg, imageDestination string, param
 		},
 		Spec: v1alpha1.WorkflowSpec{
 			Entrypoint: "main",
-			Volumes: []corev1.Volume{
-				{
-					Name: "shared",
-					VolumeSource: corev1.VolumeSource{
-						EmptyDir: &corev1.EmptyDirVolumeSource{},
-					},
-				},
-				{
-					Name: "init-volume",
-					VolumeSource: corev1.VolumeSource{
-						ConfigMap: &corev1.ConfigMapVolumeSource{
-							LocalObjectReference: corev1.LocalObjectReference{
-								Name: "init-configmap",
-							},
-						},
-					},
-				},
-				{
-					Name: "cpu-docker-volume",
-					VolumeSource: corev1.VolumeSource{
-						ConfigMap: &corev1.ConfigMapVolumeSource{
-							LocalObjectReference: corev1.LocalObjectReference{
-								Name: "cpu-docker-configmap",
-							},
-						},
-					},
-				},
-				{
-					Name: "gpu-docker-volume",
-					VolumeSource: corev1.VolumeSource{
-						ConfigMap: &corev1.ConfigMapVolumeSource{
-							LocalObjectReference: corev1.LocalObjectReference{
-								Name: "gpu-docker-configmap",
-							},
-						},
-					},
-				},
-			},
+			Volumes:    specVolumes,
 			Templates: []v1alpha1.Template{
 				{
 					Name: "main",
@@ -397,45 +402,15 @@ func wfTemplateForImageBuilder(gitImg, kanikoImg, imageDestination string, param
 									{Name: "PYTHON_VERSION", Value: params.PythonVersion},
 									{Name: "HARDWARE", Value: params.Hardware},
 								},
-								VolumeMounts: []corev1.VolumeMount{
-									{
-										Name:      "shared",
-										MountPath: "/shared",
-									},
-									{
-										Name:      "init-volume",
-										MountPath: "/builder/config/init.sh",
-										SubPath:   "init.sh",
-										ReadOnly:  false,
-									},
-									{
-										Name:      "cpu-docker-volume",
-										MountPath: "/builder/config/Dockerfile-python3.10",
-										SubPath:   "Dockerfile-python3.10",
-									},
-									{
-										Name:      "gpu-docker-volume",
-										MountPath: "/builder/config/Dockerfile-python3.10-cuda11.8.0",
-										SubPath:   "Dockerfile-python3.10-cuda11.8.0",
-									},
-								},
+								VolumeMounts: initContainerVolumeMounts,
 							},
 						},
 					},
 					Container: &corev1.Container{
-						Name:  buildContainerType,
-						Image: kanikoImg,
-						Args:  builderArgs,
-						VolumeMounts: []corev1.VolumeMount{
-							{
-								Name:      "shared",
-								MountPath: "/shared",
-							},
-							{
-								Name:      "docker-config",
-								MountPath: "/kaniko/.docker",
-							},
-						},
+						Name:         buildContainerType,
+						Image:        kanikoImg,
+						Args:         builderArgs,
+						VolumeMounts: containerVolumeMounts,
 					},
 				},
 			},
