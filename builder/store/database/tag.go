@@ -30,7 +30,7 @@ type TagStore interface {
 	AllDatasetCategories(ctx context.Context) ([]TagCategory, error)
 	AllCodeCategories(ctx context.Context) ([]TagCategory, error)
 	AllSpaceCategories(ctx context.Context) ([]TagCategory, error)
-	CreateTag(ctx context.Context, category, name, group string, scope types.TagScope) (Tag, error)
+	CreateTag(ctx context.Context, tag Tag) (*Tag, error)
 	SaveTags(ctx context.Context, tags []*Tag) error
 	// SetMetaTags will delete existing tags and create new ones
 	SetMetaTags(ctx context.Context, repoType types.RepositoryType, namespace, name string, tags []*Tag) (repoTags []*RepositoryTag, err error)
@@ -185,15 +185,9 @@ func (ts *tagStoreImpl) AllCategories(ctx context.Context, scope types.TagScope)
 	return tags, nil
 }
 
-func (ts *tagStoreImpl) CreateTag(ctx context.Context, category, name, group string, scope types.TagScope) (Tag, error) {
-	tag := Tag{
-		Name:     name,
-		Category: category,
-		Group:    group,
-		Scope:    scope,
-	}
+func (ts *tagStoreImpl) CreateTag(ctx context.Context, tag Tag) (*Tag, error) {
 	_, err := ts.db.Operator.Core.NewInsert().Model(&tag).Exec(ctx)
-	return tag, err
+	return &tag, err
 }
 
 func (ts *tagStoreImpl) SaveTags(ctx context.Context, tags []*Tag) error {
