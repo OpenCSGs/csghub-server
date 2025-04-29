@@ -12,8 +12,8 @@ echo "$OPENCSG_ACR_PASSWORD" | docker login $OPENCSG_ACR -u $OPENCSG_ACR_USERNAM
 ```bash
 export BUILDX_NO_DEFAULT_ATTESTATIONS=1
 
-# For vllm: opencsg-registry.cn-beijing.cr.aliyuncs.com/public/vllm:v0.8.4
-export IMAGE_TAG=v0.8.4
+# For vllm: opencsg-registry.cn-beijing.cr.aliyuncs.com/public/vllm:v0.8.5
+export IMAGE_TAG=v0.8.5
 docker buildx build --platform linux/amd64,linux/arm64 \
   -t ${OPENCSG_ACR}/public/vllm:${IMAGE_TAG} \
   -t ${OPENCSG_ACR}/public/vllm:latest \
@@ -36,8 +36,8 @@ docker buildx build --platform linux/amd64 \
   -f Dockerfile.tgi \
   --push .
 
-# For sglang: opencsg-registry.cn-beijing.cr.aliyuncs.com/public/sglang:v0.4.5.post2-cu124-srt
-export IMAGE_TAG=v0.4.5.post2-cu124-srt
+# For sglang: opencsg-registry.cn-beijing.cr.aliyuncs.com/public/sglang:v0.4.6.post1-cu124-srt
+export IMAGE_TAG=v0.4.6.post1-cu124-srt
 docker buildx build --platform linux/amd64 \
   -t ${OPENCSG_ACR}/public/sglang:${IMAGE_TAG} \
   -t ${OPENCSG_ACR}/public/sglang:latest \
@@ -65,8 +65,8 @@ docker buildx build --platform linux/amd64 \
   -t ${OPENCSG_ACR}/public/tei:latest \
   -f Dockerfile.tei \
   --push .
-# For Text Llama.cpp Inference: opencsg-registry.cn-beijing.cr.aliyuncs.com/public/llama.cpp:b4689
-export IMAGE_TAG=b4689
+# For Text Llama.cpp Inference: opencsg-registry.cn-beijing.cr.aliyuncs.com/public/llama.cpp:b5215
+export IMAGE_TAG=b5215
 docker buildx build --platform linux/amd64 \
   -t ${OPENCSG_ACR}/public/llama.cpp:${IMAGE_TAG} \
   -t ${OPENCSG_ACR}/public/llama.cpp:latest \
@@ -109,14 +109,14 @@ docker run -d \
 | Task| Image Name | Version | CUDA Version | Fix
 | --- | --- | --- | --- |--- |
 |text generation| vllm | 2.8 | 12.1 | - |
-|text generation| vllm | v0.7.1 | 12.4 |fix hf hub timestamp|
+|text generation| vllm | v0.8.5 | 12.4 |fix hf hub timestamp|
 |text generation| vllm-cpu | 2.4 | -|fix hf hub timestamp |
 |text generation| tgi | 2.2 | 12.1 |- |
 |text generation| tgi | 3.2 | 12.4 |fix hf hub timestamp|
 |image generation| hf-inference-toolkit | 0.5.3 | 12.1 |-|
-|text generation| sglang | v0.4.1.post3-cu124-srt | 12.4 |- |
+|text generation| sglang | v0.4.6.post1-cu124-srt| 12.4 |- |
 |text generation| mindie | 2.0-csg-1.0.RC2 | 1.0.RC2 |- |
-|text generation| llama.cpp | b4689 | - |- |
+|text generation| llama.cpp | b5215 | - |- |
 |text generation| tei | 1.6 | - |- |
 
 

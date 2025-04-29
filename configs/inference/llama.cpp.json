@@ -1,18 +1,18 @@
 {
   "engine_name": "llama.cpp",
-  "engine_version": "b4689",
+  "engine_version": "b5215",
   "enabled": 1,
   "model_format": "gguf",
   "container_port": 8000,
   "engine_images": [
     {
       "compute_type": "gpu",
-      "image": "llama.cpp:b4689",
+      "image": "llama.cpp:b5215",
       "driver_version": "12.4"
     },
     {
       "compute_type": "cpu",
-      "image": "llama.cpp:b4689-cpu"
+      "image": "llama.cpp:b5215-cpu"
     }
   ],
   "engine_args": [
@@ -25,18 +25,20 @@
   ],
   "supported_archs": [
     "llama",
+    "llama4",
     "deci",
     "falcon",
-    "baichuan",
     "grok",
     "gpt2",
     "gptj",
     "gptneox",
     "mpt",
+    "baichuan",
     "starcoder",
     "refact",
     "bert",
     "nomic-bert",
+    "nomic-bert-moe",
     "jina-bert-v2",
     "bloom",
     "stablelm",
@@ -44,6 +46,8 @@
     "qwen2",
     "qwen2moe",
     "qwen2vl",
+    "qwen3",
+    "qwen3moe",
     "phi2",
     "phi3",
     "phimoe",
@@ -55,9 +59,8 @@
     "minicpm3",
     "gemma",
     "gemma2",
+    "gemma3",
     "starcoder2",
-    "rwkv6",
-    "rwkv6qwen2",
     "mamba",
     "xverse",
     "command-r",
@@ -71,15 +74,22 @@
     "deepseek",
     "deepseek2",
     "chatglm",
+    "glm4",
     "bitnet",
     "t5",
     "t5encoder",
     "jais",
     "nemotron",
     "exaone",
+    "rwkv6",
+    "rwkv6qwen2",
+    "rwkv7",
+    "arwkv7",
     "granite",
     "granitemoe",
     "chameleon",
-    "wavtokenizer-dec"
+    "wavtokenizer-dec",
+    "plm",
+    "bailingmoe"
   ]
 }
