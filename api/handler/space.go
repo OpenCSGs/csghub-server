@@ -78,14 +78,14 @@ func (h *SpaceHandler) Index(ctx *gin.Context) {
 		return
 	}
 	repoFilter = getFilterFromContext(ctx, repoFilter)
-	if !slices.Contains(Sorts, repoFilter.Sort) {
-		msg := fmt.Sprintf("sort parameter must be one of %v", Sorts)
+	if !slices.Contains(types.Sorts, repoFilter.Sort) {
+		msg := fmt.Sprintf("sort parameter must be one of %v", types.Sorts)
 		slog.Error("Bad request format,", slog.String("error", msg))
 		httpbase.BadRequest(ctx, msg)
 		return
 	}
-	if repoFilter.Source != "" && !slices.Contains(Sources, repoFilter.Source) {
-		msg := fmt.Sprintf("source parameter must be one of %v", Sources)
+	if repoFilter.Source != "" && !slices.Contains(types.Sources, repoFilter.Source) {
+		msg := fmt.Sprintf("source parameter must be one of %v", types.Sources)
 		slog.Error("Bad request format,", slog.String("error", msg))
 		ctx.JSON(http.StatusBadRequest, gin.H{"message": msg})
 		return
