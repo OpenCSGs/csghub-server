@@ -237,9 +237,9 @@ func TestModelHandler_DeployDedicated(t *testing.T) {
 
 	tester.mocks.repo.EXPECT().AllowReadAccess(tester.Ctx(), types.ModelRepo, "u", "r", "u").Return(true, nil)
 	tester.mocks.sensitive.EXPECT().CheckRequestV2(tester.Ctx(), &types.ModelRunReq{
-		Revision:   "main",
 		MinReplica: 1,
 		MaxReplica: 2,
+		Revision:   "main",
 	}).Return(true, nil)
 	tester.mocks.model.EXPECT().Deploy(tester.Ctx(), types.DeployActReq{
 		Namespace:   "u",
@@ -248,7 +248,7 @@ func TestModelHandler_DeployDedicated(t *testing.T) {
 		DeployType:  types.InferenceType,
 	}, types.ModelRunReq{MinReplica: 1, MaxReplica: 2, Revision: "main"}).Return(123, nil)
 
-	tester.WithBody(t, &types.ModelRunReq{MinReplica: 1, MaxReplica: 2}).Execute()
+	tester.WithBody(t, &types.ModelRunReq{MinReplica: 1, MaxReplica: 2, Revision: "main"}).Execute()
 
 	tester.ResponseEq(t, 200, tester.OKText, types.DeployRepo{DeployID: 123})
 }
@@ -503,7 +503,7 @@ func TestModelHandler_DeployServerless(t *testing.T) {
 		DeployType:  types.ServerlessType,
 	}, types.ModelRunReq{MinReplica: 1, MaxReplica: 2, Revision: "main", SecureLevel: 1}).Return(123, nil)
 
-	tester.WithBody(t, &types.ModelRunReq{MinReplica: 1, MaxReplica: 2}).Execute()
+	tester.WithBody(t, &types.ModelRunReq{MinReplica: 1, MaxReplica: 2, Revision: "main"}).Execute()
 
 	tester.ResponseEq(t, 200, tester.OKText, types.DeployRepo{DeployID: 123})
 }

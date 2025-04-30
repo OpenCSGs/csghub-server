@@ -624,10 +624,6 @@ func (h *ModelHandler) DeployDedicated(ctx *gin.Context) {
 		return
 	}
 
-	if req.Revision == "" {
-		req.Revision = "main" // default repo branch
-	}
-
 	if req.MinReplica < 0 || req.MaxReplica < 0 || req.MinReplica > req.MaxReplica {
 		slog.Error("Bad request setting for replica", slog.Any("MinReplica", req.MinReplica), slog.Any("MaxReplica", req.MaxReplica))
 		httpbase.BadRequest(ctx, "Bad request setting for replica")
@@ -1451,10 +1447,6 @@ func (h *ModelHandler) DeployServerless(ctx *gin.Context) {
 		slog.Error("Bad request format", "error", err)
 		httpbase.BadRequest(ctx, err.Error())
 		return
-	}
-
-	if req.Revision == "" {
-		req.Revision = "main" // default repo branch
 	}
 
 	if req.MinReplica < 0 || req.MaxReplica < 0 || req.MinReplica > req.MaxReplica {

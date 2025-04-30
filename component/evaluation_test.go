@@ -28,6 +28,7 @@ func TestEvaluationComponent_CreateEvaluation(t *testing.T) {
 		ResourceId:         0,
 		Datasets:           []string{"Rowan/hellaswag"},
 		RuntimeFrameworkId: 1,
+		Revision:           "main",
 		Hardware: types.HardWare{
 			Gpu: types.Processor{
 				Num:          "1",
@@ -55,6 +56,9 @@ func TestEvaluationComponent_CreateEvaluation(t *testing.T) {
 		c.mocks.stores.ModelMock().EXPECT().FindByPath(ctx, "opencsg", "wukong").Return(
 			&database.Model{
 				ID: 1,
+				Repository: &database.Repository{
+					DefaultBranch: "main",
+				},
 			}, nil,
 		).Maybe()
 		c.mocks.stores.MirrorMock().EXPECT().FindByRepoPath(ctx, types.DatasetRepo, "opencsg", "hellaswag").Return(&database.Mirror{
@@ -88,6 +92,9 @@ func TestEvaluationComponent_CreateEvaluation(t *testing.T) {
 		c.mocks.stores.ModelMock().EXPECT().FindByPath(ctx, "opencsg", "wukong").Return(
 			&database.Model{
 				ID: 1,
+				Repository: &database.Repository{
+					DefaultBranch: "main",
+				},
 			}, nil,
 		).Maybe()
 		c.mocks.stores.MirrorMock().EXPECT().FindByRepoPath(ctx, types.DatasetRepo, "opencsg", "hellaswag").Return(&database.Mirror{

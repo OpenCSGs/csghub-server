@@ -61,9 +61,12 @@ func (c *evaluationComponentImpl) CreateEvaluation(ctx context.Context, req type
 		return nil, fmt.Errorf("failed to get current user %s, error:%w", req.Username, err)
 	}
 	result := strings.Split(req.ModelId, "/")
-	_, err = c.modelStore.FindByPath(ctx, result[0], result[1])
+	m, err := c.modelStore.FindByPath(ctx, result[0], result[1])
 	if err != nil {
 		return nil, fmt.Errorf("cannot find model, %w", err)
+	}
+	if req.Revision == "" {
+		req.Revision = m.Repository.DefaultBranch
 	}
 
 	token, err := c.tokenStore.FindByUID(ctx, user.ID)

@@ -782,10 +782,9 @@ func checkMultiNodeResource(mem int, clusterResources *types.ClusterRes, hardwar
 // SubmitEvaluation
 func (d *deployer) SubmitEvaluation(ctx context.Context, req types.EvaluationReq) (*types.ArgoWorkFlowRes, error) {
 	env := make(map[string]string)
-	env["REVISION"] = "main"
+	env["REVISION"] = req.Revision
 	env["MODEL_ID"] = req.ModelId
 	env["DATASET_IDS"] = strings.Join(req.Datasets, ",")
-	env["REVISION"] = "main"
 	env["ACCESS_TOKEN"] = req.Token
 	env["HF_ENDPOINT"] = req.DownloadEndpoint
 
