@@ -10,4 +10,5 @@ if __name__ == "__main__":
     TOKEN = os.environ['ACCESS_TOKEN']
     ENDPOINT = os.environ['HF_ENDPOINT']
     os.environ['CSGHUB_DOMAIN'] = ENDPOINT
-    snapshot_download(REPO_ID, cache_dir=DOWNLOAD_DIR, endpoint=ENDPOINT, token=TOKEN, allow_patterns=model_file)
+    snapshot_download(REPO_ID, cache_dir=DOWNLOAD_DIR, endpoint=ENDPOINT,
+                      revision=REVISION, token=TOKEN, allow_patterns=model_file)
