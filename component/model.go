@@ -924,6 +924,9 @@ func (c *modelComponentImpl) Deploy(ctx context.Context, deployReq types.DeployA
 	if err != nil {
 		return -1, fmt.Errorf("cannot find model, %w", err)
 	}
+	if req.Revision == "" {
+		req.Revision = m.Repository.DefaultBranch
+	}
 	task := GetBuiltInTaskFromTags(m.Repository.Tags)
 	if deployReq.DeployType == types.ServerlessType {
 		// only one service deploy was allowed

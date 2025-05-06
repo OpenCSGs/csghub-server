@@ -1,13 +1,13 @@
 {
   "engine_name": "sglang",
-  "engine_version": "v0.4.5.post2-cu124-srt",
+  "engine_version": "v0.4.6.post1-cu124-srt",
   "container_port": 8000,
   "enabled": 1,
   "model_format": "safetensors",
   "engine_images": [
     {
       "compute_type": "gpu",
-      "image": "sglang:v0.4.5.post2-cu124-srt",
+      "image": "sglang:v0.4.6.post1-cu124-srt",
       "driver_version": "12.4"
     }
   ],
@@ -44,6 +44,7 @@
     "DeepseekForCausalLM",
     "DeepseekV2ForCausalLM",
     "DeepseekV3ForCausalLM",
+    "DeepseekVL2ForCausalLM",
     "ExaoneForCausalLM",
     "GPT2LMHeadModel",
     "GPTBigCodeForCausalLM",
@@ -59,6 +60,8 @@
     "LlamaForCausalLM",
     "LlamaForCausalLMEagle",
     "LlamaForClassification",
+    "Llama4ForCausalLM",
+    "Llama4ForConditionalGeneration",
     "LlavaLlamaForCausalLM",
     "LlavaMistralForCausalLM",
     "LlavaQwenForCausalLM",
@@ -69,6 +72,7 @@
     "MistralModel",
     "MixtralForCausalLM",
     "MllamaForConditionalGeneration",
+    "MiniCPMO",
     "Olmo2ForCausalLM",
     "OlmoForCausalLM",
     "OlmoeForCausalLM",
@@ -79,11 +83,15 @@
     "Qwen2ForCausalLM",
     "Qwen2MoeForCausalLM",
     "Qwen2VLForConditionalGeneration",
+    "Qwen2_5_VLForConditionalGeneration",
+    "Qwen3MoeForCausalLM",
+    "Qwen3ForCausalLM",
     "StableLmForCausalLM",
     "TorchNativeLlamaForCausalLM",
     "TorchNativePhi3ForCausalLM",
     "XverseForCausalLM",
     "XverseMoeForCausalLM",
+    "XLMRobertaModel",
     "YiVLForCausalLM"
   ]
 }

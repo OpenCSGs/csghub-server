@@ -782,10 +782,9 @@ func checkMultiNodeResource(mem int, clusterResources *types.ClusterRes, hardwar
 // SubmitEvaluation
 func (d *deployer) SubmitEvaluation(ctx context.Context, req types.EvaluationReq) (*types.ArgoWorkFlowRes, error) {
 	env := make(map[string]string)
-	env["REVISION"] = "main"
+	env["REVISION"] = req.Revision
 	env["MODEL_ID"] = req.ModelId
 	env["DATASET_IDS"] = strings.Join(req.Datasets, ",")
-	env["REVISION"] = "main"
 	env["ACCESS_TOKEN"] = req.Token
 	env["HF_ENDPOINT"] = req.DownloadEndpoint
 
@@ -896,16 +895,78 @@ func (d *deployer) serviceUpdateConsumerCallback(msg jetstream.Msg) {
 		slog.Warn("fail to get deploy by service name in event consumer", slog.Any("service_name", event.ServiceName))
 		return
 	}
-	deploy.Status = event.Status
-	deploy.Message = event.Message
-	deploy.Reason = event.Reason
-	err = d.deployTaskStore.UpdateDeploy(ctx, deploy)
-	if err != nil {
-		slog.Warn("fail to update deploy status in event consumer", slog.Any("service_name", event.ServiceName), slog.Any("error", err))
-		return
+	if deploy.Status != common.Deleted {
+		deploy.Status = event.Status
+		deploy.Message = event.Message
+		deploy.Reason = event.Reason
+		err = d.deployTaskStore.UpdateDeploy(ctx, deploy)
+		if err != nil {
+			slog.Warn("fail to update deploy status in event consumer", slog.Any("service_name", event.ServiceName), slog.Any("error", err))
+			return
+		}
 	}
 	err = msg.Ack()
 	if err != nil {
 		slog.Warn("fail to ack after processing service message", slog.Any("msg", string(msg.Data())))
+	}
+}
+
+// handle some extreme cases like the runner is down for a long time and svc was deleted by admin
+func (d *deployer) startSyncDeployStatus() {
+	for {
+		ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+		status, err := d.imageRunner.StatusAll(ctx)
+		if err != nil {
+			slog.Error("fail to get all deploy status", slog.Any("error", err))
+			time.Sleep(10 * time.Minute)
+			cancel()
+			continue
+		}
+		var req types.DeployReq
+		req.Page = 1
+		req.PageSize = 300
+		for {
+			deploys, _, err := d.deployTaskStore.ListAllDeploys(ctx, req, true)
+			if err != nil {
+				slog.Error("fail to list deploys", slog.Any("error", err))
+				break
+			}
+			if len(deploys) == 0 {
+				break
+			}
+			d.startCheckAndUpdateDeploy(ctx, deploys, status)
+			req.Page += 1
+		}
+		cancel()
+		time.Sleep(1 * time.Hour)
+	}
+}
+
+// The startCheckAndUpdateDeploy function checks and updates the deployment status.
+// Parameters:
+// - ctx context.Context: Context object for request cancellation and timeout handling.
+// - deploys []database.Deploy: List of deployment objects.
+// - status map[string]types.StatusResponse: Status response map.
+func (d *deployer) startCheckAndUpdateDeploy(ctx context.Context, deploys []database.Deploy, status map[string]types.StatusResponse) {
+	for _, deploy := range deploys {
+		var newStatus int
+		if deploy.Status == common.Deleted {
+			//ignore the deleted deploy
+			continue
+		}
+		if _, ok := status[deploy.SvcName]; !ok {
+			newStatus = common.Stopped
+		} else {
+			newStatus = status[deploy.SvcName].Code
+		}
+
+		if deploy.Status != newStatus {
+			deploy.Status = newStatus
+			err := d.deployTaskStore.UpdateDeploy(ctx, &deploy)
+			if err != nil {
+				slog.Warn("fail to update deploy status in deployer", slog.Any("error", err))
+			}
+			slog.Info("updated deploy status", slog.Any("deploy_id", deploy.ID), slog.Int("status", newStatus))
+		}
 	}
 }

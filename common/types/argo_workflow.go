@@ -60,6 +60,7 @@ type EvaluationReq struct {
 	TaskType           TaskType `json:"-"`
 	DownloadEndpoint   string   `json:"-"`
 	ResourceName       string   `json:"-"`
+	Revision           string   `json:"-"`
 }
 
 type ArgoFlowTemplate struct {

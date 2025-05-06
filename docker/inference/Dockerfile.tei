@@ -9,7 +9,7 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 # Set Python 3.10 as the default Python version
-RUN pip3 install --no-cache-dir csghub-sdk==0.4.7
+RUN pip3 config set global.index-url https://mirrors.aliyun.com/pypi/simple && pip3 install --no-cache-dir csghub-sdk==0.4.7
 
 WORKDIR /workspace/
 

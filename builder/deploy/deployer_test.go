@@ -726,6 +726,7 @@ func TestDeployer_SubmitEvaluation(t *testing.T) {
 		ModelId:          "m1",
 		Token:            "k",
 		DownloadEndpoint: "dl",
+		Revision:         "main",
 	})
 	require.NoError(t, err)
 	require.Equal(t, &types.ArgoWorkFlowRes{ID: 1}, resp)

@@ -110,6 +110,7 @@ func (d *deployer) startJobs() {
 		}
 	}()
 	go d.startAccounting()
+	go d.startSyncDeployStatus()
 }
 
 func (d *deployer) getResources(ctx context.Context, clusterId string, clusterResponse *types.ClusterResponse) ([]types.NodeResourceInfo, error) {
