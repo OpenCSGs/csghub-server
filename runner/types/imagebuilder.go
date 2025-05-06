@@ -42,8 +42,37 @@ type CMConfig struct {
 }
 
 type FileCMConfig struct {
-	FileName string // file name
-	CMName   string // configMap ID
+	FileName      string // file name
+	ConfigMapName string // configMap ID
+	VolumeName    string // volume name
+	ReadOnly      bool
+}
+
+var ConfigMapFiles = []FileCMConfig{
+	{
+		FileName:      "init.sh",
+		ConfigMapName: "init-configmap",
+		VolumeName:    "init-volume",
+		ReadOnly:      false,
+	},
+	{
+		FileName:      "Dockerfile-python3.10",
+		ConfigMapName: "cpu-docker-configmap",
+		VolumeName:    "cpu-docker-volume",
+		ReadOnly:      true,
+	},
+	{
+		FileName:      "Dockerfile-python3.10-cuda11.8.0",
+		ConfigMapName: "gpu-docker-configmap",
+		VolumeName:    "gpu-docker-volume",
+		ReadOnly:      true,
+	},
+	{
+		FileName:      "Dockerfile-nginx",
+		ConfigMapName: "nginx-docker-configmap",
+		VolumeName:    "nginx-docker-volume",
+		ReadOnly:      true,
+	},
 }
 
 type ImageBuilderWork struct {
