@@ -11,9 +11,10 @@ const (
 	ScenarioCommentDetection  Scenario = "comment_detection"
 )
 
-// for llm response
+// for llm text
 const (
-	ScenarioLLMResModeration Scenario = "llm_response_moderation"
+	ScenarioLLMQueryModeration Scenario = "llm_query_moderation"
+	ScenarioLLMResModeration   Scenario = "llm_response_moderation"
 )
 
 // for image

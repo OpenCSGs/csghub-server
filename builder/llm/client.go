@@ -13,6 +13,10 @@ import (
 	"opencsg.com/csghub-server/common/types"
 )
 
+type LLMSvcClient interface {
+	Tokenize(ctx context.Context, endpoint string, req interface{}) ([]byte, error)
+}
+
 type Client struct {
 	client *http.Client
 }
@@ -23,9 +27,9 @@ func NewClient() *Client {
 	}
 }
 
-func (c *Client) Chat(ctx context.Context, endpoint string, headers map[string]string, data types.LLMReqBody) (<-chan string, error) {
+func (c *Client) ChatStream(ctx context.Context, endpoint string, headers map[string]string, data types.LLMReqBody) (<-chan string, error) {
 	slog.Debug("chat with llm", slog.Any("endpoint", endpoint), slog.Any("data", data))
-	rc, err := c.doSteamRequest(ctx, http.MethodPost, endpoint, headers, data)
+	rc, err := c.doRequest(ctx, http.MethodPost, endpoint, headers, data)
 	if err != nil {
 		return nil, fmt.Errorf("do llm stream request, error: %w", err)
 	}
@@ -33,7 +37,7 @@ func (c *Client) Chat(ctx context.Context, endpoint string, headers map[string]s
 	return c.readToChannel(rc), nil
 }
 
-func (c *Client) doSteamRequest(ctx context.Context, method, url string, headers map[string]string, data interface{}) (io.ReadCloser, error) {
+func (c *Client) doRequest(ctx context.Context, method, url string, headers map[string]string, data interface{}) (io.ReadCloser, error) {
 	var buf io.Reader
 	if data != nil {
 		jsonData, err := json.Marshal(data)
@@ -85,4 +89,61 @@ func (c *Client) readToChannel(rc io.ReadCloser) <-chan string {
 	}()
 
 	return output
+}
+
+func (c *Client) Chat(ctx context.Context, endpoint string, headers map[string]string, data types.LLMReqBody) (string, error) {
+	slog.Debug("chat with llm", slog.Any("endpoint", endpoint), slog.Any("data", data))
+	rc, err := c.doRequest(ctx, http.MethodPost, endpoint, headers, data)
+	if err != nil {
+		return "", fmt.Errorf("do llm request, error: %w", err)
+	}
+
+	bodyBytes, err := io.ReadAll(rc)
+	if err != nil {
+		return "", fmt.Errorf("read llm response body, error: %w", err)
+	}
+	defer rc.Close()
+
+	bodyStr := string(bodyBytes)
+	slog.Debug("Response body", slog.String("body", bodyStr))
+
+	var chatCompletion types.ChatCompletion
+
+	err = json.Unmarshal(bodyBytes, &chatCompletion)
+	if err != nil {
+		return "", fmt.Errorf("decode llm response, error: %w", err)
+	}
+
+	if len(chatCompletion.Choices) == 0 || len(chatCompletion.Choices[0].Message.Content) == 0 {
+		return "", fmt.Errorf("summary of conversation is invalid")
+	}
+
+	return chatCompletion.Choices[0].Message.Content, nil
+}
+
+func (c *Client) Tokenize(ctx context.Context, endpoint string, req interface{}) ([]byte, error) {
+	rc, err := c.doRequest(ctx, http.MethodPost, endpoint, nil, req)
+	if err != nil {
+		return nil, fmt.Errorf("do llm request, error: %w", err)
+	}
+	bodyBytes, err := io.ReadAll(rc)
+	if err != nil {
+		return nil, fmt.Errorf("read llm response body, error: %w", err)
+	}
+	defer rc.Close()
+	return bodyBytes, nil
+}
+
+func (c *Client) EmbeddingTokenize(ctx context.Context, endpoint string, req interface{}) ([]byte, error) {
+	const path = "/tokenize"
+	rc, err := c.doRequest(ctx, http.MethodPost, endpoint+path, nil, req)
+	if err != nil {
+		return nil, fmt.Errorf("do llm request, error: %w", err)
+	}
+	bodyBytes, err := io.ReadAll(rc)
+	if err != nil {
+		return nil, fmt.Errorf("read llm response body, error: %w", err)
+	}
+	defer rc.Close()
+	return bodyBytes, nil
 }

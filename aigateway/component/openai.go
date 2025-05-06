@@ -19,7 +19,7 @@ import (
 type OpenAIComponent interface {
 	GetAvailableModels(c context.Context, user string) ([]types.Model, error)
 	GetModelByID(c context.Context, username, modelID string) (*types.Model, error)
-	RecordUsage(c context.Context, userUUID string, model *types.Model, tokenCounter token.LLMTokenCounter) error
+	RecordUsage(c context.Context, userUUID string, model *types.Model, tokenCounter token.Counter) error
 }
 
 type openaiComponentImpl struct {
@@ -49,13 +49,21 @@ func (m *openaiComponentImpl) GetAvailableModels(c context.Context, userName str
 	}
 	var models []types.Model
 	for _, deploy := range runningDeploys {
+		var hardwareInfo commontypes.HardWare
+		err := json.Unmarshal([]byte(deploy.Hardware), &hardwareInfo)
+		if err != nil {
+			slog.Error("get deploy hardware ")
+		}
 		m := types.Model{
-			Object:        "model",
-			Created:       deploy.CreatedAt.Unix(),
-			Task:          string(deploy.Task),
-			CSGHubModelID: deploy.Repository.Path,
-			SvcName:       deploy.SvcName,
-			SvcType:       deploy.Type,
+			Object:           "model",
+			Created:          deploy.CreatedAt.Unix(),
+			Task:             string(deploy.Task),
+			CSGHubModelID:    deploy.Repository.Path,
+			SvcName:          deploy.SvcName,
+			SvcType:          deploy.Type,
+			Hardware:         hardwareInfo,
+			RuntimeFramework: deploy.RuntimeFramework,
+			ImageID:          deploy.ImageID,
 		}
 		modelName := ""
 		if deploy.Repository.HFPath != "" {
@@ -101,11 +109,12 @@ func getSceneFromSvcType(svcType int) int {
 	}
 }
 
-func (m *openaiComponentImpl) RecordUsage(c context.Context, userUUID string, model *types.Model, counter token.LLMTokenCounter) error {
+func (m *openaiComponentImpl) RecordUsage(c context.Context, userUUID string, model *types.Model, counter token.Counter) error {
 	usage, err := counter.Usage()
 	if err != nil {
 		return fmt.Errorf("failed to get token usage from counter,error:%w", err)
 	}
+	slog.Debug("token", slog.Any("usage", usage))
 	var tokenUsageExtra = struct {
 		PromptTokenNum     int64 `json:"prompt_token_num"`
 		CompletionTokenNum int64 `json:"completion_token_num"`

@@ -4,13 +4,15 @@ import (
 	"context"
 
 	"opencsg.com/csghub-server/api/httpbase"
+	"opencsg.com/csghub-server/builder/sensitive"
 	"opencsg.com/csghub-server/common/types"
 )
 
 type ModerationSvcClient interface {
 	PassTextCheck(ctx context.Context, scenario, text string) (*CheckResult, error)
 	PassImageCheck(ctx context.Context, scenario, ossBucketName, ossObjectName string) (*CheckResult, error)
-	PassStreamCheck(ctx context.Context, scenario, text, id string) (*CheckResult, error)
+	PassLLMRespCheck(ctx context.Context, text, sessionId string) (*CheckResult, error)
+	PassLLMPromptCheck(ctx context.Context, text, accountId string) (*CheckResult, error)
 	SubmitRepoCheck(ctx context.Context, repoType types.RepositoryType, namespace, name string) error
 }
 
@@ -49,7 +51,8 @@ func (c *ModerationSvcHttpClient) PassTextCheck(ctx context.Context, scenario, t
 	return resp.Data.(*CheckResult), nil
 }
 
-func (c *ModerationSvcHttpClient) PassStreamCheck(ctx context.Context, scenario, text, id string) (*CheckResult, error) {
+// If sessionID is set, used to check stream response; if not set, check non-stream.
+func (c *ModerationSvcHttpClient) PassLLMRespCheck(ctx context.Context, text, sessionId string) (*CheckResult, error) {
 	type ServiceParameters struct {
 		Content   string `json:"content"`
 		SessionId string `json:"sessionId"`
@@ -59,13 +62,13 @@ func (c *ModerationSvcHttpClient) PassStreamCheck(ctx context.Context, scenario,
 		ServiceParameters ServiceParameters `json:"ServiceParameters"`
 	}
 	req := &CheckRequest{
-		Service: scenario,
+		Service: string(sensitive.ScenarioLLMResModeration),
 		ServiceParameters: ServiceParameters{
 			Content:   text,
-			SessionId: id,
+			SessionId: sessionId,
 		},
 	}
-	const path = "/api/v1/stream"
+	const path = "/api/v1/llmresp"
 	var resp httpbase.R
 	resp.Data = &CheckResult{}
 	err := c.hc.Post(ctx, path, req, &resp)
@@ -112,4 +115,30 @@ func (c *ModerationSvcHttpClient) SubmitRepoCheck(ctx context.Context, repoType 
 	const path = "/api/v1/repo"
 	var resp httpbase.R
 	return c.hc.Post(ctx, path, req, &resp)
+}
+
+func (c *ModerationSvcHttpClient) PassLLMPromptCheck(ctx context.Context, text, accountId string) (*CheckResult, error) {
+	type ServiceParameters struct {
+		Content   string `json:"content"`
+		SessionId string `json:"sessionId"`
+	}
+	type CheckRequest struct {
+		Service           string            `json:"Service"`
+		ServiceParameters ServiceParameters `json:"ServiceParameters"`
+	}
+	req := &CheckRequest{
+		Service: string(sensitive.ScenarioLLMQueryModeration),
+		ServiceParameters: ServiceParameters{
+			Content:   text,
+			SessionId: accountId,
+		},
+	}
+	const path = "/api/v1/llmprompt"
+	var resp httpbase.R
+	resp.Data = &CheckResult{}
+	err := c.hc.Post(ctx, path, req, &resp)
+	if err != nil {
+		return nil, err
+	}
+	return resp.Data.(*CheckResult), nil
 }
