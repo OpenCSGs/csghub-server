@@ -96,7 +96,34 @@ func TestRuntimeArchitecturesStore_ListByRArchNameAndModel(t *testing.T) {
 	})
 	require.Nil(t, err)
 
-	res, err := raStore.ListByRArchNameAndModel(ctx, "Qwen2ForCausalLM", "model1")
+	res, err := raStore.ListByArchNameAndModel(ctx, []string{"Qwen2ForCausalLM"}, "model1")
 	require.Nil(t, err)
 	require.Equal(t, 1, len(res))
+}
+
+func TestRuntimeArchitecturesStore_ListByRArchFormateAndType(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+	ctx := context.TODO()
+
+	rfStore := database.NewRuntimeFrameworksStoreWithDB(db)
+
+	_, err := rfStore.Add(ctx, database.RuntimeFramework{
+		ID:          1,
+		FrameName:   "vllm",
+		Type:        1,
+		ModelFormat: "safetensors",
+	})
+	require.Nil(t, err)
+
+	raStore := database.NewRuntimeArchitecturesStoreWithDB(db)
+	err = raStore.Add(ctx, database.RuntimeArchitecture{
+		RuntimeFrameworkID: 1,
+		ArchitectureName:   "Qwen2ForCausalLM",
+	})
+	require.Nil(t, err)
+
+	enableInference, err := raStore.CheckEngineByArchModelNameAndType(ctx, []string{"Qwen2ForCausalLM"}, "", "safetensors", 1)
+	require.Nil(t, err)
+	require.Equal(t, true, enableInference)
 }

@@ -130,7 +130,6 @@ func (cs *collectionStoreImpl) QueryByTrending(ctx context.Context, filter *type
 	err = query.Order(sortBy[filter.Sort]).
 		Limit(per).Offset((page - 1) * per).
 		Scan(ctx)
-	fmt.Println(query.String())
 	if err != nil {
 		return nil, 0, err
 	}

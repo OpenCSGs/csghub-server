@@ -34,13 +34,14 @@ func NewClusterInfoStoreWithDB(db *DB) ClusterInfoStore {
 }
 
 type ClusterInfo struct {
-	ClusterID     string `bun:",pk" json:"cluster_id"`
-	ClusterConfig string `bun:",notnull" json:"cluster_config"`
-	StorageClass  string `bun:",notnull" json:"storage_class"`
-	Region        string `bun:",notnull" json:"region"`
-	Zone          string `bun:",notnull" json:"zone"`     //cn-beijing
-	Provider      string `bun:",notnull" json:"provider"` //ali
-	Enable        bool   `bun:",notnull" json:"enable"`
+	ClusterID        string `bun:",pk" json:"cluster_id"`
+	ClusterConfig    string `bun:",notnull" json:"cluster_config"`
+	StorageClass     string `bun:"," json:"storage_class"`
+	Region           string `bun:"," json:"region"`
+	Zone             string `bun:"," json:"zone"`     //cn-beijing
+	Provider         string `bun:"," json:"provider"` //ali
+	Enable           bool   `bun:",notnull" json:"enable"`
+	NetworkInterface string `bun:"," json:"network_interface"` //used for multi-host, e.g., eth0
 }
 
 func (r *clusterInfoStoreImpl) Add(ctx context.Context, clusterConfig string, region string) (*ClusterInfo, error) {

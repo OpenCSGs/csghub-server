@@ -51,7 +51,7 @@ func TestServiceComponent_RunService(t *testing.T) {
 		Sku:        "1",
 		SrvName:    "test",
 		Hardware: types.HardWare{
-			Gpu: types.GPU{
+			Gpu: types.Processor{
 				Num:  "1",
 				Type: "A10",
 			},
@@ -101,7 +101,7 @@ func TestServiceComponent_StopService(t *testing.T) {
 		Sku:        "1",
 		SrvName:    "test",
 		Hardware: types.HardWare{
-			Gpu: types.GPU{
+			Gpu: types.Processor{
 				Num:  "1",
 				Type: "A10",
 			},
@@ -120,6 +120,7 @@ func TestServiceComponent_StopService(t *testing.T) {
 		ClusterConfig: "config",
 		StorageClass:  "test",
 	}, nil)
+	kss.EXPECT().Delete(ctx, "test", "test").Return(nil)
 	resp, err := sc.StopService(ctx, types.StopRequest{
 		SvcName:   "test",
 		ClusterID: "test",
@@ -163,7 +164,7 @@ func TestServiceComponent_PurgeService(t *testing.T) {
 		Sku:        "1",
 		SrvName:    "test",
 		Hardware: types.HardWare{
-			Gpu: types.GPU{
+			Gpu: types.Processor{
 				Num:  "1",
 				Type: "A10",
 			},
@@ -225,7 +226,7 @@ func TestServiceComponent_UpdateService(t *testing.T) {
 		Sku:        "1",
 		SrvName:    "test",
 		Hardware: types.HardWare{
-			Gpu: types.GPU{
+			Gpu: types.Processor{
 				Num:  "1",
 				Type: "A10",
 			},
@@ -251,7 +252,7 @@ func TestServiceComponent_UpdateService(t *testing.T) {
 		MaxReplica: 2,
 		ImageID:    "test2",
 		Hardware: types.HardWare{
-			Gpu: types.GPU{
+			Gpu: types.Processor{
 				Num:  "1",
 				Type: "A10",
 			},
@@ -294,7 +295,7 @@ func TestServiceComponent_GetServicePodWithStatus(t *testing.T) {
 		Sku:        "1",
 		SrvName:    "test",
 		Hardware: types.HardWare{
-			Gpu: types.GPU{
+			Gpu: types.Processor{
 				Num:  "1",
 				Type: "A10",
 			},
@@ -344,7 +345,7 @@ func TestServiceComponent_GetAllStatus(t *testing.T) {
 		Sku:        "1",
 		SrvName:    "test",
 		Hardware: types.HardWare{
-			Gpu: types.GPU{
+			Gpu: types.Processor{
 				Num:  "1",
 				Type: "A10",
 			},
@@ -403,7 +404,7 @@ func TestServiceComponent_GetServiceByName(t *testing.T) {
 		Sku:        "1",
 		SrvName:    "test",
 		Hardware: types.HardWare{
-			Gpu: types.GPU{
+			Gpu: types.Processor{
 				Num:  "1",
 				Type: "A10",
 			},
@@ -460,7 +461,7 @@ func TestServiceComponent_GetServiceInfo(t *testing.T) {
 		Sku:        "1",
 		SrvName:    "test",
 		Hardware: types.HardWare{
-			Gpu: types.GPU{
+			Gpu: types.Processor{
 				Num:  "1",
 				Type: "A10",
 			},
@@ -520,7 +521,7 @@ func TestServiceComponent_AddServiceInDB(t *testing.T) {
 		Sku:        "1",
 		SrvName:    "test",
 		Hardware: types.HardWare{
-			Gpu: types.GPU{
+			Gpu: types.Processor{
 				Num:  "1",
 				Type: "A10",
 			},
@@ -581,7 +582,7 @@ func TestServiceComponent_updateServiceInDB(t *testing.T) {
 		Sku:        "1",
 		SrvName:    "test",
 		Hardware: types.HardWare{
-			Gpu: types.GPU{
+			Gpu: types.Processor{
 				Num:  "1",
 				Type: "A10",
 			},
@@ -658,7 +659,7 @@ func TestServiceComponent_deleteServiceInDB2(t *testing.T) {
 		Sku:        "1",
 		SrvName:    "test",
 		Hardware: types.HardWare{
-			Gpu: types.GPU{
+			Gpu: types.Processor{
 				Num:  "1",
 				Type: "A10",
 			},

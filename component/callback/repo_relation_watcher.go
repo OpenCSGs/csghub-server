@@ -107,13 +107,16 @@ func (w *repoRelationWatcher) toRepoIDsFromReadme(namespace, repoName, repoType,
 		}
 	}
 
-	if repoType == fmt.Sprintf("%ss", types.SpaceRepo) || repoType == fmt.Sprintf("%ss", types.DatasetRepo) || repoType == fmt.Sprintf("%ss", types.PromptRepo) {
+	if repoType == fmt.Sprintf("%ss", types.SpaceRepo) ||
+		repoType == fmt.Sprintf("%ss", types.DatasetRepo) ||
+		repoType == fmt.Sprintf("%ss", types.PromptRepo) {
 		modelItems := meta["models"]
-		if len(modelItems) == 0 {
-			return toRepoIDs, nil
-		}
+		mcpServerItems := meta["mcpservers"]
 		for _, modelItem := range modelItems {
 			paths = append(paths, fmt.Sprintf("%s%s", "models_", modelItem))
+		}
+		for _, mcpServerItem := range mcpServerItems {
+			paths = append(paths, fmt.Sprintf("%s%s", "mcpservers_", mcpServerItem))
 		}
 	}
 

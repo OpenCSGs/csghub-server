@@ -1,0 +1,38 @@
+FROM ubuntu:22.04 AS build
+RUN apt-get update && \
+    apt-get install -y build-essential cmake python3 python3-pip git libcurl4-openssl-dev libgomp1
+WORKDIR /workspace/
+RUN git clone --depth 1 -b b4689 https://gitee.com/xzgan/llama.cpp.git \
+    && cd llama.cpp \
+    && cmake -B build -DGGML_CUDA=off -DGGML_NATIVE=OFF -DLLAMA_CURL=ON -DBUILD_SHARED_LIBS=off \
+    && cmake --build build --config Release -j$(nproc)
+
+FROM ubuntu:22.04 AS base
+# Set bash as the default shell
+
+# Build with some basic utilities
+RUN apt-get update && apt-get install -y \
+    python3-pip apt-utils \
+    wget curl vim git \
+    unzip dumb-init
+
+# alias python='python3'
+RUN ln -s /usr/bin/python3 /usr/bin/python
+RUN pip config set global.index-url https://pypi.tuna.tsinghua.edu.cn/simple
+
+# Build llama.cpp
+WORKDIR /workspace/
+# copy llama.cpp binaries
+COPY --from=build /workspace/llama.cpp/build/bin/llama-cli /usr/local/bin/llama-cli
+COPY --from=build /workspace/llama.cpp/build/bin/llama-server /usr/local/bin/llama-server
+
+RUN pip install --no-cache-dir csghub-sdk
+COPY ./llama.cpp/ /etc/csghub/
+RUN chmod +x /etc/csghub/*.sh
+
+ENV HUGGINGFACE_HUB_CACHE=/workspace/ \
+    HF_HUB_ENABLE_HF_TRANSFER=0
+ENV PORT=8000
+EXPOSE 8000
+ENTRYPOINT [ "/usr/bin/dumb-init", "--" ]
+CMD ["/etc/csghub/serve.sh"]

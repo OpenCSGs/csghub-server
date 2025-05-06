@@ -29,7 +29,7 @@ func TestEvaluationComponent_CreateEvaluation(t *testing.T) {
 		Datasets:           []string{"Rowan/hellaswag"},
 		RuntimeFrameworkId: 1,
 		Hardware: types.HardWare{
-			Gpu: types.GPU{
+			Gpu: types.Processor{
 				Num:          "1",
 				ResourceName: "nvidia.com/gpu",
 			},

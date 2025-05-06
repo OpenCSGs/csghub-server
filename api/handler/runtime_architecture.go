@@ -25,6 +25,12 @@ func NewRuntimeArchitectureHandler(config *config.Config) (*RuntimeArchitectureH
 		return nil, fmt.Errorf("fail to create runtime arch component, %w", err)
 	}
 
+	// init runtime framework and architectures when startup server
+	err = nrac.InitRuntimeFrameworkAndArchitectures()
+	if err != nil {
+		slog.Error("Failed to initialize runtime framework and architectures", slog.Any("error", err))
+	}
+
 	return &RuntimeArchitectureHandler{
 		repo:           nrc,
 		runtimeArch:    nrac,
@@ -143,28 +149,19 @@ func (r *RuntimeArchitectureHandler) DeleteArchitecture(ctx *gin.Context) {
 	httpbase.OK(ctx, list)
 }
 
-// ScanArchitecture godoc
+// ScanMetadata godoc
 // @Security     ApiKey
-// @Summary      Scan runtime architecture
-// @Description  Scan runtime architecture
-// @Tags         RuntimeFramework
+// @Summary      Scan model metadata
+// @Description  Scan model metadata
+// @Tags         Model
 // @Accept       json
 // @Produce      json
-// @Param        id path int true "runtime framework id"
-// @Param 		 scan_type query int false "scan_type(0:all models, 1:new models, 2:old models)" Enums(0, 1, 2)
-// @Param        task query string false "task" Enums(text-generation, text-to-image)
-// @Param        body body types.RuntimeFrameworkModels true "body"
+// @Param 		 scan_type query int false "scan_type(0:all models, 1:new models)" Enums(0, 1)
 // @Success      200  {object}  types.Response{} "OK"
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
-// @Router       /runtime_framework/{id}/scan [post]
+// @Router        /runtime_framework/scan [post]
 func (r *RuntimeArchitectureHandler) ScanArchitecture(ctx *gin.Context) {
-	id, err := strconv.ParseInt(ctx.Param("id"), 10, 64)
-	if err != nil {
-		slog.Error("Bad request runtime framework id format", "error", err)
-		httpbase.BadRequest(ctx, err.Error())
-		return
-	}
 
 	scanTypeStr := ctx.Query("scan_type")
 	if scanTypeStr == "" {
@@ -178,20 +175,7 @@ func (r *RuntimeArchitectureHandler) ScanArchitecture(ctx *gin.Context) {
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
-	req := types.RuntimeFrameworkModels{}
-	contentLength := ctx.GetHeader("Content-Length")
-	if contentLength != "0" {
-		err := ctx.ShouldBindJSON(&req)
-		if err != nil {
-			slog.Error("Failed to bind json", slog.Any("error", err))
-			httpbase.BadRequest(ctx, err.Error())
-			return
-		}
-	}
-
-	taskStr := ctx.Query("task")
-	req.Task = types.PipelineTask(taskStr)
-	req.ID = id
+	var req types.RuntimeFrameworkModels
 	req.ScanType = scanType
 
 	//start workflow to do full scaning

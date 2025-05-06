@@ -14,6 +14,7 @@ var sortBy = map[string]string{
 	"recently_update": "updated_at DESC NULLS LAST",
 	"most_download":   "download_count DESC NULLS LAST",
 	"most_favorite":   "likes DESC NULLS LAST",
+	"most_star":       "star_count DESC NULLS LAST",
 }
 
 type datasetStoreImpl struct {

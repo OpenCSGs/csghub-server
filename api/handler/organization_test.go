@@ -19,6 +19,7 @@ type OrganizationTester struct {
 		dataset    *mockcomponent.MockDatasetComponent
 		collection *mockcomponent.MockCollectionComponent
 		prompt     *mockcomponent.MockPromptComponent
+		mcp        *mockcomponent.MockMCPServerComponent
 	}
 }
 
@@ -30,6 +31,7 @@ func NewOrganizationTester(t *testing.T) *OrganizationTester {
 	tester.mocks.dataset = mockcomponent.NewMockDatasetComponent(t)
 	tester.mocks.collection = mockcomponent.NewMockCollectionComponent(t)
 	tester.mocks.prompt = mockcomponent.NewMockPromptComponent(t)
+	tester.mocks.mcp = mockcomponent.NewMockMCPServerComponent(t)
 
 	tester.handler = &OrganizationHandler{
 		space:      tester.mocks.space,
@@ -38,6 +40,7 @@ func NewOrganizationTester(t *testing.T) *OrganizationTester {
 		dataset:    tester.mocks.dataset,
 		collection: tester.mocks.collection,
 		prompt:     tester.mocks.prompt,
+		mcp:        tester.mocks.mcp,
 	}
 	tester.WithParam("namespace", "u")
 	tester.WithParam("name", "n")
@@ -172,5 +175,27 @@ func TestOrganizationHandler_Prompts(t *testing.T) {
 		"message": "OK",
 		"data":    []types.PromptRes{{Name: "m"}},
 		"total":   100,
+	})
+}
+
+func TestOrganizationHandler_MCPServers(t *testing.T) {
+	tester := NewOrganizationTester(t).WithHandleFunc(func(h *OrganizationHandler) gin.HandlerFunc {
+		return h.MCPServers
+	})
+
+	tester.mocks.mcp.EXPECT().OrgMCPServers(tester.Ctx(), &types.OrgMCPsReq{
+		PageOpts: types.PageOpts{
+			Page:     1,
+			PageSize: 10,
+		},
+		Namespace:   "u",
+		CurrentUser: "u",
+	}).Return([]types.MCPServer{{Name: "m"}}, 100, nil)
+
+	tester.WithUser().AddPagination(1, 10).Execute()
+
+	tester.ResponseEq(t, 200, tester.OKText, gin.H{
+		"data":  []types.MCPServer{{Name: "m"}},
+		"total": 100,
 	})
 }

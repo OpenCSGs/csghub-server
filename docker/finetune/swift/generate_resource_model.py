@@ -26,8 +26,8 @@ def generate_model_sql():
                 if ":" in namespace_and_name[1]:
                     continue
                 # generate sql and save to file
-                sql = f"INSERT INTO resource_models (resource_name, engine_name, model_name, type) VALUES ('nvidia', 'ms-swift', '{namespace_and_name[1]}', 'gpu') ON CONFLICT (engine_name, model_name) DO NOTHING;"
-                with open("resource_model.sql", 'a') as file:
+                sql = f"\"{namespace_and_name[1]}\","
+                with open("resource_model.txt", 'a') as file:
                     file.write(sql + '\n')
 
 

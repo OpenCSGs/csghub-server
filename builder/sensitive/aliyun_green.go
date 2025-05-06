@@ -159,8 +159,7 @@ func (c *AliyunGreenChecker) PassLargeTextCheck(ctx context.Context, text string
 	}
 	for _, data := range resp.Data {
 		for _, result := range data.Results {
-			if result.Label == "ad" || result.Label == "flood" {
-				slog.Info("allow ad and flood in text", slog.String("taskId", data.TaskId), slog.String("aliyun_request_id", resp.RequestID))
+			if result.Label != "politics" && result.Label != "political_content" {
 				continue
 			}
 
@@ -211,7 +210,7 @@ func (c *AliyunGreenChecker) PassTextCheck(ctx context.Context, scenario Scenari
 	labelStr := *resp.Body.Data.Labels
 	labels := strings.Split(labelStr, ",")
 	for _, label := range labels {
-		if label == "ad" || label == "flood" {
+		if label != "politics" && label != "political_content" {
 			continue
 		}
 
@@ -237,13 +236,24 @@ func (*AliyunGreenChecker) SplitTasks(text string) []map[string]string {
 	return tasks
 }
 
-func (c *AliyunGreenChecker) PassStreamCheck(ctx context.Context, scenario Scenario, text, sessionId string) (*CheckResult, error) {
-	serviceParameters, _ := json.Marshal(
-		map[string]interface{}{
-			"content":   text,
-			"sessionId": sessionId,
-		},
-	)
+func (c *AliyunGreenChecker) PassLLMCheck(ctx context.Context, scenario Scenario, text string, sessionId string, accountId string) (*CheckResult, error) {
+	// Build parameter map
+	paramMap := map[string]interface{}{
+		"content": text,
+	}
+	// Add different ID field based on idType
+	if sessionId != "" && accountId != "" {
+		return nil, fmt.Errorf("fail to call aliyun TextModerationPlusWithOptions, can't set sessionId and accountId both")
+	}
+	if sessionId != "" {
+		paramMap["sessionId"] = sessionId
+	}
+	if accountId != "" {
+		paramMap["accountId"] = accountId
+	}
+
+	serviceParameters, _ := json.Marshal(paramMap)
+
 	req := &green20220302.TextModerationPlusRequest{
 		Service:           tea.String(string(scenario)),
 		ServiceParameters: tea.String(string(serviceParameters)),

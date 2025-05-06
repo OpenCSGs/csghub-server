@@ -36,7 +36,7 @@ func TestTagComponent_CreateTag(t *testing.T) {
 		tc := initializeTestTagComponent(ctx, t)
 
 		tc.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, username).Return(database.User{UUID: "testUUID", RoleMask: "admin"}, nil)
-		tc.mocks.stores.TagMock().EXPECT().FindOrCreate(ctx, newTag).Return(&newTag, nil)
+		tc.mocks.stores.TagMock().EXPECT().CreateTag(ctx, newTag).Return(&newTag, nil)
 		tc.mocks.moderationClient.EXPECT().PassTextCheck(ctx, mock.Anything, req.Name).Return(&rpc.CheckResult{
 			IsSensitive: false,
 		}, nil)

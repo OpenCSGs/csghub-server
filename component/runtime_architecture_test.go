@@ -6,10 +6,12 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
-	"opencsg.com/csghub-server/builder/git/gitserver"
 	"opencsg.com/csghub-server/builder/store/database"
+	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/types"
+	"opencsg.com/csghub-server/common/utils/common"
 )
 
 func TestRuntimeArchComponent_ListByRuntimeFrameworkID(t *testing.T) {
@@ -62,166 +64,6 @@ func TestRuntimeArchComponent_DeleteArchitectures(t *testing.T) {
 
 }
 
-func TestRuntimeArchComponent_ScanArchitectures(t *testing.T) {
-	ctx := context.TODO()
-	rc := initializeTestRuntimeArchComponent(ctx, t)
-
-	rc.mocks.stores.RuntimeFrameworkMock().EXPECT().FindByID(ctx, int64(1)).Return(
-		&database.RuntimeFramework{
-			Type: 11,
-		}, nil,
-	)
-
-	// scan exists mocks
-	rc.mocks.stores.RepoMock().EXPECT().GetRepoWithRuntimeByID(ctx, int64(1), []string{"foo"}).Return([]database.Repository{
-		{Path: "foo/bar"},
-	}, nil)
-	rc.mocks.gitServer.EXPECT().GetRepoFileRaw(ctx, gitserver.GetRepoInfoByPathReq{
-		Namespace: "foo",
-		Name:      "bar",
-		Path:      ConfigFileName,
-		RepoType:  types.ModelRepo,
-	}).Return(`{"architectures": ["foo","bar"]}`, nil)
-
-	// scan new mocks
-	rc.mocks.stores.RepoMock().EXPECT().GetRepoWithoutRuntimeByID(ctx, int64(1), []string{"foo"}, 1000, 0).Return([]database.Repository{
-		{Path: "foo/bar"},
-	}, nil)
-	//page 2
-	rc.mocks.stores.RepoMock().EXPECT().GetRepoWithoutRuntimeByID(ctx, int64(1), []string{"foo"}, 1000, 1).Return(nil, nil)
-	filter := &types.TagFilter{
-		Categories: []string{"runtime_framework", "resource"},
-		Scopes:     []types.TagScope{types.ModelTagScope},
-	}
-	rc.mocks.stores.TagMock().EXPECT().AllTags(ctx, filter).Return([]*database.Tag{}, nil)
-	rc.mocks.stores.RepoRuntimeFrameworkMock().EXPECT().Add(ctx, int64(1), int64(0), 0).Return(nil)
-	rc.mocks.stores.ResourceModelMock().EXPECT().CheckModelNameNotInRFRepo(ctx, "bar", int64(0)).Return(
-		&database.ResourceModel{}, nil,
-	)
-	rc.mocks.stores.ResourceModelMock().EXPECT().FindByModelName(ctx, "bar").Return(
-		[]*database.ResourceModel{
-			{ResourceName: "r1"},
-			{ResourceName: "r2"},
-		}, nil,
-	)
-	var archMap = make(map[string]string)
-	archMap["foo"] = "bar"
-	models := []string{"foo"}
-	err := rc.scanExistModels(ctx, types.ScanReq{
-		FrameID:   1,
-		FrameType: 0,
-		ArchMap:   archMap,
-		Models:    models,
-		Task:      types.TextGeneration,
-	})
-	require.Nil(t, err)
-	err = rc.scanNewModels(ctx, types.ScanReq{
-		FrameID:   1,
-		FrameType: 0,
-		ArchMap:   archMap,
-		Models:    models,
-		Task:      types.TextGeneration,
-	})
-	require.Nil(t, err)
-
-}
-
-func TestRuntimeArchComponent_IsSupportedModelResource(t *testing.T) {
-
-	cases := []struct {
-		image   string
-		support bool
-	}{
-		{"foo", false},
-		{"bar", true},
-		{"foo/bar", true},
-		{"bar/foo", false},
-		{"foo-bar", true},
-		{"foo-model", true},
-	}
-
-	for _, c := range cases {
-		t.Run(fmt.Sprintf("%+v", c), func(t *testing.T) {
-
-			ctx := context.TODO()
-			rc := initializeTestRuntimeArchComponent(ctx, t)
-
-			rc.mocks.stores.ResourceModelMock().EXPECT().CheckModelNameNotInRFRepo(ctx, "model", int64(1)).Return(
-				&database.ResourceModel{EngineName: "a"}, nil,
-			)
-
-			r, err := rc.IsSupportedModelResource(ctx, "meta-model", &database.RuntimeFramework{
-				FrameImage: c.image,
-			}, 1)
-			require.Nil(t, err, nil)
-			require.Equal(t, c.support, r)
-		})
-	}
-}
-
-func TestRuntimeArchComponent_GetArchitectureFromConfig(t *testing.T) {
-	ctx := context.TODO()
-	rc := initializeTestRuntimeArchComponent(ctx, t)
-
-	rc.mocks.gitServer.EXPECT().GetRepoFileRaw(ctx, gitserver.GetRepoInfoByPathReq{
-		Namespace: "foo",
-		Name:      "bar",
-		Ref:       "main",
-		Path:      ConfigFileName,
-		RepoType:  types.ModelRepo,
-	}).Return(`{"architectures": ["foo","bar"]}`, nil)
-
-	arch, err := rc.GetArchitecture(ctx, types.TextGeneration, &database.Repository{
-		Path:          "foo/bar",
-		DefaultBranch: "main",
-	})
-	require.Nil(t, err)
-	require.Equal(t, "foo", arch)
-
-}
-
-func TestRuntimeArchComponent_GetModelTypeFromConfig(t *testing.T) {
-	ctx := context.TODO()
-	rc := initializeTestRuntimeArchComponent(ctx, t)
-
-	rc.mocks.gitServer.EXPECT().GetRepoFileRaw(ctx, gitserver.GetRepoInfoByPathReq{
-		Namespace: "foo",
-		Name:      "bar",
-		Ref:       "main",
-		Path:      ConfigFileName,
-		RepoType:  types.ModelRepo,
-	}).Return(`{"model_type": "bert"}`, nil)
-
-	arch, err := rc.GetArchitecture(ctx, types.TaskAutoDetection, &database.Repository{
-		Path:          "foo/bar",
-		DefaultBranch: "main",
-		Tags: []database.Tag{{
-			Name: "feature-extraction",
-		}, {
-			Name: "sentence-similarity",
-		}},
-	})
-	require.Nil(t, err)
-	require.Equal(t, "bert", arch)
-
-}
-
-func TestRuntimeArchComponent_RemoveRuntimeFrameworkTag(t *testing.T) {
-	ctx := context.TODO()
-	rc := initializeTestRuntimeArchComponent(ctx, t)
-
-	rc.mocks.stores.RuntimeFrameworkMock().EXPECT().FindByID(ctx, int64(2)).Return(
-		&database.RuntimeFramework{
-			FrameImage: "img",
-		}, nil,
-	)
-	rc.mocks.stores.TagMock().EXPECT().RemoveRepoTags(ctx, int64(1), []int64{1}).Return(nil)
-
-	rc.RemoveRuntimeFrameworkTag(ctx, []*database.Tag{
-		{Name: "img", ID: 1},
-	}, int64(1), int64(2))
-}
-
 func TestRuntimeArchComponent_AddRuntimeFrameworkTag(t *testing.T) {
 	ctx := context.TODO()
 	rc := initializeTestRuntimeArchComponent(ctx, t)
@@ -261,7 +103,17 @@ func TestRuntimeArchComponent_GetGGUFContent(t *testing.T) {
 	ctx := context.TODO()
 	rc := initializeTestRuntimeArchComponent(ctx, t)
 	rc.fileDownloadPath = "https://hub.opencsg.com/csg"
-
+	req := types.GetFileReq{
+		Lfs:       true,
+		Namespace: "AIWizards",
+		Name:      "Llama-2-7B-GGUF",
+		Path:      "llama-2-7b.Q2_K.gguf",
+		Ref:       "main",
+		RepoType:  types.ModelRepo,
+	}
+	rc.mocks.components.repo.EXPECT().InternalDownloadFile(ctx, &req).Return(
+		nil, 0, "https://hub.opencsg.com/csg/AIWizards/Llama-2-7B-GGUF/resolve/main/llama-2-7b.Q2_K.gguf", nil,
+	)
 	file, err := rc.GetGGUFContent(ctx, "llama-2-7b.Q2_K.gguf", &database.Repository{
 		Path:          "AIWizards/Llama-2-7B-GGUF",
 		DefaultBranch: "main",
@@ -269,4 +121,69 @@ func TestRuntimeArchComponent_GetGGUFContent(t *testing.T) {
 	require.Nil(t, err)
 	meta := file.Metadata()
 	require.Equal(t, "llama", meta.Architecture)
+}
+
+func TestRuntimeArchComponent_GetSafetensorsContent(t *testing.T) {
+	fileList := []string{}
+	//fileList append from 00001 to model-00001-of-00004.safetensors
+	for i := 1; i <= 4; i++ {
+		fileList = append(fileList, fmt.Sprintf("https://hub.opencsg.com/csg/Qwen/Qwen2.5-7B-Instruct/resolve/main/model-%05d-of-00004.safetensors", i))
+	}
+	modelInfo, err := common.GetModelInfo(fileList, "", 5120)
+	require.Nil(t, err)
+	modelInfo.HiddenSize = 3584
+	modelInfo.NumHiddenLayers = 28
+	modelInfo.NumAttentionHeads = 28
+	kvcacheSize := common.GetKvCacheSize(modelInfo.ContextSize, modelInfo.BatchSize, modelInfo.HiddenSize, modelInfo.NumHiddenLayers, modelInfo.BytesPerParam)
+	activateMemory := common.GetActivationMemory(modelInfo.BatchSize, modelInfo.ContextSize, modelInfo.NumHiddenLayers, modelInfo.HiddenSize, modelInfo.NumAttentionHeads, modelInfo.BytesPerParam)
+	modelInfo.MiniGPUMemoryGB = kvcacheSize + modelInfo.ModelWeightsGB + activateMemory
+	require.Equal(t, "BF16", modelInfo.TensorType)
+	require.Equal(t, float32(7.62), modelInfo.ParamsBillions)
+	require.Equal(t, 22, int(modelInfo.MiniGPUMemoryGB))
+}
+
+func TestGetMetadataFromSafetensors_Error(t *testing.T) {
+	ctx := context.TODO()
+	rc := initializeTestRuntimeArchComponent(ctx, t)
+	rc.config = &config.Config{}
+	rc.mocks.gitServer.EXPECT().GetTree(
+		mock.Anything, mock.Anything,
+	).Return(&types.GetRepoFileTreeResp{Files: []*types.File{{Name: "config.json", Path: "config.json"},
+		{Name: "model.safetensors", Path: "model.safetensors"}}, Cursor: ""}, nil)
+
+	//internalDownloadFile
+	rc.mocks.components.repo.EXPECT().InternalDownloadFile(
+		ctx, mock.AnythingOfType("*types.GetFileReq"),
+	).Return(nil, 0, "test", nil)
+	_, err := rc.GetMetadataFromSafetensors(ctx, &database.Repository{
+		Path:           "AIWizards/drawatoon-v1",
+		DefaultBranch:  "main",
+		Tags:           []database.Tag{{Name: "safetensors", Category: "framework"}},
+		RepositoryType: types.ModelRepo,
+	})
+	require.NotNil(t, err)
+}
+
+func TestGetMetadataFromSafetensors_className(t *testing.T) {
+	ctx := context.TODO()
+	rc := initializeTestRuntimeArchComponent(ctx, t)
+	rc.mocks.gitServer.EXPECT().GetTree(
+		mock.Anything, mock.Anything,
+	).Return(&types.GetRepoFileTreeResp{Files: []*types.File{{Name: "model_index.json", Path: "model_index.json"},
+		{Name: "model.safetensors", Path: "model.safetensors"}}, Cursor: ""}, nil)
+	//internalDownloadFile
+	rc.mocks.components.repo.EXPECT().InternalDownloadFile(
+		ctx, mock.AnythingOfType("*types.GetFileReq"),
+	).Return(nil, 0, "test", nil)
+	rc.mocks.gitServer.EXPECT().GetRepoFileRaw(
+		mock.Anything, mock.Anything,
+	).Return(`{"_class_name": "PixArtSigmaPipeline"}`, nil)
+	modelInfo, err := rc.GetMetadataFromSafetensors(ctx, &database.Repository{
+		Path:           "AIWizards/drawatoon-v1",
+		DefaultBranch:  "main",
+		Tags:           []database.Tag{{Name: "safetensors", Category: "framework"}},
+		RepositoryType: types.ModelRepo,
+	})
+	require.Nil(t, err)
+	require.NotNil(t, modelInfo)
 }

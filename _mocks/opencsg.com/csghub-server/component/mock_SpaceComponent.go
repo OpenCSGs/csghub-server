@@ -728,9 +728,9 @@ func (_c *MockSpaceComponent_OrgSpaces_Call) RunAndReturn(run func(context.Conte
 	return _c
 }
 
-// Show provides a mock function with given fields: ctx, namespace, name, currentUser
-func (_m *MockSpaceComponent) Show(ctx context.Context, namespace string, name string, currentUser string) (*types.Space, error) {
-	ret := _m.Called(ctx, namespace, name, currentUser)
+// Show provides a mock function with given fields: ctx, namespace, name, currentUser, needOpWeight
+func (_m *MockSpaceComponent) Show(ctx context.Context, namespace string, name string, currentUser string, needOpWeight bool) (*types.Space, error) {
+	ret := _m.Called(ctx, namespace, name, currentUser, needOpWeight)
 
 	if len(ret) == 0 {
 		panic("no return value specified for Show")
@@ -738,19 +738,19 @@ func (_m *MockSpaceComponent) Show(ctx context.Context, namespace string, name s
 
 	var r0 *types.Space
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, string, string) (*types.Space, error)); ok {
-		return rf(ctx, namespace, name, currentUser)
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, string, bool) (*types.Space, error)); ok {
+		return rf(ctx, namespace, name, currentUser, needOpWeight)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, string, string, string) *types.Space); ok {
-		r0 = rf(ctx, namespace, name, currentUser)
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, string, bool) *types.Space); ok {
+		r0 = rf(ctx, namespace, name, currentUser, needOpWeight)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*types.Space)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, string, string, string) error); ok {
-		r1 = rf(ctx, namespace, name, currentUser)
+	if rf, ok := ret.Get(1).(func(context.Context, string, string, string, bool) error); ok {
+		r1 = rf(ctx, namespace, name, currentUser, needOpWeight)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -768,13 +768,14 @@ type MockSpaceComponent_Show_Call struct {
 //   - namespace string
 //   - name string
 //   - currentUser string
-func (_e *MockSpaceComponent_Expecter) Show(ctx interface{}, namespace interface{}, name interface{}, currentUser interface{}) *MockSpaceComponent_Show_Call {
-	return &MockSpaceComponent_Show_Call{Call: _e.mock.On("Show", ctx, namespace, name, currentUser)}
+//   - needOpWeight bool
+func (_e *MockSpaceComponent_Expecter) Show(ctx interface{}, namespace interface{}, name interface{}, currentUser interface{}, needOpWeight interface{}) *MockSpaceComponent_Show_Call {
+	return &MockSpaceComponent_Show_Call{Call: _e.mock.On("Show", ctx, namespace, name, currentUser, needOpWeight)}
 }
 
-func (_c *MockSpaceComponent_Show_Call) Run(run func(ctx context.Context, namespace string, name string, currentUser string)) *MockSpaceComponent_Show_Call {
+func (_c *MockSpaceComponent_Show_Call) Run(run func(ctx context.Context, namespace string, name string, currentUser string, needOpWeight bool)) *MockSpaceComponent_Show_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(string), args[2].(string), args[3].(string))
+		run(args[0].(context.Context), args[1].(string), args[2].(string), args[3].(string), args[4].(bool))
 	})
 	return _c
 }
@@ -784,7 +785,7 @@ func (_c *MockSpaceComponent_Show_Call) Return(_a0 *types.Space, _a1 error) *Moc
 	return _c
 }
 
-func (_c *MockSpaceComponent_Show_Call) RunAndReturn(run func(context.Context, string, string, string) (*types.Space, error)) *MockSpaceComponent_Show_Call {
+func (_c *MockSpaceComponent_Show_Call) RunAndReturn(run func(context.Context, string, string, string, bool) (*types.Space, error)) *MockSpaceComponent_Show_Call {
 	_c.Call.Return(run)
 	return _c
 }

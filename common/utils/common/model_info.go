@@ -1,0 +1,215 @@
+package common
+
+import (
+	"crypto/tls"
+	"encoding/binary"
+	"encoding/json"
+	"fmt"
+	"io"
+	"math"
+	"net/http"
+	"strings"
+
+	"opencsg.com/csghub-server/common/types"
+)
+
+// TensorSummary contains summary information about a tensor
+type TensorSummary struct {
+	Name      string `json:"name"`
+	Shape     []int  `json:"shape"`
+	DataType  string `json:"data_type"`
+	SizeBytes int64  `json:"size_bytes"`
+}
+
+// GetModelInfo fetches and parses metadata from a list of files to extract model information
+// file List contains the whole path of the file
+// https://hub.opencsg.com/csg/Qwen/Qwen2-1.5B-Instruct/resolve/main/model-00001-of-0002.safetensors
+// https://hub.opencsg.com/csg/Qwen/Qwen2-1.5B-Instruct/resolve/main/model-00001-of-0002.safetensors
+func GetModelInfo(fileList []string, token string, minContext int) (*types.ModelInfo, error) {
+
+	modelInfo := &types.ModelInfo{}
+	var totalParams int64
+	var totalMemoryBytes int64
+	var modelSize int64
+	var bytesPerParam int
+	for _, file := range fileList {
+		header, err := fetchSafetensorsMetadata(file)
+		if err != nil {
+			return nil, fmt.Errorf("failed to fetch metadata: %v", err)
+		}
+		delete(header, "__metadata__")
+
+		for _, value := range header {
+			tensorData, ok := value.(map[string]interface{})
+			if !ok {
+				continue
+			}
+
+			dtype, ok := tensorData["dtype"].(string)
+			if ok && !strings.Contains(modelInfo.TensorType, dtype) {
+				modelInfo.TensorType += dtype + " "
+			}
+
+			shape, err := extractShape(tensorData)
+			if err != nil {
+				continue
+			}
+
+			tensorParams := calculateTensorParams(shape)
+			totalParams += tensorParams
+
+			bytesPerParam = getBytesPerParam(dtype)
+			tensorMemoryBytes := tensorParams * int64(bytesPerParam)
+			modelSize += tensorMemoryBytes
+		}
+
+		modelInfo.TotalParams = totalParams
+		modelInfo.ParamsBillions = float32(math.Round(float64(totalParams)/1e9*100) / 100)
+	}
+	modelInfo.ModelWeightsGB = float32(modelSize / (1024 * 1024 * 1024))
+	modelInfo.MiniGPUMemoryGB = max(float32(totalMemoryBytes/(1024*1024*1024)), 1)
+	//min contexnt for min gpu memory
+	modelInfo.ContextSize = minContext
+	modelInfo.BatchSize = 1
+	modelInfo.BytesPerParam = bytesPerParam
+	modelInfo.TensorType = strings.TrimSpace(modelInfo.TensorType)
+	return modelInfo, nil
+}
+
+func ExtraOverhead(modelSize int64) float32 {
+	return float32(modelSize) * 0.05
+}
+
+func GetActivationMemory(batchSize, seqLength, numLayers, hiddenSize, numHeads, bytesPerParam int) float32 {
+	batchF := float32(batchSize)
+	seqF := float32(seqLength)
+	headsF := float32(numHeads)
+	hiddenF := float32(hiddenSize)
+	sizeF := float32(bytesPerParam)
+	activationFactor := 34.0 + ((5.0 * seqF * headsF) / hiddenF)
+	total := batchF * seqF * hiddenF * activationFactor * sizeF
+	return total / (1024 * 1024 * 1024)
+}
+
+func GetKvCacheSize(contextSize, batchSize, hiddenSize, numHiddenLayers, bytesPerParam int) float32 {
+	activateBytes := 2 * batchSize * contextSize * numHiddenLayers * hiddenSize * bytesPerParam
+	return float32(activateBytes / (1024 * 1024 * 1024))
+}
+
+func extractShape(tensorData map[string]any) ([]int, error) {
+	shapeRaw, ok := tensorData["shape"].([]any)
+	if !ok {
+		return nil, fmt.Errorf("invalid shape format")
+	}
+
+	shape := make([]int, len(shapeRaw))
+	for i, dim := range shapeRaw {
+		dimFloat, ok := dim.(float64)
+		if !ok {
+			return nil, fmt.Errorf("invalid shape dimension")
+		}
+		shape[i] = int(dimFloat)
+	}
+	return shape, nil
+}
+
+func calculateTensorParams(shape []int) int64 {
+	var tensorParams int64 = 1
+	for _, dim := range shape {
+		tensorParams *= int64(dim)
+	}
+	return tensorParams
+}
+
+// fetchSafetensorsMetadata fetches the metadata header from a safetensors file
+func fetchSafetensorsMetadata(url string) (map[string]any, error) {
+	// Create a custom http.Transport that skips TLS verification
+	tr := &http.Transport{
+		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+	}
+	client := &http.Client{Transport: tr}
+	if strings.HasPrefix(url, "http://") {
+		client = &http.Client{}
+	}
+
+	// Fetch the first 8 bytes of the file
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Add("Range", "bytes=0-7")
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	if resp.StatusCode != http.StatusPartialContent {
+		return nil, fmt.Errorf("failed to fetch metadata: %v", resp.Status)
+	}
+	defer resp.Body.Close()
+
+	// Read the first 8 bytes
+	lengthBytes := make([]byte, 8)
+	_, err = io.ReadFull(resp.Body, lengthBytes)
+	if err != nil {
+		return nil, err
+	}
+
+	// Interpret the bytes as a little-endian unsigned 64-bit integer
+	lengthOfHeader := binary.LittleEndian.Uint64(lengthBytes)
+
+	maxSize := uint64(100 * 1024)
+	if lengthOfHeader > maxSize {
+		return nil, fmt.Errorf("header size exceeds maximum allowed size: %d bytes,header length: %d", maxSize, lengthOfHeader)
+	}
+
+	// Fetch length_of_header bytes starting from the 9th byte
+	req, err = http.NewRequest("GET", url, nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Add("Range", fmt.Sprintf("bytes=8-%d", 7+lengthOfHeader))
+
+	resp, err = client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	// Read the response body
+	headerBytes, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	// Interpret the response as a JSON object
+	var header map[string]any
+	err = json.Unmarshal(headerBytes, &header)
+	if err != nil {
+		return nil, err
+	}
+
+	return header, nil
+}
+
+// getBytesPerParam returns the number of bytes per parameter for a given data type
+func getBytesPerParam(dtype string) int {
+	dtype = strings.ToUpper(dtype)
+	switch {
+	case strings.Contains(dtype, "F16") || strings.Contains(dtype, "BF16"):
+		return 2
+	case strings.Contains(dtype, "F64"):
+		return 8
+	case strings.Contains(dtype, "F8"):
+		return 1
+	case strings.Contains(dtype, "I8") || strings.Contains(dtype, "U8"):
+		return 1
+	case strings.Contains(dtype, "I32") || strings.Contains(dtype, "U32"):
+		return 4
+	case strings.Contains(dtype, "I64") || strings.Contains(dtype, "U64"):
+		return 8
+	default:
+		// Default to float32 (4 bytes)
+		return 4
+	}
+}

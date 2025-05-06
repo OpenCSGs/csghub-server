@@ -1,0 +1,41 @@
+{
+  "engine_name": "tgi",
+  "engine_version": "3.2.1",
+  "enabled": 1,
+  "container_port": 8000,
+  "model_format": "safetensors",
+  "engine_images": [
+    {
+      "compute_type": "gpu",
+      "image": "tgi:3.2.1",
+      "driver_version": "12.4"
+    }
+  ],
+  "supported_archs": [
+    "BaichuanForCausalLM",
+    "BloomForCausalLM",
+    "CohereForCausalLM",
+    "DbrxForCausalLM",
+    "DeepseekV2ForCausalLM",
+    "FalconForCausalLM",
+    "GPT2LMHeadCustomModel",
+    "GPT2LMHeadModel",
+    "GPTBigCodeForCausalLM",
+    "GPTNeoXForCausalLM",
+    "GemmaForCausalLM",
+    "Idefics2ForConditionalGeneration",
+    "IdeficsForVisionText2Text",
+    "LlamaForCausalLM",
+    "LlavaNextForConditionalGeneration",
+    "MPTForCausalLM",
+    "MistralForCausalLM",
+    "MixtralForCausalLM",
+    "OPTForCausalLM",
+    "PaliGemmaForConditionalGeneration",
+    "Phi3ForCausalLM",
+    "PhiForCausalLM",
+    "Qwen2ForCausalLM",
+    "Starcoder2ForCausalLM",
+    "T5ForConditionalGeneration"
+  ]
+}

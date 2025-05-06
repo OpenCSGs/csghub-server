@@ -10,7 +10,6 @@ import (
 	"log/slog"
 	"net/http"
 	"net/url"
-	"time"
 )
 
 var _ Builder = (*RemoteBuilder)(nil)
@@ -32,7 +31,7 @@ func NewRemoteBuilder(remoteURL string) (*RemoteBuilder, error) {
 }
 
 func (h *RemoteBuilder) Build(ctx context.Context, req *BuildRequest) (*BuildResponse, error) {
-	rel := &url.URL{Path: "/push_data"}
+	rel := &url.URL{Path: "/api/v1/imagebuilder/builder"}
 	u := h.remote.ResolveReference(rel)
 	response, err := h.doRequest(http.MethodPost, u.String(), req)
 	if err != nil {
@@ -49,7 +48,7 @@ func (h *RemoteBuilder) Build(ctx context.Context, req *BuildRequest) (*BuildRes
 }
 
 func (h *RemoteBuilder) Status(ctx context.Context, req *StatusRequest) (*StatusResponse, error) {
-	u := fmt.Sprintf("%s/%s/%s/status?build_id=%s", h.remote, req.OrgName, req.SpaceName, req.BuildID)
+	u := fmt.Sprintf("%s/api/v1/imagebuilder/%s/%s/status?build_id=%s", h.remote, req.OrgName, req.SpaceName, req.BuildID)
 	response, err := h.doRequest(http.MethodGet, u, req)
 	if err != nil {
 		return nil, err
@@ -75,7 +74,7 @@ func (h *RemoteBuilder) Status(ctx context.Context, req *StatusRequest) (*Status
 }
 
 func (h *RemoteBuilder) Logs(ctx context.Context, req *LogsRequest) (<-chan string, error) {
-	u := fmt.Sprintf("%s/%s/%s/logs?build_id=%s", h.remote, req.OrgName, req.SpaceName, req.BuildID)
+	u := fmt.Sprintf("%s/api/v1/imagebuilder/%s/%s/logs?build_id=%s", h.remote, req.OrgName, req.SpaceName, req.BuildID)
 
 	rc, err := h.doStreamRequest(ctx, http.MethodGet, u, req)
 	if err != nil {
@@ -87,25 +86,20 @@ func (h *RemoteBuilder) Logs(ctx context.Context, req *LogsRequest) (<-chan stri
 
 func (h *RemoteBuilder) readToChannel(rc io.ReadCloser) <-chan string {
 	output := make(chan string, 2)
-
-	buf := make([]byte, 256)
-	br := bufio.NewReader(rc)
+	scanner := bufio.NewScanner(rc) // Use Scanner to split by line
 
 	go func() {
-		for {
-			n, err := br.Read(buf)
-			if err != nil {
-				slog.Info("remote builder log reader aborted", slog.Any("error", err))
-				rc.Close()
-				close(output)
-				break
-			}
-
-			if n > 0 {
-				output <- string(buf[:n])
-			} else {
-				time.Sleep(2 * time.Second)
-			}
+		defer func() {
+			rc.Close()
+			close(output)
+		}()
+		for scanner.Scan() {
+			line := scanner.Text()
+			output <- line
+		}
+		if err := scanner.Err(); err != nil {
+			slog.Error("remote builder log read failed", slog.Any("error", err))
+			return
 		}
 	}()
 

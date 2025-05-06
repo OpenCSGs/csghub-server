@@ -48,7 +48,7 @@ type RepoStore interface {
 	SetUpdateTimeByPath(ctx context.Context, repoType types.RepositoryType, namespace, name string, update time.Time) error
 	PublicToUser(ctx context.Context, repoType types.RepositoryType, userIDs []int64, filter *types.RepoFilter, per, page int, isAdmin bool) (repos []*Repository, count int, err error)
 	IsMirrorRepo(ctx context.Context, repoType types.RepositoryType, namespace, name string) (bool, error)
-	ListRepoPublicToUserByRepoIDs(ctx context.Context, repoType types.RepositoryType, userID int64, search, sort string, per, page int, repoIDs []int64) (repos []*Repository, count int, err error)
+	ListRepoByDeployType(ctx context.Context, repoType types.RepositoryType, userID int64, search, sort string, deployType, per, page int) (repos []*Repository, count int, err error)
 	WithMirror(ctx context.Context, per, page int) (repos []Repository, count int, err error)
 	CleanRelationsByRepoID(ctx context.Context, repoId int64) error
 	BatchCreateRepoTags(ctx context.Context, repoTags []RepositoryTag) error
@@ -101,6 +101,7 @@ type Repository struct {
 	DownloadCount        int64                      `bun:",nullzero" json:"download_count"`
 	Downloads            []RepositoryDownload       `bun:"rel:has-many,join:id=repository_id" json:"downloads"`
 	Tags                 []Tag                      `bun:"m2m:repository_tags,join:Repository=Tag" json:"tags"`
+	Metadata             Metadata                   `bun:"rel:has-one,join:id=repository_id" json:"metadata"`
 	Mirror               Mirror                     `bun:"rel:has-one,join:id=repository_id" json:"mirror"`
 	RepositoryType       types.RepositoryType       `bun:",notnull" json:"repository_type"`
 	HTTPCloneURL         string                     `bun:",nullzero" json:"http_clone_url"`
@@ -111,6 +112,8 @@ type Repository struct {
 	MSPath               string                     `bun:",nullzero" json:"ms_path"`
 	CSGPath              string                     `bun:",nullzero" json:"csg_path"`
 	HFPath               string                     `bun:",nullzero" json:"hf_path"`
+	GithubPath           string                     `bun:",nullzero" json:"github_path"`
+	StarCount            int                        `bun:",nullzero" json:"star_count"`
 	// updated_at timestamp will be updated only if files changed
 	times
 }
@@ -119,6 +122,58 @@ type Repository struct {
 func (r Repository) NamespaceAndName() (namespace string, name string) {
 	fields := strings.Split(r.Path, "/")
 	return fields[0], fields[1]
+}
+
+func (r Repository) OriginName() string {
+	oriName := r.Name
+	if r.HFPath != "" {
+		oriName = strings.Split(r.HFPath, "/")[1]
+	} else if r.MSPath != "" {
+		oriName = strings.Split(r.MSPath, "/")[1]
+	}
+	return oriName
+}
+
+func (r Repository) Archs() (archs []string) {
+	if r.Metadata.Architecture != "" {
+		archs = append(archs, r.Metadata.Architecture)
+	}
+	if r.Metadata.ClassName != "" {
+		archs = append(archs, r.Metadata.ClassName)
+	}
+	if r.Metadata.ModelType != "" {
+		archs = append(archs, r.Metadata.ModelType)
+	}
+	return archs
+}
+func (r Repository) Format() string {
+	for _, tag := range r.Tags {
+		if tag.Category == "framework" {
+			if tag.Name == "gguf" {
+				return tag.Name
+			}
+			if tag.Name == "onnx" {
+				return tag.Name
+			}
+			if tag.Name == "safetensors" {
+				return tag.Name
+			}
+		}
+	}
+	//handle some old repo has no gguf tag
+	if strings.Contains(strings.ToLower(r.Name), "gguf") {
+		return "gguf"
+	}
+	return string(types.Unknown)
+}
+
+func (r Repository) Task() string {
+	for _, tag := range r.Tags {
+		if tag.Category == "task" {
+			return tag.Name
+		}
+	}
+	return string(types.Unknown)
 }
 
 func (r *Repository) UpdateSourceBySourceTypeAndSourcePath(sourceType, sourcePath string) {
@@ -223,6 +278,7 @@ func (s *repoStoreImpl) FindByPath(ctx context.Context, repoType types.Repositor
 		NewSelect().
 		Model(resRepo).
 		Relation("Tags").
+		Relation("Metadata").
 		Where("LOWER(git_path) = LOWER(?)", fmt.Sprintf("%ss_%s/%s", repoType, namespace, name)).
 		Limit(1).
 		Scan(ctx)
@@ -467,7 +523,15 @@ func (s *repoStoreImpl) PublicToUser(ctx context.Context, repoType types.Reposit
 			var asTag = fmt.Sprintf("%s%d", "ts", i)
 			q.Join(fmt.Sprintf("JOIN repository_tags AS %s ON repository.id = %s.repository_id", asRepoTag, asRepoTag)).
 				Join(fmt.Sprintf("JOIN tags AS %s ON %s.tag_id = %s.id", asTag, asRepoTag, asTag))
-			q.Where(fmt.Sprintf("%s.category = ? AND %s.name = ?", asTag, asTag), tag.Category, tag.Name)
+			if tag.Category != "" {
+				q.Where(fmt.Sprintf("%s.category = ?", asTag), tag.Category)
+			}
+			if tag.Name != "" {
+				q.Where(fmt.Sprintf("%s.name = ?", asTag), tag.Name)
+			}
+			if tag.Group != "" {
+				q.Where(fmt.Sprintf("%s.group = ?", asTag), tag.Group)
+			}
 		}
 
 	}
@@ -508,17 +572,26 @@ func (s *repoStoreImpl) IsMirrorRepo(ctx context.Context, repoType types.Reposit
 	return result.Exists, nil
 }
 
-func (s *repoStoreImpl) ListRepoPublicToUserByRepoIDs(ctx context.Context, repoType types.RepositoryType, userID int64, search, sort string, per, page int, repoIDs []int64) (repos []*Repository, count int, err error) {
+func (s *repoStoreImpl) ListRepoByDeployType(ctx context.Context, repoType types.RepositoryType, userID int64, search, sort string, deployType, per, page int) (repos []*Repository, count int, err error) {
+	queryArchs := "SELECT architecture_name FROM runtime_architectures WHERE runtime_framework_id IN (SELECT id FROM runtime_frameworks WHERE type=?)"
+	var architectureNames []string
+	err = s.db.BunDB.NewRaw(queryArchs, deployType).
+		Scan(ctx, &architectureNames)
+	if err != nil {
+		return
+	}
+
 	q := s.db.Operator.Core.
 		NewSelect().
 		Column("repository.*").
 		Model(&repos).
-		Relation("Tags")
+		Relation("Tags").
+		Relation("Metadata")
+
+	q.Where("metadata.architecture IN (?) or metadata.model_type IN (?) or metadata.class_name IN (?)", bun.In(architectureNames), bun.In(architectureNames), bun.In(architectureNames))
 
 	q.Where("repository.repository_type = ?", repoType)
 	q.Where("repository.private = ? or repository.user_id = ?", false, userID)
-	q.Where("repository.id in (?)", bun.In(repoIDs))
-
 	if search != "" {
 		search = strings.ToLower(search)
 		q.Where(
@@ -528,7 +601,6 @@ func (s *repoStoreImpl) ListRepoPublicToUserByRepoIDs(ctx context.Context, repoT
 			fmt.Sprintf("%%%s%%", search),
 		)
 	}
-
 	count, err = q.Count(ctx)
 	if err != nil {
 		return
@@ -727,7 +799,8 @@ func (s *repoStoreImpl) BatchGet(ctx context.Context, repoType types.RepositoryT
 func (s *repoStoreImpl) FindWithBatch(ctx context.Context, batchSize, batch int, repoTypes ...types.RepositoryType) ([]Repository, error) {
 	var res []Repository
 	q := s.db.Operator.Core.NewSelect().
-		Model(&res)
+		Model(&res).
+		Relation("Tags")
 	if len(repoTypes) > 0 {
 		q.Where("repository_type in (?)", bun.In(repoTypes))
 	}
@@ -778,6 +851,8 @@ func (s *repoStoreImpl) UpdateSourcePath(ctx context.Context, repoID int64, sour
 		field = "hf_path"
 	case enum.MSSource:
 		field = "ms_path"
+	case enum.GitHubSource:
+		field = "github_path"
 	default:
 		return fmt.Errorf("unknown source type: %s", sourceType)
 	}

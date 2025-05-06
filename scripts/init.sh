@@ -83,4 +83,14 @@ echo "Trigger multisync once in background"
 nohup /starhub-bin/starhub sync sync-as-client >> /starhub-bin/cron-sync-as-client.log 2>&1 &
 
 echo "Start server..."
-/starhub-bin/starhub start server --config=/starhub-bin/config/config.toml
+CONFIG_FILE="/starhub-bin/config/config.toml"
+CMD="/starhub-bin/starhub start server"
+
+// Check if the config file exists and use it if it does, otherwise start without it
+if [ -f "$CONFIG_FILE" ]; then
+  echo "Using config file: $CONFIG_FILE"
+  exec $CMD --config="$CONFIG_FILE"
+else
+  echo "Config file not found, starting without config"
+  exec $CMD
+fi

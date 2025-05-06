@@ -1,5 +1,12 @@
 package checker
 
+// GetLocalWordChecker returns the local word checker instance
+//
+// It's better to call this method everytime before using the local checker, as the checker may be changed asynchronously
+func GetLocalWordChecker() *DFA {
+	return localWordChecker
+}
+
 // DFA State
 type State struct {
 	transitions map[rune]*State

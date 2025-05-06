@@ -1,0 +1,5 @@
+FROM opencsg-registry.cn-beijing.cr.aliyuncs.com/opencsg_public/nginx:latest
+WORKDIR /usr/share/nginx/html
+COPY nginx.conf /etc/nginx/nginx.conf
+
+CMD ["nginx", "-g", "daemon off;"]

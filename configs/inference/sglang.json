@@ -1,0 +1,89 @@
+{
+  "engine_name": "sglang",
+  "engine_version": "v0.4.5.post2-cu124-srt",
+  "container_port": 8000,
+  "enabled": 1,
+  "model_format": "safetensors",
+  "engine_images": [
+    {
+      "compute_type": "gpu",
+      "image": "sglang:v0.4.5.post2-cu124-srt",
+      "driver_version": "12.4"
+    }
+  ],
+  "engine_args": [
+    {
+      "name": "context-length",
+      "value": "1024",
+      "format": "--context-length %s"
+    },
+    {
+      "name": "tensor-parallel-size",
+      "value": "1",
+      "format": "--tensor-parallel-size %s"
+    },
+    {
+      "name": "chunked-prefill-size",
+      "value": "1024",
+      "format": "--chunked-prefill-size %s"
+    },
+    { "name": "cpu-offload-gb", "value": "1", "format": "--cpu-offload-gb %s" },
+    { "name": "dp-size", "value": "1", "format": "--dp-size %s" },
+    {
+      "name": "enable-dp-attention",
+      "value": "enable",
+      "format": "--enable-dp-attention"
+    },
+    { "name": "enable-ep-moe", "value": "enable", "format": "--enable-ep-moe" }
+  ],
+  "supported_archs": [
+    "BaichuanForCausalLM",
+    "ChatGLMModel",
+    "CohereForCausalLM",
+    "DbrxForCausalLM",
+    "DeepseekForCausalLM",
+    "DeepseekV2ForCausalLM",
+    "DeepseekV3ForCausalLM",
+    "ExaoneForCausalLM",
+    "GPT2LMHeadModel",
+    "GPTBigCodeForCausalLM",
+    "Gemma2ForCausalLM",
+    "Gemma2ForSequenceClassification",
+    "GemmaForCausalLM",
+    "GraniteForCausalLM",
+    "Grok1ForCausalLM",
+    "Grok1ModelForCausalLM",
+    "InternLM2ForCausalLM",
+    "InternLM2ForRewardModel",
+    "LlamaEmbeddingModel",
+    "LlamaForCausalLM",
+    "LlamaForCausalLMEagle",
+    "LlamaForClassification",
+    "LlavaLlamaForCausalLM",
+    "LlavaMistralForCausalLM",
+    "LlavaQwenForCausalLM",
+    "LlavaVidForCausalLM",
+    "MiniCPM3ForCausalLM",
+    "MiniCPMForCausalLM",
+    "MistralForCausalLM",
+    "MistralModel",
+    "MixtralForCausalLM",
+    "MllamaForConditionalGeneration",
+    "Olmo2ForCausalLM",
+    "OlmoForCausalLM",
+    "OlmoeForCausalLM",
+    "Phi3ForCausalLM",
+    "Phi3SmallForCausalLM",
+    "QWenLMHeadModel",
+    "QuantMixtralForCausalLM",
+    "Qwen2ForCausalLM",
+    "Qwen2MoeForCausalLM",
+    "Qwen2VLForConditionalGeneration",
+    "StableLmForCausalLM",
+    "TorchNativeLlamaForCausalLM",
+    "TorchNativePhi3ForCausalLM",
+    "XverseForCausalLM",
+    "XverseMoeForCausalLM",
+    "YiVLForCausalLM"
+  ]
+}

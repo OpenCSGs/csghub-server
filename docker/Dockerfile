@@ -12,6 +12,7 @@ COPY --from=build-env /go/bin/starhub .
 COPY scripts/init.sh /starhub-bin/scripts/
 COPY builder/store/database/seeds/. /starhub-bin/builder/store/database/seeds/
 COPY docker/spaces/templates/ /starhub-bin/docker/spaces/templates/
+COPY configs/ /starhub-bin/configs/
 RUN chmod +x /starhub-bin/scripts/init.sh
 
 EXPOSE 8080

@@ -78,14 +78,14 @@ func (h *SpaceHandler) Index(ctx *gin.Context) {
 		return
 	}
 	repoFilter = getFilterFromContext(ctx, repoFilter)
-	if !slices.Contains(Sorts, repoFilter.Sort) {
-		msg := fmt.Sprintf("sort parameter must be one of %v", Sorts)
+	if !slices.Contains(types.Sorts, repoFilter.Sort) {
+		msg := fmt.Sprintf("sort parameter must be one of %v", types.Sorts)
 		slog.Error("Bad request format,", slog.String("error", msg))
 		httpbase.BadRequest(ctx, msg)
 		return
 	}
-	if repoFilter.Source != "" && !slices.Contains(Sources, repoFilter.Source) {
-		msg := fmt.Sprintf("source parameter must be one of %v", Sources)
+	if repoFilter.Source != "" && !slices.Contains(types.Sources, repoFilter.Source) {
+		msg := fmt.Sprintf("source parameter must be one of %v", types.Sources)
 		slog.Error("Bad request format,", slog.String("error", msg))
 		ctx.JSON(http.StatusBadRequest, gin.H{"message": msg})
 		return
@@ -130,7 +130,7 @@ func (h *SpaceHandler) Show(ctx *gin.Context) {
 		return
 	}
 	currentUser := httpbase.GetCurrentUser(ctx)
-	detail, err := h.space.Show(ctx.Request.Context(), namespace, name, currentUser)
+	detail, err := h.space.Show(ctx.Request.Context(), namespace, name, currentUser, false)
 	if err != nil {
 		if errors.Is(err, component.ErrUnauthorized) {
 			httpbase.UnauthorizedError(ctx, err)
@@ -309,9 +309,9 @@ func (h *SpaceHandler) Run(ctx *gin.Context) {
 		return
 	}
 	if !allow {
-		slog.Info("user not allowed to run space", slog.String("namespace", namespace),
+		slog.Warn("user not allowed to run space", slog.String("namespace", namespace),
 			slog.String("name", name), slog.Any("username", currentUser))
-		httpbase.UnauthorizedError(ctx, errors.New("user not allowed to run sapce"))
+		httpbase.ForbiddenError(ctx, errors.New("user not allowed to run space"))
 		return
 	}
 	deployID, err := h.space.Deploy(ctx.Request.Context(), namespace, name, currentUser)
@@ -387,9 +387,9 @@ func (h *SpaceHandler) Stop(ctx *gin.Context) {
 		return
 	}
 	if !allow {
-		slog.Info("user not allowed to stop space", slog.String("namespace", namespace),
+		slog.Warn("user not allowed to stop space", slog.String("namespace", namespace),
 			slog.String("name", name), slog.Any("username", currentUser))
-		httpbase.UnauthorizedError(ctx, errors.New("user not allowed to stop sapce"))
+		httpbase.ForbiddenError(ctx, errors.New("user not allowed to stop space"))
 		return
 	}
 
@@ -440,8 +440,10 @@ func (h *SpaceHandler) Status(ctx *gin.Context) {
 	}
 
 	if !allow {
-		slog.Info("user not allowed to query space status", slog.String("namespace", namespace),
+		slog.Warn("user not allowed to query space status", slog.String("namespace", namespace),
 			slog.String("name", name), slog.Any("username", currentUser))
+		httpbase.ForbiddenError(ctx, errors.New("user not allowed to read space status"))
+		return
 	}
 
 	ctx.Writer.Header().Set("Content-Type", "text/event-stream")
@@ -455,15 +457,19 @@ func (h *SpaceHandler) Status(ctx *gin.Context) {
 	for {
 		select {
 		case <-ctx.Request.Context().Done():
-			slog.Info("space handler status request context done", slog.Any("error", ctx.Request.Context().Err()))
+			slog.Info("space handler status request context done",
+				slog.String("namespace", namespace), slog.String("name", name),
+				slog.Any("error", ctx.Request.Context().Err()))
 			return
 		default:
 			time.Sleep(h.spaceStatusCheckInterval)
 			//user http request context instead of gin context, so that server knows the life cycle of the request
 			_, status, err := h.space.Status(ctx.Request.Context(), namespace, name)
 			if err != nil {
-				slog.Error("failed to get space status", slog.Any("error", err), slog.String("namespace", namespace),
-					slog.String("name", name))
+				deadline, ok := ctx.Request.Context().Deadline()
+				slog.Error("failed to get space status in stream", slog.Any("error", err),
+					slog.String("namespace", namespace), slog.String("name", name),
+					slog.Any("deadline", time.Until(deadline)), slog.Bool("ok", ok))
 				ctx.SSEvent("error", err.Error())
 			} else {
 				ctx.SSEvent("status", status)
@@ -537,9 +543,9 @@ func (h *SpaceHandler) Logs(ctx *gin.Context) {
 	}
 
 	if !allow {
-		slog.Info("user not allowed to read sapce logs", slog.String("namespace", namespace),
+		slog.Warn("user not allowed to read space logs", slog.String("namespace", namespace),
 			slog.String("name", name), slog.Any("username", currentUser))
-		httpbase.UnauthorizedError(ctx, errors.New("user not allowed to read sapce logs"))
+		httpbase.ForbiddenError(ctx, errors.New("user not allowed to read space logs"))
 		return
 	}
 
@@ -551,6 +557,12 @@ func (h *SpaceHandler) Logs(ctx *gin.Context) {
 	//user http request context instead of gin context, so that server knows the life cycle of the request
 	logReader, err := h.space.Logs(ctx.Request.Context(), namespace, name)
 	if err != nil {
+		deadline, ok := ctx.Request.Context().Deadline()
+		slog.Error("failed to get space logs",
+			slog.Any("error", err),
+			slog.String("namespace", namespace), slog.String("name", name),
+			slog.Any("deadline", time.Until(deadline)), slog.Bool("ok", ok),
+		)
 		httpbase.ServerError(ctx, err)
 		return
 	}
@@ -567,7 +579,9 @@ func (h *SpaceHandler) Logs(ctx *gin.Context) {
 	for {
 		select {
 		case <-ctx.Request.Context().Done():
-			slog.Info("space handler logs request context done", slog.Any("error", ctx.Request.Context().Err()))
+			slog.Info("space handler logs request context done",
+				slog.String("namespace", namespace), slog.String("name", name),
+				slog.Any("error", ctx.Request.Context().Err()))
 			return
 		case data, ok := <-logReader.BuildLog():
 			if ok {
@@ -579,6 +593,9 @@ func (h *SpaceHandler) Logs(ctx *gin.Context) {
 				ctx.SSEvent("Container", string(data))
 				ctx.Writer.Flush()
 			}
+		default:
+			// Add a small sleep to prevent CPU spinning when no data is available
+			time.Sleep(time.Second)
 		}
 	}
 }

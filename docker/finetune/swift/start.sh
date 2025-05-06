@@ -32,9 +32,9 @@ modify_if_exists() {
         sed -i "s|elem_id='model_type'|elem_id='model_type',value='${model_type}'|" $ui_path
     fi
     # set default template type for csghub
-    grep -q "elem_id='template_type',value=" $ui_path
+    grep -q "elem_id='template',value=" $ui_path
     if [ $? -ne 0 ]; then
-        sed -i "s|elem_id='template_type'|elem_id='template_type',value='${template_type}'|" $ui_path
+        sed -i "s|elem_id='template'|elem_id='template',value='${template_type}'|" $ui_path
     fi
     # set default model id for training
     sed -i "s|Qwen/Qwen2.5-7B-Instruct|$REPO_ID|" $ui_path

@@ -125,13 +125,13 @@ func TestDeployer_updateEvaluationEnvHardware(t *testing.T) {
 		value    string
 	}{
 		{types.HardWare{
-			Gpu: types.GPU{Num: "1"},
+			Gpu: types.Processor{Num: "1"},
 		}, "GPU_NUM", "1"},
 	}
 
 	for _, c := range cases {
 		m := map[string]string{}
-		updateEvaluationEnvHardware(m, types.EvaluationReq{Hardware: c.hardware})
+		common.UpdateEvaluationEnvHardware(m, c.hardware)
 		require.Equal(t, c.value, m[c.key])
 	}
 

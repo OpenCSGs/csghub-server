@@ -1,7 +1,0 @@
-FROM opencsg-registry.cn-beijing.cr.aliyuncs.com/opencsg_public/nginx:latest
-RUN apt-get update && apt-get install -y git
-WORKDIR /usr/share/nginx/html
-COPY ./nginx/serve.sh /etc/serve.sh
-RUN chmod +x /etc/serve.sh
-
-CMD ["/etc/serve.sh"]

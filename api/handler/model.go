@@ -59,6 +59,8 @@ type ModelHandler struct {
 // @Param        language_tag query string false "filter by language tag, deprecated"
 // @Param        tag_category query string false "filter by tag category"
 // @Param        tag_name query string false "filter by tag name"
+// @Param        tag_group query string false "filter by tag group"
+// @Param        need_op_weight query bool false "need op weight" default(false)
 // @Param        sort query string false "sort by"
 // @Param        source query string false "source" Enums(opencsg, huggingface, local)
 // @Param        per query int false "per" default(20)
@@ -78,15 +80,15 @@ func (h *ModelHandler) Index(ctx *gin.Context) {
 		return
 	}
 	filter = getFilterFromContext(ctx, filter)
-	if !slices.Contains(Sorts, filter.Sort) {
-		msg := fmt.Sprintf("sort parameter must be one of %v", Sorts)
+	if !slices.Contains(types.Sorts, filter.Sort) {
+		msg := fmt.Sprintf("sort parameter must be one of %v", types.Sorts)
 		slog.Error("Bad request format,", slog.String("error", msg))
 		ctx.JSON(http.StatusBadRequest, gin.H{"message": msg})
 		return
 	}
 
-	if filter.Source != "" && !slices.Contains[[]string](Sources, filter.Source) {
-		msg := fmt.Sprintf("source parameter must be one of %v", Sources)
+	if filter.Source != "" && !slices.Contains(types.Sources, filter.Source) {
+		msg := fmt.Sprintf("source parameter must be one of %v", types.Sources)
 		slog.Error("Bad request format,", slog.String("error", msg))
 		ctx.JSON(http.StatusBadRequest, gin.H{"message": msg})
 		return
@@ -511,12 +513,18 @@ func (h *ModelHandler) DelDatasetRelation(ctx *gin.Context) {
 func parseTagReqs(ctx *gin.Context) (tags []types.TagReq) {
 	tagCategories := ctx.QueryArray("tag_category")
 	tagNames := ctx.QueryArray("tag_name")
-	if len(tagCategories) > 0 && len(tagCategories) == len(tagNames) {
+	tagGroups := ctx.QueryArray("tag_group")
+	if len(tagCategories) > 0 {
 		for i, category := range tagCategories {
-			tags = append(tags, types.TagReq{
-				Name:     tagNames[i],
-				Category: category,
-			})
+			var tag types.TagReq
+			tag.Category = strings.ToLower(category)
+			if len(tagCategories) == len(tagNames) {
+				tag.Name = strings.ToLower(tagNames[i])
+			}
+			if len(tagCategories) == len(tagGroups) {
+				tag.Group = strings.ToLower(tagGroups[i])
+			}
+			tags = append(tags, tag)
 		}
 		return
 	}
@@ -594,16 +602,18 @@ func (h *ModelHandler) DeployDedicated(ctx *gin.Context) {
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
+
 	allow, err := h.repo.AllowReadAccess(ctx.Request.Context(), types.ModelRepo, namespace, name, currentUser)
 	if err != nil {
 		slog.Error("failed to check user permission", "error", err)
 		httpbase.ServerError(ctx, errors.New("failed to check user permission"))
 		return
 	}
+
 	if !allow {
-		slog.Info("user not allowed to run model", slog.String("namespace", namespace),
+		slog.Info("user do not allowed to create deploy", slog.String("namespace", namespace),
 			slog.String("name", name), slog.Any("username", currentUser))
-		httpbase.ForbiddenError(ctx, errors.New("user not allowed to run model"))
+		httpbase.ForbiddenError(ctx, errors.New("user is not authorized to read this repository for create deploy"))
 		return
 	}
 

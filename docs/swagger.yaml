@@ -89,6 +89,35 @@ definitions:
       updated_at:
         type: string
     type: object
+  database.Metadata:
+    properties:
+      architecture:
+        type: string
+      class_name:
+        type: string
+      created_at:
+        type: string
+      id:
+        type: integer
+      mini_gpu_memory_gb:
+        type: number
+      model_params:
+        type: number
+      model_type:
+        type: string
+      quantizations:
+        items:
+          $ref: '#/definitions/types.Quantization'
+        type: array
+      repository:
+        $ref: '#/definitions/database.Repository'
+      repository_id:
+        type: integer
+      tensor_type:
+        type: string
+      updated_at:
+        type: string
+    type: object
   database.Mirror:
     properties:
       created_at:
@@ -239,6 +268,8 @@ definitions:
         type: array
       git_path:
         type: string
+      github_path:
+        type: string
       hf_path:
         type: string
       http_clone_url:
@@ -252,6 +283,8 @@ definitions:
         type: string
       likes:
         type: integer
+      metadata:
+        $ref: '#/definitions/database.Metadata'
       mirror:
         $ref: '#/definitions/database.Mirror'
       ms_path:
@@ -275,6 +308,8 @@ definitions:
         $ref: '#/definitions/types.RepositorySource'
       ssh_clone_url:
         type: string
+      star_count:
+        type: integer
       sync_status:
         $ref: '#/definitions/types.RepositorySyncStatus'
       tags:
@@ -327,6 +362,35 @@ definitions:
         $ref: '#/definitions/database.User'
       user_id:
         type: integer
+    type: object
+  database.SpaceTemplate:
+    properties:
+      created_at:
+        type: string
+      description:
+        type: string
+      dev_mode:
+        type: boolean
+      enable:
+        type: boolean
+      id:
+        type: integer
+      name:
+        type: string
+      path:
+        type: string
+      port:
+        type: integer
+      secrets:
+        type: string
+      show_name:
+        type: string
+      type:
+        type: string
+      updated_at:
+        type: string
+      variables:
+        type: string
     type: object
   database.SyncClientSetting:
     properties:
@@ -862,6 +926,10 @@ definitions:
         type: boolean
       readme:
         type: string
+      star_count:
+        type: integer
+      tool_count:
+        type: integer
     type: object
   types.CreateCollectionReq:
     properties:
@@ -932,6 +1000,10 @@ definitions:
         type: boolean
       readme:
         type: string
+      star_count:
+        type: integer
+      tool_count:
+        type: integer
       type:
         type: integer
     type: object
@@ -986,6 +1058,39 @@ definitions:
         type: string
       token:
         type: string
+    type: object
+  types.CreateMCPServerReq:
+    properties:
+      configuration:
+        type: string
+      default_branch:
+        example: main
+        type: string
+      description:
+        type: string
+      labels:
+        example: ""
+        type: string
+      license:
+        example: MIT
+        type: string
+      name:
+        example: model_name_1
+        type: string
+      namespace:
+        example: user_or_org_name
+        type: string
+      nickname:
+        example: model display name
+        type: string
+      private:
+        type: boolean
+      readme:
+        type: string
+      star_count:
+        type: integer
+      tool_count:
+        type: integer
     type: object
   types.CreateMirrorParams:
     properties:
@@ -1070,6 +1175,10 @@ definitions:
         type: boolean
       readme:
         type: string
+      star_count:
+        type: integer
+      tool_count:
+        type: integer
     type: object
   types.CreateOrgReq:
     properties:
@@ -1123,6 +1232,10 @@ definitions:
         type: boolean
       readme:
         type: string
+      star_count:
+        type: integer
+      tool_count:
+        type: integer
     type: object
   types.CreateRepoDiscussionRequest:
     properties:
@@ -1182,7 +1295,13 @@ definitions:
         type: string
       secrets:
         type: string
+      star_count:
+        type: integer
       template:
+        type: string
+      tool_count:
+        type: integer
+      variables:
         type: string
     type: object
   types.CreateSpaceResourceReq:
@@ -1296,6 +1415,10 @@ definitions:
         $ref: '#/definitions/types.Repository'
       repository_id:
         type: integer
+      scores:
+        items:
+          $ref: '#/definitions/types.WeightScore'
+        type: array
       sensitive_check_status:
         type: string
       source:
@@ -1350,11 +1473,55 @@ definitions:
         description: default to empty, means full permission
         type: string
     type: object
+  types.DeployMCPServerReq:
+    properties:
+      cluster_id:
+        type: string
+      cover_image_url:
+        type: string
+      default_branch:
+        example: main
+        type: string
+      description:
+        type: string
+      env:
+        type: string
+      labels:
+        example: ""
+        type: string
+      license:
+        example: MIT
+        type: string
+      name:
+        example: model_name_1
+        type: string
+      namespace:
+        example: user_or_org_name
+        type: string
+      nickname:
+        example: model display name
+        type: string
+      private:
+        type: boolean
+      readme:
+        type: string
+      resource_id:
+        description: space resource id
+        type: integer
+      star_count:
+        type: integer
+      tool_count:
+        type: integer
+    type: object
   types.DeployUpdateReq:
     properties:
       cluster_id:
         type: string
       deploy_name:
+        type: string
+      engine_args:
+        type: string
+      entrypoint:
         type: string
       env:
         type: string
@@ -1362,7 +1529,7 @@ definitions:
         minimum: 1
         type: integer
       min_replica:
-        minimum: 1
+        minimum: 0
         type: integer
       resource_id:
         type: integer
@@ -1372,6 +1539,8 @@ definitions:
         type: integer
       secure_level:
         type: integer
+      variables:
+        type: string
     type: object
   types.DiscussionResponse_Comment:
     properties:
@@ -1548,6 +1717,10 @@ definitions:
         type: string
       deploy_name:
         type: string
+      engine_args:
+        type: string
+      order_detail_id:
+        type: integer
       resource_id:
         type: integer
       revision:
@@ -1576,6 +1749,133 @@ definitions:
           $ref: '#/definitions/types.CommitForTree'
         type: array
     type: object
+  types.MCPPropertyKind:
+    enum:
+    - tool
+    - prompt
+    - resource
+    - resource_template
+    type: string
+    x-enum-varnames:
+    - MCPPropTool
+    - MCPPropPrompt
+    - MCPPropResource
+    - MCPPropresourceTemplate
+  types.MCPServer:
+    properties:
+      build_cmds:
+        type: string
+      can_manage:
+        type: boolean
+      can_write:
+        type: boolean
+      configuration:
+        type: string
+      created_at:
+        type: string
+      csg_path:
+        type: string
+      default_branch:
+        type: string
+      description:
+        type: string
+      downloads:
+        type: integer
+      github_path:
+        description: github path
+        type: string
+      hf_path:
+        type: string
+      id:
+        type: integer
+      install_deps_cmds:
+        type: string
+      launch_cmds:
+        type: string
+      license:
+        type: string
+      likes:
+        type: integer
+      ms_path:
+        type: string
+      name:
+        type: string
+      namespace:
+        $ref: '#/definitions/types.Namespace'
+      nickname:
+        type: string
+      path:
+        type: string
+      private:
+        type: boolean
+      program_language:
+        type: string
+      readme:
+        type: string
+      recom_op_weight:
+        type: integer
+      repository:
+        $ref: '#/definitions/types.Repository'
+      repository_id:
+        type: integer
+      run_mode:
+        type: string
+      schema:
+        type: string
+      scores:
+        items:
+          $ref: '#/definitions/types.WeightScore'
+        type: array
+      sensitive_check_status:
+        type: string
+      source:
+        $ref: '#/definitions/types.RepositorySource'
+      star_num:
+        type: integer
+      sync_status:
+        $ref: '#/definitions/types.RepositorySyncStatus'
+      tags:
+        items:
+          $ref: '#/definitions/types.RepoTag'
+        type: array
+      tools_num:
+        type: integer
+      updated_at:
+        type: string
+      user:
+        $ref: '#/definitions/types.User'
+      user_likes:
+        type: boolean
+    type: object
+  types.MCPServerProperties:
+    properties:
+      created_at:
+        type: string
+      description:
+        type: string
+      id:
+        type: integer
+      kind:
+        allOf:
+        - $ref: '#/definitions/types.MCPPropertyKind'
+        description: tool, prompt, resource, resource_template
+      mcp_server_id:
+        type: integer
+      name:
+        type: string
+      repo_path:
+        type: string
+      repository_id:
+        type: integer
+      schema:
+        type: string
+      tags:
+        items:
+          $ref: '#/definitions/types.RepoTag'
+        type: array
+      updated_at:
+        type: string
+    type: object
   types.Member:
     properties:
       avatar:
@@ -1591,13 +1891,30 @@ definitions:
       uuid:
         type: string
     type: object
+  types.Metadata:
+    properties:
+      architecture:
+        type: string
+      class_name:
+        type: string
+      mini_gpu_memory_gb:
+        type: number
+      model_params:
+        type: number
+      model_type:
+        type: string
+      quantizations:
+        items:
+          $ref: '#/definitions/types.Quantization'
+        type: array
+      tensor_type:
+        type: string
+    type: object
   types.Mirror:
     properties:
       access_token:
         description: source access token
         type: string
-      id:
-        type: integer
       last_message:
         type: string
       last_updated_at:
@@ -1700,6 +2017,8 @@ definitions:
         type: string
       likes:
         type: integer
+      metadata:
+        $ref: '#/definitions/types.Metadata'
       mirror_last_updated_at:
         type: string
       ms_path:
@@ -1722,6 +2041,10 @@ definitions:
         $ref: '#/definitions/types.Repository'
       repository_id:
         type: integer
+      scores:
+        items:
+          $ref: '#/definitions/types.WeightScore'
+        type: array
       sensitive_check_status:
         type: string
       source:
@@ -1774,6 +2097,8 @@ definitions:
       cluster_id:
         type: string
       deploy_name:
+        type: string
+      engine_args:
         type: string
       entrypoint:
         description: model file name for gguf model
@@ -1836,12 +2161,18 @@ definitions:
     enum:
     - text-generation
     - text-to-image
+    - feature-extraction
+    - sentence-similarity
     - task-auto-detection
+    - video-text-to-text
     type: string
     x-enum-varnames:
     - TextGeneration
     - Text2Image
+    - FeatureExtraction
+    - SentenceSimilarity
     - TaskAutoDetection
+    - VideoText2Text
   types.Pointer:
     properties:
       download_url:
@@ -1901,6 +2232,15 @@ definitions:
         $ref: '#/definitions/types.User'
       user_likes:
         type: boolean
+    type: object
+  types.Quantization:
+    properties:
+      mini_gpu_memory_gb:
+        type: number
+      type:
+        type: string
+      version:
+        type: string
     type: object
   types.RelationDataset:
     properties:
@@ -2016,6 +2356,7 @@ definitions:
     - space
     - code
     - prompt
+    - mcpserver
     - ""
     type: string
     x-enum-varnames:
@@ -2024,15 +2365,22 @@ definitions:
     - SpaceRepo
     - CodeRepo
     - PromptRepo
+    - MCPServerRepo
     - UnknownRepo
   types.ResourceType:
     enum:
     - cpu
     - gpu
+    - npu
+    - enflame
+    - mlu
     type: string
     x-enum-varnames:
     - ResourceTypeCPU
     - ResourceTypeGPU
+    - ResourceTypeNPU
+    - ResourceTypeEnflame
+    - ResourceTypeMLU
   types.Response:
     properties:
       data: {}
@@ -2056,11 +2404,17 @@ definitions:
     type: object
   types.RuntimeFramework:
     properties:
+      compute_type:
+        type: string
       container_port:
         type: integer
+      description:
+        type: string
+      driver_version:
+        type: string
       enabled:
         type: integer
-      frame_cpu_image:
+      engine_args:
         type: string
       frame_image:
         type: string
@@ -2088,11 +2442,15 @@ definitions:
     type: object
   types.RuntimeFrameworkReq:
     properties:
+      compute_type:
+        type: string
       container_port:
         type: integer
+      driver_version:
+        type: string
       enabled:
         type: integer
-      frame_cpu_image:
+      engine_args:
         type: string
       frame_image:
         type: string
@@ -2222,6 +2580,8 @@ definitions:
       username:
         example: creator_user_name
         type: string
+      variables:
+        type: string
     type: object
   types.SpaceResource:
     properties:
@@ -2244,6 +2604,34 @@ definitions:
         type: string
       version:
         type: string
+    type: object
+  types.SpaceTemplateReq:
+    properties:
+      description:
+        type: string
+      dev_mode:
+        type: boolean
+      enable:
+        type: boolean
+      name:
+        type: string
+      path:
+        type: string
+      port:
+        type: integer
+      secrets:
+        type: string
+      show_name:
+        type: string
+      type:
+        type: string
+      variables:
+        type: string
+    required:
+    - name
+    - path
+    - show_name
+    - type
     type: object
   types.SyncVersion:
     properties:
@@ -2282,6 +2670,8 @@ definitions:
     - code
     - space
     - prompt
+    - mcp
+    - unknown
     type: string
     x-enum-varnames:
     - ModelTagScope
@@ -2289,6 +2679,8 @@ definitions:
     - CodeTagScope
     - SpaceTagScope
     - PromptTagScope
+    - MCPTagScope
+    - UnknownScope
   types.TaskType:
     enum:
     - evaluation
@@ -2384,6 +2776,29 @@ definitions:
     type: object
   types.UpdateFileResp:
     type: object
+  types.UpdateMCPServerReq:
+    properties:
+      build_cmds:
+        type: string
+      configuration:
+        type: string
+      description:
+        type: string
+      install_deps_cmds:
+        type: string
+      launch_cmds:
+        type: string
+      nickname:
+        example: model display name
+        type: string
+      private:
+        example: false
+        type: boolean
+      program_language:
+        type: string
+      run_mode:
+        type: string
+    type: object
   types.UpdateMirrorParams:
     properties:
       mirror_source_id:
@@ -2443,6 +2858,8 @@ definitions:
       nickname:
         example: model display name
         type: string
+      order_detail_id:
+        type: integer
       private:
         example: false
         type: boolean
@@ -2457,6 +2874,8 @@ definitions:
       secrets:
         type: string
       template:
+        type: string
+      variables:
         type: string
     type: object
   types.UpdateSpaceResourceReq:
@@ -2473,6 +2892,29 @@ definitions:
       name:
         type: string
       version:
+        type: string
+    type: object
+  types.UpdateSpaceTemplateReq:
+    properties:
+      description:
+        type: string
+      dev_mode:
+        type: boolean
+      enable:
+        type: boolean
+      name:
+        type: string
+      path:
+        type: string
+      port:
+        type: integer
+      secrets:
+        type: string
+      show_name:
+        type: string
+      type:
+        type: string
+      variables:
         type: string
     type: object
   types.UpdateTag:
@@ -2522,8 +2964,6 @@ definitions:
         items:
           type: string
         type: array
-      uuid:
-        type: string
     type: object
   types.User:
     properties:
@@ -2556,6 +2996,13 @@ definitions:
       username:
         type: string
       uuid:
+        type: string
+    type: object
+  types.WeightScore:
+    properties:
+      score:
+        type: number
+      weight_name:
         type: string
     type: object
 info:
@@ -6064,6 +6511,369 @@ paths:
       summary: List spaces by paths
       tags:
       - List
+  /mcps:
+    get:
+      consumes:
+      - application/json
+      description: Get visiable mcp servers for current user
+      parameters:
+      - description: current user
+        in: query
+        name: current_user
+        type: string
+      - description: filter by tag category
+        in: query
+        name: tag_category
+        type: string
+      - description: filter by tag name
+        in: query
+        name: tag_name
+        type: string
+      - description: filter by tag group
+        in: query
+        name: tag_group
+        type: string
+      - default: false
+        description: need op weight
+        in: query
+        name: need_op_weight
+        type: boolean
+      - description: search text
+        in: query
+        name: search
+        type: string
+      - description: sort by
+        in: query
+        name: sort
+        type: string
+      - default: 20
+        description: per
+        in: query
+        name: per
+        type: integer
+      - default: 1
+        description: per page
+        in: query
+        name: page
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/types.ResponseWithTotal'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/types.MCPServer'
+                  type: array
+                total:
+                  type: integer
+              type: object
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Get Visiable mcp servers for current user
+      tags:
+      - MCP
+    post:
+      consumes:
+      - application/json
+      description: create a new mcp server
+      parameters:
+      - description: current user, the owner
+        in: query
+        name: current_user
+        type: string
+      - description: body
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/types.CreateMCPServerReq'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/types.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/types.MCPServer'
+              type: object
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Create a new mcp server
+      tags:
+      - MCP
+  /mcps/{namespace}/{name}:
+    delete:
+      consumes:
+      - application/json
+      description: delete a exists mcp server
+      parameters:
+      - description: namespace
+        in: path
+        name: namespace
+        required: true
+        type: string
+      - description: name
+        in: path
+        name: name
+        required: true
+        type: string
+      - description: current user, the owner
+        in: query
+        name: current_user
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/types.Response'
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Delete a exists mcp server
+      tags:
+      - MCP
+    get:
+      consumes:
+      - application/json
+      description: Get mcp server detail
+      parameters:
+      - description: namespace
+        in: path
+        name: namespace
+        required: true
+        type: string
+      - description: name
+        in: path
+        name: name
+        required: true
+        type: string
+      - description: current_user
+        in: query
+        name: current_user
+        required: true
+        type: string
+      - default: false
+        description: need op weight
+        in: query
+        name: need_op_weight
+        type: boolean
+      - default: false
+        description: need multi sync
+        in: query
+        name: need_multi_sync
+        type: boolean
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/types.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/types.MCPServer'
+              type: object
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Get mcp server detail
+      tags:
+      - MCP
+    put:
+      consumes:
+      - application/json
+      description: update a exists mcp server
+      parameters:
+      - description: namespace
+        in: path
+        name: namespace
+        required: true
+        type: string
+      - description: name
+        in: path
+        name: name
+        required: true
+        type: string
+      - description: current user, the owner
+        in: query
+        name: current_user
+        type: string
+      - description: body
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/types.UpdateMCPServerReq'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/types.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/types.MCPServer'
+              type: object
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Update a exists mcp server
+      tags:
+      - MCP
+  /mcps/{namespace}/{name}/deploy:
+    post:
+      consumes:
+      - application/json
+      description: Deploy a exists mcp server as space
+      parameters:
+      - description: namespace
+        in: path
+        name: namespace
+        required: true
+        type: string
+      - description: name
+        in: path
+        name: name
+        required: true
+        type: string
+      - description: current user
+        in: query
+        name: current_user
+        type: string
+      - description: body
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/types.DeployMCPServerReq'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/types.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/types.Space'
+              type: object
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Deploy a exists mcp server as space
+      tags:
+      - MCP
+  /mcps/tools:
+    get:
+      consumes:
+      - application/json
+      description: Get visiable mcp servers tools for current user
+      parameters:
+      - description: search text
+        in: query
+        name: search
+        type: string
+      - default: 20
+        description: per
+        in: query
+        name: per
+        type: integer
+      - default: 1
+        description: per page
+        in: query
+        name: page
+        type: integer
+      - description: current user
+        in: query
+        name: current_user
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/types.ResponseWithTotal'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/types.MCPServerProperties'
+                  type: array
+                total:
+                  type: integer
+              type: object
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Get Visiable mcp servers tools for current user
+      tags:
+      - MCP
   /mirror/repo:
     post:
       consumes:
@@ -6391,6 +7201,15 @@ paths:
         in: query
         name: tag_name
         type: string
+      - description: filter by tag group
+        in: query
+        name: tag_group
+        type: string
+      - default: false
+        description: need op weight
+        in: query
+        name: need_op_weight
+        type: boolean
       - description: sort by
         in: query
         name: sort
@@ -7967,6 +8786,59 @@ paths:
       security:
       - ApiKey: []
       summary: Get organization datasets
+      tags:
+      - Organization
+  /organization/{namespace}/mcps:
+    get:
+      consumes:
+      - application/json
+      description: get organization mcp servers
+      parameters:
+      - description: org name
+        in: path
+        name: namespace
+        required: true
+        type: string
+      - description: current user name
+        in: query
+        name: current_user
+        required: true
+        type: string
+      - description: page size
+        in: query
+        name: per
+        type: integer
+      - description: current page number
+        in: query
+        name: page
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/types.ResponseWithTotal'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/types.MCPServer'
+                  type: array
+                total:
+                  type: integer
+              type: object
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Get organization mcp servers
       tags:
       - Organization
   /organization/{namespace}/members:
@@ -9641,58 +10513,6 @@ paths:
       summary: Set model runtime frameworks
       tags:
       - RuntimeFramework
-  /runtime_framework/{id}/scan:
-    post:
-      consumes:
-      - application/json
-      description: Scan runtime architecture
-      parameters:
-      - description: runtime framework id
-        in: path
-        name: id
-        required: true
-        type: integer
-      - description: scan_type(0:all models, 1:new models, 2:old models)
-        enum:
-        - 0
-        - 1
-        - 2
-        in: query
-        name: scan_type
-        type: integer
-      - description: task
-        enum:
-        - text-generation
-        - text-to-image
-        in: query
-        name: task
-        type: string
-      - description: body
-        in: body
-        name: body
-        required: true
-        schema:
-          $ref: '#/definitions/types.RuntimeFrameworkModels'
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/types.Response'
-        "400":
-          description: Bad request
-          schema:
-            $ref: '#/definitions/types.APIBadRequest'
-        "500":
-          description: Internal server error
-          schema:
-            $ref: '#/definitions/types.APIInternalServerError'
-      security:
-      - ApiKey: []
-      summary: Scan runtime architecture
-      tags:
-      - RuntimeFramework
   /runtime_framework/models:
     get:
       consumes:
@@ -9749,6 +10569,39 @@ paths:
       summary: Get Visible models for all runtime frameworks for current user
       tags:
       - RuntimeFramework
+  /runtime_framework/scan:
+    post:
+      consumes:
+      - application/json
+      description: Scan model metadata
+      parameters:
+      - description: scan_type(0:all models, 1:new models)
+        enum:
+        - 0
+        - 1
+        in: query
+        name: scan_type
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/types.Response'
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Scan model metadata
+      tags:
+      - Model
   /space_resources:
     get:
       consumes:
@@ -9989,7 +10842,7 @@ paths:
       parameters:
       - description: id
         in: path
-        name: 写id
+        name: id
         required: true
         type: integer
       produces:
@@ -10055,6 +10908,184 @@ paths:
       summary: Update a exist space sdk
       tags:
       - SpaceSdk
+  /space_templates:
+    get:
+      consumes:
+      - application/json
+      description: Get all space templates
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/types.Response'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/database.SpaceTemplate'
+                  type: array
+              type: object
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Get all space templates
+      tags:
+      - SpaceTemplate
+    post:
+      consumes:
+      - application/json
+      description: create space template
+      parameters:
+      - description: body
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/types.SpaceTemplateReq'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/types.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/database.SpaceTemplate'
+              type: object
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Create space template
+      tags:
+      - SpaceTemplate
+  /space_templates/{id}:
+    delete:
+      consumes:
+      - application/json
+      description: delete a exist space template
+      parameters:
+      - description: id
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/types.Response'
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Delete a exist space template
+      tags:
+      - SpaceTemplate
+    put:
+      consumes:
+      - application/json
+      description: update a exist space template
+      parameters:
+      - description: id
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: body
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/types.UpdateSpaceTemplateReq'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/types.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/database.SpaceTemplate'
+              type: object
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Update a exist space template
+      tags:
+      - SpaceTemplate
+  /space_templates/{type}:
+    get:
+      consumes:
+      - application/json
+      description: get space templates by type
+      parameters:
+      - description: type
+        in: path
+        name: type
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/types.Response'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/database.SpaceTemplate'
+                  type: array
+              type: object
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Get space templates by type
+      tags:
+      - SpaceTemplate
   /spaces:
     get:
       consumes:
@@ -10096,6 +11127,10 @@ paths:
         - local
         in: query
         name: source
+        type: string
+      - description: filter by space sdk
+        in: query
+        name: sdk
         type: string
       - default: 20
         description: per
@@ -11704,6 +12739,46 @@ paths:
       summary: Get user likes datasets
       tags:
       - User
+  /user/{username}/likes/mcps:
+    get:
+      consumes:
+      - application/json
+      description: get user likes mcp servers
+      parameters:
+      - description: username
+        in: path
+        name: username
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/types.ResponseWithTotal'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/types.MCPServer'
+                  type: array
+                total:
+                  type: integer
+              type: object
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Get user likes mcp servers
+      tags:
+      - User
   /user/{username}/likes/models:
     get:
       consumes:
@@ -11781,6 +12856,56 @@ paths:
       security:
       - ApiKey: []
       summary: Get user likes spaces
+      tags:
+      - User
+  /user/{username}/mcps:
+    get:
+      consumes:
+      - application/json
+      description: Get user mcp servers
+      parameters:
+      - description: username
+        in: path
+        name: username
+        required: true
+        type: string
+      - default: 20
+        description: per
+        in: query
+        name: per
+        type: integer
+      - default: 1
+        description: per page
+        in: query
+        name: page
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/types.Response'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/types.MCPServer'
+                  type: array
+                total:
+                  type: integer
+              type: object
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Get user mcp servers
       tags:
       - User
   /user/{username}/models:
@@ -11976,6 +13101,10 @@ paths:
       consumes:
       - application/json
       parameters:
+      - description: filter by space sdk
+        in: query
+        name: sdk
+        type: string
       - description: username
         in: path
         name: username

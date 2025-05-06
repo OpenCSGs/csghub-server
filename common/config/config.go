@@ -112,7 +112,7 @@ type Config struct {
 	}
 
 	Space struct {
-		BuilderEndpoint string `env:"STARHUB_SERVER_SPACE_BUILDER_ENDPOINT, default=http://localhost:8081"`
+		BuilderEndpoint string `env:"STARHUB_SERVER_SPACE_BUILDER_ENDPOINT, default=http://localhost:8082"`
 		// base url for space api running in k8s cluster
 		RunnerEndpoint   string `env:"STARHUB_SERVER_SPACE_RUNNER_ENDPOINT, default=http://localhost:8082"`
 		RunnerServerPort int    `env:"STARHUB_SERVER_SPACE_RUNNER_SERVER_PORT, default=8082"`
@@ -133,14 +133,16 @@ type Config struct {
 		ReadnessDelaySeconds     int    `env:"STARHUB_SERVER_READNESS_DELAY_SECONDS, default=120"`
 		ReadnessPeriodSeconds    int    `env:"STARHUB_SERVER_READNESS_PERIOD_SECONDS, default=10"`
 		ReadnessFailureThreshold int    `env:"STARHUB_SERVER_READNESS_FAILURE_THRESHOLD, default=3"`
+		PYPIIndexURL             string `env:"STARHUB_SERVER_SPACE_PYPI_INDEX_URL, default="`
 	}
 
 	Model struct {
-		DeployTimeoutInMin  int    `env:"STARHUB_SERVER_MODEL_DEPLOY_TIMEOUT_IN_MINUTES, default=60"`
-		DownloadEndpoint    string `env:"STARHUB_SERVER_MODEL_DOWNLOAD_ENDPOINT, default=https://hub.opencsg.com"`
-		DockerRegBase       string `env:"STARHUB_SERVER_MODEL_DOCKER_REG_BASE, default=opencsg-registry.cn-beijing.cr.aliyuncs.com/public/"`
-		NimDockerSecretName string `env:"STARHUB_SERVER_MODEL_NIM_DOCKER_SECRET_NAME, default=ngc-secret"`
-		NimNGCSecretName    string `env:"STARHUB_SERVER_MODEL_NIM_NGC_SECRET_NAME, default=nvidia-nim-secrets"`
+		DeployTimeoutInMin      int    `env:"STARHUB_SERVER_MODEL_DEPLOY_TIMEOUT_IN_MINUTES, default=60"`
+		DownloadEndpoint        string `env:"STARHUB_SERVER_MODEL_DOWNLOAD_ENDPOINT, default=https://hub.opencsg.com"`
+		DockerRegBase           string `env:"STARHUB_SERVER_MODEL_DOCKER_REG_BASE, default=opencsg-registry.cn-beijing.cr.aliyuncs.com/public/"`
+		NimDockerSecretName     string `env:"STARHUB_SERVER_MODEL_NIM_DOCKER_SECRET_NAME, default=ngc-secret"`
+		NimNGCSecretName        string `env:"STARHUB_SERVER_MODEL_NIM_NGC_SECRET_NAME, default=nvidia-nim-secrets"`
+		MinContextForEstimation int    `env:"STARHUB_SERVER_MODEL_MIN_CONTEXT_FOR_ESTIMATION, default=5120"`
 	}
 	// send events
 	Event struct {
@@ -256,15 +258,28 @@ type Config struct {
 
 	Instrumentation struct {
 		OTLPEndpoint string `env:"OPENCSG_TRACING_OTLP_ENDPOINT"`
-		OTLPLogging  bool   `env:"OPENCSG_TRACING_OTLP_LOGGING"`
+		//Note: don't enable it unless you have no other way to collect service logs. It will leads to very high CPU usage.
+		OTLPLogging bool `env:"OPENCSG_TRACING_OTLP_LOGGING"`
 	}
 
 	Git struct {
+		// Timeout time(seconds) for git operations
+		OperationTimeout      int  `env:"STARHUB_SERVER_GIT_OPERATION_TIMEOUT, default=300"`
 		SkipLfsFileValidation bool `env:"STARHUB_SERVER_SKIP_LFS_FILE_VALIDATION, default=false"`
 	}
 
 	AIGateway struct {
 		Port int `env:"OPENCSG_AIGATEWAY_PORT, default=8094"`
+	}
+
+	Runner struct {
+		ImageBuilderClusterID   string   `env:"STARHUB_SERVER_RUNNER_IMAGE_BUILDER_CLUSTER_ID, default="`
+		ImageBuilderNamespace   string   `env:"STARHUB_SERVER_RUNNER_IMAGE_BUILDER_NAMESPACE, default=imagebuilder"`
+		ImageBuilderGitImage    string   `env:"STARHUB_SERVER_RUNNER_IMAGE_BUILDER_GIT_IMAGE, default=opencsg-registry.cn-beijing.cr.aliyuncs.com/opencsg_public/alpine/git:2.36.2"`
+		ImageBuilderKanikoImage string   `env:"STARHUB_SERVER_RUNNER_IMAGE_BUILDER_KANIKO_IMAGE, default=opencsg-registry.cn-beijing.cr.aliyuncs.com/public/kaniko-project-executor:v1.23.2"`
+		ImageBuilderJobTTL      int      `env:"STARHUB_SERVER_RUNNER_IMAGE_BUILDER_JOB_TTL, default=120"`
+		ImageBuilderStatusTTL   int      `env:"STARHUB_SERVER_RUNNER_IMAGE_BUILDER_STATUS_TTL, default=300"`
+		ImageBuilderKanikoArgs  []string `env:"STARHUB_SERVER_RUNNER_IMAGE_BUILDER_KANIKO_ARGS"`
 	}
 }
 

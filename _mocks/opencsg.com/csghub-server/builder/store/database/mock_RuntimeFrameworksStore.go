@@ -23,21 +23,33 @@ func (_m *MockRuntimeFrameworksStore) EXPECT() *MockRuntimeFrameworksStore_Expec
 }
 
 // Add provides a mock function with given fields: ctx, frame
-func (_m *MockRuntimeFrameworksStore) Add(ctx context.Context, frame database.RuntimeFramework) error {
+func (_m *MockRuntimeFrameworksStore) Add(ctx context.Context, frame database.RuntimeFramework) (*database.RuntimeFramework, error) {
 	ret := _m.Called(ctx, frame)
 
 	if len(ret) == 0 {
 		panic("no return value specified for Add")
 	}
 
-	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, database.RuntimeFramework) error); ok {
+	var r0 *database.RuntimeFramework
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, database.RuntimeFramework) (*database.RuntimeFramework, error)); ok {
+		return rf(ctx, frame)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, database.RuntimeFramework) *database.RuntimeFramework); ok {
 		r0 = rf(ctx, frame)
 	} else {
-		r0 = ret.Error(0)
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*database.RuntimeFramework)
+		}
 	}
 
-	return r0
+	if rf, ok := ret.Get(1).(func(context.Context, database.RuntimeFramework) error); ok {
+		r1 = rf(ctx, frame)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
 }
 
 // MockRuntimeFrameworksStore_Add_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'Add'
@@ -59,12 +71,12 @@ func (_c *MockRuntimeFrameworksStore_Add_Call) Run(run func(ctx context.Context,
 	return _c
 }
 
-func (_c *MockRuntimeFrameworksStore_Add_Call) Return(_a0 error) *MockRuntimeFrameworksStore_Add_Call {
-	_c.Call.Return(_a0)
+func (_c *MockRuntimeFrameworksStore_Add_Call) Return(_a0 *database.RuntimeFramework, _a1 error) *MockRuntimeFrameworksStore_Add_Call {
+	_c.Call.Return(_a0, _a1)
 	return _c
 }
 
-func (_c *MockRuntimeFrameworksStore_Add_Call) RunAndReturn(run func(context.Context, database.RuntimeFramework) error) *MockRuntimeFrameworksStore_Add_Call {
+func (_c *MockRuntimeFrameworksStore_Add_Call) RunAndReturn(run func(context.Context, database.RuntimeFramework) (*database.RuntimeFramework, error)) *MockRuntimeFrameworksStore_Add_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -171,6 +183,67 @@ func (_c *MockRuntimeFrameworksStore_FindByID_Call) Return(_a0 *database.Runtime
 }
 
 func (_c *MockRuntimeFrameworksStore_FindByID_Call) RunAndReturn(run func(context.Context, int64) (*database.RuntimeFramework, error)) *MockRuntimeFrameworksStore_FindByID_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// FindByNameAndComputeType provides a mock function with given fields: ctx, engineName, driverVersion, ComputeType
+func (_m *MockRuntimeFrameworksStore) FindByNameAndComputeType(ctx context.Context, engineName string, driverVersion string, ComputeType string) (*database.RuntimeFramework, error) {
+	ret := _m.Called(ctx, engineName, driverVersion, ComputeType)
+
+	if len(ret) == 0 {
+		panic("no return value specified for FindByNameAndComputeType")
+	}
+
+	var r0 *database.RuntimeFramework
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, string) (*database.RuntimeFramework, error)); ok {
+		return rf(ctx, engineName, driverVersion, ComputeType)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, string) *database.RuntimeFramework); ok {
+		r0 = rf(ctx, engineName, driverVersion, ComputeType)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*database.RuntimeFramework)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string, string, string) error); ok {
+		r1 = rf(ctx, engineName, driverVersion, ComputeType)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockRuntimeFrameworksStore_FindByNameAndComputeType_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'FindByNameAndComputeType'
+type MockRuntimeFrameworksStore_FindByNameAndComputeType_Call struct {
+	*mock.Call
+}
+
+// FindByNameAndComputeType is a helper method to define mock.On call
+//   - ctx context.Context
+//   - engineName string
+//   - driverVersion string
+//   - ComputeType string
+func (_e *MockRuntimeFrameworksStore_Expecter) FindByNameAndComputeType(ctx interface{}, engineName interface{}, driverVersion interface{}, ComputeType interface{}) *MockRuntimeFrameworksStore_FindByNameAndComputeType_Call {
+	return &MockRuntimeFrameworksStore_FindByNameAndComputeType_Call{Call: _e.mock.On("FindByNameAndComputeType", ctx, engineName, driverVersion, ComputeType)}
+}
+
+func (_c *MockRuntimeFrameworksStore_FindByNameAndComputeType_Call) Run(run func(ctx context.Context, engineName string, driverVersion string, ComputeType string)) *MockRuntimeFrameworksStore_FindByNameAndComputeType_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(string), args[2].(string), args[3].(string))
+	})
+	return _c
+}
+
+func (_c *MockRuntimeFrameworksStore_FindByNameAndComputeType_Call) Return(_a0 *database.RuntimeFramework, _a1 error) *MockRuntimeFrameworksStore_FindByNameAndComputeType_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockRuntimeFrameworksStore_FindByNameAndComputeType_Call) RunAndReturn(run func(context.Context, string, string, string) (*database.RuntimeFramework, error)) *MockRuntimeFrameworksStore_FindByNameAndComputeType_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -410,6 +483,68 @@ func (_c *MockRuntimeFrameworksStore_ListAll_Call) RunAndReturn(run func(context
 	return _c
 }
 
+// ListByArchsNameAndType provides a mock function with given fields: ctx, name, format, archs, deployType
+func (_m *MockRuntimeFrameworksStore) ListByArchsNameAndType(ctx context.Context, name string, format string, archs []string, deployType int) ([]database.RuntimeFramework, error) {
+	ret := _m.Called(ctx, name, format, archs, deployType)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ListByArchsNameAndType")
+	}
+
+	var r0 []database.RuntimeFramework
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, []string, int) ([]database.RuntimeFramework, error)); ok {
+		return rf(ctx, name, format, archs, deployType)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, []string, int) []database.RuntimeFramework); ok {
+		r0 = rf(ctx, name, format, archs, deployType)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]database.RuntimeFramework)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string, string, []string, int) error); ok {
+		r1 = rf(ctx, name, format, archs, deployType)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockRuntimeFrameworksStore_ListByArchsNameAndType_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ListByArchsNameAndType'
+type MockRuntimeFrameworksStore_ListByArchsNameAndType_Call struct {
+	*mock.Call
+}
+
+// ListByArchsNameAndType is a helper method to define mock.On call
+//   - ctx context.Context
+//   - name string
+//   - format string
+//   - archs []string
+//   - deployType int
+func (_e *MockRuntimeFrameworksStore_Expecter) ListByArchsNameAndType(ctx interface{}, name interface{}, format interface{}, archs interface{}, deployType interface{}) *MockRuntimeFrameworksStore_ListByArchsNameAndType_Call {
+	return &MockRuntimeFrameworksStore_ListByArchsNameAndType_Call{Call: _e.mock.On("ListByArchsNameAndType", ctx, name, format, archs, deployType)}
+}
+
+func (_c *MockRuntimeFrameworksStore_ListByArchsNameAndType_Call) Run(run func(ctx context.Context, name string, format string, archs []string, deployType int)) *MockRuntimeFrameworksStore_ListByArchsNameAndType_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(string), args[2].(string), args[3].([]string), args[4].(int))
+	})
+	return _c
+}
+
+func (_c *MockRuntimeFrameworksStore_ListByArchsNameAndType_Call) Return(_a0 []database.RuntimeFramework, _a1 error) *MockRuntimeFrameworksStore_ListByArchsNameAndType_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockRuntimeFrameworksStore_ListByArchsNameAndType_Call) RunAndReturn(run func(context.Context, string, string, []string, int) ([]database.RuntimeFramework, error)) *MockRuntimeFrameworksStore_ListByArchsNameAndType_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // ListByIDs provides a mock function with given fields: ctx, ids
 func (_m *MockRuntimeFrameworksStore) ListByIDs(ctx context.Context, ids []int64) ([]database.RuntimeFramework, error) {
 	ret := _m.Called(ctx, ids)
@@ -465,66 +600,6 @@ func (_c *MockRuntimeFrameworksStore_ListByIDs_Call) Return(_a0 []database.Runti
 }
 
 func (_c *MockRuntimeFrameworksStore_ListByIDs_Call) RunAndReturn(run func(context.Context, []int64) ([]database.RuntimeFramework, error)) *MockRuntimeFrameworksStore_ListByIDs_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
-// ListByRepoID provides a mock function with given fields: ctx, repoID, deployType
-func (_m *MockRuntimeFrameworksStore) ListByRepoID(ctx context.Context, repoID int64, deployType int) ([]database.RepositoriesRuntimeFramework, error) {
-	ret := _m.Called(ctx, repoID, deployType)
-
-	if len(ret) == 0 {
-		panic("no return value specified for ListByRepoID")
-	}
-
-	var r0 []database.RepositoriesRuntimeFramework
-	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, int64, int) ([]database.RepositoriesRuntimeFramework, error)); ok {
-		return rf(ctx, repoID, deployType)
-	}
-	if rf, ok := ret.Get(0).(func(context.Context, int64, int) []database.RepositoriesRuntimeFramework); ok {
-		r0 = rf(ctx, repoID, deployType)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]database.RepositoriesRuntimeFramework)
-		}
-	}
-
-	if rf, ok := ret.Get(1).(func(context.Context, int64, int) error); ok {
-		r1 = rf(ctx, repoID, deployType)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
-// MockRuntimeFrameworksStore_ListByRepoID_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ListByRepoID'
-type MockRuntimeFrameworksStore_ListByRepoID_Call struct {
-	*mock.Call
-}
-
-// ListByRepoID is a helper method to define mock.On call
-//   - ctx context.Context
-//   - repoID int64
-//   - deployType int
-func (_e *MockRuntimeFrameworksStore_Expecter) ListByRepoID(ctx interface{}, repoID interface{}, deployType interface{}) *MockRuntimeFrameworksStore_ListByRepoID_Call {
-	return &MockRuntimeFrameworksStore_ListByRepoID_Call{Call: _e.mock.On("ListByRepoID", ctx, repoID, deployType)}
-}
-
-func (_c *MockRuntimeFrameworksStore_ListByRepoID_Call) Run(run func(ctx context.Context, repoID int64, deployType int)) *MockRuntimeFrameworksStore_ListByRepoID_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(int64), args[2].(int))
-	})
-	return _c
-}
-
-func (_c *MockRuntimeFrameworksStore_ListByRepoID_Call) Return(_a0 []database.RepositoriesRuntimeFramework, _a1 error) *MockRuntimeFrameworksStore_ListByRepoID_Call {
-	_c.Call.Return(_a0, _a1)
-	return _c
-}
-
-func (_c *MockRuntimeFrameworksStore_ListByRepoID_Call) RunAndReturn(run func(context.Context, int64, int) ([]database.RepositoriesRuntimeFramework, error)) *MockRuntimeFrameworksStore_ListByRepoID_Call {
 	_c.Call.Return(run)
 	return _c
 }

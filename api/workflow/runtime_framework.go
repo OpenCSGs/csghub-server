@@ -18,7 +18,7 @@ func RuntimeFrameworkWorkflow(ctx workflow.Context, req types.RuntimeFrameworkMo
 	}
 
 	options := workflow.ActivityOptions{
-		StartToCloseTimeout: time.Hour * 2,
+		StartToCloseTimeout: time.Hour * 5,
 		RetryPolicy:         retryPolicy,
 	}
 

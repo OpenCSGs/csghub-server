@@ -74,6 +74,9 @@ func (c *tagComponentImpl) UpdateMetaTags(ctx context.Context, tagScope types.Ta
 	} else if tagScope == types.PromptTagScope {
 		tp = tagparser.NewPromptTagProcessor(c.tagStore)
 		repoType = types.PromptRepo
+	} else if tagScope == types.MCPTagScope {
+		tp = tagparser.NewMCPTagProcessor(c.tagStore)
+		repoType = types.MCPServerRepo
 	} else {
 		// skip tag process for code and space now
 		return nil, nil
@@ -230,7 +233,7 @@ func (c *tagComponentImpl) CreateTag(ctx context.Context, username string, req t
 		ShowName: req.ShowName,
 	}
 
-	tag, err := c.tagStore.FindOrCreate(ctx, newTag)
+	tag, err := c.tagStore.CreateTag(ctx, newTag)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create tag, error: %w", err)
 	}

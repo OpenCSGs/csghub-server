@@ -39,6 +39,8 @@ type UserComponent interface {
 	GetUserByName(ctx context.Context, userName string) (*database.User, error)
 	Prompts(ctx context.Context, req *types.UserPromptsReq) ([]types.PromptRes, int, error)
 	Evaluations(ctx context.Context, req *types.UserEvaluationReq) ([]types.ArgoWorkFlowRes, int, error)
+	MCPServers(ctx context.Context, req *types.UserMCPsReq) ([]types.MCPServer, int, error)
+	LikesMCPServers(ctx context.Context, req *types.UserMCPsReq) ([]types.MCPServer, int, error)
 }
 
 func NewUserComponent(config *config.Config) (UserComponent, error) {
@@ -75,8 +77,8 @@ func NewUserComponent(config *config.Config) (UserComponent, error) {
 		return nil, err
 	}
 	c.promptStore = database.NewPromptStore()
-	c.promptStore = database.NewPromptStore()
-	c.wfs = database.NewArgoWorkFlowStore()
+	c.workflowStore = database.NewArgoWorkFlowStore()
+	c.mcpServerStore = database.NewMCPServerStore()
 	return c, nil
 }
 
@@ -96,10 +98,9 @@ type userComponentImpl struct {
 	deployTaskStore     database.DeployTaskStore
 	collectionStore     database.CollectionStore
 	accountingComponent AccountingComponent
-	// srs            database.SpaceResourceStore
-	// urs            *database.UserResourcesStore
-	promptStore database.PromptStore
-	wfs         database.ArgoWorkFlowStore
+	promptStore         database.PromptStore
+	workflowStore       database.ArgoWorkFlowStore
+	mcpServerStore      database.MCPServerStore
 }
 
 func (c *userComponentImpl) Datasets(ctx context.Context, req *types.UserDatasetsReq) ([]types.Dataset, int, error) {
@@ -655,4 +656,91 @@ func (c *userComponentImpl) Evaluations(ctx context.Context, req *types.UserEval
 		return nil, 0, newError
 	}
 	return res.List, res.Total, nil
+}
+
+func (c *userComponentImpl) MCPServers(ctx context.Context, req *types.UserMCPsReq) ([]types.MCPServer, int, error) {
+	ownerExists, err := c.userStore.IsExist(ctx, req.Owner)
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to check mcp owner, error: %w", err)
+	}
+	if !ownerExists {
+		return nil, 0, errors.New("mcp owner does not exist")
+	}
+	if len(req.CurrentUser) > 0 {
+		currentUserExists, err := c.userStore.IsExist(ctx, req.CurrentUser)
+		if err != nil {
+			return nil, 0, fmt.Errorf("failed to check current user, error: %w", err)
+		}
+		if !currentUserExists {
+			return nil, 0, errors.New("current user does not exist")
+		}
+	}
+
+	onlyPublic := req.Owner != req.CurrentUser
+	mcpServers, total, err := c.mcpServerStore.ByUsername(ctx, req.Owner, req.PageSize, req.Page, onlyPublic)
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to list owners %s mcp servers, error: %w", req.Owner, err)
+	}
+	var resMCPs []types.MCPServer
+
+	for _, mcpServer := range mcpServers {
+		resMCPs = append(resMCPs, types.MCPServer{
+			ID:           mcpServer.ID,
+			Name:         mcpServer.Repository.Name,
+			Nickname:     mcpServer.Repository.Nickname,
+			Description:  mcpServer.Repository.Description,
+			Likes:        mcpServer.Repository.Likes,
+			Downloads:    mcpServer.Repository.DownloadCount,
+			Path:         mcpServer.Repository.Path,
+			RepositoryID: mcpServer.RepositoryID,
+			Private:      mcpServer.Repository.Private,
+			CreatedAt:    mcpServer.CreatedAt,
+			UpdatedAt:    mcpServer.Repository.UpdatedAt,
+			Source:       mcpServer.Repository.Source,
+			SyncStatus:   mcpServer.Repository.SyncStatus,
+			License:      mcpServer.Repository.License,
+			GithubPath:   mcpServer.Repository.GithubPath,
+			ToolsNum:     mcpServer.ToolsNum,
+			StarNum:      mcpServer.Repository.StarCount,
+		})
+	}
+
+	return resMCPs, total, nil
+}
+
+func (c *userComponentImpl) LikesMCPServers(ctx context.Context, req *types.UserMCPsReq) ([]types.MCPServer, int, error) {
+	user, err := c.userStore.FindByUsername(ctx, req.CurrentUser)
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to get user by username %s, error: %w", req.CurrentUser, err)
+	}
+
+	mcpServers, total, err := c.mcpServerStore.UserLikes(ctx, user.ID, req.PageSize, req.Page)
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to get user liked mcp servers, error: %w", err)
+	}
+
+	var res []types.MCPServer
+	for _, mcpServer := range mcpServers {
+		res = append(res, types.MCPServer{
+			ID:           mcpServer.ID,
+			Name:         mcpServer.Repository.Name,
+			Nickname:     mcpServer.Repository.Nickname,
+			Description:  mcpServer.Repository.Description,
+			Likes:        mcpServer.Repository.Likes,
+			Downloads:    mcpServer.Repository.DownloadCount,
+			Path:         mcpServer.Repository.Path,
+			RepositoryID: mcpServer.RepositoryID,
+			Private:      mcpServer.Repository.Private,
+			CreatedAt:    mcpServer.CreatedAt,
+			UpdatedAt:    mcpServer.Repository.UpdatedAt,
+			Source:       mcpServer.Repository.Source,
+			SyncStatus:   mcpServer.Repository.SyncStatus,
+			License:      mcpServer.Repository.License,
+			GithubPath:   mcpServer.Repository.GithubPath,
+			ToolsNum:     mcpServer.ToolsNum,
+			StarNum:      mcpServer.Repository.StarCount,
+		})
+	}
+
+	return res, total, nil
 }

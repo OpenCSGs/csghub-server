@@ -1,0 +1,33 @@
+{
+  "engine_name": "tei",
+  "engine_version": "1.6",
+  "enabled": 1,
+  "container_port": 8000,
+  "model_format": "safetensors",
+  "description": "A blazing fast inference solution for text embeddings models",
+  "engine_images": [
+    {
+      "compute_type": "gpu",
+      "image": "tei:1.6",
+      "driver_version": "12.4"
+    },
+    {
+      "compute_type": "cpu",
+      "image": "tei:cpu-1.6"
+    }
+  ],
+  "supported_models": [
+    "gte-Qwen2-7B-instruct",
+    "gte-Qwen2-1.5B-instruct",
+    "SFR-Embedding-2_R",
+    "snowflake-arctic-embed-l-v2.0",
+    "snowflake-arctic-embed-m-v2.0",
+    "multilingual-e5-large-instruct",
+    "gte-large-en-v1.5",
+    "nomic-embed-text-v1",
+    "nomic-embed-text-v1.5",
+    "jina-embeddings-v2-base-en",
+    "jina-embeddings-v2-base-code",
+    "all-mpnet-base-v2"
+  ]
+}

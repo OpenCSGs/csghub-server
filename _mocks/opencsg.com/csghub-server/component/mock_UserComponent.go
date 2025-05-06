@@ -686,6 +686,72 @@ func (_c *MockUserComponent_LikesDatasets_Call) RunAndReturn(run func(context.Co
 	return _c
 }
 
+// LikesMCPServers provides a mock function with given fields: ctx, req
+func (_m *MockUserComponent) LikesMCPServers(ctx context.Context, req *types.UserMCPsReq) ([]types.MCPServer, int, error) {
+	ret := _m.Called(ctx, req)
+
+	if len(ret) == 0 {
+		panic("no return value specified for LikesMCPServers")
+	}
+
+	var r0 []types.MCPServer
+	var r1 int
+	var r2 error
+	if rf, ok := ret.Get(0).(func(context.Context, *types.UserMCPsReq) ([]types.MCPServer, int, error)); ok {
+		return rf(ctx, req)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, *types.UserMCPsReq) []types.MCPServer); ok {
+		r0 = rf(ctx, req)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]types.MCPServer)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, *types.UserMCPsReq) int); ok {
+		r1 = rf(ctx, req)
+	} else {
+		r1 = ret.Get(1).(int)
+	}
+
+	if rf, ok := ret.Get(2).(func(context.Context, *types.UserMCPsReq) error); ok {
+		r2 = rf(ctx, req)
+	} else {
+		r2 = ret.Error(2)
+	}
+
+	return r0, r1, r2
+}
+
+// MockUserComponent_LikesMCPServers_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'LikesMCPServers'
+type MockUserComponent_LikesMCPServers_Call struct {
+	*mock.Call
+}
+
+// LikesMCPServers is a helper method to define mock.On call
+//   - ctx context.Context
+//   - req *types.UserMCPsReq
+func (_e *MockUserComponent_Expecter) LikesMCPServers(ctx interface{}, req interface{}) *MockUserComponent_LikesMCPServers_Call {
+	return &MockUserComponent_LikesMCPServers_Call{Call: _e.mock.On("LikesMCPServers", ctx, req)}
+}
+
+func (_c *MockUserComponent_LikesMCPServers_Call) Run(run func(ctx context.Context, req *types.UserMCPsReq)) *MockUserComponent_LikesMCPServers_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(*types.UserMCPsReq))
+	})
+	return _c
+}
+
+func (_c *MockUserComponent_LikesMCPServers_Call) Return(_a0 []types.MCPServer, _a1 int, _a2 error) *MockUserComponent_LikesMCPServers_Call {
+	_c.Call.Return(_a0, _a1, _a2)
+	return _c
+}
+
+func (_c *MockUserComponent_LikesMCPServers_Call) RunAndReturn(run func(context.Context, *types.UserMCPsReq) ([]types.MCPServer, int, error)) *MockUserComponent_LikesMCPServers_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // LikesModels provides a mock function with given fields: ctx, req
 func (_m *MockUserComponent) LikesModels(ctx context.Context, req *types.UserModelsReq) ([]types.Model, int, error) {
 	ret := _m.Called(ctx, req)
@@ -1013,6 +1079,72 @@ func (_c *MockUserComponent_ListServerless_Call) Return(_a0 []types.DeployRepo, 
 }
 
 func (_c *MockUserComponent_ListServerless_Call) RunAndReturn(run func(context.Context, types.DeployReq) ([]types.DeployRepo, int, error)) *MockUserComponent_ListServerless_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// MCPServers provides a mock function with given fields: ctx, req
+func (_m *MockUserComponent) MCPServers(ctx context.Context, req *types.UserMCPsReq) ([]types.MCPServer, int, error) {
+	ret := _m.Called(ctx, req)
+
+	if len(ret) == 0 {
+		panic("no return value specified for MCPServers")
+	}
+
+	var r0 []types.MCPServer
+	var r1 int
+	var r2 error
+	if rf, ok := ret.Get(0).(func(context.Context, *types.UserMCPsReq) ([]types.MCPServer, int, error)); ok {
+		return rf(ctx, req)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, *types.UserMCPsReq) []types.MCPServer); ok {
+		r0 = rf(ctx, req)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]types.MCPServer)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, *types.UserMCPsReq) int); ok {
+		r1 = rf(ctx, req)
+	} else {
+		r1 = ret.Get(1).(int)
+	}
+
+	if rf, ok := ret.Get(2).(func(context.Context, *types.UserMCPsReq) error); ok {
+		r2 = rf(ctx, req)
+	} else {
+		r2 = ret.Error(2)
+	}
+
+	return r0, r1, r2
+}
+
+// MockUserComponent_MCPServers_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'MCPServers'
+type MockUserComponent_MCPServers_Call struct {
+	*mock.Call
+}
+
+// MCPServers is a helper method to define mock.On call
+//   - ctx context.Context
+//   - req *types.UserMCPsReq
+func (_e *MockUserComponent_Expecter) MCPServers(ctx interface{}, req interface{}) *MockUserComponent_MCPServers_Call {
+	return &MockUserComponent_MCPServers_Call{Call: _e.mock.On("MCPServers", ctx, req)}
+}
+
+func (_c *MockUserComponent_MCPServers_Call) Run(run func(ctx context.Context, req *types.UserMCPsReq)) *MockUserComponent_MCPServers_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(*types.UserMCPsReq))
+	})
+	return _c
+}
+
+func (_c *MockUserComponent_MCPServers_Call) Return(_a0 []types.MCPServer, _a1 int, _a2 error) *MockUserComponent_MCPServers_Call {
+	_c.Call.Return(_a0, _a1, _a2)
+	return _c
+}
+
+func (_c *MockUserComponent_MCPServers_Call) RunAndReturn(run func(context.Context, *types.UserMCPsReq) ([]types.MCPServer, int, error)) *MockUserComponent_MCPServers_Call {
 	_c.Call.Return(run)
 	return _c
 }

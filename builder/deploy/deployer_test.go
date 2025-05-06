@@ -229,7 +229,6 @@ func TestDeployer_Status(t *testing.T) {
 		mockDeployTaskStore := mockdb.NewMockDeployTaskStore(t)
 		mockDeployTaskStore.EXPECT().GetDeployByID(mock.Anything, dr.DeployID).
 			Return(nil, nil)
-
 		d := &deployer{
 			deployTaskStore: mockDeployTaskStore,
 		}
@@ -673,23 +672,23 @@ func TestDeployer_CheckResource(t *testing.T) {
 	}{
 		{&types.HardWare{}, true},
 		{&types.HardWare{
-			Gpu: types.GPU{Num: "1", Type: "t1"},
+			Gpu: types.Processor{Num: "1", Type: "t1"},
 			Cpu: types.CPU{Num: "2"},
 		}, true},
 		{&types.HardWare{
-			Gpu: types.GPU{Num: "1", Type: "t2"},
+			Gpu: types.Processor{Num: "1", Type: "t2"},
 			Cpu: types.CPU{Num: "2"},
 		}, false},
 		{&types.HardWare{
-			Gpu: types.GPU{Num: "15", Type: "t1"},
+			Gpu: types.Processor{Num: "15", Type: "t1"},
 			Cpu: types.CPU{Num: "2"},
 		}, false},
 		{&types.HardWare{
-			Gpu: types.GPU{Num: "1", Type: "t1"},
+			Gpu: types.Processor{Num: "1", Type: "t1"},
 			Cpu: types.CPU{Num: "20"},
 		}, false},
 		{&types.HardWare{
-			Gpu: types.GPU{Num: "1", Type: "t1"},
+			Gpu: types.Processor{Num: "1", Type: "t1"},
 			Cpu: types.CPU{Num: "12"},
 		}, true},
 	}

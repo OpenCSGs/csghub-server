@@ -30,7 +30,7 @@ const (
 func (c *Client) GetRepoFileRaw(ctx context.Context, req gitserver.GetRepoInfoByPathReq) (string, error) {
 	var data []byte
 	repoType := fmt.Sprintf("%ss", string(req.RepoType))
-	ctx, cancel := context.WithTimeout(ctx, timeoutTime)
+	ctx, cancel := context.WithTimeout(ctx, c.timeoutTime)
 	defer cancel()
 	repository := &gitalypb.Repository{
 		StorageName:  c.config.GitalyServer.Storge,
@@ -70,7 +70,7 @@ func (c *Client) GetRepoFileReader(ctx context.Context, req gitserver.GetRepoInf
 	pr, pw := io.Pipe()
 	repoType := fmt.Sprintf("%ss", string(req.RepoType))
 	// if we add cancel function here, it will break the download stream
-	// ctx, cancel := context.WithTimeout(ctx, timeoutTime)
+	// ctx, cancel := context.WithTimeout(ctx, c.timeoutTime)
 	// defer cancel()
 	repository := &gitalypb.Repository{
 		StorageName:  c.config.GitalyServer.Storge,
@@ -145,7 +145,7 @@ func (c *Client) CreateRepoFile(req *types.CreateFileReq) (err error) {
 		req.NewBranch = req.Branch
 	}
 
-	ctx, cancel := context.WithTimeout(ctx, timeoutTime)
+	ctx, cancel := context.WithTimeout(ctx, c.timeoutTime)
 	defer cancel()
 	userCommitFilesClient, err := c.operationClient.UserCommitFiles(ctx)
 	if err != nil {
@@ -224,7 +224,7 @@ func (c *Client) UpdateRepoFile(req *types.UpdateFileReq) (err error) {
 	ctx := context.Background()
 	repoType := fmt.Sprintf("%ss", string(req.RepoType))
 
-	ctx, cancel := context.WithTimeout(ctx, timeoutTime)
+	ctx, cancel := context.WithTimeout(ctx, c.timeoutTime)
 	defer cancel()
 	userCommitFilesClient, err := c.operationClient.UserCommitFiles(ctx)
 	if err != nil {
@@ -252,13 +252,13 @@ func (c *Client) UpdateRepoFile(req *types.UpdateFileReq) (err error) {
 					Repository: repository,
 					User: &gitalypb.User{
 						GlId:       "user-1",
-						Name:       []byte(req.Name),
+						Name:       []byte(req.Username),
 						GlUsername: req.Username,
 						Email:      []byte(req.Email),
 					},
 					BranchName:        []byte(req.Branch),
 					CommitMessage:     []byte(req.Message),
-					CommitAuthorName:  []byte(req.Name),
+					CommitAuthorName:  []byte(req.Username),
 					CommitAuthorEmail: []byte(req.Email),
 					StartBranchName:   []byte(req.Branch),
 					StartRepository:   repository,
@@ -316,7 +316,7 @@ func (c *Client) DeleteRepoFile(req *types.DeleteFileReq) (err error) {
 		return err
 	}
 	defer conn.Close()
-	ctx, cancel := context.WithTimeout(ctx, timeoutTime)
+	ctx, cancel := context.WithTimeout(ctx, c.timeoutTime)
 	defer cancel()
 	userCommitFilesClient, err := c.operationClient.UserCommitFiles(ctx)
 	if err != nil {
@@ -334,13 +334,13 @@ func (c *Client) DeleteRepoFile(req *types.DeleteFileReq) (err error) {
 					Repository: repository,
 					User: &gitalypb.User{
 						GlId:       "user-1",
-						Name:       []byte(req.Name),
+						Name:       []byte(req.Username),
 						GlUsername: req.Username,
 						Email:      []byte(req.Email),
 					},
 					BranchName:        []byte(req.Branch),
 					CommitMessage:     []byte(req.Message),
-					CommitAuthorName:  []byte(req.Name),
+					CommitAuthorName:  []byte(req.Username),
 					CommitAuthorEmail: []byte(req.Email),
 					StartBranchName:   []byte(req.Branch),
 					StartRepository:   repository,

@@ -111,6 +111,7 @@ func NewModelComponent(config *config.Config) (ModelComponent, error) {
 		return nil, err
 	}
 	c.datasetStore = database.NewDatasetStore()
+	c.runtimeArchitecturesStore = database.NewRuntimeArchitecturesStore()
 	c.repoRuntimeFrameworkStore = database.NewRepositoriesRuntimeFramework()
 	c.runtimeFrameworksStore = database.NewRuntimeFrameworksStore()
 	c.deployTaskStore = database.NewDeployTaskStore()
@@ -140,6 +141,7 @@ type modelComponentImpl struct {
 	recomStore                database.RecomStore
 	gitServer                 gitserver.GitServer
 	userLikesStore            database.UserLikesStore
+	runtimeArchitecturesStore database.RuntimeArchitecturesStore
 	repoRuntimeFrameworkStore database.RepositoriesRuntimeFrameworkStore
 	deployTaskStore           database.DeployTaskStore
 	runtimeFrameworksStore    database.RuntimeFrameworksStore
@@ -473,6 +475,16 @@ func (c *modelComponentImpl) Show(ctx context.Context, namespace, name, currentU
 		CanWrite:            permission.CanWrite,
 		CanManage:           permission.CanAdmin,
 		Namespace:           ns,
+		Metadata: types.Metadata{
+			ModelParams:     model.Repository.Metadata.ModelParams,
+			TensorType:      model.Repository.Metadata.TensorType,
+			MiniGPUMemoryGB: model.Repository.Metadata.MiniGPUMemoryGB,
+			Architecture:    model.Repository.Metadata.Architecture,
+			ModelType:       model.Repository.Metadata.ModelType,
+			ClassName:       model.Repository.Metadata.ClassName,
+			Quantizations:   model.Repository.Metadata.Quantizations,
+		},
+
 		MultiSource: types.MultiSource{
 			HFPath:  model.Repository.HFPath,
 			MSPath:  model.Repository.MSPath,
@@ -486,18 +498,16 @@ func (c *modelComponentImpl) Show(ctx context.Context, namespace, name, currentU
 	if needOpWeight {
 		c.addOpWeightToModel(ctx, []int64{model.RepositoryID}, []*types.Model{resModel})
 	}
-	inferences, _ := c.repoRuntimeFrameworkStore.GetByRepoIDsAndType(ctx, model.Repository.ID, types.InferenceType)
-	if len(inferences) > 0 {
-		resModel.EnableInference = true
-	}
-	finetunes, _ := c.repoRuntimeFrameworkStore.GetByRepoIDsAndType(ctx, model.Repository.ID, types.FinetuneType)
-	if len(finetunes) > 0 {
-		resModel.EnableFinetune = true
-	}
-	evaluations, _ := c.repoRuntimeFrameworkStore.GetByRepoIDsAndType(ctx, model.Repository.ID, types.EvaluationType)
-	if len(evaluations) > 0 {
-		resModel.EnableEvaluation = true
-	}
+
+	modelFormat := model.Repository.Format()
+	archs := model.Repository.Archs()
+	oriName := model.Repository.OriginName()
+	enableInference, _ := c.runtimeArchitecturesStore.CheckEngineByArchModelNameAndType(ctx, archs, oriName, modelFormat, types.InferenceType)
+	resModel.EnableInference = enableInference
+	enableFinetune, _ := c.runtimeArchitecturesStore.CheckEngineByArchModelNameAndType(ctx, archs, oriName, modelFormat, types.FinetuneType)
+	resModel.EnableFinetune = enableFinetune
+	enableEvaluation, _ := c.runtimeArchitecturesStore.CheckEngineByArchModelNameAndType(ctx, archs, oriName, modelFormat, types.EvaluationType)
+	resModel.EnableEvaluation = enableEvaluation
 	return resModel, nil
 }
 
@@ -519,15 +529,25 @@ func (c *modelComponentImpl) GetServerless(ctx context.Context, namespace, name,
 	}
 	endpoint, _ := c.repoComponent.GenerateEndpoint(ctx, deploy)
 
+	varMap, err := common.JsonStrToMap(deploy.Variables)
+	if err != nil {
+		return nil, fmt.Errorf("failed to convert variables to map, error: %w", err)
+	}
+	var entrypoint string
+	val, exist := varMap[types.GGUFEntryPoint]
+	if exist {
+		entrypoint = val
+	}
+
 	resDeploy := types.DeployRepo{
 		DeployID:         deploy.ID,
 		DeployName:       deploy.DeployName,
 		RepoID:           deploy.RepoID,
 		SvcName:          deploy.SvcName,
 		Status:           deployStatusCodeToString(deploy.Status),
+		RuntimeFramework: deploy.RuntimeFramework,
 		Hardware:         deploy.Hardware,
 		Env:              deploy.Env,
-		RuntimeFramework: deploy.RuntimeFramework,
 		MinReplica:       deploy.MinReplica,
 		MaxReplica:       deploy.MaxReplica,
 		GitBranch:        deploy.GitBranch,
@@ -537,6 +557,7 @@ func (c *modelComponentImpl) GetServerless(ctx context.Context, namespace, name,
 		UpdatedAt:        deploy.UpdatedAt,
 		ProxyEndpoint:    endpoint,
 		Task:             string(deploy.Task),
+		Entrypoint:       entrypoint,
 	}
 	return &resDeploy, nil
 }
@@ -965,15 +986,22 @@ func (c *modelComponentImpl) Deploy(ctx context.Context, deployReq types.DeployA
 		return -1, fmt.Errorf("invalid hardware setting, %w", err)
 	}
 
+	// only vllm and sglang support multi-host inference
+	if hardware.Replicas > 1 {
+		if frame.FrameName != "vllm" && frame.FrameName != "sglang" {
+			return -1, fmt.Errorf("only vllm and sglang support multi-host inference")
+		}
+		if req.MinReplica < 1 {
+			return -1, fmt.Errorf("Multi-host inference only supports a minimum replica count greater than 0")
+		}
+	}
+
 	// resource available only if err is nil, err message should contain
 	// the reason why resource is unavailable
-	err = c.resourceAvailable(ctx, resource, req, deployReq, hardware)
+	_, err = c.deployer.CheckResourceAvailable(ctx, req.ClusterID, req.OrderDetailID, &hardware)
 	if err != nil {
 		return -1, err
 	}
-
-	// choose image
-	containerImg := c.containerImg(frame, hardware)
 
 	if len(req.EngineArgs) > 0 {
 		_, err = common.JsonStrToMap(req.EngineArgs)
@@ -996,7 +1024,7 @@ func (c *modelComponentImpl) Deploy(ctx context.Context, deployReq types.DeployA
 		RepoID:           m.Repository.ID,
 		RuntimeFramework: frame.FrameName,
 		ContainerPort:    frame.ContainerPort, // default container port
-		ImageID:          containerImg,        // do not need build pod image for model
+		ImageID:          frame.FrameImage,    // do not need build pod image for model
 		MinReplica:       req.MinReplica,
 		MaxReplica:       req.MaxReplica,
 		Annotation:       string(annoStr),
@@ -1044,21 +1072,7 @@ func (c *modelComponentImpl) ListModelsByRuntimeFrameworkID(ctx context.Context,
 		}
 	}
 
-	runtimeRepos, err := c.repoRuntimeFrameworkStore.ListByRuntimeFrameworkID(ctx, id, deployType)
-	if err != nil {
-		return nil, 0, fmt.Errorf("failed to get repo by runtime,error:%w", err)
-	}
-
-	if runtimeRepos == nil {
-		return nil, 0, nil
-	}
-
-	var repoIDs []int64
-	for _, repo := range runtimeRepos {
-		repoIDs = append(repoIDs, repo.RepoID)
-	}
-
-	repos, total, err := c.repoStore.ListRepoPublicToUserByRepoIDs(ctx, types.ModelRepo, user.ID, "", "", per, page, repoIDs)
+	repos, total, err := c.repoStore.ListRepoByDeployType(ctx, types.ModelRepo, user.ID, "", "", types.InferenceType, per, page)
 	if err != nil {
 		newError := fmt.Errorf("failed to get public model repos,error:%w", err)
 		return nil, 0, newError
@@ -1180,21 +1194,7 @@ func (c *modelComponentImpl) ListModelsOfRuntimeFrameworks(ctx context.Context, 
 		return nil, 0, fmt.Errorf("failed to get current user %s, error:%w", currentUser, err)
 	}
 
-	runtimeRepos, err := c.repoRuntimeFrameworkStore.ListRepoIDsByType(ctx, deployType)
-	if err != nil {
-		return nil, 0, fmt.Errorf("failed to get repo by deploy type, error:%w", err)
-	}
-
-	if len(runtimeRepos) < 1 {
-		return nil, 0, nil
-	}
-
-	var repoIDs []int64
-	for _, repo := range runtimeRepos {
-		repoIDs = append(repoIDs, repo.RepoID)
-	}
-
-	repos, total, err := c.repoStore.ListRepoPublicToUserByRepoIDs(ctx, types.ModelRepo, user.ID, search, sort, per, page, repoIDs)
+	repos, total, err := c.repoStore.ListRepoByDeployType(ctx, types.ModelRepo, user.ID, search, sort, deployType, per, page)
 	if err != nil {
 		newError := fmt.Errorf("failed to get public model repos, error:%w", err)
 		return nil, 0, newError

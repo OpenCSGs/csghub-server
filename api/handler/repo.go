@@ -86,11 +86,11 @@ func (h *RepoHandler) CreateFile(ctx *gin.Context) {
 
 	resp, err := h.c.CreateFile(ctx.Request.Context(), req)
 	if err != nil {
-		slog.Error("Failed to create repo file", slog.String("repo_type", string(req.RepoType)), slog.Any("error", err))
+		slog.Error("Failed to create repo file", slog.String("repo_type", string(req.RepoType)), slog.Any("error", err), slog.Any("req", req))
 		httpbase.ServerError(ctx, err)
 		return
 	}
-	slog.Info("Create repo file succeed", slog.String("repo_type", string(req.RepoType)), slog.String("name", name))
+	slog.Debug("Create repo file succeed", slog.String("repo_type", string(req.RepoType)), slog.String("name", name))
 	httpbase.OK(ctx, resp)
 }
 
@@ -141,11 +141,11 @@ func (h *RepoHandler) UpdateFile(ctx *gin.Context) {
 
 	resp, err := h.c.UpdateFile(ctx.Request.Context(), req)
 	if err != nil {
-		slog.Error("Failed to update repo file", slog.String("repo_type", string(req.RepoType)), slog.Any("error", err))
+		slog.Error("Failed to update repo file", slog.String("repo_type", string(req.RepoType)), slog.Any("error", err), slog.Any("req", req))
 		httpbase.ServerError(ctx, err)
 		return
 	}
-	slog.Info("Update repo file succeed", slog.String("repo_type", string(req.RepoType)), slog.String("name", name))
+	slog.Debug("Update repo file succeed", slog.String("repo_type", string(req.RepoType)), slog.String("name", name))
 	httpbase.OK(ctx, resp)
 }
 
@@ -192,12 +192,12 @@ func (h *RepoHandler) Commits(ctx *gin.Context) {
 	}
 	commits, pageOpt, err := h.c.Commits(ctx.Request.Context(), req)
 	if err != nil {
-		slog.Error("Failed to get repo commits", slog.String("repo_type", string(req.RepoType)), slog.Any("error", err))
+		slog.Error("Failed to get repo commits", slog.String("repo_type", string(req.RepoType)), slog.Any("error", err), slog.Any("req", req))
 		httpbase.ServerError(ctx, err)
 		return
 	}
 
-	slog.Info("Get repo commits succeed", slog.String("repo_type", string(req.RepoType)), slog.String("name", name), slog.String("ref", req.Ref))
+	slog.Debug("Get repo commits succeed", slog.String("repo_type", string(req.RepoType)), slog.String("name", name), slog.String("ref", req.Ref))
 	resData := gin.H{
 		"commits":    commits,
 		"total":      pageOpt.Total,
@@ -243,12 +243,12 @@ func (h *RepoHandler) LastCommit(ctx *gin.Context) {
 			httpbase.ForbiddenError(ctx, err)
 			return
 		}
-		slog.Error("Failed to get repo last commit", slog.String("repo_type", string(req.RepoType)), slog.Any("error", err))
+		slog.Error("Failed to get repo last commit", slog.String("repo_type", string(req.RepoType)), slog.Any("error", err), slog.Any("req", req))
 		httpbase.ServerError(ctx, err)
 		return
 	}
 
-	slog.Info("Get repo last commit succeed", slog.String("repo_type", string(req.RepoType)), slog.String("name", name), slog.String("ref", req.Ref))
+	slog.Debug("Get repo last commit succeed", slog.String("repo_type", string(req.RepoType)), slog.String("name", name), slog.String("ref", req.Ref))
 	httpbase.OK(ctx, commit)
 }
 
@@ -288,12 +288,12 @@ func (h *RepoHandler) FileRaw(ctx *gin.Context) {
 	}
 	raw, err := h.c.FileRaw(ctx.Request.Context(), req)
 	if err != nil {
-		slog.Error("Failed to get repo file raw", slog.String("repo_type", string(req.RepoType)), slog.Any("error", err))
+		slog.Error("Failed to get repo file raw", slog.String("repo_type", string(req.RepoType)), slog.Any("error", err), slog.Any("req", req))
 		httpbase.ServerError(ctx, err)
 		return
 	}
 
-	slog.Info("Get repo file raw succeed", slog.String("repo_type", string(req.RepoType)), slog.String("name", name), slog.String("path", req.Path), slog.String("ref", req.Ref))
+	slog.Debug("Get repo file raw succeed", slog.String("repo_type", string(req.RepoType)), slog.String("name", name), slog.String("path", req.Path), slog.String("ref", req.Ref))
 	httpbase.OK(ctx, raw)
 }
 
@@ -333,12 +333,12 @@ func (h *RepoHandler) FileInfo(ctx *gin.Context) {
 	}
 	file, err := h.c.FileInfo(ctx.Request.Context(), req)
 	if err != nil {
-		slog.Error("Failed to get repo file info", slog.Any("req", req), slog.Any("error", err))
+		slog.Error("Failed to get repo file info", slog.Any("req", req), slog.Any("error", err), slog.Any("req", req))
 		httpbase.ServerError(ctx, err)
 		return
 	}
 
-	slog.Info("Get repo file info succeed", slog.String("repo_type", string(req.RepoType)), slog.String("name", name), slog.String("path", req.Path), slog.String("ref", req.Ref))
+	slog.Debug("Get repo file info succeed", slog.String("repo_type", string(req.RepoType)), slog.String("name", name), slog.String("path", req.Path), slog.String("ref", req.Ref))
 	httpbase.OK(ctx, file)
 }
 
@@ -394,7 +394,7 @@ func (h *RepoHandler) DownloadFile(ctx *gin.Context) {
 	}
 	reader, size, url, err := h.c.DownloadFile(ctx.Request.Context(), req, currentUser)
 	if err != nil {
-		slog.Error("Failed to download repo file", slog.String("repo_type", string(req.RepoType)), slog.Any("error", err))
+		slog.Error("Failed to download repo file", slog.String("repo_type", string(req.RepoType)), slog.Any("error", err), slog.Any("req", req))
 		httpbase.ServerError(ctx, err)
 		return
 	}
@@ -402,14 +402,14 @@ func (h *RepoHandler) DownloadFile(ctx *gin.Context) {
 	if req.Lfs {
 		httpbase.OK(ctx, url)
 	} else {
-		slog.Info("Download repo file succeed", slog.String("repo_type", string(req.RepoType)), slog.String("name", name), slog.String("path", req.Path), slog.String("ref", req.Ref))
+		slog.Debug("Download repo file succeed", slog.String("repo_type", string(req.RepoType)), slog.String("name", name), slog.String("path", req.Path), slog.String("ref", req.Ref))
 		fileName := path.Base(req.Path)
 		ctx.Header("Content-Type", "application/octet-stream")
 		ctx.Header("Content-Disposition", `attachment; filename="`+fileName+`"`)
 		ctx.Header("Content-Length", strconv.FormatInt(size, 10))
 		_, err = io.Copy(ctx.Writer, reader)
 		if err != nil {
-			slog.Error("Failed to download repo file", slog.String("repo_type", string(req.RepoType)), slog.Any("error", err))
+			slog.Error("Failed to download repo file", slog.String("repo_type", string(req.RepoType)), slog.Any("error", err), slog.Any("req", req))
 			httpbase.ServerError(ctx, err)
 			return
 		}
@@ -455,12 +455,12 @@ func (h *RepoHandler) Branches(ctx *gin.Context) {
 	}
 	branches, err := h.c.Branches(ctx.Request.Context(), req)
 	if err != nil {
-		slog.Error("Failed to get repo branches", slog.String("repo_type", string(req.RepoType)), slog.Any("error", err))
+		slog.Error("Failed to get repo branches", slog.String("repo_type", string(req.RepoType)), slog.Any("error", err), slog.Any("req", req))
 		httpbase.ServerError(ctx, err)
 		return
 	}
 
-	slog.Info("Get repo branches succeed", slog.String("repo_type", string(req.RepoType)), slog.String("name", name))
+	slog.Debug("Get repo branches succeed", slog.String("repo_type", string(req.RepoType)), slog.String("name", name))
 	httpbase.OK(ctx, branches)
 }
 
@@ -494,12 +494,12 @@ func (h *RepoHandler) Tags(ctx *gin.Context) {
 	}
 	tags, err := h.c.Tags(ctx.Request.Context(), req)
 	if err != nil {
-		slog.Error("Failed to get repo tags", slog.String("repo_type", string(req.RepoType)), slog.Any("error", err))
+		slog.Error("Failed to get repo tags", slog.String("repo_type", string(req.RepoType)), slog.Any("error", err), slog.Any("req", req))
 		httpbase.ServerError(ctx, err)
 		return
 	}
 
-	slog.Info("Get repo tags succeed", slog.String("repo_type", string(req.RepoType)), slog.String("name", name))
+	slog.Debug("Get repo tags succeed", slog.String("repo_type", string(req.RepoType)), slog.String("name", name))
 	httpbase.OK(ctx, tags)
 }
 
@@ -540,8 +540,7 @@ func (h *RepoHandler) UpdateTags(ctx *gin.Context) {
 	repoType := common.RepoTypeFromContext(ctx)
 	err = h.c.UpdateTags(ctx.Request.Context(), namespace, name, repoType, category, currentUser, tags)
 	if err != nil {
-		slog.Error("Failed to update tags", slog.String("error", err.Error()), slog.String("category", category), slog.String("repo_type", string(repoType)),
-			slog.String("namespace", namespace), slog.String("name", name))
+		slog.Error("Failed to update tags", slog.String("error", err.Error()), slog.String("category", category), slog.String("repo_type", string(repoType)), slog.String("namespace", namespace), slog.String("name", name))
 		httpbase.ServerError(ctx, err)
 		return
 	}
@@ -586,12 +585,12 @@ func (h *RepoHandler) Tree(ctx *gin.Context) {
 			httpbase.ForbiddenError(ctx, err)
 			return
 		}
-		slog.Error("Failed to get repo file tree", slog.String("repo_type", string(req.RepoType)), slog.Any("error", err))
+		slog.Error("Failed to get repo file tree", slog.String("repo_type", string(req.RepoType)), slog.Any("error", err), slog.Any("req", req))
 		httpbase.ServerError(ctx, err)
 		return
 	}
 
-	slog.Info("Get repo file tree succeed", slog.String("repo_type", string(req.RepoType)), slog.String("name", name), slog.String("path", req.Path), slog.String("ref", req.Ref))
+	slog.Debug("Get repo file tree succeed", slog.String("repo_type", string(req.RepoType)), slog.String("name", name), slog.String("path", req.Path), slog.String("ref", req.Ref))
 	httpbase.OK(ctx, tree)
 }
 
@@ -638,7 +637,7 @@ func (h *RepoHandler) TreeV2(ctx *gin.Context) {
 		}
 		slog.Error(
 			"Failed to get tree", slog.String("repo_type", string(req.RepoType)),
-			slog.Any("error", err),
+			slog.Any("error", err), slog.Any("req", req),
 		)
 		httpbase.ServerError(ctx, err)
 		return
@@ -695,6 +694,7 @@ func (h *RepoHandler) LogsTree(ctx *gin.Context) {
 		slog.Error(
 			"Failed to get logs tree",
 			slog.String("repo_type", string(req.RepoType)), slog.Any("error", err),
+			slog.Any("req", req),
 		)
 		httpbase.ServerError(ctx, err)
 		return
@@ -731,11 +731,11 @@ func (h *RepoHandler) UpdateDownloads(ctx *gin.Context) {
 
 	err = h.c.UpdateDownloads(ctx.Request.Context(), req)
 	if err != nil {
-		slog.Error("Failed to update repo download count", slog.String("repo_type", string(req.RepoType)), slog.Any("error", err), slog.String("namespace", namespace), slog.String("name", name), slog.Time("date", date), slog.Int64("clone_count", req.CloneCount))
+		slog.Error("Failed to update repo download count", slog.String("repo_type", string(req.RepoType)), slog.Any("error", err), slog.String("namespace", namespace), slog.String("name", name), slog.Time("date", date), slog.Int64("clone_count", req.CloneCount), slog.Any("req", req))
 		httpbase.ServerError(ctx, err)
 		return
 	}
-	slog.Info("Update repo download count succeed", slog.String("repo_type", string(req.RepoType)), slog.String("namespace", namespace), slog.String("name", name), slog.Int64("clone_count", req.CloneCount))
+	slog.Debug("Update repo download count succeed", slog.String("repo_type", string(req.RepoType)), slog.String("namespace", namespace), slog.String("name", name), slog.Int64("clone_count", req.CloneCount))
 	httpbase.OK(ctx, nil)
 }
 
@@ -768,7 +768,7 @@ func (h *RepoHandler) IncrDownloads(ctx *gin.Context) {
 		httpbase.ServerError(ctx, err)
 		return
 	}
-	slog.Info("increase repo download count succeed", slog.String("repo_type", string(repoType)), slog.String("namespace", namespace), slog.String("name", name))
+	slog.Debug("increase repo download count succeed", slog.String("repo_type", string(repoType)), slog.String("namespace", namespace), slog.String("name", name))
 	httpbase.OK(ctx, nil)
 }
 
@@ -807,7 +807,7 @@ func (h *RepoHandler) UploadFile(ctx *gin.Context) {
 		buf.Reset()
 		_, err = io.Copy(&buf, openedFile)
 		if err != nil {
-			slog.Info("Error encodeing uploaded file", "error", err, slog.String("file_name", file.Filename))
+			slog.Error("Error encodeing uploaded file", "error", err, slog.String("file_name", file.Filename))
 			httpbase.BadRequest(ctx, err.Error())
 			return
 		}
@@ -834,8 +834,7 @@ func (h *RepoHandler) UploadFile(ctx *gin.Context) {
 			httpbase.ServerError(ctx, err)
 			return
 		}
-		slog.Info("Upload file succeed", slog.String("repo_type", string(upload.RepoType)), slog.Any("path", fmt.Sprintf("%s/%s", namespace, name)),
-			slog.String("file_name", file.Filename))
+		slog.Debug("Upload file succeed", slog.String("repo_type", string(upload.RepoType)), slog.Any("path", fmt.Sprintf("%s/%s", namespace, name)), slog.String("file_name", file.Filename))
 	}
 
 	httpbase.OK(ctx, nil)
@@ -942,8 +941,7 @@ func (h *RepoHandler) HeadSDKDownload(ctx *gin.Context) {
 		return
 	}
 
-	slog.Info("Head download repo file succeed", slog.String("repo_type", string(req.RepoType)), slog.String("name", name), slog.String("path", req.Path), slog.String("ref", req.Ref),
-		slog.Int64("contentLength", file.Size))
+	slog.Debug("Head download repo file succeed", slog.String("repo_type", string(req.RepoType)), slog.String("name", name), slog.String("path", req.Path), slog.String("ref", req.Ref), slog.Int64("contentLength", file.Size))
 	ctx.Header("Content-Length", strconv.Itoa(int(file.Size)))
 	ctx.Header("X-Repo-Commit", file.SHA)
 	ctx.Header("ETag", file.SHA)
@@ -1035,7 +1033,7 @@ func (h *RepoHandler) handleDownload(ctx *gin.Context, isResolve bool) {
 	if req.Lfs {
 		ctx.Redirect(http.StatusMovedPermanently, url)
 	} else {
-		slog.Info("Download repo file succeed", slog.String("repo_type", string(req.RepoType)), slog.String("name", name), slog.String("path", req.Path), slog.String("ref", req.Ref), slog.Any("Content-Length", size))
+		slog.Debug("Download repo file succeed", slog.String("repo_type", string(req.RepoType)), slog.String("name", name), slog.String("path", req.Path), slog.String("ref", req.Ref), slog.Any("Content-Length", size))
 		fileName := path.Base(req.Path)
 		ctx.Header("Content-Type", "application/octet-stream")
 		ctx.Header("Content-Disposition", `attachment; filename="`+fileName+`"`)
@@ -1088,7 +1086,7 @@ func (h *RepoHandler) CommitWithDiff(ctx *gin.Context) {
 		httpbase.ServerError(ctx, err)
 		return
 	}
-	slog.Info("Get repo commit with diff succeed", slog.String("repo_type", string(req.RepoType)), slog.String("name", name), slog.String("commit id", req.Ref))
+	slog.Debug("Get repo commit with diff succeed", slog.String("repo_type", string(req.RepoType)), slog.String("name", name), slog.String("commit id", req.Ref))
 	// client need base64 decode for diff, for example: echo <diff> | base64 -d
 	httpbase.OK(ctx, commit)
 }
@@ -1673,7 +1671,7 @@ func (h *RepoHandler) DeployInstanceLogs(ctx *gin.Context) {
 	logReader, err := h.c.DeployInstanceLogs(ctx.Request.Context(), logReq)
 	if err != nil {
 		if errors.Is(err, component.ErrForbidden) {
-			slog.Info("not allowed to get instance logs", slog.Any("error", err), slog.Any("req", logReq))
+			slog.Warn("not allowed to get instance logs", slog.Any("error", err), slog.Any("req", logReq))
 			httpbase.ForbiddenError(ctx, err)
 			return
 		}
@@ -1695,13 +1693,16 @@ func (h *RepoHandler) DeployInstanceLogs(ctx *gin.Context) {
 	for {
 		select {
 		case <-ctx.Request.Context().Done():
-			slog.Info("repo handler logs request context done", slog.Any("error", ctx.Request.Context().Err()))
+			slog.Debug("repo handler logs request context done", slog.Any("error", ctx.Request.Context().Err()))
 			return
 		case data, ok := <-logReader.RunLog():
 			if ok {
 				ctx.SSEvent("Container", string(data))
 				ctx.Writer.Flush()
 			}
+		default:
+			// Add a small sleep to prevent CPU spinning when no data is available
+			time.Sleep(time.Second * 1)
 		}
 	}
 }
@@ -1794,7 +1795,7 @@ func (h *RepoHandler) DeployStatus(ctx *gin.Context) {
 	if err != nil {
 
 		if errors.Is(err, component.ErrForbidden) {
-			slog.Info("not allowed to get deploy status", slog.Any("error", err), slog.Any("req", statusReq))
+			slog.Warn("not allowed to get deploy status", slog.Any("error", err), slog.Any("req", statusReq))
 			httpbase.ForbiddenError(ctx, err)
 			return
 		}
@@ -1805,7 +1806,7 @@ func (h *RepoHandler) DeployStatus(ctx *gin.Context) {
 	}
 
 	if !allow {
-		slog.Info("not allowed to query deploy status", "req", statusReq)
+		slog.Error("not allowed to query deploy status", "req", statusReq)
 		httpbase.ForbiddenError(ctx, err)
 		return
 	}
@@ -1821,7 +1822,7 @@ func (h *RepoHandler) DeployStatus(ctx *gin.Context) {
 	for {
 		select {
 		case <-ctx.Request.Context().Done():
-			slog.Info("deploy handler status request context done", slog.Any("error", ctx.Request.Context().Err()))
+			slog.Debug("deploy handler status request context done", slog.Any("error", ctx.Request.Context().Err()))
 			return
 		default:
 			time.Sleep(h.deployStatusCheckInterval)
@@ -1869,7 +1870,7 @@ func (h *RepoHandler) SyncMirror(ctx *gin.Context) {
 	err = h.c.SyncMirror(ctx.Request.Context(), repoType, namespace, name, currentUser)
 	if err != nil {
 		if errors.Is(err, component.ErrForbidden) {
-			slog.Info("not allowed to sync mirror", slog.Any("error", err), slog.String("repo_type", string(repoType)), slog.String("path", fmt.Sprintf("%s/%s", namespace, name)))
+			slog.Error("not allowed to sync mirror", slog.Any("error", err), slog.String("repo_type", string(repoType)), slog.String("path", fmt.Sprintf("%s/%s", namespace, name)))
 			httpbase.ForbiddenError(ctx, err)
 			return
 		}
@@ -1893,7 +1894,7 @@ func (h *RepoHandler) testStatus(ctx *gin.Context) {
 	for {
 		select {
 		case <-ctx.Request.Context().Done():
-			slog.Info("deploy handler status request context done", slog.Any("error", ctx.Request.Context().Err()))
+			slog.Debug("deploy handler status request context done", slog.Any("error", ctx.Request.Context().Err()))
 			return
 		default:
 			time.Sleep(time.Second * 5)
@@ -1941,16 +1942,18 @@ func (h *RepoHandler) DeployUpdate(ctx *gin.Context) {
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
-	allow, err := h.c.AllowAdminAccess(ctx.Request.Context(), types.ModelRepo, namespace, name, currentUser)
+
+	allow, err := h.c.AllowReadAccess(ctx.Request.Context(), types.ModelRepo, namespace, name, currentUser)
 	if err != nil {
 		slog.Error("failed to check user permission", "error", err, slog.Any("currentUser", currentUser), slog.Any("namespace", name), slog.Any("name", name))
 		httpbase.ServerError(ctx, errors.New("failed to check user permission"))
 		return
 	}
+
 	if !allow {
-		slog.Info("user not allowed to update deploy", slog.String("namespace", namespace),
+		slog.Warn("user not allowed to update deploy", slog.String("namespace", namespace),
 			slog.String("name", name), slog.Any("username", currentUser))
-		httpbase.ForbiddenError(ctx, errors.New("user not allowed to update deploy"))
+		httpbase.ForbiddenError(ctx, errors.New("user is not authorized to read this repository for update deploy"))
 		return
 	}
 
@@ -1988,7 +1991,7 @@ func (h *RepoHandler) DeployUpdate(ctx *gin.Context) {
 	err = h.c.DeployUpdate(ctx.Request.Context(), updateReq, req)
 	if err != nil {
 		if errors.Is(err, component.ErrForbidden) {
-			slog.Info("user not allowed to update deploy", slog.String("namespace", namespace),
+			slog.Error("user not allowed to update deploy", slog.String("namespace", namespace),
 				slog.String("name", name), slog.Any("username", currentUser), slog.Int64("deploy_id", deployID))
 			httpbase.ForbiddenError(ctx, err)
 			return
@@ -2097,7 +2100,7 @@ func (h *RepoHandler) ServerlessDetail(ctx *gin.Context) {
 	response, err := h.c.DeployDetail(ctx.Request.Context(), detailReq)
 	if err != nil {
 		if errors.Is(err, component.ErrForbidden) {
-			slog.Info("user not allowed to get serverless deploy detail", slog.String("namespace", namespace),
+			slog.Error("user not allowed to get serverless deploy detail", slog.String("namespace", namespace),
 				slog.String("name", name), slog.Any("username", currentUser), slog.Int64("deploy_id", deployID))
 			httpbase.ForbiddenError(ctx, err)
 			return
@@ -2174,7 +2177,7 @@ func (h *RepoHandler) ServerlessLogs(ctx *gin.Context) {
 	logReader, err := h.c.DeployInstanceLogs(ctx.Request.Context(), logReq)
 	if err != nil {
 		if errors.Is(err, component.ErrForbidden) {
-			slog.Info("user not allowed to get serverless deploy logs", slog.Any("logReq", logReq), slog.Any("error", err))
+			slog.Error("user not allowed to get serverless deploy logs", slog.Any("logReq", logReq), slog.Any("error", err))
 			httpbase.ForbiddenError(ctx, err)
 			return
 		}
@@ -2196,13 +2199,16 @@ func (h *RepoHandler) ServerlessLogs(ctx *gin.Context) {
 	for {
 		select {
 		case <-ctx.Request.Context().Done():
-			slog.Info("repo handler logs request context done", slog.Any("error", ctx.Request.Context().Err()))
+			slog.Debug("repo handler logs request context done", slog.Any("error", ctx.Request.Context().Err()))
 			return
 		case data, ok := <-logReader.RunLog():
 			if ok {
 				ctx.SSEvent("Container", string(data))
 				ctx.Writer.Flush()
 			}
+		default:
+			// Add a small sleep to prevent CPU spinning when no data is available
+			time.Sleep(time.Second * 1)
 		}
 	}
 }
@@ -2258,7 +2264,7 @@ func (h *RepoHandler) ServerlessStatus(ctx *gin.Context) {
 	allow, err := h.c.AllowAccessDeploy(ctx.Request.Context(), statusReq)
 	if err != nil {
 		if errors.Is(err, component.ErrForbidden) {
-			slog.Info("user not allowed to get serverless deploy status", slog.Any("error", err), slog.Any("req", statusReq))
+			slog.Error("user not allowed to get serverless deploy status", slog.Any("error", err), slog.Any("req", statusReq))
 			httpbase.ForbiddenError(ctx, err)
 			return
 		}
@@ -2269,7 +2275,7 @@ func (h *RepoHandler) ServerlessStatus(ctx *gin.Context) {
 	}
 
 	if !allow {
-		slog.Info("user not allowed to query deploy status", slog.Any("req", statusReq))
+		slog.Warn("user not allowed to query deploy status", slog.Any("req", statusReq))
 		httpbase.ForbiddenError(ctx, errors.New("user not allowed to query serverless deploy status"))
 		return
 	}
@@ -2285,7 +2291,7 @@ func (h *RepoHandler) ServerlessStatus(ctx *gin.Context) {
 	for {
 		select {
 		case <-ctx.Request.Context().Done():
-			slog.Info("deploy handler status request context done", slog.Any("error", ctx.Request.Context().Err()))
+			slog.Debug("deploy handler status request context done", slog.Any("error", ctx.Request.Context().Err()))
 			return
 		default:
 			time.Sleep(h.deployStatusCheckInterval)
@@ -2366,7 +2372,7 @@ func (h *RepoHandler) ServerlessUpdate(ctx *gin.Context) {
 	err = h.c.DeployUpdate(ctx.Request.Context(), updateReq, req)
 	if err != nil {
 		if errors.Is(err, component.ErrForbidden) {
-			slog.Info("user not allowed to update serverless", slog.Any("error", err), slog.Any("req", updateReq))
+			slog.Debug("user not allowed to update serverless", slog.Any("error", err), slog.Any("req", updateReq))
 			httpbase.ForbiddenError(ctx, err)
 			return
 		}

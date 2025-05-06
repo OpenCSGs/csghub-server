@@ -82,7 +82,7 @@ func (s *spaceStoreImpl) FindByPath(ctx context.Context, namespace, name string)
 		Where("repository.path = ? and repository.repository_type = ?", fmt.Sprintf("%s/%s", namespace, name), types.SpaceRepo).
 		Scan(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("failed to find space: %w", err)
+		return nil, fmt.Errorf("select space by path, error: %w", err)
 	}
 
 	return resSpace, err

@@ -1,6 +1,7 @@
 package router
 
 import (
+	"context"
 	"fmt"
 	"log/slog"
 
@@ -11,7 +12,7 @@ import (
 	"opencsg.com/csghub-server/runner/handler"
 )
 
-func NewHttpServer(config *config.Config) (*gin.Engine, error) {
+func NewHttpServer(ctx context.Context, config *config.Config) (*gin.Engine, error) {
 	r := gin.New()
 	r.Use(gin.Recovery())
 	r.Use(middleware.Log(config))
@@ -59,6 +60,18 @@ func NewHttpServer(config *config.Config) (*gin.Engine, error) {
 		workflows.GET("", argoHandler.ListWorkflows)
 		workflows.DELETE("/:id", argoHandler.DeleteWorkflow)
 		workflows.GET("/:id", argoHandler.GetWorkflow)
+	}
+
+	imagebuilderHandler, err := handler.NewImagebuilderHandler(ctx, config, clusterPool)
+	if err != nil {
+		return nil, fmt.Errorf("failed to build NewHttpServer,%w", err)
+	}
+
+	imagebuilderGroup := apiGroup.Group("/imagebuilder")
+	{
+		imagebuilderGroup.POST("/builder", imagebuilderHandler.Build)
+		imagebuilderGroup.GET("/:namespace/:name/status", imagebuilderHandler.Status)
+		imagebuilderGroup.GET("/:namespace/:name/logs", imagebuilderHandler.Logs)
 	}
 
 	return r, nil

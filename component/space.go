@@ -33,7 +33,7 @@ enableXsrfProtection = false
 
 type SpaceComponent interface {
 	Create(ctx context.Context, req types.CreateSpaceReq) (*types.Space, error)
-	Show(ctx context.Context, namespace, name, currentUser string) (*types.Space, error)
+	Show(ctx context.Context, namespace, name, currentUser string, needOpWeight bool) (*types.Space, error)
 	Update(ctx context.Context, req *types.UpdateSpaceReq) (*types.Space, error)
 	Index(ctx context.Context, repoFilter *types.RepoFilter, per, page int, needOpWeight bool) ([]*types.Space, int, error)
 	OrgSpaces(ctx context.Context, req *types.OrgSpacesReq) ([]types.Space, int, error)
@@ -199,6 +199,13 @@ func (c *spaceComponentImpl) createSpaceDefaultFiles(dbRepo *database.Repository
 			return fmt.Errorf("failed to create space mcp server file, cause: %w", err)
 		}
 	}
+
+	if req.Sdk == types.NGINX.Name {
+		err = c.createSpaceNginxTemplateFile(dbRepo, req)
+		if err != nil {
+			return fmt.Errorf("failed to create space nginx template file, cause: %w", err)
+		}
+	}
 	return nil
 }
 
@@ -318,6 +325,33 @@ func (c *spaceComponentImpl) createSpaceMCPServerTemplateFile(dbRepo *database.R
 	return nil
 }
 
+func (c *spaceComponentImpl) createSpaceNginxTemplateFile(dbRepo *database.Repository, req types.CreateSpaceReq) error {
+	templatePath, err := getSpaceTemplatePath(req.Sdk)
+	if err != nil {
+		return fmt.Errorf("check space nginx template path %s error: %w", templatePath, err)
+	}
+	entries, err := os.ReadDir(templatePath)
+	if err != nil {
+		return fmt.Errorf("failed to list dir %s error: %w", templatePath, err)
+	}
+	sort.Slice(entries, func(i, j int) bool {
+		nameI := entries[i].Name()
+		nameJ := entries[j].Name()
+		if nameI == types.EntryFileNginx {
+			return false
+		}
+		if nameJ == types.EntryFileNginx {
+			return true
+		}
+		return nameI < nameJ
+	})
+	err = c.uploadTemplateFiles(entries, req, dbRepo, templatePath)
+	if err != nil {
+		return fmt.Errorf("failed to upload space nginx template files error: %w", err)
+	}
+	return nil
+}
+
 func getSpaceTemplatePath(subPath string) (string, error) {
 	currentDir, err := filepath.Abs(filepath.Dir("."))
 	if err != nil {
@@ -363,7 +397,7 @@ func (c *spaceComponentImpl) uploadTemplateFiles(entries []os.DirEntry, req type
 	return nil
 }
 
-func (c *spaceComponentImpl) Show(ctx context.Context, namespace, name, currentUser string) (*types.Space, error) {
+func (c *spaceComponentImpl) Show(ctx context.Context, namespace, name, currentUser string, needOpWeight bool) (*types.Space, error) {
 	var tags []types.RepoTag
 	space, err := c.spaceStore.FindByPath(ctx, namespace, name)
 	if err != nil {
@@ -393,7 +427,7 @@ func (c *spaceComponentImpl) Show(ctx context.Context, namespace, name, currentU
 	}
 	repository := common.BuildCloneInfo(c.config, space.Repository)
 
-	resModel := &types.Space{
+	resSpace := &types.Space{
 		ID:            space.ID,
 		Name:          space.Repository.Name,
 		Nickname:      space.Repository.Nickname,
@@ -419,7 +453,6 @@ func (c *spaceComponentImpl) Show(ctx context.Context, namespace, name, currentU
 		UserLikes:     likeExists,
 		Sdk:           space.Sdk,
 		SdkVersion:    space.SdkVersion,
-		Secrets:       space.Secrets,
 		Variables:     space.Variables,
 		CoverImageUrl: space.CoverImageUrl,
 		Source:        space.Repository.Source,
@@ -431,10 +464,17 @@ func (c *spaceComponentImpl) Show(ctx context.Context, namespace, name, currentU
 		Namespace:     ns,
 	}
 	if permission.CanAdmin {
-		resModel.SensitiveCheckStatus = space.Repository.SensitiveCheckStatus.String()
+		resSpace.SensitiveCheckStatus = space.Repository.SensitiveCheckStatus.String()
+	}
+	if permission.CanWrite {
+		resSpace.Env = space.Env
+		resSpace.Secrets = space.Secrets
+	}
+	if needOpWeight {
+		c.addOpWeightToSpaces(ctx, []int64{resSpace.RepositoryID}, []*types.Space{resSpace})
 	}
 
-	return resModel, nil
+	return resSpace, nil
 }
 
 func (c *spaceComponentImpl) Update(ctx context.Context, req *types.UpdateSpaceReq) (*types.Space, error) {
@@ -797,15 +837,12 @@ func (c *spaceComponentImpl) Deploy(ctx context.Context, namespace, name, curren
 		return -1, err
 	}
 
-	containerImg := ""
 	containerPort := types.DefaultContainerPort
 	if space.Sdk == types.GRADIO.Name {
 		containerPort = types.GRADIO.Port
 	} else if space.Sdk == types.STREAMLIT.Name {
 		containerPort = types.STREAMLIT.Port
 	} else if space.Sdk == types.NGINX.Name {
-		// Use default image for nginx space
-		containerImg = types.NGINX.Image
 		containerPort = types.NGINX.Port
 	} else if space.Sdk == types.DOCKER.Name {
 		template, err := c.templateStore.FindByName(ctx, types.DOCKER.Name, space.Template)
@@ -833,7 +870,7 @@ func (c *spaceComponentImpl) Deploy(ctx context.Context, namespace, name, curren
 		ModelID:       0,
 		UserID:        user.ID,
 		Annotation:    string(annoStr),
-		ImageID:       containerImg,
+		ImageID:       "",
 		Type:          types.SpaceType,
 		UserUUID:      user.UUID,
 		SKU:           space.SKU,
@@ -937,7 +974,7 @@ func (c *spaceComponentImpl) status(ctx context.Context, s *database.Space) (str
 func (c *spaceComponentImpl) Status(ctx context.Context, namespace, name string) (string, string, error) {
 	s, err := c.spaceStore.FindByPath(ctx, namespace, name)
 	if err != nil {
-		return "", SpaceStatusStopped, fmt.Errorf("can't find space by path:%w", err)
+		return "", SpaceStatusStopped, fmt.Errorf("can't find space by path status, error: %w", err)
 	}
 	return c.status(ctx, s)
 }
@@ -945,7 +982,7 @@ func (c *spaceComponentImpl) Status(ctx context.Context, namespace, name string)
 func (c *spaceComponentImpl) Logs(ctx context.Context, namespace, name string) (*deploy.MultiLogReader, error) {
 	s, err := c.spaceStore.FindByPath(ctx, namespace, name)
 	if err != nil {
-		return nil, fmt.Errorf("can't find space by path:%w", err)
+		return nil, fmt.Errorf("can't find space for logs, error: %w", err)
 	}
 	return c.deployer.Logs(ctx, types.DeployRepo{
 		SpaceID:   s.ID,

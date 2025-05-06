@@ -53,10 +53,12 @@ const (
 	CodeTagScope    TagScope = "code"
 	SpaceTagScope   TagScope = "space"
 	PromptTagScope  TagScope = "prompt"
+	MCPTagScope     TagScope = "mcp"
+	UnknownScope    TagScope = "unknown"
 )
 
 type TagFilter struct {
-	Scopes     []TagScope `form:"scope" binding:"omitempty,dive,eq=model|eq=dataset|eq=code|eq=space|eq=prompt"`
+	Scopes     []TagScope `form:"scope" binding:"omitempty,dive,eq=model|eq=dataset|eq=code|eq=space|eq=prompt|eq=mcp"`
 	Categories []string   `form:"category" binding:"omitempty,dive"`
 	BuiltIn    *bool      `form:"built_in" binding:"omitnil"`
 }

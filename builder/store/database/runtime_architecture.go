@@ -5,7 +5,8 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"strings"
+
+	"github.com/uptrace/bun"
 )
 
 type runtimeArchitecturesStoreImpl struct {
@@ -15,11 +16,13 @@ type runtimeArchitecturesStoreImpl struct {
 type RuntimeArchitecturesStore interface {
 	ListByRuntimeFrameworkID(ctx context.Context, id int64) ([]RuntimeArchitecture, error)
 	Add(ctx context.Context, arch RuntimeArchitecture) error
+	BatchAdd(ctx context.Context, archs []RuntimeArchitecture) error
 	DeleteByRuntimeIDAndArchName(ctx context.Context, id int64, archName string) error
+	DeleteByRuntimeID(ctx context.Context, id int64) error
 	FindByRuntimeIDAndArchName(ctx context.Context, id int64, archName string) (*RuntimeArchitecture, error)
 	ListByRArchName(ctx context.Context, archName string) ([]RuntimeArchitecture, error)
-	ListByRArchNameAndModel(ctx context.Context, archName, modelName string) ([]RuntimeArchitecture, error)
-	GetRuntimeByModelName(ctx context.Context, archName, modelName string) ([]RuntimeArchitecture, error)
+	ListByArchNameAndModel(ctx context.Context, archs []string, modelName string) ([]RuntimeArchitecture, error)
+	CheckEngineByArchModelNameAndType(ctx context.Context, archs []string, modelName, format string, deployType int) (bool, error)
 }
 
 func NewRuntimeArchitecturesStore() RuntimeArchitecturesStore {
@@ -35,9 +38,12 @@ func NewRuntimeArchitecturesStoreWithDB(db *DB) RuntimeArchitecturesStore {
 }
 
 type RuntimeArchitecture struct {
-	ID                 int64  `bun:",pk,autoincrement" json:"id"`
-	RuntimeFrameworkID int64  `bun:",notnull" json:"runtime_framework_id"`
-	ArchitectureName   string `bun:",notnull" json:"architecture_name"`
+	ID                 int64             `bun:",pk,autoincrement" json:"id"`
+	RuntimeFrameworkID int64             `bun:",notnull" json:"runtime_framework_id"`
+	RuntimeFramework   *RuntimeFramework `bun:"rel:belongs-to,join:runtime_framework_id=id" json:"runtime_framework"`
+	ArchitectureName   string            `bun:",nullzero" json:"architecture_name"`
+	// some engine has specific model names, like ms-swift,mindie
+	ModelName string `bun:",nullzero" json:"model_name"`
 }
 
 func (ra *runtimeArchitecturesStoreImpl) ListByRuntimeFrameworkID(ctx context.Context, id int64) ([]RuntimeArchitecture, error) {
@@ -87,108 +93,46 @@ func (ra *runtimeArchitecturesStoreImpl) ListByRArchName(ctx context.Context, ar
 	return result, nil
 }
 
-func (ra *runtimeArchitecturesStoreImpl) ListByRArchNameAndModel(ctx context.Context, archName, modelName string) ([]RuntimeArchitecture, error) {
+func (ra *runtimeArchitecturesStoreImpl) ListByArchNameAndModel(ctx context.Context, archNames []string, modelName string) ([]RuntimeArchitecture, error) {
 	var result []RuntimeArchitecture
-	_, err := ra.db.Operator.Core.NewSelect().Model(&result).Where("architecture_name = ?", archName).Exec(ctx, &result)
+	_, err := ra.db.Operator.Core.NewSelect().Model(&result).Where("architecture_name in (?) or model_name=?", bun.In(archNames), modelName).Exec(ctx, &result)
 	if err != nil {
 		return nil, fmt.Errorf("error happened while getting runtime architecture, %w", err)
 	}
-	result2, err := ra.GetRuntimeByModelName(ctx, archName, modelName)
-	if err != nil {
-		return nil, fmt.Errorf("error happened while getting runtime architecture by model name, %w", err)
-	}
-	result = append(result, result2...)
 	return result, nil
 }
 
-/**
-@Description: get runtime architecture by model name
-@param ctx
-@param archName
-@param modelName
-@return []RuntimeArchitecture
-------------      table resource_models         -----------------
-resource_name | engine_name |            model_name
----------------+-------------+-----------------------------------
-ascend        | mindie      | Baichuan-7B
-ascend        | mindie      | Baichuan-13B
-nvidia        | nim         | Llama-3.1-8B-Instruct
-nvidia        | nim         | Llama-3-8B-Instruct
+// ListByRArchsAndModelFormat
+// add RuntimeFramework as relation
+func (ra *runtimeArchitecturesStoreImpl) CheckEngineByArchModelNameAndType(ctx context.Context, archs []string, name, modelFormat string, deployType int) (bool, error) {
 
-------------      table runtime_frameworks         -----------------
-        frame_name         |                          frame_image                           |    frame_npu_image
----------------------------+----------------------------------------------------------------+------------------------
- TGI                       | tgi:2.1                                                        |
- VLLM                      | vllm-local:2.7                                                 | vllm-cpu:2.3
- MindIE                    |                                                                | mindie:1.8-csg-1.0.RC2
- nim-llama-3.1-8b-instruct | nvcr.io/nim/meta/llama-3.1-8b-instruct:latest                  |
- nim-llama-2-13b-chat      | nvcr.io/nim/meta/llama-2-13b-chat:latest                       |
- nim-llama3-8b-instruct    | nvcr.io/nim/meta/llama3-8b-instruct:latest                     |
-case 1: mindie
-all models share same runtime framework mindie, so we only need to get the runtime framework for mindie when the image contains mindie
-case 2: nim
-every llama model has its own runtime framework, so we need to get the runtime framework for each model
-Meta-Llama-3-8B-Instruct --> llama3-8b-instruct
-Llama-2-13b-chat --> llama-2-13b-chat
-*/
-
-func (ra *runtimeArchitecturesStoreImpl) GetRuntimeByModelName(ctx context.Context, archName, modelName string) ([]RuntimeArchitecture, error) {
 	var result []RuntimeArchitecture
-	var resModel []ResourceModel
-	err := ra.db.Core.NewSelect().Model(&resModel).Where("LOWER(model_name) like ? and engine_name != ?", fmt.Sprintf("%%%s%%", strings.ToLower(modelName)), "nim").Scan(ctx)
+	_, err := ra.db.Operator.Core.
+		NewSelect().Model(&result).
+		Relation("RuntimeFramework", func(q *bun.SelectQuery) *bun.SelectQuery {
+			return q.Where("model_format = ?", modelFormat).Where("type = ?", deployType)
+		}).
+		Where("architecture_name in (?) or model_name=?", bun.In(archs), name).Exec(ctx, &result)
 	if err != nil {
-		return nil, fmt.Errorf("error happened while getting resource model, %w", err)
+		return false, fmt.Errorf("error happened while checking runtime architecture, %w", err)
 	}
-	var resNIMModel []ResourceModel
-	nimModel := strings.Replace(strings.ToLower(modelName), "meta-", "", 1)
-	err = ra.db.Core.NewSelect().Model(&resNIMModel).Where("LOWER(model_name) = ? and engine_name = ?", nimModel, "nim").Scan(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("error happened while getting resource model, %w", err)
-	}
-	resModel = append(resModel, resNIMModel...)
-	var runtime_frameworks []RuntimeFramework
-	// select all runtime_frameworks
-	err = ra.db.Core.NewSelect().Model(&runtime_frameworks).Scan(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("error happened while getting runtime frameworks, %w", err)
-	}
-	nimMatchModel := strings.ReplaceAll(nimModel, "-", "")
-	for _, r := range resModel {
-		//append to result if result dont' have the runtime_framework_id
-		engineName := strings.ToLower(r.EngineName)
-
-		for _, rf := range runtime_frameworks {
-			image := strings.ToLower(rf.FrameImage)
-			if strings.Contains(image, "/") {
-				parts := strings.Split(image, "/")
-				image = parts[len(parts)-1]
-			}
-			if strings.Contains(image, engineName) && !contains(result, rf.ID) {
-				result = append(result, RuntimeArchitecture{
-					RuntimeFrameworkID: rf.ID,
-					ArchitectureName:   archName,
-				})
-				continue
-			}
-			// special handling for nim models
-			nimImage := strings.ReplaceAll(image, "-", "")
-			if strings.Contains(nimImage, nimMatchModel) && !contains(result, rf.ID) {
-				result = append(result, RuntimeArchitecture{
-					RuntimeFrameworkID: rf.ID,
-					ArchitectureName:   archName,
-				})
-			}
-		}
-
-	}
-	return result, nil
+	return len(result) > 0, nil
 }
 
-func contains(architectures []RuntimeArchitecture, id int64) bool {
-	for _, arch := range architectures {
-		if arch.RuntimeFrameworkID == id {
-			return true
-		}
+// DeleteByRuntimeID
+func (ra *runtimeArchitecturesStoreImpl) DeleteByRuntimeID(ctx context.Context, runtimeFrameworkID int64) error {
+	_, err := ra.db.Core.NewDelete().Model((*RuntimeArchitecture)(nil)).Where("runtime_framework_id = ?", runtimeFrameworkID).Exec(ctx)
+	if err != nil {
+		return fmt.Errorf("error happened while deleting runtime architecture by runtime framework id %d, %w", runtimeFrameworkID, err)
 	}
-	return false
+	return nil
+}
+
+// batchadd
+func (ra *runtimeArchitecturesStoreImpl) BatchAdd(ctx context.Context, architectures []RuntimeArchitecture) error {
+	_, err := ra.db.Core.NewInsert().Model(&architectures).Exec(ctx)
+	if err != nil {
+		return fmt.Errorf("error happened while adding runtime architecture %v, %w", architectures, err)
+	}
+	return nil
 }

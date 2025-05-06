@@ -21,18 +21,21 @@ import (
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/types"
+	lwscli "sigs.k8s.io/lws/client-go/clientset/versioned"
 )
 
 // Cluster holds basic information about a Kubernetes cluster
 
 type Cluster struct {
-	CID           string               // config id
-	ID            string               // unique id
-	ConfigPath    string               // Path to the kubeconfig file
-	Client        kubernetes.Interface // Kubernetes client
-	KnativeClient knative.Interface    // Knative client
-	ArgoClient    versioned.Interface  // Argo client
-	StorageClass  string
+	CID              string               // config id
+	ID               string               // unique id
+	ConfigPath       string               // Path to the kubeconfig file
+	Client           kubernetes.Interface // Kubernetes client
+	KnativeClient    knative.Interface    // Knative client
+	LWSClient        lwscli.Interface     // LWS client
+	ArgoClient       versioned.Interface  // Argo client
+	StorageClass     string
+	NetworkInterface string // Main network interface, used to rdma, ex: eth0
 }
 
 // ClusterPool is a resource pool of cluster information
@@ -75,6 +78,11 @@ func NewClusterPool() (*ClusterPool, error) {
 			slog.Error("failed to create knative client", "error", err)
 			return nil, fmt.Errorf("failed to create knative client,%w", err)
 		}
+		lwsclient, err := lwscli.NewForConfig(config)
+		if err != nil {
+			slog.Error("failed to create lws client", "error", err)
+			return nil, fmt.Errorf("failed to create lws client,%w", err)
+		}
 		id := filepath.Base(kubeconfig)
 		ctxTimeout, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
@@ -90,6 +98,7 @@ func NewClusterPool() (*ClusterPool, error) {
 			Client:        client,
 			KnativeClient: knativeClient,
 			ArgoClient:    argoClient,
+			LWSClient:     lwsclient,
 		})
 
 	}
@@ -115,14 +124,17 @@ func (p *ClusterPool) GetCluster() (*Cluster, error) {
 func (p *ClusterPool) GetClusterByID(ctx context.Context, id string) (*Cluster, error) {
 	cfId := "config"
 	storageClass := ""
+	networkInterface := "eth0"
 	if len(id) != 0 {
 		cInfo, _ := p.ClusterStore.ByClusterID(ctx, id)
 		cfId = cInfo.ClusterConfig
 		storageClass = cInfo.StorageClass
+		networkInterface = cInfo.NetworkInterface
 	}
 	for _, Cluster := range p.Clusters {
 		if Cluster.CID == cfId {
 			Cluster.StorageClass = storageClass
+			Cluster.NetworkInterface = networkInterface
 			return &Cluster, nil
 		}
 	}

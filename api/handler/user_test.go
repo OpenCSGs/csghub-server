@@ -438,3 +438,48 @@ func TestUserHandler_GetEvaluations(t *testing.T) {
 		"total": 100,
 	})
 }
+
+func TestUserHandler_MCPServers(t *testing.T) {
+	tester := NewUserTester(t).WithHandleFunc(func(h *UserHandler) gin.HandlerFunc {
+		return h.MCPServers
+	})
+
+	tester.mocks.user.EXPECT().MCPServers(tester.Ctx(), &types.UserMCPsReq{
+		CurrentUser: "u",
+		Owner:       "u",
+		PageOpts: types.PageOpts{
+			Page:     1,
+			PageSize: 10,
+		},
+	}).Return([]types.MCPServer{{ID: 123}}, 1, nil)
+
+	tester.WithUser().WithParam("username", "u").AddPagination(1, 10).Execute()
+
+	tester.ResponseEq(t, 200, tester.OKText, gin.H{
+		"data":  []types.MCPServer{{ID: 123}},
+		"total": 1,
+	})
+}
+
+func TestUserHandler_LikesMCPServers(t *testing.T) {
+	tester := NewUserTester(t).WithHandleFunc(func(h *UserHandler) gin.HandlerFunc {
+		return h.LikesMCPServers
+	})
+	tester.RequireUser(t)
+
+	tester.mocks.user.EXPECT().LikesMCPServers(tester.Ctx(), &types.UserMCPsReq{
+		Owner:       "foo",
+		CurrentUser: "u",
+		PageOpts: types.PageOpts{
+			Page:     1,
+			PageSize: 10,
+		},
+	}).Return([]types.MCPServer{{Name: "sp"}}, 100, nil)
+
+	tester.WithParam("username", "foo").AddPagination(1, 10).Execute()
+
+	tester.ResponseEq(t, 200, tester.OKText, gin.H{
+		"data":  []types.MCPServer{{Name: "sp"}},
+		"total": 100,
+	})
+}

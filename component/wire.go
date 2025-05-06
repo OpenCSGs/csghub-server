@@ -521,3 +521,19 @@ func initializeTestSpaceTemplateComponent(ctx context.Context, t interface {
 	)
 	return &testSpaceTemplateWithMocks{}
 }
+
+type testMCPServerWithMocks struct {
+	*mcpServerComponentImpl
+	mocks *Mocks
+}
+
+func initializeTestMCPServerComponent(ctx context.Context, t interface {
+	Cleanup(func())
+	mock.TestingT
+}) *testMCPServerWithMocks {
+	wire.Build(
+		MockSuperSet, MCPServerComponentSet,
+		wire.Struct(new(testMCPServerWithMocks), "*"),
+	)
+	return &testMCPServerWithMocks{}
+}

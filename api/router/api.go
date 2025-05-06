@@ -230,7 +230,7 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 		return nil, fmt.Errorf("error creating user proxy handler:%w", err)
 	}
 
-	createUserRoutes(apiGroup, authCollection.NeedAPIKey, userProxyHandler, userHandler)
+	createUserRoutes(apiGroup, authCollection, userProxyHandler, userHandler)
 
 	tokenGroup := apiGroup.Group("token")
 	{
@@ -251,28 +251,8 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 		apiGroup.DELETE("/user/:username/ssh_key/:name", authCollection.UserMatch, sshKeyHandler.Delete)
 	}
 
-	{
-		apiGroup.GET("/organizations", userProxyHandler.Proxy)
-		apiGroup.POST("/organizations", userProxyHandler.Proxy)
-		apiGroup.GET("/organization/:namespace", userProxyHandler.ProxyToApi("/api/v1/organization/%s", "namespace"))
-		apiGroup.PUT("/organization/:namespace", userProxyHandler.ProxyToApi("/api/v1/organization/%s", "namespace"))
-		apiGroup.DELETE("/organization/:namespace", userProxyHandler.ProxyToApi("/api/v1/organization/%s", "namespace"))
-		// Organization assets
-		apiGroup.GET("/organization/:namespace/models", orgHandler.Models)
-		apiGroup.GET("/organization/:namespace/datasets", orgHandler.Datasets)
-		apiGroup.GET("/organization/:namespace/codes", orgHandler.Codes)
-		apiGroup.GET("/organization/:namespace/spaces", orgHandler.Spaces)
-		apiGroup.GET("/organization/:namespace/collections", orgHandler.Collections)
-		apiGroup.GET("/organization/:namespace/prompts", orgHandler.Prompts)
-	}
-
-	{
-		apiGroup.GET("/organization/:namespace/members", userProxyHandler.ProxyToApi("/api/v1/organization/%s/members", "namespace"))
-		apiGroup.POST("/organization/:namespace/members", userProxyHandler.ProxyToApi("/api/v1/organization/%s/members", "namespace"))
-		apiGroup.GET("/organization/:namespace/members/:username", userProxyHandler.ProxyToApi("/api/v1/organization/%s/members/%s", "namespace", "username"))
-		apiGroup.PUT("/organization/:namespace/members/:username", userProxyHandler.ProxyToApi("/api/v1/organization/%s/members/%s", "namespace", "username"))
-		apiGroup.DELETE("/organization/:namespace/members/:username", userProxyHandler.ProxyToApi("/api/v1/organization/%s/members/%s", "namespace", "username"))
-	}
+	// Organization routes
+	createOrgRoutes(apiGroup, userProxyHandler, orgHandler)
 
 	// Tag
 	tagCtrl, err := handler.NewTagHandler(config)
@@ -294,14 +274,12 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 	apiGroup.POST("/callback/git", callbackCtrl.Handle)
 	apiGroup.GET("/callback/casdoor", userProxyHandler.Proxy)
 	// Sensive check
-	if config.SensitiveCheck.Enable {
-		sensitiveCtrl, err := handler.NewSensitiveHandler(config)
-		if err != nil {
-			return nil, fmt.Errorf("error creating sensitive handler:%w", err)
-		}
-		apiGroup.POST("/sensitive/text", sensitiveCtrl.Text)
-		apiGroup.POST("/sensitive/image", sensitiveCtrl.Image)
+	sensitiveCtrl, err := handler.NewSensitiveHandler(config)
+	if err != nil {
+		return nil, fmt.Errorf("error creating sensitive handler:%w", err)
 	}
+	apiGroup.POST("/sensitive/text", sensitiveCtrl.Text)
+	apiGroup.POST("/sensitive/image", sensitiveCtrl.Image)
 
 	// MirrorSource
 	msHandler, err := handler.NewMirrorSourceHandler(config)
@@ -379,7 +357,7 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 		return nil, fmt.Errorf("error creating runtime framework architecture handler:%w", err)
 	}
 
-	createRuntimeFrameworkRoutes(apiGroup, authCollection.NeedAPIKey, modelHandler, runtimeArchHandler, repoCommonHandler)
+	createRuntimeFrameworkRoutes(apiGroup, authCollection, modelHandler, runtimeArchHandler, repoCommonHandler)
 
 	syncHandler, err := handler.NewSyncHandler(config)
 	if err != nil {
@@ -465,6 +443,13 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 		return nil, fmt.Errorf("error creating space template proxy:%w", err)
 	}
 	createSpaceTemplateRoutes(apiGroup, authCollection, templateHandler)
+
+	// mcp server
+	mcpHandler, err := handler.NewMCPServerHandler(config)
+	if err != nil {
+		return nil, fmt.Errorf("error creating mcp server handler: %w", err)
+	}
+	CreateMCPServerRoutes(apiGroup, authCollection, mcpHandler, repoCommonHandler)
 	return r, nil
 }
 
@@ -711,8 +696,8 @@ func createSpaceRoutes(config *config.Config, apiGroup *gin.RouterGroup, spaceHa
 	}
 }
 
-func createUserRoutes(apiGroup *gin.RouterGroup, needAPIKey gin.HandlerFunc, userProxyHandler *handler.InternalServiceProxyHandler, userHandler *handler.UserHandler) {
-	// depricated
+func createUserRoutes(apiGroup *gin.RouterGroup, authCollection middleware.AuthenticatorCollection, userProxyHandler *handler.InternalServiceProxyHandler, userHandler *handler.UserHandler) {
+	// deprecated
 	{
 		apiGroup.POST("/users", userProxyHandler.ProxyToApi("/api/v1/user"))
 		apiGroup.PUT("/users/:username", userProxyHandler.ProxyToApi("/api/v1/user/%v", "username"))
@@ -733,6 +718,7 @@ func createUserRoutes(apiGroup *gin.RouterGroup, needAPIKey gin.HandlerFunc, use
 		apiGroup.GET("/user/:username/codes", userHandler.Codes)
 		apiGroup.GET("/user/:username/spaces", userHandler.Spaces)
 		apiGroup.GET("/user/:username/prompts", userHandler.Prompts)
+		apiGroup.GET("/user/:username/mcps", userHandler.MCPServers)
 		// User likes
 		apiGroup.PUT("/user/:username/likes/:repo_id", userHandler.LikesAdd)
 		apiGroup.DELETE("/user/:username/likes/:repo_id", userHandler.LikesDelete)
@@ -740,6 +726,7 @@ func createUserRoutes(apiGroup *gin.RouterGroup, needAPIKey gin.HandlerFunc, use
 		apiGroup.GET("/user/:username/likes/codes", userHandler.LikesCodes)
 		apiGroup.GET("/user/:username/likes/models", userHandler.LikesModels)
 		apiGroup.GET("/user/:username/likes/datasets", userHandler.LikesDatasets)
+		apiGroup.GET("/user/:username/likes/mcps", userHandler.LikesMCPServers)
 		apiGroup.GET("/user/:username/run/:repo_type", userHandler.GetRunDeploys)
 		apiGroup.GET("/user/:username/finetune/instances", userHandler.GetFinetuneInstances)
 		// User evaluations
@@ -755,10 +742,11 @@ func createUserRoutes(apiGroup *gin.RouterGroup, needAPIKey gin.HandlerFunc, use
 	apiGroup.GET("/user/:username/tokens", userProxyHandler.ProxyToApi("/api/v1/user/%s/tokens", "username"))
 
 	// serverless list
-	apiGroup.GET("/user/:username/run/serverless", needAPIKey, userHandler.GetRunServerless)
+	apiGroup.GET("/user/:username/run/serverless", authCollection.NeedAdmin, userHandler.GetRunServerless)
 }
 
-func createRuntimeFrameworkRoutes(apiGroup *gin.RouterGroup, needAPIKey gin.HandlerFunc, modelHandler *handler.ModelHandler, runtimeArchHandler *handler.RuntimeArchitectureHandler, repoCommonHandler *handler.RepoHandler) {
+func createRuntimeFrameworkRoutes(apiGroup *gin.RouterGroup, authCollection middleware.AuthenticatorCollection, modelHandler *handler.ModelHandler, runtimeArchHandler *handler.RuntimeArchitectureHandler, repoCommonHandler *handler.RepoHandler) {
+	needAdmin := authCollection.NeedAdmin
 	runtimeFramework := apiGroup.Group("/runtime_framework")
 	{
 		runtimeFramework.GET("/:id/models", modelHandler.ListByRuntimeFrameworkID)
@@ -770,10 +758,10 @@ func createRuntimeFrameworkRoutes(apiGroup *gin.RouterGroup, needAPIKey gin.Hand
 		runtimeFramework.DELETE("/:id/models", modelHandler.DeleteModelRuntimeFrameworks)
 		runtimeFramework.GET("/models", modelHandler.ListModelsOfRuntimeFrameworks)
 
-		runtimeFramework.GET("/:id/architecture", needAPIKey, runtimeArchHandler.ListByRuntimeFrameworkID)
-		runtimeFramework.PUT("/:id/architecture", needAPIKey, runtimeArchHandler.UpdateArchitecture)
-		runtimeFramework.DELETE("/:id/architecture", needAPIKey, runtimeArchHandler.DeleteArchitecture)
-		runtimeFramework.POST("/:id/scan", needAPIKey, runtimeArchHandler.ScanArchitecture)
+		runtimeFramework.GET("/:id/architecture", needAdmin, runtimeArchHandler.ListByRuntimeFrameworkID)
+		runtimeFramework.PUT("/:id/architecture", needAdmin, runtimeArchHandler.UpdateArchitecture)
+		runtimeFramework.DELETE("/:id/architecture", needAdmin, runtimeArchHandler.DeleteArchitecture)
+		runtimeFramework.POST("/scan", needAdmin, runtimeArchHandler.ScanArchitecture)
 	}
 }
 
@@ -906,5 +894,31 @@ func createSpaceTemplateRoutes(apiGroup *gin.RouterGroup, authCollection middlew
 		spaceTemplateGrp.PUT("/:id", authCollection.NeedAdmin, templateHandler.Update)
 		spaceTemplateGrp.DELETE("/:id", authCollection.NeedAdmin, templateHandler.Delete)
 		spaceTemplateGrp.GET("/:type", templateHandler.List)
+	}
+}
+
+func createOrgRoutes(apiGroup *gin.RouterGroup, userProxyHandler *handler.InternalServiceProxyHandler, orgHandler *handler.OrganizationHandler) {
+	{
+		apiGroup.GET("/organizations", userProxyHandler.Proxy)
+		apiGroup.POST("/organizations", userProxyHandler.Proxy)
+		apiGroup.GET("/organization/:namespace", userProxyHandler.ProxyToApi("/api/v1/organization/%s", "namespace"))
+		apiGroup.PUT("/organization/:namespace", userProxyHandler.ProxyToApi("/api/v1/organization/%s", "namespace"))
+		apiGroup.DELETE("/organization/:namespace", userProxyHandler.ProxyToApi("/api/v1/organization/%s", "namespace"))
+		// Organization assets
+		apiGroup.GET("/organization/:namespace/models", orgHandler.Models)
+		apiGroup.GET("/organization/:namespace/datasets", orgHandler.Datasets)
+		apiGroup.GET("/organization/:namespace/codes", orgHandler.Codes)
+		apiGroup.GET("/organization/:namespace/spaces", orgHandler.Spaces)
+		apiGroup.GET("/organization/:namespace/collections", orgHandler.Collections)
+		apiGroup.GET("/organization/:namespace/prompts", orgHandler.Prompts)
+		apiGroup.GET("/organization/:namespace/mcps", orgHandler.MCPServers)
+	}
+
+	{
+		apiGroup.GET("/organization/:namespace/members", userProxyHandler.ProxyToApi("/api/v1/organization/%s/members", "namespace"))
+		apiGroup.POST("/organization/:namespace/members", userProxyHandler.ProxyToApi("/api/v1/organization/%s/members", "namespace"))
+		apiGroup.GET("/organization/:namespace/members/:username", userProxyHandler.ProxyToApi("/api/v1/organization/%s/members/%s", "namespace", "username"))
+		apiGroup.PUT("/organization/:namespace/members/:username", userProxyHandler.ProxyToApi("/api/v1/organization/%s/members/%s", "namespace", "username"))
+		apiGroup.DELETE("/organization/:namespace/members/:username", userProxyHandler.ProxyToApi("/api/v1/organization/%s/members/%s", "namespace", "username"))
 	}
 }

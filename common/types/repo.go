@@ -40,12 +40,15 @@ const (
 	ResDeployID   string = "hub-deploy-id"
 	ResDeployUser string = "hub-deploy-user"
 
-	ModelRepo   RepositoryType = "model"
-	DatasetRepo RepositoryType = "dataset"
-	SpaceRepo   RepositoryType = "space"
-	CodeRepo    RepositoryType = "code"
-	PromptRepo  RepositoryType = "prompt"
-	UnknownRepo RepositoryType = ""
+	RepoTypeSuffix string = "s_"
+
+	ModelRepo     RepositoryType = "model"
+	DatasetRepo   RepositoryType = "dataset"
+	SpaceRepo     RepositoryType = "space"
+	CodeRepo      RepositoryType = "code"
+	PromptRepo    RepositoryType = "prompt"
+	MCPServerRepo RepositoryType = "mcpserver"
+	UnknownRepo   RepositoryType = ""
 
 	OpenCSGSource     RepositorySource = "opencsg"
 	LocalSource       RepositorySource = "local"
@@ -80,12 +83,16 @@ const (
 	FeatureExtraction  PipelineTask    = "feature-extraction"
 	SentenceSimilarity PipelineTask    = "sentence-similarity"
 	TaskAutoDetection  PipelineTask    = "task-auto-detection"
+	VideoText2Text     PipelineTask    = "video-text-to-text"
 	LlamaCpp           InferenceEngine = "llama.cpp"
 	TEI                InferenceEngine = "tei"
 	Ktransformers      InferenceEngine = "ktransformers"
 
 	MaxFileTreeSize int = 500
 )
+
+var Sorts = []string{"trending", "recently_update", "most_download", "most_favorite", "most_star"}
+var Sources = []string{"opencsg", "huggingface", "local"}
 
 type RepoRequest struct {
 	Namespace string `json:"namespace"`
@@ -111,6 +118,16 @@ type Tag struct {
 type Repository struct {
 	HTTPCloneURL string `json:"http_clone_url"`
 	SSHCloneURL  string `json:"ssh_clone_url"`
+}
+
+type Metadata struct {
+	ModelParams     float32        `json:"model_params"`
+	TensorType      string         `json:"tensor_type"`
+	Architecture    string         `json:"architecture"`
+	MiniGPUMemoryGB float32        `json:"mini_gpu_memory_gb"`
+	ModelType       string         `json:"model_type"`
+	ClassName       string         `json:"class_name"`
+	Quantizations   []Quantization `json:"quantizations,omitempty"`
 }
 
 type RepoPageOpts struct {
@@ -151,7 +168,6 @@ type DeployRepo struct {
 	UserID           int64      `json:"user_id,omitempty"`
 	ModelID          int64      `json:"repo_model_id,omitempty"` // for URM code logic
 	RepoID           int64      `json:"repository_id,omitempty"`
-	Provider         string     `json:"provider,omitempty"`
 	RuntimeFramework string     `json:"runtime_framework,omitempty"`
 	ContainerPort    int        `json:"container_port,omitempty"`
 	Annotation       string     `json:"annotation,omitempty"`
@@ -172,6 +188,8 @@ type DeployRepo struct {
 	ProxyEndpoint    string     `json:"proxy_endpoint,omitempty"`
 	UserUUID         string     `json:"user_uuid,omitempty"`
 	SKU              string     `json:"sku,omitempty"`
+	OrderDetailID    int64      `json:"order_detail_id,omitempty"`
+	Provider         string     `json:"provider,omitempty"`
 	ResourceType     string     `json:"resource_type,omitempty"`
 	RepoTag          string     `json:"repo_tag,omitempty"`
 	Task             string     `json:"task,omitempty"`
@@ -186,12 +204,13 @@ type RuntimeFrameworkReq struct {
 	FrameName     string `json:"frame_name"`
 	FrameVersion  string `json:"frame_version"`
 	FrameImage    string `json:"frame_image"`
-	FrameCpuImage string `json:"frame_cpu_image"`
 	Enabled       int64  `json:"enabled"`
 	ContainerPort int    `json:"container_port"`
 	Type          int    `json:"type"`
 	EngineArgs    string `json:"engine_args"`
 	CurrentUser   string `json:"-"`
+	ComputeType   string `json:"compute_type"`
+	DriverVersion string `json:"driver_version"`
 }
 
 type RuntimeFramework struct {
@@ -199,11 +218,13 @@ type RuntimeFramework struct {
 	FrameName     string `json:"frame_name"`
 	FrameVersion  string `json:"frame_version"`
 	FrameImage    string `json:"frame_image"`
-	FrameCpuImage string `json:"frame_cpu_image"`
 	Enabled       int64  `json:"enabled"`
 	ContainerPort int    `json:"container_port"`
 	Type          int    `json:"type"`
 	EngineArgs    string `json:"engine_args"`
+	ComputeType   string `json:"compute_type"`
+	DriverVersion string `json:"driver_version"`
+	Description   string `json:"description"`
 }
 
 type RuntimeFrameworkModels struct {
@@ -226,6 +247,7 @@ type RepoFilter struct {
 type TagReq struct {
 	Name     string `json:"name"`
 	Category string `json:"category"`
+	Group    string `json:"group"`
 }
 
 type RuntimeArchitecture struct {

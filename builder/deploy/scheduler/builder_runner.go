@@ -94,7 +94,7 @@ func (t *BuilderRunner) Run(ctx context.Context) error {
 		}
 		if resp.Code != 0 {
 			// job failed
-			return fmt.Errorf("image builder reported error,code:%d,msg:%s", resp.Code, resp.Message)
+			return fmt.Errorf("image builder reported error, code: %d, msg: %s", resp.Code, resp.Message)
 		}
 
 		t.buildInProgress()

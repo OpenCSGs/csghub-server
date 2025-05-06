@@ -20,6 +20,7 @@ type TagStore interface {
 	AllTags(ctx context.Context, filter *types.TagFilter) ([]*Tag, error)
 	AllModelTags(ctx context.Context) ([]*Tag, error)
 	AllPromptTags(ctx context.Context) ([]*Tag, error)
+	AllMCPTags(ctx context.Context) ([]*Tag, error)
 	AllDatasetTags(ctx context.Context) ([]*Tag, error)
 	AllCodeTags(ctx context.Context) ([]*Tag, error)
 	AllSpaceTags(ctx context.Context) ([]*Tag, error)
@@ -29,13 +30,14 @@ type TagStore interface {
 	AllDatasetCategories(ctx context.Context) ([]TagCategory, error)
 	AllCodeCategories(ctx context.Context) ([]TagCategory, error)
 	AllSpaceCategories(ctx context.Context) ([]TagCategory, error)
-	CreateTag(ctx context.Context, category, name, group string, scope types.TagScope) (Tag, error)
+	CreateTag(ctx context.Context, tag Tag) (*Tag, error)
 	SaveTags(ctx context.Context, tags []*Tag) error
 	// SetMetaTags will delete existing tags and create new ones
 	SetMetaTags(ctx context.Context, repoType types.RepositoryType, namespace, name string, tags []*Tag) (repoTags []*RepositoryTag, err error)
 	SetLibraryTag(ctx context.Context, repoType types.RepositoryType, namespace, name string, newTag, oldTag *Tag) (err error)
 	UpsertRepoTags(ctx context.Context, repoID int64, oldTagIDs, newTagIDs []int64) (err error)
 	RemoveRepoTags(ctx context.Context, repoID int64, tagIDs []int64) (err error)
+	RemoveRepoTagsByCategory(ctx context.Context, repoID int64, category []string) (err error)
 	FindOrCreate(ctx context.Context, tag Tag) (*Tag, error)
 	FindTag(ctx context.Context, name, scope, category string) (*Tag, error)
 	FindTagByID(ctx context.Context, id int64) (*Tag, error)
@@ -133,6 +135,10 @@ func (ts *tagStoreImpl) AllPromptTags(ctx context.Context) ([]*Tag, error) {
 	return ts.AllTagsByScope(ctx, types.PromptTagScope)
 }
 
+func (ts *tagStoreImpl) AllMCPTags(ctx context.Context) ([]*Tag, error) {
+	return ts.AllTagsByScope(ctx, types.MCPTagScope)
+}
+
 func (ts *tagStoreImpl) AllDatasetTags(ctx context.Context) ([]*Tag, error) {
 	return ts.AllTagsByScope(ctx, types.DatasetTagScope)
 }
@@ -179,15 +185,9 @@ func (ts *tagStoreImpl) AllCategories(ctx context.Context, scope types.TagScope)
 	return tags, nil
 }
 
-func (ts *tagStoreImpl) CreateTag(ctx context.Context, category, name, group string, scope types.TagScope) (Tag, error) {
-	tag := Tag{
-		Name:     name,
-		Category: category,
-		Group:    group,
-		Scope:    scope,
-	}
+func (ts *tagStoreImpl) CreateTag(ctx context.Context, tag Tag) (*Tag, error) {
 	_, err := ts.db.Operator.Core.NewInsert().Model(&tag).Exec(ctx)
-	return tag, err
+	return &tag, err
 }
 
 func (ts *tagStoreImpl) SaveTags(ctx context.Context, tags []*Tag) error {
@@ -355,6 +355,15 @@ func (ts *tagStoreImpl) RemoveRepoTags(ctx context.Context, repoID int64, tagIDs
 		Where("repository_id =? and tag_id in (?)", repoID, bun.In(tagIDs)).
 		Exec(ctx)
 
+	return err
+}
+
+// RemoveRepoTagsByCategory
+func (ts *tagStoreImpl) RemoveRepoTagsByCategory(ctx context.Context, repoID int64, category []string) error {
+	_, err := ts.db.Operator.Core.NewDelete().
+		Model(&RepositoryTag{}).
+		Where("repository_id =? and tag_id in (select id from tags where category in (?))", repoID, bun.In(category)).
+		Exec(ctx)
 	return err
 }
 

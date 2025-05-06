@@ -589,7 +589,7 @@ func (h *UserHandler) LikesDatasets(ctx *gin.Context) {
 	req.PageSize = per
 	ds, total, err := h.user.LikesDatasets(ctx.Request.Context(), &req)
 	if err != nil {
-		slog.Error("Failed to gat user datasets", slog.Any("error", err))
+		slog.Error("Failed to get user datasets", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
 		return
 	}
@@ -780,13 +780,6 @@ func (h *UserHandler) GetRunServerless(ctx *gin.Context) {
 		return
 	}
 
-	username := ctx.Param("username")
-	if currentUser != username {
-		slog.Warn("invalid user to list serverless", slog.String("currentUser", currentUser), slog.String("username", username))
-		httpbase.ServerError(ctx, errors.New("invalid user"))
-		return
-	}
-
 	per, page, err := common.GetPerAndPageFromContext(ctx)
 	if err != nil {
 		slog.Error("Bad request format of page and per", slog.Any("error", err))
@@ -900,4 +893,91 @@ func (h *UserHandler) GetEvaluations(ctx *gin.Context) {
 		"total": total,
 	}
 	ctx.JSON(http.StatusOK, respData)
+}
+
+// GetUserMCPs   godoc
+// @Security     ApiKey
+// @Summary      Get user mcp servers
+// @Description  Get user mcp servers
+// @Tags         User
+// @Accept       json
+// @Produce      json
+// @Param        username path string true "username"
+// @Param        per query int false "per" default(20)
+// @Param        page query int false "per page" default(1)
+// @Success      200  {object}  types.Response{data=[]types.MCPServer,total=int} "OK"
+// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
+// @Router       /user/{username}/mcps [get]
+func (h *UserHandler) MCPServers(ctx *gin.Context) {
+	var req types.UserMCPsReq
+	per, page, err := common.GetPerAndPageFromContext(ctx)
+	if err != nil {
+		slog.Error("Bad request format of page and per", "error", err)
+		httpbase.BadRequest(ctx, err.Error())
+		return
+	}
+
+	req.Owner = ctx.Param("username")
+	req.CurrentUser = httpbase.GetCurrentUser(ctx)
+	req.Page = page
+	req.PageSize = per
+	mcps, total, err := h.user.MCPServers(ctx.Request.Context(), &req)
+	if err != nil {
+		slog.Error("Failed to get user mcp servers", slog.Any("error", err), slog.Any("req", req))
+		httpbase.ServerError(ctx, err)
+		return
+	}
+
+	respData := gin.H{
+		"data":  mcps,
+		"total": total,
+	}
+
+	httpbase.OK(ctx, respData)
+}
+
+// GetUserLikesMCPServers godoc
+// @Security     ApiKey
+// @Summary      Get user likes mcp servers
+// @Description  get user likes mcp servers
+// @Tags         User
+// @Accept       json
+// @Produce      json
+// @Param        username path string true "username"
+// @Success      200  {object}  types.ResponseWithTotal{data=[]types.MCPServer,total=int} "OK"
+// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
+// @Router       /user/{username}/likes/mcps [get]
+func (h *UserHandler) LikesMCPServers(ctx *gin.Context) {
+	currentUser := httpbase.GetCurrentUser(ctx)
+	if currentUser == "" {
+		httpbase.UnauthorizedError(ctx, component.ErrUserNotFound)
+		return
+	}
+	var req types.UserMCPsReq
+	per, page, err := common.GetPerAndPageFromContext(ctx)
+	if err != nil {
+		slog.Error("Bad request format of page and per", "error", err)
+		httpbase.BadRequest(ctx, err.Error())
+		return
+	}
+
+	req.Owner = ctx.Param("username")
+	req.CurrentUser = currentUser
+	req.Page = page
+	req.PageSize = per
+	data, total, err := h.user.LikesMCPServers(ctx.Request.Context(), &req)
+	if err != nil {
+		slog.Error("Failed to get user likes mcp servers", slog.Any("error", err), slog.Any("req", req))
+		httpbase.ServerError(ctx, err)
+		return
+	}
+
+	respData := gin.H{
+		"data":  data,
+		"total": total,
+	}
+
+	httpbase.OK(ctx, respData)
 }

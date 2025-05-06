@@ -224,6 +224,10 @@ func (d *deployer) Status(ctx context.Context, dr types.DeployRepo, needDetails 
 		return "", common.Stopped, nil, fmt.Errorf("can't get deploy, %w", err)
 	}
 	svcName := deploy.SvcName
+	if deploy.Status == common.Pending {
+		//if deploy is pending, no need to check ksvc status
+		return svcName, common.Pending, nil, nil
+	}
 	svc, err := d.imageRunner.Exist(ctx, &types.CheckRequest{
 		SvcName:   svcName,
 		ClusterID: deploy.ClusterID,
@@ -337,11 +341,10 @@ func (d *deployer) Wakeup(ctx context.Context, dr types.DeployRepo) error {
 	defer resp.Body.Close()
 
 	// Check if the request was successful
-	if resp.StatusCode == http.StatusOK {
-		return nil
-	} else {
+	if resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("space endpoint status not ok, status:%d", resp.StatusCode)
 	}
+	return nil
 }
 
 func (d *deployer) Exist(ctx context.Context, dr types.DeployRepo) (bool, error) {
@@ -506,7 +509,7 @@ func (d *deployer) UpdateDeploy(ctx context.Context, dur *types.DeployUpdateReq,
 
 	if frame != nil {
 		// choose image
-		containerImg := containerImage(hardware, frame)
+		containerImg := frame.FrameImage
 		deploy.ImageID = containerImg
 		deploy.RuntimeFramework = frame.FrameName
 		deploy.ContainerPort = frame.ContainerPort
@@ -739,12 +742,37 @@ func CheckResource(clusterResources *types.ClusterRes, hardware *types.HardWare)
 		slog.Error("failed to parse hardware memory ", slog.Any("error", err))
 		return false
 	}
+	if hardware.Replicas > 1 {
+		return checkMultiNodeResource(mem, clusterResources, hardware)
+	} else {
+		return checkSingleNodeResource(mem, clusterResources, hardware)
+	}
+}
+
+// check reousrce for sigle node
+func checkSingleNodeResource(mem int, clusterResources *types.ClusterRes, hardware *types.HardWare) bool {
 	for _, node := range clusterResources.Resources {
 		if float32(mem) <= node.AvailableMem {
 			isAvailable := checkNodeResource(node, hardware)
 			if isAvailable {
 				// if true return, otherwise continue check next node
 				return true
+			}
+		}
+	}
+	return false
+}
+
+func checkMultiNodeResource(mem int, clusterResources *types.ClusterRes, hardware *types.HardWare) bool {
+	ready := 0
+	for _, node := range clusterResources.Resources {
+		if float32(mem) <= node.AvailableMem {
+			isAvailable := checkNodeResource(node, hardware)
+			if isAvailable {
+				ready++
+				if ready >= hardware.Replicas {
+					return true
+				}
 			}
 		}
 	}
@@ -761,7 +789,7 @@ func (d *deployer) SubmitEvaluation(ctx context.Context, req types.EvaluationReq
 	env["ACCESS_TOKEN"] = req.Token
 	env["HF_ENDPOINT"] = req.DownloadEndpoint
 
-	updateEvaluationEnvHardware(env, req)
+	common.UpdateEvaluationEnvHardware(env, req.Hardware)
 
 	templates := []types.ArgoFlowTemplate{}
 	templates = append(templates, types.ArgoFlowTemplate{

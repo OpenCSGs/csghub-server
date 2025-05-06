@@ -69,6 +69,160 @@ func (_c *MockRuntimeArchitecturesStore_Add_Call) RunAndReturn(run func(context.
 	return _c
 }
 
+// BatchAdd provides a mock function with given fields: ctx, archs
+func (_m *MockRuntimeArchitecturesStore) BatchAdd(ctx context.Context, archs []database.RuntimeArchitecture) error {
+	ret := _m.Called(ctx, archs)
+
+	if len(ret) == 0 {
+		panic("no return value specified for BatchAdd")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, []database.RuntimeArchitecture) error); ok {
+		r0 = rf(ctx, archs)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// MockRuntimeArchitecturesStore_BatchAdd_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'BatchAdd'
+type MockRuntimeArchitecturesStore_BatchAdd_Call struct {
+	*mock.Call
+}
+
+// BatchAdd is a helper method to define mock.On call
+//   - ctx context.Context
+//   - archs []database.RuntimeArchitecture
+func (_e *MockRuntimeArchitecturesStore_Expecter) BatchAdd(ctx interface{}, archs interface{}) *MockRuntimeArchitecturesStore_BatchAdd_Call {
+	return &MockRuntimeArchitecturesStore_BatchAdd_Call{Call: _e.mock.On("BatchAdd", ctx, archs)}
+}
+
+func (_c *MockRuntimeArchitecturesStore_BatchAdd_Call) Run(run func(ctx context.Context, archs []database.RuntimeArchitecture)) *MockRuntimeArchitecturesStore_BatchAdd_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].([]database.RuntimeArchitecture))
+	})
+	return _c
+}
+
+func (_c *MockRuntimeArchitecturesStore_BatchAdd_Call) Return(_a0 error) *MockRuntimeArchitecturesStore_BatchAdd_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockRuntimeArchitecturesStore_BatchAdd_Call) RunAndReturn(run func(context.Context, []database.RuntimeArchitecture) error) *MockRuntimeArchitecturesStore_BatchAdd_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// CheckEngineByArchModelNameAndType provides a mock function with given fields: ctx, archs, modelName, format, deployType
+func (_m *MockRuntimeArchitecturesStore) CheckEngineByArchModelNameAndType(ctx context.Context, archs []string, modelName string, format string, deployType int) (bool, error) {
+	ret := _m.Called(ctx, archs, modelName, format, deployType)
+
+	if len(ret) == 0 {
+		panic("no return value specified for CheckEngineByArchModelNameAndType")
+	}
+
+	var r0 bool
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, []string, string, string, int) (bool, error)); ok {
+		return rf(ctx, archs, modelName, format, deployType)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, []string, string, string, int) bool); ok {
+		r0 = rf(ctx, archs, modelName, format, deployType)
+	} else {
+		r0 = ret.Get(0).(bool)
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, []string, string, string, int) error); ok {
+		r1 = rf(ctx, archs, modelName, format, deployType)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockRuntimeArchitecturesStore_CheckEngineByArchModelNameAndType_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'CheckEngineByArchModelNameAndType'
+type MockRuntimeArchitecturesStore_CheckEngineByArchModelNameAndType_Call struct {
+	*mock.Call
+}
+
+// CheckEngineByArchModelNameAndType is a helper method to define mock.On call
+//   - ctx context.Context
+//   - archs []string
+//   - modelName string
+//   - format string
+//   - deployType int
+func (_e *MockRuntimeArchitecturesStore_Expecter) CheckEngineByArchModelNameAndType(ctx interface{}, archs interface{}, modelName interface{}, format interface{}, deployType interface{}) *MockRuntimeArchitecturesStore_CheckEngineByArchModelNameAndType_Call {
+	return &MockRuntimeArchitecturesStore_CheckEngineByArchModelNameAndType_Call{Call: _e.mock.On("CheckEngineByArchModelNameAndType", ctx, archs, modelName, format, deployType)}
+}
+
+func (_c *MockRuntimeArchitecturesStore_CheckEngineByArchModelNameAndType_Call) Run(run func(ctx context.Context, archs []string, modelName string, format string, deployType int)) *MockRuntimeArchitecturesStore_CheckEngineByArchModelNameAndType_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].([]string), args[2].(string), args[3].(string), args[4].(int))
+	})
+	return _c
+}
+
+func (_c *MockRuntimeArchitecturesStore_CheckEngineByArchModelNameAndType_Call) Return(_a0 bool, _a1 error) *MockRuntimeArchitecturesStore_CheckEngineByArchModelNameAndType_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockRuntimeArchitecturesStore_CheckEngineByArchModelNameAndType_Call) RunAndReturn(run func(context.Context, []string, string, string, int) (bool, error)) *MockRuntimeArchitecturesStore_CheckEngineByArchModelNameAndType_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// DeleteByRuntimeID provides a mock function with given fields: ctx, id
+func (_m *MockRuntimeArchitecturesStore) DeleteByRuntimeID(ctx context.Context, id int64) error {
+	ret := _m.Called(ctx, id)
+
+	if len(ret) == 0 {
+		panic("no return value specified for DeleteByRuntimeID")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, int64) error); ok {
+		r0 = rf(ctx, id)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// MockRuntimeArchitecturesStore_DeleteByRuntimeID_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'DeleteByRuntimeID'
+type MockRuntimeArchitecturesStore_DeleteByRuntimeID_Call struct {
+	*mock.Call
+}
+
+// DeleteByRuntimeID is a helper method to define mock.On call
+//   - ctx context.Context
+//   - id int64
+func (_e *MockRuntimeArchitecturesStore_Expecter) DeleteByRuntimeID(ctx interface{}, id interface{}) *MockRuntimeArchitecturesStore_DeleteByRuntimeID_Call {
+	return &MockRuntimeArchitecturesStore_DeleteByRuntimeID_Call{Call: _e.mock.On("DeleteByRuntimeID", ctx, id)}
+}
+
+func (_c *MockRuntimeArchitecturesStore_DeleteByRuntimeID_Call) Run(run func(ctx context.Context, id int64)) *MockRuntimeArchitecturesStore_DeleteByRuntimeID_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(int64))
+	})
+	return _c
+}
+
+func (_c *MockRuntimeArchitecturesStore_DeleteByRuntimeID_Call) Return(_a0 error) *MockRuntimeArchitecturesStore_DeleteByRuntimeID_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockRuntimeArchitecturesStore_DeleteByRuntimeID_Call) RunAndReturn(run func(context.Context, int64) error) *MockRuntimeArchitecturesStore_DeleteByRuntimeID_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // DeleteByRuntimeIDAndArchName provides a mock function with given fields: ctx, id, archName
 func (_m *MockRuntimeArchitecturesStore) DeleteByRuntimeIDAndArchName(ctx context.Context, id int64, archName string) error {
 	ret := _m.Called(ctx, id, archName)
@@ -177,29 +331,29 @@ func (_c *MockRuntimeArchitecturesStore_FindByRuntimeIDAndArchName_Call) RunAndR
 	return _c
 }
 
-// GetRuntimeByModelName provides a mock function with given fields: ctx, archName, modelName
-func (_m *MockRuntimeArchitecturesStore) GetRuntimeByModelName(ctx context.Context, archName string, modelName string) ([]database.RuntimeArchitecture, error) {
-	ret := _m.Called(ctx, archName, modelName)
+// ListByArchNameAndModel provides a mock function with given fields: ctx, archs, modelName
+func (_m *MockRuntimeArchitecturesStore) ListByArchNameAndModel(ctx context.Context, archs []string, modelName string) ([]database.RuntimeArchitecture, error) {
+	ret := _m.Called(ctx, archs, modelName)
 
 	if len(ret) == 0 {
-		panic("no return value specified for GetRuntimeByModelName")
+		panic("no return value specified for ListByArchNameAndModel")
 	}
 
 	var r0 []database.RuntimeArchitecture
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, string) ([]database.RuntimeArchitecture, error)); ok {
-		return rf(ctx, archName, modelName)
+	if rf, ok := ret.Get(0).(func(context.Context, []string, string) ([]database.RuntimeArchitecture, error)); ok {
+		return rf(ctx, archs, modelName)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, string, string) []database.RuntimeArchitecture); ok {
-		r0 = rf(ctx, archName, modelName)
+	if rf, ok := ret.Get(0).(func(context.Context, []string, string) []database.RuntimeArchitecture); ok {
+		r0 = rf(ctx, archs, modelName)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).([]database.RuntimeArchitecture)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, string, string) error); ok {
-		r1 = rf(ctx, archName, modelName)
+	if rf, ok := ret.Get(1).(func(context.Context, []string, string) error); ok {
+		r1 = rf(ctx, archs, modelName)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -207,32 +361,32 @@ func (_m *MockRuntimeArchitecturesStore) GetRuntimeByModelName(ctx context.Conte
 	return r0, r1
 }
 
-// MockRuntimeArchitecturesStore_GetRuntimeByModelName_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetRuntimeByModelName'
-type MockRuntimeArchitecturesStore_GetRuntimeByModelName_Call struct {
+// MockRuntimeArchitecturesStore_ListByArchNameAndModel_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ListByArchNameAndModel'
+type MockRuntimeArchitecturesStore_ListByArchNameAndModel_Call struct {
 	*mock.Call
 }
 
-// GetRuntimeByModelName is a helper method to define mock.On call
+// ListByArchNameAndModel is a helper method to define mock.On call
 //   - ctx context.Context
-//   - archName string
+//   - archs []string
 //   - modelName string
-func (_e *MockRuntimeArchitecturesStore_Expecter) GetRuntimeByModelName(ctx interface{}, archName interface{}, modelName interface{}) *MockRuntimeArchitecturesStore_GetRuntimeByModelName_Call {
-	return &MockRuntimeArchitecturesStore_GetRuntimeByModelName_Call{Call: _e.mock.On("GetRuntimeByModelName", ctx, archName, modelName)}
+func (_e *MockRuntimeArchitecturesStore_Expecter) ListByArchNameAndModel(ctx interface{}, archs interface{}, modelName interface{}) *MockRuntimeArchitecturesStore_ListByArchNameAndModel_Call {
+	return &MockRuntimeArchitecturesStore_ListByArchNameAndModel_Call{Call: _e.mock.On("ListByArchNameAndModel", ctx, archs, modelName)}
 }
 
-func (_c *MockRuntimeArchitecturesStore_GetRuntimeByModelName_Call) Run(run func(ctx context.Context, archName string, modelName string)) *MockRuntimeArchitecturesStore_GetRuntimeByModelName_Call {
+func (_c *MockRuntimeArchitecturesStore_ListByArchNameAndModel_Call) Run(run func(ctx context.Context, archs []string, modelName string)) *MockRuntimeArchitecturesStore_ListByArchNameAndModel_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(string), args[2].(string))
+		run(args[0].(context.Context), args[1].([]string), args[2].(string))
 	})
 	return _c
 }
 
-func (_c *MockRuntimeArchitecturesStore_GetRuntimeByModelName_Call) Return(_a0 []database.RuntimeArchitecture, _a1 error) *MockRuntimeArchitecturesStore_GetRuntimeByModelName_Call {
+func (_c *MockRuntimeArchitecturesStore_ListByArchNameAndModel_Call) Return(_a0 []database.RuntimeArchitecture, _a1 error) *MockRuntimeArchitecturesStore_ListByArchNameAndModel_Call {
 	_c.Call.Return(_a0, _a1)
 	return _c
 }
 
-func (_c *MockRuntimeArchitecturesStore_GetRuntimeByModelName_Call) RunAndReturn(run func(context.Context, string, string) ([]database.RuntimeArchitecture, error)) *MockRuntimeArchitecturesStore_GetRuntimeByModelName_Call {
+func (_c *MockRuntimeArchitecturesStore_ListByArchNameAndModel_Call) RunAndReturn(run func(context.Context, []string, string) ([]database.RuntimeArchitecture, error)) *MockRuntimeArchitecturesStore_ListByArchNameAndModel_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -292,66 +446,6 @@ func (_c *MockRuntimeArchitecturesStore_ListByRArchName_Call) Return(_a0 []datab
 }
 
 func (_c *MockRuntimeArchitecturesStore_ListByRArchName_Call) RunAndReturn(run func(context.Context, string) ([]database.RuntimeArchitecture, error)) *MockRuntimeArchitecturesStore_ListByRArchName_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
-// ListByRArchNameAndModel provides a mock function with given fields: ctx, archName, modelName
-func (_m *MockRuntimeArchitecturesStore) ListByRArchNameAndModel(ctx context.Context, archName string, modelName string) ([]database.RuntimeArchitecture, error) {
-	ret := _m.Called(ctx, archName, modelName)
-
-	if len(ret) == 0 {
-		panic("no return value specified for ListByRArchNameAndModel")
-	}
-
-	var r0 []database.RuntimeArchitecture
-	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, string) ([]database.RuntimeArchitecture, error)); ok {
-		return rf(ctx, archName, modelName)
-	}
-	if rf, ok := ret.Get(0).(func(context.Context, string, string) []database.RuntimeArchitecture); ok {
-		r0 = rf(ctx, archName, modelName)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]database.RuntimeArchitecture)
-		}
-	}
-
-	if rf, ok := ret.Get(1).(func(context.Context, string, string) error); ok {
-		r1 = rf(ctx, archName, modelName)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
-// MockRuntimeArchitecturesStore_ListByRArchNameAndModel_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ListByRArchNameAndModel'
-type MockRuntimeArchitecturesStore_ListByRArchNameAndModel_Call struct {
-	*mock.Call
-}
-
-// ListByRArchNameAndModel is a helper method to define mock.On call
-//   - ctx context.Context
-//   - archName string
-//   - modelName string
-func (_e *MockRuntimeArchitecturesStore_Expecter) ListByRArchNameAndModel(ctx interface{}, archName interface{}, modelName interface{}) *MockRuntimeArchitecturesStore_ListByRArchNameAndModel_Call {
-	return &MockRuntimeArchitecturesStore_ListByRArchNameAndModel_Call{Call: _e.mock.On("ListByRArchNameAndModel", ctx, archName, modelName)}
-}
-
-func (_c *MockRuntimeArchitecturesStore_ListByRArchNameAndModel_Call) Run(run func(ctx context.Context, archName string, modelName string)) *MockRuntimeArchitecturesStore_ListByRArchNameAndModel_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(string), args[2].(string))
-	})
-	return _c
-}
-
-func (_c *MockRuntimeArchitecturesStore_ListByRArchNameAndModel_Call) Return(_a0 []database.RuntimeArchitecture, _a1 error) *MockRuntimeArchitecturesStore_ListByRArchNameAndModel_Call {
-	_c.Call.Return(_a0, _a1)
-	return _c
-}
-
-func (_c *MockRuntimeArchitecturesStore_ListByRArchNameAndModel_Call) RunAndReturn(run func(context.Context, string, string) ([]database.RuntimeArchitecture, error)) *MockRuntimeArchitecturesStore_ListByRArchNameAndModel_Call {
 	_c.Call.Return(run)
 	return _c
 }
