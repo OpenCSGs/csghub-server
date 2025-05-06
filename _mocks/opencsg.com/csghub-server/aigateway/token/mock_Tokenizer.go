@@ -31,16 +31,16 @@ func (_m *MockTokenizer) EmbeddingEncode(_a0 string) (int64, error) {
 
 	var r0 int64
 	var r1 error
-	if rf, ok := ret.Get(0).(func(types.Message) (int64, error)); ok {
+	if rf, ok := ret.Get(0).(func(string) (int64, error)); ok {
 		return rf(_a0)
 	}
-	if rf, ok := ret.Get(0).(func(types.Message) int64); ok {
+	if rf, ok := ret.Get(0).(func(string) int64); ok {
 		r0 = rf(_a0)
 	} else {
 		r0 = ret.Get(0).(int64)
 	}
 
-	if rf, ok := ret.Get(1).(func(types.Message) error); ok {
+	if rf, ok := ret.Get(1).(func(string) error); ok {
 		r1 = rf(_a0)
 	} else {
 		r1 = ret.Error(1)
