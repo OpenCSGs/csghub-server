@@ -926,7 +926,7 @@ func (d *deployer) startSyncDeployStatus() {
 		req.Page = 1
 		req.PageSize = 300
 		for {
-			deploys, _, err := d.deployTaskStore.ListAllDeploys(ctx, req)
+			deploys, _, err := d.deployTaskStore.ListAllDeploys(ctx, req, true)
 			if err != nil {
 				slog.Error("fail to list deploys", slog.Any("error", err))
 				break

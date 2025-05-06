@@ -757,9 +757,9 @@ func (_c *MockDeployTaskStore_ListAllDeployByUID_Call) RunAndReturn(run func(con
 	return _c
 }
 
-// ListAllDeploys provides a mock function with given fields: ctx, req
-func (_m *MockDeployTaskStore) ListAllDeploys(ctx context.Context, req types.DeployReq) ([]database.Deploy, int, error) {
-	ret := _m.Called(ctx, req)
+// ListAllDeploys provides a mock function with given fields: ctx, req, isActive
+func (_m *MockDeployTaskStore) ListAllDeploys(ctx context.Context, req types.DeployReq, isActive bool) ([]database.Deploy, int, error) {
+	ret := _m.Called(ctx, req, isActive)
 
 	if len(ret) == 0 {
 		panic("no return value specified for ListAllDeploys")
@@ -768,25 +768,25 @@ func (_m *MockDeployTaskStore) ListAllDeploys(ctx context.Context, req types.Dep
 	var r0 []database.Deploy
 	var r1 int
 	var r2 error
-	if rf, ok := ret.Get(0).(func(context.Context, types.DeployReq) ([]database.Deploy, int, error)); ok {
-		return rf(ctx, req)
+	if rf, ok := ret.Get(0).(func(context.Context, types.DeployReq, bool) ([]database.Deploy, int, error)); ok {
+		return rf(ctx, req, isActive)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, types.DeployReq) []database.Deploy); ok {
-		r0 = rf(ctx, req)
+	if rf, ok := ret.Get(0).(func(context.Context, types.DeployReq, bool) []database.Deploy); ok {
+		r0 = rf(ctx, req, isActive)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).([]database.Deploy)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, types.DeployReq) int); ok {
-		r1 = rf(ctx, req)
+	if rf, ok := ret.Get(1).(func(context.Context, types.DeployReq, bool) int); ok {
+		r1 = rf(ctx, req, isActive)
 	} else {
 		r1 = ret.Get(1).(int)
 	}
 
-	if rf, ok := ret.Get(2).(func(context.Context, types.DeployReq) error); ok {
-		r2 = rf(ctx, req)
+	if rf, ok := ret.Get(2).(func(context.Context, types.DeployReq, bool) error); ok {
+		r2 = rf(ctx, req, isActive)
 	} else {
 		r2 = ret.Error(2)
 	}
@@ -802,13 +802,14 @@ type MockDeployTaskStore_ListAllDeploys_Call struct {
 // ListAllDeploys is a helper method to define mock.On call
 //   - ctx context.Context
 //   - req types.DeployReq
-func (_e *MockDeployTaskStore_Expecter) ListAllDeploys(ctx interface{}, req interface{}) *MockDeployTaskStore_ListAllDeploys_Call {
-	return &MockDeployTaskStore_ListAllDeploys_Call{Call: _e.mock.On("ListAllDeploys", ctx, req)}
+//   - isActive bool
+func (_e *MockDeployTaskStore_Expecter) ListAllDeploys(ctx interface{}, req interface{}, isActive interface{}) *MockDeployTaskStore_ListAllDeploys_Call {
+	return &MockDeployTaskStore_ListAllDeploys_Call{Call: _e.mock.On("ListAllDeploys", ctx, req, isActive)}
 }
 
-func (_c *MockDeployTaskStore_ListAllDeploys_Call) Run(run func(ctx context.Context, req types.DeployReq)) *MockDeployTaskStore_ListAllDeploys_Call {
+func (_c *MockDeployTaskStore_ListAllDeploys_Call) Run(run func(ctx context.Context, req types.DeployReq, isActive bool)) *MockDeployTaskStore_ListAllDeploys_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(types.DeployReq))
+		run(args[0].(context.Context), args[1].(types.DeployReq), args[2].(bool))
 	})
 	return _c
 }
@@ -818,7 +819,7 @@ func (_c *MockDeployTaskStore_ListAllDeploys_Call) Return(_a0 []database.Deploy,
 	return _c
 }
 
-func (_c *MockDeployTaskStore_ListAllDeploys_Call) RunAndReturn(run func(context.Context, types.DeployReq) ([]database.Deploy, int, error)) *MockDeployTaskStore_ListAllDeploys_Call {
+func (_c *MockDeployTaskStore_ListAllDeploys_Call) RunAndReturn(run func(context.Context, types.DeployReq, bool) ([]database.Deploy, int, error)) *MockDeployTaskStore_ListAllDeploys_Call {
 	_c.Call.Return(run)
 	return _c
 }

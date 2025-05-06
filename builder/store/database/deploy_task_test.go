@@ -382,3 +382,98 @@ func TestDeployTaskStore_RunningVisibleToUser(t *testing.T) {
 	require.Equal(t, deploy4.ID, deploys[1].ID)
 	require.Equal(t, deploy5.ID, deploys[2].ID)
 }
+
+func TestDeployTaskStore_ListAllDeploys(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+	ctx := context.TODO()
+
+	store := database.NewDeployTaskStoreWithDB(db)
+	// user 1 's public dedicated inference
+	deploy1 := database.Deploy{
+		ID:          1,
+		DeployName:  "deploy1",
+		SvcName:     "svc1",
+		RepoID:      1,
+		UserID:      1,
+		Type:        1,
+		SecureLevel: 1,
+		Status:      common.Running,
+	}
+	// user 2 's public fintune
+	deploy2 := database.Deploy{
+		ID:          2,
+		DeployName:  "deploy2",
+		SvcName:     "svc2",
+		RepoID:      2,
+		UserID:      2,
+		Type:        2,
+		SecureLevel: 1,
+		Status:      common.Running,
+	}
+	// user 1 's private dedicated inference
+	deploy3 := database.Deploy{
+		ID:          3,
+		DeployName:  "deploy3",
+		SvcName:     "svc3",
+		RepoID:      3,
+		UserID:      1,
+		Type:        1,
+		SecureLevel: 1,
+		Status:      common.Deleted,
+	}
+	// user 2 's public dedicated inference
+	deploy4 := database.Deploy{
+		ID:          4,
+		DeployName:  "deploy4",
+		SvcName:     "svc4",
+		RepoID:      4,
+		UserID:      2,
+		Type:        1,
+		SecureLevel: 1,
+		Status:      common.Running,
+	}
+	// user 3 's serverless inference
+	deploy5 := database.Deploy{
+		ID:          5,
+		DeployName:  "deploy5",
+		SvcName:     "svc5",
+		RepoID:      5,
+		UserID:      3,
+		Type:        3,
+		SecureLevel: 1,
+		Status:      common.Deleted,
+	}
+	// user 3 's serverless inference not running
+	deploy6 := database.Deploy{
+		ID:          6,
+		DeployName:  "deploy6",
+		SvcName:     "svc6",
+		RepoID:      6,
+		UserID:      3,
+		Type:        3,
+		SecureLevel: 1,
+		Status:      common.Stopped,
+	}
+
+	// Insert test data into the database
+	err := store.CreateDeploy(ctx, &deploy1)
+	require.Nil(t, err)
+	err = store.CreateDeploy(ctx, &deploy2)
+	require.Nil(t, err)
+	err = store.CreateDeploy(ctx, &deploy3)
+	require.Nil(t, err)
+	err = store.CreateDeploy(ctx, &deploy4)
+	require.Nil(t, err)
+	err = store.CreateDeploy(ctx, &deploy5)
+	require.Nil(t, err)
+	err = store.CreateDeploy(ctx, &deploy6)
+	require.Nil(t, err)
+	var req types.DeployReq
+	req.Page = 1
+	req.PageSize = 300
+	_, total, err := store.ListAllDeploys(ctx, req, true)
+	require.Nil(t, err)
+	require.Equal(t, total, 4)
+
+}

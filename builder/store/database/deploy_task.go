@@ -98,7 +98,7 @@ type DeployTaskStore interface {
 	ListServerless(ctx context.Context, req types.DeployReq) ([]Deploy, int, error)
 	GetRunningInferenceAndFinetuneByUserID(ctx context.Context, userID int64) ([]Deploy, error)
 	ListAllDeployByUID(ctx context.Context, userID int64) ([]Deploy, error)
-	ListAllDeploys(ctx context.Context, req types.DeployReq) ([]Deploy, int, error)
+	ListAllDeploys(ctx context.Context, req types.DeployReq, isActive bool) ([]Deploy, int, error)
 	RunningVisibleToUser(ctx context.Context, userID int64) ([]Deploy, error)
 }
 
@@ -318,6 +318,7 @@ func (s *deployTaskStoreImpl) GetServerlessDeployByRepID(ctx context.Context, re
 func (s *deployTaskStoreImpl) ListServerless(ctx context.Context, req types.DeployReq) ([]Deploy, int, error) {
 	var result []Deploy
 	query := s.db.Operator.Core.NewSelect().Model(&result).Where("type = ?", req.DeployType)
+	query = query.Where("status != ?", common.Deleted)
 	query = query.Limit(req.PageSize).Offset((req.Page - 1) * req.PageSize)
 	_, err := query.Exec(ctx, &result)
 	if err != nil {
@@ -400,9 +401,12 @@ func (s *deployTaskStoreImpl) RunningVisibleToUser(ctx context.Context, userID i
 }
 
 // list all deploy
-func (s *deployTaskStoreImpl) ListAllDeploys(ctx context.Context, req types.DeployReq) ([]Deploy, int, error) {
+func (s *deployTaskStoreImpl) ListAllDeploys(ctx context.Context, req types.DeployReq, isActive bool) ([]Deploy, int, error) {
 	var result []Deploy
 	query := s.db.Operator.Core.NewSelect().Model(&result)
+	if isActive {
+		query = query.Where("status != ?", common.Deleted)
+	}
 	query = query.Limit(req.PageSize).Offset((req.Page - 1) * req.PageSize)
 	_, err := query.Exec(ctx, &result)
 	if err != nil {
