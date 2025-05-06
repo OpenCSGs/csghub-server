@@ -1,10 +1,12 @@
 package types
 
 // refer to https://github.com/openai/openai-go/blob/main/chatcompletion.go#L1219
+// refer to https://github.com/go-deepseek/deepseek/blob/main/response/response.go
 type Message struct {
-	Role    string `json:"role,omitempty"`
-	Content any    `json:"content,omitempty"`
-	Name    string `json:"name,omitempty"`
+	Role             string `json:"role,omitempty"`
+	Name             string `json:"name,omitempty"`
+	Content          any    `json:"content,omitempty"`
+	ReasoningContent string `json:"reasoning_content"`
 }
 
 func (m Message) IsStringContent() bool {

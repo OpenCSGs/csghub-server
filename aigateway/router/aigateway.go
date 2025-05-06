@@ -17,13 +17,30 @@ func NewRouter(config *config.Config) (*gin.Engine, error) {
 	r.Use(middleware.Authenticator(config))
 	mustLogin := middleware.MustLogin()
 
-	handler, err := handler.NewOpenAIHandlerFromConfig(config)
-	if err != nil {
-		return nil, fmt.Errorf("error creating openai handler from config:%w", err)
-	}
-	r.GET("/v1/models", mustLogin, handler.ListModels)
-	r.GET("/v1/models/:model", mustLogin, handler.GetModel)
-	r.POST("/v1/chat/completions", mustLogin, handler.Chat)
+	v1Group := r.Group("/v1")
 
+	openAIhandler, err := handler.NewOpenAIHandlerFromConfig(config)
+	if err != nil {
+		return nil, fmt.Errorf("error creating openai handler :%w", err)
+	}
+	v1Group.GET("/models", mustLogin, openAIhandler.ListModels)
+	v1Group.GET("/models/:model", mustLogin, openAIhandler.GetModel)
+	v1Group.POST("/chat/completions", mustLogin, openAIhandler.Chat)
+	v1Group.POST("/embeddings", mustLogin, openAIhandler.Embedding)
+
+	mcpProxy, err := handler.NewMCPProxyHandler(config)
+	if err != nil {
+		return nil, fmt.Errorf("error creating mcp proxy handler :%w", err)
+	}
+	CreateMCPRoute(v1Group, mcpProxy)
 	return r, nil
+}
+
+func CreateMCPRoute(v1Group *gin.RouterGroup, mcpProxy handler.MCPProxyHandler) {
+	mcpGroup := v1Group.Group("mcp")
+	mcpGroup.GET("/servers", mcpProxy.List)
+
+	// todo: enable mcp server proxy later
+	// mcpGroup.GET("/:servicename/sse", mcpProxy.ProxyToApi("/sse"))
+	// mcpGroup.Any("/:servicename/messages/", mcpProxy.ProxyToApi("/messages/"))
 }

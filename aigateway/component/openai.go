@@ -19,7 +19,7 @@ import (
 type OpenAIComponent interface {
 	GetAvailableModels(c context.Context, user string) ([]types.Model, error)
 	GetModelByID(c context.Context, username, modelID string) (*types.Model, error)
-	RecordUsage(c context.Context, userUUID string, model *types.Model, tokenCounter token.LLMTokenCounter) error
+	RecordUsage(c context.Context, userUUID string, model *types.Model, tokenCounter token.Counter) error
 }
 
 type openaiComponentImpl struct {
@@ -109,7 +109,7 @@ func getSceneFromSvcType(svcType int) int {
 	}
 }
 
-func (m *openaiComponentImpl) RecordUsage(c context.Context, userUUID string, model *types.Model, counter token.LLMTokenCounter) error {
+func (m *openaiComponentImpl) RecordUsage(c context.Context, userUUID string, model *types.Model, counter token.Counter) error {
 	usage, err := counter.Usage()
 	if err != nil {
 		return fmt.Errorf("failed to get token usage from counter,error:%w", err)

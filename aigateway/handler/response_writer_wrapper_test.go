@@ -8,8 +8,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/openai/openai-go"
 	"github.com/stretchr/testify/assert"
-	mockhd "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/aigateway/handler"
-	mockrpc "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/rpc"
+	rpcmock "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/rpc"
 )
 
 func TestResponseWriterWrapper_StreamWrite(t *testing.T) {
@@ -77,13 +76,17 @@ func TestResponseWriterWrapper_StreamWrite_WithWhiteSpace(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			writer := mockhd.NewMockCommonResponseWriter(t)
-			moderationClient := mockrpc.NewMockModerationSvcClient(t)
-			writer.EXPECT().WithModeration(moderationClient).Return()
-			writer.WithModeration(moderationClient)
-			writer.EXPECT().Write(tt.inputs).Return(len(tt.inputs), nil)
-			_, _ = writer.Write(tt.inputs)
-			moderationClient.AssertNotCalled(t, "PassStreamCheck")
+			w := httptest.NewRecorder()
+			ctx, _ := gin.CreateTestContext(w)
+			wrapper := NewResponseWriterWrapper(ctx.Writer, true)
+			modSvcClient := rpcmock.NewMockModerationSvcClient(t)
+			wrapper.WithModeration(modSvcClient)
+			n, err := wrapper.Write(tt.inputs)
+			assert.NoError(t, err)
+			assert.Equal(t, len(tt.inputs), n)
+			assert.Equal(t, w.Body.String(), string(tt.wantResp))
+			// not work: modSvcClient.EXPECT().PassTextCheck(mock.Anything, mock.Anything, mock.Anything).Times(0)
+			modSvcClient.AssertNotCalled(t, "PassTextCheck")
 		})
 	}
 }

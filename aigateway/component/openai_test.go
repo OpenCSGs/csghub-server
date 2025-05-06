@@ -12,6 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 	mockdb "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/store/database"
 	mockmq "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/mq"
+	"opencsg.com/csghub-server/aigateway/token"
 	"opencsg.com/csghub-server/aigateway/types"
 
 	"github.com/openai/openai-go"
@@ -194,7 +195,7 @@ func TestOpenAIComponentImpl_RecordUsage(t *testing.T) {
 	mockUserStore := &mockdb.MockUserStore{}
 	mockDeployStore := &mockdb.MockDeployTaskStore{}
 
-	var mockCounter *mocktoken.MockLLMTokenCounter
+	var mockCounter *mocktoken.MockCounter
 	var comp *openaiComponentImpl
 
 	tests := []struct {
@@ -225,14 +226,14 @@ func TestOpenAIComponentImpl_RecordUsage(t *testing.T) {
 					Connector:    mockMQ,
 					SyncInterval: 1,
 				}
-				mockCounter = mocktoken.NewMockLLMTokenCounter(t)
+				mockCounter = mocktoken.NewMockCounter(t)
 
 				comp = &openaiComponentImpl{
 					userStore:   mockUserStore,
 					deployStore: mockDeployStore,
 					eventPub:    eventPub,
 				}
-				mockCounter.EXPECT().Usage().Return(&openai.CompletionUsage{
+				mockCounter.EXPECT().Usage().Return(&token.Usage{
 					PromptTokens:     100,
 					CompletionTokens: 50,
 					TotalTokens:      150,
@@ -281,14 +282,14 @@ func TestOpenAIComponentImpl_RecordUsage(t *testing.T) {
 					Connector:    mockMQ,
 					SyncInterval: 1,
 				}
-				mockCounter = mocktoken.NewMockLLMTokenCounter(t)
+				mockCounter = mocktoken.NewMockCounter(t)
 
 				comp = &openaiComponentImpl{
 					userStore:   mockUserStore,
 					deployStore: mockDeployStore,
 					eventPub:    eventPub,
 				}
-				mockCounter.EXPECT().Usage().Return(&openai.CompletionUsage{
+				mockCounter.EXPECT().Usage().Return(&token.Usage{
 					PromptTokens:     100,
 					CompletionTokens: 50,
 					TotalTokens:      150,
@@ -333,7 +334,7 @@ func TestOpenAIComponentImpl_RecordUsage(t *testing.T) {
 					Connector:    mockMQ,
 					SyncInterval: 1,
 				}
-				mockCounter = mocktoken.NewMockLLMTokenCounter(t)
+				mockCounter = mocktoken.NewMockCounter(t)
 
 				comp = &openaiComponentImpl{
 					userStore:   mockUserStore,
@@ -363,14 +364,13 @@ func TestOpenAIComponentImpl_RecordUsage(t *testing.T) {
 					Connector:    mockMQ,
 					SyncInterval: 1,
 				}
-				mockCounter = mocktoken.NewMockLLMTokenCounter(t)
-
+				mockCounter = mocktoken.NewMockCounter(t)
 				comp = &openaiComponentImpl{
 					userStore:   mockUserStore,
 					deployStore: mockDeployStore,
 					eventPub:    eventPub,
 				}
-				mockCounter.EXPECT().Usage().Return(&openai.CompletionUsage{
+				mockCounter.EXPECT().Usage().Return(&token.Usage{
 					PromptTokens:     100,
 					CompletionTokens: 50,
 					TotalTokens:      150,

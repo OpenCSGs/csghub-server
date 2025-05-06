@@ -6,7 +6,7 @@ import "opencsg.com/csghub-server/common/types"
 type Model struct {
 	ID      string `json:"id"`
 	Object  string `json:"object"`
-	Created int64  `json:"created"`
+	Created int64  `json:"created"` //organization-owner (e.g. openai)
 	OwnedBy string `json:"owned_by"`
 
 	// extend opanai struct
