@@ -1042,6 +1042,16 @@ definitions:
         type: array
       pointer:
         $ref: '#/definitions/types.Pointer'
+      start_branch:
+        type: string
+      start_name:
+        type: string
+      start_namespace:
+        type: string
+      start_repo_type:
+        $ref: '#/definitions/types.RepositoryType'
+      start_sha:
+        type: string
     type: object
   types.CreateFileResp:
     type: object
@@ -2357,6 +2367,7 @@ definitions:
     - code
     - prompt
     - mcpserver
+    - template
     - ""
     type: string
     x-enum-varnames:
@@ -2366,6 +2377,7 @@ definitions:
     - CodeRepo
     - PromptRepo
     - MCPServerRepo
+    - TemplateRepo
     - UnknownRepo
   types.ResourceType:
     enum:
@@ -2772,6 +2784,16 @@ definitions:
       repoType:
         $ref: '#/definitions/types.RepositoryType'
       sha:
+        type: string
+      start_branch:
+        type: string
+      start_name:
+        type: string
+      start_namespace:
+        type: string
+      start_repo_type:
+        $ref: '#/definitions/types.RepositoryType'
+      start_sha:
         type: string
     type: object
   types.UpdateFileResp:

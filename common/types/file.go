@@ -35,6 +35,12 @@ type CreateFileReq struct {
 	FilePath    string         `json:"-"`
 	RepoType    RepositoryType `json:"-"`
 	CurrentUser string         `json:"current_user"`
+
+	StartRepoType  RepositoryType `json:"start_repo_type"`
+	StartNamespace string         `json:"start_namespace"`
+	StartName      string         `json:"start_name"`
+	StartBranch    string         `json:"start_branch"`
+	StartSha       string         `json:"start_sha"`
 }
 
 type CreateFileResp struct{}
@@ -60,6 +66,12 @@ type UpdateFileReq struct {
 	FilePath    string `json:"-"`
 	RepoType    RepositoryType
 	CurrentUser string `json:"-"`
+
+	StartRepoType  RepositoryType `json:"start_repo_type"`
+	StartNamespace string         `json:"start_namespace"`
+	StartName      string         `json:"start_name"`
+	StartBranch    string         `json:"start_branch"`
+	StartSha       string         `json:"start_sha"`
 }
 
 type DeleteFileReq struct {

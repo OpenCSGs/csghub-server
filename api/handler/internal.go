@@ -2,8 +2,10 @@ package handler
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"net/http"
+	"path/filepath"
 	"strings"
 
 	"github.com/gin-gonic/gin"
@@ -22,10 +24,13 @@ func NewInternalHandler(config *config.Config) (*InternalHandler, error) {
 	if err != nil {
 		return nil, err
 	}
+	emptyRepoPath := filepath.Join(fmt.Sprintf("%ss", string(config.RepoTemplate.EmptyRepoType)),
+		config.RepoTemplate.EmptyNameSpace, config.RepoTemplate.EmptyRepoName)
 	return &InternalHandler{
 		internal:       uc,
 		config:         config,
 		temporalClient: temporal.GetClient(),
+		emptyRepoPath:  emptyRepoPath,
 	}, nil
 }
 
@@ -33,6 +38,7 @@ type InternalHandler struct {
 	internal       component.InternalComponent
 	config         *config.Config
 	temporalClient temporal.Client
+	emptyRepoPath  string
 }
 
 // TODO: add prmission check
@@ -59,6 +65,16 @@ func (h *InternalHandler) SSHAllowed(ctx *gin.Context) {
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
+
+	slog.Debug("SSHAllowed check path", slog.Any("GlRepository", rawReq.GlRepository), slog.Any("emptyRepoPath", h.emptyRepoPath))
+	if rawReq.GlRepository == h.emptyRepoPath {
+		ctx.PureJSON(http.StatusOK, gin.H{
+			"status":  true,
+			"message": "allowed",
+		})
+		return
+	}
+
 	if rawReq.Protocol == "ssh" {
 		if rawReq.GlRepository != "" {
 			repoPath = rawReq.GlRepository
@@ -126,6 +142,12 @@ func (h *InternalHandler) PostReceive(ctx *gin.Context) {
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
+
+	if req.GlRepository == h.emptyRepoPath {
+		ctx.PureJSON(http.StatusOK, successResp)
+		return
+	}
+
 	strs := strings.Split(req.Changes, " ")
 	// the format of originalRef is refs/heads/main
 	originalRef := strings.ReplaceAll(strs[2], "\n", "")

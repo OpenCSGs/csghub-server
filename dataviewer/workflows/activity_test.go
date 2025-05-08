@@ -257,16 +257,31 @@ func TestActivity_CreateParquetBranch(t *testing.T) {
 	},
 	).Return(nil, nil)
 
-	mockGitServer.EXPECT().CreateRepoFile(&types.CreateFileReq{
-		Username:  GitDefaultUserName,
-		Email:     GitDefaultUserEmail,
-		Message:   "create branch",
-		Content:   base64.StdEncoding.EncodeToString([]byte(types.DatasetGitattributesContent)),
-		NewBranch: dvCom.ParquetBranch,
-		Namespace: req.Namespace,
-		Name:      req.Name,
-		FilePath:  types.GitattributesFileName,
-		RepoType:  req.RepoType,
+	mockGitServer.EXPECT().RepositoryExists(ctx, gitserver.CheckRepoReq{
+		RepoType:  types.RepositoryType(config.RepoTemplate.EmptyRepoType),
+		Namespace: config.RepoTemplate.EmptyNameSpace,
+		Name:      config.RepoTemplate.EmptyRepoName,
+	}).Return(true, nil)
+
+	mockGitServer.EXPECT().GetRepoLastCommit(ctx, gitserver.GetRepoLastCommitReq{
+		Namespace: config.RepoTemplate.EmptyNameSpace,
+		Name:      config.RepoTemplate.EmptyRepoName,
+		RepoType:  types.RepositoryType(config.RepoTemplate.EmptyRepoType),
+		Ref:       types.MainBranch,
+	}).Return(&types.Commit{}, nil)
+
+	mockGitServer.EXPECT().UpdateRepoFile(&types.UpdateFileReq{
+		Username:    GitDefaultUserName,
+		Email:       GitDefaultUserEmail,
+		Message:     "update gitattributes file in new branch refs-convert-parquet",
+		Content:     base64.StdEncoding.EncodeToString([]byte(types.DatasetGitattributesContent)),
+		NewBranch:   dvCom.ParquetBranch,
+		Branch:      dvCom.ParquetBranch,
+		Namespace:   req.Namespace,
+		Name:        req.Name,
+		FilePath:    types.GitattributesFileName,
+		RepoType:    req.RepoType,
+		StartBranch: "main",
 	}).Return(nil)
 
 	res, err := dvActivity.CreateParquetBranch(ctx, req)

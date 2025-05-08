@@ -48,6 +48,7 @@ const (
 	CodeRepo      RepositoryType = "code"
 	PromptRepo    RepositoryType = "prompt"
 	MCPServerRepo RepositoryType = "mcpserver"
+	TemplateRepo  RepositoryType = "template"
 	UnknownRepo   RepositoryType = ""
 
 	OpenCSGSource     RepositorySource = "opencsg"

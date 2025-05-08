@@ -18,7 +18,7 @@ const SHA1EmptyTreeID = "4b825dc642cb6eb9a060e54bf8d69288fbee4904"
 func (c *Client) GetRepoCommits(ctx context.Context, req gitserver.GetRepoCommitsReq) ([]types.Commit, *types.RepoPageOpts, error) {
 	var commits []types.Commit
 	repoType := fmt.Sprintf("%ss", string(req.RepoType))
-	ctx, cancel := context.WithTimeout(ctx, c.timeoutTime)
+	ctx, cancel := context.WithTimeout(ctx, c.timeout)
 	defer cancel()
 
 	commitsReq := &gitalypb.FindCommitsRequest{
@@ -82,7 +82,7 @@ func (c *Client) GetRepoCommits(ctx context.Context, req gitserver.GetRepoCommit
 func (c *Client) GetRepoLastCommit(ctx context.Context, req gitserver.GetRepoLastCommitReq) (*types.Commit, error) {
 	var commit types.Commit
 	repoType := fmt.Sprintf("%ss", string(req.RepoType))
-	ctx, cancel := context.WithTimeout(ctx, c.timeoutTime)
+	ctx, cancel := context.WithTimeout(ctx, c.timeout)
 	defer cancel()
 
 	commitReq := &gitalypb.FindCommitRequest{
@@ -129,7 +129,7 @@ func (c *Client) GetSingleCommit(ctx context.Context, req gitserver.GetRepoLastC
 	)
 
 	repoType := fmt.Sprintf("%ss", string(req.RepoType))
-	ctx, cancel := context.WithTimeout(ctx, c.timeoutTime)
+	ctx, cancel := context.WithTimeout(ctx, c.timeout)
 	defer cancel()
 
 	commitReq := &gitalypb.FindCommitRequest{
@@ -169,7 +169,7 @@ func (c *Client) GetSingleCommit(ctx context.Context, req gitserver.GetRepoLastC
 		Parents: parents,
 	}
 
-	diffCtx, cancel := context.WithTimeout(ctx, c.timeoutTime)
+	diffCtx, cancel := context.WithTimeout(ctx, c.timeout)
 	defer cancel()
 
 	filesReq := &gitalypb.DiffStatsRequest{
@@ -246,7 +246,7 @@ func (c *Client) GetSingleCommit(ctx context.Context, req gitserver.GetRepoLastC
 
 func (c *Client) GetDiffBetweenTwoCommits(ctx context.Context, req gitserver.GetDiffBetweenTwoCommitsReq) (*types.GiteaCallbackPushReq, error) {
 	repoType := fmt.Sprintf("%ss", string(req.RepoType))
-	ctx, cancel := context.WithTimeout(ctx, c.timeoutTime)
+	ctx, cancel := context.WithTimeout(ctx, c.timeout)
 	defer cancel()
 	callback := &types.GiteaCallbackPushReq{
 		Ref: req.Ref,

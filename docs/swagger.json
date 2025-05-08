@@ -18128,6 +18128,21 @@
                 },
                 "pointer": {
                     "$ref": "#/definitions/types.Pointer"
+                },
+                "start_branch": {
+                    "type": "string"
+                },
+                "start_name": {
+                    "type": "string"
+                },
+                "start_namespace": {
+                    "type": "string"
+                },
+                "start_repo_type": {
+                    "$ref": "#/definitions/types.RepositoryType"
+                },
+                "start_sha": {
+                    "type": "string"
                 }
             }
         },
@@ -20074,6 +20089,7 @@
                 "code",
                 "prompt",
                 "mcpserver",
+                "template",
                 ""
             ],
             "x-enum-varnames": [
@@ -20083,6 +20099,7 @@
                 "CodeRepo",
                 "PromptRepo",
                 "MCPServerRepo",
+                "TemplateRepo",
                 "UnknownRepo"
             ]
         },
@@ -20672,6 +20689,21 @@
                     "$ref": "#/definitions/types.RepositoryType"
                 },
                 "sha": {
+                    "type": "string"
+                },
+                "start_branch": {
+                    "type": "string"
+                },
+                "start_name": {
+                    "type": "string"
+                },
+                "start_namespace": {
+                    "type": "string"
+                },
+                "start_repo_type": {
+                    "$ref": "#/definitions/types.RepositoryType"
+                },
+                "start_sha": {
                     "type": "string"
                 }
             }
