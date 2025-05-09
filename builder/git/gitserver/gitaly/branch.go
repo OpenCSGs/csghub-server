@@ -18,7 +18,7 @@ func (c *Client) GetRepoBranches(ctx context.Context, req gitserver.GetBranchesR
 	defer cancel()
 	branchesReq := &gitalypb.FindAllBranchesRequest{
 		Repository: &gitalypb.Repository{
-			StorageName:  c.config.GitalyServer.Storge,
+			StorageName:  c.config.GitalyServer.Storage,
 			RelativePath: BuildRelativePath(repoType, req.Namespace, req.Name),
 		},
 	}
@@ -57,7 +57,7 @@ func (c *Client) GetRepoBranchByName(ctx context.Context, req gitserver.GetBranc
 	defer cancel()
 	branchReq := &gitalypb.FindBranchRequest{
 		Repository: &gitalypb.Repository{
-			StorageName:  c.config.GitalyServer.Storge,
+			StorageName:  c.config.GitalyServer.Storage,
 			RelativePath: BuildRelativePath(repoType, req.Namespace, req.Name),
 		},
 		Name: []byte(req.Ref),
@@ -87,7 +87,7 @@ func (c *Client) DeleteRepoBranch(ctx context.Context, req gitserver.DeleteBranc
 
 	deleteBranchReq := &gitalypb.UserDeleteBranchRequest{
 		Repository: &gitalypb.Repository{
-			StorageName:  c.config.GitalyServer.Storge,
+			StorageName:  c.config.GitalyServer.Storage,
 			RelativePath: BuildRelativePath(repoType, req.Namespace, req.Name),
 			GlRepository: filepath.Join(repoType, req.Namespace, req.Name),
 		},

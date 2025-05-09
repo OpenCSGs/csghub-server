@@ -114,7 +114,7 @@ func newGitalyTester(t *testing.T) *gitalyTester {
 		smartHttpClient: tester.mocks.smartHttpClient,
 		remoteClient:    tester.mocks.remoteClient,
 	}
-	tester.config.GitalyServer.Storge = "st"
+	tester.config.GitalyServer.Storage = "st"
 	return tester
 }
 

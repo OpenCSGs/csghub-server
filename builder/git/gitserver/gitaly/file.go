@@ -33,7 +33,7 @@ func (c *Client) GetRepoFileRaw(ctx context.Context, req gitserver.GetRepoInfoBy
 	ctx, cancel := context.WithTimeout(ctx, c.timeoutTime)
 	defer cancel()
 	repository := &gitalypb.Repository{
-		StorageName:  c.config.GitalyServer.Storge,
+		StorageName:  c.config.GitalyServer.Storage,
 		RelativePath: BuildRelativePath(repoType, req.Namespace, req.Name),
 	}
 
@@ -73,7 +73,7 @@ func (c *Client) GetRepoFileReader(ctx context.Context, req gitserver.GetRepoInf
 	// ctx, cancel := context.WithTimeout(ctx, c.timeoutTime)
 	// defer cancel()
 	repository := &gitalypb.Repository{
-		StorageName:  c.config.GitalyServer.Storge,
+		StorageName:  c.config.GitalyServer.Storage,
 		RelativePath: BuildRelativePath(repoType, req.Namespace, req.Name),
 	}
 
@@ -152,7 +152,7 @@ func (c *Client) CreateRepoFile(req *types.CreateFileReq) (err error) {
 		return err
 	}
 	repository := &gitalypb.Repository{
-		StorageName:  c.config.GitalyServer.Storge,
+		StorageName:  c.config.GitalyServer.Storage,
 		RelativePath: BuildRelativePath(repoType, req.Namespace, req.Name),
 		GlRepository: filepath.Join(repoType, req.Namespace, req.Name),
 	}
@@ -231,7 +231,7 @@ func (c *Client) UpdateRepoFile(req *types.UpdateFileReq) (err error) {
 		return err
 	}
 	repository := &gitalypb.Repository{
-		StorageName:  c.config.GitalyServer.Storge,
+		StorageName:  c.config.GitalyServer.Storage,
 		RelativePath: BuildRelativePath(repoType, req.Namespace, req.Name),
 		GlRepository: filepath.Join(repoType, req.Namespace, req.Name),
 	}
@@ -323,7 +323,7 @@ func (c *Client) DeleteRepoFile(req *types.DeleteFileReq) (err error) {
 		return err
 	}
 	repository := &gitalypb.Repository{
-		StorageName:  c.config.GitalyServer.Storge,
+		StorageName:  c.config.GitalyServer.Storage,
 		RelativePath: BuildRelativePath(repoType, req.Namespace, req.Name),
 		GlRepository: filepath.Join(repoType, req.Namespace, req.Name),
 	}
@@ -489,7 +489,7 @@ func (c *Client) GetRepoFileTree(ctx context.Context, req gitserver.GetRepoInfoB
 		req.Ref = "main"
 	}
 	repository := &gitalypb.Repository{
-		StorageName:  c.config.GitalyServer.Storge,
+		StorageName:  c.config.GitalyServer.Storage,
 		RelativePath: BuildRelativePath(repoType, req.Namespace, req.Name),
 	}
 
@@ -622,7 +622,7 @@ func (c *Client) GetTree(ctx context.Context, req types.GetTreeRequest) (*types.
 		req.Ref = "main"
 	}
 	repository := &gitalypb.Repository{
-		StorageName:  c.config.GitalyServer.Storge,
+		StorageName:  c.config.GitalyServer.Storage,
 		RelativePath: BuildRelativePath(repoType, req.Namespace, req.Name),
 	}
 
@@ -693,7 +693,7 @@ func (c *Client) GetLogsTree(ctx context.Context, req types.GetLogsTreeRequest) 
 		req.Path += "/"
 	}
 	repository := &gitalypb.Repository{
-		StorageName:  c.config.GitalyServer.Storge,
+		StorageName:  c.config.GitalyServer.Storage,
 		RelativePath: BuildRelativePath(repoType, req.Namespace, req.Name),
 	}
 
@@ -753,7 +753,7 @@ func (c *Client) GetRepoAllFiles(ctx context.Context, req gitserver.GetRepoAllFi
 
 	allFilesReq := &gitalypb.ListFilesRequest{
 		Repository: &gitalypb.Repository{
-			StorageName:  c.config.GitalyServer.Storge,
+			StorageName:  c.config.GitalyServer.Storage,
 			RelativePath: BuildRelativePath(repoType, req.Namespace, req.Name),
 		},
 		Revision: []byte(req.Ref),
@@ -793,7 +793,7 @@ func (c *Client) GetRepoAllLfsPointers(ctx context.Context, req gitserver.GetRep
 
 	allPointersReq := &gitalypb.ListAllLFSPointersRequest{
 		Repository: &gitalypb.Repository{
-			StorageName:  c.config.GitalyServer.Storge,
+			StorageName:  c.config.GitalyServer.Storage,
 			RelativePath: BuildRelativePath(repoType, req.Namespace, req.Name),
 		},
 	}

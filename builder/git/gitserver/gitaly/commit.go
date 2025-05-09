@@ -23,7 +23,7 @@ func (c *Client) GetRepoCommits(ctx context.Context, req gitserver.GetRepoCommit
 
 	commitsReq := &gitalypb.FindCommitsRequest{
 		Repository: &gitalypb.Repository{
-			StorageName:  c.config.GitalyServer.Storge,
+			StorageName:  c.config.GitalyServer.Storage,
 			RelativePath: BuildRelativePath(repoType, req.Namespace, req.Name),
 		},
 		Revision: []byte(req.Ref),
@@ -62,7 +62,7 @@ func (c *Client) GetRepoCommits(ctx context.Context, req gitserver.GetRepoCommit
 
 	countCommitsReq := &gitalypb.CountCommitsRequest{
 		Repository: &gitalypb.Repository{
-			StorageName:  c.config.GitalyServer.Storge,
+			StorageName:  c.config.GitalyServer.Storage,
 			RelativePath: BuildRelativePath(repoType, req.Namespace, req.Name),
 		},
 		Revision: []byte(req.Ref),
@@ -87,7 +87,7 @@ func (c *Client) GetRepoLastCommit(ctx context.Context, req gitserver.GetRepoLas
 
 	commitReq := &gitalypb.FindCommitRequest{
 		Repository: &gitalypb.Repository{
-			StorageName:  c.config.GitalyServer.Storge,
+			StorageName:  c.config.GitalyServer.Storage,
 			RelativePath: BuildRelativePath(repoType, req.Namespace, req.Name),
 		},
 		Revision: []byte(req.Ref),
@@ -134,7 +134,7 @@ func (c *Client) GetSingleCommit(ctx context.Context, req gitserver.GetRepoLastC
 
 	commitReq := &gitalypb.FindCommitRequest{
 		Repository: &gitalypb.Repository{
-			StorageName:  c.config.GitalyServer.Storge,
+			StorageName:  c.config.GitalyServer.Storage,
 			RelativePath: BuildRelativePath(repoType, req.Namespace, req.Name),
 		},
 		Revision: []byte(req.Ref),
@@ -174,7 +174,7 @@ func (c *Client) GetSingleCommit(ctx context.Context, req gitserver.GetRepoLastC
 
 	filesReq := &gitalypb.DiffStatsRequest{
 		Repository: &gitalypb.Repository{
-			StorageName:  c.config.GitalyServer.Storge,
+			StorageName:  c.config.GitalyServer.Storage,
 			RelativePath: BuildRelativePath(repoType, req.Namespace, req.Name),
 		},
 		RightCommitId: req.Ref,
@@ -213,7 +213,7 @@ func (c *Client) GetSingleCommit(ctx context.Context, req gitserver.GetRepoLastC
 
 	diffReq := &gitalypb.RawDiffRequest{
 		Repository: &gitalypb.Repository{
-			StorageName:  c.config.GitalyServer.Storge,
+			StorageName:  c.config.GitalyServer.Storage,
 			RelativePath: BuildRelativePath(repoType, req.Namespace, req.Name),
 		},
 		RightCommitId: req.Ref,
@@ -256,7 +256,7 @@ func (c *Client) GetDiffBetweenTwoCommits(ctx context.Context, req gitserver.Get
 		},
 	}
 	repository := &gitalypb.Repository{
-		StorageName:  c.config.GitalyServer.Storge,
+		StorageName:  c.config.GitalyServer.Storage,
 		RelativePath: BuildRelativePath(repoType, req.Namespace, req.Name),
 	}
 	treeReq := &gitalypb.FindChangedPathsRequest_Request_TreeRequest{

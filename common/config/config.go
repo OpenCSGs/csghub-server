@@ -65,7 +65,7 @@ type Config struct {
 
 	GitalyServer struct {
 		Address   string `env:"STARHUB_SERVER_GITALY_SERVER_SOCKET, default=tcp://localhost:9999"`
-		Storge    string `env:"STARHUB_SERVER_GITALY_STORGE, default=default"`
+		Storage   string `env:"STARHUB_SERVER_GITALY_STORGE, default=default"`
 		Token     string `env:"STARHUB_SERVER_GITALY_TOKEN, default=abc123secret"`
 		JWTSecret string `env:"STARHUB_SERVER_GITALY_JWT_SECRET, default=signing-key"`
 	}
@@ -129,11 +129,11 @@ type Config struct {
 		SessionSecretKey   string `env:"STARHUB_SERVER_SPACE_SESSION_SECRET_KEY, default=secret"`
 		DeployTimeoutInMin int    `env:"STARHUB_SERVER_SPACE_DEPLOY_TIMEOUT_IN_MINUTES, default=30"`
 		// gpu model label
-		GPUModelLabel            string `env:"STARHUB_SERVER_GPU_MODEL_LABEL, default=aliyun.accelerator/nvidia_name"`
-		ReadnessDelaySeconds     int    `env:"STARHUB_SERVER_READNESS_DELAY_SECONDS, default=120"`
-		ReadnessPeriodSeconds    int    `env:"STARHUB_SERVER_READNESS_PERIOD_SECONDS, default=10"`
-		ReadnessFailureThreshold int    `env:"STARHUB_SERVER_READNESS_FAILURE_THRESHOLD, default=3"`
-		PYPIIndexURL             string `env:"STARHUB_SERVER_SPACE_PYPI_INDEX_URL, default="`
+		GPUModelLabel             string `env:"STARHUB_SERVER_GPU_MODEL_LABEL, default=aliyun.accelerator/nvidia_name"`
+		ReadinessDelaySeconds     int    `env:"STARHUB_SERVER_READINESS_DELAY_SECONDS, default=120"`
+		ReadinessPeriodSeconds    int    `env:"STARHUB_SERVER_READINESS_PERIOD_SECONDS, default=10"`
+		ReadinessFailureThreshold int    `env:"STARHUB_SERVER_READINESS_FAILURE_THRESHOLD, default=3"`
+		PYPIIndexURL              string `env:"STARHUB_SERVER_SPACE_PYPI_INDEX_URL, default="`
 	}
 
 	Model struct {
