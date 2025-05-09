@@ -23,7 +23,7 @@ func (c *Client) CreateMirrorRepo(ctx context.Context, req gitserver.CreateMirro
 	if req.MirrorToken == "" {
 		remoteCheckReq = &gitalypb.FindRemoteRepositoryRequest{
 			Remote:      req.CloneUrl,
-			StorageName: c.config.GitalyServer.Storge,
+			StorageName: c.config.GitalyServer.Storage,
 		}
 
 		resp, err := c.remoteClient.FindRemoteRepository(ctx, remoteCheckReq)
@@ -38,7 +38,7 @@ func (c *Client) CreateMirrorRepo(ctx context.Context, req gitserver.CreateMirro
 
 	gitalyReq := &gitalypb.CreateRepositoryFromURLRequest{
 		Repository: &gitalypb.Repository{
-			StorageName:  c.config.GitalyServer.Storge,
+			StorageName:  c.config.GitalyServer.Storage,
 			RelativePath: BuildRelativePath(repoType, req.Namespace, req.Name),
 		},
 		Url:    req.CloneUrl,
@@ -66,7 +66,7 @@ func (c *Client) CreateMirrorForExistsRepo(ctx context.Context, req gitserver.Cr
 
 	fetchRemoteReq := &gitalypb.FetchRemoteRequest{
 		Repository: &gitalypb.Repository{
-			StorageName:  c.config.GitalyServer.Storge,
+			StorageName:  c.config.GitalyServer.Storage,
 			RelativePath: BuildRelativePath(repoType, req.Namespace, req.Name),
 		},
 		Force:   true,
@@ -103,7 +103,7 @@ func (c *Client) MirrorSync(ctx context.Context, req gitserver.MirrorSyncReq) er
 
 	fetchRemoteReq := &gitalypb.FetchRemoteRequest{
 		Repository: &gitalypb.Repository{
-			StorageName:  c.config.GitalyServer.Storge,
+			StorageName:  c.config.GitalyServer.Storage,
 			RelativePath: BuildRelativePath(repoType, req.Namespace, req.Name),
 		},
 		Force:   true,

@@ -29,7 +29,7 @@ func (c *Client) CreateRepo(ctx context.Context, req gitserver.CreateRepoReq) (*
 
 	gitalyReq := &gitalypb.CreateRepositoryRequest{
 		Repository: &gitalypb.Repository{
-			StorageName:  c.config.GitalyServer.Storge,
+			StorageName:  c.config.GitalyServer.Storage,
 			RelativePath: BuildRelativePath(repoType, req.Namespace, req.Name),
 		},
 		DefaultBranch: []byte(req.DefaultBranch),
@@ -64,7 +64,7 @@ func (c *Client) DeleteRepo(ctx context.Context, req gitserver.DeleteRepoReq) er
 	defer cancel()
 	gitalyReq := &gitalypb.RemoveRepositoryRequest{
 		Repository: &gitalypb.Repository{
-			StorageName:  c.config.GitalyServer.Storge,
+			StorageName:  c.config.GitalyServer.Storage,
 			RelativePath: BuildRelativePath(repoType, req.Namespace, req.Name),
 		},
 	}
@@ -82,7 +82,7 @@ func (c *Client) GetRepo(ctx context.Context, req gitserver.GetRepoReq) (*gitser
 	defer cancel()
 	gitalyReq := &gitalypb.FindDefaultBranchNameRequest{
 		Repository: &gitalypb.Repository{
-			StorageName:  c.config.GitalyServer.Storge,
+			StorageName:  c.config.GitalyServer.Storage,
 			RelativePath: BuildRelativePath(repoType, req.Namespace, req.Name),
 		},
 	}

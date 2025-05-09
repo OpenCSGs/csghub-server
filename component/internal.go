@@ -116,7 +116,7 @@ func (c *internalComponentImpl) SSHAllowed(ctx context.Context, req types.SSHAll
 		GitConfigOptions: []string{"uploadpack.allowFilter=true", "uploadpack.allowAnySHA1InWant=true"},
 		Gitaly: types.Gitaly{
 			Repo: pb.Repository{
-				StorageName:  c.config.GitalyServer.Storge,
+				StorageName:  c.config.GitalyServer.Storage,
 				RelativePath: gitaly.BuildRelativePath(repoType, req.Namespace, req.Name),
 				GlRepository: filepath.Join(repoType, req.Namespace, req.Name),
 			},

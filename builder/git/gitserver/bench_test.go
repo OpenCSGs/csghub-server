@@ -26,7 +26,7 @@ func newGitClient(b *testing.B) gitserver.GitServer {
 	if gitalyBench {
 		config := &config.Config{}
 		config.GitalyServer.Address = "tcp://localhost:9999"
-		config.GitalyServer.Storge = "default"
+		config.GitalyServer.Storage = "default"
 		client, err := gitaly.NewClient(config)
 		require.NoError(b, err)
 		return client

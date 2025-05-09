@@ -170,9 +170,9 @@ func (s *serviceComponentImpl) GenerateService(ctx context.Context, cluster clus
 	periodSeconds := 10
 	failureThreshold := 3
 	if request.DeployType == types.InferenceType {
-		initialDelaySeconds = s.env.Space.ReadnessDelaySeconds
-		periodSeconds = s.env.Space.ReadnessPeriodSeconds
-		failureThreshold = s.env.Space.ReadnessFailureThreshold
+		initialDelaySeconds = s.env.Space.ReadinessDelaySeconds
+		periodSeconds = s.env.Space.ReadinessPeriodSeconds
+		failureThreshold = s.env.Space.ReadinessFailureThreshold
 	}
 
 	imagePullSecrets := []corev1.LocalObjectReference{

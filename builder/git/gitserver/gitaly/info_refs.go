@@ -22,7 +22,7 @@ func (c *Client) InfoRefsResponse(ctx context.Context, req gitserver.InfoRefsReq
 
 	rpcRequest := &gitalypb.InfoRefsRequest{
 		Repository: &gitalypb.Repository{
-			StorageName:  c.config.GitalyServer.Storge,
+			StorageName:  c.config.GitalyServer.Storage,
 			RelativePath: BuildRelativePath(repoType, req.Namespace, req.Name),
 		},
 		GitProtocol: req.GitProtocol,
@@ -72,7 +72,7 @@ func (c *Client) UploadPack(ctx context.Context, req gitserver.UploadPackReq) er
 
 	rpcRequest := &gitalypb.PostUploadPackWithSidechannelRequest{
 		Repository: &gitalypb.Repository{
-			StorageName:  c.config.GitalyServer.Storge,
+			StorageName:  c.config.GitalyServer.Storage,
 			RelativePath: BuildRelativePath(repoType, req.Namespace, req.Name),
 		},
 		GitProtocol: req.GitProtocol,
@@ -101,7 +101,7 @@ func (c *Client) ReceivePack(ctx context.Context, req gitserver.ReceivePackReq) 
 	rpcRequest := &gitalypb.PostReceivePackRequest{
 		Repository: &gitalypb.Repository{
 			GlRepository: glRepository,
-			StorageName:  c.config.GitalyServer.Storge,
+			StorageName:  c.config.GitalyServer.Storage,
 			RelativePath: BuildRelativePath(repoType, req.Namespace, req.Name),
 		},
 		GlId:         fmt.Sprintf("user-%s", strconv.FormatInt(req.UserId, 10)),
