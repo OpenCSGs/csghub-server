@@ -264,6 +264,7 @@ func TestGitalyFile_CreateRepoFile(t *testing.T) {
 	err := tester.CreateRepoFile(&types.CreateFileReq{
 		Namespace: "ns",
 		Name:      "n",
+		Username:  "name",
 		Branch:    "main",
 		Message:   "new",
 		FilePath:  "foo",
@@ -279,12 +280,13 @@ func TestGitalyFile_CreateRepoFile(t *testing.T) {
 	header := &gitalypb.UserCommitFilesRequestHeader{
 		Repository: repository,
 		User: &gitalypb.User{
-			GlId: "user-1",
-			Name: []byte("n"),
+			GlId:       "user-1",
+			Name:       []byte("name"),
+			GlUsername: "name",
 		},
 		BranchName:       []byte("main"),
 		CommitMessage:    []byte("new"),
-		CommitAuthorName: []byte("n"),
+		CommitAuthorName: []byte("name"),
 		StartRepository:  repository,
 		StartBranchName:  []byte("main"),
 		Timestamp:        timestamppb.New(time.Now()),
