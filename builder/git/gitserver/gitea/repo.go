@@ -16,6 +16,10 @@ const (
 	CodeOrgPrefix    = "codes_"
 )
 
+func (c *Client) RepositoryExists(ctx context.Context, req gitserver.CheckRepoReq) (bool, error) {
+	return false, nil
+}
+
 func (c *Client) CreateRepo(ctx context.Context, req gitserver.CreateRepoReq) (*gitserver.CreateRepoResp, error) {
 	giteaRepo, _, err := c.giteaClient.CreateOrgRepo(
 		common.WithPrefix(req.Namespace, repoPrefixByType(req.RepoType)),

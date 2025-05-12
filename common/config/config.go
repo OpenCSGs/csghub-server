@@ -281,6 +281,12 @@ type Config struct {
 		ImageBuilderStatusTTL   int      `env:"STARHUB_SERVER_RUNNER_IMAGE_BUILDER_STATUS_TTL, default=300"`
 		ImageBuilderKanikoArgs  []string `env:"STARHUB_SERVER_RUNNER_IMAGE_BUILDER_KANIKO_ARGS"`
 	}
+
+	RepoTemplate struct {
+		EmptyRepoType  string `env:"STARHUB_SERVER_REPO_TEMPLATE_EMPTY_REPO_TYPE, default=template"`
+		EmptyNameSpace string `env:"STARHUB_SERVER_REPO_TEMPLATE_EMPTY_NAMESPACE, default=emptynamespace"`
+		EmptyRepoName  string `env:"STARHUB_SERVER_REPO_TEMPLATE_EMPTY_REPO_NAME, default=emptyreponame"`
+	}
 }
 
 func SetConfigFile(file string) {

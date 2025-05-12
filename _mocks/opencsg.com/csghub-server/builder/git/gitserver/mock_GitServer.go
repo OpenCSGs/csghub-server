@@ -2024,6 +2024,63 @@ func (_c *MockGitServer_ReceivePack_Call) RunAndReturn(run func(context.Context,
 	return _c
 }
 
+// RepositoryExists provides a mock function with given fields: ctx, req
+func (_m *MockGitServer) RepositoryExists(ctx context.Context, req gitserver.CheckRepoReq) (bool, error) {
+	ret := _m.Called(ctx, req)
+
+	if len(ret) == 0 {
+		panic("no return value specified for RepositoryExists")
+	}
+
+	var r0 bool
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, gitserver.CheckRepoReq) (bool, error)); ok {
+		return rf(ctx, req)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, gitserver.CheckRepoReq) bool); ok {
+		r0 = rf(ctx, req)
+	} else {
+		r0 = ret.Get(0).(bool)
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, gitserver.CheckRepoReq) error); ok {
+		r1 = rf(ctx, req)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockGitServer_RepositoryExists_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'RepositoryExists'
+type MockGitServer_RepositoryExists_Call struct {
+	*mock.Call
+}
+
+// RepositoryExists is a helper method to define mock.On call
+//   - ctx context.Context
+//   - req gitserver.CheckRepoReq
+func (_e *MockGitServer_Expecter) RepositoryExists(ctx interface{}, req interface{}) *MockGitServer_RepositoryExists_Call {
+	return &MockGitServer_RepositoryExists_Call{Call: _e.mock.On("RepositoryExists", ctx, req)}
+}
+
+func (_c *MockGitServer_RepositoryExists_Call) Run(run func(ctx context.Context, req gitserver.CheckRepoReq)) *MockGitServer_RepositoryExists_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(gitserver.CheckRepoReq))
+	})
+	return _c
+}
+
+func (_c *MockGitServer_RepositoryExists_Call) Return(_a0 bool, _a1 error) *MockGitServer_RepositoryExists_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockGitServer_RepositoryExists_Call) RunAndReturn(run func(context.Context, gitserver.CheckRepoReq) (bool, error)) *MockGitServer_RepositoryExists_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // UpdateOrganization provides a mock function with given fields: _a0, _a1
 func (_m *MockGitServer) UpdateOrganization(_a0 *types.EditOrgReq, _a1 *database.Organization) (*database.Organization, error) {
 	ret := _m.Called(_a0, _a1)

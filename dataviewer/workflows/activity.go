@@ -342,30 +342,99 @@ func (dva *dataViewerActivityImpl) CreateParquetBranch(ctx context.Context, req 
 		}
 		err = dva.gitServer.DeleteRepoBranch(ctx, deleteReq)
 		if err != nil {
-			slog.Error("failed to delete branch", slog.Any("req", req), slog.Any("req", req), slog.Any("err", err))
+			slog.Error("failed to delete branch", slog.Any("req", req), slog.Any("deleteReq", deleteReq), slog.Any("err", err))
 			return branch.Name, fmt.Errorf("delete branch %s error: %w", findReq.Ref, err)
 		}
 	}
 
-	// Create .gitattributes file in new branch
-	createReq := &types.CreateFileReq{
+	// check empty repo
+	checkReq := gitserver.CheckRepoReq{
+		RepoType:  types.RepositoryType(dva.cfg.RepoTemplate.EmptyRepoType),
+		Namespace: dva.cfg.RepoTemplate.EmptyNameSpace,
+		Name:      dva.cfg.RepoTemplate.EmptyRepoName,
+	}
+
+	exists, err := dva.gitServer.RepositoryExists(ctx, checkReq)
+	if err != nil {
+		slog.Error("failed to check base repo", slog.Any("checkReq", checkReq), slog.Any("err", err))
+		return "", fmt.Errorf("failed to check base repo %s/%s, result %v, cause: %w", checkReq.Namespace, checkReq.Name, exists, err)
+	}
+
+	if !exists {
+		gitRepoReq := gitserver.CreateRepoReq{
+			RepoType:      checkReq.RepoType,
+			Namespace:     checkReq.Namespace,
+			Name:          checkReq.Name,
+			Nickname:      checkReq.Name,
+			Username:      GitDefaultUserName,
+			DefaultBranch: types.MainBranch,
+			License:       "",
+			Readme:        "",
+			Private:       false,
+		}
+		_, err := dva.gitServer.CreateRepo(ctx, gitRepoReq)
+		if err != nil {
+			slog.Error("failed to create base repo", slog.Any("gitRepoReq", gitRepoReq), slog.Any("err", err))
+			return "", fmt.Errorf("failed to create base repo %s/%s, cause: %w", gitRepoReq.Namespace, gitRepoReq.Name, err)
+		}
+
+		baseFileReq := &types.CreateFileReq{
+			Username:  GitDefaultUserName,
+			Email:     GitDefaultUserEmail,
+			Message:   "create gitattributes file in base repo",
+			Content:   base64.StdEncoding.EncodeToString([]byte("")),
+			Branch:    types.MainBranch,
+			Namespace: checkReq.Namespace,
+			Name:      checkReq.Name,
+			FilePath:  types.GitattributesFileName,
+			RepoType:  checkReq.RepoType,
+		}
+
+		err = dva.gitServer.CreateRepoFile(baseFileReq)
+		if err != nil {
+			slog.Error("failed to create gitattributes file in base repo", slog.Any("baseFileReq", baseFileReq), slog.Any("error", err))
+			return "", fmt.Errorf("failed to create gitattributes file in base repo %s/%s, cause: %w", baseFileReq.Namespace, baseFileReq.Name, err)
+		}
+	}
+
+	getLastCommitReq := gitserver.GetRepoLastCommitReq{
+		Namespace: checkReq.Namespace,
+		Name:      checkReq.Name,
+		RepoType:  checkReq.RepoType,
+		Ref:       types.MainBranch,
+	}
+	commit, err := dva.gitServer.GetRepoLastCommit(ctx, getLastCommitReq)
+	if err != nil {
+		slog.Error("failed to get last commit of base repo", slog.Any("getLastCommitReq", getLastCommitReq), slog.Any("err", err))
+		return "", fmt.Errorf("failed to get last commit of base repo %s/%s, cause: %w", getLastCommitReq.Namespace, getLastCommitReq.Name, err)
+	}
+
+	// Update .gitattributes file in new branch
+	updateReq := &types.UpdateFileReq{
 		Username:  GitDefaultUserName,
 		Email:     GitDefaultUserEmail,
-		Message:   "create branch",
+		Message:   fmt.Sprintf("update gitattributes file in new branch %s", findReq.Ref),
 		Content:   base64.StdEncoding.EncodeToString([]byte(types.DatasetGitattributesContent)),
 		NewBranch: findReq.Ref,
+		Branch:    findReq.Ref,
 		Namespace: req.Namespace,
 		Name:      req.Name,
 		FilePath:  types.GitattributesFileName,
 		RepoType:  req.RepoType,
+
+		StartNamespace: checkReq.Namespace,
+		StartName:      checkReq.Name,
+		StartRepoType:  checkReq.RepoType,
+		StartBranch:    types.MainBranch,
+		StartSha:       commit.ID,
 	}
 
-	err = dva.gitServer.CreateRepoFile(createReq)
+	err = dva.gitServer.UpdateRepoFile(updateReq)
 	if err != nil {
-		slog.Error("failed to create .gitattributes file in branch", slog.Any("branch", createReq.NewBranch), slog.Any("req", req), slog.Any("error", err))
-		return "", fmt.Errorf("failed to create .gitattributes file in branch %s, cause: %w", createReq.NewBranch, err)
+		slog.Error("failed to update gitattributes file in new branch", slog.Any("req", req), slog.Any("updateReq", updateReq), slog.Any("error", err))
+		return "", fmt.Errorf("failed to update gitattributes file in new branch %s, cause: %w", updateReq.NewBranch, err)
 	}
-	return createReq.NewBranch, nil
+	return updateReq.NewBranch, nil
 }
 
 func (dva *dataViewerActivityImpl) CopyParquetFiles(ctx context.Context, copyReq dvCom.CopyParquetReq) (*dvCom.CardData, error) {

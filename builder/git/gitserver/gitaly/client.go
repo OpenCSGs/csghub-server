@@ -28,7 +28,7 @@ type Client struct {
 	operationClient     gitalypb.OperationServiceClient
 	smartHttpClient     gitalypb.SmartHTTPServiceClient
 	remoteClient        gitalypb.RemoteServiceClient
-	timeoutTime         time.Duration
+	timeout             time.Duration
 }
 
 func NewClient(config *config.Config) (*Client, error) {
@@ -69,6 +69,6 @@ func NewClient(config *config.Config) (*Client, error) {
 		operationClient:     operationClient,
 		smartHttpClient:     smartHttpClient,
 		remoteClient:        remoteClient,
-		timeoutTime:         timeoutTime,
+		timeout:             timeoutTime,
 	}, nil
 }

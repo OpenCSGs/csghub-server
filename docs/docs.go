@@ -18139,6 +18139,21 @@ const docTemplate = `{
                 },
                 "pointer": {
                     "$ref": "#/definitions/types.Pointer"
+                },
+                "start_branch": {
+                    "type": "string"
+                },
+                "start_name": {
+                    "type": "string"
+                },
+                "start_namespace": {
+                    "type": "string"
+                },
+                "start_repo_type": {
+                    "$ref": "#/definitions/types.RepositoryType"
+                },
+                "start_sha": {
+                    "type": "string"
                 }
             }
         },
@@ -20085,6 +20100,7 @@ const docTemplate = `{
                 "code",
                 "prompt",
                 "mcpserver",
+                "template",
                 ""
             ],
             "x-enum-varnames": [
@@ -20094,6 +20110,7 @@ const docTemplate = `{
                 "CodeRepo",
                 "PromptRepo",
                 "MCPServerRepo",
+                "TemplateRepo",
                 "UnknownRepo"
             ]
         },
@@ -20683,6 +20700,21 @@ const docTemplate = `{
                     "$ref": "#/definitions/types.RepositoryType"
                 },
                 "sha": {
+                    "type": "string"
+                },
+                "start_branch": {
+                    "type": "string"
+                },
+                "start_name": {
+                    "type": "string"
+                },
+                "start_namespace": {
+                    "type": "string"
+                },
+                "start_repo_type": {
+                    "$ref": "#/definitions/types.RepositoryType"
+                },
+                "start_sha": {
                     "type": "string"
                 }
             }

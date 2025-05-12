@@ -30,7 +30,7 @@ const (
 func (c *Client) GetRepoFileRaw(ctx context.Context, req gitserver.GetRepoInfoByPathReq) (string, error) {
 	var data []byte
 	repoType := fmt.Sprintf("%ss", string(req.RepoType))
-	ctx, cancel := context.WithTimeout(ctx, c.timeoutTime)
+	ctx, cancel := context.WithTimeout(ctx, c.timeout)
 	defer cancel()
 	repository := &gitalypb.Repository{
 		StorageName:  c.config.GitalyServer.Storage,
@@ -145,7 +145,7 @@ func (c *Client) CreateRepoFile(req *types.CreateFileReq) (err error) {
 		req.NewBranch = req.Branch
 	}
 
-	ctx, cancel := context.WithTimeout(ctx, c.timeoutTime)
+	ctx, cancel := context.WithTimeout(ctx, c.timeout)
 	defer cancel()
 	userCommitFilesClient, err := c.operationClient.UserCommitFiles(ctx)
 	if err != nil {
@@ -156,25 +156,47 @@ func (c *Client) CreateRepoFile(req *types.CreateFileReq) (err error) {
 		RelativePath: BuildRelativePath(repoType, req.Namespace, req.Name),
 		GlRepository: filepath.Join(repoType, req.Namespace, req.Name),
 	}
+
+	startRepo := repository
+
+	if len(req.StartNamespace) > 0 && len(req.StartName) > 0 {
+		startRepoType := fmt.Sprintf("%ss", string(req.StartRepoType))
+		startRepo = &gitalypb.Repository{
+			StorageName:  c.config.GitalyServer.Storage,
+			RelativePath: BuildRelativePath(startRepoType, req.StartNamespace, req.StartName),
+			GlRepository: filepath.Join(startRepoType, req.StartNamespace, req.StartName),
+		}
+	}
+
+	header := &gitalypb.UserCommitFilesRequestHeader{
+		Repository: repository,
+		User: &gitalypb.User{
+			GlId:       "user-1",
+			Name:       []byte(req.Username),
+			GlUsername: req.Username,
+			Email:      []byte(req.Email),
+		},
+		BranchName:        []byte(req.NewBranch),
+		CommitMessage:     []byte(req.Message),
+		CommitAuthorName:  []byte(req.Username),
+		CommitAuthorEmail: []byte(req.Email),
+		// StartRepository:   repository,
+		Timestamp:       timestamppb.New(time.Now()),
+		StartRepository: startRepo,
+	}
+
+	if req.Branch != "" {
+		header.StartBranchName = []byte(req.Branch)
+	}
+	if req.StartSha != "" {
+		header.StartSha = req.StartSha
+		header.StartBranchName = []byte(req.StartBranch)
+	}
+
 	actions := []*gitalypb.UserCommitFilesRequest{
 		{
 			UserCommitFilesRequestPayload: &gitalypb.UserCommitFilesRequest_Header{
-				Header: &gitalypb.UserCommitFilesRequestHeader{
-					Repository: repository,
-					User: &gitalypb.User{
-						GlId:       "user-1",
-						Name:       []byte(req.Name),
-						GlUsername: req.Username,
-						Email:      []byte(req.Email),
-					},
-					BranchName:        []byte(req.NewBranch),
-					CommitMessage:     []byte(req.Message),
-					CommitAuthorName:  []byte(req.Name),
-					CommitAuthorEmail: []byte(req.Email),
-					StartBranchName:   []byte(req.Branch),
-					StartRepository:   repository,
-					Timestamp:         timestamppb.New(time.Now()),
-				},
+				Header: header,
 			},
 		},
 		{
@@ -223,8 +245,10 @@ func (c *Client) CreateRepoFile(req *types.CreateFileReq) (err error) {
 func (c *Client) UpdateRepoFile(req *types.UpdateFileReq) (err error) {
 	ctx := context.Background()
 	repoType := fmt.Sprintf("%ss", string(req.RepoType))
-
-	ctx, cancel := context.WithTimeout(ctx, c.timeoutTime)
+	if req.NewBranch == "" {
+		req.NewBranch = req.Branch
+	}
+	ctx, cancel := context.WithTimeout(ctx, c.timeout)
 	defer cancel()
 	userCommitFilesClient, err := c.operationClient.UserCommitFiles(ctx)
 	if err != nil {
@@ -245,25 +269,49 @@ func (c *Client) UpdateRepoFile(req *types.UpdateFileReq) (err error) {
 		header.Action = gitalypb.UserCommitFilesActionHeader_MOVE
 		header.PreviousPath = []byte(req.OriginPath)
 	}
+
+	startRepo := repository
+
+	if len(req.StartNamespace) > 0 && len(req.StartName) > 0 {
+		startRepoType := fmt.Sprintf("%ss", string(req.StartRepoType))
+		startRepo = &gitalypb.Repository{
+			StorageName:  c.config.GitalyServer.Storage,
+			RelativePath: BuildRelativePath(startRepoType, req.StartNamespace, req.StartName),
+			GlRepository: filepath.Join(startRepoType, req.StartNamespace, req.StartName),
+		}
+	}
+
+	fileReqHeader := &gitalypb.UserCommitFilesRequestHeader{
+		Repository: repository,
+		User: &gitalypb.User{
+			GlId:       "user-1",
+			Name:       []byte(req.Username),
+			GlUsername: req.Username,
+			Email:      []byte(req.Email),
+		},
+		BranchName:        []byte(req.Branch),
+		CommitMessage:     []byte(req.Message),
+		CommitAuthorName:  []byte(req.Username),
+		CommitAuthorEmail: []byte(req.Email),
+		// StartBranchName:   []byte(req.NewBranch),
+		// StartRepository:   repository,
+		Timestamp:       timestamppb.New(time.Now()),
+		StartRepository: startRepo,
+	}
+
+	if req.Branch != "" {
+		fileReqHeader.StartBranchName = []byte(req.Branch)
+	}
+
+	if req.StartSha != "" {
+		fileReqHeader.StartSha = req.StartSha
+		fileReqHeader.StartBranchName = []byte(req.StartBranch)
+	}
+
 	actions := []*gitalypb.UserCommitFilesRequest{
 		{
 			UserCommitFilesRequestPayload: &gitalypb.UserCommitFilesRequest_Header{
-				Header: &gitalypb.UserCommitFilesRequestHeader{
-					Repository: repository,
-					User: &gitalypb.User{
-						GlId:       "user-1",
-						Name:       []byte(req.Username),
-						GlUsername: req.Username,
-						Email:      []byte(req.Email),
-					},
-					BranchName:        []byte(req.Branch),
-					CommitMessage:     []byte(req.Message),
-					CommitAuthorName:  []byte(req.Username),
-					CommitAuthorEmail: []byte(req.Email),
-					StartBranchName:   []byte(req.Branch),
-					StartRepository:   repository,
-					Timestamp:         timestamppb.New(time.Now()),
-				},
+				Header: fileReqHeader,
 			},
 		},
 		{
@@ -316,7 +364,7 @@ func (c *Client) DeleteRepoFile(req *types.DeleteFileReq) (err error) {
 		return err
 	}
 	defer conn.Close()
-	ctx, cancel := context.WithTimeout(ctx, c.timeoutTime)
+	ctx, cancel := context.WithTimeout(ctx, c.timeout)
 	defer cancel()
 	userCommitFilesClient, err := c.operationClient.UserCommitFiles(ctx)
 	if err != nil {
