@@ -138,18 +138,6 @@ func (c *Client) GetRepoFileContents(ctx context.Context, req gitserver.GetRepoI
 	return file, nil
 }
 
-func chunkBytes(data []byte, chunkSize int) [][]byte {
-	var chunks [][]byte
-	for i := 0; i < len(data); i += chunkSize {
-		end := i + chunkSize
-		if end > len(data) {
-			end = len(data)
-		}
-		chunks = append(chunks, data[i:end])
-	}
-	return chunks
-}
-
 func (c *Client) CreateRepoFile(req *types.CreateFileReq) (err error) {
 	ctx := context.Background()
 	repoType := fmt.Sprintf("%ss", string(req.RepoType))
@@ -205,38 +193,10 @@ func (c *Client) CreateRepoFile(req *types.CreateFileReq) (err error) {
 		header.StartBranchName = []byte(req.StartBranch)
 	}
 
-	bodys := []*gitalypb.UserCommitFilesRequest{}
-	for _, chunk := range chunkBytes([]byte(req.Content), 3<<20) {
-		bodys = append(bodys, &gitalypb.UserCommitFilesRequest{
-			UserCommitFilesRequestPayload: &gitalypb.UserCommitFilesRequest_Action{
-				Action: &gitalypb.UserCommitFilesAction{
-					UserCommitFilesActionPayload: &gitalypb.UserCommitFilesAction_Content{
-						Content: chunk,
-					},
-				},
-			},
-		})
-	}
-
 	actions := []*gitalypb.UserCommitFilesRequest{
 		{
 			UserCommitFilesRequestPayload: &gitalypb.UserCommitFilesRequest_Header{
-				Header: &gitalypb.UserCommitFilesRequestHeader{
-					Repository: repository,
-					User: &gitalypb.User{
-						GlId:       "user-1",
-						Name:       []byte(req.Name),
-						GlUsername: req.Username,
-						Email:      []byte(req.Email),
-					},
-					BranchName:        []byte(req.NewBranch),
-					CommitMessage:     []byte(req.Message),
-					CommitAuthorName:  []byte(req.Name),
-					CommitAuthorEmail: []byte(req.Email),
-					StartBranchName:   []byte(req.Branch),
-					StartRepository:   repository,
-					Timestamp:         timestamppb.New(time.Now()),
-				},
+				Header: header,
 			},
 		},
 		{
