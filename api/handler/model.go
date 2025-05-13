@@ -303,12 +303,16 @@ func (h *ModelHandler) SDKModelInfo(ctx *gin.Context) {
 		return
 	}
 	ref := ctx.Param("ref")
+	blobs, err := strconv.ParseBool(ctx.Query("blobs"))
+	if err != nil {
+		blobs = false
+	}
 	mappedBranch := ctx.Param("branch_mapped")
 	if mappedBranch != "" {
 		ref = mappedBranch
 	}
 	currentUser := httpbase.GetCurrentUser(ctx)
-	modelInfo, err := h.model.SDKModelInfo(ctx.Request.Context(), namespace, name, ref, currentUser)
+	modelInfo, err := h.model.SDKModelInfo(ctx.Request.Context(), namespace, name, ref, currentUser, blobs)
 	if err != nil {
 		if errors.Is(err, component.ErrForbidden) {
 			httpbase.ForbiddenError(ctx, err)

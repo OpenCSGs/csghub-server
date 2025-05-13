@@ -863,9 +863,9 @@ func (_c *MockModelComponent_Relations_Call) RunAndReturn(run func(context.Conte
 	return _c
 }
 
-// SDKModelInfo provides a mock function with given fields: ctx, namespace, name, ref, currentUser
-func (_m *MockModelComponent) SDKModelInfo(ctx context.Context, namespace string, name string, ref string, currentUser string) (*types.SDKModelInfo, error) {
-	ret := _m.Called(ctx, namespace, name, ref, currentUser)
+// SDKModelInfo provides a mock function with given fields: ctx, namespace, name, ref, currentUser, blobs
+func (_m *MockModelComponent) SDKModelInfo(ctx context.Context, namespace string, name string, ref string, currentUser string, blobs bool) (*types.SDKModelInfo, error) {
+	ret := _m.Called(ctx, namespace, name, ref, currentUser, blobs)
 
 	if len(ret) == 0 {
 		panic("no return value specified for SDKModelInfo")
@@ -873,19 +873,19 @@ func (_m *MockModelComponent) SDKModelInfo(ctx context.Context, namespace string
 
 	var r0 *types.SDKModelInfo
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, string, string, string) (*types.SDKModelInfo, error)); ok {
-		return rf(ctx, namespace, name, ref, currentUser)
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, string, string, bool) (*types.SDKModelInfo, error)); ok {
+		return rf(ctx, namespace, name, ref, currentUser, blobs)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, string, string, string, string) *types.SDKModelInfo); ok {
-		r0 = rf(ctx, namespace, name, ref, currentUser)
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, string, string, bool) *types.SDKModelInfo); ok {
+		r0 = rf(ctx, namespace, name, ref, currentUser, blobs)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*types.SDKModelInfo)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, string, string, string, string) error); ok {
-		r1 = rf(ctx, namespace, name, ref, currentUser)
+	if rf, ok := ret.Get(1).(func(context.Context, string, string, string, string, bool) error); ok {
+		r1 = rf(ctx, namespace, name, ref, currentUser, blobs)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -904,13 +904,14 @@ type MockModelComponent_SDKModelInfo_Call struct {
 //   - name string
 //   - ref string
 //   - currentUser string
-func (_e *MockModelComponent_Expecter) SDKModelInfo(ctx interface{}, namespace interface{}, name interface{}, ref interface{}, currentUser interface{}) *MockModelComponent_SDKModelInfo_Call {
-	return &MockModelComponent_SDKModelInfo_Call{Call: _e.mock.On("SDKModelInfo", ctx, namespace, name, ref, currentUser)}
+//   - blobs bool
+func (_e *MockModelComponent_Expecter) SDKModelInfo(ctx interface{}, namespace interface{}, name interface{}, ref interface{}, currentUser interface{}, blobs interface{}) *MockModelComponent_SDKModelInfo_Call {
+	return &MockModelComponent_SDKModelInfo_Call{Call: _e.mock.On("SDKModelInfo", ctx, namespace, name, ref, currentUser, blobs)}
 }
 
-func (_c *MockModelComponent_SDKModelInfo_Call) Run(run func(ctx context.Context, namespace string, name string, ref string, currentUser string)) *MockModelComponent_SDKModelInfo_Call {
+func (_c *MockModelComponent_SDKModelInfo_Call) Run(run func(ctx context.Context, namespace string, name string, ref string, currentUser string, blobs bool)) *MockModelComponent_SDKModelInfo_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(string), args[2].(string), args[3].(string), args[4].(string))
+		run(args[0].(context.Context), args[1].(string), args[2].(string), args[3].(string), args[4].(string), args[5].(bool))
 	})
 	return _c
 }
@@ -920,7 +921,7 @@ func (_c *MockModelComponent_SDKModelInfo_Call) Return(_a0 *types.SDKModelInfo, 
 	return _c
 }
 
-func (_c *MockModelComponent_SDKModelInfo_Call) RunAndReturn(run func(context.Context, string, string, string, string) (*types.SDKModelInfo, error)) *MockModelComponent_SDKModelInfo_Call {
+func (_c *MockModelComponent_SDKModelInfo_Call) RunAndReturn(run func(context.Context, string, string, string, string, bool) (*types.SDKModelInfo, error)) *MockModelComponent_SDKModelInfo_Call {
 	_c.Call.Return(run)
 	return _c
 }

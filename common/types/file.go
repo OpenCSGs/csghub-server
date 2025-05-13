@@ -12,6 +12,7 @@ type File struct {
 	URL            string `json:"url"`
 	Content        string `json:"content"`
 	Lfs            bool   `json:"lfs"`
+	LfsSHA256      string `json:"lfs_sha256"`
 	LfsPointerSize int    `json:"lfs_pointer_size"`
 	// relative path in lfs storage
 	LfsRelativePath string `json:"lfs_relative_path"`
@@ -171,7 +172,16 @@ type SDKFiles struct {
 }
 
 type SDKFile struct {
-	Filename string `json:"rfilename"`
+	Filename string  `json:"rfilename"`
+	BlobID   string  `json:"blobId,omitempty"`
+	Size     int64   `json:"size,omitempty"`
+	LFS      *SDKLFS `json:"lfs,omitempty"`
+}
+
+type SDKLFS struct {
+	SHA256      string `json:"sha256"`
+	Size        int64  `json:"size"`
+	PointerSize int    `json:"pointerSize"`
 }
 
 type CreateFileParams struct {

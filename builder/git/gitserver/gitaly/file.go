@@ -511,7 +511,7 @@ func (c *Client) getBlobInfo(ctx context.Context, repo *gitalypb.Repository, pat
 						for _, file := range oidFiles[string(pointer.Oid)] {
 							file.Size = p.Size
 							file.Lfs = true
-							file.SHA = p.Oid
+							file.LfsSHA256 = p.Oid
 							file.LfsRelativePath = p.RelativePath()
 							file.LfsPointerSize = int(pointer.Size)
 						}

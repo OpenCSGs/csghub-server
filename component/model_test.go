@@ -323,7 +323,7 @@ func TestModelComponent_SDKModelInfo(t *testing.T) {
 		}, nil,
 	)
 
-	info, err := mc.SDKModelInfo(ctx, "ns", "n", "main", "user")
+	info, err := mc.SDKModelInfo(ctx, "ns", "n", "main", "user", false)
 	require.Nil(t, err)
 	require.Equal(t, &types.SDKModelInfo{
 		ID:           "p/p",
