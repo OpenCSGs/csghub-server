@@ -3,6 +3,7 @@ package start
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -34,24 +35,30 @@ var Cmd = &cobra.Command{
 			DSN:     config.Database.DSN,
 		}
 
-		db, err := database.NewDB(cmd.Context(), dbConfig)
+		db, err := database.NewDB(ctx, dbConfig)
 		if err != nil {
 			err = fmt.Errorf("initializing DB connection: %w", err)
 			return
 		}
 		migrator := migrations.NewMigrator(db)
 
-		status, err := migrator.MigrationsWithStatus(ctx)
+		// migration init
+		err = migrator.Init(ctx)
 		if err != nil {
-			err = fmt.Errorf("listing database migration status: %w", err)
+			slog.Error("failed to init migration", slog.Any("error", err))
 			return
 		}
 
-		unapplied := status.Unapplied()
-		if len(unapplied) > 0 {
-			err = fmt.Errorf("abort to start, there are unapplied database migrations: %s", unapplied)
+		// migration migrate
+		group, err := migrator.Migrate(ctx)
+		if err != nil {
 			return
 		}
+		if group.IsZero() {
+			slog.Info("there are no new migrations to run (database is up to date)")
+			return
+		}
+		slog.Info(fmt.Sprintf("migrated to %s", group))
 
 		return
 	},
