@@ -71,7 +71,7 @@ type ModelComponent interface {
 	Delete(ctx context.Context, namespace, name, currentUser string) error
 	Show(ctx context.Context, namespace, name, currentUser string, needOpWeight bool) (*types.Model, error)
 	GetServerless(ctx context.Context, namespace, name, currentUser string) (*types.DeployRepo, error)
-	SDKModelInfo(ctx context.Context, namespace, name, ref, currentUser string) (*types.SDKModelInfo, error)
+	SDKModelInfo(ctx context.Context, namespace, name, ref, currentUser string, blobs bool) (*types.SDKModelInfo, error)
 	Relations(ctx context.Context, namespace, name, currentUser string) (*types.Relations, error)
 	SetRelationDatasets(ctx context.Context, req types.RelationDatasets) error
 	AddRelationDataset(ctx context.Context, req types.RelationDataset) error
@@ -562,7 +562,7 @@ func (c *modelComponentImpl) GetServerless(ctx context.Context, namespace, name,
 	return &resDeploy, nil
 }
 
-func (c *modelComponentImpl) SDKModelInfo(ctx context.Context, namespace, name, ref, currentUser string) (*types.SDKModelInfo, error) {
+func (c *modelComponentImpl) SDKModelInfo(ctx context.Context, namespace, name, ref, currentUser string, blobs bool) (*types.SDKModelInfo, error) {
 	model, err := c.modelStore.FindByPath(ctx, namespace, name)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find model, error: %w", err)
@@ -585,14 +585,31 @@ func (c *modelComponentImpl) SDKModelInfo(ctx context.Context, namespace, name, 
 		}
 	}
 
-	filePaths, err := GetFilePaths(ctx, namespace, name, "", types.ModelRepo, ref, c.gitServer.GetTree)
+	files, err := GetFilePathObjects(ctx, namespace, name, "", types.ModelRepo, ref, c.gitServer.GetTree)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get all %s files, error: %w", types.ModelRepo, err)
 	}
 
 	var sdkFiles []types.SDKFile
-	for _, filePath := range filePaths {
-		sdkFiles = append(sdkFiles, types.SDKFile{Filename: filePath})
+	for _, file := range files {
+		if blobs {
+			sdkFile := types.SDKFile{
+				Filename: file.Path,
+				BlobID:   file.SHA,
+				Size:     file.Size,
+			}
+			if file.Lfs {
+				sdkFile.LFS = &types.SDKLFS{
+					SHA256:      file.LfsSHA256,
+					PointerSize: file.LfsPointerSize,
+					Size:        file.Size,
+				}
+			}
+			sdkFiles = append(sdkFiles, sdkFile)
+		} else {
+			sdkFiles = append(sdkFiles, types.SDKFile{Filename: file.Path})
+		}
+
 	}
 
 	if ref == "" {

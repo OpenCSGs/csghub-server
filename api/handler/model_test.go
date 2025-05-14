@@ -154,7 +154,7 @@ func TestModelHandler_SDKModelInfo(t *testing.T) {
 	})
 
 	tester.WithUser()
-	tester.mocks.model.EXPECT().SDKModelInfo(tester.Ctx(), "u", "r", "main", "u").Return(&types.SDKModelInfo{
+	tester.mocks.model.EXPECT().SDKModelInfo(tester.Ctx(), "u", "r", "main", "u", false).Return(&types.SDKModelInfo{
 		ID: "m",
 	}, nil)
 	tester.WithParam("ref", "main").Execute()
