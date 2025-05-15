@@ -110,6 +110,7 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 	authCollection.NeedAPIKey = middleware.OnlyAPIKeyAuthenticator(config)
 	authCollection.NeedAdmin = middleware.NeedAdmin(config)
 	authCollection.UserMatch = middleware.UserMatch()
+	authCollection.NeedLogin = middleware.MustLogin()
 
 	if enableSwagger {
 		r.GET("/api/v1/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))

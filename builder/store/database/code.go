@@ -2,6 +2,8 @@ package database
 
 import (
 	"context"
+	"database/sql"
+	"errors"
 	"fmt"
 	"log/slog"
 	"time"
@@ -24,6 +26,7 @@ type CodeStore interface {
 	FindByPath(ctx context.Context, namespace string, repoPath string) (code *Code, err error)
 	Delete(ctx context.Context, input Code) error
 	ListByPath(ctx context.Context, paths []string) ([]Code, error)
+	CreateIfNotExist(ctx context.Context, input Code) (*Code, error)
 }
 
 func NewCodeStore() CodeStore {
@@ -196,4 +199,27 @@ func (s *codeStoreImpl) ListByPath(ctx context.Context, paths []string) ([]Code,
 		return nil, fmt.Errorf("failed to find models by path,error: %w", err)
 	}
 	return codes, nil
+}
+
+func (s *codeStoreImpl) CreateIfNotExist(ctx context.Context, input Code) (*Code, error) {
+	err := s.db.Core.NewSelect().
+		Model(&input).
+		Where("repository_id = ?", input.RepositoryID).
+		Relation("Repository").
+		Scan(ctx)
+	if err == nil {
+		return &input, nil
+	}
+
+	if !errors.Is(err, sql.ErrNoRows) {
+		return &input, err
+	}
+
+	res, err := s.db.Core.NewInsert().Model(&input).Exec(ctx, &input)
+	if err := assertAffectedOneRow(res, err); err != nil {
+		slog.Error("create code in db failed", slog.String("error", err.Error()))
+		return nil, fmt.Errorf("create code in db failed,error:%w", err)
+	}
+
+	return &input, nil
 }

@@ -337,6 +337,65 @@ func (_c *MockCodeStore_Create_Call) RunAndReturn(run func(context.Context, data
 	return _c
 }
 
+// CreateIfNotExist provides a mock function with given fields: ctx, input
+func (_m *MockCodeStore) CreateIfNotExist(ctx context.Context, input database.Code) (*database.Code, error) {
+	ret := _m.Called(ctx, input)
+
+	if len(ret) == 0 {
+		panic("no return value specified for CreateIfNotExist")
+	}
+
+	var r0 *database.Code
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, database.Code) (*database.Code, error)); ok {
+		return rf(ctx, input)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, database.Code) *database.Code); ok {
+		r0 = rf(ctx, input)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*database.Code)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, database.Code) error); ok {
+		r1 = rf(ctx, input)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockCodeStore_CreateIfNotExist_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'CreateIfNotExist'
+type MockCodeStore_CreateIfNotExist_Call struct {
+	*mock.Call
+}
+
+// CreateIfNotExist is a helper method to define mock.On call
+//   - ctx context.Context
+//   - input database.Code
+func (_e *MockCodeStore_Expecter) CreateIfNotExist(ctx interface{}, input interface{}) *MockCodeStore_CreateIfNotExist_Call {
+	return &MockCodeStore_CreateIfNotExist_Call{Call: _e.mock.On("CreateIfNotExist", ctx, input)}
+}
+
+func (_c *MockCodeStore_CreateIfNotExist_Call) Run(run func(ctx context.Context, input database.Code)) *MockCodeStore_CreateIfNotExist_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(database.Code))
+	})
+	return _c
+}
+
+func (_c *MockCodeStore_CreateIfNotExist_Call) Return(_a0 *database.Code, _a1 error) *MockCodeStore_CreateIfNotExist_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockCodeStore_CreateIfNotExist_Call) RunAndReturn(run func(context.Context, database.Code) (*database.Code, error)) *MockCodeStore_CreateIfNotExist_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // Delete provides a mock function with given fields: ctx, input
 func (_m *MockCodeStore) Delete(ctx context.Context, input database.Code) error {
 	ret := _m.Called(ctx, input)

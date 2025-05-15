@@ -337,6 +337,65 @@ func (_c *MockPromptStore_Create_Call) RunAndReturn(run func(context.Context, da
 	return _c
 }
 
+// CreateIfNotExist provides a mock function with given fields: ctx, input
+func (_m *MockPromptStore) CreateIfNotExist(ctx context.Context, input database.Prompt) (*database.Prompt, error) {
+	ret := _m.Called(ctx, input)
+
+	if len(ret) == 0 {
+		panic("no return value specified for CreateIfNotExist")
+	}
+
+	var r0 *database.Prompt
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, database.Prompt) (*database.Prompt, error)); ok {
+		return rf(ctx, input)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, database.Prompt) *database.Prompt); ok {
+		r0 = rf(ctx, input)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*database.Prompt)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, database.Prompt) error); ok {
+		r1 = rf(ctx, input)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockPromptStore_CreateIfNotExist_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'CreateIfNotExist'
+type MockPromptStore_CreateIfNotExist_Call struct {
+	*mock.Call
+}
+
+// CreateIfNotExist is a helper method to define mock.On call
+//   - ctx context.Context
+//   - input database.Prompt
+func (_e *MockPromptStore_Expecter) CreateIfNotExist(ctx interface{}, input interface{}) *MockPromptStore_CreateIfNotExist_Call {
+	return &MockPromptStore_CreateIfNotExist_Call{Call: _e.mock.On("CreateIfNotExist", ctx, input)}
+}
+
+func (_c *MockPromptStore_CreateIfNotExist_Call) Run(run func(ctx context.Context, input database.Prompt)) *MockPromptStore_CreateIfNotExist_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(database.Prompt))
+	})
+	return _c
+}
+
+func (_c *MockPromptStore_CreateIfNotExist_Call) Return(_a0 *database.Prompt, _a1 error) *MockPromptStore_CreateIfNotExist_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockPromptStore_CreateIfNotExist_Call) RunAndReturn(run func(context.Context, database.Prompt) (*database.Prompt, error)) *MockPromptStore_CreateIfNotExist_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // Delete provides a mock function with given fields: ctx, input
 func (_m *MockPromptStore) Delete(ctx context.Context, input database.Prompt) error {
 	ret := _m.Called(ctx, input)

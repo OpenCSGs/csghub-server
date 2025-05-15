@@ -25,6 +25,9 @@ type multiSyncComponentImpl struct {
 	repoStore        database.RepoStore
 	modelStore       database.ModelStore
 	datasetStore     database.DatasetStore
+	codeStore        database.CodeStore
+	promptStore      database.PromptStore
+	mcpStore         database.MCPServerStore
 	namespaceStore   database.NamespaceStore
 	userStore        database.UserStore
 	recomStore       database.RecomStore
@@ -55,6 +58,9 @@ func NewMultiSyncComponent(config *config.Config) (MultiSyncComponent, error) {
 		syncVersionStore: database.NewSyncVersionStore(),
 		tagStore:         database.NewTagStore(),
 		fileStore:        database.NewFileStore(),
+		codeStore:        database.NewCodeStore(),
+		promptStore:      database.NewPromptStore(),
+		mcpStore:         database.NewMCPServerStore(),
 		gitServer:        git,
 	}, nil
 }
@@ -160,6 +166,66 @@ func (c *multiSyncComponentImpl) SyncAsClient(ctx context.Context, sc multisync.
 			datasetInfo.Readme = ReadMeData
 			ctxCreateDataset, cancel := context.WithTimeout(ctx, 5*time.Second)
 			err = c.createLocalDataset(ctxCreateDataset, datasetInfo, sv, sc)
+			cancel()
+			if err != nil {
+				slog.Error("failed to create local synced repo", slog.Any("sync_version", v), slog.Any("error", err))
+			}
+		case types.CodeRepo:
+			ctxGetCode, cancel := context.WithTimeout(ctx, 10*time.Second)
+			codeInfo, err := sc.CodeInfo(ctxGetCode, sv)
+			if err != nil {
+				slog.Error("failed to get code info from client", slog.Any("sync_version", v))
+				cancel()
+				continue
+			}
+			ReadMeData, err := sc.ReadMeData(ctxGetCode, sv)
+			if err != nil {
+				slog.Error("failed to get code readme from client", slog.Any("sync_version", v), slog.Any("error", err))
+			}
+			cancel()
+			codeInfo.Readme = ReadMeData
+			ctxCreateCode, cancel := context.WithTimeout(ctx, 5*time.Second)
+			err = c.createLocalCode(ctxCreateCode, codeInfo, sv, sc)
+			cancel()
+			if err != nil {
+				slog.Error("failed to create local synced repo", slog.Any("sync_version", v), slog.Any("error", err))
+			}
+		case types.MCPServerRepo:
+			ctxGetMCPServer, cancel := context.WithTimeout(ctx, 10*time.Second)
+			mcpServerInfo, err := sc.MCPServerInfo(ctxGetMCPServer, sv)
+			if err != nil {
+				slog.Error("failed to get mcpServer info from client", slog.Any("sync_version", v))
+				cancel()
+				continue
+			}
+			ReadMeData, err := sc.ReadMeData(ctxGetMCPServer, sv)
+			if err != nil {
+				slog.Error("failed to get mcpServer readme from client", slog.Any("sync_version", v), slog.Any("error", err))
+			}
+			cancel()
+			mcpServerInfo.Readme = ReadMeData
+			ctxCreateMCPServer, cancel := context.WithTimeout(ctx, 5*time.Second)
+			err = c.createLocalMCPServer(ctxCreateMCPServer, mcpServerInfo, sv, sc)
+			cancel()
+			if err != nil {
+				slog.Error("failed to create local synced repo", slog.Any("sync_version", v), slog.Any("error", err))
+			}
+		case types.PromptRepo:
+			ctxGetPrompt, cancel := context.WithTimeout(ctx, 10*time.Second)
+			promptInfo, err := sc.PromptInfo(ctxGetPrompt, sv)
+			if err != nil {
+				slog.Error("failed to get prompt info from client", slog.Any("sync_version", v))
+				cancel()
+				continue
+			}
+			ReadMeData, err := sc.ReadMeData(ctxGetPrompt, sv)
+			if err != nil {
+				slog.Error("failed to get prompt readme from client", slog.Any("sync_version", v), slog.Any("error", err))
+			}
+			cancel()
+			promptInfo.Readme = ReadMeData
+			ctxCreatePrompt, cancel := context.WithTimeout(ctx, 5*time.Second)
+			err = c.createLocalPrompt(ctxCreatePrompt, promptInfo, sv, sc)
 			cancel()
 			if err != nil {
 				slog.Error("failed to create local synced repo", slog.Any("sync_version", v), slog.Any("error", err))
@@ -434,6 +500,425 @@ func (c *multiSyncComponentImpl) createLocalModel(ctx context.Context, m *types.
 		BaseModel:    m.BaseModel,
 	}
 	_, err = c.modelStore.CreateIfNotExist(ctx, dbModel)
+	if err != nil {
+		return fmt.Errorf("failed to create database model, cause: %w", err)
+	}
+
+	// create new trending scores related to repo
+	if len(m.Scores) != 0 {
+		err = c.createLocalRecom(ctx, newDBRepo.ID, m.Scores)
+		if err != nil {
+			return fmt.Errorf("failed to create database.recom_repo_scores, cause: %w", err)
+		}
+	}
+	return nil
+}
+
+func (c *multiSyncComponentImpl) createLocalCode(ctx context.Context, m *types.Code, s types.SyncVersion, sc multisync.Client) error {
+	namespace, name, _ := strings.Cut(m.Path, "/")
+	//add prefix to avoid namespace conflict
+	namespace = common.AddPrefixBySourceID(s.SourceID, namespace)
+
+	//use namespace as the user login name
+	userName := namespace
+	var user database.User
+	user, err := c.getUser(ctx, userName)
+	if err != nil {
+		if err != sql.ErrNoRows {
+			return fmt.Errorf("fail to get user, userName:%s, error: %w", userName, err)
+		}
+	}
+	//user not exists, create new one
+	if user.ID == 0 {
+		//create as user instead of org, no matter if the namespace is org or user
+		user, err = c.createUser(ctx, types.CreateUserRequest{
+			Name:     m.User.Nickname,
+			Username: userName,
+			// Add userName to email to avoid email conflict
+			Email: common.MD5Hash(fmt.Sprintf("%s_%s", userName, m.User.Email)),
+			UUID:  uuid.New().String(),
+		})
+		if err != nil {
+			return fmt.Errorf("fail to create user for namespace, namespace:%s, error: %w", namespace, err)
+		}
+	}
+	//create new database repo
+	dbRepo := database.Repository{
+		UserID: user.ID,
+		//new path with prefixed namespace
+		Path:        path.Join(namespace, name),
+		GitPath:     fmt.Sprintf("%ss_%s/%s", types.CodeRepo, namespace, name),
+		Name:        name,
+		Nickname:    m.Nickname,
+		Description: m.Description,
+		Private:     m.Private,
+		Readme:      m.Readme,
+		// License:        req.License,
+		DefaultBranch:  m.DefaultBranch,
+		RepositoryType: types.CodeRepo,
+		Source:         types.OpenCSGSource,
+		SyncStatus:     types.SyncStatusPending,
+		// HTTPCloneURL:   gitRepo.HttpCloneURL,
+		// SSHCloneURL:    gitRepo.SshCloneURL,
+		MSPath:  m.MultiSource.MSPath,
+		HFPath:  m.MultiSource.HFPath,
+		CSGPath: m.MultiSource.CSGPath,
+	}
+	newDBRepo, err := c.repoStore.UpdateOrCreateRepo(ctx, dbRepo)
+	if err != nil {
+		return fmt.Errorf("fail to create database repo, error: %w", err)
+	}
+
+	if len(m.Tags) > 0 {
+		var repoTags []database.RepositoryTag
+		for _, tag := range m.Tags {
+			dbTag := database.Tag{
+				Name:     tag.Name,
+				Category: tag.Category,
+				Group:    tag.Group,
+				BuiltIn:  tag.BuiltIn,
+				ShowName: tag.ShowName,
+				Scope:    types.CodeTagScope,
+			}
+			t, err := c.tagStore.FindOrCreate(ctx, dbTag)
+			if err != nil {
+				slog.Error("failed to create or find database tag", slog.Any("tag", dbTag))
+				continue
+			}
+			repoTags = append(repoTags, database.RepositoryTag{
+				RepositoryID: newDBRepo.ID,
+				TagID:        t.ID,
+			})
+		}
+		err = c.repoStore.DeleteAllTags(ctx, newDBRepo.ID)
+		if err != nil && err != sql.ErrNoRows {
+			slog.Error("failed to delete database tag", slog.Any("error", err))
+		}
+		err = c.repoStore.BatchCreateRepoTags(ctx, repoTags)
+		if err != nil {
+			slog.Error("failed to batch create database tag", slog.Any("error", err))
+		}
+	}
+
+	err = c.repoStore.DeleteAllFiles(ctx, newDBRepo.ID)
+	if err != nil && err != sql.ErrNoRows {
+		slog.Error("failed to delete all files for repo", slog.Any("error", err))
+	}
+
+	ctxGetFileList, cancel := context.WithTimeout(ctx, 5*time.Second)
+	files, err := sc.FileList(ctxGetFileList, s)
+	cancel()
+	if err != nil && err != sql.ErrNoRows {
+		slog.Error("failed to get all files of repo", slog.Any("sync_version", s), slog.Any("error", err))
+	}
+	if len(files) > 0 {
+		var dbFiles []database.File
+		for _, f := range files {
+			dbFiles = append(dbFiles, database.File{
+				Name:              f.Name,
+				Path:              f.Path,
+				ParentPath:        common.ConvertDotToSlash(filepath.Dir(f.Path)),
+				Size:              f.Size,
+				LastCommitMessage: f.Commit.Message,
+				LastCommitDate:    f.Commit.CommitterDate,
+				RepositoryID:      newDBRepo.ID,
+			})
+		}
+
+		err = c.fileStore.BatchCreate(ctx, dbFiles)
+		if err != nil {
+			slog.Error("failed to create all files of repo", slog.Any("sync_version", s))
+		}
+	}
+
+	//create new model record related to repo
+	dbCode := database.Code{
+		Repository:   newDBRepo,
+		RepositoryID: newDBRepo.ID,
+	}
+	_, err = c.codeStore.CreateIfNotExist(ctx, dbCode)
+	if err != nil {
+		return fmt.Errorf("failed to create database model, cause: %w", err)
+	}
+
+	// create new trending scores related to repo
+	if len(m.Scores) != 0 {
+		err = c.createLocalRecom(ctx, newDBRepo.ID, m.Scores)
+		if err != nil {
+			return fmt.Errorf("failed to create database.recom_repo_scores, cause: %w", err)
+		}
+	}
+	return nil
+}
+
+func (c *multiSyncComponentImpl) createLocalPrompt(ctx context.Context, m *types.PromptRes, s types.SyncVersion, sc multisync.Client) error {
+	namespace, name, _ := strings.Cut(m.Path, "/")
+	//add prefix to avoid namespace conflict
+	namespace = common.AddPrefixBySourceID(s.SourceID, namespace)
+
+	//use namespace as the user login name
+	userName := namespace
+	var user database.User
+	user, err := c.getUser(ctx, userName)
+	if err != nil {
+		if err != sql.ErrNoRows {
+			return fmt.Errorf("fail to get user, userName:%s, error: %w", userName, err)
+		}
+	}
+	//user not exists, create new one
+	if user.ID == 0 {
+		//create as user instead of org, no matter if the namespace is org or user
+		user, err = c.createUser(ctx, types.CreateUserRequest{
+			Name:     m.User.Nickname,
+			Username: userName,
+			// Add userName to email to avoid email conflict
+			Email: common.MD5Hash(fmt.Sprintf("%s_%s", userName, m.User.Email)),
+			UUID:  uuid.New().String(),
+		})
+		if err != nil {
+			return fmt.Errorf("fail to create user for namespace, namespace:%s, error: %w", namespace, err)
+		}
+	}
+	//create new database repo
+	dbRepo := database.Repository{
+		UserID: user.ID,
+		//new path with prefixed namespace
+		Path:        path.Join(namespace, name),
+		GitPath:     fmt.Sprintf("%ss_%s/%s", types.PromptRepo, namespace, name),
+		Name:        name,
+		Nickname:    m.Nickname,
+		Description: m.Description,
+		Private:     m.Private,
+		Readme:      m.Readme,
+		// License:        req.License,
+		DefaultBranch:  m.DefaultBranch,
+		RepositoryType: types.PromptRepo,
+		Source:         types.OpenCSGSource,
+		SyncStatus:     types.SyncStatusPending,
+		// HTTPCloneURL:   gitRepo.HttpCloneURL,
+		// SSHCloneURL:    gitRepo.SshCloneURL,
+		MSPath:  m.MultiSource.MSPath,
+		HFPath:  m.MultiSource.HFPath,
+		CSGPath: m.MultiSource.CSGPath,
+	}
+	newDBRepo, err := c.repoStore.UpdateOrCreateRepo(ctx, dbRepo)
+	if err != nil {
+		return fmt.Errorf("fail to create database repo, error: %w", err)
+	}
+
+	if len(m.Tags) > 0 {
+		var repoTags []database.RepositoryTag
+		for _, tag := range m.Tags {
+			dbTag := database.Tag{
+				Name:     tag.Name,
+				Category: tag.Category,
+				Group:    tag.Group,
+				BuiltIn:  tag.BuiltIn,
+				ShowName: tag.ShowName,
+				Scope:    types.CodeTagScope,
+			}
+			t, err := c.tagStore.FindOrCreate(ctx, dbTag)
+			if err != nil {
+				slog.Error("failed to create or find database tag", slog.Any("tag", dbTag))
+				continue
+			}
+			repoTags = append(repoTags, database.RepositoryTag{
+				RepositoryID: newDBRepo.ID,
+				TagID:        t.ID,
+			})
+		}
+		err = c.repoStore.DeleteAllTags(ctx, newDBRepo.ID)
+		if err != nil && err != sql.ErrNoRows {
+			slog.Error("failed to delete database tag", slog.Any("error", err))
+		}
+		err = c.repoStore.BatchCreateRepoTags(ctx, repoTags)
+		if err != nil {
+			slog.Error("failed to batch create database tag", slog.Any("error", err))
+		}
+	}
+
+	err = c.repoStore.DeleteAllFiles(ctx, newDBRepo.ID)
+	if err != nil && err != sql.ErrNoRows {
+		slog.Error("failed to delete all files for repo", slog.Any("error", err))
+	}
+
+	ctxGetFileList, cancel := context.WithTimeout(ctx, 5*time.Second)
+	files, err := sc.FileList(ctxGetFileList, s)
+	cancel()
+	if err != nil && err != sql.ErrNoRows {
+		slog.Error("failed to get all files of repo", slog.Any("sync_version", s), slog.Any("error", err))
+	}
+	if len(files) > 0 {
+		var dbFiles []database.File
+		for _, f := range files {
+			dbFiles = append(dbFiles, database.File{
+				Name:              f.Name,
+				Path:              f.Path,
+				ParentPath:        common.ConvertDotToSlash(filepath.Dir(f.Path)),
+				Size:              f.Size,
+				LastCommitMessage: f.Commit.Message,
+				LastCommitDate:    f.Commit.CommitterDate,
+				RepositoryID:      newDBRepo.ID,
+			})
+		}
+
+		err = c.fileStore.BatchCreate(ctx, dbFiles)
+		if err != nil {
+			slog.Error("failed to create all files of repo", slog.Any("sync_version", s))
+		}
+	}
+
+	//create new model record related to repo
+	dbPrompt := database.Prompt{
+		Repository:   newDBRepo,
+		RepositoryID: newDBRepo.ID,
+	}
+	_, err = c.promptStore.CreateIfNotExist(ctx, dbPrompt)
+	if err != nil {
+		return fmt.Errorf("failed to create database model, cause: %w", err)
+	}
+
+	// create new trending scores related to repo
+	if len(m.Scores) != 0 {
+		err = c.createLocalRecom(ctx, newDBRepo.ID, m.Scores)
+		if err != nil {
+			return fmt.Errorf("failed to create database.recom_repo_scores, cause: %w", err)
+		}
+	}
+	return nil
+}
+
+func (c *multiSyncComponentImpl) createLocalMCPServer(ctx context.Context, m *types.MCPServer, s types.SyncVersion, sc multisync.Client) error {
+	namespace, name, _ := strings.Cut(m.Path, "/")
+	//add prefix to avoid namespace conflict
+	namespace = common.AddPrefixBySourceID(s.SourceID, namespace)
+
+	//use namespace as the user login name
+	userName := namespace
+	var user database.User
+	user, err := c.getUser(ctx, userName)
+	if err != nil {
+		if err != sql.ErrNoRows {
+			return fmt.Errorf("fail to get user, userName:%s, error: %w", userName, err)
+		}
+	}
+	//user not exists, create new one
+	if user.ID == 0 {
+		//create as user instead of org, no matter if the namespace is org or user
+		user, err = c.createUser(ctx, types.CreateUserRequest{
+			Name:     m.User.Nickname,
+			Username: userName,
+			// Add userName to email to avoid email conflict
+			Email: common.MD5Hash(fmt.Sprintf("%s_%s", userName, m.User.Email)),
+			UUID:  uuid.New().String(),
+		})
+		if err != nil {
+			return fmt.Errorf("fail to create user for namespace, namespace:%s, error: %w", namespace, err)
+		}
+	}
+	//create new database repo
+	dbRepo := database.Repository{
+		UserID: user.ID,
+		//new path with prefixed namespace
+		Path:        path.Join(namespace, name),
+		GitPath:     fmt.Sprintf("%ss_%s/%s", types.MCPServerRepo, namespace, name),
+		Name:        name,
+		Nickname:    m.Nickname,
+		Description: m.Description,
+		Private:     m.Private,
+		Readme:      m.Readme,
+		// License:        req.License,
+		DefaultBranch:  m.DefaultBranch,
+		RepositoryType: types.MCPServerRepo,
+		Source:         types.OpenCSGSource,
+		SyncStatus:     types.SyncStatusPending,
+		// HTTPCloneURL:   gitRepo.HttpCloneURL,
+		// SSHCloneURL:    gitRepo.SshCloneURL,
+		MSPath:  m.MultiSource.MSPath,
+		HFPath:  m.MultiSource.HFPath,
+		CSGPath: m.MultiSource.CSGPath,
+	}
+	newDBRepo, err := c.repoStore.UpdateOrCreateRepo(ctx, dbRepo)
+	if err != nil {
+		return fmt.Errorf("fail to create database repo, error: %w", err)
+	}
+
+	if len(m.Tags) > 0 {
+		var repoTags []database.RepositoryTag
+		for _, tag := range m.Tags {
+			dbTag := database.Tag{
+				Name:     tag.Name,
+				Category: tag.Category,
+				Group:    tag.Group,
+				BuiltIn:  tag.BuiltIn,
+				ShowName: tag.ShowName,
+				Scope:    types.CodeTagScope,
+			}
+			t, err := c.tagStore.FindOrCreate(ctx, dbTag)
+			if err != nil {
+				slog.Error("failed to create or find database tag", slog.Any("tag", dbTag))
+				continue
+			}
+			repoTags = append(repoTags, database.RepositoryTag{
+				RepositoryID: newDBRepo.ID,
+				TagID:        t.ID,
+			})
+		}
+		err = c.repoStore.DeleteAllTags(ctx, newDBRepo.ID)
+		if err != nil && err != sql.ErrNoRows {
+			slog.Error("failed to delete database tag", slog.Any("error", err))
+		}
+		err = c.repoStore.BatchCreateRepoTags(ctx, repoTags)
+		if err != nil {
+			slog.Error("failed to batch create database tag", slog.Any("error", err))
+		}
+	}
+
+	err = c.repoStore.DeleteAllFiles(ctx, newDBRepo.ID)
+	if err != nil && err != sql.ErrNoRows {
+		slog.Error("failed to delete all files for repo", slog.Any("error", err))
+	}
+
+	ctxGetFileList, cancel := context.WithTimeout(ctx, 5*time.Second)
+	files, err := sc.FileList(ctxGetFileList, s)
+	cancel()
+	if err != nil && err != sql.ErrNoRows {
+		slog.Error("failed to get all files of repo", slog.Any("sync_version", s), slog.Any("error", err))
+	}
+	if len(files) > 0 {
+		var dbFiles []database.File
+		for _, f := range files {
+			dbFiles = append(dbFiles, database.File{
+				Name:              f.Name,
+				Path:              f.Path,
+				ParentPath:        common.ConvertDotToSlash(filepath.Dir(f.Path)),
+				Size:              f.Size,
+				LastCommitMessage: f.Commit.Message,
+				LastCommitDate:    f.Commit.CommitterDate,
+				RepositoryID:      newDBRepo.ID,
+			})
+		}
+
+		err = c.fileStore.BatchCreate(ctx, dbFiles)
+		if err != nil {
+			slog.Error("failed to create all files of repo", slog.Any("sync_version", s))
+		}
+	}
+
+	//create new model record related to repo
+	dbMCPServer := database.MCPServer{
+		Repository:      newDBRepo,
+		RepositoryID:    newDBRepo.ID,
+		ToolsNum:        m.ToolsNum,
+		Configuration:   m.Configuration,
+		Schema:          m.Schema,
+		ProgramLanguage: m.ProgramLanguage,
+		RunMode:         m.RunMode,
+		InstallDepsCmds: m.InstallDepsCmds,
+		BuildCmds:       m.BuildCmds,
+		LaunchCmds:      m.LaunchCmds,
+	}
+	_, err = c.mcpStore.CreateIfNotExist(ctx, dbMCPServer)
 	if err != nil {
 		return fmt.Errorf("failed to create database model, cause: %w", err)
 	}

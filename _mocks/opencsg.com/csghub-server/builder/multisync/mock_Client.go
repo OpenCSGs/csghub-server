@@ -23,6 +23,65 @@ func (_m *MockClient) EXPECT() *MockClient_Expecter {
 	return &MockClient_Expecter{mock: &_m.Mock}
 }
 
+// CodeInfo provides a mock function with given fields: ctx, v
+func (_m *MockClient) CodeInfo(ctx context.Context, v types.SyncVersion) (*types.Code, error) {
+	ret := _m.Called(ctx, v)
+
+	if len(ret) == 0 {
+		panic("no return value specified for CodeInfo")
+	}
+
+	var r0 *types.Code
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, types.SyncVersion) (*types.Code, error)); ok {
+		return rf(ctx, v)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, types.SyncVersion) *types.Code); ok {
+		r0 = rf(ctx, v)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*types.Code)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, types.SyncVersion) error); ok {
+		r1 = rf(ctx, v)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockClient_CodeInfo_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'CodeInfo'
+type MockClient_CodeInfo_Call struct {
+	*mock.Call
+}
+
+// CodeInfo is a helper method to define mock.On call
+//   - ctx context.Context
+//   - v types.SyncVersion
+func (_e *MockClient_Expecter) CodeInfo(ctx interface{}, v interface{}) *MockClient_CodeInfo_Call {
+	return &MockClient_CodeInfo_Call{Call: _e.mock.On("CodeInfo", ctx, v)}
+}
+
+func (_c *MockClient_CodeInfo_Call) Run(run func(ctx context.Context, v types.SyncVersion)) *MockClient_CodeInfo_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(types.SyncVersion))
+	})
+	return _c
+}
+
+func (_c *MockClient_CodeInfo_Call) Return(_a0 *types.Code, _a1 error) *MockClient_CodeInfo_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockClient_CodeInfo_Call) RunAndReturn(run func(context.Context, types.SyncVersion) (*types.Code, error)) *MockClient_CodeInfo_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // DatasetInfo provides a mock function with given fields: ctx, v
 func (_m *MockClient) DatasetInfo(ctx context.Context, v types.SyncVersion) (*types.Dataset, error) {
 	ret := _m.Called(ctx, v)
@@ -198,6 +257,65 @@ func (_c *MockClient_Latest_Call) RunAndReturn(run func(context.Context, int64) 
 	return _c
 }
 
+// MCPServerInfo provides a mock function with given fields: ctx, v
+func (_m *MockClient) MCPServerInfo(ctx context.Context, v types.SyncVersion) (*types.MCPServer, error) {
+	ret := _m.Called(ctx, v)
+
+	if len(ret) == 0 {
+		panic("no return value specified for MCPServerInfo")
+	}
+
+	var r0 *types.MCPServer
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, types.SyncVersion) (*types.MCPServer, error)); ok {
+		return rf(ctx, v)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, types.SyncVersion) *types.MCPServer); ok {
+		r0 = rf(ctx, v)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*types.MCPServer)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, types.SyncVersion) error); ok {
+		r1 = rf(ctx, v)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockClient_MCPServerInfo_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'MCPServerInfo'
+type MockClient_MCPServerInfo_Call struct {
+	*mock.Call
+}
+
+// MCPServerInfo is a helper method to define mock.On call
+//   - ctx context.Context
+//   - v types.SyncVersion
+func (_e *MockClient_Expecter) MCPServerInfo(ctx interface{}, v interface{}) *MockClient_MCPServerInfo_Call {
+	return &MockClient_MCPServerInfo_Call{Call: _e.mock.On("MCPServerInfo", ctx, v)}
+}
+
+func (_c *MockClient_MCPServerInfo_Call) Run(run func(ctx context.Context, v types.SyncVersion)) *MockClient_MCPServerInfo_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(types.SyncVersion))
+	})
+	return _c
+}
+
+func (_c *MockClient_MCPServerInfo_Call) Return(_a0 *types.MCPServer, _a1 error) *MockClient_MCPServerInfo_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockClient_MCPServerInfo_Call) RunAndReturn(run func(context.Context, types.SyncVersion) (*types.MCPServer, error)) *MockClient_MCPServerInfo_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // ModelInfo provides a mock function with given fields: ctx, v
 func (_m *MockClient) ModelInfo(ctx context.Context, v types.SyncVersion) (*types.Model, error) {
 	ret := _m.Called(ctx, v)
@@ -253,6 +371,65 @@ func (_c *MockClient_ModelInfo_Call) Return(_a0 *types.Model, _a1 error) *MockCl
 }
 
 func (_c *MockClient_ModelInfo_Call) RunAndReturn(run func(context.Context, types.SyncVersion) (*types.Model, error)) *MockClient_ModelInfo_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// PromptInfo provides a mock function with given fields: ctx, v
+func (_m *MockClient) PromptInfo(ctx context.Context, v types.SyncVersion) (*types.PromptRes, error) {
+	ret := _m.Called(ctx, v)
+
+	if len(ret) == 0 {
+		panic("no return value specified for PromptInfo")
+	}
+
+	var r0 *types.PromptRes
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, types.SyncVersion) (*types.PromptRes, error)); ok {
+		return rf(ctx, v)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, types.SyncVersion) *types.PromptRes); ok {
+		r0 = rf(ctx, v)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*types.PromptRes)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, types.SyncVersion) error); ok {
+		r1 = rf(ctx, v)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockClient_PromptInfo_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'PromptInfo'
+type MockClient_PromptInfo_Call struct {
+	*mock.Call
+}
+
+// PromptInfo is a helper method to define mock.On call
+//   - ctx context.Context
+//   - v types.SyncVersion
+func (_e *MockClient_Expecter) PromptInfo(ctx interface{}, v interface{}) *MockClient_PromptInfo_Call {
+	return &MockClient_PromptInfo_Call{Call: _e.mock.On("PromptInfo", ctx, v)}
+}
+
+func (_c *MockClient_PromptInfo_Call) Run(run func(ctx context.Context, v types.SyncVersion)) *MockClient_PromptInfo_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(types.SyncVersion))
+	})
+	return _c
+}
+
+func (_c *MockClient_PromptInfo_Call) Return(_a0 *types.PromptRes, _a1 error) *MockClient_PromptInfo_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockClient_PromptInfo_Call) RunAndReturn(run func(context.Context, types.SyncVersion) (*types.PromptRes, error)) *MockClient_PromptInfo_Call {
 	_c.Call.Return(run)
 	return _c
 }

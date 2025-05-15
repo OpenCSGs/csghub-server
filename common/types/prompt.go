@@ -104,6 +104,9 @@ type PromptRes struct {
 	CanWrite      bool                 `json:"can_write"`
 	CanManage     bool                 `json:"can_manage"`
 	Namespace     *Namespace           `json:"namespace"`
+	RecomOpWeight int                  `json:"recom_op_weight,omitempty"`
+	Scores        []WeightScore        `json:"scores"`
+	MultiSource
 }
 
 type PromptOutput struct {

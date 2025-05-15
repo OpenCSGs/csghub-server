@@ -458,6 +458,65 @@ func (_c *MockMCPServerStore_Create_Call) RunAndReturn(run func(context.Context,
 	return _c
 }
 
+// CreateIfNotExist provides a mock function with given fields: ctx, input
+func (_m *MockMCPServerStore) CreateIfNotExist(ctx context.Context, input database.MCPServer) (*database.MCPServer, error) {
+	ret := _m.Called(ctx, input)
+
+	if len(ret) == 0 {
+		panic("no return value specified for CreateIfNotExist")
+	}
+
+	var r0 *database.MCPServer
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, database.MCPServer) (*database.MCPServer, error)); ok {
+		return rf(ctx, input)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, database.MCPServer) *database.MCPServer); ok {
+		r0 = rf(ctx, input)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*database.MCPServer)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, database.MCPServer) error); ok {
+		r1 = rf(ctx, input)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockMCPServerStore_CreateIfNotExist_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'CreateIfNotExist'
+type MockMCPServerStore_CreateIfNotExist_Call struct {
+	*mock.Call
+}
+
+// CreateIfNotExist is a helper method to define mock.On call
+//   - ctx context.Context
+//   - input database.MCPServer
+func (_e *MockMCPServerStore_Expecter) CreateIfNotExist(ctx interface{}, input interface{}) *MockMCPServerStore_CreateIfNotExist_Call {
+	return &MockMCPServerStore_CreateIfNotExist_Call{Call: _e.mock.On("CreateIfNotExist", ctx, input)}
+}
+
+func (_c *MockMCPServerStore_CreateIfNotExist_Call) Run(run func(ctx context.Context, input database.MCPServer)) *MockMCPServerStore_CreateIfNotExist_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(database.MCPServer))
+	})
+	return _c
+}
+
+func (_c *MockMCPServerStore_CreateIfNotExist_Call) Return(_a0 *database.MCPServer, _a1 error) *MockMCPServerStore_CreateIfNotExist_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockMCPServerStore_CreateIfNotExist_Call) RunAndReturn(run func(context.Context, database.MCPServer) (*database.MCPServer, error)) *MockMCPServerStore_CreateIfNotExist_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // Delete provides a mock function with given fields: ctx, input
 func (_m *MockMCPServerStore) Delete(ctx context.Context, input database.MCPServer) error {
 	ret := _m.Called(ctx, input)

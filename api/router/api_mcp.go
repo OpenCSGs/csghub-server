@@ -43,5 +43,6 @@ func CreateMCPServerRoutes(
 		mcpGroup.POST("/:namespace/:name/update_downloads", middleware.RepoType(types.MCPServerRepo), repoCommonHandler.UpdateDownloads)
 		mcpGroup.PUT("/:namespace/:name/incr_downloads", authCollection.NeedLogin, middleware.RepoType(types.MCPServerRepo), repoCommonHandler.IncrDownloads)
 		mcpGroup.POST("/:namespace/:name/upload_file", authCollection.NeedLogin, middleware.RepoType(types.MCPServerRepo), repoCommonHandler.UploadFile)
+		mcpGroup.POST("/:namespace/:name/mirror_from_saas", authCollection.NeedLogin, middleware.RepoType(types.MCPServerRepo), repoCommonHandler.MirrorFromSaas)
 	}
 }
