@@ -295,3 +295,24 @@ func TestPromptStore_ByUserName(t *testing.T) {
 	}
 
 }
+
+func TestPromptStore_CreateIfNotExist(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+	ctx := context.TODO()
+
+	ps := database.NewPromptStoreWithDB(db)
+	p, err := ps.CreateIfNotExist(ctx, database.Prompt{
+		ID:           1,
+		RepositoryID: 1,
+	})
+	require.Nil(t, err)
+	require.Equal(t, p.ID, int64(1))
+
+	p, err = ps.CreateIfNotExist(ctx, database.Prompt{
+		ID:           1,
+		RepositoryID: 1,
+	})
+	require.Nil(t, err)
+	require.Equal(t, p.ID, int64(1))
+}

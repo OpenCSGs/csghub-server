@@ -3,6 +3,7 @@ package database
 import (
 	"context"
 	"fmt"
+	"log/slog"
 
 	"github.com/uptrace/bun"
 )
@@ -27,6 +28,7 @@ type PromptStore interface {
 	Delete(ctx context.Context, input Prompt) error
 	ByUsername(ctx context.Context, username string, per, page int, onlyPublic bool) (prompts []Prompt, total int, err error)
 	ByOrgPath(ctx context.Context, namespace string, per, page int, onlyPublic bool) (prompts []Prompt, total int, err error)
+	CreateIfNotExist(ctx context.Context, input Prompt) (*Prompt, error)
 }
 
 func NewPromptStoreWithDB(db *DB) PromptStore {
@@ -153,4 +155,23 @@ func (s *promptStoreImpl) ByOrgPath(ctx context.Context, namespace string, per, 
 		return
 	}
 	return
+}
+
+func (s *promptStoreImpl) CreateIfNotExist(ctx context.Context, input Prompt) (*Prompt, error) {
+	err := s.db.Core.NewSelect().
+		Model(&input).
+		Where("repository_id = ?", input.RepositoryID).
+		Relation("Repository").
+		Scan(ctx)
+	if err == nil {
+		return &input, nil
+	}
+
+	res, err := s.db.Core.NewInsert().Model(&input).Exec(ctx, &input)
+	if err := assertAffectedOneRow(res, err); err != nil {
+		slog.Error("create prompt in db failed", slog.String("error", err.Error()))
+		return nil, fmt.Errorf("create prompt in db failed,error:%w", err)
+	}
+
+	return &input, nil
 }

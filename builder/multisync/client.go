@@ -13,6 +13,9 @@ type Client interface {
 	Latest(ctx context.Context, currentVersion int64) (types.SyncVersionResponse, error)
 	ModelInfo(ctx context.Context, v types.SyncVersion) (*types.Model, error)
 	DatasetInfo(ctx context.Context, v types.SyncVersion) (*types.Dataset, error)
+	CodeInfo(ctx context.Context, v types.SyncVersion) (*types.Code, error)
+	PromptInfo(ctx context.Context, v types.SyncVersion) (*types.PromptRes, error)
+	MCPServerInfo(ctx context.Context, v types.SyncVersion) (*types.MCPServer, error)
 	ReadMeData(ctx context.Context, v types.SyncVersion) (string, error)
 	FileList(ctx context.Context, v types.SyncVersion) ([]types.File, error)
 }
@@ -57,6 +60,39 @@ func (c *commonClient) DatasetInfo(ctx context.Context, v types.SyncVersion) (*t
 	err := c.rpcClent.Get(ctx, url, &res)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get dataset info, cause: %w", err)
+	}
+	return &res.Data, nil
+}
+
+func (c *commonClient) CodeInfo(ctx context.Context, v types.SyncVersion) (*types.Code, error) {
+	namespace, name, _ := strings.Cut(v.RepoPath, "/")
+	url := fmt.Sprintf("/api/v1/codes/%s/%s?need_multi_sync=true", namespace, name)
+	var res types.CodeResponse
+	err := c.rpcClent.Get(ctx, url, &res)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get codes info, cause: %w", err)
+	}
+	return &res.Data, nil
+}
+
+func (c *commonClient) PromptInfo(ctx context.Context, v types.SyncVersion) (*types.PromptRes, error) {
+	namespace, name, _ := strings.Cut(v.RepoPath, "/")
+	url := fmt.Sprintf("/api/v1/prompts_info/%s/%s?need_multi_sync=true", namespace, name)
+	var res types.PromptResponse
+	err := c.rpcClent.Get(ctx, url, &res)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get prompt info, cause: %w", err)
+	}
+	return &res.Data, nil
+}
+
+func (c *commonClient) MCPServerInfo(ctx context.Context, v types.SyncVersion) (*types.MCPServer, error) {
+	namespace, name, _ := strings.Cut(v.RepoPath, "/")
+	url := fmt.Sprintf("/api/v1/mcps/%s/%s?need_multi_sync=true", namespace, name)
+	var res types.MCPServerResponse
+	err := c.rpcClent.Get(ctx, url, &res)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get mcpserver info, cause: %w", err)
 	}
 	return &res.Data, nil
 }

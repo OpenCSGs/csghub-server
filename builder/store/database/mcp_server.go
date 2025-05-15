@@ -3,6 +3,7 @@ package database
 import (
 	"context"
 	"fmt"
+	"log/slog"
 
 	"github.com/uptrace/bun"
 	"opencsg.com/csghub-server/common/types"
@@ -48,6 +49,7 @@ type MCPServerStore interface {
 	ByUsername(ctx context.Context, username string, per, page int, onlyPublic bool) ([]MCPServer, int, error)
 	ByOrgPath(ctx context.Context, namespace string, per, page int, onlyPublic bool) ([]MCPServer, int, error)
 	UserLikes(ctx context.Context, userID int64, per, page int) ([]MCPServer, int, error)
+	CreateIfNotExist(ctx context.Context, input MCPServer) (*MCPServer, error)
 }
 
 type mcpServerStoreImpl struct {
@@ -279,4 +281,23 @@ func (m *mcpServerStoreImpl) UserLikes(ctx context.Context, userID int64, per, p
 		return nil, 0, fmt.Errorf("count user liked mcp servers by userid %d: %w", userID, err)
 	}
 	return mcps, count, nil
+}
+
+func (m *mcpServerStoreImpl) CreateIfNotExist(ctx context.Context, input MCPServer) (*MCPServer, error) {
+	err := m.db.Core.NewSelect().
+		Model(&input).
+		Where("repository_id = ?", input.RepositoryID).
+		Relation("Repository").
+		Scan(ctx)
+	if err == nil {
+		return &input, nil
+	}
+
+	res, err := m.db.Core.NewInsert().Model(&input).Exec(ctx, &input)
+	if err := assertAffectedOneRow(res, err); err != nil {
+		slog.Error("create mcp server in db failed", slog.String("error", err.Error()))
+		return nil, fmt.Errorf("create mcp server in db failed,error:%w", err)
+	}
+
+	return &input, nil
 }

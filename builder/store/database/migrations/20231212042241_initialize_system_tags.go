@@ -4,13 +4,16 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"os"
-	"path/filepath"
+
+	_ "embed"
 
 	"github.com/uptrace/bun"
 	"gopkg.in/yaml.v2"
 	"opencsg.com/csghub-server/builder/store/database"
 )
+
+//go:embed seeds/tags.yml
+var tagsYmlData []byte
 
 type Tags struct {
 	Tags []database.Tag
@@ -20,20 +23,8 @@ func init() {
 	Migrations.MustRegister(func(ctx context.Context, db *bun.DB) error {
 		return db.RunInTx(ctx, &sql.TxOptions{}, func(ctx context.Context, db bun.Tx) (err error) {
 			// Read the seeds file of tags
-			currentDir, err := filepath.Abs(filepath.Dir("."))
-			if err != nil {
-				fmt.Println("Error getting current directory:", err)
-				return
-			}
-			yamlFilePath := filepath.Join(currentDir, "builder", "store", "database", "seeds", "tags.yml")
-			yamlFile, err := os.ReadFile(yamlFilePath)
-			if err != nil {
-				fmt.Println("Error reading YAML file:", err)
-				return
-			}
-
 			var tags Tags
-			err = yaml.Unmarshal(yamlFile, &tags)
+			err = yaml.Unmarshal(tagsYmlData, &tags)
 			if err != nil {
 				fmt.Println("Error parsing YAML:", err)
 				return

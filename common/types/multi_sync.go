@@ -37,6 +37,21 @@ type DatasetResponse struct {
 	Data    Dataset `json:"data"`
 }
 
+type CodeResponse struct {
+	Message string `json:"msg"`
+	Data    Code   `json:"data"`
+}
+
+type PromptResponse struct {
+	Message string    `json:"msg"`
+	Data    PromptRes `json:"data"`
+}
+
+type MCPServerResponse struct {
+	Message string    `json:"msg"`
+	Data    MCPServer `json:"data"`
+}
+
 const (
 	SyncVersionSourceOpenCSG = iota
 	SyncVersionSourceHF

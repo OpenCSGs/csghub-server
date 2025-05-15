@@ -118,3 +118,24 @@ func TestCodeStore_UserLikesCodes(t *testing.T) {
 	require.Equal(t, repo2.ID, cs[0].RepositoryID)
 
 }
+
+func TestCodeStore_CreateIfNotExist(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+	ctx := context.TODO()
+
+	cs := database.NewCodeStoreWithDB(db)
+	c, err := cs.CreateIfNotExist(ctx, database.Code{
+		ID:           1,
+		RepositoryID: 1,
+	})
+	require.Nil(t, err)
+	require.Equal(t, c.ID, int64(1))
+
+	c, err = cs.CreateIfNotExist(ctx, database.Code{
+		ID:           1,
+		RepositoryID: 1,
+	})
+	require.Nil(t, err)
+	require.Equal(t, c.ID, int64(1))
+}

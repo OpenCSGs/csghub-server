@@ -40,4 +40,7 @@ type Code struct {
 	CanManage            bool                 `json:"can_manage"`
 	Namespace            *Namespace           `json:"namespace"`
 	SensitiveCheckStatus string               `json:"sensitive_check_status"`
+	Readme               string               `json:"readme"`
+	Scores               []WeightScore        `json:"scores"`
+	MultiSource
 }

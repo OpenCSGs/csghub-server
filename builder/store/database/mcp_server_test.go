@@ -226,3 +226,24 @@ func TestMCPServerStore_UserLikes(t *testing.T) {
 	require.Equal(t, []string{"repo3", "repo1"}, names)
 
 }
+
+func TestMCPServerStore_CreateIfNotExist(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+	ctx := context.TODO()
+
+	ms := database.NewMCPServerStoreWithDB(db)
+	m, err := ms.CreateIfNotExist(ctx, database.MCPServer{
+		ID:           1,
+		RepositoryID: 1,
+	})
+	require.Nil(t, err)
+	require.Equal(t, m.ID, int64(1))
+
+	m, err = ms.CreateIfNotExist(ctx, database.MCPServer{
+		ID:           1,
+		RepositoryID: 1,
+	})
+	require.Nil(t, err)
+	require.Equal(t, m.ID, int64(1))
+}
