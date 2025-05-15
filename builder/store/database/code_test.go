@@ -130,5 +130,12 @@ func TestCodeStore_CreateIfNotExist(t *testing.T) {
 		RepositoryID: 1,
 	})
 	require.Nil(t, err)
-	require.Equal(t, c.ID, 1)
+	require.Equal(t, c.ID, int64(1))
+
+	c, err = cs.CreateIfNotExist(ctx, database.Code{
+		ID:           1,
+		RepositoryID: 1,
+	})
+	require.Nil(t, err)
+	require.Equal(t, c.ID, int64(1))
 }

@@ -238,5 +238,12 @@ func TestMCPServerStore_CreateIfNotExist(t *testing.T) {
 		RepositoryID: 1,
 	})
 	require.Nil(t, err)
-	require.Equal(t, m.ID, 1)
+	require.Equal(t, m.ID, int64(1))
+
+	m, err = ms.CreateIfNotExist(ctx, database.MCPServer{
+		ID:           1,
+		RepositoryID: 1,
+	})
+	require.Nil(t, err)
+	require.Equal(t, m.ID, int64(1))
 }

@@ -307,5 +307,12 @@ func TestPromptStore_CreateIfNotExist(t *testing.T) {
 		RepositoryID: 1,
 	})
 	require.Nil(t, err)
-	require.Equal(t, p.ID, 1)
+	require.Equal(t, p.ID, int64(1))
+
+	p, err = ps.CreateIfNotExist(ctx, database.Prompt{
+		ID:           1,
+		RepositoryID: 1,
+	})
+	require.Nil(t, err)
+	require.Equal(t, p.ID, int64(1))
 }
