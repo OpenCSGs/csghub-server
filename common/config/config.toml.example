@@ -127,6 +127,7 @@ meter_quota_send_subject = "accounting.metering.quota"
 [accounting]
 host = "http://localhost"
 port = 8086
+charging_enable = false
 
 [user]
 host = "http://localhost"
@@ -159,6 +160,8 @@ encoded_sensitive_words = "5Lmg6L+R5bmzLHhpamlucGluZw=="
 
 [workflow]
 endpoint = "localhost:7233"
+execution_timeout = 43200
+task_timeout = 43200
 
 [cron_job]
 sync_as_client_cron_expression = "0 * * * *"
@@ -166,6 +169,8 @@ calc_recom_score_cron_expression = "0 1 * * *"
 
 [proxy]
 hosts = ["opencsg.com", "sync.opencsg.com"]
+url = ""
+enable = false
 
 [instrumentation]
 otlp_endpoint = "http://localhost:4317"
@@ -185,3 +190,12 @@ image_builder_status_ttl = 300
 # --skip-tls-verify : Disable TLS certificate validation for registries.
 # Uncomment the following line to enable pull images from a private registry without https
 # image_builder_kaniko_args = ["--insecure", "--skip-tls-verify"]
+
+[git]
+operation_timeout = 300
+skip_lfs_file_validation = false
+
+[repo_template]
+empty_repo_type = "template"
+empty_name_space = "emptynamespace"
+empty_repo_name = "emptyreponame"
