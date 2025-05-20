@@ -16578,6 +16578,318 @@ const docTemplate = `{
                     }
                 }
             }
+        },
+        "/{repo_type}/{namespace}/{name}/{type}/{id}/cpu/{instance}/usage": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Monitor"
+                ],
+                "summary": "Get instance cpu usage",
+                "parameters": [
+                    {
+                        "enum": [
+                            "models",
+                            "spaces"
+                        ],
+                        "type": "string",
+                        "description": "models,spaces",
+                        "name": "repo_type",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "repo owner name",
+                        "name": "namespace",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "repo name",
+                        "name": "name",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/types.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/types.MonitorCPUResp"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            }
+        },
+        "/{repo_type}/{namespace}/{name}/{type}/{id}/memory/{instance}/usage": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Monitor"
+                ],
+                "summary": "Get instance memory usage",
+                "parameters": [
+                    {
+                        "enum": [
+                            "models",
+                            "spaces"
+                        ],
+                        "type": "string",
+                        "description": "models,spaces",
+                        "name": "repo_type",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "repo owner name",
+                        "name": "namespace",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "repo name",
+                        "name": "name",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/types.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/types.MonitorMemoryResp"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            }
+        },
+        "/{repo_type}/{namespace}/{name}/{type}/{id}/request/{instance}/count": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Monitor"
+                ],
+                "summary": "Get instance request count",
+                "parameters": [
+                    {
+                        "enum": [
+                            "models",
+                            "spaces"
+                        ],
+                        "type": "string",
+                        "description": "models,spaces",
+                        "name": "repo_type",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "repo owner name",
+                        "name": "namespace",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "repo name",
+                        "name": "name",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/types.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/types.MonitorRequestCountResp"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            }
+        },
+        "/{repo_type}/{namespace}/{name}/{type}/{id}/request/{instance}/latency": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Monitor"
+                ],
+                "summary": "Get instance request latency",
+                "parameters": [
+                    {
+                        "enum": [
+                            "models",
+                            "spaces"
+                        ],
+                        "type": "string",
+                        "description": "models,spaces",
+                        "name": "repo_type",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "repo owner name",
+                        "name": "namespace",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "repo name",
+                        "name": "name",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/types.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/types.MonitorRequestLatencyResp"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            }
         }
     },
     "definitions": {
@@ -17599,6 +17911,9 @@ const docTemplate = `{
                 "created_at": {
                     "type": "string"
                 },
+                "csg_path": {
+                    "type": "string"
+                },
                 "default_branch": {
                     "type": "string"
                 },
@@ -17608,6 +17923,9 @@ const docTemplate = `{
                 "downloads": {
                     "type": "integer"
                 },
+                "hf_path": {
+                    "type": "string"
+                },
                 "id": {
                     "type": "integer"
                 },
@@ -17616,6 +17934,9 @@ const docTemplate = `{
                 },
                 "likes": {
                     "type": "integer"
+                },
+                "ms_path": {
+                    "type": "string"
                 },
                 "name": {
                     "type": "string"
@@ -17632,11 +17953,20 @@ const docTemplate = `{
                 "private": {
                     "type": "boolean"
                 },
+                "readme": {
+                    "type": "string"
+                },
                 "repository": {
                     "$ref": "#/definitions/types.Repository"
                 },
                 "repository_id": {
                     "type": "integer"
+                },
+                "scores": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/types.WeightScore"
+                    }
                 },
                 "sensitive_check_status": {
                     "type": "string"
@@ -19105,6 +19435,9 @@ const docTemplate = `{
                     "description": "relative path in lfs storage",
                     "type": "string"
                 },
+                "lfs_sha256": {
+                    "type": "string"
+                },
                 "mode": {
                     "type": "string"
                 },
@@ -19765,6 +20098,96 @@ const docTemplate = `{
                 "ModelWidgetTypeChat"
             ]
         },
+        "types.MonitorCPUResp": {
+            "type": "object",
+            "properties": {
+                "result": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/types.MonitorData"
+                    }
+                },
+                "result_type": {
+                    "type": "string"
+                }
+            }
+        },
+        "types.MonitorData": {
+            "type": "object",
+            "properties": {
+                "metric": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "string"
+                    }
+                },
+                "value": {
+                    "$ref": "#/definitions/types.MonitorValue"
+                },
+                "values": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/types.MonitorValue"
+                    }
+                }
+            }
+        },
+        "types.MonitorMemoryResp": {
+            "type": "object",
+            "properties": {
+                "result": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/types.MonitorData"
+                    }
+                },
+                "result_type": {
+                    "type": "string"
+                }
+            }
+        },
+        "types.MonitorRequestCountResp": {
+            "type": "object",
+            "properties": {
+                "result": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/types.MonitorData"
+                    }
+                },
+                "result_type": {
+                    "type": "string"
+                },
+                "total_request_count": {
+                    "type": "integer"
+                }
+            }
+        },
+        "types.MonitorRequestLatencyResp": {
+            "type": "object",
+            "properties": {
+                "result": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/types.MonitorData"
+                    }
+                },
+                "result_type": {
+                    "type": "string"
+                }
+            }
+        },
+        "types.MonitorValue": {
+            "type": "object",
+            "properties": {
+                "timestamp": {
+                    "type": "integer"
+                },
+                "value": {
+                    "type": "number"
+                }
+            }
+        },
         "types.Namespace": {
             "type": "object",
             "properties": {
@@ -19852,6 +20275,9 @@ const docTemplate = `{
                 "created_at": {
                     "type": "string"
                 },
+                "csg_path": {
+                    "type": "string"
+                },
                 "default_branch": {
                     "type": "string"
                 },
@@ -19861,6 +20287,9 @@ const docTemplate = `{
                 "downloads": {
                     "type": "integer"
                 },
+                "hf_path": {
+                    "type": "string"
+                },
                 "id": {
                     "type": "integer"
                 },
@@ -19869,6 +20298,9 @@ const docTemplate = `{
                 },
                 "likes": {
                     "type": "integer"
+                },
+                "ms_path": {
+                    "type": "string"
                 },
                 "name": {
                     "type": "string"
@@ -19888,11 +20320,20 @@ const docTemplate = `{
                 "readme": {
                     "type": "string"
                 },
+                "recom_op_weight": {
+                    "type": "integer"
+                },
                 "repository": {
                     "$ref": "#/definitions/types.Repository"
                 },
                 "repository_id": {
                     "type": "integer"
+                },
+                "scores": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/types.WeightScore"
+                    }
                 },
                 "source": {
                     "$ref": "#/definitions/types.RepositorySource"

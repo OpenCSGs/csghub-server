@@ -678,18 +678,24 @@ definitions:
         type: boolean
       created_at:
         type: string
+      csg_path:
+        type: string
       default_branch:
         type: string
       description:
         type: string
       downloads:
         type: integer
+      hf_path:
+        type: string
       id:
         type: integer
       license:
         type: string
       likes:
         type: integer
+      ms_path:
+        type: string
       name:
         type: string
       namespace:
@@ -700,10 +706,16 @@ definitions:
         type: string
       private:
         type: boolean
+      readme:
+        type: string
       repository:
         $ref: '#/definitions/types.Repository'
       repository_id:
         type: integer
+      scores:
+        items:
+          $ref: '#/definitions/types.WeightScore'
+        type: array
       sensitive_check_status:
         type: string
       source:
@@ -1696,6 +1708,8 @@ definitions:
       lfs_relative_path:
         description: relative path in lfs storage
         type: string
+      lfs_sha256:
+        type: string
       mode:
         type: string
       name:
@@ -2138,6 +2152,64 @@ definitions:
     x-enum-varnames:
     - ModelWidgetTypeGeneration
     - ModelWidgetTypeChat
+  types.MonitorCPUResp:
+    properties:
+      result:
+        items:
+          $ref: '#/definitions/types.MonitorData'
+        type: array
+      result_type:
+        type: string
+    type: object
+  types.MonitorData:
+    properties:
+      metric:
+        additionalProperties:
+          type: string
+        type: object
+      value:
+        $ref: '#/definitions/types.MonitorValue'
+      values:
+        items:
+          $ref: '#/definitions/types.MonitorValue'
+        type: array
+    type: object
+  types.MonitorMemoryResp:
+    properties:
+      result:
+        items:
+          $ref: '#/definitions/types.MonitorData'
+        type: array
+      result_type:
+        type: string
+    type: object
+  types.MonitorRequestCountResp:
+    properties:
+      result:
+        items:
+          $ref: '#/definitions/types.MonitorData'
+        type: array
+      result_type:
+        type: string
+      total_request_count:
+        type: integer
+    type: object
+  types.MonitorRequestLatencyResp:
+    properties:
+      result:
+        items:
+          $ref: '#/definitions/types.MonitorData'
+        type: array
+      result_type:
+        type: string
+    type: object
+  types.MonitorValue:
+    properties:
+      timestamp:
+        type: integer
+      value:
+        type: number
+    type: object
   types.Namespace:
     properties:
       avatar:
@@ -2200,18 +2272,24 @@ definitions:
         type: boolean
       created_at:
         type: string
+      csg_path:
+        type: string
       default_branch:
         type: string
       description:
         type: string
       downloads:
         type: integer
+      hf_path:
+        type: string
       id:
         type: integer
       license:
         type: string
       likes:
         type: integer
+      ms_path:
+        type: string
       name:
         type: string
       namespace:
@@ -2224,10 +2302,16 @@ definitions:
         type: boolean
       readme:
         type: string
+      recom_op_weight:
+        type: integer
       repository:
         $ref: '#/definitions/types.Repository'
       repository_id:
         type: integer
+      scores:
+        items:
+          $ref: '#/definitions/types.WeightScore'
+        type: array
       source:
         $ref: '#/definitions/types.RepositorySource'
       sync_status:
@@ -3030,6 +3114,198 @@ definitions:
 info:
   contact: {}
 paths:
+  /{repo_type}/{namespace}/{name}/{type}/{id}/cpu/{instance}/usage:
+    get:
+      consumes:
+      - application/json
+      parameters:
+      - description: models,spaces
+        enum:
+        - models
+        - spaces
+        in: path
+        name: repo_type
+        required: true
+        type: string
+      - description: repo owner name
+        in: path
+        name: namespace
+        required: true
+        type: string
+      - description: repo name
+        in: path
+        name: name
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/types.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/types.MonitorCPUResp'
+              type: object
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Get instance cpu usage
+      tags:
+      - Monitor
+  /{repo_type}/{namespace}/{name}/{type}/{id}/memory/{instance}/usage:
+    get:
+      consumes:
+      - application/json
+      parameters:
+      - description: models,spaces
+        enum:
+        - models
+        - spaces
+        in: path
+        name: repo_type
+        required: true
+        type: string
+      - description: repo owner name
+        in: path
+        name: namespace
+        required: true
+        type: string
+      - description: repo name
+        in: path
+        name: name
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/types.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/types.MonitorMemoryResp'
+              type: object
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Get instance memory usage
+      tags:
+      - Monitor
+  /{repo_type}/{namespace}/{name}/{type}/{id}/request/{instance}/count:
+    get:
+      consumes:
+      - application/json
+      parameters:
+      - description: models,spaces
+        enum:
+        - models
+        - spaces
+        in: path
+        name: repo_type
+        required: true
+        type: string
+      - description: repo owner name
+        in: path
+        name: namespace
+        required: true
+        type: string
+      - description: repo name
+        in: path
+        name: name
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/types.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/types.MonitorRequestCountResp'
+              type: object
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Get instance request count
+      tags:
+      - Monitor
+  /{repo_type}/{namespace}/{name}/{type}/{id}/request/{instance}/latency:
+    get:
+      consumes:
+      - application/json
+      parameters:
+      - description: models,spaces
+        enum:
+        - models
+        - spaces
+        in: path
+        name: repo_type
+        required: true
+        type: string
+      - description: repo owner name
+        in: path
+        name: namespace
+        required: true
+        type: string
+      - description: repo name
+        in: path
+        name: name
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/types.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/types.MonitorRequestLatencyResp'
+              type: object
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Get instance request latency
+      tags:
+      - Monitor
   /{repo_type}/{namespace}/{name}/blob/{file_path}:
     get:
       consumes:
