@@ -195,6 +195,11 @@ image_builder_status_ttl = 300
 operation_timeout = 300
 skip_lfs_file_validation = false
 
+[repo_template]
+empty_repo_type = "template"
+empty_name_space = "emptynamespace"
+empty_repo_name = "emptyreponame"
+
 [prometheus]
 api_address = "http://prometheus.opencsg.com/api/v1/query"
 basic_auth = "myauth"
