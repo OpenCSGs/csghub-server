@@ -195,10 +195,6 @@ image_builder_status_ttl = 300
 operation_timeout = 300
 skip_lfs_file_validation = false
 
-[integration]
-github_token = ""
-github_api_base_url = "https://api.github.com"
-
 [prometheus]
 api_address = "http://prometheus.opencsg.com/api/v1/query"
 basic_auth = "myauth"
