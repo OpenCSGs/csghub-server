@@ -199,3 +199,7 @@ skip_lfs_file_validation = false
 empty_repo_type = "template"
 empty_name_space = "emptynamespace"
 empty_repo_name = "emptyreponame"
+
+[prometheus]
+api_address = "http://prometheus.opencsg.com/api/v1/query"
+basic_auth = "myauth"

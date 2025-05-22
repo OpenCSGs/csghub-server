@@ -287,6 +287,11 @@ type Config struct {
 		EmptyNameSpace string `env:"STARHUB_SERVER_REPO_TEMPLATE_EMPTY_NAMESPACE, default=emptynamespace"`
 		EmptyRepoName  string `env:"STARHUB_SERVER_REPO_TEMPLATE_EMPTY_REPO_NAME, default=emptyreponame"`
 	}
+
+	Prometheus struct {
+		ApiAddress string `env:"STARHUB_SERVER_PROMETHEUS_API_ADDRESS, default="`
+		BasicAuth  string `env:"STARHUB_SERVER_PROMETHEUS_BASIC_AUTH, default="`
+	}
 }
 
 func SetConfigFile(file string) {

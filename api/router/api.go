@@ -180,8 +180,14 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 
 	createEvaluationRoutes(apiGroup, evaluationHandler)
 
+	// monitor handler
+	monitorHandler, err := handler.NewMonitorHandler(config)
+	if err != nil {
+		return nil, fmt.Errorf("error creatring monitor handler: %v", err)
+	}
+
 	// Model routes
-	createModelRoutes(config, apiGroup, authCollection.NeedAPIKey, modelHandler, repoCommonHandler)
+	createModelRoutes(config, apiGroup, authCollection, modelHandler, repoCommonHandler, monitorHandler)
 
 	// Dataset routes
 	createDatasetRoutes(config, apiGroup, dsHandler, repoCommonHandler)
@@ -198,7 +204,7 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 		return nil, fmt.Errorf("error creating space handler:%w", err)
 	}
 	// space routers
-	createSpaceRoutes(config, apiGroup, spaceHandler, repoCommonHandler)
+	createSpaceRoutes(config, apiGroup, authCollection, spaceHandler, repoCommonHandler, monitorHandler)
 
 	spaceResourceHandler, err := handler.NewSpaceResourceHandler(config)
 	if err != nil {
@@ -464,7 +470,12 @@ func createEvaluationRoutes(apiGroup *gin.RouterGroup, evaluationHandler *handle
 	}
 }
 
-func createModelRoutes(config *config.Config, apiGroup *gin.RouterGroup, needAPIKey gin.HandlerFunc, modelHandler *handler.ModelHandler, repoCommonHandler *handler.RepoHandler) {
+func createModelRoutes(config *config.Config,
+	apiGroup *gin.RouterGroup,
+	authCollection middleware.AuthenticatorCollection,
+	modelHandler *handler.ModelHandler,
+	repoCommonHandler *handler.RepoHandler,
+	monitorHandler *handler.MonitorHandler) {
 	// Models routes
 	modelsGroup := apiGroup.Group("/models")
 	{
@@ -531,6 +542,16 @@ func createModelRoutes(config *config.Config, apiGroup *gin.RouterGroup, needAPI
 		modelsGroup.PUT("/:namespace/:name/run/:id/stop", middleware.RepoType(types.ModelRepo), modelHandler.DeployStop)
 		modelsGroup.PUT("/:namespace/:name/run/:id/start", middleware.RepoType(types.ModelRepo), modelHandler.DeployStart)
 
+		// inference monitor
+		modelsGroup.GET("/:namespace/:name/run/:id/cpu/:instance/usage",
+			authCollection.NeedLogin, middleware.RepoType(types.ModelRepo), monitorHandler.CPUUsage)
+		modelsGroup.GET("/:namespace/:name/run/:id/memory/:instance/usage",
+			authCollection.NeedLogin, middleware.RepoType(types.ModelRepo), monitorHandler.MemoryUsage)
+		modelsGroup.GET("/:namespace/:name/run/:id/request/:instance/count",
+			authCollection.NeedLogin, middleware.RepoType(types.ModelRepo), monitorHandler.RequestCount)
+		modelsGroup.GET("/:namespace/:name/run/:id/request/:instance/latency",
+			authCollection.NeedLogin, middleware.RepoType(types.ModelRepo), monitorHandler.RequestLatency)
+
 		// runtime framework for both finetune and inference
 		modelsGroup.GET("/runtime_framework", middleware.RepoType(types.ModelRepo), repoCommonHandler.RuntimeFrameworkListWithType)
 		modelsGroup.GET("/:namespace/:name/quantizations", middleware.RepoType(types.ModelRepo), modelHandler.ListQuantizations)
@@ -543,6 +564,16 @@ func createModelRoutes(config *config.Config, apiGroup *gin.RouterGroup, needAPI
 		// delete a finetune instance
 		modelsGroup.DELETE("/:namespace/:name/finetune/:id", middleware.RepoType(types.ModelRepo), modelHandler.FinetuneDelete)
 
+		// finetune monitor
+		modelsGroup.GET("/:namespace/:name/finetune/:id/cpu/:instance/usage",
+			authCollection.NeedLogin, middleware.RepoType(types.ModelRepo), monitorHandler.CPUUsage)
+		modelsGroup.GET("/:namespace/:name/finetune/:id/memory/:instance/usage",
+			authCollection.NeedLogin, middleware.RepoType(types.ModelRepo), monitorHandler.MemoryUsage)
+		modelsGroup.GET("/:namespace/:name/finetune/:id/request/:instance/count",
+			authCollection.NeedLogin, middleware.RepoType(types.ModelRepo), monitorHandler.RequestCount)
+		modelsGroup.GET("/:namespace/:name/finetune/:id/request/:instance/latency",
+			authCollection.NeedLogin, middleware.RepoType(types.ModelRepo), monitorHandler.RequestLatency)
+
 		// deploy model as serverless
 		modelsGroup.GET("/:namespace/:name/serverless", middleware.RepoType(types.ModelRepo), modelHandler.GetDeployServerless)
 		modelsGroup.POST("/:namespace/:name/serverless", middleware.RepoType(types.ModelRepo), modelHandler.DeployServerless)
@@ -552,6 +583,16 @@ func createModelRoutes(config *config.Config, apiGroup *gin.RouterGroup, needAPI
 		modelsGroup.GET("/:namespace/:name/serverless/:id/status", middleware.RepoType(types.ModelRepo), repoCommonHandler.ServerlessStatus)
 		modelsGroup.GET("/:namespace/:name/serverless/:id/logs/:instance", middleware.RepoType(types.ModelRepo), repoCommonHandler.ServerlessLogs)
 		modelsGroup.PUT("/:namespace/:name/serverless/:id", middleware.RepoType(types.ModelRepo), repoCommonHandler.ServerlessUpdate)
+
+		// serverless monitor
+		modelsGroup.GET("/:namespace/:name/serverless/:id/cpu/:instance/usage",
+			authCollection.NeedLogin, middleware.RepoType(types.ModelRepo), monitorHandler.CPUUsage)
+		modelsGroup.GET("/:namespace/:name/serverless/:id/memory/:instance/usage",
+			authCollection.NeedLogin, middleware.RepoType(types.ModelRepo), monitorHandler.MemoryUsage)
+		modelsGroup.GET("/:namespace/:name/serverless/:id/request/:instance/count",
+			authCollection.NeedLogin, middleware.RepoType(types.ModelRepo), monitorHandler.RequestCount)
+		modelsGroup.GET("/:namespace/:name/serverless/:id/request/:instance/latency",
+			authCollection.NeedLogin, middleware.RepoType(types.ModelRepo), monitorHandler.RequestLatency)
 	}
 }
 
@@ -638,7 +679,12 @@ func createCodeRoutes(config *config.Config, apiGroup *gin.RouterGroup, codeHand
 	}
 }
 
-func createSpaceRoutes(config *config.Config, apiGroup *gin.RouterGroup, spaceHandler *handler.SpaceHandler, repoCommonHandler *handler.RepoHandler) {
+func createSpaceRoutes(config *config.Config,
+	apiGroup *gin.RouterGroup,
+	authCollection middleware.AuthenticatorCollection,
+	spaceHandler *handler.SpaceHandler,
+	repoCommonHandler *handler.RepoHandler,
+	monitorHandler *handler.MonitorHandler) {
 	spaces := apiGroup.Group("/spaces")
 	{
 		// list all spaces
@@ -694,6 +740,15 @@ func createSpaceRoutes(config *config.Config, apiGroup *gin.RouterGroup, spaceHa
 		spaces.GET("/:namespace/:name/run/:id", middleware.RepoType(types.SpaceRepo), repoCommonHandler.DeployDetail)
 		spaces.GET("/:namespace/:name/run/:id/status", middleware.RepoType(types.SpaceRepo), repoCommonHandler.DeployStatus)
 		spaces.GET("/:namespace/:name/run/:id/logs/:instance", middleware.RepoType(types.SpaceRepo), repoCommonHandler.DeployInstanceLogs)
+		// space monitor
+		spaces.GET("/:namespace/:name/run/:id/cpu/:instance/usage",
+			authCollection.NeedLogin, middleware.RepoType(types.SpaceRepo), monitorHandler.CPUUsage)
+		spaces.GET("/:namespace/:name/run/:id/memory/:instance/usage",
+			authCollection.NeedLogin, middleware.RepoType(types.SpaceRepo), monitorHandler.MemoryUsage)
+		spaces.GET("/:namespace/:name/run/:id/request/:instance/count",
+			authCollection.NeedLogin, middleware.RepoType(types.SpaceRepo), monitorHandler.RequestCount)
+		spaces.GET("/:namespace/:name/run/:id/request/:instance/latency",
+			authCollection.NeedLogin, middleware.RepoType(types.SpaceRepo), monitorHandler.RequestLatency)
 	}
 }
 

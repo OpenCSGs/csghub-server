@@ -37,6 +37,7 @@ packages:
       ModelTreeComponent:
       SpaceTemplateComponent:
       MCPServerComponent:
+      MonitorComponent:
   opencsg.com/csghub-server/component/callback:
     config:
     interfaces:
@@ -77,6 +78,10 @@ packages:
     config:
     interfaces:
       KeysReader:
+  opencsg.com/csghub-server/builder/prometheus:
+    config:
+    interfaces:
+      PrometheusClient:  
   opencsg.com/csghub-server/mirror/cache:
     config:
     interfaces:

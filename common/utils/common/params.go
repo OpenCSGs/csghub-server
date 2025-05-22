@@ -3,6 +3,7 @@ package common
 import (
 	"crypto/sha256"
 	"encoding/base64"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -90,4 +91,26 @@ func CalculateAuthorizedSSHKeyFingerprint(key string) (string, error) {
 	hash := sha256.Sum256(decodedKey)
 	base64Hash := base64.RawStdEncoding.EncodeToString(hash[:])
 	return base64Hash, nil
+}
+
+func CalculateSHA256(s string) string {
+	h := sha256.New()
+	h.Write([]byte(s))
+	bs := h.Sum(nil)
+	return hex.EncodeToString(bs)
+}
+
+func GetValidTimeDuration(ctx *gin.Context) (string, string) {
+	defaultDuration := "30m"
+	defaultRange := "1m"
+	rawDuration := ctx.Query("last_duration")
+	if len(rawDuration) < 1 {
+		return defaultDuration, defaultRange
+	}
+
+	timeRange, ok := types.MonitorValidDurations[rawDuration]
+	if ok {
+		return rawDuration, timeRange
+	}
+	return defaultDuration, defaultRange
 }
