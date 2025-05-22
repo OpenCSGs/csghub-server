@@ -714,7 +714,7 @@ func (m *mcpServerComponentImpl) Deploy(ctx context.Context, req *types.DeployMC
 		return nil, fmt.Errorf("fail to get source repo clone url for mcp server %s/%s, error: %w",
 			req.MCPRepo.Namespace, req.MCPRepo.Name, err)
 	}
-
+	slog.Info("create mcp space from cloneURL", slog.Any("cloneURL", cloneURL), slog.Any("PublicDomain", m.config.APIServer.PublicDomain))
 	cloneReq := gitserver.CreateMirrorRepoReq{
 		RepoType:  req.RepoType,  // copy to repo type
 		Namespace: req.Namespace, // copy to space namespace

@@ -52,7 +52,7 @@ func (r *RProxyHandler) Proxy(ctx *gin.Context) {
 		return
 	}
 	username := httpbase.GetCurrentUser(ctx)
-	allow, err := r.CheckAccessPermission(ctx, deploy, username)
+	allow, spaceSdk, err := r.CheckAccessPermission(ctx, deploy, username)
 
 	if err != nil {
 		if errors.Is(err, ErrUnauthorized) {
@@ -74,11 +74,20 @@ func (r *RProxyHandler) Proxy(ctx *gin.Context) {
 		}
 		slog.Debug("proxy target", slog.Any("target", target))
 		rp, _ := proxy.NewReverseProxy(target)
+
+		removeContextPath := false
 		if deploy.Type == types.InferenceType || deploy.Type == types.ServerlessType {
-			//for infernece,no need context path
+			//for inference, no need context path
+			removeContextPath = true
+		}
+		if deploy.Type == types.SpaceType && spaceSdk == types.MCPSERVER.Name {
+			removeContextPath = true
+		}
+		if removeContextPath {
 			contextPath := fmt.Sprintf("/%s/%s", "endpoint", appSvcName)
 			apiname = strings.TrimPrefix(apiname, contextPath)
 		}
+
 		rp.ServeHTTP(ctx.Writer, ctx.Request, apiname)
 	} else {
 		slog.Warn("user not allowed to call endpoint api", slog.String("svc_name", appSvcName), slog.Any("user_name", username), slog.Any("deployID", deploy.ID))
@@ -86,30 +95,32 @@ func (r *RProxyHandler) Proxy(ctx *gin.Context) {
 	}
 }
 
-func (r *RProxyHandler) CheckAccessPermission(ctx *gin.Context, deploy *database.Deploy, username string) (bool, error) {
+func (r *RProxyHandler) CheckAccessPermission(ctx *gin.Context, deploy *database.Deploy, username string) (bool, string, error) {
 	var (
-		allow bool
-		err   error
-		space *database.Space
+		allow    bool
+		err      error
+		space    *database.Space
+		spaceSdk string
 	)
 	if deploy.SpaceID > 0 {
 		space, err = r.spaceComp.GetByID(ctx.Request.Context(), deploy.SpaceID)
 		if err != nil {
 			slog.Error("failed to get space by id", slog.Any("spaceID", deploy.SpaceID), slog.Any("error", err))
-			return false, fmt.Errorf("failed to get space, %w", err)
+			return false, "", fmt.Errorf("failed to get space, %w", err)
 		}
 		// user must login to visit space except mcp server
 		if space.Sdk != types.MCPSERVER.Name && httpbase.GetAuthType(ctx) != httpbase.AuthTypeJwt {
 			slog.Error("invalid auth type in proxy", slog.Any("AuthType(ctx)", httpbase.GetAuthType(ctx)), slog.Any("URI", ctx.Request.RequestURI))
-			return false, ErrUnauthorized
+			return false, "", ErrUnauthorized
 		}
+		spaceSdk = space.Sdk
 		// check space
 		allow, err = r.repoComp.AllowAccessByRepoID(ctx.Request.Context(), deploy.RepoID, username)
 	} else if deploy.ModelID > 0 {
 		// check model inference
 		allow, err = r.repoComp.AllowAccessEndpoint(ctx.Request.Context(), username, deploy)
 	}
-	return allow, err
+	return allow, spaceSdk, err
 }
 
 // get service name based on request
