@@ -767,11 +767,16 @@ func getSourceRepoCloneURL(address, userName, token, repoPath string) (string, e
 	}
 	credential := fmt.Sprintf("%s:%s", userName, token)
 
-	cloneURL := fmt.Sprintf("%s://%s@%s:%s/%ss/%s.git",
+	port := u.Port()
+	if len(port) > 0 {
+		port = ":" + port
+	}
+
+	cloneURL := fmt.Sprintf("%s://%s@%s%s/%ss/%s.git",
 		u.Scheme,
 		credential,
 		u.Hostname(),
-		u.Port(),
+		port,
 		types.MCPServerRepo,
 		repoPath)
 
