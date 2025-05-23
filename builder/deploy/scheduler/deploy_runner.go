@@ -152,6 +152,10 @@ func (t *DeployRunner) shouldForceCancelDeploy(orgName, repoName string, resp *t
 		return true, reason
 	}
 
+	if resp.Code == common.Deploying {
+		return false, "" // do nothing if deploy is still in progress
+	}
+
 	// Todo: check if pod is pending for too long due to not enough hardware resources
 	// if t.task.Deploy.SpaceID > 0 && len(resp.Instances) > 0 && resp.Instances[0].Status == string(corev1.PodPending) {
 	// 	reason := "The deployment has been cancelled because it took too long to acquire the necessary hardware resources."

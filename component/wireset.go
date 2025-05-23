@@ -164,6 +164,7 @@ func NewTestRepoComponent(config *config.Config, stores *tests.MockStores, rpcUs
 		mq:                     mq,
 		mirrorServer:           mirrorServer,
 		fileStore:              stores.File,
+		clusterInfoStore:       stores.ClusterInfo,
 	}
 }
 
