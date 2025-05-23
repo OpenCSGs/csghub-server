@@ -53,7 +53,7 @@ func (m *monitorComponentImpl) CPUUsage(ctx context.Context, req *types.MonitorR
 		return nil, fmt.Errorf("user %s has no permission to access cpu usage", req.CurrentUser)
 	}
 
-	query := fmt.Sprintf("avg_over_time(rate(container_cpu_usage_seconds_total{pod='%s',namespace='%s',container='user-container',service='prometheus-stack-kube-prom-kubelet'}[1m])[%s:])[%s:%s]", req.Instance, m.k8sNameSpace, req.LastDuration, req.LastDuration, req.TimeRange)
+	query := fmt.Sprintf("avg_over_time(rate(container_cpu_usage_seconds_total{pod='%s',namespace='%s',container='user-container'}[1m])[%s:])[%s:%s]", req.Instance, m.k8sNameSpace, req.LastDuration, req.LastDuration, req.TimeRange)
 	slog.Debug("cpu-usage", slog.Any("query", query))
 
 	promeResp, err := m.client.SerialData(query)
@@ -129,7 +129,7 @@ func (m *monitorComponentImpl) MemoryUsage(ctx context.Context, req *types.Monit
 		return nil, fmt.Errorf("user %s has no permission to access memory usage", req.CurrentUser)
 	}
 
-	query := fmt.Sprintf("avg_over_time(container_memory_usage_bytes{pod='%s',namespace='%s',container='user-container',service='prometheus-stack-kube-prom-kubelet'}[%s:])[%s:%s]",
+	query := fmt.Sprintf("avg_over_time(container_memory_usage_bytes{pod='%s',namespace='%s',container='user-container'}[%s:])[%s:%s]",
 		req.Instance, m.k8sNameSpace, req.LastDuration, req.LastDuration, req.TimeRange)
 	slog.Debug("memory-usage", slog.Any("query", query))
 
