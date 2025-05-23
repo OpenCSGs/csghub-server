@@ -401,12 +401,12 @@ func (c *spaceComponentImpl) Show(ctx context.Context, namespace, name, currentU
 	var tags []types.RepoTag
 	space, err := c.spaceStore.FindByPath(ctx, namespace, name)
 	if err != nil {
-		return nil, fmt.Errorf("failed to find space, error: %w", err)
+		return nil, fmt.Errorf("failed to find space %s/%s, error: %w", namespace, name, err)
 	}
 
 	permission, err := c.repoComponent.GetUserRepoPermission(ctx, currentUser, space.Repository)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get user repo permission, error: %w", err)
+		return nil, fmt.Errorf("failed to get user %s repo permission, error: %w", currentUser, err)
 	}
 	if !permission.CanRead {
 		return nil, ErrUnauthorized
@@ -414,11 +414,24 @@ func (c *spaceComponentImpl) Show(ctx context.Context, namespace, name, currentU
 
 	ns, err := c.repoComponent.GetNameSpaceInfo(ctx, namespace)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get namespace info for space, error: %w", err)
+		return nil, fmt.Errorf("failed to get namespace %s info for space, error: %w", namespace, err)
 	}
 
-	svcName, status, _ := c.status(ctx, space)
-	endpoint := c.getEndpoint(svcName, space)
+	spaceStatus, _ := c.status(ctx, space)
+	endpoint := c.getEndpoint(spaceStatus.SvcName, space)
+
+	req := types.DeployRepo{
+		DeployID:  spaceStatus.DeployID,
+		SpaceID:   space.ID,
+		Namespace: namespace,
+		Name:      name,
+		SvcName:   spaceStatus.SvcName,
+		ClusterID: spaceStatus.ClusterID,
+	}
+	_, _, instList, err := c.deployer.GetReplica(ctx, req)
+	if err != nil {
+		slog.Warn("no space deployment replica found", slog.Any("req", req), slog.Any("err", err))
+	}
 
 	likeExists, err := c.userLikesStore.IsExist(ctx, currentUser, space.Repository.ID)
 	if err != nil {
@@ -446,7 +459,7 @@ func (c *spaceComponentImpl) Show(ctx context.Context, namespace, name, currentU
 		},
 		CreatedAt:     space.CreatedAt,
 		UpdatedAt:     space.Repository.UpdatedAt,
-		Status:        status,
+		Status:        spaceStatus.Status,
 		Endpoint:      endpoint,
 		Hardware:      space.Hardware,
 		RepositoryID:  space.Repository.ID,
@@ -458,10 +471,12 @@ func (c *spaceComponentImpl) Show(ctx context.Context, namespace, name, currentU
 		Source:        space.Repository.Source,
 		SyncStatus:    space.Repository.SyncStatus,
 		SKU:           space.SKU,
-		SvcName:       svcName,
+		SvcName:       spaceStatus.SvcName,
 		CanWrite:      permission.CanWrite,
 		CanManage:     permission.CanAdmin,
 		Namespace:     ns,
+		DeployID:      spaceStatus.DeployID,
+		Instances:     instList,
 	}
 	if permission.CanAdmin {
 		resSpace.SensitiveCheckStatus = space.Repository.SensitiveCheckStatus.String()
@@ -567,7 +582,7 @@ func (c *spaceComponentImpl) Index(ctx context.Context, repoFilter *types.RepoFi
 		if space == nil {
 			continue
 		}
-		_, status, _ := c.status(ctx, space)
+		spaceStatus, _ := c.status(ctx, space)
 		var tags []types.RepoTag
 		for _, tag := range space.Repository.Tags {
 			tags = append(tags, types.RepoTag{
@@ -596,7 +611,7 @@ func (c *spaceComponentImpl) Index(ctx context.Context, repoFilter *types.RepoFi
 			CreatedAt:     space.Repository.CreatedAt,
 			UpdatedAt:     space.Repository.UpdatedAt,
 			Tags:          tags,
-			Status:        status,
+			Status:        spaceStatus.Status,
 			RepositoryID:  space.Repository.ID,
 			Source:        repo.Source,
 			SyncStatus:    repo.SyncStatus,
@@ -627,7 +642,7 @@ func (c *spaceComponentImpl) OrgSpaces(ctx context.Context, req *types.OrgSpaces
 	}
 
 	for _, data := range spaces {
-		_, status, _ := c.status(ctx, &data)
+		spaceStatus, _ := c.status(ctx, &data)
 		resSpaces = append(resSpaces, types.Space{
 			ID:            data.ID,
 			Name:          data.Repository.Name,
@@ -640,7 +655,7 @@ func (c *spaceComponentImpl) OrgSpaces(ctx context.Context, req *types.OrgSpaces
 			UpdatedAt:     data.Repository.UpdatedAt,
 			RepositoryID:  data.Repository.ID,
 			CoverImageUrl: data.CoverImageUrl,
-			Status:        status,
+			Status:        spaceStatus.Status,
 		})
 	}
 
@@ -658,8 +673,8 @@ func (c *spaceComponentImpl) UserSpaces(ctx context.Context, req *types.UserSpac
 
 	var resSpaces []types.Space
 	for _, data := range ms {
-		svcName, status, _ := c.status(ctx, &data)
-		endpoint := c.getEndpoint(svcName, &data)
+		spaceStatus, _ := c.status(ctx, &data)
+		endpoint := c.getEndpoint(spaceStatus.SvcName, &data)
 		resSpaces = append(resSpaces, types.Space{
 			ID:            data.ID,
 			Name:          data.Repository.Name,
@@ -672,7 +687,7 @@ func (c *spaceComponentImpl) UserSpaces(ctx context.Context, req *types.UserSpac
 			CreatedAt:     data.CreatedAt,
 			UpdatedAt:     data.Repository.UpdatedAt,
 			Hardware:      data.Hardware,
-			Status:        status,
+			Status:        spaceStatus.Status,
 			CoverImageUrl: data.CoverImageUrl,
 			Sdk:           data.Sdk,
 			Endpoint:      endpoint,
@@ -691,7 +706,7 @@ func (c *spaceComponentImpl) UserLikesSpaces(ctx context.Context, req *types.Use
 
 	var resSpaces []types.Space
 	for _, data := range ms {
-		_, status, _ := c.status(ctx, &data)
+		spaceStatus, _ := c.status(ctx, &data)
 		resSpaces = append(resSpaces, types.Space{
 			ID:            data.ID,
 			Name:          data.Repository.Name,
@@ -703,7 +718,7 @@ func (c *spaceComponentImpl) UserLikesSpaces(ctx context.Context, req *types.Use
 			CreatedAt:     data.CreatedAt,
 			UpdatedAt:     data.Repository.UpdatedAt,
 			Hardware:      data.Hardware,
-			Status:        status,
+			Status:        spaceStatus.Status,
 			CoverImageUrl: data.CoverImageUrl,
 		})
 	}
@@ -719,7 +734,7 @@ func (c *spaceComponentImpl) ListByPath(ctx context.Context, paths []string) ([]
 		return nil, fmt.Errorf("list space db failed, %w", err)
 	}
 	for _, data := range spacesData {
-		_, status, _ := c.status(ctx, &data)
+		spaceStatus, _ := c.status(ctx, &data)
 		var tags []types.RepoTag
 		for _, tag := range data.Repository.Tags {
 			tags = append(tags, types.RepoTag{
@@ -749,7 +764,7 @@ func (c *spaceComponentImpl) ListByPath(ctx context.Context, paths []string) ([]
 			CreatedAt:     data.Repository.CreatedAt,
 			UpdatedAt:     data.Repository.UpdatedAt,
 			Tags:          tags,
-			Status:        status,
+			Status:        spaceStatus.Status,
 			RepositoryID:  data.Repository.ID,
 		})
 	}
@@ -954,21 +969,31 @@ func (c *spaceComponentImpl) FixHasEntryFile(ctx context.Context, s *database.Sp
 	return s
 }
 
-func (c *spaceComponentImpl) status(ctx context.Context, s *database.Space) (string, string, error) {
+func (c *spaceComponentImpl) status(ctx context.Context, s *database.Space) (types.SpaceStatus, error) {
 	if !s.HasAppFile {
 		if s.Sdk == types.NGINX.Name {
-			return "", SpaceStatusNoNGINXConf, nil
+			return types.SpaceStatus{
+				Status: SpaceStatusNoNGINXConf,
+			}, nil
 		}
-		return "", SpaceStatusNoAppFile, nil
+		return types.SpaceStatus{
+			Status: SpaceStatusNoAppFile,
+		}, nil
 	}
 	// get latest Deploy for space by space id
 	deploy, err := c.deployTaskStore.GetLatestDeployBySpaceID(ctx, s.ID)
 	if err != nil || deploy == nil {
-		slog.Error("fail to get latest space deploy by space id", slog.Any("SpaceID", s.ID))
-		return "", SpaceStatusStopped, fmt.Errorf("can't get space deployment,%w", err)
+		return types.SpaceStatus{
+			Status: SpaceStatusStopped,
+		}, fmt.Errorf("failed to get latest space deploy by space id %d, error: %w", s.ID, err)
 	}
 	slog.Debug("space deploy", slog.Any("deploy", deploy))
-	return deploy.SvcName, deployStatusCodeToString(deploy.Status), nil
+	return types.SpaceStatus{
+		SvcName:   deploy.SvcName,
+		Status:    deployStatusCodeToString(deploy.Status),
+		DeployID:  deploy.ID,
+		ClusterID: deploy.ClusterID,
+	}, nil
 }
 
 func (c *spaceComponentImpl) Status(ctx context.Context, namespace, name string) (string, string, error) {
@@ -976,7 +1001,8 @@ func (c *spaceComponentImpl) Status(ctx context.Context, namespace, name string)
 	if err != nil {
 		return "", SpaceStatusStopped, fmt.Errorf("can't find space by path status, error: %w", err)
 	}
-	return c.status(ctx, s)
+	spaceStatus, err := c.status(ctx, s)
+	return spaceStatus.SvcName, spaceStatus.Status, err
 }
 
 func (c *spaceComponentImpl) Logs(ctx context.Context, namespace, name string) (*deploy.MultiLogReader, error) {
@@ -1100,8 +1126,8 @@ func (c *spaceComponentImpl) MCPIndex(ctx context.Context, repoFilter *types.Rep
 			continue
 		}
 
-		svcName, status, _ := c.status(ctx, space)
-		endpoint := c.getEndpoint(svcName, space)
+		spaceStatus, _ := c.status(ctx, space)
+		endpoint := c.getEndpoint(spaceStatus.SvcName, space)
 
 		resSpaces = append(resSpaces, &types.MCPService{
 			ID:           space.ID,
@@ -1113,9 +1139,9 @@ func (c *spaceComponentImpl) MCPIndex(ctx context.Context, repoFilter *types.Rep
 			Private:      space.Repository.Private,
 			CreatedAt:    space.Repository.CreatedAt,
 			UpdatedAt:    space.Repository.UpdatedAt,
-			Status:       status,
+			Status:       spaceStatus.Status,
 			RepositoryID: space.Repository.ID,
-			SvcName:      svcName,
+			SvcName:      spaceStatus.SvcName,
 			Endpoint:     endpoint,
 		})
 	}

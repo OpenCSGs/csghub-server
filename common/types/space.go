@@ -119,6 +119,15 @@ type Space struct {
 	CanManage            bool                 `json:"can_manage"`
 	Namespace            *Namespace           `json:"namespace"`
 	SensitiveCheckStatus string               `json:"sensitive_check_status"`
+	DeployID             int64                `json:"deploy_id,omitempty"`
+	Instances            []Instance           `json:"instances,omitempty"`
+}
+
+type SpaceStatus struct {
+	SvcName   string `json:"svc_name"`
+	Status    string `json:"status"`
+	DeployID  int64  `json:"deploy_id"`
+	ClusterID string `json:"cluster_id"`
 }
 
 type UpdateSpaceReq struct {
