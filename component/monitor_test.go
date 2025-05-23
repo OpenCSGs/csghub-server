@@ -232,7 +232,7 @@ func TestMonitor_MemoryUsage(t *testing.T) {
 		UserID:  1,
 	}, nil)
 
-	query := fmt.Sprintf("avg_over_time(container_memory_usage_bytes{pod='%s',namespace='%s',container='user-container',service='prometheus-stack-kube-prom-kubelet'}[%s:])[%s:%s]",
+	query := fmt.Sprintf("avg_over_time(container_memory_usage_bytes{pod='%s',namespace='%s',container='user-container'}[%s:])[%s:%s]",
 		req.Instance, "", req.LastDuration, req.LastDuration, req.TimeRange)
 
 	client.EXPECT().SerialData(query).Return(&types.PrometheusResponse{
@@ -333,7 +333,7 @@ func TestMonitor_CPUUsage(t *testing.T) {
 		},
 	}, nil)
 
-	query = fmt.Sprintf("avg_over_time(rate(container_cpu_usage_seconds_total{pod='%s',namespace='%s',container='user-container',service='prometheus-stack-kube-prom-kubelet'}[1m])[%s:])[%s:%s]", req.Instance, "", req.LastDuration, req.LastDuration, req.TimeRange)
+	query = fmt.Sprintf("avg_over_time(rate(container_cpu_usage_seconds_total{pod='%s',namespace='%s',container='user-container'}[1m])[%s:])[%s:%s]", req.Instance, "", req.LastDuration, req.LastDuration, req.TimeRange)
 
 	client.EXPECT().SerialData(query).Return(&types.PrometheusResponse{
 		Data: types.PrometheusData{
