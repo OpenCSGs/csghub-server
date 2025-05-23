@@ -39,6 +39,13 @@ func TestSpaceComponent_Show(t *testing.T) {
 		}, nil,
 	)
 
+	sc.mocks.deployer.EXPECT().GetReplica(ctx, types.DeployRepo{
+		SpaceID:   1,
+		Namespace: "ns",
+		Name:      "n",
+		SvcName:   "svc",
+	}).Return(0, 0, nil, nil)
+
 	sc.mocks.stores.UserLikesMock().EXPECT().IsExist(ctx, "user", int64(123)).Return(true, nil)
 
 	space, err := sc.Show(ctx, "ns", "n", "user", false)

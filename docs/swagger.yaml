@@ -1735,6 +1735,13 @@ definitions:
           $ref: '#/definitions/types.File'
         type: array
     type: object
+  types.Instance:
+    properties:
+      name:
+        type: string
+      status:
+        type: string
+    type: object
   types.InstanceRunReq:
     properties:
       cluster_id:
@@ -2604,6 +2611,8 @@ definitions:
         type: string
       default_branch:
         type: string
+      deploy_id:
+        type: integer
       description:
         example: ""
         type: string
@@ -2617,6 +2626,10 @@ definitions:
         type: string
       id:
         type: integer
+      instances:
+        items:
+          $ref: '#/definitions/types.Instance'
+        type: array
       license:
         example: MIT
         type: string

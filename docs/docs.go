@@ -19476,6 +19476,17 @@ const docTemplate = `{
                 }
             }
         },
+        "types.Instance": {
+            "type": "object",
+            "properties": {
+                "name": {
+                    "type": "string"
+                },
+                "status": {
+                    "type": "string"
+                }
+            }
+        },
         "types.InstanceRunReq": {
             "type": "object",
             "properties": {
@@ -20759,6 +20770,9 @@ const docTemplate = `{
                 "default_branch": {
                     "type": "string"
                 },
+                "deploy_id": {
+                    "type": "integer"
+                },
                 "description": {
                     "type": "string",
                     "example": ""
@@ -20776,6 +20790,12 @@ const docTemplate = `{
                 },
                 "id": {
                     "type": "integer"
+                },
+                "instances": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/types.Instance"
+                    }
                 },
                 "license": {
                     "type": "string",
