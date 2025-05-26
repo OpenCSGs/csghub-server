@@ -2362,8 +2362,6 @@ func (c *repoComponentImpl) DeployDetail(ctx context.Context, detailReq types.De
 		return nil, err
 	}
 
-	endpoint, _ := c.GenerateEndpoint(ctx, deploy)
-
 	req := types.DeployRepo{
 		DeployID:  deploy.ID,
 		SpaceID:   deploy.SpaceID,
@@ -2390,6 +2388,10 @@ func (c *repoComponentImpl) DeployDetail(ctx context.Context, detailReq types.De
 	if err != nil {
 		slog.Warn("fail to get deploy status", slog.Any("repo type", detailReq.RepoType), slog.Any("svc name", deploy.SvcName), slog.Any("error", err))
 	}
+
+	deploy.Status = code
+
+	endpoint, _ := c.GenerateEndpoint(ctx, deploy)
 
 	endpointPrivate := true
 	if deploy.SecureLevel == types.EndpointPublic {

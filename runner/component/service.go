@@ -421,7 +421,7 @@ func (s *serviceComponentImpl) NewPersistentVolumeClaim(name string, ctx context
 		},
 		Spec: corev1.PersistentVolumeClaimSpec{
 			AccessModes: []corev1.PersistentVolumeAccessMode{
-				corev1.ReadWriteOnce,
+				corev1.ReadWriteMany,
 			},
 			Resources: corev1.VolumeResourceRequirements{
 				Requests: corev1.ResourceList{
