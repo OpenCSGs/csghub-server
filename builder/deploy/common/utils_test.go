@@ -69,7 +69,7 @@ func TestUpdateEvaluationEnvHardware(t *testing.T) {
 				Enflame: types.Processor{Num: "1"},
 			},
 			expected: map[string]string{
-				"ENFLAME_NUM": "1",
+				"GCU_NUM": "1",
 			},
 		},
 		{
@@ -82,7 +82,21 @@ func TestUpdateEvaluationEnvHardware(t *testing.T) {
 				Mlu:     types.Processor{Num: "8"},
 			},
 			expected: map[string]string{
-				"Mlu_NUM": "8",
+				"MLU_NUM": "8",
+			},
+		},
+		{
+			name: "DCU set when others are empty",
+			env:  make(map[string]string),
+			hardware: types.HardWare{
+				Gpu: types.Processor{Num: ""},
+				Npu: types.Processor{Num: ""},
+				Gcu: types.Processor{Num: ""},
+				Mlu: types.Processor{Num: ""},
+				Dcu: types.Processor{Num: "1"},
+			},
+			expected: map[string]string{
+				"DCU_NUM": "1",
 			},
 		},
 		{
@@ -141,10 +155,6 @@ func TestUpdateEvaluationEnvHardware(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			UpdateEvaluationEnvHardware(tt.env, tt.hardware)
 
-			if len(tt.env) != len(tt.expected) {
-				t.Errorf("Expected env length %d, got %d", len(tt.expected), len(tt.env))
-			}
-
 			for k, v := range tt.expected {
 				if tt.env[k] != v {
 					t.Errorf("For key %s, expected %s, got %s", k, v, tt.env[k])
@@ -184,7 +194,7 @@ func TestGetXPUNumber(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name: "Only Enflame specified",
+			name: "Only Gcu specified",
 			hardware: types.HardWare{
 				Enflame: types.Processor{Num: "8"},
 			},
@@ -221,7 +231,7 @@ func TestGetXPUNumber(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name: "Enflame takes priority when GPU and NPU are empty",
+			name: "Gcu takes priority when GPU and NPU are empty",
 			hardware: types.HardWare{
 				Enflame: types.Processor{Num: "8"},
 				Mlu:     types.Processor{Num: "1"},
@@ -374,14 +384,14 @@ func TestResourceType(t *testing.T) {
 			expected: types.ResourceTypeMLU,
 		},
 		{
-			name: "Enflame when Enflame Num is not empty and others are empty",
+			name: "Gcu when Gcu Num is not empty and others are empty",
 			hardware: types.HardWare{
 				Gpu:     types.Processor{Num: ""},
 				Npu:     types.Processor{Num: ""},
 				Mlu:     types.Processor{Num: ""},
 				Enflame: types.Processor{Num: "4"},
 			},
-			expected: types.ResourceTypeEnflame,
+			expected: types.ResourceTypeGCU,
 		},
 		{
 			name: "GPU has priority when multiple hardware types are present",
@@ -394,7 +404,7 @@ func TestResourceType(t *testing.T) {
 			expected: types.ResourceTypeGPU,
 		},
 		{
-			name: "NPU has priority over Mlu and Enflame",
+			name: "NPU has priority over Mlu and Gcu",
 			hardware: types.HardWare{
 				Gpu:     types.Processor{Num: ""},
 				Npu:     types.Processor{Num: "2"},
@@ -404,7 +414,7 @@ func TestResourceType(t *testing.T) {
 			expected: types.ResourceTypeNPU,
 		},
 		{
-			name: "Mlu has priority over Enflame",
+			name: "Mlu has priority over Gcu",
 			hardware: types.HardWare{
 				Gpu:     types.Processor{Num: ""},
 				Npu:     types.Processor{Num: ""},

@@ -235,6 +235,9 @@ func (s *K8sHandler) GetClusterInfo(c *gin.Context) {
 			slog.Error("get cluster info failed", slog.Any("error", err))
 			continue
 		}
+		if !cInfo.Enable {
+			continue
+		}
 		clusterInfo := types.CluserResponse{}
 		clusterInfo.Region = cInfo.Region
 		clusterInfo.Zone = cInfo.Zone

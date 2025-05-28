@@ -393,7 +393,6 @@ type ModelConfig struct {
 
 type EngineConfig struct {
 	EngineName      string      `json:"engine_name"`
-	EngineVersion   string      `json:"engine_version"`
 	ContainerPort   int         `json:"container_port"`
 	ModelFormat     string      `json:"model_format"`
 	EngineImages    []Image     `json:"engine_images"`
@@ -419,4 +418,7 @@ type Image struct {
 	ComputeType   ComputeType `json:"compute_type"`
 	Image         string      `json:"image"`
 	DriverVersion string      `json:"driver_version"`
+	EngineVersion string      `json:"engine_version"`
+	ExtraArchs    []string    `json:"extra_archs"`
+	ExtraModels   []string    `json:"extra_models"`
 }

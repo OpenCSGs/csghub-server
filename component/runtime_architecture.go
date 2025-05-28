@@ -685,7 +685,7 @@ func (c *runtimeArchitectureComponentImpl) UpdateRuntimeFrameworkAndArch(ctx con
 		rf.FrameName = engineConfig.EngineName
 		rf.ComputeType = string(image.ComputeType)
 		rf.ContainerPort = engineConfig.ContainerPort
-		rf.FrameVersion = engineConfig.EngineVersion
+		rf.FrameVersion = image.EngineVersion
 		if engineConfig.EngineArgs != nil {
 			args, err := json.Marshal(engineConfig.EngineArgs)
 			if err != nil {
@@ -724,7 +724,8 @@ func (c *runtimeArchitectureComponentImpl) UpdateRuntimeFrameworkAndArch(ctx con
 		}
 		var archs []database.RuntimeArchitecture
 		archMap := make(map[string]bool)
-		for _, arch := range engineConfig.SupportedArchs {
+		engineArchs := append(engineConfig.SupportedArchs, image.ExtraArchs...)
+		for _, arch := range engineArchs {
 			//check duplicate arch in archs
 			if _, exists := archMap[arch]; !exists {
 				// If it doesn't exist, add it to the slice and the map
@@ -735,7 +736,8 @@ func (c *runtimeArchitectureComponentImpl) UpdateRuntimeFrameworkAndArch(ctx con
 				archMap[arch] = true
 			}
 		}
-		for _, name := range engineConfig.SupportedModels {
+		engineModels := append(engineConfig.SupportedModels, image.ExtraModels...)
+		for _, name := range engineModels {
 			if _, exists := archMap[name]; !exists {
 				// If it doesn't exist, add it to the slice and the map
 				archs = append(archs, database.RuntimeArchitecture{

@@ -190,6 +190,7 @@ image_builder_status_ttl = 300
 # --skip-tls-verify : Disable TLS certificate validation for registries.
 # Uncomment the following line to enable pull images from a private registry without https
 # image_builder_kaniko_args = ["--insecure", "--skip-tls-verify"]
+STARHUB_SERVER_GPU_MODEL_LABEL = '[{"type_label": "aliyun.accelerator/nvidia_name", "capacity_label": "nvidia.com/gpu"}]'
 
 [git]
 operation_timeout = 300

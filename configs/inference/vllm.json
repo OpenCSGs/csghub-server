@@ -1,18 +1,25 @@
 {
   "engine_name": "vllm",
-  "engine_version": "v0.8.4",
   "enabled": 1,
   "container_port": 8000,
   "model_format": "safetensors",
   "engine_images": [
     {
       "compute_type": "gpu",
-      "image": "vllm:v0.8.4",
-      "driver_version": "12.4"
+      "image": "vllm:v0.8.5",
+      "driver_version": "12.4",
+      "engine_version": "v0.8.5"
+    },
+    {
+      "compute_type": "gpu",
+      "image": "vllm:v0.8.5-cu121",
+      "driver_version": "12.1",
+      "engine_version": "v0.8.5"
     },
     {
       "compute_type": "cpu",
-      "image": "vllm-cpu:2.4"
+      "image": "vllm-cpu:2.4",
+      "engine_version": "0.4.12-fix1"
     }
   ],
   "engine_args": [
