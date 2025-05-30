@@ -149,6 +149,7 @@ func (rs *FIFOScheduler) next() (Runner, error) {
 			repo.Name = s.Repository.Name
 			repo.Sdk = s.Sdk
 			repo.SdkVersion = s.SdkVersion
+			repo.DriverVersion = s.DriverVersion
 			repo.HTTPCloneURL = repoCloneInfo.HTTPCloneURL
 			repo.SpaceID = s.ID
 			repo.RepoID = s.Repository.ID

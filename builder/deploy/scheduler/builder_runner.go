@@ -59,6 +59,7 @@ func (t *BuilderRunner) makeBuildRequest() (*imagebuilder.BuildRequest, error) {
 		// SDKType:       "gradio",
 		// SDKVersion:    "3.37.0",
 		SDKType:        t.repo.Sdk,
+		DriverVersion:  t.repo.DriverVersion,
 		SDKVersion:     sdkVer,
 		SpaceGitURL:    t.repo.HTTPCloneURL,
 		GitRef:         t.task.Deploy.GitBranch,

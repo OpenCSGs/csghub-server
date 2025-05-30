@@ -92,6 +92,9 @@ func NewClusterPool() (*ClusterPool, error) {
 			slog.Error("failed to add cluster info to db", slog.Any("error", err), slog.Any("congfig id", id))
 			return nil, fmt.Errorf("failed to add cluster info to db,%v", err)
 		}
+		if !cluster.Enable {
+			continue
+		}
 		pool.Clusters = append(pool.Clusters, Cluster{
 			CID:           id,
 			ID:            cluster.ClusterID,

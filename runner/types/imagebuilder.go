@@ -23,6 +23,7 @@ type SpaceBuilderConfig struct {
 	Sdk_version    string `json:"sdk_version"`
 	PythonVersion  string `json:"python_version"`
 	Hardware       string `json:"hardware,omitempty"`
+	DriverVersion  string `json:"driver_version,omitempty"`
 	FactoryBuild   bool   `json:"factory_build,omitempty"`
 	GitRef         string `json:"git_ref"`
 	UserId         string `json:"user_id"`
@@ -65,6 +66,12 @@ var ConfigMapFiles = []FileCMConfig{
 		FileName:      "Dockerfile-python3.10-cuda11.8.0",
 		ConfigMapName: "gpu-docker-configmap",
 		VolumeName:    "gpu-docker-volume",
+		ReadOnly:      true,
+	},
+	{
+		FileName:      "Dockerfile-python3.10-cuda12.1.0",
+		ConfigMapName: "gpu-cu121-configmap",
+		VolumeName:    "gpu-cu121-volume",
 		ReadOnly:      true,
 	},
 	{
