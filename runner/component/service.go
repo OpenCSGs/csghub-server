@@ -348,7 +348,7 @@ func GenerateResources(hardware types.HardWare) (map[corev1.ResourceName]resourc
 	}{
 		{hardware.Gpu.Labels},
 		{hardware.Npu.Labels},
-		{hardware.Enflame.Labels},
+		{hardware.Gcu.Labels},
 		{hardware.Mlu.Labels},
 		{hardware.Dcu.Labels},
 		{hardware.GPGpu.Labels},
@@ -394,7 +394,7 @@ func GenerateResources(hardware types.HardWare) (map[corev1.ResourceName]resourc
 	}{
 		{hardware.Gpu.ResourceName, hardware.Gpu.Num},
 		{hardware.Npu.ResourceName, hardware.Npu.Num},
-		{hardware.Enflame.ResourceName, hardware.Enflame.Num},
+		{hardware.Gcu.ResourceName, hardware.Gcu.Num},
 		{hardware.Mlu.ResourceName, hardware.Mlu.Num},
 		{hardware.Dcu.ResourceName, hardware.Dcu.Num},
 		{hardware.GPGpu.ResourceName, hardware.GPGpu.Num},
