@@ -207,6 +207,14 @@ func generateWorkflow(req types.ArgoWorkFlowReq, config *config.Config) *v1alpha
 			environments = append(environments, corev1.EnvVar{Name: "NVIDIA_VISIBLE_DEVICES", Value: "none"})
 		}
 
+		if v.HardWare.Dcu.ResourceName == "" || v.HardWare.Dcu.Num == "" {
+			environments = append(environments, corev1.EnvVar{Name: "ENFLAME_VISIBLE_DEVICES", Value: "none"})
+		}
+
+		if v.HardWare.Gcu.ResourceName == "" || v.HardWare.Gcu.Num == "" {
+			environments = append(environments, corev1.EnvVar{Name: "ROCR_VISIBLE_DEVICES", Value: "none"})
+		}
+
 		resources := corev1.ResourceRequirements{
 			Limits:   resReq,
 			Requests: resReq,

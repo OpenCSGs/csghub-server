@@ -43,7 +43,11 @@ gen_dockerfile(){
   file="Dockerfile-python$python_version"
   
   if [[ $device == 'gpu' ]]; then
-    file=$file"-cuda11.8.0"
+    #set driver version to 11.8.0 if not set
+    if [[ -z $driver_version ]]; then
+      driver_version="11.8.0"
+    fi
+    file="$file-cuda$driver_version"
   fi
 
   if [[ $sdk == $SDK_NGINX ]]; then
@@ -107,6 +111,7 @@ gitref=$6
 sdk=$7
 python_version=$8
 device=$9  # cpu or gpu
+driver_version=${10} # cuda version, e.g. 11.8.0
 
 source_dir=$CURRENT_DIR
 echo "the full space clone url is $fullrepourl"

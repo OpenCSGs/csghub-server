@@ -41,14 +41,28 @@ func GetValidSceneType(deployType int) types.SceneType {
 }
 
 func UpdateEvaluationEnvHardware(env map[string]string, hardware types.HardWare) {
+	xpuNum := "0"
 	if hardware.Gpu.Num != "" {
 		env["GPU_NUM"] = hardware.Gpu.Num
+		xpuNum = hardware.Gpu.Num
 	} else if hardware.Npu.Num != "" {
 		env["NPU_NUM"] = hardware.Npu.Num
-	} else if hardware.Enflame.Num != "" {
-		env["ENFLAME_NUM"] = hardware.Enflame.Num
+		xpuNum = hardware.Npu.Num
+	} else if hardware.Gcu.Num != "" {
+		env["GCU_NUM"] = hardware.Gcu.Num
+		xpuNum = hardware.Gcu.Num
 	} else if hardware.Mlu.Num != "" {
-		env["Mlu_NUM"] = hardware.Mlu.Num
+		env["MLU_NUM"] = hardware.Mlu.Num
+		xpuNum = hardware.Mlu.Num
+	} else if hardware.Dcu.Num != "" {
+		env["DCU_NUM"] = hardware.Dcu.Num
+		xpuNum = hardware.Dcu.Num
+	} else if hardware.GPGpu.Num != "" {
+		env["GPGPU_NUM"] = hardware.GPGpu.Num
+		xpuNum = hardware.GPGpu.Num
+	}
+	if xpuNum != "0" {
+		env["GPU_NUM"] = xpuNum
 	}
 }
 
@@ -60,8 +74,12 @@ func ResourceType(hardware types.HardWare) types.ResourceType {
 		resourceType = types.ResourceTypeNPU
 	} else if hardware.Mlu.Num != "" {
 		resourceType = types.ResourceTypeMLU
-	} else if hardware.Enflame.Num != "" {
-		resourceType = types.ResourceTypeEnflame
+	} else if hardware.Gcu.Num != "" {
+		resourceType = types.ResourceTypeGCU
+	} else if hardware.Dcu.Num != "" {
+		resourceType = types.ResourceTypeDCU
+	} else if hardware.GPGpu.Num != "" {
+		resourceType = types.ResourceTypeGPGPU
 	}
 	return resourceType
 }
@@ -78,9 +96,12 @@ func GetResourceAndType(hardware types.HardWare) (string, string) {
 	} else if hardware.Mlu.Num != "" {
 		resourceType = hardware.Mlu.Type
 		resource += "·" + hardware.Mlu.Num + "Mlu"
-	} else if hardware.Enflame.Num != "" {
-		resourceType = hardware.Enflame.Type
-		resource += "·" + hardware.Enflame.Num + "Enflame"
+	} else if hardware.Gcu.Num != "" {
+		resourceType = hardware.Gcu.Type
+		resource += "·" + hardware.Gcu.Num + "GCU"
+	} else if hardware.Dcu.Num != "" {
+		resourceType = hardware.Dcu.Type
+		resource += "·" + hardware.Dcu.Num + "Dcu"
 	} else {
 		resourceType = hardware.Cpu.Type
 	}
@@ -89,7 +110,8 @@ func GetResourceAndType(hardware types.HardWare) (string, string) {
 
 func ContainsGraphicResource(hardware types.HardWare) bool {
 	if hardware.Gpu.Num != "" || hardware.Npu.Num != "" ||
-		hardware.Enflame.Num != "" || hardware.Mlu.Num != "" {
+		hardware.Gcu.Num != "" || hardware.Mlu.Num != "" ||
+		hardware.Dcu.Num != "" || hardware.GPGpu.Num != "" {
 		return true
 	}
 	return false
@@ -101,10 +123,14 @@ func GetXPUNumber(hardware types.HardWare) (int, error) {
 		xpuNumStr = hardware.Gpu.Num
 	} else if hardware.Npu.Num != "" {
 		xpuNumStr = hardware.Npu.Num
-	} else if hardware.Enflame.Num != "" {
-		xpuNumStr = hardware.Enflame.Num
+	} else if hardware.Gcu.Num != "" {
+		xpuNumStr = hardware.Gcu.Num
 	} else if hardware.Mlu.Num != "" {
 		xpuNumStr = hardware.Mlu.Num
+	} else if hardware.Dcu.Num != "" {
+		xpuNumStr = hardware.Dcu.Num
+	} else if hardware.GPGpu.Num != "" {
+		xpuNumStr = hardware.GPGpu.Num
 	}
 	xpuNum, err := strconv.Atoi(xpuNumStr)
 	return xpuNum, err

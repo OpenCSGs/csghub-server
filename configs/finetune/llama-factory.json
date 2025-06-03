@@ -1,6 +1,5 @@
 {
   "engine_name": "llama-factory",
-  "engine_version": "0.9.2",
   "model_format": "safetensors",
   "enabled": 1,
   "container_port": 8000,
@@ -8,7 +7,15 @@
     {
       "compute_type": "gpu",
       "image": "llama-factory:0.9.2",
-      "driver_version": "12.4"
+      "driver_version": "12.4",
+      "engine_version": "0.9.2"
+    },
+    {
+      "compute_type": "dcu",
+      "image": "llama-factory:0.9.3-dtk25.04",
+      "driver_version": "25.04",
+      "engine_version": "0.9.3",
+      "extra_archs": ["Qwen3ForCausalLM", "Qwen3MoeForCausalLM"]
     }
   ],
   "supported_archs": [

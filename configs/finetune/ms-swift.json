@@ -1,6 +1,5 @@
 {
   "engine_name": "ms-swift",
-  "engine_version": "v3.2.1",
   "model_format": "safetensors",
   "enabled": 1,
   "container_port": 8000,
@@ -8,7 +7,14 @@
     {
       "compute_type": "gpu",
       "image": "ms-swift:v3.2.1",
-      "driver_version": "12.4"
+      "driver_version": "12.4",
+      "engine_version": "v3.2.1"
+    },
+    {
+      "compute_type": "gpu",
+      "image": "ms-swift:v3.2.1-cu121",
+      "driver_version": "12.1",
+      "engine_version": "v3.2.1"
     }
   ],
   "supported_models": [

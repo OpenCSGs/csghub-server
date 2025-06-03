@@ -1,6 +1,5 @@
 {
   "engine_name": "tei",
-  "engine_version": "1.6",
   "enabled": 1,
   "container_port": 8000,
   "model_format": "safetensors",
@@ -9,11 +8,13 @@
     {
       "compute_type": "gpu",
       "image": "tei:1.6",
-      "driver_version": "12.4"
+      "driver_version": "12.4",
+      "engine_version": "1.6"
     },
     {
       "compute_type": "cpu",
-      "image": "tei:cpu-1.6"
+      "image": "tei:cpu-1.6",
+      "engine_version": "1.6"
     }
   ],
   "supported_models": [

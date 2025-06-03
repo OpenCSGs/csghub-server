@@ -1150,6 +1150,65 @@ func TestRepoComponent_DeleteDeploy(t *testing.T) {
 
 }
 
+func TestRepoComponent_DeployDetail(t *testing.T) {
+	ctx := context.TODO()
+	repo := initializeTestRepoComponent(ctx, t)
+	mockUserRepoAdminPermission(ctx, repo.mocks.stores, "user")
+
+	repo.mocks.stores.ClusterInfoMock().EXPECT().ByClusterID(ctx, "cluster").Return(database.ClusterInfo{
+		Zone:     "z",
+		Provider: "p",
+	}, nil)
+	repo.mocks.stores.DeployTaskMock().EXPECT().GetDeployByID(ctx, int64(1)).Return(&database.Deploy{
+		RepoID:        1,
+		UserUUID:      "uuid",
+		OrderDetailID: 11,
+		ClusterID:     "cluster",
+		SvcName:       "svc",
+		Status:        deployStatus.Running,
+	}, nil)
+
+	repo.mocks.deployer.EXPECT().GetReplica(ctx, types.DeployRepo{
+		Namespace: "ns",
+		Name:      "n",
+		ClusterID: "cluster",
+		SvcName:   "svc",
+	}).Return(1, 2, []types.Instance{{Name: "i1"}}, nil)
+
+	repo.mocks.deployer.EXPECT().Status(ctx, types.DeployRepo{
+		DeployID:  0,
+		SpaceID:   0,
+		ModelID:   0,
+		Namespace: "ns",
+		Name:      "n",
+		SvcName:   "svc",
+		ClusterID: "cluster",
+	}, false).Return("svc", 23, nil, nil)
+
+	dp, err := repo.DeployDetail(ctx, types.DeployActReq{
+		RepoType:     types.ModelRepo,
+		Namespace:    "ns",
+		Name:         "n",
+		CurrentUser:  "user",
+		DeployID:     1,
+		DeployType:   2,
+		InstanceName: "i1",
+	})
+	require.Nil(t, err)
+	require.Equal(t, types.DeployRepo{
+		RepoID:         1,
+		ActualReplica:  1,
+		DesiredReplica: 2,
+		Status:         "Running",
+		ClusterID:      "cluster",
+		Instances:      []types.Instance{{Name: "i1"}},
+		Private:        true,
+		SvcName:        "svc",
+		Endpoint:       "endpoint/svc",
+	}, *dp)
+
+}
+
 func TestRepoComponent_DeployInstanceLogs(t *testing.T) {
 	ctx := context.TODO()
 	repo := initializeTestRepoComponent(ctx, t)

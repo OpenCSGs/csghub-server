@@ -122,6 +122,15 @@ func (s *serviceComponentImpl) GenerateService(ctx context.Context, cluster clus
 		environments = append(environments, corev1.EnvVar{Name: "NVIDIA_VISIBLE_DEVICES", Value: "none"})
 	}
 
+	if hardware.Dcu.ResourceName == "" || hardware.Dcu.Num == "" {
+		environments = append(environments, corev1.EnvVar{Name: "ENFLAME_VISIBLE_DEVICES", Value: "none"})
+	}
+
+	if hardware.Gcu.ResourceName == "" || hardware.Gcu.Num == "" {
+		environments = append(environments, corev1.EnvVar{Name: "ROCR_VISIBLE_DEVICES", Value: "none"})
+		environments = append(environments, corev1.EnvVar{Name: "TOPS_VISIBLE_DEVICES", Value: "none"})
+	}
+
 	if appPort == 0 {
 		return nil, fmt.Errorf("app export port is not defined")
 	}
@@ -339,8 +348,10 @@ func GenerateResources(hardware types.HardWare) (map[corev1.ResourceName]resourc
 	}{
 		{hardware.Gpu.Labels},
 		{hardware.Npu.Labels},
-		{hardware.Enflame.Labels},
+		{hardware.Gcu.Labels},
 		{hardware.Mlu.Labels},
+		{hardware.Dcu.Labels},
+		{hardware.GPGpu.Labels},
 		{hardware.Cpu.Labels},
 	}
 
@@ -383,8 +394,10 @@ func GenerateResources(hardware types.HardWare) (map[corev1.ResourceName]resourc
 	}{
 		{hardware.Gpu.ResourceName, hardware.Gpu.Num},
 		{hardware.Npu.ResourceName, hardware.Npu.Num},
-		{hardware.Enflame.ResourceName, hardware.Enflame.Num},
+		{hardware.Gcu.ResourceName, hardware.Gcu.Num},
 		{hardware.Mlu.ResourceName, hardware.Mlu.Num},
+		{hardware.Dcu.ResourceName, hardware.Dcu.Num},
+		{hardware.GPGpu.ResourceName, hardware.GPGpu.Num},
 	}
 
 	for _, acc := range accelerators {

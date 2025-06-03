@@ -1,0 +1,70 @@
+# Download LFS content while building in order to make this step cacheable
+#===== LFS =====
+FROM opencsg-registry.cn-beijing.cr.aliyuncs.com/opencsg_public/alpine/git:2.36.2 AS lfs
+WORKDIR /app
+
+COPY --link .lfs.opencsg.co .
+COPY --link ./SPACE_REPOSITORY ./
+RUN  git init \
+        && git remote add origin $(cat ./SPACE_REPOSITORY) \
+        && git add --all \
+        && git config user.email "name@mail.com" \
+        && git config user.name "Name" \
+        && git commit -m "lfs" \
+        && git lfs pull \
+        && rm -rf .git .gitattributes
+#===============
+
+FROM opencsg-registry.cn-beijing.cr.aliyuncs.com/opencsg_public/space-base:python3.10-cuda12.1.0 as base
+
+# BEGIN Dynamic Part
+USER user
+COPY --link --chown=1000 ./  /home/user/app
+
+USER root
+# User Debian packages
+## Security warning : Potential user code executed as root (build time)
+RUN xargs -r -a ./packages.txt apt-get install -y \
+	&& rm -rf /var/lib/apt/lists/*
+
+USER user
+
+# Pypi source
+ARG PyPI 
+
+RUN if [ -n "$PyPI" ]; then \
+        pip config set global.index-url ${PyPI}; \
+    else \
+        echo "PyPI is not defined, skipping pip index url setting "; \
+    fi
+
+
+# Pre requirements and  Python packages (e.g. upgrading pip)
+RUN pip install  --default-timeout=60 -r pre-requirements.txt && \
+    pip install  --default-timeout=60  -r requirements.txt
+
+FROM base as pipfreeze
+RUN pip freeze > /tmp/freeze.txt
+
+FROM base
+
+# HF_ENDPOINT parameter
+ARG HF_ENDPOINT
+
+COPY --link --chown=1000 --from=lfs /app /home/user/app
+# Warning, if you change something under this line, dont forget to change the PIP_FREEZE_REVERSED_INDEX
+COPY --from=pipfreeze --link --chown=1000 /tmp/freeze.txt .
+
+ENV PYTHONPATH=$HOME/app \
+	PYTHONUNBUFFERED=1 \
+	#HF_HUB_ENABLE_HF_TRANSFER=1 \  # need hf_transfer python package
+	GRADIO_ALLOW_FLAGGING=never \
+	GRADIO_NUM_PORTS=1 \
+	GRADIO_SERVER_NAME=0.0.0.0 \
+	GRADIO_THEME=huggingface \
+	TQDM_POSITION=-1 \
+	TQDM_MININTERVAL=1 \
+	SYSTEM=spaces \
+    HF_ENDPOINT=${HF_ENDPOINT}
+
+ENTRYPOINT ["./start_entrypoint.sh"]

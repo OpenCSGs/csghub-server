@@ -1,0 +1,52 @@
+FROM nvidia/cuda:12.1.0-cudnn8-devel-ubuntu22.04 AS base
+
+# BEGIN Static part
+ENV DEBIAN_FRONTEND=noninteractive \
+	TZ=Asia/Shanghai
+
+# Update the package list to use Alibaba Cloud source
+# RUN cp /etc/apt/sources.list /etc/apt/sources.list.bak && \
+#     echo "deb http://mirrors.aliyun.com/ubuntu/ jammy main restricted universe multiverse " > /etc/apt/sources.list && \
+#     echo "deb http://mirrors.aliyun.com/ubuntu/ jammy-security main restricted universe multiverse" >> /etc/apt/sources.list && \
+#     echo "deb http://mirrors.aliyun.com/ubuntu/ jammy-updates main restricted universe multiverse" >> /etc/apt/sources.list && \
+#     echo "deb http://mirrors.aliyun.com/ubuntu/ jammy-backports main restricted universe multiverse" >> /etc/apt/sources.list
+
+RUN apt-get update && apt-get install -y \
+	git make build-essential libssl-dev zlib1g-dev \
+	libbz2-dev libreadline-dev libsqlite3-dev wget curl llvm \
+	libncursesw5-dev xz-utils tk-dev libxml2-dev libxmlsec1-dev libffi-dev \
+	liblzma-dev git-lfs ffmpeg libsm6 libxext6 cmake libgl1-mesa-glx && \
+	apt-get clean && rm -rf /var/lib/apt/lists/* && \
+    git lfs install
+
+# User
+RUN useradd -m -u 1000 user
+USER user
+ENV HOME=/home/user \
+	PATH=/home/user/.local/bin:$PATH
+WORKDIR /home/user/app
+
+# Pyenv
+RUN curl https://pyenv.run | bash
+ENV PATH=$HOME/.pyenv/shims:$HOME/.pyenv/bin:$PATH
+
+ARG PYTHON_VERSION=3.10.0
+# Python ( download and cache specific python package)
+RUN wget https://mirrors.huaweicloud.com/python/${PYTHON_VERSION}/Python-${PYTHON_VERSION}.tar.xz -P ~/.pyenv/cache/
+
+# pyenv install use cache python package (default pyenv source: https://www.python.org/ftp/python/)
+RUN pyenv install ${PYTHON_VERSION} && \
+    pyenv global ${PYTHON_VERSION} && \
+    pyenv rehash && \
+    rm -rf ~/.pyenv/cache/*
+
+# use domestic pip source
+RUN pip config set global.index-url https://pypi.tuna.tsinghua.edu.cn/simple/ && \
+    pip config set global.extra-index-url "https://mirrors.aliyun.com/pypi/simple/ https://pypi.mirrors.ustc.edu.cn/simple/" && \
+    pip install --no-cache-dir --upgrade pip==22.3.1 setuptools wheel
+    # pip install datasets "huggingface-hub>=0.19" "hf-transfer>=0.1.4" "protobuf<4" "click<8.1" "pydantic~=1.0"
+
+# install default gradio and streamlit
+RUN pip install --no-cache-dir --default-timeout=60  streamlit==1.33.0
+## install specific gradio 5.1.0
+RUN pip install https://git-devops.opencsg.com/opensource/gradio/-/raw/main/gradio-5.1.0-py3-none-any.whl

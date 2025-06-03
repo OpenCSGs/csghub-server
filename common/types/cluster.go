@@ -43,3 +43,7 @@ type UpdateClusterResponse struct {
 	Code    int    `json:"code"`
 	Message string `json:"message"`
 }
+type GPUModel struct {
+	TypeLabel     string `json:"type_label"`
+	CapacityLabel string `json:"capacity_label"`
+}

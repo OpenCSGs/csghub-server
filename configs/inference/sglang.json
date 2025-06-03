@@ -1,6 +1,5 @@
 {
   "engine_name": "sglang",
-  "engine_version": "v0.4.6.post1-cu124-srt",
   "container_port": 8000,
   "enabled": 1,
   "model_format": "safetensors",
@@ -8,7 +7,14 @@
     {
       "compute_type": "gpu",
       "image": "sglang:v0.4.6.post1-cu124-srt",
-      "driver_version": "12.4"
+      "driver_version": "12.4",
+      "engine_version": "v0.4.6.post1"
+    },
+    {
+      "compute_type": "gpu",
+      "image": "sglang:v0.4.6.post1-cu121-srt",
+      "driver_version": "12.1",
+      "engine_version": "v0.4.6.post1"
     }
   ],
   "engine_args": [

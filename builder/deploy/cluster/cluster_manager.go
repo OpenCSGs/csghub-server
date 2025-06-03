@@ -2,6 +2,7 @@ package cluster
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log/slog"
 	"math"
@@ -91,6 +92,9 @@ func NewClusterPool() (*ClusterPool, error) {
 			slog.Error("failed to add cluster info to db", slog.Any("error", err), slog.Any("congfig id", id))
 			return nil, fmt.Errorf("failed to add cluster info to db,%v", err)
 		}
+		if !cluster.Enable {
+			continue
+		}
 		pool.Clusters = append(pool.Clusters, Cluster{
 			CID:           id,
 			ID:            cluster.ClusterID,
@@ -170,17 +174,13 @@ func GetNodeResources(clientset kubernetes.Interface, config *config.Config) (ma
 			totalXPU = node.Status.Capacity[v1.ResourceName(xpuCapacityLabel)]
 		}
 
-		gpuModelVendor := strings.Split(node.Labels[xpuTypeLabel], "-")
-		gpuModel := ""
-		if len(gpuModelVendor) > 1 {
-			gpuModel = gpuModelVendor[1]
-		}
+		gpuModelVendor, gpuModel := getGpuTypeAndVendor(node.Labels[xpuTypeLabel], xpuCapacityLabel)
 		nodeResourcesMap[node.Name] = types.NodeResourceInfo{
 			NodeName:         node.Name,
 			TotalCPU:         millicoresToCores(totalCPU),
 			AvailableCPU:     millicoresToCores(totalCPU),
 			XPUModel:         gpuModel,
-			GPUVendor:        gpuModelVendor[0],
+			GPUVendor:        gpuModelVendor,
 			TotalXPU:         parseQuantityToInt64(totalXPU),
 			AvailableXPU:     parseQuantityToInt64(totalXPU),
 			AvailableMem:     totalMem,
@@ -212,10 +212,32 @@ func GetNodeResources(clientset kubernetes.Interface, config *config.Config) (ma
 	return nodeResourcesMap, nil
 }
 
+// return the gpu vendor and type
+func getGpuTypeAndVendor(vendorType string, label string) (string, string) {
+	if strings.Contains(vendorType, "-") {
+		gpuModelVendor := strings.Split(vendorType, "-")
+		return gpuModelVendor[0], gpuModelVendor[1]
+	}
+	if strings.Contains(label, ".") {
+		gpuModelVendor := strings.Split(label, ".")
+		return gpuModelVendor[0], vendorType
+	}
+	return label, vendorType
+}
+
+// the first label is the xpu capacity label, the second is the gpu model label
 func getXPULabel(node v1.Node, config *config.Config) (string, string) {
-	if _, found := node.Labels[config.Space.GPUModelLabel]; found {
+	if _, found := node.Labels["aliyun.accelerator/nvidia_name"]; found {
 		//for default cluster
-		return "nvidia.com/gpu", config.Space.GPUModelLabel
+		return "nvidia.com/gpu", "aliyun.accelerator/nvidia_name"
+	}
+	if _, found := node.Labels["machine.cluster.vke.volcengine.com/gpu-name"]; found {
+		//for volcano cluster
+		return "nvidia.com/gpu", "machine.cluster.vke.volcengine.com/gpu-name"
+	}
+	if _, found := node.Labels["eks.tke.cloud.tencent.com/gpu-type"]; found {
+		//for tencent cluster
+		return "nvidia.com/gpu", "eks.tke.cloud.tencent.com/gpu-type"
 	}
 	if _, found := node.Labels["nvidia.com/nvidia_name"]; found {
 		//for k3s cluster
@@ -232,6 +254,32 @@ func getXPULabel(node v1.Node, config *config.Config) (string, string) {
 	if _, found := node.Labels["accelerator/huawei-npu"]; found {
 		//for huawei gpu
 		return "huawei.com/Ascend910", "accelerator/huawei-npu"
+	}
+	if _, found := node.Labels["hygon.com/dcu.name"]; found {
+		//for hy dcu
+		return "hygon.com/dcu", "hygon.com/dcu.name"
+	}
+	if _, found := node.Labels["enflame.com/gcu"]; found {
+		//for enflame gcu
+		return "enflame.com/gcu", "enflame.com/gcu.model"
+	}
+	if _, found := node.Labels["enflame.com/gcu.count"]; found {
+		//for enflame gcu
+		return "enflame.com/gcu.count", "enflame.com/gcu.model"
+	}
+	//check custom gpu model label
+	if config.Space.GPUModelLabel != "" {
+		var gpuLabels []types.GPUModel
+		err := json.Unmarshal([]byte(config.Space.GPUModelLabel), &gpuLabels)
+		if err != nil {
+			slog.Error("failed to parse GPUModelLabel", "error", err)
+			return "", ""
+		}
+		for _, gpuModel := range gpuLabels {
+			if _, found := node.Labels[gpuModel.TypeLabel]; found {
+				return gpuModel.CapacityLabel, gpuModel.TypeLabel
+			}
+		}
 	}
 	return "", ""
 }

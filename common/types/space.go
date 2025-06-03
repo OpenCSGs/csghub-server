@@ -69,6 +69,7 @@ type CreateSpaceReq struct {
 	CreateRepoReq
 	Sdk           string `json:"sdk" example:"1"`
 	SdkVersion    string `json:"sdk_version" example:"v0.1"`
+	DriverVersion string `json:"driver_version" example:"11.8.0"`
 	CoverImageUrl string `json:"cover_image_url"`
 	Template      string `json:"template"`
 	Env           string `json:"env"`
@@ -99,6 +100,7 @@ type Space struct {
 	// like gradio,steamlit etc
 	Sdk           string `json:"sdk,omitempty" example:"1"`
 	SdkVersion    string `json:"sdk_version,omitempty" example:"v0.1"`
+	DriverVersion string `json:"driver_version,omitempty" example:"11.8.0"`
 	CoverImageUrl string `json:"cover_image_url,omitempty"`
 	Template      string `json:"template,omitempty"`
 	Env           string `json:"env,omitempty"`

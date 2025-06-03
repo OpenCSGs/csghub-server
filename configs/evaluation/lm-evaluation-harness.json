@@ -1,13 +1,14 @@
 {
   "engine_name": "lm-evaluation-harness",
-  "engine_version": "0.4.7",
+
   "enabled": 1,
   "model_format": "safetensors",
   "engine_images": [
     {
       "compute_type": "gpu",
       "image": "lm-evaluation-harness:0.4.7",
-      "driver_version": "12.4"
+      "driver_version": "12.4",
+      "engine_version": "0.4.7"
     }
   ],
   "supported_archs": [

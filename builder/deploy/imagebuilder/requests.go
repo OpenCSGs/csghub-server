@@ -11,6 +11,7 @@ type (
 		PythonVersion string `json:"python_version"`
 		SDKType       string `json:"sdk"`
 		SDKVersion    string `json:"sdk_version"`
+		DriverVersion string `json:"driver_version,omitempty"`
 
 		SpaceGitURL    string `json:"space_url"`
 		GitRef         string `json:"git_ref"`

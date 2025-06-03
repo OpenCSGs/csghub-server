@@ -386,7 +386,7 @@ func wfTemplateForImageBuilder(gitImg, kanikoImg, imageDestination string, param
 								Image:   gitImg,
 								Command: []string{"sh", "-c"},
 								Args: []string{
-									`sh /builder/config/init.sh  $REPO $REPO_NAME $USER_NAME $SECRET $SPACE_URL $GIT_REF $SDK $PYTHON_VERSION $HARDWARE && cp -r $REPO/$REPO_NAME/ /shared `,
+									`sh /builder/config/init.sh  $REPO $REPO_NAME $USER_NAME $SECRET $SPACE_URL $GIT_REF $SDK $PYTHON_VERSION $HARDWARE $DRIVER_VERSION && cp -r $REPO/$REPO_NAME/ /shared`,
 								},
 								SecurityContext: &corev1.SecurityContext{
 									RunAsUser: ptr.To(int64(0)),
@@ -401,6 +401,7 @@ func wfTemplateForImageBuilder(gitImg, kanikoImg, imageDestination string, param
 									{Name: "SDK", Value: params.Sdk},
 									{Name: "PYTHON_VERSION", Value: params.PythonVersion},
 									{Name: "HARDWARE", Value: params.Hardware},
+									{Name: "DRIVER_VERSION", Value: params.DriverVersion},
 								},
 								VolumeMounts: initContainerVolumeMounts,
 							},

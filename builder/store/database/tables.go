@@ -22,8 +22,9 @@ type Space struct {
 	RepositoryID int64       `bun:",notnull" json:"repository_id"`
 	Repository   *Repository `bun:"rel:belongs-to,join:repository_id=id" json:"repository"`
 	// gradio, streamlit, docker etc
-	Sdk        string `bun:",notnull" json:"sdk"`
-	SdkVersion string `bun:",notnull" json:"sdk_version"`
+	Sdk           string `bun:",notnull" json:"sdk"`
+	SdkVersion    string `bun:",notnull" json:"sdk_version"`
+	DriverVersion string `bun:",notnull" json:"driver_version"`
 	// PythonVersion string `bun:",notnull" json:"python_version"`
 	Template      string `bun:",notnull" json:"template"`
 	CoverImageUrl string `bun:"" json:"cover_image_url"`

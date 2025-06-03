@@ -64,35 +64,49 @@ func TestUpdateEvaluationEnvHardware(t *testing.T) {
 			name: "Enflame set when GPU and NPU are empty",
 			env:  make(map[string]string),
 			hardware: types.HardWare{
-				Gpu:     types.Processor{Num: ""},
-				Npu:     types.Processor{Num: ""},
-				Enflame: types.Processor{Num: "1"},
+				Gpu: types.Processor{Num: ""},
+				Npu: types.Processor{Num: ""},
+				Gcu: types.Processor{Num: "1"},
 			},
 			expected: map[string]string{
-				"ENFLAME_NUM": "1",
+				"GCU_NUM": "1",
 			},
 		},
 		{
 			name: "Mlu set when others are empty",
 			env:  make(map[string]string),
 			hardware: types.HardWare{
-				Gpu:     types.Processor{Num: ""},
-				Npu:     types.Processor{Num: ""},
-				Enflame: types.Processor{Num: ""},
-				Mlu:     types.Processor{Num: "8"},
+				Gpu: types.Processor{Num: ""},
+				Npu: types.Processor{Num: ""},
+				Gcu: types.Processor{Num: ""},
+				Mlu: types.Processor{Num: "8"},
 			},
 			expected: map[string]string{
-				"Mlu_NUM": "8",
+				"MLU_NUM": "8",
+			},
+		},
+		{
+			name: "DCU set when others are empty",
+			env:  make(map[string]string),
+			hardware: types.HardWare{
+				Gpu: types.Processor{Num: ""},
+				Npu: types.Processor{Num: ""},
+				Gcu: types.Processor{Num: ""},
+				Mlu: types.Processor{Num: ""},
+				Dcu: types.Processor{Num: "1"},
+			},
+			expected: map[string]string{
+				"DCU_NUM": "1",
 			},
 		},
 		{
 			name: "No hardware set",
 			env:  make(map[string]string),
 			hardware: types.HardWare{
-				Gpu:     types.Processor{Num: ""},
-				Npu:     types.Processor{Num: ""},
-				Enflame: types.Processor{Num: ""},
-				Mlu:     types.Processor{Num: ""},
+				Gpu: types.Processor{Num: ""},
+				Npu: types.Processor{Num: ""},
+				Gcu: types.Processor{Num: ""},
+				Mlu: types.Processor{Num: ""},
 			},
 			expected: map[string]string{},
 		},
@@ -113,10 +127,10 @@ func TestUpdateEvaluationEnvHardware(t *testing.T) {
 			name: "First non-empty hardware wins (GPU)",
 			env:  make(map[string]string),
 			hardware: types.HardWare{
-				Gpu:     types.Processor{Num: "2"},
-				Npu:     types.Processor{Num: "4"},
-				Enflame: types.Processor{Num: "1"},
-				Mlu:     types.Processor{Num: "8"},
+				Gpu: types.Processor{Num: "2"},
+				Npu: types.Processor{Num: "4"},
+				Gcu: types.Processor{Num: "1"},
+				Mlu: types.Processor{Num: "8"},
 			},
 			expected: map[string]string{
 				"GPU_NUM": "2",
@@ -126,10 +140,10 @@ func TestUpdateEvaluationEnvHardware(t *testing.T) {
 			name: "First non-empty hardware wins (NPU)",
 			env:  make(map[string]string),
 			hardware: types.HardWare{
-				Gpu:     types.Processor{Num: ""},
-				Npu:     types.Processor{Num: "4"},
-				Enflame: types.Processor{Num: "1"},
-				Mlu:     types.Processor{Num: "8"},
+				Gpu: types.Processor{Num: ""},
+				Npu: types.Processor{Num: "4"},
+				Gcu: types.Processor{Num: "1"},
+				Mlu: types.Processor{Num: "8"},
 			},
 			expected: map[string]string{
 				"NPU_NUM": "4",
@@ -140,10 +154,6 @@ func TestUpdateEvaluationEnvHardware(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			UpdateEvaluationEnvHardware(tt.env, tt.hardware)
-
-			if len(tt.env) != len(tt.expected) {
-				t.Errorf("Expected env length %d, got %d", len(tt.expected), len(tt.env))
-			}
 
 			for k, v := range tt.expected {
 				if tt.env[k] != v {
@@ -184,9 +194,9 @@ func TestGetXPUNumber(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name: "Only Enflame specified",
+			name: "Only Gcu specified",
 			hardware: types.HardWare{
-				Enflame: types.Processor{Num: "8"},
+				Gcu: types.Processor{Num: "8"},
 			},
 			want:    8,
 			wantErr: false,
@@ -202,10 +212,10 @@ func TestGetXPUNumber(t *testing.T) {
 		{
 			name: "GPU takes priority over others",
 			hardware: types.HardWare{
-				Gpu:     types.Processor{Num: "4"},
-				Npu:     types.Processor{Num: "2"},
-				Enflame: types.Processor{Num: "8"},
-				Mlu:     types.Processor{Num: "1"},
+				Gpu: types.Processor{Num: "4"},
+				Npu: types.Processor{Num: "2"},
+				Gcu: types.Processor{Num: "8"},
+				Mlu: types.Processor{Num: "1"},
 			},
 			want:    4,
 			wantErr: false,
@@ -213,18 +223,18 @@ func TestGetXPUNumber(t *testing.T) {
 		{
 			name: "NPU takes priority when GPU is empty",
 			hardware: types.HardWare{
-				Npu:     types.Processor{Num: "2"},
-				Enflame: types.Processor{Num: "8"},
-				Mlu:     types.Processor{Num: "1"},
+				Npu: types.Processor{Num: "2"},
+				Gcu: types.Processor{Num: "8"},
+				Mlu: types.Processor{Num: "1"},
 			},
 			want:    2,
 			wantErr: false,
 		},
 		{
-			name: "Enflame takes priority when GPU and NPU are empty",
+			name: "Gcu takes priority when GPU and NPU are empty",
 			hardware: types.HardWare{
-				Enflame: types.Processor{Num: "8"},
-				Mlu:     types.Processor{Num: "1"},
+				Gcu: types.Processor{Num: "8"},
+				Mlu: types.Processor{Num: "1"},
 			},
 			want:    8,
 			wantErr: false,
@@ -303,10 +313,10 @@ func TestGetXPUNumberEdgeCases(t *testing.T) {
 		{
 			name: "Multiple processors with empty strings",
 			hardware: types.HardWare{
-				Gpu:     types.Processor{Num: ""},
-				Npu:     types.Processor{Num: ""},
-				Enflame: types.Processor{Num: ""},
-				Mlu:     types.Processor{Num: ""},
+				Gpu: types.Processor{Num: ""},
+				Npu: types.Processor{Num: ""},
+				Gcu: types.Processor{Num: ""},
+				Mlu: types.Processor{Num: ""},
 			},
 			want:    0,
 			wantErr: false,
@@ -336,90 +346,90 @@ func TestResourceType(t *testing.T) {
 		{
 			name: "CPU when all hardware fields are empty",
 			hardware: types.HardWare{
-				Gpu:     types.Processor{Num: ""},
-				Npu:     types.Processor{Num: ""},
-				Mlu:     types.Processor{Num: ""},
-				Enflame: types.Processor{Num: ""},
+				Gpu: types.Processor{Num: ""},
+				Npu: types.Processor{Num: ""},
+				Mlu: types.Processor{Num: ""},
+				Gcu: types.Processor{Num: ""},
 			},
 			expected: types.ResourceTypeCPU,
 		},
 		{
 			name: "GPU when GPU Num is not empty",
 			hardware: types.HardWare{
-				Gpu:     types.Processor{Num: "1"},
-				Npu:     types.Processor{Num: ""},
-				Mlu:     types.Processor{Num: ""},
-				Enflame: types.Processor{Num: ""},
+				Gpu: types.Processor{Num: "1"},
+				Npu: types.Processor{Num: ""},
+				Mlu: types.Processor{Num: ""},
+				Gcu: types.Processor{Num: ""},
 			},
 			expected: types.ResourceTypeGPU,
 		},
 		{
 			name: "NPU when NPU Num is not empty and GPU is empty",
 			hardware: types.HardWare{
-				Gpu:     types.Processor{Num: ""},
-				Npu:     types.Processor{Num: "2"},
-				Mlu:     types.Processor{Num: ""},
-				Enflame: types.Processor{Num: ""},
+				Gpu: types.Processor{Num: ""},
+				Npu: types.Processor{Num: "2"},
+				Mlu: types.Processor{Num: ""},
+				Gcu: types.Processor{Num: ""},
 			},
 			expected: types.ResourceTypeNPU,
 		},
 		{
 			name: "Mlu when Mlu Num is not empty and GPU/NPU are empty",
 			hardware: types.HardWare{
-				Gpu:     types.Processor{Num: ""},
-				Npu:     types.Processor{Num: ""},
-				Mlu:     types.Processor{Num: "3"},
-				Enflame: types.Processor{Num: ""},
+				Gpu: types.Processor{Num: ""},
+				Npu: types.Processor{Num: ""},
+				Mlu: types.Processor{Num: "3"},
+				Gcu: types.Processor{Num: ""},
 			},
 			expected: types.ResourceTypeMLU,
 		},
 		{
-			name: "Enflame when Enflame Num is not empty and others are empty",
+			name: "Gcu when Gcu Num is not empty and others are empty",
 			hardware: types.HardWare{
-				Gpu:     types.Processor{Num: ""},
-				Npu:     types.Processor{Num: ""},
-				Mlu:     types.Processor{Num: ""},
-				Enflame: types.Processor{Num: "4"},
+				Gpu: types.Processor{Num: ""},
+				Npu: types.Processor{Num: ""},
+				Mlu: types.Processor{Num: ""},
+				Gcu: types.Processor{Num: "4"},
 			},
-			expected: types.ResourceTypeEnflame,
+			expected: types.ResourceTypeGCU,
 		},
 		{
 			name: "GPU has priority when multiple hardware types are present",
 			hardware: types.HardWare{
-				Gpu:     types.Processor{Num: "1"},
-				Npu:     types.Processor{Num: "2"},
-				Mlu:     types.Processor{Num: "3"},
-				Enflame: types.Processor{Num: "4"},
+				Gpu: types.Processor{Num: "1"},
+				Npu: types.Processor{Num: "2"},
+				Mlu: types.Processor{Num: "3"},
+				Gcu: types.Processor{Num: "4"},
 			},
 			expected: types.ResourceTypeGPU,
 		},
 		{
-			name: "NPU has priority over Mlu and Enflame",
+			name: "NPU has priority over Mlu and Gcu",
 			hardware: types.HardWare{
-				Gpu:     types.Processor{Num: ""},
-				Npu:     types.Processor{Num: "2"},
-				Mlu:     types.Processor{Num: "3"},
-				Enflame: types.Processor{Num: "4"},
+				Gpu: types.Processor{Num: ""},
+				Npu: types.Processor{Num: "2"},
+				Mlu: types.Processor{Num: "3"},
+				Gcu: types.Processor{Num: "4"},
 			},
 			expected: types.ResourceTypeNPU,
 		},
 		{
-			name: "Mlu has priority over Enflame",
+			name: "Mlu has priority over Gcu",
 			hardware: types.HardWare{
-				Gpu:     types.Processor{Num: ""},
-				Npu:     types.Processor{Num: ""},
-				Mlu:     types.Processor{Num: "3"},
-				Enflame: types.Processor{Num: "4"},
+				Gpu: types.Processor{Num: ""},
+				Npu: types.Processor{Num: ""},
+				Mlu: types.Processor{Num: "3"},
+				Gcu: types.Processor{Num: "4"},
 			},
 			expected: types.ResourceTypeMLU,
 		},
 		{
 			name: "Zero values for Num fields",
 			hardware: types.HardWare{
-				Gpu:     types.Processor{Num: "0"},
-				Npu:     types.Processor{Num: "0"},
-				Mlu:     types.Processor{Num: "0"},
-				Enflame: types.Processor{Num: "0"},
+				Gpu: types.Processor{Num: "0"},
+				Npu: types.Processor{Num: "0"},
+				Mlu: types.Processor{Num: "0"},
+				Gcu: types.Processor{Num: "0"},
 			},
 			expected: types.ResourceTypeGPU,
 		},

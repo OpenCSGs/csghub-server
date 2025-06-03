@@ -2362,8 +2362,6 @@ func (c *repoComponentImpl) DeployDetail(ctx context.Context, detailReq types.De
 		return nil, err
 	}
 
-	endpoint, _ := c.GenerateEndpoint(ctx, deploy)
-
 	req := types.DeployRepo{
 		DeployID:  deploy.ID,
 		SpaceID:   deploy.SpaceID,
@@ -2377,6 +2375,24 @@ func (c *repoComponentImpl) DeployDetail(ctx context.Context, detailReq types.De
 	if err != nil {
 		slog.Warn("fail to get deploy replica", slog.Any("repotype", detailReq.RepoType), slog.Any("req", req), slog.Any("error", err))
 	}
+
+	_, code, _, err := c.deployer.Status(ctx, types.DeployRepo{
+		DeployID:  deploy.ID,
+		SpaceID:   deploy.SpaceID,
+		ModelID:   deploy.ModelID,
+		Namespace: detailReq.Namespace,
+		Name:      detailReq.Name,
+		SvcName:   deploy.SvcName,
+		ClusterID: deploy.ClusterID,
+	}, false)
+	if err != nil {
+		slog.Warn("fail to get deploy status", slog.Any("repo type", detailReq.RepoType), slog.Any("svc name", deploy.SvcName), slog.Any("error", err))
+	}
+
+	deploy.Status = code
+
+	endpoint, _ := c.GenerateEndpoint(ctx, deploy)
+
 	endpointPrivate := true
 	if deploy.SecureLevel == types.EndpointPublic {
 		endpointPrivate = false
@@ -2402,7 +2418,7 @@ func (c *repoComponentImpl) DeployDetail(ctx context.Context, detailReq types.De
 		DeployName:       deploy.DeployName,
 		RepoID:           deploy.RepoID,
 		SvcName:          deploy.SvcName,
-		Status:           deployStatusCodeToString(deploy.Status),
+		Status:           deployStatusCodeToString(code),
 		Hardware:         deploy.Hardware,
 		Env:              deploy.Env,
 		RuntimeFramework: deploy.RuntimeFramework,
