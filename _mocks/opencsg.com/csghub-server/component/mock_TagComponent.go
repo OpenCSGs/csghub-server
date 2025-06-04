@@ -83,23 +83,23 @@ func (_c *MockTagComponent_AllCategories_Call) RunAndReturn(run func(context.Con
 }
 
 // AllTags provides a mock function with given fields: ctx, filter
-func (_m *MockTagComponent) AllTags(ctx context.Context, filter *types.TagFilter) ([]*database.Tag, error) {
+func (_m *MockTagComponent) AllTags(ctx context.Context, filter *types.TagFilter) ([]*types.RepoTag, error) {
 	ret := _m.Called(ctx, filter)
 
 	if len(ret) == 0 {
 		panic("no return value specified for AllTags")
 	}
 
-	var r0 []*database.Tag
+	var r0 []*types.RepoTag
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, *types.TagFilter) ([]*database.Tag, error)); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, *types.TagFilter) ([]*types.RepoTag, error)); ok {
 		return rf(ctx, filter)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, *types.TagFilter) []*database.Tag); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, *types.TagFilter) []*types.RepoTag); ok {
 		r0 = rf(ctx, filter)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]*database.Tag)
+			r0 = ret.Get(0).([]*types.RepoTag)
 		}
 	}
 
@@ -131,12 +131,12 @@ func (_c *MockTagComponent_AllTags_Call) Run(run func(ctx context.Context, filte
 	return _c
 }
 
-func (_c *MockTagComponent_AllTags_Call) Return(_a0 []*database.Tag, _a1 error) *MockTagComponent_AllTags_Call {
+func (_c *MockTagComponent_AllTags_Call) Return(_a0 []*types.RepoTag, _a1 error) *MockTagComponent_AllTags_Call {
 	_c.Call.Return(_a0, _a1)
 	return _c
 }
 
-func (_c *MockTagComponent_AllTags_Call) RunAndReturn(run func(context.Context, *types.TagFilter) ([]*database.Tag, error)) *MockTagComponent_AllTags_Call {
+func (_c *MockTagComponent_AllTags_Call) RunAndReturn(run func(context.Context, *types.TagFilter) ([]*types.RepoTag, error)) *MockTagComponent_AllTags_Call {
 	_c.Call.Return(run)
 	return _c
 }

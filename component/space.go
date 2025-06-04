@@ -592,7 +592,8 @@ func (c *spaceComponentImpl) Index(ctx context.Context, repoFilter *types.RepoFi
 				Category:  tag.Category,
 				Group:     tag.Group,
 				BuiltIn:   tag.BuiltIn,
-				ShowName:  tag.ShowName,
+				ShowName:  tag.I18nKey, // ShowName:  tag.ShowName,
+				I18nKey:   tag.I18nKey,
 				CreatedAt: tag.CreatedAt,
 				UpdatedAt: tag.UpdatedAt,
 			})
@@ -744,7 +745,8 @@ func (c *spaceComponentImpl) ListByPath(ctx context.Context, paths []string) ([]
 				Category:  tag.Category,
 				Group:     tag.Group,
 				BuiltIn:   tag.BuiltIn,
-				ShowName:  tag.ShowName,
+				ShowName:  tag.I18nKey, // ShowName:  tag.ShowName,
+				I18nKey:   tag.I18nKey,
 				CreatedAt: tag.CreatedAt,
 				UpdatedAt: tag.UpdatedAt,
 			})

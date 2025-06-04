@@ -28,8 +28,8 @@ func NewTestTagHandler(
 
 func TestTagHandler_AllTags(t *testing.T) {
 	t.Run("no builtin", func(t *testing.T) {
-		var tags []*database.Tag
-		tags = append(tags, &database.Tag{ID: 1, Name: "test1"})
+		var tags []*types.RepoTag
+		tags = append(tags, &types.RepoTag{Name: "test1"})
 
 		values := url.Values{}
 		values.Add("category", "task")
@@ -60,13 +60,13 @@ func TestTagHandler_AllTags(t *testing.T) {
 		require.Nil(t, err)
 
 		require.Equal(t, 0, resp.Code)
-		require.Equal(t, "", resp.Msg)
+		require.Equal(t, "OK", resp.Msg)
 		require.NotNil(t, resp.Data)
 	})
 
 	t.Run("with builtin", func(t *testing.T) {
-		var tags []*database.Tag
-		tags = append(tags, &database.Tag{ID: 1, Name: "test1"})
+		var tags []*types.RepoTag
+		tags = append(tags, &types.RepoTag{ID: 1, Name: "test1"})
 
 		values := url.Values{}
 		values.Add("category", "task")
@@ -99,7 +99,7 @@ func TestTagHandler_AllTags(t *testing.T) {
 		require.Nil(t, err)
 
 		require.Equal(t, 0, resp.Code)
-		require.Equal(t, "", resp.Msg)
+		require.Equal(t, "OK", resp.Msg)
 		require.NotNil(t, resp.Data)
 	})
 }
