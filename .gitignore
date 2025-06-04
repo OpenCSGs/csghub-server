@@ -3,6 +3,7 @@ bin
 .vscode
 .DS_Store
 .envrc
+.idea/
 
 /gitea
 /pgdata
