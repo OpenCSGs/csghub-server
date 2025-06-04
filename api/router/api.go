@@ -20,6 +20,7 @@ import (
 	"opencsg.com/csghub-server/builder/instrumentation"
 	"opencsg.com/csghub-server/builder/temporal"
 	"opencsg.com/csghub-server/common/config"
+	"opencsg.com/csghub-server/common/i18n"
 	"opencsg.com/csghub-server/common/types"
 	"opencsg.com/csghub-server/mirror"
 )
@@ -49,7 +50,7 @@ func RunServer(config *config.Config, enableSwagger bool) {
 	if config.MirrorServer.Enable && config.GitServer.Type == types.GitServerTypeGitaly {
 		mirrorService.EnqueueMirrorTasks()
 	}
-
+	i18n.InitLocalizersFromEmbedFile()
 	server.Run()
 	_ = stopOtel(context.Background())
 	temporal.Stop()
