@@ -53,6 +53,10 @@ func (c *spaceResourceComponentImpl) Index(ctx context.Context, clusterId string
 		if !c.deployAvailable(deployType, hardware) {
 			continue
 		}
+		if deployType == types.SpaceType && hardware.Replicas != 0 {
+			// Space resources should not have multi-node resources
+			continue
+		}
 		resourceType := common.ResourceType(hardware)
 		result = append(result, types.SpaceResource{
 			ID:          r.ID,

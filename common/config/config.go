@@ -134,6 +134,7 @@ type Config struct {
 		ReadinessPeriodSeconds    int    `env:"STARHUB_SERVER_READINESS_PERIOD_SECONDS, default=10"`
 		ReadinessFailureThreshold int    `env:"STARHUB_SERVER_READINESS_FAILURE_THRESHOLD, default=3"`
 		PYPIIndexURL              string `env:"STARHUB_SERVER_SPACE_PYPI_INDEX_URL, default="`
+		InformerSyncPeriodInMin   int    `env:"STARHUB_SERVER_SPACE_INFORMER_SYNC_PERIOD_IN_MINUTES, default=2"`
 	}
 
 	Model struct {

@@ -43,14 +43,15 @@ var (
 )
 
 type serviceComponentImpl struct {
-	k8sNameSpace       string
-	env                *config.Config
-	spaceDockerRegBase string
-	modelDockerRegBase string
-	imagePullSecret    string
-	serviceStore       database.KnativeServiceStore
-	clusterPool        *cluster.ClusterPool
-	eventPub           *event.EventPublisher
+	k8sNameSpace            string
+	env                     *config.Config
+	spaceDockerRegBase      string
+	modelDockerRegBase      string
+	imagePullSecret         string
+	informerSyncPeriodInMin int
+	serviceStore            database.KnativeServiceStore
+	clusterPool             *cluster.ClusterPool
+	eventPub                *event.EventPublisher
 }
 
 type ServiceComponent interface {
@@ -79,14 +80,15 @@ type ServiceComponent interface {
 func NewServiceComponent(config *config.Config, clusterPool *cluster.ClusterPool) ServiceComponent {
 	domainParts := strings.SplitN(config.Space.InternalRootDomain, ".", 2)
 	sc := &serviceComponentImpl{
-		k8sNameSpace:       domainParts[0],
-		env:                config,
-		spaceDockerRegBase: config.Space.DockerRegBase,
-		modelDockerRegBase: config.Model.DockerRegBase,
-		imagePullSecret:    config.Space.ImagePullSecret,
-		serviceStore:       database.NewKnativeServiceStore(),
-		clusterPool:        clusterPool,
-		eventPub:           &event.DefaultEventPublisher,
+		k8sNameSpace:            domainParts[0],
+		env:                     config,
+		spaceDockerRegBase:      config.Space.DockerRegBase,
+		modelDockerRegBase:      config.Model.DockerRegBase,
+		imagePullSecret:         config.Space.ImagePullSecret,
+		informerSyncPeriodInMin: config.Space.InformerSyncPeriodInMin,
+		serviceStore:            database.NewKnativeServiceStore(),
+		clusterPool:             clusterPool,
+		eventPub:                &event.DefaultEventPublisher,
 	}
 	return sc
 }
@@ -476,7 +478,7 @@ func (s *serviceComponentImpl) RunInformer() {
 func (s *serviceComponentImpl) RunServiceInformer(stopCh <-chan struct{}, cluster cluster.Cluster) {
 	informerFactory := externalversions.NewSharedInformerFactoryWithOptions(
 		cluster.KnativeClient,
-		1*time.Hour, //sync every 1 hour
+		time.Duration(s.informerSyncPeriodInMin)*time.Minute, //sync every 2 minutes, if network unavailable, it will trigger watcher to reconnect
 		externalversions.WithNamespace(s.k8sNameSpace),
 	)
 	informer := informerFactory.Serving().V1().Services().Informer()
@@ -520,7 +522,7 @@ func (s *serviceComponentImpl) RunServiceInformer(stopCh <-chan struct{}, cluste
 func (s *serviceComponentImpl) RunPodInformer(stopCh <-chan struct{}, cluster cluster.Cluster) {
 	factory := informers.NewSharedInformerFactoryWithOptions(
 		cluster.Client,
-		0,
+		1*time.Hour, //sync every 1 hour, if pod unavailable, it will reconnect
 		informers.WithNamespace(s.k8sNameSpace),
 		informers.WithTweakListOptions(func(options *metav1.ListOptions) {
 			options.LabelSelector = KeyServiceLabel
@@ -893,6 +895,11 @@ func (s *serviceComponentImpl) RunServiceSingleHost(ctx context.Context, req typ
 	if err != nil {
 		return fmt.Errorf("failed to create service, error: %v, req: %v", err, req)
 	}
+	// add a placeholder service
+	err = s.AddKService(ctx, req)
+	if err != nil {
+		return fmt.Errorf("failed to add knative service to db, error: %v", err)
+	}
 	return nil
 }
 
@@ -1107,4 +1114,18 @@ func (wc *serviceComponentImpl) sendServiceUpdateEvent(event types.ServiceEvent)
 	} else {
 		slog.Debug("pub service event success", slog.Any("data", string(str)))
 	}
+}
+
+// add place holder service, the status will be updated by the informer
+func (s *serviceComponentImpl) AddKService(ctx context.Context, req types.SVCRequest) error {
+	ks := &database.KnativeService{
+		Code:       common.Deploying,
+		Name:       req.SrvName,
+		ClusterID:  req.ClusterID,
+		Status:     corev1.ConditionUnknown,
+		DeployID:   req.DeployID,
+		UserUUID:   req.UserID,
+		DeployType: req.DeployType,
+	}
+	return s.serviceStore.Add(ctx, ks)
 }
