@@ -70,7 +70,8 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 	}))
 	r.Use(gin.Recovery())
 	r.Use(middleware.Log(config))
-
+	r.Use(middleware.ModifyAcceptLanguageMiddleware())
+	r.Use(middleware.LocalizedErrorMiddleware())
 	gitHTTPHandler, err := handler.NewGitHTTPHandler(config)
 	if err != nil {
 		return nil, fmt.Errorf("error creating git http handler:%w", err)

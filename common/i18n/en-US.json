@@ -1,0 +1,171 @@
+{
+    "method.get": {
+        "other": "Get"
+    },
+    "method.post": {
+        "other": "Create"
+    },
+    "method.put": {
+        "other": "Update"
+    },
+    "method.delete": {
+        "other": "Delete"
+    },
+    "handler.list": {
+        "other": "list"
+    },
+    "handler.sshkey": {
+        "other": "ssh key"
+    },
+    "handler.mcpserver": {
+        "other": "mcp server"
+    },
+    "handler.spacesdk": {
+        "other": "space sdk"
+    },
+    "handler.accounting": {
+        "other": "accounting"
+    },
+    "handler.discussion": {
+        "other": "discussion"
+    },
+    "handler.internalserviceproxy": {
+        "other": "internal service proxy"
+    },
+    "handler.sync": {
+        "other": "sync"
+    },
+    "handler.space": {
+        "other": "space"
+    },
+    "handler.rproxy": {
+        "other": "rproxy"
+    },
+    "handler.recom": {
+        "other": "recom"
+    },
+    "handler.event": {
+        "other": "event"
+    },
+    "handler.dataset": {
+        "other": "dataset"
+    },
+    "handler.cluster": {
+        "other": "cluster"
+    },
+    "handler.hfdataset": {
+        "other": "Hugging Face dataset"
+    },
+    "handler.broadcast": {
+        "other": "broadcast"
+    },
+    "handler.monitor": {
+        "other": "monitor"
+    },
+    "handler.spacetemplate": {
+        "other": "space template"
+    },
+    "handler.mirrorsource": {
+        "other": "mirror source"
+    },
+    "handler.prompt": {
+        "other": "prompt"
+    },
+    "handler.mirror": {
+        "other": "mirror"
+    },
+    "handler.gitcallback": {
+        "other": "git call back"
+    },
+    "handler.repo": {
+        "other": "repo"
+    },
+    "handler.user": {
+        "other": "user"
+    },
+    "handler.tags": {
+        "other": "tag"
+    },
+    "handler.organization": {
+        "other": "organization"
+    },
+    "handler.sensitive": {
+        "other": "sensitive"
+    },
+    "handler.internal": {
+        "other": "internal"
+    },
+    "handler.githttp": {
+        "other": "githttp"
+    },
+    "handler.evaluation": {
+        "other": "evaluation"
+    },
+    "handler.spaceresource": {
+        "other": "space resource"
+    },
+    "handler.telemetry": {
+        "other": "telemetry"
+    },
+    "handler.model": {
+        "other": "model"
+    },
+    "handler.collection": {
+        "other": "collection"
+    },
+    "handler.modeltree": {
+        "other": "model tree"
+    },
+    "handler.stat": {
+        "other": "stat"
+    },
+    "handler.dataflowproxy": {
+        "other": "dataflow proxy"
+    },
+    "handler.license": {
+        "other": "license"
+    },
+    "handler.runtimearchitecture": {
+        "other": "runtime architecture"
+    },
+    "handler.code": {
+        "other": "code"
+    },
+    "handler.syncclientsetting": {
+        "other": "sync client setting"
+    },
+    "handler.rule": {
+        "other": "rule"
+    },
+    "handler.config": {
+        "other": "config"
+    },
+    "error.BadRequest": {
+        "description": "Bad request error message",
+        "other": "{{.method | default \"request for\"}} {{.handler | default \"data\"}}. The request could not be understood due to bad request."
+    },
+    "error.Unauthorized": {
+        "description": "Unauthorized error message",
+        "other": "{{.method | default \"request for\"}} {{.handler | default \"data\"}}. Authentication is required and has failed or has not been provided."
+    },
+    "error.Forbidden": {
+        "description": "Forbidden error message",
+        "other": "{{.method | default \"request for\"}} {{.handler | default \"data\"}}. You don't have permission to access this resource."
+    },
+    "error.NotFound": {
+        "description": "Not found error message",
+        "other": "{{.method | default \"request for\"}} {{.handler | default \"data\"}}. The requested resource could not be found."
+    },
+    "error.MethodNotAllowed": {
+        "description": "Method not allowed error message",
+        "other": "{{.method | default \"request for\"}} {{.handler | default \"data\"}}. The method specified in the request is not allowed for the resource."
+    },
+    "error.InternalServerError": {
+        "description": "Internal server error message",
+        "other": "{{.method | default \"request for\"}} {{.handler | default \"data\"}}. The server encountered an unexpected condition which prevented it from fulfilling the request."
+    },
+    "error.ServiceUnavailable": {
+        "description": "Service unavailable error message",
+        "other": "{{.method | default \"request for\"}} {{.handler | default \"data\"}}. The service is temporarily unavailable. Please try again later."
+    }
+}
