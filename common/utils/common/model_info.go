@@ -13,7 +13,6 @@ import (
 	"opencsg.com/csghub-server/common/types"
 )
 
-// TensorSummary contains summary information about a tensor
 type TensorSummary struct {
 	Name      string `json:"name"`
 	Shape     []int  `json:"shape"`
@@ -25,16 +24,23 @@ type TensorSummary struct {
 // file List contains the whole path of the file
 // https://hub.opencsg.com/csg/Qwen/Qwen2-1.5B-Instruct/resolve/main/model-00001-of-0002.safetensors
 // https://hub.opencsg.com/csg/Qwen/Qwen2-1.5B-Instruct/resolve/main/model-00001-of-0002.safetensors
-func GetModelInfo(fileList []string, token string, minContext int) (*types.ModelInfo, error) {
+func GetModelInfo(fileList []string, minContext int) (*types.ModelInfo, error) {
 
 	modelInfo := &types.ModelInfo{}
 	var totalParams int64
 	var totalMemoryBytes int64
 	var modelSize int64
 	var bytesPerParam int
+	headerTooBig := false
 	for _, file := range fileList {
 		header, err := fetchSafetensorsMetadata(file)
+		//check error if it contains exceeds maximum allowed size
 		if err != nil {
+			if strings.Contains(err.Error(), "header size exceeds maximum allowed size") {
+				//such as deepseek-ai/DeepSeek-R1-0528
+				headerTooBig = true
+				break
+			}
 			return nil, fmt.Errorf("failed to fetch metadata: %v", err)
 		}
 		delete(header, "__metadata__")
@@ -58,13 +64,16 @@ func GetModelInfo(fileList []string, token string, minContext int) (*types.Model
 			tensorParams := calculateTensorParams(shape)
 			totalParams += tensorParams
 
-			bytesPerParam = getBytesPerParam(dtype)
+			bytesPerParam = GetBytesPerParam(dtype)
 			tensorMemoryBytes := tensorParams * int64(bytesPerParam)
 			modelSize += tensorMemoryBytes
 		}
 
 		modelInfo.TotalParams = totalParams
 		modelInfo.ParamsBillions = float32(math.Round(float64(totalParams)/1e9*100) / 100)
+	}
+	if headerTooBig {
+		return GetModelInfoWithoutParameters(fileList, minContext)
 	}
 	modelInfo.ModelWeightsGB = float32(modelSize / (1024 * 1024 * 1024))
 	modelInfo.MiniGPUMemoryGB = max(float32(totalMemoryBytes/(1024*1024*1024)), 1)
@@ -73,6 +82,22 @@ func GetModelInfo(fileList []string, token string, minContext int) (*types.Model
 	modelInfo.BatchSize = 1
 	modelInfo.BytesPerParam = bytesPerParam
 	modelInfo.TensorType = strings.TrimSpace(modelInfo.TensorType)
+	return modelInfo, nil
+}
+
+// get model info from model index
+func GetModelInfoWithoutParameters(fileList []string, minContext int) (*types.ModelInfo, error) {
+	modelInfo := &types.ModelInfo{}
+	for _, file := range fileList {
+		size, err := GetFileSize(file)
+		if err != nil {
+			return nil, err
+		}
+		modelInfo.ModelWeightsGB += size
+	}
+	modelInfo.ContextSize = minContext
+	modelInfo.BatchSize = 1
+
 	return modelInfo, nil
 }
 
@@ -94,6 +119,22 @@ func GetActivationMemory(batchSize, seqLength, numLayers, hiddenSize, numHeads, 
 func GetKvCacheSize(contextSize, batchSize, hiddenSize, numHiddenLayers, bytesPerParam int) float32 {
 	activateBytes := 2 * batchSize * contextSize * numHiddenLayers * hiddenSize * bytesPerParam
 	return float32(activateBytes / (1024 * 1024 * 1024))
+}
+
+// GetLoRAFinetuneMemory estimates the memory required for fine-tuning a model with LoRA
+func GetLoRAFinetuneMemory(modelWeightsGB, totalParams float32, batchSize, contextSize, hiddenSize, numHiddenLayers, numAttentionHeads, bytesPerParam int, loraRank int) float32 {
+	modelWeights := modelWeightsGB
+	loraRatio := float32(loraRank) / 1000.0
+	if loraRatio > 0.05 {
+		loraRatio = 0.05
+	}
+	loraParamsGB := totalParams * loraRatio * float32(bytesPerParam) / (1024 * 1024 * 1024)
+	gradientsGB := loraParamsGB
+	optimizerStateGB := loraParamsGB * 2
+	activationMemoryGB := GetActivationMemory(batchSize, contextSize, numHiddenLayers, hiddenSize, numAttentionHeads, bytesPerParam)
+	overHead := float32(1.0)
+	totalMemoryGB := modelWeights + loraParamsGB + gradientsGB + optimizerStateGB + activationMemoryGB + overHead
+	return float32(math.Round(float64(totalMemoryGB)*100)) / 100
 }
 
 func extractShape(tensorData map[string]any) ([]int, error) {
@@ -193,7 +234,7 @@ func fetchSafetensorsMetadata(url string) (map[string]any, error) {
 }
 
 // getBytesPerParam returns the number of bytes per parameter for a given data type
-func getBytesPerParam(dtype string) int {
+func GetBytesPerParam(dtype string) int {
 	dtype = strings.ToUpper(dtype)
 	switch {
 	case strings.Contains(dtype, "F16") || strings.Contains(dtype, "BF16"):
@@ -212,4 +253,73 @@ func getBytesPerParam(dtype string) int {
 		// Default to float32 (4 bytes)
 		return 4
 	}
+}
+
+func GetFileSize(fileURL string) (float32, error) {
+	// Send a HEAD request
+	tr := &http.Transport{
+		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+	}
+	client := &http.Client{Transport: tr}
+	if strings.HasPrefix(fileURL, "http://") {
+		client = &http.Client{}
+	}
+
+	resp, err := client.Head(fileURL)
+	if err != nil {
+		return 0, err
+	}
+	defer resp.Body.Close()
+
+	// Get the Content-Length from the header
+	contentLength := resp.Header.Get("Content-Length")
+
+	// Convert Content-Length to int64
+	var sizeInBytes int64
+	_, err = fmt.Sscanf(contentLength, "%d", &sizeInBytes)
+	if err != nil {
+		return 0, err
+	}
+
+	// Convert bytes to GB
+	sizeInGB := float32(sizeInBytes) / (1024 * 1024 * 1024) // 1 GB = 1024 * 1024 * 1024 bytes
+
+	return sizeInGB, nil
+}
+
+func TorchDtypeToSafetensors(dtype string) string {
+
+	dtypeMap := map[string]string{
+		"float16":  "F16",
+		"float32":  "F32",
+		"float64":  "F64",
+		"bfloat16": "BF16",
+		"half":     "F16",
+		"float":    "F32",
+		"double":   "F64",
+
+		"int8":   "I8",
+		"int16":  "I16",
+		"int32":  "I32",
+		"int64":  "I64",
+		"uint8":  "U8",
+		"uint16": "U16",
+		"uint32": "U32",
+		"uint64": "U64",
+		"byte":   "U8",
+		"short":  "I16",
+		"int":    "I32",
+		"long":   "I64",
+
+		"bool": "BOOL",
+
+		"complex64":  "C64",
+		"complex128": "C128",
+	}
+
+	if safetensorsName, exists := dtypeMap[dtype]; exists {
+		return safetensorsName
+	}
+
+	return strings.ToUpper(dtype)
 }

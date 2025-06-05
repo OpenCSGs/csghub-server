@@ -363,7 +363,9 @@ type ModelInfo struct {
 	//fp16, fp32, int8
 	TensorType      string  `json:"tensor_type"`
 	MiniGPUMemoryGB float32 `json:"mini_gpu_memory_gb"`
-	ModelWeightsGB  float32 `json:"model_weights_gb"`
+	//the gpu memory for finetuning on a mini GPU
+	MiniGPUFinetuneGB float32 `json:"mini_gpu_finetune_gb"`
+	ModelWeightsGB    float32 `json:"model_weights_gb"`
 	//qwen2
 	ModelType string `json:"model_type"`
 	//Qwen2ForCausalLM
@@ -389,8 +391,8 @@ type ModelConfig struct {
 	NumHiddenLayers   int      `json:"num_hidden_layers"`
 	HiddenSize        int      `json:"hidden_size"`
 	NumAttentionHeads int      `json:"num_attention_heads"`
+	TorchDtype        string   `json:"torch_dtype"`
 }
-
 type EngineConfig struct {
 	EngineName      string      `json:"engine_name"`
 	ContainerPort   int         `json:"container_port"`

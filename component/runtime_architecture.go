@@ -25,11 +25,12 @@ import (
 )
 
 var (
-	MainBranch         string = "main"
-	MasterBranch       string = "master"
-	ConfigFileName     string = "config.json"
-	ModelIndexFileName string = "model_index.json"
-	ScanLock           sync.Mutex
+	MainBranch            string = "main"
+	MasterBranch          string = "master"
+	ConfigFileName        string = "config.json"
+	ModelIndexFileName    string = "model_index.json"
+	ModelSafetensorsIndex string = "model.safetensors.index.json"
+	ScanLock              sync.Mutex
 )
 
 type runtimeArchitectureComponentImpl struct {
@@ -211,14 +212,15 @@ func (c *runtimeArchitectureComponentImpl) UpdateModelMetadata(ctx context.Conte
 		return nil, fmt.Errorf("fail to get model metadata from %s, %w", modelFormat, err)
 	}
 	metadata := &database.Metadata{
-		RepositoryID:    repo.ID,
-		ModelParams:     modelInfo.ParamsBillions,
-		TensorType:      modelInfo.TensorType,
-		MiniGPUMemoryGB: modelInfo.MiniGPUMemoryGB,
-		Architecture:    modelInfo.Architecture,
-		ModelType:       modelInfo.ModelType,
-		ClassName:       modelInfo.ClassName,
-		Quantizations:   modelInfo.Quantizations,
+		RepositoryID:      repo.ID,
+		ModelParams:       modelInfo.ParamsBillions,
+		TensorType:        modelInfo.TensorType,
+		MiniGPUMemoryGB:   modelInfo.MiniGPUMemoryGB,
+		MiniGPUFinetuneGB: modelInfo.MiniGPUFinetuneGB,
+		Architecture:      modelInfo.Architecture,
+		ModelType:         modelInfo.ModelType,
+		ClassName:         modelInfo.ClassName,
+		Quantizations:     modelInfo.Quantizations,
 	}
 	err = c.metadataStore.Upsert(ctx, metadata)
 	if err != nil {
@@ -331,6 +333,27 @@ func (c *runtimeArchitectureComponentImpl) GetArchitectureFromConfig(ctx context
 		return nil, nil
 	}
 	return config, nil
+}
+
+func (c *runtimeArchitectureComponentImpl) GetParametersFromIndex(ctx context.Context, repo *database.Repository) (int64, error) {
+	content, err := c.getConfigContent(ctx, ModelSafetensorsIndex, repo)
+	if err != nil {
+		return 0, fmt.Errorf("fail to read model.safetensors.index.json, %w", err)
+	}
+	var index map[string]any
+	if err := json.Unmarshal([]byte(content), &index); err != nil {
+		return 0, fmt.Errorf("fail to unmarshal index, %w", err)
+	}
+	//get total_size
+	metadata, ok := index["metadata"].(map[string]any)
+	if !ok {
+		return 0, fmt.Errorf("invalid index format: missing metadata")
+	}
+	totalSize, ok := metadata["total_size"].(float64)
+	if !ok {
+		return 0, fmt.Errorf("invalid index format: missing total_size")
+	}
+	return int64(totalSize) / 2, nil
 }
 
 func (c *runtimeArchitectureComponentImpl) GetModelTypeFromConfig(ctx context.Context, repo *database.Repository) (string, error) {
@@ -453,7 +476,7 @@ func (c *runtimeArchitectureComponentImpl) GetMetadataFromSafetensors(ctx contex
 	modelInfo := &types.ModelInfo{}
 	//check files contains config.json
 	if hasConfig {
-		modelInfo, err := common.GetModelInfo(fileUrls, c.apiToken, c.config.Model.MinContextForEstimation)
+		modelInfo, err := common.GetModelInfo(fileUrls, c.config.Model.MinContextForEstimation)
 		if err != nil {
 			slog.Error("fail to get model info from safetensors", slog.Any("err", err), slog.Any("repo", repo.Path))
 			return nil, fmt.Errorf("fail to get model info from safetensors, %w, repo: %v", err, repo.Path)
@@ -470,10 +493,36 @@ func (c *runtimeArchitectureComponentImpl) GetMetadataFromSafetensors(ctx contex
 		modelInfo.NumHiddenLayers = config.NumHiddenLayers
 		modelInfo.HiddenSize = config.HiddenSize
 		modelInfo.NumAttentionHeads = config.NumAttentionHeads
+		if modelInfo.TensorType == "" {
+			modelInfo.TensorType = common.TorchDtypeToSafetensors(config.TorchDtype)
+			modelInfo.BytesPerParam = common.GetBytesPerParam(modelInfo.TensorType)
+		}
+		if modelInfo.TotalParams == 0 {
+			modelInfo.TotalParams, err = c.GetParametersFromIndex(ctx, repo)
+			if err != nil {
+				slog.Error("fail to get parameters from index", slog.Any("err", err))
+				return nil, fmt.Errorf("fail to get parameters from index, %w", err)
+			}
+			modelInfo.ParamsBillions = float32(math.Round(float64(modelInfo.TotalParams)/1e9*100) / 100)
+		}
 		if modelInfo.HiddenSize != 0 {
 			kvcacheSize := common.GetKvCacheSize(modelInfo.ContextSize, modelInfo.BatchSize, modelInfo.HiddenSize, modelInfo.NumHiddenLayers, modelInfo.BytesPerParam)
 			activateMemory := common.GetActivationMemory(modelInfo.BatchSize, modelInfo.ContextSize, modelInfo.NumHiddenLayers, modelInfo.HiddenSize, modelInfo.NumAttentionHeads, modelInfo.BytesPerParam)
 			modelInfo.MiniGPUMemoryGB = float32(math.Round(float64(kvcacheSize+modelInfo.ModelWeightsGB+activateMemory)*100)) / 100
+
+			defaultLoRArank := 16
+			defaultBatchSize := 16
+			modelInfo.MiniGPUFinetuneGB = common.GetLoRAFinetuneMemory(
+				modelInfo.ModelWeightsGB,
+				modelInfo.ParamsBillions*1e9,
+				defaultBatchSize,
+				modelInfo.ContextSize,
+				modelInfo.HiddenSize,
+				modelInfo.NumHiddenLayers,
+				modelInfo.NumAttentionHeads,
+				modelInfo.BytesPerParam,
+				defaultLoRArank,
+			)
 		}
 		return modelInfo, nil
 	}

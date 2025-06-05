@@ -28,16 +28,17 @@ func NewMetadataStoreWithDB(db *DB) MetadataStore {
 }
 
 type Metadata struct {
-	ID              int64                `bun:",pk,autoincrement" json:"id"`
-	RepositoryID    int64                `bun:",notnull,unique" json:"repository_id"`
-	Repository      *Repository          `bun:"rel:belongs-to,join:repository_id=id" json:"repository"`
-	ModelParams     float32              `bun:"," json:"model_params"`
-	TensorType      string               `bun:"," json:"tensor_type"`
-	MiniGPUMemoryGB float32              `bun:"," json:"mini_gpu_memory_gb"`
-	Architecture    string               `bun:"," json:"architecture"`
-	ModelType       string               `bun:"," json:"model_type"`
-	ClassName       string               `bun:"," json:"class_name"`
-	Quantizations   []types.Quantization `bun:"type:jsonb" json:"quantizations,omitempty"`
+	ID                int64                `bun:",pk,autoincrement" json:"id"`
+	RepositoryID      int64                `bun:",notnull,unique" json:"repository_id"`
+	Repository        *Repository          `bun:"rel:belongs-to,join:repository_id=id" json:"repository"`
+	ModelParams       float32              `bun:"," json:"model_params"`
+	TensorType        string               `bun:"," json:"tensor_type"`
+	MiniGPUMemoryGB   float32              `bun:"," json:"mini_gpu_memory_gb"`
+	MiniGPUFinetuneGB float32              `bun:"," json:"mini_gpu_finetune_gb"`
+	Architecture      string               `bun:"," json:"architecture"`
+	ModelType         string               `bun:"," json:"model_type"`
+	ClassName         string               `bun:"," json:"class_name"`
+	Quantizations     []types.Quantization `bun:"type:jsonb" json:"quantizations,omitempty"`
 	times
 }
 
