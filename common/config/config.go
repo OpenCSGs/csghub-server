@@ -143,7 +143,8 @@ type Config struct {
 		DockerRegBase           string `env:"STARHUB_SERVER_MODEL_DOCKER_REG_BASE, default=opencsg-registry.cn-beijing.cr.aliyuncs.com/public/"`
 		NimDockerSecretName     string `env:"STARHUB_SERVER_MODEL_NIM_DOCKER_SECRET_NAME, default=ngc-secret"`
 		NimNGCSecretName        string `env:"STARHUB_SERVER_MODEL_NIM_NGC_SECRET_NAME, default=nvidia-nim-secrets"`
-		MinContextForEstimation int    `env:"STARHUB_SERVER_MODEL_MIN_CONTEXT_FOR_ESTIMATION, default=5120"`
+		MinContextForEstimation int    `env:"STARHUB_SERVER_MODEL_MIN_CONTEXT_FOR_ESTIMATION, default=8192"`
+		MinContextForFinetune   int    `env:"STARHUB_SERVER_MODEL_MIN_CONTEXT_FOR_FINETUNE, default=512"`
 	}
 	// send events
 	Event struct {

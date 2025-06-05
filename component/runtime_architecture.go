@@ -516,7 +516,7 @@ func (c *runtimeArchitectureComponentImpl) GetMetadataFromSafetensors(ctx contex
 				modelInfo.ModelWeightsGB,
 				modelInfo.ParamsBillions*1e9,
 				defaultBatchSize,
-				modelInfo.ContextSize,
+				c.config.Model.MinContextForFinetune,
 				modelInfo.HiddenSize,
 				modelInfo.NumHiddenLayers,
 				modelInfo.NumAttentionHeads,
