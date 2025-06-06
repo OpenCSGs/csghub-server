@@ -476,13 +476,14 @@ func (c *modelComponentImpl) Show(ctx context.Context, namespace, name, currentU
 		CanManage:           permission.CanAdmin,
 		Namespace:           ns,
 		Metadata: types.Metadata{
-			ModelParams:     model.Repository.Metadata.ModelParams,
-			TensorType:      model.Repository.Metadata.TensorType,
-			MiniGPUMemoryGB: model.Repository.Metadata.MiniGPUMemoryGB,
-			Architecture:    model.Repository.Metadata.Architecture,
-			ModelType:       model.Repository.Metadata.ModelType,
-			ClassName:       model.Repository.Metadata.ClassName,
-			Quantizations:   model.Repository.Metadata.Quantizations,
+			ModelParams:       model.Repository.Metadata.ModelParams,
+			TensorType:        model.Repository.Metadata.TensorType,
+			MiniGPUMemoryGB:   model.Repository.Metadata.MiniGPUMemoryGB,
+			Architecture:      model.Repository.Metadata.Architecture,
+			ModelType:         model.Repository.Metadata.ModelType,
+			ClassName:         model.Repository.Metadata.ClassName,
+			Quantizations:     model.Repository.Metadata.Quantizations,
+			MiniGPUFinetuneGB: model.Repository.Metadata.MiniGPUFinetuneGB,
 		},
 
 		MultiSource: types.MultiSource{

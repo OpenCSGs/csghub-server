@@ -34,10 +34,10 @@ func GetModelInfo(fileList []string, minContext int) (*types.ModelInfo, error) {
 	headerTooBig := false
 	for _, file := range fileList {
 		header, err := fetchSafetensorsMetadata(file)
-		//check error if it contains exceeds maximum allowed size
+		// check error if it contains exceeds maximum allowed size
 		if err != nil {
 			if strings.Contains(err.Error(), "header size exceeds maximum allowed size") {
-				//such as deepseek-ai/DeepSeek-R1-0528
+				// such as deepseek-ai/DeepSeek-R1-0528
 				headerTooBig = true
 				break
 			}
@@ -77,7 +77,7 @@ func GetModelInfo(fileList []string, minContext int) (*types.ModelInfo, error) {
 	}
 	modelInfo.ModelWeightsGB = float32(modelSize / (1024 * 1024 * 1024))
 	modelInfo.MiniGPUMemoryGB = max(float32(totalMemoryBytes/(1024*1024*1024)), 1)
-	//min contexnt for min gpu memory
+	// min context for min gpu memory
 	modelInfo.ContextSize = minContext
 	modelInfo.BatchSize = 1
 	modelInfo.BytesPerParam = bytesPerParam
@@ -256,7 +256,6 @@ func GetBytesPerParam(dtype string) int {
 }
 
 func GetFileSize(fileURL string) (float32, error) {
-	// Send a HEAD request
 	tr := &http.Transport{
 		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
 	}
@@ -265,25 +264,35 @@ func GetFileSize(fileURL string) (float32, error) {
 		client = &http.Client{}
 	}
 
-	resp, err := client.Head(fileURL)
+	req, err := http.NewRequest("GET", fileURL, nil)
+	if err != nil {
+		return 0, err
+	}
+
+	req.Header.Set("Range", "bytes=0-0")
+
+	resp, err := client.Do(req)
 	if err != nil {
 		return 0, err
 	}
 	defer resp.Body.Close()
 
-	// Get the Content-Length from the header
-	contentLength := resp.Header.Get("Content-Length")
-
-	// Convert Content-Length to int64
-	var sizeInBytes int64
-	_, err = fmt.Sscanf(contentLength, "%d", &sizeInBytes)
-	if err != nil {
-		return 0, err
+	if resp.StatusCode != http.StatusPartialContent {
+		return 0, fmt.Errorf("remote server does not support range request ,status code: %d", resp.StatusCode)
 	}
 
-	// Convert bytes to GB
-	sizeInGB := float32(sizeInBytes) / (1024 * 1024 * 1024) // 1 GB = 1024 * 1024 * 1024 bytes
+	contentRange := resp.Header.Get("Content-Range")
+	if contentRange == "" {
+		return 0, fmt.Errorf("empty Content-Range")
+	}
 
+	var start, end, total int64
+	_, err = fmt.Sscanf(contentRange, "bytes %d-%d/%d", &start, &end, &total)
+	if err != nil || total <= 0 {
+		return 0, fmt.Errorf("can not parse Content-Range: %s", contentRange)
+	}
+
+	sizeInGB := float32(total) / (1024 * 1024 * 1024)
 	return sizeInGB, nil
 }
 
