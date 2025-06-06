@@ -64,7 +64,9 @@ func TranslateText(lang, messageID, defaultMessage string) string {
 		MessageID: messageID,
 	})
 	if err != nil {
-		slog.Error("Failed to translate message", slog.String("messageID", messageID), slog.String("lang", lang), slog.Any("error", err))
+		if defaultMessage == "" {
+			slog.Error("Failed to translate message", slog.String("messageID", messageID), slog.String("lang", lang), slog.Any("error", err))
+		}
 		return defaultMessage
 	}
 	return message

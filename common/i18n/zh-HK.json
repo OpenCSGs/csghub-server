@@ -551,6 +551,21 @@
   "method.delete": {
     "other": "刪除"
   },
+  "method.head": {
+    "other": "請求標頭"
+  },
+  "method.patch": {
+    "other": "部分更新"
+  },
+  "method.options": {
+    "other": "請求通信選項"
+  },
+  "method.connect": {
+    "other": "建立連接"
+  },
+  "method.trace": {
+    "other": "追蹤請求"
+  },
   "handler.list": {
     "other": "列表"
   },

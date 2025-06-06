@@ -551,6 +551,21 @@
   "method.delete": {
     "other": "删除"
   },
+  "method.head": {
+    "other": "请求标头"
+  },
+  "method.patch": {
+    "other": "部分更新"
+  },
+  "method.options": {
+    "other": "请求通信选项"
+  },
+  "method.connect": {
+    "other": "建立连接"
+  },
+  "method.trace": {
+    "other": "追踪请求"
+  },
   "handler.list": {
     "other": "列表"
   },

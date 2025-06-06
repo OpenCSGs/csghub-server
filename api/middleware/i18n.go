@@ -43,10 +43,6 @@ func LocalizedErrorMiddleware() gin.HandlerFunc {
 
 		statusCode := c.Writer.Status()
 		if statusCode < 400 {
-			_, err := bw.ResponseWriter.Write(bw.body.Bytes())
-			if err != nil {
-				slog.Error("statusCode < 400, LocalizedErrorMiddleware", slog.String("err", err.Error()))
-			}
 			return
 		}
 
@@ -95,6 +91,9 @@ type bodyWriter struct {
 }
 
 func (w *bodyWriter) Write(b []byte) (int, error) {
-	return w.body.Write(b)
-	// w.ResponseWriter.Write(b)
+	if w.Status() == 200 {
+		return w.ResponseWriter.Write(b) // If status is 200, write directly to the ResponseWriter
+	} else {
+		return w.body.Write(b) // If status is not 200, write to the buffer
+	}
 }

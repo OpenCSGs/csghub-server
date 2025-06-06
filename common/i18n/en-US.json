@@ -11,6 +11,21 @@
     "method.delete": {
         "other": "Delete"
     },
+    "method.head": {
+        "other": "Get head"
+    },
+    "method.patch": {
+        "other": "Update partially"
+    },
+    "method.options": {
+        "other": "Get options"
+    },
+    "method.connect": {
+        "other": "Connect"
+    },
+    "method.trace": {
+        "other": "Trace"
+    },
     "handler.list": {
         "other": "list"
     },
