@@ -37,7 +37,7 @@ type TagsHandler struct {
 // @Param		 category query string false "category name"
 // @Param		 scope query string false "scope name" Enums(model, dataset, code, space, prompt)
 // @Param		 built_in query bool false "built_in"
-// @Success      200  {object}  types.ResponseWithTotal{data=[]database.Tag} "tags"
+// @Success      200  {object}  types.ResponseWithTotal{data=[]types.RepoTag} "tags"
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
 // @Router       /tags [get]
@@ -54,10 +54,7 @@ func (t *TagsHandler) AllTags(ctx *gin.Context) {
 		httpbase.ServerError(ctx, err)
 		return
 	}
-	respData := gin.H{
-		"data": tags,
-	}
-	ctx.JSON(http.StatusOK, respData)
+	httpbase.OK(ctx, tags)
 }
 
 // CreateTag     godoc

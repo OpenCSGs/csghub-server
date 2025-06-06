@@ -187,7 +187,8 @@ func (c *modelComponentImpl) Index(ctx context.Context, filter *types.RepoFilter
 				Category:  tag.Category,
 				Group:     tag.Group,
 				BuiltIn:   tag.BuiltIn,
-				ShowName:  tag.ShowName,
+				ShowName:  tag.I18nKey, // ShowName:  tag.ShowName,
+				I18nKey:   tag.I18nKey,
 				CreatedAt: tag.CreatedAt,
 				UpdatedAt: tag.UpdatedAt,
 			})
@@ -298,7 +299,8 @@ func (c *modelComponentImpl) Create(ctx context.Context, req *types.CreateModelR
 			Category:  tag.Category,
 			Group:     tag.Group,
 			BuiltIn:   tag.BuiltIn,
-			ShowName:  tag.ShowName,
+			ShowName:  tag.I18nKey, // ShowName:  tag.ShowName,
+			I18nKey:   tag.I18nKey,
 			CreatedAt: tag.CreatedAt,
 			UpdatedAt: tag.UpdatedAt,
 		})
@@ -432,7 +434,8 @@ func (c *modelComponentImpl) Show(ctx context.Context, namespace, name, currentU
 			Category:  tag.Category,
 			Group:     tag.Group,
 			BuiltIn:   tag.BuiltIn,
-			ShowName:  tag.ShowName,
+			ShowName:  tag.I18nKey, // ShowName:  tag.ShowName,
+			I18nKey:   tag.I18nKey,
 			CreatedAt: tag.CreatedAt,
 			UpdatedAt: tag.UpdatedAt,
 		})

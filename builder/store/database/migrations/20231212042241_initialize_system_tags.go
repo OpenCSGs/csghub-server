@@ -9,14 +9,13 @@ import (
 
 	"github.com/uptrace/bun"
 	"gopkg.in/yaml.v2"
-	"opencsg.com/csghub-server/builder/store/database"
 )
 
 //go:embed seeds/tags.yml
 var tagsYmlData []byte
 
 type Tags struct {
-	Tags []database.Tag
+	Tags []Tag
 }
 
 func init() {

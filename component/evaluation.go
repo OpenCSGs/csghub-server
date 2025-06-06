@@ -159,7 +159,8 @@ func (c *evaluationComponentImpl) GetEvaluation(ctx context.Context, req types.E
 				Category:  tag.Category,
 				Group:     tag.Group,
 				BuiltIn:   tag.BuiltIn,
-				ShowName:  tag.ShowName,
+				ShowName:  tag.I18nKey, // ShowName:  tag.ShowName,
+				I18nKey:   tag.I18nKey,
 				CreatedAt: tag.CreatedAt,
 				UpdatedAt: tag.UpdatedAt,
 			})

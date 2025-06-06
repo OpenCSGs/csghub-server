@@ -90,10 +90,7 @@ func (h *DatasetHandler) Create(ctx *gin.Context) {
 		return
 	}
 	slog.Info("Create dataset succeed", slog.String("dataset", dataset.Name))
-	respData := gin.H{
-		"data": dataset,
-	}
-	ctx.JSON(http.StatusOK, respData)
+	httpbase.OK(ctx, dataset)
 }
 
 // GetVisiableDatasets godoc
@@ -149,11 +146,7 @@ func (h *DatasetHandler) Index(ctx *gin.Context) {
 		return
 	}
 	slog.Info("Get public datasets succeed", slog.Int("count", total))
-	respData := gin.H{
-		"data":  datasets,
-		"total": total,
-	}
-	ctx.JSON(http.StatusOK, respData)
+	httpbase.OKWithTotal(ctx, datasets, total)
 }
 
 // UpdateDataset   godoc

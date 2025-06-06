@@ -82,6 +82,7 @@ func TestModelHandler_Index(t *testing.T) {
 				tester.ResponseEqSimple(t, 200, gin.H{
 					"data":  []*types.Model{{Name: "cc"}},
 					"total": 100,
+					"msg":   "OK",
 				})
 			}
 		})

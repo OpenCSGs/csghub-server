@@ -25,6 +25,7 @@ require (
 	github.com/minio/minio-go/v7 v7.0.84
 	github.com/minio/sha256-simd v1.0.1
 	github.com/naoina/toml v0.1.1
+	github.com/nicksnyder/go-i18n/v2 v2.6.0
 	github.com/openai/openai-go v0.1.0-alpha.59
 	github.com/parquet-go/parquet-go v0.24.0
 	github.com/redis/go-redis/v9 v9.5.1
@@ -332,7 +333,7 @@ require (
 	golang.org/x/sync v0.12.0
 	golang.org/x/sys v0.32.0 // indirect
 	golang.org/x/term v0.30.0 // indirect
-	golang.org/x/text v0.23.0 // indirect
+	golang.org/x/text v0.23.0
 	golang.org/x/time v0.11.0 // indirect
 	golang.org/x/tools v0.31.0
 	gomodules.xyz/jsonpatch/v2 v2.4.0 // indirect

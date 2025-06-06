@@ -102,11 +102,7 @@ func (h *ModelHandler) Index(ctx *gin.Context) {
 		return
 	}
 	slog.Info("Get public models succeed", slog.Int("count", total))
-	respData := gin.H{
-		"data":  models,
-		"total": total,
-	}
-	ctx.JSON(http.StatusOK, respData)
+	httpbase.OKWithTotal(ctx, models, total)
 }
 
 // CreateModel   godoc

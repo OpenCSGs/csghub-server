@@ -29,6 +29,7 @@ func TestDatasetHandler_Create(t *testing.T) {
 
 		tester.ResponseEqSimple(t, 200, gin.H{
 			"data": &types.Dataset{Name: "d"},
+			"msg":  "OK",
 		})
 
 	})
@@ -52,6 +53,7 @@ func TestDatasetHandler_Create(t *testing.T) {
 
 		tester.ResponseEqSimple(t, 200, gin.H{
 			"data": &types.Dataset{Name: "d"},
+			"msg":  "OK",
 		})
 	})
 

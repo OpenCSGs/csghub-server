@@ -103,11 +103,7 @@ func (h *SpaceHandler) Index(ctx *gin.Context) {
 		return
 	}
 	slog.Info("Get public spaces succeed", slog.Int("count", total))
-	respData := gin.H{
-		"data":  spaces,
-		"total": total,
-	}
-	ctx.JSON(http.StatusOK, respData)
+	httpbase.OKWithTotal(ctx, spaces, total)
 }
 
 // ShowSpaceDetail   godoc

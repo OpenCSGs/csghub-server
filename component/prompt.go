@@ -695,7 +695,8 @@ func (c *promptComponentImpl) CreatePromptRepo(ctx context.Context, req *types.C
 			Category:  tag.Category,
 			Group:     tag.Group,
 			BuiltIn:   tag.BuiltIn,
-			ShowName:  tag.ShowName,
+			ShowName:  tag.I18nKey, // ShowName:  tag.ShowName,
+			I18nKey:   tag.I18nKey,
 			CreatedAt: tag.CreatedAt,
 			UpdatedAt: tag.UpdatedAt,
 		})
@@ -764,7 +765,8 @@ func (c *promptComponentImpl) IndexPromptRepo(ctx context.Context, filter *types
 				Category:  tag.Category,
 				Group:     tag.Group,
 				BuiltIn:   tag.BuiltIn,
-				ShowName:  tag.ShowName,
+				ShowName:  tag.I18nKey, // ShowName:  tag.ShowName,
+				I18nKey:   tag.I18nKey,
 				CreatedAt: tag.CreatedAt,
 				UpdatedAt: tag.UpdatedAt,
 			})
@@ -884,7 +886,8 @@ func (c *promptComponentImpl) Show(ctx context.Context, namespace, name, current
 			Category:  tag.Category,
 			Group:     tag.Group,
 			BuiltIn:   tag.BuiltIn,
-			ShowName:  tag.ShowName,
+			ShowName:  tag.I18nKey, // ShowName:  tag.ShowName,
+			I18nKey:   tag.I18nKey,
 			CreatedAt: tag.CreatedAt,
 			UpdatedAt: tag.UpdatedAt,
 		})

@@ -172,7 +172,8 @@ func (c *datasetComponentImpl) Create(ctx context.Context, req *types.CreateData
 			Category:  tag.Category,
 			Group:     tag.Group,
 			BuiltIn:   tag.BuiltIn,
-			ShowName:  tag.ShowName,
+			ShowName:  tag.I18nKey, // ShowName:  tag.ShowName,
+			I18nKey:   tag.I18nKey,
 			CreatedAt: tag.CreatedAt,
 			UpdatedAt: tag.UpdatedAt,
 		})
@@ -253,7 +254,8 @@ func (c *datasetComponentImpl) commonIndex(ctx context.Context, filter *types.Re
 				Category:  tag.Category,
 				Group:     tag.Group,
 				BuiltIn:   tag.BuiltIn,
-				ShowName:  tag.ShowName,
+				ShowName:  tag.I18nKey, // ShowName:  tag.ShowName,
+				I18nKey:   tag.I18nKey,
 				CreatedAt: tag.CreatedAt,
 				UpdatedAt: tag.UpdatedAt,
 			})
@@ -377,7 +379,8 @@ func (c *datasetComponentImpl) Show(ctx context.Context, namespace, name, curren
 			Category:  tag.Category,
 			Group:     tag.Group,
 			BuiltIn:   tag.BuiltIn,
-			ShowName:  tag.ShowName,
+			ShowName:  tag.I18nKey, // ShowName:  tag.ShowName,
+			I18nKey:   tag.I18nKey,
 			CreatedAt: tag.CreatedAt,
 			UpdatedAt: tag.UpdatedAt,
 		})

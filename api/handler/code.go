@@ -80,10 +80,7 @@ func (h *CodeHandler) Create(ctx *gin.Context) {
 		return
 	}
 	slog.Info("Create code succeed", slog.String("code", code.Name))
-	respData := gin.H{
-		"data": code,
-	}
-	ctx.JSON(http.StatusOK, respData)
+	httpbase.OK(ctx, code)
 }
 
 // GetVisiableCodes godoc
@@ -139,11 +136,7 @@ func (h *CodeHandler) Index(ctx *gin.Context) {
 		return
 	}
 	slog.Info("Get public codes succeed", slog.Int("count", total))
-	respData := gin.H{
-		"data":  codes,
-		"total": total,
-	}
-	ctx.JSON(http.StatusOK, respData)
+	httpbase.OKWithTotal(ctx, codes, total)
 }
 
 // UpdateCode   godoc

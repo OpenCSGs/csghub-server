@@ -419,6 +419,8 @@ definitions:
         type: string
       group:
         type: string
+      i18n_key:
+        type: string
       id:
         type: integer
       name:
@@ -426,6 +428,7 @@ definitions:
       scope:
         $ref: '#/definitions/types.TagScope'
       show_name:
+        description: 'Deprecated: use I18nKey instead'
         type: string
       updated_at:
         type: string
@@ -504,6 +507,61 @@ definitions:
         description: TODO:add unique index after migration
         type: string
     type: object
+  handler.ChatCompletionRequest:
+    properties:
+      max_tokens:
+        type: integer
+      messages:
+        items:
+          $ref: '#/definitions/handler.ChatMessage'
+        type: array
+      model:
+        type: string
+      stream:
+        type: boolean
+      stream_options:
+        $ref: '#/definitions/handler.StreamOptions'
+      temperature:
+        type: number
+    type: object
+  handler.ChatCompletionResponse:
+    properties:
+      choices:
+        items:
+          properties:
+            finish_reason:
+              type: string
+            index:
+              type: integer
+            message:
+              $ref: '#/definitions/handler.ChatMessage'
+          type: object
+        type: array
+      created:
+        type: integer
+      id:
+        type: string
+      model:
+        type: string
+      object:
+        type: string
+      usage:
+        properties:
+          completion_tokens:
+            type: integer
+          prompt_tokens:
+            type: integer
+          total_tokens:
+            type: integer
+        type: object
+    type: object
+  handler.ChatMessage:
+    properties:
+      content:
+        type: string
+      role:
+        type: string
+    type: object
   handler.Create.addMemberRequest:
     properties:
       role:
@@ -523,6 +581,18 @@ definitions:
     required:
     - role
     type: object
+  handler.EmbeddingRequest:
+    properties:
+      encoding_format:
+        description: Encoding format (e.g., "float")
+        type: string
+      input:
+        description: Input text content
+        type: string
+      model:
+        description: Model name used (e.g., "text-embedding-ada-002")
+        type: string
+    type: object
   handler.SetOpWeight.SetOpWeightReq:
     properties:
       repo_id:
@@ -533,6 +603,11 @@ definitions:
     - repo_id
     - weight
     type: object
+  handler.StreamOptions:
+    properties:
+      include_usage:
+        type: boolean
+    type: object
   handler.Update.updateMemberRequest:
     properties:
       new_role:
@@ -542,6 +617,107 @@ definitions:
     required:
     - new_role
     - old_role
+    type: object
+  opencsg_com_csghub-server_aigateway_types.Model:
+    properties:
+      created:
+        description: organization-owner (e.g. openai)
+        type: integer
+      id:
+        type: string
+      object:
+        type: string
+      owned_by:
+        type: string
+      task:
+        description: extend opanai struct
+        type: string
+    type: object
+  opencsg_com_csghub-server_common_types.Model:
+    properties:
+      base_model:
+        type: string
+      can_manage:
+        type: boolean
+      can_write:
+        type: boolean
+      created_at:
+        type: string
+      csg_path:
+        type: string
+      default_branch:
+        type: string
+      description:
+        type: string
+      downloads:
+        type: integer
+      enable_evaluation:
+        type: boolean
+      enable_finetune:
+        type: boolean
+      enable_inference:
+        type: boolean
+      hf_path:
+        type: string
+      id:
+        type: integer
+      license:
+        type: string
+      likes:
+        type: integer
+      metadata:
+        $ref: '#/definitions/types.Metadata'
+      mirror_last_updated_at:
+        type: string
+      ms_path:
+        type: string
+      name:
+        type: string
+      namespace:
+        $ref: '#/definitions/types.Namespace'
+      nickname:
+        type: string
+      path:
+        type: string
+      private:
+        type: boolean
+      readme:
+        type: string
+      recom_op_weight:
+        type: integer
+      repository:
+        $ref: '#/definitions/types.Repository'
+      repository_id:
+        type: integer
+      scores:
+        items:
+          $ref: '#/definitions/types.WeightScore'
+        type: array
+      sensitive_check_status:
+        type: string
+      source:
+        $ref: '#/definitions/types.RepositorySource'
+      status:
+        description: url to interact with the model
+        example: RUNNING
+        type: string
+      sync_status:
+        $ref: '#/definitions/types.RepositorySyncStatus'
+      tags:
+        items:
+          $ref: '#/definitions/types.RepoTag'
+        type: array
+      updated_at:
+        type: string
+      user:
+        $ref: '#/definitions/types.User'
+      user_likes:
+        type: boolean
+      widget_type:
+        allOf:
+        - $ref: '#/definitions/types.ModelWidgetType'
+        description: 'widget UI style: generation,chat'
+        example: generation
     type: object
   telemetry.Counts:
     properties:
@@ -1286,6 +1462,9 @@ definitions:
         type: string
       description:
         type: string
+      driver_version:
+        example: 11.8.0
+        type: string
       env:
         type: string
       labels:
@@ -1368,11 +1547,14 @@ definitions:
         type: string
       group:
         type: string
+      i18n_key:
+        type: string
       name:
         type: string
       scope:
         type: string
       show_name:
+        description: 'deprecated: use I18nKey instead'
         type: string
     required:
     - category
@@ -1907,6 +2089,52 @@ definitions:
       updated_at:
         type: string
     type: object
+  types.MCPService:
+    properties:
+      created_at:
+        type: string
+      default_branch:
+        type: string
+      description:
+        example: ""
+        type: string
+      endpoint:
+        example: https://localhost/spaces/myname/mymcp
+        type: string
+      env:
+        type: string
+      id:
+        type: integer
+      license:
+        example: MIT
+        type: string
+      name:
+        example: mcp_name_1
+        type: string
+      nickname:
+        example: ""
+        type: string
+      path:
+        example: user_or_org_name/mcp_name_1
+        type: string
+      private:
+        type: boolean
+      repository_id:
+        type: integer
+      secrets:
+        type: string
+      status:
+        type: string
+      svc_name:
+        type: string
+      updated_at:
+        type: string
+      username:
+        example: creator_user_name
+        type: string
+      variables:
+        type: string
+    type: object
   types.Member:
     properties:
       avatar:
@@ -2016,91 +2244,14 @@ definitions:
     - MirrorFinished
     - MirrorFailed
     - MirrorIncomplete
-  types.Model:
+  types.ModelList:
     properties:
-      base_model:
-        type: string
-      can_manage:
-        type: boolean
-      can_write:
-        type: boolean
-      created_at:
-        type: string
-      csg_path:
-        type: string
-      default_branch:
-        type: string
-      description:
-        type: string
-      downloads:
-        type: integer
-      enable_evaluation:
-        type: boolean
-      enable_finetune:
-        type: boolean
-      enable_inference:
-        type: boolean
-      hf_path:
-        type: string
-      id:
-        type: integer
-      license:
-        type: string
-      likes:
-        type: integer
-      metadata:
-        $ref: '#/definitions/types.Metadata'
-      mirror_last_updated_at:
-        type: string
-      ms_path:
-        type: string
-      name:
-        type: string
-      namespace:
-        $ref: '#/definitions/types.Namespace'
-      nickname:
-        type: string
-      path:
-        type: string
-      private:
-        type: boolean
-      readme:
-        type: string
-      recom_op_weight:
-        type: integer
-      repository:
-        $ref: '#/definitions/types.Repository'
-      repository_id:
-        type: integer
-      scores:
+      data:
         items:
-          $ref: '#/definitions/types.WeightScore'
+          $ref: '#/definitions/opencsg_com_csghub-server_aigateway_types.Model'
         type: array
-      sensitive_check_status:
+      object:
         type: string
-      source:
-        $ref: '#/definitions/types.RepositorySource'
-      status:
-        description: url to interact with the model
-        example: RUNNING
-        type: string
-      sync_status:
-        $ref: '#/definitions/types.RepositorySyncStatus'
-      tags:
-        items:
-          $ref: '#/definitions/types.RepoTag'
-        type: array
-      updated_at:
-        type: string
-      user:
-        $ref: '#/definitions/types.User'
-      user_likes:
-        type: boolean
-      widget_type:
-        allOf:
-        - $ref: '#/definitions/types.ModelWidgetType'
-        description: 'widget UI style: generation,chat'
-        example: generation
     type: object
   types.ModelResp:
     properties:
@@ -2379,7 +2530,7 @@ definitions:
         type: array
       models:
         items:
-          $ref: '#/definitions/types.Model'
+          $ref: '#/definitions/opencsg_com_csghub-server_common_types.Model'
         type: array
       prompts:
         items:
@@ -2405,8 +2556,14 @@ definitions:
         type: string
       group:
         type: string
+      i18n_key:
+        type: string
+      id:
+        type: integer
       name:
         type: string
+      scope:
+        $ref: '#/definitions/types.TagScope'
       show_name:
         type: string
       updated_at:
@@ -2475,15 +2632,19 @@ definitions:
     - cpu
     - gpu
     - npu
-    - enflame
+    - gcu
+    - gpgpu
     - mlu
+    - dcu
     type: string
     x-enum-varnames:
     - ResourceTypeCPU
     - ResourceTypeGPU
     - ResourceTypeNPU
-    - ResourceTypeEnflame
+    - ResourceTypeGCU
+    - ResourceTypeGPGPU
     - ResourceTypeMLU
+    - ResourceTypeDCU
   types.Response:
     properties:
       data: {}
@@ -2615,6 +2776,9 @@ definitions:
         type: integer
       description:
         example: ""
+        type: string
+      driver_version:
+        example: 11.8.0
         type: string
       endpoint:
         description: the serving endpoint url
@@ -3044,11 +3208,14 @@ definitions:
         type: string
       group:
         type: string
+      i18n_key:
+        type: string
       name:
         type: string
       scope:
         type: string
       show_name:
+        description: 'deprecated: use I18nKey instead'
         type: string
     required:
     - category
@@ -6279,6 +6446,100 @@ paths:
       summary: Get all files of a dataset
       tags:
       - Dataset
+  /datasets/{namespace}/{name}/dataviewer/catalog:
+    get:
+      consumes:
+      - application/json
+      description: get catalog of the dataset
+      parameters:
+      - description: namespace
+        in: path
+        name: namespace
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/types.Response'
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Get catalog of the dataset
+      tags:
+      - Dataset
+  /datasets/{namespace}/{name}/dataviewer/rows:
+    get:
+      consumes:
+      - application/json
+      description: get rows of the dataset
+      parameters:
+      - description: namespace
+        in: path
+        name: namespace
+        required: true
+        type: string
+      - description: config
+        in: query
+        name: config
+        required: true
+        type: string
+      - description: split
+        in: query
+        name: split
+        required: true
+        type: string
+      - description: search
+        in: query
+        name: search
+        type: string
+      - description: where
+        in: query
+        name: where
+        type: string
+      - description: orderby
+        in: query
+        name: orderby
+        type: string
+      - default: 50
+        description: per
+        in: query
+        name: per
+        type: integer
+      - default: 1
+        description: per page
+        in: query
+        name: page
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/types.Response'
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Get rows of the dataset
+      tags:
+      - Dataset
   /datasets/{namespace}/{name}/relations:
     get:
       consumes:
@@ -6321,6 +6582,52 @@ paths:
       security:
       - ApiKey: []
       summary: Get dataset related assets
+      tags:
+      - Dataset
+  /datasets/{namespace}/{name}/viewer/{file_path}:
+    get:
+      consumes:
+      - application/json
+      description: get the demo data of the dataset
+      parameters:
+      - description: namespace
+        in: path
+        name: namespace
+        required: true
+        type: string
+      - description: file_path
+        in: path
+        name: file_path
+        required: true
+        type: string
+      - default: 50
+        description: per
+        in: query
+        name: per
+        type: integer
+      - default: 1
+        description: per page
+        in: query
+        name: page
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/types.Response'
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Get the demo data of the dataset
       tags:
       - Dataset
   /discussions/{id}:
@@ -7554,7 +7861,7 @@ paths:
             - properties:
                 data:
                   items:
-                    $ref: '#/definitions/types.Model'
+                    $ref: '#/definitions/opencsg_com_csghub-server_common_types.Model'
                   type: array
                 total:
                   type: integer
@@ -7682,7 +7989,7 @@ paths:
             - $ref: '#/definitions/types.Response'
             - properties:
                 data:
-                  $ref: '#/definitions/types.Model'
+                  $ref: '#/definitions/opencsg_com_csghub-server_common_types.Model'
               type: object
         "400":
           description: Bad request
@@ -9406,7 +9713,7 @@ paths:
             - properties:
                 data:
                   items:
-                    $ref: '#/definitions/types.Model'
+                    $ref: '#/definitions/opencsg_com_csghub-server_common_types.Model'
                   type: array
                 total:
                   type: integer
@@ -11977,7 +12284,7 @@ paths:
             - properties:
                 data:
                   items:
-                    $ref: '#/definitions/database.Tag'
+                    $ref: '#/definitions/types.RepoTag'
                   type: array
               type: object
         "400":
@@ -13112,7 +13419,7 @@ paths:
             - properties:
                 data:
                   items:
-                    $ref: '#/definitions/types.Model'
+                    $ref: '#/definitions/opencsg_com_csghub-server_common_types.Model'
                   type: array
                 total:
                   type: integer
@@ -13241,7 +13548,7 @@ paths:
             - properties:
                 data:
                   items:
-                    $ref: '#/definitions/types.Model'
+                    $ref: '#/definitions/opencsg_com_csghub-server_common_types.Model'
                   type: array
                 total:
                   type: integer
@@ -13739,6 +14046,162 @@ paths:
       summary: Get users info. Only Admin
       tags:
       - User
+  /v1/chat/completions:
+    post:
+      consumes:
+      - application/json
+      description: Sends a chat completion request to the backend model and returns
+        the response
+      parameters:
+      - description: Chat completion request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handler.ChatCompletionRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.ChatCompletionResponse'
+        "400":
+          description: Bad request
+          schema: {}
+        "404":
+          description: Model not found
+          schema: {}
+        "500":
+          description: Internal server error
+          schema: {}
+      security:
+      - ApiKey: []
+      summary: Chat with backend model
+      tags:
+      - AIGateway
+  /v1/embeddings:
+    post:
+      consumes:
+      - application/json
+      description: Sends a text to the backend model and returns the embedding
+      parameters:
+      - description: Embedding request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handler.EmbeddingRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/types.Response'
+        "400":
+          description: Bad request or sensitive input
+          schema: {}
+        "404":
+          description: Model not found
+          schema: {}
+        "500":
+          description: Internal server error
+          schema: {}
+      security:
+      - ApiKey: []
+      summary: Get embedding for a text
+      tags:
+      - AIGateway
+  /v1/mcp/servers:
+    get:
+      consumes:
+      - application/json
+      description: Returns a list of available mcp servers
+      parameters:
+      - default: 20
+        description: per
+        in: query
+        name: per
+        type: integer
+      - default: 1
+        description: per page
+        in: query
+        name: page
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/types.ResponseWithTotal'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/types.MCPService'
+                  type: array
+                total:
+                  type: integer
+              type: object
+        "500":
+          description: Internal server error
+          schema: {}
+      security:
+      - ApiKey: []
+      summary: List available mcp servers
+      tags:
+      - AIGateway
+  /v1/models:
+    get:
+      consumes:
+      - application/json
+      description: Returns a list of available models
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/types.ModelList'
+        "500":
+          description: Internal server error
+          schema: {}
+      security:
+      - ApiKey: []
+      summary: List available models
+      tags:
+      - AIGateway
+  /v1/models/{model}:
+    get:
+      consumes:
+      - application/json
+      description: Returns information about a specific model
+      parameters:
+      - description: Model ID
+        in: path
+        name: model
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/opencsg_com_csghub-server_aigateway_types.Model'
+        "404":
+          description: Model not found
+          schema: {}
+        "500":
+          description: Internal server error
+          schema: {}
+      security:
+      - ApiKey: []
+      summary: Get model details
+      tags:
+      - AIGateway
 securityDefinitions:
   ApiKey:
     description: Bearer token

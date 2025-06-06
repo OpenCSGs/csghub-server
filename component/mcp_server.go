@@ -123,7 +123,8 @@ func (m *mcpServerComponentImpl) Create(ctx context.Context, req *types.CreateMC
 			Category:  tag.Category,
 			Group:     tag.Group,
 			BuiltIn:   tag.BuiltIn,
-			ShowName:  tag.ShowName,
+			ShowName:  tag.I18nKey, // ShowName:  tag.ShowName,
+			I18nKey:   tag.I18nKey,
 			CreatedAt: tag.CreatedAt,
 			UpdatedAt: tag.UpdatedAt,
 		})
@@ -321,7 +322,8 @@ func (m *mcpServerComponentImpl) Show(ctx context.Context, namespace string, nam
 			Category:  tag.Category,
 			Group:     tag.Group,
 			BuiltIn:   tag.BuiltIn,
-			ShowName:  tag.ShowName,
+			ShowName:  tag.I18nKey, // ShowName:  tag.ShowName,
+			I18nKey:   tag.I18nKey,
 			CreatedAt: tag.CreatedAt,
 			UpdatedAt: tag.UpdatedAt,
 		})
@@ -431,7 +433,8 @@ func (m *mcpServerComponentImpl) Index(ctx context.Context, filter *types.RepoFi
 				Category:  tag.Category,
 				Group:     tag.Group,
 				BuiltIn:   tag.BuiltIn,
-				ShowName:  tag.ShowName,
+				ShowName:  tag.I18nKey, // ShowName:  tag.ShowName,
+				I18nKey:   tag.I18nKey,
 				CreatedAt: tag.CreatedAt,
 				UpdatedAt: tag.UpdatedAt,
 			})
@@ -509,7 +512,8 @@ func (m *mcpServerComponentImpl) Properties(ctx context.Context, req *types.MCPP
 				Category:  tag.Category,
 				Group:     tag.Group,
 				BuiltIn:   tag.BuiltIn,
-				ShowName:  tag.ShowName,
+				ShowName:  tag.I18nKey, // ShowName:  tag.ShowName,
+				I18nKey:   tag.I18nKey,
 				CreatedAt: tag.CreatedAt,
 				UpdatedAt: tag.UpdatedAt,
 			})
