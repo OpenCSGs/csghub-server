@@ -6,7 +6,7 @@ import (
 	"encoding/base64"
 	"fmt"
 	"io"
-	"net/http"
+	"log/slog"
 	"strings"
 
 	"github.com/gin-gonic/gin"
@@ -85,26 +85,35 @@ func GetCurrentUserFromHeader() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		authHeader := c.Request.Header.Get("Authorization")
 		if authHeader != "" && !strings.HasPrefix(authHeader, "X-OPENCSG-Sync-Token") {
-			authHeader = strings.TrimPrefix(authHeader, "Basic ")
-			authInfo, err := base64.StdEncoding.DecodeString(authHeader)
-			if err != nil {
-				c.Header("WWW-Authenticate", "Basic realm=opencsg-git")
-				c.PureJSON(http.StatusUnauthorized, nil)
-				c.Abort()
-				return
-			}
-			username := strings.Split(string(authInfo), ":")[0]
-			password := strings.Split(string(authInfo), ":")[1]
-
-			user, err := userStore.FindByGitAccessToken(context.Background(), password)
-			if err != nil {
-				c.Header("WWW-Authenticate", "Basic realm=opencsg-git")
-				c.PureJSON(http.StatusUnauthorized, nil)
-				c.Abort()
-				return
-			}
-			if user.Username == username {
-				httpbase.SetCurrentUser(c, username)
+			var username, token string
+			if strings.HasPrefix(authHeader, "Basic ") {
+				authHeader = strings.TrimPrefix(authHeader, "Basic ")
+				authInfo, err := base64.StdEncoding.DecodeString(authHeader)
+				if err != nil {
+					slog.Info("Failed to decode basic auth header", slog.Any("header", authHeader), slog.Any("error", err))
+					c.Next()
+					return
+				}
+				username = strings.Split(string(authInfo), ":")[0]
+				token = strings.Split(string(authInfo), ":")[1]
+				user, err := userStore.FindByGitAccessToken(context.Background(), token)
+				if err != nil {
+					slog.Info("Failed to find user by git access token", slog.Any("header", authHeader), slog.Any("token", token), slog.Any("error", err))
+					c.Next()
+					return
+				}
+				if user.Username == username {
+					httpbase.SetCurrentUser(c, username)
+				}
+			} else if strings.HasPrefix(authHeader, "Bearer ") {
+				token = strings.TrimPrefix(authHeader, "Bearer ")
+				user, err := userStore.FindByGitAccessToken(context.Background(), token)
+				if err != nil {
+					slog.Info("Failed to find user by git access token", slog.Any("header", authHeader), slog.Any("token", token), slog.Any("error", err))
+					c.Next()
+					return
+				}
+				httpbase.SetCurrentUser(c, user.Username)
 			}
 		}
 

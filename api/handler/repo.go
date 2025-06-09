@@ -2384,3 +2384,147 @@ func (h *RepoHandler) ServerlessUpdate(ctx *gin.Context) {
 
 	httpbase.OK(ctx, nil)
 }
+
+// GetRepoRemoteCommitDiff godoc
+// @Security     ApiKey
+// @Summary      Get diff between local last commit and remote commit
+// @Tags         Repository
+// @Accept       json
+// @Produce      json
+// @Param        repo_type path string true "models,datasets,codes or spaces" Enums(models,datasets,codes,spaces)
+// @Param        namespace path string true "repo owner name"
+// @Param        name path string true "repo name"
+// @Param        current_user query string false "current user name"
+// @Param        left_commit_id query string true "previous commit id"
+// @Success      200  {object}  types.Response{data=[]types.RemoteDiffs} "OK"
+// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
+// @Router       /{repo_type}/{namespace}/{name}/remote_diff [get]
+func (h *RepoHandler) RemoteDiff(ctx *gin.Context) {
+	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
+	if err != nil {
+		slog.Error("Bad request format", "error", err)
+		httpbase.BadRequest(ctx, err.Error())
+		return
+	}
+	currentUser := httpbase.GetCurrentUser(ctx)
+	leftCommitId := ctx.Query("left_commit_id")
+
+	if leftCommitId == "" {
+		httpbase.BadRequest(ctx, "left_commit_id is required")
+		return
+	}
+	namespace = strings.TrimPrefix(namespace, types.OpenCSGPrefix)
+	req := types.GetDiffBetweenCommitsReq{
+		Namespace:    namespace,
+		Name:         name,
+		RepoType:     common.RepoTypeFromContext(ctx),
+		LeftCommitID: leftCommitId,
+		CurrentUser:  currentUser,
+	}
+	diff, err := h.c.RemoteDiff(ctx.Request.Context(), req)
+	if err != nil {
+		slog.Error(
+			"Failed to get repo remote diff",
+			slog.String("repo_type", string(req.RepoType)),
+			slog.Any("error", err))
+		httpbase.ServerError(ctx, err)
+		return
+	}
+	slog.Debug(
+		"Get repo remote diff succeed",
+		slog.String("repo_type", string(req.RepoType)),
+		slog.String("name", name),
+		slog.String("left commit id", leftCommitId))
+	httpbase.OK(ctx, diff)
+}
+
+// RepoPreupload godoc
+// @Security     ApiKey
+// @Summary      Get upload mode for files
+// @Tags         Repository
+// @Accept       json
+// @Produce      json
+// @Param        repo_type path string true "models,datasets,codes or spaces" Enums(models,datasets,codes,spaces)
+// @Param        namespace path string true "repo owner name"
+// @Param        name path string true "repo name"
+// @Param        revision path string true "revision"
+// @Param        current_user query string false "current user name"
+// @Param        body body types.PreuploadReq true "body"
+// @Success      200  {object}  types.Response{data=types.PreuploadResp} "OK"
+// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
+// @Router       /{repo_type}/{namespace}/{name}/preupload/{revision} [post]
+func (h *RepoHandler) Preupload(ctx *gin.Context) {
+	var req types.PreuploadReq
+	if err := ctx.ShouldBindJSON(&req); err != nil {
+		httpbase.BadRequest(ctx, err.Error())
+		return
+	}
+
+	currentUser := httpbase.GetCurrentUser(ctx)
+
+	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
+	if err != nil {
+		httpbase.BadRequest(ctx, err.Error())
+	}
+	req.Namespace = namespace
+	req.Name = name
+	req.CurrentUser = currentUser
+	req.RepoType = common.RepoTypeFromContext(ctx)
+	req.Revision = ctx.Param("revision")
+
+	resp, err := h.c.Preupload(ctx.Request.Context(), req)
+	if err != nil {
+		httpbase.ServerError(ctx, err)
+		return
+	}
+
+	httpbase.OK(ctx, resp)
+}
+
+// CommitFiles godoc
+// @Security     ApiKey
+// @Summary      Create commit with batch files
+// @Tags         Repository
+// @Accept       json
+// @Produce      json
+// @Param        repo_type path string true "models,datasets,codes or spaces" Enums(models,datasets,codes,spaces)
+// @Param        namespace path string true "repo owner name"
+// @Param        name path string true "repo name"
+// @Param        revision path string true "revision"
+// @Param        current_user query string false "current user name"
+// @Param        body body types.CommitFilesReq true "body"
+// @Success      200  {object}  types.Response{} "OK"
+// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
+// @Router       /{repo_type}/{namespace}/{name}/commit/{revision} [post]
+func (h *RepoHandler) CommitFiles(ctx *gin.Context) {
+	var req types.CommitFilesReq
+	if err := ctx.ShouldBindJSON(&req); err != nil {
+		slog.Error("invalid request body", slog.Any("error", err))
+		httpbase.BadRequest(ctx, err.Error())
+		return
+	}
+
+	currentUser := httpbase.GetCurrentUser(ctx)
+
+	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
+	if err != nil {
+		slog.Error("invalid request body", slog.Any("error", err))
+		httpbase.BadRequest(ctx, err.Error())
+	}
+	req.Namespace = namespace
+	req.Name = name
+	req.CurrentUser = currentUser
+	req.RepoType = common.RepoTypeFromContext(ctx)
+	req.Revision = ctx.Param("revision")
+
+	err = h.c.CommitFiles(ctx.Request.Context(), req)
+	if err != nil {
+		slog.Error("failed to commit files", slog.Any("error", err))
+		httpbase.ServerError(ctx, err)
+		return
+	}
+	httpbase.OK(ctx, nil)
+}

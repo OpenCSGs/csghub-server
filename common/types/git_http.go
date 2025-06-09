@@ -56,6 +56,7 @@ type BatchRequest struct {
 	Name          string            `json:"name"`
 	RepoType      RepositoryType    `json:"repo_type"`
 	CurrentUser   string            `json:"current_user"`
+	UploadID      string            `json:"upload_id"`
 }
 
 type UploadRequest struct {
@@ -91,7 +92,7 @@ type Reference struct {
 type Pointer struct {
 	Oid         string `json:"oid"`
 	Size        int64  `json:"size"`
-	DownloadURL string `json:"download_url"`
+	DownloadURL string `json:"download_url,omitempty"`
 }
 
 type BatchResponse struct {
@@ -100,9 +101,9 @@ type BatchResponse struct {
 }
 
 type Link struct {
-	Href      string            `json:"href"`
-	Header    map[string]string `json:"header,omitempty"`
-	ExpiresAt *time.Time        `json:"expires_at,omitempty"`
+	Href      string         `json:"href"`
+	Header    map[string]any `json:"header,omitempty"`
+	ExpiresAt *time.Time     `json:"expires_at,omitempty"`
 }
 
 type ObjectResponse struct {
@@ -204,6 +205,23 @@ type GitalyAllowedReq struct {
 	UserID       string `json:"user_id"`
 	KeyID        string `json:"key_id"`
 	CheckIP      string `json:"check_ip"`
+}
+
+type CompleteMultipartUploadReq struct {
+	ObjectKey string `form:"objectKey"`
+	UploadID  string `form:"uploadId"`
+	ExpiresAt string `form:"expiresAt"`
+	Signature string `form:"signature"`
+}
+
+type CompleteMultipartUploadBody struct {
+	Oid   string `json:"oid"`
+	Parts []Part `json:"parts"`
+}
+
+type Part struct {
+	PartNumber int    `json:"partNumber"`
+	Etag       string `json:"etag"`
 }
 
 func (p Pointer) Valid() bool {

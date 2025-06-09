@@ -1207,3 +1207,109 @@ func TestRepoHandler_LogsTree(t *testing.T) {
 		t, 200, tester.OKText, &types.LogsTreeResp{Commits: []*types.CommitForTree{{Name: "c1"}}},
 	)
 }
+
+func TestRepoHandler_RemoteDiff(t *testing.T) {
+	tester := NewRepoTester(t).WithHandleFunc(func(rp *RepoHandler) gin.HandlerFunc {
+		return rp.RemoteDiff
+	})
+	tester.mocks.repo.EXPECT().RemoteDiff(mock.Anything, types.GetDiffBetweenCommitsReq{
+		Namespace:     "u",
+		Name:          "r",
+		RepoType:      types.ModelRepo,
+		LeftCommitID:  "left",
+		RightCommitID: "",
+		CurrentUser:   "u",
+	}).Return(
+		[]types.RemoteDiffs{
+			{
+				Added:    []string{"file1"},
+				Removed:  []string{"file2"},
+				Modified: []string{"file3"},
+			},
+		}, nil,
+	).Once()
+	tester.WithParam("path", "CSG_u/r").WithKV("repo_type", types.ModelRepo).WithQuery("left_commit_id", "left").WithUser().Execute()
+
+	tester.ResponseEq(
+		t, 200, tester.OKText, []types.RemoteDiffs{
+			{
+				Added:    []string{"file1"},
+				Removed:  []string{"file2"},
+				Modified: []string{"file3"},
+			},
+		},
+	)
+}
+
+func TestRepoHandler_Preupload(t *testing.T) {
+	tester := NewRepoTester(t).WithHandleFunc(func(rp *RepoHandler) gin.HandlerFunc {
+		return rp.Preupload
+	})
+	req := types.PreuploadReq{
+		Namespace:   "u",
+		Name:        "r",
+		RepoType:    types.ModelRepo,
+		Revision:    "main",
+		CurrentUser: "u",
+		Files: []types.PreuploadFile{
+			{
+				Path:   "file1",
+				Sample: "",
+				Size:   1000,
+			},
+		},
+	}
+	tester.mocks.repo.EXPECT().Preupload(mock.Anything, req).Return(
+		&types.PreuploadResp{
+			Files: []types.PreuploadRespFile{
+				{
+					OID:          "oid1",
+					Path:         "file1",
+					UploadMode:   "lfs",
+					ShouldIgnore: false,
+				},
+			},
+		}, nil,
+	).Once()
+	tester.WithParam("path", "CSG_u/r").WithKV("repo_type", types.ModelRepo).WithParam("revision", "main").WithBody(t, req).WithUser().Execute()
+
+	tester.ResponseEq(
+		t, 200, tester.OKText, &types.PreuploadResp{
+			Files: []types.PreuploadRespFile{
+				{
+					OID:          "oid1",
+					Path:         "file1",
+					UploadMode:   "lfs",
+					ShouldIgnore: false,
+				},
+			},
+		},
+	)
+}
+
+func TestRepoHandler_CommitFiles(t *testing.T) {
+	tester := NewRepoTester(t).WithHandleFunc(func(rp *RepoHandler) gin.HandlerFunc {
+		return rp.CommitFiles
+	})
+	req := types.CommitFilesReq{
+		Namespace:   "u",
+		Name:        "r",
+		RepoType:    types.ModelRepo,
+		Revision:    "main",
+		CurrentUser: "u",
+		Message:     "msg",
+		Files: []types.CommitFileReq{
+			{
+				Path:    "file1",
+				Action:  types.CommitActionCreate,
+				Content: "",
+			},
+		},
+	}
+	tester.mocks.repo.EXPECT().CommitFiles(mock.Anything, req).Return(nil).Once()
+	tester.WithParam("path", "CSG_u/r").WithKV("repo_type", types.ModelRepo).WithParam("revision", "main").WithBody(t, req).WithUser().Execute()
+
+	tester.ResponseEq(
+		t, 200, tester.OKText, nil,
+	)
+}

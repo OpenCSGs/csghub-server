@@ -483,6 +483,33 @@ func (h *GitHTTPHandler) UnLock(ctx *gin.Context) {
 	})
 }
 
+func (h *GitHTTPHandler) CompleteMultipartUpload(ctx *gin.Context) {
+	var (
+		req     types.CompleteMultipartUploadReq
+		bodyReq types.CompleteMultipartUploadBody
+	)
+	if err := ctx.ShouldBindQuery(&req); err != nil {
+		slog.Error("invalid request body", slog.Any("error", err))
+		httpbase.BadRequest(ctx, err.Error())
+		return
+	}
+
+	if err := ctx.ShouldBindJSON(&bodyReq); err != nil {
+		slog.Error("invalid json body", slog.Any("error", err))
+		httpbase.BadRequest(ctx, err.Error())
+		return
+	}
+
+	code, err := h.gitHttp.CompleteMultipartUpload(ctx.Request.Context(), req, bodyReq)
+	if err != nil {
+		slog.Error("failed to complete multipart upload", slog.Any("req", req), slog.Any("bodyReq", bodyReq), slog.Any("error", err))
+		ctx.PureJSON(code, gin.H{
+			"msg": err.Error(),
+		})
+		return
+	}
+}
+
 func getService(r *http.Request) string {
 	if r.Method == "GET" {
 		return r.URL.Query().Get("service")

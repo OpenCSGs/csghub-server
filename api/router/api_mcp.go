@@ -27,9 +27,12 @@ func CreateMCPServerRoutes(
 		// repo common handler functions
 		mcpGroup.GET("/:namespace/:name/branches", middleware.RepoType(types.MCPServerRepo), repoCommonHandler.Branches)
 		mcpGroup.GET("/:namespace/:name/tags", middleware.RepoType(types.MCPServerRepo), repoCommonHandler.Tags)
+		mcpGroup.POST("/:namespace/:name/preupload/:revision", middleware.RepoType(types.MCPServerRepo), repoCommonHandler.Preupload)
 		mcpGroup.POST("/:namespace/:name/tags/:category", middleware.RepoType(types.MCPServerRepo), repoCommonHandler.UpdateTags)
 		mcpGroup.GET("/:namespace/:name/last_commit", middleware.RepoType(types.MCPServerRepo), repoCommonHandler.LastCommit)
 		mcpGroup.GET("/:namespace/:name/commit/:commit_id", middleware.RepoType(types.MCPServerRepo), repoCommonHandler.CommitWithDiff)
+		mcpGroup.POST("/:namespace/:name/commit/:revision", middleware.RepoType(types.MCPServerRepo), repoCommonHandler.CommitFiles)
+		mcpGroup.GET("/:namespace/:name/remote_diff", middleware.RepoType(types.MCPServerRepo), repoCommonHandler.RemoteDiff)
 		mcpGroup.GET("/:namespace/:name/tree", middleware.RepoType(types.MCPServerRepo), repoCommonHandler.Tree)
 		mcpGroup.GET("/:namespace/:name/refs/:ref/tree/*path", middleware.RepoType(types.MCPServerRepo), repoCommonHandler.TreeV2)
 		mcpGroup.GET("/:namespace/:name/refs/:ref/logs_tree/*path", middleware.RepoType(types.MCPServerRepo), repoCommonHandler.LogsTree)

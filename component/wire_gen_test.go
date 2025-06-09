@@ -14,6 +14,7 @@ import (
 	"opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/deploy"
 	"opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/git/gitserver"
 	"opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/git/mirrorserver"
+	"opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/multisync"
 	"opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/parquet"
 	"opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/rpc"
 	"opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/store/s3"
@@ -38,7 +39,8 @@ func initializeTestRepoComponent(ctx context.Context, t interface {
 	mockAccountingComponent := component.NewMockAccountingComponent(t)
 	mockPriorityQueue := queue.NewMockPriorityQueue(t)
 	mockMirrorServer := mirrorserver.NewMockMirrorServer(t)
-	componentRepoComponentImpl := NewTestRepoComponent(config, mockStores, mockUserSvcClient, mockGitServer, mockTagComponent, mockClient, mockDeployer, mockAccountingComponent, mockPriorityQueue, mockMirrorServer)
+	multisyncMockClient := multisync.NewMockClient(t)
+	componentRepoComponentImpl := NewTestRepoComponent(config, mockStores, mockUserSvcClient, mockGitServer, mockTagComponent, mockClient, mockDeployer, mockAccountingComponent, mockPriorityQueue, mockMirrorServer, multisyncMockClient)
 	mockRepoComponent := component.NewMockRepoComponent(t)
 	mockSpaceComponent := component.NewMockSpaceComponent(t)
 	mockRuntimeArchitectureComponent := component.NewMockRuntimeArchitectureComponent(t)
@@ -55,6 +57,7 @@ func initializeTestRepoComponent(ctx context.Context, t interface {
 	mockReader := parquet.NewMockReader(t)
 	mockModerationSvcClient := rpc.NewMockModerationSvcClient(t)
 	mockDataviewerClient := dataviewer.NewMockDataviewerClient(t)
+	mockCore := s3.NewMockCore(t)
 	mocks := &Mocks{
 		stores:           mockStores,
 		components:       componentMockedComponents,
@@ -68,6 +71,8 @@ func initializeTestRepoComponent(ctx context.Context, t interface {
 		preader:          mockReader,
 		moderationClient: mockModerationSvcClient,
 		dataviewerClient: mockDataviewerClient,
+		multiSyncClient:  multisyncMockClient,
+		s3Core:           mockCore,
 	}
 	componentTestRepoWithMocks := &testRepoWithMocks{
 		repoComponentImpl: componentRepoComponentImpl,
@@ -107,6 +112,8 @@ func initializeTestPromptComponent(ctx context.Context, t interface {
 	mockReader := parquet.NewMockReader(t)
 	mockModerationSvcClient := rpc.NewMockModerationSvcClient(t)
 	mockDataviewerClient := dataviewer.NewMockDataviewerClient(t)
+	multisyncMockClient := multisync.NewMockClient(t)
+	mockCore := s3.NewMockCore(t)
 	mocks := &Mocks{
 		stores:           mockStores,
 		components:       componentMockedComponents,
@@ -120,6 +127,8 @@ func initializeTestPromptComponent(ctx context.Context, t interface {
 		preader:          mockReader,
 		moderationClient: mockModerationSvcClient,
 		dataviewerClient: mockDataviewerClient,
+		multiSyncClient:  multisyncMockClient,
+		s3Core:           mockCore,
 	}
 	componentTestPromptWithMocks := &testPromptWithMocks{
 		promptComponentImpl: componentPromptComponentImpl,
@@ -158,6 +167,8 @@ func initializeTestUserComponent(ctx context.Context, t interface {
 	mockReader := parquet.NewMockReader(t)
 	mockModerationSvcClient := rpc.NewMockModerationSvcClient(t)
 	mockDataviewerClient := dataviewer.NewMockDataviewerClient(t)
+	multisyncMockClient := multisync.NewMockClient(t)
+	mockCore := s3.NewMockCore(t)
 	mocks := &Mocks{
 		stores:           mockStores,
 		components:       componentMockedComponents,
@@ -171,6 +182,8 @@ func initializeTestUserComponent(ctx context.Context, t interface {
 		preader:          mockReader,
 		moderationClient: mockModerationSvcClient,
 		dataviewerClient: mockDataviewerClient,
+		multiSyncClient:  multisyncMockClient,
+		s3Core:           mockCore,
 	}
 	componentTestUserWithMocks := &testUserWithMocks{
 		userComponentImpl: componentUserComponentImpl,
@@ -210,6 +223,8 @@ func initializeTestSpaceComponent(ctx context.Context, t interface {
 	mockReader := parquet.NewMockReader(t)
 	mockModerationSvcClient := rpc.NewMockModerationSvcClient(t)
 	mockDataviewerClient := dataviewer.NewMockDataviewerClient(t)
+	multisyncMockClient := multisync.NewMockClient(t)
+	mockCore := s3.NewMockCore(t)
 	mocks := &Mocks{
 		stores:           mockStores,
 		components:       componentMockedComponents,
@@ -223,6 +238,8 @@ func initializeTestSpaceComponent(ctx context.Context, t interface {
 		preader:          mockReader,
 		moderationClient: mockModerationSvcClient,
 		dataviewerClient: mockDataviewerClient,
+		multiSyncClient:  multisyncMockClient,
+		s3Core:           mockCore,
 	}
 	componentTestSpaceWithMocks := &testSpaceWithMocks{
 		spaceComponentImpl: componentSpaceComponentImpl,
@@ -262,6 +279,8 @@ func initializeTestModelComponent(ctx context.Context, t interface {
 	mockReader := parquet.NewMockReader(t)
 	mockModerationSvcClient := rpc.NewMockModerationSvcClient(t)
 	mockDataviewerClient := dataviewer.NewMockDataviewerClient(t)
+	multisyncMockClient := multisync.NewMockClient(t)
+	mockCore := s3.NewMockCore(t)
 	mocks := &Mocks{
 		stores:           mockStores,
 		components:       componentMockedComponents,
@@ -275,6 +294,8 @@ func initializeTestModelComponent(ctx context.Context, t interface {
 		preader:          mockReader,
 		moderationClient: mockModerationSvcClient,
 		dataviewerClient: mockDataviewerClient,
+		multiSyncClient:  multisyncMockClient,
+		s3Core:           mockCore,
 	}
 	componentTestModelWithMocks := &testModelWithMocks{
 		modelComponentImpl: componentModelComponentImpl,
@@ -313,6 +334,8 @@ func initializeTestAccountingComponent(ctx context.Context, t interface {
 	mockReader := parquet.NewMockReader(t)
 	mockModerationSvcClient := rpc.NewMockModerationSvcClient(t)
 	mockDataviewerClient := dataviewer.NewMockDataviewerClient(t)
+	multisyncMockClient := multisync.NewMockClient(t)
+	mockCore := s3.NewMockCore(t)
 	mocks := &Mocks{
 		stores:           mockStores,
 		components:       componentMockedComponents,
@@ -326,6 +349,8 @@ func initializeTestAccountingComponent(ctx context.Context, t interface {
 		preader:          mockReader,
 		moderationClient: mockModerationSvcClient,
 		dataviewerClient: mockDataviewerClient,
+		multiSyncClient:  multisyncMockClient,
+		s3Core:           mockCore,
 	}
 	componentTestAccountingWithMocks := &testAccountingWithMocks{
 		accountingComponentImpl: componentAccountingComponentImpl,
@@ -343,7 +368,8 @@ func initializeTestGitHTTPComponent(ctx context.Context, t interface {
 	mockRepoComponent := component.NewMockRepoComponent(t)
 	mockGitServer := gitserver.NewMockGitServer(t)
 	mockClient := s3.NewMockClient(t)
-	componentGitHTTPComponentImpl := NewTestGitHTTPComponent(config, mockStores, mockRepoComponent, mockGitServer, mockClient)
+	mockCore := s3.NewMockCore(t)
+	componentGitHTTPComponentImpl := NewTestGitHTTPComponent(config, mockStores, mockRepoComponent, mockGitServer, mockClient, mockCore)
 	mockAccountingComponent := component.NewMockAccountingComponent(t)
 	mockTagComponent := component.NewMockTagComponent(t)
 	mockSpaceComponent := component.NewMockSpaceComponent(t)
@@ -365,6 +391,7 @@ func initializeTestGitHTTPComponent(ctx context.Context, t interface {
 	mockReader := parquet.NewMockReader(t)
 	mockModerationSvcClient := rpc.NewMockModerationSvcClient(t)
 	mockDataviewerClient := dataviewer.NewMockDataviewerClient(t)
+	multisyncMockClient := multisync.NewMockClient(t)
 	mocks := &Mocks{
 		stores:           mockStores,
 		components:       componentMockedComponents,
@@ -378,6 +405,8 @@ func initializeTestGitHTTPComponent(ctx context.Context, t interface {
 		preader:          mockReader,
 		moderationClient: mockModerationSvcClient,
 		dataviewerClient: mockDataviewerClient,
+		multiSyncClient:  multisyncMockClient,
+		s3Core:           mockCore,
 	}
 	componentTestGitHTTPWithMocks := &testGitHTTPWithMocks{
 		gitHTTPComponentImpl: componentGitHTTPComponentImpl,
@@ -416,6 +445,8 @@ func initializeTestDiscussionComponent(ctx context.Context, t interface {
 	mockReader := parquet.NewMockReader(t)
 	mockModerationSvcClient := rpc.NewMockModerationSvcClient(t)
 	mockDataviewerClient := dataviewer.NewMockDataviewerClient(t)
+	multisyncMockClient := multisync.NewMockClient(t)
+	mockCore := s3.NewMockCore(t)
 	mocks := &Mocks{
 		stores:           mockStores,
 		components:       componentMockedComponents,
@@ -429,6 +460,8 @@ func initializeTestDiscussionComponent(ctx context.Context, t interface {
 		preader:          mockReader,
 		moderationClient: mockModerationSvcClient,
 		dataviewerClient: mockDataviewerClient,
+		multiSyncClient:  multisyncMockClient,
+		s3Core:           mockCore,
 	}
 	componentTestDiscussionWithMocks := &testDiscussionWithMocks{
 		discussionComponentImpl: componentDiscussionComponentImpl,
@@ -467,6 +500,8 @@ func initializeTestRuntimeArchComponent(ctx context.Context, t interface {
 	mockReader := parquet.NewMockReader(t)
 	mockModerationSvcClient := rpc.NewMockModerationSvcClient(t)
 	mockDataviewerClient := dataviewer.NewMockDataviewerClient(t)
+	multisyncMockClient := multisync.NewMockClient(t)
+	mockCore := s3.NewMockCore(t)
 	mocks := &Mocks{
 		stores:           mockStores,
 		components:       componentMockedComponents,
@@ -480,6 +515,8 @@ func initializeTestRuntimeArchComponent(ctx context.Context, t interface {
 		preader:          mockReader,
 		moderationClient: mockModerationSvcClient,
 		dataviewerClient: mockDataviewerClient,
+		multiSyncClient:  multisyncMockClient,
+		s3Core:           mockCore,
 	}
 	componentTestRuntimeArchWithMocks := &testRuntimeArchWithMocks{
 		runtimeArchitectureComponentImpl: componentRuntimeArchitectureComponentImpl,
@@ -519,6 +556,8 @@ func initializeTestMirrorComponent(ctx context.Context, t interface {
 	mockReader := parquet.NewMockReader(t)
 	mockModerationSvcClient := rpc.NewMockModerationSvcClient(t)
 	mockDataviewerClient := dataviewer.NewMockDataviewerClient(t)
+	multisyncMockClient := multisync.NewMockClient(t)
+	mockCore := s3.NewMockCore(t)
 	mocks := &Mocks{
 		stores:           mockStores,
 		components:       componentMockedComponents,
@@ -532,6 +571,8 @@ func initializeTestMirrorComponent(ctx context.Context, t interface {
 		preader:          mockReader,
 		moderationClient: mockModerationSvcClient,
 		dataviewerClient: mockDataviewerClient,
+		multiSyncClient:  multisyncMockClient,
+		s3Core:           mockCore,
 	}
 	componentTestMirrorWithMocks := &testMirrorWithMocks{
 		mirrorComponentImpl: componentMirrorComponentImpl,
@@ -570,6 +611,8 @@ func initializeTestCollectionComponent(ctx context.Context, t interface {
 	mockReader := parquet.NewMockReader(t)
 	mockModerationSvcClient := rpc.NewMockModerationSvcClient(t)
 	mockDataviewerClient := dataviewer.NewMockDataviewerClient(t)
+	multisyncMockClient := multisync.NewMockClient(t)
+	mockCore := s3.NewMockCore(t)
 	mocks := &Mocks{
 		stores:           mockStores,
 		components:       componentMockedComponents,
@@ -583,6 +626,8 @@ func initializeTestCollectionComponent(ctx context.Context, t interface {
 		preader:          mockReader,
 		moderationClient: mockModerationSvcClient,
 		dataviewerClient: mockDataviewerClient,
+		multiSyncClient:  multisyncMockClient,
+		s3Core:           mockCore,
 	}
 	componentTestCollectionWithMocks := &testCollectionWithMocks{
 		collectionComponentImpl: componentCollectionComponentImpl,
@@ -621,6 +666,8 @@ func initializeTestBroadcastComponent(ctx context.Context, t interface {
 	mockReader := parquet.NewMockReader(t)
 	mockModerationSvcClient := rpc.NewMockModerationSvcClient(t)
 	mockDataviewerClient := dataviewer.NewMockDataviewerClient(t)
+	multisyncMockClient := multisync.NewMockClient(t)
+	mockCore := s3.NewMockCore(t)
 	mocks := &Mocks{
 		stores:           mockStores,
 		components:       componentMockedComponents,
@@ -634,6 +681,8 @@ func initializeTestBroadcastComponent(ctx context.Context, t interface {
 		preader:          mockReader,
 		moderationClient: mockModerationSvcClient,
 		dataviewerClient: mockDataviewerClient,
+		multiSyncClient:  multisyncMockClient,
+		s3Core:           mockCore,
 	}
 	componentTestBroadcastWithMocks := &testBroadcastWithMocks{
 		broadcastComponentImpl: componentBroadcastComponentImpl,
@@ -673,6 +722,8 @@ func initializeTestDatasetComponent(ctx context.Context, t interface {
 	mockReader := parquet.NewMockReader(t)
 	mockModerationSvcClient := rpc.NewMockModerationSvcClient(t)
 	mockDataviewerClient := dataviewer.NewMockDataviewerClient(t)
+	multisyncMockClient := multisync.NewMockClient(t)
+	mockCore := s3.NewMockCore(t)
 	mocks := &Mocks{
 		stores:           mockStores,
 		components:       componentMockedComponents,
@@ -686,6 +737,8 @@ func initializeTestDatasetComponent(ctx context.Context, t interface {
 		preader:          mockReader,
 		moderationClient: mockModerationSvcClient,
 		dataviewerClient: mockDataviewerClient,
+		multiSyncClient:  multisyncMockClient,
+		s3Core:           mockCore,
 	}
 	componentTestDatasetWithMocks := &testDatasetWithMocks{
 		datasetComponentImpl: componentDatasetComponentImpl,
@@ -725,6 +778,8 @@ func initializeTestCodeComponent(ctx context.Context, t interface {
 	mockReader := parquet.NewMockReader(t)
 	mockModerationSvcClient := rpc.NewMockModerationSvcClient(t)
 	mockDataviewerClient := dataviewer.NewMockDataviewerClient(t)
+	multisyncMockClient := multisync.NewMockClient(t)
+	mockCore := s3.NewMockCore(t)
 	mocks := &Mocks{
 		stores:           mockStores,
 		components:       componentMockedComponents,
@@ -738,6 +793,8 @@ func initializeTestCodeComponent(ctx context.Context, t interface {
 		preader:          mockReader,
 		moderationClient: mockModerationSvcClient,
 		dataviewerClient: mockDataviewerClient,
+		multiSyncClient:  multisyncMockClient,
+		s3Core:           mockCore,
 	}
 	componentTestCodeWithMocks := &testCodeWithMocks{
 		codeComponentImpl: componentCodeComponentImpl,
@@ -777,6 +834,8 @@ func initializeTestMultiSyncComponent(ctx context.Context, t interface {
 	mockReader := parquet.NewMockReader(t)
 	mockModerationSvcClient := rpc.NewMockModerationSvcClient(t)
 	mockDataviewerClient := dataviewer.NewMockDataviewerClient(t)
+	multisyncMockClient := multisync.NewMockClient(t)
+	mockCore := s3.NewMockCore(t)
 	mocks := &Mocks{
 		stores:           mockStores,
 		components:       componentMockedComponents,
@@ -790,6 +849,8 @@ func initializeTestMultiSyncComponent(ctx context.Context, t interface {
 		preader:          mockReader,
 		moderationClient: mockModerationSvcClient,
 		dataviewerClient: mockDataviewerClient,
+		multiSyncClient:  multisyncMockClient,
+		s3Core:           mockCore,
 	}
 	componentTestMultiSyncWithMocks := &testMultiSyncWithMocks{
 		multiSyncComponentImpl: componentMultiSyncComponentImpl,
@@ -829,6 +890,8 @@ func initializeTestInternalComponent(ctx context.Context, t interface {
 	mockReader := parquet.NewMockReader(t)
 	mockModerationSvcClient := rpc.NewMockModerationSvcClient(t)
 	mockDataviewerClient := dataviewer.NewMockDataviewerClient(t)
+	multisyncMockClient := multisync.NewMockClient(t)
+	mockCore := s3.NewMockCore(t)
 	mocks := &Mocks{
 		stores:           mockStores,
 		components:       componentMockedComponents,
@@ -842,6 +905,8 @@ func initializeTestInternalComponent(ctx context.Context, t interface {
 		preader:          mockReader,
 		moderationClient: mockModerationSvcClient,
 		dataviewerClient: mockDataviewerClient,
+		multiSyncClient:  multisyncMockClient,
+		s3Core:           mockCore,
 	}
 	componentTestInternalWithMocks := &testInternalWithMocks{
 		internalComponentImpl: componentInternalComponentImpl,
@@ -881,6 +946,8 @@ func initializeTestMirrorSourceComponent(ctx context.Context, t interface {
 	mockReader := parquet.NewMockReader(t)
 	mockModerationSvcClient := rpc.NewMockModerationSvcClient(t)
 	mockDataviewerClient := dataviewer.NewMockDataviewerClient(t)
+	multisyncMockClient := multisync.NewMockClient(t)
+	mockCore := s3.NewMockCore(t)
 	mocks := &Mocks{
 		stores:           mockStores,
 		components:       componentMockedComponents,
@@ -894,6 +961,8 @@ func initializeTestMirrorSourceComponent(ctx context.Context, t interface {
 		preader:          mockReader,
 		moderationClient: mockModerationSvcClient,
 		dataviewerClient: mockDataviewerClient,
+		multiSyncClient:  multisyncMockClient,
+		s3Core:           mockCore,
 	}
 	componentTestMirrorSourceWithMocks := &testMirrorSourceWithMocks{
 		mirrorSourceComponentImpl: componentMirrorSourceComponentImpl,
@@ -933,6 +1002,8 @@ func initializeTestSpaceResourceComponent(ctx context.Context, t interface {
 	mockReader := parquet.NewMockReader(t)
 	mockModerationSvcClient := rpc.NewMockModerationSvcClient(t)
 	mockDataviewerClient := dataviewer.NewMockDataviewerClient(t)
+	multisyncMockClient := multisync.NewMockClient(t)
+	mockCore := s3.NewMockCore(t)
 	mocks := &Mocks{
 		stores:           mockStores,
 		components:       componentMockedComponents,
@@ -946,6 +1017,8 @@ func initializeTestSpaceResourceComponent(ctx context.Context, t interface {
 		preader:          mockReader,
 		moderationClient: mockModerationSvcClient,
 		dataviewerClient: mockDataviewerClient,
+		multiSyncClient:  multisyncMockClient,
+		s3Core:           mockCore,
 	}
 	componentTestSpaceResourceWithMocks := &testSpaceResourceWithMocks{
 		spaceResourceComponentImpl: componentSpaceResourceComponentImpl,
@@ -985,6 +1058,8 @@ func initializeTestTagComponent(ctx context.Context, t interface {
 	mockAccountingClient := accounting.NewMockAccountingClient(t)
 	mockReader := parquet.NewMockReader(t)
 	mockDataviewerClient := dataviewer.NewMockDataviewerClient(t)
+	multisyncMockClient := multisync.NewMockClient(t)
+	mockCore := s3.NewMockCore(t)
 	mocks := &Mocks{
 		stores:           mockStores,
 		components:       componentMockedComponents,
@@ -998,6 +1073,8 @@ func initializeTestTagComponent(ctx context.Context, t interface {
 		preader:          mockReader,
 		moderationClient: mockModerationSvcClient,
 		dataviewerClient: mockDataviewerClient,
+		multiSyncClient:  multisyncMockClient,
+		s3Core:           mockCore,
 	}
 	componentTestTagWithMocks := &testTagWithMocks{
 		tagComponentImpl: componentTagComponentImpl,
@@ -1037,6 +1114,8 @@ func initializeTestRecomComponent(ctx context.Context, t interface {
 	mockReader := parquet.NewMockReader(t)
 	mockModerationSvcClient := rpc.NewMockModerationSvcClient(t)
 	mockDataviewerClient := dataviewer.NewMockDataviewerClient(t)
+	multisyncMockClient := multisync.NewMockClient(t)
+	mockCore := s3.NewMockCore(t)
 	mocks := &Mocks{
 		stores:           mockStores,
 		components:       componentMockedComponents,
@@ -1050,6 +1129,8 @@ func initializeTestRecomComponent(ctx context.Context, t interface {
 		preader:          mockReader,
 		moderationClient: mockModerationSvcClient,
 		dataviewerClient: mockDataviewerClient,
+		multiSyncClient:  multisyncMockClient,
+		s3Core:           mockCore,
 	}
 	componentTestRecomWithMocks := &testRecomWithMocks{
 		recomComponentImpl: componentRecomComponentImpl,
@@ -1089,6 +1170,8 @@ func initializeTestSpaceSdkComponent(ctx context.Context, t interface {
 	mockReader := parquet.NewMockReader(t)
 	mockModerationSvcClient := rpc.NewMockModerationSvcClient(t)
 	mockDataviewerClient := dataviewer.NewMockDataviewerClient(t)
+	multisyncMockClient := multisync.NewMockClient(t)
+	mockCore := s3.NewMockCore(t)
 	mocks := &Mocks{
 		stores:           mockStores,
 		components:       componentMockedComponents,
@@ -1102,6 +1185,8 @@ func initializeTestSpaceSdkComponent(ctx context.Context, t interface {
 		preader:          mockReader,
 		moderationClient: mockModerationSvcClient,
 		dataviewerClient: mockDataviewerClient,
+		multiSyncClient:  multisyncMockClient,
+		s3Core:           mockCore,
 	}
 	componentTestSpaceSdkWithMocks := &testSpaceSdkWithMocks{
 		spaceSdkComponentImpl: componentSpaceSdkComponentImpl,
@@ -1141,6 +1226,8 @@ func initializeTestTelemetryComponent(ctx context.Context, t interface {
 	mockReader := parquet.NewMockReader(t)
 	mockModerationSvcClient := rpc.NewMockModerationSvcClient(t)
 	mockDataviewerClient := dataviewer.NewMockDataviewerClient(t)
+	multisyncMockClient := multisync.NewMockClient(t)
+	mockCore := s3.NewMockCore(t)
 	mocks := &Mocks{
 		stores:           mockStores,
 		components:       componentMockedComponents,
@@ -1154,6 +1241,8 @@ func initializeTestTelemetryComponent(ctx context.Context, t interface {
 		preader:          mockReader,
 		moderationClient: mockModerationSvcClient,
 		dataviewerClient: mockDataviewerClient,
+		multiSyncClient:  multisyncMockClient,
+		s3Core:           mockCore,
 	}
 	componentTestTelemetryWithMocks := &testTelemetryWithMocks{
 		telemetryComponentImpl: componentTelemetryComponentImpl,
@@ -1193,6 +1282,8 @@ func initializeTestClusterComponent(ctx context.Context, t interface {
 	mockReader := parquet.NewMockReader(t)
 	mockModerationSvcClient := rpc.NewMockModerationSvcClient(t)
 	mockDataviewerClient := dataviewer.NewMockDataviewerClient(t)
+	multisyncMockClient := multisync.NewMockClient(t)
+	mockCore := s3.NewMockCore(t)
 	mocks := &Mocks{
 		stores:           mockStores,
 		components:       componentMockedComponents,
@@ -1206,6 +1297,8 @@ func initializeTestClusterComponent(ctx context.Context, t interface {
 		preader:          mockReader,
 		moderationClient: mockModerationSvcClient,
 		dataviewerClient: mockDataviewerClient,
+		multiSyncClient:  multisyncMockClient,
+		s3Core:           mockCore,
 	}
 	componentTestClusterWithMocks := &testClusterWithMocks{
 		clusterComponentImpl: componentClusterComponentImpl,
@@ -1245,6 +1338,8 @@ func initializeTestEvaluationComponent(ctx context.Context, t interface {
 	mockReader := parquet.NewMockReader(t)
 	mockModerationSvcClient := rpc.NewMockModerationSvcClient(t)
 	mockDataviewerClient := dataviewer.NewMockDataviewerClient(t)
+	multisyncMockClient := multisync.NewMockClient(t)
+	mockCore := s3.NewMockCore(t)
 	mocks := &Mocks{
 		stores:           mockStores,
 		components:       componentMockedComponents,
@@ -1258,6 +1353,8 @@ func initializeTestEvaluationComponent(ctx context.Context, t interface {
 		preader:          mockReader,
 		moderationClient: mockModerationSvcClient,
 		dataviewerClient: mockDataviewerClient,
+		multiSyncClient:  multisyncMockClient,
+		s3Core:           mockCore,
 	}
 	componentTestEvaluationWithMocks := &testEvaluationWithMocks{
 		evaluationComponentImpl: componentEvaluationComponentImpl,
@@ -1297,6 +1394,8 @@ func initializeTestHFDatasetComponent(ctx context.Context, t interface {
 	mockReader := parquet.NewMockReader(t)
 	mockModerationSvcClient := rpc.NewMockModerationSvcClient(t)
 	mockDataviewerClient := dataviewer.NewMockDataviewerClient(t)
+	multisyncMockClient := multisync.NewMockClient(t)
+	mockCore := s3.NewMockCore(t)
 	mocks := &Mocks{
 		stores:           mockStores,
 		components:       componentMockedComponents,
@@ -1310,6 +1409,8 @@ func initializeTestHFDatasetComponent(ctx context.Context, t interface {
 		preader:          mockReader,
 		moderationClient: mockModerationSvcClient,
 		dataviewerClient: mockDataviewerClient,
+		multiSyncClient:  multisyncMockClient,
+		s3Core:           mockCore,
 	}
 	componentTestHFDatasetWithMocks := &testHFDatasetWithMocks{
 		hFDatasetComponentImpl: componentHFDatasetComponentImpl,
@@ -1349,6 +1450,8 @@ func initializeTestRepoFileComponent(ctx context.Context, t interface {
 	mockReader := parquet.NewMockReader(t)
 	mockModerationSvcClient := rpc.NewMockModerationSvcClient(t)
 	mockDataviewerClient := dataviewer.NewMockDataviewerClient(t)
+	multisyncMockClient := multisync.NewMockClient(t)
+	mockCore := s3.NewMockCore(t)
 	mocks := &Mocks{
 		stores:           mockStores,
 		components:       componentMockedComponents,
@@ -1362,6 +1465,8 @@ func initializeTestRepoFileComponent(ctx context.Context, t interface {
 		preader:          mockReader,
 		moderationClient: mockModerationSvcClient,
 		dataviewerClient: mockDataviewerClient,
+		multiSyncClient:  multisyncMockClient,
+		s3Core:           mockCore,
 	}
 	componentTestRepoFileWithMocks := &testRepoFileWithMocks{
 		repoFileComponentImpl: componentRepoFileComponentImpl,
@@ -1401,6 +1506,8 @@ func initializeTestSensitiveComponent(ctx context.Context, t interface {
 	mockAccountingClient := accounting.NewMockAccountingClient(t)
 	mockReader := parquet.NewMockReader(t)
 	mockDataviewerClient := dataviewer.NewMockDataviewerClient(t)
+	multisyncMockClient := multisync.NewMockClient(t)
+	mockCore := s3.NewMockCore(t)
 	mocks := &Mocks{
 		stores:           mockStores,
 		components:       componentMockedComponents,
@@ -1414,6 +1521,8 @@ func initializeTestSensitiveComponent(ctx context.Context, t interface {
 		preader:          mockReader,
 		moderationClient: mockModerationSvcClient,
 		dataviewerClient: mockDataviewerClient,
+		multiSyncClient:  multisyncMockClient,
+		s3Core:           mockCore,
 	}
 	componentTestSensitiveWithMocks := &testSensitiveWithMocks{
 		sensitiveComponentImpl: componentSensitiveComponentImpl,
@@ -1453,6 +1562,8 @@ func initializeTestSSHKeyComponent(ctx context.Context, t interface {
 	mockReader := parquet.NewMockReader(t)
 	mockModerationSvcClient := rpc.NewMockModerationSvcClient(t)
 	mockDataviewerClient := dataviewer.NewMockDataviewerClient(t)
+	multisyncMockClient := multisync.NewMockClient(t)
+	mockCore := s3.NewMockCore(t)
 	mocks := &Mocks{
 		stores:           mockStores,
 		components:       componentMockedComponents,
@@ -1466,6 +1577,8 @@ func initializeTestSSHKeyComponent(ctx context.Context, t interface {
 		preader:          mockReader,
 		moderationClient: mockModerationSvcClient,
 		dataviewerClient: mockDataviewerClient,
+		multiSyncClient:  multisyncMockClient,
+		s3Core:           mockCore,
 	}
 	componentTestSSHKeyWithMocks := &testSSHKeyWithMocks{
 		sSHKeyComponentImpl: componentSSHKeyComponentImpl,
@@ -1505,6 +1618,8 @@ func initializeTestListComponent(ctx context.Context, t interface {
 	mockReader := parquet.NewMockReader(t)
 	mockModerationSvcClient := rpc.NewMockModerationSvcClient(t)
 	mockDataviewerClient := dataviewer.NewMockDataviewerClient(t)
+	multisyncMockClient := multisync.NewMockClient(t)
+	mockCore := s3.NewMockCore(t)
 	mocks := &Mocks{
 		stores:           mockStores,
 		components:       componentMockedComponents,
@@ -1518,6 +1633,8 @@ func initializeTestListComponent(ctx context.Context, t interface {
 		preader:          mockReader,
 		moderationClient: mockModerationSvcClient,
 		dataviewerClient: mockDataviewerClient,
+		multiSyncClient:  multisyncMockClient,
+		s3Core:           mockCore,
 	}
 	componentTestListWithMocks := &testListWithMocks{
 		listComponentImpl: componentListComponentImpl,
@@ -1557,6 +1674,8 @@ func initializeTestSyncClientSettingComponent(ctx context.Context, t interface {
 	mockReader := parquet.NewMockReader(t)
 	mockModerationSvcClient := rpc.NewMockModerationSvcClient(t)
 	mockDataviewerClient := dataviewer.NewMockDataviewerClient(t)
+	multisyncMockClient := multisync.NewMockClient(t)
+	mockCore := s3.NewMockCore(t)
 	mocks := &Mocks{
 		stores:           mockStores,
 		components:       componentMockedComponents,
@@ -1570,6 +1689,8 @@ func initializeTestSyncClientSettingComponent(ctx context.Context, t interface {
 		preader:          mockReader,
 		moderationClient: mockModerationSvcClient,
 		dataviewerClient: mockDataviewerClient,
+		multiSyncClient:  multisyncMockClient,
+		s3Core:           mockCore,
 	}
 	componentTestSyncClientSettingWithMocks := &testSyncClientSettingWithMocks{
 		syncClientSettingComponentImpl: componentSyncClientSettingComponentImpl,
@@ -1609,6 +1730,8 @@ func initializeTestEventComponent(ctx context.Context, t interface {
 	mockReader := parquet.NewMockReader(t)
 	mockModerationSvcClient := rpc.NewMockModerationSvcClient(t)
 	mockDataviewerClient := dataviewer.NewMockDataviewerClient(t)
+	multisyncMockClient := multisync.NewMockClient(t)
+	mockCore := s3.NewMockCore(t)
 	mocks := &Mocks{
 		stores:           mockStores,
 		components:       componentMockedComponents,
@@ -1622,6 +1745,8 @@ func initializeTestEventComponent(ctx context.Context, t interface {
 		preader:          mockReader,
 		moderationClient: mockModerationSvcClient,
 		dataviewerClient: mockDataviewerClient,
+		multiSyncClient:  multisyncMockClient,
+		s3Core:           mockCore,
 	}
 	componentTestEventWithMocks := &testEventWithMocks{
 		eventComponentImpl: componentEventComponentImpl,
@@ -1661,6 +1786,8 @@ func initializeTestSpaceTemplateComponent(ctx context.Context, t interface {
 	mockReader := parquet.NewMockReader(t)
 	mockModerationSvcClient := rpc.NewMockModerationSvcClient(t)
 	mockDataviewerClient := dataviewer.NewMockDataviewerClient(t)
+	multisyncMockClient := multisync.NewMockClient(t)
+	mockCore := s3.NewMockCore(t)
 	mocks := &Mocks{
 		stores:           mockStores,
 		components:       componentMockedComponents,
@@ -1674,6 +1801,8 @@ func initializeTestSpaceTemplateComponent(ctx context.Context, t interface {
 		preader:          mockReader,
 		moderationClient: mockModerationSvcClient,
 		dataviewerClient: mockDataviewerClient,
+		multiSyncClient:  multisyncMockClient,
+		s3Core:           mockCore,
 	}
 	componentTestSpaceTemplateWithMocks := &testSpaceTemplateWithMocks{
 		spaceTemplateComponentImpl: componentSpaceTemplateComponentImpl,
@@ -1713,6 +1842,8 @@ func initializeTestMCPServerComponent(ctx context.Context, t interface {
 	mockReader := parquet.NewMockReader(t)
 	mockModerationSvcClient := rpc.NewMockModerationSvcClient(t)
 	mockDataviewerClient := dataviewer.NewMockDataviewerClient(t)
+	multisyncMockClient := multisync.NewMockClient(t)
+	mockCore := s3.NewMockCore(t)
 	mocks := &Mocks{
 		stores:           mockStores,
 		components:       componentMockedComponents,
@@ -1726,6 +1857,8 @@ func initializeTestMCPServerComponent(ctx context.Context, t interface {
 		preader:          mockReader,
 		moderationClient: mockModerationSvcClient,
 		dataviewerClient: mockDataviewerClient,
+		multiSyncClient:  multisyncMockClient,
+		s3Core:           mockCore,
 	}
 	componentTestMCPServerWithMocks := &testMCPServerWithMocks{
 		mcpServerComponentImpl: componentMcpServerComponentImpl,

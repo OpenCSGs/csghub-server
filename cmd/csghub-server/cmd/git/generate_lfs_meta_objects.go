@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
-	"path"
 	"strings"
 	"time"
 
@@ -16,6 +15,7 @@ import (
 	"opencsg.com/csghub-server/builder/store/s3"
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/types"
+	"opencsg.com/csghub-server/common/utils/common"
 )
 
 var generateLfsMetaObjectsCmd = &cobra.Command{
@@ -127,7 +127,7 @@ func checkAndUpdateLfsMetaObjects(config *config.Config, s3Client s3.Client, lfs
 	var exists bool
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancel()
-	objectKey := path.Join("lfs", pointer.RelativePath())
+	objectKey := common.BuildLfsPath(repo.ID, pointer.Oid, repo.Migrated)
 	_, err := s3Client.StatObject(ctx, config.S3.Bucket, objectKey, minio.StatObjectOptions{})
 	if err != nil {
 		slog.Error("failed to check if lfs file exists", slog.String("oid", objectKey), slog.Any("error", err))

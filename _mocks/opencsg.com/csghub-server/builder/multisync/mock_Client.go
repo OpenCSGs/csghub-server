@@ -141,6 +141,65 @@ func (_c *MockClient_DatasetInfo_Call) RunAndReturn(run func(context.Context, ty
 	return _c
 }
 
+// Diff provides a mock function with given fields: ctx, req
+func (_m *MockClient) Diff(ctx context.Context, req types.RemoteDiffReq) ([]types.RemoteDiffs, error) {
+	ret := _m.Called(ctx, req)
+
+	if len(ret) == 0 {
+		panic("no return value specified for Diff")
+	}
+
+	var r0 []types.RemoteDiffs
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, types.RemoteDiffReq) ([]types.RemoteDiffs, error)); ok {
+		return rf(ctx, req)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, types.RemoteDiffReq) []types.RemoteDiffs); ok {
+		r0 = rf(ctx, req)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]types.RemoteDiffs)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, types.RemoteDiffReq) error); ok {
+		r1 = rf(ctx, req)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockClient_Diff_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'Diff'
+type MockClient_Diff_Call struct {
+	*mock.Call
+}
+
+// Diff is a helper method to define mock.On call
+//   - ctx context.Context
+//   - req types.RemoteDiffReq
+func (_e *MockClient_Expecter) Diff(ctx interface{}, req interface{}) *MockClient_Diff_Call {
+	return &MockClient_Diff_Call{Call: _e.mock.On("Diff", ctx, req)}
+}
+
+func (_c *MockClient_Diff_Call) Run(run func(ctx context.Context, req types.RemoteDiffReq)) *MockClient_Diff_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(types.RemoteDiffReq))
+	})
+	return _c
+}
+
+func (_c *MockClient_Diff_Call) Return(_a0 []types.RemoteDiffs, _a1 error) *MockClient_Diff_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockClient_Diff_Call) RunAndReturn(run func(context.Context, types.RemoteDiffReq) ([]types.RemoteDiffs, error)) *MockClient_Diff_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // FileList provides a mock function with given fields: ctx, v
 func (_m *MockClient) FileList(ctx context.Context, v types.SyncVersion) ([]types.File, error) {
 	ret := _m.Called(ctx, v)

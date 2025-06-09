@@ -7,6 +7,7 @@ import (
 	mock_deploy "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/deploy"
 	mock_git "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/git/gitserver"
 	mock_mirror "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/git/mirrorserver"
+	mock_multisync "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/multisync"
 	mock_preader "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/parquet"
 	mock_rpc "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/rpc"
 	mock_s3 "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/store/s3"
@@ -18,6 +19,7 @@ import (
 	"opencsg.com/csghub-server/builder/git/gitserver"
 	"opencsg.com/csghub-server/builder/git/mirrorserver"
 	"opencsg.com/csghub-server/builder/llm"
+	"opencsg.com/csghub-server/builder/multisync"
 	"opencsg.com/csghub-server/builder/parquet"
 	"opencsg.com/csghub-server/builder/rpc"
 	"opencsg.com/csghub-server/builder/store/s3"
@@ -88,6 +90,11 @@ var MockedMirrorQueueSet = wire.NewSet(
 	wire.Bind(new(queue.PriorityQueue), new(*mock_mirror_queue.MockPriorityQueue)),
 )
 
+var MockedMultiSyncClientSet = wire.NewSet(
+	mock_multisync.NewMockClient,
+	wire.Bind(new(multisync.Client), new(*mock_multisync.MockClient)),
+)
+
 var MockedAccountingClientSet = wire.NewSet(
 	mock_accounting.NewMockAccountingClient,
 	wire.Bind(new(accounting.AccountingClient), new(*mock_accounting.MockAccountingClient)),
@@ -108,6 +115,11 @@ var MockedDataviewerClientSet = wire.NewSet(
 	wire.Bind(new(dataviewer.DataviewerClient), new(*mock_dataviewer_client.MockDataviewerClient)),
 )
 
+var MockedS3CoreSet = wire.NewSet(
+	mock_s3.NewMockCore,
+	wire.Bind(new(s3.Core), new(*mock_s3.MockCore)),
+)
+
 type Mocks struct {
 	stores           *tests.MockStores
 	components       *mockedComponents
@@ -121,6 +133,8 @@ type Mocks struct {
 	preader          *mock_preader.MockReader
 	moderationClient *mock_rpc.MockModerationSvcClient
 	dataviewerClient *mock_dataviewer_client.MockDataviewerClient
+	multiSyncClient  *mock_multisync.MockClient
+	s3Core           *mock_s3.MockCore
 }
 
 var AllMockSet = wire.NewSet(
@@ -134,12 +148,12 @@ func ProvideTestConfig() *config.Config {
 
 var MockSuperSet = wire.NewSet(
 	MockedComponentSet, AllMockSet, MockedStoreSet, MockedGitServerSet, MockedUserSvcSet,
-	MockedS3Set, MockedDeployerSet, ProvideTestConfig, MockedMirrorServerSet,
+	MockedS3Set, MockedS3CoreSet, MockedMultiSyncClientSet, MockedDeployerSet, ProvideTestConfig, MockedMirrorServerSet,
 	MockedMirrorQueueSet, MockedAccountingClientSet, MockedParquetReaderSet,
 	MockedModerationSvcClientSet, MockedDataviewerClientSet,
 )
 
-func NewTestRepoComponent(config *config.Config, stores *tests.MockStores, rpcUser rpc.UserSvcClient, gitServer gitserver.GitServer, tagComponent TagComponent, s3Client s3.Client, deployer deploy.Deployer, accountingComponent AccountingComponent, mq queue.PriorityQueue, mirrorServer mirrorserver.MirrorServer) *repoComponentImpl {
+func NewTestRepoComponent(config *config.Config, stores *tests.MockStores, rpcUser rpc.UserSvcClient, gitServer gitserver.GitServer, tagComponent TagComponent, s3Client s3.Client, deployer deploy.Deployer, accountingComponent AccountingComponent, mq queue.PriorityQueue, mirrorServer mirrorserver.MirrorServer, multiSyncClient multisync.Client) *repoComponentImpl {
 	return &repoComponentImpl{
 		userStore:              stores.User,
 		repoStore:              stores.Repo,
@@ -165,6 +179,7 @@ func NewTestRepoComponent(config *config.Config, stores *tests.MockStores, rpcUs
 		mirrorServer:           mirrorServer,
 		fileStore:              stores.File,
 		clusterInfoStore:       stores.ClusterInfo,
+		multiSyncClient:        multiSyncClient,
 	}
 }
 
@@ -280,6 +295,7 @@ func NewTestGitHTTPComponent(
 	repoComponent RepoComponent,
 	gitServer gitserver.GitServer,
 	s3Client s3.Client,
+	s3Core s3.Core,
 ) *gitHTTPComponentImpl {
 	config.APIServer.PublicDomain = "https://foo.com"
 	config.APIServer.SSHDomain = "ssh://test@127.0.0.1"
@@ -292,6 +308,7 @@ func NewTestGitHTTPComponent(
 		s3Client:           s3Client,
 		lfsMetaObjectStore: stores.LfsMetaObject,
 		lfsLockStore:       stores.LfsLock,
+		s3Core:             s3Core,
 	}
 }
 

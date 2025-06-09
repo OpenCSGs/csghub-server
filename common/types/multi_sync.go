@@ -66,3 +66,21 @@ type AllFilesResponse struct {
 	Message string `json:"msg"`
 	Data    []File `json:"data"`
 }
+
+type RemoteDiffReq struct {
+	RepoType     RepositoryType `json:"repo_type"`
+	Namespace    string         `json:"namespace"`
+	Name         string         `json:"name"`
+	LeftCommitID string         `json:"left_commit_id"`
+}
+
+type RemoteDiffs struct {
+	Added    []string `json:"added"`
+	Removed  []string `json:"removed"`
+	Modified []string `json:"modified"`
+}
+
+type RemoteDiffRespones struct {
+	Message string        `json:"msg"`
+	Data    []RemoteDiffs `json:"data"`
+}

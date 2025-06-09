@@ -19,13 +19,17 @@ import (
 	"time"
 
 	"github.com/minio/minio-go/v7"
+	ignore "github.com/sabhiram/go-gitignore"
 	"github.com/spf13/cast"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 	"opencsg.com/csghub-server/builder/deploy"
 	deployStatus "opencsg.com/csghub-server/builder/deploy/common"
 	"opencsg.com/csghub-server/builder/git"
 	"opencsg.com/csghub-server/builder/git/gitserver"
 	"opencsg.com/csghub-server/builder/git/membership"
 	"opencsg.com/csghub-server/builder/git/mirrorserver"
+	"opencsg.com/csghub-server/builder/multisync"
 	"opencsg.com/csghub-server/builder/rpc"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/builder/store/s3"
@@ -40,6 +44,7 @@ const (
 	ErrGetContentsOrList  = "GetContentsOrList"
 	AdminSecret           = "gnuRYKce"
 	GitAttributesFileName = ".gitattributes"
+	GitIgnoreFileName     = ".gitignore"
 	DefaultTreeLimit      = 500
 	MaxTreeLimit          = 10000
 	DefaultLogTreeLimit   = 25
@@ -78,6 +83,7 @@ type repoComponentImpl struct {
 	lfsMetaObjectStore     database.LfsMetaObjectStore
 	recomStore             database.RecomStore
 	mq                     queue.PriorityQueue
+	multiSyncClient        multisync.Client
 }
 
 type RepoComponent interface {
@@ -153,6 +159,9 @@ type RepoComponent interface {
 	GenerateEndpoint(ctx context.Context, deploy *database.Deploy) (string, string)
 	IsAdminRole(user database.User) bool
 	CheckAccountAndResource(ctx context.Context, userName string, clusterID string, orderDetailID int64, resource *database.SpaceResource) error
+	RemoteDiff(ctx context.Context, req types.GetDiffBetweenCommitsReq) ([]types.RemoteDiffs, error)
+	Preupload(ctx context.Context, req types.PreuploadReq) (*types.PreuploadResp, error)
+	CommitFiles(ctx context.Context, req types.CommitFilesReq) error
 }
 
 func NewRepoComponentImpl(config *config.Config) (*repoComponentImpl, error) {
@@ -225,6 +234,13 @@ func NewRepoComponent(config *config.Config) (RepoComponent, error) {
 	c.lfsMetaObjectStore = database.NewLfsMetaObjectStore()
 	c.recomStore = database.NewRecomStore()
 	c.config = config
+	syncClientSettingStore := database.NewSyncClientSettingStore()
+	setting, err := syncClientSettingStore.First(context.Background())
+	if err != nil {
+		return nil, fmt.Errorf("get sync client setting: %w", err)
+	}
+	apiDomain := config.MultiSync.SaasAPIDomain
+	c.multiSyncClient = multisync.FromOpenCSG(apiDomain, setting.Token)
 	return c, nil
 }
 
@@ -398,17 +414,19 @@ func (c *repoComponentImpl) DeleteRepo(ctx context.Context, req types.DeleteRepo
 		return nil, errors.New("user does not exist")
 	}
 
-	if namespace.NamespaceType == database.OrgNamespace {
-		canWrite, err := c.CheckCurrentUserPermission(ctx, req.Username, req.Namespace, membership.RoleAdmin)
-		if err != nil {
-			return nil, err
-		}
-		if !canWrite {
-			return nil, ErrForbiddenMsg("users do not have permission to delete repo in this organization")
-		}
-	} else {
-		if namespace.Path != user.Username {
-			return nil, ErrForbiddenMsg("users do not have permission to delete repo in this namespace")
+	if !user.CanAdmin() {
+		if namespace.NamespaceType == database.OrgNamespace {
+			canWrite, err := c.CheckCurrentUserPermission(ctx, req.Username, req.Namespace, membership.RoleAdmin)
+			if err != nil {
+				return nil, err
+			}
+			if !canWrite {
+				return nil, ErrForbiddenMsg("users do not have permission to delete repo in this organization")
+			}
+		} else {
+			if namespace.Path != user.Username {
+				return nil, ErrForbiddenMsg("users do not have permission to delete repo in this namespace")
+			}
 		}
 	}
 
@@ -423,7 +441,7 @@ func (c *repoComponentImpl) DeleteRepo(ctx context.Context, req types.DeleteRepo
 		RepoType:  req.RepoType,
 	}
 	err = c.git.DeleteRepo(ctx, deleteRepoReq)
-	if err != nil {
+	if err != nil && status.Code(err) != codes.NotFound {
 		slog.Error("fail to update repo in git ", slog.Any("req", req), slog.String("error", err.Error()))
 		return nil, fmt.Errorf("fail to delete repo in git, error: %w", err)
 	}
@@ -590,7 +608,7 @@ func (c *repoComponentImpl) CreateFile(ctx context.Context, req *types.CreateFil
 	}
 
 	if useLfs {
-		objectKey := filepath.Join("lfs", req.Pointer.RelativePath())
+		objectKey := common.BuildLfsPath(repo.ID, req.Pointer.Oid, repo.Migrated)
 		uploadInfo, err := c.s3Client.PutObject(ctx, c.config.S3.Bucket, objectKey, bytes.NewReader(req.OriginalContent), req.Pointer.Size, minio.PutObjectOptions{})
 		if err != nil {
 			return nil, fmt.Errorf("failed to upload to Minio: %w", err)
@@ -709,7 +727,7 @@ func (c *repoComponentImpl) UpdateFile(ctx context.Context, req *types.UpdateFil
 	}
 
 	if useLfs {
-		objectKey := filepath.Join("lfs", req.Pointer.RelativePath())
+		objectKey := common.BuildLfsPath(repo.ID, req.Pointer.Oid, repo.Migrated)
 		uploadInfo, err := c.s3Client.PutObject(ctx, c.config.S3.Bucket, objectKey, bytes.NewReader(req.OriginalContent), req.Pointer.Size, minio.PutObjectOptions{})
 		if err != nil {
 			return nil, fmt.Errorf("failed to upload to Minio: %w", err)
@@ -981,7 +999,7 @@ func (c *repoComponentImpl) DownloadFile(ctx context.Context, req *types.GetFile
 		req.Ref = repo.DefaultBranch
 	}
 	if req.Lfs {
-		objectKey := path.Join("lfs", req.Path)
+		objectKey := common.BuildLfsPath(repo.ID, strings.ReplaceAll(req.Path, "/", ""), repo.Migrated)
 
 		reqParams := make(url.Values)
 		if req.SaveAs != "" {
@@ -1456,8 +1474,7 @@ func (c *repoComponentImpl) SDKDownloadFile(ctx context.Context, req *types.GetF
 		if err != nil {
 			return nil, 0, "", err
 		}
-		objectKey := file.LfsRelativePath
-		objectKey = path.Join("lfs", objectKey)
+		objectKey := common.BuildLfsPath(repo.ID, file.LfsSHA256, repo.Migrated)
 		reqParams := make(url.Values)
 		if req.SaveAs != "" {
 			// allow rename when download through content-disposition header
@@ -1511,8 +1528,7 @@ func (c *repoComponentImpl) InternalDownloadFile(ctx context.Context, req *types
 		if err != nil {
 			return nil, 0, "", err
 		}
-		objectKey := file.LfsRelativePath
-		objectKey = path.Join("lfs", objectKey)
+		objectKey := common.BuildLfsPath(repo.ID, file.LfsSHA256, repo.Migrated)
 		reqParams := make(url.Values)
 		if req.SaveAs != "" {
 			// allow rename when download through content-disposition header
@@ -3033,6 +3049,173 @@ func (c *repoComponentImpl) checkIfShouldUseLfsUpdate(ctx context.Context, req *
 	return true, req
 }
 
+func (c *repoComponentImpl) RemoteDiff(ctx context.Context, req types.GetDiffBetweenCommitsReq) ([]types.RemoteDiffs, error) {
+	return c.multiSyncClient.Diff(ctx, types.RemoteDiffReq{
+		RepoType:     req.RepoType,
+		Namespace:    req.Namespace,
+		Name:         req.Name,
+		LeftCommitID: req.LeftCommitID,
+	})
+}
+
+func (c *repoComponentImpl) Preupload(ctx context.Context, req types.PreuploadReq) (*types.PreuploadResp, error) {
+	var (
+		resp               types.PreuploadResp
+		filePathOidMapping = make(map[string]*types.File)
+	)
+	repo, err := c.repoStore.FindByPath(ctx, req.RepoType, req.Namespace, req.Name)
+	if err != nil {
+		return nil, fmt.Errorf("failed to find repo, err: %w", err)
+	}
+	if repo == nil {
+		return nil, errors.New("repo not found")
+	}
+
+	permission, err := c.GetUserRepoPermission(ctx, req.CurrentUser, repo)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get user repo permission, error: %w", err)
+	}
+	if !permission.CanWrite {
+		return nil, ErrForbiddenMsg("users do not have permission to get diff bewtween two commits in this repo")
+	}
+
+	existFiles, err := getAllFiles(ctx, req.Namespace, req.Name, "", req.RepoType, req.Revision, c.git.GetTree)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get repo files, err: %w", err)
+	}
+
+	for _, file := range existFiles {
+		filePathOidMapping[file.Path] = file
+	}
+
+	gFile, err := c.git.GetRepoFileContents(ctx, gitserver.GetRepoInfoByPathReq{
+		RepoType:  req.RepoType,
+		Namespace: req.Namespace,
+		Name:      req.Name,
+		Ref:       req.Revision,
+		Path:      GitAttributesFileName,
+	})
+	if err != nil && status.Code(err) != codes.InvalidArgument {
+		return nil, fmt.Errorf("failed to get gitattributes file, err: %w", err)
+	}
+
+	var sourceGContent string
+	if gFile != nil {
+		sourceGContent = gFile.Content
+	}
+	gContent, _ := base64.StdEncoding.DecodeString(sourceGContent)
+	attributes := parseGitattributesContent(string(gContent))
+
+	iFile, err := c.git.GetRepoFileContents(ctx, gitserver.GetRepoInfoByPathReq{
+		RepoType:  req.RepoType,
+		Namespace: req.Namespace,
+		Name:      req.Name,
+		Ref:       req.Revision,
+		Path:      GitIgnoreFileName,
+	})
+	code := status.Code(err)
+	if err != nil && code != codes.InvalidArgument {
+		return nil, fmt.Errorf("failed to get .gitignore file, err: %w", err)
+	}
+
+	var sourceIContent string
+	if iFile != nil {
+		sourceIContent = iFile.Content
+	}
+
+	iContent, _ := base64.StdEncoding.DecodeString(sourceIContent)
+	ig := ignore.CompileIgnoreLines(string(iContent))
+
+	for _, file := range req.Files {
+		var (
+			uploadMode types.UploadMode
+			oid        string
+			isDir      bool
+		)
+		fileName := filepath.Base(file.Path)
+		if shouldUseLFS(fileName, attributes) || file.Size > c.config.Git.MaxUnLfsFileSize {
+			uploadMode = types.UploadModeLFS
+		} else {
+			uploadMode = types.UploadModeRegular
+		}
+		if file, ok := filePathOidMapping[file.Path]; ok {
+			if file.Lfs {
+				oid = file.LfsSHA256
+			} else {
+				oid = file.SHA
+			}
+		}
+		for k := range filePathOidMapping {
+			if strings.HasPrefix(k, fmt.Sprintf("%s/", file.Path)) {
+				isDir = true
+				break
+			}
+		}
+		resp.Files = append(resp.Files, types.PreuploadRespFile{
+			Path:         file.Path,
+			UploadMode:   uploadMode,
+			OID:          oid,
+			ShouldIgnore: ig.MatchesPath(file.Path),
+			IsDir:        isDir,
+		})
+	}
+
+	return &resp, nil
+}
+
+func (c *repoComponentImpl) CommitFiles(ctx context.Context, req types.CommitFilesReq) error {
+	var files []gitserver.CommitFile
+	repo, err := c.repoStore.FindByPath(ctx, req.RepoType, req.Namespace, req.Name)
+	if err != nil {
+		return fmt.Errorf("failed to find repo, err: %w", err)
+	}
+	if repo == nil {
+		return errors.New("repo not found")
+	}
+
+	permission, err := c.GetUserRepoPermission(ctx, req.CurrentUser, repo)
+	if err != nil {
+		return fmt.Errorf("failed to get user repo permission, error: %w", err)
+	}
+	if !permission.CanWrite {
+		return ErrForbiddenMsg("users do not have permission to get diff bewtween two commits in this repo")
+	}
+
+	user, err := c.userStore.FindByUsername(ctx, req.CurrentUser)
+	if err != nil {
+		return fmt.Errorf("failed to find user, err: %w", err)
+	}
+	for _, file := range req.Files {
+		var action gitserver.CommitAction
+		if file.Action == types.CommitActionCreate {
+			action = gitserver.CommitActionCreate
+		} else if file.Action == types.CommitActionUpdate {
+			action = gitserver.CommitActionUpdate
+		} else if file.Action == types.CommitActionDelete {
+			action = gitserver.CommitActionDelete
+		} else {
+			return fmt.Errorf("invalid action: %s", file.Action)
+		}
+		files = append(files, gitserver.CommitFile{
+			Path:    file.Path,
+			Content: cleanBase64(file.Content),
+			Action:  action,
+		})
+	}
+
+	err = c.git.CommitFiles(ctx, gitserver.CommitFilesReq{
+		Namespace: req.Namespace,
+		Name:      req.Name,
+		RepoType:  string(req.RepoType),
+		Revision:  req.Revision,
+		Username:  user.Username,
+		Email:     user.Email,
+		Message:   req.Message,
+		Files:     files,
+	})
+	return err
+}
+
 func parseGitattributesContent(content string) map[string][]string {
 	attributes := make(map[string][]string)
 	scanner := bufio.NewScanner(strings.NewReader(content))
@@ -3085,4 +3268,28 @@ size %d
 	}
 
 	return &pointer, encodingContent
+}
+
+func sanitizeBase64(input string) string {
+	var sb strings.Builder
+	for i := 0; i < len(input); i++ {
+		c := input[i]
+		if (c >= 'A' && c <= 'Z') ||
+			(c >= 'a' && c <= 'z') ||
+			(c >= '0' && c <= '9') ||
+			c == '+' || c == '/' || c == '=' {
+			sb.WriteByte(c)
+		}
+	}
+	return sb.String()
+}
+
+func cleanBase64(input string) string {
+	cleaned := sanitizeBase64(input)
+
+	cleaned = strings.ReplaceAll(cleaned, "=", "")
+	if m := len(cleaned) % 4; m != 0 {
+		cleaned += strings.Repeat("=", 4-m)
+	}
+	return cleaned
 }

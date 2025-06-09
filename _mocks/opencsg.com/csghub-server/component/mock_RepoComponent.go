@@ -731,6 +731,53 @@ func (_c *MockRepoComponent_CheckCurrentUserPermission_Call) RunAndReturn(run fu
 	return _c
 }
 
+// CommitFiles provides a mock function with given fields: ctx, req
+func (_m *MockRepoComponent) CommitFiles(ctx context.Context, req types.CommitFilesReq) error {
+	ret := _m.Called(ctx, req)
+
+	if len(ret) == 0 {
+		panic("no return value specified for CommitFiles")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, types.CommitFilesReq) error); ok {
+		r0 = rf(ctx, req)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// MockRepoComponent_CommitFiles_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'CommitFiles'
+type MockRepoComponent_CommitFiles_Call struct {
+	*mock.Call
+}
+
+// CommitFiles is a helper method to define mock.On call
+//   - ctx context.Context
+//   - req types.CommitFilesReq
+func (_e *MockRepoComponent_Expecter) CommitFiles(ctx interface{}, req interface{}) *MockRepoComponent_CommitFiles_Call {
+	return &MockRepoComponent_CommitFiles_Call{Call: _e.mock.On("CommitFiles", ctx, req)}
+}
+
+func (_c *MockRepoComponent_CommitFiles_Call) Run(run func(ctx context.Context, req types.CommitFilesReq)) *MockRepoComponent_CommitFiles_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(types.CommitFilesReq))
+	})
+	return _c
+}
+
+func (_c *MockRepoComponent_CommitFiles_Call) Return(_a0 error) *MockRepoComponent_CommitFiles_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockRepoComponent_CommitFiles_Call) RunAndReturn(run func(context.Context, types.CommitFilesReq) error) *MockRepoComponent_CommitFiles_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // Commits provides a mock function with given fields: ctx, req
 func (_m *MockRepoComponent) Commits(ctx context.Context, req *types.GetCommitsReq) ([]types.Commit, *types.RepoPageOpts, error) {
 	ret := _m.Called(ctx, req)
@@ -2810,6 +2857,65 @@ func (_c *MockRepoComponent_MirrorFromSaas_Call) RunAndReturn(run func(context.C
 	return _c
 }
 
+// Preupload provides a mock function with given fields: ctx, req
+func (_m *MockRepoComponent) Preupload(ctx context.Context, req types.PreuploadReq) (*types.PreuploadResp, error) {
+	ret := _m.Called(ctx, req)
+
+	if len(ret) == 0 {
+		panic("no return value specified for Preupload")
+	}
+
+	var r0 *types.PreuploadResp
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, types.PreuploadReq) (*types.PreuploadResp, error)); ok {
+		return rf(ctx, req)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, types.PreuploadReq) *types.PreuploadResp); ok {
+		r0 = rf(ctx, req)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*types.PreuploadResp)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, types.PreuploadReq) error); ok {
+		r1 = rf(ctx, req)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockRepoComponent_Preupload_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'Preupload'
+type MockRepoComponent_Preupload_Call struct {
+	*mock.Call
+}
+
+// Preupload is a helper method to define mock.On call
+//   - ctx context.Context
+//   - req types.PreuploadReq
+func (_e *MockRepoComponent_Expecter) Preupload(ctx interface{}, req interface{}) *MockRepoComponent_Preupload_Call {
+	return &MockRepoComponent_Preupload_Call{Call: _e.mock.On("Preupload", ctx, req)}
+}
+
+func (_c *MockRepoComponent_Preupload_Call) Run(run func(ctx context.Context, req types.PreuploadReq)) *MockRepoComponent_Preupload_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(types.PreuploadReq))
+	})
+	return _c
+}
+
+func (_c *MockRepoComponent_Preupload_Call) Return(_a0 *types.PreuploadResp, _a1 error) *MockRepoComponent_Preupload_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockRepoComponent_Preupload_Call) RunAndReturn(run func(context.Context, types.PreuploadReq) (*types.PreuploadResp, error)) *MockRepoComponent_Preupload_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // PublicToUser provides a mock function with given fields: ctx, repoType, userName, filter, per, page
 func (_m *MockRepoComponent) PublicToUser(ctx context.Context, repoType types.RepositoryType, userName string, filter *types.RepoFilter, per int, page int) ([]*database.Repository, int, error) {
 	ret := _m.Called(ctx, repoType, userName, filter, per, page)
@@ -2936,6 +3042,65 @@ func (_c *MockRepoComponent_RelatedRepos_Call) Return(_a0 map[types.RepositoryTy
 }
 
 func (_c *MockRepoComponent_RelatedRepos_Call) RunAndReturn(run func(context.Context, int64, string) (map[types.RepositoryType][]*database.Repository, error)) *MockRepoComponent_RelatedRepos_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// RemoteDiff provides a mock function with given fields: ctx, req
+func (_m *MockRepoComponent) RemoteDiff(ctx context.Context, req types.GetDiffBetweenCommitsReq) ([]types.RemoteDiffs, error) {
+	ret := _m.Called(ctx, req)
+
+	if len(ret) == 0 {
+		panic("no return value specified for RemoteDiff")
+	}
+
+	var r0 []types.RemoteDiffs
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, types.GetDiffBetweenCommitsReq) ([]types.RemoteDiffs, error)); ok {
+		return rf(ctx, req)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, types.GetDiffBetweenCommitsReq) []types.RemoteDiffs); ok {
+		r0 = rf(ctx, req)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]types.RemoteDiffs)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, types.GetDiffBetweenCommitsReq) error); ok {
+		r1 = rf(ctx, req)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockRepoComponent_RemoteDiff_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'RemoteDiff'
+type MockRepoComponent_RemoteDiff_Call struct {
+	*mock.Call
+}
+
+// RemoteDiff is a helper method to define mock.On call
+//   - ctx context.Context
+//   - req types.GetDiffBetweenCommitsReq
+func (_e *MockRepoComponent_Expecter) RemoteDiff(ctx interface{}, req interface{}) *MockRepoComponent_RemoteDiff_Call {
+	return &MockRepoComponent_RemoteDiff_Call{Call: _e.mock.On("RemoteDiff", ctx, req)}
+}
+
+func (_c *MockRepoComponent_RemoteDiff_Call) Run(run func(ctx context.Context, req types.GetDiffBetweenCommitsReq)) *MockRepoComponent_RemoteDiff_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(types.GetDiffBetweenCommitsReq))
+	})
+	return _c
+}
+
+func (_c *MockRepoComponent_RemoteDiff_Call) Return(_a0 []types.RemoteDiffs, _a1 error) *MockRepoComponent_RemoteDiff_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockRepoComponent_RemoteDiff_Call) RunAndReturn(run func(context.Context, types.GetDiffBetweenCommitsReq) ([]types.RemoteDiffs, error)) *MockRepoComponent_RemoteDiff_Call {
 	_c.Call.Return(run)
 	return _c
 }

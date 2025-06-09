@@ -227,3 +227,74 @@ const (
 	// dont allow to preview because file content is not text
 	FilePreviewCodeNotText
 )
+
+type GetDiffBetweenCommitsReq struct {
+	Namespace     string         `json:"namespace"`
+	Name          string         `json:"name"`
+	RepoType      RepositoryType `json:"repo_type"`
+	LeftCommitID  string         `json:"left_commit_id"`
+	RightCommitID string         `json:"right_commit_id"`
+	CurrentUser   string         `json:"current_user"`
+}
+
+type PreuploadReq struct {
+	Namespace   string          `json:"-"`
+	Name        string          `json:"-"`
+	RepoType    RepositoryType  `json:"-"`
+	Revision    string          `json:"-"`
+	CurrentUser string          `json:"-"`
+	Files       []PreuploadFile `json:"files"`
+}
+
+type PreuploadFile struct {
+	Path   string `json:"path"`
+	Sample string `json:"sample"`
+	Size   int64  `json:"size"`
+}
+
+type PreuploadResp struct {
+	Files []PreuploadRespFile `json:"files"`
+}
+
+type PreuploadRespFile struct {
+	OID          string     `json:"oid"`
+	Path         string     `json:"path"`
+	UploadMode   UploadMode `json:"uploadMode"`
+	ShouldIgnore bool       `json:"shouldIgnore"`
+	IsDir        bool       `json:"isDir"`
+}
+
+type UploadMode string
+
+const (
+	UploadModeRegular UploadMode = "regular"
+	UploadModeLFS     UploadMode = "lfs"
+)
+
+type CommitFilesReq struct {
+	Namespace   string          `json:"-"`
+	Name        string          `json:"-"`
+	RepoType    RepositoryType  `json:"-"`
+	Revision    string          `json:"-"`
+	CurrentUser string          `json:"-"`
+	Message     string          `json:"message"`
+	Files       []CommitFileReq `json:"files"`
+}
+
+type CommitFileReq struct {
+	Path    string       `json:"path"`
+	Action  CommitAction `json:"action"`
+	Content string       `json:"content"`
+}
+
+type CommitAction string
+
+const (
+	CommitActionCreate CommitAction = "create"
+	CommitActionUpdate CommitAction = "update"
+	CommitActionDelete CommitAction = "delete"
+)
+
+type CommitFilesResp struct {
+	Files []string `json:"files"`
+}

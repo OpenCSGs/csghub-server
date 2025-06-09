@@ -11,6 +11,7 @@ import (
 
 	"github.com/alibabacloud-go/tea/tea"
 	"github.com/minio/minio-go/v7"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"opencsg.com/csghub-server/builder/deploy"
@@ -699,7 +700,7 @@ func TestRepoComponent_InternalDownloadFile(t *testing.T) {
 			repo.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, types.ModelRepo, "ns", "n").Return(
 				mockedRepo, nil,
 			)
-			file := &types.File{Name: "zzz"}
+			file := &types.File{Name: "zzz", LfsSHA256: "abcdefghi"}
 			repo.mocks.gitServer.EXPECT().GetRepoFileContents(ctx, gitserver.GetRepoInfoByPathReq{
 				Namespace: "ns",
 				Name:      "n",
@@ -712,7 +713,7 @@ func TestRepoComponent_InternalDownloadFile(t *testing.T) {
 				reqParams := make(url.Values)
 				reqParams.Set("response-content-disposition", fmt.Sprintf("attachment;filename=%s", "zzz"))
 				repo.mocks.s3Client.EXPECT().PresignedGetObject(
-					ctx, repo.lfsBucket, "lfs", types.OssFileExpire, reqParams,
+					ctx, repo.lfsBucket, "lfs/ab/cd/efghi", types.OssFileExpire, reqParams,
 				).Return(&url.URL{Path: "foobar"}, nil)
 			} else {
 				repo.mocks.gitServer.EXPECT().GetRepoFileReader(ctx, gitserver.GetRepoInfoByPathReq{
@@ -817,12 +818,12 @@ func TestRepoComponent_SDKDownloadFile(t *testing.T) {
 					Ref:       "main",
 					Path:      "path",
 					RepoType:  types.ModelRepo,
-				}).Return(&types.File{LfsRelativePath: "qqq"}, nil)
+				}).Return(&types.File{LfsRelativePath: "qqq", LfsSHA256: "123456"}, nil)
 
 				reqParams := make(url.Values)
 				reqParams.Set("response-content-disposition", fmt.Sprintf("attachment;filename=%s", "zzz"))
 				repo.mocks.s3Client.EXPECT().PresignedGetObject(
-					ctx, repo.lfsBucket, "lfs/qqq", ossFileExpire, reqParams,
+					ctx, repo.lfsBucket, "lfs/12/34/56", ossFileExpire, reqParams,
 				).Return(&url.URL{Path: "foobar"}, nil)
 			} else {
 				repo.mocks.gitServer.EXPECT().GetRepoFileReader(ctx, gitserver.GetRepoInfoByPathReq{
@@ -2157,4 +2158,233 @@ func TestRepoComponent_LogsTreeRemote(t *testing.T) {
 		req.Offset += 1
 	}
 	require.Equal(t, []*types.CommitForTree{{Message: "m1"}, {Message: "m2"}}, commits)
+}
+
+func TestRepoComponent_RemoteDiff(t *testing.T) {
+	ctx := context.TODO()
+	repoComp := initializeTestRepoComponent(ctx, t)
+
+	req := types.RemoteDiffReq{
+		Namespace:    "test-namespace",
+		Name:         "test-repo",
+		RepoType:     types.ModelRepo,
+		LeftCommitID: "left-commit-id",
+	}
+
+	resp := []types.RemoteDiffs{
+		{
+			Added:    []string{"file1"},
+			Removed:  []string{"file2"},
+			Modified: []string{"file3"},
+		},
+	}
+
+	repoComp.mocks.multiSyncClient.EXPECT().Diff(ctx, req).Return(resp, nil)
+
+	req1 := types.GetDiffBetweenCommitsReq{
+		Namespace:    "test-namespace",
+		Name:         "test-repo",
+		RepoType:     types.ModelRepo,
+		LeftCommitID: "left-commit-id",
+	}
+	res, err := repoComp.RemoteDiff(ctx, req1)
+	require.Nil(t, err)
+	assert.Equal(t, resp, res)
+}
+
+func TestRepoComponent_Preupload(t *testing.T) {
+	ctx := context.TODO()
+	repoComp := initializeTestRepoComponent(ctx, t)
+	repoComp.config.Git.MaxUnLfsFileSize = 100000
+
+	user := database.User{}
+	user.Username = "user_name"
+	repoComp.mocks.stores.UserMock().EXPECT().FindByUsername(mock.Anything, user.Username).Return(user, nil)
+
+	ns := database.Namespace{}
+	ns.NamespaceType = "user"
+	ns.Path = "user_name"
+	repoComp.mocks.stores.NamespaceMock().EXPECT().FindByPath(mock.Anything, ns.Path).Return(ns, nil)
+
+	repo := &database.Repository{
+		ID:      1,
+		Private: true,
+		User:    user,
+		Path:    fmt.Sprintf("%s/%s", ns.Path, "repo_name"),
+		Source:  types.OpenCSGSource,
+	}
+
+	req := types.PreuploadReq{
+		Namespace:   ns.Path,
+		Name:        repo.Name,
+		RepoType:    types.ModelRepo,
+		Revision:    "revision",
+		CurrentUser: user.Username,
+		Files: []types.PreuploadFile{
+			{
+				Path:   "a.go",
+				Sample: "",
+				Size:   123,
+			},
+			{
+				Path:   "b.example",
+				Sample: "",
+				Size:   1234,
+			},
+			{
+				Path:   "c.parquet",
+				Sample: "",
+				Size:   123,
+			},
+			{
+				Path:   "c.txt",
+				Sample: "",
+				Size:   10000000000,
+			},
+			{
+				Path:   "dir",
+				Sample: "",
+				Size:   100,
+			},
+		},
+	}
+
+	repoComp.mocks.stores.RepoMock().EXPECT().FindByPath(mock.Anything, types.ModelRepo, ns.Path, repo.Name).Return(repo, nil)
+	repoComp.mocks.gitServer.EXPECT().GetTree(mock.Anything, mock.Anything).Return(&types.GetRepoFileTreeResp{
+		Files: []*types.File{
+			{
+				Path: "a.go",
+				SHA:  "sha",
+			},
+			{
+				Path: "dir/a.go",
+				SHA:  "sha",
+			},
+		},
+		Cursor: "",
+	}, nil)
+
+	content := `
+*.parquet filter=lfs diff=lfs merge=lfs -text
+`
+	encodedContent := base64.StdEncoding.EncodeToString([]byte(content))
+	repoComp.mocks.gitServer.EXPECT().GetRepoFileContents(mock.Anything, gitserver.GetRepoInfoByPathReq{
+		RepoType:  req.RepoType,
+		Namespace: req.Namespace,
+		Name:      req.Name,
+		Ref:       req.Revision,
+		Path:      GitAttributesFileName,
+	}).Return(&types.File{
+		Content: encodedContent,
+	}, nil)
+
+	ignoreContent := `*.example`
+
+	encodedIgnoreContent := base64.StdEncoding.EncodeToString([]byte(ignoreContent))
+	repoComp.mocks.gitServer.EXPECT().GetRepoFileContents(mock.Anything, gitserver.GetRepoInfoByPathReq{
+		RepoType:  req.RepoType,
+		Namespace: req.Namespace,
+		Name:      req.Name,
+		Ref:       req.Revision,
+		Path:      GitIgnoreFileName,
+	}).Return(&types.File{
+		Content: encodedIgnoreContent,
+	}, nil)
+
+	res, err := repoComp.Preupload(ctx, req)
+	require.Equal(t, nil, err)
+	require.Equal(t, &types.PreuploadResp{
+		Files: []types.PreuploadRespFile{
+			{
+				OID:          "sha",
+				Path:         "a.go",
+				ShouldIgnore: false,
+				UploadMode:   types.UploadModeRegular,
+			},
+			{
+				OID:          "",
+				Path:         "b.example",
+				ShouldIgnore: true,
+				UploadMode:   types.UploadModeRegular,
+			},
+			{
+				OID:          "",
+				Path:         "c.parquet",
+				ShouldIgnore: false,
+				UploadMode:   types.UploadModeLFS,
+			},
+			{
+				OID:          "",
+				Path:         "c.txt",
+				ShouldIgnore: false,
+				UploadMode:   types.UploadModeLFS,
+			},
+			{
+				OID:          "",
+				Path:         "dir",
+				ShouldIgnore: false,
+				UploadMode:   types.UploadModeRegular,
+				IsDir:        true,
+			},
+		},
+	}, res)
+}
+
+func TestRepoComponent_CommitFiles(t *testing.T) {
+	ctx := context.TODO()
+	repoComp := initializeTestRepoComponent(ctx, t)
+
+	user := database.User{}
+	user.Username = "user_name"
+	repoComp.mocks.stores.UserMock().EXPECT().FindByUsername(mock.Anything, user.Username).Return(user, nil)
+
+	ns := database.Namespace{}
+	ns.NamespaceType = "user"
+	ns.Path = "user_name"
+	repoComp.mocks.stores.NamespaceMock().EXPECT().FindByPath(mock.Anything, ns.Path).Return(ns, nil)
+
+	repo := &database.Repository{
+		ID:      1,
+		Private: true,
+		User:    user,
+		Path:    fmt.Sprintf("%s/%s", ns.Path, "repo_name"),
+		Source:  types.OpenCSGSource,
+	}
+
+	req := types.CommitFilesReq{
+		Namespace:   ns.Path,
+		Name:        repo.Name,
+		RepoType:    types.ModelRepo,
+		Revision:    "revision",
+		CurrentUser: user.Username,
+		Message:     "msg",
+		Files: []types.CommitFileReq{
+			{
+				Path:    "a.go",
+				Action:  types.CommitActionCreate,
+				Content: "content",
+			},
+		},
+	}
+
+	repoComp.mocks.stores.RepoMock().EXPECT().FindByPath(mock.Anything, types.ModelRepo, ns.Path, repo.Name).Return(repo, nil)
+	repoComp.mocks.gitServer.EXPECT().CommitFiles(mock.Anything, gitserver.CommitFilesReq{
+		Namespace: req.Namespace,
+		Name:      req.Name,
+		RepoType:  string(req.RepoType),
+		Revision:  req.Revision,
+		Username:  user.Username,
+		Email:     user.Email,
+		Message:   req.Message,
+		Files: []gitserver.CommitFile{
+			{
+				Path:    "a.go",
+				Content: "content=",
+				Action:  gitserver.CommitActionCreate,
+			},
+		},
+	}).Return(nil)
+
+	err := repoComp.CommitFiles(ctx, req)
+	require.Equal(t, nil, err)
 }

@@ -4,6 +4,8 @@ package s3
 
 import (
 	context "context"
+	http "net/http"
+
 	io "io"
 
 	minio "github.com/minio/minio-go/v7"
@@ -143,6 +145,70 @@ func (_c *MockClient_GetObject_Call) Return(_a0 *minio.Object, _a1 error) *MockC
 }
 
 func (_c *MockClient_GetObject_Call) RunAndReturn(run func(context.Context, string, string, minio.GetObjectOptions) (*minio.Object, error)) *MockClient_GetObject_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// PresignHeader provides a mock function with given fields: ctx, method, bucketName, objectName, expires, reqParams, extraHeaders
+func (_m *MockClient) PresignHeader(ctx context.Context, method string, bucketName string, objectName string, expires time.Duration, reqParams url.Values, extraHeaders http.Header) (*url.URL, error) {
+	ret := _m.Called(ctx, method, bucketName, objectName, expires, reqParams, extraHeaders)
+
+	if len(ret) == 0 {
+		panic("no return value specified for PresignHeader")
+	}
+
+	var r0 *url.URL
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, string, time.Duration, url.Values, http.Header) (*url.URL, error)); ok {
+		return rf(ctx, method, bucketName, objectName, expires, reqParams, extraHeaders)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, string, time.Duration, url.Values, http.Header) *url.URL); ok {
+		r0 = rf(ctx, method, bucketName, objectName, expires, reqParams, extraHeaders)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*url.URL)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string, string, string, time.Duration, url.Values, http.Header) error); ok {
+		r1 = rf(ctx, method, bucketName, objectName, expires, reqParams, extraHeaders)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockClient_PresignHeader_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'PresignHeader'
+type MockClient_PresignHeader_Call struct {
+	*mock.Call
+}
+
+// PresignHeader is a helper method to define mock.On call
+//   - ctx context.Context
+//   - method string
+//   - bucketName string
+//   - objectName string
+//   - expires time.Duration
+//   - reqParams url.Values
+//   - extraHeaders http.Header
+func (_e *MockClient_Expecter) PresignHeader(ctx interface{}, method interface{}, bucketName interface{}, objectName interface{}, expires interface{}, reqParams interface{}, extraHeaders interface{}) *MockClient_PresignHeader_Call {
+	return &MockClient_PresignHeader_Call{Call: _e.mock.On("PresignHeader", ctx, method, bucketName, objectName, expires, reqParams, extraHeaders)}
+}
+
+func (_c *MockClient_PresignHeader_Call) Run(run func(ctx context.Context, method string, bucketName string, objectName string, expires time.Duration, reqParams url.Values, extraHeaders http.Header)) *MockClient_PresignHeader_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(string), args[2].(string), args[3].(string), args[4].(time.Duration), args[5].(url.Values), args[6].(http.Header))
+	})
+	return _c
+}
+
+func (_c *MockClient_PresignHeader_Call) Return(u *url.URL, err error) *MockClient_PresignHeader_Call {
+	_c.Call.Return(u, err)
+	return _c
+}
+
+func (_c *MockClient_PresignHeader_Call) RunAndReturn(run func(context.Context, string, string, string, time.Duration, url.Values, http.Header) (*url.URL, error)) *MockClient_PresignHeader_Call {
 	_c.Call.Return(run)
 	return _c
 }
