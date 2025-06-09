@@ -63,6 +63,7 @@ func TestServiceComponent_RunService(t *testing.T) {
 		},
 		Annotation: map[string]string{},
 	}
+	kss.EXPECT().Add(mock.Anything, mock.Anything).Return(nil)
 	err := sc.RunService(ctx, req)
 	require.Nil(t, err)
 }
@@ -113,6 +114,7 @@ func TestServiceComponent_StopService(t *testing.T) {
 		},
 		Annotation: map[string]string{},
 	}
+	kss.EXPECT().Add(mock.Anything, mock.Anything).Return(nil)
 	err := sc.RunService(ctx, req)
 	require.Nil(t, err)
 	cis.EXPECT().ByClusterID(ctx, "test").Return(database.ClusterInfo{
@@ -176,6 +178,7 @@ func TestServiceComponent_PurgeService(t *testing.T) {
 		},
 		Annotation: map[string]string{},
 	}
+	kss.EXPECT().Add(mock.Anything, mock.Anything).Return(nil)
 	err := sc.RunService(ctx, req)
 	require.Nil(t, err)
 	cis.EXPECT().ByClusterID(ctx, "test").Return(database.ClusterInfo{
@@ -238,6 +241,7 @@ func TestServiceComponent_UpdateService(t *testing.T) {
 		},
 		Annotation: map[string]string{},
 	}
+	kss.EXPECT().Add(mock.Anything, mock.Anything).Return(nil)
 	err := sc.RunService(ctx, req)
 	require.Nil(t, err)
 	cis.EXPECT().ByClusterID(ctx, "test").Return(database.ClusterInfo{
@@ -307,6 +311,7 @@ func TestServiceComponent_GetServicePodWithStatus(t *testing.T) {
 		},
 		Annotation: map[string]string{},
 	}
+	kss.EXPECT().Add(mock.Anything, mock.Anything).Return(nil)
 	err := sc.RunService(ctx, req)
 	require.Nil(t, err)
 	_, err = sc.GetServicePodsWithStatus(ctx, pool.Clusters[0], "test", "test")
@@ -357,6 +362,7 @@ func TestServiceComponent_GetAllStatus(t *testing.T) {
 		},
 		Annotation: map[string]string{},
 	}
+	kss.EXPECT().Add(mock.Anything, mock.Anything).Return(nil)
 	err := sc.RunService(ctx, req)
 	require.Nil(t, err)
 	kss.EXPECT().GetByCluster(ctx, "test").Return([]database.KnativeService{
@@ -416,6 +422,7 @@ func TestServiceComponent_GetServiceByName(t *testing.T) {
 		},
 		Annotation: map[string]string{},
 	}
+	kss.EXPECT().Add(mock.Anything, mock.Anything).Return(nil)
 	err := sc.RunService(ctx, req)
 	require.Nil(t, err)
 	kss.EXPECT().Get(ctx, "test", "test").Return(&database.KnativeService{
@@ -473,6 +480,7 @@ func TestServiceComponent_GetServiceInfo(t *testing.T) {
 		},
 		Annotation: map[string]string{},
 	}
+	kss.EXPECT().Add(mock.Anything, mock.Anything).Return(nil)
 	err := sc.RunService(ctx, req)
 	require.Nil(t, err)
 	kss.EXPECT().Get(ctx, "test", "test").Return(&database.KnativeService{
@@ -534,6 +542,7 @@ func TestServiceComponent_AddServiceInDB(t *testing.T) {
 		Annotation: map[string]string{},
 	}
 	ctx := context.TODO()
+	kss.EXPECT().Add(mock.Anything, mock.Anything).Return(nil)
 	err := sc.RunService(ctx, req)
 	require.Nil(t, err)
 	cis.EXPECT().ByClusterID(mock.Anything, "test").Return(database.ClusterInfo{
@@ -594,6 +603,7 @@ func TestServiceComponent_updateServiceInDB(t *testing.T) {
 		},
 		Annotation: map[string]string{},
 	}
+	kss.EXPECT().Add(mock.Anything, mock.Anything).Return(nil)
 	ctx := context.TODO()
 	err := sc.RunService(ctx, req)
 	require.Nil(t, err)
@@ -672,6 +682,7 @@ func TestServiceComponent_deleteServiceInDB2(t *testing.T) {
 		Annotation: map[string]string{},
 	}
 	ctx := context.TODO()
+	kss.EXPECT().Add(mock.Anything, mock.Anything).Return(nil)
 	err = sc.RunService(ctx, req)
 	require.Nil(t, err)
 	ksvc, err := knativeClient.ServingV1().Services("test").

@@ -374,7 +374,7 @@ func (t *DeployRunner) makeDeployEnv(
 
 	if deploy.Type == types.FinetuneType {
 		envMap["port"] = strconv.Itoa(deploy.ContainerPort)
-		envMap["HF_ENDPOINT"], _ = url.JoinPath(t.deployCfg.ModelDownloadEndpoint, "hf")
+		envMap["HF_ENDPOINT"], _ = url.JoinPath(t.deployCfg.ModelDownloadEndpoint, "csg")
 		envMap["HF_TOKEN"] = token.Token
 		envMap["USE_CSGHUB_MODEL"] = "1"
 		envMap["USE_CSGHUB_DATASET"] = "1"

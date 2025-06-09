@@ -129,7 +129,7 @@ func TestRuntimeArchComponent_GetSafetensorsContent(t *testing.T) {
 	for i := 1; i <= 4; i++ {
 		fileList = append(fileList, fmt.Sprintf("https://hub.opencsg.com/csg/Qwen/Qwen2.5-7B-Instruct/resolve/main/model-%05d-of-00004.safetensors", i))
 	}
-	modelInfo, err := common.GetModelInfo(fileList, "", 5120)
+	modelInfo, err := common.GetModelInfo(fileList, 5120)
 	require.Nil(t, err)
 	modelInfo.HiddenSize = 3584
 	modelInfo.NumHiddenLayers = 28
@@ -140,6 +140,36 @@ func TestRuntimeArchComponent_GetSafetensorsContent(t *testing.T) {
 	require.Equal(t, "BF16", modelInfo.TensorType)
 	require.Equal(t, float32(7.62), modelInfo.ParamsBillions)
 	require.Equal(t, 22, int(modelInfo.MiniGPUMemoryGB))
+}
+
+func TestRuntimeArchComponent_GetGPUMemoryForFinetune(t *testing.T) {
+	fileList := []string{}
+	//fileList append from 00001 to model-00001-of-00004.safetensors
+	for i := 1; i <= 4; i++ {
+		fileList = append(fileList, fmt.Sprintf("https://hub.opencsg.com/csg/Qwen/Qwen2-7B-Instruct/resolve/main/model-%05d-of-00004.safetensors", i))
+	}
+	modelInfo, err := common.GetModelInfo(fileList, 512)
+	require.Nil(t, err)
+	modelInfo.HiddenSize = 3584
+	modelInfo.NumHiddenLayers = 28
+	modelInfo.NumAttentionHeads = 28
+	modelInfo.BatchSize = 16
+	kvcacheSize := common.GetKvCacheSize(modelInfo.ContextSize, modelInfo.BatchSize, modelInfo.HiddenSize, modelInfo.NumHiddenLayers, modelInfo.BytesPerParam)
+	activateMemory := common.GetActivationMemory(modelInfo.BatchSize, modelInfo.ContextSize, modelInfo.NumHiddenLayers, modelInfo.HiddenSize, modelInfo.NumAttentionHeads, modelInfo.BytesPerParam)
+	modelInfo.MiniGPUMemoryGB = kvcacheSize + modelInfo.ModelWeightsGB + activateMemory
+	modelInfo.MiniGPUFinetuneGB = common.GetLoRAFinetuneMemory(modelInfo.ModelWeightsGB,
+		modelInfo.ParamsBillions*1e9,
+		modelInfo.BatchSize,
+		modelInfo.ContextSize,
+		modelInfo.HiddenSize,
+		modelInfo.NumHiddenLayers,
+		modelInfo.NumAttentionHeads,
+		modelInfo.BytesPerParam,
+		16)
+	require.Equal(t, "BF16", modelInfo.TensorType)
+	require.Equal(t, float32(7.62), modelInfo.ParamsBillions)
+	require.Equal(t, 19, int(modelInfo.MiniGPUMemoryGB))
+	require.Equal(t, 18, int(modelInfo.MiniGPUFinetuneGB))
 }
 
 func TestGetMetadataFromSafetensors_Error(t *testing.T) {

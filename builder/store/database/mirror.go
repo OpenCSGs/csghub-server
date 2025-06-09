@@ -160,7 +160,7 @@ func (s *mirrorStoreImpl) FindWithMapping(ctx context.Context, repoType types.Re
 		// for csg path
 		query.Where("path = ?", path)
 	}
-	err := query.Limit(1).Scan(ctx)
+	err := query.Order("created_at desc").Limit(1).Scan(ctx)
 	return resRepo, err
 }
 

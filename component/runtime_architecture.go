@@ -25,11 +25,12 @@ import (
 )
 
 var (
-	MainBranch         string = "main"
-	MasterBranch       string = "master"
-	ConfigFileName     string = "config.json"
-	ModelIndexFileName string = "model_index.json"
-	ScanLock           sync.Mutex
+	MainBranch            string = "main"
+	MasterBranch          string = "master"
+	ConfigFileName        string = "config.json"
+	ModelIndexFileName    string = "model_index.json"
+	ModelSafetensorsIndex string = "model.safetensors.index.json"
+	ScanLock              sync.Mutex
 )
 
 type runtimeArchitectureComponentImpl struct {
@@ -211,14 +212,15 @@ func (c *runtimeArchitectureComponentImpl) UpdateModelMetadata(ctx context.Conte
 		return nil, fmt.Errorf("fail to get model metadata from %s, %w", modelFormat, err)
 	}
 	metadata := &database.Metadata{
-		RepositoryID:    repo.ID,
-		ModelParams:     modelInfo.ParamsBillions,
-		TensorType:      modelInfo.TensorType,
-		MiniGPUMemoryGB: modelInfo.MiniGPUMemoryGB,
-		Architecture:    modelInfo.Architecture,
-		ModelType:       modelInfo.ModelType,
-		ClassName:       modelInfo.ClassName,
-		Quantizations:   modelInfo.Quantizations,
+		RepositoryID:      repo.ID,
+		ModelParams:       modelInfo.ParamsBillions,
+		TensorType:        modelInfo.TensorType,
+		MiniGPUMemoryGB:   modelInfo.MiniGPUMemoryGB,
+		MiniGPUFinetuneGB: modelInfo.MiniGPUFinetuneGB,
+		Architecture:      modelInfo.Architecture,
+		ModelType:         modelInfo.ModelType,
+		ClassName:         modelInfo.ClassName,
+		Quantizations:     modelInfo.Quantizations,
 	}
 	err = c.metadataStore.Upsert(ctx, metadata)
 	if err != nil {
@@ -453,7 +455,7 @@ func (c *runtimeArchitectureComponentImpl) GetMetadataFromSafetensors(ctx contex
 	modelInfo := &types.ModelInfo{}
 	//check files contains config.json
 	if hasConfig {
-		modelInfo, err := common.GetModelInfo(fileUrls, c.apiToken, c.config.Model.MinContextForEstimation)
+		modelInfo, err := common.GetModelInfo(fileUrls, c.config.Model.MinContextForEstimation)
 		if err != nil {
 			slog.Error("fail to get model info from safetensors", slog.Any("err", err), slog.Any("repo", repo.Path))
 			return nil, fmt.Errorf("fail to get model info from safetensors, %w, repo: %v", err, repo.Path)
@@ -474,6 +476,20 @@ func (c *runtimeArchitectureComponentImpl) GetMetadataFromSafetensors(ctx contex
 			kvcacheSize := common.GetKvCacheSize(modelInfo.ContextSize, modelInfo.BatchSize, modelInfo.HiddenSize, modelInfo.NumHiddenLayers, modelInfo.BytesPerParam)
 			activateMemory := common.GetActivationMemory(modelInfo.BatchSize, modelInfo.ContextSize, modelInfo.NumHiddenLayers, modelInfo.HiddenSize, modelInfo.NumAttentionHeads, modelInfo.BytesPerParam)
 			modelInfo.MiniGPUMemoryGB = float32(math.Round(float64(kvcacheSize+modelInfo.ModelWeightsGB+activateMemory)*100)) / 100
+
+			defaultLoRArank := 16
+			defaultBatchSize := 16
+			modelInfo.MiniGPUFinetuneGB = common.GetLoRAFinetuneMemory(
+				modelInfo.ModelWeightsGB,
+				modelInfo.ParamsBillions*1e9,
+				defaultBatchSize,
+				c.config.Model.MinContextForFinetune,
+				modelInfo.HiddenSize,
+				modelInfo.NumHiddenLayers,
+				modelInfo.NumAttentionHeads,
+				modelInfo.BytesPerParam,
+				defaultLoRArank,
+			)
 		}
 		return modelInfo, nil
 	}
