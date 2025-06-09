@@ -335,27 +335,6 @@ func (c *runtimeArchitectureComponentImpl) GetArchitectureFromConfig(ctx context
 	return config, nil
 }
 
-func (c *runtimeArchitectureComponentImpl) GetParametersFromIndex(ctx context.Context, repo *database.Repository) (int64, error) {
-	content, err := c.getConfigContent(ctx, ModelSafetensorsIndex, repo)
-	if err != nil {
-		return 0, fmt.Errorf("fail to read model.safetensors.index.json, %w", err)
-	}
-	var index map[string]any
-	if err := json.Unmarshal([]byte(content), &index); err != nil {
-		return 0, fmt.Errorf("fail to unmarshal index, %w", err)
-	}
-	//get total_size
-	metadata, ok := index["metadata"].(map[string]any)
-	if !ok {
-		return 0, fmt.Errorf("invalid index format: missing metadata")
-	}
-	totalSize, ok := metadata["total_size"].(float64)
-	if !ok {
-		return 0, fmt.Errorf("invalid index format: missing total_size")
-	}
-	return int64(totalSize) / 2, nil
-}
-
 func (c *runtimeArchitectureComponentImpl) GetModelTypeFromConfig(ctx context.Context, repo *database.Repository) (string, error) {
 	content, err := c.getConfigContent(ctx, ConfigFileName, repo)
 	if err != nil {
@@ -493,18 +472,6 @@ func (c *runtimeArchitectureComponentImpl) GetMetadataFromSafetensors(ctx contex
 		modelInfo.NumHiddenLayers = config.NumHiddenLayers
 		modelInfo.HiddenSize = config.HiddenSize
 		modelInfo.NumAttentionHeads = config.NumAttentionHeads
-		if modelInfo.TensorType == "" {
-			modelInfo.TensorType = common.TorchDtypeToSafetensors(config.TorchDtype)
-			modelInfo.BytesPerParam = common.GetBytesPerParam(modelInfo.TensorType)
-		}
-		if modelInfo.TotalParams == 0 {
-			modelInfo.TotalParams, err = c.GetParametersFromIndex(ctx, repo)
-			if err != nil {
-				slog.Error("fail to get parameters from index", slog.Any("err", err))
-				return nil, fmt.Errorf("fail to get parameters from index, %w", err)
-			}
-			modelInfo.ParamsBillions = float32(math.Round(float64(modelInfo.TotalParams)/1e9*100) / 100)
-		}
 		if modelInfo.HiddenSize != 0 {
 			kvcacheSize := common.GetKvCacheSize(modelInfo.ContextSize, modelInfo.BatchSize, modelInfo.HiddenSize, modelInfo.NumHiddenLayers, modelInfo.BytesPerParam)
 			activateMemory := common.GetActivationMemory(modelInfo.BatchSize, modelInfo.ContextSize, modelInfo.NumHiddenLayers, modelInfo.HiddenSize, modelInfo.NumAttentionHeads, modelInfo.BytesPerParam)

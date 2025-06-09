@@ -31,17 +31,11 @@ func GetModelInfo(fileList []string, minContext int) (*types.ModelInfo, error) {
 	var totalMemoryBytes int64
 	var modelSize int64
 	var bytesPerParam int
-	headerTooBig := false
 	for _, file := range fileList {
 		header, err := fetchSafetensorsMetadata(file)
 		// check error if it contains exceeds maximum allowed size
 		if err != nil {
-			if strings.Contains(err.Error(), "header size exceeds maximum allowed size") {
-				// such as deepseek-ai/DeepSeek-R1-0528
-				headerTooBig = true
-				break
-			}
-			return nil, fmt.Errorf("failed to fetch metadata: %v", err)
+			return nil, fmt.Errorf("failed to fetch metadata: %v, url: %s", err, file)
 		}
 		delete(header, "__metadata__")
 
@@ -72,9 +66,6 @@ func GetModelInfo(fileList []string, minContext int) (*types.ModelInfo, error) {
 		modelInfo.TotalParams = totalParams
 		modelInfo.ParamsBillions = float32(math.Round(float64(totalParams)/1e9*100) / 100)
 	}
-	if headerTooBig {
-		return GetModelInfoWithoutParameters(fileList, minContext)
-	}
 	modelInfo.ModelWeightsGB = float32(modelSize / (1024 * 1024 * 1024))
 	modelInfo.MiniGPUMemoryGB = max(float32(totalMemoryBytes/(1024*1024*1024)), 1)
 	// min context for min gpu memory
@@ -82,22 +73,6 @@ func GetModelInfo(fileList []string, minContext int) (*types.ModelInfo, error) {
 	modelInfo.BatchSize = 1
 	modelInfo.BytesPerParam = bytesPerParam
 	modelInfo.TensorType = strings.TrimSpace(modelInfo.TensorType)
-	return modelInfo, nil
-}
-
-// get model info from model index
-func GetModelInfoWithoutParameters(fileList []string, minContext int) (*types.ModelInfo, error) {
-	modelInfo := &types.ModelInfo{}
-	for _, file := range fileList {
-		size, err := GetFileSize(file)
-		if err != nil {
-			return nil, err
-		}
-		modelInfo.ModelWeightsGB += size
-	}
-	modelInfo.ContextSize = minContext
-	modelInfo.BatchSize = 1
-
 	return modelInfo, nil
 }
 
@@ -253,82 +228,4 @@ func GetBytesPerParam(dtype string) int {
 		// Default to float32 (4 bytes)
 		return 4
 	}
-}
-
-func GetFileSize(fileURL string) (float32, error) {
-	tr := &http.Transport{
-		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
-	}
-	client := &http.Client{Transport: tr}
-	if strings.HasPrefix(fileURL, "http://") {
-		client = &http.Client{}
-	}
-
-	req, err := http.NewRequest("GET", fileURL, nil)
-	if err != nil {
-		return 0, err
-	}
-
-	req.Header.Set("Range", "bytes=0-0")
-
-	resp, err := client.Do(req)
-	if err != nil {
-		return 0, err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusPartialContent {
-		return 0, fmt.Errorf("remote server does not support range request ,status code: %d", resp.StatusCode)
-	}
-
-	contentRange := resp.Header.Get("Content-Range")
-	if contentRange == "" {
-		return 0, fmt.Errorf("empty Content-Range")
-	}
-
-	var start, end, total int64
-	_, err = fmt.Sscanf(contentRange, "bytes %d-%d/%d", &start, &end, &total)
-	if err != nil || total <= 0 {
-		return 0, fmt.Errorf("can not parse Content-Range: %s", contentRange)
-	}
-
-	sizeInGB := float32(total) / (1024 * 1024 * 1024)
-	return sizeInGB, nil
-}
-
-func TorchDtypeToSafetensors(dtype string) string {
-
-	dtypeMap := map[string]string{
-		"float16":  "F16",
-		"float32":  "F32",
-		"float64":  "F64",
-		"bfloat16": "BF16",
-		"half":     "F16",
-		"float":    "F32",
-		"double":   "F64",
-
-		"int8":   "I8",
-		"int16":  "I16",
-		"int32":  "I32",
-		"int64":  "I64",
-		"uint8":  "U8",
-		"uint16": "U16",
-		"uint32": "U32",
-		"uint64": "U64",
-		"byte":   "U8",
-		"short":  "I16",
-		"int":    "I32",
-		"long":   "I64",
-
-		"bool": "BOOL",
-
-		"complex64":  "C64",
-		"complex128": "C128",
-	}
-
-	if safetensorsName, exists := dtypeMap[dtype]; exists {
-		return safetensorsName
-	}
-
-	return strings.ToUpper(dtype)
 }
