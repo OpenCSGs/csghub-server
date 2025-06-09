@@ -653,7 +653,7 @@ func TestRepoComponent_DownloadFile(t *testing.T) {
 				reqParams := make(url.Values)
 				reqParams.Set("response-content-disposition", fmt.Sprintf("attachment;filename=%s", "zzz"))
 				repo.mocks.s3Client.EXPECT().PresignedGetObject(
-					ctx, repo.lfsBucket, "lfs/path", ossFileExpire, reqParams,
+					ctx, repo.lfsBucket, "lfs/pa/th", ossFileExpire, reqParams,
 				).Return(&url.URL{Path: "foobar"}, nil)
 			} else {
 				repo.mocks.gitServer.EXPECT().GetRepoFileReader(ctx, gitserver.GetRepoInfoByPathReq{
