@@ -8,6 +8,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/require"
 	mockcomponent "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/component"
+	"opencsg.com/csghub-server/api/httpbase"
 	"opencsg.com/csghub-server/builder/testutil"
 	"opencsg.com/csghub-server/common/types"
 )
@@ -50,8 +51,7 @@ func TestCodeHandler_Create(t *testing.T) {
 	tester.mocks.code.EXPECT().Create(tester.Ctx(), &reqn).Return(&types.Code{Name: "c"}, nil)
 	tester.WithBody(t, req).Execute()
 
-	tester.ResponseEqSimple(t, 200, gin.H{"data": &types.Code{Name: "c"}})
-
+	tester.ResponseEqSimple(t, 200, httpbase.R{Msg: "OK", Data: &types.Code{Name: "c"}})
 }
 
 func TestCodeHandler_Index(t *testing.T) {
@@ -93,6 +93,7 @@ func TestCodeHandler_Index(t *testing.T) {
 				tester.ResponseEqSimple(t, 200, gin.H{
 					"data":  []types.Code{{Name: "cc"}},
 					"total": 100,
+					"msg":   "OK",
 				})
 			}
 		})

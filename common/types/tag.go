@@ -5,11 +5,14 @@ import (
 )
 
 type RepoTag struct {
+	ID        int64     `json:"id,omitempty"`
 	Name      string    `json:"name"`
 	Category  string    `json:"category"`
 	Group     string    `json:"group"`
 	BuiltIn   bool      `json:"built_in"`
-	ShowName  string    `json:"show_name"`
+	Scope     TagScope  `json:"scope,omitempty"`
+	ShowName  string    `json:"show_name" i18n:"Tag.I18nKey"`
+	I18nKey   string    `json:"i18n_key,omitempty"`
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
 }
@@ -31,7 +34,9 @@ type CreateTag struct {
 	Group    string `json:"group"`
 	Scope    string `json:"scope" binding:"required"`
 	BuiltIn  bool   `json:"built_in"`
+	// deprecated: use I18nKey instead
 	ShowName string `json:"show_name"`
+	I18nKey  string `json:"i18n_key"`
 }
 
 type UpdateTag CreateTag
@@ -61,4 +66,5 @@ type TagFilter struct {
 	Scopes     []TagScope `form:"scope" binding:"omitempty,dive,eq=model|eq=dataset|eq=code|eq=space|eq=prompt|eq=mcp"`
 	Categories []string   `form:"category" binding:"omitempty,dive"`
 	BuiltIn    *bool      `form:"built_in" binding:"omitnil"`
+	Search     string     `form:"search" binding:"omitempty"`
 }

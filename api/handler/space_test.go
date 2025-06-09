@@ -86,6 +86,7 @@ func TestSpaceHandler_Index(t *testing.T) {
 				tester.ResponseEqSimple(t, 200, gin.H{
 					"data":  []types.Space{{Name: "cc"}},
 					"total": 100,
+					"msg":   "OK",
 				})
 			}
 		})

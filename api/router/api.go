@@ -20,6 +20,7 @@ import (
 	"opencsg.com/csghub-server/builder/instrumentation"
 	"opencsg.com/csghub-server/builder/temporal"
 	"opencsg.com/csghub-server/common/config"
+	"opencsg.com/csghub-server/common/i18n"
 	"opencsg.com/csghub-server/common/types"
 	"opencsg.com/csghub-server/mirror"
 )
@@ -49,7 +50,7 @@ func RunServer(config *config.Config, enableSwagger bool) {
 	if config.MirrorServer.Enable && config.GitServer.Type == types.GitServerTypeGitaly {
 		mirrorService.EnqueueMirrorTasks()
 	}
-
+	i18n.InitLocalizersFromEmbedFile()
 	server.Run()
 	_ = stopOtel(context.Background())
 	temporal.Stop()
@@ -70,7 +71,8 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 	}))
 	r.Use(gin.Recovery())
 	r.Use(middleware.Log(config))
-
+	r.Use(middleware.ModifyAcceptLanguageMiddleware())
+	r.Use(middleware.LocalizedErrorMiddleware())
 	gitHTTPHandler, err := handler.NewGitHTTPHandler(config)
 	if err != nil {
 		return nil, fmt.Errorf("error creating git http handler:%w", err)
