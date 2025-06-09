@@ -14155,6 +14155,96 @@ const docTemplate = `{
                 }
             }
         },
+        "/{repo_type}/{namespace}/{name}/commit/{revision}": {
+            "post": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Repository"
+                ],
+                "summary": "Create commit with batch files",
+                "parameters": [
+                    {
+                        "enum": [
+                            "models",
+                            "datasets",
+                            "codes",
+                            "spaces"
+                        ],
+                        "type": "string",
+                        "description": "models,datasets,codes or spaces",
+                        "name": "repo_type",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "repo owner name",
+                        "name": "namespace",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "repo name",
+                        "name": "name",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "revision",
+                        "name": "revision",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "current user name",
+                        "name": "current_user",
+                        "in": "query"
+                    },
+                    {
+                        "description": "body",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/types.CommitFilesReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/types.Response"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            }
+        },
         "/{repo_type}/{namespace}/{name}/commits": {
             "get": {
                 "security": [
@@ -15188,6 +15278,108 @@ const docTemplate = `{
                 }
             }
         },
+        "/{repo_type}/{namespace}/{name}/preupload/{revision}": {
+            "post": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Repository"
+                ],
+                "summary": "Get upload mode for files",
+                "parameters": [
+                    {
+                        "enum": [
+                            "models",
+                            "datasets",
+                            "codes",
+                            "spaces"
+                        ],
+                        "type": "string",
+                        "description": "models,datasets,codes or spaces",
+                        "name": "repo_type",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "repo owner name",
+                        "name": "namespace",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "repo name",
+                        "name": "name",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "revision",
+                        "name": "revision",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "current user name",
+                        "name": "current_user",
+                        "in": "query"
+                    },
+                    {
+                        "description": "body",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/types.PreuploadReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/types.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/types.PreuploadResp"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            }
+        },
         "/{repo_type}/{namespace}/{name}/raw/{file_path}": {
             "get": {
                 "security": [
@@ -15675,6 +15867,102 @@ const docTemplate = `{
                                     "properties": {
                                         "data": {
                                             "$ref": "#/definitions/types.GetRepoFileTreeResp"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            }
+        },
+        "/{repo_type}/{namespace}/{name}/remote_diff": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Repository"
+                ],
+                "summary": "Get diff between local last commit and remote commit",
+                "parameters": [
+                    {
+                        "enum": [
+                            "models",
+                            "datasets",
+                            "codes",
+                            "spaces"
+                        ],
+                        "type": "string",
+                        "description": "models,datasets,codes or spaces",
+                        "name": "repo_type",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "repo owner name",
+                        "name": "namespace",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "repo name",
+                        "name": "name",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "current user name",
+                        "name": "current_user",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "previous commit id",
+                        "name": "left_commit_id",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/types.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/definitions/types.RemoteDiffs"
+                                            }
                                         }
                                     }
                                 }
@@ -17047,6 +17335,9 @@ const docTemplate = `{
                 "id": {
                     "type": "integer"
                 },
+                "mini_gpu_finetune_gb": {
+                    "type": "number"
+                },
                 "mini_gpu_memory_gb": {
                     "type": "number"
                 },
@@ -17326,6 +17617,9 @@ const docTemplate = `{
                 },
                 "metadata": {
                     "$ref": "#/definitions/database.Metadata"
+                },
+                "migrated": {
+                    "type": "boolean"
                 },
                 "mirror": {
                     "$ref": "#/definitions/database.Mirror"
@@ -18132,6 +18426,47 @@ const docTemplate = `{
                 }
             }
         },
+        "types.CommitAction": {
+            "type": "string",
+            "enum": [
+                "create",
+                "update",
+                "delete"
+            ],
+            "x-enum-varnames": [
+                "CommitActionCreate",
+                "CommitActionUpdate",
+                "CommitActionDelete"
+            ]
+        },
+        "types.CommitFileReq": {
+            "type": "object",
+            "properties": {
+                "action": {
+                    "$ref": "#/definitions/types.CommitAction"
+                },
+                "content": {
+                    "type": "string"
+                },
+                "path": {
+                    "type": "string"
+                }
+            }
+        },
+        "types.CommitFilesReq": {
+            "type": "object",
+            "properties": {
+                "files": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/types.CommitFileReq"
+                    }
+                },
+                "message": {
+                    "type": "string"
+                }
+            }
+        },
         "types.CommitForTree": {
             "type": "object",
             "properties": {
@@ -18808,6 +19143,10 @@ const docTemplate = `{
                 },
                 "description": {
                     "type": "string"
+                },
+                "driver_version": {
+                    "type": "string",
+                    "example": "11.8.0"
                 },
                 "env": {
                     "type": "string"
@@ -19768,6 +20107,9 @@ const docTemplate = `{
                 "class_name": {
                     "type": "string"
                 },
+                "mini_gpu_finetune_gb": {
+                    "type": "number"
+                },
                 "mini_gpu_memory_gb": {
                     "type": "number"
                 },
@@ -20274,6 +20616,62 @@ const docTemplate = `{
                 }
             }
         },
+        "types.PreuploadFile": {
+            "type": "object",
+            "properties": {
+                "path": {
+                    "type": "string"
+                },
+                "sample": {
+                    "type": "string"
+                },
+                "size": {
+                    "type": "integer"
+                }
+            }
+        },
+        "types.PreuploadReq": {
+            "type": "object",
+            "properties": {
+                "files": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/types.PreuploadFile"
+                    }
+                }
+            }
+        },
+        "types.PreuploadResp": {
+            "type": "object",
+            "properties": {
+                "files": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/types.PreuploadRespFile"
+                    }
+                }
+            }
+        },
+        "types.PreuploadRespFile": {
+            "type": "object",
+            "properties": {
+                "isDir": {
+                    "type": "boolean"
+                },
+                "oid": {
+                    "type": "string"
+                },
+                "path": {
+                    "type": "string"
+                },
+                "shouldIgnore": {
+                    "type": "boolean"
+                },
+                "uploadMode": {
+                    "$ref": "#/definitions/types.UploadMode"
+                }
+            }
+        },
         "types.PromptRes": {
             "type": "object",
             "properties": {
@@ -20456,6 +20854,29 @@ const docTemplate = `{
                 }
             }
         },
+        "types.RemoteDiffs": {
+            "type": "object",
+            "properties": {
+                "added": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "modified": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "removed": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                }
+            }
+        },
         "types.RepoBranchCommit": {
             "type": "object",
             "properties": {
@@ -20572,15 +20993,19 @@ const docTemplate = `{
                 "cpu",
                 "gpu",
                 "npu",
-                "enflame",
-                "mlu"
+                "gcu",
+                "gpgpu",
+                "mlu",
+                "dcu"
             ],
             "x-enum-varnames": [
                 "ResourceTypeCPU",
                 "ResourceTypeGPU",
                 "ResourceTypeNPU",
-                "ResourceTypeEnflame",
-                "ResourceTypeMLU"
+                "ResourceTypeGCU",
+                "ResourceTypeGPGPU",
+                "ResourceTypeMLU",
+                "ResourceTypeDCU"
             ]
         },
         "types.Response": {
@@ -20776,6 +21201,10 @@ const docTemplate = `{
                 "description": {
                     "type": "string",
                     "example": ""
+                },
+                "driver_version": {
+                    "type": "string",
+                    "example": "11.8.0"
                 },
                 "endpoint": {
                     "description": "the serving endpoint url",
@@ -21461,6 +21890,17 @@ const docTemplate = `{
                     ]
                 }
             }
+        },
+        "types.UploadMode": {
+            "type": "string",
+            "enum": [
+                "regular",
+                "lfs"
+            ],
+            "x-enum-varnames": [
+                "UploadModeRegular",
+                "UploadModeLFS"
+            ]
         },
         "types.User": {
             "type": "object",
