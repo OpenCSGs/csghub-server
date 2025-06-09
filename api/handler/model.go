@@ -1486,6 +1486,57 @@ func (h *ModelHandler) DeployServerless(ctx *gin.Context) {
 	httpbase.OK(ctx, response)
 }
 
+// RemoveServerless  godoc
+// @Security     ApiKey
+// @Summary      remove a serverless service
+// @Tags         Model
+// @Accept       json
+// @Produce      json
+// @Param        namespace path string true "namespace"
+// @Param        name path string true "name"
+// @Param        current_user query string true "current_user"
+// @Success      200  {object}  string "OK"
+// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
+// @Router       /models/{namespace}/{name}/serverless [delete]
+func (h *ModelHandler) RemoveServerless(ctx *gin.Context) {
+	currentUser := httpbase.GetCurrentUser(ctx)
+	if currentUser == "" {
+		httpbase.UnauthorizedError(ctx, errors.New("user not found, please login first"))
+		return
+	}
+
+	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
+	if err != nil {
+		slog.Error("failed to get namespace from context", "error", err)
+		httpbase.BadRequest(ctx, err.Error())
+		return
+	}
+
+	startReq := types.DeployActReq{
+		RepoType:    types.ModelRepo,
+		Namespace:   namespace,
+		Name:        name,
+		CurrentUser: currentUser,
+		DeployType:  types.ServerlessType,
+	}
+
+	err = h.repo.DeleteDeploy(ctx.Request.Context(), startReq)
+	if err != nil {
+		if errors.Is(err, component.ErrForbidden) {
+			slog.Info("not allowed to remove model serverless deploy", slog.Any("error", err), slog.Any("req", startReq))
+
+			httpbase.ForbiddenError(ctx, err)
+			return
+		}
+		slog.Info("failed to remove model serverless deploy", slog.Any("error", err), slog.Any("req", startReq))
+		httpbase.ServerError(ctx, err)
+		return
+	}
+
+	httpbase.OK(ctx, nil)
+}
+
 // StartServerless   godoc
 // @Security     ApiKey
 // @Summary      Start a model serverless

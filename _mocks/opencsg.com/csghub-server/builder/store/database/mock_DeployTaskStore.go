@@ -168,6 +168,53 @@ func (_c *MockDeployTaskStore_DeleteDeploy_Call) RunAndReturn(run func(context.C
 	return _c
 }
 
+// DeleteDeployNow provides a mock function with given fields: ctx, deployID
+func (_m *MockDeployTaskStore) DeleteDeployNow(ctx context.Context, deployID int64) error {
+	ret := _m.Called(ctx, deployID)
+
+	if len(ret) == 0 {
+		panic("no return value specified for DeleteDeployNow")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, int64) error); ok {
+		r0 = rf(ctx, deployID)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// MockDeployTaskStore_DeleteDeployNow_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'DeleteDeployNow'
+type MockDeployTaskStore_DeleteDeployNow_Call struct {
+	*mock.Call
+}
+
+// DeleteDeployNow is a helper method to define mock.On call
+//   - ctx context.Context
+//   - deployID int64
+func (_e *MockDeployTaskStore_Expecter) DeleteDeployNow(ctx interface{}, deployID interface{}) *MockDeployTaskStore_DeleteDeployNow_Call {
+	return &MockDeployTaskStore_DeleteDeployNow_Call{Call: _e.mock.On("DeleteDeployNow", ctx, deployID)}
+}
+
+func (_c *MockDeployTaskStore_DeleteDeployNow_Call) Run(run func(ctx context.Context, deployID int64)) *MockDeployTaskStore_DeleteDeployNow_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(int64))
+	})
+	return _c
+}
+
+func (_c *MockDeployTaskStore_DeleteDeployNow_Call) Return(_a0 error) *MockDeployTaskStore_DeleteDeployNow_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockDeployTaskStore_DeleteDeployNow_Call) RunAndReturn(run func(context.Context, int64) error) *MockDeployTaskStore_DeleteDeployNow_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // GetDeployByID provides a mock function with given fields: ctx, deployID
 func (_m *MockDeployTaskStore) GetDeployByID(ctx context.Context, deployID int64) (*database.Deploy, error) {
 	ret := _m.Called(ctx, deployID)
