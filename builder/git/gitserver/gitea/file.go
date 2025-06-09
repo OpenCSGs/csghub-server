@@ -302,3 +302,7 @@ func (c *Client) GetLogsTree(ctx context.Context, req types.GetLogsTreeRequest) 
 
 	return &types.LogsTreeResp{Commits: commits}, nil
 }
+
+func (c *Client) CommitFiles(ctx context.Context, req gitserver.CommitFilesReq) error {
+	return nil
+}

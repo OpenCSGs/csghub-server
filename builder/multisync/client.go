@@ -18,6 +18,7 @@ type Client interface {
 	MCPServerInfo(ctx context.Context, v types.SyncVersion) (*types.MCPServer, error)
 	ReadMeData(ctx context.Context, v types.SyncVersion) (string, error)
 	FileList(ctx context.Context, v types.SyncVersion) ([]types.File, error)
+	Diff(ctx context.Context, req types.RemoteDiffReq) ([]types.RemoteDiffs, error)
 }
 
 func FromOpenCSG(endpoint string, accessToken string) Client {
@@ -115,6 +116,21 @@ func (c *commonClient) FileList(ctx context.Context, v types.SyncVersion) ([]typ
 	err := c.rpcClent.Get(ctx, url, &res)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get file list, cause: %w", err)
+	}
+	return res.Data, nil
+}
+
+func (c *commonClient) Diff(ctx context.Context, req types.RemoteDiffReq) ([]types.RemoteDiffs, error) {
+	url := fmt.Sprintf(
+		"/api/v1/%ss/%s/%s/diff?left_commit_id=%s",
+		req.RepoType,
+		req.Namespace,
+		req.Name,
+		req.LeftCommitID)
+	var res types.RemoteDiffRespones
+	err := c.rpcClent.Get(ctx, url, &res)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get diff list, cause: %w", err)
 	}
 	return res.Data, nil
 }

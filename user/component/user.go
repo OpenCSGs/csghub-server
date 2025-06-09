@@ -15,6 +15,8 @@ import (
 	"github.com/bwmarrin/snowflake"
 	"github.com/casdoor/casdoor-go-sdk/casdoorsdk"
 	"github.com/google/uuid"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 	"opencsg.com/csghub-server/builder/git"
 	"opencsg.com/csghub-server/builder/git/gitserver"
 	"opencsg.com/csghub-server/builder/store/database"
@@ -537,7 +539,7 @@ func (c *userComponentImpl) Delete(ctx context.Context, operator, username strin
 				Name:      namespaceAndName[1],
 				RepoType:  repo.RepositoryType,
 			})
-			if err != nil && err.Error() != GitalyRepoNotFoundErr {
+			if err != nil && status.Code(err) != codes.NotFound {
 				slog.Error("failed to delete user repos in git server", slog.String("username", user.Username), slog.String("repo_path", repo.Path), slog.Any("error", err))
 				return fmt.Errorf("failed to delete user repos in git server: %v", err)
 			}

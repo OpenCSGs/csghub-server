@@ -77,6 +77,7 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 	if err != nil {
 		return nil, fmt.Errorf("error creating git http handler:%w", err)
 	}
+	r.POST("/api/v1/complete_multipart", gitHTTPHandler.CompleteMultipartUpload)
 	gitHTTP := r.Group("/:repo_type/:namespace/:name")
 	gitHTTP.Use(middleware.GitHTTPParamMiddleware())
 	gitHTTP.Use(middleware.GetCurrentUserFromHeader())
@@ -493,10 +494,13 @@ func createModelRoutes(config *config.Config,
 		modelsGroup.DELETE("/:namespace/:name/relations/dataset", modelHandler.DelDatasetRelation)
 		modelsGroup.GET("/:namespace/:name/branches", middleware.RepoType(types.ModelRepo), repoCommonHandler.Branches)
 		modelsGroup.GET("/:namespace/:name/tags", middleware.RepoType(types.ModelRepo), repoCommonHandler.Tags)
+		modelsGroup.POST("/:namespace/:name/preupload/:revision", middleware.RepoType(types.ModelRepo), repoCommonHandler.Preupload)
 		// update tags of a certain category
 		modelsGroup.POST("/:namespace/:name/tags/:category", middleware.RepoType(types.ModelRepo), repoCommonHandler.UpdateTags)
 		modelsGroup.GET("/:namespace/:name/last_commit", middleware.RepoType(types.ModelRepo), repoCommonHandler.LastCommit)
 		modelsGroup.GET("/:namespace/:name/commit/:commit_id", middleware.RepoType(types.ModelRepo), repoCommonHandler.CommitWithDiff)
+		modelsGroup.POST("/:namespace/:name/commit/:revision", middleware.RepoType(types.ModelRepo), repoCommonHandler.CommitFiles)
+		modelsGroup.GET("/:namespace/:name/remote_diff", middleware.RepoType(types.ModelRepo), repoCommonHandler.RemoteDiff)
 		modelsGroup.GET("/:namespace/:name/tree", middleware.RepoType(types.ModelRepo), repoCommonHandler.Tree)
 		modelsGroup.GET("/:namespace/:name/refs/:ref/tree/*path", middleware.RepoType(types.ModelRepo), repoCommonHandler.TreeV2)
 		modelsGroup.GET("/:namespace/:name/refs/:ref/logs_tree/*path", middleware.RepoType(types.ModelRepo), repoCommonHandler.LogsTree)
@@ -610,10 +614,13 @@ func createDatasetRoutes(config *config.Config, apiGroup *gin.RouterGroup, dsHan
 		datasetsGroup.GET("/:namespace/:name/relations", dsHandler.Relations)
 		datasetsGroup.GET("/:namespace/:name/branches", middleware.RepoType(types.DatasetRepo), repoCommonHandler.Branches)
 		datasetsGroup.GET("/:namespace/:name/tags", middleware.RepoType(types.DatasetRepo), repoCommonHandler.Tags)
+		datasetsGroup.POST("/:namespace/:name/preupload/:revision", middleware.RepoType(types.DatasetRepo), repoCommonHandler.Preupload)
 		// update tags of a certain category
 		datasetsGroup.POST("/:namespace/:name/tags/:category", middleware.RepoType(types.DatasetRepo), repoCommonHandler.UpdateTags)
 		datasetsGroup.GET("/:namespace/:name/last_commit", middleware.RepoType(types.DatasetRepo), repoCommonHandler.LastCommit)
 		datasetsGroup.GET("/:namespace/:name/commit/:commit_id", middleware.RepoType(types.DatasetRepo), repoCommonHandler.CommitWithDiff)
+		datasetsGroup.POST("/:namespace/:name/commit/:revision", middleware.RepoType(types.DatasetRepo), repoCommonHandler.CommitFiles)
+		datasetsGroup.GET("/:namespace/:name/remote_diff", middleware.RepoType(types.DatasetRepo), repoCommonHandler.RemoteDiff)
 		datasetsGroup.GET("/:namespace/:name/tree", middleware.RepoType(types.DatasetRepo), repoCommonHandler.Tree)
 		datasetsGroup.GET("/:namespace/:name/refs/:ref/tree/*path", middleware.RepoType(types.DatasetRepo), repoCommonHandler.TreeV2)
 		datasetsGroup.GET("/:namespace/:name/refs/:ref/logs_tree/*path", middleware.RepoType(types.DatasetRepo), repoCommonHandler.LogsTree)
@@ -651,10 +658,13 @@ func createCodeRoutes(config *config.Config, apiGroup *gin.RouterGroup, codeHand
 		codesGroup.GET("/:namespace/:name/relations", codeHandler.Relations)
 		codesGroup.GET("/:namespace/:name/branches", middleware.RepoType(types.CodeRepo), repoCommonHandler.Branches)
 		codesGroup.GET("/:namespace/:name/tags", middleware.RepoType(types.CodeRepo), repoCommonHandler.Tags)
+		codesGroup.POST("/:namespace/:name/preupload/:revision", middleware.RepoType(types.CodeRepo), repoCommonHandler.Preupload)
 		// update tags of a certain category
 		codesGroup.POST("/:namespace/:name/tags/:category", middleware.RepoType(types.CodeRepo), repoCommonHandler.UpdateTags)
 		codesGroup.GET("/:namespace/:name/last_commit", middleware.RepoType(types.CodeRepo), repoCommonHandler.LastCommit)
 		codesGroup.GET("/:namespace/:name/commit/:commit_id", middleware.RepoType(types.CodeRepo), repoCommonHandler.CommitWithDiff)
+		codesGroup.POST("/:namespace/:name/commit/:revision", middleware.RepoType(types.CodeRepo), repoCommonHandler.CommitFiles)
+		codesGroup.GET("/:namespace/:name/remote_diff", middleware.RepoType(types.CodeRepo), repoCommonHandler.RemoteDiff)
 		codesGroup.GET("/:namespace/:name/tree", middleware.RepoType(types.CodeRepo), repoCommonHandler.Tree)
 		codesGroup.GET("/:namespace/:name/refs/:ref/tree/*path", middleware.RepoType(types.CodeRepo), repoCommonHandler.TreeV2)
 		codesGroup.GET("/:namespace/:name/refs/:ref/logs_tree/*path", middleware.RepoType(types.CodeRepo), repoCommonHandler.LogsTree)
@@ -711,10 +721,13 @@ func createSpaceRoutes(config *config.Config,
 
 		spaces.GET("/:namespace/:name/branches", middleware.RepoType(types.SpaceRepo), repoCommonHandler.Branches)
 		spaces.GET("/:namespace/:name/tags", middleware.RepoType(types.SpaceRepo), repoCommonHandler.Tags)
+		spaces.POST("/:namespace/:name/preupload/:revision", middleware.RepoType(types.SpaceRepo), repoCommonHandler.Preupload)
 		// update tags of a certain category
 		spaces.POST("/:namespace/:name/tags/:category", middleware.RepoType(types.SpaceRepo), repoCommonHandler.UpdateTags)
 		spaces.GET("/:namespace/:name/last_commit", middleware.RepoType(types.SpaceRepo), repoCommonHandler.LastCommit)
 		spaces.GET("/:namespace/:name/commit/:commit_id", middleware.RepoType(types.SpaceRepo), repoCommonHandler.CommitWithDiff)
+		spaces.POST("/:namespace/:name/commit/:revision", middleware.RepoType(types.SpaceRepo), repoCommonHandler.CommitFiles)
+		spaces.GET("/:namespace/:name/remote_diff", middleware.RepoType(types.SpaceRepo), repoCommonHandler.RemoteDiff)
 		spaces.GET("/:namespace/:name/tree", middleware.RepoType(types.SpaceRepo), repoCommonHandler.Tree)
 		spaces.GET("/:namespace/:name/refs/:ref/tree/*path", middleware.RepoType(types.SpaceRepo), repoCommonHandler.TreeV2)
 		spaces.GET("/:namespace/:name/refs/:ref/logs_tree/*path", middleware.RepoType(types.SpaceRepo), repoCommonHandler.LogsTree)

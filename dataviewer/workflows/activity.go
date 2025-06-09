@@ -10,7 +10,6 @@ import (
 	"net/http"
 	"net/url"
 	"os"
-	"path"
 	"path/filepath"
 	"sort"
 	"strconv"
@@ -27,6 +26,7 @@ import (
 	"opencsg.com/csghub-server/builder/store/s3"
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/types"
+	"opencsg.com/csghub-server/common/utils/common"
 	dvCom "opencsg.com/csghub-server/dataviewer/common"
 )
 
@@ -52,6 +52,7 @@ type dataViewerActivityImpl struct {
 	cfg          *config.Config
 	viewerStore  database.DataviewerStore
 	lfsMetaStore database.LfsMetaObjectStore
+	repoStore    database.RepoStore
 }
 
 func NewDataViewerActivity(cfg *config.Config, gs gitserver.GitServer) (DataViewerActivity, error) {
@@ -65,6 +66,7 @@ func NewDataViewerActivity(cfg *config.Config, gs gitserver.GitServer) (DataView
 		cfg:          cfg,
 		viewerStore:  database.NewDataviewerStore(),
 		lfsMetaStore: database.NewLfsMetaObjectStore(),
+		repoStore:    database.NewRepoStore(),
 	}, nil
 }
 
@@ -650,7 +652,7 @@ func (dva *dataViewerActivityImpl) downloadFile(ctx context.Context, req types.U
 	}
 	localFileFullPath := fmt.Sprintf("%s/%s", cacheFilePath, loadFile.LocalFileName)
 	if orginFile.Lfs {
-		err := dva.downloadLfsFile(ctx, localFileFullPath, orginFile, loadFile, fileExtName)
+		err := dva.downloadLfsFile(ctx, req, localFileFullPath, orginFile, loadFile, fileExtName)
 		if err != nil {
 			return nil, fmt.Errorf("fail to download repo %s/%s lfs file %s, error: %w", req.Namespace, req.Name, orginFile.RepoFile, err)
 		}
@@ -664,9 +666,12 @@ func (dva *dataViewerActivityImpl) downloadFile(ctx context.Context, req types.U
 	return loadFile, nil
 }
 
-func (dva *dataViewerActivityImpl) downloadLfsFile(ctx context.Context, localFileFullPath string, orginFile dvCom.FileObject, loadFile *dvCom.FileObject, fileExtName string) error {
-	objectKey := orginFile.LfsRelativePath
-	objectKey = path.Join("lfs", objectKey)
+func (dva *dataViewerActivityImpl) downloadLfsFile(ctx context.Context, req types.UpdateViewerReq, localFileFullPath string, orginFile dvCom.FileObject, loadFile *dvCom.FileObject, fileExtName string) error {
+	repo, err := dva.repoStore.FindByPath(ctx, req.RepoType, req.Namespace, req.Name)
+	if err != nil {
+		return fmt.Errorf("failed to find repo: %w", err)
+	}
+	objectKey := common.BuildLfsPath(repo.ID, strings.ReplaceAll(orginFile.LfsRelativePath, "/", ""), repo.Migrated)
 	loadFile.ObjectKey = objectKey
 
 	if !dva.cfg.DataViewer.DownloadLfsFile {
@@ -926,7 +931,11 @@ func (dva *dataViewerActivityImpl) uploadToRepo(ctx context.Context, req types.U
 	}
 
 	uploadFile.LfsRelativePath = pointer.RelativePath()
-	objectKey := filepath.Join("lfs", pointer.RelativePath())
+	repo, err := dva.repoStore.FindByPath(ctx, req.RepoType, req.Namespace, req.Name)
+	if err != nil {
+		return fmt.Errorf("failed to find repo: %w", err)
+	}
+	objectKey := common.BuildLfsPath(repo.ID, pointer.Oid, repo.Migrated)
 	uploadInfo, err := dva.s3Client.PutObject(ctx, dva.cfg.S3.Bucket, objectKey, f, pointer.Size, minio.PutObjectOptions{})
 	if err != nil {
 		return fmt.Errorf("upload file %s to S3, cause: %w", uploadFile.ConvertPath, err)

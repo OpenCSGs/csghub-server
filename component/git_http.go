@@ -2,16 +2,21 @@ package component
 
 import (
 	"context"
+	"crypto/hmac"
 	"database/sql"
+	"encoding/base64"
 	"encoding/hex"
 	"errors"
 	"fmt"
 	"io"
 	"log/slog"
+	"net/http"
 	"net/url"
 	"os"
 	"path"
+	"slices"
 	"strconv"
+	"time"
 
 	"github.com/minio/minio-go/v7"
 	"github.com/minio/sha256-simd"
@@ -21,12 +26,14 @@ import (
 	"opencsg.com/csghub-server/builder/store/s3"
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/types"
+	"opencsg.com/csghub-server/common/utils/common"
 )
 
 type gitHTTPComponentImpl struct {
 	gitServer          gitserver.GitServer
 	config             *config.Config
 	s3Client           s3.Client
+	s3Core             s3.Core
 	lfsMetaObjectStore database.LfsMetaObjectStore
 	lfsLockStore       database.LfsLockStore
 	repoStore          database.RepoStore
@@ -46,7 +53,13 @@ type GitHTTPComponent interface {
 	UnLock(ctx context.Context, req types.UnlockLFSReq) (*database.LfsLock, error)
 	VerifyLock(ctx context.Context, req types.VerifyLFSLockReq) (*types.LFSLockListVerify, error)
 	LfsDownload(ctx context.Context, req types.DownloadRequest) (*url.URL, error)
+	CompleteMultipartUpload(ctx context.Context, req types.CompleteMultipartUploadReq, bodyReq types.CompleteMultipartUploadBody) (int, error)
 }
+
+const (
+	lfsFileNonMultipartSize = 1024 * 1024 * 1024 * 5 // 5GB
+	maxPartNum              = 1000
+)
 
 func NewGitHTTPComponent(config *config.Config) (GitHTTPComponent, error) {
 	c := &gitHTTPComponentImpl{}
@@ -63,6 +76,10 @@ func NewGitHTTPComponent(config *config.Config) (GitHTTPComponent, error) {
 		newError := fmt.Errorf("fail to init s3 client for code,error:%w", err)
 		slog.Error(newError.Error())
 		return nil, newError
+	}
+	c.s3Core, err = s3.NewMinioCore(config)
+	if err != nil {
+		return nil, err
 	}
 	c.lfsMetaObjectStore = database.NewLfsMetaObjectStore()
 	c.repoStore = database.NewRepoStore()
@@ -198,7 +215,7 @@ func (c *gitHTTPComponentImpl) lfsBatchDownloadInfo(ctx context.Context, req typ
 			})
 			continue
 		}
-		objectKey := path.Join("lfs", obj.RelativePath())
+		objectKey := common.BuildLfsPath(repo.ID, obj.Oid, repo.Migrated)
 		resp := &types.ObjectResponse{
 			Actions: map[string]*types.Link{},
 			Pointer: obj,
@@ -211,14 +228,15 @@ func (c *gitHTTPComponentImpl) lfsBatchDownloadInfo(ctx context.Context, req typ
 			})
 			continue
 		}
-		resp.Actions["download"] = &types.Link{Href: url.String(), Header: map[string]string{}}
+		resp.Actions["download"] = &types.Link{Href: url.String(), Header: map[string]any{}}
 		objs = append(objs, resp)
 	}
 	return &types.BatchResponse{Objects: objs}, nil
 }
 
 func (c *gitHTTPComponentImpl) lfsBatchUploadInfo(ctx context.Context, req types.BatchRequest, repo *database.Repository) (*types.BatchResponse, error) {
-	header := make(map[string]string)
+	var transfer string
+	header := make(map[string]any)
 	if len(req.Authorization) > 0 {
 		header["Authorization"] = req.Authorization
 	}
@@ -233,18 +251,24 @@ func (c *gitHTTPComponentImpl) lfsBatchUploadInfo(ctx context.Context, req types
 		exists[f.Oid] = &f
 	}
 
+	useMultipart := slices.Contains(req.Transfers, "multipart")
+
+	if useMultipart {
+		transfer = "multipart"
+	}
+
 	for _, obj := range req.Objects {
 		// for existing lfs files, return pointer only and no action,
 		// this is the expeted format when file exists and doesn't
 		// need to be reuploaded. See:
 		// https://github.com/git-lfs/git-lfs/blob/main/docs/api/batch.md
 		// "If a client requests to upload an object that the server already has,the server should omit the actions property completely. The client will then assume the server already has it."
-		if _, ok := exists[obj.Oid]; ok {
-			objs = append(objs, &types.ObjectResponse{
-				Pointer: obj,
-			})
-			continue
-		}
+		// if _, ok := exists[obj.Oid]; ok {
+		// 	objs = append(objs, &types.ObjectResponse{
+		// 		Pointer: obj,
+		// 	})
+		// 	continue
+		// }
 		if !obj.Valid() {
 			objs = append(objs, &types.ObjectResponse{
 				Pointer: obj,
@@ -256,8 +280,21 @@ func (c *gitHTTPComponentImpl) lfsBatchUploadInfo(ctx context.Context, req types
 			Actions: map[string]*types.Link{},
 			Pointer: obj,
 		}
-		resp.Actions["upload"] = &types.Link{Href: c.buildUploadLink(ctx, req, obj), Header: header}
-		verifyHeader := make(map[string]string)
+		if largeFileWithoutMultipart(req, obj) {
+			return nil, errors.New("You need to configure your repository to enable upload of files > 5GB.\nRun \"csghub-sdk lfs-enable-largefiles ./path/to/your/repo\" and try again.")
+		}
+
+		if useMultipart {
+			link, err := c.buildMultipartUploadLink(ctx, req, obj, header)
+			if err != nil {
+				return nil, err
+			}
+			resp.Actions["upload"] = link
+		} else {
+			resp.Actions["upload"] = &types.Link{Href: c.buildUploadLink(ctx, req, obj), Header: header}
+		}
+
+		verifyHeader := make(map[string]any)
 		for key, value := range header {
 			verifyHeader[key] = value
 		}
@@ -265,7 +302,10 @@ func (c *gitHTTPComponentImpl) lfsBatchUploadInfo(ctx context.Context, req types
 		resp.Actions["verify"] = &types.Link{Href: c.buildVerifyLink(req), Header: verifyHeader}
 		objs = append(objs, resp)
 	}
-	return &types.BatchResponse{Objects: objs}, nil
+	return &types.BatchResponse{
+		Objects:  objs,
+		Transfer: transfer,
+	}, nil
 }
 
 // https://gitlab.com/gitlab-org/gitlab-foss/-/blob/master/app/controllers/concerns/lfs_request.rb#L45
@@ -355,7 +395,7 @@ func noSuchKey(err error) bool {
 func (c *gitHTTPComponentImpl) LfsUpload(ctx context.Context, body io.ReadCloser, req types.UploadRequest) error {
 	var allowed bool
 	defer body.Close()
-	_, err := c.repoStore.FindByPath(ctx, req.RepoType, req.Namespace, req.Name)
+	repo, err := c.repoStore.FindByPath(ctx, req.RepoType, req.Namespace, req.Name)
 	if err != nil {
 		return fmt.Errorf("failed to find repo, error: %w", err)
 	}
@@ -374,7 +414,7 @@ func (c *gitHTTPComponentImpl) LfsUpload(ctx context.Context, body io.ReadCloser
 		return errors.New("invalid lfs oid")
 	}
 
-	objectKey := path.Join("lfs", pointer.RelativePath())
+	objectKey := common.BuildLfsPath(repo.ID, pointer.Oid, repo.Migrated)
 	_, err = c.s3Client.StatObject(ctx, c.config.S3.Bucket, objectKey, minio.StatObjectOptions{})
 	if err != nil {
 		if !noSuchKey(err) {
@@ -416,8 +456,10 @@ func (c *gitHTTPComponentImpl) LfsVerify(ctx context.Context, req types.VerifyRe
 		return fmt.Errorf("failed to find repo, error: %w", err)
 	}
 
-	objectKey := path.Join("lfs", p.RelativePath())
-	fileInfo, err := c.s3Client.StatObject(ctx, c.config.S3.Bucket, objectKey, minio.StatObjectOptions{})
+	objectKey := common.BuildLfsPath(repo.ID, p.Oid, repo.Migrated)
+	fileInfo, err := c.s3Client.StatObject(ctx, c.config.S3.Bucket, objectKey, minio.StatObjectOptions{
+		Checksum: true,
+	})
 	if err != nil {
 		slog.Error("failed to stat object in s3", slog.Any("error", err))
 		return fmt.Errorf("failed to stat object in s3, error: %w", err)
@@ -666,7 +708,7 @@ func (c *gitHTTPComponentImpl) LfsDownload(ctx context.Context, req types.Downlo
 	if err != nil {
 		return nil, fmt.Errorf("failed to find lfs meta object, error: %w", err)
 	}
-	objectKey := path.Join("lfs", pointer.RelativePath())
+	objectKey := common.BuildLfsPath(repo.ID, pointer.Oid, repo.Migrated)
 
 	reqParams := make(url.Values)
 	if req.SaveAs != "" {
@@ -682,7 +724,22 @@ func (c *gitHTTPComponentImpl) LfsDownload(ctx context.Context, req types.Downlo
 
 func (c *gitHTTPComponentImpl) buildUploadLink(ctx context.Context, req types.BatchRequest, pointer types.Pointer) string {
 	if c.config.Git.SkipLfsFileValidation {
-		u, err := c.s3Client.PresignedPutObject(ctx, c.config.S3.Bucket, path.Join("lfs", pointer.RelativePath()), types.OssFileExpire)
+		repo, err := c.repoStore.FindByPath(ctx, req.RepoType, req.Namespace, req.Name)
+		if err != nil {
+			return ""
+		}
+		encodedOid := base64.StdEncoding.EncodeToString([]byte(pointer.Oid))
+		reqHeader := make(url.Values)
+		reqHeader.Add("X-Amz-Checksum-SHA256", encodedOid)
+		reqHeader.Add("X-Amz-Checksum-Algorithm", "SHA256")
+		// u, err := c.s3Client.PresignedPutObject(ctx, c.config.S3.Bucket, common.BuildLfsPath(repo.ID, pointer.Oid, repo.Migrated), types.OssFileExpire)
+		u, err := c.s3Core.PresignHeader(
+			ctx,
+			http.MethodPut,
+			c.config.S3.Bucket,
+			common.BuildLfsPath(repo.ID, pointer.Oid, repo.Migrated),
+			types.OssFileExpire,
+			reqHeader, nil)
 		if err != nil {
 			return c.config.APIServer.PublicDomain + "/" + path.Join(fmt.Sprintf("%ss", req.RepoType), url.PathEscape(req.Namespace), url.PathEscape(req.Name+".git"), "info/lfs/objects", url.PathEscape(pointer.Oid), strconv.FormatInt(pointer.Size, 10))
 		}
@@ -716,4 +773,124 @@ func buildLFSLockList(lfsLocks []database.LfsLock) *types.LFSLockList {
 	return &types.LFSLockList{
 		Locks: locks,
 	}
+}
+
+func (c *gitHTTPComponentImpl) buildMultipartUploadLink(ctx context.Context, req types.BatchRequest, pointer types.Pointer, header map[string]any) (*types.Link, error) {
+	var (
+		resp     types.Link
+		uploadID string
+	)
+	repo, err := c.repoStore.FindByPath(ctx, req.RepoType, req.Namespace, req.Name)
+	if err != nil {
+		return nil, fmt.Errorf("failed to find repo: %w", err)
+	}
+
+	chunSize := calculatePartSize(pointer.Size, c.config.Git.MinMultipartSize)
+
+	if req.UploadID == "" {
+		uploadID, err = c.s3Core.NewMultipartUpload(ctx, c.config.S3.Bucket, common.BuildLfsPath(repo.ID, pointer.Oid, repo.Migrated), minio.PutObjectOptions{
+			PartSize: uint64(chunSize),
+		})
+		if err != nil {
+			return nil, fmt.Errorf("failed to initialize multipart upload: %w", err)
+		}
+	} else {
+		uploadID = req.UploadID
+	}
+	partNumber := 1
+	resp.Href = c.generateSignedCompleteURL(common.BuildLfsPath(repo.ID, pointer.Oid, repo.Migrated), uploadID)
+	resp.Header = make(map[string]any)
+	resp.Header["chunk_size"] = strconv.FormatInt(chunSize, 10)
+	for totalSize := pointer.Size; totalSize > 0; totalSize -= chunSize {
+		reqHeader := make(url.Values)
+		for k, v := range header {
+			reqHeader.Set(k, v.(string))
+		}
+		reqHeader.Set("uploadId", uploadID)
+		reqHeader.Set("partNumber", strconv.Itoa(partNumber))
+		u, err := c.s3Client.PresignHeader(
+			ctx,
+			http.MethodPut,
+			c.config.S3.Bucket,
+			common.BuildLfsPath(repo.ID, pointer.Oid, repo.Migrated),
+			types.OssFileExpire, reqHeader, nil)
+		if err != nil {
+			return nil, err
+		}
+		resp.Header[strconv.Itoa(partNumber)] = u.String()
+
+		partNumber++
+	}
+
+	return &resp, nil
+}
+
+func (c *gitHTTPComponentImpl) CompleteMultipartUpload(ctx context.Context, req types.CompleteMultipartUploadReq, bodyReq types.CompleteMultipartUploadBody) (int, error) {
+	code := http.StatusOK
+	isValid := c.isValidCompleteUploadSignature(req.ObjectKey, req.UploadID, req.ExpiresAt, req.Signature)
+	if !isValid {
+		return code, errors.New("invalid signature")
+	}
+	var parts []minio.CompletePart
+	for _, part := range bodyReq.Parts {
+		parts = append(parts, minio.CompletePart{ETag: part.Etag, PartNumber: part.PartNumber})
+	}
+	_, err := c.s3Core.CompleteMultipartUpload(ctx, c.config.S3.Bucket, req.ObjectKey, req.UploadID, parts, minio.PutObjectOptions{
+		AutoChecksum: minio.ChecksumSHA256,
+	})
+	if err != nil {
+		code = err.(minio.ErrorResponse).StatusCode
+		return code, fmt.Errorf("complete multipart upload failed: %v", err)
+	}
+	return code, nil
+}
+
+func (c *gitHTTPComponentImpl) generateSignedCompleteURL(objectKey, uploadID string) string {
+	expiresAt := time.Now().Add(types.OssFileExpire).UTC().Format(time.RFC3339)
+	toSign := fmt.Sprintf("%s:%s:%s", objectKey, uploadID, expiresAt)
+	mac := hmac.New(sha256.New, []byte(c.config.Git.SignatureSecertKey))
+	mac.Write([]byte(toSign))
+	signature := hex.EncodeToString(mac.Sum(nil))
+
+	params := url.Values{}
+	params.Set("objectKey", objectKey)
+	params.Set("uploadId", uploadID)
+	params.Set("expiresAt", expiresAt)
+	params.Set("signature", signature)
+
+	return fmt.Sprintf("%s/api/v1/complete_multipart?%s", c.config.APIServer.PublicDomain, params.Encode())
+}
+
+func (c *gitHTTPComponentImpl) isValidCompleteUploadSignature(objectKey, uploadID, expiresAt string, providedSign string) bool {
+	parsedTime, err := time.Parse(time.RFC3339, expiresAt)
+	if err != nil || time.Now().After(parsedTime) {
+		return false
+	}
+
+	toSign := fmt.Sprintf("%s:%s:%s", objectKey, uploadID, expiresAt)
+	mac := hmac.New(sha256.New, []byte(c.config.Git.SignatureSecertKey))
+	mac.Write([]byte(toSign))
+	expectedSign := hex.EncodeToString(mac.Sum(nil))
+
+	return hmac.Equal([]byte(expectedSign), []byte(providedSign))
+}
+
+func largeFileWithoutMultipart(req types.BatchRequest, pointer types.Pointer) bool {
+	if req.Operation == "upload" &&
+		pointer.Size > lfsFileNonMultipartSize &&
+		!slices.Contains(req.Transfers, "multipart") {
+		return true
+	}
+	return false
+}
+
+func calculatePartSize(fileSize int64, minSize int64) int64 {
+	partSize := fileSize / maxPartNum
+	if fileSize%maxPartNum != 0 {
+		partSize++
+	}
+	if partSize < minSize {
+		partSize = minSize
+	}
+	return partSize
 }

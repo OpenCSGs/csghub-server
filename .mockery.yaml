@@ -98,6 +98,7 @@ packages:
     config:
     interfaces:
       Client:
+      Core:
   opencsg.com/csghub-server/mirror/queue:
     config:
     interfaces:

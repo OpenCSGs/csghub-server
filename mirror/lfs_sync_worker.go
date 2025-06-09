@@ -10,7 +10,7 @@ import (
 
 type LFSSyncWorker interface {
 	Run()
-	SyncLfs(ctx context.Context, workerID int, mirror *database.Mirror) error
+	SyncLfs(ctx context.Context, workerID int, mirror *database.Mirror, repo *database.Repository) error
 }
 
 func NewLFSSyncWorker(config *config.Config, numWorkers int) (LFSSyncWorker, error) {

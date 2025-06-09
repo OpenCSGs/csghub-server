@@ -8,7 +8,6 @@ import (
 	"log/slog"
 	"net/http"
 	"net/url"
-	"path/filepath"
 	"strings"
 	"sync"
 	"time"
@@ -18,6 +17,7 @@ import (
 	"opencsg.com/csghub-server/builder/store/s3"
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/types"
+	"opencsg.com/csghub-server/common/utils/common"
 	"opencsg.com/csghub-server/mirror/queue"
 )
 
@@ -111,7 +111,7 @@ func (w *MinioLFSSyncWorker) worker(id int) {
 			slog.Error("fail to get repository", slog.Int("workerId", id), slog.String("error", err.Error()))
 			continue
 		}
-		err = w.SyncLfs(ctx, id, mirror)
+		err = w.SyncLfs(ctx, id, mirror, repo)
 		if err != nil {
 			repo.SyncStatus = types.SyncStatusFailed
 			mirror.LastMessage = err.Error()
@@ -133,7 +133,7 @@ func (w *MinioLFSSyncWorker) worker(id int) {
 	}
 }
 
-func (w *MinioLFSSyncWorker) SyncLfs(ctx context.Context, workerId int, mirror *database.Mirror) error {
+func (w *MinioLFSSyncWorker) SyncLfs(ctx context.Context, workerId int, mirror *database.Mirror, repo *database.Repository) error {
 	var pointers []*types.Pointer
 	lfsMetaObjects, err := w.lfsMetaObjectStore.FindByRepoID(ctx, mirror.Repository.ID)
 	if err != nil {
@@ -151,7 +151,7 @@ func (w *MinioLFSSyncWorker) SyncLfs(ctx context.Context, workerId int, mirror *
 	if err != nil {
 		return fmt.Errorf("fail to get LFS download URL: %w", err)
 	}
-	err = w.DownloadAndUploadLFSFiles(ctx, mirror, pointers)
+	err = w.DownloadAndUploadLFSFiles(ctx, mirror, pointers, repo)
 	if err != nil {
 		return fmt.Errorf("fail to download and upload LFS files: %w", err)
 	}
@@ -232,7 +232,7 @@ func (w *MinioLFSSyncWorker) GetLFSDownloadURLs(ctx context.Context, mirror *dat
 	return resPointers, nil
 }
 
-func (w *MinioLFSSyncWorker) DownloadAndUploadLFSFiles(ctx context.Context, mirror *database.Mirror, pointers []*types.Pointer) error {
+func (w *MinioLFSSyncWorker) DownloadAndUploadLFSFiles(ctx context.Context, mirror *database.Mirror, pointers []*types.Pointer, repo *database.Repository) error {
 	var (
 		finishedLFSFileCount int
 		success              bool
@@ -240,14 +240,14 @@ func (w *MinioLFSSyncWorker) DownloadAndUploadLFSFiles(ctx context.Context, mirr
 	lfsFilesCount := len(pointers)
 	for _, pointer := range pointers {
 		success = true
-		objectKey := filepath.Join("lfs", pointer.RelativePath())
+		objectKey := common.BuildLfsPath(mirror.RepositoryID, pointer.Oid, repo.Migrated)
 		fileInfo, err := w.s3Client.StatObject(ctx, w.config.S3.Bucket, objectKey, minio.StatObjectOptions{})
 		if err != nil && err.Error() != "The specified key does not exist." {
 			slog.Error("failed to check if LFS file exists", slog.Any("error", err))
 			continue
 		}
 		if (err != nil && err.Error() != "The specified key does not exist.") || fileInfo.Size != pointer.Size {
-			err = w.DownloadAndUploadLFSFile(ctx, mirror, pointer)
+			err = w.DownloadAndUploadLFSFile(ctx, mirror, pointer, repo)
 			if err != nil {
 				success = false
 				slog.Error("failed to download and upload LFS file", slog.Any("error", err))
@@ -287,8 +287,8 @@ func (w *MinioLFSSyncWorker) DownloadAndUploadLFSFiles(ctx context.Context, mirr
 	return nil
 }
 
-func (w *MinioLFSSyncWorker) DownloadAndUploadLFSFile(ctx context.Context, mirror *database.Mirror, pointer *types.Pointer) error {
-	objectKey := filepath.Join("lfs", pointer.RelativePath())
+func (w *MinioLFSSyncWorker) DownloadAndUploadLFSFile(ctx context.Context, mirror *database.Mirror, pointer *types.Pointer, repo *database.Repository) error {
+	objectKey := common.BuildLfsPath(mirror.RepositoryID, pointer.Oid, repo.Migrated)
 	slog.Info("downloading LFS file from", slog.Any("url", pointer.DownloadURL))
 
 	req, err := http.NewRequest("GET", pointer.DownloadURL, nil)

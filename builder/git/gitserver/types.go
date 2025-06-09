@@ -227,3 +227,28 @@ type UploadPackReq struct {
 }
 
 type ReceivePackReq = UploadPackReq
+
+type CommitFilesReq struct {
+	Namespace string       `json:"namespace"`
+	Name      string       `json:"name"`
+	RepoType  string       `json:"repo_type"`
+	Revision  string       `json:"revision"`
+	Username  string       `json:"username"`
+	Email     string       `json:"email"`
+	Message   string       `json:"message"`
+	Files     []CommitFile `json:"files"`
+}
+
+type CommitFile struct {
+	Path    string       `json:"path"`
+	Content string       `json:"content"`
+	Action  CommitAction `json:"action"`
+}
+
+type CommitAction string
+
+const (
+	CommitActionCreate CommitAction = "create"
+	CommitActionUpdate CommitAction = "update"
+	CommitActionDelete CommitAction = "delete"
+)

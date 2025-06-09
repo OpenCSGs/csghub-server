@@ -114,6 +114,7 @@ type Repository struct {
 	HFPath               string                     `bun:",nullzero" json:"hf_path"`
 	GithubPath           string                     `bun:",nullzero" json:"github_path"`
 	StarCount            int                        `bun:",nullzero" json:"star_count"`
+	Migrated             bool                       `bun:"," json:"migrated"`
 	// updated_at timestamp will be updated only if files changed
 	times
 }
@@ -207,6 +208,7 @@ func (r Repository) PathWithOutPrefix() string {
 }
 
 func (s *repoStoreImpl) CreateRepoTx(ctx context.Context, tx bun.Tx, input Repository) (*Repository, error) {
+	input.Migrated = true
 	res, err := tx.NewInsert().Model(&input).Exec(ctx)
 	if err := assertAffectedOneRow(res, err); err != nil {
 		return nil, fmt.Errorf("create repository in tx failed,error:%w", err)

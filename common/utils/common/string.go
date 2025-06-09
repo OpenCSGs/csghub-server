@@ -2,6 +2,7 @@ package common
 
 import (
 	"crypto/md5"
+	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
 	"strings"
@@ -34,5 +35,12 @@ func MD5Hash(s string) string {
 	hash.Write([]byte(s))
 	hashBytes := hash.Sum(nil)
 
+	return hex.EncodeToString(hashBytes)
+}
+
+func SHA256(s string) string {
+	hash := sha256.New()
+	hash.Write([]byte(s))
+	hashBytes := hash.Sum(nil)
 	return hex.EncodeToString(hashBytes)
 }

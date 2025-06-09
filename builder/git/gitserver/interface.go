@@ -72,4 +72,5 @@ type GitServer interface {
 	UploadPack(ctx context.Context, req UploadPackReq) error
 	// Handle git push request
 	ReceivePack(ctx context.Context, req ReceivePackReq) error
+	CommitFiles(ctx context.Context, req CommitFilesReq) error
 }

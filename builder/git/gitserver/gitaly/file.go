@@ -604,6 +604,7 @@ func (c *Client) GetRepoFileTree(ctx context.Context, req gitserver.GetRepoInfoB
 				isLfs           bool
 				lfsPointerSize  int
 				LfsRelativePath string
+				lfsSHA256       string
 			)
 			filename := filepath.Base(string(listBlobResp.Path))
 			if listBlobResp.Type == gitalypb.ObjectType_BLOB {
@@ -619,6 +620,7 @@ func (c *Client) GetRepoFileTree(ctx context.Context, req gitserver.GetRepoInfoB
 					isLfs = true
 					LfsRelativePath = p.RelativePath()
 					lfsPointerSize = int(listBlobResp.Size)
+					lfsSHA256 = p.Oid
 				}
 			}
 			file := &types.File{
@@ -631,6 +633,7 @@ func (c *Client) GetRepoFileTree(ctx context.Context, req gitserver.GetRepoInfoB
 				SHA:             listBlobResp.Oid,
 				LfsPointerSize:  lfsPointerSize,
 				LfsRelativePath: LfsRelativePath,
+				LfsSHA256:       lfsSHA256,
 			}
 			commit := pathCommitMap[string(listBlobResp.Path)]
 			if commit != nil {
@@ -873,4 +876,114 @@ func (c *Client) GetRepoAllLfsPointers(ctx context.Context, req gitserver.GetRep
 		}
 	}
 	return pointers, nil
+}
+
+func (c *Client) CommitFiles(ctx context.Context, req gitserver.CommitFilesReq) error {
+	repoType := fmt.Sprintf("%ss", req.RepoType)
+
+	ctx, cancel := context.WithTimeout(ctx, c.timeout)
+	defer cancel()
+	userCommitFilesClient, err := c.operationClient.UserCommitFiles(ctx)
+	if err != nil {
+		return err
+	}
+	repository := &gitalypb.Repository{
+		StorageName:  c.config.GitalyServer.Storage,
+		RelativePath: BuildRelativePath(repoType, req.Namespace, req.Name),
+		GlRepository: filepath.Join(repoType, req.Namespace, req.Name),
+	}
+
+	startRepo := repository
+
+	header := &gitalypb.UserCommitFilesRequestHeader{
+		Repository: repository,
+		User: &gitalypb.User{
+			GlId:       "user-1",
+			Name:       []byte(req.Username),
+			GlUsername: req.Username,
+			Email:      []byte(req.Email),
+		},
+		BranchName:        []byte(req.Revision),
+		CommitMessage:     []byte(req.Message),
+		CommitAuthorName:  []byte(req.Username),
+		CommitAuthorEmail: []byte(req.Email),
+		Timestamp:         timestamppb.New(time.Now()),
+		StartRepository:   startRepo,
+		Force:             true,
+	}
+
+	allFileActions := []*gitalypb.UserCommitFilesRequest{
+		{
+			UserCommitFilesRequestPayload: &gitalypb.UserCommitFilesRequest_Header{
+				Header: header,
+			},
+		},
+	}
+	for _, file := range req.Files {
+		bodys := []*gitalypb.UserCommitFilesRequest{}
+		for _, chunk := range chunkBytes([]byte(file.Content), 3<<20) {
+			bodys = append(bodys, &gitalypb.UserCommitFilesRequest{
+				UserCommitFilesRequestPayload: &gitalypb.UserCommitFilesRequest_Action{
+					Action: &gitalypb.UserCommitFilesAction{
+						UserCommitFilesActionPayload: &gitalypb.UserCommitFilesAction_Content{
+							Content: chunk,
+						},
+					},
+				},
+			})
+		}
+
+		var action gitalypb.UserCommitFilesActionHeader_ActionType
+		if file.Action == "create" {
+			action = gitalypb.UserCommitFilesActionHeader_CREATE
+		} else if file.Action == "update" {
+			action = gitalypb.UserCommitFilesActionHeader_UPDATE
+		} else if file.Action == "delete" {
+			action = gitalypb.UserCommitFilesActionHeader_DELETE
+		} else {
+			return fmt.Errorf("unknown action: %s", file.Action)
+		}
+
+		fileAction := []*gitalypb.UserCommitFilesRequest{
+			{
+				UserCommitFilesRequestPayload: &gitalypb.UserCommitFilesRequest_Action{
+					Action: &gitalypb.UserCommitFilesAction{
+						UserCommitFilesActionPayload: &gitalypb.UserCommitFilesAction_Header{
+							Header: &gitalypb.UserCommitFilesActionHeader{
+								Action:        action,
+								Base64Content: true,
+								FilePath:      []byte(file.Path),
+							},
+						},
+					},
+				},
+			},
+		}
+		fileAction = append(fileAction, bodys...)
+		allFileActions = append(allFileActions, fileAction...)
+	}
+	for _, action := range allFileActions {
+		err = userCommitFilesClient.Send(action)
+		if err != nil {
+			return err
+		}
+	}
+	_, err = userCommitFilesClient.CloseAndRecv()
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func chunkBytes(data []byte, chunkSize int) [][]byte {
+	var chunks [][]byte
+	for i := 0; i < len(data); i += chunkSize {
+		end := i + chunkSize
+		if end > len(data) {
+			end = len(data)
+		}
+		chunks = append(chunks, data[i:end])
+	}
+	return chunks
 }

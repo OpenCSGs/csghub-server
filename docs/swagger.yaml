@@ -99,6 +99,8 @@ definitions:
         type: string
       id:
         type: integer
+      mini_gpu_finetune_gb:
+        type: number
       mini_gpu_memory_gb:
         type: number
       model_params:
@@ -285,6 +287,8 @@ definitions:
         type: integer
       metadata:
         $ref: '#/definitions/database.Metadata'
+      migrated:
+        type: boolean
       mirror:
         $ref: '#/definitions/database.Mirror'
       ms_path:
@@ -997,6 +1001,34 @@ definitions:
         type: string
       id:
         type: string
+      message:
+        type: string
+    type: object
+  types.CommitAction:
+    enum:
+    - create
+    - update
+    - delete
+    type: string
+    x-enum-varnames:
+    - CommitActionCreate
+    - CommitActionUpdate
+    - CommitActionDelete
+  types.CommitFileReq:
+    properties:
+      action:
+        $ref: '#/definitions/types.CommitAction'
+      content:
+        type: string
+      path:
+        type: string
+    type: object
+  types.CommitFilesReq:
+    properties:
+      files:
+        items:
+          $ref: '#/definitions/types.CommitFileReq'
+        type: array
       message:
         type: string
     type: object
@@ -2156,6 +2188,8 @@ definitions:
         type: string
       class_name:
         type: string
+      mini_gpu_finetune_gb:
+        type: number
       mini_gpu_memory_gb:
         type: number
       model_params:
@@ -2422,6 +2456,42 @@ definitions:
       size:
         type: integer
     type: object
+  types.PreuploadFile:
+    properties:
+      path:
+        type: string
+      sample:
+        type: string
+      size:
+        type: integer
+    type: object
+  types.PreuploadReq:
+    properties:
+      files:
+        items:
+          $ref: '#/definitions/types.PreuploadFile'
+        type: array
+    type: object
+  types.PreuploadResp:
+    properties:
+      files:
+        items:
+          $ref: '#/definitions/types.PreuploadRespFile'
+        type: array
+    type: object
+  types.PreuploadRespFile:
+    properties:
+      isDir:
+        type: boolean
+      oid:
+        type: string
+      path:
+        type: string
+      shouldIgnore:
+        type: boolean
+      uploadMode:
+        $ref: '#/definitions/types.UploadMode'
+    type: object
   types.PromptRes:
     properties:
       can_manage:
@@ -2539,6 +2609,21 @@ definitions:
       spaces:
         items:
           $ref: '#/definitions/types.Space'
+        type: array
+    type: object
+  types.RemoteDiffs:
+    properties:
+      added:
+        items:
+          type: string
+        type: array
+      modified:
+        items:
+          type: string
+        type: array
+      removed:
+        items:
+          type: string
         type: array
     type: object
   types.RepoBranchCommit:
@@ -3251,6 +3336,14 @@ definitions:
           type: string
         type: array
     type: object
+  types.UploadMode:
+    enum:
+    - regular
+    - lfs
+    type: string
+    x-enum-varnames:
+    - UploadModeRegular
+    - UploadModeLFS
   types.User:
     properties:
       avatar:
@@ -3669,6 +3762,66 @@ paths:
       - ApiKey: []
       summary: Get commit diff of repository and data field of response need to be
         decode with base64
+      tags:
+      - Repository
+  /{repo_type}/{namespace}/{name}/commit/{revision}:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: models,datasets,codes or spaces
+        enum:
+        - models
+        - datasets
+        - codes
+        - spaces
+        in: path
+        name: repo_type
+        required: true
+        type: string
+      - description: repo owner name
+        in: path
+        name: namespace
+        required: true
+        type: string
+      - description: repo name
+        in: path
+        name: name
+        required: true
+        type: string
+      - description: revision
+        in: path
+        name: revision
+        required: true
+        type: string
+      - description: current user name
+        in: query
+        name: current_user
+        type: string
+      - description: body
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/types.CommitFilesReq'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/types.Response'
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Create commit with batch files
       tags:
       - Repository
   /{repo_type}/{namespace}/{name}/commits:
@@ -4333,6 +4486,71 @@ paths:
       summary: Mirror repo from OpenCSG Saas(only on-premises)
       tags:
       - Repository
+  /{repo_type}/{namespace}/{name}/preupload/{revision}:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: models,datasets,codes or spaces
+        enum:
+        - models
+        - datasets
+        - codes
+        - spaces
+        in: path
+        name: repo_type
+        required: true
+        type: string
+      - description: repo owner name
+        in: path
+        name: namespace
+        required: true
+        type: string
+      - description: repo name
+        in: path
+        name: name
+        required: true
+        type: string
+      - description: revision
+        in: path
+        name: revision
+        required: true
+        type: string
+      - description: current user name
+        in: query
+        name: current_user
+        type: string
+      - description: body
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/types.PreuploadReq'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/types.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/types.PreuploadResp'
+              type: object
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Get upload mode for files
+      tags:
+      - Repository
   /{repo_type}/{namespace}/{name}/raw/{file_path}:
     get:
       consumes:
@@ -4655,6 +4873,67 @@ paths:
       security:
       - ApiKey: []
       summary: Get file tree
+      tags:
+      - Repository
+  /{repo_type}/{namespace}/{name}/remote_diff:
+    get:
+      consumes:
+      - application/json
+      parameters:
+      - description: models,datasets,codes or spaces
+        enum:
+        - models
+        - datasets
+        - codes
+        - spaces
+        in: path
+        name: repo_type
+        required: true
+        type: string
+      - description: repo owner name
+        in: path
+        name: namespace
+        required: true
+        type: string
+      - description: repo name
+        in: path
+        name: name
+        required: true
+        type: string
+      - description: current user name
+        in: query
+        name: current_user
+        type: string
+      - description: previous commit id
+        in: query
+        name: left_commit_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/types.Response'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/types.RemoteDiffs'
+                  type: array
+              type: object
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/types.APIBadRequest'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/types.APIInternalServerError'
+      security:
+      - ApiKey: []
+      summary: Get diff between local last commit and remote commit
       tags:
       - Repository
   /{repo_type}/{namespace}/{name}/resolve/{file_path}:

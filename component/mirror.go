@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
-	"path"
 	"strings"
 
 	"github.com/minio/minio-go/v7"
@@ -602,8 +601,7 @@ func (c *mirrorComponentImpl) countMirrorProgress(ctx context.Context, mirror da
 		return 100, nil
 	}
 	for _, f := range lfsFiles {
-		objectKey := f.LfsRelativePath
-		objectKey = path.Join("lfs", objectKey)
+		objectKey := common.BuildLfsPath(mirror.Repository.ID, f.LfsSHA256, mirror.Repository.Migrated)
 		_, err := c.s3Client.StatObject(ctx, c.lfsBucket, objectKey, minio.GetObjectOptions{})
 		if err != nil {
 			if minio.ToErrorResponse(err).Code != "NoSuchKey" {
