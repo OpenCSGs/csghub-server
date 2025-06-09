@@ -29,21 +29,31 @@ func (_m *MockGitHTTPComponent) EXPECT() *MockGitHTTPComponent_Expecter {
 }
 
 // CompleteMultipartUpload provides a mock function with given fields: ctx, req, bodyReq
-func (_m *MockGitHTTPComponent) CompleteMultipartUpload(ctx context.Context, req types.CompleteMultipartUploadReq, bodyReq types.CompleteMultipartUploadBody) error {
+func (_m *MockGitHTTPComponent) CompleteMultipartUpload(ctx context.Context, req types.CompleteMultipartUploadReq, bodyReq types.CompleteMultipartUploadBody) (int, error) {
 	ret := _m.Called(ctx, req, bodyReq)
 
 	if len(ret) == 0 {
 		panic("no return value specified for CompleteMultipartUpload")
 	}
 
-	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, types.CompleteMultipartUploadReq, types.CompleteMultipartUploadBody) error); ok {
+	var r0 int
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, types.CompleteMultipartUploadReq, types.CompleteMultipartUploadBody) (int, error)); ok {
+		return rf(ctx, req, bodyReq)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, types.CompleteMultipartUploadReq, types.CompleteMultipartUploadBody) int); ok {
 		r0 = rf(ctx, req, bodyReq)
 	} else {
-		r0 = ret.Error(0)
+		r0 = ret.Get(0).(int)
 	}
 
-	return r0
+	if rf, ok := ret.Get(1).(func(context.Context, types.CompleteMultipartUploadReq, types.CompleteMultipartUploadBody) error); ok {
+		r1 = rf(ctx, req, bodyReq)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
 }
 
 // MockGitHTTPComponent_CompleteMultipartUpload_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'CompleteMultipartUpload'
@@ -66,12 +76,12 @@ func (_c *MockGitHTTPComponent_CompleteMultipartUpload_Call) Run(run func(ctx co
 	return _c
 }
 
-func (_c *MockGitHTTPComponent_CompleteMultipartUpload_Call) Return(_a0 error) *MockGitHTTPComponent_CompleteMultipartUpload_Call {
-	_c.Call.Return(_a0)
+func (_c *MockGitHTTPComponent_CompleteMultipartUpload_Call) Return(_a0 int, _a1 error) *MockGitHTTPComponent_CompleteMultipartUpload_Call {
+	_c.Call.Return(_a0, _a1)
 	return _c
 }
 
-func (_c *MockGitHTTPComponent_CompleteMultipartUpload_Call) RunAndReturn(run func(context.Context, types.CompleteMultipartUploadReq, types.CompleteMultipartUploadBody) error) *MockGitHTTPComponent_CompleteMultipartUpload_Call {
+func (_c *MockGitHTTPComponent_CompleteMultipartUpload_Call) RunAndReturn(run func(context.Context, types.CompleteMultipartUploadReq, types.CompleteMultipartUploadBody) (int, error)) *MockGitHTTPComponent_CompleteMultipartUpload_Call {
 	_c.Call.Return(run)
 	return _c
 }
