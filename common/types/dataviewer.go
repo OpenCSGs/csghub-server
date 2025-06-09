@@ -20,6 +20,7 @@ type UpdateViewerReq struct {
 	CurrentUser string         `json:"current_user"`
 	RepoType    RepositoryType `json:"repo_type"`
 	RepoID      int64          `json:"repo_id"`
+	Migrated    bool           `json:"migrated"`
 }
 
 type WorkFlowInfo struct {

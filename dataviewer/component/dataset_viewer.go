@@ -19,6 +19,7 @@ import (
 	"opencsg.com/csghub-server/builder/store/s3"
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/types"
+	"opencsg.com/csghub-server/common/utils/common"
 	hubCom "opencsg.com/csghub-server/component"
 	dvCom "opencsg.com/csghub-server/dataviewer/common"
 	"opencsg.com/csghub-server/dataviewer/workflows"
@@ -187,8 +188,10 @@ func (c *datasetViewerComponentImpl) LimitOffsetRows(ctx context.Context, req *d
 		return nil, hubCom.ErrForbidden
 	}
 	req.Branch = r.DefaultBranch
+	req.RepoID = r.ID
+	req.Migrated = r.Migrated
 
-	_, paths, err := c.getViewerCardData(ctx, r.ID, &viewerReq)
+	_, paths, err := c.getViewerCardData(ctx, req, &viewerReq)
 	if err != nil {
 		// parse readme dataset yaml
 		paths, err = c.getFilesFromDatasetCard(ctx, req, viewerReq.Config, viewerReq.Split)
@@ -200,7 +203,9 @@ func (c *datasetViewerComponentImpl) LimitOffsetRows(ctx context.Context, req *d
 				return nil, fmt.Errorf("failed to get parquet objects, %w", err)
 			}
 			for _, f := range fs {
-				paths = append(paths, "lfs/"+f.LfsRelativePath)
+				objectKey := common.BuildLfsPath(req.RepoID, f.LfsSHA256, req.Migrated)
+				paths = append(paths, objectKey)
+				// paths = append(paths, "lfs/"+f.LfsRelativePath)
 			}
 		}
 	}
@@ -243,13 +248,15 @@ func (c *datasetViewerComponentImpl) Rows(ctx context.Context, req *dvCom.ViewPa
 		return nil, hubCom.ErrForbidden
 	}
 	req.Branch = r.DefaultBranch
+	req.RepoID = r.ID
+	req.Migrated = r.Migrated
 
 	err = c.lazyInit(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to init parquet reader, %w", err)
 	}
 
-	_, parquetObjs, err := c.getViewerCardData(ctx, r.ID, &viewerReq)
+	_, parquetObjs, err := c.getViewerCardData(ctx, req, &viewerReq)
 	if err != nil {
 		slog.Warn("do not found viewer card data", slog.Any("repo_id", r.ID), slog.Any("req", req), slog.Any("error", err))
 		parquetObjs, err = c.getRepoParquetObjs(ctx, req, viewerReq)
@@ -339,13 +346,15 @@ func (c *datasetViewerComponentImpl) GetCatalog(ctx context.Context, req *dvCom.
 		return nil, hubCom.ErrForbidden
 	}
 	req.Branch = r.DefaultBranch
+	req.RepoID = r.ID
+	req.Migrated = r.Migrated
 
 	err = c.lazyInit(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to init parquet reader, %w", err)
 	}
 
-	viewerCardData, _, err := c.getViewerCardData(ctx, r.ID, nil)
+	viewerCardData, _, err := c.getViewerCardData(ctx, req, nil)
 	if err != nil {
 		slog.Warn("do not found viewer card data", slog.Any("repo_id", r.ID), slog.Any("req", req), slog.Any("error", err))
 	} else {
@@ -362,10 +371,10 @@ func (c *datasetViewerComponentImpl) GetCatalog(ctx context.Context, req *dvCom.
 	}, nil
 }
 
-func (c *datasetViewerComponentImpl) getViewerCardData(ctx context.Context, repoID int64, viewerReq *types.DataViewerReq) (*dvCom.CataLogRespone, []string, error) {
-	viewer, err := c.viewerStore.GetViewerByRepoID(ctx, repoID)
+func (c *datasetViewerComponentImpl) getViewerCardData(ctx context.Context, req *dvCom.ViewParquetFileReq, viewerReq *types.DataViewerReq) (*dvCom.CataLogRespone, []string, error) {
+	viewer, err := c.viewerStore.GetViewerByRepoID(ctx, req.RepoID)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to get viewer by repo_id %d, error: %w", repoID, err)
+		return nil, nil, fmt.Errorf("failed to get viewer by repo_id %d, error: %w", req.RepoID, err)
 	}
 
 	if viewer == nil || viewer.DataviewerJob == nil {
@@ -395,7 +404,9 @@ func (c *datasetViewerComponentImpl) getViewerCardData(ctx context.Context, repo
 		for _, split := range info.Splits {
 			if viewerReq != nil && viewerReq.Config == info.ConfigName && viewerReq.Split == split.Name {
 				for _, f := range split.Files {
-					parquetObjs = append(parquetObjs, fmt.Sprintf("lfs/%s", f.LfsRelativePath))
+					objectKey := common.BuildLfsPath(req.RepoID, f.LfsSHA256, req.Migrated)
+					parquetObjs = append(parquetObjs, objectKey)
+					// parquetObjs = append(parquetObjs, fmt.Sprintf("lfs/%s", f.LfsRelativePath))
 				}
 			}
 			newSplit := dvCom.Split{
@@ -718,6 +729,8 @@ func (c *datasetViewerComponentImpl) getFilesOBJs(ctx context.Context, req *dvCo
 			RepoName:  req.RepoName,
 			Branch:    req.Branch,
 			Path:      file,
+			RepoID:    req.RepoID,
+			Migrated:  req.Migrated,
 		})
 		if err != nil {
 			slog.Warn("failed to get parquet object name", slog.Any("req", req), slog.Any("error", err))
@@ -747,5 +760,8 @@ func (c *datasetViewerComponentImpl) getParquetObject(ctx context.Context, req *
 	if f.LfsRelativePath == "" {
 		return "", fmt.Errorf("file LfsRelativePath is empty for %s", getFileContentReq.Path)
 	}
-	return "lfs/" + f.LfsRelativePath, nil
+	// return "lfs/" + f.LfsRelativePath, nil
+	objectKey := common.BuildLfsPath(req.RepoID, f.LfsSHA256, req.Migrated)
+	return objectKey, nil
+
 }

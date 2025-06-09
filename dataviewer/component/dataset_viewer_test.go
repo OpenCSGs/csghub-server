@@ -22,6 +22,7 @@ func TestDatasetViewerComponent_ViewParquetFile(t *testing.T) {
 		repo, nil,
 	)
 	dc.mocks.components.repo.EXPECT().AllowReadAccessRepo(ctx, repo, "user").Return(true, nil)
+
 	dc.mocks.gitServer.EXPECT().GetRepoFileContents(mock.Anything, gitserver.GetRepoInfoByPathReq{
 		Namespace: "ns",
 		Name:      "repo",
@@ -30,12 +31,15 @@ func TestDatasetViewerComponent_ViewParquetFile(t *testing.T) {
 		RepoType:  types.DatasetRepo,
 	}).Return(&types.File{
 		LfsRelativePath: "a/b",
+		LfsSHA256:       "c5185c4794be2d8a9784d5753c9922db38df478ce11f9ed0b415b7304d896836",
 	}, nil)
-	dc.mocks.preader.EXPECT().RowCount(mock.Anything, []string{"lfs/a/b"}, types.QueryReq{
+
+	dc.mocks.preader.EXPECT().RowCount(mock.Anything, []string{"lfs/c5/18/5c4794be2d8a9784d5753c9922db38df478ce11f9ed0b415b7304d896836"}, types.QueryReq{
 		PageSize:  10,
 		PageIndex: 1,
 	}, true).Return(100, nil)
-	dc.mocks.preader.EXPECT().FetchRows(mock.Anything, []string{"lfs/a/b"}, types.QueryReq{
+
+	dc.mocks.preader.EXPECT().FetchRows(mock.Anything, []string{"lfs/c5/18/5c4794be2d8a9784d5753c9922db38df478ce11f9ed0b415b7304d896836"}, types.QueryReq{
 		PageSize:  10,
 		PageIndex: 1,
 	}, true).Return([]string{"a", "b"}, []string{"c", "d"}, [][]interface{}{
@@ -84,6 +88,7 @@ func TestDatasetViewerComponent_Rows(t *testing.T) {
 		RepoType:  types.DatasetRepo,
 	}).Return(&types.File{
 		LfsRelativePath: "a/b",
+		LfsSHA256:       "c5185c4794be2d8a9784d5753c9922db38df478ce11f9ed0b415b7304d896836",
 		Content:         "LS0tCmNvbmZpZ3M6Ci0gY29uZmlnX25hbWU6ICJmb28iCiAgZGF0YV9maWxlczoKICAtIHNwbGl0OiB0cmFpbgogICAgcGF0aDogZm9vLy4qCi0gY29uZmlnX25hbWU6ICJiYXIiCiAgZGF0YV9maWxlczoKICAtIHNwbGl0OiB0cmFpbgpwYXRoOiBiYXIvLioKLS0tCg==",
 	}, nil)
 	dc.mocks.gitServer.EXPECT().GetRepoFileContents(mock.Anything, gitserver.GetRepoInfoByPathReq{
@@ -94,12 +99,13 @@ func TestDatasetViewerComponent_Rows(t *testing.T) {
 		RepoType:  types.DatasetRepo,
 	}).Return(&types.File{
 		LfsRelativePath: "a/b",
+		LfsSHA256:       "c5185c4794be2d8a9784d5753c9922db38df478ce11f9ed0b415b7304d896836",
 	}, nil)
-	dc.mocks.preader.EXPECT().RowCount(mock.Anything, []string{"lfs/a/b"}, types.QueryReq{
+	dc.mocks.preader.EXPECT().RowCount(mock.Anything, []string{"lfs/c5/18/5c4794be2d8a9784d5753c9922db38df478ce11f9ed0b415b7304d896836"}, types.QueryReq{
 		PageSize:  10,
 		PageIndex: 1,
 	}, true).Return(100, nil)
-	dc.mocks.preader.EXPECT().FetchRows(mock.Anything, []string{"lfs/a/b"}, types.QueryReq{
+	dc.mocks.preader.EXPECT().FetchRows(mock.Anything, []string{"lfs/c5/18/5c4794be2d8a9784d5753c9922db38df478ce11f9ed0b415b7304d896836"}, types.QueryReq{
 		PageSize:  10,
 		PageIndex: 1,
 	}, true).Return([]string{"a", "b"}, []string{"c", "d"}, [][]interface{}{
@@ -108,7 +114,11 @@ func TestDatasetViewerComponent_Rows(t *testing.T) {
 	dc.mocks.gitServer.EXPECT().GetTree(
 		mock.Anything, types.GetTreeRequest{Namespace: "ns", Name: "repo", Ref: "main", Limit: 500, RepoType: "dataset", Recursive: true},
 	).Return(&types.GetRepoFileTreeResp{Files: []*types.File{
-		{Name: "foobar.parquet", Path: "foo/foobar.parquet"},
+		{
+			Name:      "foobar.parquet",
+			Path:      "foo/foobar.parquet",
+			LfsSHA256: "c5185c4794be2d8a9784d5753c9922db38df478ce11f9ed0b415b7304d896836",
+		},
 	}, Cursor: ""}, nil)
 
 	resp, err := dc.Rows(ctx, &dvCom.ViewParquetFileReq{
@@ -154,6 +164,7 @@ func TestDatasetViewerComponent_LimitOffsetRowsNoCard(t *testing.T) {
 	}).Return(&types.File{
 		LfsRelativePath: "a/b",
 		Content:         "xxx",
+		LfsSHA256:       "c5185c4794be2d8a9784d5753c9922db38df478ce11f9ed0b415b7304d896836",
 	}, nil)
 	dc.mocks.gitServer.EXPECT().GetTree(mock.Anything, types.GetTreeRequest{
 		Namespace: "ns",
@@ -166,14 +177,20 @@ func TestDatasetViewerComponent_LimitOffsetRowsNoCard(t *testing.T) {
 	}).Return(
 		&types.GetRepoFileTreeResp{Files: []*types.File{
 			{
-				Name: "foobar.parquet", Path: "train/foobar.parquet",
+				Name:            "foobar.parquet",
+				Path:            "train/foobar.parquet",
 				LfsRelativePath: "a/b",
+				LfsSHA256:       "c5185c4794be2d8a9784d5753c9922db38df478ce11f9ed0b415b7304d896836",
 			},
 		}}, nil,
 	)
 
-	dc.mocks.limitOffsetReader.EXPECT().RowsWithCount(ctx, []string{"lfs/a/b"}, int64(16), int64(48)).Return(
-		[]string{"a", "b"}, []string{"c", "d"}, [][]any{
+	dc.mocks.limitOffsetReader.EXPECT().RowsWithCount(ctx,
+		[]string{"lfs/c5/18/5c4794be2d8a9784d5753c9922db38df478ce11f9ed0b415b7304d896836"},
+		int64(16), int64(48)).Return(
+		[]string{"a", "b"},
+		[]string{"c", "d"},
+		[][]any{
 			{1, 2, 3},
 		}, 12000, nil,
 	)
@@ -220,6 +237,7 @@ func TestDatasetViewerComponent_LimitOffsetRowsWithCard(t *testing.T) {
 	}).Return(&types.File{
 		LfsRelativePath: "a/b",
 		Content:         "LS0tCmNvbmZpZ3M6Ci0gY29uZmlnX25hbWU6ICJmb28iCiAgZGF0YV9maWxlczoKICAtIHNwbGl0OiB0cmFpbgogICAgcGF0aDogZm9vLy4qCi0gY29uZmlnX25hbWU6ICJiYXIiCiAgZGF0YV9maWxlczoKICAtIHNwbGl0OiB0cmFpbgpwYXRoOiBiYXIvLioKLS0tCg==",
+		LfsSHA256:       "c5185c4794be2d8a9784d5753c9922db38df478ce11f9ed0b415b7304d896836",
 	}, nil)
 	dc.mocks.gitServer.EXPECT().GetRepoFileContents(mock.Anything, gitserver.GetRepoInfoByPathReq{
 		Namespace: "ns",
@@ -229,6 +247,7 @@ func TestDatasetViewerComponent_LimitOffsetRowsWithCard(t *testing.T) {
 		RepoType:  types.DatasetRepo,
 	}).Return(&types.File{
 		LfsRelativePath: "a/b",
+		LfsSHA256:       "c5185c4794be2d8a9784d5753c9922db38df478ce11f9ed0b415b7304d896836",
 	}, nil)
 
 	dc.mocks.gitServer.EXPECT().GetTree(
@@ -237,8 +256,13 @@ func TestDatasetViewerComponent_LimitOffsetRowsWithCard(t *testing.T) {
 		{Name: "foobar.parquet", Path: "foo/foobar.parquet"},
 	}, Cursor: ""}, nil)
 
-	dc.mocks.limitOffsetReader.EXPECT().RowsWithCount(ctx, []string{"lfs/a/b"}, int64(16), int64(48)).Return(
-		[]string{"a", "b"}, []string{"c", "d"}, [][]any{
+	dc.mocks.limitOffsetReader.EXPECT().RowsWithCount(ctx,
+		[]string{"lfs/c5/18/5c4794be2d8a9784d5753c9922db38df478ce11f9ed0b415b7304d896836"},
+		int64(16),
+		int64(48)).Return(
+		[]string{"a", "b"},
+		[]string{"c", "d"},
+		[][]any{
 			{1, 2, 3},
 		}, 12000, nil,
 	)
@@ -284,6 +308,7 @@ func TestDatasetViewerComponent_GetCatalog(t *testing.T) {
 		}).Return(&types.File{
 			LfsRelativePath: "a/b",
 			Content:         "LS0tCmNvbmZpZ3M6Ci0gY29uZmlnX25hbWU6ICJmb28iCiAgZGF0YV9maWxlczoKICAtIHNwbGl0OiB0cmFpbgogICAgcGF0aDogZm9vLy4qCi0gY29uZmlnX25hbWU6ICJiYXIiCiAgZGF0YV9maWxlczoKICAtIHNwbGl0OiB0cmFpbgpwYXRoOiBiYXIvLioKLS0tCg==",
+			LfsSHA256:       "c5185c4794be2d8a9784d5753c9922db38df478ce11f9ed0b415b7304d896836",
 		}, nil)
 		dc.mocks.gitServer.EXPECT().GetRepoFileContents(mock.Anything, gitserver.GetRepoInfoByPathReq{
 			Namespace: "ns",
@@ -293,16 +318,23 @@ func TestDatasetViewerComponent_GetCatalog(t *testing.T) {
 			RepoType:  types.DatasetRepo,
 		}).Return(&types.File{
 			LfsRelativePath: "a/b",
+			LfsSHA256:       "c5185c4794be2d8a9784d5753c9922db38df478ce11f9ed0b415b7304d896836",
 		}, nil)
-		dc.mocks.preader.EXPECT().RowCount(mock.Anything, []string{"lfs/a/b"}, types.QueryReq{
-			PageSize:  10,
-			PageIndex: 1,
-		}, true).Return(100, nil)
+		dc.mocks.preader.EXPECT().RowCount(mock.Anything,
+			[]string{"lfs/c5/18/5c4794be2d8a9784d5753c9922db38df478ce11f9ed0b415b7304d896836"},
+			types.QueryReq{
+				PageSize:  10,
+				PageIndex: 1,
+			}, true).Return(100, nil)
 
 		dc.mocks.gitServer.EXPECT().GetTree(
 			mock.Anything, types.GetTreeRequest{Namespace: "ns", Name: "repo", RepoType: "dataset", Ref: "main", Limit: 500, Recursive: true},
 		).Return(&types.GetRepoFileTreeResp{Files: []*types.File{
-			{Name: "foobar.parquet", Path: "foo/foobar.parquet"},
+			{
+				Name:      "foobar.parquet",
+				Path:      "foo/foobar.parquet",
+				LfsSHA256: "c5185c4794be2d8a9784d5753c9922db38df478ce11f9ed0b415b7304d896836",
+			},
 		}, Cursor: ""}, nil)
 
 		data, err := dc.GetCatalog(ctx, &dvCom.ViewParquetFileReq{
@@ -346,6 +378,7 @@ func TestDatasetViewerComponent_GetCatalog(t *testing.T) {
 		}).Return(&types.File{
 			LfsRelativePath: "a/b",
 			Content:         "xxx",
+			LfsSHA256:       "c5185c4794be2d8a9784d5753c9922db38df478ce11f9ed0b415b7304d896836",
 		}, nil)
 		dc.mocks.gitServer.EXPECT().GetRepoFileContents(mock.Anything, gitserver.GetRepoInfoByPathReq{
 			Namespace: "ns",
@@ -355,16 +388,23 @@ func TestDatasetViewerComponent_GetCatalog(t *testing.T) {
 			RepoType:  types.DatasetRepo,
 		}).Return(&types.File{
 			LfsRelativePath: "a/b",
+			LfsSHA256:       "c5185c4794be2d8a9784d5753c9922db38df478ce11f9ed0b415b7304d896836",
 		}, nil)
-		dc.mocks.preader.EXPECT().RowCount(mock.Anything, []string{"lfs/a/b"}, types.QueryReq{
-			PageSize:  10,
-			PageIndex: 1,
-		}, true).Return(100, nil)
+		dc.mocks.preader.EXPECT().RowCount(mock.Anything,
+			[]string{"lfs/c5/18/5c4794be2d8a9784d5753c9922db38df478ce11f9ed0b415b7304d896836"},
+			types.QueryReq{
+				PageSize:  10,
+				PageIndex: 1,
+			}, true).Return(100, nil)
 
 		dc.mocks.gitServer.EXPECT().GetTree(
 			mock.Anything, types.GetTreeRequest{Namespace: "ns", Name: "repo", RepoType: "dataset", Ref: "main", Limit: 500, Recursive: true},
 		).Return(&types.GetRepoFileTreeResp{Files: []*types.File{
-			{Name: "foobar.parquet", Path: "foo/train.parquet"},
+			{
+				Name:      "foobar.parquet",
+				Path:      "foo/train.parquet",
+				LfsSHA256: "c5185c4794be2d8a9784d5753c9922db38df478ce11f9ed0b415b7304d896836",
+			},
 		}, Cursor: ""}, nil)
 
 		data, err := dc.GetCatalog(ctx, &dvCom.ViewParquetFileReq{

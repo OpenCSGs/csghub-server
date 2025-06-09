@@ -52,7 +52,6 @@ type dataViewerActivityImpl struct {
 	cfg          *config.Config
 	viewerStore  database.DataviewerStore
 	lfsMetaStore database.LfsMetaObjectStore
-	repoStore    database.RepoStore
 }
 
 func NewDataViewerActivity(cfg *config.Config, gs gitserver.GitServer) (DataViewerActivity, error) {
@@ -66,7 +65,6 @@ func NewDataViewerActivity(cfg *config.Config, gs gitserver.GitServer) (DataView
 		cfg:          cfg,
 		viewerStore:  database.NewDataviewerStore(),
 		lfsMetaStore: database.NewLfsMetaObjectStore(),
-		repoStore:    database.NewRepoStore(),
 	}, nil
 }
 
@@ -310,9 +308,10 @@ func (dva *dataViewerActivityImpl) CheckIfNeedRebuild(ctx context.Context, check
 			slog.Any("repo id", checkParam.Req.RepoID), slog.Any("error", err))
 		return true, nil
 	}
-	if viewer == nil {
+	if viewer == nil || viewer.DataviewerJob == nil {
 		return true, nil
 	}
+
 	newMD5 := GetCardDataMD5(checkParam.Card)
 	if viewer.DataviewerJob.CardMD5 == newMD5 {
 		slog.Warn("card data md5 not changed, no need to rebuild", slog.Any("req", checkParam.Req),
@@ -526,8 +525,11 @@ func (dva *dataViewerActivityImpl) CopyParquetFiles(ctx context.Context, copyReq
 						Size:            orginfile.Size,
 						Lfs:             orginfile.Lfs,
 						LfsRelativePath: orginfile.LfsRelativePath,
+						LfsSHA256:       orginfile.LfsSHA256,
 					})
-					objectNames = append(objectNames, filepath.Join("lfs", orginfile.LfsRelativePath))
+					objectKey := common.BuildLfsPath(copyReq.Req.RepoID, orginfile.LfsSHA256, copyReq.Req.Migrated)
+					objectNames = append(objectNames, objectKey)
+					// objectNames = append(objectNames, filepath.Join("lfs", orginfile.LfsRelativePath))
 				}
 				count, err = r.RowCount(ctx, objectNames, types.QueryReq{}, true)
 				if err != nil {
@@ -667,11 +669,7 @@ func (dva *dataViewerActivityImpl) downloadFile(ctx context.Context, req types.U
 }
 
 func (dva *dataViewerActivityImpl) downloadLfsFile(ctx context.Context, req types.UpdateViewerReq, localFileFullPath string, orginFile dvCom.FileObject, loadFile *dvCom.FileObject, fileExtName string) error {
-	repo, err := dva.repoStore.FindByPath(ctx, req.RepoType, req.Namespace, req.Name)
-	if err != nil {
-		return fmt.Errorf("failed to find repo: %w", err)
-	}
-	objectKey := common.BuildLfsPath(repo.ID, strings.ReplaceAll(orginFile.LfsRelativePath, "/", ""), repo.Migrated)
+	objectKey := common.BuildLfsPath(req.RepoID, strings.ReplaceAll(orginFile.LfsRelativePath, "/", ""), req.Migrated)
 	loadFile.ObjectKey = objectKey
 
 	if !dva.cfg.DataViewer.DownloadLfsFile {
@@ -878,13 +876,14 @@ func (dva *dataViewerActivityImpl) UploadParquetFiles(ctx context.Context, uploa
 						Size:        fileInfo.Size(),
 						Lfs:         true,
 					}
-					err = dva.uploadToRepo(ctx, uploadReq.Req, uploadFile, uploadReq.NewBranch, repoAllFiles)
+					oid, err := dva.uploadToRepo(ctx, uploadReq.Req, uploadFile, uploadReq.NewBranch, repoAllFiles)
 					if err != nil {
 						slog.Error("upload file to repo error", slog.Any("realFile", realFile),
 							slog.Any("req", uploadReq.Req), slog.Any("newbranch", uploadReq.NewBranch), slog.Any("error", err))
 						return nil, fmt.Errorf("failed to upload file %s to repo %s/%s branch %s, cause: %w", realFile,
 							uploadReq.Req.Namespace, uploadReq.Req.Name, uploadReq.NewBranch, err)
 					}
+					uploadFile.LfsSHA256 = oid
 					newFiles = append(newFiles, *uploadFile)
 					objectNames = append(objectNames, realFile)
 				}
@@ -912,37 +911,34 @@ func (dva *dataViewerActivityImpl) UploadParquetFiles(ctx context.Context, uploa
 	return &cardData, nil
 }
 
-func (dva *dataViewerActivityImpl) uploadToRepo(ctx context.Context, req types.UpdateViewerReq, uploadFile *dvCom.FileObject, newBranch string, repoAllFiles map[string]string) error {
+func (dva *dataViewerActivityImpl) uploadToRepo(ctx context.Context, req types.UpdateViewerReq, uploadFile *dvCom.FileObject, newBranch string, repoAllFiles map[string]string) (string, error) {
 	f, err := os.Open(uploadFile.ConvertPath)
 	if err != nil {
-		return fmt.Errorf("open file %s, cause: %w", uploadFile.ConvertPath, err)
+		return "", fmt.Errorf("open file %s, cause: %w", uploadFile.ConvertPath, err)
 	}
 	defer f.Close()
 
 	pointer, err := gitea.GeneratePointer(f)
 	if err != nil {
-		return fmt.Errorf("fail to get lfs file %s point, cause: %w", uploadFile.ConvertPath, err)
+		return "", fmt.Errorf("fail to get lfs file %s point, cause: %w", uploadFile.ConvertPath, err)
 	}
 	encodingLfsContent := base64.StdEncoding.EncodeToString([]byte(pointer.StringContent()))
 
 	_, err = f.Seek(0, 0)
 	if err != nil {
-		return fmt.Errorf("seek to beginning of file %s, cause: %w", uploadFile.ConvertPath, err)
+		return "", fmt.Errorf("seek to beginning of file %s, cause: %w", uploadFile.ConvertPath, err)
 	}
 
 	uploadFile.LfsRelativePath = pointer.RelativePath()
-	repo, err := dva.repoStore.FindByPath(ctx, req.RepoType, req.Namespace, req.Name)
-	if err != nil {
-		return fmt.Errorf("failed to find repo: %w", err)
-	}
-	objectKey := common.BuildLfsPath(repo.ID, pointer.Oid, repo.Migrated)
+
+	objectKey := common.BuildLfsPath(req.RepoID, pointer.Oid, req.Migrated)
 	uploadInfo, err := dva.s3Client.PutObject(ctx, dva.cfg.S3.Bucket, objectKey, f, pointer.Size, minio.PutObjectOptions{})
 	if err != nil {
-		return fmt.Errorf("upload file %s to S3, cause: %w", uploadFile.ConvertPath, err)
+		return "", fmt.Errorf("upload file %s to S3, cause: %w", uploadFile.ConvertPath, err)
 	}
 
 	if uploadInfo.Size != pointer.Size {
-		return fmt.Errorf("uploaded S3 file %s size does not match expected size: %d != %d", uploadFile.ConvertPath, uploadInfo.Size, pointer.Size)
+		return "", fmt.Errorf("uploaded S3 file %s size does not match expected size: %d != %d", uploadFile.ConvertPath, uploadInfo.Size, pointer.Size)
 	}
 
 	metaReq := database.LfsMetaObject{
@@ -953,7 +949,7 @@ func (dva *dataViewerActivityImpl) uploadToRepo(ctx context.Context, req types.U
 	}
 	_, err = dva.lfsMetaStore.UpdateOrCreate(ctx, metaReq)
 	if err != nil {
-		return fmt.Errorf("failed to create meta record for lfs file %s in repo %s/%s branch %s, cause: %w", uploadFile.RepoFile, req.Namespace, req.Name, newBranch, err)
+		return "", fmt.Errorf("failed to create meta record for lfs file %s in repo %s/%s branch %s, cause: %w", uploadFile.RepoFile, req.Namespace, req.Name, newBranch, err)
 	}
 
 	_, exists := repoAllFiles[uploadFile.RepoFile]
@@ -974,7 +970,7 @@ func (dva *dataViewerActivityImpl) uploadToRepo(ctx context.Context, req types.U
 		if err != nil {
 			slog.Error("failed to update file in branch", slog.Any("newfile", uploadFile.RepoFile),
 				slog.Any("newBranch", newBranch), slog.Any("req", req), slog.Any("error", err))
-			return fmt.Errorf("failed to update file %s in new branch %s, cause: %w",
+			return "", fmt.Errorf("failed to update file %s in new branch %s, cause: %w",
 				uploadFile.RepoFile, newBranch, err)
 		}
 	} else {
@@ -992,11 +988,11 @@ func (dva *dataViewerActivityImpl) uploadToRepo(ctx context.Context, req types.U
 
 		err = dva.gitServer.CreateRepoFile(createReq)
 		if err != nil {
-			return fmt.Errorf("failed to create lfs file %s in repo %s/%s branch %s, cause: %w", uploadFile.RepoFile, req.Namespace, req.Name, newBranch, err)
+			return "", fmt.Errorf("failed to create lfs file %s in repo %s/%s branch %s, cause: %w", uploadFile.RepoFile, req.Namespace, req.Name, newBranch, err)
 		}
 	}
 
-	return nil
+	return pointer.Oid, nil
 }
 
 func (dva *dataViewerActivityImpl) UpdateCardData(ctx context.Context, cardReq dvCom.UpdateCardReq) error {
