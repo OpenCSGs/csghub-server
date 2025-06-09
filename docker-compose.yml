@@ -122,6 +122,8 @@ services:
     volumes:
       - ./nats-server.conf:/nats-server.conf
       - ./jetstream:/data/jetstream
+    networks:
+      - my_network
     restart: always
 
   account_server:
@@ -142,6 +144,8 @@ services:
       GIN_MODE: release
     ports:
       - "8086:8086"
+    networks:
+      - my_network
     restart: always
   
   user_server:
@@ -175,6 +179,8 @@ services:
       - "8088:8088"
     volumes:
       - ./casdoor:/starhub-bin/casdoor:r
+    networks:
+      - my_network
 
 networks:
   my_network:
