@@ -6,6 +6,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"opencsg.com/csghub-server/api/httpbase"
 	"opencsg.com/csghub-server/common/config"
+	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/types"
 	"opencsg.com/csghub-server/common/utils/common"
 	"opencsg.com/csghub-server/component"
@@ -40,7 +41,7 @@ type MirrorHandler struct {
 func (h *MirrorHandler) CreateMirrorRepo(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
 	if currentUser == "" {
-		httpbase.UnauthorizedError(ctx, component.ErrUserNotFound)
+		httpbase.UnauthorizedError(ctx, errorx.ErrUserNotFound)
 		return
 	}
 
@@ -78,7 +79,7 @@ func (h *MirrorHandler) CreateMirrorRepo(ctx *gin.Context) {
 func (h *MirrorHandler) Repos(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
 	if currentUser == "" {
-		httpbase.UnauthorizedError(ctx, component.ErrUserNotFound)
+		httpbase.UnauthorizedError(ctx, errorx.ErrUserNotFound)
 		return
 	}
 
@@ -118,7 +119,7 @@ func (h *MirrorHandler) Repos(ctx *gin.Context) {
 func (h *MirrorHandler) Index(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
 	if currentUser == "" {
-		httpbase.UnauthorizedError(ctx, component.ErrUserNotFound)
+		httpbase.UnauthorizedError(ctx, errorx.ErrUserNotFound)
 		return
 	}
 

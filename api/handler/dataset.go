@@ -10,6 +10,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"opencsg.com/csghub-server/api/httpbase"
 	"opencsg.com/csghub-server/common/config"
+	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/types"
 	"opencsg.com/csghub-server/common/utils/common"
 	"opencsg.com/csghub-server/component"
@@ -58,7 +59,7 @@ type DatasetHandler struct {
 func (h *DatasetHandler) Create(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
 	if currentUser == "" {
-		httpbase.UnauthorizedError(ctx, component.ErrUserNotFound)
+		httpbase.UnauthorizedError(ctx, errorx.ErrUserNotFound)
 		return
 	}
 	var req *types.CreateDatasetReq
@@ -81,7 +82,7 @@ func (h *DatasetHandler) Create(ctx *gin.Context) {
 
 	dataset, err := h.dataset.Create(ctx.Request.Context(), req)
 	if err != nil {
-		if errors.Is(err, component.ErrForbidden) {
+		if errors.Is(err, errorx.ErrForbidden) {
 			httpbase.ForbiddenError(ctx, err)
 			return
 		}
@@ -167,7 +168,7 @@ func (h *DatasetHandler) Index(ctx *gin.Context) {
 func (h *DatasetHandler) Update(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
 	if currentUser == "" {
-		httpbase.UnauthorizedError(ctx, component.ErrUserNotFound)
+		httpbase.UnauthorizedError(ctx, errorx.ErrUserNotFound)
 		return
 	}
 	var req *types.UpdateDatasetReq
@@ -196,7 +197,7 @@ func (h *DatasetHandler) Update(ctx *gin.Context) {
 
 	dataset, err := h.dataset.Update(ctx.Request.Context(), req)
 	if err != nil {
-		if errors.Is(err, component.ErrForbidden) {
+		if errors.Is(err, errorx.ErrForbidden) {
 			httpbase.ForbiddenError(ctx, err)
 			return
 		}
@@ -226,7 +227,7 @@ func (h *DatasetHandler) Update(ctx *gin.Context) {
 func (h *DatasetHandler) Delete(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
 	if currentUser == "" {
-		httpbase.UnauthorizedError(ctx, component.ErrUserNotFound)
+		httpbase.UnauthorizedError(ctx, errorx.ErrUserNotFound)
 		return
 	}
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
@@ -237,7 +238,7 @@ func (h *DatasetHandler) Delete(ctx *gin.Context) {
 	}
 	err = h.dataset.Delete(ctx.Request.Context(), namespace, name, currentUser)
 	if err != nil {
-		if errors.Is(err, component.ErrForbidden) {
+		if errors.Is(err, errorx.ErrForbidden) {
 			httpbase.ForbiddenError(ctx, err)
 			return
 		}
@@ -273,7 +274,7 @@ func (h *DatasetHandler) Show(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
 	detail, err := h.dataset.Show(ctx.Request.Context(), namespace, name, currentUser)
 	if err != nil {
-		if errors.Is(err, component.ErrForbidden) {
+		if errors.Is(err, errorx.ErrForbidden) {
 			httpbase.ForbiddenError(ctx, err)
 			return
 		}
@@ -309,7 +310,7 @@ func (h *DatasetHandler) Relations(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
 	detail, err := h.dataset.Relations(ctx.Request.Context(), namespace, name, currentUser)
 	if err != nil {
-		if errors.Is(err, component.ErrForbidden) {
+		if errors.Is(err, errorx.ErrForbidden) {
 			httpbase.ForbiddenError(ctx, err)
 			return
 		}
@@ -359,7 +360,7 @@ func (h *DatasetHandler) AllFiles(ctx *gin.Context) {
 	req.Ref = ""
 	detail, err := h.repo.AllFiles(ctx.Request.Context(), req)
 	if err != nil {
-		if errors.Is(err, component.ErrForbidden) {
+		if errors.Is(err, errorx.ErrForbidden) {
 			httpbase.ForbiddenError(ctx, err)
 			return
 		}

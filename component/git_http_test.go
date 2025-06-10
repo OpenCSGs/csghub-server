@@ -20,6 +20,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"opencsg.com/csghub-server/builder/git/gitserver"
 	"opencsg.com/csghub-server/builder/store/database"
+	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/types"
 )
 
@@ -164,14 +165,14 @@ func TestGitHTTPComponent_Batch(t *testing.T) {
 			name:      "download no read access, no write access",
 			operation: types.LFSBatchDownload,
 			exist:     true,
-			err:       ErrNotFound,
+			err:       errorx.ErrNotFound,
 		},
 		{
 			name:           "download no read access, has write access",
 			operation:      types.LFSBatchDownload,
 			exist:          true,
 			hasWriteAccess: true,
-			err:            ErrNotFound,
+			err:            errorx.ErrNotFound,
 		},
 		{
 			name:          "download file not exist",
@@ -216,13 +217,13 @@ func TestGitHTTPComponent_Batch(t *testing.T) {
 		{
 			name:      "upload no read access, no write access",
 			operation: types.LFSBatchUpload,
-			err:       ErrNotFound,
+			err:       errorx.ErrNotFound,
 		},
 		{
 			name:          "upload has read access, no write access",
 			operation:     types.LFSBatchUpload,
 			hasReadAccess: true,
-			err:           ErrForbidden,
+			err:           errorx.ErrForbidden,
 		},
 		// {
 		// 	name:           "upload file exist",
@@ -241,21 +242,21 @@ func TestGitHTTPComponent_Batch(t *testing.T) {
 		{
 			name:      "upload and current user empty, 401",
 			operation: types.LFSBatchUpload,
-			err:       ErrUnauthorized,
+			err:       errorx.ErrUnauthorized,
 			noUser:    true,
 		},
 		{
 			name:          "download and current user empty, 401",
 			operation:     types.LFSBatchDownload,
-			err:           ErrUnauthorized,
-			readAccessErr: ErrUserNotFound,
+			err:           errorx.ErrUnauthorized,
+			readAccessErr: errorx.ErrUserNotFound,
 			noUser:        true,
 		},
 		{
 			name:          "download and user not found",
 			operation:     types.LFSBatchDownload,
-			err:           ErrUserNotFound,
-			readAccessErr: ErrUserNotFound,
+			err:           errorx.ErrUserNotFound,
+			readAccessErr: errorx.ErrUserNotFound,
 		},
 	}
 

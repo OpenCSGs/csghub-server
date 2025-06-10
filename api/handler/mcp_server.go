@@ -11,6 +11,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"opencsg.com/csghub-server/api/httpbase"
 	"opencsg.com/csghub-server/common/config"
+	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/types"
 	"opencsg.com/csghub-server/common/utils/common"
 	"opencsg.com/csghub-server/component"
@@ -70,7 +71,7 @@ func (h *MCPServerHandler) Create(ctx *gin.Context) {
 
 	mcpServer, err := h.mcpComp.Create(ctx.Request.Context(), req)
 	if err != nil {
-		if errors.Is(err, component.ErrForbidden) {
+		if errors.Is(err, errorx.ErrForbidden) {
 			httpbase.ForbiddenError(ctx, err)
 			return
 		}
@@ -114,7 +115,7 @@ func (h *MCPServerHandler) Delete(ctx *gin.Context) {
 
 	err = h.mcpComp.Delete(ctx.Request.Context(), req)
 	if err != nil {
-		if errors.Is(err, component.ErrForbidden) {
+		if errors.Is(err, errorx.ErrForbidden) {
 			httpbase.ForbiddenError(ctx, err)
 			return
 		}
@@ -170,7 +171,7 @@ func (h *MCPServerHandler) Update(ctx *gin.Context) {
 
 	res, err := h.mcpComp.Update(ctx.Request.Context(), req)
 	if err != nil {
-		if errors.Is(err, component.ErrForbidden) {
+		if errors.Is(err, errorx.ErrForbidden) {
 			httpbase.ForbiddenError(ctx, err)
 			return
 		}
@@ -221,7 +222,7 @@ func (h *MCPServerHandler) Show(ctx *gin.Context) {
 
 	detail, err := h.mcpComp.Show(ctx.Request.Context(), namespace, name, currentUser, needOpWeight, needMultiSync)
 	if err != nil {
-		if errors.Is(err, component.ErrForbidden) {
+		if errors.Is(err, errorx.ErrForbidden) {
 			httpbase.ForbiddenError(ctx, err)
 			return
 		}
@@ -391,7 +392,7 @@ func (h *MCPServerHandler) Deploy(ctx *gin.Context) {
 
 	respData, err := h.mcpComp.Deploy(ctx.Request.Context(), req)
 	if err != nil {
-		if errors.Is(err, component.ErrForbidden) {
+		if errors.Is(err, errorx.ErrForbidden) {
 			httpbase.ForbiddenError(ctx, err)
 			return
 		}

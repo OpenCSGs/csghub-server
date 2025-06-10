@@ -21,6 +21,7 @@ import (
 	"opencsg.com/csghub-server/builder/git/mirrorserver"
 	"opencsg.com/csghub-server/builder/rpc"
 	"opencsg.com/csghub-server/builder/store/database"
+	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/tests"
 	"opencsg.com/csghub-server/common/types"
 	"opencsg.com/csghub-server/mirror/queue"
@@ -540,7 +541,7 @@ func TestRepoComponent_Commits(t *testing.T) {
 				CurrentUser: user,
 			})
 			if user == "" {
-				require.Equal(t, ErrUnauthorized, err)
+				require.Equal(t, errorx.ErrUnauthorized, err)
 				return
 			}
 			require.Nil(t, err)
@@ -588,7 +589,7 @@ func TestRepoComponent_FileRaw(t *testing.T) {
 					Path:        c.path,
 					CurrentUser: currentUser,
 				})
-				require.True(t, errors.Is(err, ErrForbidden))
+				require.True(t, errors.Is(err, errorx.ErrForbidden))
 				return
 			}
 
@@ -1731,7 +1732,7 @@ func TestRepoComponent_LastCommit(t *testing.T) {
 
 		actualCommit, err := repoComp.LastCommit(context.Background(), &types.GetCommitsReq{})
 		require.Nil(t, actualCommit)
-		require.ErrorIs(t, err, ErrForbidden)
+		require.ErrorIs(t, err, errorx.ErrForbidden)
 
 	})
 }
@@ -1785,7 +1786,7 @@ func TestRepoComponent_Tree(t *testing.T) {
 
 			actualTree, err := repoComp.Tree(context.Background(), &types.GetFileReq{})
 			require.Nil(t, actualTree)
-			require.ErrorIs(t, err, ErrForbidden)
+			require.ErrorIs(t, err, errorx.ErrForbidden)
 
 		})
 	}
@@ -1814,7 +1815,7 @@ func TestRepoComponent_AllowWriteAccess(t *testing.T) {
 			Private: false,
 		}, nil)
 		allow, err := repoComp.AllowWriteAccess(ctx, types.ModelRepo, "namespace", "name", "")
-		require.Error(t, err, ErrUserNotFound)
+		require.Error(t, err, errorx.ErrUserNotFound)
 		require.False(t, allow)
 	})
 
@@ -1864,7 +1865,7 @@ func TestRepoComponent_AllowAdminAccess(t *testing.T) {
 			Private: false,
 		}, nil)
 		allow, err := repoComp.AllowAdminAccess(ctx, types.ModelRepo, "namespace", "name", "")
-		require.Error(t, err, ErrUserNotFound)
+		require.Error(t, err, errorx.ErrUserNotFound)
 		require.False(t, allow)
 	})
 
@@ -1928,7 +1929,7 @@ func TestRepoComponent_AllowReadAccessRepo(t *testing.T) {
 			Path:    "namespace/name",
 			Private: true,
 		}, "")
-		require.Error(t, err, ErrUserNotFound)
+		require.Error(t, err, errorx.ErrUserNotFound)
 		require.False(t, allow)
 	})
 }
@@ -1985,7 +1986,7 @@ func TestRepoComponent_TreeV2(t *testing.T) {
 
 			actualTree, err := repoComp.TreeV2(context.Background(), &types.GetTreeRequest{})
 			require.Nil(t, actualTree)
-			require.ErrorIs(t, err, ErrForbidden)
+			require.ErrorIs(t, err, errorx.ErrForbidden)
 
 		})
 	}
@@ -2098,7 +2099,7 @@ func TestRepoComponent_LogsTree(t *testing.T) {
 
 			actualTree, err := repoComp.LogsTree(context.Background(), &types.GetLogsTreeRequest{})
 			require.Nil(t, actualTree)
-			require.ErrorIs(t, err, ErrForbidden)
+			require.ErrorIs(t, err, errorx.ErrForbidden)
 
 		})
 	}

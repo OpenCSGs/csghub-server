@@ -13,8 +13,8 @@ import (
 	mockcomponent "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/component"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/builder/testutil"
+	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/types"
-	"opencsg.com/csghub-server/component"
 )
 
 type GitHTTPTester struct {
@@ -110,7 +110,7 @@ func TestGitHTTPHandler_GitUploadPack(t *testing.T) {
 			Request:     tester.Gctx().Request,
 			Writer:      tester.Gctx().Writer,
 			CurrentUser: "u",
-		}).Return(component.ErrForbidden)
+		}).Return(errorx.ErrForbidden)
 		tester.SetPath("git").WithQuery("service", "git-upload-pack").WithHeader("Git-Protocol", "ssh")
 		tester.WithKV("namespace", "u-other").WithKV("name", "r")
 		tester.WithKV("repo_type", "model").WithUser().WithHeader("Accept-Encoding", "gzip").Execute()
@@ -174,9 +174,9 @@ func TestGitHTTPHandler_LfsBatch(t *testing.T) {
 		err        error
 		statusCode int
 	}{
-		{component.ErrUnauthorized, 401},
-		{component.ErrForbidden, 403},
-		{&component.HTTPError{
+		{errorx.ErrUnauthorized, 401},
+		{errorx.ErrForbidden, 403},
+		{&errorx.HTTPError{
 			StatusCode: 499,
 			Message:    "xxx",
 		}, 499},

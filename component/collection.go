@@ -13,6 +13,7 @@ import (
 	"opencsg.com/csghub-server/builder/rpc"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/config"
+	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/types"
 )
 
@@ -122,7 +123,7 @@ func (cc *collectionComponentImpl) GetCollection(ctx context.Context, currentUse
 	}
 
 	if !permission.CanRead {
-		return nil, ErrUnauthorized
+		return nil, errorx.ErrUnauthorized
 	}
 
 	var newCollection types.Collection

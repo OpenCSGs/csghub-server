@@ -15,6 +15,7 @@ import (
 	"opencsg.com/csghub-server/api/httpbase"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/config"
+	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/types"
 	"opencsg.com/csghub-server/component"
 )
@@ -55,13 +56,13 @@ func (h *GitHTTPHandler) InfoRefs(ctx *gin.Context) {
 	}
 	reader, err := h.gitHttp.InfoRefs(ctx.Request.Context(), req)
 	if err != nil {
-		if err == component.ErrUnauthorized {
+		if err == errorx.ErrUnauthorized {
 			ctx.Header("WWW-Authenticate", "Basic realm=opencsg-git")
 			ctx.PureJSON(http.StatusUnauthorized, nil)
 			return
 		}
 
-		if err == component.ErrForbidden {
+		if err == errorx.ErrForbidden {
 			ctx.PureJSON(http.StatusForbidden, gin.H{
 				"error": "You do not have permission to access this repository.",
 			})
@@ -111,7 +112,7 @@ func (h *GitHTTPHandler) GitUploadPack(ctx *gin.Context) {
 
 	err := h.gitHttp.GitUploadPack(ctx.Request.Context(), req)
 	if err != nil {
-		if errors.Is(err, component.ErrForbidden) {
+		if errors.Is(err, errorx.ErrForbidden) {
 			httpbase.ForbiddenError(ctx, err)
 			return
 		}
@@ -138,13 +139,13 @@ func (h *GitHTTPHandler) GitReceivePack(ctx *gin.Context) {
 
 	err := h.gitHttp.GitReceivePack(ctx.Request.Context(), req)
 	if err != nil {
-		if err == component.ErrUnauthorized {
+		if err == errorx.ErrUnauthorized {
 			ctx.Header("WWW-Authenticate", "Basic realm=opencsg-git")
 			ctx.PureJSON(http.StatusUnauthorized, nil)
 			return
 		}
 
-		if err == component.ErrForbidden {
+		if err == errorx.ErrForbidden {
 			ctx.PureJSON(http.StatusForbidden, gin.H{
 				"error": "You do not have permission to access this repository.",
 			})
@@ -171,13 +172,13 @@ func (h *GitHTTPHandler) LfsBatch(ctx *gin.Context) {
 
 	objectResponse, err := h.gitHttp.LFSBatch(ctx.Request.Context(), batchRequest)
 	if err != nil {
-		httpErr := &component.HTTPError{}
+		httpErr := &errorx.HTTPError{}
 		switch {
-		case errors.Is(err, component.ErrUnauthorized):
+		case errors.Is(err, errorx.ErrUnauthorized):
 			ctx.Header("WWW-Authenticate", "Basic realm=opencsg-git")
 			ctx.PureJSON(http.StatusUnauthorized, nil)
 			return
-		case errors.Is(err, component.ErrForbidden):
+		case errors.Is(err, errorx.ErrForbidden):
 			ctx.PureJSON(http.StatusForbidden, gin.H{
 				"error": "You do not have permission to access this repository.",
 			})
@@ -306,7 +307,7 @@ func (h *GitHTTPHandler) ListLocks(ctx *gin.Context) {
 
 	res, err := h.gitHttp.ListLocks(ctx.Request.Context(), req)
 	if err != nil {
-		if errors.Is(err, component.ErrUnauthorized) {
+		if errors.Is(err, errorx.ErrUnauthorized) {
 			ctx.Header("WWW-Authenticate", "Basic realm=opencsg-git")
 			ctx.PureJSON(http.StatusUnauthorized, types.LFSLockError{
 				Message: "You must have access to read locks",
@@ -338,7 +339,7 @@ func (h *GitHTTPHandler) CreateLock(ctx *gin.Context) {
 
 	lock, err := h.gitHttp.CreateLock(ctx.Request.Context(), req)
 	if err != nil {
-		if errors.Is(err, component.ErrAlreadyExists) {
+		if errors.Is(err, errorx.ErrAlreadyExists) {
 			ctx.PureJSON(http.StatusConflict, types.LFSLockError{
 				Lock: &types.LFSLock{
 					ID:       strconv.FormatInt(lock.ID, 10),
@@ -353,7 +354,7 @@ func (h *GitHTTPHandler) CreateLock(ctx *gin.Context) {
 			return
 		}
 
-		if errors.Is(err, component.ErrUnauthorized) {
+		if errors.Is(err, errorx.ErrUnauthorized) {
 			ctx.Header("WWW-Authenticate", "Basic realm=opencsg-git")
 			ctx.PureJSON(http.StatusUnauthorized, types.LFSLockError{
 				Message: "You must have push access to create locks",
@@ -446,20 +447,20 @@ func (h *GitHTTPHandler) UnLock(ctx *gin.Context) {
 
 	lock, err = h.gitHttp.UnLock(ctx.Request.Context(), req)
 	if err != nil {
-		if errors.Is(err, component.ErrUnauthorized) {
+		if errors.Is(err, errorx.ErrUnauthorized) {
 			ctx.Header("WWW-Authenticate", "Basic realm=opencsg-git")
 			ctx.PureJSON(http.StatusUnauthorized, types.LFSLockError{
 				Message: "You must have push access to create locks",
 			})
 			return
 		}
-		if errors.Is(err, component.ErrNotFound) {
+		if errors.Is(err, errorx.ErrNotFound) {
 			ctx.PureJSON(http.StatusNotFound, types.LFSLockError{
 				Message: "unable to delete lock : not found",
 			})
 			return
 		}
-		if errors.Is(err, component.ErrPermissionDenied) {
+		if errors.Is(err, errorx.ErrPermissionDenied) {
 			ctx.PureJSON(http.StatusMethodNotAllowed, types.LFSLockError{
 				Message: "unable to delete lock : this lock is not created by you, try --force if you still want unlock it",
 			})

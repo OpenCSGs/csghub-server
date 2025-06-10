@@ -7,6 +7,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"opencsg.com/csghub-server/api/httpbase"
 	"opencsg.com/csghub-server/common/config"
+	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/types"
 	"opencsg.com/csghub-server/component"
 )
@@ -46,12 +47,12 @@ func (h *SyncClientSettingHandler) Create(ctx *gin.Context) {
 	}
 	req.CurrentUser = httpbase.GetCurrentUser(ctx)
 	if req.CurrentUser == "" {
-		httpbase.UnauthorizedError(ctx, component.ErrUserNotFound)
+		httpbase.UnauthorizedError(ctx, errorx.ErrUserNotFound)
 		return
 	}
 	ms, err := h.c.Create(ctx.Request.Context(), req)
 	if err != nil {
-		if errors.Is(err, component.ErrUnauthorized) {
+		if errors.Is(err, errorx.ErrUnauthorized) {
 			httpbase.UnauthorizedError(ctx, err)
 			return
 		}
@@ -76,12 +77,12 @@ func (h *SyncClientSettingHandler) Create(ctx *gin.Context) {
 func (h *SyncClientSettingHandler) Show(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
 	if currentUser == "" {
-		httpbase.UnauthorizedError(ctx, component.ErrUserNotFound)
+		httpbase.UnauthorizedError(ctx, errorx.ErrUserNotFound)
 		return
 	}
 	ms, err := h.c.Show(ctx.Request.Context(), currentUser)
 	if err != nil {
-		if errors.Is(err, component.ErrUnauthorized) {
+		if errors.Is(err, errorx.ErrUnauthorized) {
 			httpbase.UnauthorizedError(ctx, err)
 			return
 		}

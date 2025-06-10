@@ -25,6 +25,7 @@ import (
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/builder/store/s3"
 	"opencsg.com/csghub-server/common/config"
+	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/types"
 	"opencsg.com/csghub-server/common/utils/common"
 )
@@ -101,19 +102,19 @@ func (c *gitHTTPComponentImpl) InfoRefs(ctx context.Context, req types.InfoRefsR
 	if req.Rpc == "git-receive-pack" {
 		allowed, err := c.repoComponent.AllowWriteAccess(ctx, req.RepoType, req.Namespace, req.Name, req.CurrentUser)
 		if err != nil {
-			return nil, ErrUnauthorized
+			return nil, errorx.ErrUnauthorized
 		}
 		if !allowed {
-			return nil, ErrForbidden
+			return nil, errorx.ErrForbidden
 		}
 	} else {
 		if repo.Private {
 			allowed, err := c.repoComponent.AllowReadAccess(ctx, req.RepoType, req.Namespace, req.Name, req.CurrentUser)
 			if err != nil {
-				return nil, ErrUnauthorized
+				return nil, errorx.ErrUnauthorized
 			}
 			if !allowed {
-				return nil, ErrForbidden
+				return nil, errorx.ErrForbidden
 			}
 		}
 	}
@@ -138,10 +139,10 @@ func (c *gitHTTPComponentImpl) GitUploadPack(ctx context.Context, req types.GitU
 	if repo.Private {
 		allowed, err := c.repoComponent.AllowReadAccess(ctx, req.RepoType, req.Namespace, req.Name, req.CurrentUser)
 		if err != nil {
-			return ErrUnauthorized
+			return errorx.ErrUnauthorized
 		}
 		if !allowed {
-			return ErrForbidden
+			return errorx.ErrForbidden
 		}
 	}
 	err = c.gitServer.UploadPack(ctx, gitserver.UploadPackReq{
@@ -164,15 +165,15 @@ func (c *gitHTTPComponentImpl) GitReceivePack(ctx context.Context, req types.Git
 
 	user, err := c.userStore.FindByUsername(ctx, req.CurrentUser)
 	if err != nil {
-		return ErrUnauthorized
+		return errorx.ErrUnauthorized
 	}
 
 	allowed, err := c.repoComponent.AllowWriteAccess(ctx, req.RepoType, req.Namespace, req.Name, req.CurrentUser)
 	if err != nil {
-		return ErrUnauthorized
+		return errorx.ErrUnauthorized
 	}
 	if !allowed {
-		return ErrForbidden
+		return errorx.ErrForbidden
 	}
 	err = c.gitServer.ReceivePack(ctx, gitserver.ReceivePackReq{
 		Namespace:   req.Namespace,
@@ -316,7 +317,7 @@ func (c *gitHTTPComponentImpl) lfsCheckAccess(ctx context.Context, req types.Bat
 	switch req.Operation {
 	case types.LFSBatchUpload:
 		if req.CurrentUser == "" {
-			return ErrUnauthorized
+			return errorx.ErrUnauthorized
 		}
 		allowWrite, err := c.repoComponent.AllowWriteAccess(
 			ctx, req.RepoType, req.Namespace, req.Name, req.CurrentUser,
@@ -334,25 +335,25 @@ func (c *gitHTTPComponentImpl) lfsCheckAccess(ctx context.Context, req types.Bat
 			return err
 		}
 		if allowRead {
-			return ErrForbidden
+			return errorx.ErrForbidden
 		}
-		return ErrNotFound
+		return errorx.ErrNotFound
 	case types.LFSBatchDownload:
 		allowRead, err := c.repoComponent.AllowReadAccess(
 			ctx, req.RepoType, req.Namespace, req.Name, req.CurrentUser,
 		)
 		if err != nil {
-			if errors.Is(err, ErrUserNotFound) && req.CurrentUser == "" {
-				err = ErrUnauthorized
+			if errors.Is(err, errorx.ErrUserNotFound) && req.CurrentUser == "" {
+				err = errorx.ErrUnauthorized
 			}
 			return err
 		}
 		if !allowRead {
-			return ErrNotFound
+			return errorx.ErrNotFound
 		}
 		return nil
 	}
-	return &HTTPError{
+	return &errorx.HTTPError{
 		StatusCode: 400,
 		Message:    fmt.Errorf("invalid lfs batch operation: %s", req.Operation),
 	}
@@ -375,7 +376,7 @@ func (c *gitHTTPComponentImpl) LFSBatch(ctx context.Context, req types.BatchRequ
 	case types.LFSBatchDownload:
 		resp, err = c.lfsBatchDownloadInfo(ctx, req, repo)
 	default:
-		return nil, &HTTPError{
+		return nil, &errorx.HTTPError{
 			StatusCode: 400,
 			Message:    fmt.Errorf("invalid lfs batch operation: %s", req.Operation),
 		}
@@ -405,7 +406,7 @@ func (c *gitHTTPComponentImpl) LfsUpload(ctx context.Context, body io.ReadCloser
 		return err
 	}
 	if !allowed {
-		return ErrPermissionDenied
+		return errorx.ErrPermissionDenied
 	}
 
 	pointer := types.Pointer{Oid: req.Oid, Size: req.Size}
@@ -493,7 +494,7 @@ func (c *gitHTTPComponentImpl) CreateLock(ctx context.Context, req types.LfsLock
 
 	user, err := c.userStore.FindByUsername(ctx, req.CurrentUser)
 	if err != nil {
-		return nil, ErrUnauthorized
+		return nil, errorx.ErrUnauthorized
 	}
 
 	allowed, err := c.repoComponent.AllowWriteAccess(ctx, req.RepoType, req.Namespace, req.Name, req.CurrentUser)
@@ -503,7 +504,7 @@ func (c *gitHTTPComponentImpl) CreateLock(ctx context.Context, req types.LfsLock
 	}
 
 	if !allowed {
-		return nil, ErrUnauthorized
+		return nil, errorx.ErrUnauthorized
 	}
 	lfsLock := database.LfsLock{
 		Path:         req.Path,
@@ -516,14 +517,14 @@ func (c *gitHTTPComponentImpl) CreateLock(ctx context.Context, req types.LfsLock
 		if errors.Is(err, sql.ErrNoRows) {
 			lock, err = c.lfsLockStore.Create(ctx, lfsLock)
 			if err != nil {
-				return nil, ErrAlreadyExists
+				return nil, errorx.ErrAlreadyExists
 			}
 			return lock, nil
 		}
 		return lock, fmt.Errorf("failed to find lfs lock, error: %w", err)
 	}
 
-	return lock, ErrAlreadyExists
+	return lock, errorx.ErrAlreadyExists
 }
 
 func (c *gitHTTPComponentImpl) ListLocks(ctx context.Context, req types.ListLFSLockReq) (*types.LFSLockList, error) {
@@ -534,7 +535,7 @@ func (c *gitHTTPComponentImpl) ListLocks(ctx context.Context, req types.ListLFSL
 
 	_, err = c.userStore.FindByUsername(ctx, req.CurrentUser)
 	if err != nil {
-		return nil, ErrUnauthorized
+		return nil, errorx.ErrUnauthorized
 	}
 
 	allowed, err := c.repoComponent.AllowReadAccess(ctx, req.RepoType, req.Namespace, req.Name, req.CurrentUser)
@@ -544,7 +545,7 @@ func (c *gitHTTPComponentImpl) ListLocks(ctx context.Context, req types.ListLFSL
 	}
 
 	if !allowed {
-		return nil, ErrUnauthorized
+		return nil, errorx.ErrUnauthorized
 	}
 
 	if req.ID != 0 {
@@ -599,7 +600,7 @@ func (c *gitHTTPComponentImpl) UnLock(ctx context.Context, req types.UnlockLFSRe
 
 	user, err := c.userStore.FindByUsername(ctx, req.CurrentUser)
 	if err != nil {
-		return nil, ErrUnauthorized
+		return nil, errorx.ErrUnauthorized
 	}
 
 	allowed, err := c.repoComponent.AllowWriteAccess(ctx, req.RepoType, req.Namespace, req.Name, req.CurrentUser)
@@ -609,19 +610,19 @@ func (c *gitHTTPComponentImpl) UnLock(ctx context.Context, req types.UnlockLFSRe
 	}
 
 	if !allowed {
-		return nil, ErrUnauthorized
+		return nil, errorx.ErrUnauthorized
 	}
 
 	lock, err = c.lfsLockStore.FindByID(ctx, req.ID)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return nil, ErrNotFound
+			return nil, errorx.ErrNotFound
 		}
 		return nil, err
 	}
 
 	if !req.Force && lock.UserID != user.ID {
-		return nil, ErrPermissionDenied
+		return nil, errorx.ErrPermissionDenied
 	}
 	err = c.lfsLockStore.RemoveByID(ctx, req.ID)
 	if err != nil {
@@ -644,7 +645,7 @@ func (c *gitHTTPComponentImpl) VerifyLock(ctx context.Context, req types.VerifyL
 
 	user, err := c.userStore.FindByUsername(ctx, req.CurrentUser)
 	if err != nil {
-		return nil, ErrUnauthorized
+		return nil, errorx.ErrUnauthorized
 	}
 
 	allowed, err := c.repoComponent.AllowReadAccess(ctx, req.RepoType, req.Namespace, req.Name, req.CurrentUser)
@@ -654,7 +655,7 @@ func (c *gitHTTPComponentImpl) VerifyLock(ctx context.Context, req types.VerifyL
 	}
 
 	if !allowed {
-		return nil, ErrUnauthorized
+		return nil, errorx.ErrUnauthorized
 	}
 
 	locks, err := c.lfsLockStore.FindByRepoID(ctx, repo.ID, req.Cursor, req.Limit)

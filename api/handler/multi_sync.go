@@ -7,6 +7,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"opencsg.com/csghub-server/api/httpbase"
 	"opencsg.com/csghub-server/common/config"
+	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/types"
 	"opencsg.com/csghub-server/component"
 )
@@ -39,7 +40,7 @@ func NewSyncHandler(config *config.Config) (*SyncHandler, error) {
 func (h *SyncHandler) Latest(c *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(c)
 	if currentUser == "" {
-		httpbase.UnauthorizedError(c, component.ErrUserNotFound)
+		httpbase.UnauthorizedError(c, errorx.ErrUserNotFound)
 		return
 	}
 

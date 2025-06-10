@@ -21,6 +21,7 @@ import (
 	"opencsg.com/csghub-server/builder/rpc"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/config"
+	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/types"
 	"opencsg.com/csghub-server/common/utils/common"
 )
@@ -201,7 +202,7 @@ func (m *mcpServerComponentImpl) Delete(ctx context.Context, req *types.UpdateMC
 	}
 
 	if !permission.CanAdmin {
-		return ErrForbidden
+		return errorx.ErrForbidden
 	}
 
 	deleteRepoReq := types.DeleteRepoReq{
@@ -234,7 +235,7 @@ func (m *mcpServerComponentImpl) Update(ctx context.Context, req *types.UpdateMC
 		return nil, fmt.Errorf("failed to get user %s permission for repo %s/%s, error: %w", req.Namespace, req.Namespace, req.Name, err)
 	}
 	if !permission.CanAdmin {
-		return nil, ErrForbidden
+		return nil, errorx.ErrForbidden
 	}
 
 	req.RepoType = types.MCPServerRepo
@@ -308,7 +309,7 @@ func (m *mcpServerComponentImpl) Show(ctx context.Context, namespace string, nam
 		return nil, fmt.Errorf("failed to get user %s permission for repo %s/%s, error: %w", currentUser, namespace, name, err)
 	}
 	if !permission.CanRead {
-		return nil, ErrForbidden
+		return nil, errorx.ErrForbidden
 	}
 
 	ns, err := m.repoComponent.GetNameSpaceInfo(ctx, namespace)
@@ -613,7 +614,7 @@ func (m *mcpServerComponentImpl) Deploy(ctx context.Context, req *types.DeployMC
 			req.CurrentUser, req.MCPRepo.Namespace, req.MCPRepo.Name, err)
 	}
 	if !permission.CanRead {
-		return nil, ErrForbidden
+		return nil, errorx.ErrForbidden
 	}
 
 	token, err := m.tokenStore.GetUserGitToken(ctx, req.CurrentUser)
@@ -659,11 +660,11 @@ func (m *mcpServerComponentImpl) Deploy(ctx context.Context, req *types.DeployMC
 				return nil, fmt.Errorf("failed to check user %s permission for namespace %s, error: %w", req.CurrentUser, req.Namespace, err)
 			}
 			if !canWrite {
-				return nil, ErrForbiddenMsg("users do not have permission to create repo in this organization")
+				return nil, errorx.ErrForbiddenMsg("users do not have permission to create repo in this organization")
 			}
 		} else {
 			if namespace.Path != user.Username {
-				return nil, ErrForbiddenMsg("users do not have permission to create repo in this namespace")
+				return nil, errorx.ErrForbiddenMsg("users do not have permission to create repo in this namespace")
 			}
 		}
 	}

@@ -9,6 +9,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"opencsg.com/csghub-server/api/httpbase"
 	"opencsg.com/csghub-server/common/config"
+	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/types"
 	"opencsg.com/csghub-server/common/utils/common"
 	"opencsg.com/csghub-server/component"
@@ -209,7 +210,7 @@ func (h *UserHandler) Spaces(ctx *gin.Context) {
 func (h *UserHandler) LikesAdd(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
 	if currentUser == "" {
-		httpbase.UnauthorizedError(ctx, component.ErrUserNotFound)
+		httpbase.UnauthorizedError(ctx, errorx.ErrUserNotFound)
 		return
 	}
 	var req types.UserLikesRequest
@@ -243,7 +244,7 @@ func (h *UserHandler) LikesAdd(ctx *gin.Context) {
 func (h *UserHandler) LikesCollections(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
 	if currentUser == "" {
-		httpbase.UnauthorizedError(ctx, component.ErrUserNotFound)
+		httpbase.UnauthorizedError(ctx, errorx.ErrUserNotFound)
 		return
 	}
 	var req types.UserCollectionReq
@@ -327,7 +328,7 @@ func (h *UserHandler) UserCollections(ctx *gin.Context) {
 func (h *UserHandler) LikeCollection(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
 	if currentUser == "" {
-		httpbase.UnauthorizedError(ctx, component.ErrUserNotFound)
+		httpbase.UnauthorizedError(ctx, errorx.ErrUserNotFound)
 		return
 	}
 	var req types.UserLikesRequest
@@ -361,7 +362,7 @@ func (h *UserHandler) LikeCollection(ctx *gin.Context) {
 func (h *UserHandler) UnLikeCollection(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
 	if currentUser == "" {
-		httpbase.UnauthorizedError(ctx, component.ErrUserNotFound)
+		httpbase.UnauthorizedError(ctx, errorx.ErrUserNotFound)
 		return
 	}
 	var req types.UserLikesRequest
@@ -396,7 +397,7 @@ func (h *UserHandler) UnLikeCollection(ctx *gin.Context) {
 func (h *UserHandler) LikesDelete(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
 	if currentUser == "" {
-		httpbase.UnauthorizedError(ctx, component.ErrUserNotFound)
+		httpbase.UnauthorizedError(ctx, errorx.ErrUserNotFound)
 		return
 	}
 	var req types.UserLikesRequest
@@ -431,7 +432,7 @@ func (h *UserHandler) LikesDelete(ctx *gin.Context) {
 func (h *UserHandler) LikesSpaces(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
 	if currentUser == "" {
-		httpbase.UnauthorizedError(ctx, component.ErrUserNotFound)
+		httpbase.UnauthorizedError(ctx, errorx.ErrUserNotFound)
 		return
 	}
 	var req types.UserCollectionReq
@@ -478,7 +479,7 @@ func (h *UserHandler) LikesSpaces(ctx *gin.Context) {
 func (h *UserHandler) LikesCodes(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
 	if currentUser == "" {
-		httpbase.UnauthorizedError(ctx, component.ErrUserNotFound)
+		httpbase.UnauthorizedError(ctx, errorx.ErrUserNotFound)
 		return
 	}
 	var req types.UserDatasetsReq
@@ -525,7 +526,7 @@ func (h *UserHandler) LikesCodes(ctx *gin.Context) {
 func (h *UserHandler) LikesModels(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
 	if currentUser == "" {
-		httpbase.UnauthorizedError(ctx, component.ErrUserNotFound)
+		httpbase.UnauthorizedError(ctx, errorx.ErrUserNotFound)
 		return
 	}
 	var req types.UserDatasetsReq
@@ -572,7 +573,7 @@ func (h *UserHandler) LikesModels(ctx *gin.Context) {
 func (h *UserHandler) LikesDatasets(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
 	if currentUser == "" {
-		httpbase.UnauthorizedError(ctx, component.ErrUserNotFound)
+		httpbase.UnauthorizedError(ctx, errorx.ErrUserNotFound)
 		return
 	}
 	var req types.UserDatasetsReq
@@ -606,7 +607,7 @@ func (h *UserHandler) LikesDatasets(ctx *gin.Context) {
 func (h *UserHandler) UserPermission(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
 	if currentUser == "" {
-		httpbase.UnauthorizedError(ctx, component.ErrUserNotFound)
+		httpbase.UnauthorizedError(ctx, errorx.ErrUserNotFound)
 		return
 	}
 	response := types.WhoamiResponse{
@@ -642,7 +643,7 @@ func (h *UserHandler) UserPermission(ctx *gin.Context) {
 func (h *UserHandler) GetRunDeploys(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
 	if currentUser == "" {
-		httpbase.UnauthorizedError(ctx, component.ErrUserNotFound)
+		httpbase.UnauthorizedError(ctx, errorx.ErrUserNotFound)
 		return
 	}
 
@@ -776,7 +777,7 @@ func (h *UserHandler) GetFinetuneInstances(ctx *gin.Context) {
 func (h *UserHandler) GetRunServerless(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
 	if currentUser == "" {
-		httpbase.UnauthorizedError(ctx, component.ErrUserNotFound)
+		httpbase.UnauthorizedError(ctx, errorx.ErrUserNotFound)
 		return
 	}
 
@@ -952,7 +953,7 @@ func (h *UserHandler) MCPServers(ctx *gin.Context) {
 func (h *UserHandler) LikesMCPServers(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
 	if currentUser == "" {
-		httpbase.UnauthorizedError(ctx, component.ErrUserNotFound)
+		httpbase.UnauthorizedError(ctx, errorx.ErrUserNotFound)
 		return
 	}
 	var req types.UserMCPsReq

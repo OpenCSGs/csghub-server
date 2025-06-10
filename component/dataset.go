@@ -13,6 +13,7 @@ import (
 	"opencsg.com/csghub-server/builder/rpc"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/config"
+	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/types"
 	"opencsg.com/csghub-server/common/utils/common"
 )
@@ -365,7 +366,7 @@ func (c *datasetComponentImpl) Show(ctx context.Context, namespace, name, curren
 		return nil, fmt.Errorf("failed to get user repo permission, error: %w", err)
 	}
 	if !permission.CanRead {
-		return nil, ErrForbidden
+		return nil, errorx.ErrForbidden
 	}
 
 	ns, err := c.repoComponent.GetNameSpaceInfo(ctx, namespace)
@@ -442,7 +443,7 @@ func (c *datasetComponentImpl) Relations(ctx context.Context, namespace, name, c
 
 	allow, _ := c.repoComponent.AllowReadAccessRepo(ctx, dataset.Repository, currentUser)
 	if !allow {
-		return nil, ErrForbidden
+		return nil, errorx.ErrForbidden
 	}
 
 	return c.getRelations(ctx, dataset.RepositoryID, currentUser)

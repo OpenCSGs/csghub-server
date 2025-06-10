@@ -10,6 +10,7 @@ import (
 	"opencsg.com/csghub-server/builder/git/gitserver"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/config"
+	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/types"
 )
 
@@ -59,7 +60,7 @@ func (h *hFDatasetComponentImpl) GetPathsInfo(ctx context.Context, req types.Pat
 		return nil, fmt.Errorf("failed to check dataset permission, error: %w", err)
 	}
 	if !allow {
-		return nil, ErrUnauthorized
+		return nil, errorx.ErrUnauthorized
 	}
 
 	getRepoFileTree := gitserver.GetRepoInfoByPathReq{
@@ -98,7 +99,7 @@ func (h *hFDatasetComponentImpl) GetDatasetTree(ctx context.Context, req types.P
 		return nil, fmt.Errorf("failed to check dataset permission, error: %w", err)
 	}
 	if !allow {
-		return nil, ErrUnauthorized
+		return nil, errorx.ErrUnauthorized
 	}
 
 	var treeFiles []types.HFDSPathInfo

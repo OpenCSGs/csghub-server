@@ -22,8 +22,8 @@ import (
 	"opencsg.com/csghub-server/builder/deploy"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/builder/testutil"
+	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/types"
-	"opencsg.com/csghub-server/component"
 )
 
 type RepoTester struct {
@@ -143,7 +143,7 @@ func TestRepoHandler_LastCommit(t *testing.T) {
 		})
 
 		//user does not have permission to access repo
-		tester.mocks.repo.EXPECT().LastCommit(mock.Anything, mock.Anything).Return(nil, component.ErrForbidden).Once()
+		tester.mocks.repo.EXPECT().LastCommit(mock.Anything, mock.Anything).Return(nil, errorx.ErrForbidden).Once()
 		tester.Execute()
 		require.Equal(t, http.StatusForbidden, tester.Response().Code)
 	})
@@ -353,7 +353,7 @@ func TestRepoHandler_Tree(t *testing.T) {
 			return rp.Tree
 		})
 		//user does not have permission to access repo
-		tester.mocks.repo.EXPECT().Tree(mock.Anything, mock.Anything).Return(nil, component.ErrForbidden).Once()
+		tester.mocks.repo.EXPECT().Tree(mock.Anything, mock.Anything).Return(nil, errorx.ErrForbidden).Once()
 		tester.Execute()
 		require.Equal(t, http.StatusForbidden, tester.Response().Code)
 	})

@@ -12,6 +12,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"opencsg.com/csghub-server/api/httpbase"
 	"opencsg.com/csghub-server/common/config"
+	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/types"
 	"opencsg.com/csghub-server/common/utils/common"
 	"opencsg.com/csghub-server/component"
@@ -121,7 +122,7 @@ func (h *ModelHandler) Index(ctx *gin.Context) {
 func (h *ModelHandler) Create(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
 	if currentUser == "" {
-		httpbase.UnauthorizedError(ctx, component.ErrUserNotFound)
+		httpbase.UnauthorizedError(ctx, errorx.ErrUserNotFound)
 		return
 	}
 	var req *types.CreateModelReq
@@ -141,7 +142,7 @@ func (h *ModelHandler) Create(ctx *gin.Context) {
 
 	model, err := h.model.Create(ctx.Request.Context(), req)
 	if err != nil {
-		if errors.Is(err, component.ErrForbidden) {
+		if errors.Is(err, errorx.ErrForbidden) {
 			httpbase.ForbiddenError(ctx, err)
 			return
 		}
@@ -171,7 +172,7 @@ func (h *ModelHandler) Create(ctx *gin.Context) {
 func (h *ModelHandler) Update(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
 	if currentUser == "" {
-		httpbase.UnauthorizedError(ctx, component.ErrUserNotFound)
+		httpbase.UnauthorizedError(ctx, errorx.ErrUserNotFound)
 		return
 	}
 	var req *types.UpdateModelReq
@@ -200,7 +201,7 @@ func (h *ModelHandler) Update(ctx *gin.Context) {
 
 	model, err := h.model.Update(ctx.Request.Context(), req)
 	if err != nil {
-		if errors.Is(err, component.ErrForbidden) {
+		if errors.Is(err, errorx.ErrForbidden) {
 			httpbase.ForbiddenError(ctx, err)
 			return
 		}
@@ -230,7 +231,7 @@ func (h *ModelHandler) Update(ctx *gin.Context) {
 func (h *ModelHandler) Delete(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
 	if currentUser == "" {
-		httpbase.UnauthorizedError(ctx, component.ErrUserNotFound)
+		httpbase.UnauthorizedError(ctx, errorx.ErrUserNotFound)
 		return
 	}
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
@@ -241,7 +242,7 @@ func (h *ModelHandler) Delete(ctx *gin.Context) {
 	}
 	err = h.model.Delete(ctx.Request.Context(), namespace, name, currentUser)
 	if err != nil {
-		if errors.Is(err, component.ErrForbidden) {
+		if errors.Is(err, errorx.ErrForbidden) {
 			httpbase.ForbiddenError(ctx, err)
 			return
 		}
@@ -278,7 +279,7 @@ func (h *ModelHandler) Show(ctx *gin.Context) {
 	detail, err := h.model.Show(ctx.Request.Context(), namespace, name, currentUser, false)
 
 	if err != nil {
-		if errors.Is(err, component.ErrForbidden) {
+		if errors.Is(err, errorx.ErrForbidden) {
 			httpbase.ForbiddenError(ctx, err)
 			return
 		}
@@ -310,7 +311,7 @@ func (h *ModelHandler) SDKModelInfo(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
 	modelInfo, err := h.model.SDKModelInfo(ctx.Request.Context(), namespace, name, ref, currentUser, blobs)
 	if err != nil {
-		if errors.Is(err, component.ErrForbidden) {
+		if errors.Is(err, errorx.ErrForbidden) {
 			httpbase.ForbiddenError(ctx, err)
 			return
 		}
@@ -345,7 +346,7 @@ func (h *ModelHandler) Relations(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
 	detail, err := h.model.Relations(ctx.Request.Context(), namespace, name, currentUser)
 	if err != nil {
-		if errors.Is(err, component.ErrForbidden) {
+		if errors.Is(err, errorx.ErrForbidden) {
 			httpbase.ForbiddenError(ctx, err)
 			return
 		}
@@ -374,7 +375,7 @@ func (h *ModelHandler) Relations(ctx *gin.Context) {
 func (h *ModelHandler) SetRelations(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
 	if currentUser == "" {
-		httpbase.UnauthorizedError(ctx, component.ErrUserNotFound)
+		httpbase.UnauthorizedError(ctx, errorx.ErrUserNotFound)
 		return
 	}
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
@@ -397,7 +398,7 @@ func (h *ModelHandler) SetRelations(ctx *gin.Context) {
 
 	err = h.model.SetRelationDatasets(ctx.Request.Context(), req)
 	if err != nil {
-		if errors.Is(err, component.ErrForbidden) {
+		if errors.Is(err, errorx.ErrForbidden) {
 			httpbase.ForbiddenError(ctx, err)
 			return
 		}
@@ -425,7 +426,7 @@ func (h *ModelHandler) SetRelations(ctx *gin.Context) {
 func (h *ModelHandler) AddDatasetRelation(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
 	if currentUser == "" {
-		httpbase.UnauthorizedError(ctx, component.ErrUserNotFound)
+		httpbase.UnauthorizedError(ctx, errorx.ErrUserNotFound)
 		return
 	}
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
@@ -448,7 +449,7 @@ func (h *ModelHandler) AddDatasetRelation(ctx *gin.Context) {
 
 	err = h.model.AddRelationDataset(ctx.Request.Context(), req)
 	if err != nil {
-		if errors.Is(err, component.ErrForbidden) {
+		if errors.Is(err, errorx.ErrForbidden) {
 			httpbase.ForbiddenError(ctx, err)
 			return
 		}
@@ -476,7 +477,7 @@ func (h *ModelHandler) AddDatasetRelation(ctx *gin.Context) {
 func (h *ModelHandler) DelDatasetRelation(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
 	if currentUser == "" {
-		httpbase.UnauthorizedError(ctx, component.ErrUserNotFound)
+		httpbase.UnauthorizedError(ctx, errorx.ErrUserNotFound)
 		return
 	}
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
@@ -499,7 +500,7 @@ func (h *ModelHandler) DelDatasetRelation(ctx *gin.Context) {
 
 	err = h.model.DelRelationDataset(ctx.Request.Context(), req)
 	if err != nil {
-		if errors.Is(err, component.ErrForbidden) {
+		if errors.Is(err, errorx.ErrForbidden) {
 			httpbase.ForbiddenError(ctx, err)
 			return
 		}
@@ -592,7 +593,7 @@ func convertFilePathFromRoute(path string) string {
 func (h *ModelHandler) DeployDedicated(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
 	if currentUser == "" {
-		httpbase.UnauthorizedError(ctx, component.ErrUserNotFound)
+		httpbase.UnauthorizedError(ctx, errorx.ErrUserNotFound)
 		return
 	}
 
@@ -677,7 +678,7 @@ func (h *ModelHandler) DeployDedicated(ctx *gin.Context) {
 func (h *ModelHandler) FinetuneCreate(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
 	if currentUser == "" {
-		httpbase.UnauthorizedError(ctx, component.ErrUserNotFound)
+		httpbase.UnauthorizedError(ctx, errorx.ErrUserNotFound)
 		return
 	}
 
@@ -764,7 +765,7 @@ func (h *ModelHandler) DeployDelete(ctx *gin.Context) {
 	)
 	currentUser := httpbase.GetCurrentUser(ctx)
 	if currentUser == "" {
-		httpbase.UnauthorizedError(ctx, component.ErrUserNotFound)
+		httpbase.UnauthorizedError(ctx, errorx.ErrUserNotFound)
 		return
 	}
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
@@ -789,7 +790,7 @@ func (h *ModelHandler) DeployDelete(ctx *gin.Context) {
 	}
 	err = h.repo.DeleteDeploy(ctx.Request.Context(), delReq)
 	if err != nil {
-		if errors.Is(err, component.ErrForbidden) {
+		if errors.Is(err, errorx.ErrForbidden) {
 			slog.Info("not allowed to delete inference", slog.Any("error", err), slog.Any("req", delReq))
 			httpbase.ForbiddenError(ctx, err)
 			return
@@ -823,7 +824,7 @@ func (h *ModelHandler) FinetuneDelete(ctx *gin.Context) {
 	)
 	currentUser := httpbase.GetCurrentUser(ctx)
 	if currentUser == "" {
-		httpbase.UnauthorizedError(ctx, component.ErrUserNotFound)
+		httpbase.UnauthorizedError(ctx, errorx.ErrUserNotFound)
 		return
 	}
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
@@ -849,7 +850,7 @@ func (h *ModelHandler) FinetuneDelete(ctx *gin.Context) {
 	}
 	err = h.repo.DeleteDeploy(ctx.Request.Context(), delReq)
 	if err != nil {
-		if errors.Is(err, component.ErrForbidden) {
+		if errors.Is(err, errorx.ErrForbidden) {
 			slog.Error("not allowed to delete finetune", slog.Any("error", err), slog.Any("req", delReq))
 			httpbase.ForbiddenError(ctx, err)
 			return
@@ -883,7 +884,7 @@ func (h *ModelHandler) DeployStop(ctx *gin.Context) {
 	)
 	currentUser := httpbase.GetCurrentUser(ctx)
 	if currentUser == "" {
-		httpbase.UnauthorizedError(ctx, component.ErrUserNotFound)
+		httpbase.UnauthorizedError(ctx, errorx.ErrUserNotFound)
 		return
 	}
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
@@ -908,7 +909,7 @@ func (h *ModelHandler) DeployStop(ctx *gin.Context) {
 	}
 	err = h.repo.DeployStop(ctx.Request.Context(), stopReq)
 	if err != nil {
-		if errors.Is(err, component.ErrForbidden) {
+		if errors.Is(err, errorx.ErrForbidden) {
 			slog.Info("not allowed to stop inference", slog.Any("error", err), slog.Any("req", stopReq))
 			httpbase.ForbiddenError(ctx, err)
 			return
@@ -942,7 +943,7 @@ func (h *ModelHandler) DeployStart(ctx *gin.Context) {
 	)
 	currentUser := httpbase.GetCurrentUser(ctx)
 	if currentUser == "" {
-		httpbase.UnauthorizedError(ctx, component.ErrUserNotFound)
+		httpbase.UnauthorizedError(ctx, errorx.ErrUserNotFound)
 		return
 	}
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
@@ -969,7 +970,7 @@ func (h *ModelHandler) DeployStart(ctx *gin.Context) {
 
 	err = h.repo.DeployStart(ctx.Request.Context(), startReq)
 	if err != nil {
-		if errors.Is(err, component.ErrForbidden) {
+		if errors.Is(err, errorx.ErrForbidden) {
 			slog.Info("not allowed to start inference", slog.Any("error", err), slog.Any("req", startReq))
 			httpbase.ForbiddenError(ctx, err)
 			return
@@ -1000,7 +1001,7 @@ func (h *ModelHandler) DeployStart(ctx *gin.Context) {
 func (h *ModelHandler) ListByRuntimeFrameworkID(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
 	if currentUser == "" {
-		httpbase.UnauthorizedError(ctx, component.ErrUserNotFound)
+		httpbase.UnauthorizedError(ctx, errorx.ErrUserNotFound)
 		return
 	}
 	deployTypeStr := ctx.Query("deploy_type")
@@ -1062,7 +1063,7 @@ func (h *ModelHandler) FinetuneStop(ctx *gin.Context) {
 	)
 	currentUser := httpbase.GetCurrentUser(ctx)
 	if currentUser == "" {
-		httpbase.UnauthorizedError(ctx, component.ErrUserNotFound)
+		httpbase.UnauthorizedError(ctx, errorx.ErrUserNotFound)
 		return
 	}
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
@@ -1087,7 +1088,7 @@ func (h *ModelHandler) FinetuneStop(ctx *gin.Context) {
 	}
 	err = h.repo.DeployStop(ctx.Request.Context(), stopReq)
 	if err != nil {
-		if errors.Is(err, component.ErrForbidden) {
+		if errors.Is(err, errorx.ErrForbidden) {
 			slog.Info("not allowed to stop finetune", slog.Any("req", stopReq), slog.Any("error", err))
 			httpbase.ForbiddenError(ctx, err)
 			return
@@ -1121,7 +1122,7 @@ func (h *ModelHandler) FinetuneStart(ctx *gin.Context) {
 	)
 	currentUser := httpbase.GetCurrentUser(ctx)
 	if currentUser == "" {
-		httpbase.UnauthorizedError(ctx, component.ErrUserNotFound)
+		httpbase.UnauthorizedError(ctx, errorx.ErrUserNotFound)
 		return
 	}
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
@@ -1146,7 +1147,7 @@ func (h *ModelHandler) FinetuneStart(ctx *gin.Context) {
 	}
 	err = h.repo.DeployStart(ctx.Request.Context(), startReq)
 	if err != nil {
-		if errors.Is(err, component.ErrForbidden) {
+		if errors.Is(err, errorx.ErrForbidden) {
 			slog.Info("not allowed to start finetune", slog.Any("error", err), slog.Any("req", startReq))
 			httpbase.ForbiddenError(ctx, err)
 			return
@@ -1173,7 +1174,7 @@ func (h *ModelHandler) FinetuneStart(ctx *gin.Context) {
 func (h *ModelHandler) ListAllRuntimeFramework(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
 	if currentUser == "" {
-		httpbase.UnauthorizedError(ctx, component.ErrUserNotFound)
+		httpbase.UnauthorizedError(ctx, errorx.ErrUserNotFound)
 		return
 	}
 
@@ -1215,7 +1216,7 @@ func (h *ModelHandler) UpdateModelRuntimeFrameworks(ctx *gin.Context) {
 
 	currentUser := httpbase.GetCurrentUser(ctx)
 	if currentUser == "" {
-		httpbase.UnauthorizedError(ctx, component.ErrUserNotFound)
+		httpbase.UnauthorizedError(ctx, errorx.ErrUserNotFound)
 		return
 	}
 
@@ -1242,7 +1243,7 @@ func (h *ModelHandler) UpdateModelRuntimeFrameworks(ctx *gin.Context) {
 
 	list, err := h.model.SetRuntimeFrameworkModes(ctx.Request.Context(), currentUser, deployType, id, req.Models)
 	if err != nil {
-		if errors.Is(err, component.ErrForbidden) {
+		if errors.Is(err, errorx.ErrForbidden) {
 			httpbase.ForbiddenError(ctx, err)
 			return
 		}
@@ -1279,7 +1280,7 @@ func (h *ModelHandler) DeleteModelRuntimeFrameworks(ctx *gin.Context) {
 
 	currentUser := httpbase.GetCurrentUser(ctx)
 	if currentUser == "" {
-		httpbase.UnauthorizedError(ctx, component.ErrUserNotFound)
+		httpbase.UnauthorizedError(ctx, errorx.ErrUserNotFound)
 		return
 	}
 
@@ -1306,7 +1307,7 @@ func (h *ModelHandler) DeleteModelRuntimeFrameworks(ctx *gin.Context) {
 
 	list, err := h.model.DeleteRuntimeFrameworkModes(ctx.Request.Context(), currentUser, deployType, id, req.Models)
 	if err != nil {
-		if errors.Is(err, component.ErrForbidden) {
+		if errors.Is(err, errorx.ErrForbidden) {
 			httpbase.ForbiddenError(ctx, err)
 			return
 		}
@@ -1339,7 +1340,7 @@ func (h *ModelHandler) ListModelsOfRuntimeFrameworks(ctx *gin.Context) {
 	filter := new(types.RepoFilter)
 	currentUser := httpbase.GetCurrentUser(ctx)
 	if currentUser == "" {
-		httpbase.UnauthorizedError(ctx, component.ErrUserNotFound)
+		httpbase.UnauthorizedError(ctx, errorx.ErrUserNotFound)
 		return
 	}
 	filter = getFilterFromContext(ctx, filter)
@@ -1401,7 +1402,7 @@ func (h *ModelHandler) AllFiles(ctx *gin.Context) {
 	req.CurrentUser = httpbase.GetCurrentUser(ctx)
 	detail, err := h.repo.AllFiles(ctx.Request.Context(), req)
 	if err != nil {
-		if errors.Is(err, component.ErrForbidden) {
+		if errors.Is(err, errorx.ErrForbidden) {
 			slog.Info("not allowed to get model all files", slog.Any("error", err), slog.Any("req", req))
 			httpbase.ForbiddenError(ctx, err)
 			return
@@ -1431,7 +1432,7 @@ func (h *ModelHandler) AllFiles(ctx *gin.Context) {
 func (h *ModelHandler) DeployServerless(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
 	if currentUser == "" {
-		httpbase.UnauthorizedError(ctx, component.ErrUserNotFound)
+		httpbase.UnauthorizedError(ctx, errorx.ErrUserNotFound)
 		return
 	}
 
@@ -1465,7 +1466,7 @@ func (h *ModelHandler) DeployServerless(ctx *gin.Context) {
 	req.SecureLevel = 1 // public for serverless
 	deployID, err := h.model.Deploy(ctx.Request.Context(), deployReq, req)
 	if err != nil {
-		if errors.Is(err, component.ErrForbidden) {
+		if errors.Is(err, errorx.ErrForbidden) {
 			slog.Info("not allowed to deploy model as serverless", slog.Any("error", err), slog.Any("deploy_req", deployReq))
 
 			httpbase.ForbiddenError(ctx, err)
@@ -1507,7 +1508,7 @@ func (h *ModelHandler) ServerlessStart(ctx *gin.Context) {
 	)
 	currentUser := httpbase.GetCurrentUser(ctx)
 	if currentUser == "" {
-		httpbase.UnauthorizedError(ctx, component.ErrUserNotFound)
+		httpbase.UnauthorizedError(ctx, errorx.ErrUserNotFound)
 		return
 	}
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
@@ -1534,7 +1535,7 @@ func (h *ModelHandler) ServerlessStart(ctx *gin.Context) {
 
 	err = h.repo.DeployStart(ctx.Request.Context(), startReq)
 	if err != nil {
-		if errors.Is(err, component.ErrForbidden) {
+		if errors.Is(err, errorx.ErrForbidden) {
 			slog.Info("not allowed to start model serverless deploy", slog.Any("error", err), slog.Any("req", startReq))
 
 			httpbase.ForbiddenError(ctx, err)
@@ -1569,7 +1570,7 @@ func (h *ModelHandler) ServerlessStop(ctx *gin.Context) {
 	)
 	currentUser := httpbase.GetCurrentUser(ctx)
 	if currentUser == "" {
-		httpbase.UnauthorizedError(ctx, component.ErrUserNotFound)
+		httpbase.UnauthorizedError(ctx, errorx.ErrUserNotFound)
 		return
 	}
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)

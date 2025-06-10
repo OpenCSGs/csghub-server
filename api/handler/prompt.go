@@ -11,6 +11,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"opencsg.com/csghub-server/api/httpbase"
 	"opencsg.com/csghub-server/common/config"
+	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/types"
 	"opencsg.com/csghub-server/common/utils/common"
 	"opencsg.com/csghub-server/component"
@@ -126,7 +127,7 @@ func (h *PromptHandler) ListPrompt(ctx *gin.Context) {
 
 	detail, err := h.prompt.Show(ctx.Request.Context(), namespace, name, currentUser)
 	if err != nil {
-		if errors.Is(err, component.ErrUnauthorized) {
+		if errors.Is(err, errorx.ErrUnauthorized) {
 			httpbase.UnauthorizedError(ctx, err)
 			return
 		}
@@ -215,7 +216,7 @@ func (h *PromptHandler) GetPrompt(ctx *gin.Context) {
 func (h *PromptHandler) CreatePrompt(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
 	if currentUser == "" {
-		httpbase.UnauthorizedError(ctx, component.ErrUserNotFound)
+		httpbase.UnauthorizedError(ctx, errorx.ErrUserNotFound)
 		return
 	}
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
@@ -270,7 +271,7 @@ func (h *PromptHandler) CreatePrompt(ctx *gin.Context) {
 func (h *PromptHandler) UpdatePrompt(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
 	if currentUser == "" {
-		httpbase.UnauthorizedError(ctx, component.ErrUserNotFound)
+		httpbase.UnauthorizedError(ctx, errorx.ErrUserNotFound)
 		return
 	}
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
@@ -332,7 +333,7 @@ func (h *PromptHandler) UpdatePrompt(ctx *gin.Context) {
 func (h *PromptHandler) DeletePrompt(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
 	if currentUser == "" {
-		httpbase.UnauthorizedError(ctx, component.ErrUserNotFound)
+		httpbase.UnauthorizedError(ctx, errorx.ErrUserNotFound)
 		return
 	}
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
@@ -387,7 +388,7 @@ func (h *PromptHandler) Relations(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
 	detail, err := h.prompt.Relations(ctx.Request.Context(), namespace, name, currentUser)
 	if err != nil {
-		if errors.Is(err, component.ErrUnauthorized) {
+		if errors.Is(err, errorx.ErrUnauthorized) {
 			httpbase.UnauthorizedError(ctx, err)
 			return
 		}
@@ -416,7 +417,7 @@ func (h *PromptHandler) Relations(ctx *gin.Context) {
 func (h *PromptHandler) SetRelations(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
 	if currentUser == "" {
-		httpbase.UnauthorizedError(ctx, component.ErrUserNotFound)
+		httpbase.UnauthorizedError(ctx, errorx.ErrUserNotFound)
 		return
 	}
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
@@ -463,7 +464,7 @@ func (h *PromptHandler) SetRelations(ctx *gin.Context) {
 func (h *PromptHandler) AddModelRelation(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
 	if currentUser == "" {
-		httpbase.UnauthorizedError(ctx, component.ErrUserNotFound)
+		httpbase.UnauthorizedError(ctx, errorx.ErrUserNotFound)
 		return
 	}
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
@@ -510,7 +511,7 @@ func (h *PromptHandler) AddModelRelation(ctx *gin.Context) {
 func (h *PromptHandler) DelModelRelation(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
 	if currentUser == "" {
-		httpbase.UnauthorizedError(ctx, component.ErrUserNotFound)
+		httpbase.UnauthorizedError(ctx, errorx.ErrUserNotFound)
 		return
 	}
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
@@ -556,7 +557,7 @@ func (h *PromptHandler) DelModelRelation(ctx *gin.Context) {
 func (h *PromptHandler) Create(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
 	if currentUser == "" {
-		httpbase.UnauthorizedError(ctx, component.ErrUserNotFound)
+		httpbase.UnauthorizedError(ctx, errorx.ErrUserNotFound)
 		return
 	}
 	var req *types.CreatePromptRepoReq
@@ -604,7 +605,7 @@ func (h *PromptHandler) Create(ctx *gin.Context) {
 func (h *PromptHandler) Update(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
 	if currentUser == "" {
-		httpbase.UnauthorizedError(ctx, component.ErrUserNotFound)
+		httpbase.UnauthorizedError(ctx, errorx.ErrUserNotFound)
 		return
 	}
 	var req *types.UpdatePromptRepoReq
@@ -658,7 +659,7 @@ func (h *PromptHandler) Update(ctx *gin.Context) {
 func (h *PromptHandler) Delete(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
 	if currentUser == "" {
-		httpbase.UnauthorizedError(ctx, component.ErrUserNotFound)
+		httpbase.UnauthorizedError(ctx, errorx.ErrUserNotFound)
 		return
 	}
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
@@ -776,7 +777,7 @@ func (h *PromptHandler) Tags(ctx *gin.Context) {
 func (h *PromptHandler) UpdateTags(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
 	if currentUser == "" {
-		httpbase.UnauthorizedError(ctx, component.ErrUserNotFound)
+		httpbase.UnauthorizedError(ctx, errorx.ErrUserNotFound)
 		return
 	}
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
