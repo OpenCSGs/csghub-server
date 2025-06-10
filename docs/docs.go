@@ -1965,150 +1965,6 @@ const docTemplate = `{
                 }
             }
         },
-        "/datasets/{namespace}/{name}/dataviewer/catalog": {
-            "get": {
-                "security": [
-                    {
-                        "ApiKey": []
-                    }
-                ],
-                "description": "get catalog of the dataset",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Dataset"
-                ],
-                "summary": "Get catalog of the dataset",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "namespace",
-                        "name": "namespace",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/types.Response"
-                        }
-                    },
-                    "400": {
-                        "description": "Bad request",
-                        "schema": {
-                            "$ref": "#/definitions/types.APIBadRequest"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal server error",
-                        "schema": {
-                            "$ref": "#/definitions/types.APIInternalServerError"
-                        }
-                    }
-                }
-            }
-        },
-        "/datasets/{namespace}/{name}/dataviewer/rows": {
-            "get": {
-                "security": [
-                    {
-                        "ApiKey": []
-                    }
-                ],
-                "description": "get rows of the dataset",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Dataset"
-                ],
-                "summary": "Get rows of the dataset",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "namespace",
-                        "name": "namespace",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "config",
-                        "name": "config",
-                        "in": "query",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "split",
-                        "name": "split",
-                        "in": "query",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "search",
-                        "name": "search",
-                        "in": "query"
-                    },
-                    {
-                        "type": "string",
-                        "description": "where",
-                        "name": "where",
-                        "in": "query"
-                    },
-                    {
-                        "type": "string",
-                        "description": "orderby",
-                        "name": "orderby",
-                        "in": "query"
-                    },
-                    {
-                        "type": "integer",
-                        "default": 50,
-                        "description": "per",
-                        "name": "per",
-                        "in": "query"
-                    },
-                    {
-                        "type": "integer",
-                        "default": 1,
-                        "description": "per page",
-                        "name": "page",
-                        "in": "query"
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/types.Response"
-                        }
-                    },
-                    "400": {
-                        "description": "Bad request",
-                        "schema": {
-                            "$ref": "#/definitions/types.APIBadRequest"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal server error",
-                        "schema": {
-                            "$ref": "#/definitions/types.APIInternalServerError"
-                        }
-                    }
-                }
-            }
-        },
         "/datasets/{namespace}/{name}/relations": {
             "get": {
                 "security": [
@@ -2165,76 +2021,6 @@ const docTemplate = `{
                                     }
                                 }
                             ]
-                        }
-                    },
-                    "400": {
-                        "description": "Bad request",
-                        "schema": {
-                            "$ref": "#/definitions/types.APIBadRequest"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal server error",
-                        "schema": {
-                            "$ref": "#/definitions/types.APIInternalServerError"
-                        }
-                    }
-                }
-            }
-        },
-        "/datasets/{namespace}/{name}/viewer/{file_path}": {
-            "get": {
-                "security": [
-                    {
-                        "ApiKey": []
-                    }
-                ],
-                "description": "get the demo data of the dataset",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Dataset"
-                ],
-                "summary": "Get the demo data of the dataset",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "namespace",
-                        "name": "namespace",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "file_path",
-                        "name": "file_path",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "type": "integer",
-                        "default": 50,
-                        "description": "per",
-                        "name": "per",
-                        "in": "query"
-                    },
-                    {
-                        "type": "integer",
-                        "default": 1,
-                        "description": "per page",
-                        "name": "page",
-                        "in": "query"
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/types.Response"
                         }
                     },
                     "400": {
@@ -4255,7 +4041,7 @@ const docTemplate = `{
                                         "data": {
                                             "type": "array",
                                             "items": {
-                                                "$ref": "#/definitions/opencsg_com_csghub-server_common_types.Model"
+                                                "$ref": "#/definitions/types.Model"
                                             }
                                         },
                                         "total": {
@@ -4485,7 +4271,7 @@ const docTemplate = `{
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/opencsg_com_csghub-server_common_types.Model"
+                                            "$ref": "#/definitions/types.Model"
                                         }
                                     }
                                 }
@@ -7176,7 +6962,7 @@ const docTemplate = `{
                                         "data": {
                                             "type": "array",
                                             "items": {
-                                                "$ref": "#/definitions/opencsg_com_csghub-server_common_types.Model"
+                                                "$ref": "#/definitions/types.Model"
                                             }
                                         },
                                         "total": {
@@ -12968,7 +12754,7 @@ const docTemplate = `{
                                         "data": {
                                             "type": "array",
                                             "items": {
-                                                "$ref": "#/definitions/opencsg_com_csghub-server_common_types.Model"
+                                                "$ref": "#/definitions/types.Model"
                                             }
                                         },
                                         "total": {
@@ -13291,7 +13077,7 @@ const docTemplate = `{
                                         "data": {
                                             "type": "array",
                                             "items": {
-                                                "$ref": "#/definitions/opencsg_com_csghub-server_common_types.Model"
+                                                "$ref": "#/definitions/types.Model"
                                             }
                                         },
                                         "total": {
@@ -14076,251 +13862,6 @@ const docTemplate = `{
                         "schema": {
                             "$ref": "#/definitions/types.APIInternalServerError"
                         }
-                    }
-                }
-            }
-        },
-        "/v1/chat/completions": {
-            "post": {
-                "security": [
-                    {
-                        "ApiKey": []
-                    }
-                ],
-                "description": "Sends a chat completion request to the backend model and returns the response",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "AIGateway"
-                ],
-                "summary": "Chat with backend model",
-                "parameters": [
-                    {
-                        "description": "Chat completion request",
-                        "name": "request",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/handler.ChatCompletionRequest"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/handler.ChatCompletionResponse"
-                        }
-                    },
-                    "400": {
-                        "description": "Bad request",
-                        "schema": {}
-                    },
-                    "404": {
-                        "description": "Model not found",
-                        "schema": {}
-                    },
-                    "500": {
-                        "description": "Internal server error",
-                        "schema": {}
-                    }
-                }
-            }
-        },
-        "/v1/embeddings": {
-            "post": {
-                "security": [
-                    {
-                        "ApiKey": []
-                    }
-                ],
-                "description": "Sends a text to the backend model and returns the embedding",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "AIGateway"
-                ],
-                "summary": "Get embedding for a text",
-                "parameters": [
-                    {
-                        "description": "Embedding request",
-                        "name": "request",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/handler.EmbeddingRequest"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/types.Response"
-                        }
-                    },
-                    "400": {
-                        "description": "Bad request or sensitive input",
-                        "schema": {}
-                    },
-                    "404": {
-                        "description": "Model not found",
-                        "schema": {}
-                    },
-                    "500": {
-                        "description": "Internal server error",
-                        "schema": {}
-                    }
-                }
-            }
-        },
-        "/v1/mcp/servers": {
-            "get": {
-                "security": [
-                    {
-                        "ApiKey": []
-                    }
-                ],
-                "description": "Returns a list of available mcp servers",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "AIGateway"
-                ],
-                "summary": "List available mcp servers",
-                "parameters": [
-                    {
-                        "type": "integer",
-                        "default": 20,
-                        "description": "per",
-                        "name": "per",
-                        "in": "query"
-                    },
-                    {
-                        "type": "integer",
-                        "default": 1,
-                        "description": "per page",
-                        "name": "page",
-                        "in": "query"
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/types.ResponseWithTotal"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "type": "array",
-                                            "items": {
-                                                "$ref": "#/definitions/types.MCPService"
-                                            }
-                                        },
-                                        "total": {
-                                            "type": "integer"
-                                        }
-                                    }
-                                }
-                            ]
-                        }
-                    },
-                    "500": {
-                        "description": "Internal server error",
-                        "schema": {}
-                    }
-                }
-            }
-        },
-        "/v1/models": {
-            "get": {
-                "security": [
-                    {
-                        "ApiKey": []
-                    }
-                ],
-                "description": "Returns a list of available models",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "AIGateway"
-                ],
-                "summary": "List available models",
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/types.ModelList"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal server error",
-                        "schema": {}
-                    }
-                }
-            }
-        },
-        "/v1/models/{model}": {
-            "get": {
-                "security": [
-                    {
-                        "ApiKey": []
-                    }
-                ],
-                "description": "Returns information about a specific model",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "AIGateway"
-                ],
-                "summary": "Get model details",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Model ID",
-                        "name": "model",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/opencsg_com_csghub-server_aigateway_types.Model"
-                        }
-                    },
-                    "404": {
-                        "description": "Model not found",
-                        "schema": {}
-                    },
-                    "500": {
-                        "description": "Internal server error",
-                        "schema": {}
                     }
                 }
             }
@@ -18408,91 +17949,6 @@ const docTemplate = `{
                 }
             }
         },
-        "handler.ChatCompletionRequest": {
-            "type": "object",
-            "properties": {
-                "max_tokens": {
-                    "type": "integer"
-                },
-                "messages": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/handler.ChatMessage"
-                    }
-                },
-                "model": {
-                    "type": "string"
-                },
-                "stream": {
-                    "type": "boolean"
-                },
-                "stream_options": {
-                    "$ref": "#/definitions/handler.StreamOptions"
-                },
-                "temperature": {
-                    "type": "number"
-                }
-            }
-        },
-        "handler.ChatCompletionResponse": {
-            "type": "object",
-            "properties": {
-                "choices": {
-                    "type": "array",
-                    "items": {
-                        "type": "object",
-                        "properties": {
-                            "finish_reason": {
-                                "type": "string"
-                            },
-                            "index": {
-                                "type": "integer"
-                            },
-                            "message": {
-                                "$ref": "#/definitions/handler.ChatMessage"
-                            }
-                        }
-                    }
-                },
-                "created": {
-                    "type": "integer"
-                },
-                "id": {
-                    "type": "string"
-                },
-                "model": {
-                    "type": "string"
-                },
-                "object": {
-                    "type": "string"
-                },
-                "usage": {
-                    "type": "object",
-                    "properties": {
-                        "completion_tokens": {
-                            "type": "integer"
-                        },
-                        "prompt_tokens": {
-                            "type": "integer"
-                        },
-                        "total_tokens": {
-                            "type": "integer"
-                        }
-                    }
-                }
-            }
-        },
-        "handler.ChatMessage": {
-            "type": "object",
-            "properties": {
-                "content": {
-                    "type": "string"
-                },
-                "role": {
-                    "type": "string"
-                }
-            }
-        },
         "handler.Create.addMemberRequest": {
             "type": "object",
             "required": [
@@ -18521,23 +17977,6 @@ const docTemplate = `{
                 }
             }
         },
-        "handler.EmbeddingRequest": {
-            "type": "object",
-            "properties": {
-                "encoding_format": {
-                    "description": "Encoding format (e.g., \"float\")",
-                    "type": "string"
-                },
-                "input": {
-                    "description": "Input text content",
-                    "type": "string"
-                },
-                "model": {
-                    "description": "Model name used (e.g., \"text-embedding-ada-002\")",
-                    "type": "string"
-                }
-            }
-        },
         "handler.SetOpWeight.SetOpWeightReq": {
             "type": "object",
             "required": [
@@ -18553,14 +17992,6 @@ const docTemplate = `{
                 }
             }
         },
-        "handler.StreamOptions": {
-            "type": "object",
-            "properties": {
-                "include_usage": {
-                    "type": "boolean"
-                }
-            }
-        },
         "handler.Update.updateMemberRequest": {
             "type": "object",
             "required": [
@@ -18573,158 +18004,6 @@ const docTemplate = `{
                 },
                 "old_role": {
                     "type": "string"
-                }
-            }
-        },
-        "opencsg_com_csghub-server_aigateway_types.Model": {
-            "type": "object",
-            "properties": {
-                "created": {
-                    "description": "organization-owner (e.g. openai)",
-                    "type": "integer"
-                },
-                "id": {
-                    "type": "string"
-                },
-                "object": {
-                    "type": "string"
-                },
-                "owned_by": {
-                    "type": "string"
-                },
-                "task": {
-                    "description": "extend opanai struct",
-                    "type": "string"
-                }
-            }
-        },
-        "opencsg_com_csghub-server_common_types.Model": {
-            "type": "object",
-            "properties": {
-                "base_model": {
-                    "type": "string"
-                },
-                "can_manage": {
-                    "type": "boolean"
-                },
-                "can_write": {
-                    "type": "boolean"
-                },
-                "created_at": {
-                    "type": "string"
-                },
-                "csg_path": {
-                    "type": "string"
-                },
-                "default_branch": {
-                    "type": "string"
-                },
-                "description": {
-                    "type": "string"
-                },
-                "downloads": {
-                    "type": "integer"
-                },
-                "enable_evaluation": {
-                    "type": "boolean"
-                },
-                "enable_finetune": {
-                    "type": "boolean"
-                },
-                "enable_inference": {
-                    "type": "boolean"
-                },
-                "hf_path": {
-                    "type": "string"
-                },
-                "id": {
-                    "type": "integer"
-                },
-                "license": {
-                    "type": "string"
-                },
-                "likes": {
-                    "type": "integer"
-                },
-                "metadata": {
-                    "$ref": "#/definitions/types.Metadata"
-                },
-                "mirror_last_updated_at": {
-                    "type": "string"
-                },
-                "ms_path": {
-                    "type": "string"
-                },
-                "name": {
-                    "type": "string"
-                },
-                "namespace": {
-                    "$ref": "#/definitions/types.Namespace"
-                },
-                "nickname": {
-                    "type": "string"
-                },
-                "path": {
-                    "type": "string"
-                },
-                "private": {
-                    "type": "boolean"
-                },
-                "readme": {
-                    "type": "string"
-                },
-                "recom_op_weight": {
-                    "type": "integer"
-                },
-                "repository": {
-                    "$ref": "#/definitions/types.Repository"
-                },
-                "repository_id": {
-                    "type": "integer"
-                },
-                "scores": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/types.WeightScore"
-                    }
-                },
-                "sensitive_check_status": {
-                    "type": "string"
-                },
-                "source": {
-                    "$ref": "#/definitions/types.RepositorySource"
-                },
-                "status": {
-                    "description": "url to interact with the model",
-                    "type": "string",
-                    "example": "RUNNING"
-                },
-                "sync_status": {
-                    "$ref": "#/definitions/types.RepositorySyncStatus"
-                },
-                "tags": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/types.RepoTag"
-                    }
-                },
-                "updated_at": {
-                    "type": "string"
-                },
-                "user": {
-                    "$ref": "#/definitions/types.User"
-                },
-                "user_likes": {
-                    "type": "boolean"
-                },
-                "widget_type": {
-                    "description": "widget UI style: generation,chat",
-                    "allOf": [
-                        {
-                            "$ref": "#/definitions/types.ModelWidgetType"
-                        }
-                    ],
-                    "example": "generation"
                 }
             }
         },
@@ -20804,72 +20083,6 @@ const docTemplate = `{
                 }
             }
         },
-        "types.MCPService": {
-            "type": "object",
-            "properties": {
-                "created_at": {
-                    "type": "string"
-                },
-                "default_branch": {
-                    "type": "string"
-                },
-                "description": {
-                    "type": "string",
-                    "example": ""
-                },
-                "endpoint": {
-                    "type": "string",
-                    "example": "https://localhost/spaces/myname/mymcp"
-                },
-                "env": {
-                    "type": "string"
-                },
-                "id": {
-                    "type": "integer"
-                },
-                "license": {
-                    "type": "string",
-                    "example": "MIT"
-                },
-                "name": {
-                    "type": "string",
-                    "example": "mcp_name_1"
-                },
-                "nickname": {
-                    "type": "string",
-                    "example": ""
-                },
-                "path": {
-                    "type": "string",
-                    "example": "user_or_org_name/mcp_name_1"
-                },
-                "private": {
-                    "type": "boolean"
-                },
-                "repository_id": {
-                    "type": "integer"
-                },
-                "secrets": {
-                    "type": "string"
-                },
-                "status": {
-                    "type": "string"
-                },
-                "svc_name": {
-                    "type": "string"
-                },
-                "updated_at": {
-                    "type": "string"
-                },
-                "username": {
-                    "type": "string",
-                    "example": "creator_user_name"
-                },
-                "variables": {
-                    "type": "string"
-                }
-            }
-        },
         "types.Member": {
             "type": "object",
             "properties": {
@@ -21031,17 +20244,133 @@ const docTemplate = `{
                 "MirrorIncomplete"
             ]
         },
-        "types.ModelList": {
+        "types.Model": {
             "type": "object",
             "properties": {
-                "data": {
+                "base_model": {
+                    "type": "string"
+                },
+                "can_manage": {
+                    "type": "boolean"
+                },
+                "can_write": {
+                    "type": "boolean"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "csg_path": {
+                    "type": "string"
+                },
+                "default_branch": {
+                    "type": "string"
+                },
+                "description": {
+                    "type": "string"
+                },
+                "downloads": {
+                    "type": "integer"
+                },
+                "enable_evaluation": {
+                    "type": "boolean"
+                },
+                "enable_finetune": {
+                    "type": "boolean"
+                },
+                "enable_inference": {
+                    "type": "boolean"
+                },
+                "hf_path": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "license": {
+                    "type": "string"
+                },
+                "likes": {
+                    "type": "integer"
+                },
+                "metadata": {
+                    "$ref": "#/definitions/types.Metadata"
+                },
+                "mirror_last_updated_at": {
+                    "type": "string"
+                },
+                "ms_path": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "namespace": {
+                    "$ref": "#/definitions/types.Namespace"
+                },
+                "nickname": {
+                    "type": "string"
+                },
+                "path": {
+                    "type": "string"
+                },
+                "private": {
+                    "type": "boolean"
+                },
+                "readme": {
+                    "type": "string"
+                },
+                "recom_op_weight": {
+                    "type": "integer"
+                },
+                "repository": {
+                    "$ref": "#/definitions/types.Repository"
+                },
+                "repository_id": {
+                    "type": "integer"
+                },
+                "scores": {
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/opencsg_com_csghub-server_aigateway_types.Model"
+                        "$ref": "#/definitions/types.WeightScore"
                     }
                 },
-                "object": {
+                "sensitive_check_status": {
                     "type": "string"
+                },
+                "source": {
+                    "$ref": "#/definitions/types.RepositorySource"
+                },
+                "status": {
+                    "description": "url to interact with the model",
+                    "type": "string",
+                    "example": "RUNNING"
+                },
+                "sync_status": {
+                    "$ref": "#/definitions/types.RepositorySyncStatus"
+                },
+                "tags": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/types.RepoTag"
+                    }
+                },
+                "updated_at": {
+                    "type": "string"
+                },
+                "user": {
+                    "$ref": "#/definitions/types.User"
+                },
+                "user_likes": {
+                    "type": "boolean"
+                },
+                "widget_type": {
+                    "description": "widget UI style: generation,chat",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/types.ModelWidgetType"
+                        }
+                    ],
+                    "example": "generation"
                 }
             }
         },
@@ -21516,7 +20845,7 @@ const docTemplate = `{
                 "models": {
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/opencsg_com_csghub-server_common_types.Model"
+                        "$ref": "#/definitions/types.Model"
                     }
                 },
                 "prompts": {
