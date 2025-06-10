@@ -17,6 +17,7 @@ import (
 	"opencsg.com/csghub-server/builder/git/gitserver"
 	"opencsg.com/csghub-server/builder/git/membership"
 	"opencsg.com/csghub-server/builder/store/database"
+	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/types"
 	"opencsg.com/csghub-server/common/utils/common"
 )
@@ -411,7 +412,7 @@ func (c *spaceComponentImpl) Show(ctx context.Context, namespace, name, currentU
 		return nil, fmt.Errorf("failed to get user %s repo permission, error: %w", currentUser, err)
 	}
 	if !permission.CanRead {
-		return nil, ErrUnauthorized
+		return nil, errorx.ErrUnauthorized
 	}
 
 	ns, err := c.repoComponent.GetNameSpaceInfo(ctx, namespace)
@@ -777,7 +778,7 @@ func (c *spaceComponentImpl) ListByPath(ctx context.Context, paths []string) ([]
 
 func (c *spaceComponentImpl) AllowCallApi(ctx context.Context, spaceID int64, username string) (bool, error) {
 	if username == "" {
-		return false, ErrUserNotFound
+		return false, errorx.ErrUserNotFound
 	}
 	s, err := c.spaceStore.ByID(ctx, spaceID)
 	if err != nil {

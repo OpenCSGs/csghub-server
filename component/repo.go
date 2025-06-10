@@ -34,6 +34,7 @@ import (
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/builder/store/s3"
 	"opencsg.com/csghub-server/common/config"
+	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/types"
 	"opencsg.com/csghub-server/common/utils/common"
 	"opencsg.com/csghub-server/mirror/queue"
@@ -272,11 +273,11 @@ func (c *repoComponentImpl) CreateRepo(ctx context.Context, req types.CreateRepo
 				return nil, nil, err
 			}
 			if !canWrite {
-				return nil, nil, ErrForbiddenMsg("users do not have permission to create repo in this organization")
+				return nil, nil, errorx.ErrForbiddenMsg("users do not have permission to create repo in this organization")
 			}
 		} else {
 			if namespace.Path != user.Username {
-				return nil, nil, ErrForbiddenMsg("users do not have permission to create repo in this namespace")
+				return nil, nil, errorx.ErrForbiddenMsg("users do not have permission to create repo in this namespace")
 			}
 		}
 	}
@@ -348,11 +349,11 @@ func (c *repoComponentImpl) UpdateRepo(ctx context.Context, req types.UpdateRepo
 				return nil, err
 			}
 			if !canWrite {
-				return nil, ErrForbiddenMsg("users do not have permission to update repo in this organization")
+				return nil, errorx.ErrForbiddenMsg("users do not have permission to update repo in this organization")
 			}
 		} else {
 			if namespace.Path != user.Username {
-				return nil, ErrForbiddenMsg("users do not have permission to update repo in this namespace")
+				return nil, errorx.ErrForbiddenMsg("users do not have permission to update repo in this namespace")
 			}
 		}
 	}
@@ -362,7 +363,7 @@ func (c *repoComponentImpl) UpdateRepo(ctx context.Context, req types.UpdateRepo
 		if !*req.Private {
 			allow, reason := c.allowPublic(repo)
 			if !allow {
-				return nil, ErrForbiddenMsg(reason)
+				return nil, errorx.ErrForbiddenMsg(reason)
 			}
 		}
 		repo.Private = *req.Private
@@ -421,11 +422,11 @@ func (c *repoComponentImpl) DeleteRepo(ctx context.Context, req types.DeleteRepo
 				return nil, err
 			}
 			if !canWrite {
-				return nil, ErrForbiddenMsg("users do not have permission to delete repo in this organization")
+				return nil, errorx.ErrForbiddenMsg("users do not have permission to delete repo in this organization")
 			}
 		} else {
 			if namespace.Path != user.Username {
-				return nil, ErrForbiddenMsg("users do not have permission to delete repo in this namespace")
+				return nil, errorx.ErrForbiddenMsg("users do not have permission to delete repo in this namespace")
 			}
 		}
 	}
@@ -575,7 +576,7 @@ func (c *repoComponentImpl) CreateFile(ctx context.Context, req *types.CreateFil
 		return nil, fmt.Errorf("failed to get user repo permission, error: %w", err)
 	}
 	if !permission.CanWrite {
-		return nil, ErrUnauthorized
+		return nil, errorx.ErrUnauthorized
 	}
 
 	user, err = c.userStore.FindByUsername(ctx, req.Username)
@@ -688,7 +689,7 @@ func (c *repoComponentImpl) UpdateFile(ctx context.Context, req *types.UpdateFil
 		return nil, fmt.Errorf("failed to get user repo permission, error: %w", err)
 	}
 	if !permission.CanWrite {
-		return nil, ErrForbiddenMsg("users do not have permission to update file in this repo")
+		return nil, errorx.ErrForbiddenMsg("users do not have permission to update file in this repo")
 	}
 
 	user, err = c.userStore.FindByUsername(ctx, req.Username)
@@ -774,7 +775,7 @@ func (c *repoComponentImpl) DeleteFile(ctx context.Context, req *types.DeleteFil
 		return nil, fmt.Errorf("failed to get user repo permission, error: %w", err)
 	}
 	if !permission.CanWrite {
-		return nil, ErrForbiddenMsg("users do not have permission to delete file in this repo")
+		return nil, errorx.ErrForbiddenMsg("users do not have permission to delete file in this repo")
 	}
 
 	user, err = c.userStore.FindByUsername(ctx, req.Username)
@@ -882,7 +883,7 @@ func (c *repoComponentImpl) Commits(ctx context.Context, req *types.GetCommitsRe
 		return nil, nil, fmt.Errorf("failed to get user repo permission, error: %w", err)
 	}
 	if !permission.CanRead {
-		return nil, nil, ErrUnauthorized
+		return nil, nil, errorx.ErrUnauthorized
 	}
 
 	if req.Ref == "" {
@@ -914,7 +915,7 @@ func (c *repoComponentImpl) LastCommit(ctx context.Context, req *types.GetCommit
 		return nil, fmt.Errorf("failed to get user repo permission, error: %w", err)
 	}
 	if !permission.CanRead {
-		return nil, ErrForbiddenMsg("users do not have permission to get last commit in this repo")
+		return nil, errorx.ErrForbiddenMsg("users do not have permission to get last commit in this repo")
 	}
 
 	if req.Ref == "" {
@@ -944,7 +945,7 @@ func (c *repoComponentImpl) FileRaw(ctx context.Context, req *types.GetFileReq) 
 		return "", fmt.Errorf("failed to get user repo permission, error: %w", err)
 	}
 	if !permission.CanRead {
-		return "", ErrForbiddenMsg("users do not have permission to get file raw in this repo")
+		return "", errorx.ErrForbiddenMsg("users do not have permission to get file raw in this repo")
 	}
 
 	if repo.Source != types.LocalSource && strings.ToLower(req.Path) == "readme.md" {
@@ -988,7 +989,7 @@ func (c *repoComponentImpl) DownloadFile(ctx context.Context, req *types.GetFile
 		return nil, 0, "", fmt.Errorf("failed to get user repo permission, error: %w", err)
 	}
 	if !permission.CanRead {
-		return nil, 0, "", ErrForbiddenMsg("users do not have permission to download file in this repo")
+		return nil, 0, "", errorx.ErrForbiddenMsg("users do not have permission to download file in this repo")
 	}
 
 	err = c.repoStore.UpdateRepoFileDownloads(ctx, repo, time.Now(), 1)
@@ -1038,7 +1039,7 @@ func (c *repoComponentImpl) Branches(ctx context.Context, req *types.GetBranches
 		return nil, fmt.Errorf("failed to get user repo permission, error: %w", err)
 	}
 	if !permission.CanRead {
-		return nil, ErrForbiddenMsg("users do not have permission to get branches in this repo")
+		return nil, errorx.ErrForbiddenMsg("users do not have permission to get branches in this repo")
 	}
 
 	getBranchesReq := gitserver.GetBranchesReq{
@@ -1069,7 +1070,7 @@ func (c *repoComponentImpl) Tags(ctx context.Context, req *types.GetTagsReq) ([]
 		return nil, fmt.Errorf("failed to get user repo permission, error: %w", err)
 	}
 	if !permission.CanRead {
-		return nil, ErrForbiddenMsg("users do not have permission to get tags in this repo")
+		return nil, errorx.ErrForbiddenMsg("users do not have permission to get tags in this repo")
 	}
 
 	tags, err := c.repoStore.Tags(ctx, repo.ID)
@@ -1090,7 +1091,7 @@ func (c *repoComponentImpl) UpdateTags(ctx context.Context, namespace, name stri
 		return fmt.Errorf("failed to get user repo permission, error: %w", err)
 	}
 	if !permission.CanWrite {
-		return ErrForbiddenMsg("users do not have permission to update tags in this repo")
+		return errorx.ErrForbiddenMsg("users do not have permission to update tags in this repo")
 	}
 
 	tagScope := getTagScopeByRepoType(repoType)
@@ -1114,7 +1115,7 @@ func (c *repoComponentImpl) Tree(ctx context.Context, req *types.GetFileReq) ([]
 		return nil, fmt.Errorf("failed to get user repo permission, error: %w", err)
 	}
 	if !permission.CanRead {
-		return nil, ErrForbiddenMsg("users do not have permission to get tree in this repo")
+		return nil, errorx.ErrForbiddenMsg("users do not have permission to get tree in this repo")
 	}
 
 	if repo.Source != types.LocalSource {
@@ -1179,7 +1180,7 @@ func (c *repoComponentImpl) TreeV2(ctx context.Context, req *types.GetTreeReques
 		return nil, fmt.Errorf("failed to get user repo permission, error: %w", err)
 	}
 	if !permission.CanRead {
-		return nil, ErrForbiddenMsg("users do not have permission to get tree in this repo")
+		return nil, errorx.ErrForbiddenMsg("users do not have permission to get tree in this repo")
 	}
 
 	if req.Limit == 0 {
@@ -1266,7 +1267,7 @@ func (c *repoComponentImpl) LogsTree(ctx context.Context, req *types.GetLogsTree
 		return nil, fmt.Errorf("failed to get user repo permission, error: %w", err)
 	}
 	if !permission.CanRead {
-		return nil, ErrForbiddenMsg("users do not have permission to get logs tree in this repo")
+		return nil, errorx.ErrForbiddenMsg("users do not have permission to get logs tree in this repo")
 	}
 
 	if req.Limit == 0 {
@@ -1358,7 +1359,7 @@ func (c *repoComponentImpl) SDKListFiles(ctx context.Context, repoType types.Rep
 	var sdkFiles []types.SDKFile
 	repo, err := c.repoStore.FindByPath(ctx, repoType, namespace, name)
 	if err != nil || repo == nil {
-		return nil, ErrNotFound
+		return nil, errorx.ErrNotFound
 	}
 
 	canRead, err := c.AllowReadAccessRepo(ctx, repo, userName)
@@ -1366,7 +1367,7 @@ func (c *repoComponentImpl) SDKListFiles(ctx context.Context, repoType types.Rep
 		return nil, err
 	}
 	if !canRead {
-		return nil, ErrForbiddenMsg("users do not have permission to access this repo")
+		return nil, errorx.ErrForbiddenMsg("users do not have permission to access this repo")
 	}
 
 	if ref == "" {
@@ -1403,7 +1404,7 @@ func (c *repoComponentImpl) IsLfs(ctx context.Context, req *types.GetFileReq) (b
 	content, err := c.git.GetRepoFileRaw(ctx, getFileRawReq)
 	if err != nil {
 		if err.Error() == ErrNotFoundMessage {
-			return false, -1, ErrNotFound
+			return false, -1, errorx.ErrNotFound
 		}
 		slog.Error("failed to get %s file raw", string(req.RepoType), slog.String("namespace", req.Namespace), slog.String("name", req.Name), slog.String("path", req.Path))
 		return false, -1, err
@@ -1422,7 +1423,7 @@ func (c *repoComponentImpl) HeadDownloadFile(ctx context.Context, req *types.Get
 		return nil, err
 	}
 	if !canRead {
-		return nil, ErrForbiddenMsg("users do not have permission to download file in this repo")
+		return nil, errorx.ErrForbiddenMsg("users do not have permission to download file in this repo")
 	}
 	if req.Ref == "" {
 		req.Ref = repo.DefaultBranch
@@ -1438,7 +1439,7 @@ func (c *repoComponentImpl) HeadDownloadFile(ctx context.Context, req *types.Get
 	if err != nil {
 		slog.Error("err.Error()", slog.Any("err.Error()", err.Error()))
 		if err.Error() == ErrNotFoundMessage || err.Error() == ErrGetContentsOrList {
-			return nil, ErrNotFound
+			return nil, errorx.ErrNotFound
 		}
 		return nil, fmt.Errorf("failed to download git %s repository file, error: %w", req.RepoType, err)
 	}
@@ -1457,7 +1458,7 @@ func (c *repoComponentImpl) SDKDownloadFile(ctx context.Context, req *types.GetF
 		return nil, 0, "", err
 	}
 	if !canRead {
-		return nil, 0, "", ErrForbiddenMsg("users do not have permission to download file in this repo")
+		return nil, 0, "", errorx.ErrForbiddenMsg("users do not have permission to download file in this repo")
 	}
 	if req.Ref == "" {
 		req.Ref = repo.DefaultBranch
@@ -1483,7 +1484,7 @@ func (c *repoComponentImpl) SDKDownloadFile(ctx context.Context, req *types.GetF
 		signedUrl, err := c.s3Client.PresignedGetObject(ctx, c.lfsBucket, objectKey, ossFileExpire, reqParams)
 		if err != nil {
 			if err.Error() == ErrNotFoundMessage || err.Error() == ErrGetContentsOrList {
-				return nil, 0, downloadUrl, ErrNotFound
+				return nil, 0, downloadUrl, errorx.ErrNotFound
 			}
 			return nil, 0, downloadUrl, err
 		}
@@ -1499,7 +1500,7 @@ func (c *repoComponentImpl) SDKDownloadFile(ctx context.Context, req *types.GetF
 		reader, size, err := c.git.GetRepoFileReader(ctx, getFileReaderReq)
 		if err != nil {
 			if err.Error() == ErrNotFoundMessage {
-				return nil, 0, downloadUrl, ErrNotFound
+				return nil, 0, downloadUrl, errorx.ErrNotFound
 			}
 			return nil, 0, "", fmt.Errorf("failed to download git %s repository file, error: %w", req.RepoType, err)
 		}
@@ -1537,7 +1538,7 @@ func (c *repoComponentImpl) InternalDownloadFile(ctx context.Context, req *types
 		signedUrl, err := c.s3Client.PresignedGetObject(ctx, c.lfsBucket, objectKey, types.OssFileExpire, reqParams)
 		if err != nil {
 			if err.Error() == ErrNotFoundMessage || err.Error() == ErrGetContentsOrList {
-				return nil, 0, downloadUrl, ErrNotFound
+				return nil, 0, downloadUrl, errorx.ErrNotFound
 			}
 			return nil, 0, downloadUrl, err
 		}
@@ -1554,7 +1555,7 @@ func (c *repoComponentImpl) InternalDownloadFile(ctx context.Context, req *types
 		reader, size, err := c.git.GetRepoFileReader(ctx, getFileReaderReq)
 		if err != nil {
 			if err.Error() == ErrNotFoundMessage {
-				return nil, 0, downloadUrl, ErrNotFound
+				return nil, 0, downloadUrl, errorx.ErrNotFound
 			}
 			return nil, 0, "", fmt.Errorf("failed to download git %s repository file, error: %w", req.RepoType, err)
 		}
@@ -1601,7 +1602,7 @@ func (c *repoComponentImpl) FileInfo(ctx context.Context, req *types.GetFileReq)
 		return nil, fmt.Errorf("failed to get user repo permission, error: %w", err)
 	}
 	if !permission.CanRead {
-		return nil, ErrForbiddenMsg("users do not have permission to get file info in this repo")
+		return nil, errorx.ErrForbiddenMsg("users do not have permission to get file info in this repo")
 	}
 
 	if req.Ref == "" {
@@ -1661,7 +1662,7 @@ func (c *repoComponentImpl) AllowReadAccessRepo(ctx context.Context, repo *datab
 	}
 
 	if username == "" {
-		return false, ErrUserNotFound
+		return false, errorx.ErrUserNotFound
 	}
 
 	namespace, _ := repo.NamespaceAndName()
@@ -1683,7 +1684,7 @@ func (c *repoComponentImpl) AllowWriteAccess(ctx context.Context, repoType types
 	}
 
 	if username == "" {
-		return false, ErrUserNotFound
+		return false, errorx.ErrUserNotFound
 	}
 
 	return c.CheckCurrentUserPermission(ctx, username, namespace, membership.RoleWrite)
@@ -1696,7 +1697,7 @@ func (c *repoComponentImpl) AllowAdminAccess(ctx context.Context, repoType types
 	}
 
 	if username == "" {
-		return false, ErrUserNotFound
+		return false, errorx.ErrUserNotFound
 	}
 
 	return c.CheckCurrentUserPermission(ctx, username, namespace, membership.RoleAdmin)
@@ -1799,7 +1800,7 @@ func (c *repoComponentImpl) GetCommitWithDiff(ctx context.Context, req *types.Ge
 		return nil, fmt.Errorf("failed to get user repo permission, error: %w", err)
 	}
 	if !permission.CanRead {
-		return nil, ErrForbiddenMsg("users do not have permission to get commit in this repo")
+		return nil, errorx.ErrForbiddenMsg("users do not have permission to get commit in this repo")
 	}
 	getCommitReq := gitserver.GetRepoLastCommitReq{
 		Namespace: req.Namespace, // user name or org name
@@ -2195,7 +2196,7 @@ func (c *repoComponentImpl) CreateRuntimeFramework(ctx context.Context, req *typ
 	}
 	isAdmin := c.IsAdminRole(user)
 	if !isAdmin {
-		return nil, ErrForbiddenMsg("need admin permission for runtime framework")
+		return nil, errorx.ErrForbiddenMsg("need admin permission for runtime framework")
 	}
 	newFrame := database.RuntimeFramework{
 		FrameName:     req.FrameName,
@@ -2233,7 +2234,7 @@ func (c *repoComponentImpl) UpdateRuntimeFramework(ctx context.Context, id int64
 	}
 	isAdmin := c.IsAdminRole(user)
 	if !isAdmin {
-		return nil, ErrForbiddenMsg("need admin permission for runtime framework")
+		return nil, errorx.ErrForbiddenMsg("need admin permission for runtime framework")
 	}
 	newFrame := database.RuntimeFramework{
 		ID:            id,
@@ -2269,7 +2270,7 @@ func (c *repoComponentImpl) DeleteRuntimeFramework(ctx context.Context, currentU
 	}
 	isAdmin := c.IsAdminRole(user)
 	if !isAdmin {
-		return ErrForbiddenMsg("need admin permission for runtime framework")
+		return errorx.ErrForbiddenMsg("need admin permission for runtime framework")
 	}
 	frame, err := c.runtimeFrameworksStore.FindByID(ctx, id)
 	if err != nil {
@@ -2622,7 +2623,7 @@ func (c *repoComponentImpl) checkAccessDeployForUser(ctx context.Context, repoID
 	}
 	if deploy.UserID != user.ID {
 		// deny access due to deploy was not created by
-		return false, ErrForbiddenMsg("deploy was not created by user")
+		return false, errorx.ErrForbiddenMsg("deploy was not created by user")
 	}
 	if deploy.RepoID != repoID {
 		// deny access for invalid repo
@@ -2638,7 +2639,7 @@ func (c *repoComponentImpl) checkAccessDeployForServerless(ctx context.Context, 
 	}
 	isAdmin := c.IsAdminRole(user)
 	if !isAdmin {
-		return false, ErrForbiddenMsg("need admin permission to see Serverless deploy instances")
+		return false, errorx.ErrForbiddenMsg("need admin permission to see Serverless deploy instances")
 	}
 	if deploy.RepoID != repoID {
 		// deny access for invalid repo
@@ -2770,7 +2771,7 @@ func (c *repoComponentImpl) SyncMirror(ctx context.Context, repoType types.Repos
 	}
 
 	if !admin {
-		return ErrForbiddenMsg("need be owner or admin role to sync mirror for this repo")
+		return errorx.ErrForbiddenMsg("need be owner or admin role to sync mirror for this repo")
 	}
 	repo, err := c.repoStore.FindByPath(ctx, repoType, namespace, name)
 	if err != nil {
@@ -2818,7 +2819,7 @@ func (c *repoComponentImpl) checkDeployPermissionForUser(ctx context.Context, de
 		return nil, nil, fmt.Errorf("do not found user deploy %v", deployReq.DeployID)
 	}
 	if deploy.UserID != user.ID {
-		return nil, nil, ErrForbiddenMsg("deploy was not created by user")
+		return nil, nil, errorx.ErrForbiddenMsg("deploy was not created by user")
 	}
 	return &user, deploy, nil
 }
@@ -2830,7 +2831,7 @@ func (c *repoComponentImpl) checkDeployPermissionForServerless(ctx context.Conte
 	}
 	isAdmin := c.IsAdminRole(user)
 	if !isAdmin {
-		return nil, nil, ErrForbiddenMsg("need admin permission for Serverless deploy")
+		return nil, nil, errorx.ErrForbiddenMsg("need admin permission for Serverless deploy")
 	}
 	deploy, err := c.deployTaskStore.GetDeployByID(ctx, deployReq.DeployID)
 	if err != nil {
@@ -2972,7 +2973,7 @@ func (c *repoComponentImpl) AllFiles(ctx context.Context, req types.GetAllFilesR
 		}
 
 		if !read {
-			return nil, ErrForbiddenMsg("users do not have permission to get all files for this repo")
+			return nil, errorx.ErrForbiddenMsg("users do not have permission to get all files for this repo")
 		}
 	}
 	allFiles, err := getAllFiles(ctx, req.Namespace, req.Name, "", req.RepoType, req.Ref, c.git.GetTree)
@@ -3076,7 +3077,7 @@ func (c *repoComponentImpl) Preupload(ctx context.Context, req types.PreuploadRe
 		return nil, fmt.Errorf("failed to get user repo permission, error: %w", err)
 	}
 	if !permission.CanWrite {
-		return nil, ErrForbiddenMsg("users do not have permission to get diff bewtween two commits in this repo")
+		return nil, errorx.ErrForbiddenMsg("users do not have permission to get diff bewtween two commits in this repo")
 	}
 
 	existFiles, err := getAllFiles(ctx, req.Namespace, req.Name, "", req.RepoType, req.Revision, c.git.GetTree)
@@ -3178,7 +3179,7 @@ func (c *repoComponentImpl) CommitFiles(ctx context.Context, req types.CommitFil
 		return fmt.Errorf("failed to get user repo permission, error: %w", err)
 	}
 	if !permission.CanWrite {
-		return ErrForbiddenMsg("users do not have permission to get diff bewtween two commits in this repo")
+		return errorx.ErrForbiddenMsg("users do not have permission to get diff bewtween two commits in this repo")
 	}
 
 	user, err := c.userStore.FindByUsername(ctx, req.CurrentUser)

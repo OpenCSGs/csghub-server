@@ -9,6 +9,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"opencsg.com/csghub-server/api/httpbase"
 	"opencsg.com/csghub-server/common/config"
+	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/types"
 	"opencsg.com/csghub-server/common/utils/common"
 	"opencsg.com/csghub-server/component"
@@ -50,7 +51,7 @@ func NewDiscussionHandler(cfg *config.Config) (*DiscussionHandler, error) {
 func (h *DiscussionHandler) CreateRepoDiscussion(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
 	if currentUser == "" {
-		httpbase.UnauthorizedError(ctx, component.ErrUserNotFound)
+		httpbase.UnauthorizedError(ctx, errorx.ErrUserNotFound)
 		return
 	}
 	repoType := h.getRepoType(ctx)
@@ -104,7 +105,7 @@ func (h *DiscussionHandler) CreateRepoDiscussion(ctx *gin.Context) {
 func (h *DiscussionHandler) UpdateDiscussion(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
 	if currentUser == "" {
-		httpbase.UnauthorizedError(ctx, component.ErrUserNotFound)
+		httpbase.UnauthorizedError(ctx, errorx.ErrUserNotFound)
 		return
 	}
 	id := ctx.Param("id")
@@ -153,7 +154,7 @@ func (h *DiscussionHandler) UpdateDiscussion(ctx *gin.Context) {
 func (h *DiscussionHandler) DeleteDiscussion(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
 	if currentUser == "" {
-		httpbase.UnauthorizedError(ctx, component.ErrUserNotFound)
+		httpbase.UnauthorizedError(ctx, errorx.ErrUserNotFound)
 		return
 	}
 	id := ctx.Param("id")
@@ -255,7 +256,7 @@ func (h *DiscussionHandler) ListRepoDiscussions(ctx *gin.Context) {
 func (h *DiscussionHandler) CreateDiscussionComment(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
 	if currentUser == "" {
-		httpbase.UnauthorizedError(ctx, component.ErrUserNotFound)
+		httpbase.UnauthorizedError(ctx, errorx.ErrUserNotFound)
 		return
 	}
 
@@ -306,7 +307,7 @@ func (h *DiscussionHandler) CreateDiscussionComment(ctx *gin.Context) {
 func (h *DiscussionHandler) UpdateComment(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
 	if currentUser == "" {
-		httpbase.UnauthorizedError(ctx, component.ErrUserNotFound)
+		httpbase.UnauthorizedError(ctx, errorx.ErrUserNotFound)
 		return
 	}
 	id := ctx.Param("id")
@@ -353,7 +354,7 @@ func (h *DiscussionHandler) UpdateComment(ctx *gin.Context) {
 func (h *DiscussionHandler) DeleteComment(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
 	if currentUser == "" {
-		httpbase.UnauthorizedError(ctx, component.ErrUserNotFound)
+		httpbase.UnauthorizedError(ctx, errorx.ErrUserNotFound)
 		return
 	}
 	id := ctx.Param("id")

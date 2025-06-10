@@ -1,4 +1,4 @@
-package component
+package errorx
 
 import (
 	"errors"
@@ -10,10 +10,12 @@ var (
 	ErrUnauthorized = errors.New("unauthorized")
 	ErrNotFound     = errors.New("not found")
 	// not enough permission for current user
-	ErrForbidden        = errors.New("forbidden")
-	ErrUserNotFound     = errors.New("user not found, please login first")
-	ErrAlreadyExists    = errors.New("the record already exists")
-	ErrPermissionDenied = errors.New("permission denied")
+	ErrForbidden             = errors.New("forbidden")
+	ErrUserNotFound          = errors.New("user not found, please login first")
+	ErrAlreadyExists         = errors.New("the record already exists")
+	ErrPermissionDenied      = errors.New("permission denied")
+	ErrContentLengthTooLarge = errors.New("content length too large")
+	ErrBadRequest            = errors.New("bad request")
 )
 
 // ErrForbiddenMsg returns a new ErrForbidden with extra message

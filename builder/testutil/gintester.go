@@ -15,7 +15,7 @@ import (
 	"github.com/spf13/cast"
 	"github.com/stretchr/testify/require"
 	"opencsg.com/csghub-server/api/httpbase"
-	"opencsg.com/csghub-server/component"
+	"opencsg.com/csghub-server/common/errorx"
 )
 
 type GinTester struct {
@@ -148,7 +148,7 @@ func (g *GinTester) RequireUser(t *testing.T) {
 	tmp.gctx.Params = g.gctx.Params
 	g.ginHandler(tmp.gctx)
 	tmp._executed = true
-	tmp.ResponseEq(t, http.StatusUnauthorized, component.ErrUserNotFound.Error(), nil)
+	tmp.ResponseEq(t, http.StatusUnauthorized, errorx.ErrUserNotFound.Error(), nil)
 	// add user to original test ctx now
 	_ = g.WithUser()
 

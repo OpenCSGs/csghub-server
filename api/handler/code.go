@@ -10,6 +10,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"opencsg.com/csghub-server/api/httpbase"
 	"opencsg.com/csghub-server/common/config"
+	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/types"
 	"opencsg.com/csghub-server/common/utils/common"
 	"opencsg.com/csghub-server/component"
@@ -51,7 +52,7 @@ type CodeHandler struct {
 func (h *CodeHandler) Create(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
 	if currentUser == "" {
-		httpbase.UnauthorizedError(ctx, component.ErrUserNotFound)
+		httpbase.UnauthorizedError(ctx, errorx.ErrUserNotFound)
 		return
 	}
 	var req *types.CreateCodeReq
@@ -71,7 +72,7 @@ func (h *CodeHandler) Create(ctx *gin.Context) {
 
 	code, err := h.code.Create(ctx.Request.Context(), req)
 	if err != nil {
-		if errors.Is(err, component.ErrForbidden) {
+		if errors.Is(err, errorx.ErrForbidden) {
 			httpbase.ForbiddenError(ctx, err)
 			return
 		}
@@ -157,7 +158,7 @@ func (h *CodeHandler) Index(ctx *gin.Context) {
 func (h *CodeHandler) Update(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
 	if currentUser == "" {
-		httpbase.UnauthorizedError(ctx, component.ErrUserNotFound)
+		httpbase.UnauthorizedError(ctx, errorx.ErrUserNotFound)
 		return
 	}
 	var req *types.UpdateCodeReq
@@ -186,7 +187,7 @@ func (h *CodeHandler) Update(ctx *gin.Context) {
 
 	code, err := h.code.Update(ctx.Request.Context(), req)
 	if err != nil {
-		if errors.Is(err, component.ErrForbidden) {
+		if errors.Is(err, errorx.ErrForbidden) {
 			httpbase.ForbiddenError(ctx, err)
 			return
 		}
@@ -216,7 +217,7 @@ func (h *CodeHandler) Update(ctx *gin.Context) {
 func (h *CodeHandler) Delete(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
 	if currentUser == "" {
-		httpbase.UnauthorizedError(ctx, component.ErrUserNotFound)
+		httpbase.UnauthorizedError(ctx, errorx.ErrUserNotFound)
 		return
 	}
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
@@ -227,7 +228,7 @@ func (h *CodeHandler) Delete(ctx *gin.Context) {
 	}
 	err = h.code.Delete(ctx.Request.Context(), namespace, name, currentUser)
 	if err != nil {
-		if errors.Is(err, component.ErrForbidden) {
+		if errors.Is(err, errorx.ErrForbidden) {
 			httpbase.ForbiddenError(ctx, err)
 			return
 		}
@@ -263,7 +264,7 @@ func (h *CodeHandler) Show(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
 	detail, err := h.code.Show(ctx.Request.Context(), namespace, name, currentUser)
 	if err != nil {
-		if errors.Is(err, component.ErrForbidden) {
+		if errors.Is(err, errorx.ErrForbidden) {
 			httpbase.ForbiddenError(ctx, err)
 			return
 		}
@@ -298,7 +299,7 @@ func (h *CodeHandler) Relations(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
 	detail, err := h.code.Relations(ctx.Request.Context(), namespace, name, currentUser)
 	if err != nil {
-		if errors.Is(err, component.ErrForbidden) {
+		if errors.Is(err, errorx.ErrForbidden) {
 			httpbase.ForbiddenError(ctx, err)
 			return
 		}

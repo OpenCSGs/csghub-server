@@ -8,6 +8,7 @@ import (
 
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/config"
+	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/types"
 )
 
@@ -31,7 +32,7 @@ func NewSyncClientSettingComponent(config *config.Config) (SyncClientSettingComp
 func (c *syncClientSettingComponentImpl) Create(ctx context.Context, req types.CreateSyncClientSettingReq) (*database.SyncClientSetting, error) {
 	user, err := c.userStore.FindByUsername(ctx, req.CurrentUser)
 	if err != nil {
-		return nil, ErrUnauthorized
+		return nil, errorx.ErrUnauthorized
 	}
 	if !user.CanAdmin() {
 		return nil, fmt.Errorf("only admin was allowed create sync client setting")
@@ -60,7 +61,7 @@ func (c *syncClientSettingComponentImpl) Create(ctx context.Context, req types.C
 func (c *syncClientSettingComponentImpl) Show(ctx context.Context, currentUser string) (*database.SyncClientSetting, error) {
 	user, err := c.userStore.FindByUsername(ctx, currentUser)
 	if err != nil {
-		return nil, ErrUnauthorized
+		return nil, errorx.ErrUnauthorized
 	}
 	if !user.CanAdmin() {
 		return nil, fmt.Errorf("only admin was allowed get sync client setting")

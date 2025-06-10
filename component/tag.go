@@ -10,6 +10,7 @@ import (
 	"opencsg.com/csghub-server/builder/sensitive"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/config"
+	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/types"
 	"opencsg.com/csghub-server/component/tagparser"
 )
@@ -336,7 +337,7 @@ func (c *tagComponentImpl) CreateCategory(ctx context.Context, username string, 
 		return nil, fmt.Errorf("failed to get user, error: %w", err)
 	}
 	if !user.CanAdmin() {
-		return nil, ErrForbidden
+		return nil, errorx.ErrForbidden
 	}
 
 	newCategory := database.TagCategory{
@@ -360,7 +361,7 @@ func (c *tagComponentImpl) UpdateCategory(ctx context.Context, username string, 
 		return nil, fmt.Errorf("failed to get user, error: %w", err)
 	}
 	if !user.CanAdmin() {
-		return nil, ErrForbidden
+		return nil, errorx.ErrForbidden
 	}
 
 	newCategory := database.TagCategory{
@@ -385,7 +386,7 @@ func (c *tagComponentImpl) DeleteCategory(ctx context.Context, username string, 
 		return fmt.Errorf("failed to get user, error: %w", err)
 	}
 	if !user.CanAdmin() {
-		return ErrForbidden
+		return errorx.ErrForbidden
 	}
 
 	err = c.tagStore.DeleteCategory(ctx, id)

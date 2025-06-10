@@ -14,6 +14,7 @@ import (
 	"opencsg.com/csghub-server/builder/git/gitserver/gitaly"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/config"
+	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/types"
 	"opencsg.com/csghub-server/common/utils/common"
 )
@@ -86,19 +87,19 @@ func (c *internalComponentImpl) SSHAllowed(ctx context.Context, req types.SSHAll
 	if req.Action == "git-receive-pack" {
 		allowed, err := c.repoComponent.AllowWriteAccess(ctx, req.RepoType, req.Namespace, req.Name, sshKey.User.Username)
 		if err != nil {
-			return nil, ErrUnauthorized
+			return nil, errorx.ErrUnauthorized
 		}
 		if !allowed {
-			return nil, ErrForbidden
+			return nil, errorx.ErrForbidden
 		}
 	} else if req.Action == "git-upload-pack" {
 		if repo.Private {
 			allowed, err := c.repoComponent.AllowReadAccess(ctx, req.RepoType, req.Namespace, req.Name, sshKey.User.Username)
 			if err != nil {
-				return nil, ErrUnauthorized
+				return nil, errorx.ErrUnauthorized
 			}
 			if !allowed {
-				return nil, ErrForbidden
+				return nil, errorx.ErrForbidden
 			}
 		}
 	}
@@ -181,10 +182,10 @@ func (c *internalComponentImpl) LfsAuthenticate(ctx context.Context, req types.L
 	if repo.Private {
 		allowed, err := c.repoComponent.AllowReadAccess(ctx, req.RepoType, req.Namespace, req.Name, sshKey.User.Username)
 		if err != nil {
-			return nil, ErrUnauthorized
+			return nil, errorx.ErrUnauthorized
 		}
 		if !allowed {
-			return nil, ErrForbidden
+			return nil, errorx.ErrForbidden
 		}
 	}
 	token, err := c.tokenStore.GetUserGitToken(ctx, sshKey.User.Username)

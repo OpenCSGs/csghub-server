@@ -18,6 +18,7 @@ import (
 	"opencsg.com/csghub-server/builder/rpc"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/config"
+	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/types"
 	"opencsg.com/csghub-server/common/utils/common"
 )
@@ -420,7 +421,7 @@ func (c *modelComponentImpl) Show(ctx context.Context, namespace, name, currentU
 		return nil, fmt.Errorf("failed to get user repo permission, error: %w", err)
 	}
 	if !permission.CanRead {
-		return nil, ErrForbidden
+		return nil, errorx.ErrForbidden
 	}
 
 	ns, err := c.repoComponent.GetNameSpaceInfo(ctx, namespace)
@@ -522,7 +523,7 @@ func (c *modelComponentImpl) GetServerless(ctx context.Context, namespace, name,
 	}
 	allow, _ := c.repoComponent.AllowReadAccessRepo(ctx, model.Repository, currentUser)
 	if !allow {
-		return nil, ErrUnauthorized
+		return nil, errorx.ErrUnauthorized
 	}
 	deploy, err := c.deployTaskStore.GetServerlessDeployByRepID(ctx, model.Repository.ID)
 	if err != nil {
@@ -574,7 +575,7 @@ func (c *modelComponentImpl) SDKModelInfo(ctx context.Context, namespace, name, 
 
 	allow, _ := c.repoComponent.AllowReadAccessRepo(ctx, model.Repository, currentUser)
 	if !allow {
-		return nil, ErrUnauthorized
+		return nil, errorx.ErrUnauthorized
 	}
 
 	var pipelineTag, libraryTag, sha string
@@ -681,7 +682,7 @@ func (c *modelComponentImpl) Relations(ctx context.Context, namespace, name, cur
 
 	allow, _ := c.repoComponent.AllowReadAccessRepo(ctx, model.Repository, currentUser)
 	if !allow {
-		return nil, ErrUnauthorized
+		return nil, errorx.ErrUnauthorized
 	}
 
 	return c.getRelations(ctx, model.RepositoryID, currentUser)
@@ -969,7 +970,7 @@ func (c *modelComponentImpl) Deploy(ctx context.Context, deployReq types.DeployA
 		// Check if the user is an admin
 		isAdmin := c.repoComponent.IsAdminRole(user)
 		if !isAdmin {
-			return -1, ErrForbiddenMsg("need admin permission for Serverless deploy")
+			return -1, errorx.ErrForbiddenMsg("need admin permission for Serverless deploy")
 		}
 	}
 
@@ -1132,7 +1133,7 @@ func (c *modelComponentImpl) SetRuntimeFrameworkModes(ctx context.Context, curre
 	}
 	isAdmin := c.repoComponent.IsAdminRole(user)
 	if !isAdmin {
-		return nil, ErrForbiddenMsg("need admin permission for runtime framework")
+		return nil, errorx.ErrForbiddenMsg("need admin permission for runtime framework")
 	}
 	runtimeRepos, err := c.runtimeFrameworksStore.FindByID(ctx, id)
 	if err != nil {
@@ -1188,7 +1189,7 @@ func (c *modelComponentImpl) DeleteRuntimeFrameworkModes(ctx context.Context, cu
 	}
 	isAdmin := c.repoComponent.IsAdminRole(user)
 	if !isAdmin {
-		return nil, ErrForbiddenMsg("need admin permission for runtime framework")
+		return nil, errorx.ErrForbiddenMsg("need admin permission for runtime framework")
 	}
 	models, err := c.modelStore.ListByPath(ctx, paths)
 	if err != nil {

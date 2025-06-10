@@ -18,6 +18,7 @@ import (
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/builder/store/s3"
 	"opencsg.com/csghub-server/common/config"
+	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/types"
 	"opencsg.com/csghub-server/common/utils/common"
 	hubCom "opencsg.com/csghub-server/component"
@@ -102,7 +103,7 @@ func (c *datasetViewerComponentImpl) ViewParquetFile(ctx context.Context, req *d
 		return nil, fmt.Errorf("failed to check dataset permission, error: %w", err)
 	}
 	if !allow {
-		return nil, hubCom.ErrForbidden
+		return nil, errorx.ErrForbidden
 	}
 	req.Branch = r.DefaultBranch
 	objName, err := c.getParquetObject(ctx, req)
@@ -185,7 +186,7 @@ func (c *datasetViewerComponentImpl) LimitOffsetRows(ctx context.Context, req *d
 		return nil, fmt.Errorf("failed to check dataset permission, error: %w", err)
 	}
 	if !allow {
-		return nil, hubCom.ErrForbidden
+		return nil, errorx.ErrForbidden
 	}
 	req.Branch = r.DefaultBranch
 	req.RepoID = r.ID
@@ -245,7 +246,7 @@ func (c *datasetViewerComponentImpl) Rows(ctx context.Context, req *dvCom.ViewPa
 		return nil, fmt.Errorf("failed to check dataset permission, error: %w", err)
 	}
 	if !allow {
-		return nil, hubCom.ErrForbidden
+		return nil, errorx.ErrForbidden
 	}
 	req.Branch = r.DefaultBranch
 	req.RepoID = r.ID
@@ -343,7 +344,7 @@ func (c *datasetViewerComponentImpl) GetCatalog(ctx context.Context, req *dvCom.
 		return nil, fmt.Errorf("failed to check dataset permission, error: %w", err)
 	}
 	if !allow {
-		return nil, hubCom.ErrForbidden
+		return nil, errorx.ErrForbidden
 	}
 	req.Branch = r.DefaultBranch
 	req.RepoID = r.ID

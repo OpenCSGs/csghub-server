@@ -18,6 +18,7 @@ import (
 	"opencsg.com/csghub-server/builder/rpc"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/config"
+	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/types"
 	"opencsg.com/csghub-server/common/utils/common"
 )
@@ -115,7 +116,7 @@ func (c *promptComponentImpl) ListPrompt(ctx context.Context, req types.PromptRe
 		return nil, fmt.Errorf("failed to check prompt set permission, error: %w", err)
 	}
 	if !allow {
-		return nil, ErrUnauthorized
+		return nil, errorx.ErrUnauthorized
 	}
 
 	slog.Debug("ListPrompt get repo file tree begin")
@@ -186,7 +187,7 @@ func (c *promptComponentImpl) GetPrompt(ctx context.Context, req types.PromptReq
 		return nil, fmt.Errorf("failed to get user repo permission, error: %w", err)
 	}
 	if !permission.CanRead {
-		return nil, ErrUnauthorized
+		return nil, errorx.ErrUnauthorized
 	}
 
 	getFileContentReq := gitserver.GetRepoInfoByPathReq{
@@ -872,7 +873,7 @@ func (c *promptComponentImpl) Show(ctx context.Context, namespace, name, current
 		return nil, fmt.Errorf("failed to get user repo permission, error: %w", err)
 	}
 	if !permission.CanRead {
-		return nil, ErrUnauthorized
+		return nil, errorx.ErrUnauthorized
 	}
 
 	ns, err := c.repoComponent.GetNameSpaceInfo(ctx, namespace)
@@ -940,7 +941,7 @@ func (c *promptComponentImpl) Relations(ctx context.Context, namespace, name, cu
 
 	allow, _ := c.repoComponent.AllowReadAccessRepo(ctx, prompt.Repository, currentUser)
 	if !allow {
-		return nil, ErrUnauthorized
+		return nil, errorx.ErrUnauthorized
 	}
 
 	return c.getRelations(ctx, prompt.RepositoryID, currentUser)

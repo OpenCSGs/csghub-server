@@ -8,8 +8,8 @@ import (
 	"github.com/stretchr/testify/require"
 	mockcomponent "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/component"
 	"opencsg.com/csghub-server/builder/testutil"
+	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/types"
-	"opencsg.com/csghub-server/component"
 )
 
 type DatasetTester struct {
@@ -102,7 +102,7 @@ func TestDatasetHandler_Update(t *testing.T) {
 				Namespace: "u-other",
 				Name:      "r",
 			},
-		}).Return(nil, component.ErrForbiddenMsg("user not allowed to update dataset"))
+		}).Return(nil, errorx.ErrForbiddenMsg("user not allowed to update dataset"))
 		tester.WithParam("namespace", "u-other").WithParam("name", "r").
 			WithBody(t, &types.UpdateDatasetReq{
 				UpdateRepoReq: types.UpdateRepoReq{Name: "r"},
@@ -142,7 +142,7 @@ func TestDatasetHandler_Delete(t *testing.T) {
 		})
 		tester.RequireUser(t)
 
-		tester.mocks.dataset.EXPECT().Delete(tester.Ctx(), "u-other", "r", "u").Return(component.ErrForbidden)
+		tester.mocks.dataset.EXPECT().Delete(tester.Ctx(), "u-other", "r", "u").Return(errorx.ErrForbidden)
 		tester.WithParam("namespace", "u-other").WithParam("name", "r")
 		tester.WithUser().Execute()
 
@@ -168,7 +168,7 @@ func TestDatasetHandler_Show(t *testing.T) {
 			return h.Show
 		})
 
-		tester.mocks.dataset.EXPECT().Show(tester.Ctx(), "u-other", "r", "u").Return(nil, component.ErrForbidden)
+		tester.mocks.dataset.EXPECT().Show(tester.Ctx(), "u-other", "r", "u").Return(nil, errorx.ErrForbidden)
 		tester.WithParam("namespace", "u-other").WithParam("name", "r")
 		tester.WithUser().Execute()
 
@@ -195,7 +195,7 @@ func TestDatasetHandler_Relations(t *testing.T) {
 			return h.Relations
 		})
 
-		tester.mocks.dataset.EXPECT().Relations(tester.Ctx(), "u-other", "r", "u").Return(nil, component.ErrForbidden)
+		tester.mocks.dataset.EXPECT().Relations(tester.Ctx(), "u-other", "r", "u").Return(nil, errorx.ErrForbidden)
 		tester.WithParam("namespace", "u-other").WithParam("name", "r")
 		tester.WithUser().Execute()
 
@@ -230,7 +230,7 @@ func TestDatasetHandler_AllFiles(t *testing.T) {
 			Name:        "r",
 			RepoType:    types.DatasetRepo,
 			CurrentUser: "u",
-		}).Return(nil, component.ErrForbidden)
+		}).Return(nil, errorx.ErrForbidden)
 		tester.WithParam("namespace", "u-other").WithParam("name", "r")
 		tester.WithUser().Execute()
 

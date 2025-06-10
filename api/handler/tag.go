@@ -9,6 +9,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"opencsg.com/csghub-server/api/httpbase"
 	"opencsg.com/csghub-server/common/config"
+	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/types"
 	"opencsg.com/csghub-server/component"
 )
@@ -72,7 +73,7 @@ func (t *TagsHandler) AllTags(ctx *gin.Context) {
 func (t *TagsHandler) CreateTag(ctx *gin.Context) {
 	userName := httpbase.GetCurrentUser(ctx)
 	if userName == "" {
-		httpbase.UnauthorizedError(ctx, component.ErrUserNotFound)
+		httpbase.UnauthorizedError(ctx, errorx.ErrUserNotFound)
 		return
 	}
 	var req types.CreateTag
@@ -105,7 +106,7 @@ func (t *TagsHandler) CreateTag(ctx *gin.Context) {
 func (t *TagsHandler) GetTagByID(ctx *gin.Context) {
 	userName := httpbase.GetCurrentUser(ctx)
 	if userName == "" {
-		httpbase.UnauthorizedError(ctx, component.ErrUserNotFound)
+		httpbase.UnauthorizedError(ctx, errorx.ErrUserNotFound)
 		return
 	}
 	id, err := strconv.ParseInt(ctx.Param("id"), 10, 64)
@@ -139,7 +140,7 @@ func (t *TagsHandler) GetTagByID(ctx *gin.Context) {
 func (t *TagsHandler) UpdateTag(ctx *gin.Context) {
 	userName := httpbase.GetCurrentUser(ctx)
 	if userName == "" {
-		httpbase.UnauthorizedError(ctx, component.ErrUserNotFound)
+		httpbase.UnauthorizedError(ctx, errorx.ErrUserNotFound)
 		return
 	}
 	id, err := strconv.ParseInt(ctx.Param("id"), 10, 64)
@@ -178,7 +179,7 @@ func (t *TagsHandler) UpdateTag(ctx *gin.Context) {
 func (t *TagsHandler) DeleteTag(ctx *gin.Context) {
 	userName := httpbase.GetCurrentUser(ctx)
 	if userName == "" {
-		httpbase.UnauthorizedError(ctx, component.ErrUserNotFound)
+		httpbase.UnauthorizedError(ctx, errorx.ErrUserNotFound)
 		return
 	}
 	id, err := strconv.ParseInt(ctx.Param("id"), 10, 64)
@@ -235,7 +236,7 @@ func (t *TagsHandler) AllCategories(ctx *gin.Context) {
 func (t *TagsHandler) CreateCategory(ctx *gin.Context) {
 	userName := httpbase.GetCurrentUser(ctx)
 	if userName == "" {
-		httpbase.UnauthorizedError(ctx, component.ErrUserNotFound)
+		httpbase.UnauthorizedError(ctx, errorx.ErrUserNotFound)
 		return
 	}
 	var req types.CreateCategory
@@ -246,7 +247,7 @@ func (t *TagsHandler) CreateCategory(ctx *gin.Context) {
 	}
 	category, err := t.tag.CreateCategory(ctx.Request.Context(), userName, req)
 	if err != nil {
-		if errors.Is(err, component.ErrForbidden) {
+		if errors.Is(err, errorx.ErrForbidden) {
 			httpbase.ForbiddenError(ctx, err)
 			return
 		}
@@ -272,7 +273,7 @@ func (t *TagsHandler) CreateCategory(ctx *gin.Context) {
 func (t *TagsHandler) UpdateCategory(ctx *gin.Context) {
 	userName := httpbase.GetCurrentUser(ctx)
 	if userName == "" {
-		httpbase.UnauthorizedError(ctx, component.ErrUserNotFound)
+		httpbase.UnauthorizedError(ctx, errorx.ErrUserNotFound)
 		return
 	}
 	var req types.UpdateCategory
@@ -289,7 +290,7 @@ func (t *TagsHandler) UpdateCategory(ctx *gin.Context) {
 	}
 	category, err := t.tag.UpdateCategory(ctx.Request.Context(), userName, req, id)
 	if err != nil {
-		if errors.Is(err, component.ErrForbidden) {
+		if errors.Is(err, errorx.ErrForbidden) {
 			httpbase.ForbiddenError(ctx, err)
 			return
 		}
@@ -314,7 +315,7 @@ func (t *TagsHandler) UpdateCategory(ctx *gin.Context) {
 func (t *TagsHandler) DeleteCategory(ctx *gin.Context) {
 	userName := httpbase.GetCurrentUser(ctx)
 	if userName == "" {
-		httpbase.UnauthorizedError(ctx, component.ErrUserNotFound)
+		httpbase.UnauthorizedError(ctx, errorx.ErrUserNotFound)
 		return
 	}
 	id, err := strconv.ParseInt(ctx.Param("id"), 10, 64)
@@ -325,7 +326,7 @@ func (t *TagsHandler) DeleteCategory(ctx *gin.Context) {
 	}
 	err = t.tag.DeleteCategory(ctx.Request.Context(), userName, id)
 	if err != nil {
-		if errors.Is(err, component.ErrForbidden) {
+		if errors.Is(err, errorx.ErrForbidden) {
 			httpbase.ForbiddenError(ctx, err)
 			return
 		}

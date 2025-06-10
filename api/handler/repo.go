@@ -19,6 +19,7 @@ import (
 	"github.com/spf13/cast"
 	"opencsg.com/csghub-server/api/httpbase"
 	"opencsg.com/csghub-server/common/config"
+	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/types"
 	"opencsg.com/csghub-server/common/utils/common"
 	"opencsg.com/csghub-server/component"
@@ -59,7 +60,7 @@ type RepoHandler struct {
 func (h *RepoHandler) CreateFile(ctx *gin.Context) {
 	userName := httpbase.GetCurrentUser(ctx)
 	if userName == "" {
-		httpbase.UnauthorizedError(ctx, component.ErrUserNotFound)
+		httpbase.UnauthorizedError(ctx, errorx.ErrUserNotFound)
 		return
 	}
 	var req *types.CreateFileReq
@@ -113,7 +114,7 @@ func (h *RepoHandler) CreateFile(ctx *gin.Context) {
 func (h *RepoHandler) UpdateFile(ctx *gin.Context) {
 	userName := httpbase.GetCurrentUser(ctx)
 	if userName == "" {
-		httpbase.UnauthorizedError(ctx, component.ErrUserNotFound)
+		httpbase.UnauthorizedError(ctx, errorx.ErrUserNotFound)
 		return
 	}
 	var req *types.UpdateFileReq
@@ -239,7 +240,7 @@ func (h *RepoHandler) LastCommit(ctx *gin.Context) {
 	}
 	commit, err := h.c.LastCommit(ctx.Request.Context(), req)
 	if err != nil {
-		if errors.Is(err, component.ErrForbidden) {
+		if errors.Is(err, errorx.ErrForbidden) {
 			httpbase.ForbiddenError(ctx, err)
 			return
 		}
@@ -522,7 +523,7 @@ func (h *RepoHandler) Tags(ctx *gin.Context) {
 func (h *RepoHandler) UpdateTags(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
 	if currentUser == "" {
-		httpbase.UnauthorizedError(ctx, component.ErrUserNotFound)
+		httpbase.UnauthorizedError(ctx, errorx.ErrUserNotFound)
 		return
 	}
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
@@ -581,7 +582,7 @@ func (h *RepoHandler) Tree(ctx *gin.Context) {
 	}
 	tree, err := h.c.Tree(ctx.Request.Context(), req)
 	if err != nil {
-		if errors.Is(err, component.ErrForbidden) {
+		if errors.Is(err, errorx.ErrForbidden) {
 			httpbase.ForbiddenError(ctx, err)
 			return
 		}
@@ -631,7 +632,7 @@ func (h *RepoHandler) TreeV2(ctx *gin.Context) {
 	}
 	tree, err := h.c.TreeV2(ctx.Request.Context(), req)
 	if err != nil {
-		if errors.Is(err, component.ErrForbidden) {
+		if errors.Is(err, errorx.ErrForbidden) {
 			httpbase.ForbiddenError(ctx, err)
 			return
 		}
@@ -687,7 +688,7 @@ func (h *RepoHandler) LogsTree(ctx *gin.Context) {
 	}
 	tree, err := h.c.LogsTree(ctx.Request.Context(), req)
 	if err != nil {
-		if errors.Is(err, component.ErrForbidden) {
+		if errors.Is(err, errorx.ErrForbidden) {
 			httpbase.ForbiddenError(ctx, err)
 			return
 		}
@@ -775,7 +776,7 @@ func (h *RepoHandler) IncrDownloads(ctx *gin.Context) {
 func (h *RepoHandler) UploadFile(ctx *gin.Context) {
 	userName := httpbase.GetCurrentUser(ctx)
 	if userName == "" {
-		httpbase.UnauthorizedError(ctx, component.ErrUserNotFound)
+		httpbase.UnauthorizedError(ctx, errorx.ErrUserNotFound)
 		return
 	}
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
@@ -855,12 +856,12 @@ func (h *RepoHandler) SDKListFiles(ctx *gin.Context) {
 	}
 	files, err := h.c.SDKListFiles(ctx.Request.Context(), common.RepoTypeFromContext(ctx), namespace, name, ref, currentUser)
 	if err != nil {
-		if errors.Is(err, component.ErrUnauthorized) {
+		if errors.Is(err, errorx.ErrUnauthorized) {
 			slog.Error("permission denied when accessing repo", slog.String("repo_type", string(common.RepoTypeFromContext(ctx))), slog.Any("path", fmt.Sprintf("%s/%s", namespace, name)))
 			httpbase.UnauthorizedError(ctx, err)
 			return
 		}
-		if errors.Is(err, component.ErrNotFound) {
+		if errors.Is(err, errorx.ErrNotFound) {
 			slog.Error("repo not found", slog.String("repo_type", string(common.RepoTypeFromContext(ctx))), slog.Any("path", fmt.Sprintf("%s/%s", namespace, name)))
 			httpbase.NotFoundError(ctx, err)
 			return
@@ -924,13 +925,13 @@ func (h *RepoHandler) HeadSDKDownload(ctx *gin.Context) {
 
 	file, err := h.c.HeadDownloadFile(ctx.Request.Context(), req, currentUser)
 	if err != nil {
-		if errors.Is(err, component.ErrUnauthorized) {
+		if errors.Is(err, errorx.ErrUnauthorized) {
 			slog.Error("permission denied when accessing repo head", slog.String("repo_type", string(req.RepoType)), slog.Any("path", fmt.Sprintf("%s/%s", namespace, name)))
 			httpbase.UnauthorizedError(ctx, err)
 			return
 		}
 
-		if errors.Is(err, component.ErrNotFound) {
+		if errors.Is(err, errorx.ErrNotFound) {
 			slog.Error("repo not found head", slog.String("repo_type", string(common.RepoTypeFromContext(ctx))), slog.Any("path", fmt.Sprintf("%s/%s", namespace, name)))
 			httpbase.NotFoundError(ctx, err)
 			return
@@ -996,7 +997,7 @@ func (h *RepoHandler) handleDownload(ctx *gin.Context, isResolve bool) {
 	// TODO:move the check into SDKDownloadFile, and can return the file content as we get all the content before check lfs pointer
 	lfs, contentLength, err := h.c.IsLfs(ctx.Request.Context(), req)
 	if err != nil {
-		if errors.Is(err, component.ErrNotFound) {
+		if errors.Is(err, errorx.ErrNotFound) {
 			slog.Error("repo not found", slog.String("repo_type", string(common.RepoTypeFromContext(ctx))), slog.Any("path", fmt.Sprintf("%s/%s", namespace, name)))
 			httpbase.NotFoundError(ctx, err)
 			return
@@ -1012,13 +1013,13 @@ func (h *RepoHandler) handleDownload(ctx *gin.Context, isResolve bool) {
 		// file content is not empty, download it directly
 		reader, size, url, err = h.c.SDKDownloadFile(ctx.Request.Context(), req, currentUser)
 		if err != nil {
-			if errors.Is(err, component.ErrUnauthorized) {
+			if errors.Is(err, errorx.ErrUnauthorized) {
 				slog.Error("permission denied when accessing repo", slog.String("repo_type", string(req.RepoType)), slog.Any("path", fmt.Sprintf("%s/%s", namespace, name)))
 				httpbase.UnauthorizedError(ctx, err)
 				return
 			}
 
-			if errors.Is(err, component.ErrNotFound) {
+			if errors.Is(err, errorx.ErrNotFound) {
 				slog.Error("repo not found", slog.String("repo_type", string(common.RepoTypeFromContext(ctx))), slog.Any("path", fmt.Sprintf("%s/%s", namespace, name)))
 				httpbase.NotFoundError(ctx, err)
 				return
@@ -1109,7 +1110,7 @@ func (h *RepoHandler) CreateMirror(ctx *gin.Context) {
 	var mirrorReq types.CreateMirrorReq
 	currentUser := httpbase.GetCurrentUser(ctx)
 	if currentUser == "" {
-		httpbase.UnauthorizedError(ctx, component.ErrUserNotFound)
+		httpbase.UnauthorizedError(ctx, errorx.ErrUserNotFound)
 		return
 	}
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
@@ -1159,7 +1160,7 @@ func (h *RepoHandler) CreateMirror(ctx *gin.Context) {
 func (h *RepoHandler) MirrorFromSaas(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
 	if currentUser == "" {
-		httpbase.UnauthorizedError(ctx, component.ErrUserNotFound)
+		httpbase.UnauthorizedError(ctx, errorx.ErrUserNotFound)
 		return
 	}
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
@@ -1200,7 +1201,7 @@ func (h *RepoHandler) GetMirror(ctx *gin.Context) {
 	var mirrorReq types.GetMirrorReq
 	currentUser := httpbase.GetCurrentUser(ctx)
 	if currentUser == "" {
-		httpbase.UnauthorizedError(ctx, component.ErrUserNotFound)
+		httpbase.UnauthorizedError(ctx, errorx.ErrUserNotFound)
 		return
 	}
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
@@ -1240,7 +1241,7 @@ func (h *RepoHandler) UpdateMirror(ctx *gin.Context) {
 	var mirrorReq types.UpdateMirrorReq
 	currentUser := httpbase.GetCurrentUser(ctx)
 	if currentUser == "" {
-		httpbase.UnauthorizedError(ctx, component.ErrUserNotFound)
+		httpbase.UnauthorizedError(ctx, errorx.ErrUserNotFound)
 		return
 	}
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
@@ -1291,7 +1292,7 @@ func (h *RepoHandler) DeleteMirror(ctx *gin.Context) {
 	var mirrorReq types.DeleteMirrorReq
 	currentUser := httpbase.GetCurrentUser(ctx)
 	if currentUser == "" {
-		httpbase.UnauthorizedError(ctx, component.ErrUserNotFound)
+		httpbase.UnauthorizedError(ctx, errorx.ErrUserNotFound)
 		return
 	}
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
@@ -1383,7 +1384,7 @@ func (h *RepoHandler) RuntimeFrameworkList(ctx *gin.Context) {
 func (h *RepoHandler) RuntimeFrameworkCreate(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
 	if currentUser == "" {
-		httpbase.UnauthorizedError(ctx, component.ErrUserNotFound)
+		httpbase.UnauthorizedError(ctx, errorx.ErrUserNotFound)
 		return
 	}
 	var req types.RuntimeFrameworkReq
@@ -1395,7 +1396,7 @@ func (h *RepoHandler) RuntimeFrameworkCreate(ctx *gin.Context) {
 	req.CurrentUser = currentUser
 	frame, err := h.c.CreateRuntimeFramework(ctx.Request.Context(), &req)
 	if err != nil {
-		if errors.Is(err, component.ErrForbidden) {
+		if errors.Is(err, errorx.ErrForbidden) {
 			httpbase.ForbiddenError(ctx, err)
 			return
 		}
@@ -1426,7 +1427,7 @@ func (h *RepoHandler) RuntimeFrameworkCreate(ctx *gin.Context) {
 func (h *RepoHandler) RuntimeFrameworkUpdate(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
 	if currentUser == "" {
-		httpbase.UnauthorizedError(ctx, component.ErrUserNotFound)
+		httpbase.UnauthorizedError(ctx, errorx.ErrUserNotFound)
 		return
 	}
 	var req types.RuntimeFrameworkReq
@@ -1445,7 +1446,7 @@ func (h *RepoHandler) RuntimeFrameworkUpdate(ctx *gin.Context) {
 
 	frame, err := h.c.UpdateRuntimeFramework(ctx.Request.Context(), id, &req)
 	if err != nil {
-		if errors.Is(err, component.ErrForbidden) {
+		if errors.Is(err, errorx.ErrForbidden) {
 			httpbase.ForbiddenError(ctx, err)
 			return
 		}
@@ -1486,13 +1487,13 @@ func (h *RepoHandler) RuntimeFrameworkDelete(ctx *gin.Context) {
 
 	currentUser := httpbase.GetCurrentUser(ctx)
 	if currentUser == "" {
-		httpbase.UnauthorizedError(ctx, component.ErrUserNotFound)
+		httpbase.UnauthorizedError(ctx, errorx.ErrUserNotFound)
 		return
 	}
 
 	err = h.c.DeleteRuntimeFramework(ctx.Request.Context(), currentUser, id)
 	if err != nil {
-		if errors.Is(err, component.ErrForbidden) {
+		if errors.Is(err, errorx.ErrForbidden) {
 			httpbase.ForbiddenError(ctx, err)
 			return
 		}
@@ -1521,7 +1522,7 @@ func (h *RepoHandler) RuntimeFrameworkDelete(ctx *gin.Context) {
 func (h *RepoHandler) DeployList(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
 	if currentUser == "" {
-		httpbase.UnauthorizedError(ctx, component.ErrUserNotFound)
+		httpbase.UnauthorizedError(ctx, errorx.ErrUserNotFound)
 		return
 	}
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
@@ -1561,7 +1562,7 @@ func (h *RepoHandler) DeployList(ctx *gin.Context) {
 func (h *RepoHandler) DeployDetail(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
 	if currentUser == "" {
-		httpbase.UnauthorizedError(ctx, component.ErrUserNotFound)
+		httpbase.UnauthorizedError(ctx, errorx.ErrUserNotFound)
 		return
 	}
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
@@ -1593,7 +1594,7 @@ func (h *RepoHandler) DeployDetail(ctx *gin.Context) {
 
 	response, err := h.c.DeployDetail(ctx.Request.Context(), detailReq)
 	if err != nil {
-		if errors.Is(err, component.ErrForbidden) {
+		if errors.Is(err, errorx.ErrForbidden) {
 			slog.Info("not allowed to get deploy detail", slog.Any("error", err), slog.Any("req", detailReq))
 			httpbase.ForbiddenError(ctx, err)
 			return
@@ -1637,7 +1638,7 @@ func (h *RepoHandler) DeployInstanceLogs(ctx *gin.Context) {
 
 	currentUser := httpbase.GetCurrentUser(ctx)
 	if currentUser == "" {
-		httpbase.UnauthorizedError(ctx, component.ErrUserNotFound)
+		httpbase.UnauthorizedError(ctx, errorx.ErrUserNotFound)
 		return
 	}
 	repoType := common.RepoTypeFromContext(ctx)
@@ -1670,7 +1671,7 @@ func (h *RepoHandler) DeployInstanceLogs(ctx *gin.Context) {
 	// user http request context instead of gin context, so that server knows the life cycle of the request
 	logReader, err := h.c.DeployInstanceLogs(ctx.Request.Context(), logReq)
 	if err != nil {
-		if errors.Is(err, component.ErrForbidden) {
+		if errors.Is(err, errorx.ErrForbidden) {
 			slog.Warn("not allowed to get instance logs", slog.Any("error", err), slog.Any("req", logReq))
 			httpbase.ForbiddenError(ctx, err)
 			return
@@ -1763,7 +1764,7 @@ func (h *RepoHandler) DeployStatus(ctx *gin.Context) {
 
 	currentUser := httpbase.GetCurrentUser(ctx)
 	if currentUser == "" {
-		httpbase.UnauthorizedError(ctx, component.ErrUserNotFound)
+		httpbase.UnauthorizedError(ctx, errorx.ErrUserNotFound)
 		return
 	}
 
@@ -1794,7 +1795,7 @@ func (h *RepoHandler) DeployStatus(ctx *gin.Context) {
 	allow, err := h.c.AllowAccessDeploy(ctx.Request.Context(), statusReq)
 	if err != nil {
 
-		if errors.Is(err, component.ErrForbidden) {
+		if errors.Is(err, errorx.ErrForbidden) {
 			slog.Warn("not allowed to get deploy status", slog.Any("error", err), slog.Any("req", statusReq))
 			httpbase.ForbiddenError(ctx, err)
 			return
@@ -1864,12 +1865,12 @@ func (h *RepoHandler) SyncMirror(ctx *gin.Context) {
 	}
 	currentUser := httpbase.GetCurrentUser(ctx)
 	if currentUser == "" {
-		httpbase.UnauthorizedError(ctx, component.ErrUserNotFound)
+		httpbase.UnauthorizedError(ctx, errorx.ErrUserNotFound)
 		return
 	}
 	err = h.c.SyncMirror(ctx.Request.Context(), repoType, namespace, name, currentUser)
 	if err != nil {
-		if errors.Is(err, component.ErrForbidden) {
+		if errors.Is(err, errorx.ErrForbidden) {
 			slog.Error("not allowed to sync mirror", slog.Any("error", err), slog.String("repo_type", string(repoType)), slog.String("path", fmt.Sprintf("%s/%s", namespace, name)))
 			httpbase.ForbiddenError(ctx, err)
 			return
@@ -1932,7 +1933,7 @@ func (h *RepoHandler) testStatus(ctx *gin.Context) {
 func (h *RepoHandler) DeployUpdate(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
 	if currentUser == "" {
-		httpbase.UnauthorizedError(ctx, component.ErrUserNotFound)
+		httpbase.UnauthorizedError(ctx, errorx.ErrUserNotFound)
 		return
 	}
 
@@ -1990,7 +1991,7 @@ func (h *RepoHandler) DeployUpdate(ctx *gin.Context) {
 	}
 	err = h.c.DeployUpdate(ctx.Request.Context(), updateReq, req)
 	if err != nil {
-		if errors.Is(err, component.ErrForbidden) {
+		if errors.Is(err, errorx.ErrForbidden) {
 			slog.Error("user not allowed to update deploy", slog.String("namespace", namespace),
 				slog.String("name", name), slog.Any("username", currentUser), slog.Int64("deploy_id", deployID))
 			httpbase.ForbiddenError(ctx, err)
@@ -2023,7 +2024,7 @@ func (h *RepoHandler) DeployUpdate(ctx *gin.Context) {
 func (h *RepoHandler) RuntimeFrameworkListWithType(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
 	if currentUser == "" {
-		httpbase.UnauthorizedError(ctx, component.ErrUserNotFound)
+		httpbase.UnauthorizedError(ctx, errorx.ErrUserNotFound)
 		return
 	}
 	deployTypeStr := ctx.Query("deploy_type")
@@ -2072,7 +2073,7 @@ func (h *RepoHandler) RuntimeFrameworkListWithType(ctx *gin.Context) {
 func (h *RepoHandler) ServerlessDetail(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
 	if currentUser == "" {
-		httpbase.UnauthorizedError(ctx, component.ErrUserNotFound)
+		httpbase.UnauthorizedError(ctx, errorx.ErrUserNotFound)
 		return
 	}
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
@@ -2099,7 +2100,7 @@ func (h *RepoHandler) ServerlessDetail(ctx *gin.Context) {
 
 	response, err := h.c.DeployDetail(ctx.Request.Context(), detailReq)
 	if err != nil {
-		if errors.Is(err, component.ErrForbidden) {
+		if errors.Is(err, errorx.ErrForbidden) {
 			slog.Error("user not allowed to get serverless deploy detail", slog.String("namespace", namespace),
 				slog.String("name", name), slog.Any("username", currentUser), slog.Int64("deploy_id", deployID))
 			httpbase.ForbiddenError(ctx, err)
@@ -2143,7 +2144,7 @@ func (h *RepoHandler) ServerlessLogs(ctx *gin.Context) {
 
 	currentUser := httpbase.GetCurrentUser(ctx)
 	if currentUser == "" {
-		httpbase.UnauthorizedError(ctx, component.ErrUserNotFound)
+		httpbase.UnauthorizedError(ctx, errorx.ErrUserNotFound)
 		return
 	}
 	repoType := common.RepoTypeFromContext(ctx)
@@ -2176,7 +2177,7 @@ func (h *RepoHandler) ServerlessLogs(ctx *gin.Context) {
 	// user http request context instead of gin context, so that server knows the life cycle of the request
 	logReader, err := h.c.DeployInstanceLogs(ctx.Request.Context(), logReq)
 	if err != nil {
-		if errors.Is(err, component.ErrForbidden) {
+		if errors.Is(err, errorx.ErrForbidden) {
 			slog.Error("user not allowed to get serverless deploy logs", slog.Any("logReq", logReq), slog.Any("error", err))
 			httpbase.ForbiddenError(ctx, err)
 			return
@@ -2234,7 +2235,7 @@ func (h *RepoHandler) ServerlessStatus(ctx *gin.Context) {
 
 	currentUser := httpbase.GetCurrentUser(ctx)
 	if currentUser == "" {
-		httpbase.UnauthorizedError(ctx, component.ErrUserNotFound)
+		httpbase.UnauthorizedError(ctx, errorx.ErrUserNotFound)
 		return
 	}
 
@@ -2263,7 +2264,7 @@ func (h *RepoHandler) ServerlessStatus(ctx *gin.Context) {
 
 	allow, err := h.c.AllowAccessDeploy(ctx.Request.Context(), statusReq)
 	if err != nil {
-		if errors.Is(err, component.ErrForbidden) {
+		if errors.Is(err, errorx.ErrForbidden) {
 			slog.Error("user not allowed to get serverless deploy status", slog.Any("error", err), slog.Any("req", statusReq))
 			httpbase.ForbiddenError(ctx, err)
 			return
@@ -2328,7 +2329,7 @@ func (h *RepoHandler) ServerlessStatus(ctx *gin.Context) {
 func (h *RepoHandler) ServerlessUpdate(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
 	if currentUser == "" {
-		httpbase.UnauthorizedError(ctx, component.ErrUserNotFound)
+		httpbase.UnauthorizedError(ctx, errorx.ErrUserNotFound)
 		return
 	}
 
@@ -2371,7 +2372,7 @@ func (h *RepoHandler) ServerlessUpdate(ctx *gin.Context) {
 	}
 	err = h.c.DeployUpdate(ctx.Request.Context(), updateReq, req)
 	if err != nil {
-		if errors.Is(err, component.ErrForbidden) {
+		if errors.Is(err, errorx.ErrForbidden) {
 			slog.Debug("user not allowed to update serverless", slog.Any("error", err), slog.Any("req", updateReq))
 			httpbase.ForbiddenError(ctx, err)
 			return

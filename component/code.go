@@ -11,6 +11,7 @@ import (
 	"opencsg.com/csghub-server/builder/rpc"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/config"
+	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/types"
 	"opencsg.com/csghub-server/common/utils/common"
 )
@@ -297,7 +298,7 @@ func (c *codeComponentImpl) Show(ctx context.Context, namespace, name, currentUs
 		return nil, fmt.Errorf("failed to get user repo permission, error: %w", err)
 	}
 	if !permission.CanRead {
-		return nil, ErrForbidden
+		return nil, errorx.ErrForbidden
 	}
 
 	ns, err := c.repoComponent.GetNameSpaceInfo(ctx, namespace)
@@ -367,7 +368,7 @@ func (c *codeComponentImpl) Relations(ctx context.Context, namespace, name, curr
 
 	allow, _ := c.repoComponent.AllowReadAccessRepo(ctx, code.Repository, currentUser)
 	if !allow {
-		return nil, ErrForbidden
+		return nil, errorx.ErrForbidden
 	}
 
 	return c.getRelations(ctx, code.RepositoryID, currentUser)
