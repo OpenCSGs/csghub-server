@@ -29,6 +29,7 @@ func TransferFileObject(file *dvCom.RepoFile, subsetName, splitName string) dvCo
 		SubsetName:      subsetName,
 		SplitName:       splitName,
 		DownloadSize:    file.DownloadSize,
+		LfsSHA256:       file.LfsSHA256,
 	}
 }
 

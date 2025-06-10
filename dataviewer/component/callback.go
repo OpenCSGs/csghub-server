@@ -49,6 +49,7 @@ func (c *callbackComponentImpl) TriggerDataviewUpdateWorkflow(ctx context.Contex
 	}
 	req.Branch = repo.DefaultBranch
 	req.RepoID = repo.ID
+	req.Migrated = repo.Migrated
 
 	jobs, err := c.dataviewerStore.GetRunningJobsByRepoID(ctx, req.RepoID)
 	if err != nil {

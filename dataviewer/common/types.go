@@ -27,6 +27,8 @@ type ViewParquetFileReq struct {
 	Per         int    `json:"per"`
 	Page        int    `json:"page"`
 	CurrentUser string `json:"current_user"`
+	RepoID      int64  `json:"repo_id"`
+	Migrated    bool   `json:"migrated"`
 }
 
 type ViewParquetFileResp struct {
@@ -120,6 +122,7 @@ type FileObject struct {
 	LocalRepoPath   string `yaml:"local_repo_path" json:"local_repo_path"`
 	LocalFileName   string `yaml:"local_file_name" json:"local_file_name"`
 	DownloadSize    int64  `yaml:"download_size" json:"download_size"`
+	LfsSHA256       string `yaml:"lfs_sha256" json:"lfs_sha256"`
 }
 
 type CataLogRespone struct {
