@@ -183,7 +183,7 @@ func (h *DatasetViewerHandler) Rows(ctx *gin.Context) {
 		return
 	}
 
-	err = validateQueryParameter(orderby, "orderby")
+	err = validateOrderBy(orderby, "orderby")
 	if err != nil {
 		slog.Error("invalid character in parameter orderby", slog.Any("req", req), slog.Any("viewReq", viewReq), slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
@@ -214,11 +214,28 @@ func (h *DatasetViewerHandler) Rows(ctx *gin.Context) {
 }
 
 func validateQueryParameter(parameterValue string, parameterName string) error {
-	SQLInvalidSymbols := []string{";", "--", `/\*`, `\*/`}
+	SQLInvalidSymbols := []string{
+		`'`, `"`, ";", "--", `/\*`, `\*/`,
+		`\bUNION\b`, `\bSELECT\b`, `\bINSERT\b`, `\bUPDATE\b`,
+		`\bDELETE\b`, `\bDROP\b`, `\bEXEC\b`, `\bCREATE\b`,
+		`\bALTER\b`, `\bTRUNCATE\b`,
+	}
 	SQLInvalidSymbolsPattern := regexp.MustCompile(fmt.Sprintf("(?:%s)", strings.Join(SQLInvalidSymbols, "|")))
 
 	if SQLInvalidSymbolsPattern.MatchString(parameterValue) {
 		return fmt.Errorf("invalid character in %s", parameterName)
+	}
+	return nil
+}
+
+func validateOrderBy(parameterValue string, parameterName string) error {
+	if parameterValue == "" {
+		return nil
+	}
+	pattern := regexp.MustCompile(`^[a-zA-Z0-9_\s]+(ASC|DESC)?(\s*,\s*[a-zA-Z0-9_\s]+(ASC|DESC)?)*$`)
+
+	if !pattern.MatchString(parameterValue) {
+		return fmt.Errorf("invalid %s format", parameterName)
 	}
 	return nil
 }
