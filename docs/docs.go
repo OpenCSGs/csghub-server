@@ -19134,6 +19134,11 @@ const docTemplate = `{
         },
         "types.CreateSpaceReq": {
             "type": "object",
+            "required": [
+                "cluster_id",
+                "resource_id",
+                "sdk"
+            ],
             "properties": {
                 "cluster_id": {
                     "type": "string"
@@ -19174,6 +19179,9 @@ const docTemplate = `{
                 "nickname": {
                     "type": "string",
                     "example": "model display name"
+                },
+                "order_detail_id": {
+                    "type": "integer"
                 },
                 "private": {
                     "type": "boolean"
@@ -21203,6 +21211,9 @@ const docTemplate = `{
                 "can_write": {
                     "type": "boolean"
                 },
+                "cluster_id": {
+                    "type": "string"
+                },
                 "cover_image_url": {
                     "type": "string"
                 },
@@ -21738,6 +21749,9 @@ const docTemplate = `{
         "types.UpdateSpaceReq": {
             "type": "object",
             "properties": {
+                "cluster_id": {
+                    "type": "string"
+                },
                 "cover_image_url": {
                     "type": "string"
                 },
