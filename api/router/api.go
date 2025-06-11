@@ -529,6 +529,7 @@ func createModelRoutes(config *config.Config,
 		modelsGroup.GET("/:namespace/:name/refs/:ref/logs_tree/*path", repoCommonHandler.LogsTree)
 		modelsGroup.GET("/:namespace/:name/commits", repoCommonHandler.Commits)
 		modelsGroup.GET("/:namespace/:name/raw/*file_path", repoCommonHandler.FileRaw)
+		modelsGroup.DELETE("/:namespace/:name/raw/*file_path", middlewareCollection.Auth.NeedLogin, repoCommonHandler.DeleteFile)
 		modelsGroup.GET("/:namespace/:name/blob/*file_path", repoCommonHandler.FileInfo)
 		// The DownloadFile method differs from the SDKDownload interface in a few ways
 
@@ -669,6 +670,7 @@ func createDatasetRoutes(
 		datasetsGroup.GET("/:namespace/:name/download/*file_path", repoCommonHandler.DownloadFile)
 		datasetsGroup.GET("/:namespace/:name/resolve/*file_path", repoCommonHandler.ResolveDownload)
 		datasetsGroup.PUT("/:namespace/:name/raw/*file_path", middlewareCollection.Auth.NeedLogin, repoCommonHandler.UpdateFile)
+		datasetsGroup.DELETE("/:namespace/:name/raw/*file_path", middlewareCollection.Auth.NeedLogin, repoCommonHandler.DeleteFile)
 		datasetsGroup.POST("/:namespace/:name/update_downloads", repoCommonHandler.UpdateDownloads)
 		datasetsGroup.PUT("/:namespace/:name/incr_downloads", repoCommonHandler.IncrDownloads)
 		datasetsGroup.POST("/:namespace/:name/upload_file", middlewareCollection.Auth.NeedLogin, repoCommonHandler.UploadFile)
@@ -724,6 +726,7 @@ func createCodeRoutes(
 		codesGroup.GET("/:namespace/:name/download/*file_path", repoCommonHandler.DownloadFile)
 		codesGroup.GET("/:namespace/:name/resolve/*file_path", repoCommonHandler.ResolveDownload)
 		codesGroup.PUT("/:namespace/:name/raw/*file_path", middlewareCollection.Auth.NeedLogin, repoCommonHandler.UpdateFile)
+		codesGroup.DELETE("/:namespace/:name/raw/*file_path", middlewareCollection.Auth.NeedLogin, repoCommonHandler.DeleteFile)
 		codesGroup.POST("/:namespace/:name/update_downloads", repoCommonHandler.UpdateDownloads)
 		codesGroup.PUT("/:namespace/:name/incr_downloads", repoCommonHandler.IncrDownloads)
 		codesGroup.POST("/:namespace/:name/upload_file", middlewareCollection.Auth.NeedLogin, repoCommonHandler.UploadFile)
@@ -789,6 +792,7 @@ func createSpaceRoutes(config *config.Config,
 		spaces.GET("/:namespace/:name/download/*file_path", repoCommonHandler.DownloadFile)
 		spaces.GET("/:namespace/:name/resolve/*file_path", repoCommonHandler.ResolveDownload)
 		spaces.PUT("/:namespace/:name/raw/*file_path", middlewareCollection.Auth.NeedLogin, repoCommonHandler.UpdateFile)
+		spaces.DELETE("/:namespace/:name/raw/*file_path", middlewareCollection.Auth.NeedLogin, repoCommonHandler.DeleteFile)
 		spaces.POST("/:namespace/:name/update_downloads", repoCommonHandler.UpdateDownloads)
 		spaces.PUT("/:namespace/:name/incr_downloads", repoCommonHandler.IncrDownloads)
 		spaces.POST("/:namespace/:name/upload_file", middlewareCollection.Auth.NeedLogin, repoCommonHandler.UploadFile)

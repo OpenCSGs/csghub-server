@@ -45,6 +45,7 @@ func CreateMCPServerRoutes(
 		mcpGroup.GET("/:namespace/:name/download/*file_path", repoCommonHandler.DownloadFile)
 		mcpGroup.GET("/:namespace/:name/resolve/*file_path", repoCommonHandler.ResolveDownload)
 		mcpGroup.PUT("/:namespace/:name/raw/*file_path", middlewareCollection.Auth.NeedLogin, repoCommonHandler.UpdateFile)
+		mcpGroup.DELETE("/:namespace/:name/raw/*file_path", middlewareCollection.Auth.NeedLogin, repoCommonHandler.DeleteFile)
 		mcpGroup.POST("/:namespace/:name/update_downloads", repoCommonHandler.UpdateDownloads)
 		mcpGroup.PUT("/:namespace/:name/incr_downloads", middlewareCollection.Auth.NeedLogin, repoCommonHandler.IncrDownloads)
 		mcpGroup.POST("/:namespace/:name/upload_file", middlewareCollection.Auth.NeedLogin, repoCommonHandler.UploadFile)

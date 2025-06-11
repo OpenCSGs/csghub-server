@@ -157,7 +157,7 @@ func (h *RepoHandler) ValidateYaml(ctx *gin.Context) {
 // @Tags         Repository
 // @Accept       json
 // @Produce      json
-// @Param		 repo_type path string true "models,dataset,codes or spaces" Enums(models,datasets,codes,spaces)
+// @Param		 repo_type path string true "models,datasets,codes,spaces or mcps" Enums(models,datasets,codes,spaces,mcps)
 // @Param		 namespace path string true "repo owner name"
 // @Param		 name path string true "repo name"
 // @Param		 file_path path string true "the new file relative path"
@@ -211,7 +211,7 @@ func (h *RepoHandler) CreateFile(ctx *gin.Context) {
 // @Tags         Repository
 // @Accept       json
 // @Produce      json
-// @Param		 repo_type path string true "models,dataset,codes or spaces" Enums(models,datasets,codes,spaces)
+// @Param		 repo_type path string true "models,datasets,codes,spaces or mcps" Enums(models,datasets,codes,spaces,mcps)
 // @Param		 namespace path string true "repo owner name"
 // @Param		 name path string true "repo name"
 // @Param		 file_path path string true "the new file relative path"

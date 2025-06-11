@@ -111,6 +111,35 @@ func TestRepoHandler_UpdateFile(t *testing.T) {
 
 }
 
+func TestRepoHandler_DeleteFile(t *testing.T) {
+	tester := NewRepoTester(t).WithHandleFunc(func(rp *RepoHandler) gin.HandlerFunc {
+		return rp.DeleteFile
+	})
+	tester.WithUser()
+
+	tester.mocks.repo.EXPECT().DeleteFile(tester.Ctx(), &types.DeleteFileReq{
+		Message:     "foo",
+		Branch:      "main",
+		Username:    "u",
+		Namespace:   "u",
+		Name:        "r",
+		CurrentUser: "u",
+		FilePath:    "foo",
+		RepoType:    types.ModelRepo,
+		OriginPath:  "",
+	}).Return(&types.DeleteFileResp{}, nil)
+	tester.WithParam("file_path", "foo")
+	tester.WithKV("repo_type", types.ModelRepo)
+	req := &types.DeleteFileReq{
+		Message: "foo",
+		Branch:  "main",
+	}
+	tester.WithBody(t, req)
+
+	tester.Execute()
+	tester.ResponseEq(t, http.StatusOK, tester.OKText, &types.DeleteFileResp{})
+}
+
 func TestRepoHandler_Commits(t *testing.T) {
 	tester := NewRepoTester(t).WithHandleFunc(func(rp *RepoHandler) gin.HandlerFunc {
 		return rp.Commits
