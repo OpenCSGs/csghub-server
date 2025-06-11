@@ -47,7 +47,7 @@ func (r *RProxyHandler) Proxy(ctx *gin.Context) {
 
 	deploy, err := r.repoComp.GetDeployBySvcName(ctx.Request.Context(), appSvcName)
 	if err != nil {
-		slog.Error("failed to get deploy in rproxy", slog.Any("error", err), slog.Any("appSrvName", appSvcName))
+		slog.Error("failed to get deploy in rproxy", slog.Any("error", err), slog.Any("appSrvName", appSvcName), slog.Any("request", ctx.Request.URL), slog.Any("header", ctx.Request.Header))
 		httpbase.ServerError(ctx, fmt.Errorf("failed to get deploy, %w", err))
 		return
 	}
