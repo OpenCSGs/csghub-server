@@ -115,7 +115,12 @@ func TestSpaceHandler_Create(t *testing.T) {
 	})
 	tester.RequireUser(t)
 
-	req := &types.CreateSpaceReq{CreateRepoReq: types.CreateRepoReq{}}
+	req := &types.CreateSpaceReq{
+		CreateRepoReq: types.CreateRepoReq{},
+		Sdk:           "gradio",
+		ResourceID:    1,
+		ClusterID:     "cluster",
+	}
 	tester.mocks.sensitive.EXPECT().CheckRequestV2(tester.Ctx(), req).Return(true, nil)
 	reqn := *req
 	reqn.Username = "u"

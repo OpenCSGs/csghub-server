@@ -706,6 +706,7 @@ func (m *mcpServerComponentImpl) Deploy(ctx context.Context, req *types.DeployMC
 		Variables:     "",
 		Template:      "",
 		SKU:           strconv.FormatInt(resource.ID, 10), // space resource id
+		ClusterID:     req.ClusterID,
 	}
 
 	resSpace, err := m.spaceStore.Create(ctx, dbSpace)
@@ -719,7 +720,7 @@ func (m *mcpServerComponentImpl) Deploy(ctx context.Context, req *types.DeployMC
 		return nil, fmt.Errorf("fail to get source repo clone url for mcp server %s/%s, error: %w",
 			req.MCPRepo.Namespace, req.MCPRepo.Name, err)
 	}
-
+	slog.Debug("clone mcp server repo to space repo", slog.Any("cloneURL", cloneURL))
 	cloneReq := gitserver.CreateMirrorRepoReq{
 		RepoType:  req.RepoType,  // copy to repo type
 		Namespace: req.Namespace, // copy to space namespace

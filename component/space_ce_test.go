@@ -51,6 +51,7 @@ func TestSpaceComponent_Create(t *testing.T) {
 		Hardware:     `{"memory": "foo"}`,
 		Secrets:      "sss",
 		SKU:          "1",
+		ClusterID:    "cluster",
 	}).Return(&database.Space{}, nil)
 	sc.mocks.gitServer.EXPECT().CreateRepoFile(buildCreateFileReq(&types.CreateFileParams{
 		Username:  "user",

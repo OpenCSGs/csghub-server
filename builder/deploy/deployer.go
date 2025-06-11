@@ -98,6 +98,8 @@ func (d *deployer) serverlessDeploy(ctx context.Context, dr types.DeployRepo) (*
 	deploy.MaxReplica = dr.MaxReplica
 	deploy.EngineArgs = dr.EngineArgs
 	deploy.Variables = dr.Variables
+	deploy.ClusterID = dr.ClusterID
+	deploy.Task = types.PipelineTask(dr.Task)
 	// deploy
 	slog.Debug("do deployer.serverlessDeploy", slog.Any("dr", dr), slog.Any("deploy", deploy))
 	err = d.deployTaskStore.UpdateDeploy(ctx, deploy)
