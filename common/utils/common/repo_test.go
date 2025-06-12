@@ -293,3 +293,34 @@ func TestGetSourceTypeAndPathFromURL(t *testing.T) {
 		})
 	}
 }
+
+func TestBuildLfsPath(t *testing.T) {
+	type args struct {
+		repoID   int64
+		oid      string
+		migrated bool
+	}
+	tests := []struct {
+		name string
+		args args
+		want string
+	}{
+		{
+			name: "Test BuildLfsPath when migrated is false",
+			args: args{repoID: 1, oid: "1234abcde", migrated: false},
+			want: "lfs/12/34/abcde",
+		},
+		{
+			name: "Test BuildLfsPath when migrated is true",
+			args: args{repoID: 1, oid: "1234abcde", migrated: true},
+			want: "repos/6b/86/6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b/1234abcde",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := BuildLfsPath(tt.args.repoID, tt.args.oid, tt.args.migrated); got != tt.want {
+				t.Errorf("BuildLfsPath() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
