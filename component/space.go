@@ -115,6 +115,7 @@ func (c *spaceComponentImpl) Create(ctx context.Context, req types.CreateSpaceRe
 		SKU:           strconv.FormatInt(resource.ID, 10),
 		Variables:     req.Variables,
 		Template:      req.Template,
+		ClusterID:     req.ClusterID,
 	}
 	dbSpace = c.updateSpaceByReq(dbSpace, req)
 
@@ -480,6 +481,7 @@ func (c *spaceComponentImpl) Show(ctx context.Context, namespace, name, currentU
 		Namespace:     ns,
 		DeployID:      spaceStatus.DeployID,
 		Instances:     instList,
+		ClusterID:     space.ClusterID,
 	}
 	if permission.CanAdmin {
 		resSpace.SensitiveCheckStatus = space.Repository.SensitiveCheckStatus.String()
@@ -896,6 +898,7 @@ func (c *spaceComponentImpl) Deploy(ctx context.Context, namespace, name, curren
 		SKU:           space.SKU,
 		ContainerPort: containerPort,
 		Variables:     space.Variables,
+		ClusterID:     space.ClusterID,
 	}
 	dr = c.updateDeployRepoBySpace(dr, space)
 	return c.deployer.Deploy(ctx, dr)
@@ -1089,6 +1092,10 @@ func (c *spaceComponentImpl) mergeUpdateSpaceRequest(ctx context.Context, space 
 
 	if req.Variables != nil {
 		space.Variables = *req.Variables
+	}
+
+	if req.ClusterID != nil {
+		space.ClusterID = *req.ClusterID
 	}
 	return nil
 }

@@ -67,7 +67,7 @@ type MCPService struct {
 
 type CreateSpaceReq struct {
 	CreateRepoReq
-	Sdk           string `json:"sdk" example:"1"`
+	Sdk           string `json:"sdk" example:"1" binding:"required"`
 	SdkVersion    string `json:"sdk_version" example:"v0.1"`
 	DriverVersion string `json:"driver_version" example:"11.8.0"`
 	CoverImageUrl string `json:"cover_image_url"`
@@ -75,8 +75,9 @@ type CreateSpaceReq struct {
 	Env           string `json:"env"`
 	Secrets       string `json:"secrets"`
 	Variables     string `json:"variables"`
-	ResourceID    int64  `json:"resource_id"`
-	ClusterID     string `json:"cluster_id"`
+	ResourceID    int64  `json:"resource_id" binding:"required"`
+	ClusterID     string `json:"cluster_id" binding:"required"`
+	OrderDetailID int64  `json:"order_detail_id"`
 }
 
 // Space is the domain object for spaces
@@ -123,6 +124,7 @@ type Space struct {
 	SensitiveCheckStatus string               `json:"sensitive_check_status"`
 	DeployID             int64                `json:"deploy_id,omitempty"`
 	Instances            []Instance           `json:"instances,omitempty"`
+	ClusterID            string               `json:"cluster_id"`
 }
 
 type SpaceStatus struct {
@@ -143,4 +145,5 @@ type UpdateSpaceReq struct {
 	Secrets       *string `json:"secrets"`
 	Variables     *string `json:"variables"`
 	OrderDetailID int64   `json:"order_detail_id"`
+	ClusterID     *string `json:"cluster_id"`
 }

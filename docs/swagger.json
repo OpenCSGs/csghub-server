@@ -19123,6 +19123,11 @@
         },
         "types.CreateSpaceReq": {
             "type": "object",
+            "required": [
+                "cluster_id",
+                "resource_id",
+                "sdk"
+            ],
             "properties": {
                 "cluster_id": {
                     "type": "string"
@@ -19163,6 +19168,9 @@
                 "nickname": {
                     "type": "string",
                     "example": "model display name"
+                },
+                "order_detail_id": {
+                    "type": "integer"
                 },
                 "private": {
                     "type": "boolean"
@@ -21192,6 +21200,9 @@
                 "can_write": {
                     "type": "boolean"
                 },
+                "cluster_id": {
+                    "type": "string"
+                },
                 "cover_image_url": {
                     "type": "string"
                 },
@@ -21727,6 +21738,9 @@
         "types.UpdateSpaceReq": {
             "type": "object",
             "properties": {
+                "cluster_id": {
+                    "type": "string"
+                },
                 "cover_image_url": {
                     "type": "string"
                 },

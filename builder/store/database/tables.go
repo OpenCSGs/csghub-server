@@ -35,6 +35,7 @@ type Space struct {
 	SKU           string `bun:"," json:"sku"`
 	OrderDetailID int64  `bun:"," json:"order_detail_id"`
 	Variables     string `bun:",nullzero" json:"variables"`
+	ClusterID     string `bun:",nullzero" json:"cluster_id"`
 	times
 }
 
