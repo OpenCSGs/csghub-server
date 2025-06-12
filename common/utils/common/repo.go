@@ -192,7 +192,7 @@ func BuildLfsPath(repoID int64, oid string, migrated bool) string {
 	var lfsPath string
 	if migrated {
 		sha256Path := SHA256(strconv.FormatInt(repoID, 10))
-		lfsPath = fmt.Sprintf("repos/%s/%s/%s/%s", sha256Path[:2], sha256Path[1:3], sha256Path, oid)
+		lfsPath = fmt.Sprintf("repos/%s/%s/%s/%s", sha256Path[0:2], sha256Path[2:4], sha256Path, oid)
 	} else {
 		lfsPath = path.Join("lfs", path.Join(oid[0:2], oid[2:4], oid[4:]))
 	}
