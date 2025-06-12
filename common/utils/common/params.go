@@ -114,3 +114,14 @@ func GetValidTimeDuration(ctx *gin.Context) (string, string) {
 	}
 	return defaultDuration, defaultRange
 }
+
+func GetNamespaceAndNameFromPath(path string) (namespace string, name string, err error) {
+	parts := strings.Split(path, "/")
+	if len(parts) != 2 {
+		err = errors.New("invalid namespace or name")
+		return
+	}
+	namespace = parts[0]
+	name = parts[1]
+	return
+}

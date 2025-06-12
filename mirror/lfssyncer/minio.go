@@ -13,8 +13,14 @@ import (
 	"time"
 
 	"github.com/minio/minio-go/v7"
+	"go.temporal.io/sdk/client"
+	"opencsg.com/csghub-server/api/workflow"
+	"opencsg.com/csghub-server/builder/git"
+	"opencsg.com/csghub-server/builder/git/gitserver"
+	"opencsg.com/csghub-server/builder/git/gitserver/gitaly"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/builder/store/s3"
+	"opencsg.com/csghub-server/builder/temporal"
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/types"
 	"opencsg.com/csghub-server/common/utils/common"
@@ -32,6 +38,7 @@ type MinioLFSSyncWorker struct {
 	repoStore          database.RepoStore
 	numWorkers         int
 	httpClient         *http.Client
+	git                gitserver.GitServer
 }
 
 func NewMinioLFSSyncWorker(config *config.Config, numWorkers int) (*MinioLFSSyncWorker, error) {
@@ -66,6 +73,12 @@ func NewMinioLFSSyncWorker(config *config.Config, numWorkers int) (*MinioLFSSync
 				Proxy: http.ProxyURL(proxyURL),
 			},
 		}
+	}
+	w.git, err = git.NewGitServer(config)
+	if err != nil {
+		newError := fmt.Errorf("fail to create git server,error:%w", err)
+		slog.Error(newError.Error())
+		return nil, newError
 	}
 	return w, nil
 }
@@ -154,6 +167,23 @@ func (w *MinioLFSSyncWorker) SyncLfs(ctx context.Context, workerId int, mirror *
 	err = w.DownloadAndUploadLFSFiles(ctx, mirror, pointers, repo)
 	if err != nil {
 		return fmt.Errorf("fail to download and upload LFS files: %w", err)
+	}
+
+	// Get repo last commit
+	namespace, name, err := common.GetNamespaceAndNameFromPath(mirror.Repository.Path)
+	if err != nil {
+		return fmt.Errorf("failed to get namespace and name from mirror repository path: %w", err)
+	}
+
+	commit, err := w.getRepoLastCommit(ctx, namespace, name, repo.DefaultBranch, mirror.Repository.RepositoryType)
+	if err != nil {
+		return fmt.Errorf("failed to get repo last commit: %w", err)
+	}
+
+	// Trigger git callback
+	err = w.triggerGitCallback(ctx, namespace, name, repo.DefaultBranch, commit, mirror)
+	if err != nil {
+		return err
 	}
 	return nil
 }
@@ -324,6 +354,52 @@ func (w *MinioLFSSyncWorker) DownloadAndUploadLFSFile(ctx context.Context, mirro
 	if uploadInfo.Size != pointer.Size {
 		return fmt.Errorf("uploaded file size does not match expected size: %d != %d", uploadInfo.Size, pointer.Size)
 	}
+
+	return nil
+}
+
+func (w *MinioLFSSyncWorker) getRepoLastCommit(ctx context.Context, namespace, name, branch string, repoType types.RepositoryType) (*types.Commit, error) {
+	commit, err := w.git.GetRepoLastCommit(ctx, gitserver.GetRepoLastCommitReq{
+		Namespace: namespace,
+		Name:      name,
+		RepoType:  repoType,
+		Ref:       branch,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to get repo last commit: %w", err)
+	}
+	return commit, nil
+}
+
+func (w *MinioLFSSyncWorker) triggerGitCallback(ctx context.Context, namespace, name, branch string, commit *types.Commit, mirror *database.Mirror) error {
+	callback, err := w.git.GetDiffBetweenTwoCommits(ctx, gitserver.GetDiffBetweenTwoCommitsReq{
+		Namespace:     namespace,
+		Name:          name,
+		RepoType:      mirror.Repository.RepositoryType,
+		Ref:           branch,
+		LeftCommitId:  gitaly.SHA1EmptyTreeID,
+		RightCommitId: commit.ID,
+		Private:       mirror.Repository.Private,
+	})
+	if err != nil {
+		return fmt.Errorf("failed to get diff between two commits: %w", err)
+	}
+	callback.Ref = branch
+
+	//start workflow to handle push request
+	workflowClient := temporal.GetClient()
+	workflowOptions := client.StartWorkflowOptions{
+		TaskQueue: workflow.HandlePushQueueName,
+	}
+
+	we, err := workflowClient.ExecuteWorkflow(
+		ctx, workflowOptions, workflow.HandlePushWorkflow, callback,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to handle git push callback: %w", err)
+	}
+
+	slog.Info("start handle push workflow", slog.String("workflow_id", we.GetID()), slog.Any("req", callback))
 
 	return nil
 }
