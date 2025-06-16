@@ -13,21 +13,26 @@ import (
 	"sync"
 	"time"
 
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/tools/cache"
 	v1 "knative.dev/serving/pkg/apis/serving/v1"
 	"knative.dev/serving/pkg/client/informers/externalversions"
+	listerv1 "knative.dev/serving/pkg/client/listers/serving/v1"
 	"opencsg.com/csghub-server/builder/deploy/cluster"
 	"opencsg.com/csghub-server/builder/deploy/common"
 	"opencsg.com/csghub-server/builder/event"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/types"
+	rcommon "opencsg.com/csghub-server/runner/common"
+	rTypes "opencsg.com/csghub-server/runner/types"
 )
 
 var (
@@ -37,6 +42,7 @@ var (
 	KeyDeploySKU     string = "deploy_sku"
 	KeyOrderDetailID string = "order-detail-id"
 	KeyMinScale      string = "autoscaling.knative.dev/min-scale"
+	KeyMaxScale      string = "autoscaling.knative.dev/max-scale"
 	KeyServiceLabel  string = "serving.knative.dev/service"
 	KeyRunModeLabel  string = "run-mode"
 	ValueMultiHost   string = "multi-host"
@@ -52,6 +58,7 @@ type serviceComponentImpl struct {
 	serviceStore            database.KnativeServiceStore
 	clusterPool             *cluster.ClusterPool
 	eventPub                *event.EventPublisher
+	deployLogStore          database.DeployLogStore
 }
 
 type ServiceComponent interface {
@@ -63,18 +70,20 @@ type ServiceComponent interface {
 	// get secret from k8s
 	// notes: admin should create nim secret "ngc-secret" and "nvidia-nim-secrets" in related namespace before deploy
 	GetNimSecret(ctx context.Context, cluster cluster.Cluster) (string, error)
-	GetServicePodsWithStatus(ctx context.Context, cluster cluster.Cluster, srvName string, namespace string) (*types.InstanceInfo, error)
+	GetServicePodsWithStatus(ctx context.Context, cluster cluster.Cluster, svcName string, namespace string) (*types.InstanceInfo, error)
 	// NewPersistentVolumeClaim creates a new k8s PVC with some default values set.
 	NewPersistentVolumeClaim(name string, ctx context.Context, cluster cluster.Cluster, hardware types.HardWare) error
 	RunInformer()
-	GetServicePods(ctx context.Context, cluster cluster.Cluster, srvName string, namespace string, limit int64) ([]string, error)
+	GetServicePods(ctx context.Context, cluster cluster.Cluster, svcName string, namespace string, limit int64) ([]string, error)
 	GetAllServiceStatus(ctx context.Context) (map[string]*types.StatusResponse, error)
-	GetServiceByName(ctx context.Context, srvName, clusterId string) (*types.StatusResponse, error)
+	GetServiceByName(ctx context.Context, svcName, clusterId string) (*types.StatusResponse, error)
 	RemoveServiceForcely(ctx context.Context, cluster *cluster.Cluster, svcName string) error
 	GetServiceInfo(ctx context.Context, req types.ServiceRequest) (*types.ServiceInfoResponse, error)
-	AddServiceInDB(srv v1.Service, clusterID string) error
-	DeleteServiceInDB(srv v1.Service, clusterID string) error
-	UpdateServiceInDB(srv v1.Service, clusterID string) error
+	AddServiceInDB(svc v1.Service, clusterID string) error
+	DeleteServiceInDB(svc v1.Service, clusterID string) error
+	UpdateServiceInDB(svc v1.Service, clusterID string) error
+	PodExist(ctx context.Context, cluster cluster.Cluster, podName string) (bool, error)
+	GetPodLogsFromDB(ctx context.Context, cluster cluster.Cluster, podName, svcName string) (string, error)
 }
 
 func NewServiceComponent(config *config.Config, clusterPool *cluster.ClusterPool) ServiceComponent {
@@ -89,7 +98,9 @@ func NewServiceComponent(config *config.Config, clusterPool *cluster.ClusterPool
 		serviceStore:            database.NewKnativeServiceStore(),
 		clusterPool:             clusterPool,
 		eventPub:                &event.DefaultEventPublisher,
+		deployLogStore:          database.NewDeployLogStore(),
 	}
+	go sc.RunInformer()
 	return sc
 }
 
@@ -122,6 +133,9 @@ func (s *serviceComponentImpl) GenerateService(ctx context.Context, cluster clus
 	// fix no gpu request case
 	if hardware.Gpu.ResourceName == "" || hardware.Gpu.Num == "" {
 		environments = append(environments, corev1.EnvVar{Name: "NVIDIA_VISIBLE_DEVICES", Value: "none"})
+	}
+	if hardware.Npu.ResourceName == "" || hardware.Npu.Num == "" {
+		environments = append(environments, corev1.EnvVar{Name: "ASCEND_VISIBLE_DEVICES", Value: "none"})
 	}
 
 	if hardware.Dcu.ResourceName == "" || hardware.Dcu.Num == "" {
@@ -207,7 +221,7 @@ func (s *serviceComponentImpl) GenerateService(ctx context.Context, cluster clus
 
 	service := &v1.Service{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:        request.SrvName,
+			Name:        request.SvcName,
 			Namespace:   s.k8sNameSpace,
 			Annotations: annotations,
 		},
@@ -251,8 +265,8 @@ func (s *serviceComponentImpl) GetNimSecret(ctx context.Context, cluster cluster
 	return string(secret.Data["NGC_API_KEY"]), nil
 }
 
-func (s *serviceComponentImpl) GetServicePodsWithStatus(ctx context.Context, cluster cluster.Cluster, srvName string, namespace string) (*types.InstanceInfo, error) {
-	labelSelector := fmt.Sprintf("serving.knative.dev/service=%s", srvName)
+func (s *serviceComponentImpl) GetServicePodsWithStatus(ctx context.Context, cluster cluster.Cluster, svcName string, namespace string) (*types.InstanceInfo, error) {
+	labelSelector := fmt.Sprintf("serving.knative.dev/service=%s", svcName)
 	// Get the list of Pods based on the label selector
 	pods, err := cluster.Client.CoreV1().Pods(namespace).List(ctx, metav1.ListOptions{
 		LabelSelector: labelSelector,
@@ -263,13 +277,15 @@ func (s *serviceComponentImpl) GetServicePodsWithStatus(ctx context.Context, clu
 	// Extract the Pod names and status
 	var podInstances []types.Instance
 	var instanceInfo types.InstanceInfo
+	readyCount := 0
 	for _, pod := range pods.Items {
 		if pod.DeletionTimestamp != nil {
 			continue
 		}
 		status := pod.Status.Phase
 		// Check container statuses for failure reasons
-		if hasFailedStatus(&pod) {
+		_, isPodFailed := hasFailedStatus(&pod)
+		if isPodFailed {
 			status = corev1.PodFailed
 		}
 		podInstances = append(podInstances,
@@ -278,8 +294,14 @@ func (s *serviceComponentImpl) GetServicePodsWithStatus(ctx context.Context, clu
 				Status: string(status),
 			},
 		)
+		for _, cs := range pod.Status.ContainerStatuses {
+			if cs.Ready {
+				readyCount++
+			}
+		}
 	}
 	instanceInfo.Instances = podInstances
+	instanceInfo.ReadyCount = readyCount
 	message, reason := getPodError(pods)
 	if message != nil {
 		instanceInfo.Message = *message
@@ -288,9 +310,9 @@ func (s *serviceComponentImpl) GetServicePodsWithStatus(ctx context.Context, clu
 	return &instanceInfo, nil
 }
 
-func hasFailedStatus(pod *corev1.Pod) bool {
+func hasFailedStatus(pod *corev1.Pod) (string, bool) {
 	if pod == nil || len(pod.Status.ContainerStatuses) == 0 {
-		return false
+		return "", false
 	}
 
 	failureReasons := map[string]struct{}{
@@ -306,13 +328,43 @@ func hasFailedStatus(pod *corev1.Pod) bool {
 		}
 		if cs.State.Waiting != nil {
 			if _, exists := failureReasons[cs.State.Waiting.Reason]; exists {
-				return true
+				return cs.State.Waiting.Reason, true
 			}
 		}
 		if cs.State.Terminated != nil {
 			if _, exists := failureReasons[cs.State.Terminated.Reason]; exists {
-				return true
+				return cs.State.Terminated.Reason, true
 			}
+		}
+	}
+	return "", false
+}
+
+func isProxyReady(pod *corev1.Pod) bool {
+	if pod == nil || len(pod.Status.ContainerStatuses) == 0 {
+		return false
+	}
+
+	for _, cs := range pod.Status.ContainerStatuses {
+		if cs.Name != "queue-proxy" {
+			continue
+		}
+		return cs.Ready
+	}
+	return false
+}
+
+// pod is in ContainerCreating
+func isContainerCreating(pod *corev1.Pod) bool {
+	if pod == nil || len(pod.Status.ContainerStatuses) == 0 {
+		return false
+	}
+	for _, cs := range pod.Status.ContainerStatuses {
+		if cs.Name != "user-container" {
+			continue
+		}
+		if cs.State.Waiting != nil && cs.State.Waiting.Reason == "ContainerCreating" {
+			return true
 		}
 	}
 	return false
@@ -485,6 +537,7 @@ func (s *serviceComponentImpl) RunServiceInformer(stopCh <-chan struct{}, cluste
 	_, err := informer.AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj any) {
 			service := obj.(*v1.Service)
+			slog.Debug("add knative server by informer", slog.Any("clusterID", cluster.ID), slog.Any("service", service.Name))
 			err := s.AddServiceInDB(*service, cluster.ID)
 			if err != nil {
 				slog.Error("failed to add service ", slog.Any("service", service.Name), slog.Any("error", err))
@@ -504,6 +557,7 @@ func (s *serviceComponentImpl) RunServiceInformer(stopCh <-chan struct{}, cluste
 		},
 		DeleteFunc: func(obj any) {
 			service := obj.(*v1.Service)
+			slog.Debug("delete knative server by informer", slog.Any("clusterID", cluster.ID), slog.Any("service", service.Name))
 			err := s.DeleteServiceInDB(*service, cluster.ID)
 			if err != nil {
 				slog.Error("failed to mark service as deleted ", slog.Any("service", service.Name), slog.Any("error", err))
@@ -513,9 +567,69 @@ func (s *serviceComponentImpl) RunServiceInformer(stopCh <-chan struct{}, cluste
 	if err != nil {
 		runtime.HandleError(fmt.Errorf("failed to add event handler for knative service informer"))
 	}
+	go s.RunServiceSync(informerFactory, cluster)
 	informer.Run(stopCh)
 	if !cache.WaitForCacheSync(stopCh, informer.HasSynced) {
 		runtime.HandleError(fmt.Errorf("timed out waiting for caches to sync for knative service informer"))
+	}
+
+}
+
+// run svc sync
+func (s *serviceComponentImpl) RunServiceSync(informerFactory externalversions.SharedInformerFactory, cluster cluster.Cluster) {
+	lister := informerFactory.Serving().V1().Services().Lister()
+	//sync once at start
+	s.syncServiceInDB(lister, cluster)
+	ticker := time.NewTicker(1 * time.Hour)
+	defer ticker.Stop()
+	for range ticker.C {
+		s.syncServiceInDB(lister, cluster)
+	}
+}
+
+// compare and remove service list in db
+func (s *serviceComponentImpl) syncServiceInDB(lister listerv1.ServiceLister, cluster cluster.Cluster) {
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	var (
+		services []*v1.Service
+		err      error
+	)
+
+	services, err = lister.Services(s.k8sNameSpace).List(labels.Everything())
+
+	if err != nil {
+		slog.Error("failed to list services", slog.Any("error", err))
+		return
+	}
+
+	if len(services) < 1 {
+		slog.Debug("skip sync service for start runner first time")
+		return
+	}
+
+	localServices, err := s.serviceStore.GetByCluster(ctx, cluster.ID)
+	if err != nil {
+		slog.Error("failed to list services in db", slog.Any("error", err))
+		return
+	}
+	slog.Debug("run sync service to compare with db", slog.Any("local services", len(localServices)), slog.Any("cluster", cluster.ID), slog.Any("services", len(services)))
+	for _, localService := range localServices {
+		found := false
+		for _, service := range services {
+			if localService.Name == service.Name {
+				found = true
+				break
+			}
+		}
+		if !found {
+			slog.Debug("delete service in sync", slog.Any("service", localService.Name), slog.Any("cluster", cluster.ID))
+			err := s.serviceStore.Delete(ctx, cluster.ID, localService.Name)
+			if err != nil {
+				slog.Error("failed to delete service ", slog.Any("service", localService.Name), slog.Any("error", err))
+			}
+		}
 	}
 }
 
@@ -537,7 +651,34 @@ func (s *serviceComponentImpl) RunPodInformer(stopCh <-chan struct{}, cluster cl
 		UpdateFunc: func(oldObj, newObj any) {
 			new := newObj.(*corev1.Pod)
 			serviceName := new.Labels[KeyServiceLabel]
-			if serviceName != "" && hasFailedStatus(new) {
+			podStatus, isPodFailed := hasFailedStatus(new)
+			if serviceName != "" && (isPodFailed || isProxyReady(new) || isContainerCreating(new)) {
+				slog.Debug("pod status changed by informer", slog.Any("service", serviceName),
+					slog.Any("pod-name", new.Name), slog.Any("namespace", new.Namespace),
+					slog.Any("isPodFailed", isPodFailed), slog.Any("pod-status", podStatus))
+				ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+				defer cancel()
+				svc, err := cluster.KnativeClient.ServingV1().Services(s.k8sNameSpace).
+					Get(ctx, serviceName, metav1.GetOptions{})
+				if err != nil {
+					slog.Error("failed to get service", slog.Any("service", serviceName), slog.Any("error", err))
+				}
+				err = s.UpdateServiceInDB(*svc, cluster.ID)
+				if err != nil {
+					slog.Error("failed to update service status", slog.Any("service", serviceName), slog.Any("error", err))
+				}
+				if isPodFailed && svc != nil && len(svc.Name) > 0 {
+					err = s.persistPodLogs(*svc, new, podStatus, &cluster)
+					if err != nil {
+						slog.Error("failed to persist pod logs", slog.Any("service", serviceName), slog.Any("error", err))
+					}
+				}
+			}
+		},
+		DeleteFunc: func(obj any) {
+			switch new := obj.(type) {
+			case *corev1.Pod:
+				serviceName := new.Labels[KeyServiceLabel]
 				ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 				defer cancel()
 				srv, err := cluster.KnativeClient.ServingV1().Services(s.k8sNameSpace).
@@ -549,6 +690,8 @@ func (s *serviceComponentImpl) RunPodInformer(stopCh <-chan struct{}, cluster cl
 				if err != nil {
 					slog.Error("failed to update service status ", slog.Any("service", serviceName), slog.Any("error", err))
 				}
+			default:
+				return
 			}
 		},
 	})
@@ -567,121 +710,126 @@ func (s *serviceComponentImpl) RunPodInformer(stopCh <-chan struct{}, cluster cl
 	<-stopCh
 }
 
-func (s *serviceComponentImpl) AddServiceInDB(srv v1.Service, clusterID string) error {
+func (s *serviceComponentImpl) AddServiceInDB(svc v1.Service, clusterID string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	status, err := s.GetServiceStatus(ctx, srv, clusterID)
+	status, err := s.GetServiceStatus(ctx, svc, clusterID)
 	if err != nil {
 		return err
 	}
-	deployIDStr := srv.Annotations[KeyDeployID]
+	deployIDStr := svc.Annotations[KeyDeployID]
 	deployID, _ := strconv.ParseInt(deployIDStr, 10, 64)
-	deployTypeStr := srv.Annotations[KeyDeployType]
+	deployTypeStr := svc.Annotations[KeyDeployType]
 	deployType, err := strconv.Atoi(deployTypeStr)
 	if err != nil {
 		deployType = 0
 	}
-	userID := srv.Annotations[KeyUserID]
-	deploySku := srv.Annotations[KeyDeploySKU]
-	orderDetailIdStr := srv.Annotations[KeyOrderDetailID]
+	userID := svc.Annotations[KeyUserID]
+	deploySku := svc.Annotations[KeyDeploySKU]
+	orderDetailIdStr := svc.Annotations[KeyOrderDetailID]
 	orderDetailId, err := strconv.ParseInt(orderDetailIdStr, 10, 64)
 	if err != nil {
 		orderDetailId = 0
 	}
-	DesiredReplica := 1
-	if minScale, ok := srv.Spec.Template.Annotations[KeyMinScale]; ok {
-		DesiredReplica, _ = strconv.Atoi(minScale)
+	deployment, err := s.getDeploymentByServiceName(ctx, svc, clusterID)
+	if err != nil {
+		slog.Error("failed to get deployment", slog.Any("service", svc.Name), slog.Any("error", err))
 	}
 	service := &database.KnativeService{
-		Code:           status.Code,
-		Name:           srv.Name,
-		ClusterID:      clusterID,
-		Status:         getReadyCondition(&srv),
-		Endpoint:       srv.Status.URL.String(),
-		DeployID:       deployID,
-		UserUUID:       userID,
-		DeployType:     deployType,
-		DeploySKU:      deploySku,
-		OrderDetailID:  orderDetailId,
-		Instances:      status.Instances,
-		DesiredReplica: DesiredReplica,
-		ActualReplica:  0,
+		Code:          status.Code,
+		Name:          svc.Name,
+		ClusterID:     clusterID,
+		Status:        getReadyCondition(&svc),
+		Endpoint:      svc.Status.URL.String(),
+		DeployID:      deployID,
+		UserUUID:      userID,
+		DeployType:    deployType,
+		DeploySKU:     deploySku,
+		OrderDetailID: orderDetailId,
+		Instances:     status.Instances,
+	}
+	if deployment != nil {
+		desiredReplicas := 1
+		if deployment.Spec.Replicas != nil {
+			desiredReplicas = int(*deployment.Spec.Replicas)
+		}
+		service.DesiredReplica = desiredReplicas
+		service.ActualReplica = int(deployment.Status.Replicas)
 	}
 
 	return s.serviceStore.Add(ctx, service)
 }
 
 // Delete service, just mark the service as stopped
-func (s *serviceComponentImpl) DeleteServiceInDB(srv v1.Service, clusterID string) error {
+func (s *serviceComponentImpl) DeleteServiceInDB(svc v1.Service, clusterID string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 	defer cancel()
 
 	event := types.ServiceEvent{
-		ServiceName: srv.Name,
+		ServiceName: svc.Name,
 		Status:      common.Stopped,
 	}
 	s.sendServiceUpdateEvent(event)
 
-	return s.serviceStore.Delete(ctx, srv.Name, clusterID)
+	return s.serviceStore.Delete(ctx, clusterID, svc.Name)
 }
 
-func (s *serviceComponentImpl) UpdateServiceInDB(srv v1.Service, clusterID string) error {
+func (s *serviceComponentImpl) UpdateServiceInDB(svc v1.Service, clusterID string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 	defer cancel()
-	status, err := s.GetServiceStatus(ctx, srv, clusterID)
+	status, err := s.GetServiceStatus(ctx, svc, clusterID)
 	if err != nil {
 		return err
 	}
-	oldService, err := s.serviceStore.Get(ctx, srv.Name, clusterID)
+	oldService, err := s.serviceStore.Get(ctx, svc.Name, clusterID)
 	if err != nil {
 		return err
 	}
-	revision, err := s.getRevisionByServiceName(srv, clusterID)
+	deployment, err := s.getDeploymentByServiceName(ctx, svc, clusterID)
 	if err != nil {
-		slog.Error("failed to get revision ", slog.Any("service", srv.Name), slog.Any("error", err))
+		slog.Error("failed to get deployment ", slog.Any("service", svc.Name), slog.Any("error", err))
 	}
-	oldService.Code = status.Code
-	oldService.Endpoint = srv.Status.URL.String()
-	oldService.Status = getReadyCondition(&srv)
+	oldService.Endpoint = svc.Status.URL.String()
+	oldService.Status = getReadyCondition(&svc)
 	oldService.Instances = status.Instances
-	if revision != nil {
-		DesiredReplicas := 1
-		ActualReplicas := 0
-		if revision.Status.DesiredReplicas != nil {
-			DesiredReplicas = int(*revision.Status.DesiredReplicas)
+	if deployment != nil {
+		desiredReplicas := 1
+		if deployment.Spec.Replicas != nil {
+			desiredReplicas = int(*deployment.Spec.Replicas)
 		}
-
-		if revision.Status.ActualReplicas != nil {
-			ActualReplicas = int(*revision.Status.ActualReplicas)
-		}
-		oldService.DesiredReplica = DesiredReplicas
-		oldService.ActualReplica = ActualReplicas
+		oldService.DesiredReplica = desiredReplicas
+		oldService.ActualReplica = int(deployment.Status.Replicas)
 	}
 	if oldService.Code != status.Code || status.Message != "" {
 		event := types.ServiceEvent{
-			ServiceName: srv.Name,
+			ServiceName: svc.Name,
 			Status:      status.Code,
 			Message:     status.Message,
 			Reason:      status.Reason,
 		}
 		s.sendServiceUpdateEvent(event)
 	}
+	oldService.Code = status.Code
 	return s.serviceStore.Update(ctx, oldService)
 }
 
 // Get Revision by Service name
-func (s *serviceComponentImpl) getRevisionByServiceName(service v1.Service, clusterID string) (*v1.Revision, error) {
+func (s *serviceComponentImpl) getDeploymentByServiceName(ctx context.Context, service v1.Service, clusterID string) (*appsv1.Deployment, error) {
 
 	// Extract the latest ready Revision name
-	revisionName := service.Status.LatestReadyRevisionName
-	if revisionName == "" {
-		return nil, fmt.Errorf("no LatestReadyRevisionName found for Service %s", service.Name)
-	}
-	cluster, err := s.clusterPool.GetClusterByID(context.Background(), clusterID)
+	svcName := service.Name
+	cluster, err := s.clusterPool.GetClusterByID(ctx, clusterID)
 	if err != nil {
-		return nil, fmt.Errorf("fail to get cluster,error: %v ", err)
+		return nil, fmt.Errorf("fail to get cluster, error: %w", err)
 	}
-	return cluster.KnativeClient.ServingV1().Revisions(s.k8sNameSpace).Get(context.Background(), revisionName, metav1.GetOptions{})
+	labelSelector := fmt.Sprintf("serving.knative.dev/service=%s", svcName)
+	deployments, err := cluster.Client.AppsV1().Deployments(s.k8sNameSpace).List(ctx, metav1.ListOptions{
+		LabelSelector: labelSelector,
+	})
+	if err != nil || len(deployments.Items) == 0 {
+		return nil, fmt.Errorf("fail to get deployment list by selector %s, error: %w", labelSelector, err)
+	}
+	return &deployments.Items[0], nil
 }
 
 func (s *serviceComponentImpl) GetServiceStatus(ctx context.Context, ks v1.Service, clusterID string) (resp types.StatusResponse, err error) {
@@ -707,6 +855,9 @@ func (s *serviceComponentImpl) GetServiceStatus(ctx context.Context, ks v1.Servi
 		resp.Code = common.Running
 		if len(instInfo.Instances) == 0 {
 			resp.Code = common.Sleeping
+		} else if instInfo.ReadyCount < 2 {
+			//for wakeup case
+			resp.Code = common.Deploying
 		}
 	case serviceCondition.Status == corev1.ConditionFalse:
 		resp.Code = common.DeployFailed
@@ -738,8 +889,8 @@ func getReadyCondition(service *v1.Service) corev1.ConditionStatus {
 	return corev1.ConditionUnknown
 }
 
-func (s *serviceComponentImpl) GetServicePods(ctx context.Context, cluster cluster.Cluster, srvName string, namespace string, limit int64) ([]string, error) {
-	labelSelector := fmt.Sprintf("serving.knative.dev/service=%s", srvName)
+func (s *serviceComponentImpl) GetServicePods(ctx context.Context, cluster cluster.Cluster, svcName string, namespace string, limit int64) ([]string, error) {
+	labelSelector := fmt.Sprintf("serving.knative.dev/service=%s", svcName)
 	// Get the list of Pods based on the label selector
 	opts := metav1.ListOptions{
 		LabelSelector: labelSelector,
@@ -792,8 +943,16 @@ func (s *serviceComponentImpl) GetAllServiceStatus(ctx context.Context) (map[str
 }
 
 // GetServiceStatus
-func (s *serviceComponentImpl) GetServiceByName(ctx context.Context, srvName, clusterId string) (*types.StatusResponse, error) {
-	svc, err := s.serviceStore.Get(ctx, srvName, clusterId)
+func (s *serviceComponentImpl) GetServiceByName(ctx context.Context, svcName, clusterId string) (*types.StatusResponse, error) {
+	if clusterId == "" {
+		// use default value
+		cluster, err := s.clusterPool.GetClusterByID(ctx, "")
+		if err != nil {
+			return nil, fmt.Errorf("fail to get cluster ,error: %v ", err)
+		}
+		clusterId = cluster.ID
+	}
+	svc, err := s.serviceStore.Get(ctx, svcName, clusterId)
 	if err != nil {
 		return nil, err
 	}
@@ -829,13 +988,13 @@ func (s *serviceComponentImpl) RunServiceSingleHost(ctx context.Context, req typ
 	}
 
 	// check if the ksvc exists
-	_, err = cluster.KnativeClient.ServingV1().Services(s.k8sNameSpace).Get(ctx, req.SrvName, metav1.GetOptions{})
+	_, err = cluster.KnativeClient.ServingV1().Services(s.k8sNameSpace).Get(ctx, req.SvcName, metav1.GetOptions{})
 	if err == nil {
-		err = s.RemoveServiceForcely(ctx, cluster, req.SrvName)
+		err = s.RemoveServiceForcely(ctx, cluster, req.SvcName)
 		if err != nil {
 			slog.Error("fail to remove service", slog.Any("error", err), slog.Any("req", req))
 		}
-		slog.Info("service already exists,delete it first", slog.String("srv_name", req.SrvName), slog.Any("image_id", req.ImageID))
+		slog.Info("service already exists,delete it first", slog.String("svc_name", req.SvcName), slog.Any("image_id", req.ImageID))
 	}
 	service, err := s.GenerateService(ctx, *cluster, req)
 	if err != nil {
@@ -859,7 +1018,7 @@ func (s *serviceComponentImpl) RunServiceSingleHost(ctx context.Context, req typ
 			MountPath: "/dev/shm",
 		})
 	}
-	pvcName := req.SrvName
+	pvcName := req.SvcName
 	if req.DeployType == types.InferenceType {
 		pvcName = req.UserID
 	}
@@ -888,7 +1047,7 @@ func (s *serviceComponentImpl) RunServiceSingleHost(ctx context.Context, req typ
 	service.Spec.Template.Spec.Volumes = volumes
 	service.Spec.Template.Spec.Containers[0].VolumeMounts = volumeMounts
 
-	slog.Debug("ksvc", slog.Any("knative service", service))
+	slog.Debug("creating ksvc", slog.Any("knative service", service))
 
 	// create ksvc
 	_, err = cluster.KnativeClient.ServingV1().Services(s.k8sNameSpace).Create(ctx, service, metav1.CreateOptions{})
@@ -896,6 +1055,7 @@ func (s *serviceComponentImpl) RunServiceSingleHost(ctx context.Context, req typ
 		return fmt.Errorf("failed to create service, error: %v, req: %v", err, req)
 	}
 	// add a placeholder service
+	req.ClusterID = cluster.ID
 	err = s.AddKService(ctx, req)
 	if err != nil {
 		return fmt.Errorf("failed to add knative service to db, error: %v", err)
@@ -943,7 +1103,7 @@ func (s *serviceComponentImpl) StopService(ctx context.Context, req types.StopRe
 		k8serr := new(k8serrors.StatusError)
 		if errors.As(err, &k8serr) {
 			if k8serr.Status().Code == http.StatusNotFound {
-				slog.Info("stop service skip,service not exist", slog.String("srv_name", req.SvcName), slog.Any("k8s_err", k8serr))
+				slog.Info("stop service skip,service not exist", slog.String("svc_name", req.SvcName), slog.Any("k8s_err", k8serr))
 				resp.Code = 0
 				resp.Message = "skip,service not exist"
 				return &resp, nil
@@ -971,7 +1131,7 @@ func (s *serviceComponentImpl) StopService(ctx context.Context, req types.StopRe
 		resp.Message = "failed to remove workset pod"
 		return &resp, fmt.Errorf("failed to remove workset pod, error: %v", err)
 	}
-	err = s.serviceStore.Delete(ctx, req.SvcName, cluster.ID)
+	err = s.serviceStore.Delete(ctx, cluster.ID, req.SvcName)
 	if err != nil {
 		resp.Code = -1
 		resp.Message = "failed to delete service"
@@ -1055,10 +1215,10 @@ func (s *serviceComponentImpl) PurgeService(ctx context.Context, req types.Purge
 		k8serr := new(k8serrors.StatusError)
 		if errors.As(err, &k8serr) {
 			if k8serr.Status().Code == http.StatusNotFound {
-				slog.Info("service not exist", slog.String("srv_name", req.SvcName), slog.Any("k8s_err", k8serr))
+				slog.Info("service not exist", slog.String("svc_name", req.SvcName), slog.Any("k8s_err", k8serr))
 			}
 		}
-		slog.Error("cannot get service info, skip service purge", slog.String("srv_name", req.SvcName), slog.Any("error", err))
+		slog.Error("cannot get service info, skip service purge", slog.String("svc_name", req.SvcName), slog.Any("error", err))
 	} else {
 		// 1 delete service
 		err = s.RemoveServiceForcely(ctx, cluster, req.SvcName)
@@ -1120,7 +1280,7 @@ func (wc *serviceComponentImpl) sendServiceUpdateEvent(event types.ServiceEvent)
 func (s *serviceComponentImpl) AddKService(ctx context.Context, req types.SVCRequest) error {
 	ks := &database.KnativeService{
 		Code:       common.Deploying,
-		Name:       req.SrvName,
+		Name:       req.SvcName,
 		ClusterID:  req.ClusterID,
 		Status:     corev1.ConditionUnknown,
 		DeployID:   req.DeployID,
@@ -1128,4 +1288,61 @@ func (s *serviceComponentImpl) AddKService(ctx context.Context, req types.SVCReq
 		DeployType: req.DeployType,
 	}
 	return s.serviceStore.Add(ctx, ks)
+}
+
+func (s *serviceComponentImpl) persistPodLogs(svc v1.Service, pod *corev1.Pod, podStatus string, cluster *cluster.Cluster) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	logs, err := rcommon.GetPodLog(ctx, cluster, pod.Name, pod.Namespace, rTypes.UserContainerName)
+	if err != nil {
+		return fmt.Errorf("failed to get svc %s/%s pod %s/%s log, error: %w", svc.Namespace, svc.Name, pod.Namespace, pod.Name, err)
+	}
+	logStr := string(logs)
+	slog.Debug("persist pod log by status changed", slog.Any("clusterID", cluster.ID), slog.Any("namespace", pod.Namespace),
+		slog.Any("svcname", svc.Name), slog.Any("pod-name", pod.Name), slog.Any("log-in-bytes", len(logs)))
+	deploy_ids := svc.Annotations[KeyDeployID]
+	deploy_id, err := strconv.Atoi(deploy_ids)
+	if err != nil {
+		slog.Error("failed to convert deploy id", slog.Any("deploy_id", deploy_ids), slog.Any("error", err))
+	}
+	logData := database.DeployLog{
+		DeployID:         int64(deploy_id),
+		ClusterID:        cluster.ID,
+		SvcName:          svc.Name,
+		PodName:          pod.Name,
+		PodStatus:        podStatus,
+		UserContainerLog: logStr,
+	}
+	_, err = s.deployLogStore.UpdateDeployLogs(ctx, logData)
+	if err != nil {
+		return fmt.Errorf("failed to persist svc %s/%s pod %s/%s log, error: %w", svc.Namespace, svc.Name, pod.Namespace, pod.Name, err)
+	}
+	return nil
+}
+
+func (s *serviceComponentImpl) PodExist(ctx context.Context, cluster cluster.Cluster, podName string) (bool, error) {
+	_, err := cluster.Client.CoreV1().Pods(s.k8sNameSpace).Get(ctx, podName, metav1.GetOptions{})
+	if err != nil {
+		k8serr := new(k8serrors.StatusError)
+		if errors.As(err, &k8serr) {
+			if k8serr.Status().Code == http.StatusNotFound {
+				return false, nil
+			}
+		}
+		return false, fmt.Errorf("get pod %s/%s from cluster, error: %w", s.k8sNameSpace, podName, err)
+	}
+	return true, nil
+}
+
+func (s *serviceComponentImpl) GetPodLogsFromDB(ctx context.Context, cluster cluster.Cluster, podName, svcName string) (string, error) {
+	logReq := database.DeployLog{
+		ClusterID: cluster.ID,
+		SvcName:   svcName,
+		PodName:   podName,
+	}
+	deployLog, err := s.deployLogStore.GetDeployLogs(ctx, logReq)
+	if err != nil {
+		return "", fmt.Errorf("failed to get svc %s/%s pod %s/%s log from db, error: %w", s.k8sNameSpace, svcName, s.k8sNameSpace, podName, err)
+	}
+	return deployLog.UserContainerLog, nil
 }

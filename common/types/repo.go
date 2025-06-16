@@ -144,9 +144,10 @@ type Instance struct {
 }
 
 type InstanceInfo struct {
-	Instances []Instance `json:"instances"`
-	Message   string     `json:"message"`
-	Reason    string     `json:"reason"`
+	Instances  []Instance `json:"instances"`
+	Message    string     `json:"message"`
+	Reason     string     `json:"reason"`
+	ReadyCount int        `json:"ready_count"`
 }
 
 // repo object(cover model/space/code/dataset) for deployer

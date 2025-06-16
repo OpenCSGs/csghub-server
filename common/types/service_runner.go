@@ -187,7 +187,7 @@ type (
 		UserID        string            `json:"user_id"`
 		Sku           string            `json:"sku"`
 		OrderDetailID int64             `json:"order_detail_id"`
-		SrvName       string            `json:"-"`
+		SvcName       string            `json:"-"`
 	}
 
 	EngineArg struct {
