@@ -59,7 +59,7 @@ func TestKnativeServiceStore_Delete(t *testing.T) {
 		ClusterID: "cluster1",
 	})
 	require.Nil(t, err)
-	err = store.Delete(ctx, "test", "cluster1")
+	err = store.Delete(ctx, "cluster1", "test")
 	require.Nil(t, err)
 	_, err = store.Get(ctx, "test", "cluster1")
 	require.NotNil(t, err)

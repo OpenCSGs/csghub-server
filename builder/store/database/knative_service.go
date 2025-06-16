@@ -2,7 +2,9 @@ package database
 
 import (
 	"context"
+	"fmt"
 
+	"github.com/uptrace/bun"
 	"opencsg.com/csghub-server/common/types"
 
 	corev1 "k8s.io/api/core/v1"
@@ -17,7 +19,7 @@ type KnativeServiceStore interface {
 	GetByCluster(ctx context.Context, clusterID string) ([]KnativeService, error)
 	Add(ctx context.Context, service *KnativeService) error
 	Update(ctx context.Context, service *KnativeService) error
-	Delete(ctx context.Context, svcName, clusterID string) error
+	Delete(ctx context.Context, clusterID, svcName string) error
 }
 
 func NewKnativeServiceStore() KnativeServiceStore {
@@ -76,11 +78,27 @@ func (s *knativeServiceImpl) Update(ctx context.Context, service *KnativeService
 }
 
 // delete
-func (s *knativeServiceImpl) Delete(ctx context.Context, svcName, clusterID string) error {
-	_, err := s.db.Operator.Core.NewDelete().
-		Model(&KnativeService{}).
-		Where("name = ? and cluster_id = ?", svcName, clusterID).
-		Exec(ctx)
+func (s *knativeServiceImpl) Delete(ctx context.Context, clusterID, svcName string) error {
+	err := s.db.Operator.Core.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
+		_, err := tx.NewDelete().Model(&KnativeService{}).
+			Where("name = ? and cluster_id = ?", svcName, clusterID).
+			Exec(ctx)
+
+		if err != nil {
+			return fmt.Errorf("delete cluster service %s error: %w", svcName, err)
+		}
+
+		_, err = tx.NewDelete().Model(&DeployLog{}).
+			Where("cluster_id = ? and svc_name = ?", clusterID, svcName).
+			Exec(ctx)
+
+		if err != nil {
+			return fmt.Errorf("delete deploy service %s log error: %w", svcName, err)
+		}
+
+		return nil
+	})
+
 	return err
 }
 

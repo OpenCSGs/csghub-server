@@ -69,9 +69,9 @@ func (_c *MockKnativeServiceStore_Add_Call) RunAndReturn(run func(context.Contex
 	return _c
 }
 
-// Delete provides a mock function with given fields: ctx, svcName, clusterID
-func (_m *MockKnativeServiceStore) Delete(ctx context.Context, svcName string, clusterID string) error {
-	ret := _m.Called(ctx, svcName, clusterID)
+// Delete provides a mock function with given fields: ctx, clusterID, svcName
+func (_m *MockKnativeServiceStore) Delete(ctx context.Context, clusterID string, svcName string) error {
+	ret := _m.Called(ctx, clusterID, svcName)
 
 	if len(ret) == 0 {
 		panic("no return value specified for Delete")
@@ -79,7 +79,7 @@ func (_m *MockKnativeServiceStore) Delete(ctx context.Context, svcName string, c
 
 	var r0 error
 	if rf, ok := ret.Get(0).(func(context.Context, string, string) error); ok {
-		r0 = rf(ctx, svcName, clusterID)
+		r0 = rf(ctx, clusterID, svcName)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -94,13 +94,13 @@ type MockKnativeServiceStore_Delete_Call struct {
 
 // Delete is a helper method to define mock.On call
 //   - ctx context.Context
-//   - svcName string
 //   - clusterID string
-func (_e *MockKnativeServiceStore_Expecter) Delete(ctx interface{}, svcName interface{}, clusterID interface{}) *MockKnativeServiceStore_Delete_Call {
-	return &MockKnativeServiceStore_Delete_Call{Call: _e.mock.On("Delete", ctx, svcName, clusterID)}
+//   - svcName string
+func (_e *MockKnativeServiceStore_Expecter) Delete(ctx interface{}, clusterID interface{}, svcName interface{}) *MockKnativeServiceStore_Delete_Call {
+	return &MockKnativeServiceStore_Delete_Call{Call: _e.mock.On("Delete", ctx, clusterID, svcName)}
 }
 
-func (_c *MockKnativeServiceStore_Delete_Call) Run(run func(ctx context.Context, svcName string, clusterID string)) *MockKnativeServiceStore_Delete_Call {
+func (_c *MockKnativeServiceStore_Delete_Call) Run(run func(ctx context.Context, clusterID string, svcName string)) *MockKnativeServiceStore_Delete_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		run(args[0].(context.Context), args[1].(string), args[2].(string))
 	})

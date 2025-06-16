@@ -49,7 +49,7 @@ func TestServiceComponent_RunService(t *testing.T) {
 		MaxReplica: 1,
 		UserID:     "test",
 		Sku:        "1",
-		SrvName:    "test",
+		SvcName:    "test",
 		Hardware: types.HardWare{
 			Gpu: types.Processor{
 				Num:  "1",
@@ -100,7 +100,7 @@ func TestServiceComponent_StopService(t *testing.T) {
 		MaxReplica: 1,
 		UserID:     "test",
 		Sku:        "1",
-		SrvName:    "test",
+		SvcName:    "test",
 		Hardware: types.HardWare{
 			Gpu: types.Processor{
 				Num:  "1",
@@ -164,7 +164,7 @@ func TestServiceComponent_PurgeService(t *testing.T) {
 		MaxReplica: 1,
 		UserID:     "test",
 		Sku:        "1",
-		SrvName:    "test",
+		SvcName:    "test",
 		Hardware: types.HardWare{
 			Gpu: types.Processor{
 				Num:  "1",
@@ -227,7 +227,7 @@ func TestServiceComponent_UpdateService(t *testing.T) {
 		MaxReplica: 1,
 		UserID:     "test",
 		Sku:        "1",
-		SrvName:    "test",
+		SvcName:    "test",
 		Hardware: types.HardWare{
 			Gpu: types.Processor{
 				Num:  "1",
@@ -297,7 +297,7 @@ func TestServiceComponent_GetServicePodWithStatus(t *testing.T) {
 		MaxReplica: 1,
 		UserID:     "test",
 		Sku:        "1",
-		SrvName:    "test",
+		SvcName:    "test",
 		Hardware: types.HardWare{
 			Gpu: types.Processor{
 				Num:  "1",
@@ -348,7 +348,7 @@ func TestServiceComponent_GetAllStatus(t *testing.T) {
 		MaxReplica: 1,
 		UserID:     "test",
 		Sku:        "1",
-		SrvName:    "test",
+		SvcName:    "test",
 		Hardware: types.HardWare{
 			Gpu: types.Processor{
 				Num:  "1",
@@ -408,7 +408,7 @@ func TestServiceComponent_GetServiceByName(t *testing.T) {
 		MaxReplica: 1,
 		UserID:     "test",
 		Sku:        "1",
-		SrvName:    "test",
+		SvcName:    "test",
 		Hardware: types.HardWare{
 			Gpu: types.Processor{
 				Num:  "1",
@@ -466,7 +466,7 @@ func TestServiceComponent_GetServiceInfo(t *testing.T) {
 		MaxReplica: 1,
 		UserID:     "test",
 		Sku:        "1",
-		SrvName:    "test",
+		SvcName:    "test",
 		Hardware: types.HardWare{
 			Gpu: types.Processor{
 				Num:  "1",
@@ -527,7 +527,7 @@ func TestServiceComponent_AddServiceInDB(t *testing.T) {
 		MaxReplica: 1,
 		UserID:     "test",
 		Sku:        "1",
-		SrvName:    "test",
+		SvcName:    "test",
 		Hardware: types.HardWare{
 			Gpu: types.Processor{
 				Num:  "1",
@@ -589,7 +589,7 @@ func TestServiceComponent_updateServiceInDB(t *testing.T) {
 		MaxReplica: 1,
 		UserID:     "test",
 		Sku:        "1",
-		SrvName:    "test",
+		SvcName:    "test",
 		Hardware: types.HardWare{
 			Gpu: types.Processor{
 				Num:  "1",
@@ -667,7 +667,7 @@ func TestServiceComponent_deleteServiceInDB2(t *testing.T) {
 		MaxReplica: 1,
 		UserID:     "test",
 		Sku:        "1",
-		SrvName:    "test",
+		SvcName:    "test",
 		Hardware: types.HardWare{
 			Gpu: types.Processor{
 				Num:  "1",
@@ -691,4 +691,85 @@ func TestServiceComponent_deleteServiceInDB2(t *testing.T) {
 	kss.EXPECT().Delete(mock.Anything, "test", "test").Return(nil)
 	err = sc.DeleteServiceInDB(*ksvc, "test")
 	require.Nil(t, err)
+}
+
+func TestServiceComponent_PodExist(t *testing.T) {
+	ctx := context.TODO()
+
+	kss := mockdb.NewMockKnativeServiceStore(t)
+
+	pool := &cluster.ClusterPool{}
+	pool.ClusterStore = mockdb.NewMockClusterInfoStore(t)
+	kubeClient := fake.NewSimpleClientset()
+	pool.Clusters = append(pool.Clusters, cluster.Cluster{
+		CID:           "config",
+		ID:            "test",
+		Client:        kubeClient,
+		KnativeClient: knativefake.NewSimpleClientset(),
+	})
+
+	sc := &serviceComponentImpl{
+		k8sNameSpace:       "test",
+		env:                &config.Config{},
+		spaceDockerRegBase: "http://test.com",
+		modelDockerRegBase: "http://test.com",
+		imagePullSecret:    "test",
+		serviceStore:       kss,
+		clusterPool:        pool,
+	}
+
+	res, err := sc.PodExist(ctx, pool.Clusters[0], "pod1")
+	require.Nil(t, err)
+	require.False(t, res)
+}
+
+func TestServiceComponent_GetPodLogsFromDB(t *testing.T) {
+	ctx := context.TODO()
+
+	cfg, err := config.LoadConfig()
+	require.Nil(t, err)
+
+	kss := mockdb.NewMockKnativeServiceStore(t)
+
+	pool := &cluster.ClusterPool{}
+	cis := mockdb.NewMockClusterInfoStore(t)
+	pool.ClusterStore = cis
+	knativeClient := knativefake.NewSimpleClientset()
+	pool.Clusters = append(pool.Clusters, cluster.Cluster{
+		CID:           "config",
+		ID:            "test",
+		KnativeClient: knativeClient,
+	})
+
+	mq := mockmq.NewMockMessageQueue(t)
+
+	eventPub := event.EventPublisher{
+		Connector:    mq,
+		SyncInterval: cfg.Event.SyncInterval,
+	}
+
+	logReq := database.DeployLog{
+		ClusterID: pool.Clusters[0].ID,
+		SvcName:   "svc",
+		PodName:   "pod1",
+	}
+
+	dls := mockdb.NewMockDeployLogStore(t)
+	dls.EXPECT().GetDeployLogs(ctx, logReq).Return(&logReq, nil)
+
+	sc := &serviceComponentImpl{
+		k8sNameSpace:       "test",
+		env:                &config.Config{},
+		spaceDockerRegBase: "http://test.com",
+		modelDockerRegBase: "http://test.com",
+		imagePullSecret:    "test",
+		serviceStore:       kss,
+		clusterPool:        pool,
+		eventPub:           &eventPub,
+		deployLogStore:     dls,
+	}
+
+	res, err := sc.GetPodLogsFromDB(ctx, pool.Clusters[0], "pod1", "svc")
+	require.Nil(t, err)
+	require.Equal(t, "", res)
 }
