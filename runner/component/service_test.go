@@ -267,6 +267,7 @@ func TestServiceComponent_UpdateService(t *testing.T) {
 	require.NotNil(t, resp)
 	require.Equal(t, resp.Code, 0)
 }
+
 func TestServiceComponent_GetServicePodWithStatus(t *testing.T) {
 	kss := mockdb.NewMockKnativeServiceStore(t)
 	ctx := context.TODO()
@@ -617,7 +618,7 @@ func TestServiceComponent_updateServiceInDB(t *testing.T) {
 		ID:        1,
 		Name:      "test",
 		ClusterID: "test",
-		Code:      common.Running,
+		Code:      common.Deploying,
 	}, nil)
 	ksvc, err := knativeClient.ServingV1().Services("test").
 		Get(ctx, "test", metav1.GetOptions{})
