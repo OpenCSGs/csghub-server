@@ -100,7 +100,7 @@ func (c *evaluationComponentImpl) CreateEvaluation(ctx context.Context, req type
 		if err != nil {
 			return nil, fmt.Errorf("invalid hardware setting, %w", err)
 		}
-		if !common.ContainsGraphicResource(hardware) {
+		if frame.ComputeType != string(types.ResourceTypeCPU) && !common.ContainsGraphicResource(hardware) {
 			return nil, fmt.Errorf("evaluation requires graphics card resources")
 		}
 		req.ClusterID = resource.ClusterID
