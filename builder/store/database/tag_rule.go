@@ -32,7 +32,7 @@ type TagRule struct {
 	TagName          string    `bun:",notnull" json:"tag_name"`
 	RuntimeFramework string    `bun:"," json:"runtime_framework"`
 	Source           string    `bun:"," json:"source"`
-	Tag              Tag       `bun:",rel:has-one,join:tag_name=name"`
+	Tag              Tag       `bun:",rel:has-one,join:tag_name=name,join:category=category"`
 	CreatedAt        time.Time `bun:",nullzero,notnull,skipupdate,default:current_timestamp" json:"created_at"`
 }
 

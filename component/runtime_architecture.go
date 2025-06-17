@@ -674,6 +674,13 @@ func (c *runtimeArchitectureComponentImpl) UpdateRuntimeFrameworkByType(ctx cont
 			slog.Error("failed to get file info", slog.Any("file", filePath), slog.Any("error", err))
 			continue
 		}
+		if engineConfig.RemoveOldVersion {
+			err = c.runtimeFrameworksStore.RemoveRuntimeFrameworkAndArch(ctx, engineConfig.EngineName)
+			if err != nil {
+				slog.Error("failed to remove runtime_framework and archs", slog.Any("file", filePath), slog.Any("error", err))
+				continue
+			}
+		}
 		engineConfig.UpdatedAt = fileInfo.ModTime()
 		err = c.UpdateRuntimeFrameworkAndArch(ctx, engineType, engineConfig)
 		if err != nil {

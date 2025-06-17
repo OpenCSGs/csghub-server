@@ -113,5 +113,6 @@ if __name__ == "__main__":
     parser_c.add_argument('--task_dir', type=str, help='Task dir')
     parser_c.add_argument('--sub_task_yaml', type=str, help='Sub task yaml')
     args = parser.parse_args()
-
-    print(get_related_task(args.task_dir, args.sub_task_yaml))
+    task = get_related_task(args.task_dir, args.sub_task_yaml)
+    with open("/tmp/task.txt", "w", encoding="utf-8") as f:
+        f.write(task)

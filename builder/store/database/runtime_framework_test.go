@@ -164,3 +164,59 @@ func TestRuntimeFrameworksStore_FindByNameAndComputeType(t *testing.T) {
 	require.Nil(t, err)
 	require.Equal(t, "vllm", rf.FrameName)
 }
+
+func TestRuntimeFrameworksStore_RemoveRuntimeFrameworkAndArch(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+	ctx := context.TODO()
+
+	rfStore := database.NewRuntimeFrameworksStoreWithDB(db)
+	raStore := database.NewRuntimeArchitecturesStoreWithDB(db)
+
+	// Add a runtime framework
+	rf, err := rfStore.Add(ctx, database.RuntimeFramework{
+		ID:        1,
+		FrameName: "test-framework",
+		Type:      1,
+		Enabled:   1,
+	})
+	require.Nil(t, err)
+
+	// Add runtime architectures associated with the framework
+	err = raStore.Add(ctx, database.RuntimeArchitecture{
+		RuntimeFrameworkID: rf.ID,
+		ArchitectureName:   "x86_64",
+		ModelName:          "test-model-1",
+	})
+	require.Nil(t, err)
+
+	err = raStore.Add(ctx, database.RuntimeArchitecture{
+		RuntimeFrameworkID: rf.ID,
+		ArchitectureName:   "arm64",
+		ModelName:          "test-model-2",
+	})
+	require.Nil(t, err)
+
+	// Verify that the runtime framework and architectures exist
+	foundRf, err := rfStore.FindByID(ctx, rf.ID)
+	require.Nil(t, err)
+	require.Equal(t, "test-framework", foundRf.FrameName)
+
+	archs, err := raStore.ListByRuntimeFrameworkID(ctx, rf.ID)
+	require.Nil(t, err)
+	require.Equal(t, 2, len(archs))
+
+	// Remove the runtime framework and its architectures
+	err = rfStore.RemoveRuntimeFrameworkAndArch(ctx, "test-framework")
+	require.Nil(t, err)
+
+	// Verify that the runtime framework is deleted
+	_, err = rfStore.FindByID(ctx, rf.ID)
+	require.Equal(t, sql.ErrNoRows, err)
+
+	// Verify that the associated architectures are deleted
+	archs, err = raStore.ListByRuntimeFrameworkID(ctx, rf.ID)
+	require.Nil(t, err)
+	require.Equal(t, 0, len(archs))
+}
+

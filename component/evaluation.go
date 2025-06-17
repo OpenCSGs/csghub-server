@@ -2,9 +2,7 @@ package component
 
 import (
 	"context"
-	"database/sql"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"strings"
 
@@ -19,6 +17,7 @@ type evaluationComponentImpl struct {
 	deployer              deploy.Deployer
 	userStore             database.UserStore
 	modelStore            database.ModelStore
+	repoStore             database.RepoStore
 	datasetStore          database.DatasetStore
 	mirrorStore           database.MirrorStore
 	spaceResourceStore    database.SpaceResourceStore
@@ -44,6 +43,7 @@ func NewEvaluationComponent(config *config.Config) (EvaluationComponent, error) 
 	c.datasetStore = database.NewDatasetStore()
 	c.mirrorStore = database.NewMirrorStore()
 	c.tokenStore = database.NewAccessTokenStore()
+	c.repoStore = database.NewRepoStore()
 	c.runtimeFrameworkStore = database.NewRuntimeFrameworksStore()
 	c.config = config
 	ac, err := NewAccountingComponent(config)
@@ -60,24 +60,35 @@ func (c *evaluationComponentImpl) CreateEvaluation(ctx context.Context, req type
 	if err != nil {
 		return nil, fmt.Errorf("failed to get current user %s, error:%w", req.Username, err)
 	}
-	result := strings.Split(req.ModelId, "/")
-	m, err := c.modelStore.FindByPath(ctx, result[0], result[1])
-	if err != nil {
-		return nil, fmt.Errorf("cannot find model, %w", err)
+	if req.ModelIds == nil {
+		req.ModelIds = []string{}
 	}
-	if req.Revision == "" {
-		req.Revision = m.Repository.DefaultBranch
+	if req.ModelId != "" {
+		req.ModelIds = append(req.ModelIds, req.ModelId)
+	}
+	for _, modelId := range req.ModelIds {
+		result := strings.Split(modelId, "/")
+		m, err := c.modelStore.FindByPath(ctx, result[0], result[1])
+		if err != nil {
+			return nil, fmt.Errorf("cannot find model, %w", err)
+		}
+		req.Revisions = append(req.Revisions, m.Repository.DefaultBranch)
 	}
 
 	token, err := c.tokenStore.FindByUID(ctx, user.ID)
 	if err != nil {
 		return nil, fmt.Errorf("cant get git access token:%w", err)
 	}
-	mirrorRepos, err := c.GenerateMirrorRepoIds(ctx, req.Datasets)
+	mirrorRepos, datasetRevisions, err := c.GenerateMirrorRepoIds(ctx, req.Datasets)
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate mirror repo ids, %w", err)
 	}
+	frame, err := c.runtimeFrameworkStore.FindEnabledByID(ctx, req.RuntimeFrameworkId)
+	if err != nil {
+		return nil, fmt.Errorf("cannot find available runtime framework, %w", err)
+	}
 	req.Datasets = mirrorRepos
+	req.DatasetRevisions = datasetRevisions
 	req.Token = token.Token
 	var hardware types.HardWare
 	if req.ResourceId != 0 {
@@ -96,15 +107,14 @@ func (c *evaluationComponentImpl) CreateEvaluation(ctx context.Context, req type
 		req.ResourceName = resource.Name
 	} else {
 		// for share mode
-		hardware.Gpu.Num = c.config.Argo.QuotaGPUNumber
-		hardware.Gpu.ResourceName = "nvidia.com/gpu"
-		hardware.Cpu.Num = "8"
+		if frame.ComputeType == string(types.ResourceTypeGPU) {
+			hardware.Gpu.Num = c.config.Argo.QuotaGPUNumber
+			hardware.Gpu.ResourceName = "nvidia.com/gpu"
+		}
+		hardware.Cpu.Num = "4"
 		hardware.Memory = "32Gi"
 	}
-	frame, err := c.runtimeFrameworkStore.FindEnabledByID(ctx, req.RuntimeFrameworkId)
-	if err != nil {
-		return nil, fmt.Errorf("cannot find available runtime framework, %w", err)
-	}
+
 	req.Hardware = hardware
 	// choose image
 	containerImg := frame.FrameImage
@@ -117,23 +127,20 @@ func (c *evaluationComponentImpl) CreateEvaluation(ctx context.Context, req type
 }
 
 // generate mirror repo ids
-func (c *evaluationComponentImpl) GenerateMirrorRepoIds(ctx context.Context, datasets []string) ([]string, error) {
+func (c *evaluationComponentImpl) GenerateMirrorRepoIds(ctx context.Context, datasets []string) ([]string, []string, error) {
 	var mirrorRepos []string
+	var revisions []string
 	for _, ds := range datasets {
 		namespace := strings.Split(ds, "/")[0]
 		name := strings.Split(ds, "/")[1]
-		mirrorRepo, err := c.mirrorStore.FindByRepoPath(ctx, types.DatasetRepo, namespace, name)
+		repo, err := c.repoStore.FindByPath(ctx, types.DatasetRepo, namespace, name)
 		if err != nil {
-			if errors.Is(err, sql.ErrNoRows) {
-				//no mirror, will use csghub repo
-				mirrorRepos = append(mirrorRepos, ds)
-				continue
-			}
-			return nil, fmt.Errorf("fail to get mirror repo, %w", err)
+			return nil, nil, fmt.Errorf("failed to find dataset repo, %w", err)
 		}
-		mirrorRepos = append(mirrorRepos, mirrorRepo.SourceRepoPath)
+		mirrorRepos = append(mirrorRepos, repo.OriginPath())
+		revisions = append(revisions, repo.DefaultBranch)
 	}
-	return mirrorRepos, nil
+	return mirrorRepos, revisions, nil
 }
 
 func (c *evaluationComponentImpl) DeleteEvaluation(ctx context.Context, req types.ArgoWorkFlowDeleteReq) error {

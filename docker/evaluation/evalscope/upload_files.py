@@ -7,7 +7,6 @@ from pathlib import Path
 import pandas as pd
 import json
 import oss2
-import csv
 
 access_key_id = os.environ['S3_ACCESS_ID']
 access_key_secret = os.environ['S3_ACCESS_SECRET']
@@ -76,20 +75,6 @@ def upload(files):
         print(f"Error writing to file: {e}")
 
 
-def csv_to_json(csv_file_path):
-    # Read the CSV file
-    with open(csv_file_path, mode='r', newline='', encoding='utf-8') as csv_file:
-        csv_reader = csv.DictReader(csv_file)  # Using DictReader to read as dictionaries
-        data = list(csv_reader)  # Convert to a list of dictionaries
-
-    # Write the JSON output
-    json_file_path = os.path.splitext(csv_file_path)[0] + '.json'
-    with open(json_file_path, mode='w', encoding='utf-8') as json_file:
-        json.dump(data, json_file, indent=4)  # Pretty print the JSON output
-
-    print(f'Successfully converted {csv_file_path} to {json_file_path}')
-
-
 column = [
     {
         "title": {
@@ -107,15 +92,6 @@ column = [
         },
         "width": 130,
         "key": "metric",
-        "fixed": "left"
-    },
-    {
-        "title": {
-            "zh-CN": "模式",
-            "en-US": "Mode"
-        },
-        "width": 100,
-        "key": "mode",
         "fixed": "left"
     },
     {
@@ -146,17 +122,15 @@ def json_to_summary(jsonPath, tasks):
     for index, jsonPath in enumerate(jsonPath):
         with open(jsonPath, 'r', encoding='utf-8') as f:
             jsonObj = json.load(f)
-        keywords = tasks
         # generate summary data
-        for item in jsonObj:
-            item_new = item.copy()
-            if item_new["dataset"] in keywords:
-                keys = list(item_new.keys())
-                model_name = keys[-1]
-                item_new['id'] = len(summary_data) + 1
-                item_new['model']=model_name
-                item_new['score']= item_new[model_name]
-                summary_data.append(item_new)
+        item_new={}
+        model_name = jsonObj['model_name']
+        task = jsonObj['dataset_name']
+        item_new['model']=model_name
+        item_new['dataset']=task
+        item_new['metric']=jsonObj['metrics'][0]['name']
+        item_new['score']=jsonObj['score']
+        summary_data.append(item_new)
         summary = {
             "column": column,
             "data": summary_data
@@ -164,23 +138,22 @@ def json_to_summary(jsonPath, tasks):
         final_json['summary'] = summary
         xlsx_json['summary'] = summary_data
         # generate detail data
-        for item in keywords:
-            sub_data = []
-            for sub_item in jsonObj:
-                item_new = sub_item.copy()
-                if item in item_new["dataset"]:
-                    keys = list(item_new.keys())
-                    model_name = keys[-1]
-                    item_new['id'] = len(sub_data) + 1
-                    item_new['model']=model_name
-                    item_new['score']= item_new[model_name]
-                    sub_data.append(item_new)
-            if item in xlsx_json:
-                xlsx_json[item].extend(sub_data)
-                final_json[item] = {"column": column, "data": xlsx_json[item]}
-            else:
-                xlsx_json[item] = sub_data
-                final_json[item] = {"column": column, "data": sub_data}
+        sub_data = []
+        for metric in jsonObj['metrics']:
+            for category in metric['categories']:
+                for subset in category['subsets']:
+                    subset_data={}
+                    subset_data['model']=model_name
+                    subset_data['dataset']=subset['name']
+                    subset_data['metric']=metric['name']
+                    subset_data['score']=subset['score']
+                    sub_data.append(subset_data)
+        if task in xlsx_json:
+            xlsx_json[task].extend(sub_data)
+            final_json[task] = {"column": column, "data": xlsx_json[task]}
+        else:
+            xlsx_json[task] = sub_data
+            final_json[task] = {"column": column, "data": sub_data}
 
     final_path="/workspace/output/final/"
     json_file_path = final_path + 'upload.json'
@@ -212,7 +185,5 @@ if __name__ == "__main__":
 
     if args.command == 'upload':
         upload(args.files)
-    elif args.command == 'convert':
-        csv_to_json(args.file)
     elif args.command == 'summary':
         json_to_summary(args.file, args.tasks)

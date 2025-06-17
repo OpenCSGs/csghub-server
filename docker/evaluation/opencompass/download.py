@@ -29,4 +29,4 @@ if __name__ == "__main__":
     elif args.command == 'datasets':
         repo_ids = args.dataset_ids.split(',')
         for repo_id in repo_ids:
-            snapshot_download(repo_id=repo_id, repo_type="dataset", endpoint=endpoint, token=token, local_dir="/workspace/"+repo_id, revision=revision,ignore_patterns=["dataset_infos.json"])
+            snapshot_download(repo_id=repo_id, repo_type="dataset", endpoint=endpoint, token=token, local_dir="/workspace/data/"+repo_id, revision=revision,ignore_patterns=["dataset_infos.json"])

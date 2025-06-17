@@ -2,18 +2,13 @@
   "engine_name": "opencompass",
   "enabled": 1,
   "model_format": "safetensors",
+  "remove_old_version":true,
   "engine_images": [
     {
       "compute_type": "gpu",
-      "image": "opencompass:0.3.5",
-      "driver_version": "12.4",
-      "engine_version": "0.3.5"
-    },
-    {
-      "compute_type": "gpu",
-      "image": "opencompass:0.3.5-cu121",
+      "image": "opencompass:0.4.2",
       "driver_version": "12.1",
-      "engine_version": "0.3.5"
+      "engine_version": "0.4.2"
     }
   ],
   "supported_archs": [

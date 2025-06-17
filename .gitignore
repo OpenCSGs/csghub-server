@@ -23,3 +23,5 @@ run_server_local.sh
 
 **/loki-data/
 **/tempo-data/
+docs/swagger.json
+docs/swagger.yaml 

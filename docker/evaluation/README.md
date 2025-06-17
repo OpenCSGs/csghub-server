@@ -1,6 +1,7 @@
 # LLM evalution docker image
 
 ## Login Container Registry
+
 ```bash
 OPENCSG_ACR="opencsg-registry.cn-beijing.cr.aliyuncs.com"
 OPENCSG_ACR_USERNAME=""
@@ -9,24 +10,29 @@ echo "$OPENCSG_ACR_PASSWORD" | docker login $OPENCSG_ACR -u $OPENCSG_ACR_USERNAM
 ```
 
 ## Build Multi-Platform Images
+
 ```bash
+#opencsg-registry.cn-beijing.cr.aliyuncs.com/public/opencompass:0.4.2
 export BUILDX_NO_DEFAULT_ATTESTATIONS=1
-export IMAGE_TAG=0.3.5
+export IMAGE_TAG=0.4.2
 docker buildx build --platform linux/amd64,linux/arm64 \
   -t ${OPENCSG_ACR}/public/opencompass:${IMAGE_TAG} \
   -t ${OPENCSG_ACR}/public/opencompass:latest \
   -f Dockerfile.opencompass \
   --push .
-export IMAGE_TAG=0.4.6
+#opencsg-registry.cn-beijing.cr.aliyuncs.com/public/lm-evaluation-harness:0.4.9
+export IMAGE_TAG=0.4.9
 docker buildx build --platform linux/amd64,linux/arm64 \
   -t ${OPENCSG_ACR}/public/lm-evaluation-harness:${IMAGE_TAG} \
   -t ${OPENCSG_ACR}/public/lm-evaluation-harness:latest \
   -f Dockerfile.lm-evaluation-harness \
   --push .
 ```
-*The above command will create `linux/amd64` and `linux/arm64` images with the tags `${IMAGE_TAG}` and `latest` at the same time.*
+
+_The above command will create `linux/amd64` and `linux/arm64` images with the tags `${IMAGE_TAG}` and `latest` at the same time._
 
 ## Test the opencompass Image
+
 ```bash
 docker run \
   -e ACCESS_TOKEN=xxxx  \
@@ -43,10 +49,11 @@ docker run \
 ```
 
 ## Test the lm-evaluation-harness Image
+
 ```bash
 export IMAGE_TAG=0.4.6
 docker run \
-  --gpus device=7 \
+  --gpus device=1 \
   -e ACCESS_TOKEN=xxxx  \
   -e MODEL_ID="OpenCSG/csg-wukong-1B" \
   -e DATASET_IDS="Rowan/hellaswag" \
@@ -59,8 +66,9 @@ docker run \
   ${OPENCSG_ACR}/public/lm-evaluation-harness:${IMAGE_TAG}
 ```
 
-## evaluation image name, version and cuda version
-| Latest Image | Version | CUDA Version |
-| --- | --- | --- |
-| opencompass | 0.3.5 | 12.4 |
-| lm-evaluation-harness | 0.4.6 | 12.4 |
+## inference image name, version and cuda version
+
+| Latest Image          | Version | CUDA Version |
+| --------------------- | ------- | ------------ |
+| opencompass           | 0.4.2   | 12.1         |
+| lm-evaluation-harness | 0.4.9   | 12.1         |

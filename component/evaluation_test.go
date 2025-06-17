@@ -13,29 +13,30 @@ import (
 func TestEvaluationComponent_CreateEvaluation(t *testing.T) {
 	req := types.EvaluationReq{
 		TaskName:           "test",
-		ModelId:            "opencsg/wukong",
 		Username:           "test",
 		ResourceId:         0,
 		Datasets:           []string{"opencsg/hellaswag"},
 		RuntimeFrameworkId: 1,
+		ModelIds:           []string{"opencsg/wukong"},
 	}
 	ctx := context.TODO()
 	req2 := types.EvaluationReq{
 		UserUUID:           "test",
 		TaskName:           "test",
-		ModelId:            "opencsg/wukong",
+		ModelIds:           []string{"opencsg/wukong"},
 		Username:           "test",
 		ResourceId:         0,
 		Datasets:           []string{"Rowan/hellaswag"},
+		DatasetRevisions:   []string{"main"},
 		RuntimeFrameworkId: 1,
-		Revision:           "main",
+		Revisions:          []string{"main"},
 		Hardware: types.HardWare{
 			Gpu: types.Processor{
 				Num:          "1",
 				ResourceName: "nvidia.com/gpu",
 			},
 			Cpu: types.CPU{
-				Num: "8",
+				Num: "4",
 			},
 			Memory: "32Gi",
 		},
@@ -61,13 +62,16 @@ func TestEvaluationComponent_CreateEvaluation(t *testing.T) {
 				},
 			}, nil,
 		).Maybe()
-		c.mocks.stores.MirrorMock().EXPECT().FindByRepoPath(ctx, types.DatasetRepo, "opencsg", "hellaswag").Return(&database.Mirror{
-			SourceRepoPath: "Rowan/hellaswag",
+		c.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, types.DatasetRepo, "opencsg", "hellaswag").Return(&database.Repository{
+			ID:            1,
+			DefaultBranch: "main",
+			HFPath:        "Rowan/hellaswag",
 		}, nil)
 		c.mocks.stores.AccessTokenMock().EXPECT().FindByUID(ctx, int64(1)).Return(&database.AccessToken{Token: "foo"}, nil)
 		c.mocks.stores.RuntimeFrameworkMock().EXPECT().FindEnabledByID(ctx, int64(1)).Return(&database.RuntimeFramework{
-			ID:         1,
-			FrameImage: "lm-evaluation-harness:0.4.6",
+			ID:          1,
+			FrameImage:  "lm-evaluation-harness:0.4.6",
+			ComputeType: string(types.ResourceTypeGPU),
 		}, nil)
 		c.mocks.deployer.EXPECT().SubmitEvaluation(ctx, req2).Return(&types.ArgoWorkFlowRes{
 			ID:       1,
@@ -97,13 +101,16 @@ func TestEvaluationComponent_CreateEvaluation(t *testing.T) {
 				},
 			}, nil,
 		).Maybe()
-		c.mocks.stores.MirrorMock().EXPECT().FindByRepoPath(ctx, types.DatasetRepo, "opencsg", "hellaswag").Return(&database.Mirror{
-			SourceRepoPath: "Rowan/hellaswag",
+		c.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, types.DatasetRepo, "opencsg", "hellaswag").Return(&database.Repository{
+			ID:            1,
+			DefaultBranch: "main",
+			HFPath:        "Rowan/hellaswag",
 		}, nil)
 		c.mocks.stores.AccessTokenMock().EXPECT().FindByUID(ctx, int64(1)).Return(&database.AccessToken{Token: "foo"}, nil)
 		c.mocks.stores.RuntimeFrameworkMock().EXPECT().FindEnabledByID(ctx, int64(1)).Return(&database.RuntimeFramework{
-			ID:         1,
-			FrameImage: "lm-evaluation-harness:0.4.6",
+			ID:          1,
+			FrameImage:  "lm-evaluation-harness:0.4.6",
+			ComputeType: string(types.ResourceTypeGPU),
 		}, nil)
 
 		resource, err := json.Marshal(req2.Hardware)

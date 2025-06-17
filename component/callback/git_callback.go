@@ -398,12 +398,11 @@ func (c *gitCallbackComponentImpl) updateDatasetTags(ctx context.Context, namesp
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			// check if it's a mirror repo
-			mirror, err := c.mirrorStore.FindWithMapping(ctx, types.DatasetRepo, namespace, repoName, types.AutoMapping)
-			if err != nil || mirror == nil {
-				slog.Debug("fail to query mirror dataset for in callback", slog.Any("namespace", namespace), slog.Any("repoName", repoName), slog.Any("error", err))
+			namespace, name := repo.OriginNamespaceAndName()
+			if namespace == "" || name == "" {
+				slog.Debug("not an evaluation dataset, ignore it", slog.Any("repo id", repo.Path))
 				return
 			}
-			namespace, name := mirror.NamespaceAndName()
 			// use mirror namespace and name to find dataset
 			evalDataset, err = c.tagRuleStore.FindByRepo(ctx, string(types.EvaluationCategory), namespace, name, string(types.DatasetRepo))
 			if err != nil {

@@ -1,14 +1,18 @@
 {
-  "engine_name": "lm-evaluation-harness",
+  "engine_name": "evalscope",
   "enabled": 1,
   "model_format": "safetensors",
-  "remove_old_version":true,
   "engine_images": [
     {
+      "compute_type": "cpu",
+      "image": "evalscope:0.15.1-cpu",
+      "engine_version": "0.15.1"
+    },
+    {
       "compute_type": "gpu",
-      "image": "lm-evaluation-harness:0.4.9",
+      "image": "evalscope:0.15.1-cu120",
       "driver_version": "12.1",
-      "engine_version": "0.4.9"
+      "engine_version": "0.15.1"
     }
   ],
   "supported_archs": [

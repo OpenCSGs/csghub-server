@@ -50,6 +50,7 @@ type EvaluationReq struct {
 	Datasets           []string `json:"datasets,omitempty"`
 	ResourceId         int64    `json:"resource_id"`
 	ModelId            string   `json:"model_id"`
+	ModelIds           []string `json:"model_ids,omitempty"` // for comparison
 	ShareMode          bool     `json:"share_mode"`
 	Token              string   `json:"-"`
 	Hardware           HardWare `json:"-"`
@@ -60,7 +61,8 @@ type EvaluationReq struct {
 	TaskType           TaskType `json:"-"`
 	DownloadEndpoint   string   `json:"-"`
 	ResourceName       string   `json:"-"`
-	Revision           string   `json:"-"`
+	Revisions          []string `json:"-"`
+	DatasetRevisions   []string `json:"-"`
 }
 
 type ArgoFlowTemplate struct {

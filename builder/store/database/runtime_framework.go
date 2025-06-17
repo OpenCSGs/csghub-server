@@ -19,6 +19,7 @@ type RuntimeFrameworksStore interface {
 	Add(ctx context.Context, frame RuntimeFramework) (*RuntimeFramework, error)
 	Update(ctx context.Context, frame RuntimeFramework) (*RuntimeFramework, error)
 	Delete(ctx context.Context, frame RuntimeFramework) error
+	RemoveRuntimeFrameworkAndArch(ctx context.Context, runtimeName string) error
 	FindEnabledByID(ctx context.Context, id int64) (*RuntimeFramework, error)
 	FindEnabledByName(ctx context.Context, name string) (*RuntimeFramework, error)
 	FindByNameAndComputeType(ctx context.Context, engineName, driverVersion, ComputeType string) (*RuntimeFramework, error)
@@ -154,3 +155,22 @@ func (rf *runtimeFrameworksStoreImpl) FindByNameAndComputeType(ctx context.Conte
 	_, err := rf.db.Core.NewSelect().Model(&res).Where("LOWER(frame_name) = LOWER(?)", frameName).Where("compute_type = ?", computeType).Where("driver_version = ?", driverVersion).Exec(ctx, &res)
 	return &res, err
 }
+
+func (rf *runtimeFrameworksStoreImpl) RemoveRuntimeFrameworkAndArch(ctx context.Context, runtimeName string) error {
+	return rf.db.Core.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
+		// First, delete runtime architectures associated with the framework
+		_, err := tx.NewDelete().Model(&RuntimeArchitecture{}).Where("runtime_framework_id in (select id from runtime_frameworks where frame_name = ?)", runtimeName).Exec(ctx)
+		if err != nil {
+			return fmt.Errorf("error happened while removing runtime architecture, %w", err)
+		}
+		
+		// Then, delete the runtime framework itself
+		_, err = tx.NewDelete().Model(&RuntimeFramework{}).Where("frame_name = ?", runtimeName).Exec(ctx)
+		if err != nil {
+			return fmt.Errorf("error happened while removing runtime framework, %w", err)
+		}
+		
+		return nil
+	})
+}
+

@@ -236,11 +236,12 @@ func generateWorkflow(req types.ArgoWorkFlowReq, config *config.Config) *v1alpha
 			Name: v.Name,
 			//NodeSelector: nodeSelector,
 			Container: &corev1.Container{
-				Image:     containerImg,
-				Command:   v.Command,
-				Env:       environments,
-				Args:      v.Args,
-				Resources: resources,
+				Image:           containerImg,
+				Command:         v.Command,
+				Env:             environments,
+				Args:            v.Args,
+				Resources:       resources,
+				ImagePullPolicy: corev1.PullAlways,
 			},
 			Outputs: v1alpha1.Outputs{
 				Parameters: []v1alpha1.Parameter{
