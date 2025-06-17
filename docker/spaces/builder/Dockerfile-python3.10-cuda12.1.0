@@ -15,7 +15,7 @@ RUN  git init \
         && rm -rf .git .gitattributes
 #===============
 
-FROM opencsg-registry.cn-beijing.cr.aliyuncs.com/opencsg_public/space-base:python3.10-cuda12.1.0-1.0.1 as base
+FROM opencsg-registry.cn-beijing.cr.aliyuncs.com/opencsg_public/space-base:python3.10-cuda12.1.0-1.0.2 as base
 
 # BEGIN Dynamic Part
 USER user
