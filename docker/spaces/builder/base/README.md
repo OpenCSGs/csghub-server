@@ -3,15 +3,15 @@
 ## Description
 These images will be referenced by the Dockerfile automatically generated for user applications in space. Different types and applications will have different base images.
 
-After the base image is generated, it will be pushed to the registry of the Chuanshen community (currently the `opencsg_space` namespace of `registry.cn-beijing.aliyuncs.com`)
+After the base image is generated, it will be pushed to the registry of the Chuanshen community (currently the `opencsg_public` namespace of `registry.cn-beijing.aliyuncs.com`)
 
 The naming format of the base image is as follows:
 
-`registry.cn-beijing.aliyuncs.com/opencsg_space/space-base:[python_version]-[cuda_version]`.
+`registry.cn-beijing.aliyuncs.com/opencsg_public/space-base:[python_version]-[cuda_version]`.
 
 For example:
-- `registry.cn-beijing.aliyuncs.com/opencsg_space/space-base:python3.10`
-- `registry.cn-beijing.aliyuncs.com/opencsg_space/space-base:python3.10-cuda11.8.0`
+- `registry.cn-beijing.aliyuncs.com/opencsg_public/space-base:python3.10`
+- `registry.cn-beijing.aliyuncs.com/opencsg_public/space-base:python3.10-cuda11.8.0`
 
 ## Build
 
@@ -38,7 +38,7 @@ docker buildx build \
 --provenance false \ 
 --platform linux/amd64,linux/arm64 \ 
 -f Dockerfile-python3.10-base \ 
--t opencsg-registry.cn-beijing.cr.aliyuncs.com/opencsg_space/space-base:python3.10-1.0.2 \ 
+-t opencsg-registry.cn-beijing.cr.aliyuncs.com/opencsg_public/space-base:python3.10-1.0.2 \ 
 --push .
 
 ## Python with cuda
@@ -48,7 +48,7 @@ docker buildx build \
 --provenance false \ 
 --platform linux/amd64,linux/arm64 \ 
 -f Dockerfile-python3.10-cuda11.8.0-base \ 
--t opencsg-registry.cn-beijing.cr.aliyuncs.com/opencsg_space/space-base:python3.10-cuda11.8.0-1.0.2 \ 
+-t opencsg-registry.cn-beijing.cr.aliyuncs.com/opencsg_public/space-base:python3.10-cuda11.8.0-1.0.2 \ 
 --push .
 
 export DOCKER_BUILDKIT=1
@@ -57,6 +57,6 @@ docker buildx build \
 --provenance false \ 
 --platform linux/amd64,linux/arm64 \ 
 -f Dockerfile-python3.10-cuda12.1.0-base \ 
--t opencsg-registry.cn-beijing.cr.aliyuncs.com/opencsg_space/space-base:python3.10-cuda12.1.0-1.0.2 \ 
+-t opencsg-registry.cn-beijing.cr.aliyuncs.com/opencsg_public/space-base:python3.10-cuda12.1.0-1.0.2 \ 
 --push .
 ```
