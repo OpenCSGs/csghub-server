@@ -1,7 +1,9 @@
 package start
 
 import (
+	"context"
 	"fmt"
+	"log/slog"
 	"net/url"
 	"time"
 
@@ -12,6 +14,7 @@ import (
 	"opencsg.com/csghub-server/builder/deploy/common"
 	"opencsg.com/csghub-server/builder/event"
 	"opencsg.com/csghub-server/builder/store/database"
+	"opencsg.com/csghub-server/builder/store/database/migrations"
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/docs"
 )
@@ -60,6 +63,29 @@ var serverCmd = &cobra.Command{
 			DSN:     cfg.Database.DSN,
 		}
 		database.InitDB(dbConfig)
+
+		migrator := migrations.NewMigrator(database.GetDB())
+
+		slog.Info("run migration")
+		ctx, cancel := context.WithTimeout(cmd.Context(), 20*time.Second)
+		defer cancel()
+		// migration init
+		err = migrator.Init(ctx)
+		if err != nil {
+			slog.Error("failed to init migration", slog.Any("error", err))
+			return fmt.Errorf("failed to init migration: %w", err)
+		}
+
+		// migration migrate
+		group, err := migrator.Migrate(ctx)
+		if err != nil {
+			return fmt.Errorf("failed to migrate: %w", err)
+		}
+		if group.IsZero() {
+			slog.Info("there are no new migrations to run (database is up to date)")
+		}
+		slog.Info(fmt.Sprintf("migrated to %s", group))
+
 		err = event.InitEventPublisher(cfg, nil)
 		if err != nil {
 			return fmt.Errorf("fail to initialize message queue, %w", err)
