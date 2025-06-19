@@ -1,7 +1,6 @@
 package handler
 
 import (
-	"errors"
 	"fmt"
 	"log/slog"
 	"strconv"
@@ -48,10 +47,6 @@ type EvaluationHandler struct {
 // @Router       /evaluations [post]
 func (h *EvaluationHandler) RunEvaluation(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
-	if currentUser == "" {
-		httpbase.UnauthorizedError(ctx, errors.New("user not found, please login first"))
-		return
-	}
 
 	var req types.EvaluationReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {
@@ -88,10 +83,6 @@ func (h *EvaluationHandler) RunEvaluation(ctx *gin.Context) {
 // @Router       /evaluations/{id} [get]
 func (h *EvaluationHandler) GetEvaluation(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
-	if currentUser == "" {
-		httpbase.UnauthorizedError(ctx, errors.New("user not found, please login first"))
-		return
-	}
 	id, err := strconv.ParseInt(ctx.Param("id"), 10, 64)
 	if err != nil {
 		slog.Error("Bad request format", "error", err)
@@ -124,10 +115,6 @@ func (h *EvaluationHandler) GetEvaluation(ctx *gin.Context) {
 // @Router       /evaluations/{id} [delete]
 func (h *EvaluationHandler) DeleteEvaluation(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
-	if currentUser == "" {
-		httpbase.UnauthorizedError(ctx, errors.New("user not found, please login first"))
-		return
-	}
 	id, err := strconv.ParseInt(ctx.Param("id"), 10, 64)
 	if err != nil {
 		slog.Error("Bad request format", "error", err)

@@ -7,7 +7,6 @@ import (
 	"github.com/gin-gonic/gin"
 	"opencsg.com/csghub-server/api/httpbase"
 	"opencsg.com/csghub-server/common/config"
-	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/types"
 	"opencsg.com/csghub-server/component"
 )
@@ -37,14 +36,8 @@ func NewSyncHandler(config *config.Config) (*SyncHandler, error) {
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
 // @Router       /sync/version/latest [get]
-func (h *SyncHandler) Latest(c *gin.Context) {
-	currentUser := httpbase.GetCurrentUser(c)
-	if currentUser == "" {
-		httpbase.UnauthorizedError(c, errorx.ErrUserNotFound)
-		return
-	}
-
-	varCur := c.Query("cur")
+func (h *SyncHandler) Latest(ctx *gin.Context) {
+	varCur := ctx.Query("cur")
 	cur, err := strconv.ParseInt(varCur, 10, 64)
 
 	if err != nil {

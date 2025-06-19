@@ -182,7 +182,7 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 		return nil, fmt.Errorf("error creatring evaluation handler: %v", err)
 	}
 
-	createEvaluationRoutes(apiGroup, evaluationHandler)
+	createEvaluationRoutes(apiGroup, authCollection, evaluationHandler)
 
 	// monitor handler
 	monitorHandler, err := handler.NewMonitorHandler(config)
@@ -319,12 +319,12 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 	{
 		// list all collection
 		collections.GET("", collectionHandler.Index)
-		collections.POST("", collectionHandler.Create)
+		collections.POST("", authCollection.NeedLogin, collectionHandler.Create)
 		collections.GET("/:id", collectionHandler.GetCollection)
-		collections.PUT("/:id", collectionHandler.UpdateCollection)
-		collections.DELETE("/:id", collectionHandler.DeleteCollection)
-		collections.POST("/:id/repos", collectionHandler.AddRepoToCollection)
-		collections.DELETE("/:id/repos", collectionHandler.RemoveRepoFromCollection)
+		collections.PUT("/:id", authCollection.NeedLogin, collectionHandler.UpdateCollection)
+		collections.DELETE("/:id", authCollection.NeedLogin, collectionHandler.DeleteCollection)
+		collections.POST("/:id/repos", authCollection.NeedLogin, collectionHandler.AddRepoToCollection)
+		collections.DELETE("/:id/repos", authCollection.NeedLogin, collectionHandler.RemoveRepoFromCollection)
 	}
 
 	// cluster infos
@@ -380,7 +380,7 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 	}
 	syncGroup := apiGroup.Group("sync")
 	{
-		syncGroup.GET("/version/latest", syncHandler.Latest)
+		syncGroup.GET("/version/latest", authCollection.NeedLogin, syncHandler.Latest)
 		// syncGroup.GET("/version/oldest", syncHandler.Oldest)
 		syncGroup.GET("/client_setting", middlewareCollection.Auth.NeedAdmin, syncClientSettingHandler.Show)
 		syncGroup.POST("/client_setting", middlewareCollection.Auth.NeedAdmin, syncClientSettingHandler.Create)
@@ -477,9 +477,10 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 	return r, nil
 }
 
-func createEvaluationRoutes(apiGroup *gin.RouterGroup, evaluationHandler *handler.EvaluationHandler) {
+func createEvaluationRoutes(apiGroup *gin.RouterGroup, authCollection middleware.AuthenticatorCollection, evaluationHandler *handler.EvaluationHandler) {
 	// Models routes
 	evaluationsGroup := apiGroup.Group("/evaluations")
+	evaluationsGroup.Use(authCollection.NeedLogin)
 	{
 		evaluationsGroup.POST("", evaluationHandler.RunEvaluation)
 		evaluationsGroup.DELETE("/:id", evaluationHandler.DeleteEvaluation)
