@@ -20,6 +20,7 @@ import (
 	"opencsg.com/csghub-server/builder/store/cache"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/config"
+	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/types"
 	"opencsg.com/csghub-server/common/utils/common"
 )
@@ -54,6 +55,7 @@ type RuntimeArchitectureComponent interface {
 	SetArchitectures(ctx context.Context, id int64, architectures []string) ([]string, error)
 	DeleteArchitectures(ctx context.Context, id int64, architectures []string) ([]string, error)
 	ScanAllModels(ctx context.Context, scanType int) error
+	ScanModel(ctx context.Context, currentUser, namespace, name string) error
 	UpdateModelMetadata(ctx context.Context, repo *database.Repository) (*types.ModelInfo, error)
 	// add runtime_framework tag to model
 	AddRuntimeFrameworkTag(ctx context.Context, rftags []*database.Tag, repoId, rfId int64) error
@@ -144,6 +146,29 @@ func (c *runtimeArchitectureComponentImpl) DeleteArchitectures(ctx context.Conte
 		}
 	}
 	return failedDeletes, nil
+}
+
+func (c *runtimeArchitectureComponentImpl) ScanModel(ctx context.Context, currentUser, namespace, name string) error {
+	repo, err := c.repoStore.FindByPath(ctx, types.ModelRepo, namespace, name)
+	if err != nil {
+		return fmt.Errorf("fail to find repository by namespace and name, %w", err)
+	}
+	permission, err := c.repoComponent.GetUserRepoPermission(ctx, currentUser, repo)
+	if err != nil {
+		return fmt.Errorf("fail to get user permission for repository, %w", err)
+	}
+	if !permission.CanWrite {
+		return errorx.ErrForbiddenMsg(fmt.Sprintf("user %s does not have permission to update metadata for %s ", currentUser, repo.Path))
+	}
+	modelInfo, err := c.UpdateModelMetadata(ctx, repo)
+	if err != nil {
+		return fmt.Errorf("fail to update model metadata, %w", err)
+	}
+	err = c.UpdateRuntimeFrameworkTag(ctx, modelInfo, repo)
+	if err != nil {
+		return fmt.Errorf("fail to update runtime framework tag, %w", err)
+	}
+	return nil
 }
 
 // scanType: 0-all, 1-new
