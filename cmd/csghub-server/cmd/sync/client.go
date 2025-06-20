@@ -4,18 +4,12 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
-	"time"
 
 	"github.com/spf13/cobra"
 	"opencsg.com/csghub-server/builder/multisync"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/component"
-)
-
-const (
-	resourceName   = "sync-as-client"
-	expirationTime = 1 * time.Hour
 )
 
 var cmdSyncAsClient = &cobra.Command{
