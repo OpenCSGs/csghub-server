@@ -391,7 +391,7 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 		return nil, fmt.Errorf("error creating accounting handler setting handler:%w", err)
 	}
 
-	createAccountRoutes(apiGroup, middlewareCollection.Auth.NeedAPIKey, accountingHandler)
+	createAccountRoutes(apiGroup, middlewareCollection, accountingHandler)
 
 	recomHandler, err := handler.NewRecomHandler(config)
 	if err != nil {
@@ -432,7 +432,7 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 	if err != nil {
 		return nil, fmt.Errorf("error creating discussion handler:%w", err)
 	}
-	createDiscussionRoutes(apiGroup, middlewareCollection.Auth.NeedAPIKey, discussionHandler)
+	createDiscussionRoutes(apiGroup, middlewareCollection, discussionHandler)
 
 	// prompt
 	promptHandler, err := handler.NewPromptHandler(config)
@@ -889,12 +889,16 @@ func createRuntimeFrameworkRoutes(apiGroup *gin.RouterGroup, middlewareCollectio
 	}
 }
 
-func createAccountRoutes(apiGroup *gin.RouterGroup, needAPIKey gin.HandlerFunc, accountingHandler *handler.AccountingHandler) {
+func createAccountRoutes(
+	apiGroup *gin.RouterGroup,
+	middlewareCollection middleware.MiddlewareCollection,
+	accountingHandler *handler.AccountingHandler,
+) {
 	accountingGroup := apiGroup.Group("/accounting")
 	{
 		meterGroup := accountingGroup.Group("/metering")
 		{
-			meterGroup.GET("/:id/statements", accountingHandler.QueryMeteringStatementByUserID)
+			meterGroup.GET("/:id/statements", middlewareCollection.Auth.NeedLogin, accountingHandler.QueryMeteringStatementByUserID)
 		}
 	}
 }
@@ -950,8 +954,8 @@ func createMappingRoutes(
 	}
 }
 
-func createDiscussionRoutes(apiGroup *gin.RouterGroup, needAPIKey gin.HandlerFunc, discussionHandler *handler.DiscussionHandler) {
-	apiGroup.POST("/:repo_type/:namespace/:name/discussions", discussionHandler.CreateRepoDiscussion)
+func createDiscussionRoutes(apiGroup *gin.RouterGroup, middlewareCollection middleware.MiddlewareCollection, discussionHandler *handler.DiscussionHandler) {
+	apiGroup.POST("/:repo_type/:namespace/:name/discussions", middlewareCollection.Auth.NeedLogin, discussionHandler.CreateRepoDiscussion)
 	apiGroup.GET("/:repo_type/:namespace/:name/discussions", discussionHandler.ListRepoDiscussions)
 	apiGroup.GET("/discussions/:id", discussionHandler.ShowDiscussion)
 	apiGroup.PUT("/discussions/:id", discussionHandler.UpdateDiscussion)
