@@ -2,6 +2,7 @@ package database_test
 
 import (
 	"context"
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -46,4 +47,102 @@ func TestSyncVersionStore_CRUD(t *testing.T) {
 	require.Nil(t, err)
 	require.Equal(t, int64(2), sv.Version)
 
+}
+
+func TestSyncVersionStore_Complete(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+	ctx := context.TODO()
+
+	store := database.NewSyncVersionStoreWithDB(db)
+
+	// Create test data with multiple versions for the same repository
+	// and different repositories to test the Complete method behavior
+
+	// Repository 1: source_id=1, repo_path="repo1", repo_type=ModelRepo
+	err := store.Create(ctx, &database.SyncVersion{
+		Version:   100,
+		SourceID:  1,
+		RepoPath:  "repo1",
+		RepoType:  types.ModelRepo,
+		Completed: false,
+	})
+	require.Nil(t, err)
+
+	err = store.Create(ctx, &database.SyncVersion{
+		Version:   110,
+		SourceID:  1,
+		RepoPath:  "repo1",
+		RepoType:  types.ModelRepo,
+		Completed: false,
+	})
+	require.Nil(t, err)
+
+	err = store.Create(ctx, &database.SyncVersion{
+		Version:   120,
+		SourceID:  1,
+		RepoPath:  "repo1",
+		RepoType:  types.ModelRepo,
+		Completed: false,
+	})
+	require.Nil(t, err)
+
+	// Repository 2: same repo_path and repo_type but different source_id
+	err = store.Create(ctx, &database.SyncVersion{
+		Version:   105,
+		SourceID:  2,
+		RepoPath:  "repo1",
+		RepoType:  types.ModelRepo,
+		Completed: false,
+	})
+	require.Nil(t, err)
+
+	// Repository 3: same source_id and repo_path but different repo_type
+	err = store.Create(ctx, &database.SyncVersion{
+		Version:   115,
+		SourceID:  1,
+		RepoPath:  "repo1",
+		RepoType:  types.DatasetRepo,
+		Completed: false,
+	})
+	require.Nil(t, err)
+
+	// Repository 4: different repo_path
+	err = store.Create(ctx, &database.SyncVersion{
+		Version:   125,
+		SourceID:  1,
+		RepoPath:  "repo2",
+		RepoType:  types.ModelRepo,
+		Completed: false,
+	})
+	require.Nil(t, err)
+
+	// Call Complete with version 110 for source_id=1, repo_path="repo1", repo_type=ModelRepo
+	err = store.Complete(ctx, database.SyncVersion{
+		Version:  110,
+		SourceID: 1,
+		RepoPath: "repo1",
+		RepoType: types.ModelRepo,
+	})
+	require.Nil(t, err)
+
+	// Verify that only versions <= 110 for the same source_id, repo_path, and repo_type are marked as completed
+	var svs []database.SyncVersion
+	err = db.Core.NewSelect().Model(&svs).Order("version").Scan(ctx)
+	require.Nil(t, err)
+
+	// Create a map for easier verification
+	completedMap := make(map[string]bool)
+	for _, sv := range svs {
+		key := fmt.Sprintf("%d-%s-%s-%d", sv.SourceID, sv.RepoPath, sv.RepoType, sv.Version)
+		completedMap[key] = sv.Completed
+	}
+
+	// Verify completion status
+	require.True(t, completedMap["1-repo1-model-100"])    // should be completed (version <= 110)
+	require.True(t, completedMap["1-repo1-model-110"])    // should be completed (version = 110)
+	require.False(t, completedMap["1-repo1-model-120"])   // should NOT be completed (version > 110)
+	require.False(t, completedMap["2-repo1-model-105"])   // should NOT be completed (different source_id)
+	require.False(t, completedMap["1-repo1-dataset-115"]) // should NOT be completed (different repo_type)
+	require.False(t, completedMap["1-repo2-model-125"])   // should NOT be completed (different repo_path)
 }

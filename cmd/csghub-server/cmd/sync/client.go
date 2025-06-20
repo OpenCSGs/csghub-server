@@ -8,7 +8,6 @@ import (
 
 	"github.com/spf13/cobra"
 	"opencsg.com/csghub-server/builder/multisync"
-	"opencsg.com/csghub-server/builder/store/cache"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/component"
@@ -53,37 +52,20 @@ var cmdSyncAsClient = &cobra.Command{
 			return
 		}
 
-		if !config.MultiSync.Enabled {
-			return
-		}
-
-		locker, err := cache.NewCache(ctx, cache.RedisConfig{
-			Addr:     config.Redis.Endpoint,
-			Username: config.Redis.User,
-			Password: config.Redis.Password,
-		})
-
+		c, err := component.NewMultiSyncComponent(config)
 		if err != nil {
-			slog.Error("failed to initialize redis", "err", err)
+			slog.Error("failed to create multi sync component", "err", err)
 			return
 		}
-
-		err = locker.RunWhileLocked(ctx, resourceName, expirationTime, func(ctx context.Context) error {
-			c, err := component.NewMultiSyncComponent(config)
-			if err != nil {
-				slog.Error("failed to create multi sync component", "err", err)
-				return err
-			}
-			syncClientSettingStore := database.NewSyncClientSettingStore()
-			setting, err := syncClientSettingStore.First(ctx)
-			if err != nil {
-				slog.Error("failed to find sync client setting", "error", err)
-				return err
-			}
-			apiDomain := config.MultiSync.SaasAPIDomain
-			sc := multisync.FromOpenCSG(apiDomain, setting.Token)
-			return c.SyncAsClient(ctx, sc)
-		})
+		syncClientSettingStore := database.NewSyncClientSettingStore()
+		setting, err := syncClientSettingStore.First(ctx)
+		if err != nil {
+			slog.Error("failed to find sync client setting", "error", err)
+			return
+		}
+		apiDomain := config.MultiSync.SaasAPIDomain
+		sc := multisync.FromOpenCSG(apiDomain, setting.Token)
+		err = c.SyncAsClient(ctx, sc)
 		if err != nil {
 			slog.Error("failed to sync as client", "err", err)
 		}
