@@ -64,15 +64,16 @@ func TestMultiSyncComponent_SyncAsClient(t *testing.T) {
 		Version: 3,
 	}).Return(nil)
 	dsvs := []database.SyncVersion{
-		{RepoType: types.ModelRepo},
-		{RepoType: types.DatasetRepo},
+		{RepoType: types.ModelRepo, Version: 2},
+		{RepoType: types.DatasetRepo, Version: 3},
 	}
-	mc.mocks.stores.MultiSyncMock().EXPECT().GetAfterDistinct(ctx, int64(1)).Return(
+	mc.mocks.stores.MultiSyncMock().EXPECT().GetNotCompletedDistinct(ctx).Return(
 		dsvs, nil,
 	)
+
 	svs := []types.SyncVersion{
-		{RepoType: types.ModelRepo},
-		{RepoType: types.DatasetRepo},
+		{RepoType: types.ModelRepo, Version: 2},
+		{RepoType: types.DatasetRepo, Version: 3},
 	}
 	// new model mock
 	mockedClient.EXPECT().ModelInfo(ctx, svs[0]).Return(&types.Model{
@@ -214,6 +215,10 @@ func TestMultiSyncComponent_SyncAsClient(t *testing.T) {
 		{RepositoryID: 2, WeightName: database.RecomWeightFreshness, Score: 70},
 		{RepositoryID: 2, WeightName: database.RecomWeightTotal, Score: 100},
 	}).Return(nil)
+
+	// Expect syncVersionStore.Complete to be called for each successful sync version
+	mc.mocks.stores.SyncVersionMock().EXPECT().Complete(ctx, dsvs[0]).Return(nil)
+	mc.mocks.stores.SyncVersionMock().EXPECT().Complete(ctx, dsvs[1]).Return(nil)
 
 	err := mc.SyncAsClient(context.TODO(), mockedClient)
 	require.Nil(t, err)

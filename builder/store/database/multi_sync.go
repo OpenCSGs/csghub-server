@@ -16,6 +16,8 @@ type MultiSyncStore interface {
 	// GetLatest get max sync version
 	GetLatest(ctx context.Context) (SyncVersion, error)
 	GetAfterDistinct(ctx context.Context, version int64) ([]SyncVersion, error)
+	// GetNotCompletedDistinct get sync versions not completed and distinct
+	GetNotCompletedDistinct(ctx context.Context) ([]SyncVersion, error)
 }
 
 func NewMultiSyncStore() MultiSyncStore {
@@ -66,6 +68,22 @@ func (s *multiSyncStoreImpl) GetAfterDistinct(ctx context.Context, version int64
 		ColumnExpr("DISTINCT ON (source_id, repo_path, repo_type) version, source_id, repo_path, repo_type, last_modified_at, change_log").
 		Model(&vs).
 		Where("version > ?", version).
+		Order("source_id", "repo_path", "repo_type", "version DESC").
 		Scan(ctx, &vs)
+	return vs, err
+}
+
+
+// get not completed sync version distinct
+func (s *multiSyncStoreImpl) GetNotCompletedDistinct(ctx context.Context) ([]SyncVersion, error) {
+	var vs []SyncVersion
+	err := s.db.Core.NewSelect().
+		ColumnExpr("DISTINCT ON (source_id, repo_path, repo_type) version, source_id, repo_path, repo_type, last_modified_at, change_log").
+		Model(&vs).
+		Where("completed = ?", false).
+		Order("source_id", "repo_path", "repo_type", "version DESC").
+		Scan(ctx, &vs)
+
+
 	return vs, err
 }

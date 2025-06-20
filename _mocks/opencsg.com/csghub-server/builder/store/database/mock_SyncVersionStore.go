@@ -71,6 +71,53 @@ func (_c *MockSyncVersionStore_BatchCreate_Call) RunAndReturn(run func(context.C
 	return _c
 }
 
+// Complete provides a mock function with given fields: ctx, version
+func (_m *MockSyncVersionStore) Complete(ctx context.Context, version database.SyncVersion) error {
+	ret := _m.Called(ctx, version)
+
+	if len(ret) == 0 {
+		panic("no return value specified for Complete")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, database.SyncVersion) error); ok {
+		r0 = rf(ctx, version)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// MockSyncVersionStore_Complete_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'Complete'
+type MockSyncVersionStore_Complete_Call struct {
+	*mock.Call
+}
+
+// Complete is a helper method to define mock.On call
+//   - ctx context.Context
+//   - version database.SyncVersion
+func (_e *MockSyncVersionStore_Expecter) Complete(ctx interface{}, version interface{}) *MockSyncVersionStore_Complete_Call {
+	return &MockSyncVersionStore_Complete_Call{Call: _e.mock.On("Complete", ctx, version)}
+}
+
+func (_c *MockSyncVersionStore_Complete_Call) Run(run func(ctx context.Context, version database.SyncVersion)) *MockSyncVersionStore_Complete_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(database.SyncVersion))
+	})
+	return _c
+}
+
+func (_c *MockSyncVersionStore_Complete_Call) Return(_a0 error) *MockSyncVersionStore_Complete_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockSyncVersionStore_Complete_Call) RunAndReturn(run func(context.Context, database.SyncVersion) error) *MockSyncVersionStore_Complete_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // Create provides a mock function with given fields: ctx, version
 func (_m *MockSyncVersionStore) Create(ctx context.Context, version *database.SyncVersion) error {
 	ret := _m.Called(ctx, version)

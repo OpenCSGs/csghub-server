@@ -17,6 +17,8 @@ type SyncVersionStore interface {
 	BatchCreate(ctx context.Context, versions []SyncVersion) error
 	FindByPath(ctx context.Context, path string) (*SyncVersion, error)
 	FindByRepoTypeAndPath(ctx context.Context, path string, repoType types.RepositoryType) (*SyncVersion, error)
+	// Complete marks all sync versions for the same repository with version <= the given version as completed.
+	Complete(ctx context.Context, version SyncVersion) error
 }
 
 func NewSyncVersionStore() SyncVersionStore {
@@ -65,4 +67,14 @@ func (s *syncVersionStoreImpl) FindByRepoTypeAndPath(ctx context.Context, path s
 		return nil, err
 	}
 	return &syncVersion, nil
+}
+
+// Complete marks all sync versions for the same repository with version <= the given version as completed.
+func (s *syncVersionStoreImpl) Complete(ctx context.Context, version SyncVersion) error {
+	_, err := s.db.Core.NewUpdate().
+		Model(&SyncVersion{}).
+		Set("completed = ?", true).
+		Where("source_id = ? AND repo_path = ? AND repo_type = ? AND version <= ?", version.SourceID, version.RepoPath, version.RepoType, version.Version).
+		Exec(ctx)
+	return err
 }

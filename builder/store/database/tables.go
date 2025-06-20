@@ -97,4 +97,6 @@ type SyncVersion struct {
 	RepoType       types.RepositoryType `bun:",notnull" json:"repo_type"`
 	LastModifiedAt time.Time            `bun:",notnull" json:"last_modified_at"`
 	ChangeLog      string               `bun:"," json:"change_log"`
+	// true if CE,EE complete the sync process successfully, e.g the repo created.
+	Completed bool `bun:",notnull" json:"completed"`
 }
