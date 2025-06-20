@@ -26,5 +26,6 @@ func SyncAsClientWorkflow(ctx workflow.Context) error {
 		logger.Error("failed to sync as client", "error", err)
 		return err
 	}
+	logger.Info("sync as client workflow finished")
 	return nil
 }

@@ -117,7 +117,7 @@ func (c *multiSyncComponentImpl) SyncAsClient(ctx context.Context, sc multisync.
 		}
 	}
 
-	syncVersions, err := c.multiSyncStore.GetAfterDistinct(ctx, v.Version)
+	syncVersions, err := c.multiSyncStore.GetNotCompletedDistinct(ctx)
 	if err != nil {
 		slog.Error("failed to find distinct sync versions", slog.Any("error", err))
 		return err
@@ -131,11 +131,13 @@ func (c *multiSyncComponentImpl) SyncAsClient(ctx context.Context, sc multisync.
 			LastModifyTime: v.LastModifiedAt,
 			ChangeLog:      v.ChangeLog,
 		}
+		success := false
 		switch v.RepoType {
 		case types.ModelRepo:
 			ctxGetModel, cancel := context.WithTimeout(ctx, 10*time.Second)
 			modelInfo, err := sc.ModelInfo(ctxGetModel, sv)
 			if err != nil {
+				cancel()
 				slog.Error("failed to get model info from client", slog.Any("sync_version", v))
 				continue
 			}
@@ -150,11 +152,14 @@ func (c *multiSyncComponentImpl) SyncAsClient(ctx context.Context, sc multisync.
 			cancel()
 			if err != nil {
 				slog.Error("failed to create local synced repo", slog.Any("sync_version", v), slog.Any("error", err))
+			} else {
+				success = true
 			}
 		case types.DatasetRepo:
 			ctxGetDataset, cancel := context.WithTimeout(ctx, 10*time.Second)
 			datasetInfo, err := sc.DatasetInfo(ctxGetDataset, sv)
 			if err != nil {
+				cancel()
 				slog.Error("failed to get dataset info from client", slog.Any("sync_version", v))
 				continue
 			}
@@ -169,7 +174,10 @@ func (c *multiSyncComponentImpl) SyncAsClient(ctx context.Context, sc multisync.
 			cancel()
 			if err != nil {
 				slog.Error("failed to create local synced repo", slog.Any("sync_version", v), slog.Any("error", err))
+			} else {
+				success = true
 			}
+
 		case types.CodeRepo:
 			ctxGetCode, cancel := context.WithTimeout(ctx, 10*time.Second)
 			codeInfo, err := sc.CodeInfo(ctxGetCode, sv)
@@ -189,12 +197,15 @@ func (c *multiSyncComponentImpl) SyncAsClient(ctx context.Context, sc multisync.
 			cancel()
 			if err != nil {
 				slog.Error("failed to create local synced repo", slog.Any("sync_version", v), slog.Any("error", err))
+			} else {
+				success = true
 			}
+
 		case types.MCPServerRepo:
 			ctxGetMCPServer, cancel := context.WithTimeout(ctx, 10*time.Second)
 			mcpServerInfo, err := sc.MCPServerInfo(ctxGetMCPServer, sv)
 			if err != nil {
-				slog.Error("failed to get mcpServer info from client", slog.Any("sync_version", v))
+				slog.Error("failed to get mcpServer info from client", slog.Any("sync_version", v), slog.Any("error", err))
 				cancel()
 				continue
 			}
@@ -209,12 +220,15 @@ func (c *multiSyncComponentImpl) SyncAsClient(ctx context.Context, sc multisync.
 			cancel()
 			if err != nil {
 				slog.Error("failed to create local synced repo", slog.Any("sync_version", v), slog.Any("error", err))
+			} else {
+				success = true
 			}
+
 		case types.PromptRepo:
 			ctxGetPrompt, cancel := context.WithTimeout(ctx, 10*time.Second)
 			promptInfo, err := sc.PromptInfo(ctxGetPrompt, sv)
 			if err != nil {
-				slog.Error("failed to get prompt info from client", slog.Any("sync_version", v))
+				slog.Error("failed to get prompt info from client", slog.Any("sync_version", v), slog.Any(("error"), err))
 				cancel()
 				continue
 			}
@@ -229,9 +243,22 @@ func (c *multiSyncComponentImpl) SyncAsClient(ctx context.Context, sc multisync.
 			cancel()
 			if err != nil {
 				slog.Error("failed to create local synced repo", slog.Any("sync_version", v), slog.Any("error", err))
+			} else {
+				success = true
 			}
+
 		default:
 			slog.Error("failed to create local synced repo, unsupported repo type", slog.Any("sync_version", v), slog.Any("error", err))
+		}
+
+		if success {
+			ctxCompleteSyncVersion, cancel := context.WithTimeout(ctx, 5*time.Second)
+			err = c.syncVersionStore.Complete(ctxCompleteSyncVersion, v)
+			cancel()
+			if err != nil {
+				slog.Error("failed to mark sync version as completed", slog.Any("err", err), slog.Any("sync_version", v))
+				// ignore error and continue to next sync version
+			}
 		}
 	}
 
@@ -428,7 +455,7 @@ func (c *multiSyncComponentImpl) createLocalModel(ctx context.Context, m *types.
 	}
 	newDBRepo, err := c.repoStore.UpdateOrCreateRepo(ctx, dbRepo)
 	if err != nil {
-		return fmt.Errorf("fail to create database repo, error: %w", err)
+		return fmt.Errorf("fail to create or update database repo, error: %w", err)
 	}
 
 	if len(m.Tags) > 0 {
@@ -511,6 +538,7 @@ func (c *multiSyncComponentImpl) createLocalModel(ctx context.Context, m *types.
 			return fmt.Errorf("failed to create database.recom_repo_scores, cause: %w", err)
 		}
 	}
+
 	return nil
 }
 
@@ -978,6 +1006,7 @@ func (c *multiSyncComponentImpl) createLocalSyncVersion(ctx context.Context, v t
 		RepoType:       v.RepoType,
 		LastModifiedAt: v.LastModifyTime,
 		ChangeLog:      v.ChangeLog,
+		Completed:      false,
 	}
 	err := c.syncVersionStore.Create(ctx, &syncVersion)
 	if err != nil {
