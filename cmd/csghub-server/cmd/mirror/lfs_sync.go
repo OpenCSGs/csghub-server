@@ -1,7 +1,10 @@
 package mirror
 
 import (
+	"log/slog"
+
 	"github.com/spf13/cobra"
+	"opencsg.com/csghub-server/api/workflow"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/mirror"
@@ -21,6 +24,12 @@ var lfsSyncCmd = &cobra.Command{
 			DSN:     cfg.Database.DSN,
 		}
 		database.InitDB(dbConfig)
+
+		slog.Info("start temporal workflow")
+		err = workflow.StartWorkflow(cfg)
+		if err != nil {
+			return err
+		}
 
 		lfsSyncWorker, err := mirror.NewLFSSyncWorker(cfg, cfg.Mirror.WorkerNumber)
 		if err != nil {

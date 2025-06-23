@@ -27,6 +27,15 @@ import (
 	"opencsg.com/csghub-server/mirror/queue"
 )
 
+type repoPathKey string
+
+type workerIDKey string
+
+var (
+	wk workerIDKey = "workerID"
+	rk repoPathKey = "repoPath"
+)
+
 type MinioLFSSyncWorker struct {
 	mq                 queue.PriorityQueue
 	tasks              chan queue.MirrorTask
@@ -148,6 +157,17 @@ func (w *MinioLFSSyncWorker) worker(id int) {
 
 func (w *MinioLFSSyncWorker) SyncLfs(ctx context.Context, workerId int, mirror *database.Mirror, repo *database.Repository) error {
 	var pointers []*types.Pointer
+	ctx = context.WithValue(ctx, wk, workerId)
+	repoPath := fmt.Sprintf("%ss/%s", mirror.Repository.RepositoryType, mirror.Repository.Path)
+	ctx = context.WithValue(ctx, rk, repoPath)
+	slog.Info("start sync lfs", slog.Int("workerId", workerId), slog.String("repoPath", repoPath))
+
+	// Update mirror status
+	mirror.SetStatus(types.MirrorLfsSyncStart)
+	err := w.mirrorStore.Update(ctx, mirror)
+	if err != nil {
+		return fmt.Errorf("failed to update mirror status: %w", err)
+	}
 	lfsMetaObjects, err := w.lfsMetaObjectStore.FindByRepoID(ctx, mirror.Repository.ID)
 	if err != nil {
 		slog.Error("fail to get lfs meta objects", slog.Int("workerId", workerId), slog.String("error", err.Error()))
@@ -306,9 +326,9 @@ func (w *MinioLFSSyncWorker) DownloadAndUploadLFSFiles(ctx context.Context, mirr
 		}
 	}
 	if mirror.Progress != 100 {
-		mirror.Status = types.MirrorIncomplete
+		mirror.Status = types.MirrorLfsIncomplete
 	} else {
-		mirror.Status = types.MirrorFinished
+		mirror.Status = types.MirrorLfsSyncFinished
 	}
 	err := w.mirrorStore.Update(ctx, mirror)
 	if err != nil {

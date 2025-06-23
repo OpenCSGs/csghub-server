@@ -43,7 +43,7 @@ func (ms *MirrorPriorityQueue) EnqueueMirrorTasks() {
 			Priority:  queue.Priority(mirror.Priority),
 			CreatedAt: mirror.CreatedAt.Unix(),
 		})
-		mirror.Status = types.MirrorWaiting
+		mirror.Status = types.MirrorInit
 		err = mirrorStore.Update(context.Background(), &mirror)
 		if err != nil {
 			slog.Error("fail to update mirror status", slog.Int64("mirrorId", mirror.ID), slog.String("error", err.Error()))
@@ -63,7 +63,7 @@ func (ms *MirrorPriorityQueue) EnqueueMirrorTasks() {
 			Priority:  queue.Priority(mirror.Priority),
 			CreatedAt: mirror.CreatedAt.Unix(),
 		})
-		mirror.Status = types.MirrorWaiting
+		mirror.Status = types.MirrorInit
 		err = mirrorStore.Update(context.Background(), &mirror)
 		if err != nil {
 			slog.Error("fail to update mirror status", slog.Int64("mirrorId", mirror.ID), slog.String("error", err.Error()))

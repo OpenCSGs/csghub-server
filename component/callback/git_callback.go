@@ -148,7 +148,7 @@ func (c *gitCallbackComponentImpl) SetRepoUpdateTime(ctx context.Context, req *t
 		updated, err := time.Parse(time.RFC3339, req.HeadCommit.Timestamp)
 		if err != nil {
 			slog.Error("Error parsing time:", slog.Any("error", err), slog.String("timestamp", req.HeadCommit.Timestamp))
-			return err
+			updated = time.Now()
 		}
 		err = c.repoStore.SetUpdateTimeByPath(ctx, adjustedRepoType, namespace, repoName, updated)
 		if err != nil {

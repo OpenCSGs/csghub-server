@@ -76,8 +76,28 @@ func TestSpaceComponent_Index(t *testing.T) {
 
 	sc.mocks.components.repo.EXPECT().PublicToUser(
 		ctx, types.SpaceRepo, "user", &types.RepoFilter{Sort: "z", Username: "user"}, 10, 1).Return([]*database.Repository{
-		{ID: 123, Name: "r1", Tags: []database.Tag{{Name: "t1"}}},
-		{ID: 124, Name: "r2", Tags: []database.Tag{{Name: "t2"}}},
+		{
+			ID:   123,
+			Name: "r1",
+			Tags: []database.Tag{{Name: "t1"}},
+			User: database.User{
+				ID:       1,
+				Username: "user",
+				NickName: "nickname",
+				Avatar:   "avatar",
+			},
+		},
+		{
+			ID:   124,
+			Name: "r2",
+			Tags: []database.Tag{{Name: "t2"}},
+			User: database.User{
+				ID:       1,
+				Username: "user",
+				NickName: "nickname",
+				Avatar:   "avatar",
+			},
+		},
 	}, 100, nil)
 
 	sc.mocks.stores.SpaceMock().EXPECT().ByRepoIDs(ctx, []int64{123, 124}).Return(
@@ -85,10 +105,32 @@ func TestSpaceComponent_Index(t *testing.T) {
 			{ID: 11, RepositoryID: 123, Repository: &database.Repository{
 				ID:   123,
 				Name: "r1",
+				User: database.User{
+					ID:       1,
+					Username: "user",
+					NickName: "nickname",
+					Avatar:   "avatar",
+				},
 			}},
 			{ID: 12, RepositoryID: 124, Repository: &database.Repository{
 				ID:   124,
 				Name: "r2",
+				User: database.User{
+					ID:       1,
+					Username: "user",
+					NickName: "nickname",
+					Avatar:   "avatar",
+				},
+			}},
+			{ID: 12, RepositoryID: 124, Repository: &database.Repository{
+				ID:   124,
+				Name: "r2",
+				User: database.User{
+					ID:       1,
+					Username: "user",
+					NickName: "nickname",
+					Avatar:   "avatar",
+				},
 			}},
 		}, nil,
 	)
@@ -100,10 +142,18 @@ func TestSpaceComponent_Index(t *testing.T) {
 		{
 			RepositoryID: 123, Name: "r1", Tags: []types.RepoTag{{Name: "t1"}},
 			Status: "NoAppFile",
+			User: &types.User{
+				Nickname: "nickname",
+				Avatar:   "avatar",
+			},
 		},
 		{
 			RepositoryID: 124, Name: "r2", Tags: []types.RepoTag{{Name: "t2"}},
 			Status: "NoAppFile",
+			User: &types.User{
+				Nickname: "nickname",
+				Avatar:   "avatar",
+			},
 		},
 	}, data)
 

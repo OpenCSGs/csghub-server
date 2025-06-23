@@ -170,13 +170,13 @@ func GetSourceTypeAndPathFromURL(url string) (string, string, error) {
 		return "", "", errors.New("invalid url")
 	}
 	path = strings.Join(strs[len(strs)-2:], "/")
-	if strings.Contains(url, "https://huggingface.co/") {
+	if strings.Contains(url, "huggingface.co/") {
 		sourceType = enum.HFSource
-	} else if strings.Contains(url, "https://www.modelscope.cn") {
+	} else if strings.Contains(url, "www.modelscope.cn") {
 		sourceType = enum.MSSource
-	} else if strings.Contains(url, "https://opencsg.com/") {
+	} else if strings.Contains(url, "opencsg.com/") {
 		sourceType = enum.CSGSource
-	} else if strings.Contains(url, "https://github.com/") {
+	} else if strings.Contains(url, "github.com/") {
 		sourceType = enum.GitHubSource
 	} else {
 		return "", "", fmt.Errorf("unsupported source type: %s", url)

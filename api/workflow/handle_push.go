@@ -11,7 +11,7 @@ import (
 
 func HandlePushWorkflow(ctx workflow.Context, req *types.GiteaCallbackPushReq) error {
 	logger := workflow.GetLogger(ctx)
-	logger.Info("handle push workflow started")
+	logger.Info("handle push workflow started", "repo_path", req.Repository.FullName)
 
 	retryPolicy := &temporal.RetryPolicy{
 		MaximumAttempts: 3,
@@ -57,6 +57,8 @@ func HandlePushWorkflow(ctx workflow.Context, req *types.GiteaCallbackPushReq) e
 		logger.Error("failed to sensitive check", "error", err, "req", req)
 		return err
 	}
+
+	logger.Info("handle push workflow ended", "repo_path", req.Repository.FullName)
 
 	return nil
 }

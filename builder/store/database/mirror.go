@@ -83,6 +83,10 @@ type MirrorStatusCount struct {
 	Count  int                    `bun:"count"`
 }
 
+func (m *Mirror) SetStatus(status types.MirrorTaskStatus) {
+	m.Status = status
+}
+
 func (s *mirrorStoreImpl) IsExist(ctx context.Context, repoID int64) (exists bool, err error) {
 	var mirror Mirror
 	exists, err = s.db.Operator.Core.
@@ -246,7 +250,7 @@ func (s *mirrorStoreImpl) Unfinished(ctx context.Context) ([]Mirror, error) {
 	err := s.db.Operator.Core.NewSelect().
 		Model(&mirrors).
 		Relation("Repository").
-		Where("status != ? OR status IS NULL", types.MirrorFinished).
+		Where("status != ? OR status IS NULL", types.MirrorLfsSyncFinished).
 		Scan(ctx)
 	if err != nil {
 		return nil, err
@@ -259,7 +263,7 @@ func (s *mirrorStoreImpl) Finished(ctx context.Context) ([]Mirror, error) {
 	err := s.db.Operator.Core.NewSelect().
 		Model(&mirrors).
 		Relation("Repository").
-		Where("status = ?", types.MirrorFinished).
+		Where("status = ?", types.MirrorLfsSyncFinished).
 		Scan(ctx)
 	if err != nil {
 		return nil, err
@@ -271,13 +275,14 @@ func (s *mirrorStoreImpl) ToSyncRepo(ctx context.Context) ([]Mirror, error) {
 	var mirrors []Mirror
 	err := s.db.Operator.Core.NewSelect().
 		Model(&mirrors).
+		Relation("Repository").
 		Where(
-			"next_execution_timestamp < ? or status in (?,?,?,?)",
+			"next_execution_timestamp < ? or status in (?,?,?)",
 			time.Now(),
-			types.MirrorIncomplete,
-			types.MirrorFailed,
-			types.MirrorWaiting,
-			types.MirrorRunning).
+			types.MirrorLfsSyncFailed,
+			types.MirrorRepoSyncFailed,
+			types.MirrorInit,
+		).
 		Scan(ctx)
 	if err != nil {
 		return nil, err
@@ -289,7 +294,8 @@ func (s *mirrorStoreImpl) ToSyncLfs(ctx context.Context) ([]Mirror, error) {
 	var mirrors []Mirror
 	err := s.db.Operator.Core.NewSelect().
 		Model(&mirrors).
-		Where("next_execution_timestamp < ? or status = ?", time.Now(), types.MirrorRepoSynced).
+		Relation("Repository").
+		Where("next_execution_timestamp < ? or status = ?", time.Now(), types.MirrorRepoSyncFinished).
 		Scan(ctx)
 	if err != nil {
 		return nil, err

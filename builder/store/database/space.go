@@ -109,6 +109,7 @@ func (s *spaceStoreImpl) ByID(ctx context.Context, id int64) (*Space, error) {
 func (s *spaceStoreImpl) ByRepoIDs(ctx context.Context, repoIDs []int64) (spaces []Space, err error) {
 	err = s.db.Operator.Core.NewSelect().
 		Model(&spaces).
+		Relation("Repository").
 		Where("repository_id in (?)", bun.In(repoIDs)).
 		Scan(ctx)
 
