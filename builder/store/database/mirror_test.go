@@ -167,13 +167,15 @@ func TestMirrorStore_ToSync(t *testing.T) {
 
 	dt := time.Now().Add(1 * time.Hour)
 	mirrors := []*database.Mirror{
-		{NextExecutionTimestamp: dt, Status: types.MirrorLfsSyncFailed, Interval: "m1"},
+		{NextExecutionTimestamp: dt, Status: types.MirrorRepoSyncFailed, Interval: "m1"},
 		{NextExecutionTimestamp: dt, Status: types.MirrorLfsSyncFinished, Interval: "m2"},
-		{NextExecutionTimestamp: dt, Status: types.MirrorLfsIncomplete, Interval: "m3"},
+		{NextExecutionTimestamp: dt, Status: types.MirrorLfsSyncFailed, Interval: "m3"},
 		{NextExecutionTimestamp: dt, Status: types.MirrorRepoSyncFinished, Interval: "m4"},
 		{NextExecutionTimestamp: dt, Status: types.MirrorRepoSyncStart, Interval: "m5"},
 		{NextExecutionTimestamp: dt, Status: types.MirrorInit, Interval: "m6"},
 		{NextExecutionTimestamp: dt.Add(-5 * time.Hour), Status: types.MirrorLfsSyncFinished, Interval: "m7"},
+		{NextExecutionTimestamp: dt, Status: types.MirrorRepoSyncFatal, Interval: "m8"},
+		{NextExecutionTimestamp: dt, Status: types.MirrorLfsSyncStart, Interval: "m9"},
 	}
 	for _, m := range mirrors {
 		_, err := store.Create(ctx, m)
@@ -186,7 +188,7 @@ func TestMirrorStore_ToSync(t *testing.T) {
 	for _, m := range ms {
 		names = append(names, m.Interval)
 	}
-	require.ElementsMatch(t, []string{"m1", "m3", "m5", "m6", "m7"}, names)
+	require.ElementsMatch(t, []string{"m1", "m3", "m6", "m7"}, names)
 
 	ms, err = store.ToSyncLfs(ctx)
 	require.Nil(t, err)
