@@ -9,7 +9,7 @@ WORKDIR /workspace/
 RUN git clone --depth 1 https://gitee.com/xzgan/lm-evaluation-harness.git --branch v0.4.9 --single-branch && \
     cd lm-evaluation-harness && pip install setuptools --upgrade --no-cache-dir -e \
      ".[ifeval,math,multilingual,sentencepiece]"
-RUN pip install --no-cache-dir huggingface-hub
+RUN pip install --no-cache-dir csghub-sdk==0.7.2
 COPY ./lm-evaluation-harness/ /etc/csghub/
 RUN ln -s /usr/bin/python3 /usr/bin/python &&\
     chmod +x /etc/csghub/*.sh

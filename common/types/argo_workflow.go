@@ -52,6 +52,7 @@ type EvaluationReq struct {
 	ModelId            string   `json:"model_id"`
 	ModelIds           []string `json:"model_ids,omitempty"` // for comparison
 	ShareMode          bool     `json:"share_mode"`
+	CustomDataSets     []string `json:"custom_datasets,omitempty"` // custom datasets
 	Token              string   `json:"-"`
 	Hardware           HardWare `json:"-"`
 	UserUUID           string   `json:"-"`
@@ -63,6 +64,12 @@ type EvaluationReq struct {
 	ResourceName       string   `json:"-"`
 	Revisions          []string `json:"-"`
 	DatasetRevisions   []string `json:"-"`
+	UseCustomDataset   bool     `json:"-"`
+}
+
+type CustomData struct {
+	TaskName string `json:"task_name"`
+	DataSet  string `json:"dataset_name"`
 }
 
 type ArgoFlowTemplate struct {

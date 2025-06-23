@@ -150,6 +150,7 @@ func (a *ArgoHandler) GetWorkflow(ctx *gin.Context) {
 		DownloadURL: wf.DownloadURL,
 		FailuresURL: wf.FailuresURL,
 		Status:      wf.Status,
+		Reason:      wf.Reason,
 	}
 	ctx.JSON(http.StatusOK, res)
 }

@@ -1,7 +1,7 @@
 FROM modelscope-registry.cn-hangzhou.cr.aliyuncs.com/modelscope-repo/modelscope:ubuntu22.04-py311-torch2.3.1-1.26.0
 RUN apt-get update && apt-get -y install dumb-init \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
-RUN pip install --no-cache-dir minio oss2
+RUN pip install --no-cache-dir minio oss2 csghub-sdk==0.7.2
 COPY ./evalscope/ /etc/csghub/
 RUN chmod +x /etc/csghub/*.sh
 WORKDIR /workspace/

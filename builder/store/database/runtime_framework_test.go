@@ -175,10 +175,11 @@ func TestRuntimeFrameworksStore_RemoveRuntimeFrameworkAndArch(t *testing.T) {
 
 	// Add a runtime framework
 	rf, err := rfStore.Add(ctx, database.RuntimeFramework{
-		ID:        1,
-		FrameName: "test-framework",
-		Type:      1,
-		Enabled:   1,
+		ID:           1,
+		FrameName:    "test-framework",
+		Type:         1,
+		Enabled:      1,
+		FrameVersion: "1.0.0",
 	})
 	require.Nil(t, err)
 
@@ -207,7 +208,7 @@ func TestRuntimeFrameworksStore_RemoveRuntimeFrameworkAndArch(t *testing.T) {
 	require.Equal(t, 2, len(archs))
 
 	// Remove the runtime framework and its architectures
-	err = rfStore.RemoveRuntimeFrameworkAndArch(ctx, "test-framework")
+	err = rfStore.RemoveRuntimeFrameworkAndArch(ctx, 1)
 	require.Nil(t, err)
 
 	// Verify that the runtime framework is deleted
@@ -219,4 +220,3 @@ func TestRuntimeFrameworksStore_RemoveRuntimeFrameworkAndArch(t *testing.T) {
 	require.Nil(t, err)
 	require.Equal(t, 0, len(archs))
 }
-

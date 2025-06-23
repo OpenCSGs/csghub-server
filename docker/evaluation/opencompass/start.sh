@@ -73,6 +73,16 @@ for index in "${!dataset_repos[@]}"; do
         #for some special case which use main branch
         python /etc/csghub/download.py datasets --dataset_ids $repo --endpoint $HF_ENDPOINT --token $HF_TOKEN --revision $revision
     fi
+    # if custom datasets, use the first csv or json file, and skip the rest
+    if [ "$USE_CUSTOM_DATASETS" = "true" ]; then
+        data_file_path=($(find /workspace/data/$repo -type f \( -name "*.csv" -o -name "*.jsonl" \) | head -n 1))
+        custom_datasets_path=$data_file_path
+        FILE_NAME="${data_file_path##*/}"
+        task_name="${FILE_NAME%.*}"
+        dataset_tasks="custom_dataset"
+        dataset_tasks_ori=$task_name
+        continue 
+    fi
     # get answer mode
     task_path=`python -W ignore /etc/csghub/get_answer_mode.py $repo`
     if [ -z "$task_path" ]; then
@@ -109,7 +119,7 @@ if [ -z "$dataset_tasks" ]; then
     echo "dataset_tasks is empty for dataset $DATASET_IDS"
     exit 1
 fi
-echo "Running tasks: $dataset_tasks"
+echo "Running tasks: $dataset_tasks, custom datasets: $custom_datasets_path"
 if [ -z "$GPU_NUM" ]; then
     GPU_NUM=1
 fi
@@ -126,7 +136,11 @@ for repo in "${model_repos[@]}"; do
     fi
     model_name=`basename $modelID`
     echo "Start evaluating model $model_name, dataset $dataset_tasks"
-    opencompass --datasets $dataset_tasks --work-dir /workspace/output  --hf-type chat --hf-path /workspace/$modelID -a vllm --max-out-len 100 --max-seq-len $LimitedMaxToken --batch-size 8 --hf-num-gpus $GPU_NUM --max-num-workers $GPU_NUM --work-dir /workspace/output/$modelID
+    if [ "$USE_CUSTOM_DATASETS" = "true" ]; then
+        opencompass --custom-dataset-path $custom_datasets_path  --work-dir /workspace/output  --hf-type chat --hf-path /workspace/$modelID -a vllm --max-out-len 100 --max-seq-len $LimitedMaxToken --batch-size 8 --hf-num-gpus $GPU_NUM --max-num-workers $GPU_NUM --work-dir /workspace/output/$modelID
+    else
+        opencompass --datasets $dataset_tasks --work-dir /workspace/output  --hf-type chat --hf-path /workspace/$modelID -a vllm --max-out-len 100 --max-seq-len $LimitedMaxToken --batch-size 8 --hf-num-gpus $GPU_NUM --max-num-workers $GPU_NUM --work-dir /workspace/output/$modelID
+    fi
     if [ $? -ne 0 ]; then
         echo "Evaluation failed for model $model_name."
         exit 1

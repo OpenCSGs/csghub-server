@@ -716,6 +716,7 @@ func TestDeployer_SubmitEvaluation(t *testing.T) {
 				"REVISIONS":               "main",
 				"MODEL_IDS":               "",
 				"DATASET_IDS":             "",
+				"USE_CUSTOM_DATASETS":     "false",
 				"DATASET_REVISIONS":       "",
 				"ACCESS_TOKEN":            "k",
 				"HF_ENDPOINT":             "dl",

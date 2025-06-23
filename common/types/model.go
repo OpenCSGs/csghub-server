@@ -394,17 +394,17 @@ type ModelConfig struct {
 	TorchDtype        string   `json:"torch_dtype"`
 }
 type EngineConfig struct {
-	EngineName       string      `json:"engine_name"`
-	ContainerPort    int         `json:"container_port"`
-	RemoveOldVersion bool        `json:"remove_old_version"`
-	ModelFormat      string      `json:"model_format"`
-	EngineImages     []Image     `json:"engine_images"`
-	SupportedArchs   []string    `json:"supported_archs"`
-	SupportedModels  []string    `json:"supported_models"`
-	EngineArgs       []EngineArg `json:"engine_args"`
-	Enabled          int64       `json:"enabled"`
-	UpdatedAt        time.Time   `json:"updated_at"`
-	Description      string      `json:"description"`
+	EngineName      string      `json:"engine_name"`
+	ContainerPort   int         `json:"container_port"`
+	MinVersion      string      `json:"min_version"`
+	ModelFormat     string      `json:"model_format"`
+	EngineImages    []Image     `json:"engine_images"`
+	SupportedArchs  []string    `json:"supported_archs"`
+	SupportedModels []string    `json:"supported_models"`
+	EngineArgs      []EngineArg `json:"engine_args"`
+	Enabled         int64       `json:"enabled"`
+	UpdatedAt       time.Time   `json:"updated_at"`
+	Description     string      `json:"description"`
 }
 
 type ComputeType string

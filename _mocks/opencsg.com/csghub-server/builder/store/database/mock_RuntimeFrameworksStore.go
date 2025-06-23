@@ -128,6 +128,125 @@ func (_c *MockRuntimeFrameworksStore_Delete_Call) RunAndReturn(run func(context.
 	return _c
 }
 
+// FindByFrameImageAndComputeType provides a mock function with given fields: ctx, frameImage, ComputeType
+func (_m *MockRuntimeFrameworksStore) FindByFrameImageAndComputeType(ctx context.Context, frameImage string, ComputeType string) (*database.RuntimeFramework, error) {
+	ret := _m.Called(ctx, frameImage, ComputeType)
+
+	if len(ret) == 0 {
+		panic("no return value specified for FindByFrameImageAndComputeType")
+	}
+
+	var r0 *database.RuntimeFramework
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, string) (*database.RuntimeFramework, error)); ok {
+		return rf(ctx, frameImage, ComputeType)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string, string) *database.RuntimeFramework); ok {
+		r0 = rf(ctx, frameImage, ComputeType)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*database.RuntimeFramework)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string, string) error); ok {
+		r1 = rf(ctx, frameImage, ComputeType)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockRuntimeFrameworksStore_FindByFrameImageAndComputeType_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'FindByFrameImageAndComputeType'
+type MockRuntimeFrameworksStore_FindByFrameImageAndComputeType_Call struct {
+	*mock.Call
+}
+
+// FindByFrameImageAndComputeType is a helper method to define mock.On call
+//   - ctx context.Context
+//   - frameImage string
+//   - ComputeType string
+func (_e *MockRuntimeFrameworksStore_Expecter) FindByFrameImageAndComputeType(ctx interface{}, frameImage interface{}, ComputeType interface{}) *MockRuntimeFrameworksStore_FindByFrameImageAndComputeType_Call {
+	return &MockRuntimeFrameworksStore_FindByFrameImageAndComputeType_Call{Call: _e.mock.On("FindByFrameImageAndComputeType", ctx, frameImage, ComputeType)}
+}
+
+func (_c *MockRuntimeFrameworksStore_FindByFrameImageAndComputeType_Call) Run(run func(ctx context.Context, frameImage string, ComputeType string)) *MockRuntimeFrameworksStore_FindByFrameImageAndComputeType_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(string), args[2].(string))
+	})
+	return _c
+}
+
+func (_c *MockRuntimeFrameworksStore_FindByFrameImageAndComputeType_Call) Return(_a0 *database.RuntimeFramework, _a1 error) *MockRuntimeFrameworksStore_FindByFrameImageAndComputeType_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockRuntimeFrameworksStore_FindByFrameImageAndComputeType_Call) RunAndReturn(run func(context.Context, string, string) (*database.RuntimeFramework, error)) *MockRuntimeFrameworksStore_FindByFrameImageAndComputeType_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// FindByFrameName provides a mock function with given fields: ctx, name
+func (_m *MockRuntimeFrameworksStore) FindByFrameName(ctx context.Context, name string) ([]database.RuntimeFramework, error) {
+	ret := _m.Called(ctx, name)
+
+	if len(ret) == 0 {
+		panic("no return value specified for FindByFrameName")
+	}
+
+	var r0 []database.RuntimeFramework
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string) ([]database.RuntimeFramework, error)); ok {
+		return rf(ctx, name)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string) []database.RuntimeFramework); ok {
+		r0 = rf(ctx, name)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]database.RuntimeFramework)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
+		r1 = rf(ctx, name)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockRuntimeFrameworksStore_FindByFrameName_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'FindByFrameName'
+type MockRuntimeFrameworksStore_FindByFrameName_Call struct {
+	*mock.Call
+}
+
+// FindByFrameName is a helper method to define mock.On call
+//   - ctx context.Context
+//   - name string
+func (_e *MockRuntimeFrameworksStore_Expecter) FindByFrameName(ctx interface{}, name interface{}) *MockRuntimeFrameworksStore_FindByFrameName_Call {
+	return &MockRuntimeFrameworksStore_FindByFrameName_Call{Call: _e.mock.On("FindByFrameName", ctx, name)}
+}
+
+func (_c *MockRuntimeFrameworksStore_FindByFrameName_Call) Run(run func(ctx context.Context, name string)) *MockRuntimeFrameworksStore_FindByFrameName_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(string))
+	})
+	return _c
+}
+
+func (_c *MockRuntimeFrameworksStore_FindByFrameName_Call) Return(_a0 []database.RuntimeFramework, _a1 error) *MockRuntimeFrameworksStore_FindByFrameName_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockRuntimeFrameworksStore_FindByFrameName_Call) RunAndReturn(run func(context.Context, string) ([]database.RuntimeFramework, error)) *MockRuntimeFrameworksStore_FindByFrameName_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // FindByID provides a mock function with given fields: ctx, id
 func (_m *MockRuntimeFrameworksStore) FindByID(ctx context.Context, id int64) (*database.RuntimeFramework, error) {
 	ret := _m.Called(ctx, id)
@@ -604,17 +723,17 @@ func (_c *MockRuntimeFrameworksStore_ListByIDs_Call) RunAndReturn(run func(conte
 	return _c
 }
 
-// RemoveRuntimeFrameworkAndArch provides a mock function with given fields: ctx, runtimeName
-func (_m *MockRuntimeFrameworksStore) RemoveRuntimeFrameworkAndArch(ctx context.Context, runtimeName string) error {
-	ret := _m.Called(ctx, runtimeName)
+// RemoveRuntimeFrameworkAndArch provides a mock function with given fields: ctx, id
+func (_m *MockRuntimeFrameworksStore) RemoveRuntimeFrameworkAndArch(ctx context.Context, id int64) error {
+	ret := _m.Called(ctx, id)
 
 	if len(ret) == 0 {
 		panic("no return value specified for RemoveRuntimeFrameworkAndArch")
 	}
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, string) error); ok {
-		r0 = rf(ctx, runtimeName)
+	if rf, ok := ret.Get(0).(func(context.Context, int64) error); ok {
+		r0 = rf(ctx, id)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -629,14 +748,14 @@ type MockRuntimeFrameworksStore_RemoveRuntimeFrameworkAndArch_Call struct {
 
 // RemoveRuntimeFrameworkAndArch is a helper method to define mock.On call
 //   - ctx context.Context
-//   - runtimeName string
-func (_e *MockRuntimeFrameworksStore_Expecter) RemoveRuntimeFrameworkAndArch(ctx interface{}, runtimeName interface{}) *MockRuntimeFrameworksStore_RemoveRuntimeFrameworkAndArch_Call {
-	return &MockRuntimeFrameworksStore_RemoveRuntimeFrameworkAndArch_Call{Call: _e.mock.On("RemoveRuntimeFrameworkAndArch", ctx, runtimeName)}
+//   - id int64
+func (_e *MockRuntimeFrameworksStore_Expecter) RemoveRuntimeFrameworkAndArch(ctx interface{}, id interface{}) *MockRuntimeFrameworksStore_RemoveRuntimeFrameworkAndArch_Call {
+	return &MockRuntimeFrameworksStore_RemoveRuntimeFrameworkAndArch_Call{Call: _e.mock.On("RemoveRuntimeFrameworkAndArch", ctx, id)}
 }
 
-func (_c *MockRuntimeFrameworksStore_RemoveRuntimeFrameworkAndArch_Call) Run(run func(ctx context.Context, runtimeName string)) *MockRuntimeFrameworksStore_RemoveRuntimeFrameworkAndArch_Call {
+func (_c *MockRuntimeFrameworksStore_RemoveRuntimeFrameworkAndArch_Call) Run(run func(ctx context.Context, id int64)) *MockRuntimeFrameworksStore_RemoveRuntimeFrameworkAndArch_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(string))
+		run(args[0].(context.Context), args[1].(int64))
 	})
 	return _c
 }
@@ -646,7 +765,7 @@ func (_c *MockRuntimeFrameworksStore_RemoveRuntimeFrameworkAndArch_Call) Return(
 	return _c
 }
 
-func (_c *MockRuntimeFrameworksStore_RemoveRuntimeFrameworkAndArch_Call) RunAndReturn(run func(context.Context, string) error) *MockRuntimeFrameworksStore_RemoveRuntimeFrameworkAndArch_Call {
+func (_c *MockRuntimeFrameworksStore_RemoveRuntimeFrameworkAndArch_Call) RunAndReturn(run func(context.Context, int64) error) *MockRuntimeFrameworksStore_RemoveRuntimeFrameworkAndArch_Call {
 	_c.Call.Return(run)
 	return _c
 }

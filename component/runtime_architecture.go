@@ -14,6 +14,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/blang/semver/v4"
 	gguf "github.com/gpustack/gguf-parser-go"
 	"opencsg.com/csghub-server/builder/git"
 	"opencsg.com/csghub-server/builder/git/gitserver"
@@ -699,8 +700,8 @@ func (c *runtimeArchitectureComponentImpl) UpdateRuntimeFrameworkByType(ctx cont
 			slog.Error("failed to get file info", slog.Any("file", filePath), slog.Any("error", err))
 			continue
 		}
-		if engineConfig.RemoveOldVersion {
-			err = c.runtimeFrameworksStore.RemoveRuntimeFrameworkAndArch(ctx, engineConfig.EngineName)
+		if engineConfig.MinVersion != "" {
+			err = c.removeFrameAndArchByVersion(ctx, engineConfig.EngineName, engineConfig.MinVersion)
 			if err != nil {
 				slog.Error("failed to remove runtime_framework and archs", slog.Any("file", filePath), slog.Any("error", err))
 				continue
@@ -804,6 +805,34 @@ func (c *runtimeArchitectureComponentImpl) UpdateRuntimeFrameworkAndArch(ctx con
 
 	}
 
+	return nil
+}
+
+func (c *runtimeArchitectureComponentImpl) removeFrameAndArchByVersion(ctx context.Context, frameName, minVersion string) error {
+	frames, err := c.runtimeFrameworksStore.FindByFrameName(ctx, frameName)
+	if err != nil {
+		return err
+	}
+	for _, frame := range frames {
+		frameVer, err := semver.Make(frame.FrameVersion)
+		if err != nil {
+			slog.Error("failed to make semver", slog.Any("version", frameVer), slog.Any("error", err))
+			continue
+		}
+		minVer, err := semver.Make(minVersion)
+		if err != nil {
+			slog.Error("failed to make semver", slog.Any("version", minVer), slog.Any("error", err))
+			continue
+		}
+		if frameVer.LT(minVer) {
+			err = c.runtimeFrameworksStore.RemoveRuntimeFrameworkAndArch(ctx, frame.ID)
+			if err != nil {
+				return err
+			}
+			slog.Info("removed runtime_framework and arch as the version is not the minimal version", slog.Int64("runtime_framework_id", frame.ID))
+
+		}
+	}
 	return nil
 }
 

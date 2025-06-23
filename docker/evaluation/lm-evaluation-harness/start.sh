@@ -25,8 +25,6 @@ search_path_with_most_term() {
     echo $max_count_path
     return 0
 }
-export CSG_ENDPOINT="${HF_ENDPOINT}/csg"
-export HF_ENDPOINT="${HF_ENDPOINT}/hf"
 export HF_TOKEN=$ACCESS_TOKEN
 #download datasets
 IFS=',' read -r -a dataset_repos <<< "$DATASET_IDS"
@@ -56,6 +54,17 @@ script_dts_array=("allenai/winogrande" "facebook/anli" "aps/super_glue" "Rowan/h
 script_dts_multi_config_array=("allenai/winogrande")
 for repo in "${dataset_repos[@]}"; do
     repo_name="${repo#*/}"
+    if [ "$USE_CUSTOM_DATASETS" = "true" ]; then
+        task_file=$(find /workspace/$repo -name "*.yaml" -type f | head -n 1)
+        
+        if [ -z "$task_file" ]; then
+            echo "No task file found in custom dataset $repo"
+            exit 1
+        fi
+        mkdir -p /workspace/lm-evaluation-harness/lm_eval/tasks/my-custom-tasks
+        cp $task_file /workspace/lm-evaluation-harness/lm_eval/tasks/my-custom-tasks/
+    fi
+
     if [[ " ${script_dts_array[@]} " =~ " ${repo} " ]]; then
         #need replace with real path
         echo "replace script repo with namespace repo"
@@ -127,7 +136,7 @@ for index in "${!model_repos[@]}"; do
     modelID=${model_repos[$index]}
     revision=${model_revisions[$index]}
     echo "Start downloading model $modelID"
-    python /etc/csghub/download.py models --model_ids $modelID --endpoint $CSG_ENDPOINT --token $HF_TOKEN --revision $revision
+    python /etc/csghub/download.py models --model_ids $modelID --endpoint $HF_ENDPOINT --token $HF_TOKEN --revision $revision --source csg
     model_name=`basename $modelID`
     modelNames="$modelNames,$model_name"
     accelerate launch -m lm_eval \

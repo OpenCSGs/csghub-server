@@ -26,6 +26,7 @@ import (
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/types"
+	"opencsg.com/csghub-server/runner/common"
 )
 
 type workFlowComponentImpl struct {
@@ -39,7 +40,7 @@ type WorkFlowComponent interface {
 	// Create workflow
 	CreateWorkflow(ctx context.Context, req types.ArgoWorkFlowReq) (*database.ArgoWorkflow, error)
 	// Update workflow
-	UpdateWorkflow(ctx context.Context, update *v1alpha1.Workflow) (*database.ArgoWorkflow, error)
+	UpdateWorkflow(ctx context.Context, update *v1alpha1.Workflow, cluster cluster.Cluster) (*database.ArgoWorkflow, error)
 	// find workflow by user name
 	FindWorkFlows(ctx context.Context, username string, per, page int) ([]database.ArgoWorkflow, int, error)
 	// generate workflow templates
@@ -135,7 +136,7 @@ func (wc *workFlowComponentImpl) GetWorkflow(ctx context.Context, id int64, user
 }
 
 // Update workflow
-func (wc *workFlowComponentImpl) UpdateWorkflow(ctx context.Context, update *v1alpha1.Workflow) (*database.ArgoWorkflow, error) {
+func (wc *workFlowComponentImpl) UpdateWorkflow(ctx context.Context, update *v1alpha1.Workflow, cluster cluster.Cluster) (*database.ArgoWorkflow, error) {
 	oldwf, err := wc.wf.FindByTaskID(ctx, update.Name)
 	if err != nil {
 		return nil, err
@@ -160,6 +161,19 @@ func (wc *workFlowComponentImpl) UpdateWorkflow(ctx context.Context, update *v1a
 					break
 				}
 			}
+		}
+		//if oldwf.Status is error, get the log from the pod and save to reason field
+		if oldwf.Status == v1alpha1.WorkflowFailed || oldwf.Status == v1alpha1.WorkflowError {
+			//podName := fmt.Sprintf("%s-%s", oldwf.TaskId, oldwf.ClusterID)
+			logs, err := common.GetPodLog(ctx, &cluster, update.Name, update.Namespace, "main")
+			if err != nil {
+				slog.Error("failed to get pod log", slog.Any("error", err), slog.Any("pod name", update.Name))
+			} else {
+				if len(logs) > 0 {
+					oldwf.Reason = string(logs)
+				}
+			}
+
 		}
 	}
 	return wc.wf.UpdateWorkFlow(ctx, oldwf)
@@ -328,7 +342,7 @@ func (wc *workFlowComponentImpl) RunArgoInformer(stopCh <-chan struct{}, namespa
 			wf := obj.(*v1alpha1.Workflow)
 			bg, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 			defer cancel()
-			_, err := wc.UpdateWorkflow(bg, wf)
+			_, err := wc.UpdateWorkflow(bg, wf, cluster)
 			if err != nil {
 				slog.Error("fail to update workflow", slog.Any("error", err), slog.Any("job id", wf.Name))
 			}
@@ -344,7 +358,7 @@ func (wc *workFlowComponentImpl) RunArgoInformer(stopCh <-chan struct{}, namespa
 				return
 			}
 			if oldWF.Status.Nodes[oldWF.Name].Phase != newWF.Status.Nodes[oldWF.Name].Phase {
-				_, err := wc.UpdateWorkflow(bg, newWF)
+				_, err := wc.UpdateWorkflow(bg, newWF, cluster)
 				if err != nil {
 					slog.Error("fail to update workflow", slog.Any("error", err), slog.Any("job id", newWF.Name))
 				}
@@ -352,12 +366,17 @@ func (wc *workFlowComponentImpl) RunArgoInformer(stopCh <-chan struct{}, namespa
 		},
 		DeleteFunc: func(obj interface{}) {
 			//handle some special case
-			wf := obj.(*v1alpha1.Workflow)
-			bg, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-			defer cancel()
-			err := wc.DeleteWorkflowInargo(bg, wf)
-			if err != nil {
-				slog.Error("fail to update workflow", slog.Any("error", err), slog.Any("job id", wf.Name))
+			switch wf := obj.(type) {
+			case *v1alpha1.Workflow:
+				bg, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+				defer cancel()
+				err := wc.DeleteWorkflowInargo(bg, wf)
+				if err != nil {
+					slog.Error("fail to update workflow", slog.Any("error", err), slog.Any("job id", wf.Name))
+				}
+			default:
+				slog.Error("unknown type", slog.Any("type", wf))
+				return
 			}
 		},
 	}

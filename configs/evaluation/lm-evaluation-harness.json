@@ -2,7 +2,7 @@
   "engine_name": "lm-evaluation-harness",
   "enabled": 1,
   "model_format": "safetensors",
-  "remove_old_version":true,
+  "min_version": "0.4.9",
   "engine_images": [
     {
       "compute_type": "gpu",

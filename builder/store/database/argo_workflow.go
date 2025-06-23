@@ -82,6 +82,7 @@ func (s *argoWorkFlowStoreImpl) FindByUsername(ctx context.Context, username str
 	query := s.db.Operator.Core.
 		NewSelect().
 		Model(&WorkFlows).
+		ExcludeColumn("reason").
 		Where("username = ?", username)
 
 	query = query.Order("submit_time DESC").

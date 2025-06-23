@@ -79,7 +79,14 @@ func (c *evaluationComponentImpl) CreateEvaluation(ctx context.Context, req type
 	if err != nil {
 		return nil, fmt.Errorf("cant get git access token:%w", err)
 	}
-	mirrorRepos, datasetRevisions, err := c.GenerateMirrorRepoIds(ctx, req.Datasets)
+	var mirrorRepos []string
+	var datasetRevisions []string
+	if req.CustomDataSets != nil {
+		mirrorRepos, datasetRevisions, err = c.generateDatasetsAndTasks(ctx, req.CustomDataSets)
+		req.UseCustomDataset = true
+	} else {
+		mirrorRepos, datasetRevisions, err = c.GenerateMirrorRepoIds(ctx, req.Datasets)
+	}
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate mirror repo ids, %w", err)
 	}
@@ -138,6 +145,22 @@ func (c *evaluationComponentImpl) GenerateMirrorRepoIds(ctx context.Context, dat
 			return nil, nil, fmt.Errorf("failed to find dataset repo, %w", err)
 		}
 		mirrorRepos = append(mirrorRepos, repo.OriginPath())
+		revisions = append(revisions, repo.DefaultBranch)
+	}
+	return mirrorRepos, revisions, nil
+}
+
+func (c *evaluationComponentImpl) generateDatasetsAndTasks(ctx context.Context, customDataSets []string) ([]string, []string, error) {
+	var mirrorRepos []string
+	var revisions []string
+	for _, cds := range customDataSets {
+		namespace := strings.Split(cds, "/")[0]
+		name := strings.Split(cds, "/")[1]
+		repo, err := c.repoStore.FindByPath(ctx, types.DatasetRepo, namespace, name)
+		if err != nil {
+			return nil, nil, fmt.Errorf("failed to find dataset repo, %w", err)
+		}
+		mirrorRepos = append(mirrorRepos, repo.Path)
 		revisions = append(revisions, repo.DefaultBranch)
 	}
 	return mirrorRepos, revisions, nil

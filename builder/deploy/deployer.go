@@ -788,6 +788,7 @@ func (d *deployer) SubmitEvaluation(ctx context.Context, req types.EvaluationReq
 	env["DATASET_REVISIONS"] = strings.Join(req.DatasetRevisions, ",")
 	env["MODEL_IDS"] = strings.Join(req.ModelIds, ",")
 	env["DATASET_IDS"] = strings.Join(req.Datasets, ",")
+	env["USE_CUSTOM_DATASETS"] = strconv.FormatBool(req.UseCustomDataset)
 	env["ACCESS_TOKEN"] = req.Token
 	env["HF_ENDPOINT"] = req.DownloadEndpoint
 	env["HF_HUB_DOWNLOAD_TIMEOUT"] = "30"
