@@ -621,6 +621,10 @@ func (c *spaceComponentImpl) Index(ctx context.Context, repoFilter *types.RepoFi
 			RepositoryID:  space.Repository.ID,
 			Source:        repo.Source,
 			SyncStatus:    repo.SyncStatus,
+			User: &types.User{
+				Nickname: space.Repository.User.NickName,
+				Avatar:   space.Repository.User.Avatar,
+			},
 		})
 	}
 	return resSpaces, total, nil

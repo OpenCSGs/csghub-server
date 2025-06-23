@@ -21,7 +21,7 @@ func TestMirrorStore_CRUD(t *testing.T) {
 		Interval:          "foo",
 		RepositoryID:      123,
 		PushMirrorCreated: true,
-		Status:            types.MirrorFinished,
+		Status:            types.MirrorLfsSyncFinished,
 		Priority:          types.HighMirrorPriority,
 	})
 	require.Nil(t, err)
@@ -167,13 +167,13 @@ func TestMirrorStore_ToSync(t *testing.T) {
 
 	dt := time.Now().Add(1 * time.Hour)
 	mirrors := []*database.Mirror{
-		{NextExecutionTimestamp: dt, Status: types.MirrorFailed, Interval: "m1"},
-		{NextExecutionTimestamp: dt, Status: types.MirrorFinished, Interval: "m2"},
-		{NextExecutionTimestamp: dt, Status: types.MirrorIncomplete, Interval: "m3"},
-		{NextExecutionTimestamp: dt, Status: types.MirrorRepoSynced, Interval: "m4"},
-		{NextExecutionTimestamp: dt, Status: types.MirrorRunning, Interval: "m5"},
-		{NextExecutionTimestamp: dt, Status: types.MirrorWaiting, Interval: "m6"},
-		{NextExecutionTimestamp: dt.Add(-5 * time.Hour), Status: types.MirrorFinished, Interval: "m7"},
+		{NextExecutionTimestamp: dt, Status: types.MirrorLfsSyncFailed, Interval: "m1"},
+		{NextExecutionTimestamp: dt, Status: types.MirrorLfsSyncFinished, Interval: "m2"},
+		{NextExecutionTimestamp: dt, Status: types.MirrorLfsIncomplete, Interval: "m3"},
+		{NextExecutionTimestamp: dt, Status: types.MirrorRepoSyncFinished, Interval: "m4"},
+		{NextExecutionTimestamp: dt, Status: types.MirrorRepoSyncStart, Interval: "m5"},
+		{NextExecutionTimestamp: dt, Status: types.MirrorInit, Interval: "m6"},
+		{NextExecutionTimestamp: dt.Add(-5 * time.Hour), Status: types.MirrorLfsSyncFinished, Interval: "m7"},
 	}
 	for _, m := range mirrors {
 		_, err := store.Create(ctx, m)
@@ -233,9 +233,9 @@ func TestMirrorStore_StatusCount(t *testing.T) {
 	store := database.NewMirrorStoreWithDB(db)
 
 	mirrors := []*database.Mirror{
-		{Interval: "m1", Status: types.MirrorFailed},
-		{Interval: "m2", Status: types.MirrorFailed},
-		{Interval: "m3", Status: types.MirrorFinished},
+		{Interval: "m1", Status: types.MirrorLfsSyncFailed},
+		{Interval: "m2", Status: types.MirrorLfsSyncFailed},
+		{Interval: "m3", Status: types.MirrorLfsSyncFinished},
 	}
 	for _, m := range mirrors {
 		_, err := store.Create(ctx, m)
@@ -246,8 +246,8 @@ func TestMirrorStore_StatusCount(t *testing.T) {
 	require.Nil(t, err)
 	require.Equal(t, 2, len(cs))
 	require.ElementsMatch(t, []database.MirrorStatusCount{
-		{types.MirrorFailed, 2},
-		{types.MirrorFinished, 1},
+		{types.MirrorLfsSyncFailed, 2},
+		{types.MirrorLfsSyncFinished, 1},
 	}, cs)
 
 }

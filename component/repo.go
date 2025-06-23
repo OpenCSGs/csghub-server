@@ -1912,7 +1912,7 @@ func (c *repoComponentImpl) CreateMirror(ctx context.Context, req types.CreateMi
 			Priority:  queue.PriorityMap[reqMirror.Priority],
 			CreatedAt: mirror.CreatedAt.Unix(),
 		})
-		reqMirror.Status = types.MirrorWaiting
+		reqMirror.Status = types.MirrorInit
 		err = c.mirrorStore.Update(ctx, reqMirror)
 		if err != nil {
 			return nil, fmt.Errorf("failed to update mirror status: %v", err)
@@ -2796,7 +2796,7 @@ func (c *repoComponentImpl) SyncMirror(ctx context.Context, repoType types.Repos
 			Priority:  queue.PriorityMap[mirror.Priority],
 			CreatedAt: mirror.CreatedAt.Unix(),
 		})
-		mirror.Status = types.MirrorWaiting
+		mirror.Status = types.MirrorInit
 		err = c.mirrorStore.Update(ctx, mirror)
 		if err != nil {
 			return fmt.Errorf("failed to update mirror status: %v", err)
