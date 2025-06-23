@@ -103,7 +103,7 @@ func (w *LocalMirrorWoker) SyncRepo(ctx context.Context, task queue.MirrorTask) 
 	if err != nil {
 		return fmt.Errorf("failed to get mirror: %v", err)
 	}
-	mirror.Status = types.MirrorRunning
+	mirror.Status = types.MirrorRepoSyncStart
 	mirror.Priority = types.LowMirrorPriority
 	err = w.mirrorStore.Update(ctx, mirror)
 	if err != nil {
@@ -130,7 +130,7 @@ func (w *LocalMirrorWoker) SyncRepo(ctx context.Context, task queue.MirrorTask) 
 	err = w.git.MirrorSync(ctx, req)
 
 	if err != nil {
-		mirror.Status = types.MirrorFailed
+		mirror.Status = types.MirrorLfsSyncFailed
 		mirror.LastMessage = fmt.Sprintf("failed mirror remote repo in git server:%s", err.Error())
 		updateErr := w.mirrorStore.Update(ctx, mirror)
 		if updateErr != nil {
@@ -146,7 +146,7 @@ func (w *LocalMirrorWoker) SyncRepo(ctx context.Context, task queue.MirrorTask) 
 		RepoType:  mirror.Repository.RepositoryType,
 	})
 	if err != nil {
-		mirror.Status = types.MirrorFailed
+		mirror.Status = types.MirrorLfsSyncFailed
 		mirror.LastMessage = fmt.Sprintf("failed to get repo detail:%s", err.Error())
 		err = w.mirrorStore.Update(ctx, mirror)
 		if err != nil {
@@ -167,7 +167,7 @@ func (w *LocalMirrorWoker) SyncRepo(ctx context.Context, task queue.MirrorTask) 
 	slog.Info("Start to sync lfs files", "repo_type", mirror.Repository.RepositoryType, "namespace", namespace, "name", name)
 	lfsFileCount, err := w.generateLfsMetaObjects(ctx, mirror)
 	if err != nil {
-		mirror.Status = types.MirrorIncomplete
+		mirror.Status = types.MirrorLfsIncomplete
 		mirror.LastMessage = err.Error()
 		mirror.Repository.SyncStatus = types.SyncStatusFailed
 		err = w.mirrorStore.UpdateMirrorAndRepository(ctx, mirror, mirror.Repository)
@@ -177,7 +177,7 @@ func (w *LocalMirrorWoker) SyncRepo(ctx context.Context, task queue.MirrorTask) 
 		return fmt.Errorf("failed to generate lfs meta objects: %v", err)
 	}
 	if lfsFileCount > 0 {
-		mirror.Status = types.MirrorRepoSynced
+		mirror.Status = types.MirrorRepoSyncFinished
 		w.mq.PushLfsMirror(&queue.MirrorTask{
 			MirrorID:    mirror.ID,
 			Priority:    queue.Priority(mirror.Priority),
@@ -185,7 +185,7 @@ func (w *LocalMirrorWoker) SyncRepo(ctx context.Context, task queue.MirrorTask) 
 			MirrorToken: task.MirrorToken,
 		})
 	} else {
-		mirror.Status = types.MirrorFinished
+		mirror.Status = types.MirrorLfsSyncFailed
 		mirror.Progress = 100
 		mirror.Repository.SyncStatus = types.SyncStatusCompleted
 		_, err = w.repoStore.UpdateRepo(ctx, *mirror.Repository)

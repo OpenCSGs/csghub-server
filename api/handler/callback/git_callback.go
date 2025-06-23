@@ -58,11 +58,11 @@ func (h *GitCallbackHandler) handlePush(c *gin.Context) {
 		c, workflowOptions, workflow.HandlePushWorkflow, &req,
 	)
 	if err != nil {
-		slog.Error("failed to handle git push callback", slog.Any("error", err))
+		slog.Error("failed to handle git push callback", slog.Any("error", err), slog.Any("repo_path", req.Repository.FullName))
 		httpbase.ServerError(c, err)
 		return
 	}
-	slog.Info("start handle push workflow", slog.String("workflow_id", we.GetID()), slog.String("run_id", we.GetRunID()), slog.Any("req", &req))
+	slog.Info("start handle push workflow", slog.String("workflow_id", we.GetID()), slog.Any("repo_path", req.Repository.FullName), slog.String("run_id", we.GetRunID()), slog.Any("req", &req))
 	slog.Info("handle git callback successfully", slog.String("event", "push"))
 	httpbase.OK(c, nil)
 }

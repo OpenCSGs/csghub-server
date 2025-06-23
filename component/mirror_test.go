@@ -261,11 +261,11 @@ func TestMirrorComponent_CheckMirrorProgress(t *testing.T) {
 					}, nil,
 				)
 			}
-			mirrors[0].Status = types.MirrorWaiting
-			mirrors[1].Status = types.MirrorRunning
+			mirrors[0].Status = types.MirrorInit
+			mirrors[1].Status = types.MirrorRepoSyncStart
 			mirrors[1].Progress = 100
-			mirrors[2].Status = types.MirrorFailed
-			mirrors[3].Status = types.MirrorFinished
+			mirrors[2].Status = types.MirrorLfsSyncFailed
+			mirrors[3].Status = types.MirrorLfsSyncFinished
 			mirrors[3].Progress = 100
 			mc.mocks.gitServer.EXPECT().GetRepo(ctx, gitserver.GetRepoReq{
 				Namespace: "foo",
@@ -342,13 +342,13 @@ func TestMirrorComponent_Statistic(t *testing.T) {
 		RoleMask: "admin",
 	}, nil)
 	mc.mocks.stores.MirrorMock().EXPECT().StatusCount(ctx).Return([]database.MirrorStatusCount{
-		{Status: types.MirrorFinished, Count: 100},
+		{Status: types.MirrorLfsSyncFinished, Count: 100},
 	}, nil)
 
 	s, err := mc.Statistics(ctx, "user")
 	require.Nil(t, err)
 	require.Equal(t, []types.MirrorStatusCount{
-		{Status: types.MirrorFinished, Count: 100},
+		{Status: types.MirrorLfsSyncFinished, Count: 100},
 	}, s)
 
 }

@@ -88,12 +88,19 @@ type MirrorResp struct {
 type MirrorTaskStatus string
 
 const (
-	MirrorWaiting    MirrorTaskStatus = "waiting"
-	MirrorRunning    MirrorTaskStatus = "running"
-	MirrorRepoSynced MirrorTaskStatus = "repo_synced"
-	MirrorFinished   MirrorTaskStatus = "finished"
-	MirrorFailed     MirrorTaskStatus = "failed"
-	MirrorIncomplete MirrorTaskStatus = "incomplete"
+	MirrorInit             MirrorTaskStatus = "waiting"
+	MirrorQueued           MirrorTaskStatus = "queued"
+	MirrorRepoSyncStart    MirrorTaskStatus = "running"
+	MirrorRepoSyncFailed   MirrorTaskStatus = "repo_failed"
+	MirrorRepoSyncFinished MirrorTaskStatus = "repo_synced"
+	MirrorRepoSyncFatal    MirrorTaskStatus = "repo_fatal"
+	MirrorLfsSyncStart     MirrorTaskStatus = "lfs_start"
+	MirrorLfsSyncFailed    MirrorTaskStatus = "failed"
+	MirrorLfsSyncFinished  MirrorTaskStatus = "finished"
+	MirrorLfsSyncFatal     MirrorTaskStatus = "fatal"
+	MirrorLfsIncomplete    MirrorTaskStatus = "incomplete"
+
+	MirrorRepoTooLarge MirrorTaskStatus = "too_large"
 )
 
 type Mapping string
