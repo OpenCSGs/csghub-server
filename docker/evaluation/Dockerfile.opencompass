@@ -4,7 +4,7 @@ RUN apt-get update && apt-get -y install python3.10 python3-pip dumb-init \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 RUN pip config set global.index-url https://mirrors.aliyun.com/pypi/simple
     
-RUN pip install --no-cache-dir opencompass==0.4.2 minio oss2 vllm==0.8.5 openpyxl modelscope==1.26.0 datasets==2.20.0 csghub-sdk==0.4.6
+RUN pip install --no-cache-dir opencompass==0.4.2 minio oss2 vllm==0.9.1 openpyxl modelscope==1.26.0 datasets==2.20.0 csghub-sdk==0.7.2
 RUN pip install --no-cache-dir math_verify latex2sympy2_extended
 COPY ./opencompass/ /etc/csghub/
 RUN ln -s /usr/bin/python3 /usr/bin/python &&\

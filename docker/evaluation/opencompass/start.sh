@@ -2,7 +2,8 @@
 
 download_model() {
     modelID=$1
-    python /etc/csghub/download.py models --model_ids $modelID --endpoint $CSG_ENDPOINT --token $HF_TOKEN
+    revision=$2
+    python /etc/csghub/download.py models --model_ids $modelID --endpoint $HF_ENDPOINT --token $HF_TOKEN --revision $revision --source csg
     if [ $? -ne 0 ]; then
         echo "Download model $modelID failed."
         exit 1
@@ -28,9 +29,7 @@ EOF
     repo_config="/workspace/$modelID/config.json"
     sed -i "s/\"max_position_embeddings\": [0-9]*/\"max_position_embeddings\": $LimitedMaxToken/" $repo_config
 }
-export CSG_ENDPOINT="$HF_ENDPOINT/csg"
-export MS_ENDPOINT="$HF_ENDPOINT/ms"
-export HF_ENDPOINT="$HF_ENDPOINT/hf"
+
 export HF_TOKEN=$ACCESS_TOKEN
 mkdir -p /workspace/data
 ANSWER_MODE=${ANSWER_MODE:-"gen"}
@@ -67,11 +66,11 @@ for index in "${!dataset_repos[@]}"; do
     repo=${dataset_repos[$index]}
     revision=${dataset_revisions[$index]}
     # check $dataset existing
-    python /etc/csghub/download.py datasets --dataset_ids $repo --endpoint $MS_ENDPOINT --token $HF_TOKEN --revision $revision
+    python /etc/csghub/download.py datasets --dataset_ids $repo --endpoint $HF_ENDPOINT --token $HF_TOKEN --revision $revision --source ms
     if [ $? -ne 0 ]; then
         echo "Download dataset $repo failed,retry with HF mirror"
         #for some special case which use main branch
-        python /etc/csghub/download.py datasets --dataset_ids $repo --endpoint $HF_ENDPOINT --token $HF_TOKEN --revision $revision
+        python /etc/csghub/download.py datasets --dataset_ids $repo --endpoint $HF_ENDPOINT --token $HF_TOKEN --revision $revision --source hf
     fi
     # if custom datasets, use the first csv or json file, and skip the rest
     if [ "$USE_CUSTOM_DATASETS" = "true" ]; then
@@ -127,9 +126,11 @@ fi
 LimitedMaxToken=$(($GPU_NUM * 4096))
 jsonFiles=""
 IFS=',' read -r -a model_repos <<< "$MODEL_IDS"
-for repo in "${model_repos[@]}"; do
-    modelID=${repo}
-    download_model $modelID
+IFS=',' read -r -a model_revisions <<< "$REVISIONS"
+for index in "${!model_repos[@]}"; do
+    modelID=${model_repos[$index]}
+    revision=${model_revisions[$index]}
+    download_model $modelID $revision
     if [ $? -ne 0 ]; then
         echo "Download model $modelID failed."
         exit 1

@@ -33,7 +33,7 @@ for index in "${!dataset_repos[@]}"; do
     repo=${dataset_repos[$index]}
     revision=${dataset_revisions[$index]}
     echo "Downloading datasets..."
-    python /etc/csghub/download.py datasets --dataset_ids $repo --endpoint $HF_ENDPOINT --token $HF_TOKEN --revision $revision
+    python /etc/csghub/download.py datasets --dataset_ids $repo --endpoint $HF_ENDPOINT --token $HF_TOKEN --revision $revision --source hf
 done
 if [ $? -ne 0 ]; then
     echo "Failed to download datasets"
