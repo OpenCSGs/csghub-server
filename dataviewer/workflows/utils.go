@@ -82,10 +82,18 @@ func ConvertRealFiles(splitFiles []string, filePaths []string, targetFiles map[s
 
 func GetCardDataMD5(finalCardData dvCom.CardData) string {
 	hasher := md5.New()
+
+	for _, subset := range finalCardData.Configs {
+		fmt.Fprintf(hasher, "%s", subset.ConfigName)
+		for _, split := range subset.DataFiles {
+			fmt.Fprintf(hasher, "%s", split.Split)
+		}
+	}
+
 	for _, info := range finalCardData.DatasetInfos {
 		for _, split := range info.Splits {
 			for _, file := range split.Origins {
-				hasher.Write([]byte(fmt.Sprintf("%s-%s", file.RepoFile, file.LastCommit)))
+				fmt.Fprintf(hasher, "%s-%s", file.RepoFile, file.LastCommit)
 			}
 		}
 	}
