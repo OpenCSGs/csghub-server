@@ -3,6 +3,9 @@
 if [ "x${REPO_ID}" != "x" ]; then
     MODEL_NAME=$(echo "$REPO_ID" | cut -d'/' -f2)
     grep -qF "${REPO_ID}" /etc/csghub/LLaMA-Factory/src/llamafactory/extras/constants.py
+    if [[ $? -eq 0 ]]; then
+        grep -qF "\"${MODEL_NAME}\":" /etc/csghub/LLaMA-Factory/src/llamafactory/extras/constants.py   
+    fi
     if [[ $? -eq 1 ]]; then
         sed -i "s#CSGHUB_MODEL_NAME#${MODEL_NAME}#" /etc/csghub/extra_models.txt
         sed -i "s#CSGHUB_MODEL_REPO#${REPO_ID}#" /etc/csghub/extra_models.txt

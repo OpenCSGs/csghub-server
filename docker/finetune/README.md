@@ -69,8 +69,8 @@ _Note: The above command will create `linux/amd64` and `linux/arm64` images with
 
 | Image Name    | Version | CUDA Version | Fix |
 | ------------- | ------- | ------------ | --- |
-| llama-factory | 0.9.2   | 12.4         | -   |
-| ms-swift      | v3.2.0  | 12.4         | -   |
+| llama-factory | 0.9.3   | 12.1         | -   |
+| ms-swift      | v3.5.2  | 12.1         | -   |
 
 ## Run Finetune Image Locally
 
