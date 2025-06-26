@@ -17,6 +17,7 @@ model_ui_path="/etc/csghub/ms-swift/swift/ui/llm_train/model.py"
 infer_ui_path="/etc/csghub/ms-swift/swift/ui/llm_infer/model.py"
 export_ui_path="/etc/csghub/ms-swift/swift/ui/llm_export/model.py"
 eval_ui_path="/etc/csghub/ms-swift/swift/ui/llm_eval/model.py"
+hub_path="/etc/csghub/ms-swift/swift/hub/hub.py"
 #find model type and template type
 model_template=`python -W ignore /etc/csghub/get_model_info.py $MODEL_NAME`
 echo $model_template
@@ -44,6 +45,8 @@ if [ "x${model_type}" != "x" ]; then
     modify_if_exists $infer_ui_path
     modify_if_exists $export_ui_path
     modify_if_exists $eval_ui_path
+    #fix revision
+    sed -i "s/repo_type='model', revision=revision/repo_type='model', revision=\"$REVISION\"/g" $hub_path
     # set required transformers
     if [ "x${lower_transformers}" = "xyes" ]; then
         pip install transformers==4.33.3

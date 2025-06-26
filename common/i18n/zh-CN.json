@@ -341,6 +341,9 @@
   "Tag.I18nKey.code": {
     "other": "代码"
   },
+  "Tag.I18nKey.bias": {
+    "other": "偏见"
+  },
   "Tag.I18nKey.other": {
     "other": "其他"
   },

@@ -25,6 +25,8 @@ if [ ! -f "/workspace/.csghub_init" ]; then
     if [ ! -d "/workspace/evaluation" ]; then
         cp -rf /etc/csghub/LLaMA-Factory/evaluation /workspace/evaluation
     fi
+    #fix revision
+    sed -i "s/model_args.model_revision/\"$REVISION\"/g" /etc/csghub/LLaMA-Factory/src/llamafactory/model/loader.py
     touch /workspace/.csghub_init
 fi 
 

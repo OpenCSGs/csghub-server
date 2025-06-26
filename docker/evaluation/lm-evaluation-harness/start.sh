@@ -137,6 +137,8 @@ for index in "${!model_repos[@]}"; do
     revision=${model_revisions[$index]}
     echo "Start downloading model $modelID"
     python /etc/csghub/download.py models --model_ids $modelID --endpoint $HF_ENDPOINT --token $HF_TOKEN --revision $revision --source csg
+    #fix cache bug
+    sed -i 's/"use_cache": true/"use_cache": false/g' /workspace/$modelID/config.json
     model_name=`basename $modelID`
     modelNames="$modelNames,$model_name"
     accelerate launch -m lm_eval \
