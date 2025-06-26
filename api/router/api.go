@@ -846,6 +846,9 @@ func createUserRoutes(apiGroup *gin.RouterGroup, middlewareCollection middleware
 		apiGroup.GET("/user/:username/spaces", userHandler.Spaces)
 		apiGroup.GET("/user/:username/prompts", userHandler.Prompts)
 		apiGroup.GET("/user/:username/mcps", userHandler.MCPServers)
+	}
+
+	{
 		// User likes
 		apiGroup.PUT("/user/:username/likes/:repo_id", middlewareCollection.Auth.NeedLogin, userHandler.LikesAdd)
 		apiGroup.DELETE("/user/:username/likes/:repo_id", middlewareCollection.Auth.NeedLogin, userHandler.LikesDelete)
@@ -1023,6 +1026,7 @@ func createDataflowRoutes(apiGroup *gin.RouterGroup, dataflowHandler *handler.Da
 func createTagsRoutes(apiGroup *gin.RouterGroup, middlewareCollection middleware.MiddlewareCollection, tagHandler *handler.TagsHandler) {
 	tagsGrp := apiGroup.Group("/tags")
 	{
+		// TODO: Remove admin check in tagComponent
 		categoryGrp := tagsGrp.Group("/categories")
 		{
 			categoryGrp.GET("", tagHandler.AllCategories)

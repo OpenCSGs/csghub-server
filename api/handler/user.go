@@ -1,7 +1,6 @@
 package handler
 
 import (
-	"errors"
 	"log/slog"
 	"net/http"
 	"strconv"
@@ -601,13 +600,6 @@ func (h *UserHandler) UserPermission(ctx *gin.Context) {
 func (h *UserHandler) GetRunDeploys(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
 
-	username := ctx.Param("username")
-	if currentUser != username {
-		slog.Warn("invalid user to list deploys", slog.String("currentUser", currentUser), slog.String("username", username))
-		httpbase.ServerError(ctx, errors.New("invalid user"))
-		return
-	}
-
 	deployTypeStr := ctx.Query("deploy_type")
 	if deployTypeStr == "" {
 		// backward compatibility for inferences
@@ -669,25 +661,8 @@ func (h *UserHandler) GetRunDeploys(ctx *gin.Context) {
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
 // @Router       /user/{username}/finetune/instances [get]
 func (h *UserHandler) GetFinetuneInstances(ctx *gin.Context) {
-	respData := gin.H{
-		"message": "OK",
-		"data":    nil,
-		"total":   0,
-	}
-
 	var req types.UserRepoReq
 	currentUser := httpbase.GetCurrentUser(ctx)
-	if currentUser == "" {
-		ctx.JSON(http.StatusOK, respData)
-		return
-	}
-
-	username := ctx.Param("username")
-	if currentUser != username {
-		slog.Warn("invalid user to list deploys", slog.String("currentUser", currentUser), slog.String("username", username))
-		ctx.JSON(http.StatusOK, respData)
-		return
-	}
 
 	per, page, err := common.GetPerAndPageFromContext(ctx)
 	if err != nil {
@@ -705,7 +680,7 @@ func (h *UserHandler) GetFinetuneInstances(ctx *gin.Context) {
 		httpbase.ServerError(ctx, err)
 		return
 	}
-	respData = gin.H{
+	respData := gin.H{
 		"message": "OK",
 		"data":    ds,
 		"total":   total,
