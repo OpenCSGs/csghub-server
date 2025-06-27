@@ -198,3 +198,10 @@ func BuildLfsPath(repoID int64, oid string, migrated bool) string {
 	}
 	return lfsPath
 }
+
+func SafeBuildLfsPath(repoID int64, oid, lfsRelativePath string, migrated bool) string {
+	if oid != "" {
+		return BuildLfsPath(repoID, oid, migrated)
+	}
+	return path.Join("lfs", lfsRelativePath)
+}
