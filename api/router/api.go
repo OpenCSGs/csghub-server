@@ -440,6 +440,14 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 	}
 	createPromptRoutes(apiGroup, promptHandler)
 
+	// dataflow proxy
+	dataflowHandler, err := handler.NewDataflowProxyHandler(config)
+	if err != nil {
+		return nil, fmt.Errorf("error creating data flow proxy handler:%w", err)
+	}
+	createDataflowRoutes(apiGroup, dataflowHandler)
+
+	// Dataset viewer proxy
 	dataViewerAddr := fmt.Sprintf("%s:%d", config.DataViewer.Host, config.DataViewer.Port)
 	dsViewerHandler, err := handler.NewInternalServiceProxyHandler(dataViewerAddr)
 	if err != nil {
@@ -924,6 +932,36 @@ func createPromptRoutes(apiGroup *gin.RouterGroup, promptHandler *handler.Prompt
 		promptGrp.GET("/:namespace/:name/tags", promptHandler.Tags)
 		promptGrp.POST("/:namespace/:name/tags/:category", promptHandler.UpdateTags)
 		promptGrp.POST("/:namespace/:name/update_downloads", promptHandler.UpdateDownloads)
+	}
+}
+
+func createDataflowRoutes(apiGroup *gin.RouterGroup, dataflowHandler *handler.DataflowProxyHandler) {
+	dataflowGrp := apiGroup.Group("/dataflow")
+	dataflowGrp.Use(middleware.MustLogin())
+	{
+		jobGrp := dataflowGrp.Group("/jobs")
+		{
+			jobGrp.GET("", dataflowHandler.Proxy)
+			jobGrp.POST("", dataflowHandler.Proxy)
+			jobGrp.GET("/:id", dataflowHandler.Proxy)
+			jobGrp.DELETE("/:id", dataflowHandler.Proxy)
+			jobGrp.GET("/log/:id", dataflowHandler.Proxy)
+			jobGrp.GET("/search", dataflowHandler.Proxy)
+		}
+		templateGrp := dataflowGrp.Group("/templates")
+		{
+			templateGrp.GET("", dataflowHandler.Proxy)
+			templateGrp.POST("", dataflowHandler.Proxy)
+			templateGrp.DELETE("/:template_id", dataflowHandler.Proxy)
+		}
+		opsGrp := dataflowGrp.Group("/ops")
+		{
+			opsGrp.GET("", dataflowHandler.Proxy)
+		}
+		toolGrp := dataflowGrp.Group("/tools")
+		{
+			toolGrp.GET("", dataflowHandler.Proxy)
+		}
 	}
 }
 
