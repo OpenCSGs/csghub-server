@@ -405,7 +405,7 @@ func (c *datasetViewerComponentImpl) getViewerCardData(ctx context.Context, req 
 		for _, split := range info.Splits {
 			if viewerReq != nil && viewerReq.Config == info.ConfigName && viewerReq.Split == split.Name {
 				for _, f := range split.Files {
-					objectKey := common.BuildLfsPath(req.RepoID, f.LfsSHA256, req.Migrated)
+					objectKey := common.SafeBuildLfsPath(req.RepoID, f.LfsSHA256, f.LfsRelativePath, req.Migrated)
 					parquetObjs = append(parquetObjs, objectKey)
 					// parquetObjs = append(parquetObjs, fmt.Sprintf("lfs/%s", f.LfsRelativePath))
 				}

@@ -327,3 +327,45 @@ func TestBuildLfsPath(t *testing.T) {
 		})
 	}
 }
+
+func TestSafeBuildLfsPath(t *testing.T) {
+	type args struct {
+		repoID          int64
+		oid             string
+		lfsRelativePath string
+		migrated        bool
+	}
+	tests := []struct {
+		name string
+		args args
+		want string
+	}{
+		{
+			name: "Test SafeBuildLfsPath when migrated is false and oid is not empty",
+			args: args{repoID: 1, oid: "1234abcde", lfsRelativePath: "", migrated: false},
+			want: "lfs/12/34/abcde",
+		},
+		{
+			name: "Test SafeBuildLfsPath when migrated is true and oid is not empty",
+			args: args{repoID: 1, oid: "1234abcde", lfsRelativePath: "", migrated: true},
+			want: "repos/6b/86/6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b/1234abcde",
+		},
+		{
+			name: "Test SafeBuildLfsPath when migrated is true and oid is empty",
+			args: args{repoID: 1, oid: "", lfsRelativePath: "ab/cd/abcde", migrated: true},
+			want: "lfs/ab/cd/abcde",
+		},
+		{
+			name: "Test SafeBuildLfsPath when migrated is false and oid is empty",
+			args: args{repoID: 1, oid: "", lfsRelativePath: "ab/cd/abcde", migrated: false},
+			want: "lfs/ab/cd/abcde",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := SafeBuildLfsPath(tt.args.repoID, tt.args.oid, tt.args.lfsRelativePath, tt.args.migrated); got != tt.want {
+				t.Errorf("SafeBuildLfsPath() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
