@@ -21,6 +21,7 @@ const (
 const (
 	ScenarioImageProfileCheck  Scenario = "profilePhotoCheck"
 	ScenarioImageBaseLineCheck Scenario = "baselineCheck"
+	ScenarioImageCommentCheck  Scenario = "commentImagecheck"
 )
 
 func (s Scenario) FromString(scenario string) (Scenario, bool) {
