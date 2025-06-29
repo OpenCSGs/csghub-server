@@ -149,7 +149,12 @@ func (c sensitiveComponentImpl) CheckMarkdownContent(ctx context.Context, conten
 
 	// Check multi content
 	var wg sync.WaitGroup
-	errChan := make(chan error, 1+len(imageURLs))
+	numWorkers := 0
+	if text != "" {
+		numWorkers += 1
+	}
+	numWorkers += len(imageURLs)
+	errChan := make(chan error, numWorkers)
 
 	// Check text content
 	if text != "" {
