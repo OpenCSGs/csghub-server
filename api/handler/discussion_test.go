@@ -146,7 +146,7 @@ func TestDiscussionHandler_CreateDiscussionComment(t *testing.T) {
 	})
 	tester.RequireUser(t)
 
-	testContent := "test markdown content. [原图2.png](http://192.168.3.31:9000/opencsg-portal-storage/comment/d2ac13b6-10c1-449b-9a55-b5fe4e245204)![test3.png](http://192.168.3.31:9000/opencsg-portal-storage/comment/d5517313-17c9-456c-9c9b-723099646fd8), contend end."
+	testContent := "test markdown content. [原图2.png](http://example.com/opencsg-portal-storage/comment/d2ac13b6-10c1-449b-9a55-b5fe4e245204)![test3.png](http://example/opencsg-portal-storage/comment/d5517313-17c9-456c-9c9b-723099646fd8), contend end."
 	tester.mocks.sensitive.On("CheckMarkdownContent", tester.Ctx(), testContent, "test-bucket").Return(true, nil)
 	tester.mocks.discussion.EXPECT().CreateDiscussionComment(
 		tester.Ctx(), types.CreateCommentRequest{

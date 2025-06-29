@@ -218,10 +218,6 @@ func (c *sensitiveComponentNoOpImpl) CheckRequestV2(ctx context.Context, req typ
 }
 
 func (c *sensitiveComponentNoOpImpl) CheckMarkdownContent(ctx context.Context, content, ossBucketName string) (bool, error) {
-	// Create a context with 3 seconds timeout for consistency
-	ctx, cancel := context.WithTimeout(ctx, 3*time.Second)
-	defer cancel()
-
 	return true, nil
 }
 
