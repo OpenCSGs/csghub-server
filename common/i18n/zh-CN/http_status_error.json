@@ -1,0 +1,30 @@
+{
+    "error.BadRequest": {
+        "description": "Bad request error message",
+        "other": "{{.method | default \"请求\"}}{{.handler | default \"内容\"}}，由于参数错误，服务器无法理解该请求。"
+    },
+    "error.Unauthorized": {
+        "description": "Unauthorized error message",
+        "other": "{{.method | default \"请求\"}}{{.handler | default \"内容\"}}，需要身份验证，但验证失败或尚未提供验证信息。"
+    },
+    "error.Forbidden": {
+        "description": "Forbidden error message",
+        "other": "{{.method | default \"请求\"}}{{.handler | default \"内容\"}}，您没有权限访问此资源。"
+    },
+    "error.NotFound": {
+        "description": "Not found error message",
+        "other": "{{.method | default \"请求\"}}{{.handler | default \"内容\"}}，找不到请求的资源。"
+    },
+    "error.MethodNotAllowed": {
+        "description": "Method not allowed error message",
+        "other": "{{.method | default \"请求\"}}{{.handler | default \"内容\"}}，请求中指定的方法不允许用于此资源。"
+    },
+    "error.InternalServerError": {
+        "description": "Internal server error message",
+        "other": "{{.method | default \"请求\"}}{{.handler | default \"内容\"}}，服务器遇到了意外情况，导致无法完成请求。"
+    },
+    "error.ServiceUnavailable": {
+        "description": "Service unavailable error message",
+        "other": "{{.method | default \"请求\"}}{{.handler | default \"内容\"}}，服务暂时不可用，请稍后再试。"
+    }
+}

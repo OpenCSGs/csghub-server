@@ -1,0 +1,32 @@
+{
+    "error.AUTH-ERR-0": {
+        "other": "未授權"
+    },
+    "error.AUTH-ERR-1": {
+        "other": "用戶未找到，請先登入"
+    },
+    "error.AUTH-ERR-2": {
+        "other": "權限被拒絕"
+    },
+    "error.AUTH-ERR-3": {
+        "other": "禁止訪問"
+    },
+    "error.AUTH-ERR-4": {
+        "other": "無效的JWT令牌"
+    },
+    "error.AUTH-ERR-5": {
+        "other": "無效的授權標頭"
+    },
+    "error.AUTH-ERR-6": {
+        "other": "僅管理員用戶可以訪問"
+    },
+    "error.AUTH-ERR-7": {
+        "other": "用戶不匹配，嘗試查詢不屬於自己的用戶賬戶"
+    },
+    "error.AUTH-ERR-8": {
+        "other": "需要用户uuid"
+    },
+    "error.AUTH-ERR-9": {
+        "other": "需要API密鑰"
+    }
+}
