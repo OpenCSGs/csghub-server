@@ -1,0 +1,32 @@
+{
+    "error.AUTH-ERR-0": {
+        "other": "未授权"
+    },
+    "error.AUTH-ERR-1": {
+        "other": "用户未找到，请先登录"
+    },
+    "error.AUTH-ERR-2": {
+        "other": "权限被拒绝"
+    },
+    "error.AUTH-ERR-3": {
+        "other": "禁止访问"
+    },
+    "error.AUTH-ERR-4": {
+        "other": "无效的JWT令牌"
+    },
+    "error.AUTH-ERR-5": {
+        "other": "无效的授权标头"
+    },
+    "error.AUTH-ERR-6": {
+        "other": "仅管理员用户可以访问"
+    },
+    "error.AUTH-ERR-7": {
+        "other": "用户不匹配，尝试查询不属于自己的用户账户"
+    },
+    "error.AUTH-ERR-8": {
+        "other": "需要用户uuid"
+    },
+    "error.AUTH-ERR-9": {
+        "other": "需要API密钥"
+    }
+}

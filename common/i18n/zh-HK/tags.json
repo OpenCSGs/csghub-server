@@ -1,0 +1,545 @@
+{
+    "Tag.I18nKey.image-classification": {
+        "other": "圖像分類"
+    },
+    "Tag.I18nKey.image-segmentation": {
+        "other": "圖像分割"
+    },
+    "Tag.I18nKey.ocr": {
+        "other": "光學字元辨識"
+    },
+    "Tag.I18nKey.skin-retouching": {
+        "other": "皮膚美化"
+    },
+    "Tag.I18nKey.image-to-image": {
+        "other": "圖像转圖像"
+    },
+    "Tag.I18nKey.video-detection": {
+        "other": "影片偵測"
+    },
+    "Tag.I18nKey.video-segmentation": {
+        "other": "影片分割"
+    },
+    "Tag.I18nKey.video-generation": {
+        "other": "影片生成"
+    },
+    "Tag.I18nKey.video-captioning": {
+        "other": "影片字幕"
+    },
+    "Tag.I18nKey.face-detection": {
+        "other": "人臉偵測"
+    },
+    "Tag.I18nKey.face-recognition": {
+        "other": "人臉辨識"
+    },
+    "Tag.I18nKey.face-image-generation": {
+        "other": "人臉圖像生成"
+    },
+    "Tag.I18nKey.image-object-detection": {
+        "other": "圖像物件偵測"
+    },
+    "Tag.I18nKey.image-super-resolution": {
+        "other": "圖像超解析度"
+    },
+    "Tag.I18nKey.action-detection": {
+        "other": "動作偵測"
+    },
+    "Tag.I18nKey.semantic-segmentation": {
+        "other": "語義分割"
+    },
+    "Tag.I18nKey.word-segmentation": {
+        "other": "分詞"
+    },
+    "Tag.I18nKey.named-entity-recognition": {
+        "other": "命名實體辨識"
+    },
+    "Tag.I18nKey.part-of-speech": {
+        "other": "詞性標註"
+    },
+    "Tag.I18nKey.document-segmentation": {
+        "other": "文件分割"
+    },
+    "Tag.I18nKey.text-classification": {
+        "other": "文本分類"
+    },
+    "Tag.I18nKey.sentiment-classification": {
+        "other": "情感分類"
+    },
+    "Tag.I18nKey.nli": {
+        "other": "自然語言推論"
+    },
+    "Tag.I18nKey.conversational": {
+        "other": "對話式"
+    },
+    "Tag.I18nKey.translation": {
+        "other": "翻譯"
+    },
+    "Tag.I18nKey.text-generation": {
+        "other": "文本生成"
+    },
+    "Tag.I18nKey.text-summarization": {
+        "other": "文本摘要"
+    },
+    "Tag.I18nKey.feature-extraction": {
+        "other": "特徵提取"
+    },
+    "Tag.I18nKey.relation-extraction": {
+        "other": "關係抽取"
+    },
+    "Tag.I18nKey.auto-speech-recognition": {
+        "other": "自動語音辨識"
+    },
+    "Tag.I18nKey.text-to-speech": {
+        "other": "文本轉語音"
+    },
+    "Tag.I18nKey.audio-classification": {
+        "other": "音訊分類"
+    },
+    "Tag.I18nKey.text-to-image": {
+        "other": "文本转圖像"
+    },
+    "Tag.I18nKey.visual-question-answering": {
+        "other": "視覺問答"
+    },
+    "Tag.I18nKey.image-text-retrieval": {
+        "other": "圖文檢索"
+    },
+    "Tag.I18nKey.zero-shot": {
+        "other": "零樣本"
+    },
+    "Tag.I18nKey.token-classification": {
+        "other": "權杖分類"
+    },
+    "Tag.I18nKey.table-question-answering": {
+        "other": "表格問答"
+    },
+    "Tag.I18nKey.sentence-similarity": {
+        "other": "句子相似度"
+    },
+    "Tag.I18nKey.fill-mask": {
+        "other": "遮罩填充"
+    },
+    "Tag.I18nKey.summarization": {
+        "other": "摘要"
+    },
+    "Tag.I18nKey.question-answering": {
+        "other": "問答"
+    },
+    "Tag.I18nKey.image-to-text": {
+        "other": "圖像转文本"
+    },
+    "Tag.I18nKey.object-detection": {
+        "other": "物件偵測"
+    },
+    "Tag.I18nKey.image-editing": {
+        "other": "圖像編輯"
+    },
+    "Tag.I18nKey.image-generation": {
+        "other": "圖像生成"
+    },
+    "Tag.I18nKey.speech-signal-process": {
+        "other": "語音訊號處理"
+    },
+    "Tag.I18nKey.keyword-spotting": {
+        "other": "關鍵詞檢出"
+    },
+    "Tag.I18nKey.voice-activity-detection": {
+        "other": "語音活動偵測"
+    },
+    "Tag.I18nKey.object-tracking": {
+        "other": "物件追蹤"
+    },
+    "Tag.I18nKey.autonomous-driving": {
+        "other": "自動駕駛"
+    },
+    "Tag.I18nKey.video-super-resolution": {
+        "other": "影片超解析度"
+    },
+    "Tag.I18nKey.image-captioning": {
+        "other": "圖像字幕"
+    },
+    "Tag.I18nKey.visual-grounding": {
+        "other": "視覺定位"
+    },
+    "Tag.I18nKey.biomedicine": {
+        "other": "生物醫藥"
+    },
+    "Tag.I18nKey.protein-structure": {
+        "other": "蛋白質結構"
+    },
+    "Tag.I18nKey.apache-2.0": {
+        "other": "Apache-2.0"
+    },
+    "Tag.I18nKey.mit": {
+        "other": "MIT"
+    },
+    "Tag.I18nKey.lgpl": {
+        "other": "LGPL"
+    },
+    "Tag.I18nKey.lgpl-2.1": {
+        "other": "LGPL-2.1"
+    },
+    "Tag.I18nKey.lgpl-3.0": {
+        "other": "LGPL-3.0"
+    },
+    "Tag.I18nKey.gpl": {
+        "other": "GPL"
+    },
+    "Tag.I18nKey.gpl-2.0": {
+        "other": "GPL-2.0"
+    },
+    "Tag.I18nKey.gpl-3.0": {
+        "other": "GPL-3.0"
+    },
+    "Tag.I18nKey.afl-3.0": {
+        "other": "AFL-3.0"
+    },
+    "Tag.I18nKey.ecl-2.0": {
+        "other": "ECL-2.0"
+    },
+    "Tag.I18nKey.cc-by-4.0": {
+        "other": "CC-BY-4.0"
+    },
+    "Tag.I18nKey.cc-by-nc-nd-3.0": {
+        "other": "CC-BY-NC-ND-3.0"
+    },
+    "Tag.I18nKey.cc-by-nc-nd-4.0": {
+        "other": "CC-BY-NC-ND-4.0"
+    },
+    "Tag.I18nKey.creativeml-openrail-m": {
+        "other": "CreativeML OpenRAIL-M"
+    },
+    "Tag.I18nKey.agpl-3.0": {
+        "other": "AGPL-3.0"
+    },
+    "Tag.I18nKey.cc-by-nc-4.0": {
+        "other": "CC-BY-NC-4.0"
+    },
+    "Tag.I18nKey.cc-by-nc-sa-2.0": {
+        "other": "CC-BY-NC-SA-2.0"
+    },
+    "Tag.I18nKey.cc-by-nc-sa-3.0": {
+        "other": "CC-BY-NC-SA-3.0"
+    },
+    "Tag.I18nKey.cc-by-nc-sa-4.0": {
+        "other": "CC-BY-NC-SA-4.0"
+    },
+    "Tag.I18nKey.cc": {
+        "other": "CC"
+    },
+    "Tag.I18nKey.cc0-1.0": {
+        "other": "CC0-1.0"
+    },
+    "Tag.I18nKey.pytorch": {
+        "other": "PyTorch"
+    },
+    "Tag.I18nKey.tensorflow": {
+        "other": "TensorFlow"
+    },
+    "Tag.I18nKey.safetensors": {
+        "other": "SafeTensors"
+    },
+    "Tag.I18nKey.jax": {
+        "other": "JAX"
+    },
+    "Tag.I18nKey.onnx": {
+        "other": "ONNX"
+    },
+    "Tag.I18nKey.paddlepaddle": {
+        "other": "PaddlePaddle"
+    },
+    "Tag.I18nKey.joblib": {
+        "other": "Joblib"
+    },
+    "Tag.I18nKey.gguf": {
+        "other": "GGUF"
+    },
+    "Tag.I18nKey.Automotive": {
+        "other": "汽車"
+    },
+    "Tag.I18nKey.Manufacturing": {
+        "other": "製造業"
+    },
+    "Tag.I18nKey.Energy": {
+        "other": "能源"
+    },
+    "Tag.I18nKey.Telecommunications and Electronic Information": {
+        "other": "電訊及電子資訊"
+    },
+    "Tag.I18nKey.Transportation and Logistics": {
+        "other": "交通運輸與物流"
+    },
+    "Tag.I18nKey.Construction and Real Estate": {
+        "other": "建築與房地產"
+    },
+    "Tag.I18nKey.Financial Services": {
+        "other": "金融服務"
+    },
+    "Tag.I18nKey.Agriculture": {
+        "other": "農業"
+    },
+    "Tag.I18nKey.Chemical Industry": {
+        "other": "化學工業"
+    },
+    "Tag.I18nKey.Environmental Protection": {
+        "other": "環境保護"
+    },
+    "Tag.I18nKey.Healthcare and Medical Services": {
+        "other": "醫療健康"
+    },
+    "Tag.I18nKey.Education and Training": {
+        "other": "教育培訓"
+    },
+    "Tag.I18nKey.Food and Beverage": {
+        "other": "食品飲品"
+    },
+    "Tag.I18nKey.Retail and Consumer Goods": {
+        "other": "零售與消費品"
+    },
+    "Tag.I18nKey.Tourism and Hospitality": {
+        "other": "旅遊與款待"
+    },
+    "Tag.I18nKey.Information Technology (IT)": {
+        "other": "資訊科技(IT)"
+    },
+    "Tag.I18nKey.Culture and Entertainment": {
+        "other": "文化娛樂"
+    },
+    "Tag.I18nKey.Ascend": {
+        "other": "昇騰(Ascend)"
+    },
+    "Tag.I18nKey.Vllm": {
+        "other": "VLLM"
+    },
+    "Tag.I18nKey.TGI": {
+        "other": "TGI"
+    },
+    "Tag.I18nKey.Mindie": {
+        "other": "MindIE"
+    },
+    "Tag.I18nKey.NIM": {
+        "other": "NIM"
+    },
+    "Tag.I18nKey.Llama factory": {
+        "other": "Llama Factory"
+    },
+    "Tag.I18nKey.Swift": {
+        "other": "Swift"
+    },
+    "Tag.I18nKey.knowledge": {
+        "other": "知識"
+    },
+    "Tag.I18nKey.reasoning": {
+        "other": "推理"
+    },
+    "Tag.I18nKey.examination": {
+        "other": "考試"
+    },
+    "Tag.I18nKey.understanding": {
+        "other": "理解"
+    },
+    "Tag.I18nKey.code": {
+        "other": "程式碼"
+    },
+    "Tag.I18nKey.bias": {
+        "other": "偏見"
+    },
+    "Tag.I18nKey.other": {
+        "other": "其他"
+    },
+    "Tag.I18nKey.OpenCompass": {
+        "other": "OpenCompass"
+    },
+    "Tag.I18nKey.lm-evaluation-harness": {
+        "other": "lm-evaluation-harness"
+    },
+    "Tag.I18nKey.Benchmark": {
+        "other": "基準測試"
+    },
+    "Tag.I18nKey.SGLang": {
+        "other": "SGLang"
+    },
+    "Tag.I18nKey.Llama.cpp": {
+        "other": "Llama.cpp"
+    },
+    "Tag.I18nKey.TEI": {
+        "other": "TEI"
+    },
+    "Tag.I18nKey.Ktransformers": {
+        "other": "Ktransformers"
+    },
+    "Tag.I18nKey.image-text-to-text": {
+        "other": "圖文转文本"
+    },
+    "Tag.I18nKey.text-to-video": {
+        "other": "文本转影片"
+    },
+    "Tag.I18nKey.video-text-to-text": {
+        "other": "影片转文本"
+    },
+    "Tag.I18nKey.any-to-any": {
+        "other": "任意到任意"
+    },
+    "Tag.I18nKey.audio-text-to-text": {
+        "other": "音訊转文本"
+    },
+    "Tag.I18nKey.English": {
+        "other": "英文"
+    },
+    "Tag.I18nKey.Arabic": {
+        "other": "阿拉伯文"
+    },
+    "Tag.I18nKey.German": {
+        "other": "德文"
+    },
+    "Tag.I18nKey.Spanish": {
+        "other": "西班牙文"
+    },
+    "Tag.I18nKey.French": {
+        "other": "法文"
+    },
+    "Tag.I18nKey.Italian": {
+        "other": "意大利文"
+    },
+    "Tag.I18nKey.Dutch": {
+        "other": "荷蘭文"
+    },
+    "Tag.I18nKey.Portuguese": {
+        "other": "葡萄牙文"
+    },
+    "Tag.I18nKey.Russian": {
+        "other": "俄文"
+    },
+    "Tag.I18nKey.Japanese": {
+        "other": "日文"
+    },
+    "Tag.I18nKey.Hindi": {
+        "other": "印地文"
+    },
+    "Tag.I18nKey.Korean": {
+        "other": "韓文"
+    },
+    "Tag.I18nKey.Polish": {
+        "other": "波蘭文"
+    },
+    "Tag.I18nKey.Turkish": {
+        "other": "土耳其文"
+    },
+    "Tag.I18nKey.Swedish": {
+        "other": "瑞典文"
+    },
+    "Tag.I18nKey.TypeScript": {
+        "other": "TypeScript"
+    },
+    "Tag.I18nKey.Python": {
+        "other": "Python"
+    },
+    "Tag.I18nKey.Go": {
+        "other": "Go"
+    },
+    "Tag.I18nKey.Java": {
+        "other": "Java"
+    },
+    "Tag.I18nKey.local": {
+        "other": "本地"
+    },
+    "Tag.I18nKey.remote": {
+        "other": "遠端"
+    },
+    "Tag.I18nKey.hybrid": {
+        "other": "混合"
+    },
+    "Tag.I18nKey.official": {
+        "other": "官方"
+    },
+    "Tag.I18nKey.claimed": {
+        "other": "聲稱"
+    },
+    "Tag.I18nKey.art & culture": {
+        "other": "藝術與文化"
+    },
+    "Tag.I18nKey.browser automation": {
+        "other": "瀏覽器自動化"
+    },
+    "Tag.I18nKey.cloud platforms": {
+        "other": "雲端平台"
+    },
+    "Tag.I18nKey.communication": {
+        "other": "通訊"
+    },
+    "Tag.I18nKey.customer data platforms": {
+        "other": "客戶數據平台"
+    },
+    "Tag.I18nKey.databases": {
+        "other": "數據庫"
+    },
+    "Tag.I18nKey.developer tools": {
+        "other": "開發者工具"
+    },
+    "Tag.I18nKey.file systems": {
+        "other": "檔案系統"
+    },
+    "Tag.I18nKey.knowledge & memory": {
+        "other": "知識與記憶"
+    },
+    "Tag.I18nKey.location services": {
+        "other": "位置服務"
+    },
+    "Tag.I18nKey.marketing": {
+        "other": "市場營銷"
+    },
+    "Tag.I18nKey.monitoring": {
+        "other": "監控"
+    },
+    "Tag.I18nKey.search": {
+        "other": "搜尋"
+    },
+    "Tag.I18nKey.version control": {
+        "other": "版本控制"
+    },
+    "Tag.I18nKey.finance": {
+        "other": "金融"
+    },
+    "Tag.I18nKey.research & data": {
+        "other": "研究與數據"
+    },
+    "Tag.I18nKey.social media": {
+        "other": "社交媒體"
+    },
+    "Tag.I18nKey.os automation": {
+        "other": "作業系統自動化"
+    },
+    "Tag.I18nKey.note taking": {
+        "other": "筆記記錄"
+    },
+    "Tag.I18nKey.cloud storage": {
+        "other": "雲端儲存"
+    },
+    "Tag.I18nKey.e-commerce & retail": {
+        "other": "電子商務與零售"
+    },
+    "Tag.I18nKey.education & learning tools": {
+        "other": "教育與學習工具"
+    },
+    "Tag.I18nKey.customer support": {
+        "other": "客戶支援"
+    },
+    "Tag.I18nKey.language translation": {
+        "other": "語言翻譯"
+    },
+    "Tag.I18nKey.healthcare": {
+        "other": "醫療保健"
+    },
+    "Tag.I18nKey.image & video processing": {
+        "other": "圖像與影片處理"
+    },
+    "Tag.I18nKey.security": {
+        "other": "安全"
+    },
+    "Tag.I18nKey.AGPL": {
+        "other": "AGPL"
+    },
+    "Tag.I18nKey.BSD-3-Clause": {
+        "other": "BSD-3-Clause"
+    }
+}

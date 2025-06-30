@@ -1,75 +1,28 @@
 package i18n
 
 import (
-	"embed"
-	"encoding/json"
 	"log/slog"
 	"net/http"
-	"path/filepath"
 	"reflect"
-	"strings"
 	text_tmpl "text/template"
 
 	"github.com/nicksnyder/go-i18n/v2/i18n"
 	"github.com/nicksnyder/go-i18n/v2/i18n/template"
-	"golang.org/x/text/language"
 )
 
-var LocalizerMap map[string]*i18n.Localizer
-var Matcher language.Matcher
-
-//go:embed *.json
-var i18nConfigFiles embed.FS
-
-func InitLocalizersFromEmbedFile() {
-	bundle := i18n.NewBundle(language.English)
-	bundle.RegisterUnmarshalFunc("json", json.Unmarshal)
-
-	LocalizerMap = make(map[string]*i18n.Localizer)
-
-	fileList, err := i18nConfigFiles.ReadDir(".")
-	if err != nil {
-		slog.Error("Failed to read i18n config files", slog.Any("error", err))
-		return
-	}
-	supportedLang := make([]language.Tag, 0)
-	for _, file := range fileList {
-		fileName := file.Name()
-		lang := strings.TrimSuffix(fileName, filepath.Ext(fileName))
-		data, err := i18nConfigFiles.ReadFile(fileName)
-		if err != nil {
-			slog.Error("Failed to read i18n config file", slog.String("file", fileName+".json"), slog.Any("error", err))
-			continue
-		}
-		bundle.MustParseMessageFileBytes(data, fileName)
-		localizer := i18n.NewLocalizer(bundle, lang)
-		LocalizerMap[lang] = localizer
-		tag, err := language.Parse(lang)
-		if err != nil {
-			slog.Error("Failed to parse language tag", slog.String("lang", lang), slog.Any("error", err))
-			continue
-		}
-		supportedLang = append(supportedLang, tag)
-	}
-	Matcher = language.NewMatcher(supportedLang)
-}
-
-func TranslateText(lang, messageID, defaultMessage string) string {
+func TranslateText(lang, messageID, defaultMessage string) (string, bool) {
 	localizer, ok := LocalizerMap[lang]
 	if !ok {
 		slog.Error("Language not supported", slog.String("lang", lang))
-		return defaultMessage
+		return defaultMessage, false
 	}
 	message, err := localizer.Localize(&i18n.LocalizeConfig{
 		MessageID: messageID,
 	})
 	if err != nil {
-		if defaultMessage == "" {
-			slog.Error("Failed to translate message", slog.String("messageID", messageID), slog.String("lang", lang), slog.Any("error", err))
-		}
-		return defaultMessage
+		return defaultMessage, false
 	}
-	return message
+	return message, true
 }
 
 // TranslateTextWithData for translate with template
@@ -148,7 +101,7 @@ func TranslateInterface(v interface{}, lang string) interface{} {
 						oldValue := fieldValue.String()
 						// Translate the string field using the i18n tag
 						// If the i18n tag is not set, use the field name as the default value
-						newValue := TranslateText(lang, i18nTag+"."+oldValue, oldValue)
+						newValue, _ := TranslateText(lang, i18nTag+"."+oldValue, oldValue)
 
 						newStruct.Field(i).SetString(newValue)
 						// val.Elem().Field(i).SetString(newValue)

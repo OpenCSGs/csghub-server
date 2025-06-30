@@ -1,0 +1,29 @@
+{
+    "method.get": {
+        "other": "獲取"
+    },
+    "method.post": {
+        "other": "創建"
+    },
+    "method.put": {
+        "other": "更新"
+    },
+    "method.delete": {
+        "other": "刪除"
+    },
+    "method.head": {
+        "other": "請求標頭"
+    },
+    "method.patch": {
+        "other": "部分更新"
+    },
+    "method.options": {
+        "other": "請求通信選項"
+    },
+    "method.connect": {
+        "other": "建立連接"
+    },
+    "method.trace": {
+        "other": "追蹤請求"
+    }
+}
