@@ -406,7 +406,7 @@ func (c *gitHTTPComponentImpl) LfsUpload(ctx context.Context, body io.ReadCloser
 		return err
 	}
 	if !allowed {
-		return errorx.ErrPermissionDenied
+		return errorx.ErrForbidden
 	}
 
 	pointer := types.Pointer{Oid: req.Oid, Size: req.Size}
@@ -622,7 +622,7 @@ func (c *gitHTTPComponentImpl) UnLock(ctx context.Context, req types.UnlockLFSRe
 	}
 
 	if !req.Force && lock.UserID != user.ID {
-		return nil, errorx.ErrPermissionDenied
+		return nil, errorx.ErrForbidden
 	}
 	err = c.lfsLockStore.RemoveByID(ctx, req.ID)
 	if err != nil {
