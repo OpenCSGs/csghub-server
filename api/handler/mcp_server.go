@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
-	"net/http"
 	"slices"
 	"strconv"
 
@@ -56,14 +55,14 @@ func (h *MCPServerHandler) Create(ctx *gin.Context) {
 	var req *types.CreateMCPServerReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {
 		slog.Error("Bad request format for create mcp server", "error", err)
-		httpbase.BadRequest(ctx, err.Error())
+		httpbase.BadRequestWithExt(ctx, errorx.ReqBodyFormat(err, nil))
 		return
 	}
 
 	_, err := h.sensitive.CheckRequestV2(ctx.Request.Context(), req)
 	if err != nil {
 		slog.Error("failed to check sensitive for mcp create request", slog.Any("error", err))
-		httpbase.BadRequest(ctx, fmt.Errorf("sensitive check failed: %w", err).Error())
+		httpbase.ServerError(ctx, fmt.Errorf("sensitive check failed: %w", err))
 		return
 	}
 
@@ -101,7 +100,7 @@ func (h *MCPServerHandler) Delete(ctx *gin.Context) {
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
 	if err != nil {
 		slog.Error("Bad request format for remove mcp server", "error", err)
-		httpbase.BadRequest(ctx, err.Error())
+		httpbase.BadRequestWithExt(ctx, err)
 		return
 	}
 
@@ -147,14 +146,14 @@ func (h *MCPServerHandler) Update(ctx *gin.Context) {
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
 	if err != nil {
 		slog.Error("Bad mcp server request format", "error", err)
-		httpbase.BadRequest(ctx, err.Error())
+		httpbase.BadRequestWithExt(ctx, err)
 		return
 	}
 
 	var req *types.UpdateMCPServerReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {
 		slog.Error("Bad request body format for update mcp server", "error", err)
-		httpbase.BadRequest(ctx, err.Error())
+		httpbase.BadRequestWithExt(ctx, errorx.ReqBodyFormat(err, nil))
 		return
 	}
 
@@ -165,7 +164,7 @@ func (h *MCPServerHandler) Update(ctx *gin.Context) {
 	_, err = h.sensitive.CheckRequestV2(ctx.Request.Context(), req)
 	if err != nil {
 		slog.Error("failed to check sensitive request for update mcp server", slog.Any("error", err))
-		httpbase.BadRequest(ctx, fmt.Errorf("sensitive check failed: %w", err).Error())
+		httpbase.ServerError(ctx, fmt.Errorf("sensitive check failed: %w", err))
 		return
 	}
 
@@ -203,7 +202,7 @@ func (h *MCPServerHandler) Show(ctx *gin.Context) {
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
 	if err != nil {
 		slog.Error("Bad request format", "error", err)
-		httpbase.BadRequest(ctx, err.Error())
+		httpbase.BadRequestWithExt(ctx, err)
 		return
 	}
 	currentUser := httpbase.GetCurrentUser(ctx)
@@ -261,14 +260,15 @@ func (h *MCPServerHandler) Index(ctx *gin.Context) {
 	per, page, err := common.GetPerAndPageFromContext(ctx)
 	if err != nil {
 		slog.Error("Bad request format for mcp list", "error", err)
-		httpbase.BadRequest(ctx, err.Error())
+		httpbase.BadRequestWithExt(ctx, err)
 		return
 	}
 	filter = getFilterFromContext(ctx, filter)
 	if !slices.Contains(types.Sorts, filter.Sort) {
-		msg := fmt.Sprintf("sort parameter must be one of %v", types.Sorts)
-		slog.Error("check list mcp server filter", slog.String("msg", msg))
-		ctx.JSON(http.StatusBadRequest, gin.H{"message": msg})
+		err = fmt.Errorf("sort parameter must be one of %v", types.Sorts)
+		err = errorx.ReqParamInvalid(err, errorx.Ctx().Set("query", "sort_filter"))
+		slog.Error("check list mcp server filter", slog.Any("filter", filter))
+		httpbase.BadRequestWithExt(ctx, err)
 		return
 	}
 
@@ -313,7 +313,7 @@ func (h *MCPServerHandler) Properties(ctx *gin.Context) {
 	per, page, err := common.GetPerAndPageFromContext(ctx)
 	if err != nil {
 		slog.Error("Bad request format for mcp property list", "error", err)
-		httpbase.BadRequest(ctx, err.Error())
+		httpbase.BadRequestWithExt(ctx, err)
 		return
 	}
 	req := &types.MCPPropertyFilter{
@@ -359,21 +359,21 @@ func (h *MCPServerHandler) Deploy(ctx *gin.Context) {
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
 	if err != nil {
 		slog.Error("Bad mcp server request format", "error", err)
-		httpbase.BadRequest(ctx, err.Error())
+		httpbase.BadRequestWithExt(ctx, err)
 		return
 	}
 
 	var req *types.DeployMCPServerReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {
 		slog.Error("Bad request format for deploy mcp server", "error", err)
-		httpbase.BadRequest(ctx, err.Error())
+		httpbase.BadRequestWithExt(ctx, errorx.ReqBodyFormat(err, nil))
 		return
 	}
 
 	_, err = h.sensitive.CheckRequestV2(ctx.Request.Context(), req)
 	if err != nil {
 		slog.Error("failed to check sensitive for mcp deploy request", slog.Any("error", err))
-		httpbase.BadRequest(ctx, fmt.Errorf("sensitive check failed: %w", err).Error())
+		httpbase.ServerError(ctx, fmt.Errorf("sensitive check failed: %w", err))
 		return
 	}
 
@@ -388,6 +388,12 @@ func (h *MCPServerHandler) Deploy(ctx *gin.Context) {
 
 	if len(req.Nickname) < 1 {
 		req.Nickname = req.Name
+	}
+
+	valid, err := common.IsValidName(req.Name)
+	if !valid {
+		httpbase.BadRequestWithExt(ctx, errorx.ReqParamInvalid(err, errorx.Ctx().Set("create", "repo_name")))
+		return
 	}
 
 	respData, err := h.mcpComp.Deploy(ctx.Request.Context(), req)
