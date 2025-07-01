@@ -2,7 +2,6 @@ package component
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"log/slog"
 	"time"
@@ -84,12 +83,12 @@ func (c *datasetComponentImpl) Create(ctx context.Context, req *types.CreateData
 
 	namespace, err := c.namespaceStore.FindByPath(ctx, req.Namespace)
 	if err != nil {
-		return nil, errors.New("namespace does not exist")
+		return nil, fmt.Errorf("namespace does not exist, error: %w", err)
 	}
 
 	user, err := c.userStore.FindByUsername(ctx, req.Username)
 	if err != nil {
-		return nil, errors.New("user does not exist")
+		return nil, fmt.Errorf("user does not exist, error: %w", err)
 	}
 	if !user.CanAdmin() {
 		if namespace.NamespaceType == database.OrgNamespace {
@@ -98,11 +97,11 @@ func (c *datasetComponentImpl) Create(ctx context.Context, req *types.CreateData
 				return nil, err
 			}
 			if !canWrite {
-				return nil, errors.New("users do not have permission to create datasets in this organization")
+				return nil, errorx.ErrForbiddenMsg("users do not have permission to create datasets in this organization")
 			}
 		} else {
 			if namespace.Path != user.Username {
-				return nil, errors.New("users do not have permission to create datasets in this namespace")
+				return nil, errorx.ErrForbiddenMsg("users do not have permission to create datasets in this namespace")
 			}
 		}
 	}
@@ -223,8 +222,7 @@ func (c *datasetComponentImpl) commonIndex(ctx context.Context, filter *types.Re
 	)
 	repos, total, err := c.repoComponent.PublicToUser(ctx, types.DatasetRepo, filter.Username, filter, per, page)
 	if err != nil {
-		newError := fmt.Errorf("failed to get public dataset repos,error:%w", err)
-		return nil, 0, newError
+		return nil, 0, fmt.Errorf("failed to get public dataset repos, error: %w", err)
 	}
 	var repoIDs []int64
 	for _, repo := range repos {
@@ -232,8 +230,7 @@ func (c *datasetComponentImpl) commonIndex(ctx context.Context, filter *types.Re
 	}
 	datasets, err := c.datasetStore.ByRepoIDs(ctx, repoIDs)
 	if err != nil {
-		newError := fmt.Errorf("failed to get datasets by repo ids,error:%w", err)
-		return nil, 0, newError
+		return nil, 0, fmt.Errorf("failed to get datasets by repo ids, error: %w", err)
 	}
 
 	// loop through repos to keep the repos in sort order
@@ -389,8 +386,7 @@ func (c *datasetComponentImpl) Show(ctx context.Context, namespace, name, curren
 
 	likeExists, err := c.userLikesStore.IsExist(ctx, currentUser, dataset.Repository.ID)
 	if err != nil {
-		newError := fmt.Errorf("failed to check for the presence of the user likes,error:%w", err)
-		return nil, newError
+		return nil, fmt.Errorf("failed to check for the presence of the user likes, error: %w", err)
 	}
 
 	resDataset := &types.Dataset{
@@ -487,9 +483,7 @@ func (c *datasetComponentImpl) OrgDatasets(ctx context.Context, req *types.OrgDa
 	onlyPublic := !r.CanRead()
 	datasets, total, err := c.datasetStore.ByOrgPath(ctx, req.Namespace, req.PageSize, req.Page, onlyPublic)
 	if err != nil {
-		newError := fmt.Errorf("failed to get user datasets,error:%w", err)
-		slog.Error(newError.Error())
-		return nil, 0, newError
+		return nil, 0, fmt.Errorf("failed to get user datasets, error: %w", err)
 	}
 
 	for _, data := range datasets {
