@@ -73,7 +73,7 @@ func (d *deployer) serverlessDeploy(ctx context.Context, dr types.DeployRepo) (*
 	} else {
 		deploy, err = d.deployTaskStore.GetServerlessDeployByRepID(ctx, dr.RepoID)
 	}
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil
 	}
 	if err != nil {
