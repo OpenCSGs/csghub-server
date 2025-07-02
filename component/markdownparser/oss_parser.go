@@ -32,7 +32,7 @@ type OSSParserComponent interface {
 	// ParseOSSUrl parses OSS URL and extracts information
 	ParseOSSUrl(url string) (*OSSImageInfo, error)
 	// IsWhitelistedImage checks if the image is in the whitelist
-	IsWhitelistedImage(imgNode *ast.Image, source []byte) bool
+	IsWhitelistedImage(imgNode *ast.Image) bool
 }
 
 // ossParserComponentImpl implements OSSParserComponent interface
@@ -74,7 +74,7 @@ func (o *ossParserComponentImpl) ParseOSSUrl(url string) (*OSSImageInfo, error) 
 }
 
 // IsWhitelistedImage checks if the image is in the whitelist
-func (o *ossParserComponentImpl) IsWhitelistedImage(imgNode *ast.Image, source []byte) bool {
+func (o *ossParserComponentImpl) IsWhitelistedImage(imgNode *ast.Image) bool {
 	urlStr := string(imgNode.Destination)
 	urlExt := strings.ToLower(path.Ext(urlStr))
 	if o.whitelistedExtensions[urlExt] {
@@ -120,7 +120,7 @@ func (o *ossParserComponentImpl) ParseMarkdownAndFilter(markdownContent string) 
 
 		if img, isImage := node.(*ast.Image); isImage {
 			urlStr := string(img.Destination)
-			if o.IsWhitelistedImage(img, source) && o.ossUrlRegex.MatchString(urlStr) {
+			if o.IsWhitelistedImage(img) && o.ossUrlRegex.MatchString(urlStr) {
 				if info, err := o.ParseOSSUrl(urlStr); err == nil {
 					OssImageInfoList = append(OssImageInfoList, info)
 					// 记录需要移除的图片URL

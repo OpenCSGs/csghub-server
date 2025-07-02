@@ -116,7 +116,7 @@ func TestIsWhitelistedImage(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := parser.IsWhitelistedImage(tt.img, tt.source)
+			result := parser.IsWhitelistedImage(tt.img)
 			assert.Equal(t, tt.expected, result)
 		})
 	}
