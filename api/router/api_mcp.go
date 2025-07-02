@@ -13,7 +13,7 @@ func CreateMCPServerRoutes(
 	mcpServerHandler *handler.MCPServerHandler,
 	repoCommonHandler *handler.RepoHandler) {
 	mcpGroup := apiGroup.Group("/mcps")
-	mcpGroup.Use(middleware.RepoType(types.MCPServerRepo))
+	mcpGroup.Use(middleware.RepoType(types.MCPServerRepo), middlewareCollection.Repo.RepoExists)
 	{
 		// mcp server handler functions
 		mcpGroup.GET("", mcpServerHandler.Index)
@@ -24,7 +24,6 @@ func CreateMCPServerRoutes(
 		mcpGroup.DELETE("/:namespace/:name", middlewareCollection.Auth.NeedLogin, mcpServerHandler.Delete)
 		mcpGroup.PUT("/:namespace/:name", middlewareCollection.Auth.NeedLogin, mcpServerHandler.Update)
 		mcpGroup.POST("/:namespace/:name/deploys", middlewareCollection.Auth.NeedLogin, mcpServerHandler.Deploy)
-
 	}
 	{
 		// repo common handler functions
