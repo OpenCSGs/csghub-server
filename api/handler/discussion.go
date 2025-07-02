@@ -16,9 +16,8 @@ import (
 )
 
 type DiscussionHandler struct {
-	discussion    component.DiscussionComponent
-	sensitive     component.SensitiveComponent
-	ossBucketName string
+	discussion component.DiscussionComponent
+	sensitive  component.SensitiveComponent
 }
 
 func NewDiscussionHandler(config *config.Config) (*DiscussionHandler, error) {
@@ -28,9 +27,8 @@ func NewDiscussionHandler(config *config.Config) (*DiscussionHandler, error) {
 		return nil, fmt.Errorf("failed to create sensitive component: %w", err)
 	}
 	return &DiscussionHandler{
-		discussion:    dc,
-		sensitive:     sc,
-		ossBucketName: config.S3.Bucket,
+		discussion: dc,
+		sensitive:  sc,
 	}, nil
 }
 
@@ -273,7 +271,7 @@ func (h *DiscussionHandler) CreateDiscussionComment(ctx *gin.Context) {
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
-	_, err = h.sensitive.CheckMarkdownContent(ctx.Request.Context(), req.Content, h.ossBucketName)
+	_, err = h.sensitive.CheckMarkdownContent(ctx.Request.Context(), req.Content)
 	if err != nil {
 		slog.Error("failed to check sensitive request", slog.Any("error", err))
 		httpbase.BadRequest(ctx, fmt.Errorf("sensitive check failed: %w", err).Error())
@@ -324,7 +322,7 @@ func (h *DiscussionHandler) UpdateComment(ctx *gin.Context) {
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
-	_, err = h.sensitive.CheckMarkdownContent(ctx.Request.Context(), req.Content, h.ossBucketName)
+	_, err = h.sensitive.CheckMarkdownContent(ctx.Request.Context(), req.Content)
 	if err != nil {
 		slog.Error("failed to check sensitive request", slog.Any("error", err))
 		httpbase.BadRequest(ctx, fmt.Errorf("sensitive check failed: %w", err).Error())

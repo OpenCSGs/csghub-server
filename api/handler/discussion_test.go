@@ -24,9 +24,8 @@ func NewDiscussionTester(t *testing.T) *DiscussionTester {
 	tester.mocks.sensitive = mockcomponent.NewMockSensitiveComponent(t)
 
 	tester.handler = &DiscussionHandler{
-		discussion:    tester.mocks.discussion,
-		sensitive:     tester.mocks.sensitive,
-		ossBucketName: "test-bucket",
+		discussion: tester.mocks.discussion,
+		sensitive:  tester.mocks.sensitive,
 	}
 	tester.WithParam("namespace", "u")
 	tester.WithParam("name", "r")
@@ -147,7 +146,7 @@ func TestDiscussionHandler_CreateDiscussionComment(t *testing.T) {
 	tester.RequireUser(t)
 
 	testContent := "test markdown content. [原图2.png](http://example.com/opencsg-portal-storage/comment/d2ac13b6-10c1-449b-9a55-b5fe4e245204)![test3.png](http://example/opencsg-portal-storage/comment/d5517313-17c9-456c-9c9b-723099646fd8), contend end."
-	tester.mocks.sensitive.On("CheckMarkdownContent", tester.Ctx(), testContent, "test-bucket").Return(true, nil)
+	tester.mocks.sensitive.On("CheckMarkdownContent", tester.Ctx(), testContent).Return(true, nil)
 	tester.mocks.discussion.EXPECT().CreateDiscussionComment(
 		tester.Ctx(), types.CreateCommentRequest{
 			CurrentUser:   "u",
@@ -169,7 +168,7 @@ func TestDiscussionHandler_UpdateComment(t *testing.T) {
 	})
 	tester.RequireUser(t)
 
-	tester.mocks.sensitive.On("CheckMarkdownContent", tester.Ctx(), "foo", "test-bucket").Return(true, nil)
+	tester.mocks.sensitive.On("CheckMarkdownContent", tester.Ctx(), "foo").Return(true, nil)
 	tester.mocks.discussion.EXPECT().UpdateComment(
 		tester.Ctx(), "u", int64(1), "foo",
 	).Return(nil)

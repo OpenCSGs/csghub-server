@@ -74,6 +74,7 @@ enable = false
 access_key_id = ""
 access_key_secret = ""
 region = ""
+max_image_count = 10
 endpoint = "oss-cn-beijing.aliyuncs.com"
 enable_ssl = true
 

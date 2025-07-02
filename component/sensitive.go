@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
-	"regexp"
 	"sync"
 	"time"
 
@@ -13,22 +12,24 @@ import (
 	"opencsg.com/csghub-server/builder/sensitive"
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/types"
+	"opencsg.com/csghub-server/component/markdownparser"
 )
 
 const (
-	maxImageCount      = 10
 	checkTimeoutSecond = 3
 )
 
 type sensitiveComponentImpl struct {
-	checker rpc.ModerationSvcClient
+	checker        rpc.ModerationSvcClient
+	markDownParser markdownparser.OSSParserComponent
+	maxImageCount  int
 }
 
 type SensitiveComponent interface {
 	CheckText(ctx context.Context, scenario, text string) (bool, error)
 	CheckImage(ctx context.Context, scenario, ossBucketName, ossObjectName string) (bool, error)
 	CheckRequestV2(ctx context.Context, req types.SensitiveRequestV2) (bool, error)
-	CheckMarkdownContent(ctx context.Context, content, ossBucketName string) (bool, error)
+	CheckMarkdownContent(ctx context.Context, content string) (bool, error)
 }
 
 func NewSensitiveComponent(cfg *config.Config) (SensitiveComponent, error) {
@@ -36,7 +37,10 @@ func NewSensitiveComponent(cfg *config.Config) (SensitiveComponent, error) {
 		return &sensitiveComponentNoOpImpl{}, nil
 	}
 
-	c := &sensitiveComponentImpl{}
+	c := &sensitiveComponentImpl{
+		markDownParser: markdownparser.NewOSSParserComponent(),
+		maxImageCount:  cfg.SensitiveCheck.MaxImageCount,
+	}
 	c.checker = rpc.NewModerationSvcHttpClient(fmt.Sprintf("%s:%d", cfg.Moderation.Host, cfg.Moderation.Port))
 	return c, nil
 }
@@ -108,41 +112,48 @@ func (c sensitiveComponentImpl) runCheckInGoroutine(ctx context.Context, wg *syn
 }
 
 // CheckMarkdownContent concurrently checks markdown content for sensitive text and images.
-func (c sensitiveComponentImpl) CheckMarkdownContent(ctx context.Context, content, ossBucketName string) (bool, error) {
+func (c sensitiveComponentImpl) CheckMarkdownContent(ctx context.Context, content string) (bool, error) {
 	// Create a context with checkTimeoutSecond seconds timeout
 	ctx, cancel := context.WithTimeout(ctx, checkTimeoutSecond*time.Second)
 	defer cancel()
 
 	// Default OSS bucket name for image checking
-	text, imageURLs := parseMarkdownContent(content)
+	parseResult, err := c.markDownParser.ParseMarkdownAndFilter(content)
+	if err != nil {
+		return false, err
+	}
 
 	// Limit the number of pictures to prevent malicious large-scale data requests from consuming resources
-	if len(imageURLs) > maxImageCount {
-		return false, fmt.Errorf("too many images: %d, maximum allowed: %d", len(imageURLs), maxImageCount)
+	if len(parseResult.OssImageInfoList) > c.maxImageCount {
+		return false, fmt.Errorf("too many images: %d, maximum allowed: %d", len(parseResult.OssImageInfoList), c.maxImageCount)
 	}
 
 	// Text only
-	if text != "" && len(imageURLs) == 0 {
-		isPass, err := c.CheckText(ctx, string(sensitive.ScenarioCommentDetection), text)
+	if parseResult.Text != "" && len(parseResult.OssImageInfoList) == 0 {
+		isPass, err := c.CheckText(ctx, string(sensitive.ScenarioCommentDetection), parseResult.Text)
 		if err != nil {
 			return false, err
 		}
 		if !isPass {
-			slog.Error("found sensitive words in request", slog.String("field", text))
-			return false, errors.New("found sensitive words in field: " + text)
+			slog.Error("found sensitive words in request", slog.String("field", parseResult.Text))
+			return false, errors.New("found sensitive words in field: " + parseResult.Text)
 		}
 		return isPass, nil
 	}
 
 	// Only one image
-	if text == "" && len(imageURLs) == 1 {
-		isPass, err := c.CheckImage(ctx, string(sensitive.ScenarioImageCommentCheck), ossBucketName, imageURLs[0])
+	if parseResult.Text == "" && len(parseResult.OssImageInfoList) == 1 {
+		isPass, err := c.CheckImage(
+			ctx,
+			string(sensitive.ScenarioImagePostImageCheck),
+			parseResult.OssImageInfoList[0].BucketName,
+			parseResult.OssImageInfoList[0].ObjectName)
 		if err != nil {
 			return false, err
 		}
 		if !isPass {
-			slog.Error("found sensitive iamges in request", slog.String("field", imageURLs[0]))
-			return false, errors.New("found sensitive iamges in field: " + text)
+			slog.Error("found sensitive iamges in request", slog.String("field", parseResult.OssImageInfoList[0].ObjectName))
+			return false, errors.New("found sensitive iamges in field: " + parseResult.OssImageInfoList[0].ObjectName)
 		}
 		return isPass, nil
 	}
@@ -150,25 +161,25 @@ func (c sensitiveComponentImpl) CheckMarkdownContent(ctx context.Context, conten
 	// Check multi content
 	var wg sync.WaitGroup
 	numWorkers := 0
-	if text != "" {
+	if parseResult.Text != "" {
 		numWorkers += 1
 	}
-	numWorkers += len(imageURLs)
+	numWorkers += len(parseResult.OssImageInfoList)
 	errChan := make(chan error, numWorkers)
 
 	// Check text content
-	if text != "" {
+	if parseResult.Text != "" {
 		wg.Add(1)
 		c.runCheckInGoroutine(ctx, &wg, errChan, func(ctx context.Context) (bool, error) {
-			return c.CheckText(ctx, string(sensitive.ScenarioCommentDetection), text)
+			return c.CheckText(ctx, string(sensitive.ScenarioCommentDetection), parseResult.Text)
 		})
 	}
 
 	// Check image URLs
-	for _, url := range imageURLs {
+	for _, ossImageInfo := range parseResult.OssImageInfoList {
 		wg.Add(1)
 		c.runCheckInGoroutine(ctx, &wg, errChan, func(ctx context.Context) (bool, error) {
-			return c.CheckImage(ctx, string(sensitive.ScenarioImageCommentCheck), ossBucketName, url)
+			return c.CheckImage(ctx, string(sensitive.ScenarioImagePostImageCheck), ossImageInfo.BucketName, ossImageInfo.ObjectName)
 		})
 	}
 
@@ -222,25 +233,6 @@ func (c *sensitiveComponentNoOpImpl) CheckRequestV2(ctx context.Context, req typ
 	return true, nil
 }
 
-func (c *sensitiveComponentNoOpImpl) CheckMarkdownContent(ctx context.Context, content, ossBucketName string) (bool, error) {
+func (c *sensitiveComponentNoOpImpl) CheckMarkdownContent(ctx context.Context, content string) (bool, error) {
 	return true, nil
-}
-
-// parseMarkdownContent parses markdown content to extract text and image URLs.
-func parseMarkdownContent(content string) (string, []string) {
-	// Regex to find markdown image syntax: ![alt text](image_url)
-	re := regexp.MustCompile(`!\[[^\]]*\]\(([^)]+)\)`)
-	matches := re.FindAllStringSubmatch(content, -1)
-
-	var imageURLs []string
-	for _, match := range matches {
-		if len(match) > 1 {
-			imageURLs = append(imageURLs, match[1])
-		}
-	}
-
-	// Remove image markdown from content to get pure text
-	text := re.ReplaceAllString(content, "")
-
-	return text, imageURLs
 }

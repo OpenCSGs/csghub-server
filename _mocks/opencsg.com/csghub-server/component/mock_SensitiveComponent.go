@@ -22,9 +22,9 @@ func (_m *MockSensitiveComponent) EXPECT() *MockSensitiveComponent_Expecter {
 	return &MockSensitiveComponent_Expecter{mock: &_m.Mock}
 }
 
-// CheckMarkdownContent provides a mock function with given fields: ctx, content, ossBucketName
-func (_m *MockSensitiveComponent) CheckMarkdownContent(ctx context.Context, content string, ossBucketName string) (bool, error) {
-	ret := _m.Called(ctx, content, ossBucketName)
+// CheckMarkdownContent provides a mock function with given fields: ctx, content
+func (_m *MockSensitiveComponent) CheckMarkdownContent(ctx context.Context, content string) (bool, error) {
+	ret := _m.Called(ctx, content)
 
 	if len(ret) == 0 {
 		panic("no return value specified for CheckMarkdownContent")
@@ -32,16 +32,16 @@ func (_m *MockSensitiveComponent) CheckMarkdownContent(ctx context.Context, cont
 
 	var r0 bool
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, string) (bool, error)); ok {
-		return rf(ctx, content, ossBucketName)
+	if rf, ok := ret.Get(0).(func(context.Context, string) (bool, error)); ok {
+		return rf(ctx, content)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, string, string) bool); ok {
-		r0 = rf(ctx, content, ossBucketName)
+	if rf, ok := ret.Get(0).(func(context.Context, string) bool); ok {
+		r0 = rf(ctx, content)
 	} else {
 		r0 = ret.Get(0).(bool)
 	}
-	if rf, ok := ret.Get(1).(func(context.Context, string, string) error); ok {
-		r1 = rf(ctx, content, ossBucketName)
+	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
+		r1 = rf(ctx, content)
 	} else {
 		r1 = ret.Error(1)
 	}
