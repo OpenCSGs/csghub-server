@@ -1,7 +1,6 @@
 package markdownparser
 
 import (
-	"bytes"
 	"errors"
 	"fmt"
 	"path"
@@ -76,23 +75,21 @@ func (o *ossParserComponentImpl) ParseOSSUrl(url string) (*OSSImageInfo, error) 
 
 // IsWhitelistedImage checks if the image is in the whitelist
 func (o *ossParserComponentImpl) IsWhitelistedImage(imgNode *ast.Image, source []byte) bool {
-	// 1. Try to get extension from URL
-	urlExt := strings.ToLower(path.Ext(string(imgNode.Destination)))
+	urlStr := string(imgNode.Destination)
+	urlExt := strings.ToLower(path.Ext(urlStr))
 	if o.whitelistedExtensions[urlExt] {
 		return true
 	}
 
-	// 2. If URL doesn't have a valid extension, try to get from alt text
-	// Directly get the text content of the Image node
-	var altText string
-	if len(imgNode.Text(source)) > 0 {
-		altText = string(imgNode.Text(source))
-	} else {
-		// If Text method returns empty, try to use other ways to get alt text
-		// This may need to be adjusted according to the implementation of the goldmark library
-		altText = string(imgNode.Title)
+	// 如果是OSS链接且无扩展名，也视为白名单图片
+	if o.ossUrlRegex.MatchString(urlStr) && urlExt == "" {
+		return true
 	}
 
+	var altText string
+	if len(imgNode.Title) > 0 {
+		altText = string(imgNode.Title)
+	}
 	altExt := strings.ToLower(path.Ext(altText))
 	if o.whitelistedExtensions[altExt] {
 		return true
@@ -112,45 +109,49 @@ func (o *ossParserComponentImpl) ParseMarkdownAndFilter(markdownContent string) 
 	root := p.Parse(text.NewReader(source))
 
 	OssImageInfoList := []*OSSImageInfo{}
-	var finalResultBuilder strings.Builder
 
-	for blockNode := root.FirstChild(); blockNode != nil; blockNode = blockNode.NextSibling() {
-		var blockContentBuilder bytes.Buffer
+	// 用于记录需要从文本中移除的图片URL
+	var removeImageUrls []string
 
-		for inlineNode := blockNode.FirstChild(); inlineNode != nil; inlineNode = inlineNode.NextSibling() {
-			img, isImage := inlineNode.(*ast.Image)
-			if !isImage {
-				blockContentBuilder.Write(inlineNode.Text(source))
-				continue
-			}
+	err := ast.Walk(root, func(node ast.Node, entering bool) (ast.WalkStatus, error) {
+		if !entering {
+			return ast.WalkContinue, nil
+		}
 
-			// Process image node
-			blockContentBuilder.Write(img.Text(source))
-
-			// Check if it's a whitelisted image
-			if o.IsWhitelistedImage(img, source) {
-				// Check if it's an OSS image
-				if o.ossUrlRegex.MatchString(string(img.Destination)) {
-					if info, err := o.ParseOSSUrl(string(img.Destination)); err == nil {
-						OssImageInfoList = append(OssImageInfoList, info)
-					}
+		if img, isImage := node.(*ast.Image); isImage {
+			urlStr := string(img.Destination)
+			if o.IsWhitelistedImage(img, source) && o.ossUrlRegex.MatchString(urlStr) {
+				if info, err := o.ParseOSSUrl(urlStr); err == nil {
+					OssImageInfoList = append(OssImageInfoList, info)
+					// 记录需要移除的图片URL
+					removeImageUrls = append(removeImageUrls, urlStr)
 				}
 			}
 		}
+		return ast.WalkContinue, nil
+	})
 
-		finalResultBuilder.Write(blockContentBuilder.Bytes())
-
-		if next := blockNode.NextSibling(); next != nil {
-			startOfNext := next.Lines().At(0).Start
-			endOfCurrent := blockNode.Lines().At(blockNode.Lines().Len() - 1).Stop
-			if startOfNext > endOfCurrent {
-				finalResultBuilder.Write(source[endOfCurrent:startOfNext])
-			}
-		}
+	if err != nil {
+		return nil, fmt.Errorf("failed to walk AST: %w", err)
 	}
 
+	// 使用正则表达式移除图片的 Markdown 语法
+	filteredText := markdownContent
+	for _, imageUrl := range removeImageUrls {
+		// 转义特殊字符以用于正则表达式
+		escapedUrl := regexp.QuoteMeta(imageUrl)
+		// 匹配图片的 Markdown 语法: ![alt text](url) 或 ![alt text](url "title")
+		imagePattern := fmt.Sprintf(`!\[[^\]]*\]\(%s(?:\s+"[^"]*")?\)`, escapedUrl)
+		imageRegex := regexp.MustCompile(imagePattern)
+		filteredText = imageRegex.ReplaceAllString(filteredText, "")
+	}
+
+	// 清理多余的空行
+	filteredText = regexp.MustCompile(`\n\s*\n`).ReplaceAllString(filteredText, "\n")
+	filteredText = strings.TrimSpace(filteredText)
+
 	return &ParseResult{
-		Text:             finalResultBuilder.String(),
+		Text:             filteredText,
 		OssImageInfoList: OssImageInfoList,
 	}, nil
 }
